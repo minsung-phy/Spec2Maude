@@ -4,7 +4,7 @@
   <strong> WebAssembly(Wasm) 명세 언어 SpecTec의 AST를 Maude 정형 모델로 자동 변환하는 시스템
 </div>
 
-<br><br> <div align="right">
+<br> <div align="right">
   <strong>포항공과대학교 SVLab 이민성</strong><br>
   <strong>2026.02.24</strong>
 </div>
