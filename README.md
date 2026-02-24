@@ -4,7 +4,7 @@
   <strong> WebAssembly(Wasm) 명세 언어 SpecTec의 AST를 Maude 정형 모델로 자동 변환하는 시스템
 </div>
 
-<div align="right">
+<br><br> <div align="right">
   <strong>포항공과대학교 SVLab 이민성</strong><br>
   <strong>2026.02.24</strong>
 </div>
@@ -83,7 +83,7 @@ dune exec ./main.exe -- wasm-3.0/* > output.maude
 상세 매핑 규칙은 [ARCHITECTURE.md](https://github.com/minsung-phy/spectec/blob/main/spectec/src/maude_translator/document/ARCHITECTURE.md)에 기술되어 있으며, 주요 변환 특징은 다음과 같습니다.
 
 * **TypD**: 합집합 타입(Union Types) 처리를 위한 **검증 권한 위임(ceq)** 로직 구현.
-* **DecD**: 함수의 개별 Clause를 Maude의 **패턴 매칭 등식(eq)**으로 직렬화.
+* **DecD**: 함수의 개별 Clause를 Maude의 패턴 매칭 등식(eq)으로 직렬화.
 * **IfPr**: $uN(N)$ 등 파라미터화된 타입의 수치 범위($0 \le i < 2^N$)를 **산술 조건문**으로 매핑.
 
 ---
