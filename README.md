@@ -31,7 +31,7 @@
 │   └── pretype.maude      <-- Wasm 타입 시스템 구동을 위한 기초 Maude 환경
 ├── data/
 │   └── *.ast              <-- 번역의 근거가 되는 SpecTec Raw AST 데이터
-├── wasm-3.0-translator/
+├── wasm-3.0/
 │   └── *.spectec          <-- 입력값으로 사용되는 원본 Wasm 명세 파일
 ├── output/
 │   └── *.maude            <-- 번역기를 통해 생성된 최종 Maude 코드
@@ -70,7 +70,7 @@
 
 ```bash
 # 전체 SpecTec 명세를 Maude 코드로 변환
-dune exec ./main.exe -- wasm-3.0-translator/* > output.maude
+dune exec ./main.exe -- wasm-3.0/* > output.maude
 ```
 
 ---
