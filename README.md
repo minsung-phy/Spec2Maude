@@ -31,6 +31,9 @@
 │   └── pretype.maude      <-- Wasm 타입 시스템 구동을 위한 기초 Maude 환경
 ├── data/
 │   └── *.ast              <-- 번역의 근거가 되는 SpecTec Raw AST 데이터
+│   └── *.maude            <-- Spectec 명세를 손으로 직접 Maude로 번역한 코드
+├── lib/
+│   └── *                  <-- Spectec의 라이브러리들
 ├── wasm-3.0/
 │   └── *.spectec          <-- 입력값으로 사용되는 원본 Wasm 명세 파일
 ├── output/
