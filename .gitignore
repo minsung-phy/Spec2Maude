@@ -1,0 +1,15 @@
+# 1. 빌드 결과물 제외
+_build/
+
+# 2. OCaml/Dune 관련 임시 파일
+*.install
+*.exe
+*.bc
+*.out
+
+# 3. 에디터 및 OS 관련 잡다한 파일
+.DS_Store
+.vscode/
+*.swp
+*~
+.merlin

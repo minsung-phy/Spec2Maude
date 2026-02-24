@@ -1,0 +1,84 @@
+load 1-1-syntax-values
+
+mod 1_2_SYNTAX_TYPES is
+  inc 1_1_SYNTAX_VALUES .
+
+  var X : WasmTerminal .
+  --- VALUE TYPES
+  op null : -> WasmType .
+  op NULL : -> WasmTerminal .
+  eq typecheck(NULL, null) = true .
+
+  op addrtype : -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, addrtype) = true .
+
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, addrtype) = true .
+
+
+  op numtype : -> WasmType .
+  op I32 : -> WasmTerminal .
+  op I64 : -> WasmTerminal .
+  op F32 : -> WasmTerminal .
+  op F64 : -> WasmTerminal .
+
+  eq typecheck(I32, numtype) = true .
+  eq typecheck(I64, numtype) = true .
+  eq typecheck(F32, numtype) = true .
+  eq typecheck(F64, numtype) = true .
+
+  op deftype : -> WasmType .
+  op TEMPDEFTYPE : -> WasmTerminal .
+  eq typecheck(TEMPDEFTYPE, deftype) = true .
+
+  ---! TEMP
+  op FUNC _ -> _ : WasmTerminals WasmTerminals -> WasmTerminal .
+  
+
+
+
+
+  --- if typecheck(DEFTYPE*_MODULEINST, ) /\ DEFTYPE*_MODULEINST = eps .
+
+
+  op typeuse : -> WasmType .
+  var TYPEIDX_TYPEUSE : WasmTerminal .
+  op -IDX _ : WasmTerminal -> WasmTerminal .
+  eq typecheck(-IDX TYPEIDX_TYPEUSE, typeuse) = true .
+  eq typecheck(X, typeuse) = typecheck(X, deftype) .
+
+  var NAT_TYPEUSE : WasmTerminal .
+  op REC _ : WasmTerminal -> WasmTerminal .
+  eq typecheck(REC NAT_TYPEUSE, typeuse) = true .
+
+  
+  --- (def $size) 
+  op $size : WasmTerminal -> WasmTerminal .
+  var VARNUMTYPE : WasmTerminal . --- numtype
+  eq $size(I32) = 32 .
+  eq $size(I64) = 64 .
+  eq $size(F32) = 32 .
+  eq $size(F64) = 64 .
+
+  --- (def $sizenn) 
+  op $sizenn : WasmTerminal -> WasmTerminal .
+  var NT : WasmTerminal . --- numtype
+  eq $sizenn(NT) = $size(NT) .
+
+
+  --- (typ Inn)
+  op Inn : -> WasmType .
+  op I32 : -> WasmTerminal .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I32, Inn) = true .
+  eq typecheck(I64, Inn) = true .
+
+
+  op valtype : -> WasmType .
+  var VALTYPE : WasmTerminals .
+
+  ceq typecheck(VALTYPE, valtype) = true
+  if typecheck(VALTYPE, numtype) .
+  
+endm 

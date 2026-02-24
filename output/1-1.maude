@@ -1,0 +1,119 @@
+load dsl/pretype 
+
+mod 1_1_SYNTAX_VALUES is
+  inc DSL-TERM .
+  inc DSL-PRETYPE .
+  inc DSL-EXEC .
+
+  subsort Int < WasmTerminal .
+  subsort Nat < WasmTerminal .
+
+  op nat : -> WasmType . 
+  var i : Int .
+  var N1 N2 N3 N4 N5 N6 : Nat .
+  var T : WasmTerminal .
+
+  op N :  -> WasmType .
+  eq typecheck(T, N) = typecheck(T, nat) .
+  op M :  -> WasmType .
+  eq typecheck(T, M) = typecheck(T, nat) .
+  op K :  -> WasmType .
+  eq typecheck(T, K) = typecheck(T, nat) .
+  op n :  -> WasmType .
+  eq typecheck(T, n) = typecheck(T, nat) .
+  op m :  -> WasmType .
+  eq typecheck(T, m) = typecheck(T, nat) .
+  op min : WasmTerminal WasmTerminal -> WasmType .
+  ceq typecheck(i, min(N1, N2)) = true if i <= j .
+  eq typecheck(i, min(N1, N2)) = true .
+  op sum : WasmTerminal -> WasmType .
+  eq typecheck(i, sum(N1)) = true .
+  eq typecheck(i, sum(N1)) = true .
+  op prod : WasmTerminal -> WasmType .
+  eq typecheck(i, prod(N1)) = true .
+  eq typecheck(i, prod(N1)) = true .
+  op opt_ : WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, opt_(N1, N2)) = true .
+  eq typecheck(i, opt_(N1, N2)) = true .
+  op concat_ : WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, concat_(N1, N2)) = true .
+  eq typecheck(i, concat_(N1, N2)) = true .
+  op concatn_ : WasmTerminal WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, concatn_(N1, N2, N3)) = true .
+  eq typecheck(i, concatn_(N1, N2, N3)) = true .
+  op concatopt_ : WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, concatopt_(N1, N2)) = true .
+  eq typecheck(i, concatopt_(N1, N2)) = true .
+  op inv_concat_ : WasmTerminal WasmTerminal -> WasmType .
+
+  op inv_concatn_ : WasmTerminal WasmTerminal WasmTerminal -> WasmType .
+
+  op disjoint_ : WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, disjoint_(N1, N2)) = true .
+  eq typecheck(i, disjoint_(N1, N2)) = true .
+  op setminus1_ : WasmTerminal WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, setminus1_(N1, N2, N3)) = true .
+  ceq typecheck(i, setminus1_(N1, N2, N3)) = true if w == w_1 .
+  eq typecheck(i, setminus1_(N1, N2, N3)) = true .
+  op setminus_ : WasmTerminal WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, setminus_(N1, N2, N3)) = true .
+  eq typecheck(i, setminus_(N1, N2, N3)) = true .
+  op setproduct2_ : WasmTerminal WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, setproduct2_(N1, N2, N3)) = true .
+  eq typecheck(i, setproduct2_(N1, N2, N3)) = true .
+  op setproduct1_ : WasmTerminal WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, setproduct1_(N1, N2, N3)) = true .
+  eq typecheck(i, setproduct1_(N1, N2, N3)) = true .
+  op setproduct_ : WasmTerminal WasmTerminal -> WasmType .
+  eq typecheck(i, setproduct_(N1, N2)) = true .
+  eq typecheck(i, setproduct_(N1, N2)) = true .
+  op ND :  -> WasmType .
+
+  op uN : WasmTerminal -> WasmType .
+  ceq typecheck(i, uN(N1)) = true if (i >= 0 /\ i <= ((2 ^ N1) - 1)) .
+  op sN : WasmTerminal -> WasmType .
+  ceq typecheck(i, sN(N1)) = true if (((i >= -((2 ^ (N1 - 1))) /\ i <= -(1)) or i == 0) or (i >= +(1) /\ i <= (+((2 ^ (N1 - 1))) - 1))) .
+  op iN : WasmTerminal -> WasmType .
+  eq typecheck(T, iN(N1)) = typecheck(T, uN(N1)) .
+  op u8 :  -> WasmType .
+  eq typecheck(T, u8) = typecheck(T, uN(8)) .
+  op u16 :  -> WasmType .
+  eq typecheck(T, u16) = typecheck(T, uN(16)) .
+  op u31 :  -> WasmType .
+  eq typecheck(T, u31) = typecheck(T, uN(31)) .
+  op u32 :  -> WasmType .
+  eq typecheck(T, u32) = typecheck(T, uN(32)) .
+  op u64 :  -> WasmType .
+  eq typecheck(T, u64) = typecheck(T, uN(64)) .
+  op u128 :  -> WasmType .
+  eq typecheck(T, u128) = typecheck(T, uN(128)) .
+  op s33 :  -> WasmType .
+  eq typecheck(T, s33) = typecheck(T, sN(33)) .
+  op idx :  -> WasmType .
+  eq typecheck(T, idx) = typecheck(T, u32) .
+  op laneidx :  -> WasmType .
+  eq typecheck(T, laneidx) = typecheck(T, u8) .
+  op typeidx :  -> WasmType .
+  eq typecheck(T, typeidx) = typecheck(T, idx) .
+  op funcidx :  -> WasmType .
+  eq typecheck(T, funcidx) = typecheck(T, idx) .
+  op globalidx :  -> WasmType .
+  eq typecheck(T, globalidx) = typecheck(T, idx) .
+  op tableidx :  -> WasmType .
+  eq typecheck(T, tableidx) = typecheck(T, idx) .
+  op memidx :  -> WasmType .
+  eq typecheck(T, memidx) = typecheck(T, idx) .
+  op tagidx :  -> WasmType .
+  eq typecheck(T, tagidx) = typecheck(T, idx) .
+  op elemidx :  -> WasmType .
+  eq typecheck(T, elemidx) = typecheck(T, idx) .
+  op dataidx :  -> WasmType .
+  eq typecheck(T, dataidx) = typecheck(T, idx) .
+  op labelidx :  -> WasmType .
+  eq typecheck(T, labelidx) = typecheck(T, idx) .
+  op localidx :  -> WasmType .
+  eq typecheck(T, localidx) = typecheck(T, idx) .
+  op fieldidx :  -> WasmType .
+  eq typecheck(T, fieldidx) = typecheck(T, idx) .
+
+endm

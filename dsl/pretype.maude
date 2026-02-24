@@ -1,0 +1,127 @@
+mod DSL-TERM is 
+  sort WasmTerminal .
+  sort WasmType .
+endm
+
+mod DSL-PRETYPE is
+  inc DSL-TERM .
+  inc NAT .
+  inc INT .
+  inc BOOL .
+  sort WasmTerminals .
+  sort WasmTypes .
+
+  subsort WasmTerminal < WasmTerminals .
+  subsort WasmType < WasmTypes . 
+  op eps : -> WasmTerminals .
+  op _ _ : WasmTerminals WasmTerminals -> WasmTerminals [ctor assoc id: eps] .
+
+  op len : WasmTerminals -> Nat .
+  var W : WasmTerminal .
+  var WTS : WasmTerminals .
+
+  eq len(eps) = 0 .
+  eq len(W WTS) = 1 + len(WTS) .
+  op typecheck : WasmTerminal WasmType -> Bool .
+  op typecheck : WasmTerminals WasmType -> Bool .
+  
+  var T : WasmTerminal .
+  var TS : WasmTerminals .
+  var WT : WasmType .
+  
+  eq typecheck(eps, WT) = true .
+  ceq typecheck(T TS, WT) = typecheck(TS, WT) if TS =/= eps /\ typecheck(T, WT) .
+  op typecheck : WasmTerminals WasmTypes -> Bool . 
+
+  var N' : Nat .
+  op index : WasmTerminals Nat -> WasmTerminal .
+  eq index(T TS, 0) = T .
+  eq index(T TS, s(N')) = index(TS, N') .
+  
+endm
+
+
+mod DSL-RECORD is 
+  inc DSL-PRETYPE .
+  inc QID .
+  sort RecordItem .
+  sort RecordItems .
+  subsort RecordItem < RecordItems . 
+
+  op EMPTY : -> RecordItem .
+  op _;_ : RecordItems RecordItems -> RecordItems [ctor assoc id: EMPTY].
+  op {_} : RecordItems -> WasmTerminal .
+
+  op item : Qid WasmTerminals -> RecordItem .
+
+
+  op value : Qid WasmTerminal -> WasmTerminal .
+  op value : Qid RecordItems -> WasmTerminals .
+  vars RI RI' : RecordItems . var R : RecordItem .
+  vars F F' : Qid .
+  var REC : WasmTerminal .
+  vars V V' : WasmTerminals . 
+
+  op _++_ : RecordItems RecordItems -> WasmTerminal .
+  eq RI ++ RI' = {RI ; RI'} .
+
+  op _[._<-_] : WasmTerminal Qid WasmTerminals -> WasmTerminal . 
+  op _[._<-_] : RecordItems Qid WasmTerminals -> WasmTerminal . --- 내가 추가한 것
+  eq {item(F, V) ; RI} [. F <- V'] = {item(F, V') ; RI} .
+  ceq {item(F, V) ; RI} [. F' <- V'] = item(F, V) ++ RI[. F' <- V'] if F =/= F' .
+  
+  --- 나의 생각 : ++ RI[. F' <- V']에서 RI는 RecordsItems인데 이는 틀렸다고 생각함.
+  --- 왜 ? op _[._<-_] : WasmTerminal Qid WasmTerminals -> WasmTerminal . 에서 왼쪽 타입이 WasmTerminal이라고 되어있음.
+  --- 그래서 다음과 같은 op를 하나 더 추가해야한다고 생각함.
+  --- op _[._<-_] : RecordItems Qid WasmTerminals -> WasmTerminal .
+
+  eq value(F,{RI}) = value(F, RI) .
+  eq value(F, EMPTY) = eps . 
+  eq value(F, item(F, V) ; RI) = V .
+  ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .
+
+  op _[_<-_] : WasmTerminals Nat WasmTerminal -> WasmTerminals [prec 50] .
+
+  var H : WasmTerminal .
+  vars L : WasmTerminals .
+  vars IDX : Nat .
+  vars VALUE NEWVALUE : WasmTerminal .
+
+  eq eps [ IDX <- NEWVALUE ] = eps .
+  eq (H L) [ 0 <- NEWVALUE ] = NEWVALUE L .
+  eq (H L) [ s(IDX) <- NEWVALUE ] = H (L [ IDX <- NEWVALUE ]) .
+
+
+endm
+
+
+mod DSL-EXEC is 
+  inc DSL-RECORD .
+  --- TODO: Implement the step rule for STEP relation .
+  sort Env .
+  sort Stage .
+  sort Context .
+  sort InstrsContext .
+
+  sort LabelContext LabelContexts .
+  subsort LabelContext < LabelContexts .
+  sorts FrameContext FrameContexts .
+  subsort FrameContext < FrameContexts .
+
+  op _::_ : Context Stage -> Env .
+  op stage:_ : WasmTerminals -> Stage [format (b o d)].
+  op context: _ /_ : LabelContexts FrameContexts -> Context [format (r o d d d)] .
+  
+  op _`[`]_ : WasmTerminals WasmTerminals -> InstrsContext .
+
+  op emptylabel : -> LabelContexts .
+  op _@_ : LabelContexts LabelContexts -> LabelContexts [ctor id: emptylabel].
+  op label : WasmTerminals InstrsContext Nat -> LabelContexts .
+
+  op emptyframe : -> FrameContexts .
+  op _#_ : FrameContexts FrameContexts -> FrameContexts [ctor id: emptyframe].
+  op frame : WasmTerminals InstrsContext Nat -> FrameContext .
+  
+
+endm 
+

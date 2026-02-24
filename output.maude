@@ -1,0 +1,1411 @@
+load dsl/pretype 
+
+load 1-1 
+
+mod 1_2_SYNTAX_VALUES is
+  inc DSL-TERM .
+  inc DSL-PRETYPE .
+  inc DSL-EXEC .
+
+  inc 1_1_SYNTAX_VALUES .
+
+  subsort Int < WasmTerminal .
+  subsort Nat < WasmTerminal .
+
+  op nat : -> WasmType . 
+  var i : Int .
+  var T : WasmTerminal .
+
+  op N :  -> WasmType .
+  eq typecheck(T, N) = typecheck(T, WasmType) .
+  op M :  -> WasmType .
+  eq typecheck(T, M) = typecheck(T, WasmType) .
+  op K :  -> WasmType .
+  eq typecheck(T, K) = typecheck(T, WasmType) .
+  op n :  -> WasmType .
+  eq typecheck(T, n) = typecheck(T, WasmType) .
+  op m :  -> WasmType .
+  eq typecheck(T, m) = typecheck(T, WasmType) .
+
+  op $min : WasmTerminal WasmTerminal -> WasmTerminal .
+  var NAT : WasmTerminal .
+  var NAT : WasmTerminal .
+  var I : WasmTerminal .
+  eq $min(I) = I .
+  var I : WasmTerminal .
+  eq $min(I) = J .
+
+
+  op $sum : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq sum(0) = 0 .
+  eq sum(0) = (N + sum(0)) .
+
+
+  op $prod : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq prod(0) = 1 .
+  eq prod(0) = (N * prod(0)) .
+
+
+  op $opt_ : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq opt_(UNKNOWN) = 0 .
+  eq opt_(UNKNOWN) = 0 .
+
+
+  op $concat_ : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq concat_(UNKNOWN) = 0 .
+  eq concat_(UNKNOWN) = 0 .
+
+
+  op $concatn_ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  var NAT : WasmTerminal .
+  eq concatn_(UNKNOWN) = 0 .
+  eq concatn_(UNKNOWN) = 0 .
+
+
+  op $concatopt_ : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq concatopt_(UNKNOWN) = 0 .
+  eq concatopt_(UNKNOWN) = 0 .
+
+
+  op $inv_concat_ : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+
+
+
+  op $inv_concatn_ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var NAT : WasmTerminal .
+  var _ : WasmTerminal .
+
+
+
+  op $disjoint_ : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq disjoint_(UNKNOWN) = 0 .
+  eq disjoint_(UNKNOWN) = (not (0) /\ disjoint_(X, 0)) .
+
+
+  op $setminus1_ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var X : WasmTerminal .
+  var _ : WasmTerminal .
+  eq setminus1_(UNKNOWN) = 0 .
+  eq setminus1_(UNKNOWN) = 0 .
+  eq setminus1_(UNKNOWN) = setminus1_(X, W, 0) .
+
+
+  op $setminus_ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq setminus_(UNKNOWN) = 0 .
+  eq setminus_(UNKNOWN) = 0 .
+
+
+  op $setproduct2_ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var X : WasmTerminal .
+  var _ : WasmTerminal .
+  eq setproduct2_(UNKNOWN) = 0 .
+  eq setproduct2_(UNKNOWN) = 0 .
+
+
+  op $setproduct1_ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq setproduct1_(UNKNOWN) = 0 .
+  eq setproduct1_(UNKNOWN) = 0 .
+
+
+  op $setproduct_ : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq setproduct_(UNKNOWN) = 0 .
+  eq setproduct_(UNKNOWN) = setproduct1_(X, 0, setproduct_(X, 0)) .
+
+
+  op $ND :  -> WasmTerminal .
+
+
+  op bit :  -> WasmType .
+  ceq typecheck(i, bit(N_BIT)) = true 
+   if typecheck(N_BIT, N) /\ ((i == 0) \/ (i == 1)) .
+  op byte :  -> WasmType .
+  ceq typecheck(i, byte(N_BYTE)) = true 
+   if typecheck(N_BYTE, N) /\ ((i >= 0) /\ (i <= 255)) .
+  op uN : WasmTerminal -> WasmType .
+  var N_UN : Nat .
+  ceq typecheck(i, uN(N_UN)) = true 
+   if typecheck(N_UN, N) /\ ((i >= 0) /\ (i <= ((2 ^ N_UN) - 1))) .
+  op sN : WasmTerminal -> WasmType .
+  var N_SN : Nat .
+  ceq typecheck(i, sN(N_SN)) = true 
+   if typecheck(N_SN, N) /\ ((((i >= -((2 ^ (N_SN - 1)))) /\ (i <= -(1))) \/ (i == 0)) \/ ((i >= +(1)) /\ (i <= (+((2 ^ (N_SN - 1))) - 1)))) .
+  op iN : WasmTerminal -> WasmType .
+  var N_IN : Nat .
+  eq typecheck(T, iN(N_IN)) = typecheck(T, uN(N_IN)) .
+  op u8 :  -> WasmType .
+  eq typecheck(T, u8) = typecheck(T, uN(8)) .
+  op u16 :  -> WasmType .
+  eq typecheck(T, u16) = typecheck(T, uN(16)) .
+  op u31 :  -> WasmType .
+  eq typecheck(T, u31) = typecheck(T, uN(31)) .
+  op u32 :  -> WasmType .
+  eq typecheck(T, u32) = typecheck(T, uN(32)) .
+  op u64 :  -> WasmType .
+  eq typecheck(T, u64) = typecheck(T, uN(64)) .
+  op s33 :  -> WasmType .
+  eq typecheck(T, s33) = typecheck(T, sN(33)) .
+  op i32 :  -> WasmType .
+  eq typecheck(T, i32) = typecheck(T, iN(32)) .
+  op i64 :  -> WasmType .
+  eq typecheck(T, i64) = typecheck(T, iN(64)) .
+  op i128 :  -> WasmType .
+  eq typecheck(T, i128) = typecheck(T, iN(128)) .
+
+  op $signif : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  eq signif(32) = 23 .
+  eq signif(64) = 52 .
+
+
+  op $expon : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  eq expon(32) = 8 .
+  eq expon(64) = 11 .
+
+
+  op $M : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  var N : WasmTerminal .
+  eq $M(N) = signif(N) .
+
+
+  op $E : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  var N : WasmTerminal .
+  eq $E(N) = expon(N) .
+
+  op exp :  -> WasmType .
+  eq typecheck(T, exp) = typecheck(T, WasmType) .
+  op fNmag : WasmTerminal -> WasmType .
+  var N_FNMAG : Nat .
+  ceq typecheck(i, fNmag(N_FNMAG)) = true 
+   if typecheck(N_FNMAG, N) /\ ((M < (2 ^ M(N_FNMAG))) /\ (((2 - (2 ^ (E(N_FNMAG) - 1))) <= EXP) /\ (EXP <= ((2 ^ (E(N_FNMAG) - 1)) - 1)))) .
+  ceq typecheck(i, fNmag(N_FNMAG)) = true 
+   if typecheck(N_FNMAG, N) /\ ((M < (2 ^ M(N_FNMAG))) /\ ((2 - (2 ^ (E(N_FNMAG) - 1))) == EXP)) .
+  op INF : -> WasmTerminal .
+  eq typecheck(INF, fNmag) = true .
+  ceq typecheck(i, fNmag(N_FNMAG)) = true 
+   if typecheck(N_FNMAG, N) /\ ((1 <= M) /\ (M < (2 ^ M(N_FNMAG)))) .
+  op fN : WasmTerminal -> WasmType .
+  var N_FN : Nat .
+  op POS _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(POS X0, fN) = true .
+  op NEG _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(NEG X0, fN) = true .
+  op f32 :  -> WasmType .
+  eq typecheck(T, f32) = typecheck(T, fN(32)) .
+  op f64 :  -> WasmType .
+  eq typecheck(T, f64) = typecheck(T, fN(64)) .
+
+  op $fzero : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  var N : WasmTerminal .
+  eq $fzero(N) = POS .
+
+
+  op $fnat : WasmTerminal WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  var NAT : WasmTerminal .
+  var N : WasmTerminal .
+  eq $fnat(N) = POS .
+
+
+  op $fone : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  var N : WasmTerminal .
+  eq $fone(N) = POS .
+
+
+  op $canon_ : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  var N : WasmTerminal .
+  eq $canon_(N) = (2 ^ (signif(N) - 1)) .
+
+  op vN : WasmTerminal -> WasmType .
+  var N_VN : Nat .
+  eq typecheck(T, vN(N_VN)) = typecheck(T, uN(N_VN)) .
+  op v128 :  -> WasmType .
+  eq typecheck(T, v128) = typecheck(T, vN(128)) .
+  op list : WasmTerminal -> WasmType .
+  var N_LIST : Nat .
+  ceq typecheck(i, list(N_LIST)) = true 
+   if typecheck(N_LIST, N) /\ (0 < (2 ^ 32)) .
+  op char :  -> WasmType .
+  ceq typecheck(i, char(N_CHAR)) = true 
+   if typecheck(N_CHAR, N) /\ (((i >= 0) /\ (i <= 55295)) \/ ((i >= 57344) /\ (i <= 1114111))) .
+
+  op $utf8 : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+
+
+  op name :  -> WasmType .
+  ceq typecheck(i, name(N_NAME)) = true 
+   if typecheck(N_NAME, N) /\ (0 < (2 ^ 32)) .
+  op idx :  -> WasmType .
+  eq typecheck(T, idx) = typecheck(T, u32) .
+  op laneidx :  -> WasmType .
+  eq typecheck(T, laneidx) = typecheck(T, u8) .
+  op typeidx :  -> WasmType .
+  eq typecheck(T, typeidx) = typecheck(T, idx) .
+  op funcidx :  -> WasmType .
+  eq typecheck(T, funcidx) = typecheck(T, idx) .
+  op globalidx :  -> WasmType .
+  eq typecheck(T, globalidx) = typecheck(T, idx) .
+  op tableidx :  -> WasmType .
+  eq typecheck(T, tableidx) = typecheck(T, idx) .
+  op memidx :  -> WasmType .
+  eq typecheck(T, memidx) = typecheck(T, idx) .
+  op tagidx :  -> WasmType .
+  eq typecheck(T, tagidx) = typecheck(T, idx) .
+  op elemidx :  -> WasmType .
+  eq typecheck(T, elemidx) = typecheck(T, idx) .
+  op dataidx :  -> WasmType .
+  eq typecheck(T, dataidx) = typecheck(T, idx) .
+  op labelidx :  -> WasmType .
+  eq typecheck(T, labelidx) = typecheck(T, idx) .
+  op localidx :  -> WasmType .
+  eq typecheck(T, localidx) = typecheck(T, idx) .
+  op fieldidx :  -> WasmType .
+  eq typecheck(T, fieldidx) = typecheck(T, idx) .
+  op externidx :  -> WasmType .
+  op FUNC _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(FUNC X0, externidx) = true .
+  op GLOBAL _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(GLOBAL X0, externidx) = true .
+  op TABLE _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(TABLE X0, externidx) = true .
+  op MEM _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(MEM X0, externidx) = true .
+  op TAG _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(TAG X0, externidx) = true .
+
+  op $funcsxx : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq funcsxx(0) = 0 .
+  eq funcsxx(0) = 0 .
+  eq funcsxx(0) = funcsxx(0) .
+
+
+  op $globalsxx : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq globalsxx(0) = 0 .
+  eq globalsxx(0) = 0 .
+  eq globalsxx(0) = globalsxx(0) .
+
+
+  op $tablesxx : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq tablesxx(0) = 0 .
+  eq tablesxx(0) = 0 .
+  eq tablesxx(0) = tablesxx(0) .
+
+
+  op $memsxx : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq memsxx(0) = 0 .
+  eq memsxx(0) = 0 .
+  eq memsxx(0) = memsxx(0) .
+
+
+  op $tagsxx : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq tagsxx(0) = 0 .
+  eq tagsxx(0) = 0 .
+  eq tagsxx(0) = tagsxx(0) .
+
+  op free :  -> WasmType .
+
+
+  op $free_opt : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq free_opt(0) = 0 .
+  eq free_opt(0) = FREE .
+
+
+  op $free_list : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq free_list(0) = 0 .
+  eq free_list(0) = 0 .
+
+
+  op $free_typeidx : WasmTerminal -> WasmTerminal .
+  var TYPEIDX : WasmTerminal .
+  var TYPEIDX : WasmTerminal .
+  eq $free_typeidx(TYPEIDX) = 0 .
+
+
+  op $free_funcidx : WasmTerminal -> WasmTerminal .
+  var FUNCIDX : WasmTerminal .
+  var FUNCIDX : WasmTerminal .
+  eq $free_funcidx(FUNCIDX) = 0 .
+
+
+  op $free_globalidx : WasmTerminal -> WasmTerminal .
+  var GLOBALIDX : WasmTerminal .
+  var GLOBALIDX : WasmTerminal .
+  eq $free_globalidx(GLOBALIDX) = 0 .
+
+
+  op $free_tableidx : WasmTerminal -> WasmTerminal .
+  var TABLEIDX : WasmTerminal .
+  var TABLEIDX : WasmTerminal .
+  eq $free_tableidx(TABLEIDX) = 0 .
+
+
+  op $free_memidx : WasmTerminal -> WasmTerminal .
+  var MEMIDX : WasmTerminal .
+  var MEMIDX : WasmTerminal .
+  eq $free_memidx(MEMIDX) = 0 .
+
+
+  op $free_elemidx : WasmTerminal -> WasmTerminal .
+  var ELEMIDX : WasmTerminal .
+  var ELEMIDX : WasmTerminal .
+  eq $free_elemidx(ELEMIDX) = 0 .
+
+
+  op $free_dataidx : WasmTerminal -> WasmTerminal .
+  var DATAIDX : WasmTerminal .
+  var DATAIDX : WasmTerminal .
+  eq $free_dataidx(DATAIDX) = 0 .
+
+
+  op $free_localidx : WasmTerminal -> WasmTerminal .
+  var LOCALIDX : WasmTerminal .
+  var LOCALIDX : WasmTerminal .
+  eq $free_localidx(LOCALIDX) = 0 .
+
+
+  op $free_labelidx : WasmTerminal -> WasmTerminal .
+  var LABELIDX : WasmTerminal .
+  var LABELIDX : WasmTerminal .
+  eq $free_labelidx(LABELIDX) = 0 .
+
+
+  op $free_externidx : WasmTerminal -> WasmTerminal .
+  var EXTERNIDX : WasmTerminal .
+  eq free_externidx(FUNC) = free_funcidx(FUNCIDX) .
+  eq free_externidx(GLOBAL) = free_globalidx(GLOBALIDX) .
+  eq free_externidx(TABLE) = free_tableidx(TABLEIDX) .
+  eq free_externidx(MEM) = free_memidx(MEMIDX) .
+
+  op null :  -> WasmType .
+  op NULL : -> WasmTerminal .
+  eq typecheck(NULL, null) = true .
+  op addrtype :  -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, addrtype) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, addrtype) = true .
+  op numtype :  -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, numtype) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, numtype) = true .
+  op F32 : -> WasmTerminal .
+  eq typecheck(F32, numtype) = true .
+  op F64 : -> WasmTerminal .
+  eq typecheck(F64, numtype) = true .
+  op vectype :  -> WasmType .
+  op V128 : -> WasmTerminal .
+  eq typecheck(V128, vectype) = true .
+  op consttype :  -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, consttype) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, consttype) = true .
+  op F32 : -> WasmTerminal .
+  eq typecheck(F32, consttype) = true .
+  op F64 : -> WasmTerminal .
+  eq typecheck(F64, consttype) = true .
+  op V128 : -> WasmTerminal .
+  eq typecheck(V128, consttype) = true .
+  op absheaptype :  -> WasmType .
+  op ANY : -> WasmTerminal .
+  eq typecheck(ANY, absheaptype) = true .
+  op EQ : -> WasmTerminal .
+  eq typecheck(EQ, absheaptype) = true .
+  op I31 : -> WasmTerminal .
+  eq typecheck(I31, absheaptype) = true .
+  op STRUCT : -> WasmTerminal .
+  eq typecheck(STRUCT, absheaptype) = true .
+  op ARRAY : -> WasmTerminal .
+  eq typecheck(ARRAY, absheaptype) = true .
+  op NONE : -> WasmTerminal .
+  eq typecheck(NONE, absheaptype) = true .
+  op FUNC : -> WasmTerminal .
+  eq typecheck(FUNC, absheaptype) = true .
+  op NOFUNC : -> WasmTerminal .
+  eq typecheck(NOFUNC, absheaptype) = true .
+  op EXN : -> WasmTerminal .
+  eq typecheck(EXN, absheaptype) = true .
+  op NOEXN : -> WasmTerminal .
+  eq typecheck(NOEXN, absheaptype) = true .
+  op EXTERN : -> WasmTerminal .
+  eq typecheck(EXTERN, absheaptype) = true .
+  op NOEXTERN : -> WasmTerminal .
+  eq typecheck(NOEXTERN, absheaptype) = true .
+  op BOT : -> WasmTerminal .
+  eq typecheck(BOT, absheaptype) = true .
+  op mut :  -> WasmType .
+  op MUT : -> WasmTerminal .
+  eq typecheck(MUT, mut) = true .
+  op final :  -> WasmType .
+  op FINAL : -> WasmTerminal .
+  eq typecheck(FINAL, final) = true .
+  op typeuse :  -> WasmType .
+  op -IDX _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(-IDX X0, typeuse) = true .
+  op -DEF _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(-DEF X0 X1, typeuse) = true .
+  op REC _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(REC X0, typeuse) = true .
+  op heaptype :  -> WasmType .
+  op ANY : -> WasmTerminal .
+  eq typecheck(ANY, heaptype) = true .
+  op EQ : -> WasmTerminal .
+  eq typecheck(EQ, heaptype) = true .
+  op I31 : -> WasmTerminal .
+  eq typecheck(I31, heaptype) = true .
+  op STRUCT : -> WasmTerminal .
+  eq typecheck(STRUCT, heaptype) = true .
+  op ARRAY : -> WasmTerminal .
+  eq typecheck(ARRAY, heaptype) = true .
+  op NONE : -> WasmTerminal .
+  eq typecheck(NONE, heaptype) = true .
+  op FUNC : -> WasmTerminal .
+  eq typecheck(FUNC, heaptype) = true .
+  op NOFUNC : -> WasmTerminal .
+  eq typecheck(NOFUNC, heaptype) = true .
+  op EXN : -> WasmTerminal .
+  eq typecheck(EXN, heaptype) = true .
+  op NOEXN : -> WasmTerminal .
+  eq typecheck(NOEXN, heaptype) = true .
+  op EXTERN : -> WasmTerminal .
+  eq typecheck(EXTERN, heaptype) = true .
+  op NOEXTERN : -> WasmTerminal .
+  eq typecheck(NOEXTERN, heaptype) = true .
+  op BOT : -> WasmTerminal .
+  eq typecheck(BOT, heaptype) = true .
+  op -IDX _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(-IDX X0, heaptype) = true .
+  op REC _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(REC X0, heaptype) = true .
+  op -DEF _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(-DEF X0 X1, heaptype) = true .
+  op valtype :  -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, valtype) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, valtype) = true .
+  op F32 : -> WasmTerminal .
+  eq typecheck(F32, valtype) = true .
+  op F64 : -> WasmTerminal .
+  eq typecheck(F64, valtype) = true .
+  op V128 : -> WasmTerminal .
+  eq typecheck(V128, valtype) = true .
+  op REF _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(REF X0 X1, valtype) = true .
+  op BOT : -> WasmTerminal .
+  eq typecheck(BOT, valtype) = true .
+  op storagetype :  -> WasmType .
+  op BOT : -> WasmTerminal .
+  eq typecheck(BOT, storagetype) = true .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, storagetype) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, storagetype) = true .
+  op F32 : -> WasmTerminal .
+  eq typecheck(F32, storagetype) = true .
+  op F64 : -> WasmTerminal .
+  eq typecheck(F64, storagetype) = true .
+  op V128 : -> WasmTerminal .
+  eq typecheck(V128, storagetype) = true .
+  op REF _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(REF X0 X1, storagetype) = true .
+  op I8 : -> WasmTerminal .
+  eq typecheck(I8, storagetype) = true .
+  op I16 : -> WasmTerminal .
+  eq typecheck(I16, storagetype) = true .
+  op resulttype :  -> WasmType .
+  eq typecheck(T, resulttype) = typecheck(T, list(valtype)) .
+  op fieldtype :  -> WasmType .
+  op UNKNOWN _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(UNKNOWN X0 X1, fieldtype) = true .
+  op comptype :  -> WasmType .
+  op STRUCT _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(STRUCT X0, comptype) = true .
+  op ARRAY _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(ARRAY X0, comptype) = true .
+  op FUNC _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(FUNC X0, comptype) = true .
+  op subtype :  -> WasmType .
+  op SUB _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 X2 : WasmTerminal .
+  eq typecheck(SUB X0 X1 X2, subtype) = true .
+  op rectype :  -> WasmType .
+  op REC _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(REC X0, rectype) = true .
+  op deftype :  -> WasmType .
+  op -DEF _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(-DEF X0 X1, deftype) = true .
+  op typevar :  -> WasmType .
+  op -IDX _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(-IDX X0, typevar) = true .
+  op REC _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(REC X0, typevar) = true .
+  op reftype :  -> WasmType .
+  op REF _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(REF X0 X1, reftype) = true .
+  op Inn :  -> WasmType .
+  eq typecheck(T, Inn) = typecheck(T, addrtype) .
+  op Fnn :  -> WasmType .
+  op F32 : -> WasmTerminal .
+  eq typecheck(F32, Fnn) = true .
+  op F64 : -> WasmTerminal .
+  eq typecheck(F64, Fnn) = true .
+  op Vnn :  -> WasmType .
+  eq typecheck(T, Vnn) = typecheck(T, vectype) .
+  op Cnn :  -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, Cnn) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, Cnn) = true .
+  op F32 : -> WasmTerminal .
+  eq typecheck(F32, Cnn) = true .
+  op F64 : -> WasmTerminal .
+  eq typecheck(F64, Cnn) = true .
+  op V128 : -> WasmTerminal .
+  eq typecheck(V128, Cnn) = true .
+
+  op $ANYREF :  -> WasmTerminal .
+  eq ANYREF = REF .
+
+
+  op $EQREF :  -> WasmTerminal .
+  eq EQREF = REF .
+
+
+  op $I31REF :  -> WasmTerminal .
+  eq I31REF = REF .
+
+
+  op $STRUCTREF :  -> WasmTerminal .
+  eq STRUCTREF = REF .
+
+
+  op $ARRAYREF :  -> WasmTerminal .
+  eq ARRAYREF = REF .
+
+
+  op $FUNCREF :  -> WasmTerminal .
+  eq FUNCREF = REF .
+
+
+  op $EXNREF :  -> WasmTerminal .
+  eq EXNREF = REF .
+
+
+  op $EXTERNREF :  -> WasmTerminal .
+  eq EXTERNREF = REF .
+
+
+  op $NULLREF :  -> WasmTerminal .
+  eq NULLREF = REF .
+
+
+  op $NULLFUNCREF :  -> WasmTerminal .
+  eq NULLFUNCREF = REF .
+
+
+  op $NULLEXNREF :  -> WasmTerminal .
+  eq NULLEXNREF = REF .
+
+
+  op $NULLEXTERNREF :  -> WasmTerminal .
+  eq NULLEXTERNREF = REF .
+
+  op packtype :  -> WasmType .
+  op I8 : -> WasmTerminal .
+  eq typecheck(I8, packtype) = true .
+  op I16 : -> WasmTerminal .
+  eq typecheck(I16, packtype) = true .
+  op lanetype :  -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, lanetype) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, lanetype) = true .
+  op F32 : -> WasmTerminal .
+  eq typecheck(F32, lanetype) = true .
+  op F64 : -> WasmTerminal .
+  eq typecheck(F64, lanetype) = true .
+  op I8 : -> WasmTerminal .
+  eq typecheck(I8, lanetype) = true .
+  op I16 : -> WasmTerminal .
+  eq typecheck(I16, lanetype) = true .
+  op Pnn :  -> WasmType .
+  eq typecheck(T, Pnn) = typecheck(T, packtype) .
+  op Jnn :  -> WasmType .
+  op I32 : -> WasmTerminal .
+  eq typecheck(I32, Jnn) = true .
+  op I64 : -> WasmTerminal .
+  eq typecheck(I64, Jnn) = true .
+  op I8 : -> WasmTerminal .
+  eq typecheck(I8, Jnn) = true .
+  op I16 : -> WasmTerminal .
+  eq typecheck(I16, Jnn) = true .
+  op Lnn :  -> WasmType .
+  eq typecheck(T, Lnn) = typecheck(T, lanetype) .
+  op limits :  -> WasmType .
+  op lbrack _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(lbrack X0, limits) = true .
+  op tagtype :  -> WasmType .
+  eq typecheck(T, tagtype) = typecheck(T, typeuse) .
+  op globaltype :  -> WasmType .
+  op UNKNOWN _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(UNKNOWN X0 X1, globaltype) = true .
+  op memtype :  -> WasmType .
+  op UNKNOWN _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 : WasmTerminal .
+  eq typecheck(UNKNOWN X0 X1, memtype) = true .
+  op tabletype :  -> WasmType .
+  op UNKNOWN _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  vars X0 X1 X2 : WasmTerminal .
+  eq typecheck(UNKNOWN X0 X1 X2, tabletype) = true .
+  op datatype :  -> WasmType .
+  op OK : -> WasmTerminal .
+  eq typecheck(OK, datatype) = true .
+  op elemtype :  -> WasmType .
+  eq typecheck(T, elemtype) = typecheck(T, reftype) .
+  op externtype :  -> WasmType .
+  op TAG _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(TAG X0, externtype) = true .
+  op GLOBAL _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(GLOBAL X0, externtype) = true .
+  op MEM _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(MEM X0, externtype) = true .
+  op TABLE _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(TABLE X0, externtype) = true .
+  op FUNC _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(FUNC X0, externtype) = true .
+  op moduletype :  -> WasmType .
+  op UNKNOWN _ : WasmTerminal -> WasmTerminal .
+  vars X0 : WasmTerminal .
+  eq typecheck(UNKNOWN X0, moduletype) = true .
+
+  op $IN : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  eq IN(32) = I32 .
+  eq IN(64) = I64 .
+
+
+  op $FN : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  eq FN(32) = F32 .
+  eq FN(64) = F64 .
+
+
+  op $JN : WasmTerminal -> WasmTerminal .
+  var N : WasmTerminal .
+  eq JN(8) = I8 .
+  eq JN(16) = I16 .
+  eq JN(32) = I32 .
+  eq JN(64) = I64 .
+
+
+  op $size : WasmTerminal -> WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  eq size(I32) = 32 .
+  eq size(I64) = 64 .
+  eq size(F32) = 32 .
+  eq size(F64) = 64 .
+
+
+  op $vsize : WasmTerminal -> WasmTerminal .
+  var VECTYPE : WasmTerminal .
+  eq vsize(V128) = 128 .
+
+
+  op $psize : WasmTerminal -> WasmTerminal .
+  var PACKTYPE : WasmTerminal .
+  eq psize(I8) = 8 .
+  eq psize(I16) = 16 .
+
+
+  op $lsize : WasmTerminal -> WasmTerminal .
+  var LANETYPE : WasmTerminal .
+  eq lsize(NUMTYPE) = size(NUMTYPE) .
+  eq lsize(PACKTYPE) = psize(PACKTYPE) .
+
+
+  op $zsize : WasmTerminal -> WasmTerminal .
+  var STORAGETYPE : WasmTerminal .
+  eq zsize(NUMTYPE) = size(NUMTYPE) .
+  eq zsize(VECTYPE) = vsize(VECTYPE) .
+  eq zsize(PACKTYPE) = psize(PACKTYPE) .
+
+
+  op $isize : WasmTerminal -> WasmTerminal .
+  var INN : WasmTerminal .
+  var INN : WasmTerminal .
+  eq $isize(INN) = size(INN) .
+
+
+  op $jsize : WasmTerminal -> WasmTerminal .
+  var JNN : WasmTerminal .
+  var JNN : WasmTerminal .
+  eq $jsize(JNN) = lsize(JNN) .
+
+
+  op $fsize : WasmTerminal -> WasmTerminal .
+  var FNN : WasmTerminal .
+  var FNN : WasmTerminal .
+  eq $fsize(FNN) = size(FNN) .
+
+
+  op $inv_isize : WasmTerminal -> WasmTerminal .
+  var NAT : WasmTerminal .
+  eq inv_isize(32) = I32 .
+  eq inv_isize(64) = I64 .
+
+
+  op $inv_jsize : WasmTerminal -> WasmTerminal .
+  var NAT : WasmTerminal .
+  eq inv_jsize(8) = I8 .
+  eq inv_jsize(16) = I16 .
+  var N : WasmTerminal .
+  eq $inv_jsize(N) = inv_isize(N) .
+
+
+  op $inv_fsize : WasmTerminal -> WasmTerminal .
+  var NAT : WasmTerminal .
+  eq inv_fsize(32) = F32 .
+  eq inv_fsize(64) = F64 .
+
+
+  op $sizenn : WasmTerminal -> WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  var NT : WasmTerminal .
+  eq $sizenn(NT) = size(NT) .
+
+
+  op $sizenn1 : WasmTerminal -> WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  var NT : WasmTerminal .
+  eq $sizenn1(NT) = size(NT) .
+
+
+  op $sizenn2 : WasmTerminal -> WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  var NT : WasmTerminal .
+  eq $sizenn2(NT) = size(NT) .
+
+
+  op $vsizenn : WasmTerminal -> WasmTerminal .
+  var VECTYPE : WasmTerminal .
+  var VT : WasmTerminal .
+  eq $vsizenn(VT) = vsize(VT) .
+
+
+  op $psizenn : WasmTerminal -> WasmTerminal .
+  var PACKTYPE : WasmTerminal .
+  var PT : WasmTerminal .
+  eq $psizenn(PT) = psize(PT) .
+
+
+  op $lsizenn : WasmTerminal -> WasmTerminal .
+  var LANETYPE : WasmTerminal .
+  var LT : WasmTerminal .
+  eq $lsizenn(LT) = lsize(LT) .
+
+
+  op $lsizenn1 : WasmTerminal -> WasmTerminal .
+  var LANETYPE : WasmTerminal .
+  var LT : WasmTerminal .
+  eq $lsizenn1(LT) = lsize(LT) .
+
+
+  op $lsizenn2 : WasmTerminal -> WasmTerminal .
+  var LANETYPE : WasmTerminal .
+  var LT : WasmTerminal .
+  eq $lsizenn2(LT) = lsize(LT) .
+
+
+  op $jsizenn : WasmTerminal -> WasmTerminal .
+  var JNN : WasmTerminal .
+  var JNN : WasmTerminal .
+  eq $jsizenn(JNN) = lsize(JNN) .
+
+
+  op $inv_jsizenn : WasmTerminal -> WasmTerminal .
+  var NAT : WasmTerminal .
+  var N : WasmTerminal .
+  eq $inv_jsizenn(N) = inv_jsize(N) .
+
+
+  op $lunpack : WasmTerminal -> WasmTerminal .
+  var LANETYPE : WasmTerminal .
+  eq lunpack(NUMTYPE) = NUMTYPE .
+  eq lunpack(PACKTYPE) = I32 .
+
+
+  op $unpack : WasmTerminal -> WasmTerminal .
+  var STORAGETYPE : WasmTerminal .
+  eq unpack(VALTYPE) = VALTYPE .
+  eq unpack(PACKTYPE) = I32 .
+
+
+  op $nunpack : WasmTerminal -> WasmTerminal .
+  var STORAGETYPE : WasmTerminal .
+  eq nunpack(NUMTYPE) = NUMTYPE .
+  eq nunpack(PACKTYPE) = I32 .
+
+
+  op $vunpack : WasmTerminal -> WasmTerminal .
+  var STORAGETYPE : WasmTerminal .
+  eq vunpack(VECTYPE) = VECTYPE .
+
+
+  op $cunpack : WasmTerminal -> WasmTerminal .
+  var STORAGETYPE : WasmTerminal .
+  eq cunpack(CONSTTYPE) = CONSTTYPE .
+  eq cunpack(PACKTYPE) = I32 .
+  eq cunpack(LANETYPE) = lunpack(LANETYPE) .
+
+
+  op $minat : WasmTerminal WasmTerminal -> WasmTerminal .
+  var ADDRTYPE : WasmTerminal .
+  var ADDRTYPE : WasmTerminal .
+  var AT_1 : WasmTerminal .
+  eq $minat(AT_1) = AT_1 .
+  var AT_1 : WasmTerminal .
+  eq $minat(AT_1) = AT_2 .
+
+
+  op $diffrt : WasmTerminal WasmTerminal -> WasmTerminal .
+  var REFTYPE : WasmTerminal .
+  var REFTYPE : WasmTerminal .
+  eq diffrt(REF) = REF .
+  eq diffrt(REF) = REF .
+
+
+  op $as_deftype : WasmTerminal -> WasmTerminal .
+  var TYPEUSE : WasmTerminal .
+  eq as_deftype(DT) = DT .
+
+
+  op $tagsxt : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq tagsxt(0) = 0 .
+  eq tagsxt(0) = 0 .
+  eq tagsxt(0) = tagsxt(0) .
+
+
+  op $globalsxt : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq globalsxt(0) = 0 .
+  eq globalsxt(0) = 0 .
+  eq globalsxt(0) = globalsxt(0) .
+
+
+  op $memsxt : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq memsxt(0) = 0 .
+  eq memsxt(0) = 0 .
+  eq memsxt(0) = memsxt(0) .
+
+
+  op $tablesxt : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq tablesxt(0) = 0 .
+  eq tablesxt(0) = 0 .
+  eq tablesxt(0) = tablesxt(0) .
+
+
+  op $funcsxt : WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  eq funcsxt(0) = 0 .
+  eq funcsxt(0) = 0 .
+  eq funcsxt(0) = funcsxt(0) .
+
+
+  op $subst_typevar : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var TYPEVAR : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  var TV : WasmTerminal .
+  eq $subst_typevar(TV) = TV .
+  var TV : WasmTerminal .
+  eq $subst_typevar(TV) = TU_1 .
+  var TV : WasmTerminal .
+  eq $subst_typevar(TV) = subst_typevar(TV, 0, 0) .
+
+
+  op $minus_recs : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq minus_recs(0) = 0 .
+  eq minus_recs(0) = minus_recs(0, 0) .
+  eq minus_recs(0) = 0 .
+
+
+  op $subst_packtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var PACKTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  var PT : WasmTerminal .
+  eq $subst_packtype(PT) = PT .
+
+
+  op $subst_numtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  var NT : WasmTerminal .
+  eq $subst_numtype(NT) = NT .
+
+
+  op $subst_vectype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var VECTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  var VT : WasmTerminal .
+  eq $subst_vectype(VT) = VT .
+
+
+  op $subst_typeuse : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var TYPEUSE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_typeuse(TV') = subst_typevar(TV', 0, 0) .
+  eq subst_typeuse(DT) = subst_deftype(DT, 0, 0) .
+
+
+  op $subst_heaptype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var HEAPTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_heaptype(TV') = subst_typevar(TV', 0, 0) .
+  eq subst_heaptype(DT) = subst_deftype(DT, 0, 0) .
+  var HT : WasmTerminal .
+  eq $subst_heaptype(HT) = HT .
+
+
+  op $subst_reftype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var REFTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_reftype(REF) = REF .
+
+
+  op $subst_valtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var VALTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_valtype(NT) = subst_numtype(NT, 0, 0) .
+  eq subst_valtype(VT) = subst_vectype(VT, 0, 0) .
+  eq subst_valtype(RT) = subst_reftype(RT, 0, 0) .
+  eq subst_valtype(BOT) = BOT .
+
+
+  op $subst_storagetype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var STORAGETYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_storagetype(T) = subst_valtype(T, 0, 0) .
+  eq subst_storagetype(PT) = subst_packtype(PT, 0, 0) .
+
+
+  op $subst_fieldtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var FIELDTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_fieldtype(UNKNOWN_CASE) = UNKNOWN_CASE .
+
+
+  op $subst_comptype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var COMPTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_comptype(STRUCT) = STRUCT .
+  eq subst_comptype(ARRAY) = ARRAY .
+  eq subst_comptype(FUNC) = FUNC .
+
+
+  op $subst_subtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var SUBTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_subtype(SUB) = SUB .
+
+
+  op $subst_rectype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var RECTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_rectype(REC) = REC .
+
+
+  op $subst_deftype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var DEFTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_deftype(_DEF) = _DEF .
+
+
+  op $subst_addrtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var ADDRTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  var AT : WasmTerminal .
+  eq $subst_addrtype(AT) = AT .
+
+
+  op $subst_tagtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var TAGTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  var TU' : WasmTerminal .
+  eq $subst_tagtype(TU') = subst_typeuse(TU', 0, 0) .
+
+
+  op $subst_globaltype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var GLOBALTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_globaltype(UNKNOWN_CASE) = UNKNOWN_CASE .
+
+
+  op $subst_memtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var MEMTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_memtype(UNKNOWN_CASE) = UNKNOWN_CASE .
+
+
+  op $subst_tabletype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var TABLETYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_tabletype(UNKNOWN_CASE) = UNKNOWN_CASE .
+
+
+  op $subst_externtype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var EXTERNTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_externtype(TAG) = TAG .
+  eq subst_externtype(GLOBAL) = GLOBAL .
+  eq subst_externtype(TABLE) = TABLE .
+  eq subst_externtype(MEM) = MEM .
+  eq subst_externtype(FUNC) = FUNC .
+
+
+  op $subst_moduletype : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  var MODULETYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_moduletype(UNKNOWN_CASE) = UNKNOWN_CASE .
+
+
+  op $subst_all_valtype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var VALTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var T : WasmTerminal .
+  eq $subst_all_valtype(T) = subst_valtype(T, 0, 0) .
+
+
+  op $subst_all_reftype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var REFTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var RT : WasmTerminal .
+  eq $subst_all_reftype(RT) = subst_reftype(RT, 0, 0) .
+
+
+  op $subst_all_deftype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var DEFTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var DT : WasmTerminal .
+  eq $subst_all_deftype(DT) = subst_deftype(DT, 0, 0) .
+
+
+  op $subst_all_tagtype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var TAGTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var JT : WasmTerminal .
+  eq $subst_all_tagtype(JT) = subst_tagtype(JT, 0, 0) .
+
+
+  op $subst_all_globaltype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var GLOBALTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var GT : WasmTerminal .
+  eq $subst_all_globaltype(GT) = subst_globaltype(GT, 0, 0) .
+
+
+  op $subst_all_memtype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var MEMTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var MT : WasmTerminal .
+  eq $subst_all_memtype(MT) = subst_memtype(MT, 0, 0) .
+
+
+  op $subst_all_tabletype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var TABLETYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var TT : WasmTerminal .
+  eq $subst_all_tabletype(TT) = subst_tabletype(TT, 0, 0) .
+
+
+  op $subst_all_externtype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var EXTERNTYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var XT : WasmTerminal .
+  eq $subst_all_externtype(XT) = subst_externtype(XT, 0, 0) .
+
+
+  op $subst_all_moduletype : WasmTerminal WasmTerminal -> WasmTerminal .
+  var MODULETYPE : WasmTerminal .
+  var _ : WasmTerminal .
+  var MMT : WasmTerminal .
+  eq $subst_all_moduletype(MMT) = subst_moduletype(MMT, 0, 0) .
+
+
+  op $subst_all_deftypes : WasmTerminal WasmTerminal -> WasmTerminal .
+  var _ : WasmTerminal .
+  var _ : WasmTerminal .
+  eq subst_all_deftypes(0) = 0 .
+  eq subst_all_deftypes(0) = 0 .
+
+
+  op $rollrt : WasmTerminal WasmTerminal -> WasmTerminal .
+  var TYPEIDX : WasmTerminal .
+  var RECTYPE : WasmTerminal .
+  var X : WasmTerminal .
+  eq $rollrt(X) = REC .
+
+
+  op $unrollrt : WasmTerminal -> WasmTerminal .
+  var RECTYPE : WasmTerminal .
+  var RECTYPE : WasmTerminal .
+  eq $unrollrt(RECTYPE) = REC .
+
+
+  op $rolldt : WasmTerminal WasmTerminal -> WasmTerminal .
+  var TYPEIDX : WasmTerminal .
+  var RECTYPE : WasmTerminal .
+  var X : WasmTerminal .
+  eq $rolldt(X) = 0 .
+
+
+  op $unrolldt : WasmTerminal -> WasmTerminal .
+  var DEFTYPE : WasmTerminal .
+  eq unrolldt(_DEF) = 0 .
+
+
+  op $expanddt : WasmTerminal -> WasmTerminal .
+  var DEFTYPE : WasmTerminal .
+  var DEFTYPE : WasmTerminal .
+  eq $expanddt(DEFTYPE) = COMPTYPE .
+
+
+  op $free_addrtype : WasmTerminal -> WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  eq free_addrtype(ADDRTYPE) = 0 .
+
+
+  op $free_numtype : WasmTerminal -> WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  var NUMTYPE : WasmTerminal .
+  eq $free_numtype(NUMTYPE) = 0 .
+
+
+  op $free_packtype : WasmTerminal -> WasmTerminal .
+  var PACKTYPE : WasmTerminal .
+  var PACKTYPE : WasmTerminal .
+  eq $free_packtype(PACKTYPE) = 0 .
+
+
+  op $free_lanetype : WasmTerminal -> WasmTerminal .
+  var LANETYPE : WasmTerminal .
+  eq free_lanetype(NUMTYPE) = free_numtype(NUMTYPE) .
+  eq free_lanetype(PACKTYPE) = free_packtype(PACKTYPE) .
+
+
+  op $free_vectype : WasmTerminal -> WasmTerminal .
+  var VECTYPE : WasmTerminal .
+  var VECTYPE : WasmTerminal .
+  eq $free_vectype(VECTYPE) = 0 .
+
+
+  op $free_consttype : WasmTerminal -> WasmTerminal .
+  var CONSTTYPE : WasmTerminal .
+  eq free_consttype(NUMTYPE) = free_numtype(NUMTYPE) .
+  eq free_consttype(VECTYPE) = free_vectype(VECTYPE) .
+
+
+  op $free_absheaptype : WasmTerminal -> WasmTerminal .
+  var ABSHEAPTYPE : WasmTerminal .
+  var ABSHEAPTYPE : WasmTerminal .
+  eq $free_absheaptype(ABSHEAPTYPE) = 0 .
+
+
+  op $free_typevar : WasmTerminal -> WasmTerminal .
+  var TYPEVAR : WasmTerminal .
+  eq free_typevar(_IDX) = free_typeidx(TYPEIDX) .
+  eq free_typevar(REC) = 0 .
+
+
+  op $free_heaptype : WasmTerminal -> WasmTerminal .
+  var HEAPTYPE : WasmTerminal .
+  eq free_heaptype(ABSHEAPTYPE) = free_absheaptype(ABSHEAPTYPE) .
+  eq free_heaptype(TYPEUSE) = free_typeuse(TYPEUSE) .
+
+
+  op $free_reftype : WasmTerminal -> WasmTerminal .
+  var REFTYPE : WasmTerminal .
+  eq free_reftype(REF) = free_heaptype(HEAPTYPE) .
+
+
+  op $free_typeuse : WasmTerminal -> WasmTerminal .
+  var TYPEUSE : WasmTerminal .
+  eq free_typeuse(TYPEVAR) = free_typevar(TYPEVAR) .
+  eq free_typeuse(DEFTYPE) = free_deftype(DEFTYPE) .
+
+
+  op $free_valtype : WasmTerminal -> WasmTerminal .
+  var VALTYPE : WasmTerminal .
+  eq free_valtype(NUMTYPE) = free_numtype(NUMTYPE) .
+  eq free_valtype(VECTYPE) = free_vectype(VECTYPE) .
+  eq free_valtype(REFTYPE) = free_reftype(REFTYPE) .
+  eq free_valtype(BOT) = 0 .
+
+
+  op $free_resulttype : WasmTerminal -> WasmTerminal .
+  var RESULTTYPE : WasmTerminal .
+  eq free_resulttype(UNKNOWN_CASE) = free_list(0) .
+
+
+  op $free_storagetype : WasmTerminal -> WasmTerminal .
+  var STORAGETYPE : WasmTerminal .
+  eq free_storagetype(VALTYPE) = free_valtype(VALTYPE) .
+  eq free_storagetype(PACKTYPE) = free_packtype(PACKTYPE) .
+
+
+  op $free_fieldtype : WasmTerminal -> WasmTerminal .
+  var FIELDTYPE : WasmTerminal .
+  eq free_fieldtype(UNKNOWN_CASE) = free_storagetype(STORAGETYPE) .
+
+
+  op $free_comptype : WasmTerminal -> WasmTerminal .
+  var COMPTYPE : WasmTerminal .
+  eq free_comptype(STRUCT) = free_list(0) .
+  eq free_comptype(ARRAY) = free_fieldtype(FIELDTYPE) .
+  eq free_comptype(FUNC) = 0 .
+
+
+  op $free_subtype : WasmTerminal -> WasmTerminal .
+  var SUBTYPE : WasmTerminal .
+  eq free_subtype(SUB) = 0 .
+
+
+  op $free_rectype : WasmTerminal -> WasmTerminal .
+  var RECTYPE : WasmTerminal .
+  eq free_rectype(REC) = free_list(0) .
+
+
+  op $free_deftype : WasmTerminal -> WasmTerminal .
+  var DEFTYPE : WasmTerminal .
+  eq free_deftype(_DEF) = free_rectype(RECTYPE) .
+
+
+  op $free_tagtype : WasmTerminal -> WasmTerminal .
+  var TAGTYPE : WasmTerminal .
+  eq free_tagtype(DEFTYPE) = free_deftype(DEFTYPE) .
+
+
+  op $free_globaltype : WasmTerminal -> WasmTerminal .
+  var GLOBALTYPE : WasmTerminal .
+  eq free_globaltype(UNKNOWN_CASE) = free_valtype(VALTYPE) .
+
+
+  op $free_memtype : WasmTerminal -> WasmTerminal .
+  var MEMTYPE : WasmTerminal .
+  eq free_memtype(UNKNOWN_CASE) = free_addrtype(ADDRTYPE) .
+
+
+  op $free_tabletype : WasmTerminal -> WasmTerminal .
+  var TABLETYPE : WasmTerminal .
+  eq free_tabletype(UNKNOWN_CASE) = 0 .
+
+
+  op $free_datatype : WasmTerminal -> WasmTerminal .
+  var DATATYPE : WasmTerminal .
+  eq free_datatype(OK) = 0 .
+
+
+  op $free_elemtype : WasmTerminal -> WasmTerminal .
+  var ELEMTYPE : WasmTerminal .
+  var REFTYPE : WasmTerminal .
+  eq $free_elemtype(REFTYPE) = free_reftype(REFTYPE) .
+
+
+  op $free_externtype : WasmTerminal -> WasmTerminal .
+  var EXTERNTYPE : WasmTerminal .
+  eq free_externtype(TAG) = free_tagtype(TAGTYPE) .
+  eq free_externtype(GLOBAL) = free_globaltype(GLOBALTYPE) .
+  eq free_externtype(MEM) = free_memtype(MEMTYPE) .
+  eq free_externtype(TABLE) = free_tabletype(TABLETYPE) .
+  eq free_externtype(FUNC) = free_typeuse(TYPEUSE) .
+
+
+  op $free_moduletype : WasmTerminal -> WasmTerminal .
+  var MODULETYPE : WasmTerminal .
+  eq free_moduletype(UNKNOWN_CASE) = 0 .
+
+
+endm
