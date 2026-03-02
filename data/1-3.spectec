@@ -1,0 +1,47 @@
+;; 1-3.spectec에서 혁순 선배가 maude로 변환한 부분만 추출
+
+syntax num_(numtype)
+syntax num_(Inn) = iN($sizenn(Inn))
+
+syntax binop_(numtype)
+syntax binop_(Inn) =
+  | ADD | SUB | MUL | DIV sx | REM sx
+  | AND | OR | XOR | SHL | SHR sx | ROTL | ROTR
+
+syntax relop_(numtype)
+syntax relop_(Inn) =
+  | EQ | NE | GT sx
+
+syntax instr
+
+syntax instr/local = ...
+  | LOCAL.GET localidx
+  | LOCAL.SET localidx
+
+syntax instr/num = ...
+  | CONST numtype num_(numtype)
+  | BINOP numtype binop_(numtype)    
+  | RELOP numtype relop_(numtype)    
+
+syntax blocktype =
+  | _RESULT valtype?
+  | _IDX typeidx
+
+syntax instr/block = ...
+  | BLOCK blocktype instr*
+  | LOOP blocktype instr*
+  | IF blocktype instr* ELSE instr*
+
+syntax instr/br = ...
+  | BR labelidx
+  | BR_IF labelidx
+
+syntax instr/call = ...
+  | CALL funcidx
+  | CALL_REF typeuse
+
+syntax instr/func = ...
+  | REF.FUNC funcidx
+
+syntax expr =
+  instr*

@@ -78,7 +78,6 @@ mod 1_2_SYNTAX_TYPES is
   op valtype : -> WasmType .
   var VALTYPE : WasmTerminals .
 
-  ceq typecheck(VALTYPE, valtype) = true
-  if typecheck(VALTYPE, numtype) .
+  eq typecheck(VALTYPE, valtype) = typecheck(VALTYPE, numtype) .
   
 endm 

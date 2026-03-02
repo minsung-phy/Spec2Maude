@@ -22,6 +22,16 @@ let header =
 
 let footer = "\nendm"
 
+(* 이름에서 _를 -로 바꾸고 끝에 %를 제거하는 함수 *)
+let sanitize name =
+  let s = String.map (fun c -> if c = '_' then '-' else c) name in
+  if String.length s > 0 && s.[String.length s - 1] = '%' then
+    String.sub s 0 (String.length s - 1)
+  else s
+
+(* 변수명을 대문자로 변환 (Inn -> INN) *)
+let to_var_name name = String.uppercase_ascii (sanitize name)
+
 (* ------------------- Helper: 수식 번역 ------------------- *)
 (* 수식(Expression) 변환 함수: 연산자 이름을 그대로 사용함 *)
 let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
@@ -82,7 +92,15 @@ let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
 
   | CallE (id, args) -> 
       let arg_strs = List.map (fun a -> translate_arg a v_map) args in
-      Printf.sprintf "%s(%s)" id.it (String.concat ", " arg_strs)
+      (* 이름은 sanitize 하고 *)
+      let fname = sanitize id.it in
+      (* 2. 만약 이름이 $로 시작하지 않는다면 $를 강제로 붙임 *)
+      let final_name = if String.length fname > 0 && fname.[0] = '$' then 
+                         fname 
+                       else 
+                         "$" ^ fname 
+      in
+      Printf.sprintf "%s(%s)" final_name (String.concat ", " arg_strs)
       
   | _ -> "0"
 
@@ -95,10 +113,11 @@ and translate_arg (a : arg) (v_map : (string * string) list) : string =
 and translate_typ (t : typ) (v_map : (string * string) list) : string =
   match t.it with
   | VarT (id, args) -> 
-      if args = [] then id.it 
+      let name = try List.assoc id.it v_map with Not_found -> sanitize id.it in
+      if args = [] then name
       else 
         let arg_strs = List.map (fun a -> translate_arg a v_map) args in
-        Printf.sprintf "%s(%s)" id.it (String.concat ", " arg_strs)
+        Printf.sprintf "%s(%s)" name (String.concat ", " arg_strs)
   | _ -> "WasmType"
 
 (* ------------------- Main: 정의 번역 (translate_definition) ------------------- *)
@@ -107,79 +126,128 @@ let rec translate_definition (d : def) : string =
   | RecD defs -> String.concat "\n" (List.map translate_definition defs)
 
   | TypD (id, params, insts) ->
-      let name = id.it in
+      let name = sanitize id.it in
       let upper_name = String.uppercase_ascii name in (* "UN", "SN" *)
       let var_name = "N_" ^ upper_name in (* 변수명을 N_UN, N_SN 형태로 생성 *)
 
       (* Maude 선언부 생성 *)
-      let v_map = [("N", var_name); ("i", "i")] in
+      (* let v_map = [("N", var_name); ("i", "i")] in *)
       
       let sig_types = if params = [] then "" else "WasmTerminal" in
       let op_decl = Printf.sprintf "  op %s : %s -> WasmType .\n" name sig_types in
       let var_decl = if params = [] then "" else Printf.sprintf "  var %s : Nat .\n" var_name in
 
-      let full_name = if params = [] then name 
-                      else Printf.sprintf "%s(%s)" name var_name in
-
       let res = List.map (fun inst ->
         match inst.it with
-        | InstD (_, _, deftyp) ->
+        | InstD (binders, args, deftyp) ->
+            (* v_map 생성 : Inn -> INN *)
+            let v_map = List.filter_map (fun b ->
+              match b.it with 
+              | TypB id -> Some (id.it, to_var_name id.it)
+              | ExpB (id, _) -> Some (id.it, to_var_name id.it)
+              | _ -> None
+            ) binders in
+
+            (* Binder들에 대한 typecheck 조건 생성 (예 : typecheck(INN, Inn)) *)
+            let binder_conds = List.filter_map (fun b ->
+              let get_cond id = Some (Printf.sprintf "typecheck(%s, %s)" (to_var_name id.it) (sanitize id.it)) in
+              match b.it with
+              | TypB id -> get_cond id
+              | ExpB (id, _) -> get_cond id
+              | _ -> None
+            ) binders in
+            
+            (* 왼쪽 항(LHS) 구성 (예: num-(INN)*)
+            let args_str = String.concat ", " (List.map (fun a -> translate_arg a v_map) args) in
+            let full_type_name = if args_str = "" then name else name ^ "(" ^ args_str ^ ")" in
+
             (match deftyp.it with 
-             | AliasT typ -> (* for u8, idx 같은 단순 별칭 *)
-                 Printf.sprintf "  eq typecheck(T, %s) = typecheck(T, %s) ." 
-                   full_name (translate_typ typ v_map)
-             | VariantT cases -> (* for uN, sN 같은 범위 조건형 *)
-                let case_res = List.map (fun (mixop_val, (binders, _, prems), _) ->
-                  (* 생성자 이름 가져오기 (I32, I64, F32, F64, NULL 등) *)
-                  let cons_name = 
-                    match mixop_val with
-                    | (a :: _) :: _ -> Xl.Atom.name a
-                    | _ -> "UNKNOWN"
-                  in
-                  
-                  if prems <> [] then (* prems != [] *)
-                     (* [1-1 로직] uN, sN 같은 범위 조건형 처리 *)
-                     let conditions = List.filter_map (fun p ->
-                       match p.it with
-                       | IfPr e -> Some (translate_exp e v_map)
-                       | _ -> None
-                     ) prems in
-                     let cond_str = String.concat " /\\ " conditions in
-                        if cond_str = "" then "" 
-                        else Printf.sprintf "  ceq typecheck(i, %s(%s)) = true \n   if typecheck(%s, N) /\\ %s ."  
-                          name var_name var_name cond_str
+             | VariantT cases -> 
+                let case_res = List.map (fun (mixop_val, (_, case_typ, prems), _) ->
+                  (* 1. Mixfix 이름 생성: IF%%ELSE% -> IF-ELSE- (Maude 스타일) *)
+                  let raw_cons_name = match mixop_val with (a :: _) :: _ -> Xl.Atom.name a | _ -> "UNKNOWN" in
+                  let maude_cons_name = sanitize raw_cons_name in
 
-                   else if binders = [] then
-                     (* [1-2 추가] null, addrtype 같은 단순 생성자 처리 *)
-                     (* 결과: op NULL : -> WasmTerminal . eq typecheck(NULL, null) = true . *)
-                     (* 기준을 binders로 한 이유 : 인자가 있는 _DEF, _IDX랑 구분하기 위해 *)
-                     Printf.sprintf "  op %s : -> WasmTerminal .\n  eq typecheck(%s, %s) = true ." 
-                      cons_name cons_name name
-                   
-                   else
-                     (* 1. Maude 안전 이름 생성: _IDX -> -IDX *)
-                     let maude_cons_name = 
-                       if String.length cons_name > 0 && cons_name.[0] = '_' then 
-                        "-" ^ String.sub cons_name 1 (String.length cons_name - 1)
-                       else cons_name
-                     in
+                  if prems <> [] then 
+                    (* Case 1: 범위 제약 (기존 유지) *)
+                    let conditions = List.filter_map (fun p -> match p.it with IfPr e -> Some (translate_exp e v_map) | _ -> None) prems in
+                    let cond_str = String.concat " /\\ " (binder_conds @ conditions) in
+                    Printf.sprintf "  ceq typecheck(i, %s) = true \n   if %s ." full_type_name cond_str
 
-                     (* 2. Mixfix 자리 표시자 (_) 생성 (인자 개수만큼) *)
-                     let placeholders = String.concat " " (List.map (fun _ -> "_") binders) in
-                     
-                     (* 3. 인자 타입 나열 (WasmTerminal ...) *)
-                     let sorts = String.concat " " (List.map (fun _ -> "WasmTerminal") binders) in
-                     
-                     (* 4. 규칙용 변수 생성 (괄호 없이 공백 구분) *)
-                     let vars_list = List.mapi (fun i _ -> Printf.sprintf "X%d" i) binders in
-                     let vars_str = String.concat " " vars_list in
-                     let var_decl = Printf.sprintf "  vars %s : WasmTerminal .\n" vars_str in
+                  else
+                    (* --- [Case 2 & 3 통합 및 개선] --- *)
+                    (* 인자 추출 함수: 변수명 중복 방지를 위해 카운터 사용, 타입 인자 보존 *)
+                    let rec collect_params counter t = match t.it with
+                      | VarT (tid, _) -> 
+                          let v_base = to_var_name tid.it in
+                          let sort_name = translate_typ t v_map in (* 파라미터 포함된 타입 가져오기 *)
+                          let count = !counter in
+                          incr counter;
+                          [(v_base ^ string_of_int count, sort_name)]
+                      | IterT (inner, _) -> collect_params counter inner
+                      | TupT fields -> List.concat_map (fun (_, ft) -> collect_params counter ft) fields
+                      | _ -> []
+                    in
+                    let param_counter = ref 1 in
+                    let params = collect_params param_counter case_typ in
+                    
+                    (* Maude 부품 조립 *)
+                    let p_vars = List.map fst params in
+                    let p_phs = String.concat "" (List.map (fun _ -> " _") params) in
+                    let p_sorts = String.concat " " (List.map (fun _ -> "WasmTerminal") params) in
+                    
+                    let v_decl = if p_vars = [] then "" 
+                                 else Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " p_vars) in
 
-                     (* 5. 최종 Maude 문장 조립 (정답지와 99% 일치) *)
-                     Printf.sprintf "  op %s %s : %s -> WasmTerminal .\n%s  eq typecheck(%s %s, %s) = true ." 
-                      maude_cons_name placeholders sorts var_decl maude_cons_name vars_str name
-                 ) cases in
-                 String.concat "\n" (List.filter (fun s -> s <> "") case_res)
+                    (* 조건문: typecheck(NUMTYPE1, numtype) /\ typecheck(NUM2, num-(NUMTYPE1)) *)
+                    let p_conds = List.map (fun (v, s) -> Printf.sprintf "typecheck(%s, %s)" v s) params in
+                    let rhs_str = String.concat " /\\ " (binder_conds @ p_conds) in
+                    
+                    let main_rule = 
+                      if p_vars = [] then
+                        Printf.sprintf "  op %s : -> WasmTerminal .\n  eq typecheck(%s, %s) = %s ." 
+                          maude_cons_name maude_cons_name full_type_name (if rhs_str = "" then "true" else rhs_str)
+                      else
+                        Printf.sprintf "  op %s%s : %s -> WasmTerminal .\n%s  eq typecheck(%s %s, %s) = %s ." 
+                          maude_cons_name p_phs p_sorts v_decl maude_cons_name (String.concat " " p_vars) full_type_name rhs_str
+                    in
+
+                    (* 2. [추가] 빈 값(eps/nil) 규칙 생성 *)
+                    (* 인자가 1개이면서 명령어 자체가 IterT일 때만 작동함 *)
+                    let empty_rule = 
+                      (* 내부 깊숙이 숨은 IterT를 찾는 재귀 함수 *)
+                      let rec find_iter t = match t.it with
+                        | IterT (_, iter) -> Some (if iter = Opt then "eps" else "nil")
+                        | TupT fields -> 
+                            (* 튜플 안의 필드들을 하나씩 뒤져서 IterT가 있는지 확인 *)
+                            List.find_map (fun (_, f) -> find_iter f) fields
+                        | _ -> None
+                      in
+                      
+                      (* 인자가 딱 1개일 때만 (예: -RESULT VALTYPE) 빈 규칙을 생성함 *)
+                      (* BLOCK(BT, INSTRS) 처럼 인자가 2개 이상이면 nil 규칙을 만들지 않음 *)
+                      if List.length params = 1 then
+                        match find_iter case_typ with
+                        | Some sym -> 
+                            let rhs_empty = if binder_conds = [] then "true" else String.concat " /\\ " binder_conds in
+                            Printf.sprintf "\n  eq typecheck(%s %s, %s) = %s ." maude_cons_name sym full_type_name rhs_empty
+                        | None -> ""
+                      else "" 
+                    in
+
+                    (* 3. 두 규칙을 합쳐서 반환 *)
+                    main_rule ^ empty_rule
+                ) cases in
+                String.concat "\n" (List.filter (fun s -> s <> "") case_res)
+
+             | AliasT typ ->
+                (* expr 같은 Alias 처리 *)
+                let rhs_body = match typ.it with
+                  | IterT (inner, _) -> translate_typ inner v_map (* instr* -> instr *)
+                  | _ -> translate_typ typ v_map
+                in
+                let var_name = if name = "expr" then "INSTRS" else "T" in
+                Printf.sprintf "  eq typecheck(%s, %s) = typecheck(%s, %s) ." var_name name var_name rhs_body
              | _ -> "")
       ) insts in
       op_decl ^ var_decl ^ String.concat "\n" res
