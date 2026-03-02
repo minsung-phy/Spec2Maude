@@ -2,7 +2,7 @@
 
 <div align="right">
   <strong>포항공과대학교 SVLab 이민성</strong><br>
-  <strong>2026.02.24</strong>
+  <strong>2026.03.01</strong>
 </div>
 
 ## 1. Introduction
