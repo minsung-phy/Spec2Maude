@@ -1,7 +1,4 @@
-(* version1-2 for 1-2.spectec -> 1-2.maude *)
-(* 문제점 : syntax typeuse/sem = | ... | deftype 와 syntax valtype/syn = | numtype | ... 이 변환이 안됌
-           -> 나중에 수정하자 ...
-*)
+(* version1-3 for 1-3.spectec -> 1-3.maude *)
 
 open Util.Source
 open Il.Ast
@@ -9,11 +6,13 @@ open Il.Ast
 let header =
   "load dsl/pretype \n\n" ^
   "load 1-1 \n\n" ^
-  "mod 1_2_SYNTAX_VALUES is\n" ^
+  "load 1-2 \n\n" ^
+  "mod 1_3_SYNTAX_INSTRUCTIONS is\n" ^
   "  inc DSL-TERM .\n" ^
   "  inc DSL-PRETYPE .\n" ^
   "  inc DSL-EXEC .\n\n" ^
   "  inc 1_1_SYNTAX_VALUES .\n\n" ^
+  "  inc 1_2_SYNTAX_TYPES .\n\n" ^
   "  subsort Int < WasmTerminal .\n" ^
   "  subsort Nat < WasmTerminal .\n\n" ^
   "  op nat : -> WasmType . \n" ^
@@ -127,23 +126,17 @@ let rec translate_definition (d : def) : string =
 
   | TypD (id, params, insts) ->
       let name = sanitize id.it in
-      let upper_name = String.uppercase_ascii name in (* "UN", "SN" *)
-      let var_name = "N_" ^ upper_name in (* 변수명을 N_UN, N_SN 형태로 생성 *)
-
+    
       (* Maude 선언부 생성 *)
-      (* let v_map = [("N", var_name); ("i", "i")] in *)
-      
       let sig_types = if params = [] then "" else "WasmTerminal" in
       let op_decl = Printf.sprintf "  op %s : %s -> WasmType .\n" name sig_types in
-      let var_decl = if params = [] then "" else Printf.sprintf "  var %s : Nat .\n" var_name in
-
+      
       let res = List.map (fun inst ->
         match inst.it with
         | InstD (binders, args, deftyp) ->
             (* v_map 생성 : Inn -> INN *)
             let v_map = List.filter_map (fun b ->
               match b.it with 
-              | TypB id -> Some (id.it, to_var_name id.it)
               | ExpB (id, _) -> Some (id.it, to_var_name id.it)
               | _ -> None
             ) binders in
@@ -152,7 +145,6 @@ let rec translate_definition (d : def) : string =
             let binder_conds = List.filter_map (fun b ->
               let get_cond id = Some (Printf.sprintf "typecheck(%s, %s)" (to_var_name id.it) (sanitize id.it)) in
               match b.it with
-              | TypB id -> get_cond id
               | ExpB (id, _) -> get_cond id
               | _ -> None
             ) binders in
@@ -169,13 +161,15 @@ let rec translate_definition (d : def) : string =
                   let maude_cons_name = sanitize raw_cons_name in
 
                   if prems <> [] then 
-                    (* Case 1: 범위 제약 (기존 유지) *)
+                    (* 범위 제약(uN, sN) *)
                     let conditions = List.filter_map (fun p -> match p.it with IfPr e -> Some (translate_exp e v_map) | _ -> None) prems in
                     let cond_str = String.concat " /\\ " (binder_conds @ conditions) in
-                    Printf.sprintf "  ceq typecheck(i, %s) = true \n   if %s ." full_type_name cond_str
+                    let upper_name = String.uppercase_ascii name in (* "UN", "SN" *)
+                    let var_name = "N_" ^ upper_name in (* 변수명을 N_UN, N_SN 형태로 생성 *)
+                    let var_decl = if params = [] then "" else Printf.sprintf "  var %s : Nat ." var_name in
+                    Printf.sprintf "%s \n  ceq typecheck(i, %s) = true \n   if %s ." var_decl full_type_name cond_str
 
                   else
-                    (* --- [Case 2 & 3 통합 및 개선] --- *)
                     (* 인자 추출 함수: 변수명 중복 방지를 위해 카운터 사용, 타입 인자 보존 *)
                     let rec collect_params counter t = match t.it with
                       | VarT (tid, _) -> 
@@ -212,20 +206,19 @@ let rec translate_definition (d : def) : string =
                           maude_cons_name p_phs p_sorts v_decl maude_cons_name (String.concat " " p_vars) full_type_name rhs_str
                     in
 
-                    (* 2. [추가] 빈 값(eps/nil) 규칙 생성 *)
-                    (* 인자가 1개이면서 명령어 자체가 IterT일 때만 작동함 *)
+                    (* 빈 값(eps) 규칙 생성 *)
                     let empty_rule = 
-                      (* 내부 깊숙이 숨은 IterT를 찾는 재귀 함수 *)
+                      (* 내부 구조에서 Opt(Optional) 타입을 찾아 eps를 반환하는 재귀 함수 *)
                       let rec find_iter t = match t.it with
-                        | IterT (_, iter) -> Some (if iter = Opt then "eps" else "nil")
+                        | IterT (_, iter) -> 
+                            if iter = Opt then Some "eps" else None
                         | TupT fields -> 
                             (* 튜플 안의 필드들을 하나씩 뒤져서 IterT가 있는지 확인 *)
                             List.find_map (fun (_, f) -> find_iter f) fields
                         | _ -> None
                       in
                       
-                      (* 인자가 딱 1개일 때만 (예: -RESULT VALTYPE) 빈 규칙을 생성함 *)
-                      (* BLOCK(BT, INSTRS) 처럼 인자가 2개 이상이면 nil 규칙을 만들지 않음 *)
+                      (* 인자가 1개일 때, 내부 구조가 Optional인 경우에만 eps 규칙 생성 *)
                       if List.length params = 1 then
                         match find_iter case_typ with
                         | Some sym -> 
@@ -247,10 +240,10 @@ let rec translate_definition (d : def) : string =
                   | _ -> translate_typ typ v_map
                 in
                 let var_name = if name = "expr" then "INSTRS" else "T" in
-                Printf.sprintf "  eq typecheck(%s, %s) = typecheck(%s, %s) ." var_name name var_name rhs_body
+                Printf.sprintf "  eq typecheck(%s, %s) = typecheck(%s, %s) ." var_name full_type_name var_name rhs_body
              | _ -> "")
       ) insts in
-      op_decl ^ var_decl ^ String.concat "\n" res
+      op_decl ^ String.concat "\n" res
   
   | DecD (id, params, _, insts) ->
     let func_name = id.it in

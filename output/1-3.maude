@@ -2,12 +2,16 @@ load dsl/pretype
 
 load 1-1 
 
-mod 1_2_SYNTAX_VALUES is
+load 1-2 
+
+mod 1_3_SYNTAX_INSTRUCTIONS is
   inc DSL-TERM .
   inc DSL-PRETYPE .
   inc DSL-EXEC .
 
   inc 1_1_SYNTAX_VALUES .
+
+  inc 1_2_SYNTAX_TYPES .
 
   subsort Int < WasmTerminal .
   subsort Nat < WasmTerminal .
@@ -129,22 +133,23 @@ mod 1_2_SYNTAX_VALUES is
 
 
   op bit :  -> WasmType .
+ 
   ceq typecheck(i, bit) = true 
    if ((I == 0) \/ (I == 1)) .
   op byte :  -> WasmType .
+ 
   ceq typecheck(i, byte) = true 
    if ((I >= 0) /\ (I <= 255)) .
   op uN : WasmTerminal -> WasmType .
-  var N_UN : Nat .
+  var N_UN : Nat . 
   ceq typecheck(i, uN(N)) = true 
    if typecheck(N, N) /\ ((I >= 0) /\ (I <= ((2 ^ N) - 1))) .
   op sN : WasmTerminal -> WasmType .
-  var N_SN : Nat .
+  var N_SN : Nat . 
   ceq typecheck(i, sN(N)) = true 
    if typecheck(N, N) /\ ((((I >= -((2 ^ (N - 1)))) /\ (I <= -(1))) \/ (I == 0)) \/ ((I >= +(1)) /\ (I <= (+((2 ^ (N - 1))) - 1)))) .
   op iN : WasmTerminal -> WasmType .
-  var N_IN : Nat .
-  eq typecheck(T, iN) = typecheck(T, uN(N)) .
+  eq typecheck(T, iN(N)) = typecheck(T, uN(N)) .
   op u8 :  -> WasmType .
   eq typecheck(T, u8) = typecheck(T, uN(8)) .
   op u16 :  -> WasmType .
@@ -190,17 +195,18 @@ mod 1_2_SYNTAX_VALUES is
   op exp :  -> WasmType .
   eq typecheck(T, exp) = typecheck(T, WasmType) .
   op fNmag : WasmTerminal -> WasmType .
-  var N_FNMAG : Nat .
+  var N_FNMAG : Nat . 
   ceq typecheck(i, fNmag(N)) = true 
    if typecheck(N, N) /\ ((M < (2 ^ $M(N))) /\ (((2 - (2 ^ ($E(N) - 1))) <= EXP) /\ (EXP <= ((2 ^ ($E(N) - 1)) - 1)))) .
+  var N_FNMAG : Nat . 
   ceq typecheck(i, fNmag(N)) = true 
    if typecheck(N, N) /\ ((M < (2 ^ $M(N))) /\ ((2 - (2 ^ ($E(N) - 1))) == EXP)) .
   op INF : -> WasmTerminal .
   eq typecheck(INF, fNmag(N)) = typecheck(N, N) .
+  var N_FNMAG : Nat . 
   ceq typecheck(i, fNmag(N)) = true 
    if typecheck(N, N) /\ ((1 <= M) /\ (M < (2 ^ $M(N)))) .
   op fN : WasmTerminal -> WasmType .
-  var N_FN : Nat .
   op POS _ : WasmTerminal -> WasmTerminal .
   vars FNMAG1 : WasmTerminal .
   eq typecheck(POS FNMAG1, fN(N)) = typecheck(N, N) /\ typecheck(FNMAG1, fNmag(N)) .
@@ -237,15 +243,15 @@ mod 1_2_SYNTAX_VALUES is
   eq $canon_(N) = (2 ^ ($signif(N) - 1)) .
 
   op vN : WasmTerminal -> WasmType .
-  var N_VN : Nat .
-  eq typecheck(T, vN) = typecheck(T, uN(N)) .
+  eq typecheck(T, vN(N)) = typecheck(T, uN(N)) .
   op v128 :  -> WasmType .
   eq typecheck(T, v128) = typecheck(T, vN(128)) .
   op list : WasmTerminal -> WasmType .
-  var N_LIST : Nat .
+  var N_LIST : Nat . 
   ceq typecheck(i, list(X)) = true 
-   if typecheck(X, X) /\ (0 < (2 ^ 32)) .
+   if (0 < (2 ^ 32)) .
   op char :  -> WasmType .
+ 
   ceq typecheck(i, char) = true 
    if (((I >= 0) /\ (I <= 55295)) \/ ((I >= 57344) /\ (I <= 1114111))) .
 
@@ -254,6 +260,7 @@ mod 1_2_SYNTAX_VALUES is
 
 
   op name :  -> WasmType .
+ 
   ceq typecheck(i, name) = true 
    if (0 < (2 ^ 32)) .
   op idx :  -> WasmType .
@@ -1408,26 +1415,22 @@ mod 1_2_SYNTAX_VALUES is
   eq free_moduletype(UNKNOWN_CASE) = 0 .
 
   op num- : WasmTerminal -> WasmType .
-  var N_NUM- : Nat .
-  eq typecheck(T, num-) = typecheck(T, iN($sizenn(INN))) .
-  eq typecheck(T, num-) = typecheck(T, fN($sizenn(FNN))) .
+  eq typecheck(T, num-(INN)) = typecheck(T, iN($sizenn(INN))) .
+  eq typecheck(T, num-(FNN)) = typecheck(T, fN($sizenn(FNN))) .
   op pack- : WasmTerminal -> WasmType .
-  var N_PACK- : Nat .
-  eq typecheck(T, pack-) = typecheck(T, iN($psizenn(PNN))) .
+  eq typecheck(T, pack-(PNN)) = typecheck(T, iN($psizenn(PNN))) .
   op lane- : WasmTerminal -> WasmType .
-  var N_LANE- : Nat .
-  eq typecheck(T, lane-) = typecheck(T, num-(NUMTYPE)) .
-  eq typecheck(T, lane-) = typecheck(T, pack-(PACKTYPE)) .
-  eq typecheck(T, lane-) = typecheck(T, iN($lsize(JNN))) .
+  eq typecheck(T, lane-(NUMTYPE)) = typecheck(T, num-(NUMTYPE)) .
+  eq typecheck(T, lane-(PACKTYPE)) = typecheck(T, pack-(PACKTYPE)) .
+  eq typecheck(T, lane-(JNN)) = typecheck(T, iN($lsize(JNN))) .
   op vec- : WasmTerminal -> WasmType .
-  var N_VEC- : Nat .
-  eq typecheck(T, vec-) = typecheck(T, vN($vsize(VNN))) .
+  eq typecheck(T, vec-(VNN)) = typecheck(T, vN($vsize(VNN))) .
   op lit- : WasmTerminal -> WasmType .
-  var N_LIT- : Nat .
-  eq typecheck(T, lit-) = typecheck(T, num-(NUMTYPE)) .
-  eq typecheck(T, lit-) = typecheck(T, vec-(VECTYPE)) .
-  eq typecheck(T, lit-) = typecheck(T, pack-(PACKTYPE)) .
+  eq typecheck(T, lit-(NUMTYPE)) = typecheck(T, num-(NUMTYPE)) .
+  eq typecheck(T, lit-(VECTYPE)) = typecheck(T, vec-(VECTYPE)) .
+  eq typecheck(T, lit-(PACKTYPE)) = typecheck(T, pack-(PACKTYPE)) .
   op sz :  -> WasmType .
+ 
   ceq typecheck(i, sz) = true 
    if ((((I == 8) \/ (I == 16)) \/ (I == 32)) \/ (I == 64)) .
   op sx :  -> WasmType .
@@ -1436,13 +1439,13 @@ mod 1_2_SYNTAX_VALUES is
   op S : -> WasmTerminal .
   eq typecheck(S, sx) = true .
   op unop- : WasmTerminal -> WasmType .
-  var N_UNOP- : Nat .
   op CLZ : -> WasmTerminal .
   eq typecheck(CLZ, unop-(INN)) = typecheck(INN, Inn) .
   op CTZ : -> WasmTerminal .
   eq typecheck(CTZ, unop-(INN)) = typecheck(INN, Inn) .
   op POPCNT : -> WasmTerminal .
   eq typecheck(POPCNT, unop-(INN)) = typecheck(INN, Inn) .
+  var N_UNOP- : Nat . 
   ceq typecheck(i, unop-(INN)) = true 
    if typecheck(INN, Inn) /\ (0 < $sizenn(INN)) .
   op ABS : -> WasmTerminal .
@@ -1460,7 +1463,6 @@ mod 1_2_SYNTAX_VALUES is
   op NEAREST : -> WasmTerminal .
   eq typecheck(NEAREST, unop-(FNN)) = typecheck(FNN, Fnn) .
   op binop- : WasmTerminal -> WasmType .
-  var N_BINOP- : Nat .
   op ADD : -> WasmTerminal .
   eq typecheck(ADD, binop-(INN)) = typecheck(INN, Inn) .
   op SUB : -> WasmTerminal .
@@ -1503,11 +1505,9 @@ mod 1_2_SYNTAX_VALUES is
   op COPYSIGN : -> WasmTerminal .
   eq typecheck(COPYSIGN, binop-(FNN)) = typecheck(FNN, Fnn) .
   op testop- : WasmTerminal -> WasmType .
-  var N_TESTOP- : Nat .
   op EQZ : -> WasmTerminal .
   eq typecheck(EQZ, testop-(INN)) = typecheck(INN, Inn) .
   op relop- : WasmTerminal -> WasmType .
-  var N_RELOP- : Nat .
   op EQ : -> WasmTerminal .
   eq typecheck(EQ, relop-(INN)) = typecheck(INN, Inn) .
   op NE : -> WasmTerminal .
@@ -1537,14 +1537,16 @@ mod 1_2_SYNTAX_VALUES is
   op GE : -> WasmTerminal .
   eq typecheck(GE, relop-(FNN)) = typecheck(FNN, Fnn) .
   op cvtop-- : WasmTerminal -> WasmType .
-  var N_CVTOP-- : Nat .
+  var N_CVTOP-- : Nat . 
   ceq typecheck(i, cvtop--(INN-1, INN-2)) = true 
    if typecheck(INN-1, Inn-1) /\ typecheck(INN-2, Inn-2) /\ ($sizenn1(INN-1) < $sizenn2(INN-2)) .
+  var N_CVTOP-- : Nat . 
   ceq typecheck(i, cvtop--(INN-1, INN-2)) = true 
    if typecheck(INN-1, Inn-1) /\ typecheck(INN-2, Inn-2) /\ ($sizenn1(INN-1) > $sizenn2(INN-2)) .
   op CONVERT _ : WasmTerminal -> WasmTerminal .
   vars SX1 : WasmTerminal .
   eq typecheck(CONVERT SX1, cvtop--(INN-1, FNN-2)) = typecheck(INN-1, Inn-1) /\ typecheck(FNN-2, Fnn-2) /\ typecheck(SX1, sx) .
+  var N_CVTOP-- : Nat . 
   ceq typecheck(i, cvtop--(INN-1, FNN-2)) = true 
    if typecheck(INN-1, Inn-1) /\ typecheck(FNN-2, Fnn-2) /\ ($sizenn1(INN-1) == $sizenn2(FNN-2)) .
   op TRUNC _ : WasmTerminal -> WasmTerminal .
@@ -1553,16 +1555,21 @@ mod 1_2_SYNTAX_VALUES is
   op TRUNC-SAT _ : WasmTerminal -> WasmTerminal .
   vars SX1 : WasmTerminal .
   eq typecheck(TRUNC-SAT SX1, cvtop--(FNN-1, INN-2)) = typecheck(FNN-1, Fnn-1) /\ typecheck(INN-2, Inn-2) /\ typecheck(SX1, sx) .
+  var N_CVTOP-- : Nat . 
   ceq typecheck(i, cvtop--(FNN-1, INN-2)) = true 
    if typecheck(FNN-1, Fnn-1) /\ typecheck(INN-2, Inn-2) /\ ($sizenn1(FNN-1) == $sizenn2(INN-2)) .
+  var N_CVTOP-- : Nat . 
   ceq typecheck(i, cvtop--(FNN-1, FNN-2)) = true 
    if typecheck(FNN-1, Fnn-1) /\ typecheck(FNN-2, Fnn-2) /\ ($sizenn1(FNN-1) < $sizenn2(FNN-2)) .
+  var N_CVTOP-- : Nat . 
   ceq typecheck(i, cvtop--(FNN-1, FNN-2)) = true 
    if typecheck(FNN-1, Fnn-1) /\ typecheck(FNN-2, Fnn-2) /\ ($sizenn1(FNN-1) > $sizenn2(FNN-2)) .
   op dim :  -> WasmType .
+ 
   ceq typecheck(i, dim) = true 
    if (((((I == 1) \/ (I == 2)) \/ (I == 4)) \/ (I == 8)) \/ (I == 16)) .
   op shape :  -> WasmType .
+ 
   ceq typecheck(i, shape) = true 
    if (($lsize(LANETYPE) * 0) == 128) .
 
@@ -1581,9 +1588,11 @@ mod 1_2_SYNTAX_VALUES is
   eq unpackshape(UNKNOWN_CASE) = $lunpack(LNN) .
 
   op ishape :  -> WasmType .
+ 
   ceq typecheck(i, ishape) = true 
    if ($lanetype(SHAPE) == JNN) .
   op bshape :  -> WasmType .
+ 
   ceq typecheck(i, bshape) = true 
    if ($lanetype(SHAPE) == I8) .
   op zero :  -> WasmType .
@@ -1613,11 +1622,11 @@ mod 1_2_SYNTAX_VALUES is
   op ANY-TRUE : -> WasmTerminal .
   eq typecheck(ANY-TRUE, vvtestop) = true .
   op vunop- : WasmTerminal -> WasmType .
-  var N_VUNOP- : Nat .
   op ABS : -> WasmTerminal .
   eq typecheck(ABS, vunop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
   op NEG : -> WasmTerminal .
   eq typecheck(NEG, vunop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
+  var N_VUNOP- : Nat . 
   ceq typecheck(i, vunop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) == 8) .
   op ABS : -> WasmTerminal .
@@ -1635,25 +1644,32 @@ mod 1_2_SYNTAX_VALUES is
   op NEAREST : -> WasmTerminal .
   eq typecheck(NEAREST, vunop-(UNKNOWN_CASE)) = typecheck(FNN, Fnn) /\ typecheck(M, M) .
   op vbinop- : WasmTerminal -> WasmType .
-  var N_VBINOP- : Nat .
   op ADD : -> WasmTerminal .
   eq typecheck(ADD, vbinop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
   op SUB : -> WasmTerminal .
   eq typecheck(SUB, vbinop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) <= 16) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) <= 16) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) >= 16) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) <= 16) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) == 16) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) == 16) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) <= 32) .
+  var N_VBINOP- : Nat . 
   ceq typecheck(i, vbinop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ ($lsizenn(JNN) <= 32) .
   op ADD : -> WasmTerminal .
@@ -1677,7 +1693,6 @@ mod 1_2_SYNTAX_VALUES is
   op RELAXED-MAX : -> WasmTerminal .
   eq typecheck(RELAXED-MAX, vbinop-(UNKNOWN_CASE)) = typecheck(FNN, Fnn) /\ typecheck(M, M) .
   op vternop- : WasmTerminal -> WasmType .
-  var N_VTERNOP- : Nat .
   op RELAXED-LANESELECT : -> WasmTerminal .
   eq typecheck(RELAXED-LANESELECT, vternop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
   op RELAXED-MADD : -> WasmTerminal .
@@ -1685,21 +1700,23 @@ mod 1_2_SYNTAX_VALUES is
   op RELAXED-NMADD : -> WasmTerminal .
   eq typecheck(RELAXED-NMADD, vternop-(UNKNOWN_CASE)) = typecheck(FNN, Fnn) /\ typecheck(M, M) .
   op vtestop- : WasmTerminal -> WasmType .
-  var N_VTESTOP- : Nat .
   op ALL-TRUE : -> WasmTerminal .
   eq typecheck(ALL-TRUE, vtestop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
   op vrelop- : WasmTerminal -> WasmType .
-  var N_VRELOP- : Nat .
   op EQ : -> WasmTerminal .
   eq typecheck(EQ, vrelop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
   op NE : -> WasmTerminal .
   eq typecheck(NE, vrelop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
+  var N_VRELOP- : Nat . 
   ceq typecheck(i, vrelop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ (($lsizenn(JNN) =/= 64) \/ (SX == S)) .
+  var N_VRELOP- : Nat . 
   ceq typecheck(i, vrelop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ (($lsizenn(JNN) =/= 64) \/ (SX == S)) .
+  var N_VRELOP- : Nat . 
   ceq typecheck(i, vrelop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ (($lsizenn(JNN) =/= 64) \/ (SX == S)) .
+  var N_VRELOP- : Nat . 
   ceq typecheck(i, vrelop-(UNKNOWN_CASE)) = true 
    if typecheck(JNN, Jnn) /\ typecheck(M, M) /\ (($lsizenn(JNN) =/= 64) \/ (SX == S)) .
   op EQ : -> WasmTerminal .
@@ -1715,65 +1732,71 @@ mod 1_2_SYNTAX_VALUES is
   op GE : -> WasmTerminal .
   eq typecheck(GE, vrelop-(UNKNOWN_CASE)) = typecheck(FNN, Fnn) /\ typecheck(M, M) .
   op vshiftop- : WasmTerminal -> WasmType .
-  var N_VSHIFTOP- : Nat .
   op SHL : -> WasmTerminal .
   eq typecheck(SHL, vshiftop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) .
   op SHR _ : WasmTerminal -> WasmTerminal .
   vars SX1 : WasmTerminal .
   eq typecheck(SHR SX1, vshiftop-(UNKNOWN_CASE)) = typecheck(JNN, Jnn) /\ typecheck(M, M) /\ typecheck(SX1, sx) .
   op vswizzlop- : WasmTerminal -> WasmType .
-  var N_VSWIZZLOP- : Nat .
   op SWIZZLE : -> WasmTerminal .
   eq typecheck(SWIZZLE, vswizzlop-(UNKNOWN_CASE)) = typecheck(M, M) .
   op RELAXED-SWIZZLE : -> WasmTerminal .
   eq typecheck(RELAXED-SWIZZLE, vswizzlop-(UNKNOWN_CASE)) = typecheck(M, M) .
   op vextunop-- : WasmTerminal -> WasmType .
-  var N_VEXTUNOP-- : Nat .
+  var N_VEXTUNOP-- : Nat . 
   ceq typecheck(i, vextunop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(JNN-1, Jnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ ((16 <= (2 * $lsizenn1(JNN-1))) /\ (((2 * $lsizenn1(JNN-1)) == $lsizenn2(JNN-2)) /\ ($lsizenn2(JNN-2) <= 32))) .
   op vextbinop-- : WasmTerminal -> WasmType .
-  var N_VEXTBINOP-- : Nat .
+  var N_VEXTBINOP-- : Nat . 
   ceq typecheck(i, vextbinop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(JNN-1, Jnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ (((2 * $lsizenn1(JNN-1)) == $lsizenn2(JNN-2)) /\ ($lsizenn2(JNN-2) >= 16)) .
+  var N_VEXTBINOP-- : Nat . 
   ceq typecheck(i, vextbinop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(JNN-1, Jnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ (((2 * $lsizenn1(JNN-1)) == $lsizenn2(JNN-2)) /\ ($lsizenn2(JNN-2) == 32)) .
+  var N_VEXTBINOP-- : Nat . 
   ceq typecheck(i, vextbinop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(JNN-1, Jnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ (((2 * $lsizenn1(JNN-1)) == $lsizenn2(JNN-2)) /\ ($lsizenn2(JNN-2) == 16)) .
   op vextternop-- : WasmTerminal -> WasmType .
-  var N_VEXTTERNOP-- : Nat .
+  var N_VEXTTERNOP-- : Nat . 
   ceq typecheck(i, vextternop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(JNN-1, Jnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ (((4 * $lsizenn1(JNN-1)) == $lsizenn2(JNN-2)) /\ ($lsizenn2(JNN-2) == 32)) .
   op vcvtop-- : WasmTerminal -> WasmType .
-  var N_VCVTOP-- : Nat .
+  var N_VCVTOP-- : Nat . 
   ceq typecheck(i, vcvtop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(JNN-1, Jnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ ($lsizenn2(JNN-2) == (2 * $lsizenn1(JNN-1))) .
+  var N_VCVTOP-- : Nat . 
   ceq typecheck(i, vcvtop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(JNN-1, Jnn-1) /\ typecheck(M-1, M-1) /\ typecheck(FNN-2, Fnn-2) /\ typecheck(M-2, M-2) /\ (((($sizenn2(FNN-2) == $lsizenn1(JNN-1)) /\ ($lsizenn1(JNN-1) == 32)) /\ (0 == 0)) \/ (($sizenn2(FNN-2) == (2 * $lsizenn1(JNN-1))) /\ (0 == 0))) .
+  var N_VCVTOP-- : Nat . 
   ceq typecheck(i, vcvtop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(FNN-1, Fnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ (((($sizenn1(FNN-1) == $lsizenn2(JNN-2)) /\ ($lsizenn2(JNN-2) == 32)) /\ (0 == 0)) \/ (($sizenn1(FNN-1) == (2 * $lsizenn2(JNN-2))) /\ (0 == 0))) .
+  var N_VCVTOP-- : Nat . 
   ceq typecheck(i, vcvtop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(FNN-1, Fnn-1) /\ typecheck(M-1, M-1) /\ typecheck(JNN-2, Jnn-2) /\ typecheck(M-2, M-2) /\ (((($sizenn1(FNN-1) == $lsizenn2(JNN-2)) /\ ($lsizenn2(JNN-2) == 32)) /\ (0 == 0)) \/ (($sizenn1(FNN-1) == (2 * $lsizenn2(JNN-2))) /\ (0 == 0))) .
+  var N_VCVTOP-- : Nat . 
   ceq typecheck(i, vcvtop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(FNN-1, Fnn-1) /\ typecheck(M-1, M-1) /\ typecheck(FNN-2, Fnn-2) /\ typecheck(M-2, M-2) /\ ($sizenn1(FNN-1) == (2 * $sizenn2(FNN-2))) .
+  var N_VCVTOP-- : Nat . 
   ceq typecheck(i, vcvtop--(UNKNOWN_CASE, UNKNOWN_CASE)) = true 
    if typecheck(FNN-1, Fnn-1) /\ typecheck(M-1, M-1) /\ typecheck(FNN-2, Fnn-2) /\ typecheck(M-2, M-2) /\ ((2 * $sizenn1(FNN-1)) == $sizenn2(FNN-2)) .
   op memarg :  -> WasmType .
 
   op loadop- : WasmTerminal -> WasmType .
-  var N_LOADOP- : Nat .
+  var N_LOADOP- : Nat . 
   ceq typecheck(i, loadop-(INN)) = true 
    if typecheck(INN, Inn) /\ (0 < $sizenn(INN)) .
   op storeop- : WasmTerminal -> WasmType .
-  var N_STOREOP- : Nat .
+  var N_STOREOP- : Nat . 
   ceq typecheck(i, storeop-(INN)) = true 
    if typecheck(INN, Inn) /\ (0 < $sizenn(INN)) .
   op vloadop- : WasmTerminal -> WasmType .
-  var N_VLOADOP- : Nat .
+  var N_VLOADOP- : Nat . 
   ceq typecheck(i, vloadop-(VECTYPE)) = true 
    if typecheck(VECTYPE, vectype) /\ ((0 * M) == ($vsize(VECTYPE) / 2)) .
   op SPLAT _ : WasmTerminal -> WasmTerminal .
   vars SZ1 : WasmTerminal .
   eq typecheck(SPLAT SZ1, vloadop-(VECTYPE)) = typecheck(VECTYPE, vectype) /\ typecheck(SZ1, sz) .
+  var N_VLOADOP- : Nat . 
   ceq typecheck(i, vloadop-(VECTYPE)) = true 
    if typecheck(VECTYPE, vectype) /\ (0 >= 32) .
   op blocktype :  -> WasmType .
@@ -2072,6 +2095,7 @@ mod 1_2_SYNTAX_VALUES is
   op VSWIZZLOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars BSHAPE1 VSWIZZLOP-2 : WasmTerminal .
   eq typecheck(VSWIZZLOP BSHAPE1 VSWIZZLOP-2, instr) = typecheck(BSHAPE1, bshape) /\ typecheck(VSWIZZLOP-2, vswizzlop-(BSHAPE)) .
+ 
   ceq typecheck(i, instr) = true 
    if (UNKNOWN_CASE == $dim(0)) .
   op VEXTUNOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -2083,6 +2107,7 @@ mod 1_2_SYNTAX_VALUES is
   op VEXTTERNOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars ISHAPE1 ISHAPE2 VEXTTERNOP--3 : WasmTerminal .
   eq typecheck(VEXTTERNOP ISHAPE1 ISHAPE2 VEXTTERNOP--3, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(ISHAPE2, ishape) /\ typecheck(VEXTTERNOP--3, vextternop--(ISHAPE_2, ISHAPE_1)) .
+ 
   ceq typecheck(i, instr) = true 
    if (($lsize($lanetype(0)) == (2 * $lsize($lanetype(0)))) /\ ((2 * $lsize($lanetype(0))) <= 32)) .
   op VCVTOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -2091,6 +2116,7 @@ mod 1_2_SYNTAX_VALUES is
   op VSPLAT _ : WasmTerminal -> WasmTerminal .
   vars SHAPE1 : WasmTerminal .
   eq typecheck(VSPLAT SHAPE1, instr) = typecheck(SHAPE1, shape) .
+ 
   ceq typecheck(i, instr) = true 
    if ((0 == 0) == 0) .
   op VREPLACE-LANE _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
