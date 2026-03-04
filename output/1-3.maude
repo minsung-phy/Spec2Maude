@@ -21,15 +21,15 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   var T : WasmTerminal .
 
   op N :  -> WasmType .
-  eq typecheck(T, N) = typecheck(T, WasmType) .
+  eq typecheck(T, N) =  typecheck(T, WasmType) .
   op M :  -> WasmType .
-  eq typecheck(T, M) = typecheck(T, WasmType) .
+  eq typecheck(T, M) =  typecheck(T, WasmType) .
   op K :  -> WasmType .
-  eq typecheck(T, K) = typecheck(T, WasmType) .
+  eq typecheck(T, K) =  typecheck(T, WasmType) .
   op n :  -> WasmType .
-  eq typecheck(T, n) = typecheck(T, WasmType) .
+  eq typecheck(T, n) =  typecheck(T, WasmType) .
   op m :  -> WasmType .
-  eq typecheck(T, m) = typecheck(T, WasmType) .
+  eq typecheck(T, m) =  typecheck(T, WasmType) .
 
   op $min : WasmTerminal WasmTerminal -> WasmTerminal .
   var NAT : WasmTerminal .
@@ -149,25 +149,25 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   ceq typecheck(i, sN(N)) = true 
    if typecheck(N, N) /\ ((((I >= -((2 ^ (N - 1)))) /\ (I <= -(1))) \/ (I == 0)) \/ ((I >= +(1)) /\ (I <= (+((2 ^ (N - 1))) - 1)))) .
   op iN : WasmTerminal -> WasmType .
-  eq typecheck(T, iN(N)) = typecheck(T, uN(N)) .
+  eq typecheck(T, iN(N)) = typecheck(N, N) /\  typecheck(T, uN(N)) .
   op u8 :  -> WasmType .
-  eq typecheck(T, u8) = typecheck(T, uN(8)) .
+  eq typecheck(T, u8) =  typecheck(T, uN(8)) .
   op u16 :  -> WasmType .
-  eq typecheck(T, u16) = typecheck(T, uN(16)) .
+  eq typecheck(T, u16) =  typecheck(T, uN(16)) .
   op u31 :  -> WasmType .
-  eq typecheck(T, u31) = typecheck(T, uN(31)) .
+  eq typecheck(T, u31) =  typecheck(T, uN(31)) .
   op u32 :  -> WasmType .
-  eq typecheck(T, u32) = typecheck(T, uN(32)) .
+  eq typecheck(T, u32) =  typecheck(T, uN(32)) .
   op u64 :  -> WasmType .
-  eq typecheck(T, u64) = typecheck(T, uN(64)) .
+  eq typecheck(T, u64) =  typecheck(T, uN(64)) .
   op s33 :  -> WasmType .
-  eq typecheck(T, s33) = typecheck(T, sN(33)) .
+  eq typecheck(T, s33) =  typecheck(T, sN(33)) .
   op i32 :  -> WasmType .
-  eq typecheck(T, i32) = typecheck(T, iN(32)) .
+  eq typecheck(T, i32) =  typecheck(T, iN(32)) .
   op i64 :  -> WasmType .
-  eq typecheck(T, i64) = typecheck(T, iN(64)) .
+  eq typecheck(T, i64) =  typecheck(T, iN(64)) .
   op i128 :  -> WasmType .
-  eq typecheck(T, i128) = typecheck(T, iN(128)) .
+  eq typecheck(T, i128) =  typecheck(T, iN(128)) .
 
   op $signif : WasmTerminal -> WasmTerminal .
   var N : WasmTerminal .
@@ -193,7 +193,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq $E(N) = $expon(N) .
 
   op exp :  -> WasmType .
-  eq typecheck(T, exp) = typecheck(T, WasmType) .
+  eq typecheck(T, exp) =  typecheck(T, WasmType) .
   op fNmag : WasmTerminal -> WasmType .
   var N_FNMAG : Nat . 
   ceq typecheck(i, fNmag(N)) = true 
@@ -214,9 +214,9 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   vars FNMAG1 : WasmTerminal .
   eq typecheck(NEG FNMAG1, fN(N)) = typecheck(N, N) /\ typecheck(FNMAG1, fNmag(N)) .
   op f32 :  -> WasmType .
-  eq typecheck(T, f32) = typecheck(T, fN(32)) .
+  eq typecheck(T, f32) =  typecheck(T, fN(32)) .
   op f64 :  -> WasmType .
-  eq typecheck(T, f64) = typecheck(T, fN(64)) .
+  eq typecheck(T, f64) =  typecheck(T, fN(64)) .
 
   op $fzero : WasmTerminal -> WasmTerminal .
   var N : WasmTerminal .
@@ -243,9 +243,9 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq $canon_(N) = (2 ^ ($signif(N) - 1)) .
 
   op vN : WasmTerminal -> WasmType .
-  eq typecheck(T, vN(N)) = typecheck(T, uN(N)) .
+  eq typecheck(T, vN(N)) = typecheck(N, N) /\  typecheck(T, uN(N)) .
   op v128 :  -> WasmType .
-  eq typecheck(T, v128) = typecheck(T, vN(128)) .
+  eq typecheck(T, v128) =  typecheck(T, vN(128)) .
   op list : WasmTerminal -> WasmType .
   var N_LIST : Nat . 
   ceq typecheck(i, list(X)) = true 
@@ -264,31 +264,31 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   ceq typecheck(i, name) = true 
    if (0 < (2 ^ 32)) .
   op idx :  -> WasmType .
-  eq typecheck(T, idx) = typecheck(T, u32) .
+  eq typecheck(T, idx) =  typecheck(T, u32) .
   op laneidx :  -> WasmType .
-  eq typecheck(T, laneidx) = typecheck(T, u8) .
+  eq typecheck(T, laneidx) =  typecheck(T, u8) .
   op typeidx :  -> WasmType .
-  eq typecheck(T, typeidx) = typecheck(T, idx) .
+  eq typecheck(T, typeidx) =  typecheck(T, idx) .
   op funcidx :  -> WasmType .
-  eq typecheck(T, funcidx) = typecheck(T, idx) .
+  eq typecheck(T, funcidx) =  typecheck(T, idx) .
   op globalidx :  -> WasmType .
-  eq typecheck(T, globalidx) = typecheck(T, idx) .
+  eq typecheck(T, globalidx) =  typecheck(T, idx) .
   op tableidx :  -> WasmType .
-  eq typecheck(T, tableidx) = typecheck(T, idx) .
+  eq typecheck(T, tableidx) =  typecheck(T, idx) .
   op memidx :  -> WasmType .
-  eq typecheck(T, memidx) = typecheck(T, idx) .
+  eq typecheck(T, memidx) =  typecheck(T, idx) .
   op tagidx :  -> WasmType .
-  eq typecheck(T, tagidx) = typecheck(T, idx) .
+  eq typecheck(T, tagidx) =  typecheck(T, idx) .
   op elemidx :  -> WasmType .
-  eq typecheck(T, elemidx) = typecheck(T, idx) .
+  eq typecheck(T, elemidx) =  typecheck(T, idx) .
   op dataidx :  -> WasmType .
-  eq typecheck(T, dataidx) = typecheck(T, idx) .
+  eq typecheck(T, dataidx) =  typecheck(T, idx) .
   op labelidx :  -> WasmType .
-  eq typecheck(T, labelidx) = typecheck(T, idx) .
+  eq typecheck(T, labelidx) =  typecheck(T, idx) .
   op localidx :  -> WasmType .
-  eq typecheck(T, localidx) = typecheck(T, idx) .
+  eq typecheck(T, localidx) =  typecheck(T, idx) .
   op fieldidx :  -> WasmType .
-  eq typecheck(T, fieldidx) = typecheck(T, idx) .
+  eq typecheck(T, fieldidx) =  typecheck(T, idx) .
   op externidx :  -> WasmType .
   op FUNC _ : WasmTerminal -> WasmTerminal .
   vars FUNCIDX1 : WasmTerminal .
@@ -563,7 +563,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   op I16 : -> WasmTerminal .
   eq typecheck(I16, storagetype) = true .
   op resulttype :  -> WasmType .
-  eq typecheck(T, resulttype) = typecheck(T, list(valtype)) .
+  eq typecheck(T, resulttype) =  typecheck(T, list(valtype)) .
   op fieldtype :  -> WasmType .
   op UNKNOWN _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars MUT1 STORAGETYPE2 : WasmTerminal .
@@ -577,7 +577,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(ARRAY FIELDTYPE1, comptype) = typecheck(FIELDTYPE1, fieldtype) .
   op FUNC _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars RESULTTYPE1 RESULTTYPE2 : WasmTerminal .
-  eq typecheck(FUNC RESULTTYPE1 RESULTTYPE2, comptype) = typecheck(RESULTTYPE1, resulttype) /\ typecheck(RESULTTYPE2, resulttype) .
+  eq typecheck(FUNC RESULTTYPE1 RESULTTYPE2, comptype) = typecheck(RESULTTYPE1, resulttype) /\ typecheck(RESULTTYPE2, RESULTTYPE1) .
   op subtype :  -> WasmType .
   op SUB _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars FINAL1 TYPEUSE2 COMPTYPE3 : WasmTerminal .
@@ -602,14 +602,14 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   vars NULL1 HEAPTYPE2 : WasmTerminal .
   eq typecheck(REF NULL1 HEAPTYPE2, reftype) = typecheck(NULL1, null) /\ typecheck(HEAPTYPE2, heaptype) .
   op Inn :  -> WasmType .
-  eq typecheck(T, Inn) = typecheck(T, addrtype) .
+  eq typecheck(T, Inn) =  typecheck(T, addrtype) .
   op Fnn :  -> WasmType .
   op F32 : -> WasmTerminal .
   eq typecheck(F32, Fnn) = true .
   op F64 : -> WasmTerminal .
   eq typecheck(F64, Fnn) = true .
   op Vnn :  -> WasmType .
-  eq typecheck(T, Vnn) = typecheck(T, vectype) .
+  eq typecheck(T, Vnn) =  typecheck(T, vectype) .
   op Cnn :  -> WasmType .
   op I32 : -> WasmTerminal .
   eq typecheck(I32, Cnn) = true .
@@ -688,7 +688,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   op I16 : -> WasmTerminal .
   eq typecheck(I16, lanetype) = true .
   op Pnn :  -> WasmType .
-  eq typecheck(T, Pnn) = typecheck(T, packtype) .
+  eq typecheck(T, Pnn) =  typecheck(T, packtype) .
   op Jnn :  -> WasmType .
   op I32 : -> WasmTerminal .
   eq typecheck(I32, Jnn) = true .
@@ -699,13 +699,13 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   op I16 : -> WasmTerminal .
   eq typecheck(I16, Jnn) = true .
   op Lnn :  -> WasmType .
-  eq typecheck(T, Lnn) = typecheck(T, lanetype) .
+  eq typecheck(T, Lnn) =  typecheck(T, lanetype) .
   op limits :  -> WasmType .
   op lbrack _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars U641 U642 : WasmTerminal .
-  eq typecheck(lbrack U641 U642, limits) = typecheck(U641, u64) /\ typecheck(U642, u64) .
+  eq typecheck(lbrack U641 U642, limits) = typecheck(U641, u64) /\ typecheck(U642, U641) .
   op tagtype :  -> WasmType .
-  eq typecheck(T, tagtype) = typecheck(T, typeuse) .
+  eq typecheck(T, tagtype) =  typecheck(T, typeuse) .
   op globaltype :  -> WasmType .
   op UNKNOWN _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars MUT1 VALTYPE2 : WasmTerminal .
@@ -722,7 +722,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   op OK : -> WasmTerminal .
   eq typecheck(OK, datatype) = true .
   op elemtype :  -> WasmType .
-  eq typecheck(T, elemtype) = typecheck(T, reftype) .
+  eq typecheck(T, elemtype) =  typecheck(T, reftype) .
   op externtype :  -> WasmType .
   op TAG _ : WasmTerminal -> WasmTerminal .
   vars TAGTYPE1 : WasmTerminal .
@@ -742,7 +742,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   op moduletype :  -> WasmType .
   op UNKNOWN _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars EXTERNTYPE1 EXTERNTYPE2 : WasmTerminal .
-  eq typecheck(UNKNOWN EXTERNTYPE1 EXTERNTYPE2, moduletype) = typecheck(EXTERNTYPE1, externtype) /\ typecheck(EXTERNTYPE2, externtype) .
+  eq typecheck(UNKNOWN EXTERNTYPE1 EXTERNTYPE2, moduletype) = typecheck(EXTERNTYPE1, externtype) /\ typecheck(EXTERNTYPE2, EXTERNTYPE1) .
 
   op $IN : WasmTerminal -> WasmTerminal .
   var N : WasmTerminal .
@@ -1415,20 +1415,20 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq free_moduletype(UNKNOWN_CASE) = 0 .
 
   op num- : WasmTerminal -> WasmType .
-  eq typecheck(T, num-(INN)) = typecheck(T, iN($sizenn(INN))) .
-  eq typecheck(T, num-(FNN)) = typecheck(T, fN($sizenn(FNN))) .
+  eq typecheck(T, num-(INN)) = typecheck(INN, Inn) /\  typecheck(T, iN($sizenn(INN))) .
+  eq typecheck(T, num-(FNN)) = typecheck(FNN, Fnn) /\  typecheck(T, fN($sizenn(FNN))) .
   op pack- : WasmTerminal -> WasmType .
-  eq typecheck(T, pack-(PNN)) = typecheck(T, iN($psizenn(PNN))) .
+  eq typecheck(T, pack-(PNN)) = typecheck(PNN, Pnn) /\  typecheck(T, iN($psizenn(PNN))) .
   op lane- : WasmTerminal -> WasmType .
-  eq typecheck(T, lane-(NUMTYPE)) = typecheck(T, num-(NUMTYPE)) .
-  eq typecheck(T, lane-(PACKTYPE)) = typecheck(T, pack-(PACKTYPE)) .
-  eq typecheck(T, lane-(JNN)) = typecheck(T, iN($lsize(JNN))) .
+  eq typecheck(T, lane-(NUMTYPE)) = typecheck(NUMTYPE, numtype) /\  typecheck(T, num-(NUMTYPE)) .
+  eq typecheck(T, lane-(PACKTYPE)) = typecheck(PACKTYPE, packtype) /\  typecheck(T, pack-(PACKTYPE)) .
+  eq typecheck(T, lane-(JNN)) = typecheck(JNN, Jnn) /\  typecheck(T, iN($lsize(JNN))) .
   op vec- : WasmTerminal -> WasmType .
-  eq typecheck(T, vec-(VNN)) = typecheck(T, vN($vsize(VNN))) .
+  eq typecheck(T, vec-(VNN)) = typecheck(VNN, Vnn) /\  typecheck(T, vN($vsize(VNN))) .
   op lit- : WasmTerminal -> WasmType .
-  eq typecheck(T, lit-(NUMTYPE)) = typecheck(T, num-(NUMTYPE)) .
-  eq typecheck(T, lit-(VECTYPE)) = typecheck(T, vec-(VECTYPE)) .
-  eq typecheck(T, lit-(PACKTYPE)) = typecheck(T, pack-(PACKTYPE)) .
+  eq typecheck(T, lit-(NUMTYPE)) = typecheck(NUMTYPE, numtype) /\  typecheck(T, num-(NUMTYPE)) .
+  eq typecheck(T, lit-(VECTYPE)) = typecheck(VECTYPE, vectype) /\  typecheck(T, vec-(VECTYPE)) .
+  eq typecheck(T, lit-(PACKTYPE)) = typecheck(PACKTYPE, packtype) /\  typecheck(T, pack-(PACKTYPE)) .
   op sz :  -> WasmType .
  
   ceq typecheck(i, sz) = true 
@@ -1839,7 +1839,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(LOOP BLOCKTYPE1 INSTR2, instr) = typecheck(BLOCKTYPE1, blocktype) /\ typecheck(INSTR2, instr) .
   op IF _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars BLOCKTYPE1 INSTR2 INSTR3 : WasmTerminal .
-  eq typecheck(IF BLOCKTYPE1 INSTR2 INSTR3, instr) = typecheck(BLOCKTYPE1, blocktype) /\ typecheck(INSTR2, instr) /\ typecheck(INSTR3, instr) .
+  eq typecheck(IF BLOCKTYPE1 INSTR2 INSTR3, instr) = typecheck(BLOCKTYPE1, blocktype) /\ typecheck(INSTR2, instr) /\ typecheck(INSTR3, INSTR2) .
   op BR _ : WasmTerminal -> WasmTerminal .
   vars LABELIDX1 : WasmTerminal .
   eq typecheck(BR LABELIDX1, instr) = typecheck(LABELIDX1, labelidx) .
@@ -1848,7 +1848,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(BR-IF LABELIDX1, instr) = typecheck(LABELIDX1, labelidx) .
   op BR-TABLE _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars LABELIDX1 LABELIDX2 : WasmTerminal .
-  eq typecheck(BR-TABLE LABELIDX1 LABELIDX2, instr) = typecheck(LABELIDX1, labelidx) /\ typecheck(LABELIDX2, labelidx) .
+  eq typecheck(BR-TABLE LABELIDX1 LABELIDX2, instr) = typecheck(LABELIDX1, labelidx) /\ typecheck(LABELIDX2, LABELIDX1) .
   op BR-ON-NULL _ : WasmTerminal -> WasmTerminal .
   vars LABELIDX1 : WasmTerminal .
   eq typecheck(BR-ON-NULL LABELIDX1, instr) = typecheck(LABELIDX1, labelidx) .
@@ -1857,10 +1857,10 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(BR-ON-NON-NULL LABELIDX1, instr) = typecheck(LABELIDX1, labelidx) .
   op BR-ON-CAST _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars LABELIDX1 REFTYPE2 REFTYPE3 : WasmTerminal .
-  eq typecheck(BR-ON-CAST LABELIDX1 REFTYPE2 REFTYPE3, instr) = typecheck(LABELIDX1, labelidx) /\ typecheck(REFTYPE2, reftype) /\ typecheck(REFTYPE3, reftype) .
+  eq typecheck(BR-ON-CAST LABELIDX1 REFTYPE2 REFTYPE3, instr) = typecheck(LABELIDX1, labelidx) /\ typecheck(REFTYPE2, reftype) /\ typecheck(REFTYPE3, REFTYPE2) .
   op BR-ON-CAST-FAIL _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars LABELIDX1 REFTYPE2 REFTYPE3 : WasmTerminal .
-  eq typecheck(BR-ON-CAST-FAIL LABELIDX1 REFTYPE2 REFTYPE3, instr) = typecheck(LABELIDX1, labelidx) /\ typecheck(REFTYPE2, reftype) /\ typecheck(REFTYPE3, reftype) .
+  eq typecheck(BR-ON-CAST-FAIL LABELIDX1 REFTYPE2 REFTYPE3, instr) = typecheck(LABELIDX1, labelidx) /\ typecheck(REFTYPE2, reftype) /\ typecheck(REFTYPE3, REFTYPE2) .
   op CALL _ : WasmTerminal -> WasmTerminal .
   vars FUNCIDX1 : WasmTerminal .
   eq typecheck(CALL FUNCIDX1, instr) = typecheck(FUNCIDX1, funcidx) .
@@ -1921,7 +1921,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(TABLE.FILL TABLEIDX1, instr) = typecheck(TABLEIDX1, tableidx) .
   op TABLE.COPY _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars TABLEIDX1 TABLEIDX2 : WasmTerminal .
-  eq typecheck(TABLE.COPY TABLEIDX1 TABLEIDX2, instr) = typecheck(TABLEIDX1, tableidx) /\ typecheck(TABLEIDX2, tableidx) .
+  eq typecheck(TABLE.COPY TABLEIDX1 TABLEIDX2, instr) = typecheck(TABLEIDX1, tableidx) /\ typecheck(TABLEIDX2, TABLEIDX1) .
   op TABLE.INIT _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars TABLEIDX1 ELEMIDX2 : WasmTerminal .
   eq typecheck(TABLE.INIT TABLEIDX1 ELEMIDX2, instr) = typecheck(TABLEIDX1, tableidx) /\ typecheck(ELEMIDX2, elemidx) .
@@ -1930,13 +1930,13 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(ELEM.DROP ELEMIDX1, instr) = typecheck(ELEMIDX1, elemidx) .
   op LOAD _ _ _ _ : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 LOADOP-2 MEMIDX3 MEMARG4 : WasmTerminal .
-  eq typecheck(LOAD NUMTYPE1 LOADOP-2 MEMIDX3 MEMARG4, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(LOADOP-2, loadop-(NUMTYPE)) /\ typecheck(MEMIDX3, memidx) /\ typecheck(MEMARG4, memarg) .
+  eq typecheck(LOAD NUMTYPE1 LOADOP-2 MEMIDX3 MEMARG4, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(LOADOP-2, loadop-(NUMTYPE1)) /\ typecheck(MEMIDX3, memidx) /\ typecheck(MEMARG4, memarg) .
   op STORE _ _ _ _ : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 STOREOP-2 MEMIDX3 MEMARG4 : WasmTerminal .
-  eq typecheck(STORE NUMTYPE1 STOREOP-2 MEMIDX3 MEMARG4, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(STOREOP-2, storeop-(NUMTYPE)) /\ typecheck(MEMIDX3, memidx) /\ typecheck(MEMARG4, memarg) .
+  eq typecheck(STORE NUMTYPE1 STOREOP-2 MEMIDX3 MEMARG4, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(STOREOP-2, storeop-(NUMTYPE1)) /\ typecheck(MEMIDX3, memidx) /\ typecheck(MEMARG4, memarg) .
   op VLOAD _ _ _ _ : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars VECTYPE1 VLOADOP-2 MEMIDX3 MEMARG4 : WasmTerminal .
-  eq typecheck(VLOAD VECTYPE1 VLOADOP-2 MEMIDX3 MEMARG4, instr) = typecheck(VECTYPE1, vectype) /\ typecheck(VLOADOP-2, vloadop-(VECTYPE)) /\ typecheck(MEMIDX3, memidx) /\ typecheck(MEMARG4, memarg) .
+  eq typecheck(VLOAD VECTYPE1 VLOADOP-2 MEMIDX3 MEMARG4, instr) = typecheck(VECTYPE1, vectype) /\ typecheck(VLOADOP-2, vloadop-(VECTYPE1)) /\ typecheck(MEMIDX3, memidx) /\ typecheck(MEMARG4, memarg) .
   op VLOAD-LANE _ _ _ _ _ : WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars VECTYPE1 SZ2 MEMIDX3 MEMARG4 LANEIDX5 : WasmTerminal .
   eq typecheck(VLOAD-LANE VECTYPE1 SZ2 MEMIDX3 MEMARG4 LANEIDX5, instr) = typecheck(VECTYPE1, vectype) /\ typecheck(SZ2, sz) /\ typecheck(MEMIDX3, memidx) /\ typecheck(MEMARG4, memarg) /\ typecheck(LANEIDX5, laneidx) .
@@ -1957,7 +1957,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(MEMORY.FILL MEMIDX1, instr) = typecheck(MEMIDX1, memidx) .
   op MEMORY.COPY _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars MEMIDX1 MEMIDX2 : WasmTerminal .
-  eq typecheck(MEMORY.COPY MEMIDX1 MEMIDX2, instr) = typecheck(MEMIDX1, memidx) /\ typecheck(MEMIDX2, memidx) .
+  eq typecheck(MEMORY.COPY MEMIDX1 MEMIDX2, instr) = typecheck(MEMIDX1, memidx) /\ typecheck(MEMIDX2, MEMIDX1) .
   op MEMORY.INIT _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars MEMIDX1 DATAIDX2 : WasmTerminal .
   eq typecheck(MEMORY.INIT MEMIDX1 DATAIDX2, instr) = typecheck(MEMIDX1, memidx) /\ typecheck(DATAIDX2, dataidx) .
@@ -2027,7 +2027,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(ARRAY.FILL TYPEIDX1, instr) = typecheck(TYPEIDX1, typeidx) .
   op ARRAY.COPY _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars TYPEIDX1 TYPEIDX2 : WasmTerminal .
-  eq typecheck(ARRAY.COPY TYPEIDX1 TYPEIDX2, instr) = typecheck(TYPEIDX1, typeidx) /\ typecheck(TYPEIDX2, typeidx) .
+  eq typecheck(ARRAY.COPY TYPEIDX1 TYPEIDX2, instr) = typecheck(TYPEIDX1, typeidx) /\ typecheck(TYPEIDX2, TYPEIDX1) .
   op ARRAY.INIT-DATA _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars TYPEIDX1 DATAIDX2 : WasmTerminal .
   eq typecheck(ARRAY.INIT-DATA TYPEIDX1 DATAIDX2, instr) = typecheck(TYPEIDX1, typeidx) /\ typecheck(DATAIDX2, dataidx) .
@@ -2040,25 +2040,25 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(ANY.CONVERT-EXTERN, instr) = true .
   op CONST _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 NUM-2 : WasmTerminal .
-  eq typecheck(CONST NUMTYPE1 NUM-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(NUM-2, num-(NUMTYPE)) .
+  eq typecheck(CONST NUMTYPE1 NUM-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(NUM-2, num-(NUMTYPE1)) .
   op UNOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 UNOP-2 : WasmTerminal .
-  eq typecheck(UNOP NUMTYPE1 UNOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(UNOP-2, unop-(NUMTYPE)) .
+  eq typecheck(UNOP NUMTYPE1 UNOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(UNOP-2, unop-(NUMTYPE1)) .
   op BINOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 BINOP-2 : WasmTerminal .
-  eq typecheck(BINOP NUMTYPE1 BINOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(BINOP-2, binop-(NUMTYPE)) .
+  eq typecheck(BINOP NUMTYPE1 BINOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(BINOP-2, binop-(NUMTYPE1)) .
   op TESTOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 TESTOP-2 : WasmTerminal .
-  eq typecheck(TESTOP NUMTYPE1 TESTOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(TESTOP-2, testop-(NUMTYPE)) .
+  eq typecheck(TESTOP NUMTYPE1 TESTOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(TESTOP-2, testop-(NUMTYPE1)) .
   op RELOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 RELOP-2 : WasmTerminal .
-  eq typecheck(RELOP NUMTYPE1 RELOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(RELOP-2, relop-(NUMTYPE)) .
+  eq typecheck(RELOP NUMTYPE1 RELOP-2, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(RELOP-2, relop-(NUMTYPE1)) .
   op CVTOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars NUMTYPE1 NUMTYPE2 CVTOP--3 : WasmTerminal .
-  eq typecheck(CVTOP NUMTYPE1 NUMTYPE2 CVTOP--3, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(NUMTYPE2, numtype) /\ typecheck(CVTOP--3, cvtop--(NUMTYPE_2, NUMTYPE_1)) .
+  eq typecheck(CVTOP NUMTYPE1 NUMTYPE2 CVTOP--3, instr) = typecheck(NUMTYPE1, numtype) /\ typecheck(NUMTYPE2, NUMTYPE1) /\ typecheck(CVTOP--3, cvtop--(NUMTYPE_2, NUMTYPE_1)) .
   op VCONST _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars VECTYPE1 VEC-2 : WasmTerminal .
-  eq typecheck(VCONST VECTYPE1 VEC-2, instr) = typecheck(VECTYPE1, vectype) /\ typecheck(VEC-2, vec-(VECTYPE)) .
+  eq typecheck(VCONST VECTYPE1 VEC-2, instr) = typecheck(VECTYPE1, vectype) /\ typecheck(VEC-2, vec-(VECTYPE1)) .
   op VVUNOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars VECTYPE1 VVUNOP2 : WasmTerminal .
   eq typecheck(VVUNOP VECTYPE1 VVUNOP2, instr) = typecheck(VECTYPE1, vectype) /\ typecheck(VVUNOP2, vvunop) .
@@ -2073,46 +2073,46 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   eq typecheck(VVTESTOP VECTYPE1 VVTESTOP2, instr) = typecheck(VECTYPE1, vectype) /\ typecheck(VVTESTOP2, vvtestop) .
   op VUNOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars SHAPE1 VUNOP-2 : WasmTerminal .
-  eq typecheck(VUNOP SHAPE1 VUNOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VUNOP-2, vunop-(SHAPE)) .
+  eq typecheck(VUNOP SHAPE1 VUNOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VUNOP-2, vunop-(SHAPE1)) .
   op VBINOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars SHAPE1 VBINOP-2 : WasmTerminal .
-  eq typecheck(VBINOP SHAPE1 VBINOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VBINOP-2, vbinop-(SHAPE)) .
+  eq typecheck(VBINOP SHAPE1 VBINOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VBINOP-2, vbinop-(SHAPE1)) .
   op VTERNOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars SHAPE1 VTERNOP-2 : WasmTerminal .
-  eq typecheck(VTERNOP SHAPE1 VTERNOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VTERNOP-2, vternop-(SHAPE)) .
+  eq typecheck(VTERNOP SHAPE1 VTERNOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VTERNOP-2, vternop-(SHAPE1)) .
   op VTESTOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars SHAPE1 VTESTOP-2 : WasmTerminal .
-  eq typecheck(VTESTOP SHAPE1 VTESTOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VTESTOP-2, vtestop-(SHAPE)) .
+  eq typecheck(VTESTOP SHAPE1 VTESTOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VTESTOP-2, vtestop-(SHAPE1)) .
   op VRELOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars SHAPE1 VRELOP-2 : WasmTerminal .
-  eq typecheck(VRELOP SHAPE1 VRELOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VRELOP-2, vrelop-(SHAPE)) .
+  eq typecheck(VRELOP SHAPE1 VRELOP-2, instr) = typecheck(SHAPE1, shape) /\ typecheck(VRELOP-2, vrelop-(SHAPE1)) .
   op VSHIFTOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars ISHAPE1 VSHIFTOP-2 : WasmTerminal .
-  eq typecheck(VSHIFTOP ISHAPE1 VSHIFTOP-2, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(VSHIFTOP-2, vshiftop-(ISHAPE)) .
+  eq typecheck(VSHIFTOP ISHAPE1 VSHIFTOP-2, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(VSHIFTOP-2, vshiftop-(ISHAPE1)) .
   op VBITMASK _ : WasmTerminal -> WasmTerminal .
   vars ISHAPE1 : WasmTerminal .
   eq typecheck(VBITMASK ISHAPE1, instr) = typecheck(ISHAPE1, ishape) .
   op VSWIZZLOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   vars BSHAPE1 VSWIZZLOP-2 : WasmTerminal .
-  eq typecheck(VSWIZZLOP BSHAPE1 VSWIZZLOP-2, instr) = typecheck(BSHAPE1, bshape) /\ typecheck(VSWIZZLOP-2, vswizzlop-(BSHAPE)) .
+  eq typecheck(VSWIZZLOP BSHAPE1 VSWIZZLOP-2, instr) = typecheck(BSHAPE1, bshape) /\ typecheck(VSWIZZLOP-2, vswizzlop-(BSHAPE1)) .
  
   ceq typecheck(i, instr) = true 
    if (UNKNOWN_CASE == $dim(0)) .
   op VEXTUNOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars ISHAPE1 ISHAPE2 VEXTUNOP--3 : WasmTerminal .
-  eq typecheck(VEXTUNOP ISHAPE1 ISHAPE2 VEXTUNOP--3, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(ISHAPE2, ishape) /\ typecheck(VEXTUNOP--3, vextunop--(ISHAPE_2, ISHAPE_1)) .
+  eq typecheck(VEXTUNOP ISHAPE1 ISHAPE2 VEXTUNOP--3, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(ISHAPE2, ISHAPE1) /\ typecheck(VEXTUNOP--3, vextunop--(ISHAPE_2, ISHAPE_1)) .
   op VEXTBINOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars ISHAPE1 ISHAPE2 VEXTBINOP--3 : WasmTerminal .
-  eq typecheck(VEXTBINOP ISHAPE1 ISHAPE2 VEXTBINOP--3, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(ISHAPE2, ishape) /\ typecheck(VEXTBINOP--3, vextbinop--(ISHAPE_2, ISHAPE_1)) .
+  eq typecheck(VEXTBINOP ISHAPE1 ISHAPE2 VEXTBINOP--3, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(ISHAPE2, ISHAPE1) /\ typecheck(VEXTBINOP--3, vextbinop--(ISHAPE_2, ISHAPE_1)) .
   op VEXTTERNOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars ISHAPE1 ISHAPE2 VEXTTERNOP--3 : WasmTerminal .
-  eq typecheck(VEXTTERNOP ISHAPE1 ISHAPE2 VEXTTERNOP--3, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(ISHAPE2, ishape) /\ typecheck(VEXTTERNOP--3, vextternop--(ISHAPE_2, ISHAPE_1)) .
+  eq typecheck(VEXTTERNOP ISHAPE1 ISHAPE2 VEXTTERNOP--3, instr) = typecheck(ISHAPE1, ishape) /\ typecheck(ISHAPE2, ISHAPE1) /\ typecheck(VEXTTERNOP--3, vextternop--(ISHAPE_2, ISHAPE_1)) .
  
   ceq typecheck(i, instr) = true 
    if (($lsize($lanetype(0)) == (2 * $lsize($lanetype(0)))) /\ ((2 * $lsize($lanetype(0))) <= 32)) .
   op VCVTOP _ _ _ : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   vars SHAPE1 SHAPE2 VCVTOP--3 : WasmTerminal .
-  eq typecheck(VCVTOP SHAPE1 SHAPE2 VCVTOP--3, instr) = typecheck(SHAPE1, shape) /\ typecheck(SHAPE2, shape) /\ typecheck(VCVTOP--3, vcvtop--(SHAPE_2, SHAPE_1)) .
+  eq typecheck(VCVTOP SHAPE1 SHAPE2 VCVTOP--3, instr) = typecheck(SHAPE1, shape) /\ typecheck(SHAPE2, SHAPE1) /\ typecheck(VCVTOP--3, vcvtop--(SHAPE_2, SHAPE_1)) .
   op VSPLAT _ : WasmTerminal -> WasmTerminal .
   vars SHAPE1 : WasmTerminal .
   eq typecheck(VSPLAT SHAPE1, instr) = typecheck(SHAPE1, shape) .
@@ -2123,7 +2123,7 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   vars SHAPE1 LANEIDX2 : WasmTerminal .
   eq typecheck(VREPLACE-LANE SHAPE1 LANEIDX2, instr) = typecheck(SHAPE1, shape) /\ typecheck(LANEIDX2, laneidx) .
   op expr :  -> WasmType .
-  eq typecheck(INSTRS, expr) = typecheck(INSTRS, instr) .
+  eq typecheck(INSTRS, expr) =  typecheck(INSTRS, instr) .
 
   op $memarg0 :  -> WasmTerminal .
   eq memarg0 = 0 .
