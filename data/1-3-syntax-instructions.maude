@@ -87,18 +87,18 @@ mod 1_3_SYNTAX_INSTRUCTIONS is
   --- syntax instr/num = ...
   ---    | CONST numtype num_(numtype)
   ---    | BINOP numtype binop_(numtype)    
-  ---    | BINOP numtype relop_(numtype)
+  ---    | RELOP numtype relop_(numtype)
   op CONST _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   var NUM_INSTR_CONST : WasmTerminal .
   eq typecheck(CONST NUMTYPE NUM_INSTR_CONST, instr) = typecheck(NUMTYPE, numtype) /\ typecheck(NUM_INSTR_CONST, num-(NUMTYPE)) .
   
   op BINOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   var BINOP_INSTR_CONST : WasmTerminal .
-  eq typecheck(BINOP NUMTYPE BINOP_INSTR_CONST, instr) = typecheck(NUMTYPE, numtype) /\ typecheck(BINOP_INSTR_CONST, num-(NUMTYPE)) .
+  eq typecheck(BINOP NUMTYPE BINOP_INSTR_CONST, instr) = typecheck(NUMTYPE, numtype) /\ typecheck(BINOP_INSTR_CONST, binop-(NUMTYPE)) .
   
   op RELOP _ _ : WasmTerminal WasmTerminal -> WasmTerminal .
   var RELOP_INSTR_CONST : WasmTerminal .
-  eq typecheck(RELOP NUMTYPE RELOP_INSTR_CONST, instr) = typecheck(NUMTYPE, numtype) /\ typecheck(RELOP_INSTR_CONST, num-(NUMTYPE)) .
+  eq typecheck(RELOP NUMTYPE RELOP_INSTR_CONST, instr) = typecheck(NUMTYPE, numtype) /\ typecheck(RELOP_INSTR_CONST, relop-(NUMTYPE)) .
   
 
   --- syntax blocktype =

@@ -9,7 +9,7 @@ open Il.Ast
 let header =
   "load dsl/pretype \n\n" ^
   "load 1-1 \n\n" ^
-  "mod 1_2_SYNTAX_VALUES is\n" ^
+  "mod 1_2_SYNTAX_TYPES is\n" ^
   "  inc DSL-TERM .\n" ^
   "  inc DSL-PRETYPE .\n" ^
   "  inc DSL-EXEC .\n\n" ^
