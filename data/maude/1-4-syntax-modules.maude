@@ -1,0 +1,20 @@
+load 1-3-syntax-instructions
+
+mod 1_4_SYNTAX_MODULES is
+  inc 1_3_SYNTAX_INSTRUCTIONS .
+  op elemode : -> WasmType . --- 혁순 선배가 왜 쓴지 모르겠네 (나중에 쓰이려나 ?)
+
+  op local : -> WasmType .
+  var VALTYPE : WasmTerminal .
+  op LOCAL _ : WasmTerminal -> WasmTerminal .
+  eq typecheck(LOCAL VALTYPE, local) = typecheck(VALTYPE, valtype) .
+
+  op func : -> WasmType .
+  var TYPEIDX : WasmTerminal .
+  var LOCAL* : WasmTerminals .
+  var EXPR : WasmTerminals .
+  
+  op FUNC _ _ _ : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
+  eq typecheck(FUNC TYPEIDX LOCAL* EXPR, func) = typecheck(TYPEIDX, typeidx) /\ typecheck(LOCAL*, local) /\
+  typecheck(EXPR, expr) .
+endm
