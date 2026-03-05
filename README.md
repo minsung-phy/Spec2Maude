@@ -80,7 +80,7 @@ dune exec ./main.exe -- wasm-3.0/* > output.maude
 
 ## 5. Core Logic Highlights
 
-상세 매핑 규칙은 [ARCHITECTURE.md](https://github.com/minsung-phy/Spec2Maude/blob/main/document/ARCHITECTURE.md)에 기술되어 있으며, 주요 변환 특징은 다음과 같습니다.
+상세 매핑 규칙은 [Mapping_Specification.md](https://github.com/minsung-phy/Spec2Maude/blob/main/document/Mapping_Specification.md)에 기술되어 있으며, 주요 변환 특징은 다음과 같습니다.
 
 * **TypD**: 합집합 타입(Union Types) 처리를 위한 **검증 권한 위임(ceq)** 로직 구현.
 * **DecD**: 함수의 개별 Clause를 Maude의 패턴 매칭 등식(eq)으로 직렬화.
