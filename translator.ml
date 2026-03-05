@@ -7,19 +7,23 @@ let header =
   "load dsl/pretype \n\n" ^
   "load 1-1 \n\n" ^
   "load 1-2 \n\n" ^
-  "mod 1_3_SYNTAX_INSTRUCTIONS is\n" ^
+  "load 1-3 \n\n" ^
+  "mod 1_4_SYNTAX_MODULES is\n" ^
   "  inc DSL-TERM .\n" ^
   "  inc DSL-PRETYPE .\n" ^
   "  inc DSL-EXEC .\n\n" ^
   "  inc 1_1_SYNTAX_VALUES .\n\n" ^
   "  inc 1_2_SYNTAX_TYPES .\n\n" ^
+  "  inc 1_3_SYNTAX_INSTRUCTIONS .\n\n" ^
   "  subsort Int < WasmTerminal .\n" ^
   "  subsort Nat < WasmTerminal .\n\n" ^
   "  op nat : -> WasmType . \n" ^
-  "  var i : Int .\n" ^
+  "  var I : Int .\n" ^
   "  var T : WasmTerminal .\n"
 
 let footer = "\nendm"
+
+(* ------------------- Helper ------------------- *)
 
 (* 이름에서 _를 -로 바꾸고 끝에 %를 제거하는 함수 *)
 let sanitize name =
@@ -31,7 +35,15 @@ let sanitize name =
 (* 변수명을 대문자로 변환 (Inn -> INN) *)
 let to_var_name name = String.uppercase_ascii (sanitize name)
 
-(* ------------------- Helper: 수식 번역 ------------------- *)
+(* Type Environment Registry : *)
+(* 겉보기엔 단수형(VarT)이지만, 의미론적으로 반드시 리스트(WasmTerminals)로 취급해야 하는 예외 타입들의 집합 *)
+let is_plural_type (type_name : string) : bool =
+  match String.lowercase_ascii type_name with
+  | "expr" -> true    (* Wasm Core Spec 기준: expr ::= instr* / 공식문서 structure/instructions 마지막 *)
+  (* 나중에 Wasm 명세에 resulttype (valtype* 의미) 같은 게 나오면 여기에 추가 *)
+  | _ -> false
+
+
 (* 수식(Expression) 변환 함수: 연산자 이름을 그대로 사용함 *)
 let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
   match e.it with
@@ -171,38 +183,54 @@ let rec translate_definition (d : def) : string =
 
                   else
                     (* 인자 추출 함수: 변수명 중복 방지를 위해 카운터 사용, 타입 인자 보존 *)
-                    let rec collect_params counter current_v_map t = match t.it with
+                    let rec collect_params counter current_v_map t is_list = match t.it with
                       | VarT (tid, _) -> 
                           let v_base = to_var_name tid.it in
                           let count = !counter in
                           incr counter;
-                          let indexed_name = v_base ^ string_of_int count in
+
+                          let indexed_name = if is_list then v_base ^ "*" else v_base ^ string_of_int count in
                           
                           let sort_name = translate_typ t current_v_map in 
                           
+                          (* 중앙 레지스트리(is_plural_type)에 질의하여 Maude Sort 결정 *)
+                          let inherent_plural = is_plural_type tid.it in
+                          let maude_sort = if is_list || inherent_plural then "WasmTerminals" else "WasmTerminal" in
+
                           let updated_v_map = (tid.it, indexed_name) :: current_v_map in
-                          ([(indexed_name, sort_name)], updated_v_map)
-                      | IterT (inner, _) -> collect_params counter current_v_map inner
+                          ([(indexed_name, sort_name, maude_sort)], updated_v_map)
+
+                      | IterT (inner, iter) -> 
+                          (* Kleene Star(별)나 Plus(+) 기호가 있으면 is_list 깃발을 꽂고 내부 타입으로 진입 *)
+                          let is_lst = (iter = List || iter = List1) in
+                          collect_params counter current_v_map inner is_lst
+
                       | TupT fields -> 
                           List.fold_left (fun (ps_acc, vm_acc) (_, ft) ->
-                            let (ps, new_vm) = collect_params counter vm_acc ft in
+                            let (ps, new_vm) = collect_params counter vm_acc ft is_list in
                             (ps_acc @ ps, new_vm)
                           ) ([], current_v_map) fields
                       | _ -> ([], current_v_map)
                     in
+
                     let param_counter = ref 1 in
-                    let (params, _) = collect_params param_counter v_map case_typ in
+                    (* 최초 호출 시 is_list는 false로 시작 *)
+                    let (params, _) = collect_params param_counter v_map case_typ false in
                     
                     (* Maude 부품 조립 *)
-                    let p_vars = List.map fst params in
+                    let p_vars = List.map (fun (v, _, _) -> v) params in
                     let p_phs = String.concat "" (List.map (fun _ -> " _") params) in
-                    let p_sorts = String.concat " " (List.map (fun _ -> "WasmTerminal") params) in
-                    
-                    let v_decl = if p_vars = [] then "" 
-                                 else Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " p_vars) in
 
-                    (* 조건문: typecheck(NUMTYPE1, numtype) /\ typecheck(NUM2, num-(NUMTYPE1)) *)
-                    let p_conds = List.map (fun (v, s) -> Printf.sprintf "typecheck(%s, %s)" v s) params in
+                    (* maude_sort(단/복수) 사용 *)
+                    let p_sorts = String.concat " " (List.map (fun (_, _, ms) -> ms) params) in
+                    
+                    (* 변수 선언: 각 변수의 maude_sort에 맞게 개별 선언 *)
+                    let v_decl = String.concat "" (List.map (fun (v, _, ms) -> 
+                        Printf.sprintf "  var %s : %s .\n" v ms
+                    ) params) in
+
+                    (* 조건문: typecheck(LOCAL*, local) 등 *)
+                    let p_conds = List.map (fun (v, s, _) -> Printf.sprintf "typecheck(%s, %s)" v s) params in
                     let rhs_str = String.concat " /\\ " (binder_conds @ p_conds) in
                     
                     let main_rule = 

@@ -27,7 +27,7 @@ TypD (id "numtype", [], [
 TypD (id "deftype", [], [
   InstD ([], [], VariantT [
     (it = Atom.Atom "_DEF", (
-      [TypB (id "rectype"); ExpB (id "n", NumT Nat)], TupT [], []
+      [ExpB (id "rectype"); ExpB (id "n", NumT Nat)], TupT [], []
     ), [])
   ])
 ]);
