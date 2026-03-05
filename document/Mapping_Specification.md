@@ -8,11 +8,12 @@
 ## 1. Pipeline
 본 문서는 WebAssembly SpecTec의 문법을 읽어, 실행 가능한 Maude Algebraic Specification으로 Mapping 알고리즘을 설명한다.
 
-```mermaid
-graph LR
-    A[.spectec] --> B[[Spec2Maude Translator]]
-    B --> C[.maude]
+```text
+.spectec 
+-> [Spec2Maude Translator]
+.maude
 ```
+
 
 ## 2. Pre-defined Infrastructure
 변환된 코드가 의존하는 Maude 기반 환경과, 변환기 전체에서 공유되는 식별자 처리 규칙이다.
@@ -30,6 +31,7 @@ sanitize(name)   (* '_' → '-',  trailing '%' 제거 *)
 uppercase(name)  (* binder → Maude variable  e.g. inn → INN *)
 to_meta(fname)   (* SpecTec built-in function prefix 강제 부여  e.g. size → $size *)
 ```
+
 
 ## 3. translate_syntax
 SpecTec의 syntax 구문을 Maude의 Sort 선언 및 typecheck 등식으로 변환한다. 분기 기준은 `|` (파이프)로 구분되는 하위 구조의 형태와 제약 조건 유무이다.
@@ -65,6 +67,7 @@ Match Body with:
 	| 0 | ... | expr ->  (* Numerical Range Constraint *)
 	    emit "ceq typecheck(i, LHS) = true if Φ_binder /\ evaluate(i, expr) ."
 ```
+
 
 ## 4. translate_DecD
 SpecTec의 `def` 구문을 Maude `op` 선언과 패턴 매칭 기반 `eq` 절로 변환한다. 분기 기준은 좌항(LHS) 인자가 변수인지 생성자인지 여부이다.
@@ -105,18 +108,17 @@ For each "def $fname(args) = rhs_expr" in Equations:
         emit "eq {f_name}({arg_str}) = {RHS_term} ."
 ```
 
+
 ## 5. Summary
 
 전체 변환 규칙을 케이스별로 정리한다. `*`는 일반 규칙과 분리된 Special Case이다.
 
 | Rule | SpecTec Condition | Maude Output Pattern |
-| --- | --- | --- |
-| **Syntax-Const** | `| C` (제약 및 인자 없음) | `eq typecheck(C, LHS) = Φ_binder .` |
-| **Syntax-Cons** | `| C t1 ... tk` (제약 없음, 인자 있음) | `eq typecheck(C(V1...Vk), LHS) = Φ_binder /\ Φ_args .` |
+| :--- | :--- | :--- |
+| **Syntax-Const** | `\| C` (제약 및 인자 없음) | `eq typecheck(C, LHS) = Φ_binder .` |
+| **Syntax-Cons** | `\| C t1 ... tk` (제약 없음, 인자 있음) | `eq typecheck(C(V1...Vk), LHS) = Φ_binder /\ Φ_args .` |
 | **Syntax-Alias** | `syntax T = inner` | `eq typecheck(V, LHS) = Φ_binder /\ typecheck(V, inner) .` |
-| *** Numerical Range** | `| 0 | ... | expr` | `ceq typecheck(i, LHS) = true if Φ_binder /\ evaluate(i, expr) .` |
-| *** Optional / eps** | 인자 중 `t*?` 존재 시 | `eq typecheck(C eps, LHS) = true .` |
-| **Def-General** | `def $f(x) = rhs` (또는 인자 없는 경우) | `op $f : WasmTerminal^k -> WasmTerminal .`<br>
-
-<br>`eq $f(X) = translate_exp(rhs) .` |
+| **\* Numerical Range** | `\| 0 \| ... \| expr` | `ceq typecheck(i, LHS) = true if Φ_binder /\ evaluate(i, expr) .` |
+| **\* Optional / eps** | 인자 중 `t*?` 존재 시 | `eq typecheck(C eps, LHS) = true .` |
+| **Def-General** | `def $f(x) = rhs`<br>(또는 인자 없는 경우) | `op $f : WasmTerminal^k -> WasmTerminal .`<br>`eq $f(X) = translate_exp(rhs) .` |
 | **Def-Cons** | `def $f(C) = rhs` | `eq $f(C) = translate_exp(rhs) .` |
