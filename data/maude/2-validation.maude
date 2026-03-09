@@ -1,0 +1,56 @@
+load 1-4-syntax-modules
+
+mod 2_0_VALIDATION_CONTEXTS is
+  inc 1_4_SYNTAX_MODULES .
+
+  --- syntax init =
+  ---   | SET | UNSET
+  op init : -> WasmType .
+
+  op SET : -> WasmTerminal .
+  op UNSET : -> WasmTerminal .
+
+  eq typecheck(SET, init) = true .
+  eq typecheck(UNSET, init) = true .
+
+  --- syntax localtype =
+  ---   init valtype
+  op localtype : -> WasmType .
+
+  var INIT : WasmTerminal .
+  var VALTYPE : WasmTerminal .
+
+  eq typecheck(INIT VALTYPE, localtype) = true .
+
+  --- syntax instrtype =
+  ---   resulttype ->_ localidx* resulttype
+  op instrtype : -> WasmType .
+
+  var RESULTTYPE1 : WasmTerminals .
+  var LOCALIDX* : WasmTerminals .
+  var RESULTTYPE2 : WasmTerminals .
+
+  op _ ->- _ _ : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminal .
+
+  eq typecheck(RESULTTYPE1 ->- LOCALIDX* RESULTTYPE2, instrtype) = typecheck(RESULTTYPE1, resulttype) /\ typecheck(LOCALIDX*, localidx) /\ typecheck(RESULTTYPE2, resulttype) .
+endm
+
+mod 2_1_VALIDATION_TYPES is
+  inc 2_0_VALIDATION_CONTEXTS .
+
+endm
+
+mod 2_2_VALIDATION_SUBTYPING is
+  inc 2_1_VALIDATION_TYPES .
+
+endm
+
+mod 2_3_VALIDATION_INSTRUCTIONS is
+  inc 2_2_VALIDATION_SUBTYPING .
+
+endm
+
+mod 2_4_VALIDATION_MODULES is
+  inc 2_3_VALIDATION_INSTRUCTIONS .
+
+endm

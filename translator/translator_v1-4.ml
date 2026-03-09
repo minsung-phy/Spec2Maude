@@ -1,4 +1,4 @@
-(* version1-3 for 1-3.spectec -> 1-3.maude *)
+(* version1-4 for 1-4.spectec -> 1-4.maude *)
 
 open Util.Source
 open Il.Ast
@@ -17,7 +17,7 @@ let header =
   "  inc 1_3_SYNTAX_INSTRUCTIONS .\n\n" ^
   "  subsort Int < WasmTerminal .\n" ^
   "  subsort Nat < WasmTerminal .\n\n" ^
-  "  op nat : -> WasmType . \n" ^
+  "  op nat : -> WasmType [ctor] . \n" ^
   "  var I : Int .\n" ^
   "  var T : WasmTerminal .\n"
 
@@ -141,7 +141,7 @@ let rec translate_definition (d : def) : string =
     
       (* Maude 선언부 생성 *)
       let sig_types = if params = [] then "" else "WasmTerminal" in
-      let op_decl = Printf.sprintf "  op %s : %s -> WasmType .\n" name sig_types in
+      let op_decl = Printf.sprintf "  op %s : %s -> WasmType [ctor] .\n" name sig_types in
       
       let res = List.map (fun inst ->
         match inst.it with
@@ -235,10 +235,10 @@ let rec translate_definition (d : def) : string =
                     
                     let main_rule = 
                       if p_vars = [] then
-                        Printf.sprintf "  op %s : -> WasmTerminal .\n  eq typecheck(%s, %s) = %s ." 
+                        Printf.sprintf "  op %s : -> WasmTerminal [ctor] .\n  eq typecheck(%s, %s) = %s ." 
                           maude_cons_name maude_cons_name full_type_name (if rhs_str = "" then "true" else rhs_str)
                       else
-                        Printf.sprintf "  op %s%s : %s -> WasmTerminal .\n%s  eq typecheck(%s %s, %s) = %s ." 
+                        Printf.sprintf "  op %s%s : %s -> WasmTerminal [ctor] .\n%s  eq typecheck(%s %s, %s) = %s ." 
                           maude_cons_name p_phs p_sorts v_decl maude_cons_name (String.concat " " p_vars) full_type_name rhs_str
                     in
 
