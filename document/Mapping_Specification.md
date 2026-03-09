@@ -31,7 +31,6 @@ op typecheck : WasmTerminals WasmType -> Bool .
 (* Naming Conventions *)
 sanitize(name)   (* '_' → '-',  trailing '%' 제거 *)
 uppercase(name)  (* binder → Maude variable  e.g. inn → INN *)
-to_meta(fname)   (* SpecTec built-in function prefix 강제 부여  e.g. size → $size *)
 is_plural(type)  (* AST 순회 중 리스트(*, +) 기호나 의미론적 복수형(expr) 식별 *)
 ```
 
