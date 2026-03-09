@@ -12,7 +12,7 @@
 ---
 
 ## 1. Introduction
-본 프로젝트는 SpecTec의 AST를 분석하여 Maude의Algebraic Specification으로 전이시키는 자동 변환기입니다. 
+본 프로젝트는 SpecTec의 AST를 분석하여 Maude의 Algebraic Specification으로 전이시키는 자동 변환기입니다. 
 
 단순 텍스트 변환이 아닌 OCaml 메모리상의 AST 객체를 직접 Mapping함으로써 명세의 논리적 무결성을 보존하고 실행 가능한 정형 모델을 구축합니다.
 
@@ -26,22 +26,22 @@
 ```text
 /
 ├── document/
-│   └── ARCHITECTURE.md    <-- 상세 변환 로직 및 Mapping Rules 명세서
+│   └── Mapping_Specification.md    <-- 상세 변환 로직 및 Mapping Rules 명세서
 ├── dsl/
-│   └── pretype.maude      <-- Wasm 타입 시스템 구동을 위한 기초 Maude 환경
+│   └── pretype.maude               <-- Wasm 타입 시스템 구동을 위한 기초 Maude 환경
 ├── data/
-│   └── *.ast              <-- 번역의 근거가 되는 SpecTec Raw AST 데이터
-│   └── *.maude            <-- Spectec 명세를 손으로 직접 Maude로 번역한 코드
+│   └── *.ast                       <-- 번역의 근거가 되는 SpecTec Raw AST 데이터
+│   └── *.maude                     <-- Spectec 명세를 손으로 직접 Maude로 번역한 코드
 ├── lib/
-│   └── *                  <-- Spectec의 라이브러리들
+│   └── *                           <-- Spectec의 라이브러리들
 ├── wasm-3.0/
-│   └── *.spectec          <-- 입력값으로 사용되는 원본 Wasm 명세 파일
+│   └── *.spectec                   <-- 입력값으로 사용되는 원본 Wasm 명세 파일
 ├── output/
-│   └── *.maude            <-- 번역기를 통해 생성된 최종 Maude 코드
+│   └── *.maude                     <-- 번역기를 통해 생성된 최종 Maude 코드
 ├── translator/
-│   └── *.ml               <-- 번역기 구현 과정
-├── translator.ml          <-- [Core] AST 매핑 로직이 담긴 메인 번역기 소스
-└── main.ml                <-- SpecTec 파이프라인 구동 및 번역기 호출 모듈
+│   └── *.ml                        <-- 번역기 구현 과정
+├── translator.ml                   <-- [Core] AST 매핑 로직이 담긴 메인 번역기 소스
+└── main.ml                         <-- SpecTec 파이프라인 구동 및 번역기 호출 모듈
 ```
 
 ---
