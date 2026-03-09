@@ -21,15 +21,18 @@
 ```text
 (* Sorts *)
 sort WasmTerminal .  *** 원자값, 생성자, 단일 명령어
+sort WasmTerminals . *** 구문들의 리스트 (e.g., instr*)
 sort WasmType .      *** 타입 카테고리 식별자
 
 (* Core interface *)
 op typecheck : WasmTerminal WasmType -> Bool .
+op typecheck : WasmTerminals WasmType -> Bool .
 
 (* Naming Conventions *)
 sanitize(name)   (* '_' → '-',  trailing '%' 제거 *)
 uppercase(name)  (* binder → Maude variable  e.g. inn → INN *)
 to_meta(fname)   (* SpecTec built-in function prefix 강제 부여  e.g. size → $size *)
+is_plural(type)  (* AST 순회 중 리스트(*, +) 기호나 의미론적 복수형(expr) 식별 *)
 ```
 
 
@@ -53,12 +56,14 @@ Match Body with:
 	| C t1 ... tk ->  (* Constructor Rules *)
 	    For each constructor case:
 	        If k = 0:  // Constant (e.g., | NULL)
-	            emit "op C : -> WasmTerminal ."
+	            emit "op C : -> WasmTerminal [ctor] ."
 	            emit "eq typecheck(C, LHS) = Φ_binder ."
 	        
 	        Else:      // Parameterized (e.g., | DIV sx)
+                Let S_j = if is_plural(t_j) then "WasmTerminals" else "WasmTerminal"
 	            Let Φ_args = ⋀ typecheck(V_j, t_j)  // V_j는 선형화된 고유 변수
-	            emit "op C _..._ : WasmTerminal^k -> WasmTerminal ."
+
+	            emit "op C _..._ : (S_1 ... S_k) -> WasmTerminal [ctor] ."
 	            emit "eq typecheck(C(V1...Vk), LHS) = Φ_binder /\ Φ_args ."
 	            
 	            If t1 is Optional (t*?):  // eps 기저 사례
