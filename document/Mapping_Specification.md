@@ -82,33 +82,32 @@ Input: SpecTec 함수 정의 블록 (시그니처 1줄 + 세부 방정식 N줄)
   [Signature] "def $fname(p1...pn) : ret_type"
   [Equations] "def $fname(args) = rhs_expr"
 
-// 1. 함수 이름 추출 및 시그니처 추상화 (op 선언)
+// 1. 시그니처 추상화 (op 선언)
 Let f_name = extract_func_name(Signature)  // 예: $size
 Let k = length(p1...pn)
 emit "op {f_name} : WasmTerminal^k -> WasmTerminal ."
 
-// 2. 바인더 변수 선언 및 환경(Environment) 구축
-Let v_map = { p -> uppercase(p) | p ∈ p1...pn }
-For each V in v_map.values:
-    emit "var {V} : WasmTerminal ."
+// 2. 공통 환경 (Environment) 변수 선언
+Let V_params = { P_1, ..., P_k }  // p_i를 대문자화한 변수 집합
+For each P_i in V_params:
+    emit "var {P_i} : WasmTerminal ."
 
 // 3. 개별 방정식(Equation) 리라이팅 규칙 도출
 For each "def $fname(args) = rhs_expr" in Equations:
     
     // 우항 수식과 좌항 인자를 Maude 항으로 사전 변환
-    Let RHS_term = translate_exp(rhs_expr, v_map)
-    Let arg_str  = translate_exp(args, v_map)
+    Let RHS_term = translate(rhs_expr)
+    Let arg_str  = translate(args)
     
     Match args with:
-    
     | [] ->  (* 기저 사례: 인자가 없는 경우 *)
         emit "eq {f_name} = {RHS_term} ."
         
-    | [Variable(x), ...] ->  (* 일반 사례: 변수 패턴 (예: x) *)
-        emit "var {arg_str} : WasmTerminal ."
+    | Variable(X) :: _ ->  (* 일반 사례: 인자가 변수 패턴인 경우 *)
+        emit "var {X} : WasmTerminal ."
         emit "eq {f_name}({arg_str}) = {RHS_term} ."
         
-    | [Constructor(C), ...] ->  (* 일반 사례: 생성자 패턴 (예: I32) *)
+    | Constructor(C) :: _ ->  (* 일반 사례: 인자가 생성자 패턴인 경우 *)
         emit "eq {f_name}({arg_str}) = {RHS_term} ."
 ```
 
