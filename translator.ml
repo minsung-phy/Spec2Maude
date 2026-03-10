@@ -1,18 +1,15 @@
-(* version2-0 for 2-0.spectec -> 2-0.maude *)
+(* version3-1 for 3-1.spectec -> 3-1.maude *)
 
 open Util.Source
 open Il.Ast
 
 let header =
-  "load 1-4 \n\n" ^
-  "mod 2_0_VALIDATION is\n" ^
+  "load 2 \n\n" ^
+  "mod 3_1_NUMERICS_SCALAR is\n" ^
   "  inc DSL-TERM .\n" ^
   "  inc DSL-PRETYPE .\n" ^
   "  inc DSL-EXEC .\n\n" ^
-  "  inc 1_1_SYNTAX_VALUES .\n" ^
-  "  inc 1_2_SYNTAX_TYPES .\n" ^
-  "  inc 1_3_SYNTAX_INSTRUCTIONS .\n" ^
-  "  inc 1_4_SYNTAX_MODULES .\n\n" ^
+  "  inc 2_0_VALIDATION .\n\n" ^
   "  subsort Int < WasmTerminal .\n" ^
   "  subsort Nat < WasmTerminal .\n\n" ^
   "  op nat : -> WasmType [ctor] . \n" ^
@@ -46,15 +43,20 @@ let is_plural_type (type_name : string) : bool =
 let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
   match e.it with
   | VarE id -> 
-      (* v_map(nt -> NT)에 있으면 바꾸고, 없으면 대문자로 바꿔서 리턴 *)
       (try List.assoc id.it v_map 
-        with Not_found -> String.uppercase_ascii id.it) (* v_map에 안잡히는게 많아서 이렇게 진행 *)
+       with Not_found -> 
+         (* 상수(ADD, SUB, EQ, false, true 등)는 변환하지 않고 그대로 출력 *)
+         if id.it = "ADD" || id.it = "SUB" || id.it = "EQ" || id.it = "false" || id.it = "true" then id.it 
+         else String.uppercase_ascii id.it)
   
-  | CaseE (mixop, _) ->
-      (* I32, I64, NULL 같은 생성자들이 여기에 있음 *)
-      (match mixop with
-       | (a :: _) :: _ -> Xl.Atom.name a  (* Atom 이름을 그대로 가져옴 *)
-       | _ -> "UNKNOWN_CASE")
+  | CaseE (mixop, inner_exp) ->
+      let op_name = 
+        try List.flatten mixop |> List.map Xl.Atom.name |> String.concat "" 
+        with _ -> "UNKNOWN_CASE"
+      in
+      (* $ 기호 또는 % 포맷팅 기호는 껍데기를 벗기고 내부 수식을 평가! *)
+      if op_name = "$" || op_name = "%" || op_name = "" then translate_exp inner_exp v_map
+      else op_name
 
   | NumE n -> 
       (match n with 
@@ -65,53 +67,44 @@ let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
   | CvtE (e1, _, _) -> translate_exp e1 v_map
   | SubE (e1, _, _) -> translate_exp e1 v_map
   
+  (* AST의 투영(proj) 및 언케이스(uncase) 노드 처리 - 껍데기 벗기고 알맹이만 반환 *)
+  | ProjE (e1, _) -> translate_exp e1 v_map
+  | UncaseE (e1, _) -> translate_exp e1 v_map
+
   | UnE (op, _, e1) -> 
-      let op_str = (match (op : unop) with 
-        | `MinusOp -> "-" 
-        | `PlusOp -> "+" 
-        | `NotOp -> "not "
-      ) in
-      Printf.sprintf "%s(%s)" op_str (translate_exp e1 v_map)
+      let op_str = (match (op : unop) with `MinusOp -> "-" | `PlusOp -> "+" | `NotOp -> "not ") in
+      if op_str = "-" then Printf.sprintf "- %s" (translate_exp e1 v_map)
+      else Printf.sprintf "%s(%s)" op_str (translate_exp e1 v_map)
       
   | BinE (op, _, e1, e2) -> 
       let op_str = (match (op : binop) with 
-        | `AddOp -> "+" 
-        | `SubOp -> "-" 
-        | `MulOp -> "*" 
-        | `DivOp -> "/" 
-        | `ModOp -> "%" 
-        | `PowOp -> "^"
-        | `AndOp -> "/\\" 
-        | `OrOp -> "\\/" (* Maude 표준 논리합은 \/ *)
-        | `ImplOp -> "implies" 
-        | `EquivOp -> "==" 
+        | `AddOp -> "+" | `SubOp -> "-" | `MulOp -> "*" | `DivOp -> "/" 
+        | `ModOp -> "rem" (* % 에서 rem으로 변경 *)
+        | `PowOp -> "^" | `AndOp -> "/\\" | `OrOp -> "\\/" 
+        | `ImplOp -> "implies" | `EquivOp -> "==" 
       ) in
       Printf.sprintf "(%s %s %s)" (translate_exp e1 v_map) op_str (translate_exp e2 v_map)
   
   | CmpE (op, _, e1, e2) ->
-      let op_str = (match (op : cmpop) with
-        | `LtOp -> "<" 
-        | `GtOp -> ">" 
-        | `LeOp -> "<=" 
-        | `GeOp -> ">=" 
-        | `EqOp -> "==" 
-        | `NeOp -> "=/="
-      ) in
+      let op_str = (match (op : cmpop) with `LtOp -> "<" | `GtOp -> ">" | `LeOp -> "<=" | `GeOp -> ">=" | `EqOp -> "==" | `NeOp -> "=/=" ) in
       Printf.sprintf "(%s %s %s)" (translate_exp e1 v_map) op_str (translate_exp e2 v_map)
 
   | CallE (id, args) -> 
       let arg_strs = List.map (fun a -> translate_arg a v_map) args in
-      (* 이름은 sanitize 하고 *)
       let fname = sanitize id.it in
-      (* 2. 만약 이름이 $로 시작하지 않는다면 $를 강제로 붙임 *)
-      let final_name = if String.length fname > 0 && fname.[0] = '$' then 
-                         fname 
-                       else 
-                         "$" ^ fname 
-      in
-      Printf.sprintf "%s(%s)" final_name (String.concat ", " arg_strs)
+      if fname = "$" then String.concat ", " arg_strs
+      else
+        let final_name = if String.length fname > 0 && fname.[0] = '$' then fname else "$" ^ fname in
+        Printf.sprintf "%s(%s)" final_name (String.concat ", " arg_strs)
+  
+  (* 괄호로 묶인 수식을 처리하기 위한 TupE 추가 *)
+  | TupE [] -> ""
+  | TupE [e1] -> translate_exp e1 v_map
+  | TupE el -> "(" ^ String.concat ", " (List.map (fun x -> translate_exp x v_map) el) ^ ")"
+  
+  | ListE el -> String.concat " " (List.map (fun x -> translate_exp x v_map) el)
       
-  | _ -> "0"
+  | _ -> "UNKNOWN_EXP"
 
 and translate_arg (a : arg) (v_map : (string * string) list) : string =
   match a.it with
@@ -313,55 +306,112 @@ let rec translate_definition (d : def) : string =
       ) insts in
       op_decl ^ String.concat "\n" res
   
-  | DecD (id, params, _, insts) ->
-    let func_name = id.it in
-    
-    (* 1. op 선언 *)
-    let arg_sorts = String.concat " " (List.map (fun _ -> "WasmTerminal") params) in
-    
-    let op_decl = Printf.sprintf "  op $%s : %s -> WasmTerminal .\n" func_name arg_sorts in
+| DecD (id, params, result_typ, insts) ->
+      let raw_func_name = id.it in
+      let func_name = sanitize raw_func_name in
+      let maude_func_name = if String.length func_name > 0 && func_name.[0] = '$' then func_name else "$" ^ func_name in
+      
+      let prefix_raw = match String.split_on_char '-' (String.uppercase_ascii func_name) with h::_ -> h | [] -> "FUNC" in
+      let prefix = if String.length prefix_raw > 0 && prefix_raw.[0] = '$' then String.sub prefix_raw 1 (String.length prefix_raw - 1) else prefix_raw in
 
-    (* 2. params에서 변수명 추출 및 대문자 변환 (NT, VARNUMTYPE 등) *)
-    (* v_map을 만들어서 eq 문장 번역할 때 nt -> NT로 바뀌게 함 *)
-    let local_v_map = List.filter_map (fun p ->
-      match p.it with
-      | ExpP (v_id, _) ->
-          let upper_v = String.uppercase_ascii v_id.it in
-          Some (v_id.it, upper_v)
-      | _ -> None
-    ) params in
-    
-    (* 3. var 선언 (위에서 만든 mapping을 그대로 사용!) *)
-    let var_decls = List.map (fun p ->
-        match p.it with
-        | ExpP (v_id, _) -> 
-            Printf.sprintf "  var %s : WasmTerminal .\n" (String.uppercase_ascii v_id.it)
-        | _ -> ""
-      ) params |> String.concat "" in
+      let arg_sorts = String.concat " " (List.map (fun p -> 
+          match p.it with 
+          | ExpP (v_id, t) -> 
+              let t_str = translate_typ t [] in
+              if t_str = "bool" || t_str = "Bool" || v_id.it = "bool" then "Bool" 
+              else "WasmTerminal"
+          | _ -> "WasmTerminal"
+      ) params) in
 
-    (* 4. eq 문장 생성 (v_map을 적용해서 소문자 인자를 대문자 변수로 치환) *)
-    let eq_lines = List.map (fun inst ->
-      match inst.it with
-      | DefD (_, lhs_args, rhs_exp, _) ->
-          let body = translate_exp rhs_exp local_v_map in
-          
-          match lhs_args with
-          | arg :: _ -> (
-              match arg.it with
-                | ExpA e -> (
-                    match e.it with
-                      | VarE _ ->
-                          let arg_str = translate_exp e local_v_map in
-                          Printf.sprintf "  var %s : WasmTerminal .\n  eq $%s(%s) = %s ." arg_str func_name arg_str body
-                      | _ -> (* CaseE 포함 *)
-                          let arg_str = translate_exp e local_v_map in
-                          Printf.sprintf "  eq %s(%s) = %s ." func_name arg_str body
-                )
-                | _ -> Printf.sprintf "  eq %s(UNKNOWN) = %s ." func_name body
-            )
-          | [] -> (* 인자가 아예 없을 때 *)
-              Printf.sprintf "  eq %s = %s ." func_name body
-    ) insts in
-    "\n" ^ op_decl ^ var_decls ^ (String.concat "\n" eq_lines) ^ "\n"
+      let ret_sort = match result_typ.it with
+          | IterT _ -> "WasmTerminals"
+          | _ -> "WasmTerminal"
+      in
+      
+      let op_decl = Printf.sprintf "  op %s : %s -> %s .\n" maude_func_name arg_sorts ret_sort in
+
+      let eq_lines = List.map (fun inst ->
+        match inst.it with
+        | DefD (binders, lhs_args, rhs_exp, _) ->
+            let v_map = ref [] in
+            let binder_conds = ref [] in
+            let var_decls = ref [] in
+            
+            List.iter (fun b ->
+                match b.it with
+                | ExpB (v_id, t) ->
+                    let raw_v = v_id.it in
+                    let t_str = translate_typ t [] in
+                    
+                    if t_str = "bool" || t_str = "Bool" || raw_v = "bool" then ()
+                    else begin
+                        let upper_v = String.uppercase_ascii (sanitize raw_v) in
+                        let upper_v = String.concat "" (String.split_on_char '-' upper_v) in
+                        let maude_var = prefix ^ "_" ^ upper_v in
+                        
+                        v_map := (raw_v, maude_var) :: !v_map;
+                        var_decls := maude_var :: !var_decls;
+                        
+                        let is_cap = (raw_v.[0] >= 'A' && raw_v.[0] <= 'Z') in
+                        if is_cap then
+                          binder_conds := Printf.sprintf "typecheck(%s, %s)" maude_var (sanitize raw_v) :: !binder_conds
+                        else begin
+                            let is_in = String.length t_str >= 2 && String.sub t_str 0 2 = "iN" in
+                            if not is_in && t_str <> "WasmType" && t_str <> "WasmTerminal" && t_str <> "Bool" then begin
+                                (* [추가됨] 여기서 t를 번역할 때 !v_map을 넘겨주면, 내부의 Inn이 BINOP_INN으로 치환됩니다! *)
+                                let t_str_mapped = translate_typ t !v_map in
+                                binder_conds := Printf.sprintf "typecheck(%s, %s)" maude_var t_str_mapped :: !binder_conds
+                            end
+                        end
+                    end
+                | _ -> ()
+            ) binders;
+
+            let body = translate_exp rhs_exp !v_map in
+            
+            let rec process_args args typs =
+                match args, typs with
+                | arg :: rest_args, param :: rest_typs ->
+                    let is_bool = 
+                        match param.it with 
+                        | ExpP (v_id, t) -> 
+                            let t_str = translate_typ t [] in
+                            (t_str = "bool" || t_str = "Bool" || v_id.it = "bool")
+                        | _ -> false 
+                    in
+                    let a_str = match arg.it with ExpA e -> translate_exp e !v_map | _ -> "UNKNOWN" in
+                    let final_a = 
+                        if is_bool then
+                            if body = "0" then "false" else if body = "1" then "true" else a_str
+                        else a_str
+                    in
+                    final_a :: process_args rest_args rest_typs
+                | [], _ -> []
+                | _, [] -> []
+            in
+            
+            let arg_strs = process_args lhs_args params in
+            let arg_str = String.concat ", " arg_strs in
+            
+            let unique_vars = List.rev !var_decls in
+            let is_n_var v = let len = String.length v in (len >= 2 && String.sub v (len-2) 2 = "_N") || (len >= 4 && String.sub v (len-4) 4 = "_INN") in
+            let vars_n = List.filter is_n_var unique_vars in
+            let vars_i = List.filter (fun v -> not (is_n_var v)) unique_vars in
+            
+            let decl_str = 
+              (if vars_n = [] then "" else if List.length vars_n = 1 then Printf.sprintf "  var %s : WasmTerminal .\n" (List.hd vars_n) else Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " vars_n)) ^
+              (if vars_i = [] then "" else if List.length vars_i = 1 then Printf.sprintf "  var %s : WasmTerminal .\n" (List.hd vars_i) else Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " vars_i))
+            in
+
+            let cond_str = if !binder_conds = [] then "" else " \n      if " ^ String.concat " /\\ " (List.rev !binder_conds) in
+            let eq_word = if !binder_conds = [] then "eq" else "ceq" in
+            let line_sep = if decl_str = "" then "" else "\n" in
+            
+            if arg_strs = [] then 
+                Printf.sprintf "%s%s  %s %s = %s%s ." line_sep decl_str eq_word maude_func_name body cond_str
+            else 
+                Printf.sprintf "%s%s  %s %s(%s) = %s%s ." line_sep decl_str eq_word maude_func_name arg_str body cond_str
+      ) insts in
+      "\n" ^ op_decl ^ String.concat "\n" eq_lines ^ "\n"
 
   | _ -> ""
