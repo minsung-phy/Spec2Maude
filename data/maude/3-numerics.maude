@@ -1,0 +1,72 @@
+load 2-validation
+
+mod 3_1_NUMERICS_SCALAR is
+    inc 2_4_VALIDATION_MODULES .
+
+    --- def $bool(bool) : nat
+    --- def $bool(false) = 0
+    --- def $bool(true) = 1
+    op $bool : Bool -> WasmTerminal .
+    
+    eq $bool(false) = 0 .
+    eq $bool(true) = 1 .
+
+    --- TODO implement with interger not nat .
+    --- def $iadd_(N, iN(N), iN(N)) : iN(N)
+    --- def $iadd_(N, i_1, i_2) = $((i_1 + i_2) \ 2^N)  
+    op $iadd- : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+    
+    var IADD_N : WasmTerminal .
+    vars IADD_I1 IADD_I2 : WasmTerminal .
+    
+    ceq $iadd-(IADD_N, IADD_I1, IADD_I2) = (IADD_I1 + IADD_I2) rem (2 ^ IADD_N) 
+        if typecheck(IADD_N, N) .
+
+    --- def $isub_(N, iN(N), iN(N)) : iN(N)
+    --- def $isub_(N, i_1, i_2) = $((2^N + i_1 - i_2) \ 2^N)
+    op $isub- : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+    
+    var ISUB_N : WasmTerminal .
+    vars ISUB_I1 ISUB_I2 : WasmTerminal .
+    
+    ceq $isub-(ISUB_N, ISUB_I1, ISUB_I2) = (2 ^ ISUB_N + ISUB_I1 + - ISUB_I2) rem (2 ^ ISUB_N)
+        if typecheck(ISUB_N, N) .
+
+    --- def $binop_(numtype, binop_(numtype), num_(numtype), num_(numtype)) : num_(numtype)*
+    --- def $binop_(Inn, ADD, i_1, i_2) = $iadd_($sizenn(Inn), i_1, i_2)
+    --- def $binop_(Inn, SUB, i_1, i_2) = $isub_($sizenn(Inn), i_1, i_2)
+    op $binop- : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
+
+    var BINOP_INN : WasmTerminal .
+    vars BINOP_I1 BINOP_I2 : WasmTerminal .
+
+    ceq $binop-(BINOP_INN, ADD, BINOP_I1, BINOP_I2) = $iadd-($sizenn(BINOP_INN), BINOP_I1, BINOP_I2)
+        if typecheck(BINOP_INN, Inn) /\ typecheck(BINOP_I1, num-(BINOP_INN)) /\ typecheck(BINOP_I2, num-(BINOP_INN)) .
+
+    ceq $binop-(BINOP_INN, SUB, BINOP_I1, BINOP_I2) = $isub-($sizenn(BINOP_INN), BINOP_I1, BINOP_I2)
+        if typecheck(BINOP_INN, Inn) /\ typecheck(BINOP_I1, num-(BINOP_INN)) /\ typecheck(BINOP_I2, num-(BINOP_INN)) .
+
+    --- def $ieq_(N, iN(N), iN(N)) : u32
+    --- def $ieq_(N, i_1, i_2) = $bool(i_1 = i_2)
+    op $ieq- : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+    
+    var IEQ_N : WasmTerminal .
+    vars IEQ_I1, IEQ_I2 : WasmTerminal .
+
+    ceq $ieq-(IEQ_N, IEQ_I1, IEQ_I2) = $bool(IEQ_I1 == IEQ_I2)
+        if typecheck(IEQ_N, N) .
+
+    --- def $relop_(numtype, relop_(numtype), num_(numtype), num_(numtype)) : u32
+    --- def $relop_(Inn, EQ, i_1, i_2) = $ieq_($sizenn(Inn), i_1, i_2)
+    op $relop- : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+    
+    var RELOP_INN : WasmTerminal .
+    vars RELOP_I1 RELOP_I2 : WasmTerminal .
+
+    ceq $relop-(RELOP_INN, EQ, RELOP_I1, RELOP_I2) = $ieq-($sizenn(RELOP_INN), RELOP_I1, RELOP_I2) 
+        if typecheck(RELOP_INN, Inn) /\ typecheck(RELOP_I1, num-(RELOP_INN)) /\ typecheck(RELOP_I2, num-(RELOP_INN)) .
+endm
+
+mod 3_2_NUMERICS_VECTOR is
+  inc 3_1_NUMERICS_SCALAR .
+endm

@@ -1,0 +1,19 @@
+def $bool(bool) : nat
+def $bool(false) = 0
+def $bool(true) = 1
+
+def $iadd_(N, iN(N), iN(N)) : iN(N)
+def $iadd_(N, i_1, i_2) = $((i_1 + i_2) \ 2^N)
+
+def $isub_(N, iN(N), iN(N)) : iN(N)
+def $isub_(N, i_1, i_2) = $((2^N + i_1 - i_2) \ 2^N)
+
+def $binop_(numtype, binop_(numtype), num_(numtype), num_(numtype)) : num_(numtype)*
+def $binop_(Inn, ADD, i_1, i_2) = $iadd_($sizenn(Inn), i_1, i_2)
+def $binop_(Inn, SUB, i_1, i_2) = $isub_($sizenn(Inn), i_1, i_2)
+
+def $ieq_(N, iN(N), iN(N)) : u32
+def $ieq_(N, i_1, i_2) = $bool(i_1 = i_2)
+
+def $relop_(numtype, relop_(numtype), num_(numtype), num_(numtype)) : u32
+def $relop_(Inn, EQ, i_1, i_2) = $ieq_($sizenn(Inn), i_1, i_2)
