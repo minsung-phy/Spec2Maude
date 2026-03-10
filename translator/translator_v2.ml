@@ -9,9 +9,6 @@ let header =
   "  inc DSL-TERM .\n" ^
   "  inc DSL-PRETYPE .\n" ^
   "  inc DSL-EXEC .\n\n" ^
-  "  inc 1_1_SYNTAX_VALUES .\n" ^
-  "  inc 1_2_SYNTAX_TYPES .\n" ^
-  "  inc 1_3_SYNTAX_INSTRUCTIONS .\n" ^
   "  inc 1_4_SYNTAX_MODULES .\n\n" ^
   "  subsort Int < WasmTerminal .\n" ^
   "  subsort Nat < WasmTerminal .\n\n" ^
@@ -19,7 +16,20 @@ let header =
   "  var I : Int .\n" ^
   "  var T : WasmTerminal .\n"
 
-let footer = "\nendm"
+let footer = 
+  "\nendm\n\n" ^
+  "mod 2_1_VALIDATION_TYPES is\n" ^
+  "  inc 2_0_VALIDATION_CONTEXTS .\n\n" ^
+  "endm\n\n" ^
+  "mod 2_2_VALIDATION_SUBTYPING is\n" ^
+  "  inc 2_1_VALIDATION_TYPES .\n\n" ^
+  "endm\n\n" ^
+  "mod 2_3_VALIDATION_INSTRUCTIONS is\n" ^
+  "  inc 2_2_VALIDATION_SUBTYPING .\n\n" ^
+  "endm\n\n" ^
+  "mod 2_4_VALIDATION_MODULES is\n" ^
+  "  inc 2_3_VALIDATION_INSTRUCTIONS .\n\n" ^
+  "endm\n"
 
 (* ------------------- Helper ------------------- *)
 
