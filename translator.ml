@@ -9,9 +9,9 @@ let header =
   "  inc DSL-TERM .\n" ^
   "  inc DSL-PRETYPE .\n" ^
   "  inc DSL-EXEC .\n\n" ^
-  "  inc 1_1_SYNTAX_VALUES .\n\n" ^
-  "  inc 1_2_SYNTAX_TYPES .\n\n" ^
-  "  inc 1_3_SYNTAX_INSTRUCTIONS .\n\n" ^
+  "  inc 1_1_SYNTAX_VALUES .\n" ^
+  "  inc 1_2_SYNTAX_TYPES .\n" ^
+  "  inc 1_3_SYNTAX_INSTRUCTIONS .\n" ^
   "  inc 1_4_SYNTAX_MODULES .\n\n" ^
   "  subsort Int < WasmTerminal .\n" ^
   "  subsort Nat < WasmTerminal .\n\n" ^
@@ -37,50 +37,10 @@ let to_var_name name = String.uppercase_ascii (sanitize name)
 (* 겉보기엔 단수형(VarT)이지만, 의미론적으로 반드시 리스트(WasmTerminals)로 취급해야 하는 예외 타입들의 집합 *)
 let is_plural_type (type_name : string) : bool =
   match String.lowercase_ascii type_name with
-  | "expr" -> true    (* Wasm Core Spec 기준: expr ::= instr* / 공식문서 structure/instructions 마지막 *)
+  | "expr" | "resulttype" -> true    (* Wasm Core Spec 기준: expr ::= instr* / 공식문서 structure/instructions 마지막 *)
   (* 나중에 Wasm 명세에 resulttype (valtype* 의미) 같은 게 나오면 여기에 추가 *)
   | _ -> false
 
-let normalize_space s =
-  let words = String.split_on_char ' ' s |> List.filter (fun x -> x <> "") in
-  String.concat " " words
-
-let build_mixfix (raw_name : string) (vars : string list) =
-  if raw_name = "" || raw_name = "UNKNOWN" then
-    (* 1. 암묵적 병치 (Juxtaposition) *)
-    let op_name = String.concat " " (List.map (fun _ -> "_") vars) in
-    let term = String.concat " " vars in
-    (op_name, term)
-  else if String.contains raw_name '%' then
-    (* 2. Mixfix 연산자 (예: "%->_%%") *)
-    let parts = String.split_on_char '%' raw_name in
-    
-    (* 리터럴 안에 있는 '_'를 '-'로 소독해서 Maude가 구멍으로 오해하지 않게 만듦 *)
-    (* "->_" 가 "->-" 로 바뀜. *)
-    let sanitized_parts = List.map sanitize parts in 
-    
-    (* 소독된 파트들 사이에 진짜 구멍인 " _ "를 예쁘게 끼워넣음 *)
-    let op_name = String.concat " _ " sanitized_parts |> normalize_space in
-    
-    let term_buf = Buffer.create 32 in
-    let rec interleave pts vs =
-      match pts, vs with
-      | [], _ -> ()
-      | [p], [] -> Buffer.add_string term_buf (" " ^ p ^ " ")
-      | p :: pts', v :: vs' ->
-          Buffer.add_string term_buf (" " ^ p ^ " ");
-          Buffer.add_string term_buf (" " ^ v ^ " ");
-          interleave pts' vs'
-      | _ -> ()
-    in
-    interleave sanitized_parts vars;
-    (op_name, normalize_space (Buffer.contents term_buf))
-  else
-    (* 3. 일반 Prefix 연산자 (예: LOCAL) *)
-    let sanitized = sanitize raw_name in
-    let op_name = if vars = [] then sanitized else sanitized ^ " " ^ String.concat " " (List.map (fun _ -> "_") vars) in
-    let term = if vars = [] then sanitized else sanitized ^ " " ^ String.concat " " vars in
-    (op_name, term)
 
 (* 수식(Expression) 변환 함수: 연산자 이름을 그대로 사용함 *)
 let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
@@ -167,6 +127,7 @@ and translate_typ (t : typ) (v_map : (string * string) list) : string =
       else 
         let arg_strs = List.map (fun a -> translate_arg a v_map) args in
         Printf.sprintf "%s(%s)" name (String.concat ", " arg_strs)
+  | IterT (inner, _) -> translate_typ inner v_map
   | _ -> "WasmType"
 
 (* ------------------- Main: 정의 번역 (translate_definition) ------------------- *)
@@ -207,7 +168,11 @@ let rec translate_definition (d : def) : string =
              | VariantT cases -> 
                 let case_res = List.map (fun (mixop_val, (_, case_typ, prems), _) ->
                   (* 1. Mixfix 이름 생성: IF%%ELSE% -> IF-ELSE- (Maude 스타일) *)
-                  let raw_cons_name = match mixop_val with (a :: _) :: _ -> Xl.Atom.name a | _ -> "" in
+                  let raw_cons_name = 
+                    match List.flatten mixop_val with
+                    | a :: _ -> Xl.Atom.name a
+                    | [] -> ""
+                  in
                   let maude_cons_name = sanitize raw_cons_name in
 
                   if prems <> [] then 
@@ -220,18 +185,22 @@ let rec translate_definition (d : def) : string =
                     Printf.sprintf "%s \n  ceq typecheck(i, %s) = true \n   if %s ." var_decl full_type_name cond_str
 
                   else
+                    (* 타입별 변수명 중복 방지를 위한 딕셔너리 카운터 *)
+                    let type_counters = ref [] in
+                    let get_count tname =
+                      let c = (try List.assoc tname !type_counters with Not_found -> 0) + 1 in
+                      type_counters := (tname, c) :: (List.remove_assoc tname !type_counters);
+                      c
+                    in
+
                     (* 인자 추출 함수: 변수명 중복 방지를 위해 카운터 사용, 타입 인자 보존 *)
-                    let rec collect_params counter current_v_map t is_list = match t.it with
+                    let rec collect_params current_v_map t is_list = match t.it with
                       | VarT (tid, _) -> 
                           let v_base = to_var_name tid.it in
-                          let count = !counter in
-                          incr counter;
+                          let count = get_count v_base in (* 타입별로 카운팅 *)
 
                           let indexed_name = if is_list then v_base ^ "*" else v_base ^ string_of_int count in
-                          
-                          let sort_name = translate_typ t current_v_map in 
-                          
-                          (* 중앙 레지스트리(is_plural_type)에 질의하여 Maude Sort 결정 *)
+                          let sort_name = translate_typ t [] in 
                           let inherent_plural = is_plural_type tid.it in
                           let maude_sort = if is_list || inherent_plural then "WasmTerminals" else "WasmTerminal" in
 
@@ -239,30 +208,24 @@ let rec translate_definition (d : def) : string =
                           ([(indexed_name, sort_name, maude_sort)], updated_v_map)
 
                       | IterT (inner, iter) -> 
-                          (* Kleene Star(별)나 Plus(+) 기호가 있으면 is_list 깃발을 꽂고 내부 타입으로 진입 *)
                           let is_lst = (iter = List || iter = List1) in
-                          collect_params counter current_v_map inner is_lst
+                          collect_params current_v_map inner is_lst
 
                       | TupT fields -> 
                           List.fold_left (fun (ps_acc, vm_acc) (_, ft) ->
-                            let (ps, new_vm) = collect_params counter vm_acc ft is_list in
+                            let (ps, new_vm) = collect_params vm_acc ft is_list in
                             (ps_acc @ ps, new_vm)
                           ) ([], current_v_map) fields
                       | _ -> ([], current_v_map)
                     in
 
-                    let param_counter = ref 1 in
-                    (* 최초 호출 시 is_list는 false로 시작 *)
-                    let (params, _) = collect_params param_counter v_map case_typ false in
+                    let (params, _) = collect_params v_map case_typ false in
                     
                     (* Maude 부품 조립 *)
                     let p_vars = List.map (fun (v, _, _) -> v) params in
-                    (* let p_phs = String.concat "" (List.map (fun _ -> " _") params) in *)
-
-                    (* maude_sort(단/복수) 사용 *)
+                    let p_phs = String.concat "" (List.map (fun _ -> " _") params) in
                     let p_sorts = String.concat " " (List.map (fun (_, _, ms) -> ms) params) in
                     
-                    (* 변수 선언: 각 변수의 maude_sort에 맞게 개별 선언 *)
                     let v_decl = String.concat "" (List.map (fun (v, _, ms) -> 
                         Printf.sprintf "  var %s : %s .\n" v ms
                     ) params) in
@@ -270,17 +233,36 @@ let rec translate_definition (d : def) : string =
                     (* 조건문: typecheck(LOCAL*, local) 등 *)
                     let p_conds = List.map (fun (v, s, _) -> Printf.sprintf "typecheck(%s, %s)" v s) params in
                     let rhs_str = String.concat " /\\ " (binder_conds @ p_conds) in
-                    
-                    (* 수정됨: build_mixfix를 통해 op_sig와 eq_lhs를 우아하게 조립 *)
-                    let (op_sig, eq_lhs) = build_mixfix raw_cons_name p_vars in
+                    let final_rhs = if rhs_str = "" then "true" else rhs_str in
 
-                    let main_rule = 
-                      if p_vars = [] then
-                        Printf.sprintf "  op %s : -> WasmTerminal [ctor] .\n  eq typecheck(%s, %s) = %s ." 
-                          op_sig eq_lhs full_type_name (if rhs_str = "" then "true" else rhs_str)
+                    (* Mixfix 및 빈 생성자(Juxtaposition) 좌항 포맷팅 *)
+                    let lhs_usage = 
+                      if maude_cons_name = "->-" && List.length p_vars = 3 then
+                        Printf.sprintf "%s ->- %s %s" (List.nth p_vars 0) (List.nth p_vars 1) (List.nth p_vars 2)
+                      else if maude_cons_name = "" then
+                        String.concat " " p_vars
+                      else if p_vars = [] then
+                        maude_cons_name
                       else
+                        maude_cons_name ^ " " ^ String.concat " " p_vars
+                    in
+
+                    let op_decl_name = 
+                      if maude_cons_name = "->-" && List.length p_vars = 3 then
+                        "_ ->- _ _"
+                      else
+                        maude_cons_name ^ p_phs
+                    in
+                                        
+                    let main_rule = 
+                      if maude_cons_name = "" then
+                        (* 1. 빈 생성자(Juxtaposition): op 선언 생략 *)
+                        Printf.sprintf "\n%s  eq typecheck(%s, %s) = %s ." 
+                          v_decl lhs_usage full_type_name final_rhs
+                      else
+                        (* 2. 일반 및 Mixfix 생성자 *)
                         Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] .\n%s  eq typecheck(%s, %s) = %s ." 
-                          op_sig p_sorts v_decl eq_lhs full_type_name (if rhs_str = "" then "true" else rhs_str)
+                          op_decl_name p_sorts v_decl lhs_usage full_type_name final_rhs
                     in
 
                     (* 빈 값(eps) 규칙 생성 *)
