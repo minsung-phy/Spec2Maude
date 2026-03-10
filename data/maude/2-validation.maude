@@ -5,10 +5,10 @@ mod 2_0_VALIDATION_CONTEXTS is
 
   --- syntax init =
   ---   | SET | UNSET
-  op init : -> WasmType .
+  op init : -> WasmType [ctor] .
 
-  op SET : -> WasmTerminal .
-  op UNSET : -> WasmTerminal .
+  op SET : -> WasmTerminal [ctor] .
+  op UNSET : -> WasmTerminal [ctor] .
 
   eq typecheck(SET, init) = true .
   eq typecheck(UNSET, init) = true .
@@ -20,17 +20,17 @@ mod 2_0_VALIDATION_CONTEXTS is
   var INIT : WasmTerminal .
   var VALTYPE : WasmTerminal .
 
-  eq typecheck(INIT VALTYPE, localtype) = true .
+  eq typecheck(INIT VALTYPE, localtype) = typecheck(INIT, init) /\ typecheck(VALTYPE, valtype) .
 
   --- syntax instrtype =
   ---   resulttype ->_ localidx* resulttype
-  op instrtype : -> WasmType .
+  op instrtype : -> WasmType [ctor] .
 
   var RESULTTYPE1 : WasmTerminals .
   var LOCALIDX* : WasmTerminals .
   var RESULTTYPE2 : WasmTerminals .
 
-  op _ ->- _ _ : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminal .
+  op _ ->- _ _ : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminal [ctor] .
 
   eq typecheck(RESULTTYPE1 ->- LOCALIDX* RESULTTYPE2, instrtype) = typecheck(RESULTTYPE1, resulttype) /\ typecheck(LOCALIDX*, localidx) /\ typecheck(RESULTTYPE2, resulttype) .
 endm
