@@ -39,7 +39,7 @@ let to_var_name name = String.uppercase_ascii (sanitize name)
 let is_plural_type (type_name : string) : bool =
   match String.lowercase_ascii type_name with
   | "expr" | "resulttype" -> true    (* Wasm Core Spec 기준: expr ::= instr* / 공식문서 structure/instructions 마지막 *)
-  (* 나중에 Wasm 명세에 resulttype (valtype* 의미) 같은 게 나오면 여기에 추가 *)
+  (* resulttype (valtype* 의미) *)
   | _ -> false
 
 
@@ -49,7 +49,7 @@ let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
   | VarE id -> 
       (try List.assoc id.it v_map 
        with Not_found -> 
-         (* 상수(ADD, SUB, EQ, false, true 등)는 변환하지 않고 그대로 출력 *)
+         (* 상수(ADD, SUB, EQ, false, true 등)는 변환하지 않고 그대로 출력 / 얘네는 나중을 위해 고정된 상수라는 것을 알려주기 위해 써놓음 *)
          if id.it = "ADD" || id.it = "SUB" || id.it = "EQ" || id.it = "false" || id.it = "true" then id.it 
          else String.uppercase_ascii id.it)
   
@@ -58,7 +58,7 @@ let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
         try List.flatten mixop |> List.map Xl.Atom.name |> String.concat "" 
         with _ -> "UNKNOWN_CASE"
       in
-      (* $ 기호 또는 % 포맷팅 기호는 껍데기를 벗기고 내부 수식을 평가! *)
+      (* $ 기호 또는 % 포맷팅 기호는 껍데기를 벗기고 내부 수식을 평가 *)
       if op_name = "$" || op_name = "%" || op_name = "" then translate_exp inner_exp v_map
       else op_name
 
@@ -130,13 +130,13 @@ and translate_typ (t : typ) (v_map : (string * string) list) : string =
 (* ------------------- Main: 정의 번역 (translate_definition) ------------------- *)
 let rec translate_definition (d : def) : string =
   match d.it with
-  | RecD defs -> String.concat "\n" (List.map translate_definition defs)
+  | RecD defs -> String.concat "\n" (List.map (fun d -> translate_definition d) defs)
 
   | TypD (id, params, insts) ->
       let name = sanitize id.it in
     
       (* Maude 선언부 생성 *)
-      let sig_types = if params = [] then "" else "WasmTerminal" in
+      let sig_types = String.concat " " (List.map (fun _ -> "WasmTerminal") params) in
       let op_decl = Printf.sprintf "  op %s : %s -> WasmType [ctor] .\n" name sig_types in
       
       let res = List.map (fun inst ->
