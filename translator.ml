@@ -16,7 +16,11 @@ let header =
   "  var I : Int .\n" ^
   "  var T : WasmTerminal .\n"
 
-let footer = "\nendm"
+let footer = 
+  "\nendm\n\n" ^
+  "mod 3_2_NUMERICS_VECTOR is\n" ^
+  "  inc 3_1_NUMERICS_SCALAR .\n" ^
+  "endm\n"
 
 (* ------------------- Helper ------------------- *)
 
