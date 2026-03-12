@@ -38,8 +38,7 @@ let to_var_name name = String.uppercase_ascii (sanitize name)
 (* 겉보기엔 단수형(VarT)이지만, 의미론적으로 반드시 리스트(WasmTerminals)로 취급해야 하는 예외 타입들의 집합 *)
 let is_plural_type (type_name : string) : bool =
   match String.lowercase_ascii type_name with
-  | "expr" | "resulttype" -> true    (* Wasm Core Spec 기준: expr ::= instr* / 공식문서 structure/instructions 마지막 *)
-  (* resulttype (valtype* 의미) *)
+  | "expr" | "resulttype" -> true    (* Wasm Core Spec 기준: expr ::= instr* / 공식문서 structure/instructions 마지막 *) (* resulttype (valtype* 의미) *)
   | _ -> false
 
 
@@ -213,6 +212,7 @@ let rec translate_definition (d : def) : string =
                             let (ps, new_vm) = collect_params vm_acc ft is_list in
                             (ps_acc @ ps, new_vm)
                           ) ([], current_v_map) fields
+
                       | _ -> ([], current_v_map)
                     in
 
@@ -234,9 +234,9 @@ let rec translate_definition (d : def) : string =
 
                     (* Mixfix 및 빈 생성자(Juxtaposition) 좌항 포맷팅 *)
                     let lhs_usage = 
-                      if maude_cons_name = "->-" && List.length p_vars = 3 then
+                      if maude_cons_name = "->-" && List.length p_vars = 3 then (* 1-4 instrtype을 위한 하드코딩 -> 바꿔야 해 *)
                         Printf.sprintf "%s ->- %s %s" (List.nth p_vars 0) (List.nth p_vars 1) (List.nth p_vars 2)
-                      else if maude_cons_name = "" then
+                      else if maude_cons_name = "" then (* 빈 생성자(Juxtaposition) *)
                         String.concat " " p_vars
                       else if p_vars = [] then
                         maude_cons_name
@@ -275,6 +275,7 @@ let rec translate_definition (d : def) : string =
                       in
                       
                       (* 인자가 1개일 때, 내부 구조가 Optional인 경우에만 eps 규칙 생성 *)
+                      (* 혁순 선배 코드에는 Ops(?)가 하나인 경우밖에 없어서 이렇게 하드코딩함 -> 인자가 여러 개인 eps가 있어 -> 수정해야해 *)
                       if List.length params = 1 then
                         match find_iter case_typ with
                         | Some sym -> 
@@ -297,7 +298,7 @@ let rec translate_definition (d : def) : string =
                 in
                 
                 (* 2. 검증 대상 변수 결정 (expr은 리스트이므로 INSTRS, 나머지는 T) *)
-                let var_name = if name = "expr" then "INSTRS" else "T" in
+                let var_name = if name = "expr" then "INSTRS" else "T" in (* syntax expr = instr* 때문에 나온 하드코딩인데 수정해야함 *)
                 
                 (* 3. 바인더 조건들(예: typecheck(INN, Inn))을 /\ 로 엮음 *)
                 let cond_prefix = if binder_conds = [] then "" 
