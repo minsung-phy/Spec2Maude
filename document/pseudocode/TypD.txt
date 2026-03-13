@@ -1,46 +1,4 @@
-# Formal Specification of WebAssembly Translation Mapping : SpecTec to Maude
-
-<div align="right">
-  <strong>포항공과대학교 SVLab 이민성</strong><br>
-  <strong>2026.03.15</strong>
-</div>
-
-## 1. Pipeline
-본 문서는 WebAssembly SpecTec의 AST를 입력받아, Maude의 Algebraic Specification으로 변환하는 알고리즘의 형식적 정의를 다룬다.
-
-```text
-SpecTec AST
--> [translator.ml] 
--> .maude
-```
-
-
-## 2. Pre-defined Infrastructure
-변환 로직에서 사용하는 기본 타입과 유틸리티 함수의 정의이다.
-
-```text
-(* Sorts *)
-sort WasmTerminal .  *** 원자값, 생성자, 단일 명령어
-sort WasmTerminals . *** 구문들의 리스트 (e.g., instr*)
-sort WasmType .      *** 타입 카테고리 식별자
-
-(* Core interface *)
-op typecheck : WasmTerminal WasmType -> Bool .
-op typecheck : WasmTerminals WasmType -> Bool .
-
-(* Naming Conventions *)
-sanitize(name)   (* '_' → '-',  trailing '%' 제거 *)
-to_var_name(name)  (* binder → Maude variable  e.g. inn → INN *)
-is_plural(type)  (* AST 순회 중 리스트(*, +) 기호나 의미론적 복수형(expr) 식별 *)
-```
-
-
-## 3. Translate TypD (Syntax Definition)
-SpecTec의 syntax 정의(TypD)를 Maude의 op 선언 및 typecheck equation으로 변환하는 재귀 알고리즘이다.
-
-**3.1 Definition & Instance Level**
-```text
-// 1. 메인 정의 변환 (Top-level)
+// 1. 메인 정의 변환
 translate_definition : Def -> String
 translate_definition(TypD(id, params, insts)) = 
     let name = sanitize(id)
@@ -54,18 +12,21 @@ translate_instances(id, ps, inst :: rest) =
     translate_instance(id, ps, inst) + "\n" + translate_instances(id, ps, rest)
 translate_instances(id, ps, nil) = ""
 
-// 3. 단일 인스턴스 변환 (Context 준비)
+// 3. 단일 인스턴스 변환
 translate_instance : ID -> Params -> Inst -> String
 translate_instance(id, ps, InstD(binders, args, VariantT(cases))) = 
-    let v_map = build_v_map(binders)
-    let binder_conds = build_binder_conds(binders)
-    let full_type_name = build_full_type_name(id, args, v_map)
+    let v_map = build_v_map(binders) // v_map 생성
+    let binder_conds = build_binder_conds(binders) // binder들에 대한 typecheck 조건 생성
+    let full_type_name = build_full_type_name(id, args, v_map) // LHS 생성
     translate_cases(cases, v_map, binder_conds, full_type_name)
-```
 
-**3.2 Case & Rule Generation**
-```text
-// 4. 개별 케이스 번역 로직 (Pattern Matching)
+// 4. Variant 케이스 리스트 재귀 처리
+translate_cases : List(Case) -> Context -> List(Cond) -> String -> String
+translate_cases(c :: rest, v_map, binder_conds, full_type) = 
+    translate_case(c, v_map, binder_conds, full_type) + "\n" + translate_cases(rest, v_map, binder_conds, full_type)
+translate_cases(nil, _, _, _) = ""
+
+// 5. 개별 케이스 번역 로직
 translate_case : Case -> Context -> List(Cond) -> String -> String
 translate_case((mixop_val, (_, case_typ, prems), _), v_map, binder_conds, full_type) = 
     let cons_name = extract_cons_name(mixop_val)
@@ -76,20 +37,36 @@ translate_case((mixop_val, (_, case_typ, prems), _), v_map, binder_conds, full_t
         let (params, _) = collect_params(v_map, case_typ, false)
         let lhs_usage = format_lhs(cons_name, params)
         let op_decl_name = format_op(cons_name, params)
+        
         let main_rule = generate_main_rule(cons_name, op_decl_name, lhs_usage, full_type, params, binder_conds)
         
-        // [Technical Debt] Epsilon rule for Optional types
+        // [하드코딩] 인자가 여러 개인 eps가 있으면 수정해야 함
         let empty_rule = 
             if length(params) == 1 then
                 match find_iter(case_typ) with
                 | Some(sym) -> "\n  eq typecheck(" + cons_name + " " + sym + ", " + full_type + ") = true ."
                 | None -> ""
             else ""
+            
         main_rule + empty_rule
-```
 
-**3.3 Structural Decomposition (Recursive Helpers)**
-```text
+// ========================================================================
+// [하드코딩] Mixfix 및 빈 생성자 포맷팅
+// ========================================================================
+format_lhs : Name -> List(Param) -> String
+format_lhs("->-", p0 :: p1 :: p2 :: nil) = p0 + " ->- " + p1 + " " + p2   // 1-4 instrtype을 위한 하드코딩
+format_lhs("", params)                   = concat_with_space(params)      // 빈 생성자(Juxtaposition)
+format_lhs(name, nil)                    = name
+format_lhs(name, params)                 = name + " " + concat_with_space(params)
+
+format_op : Name -> List(Param) -> String
+format_op("->-", p0 :: p1 :: p2 :: nil) = "_ ->- _ _"                     // 1-4 instrtype을 위한 하드코딩
+format_op(name, params)                 = name + build_placeholders(params)
+
+// ========================================================================
+// 핵심 OCaml 재귀 함수들 (rec collect_params & rec find_iter)
+// ========================================================================
+
 // 인자 추출 및 변수명 생성
 collect_params : Context -> Type -> Bool -> (List(Param) * Context)
 collect_params(C, VarT(tid, _), isL) = 
@@ -126,31 +103,11 @@ find_iter_list(f :: rest) =
     | Some(sym) -> Some(sym)
     | None -> find_iter_list(rest)
 find_iter_list(nil) = None
-```
 
-## 4. Translate DecD (Function Definition)
-(작성 예정)
+// ========================================================================
+// Appendix : 헬퍼 함수 (Helper Functions for Mapping & Formatting)
+// ========================================================================
 
-## 5. Translate Rule (Inference Rule)
-(작성 예정)
-
-## 6. Appendix : Helper Functions
-변환 로직의 문자열 포맷팅 및 컨텍스트 관리를 위한 보조 함수 정의이다.
-
-**6.1 Formatting Helpers**
-```text
-format_lhs : Name -> List(Param) -> String
-format_lhs("->-", p0 :: p1 :: p2 :: nil) = p0 + " ->- " + p1 + " " + p2   // 하드코딩 분기
-format_lhs("", params)                   = concat_with_space(params)      // Juxtaposition
-format_lhs(name, params)                 = name + " " + concat_with_space(params)
-
-format_op : Name -> List(Param) -> String
-format_op("->-", p0 :: p1 :: p2 :: nil) = "_ ->- _ _"
-format_op(name, params)                 = name + build_placeholders(params)
-```
-
-**6.2 Mapping Helpers**
-```text
 // 1. 바인더(Binder)에서 변수명 매핑(Context) 추출
 build_v_map : List(Binder) -> Context
 build_v_map(ExpB(id, _) :: rest) = {id -> to_var_name(id)} U build_v_map(rest)
@@ -199,4 +156,3 @@ generate_main_rule(cons_name, op_decl_name, lhs_usage, full_type, params, binder
     else
         "  op " + op_decl_name + " : " + p_sorts + " -> WasmTerminal [ctor] .\n" + 
         v_decl + "  eq typecheck(" + lhs_usage + ", " + full_type + ") = " + final_rhs + " ."
-```
