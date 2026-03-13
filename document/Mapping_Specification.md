@@ -29,9 +29,9 @@ op typecheck : WasmTerminal WasmType -> Bool .
 op typecheck : WasmTerminals WasmType -> Bool .
 
 (* Naming Conventions *)
-sanitize(name)   (* '_' → '-',  trailing '%' 제거 *)
+sanitize(name)     (* '_' → '-',  trailing '%' 제거 *)
 to_var_name(name)  (* binder → Maude variable  e.g. inn → INN *)
-is_plural(type)  (* AST 순회 중 리스트(*, +) 기호나 의미론적 복수형(expr) 식별 *)
+is_plural(type)    (* AST 순회 중 리스트(*, +) 기호나 의미론적 복수형(expr) 식별 *)
 ```
 
 
@@ -171,154 +171,157 @@ find_iter_list(nil) = None
 알고리즘의 실제 동작을 증명하기 위한 종단간(End-to-End) 실행 추적 예시이다.
 
 **6.1 Basic Mapping: Alias Type**
+
 단순 위임 패턴(AliasT)의 변환 과정이다.
 
 1. Spectec Source
-```text
-syntax idx = u32
-```
+    ```text
+    syntax idx = u32
+    ```
 
 2. Internal AST (IL)
-```text
-TypD("idx", 
-     [], 
-     [ InstD([], [], AliasT(VarT(id "u32", []))) ]
-    )
-```
+    ```text
+    TypD("idx", 
+        [], 
+        [ InstD([], [], AliasT(VarT(id "u32", []))) ]
+        )
+    ```
 
 3. Execution Trace
-```text
-[Step 1] translate_definition(TypD("idx", [], insts))
-    let name = "idx"
-    let sig_types = ""
-    let op_decl = "op idx : -> WasmType [ctor] .\n"
+    ```text
+    [Step 1] translate_definition(TypD("idx", [], insts))
+        let name = "idx"
+        let sig_types = ""
+        let op_decl = "op idx : -> WasmType [ctor] .\n"
 
-    emit: op_decl + translate_instances("idx", [], insts)
+        emit: op_decl + translate_instances("idx", [], insts)
 
-[Step 2] translate_instances("idx", [], [inst])
-    emit: translate_instance("idx", [], inst) + "\n"
+    [Step 2] translate_instances("idx", [], [inst])
+        emit: translate_instance("idx", [], inst) + "\n"
 
-[Step 3] translate_instance("idx", [], InstD([], [], AliasT(VarT("u32", []))))
-    // 1. Context 초기화
-    let v_map = []
-    let binder_conds = []
-    let full_type_name = "idx"
+    [Step 3] translate_instance("idx", [], InstD([], [], AliasT(VarT("u32", []))))
+        // 1. Context 초기화
+        let v_map = []
+        let binder_conds = []
+        let full_type_name = "idx"
+        
+        // 2. AliasT 매핑 로직
+        let rhs_body = "u32"
+        let var_name = "T"
+        let p_cond = "typecheck(T, u32)"
+        let cond_str = "typecheck(T, u32)"
     
-    // 2. AliasT 매핑 로직
-    let rhs_body = "u32"
-    let var_name = "T"
-    let p_cond = "typecheck(T, u32)"
-    let cond_str = "typecheck(T, u32)"
-  
-    emit: "eq typecheck(T, idx) = typecheck(T, u32) ."
-```
+        emit: "eq typecheck(T, idx) = typecheck(T, u32) ."
+    ```
 
 4. Result
-```text
-op idx : -> WasmType [ctor] .
-eq typecheck(T, idx) = typecheck(T, u32) .
-```
+    ```text
+    op idx : -> WasmType [ctor] .
+    eq typecheck(T, idx) = typecheck(T, u32) .
+    ```
 
 **6.2 Advanced Mapping: Variant with Epsilon**
+
 생성자 선언, 변수명 자동 치환(to_var_name), 그리고 옵셔널(?) 타입에 대한 기저 사례(eps) 생성 과정이 모두 포함된 복합 패턴이다.
 
 1. SpecTec Source
-```text
-syntax blocktype =
-  | _RESULT valtype?
-  | _IDX typeidx
-```
+    ```text
+    syntax blocktype =
+    | _RESULT valtype?
+    | _IDX typeidx
+    ```
 
 2. Internal AST (IL)
-```text
-TypD ("blocktype", 
-      [], 
-      [InstD (
-        [], [],
-        VariantT [
-          (["_RESULT%"], ([], IterT (VarT ("valtype", []), Opt), []), []);
-          (["_IDX%"], ([], VarT ("typeidx", []), []), [])
+    ```text
+    TypD ("blocktype", 
+        [], 
+        [InstD (
+            [], [],
+            VariantT [
+            (["_RESULT%"], ([], IterT (VarT ("valtype", []), Opt), []), []);
+            (["_IDX%"], ([], VarT ("typeidx", []), []), [])
+            ]
+            )
         ]
         )
-      ]
-    )
-```
+    ```
 
 3. Execution Trace
-```text
-[Step 1] translate_definition(TypD("blocktype", [], insts))
-    let name = blocktype
-    let sig_types = ""
-    let op_decl = "op blocktype : -> WasmType [ctor] .\n"
+    ```text
+    [Step 1] translate_definition(TypD("blocktype", [], insts))
+        let name = blocktype
+        let sig_types = ""
+        let op_decl = "op blocktype : -> WasmType [ctor] .\n"
 
-    emit: op_decl + translate_instances("blocktype", [], insts)
+        emit: op_decl + translate_instances("blocktype", [], insts)
 
-[Step 2] translate_instances("blocktype", [], [inst])
-    emit: translate_instance("blocktype", [], inst) + "\n"
+    [Step 2] translate_instances("blocktype", [], [inst])
+        emit: translate_instance("blocktype", [], inst) + "\n"
 
-[Step 3] translate_instance("blocktype", [], InstD(..., VariantT(cases)))
-    // 1. Context 초기화 (binders가 없으므로 빈 상태)
-    let v_map = []
-    let binder_conds = []
-    let full_type_name = "blocktype"
-    
-    emit: translate_cases(cases, v_map, binder_conds, "blocktype")
-
-[Step 4] translate_cases -> Case 1: _RESULT valtype? 
-    // ast: (["_RESULT%"], IterT(VarT("valtype"), Opt))
-    let cons_name = "-RESULT" // sanitize("_RESULT%")
-  
-    // 1. 인자 추출 (collect_params)
-    let params = [("VALTYPE", "valtype", "WasmTerminal")]
-    let lhs_usage = "-RESULT VALTYPE"
-    let op_decl_name = "-RESULT _"
-  
-    // 2. 일반 규칙 생성 (generate_main_rule)
-    let main_rule = 
-        "  op _RESULT _ : WasmTerminal -> WasmTerminal [ctor] .\n" +
-        "  var VALTYPE : WasmTerminal .\n" +
-        "  eq typecheck(-RESULT VALTYPE, blocktype) = typecheck(VALTYPE, valtype) ."
+    [Step 3] translate_instance("blocktype", [], InstD(..., VariantT(cases)))
+        // 1. Context 초기화 (binders가 없으므로 빈 상태)
+        let v_map = []
+        let binder_conds = []
+        let full_type_name = "blocktype"
         
-    // 3. 기저 사례 생성 (find_iter에서 Opt(?) 발견)
-    let empty_rule = 
-        "\n  eq typecheck(-RESULT eps, blocktype) = true ."
-        
-    emit: main_rule + empty_rule
+        emit: translate_cases(cases, v_map, binder_conds, "blocktype")
 
-[Step 5] translate_cases -> Case 2: _IDX typeidx
-    // ast: (["_IDX%"], VarT("typeidx"))
-    let cons_name = "-IDX" // sanitize("_IDX%")
+    [Step 4] translate_cases -> Case 1: _RESULT valtype? 
+        // ast: (["_RESULT%"], IterT(VarT("valtype"), Opt))
+        let cons_name = "-RESULT" // sanitize("_RESULT%")
     
-    // 1. 인자 추출 (collect_params)
-    let params = [("TYPEIDX", "typeidx", "WasmTerminal")]
-    let lhs_usage = "-IDX TYPEIDX"
-    let op_decl_name = "-IDX _"
+        // 1. 인자 추출 (collect_params)
+        let params = [("VALTYPE", "valtype", "WasmTerminal")]
+        let lhs_usage = "-RESULT VALTYPE"
+        let op_decl_name = "-RESULT _"
     
-    // 2. 일반 규칙 생성 (generate_main_rule)
-    let main_rule = 
-        "  op -IDX _ : WasmTerminal -> WasmTerminal [ctor] .\n" +
-        "  var TYPEIDX : WasmTerminal .\n" +
-        "  eq typecheck(-IDX TYPEIDX, blocktype) = typecheck(TYPEIDX, typeidx) ."
+        // 2. 일반 규칙 생성 (generate_main_rule)
+        let main_rule = 
+            "  op _RESULT _ : WasmTerminal -> WasmTerminal [ctor] .\n" +
+            "  var VALTYPE : WasmTerminal .\n" +
+            "  eq typecheck(-RESULT VALTYPE, blocktype) = typecheck(VALTYPE, valtype) ."
+            
+        // 3. 기저 사례 생성 (find_iter에서 Opt(?) 발견)
+        let empty_rule = 
+            "\n  eq typecheck(-RESULT eps, blocktype) = true ."
+            
+        emit: main_rule + empty_rule
+
+    [Step 5] translate_cases -> Case 2: _IDX typeidx
+        // ast: (["_IDX%"], VarT("typeidx"))
+        let cons_name = "-IDX" // sanitize("_IDX%")
         
-    // 3. 기저 사례 생성 (find_iter에서 Opt를 찾지 못함 -> None 반환)
-    let empty_rule = ""
-  
-    emit: main_rule
-```
+        // 1. 인자 추출 (collect_params)
+        let params = [("TYPEIDX", "typeidx", "WasmTerminal")]
+        let lhs_usage = "-IDX TYPEIDX"
+        let op_decl_name = "-IDX _"
+        
+        // 2. 일반 규칙 생성 (generate_main_rule)
+        let main_rule = 
+            "  op -IDX _ : WasmTerminal -> WasmTerminal [ctor] .\n" +
+            "  var TYPEIDX : WasmTerminal .\n" +
+            "  eq typecheck(-IDX TYPEIDX, blocktype) = typecheck(TYPEIDX, typeidx) ."
+            
+        // 3. 기저 사례 생성 (find_iter에서 Opt를 찾지 못함 -> None 반환)
+        let empty_rule = ""
+    
+        emit: main_rule
+    ```
 
 4. Result
-```text
-op blocktype : -> WasmType .
+    ```text
+    op blocktype : -> WasmType .
 
-op -RESULT _ : WasmTerminal -> WasmTerminal [ctor] .
-var VALTYPE : WasmTerminal .
-eq typecheck(-RESULT VALTYPE, blocktype) = typecheck(VALTYPE, valtype) .
-eq typecheck(-RESULT eps, blocktype) = true .
+    op -RESULT _ : WasmTerminal -> WasmTerminal [ctor] .
+    var VALTYPE : WasmTerminal .
+    eq typecheck(-RESULT VALTYPE, blocktype) = typecheck(VALTYPE, valtype) .
+    eq typecheck(-RESULT eps, blocktype) = true .
 
-op -IDX _ : WasmTerminal -> WasmTerminal .
-var TYPEIDX : WasmTerminal .
-eq typecheck(-IDX TYPEIDX, blocktype) = typecheck(TYPEIDX, typeidx) .
-```
+    op -IDX _ : WasmTerminal -> WasmTerminal .
+    var TYPEIDX : WasmTerminal .
+    eq typecheck(-IDX TYPEIDX, blocktype) = typecheck(TYPEIDX, typeidx) .
+    ```
+
 
 ## 7. Appendix : Helper Functions
 변환 로직의 문자열 포맷팅 및 컨텍스트 관리를 위한 보조 함수 정의이다.
