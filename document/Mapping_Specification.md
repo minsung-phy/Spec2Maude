@@ -75,7 +75,7 @@ translate_instance(id, ps, InstD(binders, args, AliasT(typ))) =
                    | IterT(inner, _) -> translate_typ(inner, v_map)
                    | _               -> translate_typ(typ, v_map)
                    
-    // 2. [하드코딩] expr 식별자를 위한 변수명 하드코딩
+    // 2. [하드코딩] expr 식별자를 위한 변수명
     let var_name = if sanitize(id) == "expr" then "INSTRS" else "T"
     
     // 3. 위임 조건문 조립 및 등식 생성
@@ -329,7 +329,7 @@ find_iter_list(nil) = None
 **7.1 Formatting Helpers**
 ```text
 format_lhs : Name -> List(Param) -> String
-format_lhs("->-", p0 :: p1 :: p2 :: nil) = p0 + " ->- " + p1 + " " + p2   // 하드코딩 분기
+format_lhs("->-", p0 :: p1 :: p2 :: nil) = p0 + " ->- " + p1 + " " + p2   // 하드코딩
 format_lhs("", params)                   = concat_with_space(params)      // Juxtaposition
 format_lhs(name, params)                 = name + " " + concat_with_space(params)
 
@@ -419,7 +419,7 @@ translate_arg(_, _) = "0"
 // 3. 수식 번역기 (수학 연산 및 변수 평가)
 translate_exp : Exp -> Context -> String
 translate_exp(VarE(id), v_map) = 
-    // ADD, SUB 등 하드코딩된 상수는 그대로 유지, 그 외는 v_map 매핑 또는 대문자화
+    // ADD, SUB 등 상수는 그대로 유지, 그 외는 v_map 매핑 또는 대문자화
     if is_constant(id) then id else lookup_or_default(id, v_map, uppercase(id))
 
 translate_exp(NumE(n), _) = to_string(n)
