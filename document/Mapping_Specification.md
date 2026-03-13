@@ -200,3 +200,57 @@ generate_main_rule(cons_name, op_decl_name, lhs_usage, full_type, params, binder
         "  op " + op_decl_name + " : " + p_sorts + " -> WasmTerminal [ctor] .\n" + 
         v_decl + "  eq typecheck(" + lhs_usage + ", " + full_type + ") = " + final_rhs + " ."
 ```
+
+**6.3 AST Node Translation Helpers**
+```text
+// 이 함수들은 TypD, DecD, Rule 변환 전반에서 식(Exp), 인자(Arg), 타입(Typ) AST 노드를 
+// Maude의 문자열(String) 포맷으로 직렬화(Serialization)하는 역할을 수행한다.
+
+// 1. 타입 번역기
+translate_typ : Type -> Context -> String
+translate_typ(VarT(id, args), v_map) = 
+    let base_name = lookup_or_default(id, v_map, sanitize(id))
+    if empty(args) then 
+        base_name 
+    else 
+        base_name + "(" + concat_with_comma(map(fun a -> translate_arg(a, v_map), args)) + ")"
+translate_typ(IterT(inner, _), v_map) = translate_typ(inner, v_map)
+translate_typ(_, _) = "WasmType"
+
+// 2. 인자 번역기
+translate_arg : Arg -> Context -> String
+translate_arg(ExpA(e), v_map) = translate_exp(e, v_map)
+translate_arg(TypA(t), v_map) = translate_typ(t, v_map)
+translate_arg(_, _) = "0"
+
+// 3. 수식 번역기 (수학 연산 및 변수 평가)
+translate_exp : Exp -> Context -> String
+translate_exp(VarE(id), v_map) = 
+    // ADD, SUB 등 하드코딩된 상수는 그대로 유지, 그 외는 v_map 매핑 또는 대문자화
+    if is_constant(id) then id else lookup_or_default(id, v_map, uppercase(id))
+
+translate_exp(NumE(n), _) = to_string(n)
+
+translate_exp(UnE(op, e), v_map) = 
+    let op_str = translate_unop(op)
+    op_str + "(" + translate_exp(e, v_map) + ")"
+
+translate_exp(BinE(op, e1, e2), v_map) = 
+    let op_str = translate_binop(op) // e.g., AddOp -> "+", ModOp -> "rem"
+    "(" + translate_exp(e1, v_map) + " " + op_str + " " + translate_exp(e2, v_map) + ")"
+
+translate_exp(CallE(id, args), v_map) = 
+    let fname = sanitize(id)
+    let final_name = if starts_with(fname, "$") then fname else "$" + fname
+    let arg_strs = concat_with_comma(map(fun a -> translate_arg(a, v_map), args))
+    final_name + "(" + arg_strs + ")"
+
+translate_exp(ListE(el), v_map) = 
+    concat_with_space(map(fun e -> translate_exp(e, v_map), el))
+
+// 껍데기(Proj, Uncase)는 벗겨내고 내부 알맹이만 번역
+translate_exp(ProjE(e, _), v_map)   = translate_exp(e, v_map)
+translate_exp(UncaseE(e, _), v_map) = translate_exp(e, v_map)
+
+translate_exp(_, _) = "UNKNOWN_EXP"
+```
