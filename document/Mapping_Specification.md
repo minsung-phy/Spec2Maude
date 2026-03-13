@@ -2,7 +2,7 @@
 
 <div align="right">
   <strong>포항공과대학교 SVLab 이민성</strong><br>
-  <strong>2026.03.15</strong>
+  <strong>2026.03.14</strong>
 </div>
 
 ## 1. Pipeline
