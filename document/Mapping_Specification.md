@@ -266,44 +266,58 @@ TypD ("blocktype",
 
 [Step 4] translate_cases -> Case 1: _RESULT valtype? 
     // ast: (["_RESULT%"], IterT(VarT("valtype"), Opt))
-    let cons_name = "_RESULT" // sanitize("_RESULT%")
+    let cons_name = "-RESULT" // sanitize("_RESULT%")
   
     // 1. 인자 추출 (collect_params)
     let params = [("VALTYPE", "valtype", "WasmTerminal")]
-    let lhs_usage = "_RESULT VALTYPE"
-    let op_decl_name = "_RESULT _"
+    let lhs_usage = "-RESULT VALTYPE"
+    let op_decl_name = "-RESULT _"
   
     // 2. 일반 규칙 생성 (generate_main_rule)
     let main_rule = 
         "  op _RESULT _ : WasmTerminal -> WasmTerminal [ctor] .\n" +
         "  var VALTYPE : WasmTerminal .\n" +
-        "  eq typecheck(_RESULT VALTYPE, blocktype) = typecheck(VALTYPE, valtype) ."
+        "  eq typecheck(-RESULT VALTYPE, blocktype) = typecheck(VALTYPE, valtype) ."
         
     // 3. 기저 사례 생성 (find_iter에서 Opt(?) 발견)
     let empty_rule = 
-        "\n  eq typecheck(_RESULT eps, blocktype) = true ."
+        "\n  eq typecheck(-RESULT eps, blocktype) = true ."
         
     emit: main_rule + empty_rule
 
 [Step 5] translate_cases -> Case 2: _IDX typeidx
     // ast: (["_IDX%"], VarT("typeidx"))
-    let cons_name = "_IDX" // sanitize("_IDX%")
+    let cons_name = "-IDX" // sanitize("_IDX%")
     
     // 1. 인자 추출 (collect_params)
     let params = [("TYPEIDX", "typeidx", "WasmTerminal")]
-    let lhs_usage = "_IDX TYPEIDX"
-    let op_decl_name = "_IDX _"
+    let lhs_usage = "-IDX TYPEIDX"
+    let op_decl_name = "-IDX _"
     
     // 2. 일반 규칙 생성 (generate_main_rule)
     let main_rule = 
-        "  op _IDX _ : WasmTerminal -> WasmTerminal [ctor] .\n" +
+        "  op -IDX _ : WasmTerminal -> WasmTerminal [ctor] .\n" +
         "  var TYPEIDX : WasmTerminal .\n" +
-        "  eq typecheck(_IDX TYPEIDX, blocktype) = typecheck(TYPEIDX, typeidx) ."
+        "  eq typecheck(-IDX TYPEIDX, blocktype) = typecheck(TYPEIDX, typeidx) ."
         
     // 3. 기저 사례 생성 (find_iter에서 Opt를 찾지 못함 -> None 반환)
     let empty_rule = ""
   
     emit: main_rule
+```
+
+4. Result
+```text
+op blocktype : -> WasmType .
+
+op -RESULT _ : WasmTerminal -> WasmTerminal [ctor] .
+var VALTYPE : WasmTerminal .
+eq typecheck(-RESULT VALTYPE, blocktype) = typecheck(VALTYPE, valtype) .
+eq typecheck(-RESULT eps, blocktype) = true .
+
+op -IDX _ : WasmTerminal -> WasmTerminal .
+var TYPEIDX : WasmTerminal .
+eq typecheck(-IDX TYPEIDX, blocktype) = typecheck(TYPEIDX, typeidx) .
 ```
 
 ## 7. Appendix : Helper Functions
