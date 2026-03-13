@@ -27,6 +27,7 @@
 /
 ├── document/
 │   └── Mapping_Specification.md    <-- 상세 변환 로직 및 Mapping Rules 명세서
+│   └── pseudocode/*.txt            <-- Pseudo Code for Syntax, Def, Rule
 ├── dsl/
 │   └── pretype.maude               <-- Wasm 타입 시스템 구동을 위한 기초 Maude 환경
 ├── data/
@@ -88,13 +89,13 @@ dune exec ./main.exe -- wasm-3.0/* > output.maude
 
 ---
 
-## 🎓 For Reviewers
+## 6. For Reviewers
 
 * **로직 발전 과정**: `translator/*.ml` 파일을 통해 초기 단순 매핑에서 복합 타입 처리까지의 **고도화 과정**을 확인하실 수 있습니다.
 * **데이터 무결성**: 메모리상의 AST를 직접 덤프한 `.ast` 데이터와 최종 생성된 `.maude` 코드를 대조함으로써 변환 로직의 정확성을 검증하였습니다.
 
 ---
 
-## ⚖️ License
+## 7. License
 Copyright (c) 2026 Minsung Lee (POSTECH SVLab). 
 This project is licensed under the MIT License.
