@@ -236,7 +236,7 @@ let rec translate_definition (d : def) : string =
                     let lhs_usage = 
                       if maude_cons_name = "->-" && List.length p_vars = 3 then (* 1-4 instrtype을 위한 하드코딩 -> 바꿔야 해 *)
                         Printf.sprintf "%s ->- %s %s" (List.nth p_vars 0) (List.nth p_vars 1) (List.nth p_vars 2)
-                      else if maude_cons_name = "" then (* 빈 생성자(Juxtaposition) *)
+                      else if maude_cons_name = "" then (* Juxtaposition *)
                         String.concat " " p_vars
                       else if p_vars = [] then
                         maude_cons_name
@@ -275,7 +275,7 @@ let rec translate_definition (d : def) : string =
                       in
                       
                       (* 인자가 1개일 때, 내부 구조가 Optional인 경우에만 eps 규칙 생성 *)
-                      (* 혁순 선배 코드에는 Ops(?)가 하나인 경우밖에 없어서 이렇게 하드코딩함 -> 인자가 여러 개인 eps가 있어 -> 수정해야해 *)
+                      (* 혁순 선배 코드에는 Ops(?)가 하나인 경우밖에 없어서 이렇게 하드코딩함 -> But 인자가 여러 개인 eps가 있어 -> 수정해야해 *)
                       if List.length params = 1 then
                         match find_iter case_typ with
                         | Some sym -> 
