@@ -19,7 +19,10 @@ let () =
     Printf.eprintf "[INFO] Elaborating all definitions together...\n%!";
     let (il_defs, _env) = Frontend.Elab.elab all_frontend_defs in
     
-    (* 3. 번역 및 Maude 형식 출력 *)
+    (* 3. 타입 환경 구축 (구조적 plural 타입 탐지) *)
+    Translator.build_type_env il_defs;
+    
+    (* 4. 번역 및 Maude 형식 출력 *)
     print_endline Translator.header;
     List.iter (fun def ->
       let result = Translator.translate_definition def in

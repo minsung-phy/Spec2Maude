@@ -1,0 +1,15 @@
+load 4-0-execution-configuration
+
+mod 4_1_EXECUTION_VALUES is
+  inc 4_0_EXECUTION_CONFIGURATION .
+  var WT : WasmTerminal .
+  var WTS : WasmTerminals .
+  op $default- : WasmTerminal -> WasmTerminal .
+  op $default- : WasmTerminals -> WasmTerminals .
+
+  eq $default-(eps) = eps .
+  ceq $default-((LOCAL WT) WTS) = (CONST WT 0) $default-(WTS) 
+  if typecheck(WT, Inn) .
+  
+
+endm

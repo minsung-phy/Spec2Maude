@@ -34,12 +34,79 @@ let sanitize name =
 (* 변수명을 대문자로 변환 (Inn -> INN) *)
 let to_var_name name = String.uppercase_ascii (sanitize name)
 
-(* Type Environment Registry : *)
-(* 겉보기엔 단수형(VarT)이지만, 의미론적으로 반드시 리스트(WasmTerminals)로 취급해야 하는 예외 타입들의 집합 *)
+(* Type Environment: AliasT(IterT(_, List|List1))인 타입을 구조적으로 탐지하기 위한 환경 *)
+let plural_types : (string, bool) Hashtbl.t = Hashtbl.create 32
+
+let build_type_env (defs : def list) =
+  let rec scan d = match d.it with
+    | RecD ds -> List.iter scan ds
+    | TypD (id, _, insts) ->
+        List.iter (fun inst -> match inst.it with
+          | InstD (_, _, deftyp) -> (match deftyp.it with
+            | AliasT typ -> (match typ.it with
+              | IterT (_, (List | List1)) -> Hashtbl.replace plural_types id.it true
+              | _ -> ())
+            | _ -> ())
+        ) insts
+    | _ -> ()
+  in
+  List.iter scan defs
+
+(* 구조적 판별: 하드코딩 없이 build_type_env에서 수집된 정보 사용 *)
 let is_plural_type (type_name : string) : bool =
-  match String.lowercase_ascii type_name with
-  | "expr" | "resulttype" -> true    (* Wasm Core Spec 기준: expr ::= instr* / 공식문서 structure/instructions 마지막 *) (* resulttype (valtype* 의미) *)
-  | _ -> false
+  Hashtbl.mem plural_types type_name
+
+(* --- Mixfix 일반화 헬퍼 (Rule V-M) --- *)
+
+(* mixop에서 각 섹션의 atom 이름을 추출하여 sanitize된 문자열 리스트로 반환 *)
+let mixop_sections (mixop_val : Xl.Mixop.mixop) : string list =
+  List.map (fun atoms ->
+    atoms |> List.map Xl.Atom.name |> String.concat "" |> sanitize
+  ) mixop_val
+
+(* 섹션과 변수를 교차 배치: section₀ var₀ section₁ var₁ ... sectionₙ *)
+let interleave_lhs (sections : string list) (vars : string list) : string =
+  let rec go secs vs = match secs, vs with
+    | [], vs_rest -> vs_rest
+    | s :: ss, v :: vs' ->
+        (if s <> "" then [s; v] else [v]) @ go ss vs'
+    | [s], [] -> if s <> "" then [s] else []
+    | _ :: ss, [] -> go ss []
+  in
+  String.concat " " (go sections vars)
+
+(* op 선언명 생성: section₀ _ section₁ _ ... sectionₙ *)
+let interleave_op (sections : string list) (n_vars : int) : string =
+  let rec go secs remaining = match secs, remaining with
+    | [], n -> List.init n (fun _ -> "_")
+    | s :: ss, n when n > 0 ->
+        (if s <> "" then [s; "_"] else ["_"]) @ go ss (n - 1)
+    | [s], 0 -> if s <> "" then [s] else []
+    | _ :: ss, 0 -> go ss 0
+    | _, _ -> []
+  in
+  String.concat " " (go sections n_vars)
+
+(* --- eps 다중 인자 일반화 헬퍼 (Rule V-E) --- *)
+
+(* 타입 구조를 재귀 순회하여 Opt가 위치한 인자 인덱스 목록을 반환 *)
+let find_opt_param_indices (case_typ : typ) : int list =
+  let idx = ref 0 in
+  let result = ref [] in
+  let rec scan t is_opt = match t.it with
+    | VarT _ ->
+        if is_opt then result := !idx :: !result;
+        idx := !idx + 1
+    | IterT (inner, Opt) ->
+        scan inner true
+    | IterT (inner, _) ->
+        scan inner is_opt
+    | TupT fields ->
+        List.iter (fun (_, ft) -> scan ft is_opt) fields
+    | _ -> ()
+  in
+  scan case_typ false;
+  List.rev !result
 
 
 (* 수식(Expression) 변환 함수: 연산자 이름을 그대로 사용함 *)
@@ -220,7 +287,6 @@ let rec translate_definition (d : def) : string =
                     
                     (* Maude 부품 조립 *)
                     let p_vars = List.map (fun (v, _, _) -> v) params in
-                    let p_phs = String.concat "" (List.map (fun _ -> " _") params) in
                     let p_sorts = String.concat " " (List.map (fun (_, _, ms) -> ms) params) in
                     
                     let v_decl = String.concat "" (List.map (fun (v, _, ms) -> 
@@ -232,24 +298,10 @@ let rec translate_definition (d : def) : string =
                     let rhs_str = String.concat " /\\ " (binder_conds @ p_conds) in
                     let final_rhs = if rhs_str = "" then "true" else rhs_str in
 
-                    (* Mixfix 및 빈 생성자(Juxtaposition) 좌항 포맷팅 *)
-                    let lhs_usage = 
-                      if maude_cons_name = "->-" && List.length p_vars = 3 then (* 1-4 instrtype을 위한 하드코딩 -> 바꿔야 해 *)
-                        Printf.sprintf "%s ->- %s %s" (List.nth p_vars 0) (List.nth p_vars 1) (List.nth p_vars 2)
-                      else if maude_cons_name = "" then (* 빈 생성자(Juxtaposition) *)
-                        String.concat " " p_vars
-                      else if p_vars = [] then
-                        maude_cons_name
-                      else
-                        maude_cons_name ^ " " ^ String.concat " " p_vars
-                    in
-
-                    let op_decl_name = 
-                      if maude_cons_name = "->-" && List.length p_vars = 3 then
-                        "_ ->- _ _"
-                      else
-                        maude_cons_name ^ p_phs
-                    in
+                    (* Mixfix 및 빈 생성자(Juxtaposition) 좌항 포맷팅 — 구조적 interleave *)
+                    let sections = mixop_sections mixop_val in
+                    let lhs_usage = interleave_lhs sections p_vars in
+                    let op_decl_name = interleave_op sections (List.length p_vars) in
                                         
                     let main_rule = 
                       if maude_cons_name = "" then
@@ -262,27 +314,18 @@ let rec translate_definition (d : def) : string =
                           op_decl_name p_sorts v_decl lhs_usage full_type_name final_rhs
                     in
 
-                    (* 빈 값(eps) 규칙 생성 *)
-                    let empty_rule = 
-                      (* 내부 구조에서 Opt(Optional) 타입을 찾아 eps를 반환하는 재귀 함수 *)
-                      let rec find_iter t = match t.it with
-                        | IterT (_, iter) -> 
-                            if iter = Opt then Some "eps" else None
-                        | TupT fields -> 
-                            (* 튜플 안의 필드들을 하나씩 뒤져서 IterT가 있는지 확인 *)
-                            List.find_map (fun (_, f) -> find_iter f) fields
-                        | _ -> None
-                      in
-                      
-                      (* 인자가 1개일 때, 내부 구조가 Optional인 경우에만 eps 규칙 생성 *)
-                      (* 혁순 선배 코드에는 Ops(?)가 하나인 경우밖에 없어서 이렇게 하드코딩함 -> 인자가 여러 개인 eps가 있어 -> 수정해야해 *)
-                      if List.length params = 1 then
-                        match find_iter case_typ with
-                        | Some sym -> 
-                            let rhs_empty = if binder_conds = [] then "true" else String.concat " /\\ " binder_conds in
-                            Printf.sprintf "\n  eq typecheck(%s %s, %s) = %s ." maude_cons_name sym full_type_name rhs_empty
-                        | None -> ""
-                      else "" 
+                    (* 빈 값(eps) 규칙 생성 — 다중 인자 일반화 (Rule V-E) *)
+                    let empty_rule =
+                      let opt_indices = find_opt_param_indices case_typ in
+                      let rules = List.map (fun opt_idx ->
+                        let p_vars_eps = List.mapi (fun i v -> if i = opt_idx then "eps" else v) p_vars in
+                        let p_conds_filtered = List.filteri (fun i _ -> i <> opt_idx) p_conds in
+                        let rhs_str = String.concat " /\\ " (binder_conds @ p_conds_filtered) in
+                        let final_rhs_eps = if rhs_str = "" then "true" else rhs_str in
+                        let lhs_eps = interleave_lhs sections p_vars_eps in
+                        Printf.sprintf "\n  eq typecheck(%s, %s) = %s ." lhs_eps full_type_name final_rhs_eps
+                      ) opt_indices in
+                      String.concat "" rules
                     in
 
                     (* 3. 두 규칙을 합쳐서 반환 *)
@@ -297,8 +340,11 @@ let rec translate_definition (d : def) : string =
                   | _ -> translate_typ typ v_map
                 in
                 
-                (* 2. 검증 대상 변수 결정 (expr은 리스트이므로 INSTRS, 나머지는 T) *)
-                let var_name = if name = "expr" then "INSTRS" else "T" in (* syntax expr = instr* 때문에 나온 하드코딩인데 수정해야함 *)
+                (* 2. 검증 대상 변수 결정 — 구조적: IterT(_, List|List1)이면 TS, 아니면 T *)
+                let var_name = match typ.it with
+                  | IterT (_, (List | List1)) -> "TS"
+                  | _ -> "T"
+                in
                 
                 (* 3. 바인더 조건들(예: typecheck(INN, Inn))을 /\ 로 엮음 *)
                 let cond_prefix = if binder_conds = [] then "" 

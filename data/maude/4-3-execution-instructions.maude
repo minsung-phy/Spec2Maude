@@ -1,0 +1,218 @@
+load 4-1-execution-values
+
+mod EXECUTION_RULES is 
+  inc 4_1_EXECUTION_VALUES .
+
+
+  --- TODO: 
+  vars NT NT2 : WasmTerminals .
+  op btlen : WasmTerminal -> WasmTerminals .
+  eq btlen(NT -> NT2) = len(NT) len(NT2) .
+
+  eq btlen(FUNC NT -> NT2) = len(NT) len(NT2) .
+
+  --- BLOCK INSTRUCTIONS
+  op $blocktype- : WasmTerminal WasmTerminal -> WasmTerminal .
+  var X : WasmTerminal .
+  vars T_1* T_2* : WasmTerminals .
+  ceq $blocktype-(STATE, -IDX X) = T_1* -> T_2* 
+  if FUNC T_1* -> T_2* := $type(STATE, X) .
+
+  var T : WasmTerminal .
+  eq $blocktype-(STATE, -RESULT eps) = eps -> eps .
+  eq $blocktype-(STATE, -RESULT T) = eps -> T .
+
+
+  --- op _[`]_ : WasmTerminals WasmTerminals -> InstrsContext .
+  var VALS VALS' : Vals .
+  vars INSTRS INSTRS' INSTRS'' INSTRS_STORED : WasmTerminals .
+  var FRAME FRAME' FRAME'' : WasmTerminals .
+  var STORE STORE' : WasmTerminals .
+  var STATE STATE' STATE'' : WasmTerminals .
+  var STAGE : Stage .
+  var N N' : Nat .
+  
+  op context1 : -> Context .
+  vars LC LC' : LabelContexts .
+  vars FC FC' : FrameContexts .
+
+  op endlabel : -> WasmTerminal .
+  op endframe : -> WasmTerminal .
+
+  eq (context: LC / FC ) :: 
+    (stage: ((STORE ; FRAME) ;
+    INSTRS' (FRAME- N {FRAME'} INSTRS END) INSTRS'')) = 
+    (context: LC / (frame(FRAME, INSTRS' [] INSTRS'', N) # FC )) ::
+    (stage: ((STORE ; FRAME') ; (INSTRS endframe))) .
+
+  eq (context: LC / (frame(FRAME, INSTRS' [] INSTRS'', N) # FC )) ::
+    (stage: ((STORE ; FRAME') ; (VALS endframe))) = 
+    (context: LC / FC) ::
+    (stage: ((STORE ; FRAME) ; (INSTRS' VALS INSTRS''))) .
+
+  eq (context: LC / FC ) :: 
+    (stage: ((STORE ; FRAME) ;
+    INSTRS' (LABEL- N {INSTRS_STORED} INSTRS END) INSTRS'')) = 
+    (context: (label(INSTRS_STORED, INSTRS' [] INSTRS'', N) @ LC) / FC ) ::
+    (stage: ((STORE ; FRAME) ; (INSTRS endlabel))) .
+
+  eq (context: (label(INSTRS_STORED, INSTRS' [] INSTRS'', N) @ LC) / FC ) ::
+    (stage: ((STORE ; FRAME) ; (VALS endlabel))) = 
+    (context: LC / FC) ::
+    (stage: ((STORE ; FRAME) ; (INSTRS' VALS INSTRS''))) .
+
+  
+  --- Branch instructions
+  ceq (context: label(INSTRS_STORED, INSTRS' [] INSTRS'', N) @ LC / FC ) :: 
+    (stage: ((STORE ; FRAME) ; (VALS VALS' (BR 0) INSTRS))) = 
+    (context: LC / FC) :: 
+    (stage: ((STORE ; FRAME) ; INSTRS' (VALS' INSTRS_STORED) INSTRS'' )) 
+    if len(VALS') = N .
+
+  ceq (context: label(INSTRS_STORED, INSTRS' [] INSTRS'', N) @ LC / FC ) :: 
+  (stage: ((STORE ; FRAME) ; (VALS (BR N')) INSTRS)) = 
+    (context: LC / FC) :: 
+    (stage: ((STORE ; FRAME) ; INSTRS' (VALS (BR (N' + - 1))) INSTRS'' )) 
+    if N' =/= 0 .
+  
+  ---
+  var C_NUM_I32_BR_IF_TRUE : WasmTerminal .
+  var L_LABELIDX_BR_IF_TRUE : WasmTerminal .
+  crl [br_if-true] : VALS (CONST I32 C_NUM_I32_BR_IF_TRUE) (BR-IF L_LABELIDX_BR_IF_TRUE) INSTRS =>
+  VALS (BR L_LABELIDX_BR_IF_TRUE) INSTRS
+  if C_NUM_I32_BR_IF_TRUE =/= 0 .
+
+  var C_NUM_I32_BR_IF_FALSE : WasmTerminal .
+  var L_LABELIDX_BR_IF_FALSE : WasmTerminal .
+  crl [br_if-false] : VALS (CONST I32 C_NUM_I32_BR_IF_FALSE) (BR-IF L_LABELIDX_BR_IF_FALSE) INSTRS =>
+  VALS INSTRS
+  if C_NUM_I32_BR_IF_FALSE == 0 .
+
+
+  --- ;; Function instructions
+  var X_CALL : WasmTerminal .
+  var A_CALL : WasmTerminal .
+  crl [call] : (STATE ; VALS (CALL X_CALL) INSTRS) =>
+  STATE ; (VALS (REF.FUNC-ADDR A_CALL) (CALL-REF value('TYPE', index($funcinst(STATE), A_CALL))) INSTRS)
+  if A_CALL := index(value('FUNCS',$moduleinst(STATE)), X_CALL) .
+
+  var YY_CALL : WasmTerminal .
+  var M_CALL : WasmTerminal .
+  var N_CALL : WasmTerminal .
+  var F_CALL : WasmTerminal .
+  var INSTRS*_CALL : WasmTerminals .
+  var FI_CALL : WasmTerminal .
+  var T_CALL : WasmTerminals .
+
+
+  crl [call_ref-func] : (STATE ; VALS VALS' (REF.FUNC-ADDR A_CALL) (CALL-REF YY_CALL) INSTRS) => STATE ; (VALS (FRAME- M_CALL {F_CALL} (LABEL- M_CALL {eps} INSTRS*_CALL END) END) INSTRS) 
+  if FI_CALL := index($funcinst(STATE), A_CALL) /\ 
+  N_CALL M_CALL := btlen(value('TYPE', FI_CALL)) /\
+  FUNC X_CALL T_CALL INSTRS*_CALL := value('CODE', FI_CALL) /\
+  F_CALL := {item('LOCALS', VALS' $default-(T_CALL)) ; item('MODULE', value('MODULE', FI_CALL)) } /\ len(VALS') ==  N_CALL . 
+     
+endm 
+
+
+mod 4_3_EXECUTION_INSTRUCTIONS is
+  inc EXECUTION_RULES .
+
+  --- Step/ctxt-frame
+  var S'_STATE_CTXT_FRAME : WasmTerminal .
+  var F'_FRAME_CTXT_FRAME : WasmTerminal .
+  var F''_FRAME_CTXT_FRAME : WasmTerminal .
+  var N_STEP_CTXT_LABEL : WasmTerminal .
+  var INSTR*_CTXT_LABEL : WasmTerminals .
+  var INSTR'*_CTXT_LABEL : WasmTerminals .
+
+  --- crl [step-ctxt-label] : (STATE ; FRAME) ; (FRAME- N_STEP_CTXT_LABEL{ F'_FRAME_CTXT_FRAME } INSTR*_CTXT_LABEL) => (S'_STATE_CTXT_FRAME ; FRAME) ; (FRAME- N_STEP_CTXT_LABEL { F'_FRAME_CTXT_FRAME } INSTR*_CTXT_LABEL) if (STATE ; F'_FRAME_CTXT_FRAME ) ; INSTR*_CTXT_LABEL => (S'_STATE_CTXT_FRAME ; F''_FRAME_CTXT_FRAME ) ;  INSTR'*_CTXT_LABEL .
+
+  
+  var STATE_STEP_READ_BLOCK : WasmTerminal .
+  var VALM_STEP_READ_BLOCK : WasmTerminals .
+  var BT_STEP_READ_BLOCK : WasmTerminal .
+  var INSTRS_STEP_READ_BLOCK : WasmTerminals .
+  var N_NAT_BLOCK : WasmTerminal .
+  var M_NAT_BLOCK : WasmTerminal .
+  
+  var VALS VALS' : Vals .
+  vars INSTRS INSTRS' INSTRS'' INSTRS_STORED : WasmTerminals .
+  var FRAME FRAME' FRAME'' : WasmTerminals .
+  var STORE STORE' : WasmTerminals .
+  var STATE STATE' STATE'' : WasmTerminals .
+  var STAGE : Stage .
+  var N N' : Nat .
+
+  crl [block] : STATE ; VALS (VALM_STEP_READ_BLOCK (BLOCK BT_STEP_READ_BLOCK INSTRS_STEP_READ_BLOCK)) INSTRS
+  => STATE ; VALS (LABEL- N_NAT_BLOCK {eps} VALM_STEP_READ_BLOCK INSTRS_STEP_READ_BLOCK END) INSTRS
+  if M_NAT_BLOCK N_NAT_BLOCK := btlen($blocktype-(STATE, BT_STEP_READ_BLOCK)) /\ 
+  len(VALM_STEP_READ_BLOCK) = M_NAT_BLOCK .
+
+  var STATE_STEP_READ_LOOP : WasmTerminal .
+  var VALM_STEP_READ_LOOP : WasmTerminals .
+  var BT_STEP_READ_LOOP : WasmTerminal .
+  var INSTRS_STEP_READ_LOOP : WasmTerminals .
+  var N_NAT_LOOP : WasmTerminal .
+  var M_NAT_LOOP : WasmTerminal .
+
+
+  crl [loop] : STATE ; VALS (VALM_STEP_READ_LOOP (LOOP BT_STEP_READ_LOOP INSTRS_STEP_READ_LOOP)) INSTRS
+  => STATE ; VALS (LABEL- N_NAT_LOOP {LOOP BT_STEP_READ_LOOP INSTRS_STEP_READ_LOOP} VALM_STEP_READ_LOOP INSTRS_STEP_READ_LOOP END) INSTRS
+  if M_NAT_LOOP N_NAT_LOOP := btlen($blocktype-(STATE, BT_STEP_READ_LOOP)) /\ len(VALM_STEP_READ_LOOP) = M_NAT_LOOP .
+
+  var C_IF_TRUE : WasmTerminal .
+  var BT_IF_TRUE : WasmTerminal .
+  var INSTR_1*_IF_TRUE : WasmTerminals .
+  var INSTR_2*_IF_TRUE : WasmTerminals .
+
+  crl [if-true] : STATE ; VALS ((CONST I32 C_IF_TRUE) (IF (BT_IF_TRUE) INSTR_1*_IF_TRUE ELSE INSTR_2*_IF_TRUE)) INSTRS => STATE ; VALS (BLOCK BT_IF_TRUE INSTR_1*_IF_TRUE) INSTRS
+  if C_IF_TRUE =/= 0 . 
+
+  crl [if-false] : STATE ; VALS ((CONST I32 C_IF_TRUE) (IF BT_IF_TRUE INSTR_1*_IF_TRUE ELSE INSTR_2*_IF_TRUE)) INSTRS => STATE ; VALS (BLOCK BT_IF_TRUE INSTR_2*_IF_TRUE) INSTRS
+  if C_IF_TRUE == 0 . 
+
+
+  --- Local instructions
+  var X_IDX_LOCALGET : WasmTerminal .
+  var VAL : Val .
+  crl [localget] : STATE ; (VALS ((LOCAL.GET X_IDX_LOCALGET)) INSTRS)
+  => STATE ; (VALS ((VAL)) INSTRS) 
+  if VAL := $local(STATE, X_IDX_LOCALGET) .
+
+  --- Local instructions
+  var X_IDX_LOCALSET : WasmTerminal .
+  var VAL_LOCALSET : Val .
+  rl [localset] : (STORE ; FRAME) ; (VALS (VAL_LOCALSET (LOCAL.SET X_IDX_LOCALSET)) INSTRS)
+  => (STORE ; (FRAME[. 'LOCALS' <- (value('LOCALS', FRAME)[X_IDX_LOCALSET <- VAL_LOCALSET])])) ; 
+  (VALS INSTRS) .
+
+  --- rel "Step_pure" "binop-val"
+  var NT_BINOP_VAL : WasmTerminal .
+  var C_1_BINOP_VAL : WasmTerminal .
+  var C_2_BINOP_VAL : WasmTerminal .
+  var BINOP_BINOP_VAL : WasmTerminal .
+  var C_BINOP_VAL : WasmTerminal .
+  var STATE_BINOP_VAL : WasmTerminal .
+
+  crl [binop-val] : stage:( 
+    STATE_BINOP_VAL ; (VALS (CONST NT_BINOP_VAL C_1_BINOP_VAL) (CONST NT_BINOP_VAL C_2_BINOP_VAL) (BINOP NT_BINOP_VAL BINOP_BINOP_VAL) INSTRS)
+   ) => stage:(
+   STATE_BINOP_VAL ; (VALS (CONST NT_BINOP_VAL C_BINOP_VAL) INSTRS)
+   ) 
+  if typecheck(STATE_BINOP_VAL, state) /\ typecheck(NT_BINOP_VAL, numtype) /\ typecheck(C_1_BINOP_VAL, num-(NT_BINOP_VAL)) /\ typecheck(C_2_BINOP_VAL, num-(NT_BINOP_VAL)) /\ typecheck(BINOP_BINOP_VAL, binop-(NT_BINOP_VAL)) /\ C_BINOP_VAL := $binop-(NT_BINOP_VAL, BINOP_BINOP_VAL, C_1_BINOP_VAL, C_2_BINOP_VAL) .
+
+
+  --- relop
+  var NT_RELOP_VAL : WasmTerminal .
+  var C_1_RELOP_VAL : WasmTerminal .
+  var C_2_RELOP_VAL : WasmTerminal .
+  var RELOP_RELOP_VAL : WasmTerminal .
+  var C_RELOP_VAL : WasmTerminal .
+  var STATE_RELOP_VAL : WasmTerminal .
+
+  crl [relop-val] : stage:( 
+    STATE_RELOP_VAL ; (VALS (CONST NT_RELOP_VAL C_1_RELOP_VAL) (CONST NT_RELOP_VAL C_2_RELOP_VAL) (RELOP NT_RELOP_VAL RELOP_RELOP_VAL) INSTRS)
+   ) => stage:(STATE_RELOP_VAL ; (VALS (CONST I32 C_RELOP_VAL) INSTRS)) 
+  if typecheck(STATE_RELOP_VAL, state) /\ typecheck(NT_RELOP_VAL, numtype) /\ typecheck(C_1_RELOP_VAL, num-(NT_RELOP_VAL)) /\ typecheck(C_2_RELOP_VAL, num-(NT_RELOP_VAL)) /\ typecheck(RELOP_RELOP_VAL, relop-(NT_RELOP_VAL)) /\ C_RELOP_VAL := $relop-(NT_RELOP_VAL, RELOP_RELOP_VAL, C_1_RELOP_VAL, C_2_RELOP_VAL) .  
+
+endm 
