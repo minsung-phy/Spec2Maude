@@ -1,26 +1,26 @@
-(* version3-1 for 3-1.spectec -> 3-1.maude *)
+(* Spec2Maude: SpecTec AST → Maude Algebraic Specification Translator *)
 
 open Util.Source
 open Il.Ast
 
 let header =
-  "load 2 \n\n" ^
-  "mod 3_1_NUMERICS_SCALAR is\n" ^
-  "  inc DSL-TERM .\n" ^
-  "  inc DSL-PRETYPE .\n" ^
-  "  inc DSL-EXEC .\n\n" ^
-  "  inc 2_0_VALIDATION .\n\n" ^
+  "load dsl/pretype \n\n" ^
+  "mod SPECTEC-CORE is\n" ^
+  "  inc DSL-RECORD .\n\n" ^
+  "  --- Base Sort subsumptions\n" ^
   "  subsort Int < WasmTerminal .\n" ^
-  "  subsort Nat < WasmTerminal .\n\n" ^
-  "  op nat : -> WasmType [ctor] . \n" ^
+  "  subsort Nat < WasmTerminal .\n" ^
+  "  subsort Bool < WasmTerminal .\n\n" ^
+  "  --- Additional utility ops\n" ^
+  "  op slice : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals .\n" ^
+  "  op _<-_ : WasmTerminal WasmTerminals -> Bool .\n\n" ^
+  "  --- Common variables\n" ^
   "  var I : Int .\n" ^
-  "  var T : WasmTerminal .\n"
+  "  var T : WasmTerminal .\n" ^
+  "  var TS : WasmTerminals .\n"
 
-let footer = 
-  "\nendm\n\n" ^
-  "mod 3_2_NUMERICS_VECTOR is\n" ^
-  "  inc 3_1_NUMERICS_SCALAR .\n" ^
-  "endm\n"
+let footer =
+  "\nendm\n"
 
 (* ------------------- Helper ------------------- *)
 
