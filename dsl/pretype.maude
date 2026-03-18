@@ -22,16 +22,18 @@ mod DSL-PRETYPE is
 
   eq len(eps) = 0 .
   eq len(W WTS) = 1 + len(WTS) .
-  op typecheck : WasmTerminal WasmType -> Bool .
-  op typecheck : WasmTerminals WasmType -> Bool .
+
+  op is-type : WasmTerminal WasmType -> Bool .
+  op are-types : WasmTerminals WasmType -> Bool .
   
   var T : WasmTerminal .
   var TS : WasmTerminals .
   var WT : WasmType .
   
-  eq typecheck(eps, WT) = true .
-  ceq typecheck(T TS, WT) = typecheck(TS, WT) if TS =/= eps /\ typecheck(T, WT) .
-  op typecheck : WasmTerminals WasmTypes -> Bool . 
+  eq are-types(eps, WT) = true .
+  ceq are-types(T TS, WT) = are-types(TS, WT) if TS =/= eps /\ is-type(T, WT) .
+
+  op are-mixed : WasmTerminals WasmTypes -> Bool . 
 
   var N' : Nat .
   op index : WasmTerminals Nat -> WasmTerminal .
@@ -66,14 +68,12 @@ mod DSL-RECORD is
   eq RI ++ RI' = {RI ; RI'} .
 
   op _[._<-_] : WasmTerminal Qid WasmTerminals -> WasmTerminal . 
-  op _[._<-_] : RecordItems Qid WasmTerminals -> WasmTerminal . --- 내가 추가한 것
+  op _[._<-_] : RecordItems Qid WasmTerminals -> WasmTerminal .
   eq {item(F, V) ; RI} [. F <- V'] = {item(F, V') ; RI} .
   ceq {item(F, V) ; RI} [. F' <- V'] = item(F, V) ++ RI[. F' <- V'] if F =/= F' .
-  
-  --- 나의 생각 : ++ RI[. F' <- V']에서 RI는 RecordsItems인데 이는 틀렸다고 생각함.
-  --- 왜 ? op _[._<-_] : WasmTerminal Qid WasmTerminals -> WasmTerminal . 에서 왼쪽 타입이 WasmTerminal이라고 되어있음.
-  --- 그래서 다음과 같은 op를 하나 더 추가해야한다고 생각함.
-  --- op _[._<-_] : RecordItems Qid WasmTerminals -> WasmTerminal .
+
+  op _[._=++_] : WasmTerminal Qid WasmTerminals -> WasmTerminal .
+  eq REC [. F =++ V'] = REC [. F <- (value(F, REC) V') ] .
 
   eq value(F,{RI}) = value(F, RI) .
   eq value(F, EMPTY) = eps . 
@@ -81,6 +81,7 @@ mod DSL-RECORD is
   ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .
 
   op _[_<-_] : WasmTerminals Nat WasmTerminal -> WasmTerminals [prec 50] .
+  op _[_<-_] : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals [prec 50] .
 
   var H : WasmTerminal .
   vars L : WasmTerminals .
@@ -97,7 +98,6 @@ endm
 
 mod DSL-EXEC is 
   inc DSL-RECORD .
-  --- TODO: Implement the step rule for STEP relation .
   sort Env .
   sort Stage .
   sort Context .
@@ -124,4 +124,3 @@ mod DSL-EXEC is
   
 
 endm 
-

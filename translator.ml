@@ -3,41 +3,131 @@
 open Util.Source
 open Il.Ast
 
-let header =
+(* ------------------------------------------------------------------------- *)
+(* Deduplicate Maude variable declarations within a module                    *)
+(* ------------------------------------------------------------------------- *)
+
+let declared_vars : (string, string) Hashtbl.t = Hashtbl.create 2048
+
+let declare_var (name : string) (sort : string) : string =
+  match Hashtbl.find_opt declared_vars name with
+  | None ->
+      Hashtbl.replace declared_vars name sort;
+      Printf.sprintf "  var %s : %s .\n" name sort
+  | Some _ -> ""
+
+let declare_op_const (name : string) (sort : string) : string =
+  match Hashtbl.find_opt declared_vars name with
+  | None ->
+      Hashtbl.replace declared_vars name sort;
+      Printf.sprintf "  op %s : -> %s .\n" name sort
+  | Some _ -> ""
+
+let declare_vars_same_sort (names : string list) (sort : string) : string =
+  let fresh =
+    names
+    |> List.sort_uniq String.compare
+    |> List.filter (fun n -> not (Hashtbl.mem declared_vars n))
+  in
+  List.iter (fun n -> Hashtbl.replace declared_vars n sort) fresh;
+  if fresh = [] then "" else "  vars " ^ String.concat " " fresh ^ " : " ^ sort ^ " .\n"
+
+let declare_ops_const_list (names : string list) (sort : string) : string =
+  let fresh =
+    names
+    |> List.sort_uniq String.compare
+    |> List.filter (fun n -> not (Hashtbl.mem declared_vars n))
+  in
+  List.iter (fun n -> Hashtbl.replace declared_vars n sort) fresh;
+  String.concat "" (List.map (fun n -> Printf.sprintf "  op %s : -> %s .\n" n sort) fresh)
+
+let init_declared_vars () =
+  Hashtbl.reset declared_vars;
+  Hashtbl.replace declared_vars "I" "Int";
+  List.iter (fun v -> Hashtbl.replace declared_vars v "Int") ["W-I"; "EXP"];
+  List.iter (fun v -> Hashtbl.replace declared_vars v "Nat") ["W-N"; "W-M"];
+  List.iter (fun v -> Hashtbl.replace declared_vars v "WasmTerminal") ["T"; "W"; "WW"; "W-X"];
+  List.iter (fun v -> Hashtbl.replace declared_vars v "WasmTerminals") ["TS"; "W*"]
+
+let header_prefix =
   "load dsl/pretype \n\n" ^
   "mod SPECTEC-CORE is\n" ^
-  "  inc DSL-RECORD .\n\n" ^
-  "  --- Base Sort subsumptions\n" ^
+  "  inc DSL-RECORD .\n" ^
+  "  inc BOOL .\n" ^
+  "  inc INT .\n\n" ^
+  "  --- Base Sorts\n" ^
   "  subsort Int < WasmTerminal .\n" ^
   "  subsort Nat < WasmTerminal .\n\n" ^
-  "  --- Additional utility ops\n" ^
+  "  --- Allow type atoms to appear as terminals (for mixed AST encodings)\n" ^
+  "  subsort WasmType < WasmTerminal .\n" ^
+  "  subsort WasmTypes < WasmTerminals .\n\n" ^
+  "  --- Bool wrapper (avoid subsort Bool < WasmTerminal conflicts)\n" ^
+  "  op w-bool : Bool -> WasmTerminal [ctor] .\n\n" ^
+  "  --- Basic Wasm Types\n" ^
+  "  ops w-N w-M w-K w-n w-m w-X w-C w-I w-S w-T w-V w-b w-z w-L w-E : -> WasmType [ctor] .\n\n" ^
+  "  --- Special Operators\n" ^
+  "  op _shape-x_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op slice : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals .\n" ^
   "  op _<-_ : WasmTerminal WasmTerminals -> Bool .\n\n" ^
-  "  --- Common variables\n" ^
+  "  --- Generic record/terminal combinators (parser support)\n" ^
+  "  op merge : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
+  "  op _=++_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
+  
+  "  op any : -> WasmTerminal [ctor] .\n\n" ^
+  "  --- Common variables (declared once)\n" ^
   "  var I : Int .\n" ^
-  "  var T : WasmTerminal .\n" ^
-  "  var TS : WasmTerminals .\n"
+  "  vars W-I EXP : Int .\n" ^
+  "  vars W-N W-M : Nat .\n" ^
+  "  vars T W WW W-X : WasmTerminal .\n" ^
+  "  vars TS W* : WasmTerminals .\n\n"
 
-let footer =
-  "\nendm\n"
+let footer = "\nendm\n"
 
-(* ------------------- Helper ------------------- *)
-
-(* 이름에서 _를 -로 바꾸고 끝에 %를 제거 + 단문자/키워드 충돌 방지 *)
 let sanitize name =
-  let s = String.map (fun c -> if c = '_' then '-' else c) name in
-  let s = if String.length s > 0 && s.[String.length s - 1] = '%' then
-    String.sub s 0 (String.length s - 1)
-  else s in
-  let keywords = ["if"; "var"; "vars"; "op"; "ops"; "eq"; "ceq"; "sort"; "sorts"; "subsort"; "subsorts"; "mod"; "fmod"; "endm"; "endfm"; "inc"; "protecting"; "extending"; "including"; "quo"; "rem"] in
-  if String.length s = 1 || List.mem (String.lowercase_ascii s) keywords then "w-" ^ s else s
+  let name = if name = "_" then "any" else name in
+  let keywords = ["if"; "var"; "op"; "eq"; "sort"; "mod"; "quo"; "rem"; "or"; "and"; "not"] in
+  let is_alpha_char c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') in
+  let needs_prefix =
+    String.length name = 1 ||
+    (String.length name > 0 && name.[0] <> '$' && not (is_alpha_char name.[0])) ||
+    List.mem (String.lowercase_ascii name) keywords
+  in
+  let base_name = if needs_prefix then "w-" ^ name else name in
+  let mapped =
+    String.map
+      (fun c ->
+        match c with
+        | '.' | '_' | '\'' | '*' | '+' | '?' -> '-'
+        | _ -> c)
+      base_name
+  in
+  let buf = Buffer.create (String.length mapped) in
+  let i = ref 0 in
+  while !i < String.length mapped do
+    let c = mapped.[!i] in
+    if c = '-' && !i + 1 < String.length mapped then
+      let c2 = mapped.[!i + 1] in
+      if c2 >= '0' && c2 <= '9' then (
+        Buffer.add_char buf 'N';
+        Buffer.add_char buf c2;
+        i := !i + 2
+      ) else (
+        Buffer.add_char buf c;
+        i := !i + 1
+      )
+    else (
+      Buffer.add_char buf c;
+      i := !i + 1
+    )
+  done;
+  let res = Buffer.contents buf in
+  if String.length res > 0 && res.[String.length res - 1] = '-' then
+    String.sub res 0 (String.length res - 1)
+  else res
 
-(* 변수명을 대문자로 변환 (Inn -> INN) *)
 let to_var_name name = String.uppercase_ascii (sanitize name)
 
-(* Type Environment: AliasT(IterT(_, List|List1))인 타입을 구조적으로 탐지하기 위한 환경 *)
 let plural_types : (string, bool) Hashtbl.t = Hashtbl.create 32
-
 let build_type_env (defs : def list) =
   let rec scan d = match d.it with
     | RecD ds -> List.iter scan ds
@@ -53,715 +143,713 @@ let build_type_env (defs : def list) =
   in
   List.iter scan defs
 
-(* 구조적 판별: 하드코딩 없이 build_type_env에서 수집된 정보 사용 *)
-let is_plural_type (type_name : string) : bool =
-  Hashtbl.mem plural_types type_name
+let is_plural_type (type_name : string) : bool = Hashtbl.mem plural_types type_name
 
-(* --- Mixfix 일반화 헬퍼 (Rule V-M) --- *)
-
-(* mixop에서 각 섹션의 atom 이름을 추출하여 sanitize된 문자열 리스트로 반환 *)
 let mixop_sections (mixop_val : Xl.Mixop.mixop) : string list =
   List.map (fun atoms ->
     atoms |> List.map Xl.Atom.name |> String.concat "" |> sanitize
   ) mixop_val
 
-(* 섹션과 변수를 교차 배치: section₀ var₀ section₁ var₁ ... sectionₙ *)
 let interleave_lhs (sections : string list) (vars : string list) : string =
   let rec go secs vs = match secs, vs with
     | [], vs_rest -> vs_rest
-    | s :: ss, v :: vs' ->
-        (if s <> "" then [s; v] else [v]) @ go ss vs'
+    | s :: ss, v :: vs' -> (if s <> "" then [s; v] else [v]) @ go ss vs'
     | [s], [] -> if s <> "" then [s] else []
     | _ :: ss, [] -> go ss []
   in
   String.concat " " (go sections vars)
 
-(* op 선언명 생성: section₀ _ section₁ _ ... sectionₙ *)
 let interleave_op (sections : string list) (n_vars : int) : string =
   let rec go secs remaining = match secs, remaining with
     | [], n -> List.init n (fun _ -> "_")
-    | s :: ss, n when n > 0 ->
-        (if s <> "" then [s; "_"] else ["_"]) @ go ss (n - 1)
+    | s :: ss, n when n > 0 -> (if s <> "" then [s; "_"] else ["_"]) @ go ss (n - 1)
     | [s], 0 -> if s <> "" then [s] else []
     | _ :: ss, 0 -> go ss 0
     | _, _ -> []
   in
   String.concat " " (go sections n_vars)
 
-(* --- eps 다중 인자 일반화 헬퍼 (Rule V-E) --- *)
-
-(* 타입 구조를 재귀 순회하여 Opt가 위치한 인자 인덱스 목록을 반환 *)
 let find_opt_param_indices (case_typ : typ) : int list =
   let idx = ref 0 in
   let result = ref [] in
   let rec scan t is_opt = match t.it with
-    | VarT _ ->
-        if is_opt then result := !idx :: !result;
-        idx := !idx + 1
-    | IterT (inner, Opt) ->
-        scan inner true
-    | IterT (inner, _) ->
-        scan inner is_opt
-    | TupT fields ->
-        List.iter (fun (_, ft) -> scan ft is_opt) fields
+    | VarT _ -> if is_opt then result := !idx :: !result; idx := !idx + 1
+    | IterT (inner, Opt) -> scan inner true
+    | IterT (inner, _) -> scan inner is_opt
+    | TupT fields -> List.iter (fun (_, ft) -> scan ft is_opt) fields
     | _ -> ()
   in
-  scan case_typ false;
-  List.rev !result
-
+  scan case_typ false; List.rev !result
 
 let undeclared_vars = ref []
 
-(* 수식(Expression) 변환 함수: 연산자 이름을 그대로 사용함 *)
-let rec translate_exp (e : exp) (v_map : (string * string) list) : string =
+let format_call (fn : string) (arg_strs : string list) : string =
+  match arg_strs with
+  | [] -> fn
+  | _ -> Printf.sprintf "%s ( %s )" fn (String.concat ", " arg_strs)
+
+type exp_ctx = BoolCtx | TermCtx
+
+let is_upper_start (s : string) : bool =
+  String.length s > 0 && s.[0] >= 'A' && s.[0] <= 'Z'
+
+let wrap_bool_if_term (ctx : exp_ctx) (bexp : string) : string =
+  match ctx with
+  | BoolCtx -> bexp
+  | TermCtx -> Printf.sprintf "w-bool ( %s )" bexp
+
+(* ------------------------------------------------------------------------- *)
+(* Option A: token pre-scan                                                   *)
+(* ------------------------------------------------------------------------- *)
+
+let token_set : (string, unit) Hashtbl.t = Hashtbl.create 1024
+let call_sigs : ((string * int), unit) Hashtbl.t = Hashtbl.create 2048
+let declared_decs : ((string * int), unit) Hashtbl.t = Hashtbl.create 2048
+let bool_call_set : (string, unit) Hashtbl.t = Hashtbl.create 64
+let ctor_names : (string, unit) Hashtbl.t = Hashtbl.create 512
+
+let add_token_raw (raw : string) : unit =
+  let low = String.lowercase_ascii raw in
+  if low = "true" || low = "false" then ()
+  else
+    let tok = sanitize raw in
+    if tok <> "" then Hashtbl.replace token_set tok ()
+
+let is_token_like_id (raw : string) : bool =
+  is_upper_start raw
+  && String.length raw > 1
+  && not (raw = "I" || raw = "T" || raw = "W")
+  && not (String.length raw >= 2 && raw.[0] = 'W' && raw.[1] = '-')
+
+let call_name (id : string) : string =
+  let fname = sanitize id in
+  if fname = "w-$" then fname
+  else if String.length fname > 0 && fname.[0] = '$' then fname else "$" ^ fname
+
+let rec prescan_exp (e : exp) : unit =
   match e.it with
-  | VarE id -> 
-      (try List.assoc id.it v_map 
-       with Not_found -> 
-         (* 상수(ADD, SUB, EQ, false, true 등)는 변환하지 않고 그대로 출력 / 얘네는 나중을 위해 고정된 상수라는 것을 알려주기 위해 써놓음 *)
-         if id.it = "ADD" || id.it = "SUB" || id.it = "EQ" || id.it = "false" || id.it = "true" then id.it 
-         else begin
-           let v = String.uppercase_ascii (sanitize id.it) in
-           undeclared_vars := v :: !undeclared_vars;
-           v
-         end)
-  
+  | VarE id ->
+      if id.it = "_" then Hashtbl.replace token_set "any" ()
+      else if is_token_like_id id.it then add_token_raw id.it
+  | CaseE (_mixop, inner) -> prescan_exp inner
+  | TupE es | ListE es -> List.iter prescan_exp es
+  | UnE (_, _, e1) -> prescan_exp e1
+  | BinE (_, _, e1, e2) | CmpE (_, _, e1, e2) | CatE (e1, e2) | MemE (e1, e2)
+  | IdxE (e1, e2) | CompE (e1, e2) ->
+      prescan_exp e1; prescan_exp e2
+  | SliceE (e1, e2, e3) ->
+      prescan_exp e1; prescan_exp e2; prescan_exp e3
+  | UpdE (e1, _, e2) | ExtE (e1, _, e2) ->
+      prescan_exp e1; prescan_exp e2
+  | IfE (c, e1, e2) ->
+      prescan_exp c; prescan_exp e1; prescan_exp e2
+  | CvtE (e1, _, _) | SubE (e1, _, _) | ProjE (e1, _) | UncaseE (e1, _)
+  | LenE e1 | OptE (Some e1) | TheE e1 | LiftE e1 | IterE (e1, _) ->
+      prescan_exp e1
+  | OptE None | BoolE _ | NumE _ | TextE _ -> ()
+  | StrE fields -> List.iter (fun (_a, e1) -> prescan_exp e1) fields
+  | DotE (e1, _a) -> prescan_exp e1
+  | CallE (id, args) ->
+      let cn = call_name id.it in
+      let arity = List.length args in
+      if cn <> "w-$" then Hashtbl.replace call_sigs (cn, arity) ();
+      List.iter (fun a -> match a.it with ExpA e1 -> prescan_exp e1 | _ -> ()) args
+
+let rec prescan_bool_exp (e : exp) : unit =
+  match e.it with
+  | CallE (id, args) ->
+      let cn = call_name id.it in
+      Hashtbl.replace bool_call_set cn ();
+      List.iter (fun a -> match a.it with ExpA e1 -> prescan_exp e1 | _ -> ()) args
+  | BinE ((`AndOp | `OrOp | `ImplOp), _, e1, e2) ->
+      prescan_bool_exp e1; prescan_bool_exp e2
+  | UnE (`NotOp, _, e1) -> prescan_bool_exp e1
+  | _ -> prescan_exp e
+
+let rec prescan_prem (p : prem) : unit =
+  match p.it with
+  | IfPr e -> prescan_bool_exp e
+  | RulePr (_id, _, e) -> prescan_exp e
+  | LetPr (e1, e2, _) -> prescan_exp e1; prescan_exp e2
+  | ElsePr -> ()
+  | IterPr (inner, _) | NegPr inner -> prescan_prem inner
+
+let rec prescan_def (d : def) : unit =
+  match d.it with
+  | RecD ds -> List.iter prescan_def ds
+  | TypD (_id, _params, insts) ->
+      List.iter
+        (fun inst ->
+          match inst.it with
+          | InstD (_binders, _args, deftyp) -> (
+              match deftyp.it with
+              | VariantT cases ->
+                  List.iter
+                    (fun (mixop_val, (_, _case_typ, prems), _) ->
+                      (match List.flatten mixop_val with
+                       | a :: _ ->
+                           let cname = sanitize (Xl.Atom.name a) in
+                           if cname <> "" then Hashtbl.replace ctor_names cname ()
+                       | [] -> ());
+                      List.iter prescan_prem prems)
+                    cases
+              | AliasT _ | StructT _ -> ()))
+        insts
+  | DecD (id, _params, _result_typ, insts) ->
+      Hashtbl.replace declared_decs (call_name id.it, -1) ();
+      List.iter
+        (fun inst ->
+          match inst.it with
+          | DefD (_binders, lhs_args, rhs, prems) ->
+              List.iter (fun a -> match a.it with ExpA e -> prescan_exp e | _ -> ()) lhs_args;
+              prescan_exp rhs;
+              List.iter prescan_prem prems)
+        insts
+  | RelD (_id, _params, _result_typ, rules) ->
+      List.iter
+        (fun r ->
+          match r.it with
+          | RuleD (_case_id, _binders, _args, concl, prems) ->
+              prescan_exp concl;
+              List.iter prescan_prem prems)
+        rules
+  | GramD _ | HintD _ -> ()
+
+let build_token_ops_lines () : string =
+  let toks = Hashtbl.to_seq_keys token_set |> List.of_seq
+    |> List.filter (fun t -> not (Hashtbl.mem ctor_names t))
+    |> List.sort_uniq String.compare in
+  if toks = [] then ""
+  else
+    let rec take k acc ys =
+      if k = 0 || ys = [] then (List.rev acc, ys)
+      else take (k - 1) (List.hd ys :: acc) (List.tl ys)
+    in
+    let rec loop ys acc =
+      if ys = [] then List.rev acc
+      else
+        let (hd, tl) = take 20 [] ys in
+        loop tl (("  ops " ^ String.concat " " hd ^ " : -> WasmTerminal [ctor] .\n") :: acc)
+    in
+    String.concat "" (loop toks []) ^ "\n"
+
+let build_missing_call_ops_lines () : string =
+  let sigs =
+    Hashtbl.to_seq_keys call_sigs |> List.of_seq |> List.sort_uniq compare
+  in
+  let lines =
+    sigs
+    |> List.filter (fun (name, arity) ->
+      not (Hashtbl.mem declared_decs (name, -1)) && arity >= 0)
+    |> List.map (fun (name, arity) ->
+      let args = String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
+      let ret = if Hashtbl.mem bool_call_set name then "Bool" else "WasmTerminal" in
+      Printf.sprintf "  op %s : %s -> %s .\n" name args ret)
+  in
+  if lines = [] then "" else "\n  --- Auto-declared helper calls\n" ^ String.concat "" lines ^ "\n"
+
+let extract_vars_from_maude (s : string) : string list =
+  let re = Str.regexp "[A-Z][A-Z0-9-]*" in
+  let excluded = ["WasmTerminal"; "WasmTerminals"; "WasmType"; "WasmTypes"; "Bool"; "Nat"; "Int";
+                   "EMPTY"; "REC"; "FUNC"; "SUB"; "STRUCT"; "ARRAY"; "FIELD"] in
+  let rec loop pos acc =
+    try
+      let _ = Str.search_forward re s pos in
+      let tok = Str.matched_string s in
+      let next = Str.match_end () in
+      let acc' = if List.mem tok excluded then acc else tok :: acc in
+      loop next acc'
+    with Not_found -> acc
+  in
+  loop 0 [] |> List.sort_uniq String.compare
+
+let rec exp_is_boolish (e : exp) : bool =
+  match e.it with
+  | BoolE _ -> true
+  | CmpE _ -> true
+  | MemE _ -> true
+  | UnE (`NotOp, _, _) -> true
+  | BinE ((`AndOp | `OrOp | `ImplOp | `EquivOp), _, _, _) -> true
+  | IfE (_, e1, e2) -> exp_is_boolish e1 && exp_is_boolish e2
+  | _ -> false
+
+let rec translate_exp (ctx : exp_ctx) (e : exp) (v_map : (string * string) list) : string =
+  match e.it with
+  | VarE id ->
+      (try
+         let (_, mapped_v) = List.find (fun (k, _) -> String.lowercase_ascii k = String.lowercase_ascii id.it) v_map in
+         undeclared_vars := mapped_v :: !undeclared_vars;
+         mapped_v
+       with Not_found ->
+         let low = String.lowercase_ascii id.it in
+         if low = "true" then wrap_bool_if_term ctx "true"
+         else if low = "false" then wrap_bool_if_term ctx "false"
+         else if is_token_like_id id.it then sanitize id.it
+         else
+           (* Try resolving suffixed names like "numtype_2" via base name "numtype" in v_map *)
+           let resolved = ref None in
+           let name = id.it in
+           let len = String.length name in
+           let rec find_split i =
+             if i <= 0 then ()
+             else if name.[i-1] >= '0' && name.[i-1] <= '9' then find_split (i-1)
+             else if name.[i-1] = '_' && i < len then begin
+               let base = String.sub name 0 (i-1) in
+               let suffix = String.sub name i (len - i) in
+               (try
+                  let idx = int_of_string suffix in
+                  let matches = List.filter (fun (k, _) -> String.lowercase_ascii k = String.lowercase_ascii base) v_map in
+                  let matches_rev = List.rev matches in
+                  if idx >= 1 && idx <= List.length matches_rev then
+                    resolved := Some (snd (List.nth matches_rev (idx - 1)))
+                with _ -> ())
+             end
+           in find_split len;
+           (match !resolved with
+            | Some v -> undeclared_vars := v :: !undeclared_vars; v
+            | None ->
+              let v = String.uppercase_ascii (sanitize id.it) in
+              undeclared_vars := v :: !undeclared_vars;
+              v))
   | CaseE (mixop, inner_exp) ->
-      let op_name = 
-        try List.flatten mixop |> List.map Xl.Atom.name |> String.concat "" 
-        with _ -> "UNKNOWN_CASE"
+      let op_name = try List.flatten mixop |> List.map Xl.Atom.name |> String.concat "" with _ -> "" in
+      if op_name = "$" || op_name = "%" || op_name = "" then translate_exp ctx inner_exp v_map
+      else if op_name = "shape-x" then
+        let args = match inner_exp.it with TupE es -> List.map (fun e -> translate_exp TermCtx e v_map) es | _ -> [translate_exp TermCtx inner_exp v_map] in
+        match args with [a; b] -> Printf.sprintf "( %s shape-x %s )" a b | _ -> "eps"
+      else interleave_lhs (mixop_sections mixop) (match inner_exp.it with TupE es -> List.map (fun e -> translate_exp TermCtx e v_map) es | _ -> [translate_exp TermCtx inner_exp v_map])
+  | NumE n -> (match n with `Nat z | `Int z -> Z.to_string z | `Rat q -> Z.to_string (Q.num q) ^ "/" ^ Z.to_string (Q.den q) | `Real r -> Printf.sprintf "%.17g" r)
+  | CvtE (e1, _, _) | SubE (e1, _, _) | ProjE (e1, _) | UncaseE (e1, _) -> translate_exp ctx e1 v_map
+  | UnE (op, _, e1) ->
+      (match op with
+       | `MinusOp -> Printf.sprintf " - ( %s ) " (translate_exp TermCtx e1 v_map)
+       | `PlusOp -> translate_exp TermCtx e1 v_map
+       | `NotOp -> wrap_bool_if_term ctx (Printf.sprintf "not ( %s )" (translate_exp BoolCtx e1 v_map)))
+  | BinE (op, _, e1, e2) ->
+      let (op_str, is_bool) =
+        match (op : binop) with
+        | `AddOp -> ("+", false)
+        | `SubOp -> ("-", false)
+        | `MulOp -> ("*", false)
+        | `DivOp -> (" quo ", false)
+        | `ModOp -> (" rem ", false)
+        | `PowOp -> (" ^ ", false)
+        | `AndOp -> (" and ", true)
+        | `OrOp -> (" or ", true)
+        | `ImplOp -> (" implies ", true)
+        | `EquivOp -> (" == ", true)
       in
-      (* $ 기호 또는 % 포맷팅 기호는 껍데기를 벗기고 내부 수식을 평가 *)
-      if op_name = "$" || op_name = "%" || op_name = "" then translate_exp inner_exp v_map
-      else begin
-        let sections = mixop_sections mixop in
-        let args = match inner_exp.it with
-          | TupE es -> List.map (fun e -> translate_exp e v_map) es
-          | _ -> 
-              let single_arg = translate_exp inner_exp v_map in
-              if single_arg = "()" || single_arg = "" || single_arg = "eps" then [] else [single_arg]
-        in
-        interleave_lhs sections args
-      end
-
-  | NumE n -> 
-      (match n with 
-       | `Nat z | `Int z -> Z.to_string z 
-       | `Rat q -> Z.to_string (Q.num q) ^ "/" ^ Z.to_string (Q.den q)
-       | `Real r -> Printf.sprintf "%.17g" r)
-       
-  | CvtE (e1, _, _) -> translate_exp e1 v_map
-  | SubE (e1, _, _) -> translate_exp e1 v_map
-  
-  (* AST의 투영(proj) 및 언케이스(uncase) 노드 처리 - 껍데기 벗기고 알맹이만 반환 *)
-  | ProjE (e1, _) -> translate_exp e1 v_map
-  | UncaseE (e1, _) -> translate_exp e1 v_map
-
-  | UnE (op, _, e1) -> 
-      let op_str = (match (op : unop) with `MinusOp -> "-" | `PlusOp -> "+" | `NotOp -> "not ") in
-      if op_str = "-" then Printf.sprintf "- %s" (translate_exp e1 v_map)
-      else Printf.sprintf "%s(%s)" op_str (translate_exp e1 v_map)
-      
-  | BinE (op, _, e1, e2) -> 
-      let op_str = (match (op : binop) with 
-        | `AddOp -> " + " | `SubOp -> " - " | `MulOp -> " * " | `DivOp -> " quo " 
-        | `ModOp -> " rem "
-        | `PowOp -> " ^ " | `AndOp -> " and " | `OrOp -> " or " 
-        | `ImplOp -> " implies " | `EquivOp -> " == " 
-      ) in
-      Printf.sprintf "(%s%s%s)" (translate_exp e1 v_map) op_str (translate_exp e2 v_map)
-  
+      if is_bool then
+        wrap_bool_if_term ctx
+          (Printf.sprintf "( %s %s %s )" (translate_exp BoolCtx e1 v_map) op_str (translate_exp BoolCtx e2 v_map))
+      else
+        Printf.sprintf "( %s %s %s )" (translate_exp TermCtx e1 v_map) op_str (translate_exp TermCtx e2 v_map)
   | CmpE (op, _, e1, e2) ->
-      let op_str = (match (op : cmpop) with `LtOp -> "<" | `GtOp -> ">" | `LeOp -> "<=" | `GeOp -> ">=" | `EqOp -> "==" | `NeOp -> "=/=" ) in
-      Printf.sprintf "(%s %s %s)" (translate_exp e1 v_map) op_str (translate_exp e2 v_map)
-
-  | CallE (id, args) -> 
+      let op_str = (match (op : cmpop) with `LtOp -> "<" | `GtOp -> ">" | `LeOp -> "<=" | `GeOp -> ">=" | `EqOp -> "==" | `NeOp -> "=/=") in
+      wrap_bool_if_term ctx (Printf.sprintf "( %s %s %s )" (translate_exp TermCtx e1 v_map) op_str (translate_exp TermCtx e2 v_map))
+  | CallE (id, args) ->
       let arg_strs = List.map (fun a -> translate_arg a v_map) args in
       let fname = sanitize id.it in
-      if fname = "$" then String.concat ", " arg_strs
+      if fname = "w-$" then String.concat ", " arg_strs
       else
-        let final_name = if String.length fname > 0 && fname.[0] = '$' then fname else "$" ^ fname in
-        Printf.sprintf "%s(%s)" final_name (String.concat ", " arg_strs)
-  
-  (* 괄호로 묶인 수식을 처리하기 위한 TupE 추가 *)
-  | TupE [] -> "eps"
-  | TupE [e1] -> translate_exp e1 v_map
-  | TupE el -> "(" ^ String.concat " " (List.map (fun x -> translate_exp x v_map) el) ^ ")"
-  
-  | ListE [] -> "eps"
-  | ListE el -> String.concat " " (List.map (fun x -> translate_exp x v_map) el)
-  (* --- 신규 exp' 분기들 (§6.2) --- *)
-
-  | BoolE b -> if b then "true" else "false"
+        let fn = if String.length fname > 0 && fname.[0] = '$' then fname else "$" ^ fname in
+        format_call fn arg_strs
+  | TupE [] | ListE [] -> "eps"
+  | TupE [e1] -> translate_exp ctx e1 v_map
+  | TupE el | ListE el -> String.concat " " (List.map (fun x -> translate_exp TermCtx x v_map) el)
+  | BoolE b -> wrap_bool_if_term ctx (if b then "true" else "false")
   | TextE s -> "\"" ^ s ^ "\""
-
-  (* 레코드 리터럴: {item('FIELD, e) ; ...} *)
-  | StrE fields ->
-      let items = List.map (fun (atom, e1) ->
-        let qid = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
-        let e_str = translate_exp e1 v_map in
-        let e_str = if e_str = "" || e_str = "()" then "eps" else e_str in
-        Printf.sprintf "item(%s, %s)" qid e_str
-      ) fields in
-      "{" ^ String.concat " ; " items ^ "}"
-
-  (* 레코드 필드 접근: value('FIELD, e) *)
-  | DotE (e1, atom) ->
-      let qid = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
-      Printf.sprintf "value(%s, %s)" qid (translate_exp e1 v_map)
-
-  (* 레코드 합성: e1 ++ e2 *)
-  | CompE (e1, e2) ->
-      Printf.sprintf "%s ++ %s" (translate_exp e1 v_map) (translate_exp e2 v_map)
-
-  (* 멤버십 검사: e1 <- e2 *)
-  | MemE (e1, e2) ->
-      Printf.sprintf "(%s <- %s)" (translate_exp e1 v_map) (translate_exp e2 v_map)
-
-  (* 길이 연산: len(e) *)
-  | LenE e1 ->
-      Printf.sprintf "len(%s)" (translate_exp e1 v_map)
-
-  (* 리스트 연결: e1 e2 (Maude의 WasmTerminals 결합은 juxtaposition) *)
-  | CatE (e1, e2) ->
-      Printf.sprintf "%s %s" (translate_exp e1 v_map) (translate_exp e2 v_map)
-
-  (* 인덱싱: index(e1, e2) *)
-  | IdxE (e1, e2) ->
-      Printf.sprintf "index(%s, %s)" (translate_exp e1 v_map) (translate_exp e2 v_map)
-
-  (* 슬라이스: slice(e, i, j) *)
-  | SliceE (e1, e2, e3) ->
-      Printf.sprintf "slice(%s, %s, %s)" (translate_exp e1 v_map) (translate_exp e2 v_map) (translate_exp e3 v_map)
-
-  (* 상태 업데이트: e1 [. FIELD <- e2] *)
+  | StrE fields -> "{" ^ String.concat " ; " (List.map (fun (atom, e1) -> Printf.sprintf "item('%s, %s)" (to_var_name (Xl.Atom.name atom)) (translate_exp TermCtx e1 v_map)) fields) ^ "}"
+  | DotE (e1, atom) -> Printf.sprintf "value('%s, %s)" (to_var_name (Xl.Atom.name atom)) (translate_exp TermCtx e1 v_map)
+  | CompE (e1, e2) -> Printf.sprintf "merge ( %s , %s )" (translate_exp TermCtx e1 v_map) (translate_exp TermCtx e2 v_map)
+  | MemE (e1, e2) -> wrap_bool_if_term ctx (Printf.sprintf "( %s <- %s )" (translate_exp TermCtx e1 v_map) (translate_exp TermCtx e2 v_map))
+  | LenE e1 -> Printf.sprintf "len ( %s )" (translate_exp TermCtx e1 v_map)
+  | CatE (e1, e2) -> Printf.sprintf "%s %s" (translate_exp TermCtx e1 v_map) (translate_exp TermCtx e2 v_map)
+  | IdxE (e1, e2) -> Printf.sprintf "index ( %s, %s )" (translate_exp TermCtx e1 v_map) (translate_exp TermCtx e2 v_map)
+  | SliceE (e1, e2, e3) -> Printf.sprintf "slice ( %s, %s, %s )" (translate_exp TermCtx e1 v_map) (translate_exp TermCtx e2 v_map) (translate_exp TermCtx e3 v_map)
   | UpdE (e1, path, e2) ->
-      Printf.sprintf "%s[%s <- %s]" (translate_exp e1 v_map) (translate_path path v_map) (translate_exp e2 v_map)
-
-  (* 상태 확장: e1 [path =.. e2] *)
+      let pstr = translate_path path v_map in
+      if String.length pstr > 0 && pstr.[0] = '\''
+      then Printf.sprintf "( %s [. %s <- %s ] )" (translate_exp TermCtx e1 v_map) pstr (translate_exp TermCtx e2 v_map)
+      else Printf.sprintf "( %s [ %s <- %s ] )" (translate_exp TermCtx e1 v_map) pstr (translate_exp TermCtx e2 v_map)
   | ExtE (e1, path, e2) ->
-      Printf.sprintf "(%s[%s =++ %s])" (translate_exp e1 v_map) (translate_path path v_map) (translate_exp e2 v_map)
-
-  (* 옵셔널: Some e -> e, None -> eps *)
-  | OptE (Some e1) -> translate_exp e1 v_map
+      let pstr = translate_path path v_map in
+      if String.length pstr > 0 && pstr.[0] = '\''
+      then Printf.sprintf "( %s [. %s =++ %s ] )" (translate_exp TermCtx e1 v_map) pstr (translate_exp TermCtx e2 v_map)
+      else Printf.sprintf "( %s [ %s =++ %s ] )" (translate_exp TermCtx e1 v_map) pstr (translate_exp TermCtx e2 v_map)
+  | OptE (Some e1) | TheE e1 | LiftE e1 -> translate_exp ctx e1 v_map
   | OptE None -> "eps"
-
-  (* 옵셔널 언래핑: e! -> e *)
-  | TheE e1 -> translate_exp e1 v_map
-
-  (* 반복(Iteration): 변수일 경우 "var*" 형태로 v_map을 먼저 조회 *)
-  | IterE (e1, (iter_type, _)) -> 
+  | IterE (e1, (iter_type, _)) ->
       let suffix = match iter_type with List -> "*" | List1 -> "+" | Opt -> "?" | ListN _ -> "" in
       (match e1.it with
-       | VarE id -> 
+       | VarE id ->
            let full_id = id.it ^ suffix in
-           (try List.assoc full_id v_map 
-            with Not_found -> 
+           (try List.assoc full_id v_map
+            with Not_found ->
               let v = String.uppercase_ascii (sanitize full_id) in
               undeclared_vars := v :: !undeclared_vars;
               v)
-       | _ -> translate_exp e1 v_map)
+       | _ -> translate_exp ctx e1 v_map)
+  | IfE (c, e1, e2) -> Printf.sprintf "if %s then %s else %s fi" (translate_exp BoolCtx c v_map) (translate_exp ctx e1 v_map) (translate_exp ctx e2 v_map)
 
-  (* 조건식: if c then e1 else e2 *)
-  | IfE (c, e1, e2) ->
-      Printf.sprintf "if %s then %s else %s fi" (translate_exp c v_map) (translate_exp e1 v_map) (translate_exp e2 v_map)
-
-  (* 리프트(coercion strip): _? <: _* *)
-  | LiftE e1 -> translate_exp e1 v_map
-
-(* 경로(Path) 변환 함수: UpdE, ExtE에서 사용 *)
 and translate_path (p : path) (v_map : (string * string) list) : string =
   match p.it with
   | RootP -> ""
-  | IdxP (p1, e) ->
-      let base = translate_path p1 v_map in
-      let idx = translate_exp e v_map in
-      if base = "" then Printf.sprintf "[%s]" idx
-      else Printf.sprintf "%s[%s]" base idx
-  | SliceP (p1, e1, e2) ->
-      Printf.sprintf "%s[%s : %s]" (translate_path p1 v_map) (translate_exp e1 v_map) (translate_exp e2 v_map)
+  | IdxP (_p1, e) ->
+      translate_exp TermCtx e v_map
+  | SliceP (_p1, e1, e2) ->
+      Printf.sprintf "%s %s" (translate_exp TermCtx e1 v_map) (translate_exp TermCtx e2 v_map)
   | DotP (p1, atom) ->
       let qid = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
       let base = translate_path p1 v_map in
-      if base = "" then Printf.sprintf ".%s" qid
-      else Printf.sprintf "%s.%s" base qid
+      if base = "" then qid else qid
 
 and translate_arg (a : arg) (v_map : (string * string) list) : string =
   match a.it with
-  | ExpA e -> translate_exp e v_map
-  | TypA _ -> "eps"
-  | DefA _ -> "eps"
-  | GramA _ -> "eps"
+  | ExpA e -> translate_exp TermCtx e v_map
+  | TypA t -> translate_typ t v_map
+  | _ -> "eps"
 
-(* 전제조건(Premise) 변환 함수 (§8) *)
 and translate_prem (p : prem) (v_map : (string * string) list) : string =
   match p.it with
-  | IfPr e -> translate_exp e v_map
-  | RulePr (id, _mixop, e) ->
-      let args_str = match e.it with
-        | TupE el -> String.concat " " (List.map (fun x -> translate_exp x v_map) el)
-        | _ -> translate_exp e v_map
+  | IfPr e -> translate_exp BoolCtx e v_map
+  | RulePr (id, _, e) ->
+      let arg_strs =
+        match e.it with
+        | TupE el -> List.map (fun x -> translate_exp TermCtx x v_map) el
+        | _ -> [translate_exp TermCtx e v_map]
       in
-      Printf.sprintf "%s(%s)" (sanitize id.it) args_str
-  | LetPr (e1, e2, _) ->
-      Printf.sprintf "(%s := %s)" (translate_exp e1 v_map) (translate_exp e2 v_map)
+      format_call (sanitize id.it) arg_strs
+  | LetPr (e1, e2, _) -> Printf.sprintf "( %s == %s )" (translate_exp TermCtx e1 v_map) (translate_exp TermCtx e2 v_map)
   | ElsePr -> "owise"
-  | IterPr (inner_p, _) -> translate_prem inner_p v_map
-  | NegPr inner_p ->
-      Printf.sprintf "not(%s)" (translate_prem inner_p v_map)
+  | IterPr (inner_p, _) | NegPr inner_p -> translate_prem inner_p v_map
 
 and translate_typ (t : typ) (v_map : (string * string) list) : string =
   match t.it with
-  | VarT (id, args) -> 
-      let name = 
-        try 
-          let mapped = List.assoc id.it v_map in
-          (* Bug Fix #1: 대문자 변수명(INVOKE_FUNCADDR 등)이 타입 위치에 오는 것을 방지 *)
-          if mapped = String.uppercase_ascii mapped then sanitize id.it
-          else mapped
-        with Not_found -> sanitize id.it 
-      in
-      if args = [] then name
-      else 
-        let arg_strs = List.map (fun a -> translate_arg a v_map) args in
-        Printf.sprintf "%s(%s)" name (String.concat ", " arg_strs)
-  | IterT (inner, _) -> translate_typ inner v_map
-  | _ -> "WasmType"
+  | VarT (id, args) -> let name = try let mapped = List.assoc id.it v_map in if mapped = String.uppercase_ascii mapped then sanitize id.it else mapped with Not_found -> sanitize id.it in if args = [] then name else Printf.sprintf "%s ( %s )" name (String.concat " , " (List.map (fun a -> translate_arg a v_map) args))
+  | IterT (inner, _) -> translate_typ inner v_map | _ -> "WasmType"
 
-(* ------------------- Main: 정의 번역 (translate_definition) ------------------- *)
+let is_bool_typ (t : typ) (v_map : (string * string) list) : bool =
+  match t.it with
+  | VarT (tid, _) ->
+      let s = String.lowercase_ascii (translate_typ t v_map) in
+      s = "bool" || s = "w-b" || String.lowercase_ascii tid.it = "bool" || String.lowercase_ascii tid.it = "b"
+  | _ ->
+      let s = String.lowercase_ascii (translate_typ t v_map) in
+      s = "bool" || s = "w-b"
+
+(* ------------------------------------------------------------------------- *)
+(* Definition translation                                                     *)
+(* ------------------------------------------------------------------------- *)
+
 let rec translate_definition (d : def) : string =
+  let base_types = ["w-N"; "w-M"; "w-K"; "w-n"; "w-m"; "w-X"; "w-C"; "w-I"; "w-S"; "w-T"; "w-V"; "w-b"; "w-z"; "w-L"; "w-E"] in
   match d.it with
-  | RecD defs -> String.concat "\n" (List.map (fun d -> translate_definition d) defs)
-
+  | RecD defs -> String.concat "\n" (List.map translate_definition defs)
   | TypD (id, params, insts) ->
       let name = sanitize id.it in
-    
-      (* Maude 선언부 생성 *)
       let sig_types = String.concat " " (List.map (fun _ -> "WasmTerminal") params) in
-      let op_decl = Printf.sprintf "  op %s : %s -> WasmType [ctor] .\n" name sig_types in
-      
-      let res = List.map (fun inst ->
-        match inst.it with
+      let op_decl = if List.mem name base_types then "" else Printf.sprintf "  op %s : %s -> WasmType [ctor] .\n" name sig_types in
+      let res = List.map (fun inst -> match inst.it with
         | InstD (binders, args, deftyp) ->
-            (* v_map 생성 : Inn -> INN *)
-            let v_map = List.filter_map (fun b ->
-              match b.it with 
-              | ExpB (id, _) -> Some (id.it, to_var_name id.it)
-              | _ -> None
-            ) binders in
-
-            (* Binder들에 대한 typecheck 조건 생성 (예 : typecheck(INN, Inn)) *)
-            let binder_conds = List.filter_map (fun b ->
-              let get_cond id = Some (Printf.sprintf "typecheck(%s, %s)" (to_var_name id.it) (sanitize id.it)) in
-              match b.it with
-              | ExpB (id, _) -> get_cond id
-              | _ -> None
-            ) binders in
-            
-            (* 왼쪽 항(LHS) 구성 (예: num-(INN)*)
-            let args_str = String.concat ", " (List.map (fun a -> translate_arg a v_map) args) in
-            let full_type_name = if args_str = "" then name else name ^ "(" ^ args_str ^ ")" in
-
-            (match deftyp.it with 
-             | VariantT cases -> 
-                let case_res = List.map (fun (mixop_val, (_, case_typ, prems), _) ->
-                  (* 1. Mixfix 이름 생성: IF%%ELSE% -> IF-ELSE- (Maude 스타일) *)
-                  let raw_cons_name = 
-                    match List.flatten mixop_val with
-                    | a :: _ -> Xl.Atom.name a
-                    | [] -> ""
-                  in
-                  let maude_cons_name = sanitize raw_cons_name in
-
+            let v_map = List.filter_map (fun b -> match b.it with ExpB (tid, _) -> Some (tid.it, to_var_name tid.it) | _ -> None) binders in
+            let binder_conds = List.filter_map (fun b -> match b.it with ExpB (tid, _) -> Some (Printf.sprintf "is-type ( %s , %s )" (to_var_name tid.it) (sanitize tid.it)) | _ -> None) binders in
+            let args_str = String.concat " , " (List.map (fun a -> translate_arg a v_map) args) in
+            let full_type_name = if args_str = "" then name else name ^ " ( " ^ args_str ^ " ) " in
+            (match deftyp.it with
+             | VariantT cases ->
+                List.map (fun (mixop_val, (_, case_typ, prems), _) ->
                   if prems <> [] then begin
-                    (* 범위 제약(uN, sN) — undeclared_vars 수집 포함 *)
-                    undeclared_vars := [];
-                    let conditions = List.filter_map (fun p -> match p.it with IfPr e -> Some (translate_exp e v_map) | _ -> None) prems in
-                    let cond_str = String.concat " /\\ " (binder_conds @ conditions) in
-                    let i_var = to_var_name "i" in
-                    let collected = List.filter (fun v -> v <> i_var) (List.sort_uniq String.compare !undeclared_vars) in
-                    let extra_decl = if collected = [] then "" else "  vars " ^ String.concat " " collected ^ " : WasmTerminal .\n" in
-                    let var_decl = Printf.sprintf "  var %s : WasmTerminal .\n%s" i_var extra_decl in
-                    Printf.sprintf "%s  ceq typecheck(%s, %s) = true \n   if %s ." var_decl i_var full_type_name cond_str
-                  end
-                  else
-                    (* 타입별 변수명 중복 방지를 위한 딕셔너리 카운터 *)
-                    let type_counters = ref [] in
-                    let get_count tname =
-                      let c = (try List.assoc tname !type_counters with Not_found -> 0) + 1 in
-                      type_counters := (tname, c) :: (List.remove_assoc tname !type_counters);
-                      c
-                    in
-
-                    (* 인자 추출 함수: 변수명 중복 방지를 위해 카운터 사용, 타입 인자 보존 *)
+                    undeclared_vars := []; let conditions = List.filter_map (fun p -> match p.it with IfPr e -> Some (translate_exp BoolCtx e v_map) | _ -> None) prems in
+                    let i_var = to_var_name "i" in let collected = List.filter (fun v -> v <> i_var && not (List.mem v ["I"; "T"; "TS"; "WW"; "W*"])) (List.sort_uniq String.compare !undeclared_vars) in
+                    let decl = declare_ops_const_list collected "WasmTerminal" in
+                    let i_decl = declare_var i_var "WasmTerminal" in
+                    Printf.sprintf "%s%s  ceq is-type ( %s , %s ) = true \n   if %s ." decl i_decl i_var full_type_name (String.concat " and " (binder_conds @ conditions))
+                  end else begin
+                    let type_counters = ref [] in let get_count tname = let c = (try List.assoc tname !type_counters with Not_found -> 0) + 1 in type_counters := (tname, c) :: (List.remove_assoc tname !type_counters); c in
                     let rec collect_params current_v_map t is_list = match t.it with
-                      | VarT (tid, _) -> 
+                      | VarT (tid, _) ->
                           let v_base = to_var_name tid.it in
-                          let count = get_count v_base in (* 타입별로 카운팅 *)
-
-                          let indexed_name = if is_list then v_base ^ "*" else v_base ^ string_of_int count in
-                          let sort_name = translate_typ t [] in 
-                          let inherent_plural = is_plural_type tid.it in
-                          let maude_sort = if is_list || inherent_plural then "WasmTerminals" else "WasmTerminal" in
-
-                          let updated_v_map = (tid.it, indexed_name) :: current_v_map in
-                          ([(indexed_name, sort_name, maude_sort)], updated_v_map)
-
-                      | IterT (inner, iter) -> 
-                          let is_lst = (iter = List || iter = List1) in
-                          collect_params current_v_map inner is_lst
-
-                      | TupT fields -> 
-                          List.fold_left (fun (ps_acc, vm_acc) (_, ft) ->
-                            let (ps, new_vm) = collect_params vm_acc ft is_list in
-                            (ps_acc @ ps, new_vm)
-                          ) ([], current_v_map) fields
-
-                      | _ -> ([], current_v_map)
+                          let count = get_count v_base in
+                          let indexed_name = if is_list then v_base ^ "-" ^ (if iter_type_name tid.it = "Opt" then "OPT" else "LIST") else v_base ^ string_of_int count in
+                          let new_vm = (tid.it, indexed_name) :: current_v_map in
+                          ([(indexed_name, translate_typ t new_vm, if is_list || is_plural_type tid.it then "WasmTerminals" else "WasmTerminal")], new_vm)
+                      | IterT (inner, iter) -> collect_params current_v_map inner (iter = List || iter = List1)
+                      | TupT fields -> List.fold_left (fun (ps_acc, vm_acc) (_, ft) -> let (ps, new_vm) = collect_params vm_acc ft is_list in (ps_acc @ ps, new_vm)) ([], current_v_map) fields | _ -> ([], current_v_map)
+                    and iter_type_name tid_it = if is_plural_type tid_it then "LIST" else "SINGLE" in
+                    (* Map suffixed binder names (e.g. "numtype_2") to indexed param names (e.g. "NUMTYPE2") *)
+                    let binder_suffix_map =
+                      List.filter_map (fun b -> match b.it with
+                        | ExpB (tid, _) ->
+                            let name = tid.it in
+                            let len = String.length name in
+                            let rec find_split i =
+                              if i <= 0 then None
+                              else if name.[i-1] >= '0' && name.[i-1] <= '9' then find_split (i-1)
+                              else if name.[i-1] = '_' && i < len then
+                                let base = String.sub name 0 (i-1) in
+                                let suffix = String.sub name i (len - i) in
+                                Some (name, to_var_name base ^ suffix)
+                              else None
+                            in find_split len
+                        | _ -> None) binders
                     in
-
-                    let (params, _) = collect_params v_map case_typ false in
-                    
-                    (* Maude 부품 조립 *)
+                    let enriched_vm = binder_suffix_map @ v_map in
+                    let (params, _collect_vm) = collect_params enriched_vm case_typ false in
                     let p_vars = List.map (fun (v, _, _) -> v) params in
-                    let p_sorts = String.concat " " (List.map (fun (_, _, ms) -> ms) params) in
-                    
-                    let v_decl = String.concat "" (List.map (fun (v, _, ms) -> 
-                        Printf.sprintf "  var %s : %s .\n" v ms
-                    ) params) in
-
-                    (* 조건문: typecheck(LOCAL*, local) 등 *)
-                    let p_conds = List.map (fun (v, s, _) -> Printf.sprintf "typecheck(%s, %s)" v s) params in
-                    let rhs_str = String.concat " and " (binder_conds @ p_conds) in
-                    let final_rhs = if rhs_str = "" then "true" else rhs_str in
-
-                    (* 바인더 변수들도 Maude에서 선언해야 함 *)
-                    let binder_decl = String.concat "" (List.map (fun b ->
-                      match b.it with
-                      | ExpB (id, _) -> Printf.sprintf "  var %s : WasmTerminal .\n" (to_var_name id.it)
-                      | _ -> ""
-                    ) binders) in
-
-                    (* Mixfix 및 빈 생성자(Juxtaposition) 좌항 포맷팅 — 구조적 interleave *)
-                    let sections = mixop_sections mixop_val in
-                    let lhs_usage = interleave_lhs sections p_vars in
-                    let op_decl_name = interleave_op sections (List.length p_vars) in
-                                        
-                    let main_rule = 
-                      if maude_cons_name = "" then
-                        (* 1. 빈 생성자(Juxtaposition): op 선언 생략 *)
-                        Printf.sprintf "\n%s%s  eq typecheck(%s, %s) = %s ." 
-                          binder_decl v_decl lhs_usage full_type_name final_rhs
-                      else
-                        (* 2. 일반 및 Mixfix 생성자 *)
-                        Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] .\n%s%s  eq typecheck(%s, %s) = %s ." 
-                          op_decl_name p_sorts binder_decl v_decl lhs_usage full_type_name final_rhs
+                    let v_decl = String.concat "" (List.map (fun (v, _, ms) -> declare_var v ms) params) in
+                    let binder_decl =
+                      String.concat ""
+                        (List.map
+                           (fun b ->
+                             match b.it with
+                             | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
+                             | _ -> "")
+                           binders)
                     in
-
-                    (* 빈 값(eps) 규칙 생성 — 다중 인자 일반화 (Rule V-E) *)
-                    let empty_rule =
-                      let opt_indices = find_opt_param_indices case_typ in
-                      let rules = List.map (fun opt_idx ->
-                        let p_vars_eps = List.mapi (fun i v -> if i = opt_idx then "eps" else v) p_vars in
-                        let p_conds_filtered = List.filteri (fun i _ -> i <> opt_idx) p_conds in
-                        let rhs_str = String.concat " and " (binder_conds @ p_conds_filtered) in
-                        let final_rhs_eps = if rhs_str = "" then "true" else rhs_str in
-                        let lhs_eps = interleave_lhs sections p_vars_eps in
-                        Printf.sprintf "\n  eq typecheck(%s, %s) = %s ." lhs_eps full_type_name final_rhs_eps
-                      ) opt_indices in
-                      String.concat "" rules
-                    in
-
-                    (* 3. 두 규칙을 합쳐서 반환 *)
-                    main_rule ^ empty_rule
-                ) cases in
-                String.concat "\n" (List.filter (fun s -> s <> "") case_res)
-
+                    let rhs = String.concat " and " (binder_conds @ List.map (fun (v, s, _) -> Printf.sprintf "is-type ( %s , %s )" v s) params) in
+                    let sections = mixop_sections mixop_val in let lhs_usage = interleave_lhs sections p_vars in
+                    let cons_name = (match List.flatten mixop_val with a :: _ -> Xl.Atom.name a | [] -> "") in
+                    let main = if cons_name = "" then Printf.sprintf "\n%s%s  eq is-type ( %s , %s ) = %s ." binder_decl v_decl lhs_usage full_type_name (if rhs="" then "true" else rhs)
+                               else Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] .\n%s%s  eq is-type ( %s , %s ) = %s ." (interleave_op sections (List.length p_vars)) (String.concat " " (List.map (fun (_, _, ms) -> ms) params)) binder_decl v_decl lhs_usage full_type_name (if rhs="" then "true" else rhs) in
+                    let opts = List.map (fun opt_idx -> let lhs_eps = interleave_lhs sections (List.mapi (fun i v -> if i = opt_idx then "eps" else v) p_vars) in
+                               Printf.sprintf "\n  eq is-type ( %s , %s ) = %s ." lhs_eps full_type_name (let r = String.concat " and " (binder_conds @ List.filteri (fun i _ -> i <> opt_idx) (List.map (fun (v, s, _) -> Printf.sprintf "is-type ( %s , %s )" v s) params)) in if r="" then "true" else r)) (find_opt_param_indices case_typ) in
+                    main ^ String.concat "" opts
+                  end) cases |> List.filter ((<>) "") |> String.concat "\n"
              | AliasT typ ->
-                (* 1. 별칭이 가리키는 실제 타입 본체 번역 *)
-                let rhs_body = match typ.it with
-                  | IterT (inner, _) -> translate_typ inner v_map (* instr* -> instr *)
-                  | _ -> translate_typ typ v_map
-                in
-                
-                (* 2. 검증 대상 변수 결정 — 구조적: IterT(_, List|List1)이면 TS, 아니면 T *)
-                let var_name = match typ.it with
-                  | IterT (_, (List | List1)) -> "TS"
-                  | _ -> "T"
-                in
-                
-                (* 3. 바인더 조건들(예: typecheck(INN, Inn))을 /\ 로 엮음 *)
-                let cond_prefix = if binder_conds = [] then "" 
-                                  else String.concat " /\\ " binder_conds ^ " /\\ " in
-
-                (* 4. 최종 Maude 등식 조립 *)
-                let actual_rhs = if rhs_body = "WasmType" then "true"
-                                 else Printf.sprintf "%stypecheck(%s, %s)" cond_prefix var_name rhs_body in
-                Printf.sprintf "  eq typecheck(%s, %s) = %s ." 
-                  var_name full_type_name actual_rhs
+                let binder_decl_a = String.concat "" (List.map (fun b -> match b.it with ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal" | _ -> "") binders) in
+                let rhs = match typ.it with IterT (inner, _) -> translate_typ inner v_map | _ -> translate_typ typ v_map in let var = match typ.it with IterT (_, (List | List1)) -> "TS" | _ -> "T" in
+                let lhs_final = if List.mem name base_types then "T" else var in
+                Printf.sprintf "%s  eq is-type ( %s , %s ) = %s ." binder_decl_a lhs_final full_type_name (if rhs="WasmType" then "true" else if binder_conds=[] then Printf.sprintf "is-type ( %s , %s )" lhs_final rhs else String.concat " and " binder_conds ^ " and " ^ Printf.sprintf "is-type ( %s , %s )" lhs_final rhs)
              | StructT fields ->
-                (* StructT: 레코드 타입 → DSL-RECORD 패턴 (Rule S-OP, S-F) *)
-                (* 각 필드에 대해 변수명, 타입, Sort를 생성 *)
-                let field_info = List.mapi (fun i (atom, (_, ft, _), _) ->
-                  let field_name = String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
-                  let qid = "'" ^ field_name in
-                  (* 필드 타입의 리스트 여부를 구조적으로 판별 *)
-                  let is_list = match ft.it with
-                    | IterT (_, (List | List1)) -> true
-                    | _ -> false
-                  in
-                  let inner_typ = match ft.it with
-                    | IterT (inner, _) -> inner
-                    | _ -> ft
-                  in
-                  let sort_name = translate_typ inner_typ v_map in
-                  let plural = is_list || is_plural_type sort_name in
-                  let maude_sort = if plural then "WasmTerminals" else "WasmTerminal" in
-                  let var_name = Printf.sprintf "F_%s_%d" field_name i in
-                  (qid, var_name, sort_name, maude_sort)
-                ) fields in
+                let binder_decl_s = String.concat "" (List.map (fun b -> match b.it with ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal" | _ -> "") binders) in
+                let info = List.mapi (fun i (atom, (_, ft, _), _) -> let fn = to_var_name (Xl.Atom.name atom) in let sn = translate_typ (match ft.it with IterT (inner, _) -> inner | _ -> ft) v_map in (fn, Printf.sprintf "F-%s-%d" fn i, sn, if (match ft.it with IterT (_, (List | List1)) -> true | _ -> false) || is_plural_type sn then "WasmTerminals" else "WasmTerminal")) fields in
+                let decls = String.concat "" (List.map (fun (_, vn, _, ms) -> declare_var vn ms) info) in
+                let rhs = String.concat " and " (binder_conds @ List.map (fun (_, vn, sn, _) -> Printf.sprintf "is-type ( %s , %s )" vn sn) info) in
+                Printf.sprintf "%s%s  eq is-type ( {%s} , %s ) = %s ." binder_decl_s decls (String.concat " ; " (List.map (fun (f, vn, _, _) -> Printf.sprintf "item('%s, %s)" f vn) info)) full_type_name (if rhs="" then "true" else rhs))
+      ) insts in op_decl ^ String.concat "\n" res
 
-                (* 변수 선언 *)
-                let var_decls = String.concat "" (List.map (fun (_, vn, _, ms) ->
-                  Printf.sprintf "  var %s : %s .\n" vn ms
-                ) field_info) in
-
-                (* LHS: {item('TYPES, F_TYPES_0) ; item('FUNCS, F_FUNCS_1) ; ...} *)
-                let items = List.map (fun (qid, vn, _, _) ->
-                  Printf.sprintf "item(%s, %s)" qid vn
-                ) field_info in
-                let lhs = "{" ^ String.concat " ; " items ^ "}" in
-
-                (* RHS: typecheck(F_TYPES_0, deftype) /\ typecheck(F_FUNCS_1, deftype) /\ ... *)
-                let conds = List.map (fun (_, vn, sn, _) ->
-                  Printf.sprintf "typecheck(%s, %s)" vn sn
-                ) field_info in
-                let rhs_str = String.concat " /\\ " (binder_conds @ conds) in
-                let final_rhs = if rhs_str = "" then "true" else rhs_str in
-
-                Printf.sprintf "%s  eq typecheck(%s, %s) = %s ."
-                  var_decls lhs full_type_name final_rhs)
-      ) insts in
-      op_decl ^ String.concat "\n" res
-  
-| DecD (id, params, result_typ, insts) ->
-      let raw_func_name = id.it in
-      let func_name = sanitize raw_func_name in
-      let maude_func_name = if String.length func_name > 0 && func_name.[0] = '$' then func_name else "$" ^ func_name in
-      
-      let prefix_raw = match String.split_on_char '-' (String.uppercase_ascii func_name) with h::_ -> h | [] -> "FUNC" in
-      let prefix = if String.length prefix_raw > 0 && prefix_raw.[0] = '$' then String.sub prefix_raw 1 (String.length prefix_raw - 1) else prefix_raw in
-
-      let arg_sorts = String.concat " " (List.map (fun p -> 
-          match p.it with 
-          | ExpP (v_id, t) -> 
-              let t_str = translate_typ t [] in
-              if t_str = "bool" || t_str = "Bool" || v_id.it = "bool" then "Bool" 
-              else "WasmTerminal"
-          | _ -> "WasmTerminal"
-      ) params) in
-
-      let ret_sort = match result_typ.it with
-          | IterT _ -> "WasmTerminals"
-          | _ -> "WasmTerminal"
-      in
-      
-      let op_decl = Printf.sprintf "  op %s : %s -> %s .\n" maude_func_name arg_sorts ret_sort in
-
-      let eq_lines = List.map (fun inst ->
-        match inst.it with
-        | DefD (binders, lhs_args, rhs_exp, prem_list) ->
-            let v_map = ref [] in
-            let binder_conds = ref [] in
-            let var_decls = ref [] in
-            
-            List.iter (fun b ->
+  | DecD (id, params, result_typ, insts) ->
+    let func_name = sanitize id.it in
+    let maude_func_name = if String.length func_name > 0 && func_name.[0] = '$' then func_name else "$" ^ func_name in
+    let prefix = match String.split_on_char '-' (String.uppercase_ascii func_name) with
+      | h :: _ ->
+          let h = if String.length h > 0 && h.[0] = '$' then String.sub h 1 (String.length h - 1) else h in
+          if h = "" then "FN" else h
+      | [] -> "FN" in
+    let arg_sorts =
+      String.concat " "
+        (List.map
+           (fun p ->
+             match p.it with
+             | ExpP (_, t) -> if is_bool_typ t [] then "Bool" else "WasmTerminal"
+             | _ -> "WasmTerminal")
+           params)
+    in
+    let inferred_bool =
+      List.exists (fun inst -> match inst.it with DefD (_, _, rhs_exp, _) -> exp_is_boolish rhs_exp) insts
+    in
+    let ret_sort =
+      match result_typ.it with
+      | IterT _ -> "WasmTerminals"
+      | _ -> if is_bool_typ result_typ [] || inferred_bool || Hashtbl.mem bool_call_set maude_func_name then "Bool" else "WasmTerminal"
+    in
+    let eq_counter = ref 0 in
+    let all_bound_vars = ref [] in
+    let all_free_vars = ref [] in
+    let rhs_ctx = if ret_sort = "Bool" then BoolCtx else TermCtx in
+    let eq_lines =
+      List.map
+        (fun inst ->
+          let eq_idx = !eq_counter in
+          eq_counter := !eq_counter + 1;
+          let (binders, lhs_args, rhs_exp, prem_list) =
+            match inst.it with DefD (b, la, re, pl) -> (b, la, re, pl)
+          in
+          let v_map =
+            List.filter_map
+              (fun b ->
                 match b.it with
                 | ExpB (v_id, t) ->
                     let raw_v = v_id.it in
-                    let t_str = translate_typ t [] in
-                    
-                    if t_str = "bool" || t_str = "Bool" || raw_v = "bool" then ()
-                    else begin
-                        let upper_v = String.uppercase_ascii (sanitize raw_v) in
-                        let upper_v = String.concat "" (String.split_on_char '-' upper_v) in
-                        let maude_var = prefix ^ "_" ^ upper_v in
-                        
-                        v_map := (raw_v, maude_var) :: !v_map;
-                        var_decls := maude_var :: !var_decls;
-                        
-                        let is_cap = (raw_v.[0] >= 'A' && raw_v.[0] <= 'Z') in
-                        if is_cap then
-                          binder_conds := Printf.sprintf "typecheck(%s, %s)" maude_var (sanitize raw_v) :: !binder_conds
-                        else begin
-                            let is_in = String.length t_str >= 2 && String.sub t_str 0 2 = "iN" in
-                            if not is_in && t_str <> "WasmType" && t_str <> "WasmTerminal" && t_str <> "Bool" then begin
-                                (* [추가됨] 여기서 t를 번역할 때 !v_map을 넘겨주면, 내부의 Inn이 BINOP_INN으로 치환됩니다! *)
-                                let t_str_mapped = translate_typ t !v_map in
-                                binder_conds := Printf.sprintf "typecheck(%s, %s)" maude_var t_str_mapped :: !binder_conds
-                            end
-                        end
-                    end
-                | _ -> ()
-            ) binders;
+                    if is_bool_typ t [] || String.lowercase_ascii raw_v = "bool" then None
+                    else
+                      Some
+                        ( raw_v,
+                          Printf.sprintf "%s%d-%s" prefix eq_idx
+                            (String.concat "" (String.split_on_char '-' (String.uppercase_ascii (sanitize raw_v)))) )
+                | _ -> None)
+              binders
+          in
+          let binder_conds =
+            List.filter_map
+              (fun b ->
+                match b.it with
+                | ExpB (v_id, t) ->
+                    let t_s = translate_typ t [] in
+                    if t_s = "WasmType" || is_bool_typ t [] || String.lowercase_ascii v_id.it = "bool"
+                    then None
+                    else
+                      (match List.assoc_opt v_id.it v_map with
+                       | Some mv -> Some (mv, Printf.sprintf "is-type ( %s , %s )" mv (translate_typ t v_map))
+                       | None -> None)
+                | _ -> None)
+              binders
+          in
+          (* Translate LHS FIRST to determine bound variables *)
+          undeclared_vars := [];
+          let arg_strs =
+            List.map
+              (fun a -> match a.it with ExpA e -> translate_exp TermCtx e v_map | _ -> "eps")
+              lhs_args
+          in
+          let lhs_vars = !undeclared_vars in
+          (* Translate RHS *)
+          undeclared_vars := [];
+          let body = translate_exp rhs_ctx rhs_exp v_map in
+          let rhs_vars = !undeclared_vars in
+          (* Translate conditions *)
+          undeclared_vars := [];
+          let prem_conds =
+            List.filter_map
+              (fun p ->
+                let s = translate_prem p v_map in
+                if s = "" || s = "owise" then None else Some s)
+              prem_list
+          in
+          let prem_vars = !undeclared_vars in
+          let has_owise = List.exists (fun p -> match p.it with ElsePr -> true | _ -> false) prem_list in
 
-            undeclared_vars := [];
-            let body = translate_exp rhs_exp !v_map in
-            (* LHS 인자 번역 시에도 undeclared_vars 수집 *)
-            let lhs_undeclared_before = !undeclared_vars in
-            
-            let rec process_args args typs =
-                match args, typs with
-                | arg :: rest_args, param :: rest_typs ->
-                    let is_bool = 
-                        match param.it with 
-                        | ExpP (v_id, t) -> 
-                            let t_str = translate_typ t [] in
-                            (t_str = "bool" || t_str = "Bool" || v_id.it = "bool")
-                        | _ -> false 
-                    in
-                    let a_str = match arg.it with ExpA e -> translate_exp e !v_map | _ -> "eps" in
-                    let final_a = 
-                        if is_bool then
-                            if body = "0" then "false" else if body = "1" then "true" else a_str
-                        else a_str
-                    in
-                    final_a :: process_args rest_args rest_typs
-                | [], _ -> []
-                | _, [] -> []
-            in
-            
-            let arg_strs = process_args lhs_args params in
-            let arg_str = String.concat ", " arg_strs in
-            
-            (* 전제조건(Premises)을 변환하여 binder 조건과 합침 *)
-            let prem_conds = List.filter_map (fun p ->
-              let s = translate_prem p !v_map in
-              if s = "" || s = "owise" then None else Some s
-            ) prem_list in
-            let has_owise = List.exists (fun p -> match p.it with ElsePr -> true | _ -> false) prem_list in
-            let all_conds = List.rev !binder_conds @ prem_conds in
-            let owise_attr = if has_owise then " [owise]" else "" in
-            let cond_str = if all_conds = [] then "" else " \n      if " ^ String.concat " /\\ " all_conds in
-            
-            (* undeclared_vars 수집 및 중복 제거 — RHS + LHS + Premises 모두 포함 *)
-            let all_undeclared = lhs_undeclared_before @ !undeclared_vars in
-            let collected_vars = List.filter (fun v -> 
-              v <> "AND" && v <> "OR" && v <> "NOT" && v <> "TRUE" && v <> "FALSE"
-            ) all_undeclared in
-            let unique_vars = List.rev !var_decls @ collected_vars in
-            let unique_vars = List.sort_uniq String.compare unique_vars in
+          let extracted =
+            extract_vars_from_maude (String.concat " " (arg_strs @ [body] @ prem_conds))
+          in
+          let all_used = List.sort_uniq String.compare (rhs_vars @ lhs_vars @ prem_vars @ extracted) in
+          let lhs_set = List.sort_uniq String.compare lhs_vars in
 
-            let is_n_var v = let len = String.length v in (len >= 2 && String.sub v (len-2) 2 = "_N") || (len >= 4 && String.sub v (len-4) 4 = "_INN") in
-            let vars_n = List.filter is_n_var unique_vars in
-            let vars_i = List.filter (fun v -> not (is_n_var v)) unique_vars in
-            
-            let decl_str = 
-              (if vars_n = [] then "" else if List.length vars_n = 1 then Printf.sprintf "  var %s : WasmTerminal .\n" (List.hd vars_n) else Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " vars_n)) ^
-              (if vars_i = [] then "" else if List.length vars_i = 1 then Printf.sprintf "  var %s : WasmTerminal .\n" (List.hd vars_i) else Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " vars_i))
-            in
+          let bound = List.filter (fun v -> List.mem v lhs_set) all_used in
+          let free = List.filter (fun v -> not (List.mem v lhs_set)) all_used in
 
-            let eq_word = if all_conds = [] && not has_owise then "eq" else "ceq" in
-            let line_sep = if decl_str = "" then "" else "\n" in
-            
-            if arg_strs = [] then 
-                Printf.sprintf "%s%s  %s %s = %s%s%s ." line_sep decl_str eq_word maude_func_name body cond_str owise_attr
-            else 
-                Printf.sprintf "%s%s  %s %s(%s) = %s%s%s ." line_sep decl_str eq_word maude_func_name arg_str body cond_str owise_attr
-      ) insts in
-      "\n" ^ op_decl ^ String.concat "\n" eq_lines ^ "\n"
+          let binder_conds = binder_conds |> List.filter (fun (mv, _) -> List.mem mv lhs_set) |> List.map snd in
 
-  | RelD (id, _mixop, _typ, rules) ->
-      (* RelD: 추론 규칙 관계 → `op rel : ... -> Bool .` + `eq/ceq rel(...) = true` *)
+          all_bound_vars := List.sort_uniq String.compare (!all_bound_vars @ bound);
+          all_free_vars := List.sort_uniq String.compare (!all_free_vars @ free);
+
+          let all_conds = binder_conds @ prem_conds in
+          let cond_str = if all_conds = [] then "" else " \n      if " ^ String.concat " and " all_conds in
+          let lhs = format_call maude_func_name arg_strs in
+          Printf.sprintf "  %s %s = %s%s%s ."
+            (if all_conds = [] then "eq" else "ceq")
+            lhs body cond_str (if has_owise then " [owise]" else ""))
+        insts
+    in
+    let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_func_name arg_sorts ret_sort in
+    let truly_free = List.filter (fun v -> not (List.mem v !all_bound_vars)) !all_free_vars in
+    let bound_decl = declare_vars_same_sort !all_bound_vars "WasmTerminal" in
+    let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
+    "\n" ^ op_decl ^ bound_decl ^ free_decl ^ String.concat "\n" eq_lines ^ "\n"
+
+  | RelD (id, _, _, rules) ->
       let rel_name = sanitize id.it in
-
-      (* 관계의 인자 arity를 첫 번째 rule의 결론(conclusion)에서 추론 *)
       let arity = match rules with
-        | r :: _ -> (match r.it with 
-            | RuleD (_, _, _, conclusion, _) ->
-                (match conclusion.it with
-                 | TupE el -> List.length el
-                 | _ -> 1))
+        | r :: _ -> (match r.it with RuleD (_, _, _, c, _) -> (match c.it with TupE el -> List.length el | _ -> 1))
         | [] -> 0
       in
-      let arg_sorts = if arity = 0 then "" else String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
-      let op_decl = Printf.sprintf "\n  op %s : %s -> Bool .\n" rel_name arg_sorts in
+      let op_decl = Printf.sprintf "\n  op %s : %s -> Bool .\n" rel_name
+        (String.concat " " (List.init arity (fun _ -> "WasmTerminal"))) in
 
-      let rule_lines = List.map (fun r ->
-        match r.it with
-        | RuleD (case_id, binders, _rule_mixop, conclusion, prem_list) ->
-            let v_map = ref [] in
-            let var_decls = ref [] in
-            let binder_conds = ref [] in
-
-            (* 바인더에서 변수 매핑 및 타입 조건 생성 *)
-            let rule_prefix = String.uppercase_ascii (sanitize case_id.it) in
-            List.iter (fun b ->
-              match b.it with
+      let rel_prefix = String.uppercase_ascii (sanitize rel_name) in
+      let rule_counter = ref 0 in
+      let all_bound_vars = ref [] in
+      let all_free_vars = ref [] in
+      let rule_lines = List.map (fun r -> match r.it with
+        | RuleD (case_id, binders, _, conclusion, prem_list) ->
+            let rule_idx = !rule_counter in
+            rule_counter := !rule_counter + 1;
+            let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
+            let case_part = if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix in
+            let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
+            let v_map = List.filter_map (fun b -> match b.it with
               | ExpB (v_id, t) ->
                   let raw_v = v_id.it in
-                  let t_str = translate_typ t [] in
-                  if t_str = "bool" || t_str = "Bool" || raw_v = "bool" then ()
-                  else begin
-                    let upper_v = String.uppercase_ascii (sanitize raw_v) in
-                    let upper_v = String.concat "" (String.split_on_char '-' upper_v) in
-                    let maude_var = rule_prefix ^ "_" ^ upper_v in
-                    v_map := (raw_v, maude_var) :: !v_map;
-                    var_decls := maude_var :: !var_decls;
-
-                    let is_cap = (raw_v.[0] >= 'A' && raw_v.[0] <= 'Z') in
-                    if is_cap then
-                      binder_conds := Printf.sprintf "typecheck(%s, %s)" maude_var (sanitize raw_v) :: !binder_conds
-                    else begin
-                      let is_in = String.length t_str >= 2 && String.sub t_str 0 2 = "iN" in
-                      if not is_in && t_str <> "WasmType" && t_str <> "WasmTerminal" && t_str <> "Bool" then
-                        let t_str_mapped = translate_typ t !v_map in
-                        binder_conds := Printf.sprintf "typecheck(%s, %s)" maude_var t_str_mapped :: !binder_conds
-                    end
-                  end
-              | _ -> ()
-            ) binders;
-
+                  if is_bool_typ t [] || raw_v = "bool" then None
+                  else Some (raw_v, Printf.sprintf "%s%d-%s" prefix rule_idx
+                    (String.concat "" (String.split_on_char '-' (String.uppercase_ascii (sanitize raw_v)))))
+              | _ -> None) binders in
+            let binder_conds = List.filter_map (fun b -> match b.it with
+              | ExpB (v_id, t) ->
+                  let t_s = translate_typ t [] in
+                  if t_s = "WasmType" || is_bool_typ t [] || v_id.it = "bool" then None
+                  else
+                    (match List.assoc_opt v_id.it v_map with
+                     | Some mv -> Some (mv, Printf.sprintf "is-type ( %s , %s )" mv (translate_typ t v_map))
+                     | None -> None)
+              | _ -> None) binders in
+            (* Translate LHS (conclusion) FIRST *)
             undeclared_vars := [];
-            (* 결론(Conclusion) 번역 → LHS: TupE unboxing으로 이중 괄호 방지 *)
             let lhs = match conclusion.it with
-              | TupE el -> String.concat ", " (List.map (fun x -> translate_exp x !v_map) el)
-              | _ -> translate_exp conclusion !v_map
+              | TupE el -> String.concat " , " (List.map (fun x -> translate_exp TermCtx x v_map) el)
+              | _ -> translate_exp TermCtx conclusion v_map
             in
+            let lhs_vars = !undeclared_vars in
+            (* Translate conditions *)
+            undeclared_vars := [];
+            let prems = List.filter_map (fun p ->
+              let s = translate_prem p v_map in
+              if s = "" || s = "owise" then None else Some s) prem_list in
+            let prem_vars = !undeclared_vars in
+            let extracted = extract_vars_from_maude (lhs ^ " " ^ String.concat " " prems) in
+            let all_used = List.sort_uniq String.compare (lhs_vars @ prem_vars @ extracted) in
+            let lhs_set = List.sort_uniq String.compare lhs_vars in
 
-            (* 전제조건(Premises) 번역 *)
-            let prem_conds = List.filter_map (fun p ->
-              let s = translate_prem p !v_map in
-              if s = "" || s = "owise" then None else Some s
-            ) prem_list in
-            let all_conds = List.rev !binder_conds @ prem_conds in
+            let bound = List.filter (fun v -> List.mem v lhs_set) all_used in
+            let free = List.filter (fun v -> not (List.mem v lhs_set)) all_used in
 
-            (* undeclared_vars 수집 및 중복 제거 *)
-            let collected_vars = List.filter (fun v -> 
-              v <> "AND" && v <> "OR" && v <> "NOT" && v <> "TRUE" && v <> "FALSE"
-            ) !undeclared_vars in
-            let unique_vars = List.rev !var_decls @ collected_vars in
-            let unique_vars = List.sort_uniq String.compare unique_vars in
+            let binder_conds = binder_conds |> List.filter (fun (mv, _) -> List.mem mv lhs_set) |> List.map snd in
 
-            (* 변수 선언 *)
-            let decl_str =
-              if unique_vars = [] then ""
-              else if List.length unique_vars = 1 then
-                Printf.sprintf "  var %s : WasmTerminal .\n" (List.hd unique_vars)
-              else
-                Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " unique_vars)
-            in
+            all_bound_vars := List.sort_uniq String.compare (!all_bound_vars @ bound);
+            all_free_vars := List.sort_uniq String.compare (!all_free_vars @ free);
 
-            (* eq/ceq 생성 *)
-            let cond_str = if all_conds = [] then "" else " \n      if " ^ String.concat " /\\ " all_conds in
-            let eq_word = if all_conds = [] then "eq" else "ceq" in
-            let line_sep = if decl_str = "" then "" else "\n" in
-            Printf.sprintf "%s%s  %s %s(%s) = true%s ."
-              line_sep decl_str eq_word rel_name lhs cond_str
+            let all_conds = binder_conds @ prems in
+            let cond_str = if all_conds = [] then ""
+              else " \n      if " ^ String.concat " and " all_conds in
+            Printf.sprintf "  %s %s ( %s ) = true%s ."
+              (if all_conds = [] then "eq" else "ceq")
+              rel_name lhs cond_str
       ) rules in
-      op_decl ^ String.concat "\n" rule_lines ^ "\n"
 
-  (* GramD: binary/text 문법 — 변환 범위 밖 *)
-  | GramD _ -> ""
-  (* HintD: 비출력 메타데이터 *)
-  | HintD _ -> ""
+      let truly_free = List.filter (fun v -> not (List.mem v !all_bound_vars)) !all_free_vars in
+      let bound_decl = declare_vars_same_sort !all_bound_vars "WasmTerminal" in
+      let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
+      op_decl ^ bound_decl ^ free_decl ^ String.concat "\n" rule_lines ^ "\n"
+
+  | GramD _ | HintD _ -> ""
+
+(* ------------------------------------------------------------------------- *)
+(* Top-level: prescan + header generation + reordered output                  *)
+(* ------------------------------------------------------------------------- *)
+
+let translate (defs : def list) : string =
+  build_type_env defs;
+  init_declared_vars ();
+  Hashtbl.reset token_set;
+  Hashtbl.reset call_sigs;
+  Hashtbl.reset declared_decs;
+  Hashtbl.reset bool_call_set;
+  Hashtbl.reset ctor_names;
+  List.iter prescan_def defs;
+  let token_ops = build_token_ops_lines () in
+  let call_ops = build_missing_call_ops_lines () in
+  let header = header_prefix ^ "  --- Auto-collected tokens\n" ^ token_ops ^ call_ops in
+  let body = String.concat "\n" (List.map translate_definition defs) in
+  let lines = String.split_on_char '\n' body in
+  let starts_with s pfx = String.length s >= String.length pfx && String.sub s 0 (String.length pfx) = pfx in
+  let is_decl l =
+    let s = String.trim l in
+    starts_with s "op " || starts_with s "ops " ||
+    starts_with s "var " || starts_with s "vars " ||
+    starts_with s "subsort "
+  in
+  let decls = List.filter is_decl lines |> List.sort_uniq String.compare in
+  let eqs = List.filter (fun l -> not (is_decl l)) lines in
+  header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
+  "\n\n  --- Equations\n" ^ String.concat "\n" eqs ^ footer
