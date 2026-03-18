@@ -1,0 +1,176 @@
+--- =========================================================================
+--- WASM-EXEC: Executable Stepping Engine (Approach B Prototype)
+---
+--- A wrapper module providing executable rewrite-rule semantics on top
+--- of SPECTEC-CORE's equational definitions ($binop, $testop, $relop).
+---
+--- Design: Uses wrapper sorts (wi for instructions, ws for sequences)
+--- to avoid parsing conflicts with SPECTEC-CORE's assoc `_ _` operator.
+---
+--- Run: maude test/wasm-exec.maude
+--- =========================================================================
+
+load ../output.maude
+
+mod WASM-EXEC is
+  protecting SPECTEC-CORE .
+
+  --- Wrapped instruction
+  sort WI .
+  op wi : WasmTerminal -> WI [ctor] .
+
+  --- Instruction sequence
+  sort WIS .
+  subsort WI < WIS .
+  op nocode : -> WIS [ctor] .
+  op __ : WIS WIS -> WIS [ctor assoc id: nocode] .
+
+  --- Value stack
+  sort VS .
+  op emptystack : -> VS [ctor] .
+  op push : WasmTerminal VS -> VS [ctor] .
+
+  --- Machine: running or halted
+  sort Run .
+  op run : VS WIS -> Run [ctor] .
+  op halt : VS -> Run [ctor] .
+  op trap : -> Run [ctor] .
+
+  vars V V1 V2 NT BO : WasmTerminal .
+  var S : VS .
+  var R : WIS .
+
+  --- Termination: no more code
+  rl [done] : run(S, nocode) => halt(S) .
+
+  --- NOP
+  rl [nop] : run(S, wi(NOP) R) => run(S, R) .
+
+  --- CONST: push value
+  rl [const] : run(S, wi(CONST NT V) R) => run(push(V, S), R) .
+
+  --- DROP: pop top
+  rl [drop] : run(push(V, S), wi(DROP) R) => run(S, R) .
+
+  --- UNREACHABLE: trap
+  rl [unreachable] : run(S, wi(UNREACHABLE) R) => trap .
+
+  --- BINOP: pop two values, compute, push result
+  crl [binop] :
+    run(push(V2, push(V1, S)), wi(BINOP NT BO) R)
+    => run(push($binop(NT, BO, V1, V2), S), R)
+    if is-type(NT, Inn) = true .
+
+  --- TESTOP: pop one value, test, push result
+  crl [testop] :
+    run(push(V1, S), wi(TESTOP NT BO) R)
+    => run(push($testop(NT, BO, V1), S), R)
+    if is-type(NT, Inn) = true .
+
+  --- RELOP: pop two values, compare, push result
+  crl [relop] :
+    run(push(V2, push(V1, S)), wi(RELOP NT BO) R)
+    => run(push($relop(NT, BO, V1, V2), S), R)
+    if is-type(NT, Inn) = true .
+
+endm
+
+--- =========================================================================
+--- Tests
+--- =========================================================================
+
+--- Test 1: 3 + 5 = 8
+--- Expected: halt(push(8, emptystack))
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 3) wi(CONST I32 5) wi(BINOP I32 ADD)) .
+
+--- Test 2: 10 - 3 = 7
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 10) wi(CONST I32 3) wi(BINOP I32 SUB)) .
+
+--- Test 3: (2 + 3) * 4 = 20
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 2) wi(CONST I32 3) wi(BINOP I32 ADD)
+    wi(CONST I32 4) wi(BINOP I32 MUL)) .
+
+--- Test 4: NOP is skipped, result = 42
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 42) wi(NOP) wi(NOP)) .
+
+--- Test 5: DROP discards top, result = 99
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 99) wi(CONST I32 42) wi(DROP)) .
+
+--- Test 6: EQZ test (0 -> 1, nonzero -> 0)
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 0) wi(TESTOP I32 EQZ)) .
+
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 5) wi(TESTOP I32 EQZ)) .
+
+--- Test 7: Equality check: (5 == 5) = 1
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 5) wi(CONST I32 5) wi(RELOP I32 w-EQ)) .
+
+--- Test 8: Inequality check: (5 == 6) = 0
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 5) wi(CONST I32 6) wi(RELOP I32 w-EQ)) .
+
+--- =========================================================================
+--- Test 9: Expression tree: ((3 + 4) * (10 - 3)) = 7 * 7 = 49
+--- =========================================================================
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 3)  wi(CONST I32 4)  wi(BINOP I32 ADD)
+    wi(CONST I32 10) wi(CONST I32 3)  wi(BINOP I32 SUB)
+    wi(BINOP I32 MUL)) .
+
+--- =========================================================================
+--- Test 10: Fibonacci(7) = 13 via chained arithmetic
+---
+--- fib(1)=1, fib(2)=1
+--- fib(3) = 1 + 1 = 2
+--- fib(4) = 2 + 1 = 3
+--- fib(5) = 3 + 2 = 5
+--- fib(6) = 5 + 3 = 8
+--- fib(7) = 8 + 5 = 13
+--- =========================================================================
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 1)                               --- fib(2) = 1
+    wi(CONST I32 1)  wi(BINOP I32 ADD)            --- 1 + 1 = 2 = fib(3)
+    wi(CONST I32 1)  wi(BINOP I32 ADD)            --- 2 + 1 = 3 = fib(4)
+    wi(CONST I32 2)  wi(BINOP I32 ADD)            --- 3 + 2 = 5 = fib(5)
+    wi(CONST I32 3)  wi(BINOP I32 ADD)            --- 5 + 3 = 8 = fib(6)
+    wi(CONST I32 5)  wi(BINOP I32 ADD))           --- 8 + 5 = 13 = fib(7)
+  .
+
+--- =========================================================================
+--- Test 11: Large computation: 2^10 = 1024 via repeated doubling
+---   1 * 2 = 2, * 2 = 4, * 2 = 8, ... * 2 = 1024
+--- =========================================================================
+rew in WASM-EXEC :
+  run(emptystack,
+    wi(CONST I32 1)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL)
+    wi(CONST I32 2)  wi(BINOP I32 MUL))
+  .
+
+--- q

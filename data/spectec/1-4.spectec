@@ -1,7 +1,0 @@
-;; 1-4.spectec에서 혁순 선배가 maude로 변환한 부분만 추출
-
-syntax local =
-  LOCAL valtype
-
-syntax func =
-  FUNC typeidx local* expr
