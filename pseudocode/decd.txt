@@ -1,0 +1,24 @@
+[[ DecD(id, params, result_typ, insts) ]] =>
+    let fn = "$" ^ sanitize(id)
+    op fn : WasmTerminal^|params| -> ret_sort .
+    --- ret_sort = result_typ이 Bool이거나 모든 RHS가 불리언 형태면 "Bool" (모든 RHS가 불리언 형태 ex : def $is_even(n : u32) = (n % 2 == 0))
+                 | result_typ이 IterT(_, List|List1)이면 "WasmTerminals"
+                 | 그 외에는 "WasmTerminal"
+
+    insts 내의 각 DefD(binders, lhs_args, rhs, prems)에 대해 :
+        --- vm (Var Map) : SpecTec 변수를 Maude 변수로 바꿔주는 '변환 사전'
+            --- (ex : "c"라는 변수가 0번 규칙에서 나오면 "CONST0-C"로, 1번 규칙이면 "CONST1-C"로 이름표를 붙여서 겹치지 않게 해줌)
+            --- 이때 Maude 문법 충돌 방지를 위해 특수기호를 제거하고 필요시 'W' 접두사를 붙여 정제(Sanitize)함
+            --- (ex: "i_1" -> 0번 규칙일 경우 "IADD0-IN1"로 매핑)
+        vm = binder_to_var_map(prefix, eq_idx, binders)
+            --- prefix : id의 대문자 / eq_idx : 함수 내의 insts 중 몇 번째인지 나타내는 idx
+
+        LHS = fn(translate_exp(lhs_args, vm))
+        RHS = translate_exp(rhs, vm)
+        COND = binder_type_conds(binders) and translate_prem(prems)
+
+        bound = vars in LHS  => vars 선언
+        free  = vars only in RHS/COND  => op 상수 선언 (스콜렘화)
+
+        if COND == empty: eq LHS = RHS [owise?] .
+        else: ceq LHS = RHS if COND [owise?] .
