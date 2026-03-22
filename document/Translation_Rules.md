@@ -5,7 +5,7 @@
 ### 1.1 Pipeline
 
 ```
-*.watsup files ──▶ Frontend.Parse ──▶ Frontend.Elab ──▶ IL AST ──▶ Translator ──▶ output.maude
+*.spectec files ──▶ Frontend.Parse ──▶ Frontend.Elab ──▶ IL AST ──▶ Translator ──▶ output.maude
                    (SpecTec parser)   (type-check &       (list      (OCaml)        (Maude module
                                        elaboration)        of def)                   SPECTEC-CORE)
 ```
