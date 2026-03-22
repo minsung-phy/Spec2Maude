@@ -4,7 +4,9 @@
 
 ### 1.1 Pipeline
 
-<img src="pipeline.png" width="300" alt="Spec2Maude Pipeline"/>
+<p align="center">
+  <img src="pipeline.png" width="300" alt="Spec2Maude Pipeline"/>
+</p>
 
 ---
 
@@ -49,7 +51,7 @@ tmap    : (string → string) → texpr → texpr (* 텍스트만 변환 *)
 tjoin2  : (string → string → string) → texpr → texpr → texpr
 ```
 
-> **💡] 예시 : `BinE(AddOp, VarE "a", VarE "b")` 변환**
+> **예시 : `BinE(AddOp, VarE "a", VarE "b")` 변환**
 >
 > **Step 1**: 왼쪽 자식 노드 `VarE("a")` 변환  
 > 전역 변수를 건드리는 대신, 자기 자신이 발견한 변수를 `texpr` 레코드에 담아서 위로 던진다.  
