@@ -1,0 +1,154 @@
+;; 1. 문맥 안으로 파고들기 (Context Heating & Cooling)
+
+;; [1-1, 1-2] LABEL 문맥 전이
+rule Step/ctxt-label:
+    z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
+    -- Step: z; instr* ~> z'; instr'*
+
+;; [1-3, 1-4] HANDLER 문맥 전이
+rule Step/ctxt-handler:
+    z; (HANDLER_ n `{catch*} instr*) ~> z'; (HANDLER_ n `{catch*} instr'*)
+    -- Step: z; instr* ~> z'; instr'*
+
+;; [1-5, 1-6] FRAME 문맥 전이 (env 스위칭 포함)
+rule Step/ctxt-frame:
+    s; f; (FRAME_ n `{f'} instr*)  ~>  s'; f; (FRAME_ n `{f''} instr'*)
+    -- Step: s; f'; instr* ~> s'; f''; instr'*
+
+;; 2. 껍데기 생성 (Context Creation)
+;; 정적인 명령어가 런타임 껍데기(`LABEL`, `FRAME` 등)로 부화하는 순간
+
+;; [2-1] BLOCK -> LABEL
+rule Step_read/block:
+    z; val^m (BLOCK bt instr*)  ~>  (LABEL_ n `{eps} val^m instr*)
+    -- if $blocktype_(z, bt) = t_1^m -> t_2^n
+
+;; [2-2] LOOP -> LABEL
+rule Step_read/loop:
+    z; val^m (LOOP bt instr*)  ~>  (LABEL_ m `{LOOP bt instr*} val^m instr*)
+    -- if $blocktype_(z, bt) = t_1^m -> t_2^n
+
+;; [2-3] CALL_REF -> FRAME + LABEL
+rule Step_read/call_ref-func:
+    z; val^n (REF.FUNC_ADDR a) (CALL_REF yy)  ~>  (FRAME_ m `{f} (LABEL_ m `{eps} instr*))
+    ----
+    -- if $funcinst(z)[a] = fi
+    -- Expand: fi.TYPE ~~ FUNC t_1^n -> t_2^m
+    -- if fi.CODE = FUNC x (LOCAL t)* (instr*)
+    -- if f = {LOCALS val^n ($default_(t))*, MODULE fi.MODULE}
+
+;; [2-4] TRY_TABLE -> HANDLER + LABEL
+rule Step_read/try_table:
+    z; val^m (TRY_TABLE bt catch* instr*)  ~>  (HANDLER_ n `{catch*} (LABEL_ n `{eps} val^m instr*))
+    ----
+    -- if $blocktype_(z, bt) = t_1^m -> t_2^n
+
+;; 3. 정상 종료 후 껍데기 벗기기 (Teardown)
+;; 명령어가 모두 값(`val*`)으로 평가되었을 때 껍데기가 해체되는 규칙입니다.
+
+;; [3-1] LABEL 벗기기
+rule Step_pure/label-vals:
+    (LABEL_ n `{instr*} val*)  ~>  val*
+
+;; [3-2] HANDLER 벗기기
+rule Step_pure/handler-vals:
+    (HANDLER_ n `{catch*} val*)  ~>  val*
+
+;; [3-3] FRAME 벗기기
+rule Step_pure/frame-vals:
+    (FRAME_ n `{f} val^n)  ~>  val^n
+
+;; 4. 분기 탈출 (Branching / BR)
+;; 원본 스펙은 `br-discard-instr`를 따로 두지 않고, `val'* val^n (BR l) instr*` 라는 패턴 매칭을 통해 잔여 명령어(`instr*`)와 잉여 값(`val'*`)을 한 번에 암묵적으로 날려버립니다.
+
+;; [4-2] BR 0 도착 시 LABEL 찢기
+rule Step_pure/br-label-zero:
+    (LABEL_ n `{instr'*} val'* val^n (BR l) instr*)  ~>  val^n instr'*
+    -- if l = 0
+
+;; [4-3] BR > 0 일 때 LABEL 한 겹 찢고 전진
+rule Step_pure/br-label-succ:
+    (LABEL_ n `{instr'*} val* (BR l) instr*)  ~>  val* (BR $(l - 1))
+    -- if l > 0
+
+;; [4-4] BR이 HANDLER를 만났을 때 찢고 전진
+rule Step_pure/br-handler:
+    (HANDLER_ n `{catch*} val* (BR l) instr*)  ~>  val* (BR l)
+
+;; 5. 함수 조기 종료 (RETURN)
+;; [5-1, 5-2] RETURN이 LABEL/HANDLER를 만났을 때
+rule Step_pure/return-label:
+    (LABEL_ n `{instr'*} val* RETURN instr*)  ~>  val* RETURN
+
+rule Step_pure/return-handler:
+    (HANDLER_ n `{catch*} val* RETURN instr*)  ~>  val* RETURN
+
+;; [5-3] RETURN이 FRAME을 만났을 때
+rule Step_pure/return-frame:
+    (FRAME_ n `{f} val'* val^n RETURN instr*)  ~>  val^n
+
+;; 6. 치명적 오류 전파 (TRAP Bubbling)
+;; `TRAP`이 주변 명령어와 모든 껍데기를 무자비하게 삼키는 규칙들입니다.
+
+;;[6-1] TRAP 주변 명령어 파괴
+rule Step_pure/trap-instrs:
+    val* TRAP instr* ~>  TRAP
+    -- if val* =/= eps \/ instr* =/= eps
+
+;; [6-2, 6-3, 6-4] 모든 껍데기 박살 내기
+rule Step_pure/trap-label:
+    (LABEL_ n `{instr'*} TRAP)  ~>  TRAP
+
+rule Step_pure/trap-handler:
+    (HANDLER_ n `{catch*} TRAP)  ~>  TRAP
+
+rule Step_pure/trap-frame:
+    (FRAME_ n `{f} TRAP)  ~>  TRAP
+
+;; 7. 예외 던지기 및 잡기 (THROW_REF)
+;; [7-1] THROW_REF 주변 명령어 파괴
+rule Step_read/throw_ref-instrs:
+    z; val* (REF.EXN_ADDR a) THROW_REF instr* ~>  (REF.EXN_ADDR a) THROW_REF
+    ----
+    -- if val* =/= eps \/ instr* =/= eps
+
+;; [7-2, 7-3, 7-4] LABEL, FRAME, 빈 HANDLER 찢고 전진
+rule Step_read/throw_ref-label:
+    z; (LABEL_ n `{instr'*} (REF.EXN_ADDR a) THROW_REF)  ~>  (REF.EXN_ADDR a) THROW_REF
+
+rule Step_read/throw_ref-frame:
+    z; (FRAME_ n `{f} (REF.EXN_ADDR a) THROW_REF)  ~>  (REF.EXN_ADDR a) THROW_REF
+
+rule Step_read/throw_ref-handler-empty:
+    z; (HANDLER_ n `{eps} (REF.EXN_ADDR a) THROW_REF)  ~>  (REF.EXN_ADDR a) THROW_REF
+
+;; [7-5 ~ 7-8] CATCH 성공 시 지정된 라벨로 점프 (BR)
+;; CATCH 룰 예시
+rule Step_read/throw_ref-handler-catch:
+    z; (HANDLER_ n `{(CATCH x l) catch'*} (REF.EXN_ADDR a) THROW_REF)  ~>  val* (BR l)
+    ----
+    -- if $exninst(z)[a].TAG = $tagaddr(z)[x]
+    -- if val* = $exninst(z)[a].FIELDS
+
+;; [7-9] 현재 매칭 실패 시 다음 Catch 블록 검사
+rule Step_read/throw_ref-handler-next:
+    z; (HANDLER_ n `{catch catch'*} (REF.EXN_ADDR a) THROW_REF)  ~>  (HANDLER_ n `{catch'*} (REF.EXN_ADDR a) THROW_REF)
+    ----
+    -- otherwise
+
+;; 8. 꼬리 호출 (Return Call)
+;; [8-1, 8-2] LABEL 및 HANDLER 찢기
+rule Step_read/return_call_ref-label:
+    z; (LABEL_ k `{instr'*} val* (RETURN_CALL_REF yy) instr*)  ~>  val* (RETURN_CALL_REF yy)
+
+rule Step_read/return_call_ref-handler:
+    z; (HANDLER_ k `{catch*} val* (RETURN_CALL_REF yy) instr*)  ~>  val* (RETURN_CALL_REF yy)
+
+;; [8-3, 8-4] FRAME 도달 시 TRAP 또는 치환
+rule Step_read/return_call_ref-frame-null:
+    z; (FRAME_ k `{f} val* (REF.NULL ht) (RETURN_CALL_REF yy) instr*)  ~>  TRAP
+
+rule Step_read/return_call_ref-frame-addr:
+    z; (FRAME_ k `{f} val'* val^n (REF.FUNC_ADDR a) (RETURN_CALL_REF yy) instr*)  ~>  val^n (REF.FUNC_ADDR a) (CALL_REF yy)
+    ----
+    -- Expand: $funcinst(z)[a].TYPE ~~ FUNC t_1^n -> t_2^m

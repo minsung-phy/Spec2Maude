@@ -1,0 +1,220 @@
+--- 1. 실행 흐름을 위한 K 연산자 정의 : 명령어와 값들을 순서대로 이어주는 ~> 연산자
+sort KItem KList .
+subsort KItem < KList .
+op eps : -> KList [ctor] . --- 빈 스택
+op _~>_ : KList KList -> KList [ctor assoc id: eps] . --- 결합 법칙(assoc)과 항등원(eps)
+
+--- 2. 다중 셀(Cell) 정의
+sort Cell .
+--- 스택 + 명령어
+op k{_} : KList -> Cell [ctor] . --- 실행할 명령어 스택 
+--- 함수 내부의 지역 변수(LOCAL.GET, LOCAL.SET) 등 프레임(Frame) 영역
+op env{_} : Env -> Cell [ctor] . --- 로컬 변수, 함수 인스턴스 (Env 타입은 별도 정의) 
+--- 선형 메모리(LOAD, STORE), 전역 변수(GLOBAL.GET, GLOBAL.SET), 테이블(TABLE.GET) 등 힙(Heap)과 전역 저장소(Store) 영역
+op mem{_} : Mem -> Cell [ctor] . --- 메모리 상태 (Mem 타입은 별도 정의) 
+
+--- 3. Configuration (상태 공간) 정의
+sort Config . 
+subsort Cell < Config .
+op emptyCfg : -> Config [ctor] .
+op __ : Config Config -> Config [ctor assoc comm id: emptyCfg] .
+
+--------------------------------------------------------------------------------------------
+--- 패턴 1 : Step_pure (순수 연산)
+--- SpecTec 원본 스펙
+--- relation Step_pure: instr* ~> instr*
+--- rule Step_pure/binop-val:
+---   (CONST nt c_1) (CONST nt c_2) (BINOP nt binop)  ~>  (CONST nt c)
+---   -- if c <- $binop_(nt, binop, c_1, c_2)
+
+crl [step-pure-binop-val] :
+    k{ (CONST nt c_1) ~> (CONST nt c_2) ~> (BINOP nt binop) ~> KRest } --- LHS (매칭할 패턴)
+    =>
+    k{ (CONST nt c) ~> KRest } --- RHS (변환된 결과)
+    if c := $binop_(nt, binop, c_1, c_2) . 
+
+--- 패턴 2 : Step_read (상태 참조)
+--- SpecTec 원본 스펙
+--- Step_read: z; instr* ~> instr'*
+--- rule Step_read/local.get:
+---  z; (LOCAL.GET x)  ~>  val
+---  -- if $local(z, x) = val
+
+crl [step-read-local-get] :
+    k{ (LOCAL.GET X) ~> KRest } --- LHS (매칭)
+    env{ E }
+    =>
+    k {VAL ~> KRest } --- RHS (결과)
+    env { E }
+    if VAL := $local(E, X) .
+
+--- 패턴 3 : Step (상태 변이)
+--- SpecTec 원본 스펙
+--- Step: z; instr*  ~>  z'; instr'*
+--- rule Step/local.set:
+---  z; val (LOCAL.SET x)  ~>  $with_local(z, x, val); eps
+rl [step-local-set] : 
+    k{ VAL ~> (LOCAL.SET X) ~> KRest } --- LHS (매칭: 값과 명령어가 k 셀 맨 앞에 있고, env 셀이 존재함)
+    env{ E } 
+    =>
+    k { KRest } --- RHS (결과: 명령어는 소비되어 사라지고, env 셀은 업데이트됨)
+    env { $with_local(E, X, VAL) } .
+
+--------------------------------------------------------------------------------------------
+
+--- 패턴 4 : 제어 흐름 및 평가 문맥
+
+--- 0. 사전 준비 (선언부)
+--- 제어 흐름 껍데기 선언 (엔진 내부 침투 차단을 위한 frozen)
+op LABEL : Nat Instrs Instrs -> Instr [ctor frozen] .
+op HANDLER : Nat Catches Instrs -> Instr [ctor frozen] .
+op FRAME : Nat Env Instrs -> Instr [ctor frozen] .
+
+--- 문맥 구멍(Hole) 표현을 위한 래퍼
+op CtxtL : Instr -> KItem [ctor] . 
+op hole : -> Instrs [ctor] . 
+
+
+--- 1. 문맥 안으로 파고들기 (Context Heating & Cooling)
+--- [1-1, 1-2] LABEL Heating / Cooling
+rl [heat-label] : 
+  k{ LABEL(N, I0, INSTRS) ~> KRest } => k{ INSTRS ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } .
+rl [cool-label] : 
+  k{ VALS ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } => k{ LABEL(N, I0, VALS) ~> KRest } .
+
+--- [1-3, 1-4] HANDLER Heating / Cooling
+rl [heat-handler] : 
+  k{ HANDLER(N, CATCHES, INSTRS) ~> KRest } => k{ INSTRS ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } .
+rl [cool-handler] : 
+  k{ VALS ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } => k{ HANDLER(N, CATCHES, VALS) ~> KRest } .
+
+--- [1-5, 1-6] FRAME Heating / Cooling (env 셀 스위칭 필수)
+rl [heat-frame] : 
+  k{ FRAME(N, F_INNER, INSTRS) ~> KRest } 
+  env{ F_OUTER } 
+  => 
+  k{ INSTRS ~> CtxtL(FRAME(N, F_OUTER, hole)) ~> KRest } 
+  env{ F_INNER } .
+
+rl [cool-frame] : 
+  k{ VALS ~> CtxtL(FRAME(N, F_OUTER, hole)) ~> KRest } 
+  env{ F_INNER_FINAL } 
+  => 
+  k{ FRAME(N, F_INNER_FINAL, VALS) ~> KRest } 
+  env{ F_OUTER } .
+
+
+--- 2. 껍데기 생성 (Context Creation) - 4개
+
+--- [2-1] BLOCK -> LABEL
+crl [exec-block] : 
+  k{ VALS ~> (BLOCK BT INSTRS) ~> KRest } => k{ LABEL(N, eps, (VALS INSTRS)) ~> KRest }
+  if N := $get_arity(BT) .
+
+--- [2-2] LOOP -> LABEL (재시작 코드를 I0에 넣음)
+crl [exec-loop] : 
+  k{ VALS ~> (LOOP BT INSTRS) ~> KRest } => k{ LABEL(N, (LOOP BT INSTRS), (VALS INSTRS)) ~> KRest }
+  if N := $get_arity(BT) .
+
+--- [2-3] CALL_REF -> FRAME + LABEL
+crl [exec-call-ref-func] : 
+  k{ VALS ~> (REF.FUNC_ADDR A) ~> (CALL_REF YY) ~> KRest }
+  => 
+  k{ FRAME(M, F, LABEL(M, eps, INSTRS)) ~> KRest }
+  if (M, F, INSTRS) := $get_func_context(A) .
+
+--- [2-4] TRY_TABLE -> HANDLER + LABEL
+crl [exec-try-table] : 
+  k{ VALS ~> (TRY_TABLE BT CATCHES INSTRS) ~> KRest } => k{ HANDLER(N, CATCHES, LABEL(N, eps, (VALS INSTRS))) ~> KRest }
+  if N := $get_arity(BT) .
+
+
+--- 3. 정상 종료 후 껍데기 벗기기 (Teardown) - 3개
+rl [teardown-label-vals] : k{ LABEL(N, I0, VALS) ~> KRest } => k{ VALS ~> KRest } .
+rl [teardown-handler-vals] : k{ HANDLER(N, CATCHES, VALS) ~> KRest } => k{ VALS ~> KRest } .
+rl [teardown-frame-vals] : k{ FRAME(N, F, VALS) ~> KRest } => k{ VALS ~> KRest } .
+
+
+--- 4. 분기 탈출 (Branching / BR) - 4개 (쓰레기 청소 포함)
+--- [4-1] BR 잔여 명령어 파괴
+rl [br-discard-instr] : k{ VALS ~> (BR L) ~> INSTR ~> KRest } => k{ VALS ~> (BR L) ~> KRest } .
+
+--- [4-2] BR 0 도착 시 LABEL 찢고 I0 실행
+rl [exec-br-label-zero] : k{ VALS ~> (BR 0) ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } => k{ VALS ~> I0 ~> KRest } .
+
+--- [4-3] BR > 0 일 때 LABEL 한 겹 찢고 전진
+crl [exec-br-label-succ] : k{ VALS ~> (BR L) ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } => k{ VALS ~> (BR (L - 1)) ~> KRest } if L > 0 .
+
+--- [4-4] BR이 HANDLER를 만났을 때는 무시하고 그냥 찢고 전진
+rl [exec-br-handler] : k{ VALS ~> (BR L) ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } => k{ VALS ~> (BR L) ~> KRest } .
+
+
+--- 5. 함수 조기 종료 (RETURN) - 3개
+--- [5-1] RETURN이 LABEL을 만났을 때 찢고 전진
+rl [exec-return-label] : k{ VALS ~> RETURN ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } => k{ VALS ~> RETURN ~> KRest } .
+
+--- [5-2] RETURN이 HANDLER를 만났을 때 찢고 전진
+rl [exec-return-handler] : k{ VALS ~> RETURN ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } => k{ VALS ~> RETURN ~> KRest } .
+
+--- [5-3] RETURN이 FRAME(정문)을 만났을 때 찢고 값만 반환 (퇴근 완료)
+rl [exec-return-frame] : k{ VALS ~> RETURN ~> CtxtL(FRAME(N, F, hole)) ~> KRest } => k{ VALS ~> KRest } .
+
+
+--- 6. 치명적 오류 전파 (TRAP Bubbling) - 4개
+--- [6-1] TRAP 잔여 명령어 파괴
+rl [trap-discard] : k{ VALS ~> TRAP ~> INSTR ~> KRest } => k{ TRAP ~> KRest } .
+
+--- [6-2, 6-3, 6-4] 모든 문맥(LABEL, HANDLER, FRAME)을 무자비하게 박살냄
+rl [trap-bubble-label] : k{ TRAP ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } => k{ TRAP ~> KRest } .
+rl [trap-bubble-handler] : k{ TRAP ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } => k{ TRAP ~> KRest } .
+rl [trap-bubble-frame] : k{ TRAP ~> CtxtL(FRAME(N, F, hole)) ~> KRest } => k{ TRAP ~> KRest } .
+
+
+--- 7. 예외 던지기 및 잡기 (THROW_REF) - 9개
+--- [7-1] THROW_REF 잔여 명령어 파괴
+rl [throw-discard-instrs] : k{ VALS ~> (REF.EXN_ADDR A) ~> THROW_REF ~> INSTR ~> KRest } => k{ (REF.EXN_ADDR A) ~> THROW_REF ~> KRest } .
+
+--- [7-2, 7-3] THROW_REF가 LABEL, FRAME을 만나면 그냥 찢고 올라감
+rl [throw-bubble-label] : k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } => k{ (REF.EXN_ADDR A) ~> THROW_REF ~> KRest } .
+rl [throw-bubble-frame] : k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(FRAME(N, F, hole)) ~> KRest } => k{ (REF.EXN_ADDR A) ~> THROW_REF ~> KRest } .
+
+--- [7-4] 핸들러가 비어있으면 그냥 찢고 올라감
+rl [throw-handler-empty] : k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(HANDLER(N, eps, hole)) ~> KRest } => k{ (REF.EXN_ADDR A) ~> THROW_REF ~> KRest } .
+
+--- [7-5] CATCH 성공 시 (에러 값을 풀고 지정된 L로 BR)
+crl [throw-handler-catch] : 
+  k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(HANDLER(N, ((CATCH X L) CATCHES), hole)) ~> KRest } => k{ VALS ~> (BR L) ~> KRest } 
+  if $match_tag(A, X) == true /\ VALS := $get_exn_fields(A) .
+
+--- [7-6] CATCH_REF 성공 시 (에러 값을 풀고 참조값도 같이 L로 BR)
+crl [throw-handler-catch-ref] : 
+  k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(HANDLER(N, ((CATCH_REF X L) CATCHES), hole)) ~> KRest } => k{ VALS ~> (REF.EXN_ADDR A) ~> (BR L) ~> KRest } 
+  if $match_tag(A, X) == true /\ VALS := $get_exn_fields(A) .
+
+--- [7-7] CATCH_ALL 성공 시
+rl [throw-handler-catch-all] : 
+  k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(HANDLER(N, ((CATCH_ALL L) CATCHES), hole)) ~> KRest } => k{ (BR L) ~> KRest } .
+
+--- [7-8] CATCH_ALL_REF 성공 시
+rl [throw-handler-catch-all-ref] : 
+  k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(HANDLER(N, ((CATCH_ALL_REF L) CATCHES), hole)) ~> KRest } => k{ (REF.EXN_ADDR A) ~> (BR L) ~> KRest } .
+
+--- [7-9] 현재 Catch에 매칭 실패 시 다음 Catch 검사를 위해 리스트 축소
+crl [throw-handler-next] : 
+  k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(HANDLER(N, (CATCH_ITEM CATCHES), hole)) ~> KRest } => k{ (REF.EXN_ADDR A) ~> THROW_REF ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } 
+  if $match_tag(A, CATCH_ITEM) == false .
+
+
+--- 8. 꼬리 호출 (Return Call) - 4개
+--- [8-1, 8-2] RETURN_CALL_REF가 LABEL과 HANDLER를 만나면 찢고 올라감
+rl [return-call-ref-label] : k{ VALS ~> (RETURN_CALL_REF YY) ~> CtxtL(LABEL(K, I0, hole)) ~> KRest } => k{ VALS ~> (RETURN_CALL_REF YY) ~> KRest } .
+rl [return-call-ref-handler] : k{ VALS ~> (RETURN_CALL_REF YY) ~> CtxtL(HANDLER(K, CATCHES, hole)) ~> KRest } => k{ VALS ~> (RETURN_CALL_REF YY) ~> KRest } .
+
+--- [8-3] FRAME까지 왔는데 함수 참조가 NULL이면 TRAP
+rl [return-call-ref-frame-null] : k{ (REF.NULL HT) ~> (RETURN_CALL_REF YY) ~> CtxtL(FRAME(K, F, hole)) ~> KRest } => k{ TRAP ~> KRest } .
+
+--- [8-4] FRAME을 부수고 그 자리에 새로운 CALL_REF를 배치 (콜 스택 재활용)
+rl [return-call-ref-frame-addr] : 
+  k{ VALS ~> (REF.FUNC_ADDR A) ~> (RETURN_CALL_REF YY) ~> CtxtL(FRAME(K, F, hole)) ~> KRest } 
+  => 
+  k{ VALS ~> (REF.FUNC_ADDR A) ~> (CALL_REF YY) ~> KRest } .
