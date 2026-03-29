@@ -24,7 +24,7 @@ rl [heat-handler] :
 rl [cool-handler] : 
   k{ VALS ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } => k{ HANDLER(N, CATCHES, VALS) ~> KRest } .
 
---- [1-5, 1-6] FRAME Heating / Cooling (env 셀 스위칭 필수)
+--- [1-5, 1-6] FRAME Heating / Cooling (env Cell switching)
 rl [heat-frame] : 
   k{ FRAME(N, F_INNER, INSTRS) ~> KRest } 
   env{ F_OUTER } 
