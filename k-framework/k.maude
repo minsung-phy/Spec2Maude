@@ -1,23 +1,70 @@
---- 1. 실행 흐름을 위한 K 연산자 정의 : 명령어와 값들을 순서대로 이어주는 ~> 연산자
-sort KItem KList .
-subsort KItem < KList .
-op eps : -> KList [ctor] . --- 빈 스택
-op _~>_ : KList KList -> KList [ctor assoc id: eps] . --- 결합 법칙(assoc)과 항등원(eps)
+--- 0. 값(Value) 기본 정의
+fmod WASM-VALUES is
+  sort Value .
+  --- 정수형 값을 Wasm Value로 취급
+  op #_ : Int -> Value [ctor] .
+endfm
 
---- 2. 다중 셀(Cell) 정의
-sort Cell .
---- 스택 + 명령어
-op k{_} : KList -> Cell [ctor] . --- 실행할 명령어 스택 
---- 함수 내부의 지역 변수(LOCAL.GET, LOCAL.SET) 등 프레임(Frame) 영역
-op env{_} : Env -> Cell [ctor] . --- 로컬 변수, 함수 인스턴스 (Env 타입은 별도 정의) 
---- 선형 메모리(LOAD, STORE), 전역 변수(GLOBAL.GET, GLOBAL.SET), 테이블(TABLE.GET) 등 힙(Heap)과 전역 저장소(Store) 영역
-op mem{_} : Mem -> Cell [ctor] . --- 메모리 상태 (Mem 타입은 별도 정의) 
+--- 1. 환경(Env) 정식 구현: 로컬 변수와 모듈 인스턴스
+fmod WASM-ENV is
+  protecting NAT .
+  protecting WASM-VALUES .
+  --- 교수님 IMP# 스타일 적용: 인덱스(Nat)를 값(Value)으로 매핑
+  protecting MAP{Nat, Value} * (op _,_ to _;_) . 
 
---- 3. Configuration (상태 공간) 정의
-sort Config . 
-subsort Cell < Config .
-op emptyCfg : -> Config [ctor] .
-op __ : Config Config -> Config [ctor assoc comm id: emptyCfg] .
+  sort Env .
+  
+  --- Wasm 프레임 환경: < locals: 로컬변수맵 module: 모듈주소 >
+  op <locals:_module:_> : Map{Nat, Value} Nat -> Env [ctor] .
+
+  --- 초기화용 헬퍼 연산자
+  op emptyEnv : -> Env .
+  eq emptyEnv = <locals: empty module: 0 > .
+endfm
+
+--- 2. 전역 상태(Store) 정식 구현: 선형 메모리와 글로벌 변수
+fmod WASM-STORE is
+  protecting NAT .
+  protecting WASM-VALUES .
+  --- 선형 메모리와 글로벌 변수 모두 주소(Nat) -> 값(Value) 매핑 사용
+  protecting MAP{Nat, Value} * (op _,_ to _;_) . 
+
+  sort Store .
+
+  --- Wasm 전역 상태: < mem: 메모리맵 globals: 글로벌맵 >
+  --- (추후 tables, funcs가 필요하면 여기에 파라미터로 추가하면 됩니다)
+  op <mem:_globals:_> : Map{Nat, Value} Map{Nat, Value} -> Store [ctor] .
+
+  --- 초기화용 헬퍼 연산자
+  op emptyStore : -> Store .
+  eq emptyStore = <mem: empty globals: empty > .
+endfm
+
+--------------------------------------------------------------------------------------
+
+--- K 연산자 정의 (Lec5/k-prelude.maude)
+fmod WASM-K-COMPUTATION is
+  sorts K KLabel .
+  subsort KLabel < K .
+
+  op .K : -> K [ctor] . --- empty value
+  op _~>_ : K K -> K [ctor prec 70 assoc id: .K] .
+endfm
+
+--- Configuration 및 Cell 정의
+fmod WASM-K-CONFIG is
+  inc WASM-K-COMPUTATION .
+
+  sorts KConfig KConfigItem .
+  subsort KConfigItem < KConfig .
+
+  op none : -> KConfig [ctor] .
+  op __ : KConfig KConfig -> KConfig [ctor assoc comm id: none] .
+
+  op k : K -> KConfigItem [ctor] .
+  op env : Env -> KConfigItem [ctor] . --- 로컬 변수, 함수 인스턴스 영역
+  op store : Store -> KConfigItem [ctor] . --- 선형 메모리, 전역 상태 영역
+endfm
 
 --------------------------------------------------------------------------------------------
 --- 패턴 1 : Step_pure (순수 연산)
@@ -26,12 +73,11 @@ op __ : Config Config -> Config [ctor assoc comm id: emptyCfg] .
 --- rule Step_pure/binop-val:
 ---   (CONST nt c_1) (CONST nt c_2) (BINOP nt binop)  ~>  (CONST nt c)
 ---   -- if c <- $binop_(nt, binop, c_1, c_2)
-
 crl [step-pure-binop-val] :
-    k{ (CONST nt c_1) ~> (CONST nt c_2) ~> (BINOP nt binop) ~> KRest } --- LHS (매칭할 패턴)
+    k( (CONST nt c_1) ~> (CONST nt c_2) ~> (BINOP nt binop) ~> KRest )
     =>
-    k{ (CONST nt c) ~> KRest } --- RHS (변환된 결과)
-    if c := $binop_(nt, binop, c_1, c_2) . 
+    k( (CONST nt c) ~> KRest )
+    if c := $binop(nt, binop, c_1, c_2) . 
 
 --- 패턴 2 : Step_read (상태 참조)
 --- SpecTec 원본 스펙
@@ -39,13 +85,12 @@ crl [step-pure-binop-val] :
 --- rule Step_read/local.get:
 ---  z; (LOCAL.GET x)  ~>  val
 ---  -- if $local(z, x) = val
-
 crl [step-read-local-get] :
-    k{ (LOCAL.GET X) ~> KRest } --- LHS (매칭)
-    env{ E }
+    k( (LOCAL.GET X) ~> KRest ) 
+    env( E )
     =>
-    k {VAL ~> KRest } --- RHS (결과)
-    env { E }
+    k (VAL ~> KRest )
+    env ( E )
     if VAL := $local(E, X) .
 
 --- 패턴 3 : Step (상태 변이)
@@ -54,67 +99,81 @@ crl [step-read-local-get] :
 --- rule Step/local.set:
 ---  z; val (LOCAL.SET x)  ~>  $with_local(z, x, val); eps
 rl [step-local-set] : 
-    k{ VAL ~> (LOCAL.SET X) ~> KRest } --- LHS (매칭: 값과 명령어가 k 셀 맨 앞에 있고, env 셀이 존재함)
-    env{ E } 
+    k( VAL ~> (LOCAL.SET X) ~> KRest ) 
+    env( E ) 
     =>
-    k { KRest } --- RHS (결과: 명령어는 소비되어 사라지고, env 셀은 업데이트됨)
-    env { $with_local(E, X, VAL) } .
+    k( KRest ) 
+    env( $with-local(E, X, VAL) ) .
 
 --------------------------------------------------------------------------------------------
 
 --- 패턴 4 : 제어 흐름 및 평가 문맥
 
 --- 0. 사전 준비 (선언부)
---- 제어 흐름 껍데기 선언 (엔진 내부 침투 차단을 위한 frozen)
+--- br -> LABEL, try_table -> HANDLER, call_ref -> FRAME (with frozen)
 op LABEL : Nat Instrs Instrs -> Instr [ctor frozen] .
 op HANDLER : Nat Catches Instrs -> Instr [ctor frozen] .
 op FRAME : Nat Env Instrs -> Instr [ctor frozen] .
 
---- 문맥 구멍(Hole) 표현을 위한 래퍼
-op CtxtL : Instr -> KItem [ctor] . 
+--- Hole
+op CtxtL : Instr -> KItem [ctor] .
 op hole : -> Instrs [ctor] . 
 
 
---- 1. 문맥 안으로 파고들기 (Context Heating & Cooling)
+--- 1. Context Heating & Cooling
 --- [1-1, 1-2] LABEL Heating / Cooling
 rl [heat-label] : 
-  k{ LABEL(N, I0, INSTRS) ~> KRest } => k{ INSTRS ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } .
+  k( LABEL(N, I0, INSTRS) ~> KRest ) 
+  => 
+  k( INSTRS ~> CtxtL(LABEL(N, I0, hole)) ~> KRest ) .
+
 rl [cool-label] : 
-  k{ VALS ~> CtxtL(LABEL(N, I0, hole)) ~> KRest } => k{ LABEL(N, I0, VALS) ~> KRest } .
+  k( VALS ~> CtxtL(LABEL(N, I0, hole)) ~> KRest ) 
+  => 
+  k( LABEL(N, I0, VALS) ~> KRest ) .
 
 --- [1-3, 1-4] HANDLER Heating / Cooling
 rl [heat-handler] : 
-  k{ HANDLER(N, CATCHES, INSTRS) ~> KRest } => k{ INSTRS ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } .
-rl [cool-handler] : 
-  k{ VALS ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest } => k{ HANDLER(N, CATCHES, VALS) ~> KRest } .
-
---- [1-5, 1-6] FRAME Heating / Cooling (env 셀 스위칭 필수)
-rl [heat-frame] : 
-  k{ FRAME(N, F_INNER, INSTRS) ~> KRest } 
-  env{ F_OUTER } 
+  k( HANDLER(N, CATCHES, INSTRS) ~> KRest ) 
   => 
-  k{ INSTRS ~> CtxtL(FRAME(N, F_OUTER, hole)) ~> KRest } 
-  env{ F_INNER } .
+  k( INSTRS ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest ) .
+
+rl [cool-handler] : 
+  k( VALS ~> CtxtL(HANDLER(N, CATCHES, hole)) ~> KRest ) 
+  => 
+  k( HANDLER(N, CATCHES, VALS) ~> KRest ) .
+
+--- [1-5, 1-6] FRAME Heating / Cooling (env cell switching)
+rl [heat-frame] : 
+  k( FRAME(N, F_INNER, INSTRS) ~> KRest ) 
+  env( F_OUTER )
+  => 
+  k( INSTRS ~> CtxtL(FRAME(N, F_OUTER, hole)) ~> KRest ) 
+  env( F_INNER ) .
 
 rl [cool-frame] : 
-  k{ VALS ~> CtxtL(FRAME(N, F_OUTER, hole)) ~> KRest } 
-  env{ F_INNER_FINAL } 
+  k( VALS ~> CtxtL(FRAME(N, F_OUTER, hole)) ~> KRest ) 
+  env( F_INNER_FINAL ) 
   => 
-  k{ FRAME(N, F_INNER_FINAL, VALS) ~> KRest } 
-  env{ F_OUTER } .
+  k( FRAME(N, F_INNER_FINAL, VALS) ~> KRest ) 
+  env( F_OUTER ) .
 
 
---- 2. 껍데기 생성 (Context Creation) - 4개
+--- 2. Context Creation
 
 --- [2-1] BLOCK -> LABEL
 crl [exec-block] : 
-  k{ VALS ~> (BLOCK BT INSTRS) ~> KRest } => k{ LABEL(N, eps, (VALS INSTRS)) ~> KRest }
-  if N := $get_arity(BT) .
+  k( VALS ~> (BLOCK BT INSTRS) ~> KRest ) 
+  => 
+  k( LABEL(N, eps, (VALS INSTRS)) ~> KRest )
+  if N := $get_output_arity(BT) . --- 함수명 걍 막해놓은거임 / 나중에 바꿔야해 (output.maude 참조)
 
 --- [2-2] LOOP -> LABEL (재시작 코드를 I0에 넣음)
 crl [exec-loop] : 
-  k{ VALS ~> (LOOP BT INSTRS) ~> KRest } => k{ LABEL(N, (LOOP BT INSTRS), (VALS INSTRS)) ~> KRest }
-  if N := $get_arity(BT) .
+  k( VALS ~> (LOOP BT INSTRS) ~> KRest ) 
+  => 
+  k( LABEL(M, (LOOP BT INSTRS), (VALS INSTRS)) ~> KRest )
+  if M := $get_input_arity(BT) .
 
 --- [2-3] CALL_REF -> FRAME + LABEL
 crl [exec-call-ref-func] : 

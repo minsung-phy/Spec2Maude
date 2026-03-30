@@ -1,0 +1,53 @@
+rule Step/ctxt-label:
+    z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
+    -- Step: z; instr* ~> z'; instr'*
+
+;; BLOCK -> LABEL
+rule Step_read/block:
+    z; val^m (BLOCK bt instr*)  ~>  (LABEL_ n `{eps} val^m instr*)
+    -- if $blocktype_(z, bt) = t_1^m -> t_2^n
+
+;; LOOP -> LABEL
+rule Step_read/loop:
+    z; val^m (LOOP bt instr*)  ~>  (LABEL_ m `{LOOP bt instr*} val^m instr*)
+    -- if $blocktype_(z, bt) = t_1^m -> t_2^n
+
+;; 정상 종료 후 LABEL 벗기기
+rule Step_pure/label-vals:
+    (LABEL_ n `{instr*} val*)  ~>  val*
+
+;; BR 0 도착 시 LABEL 찢기
+rule Step_pure/br-label-zero:
+    (LABEL_ n `{instr'*} val'* val^n (BR l) instr*)  ~>  val^n instr'*
+    -- if l = 0
+
+;; BR > 0 일 때 LABEL 한 겹 찢고 전진
+rule Step_pure/br-label-succ:
+    (LABEL_ n `{instr'*} val* (BR l) instr*)  ~>  val* (BR $(l - 1))
+    -- if l > 0
+
+;; 5. 함수 조기 종료 (RETURN)
+;; [5-1, 5-2] RETURN이 LABEL/HANDLER를 만났을 때
+rule Step_pure/return-label:
+    (LABEL_ n `{instr'*} val* RETURN instr*)  ~>  val* RETURN
+
+;; 6. 치명적 오류 전파 (TRAP Bubbling)
+;; `TRAP`이 주변 명령어와 모든 껍데기를 무자비하게 삼키는 규칙들입니다.
+
+;;[6-1] TRAP 주변 명령어 파괴
+rule Step_pure/trap-instrs:
+    val* TRAP instr* ~>  TRAP
+    -- if val* =/= eps \/ instr* =/= eps
+
+;; [6-2, 6-3, 6-4] 모든 껍데기 박살 내기
+rule Step_pure/trap-label:
+    (LABEL_ n `{instr'*} TRAP)  ~>  TRAP
+
+;; [7-2, 7-3, 7-4] LABEL, FRAME, 빈 HANDLER 찢고 전진
+rule Step_read/throw_ref-label:
+    z; (LABEL_ n `{instr'*} (REF.EXN_ADDR a) THROW_REF)  ~>  (REF.EXN_ADDR a) THROW_REF
+
+;; 8. 꼬리 호출 (Return Call)
+;; [8-1, 8-2] LABEL 및 HANDLER 찢기
+rule Step_read/return_call_ref-label:
+    z; (LABEL_ k `{instr'*} val* (RETURN_CALL_REF yy) instr*)  ~>  val* (RETURN_CALL_REF yy)
