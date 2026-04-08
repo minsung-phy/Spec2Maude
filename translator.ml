@@ -110,7 +110,8 @@ let sanitize name =
     in
     let base = if needs_prefix then "w-" ^ name else name in
     let mapped = String.map (function
-      | '.' | '_' | '\'' | '*' | '+' | '?' -> '-'
+      | '.' | '_' | '*' | '+' | '?' -> '-'
+      | '\'' -> 'Q'
       | c -> c) base
     in
     let buf = Buffer.create (String.length mapped) in
@@ -143,9 +144,15 @@ let is_upper_token s =
 let sort_of_type_name raw =
   let s = sanitize raw in
   if String.length s >= 2 && String.sub s 0 2 = "w-" then "WasmTerminal"
-  else String.map (fun c -> if c = '-' then '_' else c) s
+  else
+    let hyphen_to_under = String.map (fun c -> if c = '-' then '_' else c) s in
+    (* Maude sort names must start with uppercase *)
+    if String.length hyphen_to_under > 0
+       && hyphen_to_under.[0] >= 'a' && hyphen_to_under.[0] <= 'z'
+    then String.capitalize_ascii hyphen_to_under
+    else hyphen_to_under
 
-let simple_sort_of_typ (t : typ) vm : string option =
+let rec simple_sort_of_typ (t : typ) vm : string option =
   match t.it with
   | VarT (id, []) ->
       let resolved = match List.assoc_opt id.it vm with
@@ -154,6 +161,7 @@ let simple_sort_of_typ (t : typ) vm : string option =
       in
       if is_upper_token resolved then None
       else Some (sort_of_type_name resolved)
+  | IterT (inner, _) -> simple_sort_of_typ inner vm
   | _ -> None
 
 let is_token_like_id raw =
@@ -784,11 +792,22 @@ let translate_typd id params insts =
     let args_str = String.concat " , " (List.map (fun a -> (translate_arg a v_map).text) args) in
     if args_str = "" then name else Printf.sprintf "%s ( %s )" name args_str
   in
+  (* Pure nat/integer meta-variable TYPES (N, M, K, n, m): Maude variables in
+     equations conflict with constants "op X : -> WasmType [ctor]".  We suppress
+     the CONSTANT declaration but keep "sort X . subsort X < WasmType ." so that
+     membership axioms like "cmb T : N if ..." can still reference them as sorts. *)
+  let pure_meta_var_names = SSet.of_list ["N"; "M"; "K"; "n"; "m"] in
+  let is_pure_meta = SSet.mem id.it pure_meta_var_names in
+  (* Sorts already declared in Maude built-in modules — skip sort/subsort declarations *)
+  let maude_builtin_sorts = SSet.of_list ["Char"; "Zero"; "NzNat"; "Nat"; "Int"; "Bool"] in
+  (* Sorts where instance axiom (cmb/mb) generation doesn't work — list-based or conflicting *)
+  let skip_instance_sorts = SSet.of_list ["Char"; "Zero"; "NzNat"; "Nat"; "Int"; "Bool"; "Name"] in
   let sort_decl =
-    if is_parametric || SSet.mem name base_types || type_sort = "WasmTerminal" then ""
+    if is_parametric || SSet.mem name base_types || type_sort = "WasmTerminal"
+       || SSet.mem type_sort maude_builtin_sorts then ""
     else Printf.sprintf "  sort %s .\n  subsort %s < WasmType .\n" type_sort type_sort in
   let op_decl =
-    if SSet.mem name base_types then ""
+    if is_pure_meta || SSet.mem name base_types then ""
     else Printf.sprintf "  op %s : %s -> WasmType [ctor] .\n" name sig_types in
   let uniq_vars_local vs = List.sort_uniq String.compare vs in
   let extract_vars_local s =
@@ -974,6 +993,8 @@ let translate_typd id params insts =
             in
             List.rev_append acc (force bound [] items)
   in
+  (* Skip instance axiom generation for sorts with incompatible encodings *)
+  let insts = if SSet.mem type_sort skip_instance_sorts then [] else insts in
   let res = List.map (fun inst -> match inst.it with
     | InstD (binders, args, deftyp) ->
         let v_map = binder_var_map binders in
@@ -1157,13 +1178,24 @@ let extract_vars_from_maude s =
   let re = Str.regexp "[A-Z][A-Z0-9-]*" in
   let excluded = SSet.of_list
     ["WasmTerminal"; "WasmTerminals"; "WasmType"; "WasmTypes"; "Bool"; "Nat"; "Int";
-     "EMPTY"; "REC"; "FUNC"; "SUB"; "STRUCT"; "ARRAY"; "FIELD"] in
+     "EMPTY"; "REC"; "FUNC"; "SUB"; "STRUCT"; "ARRAY"; "FIELD";
+     (* Maude DSL-RECORD atom labels — these appear in value('FOO, ...) and must not
+        be treated as free variables when deciding := vs == in condition scheduling *)
+     "TYPES"; "TAGS"; "GLOBALS"; "LOCALS"; "MEMS"; "TABLES"; "FUNCS"; "DATAS"; "ELEMS";
+     "STRUCTS"; "ARRAYS"; "EXNS"; "EXPORTS"; "LABELS"; "RETURN"; "MODULE"; "OFFSET";
+     "ALIGN"; "BYTES"; "CODE"; "REFS"; "RECS"; "FIELDS"; "TAG"; "TYPE"; "VALUE"; "NAME";
+     "ADDR"; "LABEL"; "LABEL"; "LABEL"; "IMPORT"] in
+  (* Also exclude CTOR-prefixed names (generated constructor ops, not variables) *)
+  let is_ctor_name t =
+    String.length t >= 4 && String.sub t 0 4 = "CTOR"
+  in
   let rec loop pos acc =
     match (try Some (Str.search_forward re s pos) with Not_found -> None) with
     | None -> acc
     | Some _ ->
         let tok = Str.matched_string s in
-        loop (Str.match_end ()) (if SSet.mem tok excluded then acc else tok :: acc)
+        loop (Str.match_end ())
+          (if SSet.mem tok excluded || is_ctor_name tok then acc else tok :: acc)
   in
   loop 0 [] |> List.sort_uniq String.compare
 
@@ -1355,9 +1387,41 @@ let rec decompose_eq_expr (e : exp) : (exp * exp) option =
       first_some (List.map snd fields)
   | _ -> None
 
-let prem_item_of_prem vm (p : prem) : prem_item option =
+(** Collect individual prem_items from an expression, splitting AND conjunctions.
+    Each equality sub-expression becomes its own PremEq so the scheduler can
+    independently bind variables from each clause (fixes missing :=  bindings). *)
+let rec collect_prem_items_of_exp vm e : prem_item list =
+  match e.it with
+  | BinE (`AndOp, _, e1, e2) ->
+      collect_prem_items_of_exp vm e1 @ collect_prem_items_of_exp vm e2
+  | CmpE (`EqOp, _, lhs_e, ({it = BoolE true; _} as _e2)) ->
+      (* outer "= true" wrapper — recurse into lhs *)
+      collect_prem_items_of_exp vm lhs_e
+  | CmpE (`EqOp, _, lhs_e, rhs_e) ->
+      let lhs = translate_exp TermCtx lhs_e vm in
+      let rhs = translate_exp TermCtx rhs_e vm in
+      (* For bool_t fallback, use BoolCtx so both sides stay as Bool (avoid w-bool/Bool mismatch) *)
+      let lhs_b = translate_exp BoolCtx lhs_e vm in
+      let rhs_b = translate_exp BoolCtx rhs_e vm in
+      let bool_t = { text = Printf.sprintf "( %s == %s )" lhs_b.text rhs_b.text;
+                     vars = uniq_vars (lhs_b.vars @ rhs_b.vars) } in
+      [PremEq { lhs; rhs; bool_t }]
+  | BinE (`EquivOp, _, lhs_e, rhs_e) ->
+      let lhs = translate_exp TermCtx lhs_e vm in
+      let rhs = translate_exp TermCtx rhs_e vm in
+      let lhs_b = translate_exp BoolCtx lhs_e vm in
+      let rhs_b = translate_exp BoolCtx rhs_e vm in
+      let bool_t = { text = Printf.sprintf "( %s == %s )" lhs_b.text rhs_b.text;
+                     vars = uniq_vars (lhs_b.vars @ rhs_b.vars) } in
+      [PremEq { lhs; rhs; bool_t }]
+  | _ ->
+      let t = translate_exp BoolCtx e vm in
+      if t.text = "" || t.text = "owise" then []
+      else [PremBool t]
+
+let prem_items_of_prem vm (p : prem) : prem_item list =
   match p.it with
-  | ElsePr -> None
+  | ElsePr -> []
   | LetPr (e1, e2, _) ->
       let lhs = translate_exp TermCtx e1 vm in
       let rhs = translate_exp TermCtx e2 vm in
@@ -1365,20 +1429,22 @@ let prem_item_of_prem vm (p : prem) : prem_item option =
         { text = Printf.sprintf "( %s == %s )" lhs.text rhs.text;
           vars = uniq_vars (lhs.vars @ rhs.vars) }
       in
-      Some (PremEq { lhs; rhs; bool_t })
+      [PremEq { lhs; rhs; bool_t }]
   | IfPr e ->
-    (match decompose_eq_expr e with
-     | Some (e1, e2) ->
-           let lhs = translate_exp TermCtx e1 vm in
-           let rhs = translate_exp TermCtx e2 vm in
-           let bool_t = translate_exp BoolCtx e vm in
-           Some (PremEq { lhs; rhs; bool_t })
-     | None ->
-           let t = translate_prem p vm in
-           if t.text = "" || t.text = "owise" then None else Some (PremBool t))
+      let items = collect_prem_items_of_exp vm e in
+      if items <> [] then items
+      else
+        let t = translate_prem p vm in
+        if t.text = "" || t.text = "owise" then [] else [PremBool t]
   | _ ->
       let t = translate_prem p vm in
-      if t.text = "" || t.text = "owise" then None else Some (PremBool t)
+      if t.text = "" || t.text = "owise" then [] else [PremBool t]
+
+(* Legacy single-result wrapper kept for callers that haven't migrated *)
+let prem_item_of_prem vm (p : prem) : prem_item option =
+  match prem_items_of_prem vm p with
+  | [] -> None
+  | x :: _ -> Some x
 
 let classify_prem bound = function
   | PremBool t ->
@@ -1481,7 +1547,7 @@ let translate_decd ss id params result_typ insts =
 
     let rhs_t = translate_exp rhs_ctx rhs_exp vm in
 
-    let prem_items = List.filter_map (prem_item_of_prem vm) prem_list in
+    let prem_items = List.concat_map (prem_items_of_prem vm) prem_list in
     let prem_scheduled = schedule_prems (SSet.of_list lhs_vars) [] prem_items in
     let prem_strs = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
     let prem_vars = List.concat_map (fun (p : prem_sched) -> p.vars @ p.binds) prem_scheduled in
@@ -1527,12 +1593,12 @@ let translate_decd ss id params result_typ insts =
   let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
   let rollrt_bridge_decl =
     if maude_fn = "$rollrt" then
-      "  op $rollrt : Int rectype -> rectype .\n"
+      "  op $rollrt : Int Rectype -> Rectype .\n"
     else ""
   in
   let bound_decl = declare_vars_same_sort !all_bound "WasmTerminal" in
   let rollrt_bridge_var =
-    if maude_fn = "$rollrt" then "  var ROLLRT-BRIDGE-R : rectype .\n" else ""
+    if maude_fn = "$rollrt" then "  var ROLLRT-BRIDGE-R : Rectype .\n" else ""
   in
   let rollrt_bridge_eq =
     if maude_fn = "$rollrt" then
@@ -1567,7 +1633,7 @@ let translate_reld _id rel_name rules =
           | TupE el -> tconcat " , " (List.map (fun x -> translate_exp TermCtx x vm) el)
           | _ -> translate_exp TermCtx conclusion vm in
 
-        let prem_items = List.filter_map (prem_item_of_prem vm) prem_list in
+        let prem_items = List.concat_map (prem_items_of_prem vm) prem_list in
         let prem_scheduled = schedule_prems (SSet.of_list lhs_t.vars) [] prem_items in
         let prem_strs = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
         let prem_vars = List.concat_map (fun (p : prem_sched) -> p.vars @ p.binds) prem_scheduled in
@@ -1651,7 +1717,6 @@ let header_prefix =
   "  var I : Int .\n" ^
   "  var W-I : Int .\n" ^
   "  op EXP : -> Int .\n" ^
-  "  op JNN : -> WasmTerminal .\n" ^
   "  vars W-N W-M : Nat .\n" ^
   "  vars T W WW : WasmTerminal .\n" ^
   "  vars TS W* : WasmTerminals .\n\n"
@@ -1665,7 +1730,7 @@ let is_decl_line l =
   let s = String.trim l in
   starts_with s "op " || starts_with s "ops " ||
   starts_with s "var " || starts_with s "vars " ||
-  starts_with s "subsort "
+  starts_with s "subsort " || starts_with s "sort "
 
 let is_canonical_ctor_decl_line l =
   let s = String.trim l in
@@ -1713,11 +1778,58 @@ let translate defs =
   let lines = String.split_on_char '\n' body in
   let eqs = List.filter (fun l -> not (is_decl_line l)) lines in
   let ctor_decl_lines = collect_ctor_decl_lines eqs in
-  let decls =
+  let raw_decls =
     List.filter is_decl_line lines
     |> List.filter (fun l -> not (is_canonical_ctor_decl_line l))
     |> List.sort_uniq String.compare
     |> fun ds -> List.sort_uniq String.compare (ds @ ctor_decl_lines)
+  in
+  (* Post-processing fix 1: Remove 0-arity "op X :  -> WasmType [ctor]" when a
+     1-arity "op X : WasmTerminal -> WasmType [ctor]" for the SAME name exists.
+     Avoids "multiple distinct parses" for names like num, vec. *)
+  let re_zero_arity = Str.regexp "  op \\([^ (]+\\) :  -> \\(WasmType\\|WasmTerminal\\) \\[ctor\\] \\." in
+  let re_higher_arity = Str.regexp "  op \\([^ (]+\\) : WasmTerminal" in
+  let higher_arity_names =
+    List.filter_map (fun l ->
+      if Str.string_match re_higher_arity l 0
+      then Some (Str.matched_group 1 l)
+      else None
+    ) raw_decls
+    |> List.sort_uniq String.compare
+    |> fun ns -> List.fold_left (fun s n -> SSet.add n s) SSet.empty ns
+  in
+  (* Post-processing fix 2: Collect all var-declared names, then remove
+     "op X : -> WasmTerminal ." or "op X :  -> WasmType [ctor]" when
+     "var X : ..." already declared — prevents op/var ambiguity. *)
+  let re_var_decl = Str.regexp "  var\\s+\\([A-Z][A-Z0-9-]*\\) :" in
+  let var_names =
+    List.filter_map (fun l ->
+      if Str.string_match re_var_decl l 0
+      then Some (Str.matched_group 1 l)
+      else None
+    ) raw_decls
+    |> List.sort_uniq String.compare
+    |> fun ns -> List.fold_left (fun s n -> SSet.add n s) SSet.empty ns
+  in
+  let decls =
+    List.filter (fun l ->
+      if Str.string_match re_zero_arity l 0 then
+        let nm = Str.matched_group 1 l in
+        (* keep if no higher-arity version and not a var *)
+        not (SSet.mem nm higher_arity_names) && not (SSet.mem nm var_names)
+      else true
+    ) raw_decls
+    (* Also remove "op X : -> WasmTerminal ." (single space) when var X exists *)
+    |> List.filter (fun l ->
+      let s = String.trim l in
+      if starts_with s "op " then
+        let re = Str.regexp "op \\([^ (]+\\) : -> WasmTerminal \\." in
+        if Str.string_match re s 0 then
+          let nm = Str.matched_group 1 s in
+          not (SSet.mem nm var_names)
+        else true
+      else true
+    )
   in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
   "\n\n  --- Equations\n" ^ String.concat "\n" eqs ^ footer
