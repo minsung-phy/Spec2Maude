@@ -1609,6 +1609,150 @@ let translate_decd ss id params result_typ insts =
   "\n" ^ op_decl ^ rollrt_bridge_decl ^ bound_decl ^ rollrt_bridge_var ^ free_decl
   ^ rollrt_bridge_eq ^ String.concat "\n" eq_lines ^ "\n"
 
+(* --- Step execution relation helpers ------------------------------------- *)
+
+(** True if the given relation name is one of the three execution Step variants. *)
+let is_step_exec_rel name =
+  name = "Step" || name = "Step-pure" || name = "Step-read"
+
+(** True if a rule has any RulePr premise (bridge / context / recursive rule).
+    We skip these: they're either handled by the heating/cooling pattern in
+    wasm-exec.maude or bridge to another Step variant. *)
+let has_rule_premise prems =
+  List.exists (fun p -> match p.it with RulePr _ -> true | _ -> false) prems
+
+(** Attempt to decompose a config expression  z ; instr*  into its two parts.
+    Detects the  _;_  operator by checking that the CTOR name is CTORSEMICOLONA2. *)
+let try_decompose_config (e : exp) : (exp * exp) option =
+  match e.it with
+  | CaseE (mixop, inner) ->
+      let arity = match inner.it with TupE es -> List.length es | _ -> 1 in
+      (match canonical_ctor_name_arity mixop arity with
+       | Some name when name = "CTORSEMICOLONA2" ->
+           (match inner.it with
+            | TupE [z_e; instr_e] -> Some (z_e, instr_e)
+            | _ -> None)
+       | _ -> None)
+  | _ -> None
+
+(** Generate Maude  step  equations for Step-pure / Step-read / Step rules.
+    Pattern: [c]eq step(< Z | LHS IS >) = < Z' | RHS IS > [if COND] .
+    Rules with RulePr premises (bridge / context rules) are silently skipped.
+    Returns the generated Maude source fragment (declarations + equations). *)
+let translate_step_reld rel_name rules =
+  let rel_prefix  = String.uppercase_ascii (sanitize rel_name) in
+  let all_bound   = ref [] in
+  let all_is_vars = ref [] in
+
+  let rule_lines = List.mapi (fun rule_idx r -> match r.it with
+    | RuleD (case_id, binders, _, conclusion, prem_list) ->
+        (* Skip bridge/context rules that delegate via RulePr *)
+        if has_rule_premise prem_list then ""
+        else begin
+          let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
+          let case_part  =
+            if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix in
+          let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
+          let vm     = binder_to_var_map prefix rule_idx binders in
+          let bconds = binder_to_type_conds binders vm in
+
+          (* Unique continuation variable for this rule *)
+          let is_var = prefix ^ "-IS" in
+          all_is_vars := is_var :: !all_is_vars;
+
+          (* ---- decode conclusion into (z_in, lhs_t, z_out, rhs_t) -------- *)
+          let decoded : (string * texpr * string * texpr) option =
+            if rel_name = "Step-pure" then
+              (* TupE [ lhs_instrs , rhs_instrs ]  — no state in spec rule *)
+              (match conclusion.it with
+               | TupE [lhs; rhs] ->
+                   let z_var = prefix ^ "-Z" in
+                   all_bound := z_var :: !all_bound;
+                   Some (z_var, translate_exp TermCtx lhs vm,
+                         z_var, translate_exp TermCtx rhs vm)
+               | _ -> None)
+            else if rel_name = "Step-read" then
+              (* TupE [ z;lhs_instrs , rhs_instrs ] *)
+              (match conclusion.it with
+               | TupE [cfg_lhs; rhs] ->
+                   (match try_decompose_config cfg_lhs with
+                    | Some (z_e, lhs_e) ->
+                        let z_t   = translate_exp TermCtx z_e   vm in
+                        let lhs_t = translate_exp TermCtx lhs_e vm in
+                        let rhs_t = translate_exp TermCtx rhs   vm in
+                        Some (z_t.text, lhs_t, z_t.text, rhs_t)
+                    | None -> None)
+               | _ -> None)
+            else
+              (* Step:  TupE [ z;lhs , z';rhs ] *)
+              (match conclusion.it with
+               | TupE [cfg_lhs; cfg_rhs] ->
+                   (match try_decompose_config cfg_lhs,
+                          try_decompose_config cfg_rhs with
+                    | Some (z_e, lhs_e), Some (zp_e, rhs_e) ->
+                        let z_t   = translate_exp TermCtx z_e   vm in
+                        let lhs_t = translate_exp TermCtx lhs_e vm in
+                        let zp_t  = translate_exp TermCtx zp_e  vm in
+                        let rhs_t = translate_exp TermCtx rhs_e vm in
+                        Some (z_t.text, lhs_t, zp_t.text, rhs_t)
+                    | _ -> None)
+               | _ -> None)
+          in
+
+          match decoded with
+          | None ->
+              Printf.eprintf
+                "[WARN] translate_step_reld: cannot decode %s rule %s (#%d)\n%!"
+                rel_name prefix rule_idx;
+              ""
+          | Some (z_in, lhs_t, z_out, rhs_t) ->
+
+            (* ---- schedule premises ------------------------------------ *)
+            let vm_vars  = List.map snd vm in
+            let lhs_vars = vars_of_texpr lhs_t in
+            let lhs_set  = SSet.of_list (z_in :: lhs_vars @ vm_vars) in
+            let prem_items     = List.concat_map (prem_items_of_prem vm) prem_list in
+            let prem_scheduled = schedule_prems lhs_set [] prem_items in
+            let prem_strs      = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
+            let prem_binds     = List.concat_map (fun p -> p.binds) prem_scheduled in
+
+            let all_texts = [lhs_t.text; rhs_t.text] @ prem_strs in
+            let all_cvars = (z_in :: lhs_vars @ vm_vars) @
+              List.concat_map (fun p -> p.vars @ p.binds) prem_scheduled in
+            let lhs_seed  = List.sort_uniq String.compare (z_in :: lhs_vars @ prem_binds) in
+            let (bound, _free, lhs_set2) = partition_vars lhs_seed all_texts all_cvars in
+            all_bound := !all_bound @ bound @ vm_vars;
+
+            let filtered_bconds =
+              bconds
+              |> List.filter (fun (mv, _) ->
+                  List.mem mv lhs_set2 && not (List.mem mv prem_binds))
+              |> List.map snd in
+            let prem_match_conds =
+              prem_scheduled |> List.filter_map (fun p ->
+                if p.binds = [] then None else Some (prem_cond p.text)) in
+            let prem_bool_conds =
+              prem_scheduled |> List.filter_map (fun p ->
+                if p.binds = [] then Some (prem_cond p.text) else None) in
+            let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
+            let cond     = cond_join all_conds in
+            let cond_str = if cond = "" then ""
+                           else Printf.sprintf "\n      if %s" cond in
+
+            Printf.sprintf "  %s step(< %s | %s %s >) = < %s | %s %s >%s ."
+              (if cond = "" then "eq" else "ceq")
+              z_in lhs_t.text is_var z_out rhs_t.text is_var cond_str
+        end
+  ) rules in
+
+  let bound_vars = List.sort_uniq String.compare !all_bound in
+  let is_vars    = List.sort_uniq String.compare !all_is_vars in
+  let bound_decl = declare_vars_same_sort bound_vars "WasmTerminal" in
+  let is_decl    = declare_vars_same_sort is_vars    "WasmTerminals" in
+  bound_decl ^ is_decl
+  ^ String.concat "\n" (List.filter (fun s -> s <> "") rule_lines)
+  ^ "\n"
+
 (* --- RelD handler -------------------------------------------------------- *)
 
 let translate_reld _id rel_name rules =
@@ -1681,7 +1825,10 @@ let rec translate_definition ss (d : def) = match d.it with
   | RecD defs -> String.concat "\n" (List.map (translate_definition ss) defs)
   | TypD (id, params, insts) -> translate_typd id params insts
   | DecD (id, params, result_typ, insts) -> translate_decd ss id params result_typ insts
-  | RelD (id, _, _, rules) -> translate_reld id (sanitize id.it) rules
+  | RelD (id, _, _, rules) ->
+      let name = sanitize id.it in
+      if is_step_exec_rel name then translate_step_reld name rules
+      else translate_reld id name rules
   | GramD _ | HintD _ -> ""
 
 (* ========================================================================= *)
@@ -1713,6 +1860,10 @@ let header_prefix =
   "  op merge : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op _=++_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op any : -> WasmTerminal [ctor] .\n\n" ^
+  "  --- ExecConf: execution configuration for step-based semantics\n" ^
+  "  sort ExecConf .\n" ^
+  "  op <_|_> : WasmTerminal WasmTerminals -> ExecConf [ctor] .\n" ^
+  "  op step : ExecConf -> ExecConf .\n\n" ^
   "  --- Common variables (declared once)\n" ^
   "  var I : Int .\n" ^
   "  var W-I : Int .\n" ^

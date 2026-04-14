@@ -5,7 +5,7 @@
 <h1 align="center">Spec2Maude</h1>
 
 <p align="center">
-  <strong>Zero-Hardcoding, Pure-Functional Translation of WebAssembly 3.0 SpecTec to Maude Algebraic Specifications</strong>
+  <strong>Automatic Translation of WebAssembly 3.0 SpecTec Formal Semantics into Maude Algebraic Specifications</strong>
 </p>
 
 <p align="center">
@@ -15,71 +15,78 @@
 </p>
 
 <p align="center">
-  <em>From executable Wasm semantics to executable formal models — no manual encoding, no global state.</em>
+  <em>From an executable Wasm 3.0 specification to a verified formal model — zero hardcoding, pure AST traversal.</em>
 </p>
 
 ---
 
 ## Overview
 
-**Spec2Maude** is a fully automatic translator that compiles the [WebAssembly 3.0](https://webassembly.github.io/spec/) SpecTec formal specification into a Maude algebraic specification. It preserves the logical integrity of the original semantics while producing a runnable formal model suitable for verification, model checking, and mechanized reasoning.
+**Spec2Maude** is a research-grade compiler that automatically translates the [WebAssembly 3.0](https://webassembly.github.io/spec/) formal specification, written in [SpecTec](https://github.com/Wasm-DSL/spectec), into a runnable Maude rewriting-logic specification. The output is suitable for equational reduction, LTL model checking, and mechanized formal reasoning about WebAssembly program behavior.
 
-Unlike ad-hoc text transformers, Spec2Maude operates directly on the elaborated IL AST, ensuring that type constraints, small-step rules, and arithmetic primitives are faithfully encoded as Maude equations and predicates.
-
----
-
-## Key Achievements
-
-| Achievement | Description |
-|-------------|-------------|
-| **Monadic Variable Collection** | Global state eliminated: the `texpr` record carries both Maude text and collected variables through pure functional composition. No mutable accumulators during expression translation. |
-| **Zero Hardcoded Tokens** | A single 1-pass AST pre-scan collects all bare tokens from mixfix patterns and emits `ops TOKEN1 TOKEN2 ... : -> WasmTerminal [ctor] .` automatically. No instruction-name lists baked into the translator. |
-| **59 Core Semantics Tests** | Equational unit tests cover arithmetic (`$iadd`, `$binop`), type-checking (`is-type`), record operations, and `Step-pure` predicates. All reduce to expected values. |
-| **Executable Confluence** | Fibonacci(7)=13 and 2¹⁰=1024 run to completion on the `WASM-EXEC` stepping engine (387–772 rewrites), proving deterministic convergence to `halt(push(result, emptystack))`. |
+The translation pipeline operates directly on the elaborated **Intermediate Language (IL) AST** produced by the SpecTec frontend. Every syntactic category (`syntax`), auxiliary definition (`def`), and operational semantics rule (`relation`) is mapped to its Maude counterpart — sorts, operators, and equations — without any instruction-specific branching in the translator source code.
 
 ---
 
-## Quick Start
+## Key Results
 
-```bash
-# Build
-dune build
+| Metric | Value |
+|--------|-------|
+| Generated `output.maude` (lines) | 7,066 |
+| Total equations / rules | 1,368 |
+| Auto-generated `step` equations | 189 |
+| Operator declarations | 1,009 |
+| Sort / subsort declarations | 307 |
+| fib(5) convergence (rewrites) | 5,619 |
+| LTL properties verified | 2 |
 
-# Translate Wasm 3.0 SpecTec → Maude
-dune exec ./main.exe -- path/to/wasm-3.0/*.watsup > output.maude
-
-# Run equational tests (59 reductions)
-maude test/test-core.maude
-
-# Execute Wasm programs (Fibonacci, arithmetic)
-maude test/wasm-exec.maude
-```
-
-**Full installation, build, and tutorial walkthrough** → [**Execution Guide**](document/Execution_Guide.md)
+The flagship verification result: iterative Fibonacci(5) = 5, proved correct by both equational normalization and LTL model checking over the complete state-transition graph.
 
 ---
 
-## Architecture at a Glance
+## Architecture Pipeline
 
 ```
-*.watsup  →  Parse  →  Elaborate  →  IL AST  →  Spec2Maude  →  output.maude
-                                                      │
-                                    ┌─────────────────┴─────────────────┐
-                                    │  Pre-scan (1 pass)                 │
-                                    │  • Tokens, ctors, call signatures │
-                                    │  • Bool-context inference          │
-                                    └─────────────────┬─────────────────┘
-                                                      │
-                                    ┌─────────────────┴─────────────────┐
-                                    │  Translation (pure functional)    │
-                                    │  • texpr = { text; vars }          │
-                                    │  • TypD → op + is-type eq/ceq      │
-                                    │  • DecD → op + eq/ceq              │
-                                    │  • RelD → op → Bool + ceq = true   │
-                                    └───────────────────────────────────┘
+*.spectec files
+      │
+      ▼
+  SpecTec Frontend
+  (Parse → Elaborate)
+      │
+      ▼
+  Elaborated IL AST
+      │
+      ▼
+ ┌────────────────────────────────────────────────┐
+ │              translator.ml                      │
+ │                                                 │
+ │  Phase 1 – Pre-scan (single pass over all defs) │
+ │   • Collect bare atom tokens  →  op T : -> WT   │
+ │   • Collect relation call signatures → op $f    │
+ │   • Infer Bool-context for expression nodes     │
+ │                                                 │
+ │  Phase 2 – Translation (pure functional)        │
+ │   • TypD  →  sort S . / op ctor : args -> S .   │
+ │   • DecD  →  op $f : args -> WasmTerminal .     │
+ │             + [c]eq $f(lhs) = rhs [if cond] .   │
+ │   • RelD (non-Step)                             │
+ │          →  op R : args -> Bool .               │
+ │             + [c]eq R(lhs) = true [if cond] .   │
+ │   • RelD (Step / Step-pure / Step-read)         │
+ │          →  [c]eq step(< Z | LHS IS >) =        │
+ │                       < Z' | RHS IS > .         │
+ └────────────────────────────────────────────────┘
+      │
+      ▼
+  output.maude  (mod SPECTEC-CORE)
+      │
+      ▼
+  wasm-exec.maude
+  (mod WASM-EXEC + WASM-FIB + WASM-FIB-PROPS)
+      │
+      ├─► rewrite [N] : steps(config) .   (equational reduction)
+      └─► modelCheck(config, φ) .         (LTL verification)
 ```
-
-**Formal translation rules, mapping notation, and confluence analysis** → [**Formal Translation Rules**](document/Translation_Rules.md)
 
 ---
 
@@ -87,18 +94,24 @@ maude test/wasm-exec.maude
 
 ```
 Spec2Maude/
-├── main.ml                 # Entry: parse → elaborate → translate
-├── translator.ml           # Core translator (SpecTec IL → Maude)
-├── dune                    # Build configuration
+├── main.ml                      # Entry point: parse → elaborate → translate
+├── translator.ml                # Core translator (~2000 lines, OCaml)
+├── dune / dune-project          # Build configuration
+├── lib/                         # SpecTec frontend libraries
+│   ├── il/ast.ml                # IL AST definition
+│   ├── frontend/                # Parser, elaborator
+│   └── ...
 ├── dsl/
-│   └── pretype.maude       # Foundation sorts, records, type combinators
-├── output.maude            # Generated SPECTEC-CORE module
-├── test/
-│   ├── test-core.maude     # 59 equational unit tests
-│   └── wasm-exec.maude     # Executable stepping engine prototype
-├── document/
-│   ├── Execution_Guide.md  # Build, run, tutorial
-│   └── Translation_Rules.md # Formal rules, architecture, examples
+│   └── pretype.maude            # Foundation module (sorts, records, DSL)
+├── wasm-3.0/                    # WebAssembly 3.0 SpecTec source files
+│   ├── 4.3-execution.instructions.spectec
+│   └── ...
+├── output.maude                 # Auto-generated SPECTEC-CORE module
+├── wasm-exec.maude              # Execution engine + LTL harness
+├── docs/
+│   ├── translation_logic.md     # Formal translation rules (Korean)
+│   ├── architecture_decisions.md # Key design decisions (Korean)
+│   └── verification_tests.md    # Verification test report (Korean)
 └── README.md
 ```
 
@@ -106,12 +119,122 @@ Spec2Maude/
 
 ## Prerequisites
 
-| Dependency | Purpose |
-|------------|---------|
-| OCaml 5.x | Translator implementation |
-| dune | Build system |
-| Maude 3.x | Rewriting logic engine |
-| SpecTec libs (`il`, `util`, `frontend`) | Parsing and elaboration |
+| Dependency | Version | Purpose |
+|------------|---------|---------|
+| OCaml | ≥ 5.0 | Translator implementation language |
+| dune | ≥ 3.0 | Build system |
+| Maude | ≥ 3.4 | Rewriting logic engine |
+| SpecTec libs | bundled in `lib/` | SpecTec IL parsing and elaboration |
+
+### Installing Maude
+
+Download a pre-built binary from the [Maude releases page](https://github.com/SRI-CSL/Maude/releases) and ensure `maude` is on your `PATH`.
+
+### Installing OCaml and dune
+
+```bash
+# via opam
+opam install dune
+```
+
+---
+
+## Build
+
+```bash
+# Clone and enter the repository
+git clone https://github.com/<your-org>/Spec2Maude.git
+cd Spec2Maude
+
+# Build the translator
+dune build
+
+# Run the translator: SpecTec sources → output.maude
+./_build/default/main.exe wasm-3.0/*.spectec > output.maude
+```
+
+The translator writes the generated Maude module to standard output and diagnostic warnings to standard error. The repository already ships a prebuilt `output.maude` for convenience.
+
+---
+
+## Running the Execution Engine
+
+`wasm-exec.maude` loads `output.maude` and defines:
+
+- **`WASM-EXEC`** — the one-step `step` function and the transitive `steps` operator
+- **`WASM-FIB`** — an iterative Fibonacci program encoded in WebAssembly instruction syntax
+- **`WASM-FIB-PROPS`** — LTL atomic propositions and model-checking harness
+
+### Multi-step equational reduction
+
+```maude
+load wasm-exec
+
+rewrite [100000] in WASM-FIB : steps(fib-config(i32v(5))) .
+```
+
+Expected output (abbreviated):
+
+```
+rewrites: 5619
+result ExecConf: < ... | CTORCONSTA2(CTORI32A0, 5) >
+```
+
+The instruction sequence on the right-hand side of `|` reduces to the single value `i32.const 5`, confirming `fib(5) = 5`.
+
+### LTL Model Checking
+
+```maude
+load wasm-exec
+
+--- Property 1: the computation eventually produces result 5
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .
+--- Expected: Bool: true
+
+--- Property 2: no reachable state ever exhibits a trap
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .
+--- Expected: Bool: true
+```
+
+Both properties hold over the complete reachable-state graph of `fib(5)`.
+
+---
+
+## Design Highlights
+
+### 1. Pure-Functional Expression Translation
+
+Every expression node in the IL AST is translated by a function returning `texpr = { text : string; vars : string list }`. The `vars` field accumulates free variables without any global mutable state, enabling compositional variable collection and premise scheduling.
+
+### 2. Zero-Hardcoding Token Collection
+
+A dedicated pre-scan pass collects every bare atom that appears as a mixfix operator component (e.g., `i32`, `add`, `local.get`). These are emitted as nullary `op TOKEN : -> WasmTerminal [ctor]` declarations — with no instruction name list baked into the translator.
+
+### 3. Step-Relation Auto-Translation
+
+The translator identifies `Step`, `Step-pure`, and `Step-read` relations and routes them to a dedicated `translate_step_reld` function. Rules with `RulePr` premises (bridge rules, evaluation-context rules) are automatically skipped. Each remaining rule generates a Maude equation of the form:
+
+```maude
+[c]eq step(< Z | LHS IS >) = < Z' | RHS IS > [if COND] .
+```
+
+### 4. Assoc-Variable Isolation
+
+Maude's coherence checker can misfire when multiple equations for different operators share the same variable name as an associative "tail" pattern. All variable names in `wasm-exec.maude` carry unique per-group prefixes (`ST-*`, `AV-*`, `IV-*`, `IT-*`, `RL-*`, etc.) to prevent this class of interference.
+
+### 5. Equational Reduction over CRL
+
+All one-step behaviors are encoded as `eq`/`ceq` rather than `crl`. A single `crl [steps-trans]` drives the transitive closure. This ensures every atomic step fires during *equational normalization* of `step(EC)`, which is both faster and avoids the non-ground matching restrictions that would otherwise apply to rewrite rules.
+
+---
+
+## Documentation
+
+| Document | Language | Audience |
+|----------|----------|---------|
+| [translation_logic.md](docs/translation_logic.md) | Korean | Advisors, lab researchers |
+| [architecture_decisions.md](docs/architecture_decisions.md) | Korean | PLDI/VMCAI reviewers, advisors |
+| [verification_tests.md](docs/verification_tests.md) | Korean | Verification engineers |
 
 ---
 
