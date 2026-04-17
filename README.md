@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  <em>From an executable Wasm 3.0 specification to a verified formal model — zero hardcoding, pure AST traversal.</em>
+  <em>From an executable Wasm 3.0 specification to a formal Maude model — syntactic translation is instruction-agnostic; a small hand-written execution harness closes evaluation contexts.</em>
 </p>
 
 ---
@@ -28,19 +28,31 @@ The translation pipeline operates directly on the elaborated **Intermediate Lang
 
 ---
 
-## Key Results
+## Current Status
+
+### Translation coverage
 
 | Metric | Value |
 |--------|-------|
-| Generated `output.maude` (lines) | 7,066 |
-| Total equations / rules | 1,368 |
+| SpecTec input files processed | 21 |
+| Parser / elaborator warnings | 0 |
+| Generated `output.maude` (lines) | 7,065 |
+| Total equations (`eq` + `ceq`) | 1,367 |
 | Auto-generated `step` equations | 189 |
-| Operator declarations | 1,009 |
+| Operator declarations | 1,007 |
 | Sort / subsort declarations | 307 |
-| fib(5) convergence (rewrites) | 5,619 |
-| LTL properties verified | 2 |
 
-The flagship verification result: iterative Fibonacci(5) = 5, proved correct by both equational normalization and LTL model checking over the complete state-transition graph.
+Every `syntax`, `def`, and `relation` declaration in the Wasm 3.0 SpecTec source is consumed without per-instruction branching in `translator.ml`. Evaluation-context wrappers (`exec-label`, `exec-frame`, `exec-handler`, `exec-loop`) and one known soundness patch (`$with-local`) are implemented by hand in [wasm-exec.maude](wasm-exec.maude).
+
+### Verified execution
+
+| Benchmark | Result | Evidence |
+|-----------|--------|----------|
+| Iterative `fib(5)` | `i32.const 5` | 5,949 rewrites to normal form |
+| `<> result-is(5)` | `true` | LTL model check passes |
+| `[] ~ trap-seen` | `true` | LTL model check passes |
+
+**Scope caveat.** End-to-end verification currently exercises only the instruction subset used by `fib` (arithmetic, `local.get`/`local.set`, `block`/`loop`/`br_if`, `const`, `relop`/`binop`/`testop`). Memory, table, call/call-indirect, GC, Exception, SIMD, atomic, and the validation relations are syntactically translated but have not been executed against benchmarks.
 
 ---
 
@@ -109,9 +121,11 @@ Spec2Maude/
 ├── output.maude                 # Auto-generated SPECTEC-CORE module
 ├── wasm-exec.maude              # Execution engine + LTL harness
 ├── docs/
-│   ├── translation_logic.md     # Formal translation rules (Korean)
-│   ├── architecture_decisions.md # Key design decisions (Korean)
-│   └── verification_tests.md    # Verification test report (Korean)
+│   ├── Translation_Rules.md        # Formal translation rules (Korean)
+│   ├── Translation_Rules_legacy.md # Earlier draft preserved for format reference
+│   ├── translation_logic.md        # Mode separation (current/legacy/legacy-safe)
+│   ├── architecture_decisions.md   # Key design decisions (Korean)
+│   └── verification_tests.md       # Verification test report (Korean)
 └── README.md
 ```
 
@@ -176,7 +190,7 @@ rewrite [100000] in WASM-FIB : steps(fib-config(i32v(5))) .
 Expected output (abbreviated):
 
 ```
-rewrites: 5619
+rewrites: 5949
 result ExecConf: < ... | CTORCONSTA2(CTORI32A0, 5) >
 ```
 
@@ -206,9 +220,9 @@ Both properties hold over the complete reachable-state graph of `fib(5)`.
 
 Every expression node in the IL AST is translated by a function returning `texpr = { text : string; vars : string list }`. The `vars` field accumulates free variables without any global mutable state, enabling compositional variable collection and premise scheduling.
 
-### 2. Zero-Hardcoding Token Collection
+### 2. Instruction-Agnostic Token Collection
 
-A dedicated pre-scan pass collects every bare atom that appears as a mixfix operator component (e.g., `i32`, `add`, `local.get`). These are emitted as nullary `op TOKEN : -> WasmTerminal [ctor]` declarations — with no instruction name list baked into the translator.
+A dedicated pre-scan pass collects every bare atom that appears as a mixfix operator component (e.g., `i32`, `add`, `local.get`). These are emitted as nullary `op TOKEN : -> WasmTerminal [ctor]` declarations — no instruction name list is baked into the translator. The one explicit exception is `$rollrt`, which is bridged in a single hardcoded branch to cross the IL/Maude sort boundary.
 
 ### 3. Step-Relation Auto-Translation
 
@@ -232,7 +246,9 @@ All one-step behaviors are encoded as `eq`/`ceq` rather than `crl`. A single `cr
 
 | Document | Language | Audience |
 |----------|----------|---------|
-| [translation_logic.md](docs/translation_logic.md) | Korean | Advisors, lab researchers |
+| [Translation_Rules.md](docs/Translation_Rules.md) | Korean | Advisors, lab researchers — formal translation rules for the current `translator.ml` |
+| [Translation_Rules_legacy.md](docs/Translation_Rules_legacy.md) | Korean | Historical reference — early draft of the translation-rules doc |
+| [translation_logic.md](docs/translation_logic.md) | Korean | Mode separation (`current` / `legacy` / `legacy-safe`) and fallback policy |
 | [architecture_decisions.md](docs/architecture_decisions.md) | Korean | PLDI/VMCAI reviewers, advisors |
 | [verification_tests.md](docs/verification_tests.md) | Korean | Verification engineers |
 
