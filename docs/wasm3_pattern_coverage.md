@@ -8,6 +8,26 @@
 - 통사(문법/정의) 변환은 광범위하게 자동 처리된다.
 - 다만 실행 의미론 핵심 일부(특히 RulePr bridge, Steps/trans, call_ref-func)는 현재 자동 변환이 완결되지 않았다.
 
+## 1.1) 총 몇 개 중 몇 개가 변환되는가
+
+- 총 규칙 수: 501개
+- 자동 변환됨: 477개
+  - `translated_auto`: 473개
+  - `translated_auto_heat_cool`: 4개
+- 자동 변환 안됨: 24개 (`not_translated_auto`)
+
+요약하면, 현재 기준 자동 변환 커버리지는 $\frac{477}{501} \approx 95.2\%$ 이고,
+미변환은 24개(약 4.8%)다.
+
+미변환 24개를 원인별로 묶으면:
+
+| 원인 | 개수 | 규칙 |
+|---|---:|---|
+| Step bridge 규칙 스킵(translate_step_reld 경로) | 2 | Step/pure, Step/read |
+| Step-family premise 포함 Steps/trans 스킵 | 1 | Steps/trans |
+| 수동 보정 의존(call_ref-func) | 1 | Step_read/call_ref-func |
+| output 라벨 미생성(현재 생성물 기준) | 20 | 아래 5.1 표 참조 |
+
 ## 2) 집계 방법
 
 - 코퍼스 전체에서 top-level 키워드(syntax/relation/def/rule)와 premise 마커(-- if, -- otherwise, -- Expand:, -- Relation:)를 집계했다.
@@ -79,6 +99,35 @@
 | NegPr 의미 | 코퍼스에서는 0건 | 미검증/잠재 미지원 | NegPr를 inner prem으로 평탄화 ([translator.ml](../translator.ml#L759)) |
 | $rollrt 브리지 | 함수 정의 변환 | 특수 하드코딩 | 전용 분기 존재 ([translator.ml](../translator.ml#L1728)) |
 
+## 5.1) 자동 변환 안되는 24개 규칙 (정확 목록)
+
+| 파일:라인 | rule_name | 사유 |
+|---|---|---|
+| wasm-3.0/4.3-execution.instructions.spectec:13 | Step/pure | Bridge rule skipped in translate_step_reld (RulePr + non-context decode). |
+| wasm-3.0/4.3-execution.instructions.spectec:17 | Step/read | Bridge rule skipped in translate_step_reld (RulePr + non-context decode). |
+| wasm-3.0/4.3-execution.instructions.spectec:24 | Steps/trans | Skipped in translate_reld when premise references Step family. |
+| wasm-3.0/4.3-execution.instructions.spectec:149 | Step_read/br_on_cast-succeed | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:160 | Step_read/br_on_cast_fail-succeed | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:180 | Step_read/call_ref-func | Auto-translation missing; manual rule exists in wasm-exec.maude. |
+| wasm-3.0/4.3-execution.instructions.spectec:203 | Step_read/return_call_ref-frame-addr | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:231 | Step/throw | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:667 | Step_read/ref.test-true | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:678 | Step_read/ref.cast-succeed | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:700 | Step/struct.new | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:706 | Step_read/struct.new_default | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:715 | Step_read/struct.get-struct | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:724 | Step/struct.set-struct | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:735 | Step_read/array.new_default | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:740 | Step/array.new_fixed | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:758 | Step_read/array.new_data-oob | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:765 | Step_read/array.new_data-num | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:779 | Step_read/array.get-array | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:792 | Step/array.set-array | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:845 | Step_read/array.copy-le | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:857 | Step_read/array.copy-gt | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:905 | Step_read/array.init_data-oob2 | Expected step label missing in output. |
+| wasm-3.0/4.3-execution.instructions.spectec:918 | Step_read/array.init_data-num | Expected step label missing in output. |
+
 ## 6) 4.3 실행 규칙 패밀리 상세
 
 원본 규칙 수 (4.3):
@@ -118,3 +167,14 @@ context 규칙(원본):
 - 규칙 단위 전체 목록(CSV): [docs/wasm3_rule_pattern_status.csv](wasm3_rule_pattern_status.csv)
 - 컬럼: file, line, rule_name, category, status, note
 - 행 수: 헤더 제외 501행
+
+## 9) 부록: 미변환 규칙의 Spectec 원문
+
+요청한 "변환 안되는 부분의 spectec 원본"은 아래 파일에 24개 전부 수록했다.
+
+- [docs/wasm3_not_translated_rules.txt](wasm3_not_translated_rules.txt)
+
+구성:
+- 각 항목 헤더: `file:line rule_name`
+- 해당 규칙의 Spectec 원문 블록 전체
+- 항목 구분선(`--------------------------------------------------------------------------------`)
