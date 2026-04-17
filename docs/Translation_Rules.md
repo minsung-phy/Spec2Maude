@@ -1,7 +1,6 @@
 # Spec2Maude Translation Rules
 
-> 대상 독자: 지도 교수님 및 랩실 연구원
-> 문서 버전: 2026-04-17
+> 작성일: 2026-04-17
 > 관련 파일: `translator.ml`, `main.ml`, `dsl/pretype.maude`, `output.maude`
 
 ---
@@ -9,10 +8,6 @@
 ## 1. Architecture Overview
 
 ### 1.1 Pipeline
-
-<p align="center">
-  <img src="pipeline.png" width="300" alt="Spec2Maude Pipeline"/>
-</p>
 
 ```
 *.spectec files

@@ -122,10 +122,8 @@ Spec2Maude/
 ├── wasm-exec.maude              # Execution engine + LTL harness
 ├── docs/
 │   ├── Translation_Rules.md        # Formal translation rules (Korean)
-│   ├── Translation_Rules_legacy.md # Earlier draft preserved for format reference
-│   ├── translation_logic.md        # Mode separation (current/legacy/legacy-safe)
-│   ├── architecture_decisions.md   # Key design decisions (Korean)
-│   └── verification_tests.md       # Verification test report (Korean)
+│   ├── execution_results.md        # How to run + regression results (Korean)
+│   └── experiment_repro.md         # Legacy split doc: reproduction steps
 └── README.md
 ```
 
@@ -179,6 +177,20 @@ The translator writes the generated Maude module to standard output and diagnost
 - **`WASM-FIB`** — an iterative Fibonacci program encoded in WebAssembly instruction syntax
 - **`WASM-FIB-PROPS`** — LTL atomic propositions and model-checking harness
 
+For one-command regeneration plus smoke verification, use:
+
+```bash
+./scripts/regen_and_smoketest.sh current
+```
+
+If you want automatic fallback (`current` -> `legacy-safe`) when `current` fails:
+
+```bash
+./scripts/regen_and_smoketest.sh auto
+```
+
+Detailed run instructions and expected outputs are documented in [docs/execution_results.md](docs/execution_results.md).
+
 ### Multi-step equational reduction
 
 ```maude
@@ -190,7 +202,6 @@ rewrite [100000] in WASM-FIB : steps(fib-config(i32v(5))) .
 Expected output (abbreviated):
 
 ```
-rewrites: 5949
 result ExecConf: < ... | CTORCONSTA2(CTORI32A0, 5) >
 ```
 
@@ -202,11 +213,11 @@ The instruction sequence on the right-hand side of `|` reduces to the single val
 load wasm-exec
 
 --- Property 1: the computation eventually produces result 5
-red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .
+red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), <> result-is(5)) .
 --- Expected: Bool: true
 
 --- Property 2: no reachable state ever exhibits a trap
-red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .
+red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), [] ~ trap-seen) .
 --- Expected: Bool: true
 ```
 
@@ -247,10 +258,8 @@ All one-step behaviors are encoded as `eq`/`ceq` rather than `crl`. A single `cr
 | Document | Language | Audience |
 |----------|----------|---------|
 | [Translation_Rules.md](docs/Translation_Rules.md) | Korean | Advisors, lab researchers — formal translation rules for the current `translator.ml` |
-| [Translation_Rules_legacy.md](docs/Translation_Rules_legacy.md) | Korean | Historical reference — early draft of the translation-rules doc |
-| [translation_logic.md](docs/translation_logic.md) | Korean | Mode separation (`current` / `legacy` / `legacy-safe`) and fallback policy |
-| [architecture_decisions.md](docs/architecture_decisions.md) | Korean | PLDI/VMCAI reviewers, advisors |
-| [verification_tests.md](docs/verification_tests.md) | Korean | Verification engineers |
+| [execution_results.md](docs/execution_results.md) | Korean | How to run the translator/Maude smoke tests and read results |
+| [experiment_repro.md](docs/experiment_repro.md) | Korean | Legacy split doc: reproduction-only procedure |
 
 ---
 

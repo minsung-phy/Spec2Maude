@@ -1,0 +1,5 @@
+[INFO] Building main.exe
+File "dune", line 10, characters 22-39:
+10 |  (modules main_legacy translator_legacy)
+                           ^^^^^^^^^^^^^^^^^
+Error: Module Translator_legacy doesn't exist.
