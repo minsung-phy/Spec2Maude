@@ -123,6 +123,7 @@ Spec2Maude/
 ├── docs/
 │   ├── Translation_Rules.md        # Formal translation rules (Korean)
 │   ├── execution_results.md        # How to run + regression results (Korean)
+│   ├── maude_warning_analysis.md   # Warning taxonomy and mitigation roadmap
 │   └── experiment_repro.md         # Legacy split doc: reproduction steps
 └── README.md
 ```
@@ -259,6 +260,7 @@ All one-step behaviors are encoded as `eq`/`ceq` rather than `crl`. A single `cr
 |----------|----------|---------|
 | [Translation_Rules.md](docs/Translation_Rules.md) | Korean | Advisors, lab researchers — formal translation rules for the current `translator.ml` |
 | [execution_results.md](docs/execution_results.md) | Korean | How to run the translator/Maude smoke tests and read results |
+| [maude_warning_analysis.md](docs/maude_warning_analysis.md) | Korean | Warning/advisory taxonomy, root causes, mitigation roadmap for `output.maude` and `wasm-exec.maude` |
 | [experiment_repro.md](docs/experiment_repro.md) | Korean | Legacy split doc: reproduction-only procedure |
 
 ---

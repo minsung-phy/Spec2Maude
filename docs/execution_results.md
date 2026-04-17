@@ -178,6 +178,14 @@ red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), [] ~ trap-seen) .
 
 ---
 
+## 7.1 로드 Warning/Advisory 해석
+
+`load output`, `load wasm-exec` 시 관찰되는 대량 warning/advisory의 정량 통계, 패턴 taxonomy, 원인-해결 매트릭스는 별도 문서로 관리합니다.
+
+- `docs/maude_warning_analysis.md`
+
+---
+
 ## 8. 권장 보고 정책
 
 - 논문/발표 표에는 `current` 결과만 사용

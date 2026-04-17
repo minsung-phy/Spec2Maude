@@ -1,0 +1,574 @@
+- 01.05 (월)
+    - slack 가입
+    - For WASM
+        - paper : a rewriting logic approach to operational semantics
+        - kframework 공부
+    
+- 01.12 (월)
+    - 월
+        - 랩미팅(오전 10시)
+        - 개인미팅 (랩미팅 이후)
+    - 수
+        - 세미나 (오후 4시)
+    - paper : a rewriting logic approach to operational semantics  볼 것
+    
+    <aside>
+    💡
+    
+    **WASM 연구 얘기**
+    
+    **1. 문제의식 및 배경**
+    
+    - WASM(WebAssembly)의 Semantics는 이미 정의되어 있음.
+    - 그러나:
+        - 문서로 기술된 Semantics는 **버전/문서마다 표현이 달라짐**
+        - 정의는 존재하지만 **정확성/일관성에 대한 의문이 지속적으로 제기됨**
+    - 여러 연구 그룹에서
+        - **프로그램 Semantics를 언어 시스템 코드처럼 형식적으로 기록**하려는 시도가 있어 왔음
+    - **K Framework**는 이를 위한 대표적인 프레임워크 중 하나
+        - 도메인 특화 언어(DSL) 기반
+        - 커뮤니티와 긴밀히 협업
+        - WASM Semantics도 연구 대상 (KAIST 쪽 연구 포함)
+    
+    ---
+    
+    **2. Spectec과 Rewriting Semantics**
+    
+    - **Spectec**
+        - WASM 공식 Semantics 명세 언어
+        - 내부적으로 **rewriting 기반** Semantics
+    - Spectec과 Maude/K의 관계
+        - Semantics 개념 자체는 **약 80% 유사**
+        - 하지만:
+            - 그대로 100% 옮길 수는 없음
+            - **사용 방식과 추상화 수준에서 약 20% 차이**
+    - 핵심 아이디어
+        - **Spectec Semantics를 Maude/K로 변환**
+        - 기존 Spectec 정의를 기반으로 의미론을 재구성
+    
+    ---
+    
+    **3. 기술적 난점**
+    
+    - Spectec ↔ Maude/K **양쪽을 모두 이해해야 함**
+        - 이 과정에서 시행착오가 있었음
+    - 현재 접근
+        - IL → Parse Tree 분석
+        - 이를 기반으로 **Maude 정의 자동 생성**
+    - 현황
+        - 변환 자체는 **약 50% 진행**
+        - 하지만 **실행이 안정적으로 동작하지 않음**
+        - 의미론 정의 ≠ 실행 가능 의미론이라는 문제가 존재
+        - K의 Heating & Cooling rules를 사용하면 잘될듯
+    
+    ---
+    
+    **4. 모델 체킹(Model Checking) 관점**
+    
+    - 일반적으로 모델 체킹은
+        - **분산 시스템**, 통신 기반 시스템에서 많이 사용됨
+    - 웹 애플리케이션 역시:
+        - 컴포넌트 간 **상호작용(communication)**이 핵심
+    - 목표
+        - **애플리케이션 전체를 대상으로 모델 체킹**
+    - 문제
+        - **상태 폭발(State Explosion)** 발생
+    - 가능성 있는 해결 방향
+        - 기존과 다른 **deduction 기반 알고리즘**
+        - 더 효과적인 상태 축소/추론 기법
+    
+    ---
+    
+    **5. 연구 포인트 및 기회**
+    
+    - 현재 상태:
+        - **이 문제를 본격적으로 해결한 연구는 거의 없음**
+    - 연구 기회:
+        - 새로운 모델 체킹 기법 + WASM/K Semantics 결합
+        - **PLDI에 논문 내자**
+    - 진척이 크지 않아 공백 상태
+    
+    ---
+    
+    **6. 향후 방향**
+    
+    - 단순 변환이 아닌:
+        - **실행 가능한 시맨틱스 확보**
+    - 적절한 규모의 애플리케이션을 대상으로:
+        - 효과적인 분석 테크닉 개발
+    - **사례 연구(case study)** 중심으로 검증
+    - K Framework 기반 의미론을 활용한:
+        - 실질적인 모델 체킹 가능성 탐구
+    </aside>
+    
+- 01.14 (수) - 혁순 선배
+    
+    **연구 설명 :**
+    
+    - Wasm Spec : Wasm을 명세해 놓음 (개념, idea, 모호함)
+        
+        -> DSL / SpecTec : Wasm Spec을 언어로 정형화 (모호 X)
+        
+    - 내가 할 것 : DSL / SpecTec을 Maude로 변환하는 변환기 제작
+        
+        -> 이후 wasm 통신 프로그램(?)을 모델 채킹
+        
+    - 이를 위해, DSL / SpecTec, Maude 이해해야함
+    
+    ---
+    
+    **지금 할 것 :**
+    
+    - [x]  A rewriting logic approach to operational semantics
+    - [x]  Wasm Manual : ch 4 보기
+        - [x]  4.2 runtime structure 보기
+        - [x]  실제 rule들 (4.6) 보기 <-> DSL이랑 비교하면서 보기 
+        (https://github.com/Wasm-DSL/spectec/blob/main/specification/wasm-3.0/4.3-execution.instructions.spectec)
+            - 핵심적으로 +, -가 function call이 어떻게 되는지 보기
+            - unop, binop, call, local.get/set, if, block, label, frame
+            - 할 수 있는 것만 보기 -> 질문을 많이 만들어야함 (질문이 더 중요, 오래 걸려도 되니까 자세히 보기)
+    
+- 01.19 (월)
+    
+    ![image.png](attachment:8fbfa337-dfd5-4865-98d9-dd98d1cb910f:image.png)
+    
+    - counter example 분석하면 됨 (loop 보기)
+        - 이런 현상이 발생하는데 어떻게 막을지 확인
+        - 아마 in-rem 함수 이용해야 할 수도
+    
+- 01.21 (수) - 혁순 선배
+    
+    **Step, Step_pure, Step_read, Steps가 뭔가 ?**
+    
+    ```
+    relation Step: config ~> config       hint(name "E") hint(macro "stepto") hint(tabular)
+    relation Step_pure: instr* ~> instr*  hint(name "E") hint(macro "stepto") hint(tabular)
+    relation Step_read: config ~> instr*  hint(name "E") hint(macro "stepto") hint(tabular)
+    relation Steps: config ~>* config     hint(name "E") hint(macro "steptostar") hint(tabular)
+    ```
+    
+    - 이게 없으면 rule을 작성할 때 항상 config 전체를 작성해야함 → 귀찮으니까 쓰는거지
+    - 즉, 전체 context를 표현안하려고
+    
+    **꾸준히 할 것 :**
+    
+    - doc에서 Language.md 자주보기 (https://github.com/Wasm-DSL/spectec/blob/main/spectec/doc/Language.md)
+        - spectec에서 각각의 구성들이 뭘 지니는지 중심으로 보기 (교수님이 무조건 물어봄)
+            
+            ![image.png](attachment:3e12de25-0518-47c4-9c63-61d72c74e34c:image.png)
+            
+            - 예를 들어 rule이 뭔지 / 어디 정의되어있는지 , nt는 뭔지 / 어디 정의되어있는지 보기
+            - Webassembly manual → 4.3-execution.instructions.spectec → 그외의 spectec 코드들 살펴보고 → Language.md
+            - 각 rule을 정리할 때 말로 정리하면 도움이 많이 됨 (말로하고 gpt한테 물어봐서 확인)
+                - rule은 어디에 정의되어있는 뭐고 ~ rule 다음에는 id 다음에는 subid가 나오고, 그 다음에는 exp인데 exp는 이렇게 정의되어있는데 이 중에 이거고 ~~
+            - 근데 wasm rule이 엄청 많은데 그 중에서 대체 뭘봐 ..?
+                - 그냥 example 하나 잡아 (+, -, *, / function call or 피보나치 같은 것) → wat으로
+                - 이것을 dsl로 만들 때 어떻게 되는지 살펴보면서 그에 관련된 rule들을 보기
+    
+    **당장 할 것 :**
+    
+    - spectec의 building 설치 (https://github.com/Wasm-DSL/spectec/tree/main/spectec)
+        
+        ![image.png](attachment:128e27b0-0453-4860-98ec-6058a5909fbc:image.png)
+        
+        - 이 부분의 spec/*은 specification/wasm-3.0으로 해야함
+        - 실행하고 결과보기
+    - usage.md에서 ast 파일로 만드는 것 있는데 이것을 해서 ast 파일 하나 뽑고 읽어보기
+        
+        ![image.png](attachment:2a919efb-b597-43b7-9447-560ca3bfe5b7:image.png)
+        
+        - file에는 specification/wasm-3.0 쓰면 됨
+    
+    **논문 찾는 법 :**
+    
+    - 학회 종류
+        - Programming langauge(PLDI, POPL, OOPSLA)
+        - Software Engineering(FSE)
+        - Verification (CAV)
+        
+        → https://csrankings.org/#/index?none&us 에서 학회 종류 확인하고 논문 찾기
+        
+    - 관련된 논문 검색 후 related works 보고, 참여한 사람 들어가서 연구한 것 보고 .. 그런식으로 계속 취미처럼 살펴보기
+    
+- 01.26 (월) - 혁순 선배
+    
+    **기억할 것 :**
+    
+    - **내가 납득이 안되면 퉁치지마라. 어차피 시간 많다 !**
+    
+    **미팅 내용 :**
+    
+    - Wasm : 모호함 (자연어, 엄밀하지 않은 rule들)
+    - Wasm-DSL : 모호하지 않음 (즉, 엄밀함)
+        - Wasm을 실행할 수 있는 interpreter나, 컴파일 할 수 있는 compiler은 Wasm-DSL을 보고 만듬 (Wasm은 모호하니까 Wasm-DSL을 보고 만들겠지)
+    
+    ---
+    
+    ![image.png](attachment:ad863aa0-de03-4145-98c0-243ea425d7bc:image.png)
+    
+    - 우리는 Wasm을 Maude로 (자동으로) 변환하는 변환기를 만들거야
+    - 근데 Wasm은 모호하잖아. 어케 변환해 ?
+        
+        ⇒ Wasm-DSL을 변환하면 되겠네 !
+        
+    - 그리고 변환된 Maude를 가지고 model checking을 하자 (최종 목표)
+    - 근데 Wasm-DSL(=spectec = EL)을 변환하는게 아니야 (이건 올바른 매핑을 위해서 공부한 것임)
+    - 이거보다 더 친절하게 되어있는 IL을 변환할거야
+        - AST(spectec 설치 후 뽑을 수 있음)를 출력 형태가 아닌 그림 형태로 되어있는 것을 보고 변환하자
+    
+    <aside>
+    💡
+    
+    **의문점**
+    
+    1. **EL을 변환하는게 아니라 IL을 변환하는거라면 spectec/specification/wasm-3.0/**.spectec을 변환하는게 아니라 spectec/src/../*.ml을 변환하는거겠네 ?**
+        
+        **그러면 ml 코드를 자동으로 변환하면 될텐데 AST를 보고 변환한다는게 무슨 소리인지 이해가 잘 안가**
+        
+        - ㄴㄴ → *.ml은 spectec을 받아서 ast(= IL)로 만드는 인터프리터임
+        - 그러면 나는 ast(= IL)을 Maude로 바꾸는 변환기(ml 코드)를 만들어야함
+        
+    2. **어떻게 자동으로 변환을 해야하는지 아이디어가 아예 생각이 안나 ..**
+        - 구현 흐름 (Implementation Flow)
+            1. **기존 상태 (SpecTec):**
+                - `main.ml` 등의 진입점이 `.spectec` 파일을 읽습니다.
+                - `parser.ml` 등이 이를 파싱하여 `AST` 데이터 구조(메모리 상의 객체)를 만듭니다.
+                - 기존 로직은 이 AST를 가지고 인터프리터 실행을 하거나 타입 체크를 합니다.
+            2. **내가 해야 할 작업 (Action Item):**
+                - SpecTec 소스 코드(`src/`) 내에 새로운 파일(예: `maude_backend.ml`)을 만듭니다.
+                    - 이 파일 안에서 **"AST를 입력받아 Maude 문법의 문자열(String)을 뱉어내는 함수”**를 OCaml로 짭니다.
+                - `main.ml`을 수정하여, 프로그램 실행 시 이 함수가 호출되도록 연결합니다.
+        - 예시로 이해하기 (Example)
+            - **입력 (`test.spectec`) :** `num : 42`
+            - **Step 1: 기존 `*.ml`이 만드는 AST (Data):** (OCaml의 데이터 타입으로 메모리에 존재)
+                
+                `Const (Int 42)`
+                
+            - **Step 2: 귀하가 작성해야 할 OCaml 코드 (Logic):**
+                
+                `(* 귀하가 작성할 maude_backend.ml *)
+                let rec to_maude (node : ast) =
+                  match node with
+                  | Const (Int n) -> "op " ^ (string_of_int n) ^ " : -> Nat ."
+                  | ...`
+                
+            - **Step 3: 결과물 (`test.maude`):**
+                
+                `op 42 : -> Nat .`
+                
+    </aside>
+    
+    ---
+    
+    - 여튼 연구 목표는 변환기 만들어서 변환 후 모델체킹하자임 ㅇㅇ
+    - 나의 목표 : DSL → Maude (반)자동 변환기 만들기
+        - 1차 : Wasm add를 Maude로 변환
+        - 2차 : Wasm 피보나치 수열을 Maude로 변환
+        
+        → 어 근데 일단 변환기 만들기 전에 Wasm-DSL을 손으로 Maude로 바꿔보는게 이해에 더 좋겠다 (그럴라면 Syntax, Semantics에 대해 완벽히 이해해야겠지 ?)
+        
+        - Tip : sort WASMType, WASMTerminal 선언 (아래는 Tip을 위한 예시)
+            - 1.3-syntax.instructions.spectec :
+                
+                ```jsx
+                syntax binop_(numtype)
+                syntax binop_(Inn) =
+                  | ADD | SUB | MUL | DIV sx hint(show DIV#_#%) | REM sx hint(show REM#_#%)
+                  | AND | OR | XOR | SHL | SHR sx hint(show SHR#_#%) | ROTL | ROTR
+                syntax binop_(Fnn) =
+                  | ADD | SUB | MUL | DIV | MIN hint(macro "FMIN") | MAX hint(macro "FMAX") | COPYSIGN
+                ```
+                
+            - 1.3-syntax.instructions.maude :
+                
+                ```jsx
+                sort WasmTerminal .
+                sort WasmType .
+                
+                op binop_ : WasmTerminal -> WasmType .
+                op sx : -> WasmType .
+                
+                op ADD : -> WasmTerminal .
+                op SUB : -> WasmTerminal .
+                
+                op typecheck _ _ : WasmTerminal WasmType -> BOOL .
+                var k : WasmTerminal .
+                eq typecheck(ADD, binop_(k)) = true
+                	if typecheck(k, Inn)
+                ```
+                
+                - 타입 하나하나 정의할 수 없으니까 WasmType, WasmTerminal 선언해서 typecheck를 하는게 tip임
+    
+    **나의 생각 :**
+    
+    - 이 연구를 위해 내가 이해해야 할 것이 뭘까 ?
+    - 일단 한달 동안 이해한 것부터 나열해보자
+        - 1주차 : Automated software verification Lec 5 (IMP, Bigstep/Smallstep SOS, kframework 이해)
+        - 2주차 : Wasm 공부 (wat 코드, wasm runtime structures / rules), A rewriting logic approach to operational semantics 논문 읽기
+        - 3주차 : Wasm 공부 (wasm rules랑 DSL 코드 비교하면서 DSL 이해), spectec 설치 후 실행
+        - 4주차 : Wasm 공부 (wasm rules랑 DSL 코드 비교하면서 DSL 이해 → 자세히 syntax 뜯어봄), 연구에 대해 전반적으로 이해한 것을 되세기며 앞으로 연구 방향을 어떻게 잡아야할지 고민
+    - 그래서 내가 앞으로 이해해야 할 것이 뭘까 ?
+        - 크게 보면 DSL / MAUDE / OCaml
+        - DSL :
+            - specification/wasm-3.0을 이해해야함
+            - spec/wasm-3.0의 AST를 이해해야함
+                - 왜 : AST(IL)을 Maude로 바꿀거니까 (변환기에 AST를 Maude로 바꾸는 rule을 써야할거아니야)
+            - 하 근데 이 둘다 양이 너무 많은데 이 중에 뭘 봐야할까 대체
+                - 일단 실제 예제를 바꿔보면서 습득해보면 좋을 듯
+            - 결론 : DSL의 syntax, semantics를 다 알아야함 (어떻게 생겨먹었는지, 이게 뭘하는지 .. 그래야지 의미를 잘 파악해서 Maude로 바꿀 수 있겠지 ?)
+        - Maude : 어떻게 sort를 표현해서 DSL을 Maude로 바꿀지 생각해야함
+            - 혁순 선배 코드 참조하면 되겠지 ?
+        - OCaml : 변환기를 위해 알아야함
+            - spectec/spectec/src/exe-spectec/main.ml에 main → EL → IL이 있음 (정확히 뭔지 몰라. 공부해야겠어)
+    
+    ---
+    
+    - 여튼 지금 단계에서 가장 중요한건 DSL 이해겠네
+    - 그럼 걍 간단한 DSL 예제를 Maude로 손으로 변환하면서 DSL을 이해해보자
+    
+- 01/28 (수) - 혁순 선배
+    - 원래 Plan : 여러 예시를 만들면서 wasm, dsl(spectec), IL, Ocaml(변환기)에 대한 공부
+    - 선배님 추천 : X → 선배가 만든 Spec2Maude(spetec/specification/wasm-3.0/* → maude 수작업)을 보면서 공부하기
+    
+- 01/30 (금)
+    - 주도적인 연구가 중요
+        - 일단은 내 계획에 맞게 Spec2Maude 공부하면 될 듯
+    - 어떤 논문을 볼까요?
+        - 교수님 : textbook을 보는게 더 좋을 것 같다
+            - The Calculus of Computation - bredly mana
+                - 4장까지 / 5, 6장도 보면 좋음
+            - Set Theory and Algebra in Computer Science
+                - Part 1까지
+        - 그래도 조금씩 논문 보는게 좋을 듯
+    - Distributed system 책 복습하면서 Maude 공부할까요 ?
+        - 굳이 이미 봤는데 볼 필요없고, 다른 textbook을 보는게 좋을 듯
+    
+    → 하루에 출근해서 1시간 논문, 2시간 책 공부 / 나머지 연구
+    
+    → 주말에는 입시공부
+    
+- 02/09 (월)
+    - 앞으로의 개인 미팅 :
+        - 이해한 spectec 내용 발표 (slide와 함께)
+            - spectec 내용
+            - spectec → Maude 변환 로직을 발표
+                - Predefined type 같은 것 다 이해해야함
+                
+- 02/24 (화)
+    - [x]  **변환 로직 문서 작성하기**
+        - 변환 Logic :
+            - Pre-defined
+                - Data structure (WasmTerminal, WasmTyepe)
+                - $, …
+            - Syntax가 어떻게 변환
+            - func이 어떻게 변환
+            - rule이 어떻게 변환
+        - Github Repo 만들어서 보내기
+            
+            ![스크린샷 2026-02-24 오후 12.39.40.png](attachment:77594dc5-c0d3-4e1e-8149-294d8ed80a8a:스크린샷_2026-02-24_오후_12.39.40.png)
+            
+    
+- 03/03 (화)
+    - ARCHITECTURE.md :
+        - 현재 예제를 들면서 설명하고 있음 → 예제가 아닌 일반적인 rule에 대해 설명하기 (수도코드 or 변환기 OCaml 코드)
+            - 일반적인 rule / 특별한 케이스 (ex: uN / sN 등)
+    
+    - 현재 typecheck 로직을 membership equation 로직으로 바꾸기 (더 효율적임)
+        - Maude 메뉴얼에 이에 대한 내용 있음
+    
+    - 교수님 질문 : numeric constraints가 하드코어인가?
+        - 하드코어가 뭐야 ? → 특별한 case에 대한 얘기인 것 같은데 알아보자
+        - 즉, 아래 $nat$(2^N-1)이 6으로 바뀌어도 됨?
+            
+            ![image.png](attachment:ec34afe0-ec06-4ec2-8ae3-7b1aa4c45d43:image.png)
+            
+            - 교수님 : 안될텐데.. 알아봐봐 !
+    
+- 03/10 (화)
+    - 변환 로직
+        - WasmTerminals는 WasmTerminal의 List로 바꾸는게 좋을 듯
+        - rule을 더 깔끔하게 변환해야해
+            - 혁순선배가 변환해놓은것은 하드코어해
+            - 그래서 우리는 이걸 하드코어 하지않게, 일반적인 형태로 바꿔야해
+    - 문서
+        - 현재 : Spectec → Maude (Pseudo Code)
+            - 변경해야함 : IL(AST) → Maude
+        - 함수형 언어(OCaml)의 장점 : 규칙 자체가 코드임
+            - 그러니 내가 짠 translator.ml은 규칙이겠지 ?
+            - 이 규칙(즉, 코드)을 보고 싶으신거임 → 근데 찐코드는 아니고 살짝 수도코드 느낌(수학식 느낌)으로 바꾼 것을 보고 싶어하심
+                - 예시 :
+                    
+                    ```ocaml
+                    length : List -> Nat
+                    length(h::t) = 1 + length(t)
+                    length(nil) = 0
+                    ```
+                    
+        
+- 03/17 (화)
+    - Pseudocode → 더 간단하게
+        - ex :
+            
+            ```ocaml
+            translate_definition(TypD(id, params, insts)
+            => op id : (WasmTerminal)^|params| -> WasmType [ctor] .
+            ```
+            
+    
+    - 지금 syntax에 대한 rule을 정의한 것(문서)은 좋아
+        
+        → 그러니까 spectec을 보면서 먼저 rule을 정의하고 변환기를 만들어봐
+        
+        → 만들고 1~50장까지 돌리는데 43장에서 에러나면 43장에 대한 rule만 수정하면 되잖아
+        
+        → 이러면 더 빨리 끝날 수도 있어
+        
+    
+- 03/24 (화)
+    
+    ### **현재 아키텍처에 대한 이론적 피드백 (Coherence & Confluence)**
+    
+    - **교수님 평가 :** 룰의 중복을 줄이고 명세서의 순수성을 살리려는 엔지니어링적 접근(투-티어)은 좋았음
+    - **문제점 지적 :** Maude에서 상태 전이를 담당하는 래퍼(Wrapper)에 방정식(`eq`, `ceq`)과 룰(`crl`, `rl`)을 섞어 쓰는 것은 수리논리학적으로 매우 위험함
+    - **이유 :** 방정식(`eq`)은 '언제든 계산해도 결과가 같음'을 전제함(Confluence & Termination). 만약 상태가 변하는 환경에서 룰과 방정식이 꼬이면, Maude 엔진이 가능한 실행 경로를 놓쳐버리는 **코히어런스(Coherence) 붕괴 문제**가 발생함.
+    - **결론 :** 룰의 왼쪽(LHS)에는 리듀스(Reduce)되는 함수가 오면 안 되며, 오직 데이터를 담는 **컨스트럭터(Constructor)**만 와야 수학적으로 안전함.
+    
+    ### 핵심 이슈 : SpecTec과 Maude의 '의미론(Semantics) 불일치'
+    
+    - **SpecTec의 실행 방식 :** Evaluation Context 기반. 명령어는 반드시 스택의 '맨 위(Top-most)' 또는 정해진 문맥에서만 실행되어야 함.
+    - **Maude의 실행 방식 :** Arbitrary Position Rewriting. 엔진이 텀(Term)의 중간이든 밑바닥이든 패턴이 매칭되면 임의의 위치에서 룰을 실행해 버림.
+    - **문제점 :** 만약 컨텍스트(`STATE`, `VALS`)를 제거하고 알맹이 룰만 남겨두면, Maude 엔진이 스택 중간에 있는 명령어를 먼저 계산해버려 Wasm 시맨틱이 완전히 깨지게 됨.
+    
+    ### 해결 방안: K-Framework 방법론 도입 (`[frozen]` & Heating/Cooling)
+    
+    독자적인 래퍼 방식 대신, 정형 검증 학계의 스탠다드한 방법론(K-Semantics)을 Maude로 구현하여 적용할 것.
+    
+    1. **`[frozen]` 속성 적용:** 컨텍스트(스택, 상태 등)를 묶는 오퍼레이터에 `[frozen]` 속성을 부여.
+        - 엔진이 스택 중간을 자기 맘대로 파고들어 계산하지 못하도록 '얼려두는' 역할.
+    2. **Heating / Cooling 룰 도입:**
+        - **Heating:** 얼어있는 전체 컨텍스트에서 '현재 실행할 수 있는 명령어(Top-most)'만 찾아내어 밖(실행 가능한 위치)으로 뽑아냄.
+        - **Execution:** 뽑아낸 명령어를 순수 연산 룰(`rl`)로 계산함.
+        - **Cooling:** 계산된 결과값을 다시 원래 얼어있던 컨텍스트의 빈자리(Hole)에 돌려놓음.
+    
+    ### 연구의 궁극적 목표 및 논문 전략 (Academic Positioning)
+    
+    - **연구 목표:** 이 연구는 단순히 Wasm 시뮬레이터를 만드는 것이 아님. 임의의 언어(Wasm GC 등)를 명세하는 **'SpecTec 자체를 Maude로 자동 변환하는 일반화된 프레임워크(Engineering Solution)'**를 구축하는 것이 핵심임.
+    - **논문 억셉(Accept) 전략:** 완전히 새로운 독자적 래퍼를 만들었다고 주장하면 리뷰어들에게 공격받기 쉬움. 대신, "**기존 K-Framework 등에서 검증된 Evaluation Context (Heating/Cooling) 방법론을 Maude와 SpecTec에 맞게 발전시켜 적용했다"**라고 포지셔닝해야 학술적 가치를 인정받고 논문 방어가 수월함.
+    
+    ### Next Step (다음 주 미팅 전까지)
+    
+    1. 당장 변환기(OCaml) 코드 구현이나 하드코딩부터 서두르지 말 것
+    2. SpecTec의 수많은 룰(`RelD`)들을 가져와서 쭉 펼쳐볼 것
+    3. 이 룰들을 **"어떤 것이 Heating 대상인가?", "어떤 것이 순수 Execution 대상인가?"** 분류해 보고, 어떻게 Maude의 K-Rule 스타일로 맵핑(Mapping)할 수 있을지 디스커션 준비하기
+    
+- 03/31 (화)
+    
+    ## 1. K-Framework 적용의 개념적 오류
+    
+    - **정적 구조와 동적 태스크의 혼동:** K-Framework의 아이템(`~>`)은 컴퓨테이션 태스크(동적인 계산 흐름)를 의미함. Wasm의 스택(Stack)과 같은 정적인 데이터 구조를 `~>`로 나열하는 것은 이론적으로 잘못된 접근임("타이어를 몸에 두르고 다니는 격").
+    - **`frozen` 속성 사용의 모순:** K-Framework 이론 자체에는 `frozen`이라는 개념이 존재하지 않음. 따라서 K-Framework를 사용한다고 하면서 Maude의 `frozen` 속성으로 리라이팅을 통제하려는 것은 앞뒤가 맞지 않는 방식임.
+    - **올바른 K-Framework(Decomposition)의 활용:** 커다란 문제를 디컴포즈(Decomposition)하여 실행 가능한 단위로 쪼개고(Heating), 서브 태스크가 완료되면 다시 원래 컨텍스트로 복구(Cooling)하는 개념을 명확히 수식적으로 정의해야 함.
+    
+    ## 2. 시맨틱의 차이: SpecTec (1-Step) vs Maude (0 or More Steps)
+    
+    - **근본적인 실행 단위의 차이:** SpecTec의 룰은 정확히 원 스텝(One-step)의 상태 전이를 의미함. 반면, Maude의 리라이팅 로직은 임의의 서브 텀 위치에서 0번 이상의 스텝(Zero or more steps)으로 동시다발적으로 발생할 수 있음.
+        
+        <aside>
+        💡
+        
+        ### "1 Step" vs "0 or More Steps"의 의미
+        
+        이 개념은 프로그램이 "어떻게 실행되는가(시맨틱)"를 묘사하는 방식의 차이야.
+        
+        - **SpecTec (Structural Operational Semantics, 1 Step):**
+            - SpecTec의 규칙은 **딱 한 번의 계산(One-step transition)**만 정의해.
+            - 예를 들어, `(CONST 1) (CONST 2) ADD => (CONST 3)` 이라는 규칙이 있다면, 이 규칙을 한 번 적용하면 덧셈 딱 한 번만 하고 멈춰야 해. "다음 명령어가 뭔지"는 이 규칙의 관심사가 아니야. 오직 "현재 상태에서 다음 상태로 가는 딱 한 걸음"만 서술해.
+        - **Maude Rewriting Logic (0 or More Steps):**
+            - Maude의 리라이팅(`=>`)은 **"조건만 맞으면 엔진이 알아서, 될 때까지, 어디서든 계속 바꾼다"**는 뜻이야.
+            - 만약 Wasm 스택에 `(CONST 1) (CONST 2) ADD (CONST 4) (CONST 5) ADD`가 있다고 치자.
+            - 우리가 원하는 순서는 왼쪽 `ADD`를 먼저 해서 `(CONST 3)`을 만들고, 그 다음에 오른쪽 `ADD`를 하는 거야. (1스텝씩 차례대로).
+            - 하지만 Maude 엔진에 덧셈 규칙(`ADD => 결과`)을 그냥 던져주면, 엔진은 "어? 왼쪽 `ADD`도 바꿀 수 있고, 동시에 오른쪽 `ADD`도 바꿀 수 있네? 둘 다 한꺼번에 바꿔버려야지!" 하고 지맘대로 순서를 무시하고 동시다발적으로 계산을 진행해 버려. 심지어 룰 적용이 끝날 때까지 (더 이상 바꿀 게 없을 때까지) 멈추지 않아.
+        
+        **결론:** SpecTec은 "이 톱니바퀴는 한 칸만 돌아간다"라고 명세했는데, Maude에 그대로 번역해 넣으면 "이 톱니바퀴는 돌릴 수 있을 때까지 미친 듯이 다 돌아간다"로 의미가 왜곡되는 거야. 이 차이 때문에 "잘못된 실행 흐름"이 발생한다고 교수님이 지적하신 거야.
+        
+        </aside>
+        
+    - **`step` 오퍼레이션 도입의 필요성:** 단순히 SpecTec 룰을 Maude 리라이팅 룰로 1:1 변환하면 이 시맨틱 차이로 인해 잘못된 실행 흐름이 발생함. 이를 통제하기 위해 명시적으로 `step`이라는 오퍼레이션을 정의하여 한 스텝만 실행되도록 강제하는 방식을 고려해야 함.
+        
+        <aside>
+        💡
+        
+        **`step` 오퍼레이션이 어떻게 이 문제를 해결하는가?**
+        Maude가 제멋대로 룰을 연속해서 적용하는 걸 막으려면, 엔진에게 **"지금은 딱 한 번만 룰을 적용해!"**라고 목줄을 채워야 해. 그 목줄이 바로 `step` 오퍼레이션이야.
+        • **해결 원리:**
+            1. 상태 $S$ 전체를 `step(S)`라는 특별한 껍데기(오퍼레이션)로 감싸.
+            2. 리라이팅 룰을 정의할 때, 조건으로 "반드시 겉에 `step(...)`이 씌워져 있을 때만 실행해라"라고 제약을 걸어.
+            3. 룰이 한 번 적용되어서 상태가 $S'$로 바뀌면, **그 결과물에는 `step` 껍데기를 벗겨서 출력**하도록 규칙을 만들어. (예: `step(S) => S'`)
+        • **효과:**
+            ◦ 처음에 `step(S)`로 시작하면 룰이 딱 한 번 적용돼서 `S'`가 돼.
+            ◦ `S'`에는 더 이상 `step` 껍데기가 없지? 그러니까 Maude 엔진이 아무리 더 바꾸고 싶어도 "어? `step` 껍데기가 없네? 더 이상 룰 적용 못 하겠다." 하고 얌전히 멈추게 돼.
+            ◦ 이 방식으로 Maude의 "0 or More Steps" 폭주를 완벽하게 "1 Step"으로 통제할 수 있어. `frozen` 같은 꼼수 없이 수학적으로 아주 깔끔하게 말이야.
+        
+        </aside>
+        
+    - **참고 자료:** 이전에 수행했던 Structural Operational Semantics (Lec 5) 과제에서 스몰 스텝(Small-step)을 정의할 때 `step` 연산자를 어떻게 활용했는지 복기할 것.
+    
+    ## 3. 조건부 룰(`crl`)의 문제점과 무조건부(`rl`) 변환의 당위성
+    
+    - **모델 체킹(Model Checking)의 분석 한계:** LTL 모델 체킹은 상태 간의 전이(Transition) 결과만 추적함. 전이가 일어날 때 조건절(`if ...`) 내부에서 수행되는 세부적인 디덕션(Deduction) 과정은 모델 체커가 분석하지 못하고 무시함.
+    - **치명적인 성능(Performance) 저하:** 조건부 룰(`crl`)은 매칭 시 조건이 참인지 판단하기 위해 수많은 내부 트랜지션(Exhaustive check)을 발생시켜 퍼포먼스를 기하급수적으로 떨어뜨림(예: 혁순 선배의 KCC 구현체에서 1분 이상 소요되는 현상).
+    - **해결 방향:** 특정 컨디셔널 룰을 어떻게 언컨디셔널 룰(Unconditional rule, `rl`) 형태로 트랜스포메이션할 것인지 방법론을 고안해야 함.
+    
+    ## 4. Next Action Items (다음 미팅 준비)
+    
+    - **구현(Implementation) 중단:** 현재 단계에서는 완벽한 변환기 구현체를 만들어가는 것이 목표가 아님.
+    - **방법론(Methodology) 정의 및 디스커션 준비:** Wasm 스펙의 방대한 룰 전체를 다루기 전에, 대표적인 패턴을 샘플링하여 위에서 논의된 문제(`step` 도입, `crl` 제거, Decomposition)들을 해결할 방법론을 먼저 디자인할 것.
+    - 정의된 인코딩 방식(Methodology)을 바탕으로 다음 미팅에서 교수님과 디스커션 진행.
+    
+- 04/06 (월)
+    
+    RelD(rule) 변환 로직 피드백 :
+    
+    1. 다음과 같이 우항에 함수를 쓰면 안됨
+        
+        ```jsx
+        rl [step-read-local-get] :
+        	step( (S ; F) ; (LOCAL.GET x) INSTRS )
+        	=>
+        	(S ; F) ; $local(F, X) INSTRS .
+        ```
+        
+        - 우항에 있는 함수가 실패한다면 시스템이 비정상적인 상태로 멈춤
+        - crl을 쓰자
+    2. crl을 쓰지말라고 한 부분은 Evaluation Context 처리 부분임 (label, frame, instrs, handler)
+        
+        → heating/cooling rule로 처리
+        
+        ```jsx
+        rule Step/ctxt-label:
+            z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
+            -- Step: z; instr* ~> z'; instr'*
+        ```
+        
+        ```jsx
+        S--- 1. 복구를 위한 보조 operator 선언 (f의 역할)
+        op restore-label : Config Nat InstSeq InstSeq -> Config .
+        
+        --- 2. Heating : Label을 만나면 step을 껍데기 안쪽(INSTRS_INNER)으로 밀어넣음
+        rl [heat-label] :
+        	step( (S ; F) ; (LABEL_ n {INSTRS_0} INSTRS_INNER) INSTRS )
+        	=>
+        	restore-label( step( (S ; F) ; INSTRS_INNER ) , n, INSTRS_0, INSTRS ) .
+        
+        --- 3. Atomic Step (실제 실행): 안쪽 명령어가 1스템 실행되며 step 껍데기를 소모함
+        --- 예: rl [step-pure-binop] : step(...) => (S' ; F') ; INSTES_INNER' .
+        
+        --- 4. Cooling : 안쪽 명령어가 1스템 실행되어 순수 Config로 돌아오면 다시 LABEL을 씌움
+        rl [cool-label] :
+        	restore-label( (S' : F') ; INSTRS_INNER', n, INSTRS_0, INSTRS )
+        	=>
+        	(S' ; F') : (LABEL_ n {INSTRS_0} INSTRS_INNER') INSTRS .
+        ```
+        
+    
+    ![image.png](attachment:314b2e36-be2d-462c-a553-f875f7d2b65c:image.png)

@@ -3,6 +3,8 @@
 > 작성일: 2026-04-17
 > 관련 파일: `translator.ml`, `main.ml`, `dsl/pretype.maude`, `output.maude`
 
+> 로드 warning/advisory의 정량 분석 및 해결 우선순위는 `docs/maude_warning_analysis.md` 참고.
+
 ---
 
 ## 1. Architecture Overview
