@@ -1,22 +1,24 @@
 --- =============================================================
---- WASM-EXEC: Execution Engine Infrastructure
+--- WASM-EXEC: Dynamic Execution Semantics (Heating/Cooling)
 --- =============================================================
---- Complements output.maude (auto-generated 1:1 from spectec).
+--- KEY DESIGN:
+---   step : ExecConf -> ExecConf  is defined ENTIRELY by equations (eq/ceq).
+---   steps : ExecConf -> ExecConf drives multi-step reduction via ONE crl rule.
 ---
---- output.maude (SPECTEC-CORE) now provides (auto-generated):
----   - All sort/op declarations (syntax, types, auxiliary fns)
----   - 189 crl step() rules from 4.3-execution.instructions.spectec
----   - heat/cool crl rules for LABEL/FRAME/HANDLER contexts
----   - restore-label/frame/handler op declarations
----   - Correct val^m patterns (WasmTerminals + all-vals guard)
----   - Correct $with-local (nested path update)
+---   ALL step behaviours (heat-label, br-if, etc.) are ceq/eq so they fire
+---   during equational normalisation of step(EC) inside steps-trans.
 ---
---- This module provides ONLY what spectec does NOT specify:
----   1. is-val / all-vals / is-trap  — Maude execution predicates
----   2. void-bt / $blocktype void    — runtime blocktype for void blocks
----   3. CALL_REF non-null rule       — has Expand relational premise
----                                     (auto-translate not possible)
----   4. steps / exec-step            — multi-step execution & LTL infra
+---   MAUDE ASSOC-TAIL VARIABLE BUG:
+---   When multiple equations for DIFFERENT operators use the same variable name
+---   as an assoc "tail" pattern (e.g. `A IS` in all-vals AND `A IS` in step),
+---   Maude's coherence checker generates a false interaction and blocks some
+---   equations from firing.
+---   WORKAROUND: use unique variable names per operator group:
+---     step     equations  =>  ST-* names
+---     all-vals equations  =>  AV-* names
+---     is-val   equations  =>  IV-* names
+---     is-trap  equations  =>  IT-* names
+---     restore  equations  =>  RL-*, RF-*, RH-* names
 --- =============================================================
 
 load output
@@ -24,52 +26,316 @@ load output
 mod WASM-EXEC is
   inc SPECTEC-CORE .
 
-  --- -------------------------------------------------------
-  --- Variables
-  --- -------------------------------------------------------
-  vars ST-Z ST-VAL ST-BT ST-BODY ST-FI ST-A ST-X ST-T ST-YY : WasmTerminal .
-  var  ST-IS ST-VALS ST-TQ ST-TR : WasmTerminals .
-  var  ST-AR : Nat .
+  --- ExecConf, <_|_>, and step are inherited from SPECTEC-CORE (output.maude)
 
-  vars TS-Z : WasmTerminal .
-  var  TS-IS : WasmTerminals .
+  --- Runtime instruction containers (eval-context wrappers)
+  op exec-label   : Nat WasmTerminals WasmTerminals -> WasmTerminal [ctor] .
+  op exec-loop    : WasmTerminal WasmTerminals -> WasmTerminal [ctor] .
+  op exec-frame   : Nat WasmTerminal WasmTerminals -> WasmTerminal [ctor] .
+  op exec-handler : Nat WasmTerminal WasmTerminals -> WasmTerminal [ctor] .
 
-  var VB-Z : WasmTerminal .
-
-  --- -------------------------------------------------------
-  --- 1. Execution predicates — defined in SPECTEC-CORE (output.maude).
-  ---    is-val, all-vals, is-trap are auto-generated there using
-  ---    Val sort membership axioms. No re-definition needed here.
-  --- -------------------------------------------------------
+  --- Evaluation-context restore helpers (equations)
+  op restore-label   : ExecConf Nat WasmTerminals WasmTerminals -> ExecConf .
+  op restore-frame   : ExecConf Nat WasmTerminal WasmTerminals -> ExecConf .
+  op restore-handler : ExecConf Nat WasmTerminal WasmTerminals -> ExecConf .
 
   --- -------------------------------------------------------
-  --- 2. void-bt: opaque Blocktype for void ([] → []) blocks/loops.
-  ---    spectec $blocktype only covers _IDX and _RESULT; void blocks
-  ---    need an explicit runtime helper.
+  --- Variables – UNIQUE per operator group to avoid assoc-tail collision
+  --- -------------------------------------------------------
+  --- step equation variables
+  vars ST-Z ST-ZN ST-X ST-VAL ST-NT ST-OP ST-C ST-C1 ST-C2 ST-A ST-BT : WasmTerminal .
+  var  ST-IS ST-ISA ST-ISB ST-ISBN ST-IS0 ST-VALS ST-TQ ST-TR ST-BODY : WasmTerminals .
+  var  ST-AR ST-LI : Nat .
+  var  ST-YY ST-CSEQ ST-T ST-FI ST-F : WasmTerminal .
+  --- For LOCAL.SET / LOCAL.TEE: destructure State into Store + Frame
+  vars ST-ZS ST-ZF : WasmTerminal .
+
+  --- all-vals equation variables
+  vars AV-NT AV-C AV-A : WasmTerminal .
+  var  AV-IS : WasmTerminals .
+
+  --- is-val equation variables
+  vars IV-NT IV-C IV-A IV-VAL : WasmTerminal .
+
+  --- is-trap equation variables
+  var  IT-IS IT-ISA : WasmTerminals .
+
+  --- restore equation variables
+  vars RL-Z RL-ZN : WasmTerminal .
+  var  RL-IS RL-ISA RL-ISBN RL-IS0 : WasmTerminals .
+  var  RL-AR : Nat .
+  var  RL-F : WasmTerminal .
+  var  RF-Z RF-ZN : WasmTerminal .
+  var  RF-IS RF-ISBN : WasmTerminals .
+  var  RF-AR : Nat .
+  var  RF-F : WasmTerminal .
+  var  RH-ZN : WasmTerminal .
+  var  RH-IS RH-ISBN : WasmTerminals .
+  var  RH-AR : Nat .
+  var  RH-CSEQ : WasmTerminal .
+
+  --- void-bt equation variables
+  var  VB-Z : WasmTerminal .
+
+  --- -------------------------------------------------------
+  --- void-bt: opaque Blocktype constant for void blocks/loops.
   --- -------------------------------------------------------
   op void-bt : -> Blocktype [ctor] .
   eq $blocktype(VB-Z, void-bt)            = CTORARROWA3(eps, eps, eps) .
   eq $blocktype(VB-Z, CTORWRESULTA1(eps)) = CTORARROWA3(eps, eps, eps) .
 
   --- -------------------------------------------------------
-  --- 3. CALL_REF non-null case.
-  ---    spectec rule Step_read/call_ref-func has an Expand relational
-  ---    premise which translator.ml cannot auto-translate.
-  ---    Manually encoded here.
+  --- Helper: is-val (uses IV-* vars)
   --- -------------------------------------------------------
+  op is-val : WasmTerminal -> Bool .
+  eq is-val(CTORCONSTA2(IV-NT, IV-C))   = true .
+  eq is-val(CTORREFFUNCADDRA1(IV-A))    = true .
+  eq is-val(CTORREFNULLA1(IV-NT))       = true .
+  eq is-val(IV-VAL)                     = false [owise] .
+
+  --- Helper: all-vals (uses AV-* vars)
+  op all-vals : WasmTerminals -> Bool .
+  eq all-vals(eps)                          = true .
+  eq all-vals(CTORCONSTA2(AV-NT, AV-C) AV-IS) = all-vals(AV-IS) .
+  eq all-vals(CTORREFFUNCADDRA1(AV-A) AV-IS)   = all-vals(AV-IS) .
+  eq all-vals(CTORREFNULLA1(AV-NT) AV-IS)       = all-vals(AV-IS) .
+  eq all-vals(AV-IS)                        = false [owise] .
+
+  --- Helper: is-trap (uses IT-* vars)
+  op is-trap : WasmTerminals -> Bool .
+  eq is-trap(CTORTRAPA0 IT-ISA) = true .
+  eq is-trap(IT-IS)             = false [owise] .
+
+  --- -------------------------------------------------------
+  --- PATTERN 1: Pure rules (EQ)
+  --- -------------------------------------------------------
+
+  eq step(< ST-Z | CTORUNREACHABLEA0 ST-IS >) = < ST-Z | CTORTRAPA0 ST-IS > .
+
+  eq step(< ST-Z | CTORNOPA0 ST-IS >) = < ST-Z | ST-IS > .
+
+  ceq step(< ST-Z | ST-VAL CTORDROPA0 ST-IS >) = < ST-Z | ST-IS >
+      if is-val(ST-VAL) = true .
+
+  --- -------------------------------------------------------
+  --- PATTERN 2: Numeric operations (CEQ)
+  --- -------------------------------------------------------
+
+  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORCONSTA2(ST-NT, ST-C2)
+                    CTORBINOPA2(ST-NT, ST-OP) ST-IS >)
+      = < ST-Z | CTORCONSTA2(ST-NT, ST-C) ST-IS >
+      if ST-C := $binop(ST-NT, ST-OP, ST-C1, ST-C2) .
+
+  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORCONSTA2(ST-NT, ST-C2)
+                    CTORBINOPA2(ST-NT, ST-OP) ST-IS >)
+      = < ST-Z | CTORTRAPA0 ST-IS >
+      if $binop(ST-NT, ST-OP, ST-C1, ST-C2) = eps .
+
+  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORUNOPA2(ST-NT, ST-OP) ST-IS >)
+      = < ST-Z | CTORCONSTA2(ST-NT, ST-C) ST-IS >
+      if ST-C := $unop(ST-NT, ST-OP, ST-C1) .
+
+  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORUNOPA2(ST-NT, ST-OP) ST-IS >)
+      = < ST-Z | CTORTRAPA0 ST-IS >
+      if $unop(ST-NT, ST-OP, ST-C1) = eps .
+
+  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORCONSTA2(ST-NT, ST-C2)
+                    CTORRELOPA2(ST-NT, ST-OP) ST-IS >)
+      = < ST-Z | CTORCONSTA2(CTORI32A0, ST-C) ST-IS >
+      if ST-C := $relop(ST-NT, ST-OP, ST-C1, ST-C2) .
+
+  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORTESTOPA2(ST-NT, ST-OP) ST-IS >)
+      = < ST-Z | CTORCONSTA2(CTORI32A0, ST-C) ST-IS >
+      if ST-C := $testop(ST-NT, ST-OP, ST-C1) .
+
+  --- SELECT
+  ceq step(< ST-Z | ST-VAL ST-VALS CTORCONSTA2(CTORI32A0, ST-C) CTORSELECTA1(ST-NT) ST-IS >)
+      = < ST-Z | ST-VAL ST-IS >
+      if ST-C =/= 0 .
+
+  ceq step(< ST-Z | ST-VAL ST-VALS CTORCONSTA2(CTORI32A0, ST-C) CTORSELECTA1(ST-NT) ST-IS >)
+      = < ST-Z | ST-VALS ST-IS >
+      if ST-C = 0 .
+
+  --- -------------------------------------------------------
+  --- PATTERN 3: Control flow (CEQ)
+  --- -------------------------------------------------------
+
+  --- IF
+  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORWIFELSEA3(ST-BT, ST-BODY, ST-ISA) ST-IS >)
+      = < ST-Z | CTORBLOCKA2(ST-BT, ST-BODY) ST-IS >
+      if ST-C =/= 0 .
+
+  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORWIFELSEA3(ST-BT, ST-ISA, ST-BODY) ST-IS >)
+      = < ST-Z | CTORBLOCKA2(ST-BT, ST-BODY) ST-IS >
+      if ST-C = 0 .
+
+  --- BR_IF
+  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRIFA1(ST-LI) ST-IS >)
+      = < ST-Z | CTORBRA1(ST-LI) ST-IS >
+      if ST-C =/= 0 .
+
+  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRIFA1(ST-LI) ST-IS >)
+      = < ST-Z | ST-IS >
+      if ST-C = 0 .
+
+  --- BR_TABLE
+  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRTABLEA2(ST-ISA, ST-A) ST-IS >)
+      = < ST-Z | CTORBRA1(index(ST-ISA, ST-C)) ST-IS >
+      if ST-C < len(ST-ISA) .
+
+  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRTABLEA2(ST-ISA, ST-A) ST-IS >)
+      = < ST-Z | CTORBRA1(ST-A) ST-IS >
+      if ST-C >= len(ST-ISA) .
+
+  --- -------------------------------------------------------
+  --- PATTERN 4: State read (EQ – inline $local/$global)
+  --- -------------------------------------------------------
+
+  --- Generalised LOCAL.GET: fire regardless of how many values precede it.
+  --- This handles the case where a prior instruction pushed a value and the
+  --- next instruction is LOCAL.GET (which needs 0 operands from the stack).
+  ceq step(< ST-Z | ST-VALS CTORLOCALGETA1(ST-X) ST-IS >)
+      = < ST-Z | ST-VALS $local(ST-Z, ST-X) ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  ceq step(< ST-Z | ST-VALS CTORGLOBALGETA1(ST-X) ST-IS >)
+      = < ST-Z | ST-VALS value('VALUE, $global(ST-Z, ST-X)) ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- CALL x (also 0 operands from stack before the address)
+  ceq step(< ST-Z | ST-VALS CTORCALLA1(ST-X) ST-IS >)
+      = < ST-Z | ST-VALS CTORREFFUNCADDRA1(index(value('FUNCS, $moduleinst(ST-Z)), ST-X))
+                 CTORCALLREFA1(value('TYPE, index($funcinst(ST-Z),
+                                     index(value('FUNCS, $moduleinst(ST-Z)), ST-X)))) ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- -------------------------------------------------------
+  --- PATTERN 5: State write (CEQ – is-val + $with-*)
+  --- -------------------------------------------------------
+
+  --- LOCAL.SET / LOCAL.TEE: bypass broken $with-local in output.maude.
+  --- $with-local does F[X<-V] (list-update on the 1-element frame) → corrupts the frame.
+  --- Correct fix: update the 'LOCALS list inside the frame record explicitly.
+  ceq step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VAL CTORLOCALSETA1(ST-X) ST-IS >)
+      = < CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-IS >
+      if is-val(ST-VAL) = true .
+
+  ceq step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VAL CTORLOCALTEEA1(ST-X) ST-IS >)
+      = < CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-VAL ST-IS >
+      if is-val(ST-VAL) = true .
+
+  ceq step(< ST-Z | ST-VAL CTORGLOBALSETA1(ST-X) ST-IS >) = < $with-global(ST-Z, ST-X, ST-VAL) | ST-IS >
+      if is-val(ST-VAL) = true .
+
+  --- -------------------------------------------------------
+  --- PATTERN 6: Block / Loop (CEQ – destructuring $blocktype)
+  --- -------------------------------------------------------
+
+  ceq step(< ST-Z | ST-VALS CTORBLOCKA2(ST-BT, ST-BODY) ST-IS >)
+      = < ST-Z | exec-label(len(ST-TR), eps, ST-VALS ST-BODY) ST-IS >
+      if all-vals(ST-VALS) = true
+      /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT) .
+
+  ceq step(< ST-Z | ST-VALS CTORLOOPA2(ST-BT, ST-BODY) ST-IS >)
+      = < ST-Z | exec-label(len(ST-TQ), exec-loop(ST-BT, ST-BODY), ST-VALS ST-BODY) ST-IS >
+      if all-vals(ST-VALS) = true
+      /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT) .
+
+  ceq step(< ST-Z | ST-VALS exec-loop(ST-BT, ST-BODY) ST-IS >)
+      = < ST-Z | exec-label(len(ST-TQ), exec-loop(ST-BT, ST-BODY), ST-VALS ST-BODY) ST-IS >
+      if all-vals(ST-VALS) = true
+      /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT) .
+
+  --- -------------------------------------------------------
+  --- PATTERN 7: Evaluation contexts (ALL CEQ/EQ)
+  --- TRAP propagation first (short-circuit before heat-*)
+  --- -------------------------------------------------------
+
+  eq step(< ST-Z | exec-label(ST-AR, ST-IS0, CTORTRAPA0 ST-ISA) ST-IS >)
+     = < ST-Z | CTORTRAPA0 ST-IS > .
+
+  eq step(< ST-Z | exec-handler(ST-AR, ST-CSEQ, CTORTRAPA0 ST-ISA) ST-IS >)
+     = < ST-Z | CTORTRAPA0 ST-IS > .
+
+  eq step(< ST-Z | exec-frame(ST-AR, ST-FI, CTORTRAPA0 ST-ISA) ST-IS >)
+     = < ST-Z | CTORTRAPA0 ST-IS > .
+
+  --- exec-label: done (all values inside)
+  ceq step(< ST-Z | exec-label(ST-AR, ST-IS0, ST-VALS) ST-IS >)
+      = < ST-Z | ST-VALS ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- exec-label: BR 0
+  ceq step(< ST-Z | exec-label(ST-AR, ST-IS0, ST-VALS CTORBRA1(0) ST-ISA) ST-IS >)
+      = < ST-Z | ST-VALS ST-IS0 ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- exec-label: BR l+1
+  ceq step(< ST-Z | exec-label(ST-AR, ST-IS0, ST-VALS CTORBRA1(s(ST-LI)) ST-ISA) ST-IS >)
+      = < ST-Z | ST-VALS CTORBRA1(ST-LI) ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- exec-handler: BR propagates out
+  ceq step(< ST-Z | exec-handler(ST-AR, ST-CSEQ, ST-VALS CTORBRA1(ST-LI) ST-ISA) ST-IS >)
+      = < ST-Z | ST-VALS CTORBRA1(ST-LI) ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- exec-frame: RETURN
+  ceq step(< ST-Z | exec-frame(ST-AR, ST-FI, ST-VALS CTORRETURNA0 ST-ISA) ST-IS >)
+      = < ST-Z | ST-VALS ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- exec-frame: done (all values)
+  ceq step(< ST-Z | exec-frame(ST-AR, ST-FI, ST-VALS) ST-IS >)
+      = < ST-Z | ST-VALS ST-IS >
+      if all-vals(ST-VALS) = true .
+
+  --- CALL_REF
   ceq step(< ST-Z | ST-VALS CTORREFFUNCADDRA1(ST-A) CTORCALLREFA1(ST-YY) ST-IS >)
-      = < ST-Z | CTORFRAMELBRACERBRACEA3(len(ST-TR), ST-FI,
-                 CTORLABELLBRACERBRACEA3(len(ST-TR), eps, ST-VALS ST-BODY)) ST-IS >
+      = < ST-Z | exec-frame(len(ST-TR), ST-FI,
+                             exec-label(len(ST-TR), eps, ST-VALS ST-BODY)) ST-IS >
       if all-vals(ST-VALS) = true
       /\ CTORFUNCARROWA2(ST-TQ, ST-TR) := value('TYPE, index($funcinst(ST-Z), ST-A))
       /\ CTORFUNCA3(ST-X, CTORLOCALA1(ST-T), ST-BODY) := value('CODE, index($funcinst(ST-Z), ST-A))
       /\ ST-FI := {item('LOCALS, ST-VALS $default(ST-T)) ;
                    item('MODULE, value('MODULE, index($funcinst(ST-Z), ST-A)))} .
 
+  --- exec-label: HEAT (body not done/trap)
+  ceq step(< ST-Z | exec-label(ST-AR, ST-IS0, ST-ISB) ST-IS >)
+      = restore-label(step(< ST-Z | ST-ISB >), ST-AR, ST-IS0, ST-IS)
+      if all-vals(ST-ISB) = false /\ is-trap(ST-ISB) = false .
+
+  --- exec-frame: HEAT (switch to inner frame)
+  ceq step(< ST-Z | exec-frame(ST-AR, ST-FI, ST-ISB) ST-IS >)
+      = restore-frame(step(< CTORSEMICOLONA2($store(ST-Z), ST-FI) | ST-ISB >),
+                      ST-AR, $frame(ST-Z), ST-IS)
+      if all-vals(ST-ISB) = false /\ is-trap(ST-ISB) = false .
+
+  --- exec-handler: HEAT
+  ceq step(< ST-Z | exec-handler(ST-AR, ST-CSEQ, ST-ISB) ST-IS >)
+      = restore-handler(step(< ST-Z | ST-ISB >), ST-AR, ST-CSEQ, ST-IS)
+      if all-vals(ST-ISB) = false /\ is-trap(ST-ISB) = false .
+
+  --- Restore helpers (EQ – eager cooling, RL-*/RF-*/RH-* vars)
+  eq restore-label(< RL-ZN | RL-ISBN >, RL-AR, RL-IS0, RL-IS)
+     = < RL-ZN | exec-label(RL-AR, RL-IS0, RL-ISBN) RL-IS > .
+
+  eq restore-frame(< RF-Z | RF-ISBN >, RF-AR, RF-F, RF-IS)
+     = < CTORSEMICOLONA2($store(RF-Z), RF-F) | exec-frame(RF-AR, $frame(RF-Z), RF-ISBN) RF-IS > .
+
+  eq restore-handler(< RH-ZN | RH-ISBN >, RH-AR, RH-CSEQ, RH-IS)
+     = < RH-ZN | exec-handler(RH-AR, RH-CSEQ, RH-ISBN) RH-IS > .
+
   --- -------------------------------------------------------
-  --- 4. Multi-step execution (steps) and LTL transition (exec-step)
+  --- Transitive closure  steps*
+  --- steps-trans is the ONLY crl rule for batch reduction.
+  --- exec-step is the transition relation for LTL model checking.
   --- -------------------------------------------------------
   op steps : ExecConf -> ExecConf .
+
+  vars TS-Z : WasmTerminal .
+  var  TS-IS : WasmTerminals .
 
   eq  steps(< TS-Z | eps >) = < TS-Z | eps > .
   ceq steps(< TS-Z | TS-IS >) = < TS-Z | TS-IS > if all-vals(TS-IS) = true .
@@ -80,15 +346,21 @@ mod WASM-EXEC is
     => steps(step(< TS-Z | TS-IS >))
     if TS-IS =/= eps /\ all-vals(TS-IS) = false /\ is-trap(TS-IS) = false .
 
+  --- One-step rule for LTL model checking (works on bare ExecConf).
+  --- The model checker uses this to explore the reachable-state graph.
+  var MC-Z-EC : WasmTerminal .
+  var MC-IS-EC : WasmTerminals .
+
+  crl [exec-step] :
+    < MC-Z-EC | MC-IS-EC >
+    => step(< MC-Z-EC | MC-IS-EC >)
+    if MC-IS-EC =/= eps /\ all-vals(MC-IS-EC) = false /\ is-trap(MC-IS-EC) = false .
+
 endm
---- NOTE: exec-step is defined in WASM-FIB-PROPS (not here) to avoid
----   interfering with steps() rewriting: exec-step fires on bare ExecConf
----   subterms inside step(...), causing infinite nesting during rew.
 
 
 --- =============================================================
 --- WASM-FIB: Iterative Fibonacci in WebAssembly
---- Uses spectec constructors (CTORBLOCKA2, CTORLOOPA2) directly.
 --- =============================================================
 
 mod WASM-FIB is
@@ -97,7 +369,7 @@ mod WASM-FIB is
   var NVAL : WasmTerminal .
   var I    : Int .
 
-  --- Store: matches spectec Store sort (no TYPES field; has STRUCTS/ARRAYS/EXNS)
+  --- Store: matches cmb Store axiom (no TYPES; has STRUCTS/ARRAYS/EXNS)
   op empty-store : -> WasmTerminal .
   eq empty-store =
     {item('TAGS,    eps) ; item('GLOBALS,  eps) ;
@@ -106,7 +378,7 @@ mod WASM-FIB is
      item('ELEMS,   eps) ; item('STRUCTS,  eps) ;
      item('ARRAYS,  eps) ; item('EXNS,     eps)} .
 
-  --- Module instance: for frame's MODULE field
+  --- Module: for frame's MODULE field
   op empty-module : -> WasmTerminal .
   eq empty-module =
     {item('TYPES,   eps) ; item('TAGS,  eps) ;
@@ -118,7 +390,6 @@ mod WASM-FIB is
   op i32v : Int -> WasmTerminal .
   eq i32v(I:Int) = CTORCONSTA2(CTORI32A0, I:Int) .
 
-  --- Frame: locals = [n, 0, 1, 0], module = empty
   op fib-frame : WasmTerminal -> WasmTerminal .
   eq fib-frame(NVAL) =
     {item('LOCALS,
@@ -128,11 +399,9 @@ mod WASM-FIB is
           CTORCONSTA2(CTORI32A0, 0)) ;
      item('MODULE, empty-module)} .
 
-  --- State = Store ; Frame
   op fib-state : WasmTerminal -> WasmTerminal .
   eq fib-state(NVAL) = CTORSEMICOLONA2(empty-store, fib-frame(NVAL)) .
 
-  --- Loop body (raw instructions, no exec-* wrappers)
   op fib-loop-body : -> WasmTerminals .
   eq fib-loop-body =
     CTORLOCALGETA1(0) CTORCONSTA2(CTORI32A0, 0)
@@ -145,41 +414,13 @@ mod WASM-FIB is
     CTORBINOPA2(CTORI32A0, CTORSUBA0) CTORLOCALSETA1(0)
     CTORBRA1(0) .
 
-  --- fib-body: BLOCK { LOOP { fib-loop-body } } LOCAL.GET(1)
-  --- Uses spectec constructors; void-bt means [] -> [].
   op fib-body : -> WasmTerminals .
   eq fib-body =
-    CTORBLOCKA2(void-bt, CTORLOOPA2(void-bt, fib-loop-body))
+    CTORBLOCKA2(void-bt, exec-loop(void-bt, fib-loop-body))
     CTORLOCALGETA1(1) .
 
   op fib-config : WasmTerminal -> ExecConf .
   eq fib-config(NVAL) = < fib-state(NVAL) | fib-body > .
-
-  --- -------------------------------------------------------
-  --- Extra micro-benchmarks (non-fib) for translation smoke checks
-  --- -------------------------------------------------------
-  op bench-add-config : -> ExecConf .
-  eq bench-add-config =
-    < fib-state(i32v(0))
-    | CTORCONSTA2(CTORI32A0, 19)
-      CTORCONSTA2(CTORI32A0, 23)
-      CTORBINOPA2(CTORI32A0, CTORADDA0) > .
-
-  op bench-muladd-config : -> ExecConf .
-  eq bench-muladd-config =
-    < fib-state(i32v(0))
-    | CTORCONSTA2(CTORI32A0, 6)
-      CTORCONSTA2(CTORI32A0, 7)
-      CTORBINOPA2(CTORI32A0, CTORMULA0)
-      CTORCONSTA2(CTORI32A0, 5)
-      CTORBINOPA2(CTORI32A0, CTORADDA0) > .
-
-  op bench-local-config : -> ExecConf .
-  eq bench-local-config =
-    < fib-state(i32v(0))
-    | CTORLOCALGETA1(1)
-      CTORLOCALGETA1(2)
-      CTORBINOPA2(CTORI32A0, CTORADDA0) > .
 
 endm
 
@@ -195,61 +436,25 @@ mod WASM-FIB-PROPS is
   inc MODEL-CHECKER .
   inc LTL-SIMPLIFIER .
 
-  sort MCState .
-  subsort MCState < State .
   subsort ExecConf < State .
-  op mc : ExecConf -> MCState [ctor frozen] .
 
   ops done trap-seen result-neg : -> Prop .
   op  result-is : Int -> Prop .
-  op mc-fib-config : WasmTerminal -> MCState .
 
-  var MC-NV : WasmTerminal .
   var MC-I  : Int .
   var MC-IS : WasmTerminals .
   var MC-Z  : WasmTerminal .
-  var MC-IS2 : WasmTerminals .
-  var MC-Z2  : WasmTerminal .
   var MC-EC : ExecConf .
-  var MC-MS : MCState .
 
-  --- Macro-step transition for model checking.
-  --- From a bare execution state, jump directly to wrapped post-state.
-  --- Because mc(...) is not of sort ExecConf, this rule cannot fire inside
-  --- steps(...) arguments during condition rewriting.
-  --- Model checking starts from mc-fib-config(N), not bare fib-config(N).
-  rl [mc-init] :
-    mc-fib-config(MC-NV)
-    => mc(< fib-state(MC-NV) | fib-body >) .
-
-  --- Wrapped micro-step transition for model checking.
-  --- We explicitly apply one semantic step via step(<...>) => ... while keeping
-  --- the state wrapped, so internal rewrites are only explored through this rule.
-  crl [exec-step] :
-    mc(< MC-Z | MC-IS >)
-     => mc(< MC-Z2 | MC-IS2 >)
-     if step(< MC-Z | MC-IS >) => < MC-Z2 | MC-IS2 > .
-
-  ceq mc(< MC-Z | MC-IS >) |= done           = true if all-vals(MC-IS) = true .
-  ceq mc(< MC-Z | MC-IS >) |= result-is(MC-I) = true if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) .
-  ceq mc(< MC-Z | MC-IS >) |= trap-seen      = true if MC-IS = CTORTRAPA0 eps .
-  ceq mc(< MC-Z | MC-IS >) |= result-neg     = true
-      if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) /\ MC-I < 0 .
-
-  ceq < MC-Z | MC-IS > |= done           = true if all-vals(MC-IS) = true .
+  ceq < MC-Z | MC-IS > |= done         = true if all-vals(MC-IS) = true .
   ceq < MC-Z | MC-IS > |= result-is(MC-I) = true if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) .
-  ceq < MC-Z | MC-IS > |= trap-seen      = true if MC-IS = CTORTRAPA0 eps .
-  ceq < MC-Z | MC-IS > |= result-neg     = true
+  ceq < MC-Z | MC-IS > |= trap-seen    = true if MC-IS = CTORTRAPA0 eps .
+  ceq < MC-Z | MC-IS > |= result-neg   = true
       if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) /\ MC-I < 0 .
 
-  eq MC-MS |= done           = false [owise] .
-  eq MC-MS |= trap-seen      = false [owise] .
-  eq MC-MS |= result-neg     = false [owise] .
-  eq MC-MS |= result-is(MC-I) = false [owise] .
-
-  eq MC-EC |= done           = false [owise] .
-  eq MC-EC |= trap-seen      = false [owise] .
-  eq MC-EC |= result-neg     = false [owise] .
+  eq MC-EC |= done         = false [owise] .
+  eq MC-EC |= trap-seen    = false [owise] .
+  eq MC-EC |= result-neg   = false [owise] .
   eq MC-EC |= result-is(MC-I) = false [owise] .
 
 endm
@@ -257,10 +462,7 @@ endm
 --- =============================================================
 --- USAGE:
 ---   rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .
----   red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), <> result-is(5)) .
----   red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), [] ~ trap-seen) .
----   red in WASM-FIB-PROPS : modelCheck(mc(bench-add-config), <> result-is(42)) .
----   red in WASM-FIB-PROPS : modelCheck(mc(bench-muladd-config), <> result-is(47)) .
----   red in WASM-FIB-PROPS : modelCheck(mc(bench-local-config), <> result-is(1)) .
+---   red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .
+---   red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .
 --- Expected: fib(0)=0 fib(1)=1 fib(2)=1 fib(3)=2 fib(4)=3 fib(5)=5
 --- =============================================================

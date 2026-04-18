@@ -1767,20 +1767,15 @@ let translate_step_reld rel_name rules =
           let is_var = prefix ^ "-IS" in
           all_is_vars := is_var :: !all_is_vars;
 
-          (* ---- decode conclusion into (z_in, z_in_vars, lhs_t, z_out, rhs_t) --
-             z_in      : Maude text that goes into the step(< Z | ...>) pattern
-             z_in_vars : actual simple variable names inside z_in (used for var
-                         tracking).  When z_in is a compound term like
-                         CTORSEMICOLONA2(S,F), z_in_vars = [S; F] so that only
-                         simple identifiers end up in the `vars` declaration.  *)
-          let decoded : (string * string list * texpr * string * texpr) option =
+          (* ---- decode conclusion into (z_in, lhs_t, z_out, rhs_t) -------- *)
+          let decoded : (string * texpr * string * texpr) option =
             if rel_name = "Step-pure" then
               (* TupE [ lhs_instrs , rhs_instrs ]  — no state in spec rule *)
               (match conclusion.it with
                | TupE [lhs; rhs] ->
                    let z_var = prefix ^ "-Z" in
-                   Some (z_var, [z_var],
-                         translate_exp TermCtx lhs vm,
+                   all_bound := z_var :: !all_bound;
+                   Some (z_var, translate_exp TermCtx lhs vm,
                          z_var, translate_exp TermCtx rhs vm)
                | _ -> None)
             else if rel_name = "Step-read" then
@@ -1792,7 +1787,7 @@ let translate_step_reld rel_name rules =
                         let z_t   = translate_exp TermCtx z_e   vm in
                         let lhs_t = translate_exp TermCtx lhs_e vm in
                         let rhs_t = translate_exp TermCtx rhs   vm in
-                        Some (z_t.text, z_t.vars, lhs_t, z_t.text, rhs_t)
+                        Some (z_t.text, lhs_t, z_t.text, rhs_t)
                     | None -> None)
                | _ -> None)
             else
@@ -1806,7 +1801,7 @@ let translate_step_reld rel_name rules =
                         let lhs_t = translate_exp TermCtx lhs_e vm in
                         let zp_t  = translate_exp TermCtx zp_e  vm in
                         let rhs_t = translate_exp TermCtx rhs_e vm in
-                        Some (z_t.text, z_t.vars, lhs_t, zp_t.text, rhs_t)
+                      Some (z_t.text, lhs_t, zp_t.text, rhs_t)
                     | _ -> None)
                | _ -> None)
           in
@@ -1817,59 +1812,21 @@ let translate_step_reld rel_name rules =
                 "[WARN] translate_step_reld: cannot decode %s rule %s (#%d)\n%!"
                 rel_name prefix rule_idx;
               ""
-          | Some (z_in, z_in_vars, lhs_t, z_out, rhs_t) ->
+          | Some (z_in, lhs_t, z_out, rhs_t) ->
 
             (* ---- schedule premises ------------------------------------ *)
             let vm_vars  = List.map snd vm in
             let lhs_vars = vars_of_texpr lhs_t in
-            (* Collect premise items early so we know which vm_vars appear as
-               binding targets on the LHS of a PremEq (e.g. "c <- $binop(...)"
-               or "b* = $nbytes(...)").  Those variables must NOT be pre-marked
-               as bound in lhs_set, otherwise classify_prem would emit a boolean
-               test instead of a :=-binding.
-               Variables that only appear in the RHS (like N in BLOCK) are NOT
-               binding targets and stay in lhs_set via vm_vars; this preserves
-               the old behaviour where their boolean conditions fail safely and
-               the equation does not fire. *)
+            let lhs_set  = SSet.of_list (z_in :: lhs_vars @ vm_vars) in
             let prem_items = List.concat_map (prem_items_of_prem vm) prem_list in
-            let vm_var_set = SSet.of_list vm_vars in
-            let lhs_t_var_set = SSet.of_list lhs_vars in
-            (* Variables in vm_vars that appear as the LHS of some PremEq — these
-               are the premise-binding targets that must be excluded from lhs_set. *)
-            let prem_binding_targets =
-              List.concat_map (fun item ->
-                match item with
-                | PremEq { lhs; rhs; _ } ->
-                    (* Both lhs-side and rhs-side of an equality can be binding
-                       targets: "c <- $f(...)" → PremEq{lhs=c, rhs=$f(...)},
-                       "$g(...) = c"          → PremEq{lhs=$g(...), rhs=c},
-                       "val = REF_NULL(ht)"   → PremEq{lhs=val, rhs=REF_NULL(ht)}
-                       We collect every vm_var that appears on either side and
-                       is not already present in the LHS pattern. *)
-                    let pick side =
-                      List.filter (fun v ->
-                        SSet.mem v vm_var_set && not (SSet.mem v lhs_t_var_set))
-                        (vars_of_texpr side) in
-                    pick lhs @ pick rhs
-                | _ -> []) prem_items
-              |> List.sort_uniq String.compare
-            in
-            let prem_binding_set = SSet.of_list prem_binding_targets in
-            (* lhs_set: start with LHS-pattern vars, plus those vm_vars that are
-               NOT premise-binding targets (they stay "pre-bound" so their boolean
-               conditions fail safely and the equation does not fire unexpectedly). *)
-            let lhs_set =
-              SSet.of_list (z_in_vars @ lhs_vars @
-                List.filter (fun v -> not (SSet.mem v prem_binding_set)) vm_vars)
-            in
             let prem_scheduled = schedule_prems lhs_set [] prem_items in
             let prem_strs      = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
             let prem_binds     = List.concat_map (fun p -> p.binds) prem_scheduled in
 
             let all_texts = [lhs_t.text; rhs_t.text] @ prem_strs in
-            let all_cvars = (z_in_vars @ lhs_vars @ vm_vars) @
+            let all_cvars = (z_in :: lhs_vars @ vm_vars) @
               List.concat_map (fun p -> p.vars @ p.binds) prem_scheduled in
-            let lhs_seed  = List.sort_uniq String.compare (z_in_vars @ lhs_vars @ prem_binds) in
+            let lhs_seed  = List.sort_uniq String.compare (z_in :: lhs_vars @ prem_binds) in
             let (bound, _free, lhs_set2) = partition_vars lhs_seed all_texts all_cvars in
             all_bound := !all_bound @ bound @ vm_vars;
 
@@ -1895,18 +1852,7 @@ let translate_step_reld rel_name rules =
         end
   ) rules in
 
-  (* Safety filter: reject any accumulated string that is not a simple Maude
-     identifier (e.g. compound terms like "CTORSEMICOLONA2(S,F)" must never
-     appear as variable names in a `vars` declaration). *)
-  let is_simple_var s =
-    String.length s > 0
-    && not (String.contains s '(')
-    && not (String.contains s ')')
-    && not (String.contains s ',')
-    && not (String.contains s ' ')
-  in
-  let bound_vars = List.filter is_simple_var
-                     (List.sort_uniq String.compare !all_bound) in
+  let bound_vars = List.sort_uniq String.compare !all_bound in
   let is_vars    = List.sort_uniq String.compare !all_is_vars in
   let bound_decl = declare_vars_same_sort bound_vars "WasmTerminal" in
   let is_decl    = declare_vars_same_sort is_vars    "WasmTerminals" in
