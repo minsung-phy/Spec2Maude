@@ -91,11 +91,12 @@ type texpr = { text : string; vars : string list }
   - Bool 문맥 처리 + `vars` 누적
 - `IterE`:
   - `*`, `+`, `?` suffix 매핑
-  - `ListN`은 `(countVar, seqVar)`를 전역 accumulator에 기록
+  - `ListN`은 별도 suffix 없이 본문 식을 그대로 번역
 
-`ListN` 기록의 이유:
+현재 버전 포인트:
 
-- step 규칙 생성 시 `N := len(seq)` 조건을 자동 추가하기 위함
+- `ListN` 카운터를 전역 accumulator로 모아 `len(...)` 조건을 자동 주입하지 않는다.
+- 대신 바인더 매핑/전제 스케줄러가 rule별 로컬 정보만 사용한다.
 
 ---
 
@@ -150,15 +151,24 @@ function translate_definition(ss, def):
     case RelD:   # rule 변환
       name = sanitize(def.id)
       if name in {"Step", "Step-pure", "Step-read"}:
-        return translate_step_reld(name, def.rules)   # rl/crl 실행 규칙
+        return translate_step_reld(name, def.rules)   # step(<...>) eq/ceq 실행식
       else:
-        return translate_reld(def.id, name, def.rules) # eq/ceq Bool 관계
+        return translate_reld(def.id, name, def.rules) # Judgement membership 관계
 
     case GramD or HintD:
       return ""
 ```
 
-### 6.2 syntax 변환 수도코드 (`TypD`)
+### 6.2 syntax 변환 수도코드 (`TypD`) + Maude 결과 모양
+
+처음 보는 분은 아래처럼 읽으면 가장 쉽습니다.
+
+1. 타입 이름/파라미터를 정리한다.
+2. 필요한 타입 선언(`sort`, `op`)을 만든다.
+3. 각 `inst`를 `VariantT | AliasT | StructT`로 나눠 membership 규칙을 만든다.
+
+여기서 `hasType`는 "값이 어떤 타입을 가진다"를 Maude 식으로 적는 표기이고, `WellTyped`는 그런 타입 판정을 담는 공통 sort입니다.
+즉 `T hasType S`는 "T가 S 타입이다"라는 뜻으로 읽으면 됩니다.
 
 ```text
 function translate_typd(id, params, insts):
@@ -166,118 +176,203 @@ function translate_typd(id, params, insts):
   type_sort = sort_of_type_name(id)
   is_parametric = (params is not empty)
 
-  emit sort/subsort/op declarations for type
+  # 선언부: 이미 내장/공통 sort면 생략
+  emit declarations for type (sort/subsort/op)
 
   for inst in insts:
     match inst.deftyp:
-      case VariantT(cases):
-        for case in cases:
-          collect constructor params and variable declarations
-          lhs = canonical CTOR call OR mixfix-interleaved pattern
 
-          prems = schedule premises
-            - promote possible equalities to bindings: X := term
-            - keep remaining boolean checks as conditions
+      case VariantT(cases):
+        # 생성자 케이스마다 규칙 생성
+        for case in cases:
+          lhs = 생성자 좌변을 만듬
+          prems = 전제를 정리
+          type_term = hasType 뒤에 붙는 타입 식 (예: binop ( Inn ))
 
           if is_parametric:
-            emit eq/ceq type-ok(lhs, type_term) = true [if cond]
+            emit (mb|cmb) (lhs hasType(type_term)) : WellTyped [if cond]
           else:
-            emit mb/cmb lhs : type_sort [if cond]
+            emit (mb|cmb) lhs : type_sort [if cond]
 
-          if optional params exist and no explicit prems:
+          if optional params exist and prems is empty:
             emit extra eps-substituted clauses
 
       case AliasT(typ):
-        emit alias membership/type-ok constraints
+        if is_parametric:
+          emit (mb|cmb) (lhs hasType(type_term)) : WellTyped [if cond]
+        else:
+          emit (mb|cmb) lhs : type_sort [if cond]
 
       case StructT(fields):
-        emit struct-style membership/type constraints
+        if is_parametric:
+          emit (mb|cmb) ({item(...); ...} hasType(type_term)) : WellTyped [if cond]
+        else:
+          emit (mb|cmb) {item(...); ...} : type_sort [if cond]
 ```
 
-### 6.3 def 변환 수도코드 (`DecD`)
+아래는 실제로 나오는 Maude 형태 예시입니다.
+
+```maude
+--- (1) 타입 선언부 예시
+op binop : WasmTerminal -> WasmType [ctor] .
+
+--- (2) VariantT, parametric 예시
+cmb ( CTORADDA0 hasType ( binop ( Inn ) ) ) : WellTyped
+  if INN : Numtype .
+
+--- (3) VariantT, non-parametric 예시
+mb ( CTORADDA0 ) : Binop .
+
+--- (4) optional 인자 eps 확장 예시 (전제 없을 때만)
+mb ( CTORFOOA1 ( eps ) ) : Foo .
+
+--- (5) StructT 예시
+cmb ( { item('FIELD, ( F-FIELD-0 )) } hasType ( recType ( T ) ) ) : WellTyped
+  if F-FIELD-0 : WasmTerminal .
+```
+
+요약하면, `translate_typd`는 "타입 정의를 Maude membership 규칙(`mb/cmb`)으로 바꾸는 함수"이고,
+파라메트릭이면 `hasType ... : WellTyped`, 아니면 `... : type_sort`를 출력합니다.
+
+정리해서 보면:
+
+- `hasType`: 값과 타입을 연결하는 연산자
+- `WellTyped`: `hasType`가 들어가는 판정식을 담는 상위 sort
+- `mb/cmb`: "이 식이 이 sort에 속한다"를 선언하는 Maude 문법
+
+### 6.3 def 변환 수도코드 (`DecD`) + Maude 결과 모양
+
+처음 보는 분은 아래 4단계로 보면 쉽습니다.
+
+1. 함수 시그니처를 보고 `op` 선언 1줄을 만든다.
+2. 각 본문(`DefD`)을 `lhs = rhs` 형태로 번역한다.
+3. 전제(`prems`)를 정리해 `:=` 바인딩과 Bool 조건을 합친다.
+4. 조건이 있으면 `ceq`, 없으면 `eq`를 출력한다 (`owise`면 `[owise]` 추가).
 
 ```text
 function translate_decd(ss, id, params, result_typ, insts):
-  fn = to_maude_function_name(id)   # usually "$" prefix
-  arg_sorts = infer_sorts(params)
-  ret_sort = infer_return_sort(result_typ, insts, ss.bool_calls)
+  fn = 함수 이름(보통 "$" 접두)
+  arg_sorts = 인자 sort들
+  ret_sort = 함수가 최종 반환할 Maude sort (op 선언의 화살표 오른쪽, 예: Bool / WasmTerminal)
 
   emit op fn : arg_sorts -> ret_sort
 
-  for inst in insts:   # each DefD
-    vm = binder variable map
-    lhs = translate lhs args with TermCtx
-    rhs = translate rhs with (BoolCtx if ret_sort == Bool else TermCtx)
+  for inst in insts:
+    lhs = 인자 패턴 번역
+    rhs = 결과 식 번역
 
-    prems = schedule premises
-      - PremEq -> try binding form: X := term
-      - PremBool -> boolean condition
+    prems = 전제 스케줄링
+      - PremEq   -> 가능하면 X := term
+      - PremBool -> Bool 조건
 
-    cond = join(binding conditions, boolean conditions, binder type conditions)
+    cond = 바인딩 조건 + Bool 조건 + 바인더 타입 조건
 
     if cond is empty:
       emit eq  fn(lhs) = rhs
     else:
       emit ceq fn(lhs) = rhs if cond
 
-    if owise premise exists:
+    if owise 전제가 있으면:
       append [owise]
 
-  emit variable declarations for bound variables
-  emit constant op declarations for truly free symbols if needed
+  emit 필요한 var/op 보조 선언
 ```
 
-### 6.4 rule 변환 수도코드 (`RelD`)
+아래는 실제로 나오는 Maude 형태 예시입니다.
 
-일반 relation과 Step relation은 변환 세계가 다릅니다.
+```maude
+--- (1) 함수 선언
+op $f : WasmTerminal WasmTerminal -> WasmTerminal .
+
+--- (2) 전제 없는 본문: eq
+eq $f ( X, Y ) = X .
+
+--- (3) 전제 있는 본문: ceq
+ceq $f ( X, Y ) = Z
+  if Z := g ( X ) /\ ( X == Y ) = true .
+
+--- (4) owise 케이스
+ceq $f ( X, Y ) = Y [owise] .
+```
+
+핵심은 `translate_decd`가 "함수 정의를 Maude 함수식(`eq/ceq`)"으로 바꾸는 함수라는 점입니다.
+
+### 6.4 rule 변환 수도코드 (`RelD`) + Maude 결과 모양
+
+`RelD`는 두 갈래로 나뉩니다.
+
+- 일반 relation: `Judgement` membership(`mb/cmb`)으로 변환
+- Step 계열 relation: 실행식 `step(<...>)`의 `eq/ceq`로 변환
+
+#### (A) 일반 relation (`translate_reld`)
 
 ```text
 function translate_reld(id, rel_name, rules):
-  emit op rel_name : ... -> Bool
+  emit op rel_name : ... -> Judgement [ctor]
 
   for rule in rules:
-    if premises reference Step-family relation:
-      skip  # Bool relation world cannot encode this directly
+    if 전제가 Step 계열 relation을 직접 참조하면:
+      skip
 
-    vm = binder variable map
-    lhs = translate conclusion as term pattern
-    prems = schedule premises (:= first, then boolean)
-    cond = join(prem conditions, binder type conditions)
+    lhs = 결론 패턴 번역
+    prems = 전제 스케줄링 (:= 먼저, Bool 나중)
+    cond = 전제 조건 + 바인더 타입 조건
 
     if cond is empty:
-      emit eq  rel_name(lhs) = true
+      emit mb  rel_name(lhs) : ValidJudgement
     else:
-      emit ceq rel_name(lhs) = true if cond
+      emit cmb rel_name(lhs) : ValidJudgement if cond
 ```
+
+```maude
+--- 일반 relation 선언
+op valid : WasmTerminal -> Judgement [ctor] .
+
+--- 전제 없는 규칙
+mb valid ( T ) : ValidJudgement .
+
+--- 전제 있는 규칙
+cmb valid ( T ) : ValidJudgement
+  if T : WasmTerminal .
+```
+
+#### (B) Step 계열 relation (`translate_step_reld`)
 
 ```text
 function translate_step_reld(rel_name, rules):
   for rule in rules:
-    if context rule:
-      emit heat/cool pair
-      continue
+    if rule has RulePr premise:
+      skip
 
-    decode conclusion into <Z | instrs> => <Z' | instrs'> shape
-    translate lhs/rhs instruction sequences
-
-    prems = schedule premises
-    add extra guards when needed:
-      - all-vals(...) for value sequences
-      - N := len(seq) for ListN counters
+    결론을 Step/Step-read/Step-pure 모양으로 분해
+    lhs/rhs instruction 시퀀스 번역
+    prems = 전제 스케줄링
+    IS : WasmTerminals continuation 변수 도입
 
     if cond is empty:
-      emit rl  [name] : step(<Z | IS>) => <Z' | IS'>
+      emit eq  step(<Z | LHS IS>) = <Z' | RHS IS>
     else:
-      emit crl [name] : step(<Z | IS>) => <Z' | IS'> if cond
+      emit ceq step(<Z | LHS IS>) = <Z' | RHS IS> if cond
 
-  emit WasmTerminal/WasmTerminals variable declarations
+  emit 필요한 변수 선언
 ```
+
+```maude
+--- Step 규칙 (무조건)
+eq step(< Z | LHS IS >) = < Z' | RHS IS > .
+
+--- Step 규칙 (조건부)
+ceq step(< Z | LHS IS >) = < Z' | RHS IS >
+  if X := term /\ cond = true .
+```
+
+핵심은 일반 relation은 "판정식(`ValidJudgement`)"으로, Step 계열은 "실행식(`step`)"으로 번역된다는 점입니다.
 
 ### 6.5 발표용 20초 요약
 
-- `TypD`는 타입 선언과 타입 제약(`mb/cmb` 또는 `type-ok`)을 만든다.
+- `TypD`는 타입 선언과 타입 제약(`mb/cmb`, parametric이면 `hasType` + `WellTyped`)을 만든다.
 - `DecD`는 함수 `op` 선언과 함수 식 `eq/ceq`를 만든다.
-- `RelD`는 일반 규칙이면 Bool predicate `eq/ceq`, Step 계열이면 실행 규칙 `rl/crl`로 만든다.
+- `RelD`는 일반 규칙이면 `Judgement -> ValidJudgement` membership(`mb/cmb`), Step 계열이면 `step(<...>)` 식 `eq/ceq`로 만든다.
 - 세 경우 모두 premise를 먼저 재배치해 가능한 항목은 `:=` 바인딩으로 승격하고, 나머지는 `if` 조건으로 붙인다.
 
 ---
@@ -288,7 +383,7 @@ function translate_step_reld(rel_name, rules):
 
 - `sort` / `subsort`
 - 타입 생성자 `op ... : ... -> WasmType [ctor]`
-- 멤버십/타입검사 `mb`/`cmb` 또는 `eq/ceq type-ok`
+- 멤버십/타입검사 `mb`/`cmb` (`parametric`은 `(T hasType S) : WellTyped`)
 
 중요한 내부 아이디어:
 
@@ -314,35 +409,35 @@ function translate_step_reld(rel_name, rules):
 
 ---
 
-## 9. `translate_reld`: 일반 relation을 Bool predicate로
+## 9. `translate_reld`: 일반 relation을 Judgement membership으로
 
 핵심 산출물:
 
-- `op rel : ... -> Bool .`
-- 각 규칙을 `eq/ceq rel(...) = true [if ...]`로 생성
+- `op rel : ... -> Judgement [ctor] .`
+- 각 규칙을 `mb/cmb rel(...) : ValidJudgement [if ...]`로 생성
 
 주의점:
 
 - premise가 Step 계열 relation을 직접 참조하면 skip
-  - 이유: Step 계열은 Bool 관계가 아니라 실행 규칙 세계(`step(<...>)`)로 번역되기 때문
+  - 이유: Step 계열은 `step(<...>)` 실행식으로 번역되므로 Judgement membership으로 직접 표현할 수 없음
 
 ---
 
-## 10. `translate_step_reld`: 실행 의미론 전용 규칙 생성
+## 10. `translate_step_reld`: 실행 의미론 전용 식(`step`) 생성
 
 Step 계열(`Step`, `Step-pure`, `Step-read`)은 별도 경로를 탄다.
 
 핵심 산출물:
 
-- `rl/crl [rule-name] : step(< Z | IS >) => < Z' | IS' > [if ...] .`
-- context rule이면 heat/cool 규칙 쌍 생성
+- `eq/ceq step(< Z | LHS IS >) = < Z' | RHS IS > [if ...] .`
+- rule 단위 continuation 변수 `IS : WasmTerminals` 선언
 
 중요 포인트:
 
-- conclusion을 분해해 `(상태 z, 명령열 instrs)` 형태를 추출
-- sequence binder는 `WasmTerminals`로 선언
-- val sequence에는 `all-vals(...) = true` guard 추가
-- `ListN` 누적 정보로 `N := len(seq)` 조건 추가
+- `RulePr` premise가 있는 규칙(bridge/context)은 현재 스킵
+- conclusion을 relation 종류별(`Step`/`Step-read`/`Step-pure`)로 분해
+- 바인더 타입조건 + 전제 스케줄 결과를 `if` 조건으로 결합
+- 모든 step 식은 `IS` tail을 보존하는 형태로 생성
 
 ---
 
@@ -351,7 +446,7 @@ Step 계열(`Step`, `Step-pure`, `Step-read`)은 별도 경로를 탄다.
 `translate` 끝부분의 post-processing이 하는 일:
 
 1. 선언부/식부 분리 재정렬
-   - 선언(op/var/sort)을 위로, 식(eq/ceq/rl/crl)을 아래로
+  - 선언(op/var/sort)을 위로, 식(eq/ceq/mb/cmb)을 아래로
 2. 누락된 canonical ctor 선언 보강
 3. 모호성 제거
    - 같은 이름의 0-arity ctor와 고차 arity ctor가 공존하면 0-arity 제거
@@ -382,7 +477,7 @@ Step 계열(`Step`, `Step-pure`, `Step-read`)은 별도 경로를 탄다.
 2. `texpr.vars`가 없으면 어떤 문제가 생기나?
 3. `PremEq`가 `:=`로 승격되는 조건은?
 4. `RelD`와 `Step RelD`가 왜 다른 경로를 타나?
-5. `ListN`이 왜 전역 accumulator를 쓰나?
+5. 왜 `RulePr` premise가 있는 Step 규칙은 현재 스킵하나?
 6. 후처리에서 0-arity ctor 제거를 왜 하나?
 
 이 6개를 말로 설명할 수 있으면, 변환 로직은 거의 잡은 상태입니다.

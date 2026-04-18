@@ -107,94 +107,17 @@ mod WASM-EXEC is
   eq is-trap(IT-IS)             = false [owise] .
 
   --- -------------------------------------------------------
-  --- PATTERN 1: Pure rules (EQ)
+  --- Core instruction semantics (pure/read/control) are taken from
+  --- generated output.maude step equations.
+  --- Keep only targeted overrides below for known mismatches.
   --- -------------------------------------------------------
 
-  eq step(< ST-Z | CTORUNREACHABLEA0 ST-IS >) = < ST-Z | CTORTRAPA0 ST-IS > .
-
-  eq step(< ST-Z | CTORNOPA0 ST-IS >) = < ST-Z | ST-IS > .
-
-  ceq step(< ST-Z | ST-VAL CTORDROPA0 ST-IS >) = < ST-Z | ST-IS >
-      if is-val(ST-VAL) = true .
-
   --- -------------------------------------------------------
-  --- PATTERN 2: Numeric operations (CEQ)
+  --- PATTERN 4: State read fast-path (CEQ)
+  --- Keep these as direct equations to avoid expensive assignment matching
+  --- in generated Step-read rules for local/global/call.
   --- -------------------------------------------------------
 
-  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORCONSTA2(ST-NT, ST-C2)
-                    CTORBINOPA2(ST-NT, ST-OP) ST-IS >)
-      = < ST-Z | CTORCONSTA2(ST-NT, ST-C) ST-IS >
-      if ST-C := $binop(ST-NT, ST-OP, ST-C1, ST-C2) .
-
-  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORCONSTA2(ST-NT, ST-C2)
-                    CTORBINOPA2(ST-NT, ST-OP) ST-IS >)
-      = < ST-Z | CTORTRAPA0 ST-IS >
-      if $binop(ST-NT, ST-OP, ST-C1, ST-C2) = eps .
-
-  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORUNOPA2(ST-NT, ST-OP) ST-IS >)
-      = < ST-Z | CTORCONSTA2(ST-NT, ST-C) ST-IS >
-      if ST-C := $unop(ST-NT, ST-OP, ST-C1) .
-
-  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORUNOPA2(ST-NT, ST-OP) ST-IS >)
-      = < ST-Z | CTORTRAPA0 ST-IS >
-      if $unop(ST-NT, ST-OP, ST-C1) = eps .
-
-  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORCONSTA2(ST-NT, ST-C2)
-                    CTORRELOPA2(ST-NT, ST-OP) ST-IS >)
-      = < ST-Z | CTORCONSTA2(CTORI32A0, ST-C) ST-IS >
-      if ST-C := $relop(ST-NT, ST-OP, ST-C1, ST-C2) .
-
-  ceq step(< ST-Z | CTORCONSTA2(ST-NT, ST-C1) CTORTESTOPA2(ST-NT, ST-OP) ST-IS >)
-      = < ST-Z | CTORCONSTA2(CTORI32A0, ST-C) ST-IS >
-      if ST-C := $testop(ST-NT, ST-OP, ST-C1) .
-
-  --- SELECT
-  ceq step(< ST-Z | ST-VAL ST-VALS CTORCONSTA2(CTORI32A0, ST-C) CTORSELECTA1(ST-NT) ST-IS >)
-      = < ST-Z | ST-VAL ST-IS >
-      if ST-C =/= 0 .
-
-  ceq step(< ST-Z | ST-VAL ST-VALS CTORCONSTA2(CTORI32A0, ST-C) CTORSELECTA1(ST-NT) ST-IS >)
-      = < ST-Z | ST-VALS ST-IS >
-      if ST-C = 0 .
-
-  --- -------------------------------------------------------
-  --- PATTERN 3: Control flow (CEQ)
-  --- -------------------------------------------------------
-
-  --- IF
-  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORWIFELSEA3(ST-BT, ST-BODY, ST-ISA) ST-IS >)
-      = < ST-Z | CTORBLOCKA2(ST-BT, ST-BODY) ST-IS >
-      if ST-C =/= 0 .
-
-  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORWIFELSEA3(ST-BT, ST-ISA, ST-BODY) ST-IS >)
-      = < ST-Z | CTORBLOCKA2(ST-BT, ST-BODY) ST-IS >
-      if ST-C = 0 .
-
-  --- BR_IF
-  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRIFA1(ST-LI) ST-IS >)
-      = < ST-Z | CTORBRA1(ST-LI) ST-IS >
-      if ST-C =/= 0 .
-
-  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRIFA1(ST-LI) ST-IS >)
-      = < ST-Z | ST-IS >
-      if ST-C = 0 .
-
-  --- BR_TABLE
-  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRTABLEA2(ST-ISA, ST-A) ST-IS >)
-      = < ST-Z | CTORBRA1(index(ST-ISA, ST-C)) ST-IS >
-      if ST-C < len(ST-ISA) .
-
-  ceq step(< ST-Z | CTORCONSTA2(CTORI32A0, ST-C) CTORBRTABLEA2(ST-ISA, ST-A) ST-IS >)
-      = < ST-Z | CTORBRA1(ST-A) ST-IS >
-      if ST-C >= len(ST-ISA) .
-
-  --- -------------------------------------------------------
-  --- PATTERN 4: State read (EQ – inline $local/$global)
-  --- -------------------------------------------------------
-
-  --- Generalised LOCAL.GET: fire regardless of how many values precede it.
-  --- This handles the case where a prior instruction pushed a value and the
-  --- next instruction is LOCAL.GET (which needs 0 operands from the stack).
   ceq step(< ST-Z | ST-VALS CTORLOCALGETA1(ST-X) ST-IS >)
       = < ST-Z | ST-VALS $local(ST-Z, ST-X) ST-IS >
       if all-vals(ST-VALS) = true .
@@ -203,7 +126,6 @@ mod WASM-EXEC is
       = < ST-Z | ST-VALS value('VALUE, $global(ST-Z, ST-X)) ST-IS >
       if all-vals(ST-VALS) = true .
 
-  --- CALL x (also 0 operands from stack before the address)
   ceq step(< ST-Z | ST-VALS CTORCALLA1(ST-X) ST-IS >)
       = < ST-Z | ST-VALS CTORREFFUNCADDRA1(index(value('FUNCS, $moduleinst(ST-Z)), ST-X))
                  CTORCALLREFA1(value('TYPE, index($funcinst(ST-Z),

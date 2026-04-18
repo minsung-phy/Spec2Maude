@@ -19,3 +19,64 @@ function translate_definition(ss, def) : // ss: scan state (pre-scan으로 모�
         case GramD or HintD :
             return ""
 
+function translate_typd(id, params, insts) :
+    name = sanitize(id)
+    type_sort = sort_of_type_name(id)
+    is_parametric = (params is not empty)
+
+    // 선언부: 이미 내장/공통 sort면 생략
+    emit declarations for type (sort/subsort/op)
+
+    for inst in insts :
+        match inst.deftype :
+            case VariantT(cases) :
+                for case in cases :
+                    lhs = 생성자 좌변을 만듬
+                    prems = 전제를 정리함
+                    type_term = hasType 뒤에 붙는 타입 식 (예: binop(Inn))
+
+                    if is_parametric :
+                        emit (mb|cmb) (lhs hasType(type_term)) : WellTyped [if cond]
+                    else :
+                        emit (mb|cmb) lhs : type_sort [if cond]
+                    
+                    if optional params exist and prems is empty :
+                        emit extra eps-substituted clauses
+                
+            case AliasT(typ) :
+                if is_parametric :
+                    emit (mb|cmb) (lhs hasType(type_term)) : WellTyped [if cond]
+                else :
+                    emit (mb|cmb) lhs : type_sort [if cond]
+            
+            case StructT(fields) :
+                if is_parametric :
+                    emit (mb|cmb) ({item(...); ...} hasType(type_term)) : WellTyped [if cond]
+                else :
+                    emit (mb|cmb) {item(...); ...} : type_sort [if cond]
+
+function translate_decd(ss, id, params, result_typ, insts) :
+    fn = 함수 이름
+    arg_sorts = 인자 sort들
+    ret_sort = 함수가 최종 반환할 Maude sort (op 선언의 화살표 오른쪽, 예: Bool / WasmTerminal)
+
+    emit op fn : arg_sorts -> ret_sort
+
+    for inst in insts :
+        lhs = 인자 패턴 변환
+        rhs = 결과 식 변환
+
+        prems = 전제 스케줄링
+          - PremEq   -> 가능하면 X := term
+          - PremBool -> Bool 조건
+        
+        cond = 바인딩 조건 + Bool 조건 + 바인더 타입 조건
+
+        if cond is empty :
+            emit eq  fn(lhs) = rhs
+        else :
+            emit ceq fn(lhs) = rhs if cond
+        
+        if owise 전제가 있으면 :
+            append [owise]
+

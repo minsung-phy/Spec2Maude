@@ -1297,15 +1297,8 @@ let extract_vars_from_maude s =
 
 (** Build a per-equation variable prefix from a case/rule identifier. *)
 let make_var_prefix prefix eq_idx raw_v =
-  let alpha_digit c =
-    match c with
-    | '0' -> 'P' | '1' -> 'Q' | '2' -> 'R' | '3' -> 'S' | '4' -> 'T'
-    | '5' -> 'U' | '6' -> 'V' | '7' -> 'W' | '8' -> 'X' | '9' -> 'Y'
-    | _ -> c
-  in
   let normalized_raw =
     String.concat "" (String.split_on_char '-' (String.uppercase_ascii (sanitize raw_v)))
-    |> String.map alpha_digit
   in
   Printf.sprintf "%s%d-%s" prefix eq_idx
     normalized_raw
@@ -1372,6 +1365,7 @@ let partition_vars lhs_vars all_texts all_collected_vars =
 
 type prem_item =
   | PremBool of texpr
+  | PremMatch of { lhs : texpr; rhs : texpr; binds : string list }
   | PremEq of { lhs : texpr; rhs : texpr; bool_t : texpr }
 
 type prem_sched = { text : string; vars : string list; binds : string list }
@@ -1558,6 +1552,15 @@ let classify_prem bound = function
       let vars = vars_of_texpr t in
       let ready = subset_bound bound vars in
       (`Bool, { text = t.text; vars; binds = [] }, ready)
+  | PremMatch { lhs; rhs; binds } ->
+      let rhs_vars = vars_of_texpr rhs in
+      let lhs_vars = vars_of_texpr lhs in
+      let ready = subset_bound bound rhs_vars in
+      (`Match,
+       { text = Printf.sprintf "%s := %s" lhs.text rhs.text;
+         vars = uniq_vars (lhs_vars @ rhs_vars);
+         binds },
+       ready)
   | PremEq { lhs; rhs; bool_t } ->
       let lhs_vars = vars_of_texpr lhs in
       let rhs_vars = vars_of_texpr rhs in
@@ -1630,7 +1633,8 @@ let translate_decd ss id params result_typ insts =
          | _ -> declared_sort_of_typ t)
     | _ -> "WasmTerminal"
   in
-  let arg_sorts = String.concat " " (List.map param_sort params) in
+  let arg_sort_list = List.map param_sort params in
+  let arg_sorts = String.concat " " arg_sort_list in
   let inferred_bool =
     List.exists (fun inst -> match inst.it with DefD (_, _, rhs, _) -> exp_is_boolish rhs) insts in
   let ret_sort = match result_typ.it with
@@ -1698,23 +1702,65 @@ let translate_decd ss id params result_typ insts =
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
   let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
-  let rollrt_bridge_decl =
-    if maude_fn = "$rollrt" then
-      "  op $rollrt : Int Rectype -> Rectype .\n"
-    else ""
+  let has_suffix s suf =
+    let ls = String.length s and luf = String.length suf in
+    ls >= luf && String.sub s (ls - luf) luf = suf
+  in
+  let is_idx_sort s =
+    let low = String.lowercase_ascii s in
+    low = "idx" || has_suffix low "idx"
+  in
+  let idx_positions =
+    arg_sort_list
+    |> List.mapi (fun i s -> if is_idx_sort s then Some i else None)
+    |> List.filter_map (fun x -> x)
+  in
+  let bridge_decl, bridge_vars_decl, bridge_eqs =
+    if idx_positions = [] then ("", "", "")
+    else
+      let int_vars = List.map (fun i -> Printf.sprintf "BRI%d" i) idx_positions in
+      let term_vars =
+        arg_sort_list
+        |> List.mapi (fun i _ -> Some (Printf.sprintf "BRA%d" i))
+        |> List.filter_map (fun x -> x)
+      in
+      let mk_bridge pos =
+        let over_sorts =
+          arg_sort_list |> List.mapi (fun i s -> if i = pos then "Int" else s)
+        in
+        let lhs_args =
+          arg_sort_list
+          |> List.mapi (fun i _ -> if i = pos then Printf.sprintf "BRI%d" i else Printf.sprintf "BRA%d" i)
+        in
+        let rhs_args =
+          arg_sort_list
+          |> List.mapi (fun i _ ->
+                 if i = pos then Printf.sprintf "CTORWIDXA1 ( BRI%d )" i
+                 else Printf.sprintf "BRA%d" i)
+        in
+        let op_line =
+          Printf.sprintf "  op %s : %s -> %s .\n" maude_fn (String.concat " " over_sorts) ret_sort
+        in
+        let eq_line =
+          Printf.sprintf "  eq %s ( %s ) = %s ( %s ) .\n"
+            maude_fn (String.concat " , " lhs_args) maude_fn (String.concat " , " rhs_args)
+        in
+        (op_line, eq_line)
+      in
+      let bridge_ops, bridge_eq_lines = List.split (List.map mk_bridge idx_positions) in
+      let vars_decl =
+        (if int_vars = [] then ""
+         else Printf.sprintf "  vars %s : Int .\n" (String.concat " " int_vars))
+        ^
+        (if term_vars = [] then ""
+         else Printf.sprintf "  vars %s : WasmTerminal .\n" (String.concat " " term_vars))
+      in
+      (String.concat "" bridge_ops, vars_decl, String.concat "" bridge_eq_lines)
   in
   let bound_decl = declare_vars_same_sort !all_bound "WasmTerminal" in
-  let rollrt_bridge_var =
-    if maude_fn = "$rollrt" then "  var ROLLRT-BRIDGE-R : Rectype .\n" else ""
-  in
-  let rollrt_bridge_eq =
-    if maude_fn = "$rollrt" then
-      "  eq $rollrt ( I, ROLLRT-BRIDGE-R ) = $rollrt ( CTORWIDXA1 ( I ) , ROLLRT-BRIDGE-R ) .\n"
-    else ""
-  in
   let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
-  "\n" ^ op_decl ^ rollrt_bridge_decl ^ bound_decl ^ rollrt_bridge_var ^ free_decl
-  ^ rollrt_bridge_eq ^ String.concat "\n" eq_lines ^ "\n"
+  "\n" ^ op_decl ^ bridge_decl ^ bound_decl ^ bridge_vars_decl ^ free_decl
+  ^ bridge_eqs ^ String.concat "\n" eq_lines ^ "\n"
 
 (* --- Step execution relation helpers ------------------------------------- *)
 
@@ -1744,17 +1790,74 @@ let try_decompose_config (e : exp) : (exp * exp) option =
 
 (** Generate Maude  step  equations for Step-pure / Step-read / Step rules.
     Pattern: [c]eq step(< Z | LHS IS >) = < Z' | RHS IS > [if COND] .
-    Rules with RulePr premises (bridge / context rules) are silently skipped.
+    RulePr premises that reference Step-family relations are rewritten into
+    explicit match-bindings against the equational step(...) function, so
+    bridge/context rules are no longer dropped.
     Returns the generated Maude source fragment (declarations + equations). *)
 let translate_step_reld rel_name rules =
   let rel_prefix  = String.uppercase_ascii (sanitize rel_name) in
   let all_bound   = ref [] in
   let all_is_vars = ref [] in
 
+  let is_redundant_step_bridge prems =
+    rel_name = "Step"
+    && List.exists (fun p ->
+         match p.it with
+         | RulePr (rid, _, _) ->
+             let n = sanitize rid.it in
+             n = "Step-pure" || n = "Step-read"
+         | _ -> false) prems
+  in
+
+  let contains_substring s sub =
+    let ls = String.length s and lsub = String.length sub in
+    let rec loop i =
+      if i + lsub > ls then false
+      else if String.sub s i lsub = sub then true
+      else loop (i + 1)
+    in
+    loop 0
+  in
+
+  let has_prefix s prefix =
+    let ls = String.length s and lp = String.length prefix in
+    ls >= lp && String.sub s 0 lp = prefix
+  in
+
+  let is_redundant_step_ctxt_instrs case_name =
+    if rel_name <> "Step" then false
+    else
+      let n = String.lowercase_ascii (sanitize case_name) in
+      contains_substring n "ctxt-instrs"
+  in
+
+  let is_redundant_step_read_fastpath case_name =
+    if rel_name <> "Step-read" then false
+    else
+      let n = String.lowercase_ascii (sanitize case_name) in
+      has_prefix n "local-get"
+      || has_prefix n "global-get"
+      || has_prefix n "call"
+      || has_prefix n "block"
+      || has_prefix n "loop"
+  in
+
+  let mk_conf_texpr (z_t : texpr) (is_t : texpr) : texpr =
+    { text = Printf.sprintf "< %s | %s >" z_t.text is_t.text;
+      vars = uniq_vars (vars_of_texpr z_t @ vars_of_texpr is_t) }
+  in
+
+  let mk_step_call_texpr (cfg_t : texpr) : texpr =
+    { text = Printf.sprintf "step ( %s )" cfg_t.text;
+      vars = vars_of_texpr cfg_t }
+  in
+
   let rule_lines = List.mapi (fun rule_idx r -> match r.it with
     | RuleD (case_id, binders, _, conclusion, prem_list) ->
-        (* Skip bridge/context rules that delegate via RulePr *)
-        if has_rule_premise prem_list then ""
+        if is_redundant_step_bridge prem_list
+           || is_redundant_step_ctxt_instrs case_id.it
+           || is_redundant_step_read_fastpath case_id.it
+        then ""
         else begin
           let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
           let case_part  =
@@ -1768,15 +1871,16 @@ let translate_step_reld rel_name rules =
           all_is_vars := is_var :: !all_is_vars;
 
           (* ---- decode conclusion into (z_in, lhs_t, z_out, rhs_t) -------- *)
-          let decoded : (string * texpr * string * texpr) option =
+          let decoded : (texpr * texpr * texpr * texpr) option =
             if rel_name = "Step-pure" then
               (* TupE [ lhs_instrs , rhs_instrs ]  — no state in spec rule *)
               (match conclusion.it with
                | TupE [lhs; rhs] ->
                    let z_var = prefix ^ "-Z" in
                    all_bound := z_var :: !all_bound;
-                   Some (z_var, translate_exp TermCtx lhs vm,
-                         z_var, translate_exp TermCtx rhs vm)
+                   let z_t = { text = z_var; vars = [z_var] } in
+                   Some (z_t, translate_exp TermCtx lhs vm,
+                         z_t, translate_exp TermCtx rhs vm)
                | _ -> None)
             else if rel_name = "Step-read" then
               (* TupE [ z;lhs_instrs , rhs_instrs ] *)
@@ -1787,7 +1891,7 @@ let translate_step_reld rel_name rules =
                         let z_t   = translate_exp TermCtx z_e   vm in
                         let lhs_t = translate_exp TermCtx lhs_e vm in
                         let rhs_t = translate_exp TermCtx rhs   vm in
-                        Some (z_t.text, lhs_t, z_t.text, rhs_t)
+                      Some (z_t, lhs_t, z_t, rhs_t)
                     | None -> None)
                | _ -> None)
             else
@@ -1801,7 +1905,7 @@ let translate_step_reld rel_name rules =
                         let lhs_t = translate_exp TermCtx lhs_e vm in
                         let zp_t  = translate_exp TermCtx zp_e  vm in
                         let rhs_t = translate_exp TermCtx rhs_e vm in
-                      Some (z_t.text, lhs_t, zp_t.text, rhs_t)
+                      Some (z_t, lhs_t, zp_t, rhs_t)
                     | _ -> None)
                | _ -> None)
           in
@@ -1812,43 +1916,133 @@ let translate_step_reld rel_name rules =
                 "[WARN] translate_step_reld: cannot decode %s rule %s (#%d)\n%!"
                 rel_name prefix rule_idx;
               ""
-          | Some (z_in, lhs_t, z_out, rhs_t) ->
+          | Some (z_in_t, lhs_t, z_out_t, rhs_t) ->
+
+            (* Step / Step-read rules operate under val* prefix context.
+               Encode this directly so LOCAL.GET/SET/TEE/GLOBAL.* rules match
+               in real stacks without hand-written wrappers. *)
+            let vals_prefix_var =
+              if rel_name = "Step" || rel_name = "Step-read"
+              then Some (prefix ^ "-VALS") else None
+            in
+            (match vals_prefix_var with
+             | Some v -> all_is_vars := v :: !all_is_vars
+             | None -> ());
+            let lhs_seq_text =
+              match vals_prefix_var with
+              | Some v -> Printf.sprintf "%s %s" v lhs_t.text
+              | None -> lhs_t.text
+            in
+            let rhs_seq_text =
+              match vals_prefix_var with
+              | Some v -> Printf.sprintf "%s %s" v rhs_t.text
+              | None -> rhs_t.text
+            in
+
+            let step_rulepr_to_items (p : prem) : prem_item list =
+              match p.it with
+              | RulePr (rid, _, e) when is_step_exec_rel (sanitize rid.it) ->
+                  let rid_name = sanitize rid.it in
+                  let make_bind (lhs_cfg : texpr) (rhs_cfg : texpr) =
+                    let lhs = rhs_cfg in
+                    let rhs = mk_step_call_texpr lhs_cfg in
+                    [PremMatch { lhs; rhs; binds = vars_of_texpr lhs }]
+                  in
+                  begin match rid_name, e.it with
+                  | "Step", TupE [cfg_lhs; cfg_rhs] ->
+                      (match try_decompose_config cfg_lhs, try_decompose_config cfg_rhs with
+                       | Some (zl_e, il_e), Some (zr_e, ir_e) ->
+                           let zl_t = translate_exp TermCtx zl_e vm in
+                           let il_t = translate_exp TermCtx il_e vm in
+                           let zr_t = translate_exp TermCtx zr_e vm in
+                           let ir_t = translate_exp TermCtx ir_e vm in
+                           make_bind (mk_conf_texpr zl_t il_t) (mk_conf_texpr zr_t ir_t)
+                       | _ ->
+                           Printf.eprintf
+                             "[WARN] translate_step_reld: cannot decode RulePr Step in %s (#%d)\n%!"
+                             prefix rule_idx;
+                           [])
+                  | "Step-read", TupE [cfg_lhs; rhs_i] ->
+                      (match try_decompose_config cfg_lhs with
+                       | Some (z_e, lhs_i) ->
+                           let z_t = translate_exp TermCtx z_e vm in
+                           let lhs_i_t = translate_exp TermCtx lhs_i vm in
+                           let rhs_i_t = translate_exp TermCtx rhs_i vm in
+                           make_bind (mk_conf_texpr z_t lhs_i_t) (mk_conf_texpr z_t rhs_i_t)
+                       | _ ->
+                           Printf.eprintf
+                             "[WARN] translate_step_reld: cannot decode RulePr Step-read in %s (#%d)\n%!"
+                             prefix rule_idx;
+                           [])
+                  | "Step-pure", TupE [lhs_i; rhs_i] ->
+                      let lhs_i_t = translate_exp TermCtx lhs_i vm in
+                      let rhs_i_t = translate_exp TermCtx rhs_i vm in
+                      make_bind (mk_conf_texpr z_in_t lhs_i_t) (mk_conf_texpr z_in_t rhs_i_t)
+                  | _ ->
+                      Printf.eprintf
+                        "[WARN] translate_step_reld: unsupported RulePr %s shape in %s (#%d)\n%!"
+                        rid_name prefix rule_idx;
+                      []
+                  end
+              | _ ->
+                  prem_items_of_prem vm p
+                  |> List.map (function
+                      | PremEq { bool_t; _ } -> PremBool bool_t
+                      | it -> it)
+            in
 
             (* ---- schedule premises ------------------------------------ *)
             let vm_vars  = List.map snd vm in
+            let z_in_vars = vars_of_texpr z_in_t in
+            let z_out_vars = vars_of_texpr z_out_t in
             let lhs_vars = vars_of_texpr lhs_t in
-            let lhs_set  = SSet.of_list (z_in :: lhs_vars @ vm_vars) in
-            let prem_items = List.concat_map (prem_items_of_prem vm) prem_list in
+            let vals_prefix_vars = match vals_prefix_var with Some v -> [v] | None -> [] in
+            let lhs_set  = SSet.of_list (z_in_vars @ lhs_vars @ vm_vars @ vals_prefix_vars) in
+            let prem_items = List.concat_map step_rulepr_to_items prem_list in
             let prem_scheduled = schedule_prems lhs_set [] prem_items in
             let prem_strs      = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
             let prem_binds     = List.concat_map (fun p -> p.binds) prem_scheduled in
 
-            let all_texts = [lhs_t.text; rhs_t.text] @ prem_strs in
-            let all_cvars = (z_in :: lhs_vars @ vm_vars) @
+            let all_texts = [lhs_seq_text; rhs_seq_text] @ prem_strs in
+            let all_cvars = (z_in_vars @ z_out_vars @ lhs_vars @ vm_vars @ vals_prefix_vars) @
               List.concat_map (fun p -> p.vars @ p.binds) prem_scheduled in
-            let lhs_seed  = List.sort_uniq String.compare (z_in :: lhs_vars @ prem_binds) in
+            let lhs_seed  = List.sort_uniq String.compare (z_in_vars @ lhs_vars @ prem_binds @ vals_prefix_vars) in
             let (bound, _free, lhs_set2) = partition_vars lhs_seed all_texts all_cvars in
             all_bound := !all_bound @ bound @ vm_vars;
 
+            let step_bcond_of (_mv, cond) =
+              match String.split_on_char ':' cond with
+              | [var_part; sort_part] ->
+                  let v = String.trim var_part in
+                  let s = String.trim sort_part in
+                  if s = "Val" then Some (Printf.sprintf "is-val ( %s ) = true" v)
+                  else None
+              | _ -> None
+            in
             let filtered_bconds =
               bconds
               |> List.filter (fun (mv, _) ->
                   List.mem mv lhs_set2 && not (List.mem mv prem_binds))
-              |> List.map snd in
+              |> List.filter_map step_bcond_of in
             let prem_match_conds =
               prem_scheduled |> List.filter_map (fun p ->
                 if p.binds = [] then None else Some (prem_cond p.text)) in
             let prem_bool_conds =
               prem_scheduled |> List.filter_map (fun p ->
                 if p.binds = [] then Some (prem_cond p.text) else None) in
-            let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
+            let vals_prefix_cond =
+              match vals_prefix_var with
+              | Some v -> [Printf.sprintf "all-vals ( %s ) = true" v]
+              | None -> []
+            in
+            let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds @ vals_prefix_cond in
             let cond     = cond_join all_conds in
             let cond_str = if cond = "" then ""
                            else Printf.sprintf "\n      if %s" cond in
 
             Printf.sprintf "  %s step(< %s | %s %s >) = < %s | %s %s >%s ."
               (if cond = "" then "eq" else "ceq")
-              z_in lhs_t.text is_var z_out rhs_t.text is_var cond_str
+              z_in_t.text lhs_seq_text is_var z_out_t.text rhs_seq_text is_var cond_str
         end
   ) rules in
 
@@ -2035,6 +2229,18 @@ let header_prefix =
 
 let footer = "\nendm\n"
 
+let step_predicate_helpers =
+  "  op is-val : WasmTerminal -> Bool .\n" ^
+  "  op all-vals : WasmTerminals -> Bool .\n" ^
+  "  var ISVAL-H-V : WasmTerminal .\n" ^
+  "  var ALLVALS-H-V : WasmTerminal .\n" ^
+  "  var ALLVALS-H-IS : WasmTerminals .\n" ^
+  "  ceq is-val ( ISVAL-H-V ) = true if ISVAL-H-V : Val .\n" ^
+  "  eq is-val ( ISVAL-H-V ) = false [owise] .\n" ^
+  "  eq all-vals ( eps ) = true .\n" ^
+  "  ceq all-vals ( ALLVALS-H-V ALLVALS-H-IS ) = all-vals ( ALLVALS-H-IS ) if ALLVALS-H-V : Val .\n" ^
+  "  eq all-vals ( ALLVALS-H-IS ) = false [owise] .\n"
+
 let starts_with s pfx =
   String.length s >= String.length pfx && String.sub s 0 (String.length pfx) = pfx
 
@@ -2086,7 +2292,10 @@ let translate defs =
   let token_ops = build_token_ops ss in
   let call_ops = build_call_ops ss in
   let header = header_prefix ^ "  --- Auto-collected tokens\n" ^ token_ops ^ call_ops in
-  let body = String.concat "\n" (List.map (translate_definition ss) defs) in
+  let body =
+    step_predicate_helpers ^ "\n"
+    ^ String.concat "\n" (List.map (translate_definition ss) defs)
+  in
   let lines = String.split_on_char '\n' body in
   let eqs = List.filter (fun l -> not (is_decl_line l)) lines in
   let ctor_decl_lines = collect_ctor_decl_lines eqs in
