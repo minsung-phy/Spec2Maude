@@ -1873,33 +1873,11 @@ let translate_step_reld rel_name rules =
             let (bound, _free, lhs_set2) = partition_vars lhs_seed all_texts all_cvars in
             all_bound := !all_bound @ bound @ vm_vars;
 
-            (* Step-rule binder conditions:
-               Maude's `mb` axioms over WasmTerminal subsorts do not fire
-               reliably against our concrete constructors (e.g. `X : Idx`
-               is false for bare Nats; `Z : State` is false for valid
-               CTORSEMICOLONA2 configurations because `Store/Frame` cmbs
-               have mismatched arities vs. the runtime record shape).
-               LHS pattern matching already constrains the constructor
-               shape, so we only keep the `Val` check and rewrite it to
-               the hand-written `is-val` helper, which is pattern-level
-               and agrees with the hand-patched execution harness. *)
-            let step_bcond_of (_, cond) =
-              (* cond form is typically "VAR : Sort" *)
-              match String.split_on_char ':' cond with
-              | [var_part; sort_part] ->
-                  let var  = String.trim var_part  in
-                  let sort = String.trim sort_part in
-                  if sort = "Val" then
-                    Some (Printf.sprintf "is-val ( %s ) = true" var)
-                  else
-                    None
-              | _ -> None
-            in
             let filtered_bconds =
               bconds
               |> List.filter (fun (mv, _) ->
                   List.mem mv lhs_set2 && not (List.mem mv prem_binds))
-              |> List.filter_map step_bcond_of in
+              |> List.map snd in
             let prem_match_conds =
               prem_scheduled |> List.filter_map (fun p ->
                 if p.binds = [] then None else Some (prem_cond p.text)) in

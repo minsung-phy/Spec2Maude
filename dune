@@ -4,8 +4,3 @@
  (name main)
  (modules main translator) ; 같은 폴더에 있는 파일들 이름만 적어주면 돼
  (libraries il util frontend)) ; lib/ 밑에 있는 라이브러리들 연결
-
-(executable
- (name main_legacy)
- (modules main_legacy translator_legacy)
- (libraries il util frontend))

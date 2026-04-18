@@ -1,0 +1,21 @@
+function translate_definition(ss, def) : // ss: scan state (pre-scan으로 모은 정보들), def: IL AST의 정의 노드(TypD, DecD, RelD, .. 중 하나)
+    match def.kind :
+        case RecD :
+            return concat(map(child -> translate_definition(ss, child), def.children))
+        
+        case TypD :
+            return translate_typd(def.id, def.params, def.insts)
+
+        case DecD :
+            retuen translate_decd(ss, def.id, def.params, def.result_typ, def.insts)
+        
+        case RelD :
+            name = sanatize(def.id)
+            if name in {"Step", "Step-pure", "Step-read"} :
+                return translate_step_reld(name, def.rules)
+            else :
+                return translate_reld(def.id, name, def.rules)
+        
+        case GramD or HintD :
+            return ""
+
