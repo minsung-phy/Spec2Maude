@@ -82,8 +82,17 @@ let safe_term_text s =
 
 let bool_cond s = Printf.sprintf "( %s ) = true" s
 
+(* A premise text passes through unwrapped if it is already a Maude
+   side-condition in its own right:
+   - LetPr / match-binding: contains ":=" (both ':' and '=' present with := adjacent)
+   - Membership condition:  contains ':' but no '=' (e.g. "X : Sort", "T : ValidJudgement")
+   Otherwise we wrap as `( s ) = true` so Maude reads it as a Bool equation. *)
 let prem_cond s =
-  if String.contains s ':' && String.contains s '=' then s else bool_cond s
+  let has_colon = String.contains s ':' in
+  let has_eq    = String.contains s '=' in
+  if has_colon && has_eq then s            (* LetPr `:=` *)
+  else if has_colon && not has_eq then s   (* membership condition *)
+  else bool_cond s
 
 (* ========================================================================= *)
 (* 2. Identifier sanitization                                                *)
@@ -96,25 +105,6 @@ let maude_keywords =
 let is_alpha c = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
 
 let is_upper_start s = String.length s > 0 && s.[0] >= 'A' && s.[0] <= 'Z'
-
-let rec strip_wrapping_parens s =
-  let t = String.trim s in
-  let n = String.length t in
-  if n >= 2 && t.[0] = '(' && t.[n - 1] = ')'
-  then strip_wrapping_parens (String.sub t 1 (n - 2))
-  else t
-
-let is_plain_var_like s =
-  let b = strip_wrapping_parens s in
-  String.length b > 0
-  && b.[0] >= 'A' && b.[0] <= 'Z'
-  && not (String.contains b ' ')
-  && not (String.contains b '(')
-  && not (String.contains b ')')
-
-let is_trivial_true_cond s =
-  let t = String.trim (strip_wrapping_parens s) in
-  t = "" || t = "true"
 
 (** Transform a SpecTec identifier into a valid Maude token.
     - Single-char, non-alpha-start, or keyword names get a [w-] prefix.
@@ -550,15 +540,6 @@ let resolve_var_name name vm =
       if base <> name then probe base
       else None
 
-(* Global accumulator: ListN count variable → sequence variable pairs.
-   Populated by translate_exp when it encounters IterE with ListN iter.
-   Reset at the start of each rule translation. *)
-let g_listn_pairs : (string * string) list ref = ref []
-let reset_listn_pairs () = g_listn_pairs := []
-let record_listn_pair cnt seq =
-  if not (List.mem_assoc cnt !g_listn_pairs) then
-    g_listn_pairs := (cnt, seq) :: !g_listn_pairs
-
 let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | VarE id -> translate_var ctx id.it vm
   | CaseE (mixop, inner) -> translate_case ctx mixop inner vm
@@ -641,23 +622,12 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
             | Some mapped ->
                 debug_iter "[ITER-MAP] kind=%s raw=%s probe=%s mapped=%s"
                   suffix id.it full mapped;
-                (* Record count-sequence pair for ListN iters so that
-                   translate_step_reld can later add N := len(seq) conditions. *)
-                (match iter_type with
-                 | ListN (count_e, _) ->
-                     (match count_e.it with
-                      | VarE count_id ->
-                          (match resolve_var_name count_id.it vm with
-                           | Some cnt_mapped -> record_listn_pair cnt_mapped mapped
-                           | None -> ())
-                      | _ -> ())
-                 | _ -> ());
                 texpr_with_var mapped mapped
-            | None ->
-                let v = String.uppercase_ascii (sanitize full) in
+        | None ->
+          let v = String.uppercase_ascii (sanitize full) in
                 debug_iter "[ITER-MAP] kind=%s raw=%s probe=%s mapped=<fallback:%s>"
                   suffix id.it full v;
-                texpr_with_var v v)
+          texpr_with_var v v)
        | _ -> translate_exp ctx e1 vm)
   | IfE (c, e1, e2) ->
       tjoin3 (Printf.sprintf "if %s then %s else %s fi")
@@ -703,41 +673,101 @@ and translate_binop ctx op e1 e2 vm =
   let text = Printf.sprintf "( %s %s %s )" t1.text op_str t2.text in
   { text = if is_bool then wrap_bool ctx text else text; vars = t1.vars @ t2.vars }
 
+(* Translate `base [ path op= value ]` where `path` may be a chain of
+   record-field accesses, list indices, and slices.  We build the Maude
+   expression outside-in:
+
+     base [. 'A <- (value('A, base) [ i <- (value('B, ...)) op= value ]) ]
+
+   - `path_access p`: the Maude expression for the sub-value at `p`, read
+     from `base` via `value(...)`/`index(...)`/`slice(...)`.
+   - `path_update p new_val`: the Maude expression for `base` updated so
+     that the value at `p` becomes `new_val`.  When `p` is non-root, the
+     outer update is always `<-` (record/list update); `op` (either `<-`
+     or `=++`) applies only at the innermost segment. *)
 and translate_bracket_op op e1 path e2 vm =
   let t1 = translate_exp TermCtx e1 vm in
   let t2 = translate_exp TermCtx e2 vm in
-  match path.it with
-  | IdxP (inner, idx_e) ->
-      let idx_t = translate_exp TermCtx idx_e vm in
-      (match inner.it with
-       | DotP (_, atom) ->
-           (* Nested path .FIELD[idx]: e1[.FIELD[idx] op v]
-              → e1 [. 'FIELD <- value('FIELD, e1)[idx op v]]
-              Handles: f[.LOCALS[x] = v]  (spectec def $with_local) *)
-           let fld = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
-           { text = Printf.sprintf "( %s [. %s <- ( value ( %s, %s ) [ %s %s %s ] ) ] )"
-               t1.text fld fld t1.text idx_t.text op t2.text;
-             vars = t1.vars @ idx_t.vars @ t2.vars }
-       | _ ->
-           (* Simple index: e1[idx op v] *)
-           { text = Printf.sprintf "( %s [ %s %s %s ] )"
-               t1.text idx_t.text op t2.text;
-             vars = t1.vars @ idx_t.vars @ t2.vars })
-  | _ ->
-      let tp = translate_path path vm in
-      let bracket = if String.length tp.text > 0 && tp.text.[0] = '\'' then "[." else "[" in
-      { text = Printf.sprintf "( %s %s %s %s %s ] )" t1.text bracket tp.text op t2.text;
-        vars = t1.vars @ tp.vars @ t2.vars }
+  let base_text = t1.text in
+  let vars_acc = ref (t1.vars @ t2.vars) in
+  let rec path_access p =
+    match p.it with
+    | RootP -> base_text
+    | DotP (parent, atom) ->
+        let pa = path_access parent in
+        let qid = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
+        Printf.sprintf "value(%s, %s)" qid pa
+    | IdxP (parent, idx) ->
+        let pa = path_access parent in
+        let it = translate_exp TermCtx idx vm in
+        vars_acc := !vars_acc @ it.vars;
+        Printf.sprintf "index(%s, %s)" pa it.text
+    | SliceP (parent, e_s, e_e) ->
+        let pa = path_access parent in
+        let es = translate_exp TermCtx e_s vm in
+        let ee = translate_exp TermCtx e_e vm in
+        vars_acc := !vars_acc @ es.vars @ ee.vars;
+        Printf.sprintf "slice(%s, %s, %s)" pa es.text ee.text
+  in
+  (* update_at p v_text inner_op:
+     returns the Maude text for `base` updated so that the value at path `p`
+     becomes `v_text`, using `inner_op` (`<-` or `=++`) at the outermost
+     segment of `p`.  Wraps recursively: non-root parents are collapsed via
+     `<-` updates of the sub-value obtained through `path_access`. *)
+  let rec update_at p v_text inner_op =
+    match p.it with
+    | RootP -> v_text
+    | DotP (parent, atom) ->
+        let qid = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
+        let parent_text = path_access parent in
+        let this_upd =
+          Printf.sprintf "( %s [. %s %s %s ] )" parent_text qid inner_op v_text in
+        update_at parent this_upd "<-"
+    | IdxP (parent, idx) ->
+        let it = translate_exp TermCtx idx vm in
+        vars_acc := !vars_acc @ it.vars;
+        let parent_text = path_access parent in
+        let this_upd =
+          Printf.sprintf "( %s [ %s %s %s ] )" parent_text it.text inner_op v_text in
+        update_at parent this_upd "<-"
+    | SliceP (parent, e_s, e_e) ->
+        let es = translate_exp TermCtx e_s vm in
+        let ee = translate_exp TermCtx e_e vm in
+        vars_acc := !vars_acc @ es.vars @ ee.vars;
+        let parent_text = path_access parent in
+        let this_upd =
+          Printf.sprintf "( %s [ %s %s %s %s ] )"
+            parent_text es.text ee.text inner_op v_text in
+        update_at parent this_upd "<-"
+  in
+  let text = update_at path t2.text op in
+  { text; vars = !vars_acc }
 
-and translate_path (p : path) vm : texpr = match p.it with
-  | RootP -> texpr ""
-  | IdxP (_, e) -> translate_exp TermCtx e vm
-  | SliceP (_, e1, e2) ->
-      tjoin2 (Printf.sprintf "%s %s") (translate_exp TermCtx e1 vm) (translate_exp TermCtx e2 vm)
-  | DotP (p1, atom) ->
-      let qid = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
-      let _base = translate_path p1 vm in
-      texpr qid
+and translate_path (p : path) vm : texpr =
+  let vars_acc = ref [] in
+  let rec aux p =
+    match p.it with
+    | RootP -> ""
+    | DotP (parent, atom) ->
+        let pa = aux parent in
+        let qid = "'" ^ String.uppercase_ascii (sanitize (Xl.Atom.name atom)) in
+        if pa = "" then Printf.sprintf ". %s" qid
+        else Printf.sprintf "%s . %s" pa qid
+    | IdxP (parent, idx) ->
+        let pa = aux parent in
+        let it = translate_exp TermCtx idx vm in
+        vars_acc := !vars_acc @ it.vars;
+        if pa = "" then Printf.sprintf "[ %s ]" it.text
+        else Printf.sprintf "%s [ %s ]" pa it.text
+    | SliceP (parent, e_s, e_e) ->
+        let pa = aux parent in
+        let es = translate_exp TermCtx e_s vm in
+        let ee = translate_exp TermCtx e_e vm in
+        vars_acc := !vars_acc @ es.vars @ ee.vars;
+        if pa = "" then Printf.sprintf "[ %s : %s ]" es.text ee.text
+        else Printf.sprintf "%s [ %s : %s ]" pa es.text ee.text
+  in
+  { text = aux p; vars = !vars_acc }
 
 and translate_arg (a : arg) vm : texpr = match a.it with
   | ExpA e -> translate_exp TermCtx e vm
@@ -750,8 +780,17 @@ and translate_prem (p : prem) vm : texpr = match p.it with
       let ts = match e.it with
         | TupE el -> List.map (fun x -> translate_exp TermCtx x vm) el
         | _ -> [translate_exp TermCtx e vm] in
-      { text = format_call (sanitize id.it) (List.map (fun t -> t.text) ts);
-        vars = List.concat_map (fun t -> t.vars) ts }
+      let name = sanitize id.it in
+      let call = format_call name (List.map (fun t -> t.text) ts) in
+      (* Step-exec relations (Step/Step-pure/Step-read) are handled elsewhere
+         via bridge rules; those that remain here become membership-style
+         witnesses of the same ValidJudgement sort used by translate_reld. *)
+      let is_step = name = "Step" || name = "Step-pure" || name = "Step-read" in
+      let text =
+        if is_step then call
+        else Printf.sprintf "%s : ValidJudgement" call
+      in
+      { text; vars = List.concat_map (fun t -> t.vars) ts }
   | LetPr (e1, e2, _) ->
       tjoin2 (Printf.sprintf "%s := %s")
         (translate_exp TermCtx e1 vm) (translate_exp TermCtx e2 vm)
@@ -784,7 +823,7 @@ let type_guard term typ vm =
           with Not_found -> false
         in
         if has_var_ref then "true"
-        else Printf.sprintf "type-ok ( %s , %s )" term ty
+        else Printf.sprintf "( %s hasType ( %s ) ) : WellTyped" term ty
 
 let is_bool_typ t vm =
   let s = String.lowercase_ascii (translate_typ t vm) in
@@ -1124,20 +1163,9 @@ let translate_typd id params insts =
                  let main =
                    if cons_name = "" then
                      if is_parametric then
-                       Printf.sprintf "\n%s%s  %s type-ok ( %s , %s ) = true%s ."
-                         binder_decl v_decl (if rhs = "" then "eq" else "ceq") lhs type_term
+                       Printf.sprintf "\n%s%s  %s ( %s hasType ( %s ) ) : WellTyped%s ."
+                         binder_decl v_decl (if rhs = "" then "mb" else "cmb") lhs type_term
                          (if rhs = "" then "" else "\n   if " ^ rhs)
-                     else if is_plain_var_like lhs then
-                       let () =
-                         (* We skip emitting this clause; rollback side-effectful
-                            var declarations so later emitted clauses can declare
-                            the same names correctly (e.g. SHAPE1). *)
-                         List.iter (fun (v, _, _) -> Hashtbl.remove declared_vars v) params;
-                         List.iter (fun b -> match b.it with
-                           | ExpB (tid, _) -> Hashtbl.remove declared_vars (to_var_name tid.it)
-                           | _ -> ()) binders
-                       in
-                       "" (* Skip: "cmb (T) : X [if true]" would make ALL terms members of X *)
                      else
                        Printf.sprintf "\n%s%s  %s ( %s ) : %s%s ."
                          binder_decl v_decl (if rhs = "" then "mb" else "cmb") lhs full_type_sort
@@ -1157,8 +1185,8 @@ let translate_typd id params insts =
                            Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] .\n" op_sig arg_sorts
                      in
                      if is_parametric then
-                       Printf.sprintf "%s%s%s  %s type-ok ( %s , %s ) = true%s ."
-                         op_line binder_decl v_decl (if rhs = "" then "eq" else "ceq") lhs type_term
+                       Printf.sprintf "%s%s%s  %s ( %s hasType ( %s ) ) : WellTyped%s ."
+                         op_line binder_decl v_decl (if rhs = "" then "mb" else "cmb") lhs type_term
                          (if rhs = "" then "" else "\n   if " ^ rhs)
                      else
                        Printf.sprintf "%s%s%s  %s ( %s ) : %s%s ."
@@ -1179,8 +1207,8 @@ let translate_typd id params insts =
                          (binder_conds @ List.filteri (fun i _ -> i <> opt_idx)
                            (List.map (fun (_, g, _) -> g) params)) in
                        if is_parametric then
-                         Printf.sprintf "\n  %s type-ok ( %s , %s ) = true%s ."
-                           (if r = "" then "eq" else "ceq") lhs_eps type_term
+                         Printf.sprintf "\n  %s ( %s hasType ( %s ) ) : WellTyped%s ."
+                           (if r = "" then "mb" else "cmb") lhs_eps type_term
                            (if r = "" then "" else "\n   if " ^ r)
                        else
                          Printf.sprintf "\n  %s ( %s ) : %s%s ."
@@ -1194,26 +1222,7 @@ let translate_typd id params insts =
              let bd = String.concat "" (List.map (fun b -> match b.it with
                | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
                | _ -> "") binders) in
-             let list_alias_info =
-               let low s = String.lowercase_ascii s in
-               match typ.it with
-               | IterT (inner, List) -> Some (inner, true)
-               | IterT (inner, List1) -> Some (inner, false)
-               | VarT (tid, [a]) when low tid.it = "list" ->
-                   (match a.it with
-                    | TypA inner -> Some (inner, true)
-                    | _ -> None)
-               | VarT (tid, [a]) when low tid.it = "list1" ->
-                   (match a.it with
-                    | TypA inner -> Some (inner, false)
-                    | _ -> None)
-               | _ -> None
-             in
-             let var =
-               match list_alias_info with
-               | Some _ -> "TS"
-               | None -> "T"
-             in
+             let var = match typ.it with IterT (_, (List | List1)) -> "TS" | _ -> "T" in
              let lhs = if SSet.mem name base_types then "T" else var in
              let alias_guard = type_guard lhs typ v_map in
              let force_unconditional_idx = String.lowercase_ascii id.it = "idx" in
@@ -1222,48 +1231,13 @@ let translate_typd id params insts =
                else if binder_conds = [] then alias_guard
                else cond_join (binder_conds @ [alias_guard]) in
              if is_parametric then
-               Printf.sprintf "%s  %s type-ok ( %s , %s ) = true%s ." bd
-                 (if cond = "" then "eq" else "ceq") lhs type_term
+               Printf.sprintf "%s  %s ( %s hasType ( %s ) ) : WellTyped%s ." bd
+                 (if cond = "" then "mb" else "cmb") lhs type_term
                  (if cond = "" then "" else "\n   if " ^ cond)
-            else
-              (match list_alias_info with
-               | Some (elem_typ, allow_empty) when is_plain_var_like lhs ->
-                   let elem_guard = type_guard "T" elem_typ v_map in
-                   let is_resulttype_alias = String.lowercase_ascii id.it = "resulttype" in
-                   if is_resulttype_alias then
-                     let single_cond = cond_join (binder_conds @ [elem_guard]) in
-                     let base_clause =
-                       if allow_empty then Printf.sprintf "%s  mb ( eps ) : %s .\n" bd full_type_sort
-                       else ""
-                     in
-                     if single_cond = "" then
-                       Printf.sprintf "%s%s  mb ( T ) : %s ."
-                         base_clause bd full_type_sort
-                     else
-                       Printf.sprintf "%s%s  cmb ( T ) : %s\n   if %s ."
-                         base_clause bd full_type_sort single_cond
-                   else
-                     let rec_cond =
-                       cond_join (binder_conds @ [elem_guard; Printf.sprintf "TS : %s" full_type_sort])
-                     in
-                     let base_clause =
-                       if allow_empty then Printf.sprintf "%s  mb ( eps ) : %s .\n" bd full_type_sort
-                       else ""
-                     in
-                     Printf.sprintf "%s%s  cmb ( T TS ) : %s\n   if %s ."
-                       base_clause bd full_type_sort rec_cond
-               | _ ->
-                   if is_plain_var_like lhs && is_trivial_true_cond cond then
-                     let () =
-                       List.iter (fun b -> match b.it with
-                         | ExpB (tid, _) -> Hashtbl.remove declared_vars (to_var_name tid.it)
-                         | _ -> ()) binders
-                     in
-                     "" (* Skip broad alias membership: cmb (T) : Sort if true *)
-                   else
-                     Printf.sprintf "%s  %s ( %s ) : %s%s ." bd
-                       (if cond = "" then "mb" else "cmb") lhs full_type_sort
-                       (if cond = "" then "" else "\n   if " ^ cond))
+             else
+               Printf.sprintf "%s  %s ( %s ) : %s%s ." bd
+                 (if cond = "" then "mb" else "cmb") lhs full_type_sort
+                 (if cond = "" then "" else "\n   if " ^ cond)
          | StructT fields ->
              let bd = String.concat "" (List.map (fun b -> match b.it with
                | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
@@ -1280,8 +1254,8 @@ let translate_typd id params insts =
              let rhs = cond_join
                (binder_conds @ List.map (fun (_, vn, ft, _) -> type_guard vn ft v_map) info) in
              if is_parametric then
-               Printf.sprintf "%s%s  %s type-ok ( {%s} , %s ) = true%s ." bd decls
-                 (if rhs = "" then "eq" else "ceq")
+               Printf.sprintf "%s%s  %s ( {%s} hasType ( %s ) ) : WellTyped%s ." bd decls
+                 (if rhs = "" then "mb" else "cmb")
                  (String.concat " ; " (List.map (fun (f, vn, _, _) ->
                      Printf.sprintf "item('%s, ( %s ))" f vn) info))
                  type_term (if rhs = "" then "" else "\n   if " ^ rhs)
@@ -1768,183 +1742,19 @@ let try_decompose_config (e : exp) : (exp * exp) option =
        | _ -> None)
   | _ -> None
 
-(** Check if a rule is a context rule: has exactly one RulePr premise
-    for a Step/Step-pure/Step-read relation. *)
-let is_ctxt_rule prems =
-  let rule_prems = List.filter (fun p -> match p.it with RulePr _ -> true | _ -> false) prems in
-  match rule_prems with
-  | [p] -> (match p.it with
-      | RulePr (id, _, _) -> is_step_exec_rel (sanitize id.it)
-      | _ -> false)
-  | _ -> false
-
-(** Try to extract context info from a context rule conclusion.
-    Returns Some (ctor_name, stable_args_texts, inner_is_var, is_frame_ctxt).
-    Handles both direct CaseE and ListE [CaseE ...] (elaborator wraps single-elem lists). *)
-let try_decode_ctxt_conclusion rel_name prefix conclusion vm =
-  let get_inner_expr cfg_expr =
-    if rel_name = "Step-pure" then Some cfg_expr
-    else match try_decompose_config cfg_expr with
-         | Some (_, instr_e) -> Some instr_e
-         | None -> None
-  in
-  (* Try to match a CaseE (or ListE [CaseE]) for LABEL/FRAME/HANDLER *)
-  let try_match_ctor e =
-    let try_case mixop inner =
-      let arity = match inner.it with TupE es -> List.length es | _ -> 1 in
-      match canonical_ctor_name_arity mixop arity with
-      | Some ctor_name when
-          (let low = String.lowercase_ascii ctor_name in
-           let has sub = let n = String.length sub in
-             String.length low >= n && String.sub low 0 n = sub in
-           has "ctorlabel" || has "ctorframe" || has "ctorhandler") ->
-          let args = match inner.it with TupE es -> es | e -> [{ inner with it = e }] in
-          let n_args = List.length args in
-          if n_args >= 2 then begin
-            let stable_args = List.filteri (fun i _ -> i < n_args - 1) args in
-            let stable_texts =
-              List.map (fun a -> (translate_exp TermCtx a vm).text) stable_args in
-            let inner_var = prefix ^ "-INNER-IS" in
-            let low = String.lowercase_ascii ctor_name in
-            let is_frame = String.length low >= 9 && String.sub low 0 9 = "ctorframe" in
-            Some (ctor_name, stable_texts, inner_var, is_frame)
-          end else None
-      | _ -> None
-    in
-    match e.it with
-    | CaseE (mixop, inner) -> try_case mixop inner
-    | ListE [single] ->
-        (match single.it with
-         | CaseE (mixop, inner) -> try_case mixop inner
-         | _ -> None)
-    | _ -> None
-  in
-  match conclusion.it with
-  | TupE [lhs_e; _rhs_e] ->
-      (match get_inner_expr lhs_e with
-       | Some instr_e -> try_match_ctor instr_e
-       | None -> None)
-  | _ -> None
-
-(** Generate Maude  step  rewrite rules for Step-pure / Step-read / Step rules.
-    Pattern: crl [name] : step(< Z | LHS IS >) => < Z' | RHS IS > [if COND] .
-    Rules with RulePr premises (bridge / context rules) are handled specially.
-    Returns the generated Maude source fragment (declarations + rules). *)
+(** Generate Maude  step  equations for Step-pure / Step-read / Step rules.
+    Pattern: [c]eq step(< Z | LHS IS >) = < Z' | RHS IS > [if COND] .
+    Rules with RulePr premises (bridge / context rules) are silently skipped.
+    Returns the generated Maude source fragment (declarations + equations). *)
 let translate_step_reld rel_name rules =
-  let rel_prefix           = String.uppercase_ascii (sanitize rel_name) in
-  let all_bound            = ref [] in
-  let all_is_vars          = ref [] in
-  let all_val_seq_vars     = ref [] in
-  let ctxt_ops_emitted     = ref false in
+  let rel_prefix  = String.uppercase_ascii (sanitize rel_name) in
+  let all_bound   = ref [] in
+  let all_is_vars = ref [] in
 
   let rule_lines = List.mapi (fun rule_idx r -> match r.it with
     | RuleD (case_id, binders, _, conclusion, prem_list) ->
-        (* Skip bridge/context rules that delegate via RulePr;
-           but context rules (exactly one Step RulePr) get heat/cool rules. *)
-        if has_rule_premise prem_list then
-          if not (is_ctxt_rule prem_list) then ""
-          else begin
-            let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
-            let case_part  =
-              if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix in
-            let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
-            let vm     = binder_to_var_map prefix rule_idx binders in
-            let all_seq_vars_ctxt =
-              List.filter_map (fun b -> match b.it with
-                | ExpB (v_id, t) ->
-                    (match t.it with
-                     | IterT (_, _) -> List.assoc_opt v_id.it vm
-                     | _ -> None)
-                | _ -> None) binders
-              |> List.sort_uniq String.compare
-            in
-            let vm_vars_ctxt = List.map snd vm |> List.sort_uniq String.compare in
-            all_val_seq_vars := !all_val_seq_vars @ all_seq_vars_ctxt;
-            all_bound := !all_bound @ List.filter (fun v -> not (List.mem v all_seq_vars_ctxt)) vm_vars_ctxt;
-            let z_var        = prefix ^ "-Z" in
-            let is_var       = prefix ^ "-IS" in
-            let is_rest_var  = prefix ^ "-IS-REST" in
-            let inner_is_var = prefix ^ "-INNER-IS" in
-            let n_var        = prefix ^ "-N" in
-            all_is_vars := is_var :: is_rest_var :: inner_is_var :: !all_is_vars;
-            all_bound   := z_var :: n_var :: !all_bound;
-            match try_decode_ctxt_conclusion rel_name prefix conclusion vm with
-            | None ->
-                (* Not a label/frame/handler context — silently skip (bridge rule or ctxt-instrs) *)
-                ""
-            | Some (ctor_name, stable_texts, _inner_var, is_frame) ->
-                let stable_str = String.concat ", " stable_texts in
-                let rule_name = String.lowercase_ascii prefix in
-                let low = String.lowercase_ascii ctor_name in
-                let restore_name =
-                  if is_frame then "restore-frame"
-                  else if String.length low >= 9 && String.sub low 0 9 = "ctorlabel" then "restore-label"
-                  else "restore-handler"
-                in
-                let is_label_ctxt =
-                  String.length low >= 9 && String.sub low 0 9 = "ctorlabel"
-                in
-                (* Emit restore-op declarations once *)
-                let op_decls =
-                  if !ctxt_ops_emitted then ""
-                  else begin
-                    ctxt_ops_emitted := true;
-                    "  op restore-label   : ExecConf WasmTerminal WasmTerminals WasmTerminals -> ExecConf .\n\
-                     \  op restore-frame   : ExecConf WasmTerminal WasmTerminal  WasmTerminals -> ExecConf .\n\
-                     \  op restore-handler : ExecConf WasmTerminal WasmTerminals WasmTerminals -> ExecConf .\n"
-                  end
-                in
-                let zn_var = prefix ^ "-ZN" in
-                all_bound := zn_var :: !all_bound;
-                (* For frame context, also declare the outer-store/outer-frame split vars *)
-                if is_frame then begin
-                  all_bound := (n_var ^ "-S")        :: !all_bound;
-                  all_bound := (n_var ^ "-F")        :: !all_bound;
-                  all_bound := (prefix ^ "-F-OUTER") :: !all_bound
-                end;
-                let heat =
-                  if is_frame then
-                    (* stable_texts = [n_text; fq_text]
-                       n_text  = arity N from FRAME constructor (e.g. STEP-CTXT-FRAME5-N)
-                       fq_text = inner frame F from FRAME constructor (e.g. STEP-CTXT-FRAME5-FQ)
-                       n_var   = prefix^"-N" used to name outer-store/outer-frame vars *)
-                    let inner_frame_text = if List.length stable_texts >= 2
-                                           then List.nth stable_texts 1 else n_var ^ "-FQ" in
-                    let n_arity_text     = if List.length stable_texts >= 1
-                                           then List.nth stable_texts 0 else n_var in
-                    Printf.sprintf
-                      "  crl [heat-%s] :\n    step(< CTORSEMICOLONA2 ( %s-S, %s-F ) | %s ( %s, %s ) %s >)\n    => %s(step(< CTORSEMICOLONA2 ( %s-S, %s ) | %s >), %s, %s-F, %s)\n    if all-vals ( %s ) = false /\\ is-trap ( %s ) = false ."
-                      rule_name n_var n_var ctor_name stable_str inner_is_var is_rest_var
-                      restore_name n_var inner_frame_text inner_is_var n_arity_text n_var is_rest_var
-                      inner_is_var inner_is_var
-                  else
-                    let extra_cond =
-                      if is_label_ctxt
-                      then Printf.sprintf " /\\ needs-label-ctxt ( %s ) = false" inner_is_var
-                      else ""
-                    in
-                    Printf.sprintf
-                      "  crl [heat-%s] :\n    step(< %s | %s ( %s, %s ) %s >)\n    => %s(step(< %s | %s >), %s)\n    if all-vals ( %s ) = false /\\ is-trap ( %s ) = false%s ."
-                      rule_name z_var ctor_name stable_str inner_is_var is_rest_var
-                      restore_name z_var inner_is_var
-                      (stable_str ^ ", " ^ is_rest_var)
-                      inner_is_var inner_is_var extra_cond
-                in
-                let cool =
-                  if is_frame then
-                    Printf.sprintf
-                      "  rl [cool-%s] :\n    %s(< %s | %s >, %s, %s-F-OUTER, %s)\n    => < CTORSEMICOLONA2 ( $store ( %s ), %s-F-OUTER ) | %s ( %s, $frame ( %s ), %s ) %s > ."
-                      rule_name restore_name zn_var is_var n_var prefix is_rest_var
-                      zn_var prefix ctor_name n_var zn_var is_var is_rest_var
-                  else
-                    Printf.sprintf
-                      "  rl [cool-%s] :\n    %s(< %s | %s >, %s)\n    => < %s | %s ( %s, %s ) %s > ."
-                      rule_name restore_name zn_var is_var
-                      (stable_str ^ ", " ^ is_rest_var)
-                      zn_var ctor_name stable_str is_var is_rest_var
-                in
-                op_decls ^ heat ^ "\n" ^ cool
-          end
+        (* Skip bridge/context rules that delegate via RulePr *)
+        if has_rule_premise prem_list then ""
         else begin
           let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
           let case_part  =
@@ -1952,43 +1762,6 @@ let translate_step_reld rel_name rules =
           let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
           let vm     = binder_to_var_map prefix rule_idx binders in
           let bconds = binder_to_type_conds binders vm in
-
-          (* Identify ALL sequence binders: IterT(any, any iter) including ListN.
-             All of these become WasmTerminals variables (not WasmTerminal).
-             Val-sort sequences additionally get all-vals guards. *)
-          let all_seq_vars =
-            List.filter_map (fun b -> match b.it with
-              | ExpB (v_id, t) ->
-                  (match t.it with
-                   | IterT (_, _) -> List.assoc_opt v_id.it vm
-                   | _ -> None)
-              | _ -> None) binders
-            |> List.sort_uniq String.compare
-          in
-          (* Val-sort sequence binders: also need all-vals guards *)
-          let val_seq_vars =
-            List.filter_map (fun b -> match b.it with
-              | ExpB (v_id, t) ->
-                  (match t.it with
-                   | IterT (inner_t, _) ->
-                       (match simple_sort_of_typ inner_t [] with
-                        | Some s when s = "Val" ->
-                            List.assoc_opt v_id.it vm
-                        | _ -> None)
-                   | _ -> None)
-              | _ -> None) binders
-            |> List.sort_uniq String.compare
-          in
-          (* Remove ALL seq vars from bconds (drop their type checks) *)
-          let bconds =
-            List.filter (fun (mv, _) -> not (List.mem mv all_seq_vars)) bconds
-          in
-          all_val_seq_vars := !all_val_seq_vars @ all_seq_vars;
-
-          (* Reset the global ListN accumulator before translating this rule.
-             translate_exp will populate it with count→sequence pairs found
-             inside IterE(_, (ListN(count_e, _), _)) sub-expressions. *)
-          reset_listn_pairs ();
 
           (* Unique continuation variable for this rule *)
           let is_var = prefix ^ "-IS" in
@@ -2092,13 +1865,6 @@ let translate_step_reld rel_name rules =
             let prem_scheduled = schedule_prems lhs_set [] prem_items in
             let prem_strs      = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
             let prem_binds     = List.concat_map (fun p -> p.binds) prem_scheduled in
-            (* Some premise-bound variables are true sequence binders, but many are
-              scalar values (e.g. C in C := $binop(...)).  Promote only those
-              premise binds that are known sequence binders for this rule. *)
-            let prem_binds_seq =
-              List.filter (fun v -> List.mem v all_seq_vars) prem_binds
-            in
-            all_val_seq_vars := !all_val_seq_vars @ prem_binds_seq;
 
             let all_texts = [lhs_t.text; rhs_t.text] @ prem_strs in
             let all_cvars = (z_in_vars @ lhs_vars @ vm_vars) @
@@ -2107,56 +1873,47 @@ let translate_step_reld rel_name rules =
             let (bound, _free, lhs_set2) = partition_vars lhs_seed all_texts all_cvars in
             all_bound := !all_bound @ bound @ vm_vars;
 
-            let has_numtype_guard cond =
-              let s = String.trim cond in
-              try
-                ignore (Str.search_forward (Str.regexp ": Numtype\\b") s 0);
-                true
-              with Not_found -> false
+            (* Step-rule binder conditions:
+               Maude's `mb` axioms over WasmTerminal subsorts do not fire
+               reliably against our concrete constructors (e.g. `X : Idx`
+               is false for bare Nats; `Z : State` is false for valid
+               CTORSEMICOLONA2 configurations because `Store/Frame` cmbs
+               have mismatched arities vs. the runtime record shape).
+               LHS pattern matching already constrains the constructor
+               shape, so we only keep the `Val` check and rewrite it to
+               the hand-written `is-val` helper, which is pattern-level
+               and agrees with the hand-patched execution harness. *)
+            let step_bcond_of (_, cond) =
+              (* cond form is typically "VAR : Sort" *)
+              match String.split_on_char ':' cond with
+              | [var_part; sort_part] ->
+                  let var  = String.trim var_part  in
+                  let sort = String.trim sort_part in
+                  if sort = "Val" then
+                    Some (Printf.sprintf "is-val ( %s ) = true" var)
+                  else
+                    None
+              | _ -> None
             in
             let filtered_bconds =
               bconds
               |> List.filter (fun (mv, _) ->
                   List.mem mv lhs_set2 && not (List.mem mv prem_binds))
-              |> List.map snd
-              |> fun conds ->
-                   if rel_name = "Step-pure" then
-                     List.filter (fun c -> not (has_numtype_guard c)) conds
-                   else conds
-            in
+              |> List.filter_map step_bcond_of in
             let prem_match_conds =
               prem_scheduled |> List.filter_map (fun p ->
                 if p.binds = [] then None else Some (prem_cond p.text)) in
             let prem_bool_conds =
               prem_scheduled |> List.filter_map (fun p ->
                 if p.binds = [] then Some (prem_cond p.text) else None) in
-            (* Add all-vals guards for val-sequence vars *)
-            let allvals_conds =
-              List.map (fun mv -> Printf.sprintf "all-vals ( %s ) = true" mv) val_seq_vars
-            in
-            (* Add len() bindings for ListN count variables.
-               These must come AFTER the prem_match_conds that bind the
-               sequence variables (e.g. TR from $blocktype binding).
-               We only emit the binding if the count var is NOT already
-               bound in the LHS pattern (to avoid double-binding).
-               g_listn_pairs was populated by translate_exp during the
-               translation of the RHS and premise expressions. *)
-            let listn_len_conds =
-              List.filter_map (fun (cnt_mv, seq_mv) ->
-                if List.mem cnt_mv lhs_set2 then None  (* already bound in LHS *)
-                else Some (Printf.sprintf "%s := len ( %s )" cnt_mv seq_mv)
-              ) !g_listn_pairs
-            in
-            let all_conds = allvals_conds @ prem_match_conds @ listn_len_conds @ prem_bool_conds @ filtered_bconds in
+            let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
             let cond     = cond_join all_conds in
-            if cond = "" then
-              Printf.sprintf "  rl [%s] :\n    step(< %s | %s %s >)\n    =>\n    < %s | %s %s > ."
-                (String.lowercase_ascii prefix)
-                z_in lhs_t.text is_var z_out rhs_t.text is_var
-            else
-              Printf.sprintf "  crl [%s] :\n    step(< %s | %s %s >)\n    =>\n    < %s | %s %s >\n      if %s ."
-                (String.lowercase_ascii prefix)
-                z_in lhs_t.text is_var z_out rhs_t.text is_var cond
+            let cond_str = if cond = "" then ""
+                           else Printf.sprintf "\n      if %s" cond in
+
+            Printf.sprintf "  %s step(< %s | %s %s >) = < %s | %s %s >%s ."
+              (if cond = "" then "eq" else "ceq")
+              z_in lhs_t.text is_var z_out rhs_t.text is_var cond_str
         end
   ) rules in
 
@@ -2170,30 +1927,12 @@ let translate_step_reld rel_name rules =
     && not (String.contains s ',')
     && not (String.contains s ' ')
   in
-  let bound_vars_wt  = List.filter (fun v -> not (List.mem v !all_val_seq_vars))
-                         (List.filter is_simple_var (List.sort_uniq String.compare !all_bound)) in
-  let bound_vars_wts = List.filter is_simple_var
-                         (List.sort_uniq String.compare !all_val_seq_vars) in
+  let bound_vars = List.filter is_simple_var
+                     (List.sort_uniq String.compare !all_bound) in
   let is_vars    = List.sort_uniq String.compare !all_is_vars in
-  let bound_decl = declare_vars_same_sort bound_vars_wt  "WasmTerminal" in
-  let vals_decl  = declare_vars_same_sort bound_vars_wts "WasmTerminals" in
-  let is_decl    = declare_vars_same_sort is_vars        "WasmTerminals" in
-  let ctxt_instrs_extra =
-    if rel_name = "Step" then
-      "  op restore-instrs : ExecConf WasmTerminals WasmTerminals -> ExecConf .\n" ^
-      "  var STEP-CTXT-INSTRS-GEN-Z : WasmTerminal .\n" ^
-      "  vars STEP-CTXT-INSTRS-GEN-VAL STEP-CTXT-INSTRS-GEN-REST STEP-CTXT-INSTRS-GEN-INNERQ : WasmTerminals .\n" ^
-      "  vars STEP-CTXT-INSTRS-GEN-W STEP-CTXT-INSTRS-GEN-INNER : WasmTerminal .\n" ^
-      "  crl [heat-step-ctxt-instrs] :\n" ^
-      "    step(< STEP-CTXT-INSTRS-GEN-Z | STEP-CTXT-INSTRS-GEN-VAL STEP-CTXT-INSTRS-GEN-W STEP-CTXT-INSTRS-GEN-INNER STEP-CTXT-INSTRS-GEN-REST >)\n" ^
-      "    => restore-instrs(step(< STEP-CTXT-INSTRS-GEN-Z | STEP-CTXT-INSTRS-GEN-INNER >), STEP-CTXT-INSTRS-GEN-VAL STEP-CTXT-INSTRS-GEN-W, STEP-CTXT-INSTRS-GEN-REST)\n" ^
-      "    if all-vals ( STEP-CTXT-INSTRS-GEN-VAL ) = true /\\ is-val ( STEP-CTXT-INSTRS-GEN-W ) = true /\\ is-val ( STEP-CTXT-INSTRS-GEN-INNER ) = false /\\ is-trap ( STEP-CTXT-INSTRS-GEN-INNER ) = false .\n" ^
-      "  rl [cool-step-ctxt-instrs] :\n" ^
-      "    restore-instrs(< STEP-CTXT-INSTRS-GEN-Z | STEP-CTXT-INSTRS-GEN-INNERQ >, STEP-CTXT-INSTRS-GEN-VAL STEP-CTXT-INSTRS-GEN-W, STEP-CTXT-INSTRS-GEN-REST)\n" ^
-      "    => < STEP-CTXT-INSTRS-GEN-Z | STEP-CTXT-INSTRS-GEN-VAL STEP-CTXT-INSTRS-GEN-W STEP-CTXT-INSTRS-GEN-INNERQ STEP-CTXT-INSTRS-GEN-REST > .\n"
-    else ""
-  in
-  bound_decl ^ vals_decl ^ is_decl ^ ctxt_instrs_extra
+  let bound_decl = declare_vars_same_sort bound_vars "WasmTerminal" in
+  let is_decl    = declare_vars_same_sort is_vars    "WasmTerminals" in
+  bound_decl ^ is_decl
   ^ String.concat "\n" (List.filter (fun s -> s <> "") rule_lines)
   ^ "\n"
 
@@ -2204,14 +1943,16 @@ let translate_reld _id rel_name rules =
     | r :: _ -> (match r.it with RuleD (_, _, _, c, _) ->
         (match c.it with TupE el -> List.length el | _ -> 1))
     | [] -> 0 in
-  let op_decl = Printf.sprintf "\n  op %s : %s -> Bool .\n" rel_name
+  (* Every RelD relation is now a Judgement constructor; rules are
+     membership axioms carving out the ValidJudgement subsort. *)
+  let op_decl = Printf.sprintf "\n  op %s : %s -> Judgement [ctor] .\n" rel_name
     (String.concat " " (List.init arity (fun _ -> "WasmTerminal"))) in
   let rel_prefix = String.uppercase_ascii (sanitize rel_name) in
 
   (* True if any RulePr premise references a Step/Step-pure/Step-read relation.
      Such rules (e.g. the transitive case of Steps) cannot be expressed as a
-     Bool ceq because Step is translated as an equational step() function, not
-     a Bool op.  Skipping them eliminates the "bad token Step" parse errors. *)
+     Judgement membership because Step is translated as an equational step()
+     function, not a ctor into Judgement.  Skipping them eliminates parse errors. *)
   let has_step_exec_rule_premise prems =
     List.exists (fun p -> match p.it with
       | RulePr (id, _, _) -> is_step_exec_rel (sanitize id.it)
@@ -2292,8 +2033,8 @@ let translate_reld _id rel_name rules =
         let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
         let cond = cond_join all_conds in
         let cond_str = if cond = "" then "" else " \n      if " ^ cond in
-        Printf.sprintf "  %s %s ( %s ) = true%s ."
-          (if cond = "" then "eq" else "ceq")
+        Printf.sprintf "  %s %s ( %s ) : ValidJudgement%s ."
+          (if cond = "" then "mb" else "cmb")
           rel_name lhs_t.text cond_str
         end
   ) rules in
@@ -2331,30 +2072,24 @@ let header_prefix =
   "  --- Allow type atoms to appear as terminals (for mixed AST encodings)\n" ^
   "  subsort WasmType < WasmTerminal .\n" ^
   "  subsort WasmTypes < WasmTerminals .\n\n" ^
-  "  --- Nat is a subtype of index-like and numeric-parameter sorts\n" ^
-  "  --- (spectec idx = u32 = nat; N/M/K are nat-valued type parameters)\n" ^
-  "  subsort Nat < N .\n" ^
-  "  subsort Nat < M .\n" ^
-  "  subsort Nat < K .\n" ^
-  "  subsort Nat < Labelidx .\n" ^
-  "  subsort Nat < Localidx .\n" ^
-  "  subsort Nat < Typeidx .\n" ^
-  "  subsort Nat < Funcidx .\n" ^
-  "  subsort Nat < Globalidx .\n" ^
-  "  subsort Nat < Tableidx .\n" ^
-  "  subsort Nat < Memidx .\n" ^
-  "  subsort Nat < Tagidx .\n" ^
-  "  subsort Nat < Elemidx .\n" ^
-  "  subsort Nat < Dataidx .\n" ^
-  "  subsort Nat < Fieldidx .\n" ^
-  "  subsort Nat < Addr .\n" ^
-  "  subsort Nat < Idx .\n\n" ^
   "  --- Bool wrapper (avoid subsort Bool < WasmTerminal conflicts)\n" ^
   "  op w-bool : Bool -> WasmTerminal [ctor] .\n\n" ^
   "  --- Basic Wasm Types\n" ^
   "  ops w-N w-M w-K w-n w-m w-X w-C w-I w-S w-T w-V w-b w-z w-L w-E : -> WasmType [ctor] .\n\n" ^
   "  --- Special Operators\n" ^
-  "  op type-ok : WasmTerminal WasmType -> Bool .\n" ^
+  "  --- Pair sort + well-typed witness for parametric type judgements.\n" ^
+  "  --- Non-parametric types use direct `mb T : S .` memberships.\n" ^
+  "  --- Parametric types emit `(mb|cmb) ( T hasType S ) : WellTyped [if ...] .`\n" ^
+  "  sort TypedTerm .\n" ^
+  "  sort WellTyped .\n" ^
+  "  subsort WellTyped < TypedTerm .\n" ^
+  "  op _hasType_ : WasmTerminal WasmType -> TypedTerm [ctor prec 95 gather (e e)] .\n" ^
+  "  --- Judgement sort for RelD typing relations (replaces Bool-returning ops).\n" ^
+  "  --- Every RelD `Rel` emits `op Rel : ... -> Judgement [ctor]` and uses\n" ^
+  "  --- `(mb|cmb) Rel(args) : ValidJudgement [if ...] .` instead of `eq Rel(...) = true`.\n" ^
+  "  sort Judgement .\n" ^
+  "  sort ValidJudgement .\n" ^
+  "  subsort ValidJudgement < Judgement .\n" ^
   "  op _shape-x_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op slice : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals .\n" ^
   "  op _<-_ : WasmTerminal WasmTerminals -> Bool .\n\n" ^
@@ -2366,12 +2101,6 @@ let header_prefix =
   "  sort ExecConf .\n" ^
   "  op <_|_> : WasmTerminal WasmTerminals -> ExecConf [ctor] .\n" ^
   "  op step : ExecConf -> ExecConf .\n\n" ^
-  "  --- Execution predicates (used by step crl conditions)\n" ^
-  "  op is-val : WasmTerminal -> Bool .\n" ^
-  "  op all-vals : WasmTerminals -> Bool .\n" ^
-  "  op is-trap : WasmTerminals -> Bool .\n\n" ^
-  "  --- Context-sensitive control-flow detector\n" ^
-  "  op needs-label-ctxt : WasmTerminals -> Bool .\n\n" ^
   "  --- Common variables (declared once)\n" ^
   "  var I : Int .\n" ^
   "  var W-I : Int .\n" ^
@@ -2380,26 +2109,7 @@ let header_prefix =
   "  vars T W WW : WasmTerminal .\n" ^
   "  vars TS W* : WasmTerminals .\n\n"
 
-let footer =
-  "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
-  "  eq  is-val(CTORCONSTA2(T, W)) = true .\n" ^
-  "  eq  is-val(CTORVCONSTA2(T, W)) = true .\n" ^
-  "  ceq is-val(W) = true if W : Val .\n" ^
-  "  eq  is-val(W) = false [owise] .\n\n" ^
-  "  ceq all-vals(W TS) = all-vals(TS) if is-val(W) = true .\n" ^
-  "  eq  all-vals(eps) = true .\n" ^
-  "  eq  all-vals(TS) = false [owise] .\n\n" ^
-  "  --- Label-context control-flow detector\n" ^
-  "  eq  needs-label-ctxt(eps) = false .\n" ^
-  "  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORBRA1(T) TS) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORRETURNA0 TS) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .\n" ^
-  "  eq  needs-label-ctxt(TS) = false [owise] .\n\n" ^
-  "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
-  "  eq  is-trap(TS) = false [owise] .\n" ^
-  "\nendm\n"
+let footer = "\nendm\n"
 
 let starts_with s pfx =
   String.length s >= String.length pfx && String.sub s 0 (String.length pfx) = pfx
@@ -2441,63 +2151,8 @@ let collect_ctor_decl_lines eq_lines =
          try int_of_string (String.sub nm (idx_a + 1) (String.length nm - idx_a - 1))
          with _ -> 0
        in
-       (* Use WasmTerminals for all CTOR arguments: sequence arguments (valtype*, instr*, etc.)
-          need WasmTerminals; single WasmTerminal values are also WasmTerminals via subsort. *)
-       let args = if arity <= 0 then "" else String.concat " " (List.init arity (fun _ -> "WasmTerminals")) in
+       let args = if arity <= 0 then "" else String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
        Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] ." nm args)
-
-let collect_declared_identifiers decl_lines =
-  let add_many set names = List.fold_left (fun s n -> if n = "" then s else SSet.add n s) set names in
-  List.fold_left (fun acc l ->
-    let s = String.trim l in
-    if starts_with s "var " then
-      let rest = String.sub s 4 (String.length s - 4) in
-      let lhs = try String.sub rest 0 (String.index rest ':') with _ -> rest in
-      add_many acc [String.trim lhs]
-    else if starts_with s "vars " then
-      let rest = String.sub s 5 (String.length s - 5) in
-      let lhs = try String.sub rest 0 (String.index rest ':') with _ -> rest in
-      add_many acc (String.split_on_char ' ' (String.trim lhs))
-    else if starts_with s "op " then
-      let rest = String.sub s 3 (String.length s - 3) in
-      let nm = try String.sub rest 0 (String.index rest ' ') with _ -> rest in
-      add_many acc [String.trim nm]
-    else if starts_with s "ops " then
-      let rest = String.sub s 4 (String.length s - 4) in
-      let lhs = try String.sub rest 0 (String.index rest ':') with _ -> rest in
-      add_many acc (String.split_on_char ' ' (String.trim lhs))
-    else acc
-  ) SSet.empty decl_lines
-
-let chunk_list n xs =
-  let rec go acc cur k = function
-    | [] -> List.rev (if cur = [] then acc else List.rev cur :: acc)
-    | x :: xt ->
-        if k = n then go (List.rev cur :: acc) [x] 1 xt
-        else go acc (x :: cur) (k + 1) xt
-  in
-  if n <= 0 then [xs] else go [] [] 0 xs
-
-let collect_fallback_var_decl_lines eq_lines decl_lines =
-  let declared = collect_declared_identifiers decl_lines in
-  let extra_excluded =
-    SSet.of_list
-      ["EQ"; "CEQ"; "MB"; "CMB"; "RL"; "CRL"; "OWISE";
-       "TRUE"; "FALSE"; "BOOL"; "INT"; "NAT"]
-  in
-  let all_vars = extract_vars_from_maude (String.concat "\n" eq_lines) in
-  let missing =
-    all_vars
-    |> List.filter (fun v ->
-         String.length v > 0
-         && not (starts_with v "CTOR")
-         && not (SSet.mem v declared)
-         && not (SSet.mem v extra_excluded))
-    |> List.sort_uniq String.compare
-  in
-  chunk_list 24 missing
-  |> List.filter (fun xs -> xs <> [])
-  |> List.map (fun xs -> Printf.sprintf "  vars %s : WasmTerminal ." (String.concat " " xs))
 
 let translate defs =
   build_type_env defs;
@@ -2509,24 +2164,13 @@ let translate defs =
   let header = header_prefix ^ "  --- Auto-collected tokens\n" ^ token_ops ^ call_ops in
   let body = String.concat "\n" (List.map (translate_definition ss) defs) in
   let lines = String.split_on_char '\n' body in
-  let header_decl_lines =
-    header
-    |> String.split_on_char '\n'
-    |> List.filter is_decl_line
-    |> List.sort_uniq String.compare
-  in
   let eqs = List.filter (fun l -> not (is_decl_line l)) lines in
   let ctor_decl_lines = collect_ctor_decl_lines eqs in
   let raw_decls =
     List.filter is_decl_line lines
     |> List.filter (fun l -> not (is_canonical_ctor_decl_line l))
     |> List.sort_uniq String.compare
-    |> fun ds ->
-         let base = List.sort_uniq String.compare (ds @ ctor_decl_lines) in
-         let fallback_var_decls =
-           collect_fallback_var_decl_lines eqs (base @ header_decl_lines)
-         in
-         List.sort_uniq String.compare (base @ fallback_var_decls)
+    |> fun ds -> List.sort_uniq String.compare (ds @ ctor_decl_lines)
   in
   (* Post-processing fix 1: Remove 0-arity "op X :  -> WasmType [ctor]" when a
      1-arity "op X : WasmTerminal -> WasmType [ctor]" for the SAME name exists.
