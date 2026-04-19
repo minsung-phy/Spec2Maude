@@ -277,9 +277,9 @@
           - `needs-label-ctxt(CTORBRA1(0)) = true`
           - `needs-label-ctxt(CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0))) = false`
         - 결론:
-          - `needs-label-ctxt`는 completed control-flow (`VAL* + BR/RETURN/RETURN-CALL-REF/THROW-REF`) 차단 용도로만 쓰는 것이 맞다.
-          - nested label wrapper 자체를 helper로 막는 방향은 의미론적으로 부적절하며 deadlock을 해소하지 못했다.
-          - 현재 blocker는 여전히 `manual block/loop bootstrap + generated label heat/cool`의 shape 상호작용이다.
+          - (해결됨) `needs-label-ctxt`는 completed control-flow (`VAL* + BR/RETURN/RETURN-CALL-REF/THROW-REF`) 차단 용도로 사용하는 것이 맞으며, 중첩된 라벨 안으로 정상적으로 가열(heating)되도록 재귀 검사를 비활성화했다.
+          - (해결됨) 가장 결정적인 문제였던 "가열된 제어 흐름 명령어의 고립(Deadlock)" 문제는, 제어 흐름 명령어 발생 시 강제로 껍데기를 다시 씌워주는 **제어 전용 냉각(Control Cooling) 규칙**(`cool-step-ctxt-*-control`)을 번역기가 자동 생성하게 만들어 해결했다.
+          - **현재 `fib(0)` ~ `fib(5)` 모두 `modelCheck` 및 `rewrite` 완벽 통과.** (Deadlock 완전 해소)
 
 ### P2. 범위 검증 미실시
 - fib 외 다른 예제 (factorial, 재귀 call, memory op 등) 미테스트
@@ -355,6 +355,8 @@
   - translator가 이 mb를 어느 SpecTec 규칙에서 어떻게 생성하는지 로그 추가
   - 해결책: (a) mb에 `T : SomeNarrowerSort` 조건 추가, (b) V128 cmb를 `owise`로, (c) hasType 시스템 재설계
 - [ ] **커밋** (작성자 `minsung-phy`, Claude 공저자 표시 없음)
+- [ ] **수동 브릿지 9종 자동화**: `wasm-exec.maude`의 `[step-*-manual]` 규칙들을 `translator.ml`에서 자동 생성하도록 이식. (Generalization 고도화)
+- [ ] **IterPr / IterE 의미 보존 lowering**: 시퀀스 반복(`val*`, `val^n`) 패턴의 정석적 번역 로직 설계.
 
 ### 단기 (1-2 세션)
 - [ ] P0-C 경고 체계적으로 해결 또는 suppress 근거 문서화

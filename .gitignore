@@ -17,5 +17,8 @@ _build/
 # 4. AI 툴 관련 파일 제외
 .claude/
 .claude*
+CLAUDE.md
 
 .obsidian/
+
+artifacts/

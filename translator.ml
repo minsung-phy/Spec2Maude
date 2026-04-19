@@ -2205,7 +2205,28 @@ let translate_step_reld rel_name rules =
                       (stable_str ^ ", " ^ is_rest_var)
                       zn_var ctor_name stable_str is_var is_rest_var
                 in
-                op_decls ^ heat ^ "\n" ^ cool
+                let cool_control =
+                  if is_frame then
+                    let inner_frame_text =
+                      if List.length stable_texts >= 2 then List.nth stable_texts 1 else n_var ^ "-FQ"
+                    in
+                    let n_arity_text =
+                      if List.length stable_texts >= 1 then List.nth stable_texts 0 else n_var
+                    in
+                    Printf.sprintf
+                      "  crl [cool-%s-control] :\n    %s(step(< CTORSEMICOLONA2 ( %s-S, %s ) | %s >), %s, %s-F, %s)\n    => step(< CTORSEMICOLONA2 ( %s-S, %s-F ) | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) = true ."
+                      rule_name restore_name n_var inner_frame_text inner_is_var n_arity_text n_var is_rest_var
+                      n_var n_var ctor_name stable_str inner_is_var is_rest_var
+                      inner_is_var
+                  else
+                    Printf.sprintf
+                      "  crl [cool-%s-control] :\n    %s(step(< %s | %s >), %s)\n    => step(< %s | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) = true ."
+                      rule_name restore_name z_var inner_is_var
+                      (stable_str ^ ", " ^ is_rest_var)
+                      z_var ctor_name stable_str inner_is_var is_rest_var
+                      inner_is_var
+                in
+                op_decls ^ heat ^ "\n" ^ cool ^ "\n" ^ cool_control
           end
         else begin
           let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
@@ -2244,6 +2265,8 @@ let translate_step_reld rel_name rules =
 
           let is_var = prefix ^ "-IS" in
           all_is_vars := is_var :: !all_is_vars;
+          let prefix_val_var = prefix ^ "-VALS" in
+          all_val_seq_vars := prefix_val_var :: !all_val_seq_vars;
 
           let decoded : (string * string list * texpr * string * texpr) option =
             if rel_name = "Step-pure" then
@@ -2360,17 +2383,18 @@ let translate_step_reld rel_name rules =
                 ) !g_listn_pairs
               in
               let all_conds =
+                (Printf.sprintf "all-vals ( %s ) = true" prefix_val_var) ::
                 prem_match_conds @ listn_len_conds @ allvals_conds @ prem_bool_conds @ filtered_bconds
               in
               let cond = cond_join all_conds in
               if cond = "" then
-                Printf.sprintf "  rl [%s] :\n    step(< %s | %s %s >)\n    =>\n    < %s | %s %s > ."
+                Printf.sprintf "  rl [%s] :\n    step(< %s | %s %s %s >)\n    =>\n    < %s | %s %s %s > ."
                   (String.lowercase_ascii prefix)
-                  z_in lhs_t.text is_var z_out rhs_t.text is_var
+                  z_in prefix_val_var lhs_t.text is_var z_out prefix_val_var rhs_t.text is_var
               else
-                Printf.sprintf "  crl [%s] :\n    step(< %s | %s %s >)\n    =>\n    < %s | %s %s >\n      if %s ."
+                Printf.sprintf "  crl [%s] :\n    step(< %s | %s %s %s >)\n    =>\n    < %s | %s %s %s >\n      if %s ."
                   (String.lowercase_ascii prefix)
-                  z_in lhs_t.text is_var z_out rhs_t.text is_var cond
+                  z_in prefix_val_var lhs_t.text is_var z_out prefix_val_var rhs_t.text is_var cond
         end
   ) rules in
 
@@ -2594,9 +2618,9 @@ let header_prefix =
   "  var I : Int .\n" ^
   "  var W-I : Int .\n" ^
   "  op EXP : -> Int .\n" ^
-  "  vars W-N W-M : Nat .\n" ^
-  "  vars T W WW : WasmTerminal .\n" ^
-  "  vars TS W* : WasmTerminals .\n\n"
+  "  vars W-N W-M NLC NFC NHC : N .\n" ^
+  "  vars T W WW FQ : WasmTerminal .\n" ^
+  "  vars TS W* ISQ INSTRQ CQ : WasmTerminals .\n\n"
 
 let footer =
   "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
@@ -2612,7 +2636,6 @@ let footer =
   "  --- i.e. a pattern that the top-level step-pure-* label rules already\n" ^
   "  --- consume directly. In those cases heat must NOT fire, otherwise the\n" ^
   "  --- control-flow instruction escapes its enclosing label wrapper.\n" ^
-  "  --- Nested labels intentionally return false so heat can descend into them.\n" ^
   "  eq  needs-label-ctxt(eps) = false .\n" ^
   "  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .\n" ^
   "  eq  needs-label-ctxt(CTORBRA1(T) TS) = true .\n" ^
@@ -2620,6 +2643,8 @@ let footer =
   "  eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .\n" ^
   "  eq  needs-label-ctxt(TS) = false [owise] .\n\n" ^
+  "  eq  is-trap(eps) = false .\n" ^
+  "  ceq is-trap(W TS) = is-trap(TS) if is-val(W) = true .\n" ^
   "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
   "  eq  is-trap(TS) = false [owise] .\n" ^
   "\nendm\n"

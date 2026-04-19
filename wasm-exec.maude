@@ -35,10 +35,9 @@ mod WASM-EXEC is
   --- Variables – UNIQUE per operator group to avoid assoc-tail collision
   --- -------------------------------------------------------
   --- step equation variables
-  vars ST-Z ST-ZN ST-X ST-VAL ST-NT ST-OP ST-C ST-C1 ST-C2 ST-A ST-BT : WasmTerminal .
-  var  ST-IS ST-ISA ST-ISB ST-ISBN ST-IS0 ST-VALS ST-TQ ST-TR ST-BODY : WasmTerminals .
-  var  ST-AR ST-LI : Nat .
-  var  ST-YY ST-CSEQ ST-T ST-FI ST-F : WasmTerminal .
+  vars ST-Z ST-ZN ST-X ST-VAL ST-NT ST-OP ST-C ST-C1 ST-C2 ST-A ST-BT ST-TY ST-FI ST-F ST-YY ST-CSEQ ST-T : WasmTerminal .
+  vars ST-IS ST-ISA ST-ISB ST-ISBN ST-IS0 ST-VALS ST-VALSQ ST-TQ ST-TR ST-BODY ST-BODY-REST : WasmTerminals .
+  vars ST-AR ST-LI ST-LEN : Nat .
   --- For LOCAL.SET / LOCAL.TEE: destructure State into Store + Frame
   vars ST-ZS ST-ZF : WasmTerminal .
 
@@ -68,63 +67,69 @@ mod WASM-EXEC is
   --- $with-local does F[X<-V] (list-update on the 1-element frame) → corrupts the frame.
   --- Correct fix: update the 'LOCALS list inside the frame record explicitly.
   crl [step-local-set-manual] :
-    step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VAL CTORLOCALSETA1(ST-X) ST-IS >)
+    step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VALS ST-VAL CTORLOCALSETA1(ST-X) ST-IS >)
     =>
-    < CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-IS >
-    if is-val(ST-VAL) = true .
+    < CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-VALS ST-IS >
+    if all-vals(ST-VALS) = true /\ is-val(ST-VAL) = true .
 
   crl [step-local-tee-manual] :
-    step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VAL CTORLOCALTEEA1(ST-X) ST-IS >)
+    step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VALS ST-VAL CTORLOCALTEEA1(ST-X) ST-IS >)
     =>
-    < CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-VAL ST-IS >
-    if is-val(ST-VAL) = true .
+    < CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-VALS ST-VAL ST-IS >
+    if all-vals(ST-VALS) = true /\ is-val(ST-VAL) = true .
 
   crl [step-global-set-manual] :
-    step(< ST-Z | ST-VAL CTORGLOBALSETA1(ST-X) ST-IS >)
+    step(< ST-Z | ST-VALS ST-VAL CTORGLOBALSETA1(ST-X) ST-IS >)
     =>
-    < $with-global(ST-Z, ST-X, ST-VAL) | ST-IS >
-    if is-val(ST-VAL) = true .
+    < $with-global(ST-Z, ST-X, ST-VAL) | ST-VALS ST-IS >
+    if all-vals(ST-VALS) = true /\ is-val(ST-VAL) = true .
 
-  rl [step-read-local-get-manual] :
-    step(< ST-Z | CTORLOCALGETA1(ST-X) ST-IS >)
+  crl [step-read-local-get-manual] :
+    step(< ST-Z | ST-VALS CTORLOCALGETA1(ST-X) ST-IS >)
     =>
-    < ST-Z | $local(ST-Z, ST-X) ST-IS > .
+    < ST-Z | ST-VALS ST-VAL ST-IS >
+    if all-vals(ST-VALS) = true /\ ST-VAL := $local(ST-Z, ST-X) .
 
-  rl [step-read-global-get-manual] :
-    step(< ST-Z | CTORGLOBALGETA1(ST-X) ST-IS >)
+  crl [step-read-global-get-manual] :
+    step(< ST-Z | ST-VALS CTORGLOBALGETA1(ST-X) ST-IS >)
     =>
-    < ST-Z | value('VALUE, $global(ST-Z, ST-X)) ST-IS > .
+    < ST-Z | ST-VALS ST-VAL ST-IS >
+    if all-vals(ST-VALS) = true /\ ST-VAL := value('VALUE, $global(ST-Z, ST-X)) .
 
   crl [step-read-call-manual] :
-    step(< ST-Z | CTORCALLA1(ST-X) ST-IS >)
+    step(< ST-Z | ST-VALS CTORCALLA1(ST-X) ST-IS >)
     =>
-    < ST-Z | CTORREFFUNCADDRA1(ST-A) CTORCALLREFA1(value('TYPE, index($funcinst(ST-Z), ST-A))) ST-IS >
-    if ST-A := index(value('FUNCS, $moduleinst(ST-Z)), ST-X) .
+    < ST-Z | ST-VALS CTORREFFUNCADDRA1(ST-A) CTORCALLREFA1(ST-TY) ST-IS >
+    if all-vals(ST-VALS) = true /\ ST-A := index(value('FUNCS, $moduleinst(ST-Z)), ST-X)
+    /\ ST-TY := value('TYPE, index($funcinst(ST-Z), ST-A)) .
 
   crl [step-read-block-manual] :
     step(< ST-Z | ST-VALS CTORBLOCKA2(ST-BT, ST-BODY) ST-IS >)
     =>
-    < ST-Z | CTORLABELLBRACERBRACEA3(len(ST-TR), eps, ST-VALS ST-BODY) ST-IS >
+    < ST-Z | CTORLABELLBRACERBRACEA3(ST-LEN, eps, ST-VALS ST-BODY) ST-IS >
     if all-vals(ST-VALS) = true
-    /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT) .
+    /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT)
+    /\ ST-LEN := len(ST-TR) .
 
   crl [step-read-loop-manual] :
     step(< ST-Z | ST-VALS CTORLOOPA2(ST-BT, ST-BODY) ST-IS >)
     =>
-    < ST-Z | CTORLABELLBRACERBRACEA3(len(ST-TQ), CTORLOOPA2(ST-BT, ST-BODY), ST-VALS ST-BODY) ST-IS >
+    < ST-Z | CTORLABELLBRACERBRACEA3(ST-LEN, CTORLOOPA2(ST-BT, ST-BODY), ST-VALS ST-BODY) ST-IS >
     if all-vals(ST-VALS) = true
-    /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT) .
+    /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT)
+    /\ ST-LEN := len(ST-TR) .
 
   crl [step-call-ref] :
     step(< ST-Z | ST-VALS CTORREFFUNCADDRA1(ST-A) CTORCALLREFA1(ST-YY) ST-IS >)
     =>
-    < ST-Z | CTORFRAMELBRACERBRACEA3(len(ST-TR), ST-FI,
-             CTORLABELLBRACERBRACEA3(len(ST-TR), eps, ST-VALS ST-BODY)) ST-IS >
+    < ST-Z | ST-VALS CTORFRAMELBRACERBRACEA3(ST-LEN, ST-FI,
+             CTORLABELLBRACERBRACEA3(ST-LEN, eps, ST-VALS ST-BODY)) ST-IS >
     if all-vals(ST-VALS) = true
     /\ CTORFUNCARROWA2(ST-TQ, ST-TR) := value('TYPE, index($funcinst(ST-Z), ST-A))
     /\ CTORFUNCA3(ST-X, CTORLOCALA1(ST-T), ST-BODY) := value('CODE, index($funcinst(ST-Z), ST-A))
     /\ ST-FI := {item('LOCALS, ST-VALS $default(ST-T)) ;
-                 item('MODULE, value('MODULE, index($funcinst(ST-Z), ST-A)))} .
+                 item('MODULE, value('MODULE, index($funcinst(ST-Z), ST-A)))}
+    /\ ST-LEN := len(ST-TR) .
 
   --- -------------------------------------------------------
   --- Transitive closure  steps*

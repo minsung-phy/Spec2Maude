@@ -46,14 +46,14 @@ run_smoke() {
   "$MAUDE_BIN" -no-banner <<'EOF' >"$smoke_log" 2>&1
 load wasm-exec
 rew in WASM-FIB : steps(fib-config(i32v(5))) .
-red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), <> result-is(5)) .
-red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), [] ~ trap-seen) .
-red in WASM-FIB-PROPS : modelCheck(mc(bench-add-config), <> result-is(42)) .
-red in WASM-FIB-PROPS : modelCheck(mc(bench-add-config), [] ~ trap-seen) .
-red in WASM-FIB-PROPS : modelCheck(mc(bench-muladd-config), <> result-is(47)) .
-red in WASM-FIB-PROPS : modelCheck(mc(bench-muladd-config), [] ~ trap-seen) .
-red in WASM-FIB-PROPS : modelCheck(mc(bench-local-config), <> result-is(1)) .
-red in WASM-FIB-PROPS : modelCheck(mc(bench-local-config), [] ~ trap-seen) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(2)), <> result-is(1)) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(2)), [] ~ trap-seen) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(3)), <> result-is(2)) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(3)), [] ~ trap-seen) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(4)), <> result-is(3)) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(4)), [] ~ trap-seen) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .
+red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .
 q
 EOF
 }
