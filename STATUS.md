@@ -1,6 +1,6 @@
 # Spec2Maude — 현재 상태 / 문제점 / 할일
 
-작성일: 2026-04-18
+작성일: 2026-04-19
 
 ---
 
@@ -31,29 +31,33 @@
 
 ## 2. 현재 문제점
 
-### ⚠ P0-0. [근본 설계 이슈] Step rule 을 eq/ceq 로 번역 중 (교수님 요구 §2.2 위반)
-- 통합 전략: P0-0 해결은 파일 전체 교체가 아니라 선택 통합으로 진행한다. 기준은 translator.ml이며, translator_0417.ml에서 rl/crl 기반 Step 생성과 context heating/cooling 경로만 이식한다. Bool 중심 RelD, type-ok 전환, rollrt 특수 브리지는 보류하고 별도 검증 항목으로 분리한다.
-- 현재 `translator.ml` 은 `Step` / `Step-pure` / `Step-read` relation 을 모두 **`eq` / `ceq` (equational)** 로 내려보냄.
-- 근거: [meeting/0331 개인.txt](meeting/0331%20개인.txt) 24:03, 24:55, 27:04
-  - "스펙텍과 리라이팅 로직의 룰의 모양이 비슷해 보이지만 시멘틱스가 완전히 다르다"
-  - "스텝 펑션을 프로즌으로 정리하면 ... 스텝이 무조건 붙어야만 리라이팅 룰 트랜지션이 일어나니까"
-  - "이 스펙텍 룰을 그냥 eq 로 바꾸는 거랑 틀렸다" (그냥 rl 로 바꾸는 것도 주의 필요)
-- 교수님이 의도한 형태:
-  ```maude
-  crl [step-…] :
-    step(< Z | LHS-instrs >) => step(< Z' | RHS-instrs >)
-    if …conditions… .
-  ```
-  (step 래퍼 아래의 **rl/crl** — rewriting rule. 1 rewrite = 1 step.)
-- 영향: P0-A (fib deadlock) / P0-B (V128 stack overflow) 보다 **상위 설계 결함**. eq/ceq 는 confluence 요구 + 임의 서브텀에서 매칭될 수 있어 의미론 보존 측면에서 부적절.
-- **우선순위 최상.** 이거 해결되면 P0-A, P0-B 의 증상도 다르게 나올 가능성 있음.
+### ✅ P0-0. Step rule rl/crl 전환 완료
+- 통합 전략은 유지했다. 기준은 `translator.ml`이고, `translator_0417.ml`에서 **Step rl/crl 생성 경로**와 **context heating/cooling 경로**만 선택 이식했다.
+- 현재 `translator.ml`은 `Step` / `Step-pure` / `Step-read`를 `rl/crl`로 생성한다.
+- `step`은 이제 `op step : ExecConf -> ExecConf [frozen (1)] .` 로 생성되어 top-most 1-step 통제가 작동한다.
+- 실행을 막던 translator 쪽 병목도 함께 수정했다.
+  - `Idx` 계열 `Int` bridge overload 제거 (`$local/$global/... : State Int -> ...` 제거)
+  - `Nat < Idx/Localidx/...` subsort 추가
+  - 잘못된 generic `heat-step-ctxt-instrs` / `cool-step-ctxt-instrs` 제거
+- 유지한 제약:
+  - RelD Bool 반환 체계로 회귀 안 함
+  - type-ok 체계로 전체 전환 안 함
+  - rollrt 특수 브리지 재도입 안 함
 
-### P0-A. fib 모델체킹이 deadlock
-- `modelCheck(fib-config(i32v(5)), <> result-is(5))` → counterexample(nil, ... deadlock)
-- 초기 state에서 rule이 fire되지 않음
-- 원인 가설: LOCAL.SET/TEE/GLOBAL.SET의 Step rule이 "스택에 이미 값이 쌓인" 상태를 매칭하지 못함
-  (스택: `VAL1 VAL2 (LOCAL.SET x)` 같은 경우 rule LHS의 `val (LOCAL.SET x)` 매칭 실패)
-- 해결 시도: Step-pure/Step/Step-read rule LHS/RHS에 `VALS` prefix 변수 + `all-vals(VALS)=true` 가드 추가 → 별도 브랜치 `wip/p0-v128-overflow`에 WIP 커밋됨
+### ✅ P0-A. fib rewrite / modelCheck 통과
+- 검증 결과:
+  - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+    - 종료
+    - 최종 결과 핵심: `CTORCONSTA2(CTORI32A0, 5)`
+  - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .`
+    - `result Bool: true`
+  - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .`
+    - `result Bool: true`
+- 디버깅 과정에서 실제 원인으로 확인된 translator 문제:
+  - `$local` lookup이 값으로 끝나지 않고 `index(..., CTORWIDXA1(...))`에 남는 문제
+  - `step` 내부에서 `exec-step`가 다시 발화해 `step(step(...))`가 생기는 문제
+  - generic `instrs` heating이 `CONST BRIF` 같은 이미 redex인 조각을 잘못 분해하는 문제
+- 위 3개는 모두 `translator.ml` 수정 후 해결됐다.
 
 ### P0-B. V128 stack overflow (WIP 브랜치에서 발견)
 - 위 P0-A 작업 중, translator의 `type_guard` regex 버그 수정 → `cmb T : V128 if true` 가 `cmb T : V128 if (T hasType (vN(128))) : WellTyped` 로 정상화됨
@@ -66,47 +70,51 @@
 - Advisory: `$lsizenn`, `$vsize`, `CTORSA0` 등의 assignment condition에서 LHS 변수가 이미 bound
 - 현재는 동작에 직접 영향 없어 보임 (경고만), 하지만 근본적 해결 필요
 
-### P1. Eval-context 규칙이 손수 작성됨
-- `wasm-exec.maude` 177-250줄의 label/frame/handler/loop context 규칙
-- translator가 SpecTec RulePr premise에서 자동 생성해야 함
+### P1. Eval-context 자동 생성 부분 완료
+- `translator.ml`이 SpecTec `RulePr` premise에서 label/frame/handler context용 heat/cool을 자동 생성한다.
+- 현재 유지되는 자동 생성 경로:
+  - label context
+  - frame context
+  - handler context
+- 제거한 자동 생성 경로:
+  - generic `instrs` context heat/cool
+  - 이유: fib 실행에서 잘못된 분해를 일으켜 `restore-instrs(step(...))`에 멈췄고, 이는 의미 보존보다 회귀를 만들었다.
+- `wasm-exec.maude`의 수동 context rule 일부는 여전히 남아 있다. 완전 제거는 후속 정리 항목이다.
 
 ### P2. 범위 검증 미실시
 - fib 외 다른 예제 (factorial, 재귀 call, memory op 등) 미테스트
 - translator가 SpecTec rule **몇 개** 중 **몇 개** 번역하는지 수치 미측정
+- `fib(0)` ~ `fib(5)`를 각각 개별 실행해 수열을 표로 남기는 작업도 아직 안 했다
 
 ---
 
 ## 3. 할일 리스트 (우선순위순)
 
 ### 즉시 (다음 세션 1회)
-- [ ] 선택 통합 1단계: translate_step_reld를 rl/crl 기반으로 전환
-- [ ] 선택 통합 2단계: context 규칙 자동 생성 경로(is_ctxt_rule, try_decode_ctxt_conclusion, heat/cool) 이식
-- [ ] 통합 제외 항목 고정: RelD Bool 반환, type-ok 체계, rollrt 특수 브리지
-- [ ] **P0-0 재설계 (최우선)**: Step/Step-pure/Step-read 번역을 `rl/crl` 로 이행
-  - `translator.ml` 의 `translate_step_reld` 수정: `ceq step(LHS) = RHS if cond` → `crl step(LHS) => step(RHS) if cond`
-  - 단순 규칙 (프리미스 없음) 은 `rl step(LHS) => step(RHS) .`
-  - wasm-exec.maude 의 step 선언 / 구동 harness 도 함께 조정 (eq 재작성 아닌 rl 재작성에 맞게)
-  - 결정: step 래퍼가 RHS 에도 남는지 (propagating) vs 1 rewrite 후 빠지는지 (one-shot) 미팅에서 확인 필요. 일단 propagating 으로 가정.
-  - 이 재설계 완료 후에야 P0-A, P0-B 가 원래 문제인지 재평가 가능.
+- [x] 선택 통합 1단계: `translate_step_reld`를 rl/crl 기반으로 전환
+- [x] 선택 통합 2단계: context 규칙 자동 생성 경로(`is_ctxt_rule`, `try_decode_ctxt_conclusion`, heat/cool) 이식
+- [x] 통합 제외 항목 고정: RelD Bool 반환, type-ok 체계, rollrt 특수 브리지
+- [x] **P0-0 재설계**: Step/Step-pure/Step-read 번역을 `rl/crl` 로 이행
+- [x] fib `rewrite` / `modelCheck` 재검증
+- [ ] `fib(0)` ~ `fib(5)`를 각각 개별 실행해 기대 수열 확인
+- [ ] `STATUS.md` 기준 warning 목록화 및 분류
 - [ ] **P0-B 디버그**: `wip/p0-v128-overflow` 브랜치에서
   - `output.maude:2275`의 `mb (T hasType (vN(N))) : WellTyped .` 가 왜 무조건인지 추적
   - T의 sort 확인 (아마 kind 레벨로 너무 넓음)
   - translator가 이 mb를 어느 SpecTec 규칙에서 어떻게 생성하는지 로그 추가
   - 해결책: (a) mb에 `T : SomeNarrowerSort` 조건 추가, (b) V128 cmb를 `owise`로, (c) hasType 시스템 재설계
-- [ ] **P0-A 재검증**: P0-B 풀린 후 `rew` 와 `modelCheck` 둘 다 통과 확인
-  - fib(1), fib(2), fib(3), fib(5) 순서로
-  - `rew` 먼저 (빠름), 그 다음 `modelCheck`
 - [ ] **커밋** (작성자 `minsung-phy`, Claude 공저자 표시 없음)
 
 ### 단기 (1-2 세션)
 - [ ] P0-C 경고 체계적으로 해결 또는 suppress 근거 문서화
 - [ ] translator 커버리지 수치: SpecTec 전체 rule 수 vs 자동 번역 성공 수
 - [ ] "translator가 번역 못 하는 규칙" 목록화 및 원인 분석
+- [ ] `wasm-exec.maude`에 남아 있는 수동 override와 자동 생성 경로를 다시 정리
 
 ### 중기 (1-2 주)
-- [ ] P1: eval-context 자동 생성
-  - SpecTec RulePr premise 파싱 로직 추가
-  - `wasm-exec.maude:177-250` 손수 규칙 제거 후 재검증
+- [ ] P1 후속: eval-context 자동 생성 정리
+  - label/frame/handler 자동 생성 경로와 `wasm-exec.maude` 수동 rule의 중복 제거
+  - `instrs` context는 어떤 제약 아래서만 안전한지 재설계
 - [ ] fib 외 예제 확장 (factorial, recursive call)
 - [ ] memory ops, table ops 지원 범위 확인
 
@@ -128,9 +136,6 @@
 
 ## 5. 다음 세션 진입점
 
-1. `git checkout wip/p0-v128-overflow`
-2. `output.maude:2275` 의 `mb (T hasType (vN(N))) : WellTyped .` 확인
-3. `translator.ml` 에서 이 mb 생성 지점 찾기 (`grep "hasType" translator.ml`)
-4. mb에 조건 추가 또는 V128 cmb를 `owise` 처리
-5. `red step(< fib-state | 10-instr body >)` 가 stack overflow 없이 끝나는지 확인
-6. fib(1) → fib(5) 순서로 `rew`, `modelCheck` 검증
+1. `fib(0)` ~ `fib(5)`를 각각 `steps(...)`로 돌려 실제 결과 표를 남긴다
+2. warning/advisory를 유형별로 묶는다
+3. `wip/p0-v128-overflow` 브랜치의 V128 이슈를 다시 재개한다
