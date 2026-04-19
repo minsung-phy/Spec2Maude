@@ -203,7 +203,8 @@ let rec simple_sort_of_typ (t : typ) vm : string option =
       in
       if is_upper_token resolved then None
       else Some (sort_of_type_name resolved)
-  | IterT (inner, _) -> simple_sort_of_typ inner vm
+  | IterT (_, (List | List1 | ListN _)) -> None
+  | IterT (inner, Opt) -> simple_sort_of_typ inner vm
   | _ -> None
 
 let is_token_like_id raw =
@@ -328,6 +329,15 @@ let find_opt_param_indices case_typ =
 
 let declared_vars : (string, string) Hashtbl.t = Hashtbl.create 2048
 
+let normalize_decl_sort name sort =
+  if String.contains name '-'
+     && (try
+           ignore (Str.search_forward (Str.regexp_string "-LIST-") name 0);
+           true
+         with Not_found -> false)
+  then "WasmTerminals"
+  else sort
+
 let init_declared_vars () =
   Hashtbl.reset declared_vars;
   List.iter (fun (v, s) -> Hashtbl.replace declared_vars v s)
@@ -338,6 +348,7 @@ let init_declared_vars () =
       ("TS", "WasmTerminals"); ("W*", "WasmTerminals") ]
 
 let declare_var name sort =
+  let sort = normalize_decl_sort name sort in
   if Hashtbl.mem declared_vars name then ""
   else (Hashtbl.replace declared_vars name sort;
         Printf.sprintf "  var %s : %s .\n" name sort)
@@ -352,12 +363,23 @@ let declare_batch emit names sort =
     |> List.sort_uniq String.compare
     |> List.filter (fun n -> not (Hashtbl.mem declared_vars n))
   in
-  List.iter (fun n -> Hashtbl.replace declared_vars n sort) fresh;
+  let fresh = List.map (fun n -> (n, normalize_decl_sort n sort)) fresh in
+  List.iter (fun (n, s) -> Hashtbl.replace declared_vars n s) fresh;
   match emit, fresh with
   | _, [] -> ""
-  | `Vars, _ -> Printf.sprintf "  vars %s : %s .\n" (String.concat " " fresh) sort
-  | `Ops, _ -> String.concat "" (List.map (fun n ->
-      Printf.sprintf "  op %s : -> %s .\n" n sort) fresh)
+  | `Vars, _ ->
+      let groups =
+        List.fold_left (fun acc (n, s) ->
+          let existing = match List.assoc_opt s acc with Some vs -> vs | None -> [] in
+          (s, n :: existing) :: List.remove_assoc s acc
+        ) [] fresh
+      in
+      groups
+      |> List.map (fun (s, vs) ->
+           Printf.sprintf "  vars %s : %s .\n" (String.concat " " (List.rev vs)) s)
+      |> String.concat ""
+  | `Ops, _ -> String.concat "" (List.map (fun (n, s) ->
+      Printf.sprintf "  op %s : -> %s .\n" n s) fresh)
 
 let declare_vars_same_sort names sort = declare_batch `Vars names sort
 let declare_ops_const_list names sort = declare_batch `Ops names sort
@@ -914,7 +936,9 @@ and translate_typ (t : typ) vm : string = match t.it with
       if args = [] then name
       else Printf.sprintf "%s ( %s )" name
         (String.concat " , " (List.map (fun a -> (translate_arg a vm).text) args))
-  | IterT (inner, _) -> translate_typ inner vm
+  | IterT (inner, (List | List1 | ListN _)) ->
+      Printf.sprintf "list ( %s )" (translate_typ inner vm)
+  | IterT (inner, Opt) -> translate_typ inner vm
   | _ -> "WasmType"
 
 let type_guard term typ vm =
@@ -1227,9 +1251,7 @@ let translate_typd id params insts =
                      let new_vm = (tid.it, indexed) :: cur_vm in
                      let ms =
                        if is_list || is_plural_type tid.it then
-                         match simple_sort_of_typ t new_vm with
-                         | Some s when s <> "WasmTerminal" -> s
-                         | _ -> "WasmTerminals"
+                         "WasmTerminals"
                        else "WasmTerminal"
                      in
                      let guard = "true" in
@@ -1246,16 +1268,23 @@ let translate_typd id params insts =
                              if is_list then
                                vb ^ "-LIST-" ^ String.uppercase_ascii (sanitize tid.it)
                              else vb ^ string_of_int count in
-                           let vm' = (tid.it, indexed) :: vm in
-                           let ms =
+                       let vm' = (tid.it, indexed) :: vm in
+                       let ms =
                              if is_list then
                                "WasmTerminals"
                              else
-                               match simple_sort_of_typ ft vm' with
-                               | Some s when s <> "WasmTerminal" -> s
-                               | _ -> "WasmTerminal"
-                           in
-                           (acc @ [(indexed, "true", ms)], vm')
+                               match ft.it with
+                               | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
+                               | IterT (_, Opt) ->
+                                   (match simple_sort_of_typ ft vm' with
+                                    | Some s when s <> "WasmTerminal" -> s
+                                    | _ -> "WasmTerminal")
+                               | _ ->
+                                   (match simple_sort_of_typ ft vm' with
+                                    | Some s when s <> "WasmTerminal" -> s
+                                    | _ -> "WasmTerminal")
+                        in
+                        (acc @ [(indexed, "true", ms)], vm')
                        | _ ->
                            let (ps, vm') = collect_params vm ft is_list in
                            (acc @ ps, vm')
@@ -1430,6 +1459,15 @@ let translate_typd id params insts =
              let bd = String.concat "" (List.map (fun b -> match b.it with
                | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
                | _ -> "") binders) in
+             let () =
+               if debug_iter_enabled &&
+                  List.mem (String.lowercase_ascii id.it) ["moduleinst"; "store"; "frame"]
+               then
+                 List.iter (fun (atom, (_, ft, _), _) ->
+                   debug_iter "[TYPD-STRUCT] id=%s field=%s typ=%s"
+                     id.it (Xl.Atom.name atom) (Il.Print.string_of_typ ft)
+                 ) fields
+             in
              let info = List.mapi (fun i (atom, (_, ft, _), _) ->
                let fn = to_var_name (Xl.Atom.name atom) in
                let sn = translate_typ (match ft.it with IterT (inner, _) -> inner | _ -> ft) v_map in
@@ -2025,13 +2063,18 @@ let try_decode_ctxt_conclusion rel_name prefix conclusion vm =
           let n_args = List.length args in
           if n_args >= 2 then begin
             let stable_args = List.filteri (fun i _ -> i < n_args - 1) args in
-            let stable_texts =
-              List.map (fun a -> (translate_exp TermCtx a vm).text) stable_args
+            let stable_ts : texpr list =
+              Stdlib.List.map (fun a -> translate_exp TermCtx a vm) stable_args
+            in
+            let stable_texts = Stdlib.List.map (fun (t : texpr) -> t.text) stable_ts in
+            let stable_vars =
+              List.concat_map (fun (t : texpr) -> vars_of_texpr t) stable_ts
+              |> List.sort_uniq String.compare
             in
             let inner_var = prefix ^ "-INNER-IS" in
             let low = String.lowercase_ascii ctor_name in
             let is_frame = String.length low >= 9 && String.sub low 0 9 = "ctorframe" in
-            Some (ctor_name, stable_texts, inner_var, is_frame)
+            Some (ctor_name, stable_texts, stable_vars, inner_var, is_frame)
           end else None
       | _ -> None
     in
@@ -2094,8 +2137,9 @@ let translate_step_reld rel_name rules =
             all_bound := z_var :: n_var :: !all_bound;
             match try_decode_ctxt_conclusion rel_name prefix conclusion vm with
             | None -> ""
-            | Some (ctor_name, stable_texts, _inner_var, is_frame) ->
+            | Some (ctor_name, stable_texts, stable_vars, _inner_var, is_frame) ->
                 let stable_str = String.concat ", " stable_texts in
+                all_bound := stable_vars @ !all_bound;
                 let rule_name = String.lowercase_ascii prefix in
                 let low = String.lowercase_ascii ctor_name in
                 let restore_name =
@@ -2138,7 +2182,7 @@ let translate_step_reld rel_name rules =
                   else
                     let extra_cond =
                       if is_label_ctxt
-                      then Printf.sprintf " /\\ needs-label-ctxt ( %s ) = false" inner_is_var
+                      then Printf.sprintf " /\\ needs-label-ctxt ( %s ) = false /\\ starts-label-ctxt ( %s ) = false" inner_is_var inner_is_var
                       else ""
                     in
                     Printf.sprintf
@@ -2566,11 +2610,15 @@ let footer =
   "  --- Label-context control-flow detector\n" ^
   "  eq  needs-label-ctxt(eps) = false .\n" ^
   "  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .\n" ^
+  "  eq  needs-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORBRA1(T) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORRETURNA0 TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .\n" ^
   "  eq  needs-label-ctxt(TS) = false [owise] .\n\n" ^
+  "  eq  starts-label-ctxt(eps) = false .\n" ^
+  "  eq  starts-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .\n" ^
+  "  eq  starts-label-ctxt(TS) = false [owise] .\n\n" ^
   "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
   "  eq  is-trap(TS) = false [owise] .\n" ^
   "\nendm\n"
@@ -2579,7 +2627,16 @@ let step_predicate_helpers =
   "  op is-val : WasmTerminal -> Bool .\n" ^
   "  op all-vals : WasmTerminals -> Bool .\n" ^
   "  op is-trap : WasmTerminals -> Bool .\n" ^
-  "  op needs-label-ctxt : WasmTerminals -> Bool .\n"
+  "  op needs-label-ctxt : WasmTerminals -> Bool .\n" ^
+  "  op starts-label-ctxt : WasmTerminals -> Bool .\n" ^
+  "  --- Context-wrapper overloads with concrete operand sorts.\n" ^
+  "  --- The generic CTOR* declarations are emitted with WasmTerminal args,\n" ^
+  "  --- but heating/cooling and step rules build these wrappers from\n" ^
+  "  --- N/Frame/Catch/WasmTerminals values. Add precise overloads so the\n" ^
+  "  --- resulting terms are well-sorted and match rewrite rules by membership.\n" ^
+  "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] .\n" ^
+  "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] .\n" ^
+  "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] .\n"
 
 let starts_with s pfx =
   String.length s >= String.length pfx && String.sub s 0 (String.length pfx) = pfx
@@ -2616,13 +2673,21 @@ let collect_ctor_decl_lines eq_lines =
   |> List.of_seq
   |> List.sort_uniq String.compare
   |> List.map (fun nm ->
-       let idx_a = try String.rindex nm 'A' with Not_found -> String.length nm - 1 in
-       let arity =
-         try int_of_string (String.sub nm (idx_a + 1) (String.length nm - idx_a - 1))
-         with _ -> 0
-       in
-       let args = if arity <= 0 then "" else String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
-       Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] ." nm args)
+       match nm with
+       | "CTORLABELLBRACERBRACEA3" ->
+           "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
+       | "CTORFRAMELBRACERBRACEA3" ->
+           "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."
+       | "CTORHANDLERLBRACERBRACEA3" ->
+           "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] ."
+       | _ ->
+           let idx_a = try String.rindex nm 'A' with Not_found -> String.length nm - 1 in
+           let arity =
+             try int_of_string (String.sub nm (idx_a + 1) (String.length nm - idx_a - 1))
+             with _ -> 0
+           in
+           let args = if arity <= 0 then "" else String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
+           Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] ." nm args)
 
 let translate defs =
   build_type_env defs;
@@ -2691,6 +2756,16 @@ let translate defs =
         else true
       else true
     )
+    |> List.map (fun l ->
+      let s = String.trim l in
+      if s = "op CTORLABELLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
+      then "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
+      else if s = "op CTORFRAMELBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
+      then "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."
+      else if s = "op CTORHANDLERLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
+      then "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] ."
+      else l)
+    |> List.sort_uniq String.compare
   in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
   "\n\n  --- Equations\n" ^ String.concat "\n" eqs ^ footer

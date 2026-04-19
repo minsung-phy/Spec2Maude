@@ -163,6 +163,104 @@
     - trivial case인 `restore-label(< Z | eps >, 0, eps, eps)`는 정상적으로 cooling 된다.
     - `exec-loop`를 제거하고 raw `CTORLOOPA2(...)`를 넣어도 block/label 경로는 여전히 정지한다.
     - 현재 판정: 핵심 blocker는 harness helper 중복 자체보다, generated label/frame heating-cooling과 실제 step rule의 조합 방식이다.
+    - 2026-04-19 추가 확인:
+      - `output.maude`의 context wrapper ctor 선언을 concrete sort로 교정했다.
+        - `CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr`
+        - `CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr`
+        - `CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr`
+      - 이 변경 후 실제 확인:
+        - `CTORLABELLBRACERBRACEA3(0, eps, fib-loop-body) :: Instr` → `true`
+        - 따라서 이전의 “wrapper generic ctor 때문에 label 자체가 well-sorted하지 않다” 문제는 일부 해결됐다.
+      - 그러나 fib deadlock은 계속 남아 있다.
+        - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+          → `steps(restore-label(< ... | CTORLABELLBRACERBRACEA3(0, CTORLOOPA2(...), fib-loop-body) >, 0, eps, CTORLOCALGETA1(1)))`
+        - `modelCheck(fib-config(i32v(5)), <> result-is(5))`
+          → counterexample / deadlock
+      - 현재 가장 구체적인 잔여 원인:
+        - generated `cool-step-ctxt-label`은
+          `restore-label(< Z | IS >, N, INSTR0, IS-REST) => < Z | label(N, INSTR0, IS) IS-REST >`
+          형태인데,
+        - 실제 deadlock term은
+          `restore-label(< Z | CTORLABELLBRACERBRACEA3(0, CTORLOOPA2(...), fib-loop-body) >, 0, eps, CTORLOCALGETA1(1))`
+          또는 `restore-label(step(< Z | exec-loop(...) >), 0, eps, CTORLOCALGETA1(1))`
+          로 남아 있다.
+        - 즉 현재는 “label wrapper sort”보다는
+          1. manual `step-read-block-manual` / `step-read-exec-loop`가 넣는 `eps` / loop-body shape
+          2. generated heat/cool이 기대하는 `restore-label` argument shape
+          의 불일치가 더 유력하다.
+      - 추가 관찰:
+        - `wasm-exec.maude`의 `fib-frame`, `fib-state`를 `Frame`, `State`로 선언했지만,
+          실제 `fib-frame(i32v(5)) :: Frame`, `fib-state(i32v(5)) :: State`는 여전히 `false`였다.
+        - 따라서 harness 쪽 record sort membership도 별도로 다시 확인해야 한다.
+      - 2026-04-19 추가 분해:
+        - `wasm-exec.maude`에서 `exec-loop`와 수동 `step-read-exec-loop`를 제거하고, fib harness를
+          `CTORBLOCKA2(void-bt, CTORLOOPA2(void-bt, fib-loop-body))`
+          형태로 바꿔 generated `step-read-block/loop`만 쓰게 해봤다.
+        - 이 경우 결과:
+          - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+            → 초기 상태에서 `steps(step(< ... | BLOCK(LOOP(...)) LOCAL.GET(1) >))`로 정지
+          - `modelCheck(..., <> result-is(5))`
+            → 초기 상태 deadlock counterexample
+        - 직접 확인:
+          - `CTORBLOCKA2(void-bt, CTORLOOPA2(void-bt, fib-loop-body)) :: Instr` → `false`
+          - `CTORLOOPA2(void-bt, fib-loop-body) :: Instr` → `false`
+          - `fib-state(i32v(5)) :: State` → `false`
+        - 판정:
+          - generated `step-read-block/loop`의 sort guard가 현재 fib harness term과 맞지 않아, manual block/loop bridge 없이 바로는 진행되지 않는다.
+        - 그래서 `exec-loop`는 계속 제거한 채, 수동 `step-read-block-manual` / `step-read-loop-manual`만 복원해 다시 검증했다.
+        - 그 결과:
+          - `steps(fib-config(i32v(5)))`는 다시 안쪽까지 진행하지만,
+            `restore-label(restore-label(step(< ... >), 0, loop, eps), 0, eps, local.get(1))`
+            형태의 nested label/restore-label에서 deadlock으로 돌아온다.
+          - `modelCheck(..., [] ~ trap-seen)`는 여전히 `true`
+        - 현재 결론:
+          - 핵심 blocker는 `exec-loop` 자체가 아니다.
+          - `manual block/loop bootstrap + generated label heat/cool` 조합에서 nested label이 다시 heat/cool되며 deadlock이 생긴다.
+          - 다음 우선 조사 대상은 `translator.ml`의 `needs-label-ctxt` / generated label heat/cool guard다.
+      - 2026-04-19 추가 실험:
+        - `translator.ml`의 auto-added helper `needs-label-ctxt`에
+          `CTORLABELLBRACERBRACEA3(...)` head를 `true`로 보는 규칙을 추가했다.
+        - `dune build` 성공, `output.maude` 재생성 성공.
+        - 재검증 결과:
+          - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+            → 여전히
+            `restore-label(restore-label(step(< ... >), 0, loop, eps), 0, eps, CTORLOCALGETA1(1))`
+            형태 deadlock
+          - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .`
+            → 여전히 counterexample / deadlock
+          - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .`
+            → `true`
+        - 직접 확인:
+          - `red in WASM-FIB : needs-label-ctxt(CTORLABELLBRACERBRACEA3(...)) .`
+            → 여전히 `false`
+        - 판정:
+          - 단순 helper case 추가만으로는 outer label reheating을 막지 못했다.
+          - 현재 더 유력한 원인은
+            1. `needs-label-ctxt` 식 자체가 assoc `WasmTerminals`에서 wrapper-head를 기대대로 못 잡는 문제
+            2. 또는 helper가 아니라 generated `heat-step-ctxt-label` 조건/shape 자체 문제
+          - 다음 작업은 `needs-label-ctxt`를 wrapper-head 전용 detector로 다시 설계하거나, label heat rule에서 outer-label-on-label case를 직접 제외하는 것이다.
+      - 2026-04-19 추가 실험 2:
+        - `needs-label-ctxt`와 별도로 `starts-label-ctxt : WasmTerminals -> Bool` helper를 추가했다.
+        - `heat-step-ctxt-label`은 이제
+          `needs-label-ctxt(inner) = false /\ starts-label-ctxt(inner) = false`
+          를 둘 다 요구한다.
+        - `dune build` 성공, `output.maude` 재생성 성공 (`output.maude` 9268줄).
+        - 직접 확인:
+          - `red in WASM-FIB : starts-label-ctxt(CTORLABELLBRACERBRACEA3(...)) .`
+            → 여전히 `false`
+        - 재검증 결과:
+          - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+            → 여전히 nested `restore-label` deadlock
+          - `modelCheck(fib-config(i32v(5)), [] ~ trap-seen)` → `true`
+          - `modelCheck(fib-config(i32v(5)), <> result-is(5))`
+            → 성공으로 확인되지 않음, deadlock trace 지속
+        - 현재 판정:
+          - helper 이름이나 rule 추가 수의 문제가 아니라,
+            현재 helper 스타일의 패턴 매칭이 assoc `WasmTerminals` 위에서
+            wrapper-head를 기대대로 식별하지 못한다.
+          - 따라서 다음 후보는
+            1. helper 기반 우회를 버리고 `heat-step-ctxt-label` rule shape 자체를 다시 설계하거나
+            2. manual block/loop bootstrap이 생성하는 label nesting 방식을 바꾸는 것이다.
 
 ### P2. 범위 검증 미실시
 - fib 외 다른 예제 (factorial, 재귀 call, memory op 등) 미테스트

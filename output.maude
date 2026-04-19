@@ -614,7 +614,7 @@ mod SPECTEC-CORE is
   op CTORF64A0 :  -> WasmTerminal [ctor] .
   op CTORFINALA0 :  -> WasmTerminal [ctor] .
   op CTORFLOORA0 :  -> WasmTerminal [ctor] .
-  op CTORFRAMELBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] .
   op CTORFUNCA0 :  -> WasmTerminal [ctor] .
   op CTORFUNCA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORFUNCA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
@@ -627,7 +627,7 @@ mod SPECTEC-CORE is
   op CTORGLOBALSETA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORGTA0 :  -> WasmTerminal [ctor] .
   op CTORGTA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORHANDLERLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] .
   op CTORHIGHA0 :  -> WasmTerminal [ctor] .
   op CTORI16A0 :  -> WasmTerminal [ctor] .
   op CTORI31A0 :  -> WasmTerminal [ctor] .
@@ -637,7 +637,7 @@ mod SPECTEC-CORE is
   op CTORI8A0 :  -> WasmTerminal [ctor] .
   op CTORIMPORTA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORINFA0 :  -> WasmTerminal [ctor] .
-  op CTORLABELLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] .
   op CTORLBRACKDOTDOTRBRACKA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORLEA0 :  -> WasmTerminal [ctor] .
   op CTORLEA1 : WasmTerminal -> WasmTerminal [ctor] .
@@ -1151,6 +1151,7 @@ mod SPECTEC-CORE is
   op sN : WasmTerminal -> WasmType [ctor] .
   op shape :  -> WasmType [ctor] .
   op start :  -> WasmType [ctor] .
+  op starts-label-ctxt : WasmTerminals -> Bool .
   op state :  -> WasmType [ctor] .
   op storagetype :  -> WasmType [ctor] .
   op store :  -> WasmType [ctor] .
@@ -1513,24 +1514,24 @@ mod SPECTEC-CORE is
   var BINOP1 : WasmTerminal .
   var BLOCKTYPE1 : Blocktype .
   var BSHAPE1 : Bshape .
-  var BYTE-LIST-BYTE : Byte .
-  var CATCH-LIST-CATCH : Catch .
+  var BYTE-LIST-BYTE : WasmTerminals .
+  var CATCH-LIST-CATCH : WasmTerminals .
   var COMPTYPE1 : Comptype .
   var CVTOP1 : WasmTerminal .
-  var DATA-LIST-DATA : Data .
+  var DATA-LIST-DATA : WasmTerminals .
   var DATAIDX1 : Dataidx .
   var DATAMODE1 : Datamode .
   var DIM1 : Dim .
-  var ELEM-LIST-ELEM : Elem .
+  var ELEM-LIST-ELEM : WasmTerminals .
   var ELEMIDX1 : Elemidx .
   var ELEMMODE1 : Elemmode .
   var EXNADDR1 : Exnaddr .
   var EXP1 : Exp .
-  var EXPORT-LIST-EXPORT : Export .
-  var EXPR-LIST-EXPR : Expr .
+  var EXPORT-LIST-EXPORT : WasmTerminals .
+  var EXPR-LIST-EXPR : WasmTerminals .
   var EXPR1 : Expr .
   var EXTERNIDX1 : Externidx .
-  var EXTERNTYPE-LIST-EXTERNTYPE : Externtype .
+  var EXTERNTYPE-LIST-EXTERNTYPE : WasmTerminals .
   var EXTERNTYPE1 : Externtype .
   var F-ADDR-1 : WasmTerminal .
   var F-ALIGN-0 : WasmTerminal .
@@ -1589,10 +1590,10 @@ mod SPECTEC-CORE is
   var FNN1 : WasmTerminal .
   var FNN2 : WasmTerminal .
   var FRAME1 : Frame .
-  var FUNC-LIST-FUNC : Func .
+  var FUNC-LIST-FUNC : WasmTerminals .
   var FUNCADDR1 : Funcaddr .
   var FUNCIDX1 : Funcidx .
-  var GLOBAL-LIST-GLOBAL : Global .
+  var GLOBAL-LIST-GLOBAL : WasmTerminals .
   var GLOBALADDR1 : Globaladdr .
   var GLOBALIDX1 : Globalidx .
   var GLOBALTYPE1 : Globaltype .
@@ -1600,35 +1601,35 @@ mod SPECTEC-CORE is
   var HEAPTYPE1 : Heaptype .
   var HOSTADDR1 : Hostaddr .
   var I1 : WasmTerminal .
-  var IMPORT-LIST-IMPORT : Import .
+  var IMPORT-LIST-IMPORT : WasmTerminals .
   var IN1 : WasmTerminal .
   var INIT1 : Init .
   var INN : WasmTerminal .
   var INN1 : WasmTerminal .
   var INN2 : WasmTerminal .
-  var INSTR-LIST-INSTR : Instr .
+  var INSTR-LIST-INSTR : WasmTerminals .
   var ISHAPE1 : Ishape .
   var ISHAPE11 : Ishape .
   var ISHAPE21 : Ishape .
   var JNN : WasmTerminal .
   var JNN1 : WasmTerminal .
   var JNN2 : WasmTerminal .
-  var LABELIDX-LIST-LABELIDX : Labelidx .
+  var LABELIDX-LIST-LABELIDX : WasmTerminals .
   var LABELIDX1 : Labelidx .
   var LABELIDX2 : WasmTerminal .
-  var LANEIDX-LIST-LANEIDX : Laneidx .
+  var LANEIDX-LIST-LANEIDX : WasmTerminals .
   var LANEIDX1 : Laneidx .
   var LANETYPE1 : Lanetype .
   var LIMITS1 : Limits .
   var LIST1 : WasmTerminal .
   var LOADOP1 : WasmTerminal .
-  var LOCAL-LIST-LOCAL : Local .
-  var LOCALIDX-LIST-LOCALIDX : Localidx .
+  var LOCAL-LIST-LOCAL : WasmTerminals .
+  var LOCALIDX-LIST-LOCALIDX : WasmTerminals .
   var LOCALIDX1 : Localidx .
   var M : WasmTerminal .
   var M1 : M .
   var M2 : WasmTerminal .
-  var MEM-LIST-MEM : Mem .
+  var MEM-LIST-MEM : WasmTerminals .
   var MEMADDR1 : Memaddr .
   var MEMARG1 : Memarg .
   var MEMIDX1 : Memidx .
@@ -1666,28 +1667,28 @@ mod SPECTEC-CORE is
   var STRUCTADDR1 : Structaddr .
   var SX1 : Sx .
   var SZ1 : Sz .
-  var TABLE-LIST-TABLE : Table .
+  var TABLE-LIST-TABLE : WasmTerminals .
   var TABLEADDR1 : Tableaddr .
   var TABLEIDX1 : Tableidx .
   var TABLEIDX2 : WasmTerminal .
   var TABLETYPE1 : Tabletype .
-  var TAG-LIST-TAG : Tag .
+  var TAG-LIST-TAG : WasmTerminals .
   var TAGADDR1 : Tagaddr .
   var TAGIDX1 : Tagidx .
   var TAGTYPE1 : Tagtype .
   var TESTOP1 : WasmTerminal .
-  var TYPE-LIST-TYPE : Type .
+  var TYPE-LIST-TYPE : WasmTerminals .
   var TYPEIDX1 : Typeidx .
   var TYPEIDX2 : WasmTerminal .
-  var TYPEUSE-LIST-TYPEUSE : Typeuse .
+  var TYPEUSE-LIST-TYPEUSE : WasmTerminals .
   var TYPEUSE1 : Typeuse .
   var U311 : U31 .
   var U321 : U32 .
   var U641 : U64 .
   var U642 : WasmTerminal .
   var UNOP1 : WasmTerminal .
-  var VAL-LIST-VAL : Val .
-  var VALTYPE-LIST-VALTYPE : Valtype .
+  var VAL-LIST-VAL : WasmTerminals .
+  var VALTYPE-LIST-VALTYPE : WasmTerminals .
   var VALTYPE1 : Valtype .
   var VBINOP1 : WasmTerminal .
   var VCVTOP1 : WasmTerminal .
@@ -2127,6 +2128,11 @@ mod SPECTEC-CORE is
   vars ZSIZE0-NUMTYPE ZSIZE1-VECTYPE ZSIZE2-PACKTYPE : WasmTerminal .
 
   --- Equations
+  --- Context-wrapper overloads with concrete operand sorts.
+  --- The generic CTOR* declarations are emitted with WasmTerminal args,
+  --- but heating/cooling and step rules build these wrappers from
+  --- N/Frame/Catch/WasmTerminals values. Add precise overloads so the
+  --- resulting terms are well-sorted and match rewrite rules by membership.
 
   cmb ( T ) : N
    if true .
@@ -2451,7 +2457,7 @@ mod SPECTEC-CORE is
 
 
   cmb ( {item('TYPES, ( F-TYPES-0 )) ; item('FUNCS, ( F-FUNCS-1 )) ; item('GLOBALS, ( F-GLOBALS-2 )) ; item('TABLES, ( F-TABLES-3 )) ; item('MEMS, ( F-MEMS-4 )) ; item('ELEMS, ( F-ELEMS-5 )) ; item('DATAS, ( F-DATAS-6 )) ; item('LOCALS, ( F-LOCALS-7 )) ; item('LABELS, ( F-LABELS-8 )) ; item('TAGS, ( F-TAGS-9 ))} ) : Free
-   if F-TYPES-0 : Typeidx /\ F-FUNCS-1 : Funcidx /\ F-GLOBALS-2 : Globalidx /\ F-TABLES-3 : Tableidx /\ F-MEMS-4 : Memidx /\ F-ELEMS-5 : Elemidx /\ F-DATAS-6 : Dataidx /\ F-LOCALS-7 : Localidx /\ F-LABELS-8 : Labelidx /\ F-TAGS-9 : Tagidx .
+   if ( F-TYPES-0 hasType ( list ( typeidx ) ) ) : WellTyped /\ ( F-FUNCS-1 hasType ( list ( funcidx ) ) ) : WellTyped /\ ( F-GLOBALS-2 hasType ( list ( globalidx ) ) ) : WellTyped /\ ( F-TABLES-3 hasType ( list ( tableidx ) ) ) : WellTyped /\ ( F-MEMS-4 hasType ( list ( memidx ) ) ) : WellTyped /\ ( F-ELEMS-5 hasType ( list ( elemidx ) ) ) : WellTyped /\ ( F-DATAS-6 hasType ( list ( dataidx ) ) ) : WellTyped /\ ( F-LOCALS-7 hasType ( list ( localidx ) ) ) : WellTyped /\ ( F-LABELS-8 hasType ( list ( labelidx ) ) ) : WellTyped /\ ( F-TAGS-9 hasType ( list ( tagidx ) ) ) : WellTyped .
 
 
 
@@ -3692,7 +3698,7 @@ mod SPECTEC-CORE is
   cmb ( {item('NAME, ( F-NAME-0 )) ; item('ADDR, ( F-ADDR-1 ))} ) : Exportinst
    if F-NAME-0 : Name /\ F-ADDR-1 : Externaddr .
   cmb ( {item('TYPES, ( F-TYPES-0 )) ; item('TAGS, ( F-TAGS-1 )) ; item('GLOBALS, ( F-GLOBALS-2 )) ; item('MEMS, ( F-MEMS-3 )) ; item('TABLES, ( F-TABLES-4 )) ; item('FUNCS, ( F-FUNCS-5 )) ; item('DATAS, ( F-DATAS-6 )) ; item('ELEMS, ( F-ELEMS-7 )) ; item('EXPORTS, ( F-EXPORTS-8 ))} ) : Moduleinst
-   if F-TYPES-0 : Deftype /\ F-TAGS-1 : Tagaddr /\ F-GLOBALS-2 : Globaladdr /\ F-MEMS-3 : Memaddr /\ F-TABLES-4 : Tableaddr /\ F-FUNCS-5 : Funcaddr /\ F-DATAS-6 : Dataaddr /\ F-ELEMS-7 : Elemaddr /\ F-EXPORTS-8 : Exportinst .
+   if ( F-TYPES-0 hasType ( list ( deftype ) ) ) : WellTyped /\ ( F-TAGS-1 hasType ( list ( tagaddr ) ) ) : WellTyped /\ ( F-GLOBALS-2 hasType ( list ( globaladdr ) ) ) : WellTyped /\ ( F-MEMS-3 hasType ( list ( memaddr ) ) ) : WellTyped /\ ( F-TABLES-4 hasType ( list ( tableaddr ) ) ) : WellTyped /\ ( F-FUNCS-5 hasType ( list ( funcaddr ) ) ) : WellTyped /\ ( F-DATAS-6 hasType ( list ( dataaddr ) ) ) : WellTyped /\ ( F-ELEMS-7 hasType ( list ( elemaddr ) ) ) : WellTyped /\ ( F-EXPORTS-8 hasType ( list ( exportinst ) ) ) : WellTyped .
   mb ( CTORCONSTA2 ( NUMTYPE1, NUM1 ) ) : Val .
   mb ( CTORVCONSTA2 ( VECTYPE1, VEC1 ) ) : Val .
   mb ( CTORREFNULLA1 ( HEAPTYPE1 ) ) : Val .
@@ -3704,7 +3710,7 @@ mod SPECTEC-CORE is
   mb ( CTORREFHOSTADDRA1 ( HOSTADDR1 ) ) : Val .
   mb ( CTORREFEXTERNA1 ( ADDRREF1 ) ) : Val .
   cmb ( {item('LOCALS, ( F-LOCALS-0 )) ; item('MODULE, ( F-MODULE-1 ))} ) : Frame
-   if F-LOCALS-0 : Val /\ F-MODULE-1 : Moduleinst .
+   if ( F-LOCALS-0 hasType ( list ( val ) ) ) : WellTyped /\ F-MODULE-1 : Moduleinst .
   mb ( CTORNOPA0 ) : Instr .
   mb ( CTORUNREACHABLEA0 ) : Instr .
   mb ( CTORDROPA0 ) : Instr .
@@ -3851,7 +3857,7 @@ mod SPECTEC-CORE is
 
 
   cmb ( TS ) : Expr
-   if TS : Instr .
+   if ( TS hasType ( list ( instr ) ) ) : WellTyped .
 
 
 
@@ -4144,7 +4150,7 @@ mod SPECTEC-CORE is
   mb ( CTORARROWA3 ( RESULTTYPE1, LOCALIDX-LIST-LOCALIDX, RESULTTYPE2 ) ) : Instrtype .
 
   cmb ( {item('TYPES, ( F-TYPES-0 )) ; item('RECS, ( F-RECS-1 )) ; item('TAGS, ( F-TAGS-2 )) ; item('GLOBALS, ( F-GLOBALS-3 )) ; item('MEMS, ( F-MEMS-4 )) ; item('TABLES, ( F-TABLES-5 )) ; item('FUNCS, ( F-FUNCS-6 )) ; item('DATAS, ( F-DATAS-7 )) ; item('ELEMS, ( F-ELEMS-8 )) ; item('LOCALS, ( F-LOCALS-9 )) ; item('LABELS, ( F-LABELS-10 )) ; item('RETURN, ( F-RETURN-11 )) ; item('REFS, ( F-REFS-12 ))} ) : Context
-   if F-TYPES-0 : Deftype /\ F-RECS-1 : Subtype /\ F-TAGS-2 : Tagtype /\ F-GLOBALS-3 : Globaltype /\ F-MEMS-4 : Memtype /\ F-TABLES-5 : Tabletype /\ F-FUNCS-6 : Deftype /\ F-DATAS-7 : Datatype /\ F-ELEMS-8 : Elemtype /\ F-LOCALS-9 : Localtype /\ F-LABELS-10 : Resulttype /\ F-RETURN-11 : Resulttype /\ F-REFS-12 : Funcidx .
+   if ( F-TYPES-0 hasType ( list ( deftype ) ) ) : WellTyped /\ ( F-RECS-1 hasType ( list ( subtype ) ) ) : WellTyped /\ ( F-TAGS-2 hasType ( list ( tagtype ) ) ) : WellTyped /\ ( F-GLOBALS-3 hasType ( list ( globaltype ) ) ) : WellTyped /\ ( F-MEMS-4 hasType ( list ( memtype ) ) ) : WellTyped /\ ( F-TABLES-5 hasType ( list ( tabletype ) ) ) : WellTyped /\ ( F-FUNCS-6 hasType ( list ( deftype ) ) ) : WellTyped /\ ( F-DATAS-7 hasType ( list ( datatype ) ) ) : WellTyped /\ ( F-ELEMS-8 hasType ( list ( elemtype ) ) ) : WellTyped /\ ( F-LOCALS-9 hasType ( list ( localtype ) ) ) : WellTyped /\ ( F-LABELS-10 hasType ( list ( resulttype ) ) ) : WellTyped /\ F-RETURN-11 : Resulttype /\ ( F-REFS-12 hasType ( list ( funcidx ) ) ) : WellTyped .
 
 
 
@@ -4360,9 +4366,9 @@ mod SPECTEC-CORE is
     prove ( Resulttype-ok ( RESULTTYPE-OK-R00-C , RESULTTYPE-OK-R00-T ) )
     =>
     proved
-      if prove ( Valtype-ok ( RESULTTYPE-OK-R00-C, RESULTTYPE-OK-R00-T ) ) : Proved /\ RESULTTYPE-OK-R00-C : Context /\ RESULTTYPE-OK-R00-T : Valtype .
+      if prove ( Valtype-ok ( RESULTTYPE-OK-R00-C, RESULTTYPE-OK-R00-T ) ) : Proved /\ RESULTTYPE-OK-R00-C : Context /\ ( RESULTTYPE-OK-R00-T hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Resulttype-ok ( RESULTTYPE-OK-R00-C , RESULTTYPE-OK-R00-T ) ) : Proved
-      if prove ( Valtype-ok ( RESULTTYPE-OK-R00-C, RESULTTYPE-OK-R00-T ) ) : Proved /\ RESULTTYPE-OK-R00-C : Context /\ RESULTTYPE-OK-R00-T : Valtype .
+      if prove ( Valtype-ok ( RESULTTYPE-OK-R00-C, RESULTTYPE-OK-R00-T ) ) : Proved /\ RESULTTYPE-OK-R00-C : Context /\ ( RESULTTYPE-OK-R00-T hasType ( list ( valtype ) ) ) : WellTyped .
 
 
   crl [fieldtype-ok-r0] :
@@ -4394,9 +4400,9 @@ mod SPECTEC-CORE is
     prove ( Comptype-ok ( COMPTYPE-OK-STRUCT0-C , CTORSTRUCTA1 ( COMPTYPE-OK-STRUCT0-FIELDTYPE ) ) )
     =>
     proved
-      if prove ( Fieldtype-ok ( COMPTYPE-OK-STRUCT0-C, COMPTYPE-OK-STRUCT0-FIELDTYPE ) ) : Proved /\ COMPTYPE-OK-STRUCT0-C : Context /\ COMPTYPE-OK-STRUCT0-FIELDTYPE : Fieldtype .
+      if prove ( Fieldtype-ok ( COMPTYPE-OK-STRUCT0-C, COMPTYPE-OK-STRUCT0-FIELDTYPE ) ) : Proved /\ COMPTYPE-OK-STRUCT0-C : Context /\ ( COMPTYPE-OK-STRUCT0-FIELDTYPE hasType ( list ( fieldtype ) ) ) : WellTyped .
   cmb prove ( Comptype-ok ( COMPTYPE-OK-STRUCT0-C , CTORSTRUCTA1 ( COMPTYPE-OK-STRUCT0-FIELDTYPE ) ) ) : Proved
-      if prove ( Fieldtype-ok ( COMPTYPE-OK-STRUCT0-C, COMPTYPE-OK-STRUCT0-FIELDTYPE ) ) : Proved /\ COMPTYPE-OK-STRUCT0-C : Context /\ COMPTYPE-OK-STRUCT0-FIELDTYPE : Fieldtype .
+      if prove ( Fieldtype-ok ( COMPTYPE-OK-STRUCT0-C, COMPTYPE-OK-STRUCT0-FIELDTYPE ) ) : Proved /\ COMPTYPE-OK-STRUCT0-C : Context /\ ( COMPTYPE-OK-STRUCT0-FIELDTYPE hasType ( list ( fieldtype ) ) ) : WellTyped .
   crl [comptype-ok-array] :
     prove ( Comptype-ok ( COMPTYPE-OK-ARRAY1-C , CTORARRAYA1 ( COMPTYPE-OK-ARRAY1-FIELDTYPE ) ) )
     =>
@@ -4408,18 +4414,18 @@ mod SPECTEC-CORE is
     prove ( Comptype-ok ( COMPTYPE-OK-FUNC2-C , CTORFUNCARROWA2 ( COMPTYPE-OK-FUNC2-T1, COMPTYPE-OK-FUNC2-T2 ) ) )
     =>
     proved
-      if prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T1 ) ) : Proved /\ prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T2 ) ) : Proved /\ COMPTYPE-OK-FUNC2-C : Context /\ COMPTYPE-OK-FUNC2-T1 : Valtype /\ COMPTYPE-OK-FUNC2-T2 : Valtype .
+      if prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T1 ) ) : Proved /\ prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T2 ) ) : Proved /\ COMPTYPE-OK-FUNC2-C : Context /\ ( COMPTYPE-OK-FUNC2-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-OK-FUNC2-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Comptype-ok ( COMPTYPE-OK-FUNC2-C , CTORFUNCARROWA2 ( COMPTYPE-OK-FUNC2-T1, COMPTYPE-OK-FUNC2-T2 ) ) ) : Proved
-      if prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T1 ) ) : Proved /\ prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T2 ) ) : Proved /\ COMPTYPE-OK-FUNC2-C : Context /\ COMPTYPE-OK-FUNC2-T1 : Valtype /\ COMPTYPE-OK-FUNC2-T2 : Valtype .
+      if prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T1 ) ) : Proved /\ prove ( Resulttype-ok ( COMPTYPE-OK-FUNC2-C, COMPTYPE-OK-FUNC2-T2 ) ) : Proved /\ COMPTYPE-OK-FUNC2-C : Context /\ ( COMPTYPE-OK-FUNC2-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-OK-FUNC2-T2 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
   crl [subtype-ok-r0] :
     prove ( Subtype-ok ( SUBTYPE-OK-R00-C , CTORSUBA3 ( CTORFINALA0, ( CTORWIDXA1 ( SUBTYPE-OK-R00-X ) ), SUBTYPE-OK-R00-COMPTYPE ) , CTOROKA1 ( SUBTYPE-OK-R00-X0 ) ) )
     =>
     proved
-      if CTORSUBA3 ( eps, ( CTORWIDXA1 ( XQ ) ), SUBTYPE-OK-R00-COMPTYPEQ ) := $unrolldt ( ( index ( value('TYPES, SUBTYPE-OK-R00-C), SUBTYPE-OK-R00-X ) ) ) /\ ( ( len ( SUBTYPE-OK-R00-X ) <= 1 ) ) = true /\ ( ( SUBTYPE-OK-R00-X < SUBTYPE-OK-R00-X0 ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE, SUBTYPE-OK-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK-R00-C : Context /\ SUBTYPE-OK-R00-X : Idx /\ SUBTYPE-OK-R00-COMPTYPE : Comptype /\ SUBTYPE-OK-R00-X0 : Idx .
+      if CTORSUBA3 ( eps, ( CTORWIDXA1 ( XQ ) ), SUBTYPE-OK-R00-COMPTYPEQ ) := $unrolldt ( ( index ( value('TYPES, SUBTYPE-OK-R00-C), SUBTYPE-OK-R00-X ) ) ) /\ ( ( len ( SUBTYPE-OK-R00-X ) <= 1 ) ) = true /\ ( ( SUBTYPE-OK-R00-X < SUBTYPE-OK-R00-X0 ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE, SUBTYPE-OK-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK-R00-C : Context /\ ( SUBTYPE-OK-R00-X hasType ( list ( idx ) ) ) : WellTyped /\ SUBTYPE-OK-R00-COMPTYPE : Comptype /\ SUBTYPE-OK-R00-X0 : Idx .
   cmb prove ( Subtype-ok ( SUBTYPE-OK-R00-C , CTORSUBA3 ( CTORFINALA0, ( CTORWIDXA1 ( SUBTYPE-OK-R00-X ) ), SUBTYPE-OK-R00-COMPTYPE ) , CTOROKA1 ( SUBTYPE-OK-R00-X0 ) ) ) : Proved
-      if CTORSUBA3 ( eps, ( CTORWIDXA1 ( XQ ) ), SUBTYPE-OK-R00-COMPTYPEQ ) := $unrolldt ( ( index ( value('TYPES, SUBTYPE-OK-R00-C), SUBTYPE-OK-R00-X ) ) ) /\ ( ( len ( SUBTYPE-OK-R00-X ) <= 1 ) ) = true /\ ( ( SUBTYPE-OK-R00-X < SUBTYPE-OK-R00-X0 ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE, SUBTYPE-OK-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK-R00-C : Context /\ SUBTYPE-OK-R00-X : Idx /\ SUBTYPE-OK-R00-COMPTYPE : Comptype /\ SUBTYPE-OK-R00-X0 : Idx .
+      if CTORSUBA3 ( eps, ( CTORWIDXA1 ( XQ ) ), SUBTYPE-OK-R00-COMPTYPEQ ) := $unrolldt ( ( index ( value('TYPES, SUBTYPE-OK-R00-C), SUBTYPE-OK-R00-X ) ) ) /\ ( ( len ( SUBTYPE-OK-R00-X ) <= 1 ) ) = true /\ ( ( SUBTYPE-OK-R00-X < SUBTYPE-OK-R00-X0 ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK-R00-C, SUBTYPE-OK-R00-COMPTYPE, SUBTYPE-OK-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK-R00-C : Context /\ ( SUBTYPE-OK-R00-X hasType ( list ( idx ) ) ) : WellTyped /\ SUBTYPE-OK-R00-COMPTYPE : Comptype /\ SUBTYPE-OK-R00-X0 : Idx .
 
 
   crl [rectype-ok-empty] :
@@ -4433,25 +4439,25 @@ mod SPECTEC-CORE is
     prove ( Rectype-ok ( RECTYPE-OK-CONS1-C , CTORRECA1 ( ( RECTYPE-OK-CONS1-SUBTYPE1 RECTYPE-OK-CONS1-SUBTYPE ) ) , CTOROKA1 ( RECTYPE-OK-CONS1-X ) ) )
     =>
     proved
-      if prove ( Subtype-ok ( RECTYPE-OK-CONS1-C, RECTYPE-OK-CONS1-SUBTYPE1, ( CTOROKA1 ( RECTYPE-OK-CONS1-X ) ) ) ) : Proved /\ prove ( Rectype-ok ( RECTYPE-OK-CONS1-C, ( CTORRECA1 ( RECTYPE-OK-CONS1-SUBTYPE ) ), ( CTOROKA1 ( ( ( RECTYPE-OK-CONS1-X + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK-CONS1-C : Context /\ RECTYPE-OK-CONS1-SUBTYPE1 : Subtype /\ RECTYPE-OK-CONS1-SUBTYPE : Subtype /\ RECTYPE-OK-CONS1-X : Idx .
+      if prove ( Subtype-ok ( RECTYPE-OK-CONS1-C, RECTYPE-OK-CONS1-SUBTYPE1, ( CTOROKA1 ( RECTYPE-OK-CONS1-X ) ) ) ) : Proved /\ prove ( Rectype-ok ( RECTYPE-OK-CONS1-C, ( CTORRECA1 ( RECTYPE-OK-CONS1-SUBTYPE ) ), ( CTOROKA1 ( ( ( RECTYPE-OK-CONS1-X + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK-CONS1-C : Context /\ RECTYPE-OK-CONS1-SUBTYPE1 : Subtype /\ ( RECTYPE-OK-CONS1-SUBTYPE hasType ( list ( subtype ) ) ) : WellTyped /\ RECTYPE-OK-CONS1-X : Idx .
   cmb prove ( Rectype-ok ( RECTYPE-OK-CONS1-C , CTORRECA1 ( ( RECTYPE-OK-CONS1-SUBTYPE1 RECTYPE-OK-CONS1-SUBTYPE ) ) , CTOROKA1 ( RECTYPE-OK-CONS1-X ) ) ) : Proved
-      if prove ( Subtype-ok ( RECTYPE-OK-CONS1-C, RECTYPE-OK-CONS1-SUBTYPE1, ( CTOROKA1 ( RECTYPE-OK-CONS1-X ) ) ) ) : Proved /\ prove ( Rectype-ok ( RECTYPE-OK-CONS1-C, ( CTORRECA1 ( RECTYPE-OK-CONS1-SUBTYPE ) ), ( CTOROKA1 ( ( ( RECTYPE-OK-CONS1-X + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK-CONS1-C : Context /\ RECTYPE-OK-CONS1-SUBTYPE1 : Subtype /\ RECTYPE-OK-CONS1-SUBTYPE : Subtype /\ RECTYPE-OK-CONS1-X : Idx .
+      if prove ( Subtype-ok ( RECTYPE-OK-CONS1-C, RECTYPE-OK-CONS1-SUBTYPE1, ( CTOROKA1 ( RECTYPE-OK-CONS1-X ) ) ) ) : Proved /\ prove ( Rectype-ok ( RECTYPE-OK-CONS1-C, ( CTORRECA1 ( RECTYPE-OK-CONS1-SUBTYPE ) ), ( CTOROKA1 ( ( ( RECTYPE-OK-CONS1-X + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK-CONS1-C : Context /\ RECTYPE-OK-CONS1-SUBTYPE1 : Subtype /\ ( RECTYPE-OK-CONS1-SUBTYPE hasType ( list ( subtype ) ) ) : WellTyped /\ RECTYPE-OK-CONS1-X : Idx .
   crl [rectype-ok-w--rec2] :
     prove ( Rectype-ok ( RECTYPE-OK-W--REC22-C , CTORRECA1 ( RECTYPE-OK-W--REC22-SUBTYPE ) , CTOROKA1 ( RECTYPE-OK-W--REC22-X ) ) )
     =>
     proved
-      if prove ( Rectype-ok2 ( ( merge ( {item('TYPES, eps) ; item('RECS, RECTYPE-OK-W--REC22-SUBTYPE) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} , RECTYPE-OK-W--REC22-C ) ), ( CTORRECA1 ( RECTYPE-OK-W--REC22-SUBTYPE ) ), ( CTOROKA2 ( RECTYPE-OK-W--REC22-X, 0 ) ) ) ) : Proved /\ RECTYPE-OK-W--REC22-C : Context /\ RECTYPE-OK-W--REC22-SUBTYPE : Subtype /\ RECTYPE-OK-W--REC22-X : Idx .
+      if prove ( Rectype-ok2 ( ( merge ( {item('TYPES, eps) ; item('RECS, RECTYPE-OK-W--REC22-SUBTYPE) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} , RECTYPE-OK-W--REC22-C ) ), ( CTORRECA1 ( RECTYPE-OK-W--REC22-SUBTYPE ) ), ( CTOROKA2 ( RECTYPE-OK-W--REC22-X, 0 ) ) ) ) : Proved /\ RECTYPE-OK-W--REC22-C : Context /\ ( RECTYPE-OK-W--REC22-SUBTYPE hasType ( list ( subtype ) ) ) : WellTyped /\ RECTYPE-OK-W--REC22-X : Idx .
   cmb prove ( Rectype-ok ( RECTYPE-OK-W--REC22-C , CTORRECA1 ( RECTYPE-OK-W--REC22-SUBTYPE ) , CTOROKA1 ( RECTYPE-OK-W--REC22-X ) ) ) : Proved
-      if prove ( Rectype-ok2 ( ( merge ( {item('TYPES, eps) ; item('RECS, RECTYPE-OK-W--REC22-SUBTYPE) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} , RECTYPE-OK-W--REC22-C ) ), ( CTORRECA1 ( RECTYPE-OK-W--REC22-SUBTYPE ) ), ( CTOROKA2 ( RECTYPE-OK-W--REC22-X, 0 ) ) ) ) : Proved /\ RECTYPE-OK-W--REC22-C : Context /\ RECTYPE-OK-W--REC22-SUBTYPE : Subtype /\ RECTYPE-OK-W--REC22-X : Idx .
+      if prove ( Rectype-ok2 ( ( merge ( {item('TYPES, eps) ; item('RECS, RECTYPE-OK-W--REC22-SUBTYPE) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} , RECTYPE-OK-W--REC22-C ) ), ( CTORRECA1 ( RECTYPE-OK-W--REC22-SUBTYPE ) ), ( CTOROKA2 ( RECTYPE-OK-W--REC22-X, 0 ) ) ) ) : Proved /\ RECTYPE-OK-W--REC22-C : Context /\ ( RECTYPE-OK-W--REC22-SUBTYPE hasType ( list ( subtype ) ) ) : WellTyped /\ RECTYPE-OK-W--REC22-X : Idx .
 
 
   crl [subtype-ok2-r0] :
     prove ( Subtype-ok2 ( SUBTYPE-OK2-R00-C , CTORSUBA3 ( CTORFINALA0, SUBTYPE-OK2-R00-TYPEUSE, SUBTYPE-OK2-R00-COMPTTYPE ) , CTOROKA2 ( SUBTYPE-OK2-R00-X, SUBTYPE-OK2-R00-I ) ) )
     =>
     proved
-      if CTORSUBA3 ( eps, SUBTYPE-OK2-R00-TYPEUSEQ, SUBTYPE-OK2-R00-COMPTYPEQ ) := $unrollht ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-TYPEUSE ) /\ ( ( len ( SUBTYPE-OK2-R00-TYPEUSE ) <= 1 ) ) = true /\ ( $before ( SUBTYPE-OK2-R00-TYPEUSE, SUBTYPE-OK2-R00-X, SUBTYPE-OK2-R00-I ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE, SUBTYPE-OK2-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK2-R00-C : Context /\ SUBTYPE-OK2-R00-TYPEUSE : Typeuse /\ SUBTYPE-OK2-R00-COMPTTYPE : Comptype /\ SUBTYPE-OK2-R00-X : Idx .
+      if CTORSUBA3 ( eps, SUBTYPE-OK2-R00-TYPEUSEQ, SUBTYPE-OK2-R00-COMPTYPEQ ) := $unrollht ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-TYPEUSE ) /\ ( ( len ( SUBTYPE-OK2-R00-TYPEUSE ) <= 1 ) ) = true /\ ( $before ( SUBTYPE-OK2-R00-TYPEUSE, SUBTYPE-OK2-R00-X, SUBTYPE-OK2-R00-I ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE, SUBTYPE-OK2-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK2-R00-C : Context /\ ( SUBTYPE-OK2-R00-TYPEUSE hasType ( list ( typeuse ) ) ) : WellTyped /\ SUBTYPE-OK2-R00-COMPTTYPE : Comptype /\ SUBTYPE-OK2-R00-X : Idx .
   cmb prove ( Subtype-ok2 ( SUBTYPE-OK2-R00-C , CTORSUBA3 ( CTORFINALA0, SUBTYPE-OK2-R00-TYPEUSE, SUBTYPE-OK2-R00-COMPTTYPE ) , CTOROKA2 ( SUBTYPE-OK2-R00-X, SUBTYPE-OK2-R00-I ) ) ) : Proved
-      if CTORSUBA3 ( eps, SUBTYPE-OK2-R00-TYPEUSEQ, SUBTYPE-OK2-R00-COMPTYPEQ ) := $unrollht ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-TYPEUSE ) /\ ( ( len ( SUBTYPE-OK2-R00-TYPEUSE ) <= 1 ) ) = true /\ ( $before ( SUBTYPE-OK2-R00-TYPEUSE, SUBTYPE-OK2-R00-X, SUBTYPE-OK2-R00-I ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE, SUBTYPE-OK2-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK2-R00-C : Context /\ SUBTYPE-OK2-R00-TYPEUSE : Typeuse /\ SUBTYPE-OK2-R00-COMPTTYPE : Comptype /\ SUBTYPE-OK2-R00-X : Idx .
+      if CTORSUBA3 ( eps, SUBTYPE-OK2-R00-TYPEUSEQ, SUBTYPE-OK2-R00-COMPTYPEQ ) := $unrollht ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-TYPEUSE ) /\ ( ( len ( SUBTYPE-OK2-R00-TYPEUSE ) <= 1 ) ) = true /\ ( $before ( SUBTYPE-OK2-R00-TYPEUSE, SUBTYPE-OK2-R00-X, SUBTYPE-OK2-R00-I ) ) = true /\ prove ( Comptype-ok ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE ) ) : Proved /\ prove ( Comptype-sub ( SUBTYPE-OK2-R00-C, SUBTYPE-OK2-R00-COMPTYPE, SUBTYPE-OK2-R00-COMPTYPEQ ) ) : Proved /\ SUBTYPE-OK2-R00-C : Context /\ ( SUBTYPE-OK2-R00-TYPEUSE hasType ( list ( typeuse ) ) ) : WellTyped /\ SUBTYPE-OK2-R00-COMPTTYPE : Comptype /\ SUBTYPE-OK2-R00-X : Idx .
 
 
   crl [rectype-ok2-empty] :
@@ -4465,9 +4471,9 @@ mod SPECTEC-CORE is
     prove ( Rectype-ok2 ( RECTYPE-OK2-CONS1-C , CTORRECA1 ( ( RECTYPE-OK2-CONS1-SUBTYPE1 RECTYPE-OK2-CONS1-SUBTYPE ) ) , CTOROKA2 ( RECTYPE-OK2-CONS1-X, RECTYPE-OK2-CONS1-I ) ) )
     =>
     proved
-      if prove ( Subtype-ok2 ( RECTYPE-OK2-CONS1-C, RECTYPE-OK2-CONS1-SUBTYPE1, ( CTOROKA2 ( RECTYPE-OK2-CONS1-X, RECTYPE-OK2-CONS1-I ) ) ) ) : Proved /\ prove ( Rectype-ok2 ( RECTYPE-OK2-CONS1-C, ( CTORRECA1 ( RECTYPE-OK2-CONS1-SUBTYPE ) ), ( CTOROKA2 ( ( ( RECTYPE-OK2-CONS1-X + 1 ) ), ( ( RECTYPE-OK2-CONS1-I + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK2-CONS1-C : Context /\ RECTYPE-OK2-CONS1-SUBTYPE1 : Subtype /\ RECTYPE-OK2-CONS1-SUBTYPE : Subtype /\ RECTYPE-OK2-CONS1-X : Idx .
+      if prove ( Subtype-ok2 ( RECTYPE-OK2-CONS1-C, RECTYPE-OK2-CONS1-SUBTYPE1, ( CTOROKA2 ( RECTYPE-OK2-CONS1-X, RECTYPE-OK2-CONS1-I ) ) ) ) : Proved /\ prove ( Rectype-ok2 ( RECTYPE-OK2-CONS1-C, ( CTORRECA1 ( RECTYPE-OK2-CONS1-SUBTYPE ) ), ( CTOROKA2 ( ( ( RECTYPE-OK2-CONS1-X + 1 ) ), ( ( RECTYPE-OK2-CONS1-I + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK2-CONS1-C : Context /\ RECTYPE-OK2-CONS1-SUBTYPE1 : Subtype /\ ( RECTYPE-OK2-CONS1-SUBTYPE hasType ( list ( subtype ) ) ) : WellTyped /\ RECTYPE-OK2-CONS1-X : Idx .
   cmb prove ( Rectype-ok2 ( RECTYPE-OK2-CONS1-C , CTORRECA1 ( ( RECTYPE-OK2-CONS1-SUBTYPE1 RECTYPE-OK2-CONS1-SUBTYPE ) ) , CTOROKA2 ( RECTYPE-OK2-CONS1-X, RECTYPE-OK2-CONS1-I ) ) ) : Proved
-      if prove ( Subtype-ok2 ( RECTYPE-OK2-CONS1-C, RECTYPE-OK2-CONS1-SUBTYPE1, ( CTOROKA2 ( RECTYPE-OK2-CONS1-X, RECTYPE-OK2-CONS1-I ) ) ) ) : Proved /\ prove ( Rectype-ok2 ( RECTYPE-OK2-CONS1-C, ( CTORRECA1 ( RECTYPE-OK2-CONS1-SUBTYPE ) ), ( CTOROKA2 ( ( ( RECTYPE-OK2-CONS1-X + 1 ) ), ( ( RECTYPE-OK2-CONS1-I + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK2-CONS1-C : Context /\ RECTYPE-OK2-CONS1-SUBTYPE1 : Subtype /\ RECTYPE-OK2-CONS1-SUBTYPE : Subtype /\ RECTYPE-OK2-CONS1-X : Idx .
+      if prove ( Subtype-ok2 ( RECTYPE-OK2-CONS1-C, RECTYPE-OK2-CONS1-SUBTYPE1, ( CTOROKA2 ( RECTYPE-OK2-CONS1-X, RECTYPE-OK2-CONS1-I ) ) ) ) : Proved /\ prove ( Rectype-ok2 ( RECTYPE-OK2-CONS1-C, ( CTORRECA1 ( RECTYPE-OK2-CONS1-SUBTYPE ) ), ( CTOROKA2 ( ( ( RECTYPE-OK2-CONS1-X + 1 ) ), ( ( RECTYPE-OK2-CONS1-I + 1 ) ) ) ) ) ) : Proved /\ RECTYPE-OK2-CONS1-C : Context /\ RECTYPE-OK2-CONS1-SUBTYPE1 : Subtype /\ ( RECTYPE-OK2-CONS1-SUBTYPE hasType ( list ( subtype ) ) ) : WellTyped /\ RECTYPE-OK2-CONS1-X : Idx .
 
 
   crl [deftype-ok-r0] :
@@ -4483,9 +4489,9 @@ mod SPECTEC-CORE is
     prove ( Comptype-sub ( COMPTYPE-SUB-STRUCT0-C , CTORSTRUCTA1 ( ( COMPTYPE-SUB-STRUCT0-FT1 COMPTYPE-SUB-STRUCT0-FTQ1 ) ) , CTORSTRUCTA1 ( COMPTYPE-SUB-STRUCT0-FT2 ) ) )
     =>
     proved
-      if prove ( Fieldtype-sub ( COMPTYPE-SUB-STRUCT0-C, COMPTYPE-SUB-STRUCT0-FT1, COMPTYPE-SUB-STRUCT0-FT2 ) ) : Proved /\ COMPTYPE-SUB-STRUCT0-C : Context /\ COMPTYPE-SUB-STRUCT0-FT1 : Fieldtype /\ COMPTYPE-SUB-STRUCT0-FTQ1 : Fieldtype /\ COMPTYPE-SUB-STRUCT0-FT2 : Fieldtype .
+      if prove ( Fieldtype-sub ( COMPTYPE-SUB-STRUCT0-C, COMPTYPE-SUB-STRUCT0-FT1, COMPTYPE-SUB-STRUCT0-FT2 ) ) : Proved /\ COMPTYPE-SUB-STRUCT0-C : Context /\ ( COMPTYPE-SUB-STRUCT0-FT1 hasType ( list ( fieldtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-STRUCT0-FTQ1 hasType ( list ( fieldtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-STRUCT0-FT2 hasType ( list ( fieldtype ) ) ) : WellTyped .
   cmb prove ( Comptype-sub ( COMPTYPE-SUB-STRUCT0-C , CTORSTRUCTA1 ( ( COMPTYPE-SUB-STRUCT0-FT1 COMPTYPE-SUB-STRUCT0-FTQ1 ) ) , CTORSTRUCTA1 ( COMPTYPE-SUB-STRUCT0-FT2 ) ) ) : Proved
-      if prove ( Fieldtype-sub ( COMPTYPE-SUB-STRUCT0-C, COMPTYPE-SUB-STRUCT0-FT1, COMPTYPE-SUB-STRUCT0-FT2 ) ) : Proved /\ COMPTYPE-SUB-STRUCT0-C : Context /\ COMPTYPE-SUB-STRUCT0-FT1 : Fieldtype /\ COMPTYPE-SUB-STRUCT0-FTQ1 : Fieldtype /\ COMPTYPE-SUB-STRUCT0-FT2 : Fieldtype .
+      if prove ( Fieldtype-sub ( COMPTYPE-SUB-STRUCT0-C, COMPTYPE-SUB-STRUCT0-FT1, COMPTYPE-SUB-STRUCT0-FT2 ) ) : Proved /\ COMPTYPE-SUB-STRUCT0-C : Context /\ ( COMPTYPE-SUB-STRUCT0-FT1 hasType ( list ( fieldtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-STRUCT0-FTQ1 hasType ( list ( fieldtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-STRUCT0-FT2 hasType ( list ( fieldtype ) ) ) : WellTyped .
   crl [comptype-sub-array] :
     prove ( Comptype-sub ( COMPTYPE-SUB-ARRAY1-C , CTORARRAYA1 ( COMPTYPE-SUB-ARRAY1-FT1 ) , CTORARRAYA1 ( COMPTYPE-SUB-ARRAY1-FT2 ) ) )
     =>
@@ -4497,9 +4503,9 @@ mod SPECTEC-CORE is
     prove ( Comptype-sub ( COMPTYPE-SUB-FUNC2-C , CTORFUNCARROWA2 ( COMPTYPE-SUB-FUNC2-T11, COMPTYPE-SUB-FUNC2-T12 ) , CTORFUNCARROWA2 ( COMPTYPE-SUB-FUNC2-T21, COMPTYPE-SUB-FUNC2-T22 ) ) )
     =>
     proved
-      if prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T21, COMPTYPE-SUB-FUNC2-T11 ) ) : Proved /\ prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T12, COMPTYPE-SUB-FUNC2-T22 ) ) : Proved /\ COMPTYPE-SUB-FUNC2-C : Context /\ COMPTYPE-SUB-FUNC2-T11 : Valtype /\ COMPTYPE-SUB-FUNC2-T12 : Valtype /\ COMPTYPE-SUB-FUNC2-T21 : Valtype /\ COMPTYPE-SUB-FUNC2-T22 : Valtype .
+      if prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T21, COMPTYPE-SUB-FUNC2-T11 ) ) : Proved /\ prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T12, COMPTYPE-SUB-FUNC2-T22 ) ) : Proved /\ COMPTYPE-SUB-FUNC2-C : Context /\ ( COMPTYPE-SUB-FUNC2-T11 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-FUNC2-T12 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-FUNC2-T21 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-FUNC2-T22 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Comptype-sub ( COMPTYPE-SUB-FUNC2-C , CTORFUNCARROWA2 ( COMPTYPE-SUB-FUNC2-T11, COMPTYPE-SUB-FUNC2-T12 ) , CTORFUNCARROWA2 ( COMPTYPE-SUB-FUNC2-T21, COMPTYPE-SUB-FUNC2-T22 ) ) ) : Proved
-      if prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T21, COMPTYPE-SUB-FUNC2-T11 ) ) : Proved /\ prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T12, COMPTYPE-SUB-FUNC2-T22 ) ) : Proved /\ COMPTYPE-SUB-FUNC2-C : Context /\ COMPTYPE-SUB-FUNC2-T11 : Valtype /\ COMPTYPE-SUB-FUNC2-T12 : Valtype /\ COMPTYPE-SUB-FUNC2-T21 : Valtype /\ COMPTYPE-SUB-FUNC2-T22 : Valtype .
+      if prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T21, COMPTYPE-SUB-FUNC2-T11 ) ) : Proved /\ prove ( Resulttype-sub ( COMPTYPE-SUB-FUNC2-C, COMPTYPE-SUB-FUNC2-T12, COMPTYPE-SUB-FUNC2-T22 ) ) : Proved /\ COMPTYPE-SUB-FUNC2-C : Context /\ ( COMPTYPE-SUB-FUNC2-T11 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-FUNC2-T12 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-FUNC2-T21 hasType ( list ( valtype ) ) ) : WellTyped /\ ( COMPTYPE-SUB-FUNC2-T22 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
   crl [deftype-sub-refl] :
@@ -4606,9 +4612,9 @@ mod SPECTEC-CORE is
     prove ( Heaptype-sub ( HEAPTYPE-SUB-REC12-C , CTORRECA1 ( HEAPTYPE-SUB-REC12-I ) , index ( HEAPTYPE-SUB-REC12-TYPEUSE, HEAPTYPE-SUB-REC12-J ) ) )
     =>
     proved
-      if CTORSUBA3 ( HEAPTYPE-SUB-REC12-FINAL, HEAPTYPE-SUB-REC12-TYPEUSE, HEAPTYPE-SUB-REC12-CT ) := index ( value('RECS, HEAPTYPE-SUB-REC12-C), HEAPTYPE-SUB-REC12-I ) /\ HEAPTYPE-SUB-REC12-C : Context /\ HEAPTYPE-SUB-REC12-I : N /\ HEAPTYPE-SUB-REC12-TYPEUSE : Typeuse .
+      if CTORSUBA3 ( HEAPTYPE-SUB-REC12-FINAL, HEAPTYPE-SUB-REC12-TYPEUSE, HEAPTYPE-SUB-REC12-CT ) := index ( value('RECS, HEAPTYPE-SUB-REC12-C), HEAPTYPE-SUB-REC12-I ) /\ HEAPTYPE-SUB-REC12-C : Context /\ HEAPTYPE-SUB-REC12-I : N /\ ( HEAPTYPE-SUB-REC12-TYPEUSE hasType ( list ( typeuse ) ) ) : WellTyped .
   cmb prove ( Heaptype-sub ( HEAPTYPE-SUB-REC12-C , CTORRECA1 ( HEAPTYPE-SUB-REC12-I ) , index ( HEAPTYPE-SUB-REC12-TYPEUSE, HEAPTYPE-SUB-REC12-J ) ) ) : Proved
-      if CTORSUBA3 ( HEAPTYPE-SUB-REC12-FINAL, HEAPTYPE-SUB-REC12-TYPEUSE, HEAPTYPE-SUB-REC12-CT ) := index ( value('RECS, HEAPTYPE-SUB-REC12-C), HEAPTYPE-SUB-REC12-I ) /\ HEAPTYPE-SUB-REC12-C : Context /\ HEAPTYPE-SUB-REC12-I : N /\ HEAPTYPE-SUB-REC12-TYPEUSE : Typeuse .
+      if CTORSUBA3 ( HEAPTYPE-SUB-REC12-FINAL, HEAPTYPE-SUB-REC12-TYPEUSE, HEAPTYPE-SUB-REC12-CT ) := index ( value('RECS, HEAPTYPE-SUB-REC12-C), HEAPTYPE-SUB-REC12-I ) /\ HEAPTYPE-SUB-REC12-C : Context /\ HEAPTYPE-SUB-REC12-I : N /\ ( HEAPTYPE-SUB-REC12-TYPEUSE hasType ( list ( typeuse ) ) ) : WellTyped .
   crl [heaptype-sub-none] :
     prove ( Heaptype-sub ( HEAPTYPE-SUB-NONE13-C , CTORNONEA0 , HEAPTYPE-SUB-NONE13-HEAPTYPE ) )
     =>
@@ -4696,9 +4702,9 @@ mod SPECTEC-CORE is
     prove ( Resulttype-sub ( RESULTTYPE-SUB-R00-C , RESULTTYPE-SUB-R00-T1 , RESULTTYPE-SUB-R00-T2 ) )
     =>
     proved
-      if prove ( Valtype-sub ( RESULTTYPE-SUB-R00-C, RESULTTYPE-SUB-R00-T1, RESULTTYPE-SUB-R00-T2 ) ) : Proved /\ RESULTTYPE-SUB-R00-C : Context /\ RESULTTYPE-SUB-R00-T1 : Valtype /\ RESULTTYPE-SUB-R00-T2 : Valtype .
+      if prove ( Valtype-sub ( RESULTTYPE-SUB-R00-C, RESULTTYPE-SUB-R00-T1, RESULTTYPE-SUB-R00-T2 ) ) : Proved /\ RESULTTYPE-SUB-R00-C : Context /\ ( RESULTTYPE-SUB-R00-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( RESULTTYPE-SUB-R00-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Resulttype-sub ( RESULTTYPE-SUB-R00-C , RESULTTYPE-SUB-R00-T1 , RESULTTYPE-SUB-R00-T2 ) ) : Proved
-      if prove ( Valtype-sub ( RESULTTYPE-SUB-R00-C, RESULTTYPE-SUB-R00-T1, RESULTTYPE-SUB-R00-T2 ) ) : Proved /\ RESULTTYPE-SUB-R00-C : Context /\ RESULTTYPE-SUB-R00-T1 : Valtype /\ RESULTTYPE-SUB-R00-T2 : Valtype .
+      if prove ( Valtype-sub ( RESULTTYPE-SUB-R00-C, RESULTTYPE-SUB-R00-T1, RESULTTYPE-SUB-R00-T2 ) ) : Proved /\ RESULTTYPE-SUB-R00-C : Context /\ ( RESULTTYPE-SUB-R00-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( RESULTTYPE-SUB-R00-T2 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
   crl [storagetype-sub-val] :
@@ -4742,9 +4748,9 @@ mod SPECTEC-CORE is
     prove ( Instrtype-ok ( INSTRTYPE-OK-R00-C , CTORARROWA3 ( INSTRTYPE-OK-R00-T1, INSTRTYPE-OK-R00-X, INSTRTYPE-OK-R00-T2 ) ) )
     =>
     proved
-      if INSTRTYPE-OK-R00-LCT := index ( value('LOCALS, INSTRTYPE-OK-R00-C), INSTRTYPE-OK-R00-X ) /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T1 ) ) : Proved /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T2 ) ) : Proved /\ INSTRTYPE-OK-R00-C : Context /\ INSTRTYPE-OK-R00-T1 : Valtype /\ INSTRTYPE-OK-R00-X : Idx /\ INSTRTYPE-OK-R00-T2 : Valtype .
+      if INSTRTYPE-OK-R00-LCT := index ( value('LOCALS, INSTRTYPE-OK-R00-C), INSTRTYPE-OK-R00-X ) /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T1 ) ) : Proved /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T2 ) ) : Proved /\ INSTRTYPE-OK-R00-C : Context /\ ( INSTRTYPE-OK-R00-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-OK-R00-X hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRTYPE-OK-R00-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instrtype-ok ( INSTRTYPE-OK-R00-C , CTORARROWA3 ( INSTRTYPE-OK-R00-T1, INSTRTYPE-OK-R00-X, INSTRTYPE-OK-R00-T2 ) ) ) : Proved
-      if INSTRTYPE-OK-R00-LCT := index ( value('LOCALS, INSTRTYPE-OK-R00-C), INSTRTYPE-OK-R00-X ) /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T1 ) ) : Proved /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T2 ) ) : Proved /\ INSTRTYPE-OK-R00-C : Context /\ INSTRTYPE-OK-R00-T1 : Valtype /\ INSTRTYPE-OK-R00-X : Idx /\ INSTRTYPE-OK-R00-T2 : Valtype .
+      if INSTRTYPE-OK-R00-LCT := index ( value('LOCALS, INSTRTYPE-OK-R00-C), INSTRTYPE-OK-R00-X ) /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T1 ) ) : Proved /\ prove ( Resulttype-ok ( INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-T2 ) ) : Proved /\ INSTRTYPE-OK-R00-C : Context /\ ( INSTRTYPE-OK-R00-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-OK-R00-X hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRTYPE-OK-R00-T2 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
 
@@ -4879,9 +4885,9 @@ mod SPECTEC-CORE is
     prove ( Instrtype-sub ( INSTRTYPE-SUB-R00-C , CTORARROWA3 ( INSTRTYPE-SUB-R00-T11, INSTRTYPE-SUB-R00-X1, INSTRTYPE-SUB-R00-T12 ) , CTORARROWA3 ( INSTRTYPE-SUB-R00-T21, INSTRTYPE-SUB-R00-X2, INSTRTYPE-SUB-R00-T22 ) ) )
     =>
     proved
-      if INSTRTYPE-SUB-R00-X := $setminus ( localidx, INSTRTYPE-SUB-R00-X2, INSTRTYPE-SUB-R00-X1 ) /\ CTORSETA0 INSTRTYPE-SUB-R00-T := index ( value('LOCALS, INSTRTYPE-SUB-R00-C), INSTRTYPE-SUB-R00-X ) /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T21, INSTRTYPE-SUB-R00-T11 ) ) : Proved /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T12, INSTRTYPE-SUB-R00-T22 ) ) : Proved /\ INSTRTYPE-SUB-R00-C : Context /\ INSTRTYPE-SUB-R00-T11 : Valtype /\ INSTRTYPE-SUB-R00-X1 : Idx /\ INSTRTYPE-SUB-R00-T12 : Valtype /\ INSTRTYPE-SUB-R00-T21 : Valtype /\ INSTRTYPE-SUB-R00-X2 : Idx /\ INSTRTYPE-SUB-R00-T22 : Valtype .
+      if INSTRTYPE-SUB-R00-X := $setminus ( localidx, INSTRTYPE-SUB-R00-X2, INSTRTYPE-SUB-R00-X1 ) /\ CTORSETA0 INSTRTYPE-SUB-R00-T := index ( value('LOCALS, INSTRTYPE-SUB-R00-C), INSTRTYPE-SUB-R00-X ) /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T21, INSTRTYPE-SUB-R00-T11 ) ) : Proved /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T12, INSTRTYPE-SUB-R00-T22 ) ) : Proved /\ INSTRTYPE-SUB-R00-C : Context /\ ( INSTRTYPE-SUB-R00-T11 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-X1 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-T12 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-T21 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-X2 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-T22 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instrtype-sub ( INSTRTYPE-SUB-R00-C , CTORARROWA3 ( INSTRTYPE-SUB-R00-T11, INSTRTYPE-SUB-R00-X1, INSTRTYPE-SUB-R00-T12 ) , CTORARROWA3 ( INSTRTYPE-SUB-R00-T21, INSTRTYPE-SUB-R00-X2, INSTRTYPE-SUB-R00-T22 ) ) ) : Proved
-      if INSTRTYPE-SUB-R00-X := $setminus ( localidx, INSTRTYPE-SUB-R00-X2, INSTRTYPE-SUB-R00-X1 ) /\ CTORSETA0 INSTRTYPE-SUB-R00-T := index ( value('LOCALS, INSTRTYPE-SUB-R00-C), INSTRTYPE-SUB-R00-X ) /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T21, INSTRTYPE-SUB-R00-T11 ) ) : Proved /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T12, INSTRTYPE-SUB-R00-T22 ) ) : Proved /\ INSTRTYPE-SUB-R00-C : Context /\ INSTRTYPE-SUB-R00-T11 : Valtype /\ INSTRTYPE-SUB-R00-X1 : Idx /\ INSTRTYPE-SUB-R00-T12 : Valtype /\ INSTRTYPE-SUB-R00-T21 : Valtype /\ INSTRTYPE-SUB-R00-X2 : Idx /\ INSTRTYPE-SUB-R00-T22 : Valtype .
+      if INSTRTYPE-SUB-R00-X := $setminus ( localidx, INSTRTYPE-SUB-R00-X2, INSTRTYPE-SUB-R00-X1 ) /\ CTORSETA0 INSTRTYPE-SUB-R00-T := index ( value('LOCALS, INSTRTYPE-SUB-R00-C), INSTRTYPE-SUB-R00-X ) /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T21, INSTRTYPE-SUB-R00-T11 ) ) : Proved /\ prove ( Resulttype-sub ( INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-T12, INSTRTYPE-SUB-R00-T22 ) ) : Proved /\ INSTRTYPE-SUB-R00-C : Context /\ ( INSTRTYPE-SUB-R00-T11 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-X1 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-T12 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-T21 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-X2 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRTYPE-SUB-R00-T22 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
 
@@ -5001,9 +5007,9 @@ mod SPECTEC-CORE is
     prove ( Blocktype-ok ( BLOCKTYPE-OK-TYPEIDX1-C , CTORWIDXA1 ( BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) , CTORARROWA3 ( BLOCKTYPE-OK-TYPEIDX1-T1, eps, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) )
     =>
     proved
-      if prove ( Expand ( ( index ( value('TYPES, BLOCKTYPE-OK-TYPEIDX1-C), BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) ), ( CTORFUNCARROWA2 ( BLOCKTYPE-OK-TYPEIDX1-T1, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) ) ) : Proved /\ BLOCKTYPE-OK-TYPEIDX1-C : Context /\ BLOCKTYPE-OK-TYPEIDX1-TYPEIDX : Typeidx /\ BLOCKTYPE-OK-TYPEIDX1-T1 : Valtype /\ BLOCKTYPE-OK-TYPEIDX1-T2 : Valtype .
+      if prove ( Expand ( ( index ( value('TYPES, BLOCKTYPE-OK-TYPEIDX1-C), BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) ), ( CTORFUNCARROWA2 ( BLOCKTYPE-OK-TYPEIDX1-T1, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) ) ) : Proved /\ BLOCKTYPE-OK-TYPEIDX1-C : Context /\ BLOCKTYPE-OK-TYPEIDX1-TYPEIDX : Typeidx /\ ( BLOCKTYPE-OK-TYPEIDX1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( BLOCKTYPE-OK-TYPEIDX1-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Blocktype-ok ( BLOCKTYPE-OK-TYPEIDX1-C , CTORWIDXA1 ( BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) , CTORARROWA3 ( BLOCKTYPE-OK-TYPEIDX1-T1, eps, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) ) : Proved
-      if prove ( Expand ( ( index ( value('TYPES, BLOCKTYPE-OK-TYPEIDX1-C), BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) ), ( CTORFUNCARROWA2 ( BLOCKTYPE-OK-TYPEIDX1-T1, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) ) ) : Proved /\ BLOCKTYPE-OK-TYPEIDX1-C : Context /\ BLOCKTYPE-OK-TYPEIDX1-TYPEIDX : Typeidx /\ BLOCKTYPE-OK-TYPEIDX1-T1 : Valtype /\ BLOCKTYPE-OK-TYPEIDX1-T2 : Valtype .
+      if prove ( Expand ( ( index ( value('TYPES, BLOCKTYPE-OK-TYPEIDX1-C), BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) ), ( CTORFUNCARROWA2 ( BLOCKTYPE-OK-TYPEIDX1-T1, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) ) ) : Proved /\ BLOCKTYPE-OK-TYPEIDX1-C : Context /\ BLOCKTYPE-OK-TYPEIDX1-TYPEIDX : Typeidx /\ ( BLOCKTYPE-OK-TYPEIDX1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( BLOCKTYPE-OK-TYPEIDX1-T2 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
   crl [catch-ok-catch] :
@@ -5079,9 +5085,9 @@ mod SPECTEC-CORE is
     prove ( Instr-ok ( INSTR-OK-UNREACHABLE1-C , CTORUNREACHABLEA0 , CTORARROWA3 ( INSTR-OK-UNREACHABLE1-T1, eps, INSTR-OK-UNREACHABLE1-T2 ) ) )
     =>
     proved
-      if prove ( Instrtype-ok ( INSTR-OK-UNREACHABLE1-C, ( CTORARROWA3 ( INSTR-OK-UNREACHABLE1-T1, eps, INSTR-OK-UNREACHABLE1-T2 ) ) ) ) : Proved /\ INSTR-OK-UNREACHABLE1-C : Context /\ INSTR-OK-UNREACHABLE1-T1 : Valtype /\ INSTR-OK-UNREACHABLE1-T2 : Valtype .
+      if prove ( Instrtype-ok ( INSTR-OK-UNREACHABLE1-C, ( CTORARROWA3 ( INSTR-OK-UNREACHABLE1-T1, eps, INSTR-OK-UNREACHABLE1-T2 ) ) ) ) : Proved /\ INSTR-OK-UNREACHABLE1-C : Context /\ ( INSTR-OK-UNREACHABLE1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-UNREACHABLE1-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-UNREACHABLE1-C , CTORUNREACHABLEA0 , CTORARROWA3 ( INSTR-OK-UNREACHABLE1-T1, eps, INSTR-OK-UNREACHABLE1-T2 ) ) ) : Proved
-      if prove ( Instrtype-ok ( INSTR-OK-UNREACHABLE1-C, ( CTORARROWA3 ( INSTR-OK-UNREACHABLE1-T1, eps, INSTR-OK-UNREACHABLE1-T2 ) ) ) ) : Proved /\ INSTR-OK-UNREACHABLE1-C : Context /\ INSTR-OK-UNREACHABLE1-T1 : Valtype /\ INSTR-OK-UNREACHABLE1-T2 : Valtype .
+      if prove ( Instrtype-ok ( INSTR-OK-UNREACHABLE1-C, ( CTORARROWA3 ( INSTR-OK-UNREACHABLE1-T1, eps, INSTR-OK-UNREACHABLE1-T2 ) ) ) ) : Proved /\ INSTR-OK-UNREACHABLE1-C : Context /\ ( INSTR-OK-UNREACHABLE1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-UNREACHABLE1-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-drop] :
     prove ( Instr-ok ( INSTR-OK-DROP2-C , CTORDROPA0 , CTORARROWA3 ( INSTR-OK-DROP2-T, eps, eps ) ) )
     =>
@@ -5107,142 +5113,142 @@ mod SPECTEC-CORE is
     prove ( Instr-ok ( INSTR-OK-BLOCK5-C , CTORBLOCKA2 ( INSTR-OK-BLOCK5-BT, INSTR-OK-BLOCK5-INSTR ) , CTORARROWA3 ( INSTR-OK-BLOCK5-T1, eps, INSTR-OK-BLOCK5-T2 ) ) )
     =>
     proved
-      if prove ( Blocktype-ok ( INSTR-OK-BLOCK5-C, INSTR-OK-BLOCK5-BT, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, eps, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-BLOCK5-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-BLOCK5-C ) ), INSTR-OK-BLOCK5-INSTR, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, INSTR-OK-BLOCK5-X, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ INSTR-OK-BLOCK5-C : Context /\ INSTR-OK-BLOCK5-BT : Blocktype /\ INSTR-OK-BLOCK5-INSTR : Instr /\ INSTR-OK-BLOCK5-T1 : Valtype /\ INSTR-OK-BLOCK5-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-BLOCK5-C, INSTR-OK-BLOCK5-BT, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, eps, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-BLOCK5-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-BLOCK5-C ) ), INSTR-OK-BLOCK5-INSTR, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, INSTR-OK-BLOCK5-X, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ INSTR-OK-BLOCK5-C : Context /\ INSTR-OK-BLOCK5-BT : Blocktype /\ ( INSTR-OK-BLOCK5-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-BLOCK5-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BLOCK5-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-BLOCK5-C , CTORBLOCKA2 ( INSTR-OK-BLOCK5-BT, INSTR-OK-BLOCK5-INSTR ) , CTORARROWA3 ( INSTR-OK-BLOCK5-T1, eps, INSTR-OK-BLOCK5-T2 ) ) ) : Proved
-      if prove ( Blocktype-ok ( INSTR-OK-BLOCK5-C, INSTR-OK-BLOCK5-BT, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, eps, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-BLOCK5-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-BLOCK5-C ) ), INSTR-OK-BLOCK5-INSTR, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, INSTR-OK-BLOCK5-X, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ INSTR-OK-BLOCK5-C : Context /\ INSTR-OK-BLOCK5-BT : Blocktype /\ INSTR-OK-BLOCK5-INSTR : Instr /\ INSTR-OK-BLOCK5-T1 : Valtype /\ INSTR-OK-BLOCK5-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-BLOCK5-C, INSTR-OK-BLOCK5-BT, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, eps, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-BLOCK5-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-BLOCK5-C ) ), INSTR-OK-BLOCK5-INSTR, ( CTORARROWA3 ( INSTR-OK-BLOCK5-T1, INSTR-OK-BLOCK5-X, INSTR-OK-BLOCK5-T2 ) ) ) ) : Proved /\ INSTR-OK-BLOCK5-C : Context /\ INSTR-OK-BLOCK5-BT : Blocktype /\ ( INSTR-OK-BLOCK5-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-BLOCK5-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BLOCK5-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-loop] :
     prove ( Instr-ok ( INSTR-OK-LOOP6-C , CTORLOOPA2 ( INSTR-OK-LOOP6-BT, INSTR-OK-LOOP6-INSTR ) , CTORARROWA3 ( INSTR-OK-LOOP6-T1, eps, INSTR-OK-LOOP6-T2 ) ) )
     =>
     proved
-      if prove ( Blocktype-ok ( INSTR-OK-LOOP6-C, INSTR-OK-LOOP6-BT, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, eps, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-LOOP6-T1) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-LOOP6-C ) ), INSTR-OK-LOOP6-INSTR, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, INSTR-OK-LOOP6-X, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ INSTR-OK-LOOP6-C : Context /\ INSTR-OK-LOOP6-BT : Blocktype /\ INSTR-OK-LOOP6-INSTR : Instr /\ INSTR-OK-LOOP6-T1 : Valtype /\ INSTR-OK-LOOP6-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-LOOP6-C, INSTR-OK-LOOP6-BT, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, eps, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-LOOP6-T1) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-LOOP6-C ) ), INSTR-OK-LOOP6-INSTR, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, INSTR-OK-LOOP6-X, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ INSTR-OK-LOOP6-C : Context /\ INSTR-OK-LOOP6-BT : Blocktype /\ ( INSTR-OK-LOOP6-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-LOOP6-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-LOOP6-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-LOOP6-C , CTORLOOPA2 ( INSTR-OK-LOOP6-BT, INSTR-OK-LOOP6-INSTR ) , CTORARROWA3 ( INSTR-OK-LOOP6-T1, eps, INSTR-OK-LOOP6-T2 ) ) ) : Proved
-      if prove ( Blocktype-ok ( INSTR-OK-LOOP6-C, INSTR-OK-LOOP6-BT, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, eps, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-LOOP6-T1) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-LOOP6-C ) ), INSTR-OK-LOOP6-INSTR, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, INSTR-OK-LOOP6-X, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ INSTR-OK-LOOP6-C : Context /\ INSTR-OK-LOOP6-BT : Blocktype /\ INSTR-OK-LOOP6-INSTR : Instr /\ INSTR-OK-LOOP6-T1 : Valtype /\ INSTR-OK-LOOP6-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-LOOP6-C, INSTR-OK-LOOP6-BT, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, eps, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-LOOP6-T1) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-LOOP6-C ) ), INSTR-OK-LOOP6-INSTR, ( CTORARROWA3 ( INSTR-OK-LOOP6-T1, INSTR-OK-LOOP6-X, INSTR-OK-LOOP6-T2 ) ) ) ) : Proved /\ INSTR-OK-LOOP6-C : Context /\ INSTR-OK-LOOP6-BT : Blocktype /\ ( INSTR-OK-LOOP6-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-LOOP6-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-LOOP6-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-w-if] :
     prove ( Instr-ok ( INSTR-OK-W-IF7-C , CTORWIFELSEA3 ( INSTR-OK-W-IF7-BT, INSTR-OK-W-IF7-INSTR1, INSTR-OK-W-IF7-INSTR2 ) , CTORARROWA3 ( ( INSTR-OK-W-IF7-T1 CTORI32A0 ), eps, INSTR-OK-W-IF7-T2 ) ) )
     =>
     proved
-      if prove ( Blocktype-ok ( INSTR-OK-W-IF7-C, INSTR-OK-W-IF7-BT, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, eps, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR1, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X1, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR2, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X2, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ INSTR-OK-W-IF7-C : Context /\ INSTR-OK-W-IF7-BT : Blocktype /\ INSTR-OK-W-IF7-INSTR1 : Instr /\ INSTR-OK-W-IF7-INSTR2 : Instr /\ INSTR-OK-W-IF7-T1 : Valtype /\ INSTR-OK-W-IF7-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-W-IF7-C, INSTR-OK-W-IF7-BT, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, eps, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR1, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X1, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR2, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X2, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ INSTR-OK-W-IF7-C : Context /\ INSTR-OK-W-IF7-BT : Blocktype /\ ( INSTR-OK-W-IF7-INSTR1 hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-W-IF7-INSTR2 hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-W-IF7-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-W-IF7-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-W-IF7-C , CTORWIFELSEA3 ( INSTR-OK-W-IF7-BT, INSTR-OK-W-IF7-INSTR1, INSTR-OK-W-IF7-INSTR2 ) , CTORARROWA3 ( ( INSTR-OK-W-IF7-T1 CTORI32A0 ), eps, INSTR-OK-W-IF7-T2 ) ) ) : Proved
-      if prove ( Blocktype-ok ( INSTR-OK-W-IF7-C, INSTR-OK-W-IF7-BT, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, eps, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR1, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X1, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR2, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X2, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ INSTR-OK-W-IF7-C : Context /\ INSTR-OK-W-IF7-BT : Blocktype /\ INSTR-OK-W-IF7-INSTR1 : Instr /\ INSTR-OK-W-IF7-INSTR2 : Instr /\ INSTR-OK-W-IF7-T1 : Valtype /\ INSTR-OK-W-IF7-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-W-IF7-C, INSTR-OK-W-IF7-BT, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, eps, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR1, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X1, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-W-IF7-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-W-IF7-C ) ), INSTR-OK-W-IF7-INSTR2, ( CTORARROWA3 ( INSTR-OK-W-IF7-T1, INSTR-OK-W-IF7-X2, INSTR-OK-W-IF7-T2 ) ) ) ) : Proved /\ INSTR-OK-W-IF7-C : Context /\ INSTR-OK-W-IF7-BT : Blocktype /\ ( INSTR-OK-W-IF7-INSTR1 hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-W-IF7-INSTR2 hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-W-IF7-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-W-IF7-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-br] :
     prove ( Instr-ok ( INSTR-OK-BR8-C , CTORBRA1 ( INSTR-OK-BR8-L ) , CTORARROWA3 ( ( INSTR-OK-BR8-T1 INSTR-OK-BR8-T ), eps, INSTR-OK-BR8-T2 ) ) )
     =>
     proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR8-C), INSTR-OK-BR8-L ) == INSTR-OK-BR8-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-BR8-C, ( CTORARROWA3 ( INSTR-OK-BR8-T1, eps, INSTR-OK-BR8-T2 ) ) ) ) : Proved /\ INSTR-OK-BR8-C : Context /\ INSTR-OK-BR8-L : Labelidx /\ INSTR-OK-BR8-T1 : Valtype /\ INSTR-OK-BR8-T : Valtype /\ INSTR-OK-BR8-T2 : Valtype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR8-C), INSTR-OK-BR8-L ) == INSTR-OK-BR8-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-BR8-C, ( CTORARROWA3 ( INSTR-OK-BR8-T1, eps, INSTR-OK-BR8-T2 ) ) ) ) : Proved /\ INSTR-OK-BR8-C : Context /\ INSTR-OK-BR8-L : Labelidx /\ ( INSTR-OK-BR8-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR8-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR8-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-BR8-C , CTORBRA1 ( INSTR-OK-BR8-L ) , CTORARROWA3 ( ( INSTR-OK-BR8-T1 INSTR-OK-BR8-T ), eps, INSTR-OK-BR8-T2 ) ) ) : Proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR8-C), INSTR-OK-BR8-L ) == INSTR-OK-BR8-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-BR8-C, ( CTORARROWA3 ( INSTR-OK-BR8-T1, eps, INSTR-OK-BR8-T2 ) ) ) ) : Proved /\ INSTR-OK-BR8-C : Context /\ INSTR-OK-BR8-L : Labelidx /\ INSTR-OK-BR8-T1 : Valtype /\ INSTR-OK-BR8-T : Valtype /\ INSTR-OK-BR8-T2 : Valtype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR8-C), INSTR-OK-BR8-L ) == INSTR-OK-BR8-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-BR8-C, ( CTORARROWA3 ( INSTR-OK-BR8-T1, eps, INSTR-OK-BR8-T2 ) ) ) ) : Proved /\ INSTR-OK-BR8-C : Context /\ INSTR-OK-BR8-L : Labelidx /\ ( INSTR-OK-BR8-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR8-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR8-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-br-if] :
     prove ( Instr-ok ( INSTR-OK-BR-IF9-C , CTORBRIFA1 ( INSTR-OK-BR-IF9-L ) , CTORARROWA3 ( ( INSTR-OK-BR-IF9-T CTORI32A0 ), eps, INSTR-OK-BR-IF9-T ) ) )
     =>
     proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR-IF9-C), INSTR-OK-BR-IF9-L ) == INSTR-OK-BR-IF9-T ) ) = true /\ INSTR-OK-BR-IF9-C : Context /\ INSTR-OK-BR-IF9-L : Labelidx /\ INSTR-OK-BR-IF9-T : Valtype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR-IF9-C), INSTR-OK-BR-IF9-L ) == INSTR-OK-BR-IF9-T ) ) = true /\ INSTR-OK-BR-IF9-C : Context /\ INSTR-OK-BR-IF9-L : Labelidx /\ ( INSTR-OK-BR-IF9-T hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-BR-IF9-C , CTORBRIFA1 ( INSTR-OK-BR-IF9-L ) , CTORARROWA3 ( ( INSTR-OK-BR-IF9-T CTORI32A0 ), eps, INSTR-OK-BR-IF9-T ) ) ) : Proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR-IF9-C), INSTR-OK-BR-IF9-L ) == INSTR-OK-BR-IF9-T ) ) = true /\ INSTR-OK-BR-IF9-C : Context /\ INSTR-OK-BR-IF9-L : Labelidx /\ INSTR-OK-BR-IF9-T : Valtype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR-IF9-C), INSTR-OK-BR-IF9-L ) == INSTR-OK-BR-IF9-T ) ) = true /\ INSTR-OK-BR-IF9-C : Context /\ INSTR-OK-BR-IF9-L : Labelidx /\ ( INSTR-OK-BR-IF9-T hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-br-table] :
     prove ( Instr-ok ( INSTR-OK-BR-TABLE10-C , CTORBRTABLEA2 ( INSTR-OK-BR-TABLE10-L, INSTR-OK-BR-TABLE10-LQ ) , CTORARROWA3 ( ( INSTR-OK-BR-TABLE10-T1 INSTR-OK-BR-TABLE10-T CTORI32A0 ), eps, INSTR-OK-BR-TABLE10-T2 ) ) )
     =>
     proved
-      if prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-L ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-LQ ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-BR-TABLE10-C, ( CTORARROWA3 ( ( INSTR-OK-BR-TABLE10-T1 INSTR-OK-BR-TABLE10-T CTORI32A0 ), eps, INSTR-OK-BR-TABLE10-T2 ) ) ) ) : Proved /\ INSTR-OK-BR-TABLE10-C : Context /\ INSTR-OK-BR-TABLE10-L : Labelidx /\ INSTR-OK-BR-TABLE10-LQ : Labelidx /\ INSTR-OK-BR-TABLE10-T1 : Valtype /\ INSTR-OK-BR-TABLE10-T : Valtype /\ INSTR-OK-BR-TABLE10-T2 : Valtype .
+      if prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-L ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-LQ ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-BR-TABLE10-C, ( CTORARROWA3 ( ( INSTR-OK-BR-TABLE10-T1 INSTR-OK-BR-TABLE10-T CTORI32A0 ), eps, INSTR-OK-BR-TABLE10-T2 ) ) ) ) : Proved /\ INSTR-OK-BR-TABLE10-C : Context /\ ( INSTR-OK-BR-TABLE10-L hasType ( list ( labelidx ) ) ) : WellTyped /\ INSTR-OK-BR-TABLE10-LQ : Labelidx /\ ( INSTR-OK-BR-TABLE10-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR-TABLE10-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR-TABLE10-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-BR-TABLE10-C , CTORBRTABLEA2 ( INSTR-OK-BR-TABLE10-L, INSTR-OK-BR-TABLE10-LQ ) , CTORARROWA3 ( ( INSTR-OK-BR-TABLE10-T1 INSTR-OK-BR-TABLE10-T CTORI32A0 ), eps, INSTR-OK-BR-TABLE10-T2 ) ) ) : Proved
-      if prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-L ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-LQ ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-BR-TABLE10-C, ( CTORARROWA3 ( ( INSTR-OK-BR-TABLE10-T1 INSTR-OK-BR-TABLE10-T CTORI32A0 ), eps, INSTR-OK-BR-TABLE10-T2 ) ) ) ) : Proved /\ INSTR-OK-BR-TABLE10-C : Context /\ INSTR-OK-BR-TABLE10-L : Labelidx /\ INSTR-OK-BR-TABLE10-LQ : Labelidx /\ INSTR-OK-BR-TABLE10-T1 : Valtype /\ INSTR-OK-BR-TABLE10-T : Valtype /\ INSTR-OK-BR-TABLE10-T2 : Valtype .
+      if prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-L ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-BR-TABLE10-C, INSTR-OK-BR-TABLE10-T, ( index ( value('LABELS, INSTR-OK-BR-TABLE10-C), INSTR-OK-BR-TABLE10-LQ ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-BR-TABLE10-C, ( CTORARROWA3 ( ( INSTR-OK-BR-TABLE10-T1 INSTR-OK-BR-TABLE10-T CTORI32A0 ), eps, INSTR-OK-BR-TABLE10-T2 ) ) ) ) : Proved /\ INSTR-OK-BR-TABLE10-C : Context /\ ( INSTR-OK-BR-TABLE10-L hasType ( list ( labelidx ) ) ) : WellTyped /\ INSTR-OK-BR-TABLE10-LQ : Labelidx /\ ( INSTR-OK-BR-TABLE10-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR-TABLE10-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-BR-TABLE10-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-br-on-null] :
     prove ( Instr-ok ( INSTR-OK-BR-ON-NULL11-C , CTORBRONNULLA1 ( INSTR-OK-BR-ON-NULL11-L ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-NULL11-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NULL11-HT ) ), eps, ( INSTR-OK-BR-ON-NULL11-T CTORREFA2 ( eps, INSTR-OK-BR-ON-NULL11-HT ) ) ) ) )
     =>
     proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NULL11-C), INSTR-OK-BR-ON-NULL11-L ) == INSTR-OK-BR-ON-NULL11-T ) ) = true /\ prove ( Heaptype-ok ( INSTR-OK-BR-ON-NULL11-C, INSTR-OK-BR-ON-NULL11-HT ) ) : Proved /\ INSTR-OK-BR-ON-NULL11-C : Context /\ INSTR-OK-BR-ON-NULL11-L : Labelidx /\ INSTR-OK-BR-ON-NULL11-T : Valtype /\ INSTR-OK-BR-ON-NULL11-HT : Heaptype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NULL11-C), INSTR-OK-BR-ON-NULL11-L ) == INSTR-OK-BR-ON-NULL11-T ) ) = true /\ prove ( Heaptype-ok ( INSTR-OK-BR-ON-NULL11-C, INSTR-OK-BR-ON-NULL11-HT ) ) : Proved /\ INSTR-OK-BR-ON-NULL11-C : Context /\ INSTR-OK-BR-ON-NULL11-L : Labelidx /\ ( INSTR-OK-BR-ON-NULL11-T hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-BR-ON-NULL11-HT : Heaptype .
   cmb prove ( Instr-ok ( INSTR-OK-BR-ON-NULL11-C , CTORBRONNULLA1 ( INSTR-OK-BR-ON-NULL11-L ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-NULL11-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NULL11-HT ) ), eps, ( INSTR-OK-BR-ON-NULL11-T CTORREFA2 ( eps, INSTR-OK-BR-ON-NULL11-HT ) ) ) ) ) : Proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NULL11-C), INSTR-OK-BR-ON-NULL11-L ) == INSTR-OK-BR-ON-NULL11-T ) ) = true /\ prove ( Heaptype-ok ( INSTR-OK-BR-ON-NULL11-C, INSTR-OK-BR-ON-NULL11-HT ) ) : Proved /\ INSTR-OK-BR-ON-NULL11-C : Context /\ INSTR-OK-BR-ON-NULL11-L : Labelidx /\ INSTR-OK-BR-ON-NULL11-T : Valtype /\ INSTR-OK-BR-ON-NULL11-HT : Heaptype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NULL11-C), INSTR-OK-BR-ON-NULL11-L ) == INSTR-OK-BR-ON-NULL11-T ) ) = true /\ prove ( Heaptype-ok ( INSTR-OK-BR-ON-NULL11-C, INSTR-OK-BR-ON-NULL11-HT ) ) : Proved /\ INSTR-OK-BR-ON-NULL11-C : Context /\ INSTR-OK-BR-ON-NULL11-L : Labelidx /\ ( INSTR-OK-BR-ON-NULL11-T hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-BR-ON-NULL11-HT : Heaptype .
   crl [instr-ok-br-on-non-null] :
     prove ( Instr-ok ( INSTR-OK-BR-ON-NON-NULL12-C , CTORBRONNONNULLA1 ( INSTR-OK-BR-ON-NON-NULL12-L ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-NON-NULL12-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NON-NULL12-HT ) ), eps, INSTR-OK-BR-ON-NON-NULL12-T ) ) )
     =>
     proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NON-NULL12-C), INSTR-OK-BR-ON-NON-NULL12-L ) == INSTR-OK-BR-ON-NON-NULL12-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NON-NULL12-HT ) ) ) = true /\ INSTR-OK-BR-ON-NON-NULL12-C : Context /\ INSTR-OK-BR-ON-NON-NULL12-L : Labelidx /\ INSTR-OK-BR-ON-NON-NULL12-T : Valtype /\ INSTR-OK-BR-ON-NON-NULL12-HT : Heaptype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NON-NULL12-C), INSTR-OK-BR-ON-NON-NULL12-L ) == INSTR-OK-BR-ON-NON-NULL12-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NON-NULL12-HT ) ) ) = true /\ INSTR-OK-BR-ON-NON-NULL12-C : Context /\ INSTR-OK-BR-ON-NON-NULL12-L : Labelidx /\ ( INSTR-OK-BR-ON-NON-NULL12-T hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-BR-ON-NON-NULL12-HT : Heaptype .
   cmb prove ( Instr-ok ( INSTR-OK-BR-ON-NON-NULL12-C , CTORBRONNONNULLA1 ( INSTR-OK-BR-ON-NON-NULL12-L ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-NON-NULL12-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NON-NULL12-HT ) ), eps, INSTR-OK-BR-ON-NON-NULL12-T ) ) ) : Proved
-      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NON-NULL12-C), INSTR-OK-BR-ON-NON-NULL12-L ) == INSTR-OK-BR-ON-NON-NULL12-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NON-NULL12-HT ) ) ) = true /\ INSTR-OK-BR-ON-NON-NULL12-C : Context /\ INSTR-OK-BR-ON-NON-NULL12-L : Labelidx /\ INSTR-OK-BR-ON-NON-NULL12-T : Valtype /\ INSTR-OK-BR-ON-NON-NULL12-HT : Heaptype .
+      if ( ( index ( value('LABELS, INSTR-OK-BR-ON-NON-NULL12-C), INSTR-OK-BR-ON-NON-NULL12-L ) == INSTR-OK-BR-ON-NON-NULL12-T CTORREFA2 ( CTORNULLA0, INSTR-OK-BR-ON-NON-NULL12-HT ) ) ) = true /\ INSTR-OK-BR-ON-NON-NULL12-C : Context /\ INSTR-OK-BR-ON-NON-NULL12-L : Labelidx /\ ( INSTR-OK-BR-ON-NON-NULL12-T hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-BR-ON-NON-NULL12-HT : Heaptype .
   crl [instr-ok-br-on-cast] :
     prove ( Instr-ok ( INSTR-OK-BR-ON-CAST13-C , CTORBRONCASTA3 ( INSTR-OK-BR-ON-CAST13-L, INSTR-OK-BR-ON-CAST13-RT1, INSTR-OK-BR-ON-CAST13-RT2 ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-CAST13-T INSTR-OK-BR-ON-CAST13-RT1 ), eps, ( INSTR-OK-BR-ON-CAST13-T $diffrt ( INSTR-OK-BR-ON-CAST13-RT1, INSTR-OK-BR-ON-CAST13-RT2 ) ) ) ) )
     =>
     proved
-      if INSTR-OK-BR-ON-CAST13-T INSTR-OK-BR-ON-CAST13-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST13-C), INSTR-OK-BR-ON-CAST13-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST13-C : Context /\ INSTR-OK-BR-ON-CAST13-L : Labelidx /\ INSTR-OK-BR-ON-CAST13-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST13-RT2 : Reftype /\ INSTR-OK-BR-ON-CAST13-T : Valtype .
+      if INSTR-OK-BR-ON-CAST13-T INSTR-OK-BR-ON-CAST13-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST13-C), INSTR-OK-BR-ON-CAST13-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST13-C : Context /\ INSTR-OK-BR-ON-CAST13-L : Labelidx /\ INSTR-OK-BR-ON-CAST13-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST13-RT2 : Reftype /\ ( INSTR-OK-BR-ON-CAST13-T hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-BR-ON-CAST13-C , CTORBRONCASTA3 ( INSTR-OK-BR-ON-CAST13-L, INSTR-OK-BR-ON-CAST13-RT1, INSTR-OK-BR-ON-CAST13-RT2 ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-CAST13-T INSTR-OK-BR-ON-CAST13-RT1 ), eps, ( INSTR-OK-BR-ON-CAST13-T $diffrt ( INSTR-OK-BR-ON-CAST13-RT1, INSTR-OK-BR-ON-CAST13-RT2 ) ) ) ) ) : Proved
-      if INSTR-OK-BR-ON-CAST13-T INSTR-OK-BR-ON-CAST13-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST13-C), INSTR-OK-BR-ON-CAST13-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST13-C : Context /\ INSTR-OK-BR-ON-CAST13-L : Labelidx /\ INSTR-OK-BR-ON-CAST13-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST13-RT2 : Reftype /\ INSTR-OK-BR-ON-CAST13-T : Valtype .
+      if INSTR-OK-BR-ON-CAST13-T INSTR-OK-BR-ON-CAST13-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST13-C), INSTR-OK-BR-ON-CAST13-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST13-C, INSTR-OK-BR-ON-CAST13-RT2, INSTR-OK-BR-ON-CAST13-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST13-C : Context /\ INSTR-OK-BR-ON-CAST13-L : Labelidx /\ INSTR-OK-BR-ON-CAST13-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST13-RT2 : Reftype /\ ( INSTR-OK-BR-ON-CAST13-T hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-br-on-cast-fail] :
     prove ( Instr-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C , CTORBRONCASTFAILA3 ( INSTR-OK-BR-ON-CAST-FAIL14-L, INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT1 ), eps, ( INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ) ) )
     =>
     proved
-      if INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST-FAIL14-C), INSTR-OK-BR-ON-CAST-FAIL14-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, ( $diffrt ( INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ), INSTR-OK-BR-ON-CAST-FAIL14-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST-FAIL14-C : Context /\ INSTR-OK-BR-ON-CAST-FAIL14-L : Labelidx /\ INSTR-OK-BR-ON-CAST-FAIL14-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST-FAIL14-RT2 : Reftype /\ INSTR-OK-BR-ON-CAST-FAIL14-T : Valtype .
+      if INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST-FAIL14-C), INSTR-OK-BR-ON-CAST-FAIL14-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, ( $diffrt ( INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ), INSTR-OK-BR-ON-CAST-FAIL14-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST-FAIL14-C : Context /\ INSTR-OK-BR-ON-CAST-FAIL14-L : Labelidx /\ INSTR-OK-BR-ON-CAST-FAIL14-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST-FAIL14-RT2 : Reftype /\ ( INSTR-OK-BR-ON-CAST-FAIL14-T hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C , CTORBRONCASTFAILA3 ( INSTR-OK-BR-ON-CAST-FAIL14-L, INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT1 ), eps, ( INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ) ) ) : Proved
-      if INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST-FAIL14-C), INSTR-OK-BR-ON-CAST-FAIL14-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, ( $diffrt ( INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ), INSTR-OK-BR-ON-CAST-FAIL14-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST-FAIL14-C : Context /\ INSTR-OK-BR-ON-CAST-FAIL14-L : Labelidx /\ INSTR-OK-BR-ON-CAST-FAIL14-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST-FAIL14-RT2 : Reftype /\ INSTR-OK-BR-ON-CAST-FAIL14-T : Valtype .
+      if INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST-FAIL14-C), INSTR-OK-BR-ON-CAST-FAIL14-L ) /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) ) : Proved /\ prove ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, ( $diffrt ( INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ), INSTR-OK-BR-ON-CAST-FAIL14-RT ) ) : Proved /\ INSTR-OK-BR-ON-CAST-FAIL14-C : Context /\ INSTR-OK-BR-ON-CAST-FAIL14-L : Labelidx /\ INSTR-OK-BR-ON-CAST-FAIL14-RT1 : Reftype /\ INSTR-OK-BR-ON-CAST-FAIL14-RT2 : Reftype /\ ( INSTR-OK-BR-ON-CAST-FAIL14-T hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-call] :
     prove ( Instr-ok ( INSTR-OK-CALL15-C , CTORCALLA1 ( INSTR-OK-CALL15-X ) , CTORARROWA3 ( INSTR-OK-CALL15-T1, eps, INSTR-OK-CALL15-T2 ) ) )
     =>
     proved
-      if prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-CALL15-C), INSTR-OK-CALL15-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL15-T1, INSTR-OK-CALL15-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL15-C : Context /\ INSTR-OK-CALL15-X : Idx /\ INSTR-OK-CALL15-T1 : Valtype /\ INSTR-OK-CALL15-T2 : Valtype .
+      if prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-CALL15-C), INSTR-OK-CALL15-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL15-T1, INSTR-OK-CALL15-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL15-C : Context /\ INSTR-OK-CALL15-X : Idx /\ ( INSTR-OK-CALL15-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL15-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-CALL15-C , CTORCALLA1 ( INSTR-OK-CALL15-X ) , CTORARROWA3 ( INSTR-OK-CALL15-T1, eps, INSTR-OK-CALL15-T2 ) ) ) : Proved
-      if prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-CALL15-C), INSTR-OK-CALL15-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL15-T1, INSTR-OK-CALL15-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL15-C : Context /\ INSTR-OK-CALL15-X : Idx /\ INSTR-OK-CALL15-T1 : Valtype /\ INSTR-OK-CALL15-T2 : Valtype .
+      if prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-CALL15-C), INSTR-OK-CALL15-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL15-T1, INSTR-OK-CALL15-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL15-C : Context /\ INSTR-OK-CALL15-X : Idx /\ ( INSTR-OK-CALL15-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL15-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-call-ref] :
     prove ( Instr-ok ( INSTR-OK-CALL-REF16-C , CTORCALLREFA1 ( ( CTORWIDXA1 ( INSTR-OK-CALL-REF16-X ) ) ) , CTORARROWA3 ( ( INSTR-OK-CALL-REF16-T1 CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-CALL-REF16-X ) ) ) ), eps, INSTR-OK-CALL-REF16-T2 ) ) )
     =>
     proved
-      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-REF16-C), INSTR-OK-CALL-REF16-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-REF16-T1, INSTR-OK-CALL-REF16-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-REF16-C : Context /\ INSTR-OK-CALL-REF16-X : Idx /\ INSTR-OK-CALL-REF16-T1 : Valtype /\ INSTR-OK-CALL-REF16-T2 : Valtype .
+      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-REF16-C), INSTR-OK-CALL-REF16-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-REF16-T1, INSTR-OK-CALL-REF16-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-REF16-C : Context /\ INSTR-OK-CALL-REF16-X : Idx /\ ( INSTR-OK-CALL-REF16-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL-REF16-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-CALL-REF16-C , CTORCALLREFA1 ( ( CTORWIDXA1 ( INSTR-OK-CALL-REF16-X ) ) ) , CTORARROWA3 ( ( INSTR-OK-CALL-REF16-T1 CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-CALL-REF16-X ) ) ) ), eps, INSTR-OK-CALL-REF16-T2 ) ) ) : Proved
-      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-REF16-C), INSTR-OK-CALL-REF16-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-REF16-T1, INSTR-OK-CALL-REF16-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-REF16-C : Context /\ INSTR-OK-CALL-REF16-X : Idx /\ INSTR-OK-CALL-REF16-T1 : Valtype /\ INSTR-OK-CALL-REF16-T2 : Valtype .
+      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-REF16-C), INSTR-OK-CALL-REF16-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-REF16-T1, INSTR-OK-CALL-REF16-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-REF16-C : Context /\ INSTR-OK-CALL-REF16-X : Idx /\ ( INSTR-OK-CALL-REF16-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL-REF16-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-call-indirect] :
     prove ( Instr-ok ( INSTR-OK-CALL-INDIRECT17-C , CTORCALLINDIRECTA2 ( INSTR-OK-CALL-INDIRECT17-X, ( CTORWIDXA1 ( INSTR-OK-CALL-INDIRECT17-Y ) ) ) , CTORARROWA3 ( ( INSTR-OK-CALL-INDIRECT17-T1 INSTR-OK-CALL-INDIRECT17-AT ), eps, INSTR-OK-CALL-INDIRECT17-T2 ) ) )
     =>
     proved
-      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := index ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-X ) /\ prove ( Reftype-sub ( INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-INDIRECT17-T1, INSTR-OK-CALL-INDIRECT17-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-INDIRECT17-C : Context /\ INSTR-OK-CALL-INDIRECT17-X : Idx /\ INSTR-OK-CALL-INDIRECT17-Y : Idx /\ INSTR-OK-CALL-INDIRECT17-T1 : Valtype /\ INSTR-OK-CALL-INDIRECT17-AT : Addrtype /\ INSTR-OK-CALL-INDIRECT17-T2 : Valtype .
+      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := index ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-X ) /\ prove ( Reftype-sub ( INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-INDIRECT17-T1, INSTR-OK-CALL-INDIRECT17-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-INDIRECT17-C : Context /\ INSTR-OK-CALL-INDIRECT17-X : Idx /\ INSTR-OK-CALL-INDIRECT17-Y : Idx /\ ( INSTR-OK-CALL-INDIRECT17-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-CALL-INDIRECT17-AT : Addrtype /\ ( INSTR-OK-CALL-INDIRECT17-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-CALL-INDIRECT17-C , CTORCALLINDIRECTA2 ( INSTR-OK-CALL-INDIRECT17-X, ( CTORWIDXA1 ( INSTR-OK-CALL-INDIRECT17-Y ) ) ) , CTORARROWA3 ( ( INSTR-OK-CALL-INDIRECT17-T1 INSTR-OK-CALL-INDIRECT17-AT ), eps, INSTR-OK-CALL-INDIRECT17-T2 ) ) ) : Proved
-      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := index ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-X ) /\ prove ( Reftype-sub ( INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-INDIRECT17-T1, INSTR-OK-CALL-INDIRECT17-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-INDIRECT17-C : Context /\ INSTR-OK-CALL-INDIRECT17-X : Idx /\ INSTR-OK-CALL-INDIRECT17-Y : Idx /\ INSTR-OK-CALL-INDIRECT17-T1 : Valtype /\ INSTR-OK-CALL-INDIRECT17-AT : Addrtype /\ INSTR-OK-CALL-INDIRECT17-T2 : Valtype .
+      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := index ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-X ) /\ prove ( Reftype-sub ( INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-INDIRECT17-T1, INSTR-OK-CALL-INDIRECT17-T2 ) ) ) ) : Proved /\ INSTR-OK-CALL-INDIRECT17-C : Context /\ INSTR-OK-CALL-INDIRECT17-X : Idx /\ INSTR-OK-CALL-INDIRECT17-Y : Idx /\ ( INSTR-OK-CALL-INDIRECT17-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-CALL-INDIRECT17-AT : Addrtype /\ ( INSTR-OK-CALL-INDIRECT17-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-return] :
     prove ( Instr-ok ( INSTR-OK-RETURN18-C , CTORRETURNA0 , CTORARROWA3 ( ( INSTR-OK-RETURN18-T1 INSTR-OK-RETURN18-T ), eps, INSTR-OK-RETURN18-T2 ) ) )
     =>
     proved
-      if ( ( value('RETURN, INSTR-OK-RETURN18-C) == INSTR-OK-RETURN18-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-RETURN18-C, ( CTORARROWA3 ( INSTR-OK-RETURN18-T1, eps, INSTR-OK-RETURN18-T2 ) ) ) ) : Proved /\ INSTR-OK-RETURN18-C : Context /\ INSTR-OK-RETURN18-T1 : Valtype /\ INSTR-OK-RETURN18-T : Valtype /\ INSTR-OK-RETURN18-T2 : Valtype .
+      if ( ( value('RETURN, INSTR-OK-RETURN18-C) == INSTR-OK-RETURN18-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-RETURN18-C, ( CTORARROWA3 ( INSTR-OK-RETURN18-T1, eps, INSTR-OK-RETURN18-T2 ) ) ) ) : Proved /\ INSTR-OK-RETURN18-C : Context /\ ( INSTR-OK-RETURN18-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN18-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN18-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-RETURN18-C , CTORRETURNA0 , CTORARROWA3 ( ( INSTR-OK-RETURN18-T1 INSTR-OK-RETURN18-T ), eps, INSTR-OK-RETURN18-T2 ) ) ) : Proved
-      if ( ( value('RETURN, INSTR-OK-RETURN18-C) == INSTR-OK-RETURN18-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-RETURN18-C, ( CTORARROWA3 ( INSTR-OK-RETURN18-T1, eps, INSTR-OK-RETURN18-T2 ) ) ) ) : Proved /\ INSTR-OK-RETURN18-C : Context /\ INSTR-OK-RETURN18-T1 : Valtype /\ INSTR-OK-RETURN18-T : Valtype /\ INSTR-OK-RETURN18-T2 : Valtype .
+      if ( ( value('RETURN, INSTR-OK-RETURN18-C) == INSTR-OK-RETURN18-T ) ) = true /\ prove ( Instrtype-ok ( INSTR-OK-RETURN18-C, ( CTORARROWA3 ( INSTR-OK-RETURN18-T1, eps, INSTR-OK-RETURN18-T2 ) ) ) ) : Proved /\ INSTR-OK-RETURN18-C : Context /\ ( INSTR-OK-RETURN18-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN18-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN18-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-return-call] :
     prove ( Instr-ok ( INSTR-OK-RETURN-CALL19-C , CTORRETURNCALLA1 ( INSTR-OK-RETURN-CALL19-X ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL19-T3 INSTR-OK-RETURN-CALL19-T1 ), eps, INSTR-OK-RETURN-CALL19-T4 ) ) )
     =>
     proved
-      if INSTR-OK-RETURN-CALL19-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL19-C) /\ prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-RETURN-CALL19-C), INSTR-OK-RETURN-CALL19-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL19-T1, INSTR-OK-RETURN-CALL19-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL19-C, INSTR-OK-RETURN-CALL19-T2, INSTR-OK-RETURN-CALL19-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL19-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL19-T3, eps, INSTR-OK-RETURN-CALL19-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL19-C : Context /\ INSTR-OK-RETURN-CALL19-X : Idx /\ INSTR-OK-RETURN-CALL19-T3 : Valtype /\ INSTR-OK-RETURN-CALL19-T1 : Valtype /\ INSTR-OK-RETURN-CALL19-T4 : Valtype .
+      if INSTR-OK-RETURN-CALL19-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL19-C) /\ prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-RETURN-CALL19-C), INSTR-OK-RETURN-CALL19-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL19-T1, INSTR-OK-RETURN-CALL19-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL19-C, INSTR-OK-RETURN-CALL19-T2, INSTR-OK-RETURN-CALL19-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL19-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL19-T3, eps, INSTR-OK-RETURN-CALL19-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL19-C : Context /\ INSTR-OK-RETURN-CALL19-X : Idx /\ ( INSTR-OK-RETURN-CALL19-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-RETURN-CALL19-C , CTORRETURNCALLA1 ( INSTR-OK-RETURN-CALL19-X ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL19-T3 INSTR-OK-RETURN-CALL19-T1 ), eps, INSTR-OK-RETURN-CALL19-T4 ) ) ) : Proved
-      if INSTR-OK-RETURN-CALL19-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL19-C) /\ prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-RETURN-CALL19-C), INSTR-OK-RETURN-CALL19-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL19-T1, INSTR-OK-RETURN-CALL19-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL19-C, INSTR-OK-RETURN-CALL19-T2, INSTR-OK-RETURN-CALL19-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL19-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL19-T3, eps, INSTR-OK-RETURN-CALL19-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL19-C : Context /\ INSTR-OK-RETURN-CALL19-X : Idx /\ INSTR-OK-RETURN-CALL19-T3 : Valtype /\ INSTR-OK-RETURN-CALL19-T1 : Valtype /\ INSTR-OK-RETURN-CALL19-T4 : Valtype .
+      if INSTR-OK-RETURN-CALL19-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL19-C) /\ prove ( Expand ( ( index ( value('FUNCS, INSTR-OK-RETURN-CALL19-C), INSTR-OK-RETURN-CALL19-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL19-T1, INSTR-OK-RETURN-CALL19-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL19-C, INSTR-OK-RETURN-CALL19-T2, INSTR-OK-RETURN-CALL19-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL19-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL19-T3, eps, INSTR-OK-RETURN-CALL19-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL19-C : Context /\ INSTR-OK-RETURN-CALL19-X : Idx /\ ( INSTR-OK-RETURN-CALL19-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-return-call-ref] :
     prove ( Instr-ok ( INSTR-OK-RETURN-CALL-REF20-C , CTORRETURNCALLREFA1 ( ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-REF20-X ) ) ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL-REF20-T3 INSTR-OK-RETURN-CALL-REF20-T1 CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-REF20-X ) ) ) ), eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) )
     =>
     proved
-      if INSTR-OK-RETURN-CALL-REF20-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-REF20-C) /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-REF20-C), INSTR-OK-RETURN-CALL-REF20-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-REF20-T1, INSTR-OK-RETURN-CALL-REF20-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-REF20-C, INSTR-OK-RETURN-CALL-REF20-T2, INSTR-OK-RETURN-CALL-REF20-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-REF20-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-REF20-T3, eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-REF20-C : Context /\ INSTR-OK-RETURN-CALL-REF20-X : Idx /\ INSTR-OK-RETURN-CALL-REF20-T3 : Valtype /\ INSTR-OK-RETURN-CALL-REF20-T1 : Valtype /\ INSTR-OK-RETURN-CALL-REF20-T4 : Valtype .
+      if INSTR-OK-RETURN-CALL-REF20-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-REF20-C) /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-REF20-C), INSTR-OK-RETURN-CALL-REF20-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-REF20-T1, INSTR-OK-RETURN-CALL-REF20-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-REF20-C, INSTR-OK-RETURN-CALL-REF20-T2, INSTR-OK-RETURN-CALL-REF20-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-REF20-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-REF20-T3, eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-REF20-C : Context /\ INSTR-OK-RETURN-CALL-REF20-X : Idx /\ ( INSTR-OK-RETURN-CALL-REF20-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-RETURN-CALL-REF20-C , CTORRETURNCALLREFA1 ( ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-REF20-X ) ) ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL-REF20-T3 INSTR-OK-RETURN-CALL-REF20-T1 CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-REF20-X ) ) ) ), eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) ) : Proved
-      if INSTR-OK-RETURN-CALL-REF20-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-REF20-C) /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-REF20-C), INSTR-OK-RETURN-CALL-REF20-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-REF20-T1, INSTR-OK-RETURN-CALL-REF20-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-REF20-C, INSTR-OK-RETURN-CALL-REF20-T2, INSTR-OK-RETURN-CALL-REF20-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-REF20-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-REF20-T3, eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-REF20-C : Context /\ INSTR-OK-RETURN-CALL-REF20-X : Idx /\ INSTR-OK-RETURN-CALL-REF20-T3 : Valtype /\ INSTR-OK-RETURN-CALL-REF20-T1 : Valtype /\ INSTR-OK-RETURN-CALL-REF20-T4 : Valtype .
+      if INSTR-OK-RETURN-CALL-REF20-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-REF20-C) /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-REF20-C), INSTR-OK-RETURN-CALL-REF20-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-REF20-T1, INSTR-OK-RETURN-CALL-REF20-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-REF20-C, INSTR-OK-RETURN-CALL-REF20-T2, INSTR-OK-RETURN-CALL-REF20-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-REF20-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-REF20-T3, eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-REF20-C : Context /\ INSTR-OK-RETURN-CALL-REF20-X : Idx /\ ( INSTR-OK-RETURN-CALL-REF20-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-return-call-indirect] :
     prove ( Instr-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C , CTORRETURNCALLINDIRECTA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-X, ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ) ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL-INDIRECT21-T3 INSTR-OK-RETURN-CALL-INDIRECT21-T1 INSTR-OK-RETURN-CALL-INDIRECT21-AT ), eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) )
     =>
     proved
-      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := index ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-X ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ prove ( Reftype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-T1, INSTR-OK-RETURN-CALL-INDIRECT21-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-T2, INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-INDIRECT21-T3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-INDIRECT21-C : Context /\ INSTR-OK-RETURN-CALL-INDIRECT21-X : Idx /\ INSTR-OK-RETURN-CALL-INDIRECT21-Y : Idx /\ INSTR-OK-RETURN-CALL-INDIRECT21-T3 : Valtype /\ INSTR-OK-RETURN-CALL-INDIRECT21-T1 : Valtype /\ INSTR-OK-RETURN-CALL-INDIRECT21-AT : Addrtype /\ INSTR-OK-RETURN-CALL-INDIRECT21-T4 : Valtype .
+      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := index ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-X ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ prove ( Reftype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-T1, INSTR-OK-RETURN-CALL-INDIRECT21-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-T2, INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-INDIRECT21-T3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-INDIRECT21-C : Context /\ INSTR-OK-RETURN-CALL-INDIRECT21-X : Idx /\ INSTR-OK-RETURN-CALL-INDIRECT21-Y : Idx /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-RETURN-CALL-INDIRECT21-AT : Addrtype /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C , CTORRETURNCALLINDIRECTA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-X, ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ) ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL-INDIRECT21-T3 INSTR-OK-RETURN-CALL-INDIRECT21-T1 INSTR-OK-RETURN-CALL-INDIRECT21-AT ), eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) ) : Proved
-      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := index ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-X ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ prove ( Reftype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-T1, INSTR-OK-RETURN-CALL-INDIRECT21-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-T2, INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-INDIRECT21-T3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-INDIRECT21-C : Context /\ INSTR-OK-RETURN-CALL-INDIRECT21-X : Idx /\ INSTR-OK-RETURN-CALL-INDIRECT21-Y : Idx /\ INSTR-OK-RETURN-CALL-INDIRECT21-T3 : Valtype /\ INSTR-OK-RETURN-CALL-INDIRECT21-T1 : Valtype /\ INSTR-OK-RETURN-CALL-INDIRECT21-AT : Addrtype /\ INSTR-OK-RETURN-CALL-INDIRECT21-T4 : Valtype .
+      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := index ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-X ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ prove ( Reftype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) ) : Proved /\ prove ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-T1, INSTR-OK-RETURN-CALL-INDIRECT21-T2 ) ) ) ) : Proved /\ prove ( Resulttype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-T2, INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-INDIRECT21-T3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) ) ) : Proved /\ INSTR-OK-RETURN-CALL-INDIRECT21-C : Context /\ INSTR-OK-RETURN-CALL-INDIRECT21-X : Idx /\ INSTR-OK-RETURN-CALL-INDIRECT21-Y : Idx /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ INSTR-OK-RETURN-CALL-INDIRECT21-AT : Addrtype /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-throw] :
     prove ( Instr-ok ( INSTR-OK-THROW22-C , CTORTHROWA1 ( INSTR-OK-THROW22-X ) , CTORARROWA3 ( ( INSTR-OK-THROW22-T1 INSTR-OK-THROW22-T ), eps, INSTR-OK-THROW22-T2 ) ) )
     =>
     proved
-      if prove ( Expand ( ( $as-deftype ( ( index ( value('TAGS, INSTR-OK-THROW22-C), INSTR-OK-THROW22-X ) ) ) ), ( CTORFUNCARROWA2 ( INSTR-OK-THROW22-T, eps ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-THROW22-C, ( CTORARROWA3 ( INSTR-OK-THROW22-T1, eps, INSTR-OK-THROW22-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW22-C : Context /\ INSTR-OK-THROW22-X : Idx /\ INSTR-OK-THROW22-T1 : Valtype /\ INSTR-OK-THROW22-T : Valtype /\ INSTR-OK-THROW22-T2 : Valtype .
+      if prove ( Expand ( ( $as-deftype ( ( index ( value('TAGS, INSTR-OK-THROW22-C), INSTR-OK-THROW22-X ) ) ) ), ( CTORFUNCARROWA2 ( INSTR-OK-THROW22-T, eps ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-THROW22-C, ( CTORARROWA3 ( INSTR-OK-THROW22-T1, eps, INSTR-OK-THROW22-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW22-C : Context /\ INSTR-OK-THROW22-X : Idx /\ ( INSTR-OK-THROW22-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-THROW22-C , CTORTHROWA1 ( INSTR-OK-THROW22-X ) , CTORARROWA3 ( ( INSTR-OK-THROW22-T1 INSTR-OK-THROW22-T ), eps, INSTR-OK-THROW22-T2 ) ) ) : Proved
-      if prove ( Expand ( ( $as-deftype ( ( index ( value('TAGS, INSTR-OK-THROW22-C), INSTR-OK-THROW22-X ) ) ) ), ( CTORFUNCARROWA2 ( INSTR-OK-THROW22-T, eps ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-THROW22-C, ( CTORARROWA3 ( INSTR-OK-THROW22-T1, eps, INSTR-OK-THROW22-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW22-C : Context /\ INSTR-OK-THROW22-X : Idx /\ INSTR-OK-THROW22-T1 : Valtype /\ INSTR-OK-THROW22-T : Valtype /\ INSTR-OK-THROW22-T2 : Valtype .
+      if prove ( Expand ( ( $as-deftype ( ( index ( value('TAGS, INSTR-OK-THROW22-C), INSTR-OK-THROW22-X ) ) ) ), ( CTORFUNCARROWA2 ( INSTR-OK-THROW22-T, eps ) ) ) ) : Proved /\ prove ( Instrtype-ok ( INSTR-OK-THROW22-C, ( CTORARROWA3 ( INSTR-OK-THROW22-T1, eps, INSTR-OK-THROW22-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW22-C : Context /\ INSTR-OK-THROW22-X : Idx /\ ( INSTR-OK-THROW22-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-throw-ref] :
     prove ( Instr-ok ( INSTR-OK-THROW-REF23-C , CTORTHROWREFA0 , CTORARROWA3 ( ( INSTR-OK-THROW-REF23-T1 CTORREFA2 ( CTORNULLA0, CTOREXNA0 ) ), eps, INSTR-OK-THROW-REF23-T2 ) ) )
     =>
     proved
-      if prove ( Instrtype-ok ( INSTR-OK-THROW-REF23-C, ( CTORARROWA3 ( INSTR-OK-THROW-REF23-T1, eps, INSTR-OK-THROW-REF23-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW-REF23-C : Context /\ INSTR-OK-THROW-REF23-T1 : Valtype /\ INSTR-OK-THROW-REF23-T2 : Valtype .
+      if prove ( Instrtype-ok ( INSTR-OK-THROW-REF23-C, ( CTORARROWA3 ( INSTR-OK-THROW-REF23-T1, eps, INSTR-OK-THROW-REF23-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW-REF23-C : Context /\ ( INSTR-OK-THROW-REF23-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW-REF23-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-THROW-REF23-C , CTORTHROWREFA0 , CTORARROWA3 ( ( INSTR-OK-THROW-REF23-T1 CTORREFA2 ( CTORNULLA0, CTOREXNA0 ) ), eps, INSTR-OK-THROW-REF23-T2 ) ) ) : Proved
-      if prove ( Instrtype-ok ( INSTR-OK-THROW-REF23-C, ( CTORARROWA3 ( INSTR-OK-THROW-REF23-T1, eps, INSTR-OK-THROW-REF23-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW-REF23-C : Context /\ INSTR-OK-THROW-REF23-T1 : Valtype /\ INSTR-OK-THROW-REF23-T2 : Valtype .
+      if prove ( Instrtype-ok ( INSTR-OK-THROW-REF23-C, ( CTORARROWA3 ( INSTR-OK-THROW-REF23-T1, eps, INSTR-OK-THROW-REF23-T2 ) ) ) ) : Proved /\ INSTR-OK-THROW-REF23-C : Context /\ ( INSTR-OK-THROW-REF23-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW-REF23-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-try-table] :
     prove ( Instr-ok ( INSTR-OK-TRY-TABLE24-C , CTORTRYTABLEA3 ( INSTR-OK-TRY-TABLE24-BT, INSTR-OK-TRY-TABLE24-CATCH, INSTR-OK-TRY-TABLE24-INSTR ) , CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, eps, INSTR-OK-TRY-TABLE24-T2 ) ) )
     =>
     proved
-      if prove ( Blocktype-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-BT, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, eps, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-TRY-TABLE24-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-TRY-TABLE24-C ) ), INSTR-OK-TRY-TABLE24-INSTR, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, INSTR-OK-TRY-TABLE24-X, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Catch-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-CATCH ) ) : Proved /\ INSTR-OK-TRY-TABLE24-C : Context /\ INSTR-OK-TRY-TABLE24-BT : Blocktype /\ INSTR-OK-TRY-TABLE24-CATCH : Catch /\ INSTR-OK-TRY-TABLE24-INSTR : Instr /\ INSTR-OK-TRY-TABLE24-T1 : Valtype /\ INSTR-OK-TRY-TABLE24-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-BT, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, eps, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-TRY-TABLE24-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-TRY-TABLE24-C ) ), INSTR-OK-TRY-TABLE24-INSTR, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, INSTR-OK-TRY-TABLE24-X, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Catch-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-CATCH ) ) : Proved /\ INSTR-OK-TRY-TABLE24-C : Context /\ INSTR-OK-TRY-TABLE24-BT : Blocktype /\ ( INSTR-OK-TRY-TABLE24-CATCH hasType ( list ( catch ) ) ) : WellTyped /\ ( INSTR-OK-TRY-TABLE24-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-TRY-TABLE24-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-TRY-TABLE24-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-TRY-TABLE24-C , CTORTRYTABLEA3 ( INSTR-OK-TRY-TABLE24-BT, INSTR-OK-TRY-TABLE24-CATCH, INSTR-OK-TRY-TABLE24-INSTR ) , CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, eps, INSTR-OK-TRY-TABLE24-T2 ) ) ) : Proved
-      if prove ( Blocktype-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-BT, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, eps, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-TRY-TABLE24-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-TRY-TABLE24-C ) ), INSTR-OK-TRY-TABLE24-INSTR, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, INSTR-OK-TRY-TABLE24-X, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Catch-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-CATCH ) ) : Proved /\ INSTR-OK-TRY-TABLE24-C : Context /\ INSTR-OK-TRY-TABLE24-BT : Blocktype /\ INSTR-OK-TRY-TABLE24-CATCH : Catch /\ INSTR-OK-TRY-TABLE24-INSTR : Instr /\ INSTR-OK-TRY-TABLE24-T1 : Valtype /\ INSTR-OK-TRY-TABLE24-T2 : Valtype .
+      if prove ( Blocktype-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-BT, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, eps, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-TRY-TABLE24-T2) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-TRY-TABLE24-C ) ), INSTR-OK-TRY-TABLE24-INSTR, ( CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, INSTR-OK-TRY-TABLE24-X, INSTR-OK-TRY-TABLE24-T2 ) ) ) ) : Proved /\ prove ( Catch-ok ( INSTR-OK-TRY-TABLE24-C, INSTR-OK-TRY-TABLE24-CATCH ) ) : Proved /\ INSTR-OK-TRY-TABLE24-C : Context /\ INSTR-OK-TRY-TABLE24-BT : Blocktype /\ ( INSTR-OK-TRY-TABLE24-CATCH hasType ( list ( catch ) ) ) : WellTyped /\ ( INSTR-OK-TRY-TABLE24-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-TRY-TABLE24-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-TRY-TABLE24-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instr-ok-ref-null] :
     prove ( Instr-ok ( INSTR-OK-REF-NULL25-C , CTORREFNULLA1 ( INSTR-OK-REF-NULL25-HT ) , CTORARROWA3 ( eps, eps, ( CTORREFA2 ( CTORNULLA0, INSTR-OK-REF-NULL25-HT ) ) ) ) )
     =>
@@ -5310,9 +5316,9 @@ mod SPECTEC-CORE is
     prove ( Instr-ok ( INSTR-OK-STRUCT-NEW34-C , CTORSTRUCTNEWA1 ( INSTR-OK-STRUCT-NEW34-X ) , CTORARROWA3 ( ( $unpack ( INSTR-OK-STRUCT-NEW34-ZT ) ), eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-STRUCT-NEW34-X ) ) ) ) ) ) )
     =>
     proved
-      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-NEW34-C), INSTR-OK-STRUCT-NEW34-X ) ), ( CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW34-MUT INSTR-OK-STRUCT-NEW34-ZT ) ) ) ) ) : Proved /\ INSTR-OK-STRUCT-NEW34-C : Context /\ INSTR-OK-STRUCT-NEW34-X : Idx /\ INSTR-OK-STRUCT-NEW34-ZT : Storagetype .
+      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-NEW34-C), INSTR-OK-STRUCT-NEW34-X ) ), ( CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW34-MUT INSTR-OK-STRUCT-NEW34-ZT ) ) ) ) ) : Proved /\ INSTR-OK-STRUCT-NEW34-C : Context /\ INSTR-OK-STRUCT-NEW34-X : Idx /\ ( INSTR-OK-STRUCT-NEW34-ZT hasType ( list ( storagetype ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-STRUCT-NEW34-C , CTORSTRUCTNEWA1 ( INSTR-OK-STRUCT-NEW34-X ) , CTORARROWA3 ( ( $unpack ( INSTR-OK-STRUCT-NEW34-ZT ) ), eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-STRUCT-NEW34-X ) ) ) ) ) ) ) : Proved
-      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-NEW34-C), INSTR-OK-STRUCT-NEW34-X ) ), ( CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW34-MUT INSTR-OK-STRUCT-NEW34-ZT ) ) ) ) ) : Proved /\ INSTR-OK-STRUCT-NEW34-C : Context /\ INSTR-OK-STRUCT-NEW34-X : Idx /\ INSTR-OK-STRUCT-NEW34-ZT : Storagetype .
+      if prove ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-NEW34-C), INSTR-OK-STRUCT-NEW34-X ) ), ( CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW34-MUT INSTR-OK-STRUCT-NEW34-ZT ) ) ) ) ) : Proved /\ INSTR-OK-STRUCT-NEW34-C : Context /\ INSTR-OK-STRUCT-NEW34-X : Idx /\ ( INSTR-OK-STRUCT-NEW34-ZT hasType ( list ( storagetype ) ) ) : WellTyped .
   crl [instr-ok-struct-new-default] :
     prove ( Instr-ok ( INSTR-OK-STRUCT-NEW-DEFAULT35-C , CTORSTRUCTNEWDEFAULTA1 ( INSTR-OK-STRUCT-NEW-DEFAULT35-X ) , CTORARROWA3 ( eps, eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-STRUCT-NEW-DEFAULT35-X ) ) ) ) ) ) )
     =>
@@ -5779,9 +5785,9 @@ mod SPECTEC-CORE is
     prove ( Instr-ok ( INSTR-OK-VSHUFFLE101-C , CTORVSHUFFLEA2 ( INSTR-OK-VSHUFFLE101-SH, INSTR-OK-VSHUFFLE101-I ) , CTORARROWA3 ( ( CTORV128A0 CTORV128A0 ), eps, CTORV128A0 ) ) )
     =>
     proved
-      if ( ( INSTR-OK-VSHUFFLE101-I < ( 2 * $dim ( INSTR-OK-VSHUFFLE101-SH ) ) ) ) = true /\ INSTR-OK-VSHUFFLE101-C : Context /\ INSTR-OK-VSHUFFLE101-SH : Bshape /\ INSTR-OK-VSHUFFLE101-I : Laneidx .
+      if ( ( INSTR-OK-VSHUFFLE101-I < ( 2 * $dim ( INSTR-OK-VSHUFFLE101-SH ) ) ) ) = true /\ INSTR-OK-VSHUFFLE101-C : Context /\ INSTR-OK-VSHUFFLE101-SH : Bshape /\ ( INSTR-OK-VSHUFFLE101-I hasType ( list ( laneidx ) ) ) : WellTyped .
   cmb prove ( Instr-ok ( INSTR-OK-VSHUFFLE101-C , CTORVSHUFFLEA2 ( INSTR-OK-VSHUFFLE101-SH, INSTR-OK-VSHUFFLE101-I ) , CTORARROWA3 ( ( CTORV128A0 CTORV128A0 ), eps, CTORV128A0 ) ) ) : Proved
-      if ( ( INSTR-OK-VSHUFFLE101-I < ( 2 * $dim ( INSTR-OK-VSHUFFLE101-SH ) ) ) ) = true /\ INSTR-OK-VSHUFFLE101-C : Context /\ INSTR-OK-VSHUFFLE101-SH : Bshape /\ INSTR-OK-VSHUFFLE101-I : Laneidx .
+      if ( ( INSTR-OK-VSHUFFLE101-I < ( 2 * $dim ( INSTR-OK-VSHUFFLE101-SH ) ) ) ) = true /\ INSTR-OK-VSHUFFLE101-C : Context /\ INSTR-OK-VSHUFFLE101-SH : Bshape /\ ( INSTR-OK-VSHUFFLE101-I hasType ( list ( laneidx ) ) ) : WellTyped .
   crl [instr-ok-vsplat] :
     prove ( Instr-ok ( INSTR-OK-VSPLAT102-C , CTORVSPLATA1 ( INSTR-OK-VSPLAT102-SH ) , CTORARROWA3 ( ( $unpackshape ( INSTR-OK-VSPLAT102-SH ) ), eps, CTORV128A0 ) ) )
     =>
@@ -5851,23 +5857,23 @@ mod SPECTEC-CORE is
     prove ( Instrs-ok ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 INSTRS-OK-SEQ1-INSTR2 , CTORARROWA3 ( INSTRS-OK-SEQ1-T1, ( INSTRS-OK-SEQ1-X1 INSTRS-OK-SEQ1-X2 ), INSTRS-OK-SEQ1-T3 ) ) )
     =>
     proved
-      if INSTRS-OK-SEQ1-INIT INSTRS-OK-SEQ1-T := index ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-X1 ) /\ prove ( Instr-ok ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T1, INSTRS-OK-SEQ1-X1, INSTRS-OK-SEQ1-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( $with-locals ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-X1, ( CTORSETA0 INSTRS-OK-SEQ1-T ) ) ), INSTRS-OK-SEQ1-INSTR2, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T2, INSTRS-OK-SEQ1-X2, INSTRS-OK-SEQ1-T3 ) ) ) ) : Proved /\ INSTRS-OK-SEQ1-C : Context /\ INSTRS-OK-SEQ1-INSTR1 : Instr /\ INSTRS-OK-SEQ1-INSTR2 : Instr /\ INSTRS-OK-SEQ1-T1 : Valtype /\ INSTRS-OK-SEQ1-X1 : Idx /\ INSTRS-OK-SEQ1-X2 : Idx /\ INSTRS-OK-SEQ1-T3 : Valtype .
+      if INSTRS-OK-SEQ1-INIT INSTRS-OK-SEQ1-T := index ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-X1 ) /\ prove ( Instr-ok ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T1, INSTRS-OK-SEQ1-X1, INSTRS-OK-SEQ1-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( $with-locals ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-X1, ( CTORSETA0 INSTRS-OK-SEQ1-T ) ) ), INSTRS-OK-SEQ1-INSTR2, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T2, INSTRS-OK-SEQ1-X2, INSTRS-OK-SEQ1-T3 ) ) ) ) : Proved /\ INSTRS-OK-SEQ1-C : Context /\ INSTRS-OK-SEQ1-INSTR1 : Instr /\ ( INSTRS-OK-SEQ1-INSTR2 hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-X1 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-X2 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-T3 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instrs-ok ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 INSTRS-OK-SEQ1-INSTR2 , CTORARROWA3 ( INSTRS-OK-SEQ1-T1, ( INSTRS-OK-SEQ1-X1 INSTRS-OK-SEQ1-X2 ), INSTRS-OK-SEQ1-T3 ) ) ) : Proved
-      if INSTRS-OK-SEQ1-INIT INSTRS-OK-SEQ1-T := index ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-X1 ) /\ prove ( Instr-ok ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T1, INSTRS-OK-SEQ1-X1, INSTRS-OK-SEQ1-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( $with-locals ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-X1, ( CTORSETA0 INSTRS-OK-SEQ1-T ) ) ), INSTRS-OK-SEQ1-INSTR2, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T2, INSTRS-OK-SEQ1-X2, INSTRS-OK-SEQ1-T3 ) ) ) ) : Proved /\ INSTRS-OK-SEQ1-C : Context /\ INSTRS-OK-SEQ1-INSTR1 : Instr /\ INSTRS-OK-SEQ1-INSTR2 : Instr /\ INSTRS-OK-SEQ1-T1 : Valtype /\ INSTRS-OK-SEQ1-X1 : Idx /\ INSTRS-OK-SEQ1-X2 : Idx /\ INSTRS-OK-SEQ1-T3 : Valtype .
+      if INSTRS-OK-SEQ1-INIT INSTRS-OK-SEQ1-T := index ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-X1 ) /\ prove ( Instr-ok ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T1, INSTRS-OK-SEQ1-X1, INSTRS-OK-SEQ1-T2 ) ) ) ) : Proved /\ prove ( Instrs-ok ( ( $with-locals ( INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-X1, ( CTORSETA0 INSTRS-OK-SEQ1-T ) ) ), INSTRS-OK-SEQ1-INSTR2, ( CTORARROWA3 ( INSTRS-OK-SEQ1-T2, INSTRS-OK-SEQ1-X2, INSTRS-OK-SEQ1-T3 ) ) ) ) : Proved /\ INSTRS-OK-SEQ1-C : Context /\ INSTRS-OK-SEQ1-INSTR1 : Instr /\ ( INSTRS-OK-SEQ1-INSTR2 hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-X1 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-X2 hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRS-OK-SEQ1-T3 hasType ( list ( valtype ) ) ) : WellTyped .
   crl [instrs-ok-sub] :
     prove ( Instrs-ok ( INSTRS-OK-SUB2-C , INSTRS-OK-SUB2-INSTR , INSTRS-OK-SUB2-ITQ ) )
     =>
     proved
-      if prove ( Instrs-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-INSTR, INSTRS-OK-SUB2-IT ) ) : Proved /\ prove ( Instrtype-sub ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-IT, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ prove ( Instrtype-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ INSTRS-OK-SUB2-C : Context /\ INSTRS-OK-SUB2-INSTR : Instr /\ INSTRS-OK-SUB2-ITQ : Instrtype .
+      if prove ( Instrs-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-INSTR, INSTRS-OK-SUB2-IT ) ) : Proved /\ prove ( Instrtype-sub ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-IT, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ prove ( Instrtype-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ INSTRS-OK-SUB2-C : Context /\ ( INSTRS-OK-SUB2-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ INSTRS-OK-SUB2-ITQ : Instrtype .
   cmb prove ( Instrs-ok ( INSTRS-OK-SUB2-C , INSTRS-OK-SUB2-INSTR , INSTRS-OK-SUB2-ITQ ) ) : Proved
-      if prove ( Instrs-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-INSTR, INSTRS-OK-SUB2-IT ) ) : Proved /\ prove ( Instrtype-sub ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-IT, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ prove ( Instrtype-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ INSTRS-OK-SUB2-C : Context /\ INSTRS-OK-SUB2-INSTR : Instr /\ INSTRS-OK-SUB2-ITQ : Instrtype .
+      if prove ( Instrs-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-INSTR, INSTRS-OK-SUB2-IT ) ) : Proved /\ prove ( Instrtype-sub ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-IT, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ prove ( Instrtype-ok ( INSTRS-OK-SUB2-C, INSTRS-OK-SUB2-ITQ ) ) : Proved /\ INSTRS-OK-SUB2-C : Context /\ ( INSTRS-OK-SUB2-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ INSTRS-OK-SUB2-ITQ : Instrtype .
   crl [instrs-ok-frame] :
     prove ( Instrs-ok ( INSTRS-OK-FRAME3-C , INSTRS-OK-FRAME3-INSTR , CTORARROWA3 ( ( INSTRS-OK-FRAME3-T INSTRS-OK-FRAME3-T1 ), INSTRS-OK-FRAME3-X, ( INSTRS-OK-FRAME3-T INSTRS-OK-FRAME3-T2 ) ) ) )
     =>
     proved
-      if prove ( Instrs-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-INSTR, ( CTORARROWA3 ( INSTRS-OK-FRAME3-T1, INSTRS-OK-FRAME3-X, INSTRS-OK-FRAME3-T2 ) ) ) ) : Proved /\ prove ( Resulttype-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-T ) ) : Proved /\ INSTRS-OK-FRAME3-C : Context /\ INSTRS-OK-FRAME3-INSTR : Instr /\ INSTRS-OK-FRAME3-T : Valtype /\ INSTRS-OK-FRAME3-T1 : Valtype /\ INSTRS-OK-FRAME3-X : Idx /\ INSTRS-OK-FRAME3-T2 : Valtype .
+      if prove ( Instrs-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-INSTR, ( CTORARROWA3 ( INSTRS-OK-FRAME3-T1, INSTRS-OK-FRAME3-X, INSTRS-OK-FRAME3-T2 ) ) ) ) : Proved /\ prove ( Resulttype-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-T ) ) : Proved /\ INSTRS-OK-FRAME3-C : Context /\ ( INSTRS-OK-FRAME3-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-X hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Instrs-ok ( INSTRS-OK-FRAME3-C , INSTRS-OK-FRAME3-INSTR , CTORARROWA3 ( ( INSTRS-OK-FRAME3-T INSTRS-OK-FRAME3-T1 ), INSTRS-OK-FRAME3-X, ( INSTRS-OK-FRAME3-T INSTRS-OK-FRAME3-T2 ) ) ) ) : Proved
-      if prove ( Instrs-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-INSTR, ( CTORARROWA3 ( INSTRS-OK-FRAME3-T1, INSTRS-OK-FRAME3-X, INSTRS-OK-FRAME3-T2 ) ) ) ) : Proved /\ prove ( Resulttype-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-T ) ) : Proved /\ INSTRS-OK-FRAME3-C : Context /\ INSTRS-OK-FRAME3-INSTR : Instr /\ INSTRS-OK-FRAME3-T : Valtype /\ INSTRS-OK-FRAME3-T1 : Valtype /\ INSTRS-OK-FRAME3-X : Idx /\ INSTRS-OK-FRAME3-T2 : Valtype .
+      if prove ( Instrs-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-INSTR, ( CTORARROWA3 ( INSTRS-OK-FRAME3-T1, INSTRS-OK-FRAME3-X, INSTRS-OK-FRAME3-T2 ) ) ) ) : Proved /\ prove ( Resulttype-ok ( INSTRS-OK-FRAME3-C, INSTRS-OK-FRAME3-T ) ) : Proved /\ INSTRS-OK-FRAME3-C : Context /\ ( INSTRS-OK-FRAME3-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-X hasType ( list ( idx ) ) ) : WellTyped /\ ( INSTRS-OK-FRAME3-T2 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
 
@@ -5876,9 +5882,9 @@ mod SPECTEC-CORE is
     prove ( Expr-ok ( EXPR-OK-R00-C , EXPR-OK-R00-INSTR , EXPR-OK-R00-T ) )
     =>
     proved
-      if prove ( Instrs-ok ( EXPR-OK-R00-C, EXPR-OK-R00-INSTR, ( CTORARROWA3 ( eps, eps, EXPR-OK-R00-T ) ) ) ) : Proved /\ EXPR-OK-R00-C : Context /\ EXPR-OK-R00-INSTR : Instr /\ EXPR-OK-R00-T : Valtype .
+      if prove ( Instrs-ok ( EXPR-OK-R00-C, EXPR-OK-R00-INSTR, ( CTORARROWA3 ( eps, eps, EXPR-OK-R00-T ) ) ) ) : Proved /\ EXPR-OK-R00-C : Context /\ ( EXPR-OK-R00-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( EXPR-OK-R00-T hasType ( list ( valtype ) ) ) : WellTyped .
   cmb prove ( Expr-ok ( EXPR-OK-R00-C , EXPR-OK-R00-INSTR , EXPR-OK-R00-T ) ) : Proved
-      if prove ( Instrs-ok ( EXPR-OK-R00-C, EXPR-OK-R00-INSTR, ( CTORARROWA3 ( eps, eps, EXPR-OK-R00-T ) ) ) ) : Proved /\ EXPR-OK-R00-C : Context /\ EXPR-OK-R00-INSTR : Instr /\ EXPR-OK-R00-T : Valtype .
+      if prove ( Instrs-ok ( EXPR-OK-R00-C, EXPR-OK-R00-INSTR, ( CTORARROWA3 ( eps, eps, EXPR-OK-R00-T ) ) ) ) : Proved /\ EXPR-OK-R00-C : Context /\ ( EXPR-OK-R00-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ ( EXPR-OK-R00-T hasType ( list ( valtype ) ) ) : WellTyped .
 
 
 
@@ -6002,9 +6008,9 @@ mod SPECTEC-CORE is
     prove ( Expr-const ( EXPR-CONST-R00-C , EXPR-CONST-R00-INSTR ) )
     =>
     proved
-      if prove ( Instr-const ( EXPR-CONST-R00-C, EXPR-CONST-R00-INSTR ) ) : Proved /\ EXPR-CONST-R00-C : Context /\ EXPR-CONST-R00-INSTR : Instr .
+      if prove ( Instr-const ( EXPR-CONST-R00-C, EXPR-CONST-R00-INSTR ) ) : Proved /\ EXPR-CONST-R00-C : Context /\ ( EXPR-CONST-R00-INSTR hasType ( list ( instr ) ) ) : WellTyped .
   cmb prove ( Expr-const ( EXPR-CONST-R00-C , EXPR-CONST-R00-INSTR ) ) : Proved
-      if prove ( Instr-const ( EXPR-CONST-R00-C, EXPR-CONST-R00-INSTR ) ) : Proved /\ EXPR-CONST-R00-C : Context /\ EXPR-CONST-R00-INSTR : Instr .
+      if prove ( Instr-const ( EXPR-CONST-R00-C, EXPR-CONST-R00-INSTR ) ) : Proved /\ EXPR-CONST-R00-C : Context /\ ( EXPR-CONST-R00-INSTR hasType ( list ( instr ) ) ) : WellTyped .
 
 
 
@@ -6022,9 +6028,9 @@ mod SPECTEC-CORE is
     prove ( Type-ok ( TYPE-OK-R00-C , CTORTYPEA1 ( TYPE-OK-R00-RECTYPE ) , TYPE-OK-R00-DT ) )
     =>
     proved
-      if TYPE-OK-R00-X := len ( value('TYPES, TYPE-OK-R00-C) ) /\ ( ( TYPE-OK-R00-DT == $rolldt ( TYPE-OK-R00-X, TYPE-OK-R00-RECTYPE ) ) ) = true /\ prove ( Rectype-ok ( ( merge ( TYPE-OK-R00-C , {item('TYPES, TYPE-OK-R00-DT) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPE-OK-R00-RECTYPE, ( CTOROKA1 ( TYPE-OK-R00-X ) ) ) ) : Proved /\ TYPE-OK-R00-C : Context /\ TYPE-OK-R00-RECTYPE : Rectype /\ TYPE-OK-R00-DT : Deftype .
+      if TYPE-OK-R00-X := len ( value('TYPES, TYPE-OK-R00-C) ) /\ ( ( TYPE-OK-R00-DT == $rolldt ( TYPE-OK-R00-X, TYPE-OK-R00-RECTYPE ) ) ) = true /\ prove ( Rectype-ok ( ( merge ( TYPE-OK-R00-C , {item('TYPES, TYPE-OK-R00-DT) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPE-OK-R00-RECTYPE, ( CTOROKA1 ( TYPE-OK-R00-X ) ) ) ) : Proved /\ TYPE-OK-R00-C : Context /\ TYPE-OK-R00-RECTYPE : Rectype /\ ( TYPE-OK-R00-DT hasType ( list ( deftype ) ) ) : WellTyped .
   cmb prove ( Type-ok ( TYPE-OK-R00-C , CTORTYPEA1 ( TYPE-OK-R00-RECTYPE ) , TYPE-OK-R00-DT ) ) : Proved
-      if TYPE-OK-R00-X := len ( value('TYPES, TYPE-OK-R00-C) ) /\ ( ( TYPE-OK-R00-DT == $rolldt ( TYPE-OK-R00-X, TYPE-OK-R00-RECTYPE ) ) ) = true /\ prove ( Rectype-ok ( ( merge ( TYPE-OK-R00-C , {item('TYPES, TYPE-OK-R00-DT) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPE-OK-R00-RECTYPE, ( CTOROKA1 ( TYPE-OK-R00-X ) ) ) ) : Proved /\ TYPE-OK-R00-C : Context /\ TYPE-OK-R00-RECTYPE : Rectype /\ TYPE-OK-R00-DT : Deftype .
+      if TYPE-OK-R00-X := len ( value('TYPES, TYPE-OK-R00-C) ) /\ ( ( TYPE-OK-R00-DT == $rolldt ( TYPE-OK-R00-X, TYPE-OK-R00-RECTYPE ) ) ) = true /\ prove ( Rectype-ok ( ( merge ( TYPE-OK-R00-C , {item('TYPES, TYPE-OK-R00-DT) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPE-OK-R00-RECTYPE, ( CTOROKA1 ( TYPE-OK-R00-X ) ) ) ) : Proved /\ TYPE-OK-R00-C : Context /\ TYPE-OK-R00-RECTYPE : Rectype /\ ( TYPE-OK-R00-DT hasType ( list ( deftype ) ) ) : WellTyped .
 
 
 
@@ -6088,9 +6094,9 @@ mod SPECTEC-CORE is
     prove ( Func-ok ( FUNC-OK-R00-C , CTORFUNCA3 ( FUNC-OK-R00-X, FUNC-OK-R00-LOCAL, FUNC-OK-R00-EXPR ) , index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ) )
     =>
     proved
-      if prove ( Expand ( ( index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ), ( CTORFUNCARROWA2 ( FUNC-OK-R00-T1, FUNC-OK-R00-T2 ) ) ) ) : Proved /\ prove ( Local-ok ( FUNC-OK-R00-C, FUNC-OK-R00-LOCAL, FUNC-OK-R00-LCT ) ) : Proved /\ prove ( Expr-ok ( ( merge ( FUNC-OK-R00-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, CTORSETA0 FUNC-OK-R00-T1 FUNC-OK-R00-LCT) ; item('LABELS, FUNC-OK-R00-T2) ; item('RETURN, FUNC-OK-R00-T2) ; item('REFS, eps)} ) ), FUNC-OK-R00-EXPR, FUNC-OK-R00-T2 ) ) : Proved /\ FUNC-OK-R00-C : Context /\ FUNC-OK-R00-X : Idx /\ FUNC-OK-R00-LOCAL : Local /\ FUNC-OK-R00-EXPR : Expr .
+      if prove ( Expand ( ( index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ), ( CTORFUNCARROWA2 ( FUNC-OK-R00-T1, FUNC-OK-R00-T2 ) ) ) ) : Proved /\ prove ( Local-ok ( FUNC-OK-R00-C, FUNC-OK-R00-LOCAL, FUNC-OK-R00-LCT ) ) : Proved /\ prove ( Expr-ok ( ( merge ( FUNC-OK-R00-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, CTORSETA0 FUNC-OK-R00-T1 FUNC-OK-R00-LCT) ; item('LABELS, FUNC-OK-R00-T2) ; item('RETURN, FUNC-OK-R00-T2) ; item('REFS, eps)} ) ), FUNC-OK-R00-EXPR, FUNC-OK-R00-T2 ) ) : Proved /\ FUNC-OK-R00-C : Context /\ FUNC-OK-R00-X : Idx /\ ( FUNC-OK-R00-LOCAL hasType ( list ( local ) ) ) : WellTyped /\ FUNC-OK-R00-EXPR : Expr .
   cmb prove ( Func-ok ( FUNC-OK-R00-C , CTORFUNCA3 ( FUNC-OK-R00-X, FUNC-OK-R00-LOCAL, FUNC-OK-R00-EXPR ) , index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ) ) : Proved
-      if prove ( Expand ( ( index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ), ( CTORFUNCARROWA2 ( FUNC-OK-R00-T1, FUNC-OK-R00-T2 ) ) ) ) : Proved /\ prove ( Local-ok ( FUNC-OK-R00-C, FUNC-OK-R00-LOCAL, FUNC-OK-R00-LCT ) ) : Proved /\ prove ( Expr-ok ( ( merge ( FUNC-OK-R00-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, CTORSETA0 FUNC-OK-R00-T1 FUNC-OK-R00-LCT) ; item('LABELS, FUNC-OK-R00-T2) ; item('RETURN, FUNC-OK-R00-T2) ; item('REFS, eps)} ) ), FUNC-OK-R00-EXPR, FUNC-OK-R00-T2 ) ) : Proved /\ FUNC-OK-R00-C : Context /\ FUNC-OK-R00-X : Idx /\ FUNC-OK-R00-LOCAL : Local /\ FUNC-OK-R00-EXPR : Expr .
+      if prove ( Expand ( ( index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ), ( CTORFUNCARROWA2 ( FUNC-OK-R00-T1, FUNC-OK-R00-T2 ) ) ) ) : Proved /\ prove ( Local-ok ( FUNC-OK-R00-C, FUNC-OK-R00-LOCAL, FUNC-OK-R00-LCT ) ) : Proved /\ prove ( Expr-ok ( ( merge ( FUNC-OK-R00-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, CTORSETA0 FUNC-OK-R00-T1 FUNC-OK-R00-LCT) ; item('LABELS, FUNC-OK-R00-T2) ; item('RETURN, FUNC-OK-R00-T2) ; item('REFS, eps)} ) ), FUNC-OK-R00-EXPR, FUNC-OK-R00-T2 ) ) : Proved /\ FUNC-OK-R00-C : Context /\ FUNC-OK-R00-X : Idx /\ ( FUNC-OK-R00-LOCAL hasType ( list ( local ) ) ) : WellTyped /\ FUNC-OK-R00-EXPR : Expr .
 
 
 
@@ -6114,9 +6120,9 @@ mod SPECTEC-CORE is
     prove ( Data-ok ( DATA-OK-R00-C , CTORDATAA2 ( DATA-OK-R00-B, DATA-OK-R00-DATAMODE ) , CTOROKA0 ) )
     =>
     proved
-      if prove ( Datamode-ok ( DATA-OK-R00-C, DATA-OK-R00-DATAMODE, CTOROKA0 ) ) : Proved /\ DATA-OK-R00-C : Context /\ DATA-OK-R00-B : Byte /\ DATA-OK-R00-DATAMODE : Datamode .
+      if prove ( Datamode-ok ( DATA-OK-R00-C, DATA-OK-R00-DATAMODE, CTOROKA0 ) ) : Proved /\ DATA-OK-R00-C : Context /\ ( DATA-OK-R00-B hasType ( list ( byte ) ) ) : WellTyped /\ DATA-OK-R00-DATAMODE : Datamode .
   cmb prove ( Data-ok ( DATA-OK-R00-C , CTORDATAA2 ( DATA-OK-R00-B, DATA-OK-R00-DATAMODE ) , CTOROKA0 ) ) : Proved
-      if prove ( Datamode-ok ( DATA-OK-R00-C, DATA-OK-R00-DATAMODE, CTOROKA0 ) ) : Proved /\ DATA-OK-R00-C : Context /\ DATA-OK-R00-B : Byte /\ DATA-OK-R00-DATAMODE : Datamode .
+      if prove ( Datamode-ok ( DATA-OK-R00-C, DATA-OK-R00-DATAMODE, CTOROKA0 ) ) : Proved /\ DATA-OK-R00-C : Context /\ ( DATA-OK-R00-B hasType ( list ( byte ) ) ) : WellTyped /\ DATA-OK-R00-DATAMODE : Datamode .
 
 
 
@@ -6147,9 +6153,9 @@ mod SPECTEC-CORE is
     prove ( Elem-ok ( ELEM-OK-R00-C , CTORELEMA3 ( ELEM-OK-R00-ELEMTYPE, ELEM-OK-R00-EXPR, ELEM-OK-R00-ELEMMODE ) , ELEM-OK-R00-ELEMTYPE ) )
     =>
     proved
-      if prove ( Reftype-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Expr-ok-const ( ELEM-OK-R00-C, ELEM-OK-R00-EXPR, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Elemmode-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMMODE, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ ELEM-OK-R00-C : Context /\ ELEM-OK-R00-ELEMTYPE : Elemtype /\ ELEM-OK-R00-EXPR : Expr /\ ELEM-OK-R00-ELEMMODE : Elemmode .
+      if prove ( Reftype-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Expr-ok-const ( ELEM-OK-R00-C, ELEM-OK-R00-EXPR, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Elemmode-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMMODE, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ ELEM-OK-R00-C : Context /\ ELEM-OK-R00-ELEMTYPE : Elemtype /\ ( ELEM-OK-R00-EXPR hasType ( list ( expr ) ) ) : WellTyped /\ ELEM-OK-R00-ELEMMODE : Elemmode .
   cmb prove ( Elem-ok ( ELEM-OK-R00-C , CTORELEMA3 ( ELEM-OK-R00-ELEMTYPE, ELEM-OK-R00-EXPR, ELEM-OK-R00-ELEMMODE ) , ELEM-OK-R00-ELEMTYPE ) ) : Proved
-      if prove ( Reftype-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Expr-ok-const ( ELEM-OK-R00-C, ELEM-OK-R00-EXPR, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Elemmode-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMMODE, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ ELEM-OK-R00-C : Context /\ ELEM-OK-R00-ELEMTYPE : Elemtype /\ ELEM-OK-R00-EXPR : Expr /\ ELEM-OK-R00-ELEMMODE : Elemmode .
+      if prove ( Reftype-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Expr-ok-const ( ELEM-OK-R00-C, ELEM-OK-R00-EXPR, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ prove ( Elemmode-ok ( ELEM-OK-R00-C, ELEM-OK-R00-ELEMMODE, ELEM-OK-R00-ELEMTYPE ) ) : Proved /\ ELEM-OK-R00-C : Context /\ ELEM-OK-R00-ELEMTYPE : Elemtype /\ ( ELEM-OK-R00-EXPR hasType ( list ( expr ) ) ) : WellTyped /\ ELEM-OK-R00-ELEMMODE : Elemmode .
 
 
 
@@ -6235,9 +6241,9 @@ mod SPECTEC-CORE is
     prove ( Globals-ok ( GLOBALS-OK-CONS1-C , GLOBALS-OK-CONS1-GLOBAL1 GLOBALS-OK-CONS1-GLOBAL , GLOBALS-OK-CONS1-GT1 GLOBALS-OK-CONS1-GT ) )
     =>
     proved
-      if prove ( Global-ok ( GLOBALS-OK-CONS1-C, GLOBALS-OK-CONS1-GLOBAL1, GLOBALS-OK-CONS1-GT1 ) ) : Proved /\ prove ( Globals-ok ( ( merge ( GLOBALS-OK-CONS1-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, GLOBALS-OK-CONS1-GT1) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), GLOBALS-OK-CONS1-GLOBAL, GLOBALS-OK-CONS1-GT ) ) : Proved /\ GLOBALS-OK-CONS1-C : Context /\ GLOBALS-OK-CONS1-GLOBAL1 : Global /\ GLOBALS-OK-CONS1-GLOBAL : Global /\ GLOBALS-OK-CONS1-GT1 : Globaltype /\ GLOBALS-OK-CONS1-GT : Globaltype .
+      if prove ( Global-ok ( GLOBALS-OK-CONS1-C, GLOBALS-OK-CONS1-GLOBAL1, GLOBALS-OK-CONS1-GT1 ) ) : Proved /\ prove ( Globals-ok ( ( merge ( GLOBALS-OK-CONS1-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, GLOBALS-OK-CONS1-GT1) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), GLOBALS-OK-CONS1-GLOBAL, GLOBALS-OK-CONS1-GT ) ) : Proved /\ GLOBALS-OK-CONS1-C : Context /\ GLOBALS-OK-CONS1-GLOBAL1 : Global /\ ( GLOBALS-OK-CONS1-GLOBAL hasType ( list ( global ) ) ) : WellTyped /\ GLOBALS-OK-CONS1-GT1 : Globaltype /\ ( GLOBALS-OK-CONS1-GT hasType ( list ( globaltype ) ) ) : WellTyped .
   cmb prove ( Globals-ok ( GLOBALS-OK-CONS1-C , GLOBALS-OK-CONS1-GLOBAL1 GLOBALS-OK-CONS1-GLOBAL , GLOBALS-OK-CONS1-GT1 GLOBALS-OK-CONS1-GT ) ) : Proved
-      if prove ( Global-ok ( GLOBALS-OK-CONS1-C, GLOBALS-OK-CONS1-GLOBAL1, GLOBALS-OK-CONS1-GT1 ) ) : Proved /\ prove ( Globals-ok ( ( merge ( GLOBALS-OK-CONS1-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, GLOBALS-OK-CONS1-GT1) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), GLOBALS-OK-CONS1-GLOBAL, GLOBALS-OK-CONS1-GT ) ) : Proved /\ GLOBALS-OK-CONS1-C : Context /\ GLOBALS-OK-CONS1-GLOBAL1 : Global /\ GLOBALS-OK-CONS1-GLOBAL : Global /\ GLOBALS-OK-CONS1-GT1 : Globaltype /\ GLOBALS-OK-CONS1-GT : Globaltype .
+      if prove ( Global-ok ( GLOBALS-OK-CONS1-C, GLOBALS-OK-CONS1-GLOBAL1, GLOBALS-OK-CONS1-GT1 ) ) : Proved /\ prove ( Globals-ok ( ( merge ( GLOBALS-OK-CONS1-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, GLOBALS-OK-CONS1-GT1) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), GLOBALS-OK-CONS1-GLOBAL, GLOBALS-OK-CONS1-GT ) ) : Proved /\ GLOBALS-OK-CONS1-C : Context /\ GLOBALS-OK-CONS1-GLOBAL1 : Global /\ ( GLOBALS-OK-CONS1-GLOBAL hasType ( list ( global ) ) ) : WellTyped /\ GLOBALS-OK-CONS1-GT1 : Globaltype /\ ( GLOBALS-OK-CONS1-GT hasType ( list ( globaltype ) ) ) : WellTyped .
 
 
   crl [types-ok-empty] :
@@ -6251,9 +6257,9 @@ mod SPECTEC-CORE is
     prove ( Types-ok ( TYPES-OK-CONS1-C , TYPES-OK-CONS1-TYPE1 TYPES-OK-CONS1-TYPE , TYPES-OK-CONS1-DT1 TYPES-OK-CONS1-DT ) )
     =>
     proved
-      if prove ( Type-ok ( TYPES-OK-CONS1-C, TYPES-OK-CONS1-TYPE1, TYPES-OK-CONS1-DT1 ) ) : Proved /\ prove ( Types-ok ( ( merge ( TYPES-OK-CONS1-C , {item('TYPES, TYPES-OK-CONS1-DT1) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPES-OK-CONS1-TYPE, TYPES-OK-CONS1-DT ) ) : Proved /\ TYPES-OK-CONS1-C : Context /\ TYPES-OK-CONS1-TYPE1 : Type /\ TYPES-OK-CONS1-TYPE : Type /\ TYPES-OK-CONS1-DT1 : Deftype /\ TYPES-OK-CONS1-DT : Deftype .
+      if prove ( Type-ok ( TYPES-OK-CONS1-C, TYPES-OK-CONS1-TYPE1, TYPES-OK-CONS1-DT1 ) ) : Proved /\ prove ( Types-ok ( ( merge ( TYPES-OK-CONS1-C , {item('TYPES, TYPES-OK-CONS1-DT1) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPES-OK-CONS1-TYPE, TYPES-OK-CONS1-DT ) ) : Proved /\ TYPES-OK-CONS1-C : Context /\ TYPES-OK-CONS1-TYPE1 : Type /\ ( TYPES-OK-CONS1-TYPE hasType ( list ( type ) ) ) : WellTyped /\ ( TYPES-OK-CONS1-DT1 hasType ( list ( deftype ) ) ) : WellTyped /\ ( TYPES-OK-CONS1-DT hasType ( list ( deftype ) ) ) : WellTyped .
   cmb prove ( Types-ok ( TYPES-OK-CONS1-C , TYPES-OK-CONS1-TYPE1 TYPES-OK-CONS1-TYPE , TYPES-OK-CONS1-DT1 TYPES-OK-CONS1-DT ) ) : Proved
-      if prove ( Type-ok ( TYPES-OK-CONS1-C, TYPES-OK-CONS1-TYPE1, TYPES-OK-CONS1-DT1 ) ) : Proved /\ prove ( Types-ok ( ( merge ( TYPES-OK-CONS1-C , {item('TYPES, TYPES-OK-CONS1-DT1) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPES-OK-CONS1-TYPE, TYPES-OK-CONS1-DT ) ) : Proved /\ TYPES-OK-CONS1-C : Context /\ TYPES-OK-CONS1-TYPE1 : Type /\ TYPES-OK-CONS1-TYPE : Type /\ TYPES-OK-CONS1-DT1 : Deftype /\ TYPES-OK-CONS1-DT : Deftype .
+      if prove ( Type-ok ( TYPES-OK-CONS1-C, TYPES-OK-CONS1-TYPE1, TYPES-OK-CONS1-DT1 ) ) : Proved /\ prove ( Types-ok ( ( merge ( TYPES-OK-CONS1-C , {item('TYPES, TYPES-OK-CONS1-DT1) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) ), TYPES-OK-CONS1-TYPE, TYPES-OK-CONS1-DT ) ) : Proved /\ TYPES-OK-CONS1-C : Context /\ TYPES-OK-CONS1-TYPE1 : Type /\ ( TYPES-OK-CONS1-TYPE hasType ( list ( type ) ) ) : WellTyped /\ ( TYPES-OK-CONS1-DT1 hasType ( list ( deftype ) ) ) : WellTyped /\ ( TYPES-OK-CONS1-DT hasType ( list ( deftype ) ) ) : WellTyped .
 
 
   mb ( ( GLOBAL-LIST-GLOBAL ) ( MEM-LIST-MEM ) ( TABLE-LIST-TABLE ) ( ELEM-LIST-ELEM ) ) : Nonfuncs .
@@ -6267,9 +6273,9 @@ mod SPECTEC-CORE is
     prove ( Module-ok ( CTORMODULEA11 ( MODULE-OK-R00-TYPE, MODULE-OK-R00-IMPORT, MODULE-OK-R00-TAG, MODULE-OK-R00-GLOBAL, MODULE-OK-R00-MEM, MODULE-OK-R00-TABLE, MODULE-OK-R00-FUNC, MODULE-OK-R00-DATA, MODULE-OK-R00-ELEM, MODULE-OK-R00-START, MODULE-OK-R00-EXPORT ) , $clos-moduletype ( MODULE-OK-R00-C, ( CTORARROWA2 ( MODULE-OK-R00-XTI, MODULE-OK-R00-XTE ) ) ) ) )
     =>
     proved
-      if merge ( MODULE-OK-R00-CQ , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, MODULE-OK-R00-JTI MODULE-OK-R00-JT) ; item('GLOBALS, MODULE-OK-R00-GT) ; item('MEMS, MODULE-OK-R00-MTI MODULE-OK-R00-MT) ; item('TABLES, MODULE-OK-R00-TTI MODULE-OK-R00-TT) ; item('FUNCS, eps) ; item('DATAS, MODULE-OK-R00-OK) ; item('ELEMS, MODULE-OK-R00-RT) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) := MODULE-OK-R00-C /\ {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, MODULE-OK-R00-GTI) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, MODULE-OK-R00-DTI MODULE-OK-R00-DT) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, MODULE-OK-R00-X)} := MODULE-OK-R00-CQ /\ ( $disjoint ( name, MODULE-OK-R00-NM ) ) = true /\ ( ( MODULE-OK-R00-X == $funcidx-nonfuncs ( ( MODULE-OK-R00-GLOBAL MODULE-OK-R00-MEM MODULE-OK-R00-TABLE MODULE-OK-R00-ELEM ) ) ) ) = true /\ ( ( MODULE-OK-R00-JTI == $tagsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-GTI == $globalsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-MTI == $memsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-TTI == $tablesxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-DTI == $funcsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ prove ( Types-ok ( ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-TYPE, MODULE-OK-R00-DTQ ) ) : Proved /\ prove ( Import-ok ( ( {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-IMPORT, MODULE-OK-R00-XTI ) ) : Proved /\ prove ( Tag-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TAG, MODULE-OK-R00-JT ) ) : Proved /\ prove ( Globals-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-GLOBAL, MODULE-OK-R00-GT ) ) : Proved /\ prove ( Mem-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-MEM, MODULE-OK-R00-MT ) ) : Proved /\ prove ( Table-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TABLE, MODULE-OK-R00-TT ) ) : Proved /\ prove ( Func-ok ( MODULE-OK-R00-C, MODULE-OK-R00-FUNC, MODULE-OK-R00-DT ) ) : Proved /\ prove ( Data-ok ( MODULE-OK-R00-C, MODULE-OK-R00-DATA, MODULE-OK-R00-OK ) ) : Proved /\ prove ( Elem-ok ( MODULE-OK-R00-C, MODULE-OK-R00-ELEM, MODULE-OK-R00-RT ) ) : Proved /\ prove ( Start-ok ( MODULE-OK-R00-C, MODULE-OK-R00-START ) ) : Proved /\ prove ( Export-ok ( MODULE-OK-R00-C, MODULE-OK-R00-EXPORT, MODULE-OK-R00-NM, MODULE-OK-R00-XTE ) ) : Proved /\ MODULE-OK-R00-TYPE : Type /\ MODULE-OK-R00-IMPORT : Import /\ MODULE-OK-R00-TAG : Tag /\ MODULE-OK-R00-GLOBAL : Global /\ MODULE-OK-R00-MEM : Mem /\ MODULE-OK-R00-TABLE : Table /\ MODULE-OK-R00-FUNC : Func /\ MODULE-OK-R00-DATA : Data /\ MODULE-OK-R00-ELEM : Elem /\ MODULE-OK-R00-START : Start /\ MODULE-OK-R00-EXPORT : Export /\ MODULE-OK-R00-C : Context /\ MODULE-OK-R00-XTI : Externtype /\ MODULE-OK-R00-XTE : Externtype .
+      if merge ( MODULE-OK-R00-CQ , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, MODULE-OK-R00-JTI MODULE-OK-R00-JT) ; item('GLOBALS, MODULE-OK-R00-GT) ; item('MEMS, MODULE-OK-R00-MTI MODULE-OK-R00-MT) ; item('TABLES, MODULE-OK-R00-TTI MODULE-OK-R00-TT) ; item('FUNCS, eps) ; item('DATAS, MODULE-OK-R00-OK) ; item('ELEMS, MODULE-OK-R00-RT) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) := MODULE-OK-R00-C /\ {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, MODULE-OK-R00-GTI) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, MODULE-OK-R00-DTI MODULE-OK-R00-DT) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, MODULE-OK-R00-X)} := MODULE-OK-R00-CQ /\ ( $disjoint ( name, MODULE-OK-R00-NM ) ) = true /\ ( ( MODULE-OK-R00-X == $funcidx-nonfuncs ( ( MODULE-OK-R00-GLOBAL MODULE-OK-R00-MEM MODULE-OK-R00-TABLE MODULE-OK-R00-ELEM ) ) ) ) = true /\ ( ( MODULE-OK-R00-JTI == $tagsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-GTI == $globalsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-MTI == $memsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-TTI == $tablesxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-DTI == $funcsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ prove ( Types-ok ( ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-TYPE, MODULE-OK-R00-DTQ ) ) : Proved /\ prove ( Import-ok ( ( {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-IMPORT, MODULE-OK-R00-XTI ) ) : Proved /\ prove ( Tag-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TAG, MODULE-OK-R00-JT ) ) : Proved /\ prove ( Globals-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-GLOBAL, MODULE-OK-R00-GT ) ) : Proved /\ prove ( Mem-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-MEM, MODULE-OK-R00-MT ) ) : Proved /\ prove ( Table-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TABLE, MODULE-OK-R00-TT ) ) : Proved /\ prove ( Func-ok ( MODULE-OK-R00-C, MODULE-OK-R00-FUNC, MODULE-OK-R00-DT ) ) : Proved /\ prove ( Data-ok ( MODULE-OK-R00-C, MODULE-OK-R00-DATA, MODULE-OK-R00-OK ) ) : Proved /\ prove ( Elem-ok ( MODULE-OK-R00-C, MODULE-OK-R00-ELEM, MODULE-OK-R00-RT ) ) : Proved /\ prove ( Start-ok ( MODULE-OK-R00-C, MODULE-OK-R00-START ) ) : Proved /\ prove ( Export-ok ( MODULE-OK-R00-C, MODULE-OK-R00-EXPORT, MODULE-OK-R00-NM, MODULE-OK-R00-XTE ) ) : Proved /\ ( MODULE-OK-R00-TYPE hasType ( list ( type ) ) ) : WellTyped /\ ( MODULE-OK-R00-IMPORT hasType ( list ( import ) ) ) : WellTyped /\ ( MODULE-OK-R00-TAG hasType ( list ( tag ) ) ) : WellTyped /\ ( MODULE-OK-R00-GLOBAL hasType ( list ( global ) ) ) : WellTyped /\ ( MODULE-OK-R00-MEM hasType ( list ( mem ) ) ) : WellTyped /\ ( MODULE-OK-R00-TABLE hasType ( list ( table ) ) ) : WellTyped /\ ( MODULE-OK-R00-FUNC hasType ( list ( func ) ) ) : WellTyped /\ ( MODULE-OK-R00-DATA hasType ( list ( data ) ) ) : WellTyped /\ ( MODULE-OK-R00-ELEM hasType ( list ( elem ) ) ) : WellTyped /\ MODULE-OK-R00-START : Start /\ ( MODULE-OK-R00-EXPORT hasType ( list ( export ) ) ) : WellTyped /\ MODULE-OK-R00-C : Context /\ ( MODULE-OK-R00-XTI hasType ( list ( externtype ) ) ) : WellTyped /\ ( MODULE-OK-R00-XTE hasType ( list ( externtype ) ) ) : WellTyped .
   cmb prove ( Module-ok ( CTORMODULEA11 ( MODULE-OK-R00-TYPE, MODULE-OK-R00-IMPORT, MODULE-OK-R00-TAG, MODULE-OK-R00-GLOBAL, MODULE-OK-R00-MEM, MODULE-OK-R00-TABLE, MODULE-OK-R00-FUNC, MODULE-OK-R00-DATA, MODULE-OK-R00-ELEM, MODULE-OK-R00-START, MODULE-OK-R00-EXPORT ) , $clos-moduletype ( MODULE-OK-R00-C, ( CTORARROWA2 ( MODULE-OK-R00-XTI, MODULE-OK-R00-XTE ) ) ) ) ) : Proved
-      if merge ( MODULE-OK-R00-CQ , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, MODULE-OK-R00-JTI MODULE-OK-R00-JT) ; item('GLOBALS, MODULE-OK-R00-GT) ; item('MEMS, MODULE-OK-R00-MTI MODULE-OK-R00-MT) ; item('TABLES, MODULE-OK-R00-TTI MODULE-OK-R00-TT) ; item('FUNCS, eps) ; item('DATAS, MODULE-OK-R00-OK) ; item('ELEMS, MODULE-OK-R00-RT) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) := MODULE-OK-R00-C /\ {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, MODULE-OK-R00-GTI) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, MODULE-OK-R00-DTI MODULE-OK-R00-DT) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, MODULE-OK-R00-X)} := MODULE-OK-R00-CQ /\ ( $disjoint ( name, MODULE-OK-R00-NM ) ) = true /\ ( ( MODULE-OK-R00-X == $funcidx-nonfuncs ( ( MODULE-OK-R00-GLOBAL MODULE-OK-R00-MEM MODULE-OK-R00-TABLE MODULE-OK-R00-ELEM ) ) ) ) = true /\ ( ( MODULE-OK-R00-JTI == $tagsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-GTI == $globalsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-MTI == $memsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-TTI == $tablesxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-DTI == $funcsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ prove ( Types-ok ( ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-TYPE, MODULE-OK-R00-DTQ ) ) : Proved /\ prove ( Import-ok ( ( {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-IMPORT, MODULE-OK-R00-XTI ) ) : Proved /\ prove ( Tag-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TAG, MODULE-OK-R00-JT ) ) : Proved /\ prove ( Globals-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-GLOBAL, MODULE-OK-R00-GT ) ) : Proved /\ prove ( Mem-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-MEM, MODULE-OK-R00-MT ) ) : Proved /\ prove ( Table-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TABLE, MODULE-OK-R00-TT ) ) : Proved /\ prove ( Func-ok ( MODULE-OK-R00-C, MODULE-OK-R00-FUNC, MODULE-OK-R00-DT ) ) : Proved /\ prove ( Data-ok ( MODULE-OK-R00-C, MODULE-OK-R00-DATA, MODULE-OK-R00-OK ) ) : Proved /\ prove ( Elem-ok ( MODULE-OK-R00-C, MODULE-OK-R00-ELEM, MODULE-OK-R00-RT ) ) : Proved /\ prove ( Start-ok ( MODULE-OK-R00-C, MODULE-OK-R00-START ) ) : Proved /\ prove ( Export-ok ( MODULE-OK-R00-C, MODULE-OK-R00-EXPORT, MODULE-OK-R00-NM, MODULE-OK-R00-XTE ) ) : Proved /\ MODULE-OK-R00-TYPE : Type /\ MODULE-OK-R00-IMPORT : Import /\ MODULE-OK-R00-TAG : Tag /\ MODULE-OK-R00-GLOBAL : Global /\ MODULE-OK-R00-MEM : Mem /\ MODULE-OK-R00-TABLE : Table /\ MODULE-OK-R00-FUNC : Func /\ MODULE-OK-R00-DATA : Data /\ MODULE-OK-R00-ELEM : Elem /\ MODULE-OK-R00-START : Start /\ MODULE-OK-R00-EXPORT : Export /\ MODULE-OK-R00-C : Context /\ MODULE-OK-R00-XTI : Externtype /\ MODULE-OK-R00-XTE : Externtype .
+      if merge ( MODULE-OK-R00-CQ , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, MODULE-OK-R00-JTI MODULE-OK-R00-JT) ; item('GLOBALS, MODULE-OK-R00-GT) ; item('MEMS, MODULE-OK-R00-MTI MODULE-OK-R00-MT) ; item('TABLES, MODULE-OK-R00-TTI MODULE-OK-R00-TT) ; item('FUNCS, eps) ; item('DATAS, MODULE-OK-R00-OK) ; item('ELEMS, MODULE-OK-R00-RT) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ) := MODULE-OK-R00-C /\ {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, MODULE-OK-R00-GTI) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, MODULE-OK-R00-DTI MODULE-OK-R00-DT) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, MODULE-OK-R00-X)} := MODULE-OK-R00-CQ /\ ( $disjoint ( name, MODULE-OK-R00-NM ) ) = true /\ ( ( MODULE-OK-R00-X == $funcidx-nonfuncs ( ( MODULE-OK-R00-GLOBAL MODULE-OK-R00-MEM MODULE-OK-R00-TABLE MODULE-OK-R00-ELEM ) ) ) ) = true /\ ( ( MODULE-OK-R00-JTI == $tagsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-GTI == $globalsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-MTI == $memsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-TTI == $tablesxt ( MODULE-OK-R00-XTI ) ) ) = true /\ ( ( MODULE-OK-R00-DTI == $funcsxt ( MODULE-OK-R00-XTI ) ) ) = true /\ prove ( Types-ok ( ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-TYPE, MODULE-OK-R00-DTQ ) ) : Proved /\ prove ( Import-ok ( ( {item('TYPES, MODULE-OK-R00-DTQ) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ; item('REFS, eps)} ), MODULE-OK-R00-IMPORT, MODULE-OK-R00-XTI ) ) : Proved /\ prove ( Tag-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TAG, MODULE-OK-R00-JT ) ) : Proved /\ prove ( Globals-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-GLOBAL, MODULE-OK-R00-GT ) ) : Proved /\ prove ( Mem-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-MEM, MODULE-OK-R00-MT ) ) : Proved /\ prove ( Table-ok ( MODULE-OK-R00-CQ, MODULE-OK-R00-TABLE, MODULE-OK-R00-TT ) ) : Proved /\ prove ( Func-ok ( MODULE-OK-R00-C, MODULE-OK-R00-FUNC, MODULE-OK-R00-DT ) ) : Proved /\ prove ( Data-ok ( MODULE-OK-R00-C, MODULE-OK-R00-DATA, MODULE-OK-R00-OK ) ) : Proved /\ prove ( Elem-ok ( MODULE-OK-R00-C, MODULE-OK-R00-ELEM, MODULE-OK-R00-RT ) ) : Proved /\ prove ( Start-ok ( MODULE-OK-R00-C, MODULE-OK-R00-START ) ) : Proved /\ prove ( Export-ok ( MODULE-OK-R00-C, MODULE-OK-R00-EXPORT, MODULE-OK-R00-NM, MODULE-OK-R00-XTE ) ) : Proved /\ ( MODULE-OK-R00-TYPE hasType ( list ( type ) ) ) : WellTyped /\ ( MODULE-OK-R00-IMPORT hasType ( list ( import ) ) ) : WellTyped /\ ( MODULE-OK-R00-TAG hasType ( list ( tag ) ) ) : WellTyped /\ ( MODULE-OK-R00-GLOBAL hasType ( list ( global ) ) ) : WellTyped /\ ( MODULE-OK-R00-MEM hasType ( list ( mem ) ) ) : WellTyped /\ ( MODULE-OK-R00-TABLE hasType ( list ( table ) ) ) : WellTyped /\ ( MODULE-OK-R00-FUNC hasType ( list ( func ) ) ) : WellTyped /\ ( MODULE-OK-R00-DATA hasType ( list ( data ) ) ) : WellTyped /\ ( MODULE-OK-R00-ELEM hasType ( list ( elem ) ) ) : WellTyped /\ MODULE-OK-R00-START : Start /\ ( MODULE-OK-R00-EXPORT hasType ( list ( export ) ) ) : WellTyped /\ MODULE-OK-R00-C : Context /\ ( MODULE-OK-R00-XTI hasType ( list ( externtype ) ) ) : WellTyped /\ ( MODULE-OK-R00-XTE hasType ( list ( externtype ) ) ) : WellTyped .
 
 
 
@@ -7523,19 +7529,19 @@ mod SPECTEC-CORE is
    if F-TYPE-0 : Globaltype /\ F-VALUE-1 : Val .
 
   cmb ( {item('TYPE, ( F-TYPE-0 )) ; item('BYTES, ( F-BYTES-1 ))} ) : Meminst
-   if F-TYPE-0 : Memtype /\ F-BYTES-1 : Byte .
+   if F-TYPE-0 : Memtype /\ ( F-BYTES-1 hasType ( list ( byte ) ) ) : WellTyped .
 
   cmb ( {item('TYPE, ( F-TYPE-0 )) ; item('REFS, ( F-REFS-1 ))} ) : Tableinst
-   if F-TYPE-0 : Tabletype /\ F-REFS-1 : Ref .
+   if F-TYPE-0 : Tabletype /\ ( F-REFS-1 hasType ( list ( ref ) ) ) : WellTyped .
 
   cmb ( {item('TYPE, ( F-TYPE-0 )) ; item('MODULE, ( F-MODULE-1 )) ; item('CODE, ( F-CODE-2 ))} ) : Funcinst
    if F-TYPE-0 : Deftype /\ F-MODULE-1 : Moduleinst /\ F-CODE-2 : Funccode .
 
   cmb ( {item('BYTES, ( F-BYTES-0 ))} ) : Datainst
-   if F-BYTES-0 : Byte .
+   if ( F-BYTES-0 hasType ( list ( byte ) ) ) : WellTyped .
 
   cmb ( {item('TYPE, ( F-TYPE-0 )) ; item('REFS, ( F-REFS-1 ))} ) : Eleminst
-   if F-TYPE-0 : Elemtype /\ F-REFS-1 : Ref .
+   if F-TYPE-0 : Elemtype /\ ( F-REFS-1 hasType ( list ( ref ) ) ) : WellTyped .
 
 
   mb ( CTORPACKA2 ( PACKTYPE1, IN1 ) ) : Packval .
@@ -7553,17 +7559,17 @@ mod SPECTEC-CORE is
   mb ( CTORPACKA2 ( PACKTYPE1, IN1 ) ) : Fieldval .
 
   cmb ( {item('TYPE, ( F-TYPE-0 )) ; item('FIELDS, ( F-FIELDS-1 ))} ) : Structinst
-   if F-TYPE-0 : Deftype /\ F-FIELDS-1 : Fieldval .
+   if F-TYPE-0 : Deftype /\ ( F-FIELDS-1 hasType ( list ( fieldval ) ) ) : WellTyped .
 
   cmb ( {item('TYPE, ( F-TYPE-0 )) ; item('FIELDS, ( F-FIELDS-1 ))} ) : Arrayinst
-   if F-TYPE-0 : Deftype /\ F-FIELDS-1 : Fieldval .
+   if F-TYPE-0 : Deftype /\ ( F-FIELDS-1 hasType ( list ( fieldval ) ) ) : WellTyped .
 
   cmb ( {item('TAG, ( F-TAG-0 )) ; item('FIELDS, ( F-FIELDS-1 ))} ) : Exninst
-   if F-TAG-0 : Tagaddr /\ F-FIELDS-1 : Val .
+   if F-TAG-0 : Tagaddr /\ ( F-FIELDS-1 hasType ( list ( val ) ) ) : WellTyped .
 
 
   cmb ( {item('TAGS, ( F-TAGS-0 )) ; item('GLOBALS, ( F-GLOBALS-1 )) ; item('MEMS, ( F-MEMS-2 )) ; item('TABLES, ( F-TABLES-3 )) ; item('FUNCS, ( F-FUNCS-4 )) ; item('DATAS, ( F-DATAS-5 )) ; item('ELEMS, ( F-ELEMS-6 )) ; item('STRUCTS, ( F-STRUCTS-7 )) ; item('ARRAYS, ( F-ARRAYS-8 )) ; item('EXNS, ( F-EXNS-9 ))} ) : Store
-   if F-TAGS-0 : Taginst /\ F-GLOBALS-1 : Globalinst /\ F-MEMS-2 : Meminst /\ F-TABLES-3 : Tableinst /\ F-FUNCS-4 : Funcinst /\ F-DATAS-5 : Datainst /\ F-ELEMS-6 : Eleminst /\ F-STRUCTS-7 : Structinst /\ F-ARRAYS-8 : Arrayinst /\ F-EXNS-9 : Exninst .
+   if ( F-TAGS-0 hasType ( list ( taginst ) ) ) : WellTyped /\ ( F-GLOBALS-1 hasType ( list ( globalinst ) ) ) : WellTyped /\ ( F-MEMS-2 hasType ( list ( meminst ) ) ) : WellTyped /\ ( F-TABLES-3 hasType ( list ( tableinst ) ) ) : WellTyped /\ ( F-FUNCS-4 hasType ( list ( funcinst ) ) ) : WellTyped /\ ( F-DATAS-5 hasType ( list ( datainst ) ) ) : WellTyped /\ ( F-ELEMS-6 hasType ( list ( eleminst ) ) ) : WellTyped /\ ( F-STRUCTS-7 hasType ( list ( structinst ) ) ) : WellTyped /\ ( F-ARRAYS-8 hasType ( list ( arrayinst ) ) ) : WellTyped /\ ( F-EXNS-9 hasType ( list ( exninst ) ) ) : WellTyped .
 
 
 
@@ -8901,7 +8907,7 @@ mod SPECTEC-CORE is
   crl [heat-step-ctxt-label] :
     step(< STEP-CTXT-LABEL-Z | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-INNER-IS ) STEP-CTXT-LABEL-IS-REST >)
     => restore-label(step(< STEP-CTXT-LABEL-Z | STEP-CTXT-LABEL-INNER-IS >), STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
-    if all-vals ( STEP-CTXT-LABEL-INNER-IS ) = false /\ is-trap ( STEP-CTXT-LABEL-INNER-IS ) = false /\ needs-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false .
+    if all-vals ( STEP-CTXT-LABEL-INNER-IS ) = false /\ is-trap ( STEP-CTXT-LABEL-INNER-IS ) = false /\ needs-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false /\ starts-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false .
   rl [cool-step-ctxt-label] :
     restore-label(< STEP-CTXT-LABEL-ZN | STEP-CTXT-LABEL-IS >, STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
     => < STEP-CTXT-LABEL-ZN | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS ) STEP-CTXT-LABEL-IS-REST > .
@@ -9033,14 +9039,14 @@ mod SPECTEC-CORE is
     prove ( Steps ( CTORSEMICOLONA2 ( STEPS-REFL0-Z, STEPS-REFL0-INSTR ) , CTORSEMICOLONA2 ( STEPS-REFL0-Z, STEPS-REFL0-INSTR ) ) )
     =>
     proved
-      if STEPS-REFL0-Z : State /\ STEPS-REFL0-INSTR : Instr .
+      if STEPS-REFL0-Z : State /\ ( STEPS-REFL0-INSTR hasType ( list ( instr ) ) ) : WellTyped .
   cmb prove ( Steps ( CTORSEMICOLONA2 ( STEPS-REFL0-Z, STEPS-REFL0-INSTR ) , CTORSEMICOLONA2 ( STEPS-REFL0-Z, STEPS-REFL0-INSTR ) ) ) : Proved
-      if STEPS-REFL0-Z : State /\ STEPS-REFL0-INSTR : Instr .
+      if STEPS-REFL0-Z : State /\ ( STEPS-REFL0-INSTR hasType ( list ( instr ) ) ) : WellTyped .
   crl [steps-trans] :
     prove ( Steps ( CTORSEMICOLONA2 ( STEPS-TRANS1-Z, STEPS-TRANS1-INSTR ) , CTORSEMICOLONA2 ( STEPS-TRANS1-ZQQ, STEPS-TRANS1-INSTRQQ ) ) )
     =>
     proved
-      if step(< STEPS-TRANS1-Z | STEPS-TRANS1-INSTR >) => < STEPS-TRANS1-ZQ | STEPS-TRANS1-INSTRQ > /\ prove ( Steps ( ( CTORSEMICOLONA2 ( STEPS-TRANS1-ZQ, STEPS-TRANS1-INSTRQ ) ), ( CTORSEMICOLONA2 ( STEPS-TRANS1-ZQQ, STEPS-TRANS1-INSTRQQ ) ) ) ) : Proved /\ STEPS-TRANS1-Z : State /\ STEPS-TRANS1-INSTR : Instr /\ STEPS-TRANS1-ZQQ : State /\ STEPS-TRANS1-INSTRQQ : Instr .
+      if step(< STEPS-TRANS1-Z | STEPS-TRANS1-INSTR >) => < STEPS-TRANS1-ZQ | STEPS-TRANS1-INSTRQ > /\ prove ( Steps ( ( CTORSEMICOLONA2 ( STEPS-TRANS1-ZQ, STEPS-TRANS1-INSTRQ ) ), ( CTORSEMICOLONA2 ( STEPS-TRANS1-ZQQ, STEPS-TRANS1-INSTRQQ ) ) ) ) : Proved /\ STEPS-TRANS1-Z : State /\ ( STEPS-TRANS1-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ STEPS-TRANS1-ZQQ : State /\ ( STEPS-TRANS1-INSTRQQ hasType ( list ( instr ) ) ) : WellTyped .
 
 
 
@@ -9049,9 +9055,9 @@ mod SPECTEC-CORE is
     prove ( Eval-expr ( EVAL-EXPR-R00-Z , EVAL-EXPR-R00-INSTR , EVAL-EXPR-R00-ZQ , EVAL-EXPR-R00-VAL ) )
     =>
     proved
-      if prove ( Steps ( ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-Z, EVAL-EXPR-R00-INSTR ) ), ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-ZQ, EVAL-EXPR-R00-VAL ) ) ) ) : Proved /\ EVAL-EXPR-R00-Z : State /\ EVAL-EXPR-R00-INSTR : Instr /\ EVAL-EXPR-R00-ZQ : State /\ EVAL-EXPR-R00-VAL : Val .
+      if prove ( Steps ( ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-Z, EVAL-EXPR-R00-INSTR ) ), ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-ZQ, EVAL-EXPR-R00-VAL ) ) ) ) : Proved /\ EVAL-EXPR-R00-Z : State /\ ( EVAL-EXPR-R00-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ EVAL-EXPR-R00-ZQ : State /\ ( EVAL-EXPR-R00-VAL hasType ( list ( val ) ) ) : WellTyped .
   cmb prove ( Eval-expr ( EVAL-EXPR-R00-Z , EVAL-EXPR-R00-INSTR , EVAL-EXPR-R00-ZQ , EVAL-EXPR-R00-VAL ) ) : Proved
-      if prove ( Steps ( ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-Z, EVAL-EXPR-R00-INSTR ) ), ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-ZQ, EVAL-EXPR-R00-VAL ) ) ) ) : Proved /\ EVAL-EXPR-R00-Z : State /\ EVAL-EXPR-R00-INSTR : Instr /\ EVAL-EXPR-R00-ZQ : State /\ EVAL-EXPR-R00-VAL : Val .
+      if prove ( Steps ( ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-Z, EVAL-EXPR-R00-INSTR ) ), ( CTORSEMICOLONA2 ( EVAL-EXPR-R00-ZQ, EVAL-EXPR-R00-VAL ) ) ) ) : Proved /\ EVAL-EXPR-R00-Z : State /\ ( EVAL-EXPR-R00-INSTR hasType ( list ( instr ) ) ) : WellTyped /\ EVAL-EXPR-R00-ZQ : State /\ ( EVAL-EXPR-R00-VAL hasType ( list ( val ) ) ) : WellTyped .
 
 
 
@@ -9244,11 +9250,16 @@ mod SPECTEC-CORE is
   --- Label-context control-flow detector
   eq  needs-label-ctxt(eps) = false .
   ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .
+  eq  needs-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .
   eq  needs-label-ctxt(CTORBRA1(T) TS) = true .
   eq  needs-label-ctxt(CTORRETURNA0 TS) = true .
   eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .
   eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .
   eq  needs-label-ctxt(TS) = false [owise] .
+
+  eq  starts-label-ctxt(eps) = false .
+  eq  starts-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .
+  eq  starts-label-ctxt(TS) = false [owise] .
 
   eq  is-trap(CTORTRAPA0 TS) = true .
   eq  is-trap(TS) = false [owise] .

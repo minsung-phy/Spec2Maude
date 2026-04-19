@@ -28,9 +28,8 @@ mod WASM-EXEC is
 
   --- ExecConf, <_|_>, and step are inherited from SPECTEC-CORE (output.maude)
 
-  op exec-loop    : WasmTerminal WasmTerminals -> WasmTerminal [ctor] .
   --- Generated output.maude owns the label/frame/handler wrappers and
-  --- restore-* helpers. Keep only exec-loop here as a manual bridge marker.
+  --- restore-* helpers.
 
   --- -------------------------------------------------------
   --- Variables – UNIQUE per operator group to avoid assoc-tail collision
@@ -116,19 +115,6 @@ mod WASM-EXEC is
     if all-vals(ST-VALS) = true
     /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT) .
 
-  --- -------------------------------------------------------
-  --- Manual bridges that still remain outside translator coverage
-  --- These now target the generated LABEL/FRAME constructors directly,
-  --- so subsequent execution uses output.maude's rl/crl + heat/cool path.
-  --- -------------------------------------------------------
-
-  crl [step-read-exec-loop] :
-    step(< ST-Z | ST-VALS exec-loop(ST-BT, ST-BODY) ST-IS >)
-    =>
-    < ST-Z | CTORLABELLBRACERBRACEA3(len(ST-TQ), CTORLOOPA2(ST-BT, ST-BODY), ST-VALS ST-BODY) ST-IS >
-    if all-vals(ST-VALS) = true
-    /\ CTORARROWA3(ST-TQ, eps, ST-TR) := $blocktype(ST-Z, ST-BT) .
-
   crl [step-call-ref] :
     step(< ST-Z | ST-VALS CTORREFFUNCADDRA1(ST-A) CTORCALLREFA1(ST-YY) ST-IS >)
     =>
@@ -183,27 +169,29 @@ mod WASM-FIB is
   var I    : Int .
 
   --- Store: matches cmb Store axiom (no TYPES; has STRUCTS/ARRAYS/EXNS)
-  op empty-store : -> WasmTerminal .
+  op empty-store : -> Store .
   eq empty-store =
     {item('TAGS,    eps) ; item('GLOBALS,  eps) ;
      item('MEMS,    eps) ; item('TABLES,   eps) ;
      item('FUNCS,   eps) ; item('DATAS,    eps) ;
      item('ELEMS,   eps) ; item('STRUCTS,  eps) ;
      item('ARRAYS,  eps) ; item('EXNS,     eps)} .
+  mb empty-store : Store .
 
   --- Module: for frame's MODULE field
-  op empty-module : -> WasmTerminal .
+  op empty-module : -> Moduleinst .
   eq empty-module =
     {item('TYPES,   eps) ; item('TAGS,  eps) ;
      item('GLOBALS, eps) ; item('MEMS,  eps) ;
      item('TABLES,  eps) ; item('FUNCS, eps) ;
      item('DATAS,   eps) ; item('ELEMS, eps) ;
      item('EXPORTS, eps)} .
+  mb empty-module : Moduleinst .
 
   op i32v : Int -> WasmTerminal .
   eq i32v(I:Int) = CTORCONSTA2(CTORI32A0, I:Int) .
 
-  op fib-frame : WasmTerminal -> WasmTerminal .
+  op fib-frame : WasmTerminal -> Frame .
   eq fib-frame(NVAL) =
     {item('LOCALS,
           NVAL
@@ -211,9 +199,11 @@ mod WASM-FIB is
           CTORCONSTA2(CTORI32A0, 1)
           CTORCONSTA2(CTORI32A0, 0)) ;
      item('MODULE, empty-module)} .
+  cmb fib-frame(NVAL) : Frame if NVAL : Val .
 
-  op fib-state : WasmTerminal -> WasmTerminal .
+  op fib-state : WasmTerminal -> State .
   eq fib-state(NVAL) = CTORSEMICOLONA2(empty-store, fib-frame(NVAL)) .
+  cmb fib-state(NVAL) : State if NVAL : Val .
 
   op fib-loop-body : -> WasmTerminals .
   eq fib-loop-body =
@@ -229,7 +219,7 @@ mod WASM-FIB is
 
   op fib-body : -> WasmTerminals .
   eq fib-body =
-    CTORBLOCKA2(void-bt, exec-loop(void-bt, fib-loop-body))
+    CTORBLOCKA2(void-bt, CTORLOOPA2(void-bt, fib-loop-body))
     CTORLOCALGETA1(1) .
 
   op fib-config : WasmTerminal -> ExecConf .
