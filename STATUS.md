@@ -261,6 +261,25 @@
           - 따라서 다음 후보는
             1. helper 기반 우회를 버리고 `heat-step-ctxt-label` rule shape 자체를 다시 설계하거나
             2. manual block/loop bootstrap이 생성하는 label nesting 방식을 바꾸는 것이다.
+      - 2026-04-19 추가 실험 3 (Claude Opus 4.7 세션 후속):
+        - nested label deadlock을 동일하게 재현했다.
+          - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+            → `steps(restore-label(restore-label(step(< ... >), 0, loop, eps), 0, eps, ...))` 형태 잔류
+          - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .`
+            → `counterexample(... deadlock)`
+          - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .`
+            → `true`
+        - helper/guard 경로를 재점검한 뒤, 의미론 정합성 기준으로 최종 롤백했다.
+          - 제거: `starts-label-ctxt` helper 및 heat guard 연동
+          - 제거: `needs-label-ctxt(CTORLABELLBRACERBRACEA3(...)) = true` 케이스
+          - 복원: `heat-step-ctxt-label` guard를 `needs-label-ctxt(inner) = false` 단독 조건으로 유지
+        - probe 확인:
+          - `needs-label-ctxt(CTORBRA1(0)) = true`
+          - `needs-label-ctxt(CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0))) = false`
+        - 결론:
+          - `needs-label-ctxt`는 completed control-flow (`VAL* + BR/RETURN/RETURN-CALL-REF/THROW-REF`) 차단 용도로만 쓰는 것이 맞다.
+          - nested label wrapper 자체를 helper로 막는 방향은 의미론적으로 부적절하며 deadlock을 해소하지 못했다.
+          - 현재 blocker는 여전히 `manual block/loop bootstrap + generated label heat/cool`의 shape 상호작용이다.
 
 ### P2. 범위 검증 미실시
 - fib 외 다른 예제 (factorial, 재귀 call, memory op 등) 미테스트
@@ -361,7 +380,7 @@
 
 | 브랜치 | 상태 | 비고 |
 |--------|------|------|
-| `main` | fib modelCheck deadlock | 최종 커밋 `11c341b` |
+| `main` | fib modelCheck deadlock (현재) | HEAD `59e8dc2`, 워킹트리 변경(`translator.ml`, `output.maude`) |
 | `wip/p0-v128-overflow` | step() stack overflow | P0 WIP 저장, 재개 시 여기서부터 |
 
 ---

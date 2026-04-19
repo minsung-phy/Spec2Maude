@@ -2182,7 +2182,7 @@ let translate_step_reld rel_name rules =
                   else
                     let extra_cond =
                       if is_label_ctxt
-                      then Printf.sprintf " /\\ needs-label-ctxt ( %s ) = false /\\ starts-label-ctxt ( %s ) = false" inner_is_var inner_is_var
+                      then Printf.sprintf " /\\ needs-label-ctxt ( %s ) = false" inner_is_var
                       else ""
                     in
                     Printf.sprintf
@@ -2607,18 +2607,19 @@ let footer =
   "  ceq all-vals(W TS) = all-vals(TS) if is-val(W) = true .\n" ^
   "  eq  all-vals(eps) = true .\n" ^
   "  eq  all-vals(TS) = false [owise] .\n\n" ^
-  "  --- Label-context control-flow detector\n" ^
+  "  --- Label-context control-flow detector: true when the inner instr list\n" ^
+  "  --- begins with VAL* followed by a BR / RETURN / RETURN-CALL-REF / THROW-REF,\n" ^
+  "  --- i.e. a pattern that the top-level step-pure-* label rules already\n" ^
+  "  --- consume directly. In those cases heat must NOT fire, otherwise the\n" ^
+  "  --- control-flow instruction escapes its enclosing label wrapper.\n" ^
+  "  --- Nested labels intentionally return false so heat can descend into them.\n" ^
   "  eq  needs-label-ctxt(eps) = false .\n" ^
   "  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORBRA1(T) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORRETURNA0 TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .\n" ^
   "  eq  needs-label-ctxt(TS) = false [owise] .\n\n" ^
-  "  eq  starts-label-ctxt(eps) = false .\n" ^
-  "  eq  starts-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .\n" ^
-  "  eq  starts-label-ctxt(TS) = false [owise] .\n\n" ^
   "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
   "  eq  is-trap(TS) = false [owise] .\n" ^
   "\nendm\n"
@@ -2628,7 +2629,6 @@ let step_predicate_helpers =
   "  op all-vals : WasmTerminals -> Bool .\n" ^
   "  op is-trap : WasmTerminals -> Bool .\n" ^
   "  op needs-label-ctxt : WasmTerminals -> Bool .\n" ^
-  "  op starts-label-ctxt : WasmTerminals -> Bool .\n" ^
   "  --- Context-wrapper overloads with concrete operand sorts.\n" ^
   "  --- The generic CTOR* declarations are emitted with WasmTerminal args,\n" ^
   "  --- but heating/cooling and step rules build these wrappers from\n" ^

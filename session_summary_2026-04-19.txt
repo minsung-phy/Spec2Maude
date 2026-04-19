@@ -124,11 +124,28 @@ Latest verified status
 - modelCheck(..., [] ~ trap-seen): verified true
 
 Current most likely next steps
-1. Rework needs-label-ctxt so it actually recognizes wrapper-head label terms under associative WasmTerminals.
-2. If helper-based exclusion still fails, modify generated heat-step-ctxt-label itself so it explicitly refuses to heat when the inner sequence already begins with a label wrapper.
+1. Rework generated heat-step-ctxt-label rule shape against the actual nested restore-label terms produced by manual block/loop bootstrap.
+2. Audit manual block/loop bootstrap output shape so it composes with generated label heat/cool without rewrapping deadlock.
 3. Keep output.maude generated from translator.ml only; do not hand-edit the generated file.
 
 Bottom line
 - The current blocker is no longer “exec-loop”.
 - The blocker is the interaction between manual block/loop bootstrap and generated label heating/cooling.
 - The most promising next fix is in translator-generated label-context guards, not in unrelated Wasm instruction logic.
+
+Addendum (post 21:31 KST, Claude Opus 4.7 continuation)
+- Reproduced the same fib deadlock again:
+  - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5)))` remained in nested `restore-label(restore-label(step(< ... >), ...), ...)` shape.
+  - `modelCheck(fib-config(i32v(5)), <> result-is(5))` still returned `counterexample(... deadlock)`.
+  - `modelCheck(fib-config(i32v(5)), [] ~ trap-seen)` stayed `true`.
+- Investigated helper matching/guard behavior and then rolled back helper detours by semantic intent:
+  - removed `starts-label-ctxt` helper and its heat-guard usage,
+  - removed `needs-label-ctxt(CTORLABELLBRACERBRACEA3(...)) = true` case,
+  - restored heat-step-ctxt-label to depend only on `needs-label-ctxt(inner) = false`.
+- Probe results after rollback:
+  - `needs-label-ctxt(CTORBRA1(0)) = true`
+  - `needs-label-ctxt(CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0))) = false`
+- Updated interpretation:
+  - `needs-label-ctxt` should block only completed control-flow forms (`VAL* + BR/RETURN/RETURN-CALL-REF/THROW-REF`).
+  - Nested label wrappers are not a completed form to block at helper level.
+  - Primary blocker remains manual block/loop bootstrap and generated label heat/cool shape interaction.

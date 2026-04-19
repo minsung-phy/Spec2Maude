@@ -1151,7 +1151,6 @@ mod SPECTEC-CORE is
   op sN : WasmTerminal -> WasmType [ctor] .
   op shape :  -> WasmType [ctor] .
   op start :  -> WasmType [ctor] .
-  op starts-label-ctxt : WasmTerminals -> Bool .
   op state :  -> WasmType [ctor] .
   op storagetype :  -> WasmType [ctor] .
   op store :  -> WasmType [ctor] .
@@ -8907,7 +8906,7 @@ mod SPECTEC-CORE is
   crl [heat-step-ctxt-label] :
     step(< STEP-CTXT-LABEL-Z | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-INNER-IS ) STEP-CTXT-LABEL-IS-REST >)
     => restore-label(step(< STEP-CTXT-LABEL-Z | STEP-CTXT-LABEL-INNER-IS >), STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
-    if all-vals ( STEP-CTXT-LABEL-INNER-IS ) = false /\ is-trap ( STEP-CTXT-LABEL-INNER-IS ) = false /\ needs-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false /\ starts-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false .
+    if all-vals ( STEP-CTXT-LABEL-INNER-IS ) = false /\ is-trap ( STEP-CTXT-LABEL-INNER-IS ) = false /\ needs-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false .
   rl [cool-step-ctxt-label] :
     restore-label(< STEP-CTXT-LABEL-ZN | STEP-CTXT-LABEL-IS >, STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
     => < STEP-CTXT-LABEL-ZN | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS ) STEP-CTXT-LABEL-IS-REST > .
@@ -9247,19 +9246,19 @@ mod SPECTEC-CORE is
   eq  all-vals(eps) = true .
   eq  all-vals(TS) = false [owise] .
 
-  --- Label-context control-flow detector
+  --- Label-context control-flow detector: true when the inner instr list
+  --- begins with VAL* followed by a BR / RETURN / RETURN-CALL-REF / THROW-REF,
+  --- i.e. a pattern that the top-level step-pure-* label rules already
+  --- consume directly. In those cases heat must NOT fire, otherwise the
+  --- control-flow instruction escapes its enclosing label wrapper.
+  --- Nested labels intentionally return false so heat can descend into them.
   eq  needs-label-ctxt(eps) = false .
   ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .
-  eq  needs-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .
   eq  needs-label-ctxt(CTORBRA1(T) TS) = true .
   eq  needs-label-ctxt(CTORRETURNA0 TS) = true .
   eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .
   eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .
   eq  needs-label-ctxt(TS) = false [owise] .
-
-  eq  starts-label-ctxt(eps) = false .
-  eq  starts-label-ctxt(CTORLABELLBRACERBRACEA3(N, INSTRQ, IS) TS) = true .
-  eq  starts-label-ctxt(TS) = false [owise] .
 
   eq  is-trap(CTORTRAPA0 TS) = true .
   eq  is-trap(TS) = false [owise] .
