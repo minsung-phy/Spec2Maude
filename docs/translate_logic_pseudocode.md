@@ -152,7 +152,7 @@ ceq $f ( X, Y ) = Y [owise] .
 `RelD`는 두 갈래로 나뉜다.
 
 - 일반 relation: `Judgement` membership(`mb/cmb`)으로 변환
-- Step 계열 relation: 실행식 `step(<...>)`의 `eq/ceq`로 변환
+- Step 계열 relation: 실행식 `step(<...>)`의 `rl/crl` rewriting rule로 변환
 
 #### (A) 일반 relation (`translate_reld`)
 
@@ -192,26 +192,37 @@ cmb valid ( T ) : ValidJudgement
 function translate_step_reld(rel_name, rules):
   for rule in rules:
     if rule has RulePr premise:
-      skip
+      if 단일 Step-family context premise이면:
+        emit heating/cooling rules (rl/crl)
+      else:
+        skip   // bridge 성격 RulePr
+      continue
 
     결론을 Step/Step-read/Step-pure 모양으로 분해
     lhs/rhs instruction 시퀀스 번역
     prems = 전제 스케줄링
+    cond = prems 조건 + 바인더 타입 조건 (+ 필요 시 all-vals/len 가드)
     IS : WasmTerminals continuation 변수 도입
 
     if cond is empty:
-      emit eq  step(<Z | LHS IS>) = <Z' | RHS IS>
+      emit rl  [name] : step(<Z | LHS IS>) => <Z' | RHS IS>
     else:
-      emit ceq step(<Z | LHS IS>) = <Z' | RHS IS> if cond
+      emit crl [name] : step(<Z | LHS IS>) => <Z' | RHS IS> if cond
 
   emit 필요한 변수 선언
 ```
 
 ```maude
 --- Step 규칙 (무조건)
-eq step(< Z | LHS IS >) = < Z' | RHS IS > .
+rl [step-sample] :
+  step(< Z | LHS IS >)
+  =>
+  < Z' | RHS IS > .
 
 --- Step 규칙 (조건부)
-ceq step(< Z | LHS IS >) = < Z' | RHS IS >
+crl [step-sample-cond] :
+  step(< Z | LHS IS >)
+  =>
+  < Z' | RHS IS >
   if X := term /\ cond = true .
 ```
