@@ -1,0 +1,152 @@
+;; 작성일: 2026.04.20
+;; 목적: 현재 output.maude + wasm-exec.maude 기준 변환 예시 정리
+
+;; 1. Syntax
+;;; SpecTec
+syntax laneidx hint(desc "lane index") = u8
+
+;;; Maude (output.maude 스타일)
+var T : WasmTerminal .
+cmb ( T ) : Laneidx if T : U8 .
+
+
+;; 2. Def
+;;; SpecTec
+def $binop_(numtype, binop_(numtype), num_(numtype), num_(numtype)) : num_(numtype)*
+def $binop_(Inn, ADD, i_1, i_2) = $iadd_($sizenn(Inn), i_1, i_2)
+
+;;; Maude (output.maude)
+op $binop : Numtype WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
+eq $binop ( BINOP0-INN, CTORADDA0, BINOP0-I1, BINOP0-I2 ) = $iadd ( ( $sizenn ( BINOP0-INN ) ), BINOP0-I1, BINOP0-I2 ) .
+
+
+;; 3. 일반 판정 Rule
+;;; SpecTec
+relation Numtype_ok: context |- numtype : OK
+
+rule Numtype_ok:
+  C |- numtype : OK
+
+;;; Maude (output.maude)
+op Numtype-ok : WasmTerminal WasmTerminal -> Judgement [ctor] .
+cmb Numtype-ok ( NUMTYPE-OK-R00-C , NUMTYPE-OK-R00-NUMTYPE ) : ValidJudgement
+    if NUMTYPE-OK-R00-C : Context /\ NUMTYPE-OK-R00-NUMTYPE : Numtype .
+
+
+;; 4. 실행 Rule 패턴
+;; 현재 기준 패턴:
+;;   4-1. Step-pure
+;;   4-2. Step-read
+;;   4-3. Step
+;;   4-4. Steps / Eval-expr 같은 rewrite judgement
+;;   4-5. Evaluation Context (label / handler / frame 자동, instrs는 수동 보완)
+
+;;; 공통 wrapper
+op step : ExecConf -> ExecConf [frozen (1)] .
+
+
+;;;; 4-1. Step-pure
+;;; SpecTec
+rule Step_pure/nop:
+  NOP  ~>  eps
+
+;;; Maude (output.maude)
+crl [step-pure-nop] :
+  step(< STEP-PURE-NOP-Z | STEP-PURE-NOP-VALS CTORNOPA0 STEP-PURE-NOP-IS >)
+  =>
+  < STEP-PURE-NOP-Z | STEP-PURE-NOP-VALS eps STEP-PURE-NOP-IS >
+    if all-vals ( STEP-PURE-NOP-VALS ) = true .
+
+
+;;;; 4-2. Step-read
+;;; SpecTec
+rule Step_read/local.get:
+  z; (LOCAL.GET x)  ~>  val
+  -- if $local(z, x) = val
+
+;;; Maude (output.maude)
+crl [step-read-local-get] :
+  step(< STEP-READ-LOCAL-GET25-Z | STEP-READ-LOCAL-GET-VALS CTORLOCALGETA1 ( STEP-READ-LOCAL-GET25-X ) STEP-READ-LOCAL-GET-IS >)
+  =>
+  < STEP-READ-LOCAL-GET25-Z | STEP-READ-LOCAL-GET-VALS STEP-READ-LOCAL-GET25-VAL STEP-READ-LOCAL-GET-IS >
+    if all-vals ( STEP-READ-LOCAL-GET-VALS ) = true
+    /\ STEP-READ-LOCAL-GET25-VAL := $local ( STEP-READ-LOCAL-GET25-Z, STEP-READ-LOCAL-GET25-X )
+    /\ STEP-READ-LOCAL-GET25-Z : State
+    /\ STEP-READ-LOCAL-GET25-X : Idx .
+
+
+;;;; 4-3. Step
+;;; SpecTec
+rule Step/local.set:
+  z; val (LOCAL.SET x)  ~>  $with_local(z, x, val); eps
+
+;;; Maude (output.maude)
+crl [step-local-set] :
+  step(< STEP-LOCAL-SET7-Z | STEP-LOCAL-SET-VALS STEP-LOCAL-SET7-VAL CTORLOCALSETA1 ( STEP-LOCAL-SET7-X ) STEP-LOCAL-SET-IS >)
+  =>
+  < $with-local ( STEP-LOCAL-SET7-Z, STEP-LOCAL-SET7-X, STEP-LOCAL-SET7-VAL ) | STEP-LOCAL-SET-VALS eps STEP-LOCAL-SET-IS >
+    if all-vals ( STEP-LOCAL-SET-VALS ) = true
+    /\ STEP-LOCAL-SET7-Z : State
+    /\ STEP-LOCAL-SET7-VAL : Val
+    /\ STEP-LOCAL-SET7-X : Idx .
+
+
+;;;; 4-4. Rewrite judgement
+;;; SpecTec
+rule Steps/trans:
+  z; instr*  ~>*  z''; instr''*
+  -- Step: z; instr*  ~>  z'; instr'*
+  -- Steps: z'; instr'*  ~>*  z''; instr''*
+
+;;; Maude (output.maude)
+crl [steps-trans] :
+  Steps ( CTORSEMICOLONA2 ( STEPS-TRANS1-Z, STEPS-TRANS1-INSTR ) , CTORSEMICOLONA2 ( STEPS-TRANS1-ZQQ, STEPS-TRANS1-INSTRQQ ) )
+  =>
+  valid
+    if step(< STEPS-TRANS1-Z | STEPS-TRANS1-INSTR >) => < STEPS-TRANS1-ZQ | STEPS-TRANS1-INSTRQ >
+    /\ Steps ( ( CTORSEMICOLONA2 ( STEPS-TRANS1-ZQ, STEPS-TRANS1-INSTRQ ) ), ( CTORSEMICOLONA2 ( STEPS-TRANS1-ZQQ, STEPS-TRANS1-INSTRQQ ) ) ) => valid
+    /\ STEPS-TRANS1-Z : State
+    /\ ( STEPS-TRANS1-INSTR hasType ( list ( instr ) ) ) : WellTyped
+    /\ STEPS-TRANS1-ZQQ : State
+    /\ ( STEPS-TRANS1-INSTRQQ hasType ( list ( instr ) ) ) : WellTyped .
+
+
+;;;; 4-5. Evaluation Context
+;;; SpecTec
+rule Step/ctxt-label:
+  z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
+  -- Step: z; instr* ~> z'; instr'*
+
+;;; Maude (output.maude, 자동 생성)
+op restore-label   : ExecConf WasmTerminal WasmTerminals WasmTerminals -> ExecConf .
+
+crl [heat-step-ctxt-label] :
+  step(< STEP-CTXT-LABEL-Z | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-INNER-IS ) STEP-CTXT-LABEL-IS-REST >)
+  => restore-label(step(< STEP-CTXT-LABEL-Z | STEP-CTXT-LABEL-INNER-IS >), STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
+  if all-vals ( STEP-CTXT-LABEL-INNER-IS ) = false
+  /\ is-trap ( STEP-CTXT-LABEL-INNER-IS ) = false
+  /\ needs-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false .
+
+rl [cool-step-ctxt-label] :
+  restore-label(< STEP-CTXT-LABEL-ZN | STEP-CTXT-LABEL-IS >, STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
+  => < STEP-CTXT-LABEL-ZN | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS ) STEP-CTXT-LABEL-IS-REST > .
+
+
+;;;; Instrs context는 현재 자동 생성하지 않음
+;;; SpecTec
+rule Step/ctxt-instrs:
+  z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
+  -- Step: z; instr* ~> z'; instr'*
+  -- if val* =/= eps \/ instr_1* =/= eps
+
+;;; Maude (현재 상태)
+;;; output.maude:
+;;;   generic heat/cool 미생성
+;;; wasm-exec.maude:
+;;;   manual override 사용
+
+crl [step-read-local-get-manual] :
+  step(< ST-Z | ST-VALS CTORLOCALGETA1(ST-X) ST-IS >)
+  =>
+  < ST-Z | ST-VALS ST-VAL ST-IS >
+  if all-vals(ST-VALS) = true /\ ST-VAL := $local(ST-Z, ST-X) .

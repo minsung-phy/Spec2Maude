@@ -9,16 +9,21 @@
 ### 번역기 (translator.ml)
 - SpecTec IL AST → Maude 변환 파이프라인 동작
 - TypD 처리 (AliasT/StructT/VariantT) → sort membership / hasType 기반 WellTyped
-- DecD/DefD → Maude eq/ceq 함수식
-- RelD 4 패턴 확립 (`labmeeting.md` 참조)
-  1. 일반 판정 RelD → `cmb ... : ValidJudgement`
-  2. Step-pure → `ceq step(< Z | VALS instr IS >) = ...`
-  3. Step-read → 상태 z 유지하며 읽기
-  4. Step → z → z' 상태 변화
+- DecD/DefD는 현재 `eq/ceq`와 `rl/crl`를 모두 사용한다.
+  - 순수 함수/판정은 `eq/ceq`
+  - rewrite judgement나 rewrite-dependent def는 `rl/crl`
+- RelD는 현재 다음 패턴으로 정리됐다.
+  1. 일반 판정 RelD (`*-ok`, `*-sub`, `Expand`, `Expand-use`) → `mb/cmb ... : ValidJudgement`
+  2. rewrite judgement (`Steps`, `Eval-expr`) → `rl/crl ... => valid`
+  3. Step-pure → `crl step(< Z | VALS instr IS >) => < Z | ... >`
+  4. Step-read → 상태 `z` 유지하며 읽기
+  5. Step → `z -> z'` 상태 변화
 - `$rollrt` 하드코딩 브릿지 제거 (commit `11c341b`)
 
 ### 실행 인프라 (wasm-exec.maude)
-- 손수 작성한 eval-context 규칙 (label/frame/handler/loop)
+- fib 검증용 harness와 일부 manual execution override 유지
+- 현재 auto-generated eval-context는 `output.maude`의 `label/frame/handler` heating/cooling이 기준
+- `instrs` context와 일부 bootstrap은 아직 `wasm-exec.maude` manual rule이 남아 있음
 - WASM-FIB 모듈 (fib-config, fib-body, fib-loop-body)
 - 모델체킹 설정 (`result-is`, `trap-seen` atomic props)
 - `modelCheck(fib-config(i32v(5)), <> result-is(5))` 실행 자체는 가능 (결과는 아래 문제점 참조)
@@ -30,6 +35,20 @@
 ---
 
 ## 2. 현재 문제점
+
+### 2026-04-20 문서 정리
+- 현재 translator/output/wasm-exec 상태에 맞춰 문서를 갱신했다.
+  - `docs/translate_example.spectec`
+  - `rule_0420.md`
+  - `rules_0420.md`
+  - `evaluation_context.md`
+  - `session_summary.txt`
+- 이번 문서 정리의 기준:
+  - `prove/proved/ProofState/Proved`는 현재 생성물에서 제거된 상태
+  - `*-ok`, `*-sub`, `Expand`, `Expand-use`는 `mb/cmb`
+  - `Steps`, `Eval-expr`, rewrite-dependent `DecD/DefD`는 `rl/crl`
+  - evaluation context는 현재 `label/handler/frame`만 `output.maude`에서 auto heat/cool 생성
+  - `instrs` context는 아직 auto heat/cool 미생성이고 `wasm-exec.maude` 수동 rule이 남아 있음
 
 ### ✅ P0-0. Step rule rl/crl 전환 완료
 - 통합 전략은 유지했다. 기준은 `translator.ml`이고, `translator_0417.ml`에서 **Step rl/crl 생성 경로**와 **context heating/cooling 경로**만 선택 이식했다.

@@ -44,4 +44,18 @@
      - `multiple distinct parses`
      - `assignment condition already bound`
      - `wasm-exec.maude` `MC-I` bind-before-use
-  3. run non-fib regression examples
+3. run non-fib regression examples
+
+- Documentation refreshed to match the current generated state:
+  - `docs/translate_example.spectec`
+  - `rule_0420.md`
+  - `rules_0420.md`
+  - `evaluation_context.md`
+- Current documentation baseline:
+  - no `prove/proved/ProofState/Proved`
+  - `*-ok`, `*-sub`, `Expand`, `Expand-use` use `mb/cmb`
+  - `Steps`, `Eval-expr`, and rewrite-aware defs use `rl/crl`
+  - evaluation contexts:
+    - auto-generated: `label`, `handler`, `frame`
+    - not yet auto-generated: `instrs`
+    - current manual support remains in `wasm-exec.maude`
