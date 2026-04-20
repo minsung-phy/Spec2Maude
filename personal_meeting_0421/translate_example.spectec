@@ -3,9 +3,9 @@
 
 ;; 1. Syntax
 ;;; SpecTec
-syntax laneidx hint(desc "lane index") = u8
+syntax laneidx = u8
 
-;;; Maude (output.maude 스타일)
+;;; Maude 
 var T : WasmTerminal .
 cmb ( T ) : Laneidx if T : U8 .
 
@@ -17,7 +17,7 @@ def $binop_(Inn, ADD, i_1, i_2) = $iadd_($sizenn(Inn), i_1, i_2)
 
 ;;; Maude (output.maude)
 op $binop : Numtype WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
-eq $binop ( BINOP0-INN, CTORADDA0, BINOP0-I1, BINOP0-I2 ) = $iadd ( ( $sizenn ( BINOP0-INN ) ), BINOP0-I1, BINOP0-I2 ) .
+eq $binop ( INN, ADD, I1, I2 ) = $iadd ( ( $sizenn ( INN ) ), I1, I2 ) .
 
 
 ;; 3. 일반 판정 Rule
@@ -150,3 +150,11 @@ crl [step-read-local-get-manual] :
   =>
   < ST-Z | ST-VALS ST-VAL ST-IS >
   if all-vals(ST-VALS) = true /\ ST-VAL := $local(ST-Z, ST-X) .
+
+
+
+
+rule Step/ctxt-instrs:
+  z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
+  -- Step: z; instr* ~> z'; instr'*
+  -- if val* =/= eps \/ instr_1* =/= eps

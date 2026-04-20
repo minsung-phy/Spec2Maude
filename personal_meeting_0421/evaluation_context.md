@@ -47,19 +47,22 @@ rule Step/ctxt-frame:
 
 ```maude
 crl [heat-step-ctxt-label] :
-  step(< STEP-CTXT-LABEL-Z | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-INNER-IS ) STEP-CTXT-LABEL-IS-REST >)
-  => restore-label(step(< STEP-CTXT-LABEL-Z | STEP-CTXT-LABEL-INNER-IS >), STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
-  if all-vals ( STEP-CTXT-LABEL-INNER-IS ) = false /\ is-trap ( STEP-CTXT-LABEL-INNER-IS ) = false /\ needs-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = false .
+  step(< Z | CTORLABELLBRACERBRACEA3 ( N, Q, IS ) IS' >)
+  => restore-label(step(< Z | IS >), N, Q, IS')
+  if all-vals ( IS ) = false /\ is-trap ( IS ) = false /\ needs-label-ctxt ( IS ) = false .
 
 rl [cool-step-ctxt-label] :
-  restore-label(< STEP-CTXT-LABEL-ZN | STEP-CTXT-LABEL-IS >, STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
-  => < STEP-CTXT-LABEL-ZN | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS ) STEP-CTXT-LABEL-IS-REST > .
+  restore-label(< Z' | IS >, N, Q, IS')
+  => < Z' | CTORLABELLBRACERBRACEA3 ( N, Q, IS ) IS' > .
 
 crl [cool-step-ctxt-label-control] :
-  restore-label(step(< STEP-CTXT-LABEL-Z | STEP-CTXT-LABEL-INNER-IS >), STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-IS-REST)
-  => step(< STEP-CTXT-LABEL-Z | CTORLABELLBRACERBRACEA3 ( STEP-CTXT-LABEL3-N, STEP-CTXT-LABEL3-INSTR0, STEP-CTXT-LABEL-INNER-IS ) STEP-CTXT-LABEL-IS-REST >)
-  if needs-label-ctxt ( STEP-CTXT-LABEL-INNER-IS ) = true .
+  restore-label(step(< Z | IS >), N, Q, IS')
+  => step(< Z | CTORLABELLBRACERBRACEA3 ( N, Q, IS ) IS' >)
+  if needs-label-ctxt ( IS ) = true .
 ```
+
+(변수: `Z` = 상태, `Z'` = 내부 스텝 후 상태, `N` = label arity,
+ `Q` = label의 저장된 instr 시퀀스, `IS` = 내부 실행 시퀀스, `IS'` = label 뒤쪽 잔여)
 
 ### 2.2 Handler
 
@@ -67,19 +70,22 @@ crl [cool-step-ctxt-label-control] :
 
 ```maude
 crl [heat-step-ctxt-handler] :
-  step(< STEP-CTXT-HANDLER-Z | CTORHANDLERLBRACERBRACEA3 ( STEP-CTXT-HANDLER4-N, STEP-CTXT-HANDLER4-CATCH, STEP-CTXT-HANDLER-INNER-IS ) STEP-CTXT-HANDLER-IS-REST >)
-  => restore-handler(step(< STEP-CTXT-HANDLER-Z | STEP-CTXT-HANDLER-INNER-IS >), STEP-CTXT-HANDLER4-N, STEP-CTXT-HANDLER4-CATCH, STEP-CTXT-HANDLER-IS-REST)
-  if all-vals ( STEP-CTXT-HANDLER-INNER-IS ) = false /\ is-trap ( STEP-CTXT-HANDLER-INNER-IS ) = false .
+  step(< Z | CTORHANDLERLBRACERBRACEA3 ( N, CATCH, IS ) IS' >)
+  => restore-handler(step(< Z | IS >), N, CATCH, IS')
+  if all-vals ( IS ) = false /\ is-trap ( IS ) = false .
 
 rl [cool-step-ctxt-handler] :
-  restore-handler(< STEP-CTXT-HANDLER-ZN | STEP-CTXT-HANDLER-IS >, STEP-CTXT-HANDLER4-N, STEP-CTXT-HANDLER4-CATCH, STEP-CTXT-HANDLER-IS-REST)
-  => < STEP-CTXT-HANDLER-ZN | CTORHANDLERLBRACERBRACEA3 ( STEP-CTXT-HANDLER4-N, STEP-CTXT-HANDLER4-CATCH, STEP-CTXT-HANDLER-IS ) STEP-CTXT-HANDLER-IS-REST > .
+  restore-handler(< Z' | IS >, N, CATCH, IS')
+  => < Z' | CTORHANDLERLBRACERBRACEA3 ( N, CATCH, IS ) IS' > .
 
 crl [cool-step-ctxt-handler-control] :
-  restore-handler(step(< STEP-CTXT-HANDLER-Z | STEP-CTXT-HANDLER-INNER-IS >), STEP-CTXT-HANDLER4-N, STEP-CTXT-HANDLER4-CATCH, STEP-CTXT-HANDLER-IS-REST)
-  => step(< STEP-CTXT-HANDLER-Z | CTORHANDLERLBRACERBRACEA3 ( STEP-CTXT-HANDLER4-N, STEP-CTXT-HANDLER4-CATCH, STEP-CTXT-HANDLER-INNER-IS ) STEP-CTXT-HANDLER-IS-REST >)
-  if needs-label-ctxt ( STEP-CTXT-HANDLER-INNER-IS ) = true .
+  restore-handler(step(< Z | IS >), N, CATCH, IS')
+  => step(< Z | CTORHANDLERLBRACERBRACEA3 ( N, CATCH, IS ) IS' >)
+  if needs-label-ctxt ( IS ) = true .
 ```
+
+(변수: `Z` = 상태, `Z'` = 내부 스텝 후 상태, `N` = handler arity,
+ `CATCH` = catch 시퀀스, `IS` = 내부 실행 시퀀스, `IS'` = handler 뒤쪽 잔여)
 
 ### 2.3 Frame
 
@@ -87,19 +93,22 @@ crl [cool-step-ctxt-handler-control] :
 
 ```maude
 crl [heat-step-ctxt-frame] :
-  step(< CTORSEMICOLONA2 ( STEP-CTXT-FRAME-N-S, STEP-CTXT-FRAME-N-F ) | CTORFRAMELBRACERBRACEA3 ( STEP-CTXT-FRAME5-N, STEP-CTXT-FRAME5-FQ, STEP-CTXT-FRAME-INNER-IS ) STEP-CTXT-FRAME-IS-REST >)
-  => restore-frame(step(< CTORSEMICOLONA2 ( STEP-CTXT-FRAME-N-S, STEP-CTXT-FRAME5-FQ ) | STEP-CTXT-FRAME-INNER-IS >), STEP-CTXT-FRAME5-N, STEP-CTXT-FRAME-N-F, STEP-CTXT-FRAME-IS-REST)
-  if all-vals ( STEP-CTXT-FRAME-INNER-IS ) = false /\ is-trap ( STEP-CTXT-FRAME-INNER-IS ) = false .
+  step(< CTORSEMICOLONA2 ( S, F ) | CTORFRAMELBRACERBRACEA3 ( N, F', IS ) IS' >)
+  => restore-frame(step(< CTORSEMICOLONA2 ( S, F' ) | IS >), N, F, IS')
+  if all-vals ( IS ) = false /\ is-trap ( IS ) = false .
 
 rl [cool-step-ctxt-frame] :
-  restore-frame(< STEP-CTXT-FRAME-ZN | STEP-CTXT-FRAME-IS >, STEP-CTXT-FRAME-N, STEP-CTXT-FRAME-F-OUTER, STEP-CTXT-FRAME-IS-REST)
-  => < CTORSEMICOLONA2 ( $store ( STEP-CTXT-FRAME-ZN ), STEP-CTXT-FRAME-F-OUTER ) | CTORFRAMELBRACERBRACEA3 ( STEP-CTXT-FRAME-N, $frame ( STEP-CTXT-FRAME-ZN ), STEP-CTXT-FRAME-IS ) STEP-CTXT-FRAME-IS-REST > .
+  restore-frame(< Z' | IS >, N, F, IS')
+  => < CTORSEMICOLONA2 ( $store ( Z' ), F ) | CTORFRAMELBRACERBRACEA3 ( N, $frame ( Z' ), IS ) IS' > .
 
 crl [cool-step-ctxt-frame-control] :
-  restore-frame(step(< CTORSEMICOLONA2 ( STEP-CTXT-FRAME-N-S, STEP-CTXT-FRAME5-FQ ) | STEP-CTXT-FRAME-INNER-IS >), STEP-CTXT-FRAME5-N, STEP-CTXT-FRAME-N-F, STEP-CTXT-FRAME-IS-REST)
-  => step(< CTORSEMICOLONA2 ( STEP-CTXT-FRAME-N-S, STEP-CTXT-FRAME-N-F ) | CTORFRAMELBRACERBRACEA3 ( STEP-CTXT-FRAME5-N, STEP-CTXT-FRAME5-FQ, STEP-CTXT-FRAME-INNER-IS ) STEP-CTXT-FRAME-IS-REST >)
-  if needs-label-ctxt ( STEP-CTXT-FRAME-INNER-IS ) = true .
+  restore-frame(step(< CTORSEMICOLONA2 ( S, F' ) | IS >), N, F, IS')
+  => step(< CTORSEMICOLONA2 ( S, F ) | CTORFRAMELBRACERBRACEA3 ( N, F', IS ) IS' >)
+  if needs-label-ctxt ( IS ) = true .
 ```
+
+(변수: `S` = store, `F` = 외부 frame, `F'` = 내부 frame, `Z'` = 내부 스텝 후 상태,
+ `N` = frame arity, `IS` = 내부 실행 시퀀스, `IS'` = frame 뒤쪽 잔여)
 
 ## 3. `instrs` Context: Current Status
 

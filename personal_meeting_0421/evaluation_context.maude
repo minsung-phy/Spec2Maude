@@ -1,0 +1,36 @@
+--- SpecTec
+rule Step/ctxt-label:
+  z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
+  -- Step: z; instr* ~> z'; instr'*
+
+--- Maude
+op restore-label : ExecConf WasmTerminal WasmTernials WasmTerminals -> ExecConf .
+
+crl [heat-step-ctxt-label] :
+  step(< Z | LABEL ( N, INSTR0, INSTRS ) REST >)
+  => restore-label(step(< Z | INSTRS >), N, INSTR0, REST)
+  if all-vals ( INSTRS ) = false /\ is-trap ( INSTRS ) = false /\ needs-label-ctxt ( INSTRS ) = false .
+
+--- restore-label 내의 step(< Z | INSTRS >)에 일반 실행 규칙이 적용되어 step(< Z' | INSTRS' >)로 바뀜 (by maude's rewriting logic)
+
+rl [cool-step-ctxt-label] :
+    restore-label(< Z' | INSTRS' >, N, INSTR0, REST)
+    => < Z' | LABEL ( N, INSTR0, INSTRS' ) REST > .
+
+
+
+
+
+
+--- SpecTec
+rule Step/ctxt-instrs:
+  z; val* instr* instr_1* ~>  z'; val* instr'* instr_1*
+  -- Step: z; instr* ~> z'; instr'*
+  -- if val* =/= eps \/ instr_1* =/= eps
+
+--- Maude
+crl [step-local-set-manual] :
+step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VALS ST-VAL CTORLOCALSETA1(ST-X) ST-IS >)
+=>
+< CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-VALS ST-IS >
+if all-vals(ST-VALS) = true /\ is-val(ST-VAL) = true .
