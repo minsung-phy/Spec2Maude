@@ -341,10 +341,86 @@
     - `vload-pack-val`과 vector helper 계열에서 `j^K`, `$extend(...)*`, `$setproduct(...)*` 같은 반복 body를 sequence-aware 하게 lowering
     - 전역 `binder_to_var_map` alias 규칙은 건드리지 않고 helper 기반 lowering 설계
 ### 즉시 (다음 세션 1회)
+- [x] **일반 판정 규칙 정리**: 타입 판정류(`Numtype-ok`, `Val-ok`, `Memtype-ok` 등)는 `prove(...) => proved` 대신 `mb/cmb`로 전환 완료
+  - `Step` / `Step-pure` / `Step-read`는 계속 `rl/crl`
+- [x] **`prove` 레이어 최소화 2단계**: `*-sub`, `Expand`, `Expand-use`, `Eval-expr`를 `mb/cmb`로 복귀
+  - 현재 `output.maude` 기준 `prove(...)`가 남아 있는 relation은 `Steps`뿐이다.
+  - 이유:
+    - `Steps/trans`의 조건에는 `step(<...>) => <...>` rewrite condition이 직접 들어간다.
+    - 이걸 `cmb Steps(...) : ValidJudgement if ...`로 내리면 Maude가 `didn't expect token =>` / `no parse for statement`를 낸다.
+    - 따라서 `Steps`만 예외적으로 `crl prove(Steps(...)) => proved` + `cmb prove(Steps(...)) : Proved`를 유지한다.
+  - `translate_prem`도 같이 수정해서:
+    - `RulePr Steps`는 `prove ( Steps(...) ) : Proved`
+    - 나머지 non-step relation premise는 `... : ValidJudgement`
+  - 재생성 결과 확인:
+    - `prove_relations [('Steps', 5)]`
+    - `Expand`, `Expand-use`, `Eval-expr`, `*-sub`는 `cmb ... : ValidJudgement`
+  - 재검증:
+    - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .` → 최종 `i32 5`
+    - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .` → `true`
+    - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .` → `true`
+- [ ] **`prove` 완전 제거**
+  - 2026-04-20 실험:
+    - `Steps`를 `crl Steps(...) => valid`로 바꾸고 `prove/proved/Proved/ProofState`를 생성물에서 0개까지 제거하는 데는 성공했다.
+    - 실제 생성물 확인:
+      - `prove 0`
+      - `proved 0`
+      - `Proved 0`
+      - `ProofState 0`
+  - 하지만 현재는 완료로 판정할 수 없다.
+    - `output.maude`에서 아래 parse warning이 새로 생긴다.
+      - `ceq $evalexprs ... if Eval-expr(...) => valid /\ ...`
+      - `ceq $evalglobals ... if Eval-expr(...) => valid /\ ...`
+    - 즉 `DecD/DefD`의 `ceq` 조건 안에는 rewrite condition(`=> valid`)을 그대로 넣을 수 없다.
+    - 같은 이유로
+      - `Steps`를 membership으로 두면 `Steps/trans`의 `step(<...>) => <...>` 때문에 깨지고
+      - `Eval-expr`를 rewrite relation으로 두면 이를 참조하는 `$evalexprs/$evalglobals`가 깨진다.
+  - 현재 판정:
+    - `prove` 완전 제거는 **방향만 확인됐고, translator 전체로는 아직 미완료**다.
+    - 근본 해결에는 아래 중 하나가 필요하다.
+      1. `DecD/DefD`에서 rewrite relation premise를 직접 쓰지 않도록 별도 lowering 경로 설계
+      2. `$evalexprs/$evalglobals`를 relation/rule 기반으로 재구성
+      3. `Steps`/`Eval-expr` 계열에 대해 equational context에서 쓸 다른 witness 표현 설계
+  - 현재까지 확인된 의존성 체인:
+    - `Steps/trans`
+      → `Eval-expr`
+      → `$evalexprs`, `$evalglobals`
+      → `$evalexprss`, `$instantiate`
+    - 즉 `prove`를 없애려면 `Steps`/`Eval-expr`만 바꾸는 것으로 끝나지 않고,
+      이를 `ceq` 조건에서 참조하는 DecD/DefD들도 같이 rewrite-aware lowering으로 옮겨야 한다.
+  - 참고:
+    - parse warning이 있어도 현재 fib 3개 검증은 여전히 통과했다.
+    - 그러나 parse warning이 있는 상태를 성공으로 보고하면 안 된다.
+- [ ] **미변환 22개 execution rule 자동 변환**
+  - `instrs` context heating/cooling 복구
+  - `RulePr`가 있는 non-context Step rule lowering
+  - `Expand` / `Ref_ok` / `Reftype_sub` 같은 premise 결과를 RHS 조립에 연결
+  - `IterE` / `IterPr` 기반 반복 시퀀스 처리
+  - `call_ref-func` 같은 수동 harness rule을 translator로 흡수
+- [ ] **warning/advisory 우선 정리**
+  - `load output.maude` 기준 `multiple distinct parses` 37건
+  - `assignment condition already bound` 8건
+  - `load wasm-exec.maude` 기준 `MC-I` bind-before-use 1건
+  - import advisory 정리
+- [ ] **isomorphic 구조 정리**
+  - rule은 필요한 곳에만 `rl/crl`
+  - 일반 판정은 가능하면 `mb/cmb`
+  - evaluation context는 translator 자동 생성으로 최대한 통일
+  - `wasm-exec.maude` 수동 override 최소화
 - [x] 선택 통합 1단계: `translate_step_reld`를 rl/crl 기반으로 전환
 - [x] 선택 통합 2단계: context 규칙 자동 생성 경로(`is_ctxt_rule`, `try_decode_ctxt_conclusion`, heat/cool) 이식
 - [x] 통합 제외 항목 고정: RelD Bool 반환, type-ok 체계, rollrt 특수 브리지
 - [x] **P0-0 재설계**: Step/Step-pure/Step-read 번역을 `rl/crl` 로 이행
+- [x] 타입 판정류 `*-ok` relation을 `mb/cmb ... : ValidJudgement`로 복귀
+  - `translator.ml`의 `translate_reld`에서 `*-ok` relation만 membership judgement로 분기
+  - `translate_prem`도 같이 수정해서 타입 판정류 premise는 `prove(...) : Proved` 대신 `... : ValidJudgement`를 사용
+  - `output.maude` 기준 확인:
+    - `Numtype-ok`, `Valtype-ok`, `Memtype-ok`, `Tabletype-ok`, `Val-ok`, `Ref-ok` 등이 `cmb ... : ValidJudgement`
+    - `Steps/trans` 같은 execution/연쇄 relation은 계속 `crl`
+  - 재검증:
+    - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .` → 최종 `i32 5`
+    - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .` → `true`
+    - `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .` → `true`
 - [x] fib `rewrite` / `modelCheck` 재검증
 - [x] `fib(0)` ~ `fib(5)`를 각각 개별 실행해 기대 수열 확인
 - [ ] `STATUS.md` 기준 warning 목록화 및 분류
@@ -360,9 +436,15 @@
 
 ### 단기 (1-2 세션)
 - [ ] P0-C 경고 체계적으로 해결 또는 suppress 근거 문서화
+- [ ] **전체 변환 감사 자동화**
+  - `syntax / relation / def / rule` 별로 source 개수와 생성물 대응 수를 재현 가능하게 뽑는 스크립트 작성
+  - 현재 직접 확인된 미변환 22개(rule)를 기준선으로 유지
 - [ ] translator 커버리지 수치: SpecTec 전체 rule 수 vs 자동 번역 성공 수
 - [ ] "translator가 번역 못 하는 규칙" 목록화 및 원인 분석
 - [ ] `wasm-exec.maude`에 남아 있는 수동 override와 자동 생성 경로를 다시 정리
+- [ ] **fib 외 회귀 검증 확대**
+  - factorial, recursive call, memory/table/GC 예제 추가
+  - translator 수정이 fib harness 특화인지 여부 확인
 
 ### 중기 (1-2 주)
 - [ ] P1 후속: eval-context 자동 생성 정리
@@ -389,12 +471,81 @@
 
 ## 5. 다음 세션 진입점
 
-1. 남은 `used before it is bound in rule` 1건(`STEP-READ-VLOAD-PACK-VAL47-J`)의 반복 binder(`j*`) 처리 경로를 설계한다
-   - 목표: `IterPr` 내부 scalar `j` 값을 sequence binder `j*`로 축적하는 일반 경로 추가
-   - 범위: `prem_items_of_prem`/prem scheduling 쪽만 보고, instruction 이름 하드코딩은 금지
-   - 주의: `binder_to_var_map`의 base alias를 전역으로 건드리면 `Eval-expr`/`instantiate`/`invoke` 쪽 sequence binder가 회귀하므로, IterPr 내부용 local vm 또는 accumulation 경로를 별도로 설계해야 한다
-   - 추가 확인 필요: `k<K`에서 나온 iterexp source `k*`를 Maude에서 어떤 sequence helper로 표현할지 현재 translator/output에는 기존 경로가 없다
-   - 현재 판정: 이 항목을 실제로 해결하려면 단순 premise 재정렬이 아니라 새 helper 생성 또는 IterPr 전용 lowering 경로가 필요하다
-2. `multiple distinct parses` 35건을 타입 판정/수치 연산/step 규칙으로 나눠 우선순위를 정한다
-3. `RulePr`의 출력 바인딩 문제를 다루지 않고 유지할지, 제한적 패턴만 지원할지 결정한다
-4. `wip/p0-v128-overflow` 브랜치의 V128 이슈를 다시 재개한다
+1. `prove` 완전 제거 blocker를 푼다
+   - `Steps` / `Eval-expr` rewrite judgement를 `DecD/DefD`에서 어떻게 참조할지 새 lowering 필요
+   - 특히 `$evalexprs`, `$evalglobals`가 `Eval-expr(...) => valid`를 `ceq` 조건에서 직접 쓰지 않게 바꿔야 한다
+   - 그 다음 영향 범위는 `$evalexprss`, `$instantiate`까지 재귀적으로 따라간다
+2. 미변환 22개 rule을 네 부류로 나눠 translator 경로를 설계한다
+   - `instrs` context
+   - success-branch cast/ref/call-ref
+   - struct/throw allocation-update
+   - array/data/iter sequence 조립
+3. warning 3대 묶음을 줄인다
+   - `multiple distinct parses` 37건
+   - `assignment condition already bound` 8건
+   - `wasm-exec.maude`의 `MC-I` bind-before-use 1건
+4. 전체 변환 감사 스크립트를 만든다
+   - `syntax / relation / def / rule` 각각에 대해 source 수와 생성물 대응 수를 재현 가능하게 출력
+5. fib 외 예제로 회귀 검증 범위를 넓힌다
+
+---
+
+## 6. 2026-04-20 업데이트
+
+### ✅ `prove` 레이어 제거 완료
+- 현재 재생성본 `output.maude` 기준:
+  - `prove`: 0
+  - `proved`: 0
+  - `ProofState`: 0
+  - `Proved`: 0
+- 즉 Gemini가 넣었던 `prove(...) => proved` 중간 레이어는 생성물에서 완전히 사라졌다.
+
+### ✅ relation 분류 최신 상태
+- `*-ok`, `*-sub`, `Expand`, `Expand-use`:
+  - `mb/cmb ... : ValidJudgement`
+- `Steps`:
+  - `crl Steps(...) => valid`
+- `Eval-expr`:
+  - `crl Eval-expr(...) => valid`
+
+### ✅ `ceq` 안의 `=>` parse blocker 해결
+- 원인:
+  - `Eval-expr(...) => valid`가 `$evalexprs`, `$evalglobals` 같은 `DecD`의 `ceq ... if ...` 조건 안으로 들어가 parse error를 냈다.
+- 해결:
+  - `translator.ml`의 `translate_decd`에 rewrite-aware lowering을 추가했다.
+  - rewrite judgement 또는 rewrite-dependent def call을 참조하는 clause는 `eq/ceq` 대신 `rl/crl`로 내린다.
+  - 해당 조건도
+    - 이전: `(... == $evalglobals(...)) = true`
+    - 현재: `$evalglobals(...) => ...`
+    형태로 직접 rewrite condition으로 바꾼다.
+- 현재 실제 생성물:
+  - `crl [eval-expr-r0] : Eval-expr(...) => valid`
+  - `crl [evalexprs-r1] : $evalexprs(...) => ...`
+  - `crl [evalglobals-r1] : $evalglobals(...) => ...`
+- `maude -no-banner output.maude` 확인 결과, 이전의
+  - `didn't expect token =>`
+  - `no parse for statement`
+  는 더 이상 나타나지 않는다.
+
+### ✅ 재검증
+- `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+  - 종료
+  - 최종 결과 핵심: `CTORCONSTA2(CTORI32A0, 5)`
+- `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .`
+  - `result Bool: true`
+- `red in WASM-FIB-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .`
+  - `result Bool: true`
+
+### 남은 이슈
+- `multiple distinct parses` 경고 다수는 여전히 남아 있다.
+- `assignment condition already bound` advisory 8건도 남아 있다.
+- `wasm-exec.maude`의 `MC-I` bind-before-use 1건도 남아 있다.
+- `evalexprss` / `instantiate` rewrite-aware 정리도 추가 반영했다.
+  - `crl [evalexprss-r1]`가 생성되고, 자기 재귀 호출도 `=>` 조건으로 내려간다.
+  - `crl [instantiate-r0]` 안의 `$evalglobals`, `$evalexprs`, `$evalexprss`, `$allocmodule` 호출이 모두 rewrite condition으로 내려간다.
+  - 즉 이 묶음의 혼합형 lowering은 현재 기준으로 해소됐다.
+
+### 다음 우선순위
+1. 미변환 22개 execution rule 자동변환 재개
+2. warning/advisory 정리
+3. fib 외 회귀 검증 확대

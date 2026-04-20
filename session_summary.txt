@@ -1,0 +1,47 @@
+2026-04-20 session summary
+
+- Goal shifted to professor alignment:
+  - remove Gemini's `prove(...) => proved` layer
+  - keep real transitions as `rl/crl`
+  - avoid `=>` inside `ceq`
+
+- Stable state reached today:
+  - `prove`, `proved`, `ProofState`, `Proved` counts in `output.maude`: all 0
+  - `*-ok`, `*-sub`, `Expand`, `Expand-use` are `mb/cmb ... : ValidJudgement`
+  - `Steps` is `crl Steps(...) => valid`
+  - `Eval-expr` is `crl Eval-expr(...) => valid`
+
+- Main blocker found and fixed:
+  - problem:
+    - `Eval-expr(...) => valid` had been emitted inside `ceq ... if ...`
+    - this caused `didn't expect token =>` / `no parse for statement`
+  - fix:
+    - `translator.ml` `translate_decd` now has rewrite-aware lowering
+    - clauses depending on rewrite judgements or rewrite-dependent defs are emitted as `rl/crl`
+    - equality-style conditions on rewrite-dependent defs can be turned into direct rewrite conditions
+
+- Current generated examples:
+  - `crl [eval-expr-r0] : Eval-expr(...) => valid`
+  - `crl [evalexprs-r1] : $evalexprs(...) => ...`
+  - `crl [evalglobals-r1] : $evalglobals(...) => ...`
+
+- Verification after regeneration:
+  - `rewrite [10000] in WASM-FIB : steps(fib-config(i32v(5))) .`
+    - result ends in `i32 5`
+  - `modelCheck(fib-config(i32v(5)), <> result-is(5))`
+    - `true`
+  - `modelCheck(fib-config(i32v(5)), [] ~ trap-seen)`
+    - `true`
+
+- Additional cleanup completed:
+  - `$evalexprss` is now `crl [evalexprss-r1]`
+  - its self-recursive call is also lowered to a rewrite condition
+  - `$instantiate` now uses rewrite conditions for `$evalglobals`, `$evalexprs`, `$evalexprss`, and `$allocmodule`
+
+- Remaining work:
+  1. finish auto-translation of the remaining 22 execution rules
+  2. reduce warnings:
+     - `multiple distinct parses`
+     - `assignment condition already bound`
+     - `wasm-exec.maude` `MC-I` bind-before-use
+  3. run non-fib regression examples

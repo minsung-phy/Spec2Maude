@@ -1,0 +1,35 @@
+;;; SpecTec
+relation Numtype_ok: context |- numtype : OK
+
+rule Numtype_ok:
+    C |- numtype : OK
+
+;;; Maude
+sort OK .
+sort Judgement .
+subsort OK < Judgement .
+
+var C       : WasmTerminal .
+var NUMTYPE : WasmTerminal .
+
+op Numtype-ok : WasmTerminal WasmTerminal -> Judgement . ;; 판정 term (유효성 미확정)
+
+cmb Numtype-ok ( C, NUMTYPE ) : OK
+    if C : Context /\ NUMTYPE : Numtype .
+
+
+--- SpecTec
+rule Step_pure/ref.i31:
+	(CONST I32 i) REF.I31  ~>  (REF.I31_NUM $wrap__(32, 31, i))
+
+--- Maude
+crl [step-pure-ref-i31] :
+    step(< Z | VALS CONST(I32, I) I31 INSTRS >)
+    =>
+    < Z | VALS REFI31NUM ($wrap(32,31, I)) INSTRS >
+      if all-vals(VALS) = true .
+      ;; instruction 바로 앞 prefix가 이미 평가 완료된 값들일 때만 적용하기 위해 앞 부분 VALS가 이미 값들로만 이루어진것인지 확인 
+      ;; (앞에 VALS를 안붙이면 이 규칙으로 안들어가는 case가 발생함)
+
+
+

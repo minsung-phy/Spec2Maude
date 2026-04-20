@@ -28,6 +28,7 @@ module SIPairSet = Set.Make (struct
 end)
 
 type var_map = (string * string) list
+let rewrite_defs_seen : SSet.t ref = ref SSet.empty
 
 type exp_ctx = BoolCtx | TermCtx
 
@@ -126,6 +127,83 @@ let prem_cond s =
   else if has_colon && has_eq then s            (* LetPr `:=` *)
   else if has_colon && not has_eq then s   (* membership condition *)
   else bool_cond s
+
+let split_once needle s =
+  let n = String.length needle in
+  let rec loop i =
+    if i + n > String.length s then None
+    else if String.sub s i n = needle then
+      Some (String.sub s 0 i, String.sub s (i + n) (String.length s - i - n))
+    else loop (i + 1)
+  in
+  loop 0
+
+let split_once_re re s =
+  try
+    let pos = Str.search_forward re s 0 in
+    let len = String.length (Str.matched_string s) in
+    Some (String.sub s 0 pos, String.sub s (pos + len) (String.length s - pos - len))
+  with Not_found -> None
+
+let head_symbol_of_text s =
+  let t = strip_wrapping_parens s |> String.trim in
+  let n = String.length t in
+  let rec find_end i =
+    if i >= n then i
+    else
+      match t.[i] with
+      | ' ' | '(' | ')' | ',' -> i
+      | _ -> find_end (i + 1)
+  in
+  if n = 0 then None
+  else
+    match t.[0] with
+    | '$' | 'A' .. 'Z' | 'a' .. 'z' ->
+        let j = find_end 0 in
+        Some (String.sub t 0 j)
+    | _ -> None
+
+let rewriteify_prem_text ?(extra_heads=[]) text =
+  let emit_rewrite call result = Some (Printf.sprintf "%s => %s" call result) in
+  let is_rewrite_def_term term =
+    match head_symbol_of_text term with
+    | Some head -> SSet.mem head !rewrite_defs_seen || List.mem head extra_heads
+    | None -> false
+  in
+  let normalize s =
+    let t = String.trim s in
+    let t =
+      match split_once " = true" t with
+      | Some (lhs, rhs) when String.trim rhs = "" -> lhs
+      | _ -> t
+    in
+    strip_wrapping_parens t |> String.trim
+  in
+  if
+    try
+      ignore (Str.search_forward (Str.regexp_string "=> valid") text 0);
+      true
+    with Not_found -> false
+  then Some text
+  else
+    match split_once_re (Str.regexp "[ \t]+:=[ \t]+") text with
+    | Some (lhs, rhs) ->
+        let lhs = normalize lhs in
+        let rhs = normalize rhs in
+        if is_rewrite_def_term rhs then emit_rewrite rhs lhs
+        else if is_rewrite_def_term lhs then emit_rewrite lhs rhs
+        else None
+    | _ ->
+        let t = normalize text in
+        (match split_once_re (Str.regexp "[ \t]+==[ \t]+") t with
+         | Some (lhs, rhs) ->
+             let lhs = normalize lhs in
+             let rhs = normalize rhs in
+             if is_rewrite_def_term rhs then emit_rewrite rhs lhs
+             else if is_rewrite_def_term lhs then emit_rewrite lhs rhs
+             else None
+         | _ ->
+             if String.contains text ':' then None else None)
 
 (* ========================================================================= *)
 (* 2. Identifier sanitization                                                *)
@@ -340,6 +418,7 @@ let normalize_decl_sort name sort =
 
 let init_declared_vars () =
   Hashtbl.reset declared_vars;
+  rewrite_defs_seen := SSet.empty;
   List.iter (fun (v, s) -> Hashtbl.replace declared_vars v s)
     [ ("I", "Int"); ("W-I", "Int"); ("EXP", "Int");
       ("W-N", "Nat"); ("W-M", "Nat");
@@ -393,12 +472,14 @@ type scan_state = {
   mutable calls     : SIPairSet.t;
   mutable dec_funcs : SSet.t;
   mutable bool_calls: SSet.t;
+  mutable rewrite_defs: SSet.t;
   mutable ctors     : SSet.t;
 }
 
 let new_scan () = {
   tokens = SSet.empty; calls = SIPairSet.empty;
   dec_funcs = SSet.empty; bool_calls = SSet.empty;
+  rewrite_defs = SSet.empty;
   ctors = SSet.empty;
 }
 
@@ -847,6 +928,24 @@ and translate_arg (a : arg) vm : texpr = match a.it with
   | TypA t -> texpr (translate_typ t vm)
   | _ -> texpr "eps"
 
+and is_ok_judgement_rel name =
+  let low = String.lowercase_ascii name in
+  let len = String.length low in
+  let rec trailing_digits_start i =
+    if i <= 0 then 0
+    else
+      let c = low.[i - 1] in
+      if c >= '0' && c <= '9' then trailing_digits_start (i - 1) else i
+  in
+  let base_end = trailing_digits_start len in
+  base_end >= 3 && String.sub low (base_end - 3) 3 = "-ok"
+
+and is_rewrite_judgement_rel name =
+  match String.lowercase_ascii name with
+  | "steps" -> true
+  | "eval-expr" -> true
+  | _ -> false
+
 and translate_prem (p : prem) vm : texpr = match p.it with
   | IfPr e -> translate_exp BoolCtx e vm
   | RulePr (id, _, e) ->
@@ -914,7 +1013,10 @@ and translate_prem (p : prem) vm : texpr = match p.it with
               Printf.sprintf "prove ( %s ) => proved" call
         else
           let call = format_call name (List.map (fun t -> t.text) ts) in
-          Printf.sprintf "prove ( %s ) : Proved" call
+          if is_rewrite_judgement_rel name then
+            Printf.sprintf "%s => valid" call
+          else
+            Printf.sprintf "%s : ValidJudgement" call
       in
       let vars =
         if name = "Step-pure" then List.sort_uniq String.compare ("PREM-Z" :: all_vars)
@@ -1926,6 +2028,7 @@ let translate_decd ss id params result_typ insts =
   let rhs_ctx = if ret_sort = "Bool" then BoolCtx else TermCtx in
 
   let all_bound = ref [] and all_free = ref [] in
+  let seen_rewrite_clause = ref false in
   let eq_lines = List.mapi (fun eq_idx inst ->
     let (binders, lhs_args, rhs_exp, prem_list) =
       match inst.it with DefD (b, la, re, pl) -> (b, la, re, pl) in
@@ -1976,26 +2079,36 @@ let translate_decd ss id params result_typ insts =
     all_bound := List.sort_uniq String.compare (!all_bound @ bound);
     all_free := List.sort_uniq String.compare (!all_free @ free);
 
-    let prem_match_conds =
+    let prem_conds, clause_uses_rewrite =
       prem_scheduled
-      |> List.filter_map (fun (p : prem_sched) ->
-          if p.binds = [] then None else Some (prem_cond p.text))
+      |> List.fold_left (fun (acc, uses_rewrite) (p : prem_sched) ->
+          match rewriteify_prem_text ~extra_heads:[maude_fn] p.text with
+          | Some rew ->
+              (acc @ [rew], true)
+          | None ->
+              (acc @ [prem_cond p.text], uses_rewrite)
+        ) ([], false)
     in
-    let prem_bool_conds =
-      prem_scheduled
-      |> List.filter_map (fun (p : prem_sched) ->
-          if p.binds = [] then Some (prem_cond p.text) else None)
-    in
-    let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
+    let all_conds = prem_conds @ filtered_bconds in
     let cond = cond_join all_conds in
     let cond_str = if cond = "" then "" else " \n      if " ^ cond in
-    Printf.sprintf "  %s %s = %s%s%s ."
-      (if cond = "" then "eq" else "ceq")
-      (format_call maude_fn lhs_strs) rhs_t.text cond_str
-      (if has_owise then " [owise]" else "")
+    let clause_is_rewrite = clause_uses_rewrite in
+    if clause_is_rewrite then seen_rewrite_clause := true;
+    if clause_is_rewrite then
+      Printf.sprintf "  %s [%s-r%d] :\n    %s\n    =>\n    %s%s ."
+        (if cond = "" then "rl" else "crl")
+        func_name eq_idx
+        (format_call maude_fn lhs_strs) rhs_t.text cond_str
+    else
+      Printf.sprintf "  %s %s = %s%s%s ."
+        (if cond = "" then "eq" else "ceq")
+        (format_call maude_fn lhs_strs) rhs_t.text cond_str
+        (if has_owise then " [owise]" else "")
   ) insts in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
+  if !seen_rewrite_clause then
+    rewrite_defs_seen := SSet.add maude_fn !rewrite_defs_seen;
   let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
   let bound_decl = declare_vars_same_sort !all_bound "WasmTerminal" in
   let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
@@ -2424,13 +2537,28 @@ let translate_step_reld rel_name rules =
 
 (* --- RelD handler -------------------------------------------------------- *)
 
-let translate_reld _id rel_name rules =
+let translate_reld id rel_name rules =
   let arity = match rules with
     | r :: _ -> (match r.it with RuleD (_, _, _, c, _) ->
         (match c.it with TupE el -> List.length el | _ -> 1))
     | [] -> 0 in
-  (* Every RelD relation emits a Judgement constructor, and every RuleD is
-     translated to a proof rewrite rule instead of an mb/cmb witness. *)
+  let has_rewrite_cond =
+    List.exists (fun r ->
+      match r.it with
+      | RuleD (_, _, _, _, prem_list) ->
+          List.exists (fun p ->
+            match p.it with
+            | RulePr (pid, _, _) -> is_step_exec_rel (sanitize pid.it)
+            | _ -> false
+          ) prem_list
+    ) rules
+  in
+  let use_rewrite_judgement =
+    let raw_name = String.lowercase_ascii id.it in
+    (match raw_name with "steps" -> true | _ -> false)
+    || is_rewrite_judgement_rel rel_name
+    || has_rewrite_cond
+  in
   let op_decl = Printf.sprintf "\n  op %s : %s -> Judgement [ctor] .\n" rel_name
     (String.concat " " (List.init arity (fun _ -> "WasmTerminal"))) in
   let rel_prefix = String.uppercase_ascii (sanitize rel_name) in
@@ -2505,29 +2633,22 @@ let translate_reld _id rel_name rules =
         let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
         let cond = cond_join all_conds in
         let rule_text =
-          if cond = "" then
-            Printf.sprintf "  rl [%s] :\n    prove ( %s ( %s ) )\n    =>\n    proved ."
-              (String.lowercase_ascii prefix) rel_name lhs_t.text
-          else
-            Printf.sprintf "  crl [%s] :\n    prove ( %s ( %s ) )\n    =>\n    proved\n      if %s ."
-              (String.lowercase_ascii prefix) rel_name lhs_t.text cond
-        in
-        let has_rewrite_cond =
-          try
-            ignore (Str.search_forward (Str.regexp_string "=>") cond 0);
-            true
-          with Not_found -> false
-        in
-        let bridge_text =
-          if has_rewrite_cond then ""
+          if use_rewrite_judgement then
+            if cond = "" then
+              Printf.sprintf "  rl [%s] :\n    %s ( %s )\n    =>\n    valid ."
+                (String.lowercase_ascii prefix) rel_name lhs_t.text
+            else
+              Printf.sprintf "  crl [%s] :\n    %s ( %s )\n    =>\n    valid\n      if %s ."
+                (String.lowercase_ascii prefix) rel_name lhs_t.text cond
           else if cond = "" then
-            Printf.sprintf "  mb prove ( %s ( %s ) ) : Proved ."
+            Printf.sprintf "  mb %s ( %s ) : ValidJudgement ."
               rel_name lhs_t.text
           else
-            Printf.sprintf "  cmb prove ( %s ( %s ) ) : Proved\n      if %s ."
+            Printf.sprintf "  cmb %s ( %s ) : ValidJudgement\n      if %s ."
               rel_name lhs_t.text cond
         in
-        if bridge_text = "" then rule_text else rule_text ^ "\n" ^ bridge_text
+        let _ = has_rewrite_cond in
+        rule_text
   ) rules in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
@@ -2594,15 +2715,13 @@ let header_prefix =
   "  subsort WellTyped < TypedTerm .\n" ^
   "  op _hasType_ : WasmTerminal WasmType -> TypedTerm [ctor prec 95 gather (e e)] .\n" ^
   "  --- Judgement sort for RelD relations.\n" ^
-  "  --- Every RelD `Rel` emits `op Rel : ... -> Judgement [ctor]` and each\n" ^
-  "  --- RuleD becomes `rl/crl prove(Rel(args)) => proved [if ...] .`\n" ^
+  "  --- Most non-step RelD cases become `mb/cmb ... : ValidJudgement [if ...]`.\n" ^
+  "  --- Relations that need rewrite premises in their conditions (currently Steps)\n" ^
+  "  --- rewrite directly to `valid` instead of using a separate proof wrapper.\n" ^
   "  sort Judgement .\n" ^
-  "  sort ProofState .\n" ^
-  "  sort Proved .\n" ^
-  "  subsort Proved < ProofState .\n" ^
-  "  op prove : Judgement -> ProofState [ctor] .\n" ^
-  "  op proved : -> ProofState [ctor] .\n" ^
-  "  mb proved : Proved .\n" ^
+  "  sort ValidJudgement .\n" ^
+  "  subsort ValidJudgement < Judgement .\n" ^
+  "  op valid : -> ValidJudgement [ctor] .\n" ^
   "  op _shape-x_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op slice : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals .\n" ^
   "  op _<-_ : WasmTerminal WasmTerminals -> Bool .\n\n" ^
