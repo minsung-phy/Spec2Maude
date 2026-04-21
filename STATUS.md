@@ -48,6 +48,21 @@
 3. `translator_bs.ml`에서는 heating/cooling 일반화보다 **conditional 1:1 coverage**를 우선
 4. 첫 목표는 `wasm-exec.maude`의 manual override 9개 없이 fib가 돌아가는지 확인
 
+### 2026-04-21 baseline translator 착수
+- `translator_bs.ml`, `main_bs.ml`, `dune` baseline 엔트리 분리 완료
+- baseline translator의 현재 방향:
+  - `-- Step:` rule은 heat/cool special-case를 끄고 direct conditional `crl`로 생성
+  - non-rewrite static judgement는 `mb/cmb` 대신 `eq/ceq ... = valid`
+  - dynamic rule 안의 static judgement 참조는 `... == valid`
+- 실제 산출물 확인:
+  - `/tmp/output_bs.maude` 생성 성공
+  - `step-ctxt-instrs`, `step-ctxt-label`, `step-ctxt-handler`, `step-ctxt-frame`가 direct conditional `crl`로 생성됨
+  - `heat-step-ctxt-*`, `cool-step-ctxt-*`는 baseline 산출물에 없음
+- 현재 남은 baseline blocker:
+  - `step-pure` schema rule에서 `PREM-Z` placeholder parse error 1건
+  - `br_on_cast-*`, `call_ref-func`, 일부 GC/array rule에서 bind-before-use warning 다수
+  - 즉 baseline translator 틀은 섰지만, 아직 fib baseline 검증까지는 못 갔다
+
 ---
 
 ## 1. 잘한 점 (이미 된 것)
@@ -614,3 +629,117 @@
 1. 미변환 22개 execution rule 자동변환 재개
 2. warning/advisory 정리
 3. fib 외 회귀 검증 확대
+
+---
+
+## 7. 2026-04-21 baseline translator (`translator_bs.ml`) 착수
+
+### 목표
+- `translator_bs.ml`는 `-- Step:`이 붙은 rule을 heating/cooling 없이 direct conditional `crl`로 1:1 변환하는 baseline translator다.
+- 목적은 `translator.ml`의 heating/cooling 기반 번역과 결과/실행 시간을 비교하는 기준선을 만드는 것이다.
+- baseline 원칙:
+  - 느려도 correct
+  - 일반화/최적화보다 직역 우선
+  - dynamic rule이 참조하는 static judgement는 `mb/cmb`가 아니라 `eq/ceq ... = valid`
+
+### 현재 완료
+- `translator_bs.ml`, `main_bs.ml`, `dune` executable 분리 완료
+- baseline 출력 생성 확인:
+  - `dune exec ./main_bs.exe -- wasm-3.0/*.spectec`
+- baseline 출력에는 자동 heating/cooling이 아니라 direct context rule이 생성된다:
+  - `crl [step-ctxt-instrs]`
+  - `crl [step-ctxt-label]`
+  - `crl [step-ctxt-handler]`
+  - `crl [step-ctxt-frame]`
+- baseline static judgement 출력은 `eq/ceq ... = valid` 경로로 바뀌었다.
+
+### 이번 턴 수정
+- `translate_step_reld`에서 heat/cool special path를 비활성화했다.
+- `translate_reld`의 non-rewrite judgement를 `mb/cmb` 대신 `eq/ceq ... = valid`로 내리게 바꿨다.
+- `translate_prem`의 non-rewrite relation premise는 `... == valid`를 사용하게 바꿨다.
+- baseline `Step/pure` schema rule의 `PREM-Z` placeholder parse error를 제거했다.
+  - 현재 `crl [step-pure]`는
+    `step(< Z | INSTR >) => < Z | INSTRQ > if step(< Z | INSTR >) => < Z | INSTRQ > ...`
+    형태로 생성된다.
+
+### 현재 상태
+- `/tmp/output_bs.maude`는 현재 Maude에서 load된다.
+- 이전의 `PREM-Z` / `bad token` / `no parse for statement` parse blocker는 사라졌다.
+- 다만 warning/advisory는 많이 남아 있다.
+- 특히 bind-before-use 경고가 남는 rule들은 현재 미변환 22개와 사실상 같은 부류다:
+  - `step-read-br-on-cast-succeed`
+  - `step-read-br-on-cast-fail-succeed`
+  - `step-read-call-ref-func`
+  - `step-read-return-call-ref-frame-addr`
+  - `step-throw`
+  - `step-struct-new`
+  - `step-struct-set-struct`
+  - `step-array-new-fixed`
+  - `step-array-set-array`
+  - `step-read-array-init-data-oob2`
+  - `step-read-array-init-data-num`
+
+### 다음 baseline 우선순위
+1. baseline output을 실제 harness와 연결해 fib 실행 가능 여부 확인
+2. `-- Step:` rule catalog를 source 기준으로 뽑아 baseline coverage를 정리
+3. baseline bind-before-use rule들을 패턴별로 분류
+4. 그다음에만 `translator.ml` heating/cooling 일반화와 비교 시작
+
+### 2026-04-21 baseline harness / coverage 결과
+- `wasm-exec-bs.maude` 생성 완료
+  - `wasm-exec.maude`에서 fib/property harness만 남기고 baseline 전용으로 분리
+  - manual `step-*` override 제거
+  - `restore-*` / generated heating-cooling 의존 조각 제거
+  - `load output_bs` 기준으로 동작
+- baseline coverage (`-- Step:` source rule 기준):
+  - source: 5개
+    - `Steps/trans`
+    - `Step/ctxt-instrs`
+    - `Step/ctxt-label`
+    - `Step/ctxt-handler`
+    - `Step/ctxt-frame`
+  - `output_bs.maude` generated coverage: 5/5
+    - `steps-trans`
+    - `step-ctxt-instrs`
+    - `step-ctxt-label`
+    - `step-ctxt-handler`
+    - `step-ctxt-frame`
+- baseline fib 검증:
+  - `rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .`
+    - 실패: `Fatal error: stack overflow`
+  - `red in WASM-FIB-BS-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .`
+    - 실패: `Fatal error: stack overflow`
+  - `red in WASM-FIB-BS-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .`
+    - 실패: `Fatal error: stack overflow`
+- 해석:
+  - baseline translator + baseline harness만으로는 아직 fib가 종료하지 않는다.
+  - 즉 current baseline은 “manual override 없이 direct conditional rule만으로는 stack overflow가 난다”는 비교 기준선 역할은 확보했다.
+
+### baseline bind-before-use 패턴 분류
+- 실행 로그(`/tmp/bs_rewrite.log`) 기준 bind-before-use rule warning: 20개
+- 패턴 1. cast/ref success: 4개
+  - `step-read-br-on-cast-succeed`
+  - `step-read-br-on-cast-fail-succeed`
+  - `step-read-ref-test-true`
+  - `step-read-ref-cast-succeed`
+- 패턴 2. call-ref: 1개
+  - `step-read-call-ref-func`
+- 패턴 3. throw: 1개
+  - `step-throw`
+- 패턴 4. struct: 4개
+  - `step-read-struct-new-default`
+  - `step-read-struct-get-struct`
+  - `step-struct-new`
+  - `step-struct-set-struct`
+- 패턴 5. array/data: 10개
+  - `step-read-array-new-default`
+  - `step-read-array-new-data-oob`
+  - `step-read-array-new-data-num`
+  - `step-read-array-get-array`
+  - `step-read-array-copy-le`
+  - `step-read-array-copy-gt`
+  - `step-read-array-init-data-oob2`
+  - `step-read-array-init-data-num`
+  - `step-array-new-fixed`
+  - `step-array-set-array`
+- 이 20개는 baseline에서도 여전히 “hard rule” 군으로 남아 있고, 기존 미변환 22개 execution rule과 거의 같은 구조적 원인을 공유한다.

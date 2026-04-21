@@ -59,3 +59,118 @@
     - auto-generated: `label`, `handler`, `frame`
     - not yet auto-generated: `instrs`
     - current manual support remains in `wasm-exec.maude`
+
+2026-04-21 baseline translator session
+
+- New direction from 0421 meeting:
+  - keep `translator.ml` as the heating/cooling / optimized path
+  - create a separate baseline translator `translator_bs.ml`
+  - baseline target is rules with `-- Step:` premises
+  - translate them as direct conditional `crl` rules without heating/cooling
+  - static judgements referenced by dynamic rules should use `eq/ceq ... = valid`
+
+- New files / split:
+  - `translator_bs.ml`
+  - `main_bs.ml`
+  - `dune` updated so `main_bs` builds with `translator_bs`
+
+- Baseline translator changes:
+  - disabled heat/cool special handling in `translate_step_reld`
+  - non-rewrite `RelD` now emits `eq/ceq ... = valid`
+  - non-rewrite relation premises now emit `... == valid`
+
+- Important baseline milestone:
+  - baseline output now generates direct context rules:
+    - `step-ctxt-instrs`
+    - `step-ctxt-label`
+    - `step-ctxt-handler`
+    - `step-ctxt-frame`
+  - this means the baseline translator is no longer relying on generated heat/cool rules
+
+- Parse blocker fixed:
+  - baseline `Step/pure` schema rule had used a fake placeholder state `PREM-Z`
+  - this produced:
+    - `bad token PREM-Z`
+    - `no parse for statement`
+  - fixed by replacing the placeholder with the enclosing rule state variable
+  - current generated form is:
+    - `step(< Z | INSTR >) => < Z | INSTRQ >`
+    - with the same `Z` used in the premise rewrite condition
+
+- Current baseline status:
+  - `/tmp/output_bs.maude` loads in Maude
+  - the old `PREM-Z` parse blocker is gone
+  - many warnings remain
+  - the remaining bind-before-use warnings line up with the previously known hard 22 execution-rule family:
+    - cast/ref success rules
+    - call-ref rules
+    - throw / struct / array rules
+
+- What is not done yet:
+  1. baseline fib harness verification
+  2. source-based catalog of all `-- Step:` rules
+  3. pattern grouping of the remaining baseline warning-heavy rules
+
+- Additional baseline harness work completed:
+  - created `wasm-exec-bs.maude`
+  - this is a baseline-only harness:
+    - loads `output_bs.maude`
+    - keeps only execution harness + fib/property modules
+    - removes manual `step-*` overrides from `wasm-exec.maude`
+    - removes restore/heat-cool dependence
+
+- Source `-- Step:` catalog verified:
+  - there are 5 such rules in `4.3-execution.instructions.spectec`
+    - `Steps/trans`
+    - `Step/ctxt-instrs`
+    - `Step/ctxt-label`
+    - `Step/ctxt-handler`
+    - `Step/ctxt-frame`
+  - baseline output covers all 5:
+    - `steps-trans`
+    - `step-ctxt-instrs`
+    - `step-ctxt-label`
+    - `step-ctxt-handler`
+    - `step-ctxt-frame`
+
+- Baseline fib verification result:
+  - `rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .`
+    - `Fatal error: stack overflow`
+  - `modelCheck(fib-config(i32v(5)), <> result-is(5))`
+    - `Fatal error: stack overflow`
+  - `modelCheck(fib-config(i32v(5)), [] ~ trap-seen)`
+    - `Fatal error: stack overflow`
+  - interpretation:
+    - the pure baseline (no manual overrides, no heat/cool) is not yet operational for fib
+    - but it now serves as the intended slow/correct-vs-optimized comparison baseline
+
+- Baseline bind-before-use warning groups from `/tmp/bs_rewrite.log`:
+  - total rule warnings: 20
+  - cast/ref success:
+    - `step-read-br-on-cast-succeed`
+    - `step-read-br-on-cast-fail-succeed`
+    - `step-read-ref-test-true`
+    - `step-read-ref-cast-succeed`
+  - call-ref:
+    - `step-read-call-ref-func`
+  - throw:
+    - `step-throw`
+  - struct:
+    - `step-read-struct-new-default`
+    - `step-read-struct-get-struct`
+    - `step-struct-new`
+    - `step-struct-set-struct`
+  - array/data:
+    - `step-read-array-new-default`
+    - `step-read-array-new-data-oob`
+    - `step-read-array-new-data-num`
+    - `step-read-array-get-array`
+    - `step-read-array-copy-le`
+    - `step-read-array-copy-gt`
+    - `step-read-array-init-data-oob2`
+    - `step-read-array-init-data-num`
+    - `step-array-new-fixed`
+    - `step-array-set-array`
+
+- Minor baseline harness cleanup:
+  - fixed `wasm-exec-bs.maude` `result-neg` condition ordering so the old `MC-I` bind-before-use warning is gone there
