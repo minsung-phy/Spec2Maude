@@ -1,6 +1,52 @@
 # Spec2Maude — 현재 상태 / 문제점 / 할일
 
-작성일: 2026-04-19
+작성일: 2026-04-19 (0421 미팅 반영: 2026-04-21)
+
+---
+
+## 0. 0421 미팅 반영 — 새 작업 로드맵 (최우선)
+
+**대원칙**: "correct 먼저, 속도는 나중". 점프하지 말고 순차적으로.
+
+### Step 0 (지금 당장) — conditional 전수 변환
+- 모든 Step 계열 rule (`Step`, `Step-pure`, `Step-read`, 그 외 condition 있는 모든 relation rule 포함)을 **`crl` + `step` 래퍼 + conditional** 단순형으로 1:1 변환.
+- 구현은 **`translator_bs.ml`** 로 분리해서 시작한다.
+  - 이유: 현재 `translator.ml`의 heating/cooling 및 일반화 실험을 보존하기 위해
+  - 목표: 느려도 correct 한 baseline translator 확보
+- `wasm-exec.maude`의 **9개 manual override** (`step-local-set-manual` 등)를 전부 제거하고, 그래도 fib이 (느려도) 돌게 만든다.
+- fib뿐 아니라 **Wasm 3.0 전체** (core + concurrency/multi-thread까지)가 이 단순형으로 돌아가는지 확인.
+- 산출물은 **differential testing baseline**으로 보존 (Step 2/3 검증에 재사용).
+
+### Step 1 — `-- Step:` rule 카탈로그
+- `wasm-3.0/` 과 미래 섹션까지 포함해 **`-- Step:`이 붙은 rule** 을 우선 전수 수집.
+- 패턴별 분류: LHS shape / ctxt 여부 / RHS 함수 호출 여부 / IterPr·IterE 여부.
+- 현재 "4개 evaluation context + 22개 미변환"이라는 숫자 재확인.
+- 필요하면 그 다음 단계에서 범위를 `-- if` 일반 rule까지 넓힌다.
+
+### Step 2 — 일반화 (instrs heat/cool 포함)
+- Value subsort 세분화: `WasmTerminals` 아래 `Val` / `NonValInstr` sort를 SpecTec 기존 정의 기반으로 강화. (VSTACK/IQUEUE 전역 리팩터는 forward-compat 리스크로 보류)
+- Nondeterministic heating + **side condition** 으로 의미 있는 fragment 하나만 pick.
+- label/handler/frame heat/cool은 이미 자동 생성 중이므로 유지하고 기록.
+
+### Step 3 — translator가 reject 하도록 고도화
+- "조건 만족 rule은 correct 변환 / 조건 불만족 rule은 **reject**" 까지 가는 게 최종.
+- 가장 피해야 할 것: 조건 안 맞는 룰이 조용히 잘못 변환되는 경우.
+
+### 0421 미팅 부산물 (Q1, Q2 정리)
+- **Static semantics (Q1)**: 원래 dynamic이 참조 안 하면 스킵이 맞지만, 실제 `4.3-execution.instructions.spectec`이 static judgement를 참조하는 곳이 있음 → 해당 부분은 **`eq`(또는 `ceq`)** 로 변환. `mb/cmb` 까지 갈 필요 없음.
+- **Rule 함수 위치 (Q2)**: 과거 노트의 "룰에 함수 금지"는 **LHS(좌항)** 한정이었음. **RHS(우항) 에 함수 호출은 허용** (오히려 SpecTec isomorphic 유지에 필요). 현재 24개는 유지.
+
+### 진행률 표시 (Step 기준)
+- Step 0: ~20% (일부 rule만 crl, 9개 manual override 아직 있음)
+- Step 1: 0% (카탈로그 미작성)
+- Step 2: 0% (instrs heat/cool off 상태)
+- Step 3: 0%
+
+### 바로 다음 구현 시작점
+1. `translator.ml`을 복사해 `translator_bs.ml` 생성
+2. baseline 전용 엔트리(`main_bs.ml` 또는 CLI 분기) 추가
+3. `translator_bs.ml`에서는 heating/cooling 일반화보다 **conditional 1:1 coverage**를 우선
+4. 첫 목표는 `wasm-exec.maude`의 manual override 9개 없이 fib가 돌아가는지 확인
 
 ---
 

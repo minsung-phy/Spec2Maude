@@ -100,27 +100,55 @@ C3 를 broader 하게 재정의(§1)하면서 업데이트함.)
 
 ## 2. 6단계 로드맵 (2026-04 ~ 2027-10)
 
-### Phase 1: Engineering Stabilization (2026-04 ~ 2026-06, 2개월)
+### Phase 1: Correct-First Transliteration (= 0421 Step 0 + Step 1, 2026-04 ~ 2026-06, 2개월)
 
-**목표**: C1 (번역기) coverage 90%+ 달성, manual override 최소화.
+**목표 (0421 미팅 반영)**: C1 coverage 를 "쉽고 느린 conditional 변환"으로 **먼저 correct 하게** 확보 +
+우선 `-- Step:` rule 카탈로그 완성.
 
-작업:
-- [ ] 현재 fib nested label deadlock 이슈 완전 종결 (STATUS.md 의 label heat/cool 회귀 루프 탈출)
-- [ ] 미번역 22개 execution rule 중 최소 15개 자동 변환
-  - `instrs` context heating/cooling (현재 off) 재설계
-  - `RulePr` 가 있는 non-context Step rule lowering
-  - `Expand` / `Ref_ok` / `Reftype_sub` 같은 premise 결과 RHS 연결
-  - `IterE` / `IterPr` 반복 시퀀스 의미 보존
-- [ ] `wasm-exec.maude` manual override 9종 중 최소 6개를 translator 로 흡수
-  - `step-local-get-manual`, `step-local-set-manual`, `step-read-block-manual`, `step-read-loop-manual`, `step-read-call-manual`, `step-call-ref`
-- [ ] `multiple distinct parses` 37건 중 최소 20건 해소
-- [ ] `assignment condition already bound` 8건 전부 해소
+작업 — Step 0 (2026-04 ~ 2026-05, 4주):
+- [ ] baseline 전용 변환기 `translator_bs.ml` 분리
+- [ ] 모든 Step 계열 rule (`Step`/`Step-pure`/`Step-read` + condition 있는 relation rule) 을 **`crl` + `step` 래퍼 + conditional** 단순형으로 1:1 변환
+  - 형태: `crl [step-r] : step(X) => Y' if … /\ step(Y) => Y' .`
+- [ ] `wasm-exec.maude` **9개 manual override 전부 제거**. Translator 자동 생성만으로 fib 이 (느려도) 통과해야 함.
+- [ ] fib 외에 Wasm 3.0 전체 (core + concurrency) 가 이 단순형으로 rewrite 가능한지 확인
+- [ ] 단순형 산출물을 **differential testing baseline** 으로 저장 (Phase 3 에서 재사용)
+- [ ] Static semantics 중 dynamic rule 이 참조하는 부분은 **`eq/ceq`** 로 변환 (mb/cmb 불필요)
+
+작업 — Step 1 (2026-05 ~ 2026-06, 4주):
+- [ ] SpecTec 전체 (미래 섹션 포함) **`-- Step:`이 붙은 rule** 전수 수집
+- [ ] 패턴별 분류표: LHS shape / ctxt 여부 / RHS 함수 호출 여부 / IterPr·IterE 여부
+- [ ] "22개 미번역" 숫자 재검증 + 현재 진짜 남은 범주 분류
+- [ ] 필요하면 다음 단계에서 범위를 `-- if` 일반 rule까지 확장
 
 **완료 기준**:
-- translator 로 변환된 rule 수 / 전체 SpecTec rule 수 표를 재현 가능하게 출력
-- fib 는 manual override 없이 통과
+- `wasm-exec.maude` manual override 0건
+- translator 변환 rule 수 / 전체 rule 수 표 재현 가능
+- condition 패턴 카탈로그 문서 1개
 
-### Phase 2: Benchmark Suite (2026-06 ~ 2026-08, 2개월)
+**주의 (0421 미팅)**: 이 단계에서 "빠르게 돌아가면" 오히려 의심할 것. correct 여부가 먼저.
+
+### Phase 2: Generalization & Instrs Context (= 0421 Step 2 + Step 3, 2026-06 ~ 2026-08, 2개월)
+
+**목표**: Phase 1 의 느린 conditional 변환을 **의미 보존하면서 최적화**.
+특히 `instrs` evaluation context 의 heat/cool 일반 이론 확립.
+
+작업 — Step 2 (2026-06 ~ 2026-07):
+- [ ] Value subsort 세분화: `WasmTerminals` 아래 `Val` / `NonValInstr` subsort 를 SpecTec 정의 기반으로 강화
+  - VSTACK/IQUEUE 전역 리팩터는 **forward-compat 리스크** 로 보류 (0421 미팅)
+- [ ] Nondeterministic instrs heating + side condition 으로 "의미 있는 fragment 하나" 만 pick
+- [ ] label/handler/frame heat/cool 은 유지, 동일 방법론으로 문서화
+- [ ] Phase 1 baseline 과 differential 실행 — 결과 다르면 heat/cool 잘못된 것
+
+작업 — Step 3 (2026-07 ~ 2026-08):
+- [ ] Translator 가 "조건 만족 rule 은 correct 변환, **조건 불만족 rule 은 reject**" 하도록 완성
+- [ ] 조용한 오변환 0 건을 보장하는 자가 검증 로직
+
+**완료 기준**:
+- translator 로 변환된 rule 전부 Phase 1 baseline 과 실행 결과 일치
+- 불만족 rule 에 대해 명시적 reject 메시지
+- `multiple distinct parses` 37건 / `assignment condition already bound` 8건 해소
+
+### Phase 2.5: Benchmark Suite (2026-08 ~ 2026-09, 1개월)
 
 **목표**: fib 외 4~7개 benchmark 추가, 수치 측정.
 
@@ -137,7 +165,7 @@ benchmark 후보 (난이도 순):
 - 각 benchmark 의 rewrite 시간, modelCheck 시간 테이블
 - K-Wasm 비교 1~2개 이상 (같은 프로그램 같은 property)
 
-### Phase 3: Research Contribution Attempt (2026-08 ~ 2026-12, 4개월)
+### Phase 3: Research Contribution Attempt (2026-09 ~ 2026-12, 4개월)
 
 **목표**: C2 기술적 기여 확정 + C3 (a)~(d) 중 최소 2개 확보.
 
@@ -281,10 +309,11 @@ submission 준비:
 
 | 월 | 주요 milestone |
 |----|----------------|
-| 2026-04 ~ 05 | fib deadlock 완전 해결, 미번역 22개 중 10개 처리 |
-| 2026-06 | 미번역 나머지 + manual override 6종 흡수 |
-| 2026-07 | benchmark factorial, sum, mutual recursion 돌리기 |
-| 2026-08 | memory / table benchmark + 성능 측정 |
+| 2026-04 ~ 05 | **Step 0**: 모든 Step rule 을 conditional `crl` 로 단순 변환, manual override 9종 제거, fib+전체 Wasm 통과 확인 |
+| 2026-05 ~ 06 | **Step 1**: SpecTec 전체 rule condition 카탈로그 + "22개" 재검증 |
+| 2026-06 ~ 07 | **Step 2**: Val/NonValInstr subsort 강화, instrs heat/cool 일반화, differential 확인 |
+| 2026-07 ~ 08 | **Step 3**: translator reject 로직 완성, parse warning 정리 |
+| 2026-08 ~ 09 | benchmark (factorial, sum, mutual recursion, memory/table) + K-Wasm 비교 |
 | 2026-09 | C3(c) LTL property catalog 작성, benchmark 별 검증 |
 | 2026-10 | C3(d) edge case enumeration + C3(b) differential harness 시작 |
 | 2026-11 | C3(b) 판정 (성공/포기), C3(a) 기회주의적 탐색 |

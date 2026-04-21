@@ -34,3 +34,13 @@ step(< CTORSEMICOLONA2(ST-ZS, ST-ZF) | ST-VALS ST-VAL CTORLOCALSETA1(ST-X) ST-IS
 =>
 < CTORSEMICOLONA2(ST-ZS, ST-ZF [. 'LOCALS <- value('LOCALS, ST-ZF) [ST-X <- ST-VAL]]) | ST-VALS ST-IS >
 if all-vals(ST-VALS) = true /\ is-val(ST-VAL) = true .
+
+
+
+
+crl [steps-trans] :
+  Steps ( COLON(X, INSTR), COLON(Z'', INSTR''))
+  =>
+  valid
+  if step(< Z | INSTR >) => < Z' | INSTR' >
+  /\ step(< Z | INSTR >) => < Z' | INSTR' >
