@@ -172,5 +172,43 @@
     - `step-array-new-fixed`
     - `step-array-set-array`
 
-- Minor baseline harness cleanup:
-  - fixed `wasm-exec-bs.maude` `result-neg` condition ordering so the old `MC-I` bind-before-use warning is gone there
+- Baseline context-disable experiments:
+  - disabling `step-ctxt-instrs` still leaves
+    `step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >)` with `Fatal error: stack overflow`
+  - disabling `step-ctxt-label` still leaves the same overflow
+  - disabling all four context rules
+    (`ctxt-instrs,ctxt-label,ctxt-handler,ctxt-frame`) still leaves the same overflow
+  - conclusion:
+    - the overflow is not caused by the baseline direct conditional encoding of the context rules themselves
+    - it persists even with all `step-ctxt-*` rules removed
+
+- Baseline stack-overflow root-cause narrowing:
+  - `NOP` single-step succeeds in baseline:
+    - `step(< fib-state(i32v(1)) | CTORNOPA0 >)` terminates to `eps`
+  - singleton `Step-read` examples overflow immediately:
+    - `step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >)`
+    - `step(< fib-state(i32v(1)) | CTORGLOBALGETA1(1) >)`
+  - helper functions themselves are not the culprit:
+    - `$local(fib-state(i32v(1)), 1)` terminates to `i32 0`
+    - `$global(fib-state(i32v(1)), 1)` terminates
+  - removing `Step/read` and `Step/pure` schema rules did not fix the overflow
+  - tightening `step-ctxt-instrs` with a non-empty focus guard (`INSTR =/= eps`) did not fix the overflow
+  - a scratch conditional rule with the same `Idx` sort condition and `$local` assignment succeeds immediately
+- conclusion:
+  - the baseline overflow is not caused by `$local/$global`, `Idx`, or the schema rules alone
+  - it is caused by the full direct-conditional `step` rule set itself: Maude's proof search over the overlapping baseline `step` rules explodes even on tiny `Step-read` terms
+  - stronger result:
+    - the explosion persists even when all baseline `step-ctxt-*` rules are disabled
+    - so the direct cause is the full baseline direct-conditional `step` encoding, not heating/cooling replacement via context rules alone
+
+- Focused-step experiment:
+  - added a baseline-only intermediate relation:
+    - `op focused-step : ExecConf -> ExecConf`
+    - `rl [step-enter] : step(EC) => focused-step(EC) .`
+  - moved all baseline direct conditional step rules from `step(...)` to `focused-step(...)`
+  - result:
+    - `step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >)` still overflows
+    - `steps(fib-config(i32v(5)))` still overflows
+  - conclusion:
+    - the problem is not just “too many rules directly on the symbol `step`”
+    - the proof-search explosion persists even with a one-hop indirection

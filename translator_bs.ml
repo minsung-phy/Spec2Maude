@@ -74,6 +74,20 @@ let debug_iter fmt =
   if debug_iter_enabled then Printf.eprintf (fmt ^^ "\n")
   else Printf.ifprintf stderr (fmt ^^ "\n")
 
+let bs_disabled_ctxt_rules =
+  match Sys.getenv_opt "SPEC2MAUDE_BS_DISABLE_CTXT" with
+  | None -> SSet.empty
+  | Some raw ->
+      raw
+      |> String.split_on_char ','
+      |> List.map String.trim
+      |> List.filter (fun s -> s <> "")
+      |> List.map String.lowercase_ascii
+      |> SSet.of_list
+
+let bs_skip_ctxt_rule case_id =
+  SSet.mem (String.lowercase_ascii case_id) bs_disabled_ctxt_rules
+
 let syntax_keywords =
   SSet.of_list
     ["semicolon"; "lbrace"; "rbrace"; "lbrack"; "rbrack";
@@ -260,6 +274,10 @@ let to_var_name name =
 let is_upper_token s =
   String.length s > 0 &&
   let c = s.[0] in c >= 'A' && c <= 'Z'
+
+let ends_with s suffix =
+  let ns = String.length s and nf = String.length suffix in
+  ns >= nf && String.sub s (ns - nf) nf = suffix
 
 let sort_of_type_name raw =
   let s = sanitize raw in
@@ -1695,6 +1713,27 @@ type prem_item =
 
 type prem_sched = { text : string; vars : string list; binds : string list }
 
+let rhs_inline_from_sched rhs_text prem_scheduled =
+  let rhs_key = strip_wrapping_parens rhs_text |> String.trim in
+  let match_rhs_binding (p : prem_sched) =
+    match split_once_re (Str.regexp "[ \t]+:=[ \t]+") p.text with
+    | Some (lhs, rhs) when String.trim (strip_wrapping_parens lhs) = rhs_key ->
+        Some (String.trim rhs)
+    | Some (lhs, rhs) when String.trim (strip_wrapping_parens rhs) = rhs_key ->
+        Some (String.trim lhs)
+    | _ -> None
+  in
+  match List.find_map match_rhs_binding prem_scheduled with
+  | Some rhs_expr ->
+      let kept =
+        List.filter (fun (p : prem_sched) ->
+          match match_rhs_binding p with
+          | Some _ -> false
+          | None -> true) prem_scheduled
+      in
+      (rhs_expr, kept)
+  | None -> (rhs_text, prem_scheduled)
+
 let uniq_vars vs = List.sort_uniq String.compare vs
 
 let is_keywordish_token v =
@@ -2217,7 +2256,9 @@ let translate_step_reld rel_name rules =
 
   let rule_lines = List.mapi (fun rule_idx r -> match r.it with
     | RuleD (case_id, binders, _, conclusion, prem_list) ->
-        if false && has_rule_premise prem_list then
+        if rel_name = "Step" && bs_skip_ctxt_rule case_id.it then ""
+        else if rel_name = "Step" && (case_id.it = "pure" || case_id.it = "read") then ""
+        else if false && has_rule_premise prem_list then
           if not (is_ctxt_rule prem_list) then ""
           else begin
             let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
@@ -2450,6 +2491,12 @@ let translate_step_reld rel_name rules =
                     prem_scheduled
                 else prem_scheduled
               in
+              let rhs_text_out, prem_scheduled =
+                if rel_name = "Step-read"
+                   && (case_id.it = "local-get" || case_id.it = "global-get")
+                then rhs_inline_from_sched rhs_t.text prem_scheduled
+                else (rhs_t.text, prem_scheduled)
+              in
               let prem_strs = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
               let prem_binds = List.concat_map (fun p -> p.binds) prem_scheduled in
               let prem_binds_seq =
@@ -2457,7 +2504,7 @@ let translate_step_reld rel_name rules =
               in
               all_val_seq_vars := !all_val_seq_vars @ prem_binds_seq;
 
-              let all_texts = [lhs_t.text; rhs_t.text] @ prem_strs in
+              let all_texts = [lhs_t.text; rhs_text_out] @ prem_strs in
               let all_cvars = (z_in_vars @ lhs_vars @ vm_vars) @
                 List.concat_map (fun p -> p.vars @ p.binds) prem_scheduled in
               let lhs_seed =
@@ -2500,19 +2547,28 @@ let translate_step_reld rel_name rules =
                   else Some (Printf.sprintf "%s := len ( %s )" cnt_mv seq_mv)
                 ) !g_listn_pairs
               in
+              let ctxt_instrs_focus_cond =
+                if rel_name = "Step" && case_id.it = "ctxt-instrs" then
+                  vm_vars
+                  |> List.find_opt (fun v -> ends_with v "-INSTR")
+                  |> Option.map (fun v -> Printf.sprintf "%s =/= eps" v)
+                  |> Option.to_list
+                else []
+              in
               let all_conds =
                 (Printf.sprintf "all-vals ( %s ) = true" prefix_val_var) ::
                 prem_match_conds @ listn_len_conds @ allvals_conds @ prem_bool_conds @ filtered_bconds
+                @ ctxt_instrs_focus_cond
               in
               let cond = cond_join all_conds in
               if cond = "" then
                 Printf.sprintf "  rl [%s] :\n    step(< %s | %s %s %s >)\n    =>\n    < %s | %s %s %s > ."
                   (String.lowercase_ascii prefix)
                   z_in prefix_val_var lhs_t.text is_var z_out prefix_val_var rhs_t.text is_var
-              else
+                  else
                 Printf.sprintf "  crl [%s] :\n    step(< %s | %s %s %s >)\n    =>\n    < %s | %s %s %s >\n      if %s ."
                   (String.lowercase_ascii prefix)
-                  z_in prefix_val_var lhs_t.text is_var z_out prefix_val_var rhs_t.text is_var cond
+                  z_in prefix_val_var lhs_t.text is_var z_out prefix_val_var rhs_text_out is_var cond
         end
   ) rules in
 
@@ -2536,9 +2592,15 @@ let translate_step_reld rel_name rules =
   let vals_decl = declare_vars_same_sort bound_vars_wts "WasmTerminals" in
   let is_decl = declare_vars_same_sort is_vars "WasmTerminals" in
   let ctxt_instrs_extra = "" in
-  bound_decl ^ vals_decl ^ is_decl ^ ctxt_instrs_extra
-  ^ String.concat "\n" (List.filter (fun s -> s <> "") rule_lines)
-  ^ "\n"
+  let rule_block =
+    bound_decl ^ vals_decl ^ is_decl ^ ctxt_instrs_extra
+    ^ String.concat "\n" (List.filter (fun s -> s <> "") rule_lines)
+    ^ "\n"
+  in
+  Str.global_replace
+    (Str.regexp_string "step(")
+    "focused-step("
+    rule_block
 
 (* --- RelD handler -------------------------------------------------------- *)
 
@@ -2738,7 +2800,9 @@ let header_prefix =
   "  sort ExecConf .\n" ^
   "  op <_|_> : WasmTerminal WasmTerminals -> ExecConf [ctor] .\n" ^
   "  op step : ExecConf -> ExecConf [frozen (1)] .\n\n" ^
+  "  op focused-step : ExecConf -> ExecConf [frozen (1)] .\n\n" ^
   "  --- Common variables (declared once)\n" ^
+  "  var EC : ExecConf .\n" ^
   "  var I : Int .\n" ^
   "  var W-I : Int .\n" ^
   "  op EXP : -> Int .\n" ^
@@ -2748,6 +2812,7 @@ let header_prefix =
 
 let footer =
   "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
+  "  rl [step-enter] : step(EC) => focused-step(EC) .\n\n" ^
   "  eq  is-val(CTORCONSTA2(T, W)) = true .\n" ^
   "  eq  is-val(CTORVCONSTA2(T, W)) = true .\n" ^
   "  ceq is-val(W) = true if W : Val .\n" ^

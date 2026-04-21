@@ -743,3 +743,49 @@
   - `step-array-new-fixed`
   - `step-array-set-array`
 - 이 20개는 baseline에서도 여전히 “hard rule” 군으로 남아 있고, 기존 미변환 22개 execution rule과 거의 같은 구조적 원인을 공유한다.
+
+### 2026-04-21 baseline stack overflow 원인 분해
+- `NOP` 단일 step은 baseline에서도 정상 종료함
+  - `rew in WASM-FIB-BS : step(< fib-state(i32v(1)) | CTORNOPA0 >) .`
+  - 결과: `< fib-state(i32v(1)) | eps >`
+- 반면 singleton `Step-read`는 아주 작은 예제에서도 stack overflow
+  - `rew in WASM-FIB-BS : step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >) .`
+  - `rew in WASM-FIB-BS : step(< fib-state(i32v(1)) | CTORGLOBALGETA1(1) >) .`
+  - 둘 다 `Fatal error: stack overflow`
+- helper 자체는 원인이 아님
+  - `red in WASM-FIB-BS : $local(fib-state(i32v(1)), 1) .` → 정상 종료, `i32 0`
+  - `red in WASM-FIB-BS : $global(fib-state(i32v(1)), 1) .` → 정상 종료
+- `Step/read`, `Step/pure` schema rule 제거 후에도 overflow 지속
+  - 즉 원인은 schema rule 재귀만이 아님
+- `step-ctxt-instrs`의 empty-focus 과매칭도 수정했지만 overflow 지속
+  - `STEP-CTXT-INSTRS2-INSTR =/= eps` guard 추가 후에도 동일
+- context rule 개별/전체 비활성화로도 overflow 지속
+  - `SPEC2MAUDE_BS_DISABLE_CTXT=ctxt-instrs`로 `step-ctxt-instrs`를 생성하지 않아도
+    `rew in WASM-FIB-BS : step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >) .`
+    는 여전히 `Fatal error: stack overflow`
+  - `SPEC2MAUDE_BS_DISABLE_CTXT=ctxt-label`로 `step-ctxt-label`을 생성하지 않아도 동일
+  - `SPEC2MAUDE_BS_DISABLE_CTXT=ctxt-instrs,ctxt-label,ctxt-handler,ctxt-frame`
+    로 context rule 4개를 전부 꺼도 동일
+- 동일한 `Idx` sort condition / `$local` assignment condition을 가진 scratch conditional rule은 즉시 성공
+  - 즉 `Idx` 자체나 `$local` assignment 자체가 stack overflow 원인은 아님
+- 현재까지 확실하게 말할 수 있는 결론:
+  - baseline stack overflow는 helper 함수나 개별 조건식 때문이 아니라,
+  - `step` 위에 direct conditional rule을 대량으로 얹었을 때 Maude가 전체 `step` rule 집합의 겹침/탐색을 폭발적으로 수행하는 데서 발생한다.
+  - 특히 concrete `Step-read` singleton도 full baseline `step` relation 안에서는 재귀적 proof search에 빠진다.
+  - context rule을 꺼도 overflow가 남으므로, 원인은 heating/cooling 대체용 `step-ctxt-*` rule이 아니라 baseline의 full direct-conditional `step` encoding 자체다.
+  - `focused-step` 중간 relation 실험도 효과가 없었다.
+    - baseline rule을 `focused-step(<...>)`로 옮기고
+      `rl [step-enter] : step(EC) => focused-step(EC) .`
+      만 남겨도
+      `step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >)`
+      와 `steps(fib-config(i32v(5)))`는 여전히 `Fatal error: stack overflow`
+    - 따라서 문제는 단순히 모든 conditional rule을 `step` 이름에 직접 얹은 것만이 아니라,
+      baseline direct conditional encoding 전체에서 발생하는 proof search explosion이다.
+
+### 교수님께 보고할 현재 원인 문장
+- “baseline conditional encoding은 아주 작은 `LOCAL.GET`/`GLOBAL.GET` 단일 step에서도 stack overflow가 납니다. `$local/$global` helper 자체와 `Idx` 조건은 단독으로는 정상 종료하므로 원인이 아니고, full baseline의 direct conditional `step` rule set 전체가 Maude의 proof search를 폭발시키는 것이 현재 확인된 직접 원인입니다.”
+- 추가 근거:
+  - `step-ctxt-instrs`, `step-ctxt-label`을 각각 꺼도 동일
+  - context rule 4개를 전부 꺼도 동일
+  - `focused-step` 중간 relation으로 한 번 분리해도 동일
+  - 따라서 현재 overflow의 직접 원인은 context rule이 아니라 baseline direct-conditional encoding 전체
