@@ -1,2 +1,0 @@
-prefix_rule(pattern=["rm", "-f", "/tmp/output_bs_no_instrs.maude"], decision="allow")
-prefix_rule(pattern=["rm", "-f", "/tmp/output_bs_no_label.maude"], decision="allow")
