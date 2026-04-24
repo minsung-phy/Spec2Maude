@@ -18,9 +18,11 @@ _build/
 .claude/
 .claude*
 CLAUDE.md
+.codex
+.codex-folder-backup/
 
 .obsidian/
 
 artifacts/
-.codex-folder-backup/
+
 Spec2Maude_JHS/
