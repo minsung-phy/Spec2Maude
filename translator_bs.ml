@@ -2597,10 +2597,7 @@ let translate_step_reld rel_name rules =
     ^ String.concat "\n" (List.filter (fun s -> s <> "") rule_lines)
     ^ "\n"
   in
-  Str.global_replace
-    (Str.regexp_string "step(")
-    "focused-step("
-    rule_block
+  rule_block
 
 (* --- RelD handler -------------------------------------------------------- *)
 
@@ -2800,7 +2797,6 @@ let header_prefix =
   "  sort ExecConf .\n" ^
   "  op <_|_> : WasmTerminal WasmTerminals -> ExecConf [ctor] .\n" ^
   "  op step : ExecConf -> ExecConf [frozen (1)] .\n\n" ^
-  "  op focused-step : ExecConf -> ExecConf [frozen (1)] .\n\n" ^
   "  --- Common variables (declared once)\n" ^
   "  var EC : ExecConf .\n" ^
   "  var I : Int .\n" ^
@@ -2812,7 +2808,6 @@ let header_prefix =
 
 let footer =
   "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
-  "  rl [step-enter] : step(EC) => focused-step(EC) .\n\n" ^
   "  eq  is-val(CTORCONSTA2(T, W)) = true .\n" ^
   "  eq  is-val(CTORVCONSTA2(T, W)) = true .\n" ^
   "  ceq is-val(W) = true if W : Val .\n" ^
