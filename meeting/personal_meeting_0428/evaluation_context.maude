@@ -9,7 +9,6 @@ crl [steps-trans] :
       /\ ZQQ : State 
       /\ ( INSTRQQ hasType ( list ( instr ) ) ) : WellTyped .
 
-
 crl [step-ctxt-instrs] :
 step(< Z | VAL INSTR INSTR1 >)
 =>
@@ -42,6 +41,8 @@ step(< SEMICOLON ( S, F ) | FRAME ( N, FQ, INSTR ) >)
 < SEMICOLON ( SQ, F ) | FRAME ( N, FQQ, INSTRQ ) >
     if step(< SEMICOLON ( S, FQ ) | INSTR >) => < SEMICOLON ( SQ, FQQ ) | INSTRQ > 
     /\ S : Store 
+    /\ SQ : Store
     /\ F : Frame 
     /\ N : N 
-    /\ FQ : Frame .
+    /\ FQ : Frame 
+    /\ FQQ : Frame .
