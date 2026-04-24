@@ -2242,10 +2242,13 @@ let try_decode_ctxt_conclusion rel_name prefix conclusion vm =
        | None -> None)
   | _ -> None
 
-(** Generate Maude  step  rewrite rules for Step-pure / Step-read / Step rules.
-    Pattern: rl/crl [name] : step(< Z | LHS IS >) => < Z' | RHS IS > [if COND] .
-    Rules with RulePr premises are either skipped (bridges) or translated into
-    heating/cooling rules (single Step-family context premise).
+(** Generate Maude step rewrite rules for Step-pure / Step-read / Step rules.
+    Baseline pattern: translate the SpecTec conclusion directly:
+      z ; lhs ~> z' ; rhs
+    becomes
+      step(< z | lhs >) => < z' | rhs >
+    with no synthetic value-prefix or instruction-suffix context. Context
+    closure is represented only by the SpecTec context rules themselves.
     Returns the generated Maude source fragment (declarations + rules). *)
 let translate_step_reld rel_name rules =
   let rel_prefix       = String.uppercase_ascii (sanitize rel_name) in
@@ -2414,11 +2417,6 @@ let translate_step_reld rel_name rules =
           all_val_seq_vars := !all_val_seq_vars @ all_seq_vars;
           reset_listn_pairs ();
 
-          let is_var = prefix ^ "-IS" in
-          all_is_vars := is_var :: !all_is_vars;
-          let prefix_val_var = prefix ^ "-VALS" in
-          all_val_seq_vars := prefix_val_var :: !all_val_seq_vars;
-
           let decoded : (string * string list * texpr * string * texpr) option =
             if rel_name = "Step-pure" then
               (match conclusion.it with
@@ -2556,19 +2554,18 @@ let translate_step_reld rel_name rules =
                 else []
               in
               let all_conds =
-                (Printf.sprintf "all-vals ( %s ) = true" prefix_val_var) ::
                 prem_match_conds @ listn_len_conds @ allvals_conds @ prem_bool_conds @ filtered_bconds
                 @ ctxt_instrs_focus_cond
               in
               let cond = cond_join all_conds in
               if cond = "" then
-                Printf.sprintf "  rl [%s] :\n    step(< %s | %s %s %s >)\n    =>\n    < %s | %s %s %s > ."
+                Printf.sprintf "  rl [%s] :\n    step(< %s | %s >)\n    =>\n    < %s | %s > ."
                   (String.lowercase_ascii prefix)
-                  z_in prefix_val_var lhs_t.text is_var z_out prefix_val_var rhs_t.text is_var
+                  z_in lhs_t.text z_out rhs_t.text
                   else
-                Printf.sprintf "  crl [%s] :\n    step(< %s | %s %s %s >)\n    =>\n    < %s | %s %s %s >\n      if %s ."
+                Printf.sprintf "  crl [%s] :\n    step(< %s | %s >)\n    =>\n    < %s | %s >\n      if %s ."
                   (String.lowercase_ascii prefix)
-                  z_in prefix_val_var lhs_t.text is_var z_out prefix_val_var rhs_text_out is_var cond
+                  z_in lhs_t.text z_out rhs_text_out cond
         end
   ) rules in
 

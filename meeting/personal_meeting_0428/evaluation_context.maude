@@ -1,0 +1,47 @@
+crl [steps-trans] :
+    Steps ( SEMICOLON ( Z, INSTR ) , SEMICOLON ( ZQQ, INSTRQQ ) )
+    =>
+    valid
+      if step(< Z | INSTR >) => < ZQ | INSTRQ > 
+      /\ Steps ( ( SEMICOLON ( ZQ, INSTRQ ) ), ( SEMICOLON ( ZQQ, INSTRQQ ) ) ) => valid 
+      /\ Z : State 
+      /\ ( INSTR hasType ( list ( instr ) ) ) : WellTyped 
+      /\ ZQQ : State 
+      /\ ( INSTRQQ hasType ( list ( instr ) ) ) : WellTyped .
+
+
+crl [step-ctxt-instrs] :
+step(< Z | VAL INSTR INSTR1 >)
+=>
+< ZQ | VAL INSTRQ INSTR1 >
+    if all-vals ( VAL ) = true 
+    /\ step(< Z | INSTR >) => < ZQ | INSTRQ > 
+    /\ ( ( ( VAL =/= eps )  or  ( INSTR1 =/= eps ) ) ) = true 
+    /\ Z : State 
+    /\ INSTR =/= eps .
+
+crl [step-ctxt-label] :
+step(< Z | LABEL ( N, INSTR0, INSTR ) >)
+=>
+< ZQ | LABEL ( N, INSTR0, INSTRQ ) >
+    if step(< Z | INSTR >) => < ZQ | INSTRQ > 
+    /\ Z : State 
+    /\ N : N .
+
+crl [step-ctxt-handler] :
+step(< Z | HANDLER ( N, CATCH, INSTR ) >)
+=>
+< ZQ | HANDLER ( N, CATCH, INSTRQ ) >
+    if step(< Z | INSTR >) => < ZQ | INSTRQ > 
+    /\ Z : State 
+    /\ N : N .
+
+crl [step-ctxt-frame] :
+step(< SEMICOLON ( S, F ) | FRAME ( N, FQ, INSTR ) >)
+=>
+< SEMICOLON ( SQ, F ) | FRAME ( N, FQQ, INSTRQ ) >
+    if step(< SEMICOLON ( S, FQ ) | INSTR >) => < SEMICOLON ( SQ, FQQ ) | INSTRQ > 
+    /\ S : Store 
+    /\ F : Frame 
+    /\ N : N 
+    /\ FQ : Frame .
