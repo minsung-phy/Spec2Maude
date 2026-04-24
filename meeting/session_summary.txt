@@ -212,3 +212,85 @@
   - conclusion:
     - the problem is not just “too many rules directly on the symbol `step`”
     - the proof-search explosion persists even with a one-hop indirection
+
+2026-04-24 session summary
+
+Purpose:
+- Continue SpecTec-to-Maude baseline work for professor requirement.
+- Baseline means direct conditional Maude rules:
+  `crl [r] : step(...) => ... if ... /\ step(...) => ... .`
+- Baseline should avoid generated heating/cooling and should be close to SpecTec rule shape.
+
+Current baseline implementation:
+- Main files:
+  - `translator_bs.ml`
+  - `main_bs.ml`
+  - `output_bs.maude`
+- `translator_bs.ml` builds with:
+  - `dune build ./main_bs.exe`
+- Regeneration command:
+  - `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude`
+- Load check:
+  - `maude -no-banner output_bs.maude`
+
+Important 2026-04-24 changes:
+- Removed the `focused-step` experiment from baseline.
+  - No `op focused-step`.
+  - No `rl [step-enter]`.
+- `output_bs.maude` has no baseline heat/cool context rules.
+  - No `heat-step-ctxt-*`.
+  - No `cool-step-ctxt-*`.
+- `Step/ctxt-instrs` no longer uses synthetic `VALS` / `IS` wrappers.
+  - Current shape follows SpecTec more directly:
+    `step(< Z | VAL INSTR INSTR1 >) => < ZQ | VAL INSTRQ INSTR1 >`
+    with condition:
+    `all-vals(VAL) = true /\ step(< Z | INSTR >) => < ZQ | INSTRQ > /\ ...`
+- Scalar type guards are now preserved for variables that appear in the generated rule text, including RHS and premise-result variables.
+  - Example: `Step/ctxt-frame` now generates `SQ : Store` and `FQQ : Frame`.
+  - Example: `Step/ctxt-instrs` now generates `ZQ : State`.
+- Sequence `hasType(list(instr))` guards are still intentionally omitted in baseline.
+  - Reason: they are expensive over associative sequence terms and are not currently required for the scalar-guard correctness issue.
+  - `all-vals(VAL) = true` remains because it represents the SpecTec `val*` side condition.
+
+Verification:
+- `dune build ./main_bs.exe` succeeds.
+- `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` succeeds.
+- `maude -no-banner output_bs.maude` loads.
+- Loading still emits existing warnings/advisories for some generated rules; this session did not attempt to eliminate every warning.
+
+Baseline stack-overflow result:
+- The direct conditional baseline still stack-overflows for fib model checking.
+- Prior narrowing results:
+  - `NOP` singleton step succeeds.
+  - `LOCAL.GET` and `GLOBAL.GET` singleton `Step-read` examples stack-overflow under the full baseline rule set.
+  - `$local(fib-state(i32v(1)), 1)` and `$global(...)` reduce normally by themselves.
+  - A scratch rule with similar `Idx` and `$local` conditions succeeds.
+  - Disabling `step-ctxt-instrs`, `step-ctxt-label`, or all four `step-ctxt-*` context rules does not remove the overflow.
+  - The removed `focused-step` indirection also did not remove the overflow.
+- Current conclusion:
+  - The direct cause is not `$local`, `$global`, `Idx`, or the context rules alone.
+  - The full direct-conditional executable `step` relation causes Maude's conditional rewrite proof search to explode over overlapping rules, even for tiny concrete `Step-read` terms.
+
+Professor-facing wording:
+- Short version:
+  "교수님 말씀대로 baseline을 heating/cooling 없이 direct conditional `crl`로 만들었고, `-- Step:` context rule 5개는 SpecTec shape에 맞춰 생성됩니다. 그런데 이 baseline은 fib는 물론 `LOCAL.GET` 단일 step에서도 stack overflow가 납니다. `$local/$global` helper나 `Idx` 조건은 단독으로 정상 종료하고, context rule들을 모두 꺼도 overflow가 남기 때문에, 현재 직접 원인은 context rule이 아니라 full direct-conditional `step` rule set에서 Maude의 조건부 rewrite proof search가 폭발하는 것입니다."
+- More precise version:
+  "`crl`을 쓰면 항상 안 된다는 뜻은 아닙니다. 문제는 SpecTec의 Step relation을 거의 1:1로 하나의 executable `step` relation에 직접 올리는 baseline 방식이 Maude 실행 전략과 맞지 않는다는 점입니다. 따라서 이 baseline은 correctness/reference artifact로는 의미가 있지만, fib model checking 실행용 semantics로는 optimized translator의 heating/cooling 또는 선배 코드처럼 redex를 좁혀 주는 구조가 필요해 보입니다."
+
+Documentation updated:
+- `STATUS.md`
+  - Added 2026-04-24 baseline update.
+  - Updated Step 0 / Step 1 progress.
+  - Added professor-facing report wording.
+- `paper_plan.md`
+  - Marked baseline translator split and context-rule direct `crl` coverage as completed.
+  - Recorded direct conditional baseline stack overflow as a risk and planning constraint.
+  - Changed the immediate action from old nested-label deadlock to baseline stack-overflow report / optimized path decision.
+
+Next session entry point:
+1. If asked to continue baseline debugging, reproduce with the smallest singleton:
+   `step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >)`.
+2. Do not reintroduce `focused-step`; it was tested and removed.
+3. Do not add hard-coded rule-specific special cases to `translator_bs.ml`.
+4. If optimizing, compare against the existing `translator.ml` heat/cool path and the manual senior-code style to identify semantic-preserving redex narrowing.
+5. If writing the professor report, use the wording above and emphasize the evidence: helper functions terminate alone, context rules disabled still overflow, singleton `Step-read` still overflows.

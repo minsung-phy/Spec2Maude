@@ -1,6 +1,6 @@
 # Spec2Maude — 현재 상태 / 문제점 / 할일
 
-작성일: 2026-04-19 (0421 미팅 반영: 2026-04-21)
+작성일: 2026-04-19 (0421 미팅 반영: 2026-04-21, baseline 갱신: 2026-04-24)
 
 ---
 
@@ -37,8 +37,8 @@
 - **Rule 함수 위치 (Q2)**: 과거 노트의 "룰에 함수 금지"는 **LHS(좌항)** 한정이었음. **RHS(우항) 에 함수 호출은 허용** (오히려 SpecTec isomorphic 유지에 필요). 현재 24개는 유지.
 
 ### 진행률 표시 (Step 기준)
-- Step 0: ~20% (일부 rule만 crl, 9개 manual override 아직 있음)
-- Step 1: 0% (카탈로그 미작성)
+- Step 0: ~55% (baseline 변환기/엔트리 분리, `-- Step:` context rule 5/5 direct `crl` 생성, `focused-step` 제거, synthetic wrapper 제거, scalar guard 보존 수정 완료. 단 fib baseline은 stack overflow로 미통과)
+- Step 1: ~40% (`4.3-execution.instructions.spectec` 기준 `-- Step:` rule 5개와 generated coverage 5/5 확인. 미래 섹션/전체 rule catalog는 아직 미완)
 - Step 2: 0% (instrs heat/cool off 상태)
 - Step 3: 0%
 
@@ -789,3 +789,54 @@
   - context rule 4개를 전부 꺼도 동일
   - `focused-step` 중간 relation으로 한 번 분리해도 동일
   - 따라서 현재 overflow의 직접 원인은 context rule이 아니라 baseline direct-conditional encoding 전체
+
+---
+
+## 8. 2026-04-24 baseline 갱신
+
+### 구현 상태
+- `translator_bs.ml`는 현재 교수님 요구사항에 맞춰 baseline 전용 direct conditional rule 생성기로 정리됐다.
+- baseline의 `Step/ctxt-*`는 heating/cooling을 쓰지 않고, SpecTec conclusion/premise shape를 직접 반영해 다음 형태로 생성한다.
+  - `step(< z | instrs >) => < z' | instrs' > if step(< z_inner | instrs_inner >) => < z'_inner | instrs'_inner > /\ ...`
+- `focused-step` 실험은 제거했다.
+  - `op focused-step`
+  - `rl [step-enter]`
+  - 위 둘은 현재 `output_bs.maude`에 없다.
+- `Step/ctxt-instrs`의 synthetic `VALS`/`IS` wrapper를 제거했다.
+  - 현재는 SpecTec의 `val* instr* instr_1*` 구조에 맞춰 한 rule 안에서 직접 `VAL INSTR INSTR1` 형태로 생성한다.
+- RHS 또는 premise 결과에만 등장하는 scalar 변수의 type guard가 누락되던 문제를 수정했다.
+  - 예: `Step/ctxt-frame`에서 `SQ : Store`, `FQQ : Frame` guard가 생성된다.
+  - `Step/ctxt-instrs`에서도 `ZQ : State` guard가 생성된다.
+- sequence 변수의 full `hasType(list(instr))` guard는 여전히 baseline에서 생략한다.
+  - 이유: Maude의 associative sequence 위에서 list membership guard를 대량으로 넣으면 탐색 비용이 커지고, 현재 baseline의 핵심 비교 대상은 scalar binder 보존 + direct `step` 조건식이다.
+  - `val*` prefix는 SpecTec side condition 보존을 위해 `all-vals(VAL) = true`로 유지한다.
+
+### 검증
+- `dune build ./main_bs.exe` 성공
+- `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` 성공
+- `maude -no-banner output_bs.maude` load 성공
+- `output_bs.maude` 기준 확인:
+  - `focused-step` 없음
+  - `step-enter` 없음
+  - `heat-step-ctxt-*` / `cool-step-ctxt-*` 없음
+  - `step-ctxt-instrs`, `step-ctxt-label`, `step-ctxt-handler`, `step-ctxt-frame`는 direct conditional `crl`
+
+### baseline stack overflow 결론
+- 현재 baseline은 `output_bs.maude` 자체는 load되지만, fib 실행/model checking은 stack overflow가 난다.
+- 현재까지의 원인 분해 결론:
+  - `NOP` 단일 step은 종료한다.
+  - `LOCAL.GET` / `GLOBAL.GET` 같은 작은 singleton `Step-read`도 full baseline rule set에서는 stack overflow가 난다.
+  - `$local`, `$global`, `Idx` 조건은 단독으로는 정상 종료한다.
+  - `step-ctxt-instrs`, `step-ctxt-label`, `step-ctxt-handler`, `step-ctxt-frame`을 꺼도 overflow가 남는다.
+  - 따라서 overflow의 직접 원인은 context rule 자체가 아니라, direct conditional `step` rule을 대량으로 같은 relation에 얹었을 때 Maude가 겹치는 조건부 규칙들의 proof search를 폭발적으로 시도하는 구조다.
+
+### 교수님께 보고할 표현
+- 짧은 버전:
+  - “교수님 말씀대로 baseline을 heating/cooling 없이 direct conditional `crl`로 만들었고, `-- Step:` context rule 5개는 SpecTec shape에 맞춰 생성됩니다. 그런데 이 baseline은 fib는 물론 `LOCAL.GET` 단일 step에서도 stack overflow가 납니다. `$local/$global` helper나 `Idx` 조건은 단독으로 정상 종료하고, context rule들을 모두 꺼도 overflow가 남기 때문에, 현재 직접 원인은 context rule이 아니라 full direct-conditional `step` rule set에서 Maude의 조건부 rewrite proof search가 폭발하는 것입니다.”
+- 조금 더 정확한 버전:
+  - “즉 `crl`을 쓰면 항상 안 된다는 뜻은 아니고, SpecTec의 Step relation을 거의 1:1로 하나의 executable `step` relation에 직접 올리는 baseline 방식이 Maude 실행 전략과 맞지 않습니다. 그래서 이 baseline은 correctness reference/code generation comparison 용도로는 의미가 있지만, fib model checking 실행용 semantics로는 optimized translator의 heating/cooling 또는 선배 코드처럼 redex를 좁혀 주는 구조가 필요해 보입니다.”
+
+### 다음 액션
+1. 이 baseline 실패를 보고서에 정리한다.
+2. 교수님께 “baseline direct `crl`은 구현했지만 실행 baseline으로는 stack overflow”라고 보고한다.
+3. 이후 실행 가능한 경로는 `translator.ml`의 optimized heat/cool 경로 또는 선배 코드식 redex-localized 구조와 비교하면서, 어떤 최적화가 semantic-preserving인지 논증한다.

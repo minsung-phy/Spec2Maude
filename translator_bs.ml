@@ -2417,13 +2417,13 @@ let translate_step_reld rel_name rules =
           all_val_seq_vars := !all_val_seq_vars @ all_seq_vars;
           reset_listn_pairs ();
 
-          let decoded : (string * string list * texpr * string * texpr) option =
+          let decoded : (string * string list * texpr * string * string list * texpr) option =
             if rel_name = "Step-pure" then
               (match conclusion.it with
                | TupE [lhs; rhs] ->
                    let z_var = prefix ^ "-Z" in
                    Some (z_var, [z_var], translate_exp TermCtx lhs vm,
-                         z_var, translate_exp TermCtx rhs vm)
+                         z_var, [z_var], translate_exp TermCtx rhs vm)
                | _ -> None)
             else if rel_name = "Step-read" then
               (match conclusion.it with
@@ -2433,7 +2433,7 @@ let translate_step_reld rel_name rules =
                         let z_t = translate_exp TermCtx z_e vm in
                         let lhs_t = translate_exp TermCtx lhs_e vm in
                         let rhs_t = translate_exp TermCtx rhs vm in
-                        Some (z_t.text, z_t.vars, lhs_t, z_t.text, rhs_t)
+                        Some (z_t.text, z_t.vars, lhs_t, z_t.text, z_t.vars, rhs_t)
                     | None -> None)
                | _ -> None)
             else
@@ -2446,7 +2446,7 @@ let translate_step_reld rel_name rules =
                         let lhs_t = translate_exp TermCtx lhs_e vm in
                         let zp_t = translate_exp TermCtx zp_e vm in
                         let rhs_t = translate_exp TermCtx rhs_e vm in
-                        Some (z_t.text, z_t.vars, lhs_t, zp_t.text, rhs_t)
+                        Some (z_t.text, z_t.vars, lhs_t, zp_t.text, zp_t.vars, rhs_t)
                     | _ -> None)
                | _ -> None)
           in
@@ -2456,7 +2456,7 @@ let translate_step_reld rel_name rules =
                 "[WARN] translate_step_reld: cannot decode %s rule %s (#%d)\n%!"
                 rel_name prefix rule_idx;
               ""
-          | Some (z_in, z_in_vars, lhs_t, z_out, rhs_t) ->
+          | Some (z_in, z_in_vars, lhs_t, z_out, z_out_vars, rhs_t) ->
               let vm_vars = List.map snd vm in
               let lhs_vars = vars_of_texpr lhs_t in
               let prem_items = List.concat_map (prem_items_of_prem vm) prem_list in
@@ -2502,8 +2502,8 @@ let translate_step_reld rel_name rules =
               in
               all_val_seq_vars := !all_val_seq_vars @ prem_binds_seq;
 
-              let all_texts = [lhs_t.text; rhs_text_out] @ prem_strs in
-              let all_cvars = (z_in_vars @ lhs_vars @ vm_vars) @
+              let all_texts = [z_in; lhs_t.text; z_out; rhs_text_out] @ prem_strs in
+              let all_cvars = (z_in_vars @ lhs_vars @ z_out_vars @ rhs_t.vars @ vm_vars) @
                 List.concat_map (fun p -> p.vars @ p.binds) prem_scheduled in
               let lhs_seed =
                 List.sort_uniq String.compare (z_in_vars @ lhs_vars @ prem_binds)
@@ -2519,9 +2519,13 @@ let translate_step_reld rel_name rules =
                 with Not_found -> false
               in
               let filtered_bconds =
+                let guard_used_vars =
+                  extract_vars_from_maude (String.concat " " all_texts)
+                  |> List.sort_uniq String.compare
+                in
                 bconds
                 |> List.filter (fun (mv, _) ->
-                    List.mem mv lhs_set2 && not (List.mem mv prem_binds))
+                    List.mem mv guard_used_vars)
                 |> List.map snd
                 |> fun conds ->
                      if rel_name = "Step-pure" then

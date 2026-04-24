@@ -1,0 +1,21 @@
+rule Steps/trans:
+  z; instr*  ~>*  z''; instr''*
+  -- Step: z; instr*  ~>  z'; instr'*
+  -- Steps: z'; instr'*  ~>*  z''; instr''*
+
+rule Step/ctxt-instrs:
+  z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
+  -- Step: z; instr* ~> z'; instr'*
+  -- if val* =/= eps \/ instr_1* =/= eps
+
+rule Step/ctxt-label:
+  z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
+  -- Step: z; instr* ~> z'; instr'*
+
+rule Step/ctxt-handler:
+  z; (HANDLER_ n `{catch*} instr*) ~> z'; (HANDLER_ n `{catch*} instr'*)
+  -- Step: z; instr* ~> z'; instr'*
+
+rule Step/ctxt-frame:
+  s; f; (FRAME_ n `{f'} instr*)  ~>  s'; f; (FRAME_ n `{f''} instr'*)
+  -- Step: s; f'; instr* ~> s'; f''; instr'*
