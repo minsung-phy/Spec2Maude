@@ -1,7 +1,7 @@
 # Spec2Maude — 논문 제출 계획 (paper_plan.md)
 
 작성일: 2026-04-20
-기준: 현재 STATUS.md (fib(0)~fib(5) rewrite/modelCheck 통과, 단 manual override 9종 · 미번역 22개 rule · benchmark fib 단독).
+기준: 현재 STATUS.md (optimized 경로는 fib(0)~fib(5) rewrite/modelCheck 통과. baseline 경로는 nil-split 수정 후 fib(5) rewrite 통과, modelCheck는 아직 병목).
 
 ---
 
@@ -112,12 +112,16 @@ C3 를 broader 하게 재정의(§1)하면서 업데이트함.)
 - [x] `-- Step:` context rule 5개 (`Steps/trans`, `Step/ctxt-instrs`, `Step/ctxt-label`, `Step/ctxt-handler`, `Step/ctxt-frame`) direct conditional `crl` 생성 확인
 - [x] baseline에서 `focused-step` / `step-enter` 제거
 - [x] baseline에서 `Step/ctxt-instrs` synthetic wrapper 제거 및 RHS/premise-result scalar guard 보존 수정
-- [!] `wasm-exec.maude` **9개 manual override 전부 제거**. Translator 자동 생성만으로 fib 이 (느려도) 통과해야 함.
-  - 2026-04-24 현재: baseline harness는 manual override 없이 구성 가능하지만, fib 실행/modelCheck는 `Fatal error: stack overflow`.
-  - 원인: 작은 `LOCAL.GET`/`GLOBAL.GET` 단일 step에서도 full direct-conditional `step` rule set의 Maude proof search가 폭발. context rule을 꺼도 지속.
+- [x] baseline에서 `Step/ctxt-instrs` nil-split 방지용 non-empty focus 생성
+  - 2026-04-27 현재: recursive focus를 `INSTR-HEAD : WasmTerminal` + `INSTR-REST : WasmTerminals`로 생성해 empty focus match를 막음.
+- [~] `wasm-exec.maude` **9개 manual override 전부 제거**. Translator 자동 생성만으로 fib 이 (느려도) 통과해야 함.
+  - 2026-04-24: baseline harness는 manual override 없이 구성 가능했지만, fib 실행/modelCheck는 `Fatal error: stack overflow`.
+  - 2026-04-27: 교수님 nil-split 가설 반영 후 `LOCAL.GET` 단일 step 및 `fib(5)` rewrite는 stack overflow 없이 통과.
+  - 남은 문제: direct-crl baseline modelCheck는 `fib(2)`에서도 60초 내 미종료. 실행 가능 rewrite artifact는 확보했지만 model-checking baseline은 아직 아님.
 - [ ] fib 외에 Wasm 3.0 전체 (core + concurrency) 가 이 단순형으로 rewrite 가능한지 확인
 - [~] 단순형 산출물을 **differential testing baseline** 으로 저장 (Phase 3 에서 재사용)
-  - 현재 산출물 `output_bs.maude`는 load 가능한 baseline artifact로 보존 가능하지만, 실행 가능한 model-checking baseline은 아님.
+  - 현재 산출물 `output_bs.maude`는 load 가능하고 fib rewrite까지 되는 baseline artifact다.
+  - 단, modelCheck baseline으로 쓰기에는 아직 상태공간/proof-search 비용이 크다.
 - [ ] Static semantics 중 dynamic rule 이 참조하는 부분은 **`eq/ceq`** 로 변환 (mb/cmb 불필요)
 
 작업 — Step 1 (2026-05 ~ 2026-06, 4주):
@@ -130,7 +134,7 @@ C3 를 broader 하게 재정의(§1)하면서 업데이트함.)
 - `wasm-exec.maude` manual override 0건
 - translator 변환 rule 수 / 전체 rule 수 표 재현 가능
 - condition 패턴 카탈로그 문서 1개
-- 2026-04-24 추가 판정: “manual override 0건 + fib 실행 통과”는 direct conditional baseline만으로는 어려울 수 있음. 이 경우 실패 원인과 Maude proof-search explosion 근거를 문서화하고, Phase 2 optimized heat/cool 경로를 실행 가능한 semantics로 삼는다.
+- 2026-04-27 추가 판정: nil-split 수정 후 “manual override 0건 + fib rewrite 통과”는 가능해졌다. 다만 direct conditional baseline modelCheck는 아직 종료하지 않으므로, Phase 2 optimized heat/cool 경로는 여전히 실행 가능한 model-checking semantics 후보로 유지한다.
 
 **주의 (0421 미팅)**: 이 단계에서 "빠르게 돌아가면" 오히려 의심할 것. correct 여부가 먼저.
 
@@ -303,7 +307,7 @@ submission 준비:
 | C3(b) (differential testing) harness 완성 못 함 | 중 | 중 | 2개월 타임박스. 안 되면 깔끔히 포기, (c)+(d) 로 수렴 |
 | C3(c) (LTL property) 가 "의미 없다" 공격 받음 | 중 | 상 | Related Work 에서 "다른 도구로 못 함" 을 명시, property 선정 근거를 prose 로 강화 |
 | K-Wasm 비교 에서 현저히 느리게 나옴 | 중 | 상 | Phase 3 초반에 성능 측정, 필요시 Maude 최적화 (frozen, memo) |
-| direct conditional baseline 이 fib 에서 stack overflow | 높음 | 중 | 이미 재현됨. baseline은 correctness/reference artifact로 보존하고, 실행/model checking은 optimized heat/cool 경로로 진행. 논문에는 “naive direct encoding is not executable enough”를 engineering lesson으로 정리 |
+| direct conditional baseline 의 modelCheck 비용 폭발 | 높음 | 중 | 2026-04-27 nil-split 수정으로 fib rewrite stack overflow는 해소. 하지만 `fib(2)` modelCheck도 60초 내 미종료. baseline은 rewrite/reference artifact로 보존하고, 실행/model checking은 optimized heat/cool 경로를 계속 검토 |
 | 리뷰어가 "Ott/Lem 에 비해 새로운 게 뭐냐" 공격 | 고 | 상 | Related work 섹션을 초기부터 강화, Ott/Lem/K 와의 차이 명시 |
 | 번역기가 SpecTec 이외의 spec 에 적용 안 됨 → generality 주장 약함 | 중 | 중 | SpecTec 로 쓰인 다른 small spec (예: MiniML) 을 1개라도 실험 |
 | 논문 작성 늦어져 submission 놓침 | 중 | 상 | Phase 5 의 "pilot submission" 이 강제 deadline 역할 |
@@ -317,7 +321,7 @@ submission 준비:
 
 | 월 | 주요 milestone |
 |----|----------------|
-| 2026-04 ~ 05 | **Step 0**: 모든 Step rule 을 conditional `crl` 로 단순 변환, manual override 9종 제거, fib+전체 Wasm 통과 확인 |
+| 2026-04 ~ 05 | **Step 0**: 모든 Step rule 을 conditional `crl` 로 단순 변환, manual override 9종 제거, fib rewrite 통과 및 modelCheck 병목 분리 |
 | 2026-05 ~ 06 | **Step 1**: SpecTec 전체 rule condition 카탈로그 + "22개" 재검증 |
 | 2026-06 ~ 07 | **Step 2**: Val/NonValInstr subsort 강화, instrs heat/cool 일반화, differential 확인 |
 | 2026-07 ~ 08 | **Step 3**: translator reject 로직 완성, parse warning 정리 |
@@ -354,9 +358,10 @@ submission 준비:
    - 이 한 줄이 모든 의사결정의 기준이 됨
    - 교수님께 공유, 피드백 받기
 
-2. [~] **baseline stack overflow 보고 및 optimized path 확정**
-   - direct conditional baseline은 `LOCAL.GET` singleton에서도 stack overflow가 재현됨.
-   - 교수님께 baseline 실패 원인과 실험 근거를 보고하고, 실행/model checking은 optimized heat/cool 경로로 진행할지 확인.
+2. [~] **baseline nil-split 수정 결과 보고 및 optimized path 확정**
+   - 교수님 nil-split 가설 반영 후 direct conditional baseline의 `LOCAL.GET` singleton과 `fib(5)` rewrite는 통과함.
+   - 남은 문제는 stack overflow가 아니라 direct-crl baseline modelCheck 비용이다. `fib(2)` reachability도 60초 내 미종료.
+   - 교수님께 “nil-split 수정으로 rewrite baseline은 확보했고, modelCheck 실행 semantics는 optimized heat/cool 경로가 필요할 수 있음”을 보고.
    - 2026-04-30 까지 방향 확정 권장
 
 3. [ ] **Related work 서베이 시작**

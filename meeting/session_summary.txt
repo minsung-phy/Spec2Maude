@@ -294,3 +294,53 @@ Next session entry point:
 3. Do not add hard-coded rule-specific special cases to `translator_bs.ml`.
 4. If optimizing, compare against the existing `translator.ml` heat/cool path and the manual senior-code style to identify semantic-preserving redex narrowing.
 5. If writing the professor report, use the wording above and emphasize the evidence: helper functions terminate alone, context rules disabled still overflow, singleton `Step-read` still overflows.
+
+2026-04-27 session update
+
+Purpose:
+- Continue baseline debugging after professor suggested the stack overflow may be a nil-split problem.
+- User asked whether changing the recursive `instr` focus into `W REST` in `translator_bs.ml` would fix it, and requested implementation.
+
+Implementation:
+- Modified `translator_bs.ml`.
+- For `Step/ctxt-instrs`, the generated recursive focus is now structurally non-empty:
+  - old shape:
+    `step(< Z | VAL INSTR INSTR1 >) => < ZQ | VAL INSTRQ INSTR1 >`
+    with recursive condition `step(< Z | INSTR >) => < ZQ | INSTRQ >`
+  - new shape:
+    `step(< Z | VAL INSTR-HEAD INSTR-REST INSTR1 >) => < ZQ | VAL INSTRQ INSTR1 >`
+    with recursive condition `step(< Z | INSTR-HEAD INSTR-REST >) => < ZQ | INSTRQ >`
+  - `INSTR-HEAD : WasmTerminal`
+  - `INSTR-REST : WasmTerminals`
+- This blocks the empty recursive focus at the left-hand-side pattern level. It directly addresses the professor's `f(nil) f(1 2 3 4)` style nil-split concern.
+- Reordered `Step/ctxt-instrs` conditions so cheap guards come before recursive `step`.
+- Found a separate issue: generated `Z : State` executable membership guards prevented concrete record-normalized states from matching in baseline `Step*` rules.
+  - Current pragmatic fix: `translator_bs.ml` omits executable `: State` guards for `Step*` relations.
+  - Interpretation: SpecTec state metavariable sort annotations are treated as generation-time/configuration-shape information, not as a Maude membership proof obligation on every step.
+  - Long-term strict fix: generate correct `State` membership for the record representation.
+- Added fib harness membership in `wasm-exec-bs.maude`:
+  - `mb CTORCONSTA2(CTORI32A0, I:Int) : Val .`
+
+Verification:
+- `dune build` succeeds.
+- `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` succeeds.
+- Singleton local-get now steps:
+  - `rew [1] in WASM-FIB-BS : step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >) .`
+  - result contains `CTORCONSTA2(CTORI32A0, 0)`.
+- Baseline fib rewrite now succeeds without stack overflow:
+  - `rew [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .`
+  - result: 24,902 rewrites, final instruction `CTORCONSTA2(CTORI32A0, 5)`.
+- Baseline modelCheck is still not usable:
+  - `modelCheck(fib-config(i32v(2)), <> result-is(1))` timed out after 60 seconds.
+  - So the current remaining baseline problem is model-checking proof-search/state-space cost, not stack overflow during rewrite.
+
+Current professor-facing summary:
+- "교수님 말씀대로 nil-split 문제가 맞았습니다. `Step/ctxt-instrs`의 recursive focus가 sequence 변수 하나라 `eps`로도 match될 수 있었고, 이것이 empty-focus proof search를 만들었습니다. `INSTR-HEAD : WasmTerminal` + `INSTR-REST : WasmTerminals`로 바꿔 focus가 항상 non-empty가 되도록 수정했습니다."
+- "수정 후 `LOCAL.GET` 단일 step과 `fib(5)` rewrite는 stack overflow 없이 종료합니다."
+- "다만 direct `crl` baseline modelCheck는 `fib(2)`에서도 60초 안에 끝나지 않았습니다. 그래서 지금 남은 문제는 stack overflow가 아니라 model-checking 단계의 상태공간/proof-search 비용입니다."
+
+Next session entry point:
+1. Do not revert the nil-split fix in `translator_bs.ml`.
+2. If strictness is requested, work on proper `State` membership generation instead of re-adding raw `Z : State` guards to `Step*` rules.
+3. For modelCheck performance, compare the direct-crl baseline with `translator.ml` heat/cool and senior-code redex-localized structure.
+4. If reporting, say: nil-split fixed rewrite; modelCheck still expensive.

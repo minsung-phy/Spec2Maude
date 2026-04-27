@@ -63,6 +63,36 @@ let rename_texpr_vars renames (t : texpr) =
   in
   { text; vars = List.sort_uniq String.compare vars }
 
+let replace_maude_var_token src dst text =
+  let is_var_char = function
+    | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '-' | '_' | '\'' -> true
+    | _ -> false
+  in
+  let src_len = String.length src in
+  let text_len = String.length text in
+  let buf = Buffer.create (text_len + String.length dst) in
+  let rec loop i =
+    if i >= text_len then ()
+    else if i + src_len <= text_len
+         && String.sub text i src_len = src
+         && (i = 0 || not (is_var_char text.[i - 1]))
+         && (i + src_len = text_len || not (is_var_char text.[i + src_len]))
+    then begin
+      Buffer.add_string buf dst;
+      loop (i + src_len)
+    end else begin
+      Buffer.add_char buf text.[i];
+      loop (i + 1)
+    end
+  in
+  loop 0;
+  Buffer.contents buf
+
+let starts_with s prefix =
+  let slen = String.length s in
+  let plen = String.length prefix in
+  slen >= plen && String.sub s 0 plen = prefix
+
 let wrap_paren s = Printf.sprintf "( %s )" s
 
 let debug_iter_enabled =
@@ -2495,14 +2525,51 @@ let translate_step_reld rel_name rules =
                 then rhs_inline_from_sched rhs_t.text prem_scheduled
                 else (rhs_t.text, prem_scheduled)
               in
+              let ctxt_focus_rewrite =
+                if rel_name = "Step" && case_id.it = "ctxt-instrs" then
+                  vm_vars
+                  |> List.find_opt (fun v -> ends_with v "-INSTR")
+                  |> Option.map (fun focus ->
+                      let head = focus ^ "-HEAD" in
+                      let rest = focus ^ "-REST" in
+                      (focus, head, rest, head ^ " " ^ rest))
+                else None
+              in
+              let rewrite_ctxt_focus_text text =
+                match ctxt_focus_rewrite with
+                | None -> text
+                | Some (focus, _head, _rest, focus_text) ->
+                    replace_maude_var_token focus focus_text text
+              in
+              let lhs_text_out = rewrite_ctxt_focus_text lhs_t.text in
+              let rhs_text_out = rewrite_ctxt_focus_text rhs_text_out in
+              let prem_scheduled =
+                match ctxt_focus_rewrite with
+                | None -> prem_scheduled
+                | Some (focus, head, rest, _focus_text) ->
+                    List.map (fun (p : prem_sched) ->
+                      { p with
+                        text = rewrite_ctxt_focus_text p.text;
+                        vars =
+                          p.vars
+                          |> List.filter (fun v -> v <> focus)
+                          |> fun vs -> head :: rest :: vs
+                          |> List.sort_uniq String.compare })
+                      prem_scheduled
+              in
               let prem_strs = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
               let prem_binds = List.concat_map (fun p -> p.binds) prem_scheduled in
               let prem_binds_seq =
                 List.filter (fun v -> List.mem v all_seq_vars) prem_binds
               in
               all_val_seq_vars := !all_val_seq_vars @ prem_binds_seq;
+              (match ctxt_focus_rewrite with
+               | None -> ()
+               | Some (_focus, head, rest, _focus_text) ->
+                   all_bound := head :: !all_bound;
+                   all_val_seq_vars := rest :: !all_val_seq_vars);
 
-              let all_texts = [z_in; lhs_t.text; z_out; rhs_text_out] @ prem_strs in
+              let all_texts = [z_in; lhs_text_out; z_out; rhs_text_out] @ prem_strs in
               let all_cvars = (z_in_vars @ lhs_vars @ z_out_vars @ rhs_t.vars @ vm_vars) @
                 List.concat_map (fun p -> p.vars @ p.binds) prem_scheduled in
               let lhs_seed =
@@ -2531,14 +2598,47 @@ let translate_step_reld rel_name rules =
                      if rel_name = "Step-pure" then
                        List.filter (fun c -> not (has_numtype_guard c)) conds
                      else conds
+                |> fun conds ->
+                     if starts_with rel_name "Step" then
+                       List.filter (fun c ->
+                         let s = String.trim c in
+                         try
+                           ignore (Str.search_forward (Str.regexp ": State\\b") s 0);
+                           false
+                         with Not_found -> true)
+                         conds
+                     else conds
+              in
+              let is_rewrite_cond text =
+                try
+                  ignore (Str.search_forward (Str.regexp_string "=>") text 0);
+                  true
+                with Not_found -> false
+              in
+              let prem_rewrite_conds =
+                prem_scheduled |> List.filter_map (fun p ->
+                  if is_rewrite_cond p.text then Some (prem_cond p.text) else None)
+              in
+              let prem_rewrite_bound_vars =
+                prem_scheduled
+                |> List.filter (fun p -> is_rewrite_cond p.text)
+                |> List.concat_map (fun p -> p.binds)
+                |> List.sort_uniq String.compare
+              in
+              let cond_mentions_any vars cond =
+                let used =
+                  extract_vars_from_maude cond
+                  |> List.sort_uniq String.compare
+                in
+                List.exists (fun v -> List.mem v used) vars
               in
               let prem_match_conds =
                 prem_scheduled |> List.filter_map (fun p ->
-                  if p.binds = [] then None else Some (prem_cond p.text))
+                  if p.binds = [] || is_rewrite_cond p.text then None else Some (prem_cond p.text))
               in
               let prem_bool_conds =
                 prem_scheduled |> List.filter_map (fun p ->
-                  if p.binds = [] then Some (prem_cond p.text) else None)
+                  if p.binds = [] && not (is_rewrite_cond p.text) then Some (prem_cond p.text) else None)
               in
               let allvals_conds =
                 List.map (fun mv -> Printf.sprintf "all-vals ( %s ) = true" mv) val_seq_vars
@@ -2549,27 +2649,32 @@ let translate_step_reld rel_name rules =
                   else Some (Printf.sprintf "%s := len ( %s )" cnt_mv seq_mv)
                 ) !g_listn_pairs
               in
-              let ctxt_instrs_focus_cond =
-                if rel_name = "Step" && case_id.it = "ctxt-instrs" then
-                  vm_vars
-                  |> List.find_opt (fun v -> ends_with v "-INSTR")
-                  |> Option.map (fun v -> Printf.sprintf "%s =/= eps" v)
-                  |> Option.to_list
-                else []
-              in
               let all_conds =
-                prem_match_conds @ listn_len_conds @ allvals_conds @ prem_bool_conds @ filtered_bconds
-                @ ctxt_instrs_focus_cond
+                if rel_name = "Step" && case_id.it = "ctxt-instrs" then
+                  let before_rewrite_bconds, after_rewrite_bconds =
+                    let rewrite_result_vars =
+                      (prem_rewrite_bound_vars @ z_out_vars)
+                      |> List.sort_uniq String.compare
+                    in
+                    List.partition
+                      (fun cond -> not (cond_mentions_any rewrite_result_vars cond))
+                      filtered_bconds
+                  in
+                  listn_len_conds @ allvals_conds @ prem_bool_conds @ before_rewrite_bconds
+                  @ prem_match_conds @ prem_rewrite_conds @ after_rewrite_bconds
+                else
+                  prem_match_conds @ prem_rewrite_conds @ listn_len_conds @ allvals_conds
+                  @ prem_bool_conds @ filtered_bconds
               in
               let cond = cond_join all_conds in
               if cond = "" then
                 Printf.sprintf "  rl [%s] :\n    step(< %s | %s >)\n    =>\n    < %s | %s > ."
                   (String.lowercase_ascii prefix)
-                  z_in lhs_t.text z_out rhs_t.text
+                  z_in lhs_text_out z_out rhs_text_out
                   else
                 Printf.sprintf "  crl [%s] :\n    step(< %s | %s >)\n    =>\n    < %s | %s >\n      if %s ."
                   (String.lowercase_ascii prefix)
-                  z_in lhs_t.text z_out rhs_text_out cond
+                  z_in lhs_text_out z_out rhs_text_out cond
         end
   ) rules in
 

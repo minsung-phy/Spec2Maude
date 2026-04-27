@@ -79,6 +79,7 @@ mod WASM-FIB-BS is
 
   op i32v : Int -> WasmTerminal .
   eq i32v(I:Int) = CTORCONSTA2(CTORI32A0, I:Int) .
+  mb CTORCONSTA2(CTORI32A0, I:Int) : Val .
 
   op fib-frame : WasmTerminal -> Frame .
   eq fib-frame(NVAL) =
@@ -121,7 +122,8 @@ endm
 --- WASM-FIB-BS-PROPS: LTL Model Checking
 --- =============================================================
 
-load /Users/minsung/Dev/tools/Maude-3.5.1-macos-x86_64/model-checker
+load ../../tools/Maude-3.5.1-linux-x86_64/model-checker
+--- load /Users/minsung/Dev/tools/Maude-3.5.1-macos-x86_64/model-checker
 
 mod WASM-FIB-BS-PROPS is
   inc WASM-FIB-BS .
