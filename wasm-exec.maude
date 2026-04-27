@@ -238,6 +238,7 @@ endm
 --- =============================================================
 
 load ../../tools/Maude-3.5.1-linux-x86_64/model-checker
+--- load /Users/minsung/Dev/tools/Maude-3.5.1-macos-x86_64/model-checker
 
 mod WASM-FIB-PROPS is
   inc WASM-FIB .

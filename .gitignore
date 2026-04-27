@@ -17,9 +17,9 @@ _build/
 # 4. 기타 파일 제외
 .claude/
 .claude*
-CLAUDE.md
 .codex
 .codex-folder-backup/
+.codex.md
 
 .obsidian/
 

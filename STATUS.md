@@ -1,12 +1,81 @@
 # Spec2Maude — 현재 상태 / 문제점 / 할일
 
-작성일: 2026-04-19 (0421 미팅 반영: 2026-04-21, baseline 갱신: 2026-04-24)
+작성일: 2026-04-19 (0421 미팅 반영: 2026-04-21, baseline 갱신: 2026-04-24, nil-split 수정: 2026-04-27)
 
 ---
 
 ## 0. 0421 미팅 반영 — 새 작업 로드맵 (최우선)
 
 **대원칙**: "correct 먼저, 속도는 나중". 점프하지 말고 순차적으로.
+
+### 2026-04-27 현재 한 줄 요약
+- `translator_bs.ml` direct-conditional baseline은 교수님 nil-split 가설을 반영해 `fib(5)` rewrite까지 성공한다.
+- 하지만 baseline `modelCheck`는 아직 실행 가능하다고 보기 어렵다. `fib(2)` reachability도 60초 안에 끝나지 않았다.
+- `translator.ml` optimized 경로는 기존 fib rewrite/modelCheck 성공 경로이고, `translator_bs.ml` baseline은 correctness/reference artifact 및 differential 비교 기준으로 유지한다.
+
+### 지금까지 한 것
+- Ubuntu 환경에서 빌드/생성 경로를 복구했다.
+  - `dune build`
+  - `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude`
+- Linux Maude model-checker 경로를 `../../tools/Maude-3.5.1-linux-x86_64/model-checker`로 맞췄다.
+- `translator_bs.ml` baseline을 `translator.ml`과 분리했다.
+  - baseline 목적: heating/cooling 없이 SpecTec `-- Step:` rule을 direct conditional `crl`로 생성.
+  - `focused-step` / `step-enter` 실험은 실패 후 제거했다.
+- baseline `Step/ctxt-*` 5개 rule을 direct conditional `crl`로 생성한다.
+  - `Steps/trans`
+  - `Step/ctxt-instrs`
+  - `Step/ctxt-label`
+  - `Step/ctxt-handler`
+  - `Step/ctxt-frame`
+- `Step/ctxt-instrs` nil-split 문제를 수정했다.
+  - 기존 recursive focus: `INSTR`
+  - 현재 recursive focus: `INSTR-HEAD : WasmTerminal` + `INSTR-REST : WasmTerminals`
+  - 목적: recursive premise가 `eps` focus로 match되는 것을 좌항 패턴 단계에서 차단.
+- baseline에서 concrete state에 대한 `Z : State` executable membership guard가 실제 step 적용을 막는 문제를 확인했다.
+  - 현재 조치: `Step*` relation의 `: State` guard는 executable condition에서 제외.
+  - 장기 조치: record representation에 맞는 `State` membership 생성 필요.
+- `wasm-exec-bs.maude` baseline harness를 유지한다.
+  - manual step override 없이 generated `output_bs.maude` direct rule을 사용.
+  - fib용 `mb CTORCONSTA2(CTORI32A0, I:Int) : Val .` 추가.
+- 검증된 baseline 결과:
+  - `LOCAL.GET` 단일 step 정상 종료.
+  - `rew [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .`
+  - 결과: 24,902 rewrites, 최종값 `CTORCONSTA2(CTORI32A0, 5)`.
+- 문서 업데이트:
+  - `STATUS.md`
+  - `paper_plan.md`
+  - `meeting/session_summary.txt`
+  - `meeting/personal_meeting_0428/nil_split_stack_overflow_report.md`
+
+### 아직 안 한 것 / 남은 문제
+- baseline `modelCheck`는 아직 성공 확인 안 됐다.
+  - `modelCheck(fib-config(i32v(2)), <> result-is(1))`는 60초 제한에서 미종료.
+  - 이제 문제는 stack overflow가 아니라 model-checking 상태공간/proof-search 비용이다.
+- `Step*`에서 제외한 `: State` guard를 더 strict하게 되살리는 작업은 아직 안 했다.
+  - 그냥 다시 넣으면 concrete `fib-state(...)`가 membership에서 막혀 rule이 적용되지 않는다.
+  - 해야 할 일은 raw guard 재추가가 아니라 `State` membership 생성/record typing을 정확히 고치는 것이다.
+- Wasm 3.0 전체 rule catalog는 아직 미완료다.
+  - 현재는 `4.3-execution.instructions.spectec`의 `-- Step:` 주요 context rule 중심으로 확인했다.
+- bind-before-use warning이 남아 있다.
+  - 특히 `br_on_cast-*`, `call_ref-func`, 일부 GC/array rule의 existential/result binder 처리.
+- `IterPr` / `IterE` lowering은 아직 의미 보존 수준으로 완성되지 않았다.
+  - load-time warning 일부는 줄였지만, sequence accumulation 의미를 일반적으로 보존하는 변환은 미완성이다.
+- fib 외 benchmark는 아직 없다.
+  - factorial, sum, memory/table, GC, exception benchmark가 필요하다.
+- baseline과 optimized heat/cool 경로의 differential comparison harness는 아직 없다.
+
+### 바로 다음에 해야 할 일
+1. baseline modelCheck 시간을 실제로 잰다.
+   - 새 스크립트: `scripts/time_baseline_modelcheck.sh`
+   - 예: `scripts/time_baseline_modelcheck.sh 2 reach 600`
+   - 예: `scripts/time_baseline_modelcheck.sh 5 trap 1800`
+2. 교수님께 보고:
+   - nil-split 가설은 맞았고, 수정 후 rewrite는 성공.
+   - modelCheck는 아직 오래 걸리며, 다음 병목은 상태공간/proof-search 비용.
+3. `State` membership을 정확히 생성할지, 아니면 baseline에서는 sort annotation을 executable guard에서 제외하는 정책을 유지할지 교수님과 결정.
+4. `-- Step:` rule catalog를 전체 Wasm 3.0 대상으로 완성.
+5. fib 외 최소 benchmark 3개를 추가.
+6. 논문용으로 optimized semantics와 baseline semantics의 차이를 표로 정리.
 
 ### Step 0 (지금 당장) — conditional 전수 변환
 - 모든 Step 계열 rule (`Step`, `Step-pure`, `Step-read`, 그 외 condition 있는 모든 relation rule 포함)을 **`crl` + `step` 래퍼 + conditional** 단순형으로 1:1 변환.
@@ -37,16 +106,17 @@
 - **Rule 함수 위치 (Q2)**: 과거 노트의 "룰에 함수 금지"는 **LHS(좌항)** 한정이었음. **RHS(우항) 에 함수 호출은 허용** (오히려 SpecTec isomorphic 유지에 필요). 현재 24개는 유지.
 
 ### 진행률 표시 (Step 기준)
-- Step 0: ~55% (baseline 변환기/엔트리 분리, `-- Step:` context rule 5/5 direct `crl` 생성, `focused-step` 제거, synthetic wrapper 제거, scalar guard 보존 수정 완료. 단 fib baseline은 stack overflow로 미통과)
+- Step 0: ~70% (baseline 변환기/엔트리 분리, `-- Step:` context rule 5/5 direct `crl` 생성, `focused-step` 제거, nil-split 방지용 non-empty focus 수정 완료. `fib(5)` baseline rewrite는 manual override 없이 통과. 단 baseline modelCheck는 아직 60초 내 미종료)
 - Step 1: ~40% (`4.3-execution.instructions.spectec` 기준 `-- Step:` rule 5개와 generated coverage 5/5 확인. 미래 섹션/전체 rule catalog는 아직 미완)
 - Step 2: 0% (instrs heat/cool off 상태)
 - Step 3: 0%
 
-### 바로 다음 구현 시작점
-1. `translator.ml`을 복사해 `translator_bs.ml` 생성
-2. baseline 전용 엔트리(`main_bs.ml` 또는 CLI 분기) 추가
-3. `translator_bs.ml`에서는 heating/cooling 일반화보다 **conditional 1:1 coverage**를 우선
-4. 첫 목표는 `wasm-exec.maude`의 manual override 9개 없이 fib가 돌아가는지 확인
+### 예전 시작점 상태
+- `translator.ml` 복사 및 `translator_bs.ml` 생성: 완료
+- baseline 전용 엔트리 `main_bs.ml` 추가: 완료
+- baseline conditional 1:1 coverage 우선 구현: 진행 중
+- manual override 없이 baseline fib rewrite 확인: `fib(5)`까지 완료
+- manual override 없이 baseline fib modelCheck 확인: 미완료
 
 ### 2026-04-21 baseline translator 착수
 - `translator_bs.ml`, `main_bs.ml`, `dune` baseline 엔트리 분리 완료
@@ -840,3 +910,51 @@
 1. 이 baseline 실패를 보고서에 정리한다.
 2. 교수님께 “baseline direct `crl`은 구현했지만 실행 baseline으로는 stack overflow”라고 보고한다.
 3. 이후 실행 가능한 경로는 `translator.ml`의 optimized heat/cool 경로 또는 선배 코드식 redex-localized 구조와 비교하면서, 어떤 최적화가 semantic-preserving인지 논증한다.
+
+---
+
+## 9. 2026-04-27 baseline nil-split 수정
+
+### 교수님 가설 확인
+- 교수님이 지적한 `nil` split 문제는 baseline `Step/ctxt-instrs`에 실제로 해당했다.
+- 기존 direct conditional rule은 recursive focus가 sequence 변수 하나였다.
+  - 형태: `step(< Z | VAL INSTR INSTR1 >) => ... if step(< Z | INSTR >) => ...`
+  - Maude의 associative sequence matching에서는 `INSTR = eps`인 경우도 좌항 후보가 될 수 있다.
+  - 이 때문에 `f(nil) f(1 2 3 4)` 같은 식의 empty-focus 분해가 proof search에 들어갈 수 있었다.
+- 수정 후에는 recursive focus를 구조적으로 non-empty로 만든다.
+  - 생성 형태: `step(< Z | VAL INSTR-HEAD INSTR-REST INSTR1 >) => ...`
+  - `INSTR-HEAD : WasmTerminal`, `INSTR-REST : WasmTerminals`
+  - 따라서 recursive premise는 항상 `step(< Z | INSTR-HEAD INSTR-REST >) => ...`이고, focus 전체가 `eps`가 되는 match는 좌항에서부터 불가능하다.
+
+### 구현 상태
+- `translator_bs.ml`에서 `Step/ctxt-instrs` rule만 일반적인 token rewrite 방식으로 focus 변수를 `HEAD REST`로 분해한다.
+  - rule-specific Maude 코드를 하드코딩한 것이 아니라, 생성된 Maude 변수 토큰을 구조적으로 교체한다.
+- `Step/ctxt-instrs`의 condition 순서를 조정했다.
+  - `all-vals(VAL) = true`
+  - `(VAL =/= eps or INSTR1 =/= eps) = true`
+  - recursive `step(< Z | INSTR-HEAD INSTR-REST >) => ...`
+- baseline 실행 중 `Z : State` membership guard가 record-normalized concrete state에 대해 실패해 `LOCAL.GET` 같은 실제 step 적용을 막는 문제가 별도로 확인됐다.
+  - 현재 baseline에서는 `Step*` relation의 `: State` guard를 executable condition에서 제외한다.
+  - 해석: SpecTec metavariable sort annotation을 Maude proof obligation으로 매번 실행하지 않고, `< Z | ... >` configuration shape와 harness typing에 맡기는 방식이다.
+  - 더 엄격한 장기 해법은 `State` membership을 record representation에 대해 정확히 생성하는 것이다.
+- `wasm-exec-bs.maude`에는 fib harness용 concrete value membership을 추가했다.
+  - `mb CTORCONSTA2(CTORI32A0, I:Int) : Val .`
+
+### 검증 결과
+- build/regenerate:
+  - `dune build` 성공
+  - `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` 성공
+- singleton step:
+  - `rew [1] in WASM-FIB-BS : step(< fib-state(i32v(1)) | CTORLOCALGETA1(1) >) .`
+  - 결과: `CTORCONSTA2(CTORI32A0, 0)`로 정상 step
+- fib rewrite:
+  - `rew [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .`
+  - 결과: 24,902 rewrites, 최종 instruction `CTORCONSTA2(CTORI32A0, 5)`
+- baseline modelCheck:
+  - `modelCheck(fib-config(i32v(2)), <> result-is(1))`도 60초 제한에서 종료하지 못했다.
+  - 따라서 현재 baseline은 “stack overflow 없이 fib rewrite는 가능한 direct-crl artifact”까지 개선됐지만, “model checking 가능한 baseline”은 아직 아니다.
+
+### 교수님께 보고할 현재 표현
+- “교수님 말씀대로 nil-split 문제가 맞았습니다. `Step/ctxt-instrs`에서 recursive focus가 sequence 변수 하나라서 `eps`로도 match될 수 있었고, 이것이 empty-focus proof search를 만들었습니다. 그래서 focus를 `INSTR-HEAD : WasmTerminal` + `INSTR-REST : WasmTerminals`로 나눠 recursive premise가 항상 non-empty instruction list를 받도록 바꿨습니다.”
+- “그 결과 `LOCAL.GET` 단일 step과 `fib(5)` rewrite는 더 이상 stack overflow 없이 종료합니다. 다만 direct `crl` baseline의 modelCheck는 `fib(2)`에서도 60초 안에 끝나지 않아, 다음 병목은 stack overflow가 아니라 상태공간/proof-search 비용입니다.”
+- “추가로 `Z : State` guard를 executable condition으로 두면 concrete state membership이 실패해서 rule이 적용되지 않았습니다. 현재는 Step 계열의 `State` sort annotation을 실행 조건에서 빼서 baseline을 돌렸고, 장기적으로는 State membership 생성 쪽을 정확히 고치는 것이 더 strict한 해법입니다.”
