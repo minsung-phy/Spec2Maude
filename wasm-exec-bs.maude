@@ -13,11 +13,15 @@ load output_bs
 mod WASM-EXEC-BS is
   inc SPECTEC-CORE .
 
-  --- ExecConf, <_|_>, and step are inherited from SPECTEC-CORE.
-  --- Baseline output owns the direct step/ctxt rules.
+  --- Config, _;_, step, step-pure, step-read, and steps are inherited from SPECTEC-CORE.
+  --- Baseline output owns the direct relation-preserving execution rules.
 
-  vars VB-Z TS-Z MC-Z-EC : WasmTerminal .
-  vars TS-IS MC-IS-EC : WasmTerminals .
+  sort MCConfig .
+  op mc : Config -> MCConfig [ctor] .
+
+  vars VB-Z MC-Z-EC : State .
+  var MC-IS-EC : InstrTerminals .
+  var MC-EC-OUT : Config .
 
   --- -------------------------------------------------------
   --- void-bt: opaque Blocktype constant for void blocks/loops.
@@ -26,25 +30,17 @@ mod WASM-EXEC-BS is
   eq $blocktype(VB-Z, void-bt)            = CTORARROWA3(eps, eps, eps) .
   eq $blocktype(VB-Z, CTORWRESULTA1(eps)) = CTORARROWA3(eps, eps, eps) .
 
-  --- -------------------------------------------------------
-  --- Transitive closure steps*
-  --- -------------------------------------------------------
-  op steps : ExecConf -> ExecConf .
-
-  eq  steps(< TS-Z | eps >) = < TS-Z | eps > .
-  ceq steps(< TS-Z | TS-IS >) = < TS-Z | TS-IS > if all-vals(TS-IS) = true .
-  ceq steps(< TS-Z | TS-IS >) = < TS-Z | TS-IS > if is-trap(TS-IS) = true .
-
-  crl [steps-trans] :
-    steps(< TS-Z | TS-IS >)
-    => steps(step(< TS-Z | TS-IS >))
-    if TS-IS =/= eps /\ all-vals(TS-IS) = false /\ is-trap(TS-IS) = false .
-
   --- One-step rule for LTL model checking.
+  --- The mc wrapper keeps this rule from being used again while Maude solves
+  --- the condition `step(C) => C'`; otherwise a single model-check transition
+  --- can accidentally range over many exec-step transitions.
   crl [exec-step] :
-    < MC-Z-EC | MC-IS-EC >
-    => step(< MC-Z-EC | MC-IS-EC >)
-    if MC-IS-EC =/= eps /\ all-vals(MC-IS-EC) = false /\ is-trap(MC-IS-EC) = false .
+    mc(MC-Z-EC ; MC-IS-EC)
+    => mc($cfg-state(MC-EC-OUT) ; $cfg-instrs(MC-EC-OUT))
+    if step(MC-Z-EC ; MC-IS-EC) => MC-EC-OUT
+    /\ MC-IS-EC =/= eps
+    /\ all-vals(MC-IS-EC) = false
+    /\ is-trap(MC-IS-EC) = false .
 
 endm
 
@@ -92,10 +88,10 @@ mod WASM-FIB-BS is
   cmb fib-frame(NVAL) : Frame if NVAL : Val .
 
   op fib-state : WasmTerminal -> State .
-  eq fib-state(NVAL) = CTORSEMICOLONA2(empty-store, fib-frame(NVAL)) .
+  eq fib-state(NVAL) = empty-store ; fib-frame(NVAL) .
   cmb fib-state(NVAL) : State if NVAL : Val .
 
-  op fib-loop-body : -> WasmTerminals .
+  op fib-loop-body : -> InstrTerminals .
   eq fib-loop-body =
     CTORLOCALGETA1(0) CTORCONSTA2(CTORI32A0, 0)
     CTORRELOPA2(CTORI32A0, CTORLEA1(CTORSA0)) CTORBRIFA1(1)
@@ -107,13 +103,13 @@ mod WASM-FIB-BS is
     CTORBINOPA2(CTORI32A0, CTORSUBA0) CTORLOCALSETA1(0)
     CTORBRA1(0) .
 
-  op fib-body : -> WasmTerminals .
+  op fib-body : -> InstrTerminals .
   eq fib-body =
     CTORBLOCKA2(void-bt, CTORLOOPA2(void-bt, fib-loop-body))
     CTORLOCALGETA1(1) .
 
-  op fib-config : WasmTerminal -> ExecConf .
-  eq fib-config(NVAL) = < fib-state(NVAL) | fib-body > .
+  op fib-config : WasmTerminal -> Config .
+  eq fib-config(NVAL) = fib-state(NVAL) ; fib-body .
 
 endm
 
@@ -130,32 +126,32 @@ mod WASM-FIB-BS-PROPS is
   inc MODEL-CHECKER .
   inc LTL-SIMPLIFIER .
 
-  subsort ExecConf < State .
+  subsort MCConfig < State .
 
   ops done trap-seen result-neg : -> Prop .
   op  result-is : Int -> Prop .
 
   var MC-I  : Int .
-  var MC-IS : WasmTerminals .
-  var MC-Z  : WasmTerminal .
-  var MC-EC : ExecConf .
+  var MC-IS : InstrTerminals .
+  var MC-Z  : State .
+  var MC-EC : Config .
 
-  ceq < MC-Z | MC-IS > |= done            = true if all-vals(MC-IS) = true .
-  ceq < MC-Z | MC-IS > |= result-is(MC-I) = true if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) .
-  ceq < MC-Z | MC-IS > |= trap-seen       = true if MC-IS = CTORTRAPA0 eps .
-  ceq < MC-Z | MC-IS > |= result-neg      = true
+  ceq mc(MC-Z ; MC-IS) |= done            = true if all-vals(MC-IS) = true .
+  ceq mc(MC-Z ; MC-IS) |= result-is(MC-I) = true if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) .
+  ceq mc(MC-Z ; MC-IS) |= trap-seen       = true if MC-IS = CTORTRAPA0 eps .
+  ceq mc(MC-Z ; MC-IS) |= result-neg      = true
       if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) /\ (MC-I < 0) = true .
 
-  eq MC-EC |= done         = false [owise] .
-  eq MC-EC |= trap-seen    = false [owise] .
-  eq MC-EC |= result-neg   = false [owise] .
-  eq MC-EC |= result-is(MC-I) = false [owise] .
+  eq mc(MC-EC) |= done         = false [owise] .
+  eq mc(MC-EC) |= trap-seen    = false [owise] .
+  eq mc(MC-EC) |= result-neg   = false [owise] .
+  eq mc(MC-EC) |= result-is(MC-I) = false [owise] .
 
 endm
 
 --- =============================================================
 --- USAGE:
 ---   rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .
----   red in WASM-FIB-BS-PROPS : modelCheck(fib-config(i32v(5)), <> result-is(5)) .
----   red in WASM-FIB-BS-PROPS : modelCheck(fib-config(i32v(5)), [] ~ trap-seen) .
+---   red in WASM-FIB-BS-PROPS : modelCheck(mc(fib-config(i32v(5))), <> result-is(5)) .
+---   red in WASM-FIB-BS-PROPS : modelCheck(mc(fib-config(i32v(5))), [] ~ trap-seen) .
 --- =============================================================
