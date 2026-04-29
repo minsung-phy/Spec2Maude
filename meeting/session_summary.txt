@@ -344,3 +344,142 @@ Next session entry point:
 2. If strictness is requested, work on proper `State` membership generation instead of re-adding raw `Z : State` guards to `Step*` rules.
 3. For modelCheck performance, compare the direct-crl baseline with `translator.ml` heat/cool and senior-code redex-localized structure.
 4. If reporting, say: nil-split fixed rewrite; modelCheck still expensive.
+
+2026-04-28 session update
+
+Purpose:
+- Continue C1 baseline work after the professor required relation-preserving
+  `Step`, `Step_pure`, `Step_read`, and `Steps`.
+- User asked specifically to:
+  1. preserve `val^n` binders generally in `translator_bs.ml`,
+  2. make `Step_pure/br-label-zero` rewrite inside wrappers,
+  3. re-run `fib(0)`, `fib(1)`, `fib(5)` rewriting/model checking,
+  4. update documents.
+
+Implementation:
+- `lib/frontend/elab.ml`
+  - Definite iterator binders are now preserved instead of being lowered to
+    ordinary `List`.
+  - This lets the backend see `ListN(count, ...)` for binders such as `val^n`.
+- `translator_bs.ml`
+  - Records general `(count, sequence)` pairs from `ListN` binders.
+  - Generates length constraints such as `len(VAL) == N`.
+  - `Step_pure/br-label-zero` now has the generated `len(VAL) == N` condition.
+  - Removed generic `Step/pure` and `Step/read` bridge rules because they could
+    satisfy conditions with unreduced relation calls and accumulate wrappers.
+  - Generates per-case bridges for `Step_pure` and `Step_read`.
+  - Generates prefix/suffix context bridges mechanically for `Step_pure`,
+    `Step_read`, direct `Step` rules, and label/handler/frame contexts.
+  - The executable generic `Step/ctxt-instrs` split rule is currently omitted
+    because it causes Maude list-split explosion.
+- `wasm-exec-bs.maude`
+  - `exec-step` uses config projection helpers, but it still relies on the
+    conditional form `step(C) => C'`.
+
+Verification:
+- `dune build` succeeds.
+- `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` succeeds.
+- Rewriting now succeeds:
+  - `fib(0)` -> `CTORCONSTA2(CTORI32A0, 0)`, 2,163 rewrites, about 0.29s real.
+  - `fib(1)` -> `CTORCONSTA2(CTORI32A0, 1)`, 7,213 rewrites, about 0.29s real.
+  - `fib(5)` -> `CTORCONSTA2(CTORI32A0, 5)`, 27,593 rewrites, about 0.31s real.
+- Model checking:
+  - `modelCheck(fib-config(i32v(0)), <> result-is(0))` returns `true`.
+    It used 2,567,549 rewrites and about 1.39s real.
+  - `fib(1)` reachability timed out at 60s.
+  - `fib(5)` reachability timed out at 60s.
+- Diagnostic search:
+  - `search [20] in WASM-FIB-BS : fib-config(i32v(1)) =>1 C:Config .`
+    produced at least 20 one-step solutions in about 3.28s.
+  - Current diagnosis: model checking still explodes because the harness rule
+    uses `step(C) => C'` in a Maude rewrite condition, which can expose many
+    reachable `Config` results instead of only the intended immediate step.
+
+Documents updated:
+- `STATUS.md`
+- `paper_plan.md`
+- `.codex.md`
+- `meeting/session_summary.txt`
+
+Current professor-facing summary:
+- "`val^n` 보존과 `Step_pure/br-label-zero` wrapper 내부 rewrite 문제는
+  해결했습니다. baseline rewrite는 `fib(0)`, `fib(1)`, `fib(5)` 모두 정상
+  종료합니다."
+- "다만 model checking은 `fib(0)`만 true로 끝나고 `fib(1)`부터 60초
+  timeout입니다. 현재 원인은 계산 규칙이 stuck되는 것이 아니라 `exec-step`의
+  `step(C) => C'` 조건이 immediate one-step이 아니라 여러 reachable config를
+  transition으로 노출하는 데 있습니다."
+
+Next session entry point:
+1. Do not revert the `val^n` preservation in `lib/frontend/elab.ml` and
+   `translator_bs.ml`.
+2. Do not reintroduce the generic `Step/pure` or `Step/read` bridge.
+3. Do not reintroduce executable generic `Step/ctxt-instrs` without measuring
+   state explosion.
+4. Next technical task is to make `exec-step` a true one-step transition for
+   model checking.
+
+2026-04-28 strict C1 update after professor direction
+
+Purpose:
+- Follow the professor's requested C1 baseline shape strictly:
+  `Step`, `Step_pure`, `Step_read`, and `Steps` should remain separate
+  relations; `steps(C) => C'` should be used; configs should print as `_ ; _`.
+- Re-test whether the faithful baseline can rewrite and model-check Fibonacci.
+
+Implementation:
+- `translator_bs.ml`
+  - Keeps `Step`, `Step_pure`, `Step_read`, and `Steps` as separate generated
+    Maude operators.
+  - Generates `Step/pure` through `step-pure(...)` and `Step/read` through
+    `step-read(...)`.
+  - Generates `Steps/trans` as `steps(C) => C'' if step(C) => C' /\ steps(C') => C''`.
+  - Adds `ValTerminals` and declares SpecTec `val*` binder variables with that
+    sort instead of arbitrary `WasmTerminals`.
+  - Preserves `val^n` as length constraints.
+  - Keeps `Step/ctxt-instrs` as a generic context rule but rewrites the
+    recursive focus to a non-empty sequence `INSTR-HEAD INSTR-REST`; this blocks
+    the nil-split case where the focus is `eps`.
+  - Splits empty/non-empty result cases where Maude needs separate rules for
+    sequence result `eps`.
+- `wasm-exec-bs.maude`
+  - Adds `MCConfig` and `mc(Config)` for model checking.
+  - `exec-step` rewrites `mc(C)` to `mc(C')`, not raw `Config` to `Config`.
+  - This prevents the harness transition from being reused recursively while
+    Maude solves `step(C) => C'`.
+
+Verification:
+- `dune build` succeeds.
+- `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` succeeds.
+- Direct previously stuck label+suffix case now rewrites:
+  - 156 rewrites, about 1ms Maude real time.
+- C1 rewriting:
+  - `fib(0)` -> `i32v(0)`, 945 rewrites, about 2ms Maude real.
+  - `fib(1)` -> `i32v(1)`, 7,549 rewrites, about 10ms Maude real.
+  - `fib(5)` -> `i32v(5)`, 33,965 rewrites, about 44ms Maude real.
+  - `steps(fib(5))` -> `i32v(5)`, 33,966 rewrites, about 45ms Maude real.
+- Terminal-state model-check sanity:
+  - `mc(fib-state(i32v(0)) ; CTORCONSTA2(CTORI32A0, 0)) |= result-is(0)` is `true`.
+  - `modelCheck(mc(fib-state(i32v(0)) ; CTORCONSTA2(CTORI32A0, 0)), <> result-is(0))`
+    is `true`.
+- Initial-state model checking:
+  - `modelCheck(mc(fib-config(i32v(0))), <> result-is(0))` timed out after
+    120 seconds.
+  - Search from `mc(fib-config(i32v(0)))` timed out after 20 seconds after only
+    a few states and showed nested label/control contexts.
+
+Current diagnosis:
+- The previous stack-overflow / nil-split / rewrite stuckness issue is fixed.
+- The previous raw-`Config` model-check harness over-approximation is also
+  fixed by `mc(Config)`.
+- The remaining failure is C1 state-space/proof-search explosion during model
+  checking. This is evidence that C1 should be the faithful reference semantics
+  and C2 should be the practical model-checking semantics.
+
+Next session entry point:
+1. Report to the professor that strict C1 rewrite/`steps` works but direct C1
+   model checking still times out.
+2. Ask whether C1 must model-check from initial states, or whether C1 as a
+   faithful executable reference plus C2 as optimized model-check target is the
+   intended research split.
+3. Start C2 from the current C1 and measure model-checking improvement.

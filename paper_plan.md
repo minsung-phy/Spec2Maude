@@ -2,99 +2,62 @@
 
 Updated: 2026-04-28
 
-This document is the research and paper plan. Engineering status is in `STATUS.md`.
+Engineering status is in `STATUS.md`.
 
 ---
 
-## 1. Target
+## 1. Paper Thesis
 
-Primary long-term target:
+One-sentence story:
 
-- **PLDI-level paper**, if the project obtains a strong research win beyond engineering.
+> Spec2Maude translates WebAssembly 3.0 SpecTec semantics to Maude while
+> preserving the original relation structure, then applies justified
+> transformations that make the generated semantics usable for LTL model
+> checking.
 
-Realistic strong targets:
+Core claim:
 
-- CAV
-- OOPSLA
-- TACAS
-- ESOP
-- FM
-- VMCAI
-
-Current judgement:
-
-- C1+C2+C3 can make a strong formal-methods paper.
-- PLDI likely requires C4 plus at least one concrete finding or broadly useful technique.
-
----
-
-## 2. Core Paper Thesis
-
-One-sentence paper story:
-
-> We present Spec2Maude, a relation-preserving translation from the WebAssembly 3.0 SpecTec semantics to Maude, and show how semantics-preserving transformations make the generated rewriting semantics usable for LTL model checking.
-
-Longer story:
-
-1. SpecTec is the official-style semantic metalanguage for Wasm 3.0.
-2. Existing executable semantics are often hand-curated.
-3. We automatically translate SpecTec into Maude.
-4. A direct isomorphic translation is faithful but can be hostile to model checking.
-5. We therefore separate:
-   - faithful baseline translation
-   - analysis-friendly transformation
-6. We evaluate the result with Maude rewriting and LTL model checking.
-7. We study state explosion and show reductions/transformations that make verification practical.
+- A faithful relation-preserving translation is important as a reference.
+- Directly model checking that faithful semantics causes severe state-space
+  explosion.
+- The research contribution is to separate:
+  1. the faithful C1 baseline,
+  2. the optimized C2 model-checking semantics,
+  3. the evaluation showing why C2 is needed and how much it helps.
 
 ---
 
-## 3. Contribution Structure
+## 2. Contribution Plan
 
-### C1. Isomorphic SpecTec-to-Maude Translation
+### C1. Relation-Preserving Baseline
 
 Implementation:
 
 - `translator_bs.ml`
 
-Required claims:
+Required shape:
 
-- Preserves SpecTec relation structure.
-- Preserves rule names and premises.
-- Uses Maude rewrite rules for SpecTec rewrite relations.
-- Avoids hiding SpecTec semantics behind hand-written execution rules.
+- Preserve `Step`, `Step_pure`, `Step_read`, and `Steps`.
+- Preserve rule names and premises.
+- Use `_ ; _` for configs.
+- Generate `steps(C) => C'`.
+- Preserve `val^n` and `val*` structure.
+- Avoid redundant executable sort guards when Maude declarations already enforce
+  the sort.
 
-Current professor requirement:
+Current status:
 
-- Preserve these four relations distinctly:
+- Implemented.
+- `fib(0)`, `fib(1)`, `fib(5)` rewrite successfully.
+- `steps(fib(5))` rewrites successfully.
+- Initial-state model checking still times out even for `fib(0)`.
 
-```spectec
-Step      : config ~> config
-Step_pure : instr* ~> instr*
-Step_read : config ~> instr*
-Steps     : config ~>* config
-```
+Interpretation:
 
-Target generated Maude shape:
+- C1 is now useful as an executable reference for rewriting.
+- C1 is not yet practical as a direct model-checking target.
 
-```maude
-step(C)      => C'
-step-pure(I) => I'
-step-read(C) => I'
-steps(C)     => C'
-```
-
-Minimum acceptance criterion:
-
-- Generated baseline loads.
-- Small rewrite tests pass.
-- Small model-checking tests pass.
-
-Why this matters:
-
-- This is the foundation that lets reviewers trust later optimizations.
-- Without C1, the project looks like another hand-written Wasm semantics.
-
-### C2. Semantics-Preserving Analysis-Friendly Transformation
+### C2. Analysis-Friendly Transformation
 
 Implementation:
 
@@ -102,255 +65,175 @@ Implementation:
 
 Purpose:
 
-- Make Maude rewriting/model checking practical.
-- Keep the transformation justified by comparison with C1.
+- Derive a model-checking-friendly semantics from C1.
+- Reduce context/proof-search nondeterminism without changing observable Wasm
+  behavior.
 
-Possible transformations:
+Likely techniques:
 
-- heat/cool
-- redex localization
-- equation abstraction
-- state-space reduction
-- sorting/subsorting improvements
-- memoization or canonicalization where Maude supports it
+- heat/cool or focused evaluation contexts
+- deterministic one-redex stepping
+- context split pruning
+- canonicalization of equivalent control-context states
+- abstraction when the property permits it
 
 Required evidence:
 
-- Baseline and optimized semantics agree on small programs.
-- Optimized path handles larger benchmarks or properties that baseline cannot.
+- C2 agrees with C1 on small rewrite tests.
+- C2 model checking finishes where C1 times out.
+- Any transformation is explained as a semantics-preserving optimization, not a
+  hand-written replacement.
 
-Why this matters:
-
-- This is the bridge from “faithful translation” to “usable verification tool.”
-
-### C3. Maude LTL Model Checking of Wasm Programs
-
-Implementation:
-
-- Maude harnesses and benchmark suite.
+### C3. Model-Checking Evaluation
 
 Properties:
 
-- reachability: `<> result-is(N)`
-- safety: `[] ~ trap-seen`
-- progress/stuckness: `[] ~ stuck`
-- feature-specific properties:
-  - exception handler matching
-  - branch/label control preservation
-  - GC null/reference behavior
-  - memory/table bounds behavior
+- Reachability: `<> result-is(N)`
+- Safety: `[] ~ trap-seen`
+- Progress/stuckness when expressible
+- Feature-specific properties for memory/table/exception/GC rules
 
-Required benchmark growth:
+Benchmarks:
 
 - fib
 - factorial
 - iterative sum/product
 - memory load/store
 - table/call-indirect
-- exception try/catch/throw
-- GC struct/array get/set
+- exceptions
+- GC struct/array operations
 
-Why this matters:
+Tables needed:
 
-- C3 is the visible verification result.
-- It differentiates the work from translations that only execute programs.
+- rewrite time for C1 and C2
+- model-check time for C1 and C2
+- number of rewrites/states when available
+- timeout table
 
-### C4. State Explosion Analysis and Reduction
+### C4. State-Explosion Analysis
 
-Problem:
+Current evidence:
 
-- Model checking over generated rewriting semantics causes state explosion.
-- This already appears in the direct baseline: `fib(5)` modelCheck can run for hours.
+- C1 `fib(5)` rewrite: 33,965 rewrites, about 44ms Maude real time.
+- C1 `steps(fib(5))`: 33,966 rewrites, about 45ms Maude real time.
+- C1 `modelCheck(mc(fib-config(i32v(0))), <> result-is(0))`: timeout after
+  120 seconds.
+- Reachability search from `mc(fib-config(i32v(0)))` times out quickly and shows
+  nested label/control-context states.
 
-Paper contribution:
+Research angle:
 
-- Identify where explosion comes from:
-  - overlapping conditional rules
-  - associative sequence matching
-  - context decomposition choices
-  - unhelpful equations/rules in transition relation
-- Show transformations that reduce it:
-  - redex-localized stepping
-  - heat/cool discipline
-  - abstraction equations
-  - canonical configurations
-  - pruning impossible context splits
-
-Why this matters:
-
-- This can become the PLDI-level technical contribution if generalized beyond one benchmark.
+- Faithful generated semantics is executable, but its context rules expose too
+  much nondeterministic proof search to the model checker.
+- C2 should be presented as a systematic reduction from the faithful semantics.
 
 ---
 
-## 4. PLDI Bar
+## 3. PLDI Bar
 
-C1 alone is not enough for PLDI.
+C1 alone is not enough.
 
-C1+C2+C3 may be enough for a strong formal-methods venue if implemented well.
-
-For PLDI, aim for:
+Minimum credible story:
 
 ```text
-C1 faithful automatic translation
-+ C2 semantics-preserving transformation framework
-+ C3 meaningful model-checking evaluation
-+ C4 state-explosion reduction technique
-+ one research win
+C1 faithful translation
++ C2 transformed executable semantics
++ C3 benchmark/property evaluation
++ C4 state-explosion diagnosis and reduction
 ```
 
-Research win options:
+PLDI likely needs one stronger research win:
 
-1. Find a Wasm 3.0 spec ambiguity or bug.
-2. Find a differential-testing mismatch with V8, wasmtime, SpiderMonkey, or the reference interpreter.
-3. Develop a generally applicable state-space reduction method for SpecTec-generated Maude semantics.
-4. Demonstrate LTL properties for Wasm 3.0 features that existing Wasm semantics tools cannot practically check.
-
-Current most realistic PLDI path:
-
-- C1 baseline translator
-- C2 optimized transformation
-- C3 benchmark/property suite
-- C4 state-explosion reduction
-- plus either differential testing or a strong Wasm 3.0 feature case study
+1. A Wasm 3.0 spec ambiguity or bug.
+2. A mismatch found by differential testing against V8/wasmtime/SpiderMonkey.
+3. A general state-space reduction method for SpecTec-generated Maude semantics.
+4. LTL verification of Wasm 3.0 features that existing tools cannot practically
+   check.
 
 ---
 
-## 5. Development Roadmap
+## 4. Roadmap
 
-### Phase 0: Baseline v2, 2026-04 to 2026-05
+### Phase 0: Finish C1 Baseline
 
-Goal:
+Done:
 
-- Implement professor's 2026-04-28 relation-preserving baseline.
+- [x] Generate `_ ; _`.
+- [x] Generate `step`, `step-pure`, `step-read`, `steps`.
+- [x] Generate `steps(C) => C'`.
+- [x] Preserve `val^n` length constraints.
+- [x] Restrict `val*` binders with `ValTerminals`.
+- [x] Prevent empty recursive focus in `Step/ctxt-instrs`.
+- [x] Verify `fib(0)`, `fib(1)`, `fib(5)` rewriting.
+- [x] Verify `steps(fib(5))` rewriting.
+- [x] Fix model-check harness over-approximation with `mc(Config)`.
 
-Tasks:
+Still open:
 
-- [ ] Generate `Config` and `_ ; _`.
-- [ ] Generate distinct `step`, `step-pure`, `step-read`, `steps`.
-- [ ] Translate `Steps` as `steps(C) => C'`, not `Judgement => valid`.
-- [ ] Remove redundant sort guards when variables are already sorted.
-- [ ] Preserve nil-split fix for `Step/ctxt-instrs`.
-- [ ] Regenerate `output_bs.maude`.
-- [ ] Verify core rule shapes.
-- [ ] Run small rewrite tests.
-- [ ] Run small model-checking tests.
+- [ ] Ask professor whether C1 must model-check from initial states, or whether
+      C1 rewrite/reference execution is enough.
+- [ ] If professor requires direct C1 model checking, investigate a deeper Maude
+      strategy/fairness/control mechanism for the strict rules.
 
-Exit criterion:
-
-- `fib(0)` and `fib(1)` modelCheck finish on baseline.
-- If `fib(2)` does not finish, record why and use it as state-explosion evidence.
-
-### Phase 1: Baseline Coverage, 2026-05 to 2026-06
-
-Goal:
-
-- Know exactly what is translated and what is not.
+### Phase 1: Build C2
 
 Tasks:
 
-- [ ] Complete full Wasm 3.0 `-- Step:` rule catalog.
-- [ ] Classify rule patterns:
-  - pure
-  - read
-  - state-changing
-  - context
-  - iterated premise
-  - static premise
-- [ ] Fix or explicitly reject unsupported patterns.
+- [ ] Rebuild `translator.ml` as a justified transformation from C1.
+- [ ] Add deterministic/focused stepping for model checking.
+- [ ] Preserve observable agreement with C1 on small programs.
+- [ ] Measure model-checking improvement on fib first.
+
+### Phase 2: Broaden Coverage
+
+Tasks:
+
+- [ ] Complete Wasm 3.0 execution-rule coverage table.
+- [ ] Classify unsupported patterns.
 - [ ] Resolve major bind-before-use warnings.
+- [ ] Add non-fib benchmarks.
 
-Exit criterion:
-
-- Coverage table.
-- Unsupported rule list with reasons.
-
-### Phase 2: Optimized Semantics, 2026-06 to 2026-08
-
-Goal:
-
-- Make model checking practical.
+### Phase 3: Evaluation
 
 Tasks:
 
-- [ ] Rebuild `translator.ml` as a justified transformation from baseline.
-- [ ] Implement heat/cool or redex-localized stepping.
-- [ ] Compare optimized vs baseline on small benchmarks.
-- [ ] Record speed/state-space improvements.
+- [ ] 5+ benchmarks.
+- [ ] 3+ properties per benchmark.
+- [ ] C1-vs-C2 rewrite table.
+- [ ] C1-vs-C2 model-check table.
+- [ ] Timeout/state-explosion table.
 
-Exit criterion:
-
-- Optimized path model-checks beyond what baseline can handle.
-
-### Phase 3: Benchmark and Property Suite, 2026-08 to 2026-10
-
-Goal:
-
-- Produce evaluation tables.
-
-Tasks:
-
-- [ ] Add 5+ benchmarks.
-- [ ] Add 3+ properties per benchmark.
-- [ ] Measure rewrite time.
-- [ ] Measure model-checking time.
-- [ ] Compare baseline vs optimized.
-
-Exit criterion:
-
-- Evaluation table suitable for paper draft.
-
-### Phase 4: Research Win, 2026-10 to 2027-02
-
-Goal:
-
-- Move from engineering paper to top-tier paper.
+### Phase 4: Research Win
 
 Tasks:
 
 - [ ] Differential testing harness.
-- [ ] Wasm 3.0 feature case studies.
-- [ ] Search for spec ambiguity / engine mismatch.
-- [ ] Generalize state-space reduction technique.
-
-Exit criterion:
-
-- At least one result that is not just “we built a translator.”
-
-### Phase 5: Writing, 2027
-
-Tasks:
-
-- [ ] Introduction and motivation.
-- [ ] SpecTec-to-Maude translation rules.
-- [ ] Correctness/faithfulness argument.
-- [ ] Transformation framework.
-- [ ] Model-checking methodology.
-- [ ] Evaluation.
-- [ ] Related work:
-  - K-Wasm
-  - Wasm reference interpreter
-  - Ott/Lem
-  - PLT Redex
-  - Maude model checking
-- [ ] Artifact instructions.
+- [ ] Wasm 3.0 feature case study.
+- [ ] Search for spec ambiguity or engine mismatch.
+- [ ] Generalize the state-space reduction technique.
 
 ---
 
-## 6. Immediate Next Paper Tasks
+## 5. Writing Guidance
 
-Do these now:
+Do not claim:
 
-1. Fix baseline v2 according to the 2026-04-28 professor requirements.
-2. Make baseline small modelCheck work or produce a precise state-explosion diagnosis.
-3. Write a short baseline design note:
-   - SpecTec rule
-   - generated Maude rule
-   - why it is isomorphic
-4. Create first benchmark/property table using fib only.
-5. Add one non-fib benchmark.
+- "The faithful baseline scales to model checking."
 
-Do not do yet:
+Honest claim:
 
-- Do not chase PLDI writing before C1 baseline is clean.
-- Do not optimize before baseline v2 rule shapes are correct.
-- Do not claim strict 1:1 if `Steps` is still `Judgement => valid`.
+- "The faithful baseline executes small programs by rewriting and serves as the
+  reference semantics."
+- "Direct model checking over the faithful baseline exposes severe state-space
+  explosion."
+- "The optimized translation is necessary for practical model checking."
+
+Next figure/table:
+
+- A table with C1 `fib(0/1/5)` rewrite and `steps` results.
+- A table showing C1 model-check timeout from initial `fib(0)`.
+- A short diagram:
+
+```text
+SpecTec -> C1 relation-preserving Maude -> C2 optimized Maude -> model checking
+```
