@@ -1,0 +1,70 @@
+# Spec2Maude Session Summary
+
+Updated: 2026-04-30
+
+This is the short handoff for a new AI session. The longer historical log is
+`meeting/session_summary.txt`.
+
+## Current Direction
+
+- C1 is `translator_bs.ml`: faithful, relation-preserving baseline.
+- C2 is `translator.ml`: analysis-friendly/model-checking transformation.
+- Professor requirements for C1:
+  - preserve `Step`, `Step_pure`, `Step_read`, and `Steps`;
+  - generate `steps(C) => C'`, not `Steps(C, C') => valid`;
+  - use `_ ; _` surface syntax for configs/states;
+  - remove redundant executable sort guards when the Maude variable declaration
+    already enforces the sort;
+  - use the WT/`WasmTerminal` representation, not RT/`RecordTerminal`.
+
+## Current Implementation
+
+- `translator_bs.ml` generates professor-style C1.
+- `output_bs.maude` contains distinct `step`, `step-pure`, `step-read`, and
+  `steps` operators.
+- `Step/ctxt-instrs` uses a non-empty recursive focus:
+
+```maude
+VAL INSTR-HEAD INSTR-REST INSTR1
+```
+
+This mitigates the nil-split issue discussed with the professor.
+
+- `wasm-exec-bs.maude` keeps C1 intact and uses the generated C1 `step`
+  relation directly for model-check transitions:
+
+```maude
+crl [exec-step] :
+  mc(C) => mc(C')
+    if step(C) => C' .
+```
+
+Do not add `dstep` or benchmark-specific deterministic rules to the C1
+baseline.
+
+## Verified Results
+
+C1 relation execution:
+
+- `rew step(fib-config(i32v(0)))` performs one generated C1 step.
+- `search [1] steps(fib-config(i32v(0))) =>* Z ; i32v(0)` finds a terminal
+  result.
+- `search [1] steps(fib-config(i32v(5))) =>* Z ; i32v(5)` finds a terminal
+  result.
+- Raw `rew fib-config(...)` is not the right execution test for C1 because C1
+  uses the generated `step` relation.
+- Raw `rew steps(...)` can stop immediately by `steps-refl`.
+
+Direct generated C1 model checking with `exec-step if step(C) => C'` still
+times out because Maude enumerates generic context/list splits while solving the
+rewrite condition.
+
+## Next Work
+
+1. Do not introduce RT/`RecordTerminal`.
+2. Do not modify `lib/frontend/elab.ml` unless the user explicitly approves a
+   frontend change.
+3. Do not claim direct generated C1 model checking is solved.
+4. Do not add `dstep` to the C1 harness.
+5. Report to the professor: strict C1 rewrite/`steps` works, direct C1 model
+   checking does not finish.

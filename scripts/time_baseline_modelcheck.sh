@@ -76,7 +76,7 @@ TMP_INPUT="$(mktemp)"
 trap 'rm -f "$TMP_INPUT"' EXIT
 
 cat > "$TMP_INPUT" <<EOF
-red in WASM-FIB-BS-PROPS : modelCheck(fib-config(i32v(${N})), ${FORMULA}) .
+red in WASM-FIB-BS-PROPS : modelCheck(mc(fib-config(i32v(${N}))), ${FORMULA}) .
 EOF
 
 START_EPOCH="$(date +%s)"

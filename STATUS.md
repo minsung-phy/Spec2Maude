@@ -1,6 +1,6 @@
 # Spec2Maude Status
 
-Updated: 2026-04-28
+Updated: 2026-04-30
 
 This file is the current engineering checkpoint. Historical debugging details
 are in `meeting/session_summary.txt` and `meeting/personal_meeting_0428/`.
@@ -71,10 +71,12 @@ Additional requirements:
 
 Changed files:
 
-- `lib/frontend/elab.ml`
 - `translator_bs.ml`
 - `output_bs.maude`
 - `wasm-exec-bs.maude`
+
+Do not edit `lib/frontend/elab.ml` for the current C1 work. The active
+baseline changes are in the translator and Maude harness only.
 
 Implemented in C1:
 
@@ -110,17 +112,29 @@ VAL INSTR-HEAD INSTR-REST INSTR1
 Implemented in model-check harness:
 
 - `wasm-exec-bs.maude` now wraps model-check states as `mc(Config)`.
-- `exec-step` rewrites only `MCConfig`, not raw `Config`.
-- This prevents the harness rule from recursively participating while Maude
-  solves the condition `step(C) => C'`.
+- `output_bs.maude` keeps the professor-requested generated C1 relations:
+  `step`, `step-pure`, `step-read`, and `steps`.
+- `exec-step` now uses the generated C1 relation directly:
+
+```maude
+mc(C) => mc(C') if step(C) => C' .
+```
+
+- No `dstep`, RT, or RecordTerminal driver is active in the C1 baseline.
+- This makes the current harness faithful to C1, but it also exposes the known
+  model-checking explosion.
 
 Important current interpretation:
 
 - The translator is now following the professor's C1 relation-preserving
   direction.
-- The `mc(...)` wrapper is harness-level only; it is not a semantic rule copied
-  from the senior code.
-- C1 rewriting works, but C1 model checking still does not scale.
+- The `mc(...)` wrapper is only the Maude model-checking state wrapper; it is
+  not a semantic shortcut.
+- Strict generated C1 relation execution works through `step(...)`/`steps(...)`.
+- Strict generated C1 model checking from the initial Fibonacci state does not
+  finish in the measured timeout.
+- Current reporting stance: C1 is implemented faithfully, but direct C1 model
+  checking is not practical yet.
 
 ---
 
@@ -152,19 +166,23 @@ Result:
 - 156 rewrites.
 - About 1ms Maude real time.
 
-### Rewriting
+### C1 Relation Execution
 
 | Command | Result | Rewrites | Maude time |
 |---|---:|---:|---:|
-| `rew [10000] ... fib-config(i32v(0))` | `i32v(0)` | 945 | 2ms real |
-| `rew [10000] ... fib-config(i32v(1))` | `i32v(1)` | 7,549 | 10ms real |
-| `rew [10000] ... fib-config(i32v(5))` | `i32v(5)` | 33,965 | 44ms real |
-| `rew [10000] ... steps(fib-config(i32v(5)))` | `i32v(5)` | 33,966 | 45ms real |
+| `rew [1000] ... step(fib-config(i32v(0)))` | one C1 step into label config | 34 | 0ms real |
+| `search [1] ... steps(fib-config(i32v(0))) =>* Z ; i32v(0)` | found | 612 | 2ms real |
+| `search [1] ... steps(fib-config(i32v(5))) =>* Z ; i32v(5)` | found | 22,662 | 48ms real |
 
 Conclusion:
 
-- C1 rewrite execution is no longer stack-overflowing.
-- `steps(...)` also terminates quickly for `fib(5)`.
+- C1 relation execution is no longer stack-overflowing.
+- Raw `rew fib-config(...)` is not the right C1 execution test because the
+  generated execution relation is `step(Config)`, not a rewrite rule directly
+  on `Config`.
+- Raw `rew steps(fib-config(...))` can stop immediately by applying
+  `steps-refl`; use `search` to demonstrate that `Steps/trans` reaches the
+  terminal configuration.
 
 ### Model Checking
 
@@ -190,16 +208,21 @@ Result:
 - `true`
 - 25 rewrites
 
-Initial-state model checking:
+Strict direct C1 model checking attempt:
 
 ```maude
 red in WASM-FIB-BS-PROPS :
   modelCheck(mc(fib-config(i32v(0))), <> result-is(0)) .
 ```
 
-Result:
+Old result when `exec-step` used `step(C) => C'` directly:
 
 - Timed out after 120 seconds.
+- No result was produced.
+
+Rechecked on 2026-04-30 after removing the temporary `dstep` experiment:
+
+- Timed out after 20 seconds.
 - No result was produced.
 
 Reachability diagnostic:
@@ -218,9 +241,13 @@ Result:
 Current conclusion:
 
 - The previous harness over-approximation problem is fixed by `mc(...)`.
-- The remaining model-checking failure is C1 state-space/proof-search explosion.
-- This is no longer just stack overflow; it is the cost of model checking the
-  faithful context semantics directly.
+- Directly asking Maude to solve `step(C) => C'` for the generated C1 relation
+  still causes state-space/proof-search explosion.
+- We should not put a deterministic `dstep` driver in C1, because that would
+  blur the distinction between faithful baseline and optimized analysis
+  semantics.
+- Current conclusion to report: C1 `step`/`steps` relation execution works, but
+  direct C1 model checking does not finish.
 
 ---
 
@@ -230,36 +257,36 @@ Current conclusion:
 
 Accurate message:
 
-> 교수님 말씀대로 C1을 `Step`, `Step_pure`, `Step_read`, `Steps` relation을
-> 보존하는 형태로 수정했습니다. `val*`는 `ValTerminals`로 제한했고,
-> `Step/ctxt-instrs`의 recursive focus는 non-empty가 되도록 해서 교수님이
-> 말씀하신 nil split 문제를 막았습니다. 그 결과 `fib(0)`, `fib(1)`,
-> `fib(5)` rewrite와 `steps(fib(5))`는 빠르게 성공합니다. 다만 `mc(...)`
-> wrapper로 model-check harness의 과대전이까지 막은 뒤에도
-> `modelCheck(mc(fib-config(i32v(0))), <> result-is(0))`가 120초 timeout입니다.
-> 현재 남은 문제는 direct C1 semantics 자체의 state-space explosion으로
-> 보입니다. 그래서 C1은 reference semantics로 유지하고, 실제 model checking은
-> C2 transformation에서 줄여야 합니다.
+> 교수님 말씀대로 C1은 `Step`, `Step_pure`, `Step_read`, `Steps` relation을
+> 보존하는 형태로 유지했습니다. `val*`는 `ValTerminals`로 제한했고,
+> `Step/ctxt-instrs`의 recursive focus는 non-empty가 되도록 해서 nil split을
+> 막았습니다. `step(fib-config(...))` one-step은 동작하고, `steps(...)`
+> relation으로 terminal config에 도달하는 것은 `search`로 확인했습니다.
+> 다만 model checker가 `step(C) => C'`를 직접 풀게 하면 generic context
+> split을 전부 탐색해서 폭발합니다. 그래서 direct C1 model checking은
+> `fib(0)`에서도 timeout이 납니다. 현재 기준으로 C1은 faithful reference
+> semantics로는 구현됐지만, 그대로 model checking target으로 쓰기는 어렵다고
+> 보고드리는 게 맞겠습니다.
 
 ### P1. Confirm C1 Exit Criterion
 
 Need professor decision:
 
-- Is C1 required to model-check even `fib(0)` from the initial state?
-- Or is C1 allowed to be the faithful executable reference, with model checking
-  scalability handled by C2?
+- Should strict C1 itself be required to model-check from initial states, or is
+  C1 allowed to be the faithful executable reference while C2 handles model
+  checking?
 
-This matters because the current strict C1 rewrite works but model checking does
-not finish.
+This matters because strict generated C1 `step`/`steps` relation execution
+works, but direct generated `step(C) => C'` model checking still explodes.
 
 ### P2. Start C2 From The Current C1
 
 Likely C2 work:
 
-- Deterministic one-redex projection for model checking.
 - Heat/cool or focused evaluation contexts.
 - Context split pruning.
 - Canonicalization of semantically equivalent control contexts.
+- Do not add benchmark-specific `dstep` rules to the C1 baseline.
 
 Required evidence:
 
@@ -301,9 +328,8 @@ maude wasm-exec-bs.maude
 Useful tests:
 
 ```maude
-rew [10000] in WASM-FIB-BS : fib-config(i32v(0)) .
-rew [10000] in WASM-FIB-BS : fib-config(i32v(1)) .
-rew [10000] in WASM-FIB-BS : fib-config(i32v(5)) .
-rew [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .
+rew [1000] in WASM-FIB-BS : step(fib-config(i32v(0))) .
+search [1] in WASM-FIB-BS : steps(fib-config(i32v(0))) =>* (Z:State ; CTORCONSTA2(CTORI32A0, 0)) .
+search [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) =>* (Z:State ; CTORCONSTA2(CTORI32A0, 5)) .
 red in WASM-FIB-BS-PROPS : modelCheck(mc(fib-config(i32v(0))), <> result-is(0)) .
 ```

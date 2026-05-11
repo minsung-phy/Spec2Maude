@@ -2134,6 +2134,91 @@ let rec schedule_prems bound acc items =
 
 (* --- DecD handler -------------------------------------------------------- *)
 
+let is_maude_var_char c =
+  (c >= 'A' && c <= 'Z')
+  || (c >= 'a' && c <= 'z')
+  || (c >= '0' && c <= '9')
+  || c = '-'
+  || c = '_'
+
+let replace_maude_var text var repl =
+  let n = String.length text in
+  let m = String.length var in
+  if m = 0 then text
+  else
+    let b = Buffer.create n in
+    let rec loop i =
+      if i >= n then ()
+      else if i + m <= n && String.sub text i m = var
+              && (i = 0 || not (is_maude_var_char text.[i - 1]))
+              && (i + m = n || not (is_maude_var_char text.[i + m]))
+      then (
+        Buffer.add_string b repl;
+        loop (i + m)
+      ) else (
+        Buffer.add_char b text.[i];
+        loop (i + 1)
+      )
+    in
+    loop 0;
+    Buffer.contents b
+
+let maude_var_occurs text var =
+  replace_maude_var text var "\000" <> text
+
+let optional_binder_vars binders vm =
+  List.filter_map (fun b -> match b.it with
+    | ExpB (v_id, t) ->
+        (match t.it with
+         | IterT (_, Opt) -> List.assoc_opt v_id.it vm
+         | _ -> None)
+    | _ -> None
+  ) binders
+  |> List.sort_uniq String.compare
+
+let rec nonempty_subsets xs =
+  match xs with
+  | [] -> []
+  | x :: rest ->
+      let rest_subsets = nonempty_subsets rest in
+      [ [x] ] @ rest_subsets @ List.map (fun ys -> x :: ys) rest_subsets
+
+let apply_optional_empty_subst opt_vars text =
+  List.fold_left (fun acc opt_v -> replace_maude_var acc opt_v "eps") text opt_vars
+
+let optional_empty_substs binders vm lhs_texts =
+  let opt_vars =
+    optional_binder_vars binders vm
+    |> List.filter (fun opt_v ->
+        List.exists (fun s -> maude_var_occurs s opt_v) lhs_texts)
+  in
+  nonempty_subsets opt_vars
+
+let cond_mentions_optional opt_vars cond =
+  List.exists (fun opt_v -> maude_var_occurs cond opt_v) opt_vars
+
+let optionalize_cond_parts opt_vars ~drop_guards conds =
+  conds
+  |> List.filter (fun cond ->
+      not (List.mem cond drop_guards && cond_mentions_optional opt_vars cond))
+  |> List.map (apply_optional_empty_subst opt_vars)
+
+let cond_parts_of_text cond =
+  let cond = String.trim cond in
+  if cond = "" then []
+  else Str.split (Str.regexp "[ \t\n]*/\\\\[ \t\n]*") cond
+
+let optionalize_cond_text opt_vars ~drop_guards cond =
+  let is_drop_guard cond =
+    let cond = String.trim cond in
+    List.exists (fun guard -> String.trim guard = cond) drop_guards
+  in
+  cond_parts_of_text cond
+  |> List.filter (fun part ->
+      not (is_drop_guard part && cond_mentions_optional opt_vars part))
+  |> List.map (apply_optional_empty_subst opt_vars)
+  |> cond_join
+
 let translate_decd ss id params result_typ insts =
   let func_name = sanitize id.it in
   let maude_fn =
@@ -2258,19 +2343,36 @@ let translate_decd ss id params result_typ insts =
     in
     let all_conds = prem_conds @ filtered_bconds in
     let cond = cond_join all_conds in
-    let cond_str = if cond = "" then "" else " \n      if " ^ cond in
     let clause_is_rewrite = clause_uses_rewrite in
     if clause_is_rewrite then seen_rewrite_clause := true;
-    if clause_is_rewrite then
-      Printf.sprintf "  %s [%s-r%d] :\n    %s\n    =>\n    %s%s ."
-        (if cond = "" then "rl" else "crl")
-        func_name eq_idx
-        (format_call maude_fn lhs_strs) rhs_t.text cond_str
-    else
-      Printf.sprintf "  %s %s = %s%s%s ."
-        (if cond = "" then "eq" else "ceq")
-        (format_call maude_fn lhs_strs) rhs_t.text cond_str
-        (if has_owise then " [owise]" else "")
+    let emit_clause ?(suffix="") lhs_texts rhs_text cond_text =
+      let cond_s = if cond_text = "" then "" else " \n      if " ^ cond_text in
+      if clause_is_rewrite then
+        Printf.sprintf "  %s [%s-r%d%s] :\n    %s\n    =>\n    %s%s ."
+          (if cond_text = "" then "rl" else "crl")
+          func_name eq_idx suffix
+          (format_call maude_fn lhs_texts) rhs_text cond_s
+      else
+        Printf.sprintf "  %s %s = %s%s%s ."
+          (if cond_text = "" then "eq" else "ceq")
+          (format_call maude_fn lhs_texts) rhs_text cond_s
+          (if has_owise then " [owise]" else "")
+    in
+    let base_clause = emit_clause lhs_strs rhs_t.text cond in
+    let opt_clauses =
+      optional_empty_substs binders vm lhs_strs
+      |> List.mapi (fun opt_idx opt_vars ->
+            let lhs_opt = List.map (apply_optional_empty_subst opt_vars) lhs_strs in
+            let rhs_opt = apply_optional_empty_subst opt_vars rhs_t.text in
+            let cond_opt =
+              optionalize_cond_parts opt_vars ~drop_guards:filtered_bconds all_conds
+              |> cond_join
+            in
+            emit_clause
+              ~suffix:(Printf.sprintf "-opt-empty%d" opt_idx)
+              lhs_opt rhs_opt cond_opt)
+    in
+    String.concat "\n" (base_clause :: opt_clauses)
   ) insts in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
@@ -2794,12 +2896,28 @@ let translate_step_reld rel_name rules =
                    config_text z_out rhs_text_out)
               in
               let emit_rule_with_cond label lhs rhs local_cond =
-                if local_cond = "" then
-                  Printf.sprintf "  rl [%s] :\n    %s\n    =>\n    %s ."
-                    label lhs rhs
-                else
-                  Printf.sprintf "  crl [%s] :\n    %s\n    =>\n    %s\n      if %s ."
-                    label lhs rhs local_cond
+                let emit_one label lhs rhs local_cond =
+                  if local_cond = "" then
+                    Printf.sprintf "  rl [%s] :\n    %s\n    =>\n    %s ."
+                      label lhs rhs
+                  else
+                    Printf.sprintf "  crl [%s] :\n    %s\n    =>\n    %s\n      if %s ."
+                      label lhs rhs local_cond
+                in
+                let opt_rules =
+                  optional_empty_substs binders vm [lhs]
+                  |> List.mapi (fun opt_idx opt_vars ->
+                      let lhs_opt = apply_optional_empty_subst opt_vars lhs in
+                      let rhs_opt = apply_optional_empty_subst opt_vars rhs in
+                      let cond_opt =
+                        optionalize_cond_text opt_vars
+                          ~drop_guards:filtered_bconds local_cond
+                      in
+                      emit_one
+                        (Printf.sprintf "%s-opt-empty%d" label opt_idx)
+                        lhs_opt rhs_opt cond_opt)
+                in
+                String.concat "\n" (emit_one label lhs rhs local_cond :: opt_rules)
               in
               let emit_rule label lhs rhs = emit_rule_with_cond label lhs rhs cond in
               let label = String.lowercase_ascii prefix in
@@ -3339,12 +3457,30 @@ let translate_steps_reld rel_name rules =
         in
         let all_conds = prem_match_conds @ prem_rewrite_conds @ prem_bool_conds @ filtered_bconds in
         let cond = cond_join all_conds in
-        if cond = "" then
-          Printf.sprintf "  rl [%s] :\n    steps ( %s )\n    =>\n    %s ."
-            (String.lowercase_ascii prefix) lhs_cfg rhs_cfg
-        else
-          Printf.sprintf "  crl [%s] :\n    steps ( %s )\n    =>\n    %s\n      if %s ."
-            (String.lowercase_ascii prefix) lhs_cfg rhs_cfg cond
+        let emit_rule label lhs rhs local_cond =
+          if local_cond = "" then
+            Printf.sprintf "  rl [%s] :\n    steps ( %s )\n    =>\n    %s ."
+              label lhs rhs
+          else
+            Printf.sprintf "  crl [%s] :\n    steps ( %s )\n    =>\n    %s\n      if %s ."
+              label lhs rhs local_cond
+        in
+        let label = String.lowercase_ascii prefix in
+        let base_rule = emit_rule label lhs_cfg rhs_cfg cond in
+        let opt_rules =
+          optional_empty_substs binders vm [lhs_cfg]
+          |> List.mapi (fun opt_idx opt_vars ->
+              let lhs_opt = apply_optional_empty_subst opt_vars lhs_cfg in
+              let rhs_opt = apply_optional_empty_subst opt_vars rhs_cfg in
+              let cond_opt =
+                optionalize_cond_parts opt_vars ~drop_guards:filtered_bconds all_conds
+                |> cond_join
+              in
+              emit_rule
+                (Printf.sprintf "%s-opt-empty%d" label opt_idx)
+                lhs_opt rhs_opt cond_opt)
+        in
+        String.concat "\n" (base_rule :: opt_rules)
   ) rules in
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
   let seq_vars = List.sort_uniq String.compare !all_seq_vars_acc in
@@ -3460,23 +3596,37 @@ let translate_reld id rel_name rules =
         in
         let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
         let cond = cond_join all_conds in
-        let rule_text =
+        let emit_rule ?(suffix="") lhs_text cond_text =
           if use_rewrite_judgement then
-            if cond = "" then
+            let label = (String.lowercase_ascii prefix) ^ suffix in
+            if cond_text = "" then
               Printf.sprintf "  rl [%s] :\n    %s ( %s )\n    =>\n    valid ."
-                (String.lowercase_ascii prefix) rel_name lhs_t.text
+                label rel_name lhs_text
             else
               Printf.sprintf "  crl [%s] :\n    %s ( %s )\n    =>\n    valid\n      if %s ."
-                (String.lowercase_ascii prefix) rel_name lhs_t.text cond
-          else if cond = "" then
+                label rel_name lhs_text cond_text
+          else if cond_text = "" then
             Printf.sprintf "  eq %s ( %s ) = valid ."
-              rel_name lhs_t.text
+              rel_name lhs_text
           else
             Printf.sprintf "  ceq %s ( %s ) = valid\n      if %s ."
-              rel_name lhs_t.text cond
+              rel_name lhs_text cond_text
+        in
+        let base_rule = emit_rule lhs_t.text cond in
+        let opt_rules =
+          optional_empty_substs binders vm [lhs_t.text]
+          |> List.mapi (fun opt_idx opt_vars ->
+              let lhs_opt = apply_optional_empty_subst opt_vars lhs_t.text in
+              let cond_opt =
+                optionalize_cond_parts opt_vars ~drop_guards:filtered_bconds all_conds
+                |> cond_join
+              in
+              emit_rule
+                ~suffix:(Printf.sprintf "-opt-empty%d" opt_idx)
+                lhs_opt cond_opt)
         in
         let _ = has_rewrite_cond in
-        rule_text
+        String.concat "\n" (base_rule :: opt_rules)
   ) rules in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
@@ -3526,6 +3676,7 @@ let header_prefix =
   "  --- consuming non-value instructions as part of the value prefix.\n" ^
   "  sort InstrTerminals .\n" ^
   "  sort ValTerminals .\n" ^
+  "  subsort Val < Instr .\n" ^
   "  subsort Val < ValTerminals .\n" ^
   "  subsort ValTerminals < InstrTerminals .\n" ^
   "  subsort Instr < InstrTerminals .\n" ^
@@ -3551,6 +3702,8 @@ let header_prefix =
   "  subsort Nat < Fieldidx .\n" ^
   "  subsort Nat < Addr .\n" ^
   "  subsort Nat < Idx .\n\n" ^
+  "  --- Address-size types are numeric types in WebAssembly.\n" ^
+  "  subsort Addrtype < Numtype .\n\n" ^
   "  --- Bool wrapper (avoid subsort Bool < WasmTerminal conflicts)\n" ^
   "  op w-bool : Bool -> WasmTerminal [ctor] .\n\n" ^
   "  --- Basic Wasm Types\n" ^
@@ -3578,15 +3731,8 @@ let header_prefix =
   "  op merge : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op _=++_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op any : -> WasmTerminal [ctor] .\n\n" ^
-  "  --- Record literals/updates are the concrete runtime shape of store/frame.\n" ^
-  "  --- Keep them separate from arbitrary WasmTerminal so internal State syntax\n" ^
-  "  --- can use _;_ without conflicting with Config syntax.\n" ^
-  "  sort RecordTerminal .\n" ^
-  "  subsort RecordTerminal < WasmTerminal .\n" ^
-  "  op {_} : RecordItems -> RecordTerminal .\n" ^
-  "  op _[._<-_] : WasmTerminal Qid WasmTerminals -> RecordTerminal .\n" ^
-  "  op _[._<-_] : RecordItems Qid WasmTerminals -> RecordTerminal .\n" ^
-  "  op _[._=++_] : WasmTerminal Qid WasmTerminals -> RecordTerminal .\n\n" ^
+  "  --- Record literals/updates come from DSL-RECORD and have sort WasmTerminal.\n" ^
+  "  --- This keeps the baseline surface aligned with the SpecTec terminal model.\n\n" ^
   "  --- Config: execution configuration for relation-preserving semantics\n" ^
   "  --- The relation operators return wrapper sorts so rewrite conditions\n" ^
   "  --- cannot satisfy themselves by zero-step matching an unreduced call.\n" ^
@@ -3595,10 +3741,8 @@ let header_prefix =
   "  subsort Config < StepsConf .\n" ^
   "  subsort InstrTerminals < StepPureConf .\n" ^
   "  subsort InstrTerminals < StepReadConf .\n" ^
-  "  op _;_ : RecordTerminal RecordTerminal -> State [ctor prec 55] .\n" ^
+  "  op _;_ : WasmTerminal WasmTerminals -> WasmTerminal [ctor prec 60] .\n" ^
   "  op _;_ : Store Frame -> State [ctor prec 55] .\n" ^
-  "  op _;_ : Store RecordTerminal -> State [ctor prec 55] .\n" ^
-  "  op _;_ : RecordTerminal Frame -> State [ctor prec 55] .\n" ^
   "  op _;_ : State InstrTerminals -> Config [ctor prec 60] .\n" ^
   "  op step : Config -> StepConf [frozen (1)] .\n" ^
   "  op step-pure : InstrTerminals -> StepPureConf [frozen (1)] .\n" ^
@@ -3615,6 +3759,14 @@ let header_prefix =
   "  vars W-N W-M NLC NFC NHC : N .\n" ^
   "  var ZS : State .\n" ^
   "  var ITS : InstrTerminals .\n" ^
+  "  var LIST-TY : WasmTerminal .\n" ^
+  "  var LIST-TS : WasmTerminals .\n" ^
+  "  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : WasmTerminals .\n" ^
+  "  vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : WasmTerminals .\n" ^
+  "  vars FRAME-LOCALS FRAME-MODULE : WasmTerminals .\n" ^
+  "  vars WT-S WT-F : WasmTerminal .\n" ^
+  "  var WT-X : Localidx .\n" ^
+  "  var WT-V : Val .\n" ^
   "  vars T W WW FQ : WasmTerminal .\n" ^
   "  vars TS W* ISQ INSTRQ CQ : WasmTerminals .\n\n" ^
   "  eq $norm-seq(ITS) = ITS .\n\n"
@@ -3646,6 +3798,27 @@ let footer =
   "  ceq is-trap(W TS) = is-trap(TS) if is-val(W) = true .\n" ^
   "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
   "  eq  is-trap(TS) = false [owise] .\n" ^
+  "\n" ^
+  "  --- Generic SpecTec list type witness.\n" ^
+  "  --- The source rule is polymorphic in the element type; this executable\n" ^
+  "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
+  "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
+  "   if (len(LIST-TS) < (2 ^ 32)) = true .\n" ^
+  "\n" ^
+  "  --- Executable record-shape memberships for runtime configurations.\n" ^
+  "  --- They keep Store/Frame/Moduleinst available after record equations\n" ^
+  "  --- normalize concrete constants to WasmTerminal record literals.\n" ^
+  "  mb {item('TYPES, MOD-TYPES) ; item('TAGS, MOD-TAGS) ; item('GLOBALS, MOD-GLOBALS) ; item('MEMS, MOD-MEMS) ; item('TABLES, MOD-TABLES) ; item('FUNCS, MOD-FUNCS) ; item('DATAS, MOD-DATAS) ; item('ELEMS, MOD-ELEMS) ; item('EXPORTS, MOD-EXPORTS)} : Moduleinst .\n" ^
+  "  mb {item('LOCALS, FRAME-LOCALS) ; item('MODULE, FRAME-MODULE)} : Frame .\n" ^
+  "  mb {item('TAGS, STORE-TAGS) ; item('GLOBALS, STORE-GLOBALS) ; item('MEMS, STORE-MEMS) ; item('TABLES, STORE-TABLES) ; item('FUNCS, STORE-FUNCS) ; item('DATAS, STORE-DATAS) ; item('ELEMS, STORE-ELEMS) ; item('STRUCTS, STORE-STRUCTS) ; item('ARRAYS, STORE-ARRAYS) ; item('EXNS, STORE-EXNS)} : Store .\n" ^
+  "\n" ^
+  "  --- Concrete record-state execution helpers.\n" ^
+  "  --- Generated SpecTec helper equations are typed as Store ; Frame.\n" ^
+  "  --- Record literals/updates have sort WasmTerminal, so add equivalent\n" ^
+  "  --- equations over WasmTerminal while preserving visible _;_ state syntax.\n" ^
+  "  eq $local((WT-S ; WT-F), WT-X) = index(value('LOCALS, WT-F), WT-X) .\n" ^
+  "  eq $with-local((WT-S ; WT-F), WT-X, WT-V) =\n" ^
+  "     (WT-S ; (WT-F [. 'LOCALS <- (value('LOCALS, WT-F) [WT-X <- WT-V])])) .\n" ^
   "\nendm\n"
 
 let step_predicate_helpers =
@@ -3682,10 +3855,23 @@ let collect_ctor_decl_lines eq_lines =
   let add_name nm =
     if not (Hashtbl.mem seen nm) then Hashtbl.add seen nm ()
   in
+  let sort_rank = function
+    | "Val" -> 2
+    | "Instr" -> 1
+    | _ -> 0
+  in
   let mark_sort nm sort =
-    Hashtbl.replace result_sort nm sort
+    match Hashtbl.find_opt result_sort nm with
+    | Some old when sort_rank old >= sort_rank sort -> ()
+    | _ -> Hashtbl.replace result_sort nm sort
   in
   let scan_line l =
+    let line_declares_val =
+      try
+        ignore (Str.search_forward (Str.regexp ": Val\\b") l 0);
+        true
+      with Not_found -> false
+    in
     let line_declares_instr =
       try
         ignore (Str.search_forward (Str.regexp ": Instr\\b") l 0);
@@ -3699,7 +3885,8 @@ let collect_ctor_decl_lines eq_lines =
           let nm = Str.matched_string l in
           let next_pos = Str.match_end () in
           add_name nm;
-          if line_declares_instr then mark_sort nm "Instr";
+          if line_declares_val then mark_sort nm "Val"
+          else if line_declares_instr then mark_sort nm "Instr";
           loop next_pos
     in
     loop 0
@@ -3716,6 +3903,12 @@ let collect_ctor_decl_lines eq_lines =
            "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."
        | "CTORHANDLERLBRACERBRACEA3" ->
            "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] ."
+       | "CTORI32A0" | "CTORI64A0" ->
+           Printf.sprintf "  op %s :  -> Addrtype [ctor] ." nm
+       | "CTORF32A0" | "CTORF64A0" ->
+           Printf.sprintf "  op %s :  -> Numtype [ctor] ." nm
+       | "CTORSA0" | "CTORUA0" ->
+           Printf.sprintf "  op %s :  -> Sx [ctor] ." nm
        | _ ->
            let idx_a = try String.rindex nm 'A' with Not_found -> String.length nm - 1 in
            let arity =
