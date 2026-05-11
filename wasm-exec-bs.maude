@@ -17,30 +17,21 @@ mod WASM-EXEC-BS is
   --- Baseline output owns the direct relation-preserving execution rules.
 
   sort MCConfig .
-  op mc : Config -> MCConfig [ctor] .
+  op mc : Config -> MCConfig [ctor frozen (1)] .
 
-  vars VB-Z MC-Z-EC : State .
-  var MC-IS-EC : InstrTerminals .
-  var MC-EC-OUT : Config .
+  var MC-Z : State .
+  var MC-ECQ : Config .
+  var MC-IS : InstrTerminals .
 
-  --- -------------------------------------------------------
-  --- void-bt: opaque Blocktype constant for void blocks/loops.
-  --- -------------------------------------------------------
-  op void-bt : -> Blocktype [ctor] .
-  eq $blocktype(VB-Z, void-bt)            = CTORARROWA3(eps, eps, eps) .
-  eq $blocktype(VB-Z, CTORWRESULTA1(eps)) = CTORARROWA3(eps, eps, eps) .
-
-  --- One-step rule for LTL model checking.
-  --- The mc wrapper keeps this rule from being used again while Maude solves
-  --- the condition `step(C) => C'`; otherwise a single model-check transition
-  --- can accidentally range over many exec-step transitions.
+  --- One-step transition for LTL model checking over strict C1.
+  --- Terminal value/trap states have no successors; nonterminal states still
+  --- use the generated relation-preserving `step`.
   crl [exec-step] :
-    mc(MC-Z-EC ; MC-IS-EC)
-    => mc($cfg-state(MC-EC-OUT) ; $cfg-instrs(MC-EC-OUT))
-    if step(MC-Z-EC ; MC-IS-EC) => MC-EC-OUT
-    /\ MC-IS-EC =/= eps
-    /\ all-vals(MC-IS-EC) = false
-    /\ is-trap(MC-IS-EC) = false .
+    mc(MC-Z ; MC-IS) => mc(MC-ECQ)
+      if MC-IS =/= eps
+      /\ all-vals(MC-IS) = false
+      /\ is-trap(MC-IS) = false
+      /\ step(MC-Z ; MC-IS) => MC-ECQ .
 
 endm
 
@@ -53,9 +44,19 @@ mod WASM-FIB-BS is
   inc WASM-EXEC-BS .
 
   vars NVAL : WasmTerminal .
+  vars L0 L1 L2 L3 L0Q L1Q L2Q L3Q : WasmTerminal .
+  var V : Val .
   var I    : Int .
-
-  op empty-store : -> Store .
+  var Z    : State .
+  vars BODY IS ISQ REST K VALS : InstrTerminals .
+  vars C C1 C2 : Int .
+  var X : Idx .
+  var L : Labelidx .
+  var N : N .
+  
+  --- Wasm 실행 상태에는 보통 memory, table, global, function, tag 같은 정보가 들어갈 수 있는데,
+  --- Fibonacci 예제는 그런 것을 쓰지 않기에 빈 store과 빈 module을 만듬.
+  op empty-store : -> Store . 
   eq empty-store =
     {item('TAGS,    eps) ; item('GLOBALS,  eps) ;
      item('MEMS,    eps) ; item('TABLES,   eps) ;
@@ -72,23 +73,45 @@ mod WASM-FIB-BS is
      item('DATAS,   eps) ; item('ELEMS, eps) ;
      item('EXPORTS, eps)} .
   mb empty-module : Moduleinst .
-
+  
+  --- 여기부터가 핵심 !
   op i32v : Int -> WasmTerminal .
   eq i32v(I:Int) = CTORCONSTA2(CTORI32A0, I:Int) .
   mb CTORCONSTA2(CTORI32A0, I:Int) : Val .
 
-  op fib-frame : WasmTerminal -> Frame .
-  eq fib-frame(NVAL) =
-    {item('LOCALS,
-          NVAL
-          CTORCONSTA2(CTORI32A0, 0)
-          CTORCONSTA2(CTORI32A0, 1)
-          CTORCONSTA2(CTORI32A0, 0)) ;
-     item('MODULE, empty-module)} .
-  cmb fib-frame(NVAL) : Frame if NVAL : Val .
+  op fib-store : -> Store [ctor] .
+  op fib-frame : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> Frame [ctor] .
+
+  eq value('LOCALS, fib-frame(L0, L1, L2, L3)) = L0 L1 L2 L3 .
+  eq fib-frame(L0, L1, L2, L3) [. 'LOCALS <- (L0Q L1Q L2Q L3Q) ] =
+     fib-frame(L0Q, L1Q, L2Q, L3Q) .
+
+  eq $local((fib-store ; fib-frame(L0, L1, L2, L3)), 0) = L0 .
+  eq $local((fib-store ; fib-frame(L0, L1, L2, L3)), 1) = L1 .
+  eq $local((fib-store ; fib-frame(L0, L1, L2, L3)), 2) = L2 .
+  eq $local((fib-store ; fib-frame(L0, L1, L2, L3)), 3) = L3 .
+
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 0, V) =
+     fib-store ; fib-frame(V, L1, L2, L3) .
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 1, V) =
+     fib-store ; fib-frame(L0, V, L2, L3) .
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 2, V) =
+     fib-store ; fib-frame(L0, L1, V, L3) .
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 3, V) =
+     fib-store ; fib-frame(L0, L1, L2, V) .
+
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 0, CTORCONSTA2(CTORI32A0, C)) =
+     fib-store ; fib-frame(CTORCONSTA2(CTORI32A0, C), L1, L2, L3) .
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 1, CTORCONSTA2(CTORI32A0, C)) =
+     fib-store ; fib-frame(L0, CTORCONSTA2(CTORI32A0, C), L2, L3) .
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 2, CTORCONSTA2(CTORI32A0, C)) =
+     fib-store ; fib-frame(L0, L1, CTORCONSTA2(CTORI32A0, C), L3) .
+  eq $with-local((fib-store ; fib-frame(L0, L1, L2, L3)), 3, CTORCONSTA2(CTORI32A0, C)) =
+     fib-store ; fib-frame(L0, L1, L2, CTORCONSTA2(CTORI32A0, C)) .
 
   op fib-state : WasmTerminal -> State .
-  eq fib-state(NVAL) = empty-store ; fib-frame(NVAL) .
+  eq fib-state(NVAL) =
+     fib-store ; fib-frame(NVAL, i32v(0), i32v(1), i32v(0)) .
   cmb fib-state(NVAL) : State if NVAL : Val .
 
   op fib-loop-body : -> InstrTerminals .
@@ -105,7 +128,7 @@ mod WASM-FIB-BS is
 
   op fib-body : -> InstrTerminals .
   eq fib-body =
-    CTORBLOCKA2(void-bt, CTORLOOPA2(void-bt, fib-loop-body))
+    CTORBLOCKA2(CTORWRESULTA1(eps), CTORLOOPA2(CTORWRESULTA1(eps), fib-loop-body))
     CTORLOCALGETA1(1) .
 
   op fib-config : WasmTerminal -> Config .
@@ -138,7 +161,7 @@ mod WASM-FIB-BS-PROPS is
 
   ceq mc(MC-Z ; MC-IS) |= done            = true if all-vals(MC-IS) = true .
   ceq mc(MC-Z ; MC-IS) |= result-is(MC-I) = true if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) .
-  ceq mc(MC-Z ; MC-IS) |= trap-seen       = true if MC-IS = CTORTRAPA0 eps .
+  ceq mc(MC-Z ; MC-IS) |= trap-seen       = true if is-trap(MC-IS) = true .
   ceq mc(MC-Z ; MC-IS) |= result-neg      = true
       if MC-IS = CTORCONSTA2(CTORI32A0, MC-I) /\ (MC-I < 0) = true .
 
@@ -151,7 +174,7 @@ endm
 
 --- =============================================================
 --- USAGE:
----   rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .
+---   rewrite [100] in WASM-FIB-BS-PROPS : mc(fib-config(i32v(5))) .
 ---   red in WASM-FIB-BS-PROPS : modelCheck(mc(fib-config(i32v(5))), <> result-is(5)) .
 ---   red in WASM-FIB-BS-PROPS : modelCheck(mc(fib-config(i32v(5))), [] ~ trap-seen) .
 --- =============================================================

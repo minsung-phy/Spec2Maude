@@ -483,3 +483,56 @@ Next session entry point:
    faithful executable reference plus C2 as optimized model-check target is the
    intended research split.
 3. Start C2 from the current C1 and measure model-checking improvement.
+
+2026-04-30 strict C1 no-dstep update
+
+Purpose:
+- Continue after the user clarified that the professor requested WT
+  (`WasmTerminal`) representation and that RT/RecordTerminal must not be
+  introduced.
+- Keep professor-style strict C1 generated output and do not add a deterministic
+  `dstep` driver to the C1 harness.
+
+Implementation:
+- `translator_bs.ml` / `output_bs.maude`
+  - C1 still preserves `Step`, `Step_pure`, `Step_read`, and `Steps`.
+  - `steps(C) => C'` remains unary and relation-preserving.
+  - Config and State semicolons are printed with `_ ; _`.
+  - `Step/ctxt-instrs` keeps the non-empty recursive focus
+    `VAL INSTR-HEAD INSTR-REST INSTR1`, avoiding the empty-focus nil split.
+  - No RT/RecordTerminal encoding was introduced.
+- `wasm-exec-bs.maude`
+  - Removed the temporary `dstep(Config)` deterministic driver.
+  - `exec-step` now uses strict generated C1 directly:
+    `mc(C) => mc(C') if step(C) => C'`.
+  - This is expected to be expensive, but it keeps the C1 harness honest.
+
+Verification:
+- C1 relation execution remains the positive baseline result:
+  - `rew step(fib-config(i32v(0)))` performs one generated C1 step.
+  - `search [1] steps(fib-config(i32v(0))) =>* Z ; i32v(0)` finds a terminal
+    result.
+  - `search [1] steps(fib-config(i32v(5))) =>* Z ; i32v(5)` finds a terminal
+    result.
+  - Raw `rew fib-config(...)` is not a valid C1 execution test because C1
+    executes through the generated `step` relation.
+  - Raw `rew steps(...)` can stop immediately by `steps-refl`; use `search` to
+    show terminal reachability.
+- Direct C1 model checking remains the negative result:
+  - `modelCheck(mc(fib-config(i32v(0))), <> result-is(0))` times out when
+    `exec-step` uses `step(C) => C'`.
+
+Current diagnosis:
+- `rl/crl` rule application itself is one-step, but Maude rewrite conditions
+  and model checking search for all ways to satisfy `step(C) => C'`.
+- Direct generated C1 model checking still explodes because the generic context
+  rules expose many list/context decompositions.
+- Because `dstep` is not part of a faithful C1, it should not be presented as
+  the C1 result.
+
+Next session entry point:
+1. Do not introduce RT/RecordTerminal.
+2. Do not claim direct generated C1 model checking is solved.
+3. Do not add `dstep` to the C1 harness.
+4. Report that professor-style C1 `step`/`steps` relation execution works, but
+   direct C1 model checking does not finish.

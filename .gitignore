@@ -15,15 +15,7 @@ _build/
 .merlin
 
 # 4. 기타 파일 제외
-.claude/
-.claude*
 .codex
-.codex-folder-backup/
 .codex.md
-.codex.md
-
-.obsidian/
-
-artifacts/
 
 Spec2Maude_JHS/
