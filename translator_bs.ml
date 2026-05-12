@@ -790,13 +790,21 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | BoolE b -> texpr (wrap_bool ctx (if b then "true" else "false"))
   | TextE s -> texpr ("\"" ^ s ^ "\"")
   | StrE fields ->
-      let items = List.map (fun (atom, e1) ->
+      let field_values = List.map (fun (atom, e1) ->
+        let name = to_var_name (Xl.Atom.name atom) in
         let t = translate_exp TermCtx e1 vm in
-        { t with text = Printf.sprintf "item('%s, %s)"
-            (to_var_name (Xl.Atom.name atom)) t.text }
+        (name, t)
       ) fields in
-      { text = "{" ^ String.concat " ; " (List.map (fun t -> t.text) items) ^ "}";
-        vars = List.concat_map (fun t -> t.vars) items }
+      (match field_values with
+       | [("LOCALS", locals); ("MODULE", modul)] ->
+           { text = Printf.sprintf "$mk-frame ( %s, %s )" locals.text modul.text;
+             vars = locals.vars @ modul.vars }
+       | _ ->
+           let items = List.map (fun (name, t) ->
+             { t with text = Printf.sprintf "item('%s, %s)" name t.text }
+           ) field_values in
+           { text = "{" ^ String.concat " ; " (List.map (fun t -> t.text) items) ^ "}";
+             vars = List.concat_map (fun t -> t.vars) items })
   | DotE (e1, atom) ->
       tmap (Printf.sprintf "value('%s, %s)" (to_var_name (Xl.Atom.name atom)))
         (translate_exp TermCtx e1 vm)
@@ -1655,20 +1663,36 @@ let translate_typd id params insts =
                | _ -> "") binders) in
              let var = match typ.it with IterT (_, (List | List1)) -> "TS" | _ -> "T" in
              let lhs = if SSet.mem name base_types then "T" else var in
-             let alias_guard = type_guard lhs typ v_map in
-             let force_unconditional_idx = String.lowercase_ascii id.it = "idx" in
-             let cond =
-               if force_unconditional_idx then ""
-               else if binder_conds = [] then alias_guard
-               else cond_join (binder_conds @ [alias_guard]) in
-             if is_parametric then
-               Printf.sprintf "%s  %s ( %s hasType ( %s ) ) : WellTyped%s ." bd
-                 (if cond = "" then "mb" else "cmb") lhs type_term
-                 (if cond = "" then "" else "\n   if " ^ cond)
-             else
-               Printf.sprintf "%s  %s ( %s ) : %s%s ." bd
-                 (if cond = "" then "mb" else "cmb") lhs full_type_sort
-                 (if cond = "" then "" else "\n   if " ^ cond)
+             let alias_guard_opt =
+               match typ.it with
+               | NumT `NatT -> Some (Printf.sprintf "%s : Nat" lhs)
+               | NumT `IntT -> Some (Printf.sprintf "%s : Int" lhs)
+               | VarT (tid, _) ->
+                   (match String.lowercase_ascii tid.it with
+                    | "un" | "u8" | "u16" | "u31" | "u32" | "u64" ->
+                        Some (Printf.sprintf "%s : Nat" lhs)
+                    | "sn" | "in" | "i32" | "i64" | "i128" | "exp" ->
+                        Some (Printf.sprintf "%s : Int" lhs)
+                    | "vn" | "v128" ->
+                        None
+                    | _ ->
+                        Some (type_guard lhs typ v_map))
+               | _ -> Some (type_guard lhs typ v_map)
+             in
+             (match alias_guard_opt with
+              | None -> ""
+              | Some alias_guard ->
+                  let cond =
+                    if alias_guard = "true" then ""
+                    else if binder_conds = [] then alias_guard
+                    else cond_join (binder_conds @ [alias_guard]) in
+                  if cond = "" then ""
+                  else if is_parametric then
+                    Printf.sprintf "%s  cmb ( %s hasType ( %s ) ) : WellTyped\n   if %s ."
+                      bd lhs type_term cond
+                  else
+                    Printf.sprintf "%s  cmb ( %s ) : %s\n   if %s ."
+                      bd lhs full_type_sort cond)
          | StructT fields ->
              let bd = String.concat "" (List.map (fun b -> match b.it with
                | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
@@ -1897,6 +1921,10 @@ let split_unbound bound vars =
   let bound_vs = List.filter (fun v -> SSet.mem v bound) vars in
   (unbound, bound_vs)
 
+let is_expanddt_term_text text =
+  let text = String.trim (strip_wrapping_parens text) in
+  starts_with text "$expanddt"
+
 let rec decompose_eq_expr (e : exp) : (exp * exp) option =
   let first_some xs =
     let rec go = function
@@ -2013,6 +2041,20 @@ let rec collect_prem_items_of_exp vm e : prem_item list =
 
 let rec prem_items_of_prem vm (p : prem) : prem_item list =
   match p.it with
+  | RulePr (id, _, e) when sanitize id.it = "Expand" ->
+      (match e.it with
+       | TupE [dt_e; out_e] ->
+           let dt = translate_exp TermCtx dt_e vm in
+           let out = translate_exp TermCtx out_e vm in
+           let expand_rhs =
+             { text = Printf.sprintf "$expanddt ( %s )" dt.text;
+               vars = dt.vars }
+           in
+           let bool_t = translate_prem p vm in
+           [ PremEq { lhs = out; rhs = expand_rhs; bool_t } ]
+       | _ ->
+           let t = translate_prem p vm in
+           if t.text = "" || t.text = "owise" then [] else [PremBool t])
   | ElsePr -> []
   | IterPr (inner, _) -> prem_items_of_prem vm inner
   | LetPr (e1, e2, _) ->
@@ -2101,6 +2143,18 @@ let classify_prem bound = function
          { text = Printf.sprintf "%s := %s" rhs.text lhs.text;
            vars = uniq_vars (lhs_vars @ rhs_vars);
            binds = rhs_vars },
+         true)
+      else if is_expanddt_term_text lhs.text && subset_bound bound lhs_vars then
+        (`Match,
+         { text = Printf.sprintf "%s := %s" rhs.text lhs.text;
+           vars = uniq_vars (lhs_vars @ rhs_vars);
+           binds = rhs_fresh },
+         true)
+      else if is_expanddt_term_text rhs.text && subset_bound bound rhs_vars then
+        (`Match,
+         { text = Printf.sprintf "%s := %s" lhs.text rhs.text;
+           vars = uniq_vars (lhs_vars @ rhs_vars);
+           binds = lhs_fresh },
          true)
       else
         let vars = vars_of_texpr bool_t in
@@ -2272,6 +2326,45 @@ let translate_decd ss id params result_typ insts =
         if is_bool_typ result_typ [] || inferred_bool || SSet.mem maude_fn ss.bool_calls
         then "Bool" else declared_sort_of_typ result_typ in
   let rhs_ctx = if ret_sort = "Bool" then BoolCtx else TermCtx in
+
+  let custom_type_iteration_def =
+    let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
+    match maude_fn with
+    | "$rollrt" ->
+        Some (
+          op_decl ^
+          "  var ROLLRT-X-X : Typeidx .\n" ^
+          "  var ROLLRT-X-RECTYPE : Rectype .\n" ^
+          "  var ROLLRT-X-SUBTYPES : WasmTerminals .\n" ^
+          "  ceq $rollrt(ROLLRT-X-X, ROLLRT-X-RECTYPE) =\n" ^
+          "      CTORRECA1($subst-subtype(ROLLRT-X-SUBTYPES,\n" ^
+          "        $idx-typeuses(ROLLRT-X-X, len(ROLLRT-X-SUBTYPES)),\n" ^
+          "        $rec-typevars(len(ROLLRT-X-SUBTYPES))))\n" ^
+          "   if CTORRECA1(ROLLRT-X-SUBTYPES) := ROLLRT-X-RECTYPE .\n")
+    | "$unrollrt" ->
+        Some (
+          op_decl ^
+          "  var UNROLLRT-X-RECTYPE : Rectype .\n" ^
+          "  var UNROLLRT-X-SUBTYPES : WasmTerminals .\n" ^
+          "  ceq $unrollrt(UNROLLRT-X-RECTYPE) =\n" ^
+          "      CTORRECA1($subst-subtype(UNROLLRT-X-SUBTYPES,\n" ^
+          "        $rec-typevars(len(UNROLLRT-X-SUBTYPES)),\n" ^
+          "        $def-typeuses(UNROLLRT-X-RECTYPE, len(UNROLLRT-X-SUBTYPES))))\n" ^
+          "   if CTORRECA1(UNROLLRT-X-SUBTYPES) := UNROLLRT-X-RECTYPE .\n")
+    | "$rolldt" ->
+        Some (
+          op_decl ^
+          "  var ROLLDT-X-X : Typeidx .\n" ^
+          "  var ROLLDT-X-RECTYPE : Rectype .\n" ^
+          "  var ROLLDT-X-SUBTYPES : WasmTerminals .\n" ^
+          "  ceq $rolldt(ROLLDT-X-X, ROLLDT-X-RECTYPE) =\n" ^
+          "      $def-typeuses(CTORRECA1(ROLLDT-X-SUBTYPES), len(ROLLDT-X-SUBTYPES))\n" ^
+          "   if CTORRECA1(ROLLDT-X-SUBTYPES) := $rollrt(ROLLDT-X-X, ROLLDT-X-RECTYPE) .\n")
+    | _ -> None
+  in
+  match custom_type_iteration_def with
+  | Some text -> text
+  | None ->
 
   let all_bound = ref [] and all_free = ref [] and all_typed = ref [] in
   let seen_rewrite_clause = ref false in
@@ -3482,6 +3575,18 @@ let translate_steps_reld rel_name rules =
         in
         String.concat "\n" (base_rule :: opt_rules)
   ) rules in
+  let contains lit s =
+    try ignore (Str.search_forward (Str.regexp_string lit) s 0); true
+    with Not_found -> false
+  in
+  let rule_rank s =
+    if contains "[steps-trans" s then 0
+    else if contains "[steps-refl" s then 1
+    else 2
+  in
+  let rule_lines =
+    List.stable_sort (fun a b -> compare (rule_rank a) (rule_rank b)) rule_lines
+  in
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
   let seq_vars = List.sort_uniq String.compare !all_seq_vars_acc in
   let bound_vars =
@@ -3704,6 +3809,14 @@ let header_prefix =
   "  subsort Nat < Idx .\n\n" ^
   "  --- Address-size types are numeric types in WebAssembly.\n" ^
   "  subsort Addrtype < Numtype .\n\n" ^
+  "  --- SpecTec union sorts used by executable type/value helpers.\n" ^
+  "  subsort Numtype < Valtype .\n" ^
+  "  subsort Vectype < Valtype .\n" ^
+  "  subsort Reftype < Valtype .\n" ^
+  "  subsort Typevar < Typeuse .\n" ^
+  "  subsort Deftype < Typeuse .\n" ^
+  "  sort OpTerminal .\n" ^
+  "  subsort OpTerminal < WasmTerminal .\n\n" ^
   "  --- Bool wrapper (avoid subsort Bool < WasmTerminal conflicts)\n" ^
   "  op w-bool : Bool -> WasmTerminal [ctor] .\n\n" ^
   "  --- Basic Wasm Types\n" ^
@@ -3741,7 +3854,6 @@ let header_prefix =
   "  subsort Config < StepsConf .\n" ^
   "  subsort InstrTerminals < StepPureConf .\n" ^
   "  subsort InstrTerminals < StepReadConf .\n" ^
-  "  op _;_ : WasmTerminal WasmTerminals -> WasmTerminal [ctor prec 60] .\n" ^
   "  op _;_ : Store Frame -> State [ctor prec 55] .\n" ^
   "  op _;_ : State InstrTerminals -> Config [ctor prec 60] .\n" ^
   "  op step : Config -> StepConf [frozen (1)] .\n" ^
@@ -3764,9 +3876,32 @@ let header_prefix =
   "  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : WasmTerminals .\n" ^
   "  vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : WasmTerminals .\n" ^
   "  vars FRAME-LOCALS FRAME-MODULE : WasmTerminals .\n" ^
+  "  vars MK-FRAME-LOCALS MK-FRAME-LOCALS2 MK-FRAME-MODULE MK-FRAME-MODULE2 : WasmTerminals .\n" ^
   "  vars WT-S WT-F : WasmTerminal .\n" ^
   "  var WT-X : Localidx .\n" ^
   "  var WT-V : Val .\n" ^
+  "  var VALOK-S : WasmTerminal .\n" ^
+  "  var VALOK-V : Val .\n" ^
+  "  var VALOK-T : Valtype .\n" ^
+  "  vars VALOK-WT-S VALOK-C : WasmTerminal .\n" ^
+  "  var VALOK-NT : Numtype .\n" ^
+  "  vars VALOK-VS VALOK-TS : WasmTerminals .\n" ^
+  "  var EXP-FL-DT : Deftype .\n" ^
+  "  var EXP-FL-CT : Comptype .\n" ^
+  "  var EXP-FL-TU : WasmTerminals .\n" ^
+  "  var EXPAND-X-DT : Deftype .\n" ^
+  "  vars EXPAND-X-T1 EXPAND-X-T2 : WasmTerminals .\n" ^
+  "  var INVOKE-X-S : WasmTerminal .\n" ^
+  "  var INVOKE-S-S : Store .\n" ^
+  "  var INVOKE-X-FUNCADDR : Funcaddr .\n" ^
+  "  var INVOKE-X-VAL : ValTerminals .\n" ^
+  "  var INVOKE-X-DT : Deftype .\n" ^
+  "  vars INVOKE-X-T1 INVOKE-X-T2 : WasmTerminals .\n" ^
+  "  var SUBST-L-W : WasmTerminal .\n" ^
+  "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : WasmTerminals .\n" ^
+  "  var TYPE-ITER-X : Typeidx .\n" ^
+  "  var TYPE-ITER-RT : Rectype .\n" ^
+  "  var TYPE-ITER-N : Nat .\n" ^
   "  vars T W WW FQ : WasmTerminal .\n" ^
   "  vars TS W* ISQ INSTRQ CQ : WasmTerminals .\n\n" ^
   "  eq $norm-seq(ITS) = ITS .\n\n"
@@ -3799,18 +3934,73 @@ let footer =
   "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
   "  eq  is-trap(TS) = false [owise] .\n" ^
   "\n" ^
+  "  --- Executable lifting for SpecTec substitution helpers over lists.\n" ^
+  "  --- Generated helper signatures are element-level (`typeuse`, `valtype`),\n" ^
+  "  --- but rules such as unroll/expand call them on `typeuse*` and `valtype*`.\n" ^
+  "  eq $subst-typeuse(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
+  "  ceq $subst-typeuse(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
+  "      $subst-typeuse(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
+  "      $subst-typeuse(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
+  "   if SUBST-L-WS =/= eps .\n" ^
+  "  eq $subst-valtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
+  "  ceq $subst-valtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
+  "      $subst-valtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
+  "      $subst-valtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
+  "   if SUBST-L-WS =/= eps .\n" ^
+  "  eq $subst-subtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
+  "  ceq $subst-subtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
+  "      $subst-subtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
+  "      $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
+  "   if SUBST-L-WS =/= eps .\n" ^
+  "\n" ^
+  "  --- Executable lowering for SpecTec (i<n) type iterations.\n" ^
+  "  --- These helpers generate the finite sequences used by roll/unroll rules;\n" ^
+  "  --- without them the iterator variable becomes a free WasmTerminal.\n" ^
+  "  eq $rec-typevars(0) = eps .\n" ^
+  "  ceq $rec-typevars(TYPE-ITER-N) =\n" ^
+  "      $rec-typevars(TYPE-ITER-N - 1) CTORRECA1(TYPE-ITER-N - 1)\n" ^
+  "   if (TYPE-ITER-N > 0) = true .\n" ^
+  "  eq $def-typeuses(TYPE-ITER-RT, 0) = eps .\n" ^
+  "  ceq $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N) =\n" ^
+  "      $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N - 1)\n" ^
+  "      CTORWDEFA2(TYPE-ITER-RT, TYPE-ITER-N - 1)\n" ^
+  "   if (TYPE-ITER-N > 0) = true .\n" ^
+  "  eq $idx-typeuses(TYPE-ITER-X, 0) = eps .\n" ^
+  "  ceq $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N) =\n" ^
+  "      $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N - 1)\n" ^
+  "      CTORWIDXA1(TYPE-ITER-X + (TYPE-ITER-N - 1))\n" ^
+  "   if (TYPE-ITER-N > 0) = true .\n" ^
+  "  ceq $expanddt(EXP-FL-DT) = EXP-FL-CT\n" ^
+  "   if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .\n" ^
+  "  ceq Expand(EXPAND-X-DT, CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2)) = valid\n" ^
+  "   if CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2) := $expanddt(EXPAND-X-DT) .\n" ^
+  "\n" ^
   "  --- Generic SpecTec list type witness.\n" ^
   "  --- The source rule is polymorphic in the element type; this executable\n" ^
   "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
   "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
   "   if (len(LIST-TS) < (2 ^ 32)) = true .\n" ^
   "\n" ^
-  "  --- Executable record-shape memberships for runtime configurations.\n" ^
-  "  --- They keep Store/Frame/Moduleinst available after record equations\n" ^
-  "  --- normalize concrete constants to WasmTerminal record literals.\n" ^
-  "  mb {item('TYPES, MOD-TYPES) ; item('TAGS, MOD-TAGS) ; item('GLOBALS, MOD-GLOBALS) ; item('MEMS, MOD-MEMS) ; item('TABLES, MOD-TABLES) ; item('FUNCS, MOD-FUNCS) ; item('DATAS, MOD-DATAS) ; item('ELEMS, MOD-ELEMS) ; item('EXPORTS, MOD-EXPORTS)} : Moduleinst .\n" ^
-  "  mb {item('LOCALS, FRAME-LOCALS) ; item('MODULE, FRAME-MODULE)} : Frame .\n" ^
-  "  mb {item('TAGS, STORE-TAGS) ; item('GLOBALS, STORE-GLOBALS) ; item('MEMS, STORE-MEMS) ; item('TABLES, STORE-TABLES) ; item('FUNCS, STORE-FUNCS) ; item('DATAS, STORE-DATAS) ; item('ELEMS, STORE-ELEMS) ; item('STRUCTS, STORE-STRUCTS) ; item('ARRAYS, STORE-ARRAYS) ; item('EXNS, STORE-EXNS)} : Store .\n" ^
+  "  --- Generic list lifting for Val_ok premises over val* / valtype*.\n" ^
+  "  --- SpecTec writes this pointwise; the executable Maude condition needs\n" ^
+  "  --- an explicit recursive case for multi-value invocation arguments.\n" ^
+  "  eq Num-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
+  "  eq Val-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
+  "  eq Val-ok(VALOK-S, eps, eps) = valid .\n" ^
+  "  ceq Val-ok(VALOK-S, VALOK-V VALOK-VS, VALOK-T VALOK-TS) = valid\n" ^
+  "   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps)) = true\n" ^
+  "   /\\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid) = true\n" ^
+  "   /\\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) = true .\n" ^
+  "\n" ^
+  "  --- Executable frame record representation.\n" ^
+  "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}. Direct Maude\n" ^
+  "  --- record-shape membership for that pattern can make sort inference\n" ^
+  "  --- diverge, so frame records are emitted as this typed constructor while\n" ^
+  "  --- preserving field projection and update behavior.\n" ^
+  "  eq value('LOCALS, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-LOCALS .\n" ^
+  "  eq value('MODULE, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-MODULE .\n" ^
+  "  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'LOCALS <- MK-FRAME-LOCALS2] = $mk-frame(MK-FRAME-LOCALS2, MK-FRAME-MODULE) .\n" ^
+  "  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'MODULE <- MK-FRAME-MODULE2] = $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE2) .\n" ^
   "\n" ^
   "  --- Concrete record-state execution helpers.\n" ^
   "  --- Generated SpecTec helper equations are typed as Store ; Frame.\n" ^
@@ -3826,11 +4016,13 @@ let step_predicate_helpers =
   "  op all-vals : WasmTerminals -> Bool .\n" ^
   "  op is-trap : WasmTerminals -> Bool .\n" ^
   "  op needs-label-ctxt : WasmTerminals -> Bool .\n" ^
-  "  --- Context-wrapper overloads with concrete operand sorts.\n" ^
-  "  --- The generic CTOR* declarations are emitted with WasmTerminal args,\n" ^
-  "  --- but heating/cooling and step rules build these wrappers from\n" ^
-  "  --- N/Frame/Catch/WasmTerminals values. Add precise overloads so the\n" ^
-  "  --- resulting terms are well-sorted and match rewrite rules by membership.\n" ^
+  "  op $subst-typeuse : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
+  "  op $subst-valtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
+  "  op $subst-subtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
+  "  op $rec-typevars : Nat -> WasmTerminals .\n" ^
+  "  op $def-typeuses : Rectype Nat -> WasmTerminals .\n" ^
+  "  op $idx-typeuses : Typeidx Nat -> WasmTerminals .\n" ^
+  "  op $mk-frame : WasmTerminals WasmTerminals -> Frame [ctor] .\n" ^
   "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] .\n" ^
   "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] .\n" ^
   "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] .\n"
@@ -3852,8 +4044,15 @@ let collect_ctor_decl_lines eq_lines =
   let re = Str.regexp "CTOR[A-Z0-9]+A[0-9]+" in
   let seen = Hashtbl.create 512 in
   let result_sort = Hashtbl.create 512 in
+  let unary_sx_arg = Hashtbl.create 32 in
+  let op_terminal = Hashtbl.create 64 in
   let add_name nm =
     if not (Hashtbl.mem seen nm) then Hashtbl.add seen nm ()
+  in
+  let ctor_arity nm =
+    let idx_a = try String.rindex nm 'A' with Not_found -> String.length nm - 1 in
+    try int_of_string (String.sub nm (idx_a + 1) (String.length nm - idx_a - 1))
+    with _ -> 0
   in
   let sort_rank = function
     | "Val" -> 2
@@ -3878,13 +4077,28 @@ let collect_ctor_decl_lines eq_lines =
         true
       with Not_found -> false
     in
+    let has_type_pos =
+      try Some (Str.search_forward (Str.regexp_string "hasType") l 0)
+      with Not_found -> None
+    in
     let rec loop pos =
       match (try Some (Str.search_forward re l pos) with Not_found -> None) with
       | None -> ()
       | Some _ ->
           let nm = Str.matched_string l in
+          let match_pos = Str.match_beginning () in
           let next_pos = Str.match_end () in
           add_name nm;
+          (match has_type_pos with
+           | Some hp when match_pos < hp -> Hashtbl.replace op_terminal nm true
+           | _ -> ());
+          if ctor_arity nm = 1 then begin
+            let sx_arg_re =
+              Str.regexp (Str.quote nm ^ "[ \t\n]*(+[ \t\n]*SX[A-Z0-9-]*")
+            in
+            if (try ignore (Str.search_forward sx_arg_re l 0); true with Not_found -> false)
+            then Hashtbl.replace unary_sx_arg nm true
+          end;
           if line_declares_val then mark_sort nm "Val"
           else if line_declares_instr then mark_sort nm "Instr";
           loop next_pos
@@ -3896,9 +4110,27 @@ let collect_ctor_decl_lines eq_lines =
   |> List.of_seq
   |> List.sort_uniq String.compare
   |> List.map (fun nm ->
-       match nm with
-       | "CTORLABELLBRACERBRACEA3" ->
-           "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
+	   match nm with
+	       | "CTORFUNCARROWA2" ->
+	           "  op CTORFUNCARROWA2 : WasmTerminals WasmTerminals -> Comptype [ctor] ."
+	       | "CTORSUBA3" ->
+	           "  op CTORSUBA3 : WasmTerminals WasmTerminals Comptype -> Subtype [ctor] ."
+	       | "CTORRECA1" ->
+	           "  op CTORRECA1 : WasmTerminals -> Rectype [ctor] ."
+	       | "CTORWDEFA2" ->
+	           "  op CTORWDEFA2 : Rectype WasmTerminal -> Deftype [ctor] ."
+	       | "CTORWRESULTA1" ->
+	           "  op CTORWRESULTA1 : WasmTerminals -> Blocktype [ctor] ."
+	       | "CTORARROWA3" ->
+	           "  op CTORARROWA3 : WasmTerminals WasmTerminals WasmTerminals -> Instrtype [ctor] ."
+	       | "CTORBLOCKA2" ->
+	           "  op CTORBLOCKA2 : Blocktype WasmTerminals -> Instr [ctor] ."
+	       | "CTORLOOPA2" ->
+	           "  op CTORLOOPA2 : Blocktype WasmTerminals -> Instr [ctor] ."
+	       | "CTORFUNCA3" ->
+	           "  op CTORFUNCA3 : WasmTerminals WasmTerminals WasmTerminals -> Funccode [ctor] ."
+	       | "CTORLABELLBRACERBRACEA3" ->
+	           "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
        | "CTORFRAMELBRACERBRACEA3" ->
            "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."
        | "CTORHANDLERLBRACERBRACEA3" ->
@@ -3910,13 +4142,16 @@ let collect_ctor_decl_lines eq_lines =
        | "CTORSA0" | "CTORUA0" ->
            Printf.sprintf "  op %s :  -> Sx [ctor] ." nm
        | _ ->
-           let idx_a = try String.rindex nm 'A' with Not_found -> String.length nm - 1 in
-           let arity =
-             try int_of_string (String.sub nm (idx_a + 1) (String.length nm - idx_a - 1))
-             with _ -> 0
+           let arity = ctor_arity nm in
+           let args =
+             if arity <= 0 then ""
+             else if arity = 1 && Hashtbl.mem unary_sx_arg nm then "Sx"
+             else String.concat " " (List.init arity (fun _ -> "WasmTerminal"))
            in
-           let args = if arity <= 0 then "" else String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
-           let ret = match Hashtbl.find_opt result_sort nm with Some s -> s | None -> "WasmTerminal" in
+           let ret =
+             if Hashtbl.mem op_terminal nm then "OpTerminal"
+             else match Hashtbl.find_opt result_sort nm with Some s -> s | None -> "WasmTerminal"
+           in
            Printf.sprintf "  op %s : %s -> %s [ctor] ." nm args ret)
 
 let translate defs =

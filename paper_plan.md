@@ -1,254 +1,151 @@
 # Spec2Maude Paper Plan
 
-Updated: 2026-04-30
+Updated: 2026-05-12
 
-Engineering status is in `STATUS.md`.
+Engineering status is in `STATUS.md`. This file is the research plan.
 
----
+## Thesis
 
-## 1. Paper Thesis
+Spec2Maude translates WebAssembly 3.0 SpecTec semantics to Maude while
+preserving the original relation structure, then derives a justified
+analysis-friendly semantics for practical LTL model checking.
 
-One-sentence story:
+The paper needs three connected artifacts:
 
-> Spec2Maude translates WebAssembly 3.0 SpecTec semantics to Maude while
-> preserving the original relation structure, then applies justified
-> transformations that make the generated semantics usable for LTL model
-> checking.
+1. C1: faithful relation-preserving translation.
+2. C2: semantics-preserving analysis transformation.
+3. Evaluation: evidence that C2 agrees with C1 but model-checks better.
 
-Core claim:
+## Contributions
 
-- A faithful relation-preserving translation is important as a reference.
-- Directly model checking that faithful semantics causes severe state-space
-  explosion.
-- The research contribution is to separate:
-  1. the faithful C1 baseline,
-  2. the optimized C2 model-checking semantics,
-  3. the evaluation showing why C2 is needed and how much it helps.
+C1 baseline:
 
----
+- Implemented in `translator_bs.ml`.
+- Generated artifact is `output_bs.maude`.
+- Must preserve `Step`, `Step_pure`, `Step_read`, and `Steps`.
+- Must use unary `steps(C) => C'`.
+- Must use `_ ; _` for configs.
+- Must use WT/`WasmTerminal`, not RT/`RecordTerminal`.
+- Must not use `dstep`, `focused-step`, `mc`, or benchmark-specific execution
+  drivers as part of the baseline semantics.
+- Must not hard-code benchmark-specific functions such as Fibonacci execution.
 
-## 2. Contribution Plan
+C2 transformation:
 
-### C1. Relation-Preserving Baseline
+- Implemented later in `translator.ml`.
+- May use heat/cool, focusing, context pruning, canonicalization, or other
+  analysis-friendly transformations.
+- Must be justified against C1 on small executions.
+- Must be the path for practical model checking if direct C1 explodes.
 
-Implementation:
+Evaluation:
 
-- `translator_bs.ml`
+- Compare C1 and C2 on rewrite/search/model-checking time.
+- Include timeout/state-space results.
+- Cover more than Fibonacci before a PLDI submission.
 
-Required shape:
+## Current Research Status
 
-- Preserve `Step`, `Step_pure`, `Step_read`, and `Steps`.
-- Preserve rule names and premises.
-- Use `_ ; _` for configs.
-- Generate `steps(C) => C'`.
-- Preserve `val^n` and `val*` structure.
-- Avoid redundant executable sort guards when Maude declarations already enforce
-  the sort.
+Done:
 
-Current status:
+- C1 generates distinct `step`, `step-pure`, `step-read`, and `steps`.
+- C1 generates unary `steps`.
+- Configs use `_ ; _`.
+- Optional `eps` cases are generated generally.
+- `Step/ctxt-instrs` avoids empty recursive focus.
+- `mc` and deterministic `dstep` are not part of generated C1.
+- The previously hand-written executable `$invoke` footer has been removed from
+  `translator_bs.ml`; only the SpecTec-generated `$invoke` remains.
+- Generic `(i<n)` type-iteration lowering for `rollrt`/`unrollrt`/`rolldt` was
+  fixed, so the fib function type can now be expanded without the old
+  `FREE-UNROLLRT0-I` style free iterator.
 
-- Implemented.
-- `step(fib-config(...))` performs generated C1 one-step execution.
-- `steps(fib(0))` and `steps(fib(5))` can reach terminal configurations by
-  Maude `search`.
-- Direct initial-state model checking through `step(C) => C'` still times out
-  even for `fib(0)`.
-- No deterministic `dstep` driver is part of C1.
+Not done:
 
-Interpretation:
+- C1 Fibonacci execution is not yet complete.
+- `fib-config(i32v(5))` reduces to a plausible call-ref config, and
+  `$expanddt(fib-type)` now succeeds.
+- The first `step-read` still overflows, but the current minimum reproducer is
+  `red CTORLEA1(CTORSA0)`, which appears in the fib function body through
+  `CTORRELOPA2(CTORI32A0, CTORLEA1(CTORSA0))`.
+- Direct `steps(fib-config(...))` execution without `mc` is therefore not
+  proven yet.
+- C1 model checking has not reached the real state-explosion experiment yet.
 
-- C1 is now useful as a relation-preserving executable reference.
-- C1 is not yet practical as a direct model-checking target when the model
-  checker must solve the full generated `step(C) => C'` relation.
-- The honest C1 claim is: faithful translation and `Step`/`Steps` relation
-  execution work; direct model checking still explodes.
+## PLDI Bar
 
-### C2. Analysis-Friendly Transformation
-
-Implementation:
-
-- `translator.ml`
-
-Purpose:
-
-- Derive a model-checking-friendly semantics from C1.
-- Reduce context/proof-search nondeterminism without changing observable Wasm
-  behavior.
-
-Likely techniques:
-
-- heat/cool or focused evaluation contexts
-- deterministic one-redex stepping
-- context split pruning
-- canonicalization of equivalent control-context states
-- abstraction when the property permits it
-
-Required evidence:
-
-- C2 agrees with C1 on small rewrite tests.
-- C2 model checking finishes where C1 times out.
-- Any transformation is explained as a semantics-preserving optimization, not a
-  hand-written replacement.
-- Do not put benchmark-specific deterministic drivers into the C1 baseline.
-
-### C3. Model-Checking Evaluation
-
-Properties:
-
-- Reachability: `<> result-is(N)`
-- Safety: `[] ~ trap-seen`
-- Progress/stuckness when expressible
-- Feature-specific properties for memory/table/exception/GC rules
-
-Benchmarks:
-
-- fib
-- factorial
-- iterative sum/product
-- memory load/store
-- table/call-indirect
-- exceptions
-- GC struct/array operations
-
-Tables needed:
-
-- rewrite time for C1 and C2
-- model-check time for C1 and C2
-- number of rewrites/states when available
-- timeout table
-
-### C4. State-Explosion Analysis
-
-Current evidence:
-
-- C1 `step(fib(0))` one-step: 34 rewrites, immediate.
-- C1 `search [1] steps(fib(0)) =>* Z ; i32v(0)`: found in 612 rewrites, about
-  2ms Maude real time.
-- C1 `search [1] steps(fib(5)) =>* Z ; i32v(5)`: found in 22,662 rewrites,
-  about 48ms Maude real time.
-- Direct C1 model checking with `exec-step if step(C) => C'`: timeout after 120
-  seconds even for `fib(0)`.
-- Reachability search from `mc(fib-config(i32v(0)))` times out quickly and shows
-  nested label/control-context states.
-
-Research angle:
-
-- Faithful generated semantics is executable, but its context rules expose too
-  much nondeterministic proof search to the model checker.
-- C2 should be presented as a systematic reduction from the faithful semantics.
-- The immediate professor-facing message should be that C1 is faithful and
-  executable by rewriting, but not yet usable as a direct model-checking target.
-
----
-
-## 3. PLDI Bar
-
-C1 alone is not enough.
+C1 alone is not enough for PLDI.
 
 Minimum credible story:
 
 ```text
-C1 faithful translation
-+ C2 transformed executable semantics
-+ C3 benchmark/property evaluation
-+ C4 state-explosion diagnosis and reduction
+SpecTec
+  -> C1 relation-preserving Maude
+  -> C2 analysis-friendly Maude
+  -> Maude LTL model checking
 ```
 
-PLDI likely needs one stronger research win:
+The paper should eventually provide at least one strong research win:
 
-1. A Wasm 3.0 spec ambiguity or bug.
-2. A mismatch found by differential testing against V8/wasmtime/SpiderMonkey.
-3. A general state-space reduction method for SpecTec-generated Maude semantics.
-4. LTL verification of Wasm 3.0 features that existing tools cannot practically
-   check.
+1. A general transformation that makes SpecTec-generated Maude semantics
+   model-checkable.
+2. LTL verification of WebAssembly 3.0 features that are hard for existing
+   tools.
+3. A spec ambiguity or bug found through the executable semantics.
+4. A mismatch found by differential testing against real engines.
 
----
+## Roadmap
 
-## 4. Roadmap
+Phase 0: finish C1 execution.
 
-### Phase 0: Finish C1 Baseline
+- [x] Generate the professor-requested relation names.
+- [x] Generate unary `steps`.
+- [x] Use `_ ; _`.
+- [x] Keep WT/`WasmTerminal`.
+- [x] Remove `dstep`/`focused-step` from C1.
+- [x] Remove hard-coded executable `$invoke` from the translator.
+- [x] Remove `mc` from the main baseline harness path.
+- [x] Fix `$expanddt/$unrolldt` stack overflow for the generic fib type
+      unrolling path.
+- [ ] Fix signed numeric operator constructor/membership executability
+      generically (`CTORLEA1(CTORSA0)` is the current minimum reproducer).
+- [ ] Verify `step-pure`, `step-read`, `step`, and `steps` with Maude
+      commands.
+- [ ] Make Fibonacci run through `steps` without `mc`.
+- [ ] Decide whether `$invoke` or `$instantiate` is the right final initial
+      config path.
 
-Done:
+Phase 1: build C2.
 
-- [x] Generate `_ ; _`.
-- [x] Generate `step`, `step-pure`, `step-read`, `steps`.
-- [x] Generate `steps(C) => C'`.
-- [x] Preserve `val^n` length constraints.
-- [x] Restrict `val*` binders with `ValTerminals`.
-- [x] Prevent empty recursive focus in `Step/ctxt-instrs`.
-- [x] Verify generated `step(...)` one-step execution.
-- [x] Verify `steps(...)` reaches Fibonacci terminal states by `search`.
-- [x] Fix model-check harness over-approximation with `mc(Config)`.
+- [ ] Rebuild `translator.ml` as a transformation from C1.
+- [ ] Pick the first transformation that makes Fibonacci model checking finish.
+- [ ] Check C1/C2 agreement on small executions.
+- [ ] Measure C1 timeout vs C2 success.
 
-Still open:
+Phase 2: broaden evaluation.
 
-- [ ] Ask professor whether the paper split is acceptable: C1 as faithful
-      executable reference, C2 as optimized model-checking semantics.
-- [ ] If professor requires direct C1 model checking, investigate a deeper Maude
-      strategy/fairness/control mechanism for the strict rules.
-- [ ] Explain clearly that no `dstep`/benchmark-specific driver is being used
-      as evidence for C1.
+- [ ] Add factorial and iterative sum/product.
+- [ ] Add memory/table examples.
+- [ ] Add exception and GC examples if possible.
+- [ ] Add repeatable timing scripts.
+- [ ] Produce C1-vs-C2 result tables.
 
-### Phase 1: Build C2
-
-Tasks:
-
-- [ ] Rebuild `translator.ml` as a justified transformation from C1.
-- [ ] Decide the C2 transformation only after professor feedback on the C1
-      model-checking failure.
-- [ ] Preserve observable agreement with C1 on small programs.
-- [ ] Measure model-checking improvement on fib first.
-
-### Phase 2: Broaden Coverage
-
-Tasks:
-
-- [ ] Complete Wasm 3.0 execution-rule coverage table.
-- [ ] Classify unsupported patterns.
-- [ ] Resolve major bind-before-use warnings.
-- [ ] Add non-fib benchmarks.
-
-### Phase 3: Evaluation
-
-Tasks:
-
-- [ ] 5+ benchmarks.
-- [ ] 3+ properties per benchmark.
-- [ ] C1-vs-C2 rewrite table.
-- [ ] C1-vs-C2 model-check table.
-- [ ] Timeout/state-explosion table.
-
-### Phase 4: Research Win
-
-Tasks:
-
-- [ ] Differential testing harness.
-- [ ] Wasm 3.0 feature case study.
-- [ ] Search for spec ambiguity or engine mismatch.
-- [ ] Generalize the state-space reduction technique.
-
----
-
-## 5. Writing Guidance
+## Claims To Avoid
 
 Do not claim:
 
-- "The faithful baseline scales to model checking."
+- C1 model checking fails because of state explosion yet.
+- `mc` is needed for the professor's baseline.
+- `mc` is part of translated semantics.
+- The current Fibonacci harness is final.
+- `$invoke` is hand-coded in C1.
 
-Honest claim:
+Current honest claim:
 
-- "The faithful baseline preserves the SpecTec relations and reaches small
-  terminal configurations through `Step`/`Steps` search."
-- "Direct model checking over the faithful baseline exposes severe state-space
-  explosion."
-- "The optimized translation is necessary for practical model checking."
-
-Next figure/table:
-
-- A table with C1 `step(...)` and `steps(...)` search results.
-- A table showing direct C1 model-check timeout from initial `fib(0)`.
-- A short diagram:
-
-```text
-SpecTec -> C1 relation-preserving Maude -> C2 optimized Maude -> model checking
-```
+> C1 now has the professor-requested relation shape, but direct execution is
+> still blocked before model checking. The earlier generated type-unrolling
+> issue for `call_ref` is fixed; the current minimum blocker is reducing the
+> signed numeric operator constructor `CTORLEA1(CTORSA0)`, which appears in the
+> Fibonacci body. The next task is to fix that constructor/membership
+> executability generally, then rerun direct `step`/`steps` evidence without
+> `mc`.

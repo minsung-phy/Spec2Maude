@@ -49,6 +49,15 @@ mod SPECTEC-CORE is
   --- Address-size types are numeric types in WebAssembly.
   subsort Addrtype < Numtype .
 
+  --- SpecTec union sorts used by executable type/value helpers.
+  subsort Numtype < Valtype .
+  subsort Vectype < Valtype .
+  subsort Reftype < Valtype .
+  subsort Typevar < Typeuse .
+  subsort Deftype < Typeuse .
+  sort OpTerminal .
+  subsort OpTerminal < WasmTerminal .
+
   --- Bool wrapper (avoid subsort Bool < WasmTerminal conflicts)
   op w-bool : Bool -> WasmTerminal [ctor] .
 
@@ -91,7 +100,6 @@ mod SPECTEC-CORE is
   subsort Config < StepsConf .
   subsort InstrTerminals < StepPureConf .
   subsort InstrTerminals < StepReadConf .
-  op _;_ : WasmTerminal WasmTerminals -> WasmTerminal [ctor prec 60] .
   op _;_ : Store Frame -> State [ctor prec 55] .
   op _;_ : State InstrTerminals -> Config [ctor prec 60] .
   op step : Config -> StepConf [frozen (1)] .
@@ -117,9 +125,32 @@ mod SPECTEC-CORE is
   vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : WasmTerminals .
   vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : WasmTerminals .
   vars FRAME-LOCALS FRAME-MODULE : WasmTerminals .
+  vars MK-FRAME-LOCALS MK-FRAME-LOCALS2 MK-FRAME-MODULE MK-FRAME-MODULE2 : WasmTerminals .
   vars WT-S WT-F : WasmTerminal .
   var WT-X : Localidx .
   var WT-V : Val .
+  var VALOK-S : WasmTerminal .
+  var VALOK-V : Val .
+  var VALOK-T : Valtype .
+  vars VALOK-WT-S VALOK-C : WasmTerminal .
+  var VALOK-NT : Numtype .
+  vars VALOK-VS VALOK-TS : WasmTerminals .
+  var EXP-FL-DT : Deftype .
+  var EXP-FL-CT : Comptype .
+  var EXP-FL-TU : WasmTerminals .
+  var EXPAND-X-DT : Deftype .
+  vars EXPAND-X-T1 EXPAND-X-T2 : WasmTerminals .
+  var INVOKE-X-S : WasmTerminal .
+  var INVOKE-S-S : Store .
+  var INVOKE-X-FUNCADDR : Funcaddr .
+  var INVOKE-X-VAL : ValTerminals .
+  var INVOKE-X-DT : Deftype .
+  vars INVOKE-X-T1 INVOKE-X-T2 : WasmTerminals .
+  var SUBST-L-W : WasmTerminal .
+  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : WasmTerminals .
+  var TYPE-ITER-X : Typeidx .
+  var TYPE-ITER-RT : Rectype .
+  var TYPE-ITER-N : Nat .
   vars T W WW FQ : WasmTerminal .
   vars TS W* ISQ INSTRQ CQ : WasmTerminals .
 
@@ -212,6 +243,7 @@ mod SPECTEC-CORE is
   op $data : State Dataidx -> Datainst .
   op $dataidx-funcs : WasmTerminals -> WasmTerminals .
   op $datainst : State -> WasmTerminals .
+  op $def-typeuses : Rectype Nat -> WasmTerminals .
   op $default : Valtype -> Val .
   op $demote : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $diffrt : Reftype Reftype -> Reftype .
@@ -352,6 +384,7 @@ mod SPECTEC-CORE is
   op $iclz : WasmTerminal WasmTerminal -> WasmTerminal .
   op $ictz : WasmTerminal WasmTerminal -> WasmTerminal .
   op $idiv : WasmTerminal Sx WasmTerminal WasmTerminal -> WasmTerminal .
+  op $idx-typeuses : Typeidx Nat -> WasmTerminals .
   op $ieq : WasmTerminal WasmTerminal WasmTerminal -> U32 .
   op $ieqz : WasmTerminal WasmTerminal -> U32 .
   op $iextend : WasmTerminal WasmTerminal Sx WasmTerminal -> WasmTerminal .
@@ -447,6 +480,7 @@ mod SPECTEC-CORE is
   op $min : WasmTerminal WasmTerminal -> WasmTerminal .
   op $minat : Addrtype Addrtype -> Addrtype .
   op $minus-recs : WasmTerminals WasmTerminals -> WasmTerminal .
+  op $mk-frame : WasmTerminals WasmTerminals -> Frame [ctor] .
   op $moduleinst : State -> Moduleinst .
   op $narrow : WasmTerminal WasmTerminal Sx WasmTerminal -> WasmTerminal .
   op $nbytes : Numtype WasmTerminal -> WasmTerminals .
@@ -457,6 +491,7 @@ mod SPECTEC-CORE is
   op $promote : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $psize : Packtype -> WasmTerminal .
   op $psizenn : Packtype -> WasmTerminal .
+  op $rec-typevars : Nat -> WasmTerminals .
   op $reinterpret : Numtype Numtype WasmTerminal -> WasmTerminal .
   op $relaxed-trunc : WasmTerminal WasmTerminal Sx WasmTerminal -> WasmTerminal .
   op $relaxed2 : Relaxed2 WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -508,11 +543,14 @@ mod SPECTEC-CORE is
   op $subst-reftype : Reftype WasmTerminals WasmTerminals -> Reftype .
   op $subst-storagetype : Storagetype WasmTerminals WasmTerminals -> Storagetype .
   op $subst-subtype : Subtype WasmTerminals WasmTerminals -> Subtype .
+  op $subst-subtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .
   op $subst-tabletype : Tabletype WasmTerminals WasmTerminals -> Tabletype .
   op $subst-tagtype : Tagtype WasmTerminals WasmTerminals -> Tagtype .
   op $subst-typeuse : Typeuse WasmTerminals WasmTerminals -> Typeuse .
+  op $subst-typeuse : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .
   op $subst-typevar : Typevar WasmTerminals WasmTerminals -> Typeuse .
   op $subst-valtype : Valtype WasmTerminals WasmTerminals -> Valtype .
+  op $subst-valtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .
   op $subst-vectype : Vectype WasmTerminals WasmTerminals -> Vectype .
   op $sum : WasmTerminals -> WasmTerminal .
   op $sx : Storagetype -> Sx .
@@ -579,14 +617,14 @@ mod SPECTEC-CORE is
   op B : -> WasmTerminal .
   op Blocktype-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op C : -> WasmTerminal .
-  op CTORABSA0 :  -> WasmTerminal [ctor] .
+  op CTORABSA0 :  -> OpTerminal [ctor] .
   op CTORACTIVEA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORADDA0 :  -> WasmTerminal [ctor] .
-  op CTORADDSATA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORALLTRUEA0 :  -> WasmTerminal [ctor] .
+  op CTORADDA0 :  -> OpTerminal [ctor] .
+  op CTORADDSATA1 : Sx -> OpTerminal [ctor] .
+  op CTORALLTRUEA0 :  -> OpTerminal [ctor] .
   op CTORANDNOTA0 :  -> WasmTerminal [ctor] .
   op CTORANYA0 :  -> WasmTerminal [ctor] .
-  op CTORANYA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORANYA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
   op CTORANYCONVERTEXTERNA0 :  -> Instr [ctor] .
   op CTORANYTRUEA0 :  -> WasmTerminal [ctor] .
   op CTORARRAYA0 :  -> WasmTerminal [ctor] .
@@ -604,11 +642,11 @@ mod SPECTEC-CORE is
   op CTORARRAYNEWFIXEDA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORARRAYSETA1 : WasmTerminal -> Instr [ctor] .
   op CTORARROWA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORARROWA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORAVGRUA0 :  -> WasmTerminal [ctor] .
+  op CTORARROWA3 : WasmTerminals WasmTerminals WasmTerminals -> Instrtype [ctor] .
+  op CTORAVGRUA0 :  -> OpTerminal [ctor] .
   op CTORBINOPA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORBITSELECTA0 :  -> WasmTerminal [ctor] .
-  op CTORBLOCKA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
+  op CTORBLOCKA2 : Blocktype WasmTerminals -> Instr [ctor] .
   op CTORBOTA0 :  -> WasmTerminal [ctor] .
   op CTORBRA1 : WasmTerminal -> Instr [ctor] .
   op CTORBRIFA1 : WasmTerminal -> Instr [ctor] .
@@ -624,77 +662,77 @@ mod SPECTEC-CORE is
   op CTORCATCHALLA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORCATCHALLREFA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORCATCHREFA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORCEILA0 :  -> WasmTerminal [ctor] .
-  op CTORCLZA0 :  -> WasmTerminal [ctor] .
+  op CTORCEILA0 :  -> OpTerminal [ctor] .
+  op CTORCLZA0 :  -> OpTerminal [ctor] .
   op CTORCONSTA2 : WasmTerminal WasmTerminal -> Val [ctor] .
-  op CTORCONVERTA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORCONVERTA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORCOPYSIGNA0 :  -> WasmTerminal [ctor] .
-  op CTORCTZA0 :  -> WasmTerminal [ctor] .
+  op CTORCONVERTA1 : Sx -> OpTerminal [ctor] .
+  op CTORCONVERTA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
+  op CTORCOPYSIGNA0 :  -> OpTerminal [ctor] .
+  op CTORCTZA0 :  -> OpTerminal [ctor] .
   op CTORCVTOPA3 : WasmTerminal WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORDATAA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORDATADROPA1 : WasmTerminal -> Instr [ctor] .
   op CTORDECLAREA0 :  -> WasmTerminal [ctor] .
-  op CTORDEMOTEA0 :  -> WasmTerminal [ctor] .
-  op CTORDEMOTEA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORDIVA0 :  -> WasmTerminal [ctor] .
-  op CTORDIVA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORDOTSA0 :  -> WasmTerminal [ctor] .
+  op CTORDEMOTEA0 :  -> OpTerminal [ctor] .
+  op CTORDEMOTEA1 : WasmTerminal -> OpTerminal [ctor] .
+  op CTORDIVA0 :  -> OpTerminal [ctor] .
+  op CTORDIVA1 : Sx -> OpTerminal [ctor] .
+  op CTORDOTSA0 :  -> OpTerminal [ctor] .
   op CTORDROPA0 :  -> Instr [ctor] .
   op CTORELEMA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORELEMDROPA1 : WasmTerminal -> Instr [ctor] .
-  op CTOREQZA0 :  -> WasmTerminal [ctor] .
+  op CTOREQZA0 :  -> OpTerminal [ctor] .
   op CTOREXNA0 :  -> WasmTerminal [ctor] .
   op CTOREXPORTA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTOREXTADDPAIRWISEA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTOREXTENDA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTOREXTENDA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTOREXTADDPAIRWISEA1 : Sx -> OpTerminal [ctor] .
+  op CTOREXTENDA1 : Sx -> OpTerminal [ctor] .
+  op CTOREXTENDA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
   op CTOREXTERNA0 :  -> WasmTerminal [ctor] .
   op CTOREXTERNCONVERTANYA0 :  -> Instr [ctor] .
-  op CTOREXTMULA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTOREXTMULA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
   op CTORF32A0 :  -> Numtype [ctor] .
   op CTORF64A0 :  -> Numtype [ctor] .
   op CTORFINALA0 :  -> WasmTerminal [ctor] .
-  op CTORFLOORA0 :  -> WasmTerminal [ctor] .
+  op CTORFLOORA0 :  -> OpTerminal [ctor] .
   op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] .
-  op CTORFUNCA0 :  -> WasmTerminal [ctor] .
+  op CTORFUNCA0 :  -> OpTerminal [ctor] .
   op CTORFUNCA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORFUNCA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORFUNCARROWA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORGEA0 :  -> WasmTerminal [ctor] .
-  op CTORGEA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORFUNCA3 : WasmTerminals WasmTerminals WasmTerminals -> Funccode [ctor] .
+  op CTORFUNCARROWA2 : WasmTerminals WasmTerminals -> Comptype [ctor] .
+  op CTORGEA0 :  -> OpTerminal [ctor] .
+  op CTORGEA1 : Sx -> OpTerminal [ctor] .
   op CTORGLOBALA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORGLOBALA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORGLOBALGETA1 : WasmTerminal -> Instr [ctor] .
   op CTORGLOBALSETA1 : WasmTerminal -> Instr [ctor] .
-  op CTORGTA0 :  -> WasmTerminal [ctor] .
-  op CTORGTA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORGTA0 :  -> OpTerminal [ctor] .
+  op CTORGTA1 : Sx -> OpTerminal [ctor] .
   op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] .
   op CTORHIGHA0 :  -> WasmTerminal [ctor] .
   op CTORI16A0 :  -> WasmTerminal [ctor] .
   op CTORI31A0 :  -> WasmTerminal [ctor] .
-  op CTORI31GETA1 : WasmTerminal -> Instr [ctor] .
+  op CTORI31GETA1 : Sx -> Instr [ctor] .
   op CTORI32A0 :  -> Addrtype [ctor] .
   op CTORI64A0 :  -> Addrtype [ctor] .
   op CTORI8A0 :  -> WasmTerminal [ctor] .
   op CTORIMPORTA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORINFA0 :  -> WasmTerminal [ctor] .
+  op CTORINFA0 :  -> OpTerminal [ctor] .
   op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] .
   op CTORLBRACKDOTDOTRBRACKA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORLEA0 :  -> WasmTerminal [ctor] .
-  op CTORLEA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORLEA0 :  -> OpTerminal [ctor] .
+  op CTORLEA1 : Sx -> OpTerminal [ctor] .
   op CTORLOADA4 : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORLOCALA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORLOCALGETA1 : WasmTerminal -> Instr [ctor] .
   op CTORLOCALSETA1 : WasmTerminal -> Instr [ctor] .
   op CTORLOCALTEEA1 : WasmTerminal -> Instr [ctor] .
-  op CTORLOOPA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
+  op CTORLOOPA2 : Blocktype WasmTerminals -> Instr [ctor] .
   op CTORLOWA0 :  -> WasmTerminal [ctor] .
   op CTORLPARENREFEXNADDRRPARENTHROWREFA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORLTA0 :  -> WasmTerminal [ctor] .
-  op CTORLTA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORMAXA0 :  -> WasmTerminal [ctor] .
-  op CTORMAXA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORLTA0 :  -> OpTerminal [ctor] .
+  op CTORLTA1 : Sx -> OpTerminal [ctor] .
+  op CTORMAXA0 :  -> OpTerminal [ctor] .
+  op CTORMAXA1 : Sx -> OpTerminal [ctor] .
   op CTORMEMA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORMEMORYA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORMEMORYCOPYA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
@@ -702,38 +740,38 @@ mod SPECTEC-CORE is
   op CTORMEMORYGROWA1 : WasmTerminal -> Instr [ctor] .
   op CTORMEMORYINITA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORMEMORYSIZEA1 : WasmTerminal -> Instr [ctor] .
-  op CTORMINA0 :  -> WasmTerminal [ctor] .
-  op CTORMINA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORMINA0 :  -> OpTerminal [ctor] .
+  op CTORMINA1 : Sx -> OpTerminal [ctor] .
   op CTORMODULEA11 : WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORMULA0 :  -> WasmTerminal [ctor] .
+  op CTORMULA0 :  -> OpTerminal [ctor] .
   op CTORMUTA0 :  -> WasmTerminal [ctor] .
-  op CTORNANA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORNEA0 :  -> WasmTerminal [ctor] .
-  op CTORNEARESTA0 :  -> WasmTerminal [ctor] .
-  op CTORNEGA0 :  -> WasmTerminal [ctor] .
-  op CTORNEGA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORNANA1 : WasmTerminal -> OpTerminal [ctor] .
+  op CTORNEA0 :  -> OpTerminal [ctor] .
+  op CTORNEARESTA0 :  -> OpTerminal [ctor] .
+  op CTORNEGA0 :  -> OpTerminal [ctor] .
+  op CTORNEGA1 : WasmTerminal -> OpTerminal [ctor] .
   op CTORNOEXNA0 :  -> WasmTerminal [ctor] .
   op CTORNOEXTERNA0 :  -> WasmTerminal [ctor] .
   op CTORNOFUNCA0 :  -> WasmTerminal [ctor] .
   op CTORNONEA0 :  -> WasmTerminal [ctor] .
   op CTORNOPA0 :  -> Instr [ctor] .
-  op CTORNORMA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORNULLA0 :  -> WasmTerminal [ctor] .
-  op CTOROKA0 :  -> WasmTerminal [ctor] .
-  op CTOROKA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTOROKA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORNORMA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
+  op CTORNULLA0 :  -> OpTerminal [ctor] .
+  op CTOROKA0 :  -> OpTerminal [ctor] .
+  op CTOROKA1 : WasmTerminal -> OpTerminal [ctor] .
+  op CTOROKA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
   op CTORPACKA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORPAGEA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORPASSIVEA0 :  -> WasmTerminal [ctor] .
-  op CTORPMAXA0 :  -> WasmTerminal [ctor] .
-  op CTORPMINA0 :  -> WasmTerminal [ctor] .
-  op CTORPOPCNTA0 :  -> WasmTerminal [ctor] .
-  op CTORPOSA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORPROMOTEA0 :  -> WasmTerminal [ctor] .
-  op CTORPROMOTELOWA0 :  -> WasmTerminal [ctor] .
-  op CTORQ15MULRSATSA0 :  -> WasmTerminal [ctor] .
-  op CTORRECA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORREFA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORPMAXA0 :  -> OpTerminal [ctor] .
+  op CTORPMINA0 :  -> OpTerminal [ctor] .
+  op CTORPOPCNTA0 :  -> OpTerminal [ctor] .
+  op CTORPOSA1 : WasmTerminal -> OpTerminal [ctor] .
+  op CTORPROMOTEA0 :  -> OpTerminal [ctor] .
+  op CTORPROMOTELOWA0 :  -> OpTerminal [ctor] .
+  op CTORQ15MULRSATSA0 :  -> OpTerminal [ctor] .
+  op CTORRECA1 : WasmTerminals -> Rectype [ctor] .
+  op CTORREFA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
   op CTORREFARRAYADDRA1 : WasmTerminal -> Val [ctor] .
   op CTORREFASNONNULLA0 :  -> Instr [ctor] .
   op CTORREFCASTA1 : WasmTerminal -> Instr [ctor] .
@@ -749,45 +787,45 @@ mod SPECTEC-CORE is
   op CTORREFNULLA1 : WasmTerminal -> Val [ctor] .
   op CTORREFSTRUCTADDRA1 : WasmTerminal -> Val [ctor] .
   op CTORREFTESTA1 : WasmTerminal -> Instr [ctor] .
-  op CTORREINTERPRETA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDDOTADDSA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDDOTSA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDLANESELECTA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDMADDA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDMAXA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDMINA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDNMADDA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDQ15MULRSA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDSWIZZLEA0 :  -> WasmTerminal [ctor] .
-  op CTORRELAXEDTRUNCA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORREINTERPRETA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDDOTADDSA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDDOTSA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDLANESELECTA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDMADDA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDMAXA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDMINA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDNMADDA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDQ15MULRSA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDSWIZZLEA0 :  -> OpTerminal [ctor] .
+  op CTORRELAXEDTRUNCA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
   op CTORRELOPA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORRETURNA0 :  -> Instr [ctor] .
   op CTORRETURNCALLA1 : WasmTerminal -> Instr [ctor] .
   op CTORRETURNCALLINDIRECTA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORRETURNCALLREFA1 : WasmTerminal -> Instr [ctor] .
-  op CTORROTLA0 :  -> WasmTerminal [ctor] .
-  op CTORROTRA0 :  -> WasmTerminal [ctor] .
+  op CTORROTLA0 :  -> OpTerminal [ctor] .
+  op CTORROTRA0 :  -> OpTerminal [ctor] .
   op CTORSA0 :  -> Sx [ctor] .
   op CTORSELECTA1 : WasmTerminal -> Instr [ctor] .
-  op CTORSETA0 :  -> WasmTerminal [ctor] .
-  op CTORSHAPEXANYA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORSHLA0 :  -> WasmTerminal [ctor] .
-  op CTORSHRA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORSPLATA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORSQRTA0 :  -> WasmTerminal [ctor] .
+  op CTORSETA0 :  -> OpTerminal [ctor] .
+  op CTORSHAPEXANYA3 : WasmTerminal WasmTerminal WasmTerminal -> OpTerminal [ctor] .
+  op CTORSHLA0 :  -> OpTerminal [ctor] .
+  op CTORSHRA1 : Sx -> OpTerminal [ctor] .
+  op CTORSPLATA1 : WasmTerminal -> OpTerminal [ctor] .
+  op CTORSQRTA0 :  -> OpTerminal [ctor] .
   op CTORSTARTA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORSTOREA4 : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORSTRUCTA0 :  -> WasmTerminal [ctor] .
-  op CTORSTRUCTA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORSTRUCTA1 : WasmTerminal -> OpTerminal [ctor] .
   op CTORSTRUCTGETA3 : WasmTerminal WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORSTRUCTNEWA1 : WasmTerminal -> Instr [ctor] .
   op CTORSTRUCTNEWDEFAULTA1 : WasmTerminal -> Instr [ctor] .
   op CTORSTRUCTSETA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
-  op CTORSUBA0 :  -> WasmTerminal [ctor] .
-  op CTORSUBA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORSUBNORMA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORSUBSATA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORSWIZZLEA0 :  -> WasmTerminal [ctor] .
+  op CTORSUBA0 :  -> OpTerminal [ctor] .
+  op CTORSUBA3 : WasmTerminals WasmTerminals Comptype -> Subtype [ctor] .
+  op CTORSUBNORMA1 : WasmTerminal -> OpTerminal [ctor] .
+  op CTORSUBSATA1 : Sx -> OpTerminal [ctor] .
+  op CTORSWIZZLEA0 :  -> OpTerminal [ctor] .
   op CTORTABLEA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORTABLEA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op CTORTABLECOPYA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
@@ -802,10 +840,10 @@ mod SPECTEC-CORE is
   op CTORTHROWA1 : WasmTerminal -> Instr [ctor] .
   op CTORTHROWREFA0 :  -> Instr [ctor] .
   op CTORTRAPA0 :  -> Instr [ctor] .
-  op CTORTRUNCA0 :  -> WasmTerminal [ctor] .
-  op CTORTRUNCA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORTRUNCSATA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORTRUNCSATA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
+  op CTORTRUNCA0 :  -> OpTerminal [ctor] .
+  op CTORTRUNCA1 : Sx -> OpTerminal [ctor] .
+  op CTORTRUNCSATA1 : Sx -> OpTerminal [ctor] .
+  op CTORTRUNCSATA2 : WasmTerminal WasmTerminal -> OpTerminal [ctor] .
   op CTORTRYTABLEA3 : WasmTerminal WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORTYPEA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORUA0 :  -> Sx [ctor] .
@@ -839,21 +877,21 @@ mod SPECTEC-CORE is
   op CTORVVTERNOPA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORVVTESTOPA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORVVUNOPA2 : WasmTerminal WasmTerminal -> Instr [ctor] .
-  op CTORWANDA0 :  -> WasmTerminal [ctor] .
-  op CTORWDEFA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORWEQA0 :  -> WasmTerminal [ctor] .
-  op CTORWIDXA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORWANDA0 :  -> OpTerminal [ctor] .
+  op CTORWDEFA2 : Rectype WasmTerminal -> Deftype [ctor] .
+  op CTORWEQA0 :  -> OpTerminal [ctor] .
+  op CTORWIDXA1 : WasmTerminal -> OpTerminal [ctor] .
   op CTORWIFELSEA3 : WasmTerminal WasmTerminal WasmTerminal -> Instr [ctor] .
   op CTORWNOTA0 :  -> WasmTerminal [ctor] .
-  op CTORWORA0 :  -> WasmTerminal [ctor] .
-  op CTORWRAPA0 :  -> WasmTerminal [ctor] .
-  op CTORWREMA1 : WasmTerminal -> WasmTerminal [ctor] .
-  op CTORWRESULTA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORWORA0 :  -> OpTerminal [ctor] .
+  op CTORWRAPA0 :  -> OpTerminal [ctor] .
+  op CTORWREMA1 : Sx -> OpTerminal [ctor] .
+  op CTORWRESULTA1 : WasmTerminals -> Blocktype [ctor] .
   op CTORWVALSA1 : WasmTerminal -> WasmTerminal [ctor] .
   op CTORXA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
-  op CTORXORA0 :  -> WasmTerminal [ctor] .
+  op CTORXORA0 :  -> OpTerminal [ctor] .
   op CTORZEROA0 :  -> WasmTerminal [ctor] .
-  op CTORZEROA1 : WasmTerminal -> WasmTerminal [ctor] .
+  op CTORZEROA1 : WasmTerminal -> OpTerminal [ctor] .
   op Catch-ok : WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Cnn :  -> WasmType [ctor] .
   op Comptype-ok : WasmTerminal WasmTerminal -> Judgement [ctor] .
@@ -881,8 +919,6 @@ mod SPECTEC-CORE is
   op F : -> WasmTerminal .
   op FREE-ALLOCMODULE0-MODULEINST : -> WasmTerminal .
   op FREE-ALLOCMODULE0-S7 : -> WasmTerminal .
-  op FREE-BLOCKTYPE0-T1 : -> WasmTerminal .
-  op FREE-BLOCKTYPE0-T2 : -> WasmTerminal .
   op FREE-EVALEXPRS1-REF : -> WasmTerminal .
   op FREE-EVALEXPRS1-REFQ : -> WasmTerminal .
   op FREE-EVALEXPRS1-ZQQ : -> WasmTerminal .
@@ -897,8 +933,6 @@ mod SPECTEC-CORE is
   op FREE-INSTANTIATE0-MODULEINST : -> WasmTerminal .
   op FREE-INSTANTIATE0-MODULEINST0 : -> WasmTerminal .
   op FREE-INSTANTIATE0-SQQQQ : -> WasmTerminal .
-  op FREE-ROLLDT0-I : -> WasmTerminal .
-  op FREE-ROLLRT0-I : -> WasmTerminal .
   op FREE-RUNDATA1-N : -> WasmTerminal .
   op FREE-RUNELEM2-N : -> WasmTerminal .
   op FREE-SUBST-ALL-DEFTYPE0-I : -> WasmTerminal .
@@ -910,7 +944,6 @@ mod SPECTEC-CORE is
   op FREE-SUBST-ALL-TABLETYPE0-I : -> WasmTerminal .
   op FREE-SUBST-ALL-TAGTYPE0-I : -> WasmTerminal .
   op FREE-SUBST-ALL-VALTYPE0-I : -> WasmTerminal .
-  op FREE-UNROLLRT0-I : -> WasmTerminal .
   op Fieldtype-ok : WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Fieldtype-sub : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Fnn :  -> WasmType [ctor] .
@@ -1541,7 +1574,6 @@ mod SPECTEC-CORE is
   var FIELDTYPE1 : Fieldtype .
   var FINAL1 : WasmTerminal .
   var FNMAG1 : WasmTerminal .
-  var FNN : WasmTerminal .
   var FNN1 : WasmTerminal .
   var FNN2 : WasmTerminal .
   var FRAME1 : Frame .
@@ -1598,11 +1630,9 @@ mod SPECTEC-CORE is
   var NAT1 : WasmTerminal .
   var NULL1 : WasmTerminal .
   var NUM1 : WasmTerminal .
-  var NUMTYPE : WasmTerminal .
   var NUMTYPE1 : Numtype .
   var NUMTYPE11 : Numtype .
   var NUMTYPE21 : Numtype .
-  var PACKTYPE : WasmTerminal .
   var PACKTYPE1 : Packtype .
   var PNN : WasmTerminal .
   var RECTYPE1 : Rectype .
@@ -1611,6 +1641,12 @@ mod SPECTEC-CORE is
   var RELOP1 : WasmTerminal .
   var RESULTTYPE1 : Resulttype .
   var RESULTTYPE2 : WasmTerminal .
+  var ROLLDT-X-RECTYPE : Rectype .
+  var ROLLDT-X-SUBTYPES : WasmTerminals .
+  var ROLLDT-X-X : Typeidx .
+  var ROLLRT-X-RECTYPE : Rectype .
+  var ROLLRT-X-SUBTYPES : WasmTerminals .
+  var ROLLRT-X-X : Typeidx .
   var SHAPE1 : Shape .
   var SHAPE11 : Shape .
   var SHAPE21 : Shape .
@@ -1642,19 +1678,19 @@ mod SPECTEC-CORE is
   var U641 : U64 .
   var U642 : WasmTerminal .
   var UNOP1 : WasmTerminal .
+  var UNROLLRT-X-RECTYPE : Rectype .
+  var UNROLLRT-X-SUBTYPES : WasmTerminals .
   var VAL-LIST-VAL : WasmTerminals .
   var VALTYPE-LIST-VALTYPE : WasmTerminals .
   var VALTYPE1 : Valtype .
   var VBINOP1 : WasmTerminal .
   var VCVTOP1 : WasmTerminal .
   var VEC1 : WasmTerminal .
-  var VECTYPE : WasmTerminal .
   var VECTYPE1 : Vectype .
   var VEXTBINOP1 : WasmTerminal .
   var VEXTTERNOP1 : WasmTerminal .
   var VEXTUNOP1 : WasmTerminal .
   var VLOADOP1 : WasmTerminal .
-  var VNN : WasmTerminal .
   var VRELOP1 : WasmTerminal .
   var VSHIFTOP1 : WasmTerminal .
   var VSWIZZLOP1 : WasmTerminal .
@@ -2445,14 +2481,6 @@ mod SPECTEC-CORE is
   vars RESULTTYPE-OK-R00-T : WasmTerminals .
   vars RESULTTYPE-SUB-R00-C : Context .
   vars RESULTTYPE-SUB-R00-T1 RESULTTYPE-SUB-R00-T2 : WasmTerminals .
-  vars ROLLDT0-I ROLLDT0-SUBTYPE : WasmTerminals .
-  vars ROLLDT0-N : N .
-  vars ROLLDT0-RECTYPE : Rectype .
-  vars ROLLDT0-X : Idx .
-  vars ROLLRT0-I ROLLRT0-SUBTYPE : WasmTerminals .
-  vars ROLLRT0-N : N .
-  vars ROLLRT0-RECTYPE : Rectype .
-  vars ROLLRT0-X : Idx .
   vars RUNDATA0-B RUNDATA1-B : WasmTerminals .
   vars RUNDATA0-N RUNDATA1-N : N .
   vars RUNDATA0-X RUNDATA1-X RUNDATA1-Y : Idx .
@@ -2759,9 +2787,6 @@ mod SPECTEC-CORE is
   vars UNROLLHT0-DEFTYPE : Deftype .
   vars UNROLLHT1-TYPEIDX : Typeidx .
   vars UNROLLHT2-I : N .
-  vars UNROLLRT0-I UNROLLRT0-SUBTYPE : WasmTerminals .
-  vars UNROLLRT0-N : N .
-  vars UNROLLRT0-RECTYPE : Rectype .
   vars VAL-OK-NUM0-NT : Numtype .
   vars VAL-OK-NUM0-NUM : Num .
   vars VAL-OK-NUM0-S VAL-OK-REF2-S VAL-OK-VEC1-S : Store .
@@ -2875,26 +2900,21 @@ mod SPECTEC-CORE is
   vars ZSIZE2-PACKTYPE : Packtype .
 
   --- Equations
-  --- Context-wrapper overloads with concrete operand sorts.
-  --- The generic CTOR* declarations are emitted with WasmTerminal args,
-  --- but heating/cooling and step rules build these wrappers from
-  --- N/Frame/Catch/WasmTerminals values. Add precise overloads so the
-  --- resulting terms are well-sorted and match rewrite rules by membership.
 
   cmb ( T ) : N
-   if true .
+   if T : Nat .
 
   cmb ( T ) : M
-   if true .
+   if T : Nat .
 
   cmb ( T ) : K
-   if true .
+   if T : Nat .
 
   cmb ( T ) : N
-   if true .
+   if T : Nat .
 
   cmb ( T ) : M
-   if true .
+   if T : Nat .
 
 
 
@@ -3017,26 +3037,27 @@ mod SPECTEC-CORE is
   cmb ( ( I1 ) hasType ( sN ( N ) ) ) : WellTyped
    if ( ( ( ( ( I1 >= ( 0 - ( ( 2  ^  ( N - 1 ) ) ) ) )  and  ( I1 <= ( 0 - ( 1 ) ) ) )  or  ( I1 == 0 ) )  or  ( ( I1 >= 1 )  and  ( I1 <= ( ( 2  ^  ( N - 1 ) ) - 1 ) ) ) ) ) = true .
 
-  mb ( T hasType ( iN ( N ) ) ) : WellTyped .
+  cmb ( T hasType ( iN ( N ) ) ) : WellTyped
+   if T : Nat .
 
   cmb ( T ) : U8
-   if true .
+   if T : Nat .
   cmb ( T ) : U16
-   if true .
+   if T : Nat .
   cmb ( T ) : U31
-   if true .
+   if T : Nat .
   cmb ( T ) : U32
-   if true .
+   if T : Nat .
   cmb ( T ) : U64
-   if true .
+   if T : Nat .
   cmb ( T ) : S33
-   if true .
+   if T : Int .
   cmb ( T ) : I32
-   if true .
+   if T : Int .
   cmb ( T ) : I64
-   if true .
+   if T : Int .
   cmb ( T ) : I128
-   if true .
+   if T : Int .
 
 
 
@@ -3064,7 +3085,7 @@ mod SPECTEC-CORE is
 
 
   cmb ( T ) : Exp
-   if true .
+   if T : Int .
   cmb ( CTORNORMA2 ( M1, EXP1 ) hasType ( fNmag ( N ) ) ) : WellTyped
    if ( ( ( M1 < ( 2  ^  $M ( N ) ) )  and  ( ( ( 2 - ( 2  ^  ( $E ( N ) - 1 ) ) ) <= EXP1 )  and  ( EXP1 <= ( ( 2  ^  ( $E ( N ) - 1 ) ) - 1 ) ) ) ) ) = true .
   cmb ( CTORSUBNORMA1 ( M1 ) hasType ( fNmag ( N ) ) ) : WellTyped
@@ -3077,10 +3098,8 @@ mod SPECTEC-CORE is
 
 
 
-  cmb ( T ) : F32
-   if true .
-  cmb ( T ) : F64
-   if true .
+
+
 
 
 
@@ -3104,10 +3123,10 @@ mod SPECTEC-CORE is
 
   eq $canon ( CANON0-N ) = ( 2  ^  ( $signif ( CANON0-N ) - 1 ) ) .
 
-  mb ( T hasType ( vN ( N ) ) ) : WellTyped .
+  cmb ( T hasType ( vN ( N ) ) ) : WellTyped
+   if T : Nat .
 
-  cmb ( T ) : V128
-   if true .
+
 
   cmb ( ( X-LIST-X ) hasType ( list ( X ) ) ) : WellTyped
    if ( ( len ( X-LIST-X ) < ( 2  ^  32 ) ) ) = true .
@@ -3120,10 +3139,11 @@ mod SPECTEC-CORE is
 
 
 
-  mb ( T ) : Idx .
+  cmb ( T ) : Idx
+   if T : Nat .
 
   cmb ( T ) : Laneidx
-   if T : U8 .
+   if T : Nat .
 
   cmb ( T ) : Typeidx
    if T : Idx .
@@ -3997,23 +4017,27 @@ mod SPECTEC-CORE is
 
 
 
-
-  ceq $rollrt ( ROLLRT0-X, ROLLRT0-RECTYPE ) = CTORRECA1 ( ( $subst-subtype ( ROLLRT0-SUBTYPE, ( CTORWIDXA1 ( ( ( ROLLRT0-X + FREE-ROLLRT0-I ) ) ) ), ( CTORRECA1 ( FREE-ROLLRT0-I ) ) ) ) ) 
-      if CTORRECA1 ( ROLLRT0-SUBTYPE ) := ROLLRT0-RECTYPE .
-
-
-
-
-
-  ceq $unrollrt ( UNROLLRT0-RECTYPE ) = CTORRECA1 ( ( $subst-subtype ( UNROLLRT0-SUBTYPE, ( CTORRECA1 ( FREE-UNROLLRT0-I ) ), ( CTORWDEFA2 ( UNROLLRT0-RECTYPE, FREE-UNROLLRT0-I ) ) ) ) ) 
-      if CTORRECA1 ( UNROLLRT0-SUBTYPE ) := UNROLLRT0-RECTYPE .
+  ceq $rollrt(ROLLRT-X-X, ROLLRT-X-RECTYPE) =
+      CTORRECA1($subst-subtype(ROLLRT-X-SUBTYPES,
+        $idx-typeuses(ROLLRT-X-X, len(ROLLRT-X-SUBTYPES)),
+        $rec-typevars(len(ROLLRT-X-SUBTYPES))))
+   if CTORRECA1(ROLLRT-X-SUBTYPES) := ROLLRT-X-RECTYPE .
 
 
 
 
+  ceq $unrollrt(UNROLLRT-X-RECTYPE) =
+      CTORRECA1($subst-subtype(UNROLLRT-X-SUBTYPES,
+        $rec-typevars(len(UNROLLRT-X-SUBTYPES)),
+        $def-typeuses(UNROLLRT-X-RECTYPE, len(UNROLLRT-X-SUBTYPES))))
+   if CTORRECA1(UNROLLRT-X-SUBTYPES) := UNROLLRT-X-RECTYPE .
 
-  ceq $rolldt ( ROLLDT0-X, ROLLDT0-RECTYPE ) = CTORWDEFA2 ( ( CTORRECA1 ( ROLLDT0-SUBTYPE ) ), FREE-ROLLDT0-I ) 
-      if CTORRECA1 ( ROLLDT0-SUBTYPE ) := $rollrt ( ROLLDT0-X, ROLLDT0-RECTYPE ) .
+
+
+
+  ceq $rolldt(ROLLDT-X-X, ROLLDT-X-RECTYPE) =
+      $def-typeuses(CTORRECA1(ROLLDT-X-SUBTYPES), len(ROLLDT-X-SUBTYPES))
+   if CTORRECA1(ROLLDT-X-SUBTYPES) := $rollrt(ROLLDT-X-X, ROLLDT-X-RECTYPE) .
 
 
 
@@ -4184,21 +4208,19 @@ mod SPECTEC-CORE is
 
   eq $free-moduletype ( ( CTORARROWA2 ( FREE-MODULETYPE0-EXTERNTYPE1, FREE-MODULETYPE0-EXTERNTYPE2 ) ) ) = merge ( $free-list ( ( $free-externtype ( FREE-MODULETYPE0-EXTERNTYPE1 ) ) ) , $free-list ( ( $free-externtype ( FREE-MODULETYPE0-EXTERNTYPE2 ) ) ) ) .
 
-  mb ( T hasType ( num ( INN ) ) ) : WellTyped .
-  mb ( T hasType ( num ( FNN ) ) ) : WellTyped .
-  mb ( T hasType ( pack ( PNN ) ) ) : WellTyped .
-  cmb ( T hasType ( lane ( NUMTYPE ) ) ) : WellTyped
-   if NUMTYPE : Numtype .
-  cmb ( T hasType ( lane ( PACKTYPE ) ) ) : WellTyped
-   if PACKTYPE : Packtype .
-  mb ( T hasType ( lane ( JNN ) ) ) : WellTyped .
-  mb ( T hasType ( vec ( VNN ) ) ) : WellTyped .
-  cmb ( T hasType ( lit ( NUMTYPE ) ) ) : WellTyped
-   if NUMTYPE : Numtype .
-  cmb ( T hasType ( lit ( VECTYPE ) ) ) : WellTyped
-   if VECTYPE : Vectype .
-  cmb ( T hasType ( lit ( PACKTYPE ) ) ) : WellTyped
-   if PACKTYPE : Packtype .
+  cmb ( T hasType ( num ( INN ) ) ) : WellTyped
+   if T : Int .
+
+  cmb ( T hasType ( pack ( PNN ) ) ) : WellTyped
+   if T : Int .
+
+
+  cmb ( T hasType ( lane ( JNN ) ) ) : WellTyped
+   if T : Int .
+
+
+
+
 
 
   mb ( CTORUA0 ) : Sx .
@@ -4420,7 +4442,7 @@ mod SPECTEC-CORE is
   mb ( CTORWIDXA1 ( TYPEIDX1 ) ) : Blocktype .
 
   cmb ( T ) : Addr
-   if true .
+   if T : Nat .
   cmb ( T ) : Arrayaddr
    if T : Addr .
   cmb ( T ) : Exnaddr
@@ -5014,7 +5036,7 @@ mod SPECTEC-CORE is
 
 
   ceq Expand ( EXPAND-R00-DEFTYPE , EXPAND-R00-COMPTYPE ) = valid
-      if ( ( $expanddt ( EXPAND-R00-DEFTYPE ) == EXPAND-R00-COMPTYPE ) ) = true .
+      if EXPAND-R00-COMPTYPE := $expanddt ( EXPAND-R00-DEFTYPE ) .
 
 
   eq Vectype-sub ( VECTYPE-SUB-R00-C , VECTYPE-SUB-R00-VECTYPE , VECTYPE-SUB-R00-VECTYPE ) = valid .
@@ -5128,11 +5150,11 @@ mod SPECTEC-CORE is
   eq Heaptype-sub ( HEAPTYPE-SUB-STRUCT-EQ4-C , CTORSTRUCTA0 , CTORWEQA0 ) = valid .
   eq Heaptype-sub ( HEAPTYPE-SUB-ARRAY-EQ5-C , CTORARRAYA0 , CTORWEQA0 ) = valid .
   ceq Heaptype-sub ( HEAPTYPE-SUB-STRUCT6-C , HEAPTYPE-SUB-STRUCT6-DEFTYPE , CTORSTRUCTA0 ) = valid
-      if ( Expand ( HEAPTYPE-SUB-STRUCT6-DEFTYPE, ( CTORSTRUCTA1 ( HEAPTYPE-SUB-STRUCT6-FIELDTYPE ) ) ) == valid ) = true .
+      if CTORSTRUCTA1 ( HEAPTYPE-SUB-STRUCT6-FIELDTYPE ) := $expanddt ( HEAPTYPE-SUB-STRUCT6-DEFTYPE ) .
   ceq Heaptype-sub ( HEAPTYPE-SUB-ARRAY7-C , HEAPTYPE-SUB-ARRAY7-DEFTYPE , CTORARRAYA0 ) = valid
-      if ( Expand ( HEAPTYPE-SUB-ARRAY7-DEFTYPE, ( CTORARRAYA1 ( HEAPTYPE-SUB-ARRAY7-FIELDTYPE ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( HEAPTYPE-SUB-ARRAY7-FIELDTYPE ) := $expanddt ( HEAPTYPE-SUB-ARRAY7-DEFTYPE ) .
   ceq Heaptype-sub ( HEAPTYPE-SUB-FUNC8-C , HEAPTYPE-SUB-FUNC8-DEFTYPE , CTORFUNCA0 ) = valid
-      if ( Expand ( HEAPTYPE-SUB-FUNC8-DEFTYPE, ( CTORFUNCARROWA2 ( HEAPTYPE-SUB-FUNC8-T1, HEAPTYPE-SUB-FUNC8-T2 ) ) ) == valid ) = true .
+      if CTORFUNCARROWA2 ( HEAPTYPE-SUB-FUNC8-T1, HEAPTYPE-SUB-FUNC8-T2 ) := $expanddt ( HEAPTYPE-SUB-FUNC8-DEFTYPE ) .
   ceq Heaptype-sub ( HEAPTYPE-SUB-DEF9-C , HEAPTYPE-SUB-DEF9-DEFTYPE1 , HEAPTYPE-SUB-DEF9-DEFTYPE2 ) = valid
       if ( Deftype-sub ( HEAPTYPE-SUB-DEF9-C, HEAPTYPE-SUB-DEF9-DEFTYPE1, HEAPTYPE-SUB-DEF9-DEFTYPE2 ) == valid ) = true .
   ceq Heaptype-sub ( HEAPTYPE-SUB-TYPEIDX-L10-C , CTORWIDXA1 ( HEAPTYPE-SUB-TYPEIDX-L10-TYPEIDX ) , HEAPTYPE-SUB-TYPEIDX-L10-HEAPTYPE ) = valid
@@ -5195,9 +5217,9 @@ mod SPECTEC-CORE is
 
 
   ceq Expand-use ( EXPAND-USE-DEFTYPE0-DEFTYPE , EXPAND-USE-DEFTYPE0-C , EXPAND-USE-DEFTYPE0-COMPTYPE ) = valid
-      if ( Expand ( EXPAND-USE-DEFTYPE0-DEFTYPE, EXPAND-USE-DEFTYPE0-COMPTYPE ) == valid ) = true .
+      if EXPAND-USE-DEFTYPE0-COMPTYPE := $expanddt ( EXPAND-USE-DEFTYPE0-DEFTYPE ) .
   ceq Expand-use ( CTORWIDXA1 ( EXPAND-USE-TYPEIDX1-TYPEIDX ) , EXPAND-USE-TYPEIDX1-C , EXPAND-USE-TYPEIDX1-COMPTYPE ) = valid
-      if ( Expand ( ( index ( value('TYPES, EXPAND-USE-TYPEIDX1-C), EXPAND-USE-TYPEIDX1-TYPEIDX ) ), EXPAND-USE-TYPEIDX1-COMPTYPE ) == valid ) = true .
+      if EXPAND-USE-TYPEIDX1-COMPTYPE := $expanddt ( index ( value('TYPES, EXPAND-USE-TYPEIDX1-C), EXPAND-USE-TYPEIDX1-TYPEIDX ) ) .
 
 
 
@@ -5319,13 +5341,13 @@ mod SPECTEC-CORE is
   ceq Blocktype-ok ( BLOCKTYPE-OK-VALTYPE0-C , CTORWRESULTA1 ( eps ) , CTORARROWA3 ( eps, eps, eps ) ) = valid
       if ( Valtype-ok ( BLOCKTYPE-OK-VALTYPE0-C, eps ) == valid ) = true .
   ceq Blocktype-ok ( BLOCKTYPE-OK-TYPEIDX1-C , CTORWIDXA1 ( BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) , CTORARROWA3 ( BLOCKTYPE-OK-TYPEIDX1-T1, eps, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, BLOCKTYPE-OK-TYPEIDX1-C), BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) ), ( CTORFUNCARROWA2 ( BLOCKTYPE-OK-TYPEIDX1-T1, BLOCKTYPE-OK-TYPEIDX1-T2 ) ) ) == valid ) = true /\ ( BLOCKTYPE-OK-TYPEIDX1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( BLOCKTYPE-OK-TYPEIDX1-T2 hasType ( list ( valtype ) ) ) : WellTyped .
+      if CTORFUNCARROWA2 ( BLOCKTYPE-OK-TYPEIDX1-T1, BLOCKTYPE-OK-TYPEIDX1-T2 ) := $expanddt ( index ( value('TYPES, BLOCKTYPE-OK-TYPEIDX1-C), BLOCKTYPE-OK-TYPEIDX1-TYPEIDX ) ) /\ ( BLOCKTYPE-OK-TYPEIDX1-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( BLOCKTYPE-OK-TYPEIDX1-T2 hasType ( list ( valtype ) ) ) : WellTyped .
 
 
   ceq Catch-ok ( CATCH-OK-CATCH0-C , CTORCATCHA2 ( CATCH-OK-CATCH0-X, CATCH-OK-CATCH0-L ) ) = valid
-      if ( Expand ( ( $as-deftype ( ( index ( value('TAGS, CATCH-OK-CATCH0-C), CATCH-OK-CATCH0-X ) ) ) ), ( CTORFUNCARROWA2 ( CATCH-OK-CATCH0-T, eps ) ) ) == valid ) = true /\ ( Resulttype-sub ( CATCH-OK-CATCH0-C, CATCH-OK-CATCH0-T, ( index ( value('LABELS, CATCH-OK-CATCH0-C), CATCH-OK-CATCH0-L ) ) ) == valid ) = true .
+      if CTORFUNCARROWA2 ( CATCH-OK-CATCH0-T, eps ) := $expanddt ( $as-deftype ( ( index ( value('TAGS, CATCH-OK-CATCH0-C), CATCH-OK-CATCH0-X ) ) ) ) /\ ( Resulttype-sub ( CATCH-OK-CATCH0-C, CATCH-OK-CATCH0-T, ( index ( value('LABELS, CATCH-OK-CATCH0-C), CATCH-OK-CATCH0-L ) ) ) == valid ) = true .
   ceq Catch-ok ( CATCH-OK-CATCH-REF1-C , CTORCATCHREFA2 ( CATCH-OK-CATCH-REF1-X, CATCH-OK-CATCH-REF1-L ) ) = valid
-      if ( Expand ( ( $as-deftype ( ( index ( value('TAGS, CATCH-OK-CATCH-REF1-C), CATCH-OK-CATCH-REF1-X ) ) ) ), ( CTORFUNCARROWA2 ( CATCH-OK-CATCH-REF1-T, eps ) ) ) == valid ) = true /\ ( Resulttype-sub ( CATCH-OK-CATCH-REF1-C, ( CATCH-OK-CATCH-REF1-T CTORREFA2 ( eps, CTOREXNA0 ) ), ( index ( value('LABELS, CATCH-OK-CATCH-REF1-C), CATCH-OK-CATCH-REF1-L ) ) ) == valid ) = true .
+      if CTORFUNCARROWA2 ( CATCH-OK-CATCH-REF1-T, eps ) := $expanddt ( $as-deftype ( ( index ( value('TAGS, CATCH-OK-CATCH-REF1-C), CATCH-OK-CATCH-REF1-X ) ) ) ) /\ ( Resulttype-sub ( CATCH-OK-CATCH-REF1-C, ( CATCH-OK-CATCH-REF1-T CTORREFA2 ( eps, CTOREXNA0 ) ), ( index ( value('LABELS, CATCH-OK-CATCH-REF1-C), CATCH-OK-CATCH-REF1-L ) ) ) == valid ) = true .
   ceq Catch-ok ( CATCH-OK-CATCH-ALL2-C , CTORCATCHALLA1 ( CATCH-OK-CATCH-ALL2-L ) ) = valid
       if ( Resulttype-sub ( CATCH-OK-CATCH-ALL2-C, eps, ( index ( value('LABELS, CATCH-OK-CATCH-ALL2-C), CATCH-OK-CATCH-ALL2-L ) ) ) == valid ) = true .
   ceq Catch-ok ( CATCH-OK-CATCH-ALL-REF3-C , CTORCATCHALLREFA1 ( CATCH-OK-CATCH-ALL-REF3-L ) ) = valid
@@ -5384,21 +5406,21 @@ mod SPECTEC-CORE is
   ceq Instr-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C , CTORBRONCASTFAILA3 ( INSTR-OK-BR-ON-CAST-FAIL14-L, INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) , CTORARROWA3 ( ( INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT1 ), eps, ( INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ) ) = valid
       if INSTR-OK-BR-ON-CAST-FAIL14-T INSTR-OK-BR-ON-CAST-FAIL14-RT := index ( value('LABELS, INSTR-OK-BR-ON-CAST-FAIL14-C), INSTR-OK-BR-ON-CAST-FAIL14-L ) /\ ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) == valid ) = true /\ ( Reftype-ok ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) == valid ) = true /\ ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, INSTR-OK-BR-ON-CAST-FAIL14-RT2, INSTR-OK-BR-ON-CAST-FAIL14-RT1 ) == valid ) = true /\ ( Reftype-sub ( INSTR-OK-BR-ON-CAST-FAIL14-C, ( $diffrt ( INSTR-OK-BR-ON-CAST-FAIL14-RT1, INSTR-OK-BR-ON-CAST-FAIL14-RT2 ) ), INSTR-OK-BR-ON-CAST-FAIL14-RT ) == valid ) = true /\ ( INSTR-OK-BR-ON-CAST-FAIL14-T hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-CALL15-C , CTORCALLA1 ( INSTR-OK-CALL15-X ) , CTORARROWA3 ( INSTR-OK-CALL15-T1, eps, INSTR-OK-CALL15-T2 ) ) = valid
-      if ( Expand ( ( index ( value('FUNCS, INSTR-OK-CALL15-C), INSTR-OK-CALL15-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL15-T1, INSTR-OK-CALL15-T2 ) ) ) == valid ) = true /\ ( INSTR-OK-CALL15-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL15-T2 hasType ( list ( valtype ) ) ) : WellTyped .
+      if CTORFUNCARROWA2 ( INSTR-OK-CALL15-T1, INSTR-OK-CALL15-T2 ) := $expanddt ( index ( value('FUNCS, INSTR-OK-CALL15-C), INSTR-OK-CALL15-X ) ) /\ ( INSTR-OK-CALL15-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL15-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-CALL-REF16-C , CTORCALLREFA1 ( ( CTORWIDXA1 ( INSTR-OK-CALL-REF16-X ) ) ) , CTORARROWA3 ( ( INSTR-OK-CALL-REF16-T1 CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-CALL-REF16-X ) ) ) ), eps, INSTR-OK-CALL-REF16-T2 ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-REF16-C), INSTR-OK-CALL-REF16-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-REF16-T1, INSTR-OK-CALL-REF16-T2 ) ) ) == valid ) = true /\ ( INSTR-OK-CALL-REF16-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL-REF16-T2 hasType ( list ( valtype ) ) ) : WellTyped .
+      if CTORFUNCARROWA2 ( INSTR-OK-CALL-REF16-T1, INSTR-OK-CALL-REF16-T2 ) := $expanddt ( index ( value('TYPES, INSTR-OK-CALL-REF16-C), INSTR-OK-CALL-REF16-X ) ) /\ ( INSTR-OK-CALL-REF16-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL-REF16-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-CALL-INDIRECT17-C , CTORCALLINDIRECTA2 ( INSTR-OK-CALL-INDIRECT17-X, ( CTORWIDXA1 ( INSTR-OK-CALL-INDIRECT17-Y ) ) ) , CTORARROWA3 ( ( INSTR-OK-CALL-INDIRECT17-T1 INSTR-OK-CALL-INDIRECT17-AT ), eps, INSTR-OK-CALL-INDIRECT17-T2 ) ) = valid
-      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := index ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-X ) /\ ( Reftype-sub ( INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) == valid ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-CALL-INDIRECT17-T1, INSTR-OK-CALL-INDIRECT17-T2 ) ) ) == valid ) = true /\ ( INSTR-OK-CALL-INDIRECT17-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL-INDIRECT17-T2 hasType ( list ( valtype ) ) ) : WellTyped .
+      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := index ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-X ) /\ CTORFUNCARROWA2 ( INSTR-OK-CALL-INDIRECT17-T1, INSTR-OK-CALL-INDIRECT17-T2 ) := $expanddt ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), INSTR-OK-CALL-INDIRECT17-Y ) ) /\ ( Reftype-sub ( INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) == valid ) = true /\ ( INSTR-OK-CALL-INDIRECT17-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-CALL-INDIRECT17-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-RETURN18-C , CTORRETURNA0 , CTORARROWA3 ( ( INSTR-OK-RETURN18-T1 INSTR-OK-RETURN18-T ), eps, INSTR-OK-RETURN18-T2 ) ) = valid
       if ( ( value('RETURN, INSTR-OK-RETURN18-C) == INSTR-OK-RETURN18-T ) ) = true /\ ( Instrtype-ok ( INSTR-OK-RETURN18-C, ( CTORARROWA3 ( INSTR-OK-RETURN18-T1, eps, INSTR-OK-RETURN18-T2 ) ) ) == valid ) = true /\ ( INSTR-OK-RETURN18-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN18-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN18-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-RETURN-CALL19-C , CTORRETURNCALLA1 ( INSTR-OK-RETURN-CALL19-X ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL19-T3 INSTR-OK-RETURN-CALL19-T1 ), eps, INSTR-OK-RETURN-CALL19-T4 ) ) = valid
-      if INSTR-OK-RETURN-CALL19-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL19-C) /\ ( Expand ( ( index ( value('FUNCS, INSTR-OK-RETURN-CALL19-C), INSTR-OK-RETURN-CALL19-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL19-T1, INSTR-OK-RETURN-CALL19-T2 ) ) ) == valid ) = true /\ ( Resulttype-sub ( INSTR-OK-RETURN-CALL19-C, INSTR-OK-RETURN-CALL19-T2, INSTR-OK-RETURN-CALL19-TQ2 ) == valid ) = true /\ ( Instrtype-ok ( INSTR-OK-RETURN-CALL19-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL19-T3, eps, INSTR-OK-RETURN-CALL19-T4 ) ) ) == valid ) = true /\ ( INSTR-OK-RETURN-CALL19-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T4 hasType ( list ( valtype ) ) ) : WellTyped .
+      if CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL19-T1, INSTR-OK-RETURN-CALL19-T2 ) := $expanddt ( index ( value('FUNCS, INSTR-OK-RETURN-CALL19-C), INSTR-OK-RETURN-CALL19-X ) ) /\ INSTR-OK-RETURN-CALL19-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL19-C) /\ ( Resulttype-sub ( INSTR-OK-RETURN-CALL19-C, INSTR-OK-RETURN-CALL19-T2, INSTR-OK-RETURN-CALL19-TQ2 ) == valid ) = true /\ ( Instrtype-ok ( INSTR-OK-RETURN-CALL19-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL19-T3, eps, INSTR-OK-RETURN-CALL19-T4 ) ) ) == valid ) = true /\ ( INSTR-OK-RETURN-CALL19-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL19-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-RETURN-CALL-REF20-C , CTORRETURNCALLREFA1 ( ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-REF20-X ) ) ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL-REF20-T3 INSTR-OK-RETURN-CALL-REF20-T1 CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-REF20-X ) ) ) ), eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) = valid
-      if INSTR-OK-RETURN-CALL-REF20-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-REF20-C) /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-REF20-C), INSTR-OK-RETURN-CALL-REF20-X ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-REF20-T1, INSTR-OK-RETURN-CALL-REF20-T2 ) ) ) == valid ) = true /\ ( Resulttype-sub ( INSTR-OK-RETURN-CALL-REF20-C, INSTR-OK-RETURN-CALL-REF20-T2, INSTR-OK-RETURN-CALL-REF20-TQ2 ) == valid ) = true /\ ( Instrtype-ok ( INSTR-OK-RETURN-CALL-REF20-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-REF20-T3, eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) ) == valid ) = true /\ ( INSTR-OK-RETURN-CALL-REF20-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T4 hasType ( list ( valtype ) ) ) : WellTyped .
+      if CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-REF20-T1, INSTR-OK-RETURN-CALL-REF20-T2 ) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-REF20-C), INSTR-OK-RETURN-CALL-REF20-X ) ) /\ INSTR-OK-RETURN-CALL-REF20-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-REF20-C) /\ ( Resulttype-sub ( INSTR-OK-RETURN-CALL-REF20-C, INSTR-OK-RETURN-CALL-REF20-T2, INSTR-OK-RETURN-CALL-REF20-TQ2 ) == valid ) = true /\ ( Instrtype-ok ( INSTR-OK-RETURN-CALL-REF20-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-REF20-T3, eps, INSTR-OK-RETURN-CALL-REF20-T4 ) ) ) == valid ) = true /\ ( INSTR-OK-RETURN-CALL-REF20-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-REF20-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C , CTORRETURNCALLINDIRECTA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-X, ( CTORWIDXA1 ( INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ) ) , CTORARROWA3 ( ( INSTR-OK-RETURN-CALL-INDIRECT21-T3 INSTR-OK-RETURN-CALL-INDIRECT21-T1 INSTR-OK-RETURN-CALL-INDIRECT21-AT ), eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) = valid
-      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := index ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-X ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ ( Reftype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) == valid ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ), ( CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-T1, INSTR-OK-RETURN-CALL-INDIRECT21-T2 ) ) ) == valid ) = true /\ ( Resulttype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-T2, INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 ) == valid ) = true /\ ( Instrtype-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-INDIRECT21-T3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) ) == valid ) = true /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T4 hasType ( list ( valtype ) ) ) : WellTyped .
+      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := index ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-X ) /\ CTORFUNCARROWA2 ( INSTR-OK-RETURN-CALL-INDIRECT21-T1, INSTR-OK-RETURN-CALL-INDIRECT21-T2 ) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), INSTR-OK-RETURN-CALL-INDIRECT21-Y ) ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ ( Reftype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( CTORREFA2 ( CTORNULLA0, CTORFUNCA0 ) ) ) == valid ) = true /\ ( Resulttype-sub ( INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-T2, INSTR-OK-RETURN-CALL-INDIRECT21-TQ2 ) == valid ) = true /\ ( Instrtype-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C, ( CTORARROWA3 ( INSTR-OK-RETURN-CALL-INDIRECT21-T3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-T4 ) ) ) == valid ) = true /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T3 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-RETURN-CALL-INDIRECT21-T4 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-THROW22-C , CTORTHROWA1 ( INSTR-OK-THROW22-X ) , CTORARROWA3 ( ( INSTR-OK-THROW22-T1 INSTR-OK-THROW22-T ), eps, INSTR-OK-THROW22-T2 ) ) = valid
-      if ( Expand ( ( $as-deftype ( ( index ( value('TAGS, INSTR-OK-THROW22-C), INSTR-OK-THROW22-X ) ) ) ), ( CTORFUNCARROWA2 ( INSTR-OK-THROW22-T, eps ) ) ) == valid ) = true /\ ( Instrtype-ok ( INSTR-OK-THROW22-C, ( CTORARROWA3 ( INSTR-OK-THROW22-T1, eps, INSTR-OK-THROW22-T2 ) ) ) == valid ) = true /\ ( INSTR-OK-THROW22-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T2 hasType ( list ( valtype ) ) ) : WellTyped .
+      if CTORFUNCARROWA2 ( INSTR-OK-THROW22-T, eps ) := $expanddt ( $as-deftype ( ( index ( value('TAGS, INSTR-OK-THROW22-C), INSTR-OK-THROW22-X ) ) ) ) /\ ( Instrtype-ok ( INSTR-OK-THROW22-C, ( CTORARROWA3 ( INSTR-OK-THROW22-T1, eps, INSTR-OK-THROW22-T2 ) ) ) == valid ) = true /\ ( INSTR-OK-THROW22-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW22-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-THROW-REF23-C , CTORTHROWREFA0 , CTORARROWA3 ( ( INSTR-OK-THROW-REF23-T1 CTORREFA2 ( CTORNULLA0, CTOREXNA0 ) ), eps, INSTR-OK-THROW-REF23-T2 ) ) = valid
       if ( Instrtype-ok ( INSTR-OK-THROW-REF23-C, ( CTORARROWA3 ( INSTR-OK-THROW-REF23-T1, eps, INSTR-OK-THROW-REF23-T2 ) ) ) == valid ) = true /\ ( INSTR-OK-THROW-REF23-T1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-THROW-REF23-T2 hasType ( list ( valtype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-TRY-TABLE24-C , CTORTRYTABLEA3 ( INSTR-OK-TRY-TABLE24-BT, INSTR-OK-TRY-TABLE24-CATCH, INSTR-OK-TRY-TABLE24-INSTR ) , CTORARROWA3 ( INSTR-OK-TRY-TABLE24-T1, eps, INSTR-OK-TRY-TABLE24-T2 ) ) = valid
@@ -5419,40 +5441,40 @@ mod SPECTEC-CORE is
       if ( Reftype-ok ( INSTR-OK-REF-CAST32-C, INSTR-OK-REF-CAST32-RT ) == valid ) = true /\ ( Reftype-ok ( INSTR-OK-REF-CAST32-C, INSTR-OK-REF-CAST32-RTQ ) == valid ) = true /\ ( Reftype-sub ( INSTR-OK-REF-CAST32-C, INSTR-OK-REF-CAST32-RT, INSTR-OK-REF-CAST32-RTQ ) == valid ) = true .
   eq Instr-ok ( INSTR-OK-I31-GET33-C , CTORI31GETA1 ( INSTR-OK-I31-GET33-SX ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, CTORI31A0 ) ), eps, CTORI32A0 ) ) = valid .
   ceq Instr-ok ( INSTR-OK-STRUCT-NEW34-C , CTORSTRUCTNEWA1 ( INSTR-OK-STRUCT-NEW34-X ) , CTORARROWA3 ( ( $unpack ( INSTR-OK-STRUCT-NEW34-ZT ) ), eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-STRUCT-NEW34-X ) ) ) ) ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-NEW34-C), INSTR-OK-STRUCT-NEW34-X ) ), ( CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW34-MUT INSTR-OK-STRUCT-NEW34-ZT ) ) ) ) == valid ) = true /\ ( INSTR-OK-STRUCT-NEW34-ZT hasType ( list ( storagetype ) ) ) : WellTyped .
+      if CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW34-MUT INSTR-OK-STRUCT-NEW34-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-STRUCT-NEW34-C), INSTR-OK-STRUCT-NEW34-X ) ) /\ ( INSTR-OK-STRUCT-NEW34-ZT hasType ( list ( storagetype ) ) ) : WellTyped .
   ceq Instr-ok ( INSTR-OK-STRUCT-NEW-DEFAULT35-C , CTORSTRUCTNEWDEFAULTA1 ( INSTR-OK-STRUCT-NEW-DEFAULT35-X ) , CTORARROWA3 ( eps, eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-STRUCT-NEW-DEFAULT35-X ) ) ) ) ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-NEW-DEFAULT35-C), INSTR-OK-STRUCT-NEW-DEFAULT35-X ) ), ( CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW-DEFAULT35-MUT INSTR-OK-STRUCT-NEW-DEFAULT35-ZT ) ) ) ) == valid ) = true /\ ( Defaultable ( ( $unpack ( INSTR-OK-STRUCT-NEW-DEFAULT35-ZT ) ) ) == valid ) = true .
+      if CTORSTRUCTA1 ( ( INSTR-OK-STRUCT-NEW-DEFAULT35-MUT INSTR-OK-STRUCT-NEW-DEFAULT35-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-STRUCT-NEW-DEFAULT35-C), INSTR-OK-STRUCT-NEW-DEFAULT35-X ) ) /\ ( Defaultable ( ( $unpack ( INSTR-OK-STRUCT-NEW-DEFAULT35-ZT ) ) ) == valid ) = true .
   ceq Instr-ok ( INSTR-OK-STRUCT-GET36-C , CTORSTRUCTGETA3 ( INSTR-OK-STRUCT-GET36-SX, INSTR-OK-STRUCT-GET36-X, INSTR-OK-STRUCT-GET36-I ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-STRUCT-GET36-X ) ) ) ), eps, ( $unpack ( INSTR-OK-STRUCT-GET36-ZT ) ) ) ) = valid
-      if ( ( ( INSTR-OK-STRUCT-GET36-SX =/= eps ) == $is-packtype ( INSTR-OK-STRUCT-GET36-ZT ) ) ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-GET36-C), INSTR-OK-STRUCT-GET36-X ) ), ( CTORSTRUCTA1 ( INSTR-OK-STRUCT-GET36-FT ) ) ) == valid ) = true /\ ( ( index ( INSTR-OK-STRUCT-GET36-FT, INSTR-OK-STRUCT-GET36-I ) == INSTR-OK-STRUCT-GET36-MUT INSTR-OK-STRUCT-GET36-ZT ) ) = true .
+      if CTORSTRUCTA1 ( INSTR-OK-STRUCT-GET36-FT ) := $expanddt ( index ( value('TYPES, INSTR-OK-STRUCT-GET36-C), INSTR-OK-STRUCT-GET36-X ) ) /\ INSTR-OK-STRUCT-GET36-MUT INSTR-OK-STRUCT-GET36-ZT := index ( INSTR-OK-STRUCT-GET36-FT, INSTR-OK-STRUCT-GET36-I ) /\ ( ( ( INSTR-OK-STRUCT-GET36-SX =/= eps ) == $is-packtype ( INSTR-OK-STRUCT-GET36-ZT ) ) ) = true .
   ceq Instr-ok ( INSTR-OK-STRUCT-GET36-C , CTORSTRUCTGETA3 ( eps, INSTR-OK-STRUCT-GET36-X, INSTR-OK-STRUCT-GET36-I ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-STRUCT-GET36-X ) ) ) ), eps, ( $unpack ( INSTR-OK-STRUCT-GET36-ZT ) ) ) ) = valid
-      if ( ( ( eps =/= eps ) == $is-packtype ( INSTR-OK-STRUCT-GET36-ZT ) ) ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-GET36-C), INSTR-OK-STRUCT-GET36-X ) ), ( CTORSTRUCTA1 ( INSTR-OK-STRUCT-GET36-FT ) ) ) == valid ) = true /\ ( ( index ( INSTR-OK-STRUCT-GET36-FT, INSTR-OK-STRUCT-GET36-I ) == INSTR-OK-STRUCT-GET36-MUT INSTR-OK-STRUCT-GET36-ZT ) ) = true .
+      if CTORSTRUCTA1 ( INSTR-OK-STRUCT-GET36-FT ) := $expanddt ( index ( value('TYPES, INSTR-OK-STRUCT-GET36-C), INSTR-OK-STRUCT-GET36-X ) ) /\ INSTR-OK-STRUCT-GET36-MUT INSTR-OK-STRUCT-GET36-ZT := index ( INSTR-OK-STRUCT-GET36-FT, INSTR-OK-STRUCT-GET36-I ) /\ ( ( ( eps =/= eps ) == $is-packtype ( INSTR-OK-STRUCT-GET36-ZT ) ) ) = true .
   ceq Instr-ok ( INSTR-OK-STRUCT-SET37-C , CTORSTRUCTSETA2 ( INSTR-OK-STRUCT-SET37-X, INSTR-OK-STRUCT-SET37-I ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-STRUCT-SET37-X ) ) ) $unpack ( INSTR-OK-STRUCT-SET37-ZT ) ), eps, eps ) ) = valid
-      if index ( INSTR-OK-STRUCT-SET37-FT, INSTR-OK-STRUCT-SET37-I ) := CTORMUTA0 INSTR-OK-STRUCT-SET37-ZT /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-STRUCT-SET37-C), INSTR-OK-STRUCT-SET37-X ) ), ( CTORSTRUCTA1 ( INSTR-OK-STRUCT-SET37-FT ) ) ) == valid ) = true .
+      if CTORSTRUCTA1 ( INSTR-OK-STRUCT-SET37-FT ) := $expanddt ( index ( value('TYPES, INSTR-OK-STRUCT-SET37-C), INSTR-OK-STRUCT-SET37-X ) ) /\ ( ( index ( INSTR-OK-STRUCT-SET37-FT, INSTR-OK-STRUCT-SET37-I ) == CTORMUTA0 INSTR-OK-STRUCT-SET37-ZT ) ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-NEW38-C , CTORARRAYNEWA1 ( INSTR-OK-ARRAY-NEW38-X ) , CTORARROWA3 ( ( $unpack ( INSTR-OK-ARRAY-NEW38-ZT ) CTORI32A0 ), eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-ARRAY-NEW38-X ) ) ) ) ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-NEW38-C), INSTR-OK-ARRAY-NEW38-X ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW38-MUT INSTR-OK-ARRAY-NEW38-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW38-MUT INSTR-OK-ARRAY-NEW38-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-NEW38-C), INSTR-OK-ARRAY-NEW38-X ) ) .
   ceq Instr-ok ( INSTR-OK-ARRAY-NEW-DEFAULT39-C , CTORARRAYNEWDEFAULTA1 ( INSTR-OK-ARRAY-NEW-DEFAULT39-X ) , CTORARROWA3 ( CTORI32A0, eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-ARRAY-NEW-DEFAULT39-X ) ) ) ) ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-DEFAULT39-C), INSTR-OK-ARRAY-NEW-DEFAULT39-X ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-DEFAULT39-MUT INSTR-OK-ARRAY-NEW-DEFAULT39-ZT ) ) ) ) == valid ) = true /\ ( Defaultable ( ( $unpack ( INSTR-OK-ARRAY-NEW-DEFAULT39-ZT ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-DEFAULT39-MUT INSTR-OK-ARRAY-NEW-DEFAULT39-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-DEFAULT39-C), INSTR-OK-ARRAY-NEW-DEFAULT39-X ) ) /\ ( Defaultable ( ( $unpack ( INSTR-OK-ARRAY-NEW-DEFAULT39-ZT ) ) ) == valid ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-NEW-FIXED40-C , CTORARRAYNEWFIXEDA2 ( INSTR-OK-ARRAY-NEW-FIXED40-X, INSTR-OK-ARRAY-NEW-FIXED40-N ) , CTORARROWA3 ( ( $unpack ( INSTR-OK-ARRAY-NEW-FIXED40-ZT ) ), eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-ARRAY-NEW-FIXED40-X ) ) ) ) ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-FIXED40-C), INSTR-OK-ARRAY-NEW-FIXED40-X ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-FIXED40-MUT INSTR-OK-ARRAY-NEW-FIXED40-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-FIXED40-MUT INSTR-OK-ARRAY-NEW-FIXED40-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-FIXED40-C), INSTR-OK-ARRAY-NEW-FIXED40-X ) ) .
   ceq Instr-ok ( INSTR-OK-ARRAY-NEW-ELEM41-C , CTORARRAYNEWELEMA2 ( INSTR-OK-ARRAY-NEW-ELEM41-X, INSTR-OK-ARRAY-NEW-ELEM41-Y ) , CTORARROWA3 ( ( CTORI32A0 CTORI32A0 ), eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-ARRAY-NEW-ELEM41-X ) ) ) ) ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-ELEM41-C), INSTR-OK-ARRAY-NEW-ELEM41-X ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-ELEM41-MUT INSTR-OK-ARRAY-NEW-ELEM41-RT ) ) ) ) == valid ) = true /\ ( Reftype-sub ( INSTR-OK-ARRAY-NEW-ELEM41-C, ( index ( value('ELEMS, INSTR-OK-ARRAY-NEW-ELEM41-C), INSTR-OK-ARRAY-NEW-ELEM41-Y ) ), INSTR-OK-ARRAY-NEW-ELEM41-RT ) == valid ) = true .
+      if CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-ELEM41-MUT INSTR-OK-ARRAY-NEW-ELEM41-RT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-ELEM41-C), INSTR-OK-ARRAY-NEW-ELEM41-X ) ) /\ ( Reftype-sub ( INSTR-OK-ARRAY-NEW-ELEM41-C, ( index ( value('ELEMS, INSTR-OK-ARRAY-NEW-ELEM41-C), INSTR-OK-ARRAY-NEW-ELEM41-Y ) ), INSTR-OK-ARRAY-NEW-ELEM41-RT ) == valid ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-NEW-DATA42-C , CTORARRAYNEWDATAA2 ( INSTR-OK-ARRAY-NEW-DATA42-X, INSTR-OK-ARRAY-NEW-DATA42-Y ) , CTORARROWA3 ( ( CTORI32A0 CTORI32A0 ), eps, ( CTORREFA2 ( eps, ( CTORWIDXA1 ( INSTR-OK-ARRAY-NEW-DATA42-X ) ) ) ) ) ) = valid
-      if ( ( ( $unpack ( INSTR-OK-ARRAY-NEW-DATA42-ZT ) == INSTR-OK-ARRAY-NEW-DATA42-NUMTYPE )  or  ( $unpack ( INSTR-OK-ARRAY-NEW-DATA42-ZT ) == INSTR-OK-ARRAY-NEW-DATA42-VECTYPE ) ) ) = true /\ ( ( index ( value('DATAS, INSTR-OK-ARRAY-NEW-DATA42-C), INSTR-OK-ARRAY-NEW-DATA42-Y ) == CTOROKA0 ) ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-DATA42-C), INSTR-OK-ARRAY-NEW-DATA42-X ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-DATA42-MUT INSTR-OK-ARRAY-NEW-DATA42-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( INSTR-OK-ARRAY-NEW-DATA42-MUT INSTR-OK-ARRAY-NEW-DATA42-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-NEW-DATA42-C), INSTR-OK-ARRAY-NEW-DATA42-X ) ) /\ ( ( ( $unpack ( INSTR-OK-ARRAY-NEW-DATA42-ZT ) == INSTR-OK-ARRAY-NEW-DATA42-NUMTYPE )  or  ( $unpack ( INSTR-OK-ARRAY-NEW-DATA42-ZT ) == INSTR-OK-ARRAY-NEW-DATA42-VECTYPE ) ) ) = true /\ ( ( index ( value('DATAS, INSTR-OK-ARRAY-NEW-DATA42-C), INSTR-OK-ARRAY-NEW-DATA42-Y ) == CTOROKA0 ) ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-GET43-C , CTORARRAYGETA2 ( INSTR-OK-ARRAY-GET43-SX, INSTR-OK-ARRAY-GET43-X ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-GET43-X ) ) ) CTORI32A0 ), eps, ( $unpack ( INSTR-OK-ARRAY-GET43-ZT ) ) ) ) = valid
-      if ( ( ( INSTR-OK-ARRAY-GET43-SX =/= eps ) == $is-packtype ( INSTR-OK-ARRAY-GET43-ZT ) ) ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-GET43-C), INSTR-OK-ARRAY-GET43-X ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-GET43-MUT INSTR-OK-ARRAY-GET43-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( INSTR-OK-ARRAY-GET43-MUT INSTR-OK-ARRAY-GET43-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-GET43-C), INSTR-OK-ARRAY-GET43-X ) ) /\ ( ( ( INSTR-OK-ARRAY-GET43-SX =/= eps ) == $is-packtype ( INSTR-OK-ARRAY-GET43-ZT ) ) ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-GET43-C , CTORARRAYGETA2 ( eps, INSTR-OK-ARRAY-GET43-X ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-GET43-X ) ) ) CTORI32A0 ), eps, ( $unpack ( INSTR-OK-ARRAY-GET43-ZT ) ) ) ) = valid
-      if ( ( ( eps =/= eps ) == $is-packtype ( INSTR-OK-ARRAY-GET43-ZT ) ) ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-GET43-C), INSTR-OK-ARRAY-GET43-X ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-GET43-MUT INSTR-OK-ARRAY-GET43-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( INSTR-OK-ARRAY-GET43-MUT INSTR-OK-ARRAY-GET43-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-GET43-C), INSTR-OK-ARRAY-GET43-X ) ) /\ ( ( ( eps =/= eps ) == $is-packtype ( INSTR-OK-ARRAY-GET43-ZT ) ) ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-SET44-C , CTORARRAYSETA1 ( INSTR-OK-ARRAY-SET44-X ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-SET44-X ) ) ) CTORI32A0 $unpack ( INSTR-OK-ARRAY-SET44-ZT ) ), eps, eps ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-SET44-C), INSTR-OK-ARRAY-SET44-X ) ), ( CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-SET44-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-SET44-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-SET44-C), INSTR-OK-ARRAY-SET44-X ) ) .
   eq Instr-ok ( INSTR-OK-ARRAY-LEN45-C , CTORARRAYLENA0 , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, CTORARRAYA0 ) ), eps, CTORI32A0 ) ) = valid .
   ceq Instr-ok ( INSTR-OK-ARRAY-FILL46-C , CTORARRAYFILLA1 ( INSTR-OK-ARRAY-FILL46-X ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-FILL46-X ) ) ) CTORI32A0 $unpack ( INSTR-OK-ARRAY-FILL46-ZT ) CTORI32A0 ), eps, eps ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-FILL46-C), INSTR-OK-ARRAY-FILL46-X ) ), ( CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-FILL46-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-FILL46-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-FILL46-C), INSTR-OK-ARRAY-FILL46-X ) ) .
   ceq Instr-ok ( INSTR-OK-ARRAY-COPY47-C , CTORARRAYCOPYA2 ( INSTR-OK-ARRAY-COPY47-X1, INSTR-OK-ARRAY-COPY47-X2 ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-COPY47-X1 ) ) ) CTORI32A0 CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-COPY47-X2 ) ) ) CTORI32A0 CTORI32A0 ), eps, eps ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-COPY47-C), INSTR-OK-ARRAY-COPY47-X1 ) ), ( CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-COPY47-ZT1 ) ) ) ) == valid ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-COPY47-C), INSTR-OK-ARRAY-COPY47-X2 ) ), ( CTORARRAYA1 ( ( INSTR-OK-ARRAY-COPY47-MUT INSTR-OK-ARRAY-COPY47-ZT2 ) ) ) ) == valid ) = true /\ ( Storagetype-sub ( INSTR-OK-ARRAY-COPY47-C, INSTR-OK-ARRAY-COPY47-ZT2, INSTR-OK-ARRAY-COPY47-ZT1 ) == valid ) = true .
+      if CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-COPY47-ZT1 ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-COPY47-C), INSTR-OK-ARRAY-COPY47-X1 ) ) /\ CTORARRAYA1 ( ( INSTR-OK-ARRAY-COPY47-MUT INSTR-OK-ARRAY-COPY47-ZT2 ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-COPY47-C), INSTR-OK-ARRAY-COPY47-X2 ) ) /\ ( Storagetype-sub ( INSTR-OK-ARRAY-COPY47-C, INSTR-OK-ARRAY-COPY47-ZT2, INSTR-OK-ARRAY-COPY47-ZT1 ) == valid ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-INIT-ELEM48-C , CTORARRAYINITELEMA2 ( INSTR-OK-ARRAY-INIT-ELEM48-X, INSTR-OK-ARRAY-INIT-ELEM48-Y ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-INIT-ELEM48-X ) ) ) CTORI32A0 CTORI32A0 CTORI32A0 ), eps, eps ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-INIT-ELEM48-C), INSTR-OK-ARRAY-INIT-ELEM48-X ) ), ( CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-INIT-ELEM48-ZT ) ) ) ) == valid ) = true /\ ( Storagetype-sub ( INSTR-OK-ARRAY-INIT-ELEM48-C, ( index ( value('ELEMS, INSTR-OK-ARRAY-INIT-ELEM48-C), INSTR-OK-ARRAY-INIT-ELEM48-Y ) ), INSTR-OK-ARRAY-INIT-ELEM48-ZT ) == valid ) = true .
+      if CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-INIT-ELEM48-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-INIT-ELEM48-C), INSTR-OK-ARRAY-INIT-ELEM48-X ) ) /\ ( Storagetype-sub ( INSTR-OK-ARRAY-INIT-ELEM48-C, ( index ( value('ELEMS, INSTR-OK-ARRAY-INIT-ELEM48-C), INSTR-OK-ARRAY-INIT-ELEM48-Y ) ), INSTR-OK-ARRAY-INIT-ELEM48-ZT ) == valid ) = true .
   ceq Instr-ok ( INSTR-OK-ARRAY-INIT-DATA49-C , CTORARRAYINITDATAA2 ( INSTR-OK-ARRAY-INIT-DATA49-X, INSTR-OK-ARRAY-INIT-DATA49-Y ) , CTORARROWA3 ( ( CTORREFA2 ( CTORNULLA0, ( CTORWIDXA1 ( INSTR-OK-ARRAY-INIT-DATA49-X ) ) ) CTORI32A0 CTORI32A0 CTORI32A0 ), eps, eps ) ) = valid
-      if ( ( ( $unpack ( INSTR-OK-ARRAY-INIT-DATA49-ZT ) == INSTR-OK-ARRAY-INIT-DATA49-NUMTYPE )  or  ( $unpack ( INSTR-OK-ARRAY-INIT-DATA49-ZT ) == INSTR-OK-ARRAY-INIT-DATA49-VECTYPE ) ) ) = true /\ ( ( index ( value('DATAS, INSTR-OK-ARRAY-INIT-DATA49-C), INSTR-OK-ARRAY-INIT-DATA49-Y ) == CTOROKA0 ) ) = true /\ ( Expand ( ( index ( value('TYPES, INSTR-OK-ARRAY-INIT-DATA49-C), INSTR-OK-ARRAY-INIT-DATA49-X ) ), ( CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-INIT-DATA49-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( CTORMUTA0 INSTR-OK-ARRAY-INIT-DATA49-ZT ) ) := $expanddt ( index ( value('TYPES, INSTR-OK-ARRAY-INIT-DATA49-C), INSTR-OK-ARRAY-INIT-DATA49-X ) ) /\ ( ( ( $unpack ( INSTR-OK-ARRAY-INIT-DATA49-ZT ) == INSTR-OK-ARRAY-INIT-DATA49-NUMTYPE )  or  ( $unpack ( INSTR-OK-ARRAY-INIT-DATA49-ZT ) == INSTR-OK-ARRAY-INIT-DATA49-VECTYPE ) ) ) = true /\ ( ( index ( value('DATAS, INSTR-OK-ARRAY-INIT-DATA49-C), INSTR-OK-ARRAY-INIT-DATA49-Y ) == CTOROKA0 ) ) = true .
   ceq Instr-ok ( INSTR-OK-EXTERN-CONVERT-ANY50-C , CTOREXTERNCONVERTANYA0 , CTORARROWA3 ( ( CTORREFA2 ( INSTR-OK-EXTERN-CONVERT-ANY50-NULL1, CTORANYA0 ) ), eps, ( CTORREFA2 ( INSTR-OK-EXTERN-CONVERT-ANY50-NULL2, CTOREXTERNA0 ) ) ) ) = valid
       if ( ( INSTR-OK-EXTERN-CONVERT-ANY50-NULL1 == INSTR-OK-EXTERN-CONVERT-ANY50-NULL2 ) ) = true .
   ceq Instr-ok ( INSTR-OK-EXTERN-CONVERT-ANY50-C , CTOREXTERNCONVERTANYA0 , CTORARROWA3 ( ( CTORREFA2 ( eps, CTORANYA0 ) ), eps, ( CTORREFA2 ( INSTR-OK-EXTERN-CONVERT-ANY50-NULL2, CTOREXTERNA0 ) ) ) ) = valid
@@ -5651,7 +5673,7 @@ mod SPECTEC-CORE is
 
 
   ceq Func-ok ( FUNC-OK-R00-C , CTORFUNCA3 ( FUNC-OK-R00-X, FUNC-OK-R00-LOCAL, FUNC-OK-R00-EXPR ) , index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ) = valid
-      if ( Expand ( ( index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ), ( CTORFUNCARROWA2 ( FUNC-OK-R00-T1, FUNC-OK-R00-T2 ) ) ) == valid ) = true /\ ( Local-ok ( FUNC-OK-R00-C, FUNC-OK-R00-LOCAL, FUNC-OK-R00-LCT ) == valid ) = true /\ ( Expr-ok ( ( merge ( FUNC-OK-R00-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, CTORSETA0 FUNC-OK-R00-T1 FUNC-OK-R00-LCT) ; item('LABELS, FUNC-OK-R00-T2) ; item('RETURN, FUNC-OK-R00-T2) ; item('REFS, eps)} ) ), FUNC-OK-R00-EXPR, FUNC-OK-R00-T2 ) == valid ) = true /\ ( FUNC-OK-R00-LOCAL hasType ( list ( local ) ) ) : WellTyped .
+      if CTORFUNCARROWA2 ( FUNC-OK-R00-T1, FUNC-OK-R00-T2 ) := $expanddt ( index ( value('TYPES, FUNC-OK-R00-C), FUNC-OK-R00-X ) ) /\ ( Local-ok ( FUNC-OK-R00-C, FUNC-OK-R00-LOCAL, FUNC-OK-R00-LCT ) == valid ) = true /\ ( Expr-ok ( ( merge ( FUNC-OK-R00-C , {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, CTORSETA0 FUNC-OK-R00-T1 FUNC-OK-R00-LCT) ; item('LABELS, FUNC-OK-R00-T2) ; item('RETURN, FUNC-OK-R00-T2) ; item('REFS, eps)} ) ), FUNC-OK-R00-EXPR, FUNC-OK-R00-T2 ) == valid ) = true /\ ( FUNC-OK-R00-LOCAL hasType ( list ( local ) ) ) : WellTyped .
 
 
 
@@ -5679,7 +5701,7 @@ mod SPECTEC-CORE is
 
 
   ceq Start-ok ( START-OK-R00-C , CTORSTARTA1 ( START-OK-R00-X ) ) = valid
-      if ( Expand ( ( index ( value('FUNCS, START-OK-R00-C), START-OK-R00-X ) ), ( CTORFUNCARROWA2 ( eps, eps ) ) ) == valid ) = true .
+      if CTORFUNCARROWA2 ( eps, eps ) := $expanddt ( index ( value('FUNCS, START-OK-R00-C), START-OK-R00-X ) ) .
 
 
 
@@ -7805,8 +7827,8 @@ mod SPECTEC-CORE is
 
 
 
-  ceq $blocktype ( BLOCKTYPE0-Z, ( CTORWIDXA1 ( BLOCKTYPE0-X ) ) ) = CTORARROWA3 ( FREE-BLOCKTYPE0-T1, eps, FREE-BLOCKTYPE0-T2 ) 
-      if ( Expand ( ( $type ( BLOCKTYPE0-Z, BLOCKTYPE0-X ) ), ( CTORFUNCARROWA2 ( FREE-BLOCKTYPE0-T1, FREE-BLOCKTYPE0-T2 ) ) ) == valid ) = true .
+  ceq $blocktype ( BLOCKTYPE0-Z, ( CTORWIDXA1 ( BLOCKTYPE0-X ) ) ) = CTORARROWA3 ( BLOCKTYPE0-T1, eps, BLOCKTYPE0-T2 ) 
+      if CTORFUNCARROWA2 ( BLOCKTYPE0-T1, BLOCKTYPE0-T2 ) := $expanddt ( $type ( BLOCKTYPE0-Z, BLOCKTYPE0-X ) ) .
   eq $blocktype ( BLOCKTYPE1-Z, ( CTORWRESULTA1 ( BLOCKTYPE1-T ) ) ) = CTORARROWA3 ( eps, eps, BLOCKTYPE1-T ) .
   eq $blocktype ( BLOCKTYPE1-Z, ( CTORWRESULTA1 ( eps ) ) ) = CTORARROWA3 ( eps, eps, eps ) .
 
@@ -7851,7 +7873,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-CALL-REF-FUNC8-Z ; STEP-READ-CALL-REF-FUNC8-VAL CTORREFFUNCADDRA1 ( STEP-READ-CALL-REF-FUNC8-A ) CTORCALLREFA1 ( STEP-READ-CALL-REF-FUNC8-YY ) ) )
     =>
     $norm-seq ( CTORFRAMELBRACERBRACEA3 ( STEP-READ-CALL-REF-FUNC8-M, STEP-READ-CALL-REF-FUNC8-F, ( CTORLABELLBRACERBRACEA3 ( STEP-READ-CALL-REF-FUNC8-M, eps, STEP-READ-CALL-REF-FUNC8-INSTR ) ) ) )
-      if STEP-READ-CALL-REF-FUNC8-FI := index ( $funcinst ( STEP-READ-CALL-REF-FUNC8-Z ), STEP-READ-CALL-REF-FUNC8-A ) /\ CTORFUNCA3 ( STEP-READ-CALL-REF-FUNC8-X, ( CTORLOCALA1 ( STEP-READ-CALL-REF-FUNC8-T ) ), STEP-READ-CALL-REF-FUNC8-INSTR ) := value('CODE, STEP-READ-CALL-REF-FUNC8-FI) /\ STEP-READ-CALL-REF-FUNC8-F := {item('LOCALS, STEP-READ-CALL-REF-FUNC8-VAL $default ( STEP-READ-CALL-REF-FUNC8-T )) ; item('MODULE, value('MODULE, STEP-READ-CALL-REF-FUNC8-FI))} /\ STEP-READ-CALL-REF-FUNC8-M := len ( STEP-READ-CALL-REF-FUNC8-T2 ) /\ STEP-READ-CALL-REF-FUNC8-N := len ( STEP-READ-CALL-REF-FUNC8-T1 ) /\ all-vals ( STEP-READ-CALL-REF-FUNC8-VAL ) = true /\ ( Expand ( ( value('TYPE, STEP-READ-CALL-REF-FUNC8-FI) ), ( CTORFUNCARROWA2 ( STEP-READ-CALL-REF-FUNC8-T1, STEP-READ-CALL-REF-FUNC8-T2 ) ) ) == valid ) = true .
+      if STEP-READ-CALL-REF-FUNC8-FI := index ( $funcinst ( STEP-READ-CALL-REF-FUNC8-Z ), STEP-READ-CALL-REF-FUNC8-A ) /\ CTORFUNCARROWA2 ( STEP-READ-CALL-REF-FUNC8-T1, STEP-READ-CALL-REF-FUNC8-T2 ) := $expanddt ( value('TYPE, STEP-READ-CALL-REF-FUNC8-FI) ) /\ CTORFUNCA3 ( STEP-READ-CALL-REF-FUNC8-X, ( CTORLOCALA1 ( STEP-READ-CALL-REF-FUNC8-T ) ), STEP-READ-CALL-REF-FUNC8-INSTR ) := value('CODE, STEP-READ-CALL-REF-FUNC8-FI) /\ STEP-READ-CALL-REF-FUNC8-F := $mk-frame ( STEP-READ-CALL-REF-FUNC8-VAL $default ( STEP-READ-CALL-REF-FUNC8-T ), value('MODULE, STEP-READ-CALL-REF-FUNC8-FI) ) /\ STEP-READ-CALL-REF-FUNC8-M := len ( STEP-READ-CALL-REF-FUNC8-T2 ) /\ STEP-READ-CALL-REF-FUNC8-N := len ( STEP-READ-CALL-REF-FUNC8-T1 ) /\ all-vals ( STEP-READ-CALL-REF-FUNC8-VAL ) = true .
   crl [step-read-return-call] :
     step-read ( ( STEP-READ-RETURN-CALL9-Z ; CTORRETURNCALLA1 ( STEP-READ-RETURN-CALL9-X ) ) )
     =>
@@ -7876,7 +7898,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-Z ; CTORFRAMELBRACERBRACEA3 ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-K, STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-F, ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALQ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VAL CTORREFFUNCADDRA1 ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-A ) CTORRETURNCALLREFA1 ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-YY ) STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-INSTR ) ) ) )
     =>
     $norm-seq ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VAL CTORREFFUNCADDRA1 ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-A ) CTORCALLREFA1 ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-YY ) )
-      if STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-M := len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T2 ) /\ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-N := len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T1 ) /\ all-vals ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VAL ) = true /\ all-vals ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALQ ) = true /\ ( Expand ( ( value('TYPE, index ( $funcinst ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-Z ), STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-A )) ), ( CTORFUNCARROWA2 ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T1, STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T2 ) ) ) == valid ) = true .
+      if CTORFUNCARROWA2 ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T1, STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T2 ) := $expanddt ( value('TYPE, index ( $funcinst ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-Z ), STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-A )) ) /\ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-M := len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T2 ) /\ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-N := len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-T1 ) /\ all-vals ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VAL ) = true /\ all-vals ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALQ ) = true .
   rl [step-read-throw-ref-null] :
     step-read ( ( STEP-READ-THROW-REF-NULL14-Z ; CTORREFNULLA1 ( STEP-READ-THROW-REF-NULL14-HT ) CTORTHROWREFA0 ) )
     =>
@@ -8149,7 +8171,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-STRUCT-NEW-DEFAULT71-Z ; CTORSTRUCTNEWDEFAULTA1 ( STEP-READ-STRUCT-NEW-DEFAULT71-X ) ) )
     =>
     $norm-seq ( STEP-READ-STRUCT-NEW-DEFAULT71-VAL CTORSTRUCTNEWA1 ( STEP-READ-STRUCT-NEW-DEFAULT71-X ) )
-      if all-vals ( STEP-READ-STRUCT-NEW-DEFAULT71-VAL ) = true /\ ( Expand ( ( $type ( STEP-READ-STRUCT-NEW-DEFAULT71-Z, STEP-READ-STRUCT-NEW-DEFAULT71-X ) ), ( CTORSTRUCTA1 ( ( STEP-READ-STRUCT-NEW-DEFAULT71-MUT STEP-READ-STRUCT-NEW-DEFAULT71-ZT ) ) ) ) == valid ) = true /\ ( ( $default ( ( $unpack ( STEP-READ-STRUCT-NEW-DEFAULT71-ZT ) ) ) == STEP-READ-STRUCT-NEW-DEFAULT71-VAL ) ) = true .
+      if CTORSTRUCTA1 ( ( STEP-READ-STRUCT-NEW-DEFAULT71-MUT STEP-READ-STRUCT-NEW-DEFAULT71-ZT ) ) := $expanddt ( $type ( STEP-READ-STRUCT-NEW-DEFAULT71-Z, STEP-READ-STRUCT-NEW-DEFAULT71-X ) ) /\ STEP-READ-STRUCT-NEW-DEFAULT71-VAL := $default ( ( $unpack ( STEP-READ-STRUCT-NEW-DEFAULT71-ZT ) ) ) /\ all-vals ( STEP-READ-STRUCT-NEW-DEFAULT71-VAL ) = true .
   rl [step-read-struct-get-null] :
     step-read ( ( STEP-READ-STRUCT-GET-NULL72-Z ; CTORREFNULLA1 ( STEP-READ-STRUCT-GET-NULL72-HT ) CTORSTRUCTGETA3 ( STEP-READ-STRUCT-GET-NULL72-SX, STEP-READ-STRUCT-GET-NULL72-X, STEP-READ-STRUCT-GET-NULL72-I ) ) )
     =>
@@ -8162,17 +8184,17 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-STRUCT-GET-STRUCT73-Z ; CTORREFSTRUCTADDRA1 ( STEP-READ-STRUCT-GET-STRUCT73-A ) CTORSTRUCTGETA3 ( STEP-READ-STRUCT-GET-STRUCT73-SX, STEP-READ-STRUCT-GET-STRUCT73-X, STEP-READ-STRUCT-GET-STRUCT73-I ) ) )
     =>
     $norm-seq ( $unpackfield ( ( index ( STEP-READ-STRUCT-GET-STRUCT73-ZT, STEP-READ-STRUCT-GET-STRUCT73-I ) ), STEP-READ-STRUCT-GET-STRUCT73-SX, ( index ( value('FIELDS, index ( $structinst ( STEP-READ-STRUCT-GET-STRUCT73-Z ), STEP-READ-STRUCT-GET-STRUCT73-A )), STEP-READ-STRUCT-GET-STRUCT73-I ) ) ) )
-      if ( Expand ( ( $type ( STEP-READ-STRUCT-GET-STRUCT73-Z, STEP-READ-STRUCT-GET-STRUCT73-X ) ), ( CTORSTRUCTA1 ( ( STEP-READ-STRUCT-GET-STRUCT73-MUT STEP-READ-STRUCT-GET-STRUCT73-ZT ) ) ) ) == valid ) = true .
+      if CTORSTRUCTA1 ( ( STEP-READ-STRUCT-GET-STRUCT73-MUT STEP-READ-STRUCT-GET-STRUCT73-ZT ) ) := $expanddt ( $type ( STEP-READ-STRUCT-GET-STRUCT73-Z, STEP-READ-STRUCT-GET-STRUCT73-X ) ) .
   crl [step-read-struct-get-struct-opt-empty0] :
     step-read ( ( STEP-READ-STRUCT-GET-STRUCT73-Z ; CTORREFSTRUCTADDRA1 ( STEP-READ-STRUCT-GET-STRUCT73-A ) CTORSTRUCTGETA3 ( eps, STEP-READ-STRUCT-GET-STRUCT73-X, STEP-READ-STRUCT-GET-STRUCT73-I ) ) )
     =>
     $norm-seq ( $unpackfield ( ( index ( STEP-READ-STRUCT-GET-STRUCT73-ZT, STEP-READ-STRUCT-GET-STRUCT73-I ) ), eps, ( index ( value('FIELDS, index ( $structinst ( STEP-READ-STRUCT-GET-STRUCT73-Z ), STEP-READ-STRUCT-GET-STRUCT73-A )), STEP-READ-STRUCT-GET-STRUCT73-I ) ) ) )
-      if ( Expand ( ( $type ( STEP-READ-STRUCT-GET-STRUCT73-Z, STEP-READ-STRUCT-GET-STRUCT73-X ) ), ( CTORSTRUCTA1 ( ( STEP-READ-STRUCT-GET-STRUCT73-MUT STEP-READ-STRUCT-GET-STRUCT73-ZT ) ) ) ) == valid ) = true .
+      if CTORSTRUCTA1 ( ( STEP-READ-STRUCT-GET-STRUCT73-MUT STEP-READ-STRUCT-GET-STRUCT73-ZT ) ) := $expanddt ( $type ( STEP-READ-STRUCT-GET-STRUCT73-Z, STEP-READ-STRUCT-GET-STRUCT73-X ) ) .
   crl [step-read-array-new-default] :
     step-read ( ( STEP-READ-ARRAY-NEW-DEFAULT74-Z ; CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-NEW-DEFAULT74-N ) CTORARRAYNEWDEFAULTA1 ( STEP-READ-ARRAY-NEW-DEFAULT74-X ) ) )
     =>
     $norm-seq ( STEP-READ-ARRAY-NEW-DEFAULT74-VAL CTORARRAYNEWFIXEDA2 ( STEP-READ-ARRAY-NEW-DEFAULT74-X, STEP-READ-ARRAY-NEW-DEFAULT74-N ) )
-      if ( Expand ( ( $type ( STEP-READ-ARRAY-NEW-DEFAULT74-Z, STEP-READ-ARRAY-NEW-DEFAULT74-X ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-NEW-DEFAULT74-MUT STEP-READ-ARRAY-NEW-DEFAULT74-ZT ) ) ) ) == valid ) = true /\ ( ( $default ( ( $unpack ( STEP-READ-ARRAY-NEW-DEFAULT74-ZT ) ) ) == STEP-READ-ARRAY-NEW-DEFAULT74-VAL ) ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-NEW-DEFAULT74-MUT STEP-READ-ARRAY-NEW-DEFAULT74-ZT ) ) := $expanddt ( $type ( STEP-READ-ARRAY-NEW-DEFAULT74-Z, STEP-READ-ARRAY-NEW-DEFAULT74-X ) ) /\ STEP-READ-ARRAY-NEW-DEFAULT74-VAL := $default ( ( $unpack ( STEP-READ-ARRAY-NEW-DEFAULT74-ZT ) ) ) .
   crl [step-read-array-new-elem-oob] :
     step-read ( ( STEP-READ-ARRAY-NEW-ELEM-OOB75-Z ; CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-NEW-ELEM-OOB75-I ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-NEW-ELEM-OOB75-N ) CTORARRAYNEWELEMA2 ( STEP-READ-ARRAY-NEW-ELEM-OOB75-X, STEP-READ-ARRAY-NEW-ELEM-OOB75-Y ) ) )
     =>
@@ -8187,12 +8209,12 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-ARRAY-NEW-DATA-OOB77-Z ; CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-NEW-DATA-OOB77-I ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-NEW-DATA-OOB77-N ) CTORARRAYNEWDATAA2 ( STEP-READ-ARRAY-NEW-DATA-OOB77-X, STEP-READ-ARRAY-NEW-DATA-OOB77-Y ) ) )
     =>
     $norm-seq ( CTORTRAPA0 )
-      if ( ( ( STEP-READ-ARRAY-NEW-DATA-OOB77-I + ( ( STEP-READ-ARRAY-NEW-DATA-OOB77-N * $zsize ( STEP-READ-ARRAY-NEW-DATA-OOB77-ZT ) )  quo  8 ) ) > len ( value('BYTES, $data ( STEP-READ-ARRAY-NEW-DATA-OOB77-Z, STEP-READ-ARRAY-NEW-DATA-OOB77-Y )) ) ) ) = true /\ ( Expand ( ( $type ( STEP-READ-ARRAY-NEW-DATA-OOB77-Z, STEP-READ-ARRAY-NEW-DATA-OOB77-X ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-NEW-DATA-OOB77-MUT STEP-READ-ARRAY-NEW-DATA-OOB77-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-NEW-DATA-OOB77-MUT STEP-READ-ARRAY-NEW-DATA-OOB77-ZT ) ) := $expanddt ( $type ( STEP-READ-ARRAY-NEW-DATA-OOB77-Z, STEP-READ-ARRAY-NEW-DATA-OOB77-X ) ) /\ ( ( ( STEP-READ-ARRAY-NEW-DATA-OOB77-I + ( ( STEP-READ-ARRAY-NEW-DATA-OOB77-N * $zsize ( STEP-READ-ARRAY-NEW-DATA-OOB77-ZT ) )  quo  8 ) ) > len ( value('BYTES, $data ( STEP-READ-ARRAY-NEW-DATA-OOB77-Z, STEP-READ-ARRAY-NEW-DATA-OOB77-Y )) ) ) ) = true .
   crl [step-read-array-new-data-num] :
     step-read ( ( STEP-READ-ARRAY-NEW-DATA-NUM78-Z ; CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-NEW-DATA-NUM78-I ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-NEW-DATA-NUM78-N ) CTORARRAYNEWDATAA2 ( STEP-READ-ARRAY-NEW-DATA-NUM78-X, STEP-READ-ARRAY-NEW-DATA-NUM78-Y ) ) )
     =>
     $norm-seq ( $const ( ( $cunpack ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT ) ), ( $cunpacknum ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, STEP-READ-ARRAY-NEW-DATA-NUM78-C ) ) ) CTORARRAYNEWFIXEDA2 ( STEP-READ-ARRAY-NEW-DATA-NUM78-X, STEP-READ-ARRAY-NEW-DATA-NUM78-N ) )
-      if ( Expand ( ( $type ( STEP-READ-ARRAY-NEW-DATA-NUM78-Z, STEP-READ-ARRAY-NEW-DATA-NUM78-X ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-NEW-DATA-NUM78-MUT STEP-READ-ARRAY-NEW-DATA-NUM78-ZT ) ) ) ) == valid ) = true /\ ( ( $concatn ( byte, ( $zbytes ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, STEP-READ-ARRAY-NEW-DATA-NUM78-C ) ), ( ( $zsize ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT )  quo  8 ) ) ) == slice ( value('BYTES, $data ( STEP-READ-ARRAY-NEW-DATA-NUM78-Z, STEP-READ-ARRAY-NEW-DATA-NUM78-Y )), STEP-READ-ARRAY-NEW-DATA-NUM78-I, ( ( STEP-READ-ARRAY-NEW-DATA-NUM78-N * $zsize ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT ) )  quo  8 ) ) ) ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-NEW-DATA-NUM78-MUT STEP-READ-ARRAY-NEW-DATA-NUM78-ZT ) ) := $expanddt ( $type ( STEP-READ-ARRAY-NEW-DATA-NUM78-Z, STEP-READ-ARRAY-NEW-DATA-NUM78-X ) ) /\ $concatn ( byte, ( $zbytes ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, STEP-READ-ARRAY-NEW-DATA-NUM78-C ) ), ( ( $zsize ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT )  quo  8 ) ) ) := slice ( value('BYTES, $data ( STEP-READ-ARRAY-NEW-DATA-NUM78-Z, STEP-READ-ARRAY-NEW-DATA-NUM78-Y )), STEP-READ-ARRAY-NEW-DATA-NUM78-I, ( ( STEP-READ-ARRAY-NEW-DATA-NUM78-N * $zsize ( STEP-READ-ARRAY-NEW-DATA-NUM78-ZT ) )  quo  8 ) ) .
   rl [step-read-array-get-null] :
     step-read ( ( STEP-READ-ARRAY-GET-NULL79-Z ; CTORREFNULLA1 ( STEP-READ-ARRAY-GET-NULL79-HT ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-GET-NULL79-I ) CTORARRAYGETA2 ( STEP-READ-ARRAY-GET-NULL79-SX, STEP-READ-ARRAY-GET-NULL79-X ) ) )
     =>
@@ -8215,12 +8237,12 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-ARRAY-GET-ARRAY81-Z ; CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-GET-ARRAY81-A ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-GET-ARRAY81-I ) CTORARRAYGETA2 ( STEP-READ-ARRAY-GET-ARRAY81-SX, STEP-READ-ARRAY-GET-ARRAY81-X ) ) )
     =>
     $norm-seq ( $unpackfield ( STEP-READ-ARRAY-GET-ARRAY81-ZT, STEP-READ-ARRAY-GET-ARRAY81-SX, ( index ( value('FIELDS, index ( $arrayinst ( STEP-READ-ARRAY-GET-ARRAY81-Z ), STEP-READ-ARRAY-GET-ARRAY81-A )), STEP-READ-ARRAY-GET-ARRAY81-I ) ) ) )
-      if ( Expand ( ( $type ( STEP-READ-ARRAY-GET-ARRAY81-Z, STEP-READ-ARRAY-GET-ARRAY81-X ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-GET-ARRAY81-MUT STEP-READ-ARRAY-GET-ARRAY81-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-GET-ARRAY81-MUT STEP-READ-ARRAY-GET-ARRAY81-ZT ) ) := $expanddt ( $type ( STEP-READ-ARRAY-GET-ARRAY81-Z, STEP-READ-ARRAY-GET-ARRAY81-X ) ) .
   crl [step-read-array-get-array-opt-empty0] :
     step-read ( ( STEP-READ-ARRAY-GET-ARRAY81-Z ; CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-GET-ARRAY81-A ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-GET-ARRAY81-I ) CTORARRAYGETA2 ( eps, STEP-READ-ARRAY-GET-ARRAY81-X ) ) )
     =>
     $norm-seq ( $unpackfield ( STEP-READ-ARRAY-GET-ARRAY81-ZT, eps, ( index ( value('FIELDS, index ( $arrayinst ( STEP-READ-ARRAY-GET-ARRAY81-Z ), STEP-READ-ARRAY-GET-ARRAY81-A )), STEP-READ-ARRAY-GET-ARRAY81-I ) ) ) )
-      if ( Expand ( ( $type ( STEP-READ-ARRAY-GET-ARRAY81-Z, STEP-READ-ARRAY-GET-ARRAY81-X ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-GET-ARRAY81-MUT STEP-READ-ARRAY-GET-ARRAY81-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-GET-ARRAY81-MUT STEP-READ-ARRAY-GET-ARRAY81-ZT ) ) := $expanddt ( $type ( STEP-READ-ARRAY-GET-ARRAY81-Z, STEP-READ-ARRAY-GET-ARRAY81-X ) ) .
   rl [step-read-array-len-null] :
     step-read ( ( STEP-READ-ARRAY-LEN-NULL82-Z ; CTORREFNULLA1 ( STEP-READ-ARRAY-LEN-NULL82-HT ) CTORARRAYLENA0 ) )
     =>
@@ -8274,12 +8296,12 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-ARRAY-COPY-LE93-Z ; CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-LE93-A1 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-LE93-I1 ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-LE93-A2 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-LE93-I2 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-LE93-N ) CTORARRAYCOPYA2 ( STEP-READ-ARRAY-COPY-LE93-X1, STEP-READ-ARRAY-COPY-LE93-X2 ) ) )
     =>
     $norm-seq ( CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-LE93-A1 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-LE93-I1 ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-LE93-A2 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-LE93-I2 ) CTORARRAYGETA2 ( STEP-READ-ARRAY-COPY-LE93-SX, STEP-READ-ARRAY-COPY-LE93-X2 ) CTORARRAYSETA1 ( STEP-READ-ARRAY-COPY-LE93-X1 ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-LE93-A1 ) CTORCONSTA2 ( CTORI32A0, ( ( STEP-READ-ARRAY-COPY-LE93-I1 + 1 ) ) ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-LE93-A2 ) CTORCONSTA2 ( CTORI32A0, ( ( STEP-READ-ARRAY-COPY-LE93-I2 + 1 ) ) ) CTORCONSTA2 ( CTORI32A0, ( ( STEP-READ-ARRAY-COPY-LE93-N - 1 ) ) ) CTORARRAYCOPYA2 ( STEP-READ-ARRAY-COPY-LE93-X1, STEP-READ-ARRAY-COPY-LE93-X2 ) )
-      if ( ( STEP-READ-ARRAY-COPY-LE93-I1 <= STEP-READ-ARRAY-COPY-LE93-I2 ) ) = true /\ ( Expand ( ( $type ( STEP-READ-ARRAY-COPY-LE93-Z, STEP-READ-ARRAY-COPY-LE93-X2 ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-COPY-LE93-MUT STEP-READ-ARRAY-COPY-LE93-ZT2 ) ) ) ) == valid ) = true /\ ( ( STEP-READ-ARRAY-COPY-LE93-SX == $sx ( STEP-READ-ARRAY-COPY-LE93-ZT2 ) ) ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-COPY-LE93-MUT STEP-READ-ARRAY-COPY-LE93-ZT2 ) ) := $expanddt ( $type ( STEP-READ-ARRAY-COPY-LE93-Z, STEP-READ-ARRAY-COPY-LE93-X2 ) ) /\ STEP-READ-ARRAY-COPY-LE93-SX := $sx ( STEP-READ-ARRAY-COPY-LE93-ZT2 ) /\ ( ( STEP-READ-ARRAY-COPY-LE93-I1 <= STEP-READ-ARRAY-COPY-LE93-I2 ) ) = true .
   crl [step-read-array-copy-gt] :
     step-read ( ( STEP-READ-ARRAY-COPY-GT94-Z ; CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-GT94-A1 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-GT94-I1 ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-GT94-A2 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-GT94-I2 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-GT94-N ) CTORARRAYCOPYA2 ( STEP-READ-ARRAY-COPY-GT94-X1, STEP-READ-ARRAY-COPY-GT94-X2 ) ) )
     =>
     $norm-seq ( CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-GT94-A1 ) CTORCONSTA2 ( CTORI32A0, ( ( ( STEP-READ-ARRAY-COPY-GT94-I1 + STEP-READ-ARRAY-COPY-GT94-N ) - 1 ) ) ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-GT94-A2 ) CTORCONSTA2 ( CTORI32A0, ( ( ( STEP-READ-ARRAY-COPY-GT94-I2 + STEP-READ-ARRAY-COPY-GT94-N ) - 1 ) ) ) CTORARRAYGETA2 ( STEP-READ-ARRAY-COPY-GT94-SX, STEP-READ-ARRAY-COPY-GT94-X2 ) CTORARRAYSETA1 ( STEP-READ-ARRAY-COPY-GT94-X1 ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-GT94-A1 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-GT94-I1 ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-COPY-GT94-A2 ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-COPY-GT94-I2 ) CTORCONSTA2 ( CTORI32A0, ( ( STEP-READ-ARRAY-COPY-GT94-N - 1 ) ) ) CTORARRAYCOPYA2 ( STEP-READ-ARRAY-COPY-GT94-X1, STEP-READ-ARRAY-COPY-GT94-X2 ) )
-      if ( Expand ( ( $type ( STEP-READ-ARRAY-COPY-GT94-Z, STEP-READ-ARRAY-COPY-GT94-X2 ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-COPY-GT94-MUT STEP-READ-ARRAY-COPY-GT94-ZT2 ) ) ) ) == valid ) = true /\ ( ( STEP-READ-ARRAY-COPY-GT94-SX == $sx ( STEP-READ-ARRAY-COPY-GT94-ZT2 ) ) ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-COPY-GT94-MUT STEP-READ-ARRAY-COPY-GT94-ZT2 ) ) := $expanddt ( $type ( STEP-READ-ARRAY-COPY-GT94-Z, STEP-READ-ARRAY-COPY-GT94-X2 ) ) /\ STEP-READ-ARRAY-COPY-GT94-SX := $sx ( STEP-READ-ARRAY-COPY-GT94-ZT2 ) .
   rl [step-read-array-init-elem-null] :
     step-read ( ( STEP-READ-ARRAY-INIT-ELEM-NULL95-Z ; CTORREFNULLA1 ( STEP-READ-ARRAY-INIT-ELEM-NULL95-HT ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-ELEM-NULL95-I ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-ELEM-NULL95-J ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-ELEM-NULL95-N ) CTORARRAYINITELEMA2 ( STEP-READ-ARRAY-INIT-ELEM-NULL95-X, STEP-READ-ARRAY-INIT-ELEM-NULL95-Y ) ) )
     =>
@@ -8317,7 +8339,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-ARRAY-INIT-DATA-OOB2102-Z ; CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-INIT-DATA-OOB2102-A ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-OOB2102-I ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-OOB2102-J ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-OOB2102-N ) CTORARRAYINITDATAA2 ( STEP-READ-ARRAY-INIT-DATA-OOB2102-X, STEP-READ-ARRAY-INIT-DATA-OOB2102-Y ) ) )
     =>
     $norm-seq ( CTORTRAPA0 )
-      if ( ( ( STEP-READ-ARRAY-INIT-DATA-OOB2102-J + ( ( STEP-READ-ARRAY-INIT-DATA-OOB2102-N * $zsize ( STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT ) )  quo  8 ) ) > len ( value('BYTES, $data ( STEP-READ-ARRAY-INIT-DATA-OOB2102-Z, STEP-READ-ARRAY-INIT-DATA-OOB2102-Y )) ) ) ) = true /\ ( Expand ( ( $type ( STEP-READ-ARRAY-INIT-DATA-OOB2102-Z, STEP-READ-ARRAY-INIT-DATA-OOB2102-X ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-INIT-DATA-OOB2102-MUT STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-INIT-DATA-OOB2102-MUT STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT ) ) := $expanddt ( $type ( STEP-READ-ARRAY-INIT-DATA-OOB2102-Z, STEP-READ-ARRAY-INIT-DATA-OOB2102-X ) ) /\ ( ( ( STEP-READ-ARRAY-INIT-DATA-OOB2102-J + ( ( STEP-READ-ARRAY-INIT-DATA-OOB2102-N * $zsize ( STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT ) )  quo  8 ) ) > len ( value('BYTES, $data ( STEP-READ-ARRAY-INIT-DATA-OOB2102-Z, STEP-READ-ARRAY-INIT-DATA-OOB2102-Y )) ) ) ) = true .
   crl [step-read-array-init-data-zero] :
     step-read ( ( STEP-READ-ARRAY-INIT-DATA-ZERO103-Z ; CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-INIT-DATA-ZERO103-A ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-ZERO103-I ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-ZERO103-J ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-ZERO103-N ) CTORARRAYINITDATAA2 ( STEP-READ-ARRAY-INIT-DATA-ZERO103-X, STEP-READ-ARRAY-INIT-DATA-ZERO103-Y ) ) )
     =>
@@ -8327,7 +8349,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-ARRAY-INIT-DATA-NUM104-Z ; CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-INIT-DATA-NUM104-A ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-NUM104-I ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-NUM104-J ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-NUM104-N ) CTORARRAYINITDATAA2 ( STEP-READ-ARRAY-INIT-DATA-NUM104-X, STEP-READ-ARRAY-INIT-DATA-NUM104-Y ) ) )
     =>
     $norm-seq ( CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-INIT-DATA-NUM104-A ) CTORCONSTA2 ( CTORI32A0, STEP-READ-ARRAY-INIT-DATA-NUM104-I ) $const ( ( $cunpack ( STEP-READ-ARRAY-INIT-DATA-NUM104-ZT ) ), ( $cunpacknum ( STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, STEP-READ-ARRAY-INIT-DATA-NUM104-C ) ) ) CTORARRAYSETA1 ( STEP-READ-ARRAY-INIT-DATA-NUM104-X ) CTORREFARRAYADDRA1 ( STEP-READ-ARRAY-INIT-DATA-NUM104-A ) CTORCONSTA2 ( CTORI32A0, ( ( STEP-READ-ARRAY-INIT-DATA-NUM104-I + 1 ) ) ) CTORCONSTA2 ( CTORI32A0, ( ( STEP-READ-ARRAY-INIT-DATA-NUM104-J + ( $zsize ( STEP-READ-ARRAY-INIT-DATA-NUM104-ZT )  quo  8 ) ) ) ) CTORCONSTA2 ( CTORI32A0, ( ( STEP-READ-ARRAY-INIT-DATA-NUM104-N - 1 ) ) ) CTORARRAYINITDATAA2 ( STEP-READ-ARRAY-INIT-DATA-NUM104-X, STEP-READ-ARRAY-INIT-DATA-NUM104-Y ) )
-      if ( Expand ( ( $type ( STEP-READ-ARRAY-INIT-DATA-NUM104-Z, STEP-READ-ARRAY-INIT-DATA-NUM104-X ) ), ( CTORARRAYA1 ( ( STEP-READ-ARRAY-INIT-DATA-NUM104-MUT STEP-READ-ARRAY-INIT-DATA-NUM104-ZT ) ) ) ) == valid ) = true /\ ( ( $zbytes ( STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, STEP-READ-ARRAY-INIT-DATA-NUM104-C ) == slice ( value('BYTES, $data ( STEP-READ-ARRAY-INIT-DATA-NUM104-Z, STEP-READ-ARRAY-INIT-DATA-NUM104-Y )), STEP-READ-ARRAY-INIT-DATA-NUM104-J, ( $zsize ( STEP-READ-ARRAY-INIT-DATA-NUM104-ZT )  quo  8 ) ) ) ) = true .
+      if CTORARRAYA1 ( ( STEP-READ-ARRAY-INIT-DATA-NUM104-MUT STEP-READ-ARRAY-INIT-DATA-NUM104-ZT ) ) := $expanddt ( $type ( STEP-READ-ARRAY-INIT-DATA-NUM104-Z, STEP-READ-ARRAY-INIT-DATA-NUM104-X ) ) /\ $zbytes ( STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, STEP-READ-ARRAY-INIT-DATA-NUM104-C ) := slice ( value('BYTES, $data ( STEP-READ-ARRAY-INIT-DATA-NUM104-Z, STEP-READ-ARRAY-INIT-DATA-NUM104-Y )), STEP-READ-ARRAY-INIT-DATA-NUM104-J, ( $zsize ( STEP-READ-ARRAY-INIT-DATA-NUM104-ZT )  quo  8 ) ) .
 
   crl [step-pure-empty] :
     step ( ( STEP-PURE0-Z ; STEP-PURE0-INSTR ) )
@@ -8388,7 +8410,7 @@ mod SPECTEC-CORE is
     step ( ( STEP-THROW6-Z ; STEP-THROW6-VAL CTORTHROWA1 ( STEP-THROW6-X ) ) )
     =>
     ( $add-exninst ( STEP-THROW6-Z, STEP-THROW6-EXN ) ; CTORREFEXNADDRA1 ( STEP-THROW6-A ) CTORTHROWREFA0 )
-      if STEP-THROW6-A := len ( $exninst ( STEP-THROW6-Z ) ) /\ STEP-THROW6-EXN := {item('TAG, index ( $tagaddr ( STEP-THROW6-Z ), STEP-THROW6-X )) ; item('FIELDS, STEP-THROW6-VAL)} /\ STEP-THROW6-N := len ( STEP-THROW6-VAL ) /\ STEP-THROW6-N := len ( STEP-THROW6-T ) /\ all-vals ( STEP-THROW6-VAL ) = true /\ ( Expand ( ( $as-deftype ( ( value('TYPE, $tag ( STEP-THROW6-Z, STEP-THROW6-X )) ) ) ), ( CTORFUNCARROWA2 ( STEP-THROW6-T, eps ) ) ) == valid ) = true .
+      if CTORFUNCARROWA2 ( STEP-THROW6-T, eps ) := $expanddt ( $as-deftype ( ( value('TYPE, $tag ( STEP-THROW6-Z, STEP-THROW6-X )) ) ) ) /\ STEP-THROW6-A := len ( $exninst ( STEP-THROW6-Z ) ) /\ STEP-THROW6-EXN := {item('TAG, index ( $tagaddr ( STEP-THROW6-Z ), STEP-THROW6-X )) ; item('FIELDS, STEP-THROW6-VAL)} /\ STEP-THROW6-N := len ( STEP-THROW6-VAL ) /\ STEP-THROW6-N := len ( STEP-THROW6-T ) /\ all-vals ( STEP-THROW6-VAL ) = true .
   rl [step-local-set] :
     step ( ( STEP-LOCAL-SET7-Z ; STEP-LOCAL-SET7-VAL CTORLOCALSETA1 ( STEP-LOCAL-SET7-X ) ) )
     =>
@@ -8477,7 +8499,7 @@ mod SPECTEC-CORE is
     step ( ( STEP-STRUCT-NEW25-Z ; STEP-STRUCT-NEW25-VAL CTORSTRUCTNEWA1 ( STEP-STRUCT-NEW25-X ) ) )
     =>
     ( $add-structinst ( STEP-STRUCT-NEW25-Z, STEP-STRUCT-NEW25-SI ) ; CTORREFSTRUCTADDRA1 ( STEP-STRUCT-NEW25-A ) )
-      if STEP-STRUCT-NEW25-A := len ( $structinst ( STEP-STRUCT-NEW25-Z ) ) /\ all-vals ( STEP-STRUCT-NEW25-VAL ) = true /\ ( Expand ( ( $type ( STEP-STRUCT-NEW25-Z, STEP-STRUCT-NEW25-X ) ), ( CTORSTRUCTA1 ( ( STEP-STRUCT-NEW25-MUT STEP-STRUCT-NEW25-ZT ) ) ) ) == valid ) = true /\ ( ( STEP-STRUCT-NEW25-SI == {item('TYPE, $type ( STEP-STRUCT-NEW25-Z, STEP-STRUCT-NEW25-X )) ; item('FIELDS, $packfield ( STEP-STRUCT-NEW25-ZT, STEP-STRUCT-NEW25-VAL ))} ) ) = true .
+      if CTORSTRUCTA1 ( ( STEP-STRUCT-NEW25-MUT STEP-STRUCT-NEW25-ZT ) ) := $expanddt ( $type ( STEP-STRUCT-NEW25-Z, STEP-STRUCT-NEW25-X ) ) /\ STEP-STRUCT-NEW25-A := len ( $structinst ( STEP-STRUCT-NEW25-Z ) ) /\ STEP-STRUCT-NEW25-SI := {item('TYPE, $type ( STEP-STRUCT-NEW25-Z, STEP-STRUCT-NEW25-X )) ; item('FIELDS, $packfield ( STEP-STRUCT-NEW25-ZT, STEP-STRUCT-NEW25-VAL ))} /\ all-vals ( STEP-STRUCT-NEW25-VAL ) = true .
   rl [step-struct-set-null] :
     step ( ( STEP-STRUCT-SET-NULL26-Z ; CTORREFNULLA1 ( STEP-STRUCT-SET-NULL26-HT ) STEP-STRUCT-SET-NULL26-VAL CTORSTRUCTSETA2 ( STEP-STRUCT-SET-NULL26-X, STEP-STRUCT-SET-NULL26-I ) ) )
     =>
@@ -8486,12 +8508,12 @@ mod SPECTEC-CORE is
     step ( ( STEP-STRUCT-SET-STRUCT27-Z ; CTORREFSTRUCTADDRA1 ( STEP-STRUCT-SET-STRUCT27-A ) STEP-STRUCT-SET-STRUCT27-VAL CTORSTRUCTSETA2 ( STEP-STRUCT-SET-STRUCT27-X, STEP-STRUCT-SET-STRUCT27-I ) ) )
     =>
     ( $with-struct ( STEP-STRUCT-SET-STRUCT27-Z, STEP-STRUCT-SET-STRUCT27-A, STEP-STRUCT-SET-STRUCT27-I, ( $packfield ( ( index ( STEP-STRUCT-SET-STRUCT27-ZT, STEP-STRUCT-SET-STRUCT27-I ) ), STEP-STRUCT-SET-STRUCT27-VAL ) ) ) ; eps )
-      if ( Expand ( ( $type ( STEP-STRUCT-SET-STRUCT27-Z, STEP-STRUCT-SET-STRUCT27-X ) ), ( CTORSTRUCTA1 ( ( STEP-STRUCT-SET-STRUCT27-MUT STEP-STRUCT-SET-STRUCT27-ZT ) ) ) ) == valid ) = true .
+      if CTORSTRUCTA1 ( ( STEP-STRUCT-SET-STRUCT27-MUT STEP-STRUCT-SET-STRUCT27-ZT ) ) := $expanddt ( $type ( STEP-STRUCT-SET-STRUCT27-Z, STEP-STRUCT-SET-STRUCT27-X ) ) .
   crl [step-array-new-fixed] :
     step ( ( STEP-ARRAY-NEW-FIXED28-Z ; STEP-ARRAY-NEW-FIXED28-VAL CTORARRAYNEWFIXEDA2 ( STEP-ARRAY-NEW-FIXED28-X, STEP-ARRAY-NEW-FIXED28-N ) ) )
     =>
     ( $add-arrayinst ( STEP-ARRAY-NEW-FIXED28-Z, STEP-ARRAY-NEW-FIXED28-AI ) ; CTORREFARRAYADDRA1 ( STEP-ARRAY-NEW-FIXED28-A ) )
-      if STEP-ARRAY-NEW-FIXED28-A := len ( $arrayinst ( STEP-ARRAY-NEW-FIXED28-Z ) ) /\ all-vals ( STEP-ARRAY-NEW-FIXED28-VAL ) = true /\ ( Expand ( ( $type ( STEP-ARRAY-NEW-FIXED28-Z, STEP-ARRAY-NEW-FIXED28-X ) ), ( CTORARRAYA1 ( ( STEP-ARRAY-NEW-FIXED28-MUT STEP-ARRAY-NEW-FIXED28-ZT ) ) ) ) == valid ) = true /\ ( ( STEP-ARRAY-NEW-FIXED28-AI == {item('TYPE, $type ( STEP-ARRAY-NEW-FIXED28-Z, STEP-ARRAY-NEW-FIXED28-X )) ; item('FIELDS, $packfield ( STEP-ARRAY-NEW-FIXED28-ZT, STEP-ARRAY-NEW-FIXED28-VAL ))} ) ) = true .
+      if CTORARRAYA1 ( ( STEP-ARRAY-NEW-FIXED28-MUT STEP-ARRAY-NEW-FIXED28-ZT ) ) := $expanddt ( $type ( STEP-ARRAY-NEW-FIXED28-Z, STEP-ARRAY-NEW-FIXED28-X ) ) /\ STEP-ARRAY-NEW-FIXED28-A := len ( $arrayinst ( STEP-ARRAY-NEW-FIXED28-Z ) ) /\ STEP-ARRAY-NEW-FIXED28-AI := {item('TYPE, $type ( STEP-ARRAY-NEW-FIXED28-Z, STEP-ARRAY-NEW-FIXED28-X )) ; item('FIELDS, $packfield ( STEP-ARRAY-NEW-FIXED28-ZT, STEP-ARRAY-NEW-FIXED28-VAL ))} /\ all-vals ( STEP-ARRAY-NEW-FIXED28-VAL ) = true .
   rl [step-array-set-null] :
     step ( ( STEP-ARRAY-SET-NULL29-Z ; CTORREFNULLA1 ( STEP-ARRAY-SET-NULL29-HT ) CTORCONSTA2 ( CTORI32A0, STEP-ARRAY-SET-NULL29-I ) STEP-ARRAY-SET-NULL29-VAL CTORARRAYSETA1 ( STEP-ARRAY-SET-NULL29-X ) ) )
     =>
@@ -8505,20 +8527,20 @@ mod SPECTEC-CORE is
     step ( ( STEP-ARRAY-SET-ARRAY31-Z ; CTORREFARRAYADDRA1 ( STEP-ARRAY-SET-ARRAY31-A ) CTORCONSTA2 ( CTORI32A0, STEP-ARRAY-SET-ARRAY31-I ) STEP-ARRAY-SET-ARRAY31-VAL CTORARRAYSETA1 ( STEP-ARRAY-SET-ARRAY31-X ) ) )
     =>
     ( $with-array ( STEP-ARRAY-SET-ARRAY31-Z, STEP-ARRAY-SET-ARRAY31-A, STEP-ARRAY-SET-ARRAY31-I, ( $packfield ( STEP-ARRAY-SET-ARRAY31-ZT, STEP-ARRAY-SET-ARRAY31-VAL ) ) ) ; eps )
-      if ( Expand ( ( $type ( STEP-ARRAY-SET-ARRAY31-Z, STEP-ARRAY-SET-ARRAY31-X ) ), ( CTORARRAYA1 ( ( STEP-ARRAY-SET-ARRAY31-MUT STEP-ARRAY-SET-ARRAY31-ZT ) ) ) ) == valid ) = true .
+      if CTORARRAYA1 ( ( STEP-ARRAY-SET-ARRAY31-MUT STEP-ARRAY-SET-ARRAY31-ZT ) ) := $expanddt ( $type ( STEP-ARRAY-SET-ARRAY31-Z, STEP-ARRAY-SET-ARRAY31-X ) ) .
 
 
 
 
-  rl [steps-refl] :
-    steps ( ( STEPS-REFL0-Z ; STEPS-REFL0-INSTR ) )
-    =>
-    ( STEPS-REFL0-Z ; STEPS-REFL0-INSTR ) .
   crl [steps-trans] :
     steps ( ( STEPS-TRANS1-Z ; STEPS-TRANS1-INSTR ) )
     =>
     ( STEPS-TRANS1-ZQQ ; STEPS-TRANS1-INSTRQQ )
       if step ( ( STEPS-TRANS1-Z ; STEPS-TRANS1-INSTR ) ) => ( STEPS-TRANS1-ZQ ; STEPS-TRANS1-INSTRQ ) /\ steps ( ( STEPS-TRANS1-ZQ ; STEPS-TRANS1-INSTRQ ) ) => ( STEPS-TRANS1-ZQQ ; STEPS-TRANS1-INSTRQQ ) .
+  rl [steps-refl] :
+    steps ( ( STEPS-REFL0-Z ; STEPS-REFL0-INSTR ) )
+    =>
+    ( STEPS-REFL0-Z ; STEPS-REFL0-INSTR ) .
 
 
 
@@ -8741,14 +8763,14 @@ mod SPECTEC-CORE is
   crl [instantiate-r0] :
     $instantiate ( INSTANTIATE0-S, INSTANTIATE0-MODULE, INSTANTIATE0-EXTERNADDR )
     =>
-    ( ( FREE-INSTANTIATE0-SQQQQ ; {item('LOCALS, eps) ; item('MODULE, FREE-INSTANTIATE0-MODULEINST)} ) ; FREE-INSTANTIATE0-INSTRE FREE-INSTANTIATE0-INSTRD INSTANTIATE0-INSTRS ) 
-      if CTORMODULEA11 ( INSTANTIATE0-TYPE, INSTANTIATE0-IMPORT, INSTANTIATE0-TAG, INSTANTIATE0-GLOBAL, INSTANTIATE0-MEM, INSTANTIATE0-TABLE, INSTANTIATE0-FUNC, INSTANTIATE0-DATA, INSTANTIATE0-ELEM, INSTANTIATE0-START, INSTANTIATE0-EXPORT ) := INSTANTIATE0-MODULE /\ CTORGLOBALA2 ( INSTANTIATE0-GLOBALTYPE, INSTANTIATE0-EXPRG ) := INSTANTIATE0-GLOBAL /\ CTORTABLEA2 ( INSTANTIATE0-TABLETYPE, INSTANTIATE0-EXPRT ) := INSTANTIATE0-TABLE /\ CTORDATAA2 ( INSTANTIATE0-BYTE, INSTANTIATE0-DATAMODE ) := INSTANTIATE0-DATA /\ CTORELEMA3 ( INSTANTIATE0-REFTYPE, INSTANTIATE0-EXPRE, INSTANTIATE0-ELEMMODE ) := INSTANTIATE0-ELEM /\ CTORSTARTA1 ( INSTANTIATE0-X ) := INSTANTIATE0-START /\ INSTANTIATE0-INSTRS := CTORCALLA1 ( INSTANTIATE0-X ) /\ ( Module-ok ( INSTANTIATE0-MODULE, ( CTORARROWA2 ( INSTANTIATE0-XTI, INSTANTIATE0-XTE ) ) ) == valid ) = true /\ ( Externaddr-ok ( INSTANTIATE0-S, INSTANTIATE0-EXTERNADDR, INSTANTIATE0-XTI ) == valid ) = true /\ ( ( FREE-INSTANTIATE0-MODULEINST0 == {item('TYPES, $alloctypes ( INSTANTIATE0-TYPE )) ; item('TAGS, eps) ; item('GLOBALS, $globalsxa ( INSTANTIATE0-EXTERNADDR )) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, $funcsxa ( INSTANTIATE0-EXTERNADDR ) ( len ( value('FUNCS, INSTANTIATE0-S) ) + INSTANTIATE0-IF )) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)} ) ) = true /\ ( ( INSTANTIATE0-Z == ( INSTANTIATE0-S ; {item('LOCALS, eps) ; item('MODULE, FREE-INSTANTIATE0-MODULEINST0)} ) ) ) = true /\ $evalglobals ( INSTANTIATE0-Z, INSTANTIATE0-GLOBALTYPE, INSTANTIATE0-EXPRG ) => INSTANTIATE0-ZQ INSTANTIATE0-VALG /\ $evalexprs ( INSTANTIATE0-ZQ, INSTANTIATE0-EXPRT ) => INSTANTIATE0-ZQQ INSTANTIATE0-REFT /\ $evalexprss ( INSTANTIATE0-ZQQ, INSTANTIATE0-EXPRE ) => INSTANTIATE0-ZQQQ INSTANTIATE0-REFE /\ ( ( INSTANTIATE0-ZQQQ == ( INSTANTIATE0-SQQQ ; INSTANTIATE0-F ) ) ) = true /\ $allocmodule ( INSTANTIATE0-SQQQ, INSTANTIATE0-MODULE, INSTANTIATE0-EXTERNADDR, INSTANTIATE0-VALG, INSTANTIATE0-REFT, INSTANTIATE0-REFE ) => FREE-INSTANTIATE0-SQQQQ FREE-INSTANTIATE0-MODULEINST /\ ( ( FREE-INSTANTIATE0-INSTRD == $concat ( instr, ( $rundata ( INSTANTIATE0-ID, ( index ( INSTANTIATE0-DATA, INSTANTIATE0-ID ) ) ) ) ) ) ) = true /\ ( ( FREE-INSTANTIATE0-INSTRE == $concat ( instr, ( $runelem ( INSTANTIATE0-IE, ( index ( INSTANTIATE0-ELEM, INSTANTIATE0-IE ) ) ) ) ) ) ) = true .
+    ( ( FREE-INSTANTIATE0-SQQQQ ; $mk-frame ( eps, FREE-INSTANTIATE0-MODULEINST ) ) ; FREE-INSTANTIATE0-INSTRE FREE-INSTANTIATE0-INSTRD INSTANTIATE0-INSTRS ) 
+      if CTORMODULEA11 ( INSTANTIATE0-TYPE, INSTANTIATE0-IMPORT, INSTANTIATE0-TAG, INSTANTIATE0-GLOBAL, INSTANTIATE0-MEM, INSTANTIATE0-TABLE, INSTANTIATE0-FUNC, INSTANTIATE0-DATA, INSTANTIATE0-ELEM, INSTANTIATE0-START, INSTANTIATE0-EXPORT ) := INSTANTIATE0-MODULE /\ CTORGLOBALA2 ( INSTANTIATE0-GLOBALTYPE, INSTANTIATE0-EXPRG ) := INSTANTIATE0-GLOBAL /\ CTORTABLEA2 ( INSTANTIATE0-TABLETYPE, INSTANTIATE0-EXPRT ) := INSTANTIATE0-TABLE /\ CTORDATAA2 ( INSTANTIATE0-BYTE, INSTANTIATE0-DATAMODE ) := INSTANTIATE0-DATA /\ CTORELEMA3 ( INSTANTIATE0-REFTYPE, INSTANTIATE0-EXPRE, INSTANTIATE0-ELEMMODE ) := INSTANTIATE0-ELEM /\ CTORSTARTA1 ( INSTANTIATE0-X ) := INSTANTIATE0-START /\ INSTANTIATE0-INSTRS := CTORCALLA1 ( INSTANTIATE0-X ) /\ ( Module-ok ( INSTANTIATE0-MODULE, ( CTORARROWA2 ( INSTANTIATE0-XTI, INSTANTIATE0-XTE ) ) ) == valid ) = true /\ ( Externaddr-ok ( INSTANTIATE0-S, INSTANTIATE0-EXTERNADDR, INSTANTIATE0-XTI ) == valid ) = true /\ ( ( FREE-INSTANTIATE0-MODULEINST0 == {item('TYPES, $alloctypes ( INSTANTIATE0-TYPE )) ; item('TAGS, eps) ; item('GLOBALS, $globalsxa ( INSTANTIATE0-EXTERNADDR )) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, $funcsxa ( INSTANTIATE0-EXTERNADDR ) ( len ( value('FUNCS, INSTANTIATE0-S) ) + INSTANTIATE0-IF )) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)} ) ) = true /\ ( ( INSTANTIATE0-Z == ( INSTANTIATE0-S ; $mk-frame ( eps, FREE-INSTANTIATE0-MODULEINST0 ) ) ) ) = true /\ $evalglobals ( INSTANTIATE0-Z, INSTANTIATE0-GLOBALTYPE, INSTANTIATE0-EXPRG ) => INSTANTIATE0-ZQ INSTANTIATE0-VALG /\ $evalexprs ( INSTANTIATE0-ZQ, INSTANTIATE0-EXPRT ) => INSTANTIATE0-ZQQ INSTANTIATE0-REFT /\ $evalexprss ( INSTANTIATE0-ZQQ, INSTANTIATE0-EXPRE ) => INSTANTIATE0-ZQQQ INSTANTIATE0-REFE /\ ( ( INSTANTIATE0-ZQQQ == ( INSTANTIATE0-SQQQ ; INSTANTIATE0-F ) ) ) = true /\ $allocmodule ( INSTANTIATE0-SQQQ, INSTANTIATE0-MODULE, INSTANTIATE0-EXTERNADDR, INSTANTIATE0-VALG, INSTANTIATE0-REFT, INSTANTIATE0-REFE ) => FREE-INSTANTIATE0-SQQQQ FREE-INSTANTIATE0-MODULEINST /\ ( ( FREE-INSTANTIATE0-INSTRD == $concat ( instr, ( $rundata ( INSTANTIATE0-ID, ( index ( INSTANTIATE0-DATA, INSTANTIATE0-ID ) ) ) ) ) ) ) = true /\ ( ( FREE-INSTANTIATE0-INSTRE == $concat ( instr, ( $runelem ( INSTANTIATE0-IE, ( index ( INSTANTIATE0-ELEM, INSTANTIATE0-IE ) ) ) ) ) ) ) = true .
 
 
 
 
-  ceq $invoke ( INVOKE0-S, INVOKE0-FUNCADDR, INVOKE0-VAL ) = ( ( INVOKE0-S ; {item('LOCALS, eps) ; item('MODULE, {item('TYPES, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)})} ) ; INVOKE0-VAL CTORREFFUNCADDRA1 ( INVOKE0-FUNCADDR ) CTORCALLREFA1 ( ( value('TYPE, index ( value('FUNCS, INVOKE0-S), INVOKE0-FUNCADDR )) ) ) ) 
-      if ( Expand ( ( value('TYPE, index ( value('FUNCS, INVOKE0-S), INVOKE0-FUNCADDR )) ), ( CTORFUNCARROWA2 ( INVOKE0-T1, INVOKE0-T2 ) ) ) == valid ) = true /\ ( Val-ok ( INVOKE0-S, INVOKE0-VAL, INVOKE0-T1 ) == valid ) = true .
+  ceq $invoke ( INVOKE0-S, INVOKE0-FUNCADDR, INVOKE0-VAL ) = ( ( INVOKE0-S ; $mk-frame ( eps, {item('TYPES, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)} ) ) ; INVOKE0-VAL CTORREFFUNCADDRA1 ( INVOKE0-FUNCADDR ) CTORCALLREFA1 ( ( value('TYPE, index ( value('FUNCS, INVOKE0-S), INVOKE0-FUNCADDR )) ) ) ) 
+      if CTORFUNCARROWA2 ( INVOKE0-T1, INVOKE0-T2 ) := $expanddt ( value('TYPE, index ( value('FUNCS, INVOKE0-S), INVOKE0-FUNCADDR )) ) /\ ( Val-ok ( INVOKE0-S, INVOKE0-VAL, INVOKE0-T1 ) == valid ) = true .
 
   --- Execution predicate equations (auto-added; use Val sort membership)
   eq $cfg-state(ZS ; ITS) = ZS .
@@ -8781,18 +8803,73 @@ mod SPECTEC-CORE is
   eq  is-trap(CTORTRAPA0 TS) = true .
   eq  is-trap(TS) = false [owise] .
 
+  --- Executable lifting for SpecTec substitution helpers over lists.
+  --- Generated helper signatures are element-level (`typeuse`, `valtype`),
+  --- but rules such as unroll/expand call them on `typeuse*` and `valtype*`.
+  eq $subst-typeuse(eps, SUBST-L-TV, SUBST-L-TU) = eps .
+  ceq $subst-typeuse(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =
+      $subst-typeuse(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)
+      $subst-typeuse(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)
+   if SUBST-L-WS =/= eps .
+  eq $subst-valtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .
+  ceq $subst-valtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =
+      $subst-valtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)
+      $subst-valtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)
+   if SUBST-L-WS =/= eps .
+  eq $subst-subtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .
+  ceq $subst-subtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =
+      $subst-subtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)
+      $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)
+   if SUBST-L-WS =/= eps .
+
+  --- Executable lowering for SpecTec (i<n) type iterations.
+  --- These helpers generate the finite sequences used by roll/unroll rules;
+  --- without them the iterator variable becomes a free WasmTerminal.
+  eq $rec-typevars(0) = eps .
+  ceq $rec-typevars(TYPE-ITER-N) =
+      $rec-typevars(TYPE-ITER-N - 1) CTORRECA1(TYPE-ITER-N - 1)
+   if (TYPE-ITER-N > 0) = true .
+  eq $def-typeuses(TYPE-ITER-RT, 0) = eps .
+  ceq $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N) =
+      $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N - 1)
+      CTORWDEFA2(TYPE-ITER-RT, TYPE-ITER-N - 1)
+   if (TYPE-ITER-N > 0) = true .
+  eq $idx-typeuses(TYPE-ITER-X, 0) = eps .
+  ceq $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N) =
+      $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N - 1)
+      CTORWIDXA1(TYPE-ITER-X + (TYPE-ITER-N - 1))
+   if (TYPE-ITER-N > 0) = true .
+  ceq $expanddt(EXP-FL-DT) = EXP-FL-CT
+   if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .
+  ceq Expand(EXPAND-X-DT, CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2)) = valid
+   if CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2) := $expanddt(EXPAND-X-DT) .
+
   --- Generic SpecTec list type witness.
   --- The source rule is polymorphic in the element type; this executable
   --- variable form makes `eps hasType list(val)` and similar instances work.
   cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped
    if (len(LIST-TS) < (2 ^ 32)) = true .
 
-  --- Executable record-shape memberships for runtime configurations.
-  --- They keep Store/Frame/Moduleinst available after record equations
-  --- normalize concrete constants to WasmTerminal record literals.
-  mb {item('TYPES, MOD-TYPES) ; item('TAGS, MOD-TAGS) ; item('GLOBALS, MOD-GLOBALS) ; item('MEMS, MOD-MEMS) ; item('TABLES, MOD-TABLES) ; item('FUNCS, MOD-FUNCS) ; item('DATAS, MOD-DATAS) ; item('ELEMS, MOD-ELEMS) ; item('EXPORTS, MOD-EXPORTS)} : Moduleinst .
-  mb {item('LOCALS, FRAME-LOCALS) ; item('MODULE, FRAME-MODULE)} : Frame .
-  mb {item('TAGS, STORE-TAGS) ; item('GLOBALS, STORE-GLOBALS) ; item('MEMS, STORE-MEMS) ; item('TABLES, STORE-TABLES) ; item('FUNCS, STORE-FUNCS) ; item('DATAS, STORE-DATAS) ; item('ELEMS, STORE-ELEMS) ; item('STRUCTS, STORE-STRUCTS) ; item('ARRAYS, STORE-ARRAYS) ; item('EXNS, STORE-EXNS)} : Store .
+  --- Generic list lifting for Val_ok premises over val* / valtype*.
+  --- SpecTec writes this pointwise; the executable Maude condition needs
+  --- an explicit recursive case for multi-value invocation arguments.
+  eq Num-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .
+  eq Val-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .
+  eq Val-ok(VALOK-S, eps, eps) = valid .
+  ceq Val-ok(VALOK-S, VALOK-V VALOK-VS, VALOK-T VALOK-TS) = valid
+   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps)) = true
+   /\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid) = true
+   /\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) = true .
+
+  --- Executable frame record representation.
+  --- SpecTec writes frames as {LOCALS ..., MODULE ...}. Direct Maude
+  --- record-shape membership for that pattern can make sort inference
+  --- diverge, so frame records are emitted as this typed constructor while
+  --- preserving field projection and update behavior.
+  eq value('LOCALS, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-LOCALS .
+  eq value('MODULE, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-MODULE .
+  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'LOCALS <- MK-FRAME-LOCALS2] = $mk-frame(MK-FRAME-LOCALS2, MK-FRAME-MODULE) .
+  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'MODULE <- MK-FRAME-MODULE2] = $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE2) .
 
   --- Concrete record-state execution helpers.
   --- Generated SpecTec helper equations are typed as Store ; Frame.
