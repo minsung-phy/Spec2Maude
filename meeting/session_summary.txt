@@ -536,3 +536,192 @@ Next session entry point:
 3. Do not add `dstep` to the C1 harness.
 4. Report that professor-style C1 `step`/`steps` relation execution works, but
    direct C1 model checking does not finish.
+
+2026-05-12 documentation and harness clarification update
+
+Purpose:
+- Update project documents to match the current files and recent conclusions.
+- Clarify the difference between generated C1 semantics, the fib harness, the
+  `mc` adapter, and actual model checking.
+
+Current generated C1 status:
+- `translator_bs.ml` still generates professor-style C1:
+  - distinct `step`, `step-pure`, `step-read`, and `steps`;
+  - unary `steps(C) => C'`;
+  - `_ ; _` surface syntax;
+  - WT/`WasmTerminal`, no RT/`RecordTerminal`;
+  - no `dstep` in C1.
+- Optional `?` binders are now handled generically:
+  - the translator generates `eps` variants for optional binders in equations
+    and rules;
+  - this is not a `$blocktype`-only hard-coded fix;
+  - generated examples include `step-pure-select-true-opt-empty0` and
+    `step-pure-select-false-opt-empty0` for `CTORSELECTA1(eps)`.
+- `$blocktype(..., CTORWRESULTA1(eps))` is generated and works without the old
+  hand-written `void-bt`.
+
+Important helper clarification:
+- `all-vals` is not a SpecTec relation with that exact name.
+- It is a generated Maude helper that encodes the meaning of SpecTec `val*`
+  sequence binders.
+- It should not be removed as a "hard-coded" helper unless a better generic
+  `val*` encoding replaces it.
+
+Harness clarification:
+- `wasm-exec-bs.maude` is a hand-written harness over generated C1, not the
+  generated semantics itself.
+- `WASM-FIB-BS` defines a concrete Fibonacci benchmark:
+  - `fib-frame(L0,L1,L2,L3)` is a four-local frame;
+  - local 0 is the input/counter;
+  - local 1 is the result accumulator;
+  - local 2 is the next Fibonacci value;
+  - local 3 is a temporary.
+- `$local` and `$with-local` equations in `WASM-FIB-BS` are needed because
+  generated local rules call the SpecTec helpers `$local` and `$with_local`.
+  These equations only define those helpers for the concrete `fib-frame`
+  representation.
+- `mc(Config)` is harness-only:
+  `mc(C) => mc(C') if step(C) => C'`.
+  It adapts the generated relation `step(C) => C'` to the `S => S'` transition
+  shape required by the Maude model checker.
+- `rew mc(fib-config(...))` is repeated execution through the adapter, not
+  model checking.
+- Actual model checking is `modelCheck(mc(...), property)`.
+- Raw `rew fib-config(...)` is expected to stop after unfolding equations,
+  because C1 has no direct `Config => Config` transition rule.
+
+Current diagnosis:
+- Stack overflow / nil-split / optional-empty issues are fixed enough for the
+  current fib C1 execution tests.
+- Direct initial-state model checking over strict generated C1 still times out
+  because the model checker must solve `step(C) => C'` over the full generated
+  relation and its context/list decompositions.
+- Current paper split remains:
+  - C1: faithful executable reference;
+  - C2: optimized model-checking semantics.
+
+Documents updated:
+- `STATUS.md`
+- `paper_plan.md`
+- `.codex.md`
+- `docs/session_summary.txt`
+
+Next session entry point:
+1. Do not confuse `rew mc(...)` with `modelCheck(...)`.
+2. Do not put `mc`, `fib-frame`, `$local` fib equations, or `$with-local` fib
+   equations into the generated C1 story; they belong to the harness.
+3. Do not reintroduce `void-bt`, RT/`RecordTerminal`, or `dstep`.
+4. Next technical work should start C2 and make model checking practical.
+
+2026-05-12 professor meeting update: baseline harness correction
+
+Professor feedback:
+- Something is still wrong in the current baseline story.
+- The Fibonacci WebAssembly config should exist as a proper initial config.
+  It should be initialized through the SpecTec initial configuration path, with
+  a complete frame/module-instance, not just a hand-written shortcut.
+- `step`, `steps`, `step-pure`, and related generated relations should be
+  checked directly with Maude `search`.
+- `mc` is not needed in the intended baseline. The professor expects execution
+  to proceed through `steps` without a separate `mc` adapter.
+
+Current code implication:
+- `wasm-exec-bs.maude` currently defines:
+  `fib-config(NVAL) = fib-state(NVAL) ; fib-body`.
+- This is a hand-written smoke-test config. It is useful for local execution
+  debugging but is not yet the professor-requested complete Wasm initial config.
+- Previous documentation that framed `mc` as the main model-checking bridge is
+  now stale. `mc` can remain as a temporary diagnostic helper, but it should not
+  be presented as the C1 baseline path.
+
+Updated next work:
+1. Replace/supplement the current `fib-config` with a complete SpecTec-style
+   initial config, preferably via `$invoke` or `$instantiate`.
+2. Run Maude `search` tests for `step`, `step-pure`, `step-read`, and `steps`.
+3. Make `rew steps(fib-config(...))` execute without `mc`.
+4. If `steps-refl` causes immediate reflexive stopping under `rew`, discuss the
+   executable encoding/strategy of `Steps` with the professor rather than adding
+   a benchmark-specific `mc` or `dstep`.
+5. Only after this baseline path is fixed should the project claim C1 timeout or
+   move the explanation to C2 state-space reduction.
+
+2026-05-12 follow-up: hard-coded invoke cleanup and current blocker
+
+Clarification:
+- The extra executable `$invoke` equations that had been added to the
+  `translator_bs.ml` footer were not acceptable for C1. They were originally
+  added to make invocation executable during Fibonacci debugging, but because
+  they lived in the translator footer they affected every generated baseline
+  output.
+- This was removed. Current `translator_bs.ml` no longer contains `$invoke`.
+- Current `output_bs.maude` still contains `$invoke`, but only because it is
+  generated from SpecTec. That is allowed.
+
+Harness update:
+- `mc` was removed from the main `wasm-exec-bs.maude` harness path to match the
+  2026-05-12 professor direction.
+- The baseline harness now focuses on direct `fib-config`, `step-read`, `step`,
+  and `steps` checks.
+
+Current test result:
+- `dune build` succeeds.
+- `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` succeeds.
+- `red in WASM-FIB-BS : fib-config(i32v(5)) .` succeeds and reduces to:
+  `fib-store ; empty-frame ; i32v(5) i32v(0) i32v(1) ref.func 0 call_ref fib-type`.
+- `rew [1] in WASM-FIB-BS : step-read(fib-config(i32v(5))) .` still causes
+  stack overflow.
+
+Current narrowed cause:
+- The overflow is before model checking.
+- The first failing path is `step-read-call-ref-func`.
+- It gets to function type expansion:
+  `$expanddt(value('TYPE, fib-funcinst))`, then `$unrolldt(fib-type)`.
+- Therefore the next technical task is to fix generated type
+  expansion/unrolling/substitution generically:
+  `$unrollrt`, `$unrolldt`, `$expanddt`, `$subst-subtype`,
+  `$subst-comptype`, `$subst-valtype`.
+- Do not add a Fibonacci-specific equation and do not reintroduce a hand-coded
+  `$invoke`.
+
+Updated next work:
+1. Fix `$expanddt/$unrolldt` stack overflow generically.
+2. Verify `step-pure`, `step-read`, `step`, and `steps` directly.
+3. Only after direct `steps` execution works without `mc`, define the model
+   checking experiment.
+
+2026-05-12 follow-up: type unrolling fixed, numeric constructor blocker found
+
+Implemented:
+- `translator_bs.ml` now lowers SpecTec `(i<n)` type iterations for
+  `rollrt`/`unrollrt`/`rolldt` generically.
+- The generated output no longer leaves `FREE-ROLLRT0-I`,
+  `FREE-UNROLLRT0-I`, or `FREE-ROLLDT0-I` in those rules.
+- Added generic helper sequences:
+  `$rec-typevars`, `$def-typeuses`, `$idx-typeuses`, plus list lifting for
+  `$subst-subtype`.
+- Regenerated `output_bs.maude`.
+
+Verified:
+- `dune build` succeeds.
+- `dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude` succeeds.
+- `red in WASM-FIB-BS : $unrollrt(...) .` succeeds for the fib rectype.
+- `red in WASM-FIB-BS : $expanddt(fib-type) .` succeeds and returns the
+  function type.
+- `red in WASM-FIB-BS : fib-config(i32v(5)) .` still succeeds.
+
+Current blocker:
+- The old `$expanddt/$unrolldt` blocker is no longer the direct blocker.
+- The new minimum failing term is:
+  `red in WASM-FIB-BS : CTORLEA1(CTORSA0) .`
+- This stack-overflows.
+- `fib-loop-body` contains
+  `CTORRELOPA2(CTORI32A0, CTORLEA1(CTORSA0))`, so reducing `fib-loop-body`,
+  reducing `value('CODE, fib-funcinst)`, and the first
+  `step-read(fib-config(...))` all overflow.
+
+Updated next work:
+1. Fix generated numeric operator constructor/membership executability
+   generally, starting from the minimal reproducer `CTORLEA1(CTORSA0)`.
+2. Then rerun direct `step-pure`, `step-read`, `step`, and `steps` tests.
+3. Do not solve this with a Fibonacci-specific body shortcut, `mc`, `dstep`, or
+   a hand-written `$invoke`.

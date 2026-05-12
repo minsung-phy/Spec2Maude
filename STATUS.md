@@ -1,45 +1,24 @@
 # Spec2Maude Status
 
-Updated: 2026-04-30
+Updated: 2026-05-12
 
-This file is the current engineering checkpoint. Historical debugging details
-are in `meeting/session_summary.txt` and `meeting/personal_meeting_0428/`.
+This is the current engineering checkpoint. Historical details are in
+`meeting/session_summary.txt` and `meeting/personal_meeting_0428/`.
 
----
+## Goal
 
-## 1. Current Direction
+Spec2Maude should translate WebAssembly 3.0 SpecTec to Maude in two stages.
 
-Research goal:
+1. C1 baseline: preserve the SpecTec relation structure as directly as possible.
+2. C2 transformation: derive an analysis-friendly semantics from C1 for practical
+   rewriting and LTL model checking.
+3. Evaluation: compare C1 and C2 on rewrite/search/model-checking results.
 
-> Translate WebAssembly 3.0 SpecTec semantics to Maude in a relation-preserving
-> way, then apply justified transformations so Maude rewriting and LTL model
-> checking become practical.
+The current priority is still C1.
 
-Pipeline:
+## Professor Requirements For C1
 
-1. **C1. Isomorphic baseline translation** (`translator_bs.ml`)
-   - Preserve SpecTec relations, rule names, and premises.
-   - Must execute enough small programs to serve as the reference semantics.
-2. **C2. Analysis-friendly transformation** (`translator.ml`)
-   - Derived from C1.
-   - Can use heat/cool, redex localization, pruning, or canonicalization.
-   - Must make model checking practical.
-3. **C3. Evaluation**
-   - Benchmarks and Maude LTL properties.
-   - Compare C1 and C2.
-4. **C4. State-explosion explanation**
-   - Explain why faithful generated semantics is hard to model check.
-   - Show which transformations reduce the state space.
-
----
-
-## 2. Professor Requirements From 2026-04-28
-
-Source:
-
-- `meeting/professor_requirement/0428_개인.txt`
-
-Required baseline relations:
+C1 must preserve these SpecTec relations:
 
 ```spectec
 relation Step      : config ~> config
@@ -48,288 +27,215 @@ relation Step_read : config ~> instr*
 relation Steps     : config ~>* config
 ```
 
-Generated Maude shape:
+Required Maude shape:
 
 ```maude
-op step      : Config -> StepConf .
-op step-pure : WasmTerminals -> StepPureConf .
-op step-read : Config -> StepReadConf .
-op steps     : Config -> StepsConf .
+op step      : Config -> StepConf [frozen (1)] .
+op step-pure : InstrTerminals -> StepPureConf [frozen (1)] .
+op step-read : Config -> StepReadConf [frozen (1)] .
+op steps     : Config -> StepsConf [frozen (1)] .
 ```
 
-Additional requirements:
+Other requirements:
 
-- Use `Z ; IS` for configs instead of exposing `CTORSEMICOLONA2(Z, IS)`.
-- Generate `steps(C) => C'`, not `Steps(C, C') => valid`.
-- Do not emit redundant executable sort guards when the Maude variable
-  declaration already enforces the sort.
-- Follow the SpecTec relation structure first; optimization belongs in C2.
+- `Steps` must be unary: `steps(C) => C'`, not binary `Steps(C, C') => valid`.
+- Configs should print with `_ ; _`, not visible `CTORSEMICOLONA2(...)`.
+- Redundant guards such as `Z : State` should be removed when Maude variable
+  declarations already enforce the sort.
+- Use WT/`WasmTerminal`. Do not introduce RT/`RecordTerminal`.
+- Do not add `dstep`, `focused-step`, `mc`, or benchmark-specific execution
+  drivers to C1.
+- Do not hard-code benchmark-specific behavior in `translator_bs.ml`.
 
----
+Latest 2026-05-12 professor feedback:
 
-## 3. Implemented Now
+- Fibonacci must start from a proper WebAssembly config. The config should not
+  hide execution by hand-written shortcuts.
+- Check `step`, `step-pure`, `step-read`, and `steps` directly with Maude
+  `search`/`rew`.
+- `mc` is not the intended baseline path. The target is to run with `steps`
+  directly.
 
-Changed files:
+## Current Implementation
 
-- `translator_bs.ml`
-- `output_bs.maude`
-- `wasm-exec-bs.maude`
+Main files:
 
-Do not edit `lib/frontend/elab.ml` for the current C1 work. The active
-baseline changes are in the translator and Maude harness only.
+- `translator_bs.ml`: C1 translator.
+- `output_bs.maude`: regenerated C1 output.
+- `wasm-exec-bs.maude`: hand-written Fibonacci harness over C1.
+- `translator.ml`: future C2 translator.
 
-Implemented in C1:
+Implemented:
 
-- `Step`, `Step_pure`, `Step_read`, and `Steps` are distinct generated
-  relations.
-- `Step/pure` and `Step/read` call `step-pure(...)` and `step-read(...)`
-  instead of collapsing everything into one `step(...)` relation.
-- `Steps/trans` is generated as:
+- `Step`, `Step_pure`, `Step_read`, and `Steps` are generated separately.
+- `Step/pure` calls `step-pure(...)`.
+- `Step/read` calls `step-read(...)`.
+- `Steps/trans` has the intended unary form:
 
 ```maude
 steps(C) => C''
   if step(C) => C' /\ steps(C') => C'' .
 ```
 
-- Configs are printed with `_ ; _`.
-- `val^n` binders are preserved through elaboration and translated to length
-  constraints such as `len(VAL) == N`.
-- `val*` binders are declared as `ValTerminals`, not arbitrary
-  `WasmTerminals`.
-  - This keeps a `val*` prefix from consuming non-value instructions.
-  - It directly addresses the professor's nil/list-split concern.
-- `Step/ctxt-instrs` is still emitted as a generic context rule, but its
-  recursive focus is structurally non-empty:
+- Configs use `_ ; _`.
+- `val^n` binders are preserved as length constraints.
+- `val*` binders are guarded with `all-vals(...)` where needed.
+- `Step/ctxt-instrs` uses a non-empty recursive focus to avoid the empty
+  `nil` split problem.
+- Optional `?` binders now generate `eps` cases generally. This is not a
+  `$blocktype`-only hard-code.
+- The old hard-coded executable `$invoke` footer was removed from
+  `translator_bs.ml`. The only `$invoke` left in `output_bs.maude` is the one
+  generated from SpecTec.
+- `mc` was removed from `wasm-exec-bs.maude` as the main C1 harness path.
+- SpecTec type-iteration lowering for `rollrt`/`unrollrt`/`rolldt` was fixed
+  generically. The old generated form left `(i<n)` iterator variables as free
+  constants such as `FREE-UNROLLRT0-I`; the new form generates finite helper
+  sequences (`$rec-typevars`, `$def-typeuses`, `$idx-typeuses`) and list-lifts
+  `$subst-subtype`.
+
+Important helper policy:
+
+- `all-vals` is a generic Maude helper for SpecTec `val*` binders.
+- `$mk-frame` is a generic executable representation for SpecTec frame records.
+- Generic list lifting for substitution helpers is allowed only when it encodes
+  a SpecTec list-level operation. It must not be Fibonacci-specific.
+
+## Current Fibonacci Harness
+
+`WASM-FIB-BS` is a hand-written benchmark harness, not generated semantics.
+
+Current `fib-config(N)` reduces to a config shaped like:
 
 ```maude
-VAL INSTR-HEAD INSTR-REST INSTR1
+fib-store ; empty-frame ;
+  N i32.const 0 i32.const 1 ref.func 0 call_ref fib-type
 ```
 
-  instead of one unconstrained `INSTR` sequence variable.
-- Empty and non-empty result cases are split when needed because Maude cannot
-  bind a sequence result to `eps` through the same pattern reliably.
+This is closer to the professor's requested call path than the old
+`fib-state(N) ; fib-body` shortcut, but it is still not final evidence because
+execution does not yet pass the first `call_ref`.
 
-Implemented in model-check harness:
-
-- `wasm-exec-bs.maude` now wraps model-check states as `mc(Config)`.
-- `output_bs.maude` keeps the professor-requested generated C1 relations:
-  `step`, `step-pure`, `step-read`, and `steps`.
-- `exec-step` now uses the generated C1 relation directly:
+Current direct test result:
 
 ```maude
-mc(C) => mc(C') if step(C) => C' .
+red in WASM-FIB-BS : fib-config(i32v(5)) .
 ```
 
-- No `dstep`, RT, or RecordTerminal driver is active in the C1 baseline.
-- This makes the current harness faithful to C1, but it also exposes the known
-  model-checking explosion.
+Status: succeeds and shows the initial config above.
 
-Important current interpretation:
+```maude
+rew [1] in WASM-FIB-BS : step-read(fib-config(i32v(5))) .
+```
 
-- The translator is now following the professor's C1 relation-preserving
-  direction.
-- The `mc(...)` wrapper is only the Maude model-checking state wrapper; it is
-  not a semantic shortcut.
-- Strict generated C1 relation execution works through `step(...)`/`steps(...)`.
-- Strict generated C1 model checking from the initial Fibonacci state does not
-  finish in the measured timeout.
-- Current reporting stance: C1 is implemented faithfully, but direct C1 model
-  checking is not practical yet.
+Status: stack overflow.
 
----
+Narrowed cause:
 
-## 4. Verification Results
+- The previous `$expanddt/$unrolldt` blocker is fixed for the fib function type.
+- The current minimum failing term is now much smaller:
 
-Build and regeneration:
+```maude
+red in WASM-FIB-BS : CTORLEA1(CTORSA0) .
+```
+
+This stack-overflows. Because `fib-loop-body` contains
+`CTORRELOPA2(CTORI32A0, CTORLEA1(CTORSA0))`, this also makes these commands
+overflow:
+
+```maude
+red in WASM-FIB-BS : fib-loop-body .
+red in WASM-FIB-BS : value('CODE, fib-funcinst) .
+rew [1] in WASM-FIB-BS : step-read(fib-config(i32v(5))) .
+```
+
+So the current blocker is still before model checking and before `steps`: C1's
+generated numeric operator constructor/membership layer is not executable for
+signed operators such as `CTORLEA1(CTORSA0)`.
+
+## Verification Done
+
+Commands run on 2026-05-12:
 
 ```sh
 dune build
 dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude
 ```
 
-Both succeeded.
+Both succeed.
 
-### Direct Stuck-Point Test
+Hard-coded `$invoke` cleanup:
 
-Test:
-
-```maude
-rew [10000] in WASM-FIB-BS :
-  step(fib-state(i32v(0)) ;
-    CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0)) CTORLOCALGETA1(1)) .
+```sh
+rg -n '\$invoke|Executable equivalent of SpecTec invoke' translator_bs.ml output_bs.maude
 ```
 
-Result:
+Current result:
 
-- Succeeds.
-- Final instruction ends with `CTORCONSTA2(CTORI32A0, 0)`.
-- 156 rewrites.
-- About 1ms Maude real time.
+- no `$invoke` in `translator_bs.ml`;
+- only generated SpecTec `$invoke` remains in `output_bs.maude`.
 
-### C1 Relation Execution
+Fibonacci smoke result:
 
-| Command | Result | Rewrites | Maude time |
-|---|---:|---:|---:|
-| `rew [1000] ... step(fib-config(i32v(0)))` | one C1 step into label config | 34 | 0ms real |
-| `search [1] ... steps(fib-config(i32v(0))) =>* Z ; i32v(0)` | found | 612 | 2ms real |
-| `search [1] ... steps(fib-config(i32v(5))) =>* Z ; i32v(5)` | found | 22,662 | 48ms real |
+- `red fib-config(i32v(5))` succeeds.
+- generic `$unrollrt/$unrolldt/$expanddt` for the fib function type succeeds.
+- `red CTORLEA1(CTORSA0)` stack-overflows.
+- `rew [1] step-read(fib-config(i32v(5)))` stack-overflows because the function
+  body contains that signed relational operator.
 
-Conclusion:
+## Next Work
 
-- C1 relation execution is no longer stack-overflowing.
-- Raw `rew fib-config(...)` is not the right C1 execution test because the
-  generated execution relation is `step(Config)`, not a rewrite rule directly
-  on `Config`.
-- Raw `rew steps(fib-config(...))` can stop immediately by applying
-  `steps-refl`; use `search` to demonstrate that `Steps/trans` reaches the
-  terminal configuration.
+P0. Fix generated numeric operator constructor/membership executability.
 
-### Model Checking
+- Minimal reproducer: `red in WASM-FIB-BS : CTORLEA1(CTORSA0) .`
+- Inspect generated membership/typing declarations around `binop`, `relop`,
+  `vbinop`, and `vrelop`.
+- The fix must be general for SpecTec numeric operator constructors.
+- Do not replace the Fibonacci body with a shortcut and do not add a
+  Fibonacci-specific equation.
+- Do not reintroduce hard-coded `$invoke`.
 
-Sanity checks on terminal states:
-
-```maude
-red in WASM-FIB-BS-PROPS :
-  mc(fib-state(i32v(0)) ; CTORCONSTA2(CTORI32A0, 0)) |= result-is(0) .
-```
-
-Result:
-
-- `true`
-- 19 rewrites
-
-```maude
-red in WASM-FIB-BS-PROPS :
-  modelCheck(mc(fib-state(i32v(0)) ; CTORCONSTA2(CTORI32A0, 0)), <> result-is(0)) .
-```
-
-Result:
-
-- `true`
-- 25 rewrites
-
-Strict direct C1 model checking attempt:
-
-```maude
-red in WASM-FIB-BS-PROPS :
-  modelCheck(mc(fib-config(i32v(0))), <> result-is(0)) .
-```
-
-Old result when `exec-step` used `step(C) => C'` directly:
-
-- Timed out after 120 seconds.
-- No result was produced.
-
-Rechecked on 2026-04-30 after removing the temporary `dstep` experiment:
-
-- Timed out after 20 seconds.
-- No result was produced.
-
-Reachability diagnostic:
-
-```maude
-search [50] in WASM-FIB-BS-PROPS :
-  mc(fib-config(i32v(0))) =>* S:MCConfig .
-```
-
-Result:
-
-- Timed out after 20 seconds.
-- Only the first few states were printed before timeout.
-- The reached states already include nested label/control contexts.
-
-Current conclusion:
-
-- The previous harness over-approximation problem is fixed by `mc(...)`.
-- Directly asking Maude to solve `step(C) => C'` for the generated C1 relation
-  still causes state-space/proof-search explosion.
-- We should not put a deterministic `dstep` driver in C1, because that would
-  blur the distinction between faithful baseline and optimized analysis
-  semantics.
-- Current conclusion to report: C1 `step`/`steps` relation execution works, but
-  direct C1 model checking does not finish.
-
----
-
-## 5. What To Do Next
-
-### P0. Report C1 Result To Professor
-
-Accurate message:
-
-> 교수님 말씀대로 C1은 `Step`, `Step_pure`, `Step_read`, `Steps` relation을
-> 보존하는 형태로 유지했습니다. `val*`는 `ValTerminals`로 제한했고,
-> `Step/ctxt-instrs`의 recursive focus는 non-empty가 되도록 해서 nil split을
-> 막았습니다. `step(fib-config(...))` one-step은 동작하고, `steps(...)`
-> relation으로 terminal config에 도달하는 것은 `search`로 확인했습니다.
-> 다만 model checker가 `step(C) => C'`를 직접 풀게 하면 generic context
-> split을 전부 탐색해서 폭발합니다. 그래서 direct C1 model checking은
-> `fib(0)`에서도 timeout이 납니다. 현재 기준으로 C1은 faithful reference
-> semantics로는 구현됐지만, 그대로 model checking target으로 쓰기는 어렵다고
-> 보고드리는 게 맞겠습니다.
-
-### P1. Confirm C1 Exit Criterion
-
-Need professor decision:
-
-- Should strict C1 itself be required to model-check from initial states, or is
-  C1 allowed to be the faithful executable reference while C2 handles model
-  checking?
-
-This matters because strict generated C1 `step`/`steps` relation execution
-works, but direct generated `step(C) => C'` model checking still explodes.
-
-### P2. Start C2 From The Current C1
-
-Likely C2 work:
-
-- Heat/cool or focused evaluation contexts.
-- Context split pruning.
-- Canonicalization of semantically equivalent control contexts.
-- Do not add benchmark-specific `dstep` rules to the C1 baseline.
+P1. After the numeric constructor issue is fixed, verify relation behavior
+directly.
 
 Required evidence:
 
-- C2 agrees with C1 on small rewrite results.
-- C2 model checking finishes where C1 times out.
-
-### P3. Add Benchmark Coverage
-
-After the C2 transition relation works:
-
-- factorial
-- iterative sum/product
-- memory load/store
-- table/call-indirect
-- exception try/catch/throw
-
----
-
-## 6. Commands
-
-Build:
-
-```sh
-dune build
-```
-
-Generate C1 baseline:
-
-```sh
-dune exec ./main_bs.exe -- wasm-3.0/* > output_bs.maude
-```
-
-Run Maude:
-
-```sh
-maude wasm-exec-bs.maude
-```
-
-Useful tests:
-
 ```maude
-rew [1000] in WASM-FIB-BS : step(fib-config(i32v(0))) .
-search [1] in WASM-FIB-BS : steps(fib-config(i32v(0))) =>* (Z:State ; CTORCONSTA2(CTORI32A0, 0)) .
-search [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) =>* (Z:State ; CTORCONSTA2(CTORI32A0, 5)) .
-red in WASM-FIB-BS-PROPS : modelCheck(mc(fib-config(i32v(0))), <> result-is(0)) .
+rew [1] in SPECTEC-CORE : step-pure(...) .
+rew [1] in WASM-FIB-BS : step-read(fib-config(i32v(0))) .
+rew [1] in WASM-FIB-BS : step(fib-config(i32v(0))) .
+search [1] in WASM-FIB-BS : steps(fib-config(i32v(0))) =>* (Z:State ; i32v(0)) .
 ```
+
+Then repeat for `fib(1)` and `fib(5)`.
+
+P2. Revisit the Fibonacci initial config if needed.
+
+- Best target: construct the config through generated SpecTec `$invoke` or
+  `$instantiate`.
+- The generated `$invoke` must come from SpecTec translation, not a hand-written
+  footer equation.
+- If `$instantiate` has bind-before-use blockers, document them separately.
+
+P3. Only after C1 execution works, return to model checking.
+
+- First show `steps` execution without `mc`.
+- Then define the model-checking state/propositions in a way consistent with the
+  professor's guidance.
+- If C1 model checking times out after this, that becomes the real motivation
+  for C2.
+
+## What To Tell The Professor Now
+
+Short version:
+
+> The C1 translator now generates the required relation structure: `step`,
+> `step-pure`, `step-read`, and unary `steps`, with `_ ; _` config syntax and no
+> `mc`/`dstep` in the main path. I also removed the hand-written executable
+> `$invoke` helper from the translator, so `$invoke` is now only the SpecTec
+> generated one. I also fixed the earlier generic `(i<n)` type-unrolling bug:
+> `$unrollrt/$unrolldt/$expanddt` now reduce for the fib function type. The
+> current blocker is smaller: even `red CTORLEA1(CTORSA0)` stack-overflows, and
+> the fib body contains that signed relational operator. So the next fix is the
+> generated numeric operator constructor/membership layer, not model checking
+> and not a Fibonacci-specific rule.
