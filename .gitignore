@@ -15,7 +15,5 @@ _build/
 .merlin
 
 # 4. 기타 파일 제외
-.codex
-.codex.md
-
+preserved/
 Spec2Maude_JHS/
