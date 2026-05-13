@@ -1,6 +1,0 @@
-load ../wasm-exec-bs
-red in WASM-FIB-BS : fib-store .
-red in WASM-FIB-BS : empty-frame .
-red in WASM-FIB-BS : (fib-store ; empty-frame).State .
-red in WASM-FIB-BS : (((fib-store ; empty-frame).State) ; i32v(0)) .
-q

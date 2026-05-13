@@ -22,7 +22,6 @@ search [1] in WASM-FIB-BS : step-read((((fib-store ; empty-frame).State) ; CTORR
 rew [1] in WASM-FIB-BS : step(fib-config(i32v(5))) .
 rew [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) . 
 search [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) =>* (fib-store ; empty-frame ; CTORCONSTA2(CTORI32A0, 5)) .
-search [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) =>* (fib-store ; empty-frame ; CTORCONSTA2(CTORI32A0, 5)) .
 ```
 
 5. ModelCheck test

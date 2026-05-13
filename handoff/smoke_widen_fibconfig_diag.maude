@@ -1,4 +1,0 @@
-load wasm-exec-bs_widen_fibconfig_diag
-red in WASM-FIB-BS : fib-config(i32v(0)) .
-rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .
-q
