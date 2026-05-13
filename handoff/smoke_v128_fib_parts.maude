@@ -1,0 +1,4 @@
+load ../wasm-exec-bs
+red in WASM-FIB-BS : i32v(0) .
+red in WASM-FIB-BS : fib-config(CTORCONSTA2(CTORI32A0, 0)) .
+q

@@ -460,7 +460,6 @@ let declared_vars : (string, string) Hashtbl.t = Hashtbl.create 2048
 
 let normalize_decl_sort name sort =
   if sort = "WasmTerminal" && ends_with name "-INSTR-HEAD" then "Instr"
-  else if sort = "WasmTerminals" && ends_with name "-INSTR-REST" then "InstrTerminals"
   else if sort = "WasmTerminal"
      && String.contains name '-'
      && (try
@@ -1221,8 +1220,8 @@ let declared_sort_of_typ t =
 
 let seq_decl_sort_of_inner_typ (inner : typ) =
   match simple_sort_of_typ inner [] with
-  | Some "Val" -> "ValTerminals"
-  | Some "Instr" -> "InstrTerminals"
+  | Some "Val" -> "WasmTerminals"
+  | Some "Instr" -> "WasmTerminals"
   | _ -> "WasmTerminals"
 
 let decl_sort_of_typ (t : typ) =
@@ -1705,8 +1704,6 @@ let translate_typd id params insts =
                         Some (Printf.sprintf "%s : Nat" lhs)
                     | "sn" | "in" | "i32" | "i64" | "i128" | "exp" ->
                         Some (Printf.sprintf "%s : Int" lhs)
-                    | "vn" | "v128" ->
-                        None
                     | _ ->
                         Some (type_guard lhs typ v_map))
                | _ -> Some (type_guard lhs typ v_map)
@@ -1718,21 +1715,14 @@ let translate_typd id params insts =
                     if alias_guard = "true" then ""
                     else if binder_conds = [] then alias_guard
                     else cond_join (binder_conds @ [alias_guard]) in
-                  let cond_uses_has_type =
-                    try
-                      ignore (Str.search_forward (Str.regexp_string "hasType") cond 0);
-                      true
-                    with Not_found -> false
-                  in
-                  if cond = "" then ""
-                  else if is_parametric then
-                    Printf.sprintf "%s  cmb ( %s hasType ( %s ) ) : WellTyped\n   if %s ."
-                      (bd ()) lhs type_term cond
-                  else if cond_uses_has_type then
-                    ""
+                  if is_parametric then
+                    Printf.sprintf "%s  %s ( %s hasType ( %s ) ) : WellTyped%s ."
+                      (bd ()) (if cond = "" then "mb" else "cmb") lhs type_term
+                      (if cond = "" then "" else "\n   if " ^ cond)
                   else
-                    Printf.sprintf "%s  cmb ( %s ) : %s\n   if %s ."
-                      (bd ()) lhs full_type_sort cond)
+                    Printf.sprintf "%s  %s ( %s ) : %s%s ."
+                      (bd ()) (if cond = "" then "mb" else "cmb") lhs full_type_sort
+                      (if cond = "" then "" else "\n   if " ^ cond))
          | StructT fields ->
              let bd = String.concat "" (List.map (fun b -> match b.it with
                | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
@@ -3592,7 +3582,7 @@ let translate_step_reld rel_name rules =
   let is_vars = List.sort_uniq String.compare !all_is_vars in
   let typed_decl = declare_vars_by_sort typed_vars in
   let bound_decl = declare_vars_same_sort bound_vars_wt "WasmTerminal" in
-  let val_terms_decl = declare_vars_same_sort bound_vars_vals "ValTerminals" in
+  let val_terms_decl = declare_vars_same_sort bound_vars_vals "WasmTerminals" in
   let vals_decl = declare_vars_same_sort bound_vars_wts "WasmTerminals" in
   let is_decl = declare_vars_same_sort is_vars "WasmTerminals" in
   let ctxt_instrs_extra = "" in
@@ -3945,19 +3935,7 @@ let header_prefix =
   "  --- Allow type atoms to appear as terminals (for mixed AST encodings)\n" ^
   "  subsort WasmType < WasmTerminal .\n" ^
   "  subsort WasmTypes < WasmTerminals .\n\n" ^
-  "  --- List sort for SpecTec val* binders.\n" ^
-  "  --- This keeps `val* instr* instr1*` context matching from\n" ^
-  "  --- consuming non-value instructions as part of the value prefix.\n" ^
-  "  sort InstrTerminals .\n" ^
-  "  sort ValTerminals .\n" ^
-  "  subsort Val < Instr .\n" ^
-  "  subsort Val < ValTerminals .\n" ^
-  "  subsort ValTerminals < InstrTerminals .\n" ^
-  "  subsort Instr < InstrTerminals .\n" ^
-  "  subsort InstrTerminals < WasmTerminals .\n" ^
-  "  op eps : -> ValTerminals .\n" ^
-  "  op _ _ : ValTerminals ValTerminals -> ValTerminals [ctor assoc id: eps] .\n" ^
-  "  op _ _ : InstrTerminals InstrTerminals -> InstrTerminals [ctor assoc id: eps] .\n\n" ^
+  "  --- SpecTec terminal sequences use the single WasmTerminals sequence sort.\n\n" ^
   "  --- Nat is a subtype of index-like and numeric-parameter sorts\n" ^
   "  --- (spectec idx = u32 = nat; N/M/K are nat-valued type parameters)\n" ^
   "  subsort Nat < N .\n" ^
@@ -3976,16 +3954,7 @@ let header_prefix =
   "  subsort Nat < Fieldidx .\n" ^
   "  subsort Nat < Addr .\n" ^
   "  subsort Nat < Idx .\n\n" ^
-  "  --- Address-size types are numeric types in WebAssembly.\n" ^
-  "  subsort Addrtype < Numtype .\n\n" ^
-  "  --- SpecTec union sorts used by executable type/value helpers.\n" ^
-  "  subsort Numtype < Valtype .\n" ^
-  "  subsort Vectype < Valtype .\n" ^
-  "  subsort Reftype < Valtype .\n" ^
-  "  subsort Typevar < Typeuse .\n" ^
-  "  subsort Deftype < Typeuse .\n" ^
-  "  sort OpTerminal .\n" ^
-  "  subsort OpTerminal < WasmTerminal .\n\n" ^
+  "  --- Syntax-category membership is represented by mb/cmb axioms, not by terminal subsorts.\n\n" ^
   "  --- Bool wrapper (avoid subsort Bool < WasmTerminal conflicts)\n" ^
   "  op w-bool : Bool -> WasmTerminal [ctor] .\n\n" ^
   "  --- Basic Wasm Types\n" ^
@@ -4021,17 +3990,17 @@ let header_prefix =
   "  sorts StepConf StepPureConf StepReadConf StepsConf .\n" ^
   "  subsort Config < StepConf .\n" ^
   "  subsort Config < StepsConf .\n" ^
-  "  subsort InstrTerminals < StepPureConf .\n" ^
-  "  subsort InstrTerminals < StepReadConf .\n" ^
+  "  subsort WasmTerminals < StepPureConf .\n" ^
+  "  subsort WasmTerminals < StepReadConf .\n" ^
   "  op _;_ : Store Frame -> State [ctor prec 55] .\n" ^
-  "  op _;_ : State InstrTerminals -> Config [ctor prec 60] .\n" ^
+  "  op _;_ : State WasmTerminals -> Config [ctor prec 60] .\n" ^
   "  op step : Config -> StepConf [frozen (1)] .\n" ^
-  "  op step-pure : InstrTerminals -> StepPureConf [frozen (1)] .\n" ^
+  "  op step-pure : WasmTerminals -> StepPureConf [frozen (1)] .\n" ^
   "  op step-read : Config -> StepReadConf [frozen (1)] .\n" ^
   "  op steps : Config -> StepsConf [frozen (1)] .\n\n" ^
   "  op $cfg-state : Config -> State .\n" ^
-  "  op $cfg-instrs : Config -> InstrTerminals .\n\n" ^
-  "  op $norm-seq : InstrTerminals -> InstrTerminals .\n\n" ^
+  "  op $cfg-instrs : Config -> WasmTerminals .\n\n" ^
+  "  op $norm-seq : WasmTerminals -> WasmTerminals .\n\n" ^
   "  --- Common variables (declared once)\n" ^
   "  var EC : Config .\n" ^
   "  var I : Int .\n" ^
@@ -4039,7 +4008,7 @@ let header_prefix =
   "  op EXP : -> Int .\n" ^
   "  vars W-N W-M NLC NFC NHC : N .\n" ^
   "  var ZS : State .\n" ^
-  "  var ITS : InstrTerminals .\n" ^
+  "  var ITS : WasmTerminals .\n" ^
   "  var LIST-TY : WasmTerminal .\n" ^
   "  var LIST-TS : WasmTerminals .\n" ^
   "  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : WasmTerminals .\n" ^
@@ -4063,7 +4032,7 @@ let header_prefix =
   "  var INVOKE-X-S : WasmTerminal .\n" ^
   "  var INVOKE-S-S : Store .\n" ^
   "  var INVOKE-X-FUNCADDR : Funcaddr .\n" ^
-  "  var INVOKE-X-VAL : ValTerminals .\n" ^
+  "  var INVOKE-X-VAL : WasmTerminals .\n" ^
   "  var INVOKE-X-DT : Deftype .\n" ^
   "  vars INVOKE-X-T1 INVOKE-X-T2 : WasmTerminals .\n" ^
   "  var SUBST-L-W : WasmTerminal .\n" ^
@@ -4212,9 +4181,6 @@ let is_canonical_ctor_decl_line l =
 let collect_ctor_decl_lines eq_lines =
   let re = Str.regexp "CTOR[A-Z0-9]+A[0-9]+" in
   let seen = Hashtbl.create 512 in
-  let result_sort = Hashtbl.create 512 in
-  let unary_sx_arg = Hashtbl.create 32 in
-  let op_terminal = Hashtbl.create 64 in
   let add_name nm =
     if not (Hashtbl.mem seen nm) then Hashtbl.add seen nm ()
   in
@@ -4223,53 +4189,14 @@ let collect_ctor_decl_lines eq_lines =
     try int_of_string (String.sub nm (idx_a + 1) (String.length nm - idx_a - 1))
     with _ -> 0
   in
-  let sort_rank = function
-    | "Val" -> 2
-    | "Instr" -> 1
-    | _ -> 0
-  in
-  let mark_sort nm sort =
-    match Hashtbl.find_opt result_sort nm with
-    | Some old when sort_rank old >= sort_rank sort -> ()
-    | _ -> Hashtbl.replace result_sort nm sort
-  in
   let scan_line l =
-    let line_declares_val =
-      try
-        ignore (Str.search_forward (Str.regexp ": Val\\b") l 0);
-        true
-      with Not_found -> false
-    in
-    let line_declares_instr =
-      try
-        ignore (Str.search_forward (Str.regexp ": Instr\\b") l 0);
-        true
-      with Not_found -> false
-    in
-    let has_type_pos =
-      try Some (Str.search_forward (Str.regexp_string "hasType") l 0)
-      with Not_found -> None
-    in
     let rec loop pos =
       match (try Some (Str.search_forward re l pos) with Not_found -> None) with
       | None -> ()
       | Some _ ->
           let nm = Str.matched_string l in
-          let match_pos = Str.match_beginning () in
           let next_pos = Str.match_end () in
           add_name nm;
-          (match has_type_pos with
-           | Some hp when match_pos < hp -> Hashtbl.replace op_terminal nm true
-           | _ -> ());
-          if ctor_arity nm = 1 then begin
-            let sx_arg_re =
-              Str.regexp (Str.quote nm ^ "[ \t\n]*(+[ \t\n]*SX[A-Z0-9-]*")
-            in
-            if (try ignore (Str.search_forward sx_arg_re l 0); true with Not_found -> false)
-            then Hashtbl.replace unary_sx_arg nm true
-          end;
-          if line_declares_val then mark_sort nm "Val"
-          else if line_declares_instr then mark_sort nm "Instr";
           loop next_pos
     in
     loop 0
@@ -4280,48 +4207,19 @@ let collect_ctor_decl_lines eq_lines =
   |> List.sort_uniq String.compare
   |> List.map (fun nm ->
 	   match nm with
-	       | "CTORFUNCARROWA2" ->
-	           "  op CTORFUNCARROWA2 : WasmTerminals WasmTerminals -> Comptype [ctor] ."
-	       | "CTORSUBA3" ->
-	           "  op CTORSUBA3 : WasmTerminals WasmTerminals Comptype -> Subtype [ctor] ."
-	       | "CTORRECA1" ->
-	           "  op CTORRECA1 : WasmTerminals -> Rectype [ctor] ."
-	       | "CTORWDEFA2" ->
-	           "  op CTORWDEFA2 : Rectype WasmTerminal -> Deftype [ctor] ."
-	       | "CTORWRESULTA1" ->
-	           "  op CTORWRESULTA1 : WasmTerminals -> Blocktype [ctor] ."
-	       | "CTORARROWA3" ->
-	           "  op CTORARROWA3 : WasmTerminals WasmTerminals WasmTerminals -> Instrtype [ctor] ."
-	       | "CTORBLOCKA2" ->
-	           "  op CTORBLOCKA2 : Blocktype WasmTerminals -> Instr [ctor] ."
-	       | "CTORLOOPA2" ->
-	           "  op CTORLOOPA2 : Blocktype WasmTerminals -> Instr [ctor] ."
-	       | "CTORFUNCA3" ->
-	           "  op CTORFUNCA3 : WasmTerminals WasmTerminals WasmTerminals -> Funccode [ctor] ."
-	       | "CTORLABELLBRACERBRACEA3" ->
-	           "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
+       | "CTORLABELLBRACERBRACEA3" ->
+           "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
        | "CTORFRAMELBRACERBRACEA3" ->
            "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."
        | "CTORHANDLERLBRACERBRACEA3" ->
            "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] ."
-       | "CTORI32A0" | "CTORI64A0" ->
-           Printf.sprintf "  op %s :  -> Addrtype [ctor] ." nm
-       | "CTORF32A0" | "CTORF64A0" ->
-           Printf.sprintf "  op %s :  -> Numtype [ctor] ." nm
-       | "CTORSA0" | "CTORUA0" ->
-           Printf.sprintf "  op %s :  -> Sx [ctor] ." nm
        | _ ->
            let arity = ctor_arity nm in
            let args =
              if arity <= 0 then ""
-             else if arity = 1 && Hashtbl.mem unary_sx_arg nm then "Sx"
              else String.concat " " (List.init arity (fun _ -> "WasmTerminal"))
            in
-           let ret =
-             if Hashtbl.mem op_terminal nm then "OpTerminal"
-             else match Hashtbl.find_opt result_sort nm with Some s -> s | None -> "WasmTerminal"
-           in
-           Printf.sprintf "  op %s : %s -> %s [ctor] ." nm args ret)
+           Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] ." nm args)
 
 let translate defs =
   build_type_env defs;

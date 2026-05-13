@@ -1,0 +1,13 @@
+load ../wasm-exec-bs
+red in WASM-FIB-BS : CTORLEA1(CTORSA0) .
+red in WASM-FIB-BS : CTORLOCALA1(CTORI32A0) .
+red in WASM-FIB-BS : fib-func .
+red in WASM-FIB-BS : fib-config(i32v(0)) .
+red in WASM-FIB-BS : fib-config(i32v(1)) .
+rew [1] in WASM-FIB-BS : step-pure(CTORNOPA0) .
+rew [1] in WASM-FIB-BS : step-pure(CTORUNREACHABLEA0) .
+rew [1] in WASM-FIB-BS :
+  step-read((((fib-store ; empty-frame).State) ;
+    CTORREFNULLA1(CTORFUNCA0) CTORTHROWREFA0)) .
+rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .
+q

@@ -1,0 +1,6 @@
+load ../wasm-exec-bs
+red in WASM-FIB-BS : fib-type .
+red in WASM-FIB-BS : CTORREFFUNCADDRA1(0) .
+red in WASM-FIB-BS : CTORCALLREFA1(fib-type) .
+red in WASM-FIB-BS : i32v(0) i32v(0) i32v(1) .
+q

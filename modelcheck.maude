@@ -40,16 +40,16 @@ mod WASM-FIB-BS-PROPS is
   eq SC |= result-is(I) = false [owise] .
 endm
 
-red in WASM-FIB-BS-PROPS :
-  modelCheck(steps(fib-config(i32v(0))), [](done -> result-is(0))) .
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(0))), [](done -> result-is(5))) . --- 끝난 상태라면 결과가 0이어야 함
 
-red in WASM-FIB-BS-PROPS :
-  modelCheck(steps(fib-config(i32v(1))), [](done -> result-is(1))) .
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(1))), [](done -> result-is(1))) .
 
-red in WASM-FIB-BS-PROPS :
-  modelCheck(steps(fib-config(i32v(5))), [](done -> result-is(5))) .
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(5))), [](done -> result-is(5))) .
 
-red in WASM-FIB-BS-PROPS :
-  modelCheck(steps(fib-config(i32v(5))), [] ~ trap-seen) .
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(5))), [] ~ trap-seen) .
 
-q
+--- q

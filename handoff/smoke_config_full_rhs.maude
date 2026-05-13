@@ -1,0 +1,5 @@
+load ../wasm-exec-bs
+red in WASM-FIB-BS :
+  (((fib-store ; empty-frame).State) ;
+    i32v(0) i32v(0) i32v(1) CTORREFFUNCADDRA1(0) CTORCALLREFA1(fib-type)) .
+q

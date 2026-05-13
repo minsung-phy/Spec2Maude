@@ -1,0 +1,9 @@
+load ../wasm-exec-bs
+rew [1] in WASM-FIB-BS : step-pure(CTORNOPA0) .
+search [1] in WASM-FIB-BS : step-pure(CTORNOPA0) =>* eps .
+rew [1] in WASM-FIB-BS : step(fib-config(i32v(5))) .
+rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(0))) .
+rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(1))) .
+rewrite [10000] in WASM-FIB-BS : steps(fib-config(i32v(5))) .
+search [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) =>* ((fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)) .
+q
