@@ -459,8 +459,7 @@ let find_opt_param_indices case_typ =
 let declared_vars : (string, string) Hashtbl.t = Hashtbl.create 2048
 
 let normalize_decl_sort name sort =
-  if sort = "WasmTerminal" && ends_with name "-INSTR-HEAD" then "Instr"
-  else if sort = "WasmTerminal"
+  if sort = "WasmTerminal"
      && String.contains name '-'
      && (try
            ignore (Str.search_forward (Str.regexp_string "-LIST-") name 0);
@@ -2628,9 +2627,9 @@ let translate_decd ss id params result_typ insts =
     |> List.sort_uniq String.compare
   in
   let typed_decl = declare_vars_by_sort !all_typed in
-  let bound_decl = declare_vars_same_sort bound_untyped "WasmTerminal" in
+  let bound_decl = declare_vars_same_sort !all_bound "WasmTerminal" in
   let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
-  "\n" ^ op_decl ^ typed_decl ^ bound_decl ^ free_decl
+  "\n" ^ op_decl ^ bound_decl ^ free_decl
   ^ String.concat "\n" eq_lines ^ "\n"
 
 (* --- Step execution relation helpers ------------------------------------- *)
@@ -4050,6 +4049,14 @@ let footer =
   "  eq $cfg-instrs(ZS ; ITS) = ITS .\n\n" ^
   "  eq  is-val(CTORCONSTA2(T, W)) = true .\n" ^
   "  eq  is-val(CTORVCONSTA2(T, W)) = true .\n" ^
+  "  eq  is-val(CTORREFNULLA1(W)) = true .\n" ^
+  "  eq  is-val(CTORREFI31NUMA1(W)) = true .\n" ^
+  "  eq  is-val(CTORREFSTRUCTADDRA1(W)) = true .\n" ^
+  "  eq  is-val(CTORREFARRAYADDRA1(W)) = true .\n" ^
+  "  eq  is-val(CTORREFFUNCADDRA1(W)) = true .\n" ^
+  "  eq  is-val(CTORREFEXNADDRA1(W)) = true .\n" ^
+  "  eq  is-val(CTORREFHOSTADDRA1(W)) = true .\n" ^
+  "  eq  is-val(CTORREFEXTERNA1(W)) = true .\n" ^
   "  ceq is-val(W) = true if W : Val .\n" ^
   "  eq  is-val(W) = false [owise] .\n\n" ^
   "  ceq all-vals(W TS) = all-vals(TS) if is-val(W) = true .\n" ^
