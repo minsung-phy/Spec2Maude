@@ -1,0 +1,3 @@
+load ../wasm-exec-bs
+search [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) =>! C:Config .
+q

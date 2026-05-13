@@ -1,0 +1,3 @@
+load output_bs_v128_diag
+red in SPECTEC-CORE : CTORLEA1(CTORSA0) .
+q
