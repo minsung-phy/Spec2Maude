@@ -15,5 +15,4 @@ _build/
 .merlin
 
 # 4. 기타 파일 제외
-preserved/
 Spec2Maude_JHS/

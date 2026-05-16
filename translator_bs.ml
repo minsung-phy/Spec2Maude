@@ -2461,7 +2461,9 @@ let translate_decd ss id params result_typ insts =
   let param_sort (p : param) =
     match p.it with
     | ExpP (_, t) ->
-        decl_sort_of_typ t
+        (match t.it with
+         | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
+         | _ -> "WasmTerminal")
     | _ -> "WasmTerminal"
   in
   let arg_sort_list = List.map param_sort params in
@@ -2469,59 +2471,18 @@ let translate_decd ss id params result_typ insts =
   let inferred_bool =
     List.exists (fun inst -> match inst.it with DefD (_, _, rhs, _) -> exp_is_boolish rhs) insts in
   let ret_sort = match result_typ.it with
-    | IterT (_, (List | List1 | ListN _)) -> decl_sort_of_typ result_typ
+    | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
     | _ ->
         if is_bool_typ result_typ [] || inferred_bool || SSet.mem maude_fn ss.bool_calls
-        then "Bool" else declared_sort_of_typ result_typ in
+        then "Bool" else "WasmTerminal" in
   let rhs_ctx = if ret_sort = "Bool" then BoolCtx else TermCtx in
 
-  let custom_type_iteration_def =
-    let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
-    match maude_fn with
-    | "$rollrt" ->
-        Some (
-          op_decl ^
-          "  var ROLLRT-X-X : Typeidx .\n" ^
-          "  var ROLLRT-X-RECTYPE : Rectype .\n" ^
-          "  var ROLLRT-X-SUBTYPES : WasmTerminals .\n" ^
-          "  ceq $rollrt(ROLLRT-X-X, ROLLRT-X-RECTYPE) =\n" ^
-          "      CTORRECA1($subst-subtype(ROLLRT-X-SUBTYPES,\n" ^
-          "        $idx-typeuses(ROLLRT-X-X, len(ROLLRT-X-SUBTYPES)),\n" ^
-          "        $rec-typevars(len(ROLLRT-X-SUBTYPES))))\n" ^
-          "   if CTORRECA1(ROLLRT-X-SUBTYPES) := ROLLRT-X-RECTYPE .\n")
-    | "$unrollrt" ->
-        Some (
-          op_decl ^
-          "  var UNROLLRT-X-RECTYPE : Rectype .\n" ^
-          "  var UNROLLRT-X-SUBTYPES : WasmTerminals .\n" ^
-          "  ceq $unrollrt(UNROLLRT-X-RECTYPE) =\n" ^
-          "      CTORRECA1($subst-subtype(UNROLLRT-X-SUBTYPES,\n" ^
-          "        $rec-typevars(len(UNROLLRT-X-SUBTYPES)),\n" ^
-          "        $def-typeuses(UNROLLRT-X-RECTYPE, len(UNROLLRT-X-SUBTYPES))))\n" ^
-          "   if CTORRECA1(UNROLLRT-X-SUBTYPES) := UNROLLRT-X-RECTYPE .\n")
-    | "$rolldt" ->
-        Some (
-          op_decl ^
-          "  var ROLLDT-X-X : Typeidx .\n" ^
-          "  var ROLLDT-X-RECTYPE : Rectype .\n" ^
-          "  var ROLLDT-X-SUBTYPES : WasmTerminals .\n" ^
-          "  ceq $rolldt(ROLLDT-X-X, ROLLDT-X-RECTYPE) =\n" ^
-          "      $def-typeuses(CTORRECA1(ROLLDT-X-SUBTYPES), len(ROLLDT-X-SUBTYPES))\n" ^
-          "   if CTORRECA1(ROLLDT-X-SUBTYPES) := $rollrt(ROLLDT-X-X, ROLLDT-X-RECTYPE) .\n")
-    | _ -> None
-  in
-  match custom_type_iteration_def with
-  | Some text -> text
-  | None ->
-
-  let all_bound = ref [] and all_free = ref [] and all_typed = ref [] in
+  let all_bound = ref [] and all_free = ref [] in
   let seen_rewrite_clause = ref false in
   let eq_lines = List.mapi (fun eq_idx inst ->
     let (binders, lhs_args, rhs_exp, prem_list) =
       match inst.it with DefD (b, la, re, pl) -> (b, la, re, pl) in
     let vm = binder_to_var_map prefix eq_idx binders in
-    let typed_vars = binder_var_sorts binders vm in
-    all_typed := List.sort_uniq compare (!all_typed @ typed_vars);
     let bconds = binder_to_type_conds binders vm in
 
     let lhs_ts : texpr list = List.map (fun a -> match a.it with
@@ -2565,10 +2526,6 @@ let translate_decd ss id params result_typ insts =
           && not (List.mem mv prem_binds)
           && not (List.mem mv lhs_vars))
       |> List.map snd in
-    let filtered_bconds =
-      List.filter (fun cond -> not (redundant_binder_guard typed_vars cond))
-        filtered_bconds
-    in
     all_bound := List.sort_uniq String.compare (!all_bound @ bound);
     all_free := List.sort_uniq String.compare (!all_free @ free);
 
@@ -2584,49 +2541,25 @@ let translate_decd ss id params result_typ insts =
     in
     let all_conds = prem_conds @ filtered_bconds in
     let cond = cond_join all_conds in
+    let cond_str = if cond = "" then "" else " \n      if " ^ cond in
     let clause_is_rewrite = clause_uses_rewrite in
     if clause_is_rewrite then seen_rewrite_clause := true;
-    let emit_clause ?(suffix="") lhs_texts rhs_text cond_text =
-      let cond_s = if cond_text = "" then "" else " \n      if " ^ cond_text in
-      if clause_is_rewrite then
-        Printf.sprintf "  %s [%s-r%d%s] :\n    %s\n    =>\n    %s%s ."
-          (if cond_text = "" then "rl" else "crl")
-          func_name eq_idx suffix
-          (format_call maude_fn lhs_texts) rhs_text cond_s
-      else
-        Printf.sprintf "  %s %s = %s%s%s ."
-          (if cond_text = "" then "eq" else "ceq")
-          (format_call maude_fn lhs_texts) rhs_text cond_s
-          (if has_owise then " [owise]" else "")
-    in
-    let base_clause = emit_clause lhs_strs rhs_t.text cond in
-    let opt_clauses =
-      optional_empty_substs binders vm lhs_strs
-      |> List.mapi (fun opt_idx opt_vars ->
-            let lhs_opt = List.map (apply_optional_empty_subst opt_vars) lhs_strs in
-            let rhs_opt = apply_optional_empty_subst opt_vars rhs_t.text in
-            let cond_opt =
-              optionalize_cond_parts opt_vars ~drop_guards:filtered_bconds all_conds
-              |> cond_join
-            in
-            emit_clause
-              ~suffix:(Printf.sprintf "-opt-empty%d" opt_idx)
-              lhs_opt rhs_opt cond_opt)
-    in
-    String.concat "\n" (base_clause :: opt_clauses)
+    if clause_is_rewrite then
+      Printf.sprintf "  %s [%s-r%d] :\n    %s\n    =>\n    %s%s ."
+        (if cond = "" then "rl" else "crl")
+        func_name eq_idx
+        (format_call maude_fn lhs_strs) rhs_t.text cond_str
+    else
+      Printf.sprintf "  %s %s = %s%s%s ."
+        (if cond = "" then "eq" else "ceq")
+        (format_call maude_fn lhs_strs) rhs_t.text cond_str
+        (if has_owise then " [owise]" else "")
   ) insts in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
   if !seen_rewrite_clause then
     rewrite_defs_seen := SSet.add maude_fn !rewrite_defs_seen;
   let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
-  let typed_names = List.map fst !all_typed |> List.sort_uniq String.compare in
-  let bound_untyped =
-    !all_bound
-    |> List.filter (fun v -> not (List.mem v typed_names))
-    |> List.sort_uniq String.compare
-  in
-  let typed_decl = declare_vars_by_sort !all_typed in
   let bound_decl = declare_vars_same_sort !all_bound "WasmTerminal" in
   let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
   "\n" ^ op_decl ^ bound_decl ^ free_decl
@@ -3438,7 +3371,7 @@ let translate_step_reld rel_name rules =
                 else
                   emit_rule label lhs_rel_text rhs_rel_text
               in
-              if true then
+              if rel_name <> "Step-pure" then
                 primary_rule
               else if rel_name = "Step-pure" then
                 let bridge_lhs =
