@@ -12,22 +12,37 @@ mod WASM-FIB-BS-PROPS is
   op result-is : Int -> Prop .
 
   var I : Int .
-  var IS : InstrTerminals .
+  var IS : WasmTerminals .
   var Z : State .
   var C : Config .
   var SC : StepsConf .
+  
+  var F : Frame .
+  var N : N .
 
   ceq (Z ; IS) |= done = true
+    if all-vals(IS) = true .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, IS)) |= done = true
     if all-vals(IS) = true .
 
   ceq (Z ; IS) |= result-is(I) = true
     if IS = CTORCONSTA2(CTORI32A0, I) .
 
-  ceq (Z ; IS) |= trap-seen = true
-    if IS = CTORTRAPA0 eps .
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, IS)) |= result-is(I) = true
+    if IS = CTORCONSTA2(CTORI32A0, I) .
 
-  ceq (Z ; IS) |= result-neg = true
-    if IS = CTORCONSTA2(CTORI32A0, I) /\ I < 0 .
+  ceq (Z ; IS) |= trap-seen = true
+    if IS = CTORTRAPA0 .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, CTORLABELLBRACERBRACEA3(N, eps, IS))) |= trap-seen = true
+    if IS = CTORTRAPA0 .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, CTORLABELLBRACERBRACEA3(N, eps, IS))) |= done = true
+    if all-vals(IS) = true .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, CTORLABELLBRACERBRACEA3(N, eps, IS))) |= result-is(I) = true
+    if IS = CTORCONSTA2(CTORI32A0, I) .
 
   eq C |= done = false [owise] .
   eq C |= trap-seen = false [owise] .
