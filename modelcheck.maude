@@ -66,5 +66,3 @@ endm
 
 --- red in WASM-FIB-BS-PROPS :
 ---   modelCheck(steps(fib-config(i32v(5))), [] ~ trap-seen) .
-
---- q
