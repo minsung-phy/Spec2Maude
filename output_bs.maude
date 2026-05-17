@@ -105,11 +105,11 @@ mod SPECTEC-CORE is
   vars WT-S WT-F : WasmTerminal .
   var WT-X : Localidx .
   var WT-V : Val .
-  var VALOK-S : WasmTerminal .
-  var VALOK-V : Val .
-  var VALOK-T : Valtype .
+  var VALOK-S : Store .
+  var VALOK-V : WasmTerminal .
+  var VALOK-T : WasmTerminal .
   vars VALOK-WT-S VALOK-C : WasmTerminal .
-  var VALOK-NT : Numtype .
+  var VALOK-NT : WasmTerminal .
   vars VALOK-VS VALOK-TS : WasmTerminals .
   var EXP-FL-DT : Deftype .
   var EXP-FL-CT : Comptype .
@@ -169,32 +169,32 @@ mod SPECTEC-CORE is
   op $R-trunc-s :  -> WasmTerminal .
   op $R-trunc-u :  -> WasmTerminal .
   op $STRUCTREF :  -> WasmTerminal .
-  op $add-arrayinst : WasmTerminal WasmTerminals -> WasmTerminal .
-  op $add-exninst : WasmTerminal WasmTerminals -> WasmTerminal .
-  op $add-structinst : WasmTerminal WasmTerminals -> WasmTerminal .
-  op $allocdata : WasmTerminal WasmTerminal WasmTerminals -> WasmTerminal .
-  op $allocdatas : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
-  op $allocelem : WasmTerminal WasmTerminal WasmTerminals -> WasmTerminal .
-  op $allocelems : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
+  op $add-arrayinst : State WasmTerminals -> State .
+  op $add-exninst : State WasmTerminals -> State .
+  op $add-structinst : State WasmTerminals -> State .
+  op $allocdata : Store WasmTerminal WasmTerminals -> WasmTerminal .
+  op $allocdatas : Store WasmTerminals WasmTerminals -> WasmTerminal .
+  op $allocelem : Store WasmTerminal WasmTerminals -> WasmTerminal .
+  op $allocelems : Store WasmTerminals WasmTerminals -> WasmTerminal .
   op $allocexport : WasmTerminal WasmTerminal -> WasmTerminal .
   op $allocexports : WasmTerminal WasmTerminals -> WasmTerminals .
-  op $allocfunc : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $allocfuncs : WasmTerminal WasmTerminals WasmTerminals WasmTerminals -> WasmTerminal .
-  op $allocglobal : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $allocglobals : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
-  op $allocmem : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $allocmems : WasmTerminal WasmTerminals -> WasmTerminal .
-  op $allocmodule : WasmTerminal WasmTerminal WasmTerminals WasmTerminals WasmTerminals WasmTerminals -> WasmTerminal .
-  op $alloctable : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $alloctables : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
-  op $alloctag : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $alloctags : WasmTerminal WasmTerminals -> WasmTerminal .
+  op $allocfunc : Store WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  op $allocfuncs : Store WasmTerminals WasmTerminals WasmTerminals -> WasmTerminal .
+  op $allocglobal : Store WasmTerminal WasmTerminal -> WasmTerminal .
+  op $allocglobals : Store WasmTerminals WasmTerminals -> WasmTerminal .
+  op $allocmem : Store WasmTerminal -> WasmTerminal .
+  op $allocmems : Store WasmTerminals -> WasmTerminal .
+  op $allocmodule : Store WasmTerminal WasmTerminals WasmTerminals WasmTerminals WasmTerminals -> WasmTerminal .
+  op $alloctable : Store WasmTerminal WasmTerminal -> WasmTerminal .
+  op $alloctables : Store WasmTerminals WasmTerminals -> WasmTerminal .
+  op $alloctag : Store WasmTerminal -> WasmTerminal .
+  op $alloctags : Store WasmTerminals -> WasmTerminal .
   op $alloctypes : WasmTerminals -> WasmTerminals .
-  op $arrayinst : WasmTerminal -> WasmTerminals .
+  op $arrayinst : State -> WasmTerminals .
   op $as-deftype : WasmTerminal -> WasmTerminal .
   op $before : WasmTerminal WasmTerminal WasmTerminal -> Bool .
   op $binop : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
-  op $blocktype : WasmTerminal WasmTerminal -> WasmTerminal .
+  op $blocktype : State WasmTerminal -> WasmTerminal .
   op $bool : WasmTerminal -> WasmTerminal .
   op $canon : WasmTerminal -> WasmTerminal .
   op $cbytes : WasmTerminal WasmTerminal -> WasmTerminals .
@@ -214,21 +214,21 @@ mod SPECTEC-CORE is
   op $cunpack : WasmTerminal -> WasmTerminal .
   op $cunpacknum : WasmTerminal WasmTerminal -> WasmTerminal .
   op $cvtop : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
-  op $data : WasmTerminal WasmTerminal -> WasmTerminal .
+  op $data : State WasmTerminal -> WasmTerminal .
   op $dataidx-funcs : WasmTerminals -> WasmTerminals .
-  op $datainst : WasmTerminal -> WasmTerminals .
+  op $datainst : State -> WasmTerminals .
   op $def-typeuses : Rectype Nat -> WasmTerminals .
   op $default : WasmTerminal -> WasmTerminal .
   op $demote : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $diffrt : WasmTerminal WasmTerminal -> WasmTerminal .
   op $dim : WasmTerminal -> WasmTerminal .
   op $disjoint : WasmTerminal WasmTerminals -> Bool .
-  op $elem : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $eleminst : WasmTerminal -> WasmTerminals .
-  op $evalexprs : WasmTerminal WasmTerminals -> WasmTerminal .
-  op $evalexprss : WasmTerminal WasmTerminals -> WasmTerminal .
-  op $evalglobals : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
-  op $exninst : WasmTerminal -> WasmTerminals .
+  op $elem : State WasmTerminal -> WasmTerminal .
+  op $eleminst : State -> WasmTerminals .
+  op $evalexprs : State WasmTerminals -> WasmTerminal .
+  op $evalexprss : State WasmTerminals -> WasmTerminal .
+  op $evalglobals : State WasmTerminals WasmTerminals -> WasmTerminal .
+  op $exninst : State -> WasmTerminals .
   op $expanddt : WasmTerminal -> WasmTerminal .
   op $expon : WasmTerminal -> WasmTerminal .
   op $extend : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -255,7 +255,7 @@ mod SPECTEC-CORE is
   op $fone : WasmTerminal -> WasmTerminal .
   op $fpmax : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $fpmin : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
-  op $frame : WasmTerminal -> WasmTerminal .
+  op $frame : State -> Frame .
   op $free-absheaptype : WasmTerminal -> WasmTerminal .
   op $free-addrtype : WasmTerminal -> WasmTerminal .
   op $free-block : WasmTerminals -> WasmTerminal .
@@ -325,10 +325,10 @@ mod SPECTEC-CORE is
   op $fsqrt : WasmTerminal WasmTerminal -> WasmTerminals .
   op $fsub : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $ftrunc : WasmTerminal WasmTerminal -> WasmTerminals .
-  op $func : WasmTerminal WasmTerminal -> WasmTerminal .
+  op $func : State WasmTerminal -> WasmTerminal .
   op $funcidx-module : WasmTerminal -> WasmTerminals .
   op $funcidx-nonfuncs : WasmTerminal -> WasmTerminals .
-  op $funcinst : WasmTerminal -> WasmTerminals .
+  op $funcinst : State -> WasmTerminals .
   op $funcsxa : WasmTerminals -> WasmTerminals .
   op $funcsxt : WasmTerminals -> WasmTerminals .
   op $funcsxx : WasmTerminals -> WasmTerminals .
@@ -337,8 +337,8 @@ mod SPECTEC-CORE is
   op $fvternop : WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $fvunop : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $fzero : WasmTerminal -> WasmTerminal .
-  op $global : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $globalinst : WasmTerminal -> WasmTerminals .
+  op $global : State WasmTerminal -> WasmTerminal .
+  op $globalinst : State -> WasmTerminals .
   op $globalsxa : WasmTerminals -> WasmTerminals .
   op $globalsxt : WasmTerminals -> WasmTerminals .
   op $globalsxx : WasmTerminals -> WasmTerminals .
@@ -378,7 +378,7 @@ mod SPECTEC-CORE is
   op $inst-reftype : WasmTerminal WasmTerminal -> WasmTerminal .
   op $inst-tabletype : WasmTerminal WasmTerminal -> WasmTerminal .
   op $inst-valtype : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $instantiate : WasmTerminal WasmTerminal WasmTerminals -> WasmTerminal .
+  op $instantiate : Store WasmTerminal WasmTerminals -> Config .
   op $inv-cbytes : WasmTerminal WasmTerminals -> WasmTerminal .
   op $inv-concat : WasmTerminal WasmTerminals -> WasmTerminals .
   op $inv-concatn : WasmTerminal WasmTerminal WasmTerminals -> WasmTerminals .
@@ -395,7 +395,7 @@ mod SPECTEC-CORE is
   op $inv-signed : WasmTerminal WasmTerminal -> WasmTerminal .
   op $inv-vbytes : WasmTerminal WasmTerminals -> WasmTerminal .
   op $inv-zbytes : WasmTerminal WasmTerminals -> WasmTerminal .
-  op $invoke : WasmTerminal WasmTerminal WasmTerminals -> WasmTerminal .
+  op $invoke : Store WasmTerminal WasmTerminals -> Config .
   op $ior : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $ipopcnt : WasmTerminal WasmTerminal -> WasmTerminal .
   op $iq15mulr-sat : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -444,7 +444,7 @@ mod SPECTEC-CORE is
   op $lanes : WasmTerminal WasmTerminal -> WasmTerminals .
   op $lanetype : WasmTerminal -> WasmTerminal .
   op $lcvtop : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
-  op $local : WasmTerminal WasmTerminal -> WasmTerminal .
+  op $local : State WasmTerminal -> WasmTerminal .
   op $lpacknum : WasmTerminal WasmTerminal -> WasmTerminal .
   op $lsize : WasmTerminal -> WasmTerminal .
   op $lsizenn : WasmTerminal -> WasmTerminal .
@@ -452,9 +452,9 @@ mod SPECTEC-CORE is
   op $lsizenn2 : WasmTerminal -> WasmTerminal .
   op $lunpack : WasmTerminal -> WasmTerminal .
   op $lunpacknum : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $mem : WasmTerminal WasmTerminal -> WasmTerminal .
+  op $mem : State WasmTerminal -> WasmTerminal .
   op $memarg0 :  -> WasmTerminal .
-  op $meminst : WasmTerminal -> WasmTerminals .
+  op $meminst : State -> WasmTerminals .
   op $memsxa : WasmTerminals -> WasmTerminals .
   op $memsxt : WasmTerminals -> WasmTerminals .
   op $memsxx : WasmTerminals -> WasmTerminals .
@@ -462,7 +462,7 @@ mod SPECTEC-CORE is
   op $minat : WasmTerminal WasmTerminal -> WasmTerminal .
   op $minus-recs : WasmTerminals WasmTerminals -> WasmTerminal .
   op $mk-frame : WasmTerminals WasmTerminals -> Frame [ctor] .
-  op $moduleinst : WasmTerminal -> WasmTerminal .
+  op $moduleinst : State -> WasmTerminal .
   op $narrow : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $nbytes : WasmTerminal WasmTerminal -> WasmTerminals .
   op $nunpack : WasmTerminal -> WasmTerminal .
@@ -497,8 +497,8 @@ mod SPECTEC-CORE is
   op $sizenn : WasmTerminal -> WasmTerminal .
   op $sizenn1 : WasmTerminal -> WasmTerminal .
   op $sizenn2 : WasmTerminal -> WasmTerminal .
-  op $store : WasmTerminal -> WasmTerminal .
-  op $structinst : WasmTerminal -> WasmTerminals .
+  op $store : State -> Store .
+  op $structinst : State -> WasmTerminals .
   op $subst-addrtype : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
   op $subst-all-deftype : WasmTerminal WasmTerminals -> WasmTerminal .
   op $subst-all-deftypes : WasmTerminals WasmTerminals -> WasmTerminals .
@@ -535,14 +535,14 @@ mod SPECTEC-CORE is
   op $subst-vectype : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
   op $sum : WasmTerminals -> WasmTerminal .
   op $sx : WasmTerminal -> WasmTerminal .
-  op $table : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $tableinst : WasmTerminal -> WasmTerminals .
+  op $table : State WasmTerminal -> WasmTerminal .
+  op $tableinst : State -> WasmTerminals .
   op $tablesxa : WasmTerminals -> WasmTerminals .
   op $tablesxt : WasmTerminals -> WasmTerminals .
   op $tablesxx : WasmTerminals -> WasmTerminals .
-  op $tag : WasmTerminal WasmTerminal -> WasmTerminal .
-  op $tagaddr : WasmTerminal -> WasmTerminals .
-  op $taginst : WasmTerminal -> WasmTerminals .
+  op $tag : State WasmTerminal -> WasmTerminal .
+  op $tagaddr : State -> WasmTerminals .
+  op $taginst : State -> WasmTerminals .
   op $tagsxa : WasmTerminals -> WasmTerminals .
   op $tagsxt : WasmTerminals -> WasmTerminals .
   op $tagsxx : WasmTerminals -> WasmTerminals .
@@ -550,7 +550,7 @@ mod SPECTEC-CORE is
   op $trunc : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $trunc-sat : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $truncz : WasmTerminal -> WasmTerminal .
-  op $type : WasmTerminal WasmTerminal -> WasmTerminal .
+  op $type : State WasmTerminal -> WasmTerminal .
   op $unop : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $unpack : WasmTerminal -> WasmTerminal .
   op $unpackfield : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -579,25 +579,22 @@ mod SPECTEC-CORE is
   op $vvbinop : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $vvternop : WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $vvunop : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
-  op $with-array : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $with-data : WasmTerminal WasmTerminal WasmTerminals -> WasmTerminal .
-  op $with-elem : WasmTerminal WasmTerminal WasmTerminals -> WasmTerminal .
-  op $with-global : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $with-local : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  op $with-array : State WasmTerminal WasmTerminal WasmTerminal -> State .
+  op $with-data : State WasmTerminal WasmTerminals -> State .
+  op $with-elem : State WasmTerminal WasmTerminals -> State .
+  op $with-global : State WasmTerminal WasmTerminal -> State .
+  op $with-local : State WasmTerminal WasmTerminal -> State .
   op $with-locals : WasmTerminal WasmTerminals WasmTerminals -> WasmTerminal .
-  op $with-mem : WasmTerminal WasmTerminal WasmTerminal WasmTerminal WasmTerminals -> WasmTerminal .
-  op $with-meminst : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $with-struct : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $with-table : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $with-tableinst : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
+  op $with-mem : State WasmTerminal WasmTerminal WasmTerminal WasmTerminals -> State .
+  op $with-meminst : State WasmTerminal WasmTerminal -> State .
+  op $with-struct : State WasmTerminal WasmTerminal WasmTerminal -> State .
+  op $with-table : State WasmTerminal WasmTerminal WasmTerminal -> State .
+  op $with-tableinst : State WasmTerminal WasmTerminal -> State .
   op $wrap : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $zbytes : WasmTerminal WasmTerminal -> WasmTerminals .
   op $zero : WasmTerminal -> WasmTerminal .
   op $zeroop : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $zsize : WasmTerminal -> WasmTerminal .
-  op ALLOCMODULE0-FA : -> WasmTerminal .
-  op ALLOCMODULE0-IF : -> WasmTerminal .
-  op ALLOCMODULE0-XI : -> WasmTerminal .
   op B : -> WasmTerminal .
   op Blocktype-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op CTORABSA0 :  -> WasmTerminal [ctor] .
@@ -886,12 +883,6 @@ mod SPECTEC-CORE is
   op Deftype-ok : WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Deftype-sub : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op E : -> WasmTerminal .
-  op EVALEXPRS1-ZQ : -> WasmTerminal .
-  op EVALGLOBALS1-A : -> WasmTerminal .
-  op EVALGLOBALS1-F : -> WasmTerminal .
-  op EVALGLOBALS1-S : -> WasmTerminal .
-  op EVALGLOBALS1-SQ : -> WasmTerminal .
-  op EVALGLOBALS1-ZQ : -> WasmTerminal .
   op Elem-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Elemmode-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Eval-expr : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
@@ -940,7 +931,6 @@ mod SPECTEC-CORE is
   op Fnn :  -> WasmType [ctor] .
   op Func-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op G : -> WasmTerminal .
-  op GROWMEM0-IQ : -> WasmTerminal .
   op Global-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Globals-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Globaltype-ok : WasmTerminal WasmTerminal -> Judgement [ctor] .
@@ -948,21 +938,6 @@ mod SPECTEC-CORE is
   op H : -> WasmTerminal .
   op Heaptype-ok : WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Heaptype-sub : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
-  op INSTANTIATE0-F : -> WasmTerminal .
-  op INSTANTIATE0-ID : -> WasmTerminal .
-  op INSTANTIATE0-IE : -> WasmTerminal .
-  op INSTANTIATE0-IF : -> WasmTerminal .
-  op INSTANTIATE0-MODULEINST0 : -> WasmTerminal .
-  op INSTANTIATE0-REFE : -> WasmTerminal .
-  op INSTANTIATE0-REFT : -> WasmTerminal .
-  op INSTANTIATE0-SQQQ : -> WasmTerminal .
-  op INSTANTIATE0-VALG : -> WasmTerminal .
-  op INSTANTIATE0-XTE : -> WasmTerminal .
-  op INSTANTIATE0-XTI : -> WasmTerminal .
-  op INSTANTIATE0-Z : -> WasmTerminal .
-  op INSTANTIATE0-ZQ : -> WasmTerminal .
-  op INSTANTIATE0-ZQQ : -> WasmTerminal .
-  op INSTANTIATE0-ZQQQ : -> WasmTerminal .
   op Import-ok : WasmTerminal WasmTerminal WasmTerminal -> Judgement [ctor] .
   op Inn :  -> WasmType [ctor] .
   op Instr-const : WasmTerminal WasmTerminal -> Judgement [ctor] .
@@ -1719,28 +1694,62 @@ mod SPECTEC-CORE is
   var VVUNOP1 : Vvunop .
   var X-LIST-X : WasmTerminals .
   var ZERO1 : WasmTerminal .
-  vars ADD-ARRAYINST0-AI ADD-ARRAYINST0-F ADD-ARRAYINST0-S : WasmTerminal .
-  vars ADD-EXNINST0-EXN ADD-EXNINST0-F ADD-EXNINST0-S : WasmTerminal .
-  vars ADD-STRUCTINST0-F ADD-STRUCTINST0-S ADD-STRUCTINST0-SI : WasmTerminal .
-  vars ALLOCDATA0-BYTE ALLOCDATA0-DATAINST ALLOCDATA0-S : WasmTerminal .
-  vars ALLOCDATAS0-S ALLOCDATAS1-B ALLOCDATAS1-BQ ALLOCDATAS1-DA ALLOCDATAS1-DAQ ALLOCDATAS1-OK ALLOCDATAS1-OKQ ALLOCDATAS1-S ALLOCDATAS1-S1 ALLOCDATAS1-S2 : WasmTerminal .
-  vars ALLOCELEM0-ELEMINST ALLOCELEM0-ELEMTYPE ALLOCELEM0-REF ALLOCELEM0-S : WasmTerminal .
-  vars ALLOCELEMS0-S ALLOCELEMS1-EA ALLOCELEMS1-EAQ ALLOCELEMS1-REF ALLOCELEMS1-REFQ ALLOCELEMS1-RT ALLOCELEMS1-RTQ ALLOCELEMS1-S ALLOCELEMS1-S1 ALLOCELEMS1-S2 : WasmTerminal .
+  vars ADD-ARRAYINST0-AI : WasmTerminals .
+  vars ADD-ARRAYINST0-F : Frame .
+  vars ADD-ARRAYINST0-S : Store .
+  vars ADD-EXNINST0-EXN : WasmTerminals .
+  vars ADD-EXNINST0-F : Frame .
+  vars ADD-EXNINST0-S : Store .
+  vars ADD-STRUCTINST0-F : Frame .
+  vars ADD-STRUCTINST0-S : Store .
+  vars ADD-STRUCTINST0-SI : WasmTerminals .
+  vars ALLOCDATA0-BYTE : WasmTerminals .
+  vars ALLOCDATA0-DATAINST : WasmTerminal .
+  vars ALLOCDATA0-S : Store .
+  vars ALLOCDATAS0-S ALLOCDATAS1-S ALLOCDATAS1-S1 ALLOCDATAS1-S2 : Store .
+  vars ALLOCDATAS1-B ALLOCDATAS1-BQ ALLOCDATAS1-DAQ ALLOCDATAS1-OKQ : WasmTerminals .
+  vars ALLOCDATAS1-DA ALLOCDATAS1-OK : WasmTerminal .
+  vars ALLOCELEM0-ELEMINST ALLOCELEM0-ELEMTYPE : WasmTerminal .
+  vars ALLOCELEM0-REF : WasmTerminals .
+  vars ALLOCELEM0-S : Store .
+  vars ALLOCELEMS0-S ALLOCELEMS1-S ALLOCELEMS1-S1 ALLOCELEMS1-S2 : Store .
+  vars ALLOCELEMS1-EA ALLOCELEMS1-RT : WasmTerminal .
+  vars ALLOCELEMS1-EAQ ALLOCELEMS1-REF ALLOCELEMS1-REFQ ALLOCELEMS1-RTQ : WasmTerminals .
   vars ALLOCEXPORT0-MODULEINST ALLOCEXPORT0-NAME ALLOCEXPORT0-X ALLOCEXPORT1-MODULEINST ALLOCEXPORT1-NAME ALLOCEXPORT1-X ALLOCEXPORT2-MODULEINST ALLOCEXPORT2-NAME ALLOCEXPORT2-X ALLOCEXPORT3-MODULEINST ALLOCEXPORT3-NAME ALLOCEXPORT3-X ALLOCEXPORT4-MODULEINST ALLOCEXPORT4-NAME ALLOCEXPORT4-X : WasmTerminal .
-  vars ALLOCEXPORTS0-EXPORT ALLOCEXPORTS0-MODULEINST : WasmTerminal .
-  vars ALLOCFUNC0-DEFTYPE ALLOCFUNC0-FUNCCODE ALLOCFUNC0-FUNCINST ALLOCFUNC0-MODULEINST ALLOCFUNC0-S : WasmTerminal .
-  vars ALLOCFUNCS0-S ALLOCFUNCS1-DT ALLOCFUNCS1-DTQ ALLOCFUNCS1-FA ALLOCFUNCS1-FAQ ALLOCFUNCS1-FUNCCODE ALLOCFUNCS1-FUNCCODEQ ALLOCFUNCS1-MODULEINST ALLOCFUNCS1-MODULEINSTQ ALLOCFUNCS1-S ALLOCFUNCS1-S1 ALLOCFUNCS1-S2 : WasmTerminal .
-  vars ALLOCGLOBAL0-GLOBALINST ALLOCGLOBAL0-GLOBALTYPE ALLOCGLOBAL0-S ALLOCGLOBAL0-VAL : WasmTerminal .
-  vars ALLOCGLOBALS0-S ALLOCGLOBALS1-GA ALLOCGLOBALS1-GAQ ALLOCGLOBALS1-GLOBALTYPE ALLOCGLOBALS1-GLOBALTYPEQ ALLOCGLOBALS1-S ALLOCGLOBALS1-S1 ALLOCGLOBALS1-S2 ALLOCGLOBALS1-VAL ALLOCGLOBALS1-VALQ : WasmTerminal .
-  vars ALLOCMEM0-AT ALLOCMEM0-I ALLOCMEM0-J ALLOCMEM0-MEMINST ALLOCMEM0-S : WasmTerminal .
-  vars ALLOCMEMS0-S ALLOCMEMS1-MA ALLOCMEMS1-MAQ ALLOCMEMS1-MEMTYPE ALLOCMEMS1-MEMTYPEQ ALLOCMEMS1-S ALLOCMEMS1-S1 ALLOCMEMS1-S2 : WasmTerminal .
-  vars ALLOCMODULE0-AA ALLOCMODULE0-AAI ALLOCMODULE0-BYTE ALLOCMODULE0-DA ALLOCMODULE0-DATA ALLOCMODULE0-DATAMODE ALLOCMODULE0-DT ALLOCMODULE0-EA ALLOCMODULE0-ELEM ALLOCMODULE0-ELEMMODE ALLOCMODULE0-ELEMTYPE ALLOCMODULE0-EXPORT ALLOCMODULE0-EXPRE ALLOCMODULE0-EXPRF ALLOCMODULE0-EXPRG ALLOCMODULE0-EXPRT ALLOCMODULE0-EXTERNADDR ALLOCMODULE0-FAI ALLOCMODULE0-FUNC ALLOCMODULE0-GA ALLOCMODULE0-GAI ALLOCMODULE0-GLOBAL ALLOCMODULE0-GLOBALTYPE ALLOCMODULE0-IMPORT ALLOCMODULE0-LOCAL ALLOCMODULE0-MA ALLOCMODULE0-MAI ALLOCMODULE0-MEM ALLOCMODULE0-MEMTYPE ALLOCMODULE0-MODULE ALLOCMODULE0-REFE ALLOCMODULE0-REFT ALLOCMODULE0-S ALLOCMODULE0-S1 ALLOCMODULE0-S2 ALLOCMODULE0-S3 ALLOCMODULE0-S4 ALLOCMODULE0-S5 ALLOCMODULE0-S6 ALLOCMODULE0-START ALLOCMODULE0-TA ALLOCMODULE0-TABLE ALLOCMODULE0-TABLETYPE ALLOCMODULE0-TAG ALLOCMODULE0-TAGTYPE ALLOCMODULE0-TAI ALLOCMODULE0-TYPE ALLOCMODULE0-VALG ALLOCMODULE0-X : WasmTerminal .
-  vars ALLOCTABLE0-AT ALLOCTABLE0-I ALLOCTABLE0-J ALLOCTABLE0-REF ALLOCTABLE0-RT ALLOCTABLE0-S ALLOCTABLE0-TABLEINST : WasmTerminal .
-  vars ALLOCTABLES0-S ALLOCTABLES1-REF ALLOCTABLES1-REFQ ALLOCTABLES1-S ALLOCTABLES1-S1 ALLOCTABLES1-S2 ALLOCTABLES1-TA ALLOCTABLES1-TABLETYPE ALLOCTABLES1-TABLETYPEQ ALLOCTABLES1-TAQ : WasmTerminal .
-  vars ALLOCTAG0-S ALLOCTAG0-TAGINST ALLOCTAG0-TAGTYPE : WasmTerminal .
-  vars ALLOCTAGS0-S ALLOCTAGS1-JA ALLOCTAGS1-JAQ ALLOCTAGS1-S ALLOCTAGS1-S1 ALLOCTAGS1-S2 ALLOCTAGS1-TAGTYPE ALLOCTAGS1-TAGTYPEQ : WasmTerminal .
-  vars ALLOCTYPES1-DEFTYPE ALLOCTYPES1-DEFTYPEQ ALLOCTYPES1-RECTYPE ALLOCTYPES1-TYPE ALLOCTYPES1-TYPEQ ALLOCTYPES1-X : WasmTerminal .
-  vars ARRAYINST0-F ARRAYINST0-S : WasmTerminal .
+  vars ALLOCEXPORTS0-EXPORT : WasmTerminals .
+  vars ALLOCEXPORTS0-MODULEINST : WasmTerminal .
+  vars ALLOCFUNC0-DEFTYPE ALLOCFUNC0-FUNCCODE ALLOCFUNC0-FUNCINST ALLOCFUNC0-MODULEINST : WasmTerminal .
+  vars ALLOCFUNC0-S : Store .
+  vars ALLOCFUNCS0-S ALLOCFUNCS1-S ALLOCFUNCS1-S1 ALLOCFUNCS1-S2 : Store .
+  vars ALLOCFUNCS1-DT ALLOCFUNCS1-FA ALLOCFUNCS1-FUNCCODE ALLOCFUNCS1-MODULEINST : WasmTerminal .
+  vars ALLOCFUNCS1-DTQ ALLOCFUNCS1-FAQ ALLOCFUNCS1-FUNCCODEQ ALLOCFUNCS1-MODULEINSTQ : WasmTerminals .
+  vars ALLOCGLOBAL0-GLOBALINST ALLOCGLOBAL0-GLOBALTYPE ALLOCGLOBAL0-VAL : WasmTerminal .
+  vars ALLOCGLOBAL0-S : Store .
+  vars ALLOCGLOBALS0-S ALLOCGLOBALS1-S ALLOCGLOBALS1-S1 ALLOCGLOBALS1-S2 : Store .
+  vars ALLOCGLOBALS1-GA ALLOCGLOBALS1-GLOBALTYPE ALLOCGLOBALS1-VAL : WasmTerminal .
+  vars ALLOCGLOBALS1-GAQ ALLOCGLOBALS1-GLOBALTYPEQ ALLOCGLOBALS1-VALQ : WasmTerminals .
+  vars ALLOCMEM0-AT ALLOCMEM0-I ALLOCMEM0-J ALLOCMEM0-MEMINST : WasmTerminal .
+  vars ALLOCMEM0-S : Store .
+  vars ALLOCMEMS0-S ALLOCMEMS1-S ALLOCMEMS1-S1 ALLOCMEMS1-S2 : Store .
+  vars ALLOCMEMS1-MA ALLOCMEMS1-MEMTYPE : WasmTerminal .
+  vars ALLOCMEMS1-MAQ ALLOCMEMS1-MEMTYPEQ : WasmTerminals .
+  vars ALLOCMODULE0-AA ALLOCMODULE0-AAI ALLOCMODULE0-BYTE ALLOCMODULE0-DA ALLOCMODULE0-DATA ALLOCMODULE0-DATAMODE ALLOCMODULE0-DT ALLOCMODULE0-EA ALLOCMODULE0-ELEM ALLOCMODULE0-ELEMMODE ALLOCMODULE0-ELEMTYPE ALLOCMODULE0-EXPORT ALLOCMODULE0-EXPRE ALLOCMODULE0-EXPRF ALLOCMODULE0-EXPRG ALLOCMODULE0-EXPRT ALLOCMODULE0-EXTERNADDR ALLOCMODULE0-FA ALLOCMODULE0-FAI ALLOCMODULE0-FUNC ALLOCMODULE0-GA ALLOCMODULE0-GAI ALLOCMODULE0-GLOBAL ALLOCMODULE0-GLOBALTYPE ALLOCMODULE0-IF ALLOCMODULE0-IMPORT ALLOCMODULE0-LOCAL ALLOCMODULE0-MA ALLOCMODULE0-MAI ALLOCMODULE0-MEM ALLOCMODULE0-MEMTYPE ALLOCMODULE0-REFE ALLOCMODULE0-REFT ALLOCMODULE0-TA ALLOCMODULE0-TABLE ALLOCMODULE0-TABLETYPE ALLOCMODULE0-TAG ALLOCMODULE0-TAGTYPE ALLOCMODULE0-TAI ALLOCMODULE0-TYPE ALLOCMODULE0-VALG ALLOCMODULE0-X ALLOCMODULE0-XI : WasmTerminals .
+  vars ALLOCMODULE0-MODULE ALLOCMODULE0-MODULEINST ALLOCMODULE0-START : WasmTerminal .
+  vars ALLOCMODULE0-S ALLOCMODULE0-S1 ALLOCMODULE0-S2 ALLOCMODULE0-S3 ALLOCMODULE0-S4 ALLOCMODULE0-S5 ALLOCMODULE0-S6 ALLOCMODULE0-S7 : Store .
+  vars ALLOCTABLE0-AT ALLOCTABLE0-I ALLOCTABLE0-J ALLOCTABLE0-REF ALLOCTABLE0-RT ALLOCTABLE0-TABLEINST : WasmTerminal .
+  vars ALLOCTABLE0-S : Store .
+  vars ALLOCTABLES0-S ALLOCTABLES1-S ALLOCTABLES1-S1 ALLOCTABLES1-S2 : Store .
+  vars ALLOCTABLES1-REF ALLOCTABLES1-TA ALLOCTABLES1-TABLETYPE : WasmTerminal .
+  vars ALLOCTABLES1-REFQ ALLOCTABLES1-TABLETYPEQ ALLOCTABLES1-TAQ : WasmTerminals .
+  vars ALLOCTAG0-S : Store .
+  vars ALLOCTAG0-TAGINST ALLOCTAG0-TAGTYPE : WasmTerminal .
+  vars ALLOCTAGS0-S ALLOCTAGS1-S ALLOCTAGS1-S1 ALLOCTAGS1-S2 : Store .
+  vars ALLOCTAGS1-JA ALLOCTAGS1-TAGTYPE : WasmTerminal .
+  vars ALLOCTAGS1-JAQ ALLOCTAGS1-TAGTYPEQ : WasmTerminals .
+  vars ALLOCTYPES1-DEFTYPE ALLOCTYPES1-DEFTYPEQ ALLOCTYPES1-TYPEQ : WasmTerminals .
+  vars ALLOCTYPES1-RECTYPE ALLOCTYPES1-TYPE ALLOCTYPES1-X : WasmTerminal .
+  vars ARRAYINST0-F : Frame .
+  vars ARRAYINST0-S : Store .
   vars AS-DEFTYPE0-DT : WasmTerminal .
   vars BEFORE0-DEFTYPE BEFORE0-I BEFORE0-X BEFORE1-I BEFORE1-TYPEIDX BEFORE1-X BEFORE2-I BEFORE2-J BEFORE2-X : WasmTerminal .
   vars BINOP0-I1 BINOP0-I2 BINOP0-INN BINOP1-I1 BINOP1-I2 BINOP1-INN BINOP10-I1 BINOP10-I2 BINOP10-INN BINOP11-I1 BINOP11-I2 BINOP11-INN BINOP12-F1 BINOP12-F2 BINOP12-FNN BINOP13-F1 BINOP13-F2 BINOP13-FNN BINOP14-F1 BINOP14-F2 BINOP14-FNN BINOP15-F1 BINOP15-F2 BINOP15-FNN BINOP16-F1 BINOP16-F2 BINOP16-FNN BINOP17-F1 BINOP17-F2 BINOP17-FNN BINOP18-F1 BINOP18-F2 BINOP18-FNN BINOP2-I1 BINOP2-I2 BINOP2-INN BINOP3-I1 BINOP3-I2 BINOP3-INN BINOP3-SX BINOP4-I1 BINOP4-I2 BINOP4-INN BINOP4-SX BINOP5-I1 BINOP5-I2 BINOP5-INN BINOP6-I1 BINOP6-I2 BINOP6-INN BINOP7-I1 BINOP7-I2 BINOP7-INN BINOP8-I1 BINOP8-I2 BINOP8-INN BINOP9-I1 BINOP9-I2 BINOP9-INN BINOP9-SX : WasmTerminal .
@@ -1748,28 +1757,38 @@ mod SPECTEC-CORE is
   vars BLOCKTYPE-OK-TYPEIDX1-T1 BLOCKTYPE-OK-TYPEIDX1-T2 : WasmTerminals .
   vars BLOCKTYPE-OK-TYPEIDX1-TYPEIDX : Typeidx .
   vars BLOCKTYPE-OK-VALTYPE0-VALTYPE : Valtype .
-  vars BLOCKTYPE0-T1 BLOCKTYPE0-T2 BLOCKTYPE0-X BLOCKTYPE0-Z BLOCKTYPE1-T BLOCKTYPE1-Z : WasmTerminal .
+  vars BLOCKTYPE0-T1 BLOCKTYPE0-T2 : WasmTerminals .
+  vars BLOCKTYPE0-X BLOCKTYPE1-T : WasmTerminal .
+  vars BLOCKTYPE0-Z BLOCKTYPE1-Z : State .
   vars C : WasmTerminal .
   vars CANON0-N : WasmTerminal .
   vars CATCH-OK-CATCH-ALL-REF3-C CATCH-OK-CATCH-ALL2-C CATCH-OK-CATCH-REF1-C CATCH-OK-CATCH0-C : Context .
   vars CATCH-OK-CATCH-ALL-REF3-L CATCH-OK-CATCH-ALL2-L CATCH-OK-CATCH-REF1-L CATCH-OK-CATCH0-L : Labelidx .
   vars CATCH-OK-CATCH-REF1-T CATCH-OK-CATCH0-T : WasmTerminals .
   vars CATCH-OK-CATCH-REF1-X CATCH-OK-CATCH0-X : Idx .
-  vars CLOS-DEFTYPE0-C CLOS-DEFTYPE0-DT CLOS-DEFTYPE0-DTQ : WasmTerminal .
-  vars CLOS-DEFTYPES1-DT CLOS-DEFTYPES1-DTN CLOS-DEFTYPES1-DTQ : WasmTerminal .
-  vars CLOS-EXTERNTYPE0-C CLOS-EXTERNTYPE0-DT CLOS-EXTERNTYPE0-XT : WasmTerminal .
-  vars CLOS-MODULETYPE0-C CLOS-MODULETYPE0-DT CLOS-MODULETYPE0-MMT : WasmTerminal .
-  vars CLOS-TAGTYPE0-C CLOS-TAGTYPE0-DT CLOS-TAGTYPE0-JT : WasmTerminal .
-  vars CLOS-VALTYPE0-C CLOS-VALTYPE0-DT CLOS-VALTYPE0-T : WasmTerminal .
+  vars CLOS-DEFTYPE0-C CLOS-DEFTYPE0-DT : WasmTerminal .
+  vars CLOS-DEFTYPE0-DTQ : WasmTerminals .
+  vars CLOS-DEFTYPES1-DT CLOS-DEFTYPES1-DTQ : WasmTerminals .
+  vars CLOS-DEFTYPES1-DTN : WasmTerminal .
+  vars CLOS-EXTERNTYPE0-C CLOS-EXTERNTYPE0-XT : WasmTerminal .
+  vars CLOS-EXTERNTYPE0-DT : WasmTerminals .
+  vars CLOS-MODULETYPE0-C CLOS-MODULETYPE0-MMT : WasmTerminal .
+  vars CLOS-MODULETYPE0-DT : WasmTerminals .
+  vars CLOS-TAGTYPE0-C CLOS-TAGTYPE0-JT : WasmTerminal .
+  vars CLOS-TAGTYPE0-DT : WasmTerminals .
+  vars CLOS-VALTYPE0-C CLOS-VALTYPE0-T : WasmTerminal .
+  vars CLOS-VALTYPE0-DT : WasmTerminals .
   vars COMPTYPE-OK-ARRAY1-C COMPTYPE-OK-FUNC2-C COMPTYPE-OK-STRUCT0-C : Context .
   vars COMPTYPE-OK-ARRAY1-FIELDTYPE : Fieldtype .
   vars COMPTYPE-OK-FUNC2-T1 COMPTYPE-OK-FUNC2-T2 COMPTYPE-OK-STRUCT0-FIELDTYPE : WasmTerminals .
   vars COMPTYPE-SUB-ARRAY1-C COMPTYPE-SUB-FUNC2-C COMPTYPE-SUB-STRUCT0-C : Context .
   vars COMPTYPE-SUB-ARRAY1-FT1 COMPTYPE-SUB-ARRAY1-FT2 : Fieldtype .
   vars COMPTYPE-SUB-FUNC2-T11 COMPTYPE-SUB-FUNC2-T12 COMPTYPE-SUB-FUNC2-T21 COMPTYPE-SUB-FUNC2-T22 COMPTYPE-SUB-STRUCT0-FT1 COMPTYPE-SUB-STRUCT0-FT2 COMPTYPE-SUB-STRUCT0-FTQ1 : WasmTerminals .
-  vars CONCAT1-W CONCAT1-WQ : WasmTerminal .
-  vars CONCATN0-N CONCATN1-N CONCATN1-W WQ : WasmTerminal .
-  vars CONCATOPT1-W CONCATOPT1-WQ : WasmTerminal .
+  vars CONCAT1-W CONCAT1-WQ : WasmTerminals .
+  vars CONCATN0-N CONCATN1-N : WasmTerminal .
+  vars CONCATN1-W CONCATN1-WQ : WasmTerminals .
+  vars CONCATOPT1-W : WasmTerminal .
+  vars CONCATOPT1-WQ : WasmTerminals .
   vars CONST0-C CONST0-NUMTYPE CONST1-C CONST1-VECTYPE : WasmTerminal .
   vars CPACKNUM0-C CPACKNUM0-CONSTTYPE CPACKNUM1-C CPACKNUM1-PACKTYPE : WasmTerminal .
   vars CUNPACK0-CONSTTYPE CUNPACK1-PACKTYPE CUNPACK2-LANETYPE : WasmTerminal .
@@ -1778,9 +1797,12 @@ mod SPECTEC-CORE is
   vars DATA-OK-R00-B : WasmTerminals .
   vars DATA-OK-R00-C : Context .
   vars DATA-OK-R00-DATAMODE : Datamode .
-  vars DATA0-F DATA0-S DATA0-X : WasmTerminal .
-  vars DATAIDX-FUNCS0-FUNC : WasmTerminal .
-  vars DATAINST0-F DATAINST0-S : WasmTerminal .
+  vars DATA0-F : Frame .
+  vars DATA0-S : Store .
+  vars DATA0-X : WasmTerminal .
+  vars DATAIDX-FUNCS0-FUNC : WasmTerminals .
+  vars DATAINST0-F : Frame .
+  vars DATAINST0-S : Store .
   vars DATAMODE-OK-ACTIVE1-AT : Addrtype .
   vars DATAMODE-OK-ACTIVE1-C DATAMODE-OK-PASSIVE0-C : Context .
   vars DATAMODE-OK-ACTIVE1-EXPR : Expr .
@@ -1801,14 +1823,18 @@ mod SPECTEC-CORE is
   vars DEFTYPE-SUB-SUPER1-TYPEUSE : WasmTerminals .
   vars DIFFRT0-HT1 DIFFRT0-HT2 DIFFRT0-NULL1 DIFFRT1-HT1 DIFFRT1-HT2 DIFFRT1-NULL1 : WasmTerminal .
   vars DIM0-LNN DIM0-N : WasmTerminal .
-  vars DISJOINT1-W DISJOINT1-WQ : WasmTerminal .
+  vars DISJOINT1-W : WasmTerminal .
+  vars DISJOINT1-WQ : WasmTerminals .
   vars E0-N : WasmTerminal .
   vars ELEM-OK-R00-C : Context .
   vars ELEM-OK-R00-ELEMMODE : Elemmode .
   vars ELEM-OK-R00-ELEMTYPE : Elemtype .
   vars ELEM-OK-R00-EXPR : WasmTerminals .
-  vars ELEM0-F ELEM0-S ELEM0-X : WasmTerminal .
-  vars ELEMINST0-F ELEMINST0-S : WasmTerminal .
+  vars ELEM0-F : Frame .
+  vars ELEM0-S : Store .
+  vars ELEM0-X : WasmTerminal .
+  vars ELEMINST0-F : Frame .
+  vars ELEMINST0-S : Store .
   vars ELEMMODE-OK-ACTIVE2-AT : Addrtype .
   vars ELEMMODE-OK-ACTIVE2-C ELEMMODE-OK-DECLARE1-C ELEMMODE-OK-PASSIVE0-C : Context .
   vars ELEMMODE-OK-ACTIVE2-EXPR : Expr .
@@ -1817,17 +1843,26 @@ mod SPECTEC-CORE is
   vars ELEMMODE-OK-ACTIVE2-X : Idx .
   vars EVAL-EXPR-R00-INSTR EVAL-EXPR-R00-VAL : WasmTerminals .
   vars EVAL-EXPR-R00-Z EVAL-EXPR-R00-ZQ : State .
-  vars EVALEXPRS0-Z EVALEXPRS1-EXPR EVALEXPRS1-EXPRQ EVALEXPRS1-Z : WasmTerminal .
-  vars EVALEXPRSS0-Z EVALEXPRSS1-EXPR EVALEXPRSS1-EXPRQ EVALEXPRSS1-REF EVALEXPRSS1-REFQ EVALEXPRSS1-Z EVALEXPRSS1-ZQ EVALEXPRSS1-ZQQ : WasmTerminal .
-  vars EVALGLOBALS0-Z EVALGLOBALS1-EXPR EVALGLOBALS1-EXPRQ EVALGLOBALS1-GT EVALGLOBALS1-GTQ EVALGLOBALS1-Z : WasmTerminal .
-  vars EXNINST0-F EXNINST0-S : WasmTerminal .
+  vars EVALEXPRS0-Z EVALEXPRS1-Z EVALEXPRS1-ZQ EVALEXPRS1-ZQQ : State .
+  vars EVALEXPRS1-EXPR EVALEXPRS1-REF : WasmTerminal .
+  vars EVALEXPRS1-EXPRQ EVALEXPRS1-REFQ : WasmTerminals .
+  vars EVALEXPRSS0-Z EVALEXPRSS1-Z EVALEXPRSS1-ZQ EVALEXPRSS1-ZQQ : State .
+  vars EVALEXPRSS1-EXPR EVALEXPRSS1-EXPRQ EVALEXPRSS1-REF EVALEXPRSS1-REFQ : WasmTerminals .
+  vars EVALGLOBALS0-Z EVALGLOBALS1-Z EVALGLOBALS1-ZQ EVALGLOBALS1-ZQQ : State .
+  vars EVALGLOBALS1-A EVALGLOBALS1-EXPR EVALGLOBALS1-GT EVALGLOBALS1-VAL : WasmTerminal .
+  vars EVALGLOBALS1-EXPRQ EVALGLOBALS1-GTQ EVALGLOBALS1-VALQ : WasmTerminals .
+  vars EVALGLOBALS1-F : Frame .
+  vars EVALGLOBALS1-S EVALGLOBALS1-SQ : Store .
+  vars EXNINST0-F : Frame .
+  vars EXNINST0-S : Store .
   vars EXPAND-R00-COMPTYPE : Comptype .
   vars EXPAND-R00-DEFTYPE : Deftype .
   vars EXPAND-USE-DEFTYPE0-C EXPAND-USE-TYPEIDX1-C : Context .
   vars EXPAND-USE-DEFTYPE0-COMPTYPE EXPAND-USE-TYPEIDX1-COMPTYPE : Comptype .
   vars EXPAND-USE-DEFTYPE0-DEFTYPE : Deftype .
   vars EXPAND-USE-TYPEIDX1-TYPEIDX : Typeidx .
-  vars EXPANDDT0-COMPTYPE EXPANDDT0-DEFTYPE EXPANDDT0-FINAL EXPANDDT0-TYPEUSE : WasmTerminal .
+  vars EXPANDDT0-COMPTYPE EXPANDDT0-DEFTYPE EXPANDDT0-FINAL : WasmTerminal .
+  vars EXPANDDT0-TYPEUSE : WasmTerminals .
   vars EXPORT-OK-R00-C : Context .
   vars EXPORT-OK-R00-EXTERNIDX : Externidx .
   vars EXPORT-OK-R00-NAME : Name .
@@ -1875,55 +1910,65 @@ mod SPECTEC-CORE is
   vars FIELDTYPE-SUB-CONST0-ZT1 FIELDTYPE-SUB-CONST0-ZT2 FIELDTYPE-SUB-W-VAR1-ZT1 FIELDTYPE-SUB-W-VAR1-ZT2 : Storagetype .
   vars FNAT0-N : WasmTerminal .
   vars FONE0-N : WasmTerminal .
-  vars FRAME0-F FRAME0-S : WasmTerminal .
+  vars FRAME0-F : Frame .
+  vars FRAME0-S : Store .
   vars FREE-ABSHEAPTYPE0-ABSHEAPTYPE : WasmTerminal .
   vars FREE-ADDRTYPE0-ADDRTYPE : WasmTerminal .
-  vars FREE-BLOCK0-FREE FREE-BLOCK0-INSTR : WasmTerminal .
+  vars FREE-BLOCK0-FREE : WasmTerminal .
+  vars FREE-BLOCK0-INSTR : WasmTerminals .
   vars FREE-BLOCKTYPE0-VALTYPE FREE-BLOCKTYPE1-TYPEIDX : WasmTerminal .
   vars FREE-CATCH0-LABELIDX FREE-CATCH0-TAGIDX FREE-CATCH1-LABELIDX FREE-CATCH1-TAGIDX FREE-CATCH2-LABELIDX FREE-CATCH3-LABELIDX : WasmTerminal .
-  vars FREE-COMPTYPE0-FIELDTYPE FREE-COMPTYPE1-FIELDTYPE FREE-COMPTYPE2-RESULTTYPE1 FREE-COMPTYPE2-RESULTTYPE2 : WasmTerminal .
+  vars FREE-COMPTYPE0-FIELDTYPE : WasmTerminals .
+  vars FREE-COMPTYPE1-FIELDTYPE FREE-COMPTYPE2-RESULTTYPE1 FREE-COMPTYPE2-RESULTTYPE2 : WasmTerminal .
   vars FREE-CONSTTYPE0-NUMTYPE FREE-CONSTTYPE1-VECTYPE : WasmTerminal .
-  vars FREE-DATA0-BYTE FREE-DATA0-DATAMODE : WasmTerminal .
+  vars FREE-DATA0-BYTE : WasmTerminals .
+  vars FREE-DATA0-DATAMODE : WasmTerminal .
   vars FREE-DATAIDX0-DATAIDX : WasmTerminal .
   vars FREE-DATAMODE0-EXPR FREE-DATAMODE0-MEMIDX : WasmTerminal .
   vars FREE-DEFTYPE0-N FREE-DEFTYPE0-RECTYPE : WasmTerminal .
-  vars FREE-ELEM0-ELEMMODE FREE-ELEM0-EXPR FREE-ELEM0-REFTYPE : WasmTerminal .
+  vars FREE-ELEM0-ELEMMODE FREE-ELEM0-REFTYPE : WasmTerminal .
+  vars FREE-ELEM0-EXPR : WasmTerminals .
   vars FREE-ELEMIDX0-ELEMIDX : WasmTerminal .
   vars FREE-ELEMMODE0-EXPR FREE-ELEMMODE0-TABLEIDX : WasmTerminal .
   vars FREE-ELEMTYPE0-REFTYPE : WasmTerminal .
   vars FREE-EXPORT0-EXTERNIDX FREE-EXPORT0-NAME : WasmTerminal .
-  vars FREE-EXPR0-INSTR : WasmTerminal .
+  vars FREE-EXPR0-INSTR : WasmTerminals .
   vars FREE-EXTERNIDX0-FUNCIDX FREE-EXTERNIDX1-GLOBALIDX FREE-EXTERNIDX2-TABLEIDX FREE-EXTERNIDX3-MEMIDX FREE-EXTERNIDX4-TAGIDX : WasmTerminal .
   vars FREE-EXTERNTYPE0-TAGTYPE FREE-EXTERNTYPE1-GLOBALTYPE FREE-EXTERNTYPE2-MEMTYPE FREE-EXTERNTYPE3-TABLETYPE FREE-EXTERNTYPE4-TYPEUSE : WasmTerminal .
   vars FREE-FIELDTYPE0-MUT FREE-FIELDTYPE0-STORAGETYPE : WasmTerminal .
-  vars FREE-FUNC0-EXPR FREE-FUNC0-LOCAL FREE-FUNC0-TYPEIDX : WasmTerminal .
+  vars FREE-FUNC0-EXPR FREE-FUNC0-TYPEIDX : WasmTerminal .
+  vars FREE-FUNC0-LOCAL : WasmTerminals .
   vars FREE-FUNCIDX0-FUNCIDX : WasmTerminal .
   vars FREE-GLOBAL0-EXPR FREE-GLOBAL0-GLOBALTYPE : WasmTerminal .
   vars FREE-GLOBALIDX0-GLOBALIDX : WasmTerminal .
   vars FREE-GLOBALTYPE0-MUT FREE-GLOBALTYPE0-VALTYPE : WasmTerminal .
   vars FREE-HEAPTYPE0-ABSHEAPTYPE FREE-HEAPTYPE1-TYPEUSE : WasmTerminal .
   vars FREE-IMPORT0-EXTERNTYPE FREE-IMPORT0-NAME1 FREE-IMPORT0-NAME2 : WasmTerminal .
-  vars FREE-INSTR10-LABELIDX FREE-INSTR100-MEMIDX FREE-INSTR101-MEMIDX1 FREE-INSTR101-MEMIDX2 FREE-INSTR102-DATAIDX FREE-INSTR102-MEMIDX FREE-INSTR103-DATAIDX FREE-INSTR11-LABELIDX FREE-INSTR12-LABELIDX FREE-INSTR12-REFTYPE1 FREE-INSTR12-REFTYPE2 FREE-INSTR13-LABELIDX FREE-INSTR13-REFTYPE1 FREE-INSTR13-REFTYPE2 FREE-INSTR14-FUNCIDX FREE-INSTR15-TYPEUSE FREE-INSTR16-TABLEIDX FREE-INSTR16-TYPEUSE FREE-INSTR18-FUNCIDX FREE-INSTR19-TYPEUSE FREE-INSTR20-TABLEIDX FREE-INSTR20-TYPEUSE FREE-INSTR21-TAGIDX FREE-INSTR23-BLOCKTYPE FREE-INSTR23-CATCH FREE-INSTR23-INSTR FREE-INSTR24-NUMLIT FREE-INSTR24-NUMTYPE FREE-INSTR25-NUMTYPE FREE-INSTR25-UNOP FREE-INSTR26-BINOP FREE-INSTR26-NUMTYPE FREE-INSTR27-NUMTYPE FREE-INSTR27-TESTOP FREE-INSTR28-NUMTYPE FREE-INSTR28-RELOP FREE-INSTR29-CVTOP FREE-INSTR29-NUMTYPE1 FREE-INSTR29-NUMTYPE2 FREE-INSTR3-VALTYPE FREE-INSTR30-VECLIT FREE-INSTR30-VECTYPE FREE-INSTR31-VECTYPE FREE-INSTR31-VVUNOP FREE-INSTR32-VECTYPE FREE-INSTR32-VVBINOP FREE-INSTR33-VECTYPE FREE-INSTR33-VVTERNOP FREE-INSTR34-VECTYPE FREE-INSTR34-VVTESTOP FREE-INSTR35-SHAPE FREE-INSTR35-VUNOP FREE-INSTR36-SHAPE FREE-INSTR36-VBINOP FREE-INSTR37-SHAPE FREE-INSTR37-VTERNOP FREE-INSTR38-SHAPE FREE-INSTR38-VTESTOP FREE-INSTR39-SHAPE FREE-INSTR39-VRELOP FREE-INSTR4-BLOCKTYPE FREE-INSTR4-INSTR FREE-INSTR40-ISHAPE FREE-INSTR40-VSHIFTOP FREE-INSTR41-ISHAPE FREE-INSTR42-BSHAPE FREE-INSTR42-VSWIZZLOP FREE-INSTR43-BSHAPE FREE-INSTR43-LANEIDX FREE-INSTR44-ISHAPE1 FREE-INSTR44-ISHAPE2 FREE-INSTR44-VEXTUNOP FREE-INSTR45-ISHAPE1 FREE-INSTR45-ISHAPE2 FREE-INSTR45-VEXTBINOP FREE-INSTR46-ISHAPE1 FREE-INSTR46-ISHAPE2 FREE-INSTR46-VEXTTERNOP FREE-INSTR47-ISHAPE1 FREE-INSTR47-ISHAPE2 FREE-INSTR47-SX FREE-INSTR48-SHAPE1 FREE-INSTR48-SHAPE2 FREE-INSTR48-VCVTOP FREE-INSTR49-SHAPE FREE-INSTR5-BLOCKTYPE FREE-INSTR5-INSTR FREE-INSTR50-LANEIDX FREE-INSTR50-SHAPE FREE-INSTR50-SX FREE-INSTR51-LANEIDX FREE-INSTR51-SHAPE FREE-INSTR52-HEAPTYPE FREE-INSTR56-REFTYPE FREE-INSTR57-REFTYPE FREE-INSTR58-FUNCIDX FREE-INSTR6-BLOCKTYPE FREE-INSTR6-INSTR1 FREE-INSTR6-INSTR2 FREE-INSTR60-SX FREE-INSTR61-TYPEIDX FREE-INSTR62-TYPEIDX FREE-INSTR63-SX FREE-INSTR63-TYPEIDX FREE-INSTR63-U32 FREE-INSTR64-TYPEIDX FREE-INSTR64-U32 FREE-INSTR65-TYPEIDX FREE-INSTR66-TYPEIDX FREE-INSTR67-TYPEIDX FREE-INSTR67-U32 FREE-INSTR68-DATAIDX FREE-INSTR68-TYPEIDX FREE-INSTR69-ELEMIDX FREE-INSTR69-TYPEIDX FREE-INSTR7-LABELIDX FREE-INSTR70-SX FREE-INSTR70-TYPEIDX FREE-INSTR71-TYPEIDX FREE-INSTR73-TYPEIDX FREE-INSTR74-TYPEIDX1 FREE-INSTR74-TYPEIDX2 FREE-INSTR75-DATAIDX FREE-INSTR75-TYPEIDX FREE-INSTR76-ELEMIDX FREE-INSTR76-TYPEIDX FREE-INSTR79-LOCALIDX FREE-INSTR8-LABELIDX FREE-INSTR80-LOCALIDX FREE-INSTR81-LOCALIDX FREE-INSTR82-GLOBALIDX FREE-INSTR83-GLOBALIDX FREE-INSTR84-TABLEIDX FREE-INSTR85-TABLEIDX FREE-INSTR86-TABLEIDX FREE-INSTR87-TABLEIDX FREE-INSTR88-TABLEIDX FREE-INSTR89-TABLEIDX1 FREE-INSTR89-TABLEIDX2 FREE-INSTR9-LABELIDX FREE-INSTR9-LABELIDXQ FREE-INSTR90-ELEMIDX FREE-INSTR90-TABLEIDX FREE-INSTR91-ELEMIDX FREE-INSTR92-LOADOP FREE-INSTR92-MEMARG FREE-INSTR92-MEMIDX FREE-INSTR92-NUMTYPE FREE-INSTR93-MEMARG FREE-INSTR93-MEMIDX FREE-INSTR93-NUMTYPE FREE-INSTR93-STOREOP FREE-INSTR94-MEMARG FREE-INSTR94-MEMIDX FREE-INSTR94-VECTYPE FREE-INSTR94-VLOADOP FREE-INSTR95-LANEIDX FREE-INSTR95-MEMARG FREE-INSTR95-MEMIDX FREE-INSTR95-SZ FREE-INSTR95-VECTYPE FREE-INSTR96-MEMARG FREE-INSTR96-MEMIDX FREE-INSTR96-VECTYPE FREE-INSTR97-LANEIDX FREE-INSTR97-MEMARG FREE-INSTR97-MEMIDX FREE-INSTR97-SZ FREE-INSTR97-VECTYPE FREE-INSTR98-MEMIDX FREE-INSTR99-MEMIDX : WasmTerminal .
+  vars FREE-INSTR10-LABELIDX FREE-INSTR100-MEMIDX FREE-INSTR101-MEMIDX1 FREE-INSTR101-MEMIDX2 FREE-INSTR102-DATAIDX FREE-INSTR102-MEMIDX FREE-INSTR103-DATAIDX FREE-INSTR11-LABELIDX FREE-INSTR12-LABELIDX FREE-INSTR12-REFTYPE1 FREE-INSTR12-REFTYPE2 FREE-INSTR13-LABELIDX FREE-INSTR13-REFTYPE1 FREE-INSTR13-REFTYPE2 FREE-INSTR14-FUNCIDX FREE-INSTR15-TYPEUSE FREE-INSTR16-TABLEIDX FREE-INSTR16-TYPEUSE FREE-INSTR18-FUNCIDX FREE-INSTR19-TYPEUSE FREE-INSTR20-TABLEIDX FREE-INSTR20-TYPEUSE FREE-INSTR21-TAGIDX FREE-INSTR23-BLOCKTYPE FREE-INSTR24-NUMLIT FREE-INSTR24-NUMTYPE FREE-INSTR25-NUMTYPE FREE-INSTR25-UNOP FREE-INSTR26-BINOP FREE-INSTR26-NUMTYPE FREE-INSTR27-NUMTYPE FREE-INSTR27-TESTOP FREE-INSTR28-NUMTYPE FREE-INSTR28-RELOP FREE-INSTR29-CVTOP FREE-INSTR29-NUMTYPE1 FREE-INSTR29-NUMTYPE2 FREE-INSTR3-VALTYPE FREE-INSTR30-VECLIT FREE-INSTR30-VECTYPE FREE-INSTR31-VECTYPE FREE-INSTR31-VVUNOP FREE-INSTR32-VECTYPE FREE-INSTR32-VVBINOP FREE-INSTR33-VECTYPE FREE-INSTR33-VVTERNOP FREE-INSTR34-VECTYPE FREE-INSTR34-VVTESTOP FREE-INSTR35-SHAPE FREE-INSTR35-VUNOP FREE-INSTR36-SHAPE FREE-INSTR36-VBINOP FREE-INSTR37-SHAPE FREE-INSTR37-VTERNOP FREE-INSTR38-SHAPE FREE-INSTR38-VTESTOP FREE-INSTR39-SHAPE FREE-INSTR39-VRELOP FREE-INSTR4-BLOCKTYPE FREE-INSTR40-ISHAPE FREE-INSTR40-VSHIFTOP FREE-INSTR41-ISHAPE FREE-INSTR42-BSHAPE FREE-INSTR42-VSWIZZLOP FREE-INSTR43-BSHAPE FREE-INSTR44-ISHAPE1 FREE-INSTR44-ISHAPE2 FREE-INSTR44-VEXTUNOP FREE-INSTR45-ISHAPE1 FREE-INSTR45-ISHAPE2 FREE-INSTR45-VEXTBINOP FREE-INSTR46-ISHAPE1 FREE-INSTR46-ISHAPE2 FREE-INSTR46-VEXTTERNOP FREE-INSTR47-ISHAPE1 FREE-INSTR47-ISHAPE2 FREE-INSTR47-SX FREE-INSTR48-SHAPE1 FREE-INSTR48-SHAPE2 FREE-INSTR48-VCVTOP FREE-INSTR49-SHAPE FREE-INSTR5-BLOCKTYPE FREE-INSTR50-LANEIDX FREE-INSTR50-SHAPE FREE-INSTR50-SX FREE-INSTR51-LANEIDX FREE-INSTR51-SHAPE FREE-INSTR52-HEAPTYPE FREE-INSTR56-REFTYPE FREE-INSTR57-REFTYPE FREE-INSTR58-FUNCIDX FREE-INSTR6-BLOCKTYPE FREE-INSTR60-SX FREE-INSTR61-TYPEIDX FREE-INSTR62-TYPEIDX FREE-INSTR63-SX FREE-INSTR63-TYPEIDX FREE-INSTR63-U32 FREE-INSTR64-TYPEIDX FREE-INSTR64-U32 FREE-INSTR65-TYPEIDX FREE-INSTR66-TYPEIDX FREE-INSTR67-TYPEIDX FREE-INSTR67-U32 FREE-INSTR68-DATAIDX FREE-INSTR68-TYPEIDX FREE-INSTR69-ELEMIDX FREE-INSTR69-TYPEIDX FREE-INSTR7-LABELIDX FREE-INSTR70-SX FREE-INSTR70-TYPEIDX FREE-INSTR71-TYPEIDX FREE-INSTR73-TYPEIDX FREE-INSTR74-TYPEIDX1 FREE-INSTR74-TYPEIDX2 FREE-INSTR75-DATAIDX FREE-INSTR75-TYPEIDX FREE-INSTR76-ELEMIDX FREE-INSTR76-TYPEIDX FREE-INSTR79-LOCALIDX FREE-INSTR8-LABELIDX FREE-INSTR80-LOCALIDX FREE-INSTR81-LOCALIDX FREE-INSTR82-GLOBALIDX FREE-INSTR83-GLOBALIDX FREE-INSTR84-TABLEIDX FREE-INSTR85-TABLEIDX FREE-INSTR86-TABLEIDX FREE-INSTR87-TABLEIDX FREE-INSTR88-TABLEIDX FREE-INSTR89-TABLEIDX1 FREE-INSTR89-TABLEIDX2 FREE-INSTR9-LABELIDXQ FREE-INSTR90-ELEMIDX FREE-INSTR90-TABLEIDX FREE-INSTR91-ELEMIDX FREE-INSTR92-LOADOP FREE-INSTR92-MEMARG FREE-INSTR92-MEMIDX FREE-INSTR92-NUMTYPE FREE-INSTR93-MEMARG FREE-INSTR93-MEMIDX FREE-INSTR93-NUMTYPE FREE-INSTR93-STOREOP FREE-INSTR94-MEMARG FREE-INSTR94-MEMIDX FREE-INSTR94-VECTYPE FREE-INSTR94-VLOADOP FREE-INSTR95-LANEIDX FREE-INSTR95-MEMARG FREE-INSTR95-MEMIDX FREE-INSTR95-SZ FREE-INSTR95-VECTYPE FREE-INSTR96-MEMARG FREE-INSTR96-MEMIDX FREE-INSTR96-VECTYPE FREE-INSTR97-LANEIDX FREE-INSTR97-MEMARG FREE-INSTR97-MEMIDX FREE-INSTR97-SZ FREE-INSTR97-VECTYPE FREE-INSTR98-MEMIDX FREE-INSTR99-MEMIDX : WasmTerminal .
+  vars FREE-INSTR23-CATCH FREE-INSTR23-INSTR FREE-INSTR4-INSTR FREE-INSTR43-LANEIDX FREE-INSTR5-INSTR FREE-INSTR6-INSTR1 FREE-INSTR6-INSTR2 FREE-INSTR9-LABELIDX : WasmTerminals .
   vars FREE-LABELIDX0-LABELIDX : WasmTerminal .
   vars FREE-LANETYPE0-NUMTYPE FREE-LANETYPE1-PACKTYPE : WasmTerminal .
-  vars FREE-LIST1-FREE FREE-LIST1-FREEQ : WasmTerminal .
+  vars FREE-LIST1-FREE : WasmTerminal .
+  vars FREE-LIST1-FREEQ : WasmTerminals .
   vars FREE-LOCAL0-T : WasmTerminal .
   vars FREE-LOCALIDX0-LOCALIDX : WasmTerminal .
   vars FREE-MEM0-MEMTYPE : WasmTerminal .
   vars FREE-MEMIDX0-MEMIDX : WasmTerminal .
   vars FREE-MEMTYPE0-ADDRTYPE FREE-MEMTYPE0-LIMITS : WasmTerminal .
-  vars FREE-MODULE0-DATA FREE-MODULE0-ELEM FREE-MODULE0-EXPORT FREE-MODULE0-FUNC FREE-MODULE0-GLOBAL FREE-MODULE0-IMPORT FREE-MODULE0-MEM FREE-MODULE0-START FREE-MODULE0-TABLE FREE-MODULE0-TAG FREE-MODULE0-TYPE : WasmTerminal .
-  vars FREE-MODULETYPE0-EXTERNTYPE1 FREE-MODULETYPE0-EXTERNTYPE2 : WasmTerminal .
+  vars FREE-MODULE0-DATA FREE-MODULE0-ELEM FREE-MODULE0-EXPORT FREE-MODULE0-FUNC FREE-MODULE0-GLOBAL FREE-MODULE0-IMPORT FREE-MODULE0-MEM FREE-MODULE0-TABLE FREE-MODULE0-TAG FREE-MODULE0-TYPE : WasmTerminals .
+  vars FREE-MODULE0-START : WasmTerminal .
+  vars FREE-MODULETYPE0-EXTERNTYPE1 FREE-MODULETYPE0-EXTERNTYPE2 : WasmTerminals .
   vars FREE-NUMTYPE0-NUMTYPE : WasmTerminal .
   vars FREE-OPT1-FREE : WasmTerminal .
   vars FREE-PACKTYPE0-PACKTYPE : WasmTerminal .
-  vars FREE-RECTYPE0-SUBTYPE : WasmTerminal .
+  vars FREE-RECTYPE0-SUBTYPE : WasmTerminals .
   vars FREE-REFTYPE0-HEAPTYPE FREE-REFTYPE0-NULL : WasmTerminal .
-  vars FREE-RESULTTYPE0-VALTYPE : WasmTerminal .
+  vars FREE-RESULTTYPE0-VALTYPE : WasmTerminals .
   vars FREE-SHAPE0-DIM FREE-SHAPE0-LANETYPE : WasmTerminal .
   vars FREE-START0-FUNCIDX : WasmTerminal .
   vars FREE-STORAGETYPE0-VALTYPE FREE-STORAGETYPE1-PACKTYPE : WasmTerminal .
-  vars FREE-SUBTYPE0-COMPTYPE FREE-SUBTYPE0-FINAL FREE-SUBTYPE0-TYPEUSE : WasmTerminal .
+  vars FREE-SUBTYPE0-COMPTYPE FREE-SUBTYPE0-FINAL : WasmTerminal .
+  vars FREE-SUBTYPE0-TYPEUSE : WasmTerminals .
   vars FREE-TABLE0-EXPR FREE-TABLE0-TABLETYPE : WasmTerminal .
   vars FREE-TABLEIDX0-TABLEIDX : WasmTerminal .
   vars FREE-TABLETYPE0-ADDRTYPE FREE-TABLETYPE0-LIMITS FREE-TABLETYPE0-REFTYPE : WasmTerminal .
@@ -1941,37 +1986,55 @@ mod SPECTEC-CORE is
   vars FUNC-OK-R00-EXPR : Expr .
   vars FUNC-OK-R00-LCT FUNC-OK-R00-LOCAL FUNC-OK-R00-T1 FUNC-OK-R00-T2 : WasmTerminals .
   vars FUNC-OK-R00-X : Idx .
-  vars FUNC0-F FUNC0-S FUNC0-X : WasmTerminal .
+  vars FUNC0-F : Frame .
+  vars FUNC0-S : Store .
+  vars FUNC0-X : WasmTerminal .
   vars FUNCIDX-MODULE0-MODULE : WasmTerminal .
-  vars FUNCIDX-NONFUNCS0-ELEM FUNCIDX-NONFUNCS0-GLOBAL FUNCIDX-NONFUNCS0-MEM FUNCIDX-NONFUNCS0-TABLE : WasmTerminal .
-  vars FUNCINST0-F FUNCINST0-S : WasmTerminal .
-  vars FUNCSXA1-A FUNCSXA1-XA FUNCSXA2-EXTERNADDR FUNCSXA2-XA : WasmTerminal .
-  vars FUNCSXT1-DT FUNCSXT1-XT FUNCSXT2-EXTERNTYPE FUNCSXT2-XT : WasmTerminal .
-  vars FUNCSXX1-X FUNCSXX1-XX FUNCSXX2-EXTERNIDX FUNCSXX2-XX : WasmTerminal .
-  vars FVBINOP0-C FVBINOP0-C1 FVBINOP0-C2 FVBINOP0-FNN FVBINOP0-M FVBINOP0-V1 FVBINOP0-V2 : WasmTerminal .
-  vars FVRELOP0-C FVRELOP0-C1 FVRELOP0-C2 FVRELOP0-FNN FVRELOP0-INN FVRELOP0-M FVRELOP0-V1 FVRELOP0-V2 : WasmTerminal .
-  vars FVTERNOP0-C FVTERNOP0-C1 FVTERNOP0-C2 FVTERNOP0-C3 FVTERNOP0-FNN FVTERNOP0-M FVTERNOP0-V1 FVTERNOP0-V2 FVTERNOP0-V3 : WasmTerminal .
-  vars FVUNOP0-C FVUNOP0-C1 FVUNOP0-FNN FVUNOP0-M FVUNOP0-V1 : WasmTerminal .
+  vars FUNCIDX-NONFUNCS0-ELEM FUNCIDX-NONFUNCS0-GLOBAL FUNCIDX-NONFUNCS0-MEM FUNCIDX-NONFUNCS0-TABLE : WasmTerminals .
+  vars FUNCINST0-F : Frame .
+  vars FUNCINST0-S : Store .
+  vars FUNCSXA1-A FUNCSXA2-EXTERNADDR : WasmTerminal .
+  vars FUNCSXA1-XA FUNCSXA2-XA : WasmTerminals .
+  vars FUNCSXT1-DT FUNCSXT2-EXTERNTYPE : WasmTerminal .
+  vars FUNCSXT1-XT FUNCSXT2-XT : WasmTerminals .
+  vars FUNCSXX1-X FUNCSXX2-EXTERNIDX : WasmTerminal .
+  vars FUNCSXX1-XX FUNCSXX2-XX : WasmTerminals .
+  vars FVBINOP0-C FVBINOP0-C1 FVBINOP0-C2 : WasmTerminals .
+  vars FVBINOP0-FNN FVBINOP0-M FVBINOP0-V1 FVBINOP0-V2 : WasmTerminal .
+  vars FVRELOP0-C FVRELOP0-C1 FVRELOP0-C2 : WasmTerminals .
+  vars FVRELOP0-FNN FVRELOP0-INN FVRELOP0-M FVRELOP0-V1 FVRELOP0-V2 : WasmTerminal .
+  vars FVTERNOP0-C FVTERNOP0-C1 FVTERNOP0-C2 FVTERNOP0-C3 : WasmTerminals .
+  vars FVTERNOP0-FNN FVTERNOP0-M FVTERNOP0-V1 FVTERNOP0-V2 FVTERNOP0-V3 : WasmTerminal .
+  vars FVUNOP0-C FVUNOP0-C1 : WasmTerminals .
+  vars FVUNOP0-FNN FVUNOP0-M FVUNOP0-V1 : WasmTerminal .
   vars FZERO0-N : WasmTerminal .
   vars GLOBAL-OK-R00-C : Context .
   vars GLOBAL-OK-R00-EXPR : Expr .
   vars GLOBAL-OK-R00-GLOBALTYPE : Globaltype .
   vars GLOBAL-OK-R00-T : Valtype .
-  vars GLOBAL0-F GLOBAL0-S GLOBAL0-X : WasmTerminal .
-  vars GLOBALINST0-F GLOBALINST0-S : WasmTerminal .
+  vars GLOBAL0-F : Frame .
+  vars GLOBAL0-S : Store .
+  vars GLOBAL0-X : WasmTerminal .
+  vars GLOBALINST0-F : Frame .
+  vars GLOBALINST0-S : Store .
   vars GLOBALS-OK-CONS1-C GLOBALS-OK-EMPTY0-C : Context .
   vars GLOBALS-OK-CONS1-GLOBAL GLOBALS-OK-CONS1-GT : WasmTerminals .
   vars GLOBALS-OK-CONS1-GLOBAL1 : Global .
   vars GLOBALS-OK-CONS1-GT1 : Globaltype .
-  vars GLOBALSXA1-A GLOBALSXA1-XA GLOBALSXA2-EXTERNADDR GLOBALSXA2-XA : WasmTerminal .
-  vars GLOBALSXT1-GT GLOBALSXT1-XT GLOBALSXT2-EXTERNTYPE GLOBALSXT2-XT : WasmTerminal .
-  vars GLOBALSXX1-X GLOBALSXX1-XX GLOBALSXX2-EXTERNIDX GLOBALSXX2-XX : WasmTerminal .
+  vars GLOBALSXA1-A GLOBALSXA2-EXTERNADDR : WasmTerminal .
+  vars GLOBALSXA1-XA GLOBALSXA2-XA : WasmTerminals .
+  vars GLOBALSXT1-GT GLOBALSXT2-EXTERNTYPE : WasmTerminal .
+  vars GLOBALSXT1-XT GLOBALSXT2-XT : WasmTerminals .
+  vars GLOBALSXX1-X GLOBALSXX2-EXTERNIDX : WasmTerminal .
+  vars GLOBALSXX1-XX GLOBALSXX2-XX : WasmTerminals .
   vars GLOBALTYPE-OK-R00-C : Context .
   vars GLOBALTYPE-OK-R00-T : Valtype .
   vars GLOBALTYPE-SUB-CONST0-C GLOBALTYPE-SUB-W-VAR1-C : Context .
   vars GLOBALTYPE-SUB-CONST0-VALTYPE1 GLOBALTYPE-SUB-CONST0-VALTYPE2 GLOBALTYPE-SUB-W-VAR1-VALTYPE1 GLOBALTYPE-SUB-W-VAR1-VALTYPE2 : Valtype .
-  vars GROWMEM0-AT GROWMEM0-B GROWMEM0-I GROWMEM0-J GROWMEM0-MEMINST GROWMEM0-N : WasmTerminal .
-  vars GROWTABLE0-AT GROWTABLE0-I GROWTABLE0-IQ GROWTABLE0-J GROWTABLE0-N GROWTABLE0-R GROWTABLE0-RQ GROWTABLE0-RT GROWTABLE0-TABLEINST GROWTABLE0-TABLEINSTQ : WasmTerminal .
+  vars GROWMEM0-AT GROWMEM0-I GROWMEM0-IQ GROWMEM0-J GROWMEM0-MEMINST GROWMEM0-MEMINSTQ GROWMEM0-N : WasmTerminal .
+  vars GROWMEM0-B : WasmTerminals .
+  vars GROWTABLE0-AT GROWTABLE0-I GROWTABLE0-IQ GROWTABLE0-J GROWTABLE0-N GROWTABLE0-R GROWTABLE0-RT GROWTABLE0-TABLEINST GROWTABLE0-TABLEINSTQ : WasmTerminal .
+  vars GROWTABLE0-RQ : WasmTerminals .
   vars HALF0-I HALF0-J HALF1-I HALF1-J : WasmTerminal .
   vars HALFOP0-HALF HALFOP0-JNN1 HALFOP0-JNN2 HALFOP0-M1 HALFOP0-M2 HALFOP0-SX HALFOP1-FNN2 HALFOP1-HALF HALFOP1-JNN1 HALFOP1-M1 HALFOP1-M2 HALFOP1-SX HALFOP2-FNN1 HALFOP2-JNN2 HALFOP2-M1 HALFOP2-M2 HALFOP2-SX HALFOP2-ZERO HALFOP3-FNN1 HALFOP3-JNN2 HALFOP3-M1 HALFOP3-M2 HALFOP3-SX HALFOP3-ZERO HALFOP4-FNN1 HALFOP4-FNN2 HALFOP4-M1 HALFOP4-M2 HALFOP4-ZERO HALFOP5-FNN1 HALFOP5-FNN2 HALFOP5-M1 HALFOP5-M2 : WasmTerminal .
   vars HEAPTYPE-OK-ABS0-ABSHEAPTYPE : Absheaptype .
@@ -2007,12 +2070,21 @@ mod SPECTEC-CORE is
   vars INE0-I1 INE0-I2 INE0-N : WasmTerminal .
   vars INEG0-I1 INEG0-N : WasmTerminal .
   vars INEZ0-I1 INEZ0-N : WasmTerminal .
-  vars INST-GLOBALTYPE0-DT INST-GLOBALTYPE0-GT INST-GLOBALTYPE0-MODULEINST : WasmTerminal .
-  vars INST-MEMTYPE0-DT INST-MEMTYPE0-MODULEINST INST-MEMTYPE0-MT : WasmTerminal .
-  vars INST-REFTYPE0-DT INST-REFTYPE0-MODULEINST INST-REFTYPE0-RT : WasmTerminal .
-  vars INST-TABLETYPE0-DT INST-TABLETYPE0-MODULEINST INST-TABLETYPE0-TT : WasmTerminal .
-  vars INST-VALTYPE0-DT INST-VALTYPE0-MODULEINST INST-VALTYPE0-T : WasmTerminal .
-  vars INSTANTIATE0-BYTE INSTANTIATE0-DATA INSTANTIATE0-DATAMODE INSTANTIATE0-ELEM INSTANTIATE0-ELEMMODE INSTANTIATE0-EXPORT INSTANTIATE0-EXPRE INSTANTIATE0-EXPRG INSTANTIATE0-EXPRT INSTANTIATE0-EXTERNADDR INSTANTIATE0-FUNC INSTANTIATE0-GLOBAL INSTANTIATE0-GLOBALTYPE INSTANTIATE0-IMPORT INSTANTIATE0-INSTRS INSTANTIATE0-MEM INSTANTIATE0-MODULE INSTANTIATE0-REFTYPE INSTANTIATE0-S INSTANTIATE0-START INSTANTIATE0-TABLE INSTANTIATE0-TABLETYPE INSTANTIATE0-TAG INSTANTIATE0-TYPE INSTANTIATE0-X : WasmTerminal .
+  vars INST-GLOBALTYPE0-DT : WasmTerminals .
+  vars INST-GLOBALTYPE0-GT INST-GLOBALTYPE0-MODULEINST : WasmTerminal .
+  vars INST-MEMTYPE0-DT : WasmTerminals .
+  vars INST-MEMTYPE0-MODULEINST INST-MEMTYPE0-MT : WasmTerminal .
+  vars INST-REFTYPE0-DT : WasmTerminals .
+  vars INST-REFTYPE0-MODULEINST INST-REFTYPE0-RT : WasmTerminal .
+  vars INST-TABLETYPE0-DT : WasmTerminals .
+  vars INST-TABLETYPE0-MODULEINST INST-TABLETYPE0-TT : WasmTerminal .
+  vars INST-VALTYPE0-DT : WasmTerminals .
+  vars INST-VALTYPE0-MODULEINST INST-VALTYPE0-T : WasmTerminal .
+  vars INSTANTIATE0-BYTE INSTANTIATE0-DATA INSTANTIATE0-DATAMODE INSTANTIATE0-ELEM INSTANTIATE0-ELEMMODE INSTANTIATE0-EXPORT INSTANTIATE0-EXPRE INSTANTIATE0-EXPRG INSTANTIATE0-EXPRT INSTANTIATE0-EXTERNADDR INSTANTIATE0-FUNC INSTANTIATE0-GLOBAL INSTANTIATE0-GLOBALTYPE INSTANTIATE0-ID INSTANTIATE0-IE INSTANTIATE0-IF INSTANTIATE0-IMPORT INSTANTIATE0-INSTRD INSTANTIATE0-INSTRE INSTANTIATE0-MEM INSTANTIATE0-REFE INSTANTIATE0-REFT INSTANTIATE0-REFTYPE INSTANTIATE0-TABLE INSTANTIATE0-TABLETYPE INSTANTIATE0-TAG INSTANTIATE0-TYPE INSTANTIATE0-VALG INSTANTIATE0-XTE INSTANTIATE0-XTI : WasmTerminals .
+  vars INSTANTIATE0-F : Frame .
+  vars INSTANTIATE0-INSTRS INSTANTIATE0-MODULE INSTANTIATE0-MODULEINST INSTANTIATE0-MODULEINST0 INSTANTIATE0-START INSTANTIATE0-X : WasmTerminal .
+  vars INSTANTIATE0-S INSTANTIATE0-SQQQ INSTANTIATE0-SQQQQ : Store .
+  vars INSTANTIATE0-Z INSTANTIATE0-ZQ INSTANTIATE0-ZQQ INSTANTIATE0-ZQQQ : State .
   vars INSTR-CONST-ANY-CONVERT-EXTERN10-C INSTR-CONST-ARRAY-NEW-DEFAULT8-C INSTR-CONST-ARRAY-NEW-FIXED9-C INSTR-CONST-ARRAY-NEW7-C INSTR-CONST-BINOP13-C INSTR-CONST-CONST0-C INSTR-CONST-EXTERN-CONVERT-ANY11-C INSTR-CONST-GLOBAL-GET12-C INSTR-CONST-REF-FUNC4-C INSTR-CONST-REF-I313-C INSTR-CONST-REF-NULL2-C INSTR-CONST-STRUCT-NEW-DEFAULT6-C INSTR-CONST-STRUCT-NEW5-C INSTR-CONST-VCONST1-C : Context .
   vars INSTR-CONST-ARRAY-NEW-DEFAULT8-X INSTR-CONST-ARRAY-NEW-FIXED9-X INSTR-CONST-ARRAY-NEW7-X INSTR-CONST-GLOBAL-GET12-X INSTR-CONST-REF-FUNC4-X INSTR-CONST-STRUCT-NEW-DEFAULT6-X INSTR-CONST-STRUCT-NEW5-X : Idx .
   vars INSTR-CONST-ARRAY-NEW-FIXED9-N : N .
@@ -2062,37 +2134,60 @@ mod SPECTEC-CORE is
   vars INV-JSIZE2-N : WasmTerminal .
   vars INV-JSIZENN0-N : WasmTerminal .
   vars INV-SIGNED0-I INV-SIGNED0-N INV-SIGNED1-I INV-SIGNED1-N : WasmTerminal .
-  vars INVOKE0-FUNCADDR INVOKE0-S INVOKE0-T1 INVOKE0-T2 INVOKE0-VAL : WasmTerminal .
-  vars IRELAXED-SWIZZLE-LANE0-C IRELAXED-SWIZZLE-LANE0-I IRELAXED-SWIZZLE-LANE0-N IRELAXED-SWIZZLE-LANE1-C IRELAXED-SWIZZLE-LANE1-I IRELAXED-SWIZZLE-LANE1-N IRELAXED-SWIZZLE-LANE2-C IRELAXED-SWIZZLE-LANE2-I IRELAXED-SWIZZLE-LANE2-N : WasmTerminal .
+  vars INVOKE0-FUNCADDR : WasmTerminal .
+  vars INVOKE0-S : Store .
+  vars INVOKE0-T1 INVOKE0-T2 INVOKE0-VAL : WasmTerminals .
+  vars IRELAXED-SWIZZLE-LANE0-C IRELAXED-SWIZZLE-LANE1-C IRELAXED-SWIZZLE-LANE2-C : WasmTerminals .
+  vars IRELAXED-SWIZZLE-LANE0-I IRELAXED-SWIZZLE-LANE0-N IRELAXED-SWIZZLE-LANE1-I IRELAXED-SWIZZLE-LANE1-N IRELAXED-SWIZZLE-LANE2-I IRELAXED-SWIZZLE-LANE2-N : WasmTerminal .
   vars IREM0-I1 IREM0-N IREM1-I1 IREM1-I2 IREM1-N IREM2-I1 IREM2-N IREM3-I1 IREM3-I2 IREM3-J1 IREM3-J2 IREM3-N : WasmTerminal .
   vars IS-PACKTYPE0-ZT : WasmTerminal .
   vars ISIZE0-INN : WasmTerminal .
   vars ISUB-SAT0-I1 ISUB-SAT0-I2 ISUB-SAT0-N ISUB-SAT1-I1 ISUB-SAT1-I2 ISUB-SAT1-N : WasmTerminal .
   vars ISUB0-I1 ISUB0-I2 ISUB0-N : WasmTerminal .
-  vars ISWIZZLE-LANE0-C ISWIZZLE-LANE0-I ISWIZZLE-LANE0-N ISWIZZLE-LANE1-C ISWIZZLE-LANE1-I ISWIZZLE-LANE1-N : WasmTerminal .
-  vars IVADD-PAIRWISE0-I IVADD-PAIRWISE0-J1 IVADD-PAIRWISE0-J2 IVADD-PAIRWISE0-N : WasmTerminal .
-  vars IVBINOP0-C IVBINOP0-C1 IVBINOP0-C2 IVBINOP0-JNN IVBINOP0-M IVBINOP0-V1 IVBINOP0-V2 : WasmTerminal .
-  vars IVBINOPSX0-C IVBINOPSX0-C1 IVBINOPSX0-C2 IVBINOPSX0-JNN IVBINOPSX0-M IVBINOPSX0-SX IVBINOPSX0-V1 IVBINOPSX0-V2 : WasmTerminal .
-  vars IVBINOPSXND0-C IVBINOPSXND0-C1 IVBINOPSXND0-C2 IVBINOPSXND0-JNN IVBINOPSXND0-M IVBINOPSXND0-SX IVBINOPSXND0-V1 IVBINOPSXND0-V2 : WasmTerminal .
-  vars IVBITMASKOP0-C IVBITMASKOP0-C1 IVBITMASKOP0-JNN IVBITMASKOP0-M IVBITMASKOP0-V1 : WasmTerminal .
-  vars IVDOT-SAT0-I1 IVDOT-SAT0-I2 IVDOT-SAT0-J1 IVDOT-SAT0-J2 IVDOT-SAT0-N : WasmTerminal .
-  vars IVDOT0-I1 IVDOT0-I2 IVDOT0-J1 IVDOT0-J2 IVDOT0-N : WasmTerminal .
-  vars IVEXTBINOP0-C IVEXTBINOP0-C1 IVEXTBINOP0-C2 IVEXTBINOP0-CQ1 IVEXTBINOP0-CQ2 IVEXTBINOP0-I IVEXTBINOP0-JNN1 IVEXTBINOP0-JNN2 IVEXTBINOP0-K IVEXTBINOP0-M1 IVEXTBINOP0-M2 IVEXTBINOP0-SX1 IVEXTBINOP0-SX2 IVEXTBINOP0-V1 IVEXTBINOP0-V2 : WasmTerminal .
-  vars IVEXTUNOP0-C IVEXTUNOP0-C1 IVEXTUNOP0-CQ1 IVEXTUNOP0-JNN1 IVEXTUNOP0-JNN2 IVEXTUNOP0-M1 IVEXTUNOP0-M2 IVEXTUNOP0-SX IVEXTUNOP0-V1 : WasmTerminal .
-  vars IVMUL0-I1 IVMUL0-I2 IVMUL0-N : WasmTerminal .
-  vars IVRELOP0-C IVRELOP0-C1 IVRELOP0-C2 IVRELOP0-JNN IVRELOP0-M IVRELOP0-V1 IVRELOP0-V2 : WasmTerminal .
-  vars IVRELOPSX0-C IVRELOPSX0-C1 IVRELOPSX0-C2 IVRELOPSX0-JNN IVRELOPSX0-M IVRELOPSX0-SX IVRELOPSX0-V1 IVRELOPSX0-V2 : WasmTerminal .
-  vars IVSHIFTOP0-C IVSHIFTOP0-C1 IVSHIFTOP0-I IVSHIFTOP0-JNN IVSHIFTOP0-M IVSHIFTOP0-V1 : WasmTerminal .
-  vars IVSHIFTOPSX0-C IVSHIFTOPSX0-C1 IVSHIFTOPSX0-I IVSHIFTOPSX0-JNN IVSHIFTOPSX0-M IVSHIFTOPSX0-SX IVSHIFTOPSX0-V1 : WasmTerminal .
-  vars IVSHUFFLOP0-C IVSHUFFLOP0-C1 IVSHUFFLOP0-C2 IVSHUFFLOP0-I IVSHUFFLOP0-JNN IVSHUFFLOP0-M IVSHUFFLOP0-V1 IVSHUFFLOP0-V2 : WasmTerminal .
-  vars IVSWIZZLOP0-C IVSWIZZLOP0-C1 IVSWIZZLOP0-C2 IVSWIZZLOP0-JNN IVSWIZZLOP0-M IVSWIZZLOP0-V1 IVSWIZZLOP0-V2 : WasmTerminal .
-  vars IVTERNOPND0-C IVTERNOPND0-C1 IVTERNOPND0-C2 IVTERNOPND0-C3 IVTERNOPND0-JNN IVTERNOPND0-M IVTERNOPND0-V1 IVTERNOPND0-V2 IVTERNOPND0-V3 : WasmTerminal .
-  vars IVUNOP0-C IVUNOP0-C1 IVUNOP0-JNN IVUNOP0-M IVUNOP0-V1 : WasmTerminal .
+  vars ISWIZZLE-LANE0-C ISWIZZLE-LANE1-C : WasmTerminals .
+  vars ISWIZZLE-LANE0-I ISWIZZLE-LANE0-N ISWIZZLE-LANE1-I ISWIZZLE-LANE1-N : WasmTerminal .
+  vars IVADD-PAIRWISE0-I IVADD-PAIRWISE0-J1 IVADD-PAIRWISE0-J2 : WasmTerminals .
+  vars IVADD-PAIRWISE0-N : WasmTerminal .
+  vars IVBINOP0-C IVBINOP0-C1 IVBINOP0-C2 : WasmTerminals .
+  vars IVBINOP0-JNN IVBINOP0-M IVBINOP0-V1 IVBINOP0-V2 : WasmTerminal .
+  vars IVBINOPSX0-C IVBINOPSX0-C1 IVBINOPSX0-C2 : WasmTerminals .
+  vars IVBINOPSX0-JNN IVBINOPSX0-M IVBINOPSX0-SX IVBINOPSX0-V1 IVBINOPSX0-V2 : WasmTerminal .
+  vars IVBINOPSXND0-C IVBINOPSXND0-C1 IVBINOPSXND0-C2 : WasmTerminals .
+  vars IVBINOPSXND0-JNN IVBINOPSXND0-M IVBINOPSXND0-SX IVBINOPSXND0-V1 IVBINOPSXND0-V2 : WasmTerminal .
+  vars IVBITMASKOP0-C IVBITMASKOP0-JNN IVBITMASKOP0-M IVBITMASKOP0-V1 : WasmTerminal .
+  vars IVBITMASKOP0-C1 : WasmTerminals .
+  vars IVDOT-SAT0-I1 IVDOT-SAT0-I2 IVDOT-SAT0-J1 IVDOT-SAT0-J2 : WasmTerminals .
+  vars IVDOT-SAT0-N : WasmTerminal .
+  vars IVDOT0-I1 IVDOT0-I2 IVDOT0-J1 IVDOT0-J2 : WasmTerminals .
+  vars IVDOT0-N : WasmTerminal .
+  vars IVEXTBINOP0-C IVEXTBINOP0-C1 IVEXTBINOP0-C2 IVEXTBINOP0-CQ1 IVEXTBINOP0-CQ2 : WasmTerminals .
+  vars IVEXTBINOP0-I IVEXTBINOP0-JNN1 IVEXTBINOP0-JNN2 IVEXTBINOP0-K IVEXTBINOP0-M1 IVEXTBINOP0-M2 IVEXTBINOP0-SX1 IVEXTBINOP0-SX2 IVEXTBINOP0-V1 IVEXTBINOP0-V2 : WasmTerminal .
+  vars IVEXTUNOP0-C IVEXTUNOP0-C1 IVEXTUNOP0-CQ1 : WasmTerminals .
+  vars IVEXTUNOP0-JNN1 IVEXTUNOP0-JNN2 IVEXTUNOP0-M1 IVEXTUNOP0-M2 IVEXTUNOP0-SX IVEXTUNOP0-V1 : WasmTerminal .
+  vars IVMUL0-I1 IVMUL0-I2 : WasmTerminals .
+  vars IVMUL0-N : WasmTerminal .
+  vars IVRELOP0-C IVRELOP0-C1 IVRELOP0-C2 : WasmTerminals .
+  vars IVRELOP0-JNN IVRELOP0-M IVRELOP0-V1 IVRELOP0-V2 : WasmTerminal .
+  vars IVRELOPSX0-C IVRELOPSX0-C1 IVRELOPSX0-C2 : WasmTerminals .
+  vars IVRELOPSX0-JNN IVRELOPSX0-M IVRELOPSX0-SX IVRELOPSX0-V1 IVRELOPSX0-V2 : WasmTerminal .
+  vars IVSHIFTOP0-C IVSHIFTOP0-C1 : WasmTerminals .
+  vars IVSHIFTOP0-I IVSHIFTOP0-JNN IVSHIFTOP0-M IVSHIFTOP0-V1 : WasmTerminal .
+  vars IVSHIFTOPSX0-C IVSHIFTOPSX0-C1 : WasmTerminals .
+  vars IVSHIFTOPSX0-I IVSHIFTOPSX0-JNN IVSHIFTOPSX0-M IVSHIFTOPSX0-SX IVSHIFTOPSX0-V1 : WasmTerminal .
+  vars IVSHUFFLOP0-C IVSHUFFLOP0-C1 IVSHUFFLOP0-C2 IVSHUFFLOP0-I : WasmTerminals .
+  vars IVSHUFFLOP0-JNN IVSHUFFLOP0-M IVSHUFFLOP0-V1 IVSHUFFLOP0-V2 : WasmTerminal .
+  vars IVSWIZZLOP0-C IVSWIZZLOP0-C1 IVSWIZZLOP0-C2 : WasmTerminals .
+  vars IVSWIZZLOP0-JNN IVSWIZZLOP0-M IVSWIZZLOP0-V1 IVSWIZZLOP0-V2 : WasmTerminal .
+  vars IVTERNOPND0-C IVTERNOPND0-C1 IVTERNOPND0-C2 IVTERNOPND0-C3 : WasmTerminals .
+  vars IVTERNOPND0-JNN IVTERNOPND0-M IVTERNOPND0-V1 IVTERNOPND0-V2 IVTERNOPND0-V3 : WasmTerminal .
+  vars IVUNOP0-C IVUNOP0-C1 : WasmTerminals .
+  vars IVUNOP0-JNN IVUNOP0-M IVUNOP0-V1 : WasmTerminal .
   vars J : WasmTerminal .
   vars JSIZE0-JNN : WasmTerminal .
   vars JSIZENN0-JNN : WasmTerminal .
   vars LANETYPE0-LNN LANETYPE0-N : WasmTerminal .
-  vars LCVTOP0-C LCVTOP0-C1 LCVTOP0-HALF LCVTOP0-JNN1 LCVTOP0-JNN2 LCVTOP0-M1 LCVTOP0-M2 LCVTOP0-SX LCVTOP1-C LCVTOP1-C1 LCVTOP1-FNN2 LCVTOP1-HALF LCVTOP1-JNN1 LCVTOP1-M1 LCVTOP1-M2 LCVTOP1-SX LCVTOP2-C LCVTOP2-C1 LCVTOP2-FNN1 LCVTOP2-INN2 LCVTOP2-M1 LCVTOP2-M2 LCVTOP2-SX LCVTOP2-ZERO LCVTOP3-C LCVTOP3-C1 LCVTOP3-FNN1 LCVTOP3-INN2 LCVTOP3-M1 LCVTOP3-M2 LCVTOP3-SX LCVTOP3-ZERO LCVTOP4-C LCVTOP4-C1 LCVTOP4-FNN1 LCVTOP4-FNN2 LCVTOP4-M1 LCVTOP4-M2 LCVTOP5-C LCVTOP5-C1 LCVTOP5-FNN1 LCVTOP5-FNN2 LCVTOP5-M1 LCVTOP5-M2 : WasmTerminal .
+  vars LCVTOP0-C LCVTOP0-C1 LCVTOP0-HALF LCVTOP0-JNN1 LCVTOP0-JNN2 LCVTOP0-M1 LCVTOP0-M2 LCVTOP0-SX LCVTOP1-C LCVTOP1-C1 LCVTOP1-FNN2 LCVTOP1-HALF LCVTOP1-JNN1 LCVTOP1-M1 LCVTOP1-M2 LCVTOP1-SX LCVTOP2-C LCVTOP2-C1 LCVTOP2-FNN1 LCVTOP2-INN2 LCVTOP2-M1 LCVTOP2-M2 LCVTOP2-SX LCVTOP2-ZERO LCVTOP3-C LCVTOP3-C1 LCVTOP3-FNN1 LCVTOP3-INN2 LCVTOP3-M1 LCVTOP3-M2 LCVTOP3-SX LCVTOP3-ZERO LCVTOP4-C1 LCVTOP4-FNN1 LCVTOP4-FNN2 LCVTOP4-M1 LCVTOP4-M2 LCVTOP5-C1 LCVTOP5-FNN1 LCVTOP5-FNN2 LCVTOP5-M1 LCVTOP5-M2 : WasmTerminal .
+  vars LCVTOP4-C LCVTOP5-C : WasmTerminals .
   vars LIMITS-OK-R00-C : Context .
   vars LIMITS-OK-R00-K : WasmTerminal .
   vars LIMITS-OK-R00-M : M .
@@ -2102,7 +2197,9 @@ mod SPECTEC-CORE is
   vars LIMITS-SUB-MAX0-M1 LIMITS-SUB-MAX0-M2 : M .
   vars LOCAL-OK-SET0-C LOCAL-OK-UNSET1-C : Context .
   vars LOCAL-OK-SET0-T LOCAL-OK-UNSET1-T : Valtype .
-  vars LOCAL0-F LOCAL0-S LOCAL0-X : WasmTerminal .
+  vars LOCAL0-F : Frame .
+  vars LOCAL0-S : Store .
+  vars LOCAL0-X : WasmTerminal .
   vars LPACKNUM0-C LPACKNUM0-NUMTYPE LPACKNUM1-C LPACKNUM1-PACKTYPE : WasmTerminal .
   vars LSIZE0-NUMTYPE LSIZE1-PACKTYPE : WasmTerminal .
   vars LSIZENN0-LT : WasmTerminal .
@@ -2113,14 +2210,20 @@ mod SPECTEC-CORE is
   vars M0-N : WasmTerminal .
   vars MEM-OK-R00-C : Context .
   vars MEM-OK-R00-MEMTYPE : Memtype .
-  vars MEM0-F MEM0-S MEM0-X : WasmTerminal .
+  vars MEM0-F : Frame .
+  vars MEM0-S : Store .
+  vars MEM0-X : WasmTerminal .
   vars MEMARG-OK-R00-AT : Addrtype .
   vars MEMARG-OK-R00-M : M .
   vars MEMARG-OK-R00-N : N .
-  vars MEMINST0-F MEMINST0-S : WasmTerminal .
-  vars MEMSXA1-A MEMSXA1-XA MEMSXA2-EXTERNADDR MEMSXA2-XA : WasmTerminal .
-  vars MEMSXT1-MT MEMSXT1-XT MEMSXT2-EXTERNTYPE MEMSXT2-XT : WasmTerminal .
-  vars MEMSXX1-X MEMSXX1-XX MEMSXX2-EXTERNIDX MEMSXX2-XX : WasmTerminal .
+  vars MEMINST0-F : Frame .
+  vars MEMINST0-S : Store .
+  vars MEMSXA1-A MEMSXA2-EXTERNADDR : WasmTerminal .
+  vars MEMSXA1-XA MEMSXA2-XA : WasmTerminals .
+  vars MEMSXT1-MT MEMSXT2-EXTERNTYPE : WasmTerminal .
+  vars MEMSXT1-XT MEMSXT2-XT : WasmTerminals .
+  vars MEMSXX1-X MEMSXX2-EXTERNIDX : WasmTerminal .
+  vars MEMSXX1-XX MEMSXX2-XX : WasmTerminals .
   vars MEMTYPE-OK-R00-ADDRTYPE : Addrtype .
   vars MEMTYPE-OK-R00-C : Context .
   vars MEMTYPE-OK-R00-LIMITS : Limits .
@@ -2129,11 +2232,13 @@ mod SPECTEC-CORE is
   vars MEMTYPE-SUB-R00-LIMITS1 MEMTYPE-SUB-R00-LIMITS2 : Limits .
   vars MIN0-I MIN0-J MIN1-I MIN1-J : WasmTerminal .
   vars MINAT0-AT1 MINAT0-AT2 MINAT1-AT1 MINAT1-AT2 : WasmTerminal .
-  vars MINUS-RECS1-N MINUS-RECS1-TU MINUS-RECS1-TU1 MINUS-RECS1-TV MINUS-RECS2-TU MINUS-RECS2-TU1 MINUS-RECS2-TUQ MINUS-RECS2-TV MINUS-RECS2-TVQ MINUS-RECS2-X : WasmTerminal .
+  vars MINUS-RECS1-N MINUS-RECS1-TU1 MINUS-RECS2-TU1 MINUS-RECS2-X : WasmTerminal .
+  vars MINUS-RECS1-TU MINUS-RECS1-TV MINUS-RECS2-TU MINUS-RECS2-TUQ MINUS-RECS2-TV MINUS-RECS2-TVQ : WasmTerminals .
   vars MODULE-OK-R00-C MODULE-OK-R00-CQ : Context .
   vars MODULE-OK-R00-DATA MODULE-OK-R00-DT MODULE-OK-R00-DTI MODULE-OK-R00-DTQ MODULE-OK-R00-ELEM MODULE-OK-R00-EXPORT MODULE-OK-R00-FUNC MODULE-OK-R00-GLOBAL MODULE-OK-R00-GT MODULE-OK-R00-GTI MODULE-OK-R00-IMPORT MODULE-OK-R00-JT MODULE-OK-R00-JTI MODULE-OK-R00-MEM MODULE-OK-R00-MT MODULE-OK-R00-MTI MODULE-OK-R00-NM MODULE-OK-R00-OK MODULE-OK-R00-RT MODULE-OK-R00-TABLE MODULE-OK-R00-TAG MODULE-OK-R00-TT MODULE-OK-R00-TTI MODULE-OK-R00-TYPE MODULE-OK-R00-X MODULE-OK-R00-XTE MODULE-OK-R00-XTI : WasmTerminals .
   vars MODULE-OK-R00-START : Start .
-  vars MODULEINST0-F MODULEINST0-S : WasmTerminal .
+  vars MODULEINST0-F : Frame .
+  vars MODULEINST0-S : Store .
   vars NONDEFAULTABLE-R00-T : Valtype .
   vars NUM-OK-R00-C : WasmTerminal .
   vars NUM-OK-R00-NT : Numtype .
@@ -2149,7 +2254,8 @@ mod SPECTEC-CORE is
   vars PACKTYPE-OK-R00-PACKTYPE : Packtype .
   vars PACKTYPE-SUB-R00-C : Context .
   vars PACKTYPE-SUB-R00-PACKTYPE : Packtype .
-  vars PROD1-N PROD1-NQ : WasmTerminal .
+  vars PROD1-N : WasmTerminal .
+  vars PROD1-NQ : WasmTerminals .
   vars PSIZENN0-PT : WasmTerminal .
   vars RECTYPE-OK-CONS1-C RECTYPE-OK-EMPTY0-C RECTYPE-OK-W--REC22-C : Context .
   vars RECTYPE-OK-CONS1-SUBTYPE RECTYPE-OK-W--REC22-SUBTYPE : WasmTerminals .
@@ -2180,18 +2286,27 @@ mod SPECTEC-CORE is
   vars RESULTTYPE-OK-R00-T : WasmTerminals .
   vars RESULTTYPE-SUB-R00-C : Context .
   vars RESULTTYPE-SUB-R00-T1 RESULTTYPE-SUB-R00-T2 : WasmTerminals .
-  vars ROLLDT0-RECTYPE ROLLDT0-SUBTYPE ROLLDT0-X : WasmTerminal .
-  vars ROLLRT0-RECTYPE ROLLRT0-SUBTYPE ROLLRT0-X : WasmTerminal .
-  vars RUNDATA0-B RUNDATA0-X RUNDATA1-B RUNDATA1-INSTR RUNDATA1-X RUNDATA1-Y : WasmTerminal .
-  vars RUNELEM0-E RUNELEM0-RT RUNELEM0-X RUNELEM1-E RUNELEM1-RT RUNELEM1-X RUNELEM2-E RUNELEM2-INSTR RUNELEM2-RT RUNELEM2-X RUNELEM2-Y : WasmTerminal .
+  vars ROLLDT0-I ROLLDT0-SUBTYPE : WasmTerminals .
+  vars ROLLDT0-N ROLLDT0-RECTYPE ROLLDT0-X : WasmTerminal .
+  vars ROLLRT0-I ROLLRT0-SUBTYPE : WasmTerminals .
+  vars ROLLRT0-N ROLLRT0-RECTYPE ROLLRT0-X : WasmTerminal .
+  vars RUNDATA0-B RUNDATA1-B RUNDATA1-INSTR : WasmTerminals .
+  vars RUNDATA0-N RUNDATA0-X RUNDATA1-N RUNDATA1-X RUNDATA1-Y : WasmTerminal .
+  vars RUNELEM0-E RUNELEM1-E RUNELEM2-E RUNELEM2-INSTR : WasmTerminals .
+  vars RUNELEM0-N RUNELEM0-RT RUNELEM0-X RUNELEM1-N RUNELEM1-RT RUNELEM1-X RUNELEM2-N RUNELEM2-RT RUNELEM2-X RUNELEM2-Y : WasmTerminal .
   vars SAT-S0-I SAT-S0-N SAT-S1-I SAT-S1-N SAT-S2-I SAT-S2-N : WasmTerminal .
   vars SAT-U0-I SAT-U0-N SAT-U1-I SAT-U1-N SAT-U2-I SAT-U2-N : WasmTerminal .
-  vars SETMINUS0-W SETMINUS1-W SETMINUS1-W1 SETMINUS1-WQ : WasmTerminal .
-  vars SETMINUS10-W SETMINUS11-W SETMINUS11-W1 SETMINUS11-WQ SETMINUS12-W SETMINUS12-W1 SETMINUS12-WQ : WasmTerminal .
-  vars SETPRODUCT1-W SETPRODUCT1-W1 : WasmTerminal .
-  vars SETPRODUCT10-W SETPRODUCT11-W SETPRODUCT11-W1 SETPRODUCT11-WQ : WasmTerminal .
-  vars SETPRODUCT20-W1 SETPRODUCT21-W SETPRODUCT21-W1 SETPRODUCT21-WQ : WasmTerminal .
-  vars SHIFT-LABELIDXS1-LABELIDXQ SHIFT-LABELIDXS2-LABELIDX SHIFT-LABELIDXS2-LABELIDXQ : WasmTerminal .
+  vars SETMINUS0-W SETMINUS1-W SETMINUS1-WQ : WasmTerminals .
+  vars SETMINUS1-W1 : WasmTerminal .
+  vars SETMINUS10-W SETMINUS11-W SETMINUS11-W1 SETMINUS12-W SETMINUS12-W1 : WasmTerminal .
+  vars SETMINUS11-WQ SETMINUS12-WQ : WasmTerminals .
+  vars SETPRODUCT1-W SETPRODUCT1-W1 : WasmTerminals .
+  vars SETPRODUCT10-W SETPRODUCT11-W SETPRODUCT11-WQ : WasmTerminals .
+  vars SETPRODUCT11-W1 : WasmTerminal .
+  vars SETPRODUCT20-W1 SETPRODUCT21-W1 : WasmTerminal .
+  vars SETPRODUCT21-W SETPRODUCT21-WQ : WasmTerminals .
+  vars SHIFT-LABELIDXS1-LABELIDXQ SHIFT-LABELIDXS2-LABELIDXQ : WasmTerminals .
+  vars SHIFT-LABELIDXS2-LABELIDX : WasmTerminal .
   vars SIGNED0-I SIGNED0-N SIGNED1-I SIGNED1-N : WasmTerminal .
   vars SIZENN0-NT : WasmTerminal .
   vars SIZENN10-NT : WasmTerminal .
@@ -2274,39 +2389,70 @@ mod SPECTEC-CORE is
   vars STORAGETYPE-SUB-PACK1-C STORAGETYPE-SUB-VAL0-C : Context .
   vars STORAGETYPE-SUB-PACK1-PACKTYPE1 STORAGETYPE-SUB-PACK1-PACKTYPE2 : Packtype .
   vars STORAGETYPE-SUB-VAL0-VALTYPE1 STORAGETYPE-SUB-VAL0-VALTYPE2 : Valtype .
-  vars STORE0-F STORE0-S : WasmTerminal .
-  vars STRUCTINST0-F STRUCTINST0-S : WasmTerminal .
-  vars SUBST-ADDRTYPE0-AT SUBST-ADDRTYPE0-TU SUBST-ADDRTYPE0-TV : WasmTerminal .
-  vars SUBST-ALL-DEFTYPE0-DT SUBST-ALL-DEFTYPE0-TU : WasmTerminal .
-  vars SUBST-ALL-DEFTYPES0-TU SUBST-ALL-DEFTYPES1-DT SUBST-ALL-DEFTYPES1-DT1 SUBST-ALL-DEFTYPES1-TU : WasmTerminal .
-  vars SUBST-ALL-EXTERNTYPE0-TU SUBST-ALL-EXTERNTYPE0-XT : WasmTerminal .
-  vars SUBST-ALL-GLOBALTYPE0-GT SUBST-ALL-GLOBALTYPE0-TU : WasmTerminal .
-  vars SUBST-ALL-MEMTYPE0-MT SUBST-ALL-MEMTYPE0-TU : WasmTerminal .
-  vars SUBST-ALL-MODULETYPE0-MMT SUBST-ALL-MODULETYPE0-TU : WasmTerminal .
-  vars SUBST-ALL-REFTYPE0-RT SUBST-ALL-REFTYPE0-TU : WasmTerminal .
-  vars SUBST-ALL-TABLETYPE0-TT SUBST-ALL-TABLETYPE0-TU : WasmTerminal .
-  vars SUBST-ALL-TAGTYPE0-JT SUBST-ALL-TAGTYPE0-TU : WasmTerminal .
-  vars SUBST-ALL-VALTYPE0-T SUBST-ALL-VALTYPE0-TU : WasmTerminal .
-  vars SUBST-COMPTYPE0-FT SUBST-COMPTYPE0-TU SUBST-COMPTYPE0-TV SUBST-COMPTYPE1-FT SUBST-COMPTYPE1-TU SUBST-COMPTYPE1-TV SUBST-COMPTYPE2-T1 SUBST-COMPTYPE2-T2 SUBST-COMPTYPE2-TU SUBST-COMPTYPE2-TV : WasmTerminal .
-  vars SUBST-DEFTYPE0-I SUBST-DEFTYPE0-QT SUBST-DEFTYPE0-TU SUBST-DEFTYPE0-TV : WasmTerminal .
-  vars SUBST-EXTERNTYPE0-JT SUBST-EXTERNTYPE0-TU SUBST-EXTERNTYPE0-TV SUBST-EXTERNTYPE1-GT SUBST-EXTERNTYPE1-TU SUBST-EXTERNTYPE1-TV SUBST-EXTERNTYPE2-TT SUBST-EXTERNTYPE2-TU SUBST-EXTERNTYPE2-TV SUBST-EXTERNTYPE3-MT SUBST-EXTERNTYPE3-TU SUBST-EXTERNTYPE3-TV SUBST-EXTERNTYPE4-DT SUBST-EXTERNTYPE4-TU SUBST-EXTERNTYPE4-TV : WasmTerminal .
-  vars SUBST-FIELDTYPE0-MUT SUBST-FIELDTYPE0-TU SUBST-FIELDTYPE0-TV SUBST-FIELDTYPE0-ZT : WasmTerminal .
-  vars SUBST-GLOBALTYPE0-MUT SUBST-GLOBALTYPE0-T SUBST-GLOBALTYPE0-TU SUBST-GLOBALTYPE0-TV : WasmTerminal .
-  vars SUBST-HEAPTYPE0-TU SUBST-HEAPTYPE0-TV SUBST-HEAPTYPE0-TVQ SUBST-HEAPTYPE1-DT SUBST-HEAPTYPE1-TU SUBST-HEAPTYPE1-TV SUBST-HEAPTYPE2-HT SUBST-HEAPTYPE2-TU SUBST-HEAPTYPE2-TV : WasmTerminal .
-  vars SUBST-MEMTYPE0-AT SUBST-MEMTYPE0-LIM SUBST-MEMTYPE0-TU SUBST-MEMTYPE0-TV : WasmTerminal .
-  vars SUBST-MODULETYPE0-TU SUBST-MODULETYPE0-TV SUBST-MODULETYPE0-XT1 SUBST-MODULETYPE0-XT2 : WasmTerminal .
-  vars SUBST-NUMTYPE0-NT SUBST-NUMTYPE0-TU SUBST-NUMTYPE0-TV : WasmTerminal .
-  vars SUBST-PACKTYPE0-PT SUBST-PACKTYPE0-TU SUBST-PACKTYPE0-TV : WasmTerminal .
-  vars SUBST-RECTYPE0-ST SUBST-RECTYPE0-TU SUBST-RECTYPE0-TUQ SUBST-RECTYPE0-TV SUBST-RECTYPE0-TVQ : WasmTerminal .
-  vars SUBST-REFTYPE0-HT SUBST-REFTYPE0-NULL SUBST-REFTYPE0-TU SUBST-REFTYPE0-TV : WasmTerminal .
-  vars SUBST-STORAGETYPE0-T SUBST-STORAGETYPE0-TU SUBST-STORAGETYPE0-TV SUBST-STORAGETYPE1-PT SUBST-STORAGETYPE1-TU SUBST-STORAGETYPE1-TV : WasmTerminal .
-  vars SUBST-SUBTYPE0-CT SUBST-SUBTYPE0-FINAL SUBST-SUBTYPE0-TU SUBST-SUBTYPE0-TUQ SUBST-SUBTYPE0-TV : WasmTerminal .
-  vars SUBST-TABLETYPE0-AT SUBST-TABLETYPE0-LIM SUBST-TABLETYPE0-RT SUBST-TABLETYPE0-TU SUBST-TABLETYPE0-TV : WasmTerminal .
-  vars SUBST-TAGTYPE0-TU SUBST-TAGTYPE0-TUQ SUBST-TAGTYPE0-TV : WasmTerminal .
-  vars SUBST-TYPEUSE0-TU SUBST-TYPEUSE0-TV SUBST-TYPEUSE0-TVQ SUBST-TYPEUSE1-DT SUBST-TYPEUSE1-TU SUBST-TYPEUSE1-TV : WasmTerminal .
-  vars SUBST-TYPEVAR0-TV SUBST-TYPEVAR1-TU1 SUBST-TYPEVAR1-TUQ SUBST-TYPEVAR1-TV SUBST-TYPEVAR1-TV1 SUBST-TYPEVAR1-TVQ SUBST-TYPEVAR2-TU1 SUBST-TYPEVAR2-TUQ SUBST-TYPEVAR2-TV SUBST-TYPEVAR2-TV1 SUBST-TYPEVAR2-TVQ : WasmTerminal .
-  vars SUBST-VALTYPE0-NT SUBST-VALTYPE0-TU SUBST-VALTYPE0-TV SUBST-VALTYPE1-TU SUBST-VALTYPE1-TV SUBST-VALTYPE1-VT SUBST-VALTYPE2-RT SUBST-VALTYPE2-TU SUBST-VALTYPE2-TV SUBST-VALTYPE3-TU SUBST-VALTYPE3-TV : WasmTerminal .
-  vars SUBST-VECTYPE0-TU SUBST-VECTYPE0-TV SUBST-VECTYPE0-VT : WasmTerminal .
+  vars STORE0-F : Frame .
+  vars STORE0-S : Store .
+  vars STRUCTINST0-F : Frame .
+  vars STRUCTINST0-S : Store .
+  vars SUBST-ADDRTYPE0-AT : WasmTerminal .
+  vars SUBST-ADDRTYPE0-TU SUBST-ADDRTYPE0-TV : WasmTerminals .
+  vars SUBST-ALL-DEFTYPE0-DT SUBST-ALL-DEFTYPE0-N : WasmTerminal .
+  vars SUBST-ALL-DEFTYPE0-I SUBST-ALL-DEFTYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-DEFTYPES0-TU SUBST-ALL-DEFTYPES1-DT SUBST-ALL-DEFTYPES1-TU : WasmTerminals .
+  vars SUBST-ALL-DEFTYPES1-DT1 : WasmTerminal .
+  vars SUBST-ALL-EXTERNTYPE0-I SUBST-ALL-EXTERNTYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-EXTERNTYPE0-N SUBST-ALL-EXTERNTYPE0-XT : WasmTerminal .
+  vars SUBST-ALL-GLOBALTYPE0-GT SUBST-ALL-GLOBALTYPE0-N : WasmTerminal .
+  vars SUBST-ALL-GLOBALTYPE0-I SUBST-ALL-GLOBALTYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-MEMTYPE0-I SUBST-ALL-MEMTYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-MEMTYPE0-MT SUBST-ALL-MEMTYPE0-N : WasmTerminal .
+  vars SUBST-ALL-MODULETYPE0-I SUBST-ALL-MODULETYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-MODULETYPE0-MMT SUBST-ALL-MODULETYPE0-N : WasmTerminal .
+  vars SUBST-ALL-REFTYPE0-I SUBST-ALL-REFTYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-REFTYPE0-N SUBST-ALL-REFTYPE0-RT : WasmTerminal .
+  vars SUBST-ALL-TABLETYPE0-I SUBST-ALL-TABLETYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-TABLETYPE0-N SUBST-ALL-TABLETYPE0-TT : WasmTerminal .
+  vars SUBST-ALL-TAGTYPE0-I SUBST-ALL-TAGTYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-TAGTYPE0-JT SUBST-ALL-TAGTYPE0-N : WasmTerminal .
+  vars SUBST-ALL-VALTYPE0-I SUBST-ALL-VALTYPE0-TU : WasmTerminals .
+  vars SUBST-ALL-VALTYPE0-N SUBST-ALL-VALTYPE0-T : WasmTerminal .
+  vars SUBST-COMPTYPE0-FT SUBST-COMPTYPE0-TU SUBST-COMPTYPE0-TV SUBST-COMPTYPE1-TU SUBST-COMPTYPE1-TV SUBST-COMPTYPE2-T1 SUBST-COMPTYPE2-T2 SUBST-COMPTYPE2-TU SUBST-COMPTYPE2-TV : WasmTerminals .
+  vars SUBST-COMPTYPE1-FT : WasmTerminal .
+  vars SUBST-DEFTYPE0-I SUBST-DEFTYPE0-QT : WasmTerminal .
+  vars SUBST-DEFTYPE0-TU SUBST-DEFTYPE0-TV : WasmTerminals .
+  vars SUBST-EXTERNTYPE0-JT SUBST-EXTERNTYPE1-GT SUBST-EXTERNTYPE2-TT SUBST-EXTERNTYPE3-MT SUBST-EXTERNTYPE4-DT : WasmTerminal .
+  vars SUBST-EXTERNTYPE0-TU SUBST-EXTERNTYPE0-TV SUBST-EXTERNTYPE1-TU SUBST-EXTERNTYPE1-TV SUBST-EXTERNTYPE2-TU SUBST-EXTERNTYPE2-TV SUBST-EXTERNTYPE3-TU SUBST-EXTERNTYPE3-TV SUBST-EXTERNTYPE4-TU SUBST-EXTERNTYPE4-TV : WasmTerminals .
+  vars SUBST-FIELDTYPE0-MUT SUBST-FIELDTYPE0-ZT : WasmTerminal .
+  vars SUBST-FIELDTYPE0-TU SUBST-FIELDTYPE0-TV : WasmTerminals .
+  vars SUBST-GLOBALTYPE0-MUT SUBST-GLOBALTYPE0-T : WasmTerminal .
+  vars SUBST-GLOBALTYPE0-TU SUBST-GLOBALTYPE0-TV : WasmTerminals .
+  vars SUBST-HEAPTYPE0-TU SUBST-HEAPTYPE0-TV SUBST-HEAPTYPE1-TU SUBST-HEAPTYPE1-TV SUBST-HEAPTYPE2-TU SUBST-HEAPTYPE2-TV : WasmTerminals .
+  vars SUBST-HEAPTYPE0-TVQ SUBST-HEAPTYPE1-DT SUBST-HEAPTYPE2-HT : WasmTerminal .
+  vars SUBST-MEMTYPE0-AT SUBST-MEMTYPE0-LIM : WasmTerminal .
+  vars SUBST-MEMTYPE0-TU SUBST-MEMTYPE0-TV : WasmTerminals .
+  vars SUBST-MODULETYPE0-TU SUBST-MODULETYPE0-TV SUBST-MODULETYPE0-XT1 SUBST-MODULETYPE0-XT2 : WasmTerminals .
+  vars SUBST-NUMTYPE0-NT : WasmTerminal .
+  vars SUBST-NUMTYPE0-TU SUBST-NUMTYPE0-TV : WasmTerminals .
+  vars SUBST-PACKTYPE0-PT : WasmTerminal .
+  vars SUBST-PACKTYPE0-TU SUBST-PACKTYPE0-TV : WasmTerminals .
+  vars SUBST-RECTYPE0-ST SUBST-RECTYPE0-TU SUBST-RECTYPE0-TUQ SUBST-RECTYPE0-TV SUBST-RECTYPE0-TVQ : WasmTerminals .
+  vars SUBST-REFTYPE0-HT SUBST-REFTYPE0-NULL : WasmTerminal .
+  vars SUBST-REFTYPE0-TU SUBST-REFTYPE0-TV : WasmTerminals .
+  vars SUBST-STORAGETYPE0-T SUBST-STORAGETYPE1-PT : WasmTerminal .
+  vars SUBST-STORAGETYPE0-TU SUBST-STORAGETYPE0-TV SUBST-STORAGETYPE1-TU SUBST-STORAGETYPE1-TV : WasmTerminals .
+  vars SUBST-SUBTYPE0-CT SUBST-SUBTYPE0-FINAL : WasmTerminal .
+  vars SUBST-SUBTYPE0-TU SUBST-SUBTYPE0-TUQ SUBST-SUBTYPE0-TV : WasmTerminals .
+  vars SUBST-TABLETYPE0-AT SUBST-TABLETYPE0-LIM SUBST-TABLETYPE0-RT : WasmTerminal .
+  vars SUBST-TABLETYPE0-TU SUBST-TABLETYPE0-TV : WasmTerminals .
+  vars SUBST-TAGTYPE0-TU SUBST-TAGTYPE0-TV : WasmTerminals .
+  vars SUBST-TAGTYPE0-TUQ : WasmTerminal .
+  vars SUBST-TYPEUSE0-TU SUBST-TYPEUSE0-TV SUBST-TYPEUSE1-TU SUBST-TYPEUSE1-TV : WasmTerminals .
+  vars SUBST-TYPEUSE0-TVQ SUBST-TYPEUSE1-DT : WasmTerminal .
+  vars SUBST-TYPEVAR0-TV SUBST-TYPEVAR1-TU1 SUBST-TYPEVAR1-TV SUBST-TYPEVAR1-TV1 SUBST-TYPEVAR2-TU1 SUBST-TYPEVAR2-TV SUBST-TYPEVAR2-TV1 : WasmTerminal .
+  vars SUBST-TYPEVAR1-TUQ SUBST-TYPEVAR1-TVQ SUBST-TYPEVAR2-TUQ SUBST-TYPEVAR2-TVQ : WasmTerminals .
+  vars SUBST-VALTYPE0-NT SUBST-VALTYPE1-VT SUBST-VALTYPE2-RT : WasmTerminal .
+  vars SUBST-VALTYPE0-TU SUBST-VALTYPE0-TV SUBST-VALTYPE1-TU SUBST-VALTYPE1-TV SUBST-VALTYPE2-TU SUBST-VALTYPE2-TV SUBST-VALTYPE3-TU SUBST-VALTYPE3-TV : WasmTerminals .
+  vars SUBST-VECTYPE0-TU SUBST-VECTYPE0-TV : WasmTerminals .
+  vars SUBST-VECTYPE0-VT : WasmTerminal .
   vars SUBTYPE-OK-R00-C : Context .
   vars SUBTYPE-OK-R00-COMPTYPE : Comptype .
   vars SUBTYPE-OK-R00-COMPTYPEQ SUBTYPE-OK-R00-X SUBTYPE-OK-R00-XQ : WasmTerminals .
@@ -2316,7 +2462,8 @@ mod SPECTEC-CORE is
   vars SUBTYPE-OK2-R00-COMPTYPEQ SUBTYPE-OK2-R00-TYPEUSE SUBTYPE-OK2-R00-TYPEUSEQ : WasmTerminals .
   vars SUBTYPE-OK2-R00-I : WasmTerminal .
   vars SUBTYPE-OK2-R00-X : Idx .
-  vars SUM1-N SUM1-NQ : WasmTerminal .
+  vars SUM1-N : WasmTerminal .
+  vars SUM1-NQ : WasmTerminals .
   vars SX0-CONSTTYPE SX1-PACKTYPE : WasmTerminal .
   vars TABLE-OK-R00-AT : Addrtype .
   vars TABLE-OK-R00-C : Context .
@@ -2324,11 +2471,17 @@ mod SPECTEC-CORE is
   vars TABLE-OK-R00-LIM : Limits .
   vars TABLE-OK-R00-RT : Reftype .
   vars TABLE-OK-R00-TABLETYPE : Tabletype .
-  vars TABLE0-F TABLE0-S TABLE0-X : WasmTerminal .
-  vars TABLEINST0-F TABLEINST0-S : WasmTerminal .
-  vars TABLESXA1-A TABLESXA1-XA TABLESXA2-EXTERNADDR TABLESXA2-XA : WasmTerminal .
-  vars TABLESXT1-TT TABLESXT1-XT TABLESXT2-EXTERNTYPE TABLESXT2-XT : WasmTerminal .
-  vars TABLESXX1-X TABLESXX1-XX TABLESXX2-EXTERNIDX TABLESXX2-XX : WasmTerminal .
+  vars TABLE0-F : Frame .
+  vars TABLE0-S : Store .
+  vars TABLE0-X : WasmTerminal .
+  vars TABLEINST0-F : Frame .
+  vars TABLEINST0-S : Store .
+  vars TABLESXA1-A TABLESXA2-EXTERNADDR : WasmTerminal .
+  vars TABLESXA1-XA TABLESXA2-XA : WasmTerminals .
+  vars TABLESXT1-TT TABLESXT2-EXTERNTYPE : WasmTerminal .
+  vars TABLESXT1-XT TABLESXT2-XT : WasmTerminals .
+  vars TABLESXX1-X TABLESXX2-EXTERNIDX : WasmTerminal .
+  vars TABLESXX1-XX TABLESXX2-XX : WasmTerminals .
   vars TABLETYPE-OK-R00-ADDRTYPE : Addrtype .
   vars TABLETYPE-OK-R00-C : Context .
   vars TABLETYPE-OK-R00-LIMITS : Limits .
@@ -2339,12 +2492,19 @@ mod SPECTEC-CORE is
   vars TABLETYPE-SUB-R00-REFTYPE1 TABLETYPE-SUB-R00-REFTYPE2 : Reftype .
   vars TAG-OK-R00-C : Context .
   vars TAG-OK-R00-TAGTYPE : Tagtype .
-  vars TAG0-F TAG0-S TAG0-X : WasmTerminal .
-  vars TAGADDR0-F TAGADDR0-S : WasmTerminal .
-  vars TAGINST0-F TAGINST0-S : WasmTerminal .
-  vars TAGSXA1-A TAGSXA1-XA TAGSXA2-EXTERNADDR TAGSXA2-XA : WasmTerminal .
-  vars TAGSXT1-JT TAGSXT1-XT TAGSXT2-EXTERNTYPE TAGSXT2-XT : WasmTerminal .
-  vars TAGSXX1-X TAGSXX1-XX TAGSXX2-EXTERNIDX TAGSXX2-XX : WasmTerminal .
+  vars TAG0-F : Frame .
+  vars TAG0-S : Store .
+  vars TAG0-X : WasmTerminal .
+  vars TAGADDR0-F : Frame .
+  vars TAGADDR0-S : Store .
+  vars TAGINST0-F : Frame .
+  vars TAGINST0-S : Store .
+  vars TAGSXA1-A TAGSXA2-EXTERNADDR : WasmTerminal .
+  vars TAGSXA1-XA TAGSXA2-XA : WasmTerminals .
+  vars TAGSXT1-JT TAGSXT2-EXTERNTYPE : WasmTerminal .
+  vars TAGSXT1-XT TAGSXT2-XT : WasmTerminals .
+  vars TAGSXX1-X TAGSXX2-EXTERNIDX : WasmTerminal .
+  vars TAGSXX1-XX TAGSXX2-XX : WasmTerminals .
   vars TAGTYPE-OK-R00-C : Context .
   vars TAGTYPE-OK-R00-T1 TAGTYPE-OK-R00-T2 : WasmTerminals .
   vars TAGTYPE-OK-R00-TYPEUSE : Typeuse .
@@ -2355,7 +2515,9 @@ mod SPECTEC-CORE is
   vars TYPE-OK-R00-DT : WasmTerminals .
   vars TYPE-OK-R00-RECTYPE : Rectype .
   vars TYPE-OK-R00-X : Idx .
-  vars TYPE0-F TYPE0-S TYPE0-X : WasmTerminal .
+  vars TYPE0-F : Frame .
+  vars TYPE0-S : Store .
+  vars TYPE0-X : WasmTerminal .
   vars TYPES-OK-CONS1-C TYPES-OK-EMPTY0-C : Context .
   vars TYPES-OK-CONS1-DT TYPES-OK-CONS1-DT1 TYPES-OK-CONS1-TYPE : WasmTerminals .
   vars TYPES-OK-CONS1-TYPE1 : Type .
@@ -2368,9 +2530,11 @@ mod SPECTEC-CORE is
   vars UNPACK0-VALTYPE UNPACK1-PACKTYPE : WasmTerminal .
   vars UNPACKFIELD0-VAL UNPACKFIELD0-VALTYPE UNPACKFIELD1-I UNPACKFIELD1-PACKTYPE UNPACKFIELD1-SX : WasmTerminal .
   vars UNPACKSHAPE0-LNN UNPACKSHAPE0-N : WasmTerminal .
-  vars UNROLLDT0-I UNROLLDT0-RECTYPE UNROLLDT0-SUBTYPE : WasmTerminal .
+  vars UNROLLDT0-I UNROLLDT0-RECTYPE : WasmTerminal .
+  vars UNROLLDT0-SUBTYPE : WasmTerminals .
   vars UNROLLHT0-C UNROLLHT0-DEFTYPE UNROLLHT1-C UNROLLHT1-TYPEIDX UNROLLHT2-C UNROLLHT2-I : WasmTerminal .
-  vars UNROLLRT0-RECTYPE UNROLLRT0-SUBTYPE : WasmTerminal .
+  vars UNROLLRT0-I UNROLLRT0-SUBTYPE : WasmTerminals .
+  vars UNROLLRT0-N UNROLLRT0-RECTYPE : WasmTerminal .
   vars VAL-OK-NUM0-NT : Numtype .
   vars VAL-OK-NUM0-NUM : Num .
   vars VAL-OK-NUM0-S VAL-OK-REF2-S VAL-OK-VEC1-S : Store .
@@ -2389,7 +2553,8 @@ mod SPECTEC-CORE is
   vars VALTYPE-SUB-VEC1-VECTYPE1 VALTYPE-SUB-VEC1-VECTYPE2 : Vectype .
   vars VBINOP0-JNN VBINOP0-M VBINOP0-V1 VBINOP0-V2 VBINOP1-JNN VBINOP1-M VBINOP1-V1 VBINOP1-V2 VBINOP10-FNN VBINOP10-M VBINOP10-V1 VBINOP10-V2 VBINOP11-FNN VBINOP11-M VBINOP11-V1 VBINOP11-V2 VBINOP12-FNN VBINOP12-M VBINOP12-V1 VBINOP12-V2 VBINOP13-FNN VBINOP13-M VBINOP13-V1 VBINOP13-V2 VBINOP14-FNN VBINOP14-M VBINOP14-V1 VBINOP14-V2 VBINOP15-FNN VBINOP15-M VBINOP15-V1 VBINOP15-V2 VBINOP16-FNN VBINOP16-M VBINOP16-V1 VBINOP16-V2 VBINOP17-FNN VBINOP17-M VBINOP17-V1 VBINOP17-V2 VBINOP18-FNN VBINOP18-M VBINOP18-V1 VBINOP18-V2 VBINOP19-FNN VBINOP19-M VBINOP19-V1 VBINOP19-V2 VBINOP2-JNN VBINOP2-M VBINOP2-V1 VBINOP2-V2 VBINOP3-JNN VBINOP3-M VBINOP3-SX VBINOP3-V1 VBINOP3-V2 VBINOP4-JNN VBINOP4-M VBINOP4-SX VBINOP4-V1 VBINOP4-V2 VBINOP5-JNN VBINOP5-M VBINOP5-SX VBINOP5-V1 VBINOP5-V2 VBINOP6-JNN VBINOP6-M VBINOP6-SX VBINOP6-V1 VBINOP6-V2 VBINOP7-JNN VBINOP7-M VBINOP7-V1 VBINOP7-V2 VBINOP8-JNN VBINOP8-M VBINOP8-V1 VBINOP8-V2 VBINOP9-JNN VBINOP9-M VBINOP9-V1 VBINOP9-V2 : WasmTerminal .
   vars VBITMASKOP0-JNN VBITMASKOP0-M VBITMASKOP0-V : WasmTerminal .
-  vars VCVTOP0-C VCVTOP0-C1 VCVTOP0-LNN1 VCVTOP0-LNN2 VCVTOP0-M VCVTOP0-V VCVTOP0-V1 VCVTOP0-VCVTOP VCVTOP1-C VCVTOP1-C1 VCVTOP1-HALF VCVTOP1-LNN1 VCVTOP1-LNN2 VCVTOP1-M1 VCVTOP1-M2 VCVTOP1-V VCVTOP1-V1 VCVTOP1-VCVTOP VCVTOP2-C VCVTOP2-C1 VCVTOP2-LNN1 VCVTOP2-LNN2 VCVTOP2-M1 VCVTOP2-M2 VCVTOP2-V VCVTOP2-V1 VCVTOP2-VCVTOP : WasmTerminal .
+  vars VCVTOP0-C VCVTOP0-C1 VCVTOP1-C VCVTOP1-C1 VCVTOP2-C VCVTOP2-C1 : WasmTerminals .
+  vars VCVTOP0-LNN1 VCVTOP0-LNN2 VCVTOP0-M VCVTOP0-V VCVTOP0-V1 VCVTOP0-VCVTOP VCVTOP1-HALF VCVTOP1-LNN1 VCVTOP1-LNN2 VCVTOP1-M1 VCVTOP1-M2 VCVTOP1-V VCVTOP1-V1 VCVTOP1-VCVTOP VCVTOP2-LNN1 VCVTOP2-LNN2 VCVTOP2-M1 VCVTOP2-M2 VCVTOP2-V VCVTOP2-V1 VCVTOP2-VCVTOP : WasmTerminal .
   vars VEC-OK-R00-C : WasmTerminal .
   vars VEC-OK-R00-S : Store .
   vars VEC-OK-R00-VT : Vectype .
@@ -2400,10 +2565,12 @@ mod SPECTEC-CORE is
   vars VEXTBINOP0-HALF VEXTBINOP0-JNN1 VEXTBINOP0-JNN2 VEXTBINOP0-M1 VEXTBINOP0-M2 VEXTBINOP0-SX VEXTBINOP0-V1 VEXTBINOP0-V2 VEXTBINOP1-JNN1 VEXTBINOP1-JNN2 VEXTBINOP1-M1 VEXTBINOP1-M2 VEXTBINOP1-V1 VEXTBINOP1-V2 VEXTBINOP2-JNN1 VEXTBINOP2-JNN2 VEXTBINOP2-M1 VEXTBINOP2-M2 VEXTBINOP2-V1 VEXTBINOP2-V2 : WasmTerminal .
   vars VEXTTERNOP0-C VEXTTERNOP0-C1 VEXTTERNOP0-C2 VEXTTERNOP0-C3 VEXTTERNOP0-CQ VEXTTERNOP0-CQQ VEXTTERNOP0-JNN VEXTTERNOP0-JNN1 VEXTTERNOP0-JNN2 VEXTTERNOP0-M VEXTTERNOP0-M1 VEXTTERNOP0-M2 : WasmTerminal .
   vars VEXTUNOP0-JNN1 VEXTUNOP0-JNN2 VEXTUNOP0-M1 VEXTUNOP0-M2 VEXTUNOP0-SX VEXTUNOP0-V1 : WasmTerminal .
-  vars VNARROWOP0-C1 VNARROWOP0-C2 VNARROWOP0-CQ1 VNARROWOP0-CQ2 VNARROWOP0-JNN1 VNARROWOP0-JNN2 VNARROWOP0-M1 VNARROWOP0-M2 VNARROWOP0-SX VNARROWOP0-V VNARROWOP0-V1 VNARROWOP0-V2 : WasmTerminal .
+  vars VNARROWOP0-C1 VNARROWOP0-C2 VNARROWOP0-CQ1 VNARROWOP0-CQ2 : WasmTerminals .
+  vars VNARROWOP0-JNN1 VNARROWOP0-JNN2 VNARROWOP0-M1 VNARROWOP0-M2 VNARROWOP0-SX VNARROWOP0-V VNARROWOP0-V1 VNARROWOP0-V2 : WasmTerminal .
   vars VRELOP0-JNN VRELOP0-M VRELOP0-V1 VRELOP0-V2 VRELOP1-JNN VRELOP1-M VRELOP1-V1 VRELOP1-V2 VRELOP10-FNN VRELOP10-M VRELOP10-V1 VRELOP10-V2 VRELOP11-FNN VRELOP11-M VRELOP11-V1 VRELOP11-V2 VRELOP2-JNN VRELOP2-M VRELOP2-SX VRELOP2-V1 VRELOP2-V2 VRELOP3-JNN VRELOP3-M VRELOP3-SX VRELOP3-V1 VRELOP3-V2 VRELOP4-JNN VRELOP4-M VRELOP4-SX VRELOP4-V1 VRELOP4-V2 VRELOP5-JNN VRELOP5-M VRELOP5-SX VRELOP5-V1 VRELOP5-V2 VRELOP6-FNN VRELOP6-M VRELOP6-V1 VRELOP6-V2 VRELOP7-FNN VRELOP7-M VRELOP7-V1 VRELOP7-V2 VRELOP8-FNN VRELOP8-M VRELOP8-V1 VRELOP8-V2 VRELOP9-FNN VRELOP9-M VRELOP9-V1 VRELOP9-V2 : WasmTerminal .
   vars VSHIFTOP0-I VSHIFTOP0-JNN VSHIFTOP0-M VSHIFTOP0-V VSHIFTOP1-I VSHIFTOP1-JNN VSHIFTOP1-M VSHIFTOP1-SX VSHIFTOP1-V : WasmTerminal .
-  vars VSHUFFLOP0-I VSHUFFLOP0-M VSHUFFLOP0-V1 VSHUFFLOP0-V2 : WasmTerminal .
+  vars VSHUFFLOP0-I : WasmTerminals .
+  vars VSHUFFLOP0-M VSHUFFLOP0-V1 VSHUFFLOP0-V2 : WasmTerminal .
   vars VSIZENN0-VT : WasmTerminal .
   vars VSWIZZLOP0-M VSWIZZLOP0-V1 VSWIZZLOP0-V2 VSWIZZLOP1-M VSWIZZLOP1-V1 VSWIZZLOP1-V2 : WasmTerminal .
   vars VTERNOP0-JNN VTERNOP0-M VTERNOP0-V1 VTERNOP0-V2 VTERNOP0-V3 VTERNOP1-FNN VTERNOP1-M VTERNOP1-V1 VTERNOP1-V2 VTERNOP1-V3 VTERNOP2-FNN VTERNOP2-M VTERNOP2-V1 VTERNOP2-V2 VTERNOP2-V3 : WasmTerminal .
@@ -2412,17 +2579,42 @@ mod SPECTEC-CORE is
   vars VVBINOP0-V1 VVBINOP0-V2 VVBINOP0-VNN VVBINOP1-V1 VVBINOP1-V2 VVBINOP1-VNN VVBINOP2-V1 VVBINOP2-V2 VVBINOP2-VNN VVBINOP3-V1 VVBINOP3-V2 VVBINOP3-VNN : WasmTerminal .
   vars VVTERNOP0-V1 VVTERNOP0-V2 VVTERNOP0-V3 VVTERNOP0-VNN : WasmTerminal .
   vars VVUNOP0-V VVUNOP0-VNN : WasmTerminal .
-  vars WITH-ARRAY0-A WITH-ARRAY0-F WITH-ARRAY0-FV WITH-ARRAY0-I WITH-ARRAY0-S : WasmTerminal .
-  vars WITH-DATA0-B WITH-DATA0-F WITH-DATA0-S WITH-DATA0-X : WasmTerminal .
-  vars WITH-ELEM0-F WITH-ELEM0-R WITH-ELEM0-S WITH-ELEM0-X : WasmTerminal .
-  vars WITH-GLOBAL0-F WITH-GLOBAL0-S WITH-GLOBAL0-V WITH-GLOBAL0-X : WasmTerminal .
-  vars WITH-LOCAL0-F WITH-LOCAL0-S WITH-LOCAL0-V WITH-LOCAL0-X : WasmTerminal .
-  vars WITH-LOCALS0-C WITH-LOCALS1-C WITH-LOCALS1-LCT WITH-LOCALS1-LCT1 WITH-LOCALS1-X WITH-LOCALS1-X1 : WasmTerminal .
-  vars WITH-MEM0-B WITH-MEM0-F WITH-MEM0-I WITH-MEM0-J WITH-MEM0-S WITH-MEM0-X : WasmTerminal .
-  vars WITH-MEMINST0-F WITH-MEMINST0-MI WITH-MEMINST0-S WITH-MEMINST0-X : WasmTerminal .
-  vars WITH-STRUCT0-A WITH-STRUCT0-F WITH-STRUCT0-FV WITH-STRUCT0-I WITH-STRUCT0-S : WasmTerminal .
-  vars WITH-TABLE0-F WITH-TABLE0-I WITH-TABLE0-R WITH-TABLE0-S WITH-TABLE0-X : WasmTerminal .
-  vars WITH-TABLEINST0-F WITH-TABLEINST0-S WITH-TABLEINST0-TI WITH-TABLEINST0-X : WasmTerminal .
+  vars WITH-ARRAY0-A WITH-ARRAY0-FV WITH-ARRAY0-I : WasmTerminal .
+  vars WITH-ARRAY0-F : Frame .
+  vars WITH-ARRAY0-S : Store .
+  vars WITH-DATA0-B : WasmTerminals .
+  vars WITH-DATA0-F : Frame .
+  vars WITH-DATA0-S : Store .
+  vars WITH-DATA0-X : WasmTerminal .
+  vars WITH-ELEM0-F : Frame .
+  vars WITH-ELEM0-R : WasmTerminals .
+  vars WITH-ELEM0-S : Store .
+  vars WITH-ELEM0-X : WasmTerminal .
+  vars WITH-GLOBAL0-F : Frame .
+  vars WITH-GLOBAL0-S : Store .
+  vars WITH-GLOBAL0-V WITH-GLOBAL0-X : WasmTerminal .
+  vars WITH-LOCAL0-F : Frame .
+  vars WITH-LOCAL0-S : Store .
+  vars WITH-LOCAL0-V WITH-LOCAL0-X : WasmTerminal .
+  vars WITH-LOCALS0-C WITH-LOCALS1-C WITH-LOCALS1-LCT1 WITH-LOCALS1-X1 : WasmTerminal .
+  vars WITH-LOCALS1-LCT WITH-LOCALS1-X : WasmTerminals .
+  vars WITH-MEM0-B : WasmTerminals .
+  vars WITH-MEM0-F : Frame .
+  vars WITH-MEM0-I WITH-MEM0-J WITH-MEM0-X : WasmTerminal .
+  vars WITH-MEM0-S : Store .
+  vars WITH-MEMINST0-F : Frame .
+  vars WITH-MEMINST0-MI WITH-MEMINST0-X : WasmTerminal .
+  vars WITH-MEMINST0-S : Store .
+  vars WITH-STRUCT0-A WITH-STRUCT0-FV WITH-STRUCT0-I : WasmTerminal .
+  vars WITH-STRUCT0-F : Frame .
+  vars WITH-STRUCT0-S : Store .
+  vars WITH-TABLE0-F : Frame .
+  vars WITH-TABLE0-I WITH-TABLE0-R WITH-TABLE0-X : WasmTerminal .
+  vars WITH-TABLE0-S : Store .
+  vars WITH-TABLEINST0-F : Frame .
+  vars WITH-TABLEINST0-S : Store .
+  vars WITH-TABLEINST0-TI WITH-TABLEINST0-X : WasmTerminal .
+  vars WQ : WasmTerminal .
   vars XQ : WasmTerminal .
   vars ZERO0-JNN ZERO1-FNN : WasmTerminal .
   vars ZEROOP0-HALF ZEROOP0-JNN1 ZEROOP0-JNN2 ZEROOP0-M1 ZEROOP0-M2 ZEROOP0-SX ZEROOP1-FNN2 ZEROOP1-HALF ZEROOP1-JNN1 ZEROOP1-M1 ZEROOP1-M2 ZEROOP1-SX ZEROOP2-FNN1 ZEROOP2-JNN2 ZEROOP2-M1 ZEROOP2-M2 ZEROOP2-SX ZEROOP2-ZERO ZEROOP3-FNN1 ZEROOP3-JNN2 ZEROOP3-M1 ZEROOP3-M2 ZEROOP3-SX ZEROOP3-ZERO ZEROOP4-FNN1 ZEROOP4-FNN2 ZEROOP4-M1 ZEROOP4-M2 ZEROOP4-ZERO ZEROOP5-FNN1 ZEROOP5-FNN2 ZEROOP5-M1 ZEROOP5-M2 : WasmTerminal .
@@ -9999,6 +10191,8 @@ mod SPECTEC-CORE is
   --- Generic list lifting for Val_ok premises over val* / valtype*.
   --- SpecTec writes this pointwise; the executable Maude condition needs
   --- an explicit recursive case for multi-value invocation arguments.
+  op Val-ok : Store WasmTerminals WasmTerminals -> Judgement .
+  eq Val-ok(VALOK-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .
   eq Num-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .
   eq Val-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .
   eq Val-ok(VALOK-S, eps, eps) = valid .

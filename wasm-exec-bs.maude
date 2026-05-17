@@ -115,4 +115,8 @@ mod WASM-FIB-BS is
     (((fib-store ; empty-frame).State) ;
       NVAL i32v(0) i32v(1) CTORREFFUNCADDRA1(0) CTORCALLREFA1(fib-type)) .
 
+  op fib-config-invoke : Val -> Config .
+  eq fib-config-invoke(NVAL) =
+    $invoke(fib-store, 0, NVAL i32v(0) i32v(1)) .
+
 endm
