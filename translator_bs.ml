@@ -1229,6 +1229,31 @@ let decl_sort_of_typ (t : typ) =
       seq_decl_sort_of_inner_typ inner
   | _ -> declared_sort_of_typ t
 
+(* DecD helper functions operate on C1's coarse CTOR carrier, but must
+   preserve runtime structural sorts used by generated configs/states. *)
+let structural_decd_sorts =
+  ["Config"; "State"; "Store"; "Frame"; "Judgement"]
+
+let decd_sort_of_typ (t : typ) =
+  match t.it with
+  | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
+  | _ ->
+      if is_bool_typ t [] then "Bool"
+      else
+        match type_sort_of_typ t [] with
+        | Some s when List.mem s structural_decd_sorts -> s
+        | _ -> "WasmTerminal"
+
+let decd_binder_var_sorts binders vm =
+  List.filter_map (fun b -> match b.it with
+    | ExpB (v_id, t) ->
+        (match List.assoc_opt v_id.it vm with
+         | Some mv -> Some (mv, decd_sort_of_typ t)
+         | None -> None)
+    | _ -> None
+  ) binders
+  |> List.sort_uniq compare
+
 (** Build a mapping from suffixed binder names (e.g. ["numtype_2"])
     to their corresponding indexed parameter names (e.g. ["NUMTYPE2"]). *)
 let build_suffix_map binders =
@@ -2460,30 +2485,29 @@ let translate_decd ss id params result_typ insts =
   in
   let param_sort (p : param) =
     match p.it with
-    | ExpP (_, t) ->
-        (match t.it with
-         | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
-         | _ -> "WasmTerminal")
+    | ExpP (_, t) -> decd_sort_of_typ t
     | _ -> "WasmTerminal"
   in
   let arg_sort_list = List.map param_sort params in
   let arg_sorts = String.concat " " arg_sort_list in
   let inferred_bool =
     List.exists (fun inst -> match inst.it with DefD (_, _, rhs, _) -> exp_is_boolish rhs) insts in
-  let ret_sort = match result_typ.it with
-    | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
-    | _ ->
-        if is_bool_typ result_typ [] || inferred_bool || SSet.mem maude_fn ss.bool_calls
-        then "Bool" else "WasmTerminal" in
+  let ret_sort =
+    if inferred_bool || SSet.mem maude_fn ss.bool_calls
+    then "Bool"
+    else decd_sort_of_typ result_typ
+  in
   let rhs_ctx = if ret_sort = "Bool" then BoolCtx else TermCtx in
 
-  let all_bound = ref [] and all_free = ref [] in
+  let all_bound = ref [] and all_free = ref [] and all_typed = ref [] in
   let seen_rewrite_clause = ref false in
   let eq_lines = List.mapi (fun eq_idx inst ->
     let (binders, lhs_args, rhs_exp, prem_list) =
       match inst.it with DefD (b, la, re, pl) -> (b, la, re, pl) in
     let vm = binder_to_var_map prefix eq_idx binders in
     let bconds = binder_to_type_conds binders vm in
+    let typed_vars = decd_binder_var_sorts binders vm in
+    all_typed := List.sort_uniq compare (!all_typed @ typed_vars);
 
     let lhs_ts : texpr list = List.map (fun a -> match a.it with
       | ExpA e -> translate_exp TermCtx e vm | _ -> texpr "eps") lhs_args in
@@ -2560,9 +2584,15 @@ let translate_decd ss id params result_typ insts =
   if !seen_rewrite_clause then
     rewrite_defs_seen := SSet.add maude_fn !rewrite_defs_seen;
   let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
-  let bound_decl = declare_vars_same_sort !all_bound "WasmTerminal" in
+  let typed_decl = declare_vars_by_sort !all_typed in
+  let bound_untyped =
+    !all_bound
+    |> List.filter (fun v -> not (List.mem_assoc v !all_typed))
+    |> List.sort_uniq String.compare
+  in
+  let bound_decl = declare_vars_same_sort bound_untyped "WasmTerminal" in
   let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
-  "\n" ^ op_decl ^ bound_decl ^ free_decl
+  "\n" ^ op_decl ^ typed_decl ^ bound_decl ^ free_decl
   ^ String.concat "\n" eq_lines ^ "\n"
 
 (* --- Step execution relation helpers ------------------------------------- *)
@@ -3944,11 +3974,11 @@ let header_prefix =
   "  vars WT-S WT-F : WasmTerminal .\n" ^
   "  var WT-X : Localidx .\n" ^
   "  var WT-V : Val .\n" ^
-  "  var VALOK-S : WasmTerminal .\n" ^
-  "  var VALOK-V : Val .\n" ^
-  "  var VALOK-T : Valtype .\n" ^
+  "  var VALOK-S : Store .\n" ^
+  "  var VALOK-V : WasmTerminal .\n" ^
+  "  var VALOK-T : WasmTerminal .\n" ^
   "  vars VALOK-WT-S VALOK-C : WasmTerminal .\n" ^
-  "  var VALOK-NT : Numtype .\n" ^
+  "  var VALOK-NT : WasmTerminal .\n" ^
   "  vars VALOK-VS VALOK-TS : WasmTerminals .\n" ^
   "  var EXP-FL-DT : Deftype .\n" ^
   "  var EXP-FL-CT : Comptype .\n" ^
@@ -4055,6 +4085,8 @@ let footer =
   "  --- Generic list lifting for Val_ok premises over val* / valtype*.\n" ^
   "  --- SpecTec writes this pointwise; the executable Maude condition needs\n" ^
   "  --- an explicit recursive case for multi-value invocation arguments.\n" ^
+  "  op Val-ok : Store WasmTerminals WasmTerminals -> Judgement .\n" ^
+  "  eq Val-ok(VALOK-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
   "  eq Num-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
   "  eq Val-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
   "  eq Val-ok(VALOK-S, eps, eps) = valid .\n" ^
