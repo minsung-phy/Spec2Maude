@@ -3063,18 +3063,13 @@ let translate_step_reld rel_name rules =
               in
               let all_conds = base_conds @ refined_lhs_guards in
               let cond = cond_join all_conds in
-              let rhs_text_for_relation =
-                if rel_name = "Step-pure" || rel_name = "Step-read" then
-                  Printf.sprintf "$norm-seq ( %s )" rhs_text_out
-                else rhs_text_out
-              in
               let lhs_rel_text, rhs_rel_text =
                 if rel_name = "Step-pure" then
                   (Printf.sprintf "step-pure ( %s )" lhs_text_out,
-                   rhs_text_for_relation)
+                   rhs_text_out)
                 else if rel_name = "Step-read" then
                   (Printf.sprintf "step-read ( %s )" (config_text z_in lhs_text_out),
-                   rhs_text_for_relation)
+                   rhs_text_out)
                 else
                   (Printf.sprintf "step ( %s )" (config_text z_in lhs_text_out),
                    config_text z_out rhs_text_out)
@@ -3932,7 +3927,6 @@ let header_prefix =
   "  op steps : Config -> StepsConf [frozen (1)] .\n\n" ^
   "  op $cfg-state : Config -> State .\n" ^
   "  op $cfg-instrs : Config -> WasmTerminals .\n\n" ^
-  "  op $norm-seq : WasmTerminals -> WasmTerminals .\n\n" ^
   "  --- Common variables (declared once)\n" ^
   "  var EC : Config .\n" ^
   "  var I : Int .\n" ^
@@ -3973,8 +3967,7 @@ let header_prefix =
   "  var TYPE-ITER-RT : Rectype .\n" ^
   "  var TYPE-ITER-N : Nat .\n" ^
   "  vars T W WW FQ : WasmTerminal .\n" ^
-  "  vars TS W* ISQ INSTRQ CQ : WasmTerminals .\n\n" ^
-  "  eq $norm-seq(ITS) = ITS .\n\n"
+  "  vars TS W* ISQ INSTRQ CQ : WasmTerminals .\n\n"
 
 let footer =
   "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
