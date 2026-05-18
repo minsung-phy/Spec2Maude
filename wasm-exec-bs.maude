@@ -64,6 +64,14 @@ mod WASM-FIB-BS is
         CTORFUNCARROWA2(CTORI32A0 CTORI32A0 CTORI32A0, CTORI32A0))),
       0) .
 
+  op fib-rectype : -> WasmTerminal .
+  eq fib-rectype =
+    CTORRECA1(CTORSUBA3(eps, eps,
+      CTORFUNCARROWA2(CTORI32A0 CTORI32A0 CTORI32A0, CTORI32A0))) .
+
+  op fib-source-type : -> WasmTerminal .
+  eq fib-source-type = CTORTYPEA1(fib-rectype) .
+
   op fib-moduleinst : -> Moduleinst [ctor] .
   eq value('TYPES,   fib-moduleinst) = fib-type .
   eq value('TAGS,    fib-moduleinst) = eps .
@@ -118,5 +126,33 @@ mod WASM-FIB-BS is
   op fib-config-invoke : Val -> Config .
   eq fib-config-invoke(NVAL) =
     $invoke(fib-store, 0, NVAL i32v(0) i32v(1)) .
+
+  op empty-store : -> Store [ctor] .
+  eq value('TAGS,    empty-store) = eps .
+  eq value('GLOBALS, empty-store) = eps .
+  eq value('MEMS,    empty-store) = eps .
+  eq value('TABLES,  empty-store) = eps .
+  eq value('FUNCS,   empty-store) = eps .
+  eq value('DATAS,   empty-store) = eps .
+  eq value('ELEMS,   empty-store) = eps .
+  eq value('STRUCTS, empty-store) = eps .
+  eq value('ARRAYS,  empty-store) = eps .
+  eq value('EXNS,    empty-store) = eps .
+
+  op fib-module : -> WasmTerminal .
+  eq fib-module =
+    CTORMODULEA11(
+      fib-source-type, --- types
+      eps,        --- imports
+      eps,        --- tags
+      eps,        --- globals
+      eps,        --- mems
+      eps,        --- tables
+      fib-func,   --- funcs
+      eps,        --- datas
+      eps,        --- elems
+      eps,        --- start
+      eps         --- exports
+    ) .
 
 endm
