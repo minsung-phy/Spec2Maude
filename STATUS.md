@@ -21,6 +21,26 @@ Project stages:
 
 The active target is still C1.
 
+## Temporary Executable Scaffolding
+
+`translator_bs.ml` currently restores only label-related generated
+`step-from-step-pure-*` rules for executability. These rules are derived lifted
+shortcuts from `Step_pure` into `Step`; they are not direct translations of
+original SpecTec `Step` rules and are not C1-final. Non-label
+`step-from-step-pure-*` shortcuts are intentionally suppressed.
+
+The strict version without these shortcuts exposed a Maude executability
+limitation in the single, SpecTec-shaped `Step/ctxt-instrs` rule: the intended
+associative split exists for terms such as `label(... br 0) local.get 1`, and
+each condition succeeds individually, but Maude does not combine that split with
+the conditional rewrite premise during full rule application. Reordering the
+conditions to put the `Step` premise first caused runaway recursion / stack
+overflow.
+
+Future work: remove the remaining label-related `step-from-step-pure-*`
+shortcuts by finding a faithful generic context-closure encoding for C1, or
+move execution-oriented control infrastructure to C2.
+
 ## C1 Goal
 
 C1 is the relation-preserving baseline. It is not the C2 analysis-friendly
