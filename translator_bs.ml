@@ -2938,16 +2938,7 @@ let translate_step_reld rel_name rules =
                 then rhs_inline_from_sched rhs_t.text prem_scheduled
                 else (rhs_t.text, prem_scheduled)
               in
-              let ctxt_focus_rewrite =
-                if rel_name = "Step" && case_id.it = "ctxt-instrs" then
-                  vm_vars
-                  |> List.find_opt (fun v -> ends_with v "-INSTR")
-                  |> Option.map (fun focus ->
-                      let head = focus ^ "-HEAD" in
-                      let rest = focus ^ "-REST" in
-                      (focus, head, rest, head ^ " " ^ rest))
-                else None
-              in
+              let ctxt_focus_rewrite = None in
               let rewrite_ctxt_focus_text text =
                 match ctxt_focus_rewrite with
                 | None -> text
@@ -3130,79 +3121,14 @@ let translate_step_reld rel_name rules =
               in
               let emit_rule label lhs rhs = emit_rule_with_cond label lhs rhs cond in
               let label = String.lowercase_ascii prefix in
-              let replace_rewrite_rhs text new_rhs =
-                match split_once_re (Str.regexp "[ \t]*=>[ \t]*") text with
-                | Some (lhs, _rhs) -> String.trim lhs ^ " => " ^ new_rhs
-                | None -> text
-              in
-              let emit_empty_result_split bridge_rel =
-                let empty_conds =
-                  List.map
-                    (fun c ->
-                      if starts_with (String.trim c) bridge_rel then
-                        replace_rewrite_rhs c "eps"
-                      else c)
-                    all_conds
-                in
-                let nonempty_conds =
-                  all_conds @
-                  [ Printf.sprintf "( %s =/= eps ) = true" rhs_text_out ]
-                in
-                String.concat "\n"
-                  [ emit_rule_with_cond
-                      (label ^ "-empty")
-                      lhs_rel_text
-                      (config_text z_out "eps")
-                      (cond_join empty_conds);
-                    emit_rule_with_cond
-                      label
-                      lhs_rel_text
-                      rhs_rel_text
-                      (cond_join nonempty_conds) ]
-              in
-              let emit_context_result_split result_seq_var =
-                let empty_conds =
-                  List.map
-                    (fun c ->
-                      if starts_with (String.trim c) "step" then
-                        replace_rewrite_rhs c (config_text z_out "eps")
-                      else c)
-                    all_conds
-                in
-                let empty_rhs_instr =
-                  replace_maude_var_token result_seq_var "eps" rhs_text_out
-                in
-                let nonempty_conds =
-                  all_conds @
-                  [ Printf.sprintf "( %s =/= eps ) = true" result_seq_var ]
-                in
-                String.concat "\n"
-                  [ emit_rule_with_cond
-                      label
-                      lhs_rel_text
-                      rhs_rel_text
-                      (cond_join nonempty_conds);
-                    emit_rule_with_cond
-                      (label ^ "-empty")
-                      lhs_rel_text
-                      (config_text z_out empty_rhs_instr)
-                      (cond_join empty_conds) ]
-              in
               let primary_rule =
-                if true then
-                  if rel_name = "Step" && case_id.it = "pure" then
-                    emit_empty_result_split "step-pure"
-                  else if rel_name = "Step" && case_id.it = "read" then
-                    emit_empty_result_split "step-read"
-                  else if rel_name = "Step"
-                          && List.mem case_id.it
-                               [ "ctxt-instrs"; "ctxt-label"; "ctxt-handler" ]
-                  then
-                    (match List.find_opt (fun v -> ends_with v "-INSTRQ") rhs_t.vars with
-                     | Some result_seq_var -> emit_context_result_split result_seq_var
-                     | None -> emit_rule label lhs_rel_text rhs_rel_text)
-                  else
-                    emit_rule label lhs_rel_text rhs_rel_text
+	                if true then
+	                  if rel_name = "Step" && case_id.it = "pure" then
+	                    emit_rule label lhs_rel_text rhs_rel_text
+	                  else if rel_name = "Step" && case_id.it = "read" then
+	                    emit_rule label lhs_rel_text rhs_rel_text
+	                  else
+	                    emit_rule label lhs_rel_text rhs_rel_text
                 else
                 let find_vm_suffix suffix =
                   List.find_opt (fun v -> ends_with v suffix) vm_vars
@@ -3398,7 +3324,14 @@ let translate_step_reld rel_name rules =
               in
               if rel_name <> "Step-pure" then
                 primary_rule
-              else if rel_name = "Step-pure" then
+              else if rel_name = "Step-pure"
+                      && (try ignore (Str.search_forward (Str.regexp_string "label") label 0); true
+                          with Not_found -> false) then
+                (* Temporary executable scaffolding, limited to label-related
+                   Step-pure families.  These lifted Step rules are derived
+                   shortcuts, not direct SpecTec rules; they remain only to
+                   cover the known Step/ctxt-instrs executability gap for
+                   label/br with a suffix. *)
                 let bridge_lhs =
                   Printf.sprintf "step ( %s )" (config_text z_in lhs_text_out)
                 in
