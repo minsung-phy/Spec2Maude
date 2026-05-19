@@ -2910,12 +2910,6 @@ let is_step_exec_rel name =
 let is_steps_rel name =
   name = "Steps"
 
-(** True if a rule has any RulePr premise (bridge / context / recursive rule).
-    We skip these: they're either handled by the heating/cooling pattern in
-    wasm-exec.maude or bridge to another Step variant. *)
-let has_rule_premise prems =
-  List.exists (fun p -> match p.it with RulePr _ -> true | _ -> false) prems
-
 (** Attempt to decompose a config expression  z ; instr*  into its two parts.
     Detects the  _;_  operator by checking that the CTOR name is CTORSEMICOLONA2. *)
 let try_decompose_config (e : exp) : (exp * exp) option =
@@ -2928,71 +2922,6 @@ let try_decompose_config (e : exp) : (exp * exp) option =
             | TupE [z_e; instr_e] -> Some (z_e, instr_e)
             | _ -> None)
        | _ -> None)
-  | _ -> None
-
-(** Check if a rule is a context rule: has exactly one RulePr premise
-    for a Step/Step-pure/Step-read relation. *)
-let is_ctxt_rule prems =
-  let rule_prems = List.filter (fun p -> match p.it with RulePr _ -> true | _ -> false) prems in
-  match rule_prems with
-  | [p] -> (match p.it with
-      | RulePr (id, _, _) -> is_step_exec_rel (sanitize id.it)
-      | _ -> false)
-  | _ -> false
-
-(** Try to extract context info from a context rule conclusion.
-    Returns Some (ctor_name, stable_args_texts, inner_is_var, is_frame_ctxt).
-    Handles both direct CaseE and ListE [CaseE] (elaborator wraps single-elem lists). *)
-let try_decode_ctxt_conclusion rel_name prefix conclusion vm =
-  let get_inner_expr cfg_expr =
-    if rel_name = "Step-pure" then Some cfg_expr
-    else match try_decompose_config cfg_expr with
-         | Some (_, instr_e) -> Some instr_e
-         | None -> None
-  in
-  let try_match_ctor e =
-    let try_case mixop inner =
-      let arity = match inner.it with TupE es -> List.length es | _ -> 1 in
-      match canonical_ctor_name_arity mixop arity with
-      | Some ctor_name when
-          (let low = String.lowercase_ascii ctor_name in
-           let has sub =
-             let n = String.length sub in
-             String.length low >= n && String.sub low 0 n = sub
-           in
-           has "ctorlabel" || has "ctorframe" || has "ctorhandler") ->
-          let args = match inner.it with TupE es -> es | e -> [{ inner with it = e }] in
-          let n_args = List.length args in
-          if n_args >= 2 then begin
-            let stable_args = List.filteri (fun i _ -> i < n_args - 1) args in
-            let stable_ts : texpr list =
-              Stdlib.List.map (fun a -> translate_exp TermCtx a vm) stable_args
-            in
-            let stable_texts = Stdlib.List.map (fun (t : texpr) -> t.text) stable_ts in
-            let stable_vars =
-              List.concat_map (fun (t : texpr) -> vars_of_texpr t) stable_ts
-              |> List.sort_uniq String.compare
-            in
-            let inner_var = prefix ^ "-INNER-IS" in
-            let low = String.lowercase_ascii ctor_name in
-            let is_frame = String.length low >= 9 && String.sub low 0 9 = "ctorframe" in
-            Some (ctor_name, stable_texts, stable_vars, inner_var, is_frame)
-          end else None
-      | _ -> None
-    in
-    match e.it with
-    | CaseE (mixop, inner) -> try_case mixop inner
-    | ListE [single] ->
-        (match single.it with
-         | CaseE (mixop, inner) -> try_case mixop inner
-         | _ -> None)
-    | _ -> None
-  in
-  match conclusion.it with
-  | TupE [lhs_e; _rhs_e] ->
-      (match get_inner_expr lhs_e with
-       | Some instr_e -> try_match_ctor instr_e
-       | None -> None)
   | _ -> None
 
 (** Generate Maude step rewrite rules for Step-pure / Step-read / Step rules.
@@ -3010,132 +2939,10 @@ let translate_step_reld rel_name rules =
   let all_val_seq_vars = ref [] in
   let all_val_term_seq_vars = ref [] in
   let all_typed_vars   = ref [] in
-  let ctxt_ops_emitted = ref false in
 
   let rule_lines = List.mapi (fun rule_idx r -> match r.it with
     | RuleD (case_id, binders, _, conclusion, prem_list) ->
         if rel_name = "Step" && bs_skip_ctxt_rule case_id.it then ""
-        else if false && has_rule_premise prem_list then
-          if not (is_ctxt_rule prem_list) then ""
-          else begin
-            let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
-            let case_part =
-              if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix
-            in
-            let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
-            let vm = binder_to_var_map prefix rule_idx binders in
-            let all_seq_vars_ctxt =
-              List.filter_map (fun b -> match b.it with
-                | ExpB (v_id, t) ->
-                    (match t.it with
-                     | IterT (_, _) -> List.assoc_opt v_id.it vm
-                     | _ -> None)
-                | _ -> None) binders
-              |> List.sort_uniq String.compare
-            in
-            let vm_vars_ctxt = List.map snd vm |> List.sort_uniq String.compare in
-            all_val_seq_vars := !all_val_seq_vars @ all_seq_vars_ctxt;
-            all_bound := !all_bound @ List.filter (fun v -> not (List.mem v all_seq_vars_ctxt)) vm_vars_ctxt;
-            let z_var = prefix ^ "-Z" in
-            let is_var = prefix ^ "-IS" in
-            let is_rest_var = prefix ^ "-IS-REST" in
-            let inner_is_var = prefix ^ "-INNER-IS" in
-            let n_var = prefix ^ "-N" in
-            all_is_vars := is_var :: is_rest_var :: inner_is_var :: !all_is_vars;
-            all_bound := z_var :: n_var :: !all_bound;
-            match try_decode_ctxt_conclusion rel_name prefix conclusion vm with
-            | None -> ""
-            | Some (ctor_name, stable_texts, stable_vars, _inner_var, is_frame) ->
-                let stable_str = String.concat ", " stable_texts in
-                all_bound := stable_vars @ !all_bound;
-                let rule_name = String.lowercase_ascii prefix in
-                let low = String.lowercase_ascii ctor_name in
-                let restore_name =
-                  if is_frame then "restore-frame"
-                  else if String.length low >= 9 && String.sub low 0 9 = "ctorlabel" then "restore-label"
-                  else "restore-handler"
-                in
-                let is_label_ctxt =
-                  String.length low >= 9 && String.sub low 0 9 = "ctorlabel"
-                in
-                let op_decls =
-                  if !ctxt_ops_emitted then ""
-                  else begin
-                    ctxt_ops_emitted := true;
-                    "  op restore-label   : ExecConf WasmTerminal WasmTerminals WasmTerminals -> ExecConf .\n\
-                     \  op restore-frame   : ExecConf WasmTerminal WasmTerminal WasmTerminals -> ExecConf .\n\
-                     \  op restore-handler : ExecConf WasmTerminal WasmTerminals WasmTerminals -> ExecConf .\n"
-                  end
-                in
-                let zn_var = prefix ^ "-ZN" in
-                all_bound := zn_var :: !all_bound;
-                if is_frame then begin
-                  all_bound := (n_var ^ "-S") :: !all_bound;
-                  all_bound := (n_var ^ "-F") :: !all_bound;
-                  all_bound := (prefix ^ "-F-OUTER") :: !all_bound
-                end;
-                let heat =
-                  if is_frame then
-                    let inner_frame_text =
-                      if List.length stable_texts >= 2 then List.nth stable_texts 1 else n_var ^ "-FQ"
-                    in
-                    let n_arity_text =
-                      if List.length stable_texts >= 1 then List.nth stable_texts 0 else n_var
-                    in
-                    Printf.sprintf
-                      "  crl [heat-%s] :\n    step(< CTORSEMICOLONA2 ( %s-S, %s-F ) | %s ( %s, %s ) %s >)\n    => %s(step(< CTORSEMICOLONA2 ( %s-S, %s ) | %s >), %s, %s-F, %s)\n    if all-vals ( %s ) = false /\\ is-trap ( %s ) = false ."
-                      rule_name n_var n_var ctor_name stable_str inner_is_var is_rest_var
-                      restore_name n_var inner_frame_text inner_is_var n_arity_text n_var is_rest_var
-                      inner_is_var inner_is_var
-                  else
-                    let extra_cond =
-                      if is_label_ctxt
-                      then Printf.sprintf " /\\ needs-label-ctxt ( %s ) = false" inner_is_var
-                      else ""
-                    in
-                    Printf.sprintf
-                      "  crl [heat-%s] :\n    step(< %s | %s ( %s, %s ) %s >)\n    => %s(step(< %s | %s >), %s)\n    if all-vals ( %s ) = false /\\ is-trap ( %s ) = false%s ."
-                      rule_name z_var ctor_name stable_str inner_is_var is_rest_var
-                      restore_name z_var inner_is_var
-                      (stable_str ^ ", " ^ is_rest_var)
-                      inner_is_var inner_is_var extra_cond
-                in
-                let cool =
-                  if is_frame then
-                    Printf.sprintf
-                      "  rl [cool-%s] :\n    %s(< %s | %s >, %s, %s-F-OUTER, %s)\n    => < CTORSEMICOLONA2 ( $store ( %s ), %s-F-OUTER ) | %s ( %s, $frame ( %s ), %s ) %s > ."
-                      rule_name restore_name zn_var is_var n_var prefix is_rest_var
-                      zn_var prefix ctor_name n_var zn_var is_var is_rest_var
-                  else
-                    Printf.sprintf
-                      "  rl [cool-%s] :\n    %s(< %s | %s >, %s)\n    => < %s | %s ( %s, %s ) %s > ."
-                      rule_name restore_name zn_var is_var
-                      (stable_str ^ ", " ^ is_rest_var)
-                      zn_var ctor_name stable_str is_var is_rest_var
-                in
-                let cool_control =
-                  if is_frame then
-                    let inner_frame_text =
-                      if List.length stable_texts >= 2 then List.nth stable_texts 1 else n_var ^ "-FQ"
-                    in
-                    let n_arity_text =
-                      if List.length stable_texts >= 1 then List.nth stable_texts 0 else n_var
-                    in
-                    Printf.sprintf
-                      "  crl [cool-%s-control] :\n    %s(step(< CTORSEMICOLONA2 ( %s-S, %s ) | %s >), %s, %s-F, %s)\n    => step(< CTORSEMICOLONA2 ( %s-S, %s-F ) | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) ."
-                      rule_name restore_name n_var inner_frame_text inner_is_var n_arity_text n_var is_rest_var
-                      n_var n_var ctor_name stable_str inner_is_var is_rest_var
-                      inner_is_var
-                  else
-                    Printf.sprintf
-                      "  crl [cool-%s-control] :\n    %s(step(< %s | %s >), %s)\n    => step(< %s | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) ."
-                      rule_name restore_name z_var inner_is_var
-                      (stable_str ^ ", " ^ is_rest_var)
-                      z_var ctor_name stable_str inner_is_var is_rest_var
-                      inner_is_var
-                in
-                op_decls ^ heat ^ "\n" ^ cool ^ "\n" ^ cool_control
-          end
         else begin
           let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
           let case_part =
@@ -4161,8 +3968,6 @@ let header_prefix =
   "  op step-pure : WasmTerminals -> StepPureConf [frozen (1)] .\n" ^
   "  op step-read : Config -> StepReadConf [frozen (1)] .\n" ^
   "  op steps : Config -> StepsConf [frozen (1)] .\n\n" ^
-  "  op $cfg-state : Config -> State .\n" ^
-  "  op $cfg-instrs : Config -> WasmTerminals .\n\n" ^
   "  --- Common variables (declared once)\n" ^
   "  var EC : Config .\n" ^
   "  var I : Int .\n" ^
@@ -4180,8 +3985,6 @@ let header_prefix =
   "  vars WT-S WT-F : WasmTerminal .\n" ^
   "  var WT-X : Localidx .\n" ^
   "  var WT-V : Val .\n" ^
-  "  vars VALOK-WT-S VALOK-C : WasmTerminal .\n" ^
-  "  var VALOK-NT : WasmTerminal .\n" ^
   "  var EXP-FL-DT : Deftype .\n" ^
   "  var EXP-FL-CT : Comptype .\n" ^
   "  var EXP-FL-TU : WasmTerminals .\n" ^
@@ -4195,16 +3998,11 @@ let header_prefix =
   "  vars INVOKE-X-T1 INVOKE-X-T2 : WasmTerminals .\n" ^
   "  var SUBST-L-W : WasmTerminal .\n" ^
   "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : WasmTerminals .\n" ^
-  "  var TYPE-ITER-X : Typeidx .\n" ^
-  "  var TYPE-ITER-RT : Rectype .\n" ^
-  "  var TYPE-ITER-N : Nat .\n" ^
   "  vars T W WW FQ : WasmTerminal .\n" ^
   "  vars TS W* ISQ INSTRSQ CQ : WasmTerminals .\n\n"
 
 let footer =
   "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
-  "  eq $cfg-state(ZS ; ITS) = ZS .\n" ^
-  "  eq $cfg-instrs(ZS ; ITS) = ITS .\n\n" ^
   "  eq  is-val(CTORCONSTA2(T, W)) = true .\n" ^
   "  eq  is-val(CTORVCONSTA2(T, W)) = true .\n" ^
   "  eq  is-val(CTORREFNULLA1(W)) = true .\n" ^
@@ -4220,23 +4018,6 @@ let footer =
   "  ceq all-vals(W TS) = all-vals(TS) if is-val(W) .\n" ^
   "  eq  all-vals(eps) = true .\n" ^
   "  eq  all-vals(TS) = false [owise] .\n\n" ^
-  "  --- Label-context control-flow detector: true when the inner instr list\n" ^
-  "  --- begins with VAL* followed by a BR / RETURN / RETURN-CALL-REF / THROW-REF,\n" ^
-  "  --- i.e. a pattern that the top-level step-pure-* label rules already\n" ^
-  "  --- consume directly. In those cases heat must NOT fire, otherwise the\n" ^
-  "  --- control-flow instruction escapes its enclosing label wrapper.\n" ^
-  "  eq  needs-label-ctxt(eps) = false .\n" ^
-  "  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) .\n" ^
-  "  eq  needs-label-ctxt(CTORBRA1(T) TS) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORRETURNA0 TS) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .\n" ^
-  "  eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .\n" ^
-  "  eq  needs-label-ctxt(TS) = false [owise] .\n\n" ^
-  "  eq  is-trap(eps) = false .\n" ^
-  "  ceq is-trap(W TS) = is-trap(TS) if is-val(W) .\n" ^
-  "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
-  "  eq  is-trap(TS) = false [owise] .\n" ^
-  "\n" ^
   "  --- Executable lifting for SpecTec substitution helpers over lists.\n" ^
   "  --- Generated helper signatures are element-level (`typeuse`, `valtype`),\n" ^
   "  --- but rules such as unroll/expand call them on `typeuse*` and `valtype*`.\n" ^
@@ -4256,23 +4037,6 @@ let footer =
   "      $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
   "   if SUBST-L-WS =/= eps .\n" ^
   "\n" ^
-  "  --- Executable lowering for SpecTec (i<n) type iterations.\n" ^
-  "  --- These helpers generate the finite sequences used by roll/unroll rules;\n" ^
-  "  --- without them the iterator variable becomes a free WasmTerminal.\n" ^
-  "  eq $rec-typevars(0) = eps .\n" ^
-  "  ceq $rec-typevars(TYPE-ITER-N) =\n" ^
-  "      $rec-typevars(TYPE-ITER-N - 1) CTORRECA1(TYPE-ITER-N - 1)\n" ^
-  "   if (TYPE-ITER-N > 0) .\n" ^
-  "  eq $def-typeuses(TYPE-ITER-RT, 0) = eps .\n" ^
-  "  ceq $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N) =\n" ^
-  "      $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N - 1)\n" ^
-  "      CTORWDEFA2(TYPE-ITER-RT, TYPE-ITER-N - 1)\n" ^
-  "   if (TYPE-ITER-N > 0) .\n" ^
-  "  eq $idx-typeuses(TYPE-ITER-X, 0) = eps .\n" ^
-  "  ceq $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N) =\n" ^
-  "      $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N - 1)\n" ^
-  "      CTORWIDXA1(TYPE-ITER-X + (TYPE-ITER-N - 1))\n" ^
-  "   if (TYPE-ITER-N > 0) .\n" ^
   "  ceq $expanddt(EXP-FL-DT) = EXP-FL-CT\n" ^
   "   if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .\n" ^
   "  --- Generic SpecTec list type witness.\n" ^
@@ -4290,27 +4054,14 @@ let footer =
   "  eq value('MODULE, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-MODULE .\n" ^
   "  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'LOCALS <- MK-FRAME-LOCALS2] = $mk-frame(MK-FRAME-LOCALS2, MK-FRAME-MODULE) .\n" ^
   "  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'MODULE <- MK-FRAME-MODULE2] = $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE2) .\n" ^
-  "\n" ^
-  "  --- Concrete record-state execution helpers.\n" ^
-  "  --- Generated SpecTec helper equations are typed as Store ; Frame.\n" ^
-  "  --- Record literals/updates have sort WasmTerminal, so add equivalent\n" ^
-  "  --- equations over WasmTerminal while preserving visible _;_ state syntax.\n" ^
-  "  eq $local((WT-S ; WT-F), WT-X) = index(value('LOCALS, WT-F), WT-X) .\n" ^
-  "  eq $with-local((WT-S ; WT-F), WT-X, WT-V) =\n" ^
-  "     (WT-S ; (WT-F [. 'LOCALS <- (value('LOCALS, WT-F) [WT-X <- WT-V])])) .\n" ^
   "\nendm\n"
 
 let step_predicate_helpers =
   "  op is-val : WasmTerminal -> Bool .\n" ^
   "  op all-vals : WasmTerminals -> Bool .\n" ^
-  "  op is-trap : WasmTerminals -> Bool .\n" ^
-  "  op needs-label-ctxt : WasmTerminals -> Bool .\n" ^
   "  op $subst-typeuse : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
   "  op $subst-valtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
   "  op $subst-subtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
-  "  op $rec-typevars : Nat -> WasmTerminals .\n" ^
-  "  op $def-typeuses : Rectype Nat -> WasmTerminals .\n" ^
-  "  op $idx-typeuses : Typeidx Nat -> WasmTerminals .\n" ^
   "  op $mk-frame : WasmTerminals WasmTerminals -> Frame [ctor] .\n" ^
   "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] .\n" ^
   "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] .\n" ^

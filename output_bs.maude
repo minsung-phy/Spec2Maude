@@ -85,9 +85,6 @@ mod SPECTEC-CORE is
   op step-read : Config -> StepReadConf [frozen (1)] .
   op steps : Config -> StepsConf [frozen (1)] .
 
-  op $cfg-state : Config -> State .
-  op $cfg-instrs : Config -> WasmTerminals .
-
   --- Common variables (declared once)
   var EC : Config .
   var I : Int .
@@ -105,8 +102,6 @@ mod SPECTEC-CORE is
   vars WT-S WT-F : WasmTerminal .
   var WT-X : Localidx .
   var WT-V : Val .
-  vars VALOK-WT-S VALOK-C : WasmTerminal .
-  var VALOK-NT : WasmTerminal .
   var EXP-FL-DT : Deftype .
   var EXP-FL-CT : Comptype .
   var EXP-FL-TU : WasmTerminals .
@@ -120,9 +115,6 @@ mod SPECTEC-CORE is
   vars INVOKE-X-T1 INVOKE-X-T2 : WasmTerminals .
   var SUBST-L-W : WasmTerminal .
   vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : WasmTerminals .
-  var TYPE-ITER-X : Typeidx .
-  var TYPE-ITER-RT : Rectype .
-  var TYPE-ITER-N : Nat .
   vars T W WW FQ : WasmTerminal .
   vars TS W* ISQ INSTRSQ CQ : WasmTerminals .
 
@@ -213,7 +205,6 @@ mod SPECTEC-CORE is
   op $data : State WasmTerminal -> WasmTerminal .
   op $dataidx-funcs : WasmTerminals -> WasmTerminals .
   op $datainst : State -> WasmTerminals .
-  op $def-typeuses : Rectype Nat -> WasmTerminals .
   op $default : WasmTerminal -> WasmTerminal .
   op $demote : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $diffrt : WasmTerminal WasmTerminal -> WasmTerminal .
@@ -354,7 +345,6 @@ mod SPECTEC-CORE is
   op $iclz : WasmTerminal WasmTerminal -> WasmTerminal .
   op $ictz : WasmTerminal WasmTerminal -> WasmTerminal .
   op $idiv : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
-  op $idx-typeuses : Typeidx Nat -> WasmTerminals .
   op $ieq : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $ieqz : WasmTerminal WasmTerminal -> WasmTerminal .
   op $iextend : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -525,7 +515,6 @@ mod SPECTEC-CORE is
   op $promote : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminals .
   op $psize : WasmTerminal -> WasmTerminal .
   op $psizenn : WasmTerminal -> WasmTerminal .
-  op $rec-typevars : Nat -> WasmTerminals .
   op $reinterpret : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $relaxed-trunc : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
   op $relaxed2 : WasmTerminal WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal .
@@ -1127,7 +1116,6 @@ mod SPECTEC-CORE is
   op init :  -> WasmType [ctor] .
   op instr :  -> WasmType [ctor] .
   op instrtype :  -> WasmType [ctor] .
-  op is-trap : WasmTerminals -> Bool .
   op is-val : WasmTerminal -> Bool .
   op ishape :  -> WasmType [ctor] .
   op labelidx :  -> WasmType [ctor] .
@@ -1152,7 +1140,6 @@ mod SPECTEC-CORE is
   op moduletype :  -> WasmType [ctor] .
   op mut :  -> WasmType [ctor] .
   op name :  -> WasmType [ctor] .
-  op needs-label-ctxt : WasmTerminals -> Bool .
   op nonfuncs :  -> WasmType [ctor] .
   op null :  -> WasmType [ctor] .
   op num : WasmTerminal -> WasmType [ctor] .
@@ -9799,9 +9786,6 @@ mod SPECTEC-CORE is
   eq $is-spectec-vvtestop ( CTORANYTRUEA0 ) = true .
   eq $is-spectec-vvunop ( CTORWNOTA0 ) = true .
   --- Execution predicate equations (auto-added; use Val sort membership)
-  eq $cfg-state(ZS ; ITS) = ZS .
-  eq $cfg-instrs(ZS ; ITS) = ITS .
-
   eq  is-val(CTORCONSTA2(T, W)) = true .
   eq  is-val(CTORVCONSTA2(T, W)) = true .
   eq  is-val(CTORREFNULLA1(W)) = true .
@@ -9818,24 +9802,6 @@ mod SPECTEC-CORE is
   ceq all-vals(W TS) = all-vals(TS) if is-val(W) .
   eq  all-vals(eps) = true .
   eq  all-vals(TS) = false [owise] .
-
-  --- Label-context control-flow detector: true when the inner instr list
-  --- begins with VAL* followed by a BR / RETURN / RETURN-CALL-REF / THROW-REF,
-  --- i.e. a pattern that the top-level step-pure-* label rules already
-  --- consume directly. In those cases heat must NOT fire, otherwise the
-  --- control-flow instruction escapes its enclosing label wrapper.
-  eq  needs-label-ctxt(eps) = false .
-  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) .
-  eq  needs-label-ctxt(CTORBRA1(T) TS) = true .
-  eq  needs-label-ctxt(CTORRETURNA0 TS) = true .
-  eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .
-  eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .
-  eq  needs-label-ctxt(TS) = false [owise] .
-
-  eq  is-trap(eps) = false .
-  ceq is-trap(W TS) = is-trap(TS) if is-val(W) .
-  eq  is-trap(CTORTRAPA0 TS) = true .
-  eq  is-trap(TS) = false [owise] .
 
   --- Executable lifting for SpecTec substitution helpers over lists.
   --- Generated helper signatures are element-level (`typeuse`, `valtype`),
@@ -9856,23 +9822,6 @@ mod SPECTEC-CORE is
       $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)
    if SUBST-L-WS =/= eps .
 
-  --- Executable lowering for SpecTec (i<n) type iterations.
-  --- These helpers generate the finite sequences used by roll/unroll rules;
-  --- without them the iterator variable becomes a free WasmTerminal.
-  eq $rec-typevars(0) = eps .
-  ceq $rec-typevars(TYPE-ITER-N) =
-      $rec-typevars(TYPE-ITER-N - 1) CTORRECA1(TYPE-ITER-N - 1)
-   if (TYPE-ITER-N > 0) .
-  eq $def-typeuses(TYPE-ITER-RT, 0) = eps .
-  ceq $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N) =
-      $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N - 1)
-      CTORWDEFA2(TYPE-ITER-RT, TYPE-ITER-N - 1)
-   if (TYPE-ITER-N > 0) .
-  eq $idx-typeuses(TYPE-ITER-X, 0) = eps .
-  ceq $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N) =
-      $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N - 1)
-      CTORWIDXA1(TYPE-ITER-X + (TYPE-ITER-N - 1))
-   if (TYPE-ITER-N > 0) .
   ceq $expanddt(EXP-FL-DT) = EXP-FL-CT
    if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .
   --- Generic SpecTec list type witness.
@@ -9890,14 +9839,6 @@ mod SPECTEC-CORE is
   eq value('MODULE, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-MODULE .
   eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'LOCALS <- MK-FRAME-LOCALS2] = $mk-frame(MK-FRAME-LOCALS2, MK-FRAME-MODULE) .
   eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'MODULE <- MK-FRAME-MODULE2] = $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE2) .
-
-  --- Concrete record-state execution helpers.
-  --- Generated SpecTec helper equations are typed as Store ; Frame.
-  --- Record literals/updates have sort WasmTerminal, so add equivalent
-  --- equations over WasmTerminal while preserving visible _;_ state syntax.
-  eq $local((WT-S ; WT-F), WT-X) = index(value('LOCALS, WT-F), WT-X) .
-  eq $with-local((WT-S ; WT-F), WT-X, WT-V) =
-     (WT-S ; (WT-F [. 'LOCALS <- (value('LOCALS, WT-F) [WT-X <- WT-V])])) .
 
 endm
 

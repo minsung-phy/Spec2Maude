@@ -55,6 +55,21 @@ Current accepted facts:
 - The four known rule-label fidelity anomalies have been cleaned up:
   `Rectype_ok/_rec2`, `Fieldtype_sub/var`, `Globaltype_sub/var`, and
   `Instr_ok/if` now generate source-faithful Maude rule labels.
+- Focused dead-helper cleanup removed `$cfg-state`, `$cfg-instrs`,
+  `needs-label-ctxt`, `is-trap`, stale `VALOK-*` variables, and the disabled
+  `ExecConf restore-*` generator branch without changing accepted execution
+  smokes.
+- The broad footer duplicate equations for `$local` and `$with-local` were
+  removed; the source-generated definitions remain and accepted execution
+  smokes still pass.
+- The `$subst-typeuse`, `$subst-valtype`, and `$subst-subtype` sequence lifts
+  were audited. A temporary ablation kept Fibonacci smokes passing but regressed
+  source substitution over sequences, so the lifts remain as non-C1-final
+  scaffolding pending generic sequence-map lowering.
+- The finite type-iteration helpers `$rec-typevars`, `$def-typeuses`, and
+  `$idx-typeuses` were audited as source-absent and unused; they were removed
+  from the generator and regenerated output, with accepted execution smokes
+  still passing.
 - `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
   hardcoding such as:
 
@@ -118,7 +133,10 @@ Current next tasks:
 2. Decide whether witness synthesis / a mode-aware validation solver belongs
    in C1 or C2.
 3. Continue `output_bs.maude` isomorphism cleanup.
-4. Audit footer/prelude separation now that `= valid` footer leftovers are gone.
+4. Continue footer/prelude separation one family at a time; the first dead
+   helper cleanup and the `$local` / `$with-local` footer-shim cleanup passed;
+   `$subst-*` sequence lifts need a generic sequence-map replacement before
+   removal.
 5. Keep init-config, frontend, and model checking out of the current C1 cleanup
    unless explicitly resumed.
 
