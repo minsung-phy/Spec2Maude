@@ -51,14 +51,12 @@ mod SPECTEC-CORE is
   subsort WellTyped < TypedTerm .
   op _hasType_ : WasmTerminal WasmType -> TypedTerm [ctor prec 95 gather (e e)] .
   --- Judgement sort for RelD relations.
-  --- Baseline translator: most non-step RelD cases become `eq/ceq ... = valid`.
-  --- Relations that need rewrite premises in their conditions (currently Steps)
-  --- rewrite directly to `valid` instead of using a separate proof wrapper.
+  --- Strict C1: source relation rules lower to primary `rl/crl => valid`.
+  --- Definitional equations remain `eq/ceq` when they translate source defs.
   sort Judgement .
   sort ValidJudgement .
   subsort ValidJudgement < Judgement .
   op valid : -> ValidJudgement [ctor] .
-  op _shape-x_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .
   op slice : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals .
   op _<-_ : WasmTerminal WasmTerminals -> Bool .
 
@@ -101,11 +99,6 @@ mod SPECTEC-CORE is
   vars WT-S WT-F : WasmTerminal .
   var WT-X : Localidx .
   var WT-V : Val .
-  var EXP-FL-DT : Deftype .
-  var EXP-FL-CT : Comptype .
-  var EXP-FL-TU : WasmTerminals .
-  var EXPAND-X-DT : Deftype .
-  vars EXPAND-X-T1 EXPAND-X-T2 : WasmTerminals .
   var INVOKE-X-S : WasmTerminal .
   var INVOKE-S-S : Store .
   var INVOKE-X-FUNCADDR : Funcaddr .
@@ -9807,9 +9800,6 @@ mod SPECTEC-CORE is
       $subst-subtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)
       $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)
    if SUBST-L-WS =/= eps .
-
-  ceq $expanddt(EXP-FL-DT) = EXP-FL-CT
-   if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .
   --- Generic SpecTec list type witness.
   --- The source rule is polymorphic in the element type; this executable
   --- variable form makes `eps hasType list(val)` and similar instances work.

@@ -44,32 +44,28 @@ plain executability limitations.
   step is to generate typed record constructors like `CTORFRAMEA2` from source
   record syntax generically rather than hardcoding the Wasm frame shape.
 
-### Sequence Substitution List Lifts
+## P2: Cleanup / Genericity Improvement
+
+### Resolved / Accepted: Sequence Substitution List Lifts
 
 - Generated artifacts: `$subst-typeuse`, `$subst-valtype`, `$subst-subtype`
   sequence overloads/equations.
-- Classification: `NON_C1_FINAL_SCAFFOLD`.
-- Why non-isomorphic: source has element-level definitions; footer adds
-  sequence lifting for source `f(x)*` map expressions.
-- Needed for current execution: accepted Fibonacci smokes do not currently
-  depend on them, but source substitution semantics does.
-- Removal attempted: yes. The ablation kept accepted smokes passing, but
-  `$subst-subtype` over a subtype sequence stopped reducing.
-- Recommended action: replace with a generic source-preserving sequence-map
-  lowering, or move hardcoded executable list lifting to C2.
+- Current classification: accepted C1 representation substrate for SpecTec
+  star-map expressions such as `f(x)*`.
+- Rationale: the element-level substitution definitions are source-derived, and
+  the source equations explicitly map them over `*` sequences. Maude needs an
+  operational list representation for that source meta-notation.
+- Follow-up: generalize this pattern beyond footer strings, but do not treat it
+  as a C1 isomorphism violation.
 
-### `$expanddt` Footer Shortcut
+### Resolved: `$expanddt` Footer Shortcut
 
-- Generated artifact: footer equation for `$expanddt`.
-- Classification: `NON_C1_FINAL_SCAFFOLD`.
-- Why non-isomorphic: shortcut overlaps source-generated Expand/unroll
-  behavior without being a primary source rule.
-- Needed for current execution: yes for current smokes and validation probes.
-- Removal attempted: not in this pass.
-- Recommended action: audit against source Expand definitions and decide
-  whether the shortcut is generic definitional prelude or C2 support.
-
-## P2: Cleanup / Genericity Improvement
+- Previous artifact: footer equation for `$expanddt`.
+- Current state: removed from `translator_bs.ml` and regenerated
+  `output_bs.maude`.
+- Rationale: source-generated `$expanddt` definition from
+  `1.2-syntax.types.spectec` already covers the behavior. Keeping the footer
+  equation duplicated source logic.
 
 ### Resolved: Legacy Or Apparently Dead Helpers
 
@@ -106,13 +102,20 @@ plain executability limitations.
 - Recommended action: generate from source syntax/category declarations or
   parameterize per input language.
 
-### Unknown Helper/Fallback Declarations
+### Resolved: Former Unknown Helper/Fallback Declarations
 
-- Generated artifacts: `_shape-x_` and fallback `$f` overloads.
-- Classification: `UNKNOWN`.
-- Why suspicious: source provenance was not established in this pass.
-- Needed for current execution: unknown.
-- Recommended action: use-site inventory before any removal.
+- Former artifact: `_shape-x_`.
+- Current state: removed from `translator_bs.ml` and regenerated output.
+- Rationale: direct source/output comparison showed that source
+  `syntax shape = lanetype X dim` is already represented by generated
+  `CTORXA2`; `_shape-x_` was a dead extra header declaration with no use.
+
+- Former artifact: fallback `$f` overloads.
+- Current classification: `SOURCE_DERIVED`.
+- Rationale: `wasm-3.0/3.2-numerics.vector.spectec` contains higher-order
+  `def $f_` parameters used by vector helper definitions. The generated `$f`
+  declarations are representation support for those source parameters, not
+  arbitrary helper debt.
 
 ## C2 Or Harness Layer
 
