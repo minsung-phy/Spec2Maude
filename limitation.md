@@ -164,10 +164,11 @@ Current focused helper classifications:
   smokes passing but regressed source substitution over subtype sequences, so
   the lifts remain until a generic source-preserving sequence-map lowering
   exists.
-- `is-val` / `all-vals` are not SpecTec source definitions. They operationalize
-  `val*` prefixes in translated execution rules such as `Step/ctxt-instrs`.
-  They are not removable without replacing them by a generic category-sequence
-  predicate/lowering.
+- The old `is-val` / `all-vals` predicates were removed from the strict core.
+  Translated `val*` premises now use `$is-spectec-val-seq`, a source-category
+  sequence predicate derived from the SpecTec `val` category and implemented
+  through Maude membership (`W : Val`) instead of hardcoded Wasm value
+  constructors.
 - `$mk-frame` is not a SpecTec source def. It represents the source frame record
   shape with a typed Maude constructor and projection/update equations. It is
   still required by the current execution representation and accepted Fibonacci

@@ -228,7 +228,7 @@ Examples of cleaned forms:
 ```maude
 if STEP-PURE-BR-IF-TRUE11-C =/= 0 .
 
-if all-vals(STEP-CTXT-INSTRS2-VALS)
+if $is-spectec-val-seq(STEP-CTXT-INSTRS2-VALS)
 /\ ((STEP-CTXT-INSTRS2-VALS =/= eps) or
     (STEP-CTXT-INSTRS2-INSTRS1 =/= eps))
 /\ step((STEP-CTXT-INSTRS2-Z ; STEP-CTXT-INSTRS2-INSTRS))
@@ -248,8 +248,8 @@ Boolean function definitions such as these should remain:
 
 ```maude
 eq $is-numtype(CTORI32A0) = true .
-eq all-vals(eps) = true .
-ceq is-val(W) = true if W : Val .
+eq $is-spectec-val-seq(eps) = true .
+ceq $is-spectec-val-seq(W TS) = $is-spectec-val-seq(TS) if W : Val .
 ```
 
 They are definitions, not redundant condition wrappers.

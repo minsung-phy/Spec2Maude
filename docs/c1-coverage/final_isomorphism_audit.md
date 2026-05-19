@@ -158,7 +158,8 @@ These are needed for current execution but are not literal source declarations:
 
 - `StepConf`, `StepPureConf`, `StepReadConf`, `StepsConf`;
 - wrapper-return adaptation for `step`, `step-pure`, `step-read`, `steps`;
-- `is-val` and `all-vals`;
+- `$is-spectec-val-seq`, a generated source-category sequence predicate for
+  SpecTec `val*` guards;
 - `$mk-frame`;
 - some frame/store representation equations.
 

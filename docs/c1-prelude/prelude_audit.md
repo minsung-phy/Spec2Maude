@@ -109,7 +109,8 @@ Current execution-oriented infrastructure includes:
 
 - `StepConf`, `StepPureConf`, `StepReadConf`, `StepsConf`;
 - `step`, `step-pure`, `step-read`, and `steps` wrapper result sorts/operators;
-- `is-val` and `all-vals`;
+- `$is-spectec-val-seq`, generated for source `val*` guards from the SpecTec
+  `val` category rather than from a hardcoded value-constructor list;
 - `$mk-frame` and its projection/update equations;
 - current frame/store representation helpers.
 

@@ -92,8 +92,9 @@ are still named or shaped as Wasm-specific infrastructure.
 
    Footer helpers that should not be part of a generic core include:
 
-   - `is-val`, which enumerates Wasm value constructors;
-   - `all-vals`, which assumes Wasm `Val`;
+   - `$is-spectec-val-seq`, which is now generated from the source `val`
+     category but should become a generic category-sequence predicate pattern
+     for non-Wasm specs;
    - `$mk-frame`, tied to Wasm frame fields `LOCALS` and `MODULE`;
    - source-derived `$local` / `$with-local`, tied to `LOCALS` and still
      Wasm-specific even though their broad footer duplicates were removed;
@@ -149,7 +150,7 @@ Move out of strict generic core:
 
 - benchmark harness;
 - Wasm frame/store representation helpers;
-- Wasm value predicates;
+- fixed Wasm value/category-sequence predicate names;
 - list-lifting shortcuts if they are not source-derived;
 - label-related `step-from-step-pure-*` debt.
 
