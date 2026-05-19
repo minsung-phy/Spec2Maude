@@ -169,10 +169,13 @@ Current focused helper classifications:
   sequence predicate derived from the SpecTec `val` category and implemented
   through Maude membership (`W : Val`) instead of hardcoded Wasm value
   constructors.
-- `$mk-frame` is not a SpecTec source def. It represents the source frame record
-  shape with a typed Maude constructor and projection/update equations. It is
-  still required by the current execution representation and accepted Fibonacci
-  smokes.
+- The old `$mk-frame` adapter was removed. Frame records now lower to
+  `CTORFRAMEA2(locals, module)`, a generated constructor for the source frame
+  syntax `{ LOCALS ..., MODULE ... }`, with projection/update equations that
+  preserve source record behavior. Direct generic record literals still do not
+  compose operationally with the `Store ; Frame` state constructor, so the
+  remaining genericity work is to generate this typed record-constructor pattern
+  from source record syntax rather than hardcoding the Wasm frame shape.
 - `$rec-typevars`, `$def-typeuses`, and `$idx-typeuses` were source-absent and
   unused finite type-iteration helpers. They have been removed from the active
   generator and regenerated output.
