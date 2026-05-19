@@ -2040,6 +2040,15 @@ let refined_exec_pred sort =
 let refined_exec_guard var sort =
   Printf.sprintf "%s ( %s )" (refined_exec_pred sort) var
 
+let source_category_seq_pred sort =
+  "$is-spectec-" ^ String.lowercase_ascii sort ^ "-seq"
+
+let source_category_seq_guard sort term =
+  Printf.sprintf "%s ( %s )" (source_category_seq_pred sort) term
+
+let val_seq_guard term =
+  source_category_seq_guard "val" term
+
 let widen_refined_lhs_typed_vars typed_vars lhs_vars =
   let lhs_set = SSet.of_list lhs_vars in
   let refined_pairs =
@@ -3160,7 +3169,7 @@ let translate_step_reld rel_name rules =
                   if p.binds = [] && not (is_rewrite_cond p.text) then Some (prem_cond p.text) else None)
               in
               let allvals_conds =
-                List.map (fun mv -> Printf.sprintf "all-vals ( %s )" mv) val_seq_vars
+                List.map val_seq_guard val_seq_vars
               in
               let listn_len_conds =
                 let is_simple_var_name s =
@@ -3298,12 +3307,12 @@ let translate_step_reld rel_name rules =
                              (label ^ "-ctx-prefix")
                              (Printf.sprintf "%s %s %s" val_head val_rest base_instr)
                              (Printf.sprintf "%s %s %s" val_head val_rest result_instr)
-                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
+                             [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ];
                            emit_ctx_bridge
                              (label ^ "-ctx-prefix-suffix")
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest base_instr suffix_head suffix_rest)
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest result_instr suffix_head suffix_rest)
-                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
+                             [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ] ]
                    | _ -> emit_rule label lhs_rel_text rhs_rel_text)
                 else if rel_name = "Step" && case_id.it = "ctxt-handler" then
                   (match find_vm_suffix "-N",
@@ -3352,12 +3361,12 @@ let translate_step_reld rel_name rules =
                              (label ^ "-ctx-prefix")
                              (Printf.sprintf "%s %s %s" val_head val_rest base_instr)
                              (Printf.sprintf "%s %s %s" val_head val_rest result_instr)
-                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
+                             [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ];
                            emit_ctx_bridge
                              (label ^ "-ctx-prefix-suffix")
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest base_instr suffix_head suffix_rest)
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest result_instr suffix_head suffix_rest)
-                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
+                             [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ] ]
                    | _ -> emit_rule label lhs_rel_text rhs_rel_text)
                 else if rel_name = "Step" && case_id.it = "ctxt-frame" then
                   (match find_vm_suffix "-S",
@@ -3413,12 +3422,12 @@ let translate_step_reld rel_name rules =
                              (label ^ "-ctx-prefix")
                              (Printf.sprintf "%s %s %s" val_head val_rest base_instr)
                              (Printf.sprintf "%s %s %s" val_head val_rest result_instr)
-                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
+                             [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ];
                            emit_ctx_bridge
                              (label ^ "-ctx-prefix-suffix")
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest base_instr suffix_head suffix_rest)
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest result_instr suffix_head suffix_rest)
-                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
+                             [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ] ]
                    | _ -> emit_rule label lhs_rel_text rhs_rel_text)
                 else
                   emit_rule label lhs_rel_text rhs_rel_text
@@ -3462,12 +3471,12 @@ let translate_step_reld rel_name rules =
                       ("step-from-" ^ label ^ "-ctx-prefix")
                       (Printf.sprintf "%s %s %s" val_head val_rest lhs_text_out)
                       (Printf.sprintf "%s %s %s" val_head val_rest rhs_text_out)
-                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
+                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ];
                     emit_ctx_bridge
                       ("step-from-" ^ label ^ "-ctx-prefix-suffix")
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest lhs_text_out suffix_head suffix_rest)
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest rhs_text_out suffix_head suffix_rest)
-                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
+                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ] ]
               else if rel_name = "Step-read" then
                 let bridge_lhs =
                   Printf.sprintf "step ( %s )" (config_text z_in lhs_text_out)
@@ -3498,12 +3507,12 @@ let translate_step_reld rel_name rules =
                       ("step-from-" ^ label ^ "-ctx-prefix")
                       (Printf.sprintf "%s %s %s" val_head val_rest lhs_text_out)
                       (Printf.sprintf "%s %s %s" val_head val_rest rhs_text_out)
-                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
+                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ];
                     emit_ctx_bridge
                       ("step-from-" ^ label ^ "-ctx-prefix-suffix")
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest lhs_text_out suffix_head suffix_rest)
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest rhs_text_out suffix_head suffix_rest)
-                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
+                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ] ]
               else if rel_name = "Step"
                       && not (List.mem case_id.it
                                 [ "pure"; "read"; "ctxt-instrs"; "ctxt-label";
@@ -3532,12 +3541,12 @@ let translate_step_reld rel_name rules =
                       (label ^ "-ctx-prefix")
                       (Printf.sprintf "%s %s %s" val_head val_rest lhs_text_out)
                       (Printf.sprintf "%s %s %s" val_head val_rest rhs_text_out)
-                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
+                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ];
                     emit_ctx_bridge
                       (label ^ "-ctx-prefix-suffix")
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest lhs_text_out suffix_head suffix_rest)
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest rhs_text_out suffix_head suffix_rest)
-                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
+                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ] ]
               else
                 primary_rule
         end
@@ -4002,22 +4011,11 @@ let header_prefix =
   "  vars TS W* ISQ INSTRSQ CQ : WasmTerminals .\n\n"
 
 let footer =
-  "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
-  "  eq  is-val(CTORCONSTA2(T, W)) = true .\n" ^
-  "  eq  is-val(CTORVCONSTA2(T, W)) = true .\n" ^
-  "  eq  is-val(CTORREFNULLA1(W)) = true .\n" ^
-  "  eq  is-val(CTORREFI31NUMA1(W)) = true .\n" ^
-  "  eq  is-val(CTORREFSTRUCTADDRA1(W)) = true .\n" ^
-  "  eq  is-val(CTORREFARRAYADDRA1(W)) = true .\n" ^
-  "  eq  is-val(CTORREFFUNCADDRA1(W)) = true .\n" ^
-  "  eq  is-val(CTORREFEXNADDRA1(W)) = true .\n" ^
-  "  eq  is-val(CTORREFHOSTADDRA1(W)) = true .\n" ^
-  "  eq  is-val(CTORREFEXTERNA1(W)) = true .\n" ^
-  "  ceq is-val(W) = true if W : Val .\n" ^
-  "  eq  is-val(W) = false [owise] .\n\n" ^
-  "  ceq all-vals(W TS) = all-vals(TS) if is-val(W) .\n" ^
-  "  eq  all-vals(eps) = true .\n" ^
-  "  eq  all-vals(TS) = false [owise] .\n\n" ^
+  "\n  --- Source-derived sequence-category predicate for SpecTec val* premises.\n" ^
+  "  eq  $is-spectec-val-seq(eps) = true .\n" ^
+  "  ceq $is-spectec-val-seq(W TS) = $is-spectec-val-seq(TS)\n" ^
+  "   if W : Val .\n" ^
+  "  eq  $is-spectec-val-seq(TS) = false [owise] .\n\n" ^
   "  --- Executable lifting for SpecTec substitution helpers over lists.\n" ^
   "  --- Generated helper signatures are element-level (`typeuse`, `valtype`),\n" ^
   "  --- but rules such as unroll/expand call them on `typeuse*` and `valtype*`.\n" ^
@@ -4057,8 +4055,7 @@ let footer =
   "\nendm\n"
 
 let step_predicate_helpers =
-  "  op is-val : WasmTerminal -> Bool .\n" ^
-  "  op all-vals : WasmTerminals -> Bool .\n" ^
+  "  op $is-spectec-val-seq : WasmTerminals -> Bool .\n" ^
   "  op $subst-typeuse : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
   "  op $subst-valtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
   "  op $subst-subtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
