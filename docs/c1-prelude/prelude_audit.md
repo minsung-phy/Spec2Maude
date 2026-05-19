@@ -111,7 +111,8 @@ Current execution-oriented infrastructure includes:
 - `step`, `step-pure`, `step-read`, and `steps` wrapper result sorts/operators;
 - `$is-spectec-val-seq`, generated for source `val*` guards from the SpecTec
   `val` category rather than from a hardcoded value-constructor list;
-- `$mk-frame` and its projection/update equations;
+- `CTORFRAMEA2` and its projection/update equations for the source frame record
+  syntax `{ LOCALS ..., MODULE ... }`;
 - current frame/store representation helpers.
 
 Some of this is needed to keep the accepted C1 execution smokes working. It is
@@ -142,8 +143,12 @@ Known non-C1-final scaffolding in the generated output/header/footer:
   `$subst-subtype`. These are not standalone source defs, but they currently
   implement SpecTec `f(x)*` sequence-map uses inside the source substitution
   equations;
-- `$expanddt` footer shortcut over `$unrolldt`;
-- `$mk-frame` representation helper.
+- `$expanddt` footer shortcut over `$unrolldt`.
+
+The old `$mk-frame` adapter has been removed. It is now represented by the
+source-derived `CTORFRAMEA2` constructor. The remaining debt is genericity: this
+typed constructor pattern should be generated from source record syntax instead
+of being tied to the Wasm frame fields in the translator.
 
 The removed sequence-shaped `Val-ok` footer list-lift confirms the cleanup
 pattern: first ablate one helper family, then keep it removed only if accepted
@@ -186,8 +191,9 @@ should be audited separately before removal.
 
 ## Recommended Cleanup Order
 
-1. Audit `$mk-frame` representation helper separately; it is high-impact and
-   tied to the current frame/store representation.
+1. Generalize the `CTORFRAMEA2` frame record lowering so typed record
+   constructors are derived from source record syntax rather than a Wasm frame
+   special case.
 2. Design generic source-preserving lowering for sequence-map expressions such
    as `$subst_valtype(t, tv*, tu*)*`, then replace the hardcoded `$subst-*`
    list lifts.

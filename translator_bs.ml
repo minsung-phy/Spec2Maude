@@ -881,7 +881,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
       ) fields in
       (match field_values with
        | [("LOCALS", locals); ("MODULE", modul)] ->
-           { text = Printf.sprintf "$mk-frame ( %s, %s )" locals.text modul.text;
+           { text = Printf.sprintf "CTORFRAMEA2 ( %s, %s )" locals.text modul.text;
              vars = locals.vars @ modul.vars }
        | _ ->
            let items = List.map (fun (name, t) ->
@@ -3989,8 +3989,7 @@ let header_prefix =
   "  var LIST-TS : WasmTerminals .\n" ^
   "  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : WasmTerminals .\n" ^
   "  vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : WasmTerminals .\n" ^
-  "  vars FRAME-LOCALS FRAME-MODULE : WasmTerminals .\n" ^
-  "  vars MK-FRAME-LOCALS MK-FRAME-LOCALS2 MK-FRAME-MODULE MK-FRAME-MODULE2 : WasmTerminals .\n" ^
+  "  vars FRAME-LOCALS FRAME-LOCALS2 FRAME-MODULE FRAME-MODULE2 : WasmTerminals .\n" ^
   "  vars WT-S WT-F : WasmTerminal .\n" ^
   "  var WT-X : Localidx .\n" ^
   "  var WT-V : Val .\n" ^
@@ -4043,15 +4042,14 @@ let footer =
   "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
   "   if (len(LIST-TS) < (2 ^ 32)) .\n" ^
   "\n" ^
-  "  --- Executable frame record representation.\n" ^
-  "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}. Direct Maude\n" ^
-  "  --- record-shape membership for that pattern can make sort inference\n" ^
-  "  --- diverge, so frame records are emitted as this typed constructor while\n" ^
-  "  --- preserving field projection and update behavior.\n" ^
-  "  eq value('LOCALS, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-LOCALS .\n" ^
-  "  eq value('MODULE, $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE)) = MK-FRAME-MODULE .\n" ^
-  "  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'LOCALS <- MK-FRAME-LOCALS2] = $mk-frame(MK-FRAME-LOCALS2, MK-FRAME-MODULE) .\n" ^
-  "  eq $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE) [. 'MODULE <- MK-FRAME-MODULE2] = $mk-frame(MK-FRAME-LOCALS, MK-FRAME-MODULE2) .\n" ^
+  "  --- Source frame record representation.\n" ^
+  "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}; this generated\n" ^
+  "  --- constructor represents that source syntax alternative at sort Frame\n" ^
+  "  --- while preserving field projection and update behavior.\n" ^
+  "  eq value('LOCALS, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-LOCALS .\n" ^
+  "  eq value('MODULE, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-MODULE .\n" ^
+  "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'LOCALS <- FRAME-LOCALS2] = CTORFRAMEA2(FRAME-LOCALS2, FRAME-MODULE) .\n" ^
+  "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'MODULE <- FRAME-MODULE2] = CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE2) .\n" ^
   "\nendm\n"
 
 let step_predicate_helpers =
@@ -4059,7 +4057,7 @@ let step_predicate_helpers =
   "  op $subst-typeuse : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
   "  op $subst-valtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
   "  op $subst-subtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
-  "  op $mk-frame : WasmTerminals WasmTerminals -> Frame [ctor] .\n" ^
+  "  op CTORFRAMEA2 : WasmTerminals WasmTerminals -> Frame [ctor] .\n" ^
   "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] .\n" ^
   "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] .\n" ^
   "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] .\n"
@@ -4192,7 +4190,9 @@ let translate defs =
     )
     |> List.map (fun l ->
       let s = String.trim l in
-      if s = "op CTORLABELLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
+      if s = "op CTORFRAMEA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
+      then "  op CTORFRAMEA2 : WasmTerminals WasmTerminals -> Frame [ctor] ."
+      else if s = "op CTORLABELLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
       then "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
       else if s = "op CTORFRAMELBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
       then "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."

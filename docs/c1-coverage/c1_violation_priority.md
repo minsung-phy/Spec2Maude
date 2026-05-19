@@ -27,8 +27,9 @@ plain executability limitations.
 
 ### Footer / Prelude Separation
 
-- Generated artifacts: mixed fixed header/footer support, including
-  `$mk-frame`, sequence substitution lifts, and Wasm-specific fixed atoms.
+- Generated artifacts: mixed fixed header/footer support, including sequence
+  substitution lifts, `CTORFRAMEA2` frame-record lowering, and Wasm-specific
+  fixed atoms.
 - Classification: mixed `GENERIC_SPECTEC_PRELUDE`,
   `WASM_SPECIFIC_SEMANTICS`, `EXECUTION_HARNESS`, and
   `NON_C1_FINAL_SCAFFOLD`.
@@ -36,10 +37,12 @@ plain executability limitations.
   source-derived only in part with extra executable footer equations.
 - Needed for current execution: several are likely needed; others appear dead.
 - Removal attempted: the sequence-shaped `Val-ok` list-lift, obvious dead
-  helpers, finite type-iteration helpers, and broad `$local` / `$with-local`
-  footer duplicates were removed; accepted smokes still passed.
-- Recommended action: ablate one family at a time. Defer `$mk-frame` until the
-  execution harness boundary is explicitly designed.
+  helpers, finite type-iteration helpers, broad `$local` / `$with-local`
+  footer duplicates, and the `$mk-frame` adapter were removed; accepted smokes
+  still passed.
+- Recommended action: ablate one family at a time. For frame records, the next
+  step is to generate typed record constructors like `CTORFRAMEA2` from source
+  record syntax generically rather than hardcoding the Wasm frame shape.
 
 ### Sequence Substitution List Lifts
 

@@ -160,7 +160,7 @@ These are needed for current execution but are not literal source declarations:
 - wrapper-return adaptation for `step`, `step-pure`, `step-read`, `steps`;
 - `$is-spectec-val-seq`, a generated source-category sequence predicate for
   SpecTec `val*` guards;
-- `$mk-frame`;
+- `CTORFRAMEA2`, the typed constructor for the source frame record syntax;
 - some frame/store representation equations.
 
 ### Non-C1-Final Scaffolding
