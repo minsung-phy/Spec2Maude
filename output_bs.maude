@@ -105,12 +105,8 @@ mod SPECTEC-CORE is
   vars WT-S WT-F : WasmTerminal .
   var WT-X : Localidx .
   var WT-V : Val .
-  var VALOK-S : Store .
-  var VALOK-V : WasmTerminal .
-  var VALOK-T : WasmTerminal .
   vars VALOK-WT-S VALOK-C : WasmTerminal .
   var VALOK-NT : WasmTerminal .
-  vars VALOK-VS VALOK-TS : WasmTerminals .
   var EXP-FL-DT : Deftype .
   var EXP-FL-CT : Comptype .
   var EXP-FL-TU : WasmTerminals .
@@ -9884,17 +9880,6 @@ mod SPECTEC-CORE is
   --- variable form makes `eps hasType list(val)` and similar instances work.
   cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped
    if (len(LIST-TS) < (2 ^ 32)) .
-
-  --- Generic list lifting for Val_ok premises over val* / valtype*.
-  --- This is non-C1-final executable harness/prelude debt: source singleton
-  --- Num_ok / Val_ok rules are emitted above as primary rl/crl rules, while
-  --- these sequence forms only support pointwise harness checks.
-  op Val-ok : Store WasmTerminals WasmTerminals -> Judgement .
-  eq Val-ok(VALOK-S, eps, eps) = valid .
-  ceq Val-ok(VALOK-S, VALOK-V VALOK-VS, VALOK-T VALOK-TS) = valid
-   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps))
-   /\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid)
-   /\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) .
 
   --- Executable frame record representation.
   --- SpecTec writes frames as {LOCALS ..., MODULE ...}. Direct Maude

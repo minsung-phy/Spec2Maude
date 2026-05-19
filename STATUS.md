@@ -49,9 +49,9 @@ Current accepted facts:
   `opt-empty` validation labels.
 - Source-rule footer duplicates for `Expand`, `Num-ok`, and singleton `Val-ok`
   have been removed from the generator.
-- Remaining `eq` / `ceq ... = valid` statements are footer / executable
-  leftovers only: sequence-shaped `Val-ok` list-lifting for harness/prelude
-  use.
+- The sequence-shaped `Val-ok` footer list-lift has also been removed from the
+  strict core.
+- No `eq` / `ceq ... = valid` statements remain in `output_bs.maude`.
 - `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
   hardcoding such as:
 
@@ -86,15 +86,18 @@ categories are:
 
 - empty `*` premises without derived `iter-empty` rules;
 - `Instrs-ok/seq` witness synthesis;
-- the strict single-rule `Step/ctxt-instrs` label/br suffix executability
-  limitation;
+- the strict `step-pure` bridge / `Step/ctxt-instrs` label executability
+  limitation, with label-related `step-from-step-pure-*` shortcuts retained as
+  non-C1-final debt;
 - concrete store/harness lookup limitations;
+- sequence `Val-ok` list-validation probes without footer list lifting;
 - footer/prelude/genericity debt.
 
 The footer `= valid` cleanup removed duplicate source-rule equations for
-`Expand`, `Num-ok`, and singleton `Val-ok`. The remaining sequence-shaped
-`Val-ok` equations are documented as non-C1-final harness/prelude debt in
-`docs/c1-validation/footer_valid_leftovers_audit.md`.
+`Expand`, `Num-ok`, singleton `Val-ok`, and the non-source sequence-shaped
+`Val-ok` list-lift. The current strict output has no `eq` / `ceq ... = valid`
+leftovers; the removed sequence probes are documented in
+`docs/c1-validation/footer_valid_leftovers_audit.md` and `limitation.md`.
 
 Current next tasks:
 
@@ -102,7 +105,7 @@ Current next tasks:
 2. Decide whether witness synthesis / a mode-aware validation solver belongs
    in C1 or C2.
 3. Continue `output_bs.maude` isomorphism cleanup.
-4. Audit footer/prelude separation.
+4. Audit footer/prelude separation now that `= valid` footer leftovers are gone.
 5. Keep init-config, frontend, and model checking out of the current C1 cleanup
    unless explicitly resumed.
 
@@ -357,15 +360,15 @@ Current strict status:
 - No `iter-empty` or `opt-empty` derived validation labels remain.
 - Source-rule footer duplicates for `Expand`, `Num-ok`, and singleton `Val-ok`
   have been removed from the generator.
-- Remaining `eq` / `ceq ... = valid` statements are non-source footer /
-  executable leftovers only: sequence-shaped `Val-ok` list-lifting for the
-  current harness/prelude.
+- The sequence-shaped `Val-ok` footer list-lift has also been removed from the
+  strict core.
+- No `eq` / `ceq ... = valid` statements remain in `output_bs.maude`.
 
 Selected concrete validation tests pass, but strict C1 does not claim that
 every validation relation is executable by plain Maude rewriting. Remaining
 validation issues are strict executability limitations documented in
 `limitation.md`, especially empty `*` premises, `Instrs-ok/seq` witness
-synthesis, and concrete store/harness lookup.
+synthesis, sequence `Val-ok` list probes, and concrete store/harness lookup.
 
 The next validation design decision is whether empty-star solving, witness
 synthesis, or a mode-aware validation solver belongs in C1 or should be left to
@@ -495,7 +498,7 @@ Recommended next tasks:
 2. Decide C1 vs C2 placement for witness synthesis / mode-aware validation
    solving, including empty-star cases.
 3. Continue `output_bs.maude` isomorphism cleanup.
-4. Audit footer/prelude separation, especially sequence-shaped `Val-ok`.
+4. Audit footer/prelude separation now that `= valid` footer leftovers are gone.
 5. Keep init-config, frontend, and model checking out of the current C1 cleanup
    unless explicitly resumed.
 

@@ -52,9 +52,9 @@ The apparent `293 -> 281` gap is a counting and mapping issue, not a missing-rul
 - No derived validation labels containing `iter-empty` or `opt-empty` remain.
 - Source-rule footer duplicates for `Expand`, `Num-ok`, and singleton
   `Val-ok` have been removed from the generator.
-- Remaining `eq` / `ceq ... = valid` statements are non-source footer /
-  executable leftovers only:
-  - sequence-shaped `Val-ok` list-lifting for harness/prelude use.
+- The non-source sequence-shaped `Val-ok` footer list-lift has also been
+  removed from the strict core.
+- No `eq` / `ceq ... = valid` statements remain in `output_bs.maude`.
 
 Detailed audit artifacts are under `docs/c1-validation/`.
 
@@ -153,12 +153,32 @@ Example:
 
 The generated source rule needs `index(value('FUNCS, s), a)` to expose a function instance and project `TYPE`. The current concrete harness/store shape does not discharge that premise in the ground probe.
 
+### Sequence `Val-ok` List Probes
+
+Examples:
+
+- `Val-ok(fib-store, eps, eps)`;
+- `Val-ok(fib-store, CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0), CTORI32A0 CTORI32A0)`.
+
+The source-generated singleton `Val-ok` rules still execute, for example
+`Val-ok(fib-store, CTORCONSTA2(CTORI32A0, 5), CTORI32A0)` rewrites to `valid`.
+The old footer sequence equations were executable list-lifting scaffolding and
+have been removed from strict C1.
+
 ### Footer / Prelude Debt
 
 Historical footer duplicates for `Expand`, `Num-ok`, and singleton `Val-ok`
 were removed after confirming that the source-generated primary `crl`s already
-exist. The remaining sequence-shaped `Val-ok` footer equations are classified
-as executable harness/prelude leftovers, not source-rule targets.
+exist. The sequence-shaped `Val-ok` footer equations were also removed after
+confirming accepted Fibonacci execution smokes do not depend on them.
+
+Current strict grep:
+
+```bash
+grep -nE "^[[:space:]]*(eq|ceq) .* = valid" output_bs.maude
+```
+
+Expected/current result: no output.
 
 ## Translator Fixes Applied During This Audit
 
