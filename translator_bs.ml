@@ -2002,7 +2002,7 @@ let is_refined_exec_sort sort =
   List.mem sort refined_exec_sorts
 
 let refined_exec_pred sort =
-  "$is-" ^ String.lowercase_ascii sort
+  "$is-spectec-" ^ String.lowercase_ascii sort
 
 let refined_exec_guard var sort =
   Printf.sprintf "%s ( %s )" (refined_exec_pred sort) var
@@ -2783,8 +2783,7 @@ let translate_decd ss id params result_typ insts =
     let typed_vars = decd_binder_var_sorts binders vm in
     all_typed := List.sort_uniq compare (!all_typed @ typed_vars);
 
-    let lhs_ts : texpr list = List.map (fun a -> match a.it with
-      | ExpA e -> translate_exp TermCtx e vm | _ -> texpr "eps") lhs_args in
+    let lhs_ts : texpr list = List.map (fun a -> translate_arg a vm) lhs_args in
     let lhs_strs : string list = List.map (fun (t : texpr) -> t.text) lhs_ts in
     let lhs_vars = List.concat_map (fun (t : texpr) -> t.vars) lhs_ts in
 
@@ -3378,20 +3377,7 @@ let translate_step_reld rel_name rules =
                     Printf.sprintf "  crl [%s] :\n    %s\n    =>\n    %s\n      if %s ."
                       label lhs rhs local_cond
                 in
-                let opt_rules =
-                  optional_empty_substs binders vm [lhs]
-                  |> List.mapi (fun opt_idx opt_vars ->
-                      let lhs_opt = apply_optional_empty_subst opt_vars lhs in
-                      let rhs_opt = apply_optional_empty_subst opt_vars rhs in
-                      let cond_opt =
-                        optionalize_cond_text opt_vars
-                          ~drop_guards:filtered_bconds local_cond
-                      in
-                      emit_one
-                        (Printf.sprintf "%s-opt-empty%d" label opt_idx)
-                        lhs_opt rhs_opt cond_opt)
-                in
-                String.concat "\n" (emit_one label lhs rhs local_cond :: opt_rules)
+                emit_one label lhs rhs local_cond
               in
               let emit_rule label lhs rhs = emit_rule_with_cond label lhs rhs cond in
               let label = String.lowercase_ascii prefix in
@@ -3882,21 +3868,7 @@ let translate_steps_reld rel_name rules =
               label lhs rhs local_cond
         in
         let label = String.lowercase_ascii prefix in
-        let base_rule = emit_rule label lhs_cfg rhs_cfg cond in
-        let opt_rules =
-          optional_empty_substs binders vm [lhs_cfg]
-          |> List.mapi (fun opt_idx opt_vars ->
-              let lhs_opt = apply_optional_empty_subst opt_vars lhs_cfg in
-              let rhs_opt = apply_optional_empty_subst opt_vars rhs_cfg in
-              let cond_opt =
-                optionalize_cond_parts opt_vars ~drop_guards:filtered_bconds all_conds
-                |> cond_join
-              in
-              emit_rule
-                (Printf.sprintf "%s-opt-empty%d" label opt_idx)
-                lhs_opt rhs_opt cond_opt)
-        in
-        String.concat "\n" (base_rule :: opt_rules)
+        emit_rule label lhs_cfg rhs_cfg cond
   ) rules in
   let contains lit s =
     try ignore (Str.search_forward (Str.regexp_string lit) s 0); true
@@ -4045,49 +4017,7 @@ let translate_reld _id rel_name rules =
               rel_name lhs_text cond_text
         in
         let base_rule = emit_rule lhs_t.text cond in
-        let opt_rules =
-          optional_empty_substs binders vm [lhs_t.text]
-          |> List.mapi (fun opt_idx opt_vars ->
-              let lhs_opt = apply_optional_empty_subst opt_vars lhs_t.text in
-              let cond_opt =
-                optionalize_cond_parts opt_vars ~drop_guards:filtered_bconds all_conds
-                |> cond_join
-              in
-              emit_rule
-                ~suffix:(Printf.sprintf "-opt-empty%d" opt_idx)
-                lhs_opt cond_opt)
-        in
-        let iter_empty_rules =
-          let known_vars = raw_typed_vars |> List.map fst |> List.sort_uniq String.compare in
-          iter_empty_var_groups vm raw_typed_vars prem_list
-          |> List.filter (fun vars ->
-              List.exists (fun v -> maude_var_occurs lhs_t.text v) vars)
-          |> nonempty_subsets
-          |> List.mapi (fun iter_idx groups ->
-              let empty_vars =
-                groups
-                |> List.flatten
-                |> List.sort_uniq String.compare
-              in
-              let dropped_conds, kept_conds =
-                List.partition (cond_mentions_optional empty_vars) all_conds
-              in
-              if not (List.for_all (safe_to_drop_iter_empty_cond known_vars lhs_t.vars empty_vars) dropped_conds)
-              then None
-              else
-              let lhs_iter = apply_optional_empty_subst empty_vars lhs_t.text in
-              let cond_iter =
-                kept_conds
-                |> List.map (apply_optional_empty_subst empty_vars)
-                |> cond_join
-              in
-              Some
-                (emit_rule
-                   ~suffix:(Printf.sprintf "-iter-empty%d" iter_idx)
-                   lhs_iter cond_iter))
-          |> List.filter_map (fun x -> x)
-        in
-        String.concat "\n" (base_rule :: opt_rules @ iter_empty_rules)
+        base_rule
   ) rules in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
@@ -4313,9 +4243,6 @@ let footer =
   "   if (TYPE-ITER-N > 0) .\n" ^
   "  ceq $expanddt(EXP-FL-DT) = EXP-FL-CT\n" ^
   "   if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .\n" ^
-  "  ceq Expand(EXPAND-X-DT, CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2)) = valid\n" ^
-  "   if CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2) := $expanddt(EXPAND-X-DT) .\n" ^
-  "\n" ^
   "  --- Generic SpecTec list type witness.\n" ^
   "  --- The source rule is polymorphic in the element type; this executable\n" ^
   "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
@@ -4323,12 +4250,10 @@ let footer =
   "   if (len(LIST-TS) < (2 ^ 32)) .\n" ^
   "\n" ^
   "  --- Generic list lifting for Val_ok premises over val* / valtype*.\n" ^
-  "  --- SpecTec writes this pointwise; the executable Maude condition needs\n" ^
-  "  --- an explicit recursive case for multi-value invocation arguments.\n" ^
+  "  --- This is non-C1-final executable harness/prelude debt: source singleton\n" ^
+  "  --- Num_ok / Val_ok rules are emitted above as primary rl/crl rules, while\n" ^
+  "  --- these sequence forms only support pointwise harness checks.\n" ^
   "  op Val-ok : Store WasmTerminals WasmTerminals -> Judgement .\n" ^
-  "  eq Val-ok(VALOK-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
-  "  eq Num-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
-  "  eq Val-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
   "  eq Val-ok(VALOK-S, eps, eps) = valid .\n" ^
   "  ceq Val-ok(VALOK-S, VALOK-V VALOK-VS, VALOK-T VALOK-TS) = valid\n" ^
   "   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps))\n" ^

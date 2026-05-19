@@ -1,6 +1,6 @@
 # Spec2Maude C1 Status
 
-Updated: 2026-05-19
+Updated: 2026-05-20
 
 This is the current handoff for the C1 baseline. Read this before continuing
 translator work.
@@ -43,6 +43,15 @@ Current accepted facts:
 - Standard Fibonacci execution regressions pass.
 - The helper-heavy Module-ok / init-config experiment has been pruned or
   deferred from the active C1 baseline.
+- Strict validation lowering structural audit is complete: 281 / 281 strict
+  source-rule targets are emitted as primary Maude `rl` / `crl` rules.
+- No derived validation rules remain: there are no generated `iter-empty` or
+  `opt-empty` validation labels.
+- Source-rule footer duplicates for `Expand`, `Num-ok`, and singleton `Val-ok`
+  have been removed from the generator.
+- Remaining `eq` / `ceq ... = valid` statements are footer / executable
+  leftovers only: sequence-shaped `Val-ok` list-lifting for harness/prelude
+  use.
 - `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
   hardcoding such as:
 
@@ -52,12 +61,62 @@ grep -n "Func-ok\|Instrs-ok\|Module-ok\|Externaddr-ok\|fib\|CTORI32A0" translato
 
 Expected result: no output.
 
+## Strict Validation-Lowering Status
+
+The strict validation-lowering audit is complete and documented in
+`validation_281_summary.md`.
+
+Structural coverage:
+
+| Source file / family | Strict targets | Primary rl/crl matched |
+|---|---:|---:|
+| `wasm-3.0/2.1-validation.types.spectec` | 42 | 42 |
+| `wasm-3.0/2.2-validation.subtyping.spectec` | 50 | 50 |
+| `wasm-3.0/2.3-validation.instructions.spectec` | 140 | 140 |
+| `wasm-3.0/2.4-validation.modules.spectec` | 28 | 28 |
+| `wasm-3.0/4.1-execution.values.spectec` + `Eval_expr` | 21 | 21 |
+| **Total** | **281** | **281** |
+
+Concrete tests passed for selected leaf/simple validation judgements, including
+representative type validation, subtyping, instruction validation, module leaf
+validation, value validation, and `Eval_expr` probes.
+
+Known strict execution limitations are recorded in `limitation.md`. The main
+categories are:
+
+- empty `*` premises without derived `iter-empty` rules;
+- `Instrs-ok/seq` witness synthesis;
+- the strict single-rule `Step/ctxt-instrs` label/br suffix executability
+  limitation;
+- concrete store/harness lookup limitations;
+- footer/prelude/genericity debt.
+
+The footer `= valid` cleanup removed duplicate source-rule equations for
+`Expand`, `Num-ok`, and singleton `Val-ok`. The remaining sequence-shaped
+`Val-ok` equations are documented as non-C1-final harness/prelude debt in
+`docs/c1-validation/footer_valid_leftovers_audit.md`.
+
+Current next tasks:
+
+1. Review `limitation.md` with the professor.
+2. Decide whether witness synthesis / a mode-aware validation solver belongs
+   in C1 or C2.
+3. Continue `output_bs.maude` isomorphism cleanup.
+4. Audit footer/prelude separation.
+5. Keep init-config, frontend, and model checking out of the current C1 cleanup
+   unless explicitly resumed.
+
 ## Important Files
 
 - `translator_bs.ml`: active C1 translator. Final fixes must be made here.
 - `output_bs.maude`: generated C1 output. Do not patch manually as final.
 - `wasm-exec-bs.maude`: current execution/regression harness.
 - `wasm-3.0/*.spectec`: WebAssembly 3.0 SpecTec source semantics.
+- `validation_281_summary.md`: strict validation-lowering coverage summary.
+- `limitation.md`: current strict C1 limitations and documented executable
+  debt.
+- `docs/c1-validation/`: detailed validation audit artifacts moved out of the
+  repository root.
 - `translator.ml`, `output.maude`, `wasm-exec.maude`: older/reference path;
   do not mix into C1 unless explicitly comparing with legacy behavior.
 
@@ -76,8 +135,10 @@ These are C1 design constraints.
    directly.** Generated conditions should avoid wrappers such as `(C =/= 0) =
    true` when `C =/= 0` is accepted.
 4. **Translate SpecTec `rule` / relation judgements as Maude `rl/crl` as much
-   as possible.** Validation judgements currently lowered as `eq/ceq ... =
-   valid` are a major remaining policy issue.
+   as possible.** The strict validation-lowering structural audit is complete:
+   281 / 281 strict source-rule targets now lower to primary Maude `rl` /
+   `crl`. Remaining validation issues are executability limitations, not
+   missing source-rule lowering.
 5. **Avoid helper-heavy executable shortcuts.** Any remaining scaffold must be
    generic, justified, and documented. Benchmark-specific or Wasm-judgement-name
    hacks do not belong in `translator_bs.ml`.
@@ -283,67 +344,32 @@ This path currently stops early at the known outer invoke frame/label/block
 shape. `$invoke(...)` itself reduces to a concrete `Config`; the full
 `fib-config-invoke` execution is a separate invoke-path issue.
 
-## Current Major Blocker: Validation Rule Lowering
+## Completed Major Task: Strict Validation Rule Lowering
 
-The next major C1 task is validation judgement lowering.
+Validation judgement lowering is no longer the current structural blocker.
+Source validation rules are no longer missing `rl` / `crl` lowering.
 
-Current generated validation rules such as `Module-ok`, `Func-ok`, `Instrs-ok`,
-`Instr-ok`, `Types-ok`, and related judgements are still generated as equations:
+Current strict status:
 
-```maude
-eq  J(...) = valid .
-ceq J(...) = valid if ... .
-```
+- 281 / 281 strict source-rule targets are emitted as primary Maude `rl` /
+  `crl` rules.
+- No strict source target remains as `eq` / `ceq ... = valid`.
+- No `iter-empty` or `opt-empty` derived validation labels remain.
+- Source-rule footer duplicates for `Expand`, `Num-ok`, and singleton `Val-ok`
+  have been removed from the generator.
+- Remaining `eq` / `ceq ... = valid` statements are non-source footer /
+  executable leftovers only: sequence-shaped `Val-ok` list-lifting for the
+  current harness/prelude.
 
-Professor requirement: SpecTec `rule` / relation judgements should be lowered
-as Maude `rl/crl` as much as possible.
+Selected concrete validation tests pass, but strict C1 does not claim that
+every validation relation is executable by plain Maude rewriting. Remaining
+validation issues are strict executability limitations documented in
+`limitation.md`, especially empty `*` premises, `Instrs-ok/seq` witness
+synthesis, and concrete store/harness lookup.
 
-This cannot be solved by blindly replacing `eq/ceq` with `rl/crl`. Current
-callers often use equation-style conditions such as:
-
-```maude
-J(...) == valid
-```
-
-If a callee is converted to a rewrite rule, caller premises may also need to be
-translated to rewrite conditions:
-
-```maude
-J(...) => valid
-```
-
-Therefore this task needs dependency-aware audit before code changes.
-
-Recommended next audit:
-
-1. List all validation judgements generated as `eq/ceq ... = valid`.
-2. For each family, record which other validation judgements it calls.
-3. Identify self-recursion and mutual recursion.
-4. Identify which caller families rely on `J(...) == valid`.
-5. Find the smallest closed subset for a safe `rl/crl` prototype.
-6. Only then implement a small prototype.
-
-Important families:
-
-```text
-Module-ok
-Func-ok
-Expr-ok
-Instrs-ok
-Instr-ok
-Types-ok
-Locals-ok
-Globals-ok
-Tables-ok
-Mems-ok
-Elem-ok
-Data-ok
-Import-ok
-Export-ok
-Ref-ok
-Externaddr-ok
-subtype/type validation judgements
-```
+The next validation design decision is whether empty-star solving, witness
+synthesis, or a mode-aware validation solver belongs in C1 or should be left to
+C2.
 
 ## Source-Level Initial Config Requirement
 
@@ -365,7 +391,7 @@ wasm / wat code
   -> steps / search / verification
 ```
 
-Immediate C1 target after validation policy is clarified:
+Possible C1 target after the current strict limitations are reviewed:
 
 ```text
 fib-module Maude term
@@ -459,50 +485,19 @@ Prioritize used-before-bound warnings in validation relations, because they may
 be related to output-bearing premise scheduling and source-module initial-config
 blockers.
 
-## Next Concrete Task
+## Next Concrete Tasks
 
 Do not jump to frontend, model checking, or broad speculative infrastructure.
 
-Next task:
+Recommended next tasks:
 
-```text
-Validation rule-lowering audit:
-why are Module-ok / Func-ok / Instrs-ok / related relation judgements emitted
-as eq/ceq = valid instead of rl/crl, and what dependency closure is needed to
-change them safely?
-```
-
-Useful starting commands:
-
-```bash
-grep -nE "^(  )?(eq|ceq) (Module-ok|Func-ok|Instrs-ok|Instr-ok|Types-ok)" output_bs.maude | head -80
-grep -n "use_rewrite_judgement" translator_bs.ml
-grep -n "translate_reld" translator_bs.ml
-grep -n "is_rewrite_judgement_rel" translator_bs.ml
-```
-
-Useful acceptance ladder after validation work begins:
-
-```maude
-red in WASM-FIB-BS :
-  Instrs-ok(
-    {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ;
-     item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ;
-     item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ;
-     item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ;
-     item('REFS, eps)},
-    CTORCONSTA2(CTORI32A0, 0),
-    CTORARROWA3(eps, eps, CTORI32A0)) .
-
-red in WASM-FIB-BS :
-  Module-ok(fib-module, CTORARROWA2(eps, eps)) .
-
-red in WASM-FIB-BS :
-  Externaddr-ok(empty-store, eps, eps) .
-
-rew [1] in WASM-FIB-BS :
-  $instantiate(empty-store, fib-module, eps) .
-```
+1. Review `limitation.md` with the professor.
+2. Decide C1 vs C2 placement for witness synthesis / mode-aware validation
+   solving, including empty-star cases.
+3. Continue `output_bs.maude` isomorphism cleanup.
+4. Audit footer/prelude separation, especially sequence-shaped `Val-ok`.
+5. Keep init-config, frontend, and model checking out of the current C1 cleanup
+   unless explicitly resumed.
 
 Do not claim the final source-module path is complete until a validation-
 preserving instantiated config can run to the Fibonacci result without bypasses.
