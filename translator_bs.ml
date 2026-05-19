@@ -154,7 +154,9 @@ let is_plain_var_like s =
   && not (String.contains b '(')
   && not (String.contains b ')')
 
-let bool_cond s = Printf.sprintf "( %s ) = true" s
+let bool_cond s =
+  let t = String.trim s in
+  if t = "" then "true" else t
 
 (* A premise text passes through unwrapped if it is already a Maude
    side-condition in its own right:
@@ -1960,7 +1962,7 @@ let refined_exec_pred sort =
   "$is-" ^ String.lowercase_ascii sort
 
 let refined_exec_guard var sort =
-  Printf.sprintf "%s ( %s ) = true" (refined_exec_pred sort) var
+  Printf.sprintf "%s ( %s )" (refined_exec_pred sort) var
 
 let widen_refined_lhs_typed_vars typed_vars lhs_vars =
   let lhs_set = SSet.of_list lhs_vars in
@@ -3094,7 +3096,7 @@ let translate_step_reld rel_name rules =
                   if p.binds = [] && not (is_rewrite_cond p.text) then Some (prem_cond p.text) else None)
               in
               let allvals_conds =
-                List.map (fun mv -> Printf.sprintf "all-vals ( %s ) = true" mv) val_seq_vars
+                List.map (fun mv -> Printf.sprintf "all-vals ( %s )" mv) val_seq_vars
               in
               let listn_len_conds =
                 let is_simple_var_name s =
@@ -3106,11 +3108,11 @@ let translate_step_reld rel_name rules =
                 in
                 List.filter_map (fun (cnt_mv, seq_mv) ->
                   if List.mem cnt_mv lhs_set2 then
-                    Some (Printf.sprintf "( ( len ( %s ) == %s ) ) = true" seq_mv cnt_mv)
+                    Some (Printf.sprintf "( ( len ( %s ) == %s ) )" seq_mv cnt_mv)
                   else if is_simple_var_name cnt_mv then
                     Some (Printf.sprintf "%s := len ( %s )" cnt_mv seq_mv)
                   else
-                    Some (Printf.sprintf "( ( len ( %s ) == %s ) ) = true" seq_mv cnt_mv)
+                    Some (Printf.sprintf "( ( len ( %s ) == %s ) )" seq_mv cnt_mv)
                 ) !g_listn_pairs
               in
               let base_conds =
@@ -3245,12 +3247,12 @@ let translate_step_reld rel_name rules =
                              (label ^ "-ctx-prefix")
                              (Printf.sprintf "%s %s %s" val_head val_rest base_instr)
                              (Printf.sprintf "%s %s %s" val_head val_rest result_instr)
-                             [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ];
+                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
                            emit_ctx_bridge
                              (label ^ "-ctx-prefix-suffix")
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest base_instr suffix_head suffix_rest)
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest result_instr suffix_head suffix_rest)
-                             [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ] ]
+                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
                    | _ -> emit_rule label lhs_rel_text rhs_rel_text)
                 else if rel_name = "Step" && case_id.it = "ctxt-handler" then
                   (match find_vm_suffix "-N",
@@ -3299,12 +3301,12 @@ let translate_step_reld rel_name rules =
                              (label ^ "-ctx-prefix")
                              (Printf.sprintf "%s %s %s" val_head val_rest base_instr)
                              (Printf.sprintf "%s %s %s" val_head val_rest result_instr)
-                             [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ];
+                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
                            emit_ctx_bridge
                              (label ^ "-ctx-prefix-suffix")
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest base_instr suffix_head suffix_rest)
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest result_instr suffix_head suffix_rest)
-                             [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ] ]
+                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
                    | _ -> emit_rule label lhs_rel_text rhs_rel_text)
                 else if rel_name = "Step" && case_id.it = "ctxt-frame" then
                   (match find_vm_suffix "-S",
@@ -3360,12 +3362,12 @@ let translate_step_reld rel_name rules =
                              (label ^ "-ctx-prefix")
                              (Printf.sprintf "%s %s %s" val_head val_rest base_instr)
                              (Printf.sprintf "%s %s %s" val_head val_rest result_instr)
-                             [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ];
+                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
                            emit_ctx_bridge
                              (label ^ "-ctx-prefix-suffix")
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest base_instr suffix_head suffix_rest)
                              (Printf.sprintf "%s %s %s %s %s" val_head val_rest result_instr suffix_head suffix_rest)
-                             [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ] ]
+                             [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
                    | _ -> emit_rule label lhs_rel_text rhs_rel_text)
                 else
                   emit_rule label lhs_rel_text rhs_rel_text
@@ -3409,12 +3411,12 @@ let translate_step_reld rel_name rules =
                       ("step-from-" ^ label ^ "-ctx-prefix")
                       (Printf.sprintf "%s %s %s" val_head val_rest lhs_text_out)
                       (Printf.sprintf "%s %s %s" val_head val_rest rhs_text_out)
-                      [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ];
+                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
                     emit_ctx_bridge
                       ("step-from-" ^ label ^ "-ctx-prefix-suffix")
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest lhs_text_out suffix_head suffix_rest)
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest rhs_text_out suffix_head suffix_rest)
-                      [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ] ]
+                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
               else if rel_name = "Step-read" then
                 let bridge_lhs =
                   Printf.sprintf "step ( %s )" (config_text z_in lhs_text_out)
@@ -3445,12 +3447,12 @@ let translate_step_reld rel_name rules =
                       ("step-from-" ^ label ^ "-ctx-prefix")
                       (Printf.sprintf "%s %s %s" val_head val_rest lhs_text_out)
                       (Printf.sprintf "%s %s %s" val_head val_rest rhs_text_out)
-                      [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ];
+                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
                     emit_ctx_bridge
                       ("step-from-" ^ label ^ "-ctx-prefix-suffix")
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest lhs_text_out suffix_head suffix_rest)
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest rhs_text_out suffix_head suffix_rest)
-                      [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ] ]
+                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
               else if rel_name = "Step"
                       && not (List.mem case_id.it
                                 [ "pure"; "read"; "ctxt-instrs"; "ctxt-label";
@@ -3479,12 +3481,12 @@ let translate_step_reld rel_name rules =
                       (label ^ "-ctx-prefix")
                       (Printf.sprintf "%s %s %s" val_head val_rest lhs_text_out)
                       (Printf.sprintf "%s %s %s" val_head val_rest rhs_text_out)
-                      [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ];
+                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ];
                     emit_ctx_bridge
                       (label ^ "-ctx-prefix-suffix")
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest lhs_text_out suffix_head suffix_rest)
                       (Printf.sprintf "%s %s %s %s %s" val_head val_rest rhs_text_out suffix_head suffix_rest)
-                      [ Printf.sprintf "all-vals ( %s %s ) = true" val_head val_rest ] ]
+                      [ Printf.sprintf "all-vals ( %s %s )" val_head val_rest ] ]
               else
                 primary_rule
         end
