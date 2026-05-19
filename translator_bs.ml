@@ -4144,12 +4144,8 @@ let header_prefix =
   "  vars WT-S WT-F : WasmTerminal .\n" ^
   "  var WT-X : Localidx .\n" ^
   "  var WT-V : Val .\n" ^
-  "  var VALOK-S : Store .\n" ^
-  "  var VALOK-V : WasmTerminal .\n" ^
-  "  var VALOK-T : WasmTerminal .\n" ^
   "  vars VALOK-WT-S VALOK-C : WasmTerminal .\n" ^
   "  var VALOK-NT : WasmTerminal .\n" ^
-  "  vars VALOK-VS VALOK-TS : WasmTerminals .\n" ^
   "  var EXP-FL-DT : Deftype .\n" ^
   "  var EXP-FL-CT : Comptype .\n" ^
   "  var EXP-FL-TU : WasmTerminals .\n" ^
@@ -4248,17 +4244,6 @@ let footer =
   "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
   "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
   "   if (len(LIST-TS) < (2 ^ 32)) .\n" ^
-  "\n" ^
-  "  --- Generic list lifting for Val_ok premises over val* / valtype*.\n" ^
-  "  --- This is non-C1-final executable harness/prelude debt: source singleton\n" ^
-  "  --- Num_ok / Val_ok rules are emitted above as primary rl/crl rules, while\n" ^
-  "  --- these sequence forms only support pointwise harness checks.\n" ^
-  "  op Val-ok : Store WasmTerminals WasmTerminals -> Judgement .\n" ^
-  "  eq Val-ok(VALOK-S, eps, eps) = valid .\n" ^
-  "  ceq Val-ok(VALOK-S, VALOK-V VALOK-VS, VALOK-T VALOK-TS) = valid\n" ^
-  "   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps))\n" ^
-  "   /\\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid)\n" ^
-  "   /\\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) .\n" ^
   "\n" ^
   "  --- Executable frame record representation.\n" ^
   "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}. Direct Maude\n" ^

@@ -45,7 +45,24 @@ redex = label(... br 0)
 suffix = local.get 1
 ```
 
-However, Maude does not combine the needed associative split with the conditional rewrite premise in some label/br suffix cases. The direct inner step succeeds, but the full context rule does not compose operationally in the strict single-rule form.
+However, Maude does not combine the needed generated bridge / conditional
+rewrite premises in some label-related cases. A focused ablation showed the
+sharper obstruction:
+
+```text
+step-pure(label(... br 0)) => eps
+```
+
+succeeds, but with the derived label shortcuts removed:
+
+```text
+step((Z ; label(... br 0)))
+```
+
+has no solution through the generic `crl [step-pure]` bridge. The suffix case
+then fails for the same reason: `Step/ctxt-instrs` needs the inner premise
+`step((Z ; label(... br 0))) => (Z ; eps)`, and that premise is not produced
+operationally by the strict bridge.
 
 Label-related `step-from-step-pure-*` shortcuts remain as temporary executable debt. They are derived Step_pure-to-Step shortcuts and are not C1-final.
 
@@ -63,7 +80,29 @@ index(value('FUNCS, s), a)
 
 to expose a function instance and project `TYPE`. The current concrete Fibonacci harness/store shape does not discharge that premise in the ground probe. This is a concrete store/harness lookup limitation, not a missing source-rule lowering.
 
-## 5. Footer / Prelude / Genericity Debt
+## 5. Sequence `Val-ok` Executability Limitation
+
+Examples:
+
+- `Val-ok(fib-store, eps, eps)`;
+- `Val-ok(fib-store, CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0), CTORI32A0 CTORI32A0)`.
+
+Strict C1 now keeps only the source-generated singleton `Val-ok` rules, such as
+`Val-ok/num` and `Val-ok/vec`. The previous footer equations that lifted
+`Val-ok` pointwise over `val*` / `valtype*` were executable scaffolding, not
+SpecTec source-rule targets, and have been removed from the strict core.
+
+The singleton probe:
+
+```text
+Val-ok(fib-store, CTORCONSTA2(CTORI32A0, 5), CTORI32A0)
+```
+
+still rewrites to `valid`. Empty and multi-value sequence probes remain stuck
+unless a later C2-style execution layer or principled mode-aware validation
+solver provides list lifting.
+
+## 6. Footer / Prelude / Genericity Debt
 
 The footer still mixes:
 
@@ -75,13 +114,15 @@ The historical source-rule footer duplicates for `Expand`, `Num-ok`, and
 singleton `Val-ok` have been removed from the generator because primary
 source-generated `crl`s already exist for those rules.
 
-Remaining `eq` / `ceq ... = valid` leftovers are sequence-shaped `Val-ok`
-list-lifting equations used by the current harness/prelude. They are not strict
-source-target validation rules, and they are not C1-final. The footer and
-prelude should be separated before non-Wasm SpecTec generalization, such as a
-P4-oriented pass.
+The sequence-shaped `Val-ok` list-lifting equations have also been removed from
+the strict core after confirming that accepted Fibonacci execution smokes do not
+depend on them. The current strict output has no `eq` / `ceq ... = valid`
+leftovers.
 
-## 6. Model Checking Note
+The footer and prelude still contain other helper infrastructure and should be
+separated before non-Wasm SpecTec generalization, such as a P4-oriented pass.
+
+## 7. Model Checking Note
 
 C1 strict is a structural and isomorphic baseline. It is not intended to be an analysis-optimized semantics.
 
