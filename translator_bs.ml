@@ -696,6 +696,49 @@ let strip_iter_suffix name =
     if last = '*' || last = '+' || last = '?' then String.sub name 0 (len - 1)
     else name
 
+let is_sequence_typ t =
+  match t.it with
+  | IterT (_, (List | List1 | ListN _)) -> true
+  | _ -> false
+
+let split_trailing_quotes s =
+  let n = String.length s in
+  let rec loop i =
+    if i > 0 && s.[i - 1] = '\''
+    then loop (i - 1)
+    else i
+  in
+  let i = loop n in
+  (String.sub s 0 i, String.sub s i (n - i))
+
+let split_numeric_suffix s =
+  let n = String.length s in
+  let rec loop i =
+    if i > 0 && s.[i - 1] >= '0' && s.[i - 1] <= '9'
+    then loop (i - 1)
+    else i
+  in
+  let i = loop n in
+  if i < n && i > 0 && s.[i - 1] = '_' then
+    (String.sub s 0 (i - 1), String.sub s (i - 1) (n - i + 1))
+  else
+    (s, "")
+
+let pluralize_sequence_var_source_name raw =
+  let raw = strip_iter_suffix raw in
+  let raw_no_quote, quote_suffix = split_trailing_quotes raw in
+  let core, numeric_suffix = split_numeric_suffix raw_no_quote in
+  let core_low = String.lowercase_ascii core in
+  let core_plural =
+    if core = "" || ends_with core_low "s" then core
+    else core ^ "s"
+  in
+  core_plural ^ numeric_suffix ^ quote_suffix
+
+let source_name_for_binder raw typ =
+  if is_sequence_typ typ then pluralize_sequence_var_source_name raw
+  else strip_iter_suffix raw
+
 let find_vm_case_insensitive name vm =
   match List.find_opt (fun (k, _) ->
     String.lowercase_ascii k = String.lowercase_ascii name) vm with
@@ -830,31 +873,34 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | OptE (Some e1) | TheE e1 | LiftE e1 -> translate_exp ctx e1 vm
   | OptE None -> texpr "eps"
   | IterE (e1, (iter_type, _)) ->
-      let suffix = match iter_type with
-        | List -> "*" | List1 -> "+" | Opt -> "?" | ListN _ -> "" in
-      (match e1.it with
-       | VarE id ->
-           let full = id.it ^ suffix in
-           (match resolve_var_name full vm with
-            | Some mapped ->
-                debug_iter "[ITER-MAP] kind=%s raw=%s probe=%s mapped=%s"
-                  suffix id.it full mapped;
-                (match iter_type with
-                 | ListN (count_e, _) ->
-                     (match count_e.it with
-                      | VarE count_id ->
-                          (match resolve_var_name count_id.it vm with
-                           | Some cnt_mapped -> record_listn_pair cnt_mapped mapped
-                           | None -> ())
-                      | _ -> ())
-                 | _ -> ());
-                texpr_with_var mapped mapped
-            | None ->
-          let v = String.uppercase_ascii (sanitize full) in
-                debug_iter "[ITER-MAP] kind=%s raw=%s probe=%s mapped=<fallback:%s>"
-                  suffix id.it full v;
-          texpr_with_var v v)
-       | _ -> translate_exp ctx e1 vm)
+    let suffix = match iter_type with
+      | List -> "*" | List1 -> "+" | Opt -> "?" | ListN _ -> "" in
+    (match e1.it with
+     | VarE id ->
+         let full = id.it ^ suffix in
+         (match resolve_var_name full vm with
+          | Some mapped ->
+              debug_iter "[ITER-MAP] kind=%s raw=%s probe=%s mapped=%s"
+                suffix id.it full mapped;
+              (match iter_type with
+               | ListN (count_e, _) ->
+                   (match count_e.it with
+                    | VarE count_id ->
+                        (match resolve_var_name count_id.it vm with
+                         | Some cnt_mapped -> record_listn_pair cnt_mapped mapped
+                         | None -> ())
+                    | _ -> ())
+               | _ -> ());
+              texpr_with_var mapped mapped
+          | None ->
+              let fallback_raw =
+                match iter_type with
+                | List | List1 | ListN _ -> pluralize_sequence_var_source_name id.it
+                | Opt -> id.it ^ "?"
+              in
+              let v = String.uppercase_ascii (sanitize fallback_raw) in
+              texpr_with_var v v)
+     | _ -> translate_exp ctx e1 vm)
   | IfE (c, e1, e2) ->
       tjoin3 (Printf.sprintf "if %s then %s else %s fi")
         (translate_exp BoolCtx c vm) (translate_exp ctx e1 vm) (translate_exp ctx e2 vm)
@@ -1197,14 +1243,14 @@ let base_types = SSet.of_list
 (** Extract variable name from an [ExpB] binder. *)
 let binder_var_map binders =
   List.filter_map (fun b -> match b.it with
-    | ExpB (tid, _) -> Some (tid.it, to_var_name tid.it)
+    | ExpB (tid, t) -> Some (tid.it, to_var_name (source_name_for_binder tid.it t))
     | _ -> None
   ) binders
 
 let binder_type_conds binders =
   List.filter_map (fun b -> match b.it with
     | ExpB (tid, t) ->
-        Some (type_guard (to_var_name tid.it) t [])
+        Some (type_guard (to_var_name (source_name_for_binder tid.it t)) t [])
     | _ -> None
   ) binders
 
@@ -1838,7 +1884,8 @@ let binder_to_var_map prefix eq_idx binders =
         else
           let raw = v_id.it in
           let base = strip_iter_suffix raw in
-          let mapped = make_var_prefix prefix eq_idx base in
+          let named_base = source_name_for_binder raw t in
+          let mapped = make_var_prefix prefix eq_idx named_base in
           let iter_kind = match t.it with
             | IterT (_, List) -> "*"
             | IterT (_, List1) -> "+"
@@ -1849,6 +1896,7 @@ let binder_to_var_map prefix eq_idx binders =
             eq_idx raw base iter_kind mapped;
           let acc = add_vm_alias raw mapped acc in
           let acc = add_vm_alias base mapped acc in
+          let acc = add_vm_alias named_base mapped acc in
           let acc = add_vm_alias (base ^ "*") mapped acc in
           let acc = add_vm_alias (base ^ "+") mapped acc in
           let acc = add_vm_alias (base ^ "?") mapped acc in
@@ -3930,7 +3978,7 @@ let header_prefix =
   "  var TYPE-ITER-RT : Rectype .\n" ^
   "  var TYPE-ITER-N : Nat .\n" ^
   "  vars T W WW FQ : WasmTerminal .\n" ^
-  "  vars TS W* ISQ INSTRQ CQ : WasmTerminals .\n\n"
+  "  vars TS W* ISQ INSTRSQ CQ : WasmTerminals .\n\n"
 
 let footer =
   "\n  --- Execution predicate equations (auto-added; use Val sort membership)\n" ^
