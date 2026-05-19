@@ -311,6 +311,39 @@ let sanitize name =
     in
     strip_tail res
 
+let sanitize_rule_label_part name =
+  if name = "_" then "any"
+  else
+    let mapped = String.map (function
+      | '.' | '_' | '*' | '+' | '?' -> '-'
+      | '\'' -> 'Q'
+      | c -> c) name
+    in
+    let buf = Buffer.create (String.length mapped) in
+    let len = String.length mapped in
+    let rec scan i =
+      if i >= len then ()
+      else if mapped.[i] = '-' && i + 1 < len
+           && mapped.[i + 1] >= '0' && mapped.[i + 1] <= '9' then
+        (Buffer.add_char buf mapped.[i + 1]; scan (i + 2))
+      else
+        (Buffer.add_char buf mapped.[i]; scan (i + 1))
+    in
+    scan 0;
+    let rec strip_edges s =
+      let n = String.length s in
+      if n > 0 && s.[0] = '-' then strip_edges (String.sub s 1 (n - 1))
+      else if n > 0 && s.[n - 1] = '-' then strip_edges (String.sub s 0 (n - 1))
+      else s
+    in
+    strip_edges (Buffer.contents buf)
+
+let rule_label_prefix rel_name case_id rule_idx =
+  let rel_part = String.uppercase_ascii (sanitize_rule_label_part rel_name) in
+  let case_part_raw = String.uppercase_ascii (sanitize_rule_label_part case_id) in
+  let case_part = if case_part_raw = "" then Printf.sprintf "R%d" rule_idx else case_part_raw in
+  Printf.sprintf "%s-%s" rel_part case_part
+
 let to_var_name name =
   String.uppercase_ascii (sanitize name)
 
@@ -3109,6 +3142,7 @@ let translate_step_reld rel_name rules =
             if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix
           in
           let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
+          let label_prefix = rule_label_prefix rel_name case_id.it rule_idx in
           let vm = binder_to_var_map prefix rule_idx binders in
           let typed_vars = binder_var_sorts binders vm in
           let bconds = binder_to_type_conds binders vm in
@@ -3380,7 +3414,7 @@ let translate_step_reld rel_name rules =
                 emit_one label lhs rhs local_cond
               in
               let emit_rule label lhs rhs = emit_rule_with_cond label lhs rhs cond in
-              let label = String.lowercase_ascii prefix in
+              let label = String.lowercase_ascii label_prefix in
               let primary_rule =
 	                if true then
 	                  if rel_name = "Step" && case_id.it = "pure" then
@@ -3758,6 +3792,7 @@ let translate_steps_reld rel_name rules =
         let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
         let case_part = if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix in
         let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
+        let label_prefix = rule_label_prefix rel_name case_id.it rule_idx in
         let vm = binder_to_var_map prefix rule_idx binders in
         let typed_vars = binder_var_sorts binders vm in
         all_typed_vars := List.sort_uniq compare (!all_typed_vars @ typed_vars);
@@ -3867,7 +3902,7 @@ let translate_steps_reld rel_name rules =
             Printf.sprintf "  crl [%s] :\n    steps ( %s )\n    =>\n    %s\n      if %s ."
               label lhs rhs local_cond
         in
-        let label = String.lowercase_ascii prefix in
+        let label = String.lowercase_ascii label_prefix in
         emit_rule label lhs_cfg rhs_cfg cond
   ) rules in
   let contains lit s =
@@ -3921,6 +3956,7 @@ let translate_reld _id rel_name rules =
         let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
         let case_part = if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix in
         let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
+        let label_prefix = rule_label_prefix rel_name case_id.it rule_idx in
 
         let vm = binder_to_var_map prefix rule_idx binders in
         let raw_typed_vars = binder_var_sorts binders vm in
@@ -4002,7 +4038,7 @@ let translate_reld _id rel_name rules =
         let cond = cond_join all_conds in
         let emit_rule ?(suffix="") lhs_text cond_text =
           if use_rewrite_judgement then
-            let label = (String.lowercase_ascii prefix) ^ suffix in
+            let label = (String.lowercase_ascii label_prefix) ^ suffix in
             if cond_text = "" then
               Printf.sprintf "  rl [%s] :\n    %s ( %s )\n    =>\n    valid ."
                 label rel_name lhs_text

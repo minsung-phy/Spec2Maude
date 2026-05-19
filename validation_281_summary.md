@@ -57,6 +57,8 @@ The apparent `293 -> 281` gap is a counting and mapping issue, not a missing-rul
 - No `eq` / `ceq ... = valid` statements remain in `output_bs.maude`.
 
 Detailed audit artifacts are under `docs/c1-validation/`.
+The focused strict executability triage is in
+`docs/c1-validation/strict_validation_failure_triage.md`.
 
 ## Concrete Successes
 

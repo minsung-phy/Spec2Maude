@@ -30,6 +30,17 @@ Instrs-ok(C', instrs2, arrow(TS2, XS2, TS3)) => valid
 
 The current `Judgement => valid` encoding checks relation facts but does not synthesize such intermediate witnesses. This is a mode / witness-search limitation, not a missing primary rule.
 
+A focused probe also showed that the generated local-initialization premise:
+
+```text
+index(value('LOCALS, C), eps)
+```
+
+does not reduce in the current generic prelude. The prelude only provides
+single-index lookup `index(WasmTerminals, Nat)`. A sequence-index/list-lift
+equation such as `index(L, eps) = eps` would be executable support for iterated
+SpecTec side conditions, not a direct source validation rule.
+
 ## 3. `Step/ctxt-instrs` Executability Limitation
 
 The strict single `Step/ctxt-instrs` rule is structurally close to the original SpecTec rule. It should cover cases such as:
@@ -89,7 +100,18 @@ The generated source rule needs:
 index(value('FUNCS, s), a)
 ```
 
-to expose a function instance and project `TYPE`. The current concrete Fibonacci harness/store shape does not discharge that premise in the ground probe. This is a concrete store/harness lookup limitation, not a missing source-rule lowering.
+to expose a function instance and project `TYPE`. In the current Fibonacci
+harness, the lookup itself succeeds:
+
+```text
+index(value('FUNCS, fib-store), 0) = fib-funcinst
+```
+
+but `fib-funcinst` is an opaque harness constant with field-projection
+equations. The generated structural predicate `$is-spectec-funcinst` recognizes
+the source record shape for function instances and does not reduce on that
+opaque constant. This is a concrete harness representation limitation, not a
+missing source-rule lowering.
 
 ## 5. Sequence `Val-ok` Executability Limitation
 
