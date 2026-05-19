@@ -7,46 +7,197 @@ translator work.
 
 ## Big Picture
 
-Spec2Maude translates WebAssembly 3.0 SpecTec semantics into Maude.
+Spec2Maude currently translates the WebAssembly 3.0 SpecTec semantics into a
+Maude rewriting-logic specification.
 
-The long-term research goal is not just to run one Fibonacci benchmark. The
-goal is to translate SpecTec semantics as relation-preservingly and
-isomorphically as possible, while still producing executable Maude semantics.
+The research goal is not merely to run one Fibonacci benchmark. The goal is to
+build a faithful, relation-preserving SpecTec-to-Maude baseline that can later
+be transformed into analysis-friendly semantics.
 
 Project stages:
 
-1. C1: faithful relation-preserving SpecTec-to-Maude baseline.
-2. C2: analysis-friendly transformation derived from C1.
-3. Evaluation: rewrite/search/LTL model-checking experiments comparing C1/C2.
+1. **C1**: faithful / relation-preserving SpecTec-to-Maude baseline.
+2. **C2**: analysis-friendly transformation derived from C1.
+3. **Evaluation**: rewrite/search/LTL experiments over C1/C2.
 
-The active target is still C1.
+The active target is C1. Model checking is deferred until the baseline is
+clean, documented, and stable.
 
-## Temporary Executable Scaffolding
+## Current Accepted C1 Baseline
 
-`translator_bs.ml` currently restores only label-related generated
-`step-from-step-pure-*` rules for executability. These rules are derived lifted
-shortcuts from `Step_pure` into `Step`; they are not direct translations of
-original SpecTec `Step` rules and are not C1-final. Non-label
-`step-from-step-pure-*` shortcuts are intentionally suppressed.
+The active generated output is `output_bs.maude`, regenerated from
+`translator_bs.ml`.
 
-The strict version without these shortcuts exposed a Maude executability
-limitation in the single, SpecTec-shaped `Step/ctxt-instrs` rule: the intended
-associative split exists for terms such as `label(... br 0) local.get 1`, and
-each condition succeeds individually, but Maude does not combine that split with
-the conditional rewrite premise during full rule application. Reordering the
-conditions to put the `Step` premise first caused runaway recursion / stack
-overflow.
+Regenerate with:
 
-Future work: remove the remaining label-related `step-from-step-pure-*`
-shortcuts by finding a faithful generic context-closure encoding for C1, or
-move execution-oriented control infrastructure to C2.
+```bash
+dune build ./main_bs.exe
+dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude
+```
 
-## C1 Goal
+Current accepted facts:
 
-C1 is the relation-preserving baseline. It is not the C2 analysis-friendly
-semantics and must not contain benchmark-specific execution adapters.
+- `dune build ./main_bs.exe` passes.
+- `dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude` passes.
+- `output_bs.maude` loads through `wasm-exec-bs.maude`.
+- Standard Fibonacci execution regressions pass.
+- The helper-heavy Module-ok / init-config experiment has been pruned or
+  deferred from the active C1 baseline.
+- `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
+  hardcoding such as:
 
-C1 must preserve the SpecTec relation structure:
+```bash
+grep -n "Func-ok\|Instrs-ok\|Module-ok\|Externaddr-ok\|fib\|CTORI32A0" translator_bs.ml
+```
+
+Expected result: no output.
+
+## Important Files
+
+- `translator_bs.ml`: active C1 translator. Final fixes must be made here.
+- `output_bs.maude`: generated C1 output. Do not patch manually as final.
+- `wasm-exec-bs.maude`: current execution/regression harness.
+- `wasm-3.0/*.spectec`: WebAssembly 3.0 SpecTec source semantics.
+- `translator.ml`, `output.maude`, `wasm-exec.maude`: older/reference path;
+  do not mix into C1 unless explicitly comparing with legacy behavior.
+
+## Professor Requirements from 2026-05-19 Meeting
+
+These are C1 design constraints.
+
+1. **Preserve C1 as the faithful SpecTec-to-Maude baseline.** C1 should show
+   that SpecTec syntax, definitions, and relation rules can be translated as
+   directly as possible. Model checking and analysis-oriented transformations
+   belong to later phases.
+2. **Use clear variable naming for singleton vs sequence variables.** A
+   singleton `instr` should be visibly different from `instr*`; use names such
+   as `INSTR` and `INSTRS`.
+3. **Remove redundant Boolean wrappers where Maude accepts Bool conditions
+   directly.** Generated conditions should avoid wrappers such as `(C =/= 0) =
+   true` when `C =/= 0` is accepted.
+4. **Translate SpecTec `rule` / relation judgements as Maude `rl/crl` as much
+   as possible.** Validation judgements currently lowered as `eq/ceq ... =
+   valid` are a major remaining policy issue.
+5. **Avoid helper-heavy executable shortcuts.** Any remaining scaffold must be
+   generic, justified, and documented. Benchmark-specific or Wasm-judgement-name
+   hacks do not belong in `translator_bs.ml`.
+6. **Grow the work from Wasm-to-Maude toward generic SpecTec-to-Maude.** Audit
+   Wasm-specific names/hardcoding, try non-Wasm SpecTec inputs such as
+   `p4-spectec`, and identify unsupported frontend/spec features.
+7. **Re-evaluate the `WasmTerm` / `WasmType` / typecheck infrastructure.** Do
+   not delete Wasm object-language type syntax or SpecTec validation semantics.
+   Instead distinguish:
+   - object-language type syntax;
+   - validation relation semantics;
+   - runtime/execution typecheck or membership guards.
+
+   If well-typed input programs are assumed, audit whether execution rules
+   still need runtime typecheck/membership guards, and whether broad
+   `WasmType` ground terms that never appear in actual programs/configurations
+   unnecessarily pollute the syntax universe.
+8. **Check broad coverage.** Verify all relevant Wasm SpecTec documents and use
+   non-Wasm smoke-test failures as evidence of current genericity limitations.
+9. **Prepare professor-facing mapping evidence.** Document how syntax
+   declarations, definitions, relation rules, and representative execution
+   relations map into Maude.
+
+## Current Cleanup State
+
+### Completed: singleton vs sequence variable naming
+
+Generated Maude variables now distinguish singleton terms from star/list terms.
+Examples:
+
+```text
+instr    -> INSTR
+instr*   -> INSTRS
+instr'   -> INSTRQ
+instr'*  -> INSTRSQ
+val*     -> VALS
+```
+
+Representative generated rules now use sequence-variable names such as
+`STEP-PURE0-INSTRS`, `STEP-PURE0-INSTRSQ`,
+`STEP-CTXT-INSTRS2-VALS`, `STEP-CTXT-INSTRS2-INSTRS`, and
+`STEP-CTXT-INSTRS2-INSTRSQ`.
+
+This is a naming/readability cleanup only. It should not change semantics.
+
+### Completed: Boolean condition wrapper cleanup
+
+Generated Maude conditions now use Bool terms directly instead of wrapping
+condition fragments as `(B) = true`.
+
+Examples of cleaned forms:
+
+```maude
+if STEP-PURE-BR-IF-TRUE11-C =/= 0 .
+
+if all-vals(STEP-CTXT-INSTRS2-VALS)
+/\ ((STEP-CTXT-INSTRS2-VALS =/= eps) or
+    (STEP-CTXT-INSTRS2-INSTRS1 =/= eps))
+/\ step((STEP-CTXT-INSTRS2-Z ; STEP-CTXT-INSTRS2-INSTRS))
+   => (STEP-CTXT-INSTRS2-ZQ ; STEP-CTXT-INSTRS2-INSTRSQ) .
+```
+
+Checks that should remain true:
+
+```bash
+grep -n "if .* = true" output_bs.maude
+grep -n "== valid = true" output_bs.maude
+```
+
+Expected result: no output.
+
+Boolean function definitions such as these should remain:
+
+```maude
+eq $is-numtype(CTORI32A0) = true .
+eq all-vals(eps) = true .
+ceq is-val(W) = true if W : Val .
+```
+
+They are definitions, not redundant condition wrappers.
+
+### Completed: empty-result split cleanup
+
+The following generated empty-result split rules are removed:
+
+- `step-ctxt-instrs-empty`;
+- `step-pure-empty`;
+- `step-read-empty`;
+- `step-ctxt-label-empty`;
+- `step-ctxt-handler-empty`.
+
+The corresponding bridge/context rules now handle both `eps` and non-`eps`
+inner results in a single rule.
+
+### Completed: remove non-label `step-from-step-pure-*` shortcuts
+
+Audit result: `step-from-step-pure-*` rules are derived lifted shortcuts from
+`Step_pure` into `Step`. They are not direct translations of original SpecTec
+`Step` rules.
+
+Current state:
+
+- non-label `step-from-step-pure-*` shortcuts are removed;
+- label-related `step-from-step-pure-*` shortcuts remain temporarily;
+- the remaining label-related shortcuts are documented non-C1-final debt.
+
+Reason for temporary retention: without them, the strict single-rule translation
+of `Step/ctxt-instrs` is structurally faithful, and the intended associative
+split exists for terms such as `label(... br 0) local.get 1`; however Maude does
+not combine that split with the conditional rewrite premise during full rule
+application. Reordering the conditions to put the `Step` premise first caused
+runaway recursion / stack overflow.
+
+Future work: remove the remaining label-related shortcuts by finding a faithful
+generic context-closure encoding for C1, or move execution-oriented control
+infrastructure to C2.
+
+## C1 Relation Structure to Preserve
+
+C1 must preserve these SpecTec relations:
 
 ```spectec
 relation Step      : config ~> config
@@ -55,7 +206,7 @@ relation Step_read : config ~> instr*
 relation Steps     : config ~>* config
 ```
 
-Generated Maude must keep the public wrappers:
+Generated Maude must expose these public wrappers:
 
 ```maude
 op step      : Config -> StepConf [frozen (1)] .
@@ -64,83 +215,23 @@ op step-read : Config -> StepReadConf [frozen (1)] .
 op steps     : Config -> StepsConf [frozen (1)] .
 ```
 
-`steps` must remain unary:
+`steps` is unary:
 
 ```maude
 steps(C) => C'
 ```
 
-Config syntax must remain:
+Config syntax uses:
 
 ```maude
 _ ; _
 ```
 
-## Professor Requirements from 2026-05-19 Meeting
+## Current Regression Evidence
 
-These requirements summarize the latest professor guidance and should be treated as C1 design constraints.
+Run through `wasm-exec-bs.maude`.
 
-1. **Preserve C1 as the faithful SpecTec-to-Maude baseline.** Model checking and analysis-oriented transformations belong to later phases. C1 should first show that SpecTec syntax/defs/rules can be translated faithfully and relation-preservingly.
-2. **Use clear variable naming for singleton vs sequence variables.** Starred SpecTec categories such as `instr*` should be visibly distinguished from singleton categories such as `instr`; prefer conventions such as `INSTR` for one instruction and `INSTRS` for instruction sequences.
-3. **Remove redundant Boolean wrappers where Maude permits it.** Generated conditions like `(C =/= 0) = true` should be audited and simplified when a direct Boolean condition is accepted by Maude. Do not perform an unsafe blind global deletion without testing representative conditions.
-4. **Translate SpecTec `rule`/relation judgements as Maude `rl/crl` as much as possible.** Validation judgements currently generated as `eq/ceq ... = valid` are a major policy issue and need dependency-aware redesign, not helper-heavy bypasses.
-5. **Avoid helper-heavy executable shortcuts.** Any remaining scaffold must be generic, justified, and documented. Benchmark-specific or Wasm-judgement-name-specific hacks do not belong in `translator_bs.ml`.
-6. **Grow the baseline from Wasm-to-Maude toward generic SpecTec-to-Maude.** Audit and remove Wasm-specific hardcoding; try non-Wasm SpecTec inputs such as `p4-spectec`; generalize names such as `WasmTerminal`/`WasmType` where appropriate.
-7. **Re-evaluate the legacy `WasmTerm`/`WasmType` and typecheck infrastructure.** This does not mean deleting Wasm object-language type syntax or deleting validation semantics. The task is to distinguish object-language type syntax, validation relations, and runtime execution guards. If a well-typed input program is assumed, audit whether execution rules still need runtime typecheck or membership guards, and whether broad `WasmType` ground terms that never appear in actual programs/configurations are unnecessary syntax-universe pollution. Keep only an elegant, necessary sort/type framework.
-8. **Check broad coverage.** Verify all relevant Wasm SpecTec documents, including non-core pieces if present, and use failures to identify translator limitations. Generic SpecTec smoke tests are useful even if full support is future work.
-9. **Prepare professor-facing mapping evidence.** Show how syntax declarations, defs/equations, relation rules, and representative `Step`/`Step_pure`/`Step_read`/`Steps` rules map into Maude.
-
-## Professor-Facing Initial-Config Requirement
-
-The professor-facing story cannot be:
-
-```text
-manual fib-store / fib-funcinst / fib-moduleinst
-  -> hand-assembled runtime config
-  -> steps(...)
-```
-
-The intended story is:
-
-```text
-wasm / wat code
-  -> Wasm module Maude term
-  -> deterministic initial config generation
-  -> generated C1 semantics
-  -> steps / search / verification
-```
-
-The immediate C1 target is the middle of that pipeline:
-
-```text
-fib-module Maude term
-  -> validation-preserving Module-ok / instantiate
-  -> invoke
-  -> unary steps(Config)
-```
-
-The benchmark harness may mention Fibonacci-specific names. The translator must
-not.
-
-## Important Files
-
-- `translator_bs.ml`: C1 translator. Final fixes must be made here.
-- `output_bs.maude`: generated C1 output. Do not patch manually as final.
-- `wasm-exec-bs.maude`: benchmark harness for current Fibonacci evidence.
-- `wasm-3.0/*.spectec`: source semantics.
-- `translator.ml`, `output.maude`: older/C2 reference path; do not mix into C1.
-
-Regenerate C1 output with:
-
-```bash
-dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude
-```
-
-## Current Successful Evidence
-
-The following are useful C1 regression tests.
-
-`$expanddt` works:
+### `$expanddt` works
 
 ```maude
 red in WASM-FIB-BS :
@@ -153,7 +244,7 @@ Expected/current result:
 CTORFUNCARROWA2(CTORI32A0 CTORI32A0 CTORI32A0, CTORI32A0)
 ```
 
-Generated `$invoke` works over the manually assembled store:
+### `$invoke` reduces to a concrete config
 
 ```maude
 red in WASM-FIB-BS :
@@ -162,261 +253,160 @@ red in WASM-FIB-BS :
 
 Expected/current result: a concrete `Config`, not a stuck `$invoke(...)`.
 
-Known invoke-path status:
+### Focused one-step/context searches pass
 
-```maude
-rew [10000] in WASM-FIB-BS : steps(fib-config-invoke(i32v(5))) .
-```
+- label/br + suffix search: exactly one `Config` solution.
+- br_if + suffix search: exactly one `Config` solution.
+- nop + suffix search: exactly one `Config` solution.
 
-This path currently stops early at the known outer invoke frame/label/block term.
-`$invoke(...)` itself still reduces to a concrete `Config`, but the full
-`fib-config-invoke` execution should be treated as a separate invoke-path issue,
-not as part of small cleanup tasks.
-
-The older hand-assembled config path also remains a useful execution
-regression:
+### Hand-assembled Fibonacci config executes
 
 ```maude
 rew [10000] in WASM-FIB-BS :
   steps(fib-config(i32v(5))) .
 ```
 
-Expected/current final constant:
+Expected/current final result:
 
 ```maude
-CTORCONSTA2(CTORI32A0, 5)
+(fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)
 ```
 
-These tests prove that generated `step`, `step-pure`, `step-read`, `steps`, and
-`$invoke` have meaningful execution coverage. They are not the final
-professor-facing path, because `fib-store`, `fib-funcinst`, and
-`fib-moduleinst` are still manually assembled by the harness.
-
-## Current Blocker
-
-The current C1 blocker is validation/typechecking execution:
+### Known invoke-path issue
 
 ```maude
-red in WASM-FIB-BS :
-  Module-ok(fib-module, CTORARROWA2(eps, eps)) .
+rew [10000] in WASM-FIB-BS :
+  steps(fib-config-invoke(i32v(5))) .
 ```
 
-This does not yet reduce to:
+This path currently stops early at the known outer invoke frame/label/block
+shape. `$invoke(...)` itself reduces to a concrete `Config`; the full
+`fib-config-invoke` execution is a separate invoke-path issue.
+
+## Current Major Blocker: Validation Rule Lowering
+
+The next major C1 task is validation judgement lowering.
+
+Current generated validation rules such as `Module-ok`, `Func-ok`, `Instrs-ok`,
+`Instr-ok`, `Types-ok`, and related judgements are still generated as equations:
 
 ```maude
-valid
+eq  J(...) = valid .
+ceq J(...) = valid if ... .
 ```
 
-Because this validation does not yet succeed, validation-preserving instantiate
-is not complete:
+Professor requirement: SpecTec `rule` / relation judgements should be lowered
+as Maude `rl/crl` as much as possible.
+
+This cannot be solved by blindly replacing `eq/ceq` with `rl/crl`. Current
+callers often use equation-style conditions such as:
 
 ```maude
-rew [1] in WASM-FIB-BS :
-  $instantiate(empty-store, fib-module, eps) .
+J(...) == valid
 ```
 
-The focus is currently:
+If a callee is converted to a rewrite rule, caller premises may also need to be
+translated to rewrite conditions:
+
+```maude
+J(...) => valid
+```
+
+Therefore this task needs dependency-aware audit before code changes.
+
+Recommended next audit:
+
+1. List all validation judgements generated as `eq/ceq ... = valid`.
+2. For each family, record which other validation judgements it calls.
+3. Identify self-recursion and mutual recursion.
+4. Identify which caller families rely on `J(...) == valid`.
+5. Find the smallest closed subset for a safe `rl/crl` prototype.
+6. Only then implement a small prototype.
+
+Important families:
 
 ```text
-Module-ok
-  -> Func-ok
-  -> Expr-ok
-  -> Instrs-ok
-  -> Instr-ok / Instrtype-sub / Resulttype-sub / frame adaptation
-```
-
-Recent diagnosis narrowed the issue to generic SpecTec-to-Maude lowering
-problems, not Fibonacci-specific semantics:
-
-- nonempty `Instrs-ok` sequence validation can stack overflow or get stuck;
-- same-input recursive adaptation rules must not be used as syntax-directed
-  inference rules;
-- SpecTec list-tail patterns such as `instr instr*` need correct singleton
-  tail `eps` handling;
-- output-bearing premises need mode-aware scheduling;
-- partial-output inference must not force Maude to solve validation backwards;
-- list elements that are themselves sequence-like need element-boundary
-  preservation.
-
-## Design Constraints
-
-Do not add any of the following to C1:
-
-- `mc`
-- `exec-step`
-- `focused-step`
-- `dstep`
-- C2-style execution adapters
-- benchmark-specific rewrite rules
-- output-level manual patches as final
-- global `mb/cmb` to `$typed` conversion
-- deletion of `OpTerminal`, `InstrTerminals`, or `ValTerminals`
-- binary `steps`
-- validation premise bypasses
-
-Do not make execution pass by removing or weakening:
-
-```maude
-Module-ok(...)
-Externaddr-ok(...)
-Val-ok(...)
-```
-
-or other validation premises generated from SpecTec.
-
-The following names must not appear as hardcoded strings in `translator_bs.ml`:
-
-```text
-fib
-fib-module
-fib-store
-empty-store
-CTORI32A0
 Module-ok
 Func-ok
+Expr-ok
 Instrs-ok
+Instr-ok
+Types-ok
+Locals-ok
+Globals-ok
+Tables-ok
+Mems-ok
+Elem-ok
+Data-ok
+Import-ok
+Export-ok
+Ref-ok
 Externaddr-ok
-Val-ok
+subtype/type validation judgements
 ```
 
-These names may appear in `output_bs.maude`, because that file is generated from
-the Wasm SpecTec sources. They may also appear in `wasm-exec-bs.maude`, because
-that file is a benchmark harness.
+## Source-Level Initial Config Requirement
 
-## Current Pruned Baseline
-
-The recent helper-heavy Module-ok / init-config experiment has been pruned from
-the active C1 baseline.
-
-Current state:
-
-- helper-heavy Module-ok/init-config changes are removed or deferred;
-- `translator_bs.ml` is restored to the clean C1 baseline;
-- `output_bs.maude` is regenerated from the translator;
-- `dune build ./main_bs.exe` passes;
-- `dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude` passes;
-- forbidden hardcoding grep on `translator_bs.ml` is empty:
-
-```bash
-grep -n "Func-ok\|Instrs-ok\|Module-ok\|Externaddr-ok\|fib\|CTORI32A0" translator_bs.ml
-```
-
-This means the current accepted C1 baseline supports execution smoke tests
-through `fib-config` / `fib-config-invoke`, but source-module
-validation-preserving initial config is still future work.
-
-## Research Direction: C1 Baseline
-
-### 1. Stop helper-heavy init-config path
-
-Module-ok / init-config should not be forced to run by adding helper-heavy
-shortcuts. That direction is not a C1-final candidate unless it can be justified
-as generic, SpecTec-derived, validation-preserving infrastructure.
-
-The following kinds of changes must stay removed or isolated as experimental:
-
-- `$infer-*`, `$prove-*`, `$out-*`;
-- `$record-update`, `$record-append`;
-- `$seq-tail`, `$list-elem`;
-- unsafe `$instantiate-eq`;
-- unsafe `$init-invoke`;
-- manual validation adapters that name Wasm judgements;
-- Fibonacci-specific rules or copied instantiated stores/configs.
-
-Past experiments should remain documented as experiments only. The active
-baseline is the pruned C1 semantics that passes the accepted execution
-regressions.
-
-### 2. Make `output_bs.maude` more isomorphic
-
-C1's core goal is to preserve SpecTec relation and rule structure as directly
-as possible. The generated Maude should become cleaner before returning to
-source-module initial config work.
-
-#### 2.1 `step-from-step-pure-*`
-
-Audit result: `step-from-step-pure-*` rules are derived `Step_pure`-to-`Step`
-lifted shortcuts, not direct translations of original SpecTec `Step` rules.
-
-Current cleanup state:
-
-- non-label `step-from-step-pure-*` shortcuts are removed;
-- only label-related `step-from-step-pure-*` shortcuts remain temporarily;
-- the remaining label-related shortcuts are non-C1-final executable debt.
-
-Reason for temporary retention: the strict single-rule translation of
-`Step/ctxt-instrs` can match the intended associative split for terms such as
-`label(... br 0) local.get 1`, and its individual conditions succeed, but Maude
-does not combine that split with the conditional rewrite premise during full
-rule application. Future work is to remove the remaining label-related
-shortcuts by finding a faithful generic context-closure encoding or by moving
-execution-control machinery to C2.
-
-#### 2.2 Empty-result splits and `INSTRQ =/= eps` guards
-
-Completed cleanup: the generated empty-result split rules have been removed, and
-their companion `INSTRQ =/= eps` guards have been removed.
-
-Removed rules:
-
-- `step-ctxt-instrs-empty`;
-- `step-pure-empty`;
-- `step-read-empty`;
-- `step-ctxt-label-empty`;
-- `step-ctxt-handler-empty`.
-
-The corresponding generated bridges/context rules now handle both `eps` and
-non-`eps` inner results in a single rule. Keep regression tests for
-label/br+suffix, br_if+suffix, nop+suffix, and `steps(fib-config(i32v(5)))`
-after any further translator changes.
-
-#### 2.3 Boolean condition cleanup
-
-Professor feedback: conditions such as `(C =/= 0) = true` are often redundant
-because Maude conditions may use Bool expressions directly. This should be
-audited separately from the completed `INSTRQ =/= eps` cleanup.
-
-Do not blindly delete every `= true`; first test representative generated
-conditions such as arithmetic comparisons and `$is-*` predicates.
-
-#### 2.4 Validation rules currently lowered as equations
-
-Some validation rules such as `Module-ok`, `Func-ok`, and `Instrs-ok` are
-currently generated as `eq/ceq ... = valid`.
-
-The professor's requirement is that SpecTec `rule`s should be represented as
-Maude `rl/crl` as much as possible. Therefore validation relation lowering must
-be audited and likely redesigned.
-
-Key research question:
+The professor-facing story cannot remain:
 
 ```text
-How can output-bearing validation premises preserve rule structure without
-falling back to helper-heavy $infer/$prove/$out mode compilation?
+manual fib-store / fib-funcinst / fib-moduleinst
+  -> hand-assembled runtime config
+  -> steps(...)
 ```
 
-#### 2.5 Generic SpecTec-to-Maude direction
+The intended story is:
 
-C1 should be audited as a generic SpecTec-to-Maude translator, not only a Wasm
-translator. Concrete tasks:
+```text
+wasm / wat code
+  -> Wasm module Maude term
+  -> validation-preserving initial config generation
+  -> generated C1 semantics
+  -> steps / search / verification
+```
 
-- grep `translator_bs.ml` for Wasm-specific hardcoding;
-- consider renaming generic generated infrastructure from `WasmTerminal` /
-  `WasmType` toward `SpecTecTerminal` / `SpecTecType`, or removing the broad
-  type sort if the audit shows it is unnecessary;
-- try `p4-spectec` or another non-Wasm SpecTec input as a smoke test;
-- record unsupported SpecTec features as translator limitations rather than
-  silently adding Wasm-specific hacks.
+Immediate C1 target after validation policy is clarified:
 
-#### 2.6 `WasmType` / typecheck infrastructure audit
+```text
+fib-module Maude term
+  -> Module-ok / instantiate
+  -> invoke
+  -> unary steps(Config)
+```
 
-The current `WasmTerm`/`WasmType` framework may be legacy/ad-hoc. Audit it
-before making invasive changes.
+The benchmark harness may mention Fibonacci-specific names. The translator must
+not.
+
+## Generic SpecTec Direction
+
+C1 should be audited as a generic SpecTec-to-Maude translator, not merely a
+Wasm-specific executor.
+
+Current `p4-spectec` smoke-test status:
+
+```bash
+dune exec ./main_bs.exe -- p4-spectec/*/*.watsup > output_bs_p4.maude
+```
+
+Current result: mostly parser/frontend failures such as `syntax error:
+unexpected token` or `malformed token`; a few files parse, but elaboration then
+fails with undeclared syntax such as `typedExpressionIR`, likely because
+prerequisite files failed to parse.
+
+Interpretation: the current frontend supports the Wasm SpecTec dialect/subset,
+but is not yet a generic parser for P4 `.watsup` syntax. This is useful
+limitation evidence for future generic SpecTec-to-Maude work, not a blocker for
+current Wasm C1 cleanup.
+
+## `WasmType` / Typecheck Infrastructure Audit
+
+The current `WasmTerm` / `WasmType` / `is-type` / `are-types` framework may be
+legacy or ad hoc. Audit before making invasive changes.
 
 Clarifications:
 
 - Do not delete Wasm object-language type syntax such as `i32`, `functype`,
-  `heaptype`, or annotations that appear in source programs.
+  `heaptype`, or source-level annotations.
 - Do not delete SpecTec validation semantics.
 - Do distinguish object-language type syntax, validation relations, and runtime
   execution guards.
@@ -429,131 +419,69 @@ Audit questions:
 - For already validated / well-typed input programs, do execution rules still
   need runtime typecheck or membership guards?
 - Are ground type terms generated that cannot appear in actual programs or
-  runtime configurations? If so, can the syntax universe be reduced?
-- Would a more elegant design use only necessary syntax categories and Maude
-  sorts, rather than a broad type-tag framework?
+  runtime configurations?
+- Would a more elegant design use necessary syntax categories and Maude sorts
+  rather than a broad type-tag framework?
 
-### 3. Initial config path
+## Design Constraints
 
-After C1 isomorphism cleanup and rule-lowering policy are clarified, resume
-source-module initial config work.
+Do not add any of the following to C1:
 
-Target path:
+- `mc`;
+- `exec-step`;
+- `focused-step`;
+- `dstep`;
+- C2-style execution adapters;
+- benchmark-specific rewrite rules;
+- output-level manual patches as final;
+- global `mb/cmb` to `$typed` conversion;
+- deletion of `OpTerminal`, `InstrTerminals`, or `ValTerminals`;
+- binary `steps`;
+- validation premise bypasses.
 
-```text
-fib-module Maude term
-  -> validation-preserving instantiate
-  -> invoke
-  -> unary steps(Config)
-  -> Fibonacci result
+Do not make execution pass by weakening or removing validation premises such as:
+
+```maude
+Module-ok(...)
+Externaddr-ok(...)
+Val-ok(...)
 ```
 
-The current manual/regression paths using `fib-store`, `fib-config`, and
-`fib-config-invoke` are useful smoke tests, but they are not the final
-source-module path. The final goal is that a source Wasm/WAT module term can
-produce an initial config deterministically without user-written runtime config
-shortcuts.
+## Warning Cleanup
 
-### 4. Wasm/WAT to Maude frontend
-
-After `fib-module -> initial config -> steps` works, build frontend support:
-
-```text
-fib.wat or Wasm source
-  -> translated/generated Maude module term
-  -> run on generated output_bs.maude
-```
-
-The frontend is important, but it should come after the C1 semantics and
-initial-config path are stable. Frontend support is separate from
-`translator_bs.ml` and must not justify benchmark hardcoding in the translator.
-
-### 5. Full cleanup and documentation
-
-Clean and document:
-
-- `translator_bs.ml`;
-- `output_bs.maude` generation policy;
-- `wasm-exec-bs.maude`;
-- `README.md`;
-- `STATUS.md`;
-- `HowToTest.md`.
-
-Also verify:
-
-- all `wasm-3.0/*.spectec` inputs are translated as expected;
-- no benchmark-specific hardcoding exists in `translator_bs.ml`;
-- unnecessary generated helpers are removed or justified;
-- warning categories are documented.
-
-### 6. Mapping document for professor
-
-Prepare examples showing how SpecTec constructs are translated:
-
-- syntax declarations;
-- defs/functions/equations;
-- rules;
-- `Step` / `Step_pure` / `Step_read` / `Steps`;
-- representative direct rules and structural bridge rules.
-
-Goal: ask the professor whether the translation is sufficiently
-relation-preserving / isomorphic.
-
-### 7. Warning cleanup
-
-Classify Maude load warnings:
+Maude load warnings remain. Classify them later into:
 
 - advisory / cosmetic;
 - multiple distinct parses;
 - used-before-bound.
 
-Prioritize used-before-bound warnings in validation relations:
-
-- `Module-ok`;
-- `Func-ok`;
-- `Instrs-ok`;
-- `Instr-ok`;
-- `Externaddr-ok`;
-- `Ref-ok`;
-- subtype/type validation rules.
-
-These warnings may be related to output-bearing premise scheduling and
-initial-config blockers.
-
-### 8. Model checking later
-
-Model checking is deferred.
-
-Only proceed to model checking after:
-
-- C1 translation policy is stable;
-- execution regressions pass;
-- initial config path is clarified;
-- generated semantics is cleaned up.
+Prioritize used-before-bound warnings in validation relations, because they may
+be related to output-bearing premise scheduling and source-module initial-config
+blockers.
 
 ## Next Concrete Task
 
 Do not jump to frontend, model checking, or broad speculative infrastructure.
 
-First, finish the validation rule-lowering design audit and the generic/type
-infrastructure audits. Then return to the current source-module blocker:
+Next task:
 
-```maude
-red in WASM-FIB-BS :
-  Module-ok(fib-module, CTORARROWA2(eps, eps)) .
+```text
+Validation rule-lowering audit:
+why are Module-ok / Func-ok / Instrs-ok / related relation judgements emitted
+as eq/ceq = valid instead of rl/crl, and what dependency closure is needed to
+change them safely?
 ```
 
-This term does not yet reduce to `valid`. When work resumes, debug one smallest
-failing validation term at a time:
+Useful starting commands:
 
-1. If it gets stuck in `Instrs-ok`, isolate the exact instruction sequence.
-2. If it is a list-tail issue, fix generic SpecTec list-tail lowering.
-3. If it is an output-bearing premise issue, fix generic rule-preserving
-   scheduling.
-4. Do not add translator rules that mention `Instrs-ok`, `Func-ok`,
-   `Module-ok`, `fib`, or `CTORI32A0` by name.
+```bash
+grep -nE "^(  )?(eq|ceq) (Module-ok|Func-ok|Instrs-ok|Instr-ok|Types-ok)" output_bs.maude | head -80
+grep -n "use_rewrite_judgement" translator_bs.ml
+grep -n "translate_reld" translator_bs.ml
+grep -n "is_rewrite_judgement_rel" translator_bs.ml
+```
 
-Useful acceptance ladder after each translator change:
+Useful acceptance ladder after validation work begins:
 
 ```maude
 red in WASM-FIB-BS :
@@ -576,35 +504,5 @@ rew [1] in WASM-FIB-BS :
   $instantiate(empty-store, fib-module, eps) .
 ```
 
-Final C1 professor-facing acceptance target:
-
-```maude
-rew [10000] in WASM-FIB-BS :
-  steps(fib-config-instantiated(i32v(5))) .
-```
-
-Expected final result:
-
-```maude
-... ; CTORCONSTA2(CTORI32A0, 5)
-```
-
-Do not claim this final path is complete until the command above succeeds
-without validation bypasses.
-
-## Cleanup Guidance
-
-Do not rely on stale `handoff/*.maude` harness files. If running from inside
-`handoff`, use:
-
-```maude
-load ../wasm-exec-bs
-```
-
-instead of:
-
-```maude
-load wasm-exec-bs
-```
-
-Keep useful logs only if they still match the current generated output.
+Do not claim the final source-module path is complete until a validation-
+preserving instantiated config can run to the Fibonacci result without bypasses.

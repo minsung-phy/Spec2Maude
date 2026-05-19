@@ -1,270 +1,339 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/SpecTec→Maude-Formal%20Translation-blue?style=for-the-badge" alt="SpecTec to Maude" />
+  <img src="https://img.shields.io/badge/SpecTec→Maude-C1%20Baseline-blue?style=for-the-badge" alt="SpecTec to Maude" />
 </p>
 
 <h1 align="center">Spec2Maude</h1>
 
 <p align="center">
-  <strong>Automatic Translation of WebAssembly 3.0 SpecTec Formal Semantics into Maude Algebraic Specifications</strong>
+  <strong>A relation-preserving translator from WebAssembly 3.0 SpecTec semantics to Maude rewriting-logic specifications.</strong>
 </p>
 
 <p align="center">
   <a href="https://ocaml.org"><img src="https://img.shields.io/badge/OCaml-5.x-EC6813?logo=ocaml" alt="OCaml" /></a>
   <a href="https://maude.cs.illinois.edu"><img src="https://img.shields.io/badge/Maude-3.x-0066CC" alt="Maude" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT" /></a>
-</p>
-
-<p align="center">
-  <em>From an executable Wasm 3.0 specification to a formal Maude model — syntactic translation is instruction-agnostic; a small hand-written execution harness closes evaluation contexts.</em>
 </p>
 
 ---
 
 ## Overview
 
-**Spec2Maude** is a research-grade compiler that automatically translates the [WebAssembly 3.0](https://webassembly.github.io/spec/) formal specification, written in [SpecTec](https://github.com/Wasm-DSL/spectec), into a runnable Maude rewriting-logic specification. The output is suitable for equational reduction, LTL model checking, and mechanized formal reasoning about WebAssembly program behavior.
+Spec2Maude is a research prototype for translating formal semantics written in
+SpecTec into Maude.
 
-The translation pipeline operates directly on the elaborated **Intermediate Language (IL) AST** produced by the SpecTec frontend. Every syntactic category (`syntax`), auxiliary definition (`def`), and operational semantics rule (`relation`) is mapped to its Maude counterpart — sorts, operators, and equations — without any instruction-specific branching in the translator source code.
+The current active target is the **C1 baseline** for WebAssembly 3.0 SpecTec:
 
----
+- preserve SpecTec relation/rule structure as directly as possible;
+- avoid benchmark-specific execution hacks in the translator;
+- generate executable Maude semantics useful for rewrite/search experiments;
+- keep analysis-oriented transformations and model checking for a later C2
+  phase.
 
-## Current Status
+The project is currently focused on making the generated `output_bs.maude` more
+isomorphic to the original SpecTec, before returning to source-level initial
+configuration and frontend work.
 
-### Translation coverage
+## Current Scope
 
-| Metric | Value |
-|--------|-------|
-| SpecTec input files processed | 21 |
-| Parser / elaborator warnings | 0 |
-| Generated `output.maude` (lines) | 7,065 |
-| Total equations (`eq` + `ceq`) | 1,367 |
-| Auto-generated `step` equations | 189 |
-| Operator declarations | 1,007 |
-| Sort / subsort declarations | 307 |
+This repository currently has two broad paths:
 
-Every `syntax`, `def`, and `relation` declaration in the Wasm 3.0 SpecTec source is consumed without per-instruction branching in `translator.ml`. Evaluation-context wrappers (`exec-label`, `exec-frame`, `exec-handler`, `exec-loop`) and one known soundness patch (`$with-local`) are implemented by hand in [wasm-exec.maude](wasm-exec.maude).
+- **Active C1 path**:
+  - `translator_bs.ml`
+  - `output_bs.maude`
+  - `wasm-exec-bs.maude`
 
-### Verified execution
+- **Older / reference path**:
+  - `translator.ml`
+  - `output.maude`
+  - `wasm-exec.maude`
 
-| Benchmark | Result | Evidence |
-|-----------|--------|----------|
-| Iterative `fib(5)` | `i32.const 5` | 5,949 rewrites to normal form |
-| `<> result-is(5)` | `true` | LTL model check passes |
-| `[] ~ trap-seen` | `true` | LTL model check passes |
+Unless explicitly comparing with legacy behavior, use the active C1 path.
 
-**Scope caveat.** End-to-end verification currently exercises only the instruction subset used by `fib` (arithmetic, `local.get`/`local.set`, `block`/`loop`/`br_if`, `const`, `relop`/`binop`/`testop`). Memory, table, call/call-indirect, GC, Exception, SIMD, atomic, and the validation relations are syntactically translated but have not been executed against benchmarks.
+## Build and Regenerate
 
----
+Build the C1 translator:
 
-## Architecture Pipeline
-
-```
-*.spectec files
-      │
-      ▼
-  SpecTec Frontend
-  (Parse → Elaborate)
-      │
-      ▼
-  Elaborated IL AST
-      │
-      ▼
- ┌────────────────────────────────────────────────┐
- │              translator.ml                      │
- │                                                 │
- │  Phase 1 – Pre-scan (single pass over all defs) │
- │   • Collect bare atom tokens  →  op T : -> WT   │
- │   • Collect relation call signatures → op $f    │
- │   • Infer Bool-context for expression nodes     │
- │                                                 │
- │  Phase 2 – Translation (pure functional)        │
- │   • TypD  →  sort S . / op ctor : args -> S .   │
- │   • DecD  →  op $f : args -> WasmTerminal .     │
- │             + [c]eq $f(lhs) = rhs [if cond] .   │
- │   • RelD (non-Step)                             │
- │          →  op R : args -> Bool .               │
- │             + [c]eq R(lhs) = true [if cond] .   │
- │   • RelD (Step / Step-pure / Step-read)         │
- │          →  [c]eq step(< Z | LHS IS >) =        │
- │                       < Z' | RHS IS > .         │
- └────────────────────────────────────────────────┘
-      │
-      ▼
-  output.maude  (mod SPECTEC-CORE)
-      │
-      ▼
-  wasm-exec.maude
-  (mod WASM-EXEC + WASM-FIB + WASM-FIB-PROPS)
-      │
-      ├─► rewrite [N] : steps(config) .   (equational reduction)
-      └─► modelCheck(config, φ) .         (LTL verification)
+```bash
+dune build ./main_bs.exe
 ```
 
----
+Regenerate the C1 Maude output:
 
-## Repository Structure
-
+```bash
+dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude
 ```
+
+Load the current Fibonacci regression harness:
+
+```bash
+maude wasm-exec-bs.maude
+```
+
+## Key Files
+
+```text
 Spec2Maude/
-├── main.ml                      # Entry point: parse → elaborate → translate
-├── translator.ml                # Core translator (~2000 lines, OCaml)
-├── dune / dune-project          # Build configuration
-├── lib/                         # SpecTec frontend libraries
-│   ├── il/ast.ml                # IL AST definition
-│   ├── frontend/                # Parser, elaborator
-│   └── ...
-├── dsl/
-│   └── pretype.maude            # Foundation module (sorts, records, DSL)
-├── wasm-3.0/                    # WebAssembly 3.0 SpecTec source files
-│   ├── 4.3-execution.instructions.spectec
-│   └── ...
-├── output.maude                 # Auto-generated SPECTEC-CORE module
-├── wasm-exec.maude              # Execution engine + LTL harness
-├── docs/
-│   ├── Translation_Rules.md        # Formal translation rules (Korean)
-│   ├── execution_results.md        # How to run + regression results (Korean)
-│   ├── maude_warning_analysis.md   # Warning taxonomy and mitigation roadmap
-│   └── experiment_repro.md         # Legacy split doc: reproduction steps
-└── README.md
+├── translator_bs.ml        # Active C1 translator
+├── output_bs.maude         # Generated C1 Maude output; do not hand-edit as final
+├── wasm-exec-bs.maude      # Current Fibonacci execution/regression harness
+├── wasm-3.0/*.spectec      # WebAssembly 3.0 SpecTec sources
+├── dsl/pretype.maude       # Shared Maude foundation modules
+├── STATUS.md               # Current handoff and research state
+├── README.md               # This file
+├── translator.ml           # Older/reference translator path
+├── output.maude            # Older/reference generated output
+└── wasm-exec.maude         # Older/reference execution harness
 ```
 
----
+## C1 Design Goal
 
-## Prerequisites
+C1 should preserve these SpecTec execution relations:
 
-| Dependency | Version | Purpose |
-|------------|---------|---------|
-| OCaml | ≥ 5.0 | Translator implementation language |
-| dune | ≥ 3.0 | Build system |
-| Maude | ≥ 3.4 | Rewriting logic engine |
-| SpecTec libs | bundled in `lib/` | SpecTec IL parsing and elaboration |
-
-### Installing Maude
-
-Download a pre-built binary from the [Maude releases page](https://github.com/SRI-CSL/Maude/releases) and ensure `maude` is on your `PATH`.
-
-### Installing OCaml and dune
-
-```bash
-# via opam
-opam install dune
+```spectec
+relation Step      : config ~> config
+relation Step_pure : instr* ~> instr*
+relation Step_read : config ~> instr*
+relation Steps     : config ~>* config
 ```
 
----
-
-## Build
-
-```bash
-# Clone and enter the repository
-git clone https://github.com/<your-org>/Spec2Maude.git
-cd Spec2Maude
-
-# Build the translator
-dune build
-
-# Run the translator: SpecTec sources → output.maude
-./_build/default/main.exe wasm-3.0/*.spectec > output.maude
-```
-
-The translator writes the generated Maude module to standard output and diagnostic warnings to standard error. The repository already ships a prebuilt `output.maude` for convenience.
-
----
-
-## Running the Execution Engine
-
-`wasm-exec.maude` loads `output.maude` and defines:
-
-- **`WASM-EXEC`** — the one-step `step` function and the transitive `steps` operator
-- **`WASM-FIB`** — an iterative Fibonacci program encoded in WebAssembly instruction syntax
-- **`WASM-FIB-PROPS`** — LTL atomic propositions and model-checking harness
-
-For one-command regeneration plus smoke verification, use:
-
-```bash
-./scripts/regen_and_smoketest.sh current
-```
-
-If you want automatic fallback (`current` -> `legacy-safe`) when `current` fails:
-
-```bash
-./scripts/regen_and_smoketest.sh auto
-```
-
-Detailed run instructions and expected outputs are documented in [docs/execution_results.md](docs/execution_results.md).
-
-### Multi-step equational reduction
+Generated Maude exposes wrappers of the form:
 
 ```maude
-load wasm-exec
-
-rewrite [100000] in WASM-FIB : steps(fib-config(i32v(5))) .
+op step      : Config -> StepConf [frozen (1)] .
+op step-pure : WasmTerminals -> StepPureConf [frozen (1)] .
+op step-read : Config -> StepReadConf [frozen (1)] .
+op steps     : Config -> StepsConf [frozen (1)] .
 ```
 
-Expected output (abbreviated):
-
-```
-result ExecConf: < ... | CTORCONSTA2(CTORI32A0, 5) >
-```
-
-The instruction sequence on the right-hand side of `|` reduces to the single value `i32.const 5`, confirming `fib(5) = 5`.
-
-### LTL Model Checking
+`steps` is intentionally unary:
 
 ```maude
-load wasm-exec
-
---- Property 1: the computation eventually produces result 5
-red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), <> result-is(5)) .
---- Expected: Bool: true
-
---- Property 2: no reachable state ever exhibits a trap
-red in WASM-FIB-PROPS : modelCheck(mc-fib-config(i32v(5)), [] ~ trap-seen) .
---- Expected: Bool: true
+steps(C) => C'
 ```
 
-Both properties hold over the complete reachable-state graph of `fib(5)`.
-
----
-
-## Design Highlights
-
-### 1. Pure-Functional Expression Translation
-
-Every expression node in the IL AST is translated by a function returning `texpr = { text : string; vars : string list }`. The `vars` field accumulates free variables without any global mutable state, enabling compositional variable collection and premise scheduling.
-
-### 2. Instruction-Agnostic Token Collection
-
-A dedicated pre-scan pass collects every bare atom that appears as a mixfix operator component (e.g., `i32`, `add`, `local.get`). These are emitted as nullary `op TOKEN : -> WasmTerminal [ctor]` declarations — no instruction name list is baked into the translator. The one explicit exception is `$rollrt`, which is bridged in a single hardcoded branch to cross the IL/Maude sort boundary.
-
-### 3. Step-Relation Auto-Translation
-
-The translator identifies `Step`, `Step-pure`, and `Step-read` relations and routes them to a dedicated `translate_step_reld` function. Rules with `RulePr` premises (bridge rules, evaluation-context rules) are automatically skipped. Each remaining rule generates a Maude equation of the form:
+and configuration syntax uses:
 
 ```maude
-[c]eq step(< Z | LHS IS >) = < Z' | RHS IS > [if COND] .
+_ ; _
 ```
 
-### 4. Assoc-Variable Isolation
+## Current Successful Regressions
 
-Maude's coherence checker can misfire when multiple equations for different operators share the same variable name as an associative "tail" pattern. All variable names in `wasm-exec.maude` carry unique per-group prefixes (`ST-*`, `AV-*`, `IV-*`, `IT-*`, `RL-*`, etc.) to prevent this class of interference.
+After regenerating `output_bs.maude`, load:
 
-### 5. Equational Reduction over CRL
+```maude
+load wasm-exec-bs
+```
 
-All one-step behaviors are encoded as `eq`/`ceq` rather than `crl`. A single `crl [steps-trans]` drives the transitive closure. This ensures every atomic step fires during *equational normalization* of `step(EC)`, which is both faster and avoids the non-ground matching restrictions that would otherwise apply to rewrite rules.
+### Expand function type
 
----
+```maude
+red in WASM-FIB-BS :
+  $expanddt(value('TYPE, fib-funcinst)) .
+```
 
-## Documentation
+Expected/current result:
 
-| Document | Language | Audience |
-|----------|----------|---------|
-| [Translation_Rules.md](docs/Translation_Rules.md) | Korean | Advisors, lab researchers — formal translation rules for the current `translator.ml` |
-| [execution_results.md](docs/execution_results.md) | Korean | How to run the translator/Maude smoke tests and read results |
-| [maude_warning_analysis.md](docs/maude_warning_analysis.md) | Korean | Warning/advisory taxonomy, root causes, mitigation roadmap for `output.maude` and `wasm-exec.maude` |
-| [experiment_repro.md](docs/experiment_repro.md) | Korean | Legacy split doc: reproduction-only procedure |
+```maude
+CTORFUNCARROWA2(CTORI32A0 CTORI32A0 CTORI32A0, CTORI32A0)
+```
 
----
+### Invoke helper reduces to a concrete config
+
+```maude
+red in WASM-FIB-BS :
+  $invoke(fib-store, 0, i32v(5) i32v(0) i32v(1)) .
+```
+
+Expected/current result: a concrete `Config`, not a stuck `$invoke(...)`.
+
+### Focused one-step searches
+
+The following focused cases should each have exactly one `Config` solution:
+
+- `label(... br 0) local.get 1` suffix case;
+- `const 1; br_if 0; local.get 1` suffix case;
+- `nop; local.get 0` suffix case.
+
+### Hand-assembled Fibonacci config
+
+```maude
+rew [10000] in WASM-FIB-BS :
+  steps(fib-config(i32v(5))) .
+```
+
+Expected/current final result:
+
+```maude
+(fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)
+```
+
+## Known Non-Final Debt
+
+### Label-related `step-from-step-pure-*` shortcuts
+
+Most synthetic `step-from-step-pure-*` shortcuts have been removed. Only
+label-related lifted shortcuts remain temporarily.
+
+These rules are executable scaffolding, not C1-final relation-preserving output.
+They remain because the strict single-rule version of `Step/ctxt-instrs` is
+structurally faithful but Maude currently does not combine the required
+associative split with the conditional rewrite premise for the label/br suffix
+case.
+
+Future work should either:
+
+- find a faithful generic context-closure encoding for C1; or
+- move execution-control scaffolding to C2.
+
+### `fib-config-invoke` path
+
+`$invoke(...)` reduces to a concrete config, but:
+
+```maude
+rew [10000] in WASM-FIB-BS :
+  steps(fib-config-invoke(i32v(5))) .
+```
+
+currently stops early at a known outer invoke frame/label/block shape. Treat
+this as a separate invoke-path issue, not as part of small cleanup tasks.
+
+## Completed C1 Cleanup
+
+Recent generator-side cleanups include:
+
+1. **Singleton vs sequence variable naming**
+   - `instr` becomes `INSTR`.
+   - `instr*` becomes `INSTRS`.
+   - `instr'` becomes `INSTRQ`.
+   - `instr'*` becomes `INSTRSQ`.
+
+2. **Boolean condition cleanup**
+   - Generated conditions now use Maude Bool terms directly.
+   - Redundant wrappers such as `(C =/= 0) = true` and `J(...) == valid = true`
+     are removed from condition fragments.
+   - Boolean definitions such as `eq $is-numtype(...) = true .` remain.
+
+3. **Empty-result split cleanup**
+   - Removed `step-pure-empty`.
+   - Removed `step-read-empty`.
+   - Removed `step-ctxt-instrs-empty`.
+   - Removed `step-ctxt-label-empty`.
+   - Removed `step-ctxt-handler-empty`.
+
+4. **Non-label `step-from-step-pure-*` cleanup**
+   - Non-label lifted shortcuts such as `step-from-step-pure-br-if-true` and
+     `step-from-step-pure-nop` are suppressed.
+   - Label-related variants remain as documented debt.
+
+## Next Major Task: Validation Rule Lowering
+
+Validation judgements such as `Module-ok`, `Func-ok`, `Instrs-ok`, `Instr-ok`,
+and `Types-ok` are currently generated as:
+
+```maude
+eq  J(...) = valid .
+ceq J(...) = valid if ... .
+```
+
+The professor requirement is that SpecTec `rule` / relation judgements should
+be represented as Maude `rl/crl` as much as possible.
+
+This requires a dependency-aware audit. Do not blindly replace `eq/ceq` with
+`rl/crl`: caller premises currently use equation-style checks such as
+`J(...) == valid`, and may need to become rewrite conditions such as
+`J(...) => valid` if the callee is lowered as a rewrite rule.
+
+Useful starting commands:
+
+```bash
+grep -nE "^(  )?(eq|ceq) (Module-ok|Func-ok|Instrs-ok|Instr-ok|Types-ok)" output_bs.maude | head -80
+grep -n "use_rewrite_judgement" translator_bs.ml
+grep -n "translate_reld" translator_bs.ml
+grep -n "is_rewrite_judgement_rel" translator_bs.ml
+```
+
+## Source-Level Initial Configuration Goal
+
+Current regressions still use a manually assembled Fibonacci harness. The
+professor-facing path should eventually be:
+
+```text
+Wasm/WAT source
+  -> Wasm module Maude term
+  -> validation-preserving instantiate/invoke
+  -> unary steps(Config)
+  -> result
+```
+
+Immediate target after validation policy is clarified:
+
+```text
+fib-module Maude term
+  -> Module-ok / instantiate
+  -> invoke
+  -> steps
+  -> CTORCONSTA2(CTORI32A0, 5)
+```
+
+Do not add benchmark-specific shortcuts to `translator_bs.ml` to force this.
+
+## Generic SpecTec Direction
+
+The current implementation is still mostly a Wasm SpecTec translator. The longer
+term goal is a more generic SpecTec-to-Maude translator.
+
+Useful smoke test:
+
+```bash
+dune exec ./main_bs.exe -- p4-spectec/*/*.watsup > output_bs_p4.maude
+```
+
+Current status: P4 `.watsup` files mostly fail during parsing with syntax or
+token errors. This shows a frontend/generic-SpecTec limitation, not a Maude
+backend result yet.
+
+## `WasmType` / Typecheck Infrastructure Audit
+
+The current `WasmTerm` / `WasmType` / `is-type` / `are-types` framework may be
+legacy or overly broad.
+
+This does **not** mean deleting Wasm type syntax such as `i32`, `functype`, or
+`heaptype`, and it does **not** mean deleting validation semantics.
+
+The audit should distinguish:
+
+1. object-language type syntax;
+2. validation relation semantics;
+3. runtime/execution typecheck or membership guards.
+
+If inputs are assumed well-typed, check whether execution rules still require
+runtime typecheck/membership guards.
+
+## What Not To Do In C1
+
+Do not add any of the following to the active C1 translator:
+
+- benchmark-specific rules;
+- `mc`, `exec-step`, `focused-step`, or `dstep`;
+- C2-style execution control;
+- manual output-level patches as final solutions;
+- validation bypasses;
+- hardcoded Wasm judgement names in `translator_bs.ml`;
+- Fibonacci-specific names in `translator_bs.ml`.
+
+## Documentation Roadmap
+
+Before claiming C1 is ready for professor review, prepare mapping evidence for:
+
+- SpecTec syntax declarations -> Maude sorts/operators;
+- SpecTec definitions -> Maude equations;
+- SpecTec relation rules -> Maude `rl/crl` or documented current exception;
+- `Step`, `Step_pure`, `Step_read`, and `Steps`;
+- remaining non-C1-final debt.
+
+Warning cleanup should be handled after the validation lowering audit, because
+many used-before-bound warnings are tied to validation premise scheduling.
 
 ## License
 
-Copyright © 2026 Minsung Lee (POSTECH SVLab). Licensed under the [MIT License](LICENSE).
+Research prototype. Add or update repository license information as appropriate.
