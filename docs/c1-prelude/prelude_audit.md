@@ -12,7 +12,8 @@ current generated C1 output and its supporting prelude:
 - fixed header/footer strings in `translator_bs.ml`
 - benchmark-only harness pieces in `wasm-exec-bs.maude`
 
-No source semantics or translator code was changed for this audit.
+This audit now includes the focused dead-helper cleanup completed on
+2026-05-20. No source semantics were changed.
 
 ## Required Checks
 
@@ -49,10 +50,11 @@ Detailed inventory: `prelude_inventory.csv`.
 | `GENERIC_SPECTEC_PRELUDE` | 17 |
 | `SOURCE_DERIVED` | 10 |
 | `NON_C1_FINAL_SCAFFOLD` | 8 |
-| `LEGACY_OR_DEAD` | 5 |
 | `WASM_SPECIFIC_SEMANTICS` | 5 |
 | `EXECUTION_HARNESS` | 5 |
 | `BENCHMARK_HARNESS` | 4 |
+| `DEAD_CAN_REMOVE` | 4 |
+| `LEGACY_OR_DEAD` | 1 |
 | `UNKNOWN` | 2 |
 | **Total inventory rows** | **56** |
 
@@ -109,7 +111,6 @@ Current execution-oriented infrastructure includes:
 - `step`, `step-pure`, `step-read`, and `steps` wrapper result sorts/operators;
 - `is-val` and `all-vals`;
 - `$mk-frame` and its projection/update equations;
-- broad record-state shims for `$local` and `$with-local`;
 - current frame/store representation helpers.
 
 Some of this is needed to keep the accepted C1 execution smokes working. It is
@@ -137,60 +138,64 @@ Known non-C1-final scaffolding in the generated output/header/footer:
 
 - 20 label-related `step-from-step-pure-*` shortcuts;
 - sequence-lifting footer helpers for `$subst-typeuse`, `$subst-valtype`, and
-  `$subst-subtype`;
-- finite type-iteration helpers:
-  `$rec-typevars`, `$def-typeuses`, `$idx-typeuses`;
+  `$subst-subtype`. These are not standalone source defs, but they currently
+  implement SpecTec `f(x)*` sequence-map uses inside the source substitution
+  equations;
 - `$expanddt` footer shortcut over `$unrolldt`;
-- `$mk-frame` representation helper;
-- broad `$local` / `$with-local` footer shims.
+- `$mk-frame` representation helper.
 
 The removed sequence-shaped `Val-ok` footer list-lift confirms the cleanup
 pattern: first ablate one helper family, then keep it removed only if accepted
 execution smokes still pass.
 
-## Likely Legacy Or Dead Artifacts
+A focused ablation of the `$subst-*` list lifts was attempted. Accepted
+Fibonacci smokes still passed, but source-level substitution probes regressed:
+`$subst-subtype` over a subtype sequence stopped reducing. The lifts therefore
+remain for now as non-C1-final scaffolding until the translator has a generic
+source-preserving lowering for SpecTec sequence-map expressions.
 
-The following appear unused in current `output_bs.maude` or are disabled in the
-translator:
+## Removed Dead Artifacts
 
-- `DSL-EXEC` in `dsl/pretype.maude`:
-  older evaluation-context infrastructure, not used by current generated C1;
+The following artifacts were classified as `DEAD_CAN_REMOVE` and removed from
+the active generator. They no longer appear in `translator_bs.ml` or
+`output_bs.maude`, and accepted execution smokes still pass:
+
 - `$cfg-state` / `$cfg-instrs`:
-  declared and defined, but no use found beyond their equations;
+  old config projection helpers;
 - `needs-label-ctxt`:
-  declared and defined, but no use found in current generated rules;
+  old label-control detector from the disabled heating/cooling experiment;
 - `is-trap`:
-  declared and defined, but no use found in current generated rules;
+  old trap detector from the disabled heating/cooling experiment;
 - stale `VALOK-WT-S`, `VALOK-C`, `VALOK-NT` variables:
-  remain after sequence `Val-ok` cleanup, no use found;
+  leftovers after footer `Val-ok` cleanup;
 - disabled `ExecConf` / `restore-label` / `restore-frame` /
   `restore-handler` branch in `translator_bs.ml`.
+- broad `$local` / `$with-local` footer shims:
+  duplicate equations over the current concrete state representation. The
+  source-generated `$local` and `$with-local` definitions remain and handle the
+  accepted execution smokes.
+- finite type-iteration helpers `$rec-typevars`, `$def-typeuses`, and
+  `$idx-typeuses`:
+  source-absent helpers that were only emitted as their own declarations and
+  equations. Regeneration and accepted smokes pass without them.
 
-These are strong cleanup candidates, but they should be removed only after a
-small ablation/regression pass for each family.
+The only remaining `LEGACY_OR_DEAD` inventory item is `DSL-EXEC` in
+`dsl/pretype.maude`, which is outside the generated `output_bs.maude` core and
+should be audited separately before removal.
 
 ## Recommended Cleanup Order
 
-1. Remove trivially unused footer/header declarations after a focused ablation:
-   `$cfg-state`, `$cfg-instrs`, `needs-label-ctxt`, `is-trap`, and stale
-   `VALOK-*` variables.
-2. Remove or archive the disabled `ExecConf restore-*` branch in
-   `translator_bs.ml` if there is no plan to revive it.
-3. Audit `$local` and `$with-local` footer shims against the source-generated
-   equations; remove only if execution smokes still pass.
-4. Audit `$mk-frame` representation helper separately; it is high-impact and
+1. Audit `$mk-frame` representation helper separately; it is high-impact and
    tied to the current frame/store representation.
-5. Audit sequence-lifting helpers for `$subst-*`; decide whether they are C1
-   structural support or C2 executable scaffolding.
-6. Audit finite type-iteration helpers `$rec-typevars`, `$def-typeuses`, and
-   `$idx-typeuses`; replace with generic source-preserving iterator lowering if
-   possible.
-7. Refresh stale header comments that still mention old `eq/ceq ... = valid`
+2. Design generic source-preserving lowering for sequence-map expressions such
+   as `$subst_valtype(t, tv*, tu*)*`, then replace the hardcoded `$subst-*`
+   list lifts.
+3. Refresh stale header comments that still mention old `eq/ceq ... = valid`
    baseline behavior.
-8. Parameterize the carrier/prelude names away from `Wasm*`.
-9. Generate administrative constructor specializations from source shapes rather
+4. Parameterize the carrier/prelude names away from `Wasm*`.
+5. Generate administrative constructor specializations from source shapes rather
    than hardcoded constructor names.
-10. Keep benchmark harness artifacts isolated in `wasm-exec-bs.maude`.
+6. Keep benchmark harness artifacts isolated in `wasm-exec-bs.maude`.
 
 ## Items That Should Move Out Of Strict C1 Core
 
@@ -200,11 +205,11 @@ small ablation/regression pass for each family.
   generic source-preserving bridge in C1;
 - frame/store representation scaffolding if it becomes an execution adapter
   rather than source translation;
-- finite-iteration and list-lifting scaffolding if retained only for
-  executability.
+- list-lifting scaffolding if retained only for executability.
 
 ## Current Recommendation
 
-Do not make broad semantic changes yet. Start with dead-artifact ablations, then
-move to the higher-risk footer helpers one family at a time. Keep structural
-coverage and executability as separate claims.
+Do not make broad semantic changes yet. The first dead-artifact ablation and the
+duplicate `$local` / `$with-local` footer-shim ablation both passed.
+Move next to the higher-risk footer helpers one family at a time. Keep
+structural coverage and executability as separate claims.

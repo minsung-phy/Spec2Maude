@@ -155,6 +155,27 @@ leftovers.
 The footer and prelude still contain other helper infrastructure and should be
 separated before non-Wasm SpecTec generalization, such as a P4-oriented pass.
 
+Current focused helper classifications:
+
+- `$subst-typeuse`, `$subst-valtype`, and `$subst-subtype` are source-derived at
+  the element-definition level, but the remaining footer sequence-lift overloads
+  are source-absent scaffolding for SpecTec star-map expressions such as
+  `$subst_valtype(t, tv*, tu*)*`. A temporary ablation kept Fibonacci execution
+  smokes passing but regressed source substitution over subtype sequences, so
+  the lifts remain until a generic source-preserving sequence-map lowering
+  exists.
+- `is-val` / `all-vals` are not SpecTec source definitions. They operationalize
+  `val*` prefixes in translated execution rules such as `Step/ctxt-instrs`.
+  They are not removable without replacing them by a generic category-sequence
+  predicate/lowering.
+- `$mk-frame` is not a SpecTec source def. It represents the source frame record
+  shape with a typed Maude constructor and projection/update equations. It is
+  still required by the current execution representation and accepted Fibonacci
+  smokes.
+- `$rec-typevars`, `$def-typeuses`, and `$idx-typeuses` were source-absent and
+  unused finite type-iteration helpers. They have been removed from the active
+  generator and regenerated output.
+
 ## 7. Model Checking Note
 
 C1 strict is a structural and isomorphic baseline. It is not intended to be an analysis-optimized semantics.

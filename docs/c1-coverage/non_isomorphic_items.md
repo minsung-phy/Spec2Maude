@@ -91,9 +91,9 @@ an executable validation-list limitation rather than hidden by footer equations.
 
 The footer still contains generic prelude pieces, Wasm-specific support, and
 executable harness scaffolding. Examples include frame/store representation
-helpers, finite type-iteration helpers, and list-lifting support outside the
-removed `= valid` validation equations. This should be separated before broader
-non-Wasm SpecTec generalization.
+helpers and list-lifting support outside the removed `= valid` validation
+equations. This should be separated before broader non-Wasm SpecTec
+generalization.
 
 ## P1: `Step/ctxt-instrs` Executability Limitation
 
@@ -118,9 +118,45 @@ rule bodies and counts are unchanged.
 No currently known source rule remains suspicious solely because of rule-label
 fidelity.
 
+## Resolved P2: Dead Helper Cleanup
+
+The following non-source helper artifacts were removed from the active
+generator after a focused usage audit and execution-smoke ablation:
+
+- `$cfg-state`;
+- `$cfg-instrs`;
+- `needs-label-ctxt`;
+- `is-trap`;
+- stale `VALOK-WT-S`, `VALOK-C`, `VALOK-NT` variables;
+- disabled `ExecConf` / `restore-label` / `restore-frame` /
+  `restore-handler` branch in `translator_bs.ml`.
+- broad `$local` / `$with-local` footer shims. The source-generated helpers
+  remain and are classified as source-derived.
+- finite type-iteration helpers `$rec-typevars`, `$def-typeuses`, and
+  `$idx-typeuses`. These source-absent helpers had no active generated use
+  beyond their own declarations/equations, so they were removed after
+  regeneration and accepted execution smokes passed.
+
+They no longer appear in `translator_bs.ml` or regenerated `output_bs.maude`.
+Accepted execution smokes still pass, and the count of label-related
+`step-from-step-pure-*` debt remains 20.
+
 ## P2: Generated Category/Free Predicates
 
 `$is-spectec-*` and `$free-*` families are generated helper infrastructure for broad-carrier Maude terms. They are source-category-derived but not themselves SpecTec source constructs.
+
+## P2: Substitution Sequence-Map Lifts
+
+The `$subst-typeuse`, `$subst-valtype`, and `$subst-subtype` sequence overload
+equations are not standalone SpecTec source definitions. They are currently
+hardcoded footer lifts used to execute source expressions such as
+`$subst_valtype(t, tv*, tu*)*` and `$subst_subtype(st, tv*, tu*)*`.
+
+A focused ablation was attempted. Accepted Fibonacci smokes still passed, but a
+source substitution probe over a subtype sequence stopped reducing, so the
+helpers remain for now as non-C1-final scaffolding. The C1-final direction is a
+generic source-preserving lowering for SpecTec sequence-map expressions rather
+than hardcoded `$subst-*` footer lifts.
 
 ## Possible Generic Translator Bugs
 

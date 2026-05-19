@@ -95,9 +95,8 @@ are still named or shaped as Wasm-specific infrastructure.
    - `is-val`, which enumerates Wasm value constructors;
    - `all-vals`, which assumes Wasm `Val`;
    - `$mk-frame`, tied to Wasm frame fields `LOCALS` and `MODULE`;
-   - `$local` / `$with-local` broad shims, tied to `LOCALS`;
-   - finite type-iteration helpers hardcoded to `CTORRECA1`, `CTORWDEFA2`, and
-     `CTORWIDXA1`;
+   - source-derived `$local` / `$with-local`, tied to `LOCALS` and still
+     Wasm-specific even though their broad footer duplicates were removed;
    - specialized administrative constructor declarations for `LABEL`, `FRAME`,
      and `HANDLER`.
 
@@ -151,13 +150,15 @@ Move out of strict generic core:
 - benchmark harness;
 - Wasm frame/store representation helpers;
 - Wasm value predicates;
-- finite type-iteration shortcuts if they remain execution-only;
 - list-lifting shortcuts if they are not source-derived;
 - label-related `step-from-step-pure-*` debt.
 
 Remove after ablation if unused:
 
 - `DSL-EXEC` context module import/dependency;
+
+Removed after focused ablation:
+
 - `$cfg-state` / `$cfg-instrs`;
 - `needs-label-ctxt`;
 - `is-trap`;
