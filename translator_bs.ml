@@ -1171,7 +1171,7 @@ and translate_prem (p : prem) vm : texpr = match p.it with
           if is_rewrite_judgement_rel name then
             Printf.sprintf "%s => valid" call
           else
-            Printf.sprintf "%s == valid" call
+            Printf.sprintf "%s => valid" call
       in
       let vars = all_vars in
       { text; vars }
@@ -1828,20 +1828,53 @@ let translate_typd id params insts =
                (fn, Printf.sprintf "F-%s-%d" fn i, ft, ms)
              ) fields in
              let decls = String.concat "" (List.map (fun (_, vn, _, ms) -> declare_var vn ms) info) in
-             let rhs = cond_join
-               (binder_conds @ List.map (fun (_, vn, ft, _) -> type_guard vn ft v_map) info) in
-             if is_parametric then
-               Printf.sprintf "%s%s  %s ( {%s} hasType ( %s ) ) : WellTyped%s ." bd decls
-                 (if rhs = "" then "mb" else "cmb")
-                 (String.concat " ; " (List.map (fun (f, vn, _, _) ->
-                     Printf.sprintf "item('%s, ( %s ))" f vn) info))
-                 type_term (if rhs = "" then "" else "\n   if " ^ rhs)
-             else
-               Printf.sprintf "%s%s  %s ( {%s} ) : %s%s ." bd decls
-                 (if rhs = "" then "mb" else "cmb")
-                 (String.concat " ; " (List.map (fun (f, vn, _, _) ->
-                     Printf.sprintf "item('%s, ( %s ))" f vn) info))
-                 full_type_sort (if rhs = "" then "" else "\n   if " ^ rhs))
+	             let field_guards =
+	               List.map (fun (_, vn, ft, _) -> (vn, type_guard vn ft v_map)) info
+	             in
+	             let optional_vns =
+	               info
+	               |> List.filter_map (fun (_, vn, ft, _) ->
+	                   match ft.it with
+	                   | IterT (_, Opt) -> Some vn
+	                   | _ -> None)
+	             in
+	             let rec nonempty_subsets = function
+	               | [] -> []
+	               | x :: xs ->
+	                   let rest = nonempty_subsets xs in
+	                   [ [ x ] ] @ rest @ List.map (fun ys -> x :: ys) rest
+	             in
+	             let emit_record_membership empty_vns =
+	               let is_empty vn = List.mem vn empty_vns in
+	               let rhs =
+	                 field_guards
+	                 |> List.filter (fun (vn, _) -> not (is_empty vn))
+	                 |> List.map snd
+	                 |> fun guards -> cond_join (binder_conds @ guards)
+	               in
+	               let record_items =
+	                 String.concat " ; "
+	                   (List.map (fun (f, vn, _, _) ->
+	                        if is_empty vn then Printf.sprintf "item('%s, eps)" f
+	                        else Printf.sprintf "item('%s, ( %s ))" f vn)
+	                      info)
+	               in
+	               if is_parametric then
+	                 Printf.sprintf "  %s ( {%s} hasType ( %s ) ) : WellTyped%s ."
+	                   (if rhs = "" then "mb" else "cmb")
+	                   record_items type_term
+	                   (if rhs = "" then "" else "\n   if " ^ rhs)
+	               else
+	                 Printf.sprintf "  %s ( {%s} ) : %s%s ."
+	                   (if rhs = "" then "mb" else "cmb")
+	                   record_items full_type_sort
+	                   (if rhs = "" then "" else "\n   if " ^ rhs)
+	             in
+	             let memberships =
+	               emit_record_membership [] ::
+	               List.map emit_record_membership (nonempty_subsets optional_vns)
+	             in
+	             bd ^ decls ^ String.concat "\n" memberships)
   ) insts in
   sort_decl ^ op_decl ^ String.concat "\n" res
 
@@ -1963,6 +1996,8 @@ let redundant_binder_guard typed_vars cond =
 let refined_exec_sorts =
   ["Heaptype"; "Typeuse"; "Valtype"; "Numtype"; "Reftype"; "Blocktype"; "Resulttype"]
 
+let reld_type_pred_sorts : SSet.t ref = ref SSet.empty
+
 let is_refined_exec_sort sort =
   List.mem sort refined_exec_sorts
 
@@ -1993,28 +2028,145 @@ let widen_refined_lhs_typed_vars typed_vars lhs_vars =
   in
   (typed_vars_for_decl, refined_pairs, guards)
 
+let preserve_narrow_lhs_sort sort =
+  List.mem sort
+    [ "WasmTerminal"; "WasmTerminals";
+      "Bool"; "Nat"; "Int";
+      "Config"; "State"; "Store"; "Frame"; "Judgement" ]
+
+let widen_reld_lhs_typed_vars typed_vars lhs_vars =
+  let lhs_set = SSet.of_list lhs_vars in
+
+  let lhs_typed_vars =
+    typed_vars
+    |> List.filter (fun (v, _) -> SSet.mem v lhs_set)
+    |> List.sort_uniq compare
+  in
+
+  let predicate_pairs =
+    lhs_typed_vars
+    |> List.filter (fun (_, s) -> not (preserve_narrow_lhs_sort s))
+    |> List.sort_uniq compare
+  in
+
+  List.iter
+    (fun (_, sort) -> reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts)
+    predicate_pairs;
+
+  let typed_vars_for_decl =
+    typed_vars
+    |> List.map (fun (v, s) ->
+         if SSet.mem v lhs_set && not (preserve_narrow_lhs_sort s)
+         then (v, "WasmTerminal")
+         else (v, s))
+    |> List.sort_uniq compare
+  in
+
+  let guards =
+    predicate_pairs
+    |> List.map (fun (v, s) -> refined_exec_guard v s)
+    |> List.sort_uniq String.compare
+  in
+
+  (typed_vars_for_decl, predicate_pairs, guards)
+
 let is_refined_exec_original_guard refined_pairs cond =
   let cond = String.trim cond in
   List.exists (fun (mv, sort) ->
     cond = Printf.sprintf "%s : %s" (String.trim mv) (String.trim sort)
   ) refined_pairs
 
-let refined_exec_pred_decls =
-  refined_exec_sorts
+let exec_pred_sorts () =
+  List.fold_left
+    (fun acc sort -> SSet.add sort acc)
+    !reld_type_pred_sorts
+    refined_exec_sorts
+  |> SSet.elements
+
+let exec_pred_decls sorts =
+  sorts
   |> List.map (fun sort ->
       Printf.sprintf "  op %s : WasmTerminal -> Bool ." (refined_exec_pred sort))
 
-let parse_unconditional_refined_membership line =
-  let s = String.trim line in
-  if not (starts_with s "mb ") then None
+let parse_membership_statement stmt =
+  let s = String.trim stmt in
+  let starts_kw kw = starts_with s (kw ^ " ") in
+  if not (starts_kw "mb" || starts_kw "cmb") then None
   else
-    let re = Str.regexp "^mb \\(.+\\) : \\([A-Za-z0-9_$-]+\\) \\.$" in
-    if Str.string_match re s 0 then
-      let pattern = Str.matched_group 1 s in
-      let sort = Str.matched_group 2 s in
-      if is_refined_exec_sort sort then Some (sort, pattern) else None
+    let conditional = starts_kw "cmb" in
+    let rest =
+      let n = if conditional then 3 else 2 in
+      String.trim (String.sub s n (String.length s - n))
+    in
+    if rest = "" || rest.[0] <> '(' then None
     else
-      None
+      let rec find_close i depth =
+        if i >= String.length rest then None
+        else
+          match rest.[i] with
+          | '(' -> find_close (i + 1) (depth + 1)
+          | ')' ->
+              let depth' = depth - 1 in
+              if depth' = 0 then Some i else find_close (i + 1) depth'
+          | _ -> find_close (i + 1) depth
+      in
+      match find_close 0 0 with
+      | None -> None
+      | Some close_idx ->
+          let pattern = String.sub rest 0 (close_idx + 1) in
+          let tail =
+            String.sub rest (close_idx + 1) (String.length rest - close_idx - 1)
+            |> String.trim
+          in
+          if not (starts_with tail ":") then None
+          else
+            let tail = String.trim (String.sub tail 1 (String.length tail - 1)) in
+            let parts = Str.bounded_split (Str.regexp "[ \t\n\r]+") tail 2 in
+            match parts with
+            | sort :: rem_parts ->
+                let rem = String.trim (String.concat " " rem_parts) in
+                if rem = "." then Some (sort, pattern, None)
+                else if starts_with rem "if " && ends_with rem " ." then
+                  let cond =
+                    String.sub rem 3 (String.length rem - 5)
+                    |> String.trim
+                  in
+                  Some (sort, pattern, Some cond)
+                else None
+            | _ -> None
+
+let collect_membership_statements lines =
+  let rec finish acc cur = function
+    | [] ->
+        (match cur with
+         | None -> List.rev acc
+         | Some chunks -> List.rev (String.concat "\n" (List.rev chunks) :: acc))
+    | line :: rest ->
+        let s = String.trim line in
+        let starts_membership = starts_with s "mb " || starts_with s "cmb " in
+        let ends_stmt = ends_with s "." in
+        match cur with
+        | None when starts_membership && ends_stmt ->
+            finish (line :: acc) None rest
+        | None when starts_membership ->
+            finish acc (Some [line]) rest
+        | None ->
+            finish acc None rest
+        | Some chunks when ends_stmt ->
+            finish (String.concat "\n" (List.rev (line :: chunks)) :: acc) None rest
+        | Some chunks ->
+            finish acc (Some (line :: chunks)) rest
+  in
+  finish [] None lines
+
+let normalize_ws s =
+  Str.global_replace (Str.regexp "[ \t\n\r]+") " " (String.trim s)
+
+let parse_unconditional_refined_membership pred_sorts line =
+  let s = String.trim line in
+  match parse_membership_statement s with
+  | Some (sort, pattern, cond) when SSet.mem sort pred_sorts -> Some (sort, pattern, cond)
+  | _ -> None
 
 let var_sort_map_of_decls decls =
   let tbl = Hashtbl.create 128 in
@@ -2047,31 +2199,47 @@ let var_sort_map_of_decls decls =
 let refined_exec_pred_pattern_var pred_sort v =
   "IS-" ^ String.uppercase_ascii pred_sort ^ "-" ^ v
 
-let refined_exec_pred_eqs eqs decls =
+let refined_exec_pred_eqs pred_sorts eqs decls =
   let var_sorts = var_sort_map_of_decls decls in
   let fresh_var_decls = ref [] in
   let rewrite_pattern_vars pred_sort pattern =
     let vars = extract_vars_from_maude pattern |> List.sort_uniq String.compare in
-    List.fold_left (fun (pat, guards) v ->
+    List.fold_left (fun (pat, guards, renames) v ->
       match Hashtbl.find_opt var_sorts v with
       | Some sort ->
           let fresh = refined_exec_pred_pattern_var pred_sort v in
-          fresh_var_decls := Printf.sprintf "  var %s : WasmTerminal ." fresh :: !fresh_var_decls;
+          let fresh_sort =
+            if preserve_narrow_lhs_sort sort then sort else "WasmTerminal"
+          in
+          fresh_var_decls := Printf.sprintf "  var %s : %s ." fresh fresh_sort :: !fresh_var_decls;
           let guards =
             if is_refined_exec_sort sort then refined_exec_guard fresh sort :: guards
             else guards
           in
-          (replace_maude_var_token v fresh pat, guards)
-      | _ -> (pat, guards)
-    ) (pattern, []) vars
+          (replace_maude_var_token v fresh pat, guards, (v, fresh) :: renames)
+      | _ -> (pat, guards, renames)
+    ) (pattern, [], []) vars
   in
   let true_eqs =
-    eqs
-    |> List.filter_map parse_unconditional_refined_membership
-    |> List.map (fun (sort, pattern) ->
-        let pattern, guards = rewrite_pattern_vars sort pattern in
-        match List.sort_uniq String.compare guards with
-        | [] -> Printf.sprintf "  eq %s %s = true ." (refined_exec_pred sort) pattern
+    collect_membership_statements eqs
+    |> List.map normalize_ws
+    |> List.filter_map (parse_unconditional_refined_membership pred_sorts)
+    |> List.map (fun (sort, pattern, cond) ->
+        let pattern, guards, renames = rewrite_pattern_vars sort pattern in
+        let rename_cond cond =
+          List.fold_left
+            (fun acc (old_name, fresh_name) -> replace_maude_var_token old_name fresh_name acc)
+            cond renames
+        in
+        let guards =
+          match cond with
+          | None -> guards
+          | Some c -> rename_cond c :: guards
+          |> List.sort_uniq String.compare
+        in
+        match guards with
+        | [] ->
+            Printf.sprintf "  eq %s %s = true ." (refined_exec_pred sort) pattern
         | guards ->
             Printf.sprintf "  ceq %s %s = true\n      if %s ."
               (refined_exec_pred sort) pattern (cond_join guards))
@@ -2416,6 +2584,54 @@ let rec schedule_prems bound acc items =
                 force bound3 (sched :: acc2) rest
           in
           List.rev_append acc (force bound [] items)
+
+let vars_of_prem_item = function
+  | PremBool t -> vars_of_texpr t
+  | PremMatch { lhs; rhs; binds } ->
+      uniq_vars (vars_of_texpr lhs @ vars_of_texpr rhs @ binds)
+  | PremEq { lhs; rhs; bool_t } ->
+      uniq_vars (vars_of_texpr lhs @ vars_of_texpr rhs @ vars_of_texpr bool_t)
+
+let iter_empty_var_groups vm typed_vars prem_list =
+  let sort_of_var v = List.assoc_opt v typed_vars in
+  let sequence_vars_of_texpr t =
+    vars_of_texpr t
+    |> List.filter (fun v -> sort_of_var v = Some "WasmTerminals")
+  in
+  let rec collect_prem p =
+    match p.it with
+    | IterPr (inner, (List, xes)) ->
+        let xes_vars =
+          xes
+          |> List.concat_map (fun (_, e) ->
+              translate_exp TermCtx e vm |> sequence_vars_of_texpr)
+        in
+        let inner_vars =
+          prem_items_of_prem vm inner
+          |> List.concat_map vars_of_prem_item
+          |> List.filter (fun v -> sort_of_var v = Some "WasmTerminals")
+        in
+        let vars =
+          List.sort_uniq String.compare (xes_vars @ inner_vars)
+        in
+        if vars = [] then [] else [vars]
+    | IterPr (inner, _) -> collect_prem inner
+    | NegPr inner -> collect_prem inner
+    | _ -> []
+  in
+  prem_list
+  |> List.concat_map collect_prem
+  |> List.sort_uniq compare
+
+let vars_of_maude_cond known_vars cond =
+  extract_vars_from_maude cond
+  |> List.filter is_bindable_name
+  |> List.filter (fun v -> List.mem v known_vars)
+  |> List.sort_uniq String.compare
+
+let safe_to_drop_iter_empty_cond known_vars lhs_vars empty_vars cond =
+  vars_of_maude_cond known_vars cond
+  |> List.for_all (fun v -> List.mem v empty_vars || List.mem v lhs_vars)
 
 (* --- DecD handler -------------------------------------------------------- *)
 
@@ -3710,27 +3926,18 @@ let translate_steps_reld rel_name rules =
   let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
   typed_decl ^ bound_decl ^ seq_decl ^ free_decl ^ String.concat "\n" rule_lines ^ "\n"
 
-let translate_reld id rel_name rules =
+let lower_all_reld_as_rewrite = true
+
+let translate_reld _id rel_name rules =
   let arity = match rules with
     | r :: _ -> (match r.it with RuleD (_, _, _, c, _) ->
         (match c.it with TupE el -> List.length el | _ -> 1))
     | [] -> 0 in
-  let has_rewrite_cond =
-    List.exists (fun r ->
-      match r.it with
-      | RuleD (_, _, _, _, prem_list) ->
-          List.exists (fun p ->
-            match p.it with
-            | RulePr (pid, _, _) -> is_step_exec_rel (sanitize pid.it)
-            | _ -> false
-          ) prem_list
-    ) rules
-  in
   let use_rewrite_judgement =
-    let raw_name = String.lowercase_ascii id.it in
-    (match raw_name with "steps" -> true | _ -> false)
-    || is_rewrite_judgement_rel rel_name
-    || has_rewrite_cond
+    (* C1 policy experiment:
+       A SpecTec relation rule should be emitted as a Maude rl/crl,
+       rather than as an equational validity test. *)
+    lower_all_reld_as_rewrite
   in
   let op_decl = Printf.sprintf "\n  op %s : %s -> Judgement [ctor] .\n" rel_name
     (String.concat " " (List.init arity (fun _ -> "WasmTerminal"))) in
@@ -3742,14 +3949,22 @@ let translate_reld id rel_name rules =
         let raw_prefix = String.uppercase_ascii (sanitize case_id.it) in
         let case_part = if raw_prefix = "" then Printf.sprintf "R%d" rule_idx else raw_prefix in
         let prefix = Printf.sprintf "%s-%s" rel_prefix case_part in
+
         let vm = binder_to_var_map prefix rule_idx binders in
-        let typed_vars = binder_var_sorts binders vm in
-        all_typed_vars := List.sort_uniq compare (!all_typed_vars @ typed_vars);
+        let raw_typed_vars = binder_var_sorts binders vm in
         let bconds = binder_to_type_conds binders vm in
 
         let lhs_t = match conclusion.it with
           | TupE el -> tconcat " , " (List.map (fun x -> translate_exp TermCtx x vm) el)
           | _ -> translate_exp TermCtx conclusion vm in
+
+        let typed_vars, refined_pairs, refined_guards =
+          if use_rewrite_judgement then
+            widen_reld_lhs_typed_vars raw_typed_vars lhs_t.vars
+          else
+            (raw_typed_vars, [], [])
+        in
+        all_typed_vars := List.sort_uniq compare (!all_typed_vars @ typed_vars);
 
         (* Apply the same prem_binding_targets logic as translate_step_reld:
            only pre-mark vm_vars that are NOT binding targets of any PremEq as
@@ -3792,7 +4007,10 @@ let translate_reld id rel_name rules =
           bconds
           |> List.filter (fun (mv, _) -> List.mem mv lhs_set && not (List.mem mv prem_binds))
           |> List.map snd
-          |> List.filter (fun cond -> not (redundant_binder_guard typed_vars cond)) in
+          |> List.filter (fun cond ->
+              not (redundant_binder_guard typed_vars cond)
+              && not (is_refined_exec_original_guard refined_pairs cond))
+        in
         all_bound := List.sort_uniq String.compare (!all_bound @ bound);
         all_free := List.sort_uniq String.compare (!all_free @ free);
 
@@ -3806,7 +4024,9 @@ let translate_reld id rel_name rules =
           |> List.filter_map (fun (p : prem_sched) ->
               if p.binds = [] then Some (prem_cond p.text) else None)
         in
-        let all_conds = prem_match_conds @ prem_bool_conds @ filtered_bconds in
+        let all_conds =
+          prem_match_conds @ prem_bool_conds @ filtered_bconds @ refined_guards
+        in
         let cond = cond_join all_conds in
         let emit_rule ?(suffix="") lhs_text cond_text =
           if use_rewrite_judgement then
@@ -3837,8 +4057,37 @@ let translate_reld id rel_name rules =
                 ~suffix:(Printf.sprintf "-opt-empty%d" opt_idx)
                 lhs_opt cond_opt)
         in
-        let _ = has_rewrite_cond in
-        String.concat "\n" (base_rule :: opt_rules)
+        let iter_empty_rules =
+          let known_vars = raw_typed_vars |> List.map fst |> List.sort_uniq String.compare in
+          iter_empty_var_groups vm raw_typed_vars prem_list
+          |> List.filter (fun vars ->
+              List.exists (fun v -> maude_var_occurs lhs_t.text v) vars)
+          |> nonempty_subsets
+          |> List.mapi (fun iter_idx groups ->
+              let empty_vars =
+                groups
+                |> List.flatten
+                |> List.sort_uniq String.compare
+              in
+              let dropped_conds, kept_conds =
+                List.partition (cond_mentions_optional empty_vars) all_conds
+              in
+              if not (List.for_all (safe_to_drop_iter_empty_cond known_vars lhs_t.vars empty_vars) dropped_conds)
+              then None
+              else
+              let lhs_iter = apply_optional_empty_subst empty_vars lhs_t.text in
+              let cond_iter =
+                kept_conds
+                |> List.map (apply_optional_empty_subst empty_vars)
+                |> cond_join
+              in
+              Some
+                (emit_rule
+                   ~suffix:(Printf.sprintf "-iter-empty%d" iter_idx)
+                   lhs_iter cond_iter))
+          |> List.filter_map (fun x -> x)
+        in
+        String.concat "\n" (base_rule :: opt_rules @ iter_empty_rules)
   ) rules in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
@@ -4258,9 +4507,10 @@ let translate defs =
       else l)
     |> List.sort_uniq String.compare
   in
-  let pred_var_decls, pred_eqs = refined_exec_pred_eqs eqs decls in
+  let pred_sorts = exec_pred_sorts () |> SSet.of_list in
+  let pred_var_decls, pred_eqs = refined_exec_pred_eqs pred_sorts eqs decls in
   let decls =
-    List.sort_uniq String.compare (decls @ refined_exec_pred_decls @ pred_var_decls)
+    List.sort_uniq String.compare (decls @ exec_pred_decls (SSet.elements pred_sorts) @ pred_var_decls)
   in
   let eqs = eqs @ pred_eqs in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
