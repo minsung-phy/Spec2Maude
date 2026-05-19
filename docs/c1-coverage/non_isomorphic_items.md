@@ -52,6 +52,21 @@ Latest ablation result:
 - direct `label(... br 0)` step had no solution.
 - `label(... br 0) local.get 1` suffix search had no solution.
 - `steps(fib-config(i32v(5)))` got stuck in the nested frame/label/br shape.
+- The strict bridge LHS does match `step((Z ; label(... br 0)))`; an
+  unconditional probe over the same LHS rewrote successfully.
+- The direct pure rewrite `step-pure(label(... br 0)) => eps` succeeds.
+- The blocking point is the conditional rewrite premise
+  `step-pure(INSTRS) => INSTRSQ` when `INSTRSQ` is a `WasmTerminals` variable:
+  Maude did not bind the collapsed `eps` result for the label/br case. The
+  same condition with exact RHS `eps` succeeds.
+- Broadening the bridge result variable to `StepPureConf` makes the condition
+  solvable, but is not faithful: Maude can satisfy the rewrite condition by the
+  zero-step unreduced term `step-pure(...)`, yielding configurations that
+  contain `step-pure(...)` as instructions.
+- Changing administrative label/frame/handler constructor result sorts did not
+  make the strict bridge fire.
+- Maude 3.5.1 rejects `=>!` in conditional rewrite premises, so there is no
+  built-in non-reflexive rewrite condition available for this bridge.
 - The shortcuts were restored because no source-preserving generic replacement
   was identified in this pass.
 
