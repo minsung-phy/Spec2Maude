@@ -88,7 +88,11 @@ categories are:
 - `Instrs-ok/seq` witness synthesis;
 - the strict `step-pure` bridge / `Step/ctxt-instrs` label executability
   limitation, with label-related `step-from-step-pure-*` shortcuts retained as
-  non-C1-final debt;
+  non-C1-final debt. A focused ablation showed the strict bridge LHS matches
+  and direct `step-pure(label(... br 0))` rewrites to `eps`, but Maude does not
+  bind the `WasmTerminals` result variable in the generated rewrite premise;
+  broadening the premise result to `StepPureConf` admits zero-step unreduced
+  `step-pure(...)` terms and is not a faithful C1 repair;
 - concrete store/harness lookup limitations;
 - sequence `Val-ok` list-validation probes without footer list lifting;
 - footer/prelude/genericity debt.
@@ -250,10 +254,14 @@ Current state:
 
 Reason for temporary retention: without them, the strict single-rule translation
 of `Step/ctxt-instrs` is structurally faithful, and the intended associative
-split exists for terms such as `label(... br 0) local.get 1`; however Maude does
-not combine that split with the conditional rewrite premise during full rule
-application. Reordering the conditions to put the `Step` premise first caused
-runaway recursion / stack overflow.
+split exists for terms such as `label(... br 0) local.get 1`; however the
+inner generic `step-pure` bridge does not produce
+`step((Z ; label(... br 0))) => (Z ; eps)` operationally. The direct
+`step-pure(label(... br 0)) => eps` rewrite succeeds, but the generated bridge
+condition with a `WasmTerminals` result variable does not bind the collapsed
+`eps` result. Reordering the conditions to put the `Step` premise first caused
+runaway recursion / stack overflow, and broadening the result to `StepPureConf`
+admitted zero-step unreduced `step-pure(...)` terms.
 
 Future work: remove the remaining label-related shortcuts by finding a faithful
 generic context-closure encoding for C1, or move execution-oriented control

@@ -59,10 +59,21 @@ succeeds, but with the derived label shortcuts removed:
 step((Z ; label(... br 0)))
 ```
 
-has no solution through the generic `crl [step-pure]` bridge. The suffix case
-then fails for the same reason: `Step/ctxt-instrs` needs the inner premise
-`step((Z ; label(... br 0))) => (Z ; eps)`, and that premise is not produced
-operationally by the strict bridge.
+has no solution through the generic `crl [step-pure]` bridge. Additional probes
+showed:
+
+- the bridge LHS can match the label configuration;
+- the exact premise `step-pure(label(... br 0)) => eps` succeeds;
+- the variable premise `step-pure(INSTRS) => INSTRSQ` fails for this label/br
+  case when `INSTRSQ` is sorted as `WasmTerminals`;
+- broadening the result variable to the wrapper sort `StepPureConf` is
+  operationally unsound for C1 because the rewrite condition can be satisfied
+  by the zero-step unreduced term `step-pure(...)`;
+- Maude 3.5.1 does not accept a non-reflexive `=>!` rewrite condition form.
+
+The suffix case then fails for the same reason: `Step/ctxt-instrs` needs the
+inner premise `step((Z ; label(... br 0))) => (Z ; eps)`, and that premise is
+not produced operationally by the strict bridge.
 
 Label-related `step-from-step-pure-*` shortcuts remain as temporary executable debt. They are derived Step_pure-to-Step shortcuts and are not C1-final.
 
