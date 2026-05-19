@@ -47,16 +47,16 @@ Detailed inventory: `prelude_inventory.csv`.
 
 | Classification | Count |
 |---|---:|
-| `GENERIC_SPECTEC_PRELUDE` | 17 |
-| `SOURCE_DERIVED` | 10 |
-| `NON_C1_FINAL_SCAFFOLD` | 8 |
-| `WASM_SPECIFIC_SEMANTICS` | 5 |
-| `EXECUTION_HARNESS` | 5 |
+| `GENERIC_SPECTEC_PRELUDE` | 21 |
+| `SOURCE_DERIVED` | 11 |
+| `DEAD_CAN_REMOVE` | 9 |
 | `BENCHMARK_HARNESS` | 4 |
-| `DEAD_CAN_REMOVE` | 4 |
+| `WASM_SPECIFIC_SEMANTICS` | 3 |
+| `SOURCE_DERIVED_OK` | 3 |
+| `EXECUTION_HARNESS` | 2 |
 | `LEGACY_OR_DEAD` | 1 |
-| `UNKNOWN` | 2 |
-| **Total inventory rows** | **56** |
+| `NON_C1_FINAL_SCAFFOLD` | 1 |
+| **Total inventory rows** | **55** |
 
 These counts are artifact-family counts, not source coverage counts. Source
 coverage remains as previously audited: syntax 249 / 249, defs 1272 / 1272,
@@ -138,12 +138,17 @@ translator or the generated strict core.
 
 Known non-C1-final scaffolding in the generated output/header/footer:
 
-- 20 label-related `step-from-step-pure-*` shortcuts;
-- sequence-lifting footer helpers for `$subst-typeuse`, `$subst-valtype`, and
-  `$subst-subtype`. These are not standalone source defs, but they currently
-  implement SpecTec `f(x)*` sequence-map uses inside the source substitution
-  equations;
-- `$expanddt` footer shortcut over `$unrolldt`.
+- 20 label-related `step-from-step-pure-*` shortcuts.
+
+The sequence-lifting footer helpers for `$subst-typeuse`, `$subst-valtype`, and
+`$subst-subtype` are now treated as accepted C1 representation substrate for
+SpecTec star-map expressions such as `f(x)*` in source substitution equations.
+They are not standalone source rules, but they preserve the source intent of
+mapping source-derived element substitution definitions over source `*`
+sequences.
+
+The old `$expanddt` footer shortcut over `$unrolldt` has been removed. Only the
+source-generated `$expanddt` definition from `1.2-syntax.types.spectec` remains.
 
 The old `$mk-frame` adapter has been removed. It is now represented by the
 source-derived `CTORFRAMEA2` constructor. The remaining debt is genericity: this

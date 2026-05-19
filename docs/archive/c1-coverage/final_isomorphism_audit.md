@@ -76,9 +76,10 @@ translation for DecD LHS arguments; `$setminus(localidx, eps, eps)` now reduces
 to `eps`. No additional dropped-argument anomaly is recorded in the current
 coverage matrix.
 
-Some generated footer helpers, such as sequence substitution lifts and finite
-type-iteration helpers, are not direct source definitions. They are classified
-under output-to-source extras below.
+The substitution sequence lifts are classified as accepted representation
+substrate for SpecTec star-map notation such as `f(x)*`; the old finite
+type-iteration helpers have been removed from the strict output. Remaining
+output-to-source extras are classified below.
 
 ### Relation And Rule
 
@@ -121,7 +122,7 @@ Classification summary for the new generated-extra inventory:
 | `BENCHMARK_HARNESS` | Fibonacci harness outside `translator_bs.ml` and outside generated strict core |
 | `NON_C1_FINAL_SCAFFOLD` | derived shortcuts or helper equations that are not direct source constructs |
 | `LEGACY_OR_DEAD` | appears unused or left over from older experiments |
-| `UNKNOWN` | source provenance not fully classified |
+| `UNKNOWN` | source provenance not fully classified; no current generated strict-core artifact remains in this class |
 
 ## Non-Source-Derived Or Partially Source-Derived Items
 
@@ -154,7 +155,8 @@ they are generated or parameterized:
 
 ### Execution Harness / Relation Compilation Layer
 
-These are needed for current execution but are not literal source declarations:
+These are needed for current execution. They are accepted as representation
+substrate rather than source-rule duplication:
 
 - `StepConf`, `StepPureConf`, `StepReadConf`, `StepsConf`;
 - wrapper-return adaptation for `step`, `step-pure`, `step-read`, `steps`;
@@ -167,9 +169,12 @@ These are needed for current execution but are not literal source declarations:
 
 These violate strict source-only isomorphism most directly:
 
-- 20 label-related `step-from-step-pure-*` shortcuts;
-- `$subst-typeuse`, `$subst-valtype`, `$subst-subtype` sequence lifts;
-- `$expanddt` footer shortcut.
+- 20 label-related `step-from-step-pure-*` shortcuts.
+
+The `$subst-typeuse`, `$subst-valtype`, and `$subst-subtype` sequence lifts are
+now treated as accepted C1 representation substrate for SpecTec `f(x)*`
+star-map notation. The old `$expanddt` footer shortcut has been removed; only
+the source-generated `$expanddt` definition remains.
 
 ### Removed Dead Helpers
 
@@ -209,11 +214,13 @@ The highest-priority violation is the 20 label-related
 Step, not direct source rules. They are currently required by accepted
 execution; prior removal broke the label/br suffix case and Fibonacci.
 
-Other strict-cleanliness issues are mostly footer/prelude separation:
+Other strict-cleanliness issues are mostly footer/prelude separation and
+genericity:
 
-- sequence substitution list lifts;
-- `$expanddt` shortcut;
-- execution wrappers and frame helpers that need a C1-vs-C2 decision;
+- hand-written footer/header strings that should become generated generic
+  substrate;
+- frame typed-record lowering that should be generated from source record
+  syntax generically;
 - legacy/dead helpers that can likely be removed after focused ablation.
 
 ## Items That Are Executability Limitations, Not Missing Translation
@@ -249,6 +256,6 @@ direction. It still contains generic prelude infrastructure, Wasm-specific fixed
 header support, execution wrapper/harness machinery, benchmark harness terms,
 legacy/dead helpers, and non-C1-final scaffolding. The most important
 non-isomorphic generated artifacts are the 20 label-related
-`step-from-step-pure-*` shortcuts, followed by footer/prelude scaffolding such
-as sequence substitution lifts and `$expanddt`
-shortcut support.
+`step-from-step-pure-*` shortcuts. The previous `$expanddt` footer shortcut has
+been removed, and substitution sequence lifts are treated as accepted
+source-star-map representation substrate.

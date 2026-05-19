@@ -2,11 +2,15 @@
 
 Updated: 2026-05-20
 
-This directory contains detailed evidence for the strict C1 validation-lowering audit.
+This directory contains detailed evidence for the strict C1
+validation-lowering audit. It is archival evidence, not the first document to
+read.
 
-The root-level summary is:
+Current reading guide:
 
-- `../../validation_281_summary.md`
+- current limitations and decisions: `../../limitation.md`;
+- historical validation summary: `../validation_281_summary.md`;
+- this directory: detailed audit evidence only.
 
 Current strict result:
 
@@ -29,21 +33,6 @@ Strict C1 validation policy:
 - `helper_setminus_audit.md`: focused DecD helper audit and generic DecD LHS lowering fix evidence.
 - `footer_valid_leftovers_audit.md`: classification of remaining footer `eq` / `ceq ... = valid` leftovers.
 
-## Batch Reports
-
-The `batches/` directory contains the per-source-file validation passes:
-
-- `validation_2_1_types_report.md`;
-- `validation_2_2_subtyping_report.md`;
-- `validation_2_3_instructions_report.md`;
-- `validation_2_4_modules_report.md`;
-- `validation_4_1_values_and_eval_expr_report.md`.
-
-## Archive
-
-The `archive/` directory contains reconciliation evidence from the earlier mechanical count:
-
-- `validation_293_reconciliation.md`;
-- `validation_293_reconciliation.csv`.
-
-Those files explain why the old mechanical `293` count became the corrected strict `281` source-target count.
+Earlier per-source-file batch reports and reconciliation CSVs were consolidated
+into the current summary documents and may no longer exist as standalone root
+files.

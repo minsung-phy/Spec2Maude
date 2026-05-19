@@ -3947,14 +3947,12 @@ let header_prefix =
   "  subsort WellTyped < TypedTerm .\n" ^
   "  op _hasType_ : WasmTerminal WasmType -> TypedTerm [ctor prec 95 gather (e e)] .\n" ^
   "  --- Judgement sort for RelD relations.\n" ^
-  "  --- Baseline translator: most non-step RelD cases become `eq/ceq ... = valid`.\n" ^
-  "  --- Relations that need rewrite premises in their conditions (currently Steps)\n" ^
-  "  --- rewrite directly to `valid` instead of using a separate proof wrapper.\n" ^
+  "  --- Strict C1: source relation rules lower to primary `rl/crl => valid`.\n" ^
+  "  --- Definitional equations remain `eq/ceq` when they translate source defs.\n" ^
   "  sort Judgement .\n" ^
   "  sort ValidJudgement .\n" ^
   "  subsort ValidJudgement < Judgement .\n" ^
   "  op valid : -> ValidJudgement [ctor] .\n" ^
-  "  op _shape-x_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
   "  op slice : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals .\n" ^
   "  op _<-_ : WasmTerminal WasmTerminals -> Bool .\n\n" ^
   "  --- Generic record/terminal combinators (parser support)\n" ^
@@ -3993,11 +3991,6 @@ let header_prefix =
   "  vars WT-S WT-F : WasmTerminal .\n" ^
   "  var WT-X : Localidx .\n" ^
   "  var WT-V : Val .\n" ^
-  "  var EXP-FL-DT : Deftype .\n" ^
-  "  var EXP-FL-CT : Comptype .\n" ^
-  "  var EXP-FL-TU : WasmTerminals .\n" ^
-  "  var EXPAND-X-DT : Deftype .\n" ^
-  "  vars EXPAND-X-T1 EXPAND-X-T2 : WasmTerminals .\n" ^
   "  var INVOKE-X-S : WasmTerminal .\n" ^
   "  var INVOKE-S-S : Store .\n" ^
   "  var INVOKE-X-FUNCADDR : Funcaddr .\n" ^
@@ -4033,9 +4026,6 @@ let footer =
   "      $subst-subtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
   "      $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
   "   if SUBST-L-WS =/= eps .\n" ^
-  "\n" ^
-  "  ceq $expanddt(EXP-FL-DT) = EXP-FL-CT\n" ^
-  "   if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .\n" ^
   "  --- Generic SpecTec list type witness.\n" ^
   "  --- The source rule is polymorphic in the element type; this executable\n" ^
   "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
