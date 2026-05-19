@@ -76,7 +76,21 @@ Config syntax must remain:
 _ ; _
 ```
 
-## Professor Requirement
+## Professor Requirements from 2026-05-19 Meeting
+
+These requirements summarize the latest professor guidance and should be treated as C1 design constraints.
+
+1. **Preserve C1 as the faithful SpecTec-to-Maude baseline.** Model checking and analysis-oriented transformations belong to later phases. C1 should first show that SpecTec syntax/defs/rules can be translated faithfully and relation-preservingly.
+2. **Use clear variable naming for singleton vs sequence variables.** Starred SpecTec categories such as `instr*` should be visibly distinguished from singleton categories such as `instr`; prefer conventions such as `INSTR` for one instruction and `INSTRS` for instruction sequences.
+3. **Remove redundant Boolean wrappers where Maude permits it.** Generated conditions like `(C =/= 0) = true` should be audited and simplified when a direct Boolean condition is accepted by Maude. Do not perform an unsafe blind global deletion without testing representative conditions.
+4. **Translate SpecTec `rule`/relation judgements as Maude `rl/crl` as much as possible.** Validation judgements currently generated as `eq/ceq ... = valid` are a major policy issue and need dependency-aware redesign, not helper-heavy bypasses.
+5. **Avoid helper-heavy executable shortcuts.** Any remaining scaffold must be generic, justified, and documented. Benchmark-specific or Wasm-judgement-name-specific hacks do not belong in `translator_bs.ml`.
+6. **Grow the baseline from Wasm-to-Maude toward generic SpecTec-to-Maude.** Audit and remove Wasm-specific hardcoding; try non-Wasm SpecTec inputs such as `p4-spectec`; generalize names such as `WasmTerminal`/`WasmType` where appropriate.
+7. **Re-evaluate the legacy `WasmTerm`/`WasmType` and typecheck infrastructure.** This does not mean deleting Wasm object-language type syntax or deleting validation semantics. The task is to distinguish object-language type syntax, validation relations, and runtime execution guards. If a well-typed input program is assumed, audit whether execution rules still need runtime typecheck or membership guards, and whether broad `WasmType` ground terms that never appear in actual programs/configurations are unnecessary syntax-universe pollution. Keep only an elegant, necessary sort/type framework.
+8. **Check broad coverage.** Verify all relevant Wasm SpecTec documents, including non-core pieces if present, and use failures to identify translator limitations. Generic SpecTec smoke tests are useful even if full support is future work.
+9. **Prepare professor-facing mapping evidence.** Show how syntax declarations, defs/equations, relation rules, and representative `Step`/`Step_pure`/`Step_read`/`Steps` rules map into Maude.
+
+## Professor-Facing Initial-Config Requirement
 
 The professor-facing story cannot be:
 
@@ -148,21 +162,16 @@ red in WASM-FIB-BS :
 
 Expected/current result: a concrete `Config`, not a stuck `$invoke(...)`.
 
-The invoke-based manual-store execution path works:
+Known invoke-path status:
 
 ```maude
-rew [10000] in WASM-FIB-BS : steps(fib-config-invoke(i32v(0))) .
-rew [10000] in WASM-FIB-BS : steps(fib-config-invoke(i32v(1))) .
 rew [10000] in WASM-FIB-BS : steps(fib-config-invoke(i32v(5))) .
 ```
 
-Expected/current final constants:
-
-```maude
-CTORCONSTA2(CTORI32A0, 0)
-CTORCONSTA2(CTORI32A0, 1)
-CTORCONSTA2(CTORI32A0, 5)
-```
+This path currently stops early at the known outer invoke frame/label/block term.
+`$invoke(...)` itself still reduces to a concrete `Config`, but the full
+`fib-config-invoke` execution should be treated as a separate invoke-path issue,
+not as part of small cleanup tasks.
 
 The older hand-assembled config path also remains a useful execution
 regression:
@@ -326,46 +335,49 @@ source-module initial config work.
 
 #### 2.1 `step-from-step-pure-*`
 
-Generated output contains derived lifted rules such as:
+Audit result: `step-from-step-pure-*` rules are derived `Step_pure`-to-`Step`
+lifted shortcuts, not direct translations of original SpecTec `Step` rules.
 
-```maude
-crl [step-from-step-pure-br-if-true] :
-  step((Z ; CONST(I32, C) BRIF(L)))
-  =>
-  (Z ; BR(L))
-  if ((C =/= 0)) = true /\ $is-labelidx(L) = true .
-```
+Current cleanup state:
 
-Manual ablation showed at least `step-from-step-pure-br-if-true` is redundant
-for current regressions.
+- non-label `step-from-step-pure-*` shortcuts are removed;
+- only label-related `step-from-step-pure-*` shortcuts remain temporarily;
+- the remaining label-related shortcuts are non-C1-final executable debt.
 
-Do not delete all `step-from-step-pure-*` rules blindly. Audit them by rule
-group and remove generation only when generic bridge/context rules already
-cover the behavior.
+Reason for temporary retention: the strict single-rule translation of
+`Step/ctxt-instrs` can match the intended associative split for terms such as
+`label(... br 0) local.get 1`, and its individual conditions succeed, but Maude
+does not combine that split with the conditional rewrite premise during full
+rule application. Future work is to remove the remaining label-related
+shortcuts by finding a faithful generic context-closure encoding or by moving
+execution-control machinery to C2.
 
-#### 2.2 `INSTRQ =/= eps` guards
+#### 2.2 Empty-result splits and `INSTRQ =/= eps` guards
 
-Do not globally delete all `INSTRQ =/= eps` guards. Some may be executable
-case-splitting guards.
+Completed cleanup: the generated empty-result split rules have been removed, and
+their companion `INSTRQ =/= eps` guards have been removed.
 
-Current strong manual evidence supports removing the guard specifically from
-`step-ctxt-instrs`. `step-pure` / `step-read` bridge guards require separate
-tests before removal.
+Removed rules:
 
-#### 2.3 `step-ctxt-instrs-empty`
+- `step-ctxt-instrs-empty`;
+- `step-pure-empty`;
+- `step-read-empty`;
+- `step-ctxt-label-empty`;
+- `step-ctxt-handler-empty`.
 
-Manual ablation showed strong evidence that the generated output can be closer
-to the original SpecTec `Step/ctxt-instrs` rule by:
+The corresponding generated bridges/context rules now handle both `eps` and
+non-`eps` inner results in a single rule. Keep regression tests for
+label/br+suffix, br_if+suffix, nop+suffix, and `steps(fib-config(i32v(5)))`
+after any further translator changes.
 
-- removing `crl [step-ctxt-instrs-empty]`;
-- removing `(INSTRQ =/= eps) = true` only from `step-ctxt-instrs`;
-- using the single `step-ctxt-instrs` rule for both empty and non-empty inner
-  results.
+#### 2.3 Boolean condition cleanup
 
-Focused label/br+suffix, br_if+suffix, nop+suffix, and Fibonacci `steps` tests
-passed under that manual ablation. This is a high-priority isomorphism cleanup
-candidate, but it still needs a generic translator-side implementation and
-regression confirmation.
+Professor feedback: conditions such as `(C =/= 0) = true` are often redundant
+because Maude conditions may use Bool expressions directly. This should be
+audited separately from the completed `INSTRQ =/= eps` cleanup.
+
+Do not blindly delete every `= true`; first test representative generated
+conditions such as arithmetic comparisons and `$is-*` predicates.
 
 #### 2.4 Validation rules currently lowered as equations
 
@@ -382,6 +394,44 @@ Key research question:
 How can output-bearing validation premises preserve rule structure without
 falling back to helper-heavy $infer/$prove/$out mode compilation?
 ```
+
+#### 2.5 Generic SpecTec-to-Maude direction
+
+C1 should be audited as a generic SpecTec-to-Maude translator, not only a Wasm
+translator. Concrete tasks:
+
+- grep `translator_bs.ml` for Wasm-specific hardcoding;
+- consider renaming generic generated infrastructure from `WasmTerminal` /
+  `WasmType` toward `SpecTecTerminal` / `SpecTecType`, or removing the broad
+  type sort if the audit shows it is unnecessary;
+- try `p4-spectec` or another non-Wasm SpecTec input as a smoke test;
+- record unsupported SpecTec features as translator limitations rather than
+  silently adding Wasm-specific hacks.
+
+#### 2.6 `WasmType` / typecheck infrastructure audit
+
+The current `WasmTerm`/`WasmType` framework may be legacy/ad-hoc. Audit it
+before making invasive changes.
+
+Clarifications:
+
+- Do not delete Wasm object-language type syntax such as `i32`, `functype`,
+  `heaptype`, or annotations that appear in source programs.
+- Do not delete SpecTec validation semantics.
+- Do distinguish object-language type syntax, validation relations, and runtime
+  execution guards.
+
+Audit questions:
+
+- Where are `WasmType`, `is-type`, `are-types`, and `are-mixed` used?
+- Are they used in execution rules, validation rules, or only generated
+  membership/typecheck scaffolding?
+- For already validated / well-typed input programs, do execution rules still
+  need runtime typecheck or membership guards?
+- Are ground type terms generated that cannot appear in actual programs or
+  runtime configurations? If so, can the syntax universe be reduced?
+- Would a more elegant design use only necessary syntax categories and Maude
+  sorts, rather than a broad type-tag framework?
 
 ### 3. Initial config path
 
@@ -485,8 +535,8 @@ Only proceed to model checking after:
 
 Do not jump to frontend, model checking, or broad speculative infrastructure.
 
-First, clean up C1 isomorphism and rule-lowering policy. Then return to the
-current source-module blocker:
+First, finish the validation rule-lowering design audit and the generic/type
+infrastructure audits. Then return to the current source-module blocker:
 
 ```maude
 red in WASM-FIB-BS :
