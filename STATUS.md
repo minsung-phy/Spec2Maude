@@ -52,6 +52,9 @@ Current accepted facts:
 - The sequence-shaped `Val-ok` footer list-lift has also been removed from the
   strict core.
 - No `eq` / `ceq ... = valid` statements remain in `output_bs.maude`.
+- The four known rule-label fidelity anomalies have been cleaned up:
+  `Rectype_ok/_rec2`, `Fieldtype_sub/var`, `Globaltype_sub/var`, and
+  `Instr_ok/if` now generate source-faithful Maude rule labels.
 - `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
   hardcoding such as:
 
@@ -96,6 +99,12 @@ categories are:
 - concrete store/harness lookup limitations;
 - sequence `Val-ok` list-validation probes without footer list lifting;
 - footer/prelude/genericity debt.
+
+The focused validation executability triage is recorded in
+`docs/c1-validation/strict_validation_failure_triage.md`. It found no small
+generic C1-isomorphic translator fix; the remaining validation failures need
+derived iteration handling, witness search, sequence-index list lifting, or
+harness representation cleanup.
 
 The footer `= valid` cleanup removed duplicate source-rule equations for
 `Expand`, `Num-ok`, singleton `Val-ok`, and the non-source sequence-shaped

@@ -103,17 +103,20 @@ premise in label cases. The current focused ablation shows that the immediate
 blocker is already visible at the generic `crl [step-pure]` bridge for
 label-shaped instruction terms. This is documented in `limitation.md`.
 
-## P2: Label Fidelity Anomalies
+## Resolved P2: Label Fidelity Anomalies
 
-The following source rules have primary rules but labels include generated `w-` artifacts or similar token sanitation effects:
+The following source rules previously had primary rules whose labels included
+generated `w-` artifacts or leading-symbol sanitation effects. This has been
+fixed with a rule-label-specific sanitizer. Only Maude bracket labels changed;
+rule bodies and counts are unchanged.
 
-- `wasm-3.0/2.1-validation.types.spectec:179` `Rectype_ok/_rec2` -> `[rectype-ok-w--rec2]`
-- `wasm-3.0/2.2-validation.subtyping.spectec:159` `Fieldtype_sub/var` -> `[fieldtype-sub-w-var]`
-- `wasm-3.0/2.2-validation.subtyping.spectec:218` `Globaltype_sub/var` -> `[globaltype-sub-w-var]`
-- `wasm-3.0/2.3-validation.instructions.spectec:63` `Instr_ok/if` -> `[instr-ok-w-if]`
+- `wasm-3.0/2.1-validation.types.spectec:179` `Rectype_ok/_rec2`: `[rectype-ok-w--rec2]` -> `[rectype-ok-rec2]`
+- `wasm-3.0/2.2-validation.subtyping.spectec:159` `Fieldtype_sub/var`: `[fieldtype-sub-w-var]` -> `[fieldtype-sub-var]`
+- `wasm-3.0/2.2-validation.subtyping.spectec:218` `Globaltype_sub/var`: `[globaltype-sub-w-var]` -> `[globaltype-sub-var]`
+- `wasm-3.0/2.3-validation.instructions.spectec:63` `Instr_ok/if`: `[instr-ok-w-if]` -> `[instr-ok-if]`
 
-
-These are likely harmless for semantics but are not ideal for professor-facing source-to-output mapping.
+No currently known source rule remains suspicious solely because of rule-label
+fidelity.
 
 ## P2: Generated Category/Free Predicates
 
@@ -121,4 +124,6 @@ These are likely harmless for semantics but are not ideal for professor-facing s
 
 ## Possible Generic Translator Bugs
 
-No definite missing construct was found. The label-fidelity anomalies above are plausible generic cleanup candidates, not semantic blockers.
+No definite missing construct was found. The remaining items above are
+execution, footer/prelude, or generated-helper questions rather than source
+coverage gaps.

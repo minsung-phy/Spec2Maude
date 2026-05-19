@@ -9,7 +9,7 @@ Updated: 2026-05-20
 - Active source `rule` declarations found: 499
 - Source rules covered by primary generated `rl`/`crl`: 499
 - Missing source rules: 0
-- Label-renamed/suspicious but structurally covered source rules: 4
+- Label-renamed/suspicious but structurally covered source rules: 0
 
 ## Validation Subset
 
@@ -19,17 +19,19 @@ The strict validation-lowering subset remains confirmed:
 - No source validation target remains as `eq`/`ceq ... = valid`.
 - No `iter-empty` or `opt-empty` derived validation labels remain.
 
-## Label-Renamed Source Rules
+## Resolved Label-Fidelity Cleanup
 
-These rules are structurally covered by primary `crl`s, but their generated labels are not a direct source-token normalization:
+The previously known label-fidelity anomalies have been fixed by using a
+rule-label-specific sanitizer. These rules remain structurally covered by the
+same primary `crl`s; only the bracketed Maude labels changed:
 
-- `wasm-3.0/2.1-validation.types.spectec:179` `Rectype_ok/_rec2` -> `[rectype-ok-w--rec2]`
-- `wasm-3.0/2.2-validation.subtyping.spectec:159` `Fieldtype_sub/var` -> `[fieldtype-sub-w-var]`
-- `wasm-3.0/2.2-validation.subtyping.spectec:218` `Globaltype_sub/var` -> `[globaltype-sub-w-var]`
-- `wasm-3.0/2.3-validation.instructions.spectec:63` `Instr_ok/if` -> `[instr-ok-w-if]`
+- `wasm-3.0/2.1-validation.types.spectec:179` `Rectype_ok/_rec2`: `[rectype-ok-w--rec2]` -> `[rectype-ok-rec2]`
+- `wasm-3.0/2.2-validation.subtyping.spectec:159` `Fieldtype_sub/var`: `[fieldtype-sub-w-var]` -> `[fieldtype-sub-var]`
+- `wasm-3.0/2.2-validation.subtyping.spectec:218` `Globaltype_sub/var`: `[globaltype-sub-w-var]` -> `[globaltype-sub-var]`
+- `wasm-3.0/2.3-validation.instructions.spectec:63` `Instr_ok/if`: `[instr-ok-w-if]` -> `[instr-ok-if]`
 
-
-These are not missing rules. They are label-fidelity anomalies to consider for later cleanup.
+No active source rule is currently marked suspicious solely because of rule-label
+sanitization.
 
 ## Execution Limitations
 

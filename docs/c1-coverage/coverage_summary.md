@@ -21,7 +21,7 @@ Block-commented `(; ... ;)` source text was ignored for source-target counts.
 | Syntax declarations | 249 | 249 | 0 | Declaration-level sort/predicate/operator coverage |
 | Def declarations/equations | 1272 | 1272 | 0 | Operator/equation/rewrite evidence found |
 | Relation declarations | 82 | 82 | 0 | Generated relation operators found |
-| Rule declarations | 499 | 499 | 0 | Primary `rl`/`crl` coverage; 4 label anomalies |
+| Rule declarations | 499 | 499 | 0 | Primary `rl`/`crl` coverage; label-fidelity anomalies resolved |
 
 ## Validation Lowering Confirmation
 
@@ -66,8 +66,11 @@ Suspicious / non-isomorphic items are documented in `non_isomorphic_items.md`:
 - removed sequence-shaped `Val-ok` footer/harness leftover, now recorded as a
   strict sequence-probe executability limitation;
 - footer/prelude genericity debt;
-- `Step/ctxt-instrs` executability limitation;
-- four label-fidelity anomalies.
+- `Step/ctxt-instrs` executability limitation.
+
+The four previously known rule-label fidelity anomalies were resolved:
+`Rectype_ok/_rec2`, `Fieldtype_sub/var`, `Globaltype_sub/var`, and
+`Instr_ok/if` now generate source-faithful Maude labels.
 
 ## Recommended Next Fixes
 
@@ -75,5 +78,4 @@ Suspicious / non-isomorphic items are documented in `non_isomorphic_items.md`:
 2. Decide whether remaining execution-oriented helpers belong in C1 or C2.
 3. Audit footer/prelude separation, especially frame/store helpers and finite
    type-iteration support.
-4. Investigate label-fidelity anomalies if professor-facing source-to-output traceability needs exact label normalization.
-5. Keep executable failures separate from structural coverage unless a generic translator bug is proven.
+4. Keep executable failures separate from structural coverage unless a generic translator bug is proven.

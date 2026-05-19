@@ -4961,7 +4961,7 @@ mod SPECTEC-CORE is
     =>
     valid
       if Subtype-ok ( RECTYPE-OK-CONS1-C, RECTYPE-OK-CONS1-SUBTYPE1, ( CTOROKA1 ( RECTYPE-OK-CONS1-X ) ) ) => valid /\ Rectype-ok ( RECTYPE-OK-CONS1-C, ( CTORRECA1 ( RECTYPE-OK-CONS1-SUBTYPES ) ), ( CTOROKA1 ( ( ( RECTYPE-OK-CONS1-X + 1 ) ) ) ) ) => valid /\ ( RECTYPE-OK-CONS1-SUBTYPES hasType ( list ( subtype ) ) ) : WellTyped /\ $is-spectec-context ( RECTYPE-OK-CONS1-C ) /\ $is-spectec-idx ( RECTYPE-OK-CONS1-X ) /\ $is-spectec-subtype ( RECTYPE-OK-CONS1-SUBTYPE1 ) .
-  crl [rectype-ok-w--rec2] :
+  crl [rectype-ok-rec2] :
     Rectype-ok ( RECTYPE-OK-W--REC22-C , CTORRECA1 ( RECTYPE-OK-W--REC22-SUBTYPES ) , CTOROKA1 ( RECTYPE-OK-W--REC22-X ) )
     =>
     valid
@@ -5173,7 +5173,7 @@ mod SPECTEC-CORE is
     =>
     valid
       if Storagetype-sub ( FIELDTYPE-SUB-CONST0-C, FIELDTYPE-SUB-CONST0-ZT1, FIELDTYPE-SUB-CONST0-ZT2 ) => valid /\ $is-spectec-context ( FIELDTYPE-SUB-CONST0-C ) /\ $is-spectec-storagetype ( FIELDTYPE-SUB-CONST0-ZT1 ) /\ $is-spectec-storagetype ( FIELDTYPE-SUB-CONST0-ZT2 ) .
-  crl [fieldtype-sub-w-var] :
+  crl [fieldtype-sub-var] :
     Fieldtype-sub ( FIELDTYPE-SUB-W-VAR1-C , CTORMUTA0 FIELDTYPE-SUB-W-VAR1-ZT1 , CTORMUTA0 FIELDTYPE-SUB-W-VAR1-ZT2 )
     =>
     valid
@@ -5333,7 +5333,7 @@ mod SPECTEC-CORE is
     =>
     valid
       if Valtype-sub ( GLOBALTYPE-SUB-CONST0-C, GLOBALTYPE-SUB-CONST0-VALTYPE1, GLOBALTYPE-SUB-CONST0-VALTYPE2 ) => valid /\ $is-spectec-context ( GLOBALTYPE-SUB-CONST0-C ) /\ $is-spectec-valtype ( GLOBALTYPE-SUB-CONST0-VALTYPE1 ) /\ $is-spectec-valtype ( GLOBALTYPE-SUB-CONST0-VALTYPE2 ) .
-  crl [globaltype-sub-w-var] :
+  crl [globaltype-sub-var] :
     Globaltype-sub ( GLOBALTYPE-SUB-W-VAR1-C , CTORMUTA0 GLOBALTYPE-SUB-W-VAR1-VALTYPE1 , CTORMUTA0 GLOBALTYPE-SUB-W-VAR1-VALTYPE2 )
     =>
     valid
@@ -5482,7 +5482,7 @@ mod SPECTEC-CORE is
     =>
     valid
       if Blocktype-ok ( INSTR-OK-LOOP6-C, INSTR-OK-LOOP6-BT, ( CTORARROWA3 ( INSTR-OK-LOOP6-TS1, eps, INSTR-OK-LOOP6-TS2 ) ) ) => valid /\ Instrs-ok ( ( merge ( {item('TYPES, eps) ; item('RECS, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('LOCALS, eps) ; item('LABELS, INSTR-OK-LOOP6-TS1) ; item('RETURN, eps) ; item('REFS, eps)} , INSTR-OK-LOOP6-C ) ), INSTR-OK-LOOP6-INSTRS, ( CTORARROWA3 ( INSTR-OK-LOOP6-TS1, INSTR-OK-LOOP6-XS, INSTR-OK-LOOP6-TS2 ) ) ) => valid /\ ( INSTR-OK-LOOP6-INSTRS hasType ( list ( instr ) ) ) : WellTyped /\ ( INSTR-OK-LOOP6-TS1 hasType ( list ( valtype ) ) ) : WellTyped /\ ( INSTR-OK-LOOP6-TS2 hasType ( list ( valtype ) ) ) : WellTyped /\ $is-spectec-blocktype ( INSTR-OK-LOOP6-BT ) /\ $is-spectec-context ( INSTR-OK-LOOP6-C ) .
-  crl [instr-ok-w-if] :
+  crl [instr-ok-if] :
     Instr-ok ( INSTR-OK-W-IF7-C , CTORWIFELSEA3 ( INSTR-OK-W-IF7-BT, INSTR-OK-W-IF7-INSTRS1, INSTR-OK-W-IF7-INSTRS2 ) , CTORARROWA3 ( ( INSTR-OK-W-IF7-TS1 CTORI32A0 ), eps, INSTR-OK-W-IF7-TS2 ) )
     =>
     valid
