@@ -129,9 +129,15 @@ let syntax_keywords =
 let wrap_mix_token s =
   s
 
+let strip_trailing_eq_true s =
+  let t = String.trim s in
+  let re = Str.regexp "[ \t]*=[ \t]*true[ \t]*$" in
+  String.trim (Str.replace_first re "" t)
+
 let cond_join conds =
   conds
   |> List.map String.trim
+  |> List.map strip_trailing_eq_true
   |> List.filter (fun c -> c <> "" && c <> "true" && c <> "( true )" && c <> "(true)")
   |> String.concat " /\\ "
 
@@ -160,9 +166,11 @@ let bool_cond s =
 
 (* A premise text passes through unwrapped if it is already a Maude
    side-condition in its own right:
-   - LetPr / match-binding: contains ":=" (both ':' and '=' present with := adjacent)
-   - Membership condition:  contains ':' but no '=' (e.g. "X : Sort", "T : ValidJudgement")
-   Otherwise we wrap as `( s ) = true` so Maude reads it as a Bool equation. *)
+   - LetPr / match-binding: contains ":="
+   - Membership condition: contains ':' but no '='
+   - Rewrite condition: contains "=>"
+   Otherwise we keep the translated Bool term directly, without wrapping it
+   as `(s) = true`. *)
 let prem_cond s =
   let has_colon = String.contains s ':' in
   let has_eq    = String.contains s '=' in
@@ -2866,13 +2874,13 @@ let translate_step_reld rel_name rules =
                       if List.length stable_texts >= 1 then List.nth stable_texts 0 else n_var
                     in
                     Printf.sprintf
-                      "  crl [cool-%s-control] :\n    %s(step(< CTORSEMICOLONA2 ( %s-S, %s ) | %s >), %s, %s-F, %s)\n    => step(< CTORSEMICOLONA2 ( %s-S, %s-F ) | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) = true ."
+                      "  crl [cool-%s-control] :\n    %s(step(< CTORSEMICOLONA2 ( %s-S, %s ) | %s >), %s, %s-F, %s)\n    => step(< CTORSEMICOLONA2 ( %s-S, %s-F ) | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) ."
                       rule_name restore_name n_var inner_frame_text inner_is_var n_arity_text n_var is_rest_var
                       n_var n_var ctor_name stable_str inner_is_var is_rest_var
                       inner_is_var
                   else
                     Printf.sprintf
-                      "  crl [cool-%s-control] :\n    %s(step(< %s | %s >), %s)\n    => step(< %s | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) = true ."
+                      "  crl [cool-%s-control] :\n    %s(step(< %s | %s >), %s)\n    => step(< %s | %s ( %s, %s ) %s >)\n    if needs-label-ctxt ( %s ) ."
                       rule_name restore_name z_var inner_is_var
                       (stable_str ^ ", " ^ is_rest_var)
                       z_var ctor_name stable_str inner_is_var is_rest_var
@@ -3998,7 +4006,7 @@ let footer =
   "  eq  is-val(CTORREFEXTERNA1(W)) = true .\n" ^
   "  ceq is-val(W) = true if W : Val .\n" ^
   "  eq  is-val(W) = false [owise] .\n\n" ^
-  "  ceq all-vals(W TS) = all-vals(TS) if is-val(W) = true .\n" ^
+  "  ceq all-vals(W TS) = all-vals(TS) if is-val(W) .\n" ^
   "  eq  all-vals(eps) = true .\n" ^
   "  eq  all-vals(TS) = false [owise] .\n\n" ^
   "  --- Label-context control-flow detector: true when the inner instr list\n" ^
@@ -4007,14 +4015,14 @@ let footer =
   "  --- consume directly. In those cases heat must NOT fire, otherwise the\n" ^
   "  --- control-flow instruction escapes its enclosing label wrapper.\n" ^
   "  eq  needs-label-ctxt(eps) = false .\n" ^
-  "  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .\n" ^
+  "  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) .\n" ^
   "  eq  needs-label-ctxt(CTORBRA1(T) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORRETURNA0 TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .\n" ^
   "  eq  needs-label-ctxt(CTORTHROWREFA0 TS) = true .\n" ^
   "  eq  needs-label-ctxt(TS) = false [owise] .\n\n" ^
   "  eq  is-trap(eps) = false .\n" ^
-  "  ceq is-trap(W TS) = is-trap(TS) if is-val(W) = true .\n" ^
+  "  ceq is-trap(W TS) = is-trap(TS) if is-val(W) .\n" ^
   "  eq  is-trap(CTORTRAPA0 TS) = true .\n" ^
   "  eq  is-trap(TS) = false [owise] .\n" ^
   "\n" ^
@@ -4043,17 +4051,17 @@ let footer =
   "  eq $rec-typevars(0) = eps .\n" ^
   "  ceq $rec-typevars(TYPE-ITER-N) =\n" ^
   "      $rec-typevars(TYPE-ITER-N - 1) CTORRECA1(TYPE-ITER-N - 1)\n" ^
-  "   if (TYPE-ITER-N > 0) = true .\n" ^
+  "   if (TYPE-ITER-N > 0) .\n" ^
   "  eq $def-typeuses(TYPE-ITER-RT, 0) = eps .\n" ^
   "  ceq $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N) =\n" ^
   "      $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N - 1)\n" ^
   "      CTORWDEFA2(TYPE-ITER-RT, TYPE-ITER-N - 1)\n" ^
-  "   if (TYPE-ITER-N > 0) = true .\n" ^
+  "   if (TYPE-ITER-N > 0) .\n" ^
   "  eq $idx-typeuses(TYPE-ITER-X, 0) = eps .\n" ^
   "  ceq $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N) =\n" ^
   "      $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N - 1)\n" ^
   "      CTORWIDXA1(TYPE-ITER-X + (TYPE-ITER-N - 1))\n" ^
-  "   if (TYPE-ITER-N > 0) = true .\n" ^
+  "   if (TYPE-ITER-N > 0) .\n" ^
   "  ceq $expanddt(EXP-FL-DT) = EXP-FL-CT\n" ^
   "   if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .\n" ^
   "  ceq Expand(EXPAND-X-DT, CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2)) = valid\n" ^
@@ -4063,7 +4071,7 @@ let footer =
   "  --- The source rule is polymorphic in the element type; this executable\n" ^
   "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
   "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
-  "   if (len(LIST-TS) < (2 ^ 32)) = true .\n" ^
+  "   if (len(LIST-TS) < (2 ^ 32)) .\n" ^
   "\n" ^
   "  --- Generic list lifting for Val_ok premises over val* / valtype*.\n" ^
   "  --- SpecTec writes this pointwise; the executable Maude condition needs\n" ^
@@ -4074,9 +4082,9 @@ let footer =
   "  eq Val-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .\n" ^
   "  eq Val-ok(VALOK-S, eps, eps) = valid .\n" ^
   "  ceq Val-ok(VALOK-S, VALOK-V VALOK-VS, VALOK-T VALOK-TS) = valid\n" ^
-  "   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps)) = true\n" ^
-  "   /\\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid) = true\n" ^
-  "   /\\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) = true .\n" ^
+  "   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps))\n" ^
+  "   /\\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid)\n" ^
+  "   /\\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) .\n" ^
   "\n" ^
   "  --- Executable frame record representation.\n" ^
   "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}. Direct Maude\n" ^

@@ -8605,7 +8605,7 @@ mod SPECTEC-CORE is
   ceq is-val(W) = true if W : Val .
   eq  is-val(W) = false [owise] .
 
-  ceq all-vals(W TS) = all-vals(TS) if is-val(W) = true .
+  ceq all-vals(W TS) = all-vals(TS) if is-val(W) .
   eq  all-vals(eps) = true .
   eq  all-vals(TS) = false [owise] .
 
@@ -8615,7 +8615,7 @@ mod SPECTEC-CORE is
   --- consume directly. In those cases heat must NOT fire, otherwise the
   --- control-flow instruction escapes its enclosing label wrapper.
   eq  needs-label-ctxt(eps) = false .
-  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) = true .
+  ceq needs-label-ctxt(W TS) = needs-label-ctxt(TS) if is-val(W) .
   eq  needs-label-ctxt(CTORBRA1(T) TS) = true .
   eq  needs-label-ctxt(CTORRETURNA0 TS) = true .
   eq  needs-label-ctxt(CTORRETURNCALLREFA1(T) TS) = true .
@@ -8623,7 +8623,7 @@ mod SPECTEC-CORE is
   eq  needs-label-ctxt(TS) = false [owise] .
 
   eq  is-trap(eps) = false .
-  ceq is-trap(W TS) = is-trap(TS) if is-val(W) = true .
+  ceq is-trap(W TS) = is-trap(TS) if is-val(W) .
   eq  is-trap(CTORTRAPA0 TS) = true .
   eq  is-trap(TS) = false [owise] .
 
@@ -8652,17 +8652,17 @@ mod SPECTEC-CORE is
   eq $rec-typevars(0) = eps .
   ceq $rec-typevars(TYPE-ITER-N) =
       $rec-typevars(TYPE-ITER-N - 1) CTORRECA1(TYPE-ITER-N - 1)
-   if (TYPE-ITER-N > 0) = true .
+   if (TYPE-ITER-N > 0) .
   eq $def-typeuses(TYPE-ITER-RT, 0) = eps .
   ceq $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N) =
       $def-typeuses(TYPE-ITER-RT, TYPE-ITER-N - 1)
       CTORWDEFA2(TYPE-ITER-RT, TYPE-ITER-N - 1)
-   if (TYPE-ITER-N > 0) = true .
+   if (TYPE-ITER-N > 0) .
   eq $idx-typeuses(TYPE-ITER-X, 0) = eps .
   ceq $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N) =
       $idx-typeuses(TYPE-ITER-X, TYPE-ITER-N - 1)
       CTORWIDXA1(TYPE-ITER-X + (TYPE-ITER-N - 1))
-   if (TYPE-ITER-N > 0) = true .
+   if (TYPE-ITER-N > 0) .
   ceq $expanddt(EXP-FL-DT) = EXP-FL-CT
    if CTORSUBA3(eps, EXP-FL-TU, EXP-FL-CT) := $unrolldt(EXP-FL-DT) .
   ceq Expand(EXPAND-X-DT, CTORFUNCARROWA2(EXPAND-X-T1, EXPAND-X-T2)) = valid
@@ -8672,7 +8672,7 @@ mod SPECTEC-CORE is
   --- The source rule is polymorphic in the element type; this executable
   --- variable form makes `eps hasType list(val)` and similar instances work.
   cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped
-   if (len(LIST-TS) < (2 ^ 32)) = true .
+   if (len(LIST-TS) < (2 ^ 32)) .
 
   --- Generic list lifting for Val_ok premises over val* / valtype*.
   --- SpecTec writes this pointwise; the executable Maude condition needs
@@ -8683,9 +8683,9 @@ mod SPECTEC-CORE is
   eq Val-ok(VALOK-WT-S, CTORCONSTA2(VALOK-NT, VALOK-C), VALOK-NT) = valid .
   eq Val-ok(VALOK-S, eps, eps) = valid .
   ceq Val-ok(VALOK-S, VALOK-V VALOK-VS, VALOK-T VALOK-TS) = valid
-   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps)) = true
-   /\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid) = true
-   /\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) = true .
+   if ((VALOK-VS =/= eps) or (VALOK-TS =/= eps))
+   /\ (Val-ok(VALOK-S, VALOK-V, VALOK-T) == valid)
+   /\ (Val-ok(VALOK-S, VALOK-VS, VALOK-TS) == valid) .
 
   --- Executable frame record representation.
   --- SpecTec writes frames as {LOCALS ..., MODULE ...}. Direct Maude
