@@ -7,7 +7,7 @@ mod SPECTEC-CORE is
 
   --- Base Sorts
   subsort Int < WasmTerminal .
-  subsort Nat < WasmTerminal .
+  --- Nat < WasmTerminal is provided by DSL-PRETYPE.
 
   --- Allow type atoms to appear as terminals (for mixed AST encodings)
   subsort WasmType < WasmTerminal .

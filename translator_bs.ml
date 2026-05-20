@@ -5171,7 +5171,7 @@ let header_prefix =
   "  inc INT .\n\n" ^
   "  --- Base Sorts\n" ^
   "  subsort Int < WasmTerminal .\n" ^
-  "  subsort Nat < WasmTerminal .\n\n" ^
+  "  --- Nat < WasmTerminal is provided by DSL-PRETYPE.\n\n" ^
   "  --- Allow type atoms to appear as terminals (for mixed AST encodings)\n" ^
   "  subsort WasmType < WasmTerminal .\n" ^
   "  subsort WasmTypes < WasmTerminals .\n\n" ^

@@ -11,6 +11,7 @@ mod DSL-PRETYPE is
   sort WasmTerminals .
   sort WasmTypes .
 
+  subsort Nat < WasmTerminal .
   subsort WasmTerminal < WasmTerminals .
   subsort WasmType < WasmTypes . 
   op eps : -> WasmTerminals .
@@ -80,7 +81,6 @@ mod DSL-RECORD is
   eq value(F, item(F, V) ; RI) = V .
   ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .
 
-  op _[_<-_] : WasmTerminals Nat WasmTerminal -> WasmTerminals [prec 50] .
   op _[_<-_] : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals [prec 50] .
 
   var H : WasmTerminal .

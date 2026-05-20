@@ -13,17 +13,20 @@ Updated: 2026-05-21
 - `assignment-fragment-advisory`: 0
 - `multiple-distinct-parses`: 0
 - `used-before-bound`: 25
-- `duplicate-import-advisory`: 3
+- `duplicate-import-advisory`: 0
 
 주의: 위 count는 `load wasm-exec-bs.maude ; q` 기준이다. 실제 `red/search`
 명령을 함께 실행하면 Maude builtin/pretype associative operator에 대한
 membership-axiom warning 11개가 추가로 출력될 수 있다. 현재 smoke 결과는
-정상이며, 이 warning은 별도 `dsl/pretype` / builtin sort 설계 cleanup에서 본다.
+정상이다. 이 warning은 source-derived `mb/cmb` category memberships가
+NAT/INT/sequence associative operators와 얽히면서 생기는 Maude 구조 warning이라,
+없애려면 `mb/cmb` 대신 helper predicate로 되돌리는 식의 큰 설계 변경이 필요하다.
+같은 실행 시점에 source shape `nonfuncs = global* mem* table* elem*`에서 온
+`Nonfuncs` sequence membership에 대해 collapse advisory 1개도 출력될 수 있다.
 
-현재 남은 warning은 크게 두 종류다.
+현재 남은 load-time warning은 한 종류다.
 
 1. source premise가 output witness를 만들어야 하는 `used-before-bound`.
-2. `dsl/pretype` import 구조에서 오는 duplicate import advisory.
 
 ## 이번 pass에서 제거한 warning
 
@@ -167,10 +170,45 @@ vector-specific shortcut을 추가하지 않는다.
 
 ## 남은 duplicate-import-advisory
 
-3개가 남아 있다. `dsl/pretype.maude`의 record update operator가 여러 import
-path로 들어오는 구조와 관련된다.
+0개다.
 
-다음 cleanup 방향:
+원인:
 
-- header/footer cleanup 또는 `dsl/pretype` cleanup 단계에서 import 구조 정리.
-- C1 relation/rule semantics를 건드리지 않고 처리할 수 있는지 확인.
+- `dsl/pretype.maude`에 list update operator `_[_<-_]`가
+  `Nat` index 버전과 `WasmTerminal` index 버전으로 둘 다 선언되어 있었다.
+- `output_bs.maude` 쪽에서 `Nat < WasmTerminal`을 선언하면 Maude가 이 overload를
+  중복 import처럼 본다.
+
+수정:
+
+- `Nat < WasmTerminal`을 `DSL-PRETYPE`에 둔다.
+- generated `SPECTEC-CORE` header에서는 같은 subsort 선언을 반복하지 않는다.
+- `_[_<-_]`는 `WasmTerminal` index 버전 하나만 둔다.
+- Nat index update는 subsort 때문에 그대로 동작한다.
+
+## 남은 command-time membership warning
+
+실제 `red/search/rew` 명령을 실행하면 아래 형태의 warning 11개가 출력될 수 있다.
+
+```text
+membership axioms are not guaranteed to work correctly for associative symbol ...
+```
+
+확인된 원인:
+
+- source syntax/category를 `mb/cmb`로 표현한 generated membership axiom들이
+  Maude builtin `Nat`/`Int` operator 또는 `WasmTerminals` sequence operator와
+  얽힌다.
+- 예를 들어 `cmb T : N if T : Nat` 같은 source alias membership은 Maude가
+  `Nat`의 `s_`, `_+_`, `_*_` 같은 operator까지 고려하면서 warning을 낸다.
+- `nonfuncs = global* mem* table* elem*`처럼 sequence category를 membership
+  axiom으로 표현한 경우에는 associative sequence operator `__` warning과
+  `collapse at top` advisory도 생긴다.
+
+현재 판단:
+
+- 실행 smoke는 정상이다.
+- warning을 없애려고 다시 `$is-*` predicate helper로 돌리면 C1의
+  `mb/cmb`-based source category representation 방향과 충돌한다.
+- 따라서 지금은 limitation으로 문서화하고, 나중에 typed sort/category 설계를
+  더 정리할 때 다시 본다.
