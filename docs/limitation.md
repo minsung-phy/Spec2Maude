@@ -75,14 +75,19 @@ source-valid probe로 다시 확인해야 한다.
   대부분 validation inference overlay, numeric/vector helper,
   allocation/eval/init helper에서 output witness를 Maude rewriting이 만들어야
   하는 경우다. 단순히 `:=`를 `==`로 바꾸면 오히려 더 위험해져서 유지했다.
-- `duplicate-import-advisory`: 3개. `dsl/pretype.maude`의 record update
-  operator가 여러 import path로 들어오는 구조 때문이다. `dsl/pretype`
-  정리 단계에서 보는 것이 맞다.
+- `duplicate-import-advisory`: 0개. `dsl/pretype.maude`의 list update
+  operator `_[_<-_]`가 예전에는 `Nat` index 버전과 `WasmTerminal` index
+  버전으로 둘 다 있어서, `Nat < WasmTerminal`과 만나 중복 import처럼 보였다.
+  이제 `Nat < WasmTerminal`은 `DSL-PRETYPE`이 제공하고, list update operator는
+  `WasmTerminal` index 버전 하나만 둔다. Nat-index update는 subsort 때문에
+  그대로 동작한다.
 - command-time membership warning: 실제 `red/search` 명령을 실행하면 Maude
   builtin/pretype associative operator에 대해
   `membership axioms are not guaranteed...` warning이 11개 출력될 수 있다.
   현재 Fibonacci smoke 결과는 정상이며, 이 warning은 `dsl/pretype` / builtin
-  sort 설계 cleanup에서 따로 본다.
+  sort 설계 cleanup에서 따로 본다. 같은 실행 시점에
+  `nonfuncs = global* mem* table* elem*`에서 온 `Nonfuncs` sequence membership
+  때문에 `collapse at top` advisory 1개도 출력될 수 있다.
 
 이번 pass에서 source-preserving하게 고친 대표 항목:
 

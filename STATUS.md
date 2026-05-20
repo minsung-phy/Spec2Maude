@@ -658,9 +658,13 @@ Current `load wasm-exec-bs` warning status after the current cleanup passes:
   with explicit Maude prefix operators where needed.
 - command-time membership warnings: `load ... ; q` does not show the old
   membership warning family, but actual `red/search` smoke commands can still
-  print 11 Maude builtin/pretype associative membership warnings. Current smoke
-  results are normal; defer this to `dsl/pretype` / builtin sort cleanup.
-- duplicate-import-advisory: 3. Defer to `dsl/pretype` cleanup.
+  print 11 Maude builtin/pretype associative membership warnings plus one
+  source-sequence `Nonfuncs` collapse advisory. Current smoke results are
+  normal; defer this to typed sort/category cleanup.
+- duplicate-import-advisory: removed. `Nat < WasmTerminal` now lives in
+  `DSL-PRETYPE`, and the record/list update operator keeps only the
+  `WasmTerminal` index declaration. Nat-index updates still work through the
+  subsort.
 
 `scripts/run_c1_regression.sh` writes a warning classification CSV. Treat each
 remaining warning family as a separate source-preserving scheduling or
