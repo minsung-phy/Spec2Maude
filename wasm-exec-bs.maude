@@ -30,7 +30,7 @@ mod WASM-FIB-BS is
   var NVAL : Val .
   var I    : Int .
   var Z    : State .
-  vars BODY IS ISQ REST K VALS : WasmTerminals .
+  vars BODY IS ISQ REST K VALS : SpectecTerminals .
   vars C C1 C2 : Int .
   var X : Idx .
   var L : Labelidx .
@@ -40,7 +40,7 @@ mod WASM-FIB-BS is
   eq i32v(I:Int) = CTORCONSTA2(CTORI32A0, I:Int) .
   mb CTORCONSTA2(CTORI32A0, I:Int) : Val .
 
-  op fib-loop-body : -> WasmTerminals .
+  op fib-loop-body : -> SpectecTerminals .
   eq fib-loop-body =
     CTORLOCALGETA1(0) CTORCONSTA2(CTORI32A0, 0)
     CTORRELOPA2(CTORI32A0, CTORLEA1(CTORSA0)) CTORBRIFA1(1)
@@ -52,7 +52,7 @@ mod WASM-FIB-BS is
     CTORBINOPA2(CTORI32A0, CTORSUBA0) CTORLOCALSETA1(0)
     CTORBRA1(0) .
 
-  op fib-body : -> WasmTerminals .
+  op fib-body : -> SpectecTerminals .
   eq fib-body =
     CTORBLOCKA2(CTORWRESULTA1(eps), CTORLOOPA2(CTORWRESULTA1(eps), fib-loop-body))
     CTORLOCALGETA1(1) .
@@ -64,12 +64,12 @@ mod WASM-FIB-BS is
         CTORFUNCARROWA2(CTORI32A0 CTORI32A0 CTORI32A0, CTORI32A0))),
       0) .
 
-  op fib-rectype : -> WasmTerminal .
+  op fib-rectype : -> SpectecTerminal .
   eq fib-rectype =
     CTORRECA1(CTORSUBA3(eps, eps,
       CTORFUNCARROWA2(CTORI32A0 CTORI32A0 CTORI32A0, CTORI32A0))) .
 
-  op fib-source-type : -> WasmTerminal .
+  op fib-source-type : -> SpectecTerminal .
   eq fib-source-type = CTORTYPEA1(fib-rectype) .
 
   op fib-moduleinst : -> Moduleinst [ctor] .
@@ -83,7 +83,7 @@ mod WASM-FIB-BS is
   eq value('ELEMS,   fib-moduleinst) = eps .
   eq value('EXPORTS, fib-moduleinst) = eps .
 
-  op fib-func : -> WasmTerminal .
+  op fib-func : -> SpectecTerminal .
   eq fib-func = CTORFUNCA3(0, CTORLOCALA1(CTORI32A0), fib-body) .
 
   op fib-funcinst : -> Funcinst [ctor] .
@@ -139,7 +139,7 @@ mod WASM-FIB-BS is
   eq value('ARRAYS,  empty-store) = eps .
   eq value('EXNS,    empty-store) = eps .
 
-  op fib-module : -> WasmTerminal .
+  op fib-module : -> SpectecTerminal .
   eq fib-module =
     CTORMODULEA11(
       fib-source-type, --- types

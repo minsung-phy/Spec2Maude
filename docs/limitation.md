@@ -76,10 +76,10 @@ source-valid probe로 다시 확인해야 한다.
   allocation/eval/init helper에서 output witness를 Maude rewriting이 만들어야
   하는 경우다. 단순히 `:=`를 `==`로 바꾸면 오히려 더 위험해져서 유지했다.
 - `duplicate-import-advisory`: 0개. `dsl/pretype.maude`의 list update
-  operator `_[_<-_]`가 예전에는 `Nat` index 버전과 `WasmTerminal` index
-  버전으로 둘 다 있어서, `Nat < WasmTerminal`과 만나 중복 import처럼 보였다.
-  이제 `Nat < WasmTerminal`은 `DSL-PRETYPE`이 제공하고, list update operator는
-  `WasmTerminal` index 버전 하나만 둔다. Nat-index update는 subsort 때문에
+  operator `_[_<-_]`가 예전에는 `Nat` index 버전과 `SpectecTerminal` index
+  버전으로 둘 다 있어서, `Nat < SpectecTerminal`과 만나 중복 import처럼 보였다.
+  이제 `Nat < SpectecTerminal`은 `DSL-PRETYPE`이 제공하고, list update operator는
+  `SpectecTerminal` index 버전 하나만 둔다. Nat-index update는 subsort 때문에
   그대로 동작한다.
 - command-time membership warning: 실제 `red/search` 명령을 실행하면 Maude
   builtin/pretype associative operator에 대해
@@ -308,7 +308,7 @@ SpecTec source에는 `(premise)*` 같은 meta-notation이 있다. Maude에서는
 
 - record category는 source-derived typed record sort로 바꿔서 제거했다.
 - simple zero-arity category도 least sort/subsort 쪽으로 많이 줄였다.
-- 하지만 `instr`, `expr`, `valtype`, `heaptype`, `reftype`, `typeuse`, `blocktype` 같은 composite/sequence category는 아직 broad `WasmTerminal` / `WasmTerminals` substrate와 섞여 있다.
+- 하지만 `instr`, `expr`, `valtype`, `heaptype`, `reftype`, `typeuse`, `blocktype` 같은 composite/sequence category는 아직 broad `SpectecTerminal` / `SpectecTerminals` substrate와 섞여 있다.
 - 이들을 무작정 Maude sort로 좁히면 sequence AC matching, membership, validation execution overlay가 충돌해서 divergence가 생긴다.
 
 현재 대표적인 좋은 형태:
@@ -527,7 +527,7 @@ artifacts/output-bs-total-audit-20260521_012550/
 - `alloctypes-r1`: source-valid `rew $alloctypes(fib-source-type)`는 Maude
   result를 낸다. 기존 `MAUDE_EXIT_2`는 자동 audit의 RHS-search sample 문제였다.
 - `evalexprss-r1`: 아직 limitation이다. source type `expr**`가 flat
-  `WasmTerminals`로 낮아져 recursive split에서 empty/non-progress split을
+  `SpectecTerminals`로 낮아져 recursive split에서 empty/non-progress split을
   선택할 수 있다. 추가로 바로 아래 source def `$evalexprs`의 premise
   `Eval_expr: z; expr ~>* z'; ref`는 Maude rewriting이 `z'`와 `ref`를
   역으로 합성하지 못한다. Exact output을 주면 `Eval-expr`는 `valid`로
@@ -662,7 +662,8 @@ python3 scripts/audit_output_bs_total_concrete.py --timeout 2
 1. 이 파일과 `STATUS.md` 기준으로 현재 C1 상태를 커밋한다.
 2. warning cleanup을 진행한다.
 3. header/footer cleanup을 계속한다.
-4. `dsl/pretype` hardcoding을 어떻게 source-derived generator로 옮길지 설계한다.
+4. generated prelude를 더 세분화해서, 실제 source가 쓰는 sequence/record/meta
+   feature에 따라 필요한 조각만 emit하도록 만든다.
 5. 남은 `$is-spectec-*` guard를 composite category typed-sort 설계로 더 줄인다.
 6. `Instrs-ok/sub` execution overlay recursion을 C1-compatible하게 고칠 수 있는지 따로 판다.
 7. 20개 label-related `step-from-step-pure-*`를 다시 제거할 수 있는 source-preserving `Step/ctxt-instrs` 실행 방식을 찾는다.
@@ -683,6 +684,38 @@ python3 scripts/audit_output_bs_total_concrete.py --timeout 2
   - `Env`, `Stage`, `InstrsContext`
   - `LabelContext(s)`, `FrameContext(s)`
   - `stage:`, `context:`, `emptylabel`, `emptyframe`, `_@_`, `_#_`
+- `translator_bs.ml` header의 source-absent fixed `SpectecType` constants:
+  - `w-N`, `w-M`, `w-K`, `w-n`, `w-m`, `w-X`, `w-C`, `w-I`,
+    `w-S`, `w-T`, `w-V`, `w-b`, `w-z`, `w-L`, `w-E`
+  - 이들은 output에 선언만 되고 실제 사용처가 없었다.
+- `translator_bs.ml` header의 unused record helper declaration:
+  - `_ =++ _`
+  - 실제 record update는 generated `DSL-RECORD`의 source-representation
+    operator `_[._=++_]`를 사용한다.
+
+source-derived로 바꾼 것:
+
+- active C1 `output_bs.maude`는 더 이상 `load dsl/pretype`으로 hand-written
+  pretype 파일을 읽지 않는다.
+- `translator_bs.ml`이 generic `DSL-TERM`, `DSL-PRETYPE`, `DSL-RECORD` 모듈을
+  generated output 앞부분에 직접 emit한다.
+- 따라서 `dsl/pretype.maude`는 현재 active C1 dependency가 아니라
+  legacy/reference copy에 가깝다.
+- prelude 생성은 이제 source feature를 본다.
+  - `StructT`/record syntax가 있으면 `DSL-RECORD`를 emit하고 `SPECTEC-CORE`가
+    그것을 include한다.
+  - record syntax가 없는 spec에서는 이 record prelude 조각을 생략할 수 있는
+    구조가 됐다.
+  - `SpectecTerminals` sequence carrier는 현재 translator의 기본 term-list
+    representation이라 아직 항상 emit된다. 이것까지 완전히 feature-gated로
+    줄이는 일은 다음 단계다.
+- 예전 header에는 `Nat < Labelidx`, `Nat < Localidx`, `Nat < Addr` 같은
+  Wasm index/address subsort 목록이 직접 박혀 있었다.
+- 이제 이 목록은 source syntax alias graph에서 생성한다.
+  예를 들어 `idx = u32`, `u32 = uN(32)`, `labelidx = idx`,
+  `addr = nat` 같은 SpecTec 선언을 보고 필요한 `subsort Nat < ...`를 낸다.
+- 따라서 P4/generalization 관점에서 “Wasm 이름을 header에 직접 나열한
+  하드코딩” 하나를 줄였다.
 
 제거 이유:
 
@@ -695,14 +728,17 @@ python3 scripts/audit_output_bs_total_concrete.py --timeout 2
 
 아직 남은 필수/보류 prelude substrate:
 
-- `WasmTerminal`, `WasmTerminals`, `WasmType`, `WasmTypes`
+- `SpectecTerminal`, `SpectecTerminals`, `SpectecType`, `SpectecTypes`
 - `eps`, sequence concatenation, `len`, `index`
 - record `item`, `value`, update operators
 - generated header의 `Judgement`, `valid`, `StepConf` wrappers
 - generated source-meta helpers such as `index(xs, i*)`, `slice`, `$repeat`,
   `$star-prefix`, `$star-unprefix`
+- `w-bool`: SpecTec Bool 계산 결과를 terminal로 다시 넣기 위한 현재 Maude
+  representation wrapper다. 실제 generated numeric/Bool defs에서 사용 중이라
+  이번 cleanup에서는 제거하지 않았다.
 
 이들은 지금 C1 실행과 source meta-expression lowering에 필요하다. 다만 P4나
-다른 SpecTec으로 확장하려면 이름을 `SpectecTerminal`/`SpectecType`처럼
-generic하게 parameterize하거나, pretype 자체를 translator가 생성하도록
-재설계해야 한다.
+다른 SpecTec으로 확장하려면 다음 단계에서 generated prelude를 feature-gated로
+더 쪼개야 한다. 예를 들어 source가 record를 쓰지 않으면 `DSL-RECORD`를 emit하지
+않고, source가 sequence를 쓰지 않으면 sequence helper를 최소화하는 식이다.

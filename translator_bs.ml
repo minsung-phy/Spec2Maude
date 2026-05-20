@@ -519,7 +519,7 @@ let unmap_call_helper_name map_helper_name =
 
 let sort_of_type_name raw =
   let s = sanitize raw in
-  if String.length s >= 2 && String.sub s 0 2 = "w-" then "WasmTerminal"
+  if String.length s >= 2 && String.sub s 0 2 = "w-" then "SpectecTerminal"
   else
     let hyphen_to_under = String.map (fun c -> if c = '-' then '_' else c) s in
     (* Maude sort names must start with uppercase *)
@@ -574,6 +574,7 @@ let zero_arity_source_sorts : SSet.t ref = ref SSet.empty
 let sequence_alias_sorts : SSet.t ref = ref SSet.empty
 let simple_alias_source_sorts : SSet.t ref = ref SSet.empty
 let source_membership_sorts : SSet.t ref = ref SSet.empty
+let nat_subsort_sorts : SSet.t ref = ref SSet.empty
 
 type source_record_info = {
   rec_source_name : string;
@@ -605,6 +606,7 @@ let build_type_env defs =
   sequence_alias_sorts := SSet.empty;
   simple_alias_source_sorts := SSet.empty;
   source_membership_sorts := SSet.empty;
+  nat_subsort_sorts := SSet.empty;
   source_record_infos := [];
   let rec scan d = match d.it with
     | RecD ds -> List.iter scan ds
@@ -654,6 +656,36 @@ let build_type_env defs =
     List.iter collect defs;
     !acc
   in
+  let rec typ_is_nat_carrier known t =
+    match t.it with
+    | VarT (id, _) ->
+        let raw = String.lowercase_ascii id.it in
+        raw = "nat"
+        || raw = "un"
+        || SSet.mem (sort_of_type_name id.it) known
+    | IterT (inner, Opt) -> typ_is_nat_carrier known inner
+    | NumT `NatT -> true
+    | _ -> false
+  in
+  let inst_is_nat_alias known inst =
+    match inst.it with
+    | InstD (binders, args, deftyp) ->
+        binders = [] && args = [] &&
+        (match deftyp.it with
+         | AliasT typ -> typ_is_nat_carrier known typ
+         | _ -> false)
+  in
+  let rec fix_nat known =
+    let next =
+      List.fold_left (fun acc (sort, _raw, params, insts) ->
+        if params = [] && insts <> [] && List.for_all (inst_is_nat_alias known) insts
+        then SSet.add sort acc
+        else acc)
+        known typ_defs
+    in
+    if SSet.equal known next then known else fix_nat next
+  in
+  nat_subsort_sorts := SSet.remove "Nat" (fix_nat SSet.empty);
   source_membership_sorts :=
     typ_defs
     |> List.fold_left (fun acc (sort, _raw, params, _insts) ->
@@ -720,7 +752,7 @@ let build_type_env defs =
   zero_arity_source_sorts := fix SSet.empty;
 
   let builtin_narrow_sort s =
-    List.mem s [ "Bool"; "Nat"; "Int"; "WasmTerminal"; "WasmTerminals" ]
+    List.mem s [ "Bool"; "Nat"; "Int"; "SpectecTerminal"; "SpectecTerminals" ]
   in
   let typ_is_simple_alias known t =
     match t.it with
@@ -858,14 +890,14 @@ let normalize_decl_sort name sort =
             "WS"; "WSQ"; "WQS"; "XS"; "XSQ"; "XQS" ]
         || (len > 2 && (ends_with frag "S" || ends_with frag "SQ" || ends_with frag "QS")))
   in
-  if sort = "WasmTerminal"
+  if sort = "SpectecTerminal"
      && ((String.contains name '-'
           && (try
                 ignore (Str.search_forward (Str.regexp_string "-LIST-") name 0);
                 true
               with Not_found -> false))
          || looks_like_sequence_var name)
-  then "WasmTerminals"
+  then "SpectecTerminals"
   else sort
 
 let init_declared_vars () =
@@ -875,9 +907,9 @@ let init_declared_vars () =
     [ ("I", "Int"); ("W-I", "Int"); ("EXP", "Int");
       ("W-N", "Nat"); ("W-M", "Nat");
       ("ZS", "State");
-      ("T", "WasmTerminal"); ("W", "WasmTerminal");
-      ("WW", "WasmTerminal");
-      ("TS", "WasmTerminals"); ("W*", "WasmTerminals") ]
+      ("T", "SpectecTerminal"); ("W", "SpectecTerminal");
+      ("WW", "SpectecTerminal");
+      ("TS", "SpectecTerminals"); ("W*", "SpectecTerminals") ]
 
 let declare_var name sort =
   let sort = normalize_decl_sort name sort in
@@ -1046,7 +1078,7 @@ let build_token_ops ss =
       | lst ->
           let hd = List.filteri (fun i _ -> i < 20) lst in
           let tl = List.filteri (fun i _ -> i >= 20) lst in
-          chunks (("  ops " ^ String.concat " " hd ^ " : -> WasmTerminal [ctor] .\n") :: acc) tl
+          chunks (("  ops " ^ String.concat " " hd ^ " : -> SpectecTerminal [ctor] .\n") :: acc) tl
     in
     String.concat "" (chunks [] toks) ^ "\n"
 
@@ -1055,8 +1087,8 @@ let build_call_ops ss =
     |> List.filter (fun (name, arity) ->
          not (SSet.mem name ss.dec_funcs) && arity >= 0)
     |> List.map (fun (name, arity) ->
-         let args = String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
-         let ret = if SSet.mem name ss.bool_calls then "Bool" else "WasmTerminal" in
+         let args = String.concat " " (List.init arity (fun _ -> "SpectecTerminal")) in
+         let ret = if SSet.mem name ss.bool_calls then "Bool" else "SpectecTerminal" in
          Printf.sprintf "  op %s : %s -> %s .\n" name args ret)
   in
   if lines = [] then ""
@@ -1658,7 +1690,7 @@ and translate_typ (t : typ) vm : string = match t.it with
   | IterT (inner, (List | List1 | ListN _)) ->
       Printf.sprintf "list ( %s )" (translate_typ inner vm)
   | IterT (inner, Opt) -> translate_typ inner vm
-  | _ -> "WasmType"
+  | _ -> "SpectecType"
 
 and translate_typ_texpr (t : typ) vm : texpr =
   match t.it with
@@ -1680,14 +1712,14 @@ and translate_typ_texpr (t : typ) vm : texpr =
       let it = translate_typ_texpr inner vm in
       { it with text = Printf.sprintf "list ( %s )" it.text }
   | IterT (inner, Opt) -> translate_typ_texpr inner vm
-  | _ -> texpr "WasmType"
+  | _ -> texpr "SpectecType"
 
 let type_guard term typ vm =
   match simple_sort_of_typ typ vm with
   | Some s -> Printf.sprintf "%s : %s" term s
   | None ->
       let ty = translate_typ typ vm in
-      if ty = "WasmType" then "true"
+      if ty = "SpectecType" then "true"
       else
         let has_var_ref =
           try
@@ -1711,9 +1743,7 @@ let is_bool_typ t vm =
 (* 8. Definition handlers                                                    *)
 (* ========================================================================= *)
 
-let base_types = SSet.of_list
-  ["w-N"; "w-M"; "w-K"; "w-n"; "w-m"; "w-X"; "w-C"; "w-I";
-   "w-S"; "w-T"; "w-V"; "w-b"; "w-z"; "w-L"; "w-E"]
+let base_types = SSet.empty
 
 (** Extract variable name from an [ExpB] binder. *)
 let binder_var_map binders =
@@ -1735,14 +1765,14 @@ let type_sort_of_typ (t : typ) vm : string option =
 let declared_sort_of_typ t =
   if is_bool_typ t [] then "Bool"
   else match type_sort_of_typ t [] with
-    | Some s when s <> "WasmTerminal" -> s
-    | _ -> "WasmTerminal"
+    | Some s when s <> "SpectecTerminal" -> s
+    | _ -> "SpectecTerminal"
 
 let seq_decl_sort_of_inner_typ (inner : typ) =
   match simple_sort_of_typ inner [] with
-  | Some "Val" -> "WasmTerminals"
-  | Some "Instr" -> "WasmTerminals"
-  | _ -> "WasmTerminals"
+  | Some "Val" -> "SpectecTerminals"
+  | Some "Instr" -> "SpectecTerminals"
+  | _ -> "SpectecTerminals"
 
 let decl_sort_of_typ (t : typ) =
   match t.it with
@@ -1757,13 +1787,13 @@ let structural_decd_sorts =
 
 let decd_sort_of_typ (t : typ) =
   match t.it with
-  | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
+  | IterT (_, (List | List1 | ListN _)) -> "SpectecTerminals"
   | _ ->
       if is_bool_typ t [] then "Bool"
       else
         match type_sort_of_typ t [] with
         | Some s when List.mem s structural_decd_sorts -> s
-        | _ -> "WasmTerminal"
+        | _ -> "SpectecTerminal"
 
 let decd_binder_var_sorts binders vm =
   List.filter_map (fun b -> match b.it with
@@ -1799,7 +1829,7 @@ let translate_typd id params insts =
   let name = sanitize id.it in
   let is_parametric = params <> [] in
   let type_sort = sort_of_type_name id.it in
-  let sig_types = String.concat " " (List.map (fun _ -> "WasmTerminal") params) in
+  let sig_types = String.concat " " (List.map (fun _ -> "SpectecTerminal") params) in
   let mk_type_term_texpr args v_map =
     let arg_ts = List.map (fun a -> translate_arg a v_map) args in
     let args_str = String.concat " , " (List.map (fun a -> a.text) arg_ts) in
@@ -1807,8 +1837,8 @@ let translate_typd id params insts =
       vars = List.concat_map (fun a -> a.vars) arg_ts }
   in
   (* Pure nat/integer meta-variable TYPES (N, M, K, n, m): Maude variables in
-     equations conflict with constants "op X : -> WasmType [ctor]".  We suppress
-     the CONSTANT declaration but keep "sort X . subsort X < WasmType ." so that
+     equations conflict with constants "op X : -> SpectecType [ctor]".  We suppress
+     the CONSTANT declaration but keep "sort X . subsort X < SpectecType ." so that
      membership axioms like "cmb T : N if ..." can still reference them as sorts. *)
   let pure_meta_var_names = SSet.of_list ["N"; "M"; "K"; "n"; "m"] in
   let is_pure_meta = SSet.mem id.it pure_meta_var_names in
@@ -1817,12 +1847,12 @@ let translate_typd id params insts =
   (* Sorts where instance axiom (cmb/mb) generation doesn't work — list-based or conflicting *)
   let skip_instance_sorts = SSet.of_list ["Char"; "Zero"; "NzNat"; "Nat"; "Int"; "Bool"; "Name"] in
   let sort_decl =
-    if is_parametric || SSet.mem name base_types || type_sort = "WasmTerminal"
+    if is_parametric || SSet.mem name base_types || type_sort = "SpectecTerminal"
        || SSet.mem type_sort maude_builtin_sorts then ""
-    else Printf.sprintf "  sort %s .\n  subsort %s < WasmType .\n" type_sort type_sort in
+    else Printf.sprintf "  sort %s .\n  subsort %s < SpectecType .\n" type_sort type_sort in
   let op_decl =
     if is_pure_meta || SSet.mem name base_types then ""
-    else Printf.sprintf "  op %s : %s -> WasmType [ctor] .\n" name sig_types in
+    else Printf.sprintf "  op %s : %s -> SpectecType [ctor] .\n" name sig_types in
   let uniq_vars_local vs = List.sort_uniq String.compare vs in
   let extract_vars_local s =
     let re = Str.regexp "[A-Z][A-Z0-9-]*" in
@@ -2071,8 +2101,8 @@ let translate_typd id params insts =
                      let new_vm = (tid.it, indexed) :: cur_vm in
                      let ms =
                        if is_list || is_plural_type tid.it then
-                         "WasmTerminals"
-                       else "WasmTerminal"
+                         "SpectecTerminals"
+                       else "SpectecTerminal"
                      in
                      let guard = "true" in
                      ([(indexed, guard, ms)], new_vm)
@@ -2091,18 +2121,18 @@ let translate_typd id params insts =
                        let vm' = (tid.it, indexed) :: vm in
                        let ms =
                              if is_list then
-                               "WasmTerminals"
+                               "SpectecTerminals"
                              else
                                match ft.it with
-                               | IterT (_, (List | List1 | ListN _)) -> "WasmTerminals"
+                               | IterT (_, (List | List1 | ListN _)) -> "SpectecTerminals"
                                | IterT (_, Opt) ->
                                    (match simple_sort_of_typ ft vm' with
-                                    | Some s when s <> "WasmTerminal" -> s
-                                    | _ -> "WasmTerminal")
+                                    | Some s when s <> "SpectecTerminal" -> s
+                                    | _ -> "SpectecTerminal")
                                | _ ->
                                    (match simple_sort_of_typ ft vm' with
-                                    | Some s when s <> "WasmTerminal" -> s
-                                    | _ -> "WasmTerminal")
+                                    | Some s when s <> "SpectecTerminal" -> s
+                                    | _ -> "SpectecTerminal")
                         in
                         (acc @ [(indexed, "true", ms)], vm')
                        | _ ->
@@ -2124,11 +2154,11 @@ let translate_typd id params insts =
                          in
                          let ms =
                            match t.it with
-                           | IterT (_, (List | List1)) -> "WasmTerminals"
+                           | IterT (_, (List | List1)) -> "SpectecTerminals"
                            | _ ->
                                (match simple_sort_of_typ t param_vm with
-                                | Some s when s <> "WasmTerminal" -> s
-                                | _ -> "WasmTerminal")
+                                | Some s when s <> "SpectecTerminal" -> s
+                                | _ -> "SpectecTerminal")
                          in
                          Some (mv, "true", ms)
                      | _ -> None
@@ -2139,10 +2169,10 @@ let translate_typd id params insts =
                  String.concat "" (List.map (fun (v, _, ms) -> declare_var v ms) params)
                in
                let binder_decl () = String.concat "" (List.map (fun b -> match b.it with
-                 | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
+                 | ExpB (tid, _) -> declare_var (to_var_name tid.it) "SpectecTerminal"
                  | _ -> "") binders) in
                let type_term_decl () =
-                 declare_vars_same_sort (vars_of_texpr_local type_term_t) "WasmTerminal"
+                 declare_vars_same_sort (vars_of_texpr_local type_term_t) "SpectecTerminal"
                in
                let decl_prefix () = type_term_decl () ^ binder_decl () ^ v_decl () in
                let prem_items = List.filter_map (prem_item_of_prem_typd param_vm) prems in
@@ -2272,7 +2302,7 @@ let translate_typd id params insts =
                        match canonical_name with
                        | Some _ -> ""
                        | None ->
-                           Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] .\n" op_sig arg_sorts
+                           Printf.sprintf "  op %s : %s -> SpectecTerminal [ctor] .\n" op_sig arg_sorts
                      in
                      if is_parametric then
                        Printf.sprintf "%s%s  %s ( %s hasType ( %s ) ) : WellTyped%s ."
@@ -2312,7 +2342,7 @@ let translate_typd id params insts =
              ) cases |> String.concat "\n"
          | AliasT typ ->
              let bd () = String.concat "" (List.map (fun b -> match b.it with
-               | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
+               | ExpB (tid, _) -> declare_var (to_var_name tid.it) "SpectecTerminal"
                | _ -> "") binders) in
              let var = match typ.it with IterT (_, (List | List1)) -> "TS" | _ -> "T" in
              let lhs = if SSet.mem name base_types then "T" else var in
@@ -2347,7 +2377,7 @@ let translate_typd id params insts =
                       (if cond = "" then "" else "\n   if " ^ cond))
          | StructT fields ->
              let bd = String.concat "" (List.map (fun b -> match b.it with
-               | ExpB (tid, _) -> declare_var (to_var_name tid.it) "WasmTerminal"
+               | ExpB (tid, _) -> declare_var (to_var_name tid.it) "SpectecTerminal"
                | _ -> "") binders) in
              let () =
                if debug_iter_enabled &&
@@ -2366,7 +2396,7 @@ let translate_typd id params insts =
                  | IterT (inner, (List | List1 | ListN _)) ->
                      seq_decl_sort_of_inner_typ inner
                  | _ ->
-                     if is_plural_type sn then "WasmTerminals" else "WasmTerminal" in
+                     if is_plural_type sn then "SpectecTerminals" else "SpectecTerminal" in
                (fn, Printf.sprintf "F-%s-%d" fn i, ft, ms)
              ) fields in
              let decls = String.concat "" (List.map (fun (_, vn, _, ms) -> declare_var vn ms) info) in
@@ -2433,7 +2463,7 @@ let translate_typd id params insts =
 	                     in
 	                     let arg_sorts =
 	                       String.concat " "
-	                         (List.map (fun _ -> "WasmTerminals") field_names)
+	                         (List.map (fun _ -> "SpectecTerminals") field_names)
                      in
                      let record_call vars = format_call ri.rec_ctor vars in
                      let vars = List.map (fun (_, vn, _, _) -> vn) info in
@@ -2486,7 +2516,7 @@ let translate_typd id params insts =
                            in
                            Printf.sprintf
                              "%s  eq %s [. '%s <- %s] = %s ."
-                             (declare_var uv "WasmTerminals")
+                             (declare_var uv "SpectecTerminals")
                              (record_call vars) f uv (record_call updated))
                        |> String.concat "\n"
                      in
@@ -2497,7 +2527,7 @@ let translate_typd id params insts =
                        in
                        let rhs_decls =
                          rhs_vars
-                         |> List.map (fun v -> declare_var v "WasmTerminals")
+                         |> List.map (fun v -> declare_var v "SpectecTerminals")
                          |> String.concat ""
                        in
                        let merged =
@@ -2527,7 +2557,7 @@ let translate_typd id params insts =
 let extract_vars_from_maude s =
   let re = Str.regexp "[A-Z][A-Z0-9-]*" in
   let excluded = SSet.of_list
-    ["WasmTerminal"; "WasmTerminals"; "WasmType"; "WasmTypes"; "Bool"; "Nat"; "Int";
+    ["SpectecTerminal"; "SpectecTerminals"; "SpectecType"; "SpectecTypes"; "Bool"; "Nat"; "Int";
      "EMPTY"; "REC"; "FUNC"; "SUB"; "STRUCT"; "ARRAY"; "FIELD";
      (* Maude DSL-RECORD atom labels — these appear in value('FOO, ...) and must not
         be treated as free variables when deciding := vs == in condition scheduling *)
@@ -2636,7 +2666,7 @@ let binder_to_type_conds binders vm =
   List.filter_map (fun b -> match b.it with
     | ExpB (v_id, t) ->
         let ts = translate_typ t [] in
-        if ts = "WasmType" || is_bool_typ t [] || String.lowercase_ascii v_id.it = "bool"
+        if ts = "SpectecType" || is_bool_typ t [] || String.lowercase_ascii v_id.it = "bool"
         then None
         else (match List.assoc_opt v_id.it vm with
           | Some mv -> Some (mv, type_guard mv t vm)
@@ -2676,7 +2706,7 @@ let refined_exec_pred sort =
 
 let has_representation_narrow_sort sort =
   List.mem sort
-    [ "WasmTerminal"; "WasmTerminals";
+    [ "SpectecTerminal"; "SpectecTerminals";
       "Bool"; "Nat"; "Int";
       "Config"; "State"; "Store"; "Frame"; "Judgement" ]
   || SSet.mem sort !zero_arity_source_sorts
@@ -2724,7 +2754,7 @@ let widen_refined_lhs_typed_vars typed_vars lhs_vars =
   let typed_vars_for_decl =
     typed_vars
     |> List.map (fun (v, s) ->
-      if SSet.mem v refined_names then (v, "WasmTerminal") else (v, s))
+      if SSet.mem v refined_names then (v, "SpectecTerminal") else (v, s))
     |> List.sort_uniq compare
   in
   let guards =
@@ -2762,7 +2792,7 @@ let widen_reld_lhs_typed_vars typed_vars lhs_vars =
     typed_vars
     |> List.map (fun (v, s) ->
          if not (preserve_narrow_lhs_sort s)
-         then (v, "WasmTerminal")
+         then (v, "SpectecTerminal")
          else (v, s))
     |> List.sort_uniq compare
   in
@@ -2791,7 +2821,7 @@ let exec_pred_sorts () =
 let exec_pred_decls sorts =
   sorts
   |> List.map (fun sort ->
-      Printf.sprintf "  op %s : WasmTerminal -> Bool ." (refined_exec_pred sort))
+      Printf.sprintf "  op %s : SpectecTerminal -> Bool ." (refined_exec_pred sort))
 
 let parse_membership_statement stmt =
   let s = String.trim stmt in
@@ -2913,7 +2943,7 @@ let refined_exec_pred_eqs pred_sorts eqs decls =
     |> List.map (fun sort ->
         let v = refined_exec_pred_pattern_var sort "TERM" in
         fresh_var_decls :=
-          Printf.sprintf "  var %s : WasmTerminal ." v :: !fresh_var_decls;
+          Printf.sprintf "  var %s : SpectecTerminal ." v :: !fresh_var_decls;
         Printf.sprintf "  ceq %s ( %s ) = true\n      if %s : %s ."
           (refined_exec_pred sort) v v sort)
   in
@@ -2924,7 +2954,7 @@ let refined_exec_pred_eqs pred_sorts eqs decls =
       | Some sort ->
           let fresh = refined_exec_pred_pattern_var pred_sort v in
           let fresh_sort =
-            if has_representation_narrow_sort sort then sort else "WasmTerminal"
+            if has_representation_narrow_sort sort then sort else "SpectecTerminal"
           in
           fresh_var_decls := Printf.sprintf "  var %s : %s ." fresh fresh_sort :: !fresh_var_decls;
           let guards =
@@ -3827,7 +3857,7 @@ let iter_empty_var_groups vm typed_vars prem_list =
   let sort_of_var v = List.assoc_opt v typed_vars in
   let sequence_vars_of_texpr t =
     vars_of_texpr t
-    |> List.filter (fun v -> sort_of_var v = Some "WasmTerminals")
+    |> List.filter (fun v -> sort_of_var v = Some "SpectecTerminals")
   in
   let rec collect_prem p =
     match p.it with
@@ -3840,7 +3870,7 @@ let iter_empty_var_groups vm typed_vars prem_list =
         let inner_vars =
           prem_items_of_prem vm inner
           |> List.concat_map vars_of_prem_item
-          |> List.filter (fun v -> sort_of_var v = Some "WasmTerminals")
+          |> List.filter (fun v -> sort_of_var v = Some "SpectecTerminals")
         in
         let vars =
           List.sort_uniq String.compare (xes_vars @ inner_vars)
@@ -3991,7 +4021,7 @@ let translate_decd ss id params result_typ insts =
   let param_sort (p : param) =
     match p.it with
     | ExpP (_, t) -> decd_sort_of_typ t
-    | _ -> "WasmTerminal"
+    | _ -> "SpectecTerminal"
   in
   let arg_sort_list = List.map param_sort params in
   let arg_sorts = String.concat " " arg_sort_list in
@@ -4100,8 +4130,8 @@ let translate_decd ss id params result_typ insts =
     |> List.filter (fun v -> not (List.mem_assoc v !all_typed))
     |> List.sort_uniq String.compare
   in
-  let bound_decl = declare_vars_same_sort bound_untyped "WasmTerminal" in
-  let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
+  let bound_decl = declare_vars_same_sort bound_untyped "SpectecTerminal" in
+  let free_decl = declare_ops_const_list truly_free "SpectecTerminal" in
   "\n" ^ op_decl ^ typed_decl ^ bound_decl ^ free_decl
   ^ String.concat "\n" eq_lines ^ "\n"
 
@@ -4776,10 +4806,10 @@ let translate_step_reld rel_name rules =
   let bound_vars_wt = List.filter (fun v -> not (List.mem v typed_names)) bound_vars_wt in
   let is_vars = List.sort_uniq String.compare !all_is_vars in
   let typed_decl = declare_vars_by_sort typed_vars in
-  let bound_decl = declare_vars_same_sort bound_vars_wt "WasmTerminal" in
-  let val_terms_decl = declare_vars_same_sort bound_vars_vals "WasmTerminals" in
-  let vals_decl = declare_vars_same_sort bound_vars_wts "WasmTerminals" in
-  let is_decl = declare_vars_same_sort is_vars "WasmTerminals" in
+  let bound_decl = declare_vars_same_sort bound_vars_wt "SpectecTerminal" in
+  let val_terms_decl = declare_vars_same_sort bound_vars_vals "SpectecTerminals" in
+  let vals_decl = declare_vars_same_sort bound_vars_wts "SpectecTerminals" in
+  let is_decl = declare_vars_same_sort is_vars "SpectecTerminals" in
   let ctxt_instrs_extra = "" in
   let rule_block =
     typed_decl ^ bound_decl ^ val_terms_decl ^ vals_decl ^ is_decl
@@ -4939,9 +4969,9 @@ let translate_steps_reld rel_name rules =
   let typed_names = List.map fst typed_vars |> List.sort_uniq String.compare in
   let bound_vars = List.filter (fun v -> not (List.mem v typed_names)) bound_vars in
   let typed_decl = declare_vars_by_sort typed_vars in
-  let bound_decl = declare_vars_same_sort bound_vars "WasmTerminal" in
-  let seq_decl = declare_vars_same_sort seq_vars "WasmTerminals" in
-  let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
+  let bound_decl = declare_vars_same_sort bound_vars "SpectecTerminal" in
+  let seq_decl = declare_vars_same_sort seq_vars "SpectecTerminals" in
+  let free_decl = declare_ops_const_list truly_free "SpectecTerminal" in
   typed_decl ^ bound_decl ^ seq_decl ^ free_decl ^ String.concat "\n" rule_lines ^ "\n"
 
 let lower_all_reld_as_rewrite = true
@@ -4959,7 +4989,7 @@ let translate_reld _id rel_name rules =
     lower_all_reld_as_rewrite
   in
   let op_decl = Printf.sprintf "\n  op %s : %s -> Judgement [ctor] .\n" rel_name
-    (String.concat " " (List.init arity (fun _ -> "WasmTerminals"))) in
+    (String.concat " " (List.init arity (fun _ -> "SpectecTerminals"))) in
   let rel_prefix = String.uppercase_ascii (sanitize rel_name) in
 
   let all_bound = ref [] and all_free = ref [] and all_typed_vars = ref [] in
@@ -5112,7 +5142,7 @@ let translate_reld _id rel_name rules =
         let tail_seq_vars =
           typed_vars
           |> List.filter_map (fun (v, sort) ->
-              if sort = "WasmTerminals" && List.mem v lhs_t.vars && is_tail_seq_var v
+              if sort = "SpectecTerminals" && List.mem v lhs_t.vars && is_tail_seq_var v
               then Some v else None)
           |> List.sort_uniq String.compare
         in
@@ -5142,8 +5172,8 @@ let translate_reld _id rel_name rules =
     |> List.sort_uniq String.compare
   in
   let typed_decl = declare_vars_by_sort typed_vars in
-  let bound_decl = declare_vars_same_sort bound_vars "WasmTerminal" in
-  let free_decl = declare_ops_const_list truly_free "WasmTerminal" in
+  let bound_decl = declare_vars_same_sort bound_vars "SpectecTerminal" in
+  let free_decl = declare_ops_const_list truly_free "SpectecTerminal" in
   op_decl ^ typed_decl ^ bound_decl ^ free_decl ^ String.concat "\n" rule_lines ^ "\n"
 
 (* --- Top-level definition dispatch --------------------------------------- *)
@@ -5163,42 +5193,130 @@ let rec translate_definition ss (d : def) = match d.it with
 (* 9. Top-level: prescan → header → translate → reorder → emit              *)
 (* ========================================================================= *)
 
-let header_prefix =
-  "load dsl/pretype \n\n" ^
+let nat_subsort_decls () =
+  let sorts = SSet.elements !nat_subsort_sorts in
+  if sorts = [] then ""
+  else
+    "  --- Source-derived Nat subsorts from SpecTec alias declarations.\n"
+    ^ (sorts
+       |> List.map (fun sort -> Printf.sprintf "  subsort Nat < %s .\n" sort)
+       |> String.concat "")
+    ^ "\n"
+
+type prelude_features = {
+  uses_sequences : bool;
+  uses_records : bool;
+}
+
+let prelude_features_of_source () = {
+  uses_sequences =
+    Hashtbl.length plural_types > 0
+    || not (SSet.is_empty !sequence_alias_sorts);
+  uses_records = !source_record_infos <> [];
+}
+
+let generated_term_prelude_module () =
+  "mod DSL-TERM is \n" ^
+  "  sort SpectecTerminal .\n" ^
+  "  sort SpectecType .\n" ^
+  "endm\n\n"
+
+let generated_sequence_prelude_module (_features : prelude_features) =
+  (* SpectecTerminals is currently the generic carrier for both singleton and
+     iterated SpecTec terms.  We keep this module even for sequence-light specs,
+     but it is emitted by the translator rather than loaded from a Wasm-specific
+     hand-written file. *)
+  "mod DSL-PRETYPE is\n" ^
+  "  inc DSL-TERM .\n" ^
+  "  inc NAT .\n" ^
+  "  inc INT .\n" ^
+  "  inc BOOL .\n" ^
+  "  sort SpectecTerminals .\n" ^
+  "  sort SpectecTypes .\n\n" ^
+  "  subsort Nat < SpectecTerminal .\n" ^
+  "  subsort SpectecTerminal < SpectecTerminals .\n" ^
+  "  subsort SpectecType < SpectecTypes . \n" ^
+  "  op eps : -> SpectecTerminals .\n" ^
+  "  op _ _ : SpectecTerminals SpectecTerminals -> SpectecTerminals [ctor assoc id: eps] .\n\n" ^
+  "  op len : SpectecTerminals -> Nat .\n" ^
+  "  var W : SpectecTerminal .\n" ^
+  "  var WTS : SpectecTerminals .\n\n" ^
+  "  eq len(eps) = 0 .\n" ^
+  "  eq len(W WTS) = 1 + len(WTS) .\n\n" ^
+  "  var T : SpectecTerminal .\n" ^
+  "  var TS : SpectecTerminals .\n\n" ^
+  "  var N' : Nat .\n" ^
+  "  op index : SpectecTerminals Nat -> SpectecTerminal .\n" ^
+  "  eq index(T TS, 0) = T .\n" ^
+  "  eq index(T TS, s(N')) = index(TS, N') .\n" ^
+  "endm\n\n"
+
+let generated_record_prelude_module () =
+  "mod DSL-RECORD is \n" ^
+  "  inc DSL-PRETYPE .\n" ^
+  "  inc QID .\n" ^
+  "  sort RecordItem .\n" ^
+  "  sort RecordItems .\n" ^
+  "  subsort RecordItem < RecordItems . \n\n" ^
+  "  op EMPTY : -> RecordItem .\n" ^
+  "  op _;_ : RecordItems RecordItems -> RecordItems [ctor assoc id: EMPTY].\n" ^
+  "  op {_} : RecordItems -> SpectecTerminal .\n\n" ^
+  "  op item : Qid SpectecTerminals -> RecordItem .\n\n" ^
+  "  op value : Qid SpectecTerminal -> SpectecTerminal .\n" ^
+  "  op value : Qid RecordItems -> SpectecTerminals .\n" ^
+  "  vars RI RI' : RecordItems . var R : RecordItem .\n" ^
+  "  vars F F' : Qid .\n" ^
+  "  var REC : SpectecTerminal .\n" ^
+  "  vars V V' : SpectecTerminals . \n\n" ^
+  "  op _++_ : RecordItems RecordItems -> SpectecTerminal .\n" ^
+  "  eq RI ++ RI' = {RI ; RI'} .\n\n" ^
+  "  op _[._<-_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal . \n" ^
+  "  op _[._<-_] : RecordItems Qid SpectecTerminals -> SpectecTerminal .\n" ^
+  "  eq {item(F, V) ; RI} [. F <- V'] = {item(F, V') ; RI} .\n" ^
+  "  ceq {item(F, V) ; RI} [. F' <- V'] = item(F, V) ++ RI[. F' <- V'] if F =/= F' .\n\n" ^
+  "  op _[._=++_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal .\n" ^
+  "  eq REC [. F =++ V'] = REC [. F <- (value(F, REC) V') ] .\n\n" ^
+  "  eq value(F,{RI}) = value(F, RI) .\n" ^
+  "  eq value(F, EMPTY) = eps . \n" ^
+  "  eq value(F, item(F, V) ; RI) = V .\n" ^
+  "  ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .\n\n" ^
+  "  op _[_<-_] : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals [prec 50] .\n\n" ^
+  "  var H : SpectecTerminal .\n" ^
+  "  vars L : SpectecTerminals .\n" ^
+  "  vars IDX : Nat .\n" ^
+  "  vars VALUE NEWVALUE : SpectecTerminal .\n\n" ^
+  "  eq eps [ IDX <- NEWVALUE ] = eps .\n" ^
+  "  eq (H L) [ 0 <- NEWVALUE ] = NEWVALUE L .\n" ^
+  "  eq (H L) [ s(IDX) <- NEWVALUE ] = H (L [ IDX <- NEWVALUE ]) .\n" ^
+  "endm\n\n"
+
+let generated_prelude_modules features =
+  generated_term_prelude_module ()
+  ^ generated_sequence_prelude_module features
+  ^ (if features.uses_records then generated_record_prelude_module () else "")
+
+let core_prelude_include features =
+  if features.uses_records then "  inc DSL-RECORD .\n"
+  else "  inc DSL-PRETYPE .\n"
+
+let header_prefix features =
+  generated_prelude_modules features ^
   "mod SPECTEC-CORE is\n" ^
-  "  inc DSL-RECORD .\n" ^
+  core_prelude_include features ^
   "  inc BOOL .\n" ^
   "  inc INT .\n\n" ^
   "  --- Base Sorts\n" ^
-  "  subsort Int < WasmTerminal .\n" ^
-  "  --- Nat < WasmTerminal is provided by DSL-PRETYPE.\n\n" ^
+  "  subsort Int < SpectecTerminal .\n" ^
+  "  --- Nat < SpectecTerminal is provided by DSL-PRETYPE.\n\n" ^
   "  --- Allow type atoms to appear as terminals (for mixed AST encodings)\n" ^
-  "  subsort WasmType < WasmTerminal .\n" ^
-  "  subsort WasmTypes < WasmTerminals .\n\n" ^
-  "  --- SpecTec terminal sequences use the single WasmTerminals sequence sort.\n\n" ^
-  "  --- Nat is a subtype of index-like and numeric-parameter sorts\n" ^
-  "  --- (spectec idx = u32 = nat; N/M/K are nat-valued type parameters)\n" ^
-  "  subsort Nat < N .\n" ^
-  "  subsort Nat < M .\n" ^
-  "  subsort Nat < K .\n" ^
-  "  subsort Nat < Labelidx .\n" ^
-  "  subsort Nat < Localidx .\n" ^
-  "  subsort Nat < Typeidx .\n" ^
-  "  subsort Nat < Funcidx .\n" ^
-  "  subsort Nat < Globalidx .\n" ^
-  "  subsort Nat < Tableidx .\n" ^
-  "  subsort Nat < Memidx .\n" ^
-  "  subsort Nat < Tagidx .\n" ^
-  "  subsort Nat < Elemidx .\n" ^
-  "  subsort Nat < Dataidx .\n" ^
-  "  subsort Nat < Fieldidx .\n" ^
-  "  subsort Nat < Addr .\n" ^
-  "  subsort Nat < Idx .\n\n" ^
+  "  subsort SpectecType < SpectecTerminal .\n" ^
+  "  subsort SpectecTypes < SpectecTerminals .\n\n" ^
+  "  --- SpecTec terminal sequences use the single SpectecTerminals sequence sort.\n\n" ^
+  (nat_subsort_decls ()) ^
   "  --- Syntax-category membership is represented by mb/cmb axioms, not by terminal subsorts.\n\n" ^
-  "  --- Bool wrapper (avoid subsort Bool < WasmTerminal conflicts)\n" ^
-  "  op w-bool : Bool -> WasmTerminal [ctor] .\n\n" ^
-  "  --- Basic Wasm Types\n" ^
-  "  ops w-N w-M w-K w-n w-m w-X w-C w-I w-S w-T w-V w-b w-z w-L w-E : -> WasmType [ctor] .\n\n" ^
+  "  --- Bool wrapper (avoid subsort Bool < SpectecTerminal conflicts)\n" ^
+  "  op w-bool : Bool -> SpectecTerminal [ctor] .\n\n" ^
+  "  --- Source type constructors are generated from SpecTec declarations.\n\n" ^
   "  --- Special Operators\n" ^
   "  --- Pair sort + well-typed witness for parametric type judgements.\n" ^
   "  --- Non-parametric types use direct `mb T : S .` memberships.\n" ^
@@ -5206,7 +5324,7 @@ let header_prefix =
   "  sort TypedTerm .\n" ^
   "  sort WellTyped .\n" ^
   "  subsort WellTyped < TypedTerm .\n" ^
-  "  op _hasType_ : WasmTerminal WasmType -> TypedTerm [ctor prec 95 gather (e e)] .\n" ^
+  "  op _hasType_ : SpectecTerminal SpectecType -> TypedTerm [ctor prec 95 gather (e e)] .\n" ^
   "  --- Judgement sort for RelD relations.\n" ^
   "  --- Strict C1: source relation rules lower to primary `rl/crl => valid`.\n" ^
   "  --- Definitional equations remain `eq/ceq` when they translate source defs.\n" ^
@@ -5214,17 +5332,16 @@ let header_prefix =
   "  sort ValidJudgement .\n" ^
   "  subsort ValidJudgement < Judgement .\n" ^
   "  op valid : -> ValidJudgement [ctor] .\n" ^
-  "  op index : WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
-  "  op $repeat : WasmTerminal Int -> WasmTerminals .\n" ^
-  "  op $star-prefix : WasmTerminal WasmTerminals -> WasmTerminals .\n" ^
-  "  op $star-unprefix : WasmTerminal WasmTerminals -> WasmTerminals .\n" ^
-  "  op slice : WasmTerminals WasmTerminal WasmTerminal -> WasmTerminals .\n" ^
-  "  op _<-_ : WasmTerminal WasmTerminals -> Bool .\n\n" ^
+  "  op index : SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
+  "  op $repeat : SpectecTerminal Int -> SpectecTerminals .\n" ^
+  "  op $star-prefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
+  "  op $star-unprefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
+  "  op slice : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals .\n" ^
+  "  op _<-_ : SpectecTerminal SpectecTerminals -> Bool .\n\n" ^
   "  --- Generic record/terminal combinators (parser support)\n" ^
-  "  op merge : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
-  "  op _=++_ : WasmTerminal WasmTerminal -> WasmTerminal [ctor] .\n" ^
-  "  op any : -> WasmTerminal [ctor] .\n\n" ^
-  "  --- Record literals/updates come from DSL-RECORD and have sort WasmTerminal.\n" ^
+  "  op merge : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .\n" ^
+  "  op any : -> SpectecTerminal [ctor] .\n\n" ^
+  "  --- Record literals/updates come from DSL-RECORD and have sort SpectecTerminal.\n" ^
   "  --- This keeps the baseline surface aligned with the SpecTec terminal model.\n\n" ^
   "  --- Config: execution configuration for relation-preserving semantics\n" ^
   "  --- The relation operators return wrapper sorts so rewrite conditions\n" ^
@@ -5232,12 +5349,12 @@ let header_prefix =
   "  sorts StepConf StepPureConf StepReadConf StepsConf .\n" ^
   "  subsort Config < StepConf .\n" ^
   "  subsort Config < StepsConf .\n" ^
-  "  subsort WasmTerminals < StepPureConf .\n" ^
-  "  subsort WasmTerminals < StepReadConf .\n" ^
+  "  subsort SpectecTerminals < StepPureConf .\n" ^
+  "  subsort SpectecTerminals < StepReadConf .\n" ^
   "  op _;_ : Store Frame -> State [ctor prec 55] .\n" ^
-  "  op _;_ : State WasmTerminals -> Config [ctor prec 60] .\n" ^
+  "  op _;_ : State SpectecTerminals -> Config [ctor prec 60] .\n" ^
   "  op step : Config -> StepConf [frozen (1)] .\n" ^
-  "  op step-pure : WasmTerminals -> StepPureConf [frozen (1)] .\n" ^
+  "  op step-pure : SpectecTerminals -> StepPureConf [frozen (1)] .\n" ^
   "  op step-read : Config -> StepReadConf [frozen (1)] .\n" ^
   "  op steps : Config -> StepsConf .\n\n" ^
   "  --- Common variables (declared once)\n" ^
@@ -5247,34 +5364,34 @@ let header_prefix =
   "  op EXP : -> Int .\n" ^
   "  vars W-N W-M NLC NFC NHC : N .\n" ^
   "  var ZS : State .\n" ^
-  "  var ITS : WasmTerminals .\n" ^
-  "  var LIST-TY : WasmTerminal .\n" ^
-  "  var LIST-TS : WasmTerminals .\n" ^
-  "  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : WasmTerminals .\n" ^
-  "  vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : WasmTerminals .\n" ^
-  "  vars FRAME-LOCALS FRAME-LOCALS2 FRAME-MODULE FRAME-MODULE2 : WasmTerminals .\n" ^
-  "  vars WT-S WT-F : WasmTerminal .\n" ^
+  "  var ITS : SpectecTerminals .\n" ^
+  "  var LIST-TY : SpectecTerminal .\n" ^
+  "  var LIST-TS : SpectecTerminals .\n" ^
+  "  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : SpectecTerminals .\n" ^
+  "  vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : SpectecTerminals .\n" ^
+  "  vars FRAME-LOCALS FRAME-LOCALS2 FRAME-MODULE FRAME-MODULE2 : SpectecTerminals .\n" ^
+  "  vars WT-S WT-F : SpectecTerminal .\n" ^
   "  var WT-X : Localidx .\n" ^
   "  var WT-V : Val .\n" ^
-  "  var INVOKE-X-S : WasmTerminal .\n" ^
+  "  var INVOKE-X-S : SpectecTerminal .\n" ^
   "  var INVOKE-S-S : Store .\n" ^
   "  var INVOKE-X-FUNCADDR : Funcaddr .\n" ^
-  "  var INVOKE-X-VAL : WasmTerminals .\n" ^
+  "  var INVOKE-X-VAL : SpectecTerminals .\n" ^
   "  var INVOKE-X-DT : Deftype .\n" ^
-  "  vars INVOKE-X-T1 INVOKE-X-T2 : WasmTerminals .\n" ^
-  "  var SUBST-L-W : WasmTerminal .\n" ^
-  "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : WasmTerminals .\n" ^
+  "  vars INVOKE-X-T1 INVOKE-X-T2 : SpectecTerminals .\n" ^
+  "  var SUBST-L-W : SpectecTerminal .\n" ^
+  "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : SpectecTerminals .\n" ^
   "  var INDEX-I : Nat .\n" ^
-  "  vars INDEX-TS INDEX-IS : WasmTerminals .\n" ^
+  "  vars INDEX-TS INDEX-IS : SpectecTerminals .\n" ^
   "  var REPEAT_N : Int .\n" ^
-  "  var REPEAT_ELEM : WasmTerminal .\n" ^
+  "  var REPEAT_ELEM : SpectecTerminal .\n" ^
   "  vars SLICE_I SLICE_N : Int .\n" ^
-  "  var SLICE_ELEM : WasmTerminal .\n" ^
-  "  var SLICE_REST : WasmTerminals .\n" ^
-  "  vars STAR-PREFIX STAR-ELEM : WasmTerminal .\n" ^
-  "  var STAR-REST : WasmTerminals .\n" ^
-  "  vars T W WW FQ : WasmTerminal .\n" ^
-  "  vars TS W* ISQ INSTRSQ CQ : WasmTerminals .\n\n" ^
+  "  var SLICE_ELEM : SpectecTerminal .\n" ^
+  "  var SLICE_REST : SpectecTerminals .\n" ^
+  "  vars STAR-PREFIX STAR-ELEM : SpectecTerminal .\n" ^
+  "  var STAR-REST : SpectecTerminals .\n" ^
+  "  vars T W WW FQ : SpectecTerminal .\n" ^
+  "  vars TS W* ISQ INSTRSQ CQ : SpectecTerminals .\n\n" ^
   "  --- Generic SpecTec sequence indexing: xs[i*] maps scalar index over i*.\n" ^
   "  --- This is representation substrate for source meta-expressions, not a\n" ^
   "  --- judgement-specific executable shortcut.\n" ^
@@ -5339,14 +5456,14 @@ let footer =
   "\nendm\n"
 
 let step_predicate_helpers =
-  "  op $is-spectec-val-seq : WasmTerminals -> Bool .\n" ^
-  "  op $subst-typeuse : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
-  "  op $subst-valtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
-  "  op $subst-subtype : WasmTerminals WasmTerminals WasmTerminals -> WasmTerminals .\n" ^
-  "  op CTORFRAMEA2 : WasmTerminals WasmTerminals -> Frame [ctor] .\n" ^
-  "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] .\n" ^
-  "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] .\n" ^
-  "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] .\n"
+  "  op $is-spectec-val-seq : SpectecTerminals -> Bool .\n" ^
+  "  op $subst-typeuse : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
+  "  op $subst-valtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
+  "  op $subst-subtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
+  "  op CTORFRAMEA2 : SpectecTerminals SpectecTerminals -> Frame [ctor] .\n" ^
+  "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] .\n" ^
+  "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] .\n" ^
+  "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] .\n"
 
 let infer_rel_helper_block () =
   let current_helpers () =
@@ -5426,12 +5543,12 @@ let infer_rel_helper_block () =
       let op_args =
         if h.infer_arity <= 1 then ""
         else String.concat " "
-          (List.init (h.infer_arity - 1) (fun _ -> "WasmTerminals"))
+          (List.init (h.infer_arity - 1) (fun _ -> "SpectecTerminals"))
       in
       if op_args = "" then
-        Printf.sprintf "  op %s : -> WasmTerminal .\n" helper_name
+        Printf.sprintf "  op %s : -> SpectecTerminal .\n" helper_name
       else
-        Printf.sprintf "  op %s : %s -> WasmTerminal .\n"
+        Printf.sprintf "  op %s : %s -> SpectecTerminal .\n"
           helper_name op_args
     in
     let emit_helper h =
@@ -5642,16 +5759,16 @@ let iter_rel_helper_block () =
           h.iter_helper_name n h.iter_helper_name (finite_args n) cond
       in
       let op_args =
-        String.concat " " (List.init h.iter_arity (fun _ -> "WasmTerminals"))
+        String.concat " " (List.init h.iter_arity (fun _ -> "SpectecTerminals"))
       in
       let var_decl =
-        "  vars " ^ String.concat " " arg_names ^ " : WasmTerminals .\n" ^
+        "  vars " ^ String.concat " " arg_names ^ " : SpectecTerminals .\n" ^
         (if split_elem_names = [] then ""
-         else "  vars " ^ String.concat " " split_elem_names ^ " : WasmTerminal .\n") ^
+         else "  vars " ^ String.concat " " split_elem_names ^ " : SpectecTerminal .\n") ^
         (if split_rest_names = [] then ""
-         else "  vars " ^ String.concat " " split_rest_names ^ " : WasmTerminals .\n") ^
+         else "  vars " ^ String.concat " " split_rest_names ^ " : SpectecTerminals .\n") ^
         (if finite_elem_names = [] then ""
-         else "  vars " ^ String.concat " " finite_elem_names ^ " : WasmTerminal .\n")
+         else "  vars " ^ String.concat " " finite_elem_names ^ " : SpectecTerminal .\n")
       in
       Printf.sprintf
         "  op %s : %s -> Judgement .\n%s\
@@ -5689,7 +5806,7 @@ let map_call_helper_block () =
       let seq = base ^ "_S" in
       let op_sorts =
         List.init h.map_arity (fun i ->
-            if i = h.map_seq_index then "WasmTerminals" else "WasmTerminal")
+            if i = h.map_seq_index then "SpectecTerminals" else "SpectecTerminal")
         |> String.concat " "
       in
       let call_args repl =
@@ -5705,15 +5822,15 @@ let map_call_helper_block () =
           |> List.filter_map (fun x -> x)
         in
         (if fixed = [] then ""
-         else "  vars " ^ String.concat " " fixed ^ " : WasmTerminal .\n") ^
-        Printf.sprintf "  var %s : WasmTerminals .\n" seq
+         else "  vars " ^ String.concat " " fixed ^ " : SpectecTerminal .\n") ^
+        Printf.sprintf "  var %s : SpectecTerminals .\n" seq
       in
       let head = Printf.sprintf "index ( %s, 0 )" seq in
       let tail =
         Printf.sprintf "slice ( %s, 1, _-_ ( len ( %s ), 1 ) )" seq seq
       in
       let map_block = Printf.sprintf
-        "  op %s : %s -> WasmTerminals .\n%s\
+        "  op %s : %s -> SpectecTerminals .\n%s\
          \n  eq %s ( %s ) = eps .\n\
          \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n      if _=/=_ ( %s, eps ) .\n"
         h.map_helper_name op_sorts var_decl
@@ -5728,8 +5845,8 @@ let map_call_helper_block () =
           let unmap_name = unmap_call_helper_name h.map_helper_name in
           let elem = base ^ "_E" in
           Printf.sprintf
-            "\n  op %s : WasmTerminals -> WasmTerminals .\n\
-             \n  var %s : WasmTerminal .\n\
+            "\n  op %s : SpectecTerminals -> SpectecTerminals .\n\
+             \n  var %s : SpectecTerminal .\n\
              \n  eq %s ( eps ) = eps .\n\
              \n  eq %s ( %s ( %s ) %s ) = %s %s ( %s ) .\n"
             unmap_name
@@ -5810,11 +5927,11 @@ let collect_ctor_decl_lines eq_lines =
   |> List.map (fun nm ->
 	   match nm with
        | "CTORLABELLBRACERBRACEA3" ->
-           "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
+           "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] ."
        | "CTORFRAMELBRACERBRACEA3" ->
-           "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."
+           "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] ."
        | "CTORHANDLERLBRACERBRACEA3" ->
-           "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] ."
+           "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] ."
 	       | _ ->
 	           let arity = ctor_arity nm in
 	           if arity = 0 then
@@ -5826,10 +5943,10 @@ let collect_ctor_decl_lines eq_lines =
 	                   "  sort %s .\n  subsort %s < %s .\n  op %s : -> %s [ctor] ."
 	                   ctor_sort ctor_sort (String.concat " " sorts) nm ctor_sort
 	             | None ->
-	                 Printf.sprintf "  op %s :  -> WasmTerminal [ctor] ." nm
+	                 Printf.sprintf "  op %s :  -> SpectecTerminal [ctor] ." nm
 	           else
-	             let args = String.concat " " (List.init arity (fun _ -> "WasmTerminal")) in
-	             Printf.sprintf "  op %s : %s -> WasmTerminal [ctor] ."
+	             let args = String.concat " " (List.init arity (fun _ -> "SpectecTerminal")) in
+	             Printf.sprintf "  op %s : %s -> SpectecTerminal [ctor] ."
 	               nm args)
 
 let translate defs =
@@ -5847,7 +5964,11 @@ let translate defs =
       (SIPairSet.elements ss.calls |> List.map fst |> SSet.of_list);
   let token_ops = build_token_ops ss in
   let call_ops = build_call_ops ss in
-  let header = header_prefix ^ "  --- Auto-collected tokens\n" ^ token_ops ^ call_ops in
+  let prelude_features = prelude_features_of_source () in
+  let header =
+    header_prefix prelude_features
+    ^ "  --- Auto-collected tokens\n" ^ token_ops ^ call_ops
+  in
   let body_core =
     step_predicate_helpers ^ "\n"
     ^ String.concat "\n" (List.map (translate_definition ss) defs)
@@ -5865,11 +5986,11 @@ let translate defs =
     |> List.sort_uniq String.compare
     |> fun ds -> List.sort_uniq String.compare (ds @ ctor_decl_lines)
   in
-  (* Post-processing fix 1: Remove 0-arity "op X :  -> WasmType [ctor]" when a
-     1-arity "op X : WasmTerminal -> WasmType [ctor]" for the SAME name exists.
+  (* Post-processing fix 1: Remove 0-arity "op X :  -> SpectecType [ctor]" when a
+     1-arity "op X : SpectecTerminal -> SpectecType [ctor]" for the SAME name exists.
      Avoids "multiple distinct parses" for names like num, vec. *)
-  let re_zero_arity = Str.regexp "  op \\([^ (]+\\) :  -> \\(WasmType\\|WasmTerminal\\) \\[ctor\\] \\." in
-  let re_higher_arity = Str.regexp "  op \\([^ (]+\\) : WasmTerminal" in
+  let re_zero_arity = Str.regexp "  op \\([^ (]+\\) :  -> \\(SpectecType\\|SpectecTerminal\\) \\[ctor\\] \\." in
+  let re_higher_arity = Str.regexp "  op \\([^ (]+\\) : SpectecTerminal" in
   let higher_arity_names =
     List.filter_map (fun l ->
       if Str.string_match re_higher_arity l 0
@@ -5880,7 +6001,7 @@ let translate defs =
     |> fun ns -> List.fold_left (fun s n -> SSet.add n s) SSet.empty ns
   in
   (* Post-processing fix 2: Collect all var-declared names, then remove
-     "op X : -> WasmTerminal ." or "op X :  -> WasmType [ctor]" when
+     "op X : -> SpectecTerminal ." or "op X :  -> SpectecType [ctor]" when
      "var X : ..." already declared — prevents op/var ambiguity. *)
   let re_var_decl = Str.regexp "  var\\s+\\([A-Z][A-Z0-9-]*\\) :" in
   let var_names =
@@ -5902,11 +6023,11 @@ let translate defs =
         | None -> true
       else true
     ) raw_decls
-    (* Also remove "op X : -> WasmTerminal ." (single space) when var X exists *)
+    (* Also remove "op X : -> SpectecTerminal ." (single space) when var X exists *)
     |> List.filter (fun l ->
       let s = String.trim l in
       if starts_with s "op " then
-        let re = Str.regexp "op \\([^ (]+\\) : -> WasmTerminal \\." in
+        let re = Str.regexp "op \\([^ (]+\\) : -> SpectecTerminal \\." in
         if Str.string_match re s 0 then
           match str_matched_group_opt 1 s with
           | Some nm -> not (SSet.mem nm var_names)
@@ -5916,14 +6037,14 @@ let translate defs =
     )
     |> List.map (fun l ->
       let s = String.trim l in
-      if s = "op CTORFRAMEA2 : WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
-      then "  op CTORFRAMEA2 : WasmTerminals WasmTerminals -> Frame [ctor] ."
-      else if s = "op CTORLABELLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
-      then "  op CTORLABELLBRACERBRACEA3 : N WasmTerminals WasmTerminals -> Instr [ctor] ."
-      else if s = "op CTORFRAMELBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
-      then "  op CTORFRAMELBRACERBRACEA3 : N Frame WasmTerminals -> Instr [ctor] ."
-      else if s = "op CTORHANDLERLBRACERBRACEA3 : WasmTerminal WasmTerminal WasmTerminal -> WasmTerminal [ctor] ."
-      then "  op CTORHANDLERLBRACERBRACEA3 : N Catch WasmTerminals -> Instr [ctor] ."
+      if s = "op CTORFRAMEA2 : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
+      then "  op CTORFRAMEA2 : SpectecTerminals SpectecTerminals -> Frame [ctor] ."
+      else if s = "op CTORLABELLBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
+      then "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] ."
+      else if s = "op CTORFRAMELBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
+      then "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] ."
+      else if s = "op CTORHANDLERLBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
+      then "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] ."
       else l)
     |> List.sort_uniq String.compare
   in
