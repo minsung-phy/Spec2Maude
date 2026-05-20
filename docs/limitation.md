@@ -710,7 +710,10 @@ source-derived로 바꾼 것:
     현재 feature-gated 대상은 `w-bool`, `_hasType_`/`WellTyped`, `index(xs,i*)`,
     `$repeat`, `slice`, `$star-prefix`/`$star-unprefix`, set-membership `_<-_`,
     `merge`, wildcard `any`, Step wrapper infrastructure, `$is-spectec-val-seq`,
-    `$subst-*` sequence lifts, and `CTORFRAMEA2` frame projection/update support다.
+    and `$subst-*` sequence lifts다.
+  - 예전 frame 전용 footer shim은 제거했다. 이제 frame literal은 source
+    `syntax frame = { LOCALS ..., MODULE ... }`에서 생성되는 `RECFrameA2`와
+    그 projection/update equation을 그대로 사용한다.
   - 즉 P4처럼 Step relation이나 Wasm frame helper를 쓰지 않는 spec에서는 해당
     header/footer 조각을 emit하지 않는 방향으로 구조가 바뀌었다.
   - `SpectecTerminals` sequence carrier는 현재 translator의 기본 term-list

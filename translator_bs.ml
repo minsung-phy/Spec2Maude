@@ -1294,23 +1294,18 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
         let t = translate_exp TermCtx e1 vm in
         (name, t)
       ) fields in
-      (match field_values with
-       | [("LOCALS", locals); ("MODULE", modul)] ->
-           { text = Printf.sprintf "CTORFRAMEA2 ( %s, %s )" locals.text modul.text;
-             vars = locals.vars @ modul.vars }
-       | _ ->
-           let field_names = List.map fst field_values in
-           (match unique_source_record_by_fields field_names with
-            | Some info ->
-                let args = List.map snd field_values in
-                { text = format_call info.rec_ctor (List.map (fun t -> t.text) args);
-                  vars = List.concat_map (fun t -> t.vars) args }
-            | None ->
-                let items = List.map (fun (name, t) ->
-                  { t with text = Printf.sprintf "item('%s, %s)" name t.text }
-                ) field_values in
-                { text = "{" ^ String.concat " ; " (List.map (fun t -> t.text) items) ^ "}";
-                  vars = List.concat_map (fun t -> t.vars) items }))
+      let field_names = List.map fst field_values in
+      (match unique_source_record_by_fields field_names with
+       | Some info ->
+           let args = List.map snd field_values in
+           { text = format_call info.rec_ctor (List.map (fun t -> t.text) args);
+             vars = List.concat_map (fun t -> t.vars) args }
+       | None ->
+           let items = List.map (fun (name, t) ->
+             { t with text = Printf.sprintf "item('%s, %s)" name t.text }
+           ) field_values in
+           { text = "{" ^ String.concat " ; " (List.map (fun t -> t.text) items) ^ "}";
+             vars = List.concat_map (fun t -> t.vars) items })
   | DotE (e1, atom) ->
       tmap (Printf.sprintf "value('%s, %s)" (to_var_name (Xl.Atom.name atom)))
         (translate_exp TermCtx e1 vm)
@@ -5224,7 +5219,6 @@ type prelude_features = {
   uses_subst_typeuse : bool;
   uses_subst_valtype : bool;
   uses_subst_subtype : bool;
-  uses_frame_record : bool;
 }
 
 let source_has_step_relations defs =
@@ -5261,9 +5255,6 @@ let prelude_features_of_source defs generated_text token_ops =
     uses_subst_typeuse = has "$subst-typeuse";
     uses_subst_valtype = has "$subst-valtype";
     uses_subst_subtype = has "$subst-subtype";
-    uses_frame_record =
-      has "CTORFRAMEA2"
-      || List.exists (fun info -> info.rec_sort = "Frame") !source_record_infos;
   }
 
 let generated_term_prelude_module () =
@@ -5439,9 +5430,6 @@ let header_prefix features =
      "  var LIST-TY : SpectecTerminal .\n" ^
      "  var LIST-TS : SpectecTerminals .\n"
    else "") ^
-  (if features.uses_frame_record then
-     "  vars FRAME-LOCALS FRAME-LOCALS2 FRAME-MODULE FRAME-MODULE2 : SpectecTerminals .\n"
-   else "") ^
   (if features.uses_subst_typeuse || features.uses_subst_valtype || features.uses_subst_subtype then
      "  var SUBST-L-W : SpectecTerminal .\n" ^
      "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : SpectecTerminals .\n"
@@ -5534,16 +5522,6 @@ let footer features =
      "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
      "   if (len(LIST-TS) < (2 ^ 32)) .\n\n"
    else "") ^
-  (if features.uses_frame_record then
-     "  --- Source frame record representation.\n" ^
-     "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}; this generated\n" ^
-     "  --- constructor represents that source syntax alternative at sort Frame\n" ^
-     "  --- while preserving field projection and update behavior.\n" ^
-     "  eq value('LOCALS, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-LOCALS .\n" ^
-     "  eq value('MODULE, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-MODULE .\n" ^
-     "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'LOCALS <- FRAME-LOCALS2] = CTORFRAMEA2(FRAME-LOCALS2, FRAME-MODULE) .\n" ^
-     "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'MODULE <- FRAME-MODULE2] = CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE2) .\n"
-   else "") ^
   "\nendm\n"
 
 let prelude_helper_decls features =
@@ -5558,9 +5536,6 @@ let prelude_helper_decls features =
    else "") ^
   (if features.uses_subst_subtype then
      "  op $subst-subtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_frame_record then
-     "  op CTORFRAMEA2 : SpectecTerminals SpectecTerminals -> Frame [ctor] .\n"
    else "") ^
   (if features.uses_step_relations then
      "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] .\n" ^
@@ -6144,9 +6119,7 @@ let translate defs =
     )
     |> List.map (fun l ->
       let s = String.trim l in
-      if s = "op CTORFRAMEA2 : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
-      then "  op CTORFRAMEA2 : SpectecTerminals SpectecTerminals -> Frame [ctor] ."
-      else if s = "op CTORLABELLBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
+      if s = "op CTORLABELLBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
       then "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] ."
       else if s = "op CTORFRAMELBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
       then "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] ."

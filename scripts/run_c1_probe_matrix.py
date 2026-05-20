@@ -42,11 +42,11 @@ mod C1-PROBE-TERMS is
      item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)} .
 
   op invoke-outer-frame : -> Frame .
-  eq invoke-outer-frame = CTORFRAMEA2(eps, invoke-literal-moduleinst) .
+  eq invoke-outer-frame = RECFrameA2(eps, invoke-literal-moduleinst) .
 
   op invoke-inner-frame : -> Frame .
   eq invoke-inner-frame =
-    CTORFRAMEA2(i32v(5) i32v(0) i32v(1) i32v(0), fib-moduleinst) .
+    RECFrameA2(i32v(5) i32v(0) i32v(1) i32v(0), fib-moduleinst) .
 
   op invoke-inner-instrs : -> SpectecTerminals .
   eq invoke-inner-instrs =
@@ -118,7 +118,7 @@ PROBES: list[Probe] = [
     Probe("steps-invoke-named-empty-frame", "PASS", "rew [1000] in C1-PROBE-TERMS : steps(invoke-outer-config-named-empty-frame) .", "result Config: (fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)"),
     Probe("steps-fib-config-invoke", "KNOWN_LIMITATION", "rew [10000] in C1-PROBE-TERMS : steps(fib-config-invoke(i32v(5))) .", "result Config: (fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)", "fib-config-invoke uses the source-shaped invoke/outer-frame path and gets stuck at the same Step/ctxt-frame limitation."),
     Probe("expanddt-fib", "PASS", "red in C1-PROBE-TERMS : $expanddt(value('TYPE, fib-funcinst)) .", "result V128: CTORFUNCARROWA2"),
-    Probe("label-br-suffix-search", "PASS", "search [5] in C1-PROBE-TERMS : step((fib-store ; CTORFRAMEA2(CTORCONSTA2(CTORI32A0, 0) CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 8) CTORCONSTA2(CTORI32A0, 8), fib-moduleinst)) ; CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0)) CTORLOCALGETA1(1)) =>* C:Config .", "Solution 1"),
+    Probe("label-br-suffix-search", "PASS", "search [5] in C1-PROBE-TERMS : step((fib-store ; RECFrameA2(CTORCONSTA2(CTORI32A0, 0) CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 8) CTORCONSTA2(CTORI32A0, 8), fib-moduleinst)) ; CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0)) CTORLOCALGETA1(1)) =>* C:Config .", "Solution 1"),
     Probe("br-if-suffix-search", "PASS", "search [5] in C1-PROBE-TERMS : step(((fib-store ; empty-frame).State ; CTORCONSTA2(CTORI32A0, 1) CTORBRIFA1(0) CTORLOCALGETA1(1))) =>* C:Config .", "Solution 1"),
     Probe("nop-suffix-search", "PASS", "search [5] in C1-PROBE-TERMS : step(((fib-store ; empty-frame).State ; CTORNOPA0 CTORLOCALGETA1(0))) =>* C:Config .", "Solution 1"),
     Probe("steps-fib-config", "PASS", "rew [10000] in C1-PROBE-TERMS : steps(fib-config(i32v(5))) .", "result Config: (fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)"),

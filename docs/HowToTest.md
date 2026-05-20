@@ -5,7 +5,7 @@ Manual tests that need a concrete frame should now use the generated source
 frame constructor:
 
 ```maude
-CTORFRAMEA2(locals, moduleinst)
+RECFrameA2(locals, moduleinst)
 ```
 
 For example, the old shape:
@@ -17,7 +17,7 @@ $mk-frame(VALS, fib-moduleinst)
 should be written as:
 
 ```maude
-CTORFRAMEA2(VALS, fib-moduleinst)
+RECFrameA2(VALS, fib-moduleinst)
 ```
 
 1. Load in terminal
@@ -51,7 +51,7 @@ search [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) =>* (fib-store ; empty-fr
 ```
 search [5] in WASM-FIB-BS :
   step((fib-store ;
-    CTORFRAMEA2(
+    RECFrameA2(
       CTORCONSTA2(CTORI32A0, 0)
       CTORCONSTA2(CTORI32A0, 5)
       CTORCONSTA2(CTORI32A0, 8)
@@ -66,7 +66,7 @@ Expected: exactly one solution, ending with:
 
 ```maude
 (fib-store ;
-  CTORFRAMEA2(
+  RECFrameA2(
     CTORCONSTA2(CTORI32A0, 0)
     CTORCONSTA2(CTORI32A0, 5)
     CTORCONSTA2(CTORI32A0, 8)

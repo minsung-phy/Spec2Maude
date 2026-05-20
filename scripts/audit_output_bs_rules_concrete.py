@@ -67,7 +67,7 @@ mod C1-RULE-CONCRETE-SAMPLES is
     RECModuleinstA9(eps, eps, eps, eps, eps, eps, eps, 0, eps) .
 
   op Z-ELEM0 : -> State .
-  eq Z-ELEM0 = S-ELEM0 ; CTORFRAMEA2(eps, MI-ELEM0) .
+  eq Z-ELEM0 = S-ELEM0 ; RECFrameA2(eps, MI-ELEM0) .
 
   op CFG0 : -> Config .
   eq CFG0 = ST0 ; CTORNOPA0 .
@@ -296,7 +296,7 @@ def candidates_for(name: str, sort: str) -> list[str]:
     if sort == "Store":
         return ["fib-store"]
     if sort == "Frame":
-        return ["FR0", "CTORFRAMEA2(eps, MI0)"]
+        return ["FR0", "RECFrameA2(eps, MI0)"]
     if sort == "State":
         if "ARRAY-NEW-ELEM" in name.upper():
             return ["Z-ELEM0", "ST0"]
