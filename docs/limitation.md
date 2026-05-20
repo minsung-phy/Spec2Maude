@@ -57,26 +57,16 @@ source-valid probe로 다시 확인해야 한다.
 
 ### D. 남은 Maude warning/advisory
 
-2026-05-21 warning cleanup에서 `:=` assignment advisory는 generic하게
-제거했다. source premise가 실제 binding이 아니라 이미 bound된 값을 확인하는
-경우는 Maude condition에서 `==` equality check로 생성되도록 바꿨다.
+2026-05-21 warning cleanup에서 안전하게 줄일 수 있는 warning은 줄였다.
 
-2차 warning cleanup에서 추가로 고친 것:
+제거된 warning family:
 
-- `ListN`/fixed-length 반복 패턴의 길이 변수 바인딩을 generic RelD lowering에도
-  반영했다. 예를 들어 source의 `rectype = REC subtype^n`은 이제
-  `SUBTYPES := ...` 다음에 `N := len(SUBTYPES)`를 생성한다. 그래서
-  `deftype-ok-r0`의 `N used before bound` warning은 제거됐다.
-- source category-pattern disjunction을 generic하게 낮췄다. 예를 들어
-  `t' = numtype \/ t' = vectype`는 더 이상 raw `NUMTYPE`/`VECTYPE`
-  witness 변수를 만들지 않고
-  `($is-spectec-numtype(t') or $is-spectec-vectype(t'))`처럼 Bool 조건으로
-  생성된다. 그래서 `instr-ok-select-impl`, `instr-ok-array-new-data`,
-  `instr-ok-array-init-data`의 category-pattern `used-before-bound` warning은
-  제거됐다.
-- DecD의 `TypA`/syntax argument가 이미 바인딩된 type parameter를 가리킬 때
-  그 mapping을 보존하도록 고쳤다. 그래서 `$ivadd-pairwise`에서 source
-  `$concat_(N, ...)`의 `N`이 raw `N`으로 남던 warning은 제거됐다.
+- `assignment condition fragment ... bound before matching`: 0개.
+  source premise가 실제 binding이 아니라 이미 bound된 값을 확인하는 경우는
+  Maude condition에서 equality check로 생성한다.
+- `multiple distinct parses`: 0개. arithmetic / Bool / comparison / generated
+  `$map-*` helper 표현을 prefix Maude operator form으로 출력해서 parser
+  ambiguity를 제거했다.
 
 현재 `load wasm-exec-bs` 기준 남은 warning family:
 
@@ -85,20 +75,30 @@ source-valid probe로 다시 확인해야 한다.
   대부분 validation inference overlay, numeric/vector helper,
   allocation/eval/init helper에서 output witness를 Maude rewriting이 만들어야
   하는 경우다. 단순히 `:=`를 `==`로 바꾸면 오히려 더 위험해져서 유지했다.
-- `multiple distinct parses`: 95개. 주로 arithmetic expression, sequence
-  concatenation, generated `$map-*` equations의 precedence/associativity
-  모호성이다. header의 `$repeat`/`slice`에 괄호를 보강해 보았지만 Maude의
-  associative sequence parsing 특성상 warning 숫자는 아직 줄지 않았다.
-  다음 단계에서는 전체 arithmetic/sequence pretty-printer precedence 정책을
-  따로 봐야 한다.
 - `duplicate-import-advisory`: 3개. `dsl/pretype.maude`의 record update
   operator가 여러 import path로 들어오는 구조 때문이다. `dsl/pretype`
   정리 단계에서 보는 것이 맞다.
+- command-time membership warning: 실제 `red/search` 명령을 실행하면 Maude
+  builtin/pretype associative operator에 대해
+  `membership axioms are not guaranteed...` warning이 11개 출력될 수 있다.
+  현재 Fibonacci smoke 결과는 정상이며, 이 warning은 `dsl/pretype` / builtin
+  sort 설계 cleanup에서 따로 본다.
 
-즉 현재 warning은 완전히 0은 아니지만, 가장 눈에 거슬리던
-`assignment condition fragment ... already bound` 계열은 제거했다. 숫자를
-줄이기 위해 무작정 condition을 바꾸는 것은 C1 실행을 깨기 쉬우므로, 남은
-warning은 source rule 단위로 하나씩 판다.
+이번 pass에서 source-preserving하게 고친 대표 항목:
+
+- `ListN`/fixed-length 반복 패턴의 길이 변수 바인딩을 generic RelD lowering에도
+  반영했다.
+- source category-pattern disjunction을 generic Bool category predicate로
+  낮췄다.
+- DecD의 `TypA`/syntax argument가 이미 바인딩된 type parameter를 가리킬 때
+  그 mapping을 보존하도록 고쳤다.
+- generated Maude expression pretty-printer가 arithmetic / Bool / comparison
+  operator를 prefix form으로 출력하도록 정리했다.
+
+즉 현재 warning은 완전히 0은 아니지만, 남은 warning은 대부분 source relation
+premise가 output witness를 합성해야 하는 문제다. 숫자를 줄이기 위해 무작정
+condition을 바꾸는 것은 C1 실행을 깨기 쉬우므로, 남은 warning은 source rule
+단위로 하나씩 판다.
 
 ### E. 지금 통과하는 핵심 smoke
 
