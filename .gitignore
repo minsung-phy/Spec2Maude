@@ -6,6 +6,7 @@ _build/
 *.exe
 *.bc
 *.out
+__pycache__/
 
 # 3. 에디터 및 OS 관련 잡다한 파일
 .DS_Store
@@ -17,3 +18,4 @@ _build/
 # 4. 기타 파일 제외
 Spec2Maude_JHS/
 preserved/
+artifacts/
