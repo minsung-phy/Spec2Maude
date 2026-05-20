@@ -100,6 +100,46 @@ premise가 output witness를 합성해야 하는 문제다. 숫자를 줄이기 
 condition을 바꾸는 것은 C1 실행을 깨기 쉬우므로, 남은 warning은 source rule
 단위로 하나씩 판다.
 
+#### 남은 `used-before-bound` 25개를 지금 유지하는 이유
+
+이 25개는 단순 pretty-printing 문제가 아니다. 공통 원인은 source premise가
+conclusion에 없는 중간값을 만들어야 하는데, 현재 C1의 rewrite-condition 실행
+방식이 그 witness를 자동 합성하지 못한다는 점이다.
+
+분류:
+
+- validation witness 6개:
+  `deftype-sub-super`, `instr-ok-block`, `instr-ok-loop`, `instr-ok-if`,
+  `instr-ok-try-table`, `module-ok-r0`.
+  예를 들어 `Instr_ok/block`의 `Instrs_ok: ... ->_(x*) ...`에서 `x*`는 source
+  premise가 만들어야 하는 annotation witness다.
+- execution/def witness 12개:
+  `step-read-br-on-cast-*`, `step-read-ref-*`, `allocmodule-r0`,
+  `evalexprs-r1`, `evalglobals-r1`, `instantiate-r0`,
+  `infer-instr-ok-arg2-*`.
+  이들은 runtime type witness, eval output state, allocation result sequence
+  같은 값을 premise에서 만들어야 한다.
+- numeric/vector output witness 7개:
+  `$vcvtop`, `$vnarrowop`, `$ivextunop`, `$ivextbinop`, `$growmem` 계열.
+  vector lane sequence나 memory-size result 같은 output 값을 premise에서
+  만들어야 한다.
+
+따라서 현재 C1에서는 이 25개를 warning으로 유지하고 limitation으로 기록한다.
+나중에 해결하려면 다음 중 하나가 필요하다.
+
+1. source-preserving generic witness solver를 설계한다.
+2. relation/def premise별 mode 정보를 생성해서 Maude가 어떤 값을 먼저 계산해야
+   하는지 알게 한다.
+3. C1은 구조 보존 baseline으로 두고, C2 execution layer에서 witness synthesis를
+   담당하게 한다.
+
+하지 말아야 할 것:
+
+- warning을 없애려고 `:=`를 무작정 `==`로 바꾸기;
+- judgement-specific helper rule 추가;
+- constructor-specific shortcut 추가;
+- source premise를 삭제하거나 약화하기.
+
 ### E. 지금 통과하는 핵심 smoke
 
 - `$expanddt(value('TYPE, fib-funcinst))`
