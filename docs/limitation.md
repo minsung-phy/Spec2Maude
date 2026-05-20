@@ -55,7 +55,31 @@ Updated: 2026-05-21
 context/store/module witness가 부족한 경우가 많다. 이 항목들은 focused
 source-valid probe로 다시 확인해야 한다.
 
-### D. 지금 통과하는 핵심 smoke
+### D. 남은 Maude warning/advisory
+
+2026-05-21 warning cleanup에서 `:=` assignment advisory는 generic하게 줄였다.
+source premise가 실제 binding이 아니라 이미 bound된 값을 확인하는 경우는
+Maude condition에서 `==` equality check로 생성되도록 바꿨다.
+
+현재 `load wasm-exec-bs` 기준 남은 warning family:
+
+- `used-before-bound`: 32개. 대부분 validation inference overlay,
+  numeric/vector helper, allocation/eval/init helper에서 output witness를
+  Maude rewriting이 만들어야 하는 경우다. 단순히 `:=`를 `==`로 바꾸면
+  오히려 더 위험해져서 이번 cleanup에서는 유지했다.
+- `multiple distinct parses`: 95개. 주로 arithmetic expression, sequence
+  concatenation, generated `$map-*` equations의 precedence/associativity
+  모호성이다. 현재 smoke 실행을 깨지는 않지만, 다음 header/footer cleanup에서
+  괄호 생성 규칙을 더 정리할 수 있다.
+- `duplicate-import-advisory`: 3개. `dsl/pretype.maude`의 record update
+  operator가 여러 import path로 들어오는 구조 때문이다. `dsl/pretype`
+  정리 단계에서 보는 것이 맞다.
+- `other`: 1개. 세부 triage 필요.
+
+즉 현재 warning은 완전히 0은 아니지만, 가장 눈에 거슬리던
+`assignment condition fragment ... already bound` 계열은 제거했다.
+
+### E. 지금 통과하는 핵심 smoke
 
 - `$expanddt(value('TYPE, fib-funcinst))`
 - `$invoke(fib-store, 0, vals)` 자체가 Config로 rewrite
