@@ -294,8 +294,11 @@ backend result yet.
 
 ## `WasmType` / Typecheck Infrastructure Audit
 
-The current `WasmTerm` / `WasmType` / `is-type` / `are-types` framework may be
-legacy or overly broad.
+The old hand-written `dsl/pretype.maude` typecheck predicates `is-type`,
+`are-types`, and `are-mixed` have been removed from the current C1 prelude
+because generated `output_bs.maude` no longer uses them. The remaining
+`WasmType` / `WasmTypes` substrate may still be overly broad and should be
+audited separately.
 
 This does **not** mean deleting Wasm type syntax such as `i32`, `functype`, or
 `heaptype`, and it does **not** mean deleting validation semantics.

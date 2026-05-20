@@ -667,3 +667,42 @@ python3 scripts/audit_output_bs_total_concrete.py --timeout 2
 6. `Instrs-ok/sub` execution overlay recursion을 C1-compatible하게 고칠 수 있는지 따로 판다.
 7. 20개 label-related `step-from-step-pure-*`를 다시 제거할 수 있는 source-preserving `Step/ctxt-instrs` 실행 방식을 찾는다.
 8. init-config/frontend는 그 다음 단계에서 한다.
+
+## Header/footer/pretype cleanup 현황
+
+2026-05-21 cleanup에서 C1이 실제로 쓰지 않는 hand-written pretype 잔재를
+제거했다.
+
+제거한 것:
+
+- `dsl/pretype.maude`의 legacy typecheck predicates:
+  - `is-type`
+  - `are-types`
+  - `are-mixed`
+- `dsl/pretype.maude`의 legacy `DSL-EXEC` evaluation-context module:
+  - `Env`, `Stage`, `InstrsContext`
+  - `LabelContext(s)`, `FrameContext(s)`
+  - `stage:`, `context:`, `emptylabel`, `emptyframe`, `_@_`, `_#_`
+
+제거 이유:
+
+- 현재 generated `output_bs.maude`와 `wasm-exec-bs.maude`가 이 선언들을 쓰지
+  않는다.
+- C1은 source-derived `mb/cmb`, relation `rl/crl`, and direct execution rules를
+  사용한다.
+- `DSL-EXEC`는 예전 evaluation-context 실험용 구조였고, 현재 C1의
+  `Step/ctxt-*` source-shaped lowering과 연결되어 있지 않다.
+
+아직 남은 필수/보류 prelude substrate:
+
+- `WasmTerminal`, `WasmTerminals`, `WasmType`, `WasmTypes`
+- `eps`, sequence concatenation, `len`, `index`
+- record `item`, `value`, update operators
+- generated header의 `Judgement`, `valid`, `StepConf` wrappers
+- generated source-meta helpers such as `index(xs, i*)`, `slice`, `$repeat`,
+  `$star-prefix`, `$star-unprefix`
+
+이들은 지금 C1 실행과 source meta-expression lowering에 필요하다. 다만 P4나
+다른 SpecTec으로 확장하려면 이름을 `SpectecTerminal`/`SpectecType`처럼
+generic하게 parameterize하거나, pretype 자체를 translator가 생성하도록
+재설계해야 한다.

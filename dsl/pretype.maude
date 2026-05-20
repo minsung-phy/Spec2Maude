@@ -24,17 +24,8 @@ mod DSL-PRETYPE is
   eq len(eps) = 0 .
   eq len(W WTS) = 1 + len(WTS) .
 
-  op is-type : WasmTerminal WasmType -> Bool .
-  op are-types : WasmTerminals WasmType -> Bool .
-  
   var T : WasmTerminal .
   var TS : WasmTerminals .
-  var WT : WasmType .
-  
-  eq are-types(eps, WT) = true .
-  ceq are-types(T TS, WT) = are-types(TS, WT) if TS =/= eps /\ is-type(T, WT) .
-
-  op are-mixed : WasmTerminals WasmTypes -> Bool . 
 
   var N' : Nat .
   op index : WasmTerminals Nat -> WasmTerminal .
@@ -94,33 +85,3 @@ mod DSL-RECORD is
 
 
 endm
-
-
-mod DSL-EXEC is 
-  inc DSL-RECORD .
-  sort Env .
-  sort Stage .
-  sort Context .
-  sort InstrsContext .
-
-  sort LabelContext LabelContexts .
-  subsort LabelContext < LabelContexts .
-  sorts FrameContext FrameContexts .
-  subsort FrameContext < FrameContexts .
-
-  op _::_ : Context Stage -> Env .
-  op stage:_ : WasmTerminals -> Stage [format (b o d)].
-  op context: _ /_ : LabelContexts FrameContexts -> Context [format (r o d d d)] .
-  
-  op _`[`]_ : WasmTerminals WasmTerminals -> InstrsContext .
-
-  op emptylabel : -> LabelContexts .
-  op _@_ : LabelContexts LabelContexts -> LabelContexts [ctor id: emptylabel].
-  op label : WasmTerminals InstrsContext Nat -> LabelContexts .
-
-  op emptyframe : -> FrameContexts .
-  op _#_ : FrameContexts FrameContexts -> FrameContexts [ctor id: emptyframe].
-  op frame : WasmTerminals InstrsContext Nat -> FrameContext .
-  
-
-endm 
