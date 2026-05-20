@@ -96,6 +96,10 @@ let starts_with s prefix =
   let plen = String.length prefix in
   slen >= plen && String.sub s 0 plen = prefix
 
+let contains_substring s lit =
+  try ignore (Str.search_forward (Str.regexp_string lit) s 0); true
+  with Not_found -> false
+
 let wrap_paren s = Printf.sprintf "( %s )" s
 
 let debug_iter_enabled =
@@ -5206,14 +5210,61 @@ let nat_subsort_decls () =
 type prelude_features = {
   uses_sequences : bool;
   uses_records : bool;
+  uses_step_relations : bool;
+  uses_bool_wrapper : bool;
+  uses_has_type : bool;
+  uses_sequence_index : bool;
+  uses_repeat : bool;
+  uses_slice : bool;
+  uses_star_prefix : bool;
+  uses_set_membership : bool;
+  uses_merge : bool;
+  uses_any : bool;
+  uses_val_seq_predicate : bool;
+  uses_subst_typeuse : bool;
+  uses_subst_valtype : bool;
+  uses_subst_subtype : bool;
+  uses_frame_record : bool;
 }
 
-let prelude_features_of_source () = {
-  uses_sequences =
-    Hashtbl.length plural_types > 0
-    || not (SSet.is_empty !sequence_alias_sorts);
-  uses_records = !source_record_infos <> [];
-}
+let source_has_step_relations defs =
+  let rec scan d =
+    match d.it with
+    | RecD ds -> List.exists scan ds
+    | RelD (id, _, _, _) ->
+        let name = sanitize id.it in
+        is_step_exec_rel name || is_steps_rel name
+    | _ -> false
+  in
+  List.exists scan defs
+
+let prelude_features_of_source defs generated_text token_ops =
+  let has lit =
+    contains_substring generated_text lit || contains_substring token_ops lit
+  in
+  {
+    uses_sequences =
+      Hashtbl.length plural_types > 0
+      || not (SSet.is_empty !sequence_alias_sorts);
+    uses_records = !source_record_infos <> [];
+    uses_step_relations = source_has_step_relations defs;
+    uses_bool_wrapper = has "w-bool";
+    uses_has_type = has " hasType ";
+    uses_sequence_index = has "index (" || has "index(";
+    uses_repeat = has "$repeat";
+    uses_slice = has "slice (" || has "slice(";
+    uses_star_prefix = has "$star-prefix" || has "$star-unprefix";
+    uses_set_membership = has " <- ";
+    uses_merge = has "merge (" || has "merge(";
+    uses_any = contains_substring token_ops "op any :";
+    uses_val_seq_predicate = has "$is-spectec-val-seq";
+    uses_subst_typeuse = has "$subst-typeuse";
+    uses_subst_valtype = has "$subst-valtype";
+    uses_subst_subtype = has "$subst-subtype";
+    uses_frame_record =
+      has "CTORFRAMEA2"
+      || List.exists (fun info -> info.rec_sort = "Frame") !source_record_infos;
+  }
 
 let generated_term_prelude_module () =
   "mod DSL-TERM is \n" ^
@@ -5314,17 +5365,20 @@ let header_prefix features =
   "  --- SpecTec terminal sequences use the single SpectecTerminals sequence sort.\n\n" ^
   (nat_subsort_decls ()) ^
   "  --- Syntax-category membership is represented by mb/cmb axioms, not by terminal subsorts.\n\n" ^
-  "  --- Bool wrapper (avoid subsort Bool < SpectecTerminal conflicts)\n" ^
-  "  op w-bool : Bool -> SpectecTerminal [ctor] .\n\n" ^
+  (if features.uses_bool_wrapper then
+     "  --- Bool wrapper emitted because source defs return Bool as a terminal.\n" ^
+     "  op w-bool : Bool -> SpectecTerminal [ctor] .\n\n"
+   else "") ^
   "  --- Source type constructors are generated from SpecTec declarations.\n\n" ^
-  "  --- Special Operators\n" ^
-  "  --- Pair sort + well-typed witness for parametric type judgements.\n" ^
-  "  --- Non-parametric types use direct `mb T : S .` memberships.\n" ^
-  "  --- Parametric types emit `(mb|cmb) ( T hasType S ) : WellTyped [if ...] .`\n" ^
-  "  sort TypedTerm .\n" ^
-  "  sort WellTyped .\n" ^
-  "  subsort WellTyped < TypedTerm .\n" ^
-  "  op _hasType_ : SpectecTerminal SpectecType -> TypedTerm [ctor prec 95 gather (e e)] .\n" ^
+  (if features.uses_has_type then
+     "  --- Pair sort + well-typed witness for parametric type judgements.\n" ^
+     "  --- Non-parametric types use direct `mb T : S .` memberships.\n" ^
+     "  --- Parametric types emit `(mb|cmb) ( T hasType S ) : WellTyped [if ...] .`\n" ^
+     "  sort TypedTerm .\n" ^
+     "  sort WellTyped .\n" ^
+     "  subsort WellTyped < TypedTerm .\n" ^
+     "  op _hasType_ : SpectecTerminal SpectecType -> TypedTerm [ctor prec 95 gather (e e)] .\n"
+   else "") ^
   "  --- Judgement sort for RelD relations.\n" ^
   "  --- Strict C1: source relation rules lower to primary `rl/crl => valid`.\n" ^
   "  --- Definitional equations remain `eq/ceq` when they translate source defs.\n" ^
@@ -5332,138 +5386,187 @@ let header_prefix features =
   "  sort ValidJudgement .\n" ^
   "  subsort ValidJudgement < Judgement .\n" ^
   "  op valid : -> ValidJudgement [ctor] .\n" ^
-  "  op index : SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
-  "  op $repeat : SpectecTerminal Int -> SpectecTerminals .\n" ^
-  "  op $star-prefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
-  "  op $star-unprefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
-  "  op slice : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals .\n" ^
-  "  op _<-_ : SpectecTerminal SpectecTerminals -> Bool .\n\n" ^
-  "  --- Generic record/terminal combinators (parser support)\n" ^
-  "  op merge : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .\n" ^
-  "  op any : -> SpectecTerminal [ctor] .\n\n" ^
-  "  --- Record literals/updates come from DSL-RECORD and have sort SpectecTerminal.\n" ^
-  "  --- This keeps the baseline surface aligned with the SpecTec terminal model.\n\n" ^
-  "  --- Config: execution configuration for relation-preserving semantics\n" ^
-  "  --- The relation operators return wrapper sorts so rewrite conditions\n" ^
-  "  --- cannot satisfy themselves by zero-step matching an unreduced call.\n" ^
-  "  sorts StepConf StepPureConf StepReadConf StepsConf .\n" ^
-  "  subsort Config < StepConf .\n" ^
-  "  subsort Config < StepsConf .\n" ^
-  "  subsort SpectecTerminals < StepPureConf .\n" ^
-  "  subsort SpectecTerminals < StepReadConf .\n" ^
-  "  op _;_ : Store Frame -> State [ctor prec 55] .\n" ^
-  "  op _;_ : State SpectecTerminals -> Config [ctor prec 60] .\n" ^
-  "  op step : Config -> StepConf [frozen (1)] .\n" ^
-  "  op step-pure : SpectecTerminals -> StepPureConf [frozen (1)] .\n" ^
-  "  op step-read : Config -> StepReadConf [frozen (1)] .\n" ^
-  "  op steps : Config -> StepsConf .\n\n" ^
+  (if features.uses_sequence_index then
+     "  op index : SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_repeat then
+     "  op $repeat : SpectecTerminal Int -> SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_star_prefix then
+     "  op $star-prefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
+     "  op $star-unprefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_slice then
+     "  op slice : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_set_membership then
+     "  op _<-_ : SpectecTerminal SpectecTerminals -> Bool .\n"
+   else "") ^
+  (if features.uses_merge || features.uses_any then "\n" else "") ^
+  (if features.uses_merge then
+     "  --- Generic record merge combinator emitted because source record composition uses it.\n" ^
+     "  op merge : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .\n"
+   else "") ^
+  (if features.uses_any then
+     "  --- Wildcard token emitted because the source uses `_` holes.\n" ^
+     "  op any : -> SpectecTerminal [ctor] .\n"
+   else "") ^
+  (if features.uses_records then
+     "\n  --- Record literals/updates come from DSL-RECORD and have sort SpectecTerminal.\n" ^
+     "  --- This keeps the baseline surface aligned with the SpecTec terminal model.\n\n"
+   else "\n") ^
+  (if features.uses_step_relations then
+     "  --- Config: execution configuration for relation-preserving semantics\n" ^
+     "  --- The relation operators return wrapper sorts so rewrite conditions\n" ^
+     "  --- cannot satisfy themselves by zero-step matching an unreduced call.\n" ^
+     "  sorts StepConf StepPureConf StepReadConf StepsConf .\n" ^
+     "  subsort Config < StepConf .\n" ^
+     "  subsort Config < StepsConf .\n" ^
+     "  subsort SpectecTerminals < StepPureConf .\n" ^
+     "  subsort SpectecTerminals < StepReadConf .\n" ^
+     "  op _;_ : Store Frame -> State [ctor prec 55] .\n" ^
+     "  op _;_ : State SpectecTerminals -> Config [ctor prec 60] .\n" ^
+     "  op step : Config -> StepConf [frozen (1)] .\n" ^
+     "  op step-pure : SpectecTerminals -> StepPureConf [frozen (1)] .\n" ^
+     "  op step-read : Config -> StepReadConf [frozen (1)] .\n" ^
+     "  op steps : Config -> StepsConf .\n\n"
+   else "") ^
   "  --- Common variables (declared once)\n" ^
-  "  var EC : Config .\n" ^
-  "  var I : Int .\n" ^
-  "  var W-I : Int .\n" ^
+  (if features.uses_step_relations then "  var EC : Config .\n" else "") ^
   "  op EXP : -> Int .\n" ^
-  "  vars W-N W-M NLC NFC NHC : N .\n" ^
-  "  var ZS : State .\n" ^
-  "  var ITS : SpectecTerminals .\n" ^
-  "  var LIST-TY : SpectecTerminal .\n" ^
-  "  var LIST-TS : SpectecTerminals .\n" ^
-  "  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : SpectecTerminals .\n" ^
-  "  vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : SpectecTerminals .\n" ^
-  "  vars FRAME-LOCALS FRAME-LOCALS2 FRAME-MODULE FRAME-MODULE2 : SpectecTerminals .\n" ^
-  "  vars WT-S WT-F : SpectecTerminal .\n" ^
-  "  var WT-X : Localidx .\n" ^
-  "  var WT-V : Val .\n" ^
-  "  var INVOKE-X-S : SpectecTerminal .\n" ^
-  "  var INVOKE-S-S : Store .\n" ^
-  "  var INVOKE-X-FUNCADDR : Funcaddr .\n" ^
-  "  var INVOKE-X-VAL : SpectecTerminals .\n" ^
-  "  var INVOKE-X-DT : Deftype .\n" ^
-  "  vars INVOKE-X-T1 INVOKE-X-T2 : SpectecTerminals .\n" ^
-  "  var SUBST-L-W : SpectecTerminal .\n" ^
-  "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : SpectecTerminals .\n" ^
-  "  var INDEX-I : Nat .\n" ^
-  "  vars INDEX-TS INDEX-IS : SpectecTerminals .\n" ^
-  "  var REPEAT_N : Int .\n" ^
-  "  var REPEAT_ELEM : SpectecTerminal .\n" ^
-  "  vars SLICE_I SLICE_N : Int .\n" ^
-  "  var SLICE_ELEM : SpectecTerminal .\n" ^
-  "  var SLICE_REST : SpectecTerminals .\n" ^
-  "  vars STAR-PREFIX STAR-ELEM : SpectecTerminal .\n" ^
-  "  var STAR-REST : SpectecTerminals .\n" ^
-  "  vars T W WW FQ : SpectecTerminal .\n" ^
-  "  vars TS W* ISQ INSTRSQ CQ : SpectecTerminals .\n\n" ^
-  "  --- Generic SpecTec sequence indexing: xs[i*] maps scalar index over i*.\n" ^
-  "  --- This is representation substrate for source meta-expressions, not a\n" ^
-  "  --- judgement-specific executable shortcut.\n" ^
-  "  eq index(INDEX-TS, eps) = eps .\n" ^
-  "  eq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS) .\n\n" ^
-  "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
-  "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
-  "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
-  "   if _>_ ( REPEAT_N, 0 ) .\n\n" ^
-  "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
-  "  eq slice(SLICE_REST, SLICE_I, 0) = eps .\n" ^
-  "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, _-_ ( SLICE_N, 1 )) )\n" ^
-  "   if _>_ ( SLICE_N, 0 ) .\n" ^
-  "  ceq slice(( SLICE_ELEM SLICE_REST ), SLICE_I, SLICE_N) = slice(SLICE_REST, _-_ ( SLICE_I, 1 ), SLICE_N)\n" ^
-  "   if _>_ ( SLICE_I, 0 ) .\n\n" ^
-  "  --- Generic SpecTec star-map lowering for flat prefix constructors.\n" ^
-  "  --- Source shapes such as (SET t)* become $star-prefix(SET, t*), and\n" ^
-  "  --- $star-unprefix recovers t* from a matching flat encoded sequence.\n" ^
-  "  eq $star-prefix(STAR-PREFIX, eps) = eps .\n" ^
-  "  eq $star-prefix(STAR-PREFIX, STAR-ELEM STAR-REST) = STAR-PREFIX STAR-ELEM $star-prefix(STAR-PREFIX, STAR-REST) .\n" ^
-  "  eq $star-unprefix(STAR-PREFIX, eps) = eps .\n" ^
-  "  eq $star-unprefix(STAR-PREFIX, STAR-PREFIX STAR-ELEM STAR-REST) = STAR-ELEM $star-unprefix(STAR-PREFIX, STAR-REST) .\n\n"
+  (if features.uses_step_relations then "  var ZS : State .\n" else "") ^
+  (if features.uses_has_type then
+     "  var LIST-TY : SpectecTerminal .\n" ^
+     "  var LIST-TS : SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_frame_record then
+     "  vars FRAME-LOCALS FRAME-LOCALS2 FRAME-MODULE FRAME-MODULE2 : SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_subst_typeuse || features.uses_subst_valtype || features.uses_subst_subtype then
+     "  var SUBST-L-W : SpectecTerminal .\n" ^
+     "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_sequence_index then
+     "  var INDEX-I : Nat .\n" ^
+     "  vars INDEX-TS INDEX-IS : SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_repeat then
+     "  var REPEAT_N : Int .\n" ^
+     "  var REPEAT_ELEM : SpectecTerminal .\n"
+   else "") ^
+  (if features.uses_slice then
+     "  vars SLICE_I SLICE_N : Int .\n" ^
+     "  var SLICE_ELEM : SpectecTerminal .\n" ^
+     "  var SLICE_REST : SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_star_prefix then
+     "  vars STAR-PREFIX STAR-ELEM : SpectecTerminal .\n" ^
+     "  var STAR-REST : SpectecTerminals .\n"
+   else "") ^
+  "  vars T W : SpectecTerminal .\n" ^
+  "  var TS : SpectecTerminals .\n\n" ^
+  (if features.uses_sequence_index then
+     "  --- Generic SpecTec sequence indexing: xs[i*] maps scalar index over i*.\n" ^
+     "  --- This is representation substrate for source meta-expressions, not a\n" ^
+     "  --- judgement-specific executable shortcut.\n" ^
+     "  eq index(INDEX-TS, eps) = eps .\n" ^
+     "  eq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS) .\n\n"
+   else "") ^
+  (if features.uses_repeat then
+     "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
+     "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
+     "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
+     "   if _>_ ( REPEAT_N, 0 ) .\n\n"
+   else "") ^
+  (if features.uses_slice then
+     "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
+     "  eq slice(SLICE_REST, SLICE_I, 0) = eps .\n" ^
+     "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, _-_ ( SLICE_N, 1 )) )\n" ^
+     "   if _>_ ( SLICE_N, 0 ) .\n" ^
+     "  ceq slice(( SLICE_ELEM SLICE_REST ), SLICE_I, SLICE_N) = slice(SLICE_REST, _-_ ( SLICE_I, 1 ), SLICE_N)\n" ^
+     "   if _>_ ( SLICE_I, 0 ) .\n\n"
+   else "") ^
+  (if features.uses_star_prefix then
+     "  --- Generic SpecTec star-map lowering for flat prefix constructors.\n" ^
+     "  --- Source shapes such as (SET t)* become $star-prefix(SET, t*), and\n" ^
+     "  --- $star-unprefix recovers t* from a matching flat encoded sequence.\n" ^
+     "  eq $star-prefix(STAR-PREFIX, eps) = eps .\n" ^
+     "  eq $star-prefix(STAR-PREFIX, STAR-ELEM STAR-REST) = STAR-PREFIX STAR-ELEM $star-prefix(STAR-PREFIX, STAR-REST) .\n" ^
+     "  eq $star-unprefix(STAR-PREFIX, eps) = eps .\n" ^
+     "  eq $star-unprefix(STAR-PREFIX, STAR-PREFIX STAR-ELEM STAR-REST) = STAR-ELEM $star-unprefix(STAR-PREFIX, STAR-REST) .\n\n"
+   else "")
 
-let footer =
-  "\n  --- Source-derived sequence-category predicate for SpecTec val* premises.\n" ^
-  "  eq  $is-spectec-val-seq(eps) = true .\n" ^
-  "  ceq $is-spectec-val-seq(W TS) = $is-spectec-val-seq(TS)\n" ^
-  "   if W : Val .\n" ^
-  "  eq  $is-spectec-val-seq(TS) = false [owise] .\n\n" ^
-  "  --- Executable lifting for SpecTec substitution helpers over lists.\n" ^
-  "  --- Generated helper signatures are element-level (`typeuse`, `valtype`),\n" ^
-  "  --- but rules such as unroll/expand call them on `typeuse*` and `valtype*`.\n" ^
-  "  eq $subst-typeuse(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
-  "  ceq $subst-typeuse(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
-  "      $subst-typeuse(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
-  "      $subst-typeuse(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
-  "   if SUBST-L-WS =/= eps .\n" ^
-  "  eq $subst-valtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
-  "  ceq $subst-valtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
-  "      $subst-valtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
-  "      $subst-valtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
-  "   if SUBST-L-WS =/= eps .\n" ^
-  "  eq $subst-subtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
-  "  ceq $subst-subtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
-  "      $subst-subtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
-  "      $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
-  "   if SUBST-L-WS =/= eps .\n" ^
-  "  --- Generic SpecTec list type witness.\n" ^
-  "  --- The source rule is polymorphic in the element type; this executable\n" ^
-  "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
-  "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
-  "   if (len(LIST-TS) < (2 ^ 32)) .\n" ^
+let footer features =
   "\n" ^
-  "  --- Source frame record representation.\n" ^
-  "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}; this generated\n" ^
-  "  --- constructor represents that source syntax alternative at sort Frame\n" ^
-  "  --- while preserving field projection and update behavior.\n" ^
-  "  eq value('LOCALS, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-LOCALS .\n" ^
-  "  eq value('MODULE, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-MODULE .\n" ^
-  "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'LOCALS <- FRAME-LOCALS2] = CTORFRAMEA2(FRAME-LOCALS2, FRAME-MODULE) .\n" ^
-  "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'MODULE <- FRAME-MODULE2] = CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE2) .\n" ^
+  (if features.uses_val_seq_predicate then
+     "  --- Source-derived sequence-category predicate for SpecTec val* premises.\n" ^
+     "  eq  $is-spectec-val-seq(eps) = true .\n" ^
+     "  ceq $is-spectec-val-seq(W TS) = $is-spectec-val-seq(TS)\n" ^
+     "   if W : Val .\n" ^
+     "  eq  $is-spectec-val-seq(TS) = false [owise] .\n\n"
+   else "") ^
+  (if features.uses_subst_typeuse then
+     "  --- Executable lifting for source substitution helper over lists.\n" ^
+     "  eq $subst-typeuse(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
+     "  ceq $subst-typeuse(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
+     "      $subst-typeuse(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
+     "      $subst-typeuse(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
+     "   if SUBST-L-WS =/= eps .\n"
+   else "") ^
+  (if features.uses_subst_valtype then
+     "  eq $subst-valtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
+     "  ceq $subst-valtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
+     "      $subst-valtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
+     "      $subst-valtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
+     "   if SUBST-L-WS =/= eps .\n"
+   else "") ^
+  (if features.uses_subst_subtype then
+     "  eq $subst-subtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
+     "  ceq $subst-subtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
+     "      $subst-subtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
+     "      $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
+     "   if SUBST-L-WS =/= eps .\n"
+   else "") ^
+  (if features.uses_has_type then
+     "  --- Generic SpecTec list type witness.\n" ^
+     "  --- The source rule is polymorphic in the element type; this executable\n" ^
+     "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
+     "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
+     "   if (len(LIST-TS) < (2 ^ 32)) .\n\n"
+   else "") ^
+  (if features.uses_frame_record then
+     "  --- Source frame record representation.\n" ^
+     "  --- SpecTec writes frames as {LOCALS ..., MODULE ...}; this generated\n" ^
+     "  --- constructor represents that source syntax alternative at sort Frame\n" ^
+     "  --- while preserving field projection and update behavior.\n" ^
+     "  eq value('LOCALS, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-LOCALS .\n" ^
+     "  eq value('MODULE, CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE)) = FRAME-MODULE .\n" ^
+     "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'LOCALS <- FRAME-LOCALS2] = CTORFRAMEA2(FRAME-LOCALS2, FRAME-MODULE) .\n" ^
+     "  eq CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE) [. 'MODULE <- FRAME-MODULE2] = CTORFRAMEA2(FRAME-LOCALS, FRAME-MODULE2) .\n"
+   else "") ^
   "\nendm\n"
 
-let step_predicate_helpers =
-  "  op $is-spectec-val-seq : SpectecTerminals -> Bool .\n" ^
-  "  op $subst-typeuse : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
-  "  op $subst-valtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
-  "  op $subst-subtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" ^
-  "  op CTORFRAMEA2 : SpectecTerminals SpectecTerminals -> Frame [ctor] .\n" ^
-  "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] .\n" ^
-  "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] .\n" ^
-  "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] .\n"
+let prelude_helper_decls features =
+  (if features.uses_val_seq_predicate then
+     "  op $is-spectec-val-seq : SpectecTerminals -> Bool .\n"
+   else "") ^
+  (if features.uses_subst_typeuse then
+     "  op $subst-typeuse : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_subst_valtype then
+     "  op $subst-valtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_subst_subtype then
+     "  op $subst-subtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
+   else "") ^
+  (if features.uses_frame_record then
+     "  op CTORFRAMEA2 : SpectecTerminals SpectecTerminals -> Frame [ctor] .\n"
+   else "") ^
+  (if features.uses_step_relations then
+     "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] .\n" ^
+     "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] .\n" ^
+     "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] .\n"
+   else "")
 
 let infer_rel_helper_block () =
   let current_helpers () =
@@ -5964,18 +6067,22 @@ let translate defs =
       (SIPairSet.elements ss.calls |> List.map fst |> SSet.of_list);
   let token_ops = build_token_ops ss in
   let call_ops = build_call_ops ss in
-  let prelude_features = prelude_features_of_source () in
+  let translated_defs =
+    String.concat "\n" (List.map (translate_definition ss) defs)
+  in
+  let body_without_prelude_helpers =
+    translated_defs ^ infer_rel_helper_block () ^ iter_rel_helper_block ()
+    ^ map_call_helper_block ()
+  in
+  let prelude_features =
+    prelude_features_of_source defs body_without_prelude_helpers token_ops
+  in
   let header =
     header_prefix prelude_features
     ^ "  --- Auto-collected tokens\n" ^ token_ops ^ call_ops
   in
-  let body_core =
-    step_predicate_helpers ^ "\n"
-    ^ String.concat "\n" (List.map (translate_definition ss) defs)
-  in
   let body =
-    body_core ^ infer_rel_helper_block () ^ iter_rel_helper_block ()
-    ^ map_call_helper_block ()
+    prelude_helper_decls prelude_features ^ "\n" ^ body_without_prelude_helpers
   in
   let lines = String.split_on_char '\n' body in
   let eqs = List.filter (fun l -> not (is_decl_line l)) lines in
@@ -6055,4 +6162,4 @@ let translate defs =
   in
   let eqs = eqs @ pred_eqs in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
-  "\n\n  --- Equations\n" ^ String.concat "\n" eqs ^ footer
+  "\n\n  --- Equations\n" ^ String.concat "\n" eqs ^ footer prelude_features

@@ -706,6 +706,13 @@ source-derived로 바꾼 것:
     그것을 include한다.
   - record syntax가 없는 spec에서는 이 record prelude 조각을 생략할 수 있는
     구조가 됐다.
+  - generated body/token output을 scan해서 실제로 쓰이는 header 조각만 emit한다.
+    현재 feature-gated 대상은 `w-bool`, `_hasType_`/`WellTyped`, `index(xs,i*)`,
+    `$repeat`, `slice`, `$star-prefix`/`$star-unprefix`, set-membership `_<-_`,
+    `merge`, wildcard `any`, Step wrapper infrastructure, `$is-spectec-val-seq`,
+    `$subst-*` sequence lifts, and `CTORFRAMEA2` frame projection/update support다.
+  - 즉 P4처럼 Step relation이나 Wasm frame helper를 쓰지 않는 spec에서는 해당
+    header/footer 조각을 emit하지 않는 방향으로 구조가 바뀌었다.
   - `SpectecTerminals` sequence carrier는 현재 translator의 기본 term-list
     representation이라 아직 항상 emit된다. 이것까지 완전히 feature-gated로
     줄이는 일은 다음 단계다.
@@ -731,7 +738,8 @@ source-derived로 바꾼 것:
 - `SpectecTerminal`, `SpectecTerminals`, `SpectecType`, `SpectecTypes`
 - `eps`, sequence concatenation, `len`, `index`
 - record `item`, `value`, update operators
-- generated header의 `Judgement`, `valid`, `StepConf` wrappers
+- generated header의 `Judgement`, `valid`
+- Step relation이 source에 있을 때만 emit되는 `StepConf` wrappers
 - generated source-meta helpers such as `index(xs, i*)`, `slice`, `$repeat`,
   `$star-prefix`, `$star-unprefix`
 - `w-bool`: SpecTec Bool 계산 결과를 terminal로 다시 넣기 위한 현재 Maude

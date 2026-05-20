@@ -133,12 +133,11 @@ mod SPECTEC-CORE is
 
   --- Syntax-category membership is represented by mb/cmb axioms, not by terminal subsorts.
 
-  --- Bool wrapper (avoid subsort Bool < SpectecTerminal conflicts)
+  --- Bool wrapper emitted because source defs return Bool as a terminal.
   op w-bool : Bool -> SpectecTerminal [ctor] .
 
   --- Source type constructors are generated from SpecTec declarations.
 
-  --- Special Operators
   --- Pair sort + well-typed witness for parametric type judgements.
   --- Non-parametric types use direct `mb T : S .` memberships.
   --- Parametric types emit `(mb|cmb) ( T hasType S ) : WellTyped [if ...] .`
@@ -160,9 +159,8 @@ mod SPECTEC-CORE is
   op slice : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals .
   op _<-_ : SpectecTerminal SpectecTerminals -> Bool .
 
-  --- Generic record/terminal combinators (parser support)
+  --- Generic record merge combinator emitted because source record composition uses it.
   op merge : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
-  op any : -> SpectecTerminal [ctor] .
 
   --- Record literals/updates come from DSL-RECORD and have sort SpectecTerminal.
   --- This keeps the baseline surface aligned with the SpecTec terminal model.
@@ -184,26 +182,11 @@ mod SPECTEC-CORE is
 
   --- Common variables (declared once)
   var EC : Config .
-  var I : Int .
-  var W-I : Int .
   op EXP : -> Int .
-  vars W-N W-M NLC NFC NHC : N .
   var ZS : State .
-  var ITS : SpectecTerminals .
   var LIST-TY : SpectecTerminal .
   var LIST-TS : SpectecTerminals .
-  vars MOD-TYPES MOD-TAGS MOD-GLOBALS MOD-MEMS MOD-TABLES MOD-FUNCS MOD-DATAS MOD-ELEMS MOD-EXPORTS : SpectecTerminals .
-  vars STORE-TAGS STORE-GLOBALS STORE-MEMS STORE-TABLES STORE-FUNCS STORE-DATAS STORE-ELEMS STORE-STRUCTS STORE-ARRAYS STORE-EXNS : SpectecTerminals .
   vars FRAME-LOCALS FRAME-LOCALS2 FRAME-MODULE FRAME-MODULE2 : SpectecTerminals .
-  vars WT-S WT-F : SpectecTerminal .
-  var WT-X : Localidx .
-  var WT-V : Val .
-  var INVOKE-X-S : SpectecTerminal .
-  var INVOKE-S-S : Store .
-  var INVOKE-X-FUNCADDR : Funcaddr .
-  var INVOKE-X-VAL : SpectecTerminals .
-  var INVOKE-X-DT : Deftype .
-  vars INVOKE-X-T1 INVOKE-X-T2 : SpectecTerminals .
   var SUBST-L-W : SpectecTerminal .
   vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : SpectecTerminals .
   var INDEX-I : Nat .
@@ -215,8 +198,8 @@ mod SPECTEC-CORE is
   var SLICE_REST : SpectecTerminals .
   vars STAR-PREFIX STAR-ELEM : SpectecTerminal .
   var STAR-REST : SpectecTerminals .
-  vars T W WW FQ : SpectecTerminal .
-  vars TS W* ISQ INSTRSQ CQ : SpectecTerminals .
+  vars T W : SpectecTerminal .
+  var TS : SpectecTerminals .
 
   --- Generic SpecTec sequence indexing: xs[i*] maps scalar index over i*.
   --- This is representation substrate for source meta-expressions, not a
@@ -13445,9 +13428,7 @@ mod SPECTEC-CORE is
    if W : Val .
   eq  $is-spectec-val-seq(TS) = false [owise] .
 
-  --- Executable lifting for SpecTec substitution helpers over lists.
-  --- Generated helper signatures are element-level (`typeuse`, `valtype`),
-  --- but rules such as unroll/expand call them on `typeuse*` and `valtype*`.
+  --- Executable lifting for source substitution helper over lists.
   eq $subst-typeuse(eps, SUBST-L-TV, SUBST-L-TU) = eps .
   ceq $subst-typeuse(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =
       $subst-typeuse(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)

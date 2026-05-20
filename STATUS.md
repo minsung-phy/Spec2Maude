@@ -157,6 +157,14 @@ Current accepted facts:
   `DSL-PRETYPE`, and `DSL-RECORD` modules directly into the generated output.
   The checked-in `dsl/pretype.maude` is currently a legacy/reference copy, not
   the active C1 dependency.
+- The generated header/footer is now partially feature-gated from the source
+  and generated body. Header pieces such as `w-bool`, `WellTyped`/`hasType`,
+  sequence-index/star/slice helpers, set-membership, merge/any, Step wrappers,
+  `$is-spectec-val-seq`, `$subst-*` sequence lifts, and `CTORFRAMEA2`
+  projection/update support are emitted only when the current spec output uses
+  them. This does not remove the generic `SpectecTerminals` carrier yet, but it
+  cuts another layer of fixed Wasm-oriented header/footer output for future
+  P4/general SpecTec experiments.
 - The first warning cleanup pass removed the Maude
   `assignment condition fragment ... bound before matching` advisory family by
   emitting equality checks when a premise no longer binds new variables. The
