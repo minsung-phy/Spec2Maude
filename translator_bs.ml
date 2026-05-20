@@ -1664,7 +1664,7 @@ and translate_typ_texpr (t : typ) vm : texpr =
   match t.it with
   | VarT (id, args) ->
       let name = match List.assoc_opt id.it vm with
-        | Some mapped when mapped <> String.uppercase_ascii mapped -> mapped
+        | Some mapped -> mapped
         | _ -> sanitize id.it
       in
       let arg_ts = List.map (fun a -> translate_arg a vm) args in
@@ -3061,6 +3061,50 @@ let rec unwrap_exp_for_meta (e : exp) =
   | UncaseE (e1, _) | TheE e1 | LiftE e1 -> unwrap_exp_for_meta e1
   | _ -> e
 
+let source_category_sort_of_pattern_name name =
+  let sort = sort_of_type_name name in
+  if SSet.mem sort !source_membership_sorts then Some sort else None
+
+let source_category_guard_texpr sort (term : texpr) : texpr =
+  if needs_source_category_predicate sort then begin
+    reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts;
+    { text = Printf.sprintf "%s ( %s )" (refined_exec_pred sort) term.text;
+      vars = term.vars }
+  end else
+    { text = Printf.sprintf "%s : %s" term.text sort; vars = term.vars }
+
+let source_category_bool_guard_texpr sort (term : texpr) : texpr =
+  reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts;
+  { text = Printf.sprintf "%s ( %s )" (refined_exec_pred sort) term.text;
+    vars = term.vars }
+
+let category_equality_side_condition vm lhs_e rhs_e =
+  let category_sort e =
+    match (unwrap_exp_for_meta e).it with
+    | VarE id -> source_category_sort_of_pattern_name id.it
+    | _ -> None
+  in
+  match category_sort lhs_e, category_sort rhs_e with
+  | Some sort, None ->
+      source_category_bool_guard_texpr sort (translate_exp TermCtx rhs_e vm)
+  | None, Some sort ->
+      source_category_bool_guard_texpr sort (translate_exp TermCtx lhs_e vm)
+  | _ -> texpr ""
+
+let rec category_disjunction_side_condition vm e =
+  match (unwrap_exp_for_meta e).it with
+  | CmpE (`EqOp, _, lhs_e, rhs_e) ->
+      let t = category_equality_side_condition vm lhs_e rhs_e in
+      if t.text = "" then None else Some t
+  | BinE (`OrOp, _, e1, e2) ->
+      (match category_disjunction_side_condition vm e1,
+             category_disjunction_side_condition vm e2 with
+       | Some t1, Some t2 ->
+           Some { text = Printf.sprintf "( %s or %s )" t1.text t2.text;
+                  vars = uniq_vars (t1.vars @ t2.vars) }
+       | _ -> None)
+  | _ -> None
+
 let inverse_prem_item_of_equality vm lhs_e rhs_e bool_t =
   let lhs_e = unwrap_exp_for_meta lhs_e in
   match lhs_e.it with
@@ -3346,6 +3390,12 @@ let rec collect_prem_items_of_exp vm e : prem_item list =
   match e.it with
   | BinE (`AndOp, _, e1, e2) ->
       collect_prem_items_of_exp vm e1 @ collect_prem_items_of_exp vm e2
+  | BinE (`OrOp, _, _, _) ->
+      (match category_disjunction_side_condition vm e with
+       | Some t -> [PremBool t]
+       | None ->
+           let t = translate_exp BoolCtx e vm in
+           if t.text = "" || t.text = "owise" then [] else [PremBool t])
   | CmpE (`EqOp, _, lhs_e, ({it = BoolE true; _} as _e2)) ->
       (* outer "= true" wrapper — recurse into lhs *)
       collect_prem_items_of_exp vm lhs_e
@@ -4921,6 +4971,8 @@ let translate_reld _id rel_name rules =
         let label_prefix = rule_label_prefix rel_name case_id.it rule_idx in
 
         let vm = binder_to_var_map prefix rule_idx binders in
+        reset_listn_pairs ();
+        record_listn_pairs_from_binders binders vm;
         let raw_typed_vars = binder_var_sorts binders vm in
         let bconds = binder_to_type_conds binders vm in
 
@@ -5026,9 +5078,10 @@ let translate_reld _id rel_name rules =
               if p.binds = [] then Some (prem_cond p.text) else None)
           |> List.filter (fun cond -> not (replaced_source_category_guard cond))
         in
+        let listn_len_conds = listn_len_conditions lhs_set in
         let all_conds =
-          prem_match_conds @ prem_bool_conds @ filtered_bconds @ refined_guards
-          @ premise_bound_refined_guards
+          prem_match_conds @ listn_len_conds @ prem_bool_conds @ filtered_bconds
+          @ refined_guards @ premise_bound_refined_guards
         in
         let cond = cond_join all_conds in
         let emit_rule ?(suffix="") lhs_text cond_text =
@@ -5229,14 +5282,14 @@ let header_prefix =
   "  eq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS) .\n\n" ^
   "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
   "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
-  "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = REPEAT_ELEM $repeat(REPEAT_ELEM, REPEAT_N - 1)\n" ^
-  "   if REPEAT_N > 0 .\n\n" ^
+  "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, ( REPEAT_N - 1 )) )\n" ^
+  "   if ( REPEAT_N > 0 ) .\n\n" ^
   "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
   "  eq slice(SLICE_REST, SLICE_I, 0) = eps .\n" ^
-  "  ceq slice(SLICE_ELEM SLICE_REST, 0, SLICE_N) = SLICE_ELEM slice(SLICE_REST, 0, SLICE_N - 1)\n" ^
-  "   if SLICE_N > 0 .\n" ^
-  "  ceq slice(SLICE_ELEM SLICE_REST, SLICE_I, SLICE_N) = slice(SLICE_REST, SLICE_I - 1, SLICE_N)\n" ^
-  "   if SLICE_I > 0 .\n\n" ^
+  "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, ( SLICE_N - 1 )) )\n" ^
+  "   if ( SLICE_N > 0 ) .\n" ^
+  "  ceq slice(( SLICE_ELEM SLICE_REST ), SLICE_I, SLICE_N) = slice(SLICE_REST, ( SLICE_I - 1 ), SLICE_N)\n" ^
+  "   if ( SLICE_I > 0 ) .\n\n" ^
   "  --- Generic SpecTec star-map lowering for flat prefix constructors.\n" ^
   "  --- Source shapes such as (SET t)* become $star-prefix(SET, t*), and\n" ^
   "  --- $star-unprefix recovers t* from a matching flat encoded sequence.\n" ^

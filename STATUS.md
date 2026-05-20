@@ -150,7 +150,14 @@ Current accepted facts:
 - The first warning cleanup pass removed the Maude
   `assignment condition fragment ... bound before matching` advisory family by
   emitting equality checks when a premise no longer binds new variables. The
-  remaining warning families are documented in `docs/limitation.md`.
+  second pass added generic `ListN` length binding for RelD rules, fixing the
+  `deftype-ok-r0` length-variable warning from source patterns such as
+  `rectype = REC subtype^n`. The next warning pass fixed source
+  category-pattern disjunctions such as `t' = numtype \/ t' = vectype` by
+  lowering them to generated Bool category predicates, and fixed DecD `TypA`
+  argument lowering so type parameters such as `$concat_(N, ...)` no longer
+  leave raw unbound `N` in generated helper conditions. The remaining warning
+  families are documented in `docs/limitation.md` and `docs/warnings.md`.
 - `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
   hardcoding such as:
 
@@ -169,8 +176,9 @@ evidence, not required reading for ordinary continuation work.
 Minimal reading order:
 
 1. `docs/limitation.md`: current truth for limitations and accepted/deferred debt.
-2. `STATUS.md`: commands, handoff state, and next tasks.
-3. `docs/HowToTest.md`: manual Maude smoke tests.
+2. `docs/warnings.md`: current Maude warning/advisory classification.
+3. `STATUS.md`: commands, handoff state, and next tasks.
+4. `docs/HowToTest.md`: manual Maude smoke tests.
 
 ## Strict Validation-Lowering Status
 
@@ -634,18 +642,23 @@ Val-ok(...)
 
 ## Warning Cleanup
 
-Maude load warnings remain. Classify them later into:
+Current `load wasm-exec-bs` warning status after the current cleanup passes:
 
-- advisory / cosmetic;
-- multiple distinct parses;
-- used-before-bound.
+- assignment-fragment advisory: removed.
+- used-before-bound: 25 total. Generic bugs fixed so far include `ListN`
+  length binding for `deftype-ok-r0`, category-pattern disjunction lowering for
+  `t' = numtype \/ t' = vectype`, and DecD `TypA` parameter lowering for
+  `$ivadd-pairwise`. The remaining cases are mostly witness synthesis,
+  numeric/vector helper output witnesses, and init/eval helper witnesses.
+- multiple distinct parses: 95. These are mostly precedence/associativity
+  warnings around arithmetic expressions, sequence concatenation, and generated
+  `$map-*` equations.
+- duplicate-import-advisory: 3. Defer to `dsl/pretype` cleanup.
 
-`scripts/run_c1_regression.sh` now writes a warning classification CSV. The
-current important class is validation `used-before-bound`, especially rules
-with source witnesses. The new execution overlay fixes focused concrete
-witness probes, but the warnings are still useful evidence that Maude is seeing
-mode-sensitive source premises. Treat each warning family as a separate
-source-preserving scheduling question rather than deleting premises.
+`scripts/run_c1_regression.sh` writes a warning classification CSV. Treat each
+remaining warning family as a separate source-preserving scheduling or
+pretty-printing question rather than deleting premises or blindly changing
+assignment fragments.
 
 ## Latest Focused Failure Triage
 
