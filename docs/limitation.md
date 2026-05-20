@@ -57,27 +57,48 @@ source-valid probe로 다시 확인해야 한다.
 
 ### D. 남은 Maude warning/advisory
 
-2026-05-21 warning cleanup에서 `:=` assignment advisory는 generic하게 줄였다.
-source premise가 실제 binding이 아니라 이미 bound된 값을 확인하는 경우는
-Maude condition에서 `==` equality check로 생성되도록 바꿨다.
+2026-05-21 warning cleanup에서 `:=` assignment advisory는 generic하게
+제거했다. source premise가 실제 binding이 아니라 이미 bound된 값을 확인하는
+경우는 Maude condition에서 `==` equality check로 생성되도록 바꿨다.
+
+2차 warning cleanup에서 추가로 고친 것:
+
+- `ListN`/fixed-length 반복 패턴의 길이 변수 바인딩을 generic RelD lowering에도
+  반영했다. 예를 들어 source의 `rectype = REC subtype^n`은 이제
+  `SUBTYPES := ...` 다음에 `N := len(SUBTYPES)`를 생성한다. 그래서
+  `deftype-ok-r0`의 `N used before bound` warning은 제거됐다.
+- source category-pattern disjunction을 generic하게 낮췄다. 예를 들어
+  `t' = numtype \/ t' = vectype`는 더 이상 raw `NUMTYPE`/`VECTYPE`
+  witness 변수를 만들지 않고
+  `($is-spectec-numtype(t') or $is-spectec-vectype(t'))`처럼 Bool 조건으로
+  생성된다. 그래서 `instr-ok-select-impl`, `instr-ok-array-new-data`,
+  `instr-ok-array-init-data`의 category-pattern `used-before-bound` warning은
+  제거됐다.
+- DecD의 `TypA`/syntax argument가 이미 바인딩된 type parameter를 가리킬 때
+  그 mapping을 보존하도록 고쳤다. 그래서 `$ivadd-pairwise`에서 source
+  `$concat_(N, ...)`의 `N`이 raw `N`으로 남던 warning은 제거됐다.
 
 현재 `load wasm-exec-bs` 기준 남은 warning family:
 
-- `used-before-bound`: 32개. 대부분 validation inference overlay,
-  numeric/vector helper, allocation/eval/init helper에서 output witness를
-  Maude rewriting이 만들어야 하는 경우다. 단순히 `:=`를 `==`로 바꾸면
-  오히려 더 위험해져서 이번 cleanup에서는 유지했다.
+- `used-before-bound`: 25개. 세부적으로는 validation 6개,
+  execution/def 12개, label 없는 numeric/vector helper 7개다.
+  대부분 validation inference overlay, numeric/vector helper,
+  allocation/eval/init helper에서 output witness를 Maude rewriting이 만들어야
+  하는 경우다. 단순히 `:=`를 `==`로 바꾸면 오히려 더 위험해져서 유지했다.
 - `multiple distinct parses`: 95개. 주로 arithmetic expression, sequence
   concatenation, generated `$map-*` equations의 precedence/associativity
-  모호성이다. 현재 smoke 실행을 깨지는 않지만, 다음 header/footer cleanup에서
-  괄호 생성 규칙을 더 정리할 수 있다.
+  모호성이다. header의 `$repeat`/`slice`에 괄호를 보강해 보았지만 Maude의
+  associative sequence parsing 특성상 warning 숫자는 아직 줄지 않았다.
+  다음 단계에서는 전체 arithmetic/sequence pretty-printer precedence 정책을
+  따로 봐야 한다.
 - `duplicate-import-advisory`: 3개. `dsl/pretype.maude`의 record update
   operator가 여러 import path로 들어오는 구조 때문이다. `dsl/pretype`
   정리 단계에서 보는 것이 맞다.
-- `other`: 1개. 세부 triage 필요.
 
 즉 현재 warning은 완전히 0은 아니지만, 가장 눈에 거슬리던
-`assignment condition fragment ... already bound` 계열은 제거했다.
+`assignment condition fragment ... already bound` 계열은 제거했다. 숫자를
+줄이기 위해 무작정 condition을 바꾸는 것은 C1 실행을 깨기 쉬우므로, 남은
+warning은 source rule 단위로 하나씩 판다.
 
 ### E. 지금 통과하는 핵심 smoke
 
@@ -211,7 +232,7 @@ SpecTec source에는 `(premise)*` 같은 meta-notation이 있다. Maude에서는
 
 `$is-spectec-*`를 최대한 줄였다.
 
-이미 제거된 대표 guard:
+이미 제거된 대표 binder-only guard:
 
 - `$is-spectec-context`
 - `$is-spectec-store`
@@ -221,9 +242,12 @@ SpecTec source에는 `(premise)*` 같은 meta-notation이 있다. Maude에서는
 - `$is-spectec-idx`
 - `$is-spectec-labelidx`
 - `$is-spectec-localidx`
-- `$is-spectec-numtype`
-- `$is-spectec-vectype`
 - `$is-spectec-packtype`
+
+주의: `$is-spectec-numtype` / `$is-spectec-vectype` predicate 자체는 여전히
+생성될 수 있다. 이는 binder-only guard가 아니라 source의
+`t' = numtype \/ t' = vectype` 같은 category-pattern disjunction을 Bool 조건으로
+표현하기 위한 것이다.
 
 현재 남은 predicate family:
 
