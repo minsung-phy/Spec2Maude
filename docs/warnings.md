@@ -175,15 +175,15 @@ vector-specific shortcut을 추가하지 않는다.
 원인:
 
 - `dsl/pretype.maude`에 list update operator `_[_<-_]`가
-  `Nat` index 버전과 `WasmTerminal` index 버전으로 둘 다 선언되어 있었다.
-- `output_bs.maude` 쪽에서 `Nat < WasmTerminal`을 선언하면 Maude가 이 overload를
+  `Nat` index 버전과 `SpectecTerminal` index 버전으로 둘 다 선언되어 있었다.
+- `output_bs.maude` 쪽에서 `Nat < SpectecTerminal`을 선언하면 Maude가 이 overload를
   중복 import처럼 본다.
 
 수정:
 
-- `Nat < WasmTerminal`을 `DSL-PRETYPE`에 둔다.
+- `Nat < SpectecTerminal`을 generated `DSL-PRETYPE`에 둔다.
 - generated `SPECTEC-CORE` header에서는 같은 subsort 선언을 반복하지 않는다.
-- `_[_<-_]`는 `WasmTerminal` index 버전 하나만 둔다.
+- `_[_<-_]`는 `SpectecTerminal` index 버전 하나만 둔다.
 - Nat index update는 subsort 때문에 그대로 동작한다.
 
 ## 남은 command-time membership warning
@@ -197,7 +197,7 @@ membership axioms are not guaranteed to work correctly for associative symbol ..
 확인된 원인:
 
 - source syntax/category를 `mb/cmb`로 표현한 generated membership axiom들이
-  Maude builtin `Nat`/`Int` operator 또는 `WasmTerminals` sequence operator와
+  Maude builtin `Nat`/`Int` operator 또는 `SpectecTerminals` sequence operator와
   얽힌다.
 - 예를 들어 `cmb T : N if T : Nat` 같은 source alias membership은 Maude가
   `Nat`의 `s_`, `_+_`, `_*_` 같은 operator까지 고려하면서 warning을 낸다.

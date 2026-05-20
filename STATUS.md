@@ -128,7 +128,7 @@ Current accepted facts:
   `Instr_ok/nop` now generate unconditional Maude `rl`.
 - Non-record sequence/composite categories such as `instr`, `expr`,
   `valtype`, and `idx` are intentionally still carried through the broad
-  `WasmTerminal`/`WasmTerminals` substrate with generated membership predicates
+  `SpectecTerminal`/`SpectecTerminals` substrate with generated membership predicates
   where needed. A direct attempt to narrow instruction sequence decomposition
   too aggressively caused Maude divergence on `Expr-ok-const`; this is recorded
   in `docs/archive/current-c1/record_sort_guard_removal_audit.md` and
@@ -147,6 +147,16 @@ Current accepted facts:
   `$idx-typeuses` were audited as source-absent and unused; they were removed
   from the generator and regenerated output, with accepted execution smokes
   still passing.
+- Header/pretype cleanup has started for P4/general SpecTec readiness. The
+  legacy fixed `w-N` / `w-M` / ... / `w-E` `SpectecType` constants and the unused
+  header `_ =++ _` declaration were removed. The old hardcoded
+  `Nat < Labelidx` / `Nat < Localidx` / `Nat < Addr`-style list is now emitted
+  from the SpecTec source alias graph instead of a fixed Wasm-name list.
+- The active generated `output_bs.maude` no longer depends on
+  `load dsl/pretype`. `translator_bs.ml` emits the generic `DSL-TERM`,
+  `DSL-PRETYPE`, and `DSL-RECORD` modules directly into the generated output.
+  The checked-in `dsl/pretype.maude` is currently a legacy/reference copy, not
+  the active C1 dependency.
 - The first warning cleanup pass removed the Maude
   `assignment condition fragment ... bound before matching` advisory family by
   emitting equality checks when a premise no longer binds new variables. The
@@ -220,7 +230,7 @@ categories are:
   limitation, with label-related `step-from-step-pure-*` shortcuts retained as
   non-C1-final debt. A focused ablation showed the strict bridge LHS matches
   and direct `step-pure(label(... br 0))` rewrites to `eps`, but Maude does not
-  bind the `WasmTerminals` result variable in the generated rewrite premise;
+  bind the `SpectecTerminals` result variable in the generated rewrite premise;
   broadening the premise result to `StepPureConf` admits zero-step unreduced
   `step-pure(...)` terms and is not a faithful C1 repair;
 - invoke-path execution: `steps(fib-config-invoke(...))` currently stops at
@@ -305,7 +315,7 @@ These are C1 design constraints.
 6. **Grow the work from Wasm-to-Maude toward generic SpecTec-to-Maude.** Audit
    Wasm-specific names/hardcoding, try non-Wasm SpecTec inputs such as
    `p4-spectec`, and identify unsupported frontend/spec features.
-7. **Re-evaluate the `WasmTerm` / `WasmType` / typecheck infrastructure.** Do
+7. **Re-evaluate the `WasmTerm` / `SpectecType` / typecheck infrastructure.** Do
    not delete Wasm object-language type syntax or SpecTec validation semantics.
    Instead distinguish:
    - object-language type syntax;
@@ -314,7 +324,7 @@ These are C1 design constraints.
 
    If well-typed input programs are assumed, audit whether execution rules
    still need runtime typecheck/membership guards, and whether broad
-   `WasmType` ground terms that never appear in actual programs/configurations
+   `SpectecType` ground terms that never appear in actual programs/configurations
    unnecessarily pollute the syntax universe.
 8. **Check broad coverage.** Verify all relevant Wasm SpecTec documents and use
    non-Wasm smoke-test failures as evidence of current genericity limitations.
@@ -411,7 +421,7 @@ split exists for terms such as `label(... br 0) local.get 1`; however the
 inner generic `step-pure` bridge does not produce
 `step((Z ; label(... br 0))) => (Z ; eps)` operationally. The direct
 `step-pure(label(... br 0)) => eps` rewrite succeeds, but the generated bridge
-condition with a `WasmTerminals` result variable does not bind the collapsed
+condition with a `SpectecTerminals` result variable does not bind the collapsed
 `eps` result. Reordering the conditions to put the `Step` premise first caused
 runaway recursion / stack overflow, and broadening the result to `StepPureConf`
 admitted zero-step unreduced `step-pure(...)` terms.
@@ -435,7 +445,7 @@ Generated Maude must expose these public wrappers:
 
 ```maude
 op step      : Config -> StepConf [frozen (1)] .
-op step-pure : WasmTerminals -> StepPureConf [frozen (1)] .
+op step-pure : SpectecTerminals -> StepPureConf [frozen (1)] .
 op step-read : Config -> StepReadConf [frozen (1)] .
 op steps     : Config -> StepsConf .
 ```
@@ -594,13 +604,30 @@ but is not yet a generic parser for P4 `.watsup` syntax. This is useful
 limitation evidence for future generic SpecTec-to-Maude work, not a blocker for
 current Wasm C1 cleanup.
 
-## `WasmType` / Typecheck Infrastructure Audit
+## `SpectecType` / Typecheck Infrastructure Audit
 
 The old hand-written `dsl/pretype.maude` typecheck predicates
 `is-type`, `are-types`, and `are-mixed` have been removed from the current C1
-prelude because generated `output_bs.maude` no longer uses them. `WasmType` /
-`WasmTypes` still remain as the broad category/type witness substrate and should
+prelude because generated `output_bs.maude` no longer uses them. `SpectecType` /
+`SpectecTypes` still remain as the broad category/type witness substrate and should
 be audited before making invasive changes.
+
+The latest header cleanup also removed unused fixed `w-*` type constants from
+the generated header and replaced the fixed Wasm index/address Nat-subsort list
+with source-derived alias analysis. `SpectecTerminal`, `SpectecTerminals`,
+`SpectecType`, `SpectecTypes`, `Judgement`, `valid`, and the step wrapper sorts still
+remain as current Maude representation substrate.
+
+The generated C1 output now includes its own generic prelude modules instead of
+loading `dsl/pretype.maude`. This is a first step toward P4/general SpecTec
+support: the prelude is still a generic Maude encoding chosen by the translator,
+but it is no longer an external hand-written Wasm-named dependency.
+
+The generated prelude is now split into feature-oriented pieces. `DSL-RECORD`
+is emitted only when the scanned source uses source record/`StructT` shapes.
+`DSL-PRETYPE` / `SpectecTerminals` is still emitted as the common term-sequence
+carrier because the current translator represents SpecTec terminal lists through
+that substrate.
 
 Clarifications:
 
@@ -612,7 +639,7 @@ Clarifications:
 
 Audit questions:
 
-- Where are `WasmType` and `WasmTypes` still used?
+- Where are `SpectecType` and `SpectecTypes` still used?
 - Are they used in execution rules, validation rules, or only generated
   membership/typecheck scaffolding?
 - For already validated / well-typed input programs, do execution rules still
@@ -664,9 +691,9 @@ Current `load wasm-exec-bs` warning status after the current cleanup passes:
   print 11 Maude builtin/pretype associative membership warnings plus one
   source-sequence `Nonfuncs` collapse advisory. Current smoke results are
   normal; defer this to typed sort/category cleanup.
-- duplicate-import-advisory: removed. `Nat < WasmTerminal` now lives in
+- duplicate-import-advisory: removed. `Nat < SpectecTerminal` now lives in
   `DSL-PRETYPE`, and the record/list update operator keeps only the
-  `WasmTerminal` index declaration. Nat-index updates still work through the
+  `SpectecTerminal` index declaration. Nat-index updates still work through the
   subsort.
 
 `scripts/run_c1_regression.sh` writes a warning classification CSV. Treat each

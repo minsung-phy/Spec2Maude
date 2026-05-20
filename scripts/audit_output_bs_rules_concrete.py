@@ -348,7 +348,7 @@ def candidates_for(name: str, sort: str) -> list[str]:
     if sort == "Externaddr":
         return ["CTORFUNCA1(0)", "CTORGLOBALA1(0)"]
 
-    if sort == "WasmTerminals":
+    if sort == "SpectecTerminals":
         if h in {"INSTRS", "INSTRSQ", "EXPR", "EXPRS", "CODE", "BODY"}:
             return ["INSTR0", "INSTR1", "eps"]
         if h in {"VAL", "VALS", "VALSQ", "V", "VS"}:
@@ -375,7 +375,7 @@ def candidates_for(name: str, sort: str) -> list[str]:
             return ["eps", "0", "0 1"]
         return ["eps", "CTORI32A0", "INSTR0"]
 
-    if sort == "WasmTerminal":
+    if sort == "SpectecTerminal":
         if h in {"C", "CTX"} or n.endswith("_C") or n.endswith("-C"):
             return ["C2", "C0", "C1"]
         if h in {"INSTR", "INSTRQ", "INSTR1", "INSTR2", "EXPR", "CODE", "BODY"}:
@@ -448,7 +448,7 @@ def substitutions_for(rule: Rule, vars_by_name: dict[str, str], max_variants: in
     emptyish: dict[str, str] = {}
     for name in names:
         sort = vars_by_name[name]
-        if sort == "WasmTerminals" or sort in {"Resulttype"}:
+        if sort == "SpectecTerminals" or sort in {"Resulttype"}:
             emptyish[name] = "eps"
         else:
             emptyish[name] = candidates_for(name, sort)[0]

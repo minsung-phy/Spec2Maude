@@ -76,7 +76,7 @@ Spec2Maude/
 ├── output_bs.maude         # Generated C1 Maude output; do not hand-edit as final
 ├── wasm-exec-bs.maude      # Current Fibonacci execution/regression harness
 ├── wasm-3.0/*.spectec      # WebAssembly 3.0 SpecTec sources
-├── dsl/pretype.maude       # Shared Maude foundation modules
+├── dsl/pretype.maude       # Legacy/reference copy of the generic prelude
 ├── STATUS.md               # Current handoff and research state
 ├── README.md               # This file
 ├── translator.ml           # Older/reference translator path
@@ -99,7 +99,7 @@ Generated Maude exposes wrappers of the form:
 
 ```maude
 op step      : Config -> StepConf [frozen (1)] .
-op step-pure : WasmTerminals -> StepPureConf [frozen (1)] .
+op step-pure : SpectecTerminals -> StepPureConf [frozen (1)] .
 op step-read : Config -> StepReadConf [frozen (1)] .
 op steps     : Config -> StepsConf [frozen (1)] .
 ```
@@ -292,13 +292,26 @@ Current status: P4 `.watsup` files mostly fail during parsing with syntax or
 token errors. This shows a frontend/generic-SpecTec limitation, not a Maude
 backend result yet.
 
-## `WasmType` / Typecheck Infrastructure Audit
+## `SpectecType` / Typecheck Infrastructure Audit
 
 The old hand-written `dsl/pretype.maude` typecheck predicates `is-type`,
 `are-types`, and `are-mixed` have been removed from the current C1 prelude
 because generated `output_bs.maude` no longer uses them. The remaining
-`WasmType` / `WasmTypes` substrate may still be overly broad and should be
+`SpectecType` / `SpectecTypes` substrate may still be overly broad and should be
 audited separately.
+
+The active C1 output no longer starts with `load dsl/pretype`. The translator
+now emits the generic `DSL-TERM`, `DSL-PRETYPE`, and `DSL-RECORD` Maude modules
+directly into `output_bs.maude`. The checked-in `dsl/pretype.maude` is kept as a
+legacy/reference copy while this generated-prelude path stabilizes.
+The generated prelude is split into feature-oriented pieces: record support is
+emitted only for sources that use record/`StructT` shapes, while the current
+`SpectecTerminals` sequence carrier remains common substrate.
+
+The generated header no longer declares unused fixed `w-N` / `w-M` / ... /
+`w-E` `SpectecType` constants, and the old fixed Nat-to-index/address subsort list
+is now generated from SpecTec source aliases such as `idx = u32` and
+`addr = nat`.
 
 This does **not** mean deleting Wasm type syntax such as `i32`, `functype`, or
 `heaptype`, and it does **not** mean deleting validation semantics.

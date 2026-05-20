@@ -48,7 +48,7 @@ mod C1-PROBE-TERMS is
   eq invoke-inner-frame =
     CTORFRAMEA2(i32v(5) i32v(0) i32v(1) i32v(0), fib-moduleinst) .
 
-  op invoke-inner-instrs : -> WasmTerminals .
+  op invoke-inner-instrs : -> SpectecTerminals .
   eq invoke-inner-instrs =
     CTORLABELLBRACERBRACEA3(1, eps, fib-body) .
 

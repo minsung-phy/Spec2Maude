@@ -392,7 +392,7 @@ def known_limitation_reason(artifact: Artifact, command: str, output: str) -> st
     if "$ivbitmaskop" in text or "$vbitmaskop" in text:
         return "vector bitmask def needs generic lowering for non-variable iterated expressions and inverse/builtin bit conversion"
     if "$evalexprss" in text or "evalexprss-r1" in text:
-        return "expr** is flattened to WasmTerminals, so recursive grouping of expr* can choose an empty/non-progress split"
+        return "expr** is flattened to SpectecTerminals, so recursive grouping of expr* can choose an empty/non-progress split"
     if "Instrs-ok" in text and ("CTORCONSTA2" in text or "instrs-ok-sub" in text):
         return "Instrs-ok non-empty/value-producing sequence currently exposes validation execution overlay recursion"
     if "Expr-ok-const" in text or "expr-ok-const" in text:
