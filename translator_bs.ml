@@ -1224,7 +1224,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | CvtE (e1, _, _) | SubE (e1, _, _) | ProjE (e1, _)
   | UncaseE (e1, _) -> translate_exp ctx e1 vm
   | UnE (op, _, e1) -> (match op with
-      | `MinusOp -> tmap (Printf.sprintf "( 0 - ( %s ) )") (translate_exp TermCtx e1 vm)
+      | `MinusOp -> tmap (Printf.sprintf "_-_ ( 0, %s )") (translate_exp TermCtx e1 vm)
       | `PlusOp -> translate_exp TermCtx e1 vm
       | `NotOp ->
           let t = translate_exp BoolCtx e1 vm in
@@ -1232,10 +1232,10 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | BinE (op, _, e1, e2) -> translate_binop ctx op e1 e2 vm
   | CmpE (op, _, e1, e2) ->
       let op_str = match (op : cmpop) with
-        | `LtOp -> "<" | `GtOp -> ">" | `LeOp -> "<=" | `GeOp -> ">="
-        | `EqOp -> "==" | `NeOp -> "=/=" in
+        | `LtOp -> "_<_" | `GtOp -> "_>_" | `LeOp -> "_<=_" | `GeOp -> "_>=_"
+        | `EqOp -> "_==_" | `NeOp -> "_=/=_" in
       let t1 = translate_exp TermCtx e1 vm and t2 = translate_exp TermCtx e2 vm in
-      { text = wrap_bool ctx (Printf.sprintf "( %s %s %s )" t1.text op_str t2.text);
+      { text = wrap_bool ctx (Printf.sprintf "%s ( %s, %s )" op_str t1.text t2.text);
         vars = t1.vars @ t2.vars }
   | CallE (id, args) ->
       let ts = List.map (fun a -> translate_arg a vm) args in
@@ -1413,14 +1413,14 @@ and translate_case ctx mixop inner vm =
           vars = List.concat_map (fun t -> t.vars) args }
 
 and translate_binop ctx op e1 e2 vm =
-  let (op_str, is_bool) = match (op : binop) with
-    | `AddOp -> ("+", false) | `SubOp -> ("-", false) | `MulOp -> ("*", false)
-    | `DivOp -> (" quo ", false) | `ModOp -> (" rem ", false) | `PowOp -> (" ^ ", false)
-    | `AndOp -> (" and ", true) | `OrOp -> (" or ", true)
-    | `ImplOp -> (" implies ", true) | `EquivOp -> (" == ", true) in
+  let (op_name, is_bool) = match (op : binop) with
+    | `AddOp -> ("_+_", false) | `SubOp -> ("_-_", false) | `MulOp -> ("_*_", false)
+    | `DivOp -> ("_quo_", false) | `ModOp -> ("_rem_", false) | `PowOp -> ("_^_", false)
+    | `AndOp -> ("_and_", true) | `OrOp -> ("_or_", true)
+    | `ImplOp -> ("_implies_", true) | `EquivOp -> ("_==_", true) in
   let sub_ctx = if is_bool then BoolCtx else TermCtx in
   let t1 = translate_exp sub_ctx e1 vm and t2 = translate_exp sub_ctx e2 vm in
-  let text = Printf.sprintf "( %s %s %s )" t1.text op_str t2.text in
+  let text = Printf.sprintf "%s ( %s, %s )" op_name t1.text t2.text in
   { text = if is_bool then wrap_bool ctx text else text; vars = t1.vars @ t2.vars }
 
 (* Translate `base [ path op= value ]` where `path` may be a chain of
@@ -3100,7 +3100,7 @@ let rec category_disjunction_side_condition vm e =
       (match category_disjunction_side_condition vm e1,
              category_disjunction_side_condition vm e2 with
        | Some t1, Some t2 ->
-           Some { text = Printf.sprintf "( %s or %s )" t1.text t2.text;
+           Some { text = Printf.sprintf "_or_ ( %s, %s )" t1.text t2.text;
                   vars = uniq_vars (t1.vars @ t2.vars) }
        | _ -> None)
   | _ -> None
@@ -4075,7 +4075,7 @@ let translate_decd ss id params result_typ insts =
       |> List.map normalize_generated_free_const_assignment
     in
     let cond = cond_join all_conds in
-    let cond_str = if cond = "" then "" else " \n      if " ^ cond in
+    let cond_str = if cond = "" then "" else "\n      if " ^ cond in
     let clause_is_rewrite = clause_uses_rewrite in
     if clause_is_rewrite then seen_rewrite_clause := true;
     if clause_is_rewrite then
@@ -5282,14 +5282,14 @@ let header_prefix =
   "  eq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS) .\n\n" ^
   "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
   "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
-  "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, ( REPEAT_N - 1 )) )\n" ^
-  "   if ( REPEAT_N > 0 ) .\n\n" ^
+  "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
+  "   if _>_ ( REPEAT_N, 0 ) .\n\n" ^
   "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
   "  eq slice(SLICE_REST, SLICE_I, 0) = eps .\n" ^
-  "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, ( SLICE_N - 1 )) )\n" ^
-  "   if ( SLICE_N > 0 ) .\n" ^
-  "  ceq slice(( SLICE_ELEM SLICE_REST ), SLICE_I, SLICE_N) = slice(SLICE_REST, ( SLICE_I - 1 ), SLICE_N)\n" ^
-  "   if ( SLICE_I > 0 ) .\n\n" ^
+  "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, _-_ ( SLICE_N, 1 )) )\n" ^
+  "   if _>_ ( SLICE_N, 0 ) .\n" ^
+  "  ceq slice(( SLICE_ELEM SLICE_REST ), SLICE_I, SLICE_N) = slice(SLICE_REST, _-_ ( SLICE_I, 1 ), SLICE_N)\n" ^
+  "   if _>_ ( SLICE_I, 0 ) .\n\n" ^
   "  --- Generic SpecTec star-map lowering for flat prefix constructors.\n" ^
   "  --- Source shapes such as (SET t)* become $star-prefix(SET, t*), and\n" ^
   "  --- $star-unprefix recovers t* from a matching flat encoded sequence.\n" ^
@@ -5710,12 +5710,12 @@ let map_call_helper_block () =
       in
       let head = Printf.sprintf "index ( %s, 0 )" seq in
       let tail =
-        Printf.sprintf "slice ( %s, 1, ( len ( %s ) - 1 ) )" seq seq
+        Printf.sprintf "slice ( %s, 1, _-_ ( len ( %s ), 1 ) )" seq seq
       in
       let map_block = Printf.sprintf
         "  op %s : %s -> WasmTerminals .\n%s\
          \n  eq %s ( %s ) = eps .\n\
-         \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n      if %s =/= eps .\n"
+         \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n      if _=/=_ ( %s, eps ) .\n"
         h.map_helper_name op_sorts var_decl
         h.map_helper_name (helper_args "eps")
         h.map_helper_name (helper_args seq)

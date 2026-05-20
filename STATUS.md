@@ -156,8 +156,11 @@ Current accepted facts:
   category-pattern disjunctions such as `t' = numtype \/ t' = vectype` by
   lowering them to generated Bool category predicates, and fixed DecD `TypA`
   argument lowering so type parameters such as `$concat_(N, ...)` no longer
-  leave raw unbound `N` in generated helper conditions. The remaining warning
-  families are documented in `docs/limitation.md` and `docs/warnings.md`.
+  leave raw unbound `N` in generated helper conditions. The latest warning pass
+  removed `multiple distinct parses` by printing arithmetic, Bool, comparison,
+  and generated `$map-*` helper expressions with explicit Maude prefix
+  operators. The remaining warning families are documented in
+  `docs/limitation.md` and `docs/warnings.md`.
 - `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
   hardcoding such as:
 
@@ -249,8 +252,8 @@ Current next tasks:
 
 1. Review `docs/limitation.md` with the professor.
 2. Continue warning cleanup only for source-preserving fixes: especially
-   `used-before-bound` witness cases and precedence-related `multiple distinct
-   parses`.
+   remaining `used-before-bound` witness cases. Precedence-related
+   `multiple distinct parses` are currently removed.
 3. Decide whether the generic `$iter-*` relation-star substrate and the new
    `$infer-*` / `-exec-tail-empty*` validation execution overlay
    are acceptable in C1, or whether they should move to C2.
@@ -650,9 +653,13 @@ Current `load wasm-exec-bs` warning status after the current cleanup passes:
   `t' = numtype \/ t' = vectype`, and DecD `TypA` parameter lowering for
   `$ivadd-pairwise`. The remaining cases are mostly witness synthesis,
   numeric/vector helper output witnesses, and init/eval helper witnesses.
-- multiple distinct parses: 95. These are mostly precedence/associativity
-  warnings around arithmetic expressions, sequence concatenation, and generated
-  `$map-*` equations.
+- multiple distinct parses: removed. Arithmetic, Bool, comparison, category
+  disjunction, unary minus, and generated `$map-*` helper expressions now print
+  with explicit Maude prefix operators where needed.
+- command-time membership warnings: `load ... ; q` does not show the old
+  membership warning family, but actual `red/search` smoke commands can still
+  print 11 Maude builtin/pretype associative membership warnings. Current smoke
+  results are normal; defer this to `dsl/pretype` / builtin sort cleanup.
 - duplicate-import-advisory: 3. Defer to `dsl/pretype` cleanup.
 
 `scripts/run_c1_regression.sh` writes a warning classification CSV. Treat each
