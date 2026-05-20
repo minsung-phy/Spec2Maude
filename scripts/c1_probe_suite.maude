@@ -18,11 +18,11 @@ mod C1-PROBE-TERMS is
      item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)} .
 
   op invoke-outer-frame : -> Frame .
-  eq invoke-outer-frame = CTORFRAMEA2(eps, invoke-literal-moduleinst) .
+  eq invoke-outer-frame = RECFrameA2(eps, invoke-literal-moduleinst) .
 
   op invoke-inner-frame : -> Frame .
   eq invoke-inner-frame =
-    CTORFRAMEA2(i32v(5) i32v(0) i32v(1) i32v(0), fib-moduleinst) .
+    RECFrameA2(i32v(5) i32v(0) i32v(1) i32v(0), fib-moduleinst) .
 
   op invoke-inner-instrs : -> SpectecTerminals .
   eq invoke-inner-instrs =
@@ -89,7 +89,7 @@ rew [10000] in C1-PROBE-TERMS : steps(fib-config-invoke(i32v(5))) .
 red in C1-PROBE-TERMS : $expanddt(value('TYPE, fib-funcinst)) .
 search [5] in C1-PROBE-TERMS :
   step((fib-store ;
-    CTORFRAMEA2(
+    RECFrameA2(
       CTORCONSTA2(CTORI32A0, 0)
       CTORCONSTA2(CTORI32A0, 5)
       CTORCONSTA2(CTORI32A0, 8)
