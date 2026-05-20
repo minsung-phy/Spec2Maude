@@ -596,8 +596,11 @@ current Wasm C1 cleanup.
 
 ## `WasmType` / Typecheck Infrastructure Audit
 
-The current `WasmTerm` / `WasmType` / `is-type` / `are-types` framework may be
-legacy or ad hoc. Audit before making invasive changes.
+The old hand-written `dsl/pretype.maude` typecheck predicates
+`is-type`, `are-types`, and `are-mixed` have been removed from the current C1
+prelude because generated `output_bs.maude` no longer uses them. `WasmType` /
+`WasmTypes` still remain as the broad category/type witness substrate and should
+be audited before making invasive changes.
 
 Clarifications:
 
@@ -609,7 +612,7 @@ Clarifications:
 
 Audit questions:
 
-- Where are `WasmType`, `is-type`, `are-types`, and `are-mixed` used?
+- Where are `WasmType` and `WasmTypes` still used?
 - Are they used in execution rules, validation rules, or only generated
   membership/typecheck scaffolding?
 - For already validated / well-typed input programs, do execution rules still
