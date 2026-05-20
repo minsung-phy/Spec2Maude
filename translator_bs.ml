@@ -1981,6 +1981,36 @@ let translate_typd id params insts =
           let ready = subset_bound_local bound vars in
           (`Bool, (bool_t.text, vars, []), ready)
   in
+  let normalize_sched_typd bound (txt, vars, binds) =
+    match split_once_re (Str.regexp "[ \t]+:=[ \t]+") txt with
+    | None -> (txt, vars, binds)
+    | Some (lhs, rhs) ->
+        let lhs_vars =
+          let re = Str.regexp "[A-Z][A-Z0-9-]*" in
+          let rec loop pos acc =
+            match (try Some (Str.search_forward re lhs pos) with Not_found -> None) with
+            | None -> List.sort_uniq String.compare acc
+            | Some _ ->
+                let tok = Str.matched_string lhs in
+                let acc =
+                  if starts_with tok "CTOR" then acc else tok :: acc
+                in
+                loop (Str.match_end ()) acc
+          in
+          loop 0 []
+        in
+        let lhs_already_known =
+          lhs_vars = []
+          || List.for_all
+               (fun v -> SSet.mem v bound || starts_with v "FREE-")
+               lhs_vars
+        in
+        if lhs_already_known then
+          (Printf.sprintf "( %s == %s )" (String.trim lhs) (String.trim rhs),
+           vars,
+           [])
+        else (txt, vars, binds)
+  in
   let rec schedule_prems_typd bound acc items =
     match items with
     | [] -> List.rev acc
@@ -1994,6 +2024,7 @@ let translate_typd id params insts =
         in
         match pick [] items with
         | Some (before, chosen, after) ->
+            let chosen = normalize_sched_typd bound chosen in
             let (_, _, binds) = chosen in
             let bound' = List.fold_left (fun b v -> SSet.add v b) bound binds in
             schedule_prems_typd bound' (chosen :: acc) (before @ after)
@@ -2002,6 +2033,7 @@ let translate_typd id params insts =
               | [] -> List.rev acc2
               | it :: rest ->
                   let (_kind, sched, _ready) = classify_prem_typd bound2 it in
+                  let sched = normalize_sched_typd bound2 sched in
                   let (_txt, _vars, binds) = sched in
                   let bound3 = List.fold_left (fun b v -> SSet.add v b) bound2 binds in
                   force bound3 (sched :: acc2) rest
@@ -2125,7 +2157,52 @@ let translate_typd id params insts =
                  |> List.filter_map (fun (txt, _, binds) ->
                      if binds = [] then Some (prem_cond txt) else None)
                in
-               let rhs = cond_join (prem_match_strs @ prem_bool_strs @ binder_conds) in
+               let normalize_typd_condition_assignments seed_vars conds =
+                 let known = ref (SSet.of_list seed_vars) in
+                 let vars_in text =
+                   let re = Str.regexp "[A-Z][A-Z0-9-]*" in
+                   let rec loop pos acc =
+                     match (try Some (Str.search_forward re text pos) with Not_found -> None) with
+                     | None -> List.sort_uniq String.compare acc
+                     | Some _ ->
+                         let tok = Str.matched_string text in
+                         let acc =
+                           if starts_with tok "CTOR" then acc else tok :: acc
+                         in
+                         loop (Str.match_end ()) acc
+                   in
+                   loop 0 []
+                 in
+                 conds
+                 |> List.map (fun cond ->
+                     match split_once_re (Str.regexp "[ \t]+:=[ \t]+") cond with
+                     | None -> cond
+                     | Some (lhs, rhs) ->
+                         let lhs_vars = vars_in lhs in
+                         let known_lhs =
+                           lhs_vars = []
+                           || List.for_all
+                                (fun v -> SSet.mem v !known || starts_with v "FREE-")
+                                lhs_vars
+                         in
+                         if known_lhs then
+                           Printf.sprintf "( %s == %s )" (String.trim lhs) (String.trim rhs)
+                         else begin
+                           List.iter (fun v -> known := SSet.add v !known) lhs_vars;
+                           cond
+                         end)
+               in
+               let rhs =
+                 let typd_seed_vars =
+                   p_vars @
+                   List.filter_map (fun b -> match b.it with
+                     | ExpB (tid, _) -> Some (to_var_name tid.it)
+                     | _ -> None) binders
+                 in
+                 cond_join
+                   (normalize_typd_condition_assignments typd_seed_vars
+                      (prem_match_strs @ prem_bool_strs @ binder_conds))
+               in
                  let sections = mixop_sections mixop_val in
                let lhs0 =
                  match canonical_ctor_name_arity mixop_val (List.length p_vars) with
@@ -2903,6 +2980,58 @@ type prem_item =
 
 type prem_sched = { text : string; vars : string list; binds : string list }
 
+let is_generated_free_const_name v =
+  String.length v >= 5 && String.sub v 0 5 = "FREE-"
+
+let normalize_assignment_sched bound (p : prem_sched) =
+  match split_once_re (Str.regexp "[ \t]+:=[ \t]+") p.text with
+  | None -> p
+  | Some (lhs, rhs) ->
+      let lhs_vars = extract_vars_from_maude lhs in
+      let lhs_already_known =
+        lhs_vars = []
+        || List.for_all
+             (fun v -> SSet.mem v bound || is_generated_free_const_name v)
+             lhs_vars
+      in
+      if lhs_already_known then
+        { text = Printf.sprintf "( %s == %s )" (String.trim lhs) (String.trim rhs);
+          vars = p.vars;
+          binds = [] }
+      else p
+
+let assignment_lhs_vars text =
+  match split_once_re (Str.regexp "[ \t]+:=[ \t]+") text with
+  | None -> None
+  | Some (lhs, rhs) -> Some (lhs, rhs, extract_vars_from_maude lhs)
+
+let normalize_assignment_conditions_ordered seed_vars conds =
+  let known = ref (SSet.of_list seed_vars) in
+  conds
+  |> List.map (fun cond ->
+      match assignment_lhs_vars cond with
+      | None -> cond
+      | Some (lhs, rhs, lhs_vars) ->
+          let lhs_already_known =
+            lhs_vars = []
+            || List.for_all
+                 (fun v -> SSet.mem v !known || is_generated_free_const_name v)
+                 lhs_vars
+          in
+          if lhs_already_known then
+            Printf.sprintf "( %s == %s )" (String.trim lhs) (String.trim rhs)
+          else begin
+            List.iter (fun v -> known := SSet.add v !known) lhs_vars;
+            cond
+          end)
+
+let normalize_generated_free_const_assignment cond =
+  match assignment_lhs_vars cond with
+  | Some (lhs, rhs, lhs_vars)
+      when lhs_vars <> [] && List.for_all is_generated_free_const_name lhs_vars ->
+      Printf.sprintf "( %s == %s )" (String.trim lhs) (String.trim rhs)
+  | _ -> cond
+
 let rhs_inline_from_sched rhs_text prem_scheduled =
   let rhs_key = strip_wrapping_parens rhs_text |> String.trim in
   let match_rhs_binding (p : prem_sched) =
@@ -3526,6 +3655,7 @@ let rec schedule_prems bound acc items =
       in
       match pick [] items with
       | Some (before, chosen, after) ->
+          let chosen = normalize_assignment_sched bound chosen in
           let bound' = List.fold_left (fun b v -> SSet.add v b) bound chosen.binds in
           schedule_prems bound' (chosen :: acc) (before @ after)
       | None ->
@@ -3539,6 +3669,7 @@ let rec schedule_prems bound acc items =
           in
           (match pick_infer [] items with
            | Some (_before, inferred, _it, _after) ->
+               let inferred = normalize_assignment_sched bound inferred in
                let bound' =
                  List.fold_left (fun b v -> SSet.add v b) bound inferred.binds
                in
@@ -3548,6 +3679,7 @@ let rec schedule_prems bound acc items =
             | [] -> List.rev acc2
             | it :: rest ->
                 let (_kind, sched, _ready) = classify_prem bound2 it in
+                let sched = normalize_assignment_sched bound2 sched in
                 let bound3 = List.fold_left (fun b v -> SSet.add v b) bound2 sched.binds in
                 force bound3 (sched :: acc2) rest
           in
@@ -3570,13 +3702,14 @@ let split_top_level_eqeq text =
   in
   loop 0 0
 
-let bind_fresh_var_bool_eq lhs_pattern_vars (p : prem_sched) =
+let bind_fresh_var_bool_eq lhs_pattern_vars bound_vars (p : prem_sched) =
   if p.binds <> [] then p
   else
     match split_top_level_eqeq p.text with
     | Some (lhs, rhs)
         when is_plain_var_like lhs
              && not (List.mem lhs lhs_pattern_vars)
+             && not (List.mem lhs bound_vars)
              && not (List.mem lhs (extract_vars_from_maude rhs)) ->
         { text = Printf.sprintf "%s := %s" lhs rhs;
           vars = uniq_vars (lhs :: extract_vars_from_maude rhs);
@@ -3584,6 +3717,7 @@ let bind_fresh_var_bool_eq lhs_pattern_vars (p : prem_sched) =
     | Some (lhs, rhs)
         when is_plain_var_like rhs
              && not (List.mem rhs lhs_pattern_vars)
+             && not (List.mem rhs bound_vars)
              && not (starts_with lhs "$map-")
              && not (List.mem rhs (extract_vars_from_maude lhs)) ->
         { text = Printf.sprintf "%s := %s" rhs lhs;
@@ -3886,7 +4020,10 @@ let translate_decd ss id params result_typ insts =
         ) ([], false)
     in
     let listn_len_conds = listn_len_conditions lhs_set in
-    let all_conds = prem_conds @ filtered_bconds @ listn_len_conds in
+    let all_conds =
+      (prem_conds @ filtered_bconds @ listn_len_conds)
+      |> List.map normalize_generated_free_const_assignment
+    in
     let cond = cond_join all_conds in
     let cond_str = if cond = "" then "" else " \n      if " ^ cond in
     let clause_is_rewrite = clause_uses_rewrite in
@@ -4097,7 +4234,13 @@ let translate_step_reld rel_name rules =
                 |> List.sort_uniq String.compare
               in
               let prem_scheduled =
-                List.map (bind_fresh_var_bool_eq lhs_pattern_seed) prem_scheduled
+                let bound_ref = ref lhs_pattern_seed in
+                List.map (fun p ->
+                  let p = bind_fresh_var_bool_eq lhs_pattern_seed !bound_ref p in
+                  let p = normalize_assignment_sched (SSet.of_list !bound_ref) p in
+                  bound_ref := List.sort_uniq String.compare (!bound_ref @ p.binds);
+                  p)
+                  prem_scheduled
               in
               let prem_strs = List.map (fun (p : prem_sched) -> p.text) prem_scheduled in
               let prem_binds = List.concat_map (fun p -> p.binds) prem_scheduled in
@@ -4204,7 +4347,10 @@ let translate_step_reld rel_name rules =
                   prem_match_conds @ prem_rewrite_conds @ listn_len_conds @ allvals_conds
                   @ prem_bool_conds @ filtered_bconds
               in
-              let all_conds = base_conds @ refined_lhs_guards in
+              let all_conds =
+                normalize_assignment_conditions_ordered lhs_pattern_vars
+                  (base_conds @ refined_lhs_guards)
+              in
               let cond = cond_join all_conds in
               let lhs_rel_text, rhs_rel_text =
                 if rel_name = "Step-pure" then
