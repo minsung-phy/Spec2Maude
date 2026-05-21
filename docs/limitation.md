@@ -468,32 +468,33 @@ python3 scripts/audit_output_bs_total_concrete.py --timeout 2
 결과 artifact:
 
 ```text
-artifacts/output-bs-total-audit-20260521_012550/
+artifacts/output-bs-total-audit-20260521_114249/
 ```
 
 검사 수:
 
 | kind | count |
 |---|---:|
-| op | 1202 |
-| eq | 997 |
-| ceq | 280 |
+| op | 1324 |
+| eq | 1115 |
+| ceq | 347 |
 | mb | 424 |
 | cmb | 118 |
-| rl | 110 |
-| crl | 774 |
-| **total** | **3905** |
+| rl | 109 |
+| crl | 775 |
+| **total** | **4212** |
 
 결과:
 
 | status | count |
 |---|---:|
-| PASS | 2892 |
-| KNOWN_LIMITATION | 41 |
-| NO_SOLUTION | 653 |
-| STUCK | 312 |
-| STACK_OVERFLOW | 3 |
-| MAUDE_EXIT_2 | 4 |
+| PASS | 3553 |
+| KNOWN_LIMITATION | 32 |
+| NO_SOLUTION | 257 |
+| STUCK | 287 |
+| PARSE_ERROR | 83 |
+
+이번 최신 audit에서 `STACK_OVERFLOW`와 `MAUDE_EXIT_*`는 0개다.
 
 주의:
 
@@ -501,8 +502,21 @@ artifacts/output-bs-total-audit-20260521_012550/
 - `KNOWN_LIMITATION`은 이미 이 문서에 적힌 limitation/debt와 일치한 경우다.
 - `NO_SOLUTION`은 곧바로 “rule이 틀렸다”는 뜻이 아니다. 샘플이 조건을 만족하지 못했거나 concrete witness/context/store가 부족한 경우가 많다.
 - `STUCK`도 대부분 membership/category sample이 부정확한 경우다. source-valid sample로 재확인해야 한다.
-- `STACK_OVERFLOW`는 우선 조사 대상이다. 다만 자동 샘플이 source premise를 만족하지 않는 값을 만든 경우도 있으므로, 반드시 focused probe로 재확인해야 한다.
-- `MAUDE_EXIT_2` / Maude internal error는 probe가 malformed source shape를 만든 경우에도 발생할 수 있다. 예: `$clos-deftypes(fib-type CTORI32A0)`처럼 `deftype*` 자리에 잘못된 원소를 섞은 샘플.
+- `PARSE_ERROR`는 대부분 자동 probe generator가 mixfix operator, record item,
+  projection/update equation, or source-sort-specific sample을 잘못 만든 경우다.
+  현재는 “output artifact가 반드시 잘못됐다”가 아니라 sample-catalog 개선 대상이다.
+- 이전 audit에서 보였던 `STACK_OVERFLOW`와 `MAUDE_EXIT_2`는 focused triage와
+  generic prelude/source-meta lowering 보강 후 최신 audit에서는 더 이상 나오지 않는다.
+
+이번 final audit pass에서 추가로 고친 항목:
+
+- scalar sequence index의 out-of-bounds case.
+  이전에는 `index(CTORI32A0, 1)`이 `index(eps, 0)`으로 간 뒤 Maude가 stack
+  overflow를 냈다. 이제 generic prelude가
+  `index(eps, n) = eps`를 제공하고, scalar `index`의 결과 sort를
+  `SpectecTerminals`로 넓혀서 source meta-expression `xs[i]`가 empty result를
+  안전하게 표현할 수 있게 했다. 이건 judgement-specific shortcut이 아니라
+  SpecTec sequence indexing representation substrate다.
 
 7개 위험 실패 focused triage 최신 결과:
 
@@ -564,8 +578,8 @@ accepted Fibonacci execution에는 현재 영향을 주지 않는다. 별도 con
 
 ```text
 docs/archive/current-c1/output_bs_total_audit_report.md
-artifacts/output-bs-total-audit-20260521_012550/summary.md
-artifacts/output-bs-total-audit-20260521_012550/test_results.csv
+artifacts/output-bs-total-audit-20260521_114249/summary.md
+artifacts/output-bs-total-audit-20260521_114249/test_results.csv
 ```
 
 ## 현재 성공하는 대표 concrete probes
@@ -573,7 +587,7 @@ artifacts/output-bs-total-audit-20260521_012550/test_results.csv
 최신 확인 artifact:
 
 ```text
-artifacts/c1-probe-matrix-20260521_005302/probe_summary.md
+artifacts/c1-probe-matrix-20260521_114209/probe_summary.md
 ```
 
 `scripts/run_c1_probe_matrix.py` 기준 성공:
@@ -581,6 +595,7 @@ artifacts/c1-probe-matrix-20260521_005302/probe_summary.md
 - `index(CTORI32A0 CTORI64A0, eps)`
 - `index(CTORI32A0 CTORI64A0, 0 1)`
 - `index(value('LOCALS, C0), eps)`
+- `index(CTORI32A0, 1)` now reduces to `eps` instead of stack overflowing.
 - `Resulttype-ok(C0, eps)`
 - `Resulttype-ok(C0, i32 i32)`
 - `Resulttype-sub(C0, eps, eps)`

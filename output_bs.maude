@@ -28,7 +28,8 @@ mod DSL-PRETYPE is
   var TS : SpectecTerminals .
 
   var N' : Nat .
-  op index : SpectecTerminals Nat -> SpectecTerminal .
+  op index : SpectecTerminals Nat -> SpectecTerminals .
+  eq index(eps, N') = eps .
   eq index(T TS, 0) = T .
   eq index(T TS, s(N')) = index(TS, N') .
 endm
