@@ -277,6 +277,18 @@ SpecTec source에는 `(premise)*` 같은 meta-notation이 있다. Maude에서는
 
 `$is-spectec-*`를 최대한 줄였다.
 
+최근 generic cleanup:
+
+- source category에 대해 Maude `mb` / `cmb` membership이 생성되는 경우,
+  validation/source relation lowering에서는 그 category를 직접 narrow sort로
+  쓰도록 바꿨다.
+- 예를 들어 많은 `Heaptype`, `Valtype`, `Instr`, `Typeuse` binder-only guard는
+  `$is-spectec-*` predicate 대신 `VAR : Heaptype` 또는 LHS typed variable로
+  표현된다.
+- 단, execution/runtime rule 쪽까지 같은 방식으로 무리하게 좁히면
+  invoke/frame 경로가 덜 진행되는 regression이 생겼다. 그래서 runtime 쪽은
+  현재 보수적으로 일부 predicate를 유지한다.
+
 이미 제거된 대표 binder-only guard:
 
 - `$is-spectec-context`
@@ -302,14 +314,28 @@ SpecTec source에는 `(premise)*` 같은 meta-notation이 있다. Maude에서는
 - `$is-spectec-reftype`
 - `$is-spectec-valtype`
 - `$is-spectec-blocktype`
-- `$is-spectec-expr`
+- `$is-spectec-numtype`
+- `$is-spectec-vectype`
+- `$is-spectec-resulttype`
 
 왜 아직 남아 있나:
 
 - record category는 source-derived typed record sort로 바꿔서 제거했다.
 - simple zero-arity category도 least sort/subsort 쪽으로 많이 줄였다.
-- 하지만 `instr`, `expr`, `valtype`, `heaptype`, `reftype`, `typeuse`, `blocktype` 같은 composite/sequence category는 아직 broad `SpectecTerminal` / `SpectecTerminals` substrate와 섞여 있다.
-- 이들을 무작정 Maude sort로 좁히면 sequence AC matching, membership, validation execution overlay가 충돌해서 divergence가 생긴다.
+- validation/source relation 쪽 composite category guard도 가능한 만큼
+  Maude sort/membership으로 옮겼다.
+- 남은 `$is-spectec-numtype` / `$is-spectec-vectype`는 주로 source의
+  `t' = numtype \/ t' = vectype` 같은 category-pattern disjunction을
+  Bool 조건으로 표현하기 위해 필요하다. Maude condition에서
+  `(T : Numtype) \/ (T : Vectype)` 형태를 그대로 Bool expression처럼
+  쓸 수 없기 때문에 predicate가 남는다.
+- `$is-spectec-val-seq`는 `val*` sequence guard다. 현재 `SpectecTerminals`
+  하나가 모든 sequence를 담기 때문에, `instr*`와 `val*`를 Maude sort만으로
+  완전히 구분하지 못한다.
+- execution/runtime rule의 `heaptype`, `reftype`, `typeuse`, `blocktype`,
+  `valtype`, `resulttype` predicate는 무작정 Maude sort로 좁히면 일부
+  execution probe가 덜 진행되는 regression이 있었다. 더 줄이려면
+  runtime term representation과 source category sort를 함께 재설계해야 한다.
 
 현재 대표적인 좋은 형태:
 
@@ -324,14 +350,106 @@ rl [instr-ok-nop] :
 
 남은 작업:
 
-- composite syntax constructor의 result/argument sort를 더 source-derived하게 정밀화해야 한다.
-- 그 후 source binder type만 표현하던 `$is-spectec-*` guard를 더 제거할 수 있다.
+- `val*`, `instr*`, `typeuse*` 같은 sequence category를 `SpectecTerminals`
+  하나가 아니라 source-derived typed sequence sort로 표현할 수 있는지 설계한다.
+- category-pattern disjunction을 Maude에서 source-preserving하게 표현하는 방법을
+  교수님과 확인한다. 현재 Bool predicate 방식이 가장 안정적인 임시 표현이다.
+- execution/runtime rule에서 category predicate를 membership condition으로
+  바꿔도 실행 regression이 없는 더 세밀한 기준을 찾는다.
 
 분류:
 
 - 일부는 `GENERIC_SPECTEC_PRELUDE_OK`
 - 일부는 `C1_ISOMORPHISM_GAP`
 - 더 줄이려면 typed syntax/category 설계가 필요하다.
+
+### 5. 남아 있는 `_hasType_` / `WellTyped` sequence-category guards
+
+`$is-spectec-*`와 별도로, 다음과 같은 guard도 아직 남아 있다.
+
+```maude
+( INSTRS-OK-SEQ1-INSTRS2 hasType ( list ( instr ) ) ) : WellTyped
+( INSTRS-OK-SEQ1-TS1 hasType ( list ( valtype ) ) ) : WellTyped
+( INSTRS-OK-SEQ1-XS1 hasType ( list ( idx ) ) ) : WellTyped
+```
+
+대표 예시는 `Instrs_ok/seq`다.
+
+SpecTec source:
+
+```spectec
+rule Instrs_ok/seq:
+  C |- instr_1 instr_2* : t_1* ->_(x_1* x_2*) t_3*
+  -- Instr_ok: C |- instr_1 : t_1* ->_(x_1*) t_2*
+  -- (if C.LOCALS[x_1] = init t)*
+  -- Instrs_ok: $with_locals(C, x_1*, (SET t)*) |- instr_2* : t_2* ->_(x_2*) t_3*
+```
+
+여기서 `instr_2*`, `t_1*`, `x_1*`, `x_2*`, `t_3*`, `t_2*`는
+단순 변수가 아니라 각각 source category가 붙은 sequence variable이다.
+
+- `instr_2*`는 `instr`들의 sequence
+- `t_1*`, `t_2*`, `t_3*`는 `valtype`들의 sequence
+- `x_1*`, `x_2*`는 `idx`들의 sequence
+
+가장 isomorphic한 Maude 형태는 이런 guard가 condition에 나타나지 않고,
+변수 sort 자체가 정밀해야 한다.
+
+예상되는 이상적인 방향:
+
+```maude
+var INSTRS2 : InstrSeq .
+vars TS1 TS2 TS3 : ValtypeSeq .
+vars XS1 XS2 : IdxSeq .
+```
+
+하지만 현재 C1 encoding은 대부분의 source sequence를 하나의 broad carrier로
+낮춘다.
+
+```maude
+sort SpectecTerminals .
+op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [assoc id: eps] .
+```
+
+따라서 Maude sort만으로 `SpectecTerminals` 값이 `instr*`인지,
+`valtype*`인지, `idx*`인지 완전히 구분하지 못한다. 그래서 변환기는 source
+binder/category 정보를 잃지 않기 위해 `_hasType_` / `WellTyped` guard를
+추가한다.
+
+현재 generated example:
+
+```maude
+crl [instrs-ok-seq] :
+  Instrs-ok(C, INSTR1 INSTRS2, ARROW(TS1, XS1 XS2, TS3))
+  =>
+  valid
+  if ...
+  /\ (INSTRS2 hasType (list(instr))) : WellTyped
+  /\ (TS1 hasType (list(valtype))) : WellTyped
+  /\ (XS1 hasType (list(idx))) : WellTyped
+  /\ ...
+```
+
+이 guard들은 source에 premise로 직접 쓰여 있지는 않지만, source variable의
+category annotation을 보존하기 위한 representation guard다. 그래서 strict
+C1 관점에서는 완전히 깔끔하지 않다.
+
+왜 아직 제거하지 않았나:
+
+- `ValtypeSeq`, `InstrSeq`, `IdxSeq` 같은 source-derived typed sequence sort가
+  아직 없다.
+- 단순히 `ValtypeSeq < SpectecTerminals`만 추가해도 `__` concatenation 결과가
+  자동으로 typed sequence가 되지는 않는다.
+- typed sequence별 `eps`, concatenation, mixed sequence composition
+  (`val* instr* instr_1*`)을 함께 설계해야 한다.
+- 이 설계를 잘못하면 associative matching, parsing ambiguity, `Step/ctxt-instrs`
+  matching, validation execution이 동시에 깨질 수 있다.
+
+분류:
+
+- `C1_ISOMORPHISM_GAP`
+- source category annotation을 보존하기 위한 임시 representation guard
+- 최종적으로는 source-derived typed sequence sort 설계로 줄여야 한다.
 
 ### 5. Step wrapper infrastructure
 

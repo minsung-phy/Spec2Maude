@@ -2770,6 +2770,7 @@ let has_representation_narrow_sort sort =
 
 let has_narrow_runtime_sort sort =
   has_representation_narrow_sort sort
+  || SSet.mem sort !source_membership_sorts
 
 let needs_source_category_predicate sort =
   SSet.mem sort !sequence_alias_sorts || not (has_narrow_runtime_sort sort)
