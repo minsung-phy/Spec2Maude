@@ -5340,7 +5340,8 @@ let generated_sequence_prelude_module (_features : prelude_features) =
   "  var T : SpectecTerminal .\n" ^
   "  var TS : SpectecTerminals .\n\n" ^
   "  var N' : Nat .\n" ^
-  "  op index : SpectecTerminals Nat -> SpectecTerminal .\n" ^
+  "  op index : SpectecTerminals Nat -> SpectecTerminals .\n" ^
+  "  eq index(eps, N') = eps .\n" ^
   "  eq index(T TS, 0) = T .\n" ^
   "  eq index(T TS, s(N')) = index(TS, N') .\n" ^
   "endm\n\n"

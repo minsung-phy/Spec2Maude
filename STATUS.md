@@ -55,7 +55,9 @@ This extracts every generated `op`, `eq`, `ceq`, `mb`, `cmb`, `rl`, and `crl`,
 generates an explicit concrete Maude command for each artifact, runs each probe
 in an isolated Maude process, and writes inventory/results/logs under
 `artifacts/output-bs-total-audit-*`. The latest completed full audit is
-summarized in `docs/archive/current-c1/output_bs_total_audit_report.md`.
+`artifacts/output-bs-total-audit-20260521_114249/`; it has no
+`STACK_OVERFLOW` or `MAUDE_EXIT_*` results. The standing summary/limitation
+notes are in `docs/limitation.md`.
 
 Current accepted facts:
 
@@ -95,6 +97,9 @@ Current accepted facts:
   `index(CTORI32A0 CTORI64A0, 0 1)`, and
   `index(value('LOCALS, C), eps)` reduce, and
   `Instrtype-ok(C, arrow(i32, eps, i32))` rewrites to `valid`.
+- Scalar sequence indexing now also closes out-of-bounds probes such as
+  `index(CTORI32A0, 1)` to `eps`, avoiding the previous concrete-audit stack
+  overflow on `index(eps, 0)`.
 - Generic prefix-constructor star-map lowering is now emitted through
   `$star-prefix` / `$star-unprefix` for source shapes such as `(SET t)*`.
   The concrete probe
