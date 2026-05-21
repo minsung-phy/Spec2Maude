@@ -709,8 +709,17 @@ source-derived로 바꾼 것:
   - generated body/token output을 scan해서 실제로 쓰이는 header 조각만 emit한다.
     현재 feature-gated 대상은 `w-bool`, `_hasType_`/`WellTyped`, `index(xs,i*)`,
     `$repeat`, `slice`, `$star-prefix`/`$star-unprefix`, set-membership `_<-_`,
-    `merge`, wildcard `any`, Step wrapper infrastructure, `$is-spectec-val-seq`,
-    and `$subst-*` sequence lifts다.
+    `merge`, wildcard `any`, Step wrapper infrastructure, and source
+    sequence-category predicates다.
+  - `$is-spectec-val-seq`는 더 이상 footer에 val 전용으로 박힌 고정 helper가
+    아니다. source lowering 중 `X*` category guard가 실제로 필요할 때
+    `$is-spectec-<X>-seq` 형태를 등록해서 emit한다. 현재 Wasm output에서는
+    source가 요구하는 남은 sequence category guard가 `val*`라서 결과 이름이
+    `$is-spectec-val-seq`인 것이다.
+  - 예전 footer에 있던 `$subst-typeuse`, `$subst-valtype`, `$subst-subtype`
+    sequence-lift overload는 제거했다. source element-level substitution def는
+    그대로 남고, source expression의 `f(x*)` / `f(x)^n` 같은 star-map 모양에서
+    generic `$map-*` helper를 생성한다.
   - 예전 frame 전용 footer shim은 제거했다. 이제 frame literal은 source
     `syntax frame = { LOCALS ..., MODULE ... }`에서 생성되는 `RECFrameA2`와
     그 projection/update equation을 그대로 사용한다.
@@ -748,6 +757,16 @@ source-derived로 바꾼 것:
 - `w-bool`: SpecTec Bool 계산 결과를 terminal로 다시 넣기 위한 현재 Maude
   representation wrapper다. 실제 generated numeric/Bool defs에서 사용 중이라
   이번 cleanup에서는 제거하지 않았다.
+- `EXP`: source의 `exp`/floating numeric condition lowering이 아직 어색하게
+  남긴 header constant다. 현재 `fNmag`/`SUBNORM` 계열 조건에서 사용된다. 아직
+  제거하지 않았고, source-derived numeric exponent lowering으로 바꿀 수 있는지
+  별도 audit이 필요하다.
+- `CTORLABELLBRACERBRACEA3`, `CTORFRAMELBRACERBRACEA3`,
+  `CTORHANDLERLBRACERBRACEA3`의 precise op signature override: source syntax에서
+  유도하는 실험을 했지만, 전체 CTOR signature를 source sort로 정밀화하면 Maude
+  preregularity warning이 늘고 `$expanddt`/Fibonacci 실행이 깨졌다. 그래서 현재는
+  이 세 execution-critical signature override를 유지한다. source-derived로 바꾸려면
+  overlapping constructor overload와 sequence/list carrier 설계를 먼저 해결해야 한다.
 
 이들은 지금 C1 실행과 source meta-expression lowering에 필요하다. 다만 P4나
 다른 SpecTec으로 확장하려면 다음 단계에서 generated prelude를 feature-gated로

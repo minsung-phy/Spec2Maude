@@ -434,6 +434,7 @@ type map_call_helper = {
   map_fn_name : string;
   map_arity : int;
   map_seq_index : int;
+  map_arg_sorts : string list;
 }
 
 let map_call_helpers : map_call_helper list ref = ref []
@@ -500,17 +501,19 @@ let map_call_helper_name fn arity seq_index =
   in
   Printf.sprintf "$map-%s-a%d-s%d" stem arity seq_index
 
-let register_map_call_helper fn arity seq_index =
+let register_map_call_helper fn arity seq_index arg_sorts =
   let helper = {
     map_helper_name = map_call_helper_name fn arity seq_index;
     map_fn_name = fn;
     map_arity = arity;
     map_seq_index = seq_index;
+    map_arg_sorts = arg_sorts;
   } in
   if not (List.exists (fun h ->
       h.map_fn_name = helper.map_fn_name
       && h.map_arity = helper.map_arity
-      && h.map_seq_index = helper.map_seq_index)
+      && h.map_seq_index = helper.map_seq_index
+      && h.map_arg_sorts = helper.map_arg_sorts)
       !map_call_helpers)
   then map_call_helpers := helper :: !map_call_helpers;
   helper.map_helper_name
@@ -589,6 +592,7 @@ type source_record_info = {
 
 let source_record_infos : source_record_info list ref = ref []
 let source_record_shape_counts : (string, int) Hashtbl.t = Hashtbl.create 32
+let source_seq_pred_sorts : SSet.t ref = ref SSet.empty
 
 let record_shape_key fields = String.concat "\x1f" fields
 
@@ -619,6 +623,11 @@ let build_type_env defs =
           | InstD (_, _, deftyp) -> (match deftyp.it with
               | AliasT typ -> (match typ.it with
                   | IterT (_, (List | List1 | ListN _)) ->
+                      Hashtbl.replace plural_types id.it true;
+                      sequence_alias_sorts :=
+                        SSet.add (sort_of_type_name id.it) !sequence_alias_sorts
+                  | VarT (tid, args)
+                    when String.lowercase_ascii tid.it = "list" && args <> [] ->
                       Hashtbl.replace plural_types id.it true;
                       sequence_alias_sorts :=
                         SSet.add (sort_of_type_name id.it) !sequence_alias_sorts
@@ -1134,7 +1143,8 @@ let strip_iter_suffix name =
 
 let is_sequence_typ t =
   match t.it with
-  | IterT (_, (List | List1 | ListN _)) -> true
+  | IterT (_, (List | List1 | ListN _ | Opt)) -> true
+  | VarT (id, args) when String.lowercase_ascii id.it = "list" && args <> [] -> true
   | _ -> false
 
 let split_trailing_quotes s =
@@ -1245,10 +1255,49 @@ let map_call_texpr_from_text (inner : texpr) =
       in
       (match seq_positions with
        | [seq_i] ->
-           let helper = register_map_call_helper fn (List.length args) seq_i in
+           let arg_sorts =
+             List.init (List.length args) (fun i ->
+                 if i = seq_i then "SpectecTerminals" else "SpectecTerminal")
+           in
+           let helper = register_map_call_helper fn (List.length args) seq_i arg_sorts in
            Some { text = format_call helper args; vars = inner.vars }
        | _ -> None)
   | None -> None
+
+let texpr_looks_sequence (t : texpr) =
+  let text = strip_wrapping_parens t.text |> String.trim in
+  text = "eps"
+  || Hashtbl.find_opt declared_vars text = Some "SpectecTerminals"
+  || List.exists (fun v ->
+      Hashtbl.find_opt declared_vars v = Some "SpectecTerminals"
+      || normalize_decl_sort v "SpectecTerminal" = "SpectecTerminals")
+      t.vars
+
+let sequence_lift_arg_sorts seq_i arg_ts =
+  arg_ts
+  |> List.mapi (fun i t ->
+      if i = seq_i || texpr_looks_sequence t
+      then "SpectecTerminals"
+      else "SpectecTerminal")
+
+let source_call_sequence_positions args arg_ts vm =
+  let direct_positions =
+    args
+    |> List.mapi (fun i a ->
+        match a.it, List.nth arg_ts i with
+        | ExpA { it = VarE vid; _ }, ({ text; vars = [v] } as _t) ->
+            (match resolve_var_name (vid.it ^ "*") vm with
+             | Some mapped when mapped = v && text = v -> Some i
+             | _ -> None)
+        | _ -> None)
+    |> List.filter_map (fun x -> x)
+  in
+  match direct_positions with
+  | [] ->
+      arg_ts
+      |> List.mapi (fun i t -> if texpr_looks_sequence t then Some i else None)
+      |> List.filter_map (fun x -> x)
+  | xs -> xs
 
 let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | VarE id -> translate_var ctx id.it vm
@@ -1368,28 +1417,35 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                | VarE _ ->
                    let count_t = translate_exp TermCtx count_e vm in
                    record_listn_pair_if_sequence_var count_t inner;
-                   inner
+                   (match e1.it with
+                    | CallE (id, args) ->
+                        let arg_ts = List.map (fun a -> translate_arg a vm) args in
+                        let seq_positions = source_call_sequence_positions args arg_ts vm in
+                        (match seq_positions with
+                         | seq_i :: _ ->
+                             let fn = call_name id.it in
+                             let arg_sorts = sequence_lift_arg_sorts seq_i arg_ts in
+                             let helper =
+                               register_map_call_helper fn (List.length arg_ts) seq_i arg_sorts
+                             in
+                             { text = format_call helper (List.map (fun (t : texpr) -> t.text) arg_ts);
+                               vars =
+                                 List.sort_uniq String.compare
+                                   (List.concat_map (fun (t : texpr) -> t.vars) arg_ts) }
+                         | [] -> inner)
+                    | _ -> inner)
                | _ ->
                    let count_t = translate_exp TermCtx count_e vm in
                    { text = Printf.sprintf "$repeat ( %s, %s )" inner.text count_t.text;
                      vars = List.sort_uniq String.compare (inner.vars @ count_t.vars) })
           | (List | List1), CallE (id, args) ->
               let arg_ts = List.map (fun a -> translate_arg a vm) args in
-              let seq_positions =
-                args
-                |> List.mapi (fun i a ->
-                    match a.it, List.nth arg_ts i with
-                    | ExpA { it = VarE vid; _ }, ({ text; vars = [v] } as _t) ->
-                        (match resolve_var_name (vid.it ^ "*") vm with
-                         | Some mapped when mapped = v && text = v -> Some i
-                         | _ -> None)
-                    | _ -> None)
-                |> List.filter_map (fun x -> x)
-              in
+              let seq_positions = source_call_sequence_positions args arg_ts vm in
               (match seq_positions with
                | [seq_i] ->
                    let fn = call_name id.it in
-                   let helper = register_map_call_helper fn (List.length arg_ts) seq_i in
+                   let arg_sorts = sequence_lift_arg_sorts seq_i arg_ts in
+                   let helper = register_map_call_helper fn (List.length arg_ts) seq_i arg_sorts in
                    { text = format_call helper (List.map (fun (t : texpr) -> t.text) arg_ts);
                      vars =
                        List.sort_uniq String.compare
@@ -1733,7 +1789,7 @@ let is_bool_typ t vm =
   let s = String.lowercase_ascii (translate_typ t vm) in
   s = "bool" || s = "w-b" ||
   (match t.it with
-   | VarT (tid, _) ->
+	   | VarT (tid, _) ->
        let low = String.lowercase_ascii tid.it in
        low = "bool" || low = "b"
    | _ -> false)
@@ -1777,7 +1833,18 @@ let decl_sort_of_typ (t : typ) =
   match t.it with
   | IterT (inner, (List | List1 | ListN _)) ->
       seq_decl_sort_of_inner_typ inner
-  | _ -> declared_sort_of_typ t
+  | _ ->
+      match type_sort_of_typ t [] with
+      | Some s when SSet.mem s !sequence_alias_sorts -> "SpectecTerminals"
+      | _ -> declared_sort_of_typ t
+
+let source_carrier_sort_of_typ (t : typ) vm =
+  if is_sequence_typ t then "SpectecTerminals"
+  else
+    match simple_sort_of_typ t vm with
+    | Some s when SSet.mem s !sequence_alias_sorts -> "SpectecTerminals"
+    | Some s when s <> "SpectecTerminal" -> s
+    | _ -> "SpectecTerminal"
 
 (* DecD helper functions operate on C1's coarse CTOR carrier, but must
    preserve runtime structural sorts used by generated configs/states. *)
@@ -2090,7 +2157,7 @@ let translate_typd id params insts =
                  let c = (try List.assoc tname !type_counters with Not_found -> 0) + 1 in
                  type_counters := (tname, c) :: (List.remove_assoc tname !type_counters); c in
                let rec collect_params cur_vm t is_list = match t.it with
-                 | VarT (tid, _) ->
+	                 | VarT (tid, args) ->
                      let vb = to_var_name tid.it in
                      let count = get_count vb in
                      let indexed =
@@ -2098,15 +2165,20 @@ let translate_typd id params insts =
                          vb ^ "-LIST-" ^ String.uppercase_ascii (sanitize tid.it)
                        else vb ^ string_of_int count in
                      let new_vm = (tid.it, indexed) :: cur_vm in
-                     let ms =
-                       if is_list || is_plural_type tid.it then
+	                     let ms =
+	                       if is_list || is_plural_type tid.it
+	                          || (String.lowercase_ascii tid.it = "list" && args <> []) then
                          "SpectecTerminals"
-                       else "SpectecTerminal"
+	                       else source_carrier_sort_of_typ t cur_vm
                      in
                      let guard = "true" in
                      ([(indexed, guard, ms)], new_vm)
-                 | IterT (inner, iter) ->
-                     collect_params cur_vm inner (iter = List || iter = List1)
+	                 | IterT (inner, iter) ->
+	                     let sequence_like =
+	                       match iter with
+	                       | List | List1 | ListN _ | Opt -> true
+	                     in
+	                     collect_params cur_vm inner sequence_like
                  | TupT fields ->
                      List.fold_left (fun (acc, vm) (fe, ft) ->
                        match fe.it with
@@ -2122,16 +2194,7 @@ let translate_typd id params insts =
                              if is_list then
                                "SpectecTerminals"
                              else
-                               match ft.it with
-                               | IterT (_, (List | List1 | ListN _)) -> "SpectecTerminals"
-                               | IterT (_, Opt) ->
-                                   (match simple_sort_of_typ ft vm' with
-                                    | Some s when s <> "SpectecTerminal" -> s
-                                    | _ -> "SpectecTerminal")
-                               | _ ->
-                                   (match simple_sort_of_typ ft vm' with
-                                    | Some s when s <> "SpectecTerminal" -> s
-                                    | _ -> "SpectecTerminal")
+	                               source_carrier_sort_of_typ ft vm'
                         in
                         (acc @ [(indexed, "true", ms)], vm')
                        | _ ->
@@ -2152,12 +2215,7 @@ let translate_typd id params insts =
                            | None -> to_var_name tid.it
                          in
                          let ms =
-                           match t.it with
-                           | IterT (_, (List | List1)) -> "SpectecTerminals"
-                           | _ ->
-                               (match simple_sort_of_typ t param_vm with
-                                | Some s when s <> "SpectecTerminal" -> s
-                                | _ -> "SpectecTerminal")
+	                           source_carrier_sort_of_typ t param_vm
                          in
                          Some (mv, "true", ms)
                      | _ -> None
@@ -2390,14 +2448,12 @@ let translate_typd id params insts =
              let info = List.mapi (fun i (atom, (_, ft, _), _) ->
                let fn = to_var_name (Xl.Atom.name atom) in
                let sn = translate_typ (match ft.it with IterT (inner, _) -> inner | _ -> ft) v_map in
-               let ms =
-                 match ft.it with
-                 | IterT (inner, (List | List1 | ListN _)) ->
-                     seq_decl_sort_of_inner_typ inner
-                 | _ ->
-                     if is_plural_type sn then "SpectecTerminals" else "SpectecTerminal" in
-               (fn, Printf.sprintf "F-%s-%d" fn i, ft, ms)
-             ) fields in
+	               let ms =
+	                 if is_plural_type sn then "SpectecTerminals"
+	                 else source_carrier_sort_of_typ ft v_map
+	               in
+	               (fn, Printf.sprintf "F-%s-%d" fn i, ft, ms)
+	             ) fields in
              let decls = String.concat "" (List.map (fun (_, vn, _, ms) -> declare_var vn ms) info) in
              let field_guards =
                List.map (fun (_, vn, ft, _) -> (vn, type_guard vn ft v_map)) info
@@ -2737,10 +2793,12 @@ let source_category_seq_pred sort =
   "$is-spectec-" ^ String.lowercase_ascii sort ^ "-seq"
 
 let source_category_seq_guard sort term =
+  let sort = sort_of_type_name sort in
+  source_seq_pred_sorts := SSet.add sort !source_seq_pred_sorts;
   Printf.sprintf "%s ( %s )" (source_category_seq_pred sort) term
 
 let val_seq_guard term =
-  source_category_seq_guard "val" term
+  source_category_seq_guard "Val" term
 
 let widen_refined_lhs_typed_vars typed_vars lhs_vars =
   let lhs_set = SSet.of_list lhs_vars in
@@ -5215,10 +5273,7 @@ type prelude_features = {
   uses_set_membership : bool;
   uses_merge : bool;
   uses_any : bool;
-  uses_val_seq_predicate : bool;
-  uses_subst_typeuse : bool;
-  uses_subst_valtype : bool;
-  uses_subst_subtype : bool;
+  seq_pred_sorts : string list;
 }
 
 let source_has_step_relations defs =
@@ -5251,10 +5306,7 @@ let prelude_features_of_source defs generated_text token_ops =
     uses_set_membership = has " <- ";
     uses_merge = has "merge (" || has "merge(";
     uses_any = contains_substring token_ops "op any :";
-    uses_val_seq_predicate = has "$is-spectec-val-seq";
-    uses_subst_typeuse = has "$subst-typeuse";
-    uses_subst_valtype = has "$subst-valtype";
-    uses_subst_subtype = has "$subst-subtype";
+    seq_pred_sorts = SSet.elements !source_seq_pred_sorts;
   }
 
 let generated_term_prelude_module () =
@@ -5430,10 +5482,6 @@ let header_prefix features =
      "  var LIST-TY : SpectecTerminal .\n" ^
      "  var LIST-TS : SpectecTerminals .\n"
    else "") ^
-  (if features.uses_subst_typeuse || features.uses_subst_valtype || features.uses_subst_subtype then
-     "  var SUBST-L-W : SpectecTerminal .\n" ^
-     "  vars SUBST-L-WS SUBST-L-TV SUBST-L-TU : SpectecTerminals .\n"
-   else "") ^
   (if features.uses_sequence_index then
      "  var INDEX-I : Nat .\n" ^
      "  vars INDEX-TS INDEX-IS : SpectecTerminals .\n"
@@ -5485,36 +5533,22 @@ let header_prefix features =
    else "")
 
 let footer features =
+  let seq_pred_blocks =
+    features.seq_pred_sorts
+    |> List.map (fun sort ->
+        let pred = source_category_seq_pred sort in
+        let lower = String.lowercase_ascii sort in
+        Printf.sprintf
+          "  --- Source-derived sequence-category predicate for SpecTec %s* premises.\n\
+           \  eq  %s(eps) = true .\n\
+           \  ceq %s(W TS) = %s(TS)\n\
+           \   if W : %s .\n\
+           \  eq  %s(TS) = false [owise] .\n"
+          lower pred pred pred sort pred)
+    |> String.concat "\n"
+  in
   "\n" ^
-  (if features.uses_val_seq_predicate then
-     "  --- Source-derived sequence-category predicate for SpecTec val* premises.\n" ^
-     "  eq  $is-spectec-val-seq(eps) = true .\n" ^
-     "  ceq $is-spectec-val-seq(W TS) = $is-spectec-val-seq(TS)\n" ^
-     "   if W : Val .\n" ^
-     "  eq  $is-spectec-val-seq(TS) = false [owise] .\n\n"
-   else "") ^
-  (if features.uses_subst_typeuse then
-     "  --- Executable lifting for source substitution helper over lists.\n" ^
-     "  eq $subst-typeuse(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
-     "  ceq $subst-typeuse(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
-     "      $subst-typeuse(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
-     "      $subst-typeuse(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
-     "   if SUBST-L-WS =/= eps .\n"
-   else "") ^
-  (if features.uses_subst_valtype then
-     "  eq $subst-valtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
-     "  ceq $subst-valtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
-     "      $subst-valtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
-     "      $subst-valtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
-     "   if SUBST-L-WS =/= eps .\n"
-   else "") ^
-  (if features.uses_subst_subtype then
-     "  eq $subst-subtype(eps, SUBST-L-TV, SUBST-L-TU) = eps .\n" ^
-     "  ceq $subst-subtype(SUBST-L-W SUBST-L-WS, SUBST-L-TV, SUBST-L-TU) =\n" ^
-     "      $subst-subtype(SUBST-L-W, SUBST-L-TV, SUBST-L-TU)\n" ^
-     "      $subst-subtype(SUBST-L-WS, SUBST-L-TV, SUBST-L-TU)\n" ^
-     "   if SUBST-L-WS =/= eps .\n"
-   else "") ^
+  (if seq_pred_blocks = "" then "" else seq_pred_blocks ^ "\n") ^
   (if features.uses_has_type then
      "  --- Generic SpecTec list type witness.\n" ^
      "  --- The source rule is polymorphic in the element type; this executable\n" ^
@@ -5525,23 +5559,11 @@ let footer features =
   "\nendm\n"
 
 let prelude_helper_decls features =
-  (if features.uses_val_seq_predicate then
-     "  op $is-spectec-val-seq : SpectecTerminals -> Bool .\n"
-   else "") ^
-  (if features.uses_subst_typeuse then
-     "  op $subst-typeuse : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_subst_valtype then
-     "  op $subst-valtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_subst_subtype then
-     "  op $subst-subtype : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_step_relations then
-     "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] .\n" ^
-     "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] .\n" ^
-     "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] .\n"
-   else "")
+  (features.seq_pred_sorts
+   |> List.map (fun sort ->
+       Printf.sprintf "  op %s : SpectecTerminals -> Bool .\n"
+         (source_category_seq_pred sort))
+   |> String.concat "")
 
 let infer_rel_helper_block () =
   let current_helpers () =
@@ -5868,8 +5890,9 @@ let map_call_helper_block () =
   let helpers =
     !map_call_helpers
     |> List.sort_uniq (fun a b ->
-        compare (a.map_helper_name, a.map_fn_name, a.map_arity, a.map_seq_index)
-                (b.map_helper_name, b.map_fn_name, b.map_arity, b.map_seq_index))
+        compare
+          (a.map_helper_name, a.map_fn_name, a.map_arity, a.map_seq_index, a.map_arg_sorts)
+          (b.map_helper_name, b.map_fn_name, b.map_arity, b.map_seq_index, b.map_arg_sorts))
   in
   if helpers = [] then ""
   else
@@ -5878,45 +5901,78 @@ let map_call_helper_block () =
         h.map_helper_name
         |> String.map (function '$' | '-' -> '_' | c -> Char.uppercase_ascii c)
       in
-      let arg_names =
-        List.init h.map_arity (fun i -> Printf.sprintf "%s_A%d" base i)
-      in
-      let seq = base ^ "_S" in
-      let op_sorts =
-        List.init h.map_arity (fun i ->
-            if i = h.map_seq_index then "SpectecTerminals" else "SpectecTerminal")
-        |> String.concat " "
-      in
+	      let arg_names =
+	        List.init h.map_arity (fun i -> Printf.sprintf "%s_A%d" base i)
+	      in
+	      let seq = base ^ "_S" in
+	      let op_sorts = String.concat " " h.map_arg_sorts in
       let call_args repl =
         arg_names
         |> List.mapi (fun i a -> if i = h.map_seq_index then repl else a)
         |> String.concat " , "
       in
       let helper_args repl = call_args repl in
+      let direct_sequence_recursion =
+        h.map_arg_sorts
+        |> List.mapi (fun i sort -> i <> h.map_seq_index && sort = "SpectecTerminals")
+        |> List.exists (fun x -> x)
+      in
       let var_decl =
         let fixed =
           arg_names
-          |> List.mapi (fun i a -> if i = h.map_seq_index then None else Some a)
+          |> List.mapi (fun i a ->
+              if i = h.map_seq_index then None
+              else
+                let sort =
+                  try List.nth h.map_arg_sorts i
+                  with _ -> "SpectecTerminal"
+                in
+                Some (a, sort))
           |> List.filter_map (fun x -> x)
         in
         (if fixed = [] then ""
-         else "  vars " ^ String.concat " " fixed ^ " : SpectecTerminal .\n") ^
-        Printf.sprintf "  var %s : SpectecTerminals .\n" seq
+         else
+           fixed
+           |> List.map (fun (v, sort) -> Printf.sprintf "  var %s : %s .\n" v sort)
+           |> String.concat "") ^
+        if direct_sequence_recursion then
+          Printf.sprintf "  var %s_E : SpectecTerminal .\n  var %s : SpectecTerminals .\n"
+            base seq
+        else
+          Printf.sprintf "  var %s : SpectecTerminals .\n" seq
       in
-      let head = Printf.sprintf "index ( %s, 0 )" seq in
-      let tail =
-        Printf.sprintf "slice ( %s, 1, _-_ ( len ( %s ), 1 ) )" seq seq
-      in
-      let map_block = Printf.sprintf
-        "  op %s : %s -> SpectecTerminals .\n%s\
-         \n  eq %s ( %s ) = eps .\n\
-         \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n      if _=/=_ ( %s, eps ) .\n"
-        h.map_helper_name op_sorts var_decl
-        h.map_helper_name (helper_args "eps")
-        h.map_helper_name (helper_args seq)
-        h.map_fn_name (call_args head)
-        h.map_helper_name (helper_args tail)
-        seq
+      let map_block =
+        if direct_sequence_recursion then
+          let elem = base ^ "_E" in
+          Printf.sprintf
+            "  op %s : %s -> SpectecTerminals .\n%s\
+             \n  eq %s ( %s ) = eps .\n\
+             \n  eq %s ( %s ) = %s ( %s ) .\n\
+             \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n\
+               if %s =/= eps .\n"
+            h.map_helper_name op_sorts var_decl
+            h.map_helper_name (helper_args "eps")
+            h.map_helper_name (helper_args elem)
+            h.map_fn_name (call_args elem)
+            h.map_helper_name (helper_args (Printf.sprintf "%s %s" elem seq))
+            h.map_fn_name (call_args elem)
+            h.map_helper_name (helper_args seq)
+            seq
+        else
+          let head = Printf.sprintf "index ( %s, 0 )" seq in
+          let tail =
+            Printf.sprintf "slice ( %s, 1, _-_ ( len ( %s ), 1 ) )" seq seq
+          in
+          Printf.sprintf
+            "  op %s : %s -> SpectecTerminals .\n%s\
+             \n  eq %s ( %s ) = eps .\n\
+             \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n      if _=/=_ ( %s, eps ) .\n"
+            h.map_helper_name op_sorts var_decl
+            h.map_helper_name (helper_args "eps")
+            h.map_helper_name (helper_args seq)
+            h.map_fn_name (call_args head)
+            h.map_helper_name (helper_args tail)
+            seq
       in
       let unmap_block =
         if h.map_arity = 1 && h.map_seq_index = 0 then
@@ -6003,16 +6059,16 @@ let collect_ctor_decl_lines eq_lines =
   |> List.of_seq
   |> List.sort_uniq String.compare
   |> List.map (fun nm ->
-	   match nm with
+       match nm with
        | "CTORLABELLBRACERBRACEA3" ->
            "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] ."
        | "CTORFRAMELBRACERBRACEA3" ->
            "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] ."
        | "CTORHANDLERLBRACERBRACEA3" ->
            "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] ."
-	       | _ ->
-	           let arity = ctor_arity nm in
-	           if arity = 0 then
+       | _ ->
+           let arity = ctor_arity nm in
+           if arity = 0 then
 	             match Hashtbl.find_opt zero_arity_memberships nm with
 	             | Some sorts ->
 	                 let sorts = List.sort_uniq String.compare sorts in
@@ -6032,6 +6088,7 @@ let translate defs =
   infer_rel_helpers := [];
   infer_rel_rules := [];
   map_call_helpers := [];
+  source_seq_pred_sorts := SSet.empty;
   build_type_env defs;
   init_declared_vars ();
   let ss = new_scan () in
@@ -6117,15 +6174,6 @@ let translate defs =
         else true
       else true
     )
-    |> List.map (fun l ->
-      let s = String.trim l in
-      if s = "op CTORLABELLBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
-      then "  op CTORLABELLBRACERBRACEA3 : N SpectecTerminals SpectecTerminals -> Instr [ctor] ."
-      else if s = "op CTORFRAMELBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
-      then "  op CTORFRAMELBRACERBRACEA3 : N Frame SpectecTerminals -> Instr [ctor] ."
-      else if s = "op CTORHANDLERLBRACERBRACEA3 : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] ."
-      then "  op CTORHANDLERLBRACERBRACEA3 : N Catch SpectecTerminals -> Instr [ctor] ."
-      else l)
     |> List.sort_uniq String.compare
   in
   let pred_sorts = exec_pred_sorts () |> SSet.of_list in

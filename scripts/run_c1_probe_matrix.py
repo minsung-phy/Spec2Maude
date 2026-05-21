@@ -136,6 +136,8 @@ def maude_bin() -> str:
 
 def classify_output(probe: Probe, text: str, returncode: int, timed_out: bool) -> tuple[str, str]:
     if timed_out:
+        if probe.expectation == "KNOWN_LIMITATION":
+            return ("EXPECTED_TIMEOUT", f"timeout; {probe.limitation}")
         return ("TIMEOUT", f"timeout; expected={probe.expectation}; {probe.limitation}")
     if "Fatal error: stack overflow" in text:
         status = "EXPECTED_STACK_OVERFLOW" if probe.expectation == "KNOWN_LIMITATION" else "STACK_OVERFLOW"

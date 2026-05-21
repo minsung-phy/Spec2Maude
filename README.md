@@ -309,10 +309,12 @@ emitted only for sources that use record/`StructT` shapes, while the current
 `SpectecTerminals` sequence carrier remains common substrate.
 The SPECTEC-CORE header/footer is also partially feature-gated: Bool wrappers,
 `WellTyped`/`hasType`, sequence-index/star/slice helpers, set-membership,
-merge/wildcard support, Step wrappers, and `$subst-*` sequence lifts are emitted
-only when the source/generated body uses them. Frame projection/update support is
-now produced by the source-derived `RECFrameA2` typed record constructor instead
-of a footer shim.
+merge/wildcard support, Step wrappers, and sequence-category predicates are
+emitted only when the source/generated body uses them. The old `$subst-*`
+footer list-lift overloads have been removed; source star-map expressions now
+generate `$map-*` helpers from the SpecTec AST shape. Frame projection/update
+support is now produced by the source-derived `RECFrameA2` typed record
+constructor instead of a footer shim.
 
 The generated header no longer declares unused fixed `w-N` / `w-M` / ... /
 `w-E` `SpectecType` constants, and the old fixed Nat-to-index/address subsort list
