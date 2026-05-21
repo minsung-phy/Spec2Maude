@@ -47,12 +47,17 @@ mod DSL-RECORD is
 
   op item : Qid SpectecTerminals -> RecordItem .
 
-  op value : Qid SpectecTerminal -> SpectecTerminal .
-  op value : Qid RecordItems -> SpectecTerminals .
   vars RI RI' : RecordItems . var R : RecordItem .
   vars F F' : Qid .
   var REC : SpectecTerminal .
   vars V V' : SpectecTerminals . 
+
+  op value : Qid SpectecTerminal -> SpectecTerminal .
+  op value : Qid RecordItems -> SpectecTerminals .
+  eq value(F,{RI}) = value(F, RI) .
+  eq value(F, EMPTY) = eps . 
+  eq value(F, item(F, V) ; RI) = V .
+  ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .
 
   op _++_ : RecordItems RecordItems -> SpectecTerminal .
   eq RI ++ RI' = {RI ; RI'} .
@@ -64,11 +69,6 @@ mod DSL-RECORD is
 
   op _[._=++_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal .
   eq REC [. F =++ V'] = REC [. F <- (value(F, REC) V') ] .
-
-  eq value(F,{RI}) = value(F, RI) .
-  eq value(F, EMPTY) = eps . 
-  eq value(F, item(F, V) ; RI) = V .
-  ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .
 
   op _[_<-_] : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals [prec 50] .
 
@@ -185,32 +185,27 @@ mod SPECTEC-CORE is
   var EC : Config .
   op EXP : -> Int .
   var ZS : State .
-  var LIST-TY : SpectecTerminal .
-  var LIST-TS : SpectecTerminals .
-  var INDEX-I : Nat .
-  vars INDEX-TS INDEX-IS : SpectecTerminals .
-  var REPEAT_N : Int .
-  var REPEAT_ELEM : SpectecTerminal .
-  vars SLICE_I SLICE_N : Int .
-  var SLICE_ELEM : SpectecTerminal .
-  var SLICE_REST : SpectecTerminals .
-  vars STAR-PREFIX STAR-ELEM : SpectecTerminal .
-  var STAR-REST : SpectecTerminals .
-  vars T W : SpectecTerminal .
-  var TS : SpectecTerminals .
+  var T : SpectecTerminal .
 
   --- Generic SpecTec sequence indexing: xs[i*] maps scalar index over i*.
   --- This is representation substrate for source meta-expressions, not a
   --- judgement-specific executable shortcut.
+  var INDEX-I : Nat .
+  vars INDEX-TS INDEX-IS : SpectecTerminals .
   eq index(INDEX-TS, eps) = eps .
   eq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS) .
 
   --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).
+  var REPEAT_N : Int .
+  var REPEAT_ELEM : SpectecTerminal .
   eq $repeat(REPEAT_ELEM, 0) = eps .
   ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )
    if _>_ ( REPEAT_N, 0 ) .
 
   --- Generic SpecTec sequence slicing: xs[i : n].
+  vars SLICE_I SLICE_N : Int .
+  var SLICE_ELEM : SpectecTerminal .
+  var SLICE_REST : SpectecTerminals .
   eq slice(SLICE_REST, SLICE_I, 0) = eps .
   ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, _-_ ( SLICE_N, 1 )) )
    if _>_ ( SLICE_N, 0 ) .
@@ -220,6 +215,8 @@ mod SPECTEC-CORE is
   --- Generic SpecTec star-map lowering for flat prefix constructors.
   --- Source shapes such as (SET t)* become $star-prefix(SET, t*), and
   --- $star-unprefix recovers t* from a matching flat encoded sequence.
+  vars STAR-PREFIX STAR-ELEM : SpectecTerminal .
+  var STAR-REST : SpectecTerminals .
   eq $star-prefix(STAR-PREFIX, eps) = eps .
   eq $star-prefix(STAR-PREFIX, STAR-ELEM STAR-REST) = STAR-PREFIX STAR-ELEM $star-prefix(STAR-PREFIX, STAR-REST) .
   eq $star-unprefix(STAR-PREFIX, eps) = eps .
@@ -13055,6 +13052,8 @@ if _MAP_SSUBST_VALTYPE_A3_S0_S =/= eps .
   eq $is-spectec-valtype ( CTORI64A0 ) = true .
   eq $is-spectec-valtype ( CTORV128A0 ) = true .
   eq $is-spectec-vectype ( CTORV128A0 ) = true .
+  var W : SpectecTerminal .
+  var TS : SpectecTerminals .
   --- Source-derived sequence-category predicate for SpecTec val* premises.
   eq  $is-spectec-val-seq(eps) = true .
   ceq $is-spectec-val-seq(W TS) = $is-spectec-val-seq(TS)
@@ -13064,6 +13063,8 @@ if _MAP_SSUBST_VALTYPE_A3_S0_S =/= eps .
   --- Generic SpecTec list type witness.
   --- The source rule is polymorphic in the element type; this executable
   --- variable form makes `eps hasType list(val)` and similar instances work.
+  var LIST-TY : SpectecTerminal .
+  var LIST-TS : SpectecTerminals .
   cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped
    if (len(LIST-TS) < (2 ^ 32)) .
 

@@ -40,6 +40,10 @@ let texpr s = { text = s; vars = [] }
 
 let texpr_with_var s v = { text = s; vars = [v] }
 
+let feature_uses_bool_wrapper : bool ref = ref false
+let feature_uses_has_type : bool ref = ref false
+let feature_uses_star_prefix : bool ref = ref false
+
 let tconcat sep ts =
   { text = String.concat sep (List.map (fun t -> t.text) ts);
     vars = List.concat_map (fun t -> t.vars) ts }
@@ -374,9 +378,11 @@ let star_prefix_pattern text =
   | _ -> None
 
 let star_prefix_text ctor seq =
+  feature_uses_star_prefix := true;
   Printf.sprintf "$star-prefix ( %s, %s )" ctor seq
 
 let star_unprefix_text ctor seq =
+  feature_uses_star_prefix := true;
   Printf.sprintf "$star-unprefix ( %s, %s )" ctor seq
 
 let split_top_level_commas s =
@@ -983,6 +989,17 @@ type scan_state = {
   mutable bool_calls: SSet.t;
   mutable rewrite_defs: SSet.t;
   mutable ctors     : SSet.t;
+  mutable scan_uses_sequence_index : bool;
+  mutable scan_uses_repeat : bool;
+  mutable scan_uses_slice : bool;
+  mutable scan_uses_set_membership : bool;
+  mutable scan_uses_merge : bool;
+  mutable scan_uses_any : bool;
+  mutable scan_uses_record_literal : bool;
+  mutable scan_uses_record_projection : bool;
+  mutable scan_uses_record_update : bool;
+  mutable scan_uses_record_extend : bool;
+  mutable scan_uses_sequence_update : bool;
 }
 
 let new_scan () = {
@@ -990,6 +1007,17 @@ let new_scan () = {
   dec_funcs = SSet.empty; bool_calls = SSet.empty;
   rewrite_defs = SSet.empty;
   ctors = SSet.empty;
+  scan_uses_sequence_index = false;
+  scan_uses_repeat = false;
+  scan_uses_slice = false;
+  scan_uses_set_membership = false;
+  scan_uses_merge = false;
+  scan_uses_any = false;
+  scan_uses_record_literal = false;
+  scan_uses_record_projection = false;
+  scan_uses_record_update = false;
+  scan_uses_record_extend = false;
+  scan_uses_sequence_update = false;
 }
 
 let scan_add_token ss raw =
@@ -1008,25 +1036,90 @@ let scan_mixop_tokens ss mixop =
 
 let rec scan_exp ss (e : exp) = match e.it with
   | VarE id ->
-    if id.it = "_" then ss.tokens <- SSet.add "any" ss.tokens
+    if id.it = "_" then (
+      ss.scan_uses_any <- true;
+      ss.tokens <- SSet.add "any" ss.tokens)
   | CaseE (mixop, inner) ->
       scan_mixop_tokens ss mixop;
       scan_exp ss inner
   | TupE es | ListE es -> List.iter (scan_exp ss) es
   | UnE (_, _, e1) | CvtE (e1, _, _) | SubE (e1, _, _) | ProjE (e1, _)
   | UncaseE (e1, _) | LenE e1 | OptE (Some e1) | TheE e1
-  | LiftE e1 | IterE (e1, _) | DotE (e1, _) -> scan_exp ss e1
-  | BinE (_, _, e1, e2) | CmpE (_, _, e1, e2) | CatE (e1, e2)
-  | MemE (e1, e2) | IdxE (e1, e2) | CompE (e1, e2)
-  | UpdE (e1, _, e2) | ExtE (e1, _, e2) -> scan_exp ss e1; scan_exp ss e2
-  | SliceE (e1, e2, e3) | IfE (e1, e2, e3) ->
+  | LiftE e1 | DotE (e1, _) -> scan_exp ss e1
+  | IterE (e1, (ListN _, _)) ->
+      ss.scan_uses_repeat <- true;
+      scan_exp ss e1
+  | IterE (e1, _) -> scan_exp ss e1
+  | BinE (_, _, e1, e2) | CmpE (_, _, e1, e2) | CatE (e1, e2) ->
+      scan_exp ss e1; scan_exp ss e2
+  | UpdE (e1, path, e2) ->
+      scan_exp ss e1; scan_update_path ss `Update path; scan_exp ss e2
+  | ExtE (e1, path, e2) ->
+      scan_exp ss e1; scan_update_path ss `Extend path; scan_exp ss e2
+  | MemE (e1, e2) ->
+      ss.scan_uses_set_membership <- true;
+      scan_exp ss e1; scan_exp ss e2
+  | IdxE (e1, e2) ->
+      ss.scan_uses_sequence_index <- true;
+      scan_exp ss e1; scan_exp ss e2
+  | CompE (e1, e2) ->
+      ss.scan_uses_merge <- true;
+      scan_exp ss e1; scan_exp ss e2
+  | SliceE (e1, e2, e3) ->
+      ss.scan_uses_slice <- true;
       scan_exp ss e1; scan_exp ss e2; scan_exp ss e3
-  | StrE fields -> List.iter (fun (_, e1) -> scan_exp ss e1) fields
+  | IfE (e1, e2, e3) ->
+      scan_exp ss e1; scan_exp ss e2; scan_exp ss e3
+  | StrE fields ->
+      let field_names =
+        List.map (fun (atom, _) -> to_var_name (Xl.Atom.name atom)) fields
+      in
+      (match unique_source_record_by_fields field_names with
+       | Some _ -> ()
+       | None -> ss.scan_uses_record_literal <- true);
+      List.iter (fun (_, e1) -> scan_exp ss e1) fields
   | CallE (id, args) ->
       let cn = call_name id.it in
       if cn <> "w-$" then ss.calls <- SIPairSet.add (cn, List.length args) ss.calls;
       List.iter (fun a -> match a.it with ExpA e1 -> scan_exp ss e1 | _ -> ()) args
   | OptE None | BoolE _ | NumE _ | TextE _ -> ()
+
+and scan_path_features ss (p : path) =
+  match p.it with
+  | RootP -> ()
+  | DotP (parent, _) ->
+      ss.scan_uses_record_projection <- true;
+      scan_path_features ss parent
+  | IdxP (parent, idx) ->
+      ss.scan_uses_sequence_index <- true;
+      scan_exp ss idx;
+      scan_path_features ss parent
+  | SliceP (parent, e_s, e_e) ->
+      ss.scan_uses_slice <- true;
+      scan_exp ss e_s;
+      scan_exp ss e_e;
+      scan_path_features ss parent
+
+and scan_update_path ss kind (p : path) =
+  let rec has_dot p =
+    match p.it with
+    | RootP -> false
+    | DotP _ -> true
+    | IdxP (parent, _) | SliceP (parent, _, _) -> has_dot parent
+  in
+  let rec has_sequence_update p =
+    match p.it with
+    | RootP -> false
+    | DotP (parent, _) -> has_sequence_update parent
+    | IdxP _ | SliceP _ -> true
+  in
+  scan_path_features ss p;
+  if has_dot p then (
+    ss.scan_uses_record_update <- true;
+    match kind with
+    | `Extend -> ss.scan_uses_record_extend <- true
+    | `Update -> ());
+  if has_sequence_update p then ss.scan_uses_sequence_update <- true
 
 let rec scan_bool_exp ss (e : exp) = match e.it with
   | CallE (id, args) ->
@@ -1125,7 +1218,9 @@ let format_call fn = function
 
 let wrap_bool ctx s = match ctx with
   | BoolCtx -> s
-  | TermCtx -> Printf.sprintf "w-bool ( %s )" s
+  | TermCtx ->
+      feature_uses_bool_wrapper := true;
+      Printf.sprintf "w-bool ( %s )" s
 
 let rec exp_is_boolish (e : exp) = match e.it with
   | BoolE _ | CmpE _ | MemE _ | UnE (`NotOp, _, _) -> true
@@ -1783,7 +1878,9 @@ let type_guard term typ vm =
           with Not_found -> false
         in
         if has_var_ref then "true"
-        else Printf.sprintf "( %s hasType ( %s ) ) : WellTyped" term ty
+        else (
+          feature_uses_has_type := true;
+          Printf.sprintf "( %s hasType ( %s ) ) : WellTyped" term ty)
 
 let is_bool_typ t vm =
   let s = String.lowercase_ascii (translate_typ t vm) in
@@ -2332,9 +2429,10 @@ let translate_typd id params insts =
                  let main =
                    if cons_name = "" then
                      if is_parametric then
+                       (feature_uses_has_type := true;
                        Printf.sprintf "\n%s  %s ( %s hasType ( %s ) ) : WellTyped%s ."
                          (decl_prefix ()) (if rhs = "" then "mb" else "cmb") lhs type_term
-                         (if rhs = "" then "" else "\n   if " ^ rhs)
+                         (if rhs = "" then "" else "\n   if " ^ rhs))
                      else if is_plain_var_like lhs then
                        let () =
                          List.iter (fun (v, _, _) -> Hashtbl.remove declared_vars v) params;
@@ -2362,9 +2460,10 @@ let translate_typd id params insts =
                            Printf.sprintf "  op %s : %s -> SpectecTerminal [ctor] .\n" op_sig arg_sorts
                      in
                      if is_parametric then
+                       (feature_uses_has_type := true;
                        Printf.sprintf "%s%s  %s ( %s hasType ( %s ) ) : WellTyped%s ."
                          op_line (decl_prefix ()) (if rhs = "" then "mb" else "cmb") lhs type_term
-                         (if rhs = "" then "" else "\n   if " ^ rhs)
+                         (if rhs = "" then "" else "\n   if " ^ rhs))
                      else
                        Printf.sprintf "%s%s  %s ( %s ) : %s%s ."
                          op_line (decl_prefix ()) (if rhs = "" then "mb" else "cmb") lhs full_type_sort
@@ -2386,9 +2485,10 @@ let translate_typd id params insts =
                          (binder_conds @ List.filteri (fun i _ -> i <> opt_idx)
                            (List.map (fun (_, g, _) -> g) params)) in
                        if is_parametric then
+                         (feature_uses_has_type := true;
                          Printf.sprintf "\n  %s ( %s hasType ( %s ) ) : WellTyped%s ."
                            (if r = "" then "mb" else "cmb") lhs_eps type_term
-                           (if r = "" then "" else "\n   if " ^ r)
+                           (if r = "" then "" else "\n   if " ^ r))
                        else
                          Printf.sprintf "\n  %s ( %s ) : %s%s ."
                            (if r = "" then "mb" else "cmb") lhs_eps full_type_sort
@@ -2425,9 +2525,10 @@ let translate_typd id params insts =
                     else if binder_conds = [] then alias_guard
                     else cond_join (binder_conds @ [alias_guard]) in
                   if is_parametric then
+                    (feature_uses_has_type := true;
                     Printf.sprintf "%s  %s ( %s hasType ( %s ) ) : WellTyped%s ."
                       (bd ()) (if cond = "" then "mb" else "cmb") lhs type_term
-                      (if cond = "" then "" else "\n   if " ^ cond)
+                      (if cond = "" then "" else "\n   if " ^ cond))
                   else
                     Printf.sprintf "%s  %s ( %s ) : %s%s ."
                       (bd ()) (if cond = "" then "mb" else "cmb") lhs full_type_sort
@@ -2487,10 +2588,11 @@ let translate_typd id params insts =
                       info)
                in
                if is_parametric then
+                 (feature_uses_has_type := true;
                  Printf.sprintf "  %s ( {%s} hasType ( %s ) ) : WellTyped%s ."
                    (if rhs = "" then "mb" else "cmb")
                    record_items type_term
-                   (if rhs = "" then "" else "\n   if " ^ rhs)
+                   (if rhs = "" then "" else "\n   if " ^ rhs))
                else
                  Printf.sprintf "  %s ( {%s} ) : %s%s ."
                    (if rhs = "" then "mb" else "cmb")
@@ -5264,6 +5366,11 @@ let nat_subsort_decls () =
 type prelude_features = {
   uses_sequences : bool;
   uses_records : bool;
+  uses_record_literal : bool;
+  uses_record_projection : bool;
+  uses_record_update : bool;
+  uses_record_extend : bool;
+  uses_sequence_update : bool;
   uses_step_relations : bool;
   uses_bool_wrapper : bool;
   uses_has_type : bool;
@@ -5274,6 +5381,7 @@ type prelude_features = {
   uses_set_membership : bool;
   uses_merge : bool;
   uses_any : bool;
+  uses_exp_const : bool;
   seq_pred_sorts : string list;
 }
 
@@ -5288,25 +5396,49 @@ let source_has_step_relations defs =
   in
   List.exists scan defs
 
-let prelude_features_of_source defs generated_text token_ops =
+let prelude_features_of_source defs ss generated_text token_ops =
   let has lit =
     contains_substring generated_text lit || contains_substring token_ops lit
+  in
+  let has_source_records = !source_record_infos <> [] in
+  let uses_record_projection =
+    has_source_records || ss.scan_uses_record_projection || has "value("
+    || has "value ("
+  in
+  let uses_record_update =
+    has_source_records || ss.scan_uses_record_update || has " [. "
+  in
+  let uses_record_extend = ss.scan_uses_record_extend || has " =++ " in
+  let uses_sequence_update = ss.scan_uses_sequence_update in
+  let uses_record_literal =
+    has_source_records || ss.scan_uses_record_literal || has "item("
+    || has "item ("
+  in
+  let uses_records =
+    uses_record_literal || uses_record_projection || uses_record_update
+    || uses_record_extend || uses_sequence_update
   in
   {
     uses_sequences =
       Hashtbl.length plural_types > 0
       || not (SSet.is_empty !sequence_alias_sorts);
-    uses_records = !source_record_infos <> [];
+    uses_records;
+    uses_record_literal;
+    uses_record_projection;
+    uses_record_update;
+    uses_record_extend;
+    uses_sequence_update;
     uses_step_relations = source_has_step_relations defs;
-    uses_bool_wrapper = has "w-bool";
-    uses_has_type = has " hasType ";
-    uses_sequence_index = has "index (" || has "index(";
-    uses_repeat = has "$repeat";
-    uses_slice = has "slice (" || has "slice(";
-    uses_star_prefix = has "$star-prefix" || has "$star-unprefix";
-    uses_set_membership = has " <- ";
-    uses_merge = has "merge (" || has "merge(";
-    uses_any = contains_substring token_ops "op any :";
+    uses_bool_wrapper = !feature_uses_bool_wrapper;
+    uses_has_type = !feature_uses_has_type;
+    uses_sequence_index = ss.scan_uses_sequence_index || has "index (" || has "index(";
+    uses_repeat = ss.scan_uses_repeat || has "$repeat";
+    uses_slice = ss.scan_uses_slice || has "slice (" || has "slice(";
+    uses_star_prefix = !feature_uses_star_prefix;
+    uses_set_membership = ss.scan_uses_set_membership || has " <- ";
+    uses_merge = ss.scan_uses_merge || has "merge (" || has "merge(";
+    uses_any = ss.scan_uses_any || contains_substring token_ops "op any :";
+    uses_exp_const = has "EXP";
     seq_pred_sorts = SSet.elements !source_seq_pred_sorts;
   }
 
@@ -5347,7 +5479,11 @@ let generated_sequence_prelude_module (_features : prelude_features) =
   "  eq index(T TS, s(N')) = index(TS, N') .\n" ^
   "endm\n\n"
 
-let generated_record_prelude_module () =
+let generated_record_prelude_module features =
+  let needs_record_items =
+    features.uses_record_literal || features.uses_record_projection
+    || features.uses_record_update || features.uses_record_extend
+  in
   "mod DSL-RECORD is \n" ^
   "  inc DSL-PRETYPE .\n" ^
   "  inc QID .\n" ^
@@ -5356,40 +5492,50 @@ let generated_record_prelude_module () =
   "  subsort RecordItem < RecordItems . \n\n" ^
   "  op EMPTY : -> RecordItem .\n" ^
   "  op _;_ : RecordItems RecordItems -> RecordItems [ctor assoc id: EMPTY].\n" ^
-  "  op {_} : RecordItems -> SpectecTerminal .\n\n" ^
-  "  op item : Qid SpectecTerminals -> RecordItem .\n\n" ^
-  "  op value : Qid SpectecTerminal -> SpectecTerminal .\n" ^
-  "  op value : Qid RecordItems -> SpectecTerminals .\n" ^
+  (if needs_record_items then
+     "  op {_} : RecordItems -> SpectecTerminal .\n\n" ^
+     "  op item : Qid SpectecTerminals -> RecordItem .\n\n"
+   else "\n") ^
   "  vars RI RI' : RecordItems . var R : RecordItem .\n" ^
   "  vars F F' : Qid .\n" ^
   "  var REC : SpectecTerminal .\n" ^
   "  vars V V' : SpectecTerminals . \n\n" ^
-  "  op _++_ : RecordItems RecordItems -> SpectecTerminal .\n" ^
-  "  eq RI ++ RI' = {RI ; RI'} .\n\n" ^
-  "  op _[._<-_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal . \n" ^
-  "  op _[._<-_] : RecordItems Qid SpectecTerminals -> SpectecTerminal .\n" ^
-  "  eq {item(F, V) ; RI} [. F <- V'] = {item(F, V') ; RI} .\n" ^
-  "  ceq {item(F, V) ; RI} [. F' <- V'] = item(F, V) ++ RI[. F' <- V'] if F =/= F' .\n\n" ^
-  "  op _[._=++_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal .\n" ^
-  "  eq REC [. F =++ V'] = REC [. F <- (value(F, REC) V') ] .\n\n" ^
-  "  eq value(F,{RI}) = value(F, RI) .\n" ^
-  "  eq value(F, EMPTY) = eps . \n" ^
-  "  eq value(F, item(F, V) ; RI) = V .\n" ^
-  "  ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .\n\n" ^
-  "  op _[_<-_] : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals [prec 50] .\n\n" ^
-  "  var H : SpectecTerminal .\n" ^
-  "  vars L : SpectecTerminals .\n" ^
-  "  vars IDX : Nat .\n" ^
-  "  vars VALUE NEWVALUE : SpectecTerminal .\n\n" ^
-  "  eq eps [ IDX <- NEWVALUE ] = eps .\n" ^
-  "  eq (H L) [ 0 <- NEWVALUE ] = NEWVALUE L .\n" ^
-  "  eq (H L) [ s(IDX) <- NEWVALUE ] = H (L [ IDX <- NEWVALUE ]) .\n" ^
+  (if features.uses_record_projection || features.uses_record_extend then
+     "  op value : Qid SpectecTerminal -> SpectecTerminal .\n" ^
+     "  op value : Qid RecordItems -> SpectecTerminals .\n" ^
+     "  eq value(F,{RI}) = value(F, RI) .\n" ^
+     "  eq value(F, EMPTY) = eps . \n" ^
+     "  eq value(F, item(F, V) ; RI) = V .\n" ^
+     "  ceq value(F, R ; RI) = value(F, RI) if R =/= EMPTY .\n\n"
+   else "") ^
+  (if features.uses_record_update || features.uses_record_extend then
+     "  op _++_ : RecordItems RecordItems -> SpectecTerminal .\n" ^
+     "  eq RI ++ RI' = {RI ; RI'} .\n\n" ^
+     "  op _[._<-_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal . \n" ^
+     "  op _[._<-_] : RecordItems Qid SpectecTerminals -> SpectecTerminal .\n" ^
+     "  eq {item(F, V) ; RI} [. F <- V'] = {item(F, V') ; RI} .\n" ^
+     "  ceq {item(F, V) ; RI} [. F' <- V'] = item(F, V) ++ RI[. F' <- V'] if F =/= F' .\n\n"
+   else "") ^
+  (if features.uses_record_extend then
+     "  op _[._=++_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal .\n" ^
+     "  eq REC [. F =++ V'] = REC [. F <- (value(F, REC) V') ] .\n\n"
+   else "") ^
+  (if features.uses_sequence_update then
+     "  op _[_<-_] : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals [prec 50] .\n\n" ^
+     "  var H : SpectecTerminal .\n" ^
+     "  vars L : SpectecTerminals .\n" ^
+     "  vars IDX : Nat .\n" ^
+     "  vars VALUE NEWVALUE : SpectecTerminal .\n\n" ^
+     "  eq eps [ IDX <- NEWVALUE ] = eps .\n" ^
+     "  eq (H L) [ 0 <- NEWVALUE ] = NEWVALUE L .\n" ^
+     "  eq (H L) [ s(IDX) <- NEWVALUE ] = H (L [ IDX <- NEWVALUE ]) .\n"
+   else "") ^
   "endm\n\n"
 
 let generated_prelude_modules features =
   generated_term_prelude_module ()
   ^ generated_sequence_prelude_module features
-  ^ (if features.uses_records then generated_record_prelude_module () else "")
+  ^ (if features.uses_records then generated_record_prelude_module features else "")
 
 let core_prelude_include features =
   if features.uses_records then "  inc DSL-RECORD .\n"
@@ -5478,46 +5624,31 @@ let header_prefix features =
    else "") ^
   "  --- Common variables (declared once)\n" ^
   (if features.uses_step_relations then "  var EC : Config .\n" else "") ^
-  "  op EXP : -> Int .\n" ^
+  (if features.uses_exp_const then "  op EXP : -> Int .\n" else "") ^
   (if features.uses_step_relations then "  var ZS : State .\n" else "") ^
-  (if features.uses_has_type then
-     "  var LIST-TY : SpectecTerminal .\n" ^
-     "  var LIST-TS : SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_sequence_index then
-     "  var INDEX-I : Nat .\n" ^
-     "  vars INDEX-TS INDEX-IS : SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_repeat then
-     "  var REPEAT_N : Int .\n" ^
-     "  var REPEAT_ELEM : SpectecTerminal .\n"
-   else "") ^
-  (if features.uses_slice then
-     "  vars SLICE_I SLICE_N : Int .\n" ^
-     "  var SLICE_ELEM : SpectecTerminal .\n" ^
-     "  var SLICE_REST : SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_star_prefix then
-     "  vars STAR-PREFIX STAR-ELEM : SpectecTerminal .\n" ^
-     "  var STAR-REST : SpectecTerminals .\n"
-   else "") ^
-  "  vars T W : SpectecTerminal .\n" ^
-  "  var TS : SpectecTerminals .\n\n" ^
+  "  var T : SpectecTerminal .\n\n" ^
   (if features.uses_sequence_index then
      "  --- Generic SpecTec sequence indexing: xs[i*] maps scalar index over i*.\n" ^
      "  --- This is representation substrate for source meta-expressions, not a\n" ^
      "  --- judgement-specific executable shortcut.\n" ^
+     "  var INDEX-I : Nat .\n" ^
+     "  vars INDEX-TS INDEX-IS : SpectecTerminals .\n" ^
      "  eq index(INDEX-TS, eps) = eps .\n" ^
      "  eq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS) .\n\n"
    else "") ^
   (if features.uses_repeat then
      "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
+     "  var REPEAT_N : Int .\n" ^
+     "  var REPEAT_ELEM : SpectecTerminal .\n" ^
      "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
      "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
      "   if _>_ ( REPEAT_N, 0 ) .\n\n"
    else "") ^
   (if features.uses_slice then
      "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
+     "  vars SLICE_I SLICE_N : Int .\n" ^
+     "  var SLICE_ELEM : SpectecTerminal .\n" ^
+     "  var SLICE_REST : SpectecTerminals .\n" ^
      "  eq slice(SLICE_REST, SLICE_I, 0) = eps .\n" ^
      "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, _-_ ( SLICE_N, 1 )) )\n" ^
      "   if _>_ ( SLICE_N, 0 ) .\n" ^
@@ -5528,6 +5659,8 @@ let header_prefix features =
      "  --- Generic SpecTec star-map lowering for flat prefix constructors.\n" ^
      "  --- Source shapes such as (SET t)* become $star-prefix(SET, t*), and\n" ^
      "  --- $star-unprefix recovers t* from a matching flat encoded sequence.\n" ^
+     "  vars STAR-PREFIX STAR-ELEM : SpectecTerminal .\n" ^
+     "  var STAR-REST : SpectecTerminals .\n" ^
      "  eq $star-prefix(STAR-PREFIX, eps) = eps .\n" ^
      "  eq $star-prefix(STAR-PREFIX, STAR-ELEM STAR-REST) = STAR-PREFIX STAR-ELEM $star-prefix(STAR-PREFIX, STAR-REST) .\n" ^
      "  eq $star-unprefix(STAR-PREFIX, eps) = eps .\n" ^
@@ -5550,11 +5683,16 @@ let footer features =
     |> String.concat "\n"
   in
   "\n" ^
-  (if seq_pred_blocks = "" then "" else seq_pred_blocks ^ "\n") ^
+  (if seq_pred_blocks = "" then "" else
+     "  var W : SpectecTerminal .\n" ^
+     "  var TS : SpectecTerminals .\n" ^
+     seq_pred_blocks ^ "\n") ^
   (if features.uses_has_type then
      "  --- Generic SpecTec list type witness.\n" ^
      "  --- The source rule is polymorphic in the element type; this executable\n" ^
      "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
+     "  var LIST-TY : SpectecTerminal .\n" ^
+     "  var LIST-TS : SpectecTerminals .\n" ^
      "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
      "   if (len(LIST-TS) < (2 ^ 32)) .\n\n"
    else "") ^
@@ -6091,6 +6229,9 @@ let translate defs =
   infer_rel_rules := [];
   map_call_helpers := [];
   source_seq_pred_sorts := SSet.empty;
+  feature_uses_bool_wrapper := false;
+  feature_uses_has_type := false;
+  feature_uses_star_prefix := false;
   build_type_env defs;
   init_declared_vars ();
   let ss = new_scan () in
@@ -6109,7 +6250,7 @@ let translate defs =
     ^ map_call_helper_block ()
   in
   let prelude_features =
-    prelude_features_of_source defs body_without_prelude_helpers token_ops
+    prelude_features_of_source defs ss body_without_prelude_helpers token_ops
   in
   let header =
     header_prefix prelude_features
