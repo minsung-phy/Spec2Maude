@@ -17,5 +17,4 @@ __pycache__/
 
 # 4. 기타 파일 제외
 Spec2Maude_JHS/
-preserved/
 artifacts/
