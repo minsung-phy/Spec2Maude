@@ -1,907 +1,575 @@
 # C1 strict limitation 정리
 
-Updated: 2026-05-21
+Updated: 2026-05-22
 
-이 파일이 현재 C1 limitation의 기준 문서다. 오래된 세부 audit 문서는
-증거/기록용이고, 지금 상태를 볼 때는 이 파일을 먼저 보면 된다.
+이 파일이 현재 C1 limitation의 기준 문서다. 오래된 batch audit 문서는 증거/기록용이고,
+지금 상태를 볼 때는 이 파일을 먼저 보면 된다.
 
-## 한눈에 보는 현재 결론
+## 현재 결론
 
-현재 `output_bs.maude`는 `wasm-3.0/*.spectec`에 대해 구조적 coverage는
-완료된 상태다. 즉 source syntax / def / relation / rule 중 “아예 빠진 것”은
-현재 확인되지 않았다.
+`output_bs.maude`는 `wasm-3.0/*.spectec`에 대해 구조적 coverage가 완료된 상태다.
 
-하지만 아래 항목들은 아직 C1 final 전에 교수님과 확인하거나, 별도 단계에서
-해결해야 한다.
-
-### A. isomorphic하지 않거나 교수님 확인이 필요한 generated artifact
-
-- label-related `step-from-step-pure-*` 20개: source rule이 아니라
-  `Step_pure`를 `Step`으로 lift한 실행용 shortcut이다. 현재 Fibonacci 실행
-  때문에 임시 유지 중이다.
-- `$infer-*` / `-exec-tail-empty*`: source validation rule 자체는 아니고,
-  witness-style premise를 실행시키기 위한 generic execution overlay다. 일부
-  validation probe를 개선하지만 `Instrs-ok(CONST...)`에서는 아직 stack overflow가
-  난다. C1에 둘지 C2로 보낼지 논의 필요하다.
-- `$iter-*`: SpecTec의 `(premise)*` meta-notation을 Maude에서 표현하기 위한
-  generic lowering이다. judgement-specific `iter-empty` rule은 아니지만,
-  source에 문자 그대로 있는 rule도 아니므로 “meta-notation representation
-  substrate”로 교수님 확인이 필요하다.
-- 남은 `$is-spectec-*` composite/category predicates:
-  `$is-spectec-val-seq`, `$is-spectec-heaptype`, `$is-spectec-typeuse`,
-  `$is-spectec-reftype`, `$is-spectec-valtype`, `$is-spectec-blocktype`,
-  `$is-spectec-expr`. record/simple category guard는 많이 제거했지만,
-  composite/sequence category는 아직 typed-sort 설계가 더 필요하다.
-
-### B. concrete 실행이 아직 안 되는 것으로 확인된 항목
-
-- `Instrs-ok(C0, CONST i32 0, arrow(eps, eps, i32))`: 현재 stack overflow.
-  `Expr-ok-const`와 constant-expression `Global-ok`도 이 문제를 타고 막힌다.
-- sequence-shaped direct `Val-ok`, 예를 들어 `Val-ok(fib-store, eps, eps)`와
-  multi-value `Val-ok(...)`: source singleton `Val-ok`에는 없는 list-lift query라
-  strict C1에서는 일부러 살리지 않았다.
-- `steps(fib-config-invoke(i32v(5)))`: `$invoke(...)` 자체는 Config로 rewrite되지만,
-  `steps($invoke(...))`와 source-shaped outer frame path는 아직 init-config /
-  invoke 연결 단계의 문제로 남아 있다.
-- `evalexprss-r1`: nested `expr**` representation과 output-bearing witness
-  synthesis가 동시에 걸린다.
-- `$ivbitmaskop` / `$vbitmaskop` 일부: stack overflow는 제거했지만 `$lanes`,
-  `$ibits`, inverse hint 쪽이 아직 완전히 executable하지 않다.
-
-### C. 아직 실행 실패인지 샘플 문제인지 분류가 덜 된 항목
-
-전체 artifact audit에서 나온 `NO_SOLUTION` / `STUCK` 다수는 곧바로 버그가
-아니다. 자동 생성 sample이 source premise를 만족하지 못하거나, 필요한
-context/store/module witness가 부족한 경우가 많다. 이 항목들은 focused
-source-valid probe로 다시 확인해야 한다.
-
-### D. 남은 Maude warning/advisory
-
-2026-05-21 warning cleanup에서 안전하게 줄일 수 있는 warning은 줄였다.
-
-제거된 warning family:
-
-- `assignment condition fragment ... bound before matching`: 0개.
-  source premise가 실제 binding이 아니라 이미 bound된 값을 확인하는 경우는
-  Maude condition에서 equality check로 생성한다.
-- `multiple distinct parses`: 0개. arithmetic / Bool / comparison / generated
-  `$map-*` helper 표현을 prefix Maude operator form으로 출력해서 parser
-  ambiguity를 제거했다.
-
-현재 `load wasm-exec-bs` 기준 남은 warning family:
-
-- `used-before-bound`: 25개. 세부적으로는 validation 6개,
-  execution/def 12개, label 없는 numeric/vector helper 7개다.
-  대부분 validation inference overlay, numeric/vector helper,
-  allocation/eval/init helper에서 output witness를 Maude rewriting이 만들어야
-  하는 경우다. 단순히 `:=`를 `==`로 바꾸면 오히려 더 위험해져서 유지했다.
-- `duplicate-import-advisory`: 0개. `dsl/pretype.maude`의 list update
-  operator `_[_<-_]`가 예전에는 `Nat` index 버전과 `SpectecTerminal` index
-  버전으로 둘 다 있어서, `Nat < SpectecTerminal`과 만나 중복 import처럼 보였다.
-  이제 `Nat < SpectecTerminal`은 `DSL-PRETYPE`이 제공하고, list update operator는
-  `SpectecTerminal` index 버전 하나만 둔다. Nat-index update는 subsort 때문에
-  그대로 동작한다.
-- command-time membership warning: 실제 `red/search` 명령을 실행하면 Maude
-  builtin/pretype associative operator에 대해
-  `membership axioms are not guaranteed...` warning이 11개 출력될 수 있다.
-  현재 Fibonacci smoke 결과는 정상이며, 이 warning은 `dsl/pretype` / builtin
-  sort 설계 cleanup에서 따로 본다. 같은 실행 시점에
-  `nonfuncs = global* mem* table* elem*`에서 온 `Nonfuncs` sequence membership
-  때문에 `collapse at top` advisory 1개도 출력될 수 있다.
-
-이번 pass에서 source-preserving하게 고친 대표 항목:
-
-- `ListN`/fixed-length 반복 패턴의 길이 변수 바인딩을 generic RelD lowering에도
-  반영했다.
-- source category-pattern disjunction을 generic Bool category predicate로
-  낮췄다.
-- DecD의 `TypA`/syntax argument가 이미 바인딩된 type parameter를 가리킬 때
-  그 mapping을 보존하도록 고쳤다.
-- generated Maude expression pretty-printer가 arithmetic / Bool / comparison
-  operator를 prefix form으로 출력하도록 정리했다.
-
-즉 현재 warning은 완전히 0은 아니지만, 남은 warning은 대부분 source relation
-premise가 output witness를 합성해야 하는 문제다. 숫자를 줄이기 위해 무작정
-condition을 바꾸는 것은 C1 실행을 깨기 쉬우므로, 남은 warning은 source rule
-단위로 하나씩 판다.
-
-#### 남은 `used-before-bound` 25개를 지금 유지하는 이유
-
-이 25개는 단순 pretty-printing 문제가 아니다. 공통 원인은 source premise가
-conclusion에 없는 중간값을 만들어야 하는데, 현재 C1의 rewrite-condition 실행
-방식이 그 witness를 자동 합성하지 못한다는 점이다.
-
-분류:
-
-- validation witness 6개:
-  `deftype-sub-super`, `instr-ok-block`, `instr-ok-loop`, `instr-ok-if`,
-  `instr-ok-try-table`, `module-ok-r0`.
-  예를 들어 `Instr_ok/block`의 `Instrs_ok: ... ->_(x*) ...`에서 `x*`는 source
-  premise가 만들어야 하는 annotation witness다.
-- execution/def witness 12개:
-  `step-read-br-on-cast-*`, `step-read-ref-*`, `allocmodule-r0`,
-  `evalexprs-r1`, `evalglobals-r1`, `instantiate-r0`,
-  `infer-instr-ok-arg2-*`.
-  이들은 runtime type witness, eval output state, allocation result sequence
-  같은 값을 premise에서 만들어야 한다.
-- numeric/vector output witness 7개:
-  `$vcvtop`, `$vnarrowop`, `$ivextunop`, `$ivextbinop`, `$growmem` 계열.
-  vector lane sequence나 memory-size result 같은 output 값을 premise에서
-  만들어야 한다.
-
-따라서 현재 C1에서는 이 25개를 warning으로 유지하고 limitation으로 기록한다.
-나중에 해결하려면 다음 중 하나가 필요하다.
-
-1. source-preserving generic witness solver를 설계한다.
-2. relation/def premise별 mode 정보를 생성해서 Maude가 어떤 값을 먼저 계산해야
-   하는지 알게 한다.
-3. C1은 구조 보존 baseline으로 두고, C2 execution layer에서 witness synthesis를
-   담당하게 한다.
-
-하지 말아야 할 것:
-
-- warning을 없애려고 `:=`를 무작정 `==`로 바꾸기;
-- judgement-specific helper rule 추가;
-- constructor-specific shortcut 추가;
-- source premise를 삭제하거나 약화하기.
-
-### E. 지금 통과하는 핵심 smoke
-
-- `$expanddt(value('TYPE, fib-funcinst))`
-- `$invoke(fib-store, 0, vals)` 자체가 Config로 rewrite
-- label/br suffix search
-- br_if suffix search
-- nop suffix search
-- `steps(fib-config(i32v(5)))`
-
-## 현재 C1 기준
-
-우리가 쓰는 isomorphic 기준은 다음이다.
-
-1. SpecTec source에 있는 syntax / def / rule 구조와 같은 의도와 모양으로 변환되어야 한다.
-2. 변수명과 Maude 내부 이름은 달라도 된다. 예를 들어 `instr*`가 `INSTRS`가 되는 것은 괜찮다.
-3. source에 없는 추가 helper, 추가 rule, 추가 condition, 추가 function은 C1 core에 남기면 안 된다. 단, Maude에서 SpecTec meta-notation을 표현하기 위한 unavoidable representation substrate는 명시적으로 기록하고 교수님과 확인해야 한다.
-4. SpecTec rule이 premise 없는 unconditional rule이면, Maude에서도 가능하면 unconditional `rl`이어야 한다. source binder/category 때문에 붙은 guard는 Maude sort/membership으로 표현할 수 있으면 제거 대상이다.
-
-## 현재 구조적 커버리지
-
-`wasm-3.0/*.spectec` 전체에 대해 구조적 source coverage는 완료된 상태다.
-
+- source files: 21 / 21
 - syntax declarations: 249 / 249
 - def declarations/equations: 1272 / 1272
 - relation declarations: 82 / 82
 - rule declarations: 499 / 499
-- missing source constructs: 0
+- strict validation source-rule targets: 281 / 281 primary `rl/crl`
+- `eq/ceq ... = valid`: 없음
+- `iter-empty` / `opt-empty`: 없음
 
-strict validation lowering도 구조적으로 완료되어 있다.
+즉 source construct가 아예 빠진 것은 현재 확인되지 않았다.
 
-- 281 / 281 strict validation source-rule targets가 primary Maude `rl` / `crl`로 생성된다.
-- `output_bs.maude`에 `eq` / `ceq ... = valid`는 남아 있지 않다.
-- 예전 judgement-specific `iter-empty` / `opt-empty` derived validation rule은 남아 있지 않다.
+다만 C1 final 관점에서 아래 항목들은 아직 limitation/debt로 남아 있다.
 
-현재 invariant:
+## 1. Non-isomorphic / 교수님 논의 필요 항목과 경계 정리
 
-```bash
-rg -n -e '^[[:space:]]*(eq|ceq) .* = valid' output_bs.maude
-rg -n -e 'iter-empty|opt-empty' output_bs.maude
-rg -n -e 'step-from-step-pure-' output_bs.maude | wc -l
-rg -n -e 'Func-ok|Instrs-ok|Module-ok|Externaddr-ok|fib|CTORI32A0' translator_bs.ml
-```
+### 1.1 label-related `step-from-step-pure-*` 20개
 
-기대값:
+이 20개 rule은 SpecTec source에 직접 있는 rule이 아니다.
 
-- `eq/ceq ... = valid`: no output
-- `iter-empty` / `opt-empty`: no output
-- `step-from-step-pure-*`: 20
-- forbidden translator hardcoding: no output
+SpecTec source에는 아래 rule 조합이 있다.
 
-## 현재 isomorphic하지 않거나 교수님 확인이 필요한 것
+- `Step_pure/...`: instruction sequence 자체가 pure하게 한 step 줄어드는 rule
+- `Step/pure`: `Step_pure`를 전체 `Step` relation으로 올리는 rule
+- `Step/ctxt-instrs`: instruction sequence 가운데 일부가 step되면 앞뒤 context를 보존하는 rule
 
-### 1. label-related `step-from-step-pure-*` 20개
+strict C1이면 이 세 source rule만으로 실행되어야 한다. 하지만 Maude가 associative
+instruction sequence split과 conditional rewrite premise를 한 번에 안정적으로 조합하지 못해서,
+`LABEL ... BR 0 LOCAL.GET 1` 같은 label/br suffix case에서 Fibonacci 실행이 멈춘다.
 
-남아 있는 가장 큰 non-C1-final debt다.
-
-이 rule들은 SpecTec source rule이 아니다. `Step_pure` rule을 `Step`으로 lift한 실행용 shortcut이다.
-
-현재 상태:
-
-- non-label `step-from-step-pure-*` shortcut은 제거되어 있다.
-- label-related shortcut 20개만 남아 있다.
-- 예: `step-from-step-pure-br-label-zero-ctx-suffix` 계열.
-
-왜 남아 있나:
-
-- source-shaped `Step/ctxt-instrs` rule 자체는 생성되어 있다.
-- direct `step-pure(label(... br 0)) => eps`는 성공한다.
-- 하지만 Maude가 `step((Z ; label(... br 0) local.get 1))`에서 필요한 associative split과 conditional rewrite premise를 source-shaped 단일 rule만으로 안정적으로 조합하지 못한다.
-- 이 shortcut을 제거하면 label/br suffix search와 Fibonacci 실행이 깨진다.
+그래서 현재 output에는 label-related `Step_pure` rule을 `Step`으로 직접 lift한 shortcut
+20개가 남아 있다.
 
 분류:
 
-- `NON_C1_FINAL_SCAFFOLD`
-- 현재 accepted execution 때문에 임시 유지.
-- C1 final 전에 제거하거나, C2 execution layer debt로 명확히 분리해야 한다.
+- `NON_C1_FINAL_EXEC_DEBT`
+- hardcoded Wasm constructor patch는 아니지만, source에는 없는 derived executable shortcut이다.
+- 교수님 질문: C1에 temporary executable debt로 둘지, C2 execution layer로 보낼지 결정 필요.
 
-교수님께 물어볼 질문:
+### 1.2 `$infer-*`
 
-> source-shaped `Step/ctxt-instrs`는 보존하되 Maude 실행 한계 때문에 label-related `step-from-step-pure-*` 20개를 C1에 임시 debt로 남겨도 되는가? 아니면 C1은 실행성이 떨어져도 strict source rule만 남기고, 이 shortcut은 C2로 보내야 하는가?
+`$infer-*`는 source에 문자 그대로 있는 relation이 아니다.
 
-### 2. `$infer-*` / `-exec-tail-empty*` validation execution overlay
+예를 들어 `Instrs_ok/seq` source rule은 첫 instruction의 중간 result type `t_2*`를
+premise `Instr_ok`가 만들어내고, 다음 premise `Instrs_ok`가 그 값을 사용한다.
+Maude의 `Judgement => valid` encoding은 `valid`만 돌려주므로 `t_2*` 같은 witness를
+자동으로 꺼내기 어렵다.
 
-이것도 source rule 자체는 아니다.
-
-목적:
-
-- `Instrs-ok/seq`처럼 중간 witness가 있는 source premise를 Maude rewriting에서 실행시키기 위한 generic execution overlay다.
-- 예: `TS2`가 첫 premise에서 만들어지고 다음 premise에서 소비된다.
-
-현재 output에는 다음 계열이 있다.
-
-- `$infer-<relation>-argN`
-- `-exec-tail-emptyN`
-
-이것들은 judgement 이름이나 constructor를 하드코딩한 것은 아니고, source relation structure에서 generic하게 생성된다. 하지만 SpecTec source에 있는 primary rule은 아니므로 strict C1 관점에서는 교수님 확인이 필요하다.
-
-현재 문제:
-
-- simple probe는 일부 좋아졌다.
-- `Instrs-ok(C0, CTORNOPA0, arrow(eps, eps, eps))`는 성공한다.
-- 하지만 `Instrs-ok(C0, CONST i32 0, arrow(eps, eps, i32))`는 현재 stack overflow가 난다.
-- 원인은 `Instrs-ok/sub` execution overlay가 non-empty value-producing sequence에서 principal type inference가 안 된 상태로 다시 같은 `Instrs-ok`를 재귀적으로 시도하기 때문이다.
-- 예전 `$exec-<relation>-argN` bridge rule은 relation 자체를 한 번 더 `valid`로 만드는 duplicate execution rule이라서 제거했다. 현재는 source premise 내부 witness 계산에 필요한 `$infer-*` helper만 남긴다.
-- `$infer-*` helper 사이 의존성이 누락되어 Maude가 `no parse` / `bad token` warning을 내던 문제는 고쳤다. 이제 필요한 `$infer-*` operator declaration을 닫힌 집합으로 먼저 생성한다.
+그래서 현재 translator는 source premise 구조를 보고 generic `$infer-*` helper를 생성한다.
+이 helper는 먼저 witness candidate를 계산하고, 원래 source premise도 다시 확인한다.
 
 분류:
 
-- `NON_C1_FINAL_BUT_SOURCE_DRIVEN_EXECUTION_OVERLAY`
-- C1에 둘지, C2로 분리할지 결정 필요.
+- `GENERIC_WITNESS_INFERENCE_OVERLAY`
+- judgement/constructor hardcoding은 아니다.
+- 하지만 source에는 없는 execution overlay이므로 C1 core에 허용할지 교수님과 논의 필요.
 
-### 3. `$iter-*` relation-star meta-lowering
+### 1.3 source-style relation-star lowering: `Valtype-oks` 등
 
-SpecTec source에는 `(premise)*` 같은 meta-notation이 있다. Maude에서는 이를 그대로 쓸 수 없어서 현재 `$iter-*` helper rule로 낮춘다.
+SpecTec의 `(premise)*` meta-notation은 Maude rule condition에 문자 그대로 쓸 수 없다.
+따라서 source의 `P*`는 sequence judgement로 낮춘다.
 
-중요한 점:
+예를 들어 source에 아래와 같은 반복 premise가 있으면:
 
-- 예전 `resulttype-ok-r0-iter-empty0` 같은 judgement-specific derived rule은 제거됐다.
-- 현재 `$iter-*`는 source meta-notation `(J(...))*`를 표현하기 위한 generic lowering이다.
-- 따라서 old helper-heavy shortcut보다는 source-preserving에 가깝다.
+```text
+(Valtype_ok: C |- t : OK)*
+```
 
-그래도 `$iter-*` 자체는 SpecTec source relation rule 이름 그대로는 아니므로, “C1에서 meta-notation lowering helper를 허용할지”는 교수님과 확인해야 한다.
+현재 output은 내부 이름 `$iter-valtype-ok-...`를 쓰지 않고, source relation 이름에 가까운
+sequence judgement를 생성한다.
+
+```maude
+rl [valtype-oks-empty] :
+  Valtype-oks(C, eps) => valid .
+
+crl [valtype-oks-cons] :
+  Valtype-oks(C, T TS) => valid
+  if Valtype-ok(C, T) => valid
+  /\ Valtype-oks(C, TS) => valid .
+```
 
 분류:
 
-- `GENERIC_SPECTEC_META_LOWERING`
-- 현재는 C1 representation substrate로 두는 것이 현실적이다.
+- `ACCEPTED_SOURCE_STAR_LOWERING`
+- 사용자의 현재 C1 기준에서는 교수님께 가져갈 non-isomorphic debt에서 제외한다.
+- source에 없는 arbitrary shortcut이 아니라, source의 `*` meta-notation을 Maude sequence 위에 표현한 것이다.
+- 예전의 `$iter-*` 내부 이름은 제거되었고, 현재 `output_bs.maude`에는 `$iter`가 남아 있지 않다.
+- `iter-empty` / `opt-empty` derived validation rule과는 다르다. 이 lowering은 source `P*` 자체를 표현하기 위한 list judgement다.
 
-### 4. 남아 있는 `$is-spectec-*` category predicates
+### 1.4 남은 `$is-spectec-*` / `_hasType_` category guard
 
-`$is-spectec-*`를 최대한 줄였다.
+source category를 Maude sort/membership으로 표현 가능한 곳은 최대한 옮겼다.
 
-최근 generic cleanup:
+이미 줄인 것:
 
-- source category에 대해 Maude `mb` / `cmb` membership이 생성되는 경우,
-  validation/source relation lowering에서는 그 category를 직접 narrow sort로
-  쓰도록 바꿨다.
-- 예를 들어 많은 `Heaptype`, `Valtype`, `Instr`, `Typeuse` binder-only guard는
-  `$is-spectec-*` predicate 대신 `VAR : Heaptype` 또는 LHS typed variable로
-  표현된다.
-- 단, execution/runtime rule 쪽까지 같은 방식으로 무리하게 좁히면
-  invoke/frame 경로가 덜 진행되는 regression이 생겼다. 그래서 runtime 쪽은
-  현재 보수적으로 일부 predicate를 유지한다.
+- record category guard 다수
+- simple alias category guard 다수
+- source category subsort 일부
+- `expr = instr*` 같은 sequence alias guard 일부
+- `globaltype = mut? valtype` 같은 flat/mixed category는 broad carrier + source-derived predicate로 보존
 
-이미 제거된 대표 binder-only guard:
+아직 남은 이유:
 
-- `$is-spectec-context`
-- `$is-spectec-store`
-- `$is-spectec-frame`
-- `$is-spectec-moduleinst`
-- `$is-spectec-funcinst`
-- `$is-spectec-idx`
-- `$is-spectec-labelidx`
-- `$is-spectec-localidx`
-- `$is-spectec-packtype`
+- `valtype*`, `instr*`, `idx*`처럼 sequence category를 하나의 broad `SpectecTerminals` 위에서 표현한다.
+- WebAssembly source에는 `val* instr* instr_1*` 같은 mixed sequence pattern이 많다.
+- 단순히 `ValSeq < SpectecTerminals`, `InstrSeq < SpectecTerminals`만 추가하면 `__` concatenation 결과가 다시 broad sequence가 되거나, mixed sequence 때문에 ambiguity가 커진다.
 
-주의: `$is-spectec-numtype` / `$is-spectec-vectype` predicate 자체는 여전히
-생성될 수 있다. 이는 binder-only guard가 아니라 source의
-`t' = numtype \/ t' = vectype` 같은 category-pattern disjunction을 Bool 조건으로
-표현하기 위한 것이다.
+이번에 줄인 부분:
 
-현재 남은 predicate family:
-
-- `$is-spectec-val-seq`
-- `$is-spectec-heaptype`
-- `$is-spectec-typeuse`
-- `$is-spectec-reftype`
-- `$is-spectec-valtype`
-- `$is-spectec-blocktype`
-- `$is-spectec-numtype`
-- `$is-spectec-vectype`
-- `$is-spectec-resulttype`
-
-왜 아직 남아 있나:
-
-- record category는 source-derived typed record sort로 바꿔서 제거했다.
-- simple zero-arity category도 least sort/subsort 쪽으로 많이 줄였다.
-- validation/source relation 쪽 composite category guard도 가능한 만큼
-  Maude sort/membership으로 옮겼다.
-- 남은 `$is-spectec-numtype` / `$is-spectec-vectype`는 주로 source의
-  `t' = numtype \/ t' = vectype` 같은 category-pattern disjunction을
-  Bool 조건으로 표현하기 위해 필요하다. Maude condition에서
-  `(T : Numtype) \/ (T : Vectype)` 형태를 그대로 Bool expression처럼
-  쓸 수 없기 때문에 predicate가 남는다.
-- `$is-spectec-val-seq`는 `val*` sequence guard다. 현재 `SpectecTerminals`
-  하나가 모든 sequence를 담기 때문에, `instr*`와 `val*`를 Maude sort만으로
-  완전히 구분하지 못한다.
-- execution/runtime rule의 `heaptype`, `reftype`, `typeuse`, `blocktype`,
-  `valtype`, `resulttype` predicate는 무작정 Maude sort로 좁히면 일부
-  execution probe가 덜 진행되는 regression이 있었다. 더 줄이려면
-  runtime term representation과 source category sort를 함께 재설계해야 한다.
-
-현재 대표적인 좋은 형태:
-
-```maude
-rl [instr-ok-nop] :
-  Instr-ok(C, CTORNOPA0, CTORARROWA3(eps, eps, eps))
-  =>
-  valid .
-```
-
-즉 source에서 premise 없는 `Instr_ok/nop`은 현재 Maude에서도 unconditional `rl`이다.
-
-남은 작업:
-
-- `val*`, `instr*`, `typeuse*` 같은 sequence category를 `SpectecTerminals`
-  하나가 아니라 source-derived typed sequence sort로 표현할 수 있는지 설계한다.
-- category-pattern disjunction을 Maude에서 source-preserving하게 표현하는 방법을
-  교수님과 확인한다. 현재 Bool predicate 방식이 가장 안정적인 임시 표현이다.
-- execution/runtime rule에서 category predicate를 membership condition으로
-  바꿔도 실행 regression이 없는 더 세밀한 기준을 찾는다.
+- `localtype*`, `globaltype*`, `tabletype*`처럼 record field 안에 들어가는 flat composite sequence element는
+  source `StructT` / `TypD` 정보를 보고 `$typed-index(sort, xs, i)`로 낮춘다.
+- 예를 들어 source의 `C.LOCALS[x]`가 `localtype*` 위의 index라는 것을 알면,
+  raw flat `index(value('LOCALS, C), x)` 대신 `$typed-index(localtype, value('LOCALS, C), x)`를 생성한다.
+- 이 helper는 localidx/localtype 이름을 손으로 박은 특수 patch가 아니라,
+  source record field의 element sort와 source category definition에서 생성된다.
+- 그래서 `C.LOCALS[0] = SET i32` 형태의 local/get 검증 probe는 이제 실행된다.
 
 분류:
 
-- 일부는 `GENERIC_SPECTEC_PRELUDE_OK`
-- 일부는 `C1_ISOMORPHISM_GAP`
-- 더 줄이려면 typed syntax/category 설계가 필요하다.
+- `CATEGORY_SEQUENCE_SORT_REPRESENTATION_GAP`
+- source 의미를 보존하기 위한 guard지만, “unconditional source rule은 unconditional Maude rule” 기준에는 아직 완전히 맞지 않는다.
+- 다만 composite record-field sequence indexing의 대표 stuck는 source-derived `$typed-index`로 해결했다.
+- 향후에는 `_hasType_` / `$is-spectec-*`까지 더 줄이기 위해 typed sequence sort / mixed sequence sort 설계를 별도 단계로 검토해야 한다.
 
-### 5. 남아 있는 `_hasType_` / `WellTyped` sequence-category guards
+## 2. Concrete 실행 limitation
 
-`$is-spectec-*`와 별도로, 다음과 같은 guard도 아직 남아 있다.
+### 2.1 direct sequence-shaped `Val-ok`
 
-```maude
-( INSTRS-OK-SEQ1-INSTRS2 hasType ( list ( instr ) ) ) : WellTyped
-( INSTRS-OK-SEQ1-TS1 hasType ( list ( valtype ) ) ) : WellTyped
-( INSTRS-OK-SEQ1-XS1 hasType ( list ( idx ) ) ) : WellTyped
-```
-
-대표 예시는 `Instrs_ok/seq`다.
-
-SpecTec source:
-
-```spectec
-rule Instrs_ok/seq:
-  C |- instr_1 instr_2* : t_1* ->_(x_1* x_2*) t_3*
-  -- Instr_ok: C |- instr_1 : t_1* ->_(x_1*) t_2*
-  -- (if C.LOCALS[x_1] = init t)*
-  -- Instrs_ok: $with_locals(C, x_1*, (SET t)*) |- instr_2* : t_2* ->_(x_2*) t_3*
-```
-
-여기서 `instr_2*`, `t_1*`, `x_1*`, `x_2*`, `t_3*`, `t_2*`는
-단순 변수가 아니라 각각 source category가 붙은 sequence variable이다.
-
-- `instr_2*`는 `instr`들의 sequence
-- `t_1*`, `t_2*`, `t_3*`는 `valtype`들의 sequence
-- `x_1*`, `x_2*`는 `idx`들의 sequence
-
-가장 isomorphic한 Maude 형태는 이런 guard가 condition에 나타나지 않고,
-변수 sort 자체가 정밀해야 한다.
-
-예상되는 이상적인 방향:
+아래 query는 stuck가 기대된다.
 
 ```maude
-var INSTRS2 : InstrSeq .
-vars TS1 TS2 TS3 : ValtypeSeq .
-vars XS1 XS2 : IdxSeq .
-```
-
-하지만 현재 C1 encoding은 대부분의 source sequence를 하나의 broad carrier로
-낮춘다.
-
-```maude
-sort SpectecTerminals .
-op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [assoc id: eps] .
-```
-
-따라서 Maude sort만으로 `SpectecTerminals` 값이 `instr*`인지,
-`valtype*`인지, `idx*`인지 완전히 구분하지 못한다. 그래서 변환기는 source
-binder/category 정보를 잃지 않기 위해 `_hasType_` / `WellTyped` guard를
-추가한다.
-
-현재 generated example:
-
-```maude
-crl [instrs-ok-seq] :
-  Instrs-ok(C, INSTR1 INSTRS2, ARROW(TS1, XS1 XS2, TS3))
-  =>
-  valid
-  if ...
-  /\ (INSTRS2 hasType (list(instr))) : WellTyped
-  /\ (TS1 hasType (list(valtype))) : WellTyped
-  /\ (XS1 hasType (list(idx))) : WellTyped
-  /\ ...
-```
-
-이 guard들은 source에 premise로 직접 쓰여 있지는 않지만, source variable의
-category annotation을 보존하기 위한 representation guard다. 그래서 strict
-C1 관점에서는 완전히 깔끔하지 않다.
-
-왜 아직 제거하지 않았나:
-
-- `ValtypeSeq`, `InstrSeq`, `IdxSeq` 같은 source-derived typed sequence sort가
-  아직 없다.
-- 단순히 `ValtypeSeq < SpectecTerminals`만 추가해도 `__` concatenation 결과가
-  자동으로 typed sequence가 되지는 않는다.
-- typed sequence별 `eps`, concatenation, mixed sequence composition
-  (`val* instr* instr_1*`)을 함께 설계해야 한다.
-- 이 설계를 잘못하면 associative matching, parsing ambiguity, `Step/ctxt-instrs`
-  matching, validation execution이 동시에 깨질 수 있다.
-
-분류:
-
-- `C1_ISOMORPHISM_GAP`
-- source category annotation을 보존하기 위한 임시 representation guard
-- 최종적으로는 source-derived typed sequence sort 설계로 줄여야 한다.
-
-### 5. Step wrapper infrastructure
-
-`StepConf`, `StepPureConf`, `StepReadConf`, `StepsConf` 같은 wrapper sort는 현재 프로젝트에서 의도적으로 쓰는 Maude relation-compilation substrate다.
-
-사용자가 명시적으로 “이건 non-isomorphic으로 보지 않아도 된다”고 정한 항목이다.
-
-분류:
-
-- `REPRESENTATION_SUBSTRATE_OK`
-
-## 현재 실행 limitation
-
-아래는 concrete probe 기준으로 확인된 실행 limitation이다.
-
-### 1. `Instrs-ok` non-empty value-producing sequence
-
-실패 probe:
-
-```maude
-rew [100] in C1-PROBE-TERMS :
-  Instrs-ok(C0,
-    CTORCONSTA2(CTORI32A0, 0),
-    CTORARROWA3(eps, eps, CTORI32A0)) .
-```
-
-결과:
-
-- stack overflow
-
-원인:
-
-- `Instrs-ok/sub` execution overlay가 principal type을 확정하지 못한 상태에서 다시 같은 `Instrs-ok`를 재귀적으로 호출한다.
-- `NOP`처럼 `eps -> eps`인 경우는 통과하지만, `CONST`처럼 stack result를 만드는 instruction sequence에서 문제가 드러난다.
-
-영향:
-
-- `Expr-ok-const`
-- `Global-ok` with constant expression
-
-관련 failing probes:
-
-```maude
-rew [100] in C1-PROBE-TERMS :
-  Expr-ok-const(C0, CTORCONSTA2(CTORI32A0, 0), CTORI32A0) .
-
-rew [100] in C1-PROBE-TERMS :
-  Global-ok(C0,
-    CTORGLOBALA2(CTORMUTA0 CTORI32A0, CTORCONSTA2(CTORI32A0, 0)),
-    CTORMUTA0 CTORI32A0) .
-```
-
-가능한 해결 방향:
-
-- `Instrs-ok/sub`의 execution overlay가 “inference가 실제로 성공했을 때만” 동작하도록 해야 한다.
-- 단순히 judgement-specific special case를 추가하면 C1 기준에 맞지 않는다.
-- generic mode-aware validation solver 또는 C2 execution layer로 분리할 가능성이 높다.
-
-### 2. sequence-shaped direct `Val-ok`
-
-실패 probe:
-
-```maude
-rew [100] in C1-PROBE-TERMS : Val-ok(fib-store, eps, eps) .
-
-rew [100] in C1-PROBE-TERMS :
+rew [100] in WASM-FIB-BS : Val-ok(fib-store, eps, eps) .
+rew [100] in WASM-FIB-BS :
   Val-ok(fib-store,
     CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0),
     CTORI32A0 CTORI32A0) .
 ```
 
-원인:
+이유:
 
-- SpecTec source의 `Val-ok`는 singleton value judgement다.
-- 예전에 footer에 있던 sequence list-lift `Val-ok(vals, types)`는 source rule이 아니라 실행 편의 helper였다.
-- strict C1에서 제거했다.
-
-현재 상태:
-
-- singleton `Val-ok(fib-store, CONST i32 5, i32)`는 source rule로 처리 가능하다.
-- sequence-shaped direct query는 C1 core에서 일부러 살리지 않는다.
+- source `Val-ok`는 singleton value validation rule이다.
+- 예전에 footer에 sequence list-lift `Val-ok(vals, types)` helper가 있었지만 strict C1에서 제거했다.
+- source에 없는 list-lift query를 되살리면 C1 strict 기준에 어긋난다.
 
 분류:
 
-- `SEQUENCE_VAL_OK_DIRECT_QUERY_LIMITATION`
+- `SEQUENCE_VAL_OK_LIMITATION`
 
-### 3. `steps(fib-config-invoke(i32v(5)))` / invoke path
+### 2.2 invoke / initial config 연결
 
-현재 `$invoke(...)` 자체는 rewrite로 config까지 간다.
+현재 `$invoke(...)` 자체는 Config로 rewrite된다.
+또 named `empty-frame` path를 사용한 일부 `steps` probe도 통과한다.
 
-성공 probe:
-
-```maude
-rew [100] in C1-PROBE-TERMS :
-  $invoke(fib-store, 0, i32v(5) i32v(0) i32v(1)) .
-```
-
-실패 probe:
+하지만 아래는 아직 stuck다.
 
 ```maude
-rew [10000] in C1-PROBE-TERMS :
-  steps(fib-config-invoke(i32v(5))) .
+rew [10000] in WASM-FIB-BS : steps(fib-config-invoke(i32v(5))) .
 ```
 
-원인:
+이유:
 
-- `steps(fib-config-invoke(i32v(5)))` 자체는 현재 `steps($invoke(...))` 형태에서 멈춘다. 즉 `steps` wrapper 안에서 `$invoke` rewrite가 먼저 일어나지 않는다.
-- `$invoke(...)`를 별도로 rewrite해서 나온 source-shaped outer frame config를 `steps(...)`에 넣어도, 그 다음에는 `Step/ctxt-frame` / `steps-trans` conditional composition 문제가 남는다.
-- 같은 inner frame을 named harness `empty-frame`으로 둔 probe는 성공한다. 따라서 문제는 Fibonacci body 자체가 아니라 invoke/source-shaped outer frame path다.
-
-성공 probe:
-
-```maude
-rew [1000] in C1-PROBE-TERMS :
-  steps(invoke-outer-config-named-empty-frame) .
-```
+- `$invoke` 이후 source-shaped outer frame/context와 `steps` 연결이 아직 완전히 정리되지 않았다.
+- 이건 init-config / frontend / harness 단계의 문제로 분리한다.
 
 분류:
 
-- `INVOKE_UNDER_STEPS_LIMITATION`
-- `STEP_CTXT_FRAME_EXECUTION_LIMITATION`
-- init-config/frontend 단계에서 다시 봐야 한다.
+- `INIT_CONFIG_INVOKE_HARNESS_LIMITATION`
 
-### 4. 전체 `output_bs.maude` concrete artifact audit 결과
+### 2.3 composite typed sequence index: 대표 stuck 해결
 
-`scripts/audit_output_bs_total_concrete.py`는 `output_bs.maude`의 모든 `op` / `eq` / `ceq` / `mb` / `cmb` / `rl` / `crl` artifact를 추출하고, 각 artifact마다 concrete Maude command를 생성해서 독립 Maude process에서 실행한다.
+이전에는 아래 source-level probe가 stuck였다.
 
-최신 전체 audit:
+```maude
+red in WASM-FIB-BS : index(value('LOCALS, CLOCAL), 0) .
 
-```bash
-python3 scripts/audit_output_bs_total_concrete.py --timeout 2
+rew [100] in WASM-FIB-BS :
+  Instr-ok(CLOCAL, CTORLOCALGETA1(0), CTORARROWA3(eps, eps, CTORI32A0)) .
 ```
 
-결과 artifact:
+원하는 source 의미:
+
+- `C.LOCALS`는 `localtype*`다.
+- `localtype`은 `SET i32` 같은 composite source element다.
+- 따라서 `C.LOCALS[0]`는 source element 하나인 `SET i32`를 돌려줘야 한다.
+
+현재 Maude 표현:
+
+- `localtype*`가 broad `SpectecTerminals` flat sequence 위에 표현된다.
+- `SET i32`가 `CTORSETA0 CTORI32A0`처럼 두 token sequence로 놓인다.
+- scalar `index(CTORSETA0 CTORI32A0, 0)`는 composite element 전체가 아니라 첫 token `CTORSETA0`만 돌려준다.
+
+그래서 예전에는 `Instr-ok/local.get`의 source premise `C.LOCALS[x] = SET t`가 풀리지 않았다.
+
+현재 수정:
+
+```maude
+red in WASM-FIB-BS :
+  $typed-index(localtype, value('LOCALS, CLOCAL), 0) .
+
+rew [100] in WASM-FIB-BS :
+  Instr-ok(CLOCAL, CTORLOCALGETA1(0), CTORARROWA3(eps, eps, CTORI32A0)) .
+```
+
+둘 다 통과한다.
+
+`$typed-index`는 다음처럼 생성된다.
+
+- source record field가 `localtype*`, `globaltype*`, `tabletype*` 같은 composite element sequence인지 수집한다.
+- source category definition이 flat composite element인지 확인한다.
+- 해당 source sort에 대해서만 source-derived typed index equations를 생성한다.
+- `globaltype = mut? valtype`처럼 optional-empty variant가 있는 경우도 source variant별 index equation을 생성한다.
+
+남은 주의점:
+
+- raw `index(SpectecTerminals, Nat)`는 여전히 flat carrier index다.
+- source expression이 composite sequence index라는 것을 translator가 알 때만 `$typed-index`를 사용한다.
+- 이것은 typed sequence sort 전체 문제를 완전히 끝낸 것은 아니고, source-derived index lowering으로 대표 stuck를 해결한 것이다.
+
+분류:
+
+- `FIXED_BY_SOURCE_DERIVED_TYPED_INDEX`
+- 남은 broader category/sequence sort 문제는 1.4에 계속 기록한다.
+
+### 2.4 nonempty `expr**` / nested sequence 실행 limitation
+
+`$evalexprss`는 source에서 아래처럼 정의된다.
+
+```spectec
+def $evalexprss(z, eps) = (z, eps)
+def $evalexprss(z, expr* expr'**) = (z'', ref* ref'**)
+  -- if (z', ref*) = $evalexprs(z, expr*)
+  -- if (z'', ref'**) = $evalexprss(z', expr'**)
+```
+
+빈 case는 실행된다.
+
+```maude
+rew [10] in C1-RULE-CONCRETE-SAMPLES : $evalexprss(ST0, eps) .
+```
+
+하지만 nonempty flat probe는 아직 source-valid nested grouping으로 실행되지 않는다.
+
+```maude
+rew [50] in C1-RULE-CONCRETE-SAMPLES :
+  $evalexprss(ST0, CTORCONSTA2(CTORI32A0, 0)) .
+```
+
+이유:
+
+- source의 `expr**`는 “expression sequence들의 sequence”, 즉 nested sequence 의미다.
+- 현재 C1 Maude 표현은 대부분 broad flat `SpectecTerminals` 위에 올라가 있다.
+- 그래서 `expr* expr'**`를 나눌 때 `expr* = eps`, `expr'** = 원래 입력` 같은 split이 계속 가능하다.
+- 그 결과 `search =>+` 기반 broad audit에서는 stack overflow가 날 수 있고,
+  focused `red` probe에서는 `$evalexprss(...)` 상태로 stuck될 수 있다.
+
+분류:
+
+- `NESTED_SEQUENCE_GROUPING_LIMITATION`
+- `expr**` 같은 nested star/meta-sequence를 source-derived 구조로 표현하는 설계가 필요하다.
+- 임시로 `expr* =/= eps` 같은 조건을 추가하면 실행은 막을 수 있지만, source 구조를 바꾸는 것이므로 현재 C1에서는 넣지 않는다.
+
+### 2.5 runtime / module execution family의 source-valid sample 부족
+
+전체 rule concrete audit에서 runtime `step`, `step-pure`, `step-read`, module allocation/eval family는
+`NO_SOLUTION`이 많이 나온다.
+
+중요한 점:
+
+- 이것은 대부분 자동 sample이 정확한 store/frame/stack/module witness를 만들지 못해서 생긴다.
+- 곧바로 translator bug라고 보면 안 된다.
+- source-valid focused sample을 만든 뒤에도 실패하는 항목만 실제 bug/limitation으로 승격한다.
+
+현재 focused smoke는 통과한다.
+
+- `$expanddt(value('TYPE, fib-funcinst))`
+- label/br suffix search
+- `br_if` suffix search
+- `nop` suffix search
+- `steps(fib-config(i32v(5)))`
+
+### 2.6 vector / numeric builtin operational limitation
+
+아래 vector bitmask 계열은 더 이상 stack overflow를 내지 않는다.
+
+```maude
+red in WASM-FIB-BS : $ivbitmaskop(CTORXA2(CTORI32A0, 4), 0) .
+red in WASM-FIB-BS : $vbitmaskop(CTORXA2(CTORI32A0, 4), 0) .
+```
+
+이번에 generic하게 고친 것:
+
+- generated `$map-*` helper가 opaque sequence에도 무한히 펼쳐지지 않도록,
+  recursive map 조건을 `S =/= eps`가 아니라 `len(S) > 0` 기반으로 바꿨다.
+- `$ilt`, `$ieq`, `$ine`처럼 Bool expression을 terminal 값으로 바꾸는 source def는
+  실제 Bool sort로 계산 가능한 경우에만 펼쳐지도록 generic Bool sort-safety condition을 붙였다.
+
+그래서 `$lanes(...)`처럼 아직 backend builtin 구현이 없는 값이 들어와도 Maude가 crash하지 않고,
+아래처럼 symbolic term으로 남는다.
+
+```maude
+result V128:
+  $irev(32,
+    $inv-ibits(32,
+      $ilt(32, CTORSA0, $lanes(CTORXA2(CTORI32A0, 4), 0), 0)
+      0 0 ... 0))
+```
+
+아직 남은 이유:
+
+- source에 `def $lanes_ hint(builtin)`, `def $inv_ibits_ hint(builtin)`,
+  `def $irev_ hint(builtin)`처럼 host/backend builtin으로 표시된 함수들이 있다.
+- 현재 C1 translator는 source def/rule 구조를 옮기지만, 모든 numeric/vector builtin의
+  실제 bit-level 구현을 제공하지는 않는다.
+
+분류:
+
+- `BUILTIN_NUMERIC_VECTOR_LIMITATION`
+- crash는 줄였지만, 완전 계산은 builtin backend 구현 또는 C2/runtime library 설계가 필요하다.
+
+## 3. 최신 concrete probe 결과
+
+최신 focused probe matrix:
 
 ```text
-artifacts/output-bs-total-audit-20260521_114249/
+artifacts/c1-probe-matrix-20260522_114516/probe_summary.md
 ```
-
-검사 수:
-
-| kind | count |
-|---|---:|
-| op | 1324 |
-| eq | 1115 |
-| ceq | 347 |
-| mb | 424 |
-| cmb | 118 |
-| rl | 109 |
-| crl | 775 |
-| **total** | **4212** |
 
 결과:
 
-| status | count |
-|---|---:|
-| PASS | 3553 |
-| KNOWN_LIMITATION | 32 |
-| NO_SOLUTION | 257 |
-| STUCK | 287 |
-| PARSE_ERROR | 83 |
+- PASS: 27 / 31
+- EXPECTED_STUCK: 4 / 31
 
-이번 최신 audit에서 `STACK_OVERFLOW`와 `MAUDE_EXIT_*`는 0개다.
+PASS로 확인된 대표 항목:
 
-주의:
-
-- `PASS`는 해당 concrete probe가 Maude에서 결과를 냈다는 뜻이다.
-- `KNOWN_LIMITATION`은 이미 이 문서에 적힌 limitation/debt와 일치한 경우다.
-- `NO_SOLUTION`은 곧바로 “rule이 틀렸다”는 뜻이 아니다. 샘플이 조건을 만족하지 못했거나 concrete witness/context/store가 부족한 경우가 많다.
-- `STUCK`도 대부분 membership/category sample이 부정확한 경우다. source-valid sample로 재확인해야 한다.
-- `PARSE_ERROR`는 대부분 자동 probe generator가 mixfix operator, record item,
-  projection/update equation, or source-sort-specific sample을 잘못 만든 경우다.
-  현재는 “output artifact가 반드시 잘못됐다”가 아니라 sample-catalog 개선 대상이다.
-- 이전 audit에서 보였던 `STACK_OVERFLOW`와 `MAUDE_EXIT_2`는 focused triage와
-  generic prelude/source-meta lowering 보강 후 최신 audit에서는 더 이상 나오지 않는다.
-
-이번 final audit pass에서 추가로 고친 항목:
-
-- scalar sequence index의 out-of-bounds case.
-  이전에는 `index(CTORI32A0, 1)`이 `index(eps, 0)`으로 간 뒤 Maude가 stack
-  overflow를 냈다. 이제 generic prelude가
-  `index(eps, n) = eps`를 제공하고, scalar `index`의 결과 sort를
-  `SpectecTerminals`로 넓혀서 source meta-expression `xs[i]`가 empty result를
-  안전하게 표현할 수 있게 했다. 이건 judgement-specific shortcut이 아니라
-  SpecTec sequence indexing representation substrate다.
-
-7개 위험 실패 focused triage 최신 결과:
-
-- `$concatn`: 실제 generic lowering bug였다. `w^n` 길이 조건과 tail sequence
-  변수 sort를 보정해서 stack overflow는 제거했다.
-- `$ivbitmaskop`, `$vbitmaskop`: stack overflow 자체는 제거했다.
-  translator가 source의 non-variable `e*`를 generic `$map-*` star-map으로,
-  `e^n`를 generic `$repeat(e,n)`로 낮추도록 보강했기 때문이다. 예를 들어
-  `$ilt(..., c_1, 0)* ++ (0)^(32-M)`는
-  `$map-Silt-a4-s2(..., c_1*, 0) $repeat(0, 32-M)` 형태가 된다.
-  하지만 완전한 값 계산은 아직 limitation이다. 남은 원인은
-  `$ibits(32,c) = bits`의 source `hint(inverse $inv_ibits_)`를 Maude 조건
-  solving에서 operational하게 쓰지 못하고, `$lanes` / `$ibits` 계열 builtin
-  의미가 현재 prelude에 충분히 실행 가능하게 구현되어 있지 않기 때문이다.
-  이 부분은 vector-specific shortcut으로 때우지 않고 generic inverse-hint /
-  builtin lowering 과제로 남긴다.
-- `clos-deftypes-r1`: source-valid `rew $clos-deftypes(fib-type fib-type)`는
-  Maude result를 낸다. 기존 `MAUDE_EXIT_2`는 자동 audit의 RHS-search sample
-  문제였다.
-- `step-read-array-new-elem-alloc`: source-shaped elem store와 `n = 1`
-  sample에서는 solution이 나온다. 기존 `MAUDE_EXIT_2`는 sample 문제였다.
-- `alloctypes-r1`: source-valid `rew $alloctypes(fib-source-type)`는 Maude
-  result를 낸다. 기존 `MAUDE_EXIT_2`는 자동 audit의 RHS-search sample 문제였다.
-- `evalexprss-r1`: 아직 limitation이다. source type `expr**`가 flat
-  `SpectecTerminals`로 낮아져 recursive split에서 empty/non-progress split을
-  선택할 수 있다. 추가로 바로 아래 source def `$evalexprs`의 premise
-  `Eval_expr: z; expr ~>* z'; ref`는 Maude rewriting이 `z'`와 `ref`를
-  역으로 합성하지 못한다. Exact output을 주면 `Eval-expr`는 `valid`로
-  줄어들지만, output witness를 변수로 둔 `search Eval-expr(..., ZQ, REF)
-  =>* valid`는 solution이 없다. 즉 이 family는
-  `NESTED_SEQUENCE_REPRESENTATION_LIMITATION`과
-  `OUTPUT_WITNESS_SYNTHESIS_LIMITATION`이 동시에 걸려 있다.
-
-  임시 실험으로 `Eval-expr` premise를 직접 `steps((z ; expr)) => (z' ; ref)`
-  로 펼치고, `expr**`의 첫 조각을 non-empty처럼 취급하면 concrete
-  `$evalexprs` / `$evalexprss` probe는 통과한다. 하지만 이 방식은 source의
-  `Eval_expr` premise를 그대로 보존하지 않고, `expr**`의 group boundary를
-  정확히 표현하지 못하므로 strict C1-final fix로 넣지 않았다. C1-compatible
-  방향은 `T**` 같은 nested sequence를 source-derived group representation으로
-  표현하거나, C2 execution layer에서 output-bearing relation premise solver를
-  두는 것이다.
-
-상세 보고서:
-
-```text
-docs/archive/current-c1/dangerous_failure_triage.md
-```
-
-이미 known limitation으로 잡힌 family:
-
-- `Instrs-ok(C0, CONST i32 0, arrow(eps, eps, i32))`: stack overflow.
-- `Expr-ok-const(C0, CONST i32 0, i32)`: 위 `Instrs-ok` 문제를 타고 stack overflow.
-- `Instr-ok/local.get`류: `C.LOCALS[x] = SET t`에서 source의 한 원소 `SET t`가 flat Maude sequence `CTORSETA0 t` 두 토큰으로 표현되어, 기존 `index(..., x)`가 한 토큰만 돌려주는 문제가 있다.
-- `Blocktype-ok/typeidx`, `Instr-ok/call`, `Instr-ok/br-on-null` 등 context lookup 기반 rule들은 richer source-shaped context sample이 필요하다. 일부는 진짜 lookup/index representation limitation이고, 일부는 자동 샘플 품질 문제다.
-
-accepted Fibonacci execution에는 현재 영향을 주지 않는다. 별도 concrete harness/probe가 필요하다.
-
-상세 보고서:
-
-```text
-docs/archive/current-c1/output_bs_total_audit_report.md
-artifacts/output-bs-total-audit-20260521_114249/summary.md
-artifacts/output-bs-total-audit-20260521_114249/test_results.csv
-```
-
-## 현재 성공하는 대표 concrete probes
-
-최신 확인 artifact:
-
-```text
-artifacts/c1-probe-matrix-20260521_114209/probe_summary.md
-```
-
-`scripts/run_c1_probe_matrix.py` 기준 성공:
-
-- `index(CTORI32A0 CTORI64A0, eps)`
-- `index(CTORI32A0 CTORI64A0, 0 1)`
-- `index(value('LOCALS, C0), eps)`
-- `index(CTORI32A0, 1)` now reduces to `eps` instead of stack overflowing.
+- `index(xs, eps)`
+- `index(xs, 0 1)`
 - `Resulttype-ok(C0, eps)`
 - `Resulttype-ok(C0, i32 i32)`
 - `Resulttype-sub(C0, eps, eps)`
 - `Instrtype-ok(C0, arrow(eps, eps, eps))`
 - `Instrtype-sub(C0, arrow(eps, eps, eps), arrow(eps, eps, eps))`
-- `Instrtype-ok(C0, arrow(i32, eps, i32))`
-- `Instrtype-sub(C0, arrow(i32, eps, i32), arrow(i32, eps, i32))`
-- `Instr-ok(C0, NOP, arrow(eps, eps, eps))`
-- `Instr-ok(C0, UNREACHABLE, arrow(eps, eps, eps))`
-- `Externaddr-ok(fib-store, FUNC 0, FUNC fib-type)`
-- `Instrs-ok(C0, NOP, arrow(eps, eps, eps))`
-- `Expr-ok(C0, NOP, eps)`
-- `$invoke(fib-store, 0, vals)` rewrites to `Config`
-- `$expanddt(value('TYPE, fib-funcinst))`
-- label/br suffix search
-- br_if suffix search
-- nop suffix search
-- `steps(fib-config(i32v(5)))`
+- `Instr-ok/NOP`
+- `Instr-ok/unreachable`
+- `Externaddr-ok/func` with `fib-store`
+- `$typed-index(localtype, value('LOCALS, CLOCAL), 0)`
+- `Instr-ok/local.get`
+- `Instrs-ok/NOP`
+- `Instrs-ok(CONST i32 0, arrow(eps, eps, i32))`
+- `Expr-ok-const(C0, CONST i32 0, i32)`
+- `Global-ok` with constant expression
+- `$invoke(...)` rewrites to Config
+- accepted execution smokes
 
-## 전체 rule 실행 검증 방법
+EXPECTED_STUCK:
 
-완전한 의미의 “모든 syntax/def/rule이 모든 가능한 input에서 잘 돈다”는 자동으로 증명할 수 없다. 상태 공간과 witness 공간이 무한하고, 많은 rule은 concrete store/context/module이 필요하다.
+- direct sequence-shaped `Val-ok` empty probe
+- direct sequence-shaped `Val-ok` multi-value probe
+- source-shaped invoke outer-frame path
+- `steps(fib-config-invoke(i32v(5)))`
 
-대신 현재는 두 종류의 audit을 제공한다.
+## 4. 전체 rule concrete audit 결과
 
-### 1. Concrete probe matrix
-
-```bash
-scripts/run_c1_probe_matrix.py
-```
-
-각 probe를 독립 Maude process로 실행한다. 하나가 stack overflow가 나도 나머지는 계속 돈다.
-
-결과는:
+최신 전체 rule audit:
 
 ```text
-artifacts/c1-probe-matrix-*/probe_results.csv
-artifacts/c1-probe-matrix-*/probe_summary.md
+artifacts/rule-concrete-audit-20260522_020812/summary.md
+artifacts/rule-concrete-audit-20260522_020812/rule_concrete_results.csv
 ```
 
-### 2. 모든 `rl/crl` concrete-sample applicability audit
+대상:
 
-```bash
-scripts/audit_output_bs_rules_concrete.py --timeout 3 --max-variants 3
-```
+- generated `rl/crl`: 884개
+- 각 rule마다 concrete sample을 넣어 `search =>+` 실행
+- 이것은 모든 input에 대한 증명이 아니라, rule별 최소 concrete 실행 probe다.
 
-`output_bs.maude`의 모든 `rl/crl` 라벨을 뽑고, 각 rule의 generated LHS에 concrete 샘플 값을 넣어서 generated RHS로 한 번 이상 rewrite 가능한지 search를 시도한다.
+Raw result:
 
-결과는:
+| status | count |
+|---|---:|
+| `SOLUTION` | 363 |
+| `NO_SOLUTION` | 502 |
+| `MAUDE_EXIT_2` | 15 |
+| `STACK_OVERFLOW` | 3 |
+| `TIMEOUT` | 1 |
+
+분류 결과:
 
 ```text
-artifacts/rule-concrete-audit-*/rule_concrete_results.csv
-artifacts/rule-concrete-audit-*/summary.md
+artifacts/rule-concrete-classification-20260522_023538/summary.md
+artifacts/rule-concrete-classification-20260522_023538/rule_concrete_classification.csv
 ```
 
 해석:
 
-- `SOLUTION`: concrete sample search에서 적용 가능성이 확인됨.
-- `NO_SOLUTION`: concrete witness/context/store가 없거나 샘플이 조건을 만족하지 못함. 바로 버그는 아님.
-- `STACK_OVERFLOW`: 우선 조사 대상.
-- `TIMEOUT`: 우선 조사 대상.
+- 363개는 broad generated sample로 직접 solution 확인.
+- 그중 171개는 source-style relation-star lowering(`Valtype-oks` 같은 `*-oks`/`*-subs` helpers) 실행 확인이고, 9개는 `$infer-*` overlay 실행 확인이다.
+- `NO_SOLUTION` 502개는 대부분 sample/context/witness 부족이다.
+- `STACK_OVERFLOW` 3개 중 `expr-ok-const-r0`와 `step-read-array-fill-succ`는 broad sample bug로 확인했다.
+  source-valid focused probe는 PASS다.
+- `evalexprss-r1`은 빈 case는 PASS지만 nonempty flat `expr**` probe가 source-valid nested grouping으로 실행되지 않는다.
+  위의 `NESTED_SEQUENCE_GROUPING_LIMITATION`으로 분류한다.
+- `MAUDE_EXIT_2` 15개는 broad search sample에서 Maude internal error가 난 것이다.
+  Phase 1 focused triage에서 priority 항목은 아래처럼 분류했다.
 
-### 3. 전체 artifact concrete audit
+Phase 1 focused error triage:
 
-```bash
-python3 scripts/audit_output_bs_total_concrete.py --timeout 2
+```text
+artifacts/phase1-error-triage-20260522_102830/summary.md
 ```
 
-이 스크립트는 `rl/crl`뿐 아니라 `op`, `eq`, `ceq`, `mb`, `cmb`까지 모두 대상으로 삼는다. 각 artifact의 generated Maude command는 `artifacts/output-bs-total-audit-*/maude-tests/`에 남는다.
+| 항목 | 결과 | 분류 |
+|---|---|---|
+| `expr-ok-const-r0` | source-valid `Expr-ok-const(C0, CONST i32 0, i32)` PASS | audit sample bug |
+| `step-read-array-fill-succ` | source-valid `ARRAY.FILL` one-step PASS | audit sample bug |
+| `clos-deftypes-r1` | source-valid `rew $clos-deftypes(...)` PASS | broad `search =>+` sample/RHS bug |
+| `alloctypes-r1` | source-valid `rew $alloctypes(fib-source-type)` PASS | broad `search =>+` sample/RHS bug |
+| `infer-fieldtype-ok-arg1-r0` | source-valid `$infer-fieldtype-ok-arg1(C0)` PASS | broad sample/context bug |
+| `step-read-array-new-elem-alloc` | PASS after generic record variable namespace fix | generic translator bug fixed |
+| `step-read-br-on-cast-succeed` | source-valid focused probe PASS after generic variable-extraction fix | generic translator bug fixed |
+| `evalexprss-r1` | empty PASS, nonempty flat probe EXPECTED_STUCK | nested sequence grouping limitation |
+| label/handler/return `Step_pure` family 5개 | source-valid focused probes PASS | broad sample bug |
+| `step-read-br-on-cast-fail-fail` | EXPECTED_LIMITATION: subtype-negative/otherwise path can stack overflow or timeout | otherwise/negative-premise limitation |
+| `step-read-return-call-ref-label` | source-valid focused probe PASS | broad sample bug |
+| `step-read-return-call-ref-handler` | source-valid focused probe PASS | broad sample bug |
+| `step-read-throw-ref-handler-catch` | source-valid focused probe PASS | broad sample bug |
+| `step-read-struct-new-default` | source-valid focused probe PASS | broad sample bug |
+| `infer-instrs-ok-arg0-r3` | focused probe remains as `$infer-instrs-ok-arg0(...)` | context witness synthesis limitation |
 
-해석:
+Generic translator bugs fixed in this phase:
 
-- 이건 “전체 output이 모든 가능한 input에서 옳다”는 증명이 아니다.
-- 하지만 현재 우리가 자동으로 확인할 수 있는 가장 넓은 concrete 실행 audit이다.
-- `NO_SOLUTION`/`STUCK` 항목은 다음 triage 대상이고, source-valid focused sample로 다시 확인해야 한다.
+1. Source-derived typed record projection equations used to reuse field variables such as `F-TYPE-0` across different record sorts.
+   This could make `eleminst.TYPE` accidentally share a `Tagtype` variable and block projections like `value('REFS, RECEleminstA2(...))`.
+   The generator now namespaces record field variables by source record sort, for example `F-TAGINST-TYPE-0` and `F-ELEMINST-TYPE-0`.
+2. Maude variable extraction used to treat the uppercase prefix of mixed-case constructor names such as `RECContextA13(...)` as a fake variable (`RECC`).
+   Because of that, a ground source context `{}` could be mistaken as an unbound witness and the generator inserted unnecessary conditions like
+   `$infer-reftype-sub-arg0(rt, target) => empty-context`.
+   The extractor now ignores partial uppercase matches inside mixed-case names, so ground record constructors stay ground.
+3. Generated `$map-*` helpers used to unfold over opaque sequence terms because they only checked `S =/= eps`.
+   The generator now unfolds map recursion only when `len(S) > 0` is operationally known.
+4. Source defs that lower Bool expressions into terminal values now get a generic Bool sort-safety condition.
+   This prevents ill-sorted symbolic Bool expressions, especially around vector builtins, from entering flat sequences and causing Maude stack overflow.
 
-## 다음 작업 순서 제안
+`step-read-br-on-cast-succeed` is now fixed:
 
-1. 이 파일과 `STATUS.md` 기준으로 현재 C1 상태를 커밋한다.
-2. warning cleanup을 진행한다.
-3. header/footer cleanup을 계속한다.
-4. generated prelude를 더 세분화해서, 실제 source가 쓰는 sequence/record/meta
-   feature에 따라 필요한 조각만 emit하도록 만든다.
-5. 남은 `$is-spectec-*` guard를 composite category typed-sort 설계로 더 줄인다.
-6. `Instrs-ok/sub` execution overlay recursion을 C1-compatible하게 고칠 수 있는지 따로 판다.
-7. 20개 label-related `step-from-step-pure-*`를 다시 제거할 수 있는 source-preserving `Step/ctxt-instrs` 실행 방식을 찾는다.
-8. init-config/frontend는 그 다음 단계에서 한다.
+```maude
+crl [step-read-br-on-cast-succeed] :
+  step-read((S ; F) ; REF BR_ON_CAST(...))
+  => REF BR(l)
+  if $infer-ref-ok-arg2(S, REF) => RT
+  /\ Ref-ok(S, REF, RT) => valid
+  /\ Reftype-sub(empty-context, RT, $inst-reftype(value('MODULE,F), RT2)) => valid
+  /\ ... .
+```
 
-## Header/footer/pretype cleanup 현황
+즉 source rule의 witness `rt`를 `Ref-ok`에서 먼저 얻고, 그 다음 `Reftype_sub`를 확인한다.
+이건 특정 `BR_ON_CAST` hardcoding이 아니라, ground constructor를 fake variable로 오해하던 generic translator bug를 고친 결과다.
 
-2026-05-21 cleanup에서 C1이 실제로 쓰지 않는 hand-written pretype 잔재를
-제거했다.
+중요:
 
-제거한 것:
+- “502개가 안 된다”는 뜻이 아니다.
+- “자동으로 만든 임의 sample 502개가 source premise를 만족하지 못했다”에 가깝다.
+- 다음 검증은 family별 source-valid sample catalog를 늘리는 방식으로 진행해야 한다.
 
-- `dsl/pretype.maude`의 legacy typecheck predicates:
-  - `is-type`
-  - `are-types`
-  - `are-mixed`
-- `dsl/pretype.maude`의 legacy `DSL-EXEC` evaluation-context module:
-  - `Env`, `Stage`, `InstrsContext`
-  - `LabelContext(s)`, `FrameContext(s)`
-  - `stage:`, `context:`, `emptylabel`, `emptyframe`, `_@_`, `_#_`
-- `translator_bs.ml` header의 source-absent fixed `SpectecType` constants:
-  - `w-N`, `w-M`, `w-K`, `w-n`, `w-m`, `w-X`, `w-C`, `w-I`,
-    `w-S`, `w-T`, `w-V`, `w-b`, `w-z`, `w-L`, `w-E`
-  - 이들은 output에 선언만 되고 실제 사용처가 없었다.
-- `translator_bs.ml` header의 unused record helper declaration:
-  - `_ =++ _`
-  - 실제 record update는 generated `DSL-RECORD`의 source-representation
-    operator `_[._=++_]`를 사용한다.
+Phase 1 위험 항목 19개 최신 해석:
 
-source-derived로 바꾼 것:
+- 대부분은 자동 broad sample이 틀렸고, source-valid focused probe는 통과했다.
+- 2개는 실제 generic translator bug였고 수정했다:
+  record field variable namespace 문제, mixed-case constructor variable extraction 문제.
+- 3개는 실제 실행 limitation으로 남는다:
+  `evalexprss-r1`, `step-read-br-on-cast-fail-fail`, `infer-instrs-ok-arg0-r3`.
+- vector bitmask stack overflow는 generic map / Bool sort-safety fix로 crash에서 symbolic stuck로 개선했다.
 
-- active C1 `output_bs.maude`는 더 이상 `load dsl/pretype`으로 hand-written
-  pretype 파일을 읽지 않는다.
-- `translator_bs.ml`이 generic `DSL-TERM`, `DSL-PRETYPE`, `DSL-RECORD` 모듈을
-  generated output 앞부분에 직접 emit한다.
-- 따라서 `dsl/pretype.maude`는 현재 active C1 dependency가 아니라
-  legacy/reference copy에 가깝다.
-- prelude 생성은 이제 source feature를 본다.
-  - `StructT`/record syntax가 있으면 `DSL-RECORD`를 emit하고 `SPECTEC-CORE`가
-    그것을 include한다.
-  - record syntax가 없는 spec에서는 이 record prelude 조각을 생략할 수 있는
-    구조가 됐다.
-  - generated body/token output을 scan해서 실제로 쓰이는 header 조각만 emit한다.
-    현재 feature-gated 대상은 `w-bool`, `_hasType_`/`WellTyped`, `index(xs,i*)`,
-    `$repeat`, `slice`, `$star-prefix`/`$star-unprefix`, set-membership `_<-_`,
-    `merge`, wildcard `any`, Step wrapper infrastructure, and source
-    sequence-category predicates다.
-  - `$is-spectec-val-seq`는 더 이상 footer에 val 전용으로 박힌 고정 helper가
-    아니다. source lowering 중 `X*` category guard가 실제로 필요할 때
-    `$is-spectec-<X>-seq` 형태를 등록해서 emit한다. 현재 Wasm output에서는
-    source가 요구하는 남은 sequence category guard가 `val*`라서 결과 이름이
-    `$is-spectec-val-seq`인 것이다.
-  - 예전 footer에 있던 `$subst-typeuse`, `$subst-valtype`, `$subst-subtype`
-    sequence-lift overload는 제거했다. source element-level substitution def는
-    그대로 남고, source expression의 `f(x*)` / `f(x)^n` 같은 star-map 모양에서
-    generic `$map-*` helper를 생성한다.
-  - 예전 frame 전용 footer shim은 제거했다. 이제 frame literal은 source
-    `syntax frame = { LOCALS ..., MODULE ... }`에서 생성되는 `RECFrameA2`와
-    그 projection/update equation을 그대로 사용한다.
-  - 즉 P4처럼 Step relation이나 Wasm frame helper를 쓰지 않는 spec에서는 해당
-    header/footer 조각을 emit하지 않는 방향으로 구조가 바뀌었다.
-  - `SpectecTerminals` sequence carrier는 현재 translator의 기본 term-list
-    representation이라 아직 항상 emit된다. 이것까지 완전히 feature-gated로
-    줄이는 일은 다음 단계다.
-- 예전 header에는 `Nat < Labelidx`, `Nat < Localidx`, `Nat < Addr` 같은
-  Wasm index/address subsort 목록이 직접 박혀 있었다.
-- 이제 이 목록은 source syntax alias graph에서 생성한다.
-  예를 들어 `idx = u32`, `u32 = uN(32)`, `labelidx = idx`,
-  `addr = nat` 같은 SpecTec 선언을 보고 필요한 `subsort Nat < ...`를 낸다.
-- 따라서 P4/generalization 관점에서 “Wasm 이름을 header에 직접 나열한
-  하드코딩” 하나를 줄였다.
+`step-read-br-on-cast-fail-fail`이 남는 이유:
 
-제거 이유:
+- source에는 `Step_read/br_on_cast_fail-succeed` 다음에 `Step_read/br_on_cast_fail-fail -- otherwise`가 있다.
+- false case에서는 먼저 “cast succeed 조건이 성립하지 않음”을 확인하고 fail-fail rule로 가야 한다.
+- 현재 Maude rewrite rule에는 source의 `otherwise`를 negative rewrite condition으로 정확히 표현하는 장치가 없다.
+- 그래서 `ref i31`을 `ref func`으로 cast하려는 실패 case에서, 성공 rule의 `Reftype-sub({}, ref i31, ref func)` 조건을 증명하려고 들어갔다가 `Heaptype_sub/trans` 같은 recursive subtype 탐색으로 stack overflow 또는 timeout이 날 수 있다.
 
-- 현재 generated `output_bs.maude`와 `wasm-exec-bs.maude`가 이 선언들을 쓰지
-  않는다.
-- C1은 source-derived `mb/cmb`, relation `rl/crl`, and direct execution rules를
-  사용한다.
-- `DSL-EXEC`는 예전 evaluation-context 실험용 구조였고, 현재 C1의
-  `Step/ctxt-*` source-shaped lowering과 연결되어 있지 않다.
+분류:
 
-아직 남은 필수/보류 prelude substrate:
+```text
+OTHERWISE_NEGATIVE_PREMISE_LIMITATION
+```
 
-- `SpectecTerminal`, `SpectecTerminals`, `SpectecType`, `SpectecTypes`
-- `eps`, sequence concatenation, `len`, `index`
-- record `item`, `value`, update operators
-- generated header의 `Judgement`, `valid`
-- Step relation이 source에 있을 때만 emit되는 `StepConf` wrappers
-- generated source-meta helpers such as `index(xs, i*)`, `slice`, `$repeat`,
-  `$star-prefix`, `$star-unprefix`
-- `w-bool`: SpecTec Bool 계산 결과를 terminal로 다시 넣기 위한 현재 Maude
-  representation wrapper다. 실제 generated numeric/Bool defs에서 사용 중이라
-  이번 cleanup에서는 제거하지 않았다.
-- `EXP`: source의 `exp`/floating numeric condition lowering이 아직 어색하게
-  남긴 header constant다. 현재 `fNmag`/`SUBNORM` 계열 조건에서 사용된다. 아직
-  제거하지 않았고, source-derived numeric exponent lowering으로 바꿀 수 있는지
-  별도 audit이 필요하다.
-- `CTORLABELLBRACERBRACEA3`, `CTORFRAMELBRACERBRACEA3`,
-  `CTORHANDLERLBRACERBRACEA3`의 precise op signature override: source syntax에서
-  유도하는 실험을 했지만, 전체 CTOR signature를 source sort로 정밀화하면 Maude
-  preregularity warning이 늘고 `$expanddt`/Fibonacci 실행이 깨졌다. 그래서 현재는
-  이 세 execution-critical signature override를 유지한다. source-derived로 바꾸려면
-  overlapping constructor overload와 sequence/list carrier 설계를 먼저 해결해야 한다.
+해결 방향:
 
-이들은 지금 C1 실행과 source meta-expression lowering에 필요하다. 다만 P4나
-다른 SpecTec으로 확장하려면 다음 단계에서 generated prelude를 feature-gated로
-더 쪼개야 한다. 예를 들어 source가 record를 쓰지 않으면 `DSL-RECORD`를 emit하지
-않고, source가 sequence를 쓰지 않으면 sequence helper를 최소화하는 식이다.
+- 특정 `BR_ON_CAST_FAIL` rule만 hardcoding해서 우회하면 C1 기준에 맞지 않는다.
+- source `otherwise`를 Maude에서 어떻게 표현할지, 또는 C2 execution strategy로 넘길지 교수님과 논의가 필요하다.
+
+`infer-instrs-ok-arg0-r3`가 남는 이유:
+
+- source `Instrs_ok/frame`은 같은 context `C`에서 내부 `Instrs_ok`와
+  `Resulttype_ok`를 확인한다.
+- `$infer-instrs-ok-arg0`는 `instr*`와 `instrtype`만 보고 context `C`를
+  만들어내려는 실행 overlay다.
+- empty instruction case에서는 가능한 context가 너무 많고, source에는
+  “대표 context 하나를 골라라”라는 규칙이 없다.
+
+분류:
+
+```text
+CONTEXT_WITNESS_SYNTHESIS_LIMITATION
+```
+
+## 5. 남은 warning/advisory
+
+안전하게 줄인 warning:
+
+- assignment-fragment advisory: 제거됨.
+- multiple distinct parses: 제거됨.
+- duplicate import advisory: 제거됨.
+
+남은 warning:
+
+- `used-before-bound`: `load wasm-exec-bs` 기준 10개.
+  대부분 validation witness, execution/module helper output witness 쪽이다.
+  source premise가 conclusion에 없는 witness를 만들어야 하는 경우라서, 무작정 `:=`를 `==`로 바꾸면 실행이 깨질 수 있다.
+- command-time membership warning:
+  Maude builtin/pretype associative operator와 generated sequence operator `__`의 membership axiom warning이 남는다.
+- `Nonfuncs` collapse advisory:
+  `nonfuncs = global* mem* table* elem*` 같은 source mixed-sequence membership에서 온다.
+
+분류:
+
+- `WARNING_DEBT`
+- 현재 accepted smoke 실행 결과는 정상이다.
+- warning을 줄이는 작업은 source rule 단위로 별도 진행해야 한다.
+
+## 6. 지금까지 generic하게 고친 것
+
+이번 C1 pass에서 source-preserving하게 고친 대표 항목:
+
+- strict validation lowering: 281 / 281 primary `rl/crl`
+- derived `iter-empty` / `opt-empty` 제거
+- footer `eq/ceq ... = valid` 제거
+- generated predicate namespace를 `$is-spectec-*`로 정리
+- DecD LHS argument lowering에서 `translate_arg` 사용
+- sequence index `index(xs, i*)` 추가
+- source set membership `x <- xs` generic lowering 추가
+- constructor argument sort hint 복구
+- source category subsort 복구
+- optional source pattern variable refinement
+- sequence alias type guard 복구 (`expr = instr*`)
+- flat/mixed source category를 broad carrier + source-derived predicate로 보존
+- typed record field 변수명 namespace fix:
+  source-derived record projection/update/merge equations에서 field 이름이 같은 record들이 서로 다른 Maude variable sort를 갖도록 수정
+- mixed-case constructor variable extraction fix:
+  `RECContextA13` 같은 generated constructor를 fake variable로 오해하지 않게 해서
+  `step-read-br-on-cast-succeed`의 불필요한 context inference를 제거
+- `Expr-ok-const`, `Global-ok const`, `Instrs-ok CONST` focused probe 개선
+- dead helper cleanup: `$cfg-state`, `$cfg-instrs`, `needs-label-ctxt`, `is-trap`, stale `VALOK-*`, duplicate `$local` footer shims 등
+- `WasmTerminal/WasmType` naming을 `SpectecTerminal/SpectecType` 계열로 일반화
+- header/prelude feature detection 일부 source-derived화
+
+## 7. 교수님께 가져갈 질문
+
+1. label-related `step-from-step-pure-*` 20개를 C1 temporary executable debt로 둘 수 있는가?
+   아니면 C1에서는 제거하고 C2 execution layer로 보내야 하는가?
+2. `$infer-*` witness inference overlay를 C1 core에 허용할 수 있는가?
+   아니면 C2 mode-aware validation solver로 분리해야 하는가?
+3. 남은 `$is-spectec-*` / `_hasType_` guard를 C1에서 허용할 수 있는가?
+   아니면 typed sequence/mixed sequence sort 설계를 반드시 해야 하는가?
+4. warning 10개와 command-time membership warning을 C1 known warning으로 둘 수 있는가?
+   아니면 final 전에 모든 warning을 0으로 만들어야 하는가?

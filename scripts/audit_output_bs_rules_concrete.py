@@ -518,6 +518,28 @@ def run_probe(rule: Rule, subst: dict[str, str], out_dir: Path, timeout: int, va
     return status, str(log_file.relative_to(ROOT))
 
 
+CSV_FIELDS = ["line", "kind", "label", "family", "status", "attempts", "log", "lhs", "rhs"]
+
+
+def write_summary(path: Path, rows: list[dict[str, str]], *, completed: int, total: int, max_variants: int) -> None:
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["status"]] = counts.get(row["status"], 0) + 1
+    with path.open("w") as f:
+        f.write("# output_bs.maude concrete-sample rl/crl audit\n\n")
+        f.write(f"- rules completed: {completed} / {total}\n")
+        f.write(f"- max variants per rule: {max_variants} + empty-ish variant\n\n")
+        f.write("## Status counts\n\n")
+        f.write("| status | count |\n|---|---:|\n")
+        for status, count in sorted(counts.items()):
+            f.write(f"| {status} | {count} |\n")
+        f.write("\n## Non-solution statuses\n\n")
+        f.write("| line | label | family | status | log |\n|---:|---|---|---|---|\n")
+        for row in rows:
+            if row["status"] != "SOLUTION":
+                f.write(f"| {row['line']} | `{row['label']}` | {row['family']} | {row['status']} | `{row['log']}` |\n")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", default="output_bs.maude")
@@ -542,65 +564,66 @@ def main() -> int:
     if args.limit:
         rules = rules[: args.limit]
 
-    rows = []
-    for idx, rule in enumerate(rules, 1):
-        variants = substitutions_for(rule, vars_by_name, args.max_variants)
-        best_status = "NO_ATTEMPT"
-        best_log = ""
-        attempted = 0
-        stack_logs: list[str] = []
-        parse_logs: list[str] = []
-        for v_idx, subst in enumerate(variants):
-            attempted += 1
-            status, log = run_probe(rule, subst, out_dir, args.timeout, v_idx)
-            if status == "SOLUTION":
-                best_status, best_log = status, log
-                break
-            if status == "STACK_OVERFLOW":
-                stack_logs.append(log)
-            if status == "PARSE_ERROR":
-                parse_logs.append(log)
-            if best_status in {"NO_ATTEMPT", "NO_SOLUTION"}:
-                best_status, best_log = status, log
-        if stack_logs and best_status != "SOLUTION":
-            best_status, best_log = "STACK_OVERFLOW", stack_logs[0]
-        elif parse_logs and best_status not in {"SOLUTION", "STACK_OVERFLOW"}:
-            best_status, best_log = "PARSE_ERROR", parse_logs[0]
-        row = {
-            "line": str(rule.line),
-            "kind": rule.kind,
-            "label": rule.label,
-            "family": family_of(rule.label),
-            "status": best_status,
-            "attempts": str(attempted),
-            "log": best_log,
-            "lhs": rule.lhs,
-            "rhs": rule.rhs,
-        }
-        rows.append(row)
-        print(f"[{idx:04d}/{len(rules):04d}] {rule.label}: {best_status} ({attempted} variants)")
-
-    with (out_dir / "rule_concrete_results.csv").open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["line", "kind", "label", "family", "status", "attempts", "log", "lhs", "rhs"])
+    rows: list[dict[str, str]] = []
+    results_path = out_dir / "rule_concrete_results.csv"
+    with results_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         writer.writeheader()
-        writer.writerows(rows)
+        f.flush()
+        for idx, rule in enumerate(rules, 1):
+            variants = substitutions_for(rule, vars_by_name, args.max_variants)
+            best_status = "NO_ATTEMPT"
+            best_log = ""
+            attempted = 0
+            stack_logs: list[str] = []
+            parse_logs: list[str] = []
+            for v_idx, subst in enumerate(variants):
+                attempted += 1
+                status, log = run_probe(rule, subst, out_dir, args.timeout, v_idx)
+                if status == "SOLUTION":
+                    best_status, best_log = status, log
+                    break
+                if status == "STACK_OVERFLOW":
+                    stack_logs.append(log)
+                if status == "PARSE_ERROR":
+                    parse_logs.append(log)
+                if best_status in {"NO_ATTEMPT", "NO_SOLUTION"}:
+                    best_status, best_log = status, log
+            if stack_logs and best_status != "SOLUTION":
+                best_status, best_log = "STACK_OVERFLOW", stack_logs[0]
+            elif parse_logs and best_status not in {"SOLUTION", "STACK_OVERFLOW"}:
+                best_status, best_log = "PARSE_ERROR", parse_logs[0]
+            row = {
+                "line": str(rule.line),
+                "kind": rule.kind,
+                "label": rule.label,
+                "family": family_of(rule.label),
+                "status": best_status,
+                "attempts": str(attempted),
+                "log": best_log,
+                "lhs": rule.lhs,
+                "rhs": rule.rhs,
+            }
+            rows.append(row)
+            writer.writerow(row)
+            f.flush()
+            print(f"[{idx:04d}/{len(rules):04d}] {rule.label}: {best_status} ({attempted} variants)", flush=True)
+            if idx == 1 or idx % 25 == 0:
+                write_summary(
+                    out_dir / "summary.partial.md",
+                    rows,
+                    completed=idx,
+                    total=len(rules),
+                    max_variants=args.max_variants,
+                )
 
-    counts: dict[str, int] = {}
-    for row in rows:
-        counts[row["status"]] = counts.get(row["status"], 0) + 1
-    with (out_dir / "summary.md").open("w") as f:
-        f.write("# output_bs.maude concrete-sample rl/crl audit\n\n")
-        f.write(f"- rules audited: {len(rows)}\n")
-        f.write(f"- max variants per rule: {args.max_variants} + empty-ish variant\n\n")
-        f.write("## Status counts\n\n")
-        f.write("| status | count |\n|---|---:|\n")
-        for status, count in sorted(counts.items()):
-            f.write(f"| {status} | {count} |\n")
-        f.write("\n## Non-solution statuses\n\n")
-        f.write("| line | label | family | status | log |\n|---:|---|---|---|---|\n")
-        for row in rows:
-            if row["status"] != "SOLUTION":
-                f.write(f"| {row['line']} | `{row['label']}` | {row['family']} | {row['status']} | `{row['log']}` |\n")
+    write_summary(
+        out_dir / "summary.md",
+        rows,
+        completed=len(rows),
+        total=len(rules),
+        max_variants=args.max_variants,
+    )
 
     print(f"[DONE] {out_dir.relative_to(ROOT)}")
     return 0

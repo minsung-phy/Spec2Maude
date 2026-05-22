@@ -35,6 +35,11 @@ mod C1-PROBE-TERMS is
      item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ;
      item('REFS, eps)} .
 
+  op CLOCAL : -> Context .
+  eq CLOCAL =
+    RECContextA13(eps, eps, eps, eps, eps, eps, eps, eps, eps,
+      CTORSETA0 CTORI32A0, eps, eps, eps) .
+
   op invoke-literal-moduleinst : -> Moduleinst .
   eq invoke-literal-moduleinst =
     {item('TYPES, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ;
@@ -88,28 +93,27 @@ PROBES: list[Probe] = [
     Probe("instr-ok-nop", "PASS", "rew [100] in C1-PROBE-TERMS : Instr-ok(C0, CTORNOPA0, CTORARROWA3(eps, eps, eps)) .", "result ValidJudgement: valid"),
     Probe("instr-ok-unreachable", "PASS", "rew [100] in C1-PROBE-TERMS : Instr-ok(C0, CTORUNREACHABLEA0, CTORARROWA3(eps, eps, eps)) .", "result ValidJudgement: valid"),
     Probe("externaddr-ok-fib", "PASS", "rew [100] in C1-PROBE-TERMS : Externaddr-ok(fib-store, CTORFUNCA1(0), CTORFUNCA1(fib-type)) .", "result ValidJudgement: valid"),
+    Probe("localtype-typed-index-composite", "PASS", "red in C1-PROBE-TERMS : $typed-index(localtype, value('LOCALS, CLOCAL), 0) .", "result Nonfuncs: CTORSETA0 CTORI32A0"),
+    Probe("instr-ok-local-get", "PASS", "rew [100] in C1-PROBE-TERMS : Instr-ok(CLOCAL, CTORLOCALGETA1(0), CTORARROWA3(eps, eps, CTORI32A0)) .", "result ValidJudgement: valid"),
     Probe("instrs-ok-nop", "PASS", "rew [1000] in C1-PROBE-TERMS : Instrs-ok(C0, CTORNOPA0, CTORARROWA3(eps, eps, eps)) .", "result ValidJudgement: valid"),
     Probe("expr-ok-nop", "PASS", "rew [100] in C1-PROBE-TERMS : Expr-ok(C0, CTORNOPA0, eps) .", "result ValidJudgement: valid"),
     Probe(
         "instrs-ok-const-i32",
-        "KNOWN_LIMITATION",
+        "PASS",
         "rew [100] in C1-PROBE-TERMS : Instrs-ok(C0, CTORCONSTA2(CTORI32A0, 0), CTORARROWA3(eps, eps, CTORI32A0)) .",
         "result ValidJudgement: valid",
-        "현재 Instrs-ok/sub 실행 overlay가 non-empty value-producing sequence에서 재귀적으로 다시 같은 Instrs-ok를 시도해 stack overflow가 난다.",
     ),
     Probe(
         "expr-ok-const",
-        "KNOWN_LIMITATION",
+        "PASS",
         "rew [100] in C1-PROBE-TERMS : Expr-ok-const(C0, CTORCONSTA2(CTORI32A0, 0), CTORI32A0) .",
         "result ValidJudgement: valid",
-        "Expr-ok-const는 내부적으로 Expr-ok -> Instrs-ok(CONST ...)를 타므로 같은 Instrs-ok/sub recursion limitation에 걸린다.",
     ),
     Probe(
         "global-ok-const",
-        "KNOWN_LIMITATION",
+        "PASS",
         "rew [100] in C1-PROBE-TERMS : Global-ok(C0, CTORGLOBALA2(CTORMUTA0 CTORI32A0, CTORCONSTA2(CTORI32A0, 0)), CTORMUTA0 CTORI32A0) .",
         "result ValidJudgement: valid",
-        "Global-ok는 Expr-ok/Expr-ok-const에 의존하므로 같은 limitation에 걸린다.",
     ),
     Probe("val-ok-empty-sequence", "KNOWN_LIMITATION", "rew [100] in C1-PROBE-TERMS : Val-ok(fib-store, eps, eps) .", "result ValidJudgement: valid", "SpecTec source는 singleton Val-ok이고 sequence list-lift footer는 C1에서 제거했다."),
     Probe("val-ok-multi-sequence", "KNOWN_LIMITATION", "rew [100] in C1-PROBE-TERMS : Val-ok(fib-store, CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0), CTORI32A0 CTORI32A0) .", "result ValidJudgement: valid", "SpecTec source는 singleton Val-ok이고 sequence list-lift footer는 C1에서 제거했다."),

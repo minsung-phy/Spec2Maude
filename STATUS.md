@@ -1,6 +1,6 @@
 # Spec2Maude C1 Status
 
-Updated: 2026-05-20
+Updated: 2026-05-22
 
 This is the current handoff for the C1 baseline. Read this before continuing
 translator work.
@@ -45,19 +45,30 @@ That script rebuilds/regenerates, checks the strict invariants, runs the
 isolated concrete probe matrix, inventories generated `rl` / `crl` labels, and
 writes Maude logs plus warning classification under `artifacts/c1-regression-*`.
 
-For the broadest concrete execution audit over generated artifacts, run:
+For the focused accepted C1 smoke/probe matrix, run:
 
 ```bash
-python3 scripts/audit_output_bs_total_concrete.py --timeout 2
+python3 scripts/run_c1_probe_matrix.py
 ```
 
-This extracts every generated `op`, `eq`, `ceq`, `mb`, `cmb`, `rl`, and `crl`,
-generates an explicit concrete Maude command for each artifact, runs each probe
-in an isolated Maude process, and writes inventory/results/logs under
-`artifacts/output-bs-total-audit-*`. The latest completed full audit is
-`artifacts/output-bs-total-audit-20260521_114249/`; it has no
-`STACK_OVERFLOW` or `MAUDE_EXIT_*` results. The standing summary/limitation
-notes are in `docs/limitation.md`.
+The latest focused matrix is
+`artifacts/c1-probe-matrix-20260522_114516/`: 27 / 31 probes pass, and the
+four remaining probes are expected stuck cases documented in
+`docs/limitation.md`.
+
+For the broad rule-level concrete execution audit over generated `rl` / `crl`,
+run:
+
+```bash
+python3 scripts/audit_output_bs_rules_concrete.py --timeout 3
+```
+
+This generates an explicit concrete Maude command for every generated rule and
+writes incremental results/logs under `artifacts/rule-concrete-audit-*`. The
+latest completed rule audit is `artifacts/rule-concrete-audit-20260522_020812/`.
+Its refined classification is
+`artifacts/rule-concrete-classification-20260522_023538/`. This audit is a
+concrete probe catalog, not a proof for all possible inputs.
 
 Current accepted facts:
 
@@ -100,18 +111,31 @@ Current accepted facts:
 - Scalar sequence indexing now also closes out-of-bounds probes such as
   `index(CTORI32A0, 1)` to `eps`, avoiding the previous concrete-audit stack
   overflow on `index(eps, 0)`.
+- Generated `$map-*` helpers now unfold only when `len(sequence) > 0` is
+  operationally known, and terminal-valued source defs that embed Bool
+  expressions now get generic Bool sort-safety conditions. This removes the
+  previous vector bitmask stack overflow around `$ivbitmaskop` /
+  `$vbitmaskop`; those terms now remain symbolic only because source
+  `hint(builtin)` functions such as `$lanes`, `$inv-ibits`, and `$irev` do not
+  yet have concrete backend implementations.
 - Generic prefix-constructor star-map lowering is now emitted through
   `$star-prefix` / `$star-unprefix` for source shapes such as `(SET t)*`.
   The concrete probe
   `Instrtype-sub(C, arrow(i32, eps, i32), arrow(i32, eps, i32))` now rewrites
   to `valid` without judgement-specific helper rules.
-- Generic relation-star lowering is now emitted as source-driven `$iter-*`
-  helpers for source premises of the form `(J(...))*`. This fixes concrete
+- Generic relation-star lowering is now emitted as source-style sequence
+  judgements such as `Valtype-oks`, `Valtype-subs`, and `Func-oks` for source
+  premises of the form `(J(...))*`. The old internal `$iter-*` naming is gone.
+  This fixes concrete
   probes such as `Resulttype-ok(C, eps)`,
   `Resulttype-sub(C, eps, eps)`,
   `Instrtype-ok(C, arrow(eps, eps, eps))`,
   `Instrtype-sub(C, arrow(eps, eps, eps), arrow(eps, eps, eps))`, and
   `Instr-ok/unreachable`.
+- Source-derived category/sequence improvements now make the representative
+  value-producing validation path execute: `Instrs-ok(CONST i32 0,
+  arrow(eps, eps, i32))`, `Expr-ok-const(C, CONST i32 0, i32)`, and
+  constant-expression `Global-ok` all pass in the focused probe matrix.
 - Generated `$is-spectec-*` predicates now include a generic membership
   fallback, so typed opaque harness constants can satisfy category predicates
   when Maude already knows their membership sort.
@@ -126,11 +150,24 @@ Current accepted facts:
   canonicalize from the generic `{item(...) ; ...}` DSL record form to the
   typed record constructor; ambiguous field shapes intentionally do not
   canonicalize automatically.
+- Source-derived typed record field variables are now namespaced by record sort
+  in generated projection/update/merge equations. This prevents different
+  records that share field names, such as `taginst.TYPE` and `eleminst.TYPE`,
+  from accidentally sharing one Maude variable sort. The focused
+  `step-read-array-new-elem-alloc` probe now reduces through
+  `value('REFS, $elem(...))` to the expected elem reference sequence.
 - RelD lowering now preserves those source-derived record sorts on rule LHS
   variables. This removes binder-only record guards such as
   `$is-spectec-context`, `$is-spectec-store`, `$is-spectec-frame`, and
   `$is-spectec-moduleinst`. Representative source-unconditional rules such as
   `Instr_ok/nop` now generate unconditional Maude `rl`.
+- Source-derived typed index lowering now handles flat composite sequence
+  elements stored in source record fields. For source expressions such as
+  `C.LOCALS[x]`, where `LOCALS` is a `localtype*` field and `localtype` is a
+  composite element like `SET i32`, the generator emits
+  `$typed-index(localtype, value('LOCALS, C), x)` instead of raw flat
+  `index(...)`. This fixes the representative `Instr-ok/local.get` probe
+  without localidx/localtype-specific hardcoding.
 - Non-record sequence/composite categories such as `instr`, `expr`,
   `valtype`, and `idx` are intentionally still carried through the broad
   `SpectecTerminal`/`SpectecTerminals` substrate with generated membership predicates
@@ -190,7 +227,7 @@ Current accepted facts:
   removed `multiple distinct parses` by printing arithmetic, Bool, comparison,
   and generated `$map-*` helper expressions with explicit Maude prefix
   operators. The remaining warning families are documented in
-  `docs/limitation.md` and `docs/warnings.md`.
+  `docs/limitation.md`.
 - `translator_bs.ml` should not contain benchmark-specific or Wasm-judgement
   hardcoding such as:
 
@@ -209,9 +246,8 @@ evidence, not required reading for ordinary continuation work.
 Minimal reading order:
 
 1. `docs/limitation.md`: current truth for limitations and accepted/deferred debt.
-2. `docs/warnings.md`: current Maude warning/advisory classification.
-3. `STATUS.md`: commands, handoff state, and next tasks.
-4. `docs/HowToTest.md`: manual Maude smoke tests.
+2. `STATUS.md`: commands, handoff state, and next tasks.
+3. `docs/HowToTest.md`: manual Maude smoke tests.
 
 ## Strict Validation-Lowering Status
 
@@ -234,42 +270,28 @@ Concrete tests passed for selected leaf/simple validation judgements, including
 representative type validation, subtyping, instruction validation, module leaf
 validation, value validation, and `Eval_expr` probes.
 
-Known strict execution limitations are recorded in `docs/limitation.md`. The main
-categories are:
+Known strict execution limitations are recorded in `docs/limitation.md`. The
+main categories are:
 
-- the generic validation execution overlay (`$infer-*` and
-  `-exec-tail-empty*`) that was added to improve witness-style premises such as
-  `Instrs-ok/seq` while keeping the primary source rules intact. This is still
-  incomplete: simple `Instrs-ok(C, NOP, arrow(eps, eps, eps))` executes, but
-  value-producing sequences such as `Instrs-ok(C, CONST i32 0,
-  arrow(eps, eps, i32))` currently stack-overflow through the
-  `Instrs-ok/sub` execution overlay. The earlier `$exec-*` relation bridge
-  layer was removed because it duplicated source relations and caused
-  recursive stack overflows;
-- the strict `step-pure` bridge / `Step/ctxt-instrs` label executability
-  limitation, with label-related `step-from-step-pure-*` shortcuts retained as
-  non-C1-final debt. A focused ablation showed the strict bridge LHS matches
-  and direct `step-pure(label(... br 0))` rewrites to `eps`, but Maude does not
-  bind the `SpectecTerminals` result variable in the generated rewrite premise;
-  broadening the premise result to `StepPureConf` admits zero-step unreduced
-  `step-pure(...)` terms and is not a faithful C1 repair;
-- invoke-path execution: `steps(fib-config-invoke(...))` currently stops at
-  `steps($invoke(...))`; direct `$invoke(...)` rewrites to a config, but the
-  resulting source-shaped outer frame path still has a separate
-  `Step/ctxt-frame` / `steps-trans` composition limitation;
-- sequence `Val-ok` list-validation probes without footer list lifting;
-- footer/prelude/genericity debt.
-
-The focused validation executability triage is recorded in
-`docs/limitation.md`. Later focused passes found generic C1
-prelude/source-meta fixes for sequence indexing `xs[i*]`, flat
-prefix-constructor star-map expressions such as `(SET t)*`, relation-star
-premises `(J(...))*`, and projection-bearing relation conclusions. The current
-known validation execution gap is non-empty value-producing instruction
-sequences: `Instrs-ok(CONST i32 0, arrow(eps, eps, i32))` stack-overflows, and
-`Expr-ok-const` / `Global-ok` inherit that limitation. The remaining direct
-validation query limitation is sequence-shaped `Val-ok` without the removed
-footer list-lift.
+- label-related `step-from-step-pure-*` 20 shortcuts retained as non-C1-final
+  executable debt;
+- `$infer-*` generic witness overlay, which needs a C1/C2 boundary decision;
+- source-style relation-star lowering (`Valtype-oks` and related helpers) is
+  now treated as accepted lowering for SpecTec `*` meta-notation, not as a
+  separate non-isomorphic debt item;
+- remaining category/sequence representation guards (`$is-spectec-*` /
+  `_hasType_`) where source categories are not yet fully represented as Maude
+  typed sequence sorts;
+- sequence-shaped direct `Val-ok` queries after removing the old non-source
+  list-lift footer helper;
+- broader typed/mixed sequence sort design; the representative composite
+  record-field index case `C.LOCALS[0] = SET i32` is now handled by
+  source-derived `$typed-index`, but `_hasType_` / `$is-spectec-*` guards still
+  remain for categories that cannot yet be represented as precise Maude
+  sequence sorts;
+- invoke/init-config path limitations, especially `steps(fib-config-invoke(...))`;
+- broad rule-audit rows that need source-valid runtime/module/type contexts
+  before they can be treated as real bugs.
 
 The footer `= valid` cleanup removed duplicate source-rule equations for
 `Expand`, `Num-ok`, singleton `Val-ok`, and the non-source sequence-shaped
@@ -284,9 +306,8 @@ Current next tasks:
 2. Continue warning cleanup only for source-preserving fixes: especially
    remaining `used-before-bound` witness cases. Precedence-related
    `multiple distinct parses` are currently removed.
-3. Decide whether the generic `$iter-*` relation-star substrate and the new
-   `$infer-*` / `-exec-tail-empty*` validation execution overlay
-   are acceptable in C1, or whether they should move to C2.
+3. Decide whether the new `$infer-*` / `-exec-tail-empty*` validation execution
+   overlay is acceptable in C1, or whether it should move to C2.
 4. Continue `output_bs.maude` isomorphism cleanup.
 5. Continue footer/prelude separation one family at a time. The first dead
    helper cleanup, the `$local` / `$with-local` footer-shim cleanup, and the
@@ -568,9 +589,8 @@ execution overlay belongs in C1 or C2, direct sequence `Val-ok` list probes,
 and invoke-path `$invoke` under `steps` plus `Step/ctxt-frame` composition
 around source-shaped record frames.
 
-The next validation design decision is whether the new generic `$iter-*`
-relation-star substrate and `$infer-*` / `$exec-*` witness overlay are
-acceptable in C1, or whether they should be left to C2.
+The next validation design decision is whether the `$infer-*` / `$exec-*`
+witness overlay is acceptable in C1, or whether it should be left to C2.
 
 ## Source-Level Initial Config Requirement
 
@@ -699,11 +719,12 @@ Val-ok(...)
 Current `load wasm-exec-bs` warning status after the current cleanup passes:
 
 - assignment-fragment advisory: removed.
-- used-before-bound: 25 total. Generic bugs fixed so far include `ListN`
+- used-before-bound: 10 total in the latest `scripts/run_c1_regression.sh`
+  warning classification. Generic bugs fixed so far include `ListN`
   length binding for `deftype-ok-r0`, category-pattern disjunction lowering for
   `t' = numtype \/ t' = vectype`, and DecD `TypA` parameter lowering for
-  `$ivadd-pairwise`. The remaining cases are mostly witness synthesis,
-  numeric/vector helper output witnesses, and init/eval helper witnesses.
+  `$ivadd-pairwise`. The remaining cases are mostly validation witness
+  synthesis and execution/module helper output witnesses.
 - multiple distinct parses: removed. Arithmetic, Bool, comparison, category
   disjunction, unary minus, and generated `$map-*` helper expressions now print
   with explicit Maude prefix operators where needed.
@@ -724,8 +745,8 @@ assignment fragments.
 
 ## Latest Focused Failure Triage
 
-The seven high-risk failures from the total concrete audit were rechecked with
-source-shaped focused probes.
+The 19 high-risk `STACK_OVERFLOW` / `MAUDE_EXIT_2` / `TIMEOUT` cases from the
+total concrete audit were rechecked with source-shaped focused probes.
 
 - `$concatn` stack overflow was a generic `ListN` lowering bug and is fixed.
 - `clos-deftypes-r1`, `alloctypes-r1`, and
@@ -743,8 +764,32 @@ source-shaped focused probes.
   reduces to `valid`, but Maude rewriting does not synthesize `ZQ/ref` outputs
   from `Eval-expr(..., ZQ, ref) => valid`. A temporary direct-`steps`
   unfolding works for concrete probes but is not strict C1-final.
+- The remaining label/handler/return `Step_pure` and selected `Step_read`
+  cases from the broad audit now pass with source-valid focused probes.
+- `step-read-br-on-cast-succeed` is fixed. The generic Maude-variable extractor
+  no longer treats mixed-case record constructors such as `RECContextA13` as fake
+  variables, so the generated condition now gets `rt` from `Ref-ok` and then
+  checks `Reftype-sub(empty-context, rt, target)`.
+- `step-read-br-on-cast-fail-fail` remains an otherwise/negative-premise
+  limitation: the false cast path needs the succeeding cast premise to fail
+  cleanly, but Maude can recurse through subtype search instead.
+- `infer-instrs-ok-arg0-r3` remains a context-witness synthesis limitation:
+  the helper is asked to infer a context from `instr*` and an instruction type,
+  but the source does not define a canonical context to choose.
 
-Details: `docs/archive/current-c1/dangerous_failure_triage.md`.
+Current dangerous-status summary:
+
+- Most broad audit failures are sample bugs: source-valid focused probes pass.
+- 2 generic translator bugs fixed: source-derived record field variable
+  namespace, and mixed-case constructor variable extraction.
+- 3 real limitations remain:
+  `evalexprss-r1`, `step-read-br-on-cast-fail-fail`,
+  `infer-instrs-ok-arg0-r3`.
+
+Latest focused probe log:
+`artifacts/phase1-error-triage-20260522_102830/summary.md`.
+Latest regression log:
+`artifacts/c1-regression-20260522_100049/`.
 
 ## Next Concrete Tasks
 
@@ -753,9 +798,8 @@ Do not jump to frontend, model checking, or broad speculative infrastructure.
 Recommended next tasks:
 
 1. Review `docs/limitation.md` with the professor.
-2. Decide C1 vs C2 placement for the generic `$iter-*` relation-star substrate
-   and the `$infer-*` / `-exec-tail-empty*` validation execution
-   overlay.
+2. Decide C1 vs C2 placement for the `$infer-*` / `-exec-tail-empty*`
+   validation execution overlay.
 3. Continue `output_bs.maude` isomorphism cleanup.
 4. Audit footer/prelude separation now that `= valid` footer leftovers are gone.
 5. Keep init-config, frontend, and model checking out of the current C1 cleanup
