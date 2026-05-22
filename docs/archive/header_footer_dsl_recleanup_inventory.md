@@ -167,14 +167,24 @@ meta-expression을 Maude에서 실행하려고 필요하다.
 `Judgement` / `valid`는 SpecTec relation rule을 Maude rewrite result로 표현하기
 위한 generic substrate다.
 
-`StepConf` 계열은 source `Step` relation을 Maude rewrite engine에서 안정적으로
-실행하기 위한 wrapper substrate다. 사용자가 이미 “이건 non-isomorphic으로 보지
-않아도 됨”이라고 정한 항목이다.
+`StepConf` 계열은 source `Step`, `Step_pure`, `Step_read`, `Steps` relation을
+Maude rewrite engine에서 안정적으로 실행하기 위한 wrapper substrate다. 사용자가
+이미 “이건 non-isomorphic으로 보지 않아도 됨”이라고 정한 항목이다.
+
+현재 상태:
+
+- wrapper block은 더 이상 고정 문자열로 무조건 출력되지 않는다.
+- translator가 source `RelD` declarations를 스캔해서 execution relation이 실제로
+  존재할 때만 해당 wrapper sort/op/subsort를 생성한다.
+- WebAssembly source의 relation declarations:
+  - `Step: config ~> config` -> `step : Config -> StepConf`
+  - `Step_pure: instr* ~> instr*` -> `step-pure : SpectecTerminals -> StepPureConf`
+  - `Step_read: config ~> instr*` -> `step-read : Config -> StepReadConf`
+  - `Steps: config ~>* config` -> `steps : Config -> StepsConf`
 
 다음 개선:
 
-- 지금은 `source_has_step_relations`로 Step relation이 있을 때만 emit한다.
-- 장기적으로는 특정 `Step` 이름에 덜 묶이게 relation wrapper generation을 일반화할 수 있다.
+- 장기적으로는 특정 `Step` 이름에 덜 묶이게 relation wrapper generation을 더 일반화할 수 있다.
 - 다만 현재는 accepted execution smoke와 직접 연결되어 있으므로 삭제 대상이 아니다.
 
 ### 4. C1 / C2 경계 항목
