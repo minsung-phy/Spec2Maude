@@ -1,0 +1,54 @@
+--- =============================================================
+--- WASM-BUILTINS: Backend implementations for SpecTec hint(builtin)
+--- =============================================================
+--- This file is intentionally separate from output_bs.maude.
+--- output_bs.maude is the source-derived C1 core; this module supplies
+--- backend primitives for definitions that the SpecTec source marks with
+--- `hint(builtin)`, such as $ibits_, $inv_ibits_, $irev_, $lanes_, and
+--- $inv_lanes_.
+--- =============================================================
+
+load output_bs
+
+mod WASM-BUILTINS is
+  inc SPECTEC-CORE .
+
+  vars N I W ACC B : Int .
+  var BS : SpectecTerminals .
+  var SH V : SpectecTerminal .
+  var LANES : SpectecTerminals .
+
+  --- Integer bit conversion.
+  --- Convention: $ibits(N, I) produces N low-to-high bits; $inv-ibits is
+  --- its inverse on such bit sequences. This matches the backend role of
+  --- the SpecTec builtin/inverse pair.
+  op $bits-le : Int Int -> SpectecTerminals .
+  eq $bits-le(0, I) = eps .
+  ceq $bits-le(N, I) = _rem_(I, 2) $bits-le(_-_(N, 1), _quo_(I, 2))
+    if _>_(N, 0) .
+
+  op $from-bits-le : SpectecTerminals Int Int -> Int .
+  eq $from-bits-le(eps, W, ACC) = ACC .
+  ceq $from-bits-le(B BS, W, ACC) =
+      $from-bits-le(BS, _*_(W, 2), _+_(ACC, _*_(B, W)))
+    if (B == 0) or (B == 1) .
+
+  eq $ibits(N, I) = $bits-le(N, I) .
+  eq $inv-ibits(N, BS) = $from-bits-le(BS, 1, 0) .
+
+  --- Bit reversal over a fixed width, used by source builtin $irev_.
+  op $reverse-bits : SpectecTerminals -> SpectecTerminals .
+  eq $reverse-bits(eps) = eps .
+  ceq $reverse-bits(B BS) = $reverse-bits(BS) B
+    if (B == 0) or (B == 1) .
+
+  eq $irev(N, I) = $inv-ibits(N, $reverse-bits($ibits(N, I))) .
+
+  --- Vector lane packing/unpacking.
+  --- Until byte-level v128 packing is implemented, this backend supports
+  --- the canonical executable representation used by tests: a vector value
+  --- may be represented directly as its lane sequence.
+  eq $lanes(SH, V) = V .
+  eq $inv-lanes(SH, LANES) = LANES .
+endm
+

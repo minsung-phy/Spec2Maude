@@ -152,8 +152,8 @@ PROBES = [
     Probe(
         "step-read-br-on-cast-fail-fail-source-valid",
         f"rew [30] in C1-RULE-CONCRETE-SAMPLES : step-read(ST0 ; CTORREFI31NUMA1(7) CTORBRONCASTFAILA3(1, {RT_I31}, {RT_FUNC})) .",
-        "KNOWN_LIMITATION",
-        "Fatal error: stack overflow",
+        "PASS",
+        "CTORREFI31NUMA1(7) CTORBRA1(1)",
     ),
     Probe(
         "step-read-return-call-ref-label-source-valid",
