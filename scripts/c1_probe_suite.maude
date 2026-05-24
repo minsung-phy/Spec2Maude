@@ -11,6 +11,9 @@ mod C1-PROBE-TERMS is
      item('LOCALS, eps) ; item('LABELS, eps) ; item('RETURN, eps) ;
      item('REFS, eps)} .
 
+  op ST0 : -> State .
+  eq ST0 = fib-store ; empty-frame .
+
   op invoke-literal-moduleinst : -> Moduleinst .
   eq invoke-literal-moduleinst =
     {item('TYPES, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ;
@@ -64,17 +67,29 @@ rew [1000] in C1-PROBE-TERMS :
   Instrs-ok(C0, CTORNOPA0, CTORARROWA3(eps, eps, eps)) .
 rew [100] in C1-PROBE-TERMS :
   Expr-ok(C0, CTORNOPA0, eps) .
---- Known limitation: value-producing non-empty instruction sequences currently
---- stack-overflow through Instrs-ok/sub execution overlay. Run
---- scripts/run_c1_probe_matrix.py to record these in isolated Maude processes:
+--- Value-producing non-empty instruction validation now passes in the isolated
+--- probe matrix:
 ---   Instrs-ok(C0, CONST i32 0, arrow(eps, eps, i32))
 ---   Expr-ok-const(C0, CONST i32 0, i32)
 ---   Global-ok(C0, global(mut i32, CONST i32 0), mut i32)
 
---- Known remaining direct-query limitations.
-rew [100] in C1-PROBE-TERMS : Val-ok(fib-store, eps, eps) .
+--- C1 otherwise / negative-path probes fixed by source-derived subtype decision guards.
 rew [100] in C1-PROBE-TERMS :
-  Val-ok(fib-store,
+  step-read(ST0 ; CTORREFI31NUMA1(7)
+    CTORBRONCASTA3(1, CTORREFA2(eps, CTORI31A0), CTORREFA2(eps, CTORFUNCA0))) .
+rew [100] in C1-PROBE-TERMS :
+  step-read(ST0 ; CTORREFI31NUMA1(7)
+    CTORBRONCASTFAILA3(1, CTORREFA2(eps, CTORI31A0), CTORREFA2(eps, CTORFUNCA0))) .
+rew [100] in C1-PROBE-TERMS :
+  step-read(ST0 ; CTORREFI31NUMA1(7) CTORREFTESTA1(CTORREFA2(eps, CTORFUNCA0))) .
+rew [100] in C1-PROBE-TERMS :
+  step-read(ST0 ; CTORREFI31NUMA1(7) CTORREFCASTA1(CTORREFA2(eps, CTORFUNCA0))) .
+
+--- Source-derived relation-star value validation.
+--- Source singleton Val-ok remains one-value validation; source P* lowers to Val-oks.
+rew [100] in C1-PROBE-TERMS : Val-oks(fib-store, eps, eps) .
+rew [100] in C1-PROBE-TERMS :
+  Val-oks(fib-store,
     CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0),
     CTORI32A0 CTORI32A0) .
 

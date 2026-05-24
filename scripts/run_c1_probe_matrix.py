@@ -40,6 +40,9 @@ mod C1-PROBE-TERMS is
     RECContextA13(eps, eps, eps, eps, eps, eps, eps, eps, eps,
       CTORSETA0 CTORI32A0, eps, eps, eps) .
 
+  op ST0 : -> State .
+  eq ST0 = fib-store ; empty-frame .
+
   op invoke-literal-moduleinst : -> Moduleinst .
   eq invoke-literal-moduleinst =
     {item('TYPES, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ;
@@ -115,8 +118,56 @@ PROBES: list[Probe] = [
         "rew [100] in C1-PROBE-TERMS : Global-ok(C0, CTORGLOBALA2(CTORMUTA0 CTORI32A0, CTORCONSTA2(CTORI32A0, 0)), CTORMUTA0 CTORI32A0) .",
         "result ValidJudgement: valid",
     ),
-    Probe("val-ok-empty-sequence", "KNOWN_LIMITATION", "rew [100] in C1-PROBE-TERMS : Val-ok(fib-store, eps, eps) .", "result ValidJudgement: valid", "SpecTec source는 singleton Val-ok이고 sequence list-lift footer는 C1에서 제거했다."),
-    Probe("val-ok-multi-sequence", "KNOWN_LIMITATION", "rew [100] in C1-PROBE-TERMS : Val-ok(fib-store, CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0), CTORI32A0 CTORI32A0) .", "result ValidJudgement: valid", "SpecTec source는 singleton Val-ok이고 sequence list-lift footer는 C1에서 제거했다."),
+    Probe(
+        "step-read-br-on-cast-negative",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORBRONCASTA3(1, CTORREFA2(eps, CTORI31A0), CTORREFA2(eps, CTORFUNCA0))) .",
+        "result Addrref: CTORREFI31NUMA1(7)",
+    ),
+    Probe(
+        "step-read-br-on-cast-positive",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORBRONCASTA3(1, CTORREFA2(eps, CTORI31A0), CTORREFA2(eps, CTORI31A0))) .",
+        "CTORREFI31NUMA1(7) CTORBRA1(1)",
+    ),
+    Probe(
+        "step-read-br-on-cast-fail-negative",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORBRONCASTFAILA3(1, CTORREFA2(eps, CTORI31A0), CTORREFA2(eps, CTORFUNCA0))) .",
+        "CTORREFI31NUMA1(7) CTORBRA1(1)",
+    ),
+    Probe(
+        "step-read-br-on-cast-fail-positive",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORBRONCASTFAILA3(1, CTORREFA2(eps, CTORI31A0), CTORREFA2(eps, CTORI31A0))) .",
+        "result Addrref: CTORREFI31NUMA1(7)",
+    ),
+    Probe(
+        "step-read-ref-test-negative",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORREFTESTA1(CTORREFA2(eps, CTORFUNCA0))) .",
+        "result Num: CTORCONSTA2(CTORI32A0, 0)",
+    ),
+    Probe(
+        "step-read-ref-test-positive",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORREFTESTA1(CTORREFA2(eps, CTORI31A0))) .",
+        "result Num: CTORCONSTA2(CTORI32A0, 1)",
+    ),
+    Probe(
+        "step-read-ref-cast-negative",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORREFCASTA1(CTORREFA2(eps, CTORFUNCA0))) .",
+        "result SortCTORTRAPA0: CTORTRAPA0",
+    ),
+    Probe(
+        "step-read-ref-cast-positive",
+        "PASS",
+        "rew [100] in C1-PROBE-TERMS : step-read(ST0 ; CTORREFI31NUMA1(7) CTORREFCASTA1(CTORREFA2(eps, CTORI31A0))) .",
+        "result Addrref: CTORREFI31NUMA1(7)",
+    ),
+    Probe("val-oks-empty-sequence", "PASS", "rew [100] in C1-PROBE-TERMS : Val-oks(fib-store, eps, eps) .", "result ValidJudgement: valid"),
+    Probe("val-oks-multi-sequence", "PASS", "rew [100] in C1-PROBE-TERMS : Val-oks(fib-store, CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0), CTORI32A0 CTORI32A0) .", "result ValidJudgement: valid"),
     Probe("invoke-rewrites-to-config", "PASS", "rew [100] in C1-PROBE-TERMS : $invoke(fib-store, 0, i32v(5) i32v(0) i32v(1)) .", "result Config:"),
     Probe("steps-invoke-outer-config", "KNOWN_LIMITATION", "rew [1000] in C1-PROBE-TERMS : steps(invoke-outer-config) .", "result Config: (fib-store ; invoke-outer-frame) ; CTORCONSTA2", "source-shaped outer frame context does not currently compose through Step/ctxt-frame execution path."),
     Probe("steps-invoke-named-empty-frame", "PASS", "rew [1000] in C1-PROBE-TERMS : steps(invoke-outer-config-named-empty-frame) .", "result Config: (fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)"),

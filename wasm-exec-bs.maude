@@ -9,10 +9,10 @@
 ---   - do NOT use the old `mc` model-checking adapter in the main C1 path
 --- =============================================================
 
-load output_bs
+load builtins
 
 mod WASM-EXEC-BS is
-  inc SPECTEC-CORE .
+  inc WASM-BUILTINS .
 
   --- Config, _;_, step, step-pure, step-read, and steps are inherited from SPECTEC-CORE.
   --- Baseline output owns the direct relation-preserving execution rules.
