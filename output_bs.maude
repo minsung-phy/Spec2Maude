@@ -1382,7 +1382,7 @@ mod SPECTEC-CORE is
   op addrtype :  -> SpectecType [ctor] .
   op arrayaddr :  -> SpectecType [ctor] .
   op arrayinst :  -> SpectecType [ctor] .
-  op binop : SpectecTerminal -> SpectecType [ctor] .
+  op binop : Numtype -> SpectecType [ctor] .
   op bit :  -> SpectecType [ctor] .
   op blocktype :  -> SpectecType [ctor] .
   op bshape :  -> SpectecType [ctor] .
@@ -1393,7 +1393,7 @@ mod SPECTEC-CORE is
   op config :  -> SpectecType [ctor] .
   op consttype :  -> SpectecType [ctor] .
   op context :  -> SpectecType [ctor] .
-  op cvtop : SpectecTerminal SpectecTerminal -> SpectecType [ctor] .
+  op cvtop : Numtype Numtype -> SpectecType [ctor] .
   op data :  -> SpectecType [ctor] .
   op dataaddr :  -> SpectecType [ctor] .
   op dataidx :  -> SpectecType [ctor] .
@@ -1419,8 +1419,8 @@ mod SPECTEC-CORE is
   op externtype :  -> SpectecType [ctor] .
   op f32 :  -> SpectecType [ctor] .
   op f64 :  -> SpectecType [ctor] .
-  op fN : SpectecTerminal -> SpectecType [ctor] .
-  op fNmag : SpectecTerminal -> SpectecType [ctor] .
+  op fN : N -> SpectecType [ctor] .
+  op fNmag : N -> SpectecType [ctor] .
   op fieldidx :  -> SpectecType [ctor] .
   op fieldtype :  -> SpectecType [ctor] .
   op fieldval :  -> SpectecType [ctor] .
@@ -1444,7 +1444,7 @@ mod SPECTEC-CORE is
   op i128 :  -> SpectecType [ctor] .
   op i32 :  -> SpectecType [ctor] .
   op i64 :  -> SpectecType [ctor] .
-  op iN : SpectecTerminal -> SpectecType [ctor] .
+  op iN : N -> SpectecType [ctor] .
   op idx :  -> SpectecType [ctor] .
   op import :  -> SpectecType [ctor] .
   op init :  -> SpectecType [ctor] .
@@ -1452,13 +1452,13 @@ mod SPECTEC-CORE is
   op instrtype :  -> SpectecType [ctor] .
   op ishape :  -> SpectecType [ctor] .
   op labelidx :  -> SpectecType [ctor] .
-  op lane : SpectecTerminal -> SpectecType [ctor] .
+  op lane : Lanetype -> SpectecType [ctor] .
   op laneidx :  -> SpectecType [ctor] .
   op lanetype :  -> SpectecType [ctor] .
   op limits :  -> SpectecType [ctor] .
-  op list : SpectecTerminal -> SpectecType [ctor] .
-  op lit : SpectecTerminal -> SpectecType [ctor] .
-  op loadop : SpectecTerminal -> SpectecType [ctor] .
+  op list : SpectecType -> SpectecType [ctor] .
+  op lit : Storagetype -> SpectecType [ctor] .
+  op loadop : Numtype -> SpectecType [ctor] .
   op local :  -> SpectecType [ctor] .
   op localidx :  -> SpectecType [ctor] .
   op localtype :  -> SpectecType [ctor] .
@@ -1475,11 +1475,11 @@ mod SPECTEC-CORE is
   op name :  -> SpectecType [ctor] .
   op nonfuncs :  -> SpectecType [ctor] .
   op null :  -> SpectecType [ctor] .
-  op num : SpectecTerminal -> SpectecType [ctor] .
+  op num : Numtype -> SpectecType [ctor] .
   op numtype :  -> SpectecType [ctor] .
   op oktypeidx :  -> SpectecType [ctor] .
   op oktypeidxnat :  -> SpectecType [ctor] .
-  op pack : SpectecTerminal -> SpectecType [ctor] .
+  op pack : Pnn -> SpectecType [ctor] .
   op packtype :  -> SpectecType [ctor] .
   op packval :  -> SpectecType [ctor] .
   op rectype :  -> SpectecType [ctor] .
@@ -1487,17 +1487,17 @@ mod SPECTEC-CORE is
   op reftype :  -> SpectecType [ctor] .
   op relaxed2 :  -> SpectecType [ctor] .
   op relaxed4 :  -> SpectecType [ctor] .
-  op relop : SpectecTerminal -> SpectecType [ctor] .
+  op relop : Numtype -> SpectecType [ctor] .
   op result :  -> SpectecType [ctor] .
   op resulttype :  -> SpectecType [ctor] .
   op s33 :  -> SpectecType [ctor] .
-  op sN : SpectecTerminal -> SpectecType [ctor] .
+  op sN : N -> SpectecType [ctor] .
   op shape :  -> SpectecType [ctor] .
   op start :  -> SpectecType [ctor] .
   op state :  -> SpectecType [ctor] .
   op storagetype :  -> SpectecType [ctor] .
   op store :  -> SpectecType [ctor] .
-  op storeop : SpectecTerminal -> SpectecType [ctor] .
+  op storeop : Numtype -> SpectecType [ctor] .
   op structaddr :  -> SpectecType [ctor] .
   op structinst :  -> SpectecType [ctor] .
   op subtype :  -> SpectecType [ctor] .
@@ -1513,7 +1513,7 @@ mod SPECTEC-CORE is
   op tagidx :  -> SpectecType [ctor] .
   op taginst :  -> SpectecType [ctor] .
   op tagtype :  -> SpectecType [ctor] .
-  op testop : SpectecTerminal -> SpectecType [ctor] .
+  op testop : Numtype -> SpectecType [ctor] .
   op type :  -> SpectecType [ctor] .
   op typeidx :  -> SpectecType [ctor] .
   op typeuse :  -> SpectecType [ctor] .
@@ -1523,26 +1523,26 @@ mod SPECTEC-CORE is
   op u32 :  -> SpectecType [ctor] .
   op u64 :  -> SpectecType [ctor] .
   op u8 :  -> SpectecType [ctor] .
-  op uN : SpectecTerminal -> SpectecType [ctor] .
-  op unop : SpectecTerminal -> SpectecType [ctor] .
+  op uN : N -> SpectecType [ctor] .
+  op unop : Numtype -> SpectecType [ctor] .
   op v128 :  -> SpectecType [ctor] .
-  op vN : SpectecTerminal -> SpectecType [ctor] .
+  op vN : N -> SpectecType [ctor] .
   op val :  -> SpectecType [ctor] .
   op valtype :  -> SpectecType [ctor] .
-  op vbinop : SpectecTerminal -> SpectecType [ctor] .
-  op vcvtop : SpectecTerminal SpectecTerminal -> SpectecType [ctor] .
-  op vec : SpectecTerminal -> SpectecType [ctor] .
+  op vbinop : Shape -> SpectecType [ctor] .
+  op vcvtop : Shape Shape -> SpectecType [ctor] .
+  op vec : Vnn -> SpectecType [ctor] .
   op vectype :  -> SpectecType [ctor] .
-  op vextbinop : SpectecTerminal SpectecTerminal -> SpectecType [ctor] .
-  op vextternop : SpectecTerminal SpectecTerminal -> SpectecType [ctor] .
-  op vextunop : SpectecTerminal SpectecTerminal -> SpectecType [ctor] .
-  op vloadop : SpectecTerminal -> SpectecType [ctor] .
-  op vrelop : SpectecTerminal -> SpectecType [ctor] .
-  op vshiftop : SpectecTerminal -> SpectecType [ctor] .
-  op vswizzlop : SpectecTerminal -> SpectecType [ctor] .
-  op vternop : SpectecTerminal -> SpectecType [ctor] .
-  op vtestop : SpectecTerminal -> SpectecType [ctor] .
-  op vunop : SpectecTerminal -> SpectecType [ctor] .
+  op vextbinop : Ishape Ishape -> SpectecType [ctor] .
+  op vextternop : Ishape Ishape -> SpectecType [ctor] .
+  op vextunop : Ishape Ishape -> SpectecType [ctor] .
+  op vloadop : Vectype -> SpectecType [ctor] .
+  op vrelop : Shape -> SpectecType [ctor] .
+  op vshiftop : Ishape -> SpectecType [ctor] .
+  op vswizzlop : Bshape -> SpectecType [ctor] .
+  op vternop : Shape -> SpectecType [ctor] .
+  op vtestop : Shape -> SpectecType [ctor] .
+  op vunop : Shape -> SpectecType [ctor] .
   op vvbinop :  -> SpectecType [ctor] .
   op vvternop :  -> SpectecType [ctor] .
   op vvtestop :  -> SpectecType [ctor] .
@@ -1859,7 +1859,7 @@ mod SPECTEC-CORE is
   sort Vvtestop .
   sort Vvunop .
   subsort Absheaptype < Heaptype .
-  subsort Absheaptype < SpectecType .
+  subsort Absheaptype < SpectecTerminal .
   subsort Addr < Arrayaddr .
   subsort Addr < Dataaddr .
   subsort Addr < Elemaddr .
@@ -1868,14 +1868,14 @@ mod SPECTEC-CORE is
   subsort Addr < Globaladdr .
   subsort Addr < Hostaddr .
   subsort Addr < Memaddr .
-  subsort Addr < SpectecType .
+  subsort Addr < SpectecTerminal .
   subsort Addr < Structaddr .
   subsort Addr < Tableaddr .
   subsort Addr < Tagaddr .
   subsort Addrref < Fieldval .
   subsort Addrref < Instr .
   subsort Addrref < Ref .
-  subsort Addrref < SpectecType .
+  subsort Addrref < SpectecTerminal .
   subsort Addrref < Val .
   subsort Addrtype < Cnn .
   subsort Addrtype < Consttype .
@@ -1883,85 +1883,85 @@ mod SPECTEC-CORE is
   subsort Addrtype < Jnn .
   subsort Addrtype < Lanetype .
   subsort Addrtype < Numtype .
-  subsort Addrtype < SpectecType .
+  subsort Addrtype < SpectecTerminal .
   subsort Addrtype < Storagetype .
   subsort Addrtype < Valtype .
-  subsort Arrayaddr < SpectecType .
-  subsort Arrayinst < SpectecType .
+  subsort Arrayaddr < SpectecTerminal .
+  subsort Arrayinst < SpectecTerminal .
   subsort Bit < Relaxed4 .
-  subsort Bit < SpectecType .
-  subsort Blocktype < SpectecType .
-  subsort Bshape < SpectecType .
-  subsort Byte < SpectecType .
-  subsort Catch < SpectecType .
-  subsort Cnn < SpectecType .
+  subsort Bit < SpectecTerminal .
+  subsort Blocktype < SpectecTerminal .
+  subsort Bshape < SpectecTerminal .
+  subsort Byte < SpectecTerminal .
+  subsort Catch < SpectecTerminal .
+  subsort Cnn < SpectecTerminal .
   subsort Cnn < Storagetype .
   subsort Cnn < Valtype .
-  subsort Comptype < SpectecType .
-  subsort Config < SpectecType .
-  subsort Consttype < SpectecType .
+  subsort Comptype < SpectecTerminal .
+  subsort Config < SpectecTerminal .
+  subsort Consttype < SpectecTerminal .
   subsort Consttype < Storagetype .
   subsort Consttype < Valtype .
-  subsort Context < SpectecType .
-  subsort Data < SpectecType .
-  subsort Dataaddr < SpectecType .
-  subsort Dataidx < SpectecType .
-  subsort Datainst < SpectecType .
-  subsort Datamode < SpectecType .
-  subsort Datatype < SpectecType .
+  subsort Context < SpectecTerminal .
+  subsort Data < SpectecTerminal .
+  subsort Dataaddr < SpectecTerminal .
+  subsort Dataidx < SpectecTerminal .
+  subsort Datainst < SpectecTerminal .
+  subsort Datamode < SpectecTerminal .
+  subsort Datatype < SpectecTerminal .
   subsort Deftype < Heaptype .
-  subsort Deftype < SpectecType .
+  subsort Deftype < SpectecTerminal .
   subsort Deftype < Typeuse .
-  subsort Dim < SpectecType .
-  subsort Elem < SpectecType .
-  subsort Elemaddr < SpectecType .
-  subsort Elemidx < SpectecType .
-  subsort Eleminst < SpectecType .
-  subsort Elemmode < SpectecType .
-  subsort Elemtype < SpectecType .
-  subsort Exnaddr < SpectecType .
-  subsort Exninst < SpectecType .
-  subsort Exp < SpectecType .
-  subsort Export < SpectecType .
-  subsort Exportinst < SpectecType .
-  subsort Expr < SpectecType .
-  subsort Externaddr < SpectecType .
-  subsort Externidx < SpectecType .
-  subsort Externtype < SpectecType .
-  subsort F32 < SpectecType .
-  subsort F64 < SpectecType .
-  subsort Fieldidx < SpectecType .
-  subsort Fieldtype < SpectecType .
-  subsort Fieldval < SpectecType .
-  subsort Final < SpectecType .
+  subsort Dim < SpectecTerminal .
+  subsort Elem < SpectecTerminal .
+  subsort Elemaddr < SpectecTerminal .
+  subsort Elemidx < SpectecTerminal .
+  subsort Eleminst < SpectecTerminal .
+  subsort Elemmode < SpectecTerminal .
+  subsort Elemtype < SpectecTerminal .
+  subsort Exnaddr < SpectecTerminal .
+  subsort Exninst < SpectecTerminal .
+  subsort Exp < SpectecTerminal .
+  subsort Export < SpectecTerminal .
+  subsort Exportinst < SpectecTerminal .
+  subsort Expr < SpectecTerminal .
+  subsort Externaddr < SpectecTerminal .
+  subsort Externidx < SpectecTerminal .
+  subsort Externtype < SpectecTerminal .
+  subsort F32 < SpectecTerminal .
+  subsort F64 < SpectecTerminal .
+  subsort Fieldidx < SpectecTerminal .
+  subsort Fieldtype < SpectecTerminal .
+  subsort Fieldval < SpectecTerminal .
+  subsort Final < SpectecTerminal .
   subsort Fnn < Cnn .
   subsort Fnn < Consttype .
   subsort Fnn < Lanetype .
   subsort Fnn < Numtype .
-  subsort Fnn < SpectecType .
+  subsort Fnn < SpectecTerminal .
   subsort Fnn < Storagetype .
   subsort Fnn < Valtype .
-  subsort Frame < SpectecType .
-  subsort Free < SpectecType .
+  subsort Frame < SpectecTerminal .
+  subsort Free < SpectecTerminal .
   subsort Func < Funccode .
-  subsort Func < SpectecType .
-  subsort Funcaddr < SpectecType .
-  subsort Funccode < SpectecType .
-  subsort Funcidx < SpectecType .
-  subsort Funcinst < SpectecType .
-  subsort Global < SpectecType .
-  subsort Globaladdr < SpectecType .
-  subsort Globalidx < SpectecType .
-  subsort Globalinst < SpectecType .
-  subsort Globaltype < SpectecType .
-  subsort Half < SpectecType .
-  subsort Heaptype < SpectecType .
-  subsort Hostaddr < SpectecType .
+  subsort Func < SpectecTerminal .
+  subsort Funcaddr < SpectecTerminal .
+  subsort Funccode < SpectecTerminal .
+  subsort Funcidx < SpectecTerminal .
+  subsort Funcinst < SpectecTerminal .
+  subsort Global < SpectecTerminal .
+  subsort Globaladdr < SpectecTerminal .
+  subsort Globalidx < SpectecTerminal .
+  subsort Globalinst < SpectecTerminal .
+  subsort Globaltype < SpectecTerminal .
+  subsort Half < SpectecTerminal .
+  subsort Heaptype < SpectecTerminal .
+  subsort Hostaddr < SpectecTerminal .
   subsort Hostfunc < Funccode .
-  subsort Hostfunc < SpectecType .
-  subsort I128 < SpectecType .
-  subsort I32 < SpectecType .
-  subsort I64 < SpectecType .
+  subsort Hostfunc < SpectecTerminal .
+  subsort I128 < SpectecTerminal .
+  subsort I32 < SpectecTerminal .
+  subsort I64 < SpectecTerminal .
   subsort Idx < Dataidx .
   subsort Idx < Elemidx .
   subsort Idx < Fieldidx .
@@ -1970,137 +1970,137 @@ mod SPECTEC-CORE is
   subsort Idx < Labelidx .
   subsort Idx < Localidx .
   subsort Idx < Memidx .
-  subsort Idx < SpectecType .
+  subsort Idx < SpectecTerminal .
   subsort Idx < Tableidx .
   subsort Idx < Tagidx .
   subsort Idx < Typeidx .
-  subsort Import < SpectecType .
-  subsort Init < SpectecType .
-  subsort Inn < SpectecType .
-  subsort Instr < SpectecType .
-  subsort Instrtype < SpectecType .
-  subsort Ishape < SpectecType .
+  subsort Import < SpectecTerminal .
+  subsort Init < SpectecTerminal .
+  subsort Inn < SpectecTerminal .
+  subsort Instr < SpectecTerminal .
+  subsort Instrtype < SpectecTerminal .
+  subsort Ishape < SpectecTerminal .
   subsort Jnn < Lanetype .
-  subsort Jnn < SpectecType .
+  subsort Jnn < SpectecTerminal .
   subsort Jnn < Storagetype .
-  subsort K < SpectecType .
-  subsort Labelidx < SpectecType .
-  subsort Laneidx < SpectecType .
+  subsort K < SpectecTerminal .
+  subsort Labelidx < SpectecTerminal .
+  subsort Laneidx < SpectecTerminal .
   subsort Lanetype < Lnn .
-  subsort Lanetype < SpectecType .
+  subsort Lanetype < SpectecTerminal .
   subsort Lanetype < Storagetype .
-  subsort Limits < SpectecType .
-  subsort Lnn < SpectecType .
-  subsort Local < SpectecType .
-  subsort Localidx < SpectecType .
-  subsort Localtype < SpectecType .
-  subsort M < SpectecType .
-  subsort Mem < SpectecType .
-  subsort Memaddr < SpectecType .
-  subsort Memarg < SpectecType .
-  subsort Memidx < SpectecType .
-  subsort Meminst < SpectecType .
-  subsort Memtype < SpectecType .
-  subsort Module < SpectecType .
-  subsort Moduleinst < SpectecType .
-  subsort Moduletype < SpectecType .
-  subsort Mut < SpectecType .
-  subsort N < SpectecType .
-  subsort Name < SpectecType .
-  subsort Nonfuncs < SpectecType .
-  subsort Null < SpectecType .
+  subsort Limits < SpectecTerminal .
+  subsort Lnn < SpectecTerminal .
+  subsort Local < SpectecTerminal .
+  subsort Localidx < SpectecTerminal .
+  subsort Localtype < SpectecTerminal .
+  subsort M < SpectecTerminal .
+  subsort Mem < SpectecTerminal .
+  subsort Memaddr < SpectecTerminal .
+  subsort Memarg < SpectecTerminal .
+  subsort Memidx < SpectecTerminal .
+  subsort Meminst < SpectecTerminal .
+  subsort Memtype < SpectecTerminal .
+  subsort Module < SpectecTerminal .
+  subsort Moduleinst < SpectecTerminal .
+  subsort Moduletype < SpectecTerminal .
+  subsort Mut < SpectecTerminal .
+  subsort N < SpectecTerminal .
+  subsort Name < SpectecTerminal .
+  subsort Nonfuncs < SpectecTerminal .
+  subsort Null < SpectecTerminal .
   subsort Num < Fieldval .
   subsort Num < Instr .
-  subsort Num < SpectecType .
+  subsort Num < SpectecTerminal .
   subsort Num < Val .
   subsort Numtype < Cnn .
   subsort Numtype < Consttype .
   subsort Numtype < Lanetype .
-  subsort Numtype < SpectecType .
+  subsort Numtype < SpectecTerminal .
   subsort Numtype < Storagetype .
   subsort Numtype < Valtype .
-  subsort Oktypeidx < SpectecType .
-  subsort Oktypeidxnat < SpectecType .
+  subsort Oktypeidx < SpectecTerminal .
+  subsort Oktypeidxnat < SpectecTerminal .
   subsort Packtype < Jnn .
   subsort Packtype < Lanetype .
   subsort Packtype < Pnn .
-  subsort Packtype < SpectecType .
+  subsort Packtype < SpectecTerminal .
   subsort Packtype < Storagetype .
   subsort Packval < Fieldval .
-  subsort Packval < SpectecType .
-  subsort Pnn < SpectecType .
-  subsort Rectype < SpectecType .
+  subsort Packval < SpectecTerminal .
+  subsort Pnn < SpectecTerminal .
+  subsort Rectype < SpectecTerminal .
   subsort Ref < Fieldval .
   subsort Ref < Instr .
-  subsort Ref < SpectecType .
+  subsort Ref < SpectecTerminal .
   subsort Ref < Val .
   subsort Reftype < Elemtype .
-  subsort Reftype < SpectecType .
+  subsort Reftype < SpectecTerminal .
   subsort Reftype < Storagetype .
   subsort Reftype < Valtype .
   subsort Relaxed2 < Relaxed4 .
-  subsort Relaxed2 < SpectecType .
-  subsort Relaxed4 < SpectecType .
-  subsort Result < SpectecType .
-  subsort Resulttype < SpectecType .
-  subsort S33 < SpectecType .
-  subsort Shape < SpectecType .
-  subsort Start < SpectecType .
-  subsort State < SpectecType .
-  subsort Storagetype < SpectecType .
-  subsort Store < SpectecType .
-  subsort Structaddr < SpectecType .
-  subsort Structinst < SpectecType .
-  subsort Subtype < SpectecType .
-  subsort Sx < SpectecType .
-  subsort Sz < SpectecType .
-  subsort Table < SpectecType .
-  subsort Tableaddr < SpectecType .
-  subsort Tableidx < SpectecType .
-  subsort Tableinst < SpectecType .
-  subsort Tabletype < SpectecType .
+  subsort Relaxed2 < SpectecTerminal .
+  subsort Relaxed4 < SpectecTerminal .
+  subsort Result < SpectecTerminal .
+  subsort Resulttype < SpectecTerminal .
+  subsort S33 < SpectecTerminal .
+  subsort Shape < SpectecTerminal .
+  subsort Start < SpectecTerminal .
+  subsort State < SpectecTerminal .
+  subsort Storagetype < SpectecTerminal .
+  subsort Store < SpectecTerminal .
+  subsort Structaddr < SpectecTerminal .
+  subsort Structinst < SpectecTerminal .
+  subsort Subtype < SpectecTerminal .
+  subsort Sx < SpectecTerminal .
+  subsort Sz < SpectecTerminal .
+  subsort Table < SpectecTerminal .
+  subsort Tableaddr < SpectecTerminal .
+  subsort Tableidx < SpectecTerminal .
+  subsort Tableinst < SpectecTerminal .
+  subsort Tabletype < SpectecTerminal .
   subsort Tag < Externtype .
-  subsort Tag < SpectecType .
-  subsort Tagaddr < SpectecType .
-  subsort Tagidx < SpectecType .
-  subsort Taginst < SpectecType .
-  subsort Tagtype < SpectecType .
-  subsort Type < SpectecType .
-  subsort Typeidx < SpectecType .
+  subsort Tag < SpectecTerminal .
+  subsort Tagaddr < SpectecTerminal .
+  subsort Tagidx < SpectecTerminal .
+  subsort Taginst < SpectecTerminal .
+  subsort Tagtype < SpectecTerminal .
+  subsort Type < SpectecTerminal .
+  subsort Typeidx < SpectecTerminal .
   subsort Typeuse < Heaptype .
-  subsort Typeuse < SpectecType .
+  subsort Typeuse < SpectecTerminal .
   subsort Typeuse < Tagtype .
   subsort Typevar < Heaptype .
-  subsort Typevar < SpectecType .
+  subsort Typevar < SpectecTerminal .
   subsort Typevar < Typeuse .
-  subsort U16 < SpectecType .
-  subsort U31 < SpectecType .
+  subsort U16 < SpectecTerminal .
+  subsort U31 < SpectecTerminal .
   subsort U32 < Idx .
-  subsort U32 < SpectecType .
-  subsort U64 < SpectecType .
+  subsort U32 < SpectecTerminal .
+  subsort U64 < SpectecTerminal .
   subsort U8 < Laneidx .
-  subsort U8 < SpectecType .
-  subsort V128 < SpectecType .
+  subsort U8 < SpectecTerminal .
+  subsort V128 < SpectecTerminal .
   subsort Val < Fieldval .
   subsort Val < Instr .
-  subsort Val < SpectecType .
-  subsort Valtype < SpectecType .
+  subsort Val < SpectecTerminal .
+  subsort Valtype < SpectecTerminal .
   subsort Valtype < Storagetype .
   subsort Vec < Fieldval .
   subsort Vec < Instr .
-  subsort Vec < SpectecType .
+  subsort Vec < SpectecTerminal .
   subsort Vec < Val .
   subsort Vectype < Cnn .
   subsort Vectype < Consttype .
-  subsort Vectype < SpectecType .
+  subsort Vectype < SpectecTerminal .
   subsort Vectype < Storagetype .
   subsort Vectype < Valtype .
   subsort Vectype < Vnn .
-  subsort Vnn < SpectecType .
-  subsort Vvbinop < SpectecType .
-  subsort Vvternop < SpectecType .
-  subsort Vvtestop < SpectecType .
-  subsort Vvunop < SpectecType .
+  subsort Vnn < SpectecTerminal .
+  subsort Vvbinop < SpectecTerminal .
+  subsort Vvternop < SpectecTerminal .
+  subsort Vvtestop < SpectecTerminal .
+  subsort Vvunop < SpectecTerminal .
   var ADDRREF1 : Addrref .
   var ADDRTYPE1 : Addrtype .
   var ARRAYADDR1 : Arrayaddr .
