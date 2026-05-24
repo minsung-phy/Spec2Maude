@@ -2484,6 +2484,14 @@ let source_carrier_sort_of_typ (t : typ) vm =
 	    | Some s when s <> "SpectecTerminal" -> s
 	    | _ -> "SpectecTerminal"
 
+let source_param_sort_of_typ (t : typ) vm =
+  match t.it with
+  | VarT (id, []) ->
+      let sort = sort_of_type_name id.it in
+      if Hashtbl.mem source_sort_type_atoms sort then sort
+      else source_carrier_sort_of_typ t vm
+  | _ -> source_carrier_sort_of_typ t vm
+
 (* DecD helper functions operate on C1's coarse CTOR carrier, but must
    preserve runtime structural sorts used by generated configs/states. *)
 let structural_decd_sorts =
@@ -2533,7 +2541,12 @@ let translate_typd id params insts =
   let name = sanitize id.it in
   let is_parametric = params <> [] in
   let type_sort = sort_of_type_name id.it in
-  let sig_types = String.concat " " (List.map (fun _ -> "SpectecTerminal") params) in
+  let param_sort = function
+    | { it = ExpP (_, t); _ } -> source_param_sort_of_typ t []
+    | { it = TypP _; _ } -> "SpectecType"
+    | { it = DefP _; _ } | { it = GramP _; _ } -> "SpectecTerminal"
+  in
+  let sig_types = String.concat " " (List.map param_sort params) in
   let mk_type_term_texpr args v_map =
     let arg_ts = List.map (fun a -> translate_arg a v_map) args in
     let args_str = String.concat " , " (List.map (fun a -> a.text) arg_ts) in
@@ -2542,8 +2555,9 @@ let translate_typd id params insts =
   in
   (* Pure nat/integer meta-variable TYPES (N, M, K, n, m): Maude variables in
      equations conflict with constants "op X : -> SpectecType [ctor]".  We suppress
-     the CONSTANT declaration but keep "sort X . subsort X < SpectecType ." so that
-     membership axioms like "cmb T : N if ..." can still reference them as sorts. *)
+     the CONSTANT declaration but keep "sort X . subsort X < SpectecTerminal ." so
+     membership axioms like "cmb T : N if ..." can still reference them as term
+     sorts without making every N-term a SpectecType tag. *)
   let pure_meta_var_names = SSet.of_list ["N"; "M"; "K"; "n"; "m"] in
   let is_pure_meta = SSet.mem id.it pure_meta_var_names in
   (* Sorts already declared in Maude built-in modules — skip sort/subsort declarations *)
@@ -2553,7 +2567,7 @@ let translate_typd id params insts =
   let sort_decl =
     if is_parametric || SSet.mem name base_types || type_sort = "SpectecTerminal"
        || SSet.mem type_sort maude_builtin_sorts then ""
-    else Printf.sprintf "  sort %s .\n  subsort %s < SpectecType .\n" type_sort type_sort in
+    else Printf.sprintf "  sort %s .\n  subsort %s < SpectecTerminal .\n" type_sort type_sort in
   let source_category_subsort_decl =
     Hashtbl.fold
       (fun child parents acc ->
@@ -8375,14 +8389,18 @@ let translate defs =
           (ds @ ctor_decl_lines @ inferred_category_subsort_decls)
   in
   (* Post-processing fix 1: Remove 0-arity "op X :  -> SpectecType [ctor]" when a
-     1-arity "op X : SpectecTerminal -> SpectecType [ctor]" for the SAME name exists.
+     higher-arity "op X : ... -> SpectecType [ctor]" for the SAME name exists.
      Avoids "multiple distinct parses" for names like num, vec. *)
   let re_zero_arity = Str.regexp "  op \\([^ (]+\\) :  -> \\(SpectecType\\|SpectecTerminal\\) \\[ctor\\] \\." in
-  let re_higher_arity = Str.regexp "  op \\([^ (]+\\) : SpectecTerminal" in
+  let re_higher_arity =
+    Str.regexp "  op \\([^ (]+\\) : \\(.+\\) -> \\(SpectecType\\|SpectecTerminal\\) \\[ctor\\] \\."
+  in
   let higher_arity_names =
     List.filter_map (fun l ->
-      if Str.string_match re_higher_arity l 0
-      then str_matched_group_opt 1 l
+      if Str.string_match re_higher_arity l 0 then
+        match str_matched_group_opt 1 l, str_matched_group_opt 2 l with
+        | Some name, Some args when String.trim args <> "" -> Some name
+        | _ -> None
       else None
     ) raw_decls
     |> List.sort_uniq String.compare
