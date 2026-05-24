@@ -493,6 +493,7 @@ type map_call_helper = {
 let map_call_helpers : map_call_helper list ref = ref []
 let known_call_names : SSet.t ref = ref SSet.empty
 let g_sequence_binder_vars : SSet.t ref = ref SSet.empty
+let listn_index_vars : SSet.t ref = ref SSet.empty
 let ctor_arg_sort_hints : (string, string list) Hashtbl.t = Hashtbl.create 512
 
 let ctor_decl_arg_sort s =
@@ -550,6 +551,14 @@ let register_infer_rel_rules rel_name rules =
 let has_infer_rel_rules rel_name =
   List.mem_assoc (sanitize rel_name) !infer_rel_rules
 
+let find_iter_rel_helper_for_name rel_name =
+  let rel_name = sanitize rel_name in
+  !iter_rel_helpers
+  |> List.find_opt (fun h -> sanitize h.iter_helper_name = rel_name)
+
+let has_infer_rel_source rel_name =
+  has_infer_rel_rules rel_name || find_iter_rel_helper_for_name rel_name <> None
+
 let register_infer_rel_helper rel_name arity arg_index =
   let helper =
     { infer_rel_name = sanitize rel_name;
@@ -599,6 +608,29 @@ let map_call_helper_name fn arity seq_index =
   Printf.sprintf "$map-%s-a%d-s%d" stem arity seq_index
 
 let register_map_call_helper fn arity seq_index arg_sorts =
+  let same_shape h =
+    h.map_fn_name = fn
+    && h.map_arity = arity
+    && h.map_seq_index = seq_index
+  in
+  let merge_sort a b =
+    if a = b then a
+    else if a = "SpectecTerminals" || b = "SpectecTerminals" then "SpectecTerminals"
+    else "SpectecTerminal"
+  in
+  match List.find_opt same_shape !map_call_helpers with
+  | Some old ->
+      let merged_sorts =
+        try List.map2 merge_sort old.map_arg_sorts arg_sorts
+        with Invalid_argument _ -> old.map_arg_sorts
+      in
+      if merged_sorts <> old.map_arg_sorts then begin
+        let widened = { old with map_arg_sorts = merged_sorts } in
+        map_call_helpers :=
+          widened :: List.filter (fun h -> not (same_shape h)) !map_call_helpers
+      end;
+      old.map_helper_name
+  | None ->
   let helper = {
     map_helper_name = map_call_helper_name fn arity seq_index;
     map_fn_name = fn;
@@ -606,13 +638,7 @@ let register_map_call_helper fn arity seq_index arg_sorts =
     map_seq_index = seq_index;
     map_arg_sorts = arg_sorts;
   } in
-  if not (List.exists (fun h ->
-      h.map_fn_name = helper.map_fn_name
-      && h.map_arity = helper.map_arity
-      && h.map_seq_index = helper.map_seq_index
-      && h.map_arg_sorts = helper.map_arg_sorts)
-      !map_call_helpers)
-  then map_call_helpers := helper :: !map_call_helpers;
+  map_call_helpers := helper :: !map_call_helpers;
   helper.map_helper_name
 
 let unmap_call_helper_name map_helper_name =
@@ -1223,6 +1249,14 @@ let _declare_op_const name sort =
         Printf.sprintf "  op %s : -> %s .\n" name sort)
 
 let declare_batch emit names sort =
+  let listn_decl_sort name default_sort =
+    let source_name =
+      if starts_with name "FREE-"
+      then String.sub name 5 (String.length name - 5)
+      else name
+    in
+    if SSet.mem source_name !listn_index_vars then "N" else default_sort
+  in
   let fresh = names
     |> List.sort_uniq String.compare
     |> List.filter (fun n -> not (Hashtbl.mem declared_vars n))
@@ -1232,17 +1266,31 @@ let declare_batch emit names sort =
   match emit, fresh with
   | _, [] -> ""
   | `Vars, _ ->
+      let op_consts, vars =
+        fresh
+        |> List.partition (fun (n, _) -> SSet.mem n !listn_index_vars)
+      in
       let groups =
         List.fold_left (fun acc (n, s) ->
           let existing = match List.assoc_opt s acc with Some vs -> vs | None -> [] in
           (s, n :: existing) :: List.remove_assoc s acc
-        ) [] fresh
+        ) [] vars
       in
-      groups
-      |> List.map (fun (s, vs) ->
-           Printf.sprintf "  vars %s : %s .\n" (String.concat " " (List.rev vs)) s)
-      |> String.concat ""
+      let var_decls =
+        groups
+        |> List.map (fun (s, vs) ->
+             Printf.sprintf "  vars %s : %s .\n" (String.concat " " (List.rev vs)) s)
+        |> String.concat ""
+      in
+      let op_decls =
+        op_consts
+        |> List.map (fun (n, s) ->
+             Printf.sprintf "  op %s : -> %s .\n" n (listn_decl_sort n s))
+        |> String.concat ""
+      in
+      var_decls ^ op_decls
   | `Ops, _ -> String.concat "" (List.map (fun (n, s) ->
+      let s = listn_decl_sort n s in
       Printf.sprintf "  op %s : -> %s .\n" n s) fresh)
 
 let declare_vars_same_sort names sort = declare_batch `Vars names sort
@@ -1624,6 +1672,11 @@ let source_seq_elem_sort_of_var name vm =
   | Some mapped -> Hashtbl.find_opt source_var_seq_elem_sorts mapped
   | None -> None
 
+let record_listn_index_var vm id =
+  match resolve_var_name id.it vm with
+  | Some mapped -> listn_index_vars := SSet.add mapped !listn_index_vars
+  | None -> ()
+
 let rec source_sort_of_exp (e : exp) vm =
   match (unwrap_exp_for_source_sort e).it with
   | VarE id -> source_sort_of_var id.it vm
@@ -1820,6 +1873,13 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | OptE (Some e1) | TheE e1 | LiftE e1 -> translate_exp ctx e1 vm
   | OptE None -> texpr "eps"
   | IterE (e1, (iter_type, _)) ->
+    let listn_index_var =
+      match iter_type with
+      | ListN (_, Some index_id) ->
+          record_listn_index_var vm index_id;
+          resolve_var_name index_id.it vm
+      | _ -> None
+    in
     let suffix = match iter_type with
       | List -> "*" | List1 -> "+" | Opt -> "?" | ListN _ -> "" in
     (match e1.it with
@@ -1855,6 +1915,64 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                | VarE _ ->
                    let count_t = translate_exp TermCtx count_e vm in
                    record_listn_pair_if_sequence_var count_t inner;
+                   let indexed_listn () =
+                     let norm_ws s =
+                       Str.global_replace (Str.regexp "[ \t\n\r]+") " " (String.trim s)
+                     in
+                     let text = norm_ws inner.text in
+                     let count_text =
+                       let s = String.trim count_t.text |> strip_wrapping_parens |> String.trim in
+                       if contains_substring s "FREE-" then
+                         Str.replace_first (Str.regexp_string "FREE-") "" s
+                       else
+                         s
+                     in
+                     let vars_without_index idx =
+                       inner.vars
+                       |> List.filter (fun v -> v <> idx)
+                       |> fun vs -> count_text :: vs
+                       |> List.sort_uniq String.compare
+                     in
+                     let exact s = norm_ws s = text in
+                     let extract_between prefix suffix =
+                       let prefix = norm_ws prefix in
+                       let suffix = norm_ws suffix in
+                       if starts_with text prefix && ends_with text suffix then
+                         let start = String.length prefix in
+                         let len = String.length text - start - String.length suffix in
+                         if len >= 0 then Some (String.trim (String.sub text start len)) else None
+                       else None
+                     in
+                     match listn_index_var with
+                     | None -> None
+                     | Some idx ->
+                         if exact (Printf.sprintf "CTORWIDXA1 ( %s )" idx) then
+                           Some { text = Printf.sprintf "$idx-range ( %s )" count_text;
+                                  vars = vars_without_index idx }
+                         else if exact (Printf.sprintf "CTORRECA1 ( %s )" idx) then
+                           Some { text = Printf.sprintf "$rec-range ( %s )" count_text;
+                                  vars = vars_without_index idx }
+                         else
+                           (match extract_between
+                                    "CTORWIDXA1 ( ( _+_ ( "
+                                    (Printf.sprintf ", %s ) ) )" idx)
+                            with
+                            | Some start ->
+                                Some { text = Printf.sprintf "$idx-range-from ( %s, %s )" start count_text;
+                                       vars = vars_without_index idx }
+                            | None ->
+                                (match extract_between
+                                         "CTORWDEFA2 ( "
+                                         (Printf.sprintf ", %s )" idx)
+                                 with
+                                 | Some rt ->
+                                     Some { text = Printf.sprintf "$def-range ( %s, %s )" rt count_text;
+                                            vars = vars_without_index idx }
+                                 | None -> None))
+                   in
+                   (match indexed_listn () with
+                    | Some t -> t
+                    | None ->
                    (match e1.it with
                     | CallE (id, args) ->
                         let arg_ts = List.map (fun a -> translate_arg a vm) args in
@@ -1871,7 +1989,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                                  List.sort_uniq String.compare
                                    (List.concat_map (fun (t : texpr) -> t.vars) arg_ts) }
                          | [] -> inner)
-                    | _ -> inner)
+                    | _ -> inner))
                | _ ->
                    let count_t = translate_exp TermCtx count_e vm in
                    { text = Printf.sprintf "$repeat ( %s, %s )" inner.text count_t.text;
@@ -3500,6 +3618,19 @@ let binder_var_sorts binders vm =
   ) binders
   |> List.sort_uniq compare
 
+let executable_binder_var_sorts binders vm =
+  List.filter_map (fun b -> match b.it with
+    | ExpB (v_id, t) ->
+        let ts = translate_typ t [] in
+        if ts = "SpectecType" || is_bool_typ t [] || String.lowercase_ascii v_id.it = "bool"
+        then None
+        else (match List.assoc_opt v_id.it vm with
+          | Some mv -> Some (mv, binder_decl_sort t)
+          | None -> None)
+    | _ -> None
+  ) binders
+  |> List.sort_uniq compare
+
 let redundant_binder_guard typed_vars cond =
   let cond = String.trim cond in
   List.exists (fun (mv, sort) ->
@@ -3527,9 +3658,11 @@ let has_representation_narrow_sort sort =
   || List.exists (fun ri -> ri.rec_sort = sort) !source_record_infos
 
 let has_narrow_runtime_sort sort =
+  (* Source category memberships are emitted into SPECTEC-CATEGORIES, outside
+     the executable core, so executable rules must not rely on those mb/cmb
+     axioms for matching. *)
   (not (SSet.mem sort !flat_sequence_source_sorts))
-  && (has_representation_narrow_sort sort
-      || SSet.mem sort !source_membership_sorts)
+  && has_representation_narrow_sort sort
 
 let needs_source_category_predicate sort =
   SSet.mem sort !sequence_alias_sorts
@@ -3546,6 +3679,34 @@ let refined_exec_guard var sort =
     Printf.sprintf "%s ( %s )" (refined_exec_pred sort) var
   else
     Printf.sprintf "%s : %s" var sort
+
+let register_exec_guard_pred sort =
+  if needs_source_category_predicate sort then
+    reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts
+
+let exec_binder_guard var sort =
+  register_exec_guard_pred sort;
+  refined_exec_guard var sort
+
+let is_execution_category_guard cond =
+  let cond = String.trim cond |> strip_wrapping_parens |> String.trim in
+  let matches re =
+    try ignore (Str.search_forward (Str.regexp re) cond 0); true
+    with Not_found -> false
+  in
+  let is_simple_sort_guard =
+    matches "^[A-Z][A-Za-z0-9-]*[A-Za-z0-9_'-]*[ \t]*:[ \t]*[A-Z][A-Za-z0-9-]*$"
+  in
+  let is_source_category_pred =
+    starts_with cond "$is-spectec-" && not (starts_with cond "$is-spectec-val-seq")
+  in
+  is_simple_sort_guard
+  || is_source_category_pred
+  || contains_substring cond " hasType "
+  || contains_substring cond " : WellTyped"
+
+let drop_execution_category_guards conds =
+  List.filter (fun cond -> not (is_execution_category_guard cond)) conds
 
 let refined_exec_runtime_guard var sort =
   if needs_exec_source_category_predicate sort then
@@ -3714,6 +3875,35 @@ let collect_membership_statements lines =
             finish acc (Some (line :: chunks)) rest
   in
   finish [] None lines
+
+let partition_membership_statements lines =
+  let rec finish non_memberships memberships cur = function
+    | [] ->
+        let non_memberships =
+          match cur with
+          | None -> non_memberships
+          | Some chunks -> (String.concat "\n" (List.rev chunks)) :: non_memberships
+        in
+        (List.rev non_memberships, List.rev memberships)
+    | line :: rest ->
+        let s = String.trim line in
+        let starts_membership = starts_with s "mb " || starts_with s "cmb " in
+        let ends_stmt = ends_with s "." in
+        match cur with
+        | None when starts_membership && ends_stmt ->
+            finish non_memberships (line :: memberships) None rest
+        | None when starts_membership ->
+            finish non_memberships memberships (Some [line]) rest
+        | None ->
+            finish (line :: non_memberships) memberships None rest
+        | Some chunks when ends_stmt ->
+            finish non_memberships
+              (String.concat "\n" (List.rev (line :: chunks)) :: memberships)
+              None rest
+        | Some chunks ->
+            finish non_memberships memberships (Some (line :: chunks)) rest
+  in
+  finish [] [] None lines
 
 let normalize_ws s =
   Str.global_replace (Str.regexp "[ \t\n\r]+") " " (String.trim s)
@@ -4025,12 +4215,17 @@ let vars_of_texpr (t : texpr) =
   let extracted = extract_vars_from_maude t.text |> List.filter is_bindable_name in
   uniq_vars (t.vars @ extracted)
 
+let is_scheduler_known bound v =
+  SSet.mem v bound
+  || is_generated_free_const_name v
+  || SSet.mem v !listn_index_vars
+
 let subset_bound bound vars =
-  List.for_all (fun v -> SSet.mem v bound) vars
+  List.for_all (is_scheduler_known bound) vars
 
 let split_unbound bound vars =
-  let unbound = List.filter (fun v -> not (SSet.mem v bound)) vars in
-  let bound_vs = List.filter (fun v -> SSet.mem v bound) vars in
+  let unbound = List.filter (fun v -> not (is_scheduler_known bound v)) vars in
+  let bound_vs = List.filter (is_scheduler_known bound) vars in
   (unbound, bound_vs)
 
 let is_expanddt_term_text text =
@@ -4349,9 +4544,10 @@ let iter_rule_prem_item vm rel_id e xes =
         helper_name
         (String.concat " , " (List.map (fun (t : texpr) -> t.text) arg_ts))
     in
-    Some (PremBool {
+    Some (PremRel {
+      rel_name = helper_name;
+      args = arg_ts;
       text = call;
-      vars = uniq_vars (List.concat_map (fun (t : texpr) -> t.vars) arg_ts);
     })
 
 let rec prem_items_of_prem vm (p : prem) : prem_item list =
@@ -4384,6 +4580,15 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
       (match iter_rule_prem_item vm rel_id e xes with
        | Some item -> [item]
        | None -> prem_items_of_prem vm { inner with it = RulePr (rel_id, mixop, e) })
+  | IterPr (inner, ((ListN (_, Some index_id), _))) ->
+      record_listn_index_var vm index_id;
+      prem_items_of_prem vm inner
+      |> List.concat_map (function
+          | PremEq ({ lhs; rhs; _ } as eq) ->
+              (match star_prefix_prem_items lhs rhs with
+               | Some items -> items
+               | None -> [PremEq eq])
+          | item -> [item])
   | IterPr (inner, ((List | List1 | ListN _), _)) ->
       prem_items_of_prem vm inner
       |> List.concat_map (function
@@ -4505,7 +4710,7 @@ let classify_prem bound = function
         (`Bool, { text = bool_t.text; vars; binds = [] }, ready)
 
 let infer_sched_for_rel bound rel_name (args : texpr list) =
-  if not (has_infer_rel_rules rel_name) then None
+  if not (has_infer_rel_source rel_name) then None
   else
     let arg_vars_for_infer (arg : texpr) =
       uniq_vars (vars_of_texpr arg @ extract_vars_from_maude arg.text)
@@ -4609,12 +4814,17 @@ let split_top_level_eqeq text =
 let bind_fresh_var_bool_eq lhs_pattern_vars bound_vars (p : prem_sched) =
   if p.binds <> [] then p
   else
+    let bound_set = SSet.of_list bound_vars in
+    let rhs_known rhs =
+      extract_vars_from_maude rhs |> subset_bound bound_set
+    in
     match split_top_level_eqeq p.text with
     | Some (lhs, rhs)
         when is_plain_var_like lhs
              && not (List.mem lhs lhs_pattern_vars)
              && not (List.mem lhs bound_vars)
-             && not (List.mem lhs (extract_vars_from_maude rhs)) ->
+             && not (List.mem lhs (extract_vars_from_maude rhs))
+             && rhs_known rhs ->
         { text = Printf.sprintf "%s := %s" lhs rhs;
           vars = uniq_vars (lhs :: extract_vars_from_maude rhs);
           binds = [lhs] }
@@ -4623,7 +4833,8 @@ let bind_fresh_var_bool_eq lhs_pattern_vars bound_vars (p : prem_sched) =
              && not (List.mem rhs lhs_pattern_vars)
              && not (List.mem rhs bound_vars)
              && not (starts_with lhs "$map-")
-             && not (List.mem rhs (extract_vars_from_maude lhs)) ->
+             && not (List.mem rhs (extract_vars_from_maude lhs))
+             && rhs_known lhs ->
         { text = Printf.sprintf "%s := %s" rhs lhs;
           vars = uniq_vars (rhs :: extract_vars_from_maude lhs);
           binds = [rhs] }
@@ -4980,12 +5191,19 @@ let translate_decd ss id params result_typ insts =
     let preserve_rhs_witness_vars =
       scheduled_has_delayed_result (SSet.of_list lhs_vars) prem_scheduled0
     in
+    let listn_count_vars =
+      !g_listn_pairs
+      |> List.map fst
+      |> List.map (fun v -> strip_wrapping_parens v |> String.trim)
+      |> List.sort_uniq String.compare
+    in
     let rhs_only_vm_vars =
       vm_vars
       |> List.filter (fun v ->
            List.mem v rhs_t0.vars
            && not (List.mem v lhs_vars)
-           && not (List.mem v prem_binds0))
+           && not (List.mem v prem_binds0)
+           && not (List.mem v listn_count_vars))
       |> List.sort_uniq String.compare
     in
     let free_vm_renames =
@@ -5380,7 +5598,7 @@ let translate_step_reld rel_name rules =
                 |> List.sort_uniq String.compare
               in
               let typed_vars_for_decl, refined_lhs_pairs, refined_lhs_guards =
-                widen_refined_lhs_typed_vars typed_vars lhs_pattern_vars
+                widen_reld_lhs_typed_vars typed_vars lhs_pattern_vars
               in
               all_typed_vars := List.sort_uniq compare (!all_typed_vars @ typed_vars_for_decl);
 
@@ -5460,10 +5678,10 @@ let translate_step_reld rel_name rules =
                   prem_match_conds @ prem_rewrite_conds @ listn_len_conds @ allvals_conds
                   @ prem_bool_conds @ filtered_bconds
               in
-              let all_conds =
-                normalize_assignment_conditions_ordered lhs_pattern_vars
-                  (base_conds @ refined_lhs_guards)
-              in
+	              let all_conds =
+	                normalize_assignment_conditions_ordered lhs_pattern_vars
+	                  (drop_execution_category_guards (base_conds @ refined_lhs_guards))
+	              in
               let label = String.lowercase_ascii label_prefix in
               let empty_context_text =
                 "( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps ) )"
@@ -5513,7 +5731,7 @@ let translate_step_reld rel_name rules =
               in
               let add_otherwise_ref_cast_conds target_rt actual_rt =
                 all_typed_vars :=
-                  List.sort_uniq compare (!all_typed_vars @ [ (actual_rt, "Reftype") ]);
+                  List.sort_uniq compare (!all_typed_vars @ [ (actual_rt, "SpectecTerminal") ]);
                 match find_vm_suffix_any [ "-S"; "-LOWS" ],
                       find_vm_suffix_any [ "-F"; "-LOWF" ],
                       find_vm_suffix "-REF" with
@@ -6387,6 +6605,15 @@ let rec translate_definition ss (d : def) = match d.it with
       else translate_reld id name rules
   | GramD _ | HintD _ -> ""
 
+let rec pre_register_relation_rules (d : def) =
+  match d.it with
+  | RecD defs -> List.iter pre_register_relation_rules defs
+  | RelD (id, _, _, rules) ->
+      let name = sanitize id.it in
+      if not (is_step_exec_rel name || is_steps_rel name) then
+        register_infer_rel_rules name rules
+  | TypD _ | DecD _ | GramD _ | HintD _ -> ()
+
 (* ========================================================================= *)
 (* 9. Top-level: prescan → header → translate → reorder → emit              *)
 (* ========================================================================= *)
@@ -6704,12 +6931,16 @@ let header_prefix features =
      "  op $typed-index : SpectecType SpectecTerminals Nat -> SpectecTerminals .\n" ^
      "  op $typed-index : SpectecType SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
    else "") ^
-  (if features.uses_repeat then
-     "  op $repeat : SpectecTerminal Int -> SpectecTerminals .\n"
-   else "") ^
-  (if features.uses_star_prefix then
-     "  op $star-prefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
-     "  op $star-unprefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n"
+	  (if features.uses_repeat then
+	     "  op $repeat : SpectecTerminal Int -> SpectecTerminals .\n"
+	   else "") ^
+	  "  op $idx-range : SpectecTerminal -> SpectecTerminals .\n" ^
+	  "  op $idx-range-from : SpectecTerminal SpectecTerminal -> SpectecTerminals .\n" ^
+	  "  op $rec-range : SpectecTerminal -> SpectecTerminals .\n" ^
+	  "  op $def-range : SpectecTerminal SpectecTerminal -> SpectecTerminals .\n" ^
+	  (if features.uses_star_prefix then
+	     "  op $star-prefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
+	     "  op $star-unprefix : SpectecTerminal SpectecTerminals -> SpectecTerminals .\n"
    else "") ^
   (if features.uses_slice then
      "  op slice : SpectecTerminals SpectecTerminal SpectecTerminal -> SpectecTerminals .\n"
@@ -6773,16 +7004,31 @@ let header_prefix features =
      "  ceq MEMBER-X <- MEMBER-Y MEMBER-YS = MEMBER-X <- MEMBER-YS\n" ^
      "   if MEMBER-X =/= MEMBER-Y .\n\n"
    else "") ^
-  (if features.uses_repeat then
-     "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
-     "  var REPEAT_N : Int .\n" ^
-     "  var REPEAT_ELEM : SpectecTerminal .\n" ^
-     "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
-     "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
-     "   if _>_ ( REPEAT_N, 0 ) .\n\n"
-   else "") ^
-  (if features.uses_slice then
-     "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
+	  (if features.uses_repeat then
+	     "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
+	     "  var REPEAT_N : Int .\n" ^
+	     "  var REPEAT_ELEM : SpectecTerminal .\n" ^
+	     "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
+	     "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
+	     "   if _>_ ( REPEAT_N, 0 ) .\n\n"
+	   else "") ^
+	  "  --- Generic SpecTec indexed repetition: e^(i<n) for source index i.\n" ^
+	  "  vars LISTN-N LISTN-START : Int .\n" ^
+	  "  var LISTN-RT : SpectecTerminal .\n" ^
+	  "  eq $idx-range(0) = eps .\n" ^
+	  "  ceq $idx-range(LISTN-N) = $idx-range(_-_ ( LISTN-N, 1 )) CTORWIDXA1(_-_ ( LISTN-N, 1 ))\n" ^
+	  "   if _>_ ( LISTN-N, 0 ) .\n" ^
+	  "  eq $idx-range-from(LISTN-START, 0) = eps .\n" ^
+	  "  ceq $idx-range-from(LISTN-START, LISTN-N) = $idx-range-from(LISTN-START, _-_ ( LISTN-N, 1 )) CTORWIDXA1(_+_ ( LISTN-START, _-_ ( LISTN-N, 1 ) ))\n" ^
+	  "   if _>_ ( LISTN-N, 0 ) .\n" ^
+	  "  eq $rec-range(0) = eps .\n" ^
+	  "  ceq $rec-range(LISTN-N) = $rec-range(_-_ ( LISTN-N, 1 )) CTORRECA1(_-_ ( LISTN-N, 1 ))\n" ^
+	  "   if _>_ ( LISTN-N, 0 ) .\n" ^
+	  "  eq $def-range(LISTN-RT, 0) = eps .\n" ^
+	  "  ceq $def-range(LISTN-RT, LISTN-N) = $def-range(LISTN-RT, _-_ ( LISTN-N, 1 )) CTORWDEFA2(LISTN-RT, _-_ ( LISTN-N, 1 ))\n" ^
+	  "   if _>_ ( LISTN-N, 0 ) .\n\n" ^
+	  (if features.uses_slice then
+	     "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
      "  vars SLICE_I SLICE_N : Int .\n" ^
      "  var SLICE_ELEM : SpectecTerminal .\n" ^
      "  var SLICE_REST : SpectecTerminals .\n" ^
@@ -6849,7 +7095,10 @@ let footer features =
       "  var SUBQ-C : SpectecTerminals .\n" ^
       "  vars SUBQ-H1 SUBQ-H2 : Heaptype .\n" ^
       "  vars SUBQ-RT1 SUBQ-RT2 : Reftype .\n" ^
+      "  vars SUBQ-N1 SUBQ-N2 : SpectecTerminals .\n" ^
       (String.concat "\n" (fragments @ ground_closure_fragments)) ^ "\n" ^
+      "  ceq $reftype-sub?(SUBQ-C, CTORREFA2(SUBQ-N1, SUBQ-H1), CTORREFA2(SUBQ-N2, SUBQ-H2)) = false\n" ^
+      "   if $heaptype-sub?(SUBQ-C, SUBQ-H1, SUBQ-H2) == false .\n" ^
       "  eq $heaptype-sub?(SUBQ-C, SUBQ-H1, SUBQ-H2) = false [owise] .\n" ^
       "  eq $reftype-sub?(SUBQ-C, SUBQ-RT1, SUBQ-RT2) = false [owise] .\n\n"
   in
@@ -6857,14 +7106,15 @@ let footer features =
     features.seq_pred_sorts
     |> List.map (fun sort ->
         let pred = source_category_seq_pred sort in
+        let elem_pred = refined_exec_pred sort in
         let lower = String.lowercase_ascii sort in
         Printf.sprintf
           "  --- Source-derived sequence-category predicate for SpecTec %s* premises.\n\
            \  eq  %s(eps) = true .\n\
            \  ceq %s(W TS) = %s(TS)\n\
-           \   if W : %s .\n\
+           \   if %s(W) == true .\n\
            \  eq  %s(TS) = false [owise] .\n"
-          lower pred pred pred sort pred)
+          lower pred pred pred elem_pred pred)
     |> String.concat "\n"
   in
   "\n" ^
@@ -6874,13 +7124,8 @@ let footer features =
      "  var TS : SpectecTerminals .\n" ^
      seq_pred_blocks ^ "\n") ^
   (if features.uses_has_type then
-     "  --- Generic SpecTec list type witness.\n" ^
-     "  --- The source rule is polymorphic in the element type; this executable\n" ^
-     "  --- variable form makes `eps hasType list(val)` and similar instances work.\n" ^
-     "  var LIST-TY : SpectecTerminal .\n" ^
-     "  var LIST-TS : SpectecTerminals .\n" ^
-     "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n" ^
-     "   if (len(LIST-TS) < (2 ^ 32)) .\n\n"
+     "  --- Generic SpecTec list type witness is emitted in SPECTEC-CATEGORIES\n" ^
+     "  --- with the other source category membership axioms.\n\n"
    else "") ^
   "\nendm\n"
 
@@ -7179,9 +7424,145 @@ let infer_rel_helper_block () =
         Printf.sprintf "  op %s : %s -> SpectecTerminal .\n"
           helper_name op_args
     in
+    let emit_iter_helper h =
+      match find_iter_rel_helper_for_name h.infer_rel_name with
+      | None -> ""
+      | Some iter_h ->
+          if h.infer_arg_index < 0
+             || h.infer_arg_index >= iter_h.iter_arity
+             || not (List.nth iter_h.iter_split_positions h.infer_arg_index)
+          then ""
+          else
+            let helper_name =
+              infer_rel_helper_name h.infer_rel_name h.infer_arg_index
+            in
+            let label_base =
+              String.sub helper_name 1 (String.length helper_name - 1)
+              |> String.lowercase_ascii
+            in
+            let base =
+              iter_h.iter_helper_name
+              |> String.map (function
+                   | '$' | '-' -> '_'
+                   | c -> Char.uppercase_ascii c)
+            in
+            let arg_names =
+              List.init iter_h.iter_arity (fun i ->
+                  Printf.sprintf "%s-INFER-A%d" base i)
+            in
+            let elem_names =
+              List.init iter_h.iter_arity (fun i ->
+                  Printf.sprintf "%s-INFER-E%d" base i)
+            in
+            let rest_names =
+              List.init iter_h.iter_arity (fun i ->
+                  Printf.sprintf "%s-INFER-R%d" base i)
+            in
+            let split_elem_names =
+              elem_names
+              |> List.mapi (fun i v ->
+                  if List.nth iter_h.iter_split_positions i then Some v else None)
+              |> List.filter_map (fun x -> x)
+            in
+            let split_rest_names =
+              rest_names
+              |> List.mapi (fun i v ->
+                  if List.nth iter_h.iter_split_positions i then Some v else None)
+              |> List.filter_map (fun x -> x)
+            in
+            let texpr_of_text text =
+              { text; vars = extract_vars_from_maude text }
+            in
+            let arg_text mode i =
+              let a = List.nth arg_names i in
+              let e = List.nth elem_names i in
+              let r = List.nth rest_names i in
+              match mode, List.nth iter_h.iter_split_positions i with
+              | `Empty, true -> "eps"
+              | `Empty, false -> a
+              | `Cons, true -> Printf.sprintf "%s %s" e r
+              | `Cons, false -> a
+              | `Rel, true -> e
+              | `Rel, false -> a
+              | `Rec, true -> r
+              | `Rec, false -> a
+            in
+            let inputs mode =
+              List.init iter_h.iter_arity (fun i ->
+                  if i = h.infer_arg_index then None
+                  else Some (texpr_of_text (arg_text mode i)))
+              |> List.filter_map (fun x -> x)
+            in
+            let rel_args mode =
+              List.init iter_h.iter_arity (arg_text mode)
+              |> String.concat " , "
+            in
+            let target_elem = List.nth elem_names h.infer_arg_index in
+            let target_rest =
+              Printf.sprintf "%s ( %s )" helper_name
+                (inputs `Rec
+                 |> List.map (fun (t : texpr) -> t.text)
+                 |> String.concat " , ")
+            in
+            let target_rest =
+              if inputs `Rec = [] then helper_name else target_rest
+            in
+            let source_helper =
+              register_infer_rel_helper
+                iter_h.iter_rel_name iter_h.iter_arity h.infer_arg_index
+            in
+            let source_helper_call =
+              let source_inputs = inputs `Rel in
+              if source_inputs = [] then source_helper
+              else
+                Printf.sprintf "%s ( %s )"
+                  source_helper
+                  (source_inputs
+                   |> List.map (fun (t : texpr) -> t.text)
+                   |> String.concat " , ")
+            in
+            let empty_eq =
+              emit_infer_eq
+                (label_base ^ "-empty")
+                helper_name
+                (inputs `Empty)
+                (texpr_of_text "eps")
+                ""
+            in
+            let cons_cond =
+              cond_join [
+                Printf.sprintf "%s => %s" source_helper_call target_elem;
+                Printf.sprintf "%s ( %s ) => valid"
+                  iter_h.iter_rel_name (rel_args `Rel);
+              ]
+            in
+            let cons_target =
+              texpr_of_text (Printf.sprintf "%s %s" target_elem target_rest)
+            in
+            let cons_eq =
+              emit_infer_eq
+                (label_base ^ "-cons")
+                helper_name
+                (inputs `Cons)
+                cons_target
+                cons_cond
+            in
+            let var_decl =
+              "  vars " ^ String.concat " " arg_names ^ " : SpectecTerminals .\n" ^
+              (if split_elem_names = [] then ""
+               else
+                 "  vars " ^ String.concat " " split_elem_names ^
+                 " : SpectecTerminal .\n") ^
+              (if split_rest_names = [] then ""
+               else
+                 "  vars " ^ String.concat " " split_rest_names ^
+                 " : SpectecTerminals .\n")
+            in
+            var_decl ^ empty_eq ^ cons_eq
+    in
     let emit_helper h =
       match List.assoc_opt h.infer_rel_name !infer_rel_rules with
-      | None -> ""
+      | None -> emit_iter_helper h
       | Some rules ->
           let rel_prefix = String.uppercase_ascii (sanitize h.infer_rel_name) in
           let helper_name =
@@ -7546,9 +7927,10 @@ let valid_rel_mirror_block () =
              | None -> ""
              | Some cond_parts ->
                  let bconds =
-                   binder_to_type_conds binders vm
+                   executable_binder_var_sorts binders vm
                    |> List.filter (fun (mv, _) -> SSet.mem mv bound_after)
-                   |> List.map snd
+                   |> List.map (fun (mv, sort) -> exec_binder_guard mv sort)
+                   |> List.sort_uniq String.compare
                  in
                  let cond = cond_join (cond_parts @ bconds) in
                  let lhs =
@@ -7562,8 +7944,15 @@ let valid_rel_mirror_block () =
                    |> List.sort_uniq String.compare
                  in
                  let typed_vars =
-                   binder_var_sorts binders vm
+                   executable_binder_var_sorts binders vm
                    |> List.filter (fun (v, _) -> List.mem v all_vars)
+                   |> List.sort_uniq compare
+                 in
+                 let typed_vars_for_decl =
+                   typed_vars
+                   |> List.map (fun (v, sort) ->
+                       if preserve_narrow_lhs_sort sort then (v, sort)
+                       else (v, "SpectecTerminal"))
                    |> List.sort_uniq compare
                  in
                  let typed_names = List.map fst typed_vars in
@@ -7573,7 +7962,7 @@ let valid_rel_mirror_block () =
                    |> List.sort_uniq String.compare
                  in
                  let decls =
-                   raw_typed_var_decls typed_vars ^ raw_var_decl untyped "SpectecTerminal"
+                   raw_typed_var_decls typed_vars_for_decl ^ raw_var_decl untyped "SpectecTerminal"
                  in
                  if cond = "" then
                    Printf.sprintf "%s  eq %s = true .\n" decls lhs
@@ -7884,6 +8273,7 @@ let translate defs =
   iter_rel_helpers := [];
   infer_rel_helpers := [];
   result_rel_helpers := [];
+  listn_index_vars := SSet.empty;
   infer_rel_rules := [];
   valid_rel_mirrors := SSet.empty;
   ref_subtype_decision_fragments := [];
@@ -7898,6 +8288,7 @@ let translate defs =
   init_declared_vars ();
   let ss = new_scan () in
   List.iter (scan_def ss) defs;
+  List.iter pre_register_relation_rules defs;
   known_call_names :=
     SSet.union
       ss.dec_funcs
@@ -7986,11 +8377,55 @@ let translate defs =
     )
     |> List.sort_uniq String.compare
   in
-  let pred_sorts = exec_pred_sorts () |> SSet.of_list in
+  let pred_sorts =
+    List.fold_left
+      (fun acc sort -> SSet.add sort acc)
+      (exec_pred_sorts () |> SSet.of_list)
+      prelude_features.seq_pred_sorts
+  in
   let pred_var_decls, pred_eqs = refined_exec_pred_eqs pred_sorts eqs decls in
+  let core_eqs, category_memberships = partition_membership_statements eqs in
   let decls =
     List.sort_uniq String.compare (decls @ exec_pred_decls (SSet.elements pred_sorts) @ pred_var_decls)
   in
-  let eqs = eqs @ pred_eqs in
+  let eqs = core_eqs @ pred_eqs in
+  let category_module =
+    let generic_has_type_memberships =
+      if prelude_features.uses_has_type then
+        [ "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n\
+           \   if (len(LIST-TS) < (2 ^ 32)) ." ]
+      else []
+    in
+    let category_memberships = category_memberships @ generic_has_type_memberships in
+    match category_memberships with
+    | [] -> ""
+    | memberships ->
+        let category_var_decls =
+          decls
+          |> List.filter (fun line ->
+              let s = String.trim line in
+              starts_with s "var " || starts_with s "vars ")
+          |> List.sort_uniq String.compare
+        in
+        let common_category_vars =
+          [ "  var T : SpectecTerminal .";
+            "  var W : SpectecTerminal .";
+            "  var LIST-TY : SpectecTerminal .";
+            "  var TS : SpectecTerminals .";
+            "  var LIST-TS : SpectecTerminals ." ]
+        in
+        let category_var_decls =
+          List.sort_uniq String.compare
+            (common_category_vars @ category_var_decls)
+        in
+        "\nmod SPECTEC-CATEGORIES is\n" ^
+        "  inc SPECTEC-CORE .\n\n" ^
+        "  --- Source syntax/category membership axioms are kept outside\n" ^
+        "  --- the executable core so rewrite/search commands do not trigger\n" ^
+        "  --- Maude's generic membership-axiom warnings.\n" ^
+        String.concat "\n" category_var_decls ^ "\n\n" ^
+        String.concat "\n" memberships ^ "\nendm\n"
+  in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
-  "\n\n  --- Equations\n" ^ String.concat "\n" eqs ^ footer prelude_features
+  "\n\n  --- Equations\n" ^ String.concat "\n" eqs ^ footer prelude_features ^
+  category_module
