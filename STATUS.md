@@ -33,8 +33,8 @@ Use this order in a fresh Codex chat:
 1. `STATUS.md`
 2. `docs/limitation.md`
 3. `docs/HowToTest.md`
-4. `artifacts/current-rule-execution-audit-20260524_213453/summary.md`
-5. `artifacts/c1-probe-matrix-20260524_225223/probe_summary.md`
+4. `artifacts/rule-concrete-audit-20260525_004500/summary.md`
+5. `artifacts/c1-probe-matrix-20260525_004421/probe_summary.md`
 
 Archive docs under `docs/archive/` are evidence/history. Do not treat them as
 the current state unless a current document explicitly points there.
@@ -98,49 +98,54 @@ Accepted representation choices for now:
   views for source meta-expressions / source `def` conditions. They should be
   mentioned if professor asks how `def` execution is made equational, but the
   top-level non-isomorphism discussion should focus on the three items above.
+- `$heaptype-sub?` / `$reftype-sub?` are source-derived decision mirrors used
+  to make the reference/cast `-- otherwise` priority executable. Focused
+  positive and negative probes pass, but this is still worth mentioning if the
+  professor asks about source-absent execution guards.
 
 ## Current Execution Audit
 
 The latest broad generated-rule concrete audit is:
 
 ```text
-artifacts/current-rule-execution-audit-20260524_213453/
+artifacts/rule-concrete-audit-20260525_004500/summary.md
 ```
 
 Result:
 
 ```text
-total rl/crl: 835
-REDUCED: 565
-STUCK: 269
-STACK_OVERFLOW: 1
-MAUDE_EXIT_2: 0
+total rl/crl: 830
+REDUCED: 559
+STUCK: 271
+STACK_OVERFLOW: 0
+MAUDE_EXIT: 0
 TIMEOUT: 0
 ```
 
 Interpretation:
 
-- `565 REDUCED`: these generated concrete commands did execute.
-- `269 STUCK`: these commands did not reduce under the generated samples. This
+- `559 REDUCED`: these generated concrete commands did execute.
+- `271 STUCK`: these commands did not reduce under the generated samples. This
   does not automatically mean each rule is broken; many samples lack the right
   source-valid context/store/module/type witness.
-- `1 STACK_OVERFLOW`: `infer-instrs-ok-arg0-r3`, a real context-witness
-  synthesis problem.
+- `0 STACK_OVERFLOW`: the previous `infer-instrs-ok-arg0-r3` crash is gone.
+  Non-productive self-recursive witness helpers are no longer generated.
+- The rule count dropped from 835 to 830 because source-absent helper rules
+  that only forwarded a recursive witness were pruned; SpecTec source rl/crl
+  rules are still emitted.
 
 The latest focused probe matrix is:
 
 ```text
-artifacts/c1-probe-matrix-20260524_225223/probe_summary.md
+artifacts/c1-probe-matrix-20260525_004421/probe_summary.md
 ```
 
-Focused failing/stuck probes:
+Focused result:
 
-- `step-read-br-on-cast-negative`: stack overflow.
-- `step-read-br-on-cast-fail-negative`: timeout.
-- `step-read-ref-test-negative`: stack overflow.
-- `step-read-ref-cast-negative`: timeout.
-- `steps-invoke-outer-config`: expected stuck.
-- `steps-fib-config-invoke`: expected stuck.
+- `43 PASS`
+- `0 FAIL`
+- `0 EXPECTED_STUCK`
+- `0 STACK_OVERFLOW`
 
 Focused passing probes include:
 
@@ -152,7 +157,13 @@ Focused passing probes include:
 - `Expr-ok-const`;
 - constant-expression `Global-ok`;
 - `Val-oks` empty and multi-value validation;
+- reference/cast `otherwise` positive and negative paths:
+  `br_on_cast`, `br_on_cast_fail`, `ref.test`, `ref.cast`;
+- `$evalexprs` one-const and `$evalexprss` one/two-const flat nonempty probes;
+- `$infer-instrs-ok-arg0` frame empty-prefix termination smoke;
 - `$invoke(...)` rewrites to a `Config`;
+- source-shaped invoke outer-frame path:
+  `steps(invoke-outer-config)` and `steps(fib-config-invoke(i32v(5)))`;
 - label/br suffix search;
 - br_if suffix search;
 - nop suffix search;
@@ -163,29 +174,29 @@ Focused passing probes include:
 Current focused execution limitations:
 
 1. **`infer-instrs-ok-arg0-r3`**
-   - Infers a canonical context from `instr*` and an instruction type.
-   - Source does not specify how to synthesize that context.
-   - This is witness/context synthesis, likely C2 unless professor accepts an
-     inference overlay in C1.
+   - The previous stack overflow is blocked by pruning non-productive
+     self-recursive `$infer-*` helper rules that only forward the same witness.
+   - The source `Instrs_ok/frame` relation rule remains generated; only the
+     source-absent witness overlay is reduced.
+   - The focused termination smoke no longer crashes.
+   - Arbitrary context witness synthesis is still not solved by the source; if
+     a query asks only for a context with too little source information, it may
+     remain stuck instead of inventing one.
 
 2. **Nonempty `$evalexprss` / `expr**`**
    - The source uses nested sequence `expr**`.
    - Current Maude representation is mostly flat `SpectecTerminals`.
-   - Empty case works; nonempty flat probes are not reliably executable.
+   - Empty and nonempty flat concrete probes now execute under `rew`.
+   - True nested grouping, especially explicit empty inner groups, is still a
+     representation question if benchmarks require it.
 
-3. **Reference/cast `otherwise` negative paths**
-   - Positive paths pass.
-   - Latest focused negative probes still stack-overflow or timeout.
-   - This is about encoding SpecTec `-- otherwise` priority/negative behavior
-     in plain Maude rewriting.
+3. **Source-shaped invoke / outer-frame path**
+   - Resolved for focused probes by source-derived empty-record
+     canonicalization (`$empty-moduleinst`, `$empty-frame`, `$empty-store`).
+   - `$invoke(...)`, `steps(invoke-outer-config)`, and
+     `steps(fib-config-invoke(i32v(5)))` all reach the Fibonacci result.
 
-4. **Source-shaped invoke / outer-frame path**
-   - `$invoke(...)` itself rewrites to `Config`.
-   - The named-empty-frame Fibonacci path passes.
-   - Fully source-shaped outer-frame `steps(fib-config-invoke(i32v(5)))` still
-     gets stuck and should be handled in init-config/frontend work.
-
-5. **Builtin backend completeness**
+4. **Builtin backend completeness**
    - `builtins.maude` implements the first concrete `hint(builtin)` layer for
      `$ibits`, `$inv-ibits`, `$irev`, `$lanes`, and `$inv-lanes`.
    - This is not a full SIMD/float/relaxed-numeric backend library yet.
@@ -204,8 +215,8 @@ Ask these before trying to make every rule execute:
 4. Should C1 implement typed/mixed/nested sequence sorts to remove remaining
    `$is-spectec-*` / `_hasType_` guards, or is the current broad-carrier
    representation acceptable for the baseline?
-5. Should `otherwise` be encoded by source-derived decision helpers/strategies
-   in C1, or deferred until an execution layer is designed?
+5. Can the source-derived `otherwise` decision guards for reference/cast paths
+   remain in C1, or should that execution priority move to C2?
 
 ## Recommended Next Steps
 
@@ -214,9 +225,9 @@ Before moving to P4/generalization:
 1. Review `docs/limitation.md` with professor.
 2. Decide the C1 acceptance criterion: structural baseline vs full concrete
    executable coverage.
-3. If professor wants stricter C1 execution, start with the focused failures:
-   reference/cast `otherwise`, `infer-instrs-ok-arg0-r3`, and nonempty
-   `$evalexprss`.
+3. If professor wants stricter C1 execution, use the focused matrix as the
+   executable baseline and next classify the broad concrete audit's remaining
+   `NO_SOLUTION` samples by source-valid witness availability.
 4. If professor accepts benchmark-driven execution, move on to benchmark
    selection and fix paths as benchmarks require them.
 5. Keep init-config/frontend/model checking separate until explicitly resumed.
@@ -232,8 +243,8 @@ Please first read:
 - STATUS.md
 - docs/limitation.md
 - docs/HowToTest.md
-- artifacts/current-rule-execution-audit-20260524_213453/summary.md
-- artifacts/c1-probe-matrix-20260524_225223/probe_summary.md
+- artifacts/rule-concrete-audit-20260525_004500/summary.md
+- artifacts/c1-probe-matrix-20260525_004421/probe_summary.md
 
 Current goal:
 C1 is a faithful WebAssembly SpecTec-to-Maude baseline. Do not assume old
@@ -246,10 +257,15 @@ Current non-isomorphic / professor-discussion items:
    _hasType_ / WellTyped guards.
 
 Current execution audit:
-- 835 generated rl/crl tested by concrete audit.
-- 565 REDUCED.
-- 269 STUCK under generated samples.
-- 1 STACK_OVERFLOW: infer-instrs-ok-arg0-r3.
+- 830 generated rl/crl tested by concrete rewrite audit.
+- 559 REDUCED.
+- 271 STUCK under generated samples.
+- 0 STACK_OVERFLOW / MAUDE_EXIT / TIMEOUT.
+
+Latest focused matrix:
+- 43 PASS.
+- 0 expected stuck.
+- 0 stack overflow.
 
 Before changing code, inspect current output_bs.maude, translator_bs.ml,
 docs/limitation.md, and the latest artifacts listed above.

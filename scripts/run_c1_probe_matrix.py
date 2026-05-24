@@ -169,9 +169,13 @@ PROBES: list[Probe] = [
     Probe("val-oks-empty-sequence", "PASS", "rew [100] in C1-PROBE-TERMS : Val-oks(fib-store, eps, eps) .", "result ValidJudgement: valid"),
     Probe("val-oks-multi-sequence", "PASS", "rew [100] in C1-PROBE-TERMS : Val-oks(fib-store, CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 0), CTORI32A0 CTORI32A0) .", "result ValidJudgement: valid"),
     Probe("invoke-rewrites-to-config", "PASS", "rew [100] in C1-PROBE-TERMS : $invoke(fib-store, 0, i32v(5) i32v(0) i32v(1)) .", "result Config:"),
-    Probe("steps-invoke-outer-config", "KNOWN_LIMITATION", "rew [1000] in C1-PROBE-TERMS : steps(invoke-outer-config) .", "result Config: (fib-store ; invoke-outer-frame) ; CTORCONSTA2", "source-shaped outer frame context does not currently compose through Step/ctxt-frame execution path."),
+    Probe("evalexprs-one-const-flat", "PASS", "rew [200] in C1-PROBE-TERMS : $evalexprs(ST0, CTORCONSTA2(CTORI32A0, 0)) .", "result Nonfuncs: (fib-store ; empty-frame) CTORCONSTA2(CTORI32A0, 0)"),
+    Probe("evalexprss-one-const-flat", "PASS", "rew [500] in C1-PROBE-TERMS : $evalexprss(ST0, CTORCONSTA2(CTORI32A0, 0)) .", "result Nonfuncs: (fib-store ; empty-frame) CTORCONSTA2(CTORI32A0, 0)"),
+    Probe("evalexprss-two-const-flat", "PASS", "rew [500] in C1-PROBE-TERMS : $evalexprss(ST0, CTORCONSTA2(CTORI32A0, 0) CTORCONSTA2(CTORI32A0, 1)) .", "result Nonfuncs: (fib-store ; empty-frame) CTORCONSTA2(CTORI32A0, 0) CTORCONSTA2(CTORI32A0, 1)"),
+    Probe("infer-instrs-ok-frame-empty-prefix-terminates", "PASS", "rew [100] in C1-PROBE-TERMS : $infer-instrs-ok-arg0(eps, CTORARROWA3(CTORI32A0, eps, CTORI32A0)) .", "result V128: $infer-instrs-ok-arg0"),
+    Probe("steps-invoke-outer-config", "PASS", "rew [1000] in C1-PROBE-TERMS : steps(invoke-outer-config) .", "result Config: (fib-store ; $empty-frame) ; CTORCONSTA2(CTORI32A0, 5)"),
     Probe("steps-invoke-named-empty-frame", "PASS", "rew [1000] in C1-PROBE-TERMS : steps(invoke-outer-config-named-empty-frame) .", "result Config: (fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)"),
-    Probe("steps-fib-config-invoke", "KNOWN_LIMITATION", "rew [10000] in C1-PROBE-TERMS : steps(fib-config-invoke(i32v(5))) .", "result Config: (fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)", "fib-config-invoke uses the source-shaped invoke/outer-frame path and gets stuck at the same Step/ctxt-frame limitation."),
+    Probe("steps-fib-config-invoke", "PASS", "rew [10000] in C1-PROBE-TERMS : steps(fib-config-invoke(i32v(5))) .", "result Config: (fib-store ; $empty-frame) ; CTORCONSTA2(CTORI32A0, 5)"),
     Probe("expanddt-fib", "PASS", "red in C1-PROBE-TERMS : $expanddt(value('TYPE, fib-funcinst)) .", "result V128: CTORFUNCARROWA2"),
     Probe("label-br-suffix-search", "PASS", "search [5] in C1-PROBE-TERMS : step((fib-store ; RECFrameA2(CTORCONSTA2(CTORI32A0, 0) CTORCONSTA2(CTORI32A0, 5) CTORCONSTA2(CTORI32A0, 8) CTORCONSTA2(CTORI32A0, 8), fib-moduleinst)) ; CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0)) CTORLOCALGETA1(1)) =>* C:Config .", "Solution 1"),
     Probe("br-if-suffix-search", "PASS", "search [5] in C1-PROBE-TERMS : step(((fib-store ; empty-frame).State ; CTORCONSTA2(CTORI32A0, 1) CTORBRIFA1(0) CTORLOCALGETA1(1))) =>* C:Config .", "Solution 1"),
@@ -189,6 +193,10 @@ def maude_bin() -> str:
     return "maude"
 
 
+def compact_ws(text: str) -> str:
+    return " ".join(text.split())
+
+
 def classify_output(probe: Probe, text: str, returncode: int, timed_out: bool) -> tuple[str, str]:
     if timed_out:
         if probe.expectation == "KNOWN_LIMITATION":
@@ -197,7 +205,7 @@ def classify_output(probe: Probe, text: str, returncode: int, timed_out: bool) -
     if "Fatal error: stack overflow" in text:
         status = "EXPECTED_STACK_OVERFLOW" if probe.expectation == "KNOWN_LIMITATION" else "STACK_OVERFLOW"
         return (status, probe.limitation or "stack overflow")
-    if probe.expected_hint in text:
+    if probe.expected_hint in text or compact_ws(probe.expected_hint) in compact_ws(text):
         if probe.expectation == "PASS":
             return ("PASS", probe.expected_hint)
         return ("UNEXPECTED_PASS", "known limitation unexpectedly passed")
