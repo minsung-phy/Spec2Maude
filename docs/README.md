@@ -14,8 +14,8 @@
    - 수동 Maude smoke test와 자주 쓰는 실행 예시.
 
 4. 최신 evidence artifacts
-   - `artifacts/current-rule-execution-audit-20260524_213453/summary.md`
-   - `artifacts/c1-probe-matrix-20260524_225223/probe_summary.md`
+   - `artifacts/rule-concrete-audit-20260525_004500/summary.md`
+   - `artifacts/c1-probe-matrix-20260525_004421/probe_summary.md`
 
 ## Archive 정책
 

@@ -267,60 +267,93 @@ crl [val-oks-cons] :
 - arbitrary Wasm-specific shortcut은 아니다.
 - 다만 교수님이 “source에 없는 helper는 전부 C2로 빼자”고 하면 다시 논의해야 한다.
 
+### 3.3 reference/cast `otherwise` decision mirror
+
+SpecTec의 `-- otherwise`는 plain Maude rewrite 조건으로는 실패 우선순위를
+직접 표현하기 어렵다. 그래서 현재 output은 `Heaptype_sub` / `Reftype_sub`
+source rule에서 만든 Boolean mirror를 사용한다.
+
+- `$heaptype-sub?`
+- `$reftype-sub?`
+
+이 mirror는 성공 rule의 recursive `Reftype-sub => valid` 조건 앞에 빠른
+`true` guard를 넣고, `-- otherwise` rule에는 같은 판단의 `false` guard를 넣는다.
+이렇게 해야 negative case에서 성공 rule의 recursive subtype search가 stack overflow
+로 들어가기 전에 실패하고, source의 otherwise branch가 실행된다.
+
+분류:
+
+- `SOURCE_DERIVED_OTHERWISE_DECISION_VIEW`
+- focused reference/cast positive/negative probe는 통과한다.
+- 다만 source에는 문자 그대로 없는 decision view이므로, strict C1 기준에서는
+  교수님께 C1에 둘지 C2 execution layer로 보낼지 확인할 수 있다.
+
 ## 4. 현재 실행 audit 결과
 
 최신 broad generated-rule concrete audit:
 
 ```text
-artifacts/current-rule-execution-audit-20260524_213453/
+artifacts/rule-concrete-audit-20260525_004500/summary.md
 ```
 
 결과:
 
 | status | count |
 |---|---:|
-| REDUCED | 565 |
-| STUCK | 269 |
-| STACK_OVERFLOW | 1 |
-| MAUDE_EXIT_2 | 0 |
+| REDUCED | 559 |
+| STUCK | 271 |
+| STACK_OVERFLOW | 0 |
+| MAUDE_EXIT | 0 |
 | TIMEOUT | 0 |
 
 해석:
 
-- `565 REDUCED`: generated concrete sample에서 실제로 실행 확인됨.
-- `269 STUCK`: generated concrete sample에서는 줄어들지 않음. 하지만 이것이 전부
+- `559 REDUCED`: generated concrete sample에서 실제로 실행 확인됨.
+- `271 STUCK`: generated concrete sample에서는 줄어들지 않음. 하지만 이것이 전부
   rule bug라는 뜻은 아니다. source-valid context/store/module/type witness가 부족한
   sample일 수 있다.
-- `1 STACK_OVERFLOW`: `infer-instrs-ok-arg0-r3`.
-
-즉 현재 “확정 crash”는 broad audit 기준으로 아래 하나다.
-
-```text
-infer-instrs-ok-arg0-r3
-```
+- `0 STACK_OVERFLOW`: 이전 broad audit의 `infer-instrs-ok-arg0-r3` crash는
+  제거됐다. source witness를 생산하지 않는 self-recursive `$infer-*` helper rule은
+  더 이상 생성하지 않는다.
+- rule count가 835에서 830으로 줄어든 것은 SpecTec source rule 삭제가 아니라
+  source-absent helper overlay pruning 때문이다.
 
 ## 5. 현재 focused execution limitation
 
 최신 focused probe matrix:
 
 ```text
-artifacts/c1-probe-matrix-20260524_225223/probe_summary.md
+artifacts/c1-probe-matrix-20260525_004421/probe_summary.md
 ```
+
+결과:
+
+- `43 PASS`
+- `0 FAIL`
+- `0 EXPECTED_STUCK`
+- `0 STACK_OVERFLOW`
 
 ### 5.1 `infer-instrs-ok-arg0-r3`
 
 상태:
 
-- broad audit에서 `STACK_OVERFLOW`.
+- 이전 broad audit에서 `STACK_OVERFLOW`.
+- 현재 broad rewrite audit에는 해당 helper rule이 생성되지 않는다.
+- focused smoke에서도 stack overflow 없이 종료한다.
 
 의미:
 
 - `instr*`와 instruction type만 보고 canonical `Context C`를 추론하려고 한다.
 - source에는 이 context를 어떻게 고르라는 규칙이 없다.
+- 그래서 translator는 source witness를 새로 만들지 않고 같은 helper premise의
+  witness를 그대로 전달하는 self-recursive `$infer-*` rule을 생성하지 않는다.
+- source relation rule 자체는 그대로 남고, source-absent inference overlay만
+  줄어든다.
 
 분류:
 
-- `CONTEXT_WITNESS_SYNTHESIS_LIMITATION`
+- `RESOLVED_STACK_OVERFLOW`
+- `CONTEXT_WITNESS_SYNTHESIS_REMAINS`
 
 교수님 질문:
 
@@ -343,15 +376,20 @@ def $evalexprss(z, expr* expr'**) = (z'', ref* ref'**)
 - `evalexprss-r1`이라는 Maude `crl` label은 더 이상 없다.
 - source `def -> eq/ceq` 기준은 고쳤다.
 - empty case는 실행된다.
-- nonempty `expr**`는 아직 안정적으로 실행된다고 보면 안 된다.
+- one-const / two-const flat nonempty `$evalexprss` focused probes도 실행된다.
 
 이유:
 
 - source의 `expr**`는 “expression sequence들의 sequence”다.
 - 현재 Maude는 대부분 flat `SpectecTerminals`로 들고 있어서 grouping이 사라진다.
+- 이번 수정은 source `def` premise에서 유도되는 continuation과 flat sequence
+  progress guard로 nonempty concrete path를 실행 가능하게 만든 것이다.
+- 하지만 explicit empty inner group처럼 flat representation으로 표현 자체가
+  사라지는 nested grouping은 별도 representation 문제가 남아 있다.
 
 분류:
 
+- `RESOLVED_FOCUSED_EXECUTION_PATH`
 - `NESTED_SEQUENCE_GROUPING_LIMITATION`
 
 해결 방향:
@@ -361,33 +399,33 @@ def $evalexprss(z, expr* expr'**) = (z'', ref* ref'**)
 
 ### 5.3 reference/cast `otherwise` negative path
 
-최신 focused probe에서 아래가 아직 실패한다.
+상태:
 
-```text
-step-read-br-on-cast-negative      STACK_OVERFLOW
-step-read-br-on-cast-fail-negative TIMEOUT
-step-read-ref-test-negative        STACK_OVERFLOW
-step-read-ref-cast-negative        TIMEOUT
-```
+- focused reference/cast positive/negative probe가 모두 통과한다.
+- `step-read-br-on-cast-negative`
+- `step-read-br-on-cast-fail-negative`
+- `step-read-ref-test-negative`
+- `step-read-ref-cast-negative`
 
-positive path는 통과한다.
+해결:
 
-문제:
-
-- SpecTec의 `-- otherwise`는 “success rule이 적용되지 않으면 fail rule”이라는
-  우선순위/negative 의미다.
-- Plain Maude rewrite에서는 이 우선순위/부정을 자연스럽게 표현하기 어렵다.
-- 현재 source-derived decision guard를 넣었지만, 최신 focused negative probe에서는
-  여전히 stack overflow / timeout이 남아 있다.
+- translator가 이미 만들던 `$heaptype-sub?` / `$reftype-sub?` decision mirror를
+  `Step_read` reference/cast rule 조건에 실제로 연결했다.
+- 기존에는 current binder 이름이 `-LOWS` / `-LOWF`인데 translator가 예전 suffix인
+  `-S` / `-F`만 찾아서 decision guard가 삽입되지 않았다.
+- 이제 성공 rule은 recursive `Reftype-sub => valid` 전에 `true` decision guard를
+  확인하고, otherwise rule은 같은 판단의 `false` guard를 확인한다.
 
 분류:
 
-- `OTHERWISE_NEGATIVE_PATH_EXECUTION_LIMITATION`
+- `RESOLVED_FOCUSED_EXECUTION_PATH`
+- `SOURCE_DERIVED_OTHERWISE_DECISION_VIEW`
 
-교수님 질문:
+교수님 확인 질문:
 
-> SpecTec `-- otherwise`를 C1에서 decision helper/strategy로 encoding해도 되는지,
-> 아니면 C2 execution layer로 보내야 하는지 결정이 필요합니다.
+> focused execution은 통과하지만, source에는 없는 Boolean decision mirror가 C1에
+> 남습니다. `-- otherwise` priority를 C1에서 이렇게 표현해도 되는지, 아니면 C2
+> execution layer로 분리해야 하는지 확인하면 됩니다.
 
 ### 5.4 source-shaped invoke / outer-frame path
 
@@ -396,16 +434,21 @@ positive path는 통과한다.
 - `$invoke(...)` 자체는 `Config`로 rewrite된다.
 - named empty-frame Fibonacci path는 result까지 간다.
 - normal smoke `steps(fib-config(i32v(5)))`는 통과한다.
-- fully source-shaped path `steps(fib-config-invoke(i32v(5)))`는 stuck이다.
+- fully source-shaped path `steps(fib-config-invoke(i32v(5)))`도 result까지 간다.
 
 분류:
 
-- `INIT_CONFIG_FRONTEND_DEFER`
+- `RESOLVED_FOCUSED_EXECUTION_PATH`
+- `SOURCE_DERIVED_EMPTY_RECORD_CANONICALIZATION`
 
-해결 방향:
+해결:
 
-- init-config/frontend 단계에서 다룬다.
-- 지금 C1 isomorphism cleanup과 섞지 않는다.
+- source record field가 전부 `eps` 또는 recursively empty record로 채워질 수 있으면
+  translator가 기계적으로 empty record constant를 만든다.
+- 현재 생성되는 대표 constant:
+  `$empty-moduleinst`, `$empty-frame`, `$empty-store`
+- 예: source-shaped `RECFrameA2(eps, RECModuleinstA9(eps, ..., eps))`가
+  `$empty-frame`으로 canonicalize되어 `Step/ctxt-frame` execution path와 맞물린다.
 
 ### 5.5 builtin backend completeness
 
@@ -449,7 +492,13 @@ positive path는 통과한다.
 - `Externaddr-ok(fib-store, FUNC 0, FUNC fib-type)`
 - `Val-oks(fib-store, eps, eps)`
 - `Val-oks(fib-store, CONST i32 5 CONST i32 0, i32 i32)`
+- reference/cast `otherwise` positive and negative probes
+- `$evalexprs(ST0, CONST i32 0)`
+- `$evalexprss(ST0, CONST i32 0)`
+- `$evalexprss(ST0, CONST i32 0 CONST i32 1)`
 - `$invoke(...)` rewrites to `Config`
+- `steps(invoke-outer-config)`
+- `steps(fib-config-invoke(i32v(5)))`
 - label/br suffix search
 - br_if suffix search
 - nop suffix search
@@ -474,13 +523,14 @@ positive path는 통과한다.
 2. `$infer-*` witness inference overlay를 C1에 허용할 수 있는가?
 3. 남은 `$is-spectec-*` / `_hasType_` guard를 C1에서 허용할 수 있는가?
 4. `expr**` 같은 nested sequence representation을 C1에서 지금 설계해야 하는가?
-5. `otherwise` negative path를 C1에서 decision helper/strategy로 고쳐야 하는가?
-6. broad audit의 `269 STUCK`을 전부 source-valid sample로 분류해야 하는가, 아니면
+5. reference/cast `otherwise` decision mirror를 C1에 둘 수 있는가, 아니면 C2로
+   분리해야 하는가?
+6. broad audit의 `271 STUCK`을 전부 source-valid sample로 분류해야 하는가, 아니면
    benchmark-driven execution validation으로 넘어가도 되는가?
 
 ## 8. 지금 당장 하지 말아야 할 것
 
-- `269 STUCK`을 전부 rule bug라고 단정하지 않는다.
+- `271 STUCK`을 전부 rule bug라고 단정하지 않는다.
 - `output_bs.maude`를 손으로 patch하지 않는다.
 - init-config/frontend/model checking과 C1 isomorphism cleanup을 섞지 않는다.
 - 교수님과 C1 기준을 정하기 전에 typed/mixed/nested sequence 대수 전체를 갈아엎지 않는다.
@@ -490,10 +540,9 @@ positive path는 통과한다.
 1. 이 문서와 `STATUS.md`를 교수님께 설명할 자료로 사용한다.
 2. 먼저 C1 기준을 확정한다.
 3. 기준이 “full executable C1”이면:
-   - reference/cast `otherwise` negative path
-   - `infer-instrs-ok-arg0-r3`
-   - nonempty `$evalexprss`
    - 269 stuck 분류
+   - true nested `expr**` grouping이 필요한 benchmark 확인
+   - arbitrary `$infer-*` witness synthesis 범위 결정
    순서로 진행한다.
 4. 기준이 “structural baseline + benchmark execution”이면:
    - 현 상태를 C1 baseline으로 고정하고,
