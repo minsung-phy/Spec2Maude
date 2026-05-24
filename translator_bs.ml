@@ -3696,6 +3696,18 @@ let is_execution_category_guard cond =
   in
   let is_simple_sort_guard =
     matches "^[A-Z][A-Za-z0-9-]*[A-Za-z0-9_'-]*[ \t]*:[ \t]*[A-Z][A-Za-z0-9-]*$"
+    ||
+    match String.split_on_char ':' cond with
+    | [lhs; rhs] ->
+        let lhs = String.trim lhs in
+        let rhs = String.trim rhs in
+        lhs <> "" && rhs <> ""
+        && not (contains_substring lhs "(")
+        && not (contains_substring lhs ")")
+        && not (contains_substring rhs "(")
+        && not (contains_substring rhs ")")
+        && not (contains_substring rhs " ")
+    | _ -> false
   in
   let is_source_category_pred =
     starts_with cond "$is-spectec-" && not (starts_with cond "$is-spectec-val-seq")
@@ -3707,6 +3719,19 @@ let is_execution_category_guard cond =
 
 let drop_execution_category_guards conds =
   List.filter (fun cond -> not (is_execution_category_guard cond)) conds
+
+let contains_maude_call name text =
+  contains_substring text (name ^ " (")
+  || contains_substring text (name ^ "(")
+
+let is_execution_rewrite_premise_text text =
+  contains_substring text "=>"
+  && List.exists
+       (fun op -> contains_maude_call op text)
+       ["step"; "step-pure"; "step-read"; "steps"]
+
+let uses_execution_rewrite_premise texts =
+  List.exists is_execution_rewrite_premise_text texts
 
 let refined_exec_runtime_guard var sort =
   if needs_exec_source_category_predicate sort then
@@ -6477,6 +6502,12 @@ let translate_reld _id rel_name rules =
           prem_match_conds @ listn_len_conds @ prem_bool_conds @ filtered_bconds
           @ refined_guards @ premise_bound_refined_guards
         in
+        let all_conds =
+          if uses_execution_rewrite_premise prem_strs then
+            drop_execution_category_guards all_conds
+          else
+            all_conds
+        in
         let cond = cond_join all_conds in
         let maybe_register_subtype_decision () =
           let decision_name =
@@ -7281,7 +7312,14 @@ let result_rel_helper_block () =
                                   reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts;
                                 refined_exec_guard v sort))
                         in
-                        let cond = cond_join (prem_conds @ guard_conds) in
+                        let conds = prem_conds @ guard_conds in
+                        let conds =
+                          if uses_execution_rewrite_premise conds then
+                            drop_execution_category_guards conds
+                          else
+                            conds
+                        in
+                        let cond = cond_join conds in
                         let rule_label =
                           Printf.sprintf "%s-r%d"
                             (String.sub helper_name 1 (String.length helper_name - 1))
@@ -7632,9 +7670,19 @@ let infer_rel_helper_block () =
                         let progress_conds =
                           self_recursive_progress_guards helper_name inputs prem_scheduled
                         in
+                        let conds =
+                          prem_match_conds @ prem_bool_conds @
+                          progress_conds @ guard_conds
+                        in
+                        let conds =
+                          if uses_execution_rewrite_premise
+                               (List.map (fun (p : prem_sched) -> p.text) prem_scheduled)
+                             || uses_execution_rewrite_premise conds
+                          then drop_execution_category_guards conds
+                          else conds
+                        in
                         let cond =
-                          cond_join (prem_match_conds @ prem_bool_conds @
-                                     progress_conds @ guard_conds)
+                          cond_join conds
                         in
                         let rule_label =
                           Printf.sprintf "%s-r%d"

@@ -10349,7 +10349,7 @@ mod SPECTEC-CORE is
     Eval-expr ( EVAL-EXPR-R00-LOWZ , EVAL-EXPR-R00-INSTRS , EVAL-EXPR-R00-ZQ , EVAL-EXPR-R00-VALS )
     =>
     valid
-      if steps ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) ) => ( EVAL-EXPR-R00-ZQ ; EVAL-EXPR-R00-VALS ) /\ ( EVAL-EXPR-R00-INSTRS hasType ( list ( instr ) ) ) : WellTyped /\ ( EVAL-EXPR-R00-VALS hasType ( list ( val ) ) ) : WellTyped .
+      if steps ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) ) => ( EVAL-EXPR-R00-ZQ ; EVAL-EXPR-R00-VALS ) .
 
 
 
@@ -10952,7 +10952,7 @@ mod SPECTEC-CORE is
     $result-eval-expr-args2-3 ( EVAL-EXPR-R00-LOWZ , EVAL-EXPR-R00-INSTRS )
     =>
     EVAL-EXPR-R00-ZQ EVAL-EXPR-R00-VALS
-      if steps ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) ) => ( EVAL-EXPR-R00-ZQ ; EVAL-EXPR-R00-VALS ) /\ EVAL-EXPR-R00-INSTRS : SpectecTerminals /\ EVAL-EXPR-R00-LOWZ : State .
+      if steps ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) ) => ( EVAL-EXPR-R00-ZQ ; EVAL-EXPR-R00-VALS ) .
 
 
   --- Non-C1-final execution support for source relation premises with
