@@ -6212,49 +6212,6 @@ let translate_step_reld rel_name rules =
               in
               if rel_name <> "Step-pure" then
                 primary_rule
-              else if rel_name = "Step-pure"
-                      && (try ignore (Str.search_forward (Str.regexp_string "label") label 0); true
-                          with Not_found -> false) then
-                (* Temporary executable scaffolding, limited to label-related
-                   Step-pure families.  These lifted Step rules are derived
-                   shortcuts, not direct SpecTec rules; they remain only to
-                   cover the known Step/ctxt-instrs executability gap for
-                   label/br with a suffix. *)
-                let bridge_lhs =
-                  Printf.sprintf "step ( %s )" (config_text z_in lhs_text_out)
-                in
-                let bridge_rhs = config_text z_in rhs_text_out in
-                let val_head = prefix ^ "-CTX-VAL-HEAD" in
-                let val_rest = prefix ^ "-CTX-VAL-REST" in
-                let suffix_head = prefix ^ "-CTX-SUFFIX-HEAD" in
-                let suffix_rest = prefix ^ "-CTX-SUFFIX-REST" in
-                all_bound := val_head :: suffix_head :: !all_bound;
-                all_val_seq_vars := val_rest :: suffix_rest :: !all_val_seq_vars;
-                let emit_ctx_bridge bridge_label lhs_instr rhs_instr extra_conds =
-                  emit_rule_with_cond
-                    bridge_label
-                    (Printf.sprintf "step ( %s )" (config_text z_in lhs_instr))
-                    (config_text z_in rhs_instr)
-                    (cond_join (extra_conds @ all_conds))
-                in
-                String.concat "\n"
-                  [ primary_rule;
-                    emit_rule ("step-from-" ^ label) bridge_lhs bridge_rhs;
-                    emit_ctx_bridge
-                      ("step-from-" ^ label ^ "-ctx-suffix")
-                      (Printf.sprintf "%s %s %s" lhs_text_out suffix_head suffix_rest)
-                      (Printf.sprintf "%s %s %s" rhs_text_out suffix_head suffix_rest)
-                      [];
-                    emit_ctx_bridge
-                      ("step-from-" ^ label ^ "-ctx-prefix")
-                      (Printf.sprintf "%s %s %s" val_head val_rest lhs_text_out)
-                      (Printf.sprintf "%s %s %s" val_head val_rest rhs_text_out)
-                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ];
-                    emit_ctx_bridge
-                      ("step-from-" ^ label ^ "-ctx-prefix-suffix")
-                      (Printf.sprintf "%s %s %s %s %s" val_head val_rest lhs_text_out suffix_head suffix_rest)
-                      (Printf.sprintf "%s %s %s %s %s" val_head val_rest rhs_text_out suffix_head suffix_rest)
-                      [ val_seq_guard (Printf.sprintf "%s %s" val_head val_rest) ] ]
               else if rel_name = "Step-read" then
                 let bridge_lhs =
                   Printf.sprintf "step ( %s )" (config_text z_in lhs_text_out)
@@ -7319,8 +7276,22 @@ let footer features =
           lower pred pred pred elem_pred pred)
     |> String.concat "\n"
   in
+  let generic_step_pure_context_bridge =
+    "  --- Generic executable bridge derived from Step_pure + Step/ctxt-instrs.\n" ^
+    "  --- It replaces the old label-specific step-from-step-pure-* shortcuts:\n" ^
+    "  --- if the middle instruction sequence can reduce by Step_pure, reduce it\n" ^
+    "  --- under the source val* / instr* / instr_1* context shape.\n" ^
+    "  var STEP-PURE-CTX-Z : State .\n" ^
+    "  vars STEP-PURE-CTX-VALS STEP-PURE-CTX-INSTRS STEP-PURE-CTX-INSTRS1 STEP-PURE-CTX-INSTRSQ : SpectecTerminals .\n" ^
+    "  crl [step-from-step-pure-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-PURE-CTX-Z ; STEP-PURE-CTX-VALS STEP-PURE-CTX-INSTRS STEP-PURE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( STEP-PURE-CTX-Z ; STEP-PURE-CTX-VALS STEP-PURE-CTX-INSTRSQ STEP-PURE-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-PURE-CTX-VALS ) /\\ _or_ ( _=/=_ ( STEP-PURE-CTX-VALS, eps ), _=/=_ ( STEP-PURE-CTX-INSTRS1, eps ) ) /\\ step-pure ( STEP-PURE-CTX-INSTRS ) => STEP-PURE-CTX-INSTRSQ .\n\n"
+  in
   "\n" ^
   ref_subtype_decision_block ^
+  generic_step_pure_context_bridge ^
   (if seq_pred_blocks = "" then "" else
      "  var W : SpectecTerminal .\n" ^
      "  var TS : SpectecTerminals .\n" ^
