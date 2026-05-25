@@ -9,3 +9,8 @@
  (name main_bs)
  (modules main_bs translator_bs) 
  (libraries il util frontend)) ; lib/ 밑에 있는 라이브러리들 연결
+
+(executable
+ (name wat_to_maude_fib)
+ (modules wat_to_maude_fib)
+ (libraries unix))
