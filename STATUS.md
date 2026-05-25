@@ -8,9 +8,13 @@ with `docs/limitation.md` before changing `translator_bs.ml`.
 ## One-Line State
 
 C1 structurally covers the WebAssembly 3.0 SpecTec input and has a warning-free
-minimal runtime/typecheck cleanup in the generated output. The remaining C1
-decisions are about whether a small number of source-derived execution helpers
-belong in C1 or should be pushed to a later C2 execution layer.
+minimal runtime/typecheck cleanup in the generated output. The focused init path
+now runs source-shaped WAT modules through the source-translated `$instantiate`,
+then invoke/call-ref, and `steps` for functions, globals, memories, tables,
+start, active data, active elements, and focused import linking for functions,
+globals, memories, and tables. The remaining C1 decisions are about whether a
+small number of source-derived execution helpers belong in C1 or should be
+pushed to a later C2 execution layer.
 
 ## Current C1 Criteria
 
@@ -50,7 +54,39 @@ Load execution:
 maude wasm-exec-bs.maude
 ```
 
-`wasm-exec-bs.maude` loads `builtins.maude`, which loads `output_bs.maude`.
+`wasm-exec-bs.maude` loads `wasm-init-bs.maude`; that loads `builtins.maude`,
+which loads `output_bs.maude`.
+
+Focused WAT frontend smoke:
+
+```bash
+dune exec ./wat_to_maude_fib.exe -- examples/fib.wat > /tmp/fib.generated.maude
+maude /tmp/fib.generated.maude
+dune exec ./wat_to_maude_fib.exe -- --result-only --run 5 examples/fib.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export wrapper --arg-i32 5 examples/fib-wrapper.wat
+```
+
+The WAT frontend is implemented in OCaml, not Python. It currently targets a
+focused executable subset: multiple function types, imports as source-shaped
+terms, globals, memories, tables, local functions, data segments, element
+segments, start, exports, direct calls, `call_ref`, table/memory/global
+instructions used by the examples, and the integer/control instructions used by
+the Fibonacci smokes. It is still not a full WAT parser.
+
+Additional focused WAT runtime smokes:
+
+```bash
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/global-get.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/memory-size.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/table-size.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/start-global.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/data-load.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/elem-call-ref.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main --arg-i32 41 --import-func 'env.bump=local.get 0 i32.const 1 i32.add' examples/import-func.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main --import-global 'env.g=i32.const 77' examples/import-global.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-memory.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-table.wat
+```
 
 ## Structural Facts
 
@@ -109,6 +145,18 @@ crl [step-from-step-pure-ctxt-instrs] :
 
 Discussion question: can this source-derived sequence-shape guard and generic
 bridge remain in C1?
+
+The output also contains a generic zero-local `call_ref` bridge:
+
+```maude
+crl [step-read-call-ref-func-zero-locals] : ...
+```
+
+This covers source-valid functions with `local* = eps`. The literal generated
+`step-read-call-ref-func` path currently misses that case because a mapped-local
+intermediate variable is generated with a too-narrow sort. Treat this as
+temporary source-derived execution infrastructure unless the underlying sort
+inference is fixed.
 
 ### 2. `$infer-*` Witness Inference Overlay
 
@@ -220,6 +268,22 @@ Representative direct focused paths currently considered passing:
 
 - `steps(fib-config(i32v(5)))`;
 - `steps(fib-config-invoke(i32v(5)))`;
+- `$instantiate(empty-store, fib-module, eps)`;
+- `steps(fib-init-config(i32v(5)))`;
+- `examples/fib.wat -> generated-fib-init-config -> steps`;
+- `examples/fib-wrapper.wat -> generated-fib-init-config -> wrapper call -> steps`;
+- `examples/global-get.wat -> generated-run-config -> steps`;
+- `examples/memory-size.wat -> generated-run-config -> steps`;
+- `examples/table-size.wat -> generated-run-config -> steps`;
+- `examples/start-global.wat -> generated-run-config -> steps`;
+- `examples/data-load.wat -> active data init -> i32.load -> steps`;
+- `examples/elem-call-ref.wat -> active elem init -> table.get/call_ref -> steps`;
+- `examples/import-func.wat` with automatic function-import linking from
+  `--import-func`;
+- `examples/import-global.wat` with automatic imported-global linking from
+  `--import-global`;
+- `examples/import-memory.wat` with automatic imported-memory zero initialization;
+- `examples/import-table.wat` with automatic imported-table default refs;
 - reference/cast `ref.test` positive and negative;
 - reference/cast `ref.cast` positive and negative;
 - label/br suffix search;
@@ -234,7 +298,19 @@ Representative direct focused paths currently considered passing:
    execute.
 3. Builtin backend coverage is partial. `builtins.maude` currently implements
    only the concrete backend paths needed by current focused tests.
-4. `$infer-*`, `$heaptype-sub?` / `$reftype-sub?`, `$cont-*`, `$valid-*`,
+4. `step-read-call-ref-func-zero-locals` is a temporary generic bridge for
+   source-valid zero-local function calls; the better long-term fix is mapped
+   local* intermediate sort inference.
+5. Active element initialization now goes through the source-translated
+   `$instantiate` path, which emits elem/table initialization instructions.
+   Execution still relies on source-derived table/elem helper bridges in
+   `output_bs.maude`.
+6. Imports have a focused CLI linker for functions, globals, memories, and
+   tables. Function imports require `--import-func` because the host function
+   body is not present in the Wasm module. Global imports can use
+   `--import-global`; memories and tables are initialized from their import
+   type.
+7. `$infer-*`, `$heaptype-sub?` / `$reftype-sub?`, `$cont-*`, `$valid-*`,
    `$result-*`, and `$map-*` remain source-derived execution views rather than
    literal source names.
 
@@ -245,11 +321,15 @@ Representative direct focused paths currently considered passing:
    sample?
 2. Are `$is-spectec-val-seq` and `step-from-step-pure-ctxt-instrs` acceptable
    C1 infrastructure?
-3. Are `$infer-*` witness helpers acceptable in C1?
-4. Is the current runtime typecheck cleanup enough, with only minimal
+3. Is `step-read-call-ref-func-zero-locals` acceptable as temporary C1
+   infrastructure, or should the mapped-local sort issue be fixed first?
+4. Are `$infer-*` witness helpers acceptable in C1?
+5. Is the current runtime typecheck cleanup enough, with only minimal
    sequence-shape guards left?
-5. Should typed/mixed/nested sequence sorts be designed now or postponed?
-6. Can source-derived `otherwise` decision mirrors for reference/cast paths
+6. Is the focused active-element init bridge acceptable, or must C1 execute
+   active elements through the literal generated `table.init` path?
+7. Should typed/mixed/nested sequence sorts be designed now or postponed?
+8. Can source-derived `otherwise` decision mirrors for reference/cast paths
    remain in C1?
 
 ## Fresh Chat Prompt
@@ -271,9 +351,10 @@ archive docs are current. Do not blindly edit translator_bs.ml.
 
 Current professor-discussion items:
 1. Category / sequence representation gap plus generic step-pure context bridge.
-2. $infer-* witness inference overlay.
-3. Runtime typecheck cleanup leaves only minimal val* sequence-shape guards.
-4. SpectecType ground-term universe has been narrowed with SpectecCategory.
+2. Temporary zero-local call_ref bridge caused by mapped-local intermediate sort.
+3. $infer-* witness inference overlay.
+4. Runtime typecheck cleanup leaves only minimal val* sequence-shape guards.
+5. SpectecType ground-term universe has been narrowed with SpectecCategory.
 
 Before changing code, inspect current output_bs.maude, translator_bs.ml,
 docs/limitation.md, and the current artifacts listed above.

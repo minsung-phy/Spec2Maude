@@ -39,7 +39,10 @@ Use the C1 path unless explicitly comparing with older code:
 translator_bs.ml        active C1 translator
 output_bs.maude         generated C1 output; do not hand-edit as final
 builtins.maude          backend implementations for current hint(builtin) paths
+wasm-init-bs.maude      focused init/config harness kept outside output_bs.maude
 wasm-exec-bs.maude      concrete Fibonacci / reference execution harness
+examples/*.wat          focused WAT frontend/runtime smoke inputs
+wat_to_maude_fib.ml     focused OCaml WAT-to-Maude frontend
 wasm-3.0/*.spectec      WebAssembly 3.0 SpecTec sources
 STATUS.md              current handoff summary
 docs/limitation.md      current limitation / professor-discussion document
@@ -62,7 +65,55 @@ Load the execution harness:
 maude wasm-exec-bs.maude
 ```
 
-`wasm-exec-bs.maude` loads `builtins.maude`, which loads `output_bs.maude`.
+`wasm-exec-bs.maude` loads `wasm-init-bs.maude`; that loads `builtins.maude`,
+which loads `output_bs.maude`.
+
+Generate the focused Fibonacci WAT harness:
+
+```bash
+dune exec ./wat_to_maude_fib.exe -- examples/fib.wat > /tmp/fib.generated.maude
+maude /tmp/fib.generated.maude
+```
+
+Or generate and run in one CLI step:
+
+```bash
+dune exec ./wat_to_maude_fib.exe -- --run 5 examples/fib.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export wrapper --arg-i32 5 examples/fib-wrapper.wat
+```
+
+The frontend is an OCaml focused WAT frontend. It now emits Maude terms for
+types, imports, globals, memories, tables, local functions, data segments,
+element segments, start, and exports, plus the integer/control/runtime
+instructions used by the current examples. It is still not a full WAT parser.
+
+Additional focused runtime smokes:
+
+```bash
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/global-get.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/memory-size.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/table-size.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/start-global.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/data-load.wat
+dune exec ./wat_to_maude_fib.exe -- --run-main examples/elem-call-ref.wat
+```
+
+Imports are linked automatically for the focused runtime path:
+
+```bash
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main --arg-i32 41 \
+  --import-func 'env.bump=local.get 0 i32.const 1 i32.add' \
+  examples/import-func.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main \
+  --import-global 'env.g=i32.const 77' examples/import-global.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-memory.wat
+dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-table.wat
+```
+
+Active data and element initialization are covered through the source-translated
+`$instantiate` path, with source-derived memory/table/elem helper bridges used
+where Maude execution would otherwise get stuck on broad sequence/record update
+patterns.
 
 ## Current Structural State
 
@@ -145,6 +196,11 @@ crl [step-from-step-pure-ctxt-instrs] :
 This bridge is not a literal source rule. It is source-derived from
 `Step_pure` under the `Step/ctxt-instrs` context shape, and exists because the
 otherwise strict path must search through broad associative sequence splits.
+
+The output also has a small zero-local function-call bridge for `call_ref`.
+It covers the source-valid case where a function has `local* = eps`; the
+literal generated rule currently misses that case because one mapped-local
+intermediate is inferred with a too-narrow sort.
 
 ### 2. `$infer-*` Witness Inference Overlay
 
@@ -262,6 +318,22 @@ That audit records direct focused runtime success for:
 
 - `steps(fib-config(i32v(5)))`;
 - `steps(fib-config-invoke(i32v(5)))`;
+- `$instantiate(empty-store, fib-module, eps)`;
+- `steps(fib-init-config(i32v(5)))`;
+- `examples/fib.wat -> generated-fib-init-config -> steps`;
+- `examples/fib-wrapper.wat -> generated-fib-init-config -> wrapper call -> steps`;
+- `examples/global-get.wat -> generated-run-config -> steps`;
+- `examples/memory-size.wat -> generated-run-config -> steps`;
+- `examples/table-size.wat -> generated-run-config -> steps`;
+- `examples/start-global.wat -> generated-run-config -> steps`;
+- `examples/data-load.wat -> active data init -> i32.load -> steps`;
+- `examples/elem-call-ref.wat -> active elem init -> table.get/call_ref -> steps`;
+- `examples/import-func.wat` with automatic function-import linking from
+  `--import-func`;
+- `examples/import-global.wat` with automatic imported-global linking from
+  `--import-global`;
+- `examples/import-memory.wat` with automatic imported-memory zero initialization;
+- `examples/import-table.wat` with automatic imported-table default refs;
 - `ref.test` positive and negative;
 - `ref.cast` positive and negative.
 
@@ -283,10 +355,14 @@ Use the direct runtime evidence above when discussing execution behavior.
    broad `SpectecTerminals` carrier remain with minimal sequence-shape guards?
 5. Are source-derived `otherwise` decision mirrors such as `$heaptype-sub?` and
    `$reftype-sub?` acceptable C1 infrastructure?
+6. Is the source-derived focused active-element init bridge acceptable, or must
+   active element initialization go through the literal generated `table.init`
+   execution path in C1?
 
 ## What Not To Do
 
-- Do not hand-edit `output_bs.maude` as the final fix.
+- Do not add init-config / WAT harness helpers directly to `output_bs.maude`;
+  keep them in `wasm-init-bs.maude`.
 - Do not add benchmark-specific shortcuts to `translator_bs.ml`.
 - Do not add `mc`, `exec-step`, `focused-step`, or other C2 execution-control
   layers to C1.

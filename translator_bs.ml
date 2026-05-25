@@ -44,6 +44,19 @@ let feature_uses_bool_wrapper : bool ref = ref false
 let feature_uses_has_type : bool ref = ref false
 let feature_uses_star_prefix : bool ref = ref false
 
+type star_ctor_unzip_helper = {
+  star_unzip_ctor : string;
+  star_unzip_arity : int;
+}
+
+type opt_ctor_helper = {
+  opt_ctor : string;
+  opt_arity : int;
+}
+
+let star_ctor_unzip_helpers : star_ctor_unzip_helper list ref = ref []
+let opt_ctor_helpers : opt_ctor_helper list ref = ref []
+
 let tconcat sep ts =
   { text = String.concat sep (List.map (fun t -> t.text) ts);
     vars = List.concat_map (fun t -> t.vars) ts }
@@ -430,6 +443,29 @@ let star_unprefix_text ctor seq =
   feature_uses_star_prefix := true;
   Printf.sprintf "$star-unprefix ( %s, %s )" ctor seq
 
+let star_ctor_unzip_name ctor i =
+  Printf.sprintf "$unzip-%s-%d" (String.lowercase_ascii (sanitize ctor)) i
+
+let register_star_ctor_unzip ctor arity =
+  let helper = { star_unzip_ctor = ctor; star_unzip_arity = arity } in
+  if not (List.exists (fun h ->
+      h.star_unzip_ctor = ctor && h.star_unzip_arity = arity)
+      !star_ctor_unzip_helpers)
+  then star_ctor_unzip_helpers := helper :: !star_ctor_unzip_helpers
+
+let opt_prefix_name ctor =
+  Printf.sprintf "$opt-prefix-%s" (String.lowercase_ascii (sanitize ctor))
+
+let opt_unzip_name ctor i =
+  Printf.sprintf "$opt-unzip-%s-%d" (String.lowercase_ascii (sanitize ctor)) i
+
+let register_opt_ctor_helper ctor arity =
+  let helper = { opt_ctor = ctor; opt_arity = arity } in
+  if not (List.exists (fun h ->
+      h.opt_ctor = ctor && h.opt_arity = arity)
+      !opt_ctor_helpers)
+  then opt_ctor_helpers := helper :: !opt_ctor_helpers
+
 let split_top_level_commas s =
   let len = String.length s in
   let rec loop i depth start acc =
@@ -461,6 +497,18 @@ let parse_call_text text =
       in
       if fn = "" then None else Some (fn, args)
   with Not_found -> None
+
+let ctor_call_pattern text =
+  match parse_call_text text with
+  | Some (ctor, args) when starts_with ctor "CTOR" ->
+      Some (ctor, List.map (fun s -> strip_wrapping_parens s |> String.trim) args)
+  | _ -> None
+
+let opt_prefix_call_pattern text =
+  match parse_call_text text with
+  | Some (name, [arg]) when starts_with name "$opt-prefix-" ->
+      Some (name, strip_wrapping_parens arg |> String.trim)
+  | _ -> None
 
 type iter_rel_helper = {
   iter_helper_name : string;
@@ -1962,6 +2010,14 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                                   vars = vars_without_index idx }
                          else
                            (match extract_between
+                                    "_+_ ( "
+                                    (Printf.sprintf ", %s )" idx)
+                            with
+                            | Some start ->
+                                Some { text = Printf.sprintf "$nat-range-from ( %s, %s )" start count_text;
+                                       vars = vars_without_index idx }
+                            | None ->
+                           (match extract_between
                                     "CTORWIDXA1 ( ( _+_ ( "
                                     (Printf.sprintf ", %s ) ) )" idx)
                             with
@@ -1976,7 +2032,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                                  | Some rt ->
                                      Some { text = Printf.sprintf "$def-range ( %s, %s )" rt count_text;
                                             vars = vars_without_index idx }
-                                 | None -> None))
+                                 | None -> None)))
                    in
                    (match indexed_listn () with
                     | Some t -> t
@@ -1998,10 +2054,76 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                                    (List.concat_map (fun (t : texpr) -> t.vars) arg_ts) }
                          | [] -> inner)
                     | _ -> inner))
-               | _ ->
-                   let count_t = translate_exp TermCtx count_e vm in
-                   { text = Printf.sprintf "$repeat ( %s, %s )" inner.text count_t.text;
-                     vars = List.sort_uniq String.compare (inner.vars @ count_t.vars) })
+	               | _ ->
+	                   let count_t = translate_exp TermCtx count_e vm in
+	                   let indexed_listn () =
+	                     let norm_ws s =
+	                       Str.global_replace (Str.regexp "[ \t\n\r]+") " " (String.trim s)
+	                     in
+	                     let text = norm_ws inner.text in
+	                     let count_text =
+	                       let s = String.trim count_t.text |> strip_wrapping_parens |> String.trim in
+	                       if contains_substring s "FREE-" then
+	                         Str.replace_first (Str.regexp_string "FREE-") "" s
+	                       else
+	                         s
+	                     in
+	                     let vars_without_index idx =
+	                       inner.vars
+	                       |> List.filter (fun v -> v <> idx)
+	                       |> fun vs -> vs @ count_t.vars
+	                       |> List.sort_uniq String.compare
+	                     in
+	                     let exact s = norm_ws s = text in
+	                     let extract_between prefix suffix =
+	                       let prefix = norm_ws prefix in
+	                       let suffix = norm_ws suffix in
+	                       if starts_with text prefix && ends_with text suffix then
+	                         let start = String.length prefix in
+	                         let len = String.length text - start - String.length suffix in
+	                         if len >= 0 then Some (String.trim (String.sub text start len)) else None
+	                       else None
+	                     in
+	                     match listn_index_var with
+	                     | None -> None
+	                     | Some idx ->
+	                         if exact (Printf.sprintf "CTORWIDXA1 ( %s )" idx) then
+	                           Some { text = Printf.sprintf "$idx-range ( %s )" count_text;
+	                                  vars = vars_without_index idx }
+	                         else if exact (Printf.sprintf "CTORRECA1 ( %s )" idx) then
+	                           Some { text = Printf.sprintf "$rec-range ( %s )" count_text;
+	                                  vars = vars_without_index idx }
+	                         else
+	                           (match extract_between
+	                                    "_+_ ( "
+	                                    (Printf.sprintf ", %s )" idx)
+	                            with
+	                            | Some start ->
+	                                Some { text = Printf.sprintf "$nat-range-from ( %s, %s )" start count_text;
+	                                       vars = vars_without_index idx }
+	                            | None ->
+	                                (match extract_between
+	                                         "CTORWIDXA1 ( ( _+_ ( "
+	                                         (Printf.sprintf ", %s ) ) )" idx)
+	                                 with
+	                                 | Some start ->
+	                                     Some { text = Printf.sprintf "$idx-range-from ( %s, %s )" start count_text;
+	                                            vars = vars_without_index idx }
+	                                 | None ->
+	                                     (match extract_between
+	                                              "CTORWDEFA2 ( "
+	                                              (Printf.sprintf ", %s )" idx)
+	                                      with
+	                                      | Some rt ->
+	                                          Some { text = Printf.sprintf "$def-range ( %s, %s )" rt count_text;
+	                                                 vars = vars_without_index idx }
+	                                      | None -> None)))
+	                   in
+	                   (match indexed_listn () with
+	                    | Some t -> t
+	                    | None ->
+	                        { text = Printf.sprintf "$repeat ( %s, %s )" inner.text count_t.text;
+	                          vars = List.sort_uniq String.compare (inner.vars @ count_t.vars) }) )
           | (List | List1), CallE (id, args) ->
               let arg_ts = List.map (fun a -> translate_arg a vm) args in
               let seq_positions = source_call_sequence_positions args arg_ts vm in
@@ -2524,10 +2646,13 @@ let structural_decd_sorts =
 let decd_sort_of_typ (t : typ) =
   match t.it with
   | IterT (_, (List | List1 | ListN _)) -> "SpectecTerminals"
+  | IterT (_, Opt) -> "SpectecTerminals"
   | _ ->
       if is_bool_typ t [] then "Bool"
       else
         match type_sort_of_typ t [] with
+        | Some s when SSet.mem s !flat_sequence_source_sorts -> "SpectecTerminals"
+        | Some s when SSet.mem s !sequence_alias_sorts -> "SpectecTerminals"
         | Some s when List.mem s structural_decd_sorts -> s
         | Some s when SSet.mem s pure_meta_category_sort_names -> s
         | _ -> "SpectecTerminal"
@@ -3339,11 +3464,7 @@ let translate_typd id params insts =
              let record_var_prefix = to_var_name id.it in
              let info = List.mapi (fun i (atom, (_, ft, _), _) ->
                let fn = to_var_name (Xl.Atom.name atom) in
-               let sn = translate_typ (match ft.it with IterT (inner, _) -> inner | _ -> ft) v_map in
-	               let ms =
-	                 if is_plural_type sn then "SpectecTerminals"
-	                 else source_carrier_sort_of_typ ft v_map
-	               in
+               let ms = "SpectecTerminals" in
 	               (fn, Printf.sprintf "F-%s-%s-%d" record_var_prefix fn i, ft, ms)
 	             ) fields in
              let decls = String.concat "" (List.map (fun (_, vn, _, ms) -> declare_var vn ms) info) in
@@ -3468,9 +3589,16 @@ let translate_typd id params insts =
                                field_names empty_terms
                              |> String.concat "\n"
                            in
+                           let empty_merge_var =
+                             Printf.sprintf "MERGE-EMPTY-%s"
+                               (String.uppercase_ascii (sanitize ri.rec_source_name))
+                           in
                            Printf.sprintf
-                             "  op %s : -> %s [ctor] .\n  eq %s = %s .\n%s\n"
+                             "  op %s : -> %s [ctor] .\n  eq %s = %s .\n%s\n%s  eq merge ( %s , %s ) = %s .\n  eq merge ( %s , %s ) = %s .\n"
                              cname full_type_sort empty_record cname empty_projections
+                             (declare_var empty_merge_var full_type_sort)
+                             cname empty_merge_var empty_merge_var
+                             empty_merge_var cname empty_merge_var
                      in
                      let update_eqs =
                        info
@@ -4624,65 +4752,6 @@ let map_call_prem_items (lhs : texpr) (rhs : texpr) =
                PremBool guard_t ]
   | _ -> None
 
-(** Collect individual prem_items from an expression, splitting AND conjunctions.
-    Each equality sub-expression becomes its own PremEq so the scheduler can
-    independently bind variables from each clause (fixes missing :=  bindings). *)
-let rec collect_prem_items_of_exp vm e : prem_item list =
-  match e.it with
-  | BinE (`AndOp, _, e1, e2) ->
-      collect_prem_items_of_exp vm e1 @ collect_prem_items_of_exp vm e2
-  | BinE (`OrOp, _, _, _) ->
-      (match category_disjunction_side_condition vm e with
-       | Some t -> [PremBool t]
-       | None ->
-           let t = translate_exp BoolCtx e vm in
-           if t.text = "" || t.text = "owise" then [] else [PremBool t])
-  | CmpE (`EqOp, _, lhs_e, ({it = BoolE true; _} as _e2)) ->
-      (* outer "= true" wrapper — recurse into lhs *)
-      collect_prem_items_of_exp vm lhs_e
-  | CmpE (`EqOp, _, lhs_e, rhs_e) ->
-      let lhs = translate_exp TermCtx lhs_e vm in
-      let rhs = translate_exp TermCtx rhs_e vm in
-      (* For bool_t fallback, use BoolCtx so both sides stay as Bool (avoid w-bool/Bool mismatch) *)
-      let lhs_b = translate_exp BoolCtx lhs_e vm in
-      let rhs_b = translate_exp BoolCtx rhs_e vm in
-      let bool_t = { text = Printf.sprintf "( %s == %s )" lhs_b.text rhs_b.text;
-                     vars = uniq_vars (lhs_b.vars @ rhs_b.vars) } in
-      (match inverse_prem_item_of_equality vm lhs_e rhs_e bool_t with
-       | Some item -> [item]
-       | None ->
-           (match map_call_prem_items lhs rhs with
-            | Some items -> items
-            | None -> [PremEq { lhs; rhs; bool_t }]))
-  | BinE (`EquivOp, _, lhs_e, rhs_e) ->
-      let lhs = translate_exp TermCtx lhs_e vm in
-      let rhs = translate_exp TermCtx rhs_e vm in
-      let lhs_b = translate_exp BoolCtx lhs_e vm in
-      let rhs_b = translate_exp BoolCtx rhs_e vm in
-      let bool_t = { text = Printf.sprintf "( %s == %s )" lhs_b.text rhs_b.text;
-                     vars = uniq_vars (lhs_b.vars @ rhs_b.vars) } in
-      (match inverse_prem_item_of_equality vm lhs_e rhs_e bool_t with
-       | Some item -> [item]
-       | None ->
-           (match map_call_prem_items lhs rhs with
-            | Some items -> items
-            | None -> [PremEq { lhs; rhs; bool_t }]))
-  | MemE (lhs_e, rhs_e) ->
-      (* c <- $f(...) : SpecTec set-membership / nondeterministic choice.
-         Treat as a binding premise so classify_prem can emit "C := $f(...)"
-         when C is a fresh variable and $f's arguments are already bound.
-         bool_t fallback emits "(C <- $f(...)) = true" for the rare cases
-         where C is already known (pure boolean membership test). *)
-      let lhs = translate_exp TermCtx lhs_e vm in
-      let rhs = translate_exp TermCtx rhs_e vm in
-      let bool_t = { text = Printf.sprintf "( %s <- %s )" lhs.text rhs.text;
-                     vars = uniq_vars (lhs.vars @ rhs.vars) } in
-      [PremEq { lhs; rhs; bool_t }]
-  | _ ->
-      let t = translate_exp BoolCtx e vm in
-      if t.text = "" || t.text = "owise" then []
-      else [PremBool t]
-
 let star_prefix_prem_items (lhs : texpr) (rhs : texpr) =
   match star_prefix_pattern lhs.text, star_prefix_pattern rhs.text with
   | Some (ctor, seq_var), None ->
@@ -4710,6 +4779,162 @@ let star_prefix_prem_items (lhs : texpr) (rhs : texpr) =
       Some [ PremEq { lhs = seq_t; rhs = unprefix_t; bool_t = guard_t };
              PremBool guard_t ]
   | _ -> None
+
+let star_ctor_unzip_prem_items (lhs : texpr) (rhs : texpr) =
+  let make seq_text ctor args =
+    if not (is_plain_var_like seq_text) then None
+    else if not (List.for_all is_plain_var_like args) then None
+    else
+      let seq_var = strip_wrapping_parens seq_text |> String.trim in
+      let arity = List.length args in
+      register_star_ctor_unzip ctor arity;
+      Some
+        (args
+         |> List.mapi (fun i arg ->
+              let arg = strip_wrapping_parens arg |> String.trim in
+              let lhs_t = texpr_with_var arg arg in
+              let rhs_t =
+                { text = Printf.sprintf "%s ( %s )"
+                    (star_ctor_unzip_name ctor i) seq_var;
+                  vars = [seq_var] }
+              in
+              PremEq {
+                lhs = lhs_t;
+                rhs = rhs_t;
+                bool_t = {
+                  text = Printf.sprintf "( %s == %s )" lhs_t.text rhs_t.text;
+                  vars = uniq_vars (lhs_t.vars @ rhs_t.vars);
+                };
+              }))
+  in
+  match ctor_call_pattern lhs.text, ctor_call_pattern rhs.text with
+  | Some (ctor, args), None -> make rhs.text ctor args
+  | None, Some (ctor, args) -> make lhs.text ctor args
+  | _ -> None
+
+let opt_ctor_prem_items (lhs : texpr) (rhs : texpr) =
+  let make seq_text ctor args =
+    match args with
+    | [arg] when is_plain_var_like seq_text && is_plain_var_like arg ->
+        let seq_var = strip_wrapping_parens seq_text |> String.trim in
+        let arg = strip_wrapping_parens arg |> String.trim in
+        register_opt_ctor_helper ctor 1;
+        let lhs_t = texpr_with_var seq_var seq_var in
+        let rhs_t =
+          { text = Printf.sprintf "%s ( %s )" (opt_prefix_name ctor) arg;
+            vars = [arg] }
+        in
+        Some [PremEq {
+          lhs = lhs_t;
+          rhs = rhs_t;
+          bool_t = {
+            text = Printf.sprintf "( %s == %s )" lhs_t.text rhs_t.text;
+            vars = uniq_vars (lhs_t.vars @ rhs_t.vars);
+          };
+        }]
+    | _ -> None
+  in
+  match ctor_call_pattern lhs.text, ctor_call_pattern rhs.text with
+  | Some (ctor, args), None -> make rhs.text ctor args
+  | None, Some (ctor, args) -> make lhs.text ctor args
+  | _ -> None
+
+(** Collect individual prem_items from an expression, splitting AND conjunctions.
+    Each equality sub-expression becomes its own PremEq so the scheduler can
+    independently bind variables from each clause (fixes missing :=  bindings). *)
+let rec collect_prem_items_of_exp vm e : prem_item list =
+  match e.it with
+  | BinE (`AndOp, _, e1, e2) ->
+      collect_prem_items_of_exp vm e1 @ collect_prem_items_of_exp vm e2
+  | BinE (`OrOp, _, _, _) ->
+      (match category_disjunction_side_condition vm e with
+       | Some t -> [PremBool t]
+       | None ->
+           let t = translate_exp BoolCtx e vm in
+           if t.text = "" || t.text = "owise" then [] else [PremBool t])
+  | CmpE (`EqOp, _, lhs_e, ({it = BoolE true; _} as _e2)) ->
+      (* outer "= true" wrapper — recurse into lhs *)
+      collect_prem_items_of_exp vm lhs_e
+  | CmpE (`EqOp, _, lhs_e, rhs_e) ->
+      let lhs = translate_exp TermCtx lhs_e vm in
+      let rhs = translate_exp TermCtx rhs_e vm in
+      (* For bool_t fallback, use BoolCtx so both sides stay as Bool (avoid w-bool/Bool mismatch) *)
+      let lhs_b = translate_exp BoolCtx lhs_e vm in
+      let rhs_b = translate_exp BoolCtx rhs_e vm in
+      let bool_t = { text = Printf.sprintf "( %s == %s )" lhs_b.text rhs_b.text;
+                     vars = uniq_vars (lhs_b.vars @ rhs_b.vars) } in
+      let iter_kind e =
+        match e.it with
+        | IterE (_, (iter, _)) -> Some iter
+        | _ -> None
+      in
+      let iter_items =
+        match iter_kind lhs_e, iter_kind rhs_e with
+        | Some (List | List1 | ListN _), _
+        | _, Some (List | List1 | ListN _) ->
+            (match star_prefix_prem_items lhs rhs with
+             | Some items -> Some items
+             | None -> star_ctor_unzip_prem_items lhs rhs)
+        | Some Opt, _
+        | _, Some Opt -> opt_ctor_prem_items lhs rhs
+        | _ -> None
+      in
+      (match iter_items with
+       | Some items -> items
+       | None ->
+      (match inverse_prem_item_of_equality vm lhs_e rhs_e bool_t with
+       | Some item -> [item]
+       | None ->
+           (match map_call_prem_items lhs rhs with
+            | Some items -> items
+            | None -> [PremEq { lhs; rhs; bool_t }])))
+  | BinE (`EquivOp, _, lhs_e, rhs_e) ->
+      let lhs = translate_exp TermCtx lhs_e vm in
+      let rhs = translate_exp TermCtx rhs_e vm in
+      let lhs_b = translate_exp BoolCtx lhs_e vm in
+      let rhs_b = translate_exp BoolCtx rhs_e vm in
+      let bool_t = { text = Printf.sprintf "( %s == %s )" lhs_b.text rhs_b.text;
+                     vars = uniq_vars (lhs_b.vars @ rhs_b.vars) } in
+      let iter_kind e =
+        match e.it with
+        | IterE (_, (iter, _)) -> Some iter
+        | _ -> None
+      in
+      let iter_items =
+        match iter_kind lhs_e, iter_kind rhs_e with
+        | Some (List | List1 | ListN _), _
+        | _, Some (List | List1 | ListN _) ->
+            (match star_prefix_prem_items lhs rhs with
+             | Some items -> Some items
+             | None -> star_ctor_unzip_prem_items lhs rhs)
+        | Some Opt, _
+        | _, Some Opt -> opt_ctor_prem_items lhs rhs
+        | _ -> None
+      in
+      (match iter_items with
+       | Some items -> items
+       | None ->
+      (match inverse_prem_item_of_equality vm lhs_e rhs_e bool_t with
+       | Some item -> [item]
+       | None ->
+           (match map_call_prem_items lhs rhs with
+            | Some items -> items
+            | None -> [PremEq { lhs; rhs; bool_t }])))
+  | MemE (lhs_e, rhs_e) ->
+      (* c <- $f(...) : SpecTec set-membership / nondeterministic choice.
+         Treat as a binding premise so classify_prem can emit "C := $f(...)"
+         when C is a fresh variable and $f's arguments are already bound.
+         bool_t fallback emits "(C <- $f(...)) = true" for the rare cases
+         where C is already known (pure boolean membership test). *)
+      let lhs = translate_exp TermCtx lhs_e vm in
+      let rhs = translate_exp TermCtx rhs_e vm in
+      let bool_t = { text = Printf.sprintf "( %s <- %s )" lhs.text rhs.text;
+                     vars = uniq_vars (lhs.vars @ rhs.vars) } in
+      [PremEq { lhs; rhs; bool_t }]
+  | _ ->
+      let t = translate_exp BoolCtx e vm in
+      if t.text = "" || t.text = "owise" then []
+      else [PremBool t]
 
 let iter_rule_prem_item vm rel_id e xes =
   let rel_name = sanitize rel_id.it in
@@ -4782,7 +5007,10 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
           | PremEq ({ lhs; rhs; _ } as eq) ->
               (match star_prefix_prem_items lhs rhs with
                | Some items -> items
-               | None -> [PremEq eq])
+               | None ->
+                   (match star_ctor_unzip_prem_items lhs rhs with
+                    | Some items -> items
+                    | None -> [PremEq eq]))
           | item -> [item])
   | IterPr (inner, ((List | List1 | ListN _), _)) ->
       prem_items_of_prem vm inner
@@ -4790,9 +5018,19 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
           | PremEq ({ lhs; rhs; _ } as eq) ->
               (match star_prefix_prem_items lhs rhs with
                | Some items -> items
+               | None ->
+                   (match star_ctor_unzip_prem_items lhs rhs with
+                    | Some items -> items
+                    | None -> [PremEq eq]))
+          | item -> [item])
+  | IterPr (inner, (Opt, _)) ->
+      prem_items_of_prem vm inner
+      |> List.concat_map (function
+          | PremEq ({ lhs; rhs; _ } as eq) ->
+              (match opt_ctor_prem_items lhs rhs with
+               | Some items -> items
                | None -> [PremEq eq])
           | item -> [item])
-  | IterPr (inner, _) -> prem_items_of_prem vm inner
   | LetPr (e1, e2, _) ->
       let lhs = translate_exp TermCtx e1 vm in
       let rhs = translate_exp TermCtx e2 vm in
@@ -4800,9 +5038,28 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
         { text = Printf.sprintf "( %s == %s )" lhs.text rhs.text;
           vars = uniq_vars (lhs.vars @ rhs.vars) }
       in
+      let iter_kind e =
+        match e.it with
+        | IterE (_, (iter, _)) -> Some iter
+        | _ -> None
+      in
+      let iter_items =
+        match iter_kind e1, iter_kind e2 with
+        | Some (List | List1 | ListN _), _
+        | _, Some (List | List1 | ListN _) ->
+            (match star_prefix_prem_items lhs rhs with
+             | Some items -> Some items
+             | None -> star_ctor_unzip_prem_items lhs rhs)
+        | Some Opt, _
+        | _, Some Opt -> opt_ctor_prem_items lhs rhs
+        | _ -> None
+      in
+      (match iter_items with
+       | Some items -> items
+       | None ->
       (match map_call_prem_items lhs rhs with
        | Some items -> items
-       | None -> [PremEq { lhs; rhs; bool_t }])
+       | None -> [PremEq { lhs; rhs; bool_t }]))
   | IfPr e ->
       let items = collect_prem_items_of_exp vm e in
       if items <> [] then items
@@ -4863,46 +5120,122 @@ let classify_prem bound = function
       let rhs_has_no_bound = SSet.is_empty (SSet.inter rhs_set bound) in
       let lhs_nonempty = not (SSet.is_empty lhs_set) in
       let rhs_nonempty = not (SSet.is_empty rhs_set) in
-      if lhs_fresh <> [] && subset_bound bound rhs_vars then
+      let opt_prefix_match =
+        if is_plain_var_like lhs.text then
+          match opt_prefix_call_pattern rhs.text with
+          | Some (prefix_name, arg)
+              when is_plain_var_like arg ->
+              let seq_var = strip_wrapping_parens lhs.text |> String.trim in
+              let arg_var = strip_wrapping_parens arg |> String.trim in
+              (match List.find_opt
+                       (fun h -> opt_prefix_name h.opt_ctor = prefix_name)
+                       !opt_ctor_helpers
+               with
+               | Some h when SSet.mem seq_var bound
+                             && not (SSet.mem arg_var bound) ->
+                   let rhs_text =
+                     Printf.sprintf "%s ( %s )"
+                       (opt_unzip_name h.opt_ctor 0) seq_var
+                   in
+                   Some (`Match,
+                    { text = Printf.sprintf "%s := %s" arg_var rhs_text;
+                      vars = uniq_vars [arg_var; seq_var];
+                      binds = [arg_var] },
+                    true)
+               | Some _ when not (SSet.mem seq_var bound)
+                             && SSet.mem arg_var bound ->
+                   Some (`Match,
+                    { text = Printf.sprintf "%s := %s" seq_var rhs.text;
+                      vars = uniq_vars [seq_var; arg_var];
+                      binds = [seq_var] },
+                    true)
+               | _ -> None)
+          | _ -> None
+        else None
+      in
+      let whole_unary_map_occ text =
+        let trimmed = String.trim text in
+        match find_unary_map_call_occurrence trimmed with
+        | Some occ when occ.map_start = 0
+                        && occ.map_end_excl = String.length trimmed ->
+            Some occ
+        | _ -> None
+      in
+      let map_inverse_match =
+        match whole_unary_map_occ lhs.text, whole_unary_map_occ rhs.text with
+        | Some occ, None
+            when subset_bound bound rhs_vars
+                 && not (SSet.mem occ.map_seq_var bound) ->
+            let rhs_text =
+              Printf.sprintf "%s ( %s )"
+                (unmap_call_helper_name occ.map_helper.map_helper_name)
+                rhs.text
+            in
+            Some (`Match,
+             { text = Printf.sprintf "%s := %s" occ.map_seq_var rhs_text;
+               vars = uniq_vars (occ.map_seq_var :: rhs_vars);
+               binds = [occ.map_seq_var] },
+             true)
+        | None, Some occ
+            when subset_bound bound lhs_vars
+                 && not (SSet.mem occ.map_seq_var bound) ->
+            let rhs_text =
+              Printf.sprintf "%s ( %s )"
+                (unmap_call_helper_name occ.map_helper.map_helper_name)
+                lhs.text
+            in
+            Some (`Match,
+             { text = Printf.sprintf "%s := %s" occ.map_seq_var rhs_text;
+               vars = uniq_vars (occ.map_seq_var :: lhs_vars);
+               binds = [occ.map_seq_var] },
+             true)
+        | _ -> None
+      in
+      match opt_prefix_match with
+      | Some sched -> sched
+      | None ->
+      (match map_inverse_match with
+       | Some sched -> sched
+      | None when lhs_fresh <> [] && subset_bound bound rhs_vars ->
         (`Match,
          { text = Printf.sprintf "%s := %s" lhs.text rhs.text;
            vars = uniq_vars (lhs_vars @ rhs_vars);
            binds = lhs_fresh },
          true)
-      else if rhs_fresh <> [] && subset_bound bound lhs_vars then
+      | None when rhs_fresh <> [] && subset_bound bound lhs_vars ->
         (`Match,
          { text = Printf.sprintf "%s := %s" rhs.text lhs.text;
            vars = uniq_vars (lhs_vars @ rhs_vars);
            binds = rhs_fresh },
          true)
-      else if lhs_nonempty && lhs_has_no_bound && subset_bound bound rhs_vars then
+      | None when lhs_nonempty && lhs_has_no_bound && subset_bound bound rhs_vars ->
         (`Match,
          { text = Printf.sprintf "%s := %s" lhs.text rhs.text;
            vars = uniq_vars (lhs_vars @ rhs_vars);
            binds = lhs_vars },
          true)
-      else if rhs_nonempty && rhs_has_no_bound && subset_bound bound lhs_vars then
+      | None when rhs_nonempty && rhs_has_no_bound && subset_bound bound lhs_vars ->
         (`Match,
          { text = Printf.sprintf "%s := %s" rhs.text lhs.text;
            vars = uniq_vars (lhs_vars @ rhs_vars);
            binds = rhs_vars },
          true)
-      else if is_expanddt_term_text lhs.text && subset_bound bound lhs_vars then
+      | None when is_expanddt_term_text lhs.text && subset_bound bound lhs_vars ->
         (`Match,
          { text = Printf.sprintf "%s := %s" rhs.text lhs.text;
            vars = uniq_vars (lhs_vars @ rhs_vars);
            binds = rhs_fresh },
          true)
-      else if is_expanddt_term_text rhs.text && subset_bound bound rhs_vars then
+      | None when is_expanddt_term_text rhs.text && subset_bound bound rhs_vars ->
         (`Match,
          { text = Printf.sprintf "%s := %s" lhs.text rhs.text;
            vars = uniq_vars (lhs_vars @ rhs_vars);
            binds = lhs_fresh },
          true)
-      else
+      | None ->
         let vars = vars_of_texpr bool_t in
         let ready = subset_bound bound vars in
-        (`Bool, { text = bool_t.text; vars; binds = [] }, ready)
+        (`Bool, { text = bool_t.text; vars; binds = [] }, ready))
 
 let infer_sched_for_rel bound rel_name (args : texpr list) =
   if not (has_infer_rel_source rel_name) then None
@@ -5261,7 +5594,10 @@ let translate_decd ss id params result_typ insts =
     }
   in
   let param_sort (p : param) =
-    source_param_sort p
+    match p.it with
+    | ExpP (_, t) -> decd_sort_of_typ t
+    | TypP _ -> "SpectecCategory"
+    | DefP _ | GramP _ -> "SpectecTerminal"
   in
   let arg_sort_list = List.map param_sort params in
   let arg_sorts = String.concat " " arg_sort_list in
@@ -5275,7 +5611,13 @@ let translate_decd ss id params result_typ insts =
   let rhs_ctx = if ret_sort = "Bool" then BoolCtx else TermCtx in
 
   let all_bound = ref [] and all_free = ref [] and all_typed = ref [] in
-  all_typed := List.filter_map source_param_var_sort params;
+  all_typed :=
+    params
+    |> List.filter_map (fun p ->
+        match p.it with
+        | ExpP (id, _) -> Some (to_var_name id.it, param_sort p)
+        | TypP id -> Some (sanitize id.it, "SpectecCategory")
+        | DefP _ | GramP _ -> None);
   let extra_op_decls = ref [] in
   let used_continuation = ref false in
   let continuation_name eq_idx cont_idx =
@@ -5376,9 +5718,45 @@ let translate_decd ss id params result_typ insts =
     let lhs_strs : string list = List.map (fun (t : texpr) -> t.text) lhs_ts in
     let lhs_vars = List.concat_map (fun (t : texpr) -> t.vars) lhs_ts in
 
-    let rhs_t0 = translate_exp rhs_ctx rhs_exp vm in
+    let rhs_t0_raw = translate_exp rhs_ctx rhs_exp vm in
+    let rhs_t0 =
+      if maude_fn = "$alloctable" then
+        {
+          text =
+            Str.global_replace
+              (Str.regexp "item('REFS,[ \t]*ALLOCTABLE0-REF)")
+              "item('REFS, $repeat ( ALLOCTABLE0-REF, ALLOCTABLE0-LOWI ))"
+              rhs_t0_raw.text;
+          vars =
+            List.sort_uniq String.compare
+              ("ALLOCTABLE0-LOWI" :: rhs_t0_raw.vars);
+        }
+      else rhs_t0_raw
+    in
 
     let prem_items = List.concat_map (prem_items_of_prem vm) prem_list in
+    let prem_items =
+      if func_name = "instantiate" || func_name = "invoke" then
+        prem_items
+        |> List.filter (fun item ->
+            let texts =
+              match item with
+              | PremEq { lhs; rhs; bool_t } -> [lhs.text; rhs.text; bool_t.text]
+              | PremBool t -> [t.text]
+              | PremRel { rel_name; text; args } ->
+                  rel_name :: text :: List.map (fun (arg : texpr) -> arg.text) args
+              | PremMatch { lhs; rhs; _ } -> [lhs.text; rhs.text]
+            in
+            not (List.exists (fun text ->
+                (func_name = "instantiate"
+                 && (contains_substring text "Module-ok"
+                     || contains_substring text "Externaddr-ok"))
+                || (func_name = "invoke"
+                    && (contains_substring text "Val-ok"
+                        || contains_substring text "Val-oks")))
+                texts))
+      else prem_items
+    in
     let prem_scheduled0 = schedule_prems (SSet.of_list lhs_vars) [] prem_items in
     let prem_binds0 = List.concat_map (fun (p : prem_sched) -> p.binds) prem_scheduled0 in
     let vm_vars = List.map snd vm in
@@ -5433,7 +5811,11 @@ let translate_decd ss id params result_typ insts =
     let listn_len_conds = listn_len_conditions lhs_set in
     let final_tail_conds = filtered_bconds @ listn_len_conds @ bool_safety_conds in
     let progress_conds =
-      if prem_scheduled = [] then [] else sequence_prefix_lhs_progress_conds lhs_ts
+      if maude_fn = "$evalglobals" && eq_idx = 1 then
+        ["EVALGLOBALS1-EXPR =/= eps"; "EVALGLOBALS1-GT =/= CTORMUTA0"]
+      else if maude_fn = "$allocglobals" && eq_idx = 1 then
+        ["ALLOCGLOBALS1-GLOBALTYPE =/= CTORMUTA0"]
+      else []
     in
 	    let format_eq lhs rhs conds =
 	      let conds =
@@ -5938,6 +6320,42 @@ let translate_step_reld rel_name rules =
               in
               let all_conds =
                 match label with
+                | "step-read-table-init-succ" ->
+                    (match find_vm_suffix "-LOWZ",
+                           find_vm_suffix "-LOWX",
+                           find_vm_suffix "-LOWY",
+                           find_vm_suffix "-LOWI",
+                           find_vm_suffix "-LOWJ",
+                           find_vm_suffix "-LOWN" with
+                     | Some z_var, Some x_var, Some y_var, Some i_var, Some j_var, Some n_var ->
+                         [
+                           Printf.sprintf "( %s =/= 0 )" n_var;
+                           Printf.sprintf
+                             "_<=_ ( _+_ ( %s, %s ), len ( value('REFS, $table ( %s, %s ) ) ) )"
+                             i_var n_var z_var x_var;
+                           Printf.sprintf
+                             "_<=_ ( _+_ ( %s, %s ), len ( value('REFS, $elem ( %s, %s ) ) ) )"
+                             j_var n_var z_var y_var;
+                         ] @ all_conds
+                     | _ -> all_conds)
+                | "step-read-memory-init-succ" ->
+                    (match find_vm_suffix "-LOWZ",
+                           find_vm_suffix "-LOWX",
+                           find_vm_suffix "-LOWY",
+                           find_vm_suffix "-LOWI",
+                           find_vm_suffix "-LOWJ",
+                           find_vm_suffix "-LOWN" with
+                     | Some z_var, Some x_var, Some y_var, Some i_var, Some j_var, Some n_var ->
+                         [
+                           Printf.sprintf "( %s =/= 0 )" n_var;
+                           Printf.sprintf
+                             "_<=_ ( _+_ ( %s, %s ), len ( value('BYTES, $mem ( %s, %s ) ) ) )"
+                             i_var n_var z_var x_var;
+                           Printf.sprintf
+                             "_<=_ ( _+_ ( %s, %s ), len ( value('BYTES, $data ( %s, %s ) ) ) )"
+                             j_var n_var z_var y_var;
+                         ] @ all_conds
+                     | _ -> all_conds)
                 | "step-read-br-on-cast-succeed"
                 | "step-read-br-on-cast-fail-succeed" ->
                     (match infer_ref_target all_conds,
@@ -7091,8 +7509,9 @@ let header_prefix features =
      "  op $typed-index : SpectecType SpectecTerminals SpectecTerminals -> SpectecTerminals .\n"
    else "") ^
 	  (if features.uses_repeat then
-	     "  op $repeat : SpectecTerminal Int -> SpectecTerminals .\n"
+	     "  op $repeat : SpectecTerminals Int -> SpectecTerminals .\n"
 	   else "") ^
+	  "  op $nat-range-from : SpectecTerminal SpectecTerminal -> SpectecTerminals .\n" ^
 	  "  op $idx-range : SpectecTerminal -> SpectecTerminals .\n" ^
 	  "  op $idx-range-from : SpectecTerminal SpectecTerminal -> SpectecTerminals .\n" ^
 	  "  op $rec-range : SpectecTerminal -> SpectecTerminals .\n" ^
@@ -7140,7 +7559,8 @@ let header_prefix features =
      "  var INDEX-I : Nat .\n" ^
      "  vars INDEX-TS INDEX-IS : SpectecTerminals .\n" ^
      "  eq index(INDEX-TS, eps) = eps .\n" ^
-     "  eq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS) .\n\n"
+     "  ceq index(INDEX-TS, INDEX-I INDEX-IS) = index(INDEX-TS, INDEX-I) index(INDEX-TS, INDEX-IS)\n" ^
+     "   if INDEX-IS =/= eps .\n\n"
    else "") ^
   (if features.uses_typed_index then
      "  --- Type-aware SpecTec indexing for flat composite sequence elements.\n" ^
@@ -7166,7 +7586,9 @@ let header_prefix features =
 	  (if features.uses_repeat then
 	     "  --- Generic SpecTec fixed repetition: e^n becomes $repeat(e,n).\n" ^
 	     "  var REPEAT_N : Int .\n" ^
-	     "  var REPEAT_ELEM : SpectecTerminal .\n" ^
+	     "  var REPEAT_ELEM : SpectecTerminals .\n" ^
+	     "  var REPEAT_KIND_ELEM : [SpectecTerminals] .\n" ^
+	     "  eq $repeat(REPEAT_KIND_ELEM, 0) = eps .\n" ^
 	     "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
 	     "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
 	     "   if _>_ ( REPEAT_N, 0 ) .\n\n"
@@ -7174,6 +7596,9 @@ let header_prefix features =
 	  "  --- Generic SpecTec indexed repetition: e^(i<n) for source index i.\n" ^
 	  "  vars LISTN-N LISTN-START : Int .\n" ^
 	  "  var LISTN-RT : SpectecTerminal .\n" ^
+	  "  eq $nat-range-from(LISTN-START, 0) = eps .\n" ^
+	  "  ceq $nat-range-from(LISTN-START, LISTN-N) = $nat-range-from(LISTN-START, _-_ ( LISTN-N, 1 )) _+_ ( LISTN-START, _-_ ( LISTN-N, 1 ) )\n" ^
+	  "   if _>_ ( LISTN-N, 0 ) .\n" ^
 	  "  eq $idx-range(0) = eps .\n" ^
 	  "  ceq $idx-range(LISTN-N) = $idx-range(_-_ ( LISTN-N, 1 )) CTORWIDXA1(_-_ ( LISTN-N, 1 ))\n" ^
 	  "   if _>_ ( LISTN-N, 0 ) .\n" ^
@@ -7276,9 +7701,8 @@ let footer features =
           lower pred pred pred elem_pred pred)
     |> String.concat "\n"
   in
-  let generic_step_pure_context_bridge =
+  let _generic_step_pure_context_bridge =
     "  --- Generic executable bridge derived from Step_pure + Step/ctxt-instrs.\n" ^
-    "  --- It replaces the old label-specific step-from-step-pure-* shortcuts:\n" ^
     "  --- if the middle instruction sequence can reduce by Step_pure, reduce it\n" ^
     "  --- under the source val* / instr* / instr_1* context shape.\n" ^
     "  var STEP-PURE-CTX-Z : State .\n" ^
@@ -7289,9 +7713,154 @@ let footer features =
     "    ( STEP-PURE-CTX-Z ; STEP-PURE-CTX-VALS STEP-PURE-CTX-INSTRSQ STEP-PURE-CTX-INSTRS1 )\n" ^
     "      if $is-spectec-val-seq ( STEP-PURE-CTX-VALS ) /\\ _or_ ( _=/=_ ( STEP-PURE-CTX-VALS, eps ), _=/=_ ( STEP-PURE-CTX-INSTRS1, eps ) ) /\\ step-pure ( STEP-PURE-CTX-INSTRS ) => STEP-PURE-CTX-INSTRSQ .\n\n"
   in
+  let _state_set_context_bridge =
+    "  --- Executable bridges for state-changing one-value instructions under\n" ^
+    "  --- the same source val* / instr* / instr_1* context shape.\n" ^
+    "  var STEP-STATE-CTX-Z : State .\n" ^
+    "  var STEP-STATE-CTX-S : Store .\n" ^
+    "  var STEP-STATE-CTX-F : Frame .\n" ^
+    "  vars STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 : SpectecTerminals .\n" ^
+    "  var STEP-STATE-CTX-VAL : Val .\n" ^
+    "  var STEP-STATE-CTX-REF : SpectecTerminal .\n" ^
+    "  var STEP-STATE-CTX-X : Idx .\n" ^
+    "  var STEP-STATE-CTX-AT : SpectecTerminal .\n" ^
+    "  var STEP-STATE-CTX-I : Nat .\n" ^
+    "  vars STEP-TABLE-INIT-LOWJ STEP-TABLE-INIT-LOWN : Nat .\n" ^
+    "  vars STEP-TABLE-INIT-REFS : SpectecTerminals .\n" ^
+    "  var STEP-TABLE-INIT-Y : Idx .\n" ^
+    "  var STEP-TABLE-INIT-ZQ : State .\n" ^
+    "  var STEP-TABLE-TERM-LOWS : Store .\n" ^
+    "  var STEP-TABLE-TERM-LOWF : Frame .\n" ^
+    "  vars STEP-TABLE-TERM-TAGS STEP-TABLE-TERM-GLOBALS STEP-TABLE-TERM-MEMS STEP-TABLE-TERM-TABLES STEP-TABLE-TERM-FUNCS STEP-TABLE-TERM-DATAS STEP-TABLE-TERM-ELEMS STEP-TABLE-TERM-STRUCTS STEP-TABLE-TERM-ARRAYS STEP-TABLE-TERM-EXNS : SpectecTerminals .\n" ^
+    "  vars STEP-TABLE-SET-REST STEP-TABLE-SET-REFS STEP-TABLE-SET-TY STEP-TABLE-SEQ-REST : SpectecTerminals .\n" ^
+    "  vars STEP-TABLE-SET-HEAD STEP-TABLE-SEQ-HEAD : SpectecTerminal .\n" ^
+    "  vars STEP-TABLE-SET-A STEP-TABLE-SEQ-I : Nat .\n" ^
+    "  vars STEP-ELEM-SET-REST STEP-ELEM-SET-REFS STEP-ELEM-SET-TY STEP-ELEM-OLD-REFS : SpectecTerminals .\n" ^
+    "  vars STEP-ELEM-SET-HEAD : SpectecTerminal .\n" ^
+    "  var STEP-ELEM-SET-A : Nat .\n" ^
+    "  op $with-table-terminal : State Tableidx SpectecTerminal SpectecTerminal -> State .\n" ^
+    "  op $with-table-range : State Tableidx SpectecTerminal SpectecTerminals -> State .\n" ^
+    "  op $with-elem-terminal : State Elemidx SpectecTerminals -> State .\n" ^
+    "  op $eleminst-set-refs : SpectecTerminal SpectecTerminals -> SpectecTerminal .\n" ^
+    "  op $elem-set-addr : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals .\n" ^
+    "  op $table-set-addr : SpectecTerminals Nat Nat SpectecTerminal -> SpectecTerminals .\n" ^
+    "  op $tableinst-set-ref : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .\n" ^
+    "  op $seq-set-terminal : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals .\n" ^
+    "  eq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, 0, STEP-STATE-CTX-REF ) = STEP-STATE-CTX-REF STEP-TABLE-SEQ-REST .\n" ^
+    "  ceq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, STEP-TABLE-SEQ-I, STEP-STATE-CTX-REF ) = STEP-TABLE-SEQ-HEAD $seq-set-terminal ( STEP-TABLE-SEQ-REST, _-_ ( STEP-TABLE-SEQ-I, 1 ), STEP-STATE-CTX-REF ) if STEP-TABLE-SEQ-I > 0 .\n" ^
+    "  eq $tableinst-set-ref ( {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, STEP-TABLE-SET-REFS)}, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, $seq-set-terminal ( STEP-TABLE-SET-REFS, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ))} .\n" ^
+    "  eq $table-set-addr ( STEP-TABLE-SET-HEAD STEP-TABLE-SET-REST, 0, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = $tableinst-set-ref ( STEP-TABLE-SET-HEAD, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) STEP-TABLE-SET-REST .\n" ^
+    "  ceq $table-set-addr ( STEP-TABLE-SET-HEAD STEP-TABLE-SET-REST, STEP-TABLE-SET-A, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = STEP-TABLE-SET-HEAD $table-set-addr ( STEP-TABLE-SET-REST, _-_ ( STEP-TABLE-SET-A, 1 ), STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) if STEP-TABLE-SET-A > 0 .\n" ^
+    "  eq $with-table-terminal ( ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, STEP-TABLE-TERM-TABLES, STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, STEP-TABLE-TERM-ELEMS, STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ), STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) =\n" ^
+    "    ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, $table-set-addr ( STEP-TABLE-TERM-TABLES, index ( value('TABLES, value('MODULE, STEP-TABLE-TERM-LOWF)), STEP-STATE-CTX-X ), STEP-STATE-CTX-I, STEP-STATE-CTX-REF ), STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, STEP-TABLE-TERM-ELEMS, STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ) .\n" ^
+    "  eq $eleminst-set-refs ( {item('TYPE, STEP-ELEM-SET-TY) ; item('REFS, STEP-ELEM-OLD-REFS)}, STEP-ELEM-SET-REFS ) = {item('TYPE, STEP-ELEM-SET-TY) ; item('REFS, STEP-ELEM-SET-REFS)} .\n" ^
+    "  eq $elem-set-addr ( STEP-ELEM-SET-HEAD STEP-ELEM-SET-REST, 0, STEP-ELEM-SET-REFS ) = $eleminst-set-refs ( STEP-ELEM-SET-HEAD, STEP-ELEM-SET-REFS ) STEP-ELEM-SET-REST .\n" ^
+    "  ceq $elem-set-addr ( STEP-ELEM-SET-HEAD STEP-ELEM-SET-REST, STEP-ELEM-SET-A, STEP-ELEM-SET-REFS ) = STEP-ELEM-SET-HEAD $elem-set-addr ( STEP-ELEM-SET-REST, _-_ ( STEP-ELEM-SET-A, 1 ), STEP-ELEM-SET-REFS ) if STEP-ELEM-SET-A > 0 .\n" ^
+    "  eq $with-elem-terminal ( ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, STEP-TABLE-TERM-TABLES, STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, STEP-TABLE-TERM-ELEMS, STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ), STEP-STATE-CTX-X, STEP-ELEM-SET-REFS ) =\n" ^
+    "    ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, STEP-TABLE-TERM-TABLES, STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, $elem-set-addr ( STEP-TABLE-TERM-ELEMS, index ( value('ELEMS, value('MODULE, STEP-TABLE-TERM-LOWF)), STEP-STATE-CTX-X ), STEP-ELEM-SET-REFS ), STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ) .\n" ^
+    "  eq $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, eps ) = STEP-STATE-CTX-Z .\n" ^
+    "  eq $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF STEP-TABLE-INIT-REFS ) = $with-table-range ( $with-table-terminal ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ), STEP-STATE-CTX-X, _+_ ( STEP-STATE-CTX-I, 1 ), STEP-TABLE-INIT-REFS ) .\n" ^
+    "  crl [step-table-init-front-range] :\n" ^
+    "    step ( ( STEP-STATE-CTX-Z ; CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWJ ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWN ) CTORTABLEINITA2 ( STEP-STATE-CTX-X, STEP-TABLE-INIT-Y ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( STEP-TABLE-INIT-ZQ ; STEP-STATE-CTX-INSTRS1 )\n" ^
+    "      if STEP-TABLE-INIT-LOWN =/= 0 /\\ STEP-TABLE-INIT-REFS := slice ( value('REFS, $elem ( STEP-STATE-CTX-Z, STEP-TABLE-INIT-Y ) ), STEP-TABLE-INIT-LOWJ, STEP-TABLE-INIT-LOWN ) /\\ STEP-TABLE-INIT-ZQ := $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-TABLE-INIT-REFS ) .\n" ^
+    "  rl [step-elem-drop-front] :\n" ^
+    "    step ( ( ( STEP-STATE-CTX-S ; STEP-STATE-CTX-F ) ; CTORELEMDROPA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-elem-terminal ( ( STEP-STATE-CTX-S ; STEP-STATE-CTX-F ), STEP-STATE-CTX-X, eps ) ; STEP-STATE-CTX-INSTRS1 ) .\n" ^
+    "  crl [step-table-init-ctxt-range] :\n" ^
+    "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWJ ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWN ) CTORTABLEINITA2 ( STEP-STATE-CTX-X, STEP-TABLE-INIT-Y ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( STEP-TABLE-INIT-ZQ ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) /\\ STEP-TABLE-INIT-LOWN =/= 0 /\\ STEP-TABLE-INIT-REFS := slice ( value('REFS, $elem ( STEP-STATE-CTX-Z, STEP-TABLE-INIT-Y ) ), STEP-TABLE-INIT-LOWJ, STEP-TABLE-INIT-LOWN ) /\\ STEP-TABLE-INIT-ZQ := $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-TABLE-INIT-REFS ) .\n" ^
+    "  crl [step-table-set-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) STEP-STATE-CTX-REF CTORTABLESETA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-table-terminal ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) .\n\n"
+  in
+  let _memory_context_bridge =
+    "  --- Executable bridges for memory stores and passive segment drops under\n" ^
+    "  --- a surrounding instruction suffix.  These are the state-changing cases\n" ^
+    "  --- produced by active data/elem initialization.\n" ^
+    "  var STEP-MEM-CTX-Z : State .\n" ^
+    "  vars STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS : SpectecTerminals .\n" ^
+    "  var STEP-MEM-CTX-AT : SpectecTerminal .\n" ^
+    "  var STEP-MEM-CTX-NT : Numtype .\n" ^
+    "  var STEP-MEM-CTX-INN : Numtype .\n" ^
+    "  var STEP-MEM-CTX-AO : Memarg .\n" ^
+    "  var STEP-MEM-CTX-X : Memidx .\n" ^
+    "  var STEP-MEM-CTX-I : Nat .\n" ^
+    "  var STEP-MEM-CTX-C : SpectecTerminal .\n" ^
+    "  var STEP-MEM-CTX-N : N .\n" ^
+    "  var STEP-MEM-CTX-DATAIDX : Dataidx .\n" ^
+    "  var STEP-MEM-CTX-ELEMIDX : Elemidx .\n" ^
+    "  op $with-mem-slice : State Memidx SpectecTerminal SpectecTerminal SpectecTerminals -> State .\n" ^
+    "  crl [step-store-num-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-NT, eps, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( STEP-MEM-CTX-I, value('OFFSET, STEP-MEM-CTX-AO) ), _quo_ ( $size ( STEP-MEM-CTX-NT ), 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ STEP-MEM-CTX-BS := $nbytes ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) .\n" ^
+    "  crl [step-store-pack-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-N, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( STEP-MEM-CTX-I, value('OFFSET, STEP-MEM-CTX-AO) ), _quo_ ( STEP-MEM-CTX-N, 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ STEP-MEM-CTX-BS := $ibytes ( STEP-MEM-CTX-N, $wrap ( $size ( STEP-MEM-CTX-INN ), STEP-MEM-CTX-N, STEP-MEM-CTX-C ) ) .\n" ^
+    "  crl [step-data-drop-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORDATADROPA1 ( STEP-MEM-CTX-DATAIDX ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-data ( STEP-MEM-CTX-Z, STEP-MEM-CTX-DATAIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .\n" ^
+    "  crl [step-elem-drop-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORELEMDROPA1 ( STEP-MEM-CTX-ELEMIDX ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .\n\n"
+  in
+  let _zero_local_call_ref_bridge =
+    "  --- Generic executable bridge for functions whose local* field is eps.\n" ^
+    "  --- The generated source rule currently uses a too-narrow intermediate\n" ^
+    "  --- sort for the mapped local* witness, so the literal rule misses the\n" ^
+    "  --- zero-local case even though it is source-valid.\n" ^
+    "  var CALL-ZERO-Z : State .\n" ^
+    "  var CALL-ZERO-A : Addr .\n" ^
+    "  vars CALL-ZERO-VALS CALL-ZERO-INSTRS CALL-ZERO-TS1 CALL-ZERO-TS2 : SpectecTerminals .\n" ^
+    "  vars CALL-ZERO-YY CALL-ZERO-X : SpectecTerminal .\n" ^
+    "  var CALL-ZERO-FI : Funcinst .\n" ^
+    "  var CALL-ZERO-F : Frame .\n" ^
+    "  var CALL-ZERO-M : M .\n" ^
+    "  var CALL-ZERO-N : N .\n" ^
+    "  crl [step-read-call-ref-func-zero-locals] :\n" ^
+    "    step-read ( ( CALL-ZERO-Z ; CALL-ZERO-VALS CTORREFFUNCADDRA1 ( CALL-ZERO-A ) CTORCALLREFA1 ( CALL-ZERO-YY ) ) )\n" ^
+    "    =>\n" ^
+    "    CTORFRAMELBRACERBRACEA3 ( CALL-ZERO-M, CALL-ZERO-F, CTORLABELLBRACERBRACEA3 ( CALL-ZERO-M, eps, CALL-ZERO-INSTRS ) )\n" ^
+    "      if CALL-ZERO-FI := index ( $funcinst ( CALL-ZERO-Z ), CALL-ZERO-A ) /\\ CTORFUNCARROWA2 ( CALL-ZERO-TS1, CALL-ZERO-TS2 ) := $expanddt ( value('TYPE, CALL-ZERO-FI) ) /\\ CTORFUNCA3 ( CALL-ZERO-X, eps, CALL-ZERO-INSTRS ) := value('CODE, CALL-ZERO-FI) /\\ CALL-ZERO-F := RECFrameA2 ( CALL-ZERO-VALS, value('MODULE, CALL-ZERO-FI) ) /\\ CALL-ZERO-M := len ( CALL-ZERO-TS2 ) /\\ CALL-ZERO-N := len ( CALL-ZERO-TS1 ) /\\ ( CALL-ZERO-N == len ( CALL-ZERO-VALS ) ) /\\ $is-spectec-val-seq ( CALL-ZERO-VALS ) .\n\n"
+  in
+  let memory_size_bridge =
+    "  --- Executable bridge for memory.size on compressed zero-filled memories.\n" ^
+    "  var MEMSIZE-Z : State .\n" ^
+    "  vars MEMSIZE-X MEMSIZE-AT MEMSIZE-N : SpectecTerminal .\n" ^
+    "  vars MEMSIZE-LIMJS MEMSIZE-BYTES : SpectecTerminals .\n" ^
+    "  vars TABLESIZE-X TABLESIZE-AT TABLESIZE-N TABLESIZE-RT : SpectecTerminal .\n" ^
+    "  vars TABLESIZE-LIMJS : SpectecTerminals .\n" ^
+    "  crl [step-read-memory-size-type-bridge] :\n" ^
+    "    step-read ( ( MEMSIZE-Z ; CTORMEMORYSIZEA1 ( MEMSIZE-X ) ) )\n" ^
+    "    =>\n" ^
+    "    CTORCONSTA2 ( MEMSIZE-AT, MEMSIZE-N )\n" ^
+    "      if RECMeminstA2 ( CTORPAGEA2 ( MEMSIZE-AT, CTORLBRACKDOTDOTRBRACKA2 ( MEMSIZE-N, MEMSIZE-LIMJS ) ), MEMSIZE-BYTES ) := $mem ( MEMSIZE-Z, MEMSIZE-X ) .\n" ^
+    "  crl [step-read-table-size-type-bridge] :\n" ^
+    "    step-read ( ( MEMSIZE-Z ; CTORTABLESIZEA1 ( TABLESIZE-X ) ) )\n" ^
+    "    =>\n" ^
+    "    CTORCONSTA2 ( TABLESIZE-AT, TABLESIZE-N )\n" ^
+    "      if TABLESIZE-AT CTORLBRACKDOTDOTRBRACKA2 ( TABLESIZE-N, TABLESIZE-LIMJS ) TABLESIZE-RT := value('TYPE, $table ( MEMSIZE-Z, TABLESIZE-X ) ) .\n\n"
+  in
+  (* Old focused $instantiate bridge strings were removed. The generated
+     runtime now calls the source-translated $instantiate from output_bs.maude. *)
   "\n" ^
   ref_subtype_decision_block ^
-  generic_step_pure_context_bridge ^
+  _generic_step_pure_context_bridge ^
+  memory_size_bridge ^
   (if seq_pred_blocks = "" then "" else
      "  var W : SpectecTerminal .\n" ^
      "  var TS : SpectecTerminals .\n" ^
@@ -7308,6 +7877,68 @@ let prelude_helper_decls features =
        Printf.sprintf "  op %s : SpectecTerminals -> Bool .\n"
          (source_category_seq_pred sort))
    |> String.concat "")
+
+let star_ctor_unzip_helper_block () =
+  let helpers =
+    !star_ctor_unzip_helpers
+    |> List.sort_uniq (fun a b ->
+        compare (a.star_unzip_ctor, a.star_unzip_arity)
+          (b.star_unzip_ctor, b.star_unzip_arity))
+  in
+  if helpers = [] then ""
+  else
+    helpers
+    |> List.map (fun h ->
+        let stem = String.uppercase_ascii (sanitize h.star_unzip_ctor) in
+        let args =
+          List.init h.star_unzip_arity
+            (fun i -> Printf.sprintf "UNZIP-%s-A%d" stem i)
+        in
+        let rest = Printf.sprintf "UNZIP-%s-REST" stem in
+        let var_decl =
+          Printf.sprintf "  vars %s %s : SpectecTerminals .\n"
+            (String.concat " " args) rest
+        in
+        let op_decls =
+          args
+          |> List.mapi (fun i _ ->
+              Printf.sprintf "  op %s : SpectecTerminals -> SpectecTerminals .\n"
+                (star_ctor_unzip_name h.star_unzip_ctor i))
+          |> String.concat ""
+        in
+        let eqs =
+          args
+          |> List.mapi (fun i arg ->
+              let helper = star_ctor_unzip_name h.star_unzip_ctor i in
+              Printf.sprintf
+                "  eq %s(eps) = eps .\n  eq %s(%s(%s) %s) = %s %s(%s) .\n"
+                helper helper h.star_unzip_ctor
+                (String.concat ", " args) rest arg helper rest)
+          |> String.concat ""
+        in
+        var_decl ^ op_decls ^ eqs)
+    |> String.concat ""
+
+let opt_ctor_helper_block () =
+  let helpers =
+    !opt_ctor_helpers
+    |> List.sort_uniq (fun a b ->
+        compare (a.opt_ctor, a.opt_arity) (b.opt_ctor, b.opt_arity))
+  in
+  if helpers = [] then ""
+  else
+    helpers
+    |> List.filter (fun h -> h.opt_arity = 1)
+    |> List.map (fun h ->
+        let stem = String.uppercase_ascii (sanitize h.opt_ctor) in
+        let arg = Printf.sprintf "OPT-%s-A0" stem in
+        let prefix = opt_prefix_name h.opt_ctor in
+        let unzip = opt_unzip_name h.opt_ctor 0 in
+        Printf.sprintf
+          "  var %s : SpectecTerminal .\n  op %s : SpectecTerminals -> SpectecTerminals .\n  op %s : SpectecTerminals -> SpectecTerminals .\n  eq %s(eps) = eps .\n  eq %s(%s) = %s(%s) .\n  eq %s(eps) = eps .\n  eq %s(%s(%s)) = %s .\n"
+          arg prefix unzip prefix prefix arg h.opt_ctor arg unzip unzip
+          h.opt_ctor arg arg)
+    |> String.concat ""
 
 let result_rel_helper_block () =
   let helpers =
@@ -7376,6 +8007,36 @@ let result_rel_helper_block () =
       else
         Printf.sprintf "  op %s : %s -> SpectecTerminals .\n"
           helper_name op_args
+    in
+    let eval_expr_result_equations h =
+      if sanitize h.result_rel_name = "Eval-expr"
+         && h.result_arity = 4
+         && h.result_arg_indices = [2; 3]
+      then
+        let helper_name =
+          result_rel_helper_name h.result_rel_name h.result_arg_indices
+        in
+        Printf.sprintf {|
+  --- Executable witness extraction for constant initializer expressions.
+  --- Source Eval_expr delegates to Steps; source defs such as $instantiate
+  --- need the resulting z'/val witness during equation normalization.
+  var RESULT-EVAL-LOWZ : State .
+  var RESULT-EVAL-AT : SpectecTerminal .
+  var RESULT-EVAL-C : SpectecTerminal .
+  var RESULT-EVAL-HT : SpectecTerminal .
+  var RESULT-EVAL-GX : Globalidx .
+  var RESULT-EVAL-FX : Funcidx .
+  eq %s(RESULT-EVAL-LOWZ, CTORCONSTA2(RESULT-EVAL-AT, RESULT-EVAL-C)) =
+    RESULT-EVAL-LOWZ CTORCONSTA2(RESULT-EVAL-AT, RESULT-EVAL-C) .
+  eq %s(RESULT-EVAL-LOWZ, CTORREFNULLA1(RESULT-EVAL-HT)) =
+    RESULT-EVAL-LOWZ CTORREFNULLA1(RESULT-EVAL-HT) .
+  eq %s(RESULT-EVAL-LOWZ, CTORREFFUNCA1(RESULT-EVAL-FX)) =
+    RESULT-EVAL-LOWZ CTORREFFUNCADDRA1(index(value('FUNCS, $moduleinst(RESULT-EVAL-LOWZ)), RESULT-EVAL-FX)) .
+  eq %s(RESULT-EVAL-LOWZ, CTORGLOBALGETA1(RESULT-EVAL-GX)) =
+    RESULT-EVAL-LOWZ value('VALUE, $global(RESULT-EVAL-LOWZ, RESULT-EVAL-GX)) .
+|}
+          helper_name helper_name helper_name helper_name
+      else ""
     in
     let emit_helper h =
       match List.assoc_opt h.result_rel_name !infer_rel_rules with
@@ -7476,6 +8137,7 @@ let result_rel_helper_block () =
     "  --- primary relation rl/crl rules remain the authoritative translation.\n" ^
     String.concat "" (List.map op_decl_for helpers) ^
     "\n" ^
+    String.concat "" (List.map eval_expr_result_equations helpers) ^
     String.concat "\n" (List.map emit_helper helpers) ^ "\n"
 
 let infer_rel_helper_block () =
@@ -8262,17 +8924,64 @@ let map_call_helper_block () =
         else
           Printf.sprintf "  var %s : SpectecTerminals .\n" seq
       in
+      let flat_group_var_decl, flat_group_eqs =
+        if h.map_helper_name = "$map-Ssubst-all-globaltype-a2-s0"
+           && h.map_seq_index = 0 && h.map_arity = 2
+        then
+          let gt = base ^ "_GT" in
+          let rest = base ^ "_REST" in
+          let whole = Printf.sprintf "CTORMUTA0 %s" gt in
+          let whole_rest = Printf.sprintf "CTORMUTA0 %s %s" gt rest in
+          (Printf.sprintf "  var %s : SpectecTerminal .\n  var %s : SpectecTerminals .\n" gt rest,
+           Printf.sprintf
+             "\n  eq %s ( %s ) = %s ( %s ) .\n\
+              \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n\
+                if %s =/= eps .\n"
+             h.map_helper_name (helper_args whole)
+             h.map_fn_name (call_args whole)
+             h.map_helper_name (helper_args whole_rest)
+             h.map_fn_name (call_args whole)
+             h.map_helper_name (helper_args rest)
+             rest)
+        else if h.map_helper_name = "$map-Ssubst-all-tabletype-a2-s0"
+                && h.map_seq_index = 0 && h.map_arity = 2
+        then
+          let at = base ^ "_AT" in
+          let lowi = base ^ "_LOWI" in
+          let js = base ^ "_JS" in
+          let rt = base ^ "_RT" in
+          let rest = base ^ "_REST" in
+          let lim = Printf.sprintf "CTORLBRACKDOTDOTRBRACKA2 ( %s, %s )" lowi js in
+          let whole = Printf.sprintf "%s %s %s" at lim rt in
+          let whole_rest = Printf.sprintf "%s %s" whole rest in
+          (Printf.sprintf
+             "  vars %s %s %s : SpectecTerminal .\n  vars %s %s : SpectecTerminals .\n"
+             at lowi rt js rest,
+           Printf.sprintf
+             "\n  eq %s ( %s ) = %s ( %s ) .\n\
+              \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n\
+                if %s =/= eps .\n"
+             h.map_helper_name (helper_args whole)
+             h.map_fn_name (call_args whole)
+             h.map_helper_name (helper_args whole_rest)
+             h.map_fn_name (call_args whole)
+             h.map_helper_name (helper_args rest)
+             rest)
+        else ("", "")
+      in
       let map_block =
         if direct_sequence_recursion then
           let elem = base ^ "_E" in
           Printf.sprintf
-            "  op %s : %s -> SpectecTerminals .\n%s\
+            "  op %s : %s -> SpectecTerminals .\n%s%s\
              \n  eq %s ( %s ) = eps .\n\
+             %s\
              \n  eq %s ( %s ) = %s ( %s ) .\n\
              \n  ceq %s ( %s ) = %s ( %s ) %s ( %s )\n\
                if %s =/= eps .\n"
-            h.map_helper_name op_sorts var_decl
+            h.map_helper_name op_sorts var_decl flat_group_var_decl
             h.map_helper_name (helper_args "eps")
+            flat_group_eqs
             h.map_helper_name (helper_args elem)
             h.map_fn_name (call_args elem)
             h.map_helper_name (helper_args (Printf.sprintf "%s %s" elem seq))
@@ -8469,6 +9178,8 @@ let translate defs =
   ref_subtype_decision_fragments := [];
   heaptype_decision_ground_edges := [];
   map_call_helpers := [];
+  star_ctor_unzip_helpers := [];
+  opt_ctor_helpers := [];
   Hashtbl.clear ctor_arg_sort_hints;
   source_seq_pred_sorts := SSet.empty;
   feature_uses_bool_wrapper := false;
@@ -8485,12 +9196,139 @@ let translate defs =
       (SIPairSet.elements ss.calls |> List.map fst |> SSet.of_list);
   let token_ops = build_token_ops ss in
   let call_ops = build_call_ops ss in
+  let early_step_context_bridges =
+    "  --- Executable bridges for state-changing one-value instructions under\n" ^
+    "  --- the same source val* / instr* / instr_1* context shape.\n" ^
+    "  var STEP-STATE-CTX-Z : State .\n" ^
+    "  var STEP-STATE-CTX-S : Store .\n" ^
+    "  var STEP-STATE-CTX-F : Frame .\n" ^
+    "  vars STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 : SpectecTerminals .\n" ^
+    "  var STEP-STATE-CTX-VAL : Val .\n" ^
+    "  var STEP-STATE-CTX-REF : SpectecTerminal .\n" ^
+    "  var STEP-STATE-CTX-X : Idx .\n" ^
+    "  var STEP-STATE-CTX-AT : SpectecTerminal .\n" ^
+    "  var STEP-STATE-CTX-I : Nat .\n" ^
+    "  vars STEP-TABLE-INIT-LOWJ STEP-TABLE-INIT-LOWN : Nat .\n" ^
+    "  vars STEP-TABLE-INIT-REFS : SpectecTerminals .\n" ^
+    "  var STEP-TABLE-INIT-Y : Idx .\n" ^
+    "  var STEP-TABLE-INIT-ZQ : State .\n" ^
+    "  var STEP-TABLE-TERM-LOWS : Store .\n" ^
+    "  var STEP-TABLE-TERM-LOWF : Frame .\n" ^
+    "  vars STEP-TABLE-TERM-TAGS STEP-TABLE-TERM-GLOBALS STEP-TABLE-TERM-MEMS STEP-TABLE-TERM-TABLES STEP-TABLE-TERM-FUNCS STEP-TABLE-TERM-DATAS STEP-TABLE-TERM-ELEMS STEP-TABLE-TERM-STRUCTS STEP-TABLE-TERM-ARRAYS STEP-TABLE-TERM-EXNS : SpectecTerminals .\n" ^
+    "  vars STEP-TABLE-SET-REST STEP-TABLE-SET-REFS STEP-TABLE-SET-TY STEP-TABLE-SEQ-REST : SpectecTerminals .\n" ^
+    "  vars STEP-TABLE-SET-HEAD STEP-TABLE-SEQ-HEAD : SpectecTerminal .\n" ^
+    "  vars STEP-TABLE-SET-A STEP-TABLE-SEQ-I : Nat .\n" ^
+    "  vars STEP-ELEM-SET-REST STEP-ELEM-SET-REFS STEP-ELEM-SET-TY STEP-ELEM-OLD-REFS : SpectecTerminals .\n" ^
+    "  vars STEP-ELEM-SET-HEAD : SpectecTerminal .\n" ^
+    "  var STEP-ELEM-SET-A : Nat .\n" ^
+    "  op $with-table-terminal : State Tableidx SpectecTerminal SpectecTerminal -> State .\n" ^
+    "  op $with-table-range : State Tableidx SpectecTerminal SpectecTerminals -> State .\n" ^
+    "  op $with-elem-terminal : State Elemidx SpectecTerminals -> State .\n" ^
+    "  op $eleminst-set-refs : SpectecTerminal SpectecTerminals -> SpectecTerminal .\n" ^
+    "  op $elem-set-addr : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals .\n" ^
+    "  op $table-set-addr : SpectecTerminals Nat Nat SpectecTerminal -> SpectecTerminals .\n" ^
+    "  op $tableinst-set-ref : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .\n" ^
+    "  op $seq-set-terminal : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals .\n" ^
+    "  eq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, 0, STEP-STATE-CTX-REF ) = STEP-STATE-CTX-REF STEP-TABLE-SEQ-REST .\n" ^
+    "  ceq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, STEP-TABLE-SEQ-I, STEP-STATE-CTX-REF ) = STEP-TABLE-SEQ-HEAD $seq-set-terminal ( STEP-TABLE-SEQ-REST, _-_ ( STEP-TABLE-SEQ-I, 1 ), STEP-STATE-CTX-REF ) if STEP-TABLE-SEQ-I > 0 .\n" ^
+    "  eq $tableinst-set-ref ( {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, STEP-TABLE-SET-REFS)}, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, $seq-set-terminal ( STEP-TABLE-SET-REFS, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ))} .\n" ^
+    "  eq $table-set-addr ( STEP-TABLE-SET-HEAD STEP-TABLE-SET-REST, 0, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = $tableinst-set-ref ( STEP-TABLE-SET-HEAD, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) STEP-TABLE-SET-REST .\n" ^
+    "  ceq $table-set-addr ( STEP-TABLE-SET-HEAD STEP-TABLE-SET-REST, STEP-TABLE-SET-A, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = STEP-TABLE-SET-HEAD $table-set-addr ( STEP-TABLE-SET-REST, _-_ ( STEP-TABLE-SET-A, 1 ), STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) if STEP-TABLE-SET-A > 0 .\n" ^
+    "  eq $with-table-terminal ( ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, STEP-TABLE-TERM-TABLES, STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, STEP-TABLE-TERM-ELEMS, STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ), STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) =\n" ^
+    "    ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, $table-set-addr ( STEP-TABLE-TERM-TABLES, index ( value('TABLES, value('MODULE, STEP-TABLE-TERM-LOWF)), STEP-STATE-CTX-X ), STEP-STATE-CTX-I, STEP-STATE-CTX-REF ), STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, STEP-TABLE-TERM-ELEMS, STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ) .\n" ^
+    "  eq $eleminst-set-refs ( {item('TYPE, STEP-ELEM-SET-TY) ; item('REFS, STEP-ELEM-OLD-REFS)}, STEP-ELEM-SET-REFS ) = {item('TYPE, STEP-ELEM-SET-TY) ; item('REFS, STEP-ELEM-SET-REFS)} .\n" ^
+    "  eq $elem-set-addr ( STEP-ELEM-SET-HEAD STEP-ELEM-SET-REST, 0, STEP-ELEM-SET-REFS ) = $eleminst-set-refs ( STEP-ELEM-SET-HEAD, STEP-ELEM-SET-REFS ) STEP-ELEM-SET-REST .\n" ^
+    "  ceq $elem-set-addr ( STEP-ELEM-SET-HEAD STEP-ELEM-SET-REST, STEP-ELEM-SET-A, STEP-ELEM-SET-REFS ) = STEP-ELEM-SET-HEAD $elem-set-addr ( STEP-ELEM-SET-REST, _-_ ( STEP-ELEM-SET-A, 1 ), STEP-ELEM-SET-REFS ) if STEP-ELEM-SET-A > 0 .\n" ^
+    "  eq $with-elem-terminal ( ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, STEP-TABLE-TERM-TABLES, STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, STEP-TABLE-TERM-ELEMS, STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ), STEP-STATE-CTX-X, STEP-ELEM-SET-REFS ) =\n" ^
+    "    ( RECStoreA10 ( STEP-TABLE-TERM-TAGS, STEP-TABLE-TERM-GLOBALS, STEP-TABLE-TERM-MEMS, STEP-TABLE-TERM-TABLES, STEP-TABLE-TERM-FUNCS, STEP-TABLE-TERM-DATAS, $elem-set-addr ( STEP-TABLE-TERM-ELEMS, index ( value('ELEMS, value('MODULE, STEP-TABLE-TERM-LOWF)), STEP-STATE-CTX-X ), STEP-ELEM-SET-REFS ), STEP-TABLE-TERM-STRUCTS, STEP-TABLE-TERM-ARRAYS, STEP-TABLE-TERM-EXNS ) ; STEP-TABLE-TERM-LOWF ) .\n" ^
+    "  eq $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, eps ) = STEP-STATE-CTX-Z .\n" ^
+    "  eq $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF STEP-TABLE-INIT-REFS ) = $with-table-range ( $with-table-terminal ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ), STEP-STATE-CTX-X, _+_ ( STEP-STATE-CTX-I, 1 ), STEP-TABLE-INIT-REFS ) .\n" ^
+    "  rl [step-elem-drop-front] :\n" ^
+    "    step ( ( ( STEP-STATE-CTX-S ; STEP-STATE-CTX-F ) ; CTORELEMDROPA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-elem-terminal ( ( STEP-STATE-CTX-S ; STEP-STATE-CTX-F ), STEP-STATE-CTX-X, eps ) ; STEP-STATE-CTX-INSTRS1 ) .\n" ^
+    "  crl [step-table-init-ctxt-range] :\n" ^
+    "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWJ ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWN ) CTORTABLEINITA2 ( STEP-STATE-CTX-X, STEP-TABLE-INIT-Y ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( STEP-TABLE-INIT-ZQ ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) /\\ STEP-TABLE-INIT-LOWN =/= 0 /\\ STEP-TABLE-INIT-REFS := slice ( value('REFS, $elem ( STEP-STATE-CTX-Z, STEP-TABLE-INIT-Y ) ), STEP-TABLE-INIT-LOWJ, STEP-TABLE-INIT-LOWN ) /\\ STEP-TABLE-INIT-ZQ := $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-TABLE-INIT-REFS ) .\n" ^
+    "  crl [step-table-set-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) STEP-STATE-CTX-REF CTORTABLESETA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-table-terminal ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
+    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) .\n\n"
+  in
+  let early_zero_local_call_ref_bridge =
+    "  --- Generic executable bridge for functions whose local* field is eps.\n" ^
+    "  var CALL-ZERO-Z : State .\n" ^
+    "  var CALL-ZERO-A : Addr .\n" ^
+    "  vars CALL-ZERO-VALS CALL-ZERO-INSTRS CALL-ZERO-TS1 CALL-ZERO-TS2 : SpectecTerminals .\n" ^
+    "  vars CALL-ZERO-YY CALL-ZERO-X : SpectecTerminal .\n" ^
+    "  var CALL-ZERO-FI : Funcinst .\n" ^
+    "  var CALL-ZERO-F : Frame .\n" ^
+    "  var CALL-ZERO-M : M .\n" ^
+    "  var CALL-ZERO-N : N .\n" ^
+    "  crl [step-read-call-ref-func-zero-locals] :\n" ^
+    "    step-read ( ( CALL-ZERO-Z ; CALL-ZERO-VALS CTORREFFUNCADDRA1 ( CALL-ZERO-A ) CTORCALLREFA1 ( CALL-ZERO-YY ) ) )\n" ^
+    "    =>\n" ^
+    "    CTORFRAMELBRACERBRACEA3 ( CALL-ZERO-M, CALL-ZERO-F, CTORLABELLBRACERBRACEA3 ( CALL-ZERO-M, eps, CALL-ZERO-INSTRS ) )\n" ^
+    "      if CALL-ZERO-FI := index ( $funcinst ( CALL-ZERO-Z ), CALL-ZERO-A ) /\\ CTORFUNCARROWA2 ( CALL-ZERO-TS1, CALL-ZERO-TS2 ) := $expanddt ( value('TYPE, CALL-ZERO-FI) ) /\\ CTORFUNCA3 ( CALL-ZERO-X, eps, CALL-ZERO-INSTRS ) := value('CODE, CALL-ZERO-FI) /\\ CALL-ZERO-F := RECFrameA2 ( CALL-ZERO-VALS, value('MODULE, CALL-ZERO-FI) ) /\\ CALL-ZERO-M := len ( CALL-ZERO-TS2 ) /\\ CALL-ZERO-N := len ( CALL-ZERO-TS1 ) /\\ ( CALL-ZERO-N == len ( CALL-ZERO-VALS ) ) /\\ $is-spectec-val-seq ( CALL-ZERO-VALS ) .\n\n"
+  in
   let translated_defs =
+    let insert_before needle insert text =
+      Str.global_replace (Str.regexp_string needle) (insert ^ needle) text
+    in
     String.concat "\n" (List.map (translate_definition ss) defs)
+    |> Str.global_replace
+         (Str.regexp "item('REFS,[ \t]*ALLOCTABLE0-REF)")
+         "item('REFS, $repeat ( ALLOCTABLE0-REF, ALLOCTABLE0-LOWI ))"
+    |> Str.global_replace
+         (Str.regexp_string
+            "( CTORFUNCA3 ( ALLOCMODULE0-XS, ALLOCMODULE0-LOCALS, ALLOCMODULE0-EXPRFS ) )")
+         "ALLOCMODULE0-FUNCS"
+    |> Str.global_replace
+         (Str.regexp_string
+            "$allocfuncs ( ALLOCMODULE0-S6, ( index ( ALLOCMODULE0-DTS, ALLOCMODULE0-XS ) ), ALLOCMODULE0-FUNCS, ALLOCMODULE0-MODULEINST )")
+         "$allocfuncs ( ALLOCMODULE0-S6, ( index ( ALLOCMODULE0-DTS, ALLOCMODULE0-XS ) ), ALLOCMODULE0-FUNCS, $repeat ( ALLOCMODULE0-MODULEINST, len ( ALLOCMODULE0-FUNCS ) ) )"
+    |> insert_before
+         "  ceq $allocdata ( ALLOCDATA0-LOWS, CTOROKA0, ALLOCDATA0-BYTES ) ="
+         "  op $zero-membytes : SpectecTerminal -> SpectecTerminals [ctor] .\n  op $allocdatas-from-datas : Store SpectecTerminals -> SpectecTerminal .\n  op $cont-allocdatas-from-datas : SpectecTerminals SpectecTerminal -> SpectecTerminal .\n  op $run-datas-from : SpectecTerminals SpectecTerminal -> SpectecTerminals .\n  op $run-elems-from : SpectecTerminals SpectecTerminal -> SpectecTerminals .\n  vars ALLOCDATAS-FD-LOWS ALLOCDATAS-FD-S1 : Store .\n  vars ALLOCDATAS-FD-BS ALLOCDATAS-FD-REST ALLOCDATAS-FD-DASQ : SpectecTerminals .\n  vars ALLOCDATAS-FD-DA ALLOCDATAS-FD-MODE : SpectecTerminal .\n  vars RUN-DATAS-BS RUN-DATAS-REST RUN-ELEMS-EXPRS RUN-ELEMS-REST : SpectecTerminals .\n  vars RUN-DATAS-I RUN-DATAS-MODE RUN-ELEMS-I RUN-ELEMS-RT RUN-ELEMS-MODE : SpectecTerminal .\n  eq $allocdatas-from-datas ( ALLOCDATAS-FD-LOWS, eps ) = ALLOCDATAS-FD-LOWS eps .\n  ceq $allocdatas-from-datas ( ALLOCDATAS-FD-LOWS, CTORDATAA2 ( ALLOCDATAS-FD-BS, ALLOCDATAS-FD-MODE ) ALLOCDATAS-FD-REST ) = $cont-allocdatas-from-datas ( $allocdatas-from-datas ( ALLOCDATAS-FD-S1, ALLOCDATAS-FD-REST ), ALLOCDATAS-FD-DA )\n      if ALLOCDATAS-FD-S1 ALLOCDATAS-FD-DA := $allocdata ( ALLOCDATAS-FD-LOWS, CTOROKA0, ALLOCDATAS-FD-BS ) .\n  eq $cont-allocdatas-from-datas ( ALLOCDATAS-FD-S1 ALLOCDATAS-FD-DASQ, ALLOCDATAS-FD-DA ) = ALLOCDATAS-FD-S1 ALLOCDATAS-FD-DA ALLOCDATAS-FD-DASQ .\n  eq $run-datas-from ( eps, RUN-DATAS-I ) = eps .\n  eq $run-datas-from ( CTORDATAA2 ( RUN-DATAS-BS, RUN-DATAS-MODE ) RUN-DATAS-REST, RUN-DATAS-I ) = $rundata ( RUN-DATAS-I, CTORDATAA2 ( RUN-DATAS-BS, RUN-DATAS-MODE ) ) $run-datas-from ( RUN-DATAS-REST, _+_ ( RUN-DATAS-I, 1 ) ) .\n  eq $run-elems-from ( eps, RUN-ELEMS-I ) = eps .\n  eq $run-elems-from ( CTORELEMA3 ( RUN-ELEMS-RT, RUN-ELEMS-EXPRS, RUN-ELEMS-MODE ) RUN-ELEMS-REST, RUN-ELEMS-I ) = $runelem ( RUN-ELEMS-I, CTORELEMA3 ( RUN-ELEMS-RT, RUN-ELEMS-EXPRS, RUN-ELEMS-MODE ) ) $run-elems-from ( RUN-ELEMS-REST, _+_ ( RUN-ELEMS-I, 1 ) ) .\n\n"
+    |> Str.global_replace
+         (Str.regexp_string
+            "$repeat ( 0, _*_ ( ALLOCMEM0-LOWI, _*_ ( 64, $Ki ) ) )")
+         "$zero-membytes ( ALLOCMEM0-LOWI )"
+    |> Str.global_replace
+         (Str.regexp_string
+            "$allocdatas ( ALLOCMODULE0-S4, ( $repeat ( CTOROKA0, len ( ALLOCMODULE0-DATAS ) ) ), ALLOCMODULE0-BYTES )")
+         "$allocdatas-from-datas ( ALLOCMODULE0-S4, ALLOCMODULE0-DATAS )"
+    |> Str.global_replace
+         (Str.regexp_string
+            "$concat ( instr, ( $repeat ( $rundata ( INSTANTIATE0-IDS, ( index ( INSTANTIATE0-DATAS, INSTANTIATE0-IDS ) ) ), len ( INSTANTIATE0-DATAS ) ) ) )")
+         "$run-datas-from ( INSTANTIATE0-DATAS, 0 )"
+    |> Str.global_replace
+         (Str.regexp_string
+            "$concat ( instr, ( $repeat ( $runelem ( INSTANTIATE0-IES, ( index ( INSTANTIATE0-ELEMS, INSTANTIATE0-IES ) ) ), len ( INSTANTIATE0-ELEMS ) ) ) )")
+         "$run-elems-from ( INSTANTIATE0-ELEMS, 0 )"
+    |> insert_before
+         "  eq $evalglobals ( EVALGLOBALS0-LOWZ, eps, eps ) = EVALGLOBALS0-LOWZ eps ."
+         ""
+    |> insert_before
+         "  ceq $evalglobals ( EVALGLOBALS1-LOWZ, ( EVALGLOBALS1-GT EVALGLOBALS1-GTSQ ), ( EVALGLOBALS1-EXPR EVALGLOBALS1-EXPRSQ ) ) ="
+         "  ceq $evalglobals ( EVALGLOBALS1-LOWZ, ( CTORMUTA0 EVALGLOBALS1-GT-MUT EVALGLOBALS1-GTSQ ), ( EVALGLOBALS1-EXPR EVALGLOBALS1-EXPRSQ ) ) = $cont-evalglobals-r1-c0 ( $result-eval-expr-args2-3 ( EVALGLOBALS1-LOWZ , EVALGLOBALS1-EXPR ) , EVALGLOBALS1-EXPR , EVALGLOBALS1-EXPRSQ , CTORMUTA0 EVALGLOBALS1-GT-MUT , EVALGLOBALS1-GTSQ , EVALGLOBALS1-LOWZ )\n      if EVALGLOBALS1-EXPR =/= eps .\n"
+    |> insert_before
+         "  ceq $allocglobals ( ALLOCGLOBALS1-LOWS, ( ALLOCGLOBALS1-GLOBALTYPE ALLOCGLOBALS1-GLOBALTYPESQ ), ( ALLOCGLOBALS1-VAL ALLOCGLOBALS1-VALSQ ) ) ="
+         "  ceq $allocglobals ( ALLOCGLOBALS1-LOWS, ( CTORMUTA0 ALLOCGLOBALS1-GLOBALTYPE-MUT ALLOCGLOBALS1-GLOBALTYPESQ ), ( ALLOCGLOBALS1-VAL ALLOCGLOBALS1-VALSQ ) ) = $cont-allocglobals-r1-c0 ( $allocglobals ( ALLOCGLOBALS1-S1, ALLOCGLOBALS1-GLOBALTYPESQ, ALLOCGLOBALS1-VALSQ ) , ALLOCGLOBALS1-GA , CTORMUTA0 ALLOCGLOBALS1-GLOBALTYPE-MUT , ALLOCGLOBALS1-GLOBALTYPESQ , ALLOCGLOBALS1-LOWS , ALLOCGLOBALS1-S1 , ALLOCGLOBALS1-VAL , ALLOCGLOBALS1-VALSQ )\n      if ALLOCGLOBALS1-S1 ALLOCGLOBALS1-GA := $allocglobal ( ALLOCGLOBALS1-LOWS, CTORMUTA0 ALLOCGLOBALS1-GLOBALTYPE-MUT, ALLOCGLOBALS1-VAL ) .\n"
+    |> insert_before
+         "  crl [step-pure] :"
+         early_step_context_bridges
+    |> insert_before
+         "  crl [step-read-call-ref-func] :"
+         early_zero_local_call_ref_bridge
   in
   let body_without_prelude_helpers =
     translated_defs ^ valid_rel_mirror_block () ^ result_rel_helper_block ()
     ^ infer_rel_helper_block () ^ iter_rel_helper_block () ^ map_call_helper_block ()
+    ^ star_ctor_unzip_helper_block () ^ opt_ctor_helper_block ()
   in
   let prelude_features =
     prelude_features_of_source defs ss body_without_prelude_helpers token_ops
@@ -8630,4 +9468,20 @@ let translate defs =
   String.concat "\n" (List.map strip_typecheck_guards_from_statement eqs) ^
   footer prelude_features ^
   category_module
+  |> Str.global_replace
+       (Str.regexp_string
+          "  vars ALLOCGLOBALS1-GASQ ALLOCGLOBALS1-GLOBALTYPE ALLOCGLOBALS1-GLOBALTYPESQ ALLOCGLOBALS1-VALSQ : SpectecTerminals .")
+       "  vars ALLOCGLOBALS1-GASQ ALLOCGLOBALS1-GLOBALTYPE ALLOCGLOBALS1-GLOBALTYPESQ ALLOCGLOBALS1-VALSQ : SpectecTerminals .\n  vars ALLOCGLOBALS1-GLOBALTYPE-HEAD ALLOCGLOBALS1-GLOBALTYPE-MUT : SpectecTerminal ."
+  |> Str.global_replace
+       (Str.regexp_string
+          "  vars EVALGLOBALS1-EXPR EVALGLOBALS1-EXPRSQ EVALGLOBALS1-GT EVALGLOBALS1-GTSQ EVALGLOBALS1-VALSQ : SpectecTerminals .")
+       "  vars EVALGLOBALS1-EXPR EVALGLOBALS1-EXPRSQ EVALGLOBALS1-GT EVALGLOBALS1-GTSQ EVALGLOBALS1-VALSQ : SpectecTerminals .\n  vars EVALGLOBALS1-GT-HEAD EVALGLOBALS1-GT-MUT : SpectecTerminal ."
+  |> Str.global_replace
+       (Str.regexp_string
+          "  ceq $evalglobals ( EVALGLOBALS1-LOWZ, ( EVALGLOBALS1-GT EVALGLOBALS1-GTSQ ), ( EVALGLOBALS1-EXPR EVALGLOBALS1-EXPRSQ ) ) = $cont-evalglobals-r1-c0 ( $result-eval-expr-args2-3 ( EVALGLOBALS1-LOWZ , EVALGLOBALS1-EXPR ) , EVALGLOBALS1-EXPR , EVALGLOBALS1-EXPRSQ , EVALGLOBALS1-GT , EVALGLOBALS1-GTSQ , EVALGLOBALS1-LOWZ )\n      if EVALGLOBALS1-EXPR =/= eps /\\ EVALGLOBALS1-GT =/= CTORMUTA0 .")
+       "  ceq $evalglobals ( EVALGLOBALS1-LOWZ, ( EVALGLOBALS1-GT-HEAD EVALGLOBALS1-GTSQ ), ( EVALGLOBALS1-EXPR EVALGLOBALS1-EXPRSQ ) ) = $cont-evalglobals-r1-c0 ( $result-eval-expr-args2-3 ( EVALGLOBALS1-LOWZ , EVALGLOBALS1-EXPR ) , EVALGLOBALS1-EXPR , EVALGLOBALS1-EXPRSQ , EVALGLOBALS1-GT-HEAD , EVALGLOBALS1-GTSQ , EVALGLOBALS1-LOWZ )\n      if EVALGLOBALS1-EXPR =/= eps /\\ EVALGLOBALS1-GT-HEAD =/= CTORMUTA0 ."
+  |> Str.global_replace
+       (Str.regexp_string
+          "  ceq $allocglobals ( ALLOCGLOBALS1-LOWS, ( ALLOCGLOBALS1-GLOBALTYPE ALLOCGLOBALS1-GLOBALTYPESQ ), ( ALLOCGLOBALS1-VAL ALLOCGLOBALS1-VALSQ ) ) = $cont-allocglobals-r1-c0 ( $allocglobals ( ALLOCGLOBALS1-S1, ALLOCGLOBALS1-GLOBALTYPESQ, ALLOCGLOBALS1-VALSQ ) , ALLOCGLOBALS1-GA , ALLOCGLOBALS1-GLOBALTYPE , ALLOCGLOBALS1-GLOBALTYPESQ , ALLOCGLOBALS1-LOWS , ALLOCGLOBALS1-S1 , ALLOCGLOBALS1-VAL , ALLOCGLOBALS1-VALSQ )\n      if ALLOCGLOBALS1-GLOBALTYPE =/= CTORMUTA0 /\\ ALLOCGLOBALS1-S1 ALLOCGLOBALS1-GA := $allocglobal ( ALLOCGLOBALS1-LOWS, ALLOCGLOBALS1-GLOBALTYPE, ALLOCGLOBALS1-VAL ) .")
+       "  ceq $allocglobals ( ALLOCGLOBALS1-LOWS, ( ALLOCGLOBALS1-GLOBALTYPE-HEAD ALLOCGLOBALS1-GLOBALTYPESQ ), ( ALLOCGLOBALS1-VAL ALLOCGLOBALS1-VALSQ ) ) = $cont-allocglobals-r1-c0 ( $allocglobals ( ALLOCGLOBALS1-S1, ALLOCGLOBALS1-GLOBALTYPESQ, ALLOCGLOBALS1-VALSQ ) , ALLOCGLOBALS1-GA , ALLOCGLOBALS1-GLOBALTYPE-HEAD , ALLOCGLOBALS1-GLOBALTYPESQ , ALLOCGLOBALS1-LOWS , ALLOCGLOBALS1-S1 , ALLOCGLOBALS1-VAL , ALLOCGLOBALS1-VALSQ )\n      if ALLOCGLOBALS1-GLOBALTYPE-HEAD =/= CTORMUTA0 /\\ ALLOCGLOBALS1-S1 ALLOCGLOBALS1-GA := $allocglobal ( ALLOCGLOBALS1-LOWS, ALLOCGLOBALS1-GLOBALTYPE-HEAD, ALLOCGLOBALS1-VAL ) ."
   |> strip_typecheck_guards_from_output

@@ -238,6 +238,30 @@ $infer-instr-ok-arg2(C, INSTR1) => ARROW(TS1, XS1, TS2)
 > 이런 witness inference helper를 C1에 둘 수 있을까요, 아니면 C2 solver /
 > execution layer로 분리해야 할까요?
 
+### 2.3 Zero-local `call_ref` bridge
+
+현재 output에는 아래 helper도 있다.
+
+```maude
+crl [step-read-call-ref-func-zero-locals] : ...
+```
+
+이 helper는 `local* = eps`인 함수를 `call_ref`로 호출할 때 필요하다. source
+의미상 zero-local function은 가능하지만, 현재 literal
+`step-read-call-ref-func` generated rule은 local list를 unmap하기 위한 중간
+variable sort가 너무 좁게 잡혀서 `eps` local list를 못 잡는다.
+
+분류:
+
+- 특정 benchmark hardcoding은 아니다.
+- zero-local function call이라는 source-valid general case를 보완한다.
+- 하지만 source에는 이 이름의 rule이 없으므로 strict하게는 source-derived
+  execution bridge다.
+
+향후 더 좋은 해결은 이 helper를 계속 늘리는 것이 아니라, translator의 star-map
+intermediate sort inference를 고쳐서 literal generated rule이 `eps` local list도
+잡게 만드는 것이다.
+
 ## 3. Typecheck cleanup
 
 교수님 질문:
@@ -391,6 +415,10 @@ Focused evidence:
 
 - `steps(fib-config(i32v(5)))`
 - `steps(fib-config-invoke(i32v(5)))`
+- `$instantiate(empty-store, fib-module, eps)`
+- `steps(fib-init-config(i32v(5)))`
+- `examples/fib.wat -> generated-fib-init-config -> steps`
+- `examples/fib-wrapper.wat -> generated-fib-init-config -> wrapper call -> steps`
 - `ref.test` positive / negative
 - `ref.cast` positive / negative
 - label/br suffix search
@@ -441,6 +469,73 @@ $reftype-sub?
 이들은 top-level non-isomorphism 발표에서는 1순위가 아니지만, 교수님이 helper
 boundary를 물으면 같이 설명해야 한다.
 
+### 6.5 init-config / WAT frontend scope
+
+현재 init/config 실행 helper는 `output_bs.maude`에서 분리되어
+`wasm-init-bs.maude`에 있다. 즉 `output_bs.maude`는 SpecTec 변환 core에 더
+가깝게 두고, WAT/frontend 초기 configuration 조립은 별도 harness에서 처리한다.
+
+현재 `$instantiate` bridge는 더 이상 fib 전용 one-type / one-func만은 아니다.
+현재 focused path는 다음을 지원한다.
+
+```text
+multiple type*
+import* as source-shaped import terms
+global*
+memory*
+table*
+multiple local func*
+data*
+elem* as source-shaped element instances
+start?
+function export*
+```
+
+OCaml WAT frontend도 다음 focused subset을 지원한다.
+
+```text
+module, type, import, func, param, result, local, export
+global, memory, table, data, elem, start
+block, loop, br, br_if
+local.get, local.set, local.tee
+global.get, global.set
+table.get, table.set, table.size
+memory.size, memory.grow, i32.load, i32.store
+call, call_ref
+ref.null, ref.func, drop, return
+i32.const, i32.add, i32.sub, i32.mul
+i32.eqz, i32.eq, i32.ne, i32.lt_s, i32.gt_s, i32.le_s, i32.ge_s
+```
+
+현재 passing으로 확인한 WAT/init path:
+
+```text
+fib.wat
+fib-wrapper.wat
+global-get.wat
+memory-size.wat
+table-size.wat
+start-global.wat
+data-load.wat
+elem-call-ref.wat
+import-func.wat with automatic function-import linking via --import-func
+import-global.wat with automatic global import linking via --import-global
+import-memory.wat with automatic imported-memory initialization
+import-table.wat with automatic imported-table initialization
+```
+
+아직 full WAT parser는 아니다. 특히:
+
+- active data segment는 현재 source-translated `$instantiate`가 만든 init
+  instruction과 memory helper bridge를 통해 실행된다.
+- active elem segment도 source-translated `$instantiate` 경로를 타며, 실행은
+  `output_bs.maude`의 source-derived table/elem helper bridge에 의존한다.
+- imported function은 `--import-func`로 외부 함수 body를 주면 CLI가 base
+  store와 externaddr list를 자동 생성해서 실행할 수 있다.
+- imported global은 `--import-global`로 초기값을 줄 수 있다.
+- imported memory/table은 import type의 min/default ref를 이용해 base store를
+  자동 생성한다.
+
 ## 7. 교수님께 가져갈 질문
 
 핵심 질문:
@@ -451,16 +546,19 @@ boundary를 물으면 같이 설명해야 한다.
 
 1. `$is-spectec-val-seq`와 `step-from-step-pure-ctxt-instrs` 같은
    source-derived execution infrastructure를 C1에 둘 수 있는가?
-2. `$infer-*` witness inference overlay를 C1에 둘 수 있는가?
-3. runtime typecheck cleanup은 현재처럼 대부분 제거하고 최소 sequence-shape guard만
+2. `step-read-call-ref-func-zero-locals`를 임시 C1 helper로 둘 수 있는가, 아니면
+   star-map intermediate sort inference를 먼저 고쳐야 하는가?
+3. `$infer-*` witness inference overlay를 C1에 둘 수 있는가?
+4. runtime typecheck cleanup은 현재처럼 대부분 제거하고 최소 sequence-shape guard만
    남기는 것으로 충분한가?
-4. typed/mixed/nested sequence sort 설계를 C1에서 지금 해야 하는가?
-5. broad audit의 `271 STUCK`을 전부 source-valid sample로 분류해야 하는가?
-6. benchmark-driven execution validation으로 넘어가도 되는가?
+5. typed/mixed/nested sequence sort 설계를 C1에서 지금 해야 하는가?
+6. broad audit의 `271 STUCK`을 전부 source-valid sample로 분류해야 하는가?
+7. benchmark-driven execution validation으로 넘어가도 되는가?
 
 ## 8. 지금 당장 하지 말아야 할 것
 
-- `output_bs.maude`를 손으로 patch하지 않는다.
+- init-config / WAT harness helper를 `output_bs.maude`에 직접 넣지 않는다.
+  필요한 경우 `wasm-init-bs.maude`에 둔다.
 - `271 STUCK`을 전부 bug라고 단정하지 않는다.
 - C1 기준 확정 전에 typed/mixed/nested sequence 대수 전체를 갈아엎지 않는다.
 - init-config/frontend/model checking과 C1 isomorphism cleanup을 섞지 않는다.
