@@ -1,339 +1,87 @@
-# C1 limitation 정리
+# C1 Limitations And Discussion Notes
 
-Updated: 2026-05-26
+Updated: 2026-05-27
 
-이 문서가 현재 C1 limitation / 교수님 논의 사항의 기준 문서다.
-`docs/archive/` 아래 문서는 기록용이며, 현재 상태를 판단할 때는 이 문서와
-root의 `STATUS.md`를 먼저 본다.
+This is the current source of truth for C1 limitations.  Older files under
+`docs/archive/` are historical evidence, not the current project state.
 
-## 0. 현재 결론
+## 0. Current Conclusion
 
-`output_bs.maude`는 WebAssembly 3.0 SpecTec source에 대해 구조적 coverage가
-완료된 상태다.
-
-```text
-source files:                    21 / 21
-syntax declarations:             249 / 249
-def declarations/equations:       1272 / 1272
-relation declarations:            82 / 82
-rule declarations:                499 / 499
-strict validation rule targets:   281 / 281 primary rl/crl
-missing source construct:         현재 확인된 것 없음
-eq/ceq ... = valid:               없음
-iter-empty / opt-empty labels:    없음
-```
-
-현재 핵심은 “source 구조를 유지하면서 Maude 실행성을 위해 필요한 최소
-source-derived helper를 C1에서 허용할 수 있는가”이다.
-
-## 1. C1 isomorphism 기준
-
-현재 프로젝트에서 말하는 C1 isomorphic 기준:
-
-1. SpecTec source에 있는 syntax / def / rule 구조와 의도를 보존한다.
-2. 변수명과 Maude 내부 이름은 달라도 된다.
-3. source에 없는 helper / rule / condition / function은 C1 core에 남기지
-   않는 것이 원칙이다. 단, Maude 표현상 unavoidable하거나 교수님께 명시적으로
-   허용받은 source-derived execution infrastructure는 예외로 둘 수 있다.
-4. SpecTec unconditional rule이면 Maude도 unconditional rule이어야 하고,
-   conditional rule이면 Maude도 conditional rule이어야 한다.
-5. SpecTec `def`는 Maude `eq/ceq`, SpecTec `rule`은 Maude `rl/crl`로 내려간다.
-
-## 2. 현재 non-isomorphic / 교수님 논의 필요 항목
-
-### 2.1 Category / Sequence Sort Representation Gap + Generic Step-Pure Context Bridge
-
-#### SpecTec 원본 예시
-
-```spectec
-rule Step/ctxt-instrs:
-  z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
-  -- Step: z; instr* ~> z'; instr'*
-  -- if val* =/= eps \/ instr_1* =/= eps
-```
-
-의미:
-
-> 전체 instruction sequence 안에서 가운데 `instr*`만 step 가능하면,
-> 앞의 `val*`와 뒤의 `instr_1*`는 그대로 두고 가운데만 바꾼다.
-
-여기서 source category 정보는 중요하다.
+`output_bs.maude` structurally covers the WebAssembly 3.0 SpecTec source in
+this repository and loads without Maude warnings through the runtime harness.
 
 ```text
-val*      : value sequence
-instr*    : instruction sequence
-instr_1*  : instruction sequence
+source files:                       21 / 21
+syntax declarations:                249 / 249
+def declarations/equations:          1272 / 1272
+relation declarations:               82 / 82
+rule declarations:                   499 / 499
+strict validation source-rule targets: 281 / 281 primary rl/crl
+missing source construct:            none currently known
+eq/ceq ... = valid:                  0
+iter-empty / opt-empty labels:       0
 ```
 
-#### Strict isomorphic한 Maude
-
-strict하게는 source premise만 내려가야 한다.
-
-```maude
-crl [step-ctxt-instrs] :
-  step((Z ; VALS INSTRS INSTRS1))
-  =>
-  (ZQ ; VALS INSTRSQ INSTRS1)
-  if (VALS =/= eps \/ INSTRS1 =/= eps)
-  /\ step((Z ; INSTRS)) => (ZQ ; INSTRSQ) .
-```
-
-#### 왜 strict하게만 하면 실행이 어렵나
-
-현재 C1에서는 `val*`, `instr*`, `instr_1*`가 각각 다른 Maude sequence sort가
-아니다. 대부분의 sequence가 넓은 sort로 올라간다.
-
-```maude
-SpectecTerminals
-op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [assoc id: eps] .
-```
-
-그래서 Maude는 source shape:
+The current research question is:
 
 ```text
-val* instr* instr_1*
+How far can we keep the generated Maude structurally isomorphic to the SpecTec
+source while still making the result executable enough for concrete Wasm
+programs and benchmark tests?
 ```
 
-을 category대로 안전하게 split하지 못하고 너무 많은 split을 시도한다.
+## 1. Isomorphism Criteria
 
-원하는 split:
+C1 currently aims for:
+
+1. SpecTec source syntax / def / rule structure and intent are preserved.
+2. SpecTec `def` lowers to Maude `eq/ceq`.
+3. SpecTec `rule` lowers to Maude `rl/crl`.
+4. Unconditional source rules stay unconditional when possible.
+5. Source-absent helper names/rules are avoided in `output_bs.maude` unless
+   they are unavoidable representation infrastructure, mechanically derived
+   execution infrastructure, or explicitly accepted after discussion.
+
+## 2. Resolved Or Improved Items
+
+### 2.1 `step-from-step-pure-*`
+
+Current output:
 
 ```text
-VALS    = eps
-INSTRS  = LABEL {...} BR 0
-INSTRS1 = LOCAL.GET 1
+step-from-step-pure count: 0
 ```
 
-하지만 broad `SpectecTerminals`에서는 `VALS` 자리에 instruction이 들어가는
-source category상 말이 안 되는 split도 후보가 된다. 이 때문에 context rule의
-condition에서 다시 `step((Z ; INSTRS))`를 증명하는 경로가 실행 중 불안정해질
-수 있다.
+The former context-step shortcut rules are no longer generated.
 
-#### 현재 output에서 어떻게 표현했나
+### 2.2 `$is-spectec-val-seq`
 
-`Step/ctxt-instrs` 본체는 source 구조대로 유지한다.
-
-```maude
-crl [step-ctxt-instrs] :
-  step((Z ; VALS INSTRS INSTRS1))
-  =>
-  (ZQ ; VALS INSTRSQ INSTRS1)
-  if $is-spectec-val-seq(VALS)
-  /\ (VALS =/= eps \/ INSTRS1 =/= eps)
-  /\ step((Z ; INSTRS)) => (ZQ ; INSTRSQ) .
-```
-
-추가된 부분:
-
-```maude
-$is-spectec-val-seq(VALS)
-```
-
-이것은 well-typed program 검사라기보다, `VALS` 자리에 진짜 value sequence만
-오게 제한하는 sequence-shape guard다.
-
-또한 pure step이 context 안에 있을 때 실행 경로를 안정화하기 위해 generic
-bridge를 둔다.
-
-```maude
-crl [step-from-step-pure-ctxt-instrs] :
-  step((Z ; VALS INSTRS INSTRS1))
-  =>
-  (Z ; VALS INSTRSQ INSTRS1)
-  if $is-spectec-val-seq(VALS)
-  /\ (VALS =/= eps \/ INSTRS1 =/= eps)
-  /\ step-pure(INSTRS) => INSTRSQ .
-```
-
-이 helper가 없으면 Maude는 pure step을 context 안에서 줄이기 위해 아래 경로를
-직접 찾아야 한다.
+Current output:
 
 ```text
-step((Z ; VALS INSTRS INSTRS1))
--> step-ctxt-instrs
--> condition에서 step((Z ; INSTRS)) 증명
--> 그 안에서 step-pure(INSTRS) 찾기
+$is-spectec-val-seq: absent
+$is-spectec-val: absent
 ```
 
-하지만 broad sequence split 후보가 너무 많아서 이 경로가 불안정해질 수 있다.
-그래서 `step-pure(INSTRS) => INSTRSQ`가 가능하면 바로:
-
-```text
-step((Z ; VALS INSTRS INSTRS1))
-=> (Z ; VALS INSTRSQ INSTRS1)
-```
-
-로 줄이는 source-derived bridge를 둔다.
-
-#### 분류
-
-- `$is-spectec-val-seq`: source `val*` category를 broad carrier 위에서 보존하는
-  최소 sequence-shape guard.
-- `step-from-step-pure-ctxt-instrs`: `Step_pure`와 `Step/ctxt-instrs` 조합에서
-  유도한 generic execution bridge.
-- 둘 다 source에 문자 그대로 있는 이름은 아니므로 strict하게는
-  non-isomorphic이다.
-
-교수님 질문:
-
-> 이런 source-derived sequence-shape guard와 generic execution bridge를 C1
-> infrastructure로 허용할 수 있을까요?
-
-### 2.2 `$infer-*` witness inference overlay
-
-대표 source:
-
-```spectec
-rule Instrs_ok/seq:
-  C |- instr_1 instr_2* : t_1* ->_(x_1* x_2*) t_3*
-  -- Instr_ok: C |- instr_1 : t_1* ->_(x_1*) t_2*
-  -- Instrs_ok: $with_locals(C, x_1*, (SET t)*) |- instr_2* : t_2* ->_(x_2*) t_3*
-```
-
-여기서 `t_2*`는 첫 premise가 만들어내고 다음 premise가 사용한다.
-
-strict Maude shape:
+Instead, source `val*` is represented with a Maude sort:
 
 ```maude
-crl [instrs-ok-seq] :
-  Instrs-ok(C, INSTR1 INSTRS2, ARROW(TS1, XS1 XS2, TS3))
-  =>
-  valid
-  if Instr-ok(C, INSTR1, ARROW(TS1, XS1, TS2)) => valid
-  /\ Instrs-ok(..., INSTRS2, ARROW(TS2, XS2, TS3)) => valid .
+sort ValSeq .
+subsort Val < ValSeq .
+subsort ValSeq < SpectecTerminals .
+op eps : -> ValSeq .
+op _ _ : ValSeq ValSeq -> ValSeq [ctor assoc id: eps] .
 ```
 
-문제는 `TS2`다. 현재 relation encoding은:
+This lets rules such as `Step/ctxt-instrs` use a sorted `VALS : ValSeq`
+variable rather than a source-absent Boolean guard.
 
-```maude
-Instr-ok(...) => valid
-```
+### 2.3 SpectecType ground-term universe
 
-형태라서 validity는 확인하지만 `TS2` 같은 witness를 결과로 반환하지 않는다.
-그래서 translator가 source premise 구조에서 `$infer-*` helper를 생성한다.
+The old overly broad shape allowed meaningless type terms such as
+`iN(CTORNOPA0)`.  This was a translator bug, not a research feature.
 
-예:
-
-```maude
-$infer-instr-ok-arg2(C, INSTR1) => ARROW(TS1, XS1, TS2)
-```
-
-그리고 원래 source premise도 다시 확인한다.
-
-```maude
-/\ $infer-instr-ok-arg2(C, INSTR1) => ARROW(TS1, XS1, TS2)
-/\ Instr-ok(C, INSTR1, ARROW(TS1, XS1, TS2)) => valid
-/\ Instrs-ok(..., INSTRS2, ARROW(TS2, XS2, TS3)) => valid
-```
-
-분류:
-
-- source relation premise에서 기계적으로 유도된다.
-- benchmark hardcoding은 아니다.
-- 하지만 source에는 `$infer-*`라는 relation이 없으므로 strict하게는
-  non-isomorphic이다.
-
-교수님 질문:
-
-> 이런 witness inference helper를 C1에 둘 수 있을까요, 아니면 C2 solver /
-> execution layer로 분리해야 할까요?
-
-### 2.3 Zero-local `call_ref` bridge
-
-현재 output에는 아래 helper도 있다.
-
-```maude
-crl [step-read-call-ref-func-zero-locals] : ...
-```
-
-이 helper는 `local* = eps`인 함수를 `call_ref`로 호출할 때 필요하다. source
-의미상 zero-local function은 가능하지만, 현재 literal
-`step-read-call-ref-func` generated rule은 local list를 unmap하기 위한 중간
-variable sort가 너무 좁게 잡혀서 `eps` local list를 못 잡는다.
-
-분류:
-
-- 특정 benchmark hardcoding은 아니다.
-- zero-local function call이라는 source-valid general case를 보완한다.
-- 하지만 source에는 이 이름의 rule이 없으므로 strict하게는 source-derived
-  execution bridge다.
-
-향후 더 좋은 해결은 이 helper를 계속 늘리는 것이 아니라, translator의 star-map
-intermediate sort inference를 고쳐서 literal generated rule이 `eps` local list도
-잡게 만드는 것이다.
-
-## 3. Typecheck cleanup
-
-교수님 질문:
-
-> 이미 well-typed Wasm program이 input으로 들어온다고 가정하면, runtime에서
-> typecheck를 다시 할 필요가 있는가?
-
-현재 결론:
-
-```text
-runtime validation/category typecheck layer는 대부분 제거 가능했다.
-다만 broad SpectecTerminals representation 때문에 val* prefix를 제한하는
-최소 sequence-shape guard는 필요하다.
-```
-
-현재 제거된 것:
-
-```text
-SPECTEC-CATEGORIES
-mb / cmb
-hasType / WellTyped
-대부분의 $is-spectec-*
-```
-
-현재 남은 것:
-
-```maude
-$is-spectec-val
-$is-spectec-val-seq
-```
-
-이 둘은 일반적인 validation typecheck라기보다 `val* instr* instr_1*` 같은
-mixed sequence split을 안정화하기 위한 runtime sequence-shape infrastructure다.
-
-중요:
-
-- Wasm type syntax를 삭제한 것이 아니다.
-- SpecTec validation semantics를 삭제한 것이 아니다.
-- runtime execution에 불필요한 generated category/typecheck layer를 줄인 것이다.
-
-남아야 하는 것:
-
-```text
-i32, i64, functype, reftype, heaptype, blocktype
-Instr-ok, Instrs-ok, Module-ok, Func-ok, Reftype-sub, Heaptype-sub
-```
-
-## 4. SpectecType / ground term universe cleanup
-
-교수님 질문:
-
-> `SpectecType`이 너무 넓어서 실제 의미 없는 ground type term까지 만들고 있는
-> 것 아닌가?
-
-문제였던 형태:
-
-```maude
-op iN   : SpectecTerminal -> SpectecType .
-op list : SpectecTerminal -> SpectecType .
-op vec  : SpectecTerminal -> SpectecType .
-```
-
-`SpectecTerminal`은 거의 모든 source/runtime term이 올라가는 큰 sort라서
-아래처럼 의미 없는 term도 `SpectecType`처럼 받아들여질 수 있었다.
-
-```maude
-iN(CTORNOPA0)
-list(CTORNOPA0)
-fN(CTORREFCASTA1(CTORI32A0))
-```
-
-현재 수정:
+Current design separates runtime terminals from category/type labels:
 
 ```maude
 sort SpectecTerminal .
@@ -342,23 +90,15 @@ sort SpectecCategory .
 subsort SpectecType < SpectecCategory .
 ```
 
-`SpectecType`은 더 이상 runtime terminal이 아니다. 현재 output에는 아래 subsort가
-없다.
+Removed:
 
 ```maude
 subsort SpectecType < SpectecTerminal .
 subsort SpectecTypes < SpectecTerminals .
 ```
 
-source category label을 받는 helper는 `SpectecCategory`를 사용한다.
-
-```maude
-op $concat  : SpectecCategory SpectecTerminals -> SpectecTerminals .
-op $disjoint : SpectecCategory SpectecTerminals -> Bool .
-op $setminus : SpectecCategory SpectecTerminals SpectecTerminals -> SpectecTerminals .
-```
-
-parametric type/category constructor도 더 좁은 sort를 받는다.
+Parametric type/category constructors now use narrower source-shaped parameter
+sorts:
 
 ```maude
 op iN    : N -> SpectecType .
@@ -367,209 +107,254 @@ op binop : Numtype -> SpectecType .
 op list  : SpectecCategory -> SpectecType .
 ```
 
-결론:
+Generic source helpers that take a syntax/category parameter now take
+`SpectecCategory`, not any runtime terminal:
 
-> `SpectecType`을 통째로 지운 것은 아니다. 대신 runtime terminal과 source
-> category/type label을 분리했고, parametric type constructor가 더 이상 아무
-> `SpectecTerminal`이나 받지 않게 만들었다.
-
-## 5. 현재 실행 audit
-
-Broad concrete audit:
-
-```text
-artifacts/rule-concrete-audit-20260525_004500/summary.md
+```maude
+op $concat   : SpectecCategory SpectecTerminals -> SpectecTerminals .
+op $disjoint : SpectecCategory SpectecTerminals -> Bool .
+op $setminus : SpectecCategory SpectecTerminals SpectecTerminals -> SpectecTerminals .
 ```
 
-결과:
+## 3. Remaining Non-Isomorphic / Discussion Items
 
-| status | count |
-|---|---:|
-| REDUCED | 559 |
-| STUCK | 271 |
-| STACK_OVERFLOW | 0 |
-| MAUDE_EXIT | 0 |
-| TIMEOUT | 0 |
+### 3.1 `$infer-*` witness inference
 
-해석:
+SpecTec relation premises can introduce witnesses used by later premises.
 
-- `559 REDUCED`: generated concrete sample에서 실제 rewrite 확인됨.
-- `271 STUCK`: generated concrete sample에서 줄어들지 않음. 이게 전부 rule bug라는
-  뜻은 아니다. source-valid context/store/module/type witness가 부족한 sample일
-  수 있다.
-- `0 STACK_OVERFLOW`: 이전 broad audit의 witness inference stack overflow는 현재
-  재현되지 않는다.
+Example:
 
-Focused evidence:
+```spectec
+rule Instrs_ok/seq:
+  C |- instr_1 instr_2* : t_1* ->_(x_1* x_2*) t_3*
+  -- Instr_ok: C |- instr_1 : t_1* ->_(x_1*) t_2*
+  -- Instrs_ok: ... |- instr_2* : t_2* ->_(x_2*) t_3*
+```
 
-- `artifacts/c1-probe-matrix-20260525_004421/probe_summary.md`
-  - last all-pass focused matrix
-  - `43 PASS`
-- `artifacts/wasmtype-cleanup-audit-20260525_054200/summary.md`
-  - typecheck / SpectecType cleanup 후 direct focused runtime checks 기록
-- `artifacts/c1-probe-matrix-20260525_054128/probe_summary.md`
-  - 최신 matrix지만 stale expected-result sort string 때문에 많은 FAIL이 찍힘
-  - direct runtime result 기준과 구분해서 봐야 함
+Here `t_2*` is produced by the first premise and consumed by the second.
+The current Maude validity encoding:
 
-현재 passing으로 보는 대표 direct runtime path:
+```maude
+Instr-ok(...) => valid
+```
 
-- `steps(fib-config(i32v(5)))`
-- `steps(fib-config-invoke(i32v(5)))`
-- `$instantiate(empty-store, fib-module, eps)`
-- `steps(fib-init-config(i32v(5)))`
-- `examples/fib.wat -> generated-fib-init-config -> steps`
-- `examples/fib-wrapper.wat -> generated-fib-init-config -> wrapper call -> steps`
-- `ref.test` positive / negative
-- `ref.cast` positive / negative
-- label/br suffix search
-- br_if suffix search
-- nop suffix search
+checks validity but does not directly return the witness.  The translator
+therefore generates `$infer-*` helpers from the source premise structure.
 
-## 6. 현재 known limitations
+Classification:
 
-### 6.1 broad audit `271 STUCK`
+- not benchmark hardcoding;
+- mechanically derived from source relation premises;
+- still strict non-isomorphic because the source does not literally contain
+  `$infer-*` relations.
 
-`271 STUCK`은 모두 즉시 bug라고 보면 안 된다. generated sample이 source-valid
-witness를 충분히 갖고 있지 않을 수 있다.
-
-교수님께 먼저 물어볼 점:
-
-> C1이 모든 generated rule에 대해 source-valid concrete execution sample까지
-> 가져야 하는가, 아니면 structural baseline + focused benchmark execution이면
-> 충분한가?
-
-### 6.2 nested sequence `expr**`
-
-`$evalexprss`의 flat concrete path는 실행된다. 하지만 source의 `expr**`는 진짜
-nested sequence이고, current `SpectecTerminals` representation은 대부분 flat하다.
-명시적 empty inner group이 필요한 benchmark가 나오면 nested sequence representation
-설계가 필요하다.
-
-### 6.3 builtin backend completeness
-
-`builtins.maude`는 현재 focused tests에 필요한 최소 backend builtin만 구현한다.
-SIMD, float, memory byte conversion, relaxed numeric benchmark를 넣으면 추가
-backend가 필요할 수 있다.
-
-### 6.4 source-derived execution views
-
-아래 helper들은 source에 문자 그대로 같은 이름은 없지만, source expression /
-source def condition / source otherwise priority를 Maude에서 실행하기 위해 둔
-source-derived views다.
+Discussion question:
 
 ```text
-$map-*
-$valid-*
-$result-*
-$cont-*
+Should witness inference helpers be allowed in C1, or should they be separated
+as a C2 execution/solver layer?
+```
+
+### 3.2 Relation decision mirrors
+
+Current subtype `otherwise` execution uses Boolean mirrors such as:
+
+```text
 $heaptype-sub?
 $reftype-sub?
 ```
 
-이들은 top-level non-isomorphism 발표에서는 1순위가 아니지만, 교수님이 helper
-boundary를 물으면 같이 설명해야 한다.
+They are generated from source subtype rules to make success/failure branching
+executable.  They are not hand-coded Wasm cases, but they are still source-absent
+helper names.
 
-### 6.5 init-config / WAT frontend scope
-
-현재 init/config 실행 helper는 `output_bs.maude`에서 분리되어
-`wasm-init-bs.maude`에 있다. 즉 `output_bs.maude`는 SpecTec 변환 core에 더
-가깝게 두고, WAT/frontend 초기 configuration 조립은 별도 harness에서 처리한다.
-
-현재 `$instantiate` bridge는 더 이상 fib 전용 one-type / one-func만은 아니다.
-현재 focused path는 다음을 지원한다.
+Discussion question:
 
 ```text
-multiple type*
-import* as source-shaped import terms
-global*
-memory*
-table*
-multiple local func*
-data*
-elem* as source-shaped element instances
-start?
-function export*
+Are source-derived decision mirrors acceptable for translating SpecTec
+otherwise-priority behavior into executable Maude?
 ```
 
-OCaml WAT frontend도 다음 focused subset을 지원한다.
+### 3.3 Def execution scaffolding
+
+Some SpecTec `def` clauses contain ordered premises and witness passing.  The
+translator keeps them as Maude `eq/ceq`, but uses source-derived scaffolding:
 
 ```text
-module, type, import, func, param, result, local, export
-global, memory, table, data, elem, start
-block, loop, br, br_if
-local.get, local.set, local.tee
-global.get, global.set
-table.get, table.set, table.size
-memory.size, memory.grow, i32.load, i32.store
-call, call_ref
-ref.null, ref.func, drop, return
-i32.const, i32.add, i32.sub, i32.mul
-i32.eqz, i32.eq, i32.ne, i32.lt_s, i32.gt_s, i32.le_s, i32.ge_s
+$cont-*
+$result-*
+$valid-*
+$map-*
 ```
 
-현재 passing으로 확인한 WAT/init path:
+Discussion question:
 
 ```text
-fib.wat
-fib-wrapper.wat
-global-get.wat
-memory-size.wat
-table-size.wat
-start-global.wat
-data-load.wat
-elem-call-ref.wat
-import-func.wat with automatic function-import linking via --import-func
-import-global.wat with automatic global import linking via --import-global
-import-memory.wat with automatic imported-memory initialization
-import-table.wat with automatic imported-table initialization
+Is this acceptable as executable equation infrastructure, or should it be
+reported as non-isomorphic support code outside the C1 core?
 ```
 
-아직 full WAT parser는 아니다. 특히:
+### 3.4 Init/runtime harness helpers
 
-- active data segment는 현재 source-translated `$instantiate`가 만든 init
-  instruction과 memory helper bridge를 통해 실행된다.
-- active elem segment도 source-translated `$instantiate` 경로를 타며, 실행은
-  `output_bs.maude`의 source-derived table/elem helper bridge에 의존한다.
-- imported function은 `--import-func`로 외부 함수 body를 주면 CLI가 base
-  store와 externaddr list를 자동 생성해서 실행할 수 있다.
-- imported global은 `--import-global`로 초기값을 줄 수 있다.
-- imported memory/table은 import type의 min/default ref를 이용해 base store를
-  자동 생성한다.
+`wasm-init-bs.maude` contains frontend/init/runtime harness helpers.  These are
+not part of the generated SpecTec core and should be discussed separately from
+`output_bs.maude`.
 
-## 7. 교수님께 가져갈 질문
+Current rule:
 
-핵심 질문:
+```text
+Do not move frontend/init harness code into output_bs.maude unless it is truly
+source-derived and translator-generated.
+```
 
-> C1 baseline의 acceptance criterion을 어디까지 잡아야 하나요?
+## 4. Typecheck / Validation Direction
 
-구체 질문:
+The correct statement is not "typecheck was removed."
 
-1. `$is-spectec-val-seq`와 `step-from-step-pure-ctxt-instrs` 같은
-   source-derived execution infrastructure를 C1에 둘 수 있는가?
-2. `step-read-call-ref-func-zero-locals`를 임시 C1 helper로 둘 수 있는가, 아니면
-   star-map intermediate sort inference를 먼저 고쳐야 하는가?
-3. `$infer-*` witness inference overlay를 C1에 둘 수 있는가?
-4. runtime typecheck cleanup은 현재처럼 대부분 제거하고 최소 sequence-shape guard만
-   남기는 것으로 충분한가?
-5. typed/mixed/nested sequence sort 설계를 C1에서 지금 해야 하는가?
-6. broad audit의 `271 STUCK`을 전부 source-valid sample로 분류해야 하는가?
-7. benchmark-driven execution validation으로 넘어가도 되는가?
+The correct statement is:
 
-## 8. 지금 당장 하지 말아야 할 것
+```text
+SpecTec validation semantics remain.
+Duplicate/generated runtime category guards were reduced or moved into better
+source-shaped representations such as ValSeq.
+```
 
-- init-config / WAT harness helper를 `output_bs.maude`에 직접 넣지 않는다.
-  필요한 경우 `wasm-init-bs.maude`에 둔다.
-- `271 STUCK`을 전부 bug라고 단정하지 않는다.
-- C1 기준 확정 전에 typed/mixed/nested sequence 대수 전체를 갈아엎지 않는다.
-- init-config/frontend/model checking과 C1 isomorphism cleanup을 섞지 않는다.
-- Wasm type syntax나 SpecTec validation relation을 runtime typecheck cleanup이라는
-  이름으로 삭제하지 않는다.
+Still present:
 
-## 9. 추천 다음 순서
+```text
+Module-ok
+Func-ok
+Instr-ok
+Instrs-ok
+Reftype-sub
+Heaptype-sub
+```
 
-1. 교수님께 C1 기준을 먼저 확정한다.
-2. source-derived helper boundary를 확정한다.
-3. 기준이 full executable C1이면 broad audit `271 STUCK`을 source-valid witness
-   기준으로 분류한다.
-4. 기준이 structural baseline + benchmark execution이면 benchmark를 넣으면서
-   필요한 execution path를 고친다.
+Removed/reduced from the runtime core path:
+
+```text
+hasType / WellTyped
+general $is-spectec-* runtime predicates
+$is-spectec-val-seq
+```
+
+Invalid input handling:
+
+- normal frontend path rejects invalid `.wat` / `.wasm` through WABT;
+- checked execution is gated by Maude `Module-ok`;
+- if `Module-ok` does not rewrite to `valid`, the generated checked run does
+  not enter `$instantiate` or `steps`.
+
+For formal reporting, emphasize the Maude `Module-ok` gate. WABT is useful for
+engineering hygiene but should not be the only formal argument.
+
+## 5. Current Benchmark State
+
+Latest checked benchmark summary:
+
+```text
+artifact: artifacts/c1-regression-20260527_133237/wasm-benchmarks/benchmark_results.csv
+
+total: 568
+PASS: 319
+STEPPED: 74
+INVALID: 21
+NO_ENTRY: 58
+IMPORT_MISSING: 5
+UNSUPPORTED: 4
+STUCK_VALIDATION: 46
+STUCK_STEP: 8
+WRONG_RESULT: 33
+```
+
+Meaning:
+
+- `PASS`: fully successful case with expected result.
+- `STEPPED`: execution ended, but no expected result was available.
+- `INVALID`: invalid module rejected or `Module-ok` did not prove valid.
+- `NO_ENTRY`: module has no callable export/main function.
+- `IMPORT_MISSING`: host import is required but not linked.
+- `UNSUPPORTED`: syntax or instruction family not supported yet.
+- `STUCK_VALIDATION`: validation executability gap.
+- `STUCK_STEP`: runtime executability gap.
+- `WRONG_RESULT`: runtime result mismatch.
+
+## 6. Current Frontend Scope
+
+The WAT/Wasm frontend currently supports:
+
+```text
+module/type/func/import/export
+global/memory/table/data/elem/start
+direct call/call_ref/call_indirect
+block/loop/if/br/br_if/br_table
+local/global get/set/tee
+memory load/store/init/copy/fill/size/grow
+table get/set/size/grow/fill/init/copy/elem.drop
+i32/i64/f32/f64 constants, numeric ops, relops, conversions
+selected v128/SIMD/relaxed-SIMD term generation
+selected ref types and ref instructions
+```
+
+Still incomplete:
+
+```text
+full WAT grammar
+all proposal/custom syntax
+structured exception/tag runtime coverage
+all SIMD/relaxed-SIMD execution semantics
+all GC/recursive type proposal paths
+complete WASI/browser import environment
+```
+
+## 7. Current Runtime/Validation Gaps
+
+Priority buckets:
+
+1. `STUCK_VALIDATION`
+   - `Module-ok` / `Instrs-ok` execution gaps.
+   - Examples include table64/memory64 validation, local initialization,
+     unreachable/polymorphic typing, and proposal instruction forms.
+2. `STUCK_STEP`
+   - Runtime rules or builtins do not finish.
+   - Examples include memory fill/copy/grow, ref/null paths, and SIMD admin
+     contexts.
+3. `WRONG_RESULT`
+   - Execution finishes with an incorrect value.
+   - Examples include memory byte operations, data/drop state, linking/import
+     state, float memory, and ref checks.
+4. `UNSUPPORTED`
+   - Frontend or WABT cannot yet parse/support the syntax.
+
+## 8. What To Ask Professor
+
+Recommended questions:
+
+1. `val*` is now represented by `ValSeq`, not `$is-spectec-val-seq`. Is this
+   the right C1 direction for source category preservation?
+2. Can `$infer-*` witness inference be considered acceptable source-derived
+   execution infrastructure, or should it be moved to a separate layer?
+3. Are subtype decision mirrors for `otherwise` acceptable in C1?
+4. Should the paper's formal path require Maude `Module-ok` checked execution
+   for all frontend runs?
+5. What is the expected C1 acceptance criterion: structural coverage plus
+   benchmark execution, or every generated rule executable on a source-valid
+   concrete witness?
+
+## 9. Recommended Next Work
+
+1. Reduce `STUCK_VALIDATION`.
+2. Reduce `STUCK_STEP`.
+3. Reduce `WRONG_RESULT`.
+4. Expand unsupported frontend syntax only after the first three buckets shrink.
+5. Continue moving non-source frontend/init code out of `output_bs.maude`.
+6. Maintain a paper-ready benchmark table from `scripts/run_wasm_benchmarks.py`.
+
+## 10. Things Not To Do
+
+- Do not claim full WebAssembly support yet.
+- Do not claim typecheck was simply removed.
+- Do not treat WABT as the only formal validation argument.
+- Do not put frontend/init harness helpers directly into `output_bs.maude`.
+- Do not assume all `STUCK_VALIDATION` cases are frontend bugs; some are Maude
+  validation executability gaps.

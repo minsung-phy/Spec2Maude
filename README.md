@@ -1,90 +1,186 @@
 <h1 align="center">Spec2Maude</h1>
 
 <p align="center">
-  <strong>Translating SpecTec language definitions into executable Maude specifications.</strong>
+  <strong>A research prototype for translating SpecTec language definitions into executable Maude specifications.</strong>
 </p>
 
 ---
 
-## Overview
+## What This Project Does
 
-Spec2Maude is a research prototype for translating formal language
-definitions written in **SpecTec** into **Maude** rewriting-logic
-specifications.
+Spec2Maude translates language definitions written in **SpecTec** into
+**Maude** rewriting-logic specifications.
 
-The current case study is **WebAssembly 3.0**.  The goal is not just to produce
-some hand-written Maude model of Wasm, but to study how much of a SpecTec
-definition can be translated automatically while preserving the source
-structure:
+The current main case study is **WebAssembly 3.0**.  The project has two
+connected goals:
 
-- SpecTec syntax declarations become Maude syntax/signature declarations.
-- SpecTec `def` clauses become Maude `eq` / `ceq`.
-- SpecTec `rule` clauses become Maude `rl` / `crl`.
-- The generated Maude should stay close to the SpecTec source, but still be
-  executable enough for concrete rewriting experiments.
+1. Translate the WebAssembly SpecTec source into a Maude specification while
+   preserving the source structure as much as possible.
+2. Run concrete `.wat` / `.wasm` programs by generating a Maude module term,
+   validating it with the translated WebAssembly validation rules, instantiating
+   it, and executing it with Maude rewriting.
 
-This repository is therefore both:
-
-1. a translator implementation, and
-2. a research artifact for studying the boundary between strict source
-   isomorphism and executable Maude infrastructure.
-
-## Current Research Target
-
-The active target is the **C1 WebAssembly baseline**.
-
-C1 aims to preserve the source shape as much as possible while allowing a small
-amount of source-derived execution infrastructure where Maude's execution model
-does not directly match SpecTec notation.
-
-Examples of current research questions:
-
-- Can broad SpecTec sequence notation such as `val* instr* instr*` be represented
-  cleanly in Maude without excessive category guards?
-- Should witness-inference helpers such as `$infer-*` be allowed in the C1
-  baseline?
-- How much helper infrastructure is acceptable when making source-translated
-  definitions executable?
-- Can Wasm module initialization be driven through the source-translated
-  `$instantiate` path rather than a hand-written runtime shortcut?
-
-Detailed discussion notes live in:
+The current execution pipeline is:
 
 ```text
-STATUS.md
-docs/limitation.md
-docs/HowToTest.md
+.wat / .wasm
+  -> WAT/Wasm frontend
+  -> Maude module term
+  -> Module-ok validation
+  -> $instantiate
+  -> invoke / call_ref
+  -> steps
+  -> result comparison
 ```
+
+This is a research artifact, not a production WebAssembly runtime.  The
+important question is not only "can this program run?", but also "how close is
+the generated Maude to the original SpecTec definition?".
+
+## Current State
+
+The active path is the **C1 WebAssembly baseline**:
+
+- `translator_bs.ml` translates `wasm-3.0/*.spectec`.
+- `output_bs.maude` is the generated WebAssembly Maude core.
+- `wasm_to_maude.ml` converts `.wat` / `.wasm` inputs into generated Maude
+  harnesses.
+- `wasm-init-bs.maude` contains init/config/runtime harness code kept outside
+  the generated core.
+- `scripts/run_c1_regression.sh` runs the current local and benchmark
+  regression.
+
+Latest checked regression shape:
+
+```text
+total benchmark rows: 568
+PASS: 319
+STEPPED: 74
+INVALID: 21
+NO_ENTRY: 58
+IMPORT_MISSING: 5
+UNSUPPORTED: 4
+STUCK_VALIDATION: 46
+STUCK_STEP: 8
+WRONG_RESULT: 33
+
+Maude load warnings: 0
+step-from-step-pure count: 0
+```
+
+How to read the important buckets:
+
+- `PASS`: validation, instantiation, execution, and expected-result comparison
+  succeeded.
+- `STEPPED`: execution reached a final Maude config, but the benchmark did not
+  provide an expected result to compare.
+- `INVALID`: the input was rejected as invalid, or `Module-ok` did not prove it
+  valid.
+- `STUCK_VALIDATION`: Maude term generation succeeded, but `Module-ok` /
+  validation did not finish as `valid`.
+- `STUCK_STEP`: validation/init succeeded, but runtime `steps` got stuck or
+  timed out.
+- `WRONG_RESULT`: execution ended, but the result did not match the expected
+  value.
+
+See [STATUS.md](STATUS.md) for the current handoff state and
+[docs/limitation.md](docs/limitation.md) for open research limitations.
 
 ## Repository Layout
 
 ```text
-translator_bs.ml          active C1 SpecTec-to-Maude translator
-main_bs.ml                C1 translator entry point
-output_bs.maude           generated Maude output for WebAssembly SpecTec
-builtins.maude            Maude implementations for selected builtin paths
-wasm-init-bs.maude        runtime/init harness helpers kept outside output_bs.maude
-wasm-exec-bs.maude        concrete execution harness and regression terms
-wat_to_maude_fib.ml       focused WAT-to-Maude frontend for executable examples
-examples/*.wat            WAT smoke-test inputs
-wasm-3.0/*.spectec        WebAssembly 3.0 SpecTec source files
-docs/HowToTest.md         current test commands
+translator_bs.ml          active SpecTec-to-Maude translator
+main_bs.ml                translator entry point
+output_bs.maude           generated WebAssembly Maude core
+builtins.maude            selected backend/builtin Maude definitions
+wasm-init-bs.maude        init/config/runtime harness outside output_bs.maude
+wasm-exec-bs.maude        concrete execution harness and smoke terms
+wasm_to_maude.ml          .wat/.wasm frontend and execution CLI
+wat_examples/             local smoke WAT programs
+wasm-3.0/                 WebAssembly 3.0 SpecTec source files
+scripts/                  regression, benchmark, and audit scripts
+docs/HowToTest.md         detailed test commands
 docs/limitation.md        current limitations and discussion points
-STATUS.md                current handoff/status summary
+STATUS.md                 current project status
 ```
 
-Older files such as `translator.ml`, `output.maude`, and `wasm-exec.maude` are
-legacy/reference paths unless explicitly stated otherwise.
+Legacy files such as `translator.ml`, `output.maude`, and `wasm-exec.maude`
+belong to older paths unless a document explicitly says otherwise.
 
-## Build
+## Requirements
 
-Build the C1 translator and WAT frontend:
+You need:
+
+- macOS or Linux shell environment
+- OCaml / opam
+- Dune
+- Maude 3.5.1 or compatible
+- WABT tools for `.wat` / `.wasm` handling
+
+Install the common tools on macOS:
 
 ```bash
-dune build ./main_bs.exe ./wat_to_maude_fib.exe
+brew install opam dune wabt
 ```
 
-Regenerate the current WebAssembly Maude output:
+Install Maude separately if it is not already available:
+
+```bash
+command -v maude
+maude --version
+```
+
+This repository's regression script also looks for local Maude binaries at:
+
+```text
+/Users/minsung/Dev/tools/Maude-3.5.1-macos-x86_64/maude
+```
+
+If Maude is elsewhere, set:
+
+```bash
+export MAUDE_BIN=/path/to/maude
+```
+
+Check WABT:
+
+```bash
+command -v wasm2wat
+command -v wat2wasm
+command -v wasm-validate
+command -v wast2json
+```
+
+## OCaml Setup
+
+Create or select an opam switch:
+
+```bash
+opam switch create spec2maude 5.2.0
+eval "$(opam env --switch=spec2maude)"
+```
+
+Install build dependencies:
+
+```bash
+opam install dune
+```
+
+If you already have a working switch, just run:
+
+```bash
+eval "$(opam env)"
+```
+
+Then build:
+
+```bash
+dune build ./main_bs.exe ./wasm_to_maude.exe
+```
+
+## Regenerate The Maude Core
+
+Generate `output_bs.maude` from the WebAssembly SpecTec source:
 
 ```bash
 dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude
@@ -96,11 +192,17 @@ Load the execution harness:
 maude wasm-exec-bs.maude
 ```
 
-Expected load behavior: no Maude warning/advisory/error.
+Expected load behavior:
 
-## Basic Execution
+```text
+no Warning
+no Advisory
+no Error
+```
 
-After loading `wasm-exec-bs.maude`, a direct Fibonacci smoke test is:
+## Run A Built-In Maude Smoke Test
+
+Inside Maude:
 
 ```maude
 rew [1] in WASM-FIB-BS : steps(fib-config(i32v(5))) .
@@ -112,24 +214,14 @@ Expected final value:
 CTORCONSTA2(CTORI32A0, 5)
 ```
 
-The module-initialization path now goes through the source-translated
-`$instantiate`:
+This checks the handwritten smoke config in `wasm-exec-bs.maude`.
 
-```maude
-red in WASM-FIB-BS : $instantiate(empty-store, fib-module, eps) .
-rew [1] in WASM-FIB-BS : steps(fib-init-config(i32v(5))) .
-```
+## Run A WAT File
 
-## WAT Frontend
-
-The repository includes a focused OCaml WAT frontend for executable examples.
-It is not a full WebAssembly parser yet, but it supports the module features
-and instructions needed by the current smoke tests.
-
-Run Fibonacci from WAT:
+Run Fibonacci from `wat_examples/fib.wat`:
 
 ```bash
-dune exec ./wat_to_maude_fib.exe -- --result-only --run 5 examples/fib.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run 5 wat_examples/fib.wat
 ```
 
 Expected output:
@@ -138,79 +230,158 @@ Expected output:
 result: CTORCONSTA2(CTORI32A0, 5)
 ```
 
-Run selected module examples:
+What happens here:
+
+1. The frontend reads `fib.wat`.
+2. WABT canonicalizes/validates the WAT.
+3. The frontend creates a Maude module term.
+4. The generated harness checks `Module-ok`.
+5. It instantiates the module.
+6. It invokes the function.
+7. It runs `steps`.
+8. It prints the final result.
+
+Run other local examples:
 
 ```bash
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-main examples/global-get.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-main examples/memory-size.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-main examples/table-size.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-main examples/data-load.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-main examples/elem-call-ref.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/global-get.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/memory-size.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/table-size.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/start-global.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/data-load.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/elem-call-ref.wat
 ```
 
-Run an import example:
+Run a `.wasm` file by converting a smoke input first:
 
 ```bash
-dune exec ./wat_to_maude_fib.exe -- --result-only \
+wat2wasm --enable-all wat_examples/fib.wat -o /tmp/fib.wasm
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run 5 /tmp/fib.wasm
+```
+
+## Imports
+
+WebAssembly modules may import functions, globals, memories, or tables from an
+external environment.  If a module imports a function, the function body is not
+inside the WAT/Wasm file, so the CLI needs an implementation.
+
+Example:
+
+```bash
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
   --run-export main \
   --arg-i32 41 \
   --import-func 'env.bump=local.get 0 i32.const 1 i32.add' \
-  examples/import-func.wat
+  wat_examples/import-func.wat
 ```
 
-Expected output:
+Expected:
 
 ```text
 result: CTORCONSTA2(CTORI32A0, 42)
 ```
 
-More complete test commands are documented in [docs/HowToTest.md](docs/HowToTest.md).
+Other import examples:
 
-## Current Scope
+```bash
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
+  --run-export main \
+  --import-global 'env.g=i32.const 77' \
+  wat_examples/import-global.wat
 
-Current generated C1 coverage structurally covers the WebAssembly 3.0 SpecTec
-input used in this repository:
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
+  --run-export main wat_examples/import-memory.wat
 
-```text
-source files:              21 / 21
-syntax declarations:       249 / 249
-def declarations:          1272 / 1272
-relation declarations:     82 / 82
-rule declarations:         499 / 499
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
+  --run-export main wat_examples/import-table.wat
 ```
 
-The runtime path is intentionally narrower than full WebAssembly.  The focused
-WAT frontend currently covers representative examples involving:
+## Invalid Input
 
-- integer arithmetic and control flow,
-- globals,
-- memories and active data segments,
-- tables and active element segments,
-- direct calls and `call_ref`,
-- start functions,
-- selected function/global/memory/table imports.
+Invalid programs must not execute.  The normal frontend path rejects invalid
+WAT/Wasm before runtime, and the generated checked-run path also gates runtime
+execution by `Module-ok`.
 
-## Limitations
+Example invalid input:
 
-This is still a research prototype, not a production Wasm runtime.
+```bash
+dune exec ./wasm_to_maude.exe -- --checked-run --result-only --run-main \
+  wat_examples/invalid-result-type.wat
+```
 
-Known limitations include:
+This module declares an `i32` result but returns an `i64`, so it should be
+rejected.
 
-- the WAT frontend is focused, not a complete WAT parser;
-- not every WebAssembly instruction family is implemented in the executable
-  smoke path;
-- some source-derived helper rules remain in the generated output to make broad
-  SpecTec sequences and record updates executable in Maude;
-- the exact boundary of acceptable helper infrastructure is still a research
-  question for the C1 baseline.
+## Full Regression
 
-See [docs/limitation.md](docs/limitation.md) for the current detailed
-discussion.
+Run the current regression:
+
+```bash
+scripts/run_c1_regression.sh
+```
+
+The script:
+
+1. checks WABT tools,
+2. builds the translator and frontend,
+3. regenerates `output_bs.maude`,
+4. checks structural invariants,
+5. runs local WAT/Wasm smokes,
+6. probes benchmark/spec-test cases,
+7. checks Maude load warnings,
+8. writes artifacts under `artifacts/c1-regression-*`.
+
+Fetch external benchmark repositories when needed:
+
+```bash
+scripts/fetch_wasm_benchmarks.sh
+```
+
+Run only the benchmark classifier:
+
+```bash
+scripts/run_wasm_benchmarks.py \
+  --cli _build/default/wasm_to_maude.exe \
+  --maude "${MAUDE_BIN:-maude}" \
+  --timeout 5 \
+  --max-external-files 80 \
+  --max-file-bytes 1000000 \
+  --artifact-dir artifacts/wasm-benchmark-latest
+```
+
+## Current Limitations
+
+The frontend and runtime are not yet full WebAssembly 3.0 coverage.
+
+Known remaining work:
+
+- reduce `STUCK_VALIDATION` cases by improving `Module-ok` / `Instrs-ok`
+  executability;
+- reduce `STUCK_STEP` cases by filling runtime rule and builtin gaps;
+- reduce `WRONG_RESULT` cases in memory, ref, import/linking, float, and SIMD
+  families;
+- support more proposal syntax and structured exception forms;
+- keep non-source helper infrastructure out of `output_bs.maude` when possible;
+- document any remaining source-derived helper as research infrastructure.
+
+The current C1 core no longer has `step-from-step-pure-*` rules and no longer
+uses `$is-spectec-val-seq`; source `val*` is represented with a `ValSeq` Maude
+sort instead.
 
 ## Development Notes
 
-`output_bs.maude` is generated.  Prefer changing `translator_bs.ml` and
-regenerating rather than hand-editing `output_bs.maude`.
+`output_bs.maude` is generated.  Prefer editing `translator_bs.ml` and
+regenerating instead of hand-editing `output_bs.maude`.
 
-Use `docs/HowToTest.md` before committing changes that affect translation or
-execution.
+Before committing translation/runtime changes, run:
+
+```bash
+dune build ./main_bs.exe ./wasm_to_maude.exe
+scripts/run_c1_regression.sh
+```
+
+For documentation-only changes, at least inspect the current status with:
+
+```bash
+git diff --stat
+```

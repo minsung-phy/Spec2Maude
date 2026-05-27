@@ -17,6 +17,7 @@ mod WASM-BUILTINS is
   var BS : SpectecTerminals .
   var SH V : SpectecTerminal .
   var LANES : SpectecTerminals .
+  op $v128lanes : SpectecTerminals -> SpectecTerminal [ctor] .
 
   --- Integer bit conversion.
   --- Convention: $ibits(N, I) produces N low-to-high bits; $inv-ibits is
@@ -48,7 +49,7 @@ mod WASM-BUILTINS is
   --- Until byte-level v128 packing is implemented, this backend supports
   --- the canonical executable representation used by tests: a vector value
   --- may be represented directly as its lane sequence.
-  eq $lanes(SH, V) = V .
-  eq $inv-lanes(SH, LANES) = LANES .
+  eq $lanes(SH, $v128lanes(LANES)) = LANES .
+  eq $inv-lanes(SH, LANES) = $v128lanes(LANES) .
+  eq $lanes(SH, V) = V [owise] .
 endm
-
