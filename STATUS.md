@@ -1,205 +1,177 @@
 # Spec2Maude C1 Status
 
-Updated: 2026-05-26
+Updated: 2026-05-27
 
-This is the current handoff document for the WebAssembly C1 baseline. Read it
-with `docs/limitation.md` before changing `translator_bs.ml`.
+This is the current handoff document for the active WebAssembly C1 baseline.
+For commands, read `docs/HowToTest.md`. For limitations/discussion points, read
+`docs/limitation.md`.
 
 ## One-Line State
 
-C1 structurally covers the WebAssembly 3.0 SpecTec input and has a warning-free
-minimal runtime/typecheck cleanup in the generated output. The focused init path
-now runs source-shaped WAT modules through the source-translated `$instantiate`,
-then invoke/call-ref, and `steps` for functions, globals, memories, tables,
-start, active data, active elements, and focused import linking for functions,
-globals, memories, and tables. The remaining C1 decisions are about whether a
-small number of source-derived execution helpers belong in C1 or should be
-pushed to a later C2 execution layer.
+Spec2Maude now has a warning-free C1 WebAssembly SpecTec-to-Maude core, an
+OCaml `.wat` / `.wasm` frontend, checked execution through `Module-ok`, and a
+benchmark runner that classifies failures by pipeline stage.  It is strong
+enough for focused paper experiments, but not yet complete WebAssembly 3.0
+coverage.
+
+## Main Pipeline
+
+```text
+.wat / .wasm
+  -> WABT canonicalization / validation
+  -> wasm_to_maude.ml frontend
+  -> generated Maude module term
+  -> Module-ok validation
+  -> $instantiate
+  -> invoke / call_ref
+  -> steps
+  -> result comparison
+```
+
+Important separation:
+
+- `output_bs.maude`: generated SpecTec-to-Maude core.
+- `wasm-init-bs.maude`: init/config/runtime harness helpers.
+- `builtins.maude`: backend/builtin Maude definitions.
+- `wasm_to_maude.ml`: WAT/Wasm frontend.
+- `scripts/run_wasm_benchmarks.py`: benchmark/spec-test classifier.
 
 ## Current C1 Criteria
 
-1. Preserve SpecTec source syntax / def / rule structure and intent.
-2. Variable names and Maude internal names may differ.
-3. Source-absent helpers should not remain in C1 unless they are unavoidable
-   representation substrate, source-derived execution infrastructure, or
-   explicitly accepted.
-4. SpecTec unconditional rules should lower to Maude unconditional rules;
-   conditional rules should lower to conditional rules.
-5. SpecTec `def` should lower to Maude `eq/ceq`; SpecTec `rule` should lower
-   to Maude `rl/crl`.
+1. Preserve SpecTec syntax / def / rule structure and intent.
+2. SpecTec `def` lowers to Maude `eq/ceq`.
+3. SpecTec `rule` lowers to Maude `rl/crl`.
+4. Unconditional source rules should stay unconditional when possible.
+5. Source-absent helpers should not remain in `output_bs.maude` unless they are
+   unavoidable representation substrate, source-derived execution
+   infrastructure, or explicitly accepted.
 
-## Read First
+## Latest Regression Snapshot
 
-Use this order in a fresh Codex chat:
-
-1. `STATUS.md`
-2. `docs/limitation.md`
-3. `docs/HowToTest.md`
-4. `artifacts/rule-concrete-audit-20260525_004500/summary.md`
-5. `artifacts/wasmtype-cleanup-audit-20260525_054200/summary.md`
-6. `artifacts/c1-probe-matrix-20260525_004421/probe_summary.md`
-
-Archive docs under `docs/archive/` are evidence/history, not current state.
-
-## Build And Regenerate
-
-```bash
-dune build ./main_bs.exe
-dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude
-```
-
-Load execution:
-
-```bash
-maude wasm-exec-bs.maude
-```
-
-`wasm-exec-bs.maude` loads `wasm-init-bs.maude`; that loads `builtins.maude`,
-which loads `output_bs.maude`.
-
-Focused WAT frontend smoke:
-
-```bash
-dune exec ./wat_to_maude_fib.exe -- examples/fib.wat > /tmp/fib.generated.maude
-maude /tmp/fib.generated.maude
-dune exec ./wat_to_maude_fib.exe -- --result-only --run 5 examples/fib.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export wrapper --arg-i32 5 examples/fib-wrapper.wat
-```
-
-The WAT frontend is implemented in OCaml, not Python. It currently targets a
-focused executable subset: multiple function types, imports as source-shaped
-terms, globals, memories, tables, local functions, data segments, element
-segments, start, exports, direct calls, `call_ref`, table/memory/global
-instructions used by the examples, and the integer/control instructions used by
-the Fibonacci smokes. It is still not a full WAT parser.
-
-Additional focused WAT runtime smokes:
-
-```bash
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/global-get.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/memory-size.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/table-size.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/start-global.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/data-load.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/elem-call-ref.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main --arg-i32 41 --import-func 'env.bump=local.get 0 i32.const 1 i32.add' examples/import-func.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main --import-global 'env.g=i32.const 77' examples/import-global.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-memory.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-table.wat
-```
-
-## Structural Facts
+Latest checked artifact:
 
 ```text
-source files:                      21 / 21
-syntax declarations:               249 / 249
-def declarations/equations:         1272 / 1272
-relation declarations:              82 / 82
-rule declarations:                  499 / 499
+artifacts/c1-regression-20260527_133237
+```
+
+Summary:
+
+```text
+total benchmark rows: 568
+PASS: 319
+STEPPED: 74
+INVALID: 21
+NO_ENTRY: 58
+IMPORT_MISSING: 5
+UNSUPPORTED: 4
+STUCK_VALIDATION: 46
+STUCK_STEP: 8
+WRONG_RESULT: 33
+
+Maude load warnings: 0
+step-from-step-pure count: 0
+```
+
+Bucket meanings:
+
+- `PASS`: validation, init, execution, and expected-result comparison succeeded.
+- `STEPPED`: execution reached a final config, but no expected result was
+  available.
+- `INVALID`: invalid input was rejected, or `Module-ok` did not prove validity.
+- `NO_ENTRY`: no callable export/main entry exists.
+- `IMPORT_MISSING`: required host import is not linked.
+- `UNSUPPORTED`: frontend or runner intentionally does not support the syntax
+  yet.
+- `STUCK_VALIDATION`: `Module-ok` / validation did not finish as `valid`.
+- `STUCK_STEP`: runtime `steps` got stuck, timed out, or left an administrative
+  term.
+- `WRONG_RESULT`: execution ended but the observed result differs from the
+  expected value.
+
+## Structural Coverage
+
+Current generated C1 core structurally covers the WebAssembly 3.0 SpecTec files
+in this repository:
+
+```text
+source files:                       21 / 21
+syntax declarations:                249 / 249
+def declarations/equations:          1272 / 1272
+relation declarations:               82 / 82
+rule declarations:                   499 / 499
 strict validation source-rule targets: 281 / 281 primary rl/crl
-missing source constructs:          0 known
-eq/ceq ... = valid:                 0
-iter-empty / opt-empty labels:      0
+missing source constructs:           0 known
+eq/ceq ... = valid:                  0
+iter-empty / opt-empty labels:       0
 ```
 
-Source `def` clauses that previously emitted as `rl/crl`
-(`evalexprs-r1`, `evalexprss-r1`, `evalglobals-r1`, `instantiate-r0`) are now
-back in `eq/ceq` shape using source-derived result / continuation mirrors.
+## Current Isomorphism State
 
-## Current Non-Isomorphic / Professor-Discussion Items
+Resolved or improved:
 
-### 1. Category / Sequence Gap + Generic Step-Pure Context Bridge
-
-Current broad sequence carrier:
+- `step-from-step-pure-*` rules are no longer generated.
+- `$is-spectec-val-seq` is no longer generated.
+- Source `val*` is represented with a Maude `ValSeq` sort:
 
 ```maude
-SpectecTerminals
-op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [assoc id: eps] .
+sort ValSeq .
+subsort Val < ValSeq .
+subsort ValSeq < SpectecTerminals .
+op eps : -> ValSeq .
+op _ _ : ValSeq ValSeq -> ValSeq [ctor assoc id: eps] .
 ```
 
-Because `val*`, `instr*`, and `instr_1*` are not separate sequence sorts, the
-generated `Step/ctxt-instrs` rule keeps a minimal value-prefix guard:
+Remaining discussion items:
 
-```maude
-crl [step-ctxt-instrs] :
-  step((Z ; VALS INSTRS INSTRS1))
-  =>
-  (ZQ ; VALS INSTRSQ INSTRS1)
-  if $is-spectec-val-seq(VALS)
-  /\ (VALS =/= eps \/ INSTRS1 =/= eps)
-  /\ step((Z ; INSTRS)) => (ZQ ; INSTRSQ) .
-```
+1. `$infer-*` witness inference overlay.
+2. Source-derived relation decision mirrors such as `$heaptype-sub?` /
+   `$reftype-sub?`.
+3. Continuation/result/map scaffolding for executable `def` equations:
+   `$cont-*`, `$result-*`, `$valid-*`, `$map-*`.
+4. Runtime/init harness helpers in `wasm-init-bs.maude`.
+5. Any temporary bridge that remains in `output_bs.maude`, especially around
+   execution paths that should ideally be handled by the literal generated
+   source rule.
 
-The current output also contains one generic bridge for pure steps under the
-same context shape:
-
-```maude
-crl [step-from-step-pure-ctxt-instrs] :
-  step((Z ; VALS INSTRS INSTRS1))
-  =>
-  (Z ; VALS INSTRSQ INSTRS1)
-  if $is-spectec-val-seq(VALS)
-  /\ (VALS =/= eps \/ INSTRS1 =/= eps)
-  /\ step-pure(INSTRS) => INSTRSQ .
-```
-
-Discussion question: can this source-derived sequence-shape guard and generic
-bridge remain in C1?
-
-The output also contains a generic zero-local `call_ref` bridge:
-
-```maude
-crl [step-read-call-ref-func-zero-locals] : ...
-```
-
-This covers source-valid functions with `local* = eps`. The literal generated
-`step-read-call-ref-func` path currently misses that case because a mapped-local
-intermediate variable is generated with a too-narrow sort. Treat this as
-temporary source-derived execution infrastructure unless the underlying sort
-inference is fixed.
-
-### 2. `$infer-*` Witness Inference Overlay
-
-Source relation premises can expose intermediate witnesses such as `TS2`.
-The current `Judgement => valid` encoding proves validity but does not return
-those witnesses directly. `$infer-*` helpers are generated from source premise
-structure, but they are still source-absent execution overlay.
-
-Discussion question: can this remain in C1, or is witness synthesis a C2 solver
-feature?
-
-## Typecheck Cleanup State
-
-Under the well-typed-input assumption, current generated runtime output removes
-the broad category/typecheck layer from execution:
+Key point for reporting:
 
 ```text
-SPECTEC-CATEGORIES: absent
-mb / cmb category axioms: absent
-hasType / WellTyped: absent
-general $is-spectec-* category predicates: absent
+No benchmark-specific hardcoding was added to output_bs.maude.
+The remaining non-source machinery should be explained as source-derived
+execution infrastructure or moved out of the generated core.
 ```
 
-Only these sequence-shape predicates remain:
+## Typecheck / Validation State
 
-```maude
-$is-spectec-val
-$is-spectec-val-seq
+Do not say "typecheck was removed" without qualification.
+
+Current accurate statement:
+
+```text
+SpecTec validation relations remain:
+Module-ok, Func-ok, Instr-ok, Instrs-ok, Reftype-sub, Heaptype-sub, ...
+
+Duplicate runtime category guards were reduced/removed where possible:
+hasType / WellTyped
+general $is-spectec-* runtime predicates
+old $is-spectec-val-seq predicate
 ```
 
-They are used to keep `val*` prefixes from matching arbitrary instruction/type
-sequences in the broad `SpectecTerminals` carrier. They should be presented as
-runtime sequence-shape infrastructure, not full validation/typechecking.
+Invalid input handling:
 
-This cleanup does not remove:
+- Normal `.wat` / `.wasm` frontend path uses WABT validation before Maude
+  runtime.
+- Checked execution also requires
+  `Module-ok(generated-fib-module, generated-module-type) => valid`.
+- If `Module-ok` does not prove validity, checked-run does not enter
+  `$instantiate` / `steps`.
 
-- Wasm type syntax such as `i32`, `functype`, `reftype`, `heaptype`;
-- SpecTec validation relations such as `Instr-ok`, `Instrs-ok`, `Module-ok`,
-  `Func-ok`, `Reftype-sub`, `Heaptype-sub`.
+For formal discussion, emphasize the Maude `Module-ok` gate. WABT is useful
+engineering validation, not the formal semantics argument by itself.
 
-## SpectecType Ground-Term Cleanup State
+## SpectecType Ground-Term Cleanup
 
-Current generated prelude separates runtime terminals from category/type labels:
+Current generated prelude separates runtime terms from category/type labels:
 
 ```maude
 sort SpectecTerminal .
@@ -208,23 +180,23 @@ sort SpectecCategory .
 subsort SpectecType < SpectecCategory .
 ```
 
-Current output has no:
+Removed:
 
 ```maude
 subsort SpectecType < SpectecTerminal .
 subsort SpectecTypes < SpectecTerminals .
 ```
 
-Generic source helpers use category labels:
+Generic category helpers now take category labels:
 
 ```maude
-op $concat  : SpectecCategory SpectecTerminals -> SpectecTerminals .
+op $concat   : SpectecCategory SpectecTerminals -> SpectecTerminals .
 op $disjoint : SpectecCategory SpectecTerminals -> Bool .
 op $setminus : SpectecCategory SpectecTerminals SpectecTerminals -> SpectecTerminals .
 ```
 
-Parametric type constructors use source-shaped parameter sorts, not broad
-`SpectecTerminal`:
+Parametric type/category constructors now use narrower source-shaped parameter
+sorts:
 
 ```maude
 op iN    : N -> SpectecType .
@@ -233,129 +205,79 @@ op binop : Numtype -> SpectecType .
 op list  : SpectecCategory -> SpectecType .
 ```
 
-This directly addresses the meaningless ground-type-term issue such as
-`iN(CTORNOPA0)`.
+This fixed the translator bug where meaningless ground type terms such as
+`iN(CTORNOPA0)` could be accepted.
 
-## Execution Evidence
+## Frontend Coverage
 
-Broad concrete audit:
+The OCaml frontend currently supports the local smoke suite and a growing
+official-spec subset:
 
 ```text
-artifacts/rule-concrete-audit-20260525_004500/summary.md
-total rl/crl: 830
-REDUCED: 559
-STUCK: 271
-STACK_OVERFLOW: 0
-MAUDE_EXIT: 0
-TIMEOUT: 0
+module/type/func/import/export
+global/memory/table/data/elem/start
+direct call/call_ref/call_indirect
+block/loop/if/br/br_if/br_table
+local/global get/set/tee
+memory load/store/init/copy/fill/size/grow
+table get/set/size/grow/fill/init/copy/elem.drop
+i32/i64/f32/f64 constants, numeric ops, relops, conversions
+selected v128/SIMD/relaxed-SIMD term generation
+selected ref types and ref instructions
 ```
 
-The `271 STUCK` samples are generated concrete samples, not proof that each
-source rule is wrong. Many lack a source-valid context/store/module/type
-witness.
+It is not yet a full WAT parser or a complete WebAssembly 3.0 implementation.
 
-Focused evidence:
+## What To Work On Next
 
-- `artifacts/c1-probe-matrix-20260525_004421/probe_summary.md`: last all-pass
-  matrix before type-signature expectation drift, `43 PASS`.
-- `artifacts/wasmtype-cleanup-audit-20260525_054200/summary.md`: records direct
-  focused runtime success after typecheck / SpectecType cleanup.
-- `artifacts/c1-probe-matrix-20260525_054128/probe_summary.md`: newest matrix,
-  but many rows fail because expected result sort strings became stale after
-  the type cleanup.
+Priority order:
 
-Representative direct focused paths currently considered passing:
+1. Reduce `STUCK_VALIDATION`.
+   - Focus: `Module-ok`, `Instrs-ok`, unreachable/polymorphic validation,
+     table64/memory64 validation, local initialization.
+2. Reduce `STUCK_STEP`.
+   - Focus: memory.fill/copy/grow, ref/null paths, SIMD/relaxed-SIMD admin
+     contexts.
+3. Reduce `WRONG_RESULT`.
+   - Focus: memory byte builtins, data.drop, linking/import state, ref.is_null,
+     float load/store.
+4. Expand unsupported frontend syntax.
+   - Focus: exception/tag forms, proposal syntax, WABT/wasm-tools fallback.
+5. Keep auditing helper boundaries.
+   - Keep `output_bs.maude` as source-derived as possible.
+   - Put frontend/init harness code in `wasm-init-bs.maude`.
 
-- `steps(fib-config(i32v(5)))`;
-- `steps(fib-config-invoke(i32v(5)))`;
-- `$instantiate(empty-store, fib-module, eps)`;
-- `steps(fib-init-config(i32v(5)))`;
-- `examples/fib.wat -> generated-fib-init-config -> steps`;
-- `examples/fib-wrapper.wat -> generated-fib-init-config -> wrapper call -> steps`;
-- `examples/global-get.wat -> generated-run-config -> steps`;
-- `examples/memory-size.wat -> generated-run-config -> steps`;
-- `examples/table-size.wat -> generated-run-config -> steps`;
-- `examples/start-global.wat -> generated-run-config -> steps`;
-- `examples/data-load.wat -> active data init -> i32.load -> steps`;
-- `examples/elem-call-ref.wat -> active elem init -> table.get/call_ref -> steps`;
-- `examples/import-func.wat` with automatic function-import linking from
-  `--import-func`;
-- `examples/import-global.wat` with automatic imported-global linking from
-  `--import-global`;
-- `examples/import-memory.wat` with automatic imported-memory zero initialization;
-- `examples/import-table.wat` with automatic imported-table default refs;
-- reference/cast `ref.test` positive and negative;
-- reference/cast `ref.cast` positive and negative;
-- label/br suffix search;
-- br_if suffix search;
-- nop suffix search.
+## Professor-Discussion Notes
 
-## Known Limitations
+Recommended framing:
 
-1. The broad audit still has `271 STUCK` generated samples.
-2. True nested sequence representation such as explicit `expr**` inner grouping
-   is still a representation issue, although focused flat `$evalexprss` paths
-   execute.
-3. Builtin backend coverage is partial. `builtins.maude` currently implements
-   only the concrete backend paths needed by current focused tests.
-4. `step-read-call-ref-func-zero-locals` is a temporary generic bridge for
-   source-valid zero-local function calls; the better long-term fix is mapped
-   local* intermediate sort inference.
-5. Active element initialization now goes through the source-translated
-   `$instantiate` path, which emits elem/table initialization instructions.
-   Execution still relies on source-derived table/elem helper bridges in
-   `output_bs.maude`.
-6. Imports have a focused CLI linker for functions, globals, memories, and
-   tables. Function imports require `--import-func` because the host function
-   body is not present in the Wasm module. Global imports can use
-   `--import-global`; memories and tables are initialized from their import
-   type.
-7. `$infer-*`, `$heaptype-sub?` / `$reftype-sub?`, `$cont-*`, `$valid-*`,
-   `$result-*`, and `$map-*` remain source-derived execution views rather than
-   literal source names.
-
-## What To Ask Professor
-
-1. Should C1 be a structural/isomorphic baseline with representative execution
-   smokes, or must every generated rule have a source-valid concrete execution
-   sample?
-2. Are `$is-spectec-val-seq` and `step-from-step-pure-ctxt-instrs` acceptable
-   C1 infrastructure?
-3. Is `step-read-call-ref-func-zero-locals` acceptable as temporary C1
-   infrastructure, or should the mapped-local sort issue be fixed first?
-4. Are `$infer-*` witness helpers acceptable in C1?
-5. Is the current runtime typecheck cleanup enough, with only minimal
-   sequence-shape guards left?
-6. Is the focused active-element init bridge acceptable, or must C1 execute
-   active elements through the literal generated `table.init` path?
-7. Should typed/mixed/nested sequence sorts be designed now or postponed?
-8. Can source-derived `otherwise` decision mirrors for reference/cast paths
-   remain in C1?
+1. `val*` is now represented with `ValSeq`; the old Boolean guard and
+   pure-step bridge are gone.
+2. Typecheck was not blindly removed. SpecTec validation remains, and checked
+   run is gated by `Module-ok`.
+3. `iN(NOP)` was a translator bug caused by an overly broad `SpectecType`
+   signature; it has been fixed by separating `SpectecCategory`.
+4. The main remaining strict non-isomorphism topic is `$infer-*` witness
+   inference and related source-derived execution infrastructure.
 
 ## Fresh Chat Prompt
 
 ```text
 You are working on my Spec2Maude C1 baseline.
 
-Please first read:
+Read these first:
 - STATUS.md
 - docs/limitation.md
 - docs/HowToTest.md
-- artifacts/rule-concrete-audit-20260525_004500/summary.md
-- artifacts/wasmtype-cleanup-audit-20260525_054200/summary.md
-- artifacts/c1-probe-matrix-20260525_004421/probe_summary.md
 
-Current goal:
-C1 is a faithful WebAssembly SpecTec-to-Maude baseline. Do not assume old
-archive docs are current. Do not blindly edit translator_bs.ml.
+Current state:
+- output_bs.maude is the generated WebAssembly SpecTec-to-Maude core.
+- wasm_to_maude.ml is the WAT/Wasm frontend.
+- wasm-init-bs.maude is the init/runtime harness.
+- step-from-step-pure count is 0.
+- $is-spectec-val-seq is gone; source val* uses ValSeq.
+- Checked execution is gated by Module-ok.
 
-Current professor-discussion items:
-1. Category / sequence representation gap plus generic step-pure context bridge.
-2. Temporary zero-local call_ref bridge caused by mapped-local intermediate sort.
-3. $infer-* witness inference overlay.
-4. Runtime typecheck cleanup leaves only minimal val* sequence-shape guards.
-5. SpectecType ground-term universe has been narrowed with SpectecCategory.
-
-Before changing code, inspect current output_bs.maude, translator_bs.ml,
-docs/limitation.md, and the current artifacts listed above.
+Do not assume old docs under docs/archive are current.
+Do not hand-edit output_bs.maude unless explicitly asked.
 ```

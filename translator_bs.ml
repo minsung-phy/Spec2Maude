@@ -2592,7 +2592,7 @@ let declared_sort_of_typ t =
 
 let seq_decl_sort_of_inner_typ (inner : typ) =
   match simple_sort_of_typ inner [] with
-  | Some "Val" -> "SpectecTerminals"
+  | Some "Val" -> "ValSeq"
   | Some "Instr" -> "SpectecTerminals"
   | _ -> "SpectecTerminals"
 
@@ -3593,12 +3593,30 @@ let translate_typd id params insts =
                              Printf.sprintf "MERGE-EMPTY-%s"
                                (String.uppercase_ascii (sanitize ri.rec_source_name))
                            in
+                           let empty_update_eqs =
+                             field_names
+                             |> List.mapi (fun i f ->
+                                 let uv =
+                                   Printf.sprintf "U-EMPTY-%s-%s-%d" record_var_prefix f i
+                                 in
+                                 let updated =
+                                   List.mapi
+                                     (fun j v -> if i = j then uv else v)
+                                     empty_terms
+                                 in
+                                 Printf.sprintf
+                                   "%s  eq %s [. '%s <- %s] = %s ."
+                                   (declare_var uv "SpectecTerminals")
+                                   cname f uv (record_call updated))
+                             |> String.concat "\n"
+                           in
                            Printf.sprintf
-                             "  op %s : -> %s [ctor] .\n  eq %s = %s .\n%s\n%s  eq merge ( %s , %s ) = %s .\n  eq merge ( %s , %s ) = %s .\n"
+                             "  op %s : -> %s [ctor] .\n  eq %s = %s .\n%s\n%s  eq merge ( %s , %s ) = %s .\n  eq merge ( %s , %s ) = %s .\n%s\n"
                              cname full_type_sort empty_record cname empty_projections
                              (declare_var empty_merge_var full_type_sort)
                              cname empty_merge_var empty_merge_var
                              empty_merge_var cname empty_merge_var
+                             empty_update_eqs
                      in
                      let update_eqs =
                        info
@@ -3837,7 +3855,8 @@ let refined_exec_pred sort =
 
 let has_representation_narrow_sort sort =
   List.mem sort
-    [ "SpectecTerminal"; "SpectecTerminals";
+      [ "SpectecTerminal"; "SpectecTerminals";
+      "ValSeq";
       "Bool"; "Nat"; "Int";
       "Config"; "State"; "Store"; "Frame"; "Judgement" ]
   || SSet.mem sort !zero_arity_source_sorts
@@ -3948,8 +3967,12 @@ let source_category_seq_pred sort =
 
 let source_category_seq_guard sort term =
   let sort = sort_of_type_name sort in
-  source_seq_pred_sorts := SSet.add sort !source_seq_pred_sorts;
-  Printf.sprintf "%s ( %s )" (source_category_seq_pred sort) term
+  if sort = "Val" then
+    "true"
+  else begin
+    source_seq_pred_sorts := SSet.add sort !source_seq_pred_sorts;
+    Printf.sprintf "%s ( %s )" (source_category_seq_pred sort) term
+  end
 
 let val_seq_guard term =
   source_category_seq_guard "Val" term
@@ -7053,7 +7076,36 @@ let translate_reld _id rel_name rules =
           else
             all_conds
         in
-        let cond = cond_join all_conds in
+        let lower_rule_label = String.lowercase_ascii label_prefix in
+        let progress_conds_before =
+          let generated_base = Printf.sprintf "%s%d" prefix rule_idx in
+          if lower_rule_label = "instrs-ok-frame" then
+            [
+              Printf.sprintf "%s-TS =/= eps" generated_base;
+              Printf.sprintf
+                "$infer-instrs-ok-arg2 ( %s-C , %s-INSTRS ) => CTORARROWA3 ( %s-TS1, %s-XS, %s-TS2 )"
+                generated_base generated_base generated_base generated_base
+                generated_base;
+            ]
+          else
+            []
+        in
+        let all_conds =
+          if lower_rule_label = "instrs-ok-sub" then
+            let generated_base = Printf.sprintf "%s%d" prefix rule_idx in
+            let guard =
+              Printf.sprintf "%s-IT =/= %s-ITQ" generated_base generated_base
+            in
+            (* The first premise is the infer premise binding IT.  Put the
+               progress guard immediately after it and before the recursive
+               Instrs-ok premise. *)
+            match all_conds with
+            | infer_cond :: rest -> infer_cond :: guard :: rest
+            | [] -> [guard]
+          else
+            all_conds
+        in
+        let cond = cond_join (progress_conds_before @ all_conds) in
         let maybe_register_subtype_decision () =
           let decision_name =
             if rel_name = "Heaptype-sub" then Some "$heaptype-sub?"
@@ -7138,19 +7190,28 @@ let translate_reld _id rel_name rules =
               then Some v else None)
           |> List.sort_uniq String.compare
         in
+        let emit_exec_tail_specializations =
+          (* The generic exec-tail-empty expansion is useful for some sequence
+             rules, but for Instrs_ok/frame it creates several t* = eps cases
+             that re-enter the same Instrs-ok goal.  The base frame rule above
+             is enough once it has a progress guard. *)
+          String.lowercase_ascii label_prefix <> "instrs-ok-frame"
+        in
         let exec_tail_rules =
-          nonempty_subsets tail_seq_vars
-          |> List.sort (fun a b -> compare (List.length b) (List.length a))
-          |> List.mapi (fun i vs ->
-              let replace_all text =
-                List.fold_left (fun acc v -> replace_maude_var_token v "eps" acc)
-                  text vs
-              in
-              let lhs_text = replace_all lhs_t.text in
-              let cond_text = replace_all cond in
-              emit_rule
-                ~suffix:(Printf.sprintf "-exec-tail-empty%d" i)
-                lhs_text cond_text)
+          if not emit_exec_tail_specializations then []
+          else
+            nonempty_subsets tail_seq_vars
+            |> List.sort (fun a b -> compare (List.length b) (List.length a))
+            |> List.mapi (fun i vs ->
+                let replace_all text =
+                  List.fold_left (fun acc v -> replace_maude_var_token v "eps" acc)
+                    text vs
+                in
+                let lhs_text = replace_all lhs_t.text in
+                let cond_text = replace_all cond in
+                emit_rule
+                  ~suffix:(Printf.sprintf "-exec-tail-empty%d" i)
+                  lhs_text cond_text)
         in
         String.concat "\n" (exec_tail_rules @ [base_rule])
   ) rules in
@@ -7477,7 +7538,14 @@ let header_prefix features =
   "  subsort Int < SpectecTerminal .\n" ^
   "  --- Nat < SpectecTerminal is provided by DSL-PRETYPE.\n\n" ^
   "  --- Source category/type tags are kept separate from runtime terminals.\n\n" ^
-  "  --- SpecTec terminal sequences use the single SpectecTerminals sequence sort.\n\n" ^
+  "  --- SpecTec terminal sequences use the single SpectecTerminals sequence sort.\n" ^
+  "  --- SpecTec val* premises are represented by a native ValSeq subsort\n" ^
+  "  --- instead of an executable Boolean sequence predicate.\n" ^
+  "  sort ValSeq .\n" ^
+  "  subsort Val < ValSeq .\n" ^
+  "  subsort ValSeq < SpectecTerminals .\n" ^
+  "  op eps : -> ValSeq .\n" ^
+  "  op _ _ : ValSeq ValSeq -> ValSeq [ctor assoc id: eps] .\n\n" ^
   (nat_subsort_decls ()) ^
   "  --- Syntax-category membership is represented by mb/cmb axioms, not by terminal subsorts.\n\n" ^
   (if features.uses_bool_wrapper then
@@ -7681,6 +7749,8 @@ let footer features =
       "  vars SUBQ-RT1 SUBQ-RT2 : Reftype .\n" ^
       "  vars SUBQ-N1 SUBQ-N2 : SpectecTerminals .\n" ^
       (String.concat "\n" (fragments @ ground_closure_fragments)) ^ "\n" ^
+      "  ceq $reftype-sub?(SUBQ-C, CTORREFA2(eps, SUBQ-H1), CTORREFA2(CTORNULLA0, SUBQ-H2)) = true\n" ^
+      "   if $heaptype-sub?(SUBQ-C, SUBQ-H1, SUBQ-H2) == true .\n" ^
       "  ceq $reftype-sub?(SUBQ-C, CTORREFA2(SUBQ-N1, SUBQ-H1), CTORREFA2(SUBQ-N2, SUBQ-H2)) = false\n" ^
       "   if $heaptype-sub?(SUBQ-C, SUBQ-H1, SUBQ-H2) == false .\n" ^
       "  eq $heaptype-sub?(SUBQ-C, SUBQ-H1, SUBQ-H2) = false [owise] .\n" ^
@@ -7701,27 +7771,391 @@ let footer features =
           lower pred pred pred elem_pred pred)
     |> String.concat "\n"
   in
-  let _generic_step_pure_context_bridge =
-    "  --- Generic executable bridge derived from Step_pure + Step/ctxt-instrs.\n" ^
-    "  --- if the middle instruction sequence can reduce by Step_pure, reduce it\n" ^
-    "  --- under the source val* / instr* / instr_1* context shape.\n" ^
-    "  var STEP-PURE-CTX-Z : State .\n" ^
-    "  vars STEP-PURE-CTX-VALS STEP-PURE-CTX-INSTRS STEP-PURE-CTX-INSTRS1 STEP-PURE-CTX-INSTRSQ : SpectecTerminals .\n" ^
-    "  crl [step-from-step-pure-ctxt-instrs] :\n" ^
-    "    step ( ( STEP-PURE-CTX-Z ; STEP-PURE-CTX-VALS STEP-PURE-CTX-INSTRS STEP-PURE-CTX-INSTRS1 ) )\n" ^
+  let validation_optional_premise_block =
+    "  --- Source-driven executable empty-iteration/optional validation cases.\n" ^
+    "  --- SpecTec premises such as `(Start_ok ...)?` and starred subtype\n" ^
+    "  --- premises disappear when the corresponding source syntax is `eps`.\n" ^
+    "  --- These rules make those empty cases executable without adding\n" ^
+    "  --- `hasType`/`WellTyped` helper guards back into the runtime core.\n" ^
+    "  var VALID-OPT-C : SpectecTerminals .\n" ^
+    "  var VALID-OPT-CT : SpectecTerminals .\n" ^
+    "  var VALID-OPT-X0 : SpectecTerminal .\n" ^
+    "  vars VALID-OPT-X VALID-OPT-I : SpectecTerminal .\n" ^
+    "  rl [start-ok-empty-optional] :\n" ^
+    "    Start-ok ( VALID-OPT-C, eps )\n" ^
     "    =>\n" ^
-    "    ( STEP-PURE-CTX-Z ; STEP-PURE-CTX-VALS STEP-PURE-CTX-INSTRSQ STEP-PURE-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-PURE-CTX-VALS ) /\\ _or_ ( _=/=_ ( STEP-PURE-CTX-VALS, eps ), _=/=_ ( STEP-PURE-CTX-INSTRS1, eps ) ) /\\ step-pure ( STEP-PURE-CTX-INSTRS ) => STEP-PURE-CTX-INSTRSQ .\n\n"
+    "    valid .\n" ^
+    "  crl [subtype-ok-empty-supers] :\n" ^
+    "    Subtype-ok ( VALID-OPT-C, CTORSUBA3 ( eps, eps, VALID-OPT-CT ), CTOROKA1 ( VALID-OPT-X0 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Comptype-ok ( VALID-OPT-C, VALID-OPT-CT ) => valid .\n" ^
+    "  crl [subtype-ok-final-empty-supers] :\n" ^
+    "    Subtype-ok ( VALID-OPT-C, CTORSUBA3 ( CTORFINALA0, eps, VALID-OPT-CT ), CTOROKA1 ( VALID-OPT-X0 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Comptype-ok ( VALID-OPT-C, VALID-OPT-CT ) => valid .\n" ^
+    "  crl [subtype-ok2-empty-supers] :\n" ^
+    "    Subtype-ok2 ( VALID-OPT-C, CTORSUBA3 ( eps, eps, VALID-OPT-CT ), CTOROKA2 ( VALID-OPT-X, VALID-OPT-I ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Comptype-ok ( VALID-OPT-C, VALID-OPT-CT ) => valid .\n" ^
+    "  crl [subtype-ok2-final-empty-supers] :\n" ^
+    "    Subtype-ok2 ( VALID-OPT-C, CTORSUBA3 ( CTORFINALA0, eps, VALID-OPT-CT ), CTOROKA2 ( VALID-OPT-X, VALID-OPT-I ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Comptype-ok ( VALID-OPT-C, VALID-OPT-CT ) => valid .\n\n" ^
+    "  --- Validation representation support for source resulttype* labels.\n" ^
+    "  --- A resulttype is itself a valtype* sequence, so an empty resulttype\n" ^
+    "  --- would disappear inside the flat SpectecTerminals carrier.  $rt keeps\n" ^
+    "  --- each source resulttype* element as one label-list element.\n" ^
+    "  op $rt : SpectecTerminals -> SpectecTerminal [ctor] .\n" ^
+    "  vars RT-LABEL-RT RT-LABEL-RTS RT-LABEL-PRE RT-LABEL-POST RT-LABEL-XS : SpectecTerminals .\n" ^
+    "  eq CTORARROWA3 ( $rt ( RT-LABEL-RT ) RT-LABEL-POST, RT-LABEL-XS, RT-LABEL-RTS ) = CTORARROWA3 ( RT-LABEL-RT RT-LABEL-POST, RT-LABEL-XS, RT-LABEL-RTS ) .\n" ^
+    "  eq CTORARROWA3 ( RT-LABEL-PRE, RT-LABEL-XS, $rt ( RT-LABEL-RT ) ) = CTORARROWA3 ( RT-LABEL-PRE, RT-LABEL-XS, RT-LABEL-RT ) .\n" ^
+    "  crl [resulttype-sub-wrapped-label-right] :\n" ^
+    "    Resulttype-sub ( VALID-OPT-C, RT-LABEL-PRE, $rt ( RT-LABEL-RT ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Resulttype-sub ( VALID-OPT-C, RT-LABEL-PRE, RT-LABEL-RT ) => valid .\n\n" ^
+    "  --- Optional empty result type for Blocktype_ok/valtype.\n" ^
+    "  --- Source has `(Valtype_ok ...)?`; when valtype? is eps, that premise\n" ^
+    "  --- disappears instead of checking Valtype_ok(C, eps).\n" ^
+    "  rl [blocktype-ok-valtype-empty] :\n" ^
+    "    Blocktype-ok ( VALID-OPT-C, CTORWRESULTA1 ( eps ), CTORARROWA3 ( eps, eps, eps ) )\n" ^
+    "    =>\n" ^
+    "    valid .\n" ^
+    "  eq $infer-blocktype-ok-arg2 ( VALID-OPT-C, CTORWRESULTA1 ( eps ) ) = CTORARROWA3 ( eps, eps, eps ) .\n\n" ^
+    "  --- Source $with_locals updates localtype* elements, whose flat encoding\n" ^
+    "  --- is two terminals (SET/UNSET plus valtype).  The generic sequence\n" ^
+    "  --- update would replace only the SET/UNSET token, so validation sees a\n" ^
+    "  --- corrupted LOCALS list after local.set/local.tee.\n" ^
+    "  op $replace-localtype : SpectecTerminals SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
+    "  vars LOCALTYPE-REST LOCALTYPE-LCT : SpectecTerminals .\n" ^
+    "  vars LOCALTYPE-X LOCALTYPE-T : SpectecTerminal .\n" ^
+    "  var LOCALTYPE-N : Nat .\n" ^
+    "  eq $replace-localtype ( CTORSETA0 LOCALTYPE-T LOCALTYPE-REST, 0, LOCALTYPE-LCT ) = LOCALTYPE-LCT LOCALTYPE-REST .\n" ^
+    "  eq $replace-localtype ( CTORUNSETA0 LOCALTYPE-T LOCALTYPE-REST, 0, LOCALTYPE-LCT ) = LOCALTYPE-LCT LOCALTYPE-REST .\n" ^
+    "  eq $replace-localtype ( CTORSETA0 LOCALTYPE-T LOCALTYPE-REST, s ( LOCALTYPE-N ), LOCALTYPE-LCT ) = CTORSETA0 LOCALTYPE-T $replace-localtype ( LOCALTYPE-REST, LOCALTYPE-N, LOCALTYPE-LCT ) .\n" ^
+    "  eq $replace-localtype ( CTORUNSETA0 LOCALTYPE-T LOCALTYPE-REST, s ( LOCALTYPE-N ), LOCALTYPE-LCT ) = CTORUNSETA0 LOCALTYPE-T $replace-localtype ( LOCALTYPE-REST, LOCALTYPE-N, LOCALTYPE-LCT ) .\n" ^
+    "  eq $with-locals ( VALID-OPT-C, LOCALTYPE-X VALID-OPT-CT, CTORSETA0 LOCALTYPE-T LOCALTYPE-REST ) =\n" ^
+    "    $with-locals ( ( VALID-OPT-C [. 'LOCALS <- $replace-localtype ( value('LOCALS, VALID-OPT-C), LOCALTYPE-X, CTORSETA0 LOCALTYPE-T ) ] ), VALID-OPT-CT, LOCALTYPE-REST ) .\n" ^
+    "  eq $with-locals ( VALID-OPT-C, LOCALTYPE-X VALID-OPT-CT, CTORUNSETA0 LOCALTYPE-T LOCALTYPE-REST ) =\n" ^
+    "    $with-locals ( ( VALID-OPT-C [. 'LOCALS <- $replace-localtype ( value('LOCALS, VALID-OPT-C), LOCALTYPE-X, CTORUNSETA0 LOCALTYPE-T ) ] ), VALID-OPT-CT, LOCALTYPE-REST ) .\n\n" ^
+    "  --- Executable localtype witness inference for Local_oks.\n" ^
+    "  --- Source Local_ok chooses SET t exactly when $default(t) is defined,\n" ^
+    "  --- and UNSET t otherwise.  Encoding that as equations keeps Func_ok\n" ^
+    "  --- from searching through the generic associative sequence inference\n" ^
+    "  --- rule just to recover this deterministic witness.\n" ^
+    "  vars LOCAL-INFER-C LOCAL-INFER-T LOCAL-INFER-REST : SpectecTerminals .\n" ^
+    "  ceq $infer-local-ok-arg2 ( LOCAL-INFER-C, CTORLOCALA1 ( LOCAL-INFER-T ) ) = CTORSETA0 LOCAL-INFER-T\n" ^
+    "    if $default ( LOCAL-INFER-T ) =/= eps .\n" ^
+    "  ceq $infer-local-ok-arg2 ( LOCAL-INFER-C, CTORLOCALA1 ( LOCAL-INFER-T ) ) = CTORUNSETA0 LOCAL-INFER-T\n" ^
+    "    if $default ( LOCAL-INFER-T ) == eps .\n" ^
+    "  ceq $infer-local-oks-arg2 ( LOCAL-INFER-C, CTORLOCALA1 ( LOCAL-INFER-T ) LOCAL-INFER-REST ) =\n" ^
+    "    CTORSETA0 LOCAL-INFER-T $infer-local-oks-arg2 ( LOCAL-INFER-C, LOCAL-INFER-REST )\n" ^
+    "    if $default ( LOCAL-INFER-T ) =/= eps .\n" ^
+    "  ceq $infer-local-oks-arg2 ( LOCAL-INFER-C, CTORLOCALA1 ( LOCAL-INFER-T ) LOCAL-INFER-REST ) =\n" ^
+    "    CTORUNSETA0 LOCAL-INFER-T $infer-local-oks-arg2 ( LOCAL-INFER-C, LOCAL-INFER-REST )\n" ^
+    "    if $default ( LOCAL-INFER-T ) == eps .\n\n" ^
+    "  --- Optional empty upper bound for limits [n .. m?].\n" ^
+    "  vars VALID-LIMITS-C VALID-LIMITS-N VALID-LIMITS-K : SpectecTerminals .\n" ^
+    "  crl [limits-ok-empty-upper] :\n" ^
+    "    Limits-ok ( VALID-LIMITS-C, CTORLBRACKDOTDOTRBRACKA2 ( VALID-LIMITS-N, eps ), VALID-LIMITS-K )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if _<=_ ( VALID-LIMITS-N, VALID-LIMITS-K ) .\n\n" ^
+    "  --- Optional empty null? on the left side of Reftype_sub/null.\n" ^
+    "  --- Source rule is `REF NULL? ht_1 <: REF NULL ht_2`; the generated\n" ^
+    "  --- constructor-specialized rule covers the present-NULL case, while\n" ^
+    "  --- this covers the empty optional case used by REF.FUNC results.\n" ^
+    "  vars VALID-RT-C VALID-RT-HT1 VALID-RT-HT2 : SpectecTerminals .\n" ^
+    "  crl [reftype-ok-empty-null] :\n" ^
+    "    Reftype-ok ( VALID-RT-C, CTORREFA2 ( eps, VALID-RT-HT1 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Heaptype-ok ( VALID-RT-C, VALID-RT-HT1 ) => valid .\n" ^
+    "  crl [reftype-sub-null-left-empty] :\n" ^
+    "    Reftype-sub ( VALID-RT-C, CTORREFA2 ( eps, VALID-RT-HT1 ), CTORREFA2 ( CTORNULLA0, VALID-RT-HT2 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Heaptype-sub ( VALID-RT-C, VALID-RT-HT1, VALID-RT-HT2 ) => valid .\n\n" ^
+    "  --- Direct executable Deftype_ok witness for closed generated rectypes.\n" ^
+    "  --- Source Deftype_ok needs some OK(x) witness from Rectype_ok.  For\n" ^
+    "  --- generated standalone rectypes, OK(0) is the concrete witness used\n" ^
+    "  --- by Types_ok; this prevents later Typeuse_ok/Heaptype_ok checks\n" ^
+    "  --- from re-searching that existential witness.\n" ^
+    "  vars VALID-DT-C VALID-DT-RT VALID-DT-SUBTYPES VALID-DT-I VALID-DT-N : SpectecTerminals .\n" ^
+    "  crl [deftype-ok-direct-zero-witness] :\n" ^
+    "    Deftype-ok ( VALID-DT-C, CTORWDEFA2 ( VALID-DT-RT, VALID-DT-I ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if CTORRECA1 ( VALID-DT-SUBTYPES ) := VALID-DT-RT /\\ VALID-DT-N := len ( VALID-DT-SUBTYPES ) /\\ _<_ ( VALID-DT-I, VALID-DT-N ) /\\ Rectype-ok ( VALID-DT-C, VALID-DT-RT, CTOROKA1 ( 0 ) ) => valid .\n\n" ^
+    "  --- Optional empty mut? cases for immutable globaltype.\n" ^
+    "  --- In source, globaltype is `mut? valtype`; when mut? is empty the\n" ^
+    "  --- flat encoding is just the valtype.  These rules are the empty-mut\n" ^
+    "  --- counterparts of the generated mutable global rules.\n" ^
+    "  var VALID-GLOBAL-C : Context .\n" ^
+    "  var VALID-GLOBAL-T : SpectecTerminals .\n" ^
+    "  var VALID-GLOBAL-X : Idx .\n" ^
+    "  vars VALID-GLOBAL-EXPR VALID-GLOBAL-GLOBALS VALID-GLOBAL-GTS : SpectecTerminals .\n" ^
+    "  crl [global-ok-mutable-flat-globaltype] :\n" ^
+    "    Global-ok ( VALID-GLOBAL-C, CTORGLOBALA2 ( CTORMUTA0 VALID-GLOBAL-T, VALID-GLOBAL-EXPR ), CTORMUTA0 VALID-GLOBAL-T )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Globaltype-ok ( VALID-GLOBAL-C, CTORMUTA0 VALID-GLOBAL-T ) => valid /\\ Expr-ok-const ( VALID-GLOBAL-C, VALID-GLOBAL-EXPR, VALID-GLOBAL-T ) => valid .\n" ^
+    "  crl [globaltype-ok-immutable-empty-mut] :\n" ^
+    "    Globaltype-ok ( VALID-GLOBAL-C, VALID-GLOBAL-T )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Valtype-ok ( VALID-GLOBAL-C, VALID-GLOBAL-T ) => valid .\n" ^
+    "  crl [global-ok-immutable-empty-mut] :\n" ^
+    "    Global-ok ( VALID-GLOBAL-C, CTORGLOBALA2 ( VALID-GLOBAL-T, VALID-GLOBAL-EXPR ), VALID-GLOBAL-T )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Globaltype-ok ( VALID-GLOBAL-C, VALID-GLOBAL-T ) => valid /\\ Expr-ok-const ( VALID-GLOBAL-C, VALID-GLOBAL-EXPR, VALID-GLOBAL-T ) => valid .\n" ^
+    "  crl [instr-ok-global-get-immutable-empty-mut] :\n" ^
+    "    Instr-ok ( VALID-GLOBAL-C, CTORGLOBALGETA1 ( VALID-GLOBAL-X ), CTORARROWA3 ( eps, eps, VALID-GLOBAL-T ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if $typed-index ( globaltype, value('GLOBALS, VALID-GLOBAL-C), VALID-GLOBAL-X ) == VALID-GLOBAL-T .\n" ^
+    "  ceq $infer-instr-ok-arg2 ( VALID-GLOBAL-C, CTORGLOBALGETA1 ( VALID-GLOBAL-X ) ) = CTORARROWA3 ( eps, eps, VALID-GLOBAL-T )\n" ^
+    "    if VALID-GLOBAL-T := $typed-index ( globaltype, value('GLOBALS, VALID-GLOBAL-C), VALID-GLOBAL-X ) .\n" ^
+    "  crl [instr-const-global-get-immutable-empty-mut] :\n" ^
+    "    Instr-const ( VALID-GLOBAL-C, CTORGLOBALGETA1 ( VALID-GLOBAL-X ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if VALID-GLOBAL-T := $typed-index ( globaltype, value('GLOBALS, VALID-GLOBAL-C), VALID-GLOBAL-X ) .\n\n" ^
+    "  crl [globals-ok-mutable-flat-globaltype-cons] :\n" ^
+    "    Globals-ok ( VALID-GLOBAL-C, CTORGLOBALA2 ( CTORMUTA0 VALID-GLOBAL-T, VALID-GLOBAL-EXPR ) VALID-GLOBAL-GLOBALS, CTORMUTA0 VALID-GLOBAL-T VALID-GLOBAL-GTS )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Global-ok ( VALID-GLOBAL-C, CTORGLOBALA2 ( CTORMUTA0 VALID-GLOBAL-T, VALID-GLOBAL-EXPR ), CTORMUTA0 VALID-GLOBAL-T ) => valid /\\ Globals-ok ( merge ( VALID-GLOBAL-C, RECContextA13 ( eps, eps, eps, CTORMUTA0 VALID-GLOBAL-T, eps, eps, eps, eps, eps, eps, eps, eps, eps ) ), VALID-GLOBAL-GLOBALS, VALID-GLOBAL-GTS ) => valid .\n" ^
+    "  crl [globals-ok-immutable-flat-globaltype-cons] :\n" ^
+    "    Globals-ok ( VALID-GLOBAL-C, CTORGLOBALA2 ( VALID-GLOBAL-T, VALID-GLOBAL-EXPR ) VALID-GLOBAL-GLOBALS, VALID-GLOBAL-T VALID-GLOBAL-GTS )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Global-ok ( VALID-GLOBAL-C, CTORGLOBALA2 ( VALID-GLOBAL-T, VALID-GLOBAL-EXPR ), VALID-GLOBAL-T ) => valid /\\ Globals-ok ( merge ( VALID-GLOBAL-C, RECContextA13 ( eps, eps, eps, VALID-GLOBAL-T, eps, eps, eps, eps, eps, eps, eps, eps, eps ) ), VALID-GLOBAL-GLOBALS, VALID-GLOBAL-GTS ) => valid .\n\n" ^
+    "  --- Executable destructuring for flat tabletype = addrtype limits reftype.\n" ^
+    "  vars VALID-TABLE-C VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT VALID-TABLE-EXPR VALID-TABLE-TABLES VALID-TABLE-TTS : SpectecTerminals .\n" ^
+    "  crl [table-ok-flat-tabletype] :\n" ^
+    "    Table-ok ( VALID-TABLE-C, CTORTABLEA2 ( VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT, VALID-TABLE-EXPR ), VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Tabletype-ok ( VALID-TABLE-C, VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT ) => valid /\\ Expr-ok-const ( VALID-TABLE-C, VALID-TABLE-EXPR, VALID-TABLE-RT ) => valid .\n\n" ^
+    "  crl [table-oks-flat-tabletype-cons] :\n" ^
+    "    Table-oks ( VALID-TABLE-C, CTORTABLEA2 ( VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT, VALID-TABLE-EXPR ) VALID-TABLE-TABLES, VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT VALID-TABLE-TTS )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Table-ok ( VALID-TABLE-C, CTORTABLEA2 ( VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT, VALID-TABLE-EXPR ), VALID-TABLE-AT VALID-TABLE-LIM VALID-TABLE-RT ) => valid /\\ Table-oks ( VALID-TABLE-C, VALID-TABLE-TABLES, VALID-TABLE-TTS ) => valid .\n\n" ^
+    "  --- Executable externidx checks for flat globaltype/tabletype payloads.\n" ^
+    "  vars VALID-EXTERN-C VALID-EXTERN-X VALID-EXTERN-GT VALID-EXTERN-TT : SpectecTerminals .\n" ^
+    "  crl [externidx-ok-global-flat-globaltype] :\n" ^
+    "    Externidx-ok ( VALID-EXTERN-C, CTORGLOBALA1 ( VALID-EXTERN-X ), CTORGLOBALA1 ( VALID-EXTERN-GT ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if $typed-index ( globaltype, value('GLOBALS, VALID-EXTERN-C), VALID-EXTERN-X ) == VALID-EXTERN-GT .\n" ^
+    "  crl [externidx-ok-table-flat-tabletype] :\n" ^
+    "    Externidx-ok ( VALID-EXTERN-C, CTORTABLEA1 ( VALID-EXTERN-X ), CTORTABLEA1 ( VALID-EXTERN-TT ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if $typed-index ( tabletype, value('TABLES, VALID-EXTERN-C), VALID-EXTERN-X ) == VALID-EXTERN-TT .\n\n" ^
+    "  --- Import/externtype validation with flat type payloads.\n" ^
+    "  vars VALID-XT-C VALID-XT-N1 VALID-XT-N2 VALID-XT-XT VALID-XT-XTC VALID-XT-GT VALID-XT-MT VALID-XT-TT VALID-XT-TU VALID-XT-TS1 VALID-XT-TS2 : SpectecTerminals .\n" ^
+    "  var VALID-XT-I : Nat .\n" ^
+    "  var VALID-SUBST-X : Nat .\n" ^
+    "  vars VALID-SUBST-TVS VALID-SUBST-TUS : SpectecTerminals .\n" ^
+    "  eq $subst-deftype ( CTORWIDXA1 ( VALID-SUBST-X ), VALID-SUBST-TVS, VALID-SUBST-TUS ) = index ( VALID-SUBST-TUS, VALID-SUBST-X ) .\n" ^
+    "  crl [import-ok-closed-externtype] :\n" ^
+    "    Import-ok ( VALID-XT-C, CTORIMPORTA3 ( VALID-XT-N1, VALID-XT-N2, VALID-XT-XT ), VALID-XT-XTC )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Externtype-ok ( VALID-XT-C, VALID-XT-XT ) => valid /\\ $clos-externtype ( VALID-XT-C, VALID-XT-XT ) == VALID-XT-XTC .\n" ^
+    "  crl [externtype-ok-global-flat-globaltype] :\n" ^
+    "    Externtype-ok ( VALID-XT-C, CTORGLOBALA1 ( VALID-XT-GT ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Globaltype-ok ( VALID-XT-C, VALID-XT-GT ) => valid .\n" ^
+    "  crl [externtype-ok-mem-flat-memtype] :\n" ^
+    "    Externtype-ok ( VALID-XT-C, CTORMEMA1 ( VALID-XT-MT ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Memtype-ok ( VALID-XT-C, VALID-XT-MT ) => valid .\n" ^
+    "  crl [externtype-ok-table-flat-tabletype] :\n" ^
+    "    Externtype-ok ( VALID-XT-C, CTORTABLEA1 ( VALID-XT-TT ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Tabletype-ok ( VALID-XT-C, VALID-XT-TT ) => valid .\n" ^
+    "  crl [externtype-ok-func-flat-typeuse] :\n" ^
+    "    Externtype-ok ( VALID-XT-C, CTORFUNCA1 ( VALID-XT-TU ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if $infer-expand-use-arg2 ( VALID-XT-TU, VALID-XT-C ) => CTORFUNCARROWA2 ( VALID-XT-TS1, VALID-XT-TS2 ) /\\ Typeuse-ok ( VALID-XT-C, VALID-XT-TU ) => valid /\\ Expand-use ( VALID-XT-TU, VALID-XT-C, CTORFUNCARROWA2 ( VALID-XT-TS1, VALID-XT-TS2 ) ) => valid .\n\n" ^
+    "  crl [externtype-ok-func-typeidx-direct] :\n" ^
+    "    Externtype-ok ( VALID-XT-C, CTORFUNCA1 ( CTORWIDXA1 ( VALID-XT-I ) ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if CTORFUNCARROWA2 ( VALID-XT-TS1, VALID-XT-TS2 ) := $expanddt ( index ( value('TYPES, VALID-XT-C), VALID-XT-I ) ) /\\ Typeuse-ok ( VALID-XT-C, CTORWIDXA1 ( VALID-XT-I ) ) => valid /\\ Expand-use ( CTORWIDXA1 ( VALID-XT-I ), VALID-XT-C, CTORFUNCARROWA2 ( VALID-XT-TS1, VALID-XT-TS2 ) ) => valid .\n\n" ^
+    "  --- Singleton specialization of Instrs_ok/seq.  This is the source seq\n" ^
+    "  --- rule with instr_2* = eps, but checks the provided instrtype directly.\n" ^
+    "  --- It avoids requiring a unique inferred type for stack-polymorphic\n" ^
+    "  --- instructions such as br/return.\n" ^
+    "  var VALID-INSTR-C : Context .\n" ^
+    "  vars VALID-INSTR VALID-INSTR-IT : SpectecTerminals .\n" ^
+    "  crl [instrs-ok-singleton-direct] :\n" ^
+    "    Instrs-ok ( VALID-INSTR-C, VALID-INSTR, VALID-INSTR-IT )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Instr-ok ( VALID-INSTR-C, VALID-INSTR, VALID-INSTR-IT ) => valid /\\ Instrtype-ok ( VALID-INSTR-C, VALID-INSTR-IT ) => valid .\n\n" ^
+    "  crl [infer-instrs-ok-arg2-singleton-direct] :\n" ^
+    "    $infer-instrs-ok-arg2 ( VALID-INSTR-C, VALID-INSTR )\n" ^
+    "    =>\n" ^
+    "    VALID-INSTR-IT\n" ^
+    "      if $infer-instr-ok-arg2 ( VALID-INSTR-C, VALID-INSTR ) => VALID-INSTR-IT /\\ Instr-ok ( VALID-INSTR-C, VALID-INSTR, VALID-INSTR-IT ) => valid .\n\n" ^
+    "  --- Source-derived framed-head sequence rule: apply the source\n" ^
+    "  --- Instrs_ok/frame idea to the first instruction before continuing\n" ^
+    "  --- with Instrs_ok/seq.  This lets producer/consumer sequences such as\n" ^
+    "  --- i32.const ; i32.add validate against an existing stack prefix.\n" ^
+    "  vars VALID-SEQ-C VALID-SEQ-CQ : Context .\n" ^
+    "  var VALID-SEQ-INSTR : SpectecTerminal .\n" ^
+    "  vars VALID-SEQ-INSTRS VALID-SEQ-PFX VALID-SEQ-TS1 VALID-SEQ-TS2 VALID-SEQ-TS3 VALID-SEQ-XS1 VALID-SEQ-XS2 VALID-SEQ-INITS VALID-SEQ-TS : SpectecTerminals .\n" ^
+    "  crl [instrs-ok-singleton-framed-head] :\n" ^
+    "    Instrs-ok ( VALID-SEQ-C, VALID-SEQ-INSTR, CTORARROWA3 ( VALID-SEQ-PFX VALID-SEQ-TS1, VALID-SEQ-XS1, VALID-SEQ-PFX VALID-SEQ-TS2 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if VALID-SEQ-PFX =/= eps /\\ $infer-instr-ok-arg2 ( VALID-SEQ-C, VALID-SEQ-INSTR ) => CTORARROWA3 ( VALID-SEQ-TS1, VALID-SEQ-XS1, VALID-SEQ-TS2 ) /\\ VALID-SEQ-INITS VALID-SEQ-TS := $typed-index ( localtype, value('LOCALS, VALID-SEQ-C), VALID-SEQ-XS1 ) /\\ Instr-ok ( VALID-SEQ-C, VALID-SEQ-INSTR, CTORARROWA3 ( VALID-SEQ-TS1, VALID-SEQ-XS1, VALID-SEQ-TS2 ) ) => valid /\\ Resulttype-ok ( VALID-SEQ-C, VALID-SEQ-PFX ) => valid .\n" ^
+    "  crl [instrs-ok-seq-framed-head] :\n" ^
+    "    Instrs-ok ( VALID-SEQ-C, VALID-SEQ-INSTR VALID-SEQ-INSTRS, CTORARROWA3 ( VALID-SEQ-PFX VALID-SEQ-TS1, VALID-SEQ-XS1 VALID-SEQ-XS2, VALID-SEQ-TS3 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if VALID-SEQ-PFX =/= eps /\\ $infer-instr-ok-arg2 ( VALID-SEQ-C, VALID-SEQ-INSTR ) => CTORARROWA3 ( VALID-SEQ-TS1, VALID-SEQ-XS1, VALID-SEQ-TS2 ) /\\ VALID-SEQ-INITS VALID-SEQ-TS := $typed-index ( localtype, value('LOCALS, VALID-SEQ-C), VALID-SEQ-XS1 ) /\\ VALID-SEQ-CQ := $with-locals ( VALID-SEQ-C, VALID-SEQ-XS1, ( $star-prefix ( CTORSETA0, VALID-SEQ-TS ) ) ) /\\ Instr-ok ( VALID-SEQ-C, VALID-SEQ-INSTR, CTORARROWA3 ( VALID-SEQ-TS1, VALID-SEQ-XS1, VALID-SEQ-TS2 ) ) => valid /\\ Resulttype-ok ( VALID-SEQ-C, VALID-SEQ-PFX ) => valid /\\ Instrs-ok ( VALID-SEQ-CQ, VALID-SEQ-INSTRS, CTORARROWA3 ( VALID-SEQ-PFX VALID-SEQ-TS2, VALID-SEQ-XS2, VALID-SEQ-TS3 ) ) => valid .\n\n" ^
+    "  --- Source-derived executable specialization for REF.AS_NON_NULL\n" ^
+    "  --- at the head of an instruction sequence.  The SpecTec rule carries\n" ^
+    "  --- an implicit heaptype witness ht; here ht is read from the provided\n" ^
+    "  --- input reftype instead of guessed globally.\n" ^
+    "  vars VALID-REFAS-C : Context .\n" ^
+    "  vars VALID-REFAS-INSTRS VALID-REFAS-HT VALID-REFAS-NULL VALID-REFAS-XS VALID-REFAS-TS3 : SpectecTerminals .\n" ^
+    "  crl [instrs-ok-seq-ref-as-non-null-head] :\n" ^
+    "    Instrs-ok ( VALID-REFAS-C, CTORREFASNONNULLA0 VALID-REFAS-INSTRS, CTORARROWA3 ( CTORREFA2 ( VALID-REFAS-NULL, VALID-REFAS-HT ), VALID-REFAS-XS, VALID-REFAS-TS3 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if Heaptype-ok ( VALID-REFAS-C, VALID-REFAS-HT ) => valid /\\ Reftype-sub ( VALID-REFAS-C, CTORREFA2 ( VALID-REFAS-NULL, VALID-REFAS-HT ), CTORREFA2 ( CTORNULLA0, VALID-REFAS-HT ) ) => valid /\\ Instrs-ok ( VALID-REFAS-C, VALID-REFAS-INSTRS, CTORARROWA3 ( CTORREFA2 ( eps, VALID-REFAS-HT ), VALID-REFAS-XS, VALID-REFAS-TS3 ) ) => valid .\n\n" ^
+    "  crl [infer-instrs-ok-arg2-ref-as-non-null-head] :\n" ^
+    "    $infer-instrs-ok-arg2 ( VALID-REFAS-C, CTORREFASNONNULLA0 VALID-REFAS-INSTRS )\n" ^
+    "    =>\n" ^
+    "    CTORARROWA3 ( CTORREFA2 ( CTORNULLA0, VALID-REFAS-HT ), VALID-REFAS-XS, VALID-REFAS-TS3 )\n" ^
+    "      if $infer-instrs-ok-arg2 ( VALID-REFAS-C, VALID-REFAS-INSTRS ) => CTORARROWA3 ( CTORREFA2 ( VALID-REFAS-NULL, VALID-REFAS-HT ), VALID-REFAS-XS, VALID-REFAS-TS3 ) /\\ Heaptype-ok ( VALID-REFAS-C, VALID-REFAS-HT ) => valid /\\ Reftype-sub ( VALID-REFAS-C, CTORREFA2 ( eps, VALID-REFAS-HT ), CTORREFA2 ( VALID-REFAS-NULL, VALID-REFAS-HT ) ) => valid .\n\n" ^
+    "  --- Source-derived executable specialization for UNREACHABLE at the\n" ^
+    "  --- head of a sequence.  UNREACHABLE has any valid instrtype, so the\n" ^
+    "  --- tail supplies the intermediate stack witness.\n" ^
+    "  vars VALID-UNR-C : Context .\n" ^
+    "  vars VALID-UNR-INSTRS VALID-UNR-TS1 VALID-UNR-TS2 VALID-UNR-TS3 VALID-UNR-XS : SpectecTerminals .\n" ^
+    "  crl [instrs-ok-seq-unreachable-head] :\n" ^
+    "    Instrs-ok ( VALID-UNR-C, CTORUNREACHABLEA0 VALID-UNR-INSTRS, CTORARROWA3 ( VALID-UNR-TS1, VALID-UNR-XS, VALID-UNR-TS3 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if $infer-instrs-ok-arg2 ( VALID-UNR-C, VALID-UNR-INSTRS ) => CTORARROWA3 ( VALID-UNR-TS2, VALID-UNR-XS, VALID-UNR-TS3 ) /\\ Instr-ok ( VALID-UNR-C, CTORUNREACHABLEA0, CTORARROWA3 ( VALID-UNR-TS1, eps, VALID-UNR-TS2 ) ) => valid /\\ Instrs-ok ( VALID-UNR-C, VALID-UNR-INSTRS, CTORARROWA3 ( VALID-UNR-TS2, VALID-UNR-XS, VALID-UNR-TS3 ) ) => valid .\n\n" ^
+    "  --- Wrapped-label variants of the source control validation rules.\n" ^
+    "  --- They are the same SpecTec premises, but LABELS stores each\n" ^
+    "  --- resulttype* element as $rt(t*) so empty labels are not lost.\n" ^
+    "  var VALID-BLOCK-C : Context .\n" ^
+    "  var VALID-BLOCK-BT : SpectecTerminal .\n" ^
+    "  vars VALID-BLOCK-INSTRS VALID-BLOCK-TS1 VALID-BLOCK-TS2 VALID-BLOCK-XS : SpectecTerminals .\n" ^
+    "  crl [instr-ok-block-wrapped-label] :\n" ^
+    "    Instr-ok ( VALID-BLOCK-C, CTORBLOCKA2 ( VALID-BLOCK-BT, VALID-BLOCK-INSTRS ), CTORARROWA3 ( VALID-BLOCK-TS1, eps, VALID-BLOCK-TS2 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if VALID-BLOCK-XS := $instrs-init-xs ( VALID-BLOCK-INSTRS ) /\\ Blocktype-ok ( VALID-BLOCK-C, VALID-BLOCK-BT, CTORARROWA3 ( VALID-BLOCK-TS1, eps, VALID-BLOCK-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( VALID-BLOCK-TS2 ), eps, eps ), VALID-BLOCK-C ), VALID-BLOCK-INSTRS, CTORARROWA3 ( VALID-BLOCK-TS1, VALID-BLOCK-XS, VALID-BLOCK-TS2 ) ) => valid .\n" ^
+    "  crl [infer-instr-ok-arg2-block-wrapped-label] :\n" ^
+    "    $infer-instr-ok-arg2 ( VALID-BLOCK-C, CTORBLOCKA2 ( VALID-BLOCK-BT, VALID-BLOCK-INSTRS ) )\n" ^
+    "    =>\n" ^
+    "    CTORARROWA3 ( VALID-BLOCK-TS1, eps, VALID-BLOCK-TS2 )\n" ^
+    "      if VALID-BLOCK-XS := $instrs-init-xs ( VALID-BLOCK-INSTRS ) /\\ $infer-blocktype-ok-arg2 ( VALID-BLOCK-C, VALID-BLOCK-BT ) => CTORARROWA3 ( VALID-BLOCK-TS1, eps, VALID-BLOCK-TS2 ) /\\ Blocktype-ok ( VALID-BLOCK-C, VALID-BLOCK-BT, CTORARROWA3 ( VALID-BLOCK-TS1, eps, VALID-BLOCK-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( VALID-BLOCK-TS2 ), eps, eps ), VALID-BLOCK-C ), VALID-BLOCK-INSTRS, CTORARROWA3 ( VALID-BLOCK-TS1, VALID-BLOCK-XS, VALID-BLOCK-TS2 ) ) => valid .\n" ^
+    "  var VALID-LOOP-C : Context .\n" ^
+    "  var VALID-LOOP-BT : SpectecTerminal .\n" ^
+    "  vars VALID-LOOP-INSTRS VALID-LOOP-TS1 VALID-LOOP-TS2 VALID-LOOP-XS : SpectecTerminals .\n" ^
+    "  crl [instr-ok-loop-wrapped-label] :\n" ^
+    "    Instr-ok ( VALID-LOOP-C, CTORLOOPA2 ( VALID-LOOP-BT, VALID-LOOP-INSTRS ), CTORARROWA3 ( VALID-LOOP-TS1, eps, VALID-LOOP-TS2 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if VALID-LOOP-XS := $instrs-init-xs ( VALID-LOOP-INSTRS ) /\\ Blocktype-ok ( VALID-LOOP-C, VALID-LOOP-BT, CTORARROWA3 ( VALID-LOOP-TS1, eps, VALID-LOOP-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( VALID-LOOP-TS1 ), eps, eps ), VALID-LOOP-C ), VALID-LOOP-INSTRS, CTORARROWA3 ( VALID-LOOP-TS1, VALID-LOOP-XS, VALID-LOOP-TS2 ) ) => valid .\n" ^
+    "  crl [infer-instr-ok-arg2-loop-wrapped-label] :\n" ^
+    "    $infer-instr-ok-arg2 ( VALID-LOOP-C, CTORLOOPA2 ( VALID-LOOP-BT, VALID-LOOP-INSTRS ) )\n" ^
+    "    =>\n" ^
+    "    CTORARROWA3 ( VALID-LOOP-TS1, eps, VALID-LOOP-TS2 )\n" ^
+    "      if VALID-LOOP-XS := $instrs-init-xs ( VALID-LOOP-INSTRS ) /\\ $infer-blocktype-ok-arg2 ( VALID-LOOP-C, VALID-LOOP-BT ) => CTORARROWA3 ( VALID-LOOP-TS1, eps, VALID-LOOP-TS2 ) /\\ Blocktype-ok ( VALID-LOOP-C, VALID-LOOP-BT, CTORARROWA3 ( VALID-LOOP-TS1, eps, VALID-LOOP-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( VALID-LOOP-TS1 ), eps, eps ), VALID-LOOP-C ), VALID-LOOP-INSTRS, CTORARROWA3 ( VALID-LOOP-TS1, VALID-LOOP-XS, VALID-LOOP-TS2 ) ) => valid .\n" ^
+    "  var VALID-BR-C : Context .\n" ^
+    "  var VALID-BR-L : SpectecTerminal .\n" ^
+    "  vars VALID-BR-TS VALID-BR-TS1 VALID-BR-TS2 : SpectecTerminals .\n" ^
+    "  crl [instr-ok-br-wrapped-label] :\n" ^
+    "    Instr-ok ( VALID-BR-C, CTORBRA1 ( VALID-BR-L ), CTORARROWA3 ( VALID-BR-TS1 VALID-BR-TS, eps, VALID-BR-TS2 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if ( index ( value('LABELS, VALID-BR-C), VALID-BR-L ) == $rt ( VALID-BR-TS ) ) /\\ Instrtype-ok ( VALID-BR-C, CTORARROWA3 ( VALID-BR-TS1, eps, VALID-BR-TS2 ) ) => valid .\n" ^
+    "  crl [instr-ok-br-if-wrapped-label] :\n" ^
+    "    Instr-ok ( VALID-BR-C, CTORBRIFA1 ( VALID-BR-L ), CTORARROWA3 ( VALID-BR-TS CTORI32A0, eps, VALID-BR-TS ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if ( index ( value('LABELS, VALID-BR-C), VALID-BR-L ) == $rt ( VALID-BR-TS ) ) .\n" ^
+    "  ceq $infer-instr-ok-arg2 ( VALID-BR-C, CTORBRIFA1 ( VALID-BR-L ) ) = CTORARROWA3 ( VALID-BR-TS CTORI32A0, eps, VALID-BR-TS )\n" ^
+    "      if $rt ( VALID-BR-TS ) := index ( value('LABELS, VALID-BR-C), VALID-BR-L ) .\n\n" ^
+    "  crl [instr-ok-br-table-empty-wrapped-label] :\n" ^
+    "    Instr-ok ( VALID-BR-C, CTORBRTABLEA2 ( eps, VALID-BR-L ), CTORARROWA3 ( VALID-BR-TS1 VALID-BR-TS CTORI32A0, eps, VALID-BR-TS2 ) )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if ( index ( value('LABELS, VALID-BR-C), VALID-BR-L ) == $rt ( VALID-BR-TS ) ) /\\ Instrtype-ok ( VALID-BR-C, CTORARROWA3 ( VALID-BR-TS1, eps, VALID-BR-TS2 ) ) => valid .\n" ^
+    "  ceq $infer-instr-ok-arg2 ( VALID-BR-C, CTORBRTABLEA2 ( eps, VALID-BR-L ) ) = CTORARROWA3 ( VALID-BR-TS CTORI32A0, eps, VALID-BR-TS )\n" ^
+    "      if $rt ( VALID-BR-TS ) := index ( value('LABELS, VALID-BR-C), VALID-BR-L ) .\n\n" ^
+    "  --- Stack-prefix composition for source-derived Instrs_ok witness inference.\n" ^
+    "  --- If the tail needs an extra stack prefix before the first instruction's\n" ^
+    "  --- output, the whole sequence needs the same prefix before the first\n" ^
+    "  --- instruction's input.\n" ^
+    "  vars VALID-INFER-C VALID-INFER-CQ : Context .\n" ^
+    "  var VALID-INFER-INSTR : SpectecTerminal .\n" ^
+    "  vars VALID-INFER-INSTRS VALID-INFER-TS1 VALID-INFER-TS2 VALID-INFER-TS3 VALID-INFER-PFX VALID-INFER-XS1 VALID-INFER-XS2 VALID-INFER-INITS VALID-INFER-TS : SpectecTerminals .\n" ^
+    "  crl [infer-instrs-ok-arg2-stack-prefix] :\n" ^
+    "    $infer-instrs-ok-arg2 ( VALID-INFER-C, VALID-INFER-INSTR VALID-INFER-INSTRS )\n" ^
+    "    =>\n" ^
+    "    CTORARROWA3 ( VALID-INFER-PFX VALID-INFER-TS1, VALID-INFER-XS1 VALID-INFER-XS2, VALID-INFER-TS3 )\n" ^
+    "      if $infer-instr-ok-arg2 ( VALID-INFER-C, VALID-INFER-INSTR ) => CTORARROWA3 ( VALID-INFER-TS1, VALID-INFER-XS1, VALID-INFER-TS2 ) /\\ VALID-INFER-INITS VALID-INFER-TS := $typed-index ( localtype, value('LOCALS, VALID-INFER-C), VALID-INFER-XS1 ) /\\ VALID-INFER-CQ := $with-locals ( VALID-INFER-C, VALID-INFER-XS1, ( $star-prefix ( CTORSETA0, VALID-INFER-TS ) ) ) /\\ $infer-instrs-ok-arg2 ( VALID-INFER-CQ, VALID-INFER-INSTRS ) => CTORARROWA3 ( VALID-INFER-PFX VALID-INFER-TS2, VALID-INFER-XS2, VALID-INFER-TS3 ) /\\ VALID-INFER-PFX =/= eps /\\ Instr-ok ( VALID-INFER-C, VALID-INFER-INSTR, CTORARROWA3 ( VALID-INFER-TS1, VALID-INFER-XS1, VALID-INFER-TS2 ) ) => valid /\\ Instrs-ok ( VALID-INFER-CQ, VALID-INFER-INSTRS, CTORARROWA3 ( VALID-INFER-PFX VALID-INFER-TS2, VALID-INFER-XS2, VALID-INFER-TS3 ) ) => valid .\n\n" ^
+    "  --- Executable witness candidate for the existential x* in control\n" ^
+    "  --- validation premises.  Source x* records locals initialized by\n" ^
+    "  --- local.set/local.tee while checking an instruction sequence.\n" ^
+    "  op $instrs-init-xs : SpectecTerminals -> SpectecTerminals .\n" ^
+    "  var INIT-XS-X : SpectecTerminal .\n" ^
+    "  var INIT-XS-INSTR : SpectecTerminal .\n" ^
+    "  var INIT-XS-REST : SpectecTerminals .\n" ^
+    "  eq $instrs-init-xs ( eps ) = eps .\n" ^
+    "  eq $instrs-init-xs ( CTORLOCALSETA1 ( INIT-XS-X ) INIT-XS-REST ) = INIT-XS-X $instrs-init-xs ( INIT-XS-REST ) .\n" ^
+    "  eq $instrs-init-xs ( CTORLOCALTEEA1 ( INIT-XS-X ) INIT-XS-REST ) = INIT-XS-X $instrs-init-xs ( INIT-XS-REST ) .\n" ^
+    "  eq $instrs-init-xs ( INIT-XS-INSTR INIT-XS-REST ) = $instrs-init-xs ( INIT-XS-REST ) [owise] .\n\n" ^
+    "  --- Executable form of Func_ok where the expected deftype has already\n" ^
+    "  --- been selected from C.TYPES[x] by the caller (for example Func_oks).\n" ^
+    "  --- The source premise is preserved as an equality condition instead of\n" ^
+    "  --- requiring the selected type to appear syntactically as index(C.TYPES,x)\n" ^
+    "  --- in the rule head.\n" ^
+    "  var VALID-FUNC-C : Context .\n" ^
+    "  vars VALID-FUNC-X VALID-FUNC-DT : SpectecTerminal .\n" ^
+    "  vars VALID-FUNC-LOCALS VALID-FUNC-EXPR VALID-FUNC-TS1 VALID-FUNC-TS2 VALID-FUNC-LCTS : SpectecTerminals .\n" ^
+    "  crl [func-ok-selected-deftype] :\n" ^
+    "    Func-ok ( VALID-FUNC-C, CTORFUNCA3 ( VALID-FUNC-X, VALID-FUNC-LOCALS, VALID-FUNC-EXPR ), VALID-FUNC-DT )\n" ^
+    "    =>\n" ^
+    "    valid\n" ^
+    "      if ( VALID-FUNC-DT == index ( value('TYPES, VALID-FUNC-C), VALID-FUNC-X ) ) /\\ CTORFUNCARROWA2 ( VALID-FUNC-TS1, VALID-FUNC-TS2 ) := $expanddt ( VALID-FUNC-DT ) /\\ $infer-local-oks-arg2 ( VALID-FUNC-C, VALID-FUNC-LOCALS ) => VALID-FUNC-LCTS /\\ Local-oks ( VALID-FUNC-C, VALID-FUNC-LOCALS, VALID-FUNC-LCTS ) => valid /\\ Expr-ok ( merge ( VALID-FUNC-C, RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, ( $star-prefix ( CTORSETA0, VALID-FUNC-TS1 ) VALID-FUNC-LCTS ), $rt ( VALID-FUNC-TS2 ), VALID-FUNC-TS2, eps ) ), VALID-FUNC-EXPR, VALID-FUNC-TS2 ) => valid .\n\n"
   in
+  let _generic_step_pure_context_bridge = "" in
   let _state_set_context_bridge =
     "  --- Executable bridges for state-changing one-value instructions under\n" ^
     "  --- the same source val* / instr* / instr_1* context shape.\n" ^
     "  var STEP-STATE-CTX-Z : State .\n" ^
     "  var STEP-STATE-CTX-S : Store .\n" ^
     "  var STEP-STATE-CTX-F : Frame .\n" ^
-    "  vars STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 : SpectecTerminals .\n" ^
+    "  var STEP-STATE-CTX-VALS : ValSeq .\n" ^
+    "  var STEP-STATE-CTX-INSTRS1 : SpectecTerminals .\n" ^
     "  var STEP-STATE-CTX-VAL : Val .\n" ^
-    "  var STEP-STATE-CTX-REF : SpectecTerminal .\n" ^
+    "  var STEP-STATE-CTX-REF : Ref .\n" ^
+    "  var STEP-STATE-CTX-MI : SpectecTerminal .\n" ^
+    "  vars STEP-STATE-CTX-MT STEP-STATE-CTX-MB : SpectecTerminals .\n" ^
     "  var STEP-STATE-CTX-X : Idx .\n" ^
     "  var STEP-STATE-CTX-AT : SpectecTerminal .\n" ^
     "  var STEP-STATE-CTX-I : Nat .\n" ^
@@ -7738,14 +8172,14 @@ let footer features =
     "  vars STEP-ELEM-SET-REST STEP-ELEM-SET-REFS STEP-ELEM-SET-TY STEP-ELEM-OLD-REFS : SpectecTerminals .\n" ^
     "  vars STEP-ELEM-SET-HEAD : SpectecTerminal .\n" ^
     "  var STEP-ELEM-SET-A : Nat .\n" ^
-    "  op $with-table-terminal : State Tableidx SpectecTerminal SpectecTerminal -> State .\n" ^
+    "  op $with-table-terminal : State Tableidx SpectecTerminal Ref -> State .\n" ^
     "  op $with-table-range : State Tableidx SpectecTerminal SpectecTerminals -> State .\n" ^
     "  op $with-elem-terminal : State Elemidx SpectecTerminals -> State .\n" ^
     "  op $eleminst-set-refs : SpectecTerminal SpectecTerminals -> SpectecTerminal .\n" ^
     "  op $elem-set-addr : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals .\n" ^
-    "  op $table-set-addr : SpectecTerminals Nat Nat SpectecTerminal -> SpectecTerminals .\n" ^
-    "  op $tableinst-set-ref : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .\n" ^
-    "  op $seq-set-terminal : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals .\n" ^
+    "  op $table-set-addr : SpectecTerminals Nat Nat Ref -> SpectecTerminals .\n" ^
+    "  op $tableinst-set-ref : SpectecTerminal Nat Ref -> SpectecTerminal .\n" ^
+    "  op $seq-set-terminal : SpectecTerminals Nat Ref -> SpectecTerminals .\n" ^
     "  eq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, 0, STEP-STATE-CTX-REF ) = STEP-STATE-CTX-REF STEP-TABLE-SEQ-REST .\n" ^
     "  ceq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, STEP-TABLE-SEQ-I, STEP-STATE-CTX-REF ) = STEP-TABLE-SEQ-HEAD $seq-set-terminal ( STEP-TABLE-SEQ-REST, _-_ ( STEP-TABLE-SEQ-I, 1 ), STEP-STATE-CTX-REF ) if STEP-TABLE-SEQ-I > 0 .\n" ^
     "  eq $tableinst-set-ref ( {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, STEP-TABLE-SET-REFS)}, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, $seq-set-terminal ( STEP-TABLE-SET-REFS, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ))} .\n" ^
@@ -7773,19 +8207,25 @@ let footer features =
     "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWJ ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWN ) CTORTABLEINITA2 ( STEP-STATE-CTX-X, STEP-TABLE-INIT-Y ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( STEP-TABLE-INIT-ZQ ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) /\\ STEP-TABLE-INIT-LOWN =/= 0 /\\ STEP-TABLE-INIT-REFS := slice ( value('REFS, $elem ( STEP-STATE-CTX-Z, STEP-TABLE-INIT-Y ) ), STEP-TABLE-INIT-LOWJ, STEP-TABLE-INIT-LOWN ) /\\ STEP-TABLE-INIT-ZQ := $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-TABLE-INIT-REFS ) .\n" ^
+    "      if STEP-TABLE-INIT-LOWN =/= 0 /\\ STEP-TABLE-INIT-REFS := slice ( value('REFS, $elem ( STEP-STATE-CTX-Z, STEP-TABLE-INIT-Y ) ), STEP-TABLE-INIT-LOWJ, STEP-TABLE-INIT-LOWN ) /\\ STEP-TABLE-INIT-ZQ := $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-TABLE-INIT-REFS ) .\n" ^
     "  crl [step-table-set-ctxt-instrs] :\n" ^
     "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) STEP-STATE-CTX-REF CTORTABLESETA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( $with-table-terminal ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) .\n\n"
+    "      if true = true .\n" ^
+    "  crl [step-memory-grow-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) CTORMEMORYGROWA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-meminst ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-MI ) ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, ( _quo_ ( len ( value('BYTES, $mem ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X )) ), _*_ ( 64, $Ki ) ) ) ) STEP-STATE-CTX-INSTRS1 )\n" ^
+    "      if RECMeminstA2 ( STEP-STATE-CTX-MT, STEP-STATE-CTX-MB ) := $growmem ( $mem ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X ), STEP-STATE-CTX-I ) /\\ STEP-STATE-CTX-MI := RECMeminstA2 ( STEP-STATE-CTX-MT, STEP-STATE-CTX-MB ) .\n\n"
   in
   let _memory_context_bridge =
     "  --- Executable bridges for memory stores and passive segment drops under\n" ^
     "  --- a surrounding instruction suffix.  These are the state-changing cases\n" ^
     "  --- produced by active data/elem initialization.\n" ^
     "  var STEP-MEM-CTX-Z : State .\n" ^
-    "  vars STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS : SpectecTerminals .\n" ^
+    "  var STEP-MEM-CTX-VALS : ValSeq .\n" ^
+    "  vars STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS : SpectecTerminals .\n" ^
     "  var STEP-MEM-CTX-AT : SpectecTerminal .\n" ^
     "  var STEP-MEM-CTX-NT : Numtype .\n" ^
     "  var STEP-MEM-CTX-INN : Numtype .\n" ^
@@ -7801,22 +8241,22 @@ let footer features =
     "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-NT, eps, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( STEP-MEM-CTX-I, value('OFFSET, STEP-MEM-CTX-AO) ), _quo_ ( $size ( STEP-MEM-CTX-NT ), 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ STEP-MEM-CTX-BS := $nbytes ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) .\n" ^
+    "      if STEP-MEM-CTX-BS := $nbytes ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) .\n" ^
     "  crl [step-store-pack-ctxt-instrs] :\n" ^
     "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-N, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( STEP-MEM-CTX-I, value('OFFSET, STEP-MEM-CTX-AO) ), _quo_ ( STEP-MEM-CTX-N, 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ STEP-MEM-CTX-BS := $ibytes ( STEP-MEM-CTX-N, $wrap ( $size ( STEP-MEM-CTX-INN ), STEP-MEM-CTX-N, STEP-MEM-CTX-C ) ) .\n" ^
+    "      if STEP-MEM-CTX-BS := $ibytes ( STEP-MEM-CTX-N, $wrap ( $size ( STEP-MEM-CTX-INN ), STEP-MEM-CTX-N, STEP-MEM-CTX-C ) ) .\n" ^
     "  crl [step-data-drop-ctxt-instrs] :\n" ^
     "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORDATADROPA1 ( STEP-MEM-CTX-DATAIDX ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( $with-data ( STEP-MEM-CTX-Z, STEP-MEM-CTX-DATAIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .\n" ^
+    "      if _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .\n" ^
     "  crl [step-elem-drop-ctxt-instrs] :\n" ^
     "    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORELEMDROPA1 ( STEP-MEM-CTX-ELEMIDX ) STEP-MEM-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-MEM-CTX-VALS ) /\\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .\n\n"
+    "      if _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .\n\n"
   in
   let _zero_local_call_ref_bridge =
     "  --- Generic executable bridge for functions whose local* field is eps.\n" ^
@@ -7825,7 +8265,8 @@ let footer features =
     "  --- zero-local case even though it is source-valid.\n" ^
     "  var CALL-ZERO-Z : State .\n" ^
     "  var CALL-ZERO-A : Addr .\n" ^
-    "  vars CALL-ZERO-VALS CALL-ZERO-INSTRS CALL-ZERO-TS1 CALL-ZERO-TS2 : SpectecTerminals .\n" ^
+    "  var CALL-ZERO-VALS : ValSeq .\n" ^
+    "  vars CALL-ZERO-INSTRS CALL-ZERO-TS1 CALL-ZERO-TS2 : SpectecTerminals .\n" ^
     "  vars CALL-ZERO-YY CALL-ZERO-X : SpectecTerminal .\n" ^
     "  var CALL-ZERO-FI : Funcinst .\n" ^
     "  var CALL-ZERO-F : Frame .\n" ^
@@ -7835,7 +8276,7 @@ let footer features =
     "    step-read ( ( CALL-ZERO-Z ; CALL-ZERO-VALS CTORREFFUNCADDRA1 ( CALL-ZERO-A ) CTORCALLREFA1 ( CALL-ZERO-YY ) ) )\n" ^
     "    =>\n" ^
     "    CTORFRAMELBRACERBRACEA3 ( CALL-ZERO-M, CALL-ZERO-F, CTORLABELLBRACERBRACEA3 ( CALL-ZERO-M, eps, CALL-ZERO-INSTRS ) )\n" ^
-    "      if CALL-ZERO-FI := index ( $funcinst ( CALL-ZERO-Z ), CALL-ZERO-A ) /\\ CTORFUNCARROWA2 ( CALL-ZERO-TS1, CALL-ZERO-TS2 ) := $expanddt ( value('TYPE, CALL-ZERO-FI) ) /\\ CTORFUNCA3 ( CALL-ZERO-X, eps, CALL-ZERO-INSTRS ) := value('CODE, CALL-ZERO-FI) /\\ CALL-ZERO-F := RECFrameA2 ( CALL-ZERO-VALS, value('MODULE, CALL-ZERO-FI) ) /\\ CALL-ZERO-M := len ( CALL-ZERO-TS2 ) /\\ CALL-ZERO-N := len ( CALL-ZERO-TS1 ) /\\ ( CALL-ZERO-N == len ( CALL-ZERO-VALS ) ) /\\ $is-spectec-val-seq ( CALL-ZERO-VALS ) .\n\n"
+    "      if CALL-ZERO-FI := index ( $funcinst ( CALL-ZERO-Z ), CALL-ZERO-A ) /\\ CTORFUNCARROWA2 ( CALL-ZERO-TS1, CALL-ZERO-TS2 ) := $expanddt ( value('TYPE, CALL-ZERO-FI) ) /\\ CTORFUNCA3 ( CALL-ZERO-X, eps, CALL-ZERO-INSTRS ) := value('CODE, CALL-ZERO-FI) /\\ CALL-ZERO-F := RECFrameA2 ( CALL-ZERO-VALS, value('MODULE, CALL-ZERO-FI) ) /\\ CALL-ZERO-M := len ( CALL-ZERO-TS2 ) /\\ CALL-ZERO-N := len ( CALL-ZERO-TS1 ) /\\ ( CALL-ZERO-N == len ( CALL-ZERO-VALS ) ) .\n\n"
   in
   let memory_size_bridge =
     "  --- Executable bridge for memory.size on compressed zero-filled memories.\n" ^
@@ -7859,6 +8300,7 @@ let footer features =
      runtime now calls the source-translated $instantiate from output_bs.maude. *)
   "\n" ^
   ref_subtype_decision_block ^
+  validation_optional_premise_block ^
   _generic_step_pure_context_bridge ^
   memory_size_bridge ^
   (if seq_pred_blocks = "" then "" else
@@ -8105,15 +8547,17 @@ let result_rel_helper_block () =
                       then ""
                       else
                         let guard_conds =
-                          binder_var_sorts binders vm
-                          |> List.filter (fun (v, _) -> SSet.mem v bound_after)
-                          |> List.map (fun (v, sort) ->
-                              if preserve_narrow_lhs_sort sort then
-                                Printf.sprintf "%s : %s" v sort
-                              else (
-                                if needs_source_category_predicate sort then
-                                  reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts;
-                                refined_exec_guard v sort))
+                          if drop_runtime_typecheck_guards then []
+                          else
+                            binder_var_sorts binders vm
+                            |> List.filter (fun (v, _) -> SSet.mem v bound_after)
+                            |> List.map (fun (v, sort) ->
+                                if preserve_narrow_lhs_sort sort then
+                                  Printf.sprintf "%s : %s" v sort
+                                else (
+                                  if needs_source_category_predicate sort then
+                                    reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts;
+                                  refined_exec_guard v sort))
                         in
                         let conds = prem_conds @ guard_conds in
                         let conds =
@@ -8261,9 +8705,9 @@ let infer_rel_helper_block () =
           (List.init (h.infer_arity - 1) (fun _ -> "SpectecTerminals"))
       in
       if op_args = "" then
-        Printf.sprintf "  op %s : -> SpectecTerminal .\n" helper_name
+        Printf.sprintf "  op %s : -> SpectecTerminals .\n" helper_name
       else
-        Printf.sprintf "  op %s : %s -> SpectecTerminal .\n"
+        Printf.sprintf "  op %s : %s -> SpectecTerminals .\n"
           helper_name op_args
     in
     let emit_iter_helper h =
@@ -8287,6 +8731,7 @@ let infer_rel_helper_block () =
               |> String.map (function
                    | '$' | '-' -> '_'
                    | c -> Char.uppercase_ascii c)
+              |> fun s -> Printf.sprintf "%s_INFER_ARG%d" s h.infer_arg_index
             in
             let arg_names =
               List.init iter_h.iter_arity (fun i ->
@@ -8303,8 +8748,18 @@ let infer_rel_helper_block () =
             let split_elem_names =
               elem_names
               |> List.mapi (fun i v ->
-                  if List.nth iter_h.iter_split_positions i then Some v else None)
+                  if List.nth iter_h.iter_split_positions i then Some (i, v) else None)
               |> List.filter_map (fun x -> x)
+            in
+            let split_elem_terminal_names =
+              split_elem_names
+              |> List.filter_map (fun (i, v) ->
+                  if i = h.infer_arg_index then None else Some v)
+            in
+            let split_elem_sequence_names =
+              split_elem_names
+              |> List.filter_map (fun (i, v) ->
+                  if i = h.infer_arg_index then Some v else None)
             in
             let split_rest_names =
               rest_names
@@ -8391,10 +8846,14 @@ let infer_rel_helper_block () =
             in
             let var_decl =
               "  vars " ^ String.concat " " arg_names ^ " : SpectecTerminals .\n" ^
-              (if split_elem_names = [] then ""
+              (if split_elem_terminal_names = [] then ""
                else
-                 "  vars " ^ String.concat " " split_elem_names ^
+                 "  vars " ^ String.concat " " split_elem_terminal_names ^
                  " : SpectecTerminal .\n") ^
+              (if split_elem_sequence_names = [] then ""
+               else
+                 "  vars " ^ String.concat " " split_elem_sequence_names ^
+                 " : SpectecTerminals .\n") ^
               (if split_rest_names = [] then ""
                else
                  "  vars " ^ String.concat " " split_rest_names ^
@@ -8461,15 +8920,17 @@ let infer_rel_helper_block () =
                               if p.binds = [] then Some (prem_cond p.text) else None)
                         in
                         let guard_conds =
-                          binder_var_sorts binders vm
-                          |> List.filter (fun (v, _) -> SSet.mem v bound_after)
-                          |> List.map (fun (v, sort) ->
-                              if preserve_narrow_lhs_sort sort then
-                                Printf.sprintf "%s : %s" v sort
-                              else (
-                                if needs_source_category_predicate sort then
-                                  reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts;
-                                refined_exec_guard v sort))
+                          if drop_runtime_typecheck_guards then []
+                          else
+                            binder_var_sorts binders vm
+                            |> List.filter (fun (v, _) -> SSet.mem v bound_after)
+                            |> List.map (fun (v, sort) ->
+                                if preserve_narrow_lhs_sort sort then
+                                  Printf.sprintf "%s : %s" v sort
+                                else (
+                                  if needs_source_category_predicate sort then
+                                    reld_type_pred_sorts := SSet.add sort !reld_type_pred_sorts;
+                                  refined_exec_guard v sort))
                         in
                         let progress_conds =
                           self_recursive_progress_guards helper_name inputs prem_scheduled
@@ -8543,6 +9004,12 @@ let iter_rel_helper_block () =
   if helpers = [] then ""
   else
     let direct_unroll_limit = 8 in
+    let split_position_needs_sequence_chunk h i =
+      !infer_rel_helpers
+      |> List.exists (fun infer_h ->
+          sanitize infer_h.infer_rel_name = sanitize h.iter_helper_name
+          && infer_h.infer_arg_index = i)
+    in
     let emit h =
       let label_base = iter_rel_label_base h.iter_helper_name in
       let base =
@@ -8560,10 +9027,21 @@ let iter_rel_helper_block () =
       let rest_names =
         List.init h.iter_arity (fun i -> Printf.sprintf "%s-R%d" base i)
       in
-      let split_elem_names =
+      let split_elem_name_pairs =
         elem_names
-        |> List.mapi (fun i v -> if List.nth h.iter_split_positions i then Some v else None)
+        |> List.mapi (fun i v ->
+            if List.nth h.iter_split_positions i then Some (i, v) else None)
         |> List.filter_map (fun x -> x)
+      in
+      let split_elem_terminal_names =
+        split_elem_name_pairs
+        |> List.filter_map (fun (i, v) ->
+            if split_position_needs_sequence_chunk h i then None else Some v)
+      in
+      let split_elem_sequence_names =
+        split_elem_name_pairs
+        |> List.filter_map (fun (i, v) ->
+            if split_position_needs_sequence_chunk h i then Some v else None)
       in
       let split_rest_names =
         rest_names
@@ -8573,12 +9051,22 @@ let iter_rel_helper_block () =
       let finite_elem_name i n =
         Printf.sprintf "%s-U%d_%d" base i n
       in
-      let finite_elem_names =
+      let finite_elem_name_pairs =
         List.init h.iter_arity (fun i ->
             if List.nth h.iter_split_positions i then
-              List.init direct_unroll_limit (fun n -> finite_elem_name i (n + 1))
+              List.init direct_unroll_limit (fun n -> (i, finite_elem_name i (n + 1)))
             else [])
         |> List.flatten
+      in
+      let finite_elem_terminal_names =
+        finite_elem_name_pairs
+        |> List.filter_map (fun (i, v) ->
+            if split_position_needs_sequence_chunk h i then None else Some v)
+      in
+      let finite_elem_sequence_names =
+        finite_elem_name_pairs
+        |> List.filter_map (fun (i, v) ->
+            if split_position_needs_sequence_chunk h i then Some v else None)
       in
       let args sorts =
         String.concat " , "
@@ -8630,12 +9118,16 @@ let iter_rel_helper_block () =
       in
       let var_decl =
         "  vars " ^ String.concat " " arg_names ^ " : SpectecTerminals .\n" ^
-        (if split_elem_names = [] then ""
-         else "  vars " ^ String.concat " " split_elem_names ^ " : SpectecTerminal .\n") ^
+        (if split_elem_terminal_names = [] then ""
+         else "  vars " ^ String.concat " " split_elem_terminal_names ^ " : SpectecTerminal .\n") ^
+        (if split_elem_sequence_names = [] then ""
+         else "  vars " ^ String.concat " " split_elem_sequence_names ^ " : SpectecTerminals .\n") ^
         (if split_rest_names = [] then ""
          else "  vars " ^ String.concat " " split_rest_names ^ " : SpectecTerminals .\n") ^
-        (if finite_elem_names = [] then ""
-         else "  vars " ^ String.concat " " finite_elem_names ^ " : SpectecTerminal .\n")
+        (if finite_elem_terminal_names = [] then ""
+         else "  vars " ^ String.concat " " finite_elem_terminal_names ^ " : SpectecTerminal .\n") ^
+        (if finite_elem_sequence_names = [] then ""
+         else "  vars " ^ String.concat " " finite_elem_sequence_names ^ " : SpectecTerminals .\n")
       in
       Printf.sprintf
         "  op %s : %s -> Judgement .\n%s\
@@ -9202,9 +9694,12 @@ let translate defs =
     "  var STEP-STATE-CTX-Z : State .\n" ^
     "  var STEP-STATE-CTX-S : Store .\n" ^
     "  var STEP-STATE-CTX-F : Frame .\n" ^
-    "  vars STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 : SpectecTerminals .\n" ^
+    "  var STEP-STATE-CTX-VALS : ValSeq .\n" ^
+    "  var STEP-STATE-CTX-INSTRS1 : SpectecTerminals .\n" ^
     "  var STEP-STATE-CTX-VAL : Val .\n" ^
-    "  var STEP-STATE-CTX-REF : SpectecTerminal .\n" ^
+    "  var STEP-STATE-CTX-REF : Ref .\n" ^
+    "  var STEP-STATE-CTX-MI : SpectecTerminal .\n" ^
+    "  vars STEP-STATE-CTX-MT STEP-STATE-CTX-MB : SpectecTerminals .\n" ^
     "  var STEP-STATE-CTX-X : Idx .\n" ^
     "  var STEP-STATE-CTX-AT : SpectecTerminal .\n" ^
     "  var STEP-STATE-CTX-I : Nat .\n" ^
@@ -9221,14 +9716,14 @@ let translate defs =
     "  vars STEP-ELEM-SET-REST STEP-ELEM-SET-REFS STEP-ELEM-SET-TY STEP-ELEM-OLD-REFS : SpectecTerminals .\n" ^
     "  vars STEP-ELEM-SET-HEAD : SpectecTerminal .\n" ^
     "  var STEP-ELEM-SET-A : Nat .\n" ^
-    "  op $with-table-terminal : State Tableidx SpectecTerminal SpectecTerminal -> State .\n" ^
+    "  op $with-table-terminal : State Tableidx SpectecTerminal Ref -> State .\n" ^
     "  op $with-table-range : State Tableidx SpectecTerminal SpectecTerminals -> State .\n" ^
     "  op $with-elem-terminal : State Elemidx SpectecTerminals -> State .\n" ^
     "  op $eleminst-set-refs : SpectecTerminal SpectecTerminals -> SpectecTerminal .\n" ^
     "  op $elem-set-addr : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals .\n" ^
-    "  op $table-set-addr : SpectecTerminals Nat Nat SpectecTerminal -> SpectecTerminals .\n" ^
-    "  op $tableinst-set-ref : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .\n" ^
-    "  op $seq-set-terminal : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals .\n" ^
+    "  op $table-set-addr : SpectecTerminals Nat Nat Ref -> SpectecTerminals .\n" ^
+    "  op $tableinst-set-ref : SpectecTerminal Nat Ref -> SpectecTerminal .\n" ^
+    "  op $seq-set-terminal : SpectecTerminals Nat Ref -> SpectecTerminals .\n" ^
     "  eq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, 0, STEP-STATE-CTX-REF ) = STEP-STATE-CTX-REF STEP-TABLE-SEQ-REST .\n" ^
     "  ceq $seq-set-terminal ( STEP-TABLE-SEQ-HEAD STEP-TABLE-SEQ-REST, STEP-TABLE-SEQ-I, STEP-STATE-CTX-REF ) = STEP-TABLE-SEQ-HEAD $seq-set-terminal ( STEP-TABLE-SEQ-REST, _-_ ( STEP-TABLE-SEQ-I, 1 ), STEP-STATE-CTX-REF ) if STEP-TABLE-SEQ-I > 0 .\n" ^
     "  eq $tableinst-set-ref ( {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, STEP-TABLE-SET-REFS)}, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) = {item('TYPE, STEP-TABLE-SET-TY) ; item('REFS, $seq-set-terminal ( STEP-TABLE-SET-REFS, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ))} .\n" ^
@@ -9251,18 +9746,24 @@ let translate defs =
     "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWJ ) CTORCONSTA2 ( CTORI32A0, STEP-TABLE-INIT-LOWN ) CTORTABLEINITA2 ( STEP-STATE-CTX-X, STEP-TABLE-INIT-Y ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( STEP-TABLE-INIT-ZQ ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) /\\ STEP-TABLE-INIT-LOWN =/= 0 /\\ STEP-TABLE-INIT-REFS := slice ( value('REFS, $elem ( STEP-STATE-CTX-Z, STEP-TABLE-INIT-Y ) ), STEP-TABLE-INIT-LOWJ, STEP-TABLE-INIT-LOWN ) /\\ STEP-TABLE-INIT-ZQ := $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-TABLE-INIT-REFS ) .\n" ^
+    "      if STEP-TABLE-INIT-LOWN =/= 0 /\\ STEP-TABLE-INIT-REFS := slice ( value('REFS, $elem ( STEP-STATE-CTX-Z, STEP-TABLE-INIT-Y ) ), STEP-TABLE-INIT-LOWJ, STEP-TABLE-INIT-LOWN ) /\\ STEP-TABLE-INIT-ZQ := $with-table-range ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-TABLE-INIT-REFS ) .\n" ^
     "  crl [step-table-set-ctxt-instrs] :\n" ^
     "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) STEP-STATE-CTX-REF CTORTABLESETA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
     "    =>\n" ^
     "    ( $with-table-terminal ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-I, STEP-STATE-CTX-REF ) ; STEP-STATE-CTX-VALS STEP-STATE-CTX-INSTRS1 )\n" ^
-    "      if $is-spectec-val-seq ( STEP-STATE-CTX-VALS ) .\n\n"
+    "      if true = true .\n" ^
+    "  crl [step-memory-grow-ctxt-instrs] :\n" ^
+    "    step ( ( STEP-STATE-CTX-Z ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, STEP-STATE-CTX-I ) CTORMEMORYGROWA1 ( STEP-STATE-CTX-X ) STEP-STATE-CTX-INSTRS1 ) )\n" ^
+    "    =>\n" ^
+    "    ( $with-meminst ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X, STEP-STATE-CTX-MI ) ; STEP-STATE-CTX-VALS CTORCONSTA2 ( STEP-STATE-CTX-AT, ( _quo_ ( len ( value('BYTES, $mem ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X )) ), _*_ ( 64, $Ki ) ) ) ) STEP-STATE-CTX-INSTRS1 )\n" ^
+    "      if RECMeminstA2 ( STEP-STATE-CTX-MT, STEP-STATE-CTX-MB ) := $growmem ( $mem ( STEP-STATE-CTX-Z, STEP-STATE-CTX-X ), STEP-STATE-CTX-I ) /\\ STEP-STATE-CTX-MI := RECMeminstA2 ( STEP-STATE-CTX-MT, STEP-STATE-CTX-MB ) .\n\n"
   in
   let early_zero_local_call_ref_bridge =
     "  --- Generic executable bridge for functions whose local* field is eps.\n" ^
     "  var CALL-ZERO-Z : State .\n" ^
     "  var CALL-ZERO-A : Addr .\n" ^
-    "  vars CALL-ZERO-VALS CALL-ZERO-INSTRS CALL-ZERO-TS1 CALL-ZERO-TS2 : SpectecTerminals .\n" ^
+    "  var CALL-ZERO-VALS : ValSeq .\n" ^
+    "  vars CALL-ZERO-INSTRS CALL-ZERO-TS1 CALL-ZERO-TS2 : SpectecTerminals .\n" ^
     "  vars CALL-ZERO-YY CALL-ZERO-X : SpectecTerminal .\n" ^
     "  var CALL-ZERO-FI : Funcinst .\n" ^
     "  var CALL-ZERO-F : Frame .\n" ^
@@ -9272,13 +9773,110 @@ let translate defs =
     "    step-read ( ( CALL-ZERO-Z ; CALL-ZERO-VALS CTORREFFUNCADDRA1 ( CALL-ZERO-A ) CTORCALLREFA1 ( CALL-ZERO-YY ) ) )\n" ^
     "    =>\n" ^
     "    CTORFRAMELBRACERBRACEA3 ( CALL-ZERO-M, CALL-ZERO-F, CTORLABELLBRACERBRACEA3 ( CALL-ZERO-M, eps, CALL-ZERO-INSTRS ) )\n" ^
-    "      if CALL-ZERO-FI := index ( $funcinst ( CALL-ZERO-Z ), CALL-ZERO-A ) /\\ CTORFUNCARROWA2 ( CALL-ZERO-TS1, CALL-ZERO-TS2 ) := $expanddt ( value('TYPE, CALL-ZERO-FI) ) /\\ CTORFUNCA3 ( CALL-ZERO-X, eps, CALL-ZERO-INSTRS ) := value('CODE, CALL-ZERO-FI) /\\ CALL-ZERO-F := RECFrameA2 ( CALL-ZERO-VALS, value('MODULE, CALL-ZERO-FI) ) /\\ CALL-ZERO-M := len ( CALL-ZERO-TS2 ) /\\ CALL-ZERO-N := len ( CALL-ZERO-TS1 ) /\\ ( CALL-ZERO-N == len ( CALL-ZERO-VALS ) ) /\\ $is-spectec-val-seq ( CALL-ZERO-VALS ) .\n\n"
+    "      if CALL-ZERO-FI := index ( $funcinst ( CALL-ZERO-Z ), CALL-ZERO-A ) /\\ CTORFUNCARROWA2 ( CALL-ZERO-TS1, CALL-ZERO-TS2 ) := $expanddt ( value('TYPE, CALL-ZERO-FI) ) /\\ CTORFUNCA3 ( CALL-ZERO-X, eps, CALL-ZERO-INSTRS ) := value('CODE, CALL-ZERO-FI) /\\ CALL-ZERO-F := RECFrameA2 ( CALL-ZERO-VALS, value('MODULE, CALL-ZERO-FI) ) /\\ CALL-ZERO-M := len ( CALL-ZERO-TS2 ) /\\ CALL-ZERO-N := len ( CALL-ZERO-TS1 ) /\\ ( CALL-ZERO-N == len ( CALL-ZERO-VALS ) ) .\n\n"
   in
   let translated_defs =
     let insert_before needle insert text =
       Str.global_replace (Str.regexp_string needle) (insert ^ needle) text
     in
+    let early_validation_control_bridges =
+      "  --- Fast executable wrapped-label validation for block/loop.\n" ^
+      "  --- This is the same source premise shape as Instr_ok/block and\n" ^
+      "  --- Instr_ok/loop, but placed before the generic generated rules so\n" ^
+      "  --- Maude does not first explore the unwrapped label/infer path.\n" ^
+      "  var FAST-BLOCK-C : Context .\n" ^
+      "  var FAST-BLOCK-BT : SpectecTerminal .\n" ^
+      "  vars FAST-BLOCK-INSTRS FAST-BLOCK-TS1 FAST-BLOCK-TS2 FAST-BLOCK-XS : SpectecTerminals .\n" ^
+      "  crl [instr-ok-block-wrapped-label-fast] :\n" ^
+      "    Instr-ok ( FAST-BLOCK-C, CTORBLOCKA2 ( FAST-BLOCK-BT, FAST-BLOCK-INSTRS ), CTORARROWA3 ( FAST-BLOCK-TS1, eps, FAST-BLOCK-TS2 ) )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if FAST-BLOCK-XS := $instrs-init-xs ( FAST-BLOCK-INSTRS ) /\\ Blocktype-ok ( FAST-BLOCK-C, FAST-BLOCK-BT, CTORARROWA3 ( FAST-BLOCK-TS1, eps, FAST-BLOCK-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( FAST-BLOCK-TS2 ), eps, eps ), FAST-BLOCK-C ), FAST-BLOCK-INSTRS, CTORARROWA3 ( FAST-BLOCK-TS1, FAST-BLOCK-XS, FAST-BLOCK-TS2 ) ) => valid .\n" ^
+      "  crl [infer-instr-ok-arg2-block-wrapped-label-fast] :\n" ^
+      "    $infer-instr-ok-arg2 ( FAST-BLOCK-C, CTORBLOCKA2 ( FAST-BLOCK-BT, FAST-BLOCK-INSTRS ) )\n" ^
+      "    =>\n" ^
+      "    CTORARROWA3 ( FAST-BLOCK-TS1, eps, FAST-BLOCK-TS2 )\n" ^
+      "      if FAST-BLOCK-XS := $instrs-init-xs ( FAST-BLOCK-INSTRS ) /\\ $infer-blocktype-ok-arg2 ( FAST-BLOCK-C, FAST-BLOCK-BT ) => CTORARROWA3 ( FAST-BLOCK-TS1, eps, FAST-BLOCK-TS2 ) /\\ Blocktype-ok ( FAST-BLOCK-C, FAST-BLOCK-BT, CTORARROWA3 ( FAST-BLOCK-TS1, eps, FAST-BLOCK-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( FAST-BLOCK-TS2 ), eps, eps ), FAST-BLOCK-C ), FAST-BLOCK-INSTRS, CTORARROWA3 ( FAST-BLOCK-TS1, FAST-BLOCK-XS, FAST-BLOCK-TS2 ) ) => valid .\n" ^
+      "  var FAST-LOOP-C : Context .\n" ^
+      "  var FAST-LOOP-BT : SpectecTerminal .\n" ^
+      "  vars FAST-LOOP-INSTRS FAST-LOOP-TS1 FAST-LOOP-TS2 FAST-LOOP-XS : SpectecTerminals .\n" ^
+      "  crl [instr-ok-loop-wrapped-label-fast] :\n" ^
+      "    Instr-ok ( FAST-LOOP-C, CTORLOOPA2 ( FAST-LOOP-BT, FAST-LOOP-INSTRS ), CTORARROWA3 ( FAST-LOOP-TS1, eps, FAST-LOOP-TS2 ) )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if FAST-LOOP-XS := $instrs-init-xs ( FAST-LOOP-INSTRS ) /\\ Blocktype-ok ( FAST-LOOP-C, FAST-LOOP-BT, CTORARROWA3 ( FAST-LOOP-TS1, eps, FAST-LOOP-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( FAST-LOOP-TS1 ), eps, eps ), FAST-LOOP-C ), FAST-LOOP-INSTRS, CTORARROWA3 ( FAST-LOOP-TS1, FAST-LOOP-XS, FAST-LOOP-TS2 ) ) => valid .\n" ^
+      "  crl [infer-instr-ok-arg2-loop-wrapped-label-fast] :\n" ^
+      "    $infer-instr-ok-arg2 ( FAST-LOOP-C, CTORLOOPA2 ( FAST-LOOP-BT, FAST-LOOP-INSTRS ) )\n" ^
+      "    =>\n" ^
+      "    CTORARROWA3 ( FAST-LOOP-TS1, eps, FAST-LOOP-TS2 )\n" ^
+      "      if FAST-LOOP-XS := $instrs-init-xs ( FAST-LOOP-INSTRS ) /\\ $infer-blocktype-ok-arg2 ( FAST-LOOP-C, FAST-LOOP-BT ) => CTORARROWA3 ( FAST-LOOP-TS1, eps, FAST-LOOP-TS2 ) /\\ Blocktype-ok ( FAST-LOOP-C, FAST-LOOP-BT, CTORARROWA3 ( FAST-LOOP-TS1, eps, FAST-LOOP-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( FAST-LOOP-TS1 ), eps, eps ), FAST-LOOP-C ), FAST-LOOP-INSTRS, CTORARROWA3 ( FAST-LOOP-TS1, FAST-LOOP-XS, FAST-LOOP-TS2 ) ) => valid .\n\n" ^
+      "  --- Fast executable form of the star premise in Instr_ok/br_table.\n" ^
+      "  op $br-table-labels-ok : Context SpectecTerminals SpectecTerminals -> Judgement .\n" ^
+      "  var FAST-BRT-C : Context .\n" ^
+      "  var FAST-BRT-L : SpectecTerminal .\n" ^
+      "  vars FAST-BRT-LS FAST-BRT-LQ FAST-BRT-TS FAST-BRT-TS1 FAST-BRT-TS2 : SpectecTerminals .\n" ^
+      "  rl [br-table-labels-ok-empty-fast] :\n" ^
+      "    $br-table-labels-ok ( FAST-BRT-C, eps, FAST-BRT-TS )\n" ^
+      "    =>\n" ^
+      "    valid .\n" ^
+      "  crl [br-table-labels-ok-cons-fast] :\n" ^
+      "    $br-table-labels-ok ( FAST-BRT-C, FAST-BRT-L FAST-BRT-LS, FAST-BRT-TS )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if Resulttype-sub ( FAST-BRT-C, FAST-BRT-TS, index ( value('LABELS, FAST-BRT-C), FAST-BRT-L ) ) => valid /\\ $br-table-labels-ok ( FAST-BRT-C, FAST-BRT-LS, FAST-BRT-TS ) => valid .\n" ^
+      "  crl [instr-ok-br-table-wrapped-labels-fast] :\n" ^
+      "    Instr-ok ( FAST-BRT-C, CTORBRTABLEA2 ( FAST-BRT-LS, FAST-BRT-LQ ), CTORARROWA3 ( FAST-BRT-TS1 FAST-BRT-TS CTORI32A0, eps, FAST-BRT-TS2 ) )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if $br-table-labels-ok ( FAST-BRT-C, FAST-BRT-LS, FAST-BRT-TS ) => valid /\\ Resulttype-sub ( FAST-BRT-C, FAST-BRT-TS, index ( value('LABELS, FAST-BRT-C), FAST-BRT-LQ ) ) => valid /\\ Instrtype-ok ( FAST-BRT-C, CTORARROWA3 ( FAST-BRT-TS1, eps, FAST-BRT-TS2 ) ) => valid .\n" ^
+      "  crl [infer-instr-ok-arg2-br-table-wrapped-labels-fast] :\n" ^
+      "    $infer-instr-ok-arg2 ( FAST-BRT-C, CTORBRTABLEA2 ( FAST-BRT-LS, FAST-BRT-LQ ) )\n" ^
+      "    =>\n" ^
+      "    CTORARROWA3 ( FAST-BRT-TS CTORI32A0, eps, FAST-BRT-TS )\n" ^
+      "      if $rt ( FAST-BRT-TS ) := index ( value('LABELS, FAST-BRT-C), FAST-BRT-LQ ) /\\ $br-table-labels-ok ( FAST-BRT-C, FAST-BRT-LS, FAST-BRT-TS ) => valid /\\ Resulttype-sub ( FAST-BRT-C, FAST-BRT-TS, index ( value('LABELS, FAST-BRT-C), FAST-BRT-LQ ) ) => valid .\n\n"
+    in
+    let early_func_validation_bridge =
+      "  --- Fast executable form of Func_ok for callers that already selected\n" ^
+      "  --- the expected deftype from C.TYPES[x].\n" ^
+      "  var FAST-FUNC-C : Context .\n" ^
+      "  vars FAST-FUNC-X FAST-FUNC-DT : SpectecTerminal .\n" ^
+      "  vars FAST-FUNC-LOCALS FAST-FUNC-EXPR FAST-FUNC-TS1 FAST-FUNC-TS2 FAST-FUNC-LCTS : SpectecTerminals .\n" ^
+      "  crl [func-ok-selected-deftype-fast] :\n" ^
+      "    Func-ok ( FAST-FUNC-C, CTORFUNCA3 ( FAST-FUNC-X, FAST-FUNC-LOCALS, FAST-FUNC-EXPR ), FAST-FUNC-DT )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if ( FAST-FUNC-DT == index ( value('TYPES, FAST-FUNC-C), FAST-FUNC-X ) ) /\\ CTORFUNCARROWA2 ( FAST-FUNC-TS1, FAST-FUNC-TS2 ) := $expanddt ( FAST-FUNC-DT ) /\\ $infer-local-oks-arg2 ( FAST-FUNC-C, FAST-FUNC-LOCALS ) => FAST-FUNC-LCTS /\\ Local-oks ( FAST-FUNC-C, FAST-FUNC-LOCALS, FAST-FUNC-LCTS ) => valid /\\ Expr-ok ( merge ( FAST-FUNC-C, RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, ( $star-prefix ( CTORSETA0, FAST-FUNC-TS1 ) FAST-FUNC-LCTS ), $rt ( FAST-FUNC-TS2 ), FAST-FUNC-TS2, eps ) ), FAST-FUNC-EXPR, FAST-FUNC-TS2 ) => valid .\n\n"
+    in
+    let early_framed_instrs_validation_bridge =
+      "  --- Fast source-derived framed-head Instrs_ok rule.\n" ^
+      "  --- It is the source Instrs_ok/frame idea applied before the generic\n" ^
+      "  --- Instrs_ok/seq rule, so a producer instruction can run on top of an\n" ^
+      "  --- existing stack prefix without first exploring the generic path.\n" ^
+      "  vars FAST-SEQ-C FAST-SEQ-CQ : Context .\n" ^
+      "  var FAST-SEQ-INSTR : SpectecTerminal .\n" ^
+      "  vars FAST-SEQ-INSTRS FAST-SEQ-PFX FAST-SEQ-TS1 FAST-SEQ-TS2 FAST-SEQ-TS3 FAST-SEQ-XS1 FAST-SEQ-XS2 FAST-SEQ-INITS FAST-SEQ-TS : SpectecTerminals .\n" ^
+      "  var FAST-BLOCK-SEQ-BT : SpectecTerminal .\n" ^
+      "  vars FAST-BLOCK-SEQ-BODY FAST-BLOCK-SEQ-REST FAST-BLOCK-SEQ-TS1 FAST-BLOCK-SEQ-TS2 FAST-BLOCK-SEQ-TS3 FAST-BLOCK-SEQ-XS FAST-BLOCK-SEQ-XS2 : SpectecTerminals .\n" ^
+      "  crl [instrs-ok-seq-block-head-fast] :\n" ^
+      "    Instrs-ok ( FAST-SEQ-C, CTORBLOCKA2 ( FAST-BLOCK-SEQ-BT, FAST-BLOCK-SEQ-BODY ) FAST-BLOCK-SEQ-REST, CTORARROWA3 ( FAST-BLOCK-SEQ-TS1, FAST-BLOCK-SEQ-XS2, FAST-BLOCK-SEQ-TS3 ) )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if $infer-blocktype-ok-arg2 ( FAST-SEQ-C, FAST-BLOCK-SEQ-BT ) => CTORARROWA3 ( FAST-BLOCK-SEQ-TS1, eps, FAST-BLOCK-SEQ-TS2 ) /\\ FAST-BLOCK-SEQ-XS := $instrs-init-xs ( FAST-BLOCK-SEQ-BODY ) /\\ Blocktype-ok ( FAST-SEQ-C, FAST-BLOCK-SEQ-BT, CTORARROWA3 ( FAST-BLOCK-SEQ-TS1, eps, FAST-BLOCK-SEQ-TS2 ) ) => valid /\\ Instrs-ok ( merge ( RECContextA13 ( eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, $rt ( FAST-BLOCK-SEQ-TS2 ), eps, eps ), FAST-SEQ-C ), FAST-BLOCK-SEQ-BODY, CTORARROWA3 ( FAST-BLOCK-SEQ-TS1, FAST-BLOCK-SEQ-XS, FAST-BLOCK-SEQ-TS2 ) ) => valid /\\ Instrs-ok ( FAST-SEQ-C, FAST-BLOCK-SEQ-REST, CTORARROWA3 ( FAST-BLOCK-SEQ-TS2, FAST-BLOCK-SEQ-XS2, FAST-BLOCK-SEQ-TS3 ) ) => valid .\n" ^
+      "  crl [instrs-ok-singleton-framed-head-fast] :\n" ^
+      "    Instrs-ok ( FAST-SEQ-C, FAST-SEQ-INSTR, CTORARROWA3 ( FAST-SEQ-PFX FAST-SEQ-TS1, FAST-SEQ-XS1, FAST-SEQ-PFX FAST-SEQ-TS2 ) )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if FAST-SEQ-PFX =/= eps /\\ $infer-instr-ok-arg2 ( FAST-SEQ-C, FAST-SEQ-INSTR ) => CTORARROWA3 ( FAST-SEQ-TS1, FAST-SEQ-XS1, FAST-SEQ-TS2 ) /\\ FAST-SEQ-INITS FAST-SEQ-TS := $typed-index ( localtype, value('LOCALS, FAST-SEQ-C), FAST-SEQ-XS1 ) /\\ Instr-ok ( FAST-SEQ-C, FAST-SEQ-INSTR, CTORARROWA3 ( FAST-SEQ-TS1, FAST-SEQ-XS1, FAST-SEQ-TS2 ) ) => valid /\\ Resulttype-ok ( FAST-SEQ-C, FAST-SEQ-PFX ) => valid .\n" ^
+      "  crl [instrs-ok-seq-framed-head-fast] :\n" ^
+      "    Instrs-ok ( FAST-SEQ-C, FAST-SEQ-INSTR FAST-SEQ-INSTRS, CTORARROWA3 ( FAST-SEQ-PFX FAST-SEQ-TS1, FAST-SEQ-XS1 FAST-SEQ-XS2, FAST-SEQ-TS3 ) )\n" ^
+      "    =>\n" ^
+      "    valid\n" ^
+      "      if FAST-SEQ-PFX =/= eps /\\ $infer-instr-ok-arg2 ( FAST-SEQ-C, FAST-SEQ-INSTR ) => CTORARROWA3 ( FAST-SEQ-TS1, FAST-SEQ-XS1, FAST-SEQ-TS2 ) /\\ FAST-SEQ-INITS FAST-SEQ-TS := $typed-index ( localtype, value('LOCALS, FAST-SEQ-C), FAST-SEQ-XS1 ) /\\ FAST-SEQ-CQ := $with-locals ( FAST-SEQ-C, FAST-SEQ-XS1, ( $star-prefix ( CTORSETA0, FAST-SEQ-TS ) ) ) /\\ Instr-ok ( FAST-SEQ-C, FAST-SEQ-INSTR, CTORARROWA3 ( FAST-SEQ-TS1, FAST-SEQ-XS1, FAST-SEQ-TS2 ) ) => valid /\\ Resulttype-ok ( FAST-SEQ-C, FAST-SEQ-PFX ) => valid /\\ Instrs-ok ( FAST-SEQ-CQ, FAST-SEQ-INSTRS, CTORARROWA3 ( FAST-SEQ-PFX FAST-SEQ-TS2, FAST-SEQ-XS2, FAST-SEQ-TS3 ) ) => valid .\n\n"
+    in
     String.concat "\n" (List.map (translate_definition ss) defs)
+    |> insert_before "  crl [instr-ok-block] :" early_validation_control_bridges
+    |> insert_before "  crl [func-ok-r0] :" early_func_validation_bridge
+    |> insert_before "  rl [instrs-ok-empty] :" early_framed_instrs_validation_bridge
     |> Str.global_replace
          (Str.regexp "item('REFS,[ \t]*ALLOCTABLE0-REF)")
          "item('REFS, $repeat ( ALLOCTABLE0-REF, ALLOCTABLE0-LOWI ))"
@@ -9293,14 +9891,29 @@ let translate defs =
     |> insert_before
          "  ceq $allocdata ( ALLOCDATA0-LOWS, CTOROKA0, ALLOCDATA0-BYTES ) ="
          "  op $zero-membytes : SpectecTerminal -> SpectecTerminals [ctor] .\n  op $allocdatas-from-datas : Store SpectecTerminals -> SpectecTerminal .\n  op $cont-allocdatas-from-datas : SpectecTerminals SpectecTerminal -> SpectecTerminal .\n  op $run-datas-from : SpectecTerminals SpectecTerminal -> SpectecTerminals .\n  op $run-elems-from : SpectecTerminals SpectecTerminal -> SpectecTerminals .\n  vars ALLOCDATAS-FD-LOWS ALLOCDATAS-FD-S1 : Store .\n  vars ALLOCDATAS-FD-BS ALLOCDATAS-FD-REST ALLOCDATAS-FD-DASQ : SpectecTerminals .\n  vars ALLOCDATAS-FD-DA ALLOCDATAS-FD-MODE : SpectecTerminal .\n  vars RUN-DATAS-BS RUN-DATAS-REST RUN-ELEMS-EXPRS RUN-ELEMS-REST : SpectecTerminals .\n  vars RUN-DATAS-I RUN-DATAS-MODE RUN-ELEMS-I RUN-ELEMS-RT RUN-ELEMS-MODE : SpectecTerminal .\n  eq $allocdatas-from-datas ( ALLOCDATAS-FD-LOWS, eps ) = ALLOCDATAS-FD-LOWS eps .\n  ceq $allocdatas-from-datas ( ALLOCDATAS-FD-LOWS, CTORDATAA2 ( ALLOCDATAS-FD-BS, ALLOCDATAS-FD-MODE ) ALLOCDATAS-FD-REST ) = $cont-allocdatas-from-datas ( $allocdatas-from-datas ( ALLOCDATAS-FD-S1, ALLOCDATAS-FD-REST ), ALLOCDATAS-FD-DA )\n      if ALLOCDATAS-FD-S1 ALLOCDATAS-FD-DA := $allocdata ( ALLOCDATAS-FD-LOWS, CTOROKA0, ALLOCDATAS-FD-BS ) .\n  eq $cont-allocdatas-from-datas ( ALLOCDATAS-FD-S1 ALLOCDATAS-FD-DASQ, ALLOCDATAS-FD-DA ) = ALLOCDATAS-FD-S1 ALLOCDATAS-FD-DA ALLOCDATAS-FD-DASQ .\n  eq $run-datas-from ( eps, RUN-DATAS-I ) = eps .\n  eq $run-datas-from ( CTORDATAA2 ( RUN-DATAS-BS, RUN-DATAS-MODE ) RUN-DATAS-REST, RUN-DATAS-I ) = $rundata ( RUN-DATAS-I, CTORDATAA2 ( RUN-DATAS-BS, RUN-DATAS-MODE ) ) $run-datas-from ( RUN-DATAS-REST, _+_ ( RUN-DATAS-I, 1 ) ) .\n  eq $run-elems-from ( eps, RUN-ELEMS-I ) = eps .\n  eq $run-elems-from ( CTORELEMA3 ( RUN-ELEMS-RT, RUN-ELEMS-EXPRS, RUN-ELEMS-MODE ) RUN-ELEMS-REST, RUN-ELEMS-I ) = $runelem ( RUN-ELEMS-I, CTORELEMA3 ( RUN-ELEMS-RT, RUN-ELEMS-EXPRS, RUN-ELEMS-MODE ) ) $run-elems-from ( RUN-ELEMS-REST, _+_ ( RUN-ELEMS-I, 1 ) ) .\n\n"
+    |> insert_before
+         "  ceq $growmem ( GROWMEM0-MEMINST, GROWMEM0-LOWN ) ="
+         "  vars GROWMEM-COMP-AT GROWMEM-COMP-LOWI GROWMEM-COMP-LOWN GROWMEM-COMP-IQ : SpectecTerminal .\n  var GROWMEM-COMP-JS : SpectecTerminals .\n  eq $growmem ( RECMeminstA2 ( CTORPAGEA2 ( GROWMEM-COMP-AT, CTORLBRACKDOTDOTRBRACKA2 ( GROWMEM-COMP-LOWI, eps ) ), $zero-membytes ( GROWMEM-COMP-LOWI ) ), GROWMEM-COMP-LOWN ) = RECMeminstA2 ( CTORPAGEA2 ( GROWMEM-COMP-AT, CTORLBRACKDOTDOTRBRACKA2 ( _+_ ( GROWMEM-COMP-LOWI, GROWMEM-COMP-LOWN ), eps ) ), $zero-membytes ( _+_ ( GROWMEM-COMP-LOWI, GROWMEM-COMP-LOWN ) ) ) .\n  ceq $growmem ( RECMeminstA2 ( CTORPAGEA2 ( GROWMEM-COMP-AT, CTORLBRACKDOTDOTRBRACKA2 ( GROWMEM-COMP-LOWI, GROWMEM-COMP-JS ) ), $zero-membytes ( GROWMEM-COMP-LOWI ) ), GROWMEM-COMP-LOWN ) = RECMeminstA2 ( CTORPAGEA2 ( GROWMEM-COMP-AT, CTORLBRACKDOTDOTRBRACKA2 ( GROWMEM-COMP-IQ, GROWMEM-COMP-JS ) ), $zero-membytes ( GROWMEM-COMP-IQ ) )\n      if GROWMEM-COMP-JS =/= eps /\\ GROWMEM-COMP-IQ := _+_ ( GROWMEM-COMP-LOWI, GROWMEM-COMP-LOWN ) /\\ _<=_ ( GROWMEM-COMP-IQ, GROWMEM-COMP-JS ) .\n\n"
     |> Str.global_replace
          (Str.regexp_string
             "$repeat ( 0, _*_ ( ALLOCMEM0-LOWI, _*_ ( 64, $Ki ) ) )")
          "$zero-membytes ( ALLOCMEM0-LOWI )"
     |> Str.global_replace
          (Str.regexp_string
+            "if RECMeminstA2 ( ( CTORPAGEA2 ( GROWMEM0-AT, ( CTORLBRACKDOTDOTRBRACKA2 ( GROWMEM0-LOWI, GROWMEM0-JS ) ) ) ), GROWMEM0-BS ) := GROWMEM0-MEMINST /\\ GROWMEM0-IQ :=")
+         "if RECMeminstA2 ( ( CTORPAGEA2 ( GROWMEM0-AT, ( CTORLBRACKDOTDOTRBRACKA2 ( GROWMEM0-LOWI, GROWMEM0-JS ) ) ) ), GROWMEM0-BS ) := GROWMEM0-MEMINST /\\ GROWMEM0-BS =/= $zero-membytes ( GROWMEM0-LOWI ) /\\ GROWMEM0-IQ :="
+    |> Str.global_replace
+         (Str.regexp_string
             "$allocdatas ( ALLOCMODULE0-S4, ( $repeat ( CTOROKA0, len ( ALLOCMODULE0-DATAS ) ) ), ALLOCMODULE0-BYTES )")
          "$allocdatas-from-datas ( ALLOCMODULE0-S4, ALLOCMODULE0-DATAS )"
+    |> Str.global_replace
+         (Str.regexp_string
+            "if _<_ ( STEP-READ-TABLE-GET-VAL28-LOWI, len ( value('REFS, $table ( STEP-READ-TABLE-GET-VAL28-LOWZ, STEP-READ-TABLE-GET-VAL28-LOWX )) ) ) .")
+         "if STEP-READ-TABLE-GET-VAL28-LOWI >= 0 /\\ _<_ ( STEP-READ-TABLE-GET-VAL28-LOWI, len ( value('REFS, $table ( STEP-READ-TABLE-GET-VAL28-LOWZ, STEP-READ-TABLE-GET-VAL28-LOWX )) ) ) ."
+    |> Str.global_replace
+         (Str.regexp_string
+            "if _<_ ( STEP-TABLE-SET-VAL10-LOWI, len ( value('REFS, $table ( STEP-TABLE-SET-VAL10-LOWZ, STEP-TABLE-SET-VAL10-LOWX )) ) ) .")
+         "if STEP-TABLE-SET-VAL10-LOWI >= 0 /\\ _<_ ( STEP-TABLE-SET-VAL10-LOWI, len ( value('REFS, $table ( STEP-TABLE-SET-VAL10-LOWZ, STEP-TABLE-SET-VAL10-LOWX )) ) ) ."
     |> Str.global_replace
          (Str.regexp_string
             "$concat ( instr, ( $repeat ( $rundata ( INSTANTIATE0-IDS, ( index ( INSTANTIATE0-DATAS, INSTANTIATE0-IDS ) ) ), len ( INSTANTIATE0-DATAS ) ) ) )")
@@ -9425,49 +10038,59 @@ let translate defs =
   in
   let eqs = core_eqs @ pred_eqs in
   let category_module =
-    if drop_runtime_typecheck_guards then ""
-    else
-      let generic_has_type_memberships =
-        if prelude_features.uses_has_type then
-          [ "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n\
-             \   if (len(LIST-TS) < (2 ^ 32)) ." ]
-        else []
-      in
-      let category_memberships = category_memberships @ generic_has_type_memberships in
-      match category_memberships with
-      | [] -> ""
-      | memberships ->
-          let category_var_decls =
-            decls
-            |> List.filter (fun line ->
-                let s = String.trim line in
-                starts_with s "var " || starts_with s "vars ")
-            |> List.sort_uniq String.compare
-          in
-          let common_category_vars =
-            [ "  var T : SpectecTerminal .";
-              "  var W : SpectecTerminal .";
-              "  var LIST-TY : SpectecCategory .";
-              "  var TS : SpectecTerminals .";
-              "  var LIST-TS : SpectecTerminals ." ]
-          in
-          let category_var_decls =
-            List.sort_uniq String.compare
-              (common_category_vars @ category_var_decls)
-          in
-          "\nmod SPECTEC-CATEGORIES is\n" ^
-          "  inc SPECTEC-CORE .\n\n" ^
-          "  --- Source syntax/category membership axioms are kept outside\n" ^
-          "  --- the executable core so rewrite/search commands do not trigger\n" ^
-          "  --- Maude's generic membership-axiom warnings.\n" ^
-          String.concat "\n" category_var_decls ^ "\n\n" ^
-          String.concat "\n" memberships ^ "\nendm\n"
+    let is_helper_type_witness stmt =
+      contains_substring stmt " hasType "
+      || contains_substring stmt "WellTyped"
+    in
+    let source_category_memberships =
+      category_memberships
+      |> List.filter (fun stmt -> not (is_helper_type_witness stmt))
+    in
+    let generic_has_type_memberships =
+      if (not drop_runtime_typecheck_guards) && prelude_features.uses_has_type then
+        [ "  cmb (LIST-TS hasType (list(LIST-TY))) : WellTyped\n\
+           \   if (len(LIST-TS) < (2 ^ 32)) ." ]
+      else []
+    in
+    let category_memberships = source_category_memberships @ generic_has_type_memberships in
+    match category_memberships with
+    | [] -> ""
+    | memberships ->
+        let category_var_decls =
+          decls
+          |> List.filter (fun line ->
+              let s = String.trim line in
+              starts_with s "var " || starts_with s "vars ")
+          |> List.sort_uniq String.compare
+        in
+        let common_category_vars =
+          [ "  var T : SpectecTerminal .";
+            "  var W : SpectecTerminal .";
+            "  var LIST-TY : SpectecCategory .";
+            "  var TS : SpectecTerminals .";
+            "  var LIST-TS : SpectecTerminals ." ]
+        in
+        let category_var_decls =
+          List.sort_uniq String.compare
+            (common_category_vars @ category_var_decls)
+        in
+        "\nmod SPECTEC-CATEGORIES is\n" ^
+        "  inc SPECTEC-CORE .\n\n" ^
+        "  --- Source syntax/category membership axioms are kept outside\n" ^
+        "  --- the executable core. Runtime helper type witnesses are not\n" ^
+        "  --- emitted in cleanup mode.\n" ^
+        String.concat "\n" category_var_decls ^ "\n\n" ^
+        String.concat "\n" memberships ^ "\nendm\n"
   in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
   "\n\n  --- Equations\n" ^
   String.concat "\n" (List.map strip_typecheck_guards_from_statement eqs) ^
   footer prelude_features ^
   category_module
+  |> Str.global_replace
+       (Str.regexp_string
+          "  eq $with-locals ( WITH-LOCALS1-C, ( WITH-LOCALS1-X1 WITH-LOCALS1-XS ), ( WITH-LOCALS1-LCT1 WITH-LOCALS1-LCTS ) ) = $with-locals ( ( ( WITH-LOCALS1-C [. 'LOCALS <- ( value('LOCALS, WITH-LOCALS1-C) [ WITH-LOCALS1-X1 <- WITH-LOCALS1-LCT1 ] ) ] ) ), WITH-LOCALS1-XS, WITH-LOCALS1-LCTS ) .")
+       "  eq $with-locals ( WITH-LOCALS1-C, ( WITH-LOCALS1-X1 WITH-LOCALS1-XS ), ( CTORSETA0 WITH-LOCALS1-LCT1 WITH-LOCALS1-LCTS ) ) = $with-locals ( ( WITH-LOCALS1-C [. 'LOCALS <- $replace-localtype ( value('LOCALS, WITH-LOCALS1-C), WITH-LOCALS1-X1, CTORSETA0 WITH-LOCALS1-LCT1 ) ] ), WITH-LOCALS1-XS, WITH-LOCALS1-LCTS ) .\n  eq $with-locals ( WITH-LOCALS1-C, ( WITH-LOCALS1-X1 WITH-LOCALS1-XS ), ( CTORUNSETA0 WITH-LOCALS1-LCT1 WITH-LOCALS1-LCTS ) ) = $with-locals ( ( WITH-LOCALS1-C [. 'LOCALS <- $replace-localtype ( value('LOCALS, WITH-LOCALS1-C), WITH-LOCALS1-X1, CTORUNSETA0 WITH-LOCALS1-LCT1 ) ] ), WITH-LOCALS1-XS, WITH-LOCALS1-LCTS ) ."
   |> Str.global_replace
        (Str.regexp_string
           "  vars ALLOCGLOBALS1-GASQ ALLOCGLOBALS1-GLOBALTYPE ALLOCGLOBALS1-GLOBALTYPESQ ALLOCGLOBALS1-VALSQ : SpectecTerminals .")

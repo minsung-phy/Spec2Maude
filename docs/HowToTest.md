@@ -1,8 +1,8 @@
 # How To Test The Current C1 Baseline
 
-Updated: 2026-05-26
+Updated: 2026-05-27
 
-This document contains the current manual smoke commands for the active C1 path:
+This document contains reproducible commands for the active C1 path:
 
 ```text
 translator_bs.ml
@@ -10,65 +10,72 @@ output_bs.maude
 builtins.maude
 wasm-init-bs.maude
 wasm-exec-bs.maude
+wasm_to_maude.ml
 ```
 
-## 1. Regenerate
+## 0. Tool Check
 
 ```bash
-dune build ./main_bs.exe
+eval "$(opam env)"
+dune --version
+command -v maude || echo "set MAUDE_BIN=/path/to/maude"
+command -v wasm2wat
+command -v wat2wasm
+command -v wasm-validate
+command -v wast2json
+```
+
+If Maude is not on `PATH`, set:
+
+```bash
+export MAUDE_BIN=/path/to/maude
+```
+
+## 1. Build
+
+```bash
+dune build ./main_bs.exe ./wasm_to_maude.exe
+```
+
+## 2. Regenerate `output_bs.maude`
+
+```bash
 dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude
 ```
 
-## 2. Load
+`output_bs.maude` is generated. Prefer changing `translator_bs.ml` and
+regenerating rather than hand-editing the generated file.
+
+## 3. Load The Maude Runtime Harness
 
 ```bash
 maude wasm-exec-bs.maude
 ```
 
-Expected: no `Warning`, no `Advisory`, no `Error` while loading.
+Expected load behavior:
+
+```text
+no Warning
+no Advisory
+no Error
+```
 
 Load chain:
 
 ```text
-wasm-exec-bs.maude -> wasm-init-bs.maude -> builtins.maude -> output_bs.maude
+wasm-exec-bs.maude
+  -> wasm-init-bs.maude
+  -> builtins.maude
+  -> output_bs.maude
 ```
 
-If your shell cannot find Maude, fix your local `PATH` first. The Codex shell in
-some environments may not inherit the same `maude` command that an interactive
-terminal has.
-
-## 3. Basic Runtime Smokes
+## 4. Direct Maude Smokes
 
 Run inside Maude after loading `wasm-exec-bs.maude`.
 
-### 3.1 step-pure
+### Fibonacci steps
 
 ```maude
-rew [1] in WASM-FIB-BS : step-pure(CTORNOPA0) .
-search [1] in WASM-FIB-BS : step-pure(CTORNOPA0) =>* eps .
-```
-
-### 3.2 step-read
-
-Null `throw_ref` should trap:
-
-```maude
-rew [1] in WASM-FIB-BS :
-  step-read((((fib-store ; empty-frame).State) ;
-    CTORREFNULLA1(CTORFUNCA0) CTORTHROWREFA0)) .
-
-search [1] in WASM-FIB-BS :
-  step-read((((fib-store ; empty-frame).State) ;
-    CTORREFNULLA1(CTORFUNCA0) CTORTHROWREFA0))
-  =>* CTORTRAPA0 .
-```
-
-### 3.3 step / steps
-
-```maude
-rew [1] in WASM-FIB-BS :
-  step(fib-config(i32v(5))) .
-
 rew [1] in WASM-FIB-BS :
   steps(fib-config(i32v(5))) .
 ```
@@ -79,30 +86,20 @@ Expected final result:
 result Config: (fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)
 ```
 
-Use explicit parentheses in search targets to avoid Maude parse ambiguity:
-
-```maude
-search [1] in WASM-FIB-BS :
-  steps(fib-config(i32v(5)))
-  =>* ((fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)) .
-```
-
-## 4. Invoke Path Smoke
+### Fibonacci invoke path
 
 ```maude
 rew [10000] in WASM-FIB-BS :
   steps(fib-config-invoke(i32v(5))) .
 ```
 
-Expected final result:
+Expected final value:
 
 ```maude
-result Config: (fib-store ; $empty-frame) ; CTORCONSTA2(CTORI32A0, 5)
+CTORCONSTA2(CTORI32A0, 5)
 ```
 
-## 5. Instantiate / Init Config Smoke
-
-This checks the source-shaped module initialization path:
+### Instantiate/init path
 
 ```maude
 red in WASM-FIB-BS :
@@ -112,207 +109,256 @@ rew [1] in WASM-FIB-BS :
   steps(fib-init-config(i32v(5))) .
 ```
 
-Expected final result:
-
-```maude
-result Config: (... ; $empty-frame) ; CTORCONSTA2(CTORI32A0, 5)
-```
-
-The store is generated from `fib-module` through `$instantiate`, not from the
-manual `fib-store` oracle.
-
-## 6. Focused WAT Frontend Smokes
-
-Generate a Maude harness from the focused function-module WAT subset:
-
-```bash
-dune exec ./wat_to_maude_fib.exe -- examples/fib.wat > /tmp/fib.generated.maude
-maude /tmp/fib.generated.maude
-```
-
-Run inside Maude:
-
-```maude
-rew [1] in WASM-FIB-GENERATED-BS :
-  steps(generated-fib-init-config(i32v(5))) .
-```
-
-Expected final result:
-
-```maude
-result Config: (... ; $empty-frame) ; CTORCONSTA2(CTORI32A0, 5)
-```
-
-The CLI can also generate and run in one step:
-
-```bash
-dune exec ./wat_to_maude_fib.exe -- --run 5 examples/fib.wat
-```
-
-The current frontend also supports multiple function types, imports as
-source-shaped terms, globals, memories, tables, data segments, element segments,
-start, multiple local functions, function exports, direct `call`, `call_ref`,
-and flat or folded `block` / `loop` forms in the focused executable subset:
-
-```bash
-dune exec ./wat_to_maude_fib.exe -- --invoke-index 1 --run 5 examples/fib-wrapper.wat
-```
-
-Expected final result:
-
-```maude
-result Config: (... ; $empty-frame) ; CTORCONSTA2(CTORI32A0, 5)
-```
-
-Additional focused runtime examples:
-
-```bash
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/global-get.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/memory-size.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/table-size.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/start-global.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/data-load.wat
-dune exec ./wat_to_maude_fib.exe -- --run-main examples/elem-call-ref.wat
-```
-
-Expected final values:
-
-```text
-global-get  => CTORCONSTA2(CTORI32A0, 42)
-memory-size => CTORCONSTA2(CTORI32A0, 0)
-table-size  => CTORCONSTA2(CTORI32A0, 3)
-start-global => CTORCONSTA2(CTORI32A0, 7)
-data-load   => CTORCONSTA2(CTORI32A0, 42)
-elem-call-ref => CTORCONSTA2(CTORI32A0, 9)
-```
-
-The frontend can parse function imports and emits source-shaped import/export
-terms. The CLI can build the compatible base store and externaddr list for
-function, global, memory, and table imports:
-
-```bash
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main --arg-i32 41 \
-  --import-func 'env.bump=local.get 0 i32.const 1 i32.add' \
-  examples/import-func.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main \
-  --import-global 'env.g=i32.const 77' examples/import-global.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-memory.wat
-dune exec ./wat_to_maude_fib.exe -- --result-only --run-export main examples/import-table.wat
-```
-
 Expected final value:
 
 ```maude
-import-func   => CTORCONSTA2(CTORI32A0, 42)
-import-global => CTORCONSTA2(CTORI32A0, 77)
-import-memory => CTORCONSTA2(CTORI32A0, 1)
-import-table  => CTORCONSTA2(CTORI32A0, 4)
+CTORCONSTA2(CTORI32A0, 5)
 ```
 
-`elem-call-ref.wat` uses an active element segment. The generated config calls
-the source-translated `$instantiate`, which emits the element/table init work;
-execution currently relies on the source-derived table/elem helper bridges in
-`output_bs.maude`.
+### Search syntax note
 
-## 7. Focused Context Smokes
-
-These check that the broad `SpectecTerminals` carrier still executes common
-`val* instr* instr_1*` context shapes.
-
-### 7.1 label/br + suffix
+Use explicit parentheses in search targets to avoid Maude parse ambiguity:
 
 ```maude
-search [5] in WASM-FIB-BS :
-  step((fib-store ;
-    RECFrameA2(
-      CTORCONSTA2(CTORI32A0, 0)
-      CTORCONSTA2(CTORI32A0, 5)
-      CTORCONSTA2(CTORI32A0, 8)
-      CTORCONSTA2(CTORI32A0, 8),
-      fib-moduleinst)) ;
-    CTORLABELLBRACERBRACEA3(0, eps, CTORBRA1(0))
-    CTORLOCALGETA1(1))
-  =>* C:Config .
+search [1] in WASM-FIB-BS :
+  steps(fib-config(i32v(5)))
+  =>* ((fib-store ; empty-frame) ; CTORCONSTA2(CTORI32A0, 5)) .
 ```
 
-Expected: `Solution 1`, ending with the suffix instruction preserved:
+## 5. WAT/Wasm Frontend Smokes
 
-```maude
-CTORLOCALGETA1(1)
-```
-
-### 7.2 br_if + suffix
-
-```maude
-search [5] in WASM-FIB-BS :
-  step(((fib-store ; empty-frame).State ;
-    CTORCONSTA2(CTORI32A0, 1) CTORBRIFA1(0) CTORLOCALGETA1(1)))
-  =>* C:Config .
-```
-
-Expected: `Solution 1`.
-
-### 7.3 nop + suffix
-
-```maude
-search [5] in WASM-FIB-BS :
-  step(((fib-store ; empty-frame).State ;
-    CTORNOPA0 CTORLOCALGETA1(0)))
-  =>* C:Config .
-```
-
-Expected: `Solution 1`.
-
-## 8. Reference / Cast Smokes
-
-The current focused evidence records these as passing in
-`artifacts/wasmtype-cleanup-audit-20260525_054200/summary.md`:
-
-```text
-ref.test negative => CTORCONSTA2(CTORI32A0, 0)
-ref.test positive => CTORCONSTA2(CTORI32A0, 1)
-ref.cast negative => CTORTRAPA0
-ref.cast positive => CTORREFI31NUMA1(7)
-```
-
-Use the concrete commands in the probe scripts/artifacts when re-running the
-full focused matrix.
-
-## 9. Typecheck / Category Cleanup Sanity Checks
-
-These are shell checks against the generated output:
+Run Fibonacci from WAT:
 
 ```bash
-rg 'mod SPECTEC-CATEGORIES|hasType|WellTyped' output_bs.maude
-rg '^  (mb|cmb) ' output_bs.maude
-rg 'subsort SpectecType < SpectecTerminal|subsort SpectecTypes < SpectecTerminals' output_bs.maude
-```
-
-Expected: no matches.
-
-The remaining source-derived sequence-shape predicates should be:
-
-```bash
-rg '\$is-spectec-' output_bs.maude
-```
-
-Expected: only `$is-spectec-val` and `$is-spectec-val-seq` definitions/usages.
-
-The current generic step-pure context bridge should be the only
-`step-from-step-pure` rule:
-
-```bash
-rg '^  (rl|crl) \[step-from-step-pure' output_bs.maude
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run 5 wat_examples/fib.wat
 ```
 
 Expected:
 
 ```text
-crl [step-from-step-pure-ctxt-instrs] :
+result: CTORCONSTA2(CTORI32A0, 5)
 ```
 
-## 10. Model Checking
+Run a `.wasm` input:
 
-Model checking is not part of the current C1 acceptance target. Keep it separate
-from C1 isomorphism and runtime cleanup unless the professor explicitly resumes
-that thread.
+```bash
+wat2wasm --enable-all wat_examples/fib.wat -o /tmp/fib.wasm
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run 5 /tmp/fib.wasm
+```
+
+Validation only:
+
+```bash
+dune exec ./wasm_to_maude.exe -- --validate-only --result-only wat_examples/fib.wat
+```
+
+Expected:
+
+```text
+result: valid
+```
+
+Generate a standalone Maude harness:
+
+```bash
+dune exec ./wasm_to_maude.exe -- wat_examples/fib.wat > /tmp/fib.generated.maude
+maude /tmp/fib.generated.maude
+```
+
+## 6. Local WAT Runtime Examples
+
+```bash
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/global-get.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/memory-size.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/table-size.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/start-global.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/data-load.wat
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run --run-main wat_examples/elem-call-ref.wat
+```
+
+Expected final values:
+
+```text
+global-get    => CTORCONSTA2(CTORI32A0, 42)
+memory-size   => CTORCONSTA2(CTORI32A0, 0)
+table-size    => CTORCONSTA2(CTORI32A0, 3)
+start-global  => CTORCONSTA2(CTORI32A0, 7)
+data-load     => CTORCONSTA2(CTORI32A0, 42)
+elem-call-ref => CTORCONSTA2(CTORI32A0, 9)
+```
+
+## 7. Import Examples
+
+Function import:
+
+```bash
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
+  --run-export main \
+  --arg-i32 41 \
+  --import-func 'env.bump=local.get 0 i32.const 1 i32.add' \
+  wat_examples/import-func.wat
+```
+
+Expected:
+
+```text
+result: CTORCONSTA2(CTORI32A0, 42)
+```
+
+Global, memory, table imports:
+
+```bash
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
+  --run-export main \
+  --import-global 'env.g=i32.const 77' \
+  wat_examples/import-global.wat
+
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
+  --run-export main wat_examples/import-memory.wat
+
+dune exec ./wasm_to_maude.exe -- --result-only --checked-run \
+  --run-export main wat_examples/import-table.wat
+```
+
+Expected:
+
+```text
+import-global => CTORCONSTA2(CTORI32A0, 77)
+import-memory => CTORCONSTA2(CTORI32A0, 1)
+import-table  => CTORCONSTA2(CTORI32A0, 4)
+```
+
+## 8. Invalid Input Smoke
+
+Normal frontend path should reject invalid WAT/Wasm before runtime:
+
+```bash
+dune exec ./wasm_to_maude.exe -- --checked-run --result-only --run-main \
+  wat_examples/invalid-result-type.wat
+```
+
+This file declares an `i32` result but returns `i64.const 1`, so WABT should
+reject it.
+
+The benchmark runner also checks a Maude-internal path using `--no-canonicalize`:
+the generated invalid module does not satisfy `Module-ok`, so checked-run stays
+blocked instead of running `steps`.
+
+## 9. Regression
+
+Run the full current regression:
+
+```bash
+scripts/run_c1_regression.sh
+```
+
+The script writes an artifact directory:
+
+```text
+artifacts/c1-regression-YYYYMMDD_HHMMSS
+```
+
+It performs:
+
+1. WABT tool check,
+2. `dune build`,
+3. `output_bs.maude` regeneration,
+4. structural invariant checks,
+5. WAT/Wasm benchmark probes,
+6. direct local WAT smokes,
+7. C1 probe matrix,
+8. Maude load warning classification,
+9. non-isomorphic helper inventory.
+
+Latest checked summary:
+
+```text
+total benchmark rows: 568
+PASS: 319
+STEPPED: 74
+INVALID: 21
+NO_ENTRY: 58
+IMPORT_MISSING: 5
+UNSUPPORTED: 4
+STUCK_VALIDATION: 46
+STUCK_STEP: 8
+WRONG_RESULT: 33
+
+Maude load warnings: 0
+step-from-step-pure count: 0
+```
+
+## 10. Benchmark Classifier Only
+
+Fetch external benchmarks when needed:
+
+```bash
+scripts/fetch_wasm_benchmarks.sh
+```
+
+Run only the benchmark classifier:
+
+```bash
+scripts/run_wasm_benchmarks.py \
+  --cli _build/default/wasm_to_maude.exe \
+  --maude "${MAUDE_BIN:-maude}" \
+  --timeout 5 \
+  --max-external-files 80 \
+  --max-file-bytes 1000000 \
+  --artifact-dir artifacts/wasm-benchmark-latest
+```
+
+Main status buckets:
+
+```text
+PASS              expected result matches
+STEPPED           execution ended, no expected result available
+INVALID           invalid input rejected or Module-ok not valid
+NO_ENTRY          no exported/main function to call
+IMPORT_MISSING    host import not provided
+UNSUPPORTED       syntax/instruction not supported yet
+STUCK_VALIDATION  Module-ok validation stuck/timeout
+STUCK_STEP        runtime steps stuck/timeout
+WRONG_RESULT      execution ended with wrong value
+WABT_FAIL         WABT cannot parse/validate the file
+FAIL              uncategorized failure
+```
+
+## 11. Generated-Core Sanity Checks
+
+No old pure-step bridge:
+
+```bash
+rg '^  (rl|crl) \\[step-from-step-pure' output_bs.maude
+```
+
+Expected: no matches.
+
+No old value-sequence Boolean guard:
+
+```bash
+rg '\\$is-spectec-val-seq|\\$is-spectec-val' output_bs.maude
+```
+
+Expected: no matches.
+
+Current source `val*` representation:
+
+```bash
+rg 'sort ValSeq|var .* : ValSeq|vars .* : ValSeq' output_bs.maude
+```
+
+Expected: matches.
+
+No broad SpectecType-as-runtime-terminal relation:
+
+```bash
+rg 'subsort SpectecType < SpectecTerminal|subsort SpectecTypes < SpectecTerminals' output_bs.maude
+```
+
+Expected: no matches.
+
+## 12. Model Checking
+
+Model checking is not part of the current C1 acceptance target. Keep it
+separate from translator/frontend/runtime cleanup unless explicitly resumed.
