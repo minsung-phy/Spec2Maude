@@ -221,7 +221,8 @@ The active C1 baseline currently has:
 - official SpecTec/WebAssembly parser-validator based `.wat` / `.wasm` input;
 - official AST lowering coverage for core scalar instructions plus many
   SIMD/GC/exception constructors;
-- a benchmark runner that records parse/validation/runtime status buckets;
+- a benchmark runner that records parse/validation/runtime status buckets and
+  handles the main numeric, vector, and GC/reference expected-result forms;
 - a separated default path where WAT/Wasm validation happens before Maude and
   Maude focuses on dynamic execution.
 

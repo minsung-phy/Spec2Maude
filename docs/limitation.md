@@ -90,7 +90,8 @@ AST constructors.
 Known gaps include:
 
 - full benchmark-scale execution for exception/tag, GC, and SIMD-heavy cases;
-- richer vector/reference expected-result comparison in the `.wast` runner;
+- richer vector expected-result comparison and more precise abstract-reference
+  result matching in the `.wast` runner;
 - richer WASI/import linking;
 - more precise failure classification for real-world benchmarks.
 

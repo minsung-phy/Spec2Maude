@@ -135,8 +135,10 @@ Still worth discussing:
    - runtime profile: excludes static validation from the runtime artifact or
      erases validation premises after external validation.
 2. Continue reducing source-absent helpers in `output_bs.maude`.
-3. Improve official `.wast` runner support for richer reference/vector expected
-   results and invoke arguments.
+3. Continue improving official `.wast` runner support for remaining vector and
+   abstract reference result forms.  The runner now accepts the main GC
+   reference families (`anyref`, `eqref`, `i31ref`, `structref`, `arrayref`,
+   `exnref`) as invoke arguments and expected results.
 4. Reduce remaining `STUCK_STEP` / `WRONG_RESULT` cases by instruction family.
 5. Continue expanding proposal/module coverage where the official AST lowers
    successfully but the Maude runtime or harness still gets stuck.

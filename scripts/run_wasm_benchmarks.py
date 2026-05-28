@@ -466,15 +466,40 @@ def run_validation_stage(maude: str, generated: Path, timeout: int) -> tuple[str
     return classify_validation_output(code, out)
 
 
-def run_step_stage(cli: str, maude: str, path: Path, timeout: int, expected: str = "") -> tuple[str, str, str]:
+def run_step_stage(
+    cli: str,
+    maude: str,
+    path: Path,
+    timeout: int,
+    expected: str = "",
+    rewrite_limit: int = 10000,
+) -> tuple[str, str, str]:
     code, out = run(
-        cli_prefix(cli) + ["--maude", maude, "--unchecked-run", "--result-only", "--run-main", str(path)],
+        cli_prefix(cli)
+        + [
+            "--maude",
+            maude,
+            "--unchecked-run",
+            "--result-only",
+            "--rewrite-limit",
+            str(rewrite_limit),
+            "--run-main",
+            str(path),
+        ],
         timeout,
     )
     return classify_step_output(code, out, expected)
 
 
-def run_stage_probe(cli: str, maude: str, path: Path, timeout: int, suite: str = "external", mode: str = "stage") -> Result:
+def run_stage_probe(
+    cli: str,
+    maude: str,
+    path: Path,
+    timeout: int,
+    suite: str = "external",
+    mode: str = "stage",
+    rewrite_limit: int = 10000,
+) -> Result:
     rel = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
     with tempfile.TemporaryDirectory(prefix="spec2maude-stage-") as tmpdir:
         generated = Path(tmpdir) / "generated.maude"
@@ -508,7 +533,9 @@ def run_stage_probe(cli: str, maude: str, path: Path, timeout: int, suite: str =
                 instantiate_status=init_status,
                 result_status=init_status,
             )
-        step_status, step_observed, step_reason = run_step_stage(cli, maude, path, timeout)
+        step_status, step_observed, step_reason = run_step_stage(
+            cli, maude, path, timeout, rewrite_limit=rewrite_limit
+        )
         final_status = step_status if step_status != "STEPPED" else "STEPPED"
         return Result(
             suite,
@@ -537,7 +564,69 @@ def signed_int(value: str, bits: int) -> int:
     return n
 
 
-def maude_num_alternatives(typ: str, value: str) -> list[str] | None:
+REF_HEAPTYPES = {
+    "funcref": "CTORFUNCA0",
+    "externref": "CTOREXTERNA0",
+    "anyref": "CTORANYA0",
+    "eqref": "CTORWEQA0",
+    "i31ref": "CTORI31A0",
+    "structref": "CTORSTRUCTA0",
+    "arrayref": "CTORARRAYA0",
+    "exnref": "CTOREXNA0",
+}
+
+REF_ARG_FLAGS = {
+    "funcref": "--arg-funcref",
+    "externref": "--arg-externref",
+    "anyref": "--arg-anyref",
+    "eqref": "--arg-eqref",
+    "i31ref": "--arg-i31ref",
+    "structref": "--arg-structref",
+    "arrayref": "--arg-arrayref",
+    "exnref": "--arg-exnref",
+}
+
+REF_VALUE_CTORS = {
+    "funcref": ["CTORREFFUNCADDRA1"],
+    "externref": ["CTORREFEXTERNA1"],
+    "anyref": [
+        "CTORREFHOSTADDRA1",
+        "CTORREFEXTERNA1",
+        "CTORREFFUNCADDRA1",
+        "CTORREFI31NUMA1",
+        "CTORREFSTRUCTADDRA1",
+        "CTORREFARRAYADDRA1",
+    ],
+    "eqref": ["CTORREFI31NUMA1", "CTORREFSTRUCTADDRA1", "CTORREFARRAYADDRA1"],
+    "i31ref": ["CTORREFI31NUMA1"],
+    "structref": ["CTORREFSTRUCTADDRA1"],
+    "arrayref": ["CTORREFARRAYADDRA1"],
+    "exnref": ["CTORREFEXNADDRA1"],
+}
+
+
+def maude_ref_alternatives(typ: str, value: str | None) -> list[str] | None:
+    heap = REF_HEAPTYPES.get(typ)
+    ctors = REF_VALUE_CTORS.get(typ)
+    if heap is None or ctors is None:
+        return None
+    if value == "null":
+        return [f"CTORREFNULLA1({heap})"]
+    if value is None:
+        return [f"{ctor}(" for ctor in ctors]
+    if typ == "externref":
+        return [
+            f"CTORREFEXTERNA1({value})",
+            f"CTORREFEXTERNA1(CTORREFHOSTADDRA1({value}))",
+        ]
+    return [f"{ctor}({value})" for ctor in ctors]
+
+
+def maude_num_alternatives(typ: str, value: str | None) -> list[str] | None:
+    if typ in REF_HEAPTYPES:
+        return maude_ref_alternatives(typ, value)
+    if value is None:
+        return None
     if typ == "i32":
         n = int(value) % (1 << 32)
         values = [n, n - (1 << 32), n + (1 << 32)]
@@ -552,14 +641,6 @@ def maude_num_alternatives(typ: str, value: str) -> list[str] | None:
         return [f"CTORCONSTA2(CTORF64A0, {int(value)})"]
     if typ == "v128":
         return [f"CTORVCONSTA2(CTORV128A0, $v128lanes({value}))"]
-    if typ == "funcref":
-        if value == "null":
-            return ["CTORREFNULLA1(CTORFUNCA0)"]
-        return [f"CTORREFFUNCADDRA1({value})"]
-    if typ == "externref":
-        if value == "null":
-            return ["CTORREFNULLA1(CTOREXTERNA0)"]
-        return [f"CTORREFEXTERNA1({value})"]
     return None
 
 
@@ -574,14 +655,10 @@ def maude_arg_flags(typ: str, value: str) -> list[str] | None:
         return ["--arg-f64", str(int(value))]
     if typ == "v128":
         return ["--arg-v128", str(value)]
-    if typ == "funcref":
+    if typ in REF_ARG_FLAGS:
         if value == "null":
-            return ["--arg-ref-null", "funcref"]
-        return ["--arg-funcref", str(value)]
-    if typ == "externref":
-        if value == "null":
-            return ["--arg-ref-null", "externref"]
-        return ["--arg-externref", str(value)]
+            return ["--arg-ref-null", typ]
+        return [REF_ARG_FLAGS[typ], str(value)]
     return None
 
 
@@ -596,10 +673,8 @@ def prelude_arg_spec(typ: str, value: object) -> str | None:
         return f"f64={int(str(value))}"
     if typ == "v128":
         return f"v128={format_wast_value(value)}"
-    if typ == "funcref":
-        return "funcref=null" if value == "null" else f"funcref={value}"
-    if typ == "externref":
-        return "externref=null" if value == "null" else f"externref={value}"
+    if typ in REF_HEAPTYPES:
+        return f"{typ}=null" if value == "null" else f"{typ}={value}"
     return None
 
 
@@ -632,7 +707,8 @@ def expected_terms(expected: list[dict]) -> str | None:
         return "eps"
     alternatives: list[str] = [""]
     for item in expected:
-        terms = maude_num_alternatives(item.get("type", ""), format_wast_value(item.get("value", "0")))
+        value = format_wast_value(item["value"]) if "value" in item else None
+        terms = maude_num_alternatives(item.get("type", ""), value)
         if terms is None:
             return None
         alternatives = [
@@ -659,6 +735,7 @@ def run_wast_assert(
     path: Path,
     prelude_specs: list[str] | None = None,
     import_memory_specs: list[str] | None = None,
+    rewrite_limit: int = 10000,
 ) -> Result:
     action = cmd.get("action", {})
     if action.get("type") != "invoke":
@@ -696,7 +773,16 @@ def run_wast_assert(
         import_memory_args.extend(["--import-memory", spec])
     code, out = run(
         cli_prefix(cli)
-        + ["--maude", maude, "--unchecked-run", "--result-only", "--run-export", field]
+        + [
+            "--maude",
+            maude,
+            "--unchecked-run",
+            "--result-only",
+            "--rewrite-limit",
+            str(rewrite_limit),
+            "--run-export",
+            field,
+        ]
         + import_memory_args
         + prelude_args
         + arg_flags
@@ -750,7 +836,15 @@ def run_wast_assert_invalid(
     )
 
 
-def run_wast_probe(cli: str, maude: str, path: Path, timeout: int, max_modules: int, max_asserts: int) -> list[Result]:
+def run_wast_probe(
+    cli: str,
+    maude: str,
+    path: Path,
+    timeout: int,
+    max_modules: int,
+    max_asserts: int,
+    rewrite_limit: int = 10000,
+) -> list[Result]:
     results: list[Result] = []
     if not shutil_which("wast2json") and not shutil_which("wasm-tools"):
         return [
@@ -819,7 +913,15 @@ def run_wast_probe(cli: str, maude: str, path: Path, timeout: int, max_modules: 
             if not filename:
                 continue
             wasm = Path(tmpdir) / filename
-            result = run_stage_probe(cli, maude, wasm, timeout, suite="spec-tests", mode="wast-module-stage")
+            result = run_stage_probe(
+                cli,
+                maude,
+                wasm,
+                timeout,
+                suite="spec-tests",
+                mode="wast-module-stage",
+                rewrite_limit=rewrite_limit,
+            )
             result.suite = "spec-tests"
             result.name = f"{path.stem}:{count}"
             result.path = str(path)
@@ -832,6 +934,7 @@ def run_wast_probe(cli: str, maude: str, path: Path, timeout: int, max_modules: 
         register_by_name: dict[str, Path] = {}
         registered_memory_exports: dict[str, dict[str, tuple[int, int | None]]] = {}
         prelude_by_module: dict[str, list[str]] = {}
+        failed_prelude_by_module: dict[str, str] = {}
         for cmd in data.get("commands", []):
             if cmd.get("type") == "module":
                 current_module_index += 1
@@ -884,6 +987,7 @@ def run_wast_probe(cli: str, maude: str, path: Path, timeout: int, max_modules: 
                         for module, exports in registered_memory_exports.items()
                         for name, (pages, max_pages) in exports.items()
                     ],
+                    rewrite_limit=rewrite_limit,
                 )
                 action_result.mode = "wast-action"
                 results.append(action_result)
@@ -891,6 +995,9 @@ def run_wast_probe(cli: str, maude: str, path: Path, timeout: int, max_modules: 
                     spec = action_prelude_spec(action, len(cmd.get("expected", [])))
                     if spec is not None:
                         prelude_by_module.setdefault(wasm_key, []).append(spec)
+                    failed_prelude_by_module.pop(wasm_key, None)
+                else:
+                    failed_prelude_by_module[wasm_key] = action_result.name
                 continue
             if cmd.get("type") == "assert_invalid":
                 if asserts >= max_asserts:
@@ -931,6 +1038,27 @@ def run_wast_probe(cli: str, maude: str, path: Path, timeout: int, max_modules: 
             if not wasm.exists():
                 continue
             wasm_key = str(wasm)
+            failed_prelude = failed_prelude_by_module.get(wasm_key)
+            if failed_prelude is not None:
+                results.append(
+                    Result(
+                        "spec-tests",
+                        f"{path.stem}:assert:{asserts}:line{cmd.get('line', '')}",
+                        str(path),
+                        "wast-assert",
+                        "STUCK_STEP",
+                        expected_terms(cmd.get("expected", [])) or "",
+                        "",
+                        f"previous stateful action did not finish: {failed_prelude}",
+                        "PARSED",
+                        "VALIDATED",
+                        "INSTANTIATED",
+                        "STUCK_STEP",
+                        "",
+                    )
+                )
+                asserts += 1
+                continue
             result = run_wast_assert(
                 cli,
                 maude,
@@ -945,6 +1073,7 @@ def run_wast_probe(cli: str, maude: str, path: Path, timeout: int, max_modules: 
                     for module, exports in registered_memory_exports.items()
                     for name, (pages, max_pages) in exports.items()
                 ],
+                rewrite_limit=rewrite_limit,
             )
             results.append(result)
             if cmd.get("type") == "assert_return" and result.status == "PASS":
@@ -1037,6 +1166,12 @@ def main() -> int:
     )
     parser.add_argument("--max-wast-modules", type=int, default=20)
     parser.add_argument("--max-wast-asserts", type=int, default=40)
+    parser.add_argument(
+        "--rewrite-limit",
+        type=int,
+        default=10000,
+        help="Maude rewrite bound for runtime assertions",
+    )
     parser.add_argument("--skip-smokes", action="store_true")
     parser.add_argument("--skip-external", action="store_true")
     parser.add_argument("--fail-on-external-failure", action="store_true")
@@ -1086,10 +1221,19 @@ def main() -> int:
                     args.timeout,
                     args.max_wast_modules,
                     args.max_wast_asserts,
+                    args.rewrite_limit,
                 )
             )
         else:
-            rows.append(run_stage_probe(args.cli, args.maude, path, args.timeout))
+            rows.append(
+                run_stage_probe(
+                    args.cli,
+                    args.maude,
+                    path,
+                    args.timeout,
+                    rewrite_limit=args.rewrite_limit,
+                )
+            )
 
     artifact_dir = ROOT / args.artifact_dir
     write_csv(artifact_dir / "benchmark_results.csv", rows)

@@ -3868,8 +3868,9 @@ let binder_to_var_map prefix eq_idx binders =
                     Hashtbl.replace source_var_seq_elem_sorts mapped elem_sort
                 | None -> ())
            | None -> ());
-          debug_iter "[BINDER-MAP] eq=%d raw=%s base=%s kind=%s mapped=%s"
-            eq_idx raw base iter_kind mapped;
+          debug_iter "[BINDER-MAP] eq=%d raw=%s base=%s kind=%s mapped=%s sort=%s"
+            eq_idx raw base iter_kind mapped
+            (match simple_sort_of_typ t [] with Some s -> s | None -> "?");
           let acc = add_vm_alias raw mapped acc in
           let acc = add_vm_alias base mapped acc in
           let acc = add_vm_alias named_base mapped acc in
@@ -3975,6 +3976,10 @@ let has_representation_narrow_sort sort =
       [ "SpectecTerminal"; "SpectecTerminals";
       "Bool"; "Nat"; "Int";
       "Config"; "State"; "Store"; "Frame"; "Judgement" ]
+  || SSet.mem sort !source_membership_sorts
+  || (match Hashtbl.find_opt source_category_subsort_edges sort with
+      | Some parents -> SSet.mem "SpectecTerminal" parents
+      | None -> false)
   || SSet.exists
        (fun source_sort -> sort = native_sequence_sort_name source_sort)
        !native_sequence_source_sorts
