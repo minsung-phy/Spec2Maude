@@ -7,7 +7,6 @@ syntax M hint(macro none) = nat
 syntax K hint(macro none) = nat
 syntax n hint(macro none) = nat  ;; hack
 syntax m hint(macro none) = nat  ;; hack
-
 ;;
 ;; General Numeric Functions
 ;;

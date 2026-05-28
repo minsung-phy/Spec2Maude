@@ -1,5 +1,6 @@
 # 1. 빌드 결과물 제외
 _build/
+/spec2maude
 
 # 2. OCaml/Dune 관련 임시 파일
 *.install

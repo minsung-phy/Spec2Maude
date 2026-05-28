@@ -1,360 +1,128 @@
-# C1 Limitations And Discussion Notes
+# Current Limitations And Discussion Points
 
-Updated: 2026-05-27
+Updated: 2026-05-29
 
-This is the current source of truth for C1 limitations.  Older files under
-`docs/archive/` are historical evidence, not the current project state.
-
-## 0. Current Conclusion
-
-`output_bs.maude` structurally covers the WebAssembly 3.0 SpecTec source in
-this repository and loads without Maude warnings through the runtime harness.
+This document records the current limitations after aligning the project with
+the professor-facing architecture:
 
 ```text
-source files:                       21 / 21
-syntax declarations:                249 / 249
-def declarations/equations:          1272 / 1272
-relation declarations:               82 / 82
-rule declarations:                   499 / 499
-strict validation source-rule targets: 281 / 281 primary rl/crl
-missing source construct:            none currently known
-eq/ceq ... = valid:                  0
-iter-empty / opt-empty labels:       0
+validated WAT/Wasm input
+  -> Maude module term
+  -> Maude dynamic execution
 ```
 
-The current research question is:
+## 1. Parser / Validator
+
+Current implementation:
 
 ```text
-How far can we keep the generated Maude structurally isomorphic to the SpecTec
-source while still making the result executable enough for concrete Wasm
-programs and benchmark tests?
+.wat / .wasm -> official SpecTec/WebAssembly parser + validator -> Wasm AST
+            -> Maude term
 ```
 
-## 1. Isomorphism Criteria
+WABT is no longer the default `.wat` / `.wasm` validator.  It may still be used
+by benchmark scripts to expand official `.wast` tests into JSON.
 
-C1 currently aims for:
+## 2. Module-ok Is Not The Default Gate
 
-1. SpecTec source syntax / def / rule structure and intent are preserved.
-2. SpecTec `def` lowers to Maude `eq/ceq`.
-3. SpecTec `rule` lowers to Maude `rl/crl`.
-4. Unconditional source rules stay unconditional when possible.
-5. Source-absent helper names/rules are avoided in `output_bs.maude` unless
-   they are unavoidable representation infrastructure, mechanically derived
-   execution infrastructure, or explicitly accepted after discussion.
-
-## 2. Resolved Or Improved Items
-
-### 2.1 `step-from-step-pure-*`
-
-Current output:
-
-```text
-step-from-step-pure count: 0
-```
-
-The former context-step shortcut rules are no longer generated.
-
-### 2.2 `$is-spectec-val-seq`
-
-Current output:
-
-```text
-$is-spectec-val-seq: absent
-$is-spectec-val: absent
-```
-
-Instead, source `val*` is represented with a Maude sort:
-
-```maude
-sort ValSeq .
-subsort Val < ValSeq .
-subsort ValSeq < SpectecTerminals .
-op eps : -> ValSeq .
-op _ _ : ValSeq ValSeq -> ValSeq [ctor assoc id: eps] .
-```
-
-This lets rules such as `Step/ctxt-instrs` use a sorted `VALS : ValSeq`
-variable rather than a source-absent Boolean guard.
-
-### 2.3 SpectecType ground-term universe
-
-The old overly broad shape allowed meaningless type terms such as
-`iN(CTORNOPA0)`.  This was a translator bug, not a research feature.
-
-Current design separates runtime terminals from category/type labels:
-
-```maude
-sort SpectecTerminal .
-sort SpectecType .
-sort SpectecCategory .
-subsort SpectecType < SpectecCategory .
-```
-
-Removed:
-
-```maude
-subsort SpectecType < SpectecTerminal .
-subsort SpectecTypes < SpectecTerminals .
-```
-
-Parametric type/category constructors now use narrower source-shaped parameter
-sorts:
-
-```maude
-op iN    : N -> SpectecType .
-op vec   : Vnn -> SpectecType .
-op binop : Numtype -> SpectecType .
-op list  : SpectecCategory -> SpectecType .
-```
-
-Generic source helpers that take a syntax/category parameter now take
-`SpectecCategory`, not any runtime terminal:
-
-```maude
-op $concat   : SpectecCategory SpectecTerminals -> SpectecTerminals .
-op $disjoint : SpectecCategory SpectecTerminals -> Bool .
-op $setminus : SpectecCategory SpectecTerminals SpectecTerminals -> SpectecTerminals .
-```
-
-## 3. Remaining Non-Isomorphic / Discussion Items
-
-### 3.1 `$infer-*` witness inference
-
-SpecTec relation premises can introduce witnesses used by later premises.
-
-Example:
-
-```spectec
-rule Instrs_ok/seq:
-  C |- instr_1 instr_2* : t_1* ->_(x_1* x_2*) t_3*
-  -- Instr_ok: C |- instr_1 : t_1* ->_(x_1*) t_2*
-  -- Instrs_ok: ... |- instr_2* : t_2* ->_(x_2*) t_3*
-```
-
-Here `t_2*` is produced by the first premise and consumed by the second.
-The current Maude validity encoding:
-
-```maude
-Instr-ok(...) => valid
-```
-
-checks validity but does not directly return the witness.  The translator
-therefore generates `$infer-*` helpers from the source premise structure.
-
-Classification:
-
-- not benchmark hardcoding;
-- mechanically derived from source relation premises;
-- still strict non-isomorphic because the source does not literally contain
-  `$infer-*` relations.
-
-Discussion question:
-
-```text
-Should witness inference helpers be allowed in C1, or should they be separated
-as a C2 execution/solver layer?
-```
-
-### 3.2 Relation decision mirrors
-
-Current subtype `otherwise` execution uses Boolean mirrors such as:
-
-```text
-$heaptype-sub?
-$reftype-sub?
-```
-
-They are generated from source subtype rules to make success/failure branching
-executable.  They are not hand-coded Wasm cases, but they are still source-absent
-helper names.
-
-Discussion question:
-
-```text
-Are source-derived decision mirrors acceptable for translating SpecTec
-otherwise-priority behavior into executable Maude?
-```
-
-### 3.3 Def execution scaffolding
-
-Some SpecTec `def` clauses contain ordered premises and witness passing.  The
-translator keeps them as Maude `eq/ceq`, but uses source-derived scaffolding:
-
-```text
-$cont-*
-$result-*
-$valid-*
-$map-*
-```
-
-Discussion question:
-
-```text
-Is this acceptable as executable equation infrastructure, or should it be
-reported as non-isomorphic support code outside the C1 core?
-```
-
-### 3.4 Init/runtime harness helpers
-
-`wasm-init-bs.maude` contains frontend/init/runtime harness helpers.  These are
-not part of the generated SpecTec core and should be discussed separately from
-`output_bs.maude`.
-
-Current rule:
-
-```text
-Do not move frontend/init harness code into output_bs.maude unless it is truly
-source-derived and translator-generated.
-```
-
-## 4. Typecheck / Validation Direction
-
-The correct statement is not "typecheck was removed."
-
-The correct statement is:
-
-```text
-SpecTec validation semantics remain.
-Duplicate/generated runtime category guards were reduced or moved into better
-source-shaped representations such as ValSeq.
-```
-
-Still present:
+The full generated core still contains SpecTec validation relations because
+they are part of the source:
 
 ```text
 Module-ok
 Func-ok
 Instr-ok
 Instrs-ok
-Reftype-sub
-Heaptype-sub
+...
 ```
 
-Removed/reduced from the runtime core path:
+But the default WAT/Wasm frontend path does not use translated `Module-ok` to
+decide whether execution may start.  Invalid programs are rejected before Maude
+execution by the official SpecTec/WebAssembly validator.
+
+Open point:
 
 ```text
-hasType / WellTyped
-general $is-spectec-* runtime predicates
-$is-spectec-val-seq
+Should the paper artifact keep full source validation in output_bs.maude, or
+should we produce a separate runtime-only profile after external validation?
 ```
 
-Invalid input handling:
+## 3. Runtime Profile Split Is Not Finished
 
-- normal frontend path rejects invalid `.wat` / `.wasm` through WABT;
-- checked execution is gated by Maude `Module-ok`;
-- if `Module-ok` does not rewrite to `valid`, the generated checked run does
-  not enter `$instantiate` or `steps`.
-
-For formal reporting, emphasize the Maude `Module-ok` gate. WABT is useful for
-engineering hygiene but should not be the only formal argument.
-
-## 5. Current Benchmark State
-
-Latest checked benchmark summary:
+A clean final structure should probably provide two artifacts:
 
 ```text
-artifact: artifacts/c1-regression-20260527_133237/wasm-benchmarks/benchmark_results.csv
-
-total: 568
-PASS: 319
-STEPPED: 74
-INVALID: 21
-NO_ENTRY: 58
-IMPORT_MISSING: 5
-UNSUPPORTED: 4
-STUCK_VALIDATION: 46
-STUCK_STEP: 8
-WRONG_RESULT: 33
+output_full_bs.maude      full SpecTec translation, including validation
+output_runtime_bs.maude   dynamic runtime profile after external validation
 ```
 
-Meaning:
+This is not fully implemented yet.  A naive removal of validation files fails
+because `4.4-execution.modules.spectec` contains `$instantiate` premises that
+refer to `Module_ok`.
 
-- `PASS`: fully successful case with expected result.
-- `STEPPED`: execution ended, but no expected result was available.
-- `INVALID`: invalid module rejected or `Module-ok` did not prove valid.
-- `NO_ENTRY`: module has no callable export/main function.
-- `IMPORT_MISSING`: host import is required but not linked.
-- `UNSUPPORTED`: syntax or instruction family not supported yet.
-- `STUCK_VALIDATION`: validation executability gap.
-- `STUCK_STEP`: runtime executability gap.
-- `WRONG_RESULT`: runtime result mismatch.
+Therefore the next cleanup must be explicit:
 
-## 6. Current Frontend Scope
+1. keep a full source-isomorphic profile for audit;
+2. derive a runtime profile that erases or externalizes static validation
+   premises only after the input has been validated.
 
-The WAT/Wasm frontend currently supports:
+## 4. Remaining Non-Isomorphic Machinery
+
+The main remaining source-absent mechanisms are:
 
 ```text
-module/type/func/import/export
-global/memory/table/data/elem/start
-direct call/call_ref/call_indirect
-block/loop/if/br/br_if/br_table
-local/global get/set/tee
-memory load/store/init/copy/fill/size/grow
-table get/set/size/grow/fill/init/copy/elem.drop
-i32/i64/f32/f64 constants, numeric ops, relops, conversions
-selected v128/SIMD/relaxed-SIMD term generation
-selected ref types and ref instructions
+$infer-*       witness inference for relation premises
+$cont-*        continuation lowering for ordered def premises
+meta-notation lowering helpers for star/optional/map/range/otherwise forms
 ```
 
-Still incomplete:
+These are not benchmark-specific hardcoding, but they are still not literally
+present in the SpecTec source.  They should be either justified as systematic
+lowering or moved into a clearly named execution-support layer.
+
+## 5. WAT/Wasm Frontend Coverage
+
+The frontend supports the current local smoke suite through the official AST
+path and part of the official test corpus.  The lowering path now covers more
+than the original focused subset, including many SIMD/GC/array/struct/exception
+AST constructors.
+
+Known gaps include:
+
+- full benchmark-scale execution for exception/tag, GC, and SIMD-heavy cases;
+- richer vector/reference expected-result comparison in the `.wast` runner;
+- richer WASI/import linking;
+- more precise failure classification for real-world benchmarks.
+
+## 6. Benchmark Status
+
+The local smoke suite currently passes through the default frontend/runtime
+path.  Larger official/external benchmark numbers should be regenerated after
+each frontend or translator change because the status buckets are sensitive to
+the chosen pipeline.
+
+Important interpretation:
+
+- `STUCK_VALIDATION` belongs only to the experimental Maude validation path.
+- `STUCK_STEP` and `WRONG_RESULT` are the more important runtime execution gaps
+  for the default architecture.
+
+## 7. What To Say In A Meeting
+
+Short version:
 
 ```text
-full WAT grammar
-all proposal/custom syntax
-structured exception/tag runtime coverage
-all SIMD/relaxed-SIMD execution semantics
-all GC/recursive type proposal paths
-complete WASI/browser import environment
+I separated the default runtime story from Maude-internal Module-ok checking.
+The default path now validates WAT/Wasm before Maude, converts the validated
+program into a Maude module term, and runs the dynamic semantics.  The full
+SpecTec validation relations are still generated for source coverage/debug, but
+they are no longer presented as the main execution gate.
 ```
 
-## 7. Current Runtime/Validation Gaps
+Open question:
 
-Priority buckets:
-
-1. `STUCK_VALIDATION`
-   - `Module-ok` / `Instrs-ok` execution gaps.
-   - Examples include table64/memory64 validation, local initialization,
-     unreachable/polymorphic typing, and proposal instruction forms.
-2. `STUCK_STEP`
-   - Runtime rules or builtins do not finish.
-   - Examples include memory fill/copy/grow, ref/null paths, and SIMD admin
-     contexts.
-3. `WRONG_RESULT`
-   - Execution finishes with an incorrect value.
-   - Examples include memory byte operations, data/drop state, linking/import
-     state, float memory, and ref checks.
-4. `UNSUPPORTED`
-   - Frontend or WABT cannot yet parse/support the syntax.
-
-## 8. What To Ask Professor
-
-Recommended questions:
-
-1. `val*` is now represented by `ValSeq`, not `$is-spectec-val-seq`. Is this
-   the right C1 direction for source category preservation?
-2. Can `$infer-*` witness inference be considered acceptable source-derived
-   execution infrastructure, or should it be moved to a separate layer?
-3. Are subtype decision mirrors for `otherwise` acceptable in C1?
-4. Should the paper's formal path require Maude `Module-ok` checked execution
-   for all frontend runs?
-5. What is the expected C1 acceptance criterion: structural coverage plus
-   benchmark execution, or every generated rule executable on a source-valid
-   concrete witness?
-
-## 9. Recommended Next Work
-
-1. Reduce `STUCK_VALIDATION`.
-2. Reduce `STUCK_STEP`.
-3. Reduce `WRONG_RESULT`.
-4. Expand unsupported frontend syntax only after the first three buckets shrink.
-5. Continue moving non-source frontend/init code out of `output_bs.maude`.
-6. Maintain a paper-ready benchmark table from `scripts/run_wasm_benchmarks.py`.
-
-## 10. Things Not To Do
-
-- Do not claim full WebAssembly support yet.
-- Do not claim typecheck was simply removed.
-- Do not treat WABT as the only formal validation argument.
-- Do not put frontend/init harness helpers directly into `output_bs.maude`.
-- Do not assume all `STUCK_VALIDATION` cases are frontend bugs; some are Maude
-  validation executability gaps.
+```text
+Should the final artifact ship both a full SpecTec translation and a smaller
+runtime-only profile, or should output_bs.maude always remain the full source
+translation?
+```

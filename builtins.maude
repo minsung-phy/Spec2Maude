@@ -11,7 +11,7 @@
 load output_bs
 
 mod WASM-BUILTINS is
-  inc SPECTEC-CORE .
+  inc SPECTEC-CATEGORIES .
 
   vars N I W ACC B : Int .
   var BS : SpectecTerminals .
