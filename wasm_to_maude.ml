@@ -1,13 +1,20 @@
 (* WebAssembly WAT/Wasm-to-Maude frontend for the C1 execution path.
 
-   The tool normalizes binary Wasm and text WAT through WABT when available,
-   then emits a Maude module term and a small execution harness that uses the
-   source-translated $instantiate path from output_bs.maude.
+   Input parsing and validation use the official SpecTec/WebAssembly
+   interpreter library vendored under vendor/wasm.  The frontend then lowers
+   the validated Wasm AST into the Maude constructor terms consumed by the
+   generated C1 semantics and execution harness.
 *)
 
 type sexpr = Atom of string | List of sexpr list
 
 type func_type = { params : string list; results : string list }
+
+type type_def = {
+  type_id : string option;
+  type_term : string;
+  type_func : func_type option;
+}
 
 type import_func = {
   import_module : string;
@@ -103,8 +110,11 @@ type data_def = { data_bytes : int list; data_mode : string }
 
 type elem_def = { elem_type : string; elem_exprs : string list; elem_mode : string }
 
+(* This is not a parser AST.  The parser AST is Wasm.Ast.module_ from the
+   official SpecTec/WebAssembly interpreter.  module_ir is only the small
+   post-validation emission record used to print Maude constructor terms. *)
 type module_ir = {
-  types : (string option * func_type) list;
+  types : type_def list;
   imports : import_desc list;
   funcs : func_def list;
   tags : tag_def list;
@@ -234,7 +244,7 @@ let require_command tool purpose =
 
 let wabt_flags = "--enable-all"
 
-let run_status cmd =
+let _run_status cmd =
   match Sys.command cmd with
   | 0 -> ()
   | code -> fail ("command failed (" ^ string_of_int code ^ "): " ^ cmd)
@@ -252,11 +262,10 @@ let first_line text =
   | line :: _ -> line
   | [] -> ""
 
-let validate_wasm path =
-  require_command "wasm-validate" "to reject invalid Wasm before Maude runtime";
-  run_status
-    ("wasm-validate " ^ wabt_flags ^ " " ^ Filename.quote path
-   ^ " >/dev/null 2>&1")
+let validate_wasm _path =
+  (* Kept for older call sites; validation now happens through the official
+     Wasm.Valid.check_module path in official_module_ir_of_file. *)
+  ()
 
 let has_suffix s suffix =
   let n = String.length s and m = String.length suffix in
@@ -283,6 +292,21 @@ let last_sub_index s needle =
       loop (i + 1) last
   in
   if m = 0 then Some 0 else loop 0 None
+
+let sub_index s needle =
+  let n = String.length s and m = String.length needle in
+  let rec loop i =
+    if i + m > n then None
+    else if String.sub s i m = needle then Some i
+    else loop (i + 1)
+  in
+  if m = 0 then Some 0 else loop 0
+
+let strip_between s start_marker stop_marker =
+  match (sub_index s start_marker, sub_index s stop_marker) with
+  | Some start, Some stop when start < stop ->
+      String.sub s 0 start ^ String.sub s stop (String.length s - stop)
+  | _ -> s
 
 let compact_spaces s =
   let b = Buffer.create (String.length s) in
@@ -340,14 +364,20 @@ let extract_final_value output =
   match result_config_tail output with
   | Some value when value <> "" -> value
   | _ ->
-      let value =
-        match last_sub_index output "result ValidJudgement: valid" with
-        | Some _ -> "valid"
-        | None -> (
-        match last_sub_index output "result StepsConf:" with
-        | Some start ->
-            let body_start = start + String.length "result StepsConf:" in
-            let body = String.sub output body_start (String.length output - body_start) in
+	      let value =
+	        match last_sub_index output "result ValidJudgement: valid" with
+	        | Some _ -> "valid"
+	        | None -> (
+	        match last_sub_index output "result Judgement: valid" with
+	        | Some _ -> "valid"
+	        | None -> (
+	        match last_sub_index output "result Judgement: Module-ok(" with
+	        | Some _ -> "NOT-VALID"
+	        | None -> (
+	        match last_sub_index output "result StepsConf:" with
+	        | Some start ->
+	            let body_start = start + String.length "result StepsConf:" in
+	            let body = String.sub output body_start (String.length output - body_start) in
             let body =
               match last_sub_index body "\nBye." with
               | Some stop -> String.sub body 0 stop
@@ -361,13 +391,13 @@ let extract_final_value output =
             | Some stop -> String.sub output start (stop - start + 1)
             | None -> String.sub output start (String.length output - start))
         | None -> (
-            match last_sub_index output "CTORREF" with
-            | Some start -> (
-                match String.index_from_opt output start ')' with
-                | Some stop -> String.sub output start (stop - start + 1)
-                | None -> String.sub output start (String.length output - start))
-            | None -> String.trim output)))
-      in
+	            match last_sub_index output "CTORREF" with
+	            | Some start -> (
+	                match String.index_from_opt output start ')' with
+	                | Some stop -> String.sub output start (stop - start + 1)
+	                | None -> String.sub output start (String.length output - start))
+	            | None -> String.trim output)))))
+	      in
       compact_spaces value
 
 let is_id s = String.length s > 0 && s.[0] = '$'
@@ -737,8 +767,16 @@ let read_func_type_fields fields =
           params := !params @ ts
       | List (Atom "result" :: xs) -> results := !results @ List.map valtype_of_sexpr xs
       | _ -> fail "unsupported function type field")
-    fields;
-  { params = !params; results = !results }
+	    fields;
+	  { params = !params; results = !results }
+
+let type_term typ =
+  let params = seq typ.params in
+  let results = seq typ.results in
+  "CTORTYPEA1(CTORRECA1(CTORSUBA3(eps, eps, CTORFUNCARROWA2("
+  ^ params ^ ", " ^ results ^ "))))"
+
+let func_type_def id typ = { type_id = id; type_term = type_term typ; type_func = Some typ }
 
 let read_type_decl = function
   | List (Atom "type" :: body) ->
@@ -752,14 +790,8 @@ let read_type_decl = function
         | [ List (Atom "func" :: fields) ] -> read_func_type_fields fields
         | _ -> fail "only (type (func ...)) is supported"
       in
-      (id, typ)
-  | _ -> fail "expected (type ...)"
-
-let type_term typ =
-  let params = seq typ.params in
-  let results = seq typ.results in
-  "CTORTYPEA1(CTORRECA1(CTORSUBA3(eps, eps, CTORFUNCARROWA2("
-  ^ params ^ ", " ^ results ^ "))))"
+	      func_type_def id typ
+	  | _ -> fail "expected (type ...)"
 
 let local_decl t = "CTORLOCALA1(" ^ t ^ ")"
 
@@ -1898,7 +1930,7 @@ let parse_typeuse type_names types_ref fields =
   | Some i -> i
   | None ->
       let i = List.length !types_ref in
-      types_ref := !types_ref @ [ (None, { params = !params; results = !results }) ];
+	      types_ref := !types_ref @ [ func_type_def None { params = !params; results = !results } ];
       i
 
 let split_leading_id body =
@@ -2111,9 +2143,11 @@ let parse_func type_names types_ref func_names tag_names global_names memory_nam
           | _ -> ())
         local_decls;
       let param_count =
-        match List.nth_opt !types_ref typeidx with
-        | Some (_, typ) -> List.length typ.params
-        | None -> fail ("function references missing type index " ^ string_of_int typeidx)
+	        match List.nth_opt !types_ref typeidx with
+	        | Some { type_func = Some typ; _ } -> List.length typ.params
+	        | Some { type_func = None; _ } ->
+	            fail ("function references non-function type index " ^ string_of_int typeidx)
+	        | None -> fail ("function references missing type index " ^ string_of_int typeidx)
       in
       let named_params =
         !param_ids
@@ -2336,6 +2370,8 @@ let parse_start func_names = function
   | _ -> fail "expected start"
 
 let load_input ~canonicalize path =
+  (* Legacy fallback for --legacy-wat-parser.  The default path below uses the
+     official Wasm parser/validator and does not go through WABT. *)
   if path = "-" then read_stdin ()
   else if has_suffix path ".wasm" then (
     let () = require_command "wasm2wat" "for .wasm input" in
@@ -2519,7 +2555,7 @@ let parse_module ?invoke_index text =
       let types_ref = ref type_decls in
       let type_names =
         type_decls
-        |> List.mapi (fun i (id, _) -> Option.map (fun id -> (id, i)) id)
+	        |> List.mapi (fun i typ -> Option.map (fun id -> (id, i)) typ.type_id)
         |> List.filter_map Fun.id
       in
       let func_index = ref 0
@@ -2617,7 +2653,7 @@ let parse_module ?invoke_index text =
       let table_names = List.rev !table_names in
       let fresh_type typ =
         let i = List.length !types_ref in
-        types_ref := !types_ref @ [ (None, typ) ];
+	        types_ref := !types_ref @ [ func_type_def None typ ];
         i
       in
       let funcs =
@@ -2730,6 +2766,645 @@ let parse_module ?invoke_index text =
       }
   | _ -> fail "expected top-level (module ...)"
 
+module Official = struct
+  module A = Wasm.Ast
+  module T = Wasm.Types
+  module V = Wasm.Value
+  module P = Wasm.Pack
+  module S = Wasm.Source
+  module Script = Wasm.Script
+
+  let it = S.it
+
+  let i32_index x = Int32.to_int (it x)
+
+  let int64_to_int n =
+    let i = Int64.to_int n in
+    if Int64.of_int i <> n then fail "integer literal is outside OCaml int range";
+    i
+
+  let quote_wat_string s = "\"" ^ String.escaped s ^ "\""
+
+  let name n = quote_wat_string (Wasm.Utf8.encode n)
+
+  let sx_term = function P.S -> "CTORSA0" | P.U -> "CTORUA0"
+
+  let pack_bits = function
+    | P.Pack8 -> 8
+    | P.Pack16 -> 16
+    | P.Pack32 -> 32
+    | P.Pack64 -> 64
+
+  let limits (lim : T.limits) =
+    limits_term (int64_to_int lim.min) (Option.map int64_to_int lim.max)
+
+  let addrtype = function T.I32AT -> "CTORI32A0" | T.I64AT -> "CTORI64A0"
+
+  let numtype = function
+    | T.I32T -> "CTORI32A0"
+    | T.I64T -> "CTORI64A0"
+    | T.F32T -> "CTORF32A0"
+    | T.F64T -> "CTORF64A0"
+
+  let vectype = function T.V128T -> "CTORV128A0"
+
+  let typeuse = function
+    | T.Idx x -> "CTORWIDXA1(" ^ string_of_int (Int32.to_int x) ^ ")"
+    | T.Rec x -> "CTORRECA1(" ^ Int32.to_string x ^ ")"
+    | T.Def _ -> fail "unsupported resolved deftype in source type use"
+
+  let rec heaptype = function
+    | T.AnyHT -> "CTORANYA0"
+    | T.NoneHT -> "CTORNONEA0"
+    | T.EqHT -> "CTORWEQA0"
+    | T.I31HT -> "CTORI31A0"
+    | T.StructHT -> "CTORSTRUCTA0"
+    | T.ArrayHT -> "CTORARRAYA0"
+    | T.FuncHT -> "CTORFUNCA0"
+    | T.NoFuncHT -> "CTORNOFUNCA0"
+    | T.ExnHT -> "CTOREXNA0"
+    | T.NoExnHT -> "CTORNOEXNA0"
+    | T.ExternHT -> "CTOREXTERNA0"
+    | T.NoExternHT -> "CTORNOEXTERNA0"
+    | T.UseHT tu -> typeuse tu
+    | T.BotHT -> "CTORBOTA0"
+
+  and reftype (nul, ht) =
+    let nul = match nul with T.NoNull -> "eps" | T.Null -> "CTORNULLA0" in
+    "CTORREFA2(" ^ nul ^ ", " ^ heaptype ht ^ ")"
+
+  let valtype = function
+    | T.NumT nt -> numtype nt
+    | T.VecT vt -> vectype vt
+    | T.RefT rt -> reftype rt
+    | T.BotT -> "CTORBOTA0"
+
+	  let packtype = function T.I8T -> "CTORI8A0" | T.I16T -> "CTORI16A0"
+
+	  let storagetype = function
+	    | T.ValStorageT t -> valtype t
+	    | T.PackStorageT t -> packtype t
+
+	  let fieldtype = function
+	    | T.FieldT (T.Cons, t) -> storagetype t
+	    | T.FieldT (T.Var, t) -> "CTORMUTA0 " ^ storagetype t
+
+	  let comptype = function
+	    | T.FuncT (params, results) ->
+	        "CTORFUNCARROWA2(" ^ seq (List.map valtype params) ^ ", "
+	        ^ seq (List.map valtype results) ^ ")"
+	    | T.StructT fields -> "CTORSTRUCTA1(" ^ seq (List.map fieldtype fields) ^ ")"
+	    | T.ArrayT field -> "CTORARRAYA1(" ^ fieldtype field ^ ")"
+
+	  let final = function T.NoFinal -> "eps" | T.Final -> "CTORFINALA0"
+
+	  let subtype (T.SubT (fin, supers, ct)) =
+	    "CTORSUBA3(" ^ final fin ^ ", " ^ seq (List.map typeuse supers) ^ ", " ^ comptype ct
+	    ^ ")"
+
+	  let type_def_of_rectype rt =
+	    let func =
+	      match rt with
+	      | T.RecT [ T.SubT (_, _, T.FuncT (params, results)) ] ->
+	          Some { params = List.map valtype params; results = List.map valtype results }
+	      | _ -> None
+	    in
+	    {
+	      type_id = None;
+	      type_term = "CTORTYPEA1(CTORRECA1(" ^ seq (List.map subtype (match rt with T.RecT sts -> sts)) ^ "))";
+	      type_func = func;
+	    }
+
+  let globaltype = function
+    | T.GlobalT (T.Cons, t) -> valtype t
+    | T.GlobalT (T.Var, t) -> "CTORMUTA0 " ^ valtype t
+
+  let memtype = function
+    | T.MemoryT (at, lim) -> "CTORPAGEA2(" ^ addrtype at ^ ", " ^ limits lim ^ ")"
+
+  let tabletype = function
+    | T.TableT (at, lim, rt) -> addrtype at ^ " " ^ limits lim ^ " " ^ reftype rt
+
+  let tagtype = function T.TagT tu -> typeuse tu
+
+  let blocktype = function
+    | A.VarBlockType x -> "CTORWIDXA1(" ^ string_of_int (i32_index x) ^ ")"
+    | A.ValBlockType None -> "CTORWRESULTA1(eps)"
+    | A.ValBlockType (Some t) -> "CTORWRESULTA1(" ^ valtype t ^ ")"
+
+  let memarg offset =
+    memarg_term (Int64.to_string offset)
+
+  let num_const = function
+    | V.I32 i -> "CTORCONSTA2(CTORI32A0, " ^ Wasm.I32.to_string_s i ^ ")"
+    | V.I64 i -> "CTORCONSTA2(CTORI64A0, " ^ Wasm.I64.to_string_s i ^ ")"
+    | V.F32 f -> "CTORCONSTA2(CTORF32A0, " ^ Int32.to_string (Wasm.F32.to_bits f) ^ ")"
+    | V.F64 f -> "CTORCONSTA2(CTORF64A0, " ^ Int64.to_string (Wasm.F64.to_bits f) ^ ")"
+
+  let int_unop = function
+    | A.IntOp.Clz -> "CTORCLZA0"
+    | A.IntOp.Ctz -> "CTORCTZA0"
+    | A.IntOp.Popcnt -> "CTORPOPCNTA0"
+    | A.IntOp.ExtendS sz -> "CTOREXTENDA1(" ^ string_of_int (8 * P.packed_size sz) ^ ")"
+
+  let int_binop = function
+    | A.IntOp.Add -> "CTORADDA0"
+    | A.IntOp.Sub -> "CTORSUBA0"
+    | A.IntOp.Mul -> "CTORMULA0"
+    | A.IntOp.Div sx -> "CTORDIVA1(" ^ sx_term sx ^ ")"
+    | A.IntOp.Rem sx -> "CTORWREMA1(" ^ sx_term sx ^ ")"
+    | A.IntOp.And -> "CTORWANDA0"
+    | A.IntOp.Or -> "CTORWORA0"
+    | A.IntOp.Xor -> "CTORXORA0"
+    | A.IntOp.Shl -> "CTORSHLA0"
+    | A.IntOp.Shr sx -> "CTORSHRA1(" ^ sx_term sx ^ ")"
+    | A.IntOp.Rotl -> "CTORROTLA0"
+    | A.IntOp.Rotr -> "CTORROTRA0"
+
+  let int_relop = function
+    | A.IntOp.Eq -> "CTORWEQA0"
+    | A.IntOp.Ne -> "CTORNEA0"
+    | A.IntOp.Lt sx -> "CTORLTA1(" ^ sx_term sx ^ ")"
+    | A.IntOp.Gt sx -> "CTORGTA1(" ^ sx_term sx ^ ")"
+    | A.IntOp.Le sx -> "CTORLEA1(" ^ sx_term sx ^ ")"
+    | A.IntOp.Ge sx -> "CTORGEA1(" ^ sx_term sx ^ ")"
+
+  let float_unop = function
+    | A.FloatOp.Neg -> "CTORNEGA0"
+    | A.FloatOp.Abs -> "CTORABSA0"
+    | A.FloatOp.Ceil -> "CTORCEILA0"
+    | A.FloatOp.Floor -> "CTORFLOORA0"
+    | A.FloatOp.Trunc -> "CTORTRUNCA0"
+    | A.FloatOp.Nearest -> "CTORNEARESTA0"
+    | A.FloatOp.Sqrt -> "CTORSQRTA0"
+
+  let float_binop = function
+    | A.FloatOp.Add -> "CTORADDA0"
+    | A.FloatOp.Sub -> "CTORSUBA0"
+    | A.FloatOp.Mul -> "CTORMULA0"
+    | A.FloatOp.Div -> "CTORDIVA0"
+    | A.FloatOp.Min -> "CTORMINA0"
+    | A.FloatOp.Max -> "CTORMAXA0"
+    | A.FloatOp.CopySign -> "CTORCOPYSIGNA0"
+
+  let float_relop = function
+    | A.FloatOp.Eq -> "CTORWEQA0"
+    | A.FloatOp.Ne -> "CTORNEA0"
+    | A.FloatOp.Lt -> "CTORLTA0"
+    | A.FloatOp.Gt -> "CTORGTA0"
+    | A.FloatOp.Le -> "CTORLEA0"
+    | A.FloatOp.Ge -> "CTORGEA0"
+
+  let testop = function
+    | V.I32 A.IntOp.Eqz -> "CTORTESTOPA2(CTORI32A0, CTOREQZA0)"
+    | V.I64 A.IntOp.Eqz -> "CTORTESTOPA2(CTORI64A0, CTOREQZA0)"
+    | V.F32 _ | V.F64 _ -> fail "invalid floating-point testop in official AST"
+
+  let unop = function
+    | V.I32 op -> "CTORUNOPA2(CTORI32A0, " ^ int_unop op ^ ")"
+    | V.I64 op -> "CTORUNOPA2(CTORI64A0, " ^ int_unop op ^ ")"
+    | V.F32 op -> "CTORUNOPA2(CTORF32A0, " ^ float_unop op ^ ")"
+    | V.F64 op -> "CTORUNOPA2(CTORF64A0, " ^ float_unop op ^ ")"
+
+  let binop = function
+    | V.I32 op -> "CTORBINOPA2(CTORI32A0, " ^ int_binop op ^ ")"
+    | V.I64 op -> "CTORBINOPA2(CTORI64A0, " ^ int_binop op ^ ")"
+    | V.F32 op -> "CTORBINOPA2(CTORF32A0, " ^ float_binop op ^ ")"
+    | V.F64 op -> "CTORBINOPA2(CTORF64A0, " ^ float_binop op ^ ")"
+
+  let relop = function
+    | V.I32 op -> "CTORRELOPA2(CTORI32A0, " ^ int_relop op ^ ")"
+    | V.I64 op -> "CTORRELOPA2(CTORI64A0, " ^ int_relop op ^ ")"
+    | V.F32 op -> "CTORRELOPA2(CTORF32A0, " ^ float_relop op ^ ")"
+    | V.F64 op -> "CTORRELOPA2(CTORF64A0, " ^ float_relop op ^ ")"
+
+  let cvtop = function
+    | V.I32 (A.IntOp.WrapI64) -> "CTORCVTOPA3(CTORI32A0, CTORI64A0, CTORWRAPA0)"
+    | V.I64 (A.IntOp.ExtendI32 sx) ->
+        "CTORCVTOPA3(CTORI64A0, CTORI32A0, CTOREXTENDA1(" ^ sx_term sx ^ "))"
+    | V.I32 (A.IntOp.TruncF32 sx) ->
+        "CTORCVTOPA3(CTORI32A0, CTORF32A0, CTORTRUNCA1(" ^ sx_term sx ^ "))"
+    | V.I32 (A.IntOp.TruncF64 sx) ->
+        "CTORCVTOPA3(CTORI32A0, CTORF64A0, CTORTRUNCA1(" ^ sx_term sx ^ "))"
+    | V.I64 (A.IntOp.TruncF32 sx) ->
+        "CTORCVTOPA3(CTORI64A0, CTORF32A0, CTORTRUNCA1(" ^ sx_term sx ^ "))"
+    | V.I64 (A.IntOp.TruncF64 sx) ->
+        "CTORCVTOPA3(CTORI64A0, CTORF64A0, CTORTRUNCA1(" ^ sx_term sx ^ "))"
+    | V.I32 (A.IntOp.TruncSatF32 sx) ->
+        "CTORCVTOPA3(CTORI32A0, CTORF32A0, CTORTRUNCSATA1(" ^ sx_term sx ^ "))"
+    | V.I32 (A.IntOp.TruncSatF64 sx) ->
+        "CTORCVTOPA3(CTORI32A0, CTORF64A0, CTORTRUNCSATA1(" ^ sx_term sx ^ "))"
+    | V.I64 (A.IntOp.TruncSatF32 sx) ->
+        "CTORCVTOPA3(CTORI64A0, CTORF32A0, CTORTRUNCSATA1(" ^ sx_term sx ^ "))"
+    | V.I64 (A.IntOp.TruncSatF64 sx) ->
+        "CTORCVTOPA3(CTORI64A0, CTORF64A0, CTORTRUNCSATA1(" ^ sx_term sx ^ "))"
+    | V.I32 A.IntOp.ReinterpretFloat ->
+        "CTORCVTOPA3(CTORI32A0, CTORF32A0, CTORREINTERPRETA0)"
+    | V.I64 A.IntOp.ReinterpretFloat ->
+        "CTORCVTOPA3(CTORI64A0, CTORF64A0, CTORREINTERPRETA0)"
+    | V.F32 (A.FloatOp.ConvertI32 sx) ->
+        "CTORCVTOPA3(CTORF32A0, CTORI32A0, CTORCONVERTA1(" ^ sx_term sx ^ "))"
+    | V.F32 (A.FloatOp.ConvertI64 sx) ->
+        "CTORCVTOPA3(CTORF32A0, CTORI64A0, CTORCONVERTA1(" ^ sx_term sx ^ "))"
+    | V.F64 (A.FloatOp.ConvertI32 sx) ->
+        "CTORCVTOPA3(CTORF64A0, CTORI32A0, CTORCONVERTA1(" ^ sx_term sx ^ "))"
+    | V.F64 (A.FloatOp.ConvertI64 sx) ->
+        "CTORCVTOPA3(CTORF64A0, CTORI64A0, CTORCONVERTA1(" ^ sx_term sx ^ "))"
+    | V.F64 A.FloatOp.PromoteF32 -> "CTORCVTOPA3(CTORF64A0, CTORF32A0, CTORPROMOTEA0)"
+    | V.F32 A.FloatOp.DemoteF64 -> "CTORCVTOPA3(CTORF32A0, CTORF64A0, CTORDEMOTEA0)"
+    | V.F32 A.FloatOp.ReinterpretInt ->
+        "CTORCVTOPA3(CTORF32A0, CTORI32A0, CTORREINTERPRETA0)"
+    | V.F64 A.FloatOp.ReinterpretInt ->
+        "CTORCVTOPA3(CTORF64A0, CTORI64A0, CTORREINTERPRETA0)"
+    | V.I32 _ | V.I64 _ | V.F32 _ | V.F64 _ ->
+        fail "unsupported conversion operator in official AST"
+
+  let load_pack = function
+    | None -> "eps"
+    | Some (sz, sx') -> "CTORANYA2(" ^ string_of_int (pack_bits sz) ^ ", " ^ sx_term sx' ^ ")"
+
+	  let store_pack = function
+	    | None -> "eps"
+	    | Some sz -> string_of_int (pack_bits sz)
+
+	  let idx x = string_of_int (i32_index x)
+
+	  let catch c =
+	    match it c with
+	    | A.Catch (tag, label) -> "CTORCATCHA2(" ^ idx tag ^ ", " ^ idx label ^ ")"
+	    | A.CatchRef (tag, label) -> "CTORCATCHREFA2(" ^ idx tag ^ ", " ^ idx label ^ ")"
+	    | A.CatchAll label -> "CTORCATCHALLA1(" ^ idx label ^ ")"
+	    | A.CatchAllRef label -> "CTORCATCHALLREFA1(" ^ idx label ^ ")"
+
+	  let initop explicit default x =
+	    match x with A.Explicit -> explicit | A.Implicit -> default
+
+	  let optional_sx = function None -> "eps" | Some sx -> sx_term sx
+
+	  let externop = function
+	    | A.Internalize -> "CTORANYCONVERTEXTERNA0"
+	    | A.Externalize -> "CTOREXTERNCONVERTANYA0"
+
+	  let lower_arranged_instr e =
+	    let text = Wasm.Sexpr.to_string 1_000_000 (Wasm.Arrange.instr e) in
+	    match parse_many (tokenize text) with
+	    | [ sexpr ] -> parse_instr (make_env ()) sexpr
+	    | sexprs -> seq (parse_instr_list (make_env ()) sexprs)
+
+	  let rec instr e =
+	    match it e with
+    | A.Unreachable -> "CTORUNREACHABLEA0"
+    | A.Nop -> "CTORNOPA0"
+    | A.Drop -> "CTORDROPA0"
+    | A.Select None -> "CTORSELECTA1(eps)"
+    | A.Select (Some ts) -> "CTORSELECTA1(" ^ seq (List.map valtype ts) ^ ")"
+    | A.Block (bt, es) -> "CTORBLOCKA2(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
+    | A.Loop (bt, es) -> "CTORLOOPA2(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
+    | A.If (bt, es1, es2) ->
+        "CTORWIFELSEA3(" ^ blocktype bt ^ ", " ^ instrs es1 ^ ", " ^ instrs es2 ^ ")"
+	    | A.Br x -> "CTORBRA1(" ^ idx x ^ ")"
+	    | A.BrIf x -> "CTORBRIFA1(" ^ idx x ^ ")"
+	    | A.BrTable (xs, x) ->
+	        "CTORBRTABLEA2(" ^ seq (List.map idx xs) ^ ", " ^ idx x ^ ")"
+	    | A.BrOnNull x -> "CTORBRONNULLA1(" ^ idx x ^ ")"
+	    | A.BrOnNonNull x -> "CTORBRONNONNULLA1(" ^ idx x ^ ")"
+	    | A.BrOnCast (x, rt1, rt2) ->
+	        "CTORBRONCASTA3(" ^ idx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2 ^ ")"
+	    | A.BrOnCastFail (x, rt1, rt2) ->
+	        "CTORBRONCASTFAILA3(" ^ idx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2
+	        ^ ")"
+	    | A.Return -> "CTORRETURNA0"
+	    | A.Call x -> "CTORCALLA1(" ^ idx x ^ ")"
+	    | A.CallRef x -> "CTORCALLREFA1(CTORWIDXA1(" ^ idx x ^ "))"
+	    | A.CallIndirect (tx, x) ->
+	        "CTORCALLINDIRECTA2(" ^ idx tx ^ ", CTORWIDXA1(" ^ idx x ^ "))"
+	    | A.ReturnCall x -> "CTORRETURNCALLA1(" ^ idx x ^ ")"
+	    | A.ReturnCallRef x -> "CTORRETURNCALLREFA1(CTORWIDXA1(" ^ idx x ^ "))"
+	    | A.ReturnCallIndirect (tx, x) ->
+	        "CTORRETURNCALLINDIRECTA2(" ^ idx tx ^ ", CTORWIDXA1(" ^ idx x ^ "))"
+	    | A.Throw x -> "CTORTHROWA1(" ^ idx x ^ ")"
+	    | A.ThrowRef -> "CTORTHROWREFA0"
+	    | A.TryTable (bt, cs, es) ->
+	        "CTORTRYTABLEA3(" ^ blocktype bt ^ ", " ^ seq (List.map catch cs) ^ ", "
+	        ^ instrs es ^ ")"
+	    | A.LocalGet x -> "CTORLOCALGETA1(" ^ idx x ^ ")"
+	    | A.LocalSet x -> "CTORLOCALSETA1(" ^ idx x ^ ")"
+	    | A.LocalTee x -> "CTORLOCALTEEA1(" ^ idx x ^ ")"
+	    | A.GlobalGet x -> "CTORGLOBALGETA1(" ^ idx x ^ ")"
+	    | A.GlobalSet x -> "CTORGLOBALSETA1(" ^ idx x ^ ")"
+	    | A.TableGet x -> "CTORTABLEGETA1(" ^ idx x ^ ")"
+	    | A.TableSet x -> "CTORTABLESETA1(" ^ idx x ^ ")"
+	    | A.TableSize x -> "CTORTABLESIZEA1(" ^ idx x ^ ")"
+	    | A.TableGrow x -> "CTORTABLEGROWA1(" ^ idx x ^ ")"
+	    | A.TableFill x -> "CTORTABLEFILLA1(" ^ idx x ^ ")"
+	    | A.TableCopy (x1, x2) ->
+	        "CTORTABLECOPYA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
+	    | A.TableInit (x1, x2) ->
+	        "CTORTABLEINITA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
+	    | A.ElemDrop x -> "CTORELEMDROPA1(" ^ idx x ^ ")"
+    | A.Load (x, op) ->
+        "CTORLOADA4(" ^ numtype op.ty ^ ", " ^ load_pack op.pack ^ ", "
+	        ^ idx x ^ ", " ^ memarg op.offset ^ ")"
+	    | A.Store (x, op) ->
+	        "CTORSTOREA4(" ^ numtype op.ty ^ ", " ^ store_pack op.pack ^ ", "
+	        ^ idx x ^ ", " ^ memarg op.offset ^ ")"
+	    | A.MemorySize x -> "CTORMEMORYSIZEA1(" ^ idx x ^ ")"
+	    | A.MemoryGrow x -> "CTORMEMORYGROWA1(" ^ idx x ^ ")"
+	    | A.MemoryFill x -> "CTORMEMORYFILLA1(" ^ idx x ^ ")"
+	    | A.MemoryCopy (x1, x2) ->
+	        "CTORMEMORYCOPYA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
+	    | A.MemoryInit (x1, x2) ->
+	        "CTORMEMORYINITA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
+	    | A.DataDrop x -> "CTORDATADROPA1(" ^ idx x ^ ")"
+	    | A.RefNull ht -> "CTORREFNULLA1(" ^ heaptype ht ^ ")"
+	    | A.RefFunc x -> "CTORREFFUNCA1(" ^ idx x ^ ")"
+    | A.RefIsNull -> "CTORREFISNULLA0"
+    | A.RefAsNonNull -> "CTORREFASNONNULLA0"
+    | A.RefTest rt -> "CTORREFTESTA1(" ^ reftype rt ^ ")"
+    | A.RefCast rt -> "CTORREFCASTA1(" ^ reftype rt ^ ")"
+    | A.RefEq -> "CTORREFEQA0"
+    | A.RefI31 -> "CTORREFI31A0"
+    | A.Const n -> num_const (it n)
+    | A.Test op -> testop op
+    | A.Compare op -> relop op
+    | A.Unary op -> unop op
+	    | A.Binary op -> binop op
+	    | A.Convert op -> cvtop op
+	    | A.VecConst _ -> lower_arranged_instr e
+	    | A.VecLoad _ | A.VecStore _ | A.VecLoadLane _ | A.VecStoreLane _ | A.VecTest _
+	    | A.VecCompare _ | A.VecUnary _ | A.VecBinary _ | A.VecTernary _
+	    | A.VecConvert _ | A.VecShift _ | A.VecBitmask _ | A.VecTestBits _
+	    | A.VecUnaryBits _ | A.VecBinaryBits _ | A.VecTernaryBits _ | A.VecSplat _
+	    | A.VecExtract _ | A.VecReplace _ ->
+	        lower_arranged_instr e
+	    | A.I31Get sx -> "CTORI31GETA1(" ^ sx_term sx ^ ")"
+	    | A.StructNew (x, op) ->
+	        initop ("CTORSTRUCTNEWA1(" ^ idx x ^ ")")
+	          ("CTORSTRUCTNEWDEFAULTA1(" ^ idx x ^ ")") op
+	    | A.StructGet (x, field, sx) ->
+	        "CTORSTRUCTGETA3(" ^ optional_sx sx ^ ", " ^ idx x ^ ", " ^ Int32.to_string field
+	        ^ ")"
+	    | A.StructSet (x, field) ->
+	        "CTORSTRUCTSETA2(" ^ idx x ^ ", " ^ Int32.to_string field ^ ")"
+	    | A.ArrayNew (x, op) ->
+	        initop ("CTORARRAYNEWA1(" ^ idx x ^ ")")
+	          ("CTORARRAYNEWDEFAULTA1(" ^ idx x ^ ")") op
+	    | A.ArrayNewFixed (x, n) -> "CTORARRAYNEWFIXEDA2(" ^ idx x ^ ", " ^ Int32.to_string n ^ ")"
+	    | A.ArrayNewData (x, y) -> "CTORARRAYNEWDATAA2(" ^ idx x ^ ", " ^ idx y ^ ")"
+	    | A.ArrayNewElem (x, y) -> "CTORARRAYNEWELEMA2(" ^ idx x ^ ", " ^ idx y ^ ")"
+	    | A.ArrayGet (x, sx) -> "CTORARRAYGETA2(" ^ optional_sx sx ^ ", " ^ idx x ^ ")"
+	    | A.ArraySet x -> "CTORARRAYSETA1(" ^ idx x ^ ")"
+	    | A.ArrayLen -> "CTORARRAYLENA0"
+	    | A.ArrayCopy (x, y) -> "CTORARRAYCOPYA2(" ^ idx x ^ ", " ^ idx y ^ ")"
+	    | A.ArrayFill x -> "CTORARRAYFILLA1(" ^ idx x ^ ")"
+	    | A.ArrayInitData (x, y) -> "CTORARRAYINITDATAA2(" ^ idx x ^ ", " ^ idx y ^ ")"
+	    | A.ArrayInitElem (x, y) -> "CTORARRAYINITELEMA2(" ^ idx x ^ ", " ^ idx y ^ ")"
+	    | A.ExternConvert op -> externop op
+
+  and instrs es = seq (List.map instr es)
+
+  let const c = instrs (it c)
+
+  let local = function A.Local t -> valtype t
+
+  let segmentmode = function
+    | A.Passive -> "CTORPASSIVEA0"
+    | A.Active (x, c) -> "CTORACTIVEA2(" ^ string_of_int (i32_index x) ^ ", " ^ const c ^ ")"
+    | A.Declarative -> "CTORDECLAREA0"
+
+  let module_definition_of_file path =
+    if has_suffix path ".wasm" then (
+      let decoded = Wasm.Decode.decode_with_custom path (read_file path) in
+      ignore (Wasm.Valid.check_module_with_custom decoded);
+      fst decoded)
+    else
+      let _, def = Wasm.Parse.Module.parse_file path in
+      match it def with
+      | Script.Textual (m, custom) ->
+          ignore (Wasm.Valid.check_module_with_custom (m, custom));
+          m
+      | Script.Encoded (_, bytes) ->
+          let decoded = Wasm.Decode.decode_with_custom path (it bytes) in
+          ignore (Wasm.Valid.check_module_with_custom decoded);
+          fst decoded
+      | Script.Quoted _ -> fail "quoted WAT modules are not supported"
+
+  let module_ir_of_ast ?invoke_index (m : A.module_) =
+	    let types = List.map (fun t -> type_def_of_rectype (it t)) (it m).types in
+    let func_import_count = ref 0
+    and tag_import_count = ref 0
+    and global_import_count = ref 0
+    and memory_import_count = ref 0
+    and table_import_count = ref 0 in
+    let import_desc im =
+      let A.Import (module_name, item_name, xt) = it im in
+      let module_name = name module_name and item_name = name item_name in
+      match xt with
+      | T.ExternFuncT (T.Idx x) ->
+          let wat_index = !func_import_count in
+          incr func_import_count;
+          ImportFunc
+            {
+              import_module = module_name;
+              import_name = item_name;
+              import_id = None;
+              import_typeidx = Int32.to_int x;
+              import_wat_index = wat_index;
+            }
+      | T.ExternFuncT _ -> fail "unsupported resolved function import type"
+      | T.ExternTagT tt ->
+          let wat_index = !tag_import_count in
+          incr tag_import_count;
+          ImportTag
+            {
+              import_module = module_name;
+              import_name = item_name;
+              import_id = None;
+              import_tagtype = tagtype tt;
+              import_wat_index = wat_index;
+            }
+      | T.ExternGlobalT gt ->
+          let wat_index = !global_import_count in
+          incr global_import_count;
+          ImportGlobal
+            {
+              import_module = module_name;
+              import_name = item_name;
+              import_id = None;
+              import_globaltype = globaltype gt;
+              import_wat_index = wat_index;
+            }
+      | T.ExternMemoryT mt ->
+          let wat_index = !memory_import_count in
+          incr memory_import_count;
+          let T.MemoryT (_, lim) = mt in
+          ImportMemory
+            {
+              import_module = module_name;
+              import_name = item_name;
+              import_id = None;
+              import_memtype = memtype mt;
+              import_mem_min = int64_to_int lim.min;
+              import_wat_index = wat_index;
+            }
+      | T.ExternTableT tt ->
+          let wat_index = !table_import_count in
+          incr table_import_count;
+          let T.TableT (_, lim, rt) = tt in
+          ImportTable
+            {
+              import_module = module_name;
+              import_name = item_name;
+              import_id = None;
+              import_tabletype = tabletype tt;
+              import_table_min = int64_to_int lim.min;
+              import_table_default_ref = "CTORREFNULLA1(" ^ heaptype (snd rt) ^ ")";
+              import_wat_index = wat_index;
+            }
+    in
+    let imports = List.map import_desc (it m).imports in
+    let funcs =
+      List.mapi
+        (fun i f ->
+          let A.Func (typeidx, locals, body) = it f in
+          {
+            func_id = None;
+            func_typeidx = i32_index typeidx;
+            func_locals = List.map (fun l -> local (it l)) locals;
+            func_body = List.map instr body;
+            func_inline_exports = [];
+            func_wat_index = !func_import_count + i;
+          })
+        (it m).funcs
+    in
+    let tags =
+      List.mapi
+        (fun i t ->
+          let A.Tag tt = it t in
+          {
+            tag_id = None;
+            tag_type = tagtype tt;
+            tag_inline_exports = [];
+            tag_wat_index = !tag_import_count + i;
+          })
+        (it m).tags
+    in
+    let globals =
+      List.mapi
+        (fun i g ->
+          let A.Global (gt, c) = it g in
+          {
+            global_id = None;
+            global_type = globaltype gt;
+            global_init = List.map instr (it c);
+            global_inline_exports = [];
+            global_wat_index = !global_import_count + i;
+          })
+        (it m).globals
+    in
+    let memories =
+      List.mapi
+        (fun i mem ->
+          let A.Memory mt = it mem in
+          {
+            memory_id = None;
+            memory_type = memtype mt;
+            memory_inline_exports = [];
+            memory_wat_index = !memory_import_count + i;
+          })
+        (it m).memories
+    in
+    let tables =
+      List.mapi
+        (fun i tab ->
+          let A.Table (tt, init) = it tab in
+          {
+            table_id = None;
+            table_type = tabletype tt;
+            table_init = List.map instr (it init);
+            table_inline_exports = [];
+            table_wat_index = !table_import_count + i;
+          })
+        (it m).tables
+    in
+    let datas =
+      List.map
+        (fun data ->
+          let A.Data (bytes, mode) = it data in
+          {
+            data_bytes = List.of_seq (String.to_seq bytes) |> List.map Char.code;
+            data_mode = segmentmode (it mode);
+          })
+        (it m).datas
+    in
+    let elems =
+      List.map
+        (fun elem ->
+          let A.Elem (rt, exprs, mode) = it elem in
+          {
+            elem_type = reftype rt;
+            elem_exprs = List.map const exprs;
+            elem_mode = segmentmode (it mode);
+          })
+        (it m).elems
+    in
+    let start =
+      match (it m).start with
+      | None -> None
+      | Some s ->
+          let A.Start x = it s in
+          Some (i32_index x)
+    in
+    let exports =
+      List.map
+        (fun ex ->
+          let A.Export (n, x) = it ex in
+          let export_item_desc =
+            match it x with
+            | A.FuncX x -> ExportFunc (i32_index x)
+            | A.TagX x -> ExportTag (i32_index x)
+            | A.GlobalX x -> ExportGlobal (i32_index x)
+            | A.MemoryX x -> ExportMemory (i32_index x)
+            | A.TableX x -> ExportTable (i32_index x)
+          in
+          { export_item_name = name n; export_item_desc })
+        (it m).exports
+    in
+    let invoke_index =
+      match invoke_index with
+      | Some i -> Some i
+      | None -> (
+          match
+            List.find_map
+              (function
+                | { export_item_desc = ExportFunc i; _ } -> Some i
+                | _ -> None)
+              exports
+          with
+          | Some i -> Some i
+          | None -> if !func_import_count + List.length funcs > 0 then Some 0 else None)
+    in
+    {
+      types;
+      imports;
+      funcs;
+      tags;
+      globals;
+      memories;
+      tables;
+      datas;
+      elems;
+      start;
+      exports;
+      invoke_index;
+    }
+
+  let module_ir_of_file ?invoke_index path =
+    try module_ir_of_ast ?invoke_index (module_definition_of_file path)
+    with exn ->
+      fail ("official Wasm parser/validator rejected input: " ^ Printexc.to_string exn)
+end
+
 let find_import_binding bindings im =
   let module_name = unquote im.import_module in
   let item_name = unquote im.import_name in
@@ -2789,13 +3464,13 @@ let default_import_func_body ir im =
   in
   if not is_defaultable then None
   else
-    match List.nth_opt ir.types im.import_typeidx with
-    | None -> None
-    | Some (_, typ) ->
-        let defaults = List.filter_map default_result_instr typ.results in
-        if List.length defaults = List.length typ.results then Some defaults
-        else if import_name = "proc_exit" then Some [ "CTORTRAPA0" ]
-        else None
+	    match List.nth_opt ir.types im.import_typeidx with
+	    | None | Some { type_func = None; _ } -> None
+	    | Some { type_func = Some typ; _ } ->
+	        let defaults = List.filter_map default_result_instr typ.results in
+	        if List.length defaults = List.length typ.results then Some defaults
+	        else if import_name = "proc_exit" then Some [ "CTORTRAPA0" ]
+	        else None
 
 let emit_import_runtime func_bindings global_bindings memory_bindings ir type_terms =
   let func_imports =
@@ -2938,10 +3613,10 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
 |}
     type_terms func_defs tag_names global_names memory_names table_names func_names externaddrs
 
-let emit_maude ~harness ?(link_imports = false) ?(import_bindings = [])
-    ?(import_global_bindings = []) ?(import_memory_bindings = [])
+let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = false)
+    ?(import_bindings = []) ?(import_global_bindings = []) ?(import_memory_bindings = [])
     ?(prelude_calls = []) ir =
-  let type_terms = ir.types |> List.map (fun (_, typ) -> type_term typ) |> seq in
+	  let type_terms = ir.types |> List.map (fun typ -> typ.type_term) |> seq in
   let import_runtime =
     if ir.imports = [] || not link_imports then ""
     else
@@ -3172,7 +3847,8 @@ let emit_maude ~harness ?(link_imports = false) ?(import_bindings = [])
     | Some i -> i
     | None -> 0
   in
-  Printf.sprintf
+  let generated =
+    Printf.sprintf
     {|load %s
 
 mod WASM-FIB-GENERATED-BS is
@@ -3322,6 +3998,9 @@ mod WASM-FIB-GENERATED-BS is
   eq generated-run-config(GEN-ARGS) =
     generated-run-config-with(%s, %s, GEN-ARGS) .
 
+  --- Experimental Maude-internal validation/debug path.
+  --- The default tool-chain validates WAT/Wasm before Maude and uses
+  --- generated-run-config for execution.
   op generated-checked-run-config-with : Store SpectecTerminals SpectecTerminals -> Config .
   crl [generated-checked-run-config-with] :
     generated-checked-run-config-with(GEN-BASE, GEN-EXTERNADDRS, GEN-ARGS)
@@ -3394,6 +4073,23 @@ endm
     export_exttypes import_exttypes export_exttypes
     default_base default_externaddrs default_base default_externaddrs
     default_base default_externaddrs
+  in
+  if include_maude_validation then generated
+  else
+    generated
+    |> fun s ->
+    strip_between s "  op generated-validation-deftypes : -> SpectecTerminals ."
+      "  op generated-init-config-with : Store SpectecTerminals -> Config ."
+    |> fun s ->
+    strip_between s "  --- Experimental Maude-internal validation/debug path."
+      "  op generated-fib-init-config-with : Store SpectecTerminals Val -> Config ."
+    |> fun s ->
+    strip_between s
+      "  op generated-checked-fib-init-config-with : Store SpectecTerminals Val -> Config ."
+      "  op generated-fib-init-config : Val -> Config ."
+    |> fun s ->
+    strip_between s "  op generated-checked-fib-init-config : Val -> Config ."
+      "endm"
 
 let run_maude_command ~maude ~result_only generated command =
   let file = Filename.temp_file "spec2maude-wat-" ".maude" in
@@ -3454,7 +4150,7 @@ let run_maude_validation ~maude ~result_only generated =
 
 let usage () =
   prerr_endline
-    "usage: wasm_to_maude [--harness FILE] [--output FILE] [--run N] [--run-main] [--run-export NAME] [--validate-only] [--checked-run|--unchecked-run] [--arg-i32 N] [--arg-i64 N] [--arg-f32 LIT] [--arg-f64 LIT] [--arg-v128 LANES] [--arg-ref-null funcref|externref] [--arg-externref N] [--arg-funcref N] [--prelude-call FIELD;TYPE=VALUE,...;drop=N] [--maude PATH] [--invoke-index N] [--result-only] [--search-expected TERM] [--no-canonicalize] [--import-func MODULE.NAME=INSTRUCTIONS] [--import-global MODULE.NAME=VALUE] [--import-memory MODULE.NAME=PAGES] INPUT.wat|INPUT.wasm";
+    "usage: wasm_to_maude [--harness FILE] [--output FILE] [--run N] [--run-main] [--run-export NAME] [--maude-validate-only] [--checked-run|--unchecked-run] [--arg-i32 N] [--arg-i64 N] [--arg-f32 LIT] [--arg-f64 LIT] [--arg-v128 LANES] [--arg-ref-null funcref|externref] [--arg-externref N] [--arg-funcref N] [--prelude-call FIELD;TYPE=VALUE,...;drop=N] [--maude PATH] [--invoke-index N] [--result-only] [--search-expected TERM] [--legacy-wat-parser] [--no-canonicalize] [--import-func MODULE.NAME=INSTRUCTIONS] [--import-global MODULE.NAME=VALUE] [--import-memory MODULE.NAME=PAGES] INPUT.wat|INPUT.wasm";
   exit 2
 
 let () =
@@ -3465,13 +4161,14 @@ let () =
     let run = ref None in
     let run_main = ref false in
     let validate_only = ref false in
-    let checked_run = ref true in
+    let checked_run = ref false in
     let run_export = ref None in
     let search_expected = ref None in
     let result_only = ref false in
     let arg_terms = ref [] in
     let invoke_index = ref None in
     let canonicalize = ref true in
+    let legacy_wat_parser = ref false in
     let import_func_specs = ref [] in
     let import_global_specs = ref [] in
     let import_memory_specs = ref [] in
@@ -3491,6 +4188,7 @@ let () =
       | "--run-main" :: rest ->
           run_main := true;
           parse_args rest
+      | "--maude-validate-only" :: rest
       | "--validate-only" :: rest ->
           validate_only := true;
           parse_args rest
@@ -3542,6 +4240,9 @@ let () =
       | "--no-canonicalize" :: rest ->
           canonicalize := false;
           parse_args rest
+      | "--legacy-wat-parser" :: rest ->
+          legacy_wat_parser := true;
+          parse_args rest
       | "--maude" :: path :: rest ->
           maude := path;
           parse_args rest
@@ -3569,7 +4270,11 @@ let () =
       if Filename.is_relative !harness then Filename.concat (Sys.getcwd ()) !harness
       else !harness
     in
-    let ir = parse_module ?invoke_index:!invoke_index (load_input ~canonicalize:!canonicalize input) in
+    let ir =
+      if !legacy_wat_parser then
+        parse_module ?invoke_index:!invoke_index (load_input ~canonicalize:!canonicalize input)
+      else Official.module_ir_of_file ?invoke_index:!invoke_index input
+    in
     let ir =
       match !run_export with
       | None -> ir
@@ -3615,7 +4320,8 @@ let () =
         ^ if names = "" then "" else " for: " ^ names)
     else ();
     let generated =
-      emit_maude ~harness ~link_imports:(!run <> None || !run_main) ~import_bindings
+      emit_maude ~harness ~link_imports:(!run <> None || !run_main)
+        ~include_maude_validation:(!validate_only || !checked_run) ~import_bindings
         ~import_global_bindings ~import_memory_bindings ~prelude_calls:!prelude_calls ir
     in
     (match !output with

@@ -40,7 +40,6 @@ mod WASM-FIB-BS is
 
   op i32v : Int -> Val .
   eq i32v(I:Int) = CTORCONSTA2(CTORI32A0, I:Int) .
-  mb CTORCONSTA2(CTORI32A0, I:Int) : Val .
 
   op fib-loop-body : -> SpectecTerminals .
   eq fib-loop-body =

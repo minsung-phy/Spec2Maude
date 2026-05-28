@@ -2,9 +2,10 @@
 --- WASM-INIT-BS: Runtime harness helpers
 --- =============================================================
 --- This file intentionally keeps WAT/import/runtime helper code out of
---- output_bs.maude.  The actual `$instantiate` equations are the ones
---- generated from the SpecTec source in output_bs.maude; this module must
---- not override `$instantiate`.
+--- output_bs.maude.  The full SpecTec `$instantiate` equations remain in
+--- output_bs.maude for source coverage, but the default WAT/Wasm frontend
+--- builds initial configs through the focused `$init-*` harness below after
+--- frontend validation.
 --- =============================================================
 
 load builtins
@@ -13,8 +14,7 @@ mod WASM-INIT-BS is
   inc WASM-BUILTINS .
 
   --- Harness support helpers.  These build imported function/store pieces
-  --- used as inputs to the source-generated $instantiate; they do not define
-  --- or override $instantiate itself.
+  --- and initial module instances for validated frontend-generated modules.
   var INIT-LOWS : Store .
   var INIT-MODULEINST : Moduleinst .
   vars INIT-TYPES INIT-IMPORTS INIT-FUNCS INIT-EXPORTS INIT-EXTERNADDRS : SpectecTerminals .
@@ -40,32 +40,6 @@ mod WASM-INIT-BS is
   var INIT-HOSTADDR : Hostaddr .
   var INIT-ADDRREF : Addrref .
   var INIT-ADDRREF-N : Nat .
-  mb CTORCONSTA2(INIT-NUMTYPE, INIT-NUM) : Val .
-  mb CTORCONSTA2(INIT-NUMTYPE, INIT-INT) : Val .
-  mb CTORVCONSTA2(INIT-VECTYPE, INIT-VEC) : Val .
-  mb CTORVCONSTA2(INIT-VECTYPE, INIT-VEC-TERM) : Val .
-  mb CTORRECA1(INIT-RECTYPE-TERMS) : Rectype .
-  mb CTORWIDXA1(INIT-HEAPTYPE-IDX) : Heaptype .
-  mb CTORWDEFA2(INIT-HEAPTYPE-REC, INIT-HEAPTYPE-N) : Heaptype .
-  mb CTORREFNULLA1(INIT-HEAPTYPE) : Val .
-  mb CTORREFI31NUMA1(INIT-U31) : Val .
-  mb CTORREFSTRUCTADDRA1(INIT-STRUCTADDR) : Val .
-  mb CTORREFARRAYADDRA1(INIT-ARRAYADDR) : Val .
-  mb CTORREFFUNCADDRA1(INIT-FUNCADDR) : Val .
-  mb CTORREFEXNADDRA1(INIT-EXNADDR) : Val .
-  mb CTORREFHOSTADDRA1(INIT-HOSTADDR) : Val .
-  mb CTORREFEXTERNA1(INIT-ADDRREF) : Val .
-  mb CTORREFEXTERNA1(INIT-ADDRREF-N) : Val .
-  mb CTORREFNULLA1(INIT-HEAPTYPE) : Ref .
-  mb CTORREFI31NUMA1(INIT-U31) : Ref .
-  mb CTORREFSTRUCTADDRA1(INIT-STRUCTADDR) : Ref .
-  mb CTORREFARRAYADDRA1(INIT-ARRAYADDR) : Ref .
-  mb CTORREFFUNCADDRA1(INIT-FUNCADDR) : Ref .
-  mb CTORREFEXNADDRA1(INIT-EXNADDR) : Ref .
-  mb CTORREFHOSTADDRA1(INIT-HOSTADDR) : Ref .
-  mb CTORREFEXTERNA1(INIT-ADDRREF) : Ref .
-  mb CTORREFEXTERNA1(INIT-ADDRREF-N) : Ref .
-
   op $wat-name : Qid -> Name [ctor] .
   op $init-deftypes : SpectecTerminals Int -> SpectecTerminals .
   op $init-funcaddrs : SpectecTerminals Int -> SpectecTerminals .
@@ -73,6 +47,7 @@ mod WASM-INIT-BS is
   op $init-funcinsts : SpectecTerminals SpectecTerminals Moduleinst -> SpectecTerminals .
   op $init-moduleinst : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Moduleinst [ctor] .
   op $init-store : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Store [ctor] .
+  op $seq-set-terminal : SpectecTerminals Nat Ref -> SpectecTerminals .
   eq $init-deftypes(eps, INIT-I) = eps .
   eq $init-deftypes(CTORTYPEA1(INIT-RECTYPE) INIT-TYPESQ, INIT-I) = CTORWDEFA2(INIT-RECTYPE, 0) $init-deftypes(INIT-TYPESQ, INIT-I + 1) .
   eq $init-funcaddrs(eps, INIT-I) = eps .
@@ -152,8 +127,8 @@ mod WASM-INIT-BS is
   --- a surrounding instruction suffix.  This belongs in the execution harness,
   --- not in the source-translated output_bs.maude core.
   var STEP-MEM-CTX-Z : State .
-  var STEP-MEM-CTX-VALS : ValSeq .
-  vars STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS : SpectecTerminals .
+  var STEP-MEM-CTX-VALS : SpectecTerminals .
+  vars STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS STEP-MEM-CTX-LIM : SpectecTerminals .
   var STEP-MEM-CTX-AT : SpectecTerminal .
   var STEP-MEM-CTX-NT : Numtype .
   var STEP-MEM-CTX-INN : Numtype .
@@ -188,7 +163,7 @@ mod WASM-INIT-BS is
   vars INIT-SIMD-LANES1 INIT-SIMD-LANES2 : SpectecTerminals .
   vars INIT-SIMD-LANE1 INIT-SIMD-LANE2 : SpectecTerminal .
   var INIT-SIMD-Z : State .
-  var INIT-SIMD-VALS : ValSeq .
+  var INIT-SIMD-VALS : SpectecTerminals .
   vars INIT-SIMD-INSTRS1 : SpectecTerminals .
   vars INIT-SIMD-C1 INIT-SIMD-C2 INIT-SIMD-CQ INIT-SIMD-SH INIT-SIMD-OP : SpectecTerminal .
   var INIT-SIMD-LOWS : Store .
@@ -291,6 +266,19 @@ mod WASM-INIT-BS is
     =>
     ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
       if _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
+  ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORELEMDROPA1 ( STEP-MEM-CTX-ELEMIDX ) STEP-MEM-CTX-INSTRS1 ) ) =
+    steps ( ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 ) )
+      if _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
+  crl [init-step-read-memory-size] :
+    step-read ( ( STEP-MEM-CTX-Z ; CTORMEMORYSIZEA1 ( STEP-MEM-CTX-X ) ) )
+    =>
+    CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-N )
+      if RECMeminstA2 ( CTORPAGEA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-LIM ), STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ STEP-MEM-CTX-N := _quo_ ( len ( STEP-MEM-CTX-BS ), _*_ ( 64, $Ki ) ) .
+  ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORMEMORYSIZEA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) ) =
+    steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-N ) STEP-MEM-CTX-INSTRS1 ) )
+      if RECMeminstA2 ( CTORPAGEA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-LIM ), STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ STEP-MEM-CTX-N := _quo_ ( len ( STEP-MEM-CTX-BS ), _*_ ( 64, $Ki ) ) .
   crl [step-memory-grow-fail-negative-ctxt-instrs] :
     step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-GROW-I ) CTORMEMORYGROWA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
     =>
@@ -407,13 +395,14 @@ mod WASM-INIT-BS is
   eq $init-datainsts(eps) = eps .
   eq $init-datainsts(CTORDATAA2(INITFULL-BYTES, INITFULL-DMODE) INITFULL-REST) = RECDatainstA1(INITFULL-BYTES) $init-datainsts(INITFULL-REST) .
   eq $init-eleminsts(eps, INITFULL-MODULEINST) = eps .
+  eq $init-eleminsts(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORDECLAREA0) INITFULL-REST, INITFULL-MODULEINST) = {item('TYPE, INITFULL-RT) ; item('REFS, eps)} $init-eleminsts(INITFULL-REST, INITFULL-MODULEINST) .
   eq $init-eleminsts(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, INITFULL-EMODE) INITFULL-REST, INITFULL-MODULEINST) = {item('TYPE, INITFULL-RT) ; item('REFS, $init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS))} $init-eleminsts(INITFULL-REST, INITFULL-MODULEINST) .
   eq $init-run-datas(eps, INITFULL-I) = eps .
   eq $init-run-datas(CTORDATAA2(INITFULL-BYTES, CTORPASSIVEA0) INITFULL-REST, INITFULL-I) = $init-run-datas(INITFULL-REST, INITFULL-I + 1) .
   eq $init-run-datas(CTORDATAA2(INITFULL-BYTES, CTORACTIVEA2(INITFULL-X, INITFULL-EXPR)) INITFULL-REST, INITFULL-I) = $rundata(INITFULL-I, CTORDATAA2(INITFULL-BYTES, CTORACTIVEA2(INITFULL-X, INITFULL-EXPR))) $init-run-datas(INITFULL-REST, INITFULL-I + 1) .
   eq $init-run-elems(eps, INITFULL-I) = eps .
   eq $init-run-elems(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORPASSIVEA0) INITFULL-REST, INITFULL-I) = $init-run-elems(INITFULL-REST, INITFULL-I + 1) .
-  eq $init-run-elems(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORDECLAREA0) INITFULL-REST, INITFULL-I) = CTORELEMDROPA1(INITFULL-I) $init-run-elems(INITFULL-REST, INITFULL-I + 1) .
+  eq $init-run-elems(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORDECLAREA0) INITFULL-REST, INITFULL-I) = $init-run-elems(INITFULL-REST, INITFULL-I + 1) .
   eq $init-run-elems(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-X, INITFULL-EXPR)) INITFULL-REST, INITFULL-I) = CTORELEMDROPA1(INITFULL-I) $init-run-elems(INITFULL-REST, INITFULL-I + 1) .
   eq $init-start-instrs(eps) = eps .
   eq $init-start-instrs(CTORSTARTA1(INITFULL-X)) = CTORCALLA1(INITFULL-X) .

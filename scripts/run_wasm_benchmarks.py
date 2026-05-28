@@ -105,6 +105,7 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
             "rejected invalid wat" in lower
             or "invalid wasm" in lower
             or "wasm-validate" in lower
+            or "official wasm parser/validator rejected input" in lower
         ):
             return ("INVALID", "", first_line(out))
         if "wasm_to_maude:" in lower and "unsupported" in lower:
@@ -228,14 +229,14 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
     return [
         (
             "fib",
-            ["--checked-run", "--result-only", "--run", "5", "wat_examples/fib.wat"],
+            ["--unchecked-run", "--result-only", "--run", "5", "wat_examples/fib.wat"],
             "CTORCONSTA2(CTORI32A0, 5)",
         ),
         (
             "fib-wrapper",
             [
                 "--result-only",
-                "--checked-run",
+                "--unchecked-run",
                 "--run-export",
                 "wrapper",
                 "--arg-i32",
@@ -250,39 +251,39 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
         ),
         (
             "global-get",
-            ["--checked-run", "--result-only", "--run-main", "wat_examples/global-get.wat"],
+            ["--unchecked-run", "--result-only", "--run-main", "wat_examples/global-get.wat"],
             "CTORCONSTA2(CTORI32A0, 42)",
         ),
         (
             "memory-size",
-            ["--checked-run", "--result-only", "--run-main", "wat_examples/memory-size.wat"],
+            ["--unchecked-run", "--result-only", "--run-main", "wat_examples/memory-size.wat"],
             "CTORCONSTA2(CTORI32A0, 0)",
         ),
         (
             "table-size",
-            ["--checked-run", "--result-only", "--run-main", "wat_examples/table-size.wat"],
+            ["--unchecked-run", "--result-only", "--run-main", "wat_examples/table-size.wat"],
             "CTORCONSTA2(CTORI32A0, 3)",
         ),
         (
             "start-global",
-            ["--checked-run", "--result-only", "--run-main", "wat_examples/start-global.wat"],
+            ["--unchecked-run", "--result-only", "--run-main", "wat_examples/start-global.wat"],
             "CTORCONSTA2(CTORI32A0, 7)",
         ),
         (
             "data-load",
-            ["--checked-run", "--result-only", "--run-main", "wat_examples/data-load.wat"],
+            ["--unchecked-run", "--result-only", "--run-main", "wat_examples/data-load.wat"],
             "CTORCONSTA2(CTORI32A0, 42)",
         ),
         (
             "elem-call-ref",
-            ["--checked-run", "--result-only", "--run-main", "wat_examples/elem-call-ref.wat"],
+            ["--unchecked-run", "--result-only", "--run-main", "wat_examples/elem-call-ref.wat"],
             "CTORCONSTA2(CTORI32A0, 9)",
         ),
         (
             "import-func",
             [
                 "--result-only",
-                "--checked-run",
+                "--unchecked-run",
                 "--run-export",
                 "main",
                 "--arg-i32",
@@ -297,7 +298,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
             "import-global",
             [
                 "--result-only",
-                "--checked-run",
+                "--unchecked-run",
                 "--run-export",
                 "main",
                 "--import-global",
@@ -308,12 +309,12 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
         ),
         (
             "import-memory",
-            ["--checked-run", "--result-only", "--run-export", "main", "wat_examples/import-memory.wat"],
+            ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-memory.wat"],
             "CTORCONSTA2(CTORI32A0, 1)",
         ),
         (
             "import-table",
-            ["--checked-run", "--result-only", "--run-export", "main", "wat_examples/import-table.wat"],
+            ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-table.wat"],
             "CTORCONSTA2(CTORI32A0, 4)",
         ),
     ]
@@ -383,7 +384,7 @@ def run_invalid_smokes(cli: str, maude: str, timeout: int) -> list[Result]:
             continue
 
         code, out = run(
-            cli_prefix(cli) + ["--maude", maude, "--checked-run", "--result-only", "--run-main", str(path)],
+            cli_prefix(cli) + ["--maude", maude, "--unchecked-run", "--result-only", "--run-main", str(path)],
             timeout,
         )
         status, observed, reason = classify_output(code, out)
@@ -403,69 +404,6 @@ def run_invalid_smokes(cli: str, maude: str, timeout: int) -> list[Result]:
             )
         )
 
-        with tempfile.TemporaryDirectory(prefix="spec2maude-invalid-") as tmpdir:
-            generated = Path(tmpdir) / "invalid-generated.maude"
-            gen_status, gen_observed, gen_reason = run_generate(
-                cli + " --no-canonicalize", path, timeout, generated
-            )
-            if gen_status != "GENERATED":
-                results.append(
-                    Result(
-                        "wat_examples_invalid",
-                        path.stem + ":maude-validation",
-                        rel,
-                        "invalid-maude-validation",
-                        gen_status,
-                        "Module-ok rejects invalid module",
-                        gen_observed,
-                        gen_reason,
-                        parse_status=gen_status,
-                        result_status=gen_status,
-                    )
-                )
-                continue
-            validation_status, validation_observed, validation_reason = run_validation_stage(
-                maude, generated, timeout
-            )
-            final_validation_status = "PASS" if validation_status == "INVALID" else "WRONG_RESULT"
-            results.append(
-                Result(
-                    "wat_examples_invalid",
-                    path.stem + ":maude-validation",
-                    rel,
-                    "invalid-maude-validation",
-                    final_validation_status,
-                    "Module-ok rejects invalid module",
-                    validation_observed,
-                    validation_reason if final_validation_status == "PASS" else f"unexpected status: {validation_status}",
-                    parse_status="GENERATED",
-                    validation_status=validation_status,
-                    result_status=final_validation_status,
-                )
-            )
-
-            code, out = generated_maude_command(
-                maude,
-                generated,
-                "rew [10000] in WASM-FIB-GENERATED-BS : generated-checked-run-config(eps) .",
-                timeout,
-            )
-            run_status, run_observed, run_reason = classify_checked_run_block_output(code, out)
-            results.append(
-                Result(
-                    "wat_examples_invalid",
-                    path.stem + ":checked-run",
-                    rel,
-                    "invalid-checked-run",
-                    run_status,
-                    "checked-run does not execute invalid module",
-                    run_observed,
-                    run_reason,
-                    parse_status="GENERATED",
-                    validation_status="INVALID" if run_status == "PASS" else "",
-                    result_status=run_status,
-                )
-            )
     return results
 
 
@@ -530,7 +468,7 @@ def run_validation_stage(maude: str, generated: Path, timeout: int) -> tuple[str
 
 def run_step_stage(cli: str, maude: str, path: Path, timeout: int, expected: str = "") -> tuple[str, str, str]:
     code, out = run(
-        cli_prefix(cli) + ["--maude", maude, "--checked-run", "--result-only", "--run-main", str(path)],
+        cli_prefix(cli) + ["--maude", maude, "--unchecked-run", "--result-only", "--run-main", str(path)],
         timeout,
     )
     return classify_step_output(code, out, expected)
@@ -554,23 +492,6 @@ def run_stage_probe(cli: str, maude: str, path: Path, timeout: int, suite: str =
                 parse_status=gen_status,
                 result_status=gen_status,
             )
-        validation_status, validation_observed, validation_reason = run_validation_stage(
-            maude, generated, timeout
-        )
-        if validation_status != "VALIDATED":
-            return Result(
-                suite,
-                path.stem,
-                rel,
-                mode,
-                validation_status,
-                "",
-                validation_observed,
-                validation_reason,
-                parse_status="GENERATED",
-                validation_status=validation_status,
-                result_status=validation_status,
-            )
         init_status, init_observed, init_reason = run_instantiate_stage(maude, generated, timeout)
         if init_status != "INSTANTIATED":
             return Result(
@@ -583,7 +504,7 @@ def run_stage_probe(cli: str, maude: str, path: Path, timeout: int, suite: str =
                 init_observed,
                 init_reason,
                 parse_status="GENERATED",
-                validation_status="VALIDATED",
+                validation_status="FRONTEND_VALIDATED",
                 instantiate_status=init_status,
                 result_status=init_status,
             )
@@ -599,7 +520,7 @@ def run_stage_probe(cli: str, maude: str, path: Path, timeout: int, suite: str =
             step_observed,
             step_reason,
             parse_status="GENERATED",
-            validation_status="VALIDATED",
+            validation_status="FRONTEND_VALIDATED",
             instantiate_status="INSTANTIATED",
             step_status=step_status,
             result_status=final_status,
@@ -775,7 +696,7 @@ def run_wast_assert(
         import_memory_args.extend(["--import-memory", spec])
     code, out = run(
         cli_prefix(cli)
-        + ["--maude", maude, "--checked-run", "--result-only", "--run-export", field]
+        + ["--maude", maude, "--unchecked-run", "--result-only", "--run-export", field]
         + import_memory_args
         + prelude_args
         + arg_flags
@@ -1116,16 +1037,21 @@ def main() -> int:
     )
     parser.add_argument("--max-wast-modules", type=int, default=20)
     parser.add_argument("--max-wast-asserts", type=int, default=40)
+    parser.add_argument("--skip-smokes", action="store_true")
+    parser.add_argument("--skip-external", action="store_true")
     parser.add_argument("--fail-on-external-failure", action="store_true")
     args = parser.parse_args()
 
     rows: list[Result] = []
-    rows.extend(run_smokes(args.cli, args.maude, args.timeout))
-    rows.extend(run_invalid_smokes(args.cli, args.maude, args.timeout))
+    if not args.skip_smokes:
+        rows.extend(run_smokes(args.cli, args.maude, args.timeout))
+        rows.extend(run_invalid_smokes(args.cli, args.maude, args.timeout))
 
-    external_root_args = args.external_root if args.external_root is not None else ["benchmarks"]
-    roots = [ROOT / p for p in external_root_args]
-    external_files = discover_bench_files(roots)
+    external_files: list[Path] = []
+    if not args.skip_external:
+        external_root_args = args.external_root if args.external_root is not None else ["benchmarks"]
+        roots = [ROOT / p for p in external_root_args]
+        external_files = discover_bench_files(roots)
     if args.max_external_files > 0:
         external_files = external_files[: args.max_external_files]
     for path in external_files:
@@ -1149,7 +1075,7 @@ def main() -> int:
                 )
                 continue
         if "wat_examples" in path.parts:
-            # Local examples are already run as checked PASS/invalid smokes.
+            # Local examples are already run by the frontend/runtime smoke suite.
             continue
         if path.suffix == ".wast":
             rows.extend(
