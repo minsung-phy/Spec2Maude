@@ -2484,6 +2484,17 @@ let parse_import_memory_binding body =
   }
 
 let maude_arg_term typ value =
+  let ref_heaptype = function
+    | "funcref" -> "CTORFUNCA0"
+    | "externref" -> "CTOREXTERNA0"
+    | "anyref" -> "CTORANYA0"
+    | "eqref" -> "CTORWEQA0"
+    | "i31ref" -> "CTORI31A0"
+    | "structref" -> "CTORSTRUCTA0"
+    | "arrayref" -> "CTORARRAYA0"
+    | "exnref" -> "CTOREXNA0"
+    | t -> fail ("unsupported reference arg type: " ^ t)
+  in
   match typ with
   | "i32" -> "CTORCONSTA2(CTORI32A0, " ^ value ^ ")"
   | "i64" -> "CTORCONSTA2(CTORI64A0, " ^ value ^ ")"
@@ -2498,10 +2509,17 @@ let maude_arg_term typ value =
         |> List.filter (fun s -> s <> "")
       in
       "CTORVCONSTA2(CTORV128A0, $v128lanes(" ^ seq lanes ^ "))"
-  | "funcref" when value = "null" -> "CTORREFNULLA1(CTORFUNCA0)"
-  | "externref" when value = "null" -> "CTORREFNULLA1(CTOREXTERNA0)"
+  | ( "funcref" | "externref" | "anyref" | "eqref" | "i31ref" | "structref"
+    | "arrayref" | "exnref" ) when value = "null" ->
+      "CTORREFNULLA1(" ^ ref_heaptype typ ^ ")"
   | "funcref" -> "CTORREFFUNCADDRA1(" ^ value ^ ")"
-  | "externref" -> "CTORREFEXTERNA1(" ^ value ^ ")"
+  | "externref" -> "CTORREFEXTERNA1(CTORREFHOSTADDRA1(" ^ value ^ "))"
+  | "anyref" -> "CTORREFHOSTADDRA1(" ^ value ^ ")"
+  | "eqref" -> "CTORREFI31NUMA1(" ^ value ^ ")"
+  | "i31ref" -> "CTORREFI31NUMA1(" ^ value ^ ")"
+  | "structref" -> "CTORREFSTRUCTADDRA1(" ^ value ^ ")"
+  | "arrayref" -> "CTORREFARRAYADDRA1(" ^ value ^ ")"
+  | "exnref" -> "CTORREFEXNADDRA1(" ^ value ^ ")"
   | _ -> fail ("unsupported invoke arg type: " ^ typ)
 
 let parse_prelude_call body =
@@ -4103,7 +4121,7 @@ let run_maude_command ~maude ~result_only generated command =
       if result_only then Printf.printf "result: %s\n" (extract_final_value output)
       else print_string output)
 
-let run_maude_fib ~maude ~result_only ~checked generated n =
+let run_maude_fib ~maude ~result_only ~checked ~rewrite_limit generated n =
   let term =
     if checked then
       "generated-checked-fib-init-config(i32v(" ^ string_of_int n ^ "))"
@@ -4111,9 +4129,9 @@ let run_maude_fib ~maude ~result_only ~checked generated n =
       "steps(generated-fib-init-config(i32v(" ^ string_of_int n ^ ")))"
   in
   run_maude_command ~maude ~result_only generated
-    ("\nrew [10000] in WASM-FIB-GENERATED-BS : " ^ term ^ " .\n")
+    ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED-BS : " ^ term ^ " .\n")
 
-let run_maude_main ~maude ~result_only ~checked ?search_expected generated args =
+let run_maude_main ~maude ~result_only ~checked ~rewrite_limit ?search_expected generated args =
   let arg_terms = seq args in
   let term =
     if checked then
@@ -4142,15 +4160,15 @@ let run_maude_main ~maude ~result_only ~checked ?search_expected generated args 
       else run_maude_command ~maude ~result_only generated command
   | None ->
       run_maude_command ~maude ~result_only generated
-        ("\nrew [10000] in WASM-FIB-GENERATED-BS : " ^ term ^ " .\n")
+        ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED-BS : " ^ term ^ " .\n")
 
-let run_maude_validation ~maude ~result_only generated =
+let run_maude_validation ~maude ~result_only ~rewrite_limit generated =
   run_maude_command ~maude ~result_only generated
-    "\nrew [10000] in WASM-FIB-GENERATED-BS : Module-ok(generated-fib-module, generated-module-type) .\n"
+    ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED-BS : Module-ok(generated-fib-module, generated-module-type) .\n")
 
 let usage () =
   prerr_endline
-    "usage: wasm_to_maude [--harness FILE] [--output FILE] [--run N] [--run-main] [--run-export NAME] [--maude-validate-only] [--checked-run|--unchecked-run] [--arg-i32 N] [--arg-i64 N] [--arg-f32 LIT] [--arg-f64 LIT] [--arg-v128 LANES] [--arg-ref-null funcref|externref] [--arg-externref N] [--arg-funcref N] [--prelude-call FIELD;TYPE=VALUE,...;drop=N] [--maude PATH] [--invoke-index N] [--result-only] [--search-expected TERM] [--legacy-wat-parser] [--no-canonicalize] [--import-func MODULE.NAME=INSTRUCTIONS] [--import-global MODULE.NAME=VALUE] [--import-memory MODULE.NAME=PAGES] INPUT.wat|INPUT.wasm";
+    "usage: wasm_to_maude [--harness FILE] [--output FILE] [--run N] [--run-main] [--run-export NAME] [--maude-validate-only] [--checked-run|--unchecked-run] [--rewrite-limit N] [--arg-i32 N] [--arg-i64 N] [--arg-f32 LIT] [--arg-f64 LIT] [--arg-v128 LANES] [--arg-ref-null REF] [--arg-externref N] [--arg-funcref N] [--arg-anyref N] [--arg-eqref N] [--arg-i31ref N] [--arg-structref N] [--arg-arrayref N] [--arg-exnref N] [--prelude-call FIELD;TYPE=VALUE,...;drop=N] [--maude PATH] [--invoke-index N] [--result-only] [--search-expected TERM] [--legacy-wat-parser] [--no-canonicalize] [--import-func MODULE.NAME=INSTRUCTIONS] [--import-global MODULE.NAME=VALUE] [--import-memory MODULE.NAME=PAGES] INPUT.wat|INPUT.wasm";
   exit 2
 
 let () =
@@ -4173,6 +4191,7 @@ let () =
     let import_global_specs = ref [] in
     let import_memory_specs = ref [] in
     let prelude_calls = ref [] in
+    let rewrite_limit = ref 10000 in
     let input = ref None in
     let rec parse_args = function
       | [] -> ()
@@ -4198,6 +4217,9 @@ let () =
       | "--unchecked-run" :: rest ->
           checked_run := false;
           parse_args rest
+      | "--rewrite-limit" :: n :: rest ->
+          rewrite_limit := int_of_string n;
+          parse_args rest
       | "--run-export" :: name :: rest ->
           run_main := true;
           run_export := Some (unquote name);
@@ -4222,17 +4244,32 @@ let () =
       | "--arg-v128" :: n :: rest ->
           arg_terms := !arg_terms @ [ maude_arg_term "v128" n ];
           parse_args rest
-      | "--arg-ref-null" :: "funcref" :: rest ->
-          arg_terms := !arg_terms @ [ "CTORREFNULLA1(CTORFUNCA0)" ];
-          parse_args rest
-      | "--arg-ref-null" :: "externref" :: rest ->
-          arg_terms := !arg_terms @ [ "CTORREFNULLA1(CTOREXTERNA0)" ];
+      | "--arg-ref-null" :: typ :: rest ->
+          arg_terms := !arg_terms @ [ maude_arg_term typ "null" ];
           parse_args rest
       | "--arg-externref" :: n :: rest ->
-          arg_terms := !arg_terms @ [ "CTORREFEXTERNA1(" ^ n ^ ")" ];
+          arg_terms := !arg_terms @ [ maude_arg_term "externref" n ];
           parse_args rest
       | "--arg-funcref" :: n :: rest ->
-          arg_terms := !arg_terms @ [ "CTORREFFUNCADDRA1(" ^ n ^ ")" ];
+          arg_terms := !arg_terms @ [ maude_arg_term "funcref" n ];
+          parse_args rest
+      | "--arg-anyref" :: n :: rest ->
+          arg_terms := !arg_terms @ [ maude_arg_term "anyref" n ];
+          parse_args rest
+      | "--arg-eqref" :: n :: rest ->
+          arg_terms := !arg_terms @ [ maude_arg_term "eqref" n ];
+          parse_args rest
+      | "--arg-i31ref" :: n :: rest ->
+          arg_terms := !arg_terms @ [ maude_arg_term "i31ref" n ];
+          parse_args rest
+      | "--arg-structref" :: n :: rest ->
+          arg_terms := !arg_terms @ [ maude_arg_term "structref" n ];
+          parse_args rest
+      | "--arg-arrayref" :: n :: rest ->
+          arg_terms := !arg_terms @ [ maude_arg_term "arrayref" n ];
+          parse_args rest
+      | "--arg-exnref" :: n :: rest ->
+          arg_terms := !arg_terms @ [ maude_arg_term "exnref" n ];
           parse_args rest
       | "--result-only" :: rest ->
           result_only := true;
@@ -4328,13 +4365,15 @@ let () =
     | Some path -> write_file path generated
     | None -> if !run = None && not !run_main && not !validate_only then print_string generated);
     if !validate_only then
-      run_maude_validation ~maude:!maude ~result_only:!result_only generated;
+      run_maude_validation ~maude:!maude ~result_only:!result_only
+        ~rewrite_limit:!rewrite_limit generated;
     (match (!run, !run_main) with
     | Some n, false ->
-        run_maude_fib ~maude:!maude ~result_only:!result_only ~checked:!checked_run generated n
+        run_maude_fib ~maude:!maude ~result_only:!result_only ~checked:!checked_run
+          ~rewrite_limit:!rewrite_limit generated n
     | None, true ->
         run_maude_main ~maude:!maude ~result_only:!result_only ~checked:!checked_run
-          ?search_expected:!search_expected generated !arg_terms
+          ~rewrite_limit:!rewrite_limit ?search_expected:!search_expected generated !arg_terms
     | None, false -> ()
     | Some _, true -> fail "use either --run or --run-main, not both")
   with
