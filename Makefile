@@ -1,9 +1,9 @@
-.PHONY: help check-tools build translate run-fib run-main validate-invalid test-smoke test-official test-all regression fetch-benchmarks clean
+.PHONY: help check-tools build translate run-fib run-main validate-invalid test-smoke test-official test-all clean
 
 DUNE ?= dune
 SPEC2MAUDE ?= ./spec2maude
 MAUDE_BIN ?= maude
-OUTPUT ?= output_bs.maude
+OUTPUT ?= output.maude
 FIB_N ?= 5
 FILE ?= wat_examples/global-get.wat
 EXPORT ?= main
@@ -17,18 +17,16 @@ help:
 	  '' \
 	  '  make check-tools        Check dune, maude, and optional spec-test tools' \
 	  '  make build              Build OCaml executables and create ./spec2maude' \
-	  '  make translate          Generate output_bs.maude from wasm-3.0/*.spectec' \
+	  '  make translate          Generate output.maude from wasm-3.0/*.spectec' \
 	  '  make run-fib            Run wat_examples/fib.wat with FIB_N=5 by default' \
 	  '  make run-main FILE=...  Run exported/main function from a WAT/Wasm file' \
 	  '  make validate-invalid   Show official validator rejection on invalid-result-type.wat' \
 	  '  make test-smoke         Run local smoke tests' \
 	  '  make test-official      Run official WebAssembly spec tests subset' \
 	  '  make test-all           Run all configured benchmark roots' \
-	  '  make regression         Run the current full C1 regression script' \
-	  '  make fetch-benchmarks   Clone/update external benchmark repositories' \
 	  '' \
 	  'Useful variables:' \
-	  '  MAUDE_BIN=maude OUTPUT=output_bs.maude FIB_N=5 LIMIT=20 TIMEOUT=10'
+	  '  MAUDE_BIN=maude OUTPUT=output.maude FIB_N=5 LIMIT=20 TIMEOUT=10'
 
 check-tools:
 	@command -v $(DUNE) >/dev/null || { echo 'missing dune'; exit 1; }
@@ -37,7 +35,7 @@ check-tools:
 	@echo 'tool check ok'
 
 build:
-	$(DUNE) build ./main_bs.exe ./wasm_to_maude.exe ./spec2maude.exe
+	$(DUNE) build ./main.exe ./wasm_to_maude.exe ./spec2maude.exe
 	install -m 755 _build/default/spec2maude.exe $(SPEC2MAUDE)
 
 translate: build
@@ -61,12 +59,6 @@ test-official: build
 
 test-all: build
 	$(SPEC2MAUDE) test all --limit $(LIMIT) --timeout $(TIMEOUT) $(if $(ARTIFACT_DIR),--artifact-dir $(ARTIFACT_DIR),)
-
-regression:
-	MAUDE_BIN=$(MAUDE_BIN) $(SPEC2MAUDE) regression
-
-fetch-benchmarks:
-	$(SPEC2MAUDE) fetch-benchmarks
 
 clean:
 	$(DUNE) clean

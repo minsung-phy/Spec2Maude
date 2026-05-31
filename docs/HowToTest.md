@@ -1,8 +1,9 @@
 # How To Test Spec2Maude
 
-Updated: 2026-05-29
+Updated: 2026-06-01
 
-Use this document for reproducible local checks.
+Use this document for reproducible local checks after the membership-based
+syntax encoding rewrite.
 
 ## 1. Tool Check
 
@@ -19,90 +20,83 @@ If Maude is not on `PATH`:
 export MAUDE_BIN=/path/to/maude
 ```
 
-## 2. Build
+## 2. Build And Regenerate
 
 ```bash
-make build
+dune build ./main.exe ./wasm_to_maude.exe ./spec2maude.exe
+_build/default/spec2maude.exe translate -o output.maude
 ```
 
-This creates:
+`output.maude` is generated.  Do not hand-edit it; change
+`translator.ml` and regenerate.
+
+## 3. Load Checks
+
+```bash
+maude -no-banner output.maude
+maude -no-banner wasm-exec.maude
+```
+
+Load chain:
 
 ```text
-./spec2maude
+wasm-exec.maude
+  -> wasm-init.maude
+  -> builtins.maude
+  -> output.maude
 ```
 
-## 3. Recommended CLI Checks
+The generated syntax layer should not contain the old JHS type-tag machinery:
+
+```bash
+rg 'SpectecType|SpectecCategory|WasmType' output.maude
+rg 'typecheck|hasType|WellTyped|_hasType_' output.maude
+rg 'SortCTOR' output.maude
+rg 'subsort Nat < U32|subsort Int < IN|subsort Nat < Byte' output.maude
+```
+
+Expected: no matches.
+
+## 4. Recommended CLI Checks
 
 ```bash
 ./spec2maude --help
 ./spec2maude validate wat_examples/fib.wat
 ./spec2maude run wat_examples/fib.wat --fib 5
-./spec2maude run wat_examples/global-get.wat --main
+./spec2maude test smoke --timeout 10
 make validate-invalid
 ```
 
 Expected Fibonacci result:
 
 ```text
-result: CTORCONSTA2(CTORI32A0, 5)
+result: CTORCONSTA2(CTORI32A0, litU32(5))
 ```
 
 `validate` checks the official SpecTec/WebAssembly parser-validator path.  It
 is intentionally not the Maude `Module-ok` path.
 
-## 4. Regenerate The Maude Core
-
-```bash
-./spec2maude translate
-```
-
-Equivalent low-level command:
-
-```bash
-dune exec ./main_bs.exe -- wasm-3.0/*.spectec > output_bs.maude
-```
-
-`output_bs.maude` is generated.  Prefer changing `translator_bs.ml` and
-regenerating instead of hand-editing it.
-
-## 5. Load Maude Harness
-
-```bash
-maude wasm-exec-bs.maude
-```
-
-Expected:
-
-```text
-no Warning
-no Error
-```
-
-Load chain:
-
-```text
-wasm-exec-bs.maude
-  -> wasm-init-bs.maude
-  -> builtins.maude
-  -> output_bs.maude
-```
-
-## 6. Direct Maude Smoke
+## 5. Direct Maude Smoke
 
 Inside Maude:
 
 ```maude
-rew [1] in WASM-FIB-BS :
+rew [1] in WASM-FIB :
   steps(fib-config(i32v(5))) .
 ```
 
 Expected final value:
 
 ```maude
-CTORCONSTA2(CTORI32A0, 5)
+CTORCONSTA2(CTORI32A0, litU32(5))
 ```
 
-## 7. WAT/Wasm Frontend Smokes
+`steps` is the source-shaped reflexive-transitive closure generated from the
+SpecTec `Steps` relation.  The numeric payload is wrapped because object-level
+SpecTec/Wasm numeric literals are represented with explicit literal
+constructors such as `litU32`.
+
+## 6. WAT/Wasm Frontend Smokes
 
 Low-level Fibonacci:
 
@@ -129,7 +123,7 @@ rg 'Module-ok|generated-checked|generated-validation' /tmp/fib.checked.maude
 
 Expected: matches.
 
-## 8. Local Example Suite
+## 7. Local Example Suite
 
 ```bash
 ./spec2maude run wat_examples/global-get.wat --main
@@ -143,15 +137,15 @@ Expected: matches.
 Expected values:
 
 ```text
-global-get    => CTORCONSTA2(CTORI32A0, 42)
-memory-size   => CTORCONSTA2(CTORI32A0, 0)
-table-size    => CTORCONSTA2(CTORI32A0, 3)
-start-global  => CTORCONSTA2(CTORI32A0, 7)
-data-load     => CTORCONSTA2(CTORI32A0, 42)
-elem-call-ref => CTORCONSTA2(CTORI32A0, 9)
+global-get    => CTORCONSTA2(CTORI32A0, litU32(42))
+memory-size   => CTORCONSTA2(CTORI32A0, litU32(0))
+table-size    => CTORCONSTA2(CTORI32A0, litU32(3))
+start-global  => CTORCONSTA2(CTORI32A0, litU32(7))
+data-load     => CTORCONSTA2(CTORI32A0, litU32(42))
+elem-call-ref => CTORCONSTA2(CTORI32A0, litU32(9))
 ```
 
-## 9. Import Examples
+## 8. Import Examples
 
 Function import:
 
@@ -165,7 +159,7 @@ Function import:
 Expected:
 
 ```text
-result: CTORCONSTA2(CTORI32A0, 42)
+result: CTORCONSTA2(CTORI32A0, litU32(42))
 ```
 
 Other imports:
@@ -179,7 +173,15 @@ Other imports:
 ./spec2maude run wat_examples/import-table.wat --export main
 ```
 
-## 10. Invalid Input
+Expected:
+
+```text
+import-global => CTORCONSTA2(CTORI32A0, litU32(77))
+import-memory => CTORCONSTA2(CTORI32A0, litU32(1))
+import-table  => CTORCONSTA2(CTORI32A0, litU32(4))
+```
+
+## 9. Invalid Input
 
 ```bash
 make validate-invalid
@@ -188,21 +190,16 @@ make validate-invalid
 The example declares an `i32` result but returns `i64.const 1`; it should be
 rejected by the frontend validation path before Maude runtime.
 
-## 11. Regression
+## 10. Regression
 
 ```bash
-./spec2maude test smoke
+./spec2maude test smoke --timeout 10
 ./spec2maude test official --limit 20 --timeout 10
-./spec2maude regression
 ```
 
-The full regression writes artifacts under:
+Test runs write artifacts under `artifacts/`.
 
-```text
-artifacts/
-```
-
-## 12. Status Buckets
+## 11. Status Buckets
 
 ```text
 PASS              expected result matched
@@ -216,25 +213,3 @@ STUCK_STEP        runtime steps stuck/timeout
 WRONG_RESULT      execution terminated with wrong value
 WABT_FAIL         wast2json/WABT could not expand an official .wast file
 ```
-
-## 13. Generated-Core Sanity Checks
-
-No old pure-step bridge:
-
-```bash
-rg '^  (rl|crl) \[step-from-step-pure' output_bs.maude
-```
-
-No old value-sequence Boolean guard:
-
-```bash
-rg '\$is-spectec-val-seq|\$is-spectec-val' output_bs.maude
-```
-
-No runtime-terminal subtype for `SpectecType`:
-
-```bash
-rg 'subsort SpectecType < SpectecTerminal|subsort SpectecTypes < SpectecTerminals' output_bs.maude
-```
-
-Expected for all three: no matches.

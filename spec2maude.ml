@@ -6,7 +6,7 @@ let quote = Filename.quote
 
 let show_cmd args = String.concat " " (List.map quote args)
 
-let translator_exe = "_build/default/main_bs.exe"
+let translator_exe = "_build/default/main.exe"
 
 let wasm_frontend_exe = "_build/default/wasm_to_maude.exe"
 
@@ -51,8 +51,6 @@ Usage:
   spec2maude validate INPUT.wat|INPUT.wasm [ARGS...]
   spec2maude maude-validate INPUT.wat|INPUT.wasm [ARGS...]
   spec2maude test smoke|official|all [OPTIONS]
-  spec2maude regression [--maude PATH]
-  spec2maude fetch-benchmarks
 
 Examples:
   spec2maude translate
@@ -83,7 +81,7 @@ let sorted_spectec_files () =
   |> List.map (Filename.concat dir)
 
 let cmd_translate args =
-  let output = ref "output_bs.maude" in
+  let output = ref "output.maude" in
   let files = ref [] in
   let rec loop = function
     | [] -> ()
@@ -236,7 +234,7 @@ let cmd_test args =
   in
   loop args;
   let suite = match !suite with Some s -> s | None -> "smoke" in
-  run ["dune"; "build"; "./main_bs.exe"; "./wasm_to_maude.exe"];
+  run ["dune"; "build"; "./main.exe"; "./wasm_to_maude.exe"];
   let artifact =
     match !artifact_dir with
     | Some path -> path
@@ -277,23 +275,6 @@ let cmd_test args =
   in
   run (base @ suite_args @ limit_args @ size_args)
 
-let cmd_regression args =
-  let rec loop = function
-    | [] -> ()
-    | "--help" :: _ -> usage ()
-    | "--maude" :: path :: rest ->
-        Unix.putenv "MAUDE_BIN" path;
-        loop rest
-    | bad :: _ -> die ("unknown regression argument: " ^ bad)
-  in
-  loop args;
-  run [ "scripts/run_c1_regression.sh" ]
-
-let cmd_fetch_benchmarks args =
-  match args with
-  | [] -> run [ "scripts/fetch_wasm_benchmarks.sh" ]
-  | _ -> die "fetch-benchmarks takes no arguments"
-
 let () =
   match List.tl (Array.to_list Sys.argv) with
   | [] | [ "help" ] | [ "--help" ] | [ "-h" ] -> usage ()
@@ -302,6 +283,4 @@ let () =
   | "validate" :: args -> cmd_validate args
   | "maude-validate" :: args -> cmd_maude_validate args
   | "test" :: args -> cmd_test args
-  | "regression" :: args -> cmd_regression args
-  | "fetch-benchmarks" :: args -> cmd_fetch_benchmarks args
   | cmd :: _ -> die ("unknown command: " ^ cmd)

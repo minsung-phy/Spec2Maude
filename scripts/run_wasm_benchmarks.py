@@ -24,6 +24,19 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+RAW_NUM_CONST_RE = re.compile(r"CTORCONSTA2\(CTOR(I32|I64|F32|F64)A0,\s*([+-]?\d+)\)")
+NUM_CONST_SHAPES = {
+    "I32": ("CTORI32A0", "litU32", 32),
+    "I64": ("CTORI64A0", "litU64", 64),
+    "F32": ("CTORF32A0", "litF32", None),
+    "F64": ("CTORF64A0", "litF64", None),
+}
+WAST_NUM_TYPES = {
+    "i32": "I32",
+    "i64": "I64",
+    "f32": "F32",
+    "f64": "F64",
+}
 
 
 @dataclass
@@ -68,6 +81,39 @@ def run(cmd: list[str], timeout: int) -> tuple[int, str]:
             if isinstance(out, bytes):
                 out = out.decode(errors="replace")
         return 124, out + "\n[TIMEOUT]"
+
+
+def unsigned_payload(value: str, bits: int) -> int:
+    return int(value) % (1 << bits)
+
+
+def wrapped_num_const(typ: str, value: str) -> str:
+    shape = NUM_CONST_SHAPES.get(typ)
+    if shape is None:
+        return value
+    ctor, wrapper, bits = shape
+    payload = unsigned_payload(value, bits) if bits is not None else int(value)
+    return f"CTORCONSTA2({ctor}, {wrapper}({payload}))"
+
+
+def wrapped_numeric_equivalent(term: str) -> str:
+    return RAW_NUM_CONST_RE.sub(
+        lambda match: wrapped_num_const(match.group(1), match.group(2)),
+        term,
+    )
+
+
+def expected_alternatives(expected: str) -> list[str]:
+    """Accept current wrapped expectations plus old raw numeric fixtures."""
+    alternatives: list[str] = []
+    for item in (part.strip() for part in expected.split(" || ")):
+        if not item:
+            continue
+        alternatives.append(item)
+        wrapped = wrapped_numeric_equivalent(item)
+        if wrapped != item:
+            alternatives.append(wrapped)
+    return alternatives
 
 
 def memory_exports_from_wasm(wasm: Path, timeout: int) -> dict[str, tuple[int, int | None]]:
@@ -159,8 +205,7 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
             ]
         ):
             return ("STUCK_STEP", observed, "administrative/runtime term remains")
-        expected_alternatives = [item.strip() for item in expected.split(" || ")]
-        if any(item and item in compact for item in expected_alternatives):
+        if any(item in compact for item in expected_alternatives(expected)):
             return ("PASS", observed, "")
         return ("WRONG_RESULT", observed or compact[-240:], "expected result not found")
     return ("GENERATED", observed, "")
@@ -230,7 +275,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
         (
             "fib",
             ["--unchecked-run", "--result-only", "--run", "5", "wat_examples/fib.wat"],
-            "CTORCONSTA2(CTORI32A0, 5)",
+            "CTORCONSTA2(CTORI32A0, litU32(5))",
         ),
         (
             "fib-wrapper",
@@ -247,37 +292,37 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "1",
                 "wat_examples/fib-wrapper.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, 5)",
+            "CTORCONSTA2(CTORI32A0, litU32(5))",
         ),
         (
             "global-get",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/global-get.wat"],
-            "CTORCONSTA2(CTORI32A0, 42)",
+            "CTORCONSTA2(CTORI32A0, litU32(42))",
         ),
         (
             "memory-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/memory-size.wat"],
-            "CTORCONSTA2(CTORI32A0, 0)",
+            "CTORCONSTA2(CTORI32A0, litU32(0))",
         ),
         (
             "table-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/table-size.wat"],
-            "CTORCONSTA2(CTORI32A0, 3)",
+            "CTORCONSTA2(CTORI32A0, litU32(3))",
         ),
         (
             "start-global",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/start-global.wat"],
-            "CTORCONSTA2(CTORI32A0, 7)",
+            "CTORCONSTA2(CTORI32A0, litU32(7))",
         ),
         (
             "data-load",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/data-load.wat"],
-            "CTORCONSTA2(CTORI32A0, 42)",
+            "CTORCONSTA2(CTORI32A0, litU32(42))",
         ),
         (
             "elem-call-ref",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/elem-call-ref.wat"],
-            "CTORCONSTA2(CTORI32A0, 9)",
+            "CTORCONSTA2(CTORI32A0, litU32(9))",
         ),
         (
             "import-func",
@@ -292,7 +337,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.bump=local.get 0 i32.const 1 i32.add",
                 "wat_examples/import-func.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, 42)",
+            "CTORCONSTA2(CTORI32A0, litU32(42))",
         ),
         (
             "import-global",
@@ -305,17 +350,17 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.g=i32.const 77",
                 "wat_examples/import-global.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, 77)",
+            "CTORCONSTA2(CTORI32A0, litU32(77))",
         ),
         (
             "import-memory",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-memory.wat"],
-            "CTORCONSTA2(CTORI32A0, 1)",
+            "CTORCONSTA2(CTORI32A0, litU32(1))",
         ),
         (
             "import-table",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-table.wat"],
-            "CTORCONSTA2(CTORI32A0, 4)",
+            "CTORCONSTA2(CTORI32A0, litU32(4))",
         ),
     ]
 
@@ -450,7 +495,7 @@ def run_instantiate_stage(maude: str, generated: Path, timeout: int) -> tuple[st
     code, out = generated_maude_command(
         maude,
         generated,
-        "rew [10000] in WASM-FIB-GENERATED-BS : generated-init-config .",
+        "rew [10000] in WASM-FIB-GENERATED : generated-init-config .",
         timeout,
     )
     return classify_instantiate_output(code, out)
@@ -460,7 +505,7 @@ def run_validation_stage(maude: str, generated: Path, timeout: int) -> tuple[str
     code, out = generated_maude_command(
         maude,
         generated,
-        "rew [10000] in WASM-FIB-GENERATED-BS : Module-ok(generated-fib-module, generated-module-type) .",
+        "rew [10000] in WASM-FIB-GENERATED : Module-ok(generated-fib-module, generated-module-type) .",
         timeout,
     )
     return classify_validation_output(code, out)
@@ -627,18 +672,9 @@ def maude_num_alternatives(typ: str, value: str | None) -> list[str] | None:
         return maude_ref_alternatives(typ, value)
     if value is None:
         return None
-    if typ == "i32":
-        n = int(value) % (1 << 32)
-        values = [n, n - (1 << 32), n + (1 << 32)]
-        return [f"CTORCONSTA2(CTORI32A0, {v})" for v in dict.fromkeys(values)]
-    if typ == "i64":
-        n = int(value) % (1 << 64)
-        values = [n, n - (1 << 64), n + (1 << 64)]
-        return [f"CTORCONSTA2(CTORI64A0, {v})" for v in dict.fromkeys(values)]
-    if typ == "f32":
-        return [f"CTORCONSTA2(CTORF32A0, {int(value)})"]
-    if typ == "f64":
-        return [f"CTORCONSTA2(CTORF64A0, {int(value)})"]
+    source_typ = WAST_NUM_TYPES.get(typ)
+    if source_typ is not None:
+        return [wrapped_num_const(source_typ, value)]
     if typ == "v128":
         return [f"CTORVCONSTA2(CTORV128A0, $v128lanes({value}))"]
     return None

@@ -279,6 +279,9 @@ let contains_sub s needle =
   in
   m = 0 || loop 0
 
+let contains_sub_ci s needle =
+  contains_sub (String.lowercase_ascii s) (String.lowercase_ascii needle)
+
 let starts_with s prefix =
   let n = String.length s and m = String.length prefix in
   n >= m && String.sub s 0 m = prefix
@@ -330,6 +333,58 @@ let compact_spaces s =
   let s = String.concat "(" (List.map String.trim (String.split_on_char '(' s)) in
   String.concat ")" (List.map String.trim (String.split_on_char ')' s))
 
+let balanced_term_from text start =
+  let len = String.length text in
+  let rec scan i depth seen_open =
+    if i >= len then String.sub text start (len - start)
+    else
+      match text.[i] with
+      | '(' -> scan (i + 1) (depth + 1) true
+      | ')' ->
+          let depth' = max 0 (depth - 1) in
+          if seen_open && depth' = 0 then String.sub text start (i - start + 1)
+          else scan (i + 1) depth' seen_open
+      | '\n' when not seen_open -> String.sub text start (i - start)
+      | _ -> scan (i + 1) depth seen_open
+  in
+  scan start 0 false
+
+let maude_line_is_fatal line =
+  contains_sub_ci line "unpatchable errors"
+  || (contains_sub_ci line "module " && contains_sub_ci line " is unusable")
+  || contains_sub_ci line "does not exist"
+  || contains_sub_ci line "no parse for"
+  || contains_sub_ci line "parse error"
+
+let maude_output_is_fatal output =
+  contains_sub_ci output "unpatchable errors"
+  || (contains_sub_ci output "module " && contains_sub_ci output " is unusable")
+  || contains_sub_ci output "does not exist"
+  || contains_sub_ci output "no parse for"
+  || contains_sub_ci output "parse error"
+
+let first_n n xs =
+  let rec loop n acc = function
+    | [] -> List.rev acc
+    | _ when n <= 0 -> List.rev acc
+    | x :: rest -> loop (n - 1) (x :: acc) rest
+  in
+  loop n [] xs
+
+let check_maude_output output =
+  if maude_output_is_fatal output then
+    let lines =
+      String.split_on_char '\n' output
+      |> List.filter maude_line_is_fatal
+      |> first_n 12
+    in
+    let excerpt =
+      match lines with
+      | [] -> first_line output
+      | _ -> String.concat "\n" lines
+    in
+    fail ("Maude reported fatal diagnostics:\n" ^ excerpt)
+
 let extract_final_value output =
   let result_config_tail text =
     match last_sub_index text "result Config:" with
@@ -361,12 +416,20 @@ let extract_final_value output =
               |> compact_spaces)
         | None -> Some (compact_spaces body))
   in
-  match result_config_tail output with
-  | Some value when value <> "" -> value
-  | _ ->
-	      let value =
-	        match last_sub_index output "result ValidJudgement: valid" with
-	        | Some _ -> "valid"
+	  match result_config_tail output with
+	  | Some value when value <> "" -> value
+	  | _ ->
+          let compact_output = compact_spaces output in
+          if contains_sub compact_output "result StepsConf: steps("
+             || contains_sub compact_output "StepsConf]: steps("
+          then
+            fail
+              "Maude returned a stuck steps(...) term instead of a final Config; \
+               increase the rewrite limit or inspect the full Maude output."
+          else
+		      let value =
+		        match last_sub_index output "result ValidJudgement: valid" with
+		        | Some _ -> "valid"
 	        | None -> (
 	        match last_sub_index output "result Judgement: valid" with
 	        | Some _ -> "valid"
@@ -386,17 +449,11 @@ let extract_final_value output =
             compact_spaces body
         | None -> (
         match last_sub_index output "CTORCONSTA2(" with
-        | Some start -> (
-            match String.index_from_opt output start ')' with
-            | Some stop -> String.sub output start (stop - start + 1)
-            | None -> String.sub output start (String.length output - start))
+        | Some start -> balanced_term_from output start
         | None -> (
-	            match last_sub_index output "CTORREF" with
-	            | Some start -> (
-	                match String.index_from_opt output start ')' with
-	                | Some stop -> String.sub output start (stop - start + 1)
-	                | None -> String.sub output start (String.length output - start))
-	            | None -> String.trim output)))))
+		            match last_sub_index output "CTORREF" with
+		            | Some start -> balanced_term_from output start
+		            | None -> String.trim output)))))
 	      in
       compact_spaces value
 
@@ -537,23 +594,43 @@ let seq xs =
 let collect_ref_func_indices terms =
   let prefix = "CTORREFFUNCA1(" in
   let plen = String.length prefix in
+  let wrap_prefix = "$wrap-Funcidx(" in
+  let wplen = String.length wrap_prefix in
+  let scan_digits s start =
+    let j = ref start in
+    while
+      !j < String.length s
+      && s.[!j] >= '0'
+      && s.[!j] <= '9'
+    do
+      incr j
+    done;
+    if !j > start then Some (!j, int_of_string (String.sub s start (!j - start)))
+    else None
+  in
   let rec scan_term acc s pos =
     if pos + plen > String.length s then acc
     else if String.sub s pos plen = prefix then
-      let j = ref (pos + plen) in
-      while
-        !j < String.length s
-        && s.[!j] >= '0'
-        && s.[!j] <= '9'
-      do
-        incr j
-      done;
-      let acc =
-        if !j > pos + plen && !j < String.length s && s.[!j] = ')' then
-          int_of_string (String.sub s (pos + plen) (!j - pos - plen)) :: acc
-        else acc
+      let arg_start = pos + plen in
+      let parsed =
+        match scan_digits s arg_start with
+        | Some (j, n) when j < String.length s && s.[j] = ')' -> Some (j, n)
+        | _ when arg_start + wplen <= String.length s
+                 && String.sub s arg_start wplen = wrap_prefix ->
+            let digit_start = arg_start + wplen in
+            (match scan_digits s digit_start with
+             | Some (j, n)
+                 when j + 1 < String.length s && s.[j] = ')' && s.[j + 1] = ')' ->
+                 Some (j + 1, n)
+             | _ -> None)
+        | _ -> None
       in
-      scan_term acc s (max (pos + 1) !j)
+      let acc, next =
+        match parsed with
+        | Some (j, n) -> (n :: acc, j)
+        | None -> (acc, pos + 1)
+      in
+      scan_term acc s (max (pos + 1) next)
     else
       scan_term acc s (pos + 1)
   in
@@ -562,6 +639,9 @@ let collect_ref_func_indices terms =
   |> List.sort_uniq compare
   |> List.map string_of_int
   |> seq
+
+let wrap_source_category sort payload =
+  "$wrap-" ^ sort ^ "(" ^ payload ^ ")"
 
 let rec valtype = function
   | "i32" -> "CTORI32A0"
@@ -584,7 +664,7 @@ and heaptype = function
         i = n || (t.[i] >= '0' && t.[i] <= '9' && loop (i + 1))
       in
       loop 0 ->
-      "CTORWIDXA1(" ^ t ^ ")"
+      "CTORWIDXA1(" ^ wrap_source_category "Typeidx" t ^ ")"
   | "func" | "funcref" -> "CTORFUNCA0"
   | "extern" | "externref" -> "CTOREXTERNA0"
   | "any" | "anyref" -> "CTORANYA0"
@@ -606,7 +686,7 @@ and reftype = function
 let rec heaptype_of_sexpr = function
   | Atom t -> heaptype t
   | List [ Atom "type"; x ] ->
-      "CTORWIDXA1(" ^ atom x ^ ")"
+      "CTORWIDXA1(" ^ wrap_source_category "Typeidx" (atom x) ^ ")"
   | x -> fail ("unsupported heap type expression: " ^ atom_or_shape x)
 
 and reftype_of_sexpr = function
@@ -628,8 +708,10 @@ and atom_or_shape = function
   | List [] -> "()"
 
 let limits_term min max_opt =
-  "CTORLBRACKDOTDOTRBRACKA2(" ^ string_of_int min ^ ", "
-  ^ (match max_opt with Some max -> string_of_int max | None -> "eps")
+  "CTORLBRACKDOTDOTRBRACKA2(" ^ wrap_source_category "U64" (string_of_int min) ^ ", "
+  ^ (match max_opt with
+     | Some max -> wrap_source_category "U64" (string_of_int max)
+     | None -> "eps")
   ^ ")"
 
 let memtype_term ?(addrtype = "CTORI32A0") min max_opt =
@@ -719,6 +801,55 @@ let is_int_literal s =
     || (s.[i] >= '0' && s.[i] <= '9' && loop (i + 1))
   in
   n > 0 && start < n && loop start
+
+let decimal_double s =
+  let carry = ref 0 in
+  let b = Buffer.create (String.length s + 1) in
+  for i = String.length s - 1 downto 0 do
+    let n = ((Char.code s.[i] - Char.code '0') * 2) + !carry in
+    Buffer.add_char b (Char.chr (Char.code '0' + (n mod 10)));
+    carry := n / 10
+  done;
+  if !carry > 0 then Buffer.add_char b (Char.chr (Char.code '0' + !carry));
+  let rev = Buffer.contents b in
+  String.init (String.length rev) (fun i -> rev.[String.length rev - 1 - i])
+
+let decimal_pow2 bits =
+  let rec loop i acc =
+    if i <= 0 then acc else loop (i - 1) (decimal_double acc)
+  in
+  loop bits "1"
+
+let decimal_sub a b =
+  let ai = ref (String.length a - 1) in
+  let bi = ref (String.length b - 1) in
+  let borrow = ref 0 in
+  let out = Buffer.create (String.length a) in
+  while !ai >= 0 do
+    let av = Char.code a.[!ai] - Char.code '0' - !borrow in
+    let bv = if !bi >= 0 then Char.code b.[!bi] - Char.code '0' else 0 in
+    let digit, borrow' =
+      if av < bv then (av + 10 - bv, 1) else (av - bv, 0)
+    in
+    Buffer.add_char out (Char.chr (Char.code '0' + digit));
+    borrow := borrow';
+    decr ai;
+    decr bi
+  done;
+  let rev = Buffer.contents out in
+  let raw = String.init (String.length rev) (fun i -> rev.[String.length rev - 1 - i]) in
+  let rec first_non_zero i =
+    if i >= String.length raw - 1 then i
+    else if raw.[i] = '0' then first_non_zero (i + 1)
+    else i
+  in
+  String.sub raw (first_non_zero 0) (String.length raw - first_non_zero 0)
+
+let unsigned_payload bits s =
+  let s = String.trim s in
+  if String.length s > 0 && s.[0] = '-' then
+    decimal_sub (decimal_pow2 bits) (String.sub s 1 (String.length s - 1))
+  else s
 
 let resolve_index kind names x =
   let s = atom x in
@@ -810,17 +941,22 @@ let parse_blocktype env fields =
     fields;
   match !rest with
   | List [ Atom "type"; x ] :: instrs ->
-      ("CTORWIDXA1(" ^ string_of_int (resolve_index "type" env.type_names x) ^ ")", instrs)
+      ("CTORWIDXA1("
+      ^ wrap_source_category "Typeidx"
+          (string_of_int (resolve_index "type" env.type_names x))
+      ^ ")", instrs)
   | instrs ->
       if !params <> [] || List.length !results > 1 then
         let idx = env.fresh_type { params = !params; results = !results } in
-        ("CTORWIDXA1(" ^ string_of_int idx ^ ")", instrs)
+        ("CTORWIDXA1(" ^ wrap_source_category "Typeidx" (string_of_int idx) ^ ")", instrs)
       else ("CTORWRESULTA1(" ^ seq !results ^ ")", instrs)
 
-let memarg0 = "$memarg0"
-
-let memarg_term offset =
-  if offset = "0" then memarg0 else "RECMemargA2(0, " ^ offset ^ ")"
+let memarg_term ?(align = "0") offset =
+  "RECMemargA2("
+  ^ wrap_source_category "U32" align
+  ^ ", "
+  ^ wrap_source_category "U64" offset
+  ^ ")"
 
 let numtype_of_prefix = function
   | "i32" -> "CTORI32A0"
@@ -849,6 +985,19 @@ let simple_float_literal width s =
       else Int64.to_string (Int64.bits_of_float f)
     with Failure _ ->
       fail ("unsupported non-integer f" ^ string_of_int width ^ " literal: " ^ s)
+
+let wrapped_num_payload = function
+  | ("i32" | "i64" | "f32" | "f64" as ty), payload ->
+      "$wrap-lit(" ^ numtype_of_prefix ty ^ ", " ^ payload ^ ")"
+  | ty, _ -> fail ("unsupported numeric literal wrapper type: " ^ ty)
+
+let num_const_term ty payload =
+  "CTORCONSTA2(" ^ numtype_of_prefix ty ^ ", " ^ wrapped_num_payload (ty, payload) ^ ")"
+
+let i32_const payload = num_const_term "i32" (unsigned_payload 32 payload)
+let i64_const payload = num_const_term "i64" (unsigned_payload 64 payload)
+let f32_const payload = num_const_term "f32" payload
+let f64_const payload = num_const_term "f64" payload
 
 let int_binop = function
   | "add" -> "CTORADDA0"
@@ -1348,19 +1497,23 @@ let is_known_opcode = function
       | _ -> starts_with op "i32." || starts_with op "i64." || starts_with op "f32." || starts_with op "f64."
 
 let parse_memory_operands env rest =
-  let rec loop memidx offset = function
+  let rec loop memidx align offset = function
     | Atom a :: xs when not (is_known_opcode a) && is_int_literal a ->
-        loop (string_of_int (resolve_index "memory" env.memory_names (Atom a))) offset xs
+        loop
+          (wrap_source_category "Memidx"
+             (string_of_int (resolve_index "memory" env.memory_names (Atom a))))
+          align offset xs
     | Atom a :: xs when starts_with a "offset=" ->
       let value = String.sub a 7 (String.length a - 7) in
         ignore (int_arg (Atom value));
-        loop memidx value xs
+        loop memidx align value xs
     | Atom a :: xs when starts_with a "align=" ->
-        (* Alignment is validation-only for the current execution harness. *)
-        loop memidx offset xs
-    | xs -> (memidx, memarg_term offset, xs)
+        let value = String.sub a 6 (String.length a - 6) in
+        ignore (int_arg (Atom value));
+        loop memidx value offset xs
+    | xs -> (memidx, memarg_term ~align offset, xs)
   in
-  loop "0" "0" rest
+  loop (wrap_source_category "Memidx" "0") "0" "0" rest
 
 let parse_load_store_instr env head rest =
   let memidx, memarg, rest = parse_memory_operands env rest in
@@ -1428,14 +1581,17 @@ let parse_vector_memory_instr env head rest =
     | _ -> None
   in
   if contains_sub head "_lane" then
-    let rec loop offset ints = function
+    let rec loop align offset ints = function
       | Atom a :: xs when starts_with a "offset=" ->
           let value = String.sub a 7 (String.length a - 7) in
           ignore (int_arg (Atom value));
-          loop value ints xs
-      | Atom a :: xs when starts_with a "align=" -> loop offset ints xs
+          loop align value ints xs
+      | Atom a :: xs when starts_with a "align=" ->
+          let value = String.sub a 6 (String.length a - 6) in
+          ignore (int_arg (Atom value));
+          loop value offset ints xs
       | Atom a :: xs when is_int_literal a && not (is_known_opcode a) ->
-          loop offset (ints @ [ a ]) xs
+          loop align offset (ints @ [ a ]) xs
       | xs ->
           let memidx, lane =
             match ints with
@@ -1443,7 +1599,7 @@ let parse_vector_memory_instr env head rest =
             | [ memidx; lane ] -> (memidx, lane)
             | _ -> fail ("missing lane immediate for " ^ head)
           in
-          let memarg = memarg_term offset in
+          let memarg = memarg_term ~align offset in
           let n = string_of_int (lane_size head) in
           let ctor =
             if starts_with head "v128.load" then
@@ -1455,7 +1611,7 @@ let parse_vector_memory_instr env head rest =
           in
           (ctor, xs)
     in
-    loop "0" [] rest
+    loop "0" "0" [] rest
   else
     let memidx, memarg, rest = parse_memory_operands env rest in
     let term =
@@ -1506,11 +1662,14 @@ let collect_shuffle_lanes rest =
 let shuffle_term lanes = "CTORVSHUFFLEA2(CTORXA2(CTORI8A0, 16), " ^ seq lanes ^ ")"
 
 let resolve_label env = function
-  | Atom id when is_id id -> string_of_int (resolve_index "label" env.label_names (Atom id))
-  | x -> int_arg x
+  | Atom id when is_id id ->
+      wrap_source_category "Labelidx"
+        (string_of_int (resolve_index "label" env.label_names (Atom id)))
+  | x -> wrap_source_category "Labelidx" (int_arg x)
 
 let resolve_tag env x =
-  string_of_int (resolve_index "tag" env.tag_names x)
+  wrap_source_category "Tagidx"
+    (string_of_int (resolve_index "tag" env.tag_names x))
 
 let parse_br_table env labels =
   let labels = List.map (resolve_label env) labels in
@@ -1545,14 +1704,18 @@ let is_catch_clause = function
   | _ -> false
 
 let resolve_mem env = function
-  | None -> "0"
-  | Some x -> string_of_int (resolve_index "memory" env.memory_names x)
+  | None -> wrap_source_category "Memidx" "0"
+  | Some x ->
+      wrap_source_category "Memidx"
+        (string_of_int (resolve_index "memory" env.memory_names x))
 
 let resolve_table env x =
-  string_of_int (resolve_index "table" env.table_names x)
+  wrap_source_category "Tableidx"
+    (string_of_int (resolve_index "table" env.table_names x))
 
 let resolve_global env x =
-  string_of_int (resolve_index "global" env.global_names x)
+  wrap_source_category "Globalidx"
+    (string_of_int (resolve_index "global" env.global_names x))
 
 let rec parse_instr env = function
   | List (Atom "block" :: body) ->
@@ -1582,8 +1745,8 @@ let rec parse_instr env = function
       "CTORTRYTABLEA3(" ^ bt ^ ", " ^ seq (List.map (parse_catch_clause env) catches)
       ^ ", " ^ seq (parse_instr_list body_env instrs) ^ ")"
   | List [ Atom "call_indirect"; List [ Atom "type"; x ] ] ->
-      "CTORCALLINDIRECTA2(0, CTORWIDXA1("
-      ^ string_of_int (resolve_index "type" env.type_names x)
+      "CTORCALLINDIRECTA2(" ^ wrap_source_category "Tableidx" "0" ^ ", CTORWIDXA1("
+      ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))"
   | List (Atom "return_call" :: target :: operands) ->
       seq (parse_instr_list env operands @ [ parse_flat_instr env "return_call" (Some target) ])
@@ -1634,8 +1797,18 @@ let rec parse_instr env = function
   | _ -> fail "empty folded instruction"
 
 and parse_flat_instr env head imm =
-  let local x = string_of_int (resolve_index "local" env.local_names x) in
-  let func x = string_of_int (resolve_index "func" env.func_names x) in
+  let local x =
+    wrap_source_category "Localidx"
+      (string_of_int (resolve_index "local" env.local_names x))
+  in
+  let func x =
+    wrap_source_category "Funcidx"
+      (string_of_int (resolve_index "func" env.func_names x))
+  in
+  let typeidx x =
+    wrap_source_category "Typeidx"
+      (string_of_int (resolve_index "type" env.type_names x))
+  in
   match (head, imm) with
   | "local.get", Some x -> "CTORLOCALGETA1(" ^ local x ^ ")"
   | "local.set", Some x -> "CTORLOCALSETA1(" ^ local x ^ ")"
@@ -1645,13 +1818,13 @@ and parse_flat_instr env head imm =
   | "table.get", Some x -> "CTORTABLEGETA1(" ^ resolve_table env x ^ ")"
   | "table.set", Some x -> "CTORTABLESETA1(" ^ resolve_table env x ^ ")"
   | "table.size", Some x -> "CTORTABLESIZEA1(" ^ resolve_table env x ^ ")"
-  | "table.size", None -> "CTORTABLESIZEA1(0)"
+  | "table.size", None -> "CTORTABLESIZEA1(" ^ wrap_source_category "Tableidx" "0" ^ ")"
   | "memory.size", Some x -> "CTORMEMORYSIZEA1(" ^ resolve_mem env (Some x) ^ ")"
   | "memory.grow", Some x -> "CTORMEMORYGROWA1(" ^ resolve_mem env (Some x) ^ ")"
-  | "i32.const", Some x -> "CTORCONSTA2(CTORI32A0, " ^ int_arg x ^ ")"
-  | "i64.const", Some x -> "CTORCONSTA2(CTORI64A0, " ^ int_arg x ^ ")"
-  | "f32.const", Some x -> "CTORCONSTA2(CTORF32A0, " ^ simple_float_literal 32 (atom x) ^ ")"
-  | "f64.const", Some x -> "CTORCONSTA2(CTORF64A0, " ^ simple_float_literal 64 (atom x) ^ ")"
+  | "i32.const", Some x -> i32_const (int_arg x)
+  | "i64.const", Some x -> i64_const (int_arg x)
+  | "f32.const", Some x -> f32_const (simple_float_literal 32 (atom x))
+  | "f64.const", Some x -> f64_const (simple_float_literal 64 (atom x))
   | "br", Some x -> "CTORBRA1(" ^ resolve_label env x ^ ")"
   | "br_if", Some x -> "CTORBRIFA1(" ^ resolve_label env x ^ ")"
   | "br_on_null", Some x -> "CTORBRONNULLA1(" ^ resolve_label env x ^ ")"
@@ -1659,16 +1832,16 @@ and parse_flat_instr env head imm =
   | "call", Some x -> "CTORCALLA1(" ^ func x ^ ")"
   | "return_call", Some x -> "CTORRETURNCALLA1(" ^ func x ^ ")"
   | "call_ref", Some (List [ Atom "type"; x ]) ->
-      "CTORCALLREFA1(CTORWIDXA1(" ^ string_of_int (resolve_index "type" env.type_names x) ^ "))"
+      "CTORCALLREFA1(CTORWIDXA1(" ^ typeidx x ^ "))"
   | "call_ref", Some x ->
-      "CTORCALLREFA1(CTORWIDXA1(" ^ string_of_int (resolve_index "type" env.type_names x) ^ "))"
+      "CTORCALLREFA1(CTORWIDXA1(" ^ typeidx x ^ "))"
   | "return_call_ref", Some (List [ Atom "type"; x ]) ->
       "CTORRETURNCALLREFA1(CTORWIDXA1("
-      ^ string_of_int (resolve_index "type" env.type_names x)
+      ^ typeidx x
       ^ "))"
   | "return_call_ref", Some x ->
       "CTORRETURNCALLREFA1(CTORWIDXA1("
-      ^ string_of_int (resolve_index "type" env.type_names x)
+      ^ typeidx x
       ^ "))"
   | "ref.null", Some x -> "CTORREFNULLA1(" ^ heaptype (atom x) ^ ")"
   | "ref.func", Some x -> "CTORREFFUNCA1(" ^ func x ^ ")"
@@ -1709,8 +1882,8 @@ and parse_flat_instr env head imm =
             with Error _ ->
               "CTORUNOPA2(" ^ numtype_of_prefix ty ^ ", " ^ float_unop op ^ ")"))
       | _ -> fail ("unsupported instruction form: " ^ head))
-  | "memory.size", None -> "CTORMEMORYSIZEA1(0)"
-  | "memory.grow", None -> "CTORMEMORYGROWA1(0)"
+  | "memory.size", None -> "CTORMEMORYSIZEA1(" ^ wrap_source_category "Memidx" "0" ^ ")"
+  | "memory.grow", None -> "CTORMEMORYGROWA1(" ^ wrap_source_category "Memidx" "0" ^ ")"
   | "select", None -> "CTORSELECTA1(eps)"
   | "drop", None -> "CTORDROPA0"
   | "return", None -> "CTORRETURNA0"
@@ -1736,73 +1909,88 @@ and parse_instr_list env items =
   | Atom "end" :: _ -> fail "unexpected end"
   | List _ as x :: rest -> parse_instr env x :: parse_instr_list env rest
   | Atom "call_indirect" :: List [ Atom "type"; x ] :: rest ->
-      ("CTORCALLINDIRECTA2(0, CTORWIDXA1("
-      ^ string_of_int (resolve_index "type" env.type_names x)
+      ("CTORCALLINDIRECTA2(" ^ wrap_source_category "Tableidx" "0" ^ ", CTORWIDXA1("
+      ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "return_call_indirect" :: List [ Atom "type"; x ] :: rest ->
-      ("CTORRETURNCALLINDIRECTA2(0, CTORWIDXA1("
-      ^ string_of_int (resolve_index "type" env.type_names x)
+      ("CTORRETURNCALLINDIRECTA2(" ^ wrap_source_category "Tableidx" "0" ^ ", CTORWIDXA1("
+      ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "call_indirect" :: Atom tableidx :: List [ Atom "type"; x ] :: rest
     when not (is_known_opcode tableidx) ->
       ("CTORCALLINDIRECTA2("
-      ^ string_of_int (resolve_index "table" env.table_names (Atom tableidx))
+      ^ wrap_source_category "Tableidx"
+          (string_of_int (resolve_index "table" env.table_names (Atom tableidx)))
       ^ ", CTORWIDXA1("
-      ^ string_of_int (resolve_index "type" env.type_names x)
+      ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "return_call_indirect" :: Atom tableidx :: List [ Atom "type"; x ] :: rest
     when not (is_known_opcode tableidx) ->
       ("CTORRETURNCALLINDIRECTA2("
-      ^ string_of_int (resolve_index "table" env.table_names (Atom tableidx))
+      ^ wrap_source_category "Tableidx"
+          (string_of_int (resolve_index "table" env.table_names (Atom tableidx)))
       ^ ", CTORWIDXA1("
-      ^ string_of_int (resolve_index "type" env.type_names x)
+      ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "table.init" :: Atom tableidx :: Atom elemidx :: rest
     when (not (is_known_opcode tableidx)) && not (is_known_opcode elemidx) ->
-      ("CTORTABLEINITA2(" ^ int_arg (Atom tableidx) ^ ", " ^ int_arg (Atom elemidx) ^ ")")
+      ("CTORTABLEINITA2(" ^ wrap_source_category "Tableidx" (int_arg (Atom tableidx))
+      ^ ", " ^ wrap_source_category "Elemidx" (int_arg (Atom elemidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "table.init" :: Atom elemidx :: rest when not (is_known_opcode elemidx) ->
-      ("CTORTABLEINITA2(0, " ^ int_arg (Atom elemidx) ^ ")")
+      ("CTORTABLEINITA2(" ^ wrap_source_category "Tableidx" "0"
+      ^ ", " ^ wrap_source_category "Elemidx" (int_arg (Atom elemidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "table.copy" :: Atom dst :: Atom src :: rest
     when (not (is_known_opcode dst)) && not (is_known_opcode src) ->
-      ("CTORTABLECOPYA2(" ^ int_arg (Atom dst) ^ ", " ^ int_arg (Atom src) ^ ")")
+      ("CTORTABLECOPYA2(" ^ wrap_source_category "Tableidx" (int_arg (Atom dst))
+      ^ ", " ^ wrap_source_category "Tableidx" (int_arg (Atom src)) ^ ")")
       :: parse_instr_list env rest
   | Atom "table.copy" :: rest ->
-      "CTORTABLECOPYA2(0, 0)" :: parse_instr_list env rest
+      ("CTORTABLECOPYA2(" ^ wrap_source_category "Tableidx" "0"
+      ^ ", " ^ wrap_source_category "Tableidx" "0" ^ ")")
+      :: parse_instr_list env rest
   | Atom (("table.grow" | "table.fill") as head) :: Atom tableidx :: rest
     when not (is_known_opcode tableidx) ->
       let ctor = if head = "table.grow" then "CTORTABLEGROWA1" else "CTORTABLEFILLA1" in
       (ctor ^ "(" ^ resolve_table env (Atom tableidx) ^ ")") :: parse_instr_list env rest
   | Atom (("table.grow" | "table.fill") as head) :: rest ->
       let ctor = if head = "table.grow" then "CTORTABLEGROWA1" else "CTORTABLEFILLA1" in
-      (ctor ^ "(0)") :: parse_instr_list env rest
+      (ctor ^ "(" ^ wrap_source_category "Tableidx" "0" ^ ")") :: parse_instr_list env rest
   | Atom "elem.drop" :: Atom elemidx :: rest when not (is_known_opcode elemidx) ->
-      ("CTORELEMDROPA1(" ^ int_arg (Atom elemidx) ^ ")") :: parse_instr_list env rest
+      ("CTORELEMDROPA1(" ^ wrap_source_category "Elemidx" (int_arg (Atom elemidx)) ^ ")")
+      :: parse_instr_list env rest
   | Atom "data.drop" :: Atom dataidx :: rest when not (is_known_opcode dataidx) ->
-      ("CTORDATADROPA1(" ^ int_arg (Atom dataidx) ^ ")") :: parse_instr_list env rest
+      ("CTORDATADROPA1(" ^ wrap_source_category "Dataidx" (int_arg (Atom dataidx)) ^ ")")
+      :: parse_instr_list env rest
   | Atom "memory.init" :: Atom dataidx :: Atom memidx :: rest
     when (not (is_known_opcode dataidx)) && not (is_known_opcode memidx) ->
       ("CTORMEMORYINITA2(" ^ resolve_mem env (Some (Atom memidx)) ^ ", "
-      ^ int_arg (Atom dataidx) ^ ")")
+      ^ wrap_source_category "Dataidx" (int_arg (Atom dataidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.init" :: Atom dataidx :: rest when not (is_known_opcode dataidx) ->
-      ("CTORMEMORYINITA2(0, " ^ int_arg (Atom dataidx) ^ ")") :: parse_instr_list env rest
+      ("CTORMEMORYINITA2(" ^ wrap_source_category "Memidx" "0"
+      ^ ", " ^ wrap_source_category "Dataidx" (int_arg (Atom dataidx)) ^ ")")
+      :: parse_instr_list env rest
   | Atom "memory.copy" :: Atom dst :: Atom src :: rest
     when (not (is_known_opcode dst)) && not (is_known_opcode src) ->
       ("CTORMEMORYCOPYA2(" ^ resolve_mem env (Some (Atom dst)) ^ ", "
       ^ resolve_mem env (Some (Atom src)) ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.copy" :: rest ->
-      "CTORMEMORYCOPYA2(0, 0)" :: parse_instr_list env rest
+      ("CTORMEMORYCOPYA2(" ^ wrap_source_category "Memidx" "0"
+      ^ ", " ^ wrap_source_category "Memidx" "0" ^ ")")
+      :: parse_instr_list env rest
   | Atom "memory.fill" :: Atom memidx :: rest when not (is_known_opcode memidx) ->
       ("CTORMEMORYFILLA1(" ^ resolve_mem env (Some (Atom memidx)) ^ ")")
       :: parse_instr_list env rest
-  | Atom "memory.fill" :: rest -> "CTORMEMORYFILLA1(0)" :: parse_instr_list env rest
+  | Atom "memory.fill" :: rest ->
+      ("CTORMEMORYFILLA1(" ^ wrap_source_category "Memidx" "0" ^ ")")
+      :: parse_instr_list env rest
   | Atom (("memory.size" | "memory.grow") as head) :: Atom x :: rest
     when not (is_known_opcode x) ->
       parse_flat_instr env head (Some (Atom x)) :: parse_instr_list env rest
@@ -2002,7 +2190,8 @@ let parse_tag_fields type_names types_ref fields =
   let id, fields = split_leading_id fields in
   let inline_exports, fields = split_inline_exports fields in
   let typeidx = parse_typeuse type_names types_ref fields in
-  (id, inline_exports, "CTORWIDXA1(" ^ string_of_int typeidx ^ ")")
+  (id, inline_exports,
+   "CTORWIDXA1(" ^ wrap_source_category "Typeidx" (string_of_int typeidx) ^ ")")
 
 let parse_import type_names types_ref func_index tag_index global_index memory_index table_index =
   function
@@ -2265,7 +2454,7 @@ let parse_data memory_names table_names global_names func_names tag_names type_n
         | (List (Atom ("i32.const" | "i64.const" | "global.get") :: _) as expr) :: rest ->
             mode :=
               Some
-                ("CTORACTIVEA2(" ^ string_of_int !memidx ^ ", "
+                ("CTORACTIVEA2(" ^ wrap_source_category "Memidx" (string_of_int !memidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -2289,10 +2478,16 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
       let rec elem_item = function
         | List [ Atom "item"; item ] -> elem_item item
         | List [ Atom "ref.func"; x ] ->
-            "CTORREFFUNCA1(" ^ string_of_int (resolve_index "func" func_names x) ^ ")"
+            "CTORREFFUNCA1("
+            ^ wrap_source_category "Funcidx"
+                (string_of_int (resolve_index "func" func_names x))
+            ^ ")"
         | List [ Atom "ref.null"; Atom ht ] -> "CTORREFNULLA1(" ^ heaptype ht ^ ")"
         | Atom x when is_id x || is_int_literal x ->
-            "CTORREFFUNCA1(" ^ string_of_int (resolve_index "func" func_names (Atom x)) ^ ")"
+            "CTORREFFUNCA1("
+            ^ wrap_source_category "Funcidx"
+                (string_of_int (resolve_index "func" func_names (Atom x)))
+            ^ ")"
         | x -> fail ("unsupported elem item: " ^ atom_or_shape x)
       in
       let rec loop = function
@@ -2315,7 +2510,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             mode :=
               Some
-                ("CTORACTIVEA2(" ^ string_of_int !tableidx ^ ", "
+                ("CTORACTIVEA2(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -2323,7 +2518,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             mode :=
               Some
-                ("CTORACTIVEA2(" ^ string_of_int !tableidx ^ ", "
+                ("CTORACTIVEA2(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -2331,7 +2526,10 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             exprs :=
               !exprs
-              @ [ "CTORREFFUNCA1(" ^ string_of_int (resolve_index "func" func_names x) ^ ")" ];
+              @ [ "CTORREFFUNCA1("
+                  ^ wrap_source_category "Funcidx"
+                      (string_of_int (resolve_index "func" func_names x))
+                  ^ ")" ];
             loop rest
         | List [ Atom "item"; item ] :: rest ->
             saw_segment_body := true;
@@ -2496,10 +2694,10 @@ let maude_arg_term typ value =
     | t -> fail ("unsupported reference arg type: " ^ t)
   in
   match typ with
-  | "i32" -> "CTORCONSTA2(CTORI32A0, " ^ value ^ ")"
-  | "i64" -> "CTORCONSTA2(CTORI64A0, " ^ value ^ ")"
-  | "f32" -> "CTORCONSTA2(CTORF32A0, " ^ simple_float_literal 32 value ^ ")"
-  | "f64" -> "CTORCONSTA2(CTORF64A0, " ^ simple_float_literal 64 value ^ ")"
+  | "i32" -> i32_const value
+  | "i64" -> i64_const value
+  | "f32" -> f32_const (simple_float_literal 32 value)
+  | "f64" -> f64_const (simple_float_literal 64 value)
   | "v128" ->
       let lanes =
         value
@@ -2827,7 +3025,8 @@ module Official = struct
   let vectype = function T.V128T -> "CTORV128A0"
 
   let typeuse = function
-    | T.Idx x -> "CTORWIDXA1(" ^ string_of_int (Int32.to_int x) ^ ")"
+    | T.Idx x ->
+        "CTORWIDXA1(" ^ wrap_source_category "Typeidx" (string_of_int (Int32.to_int x)) ^ ")"
     | T.Rec x -> "CTORRECA1(" ^ Int32.to_string x ^ ")"
     | T.Def _ -> fail "unsupported resolved deftype in source type use"
 
@@ -2906,7 +3105,8 @@ module Official = struct
   let tagtype = function T.TagT tu -> typeuse tu
 
   let blocktype = function
-    | A.VarBlockType x -> "CTORWIDXA1(" ^ string_of_int (i32_index x) ^ ")"
+    | A.VarBlockType x ->
+        "CTORWIDXA1(" ^ wrap_source_category "Typeidx" (string_of_int (i32_index x)) ^ ")"
     | A.ValBlockType None -> "CTORWRESULTA1(eps)"
     | A.ValBlockType (Some t) -> "CTORWRESULTA1(" ^ valtype t ^ ")"
 
@@ -2914,10 +3114,10 @@ module Official = struct
     memarg_term (Int64.to_string offset)
 
   let num_const = function
-    | V.I32 i -> "CTORCONSTA2(CTORI32A0, " ^ Wasm.I32.to_string_s i ^ ")"
-    | V.I64 i -> "CTORCONSTA2(CTORI64A0, " ^ Wasm.I64.to_string_s i ^ ")"
-    | V.F32 f -> "CTORCONSTA2(CTORF32A0, " ^ Int32.to_string (Wasm.F32.to_bits f) ^ ")"
-    | V.F64 f -> "CTORCONSTA2(CTORF64A0, " ^ Int64.to_string (Wasm.F64.to_bits f) ^ ")"
+    | V.I32 i -> i32_const (Wasm.I32.to_string_s i)
+    | V.I64 i -> i64_const (Wasm.I64.to_string_s i)
+    | V.F32 f -> f32_const (Int32.to_string (Wasm.F32.to_bits f))
+    | V.F64 f -> f64_const (Int64.to_string (Wasm.F64.to_bits f))
 
   let int_unop = function
     | A.IntOp.Clz -> "CTORCLZA0"
@@ -3046,13 +3246,25 @@ module Official = struct
 	    | Some sz -> string_of_int (pack_bits sz)
 
 	  let idx x = string_of_int (i32_index x)
+    let idx_as sort x = wrap_source_category sort (idx x)
+    let typeidx x = idx_as "Typeidx" x
+    let funcidx x = idx_as "Funcidx" x
+    let labelidx x = idx_as "Labelidx" x
+    let localidx x = idx_as "Localidx" x
+    let globalidx x = idx_as "Globalidx" x
+    let tableidx x = idx_as "Tableidx" x
+    let memidx x = idx_as "Memidx" x
+    let tagidx x = idx_as "Tagidx" x
+    let elemidx x = idx_as "Elemidx" x
+    let dataidx x = idx_as "Dataidx" x
+    let field_u32 x = wrap_source_category "U32" (Int32.to_string x)
 
 	  let catch c =
 	    match it c with
-	    | A.Catch (tag, label) -> "CTORCATCHA2(" ^ idx tag ^ ", " ^ idx label ^ ")"
-	    | A.CatchRef (tag, label) -> "CTORCATCHREFA2(" ^ idx tag ^ ", " ^ idx label ^ ")"
-	    | A.CatchAll label -> "CTORCATCHALLA1(" ^ idx label ^ ")"
-	    | A.CatchAllRef label -> "CTORCATCHALLREFA1(" ^ idx label ^ ")"
+	    | A.Catch (tag, label) -> "CTORCATCHA2(" ^ tagidx tag ^ ", " ^ labelidx label ^ ")"
+	    | A.CatchRef (tag, label) -> "CTORCATCHREFA2(" ^ tagidx tag ^ ", " ^ labelidx label ^ ")"
+	    | A.CatchAll label -> "CTORCATCHALLA1(" ^ labelidx label ^ ")"
+	    | A.CatchAllRef label -> "CTORCATCHALLREFA1(" ^ labelidx label ^ ")"
 
 	  let initop explicit default x =
 	    match x with A.Explicit -> explicit | A.Implicit -> default
@@ -3080,62 +3292,62 @@ module Official = struct
     | A.Loop (bt, es) -> "CTORLOOPA2(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
     | A.If (bt, es1, es2) ->
         "CTORWIFELSEA3(" ^ blocktype bt ^ ", " ^ instrs es1 ^ ", " ^ instrs es2 ^ ")"
-	    | A.Br x -> "CTORBRA1(" ^ idx x ^ ")"
-	    | A.BrIf x -> "CTORBRIFA1(" ^ idx x ^ ")"
+	    | A.Br x -> "CTORBRA1(" ^ labelidx x ^ ")"
+	    | A.BrIf x -> "CTORBRIFA1(" ^ labelidx x ^ ")"
 	    | A.BrTable (xs, x) ->
-	        "CTORBRTABLEA2(" ^ seq (List.map idx xs) ^ ", " ^ idx x ^ ")"
-	    | A.BrOnNull x -> "CTORBRONNULLA1(" ^ idx x ^ ")"
-	    | A.BrOnNonNull x -> "CTORBRONNONNULLA1(" ^ idx x ^ ")"
+	        "CTORBRTABLEA2(" ^ seq (List.map labelidx xs) ^ ", " ^ labelidx x ^ ")"
+	    | A.BrOnNull x -> "CTORBRONNULLA1(" ^ labelidx x ^ ")"
+	    | A.BrOnNonNull x -> "CTORBRONNONNULLA1(" ^ labelidx x ^ ")"
 	    | A.BrOnCast (x, rt1, rt2) ->
-	        "CTORBRONCASTA3(" ^ idx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2 ^ ")"
+	        "CTORBRONCASTA3(" ^ labelidx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2 ^ ")"
 	    | A.BrOnCastFail (x, rt1, rt2) ->
-	        "CTORBRONCASTFAILA3(" ^ idx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2
+	        "CTORBRONCASTFAILA3(" ^ labelidx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2
 	        ^ ")"
 	    | A.Return -> "CTORRETURNA0"
-	    | A.Call x -> "CTORCALLA1(" ^ idx x ^ ")"
-	    | A.CallRef x -> "CTORCALLREFA1(CTORWIDXA1(" ^ idx x ^ "))"
+	    | A.Call x -> "CTORCALLA1(" ^ funcidx x ^ ")"
+	    | A.CallRef x -> "CTORCALLREFA1(CTORWIDXA1(" ^ typeidx x ^ "))"
 	    | A.CallIndirect (tx, x) ->
-	        "CTORCALLINDIRECTA2(" ^ idx tx ^ ", CTORWIDXA1(" ^ idx x ^ "))"
-	    | A.ReturnCall x -> "CTORRETURNCALLA1(" ^ idx x ^ ")"
-	    | A.ReturnCallRef x -> "CTORRETURNCALLREFA1(CTORWIDXA1(" ^ idx x ^ "))"
+	        "CTORCALLINDIRECTA2(" ^ tableidx tx ^ ", CTORWIDXA1(" ^ typeidx x ^ "))"
+	    | A.ReturnCall x -> "CTORRETURNCALLA1(" ^ funcidx x ^ ")"
+	    | A.ReturnCallRef x -> "CTORRETURNCALLREFA1(CTORWIDXA1(" ^ typeidx x ^ "))"
 	    | A.ReturnCallIndirect (tx, x) ->
-	        "CTORRETURNCALLINDIRECTA2(" ^ idx tx ^ ", CTORWIDXA1(" ^ idx x ^ "))"
-	    | A.Throw x -> "CTORTHROWA1(" ^ idx x ^ ")"
+	        "CTORRETURNCALLINDIRECTA2(" ^ tableidx tx ^ ", CTORWIDXA1(" ^ typeidx x ^ "))"
+	    | A.Throw x -> "CTORTHROWA1(" ^ tagidx x ^ ")"
 	    | A.ThrowRef -> "CTORTHROWREFA0"
 	    | A.TryTable (bt, cs, es) ->
 	        "CTORTRYTABLEA3(" ^ blocktype bt ^ ", " ^ seq (List.map catch cs) ^ ", "
 	        ^ instrs es ^ ")"
-	    | A.LocalGet x -> "CTORLOCALGETA1(" ^ idx x ^ ")"
-	    | A.LocalSet x -> "CTORLOCALSETA1(" ^ idx x ^ ")"
-	    | A.LocalTee x -> "CTORLOCALTEEA1(" ^ idx x ^ ")"
-	    | A.GlobalGet x -> "CTORGLOBALGETA1(" ^ idx x ^ ")"
-	    | A.GlobalSet x -> "CTORGLOBALSETA1(" ^ idx x ^ ")"
-	    | A.TableGet x -> "CTORTABLEGETA1(" ^ idx x ^ ")"
-	    | A.TableSet x -> "CTORTABLESETA1(" ^ idx x ^ ")"
-	    | A.TableSize x -> "CTORTABLESIZEA1(" ^ idx x ^ ")"
-	    | A.TableGrow x -> "CTORTABLEGROWA1(" ^ idx x ^ ")"
-	    | A.TableFill x -> "CTORTABLEFILLA1(" ^ idx x ^ ")"
+	    | A.LocalGet x -> "CTORLOCALGETA1(" ^ localidx x ^ ")"
+	    | A.LocalSet x -> "CTORLOCALSETA1(" ^ localidx x ^ ")"
+	    | A.LocalTee x -> "CTORLOCALTEEA1(" ^ localidx x ^ ")"
+	    | A.GlobalGet x -> "CTORGLOBALGETA1(" ^ globalidx x ^ ")"
+	    | A.GlobalSet x -> "CTORGLOBALSETA1(" ^ globalidx x ^ ")"
+	    | A.TableGet x -> "CTORTABLEGETA1(" ^ tableidx x ^ ")"
+	    | A.TableSet x -> "CTORTABLESETA1(" ^ tableidx x ^ ")"
+	    | A.TableSize x -> "CTORTABLESIZEA1(" ^ tableidx x ^ ")"
+	    | A.TableGrow x -> "CTORTABLEGROWA1(" ^ tableidx x ^ ")"
+	    | A.TableFill x -> "CTORTABLEFILLA1(" ^ tableidx x ^ ")"
 	    | A.TableCopy (x1, x2) ->
-	        "CTORTABLECOPYA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
+	        "CTORTABLECOPYA2(" ^ tableidx x1 ^ ", " ^ tableidx x2 ^ ")"
 	    | A.TableInit (x1, x2) ->
-	        "CTORTABLEINITA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
-	    | A.ElemDrop x -> "CTORELEMDROPA1(" ^ idx x ^ ")"
+	        "CTORTABLEINITA2(" ^ tableidx x1 ^ ", " ^ elemidx x2 ^ ")"
+	    | A.ElemDrop x -> "CTORELEMDROPA1(" ^ elemidx x ^ ")"
     | A.Load (x, op) ->
         "CTORLOADA4(" ^ numtype op.ty ^ ", " ^ load_pack op.pack ^ ", "
-	        ^ idx x ^ ", " ^ memarg op.offset ^ ")"
+	        ^ memidx x ^ ", " ^ memarg op.offset ^ ")"
 	    | A.Store (x, op) ->
 	        "CTORSTOREA4(" ^ numtype op.ty ^ ", " ^ store_pack op.pack ^ ", "
-	        ^ idx x ^ ", " ^ memarg op.offset ^ ")"
-	    | A.MemorySize x -> "CTORMEMORYSIZEA1(" ^ idx x ^ ")"
-	    | A.MemoryGrow x -> "CTORMEMORYGROWA1(" ^ idx x ^ ")"
-	    | A.MemoryFill x -> "CTORMEMORYFILLA1(" ^ idx x ^ ")"
+	        ^ memidx x ^ ", " ^ memarg op.offset ^ ")"
+	    | A.MemorySize x -> "CTORMEMORYSIZEA1(" ^ memidx x ^ ")"
+	    | A.MemoryGrow x -> "CTORMEMORYGROWA1(" ^ memidx x ^ ")"
+	    | A.MemoryFill x -> "CTORMEMORYFILLA1(" ^ memidx x ^ ")"
 	    | A.MemoryCopy (x1, x2) ->
-	        "CTORMEMORYCOPYA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
+	        "CTORMEMORYCOPYA2(" ^ memidx x1 ^ ", " ^ memidx x2 ^ ")"
 	    | A.MemoryInit (x1, x2) ->
-	        "CTORMEMORYINITA2(" ^ idx x1 ^ ", " ^ idx x2 ^ ")"
-	    | A.DataDrop x -> "CTORDATADROPA1(" ^ idx x ^ ")"
+	        "CTORMEMORYINITA2(" ^ memidx x1 ^ ", " ^ dataidx x2 ^ ")"
+	    | A.DataDrop x -> "CTORDATADROPA1(" ^ dataidx x ^ ")"
 	    | A.RefNull ht -> "CTORREFNULLA1(" ^ heaptype ht ^ ")"
-	    | A.RefFunc x -> "CTORREFFUNCA1(" ^ idx x ^ ")"
+	    | A.RefFunc x -> "CTORREFFUNCA1(" ^ funcidx x ^ ")"
     | A.RefIsNull -> "CTORREFISNULLA0"
     | A.RefAsNonNull -> "CTORREFASNONNULLA0"
     | A.RefTest rt -> "CTORREFTESTA1(" ^ reftype rt ^ ")"
@@ -3157,26 +3369,29 @@ module Official = struct
 	        lower_arranged_instr e
 	    | A.I31Get sx -> "CTORI31GETA1(" ^ sx_term sx ^ ")"
 	    | A.StructNew (x, op) ->
-	        initop ("CTORSTRUCTNEWA1(" ^ idx x ^ ")")
-	          ("CTORSTRUCTNEWDEFAULTA1(" ^ idx x ^ ")") op
+	        initop ("CTORSTRUCTNEWA1(" ^ typeidx x ^ ")")
+	          ("CTORSTRUCTNEWDEFAULTA1(" ^ typeidx x ^ ")") op
 	    | A.StructGet (x, field, sx) ->
-	        "CTORSTRUCTGETA3(" ^ optional_sx sx ^ ", " ^ idx x ^ ", " ^ Int32.to_string field
+	        "CTORSTRUCTGETA3(" ^ optional_sx sx ^ ", " ^ typeidx x ^ ", "
+          ^ field_u32 field
 	        ^ ")"
 	    | A.StructSet (x, field) ->
-	        "CTORSTRUCTSETA2(" ^ idx x ^ ", " ^ Int32.to_string field ^ ")"
+	        "CTORSTRUCTSETA2(" ^ typeidx x ^ ", " ^ field_u32 field ^ ")"
 	    | A.ArrayNew (x, op) ->
-	        initop ("CTORARRAYNEWA1(" ^ idx x ^ ")")
-	          ("CTORARRAYNEWDEFAULTA1(" ^ idx x ^ ")") op
-	    | A.ArrayNewFixed (x, n) -> "CTORARRAYNEWFIXEDA2(" ^ idx x ^ ", " ^ Int32.to_string n ^ ")"
-	    | A.ArrayNewData (x, y) -> "CTORARRAYNEWDATAA2(" ^ idx x ^ ", " ^ idx y ^ ")"
-	    | A.ArrayNewElem (x, y) -> "CTORARRAYNEWELEMA2(" ^ idx x ^ ", " ^ idx y ^ ")"
-	    | A.ArrayGet (x, sx) -> "CTORARRAYGETA2(" ^ optional_sx sx ^ ", " ^ idx x ^ ")"
-	    | A.ArraySet x -> "CTORARRAYSETA1(" ^ idx x ^ ")"
+	      initop ("CTORARRAYNEWA1(" ^ typeidx x ^ ")")
+	          ("CTORARRAYNEWDEFAULTA1(" ^ typeidx x ^ ")") op
+	    | A.ArrayNewFixed (x, n) ->
+          "CTORARRAYNEWFIXEDA2(" ^ typeidx x ^ ", "
+          ^ wrap_source_category "U32" (Int32.to_string n) ^ ")"
+	    | A.ArrayNewData (x, y) -> "CTORARRAYNEWDATAA2(" ^ typeidx x ^ ", " ^ dataidx y ^ ")"
+	    | A.ArrayNewElem (x, y) -> "CTORARRAYNEWELEMA2(" ^ typeidx x ^ ", " ^ elemidx y ^ ")"
+	    | A.ArrayGet (x, sx) -> "CTORARRAYGETA2(" ^ optional_sx sx ^ ", " ^ typeidx x ^ ")"
+	    | A.ArraySet x -> "CTORARRAYSETA1(" ^ typeidx x ^ ")"
 	    | A.ArrayLen -> "CTORARRAYLENA0"
-	    | A.ArrayCopy (x, y) -> "CTORARRAYCOPYA2(" ^ idx x ^ ", " ^ idx y ^ ")"
-	    | A.ArrayFill x -> "CTORARRAYFILLA1(" ^ idx x ^ ")"
-	    | A.ArrayInitData (x, y) -> "CTORARRAYINITDATAA2(" ^ idx x ^ ", " ^ idx y ^ ")"
-	    | A.ArrayInitElem (x, y) -> "CTORARRAYINITELEMA2(" ^ idx x ^ ", " ^ idx y ^ ")"
+	    | A.ArrayCopy (x, y) -> "CTORARRAYCOPYA2(" ^ typeidx x ^ ", " ^ typeidx y ^ ")"
+	    | A.ArrayFill x -> "CTORARRAYFILLA1(" ^ typeidx x ^ ")"
+	    | A.ArrayInitData (x, y) -> "CTORARRAYINITDATAA2(" ^ typeidx x ^ ", " ^ dataidx y ^ ")"
+	    | A.ArrayInitElem (x, y) -> "CTORARRAYINITELEMA2(" ^ typeidx x ^ ", " ^ elemidx y ^ ")"
 	    | A.ExternConvert op -> externop op
 
   and instrs es = seq (List.map instr es)
@@ -3185,9 +3400,11 @@ module Official = struct
 
   let local = function A.Local t -> valtype t
 
-  let segmentmode = function
+  let segmentmode index_sort = function
     | A.Passive -> "CTORPASSIVEA0"
-    | A.Active (x, c) -> "CTORACTIVEA2(" ^ string_of_int (i32_index x) ^ ", " ^ const c ^ ")"
+    | A.Active (x, c) ->
+        "CTORACTIVEA2(" ^ wrap_source_category index_sort (string_of_int (i32_index x))
+        ^ ", " ^ const c ^ ")"
     | A.Declarative -> "CTORDECLAREA0"
 
   let module_definition_of_file path =
@@ -3351,7 +3568,7 @@ module Official = struct
           let A.Data (bytes, mode) = it data in
           {
             data_bytes = List.of_seq (String.to_seq bytes) |> List.map Char.code;
-            data_mode = segmentmode (it mode);
+            data_mode = segmentmode "Memidx" (it mode);
           })
         (it m).datas
     in
@@ -3362,7 +3579,7 @@ module Official = struct
           {
             elem_type = reftype rt;
             elem_exprs = List.map const exprs;
-            elem_mode = segmentmode (it mode);
+            elem_mode = segmentmode "Tableidx" (it mode);
           })
         (it m).elems
     in
@@ -3446,22 +3663,22 @@ let find_import_memory_binding bindings module_name item_name =
 
 let default_import_global_value globaltype =
   if contains_sub globaltype "CTORI32A0" then
-    "CTORCONSTA2(CTORI32A0, 0)"
+    i32_const "0"
   else if contains_sub globaltype "CTORI64A0" then
-    "CTORCONSTA2(CTORI64A0, 0)"
+    i64_const "0"
   else if contains_sub globaltype "CTORF32A0" then
-    "CTORCONSTA2(CTORF32A0, 0)"
+    f32_const "0"
   else if contains_sub globaltype "CTORF64A0" then
-    "CTORCONSTA2(CTORF64A0, 0)"
+    f64_const "0"
   else if contains_sub globaltype "CTORV128A0" then
     "CTORVCONSTA2(CTORV128A0, eps)"
   else "CTORREFNULLA1(CTORFUNCA0)"
 
 let default_result_instr = function
-  | "i32" -> Some "CTORCONSTA2(CTORI32A0, 0)"
-  | "i64" -> Some "CTORCONSTA2(CTORI64A0, 0)"
-  | "f32" -> Some "CTORCONSTA2(CTORF32A0, 0)"
-  | "f64" -> Some "CTORCONSTA2(CTORF64A0, 0)"
+  | "i32" -> Some (i32_const "0")
+  | "i64" -> Some (i64_const "0")
+  | "f32" -> Some (f32_const "0")
+  | "f64" -> Some (f64_const "0")
   | "v128" -> Some "CTORVCONSTA2(CTORV128A0, 0)"
   | "funcref" -> Some "CTORREFNULLA1(CTORFUNCA0)"
   | "externref" -> Some "CTORREFNULLA1(CTOREXTERNA0)"
@@ -3525,9 +3742,11 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
   op generated-import-func-%d : -> Funcinst [ctor] .
   eq value('TYPE, generated-import-func-%d) = index(generated-import-deftypes, %d) .
   eq value('MODULE, generated-import-func-%d) = $empty-moduleinst .
-  eq value('CODE, generated-import-func-%d) = CTORFUNCA3(%d, eps, %s) .
+  eq value('CODE, generated-import-func-%d) = CTORFUNCA3(%s, eps, %s) .
 |}
-             i i im.import_typeidx i i im.import_typeidx (seq binding))
+             i i im.import_typeidx i i
+             (wrap_source_category "Typeidx" (string_of_int im.import_typeidx))
+             (seq binding))
     |> String.concat "\n"
   in
   let func_names =
@@ -3567,13 +3786,7 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
              let runtime_memtype =
                match find_import_memory_binding memory_bindings im.import_module im.import_name with
                | Some b ->
-                   let max_term =
-                     match b.memory_binding_max with
-                     | Some max_pages -> string_of_int max_pages
-                     | None -> "eps"
-                   in
-                   "CTORPAGEA2(CTORI32A0, CTORLBRACKDOTDOTRBRACKA2("
-                   ^ string_of_int pages ^ ", " ^ max_term ^ "))"
+                  memtype_term pages b.memory_binding_max
                | None -> im.import_memtype
              in
              Some
@@ -3651,7 +3864,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
          | ImportFunc im ->
              "CTORIMPORTA3($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
              ^ maude_qid im.import_name ^ "), CTORFUNCA1(CTORWIDXA1("
-             ^ string_of_int im.import_typeidx ^ ")))"
+             ^ wrap_source_category "Typeidx" (string_of_int im.import_typeidx) ^ ")))"
          | ImportTag im ->
              "CTORIMPORTA3($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
              ^ maude_qid im.import_name ^ "), CTORTAGA1(" ^ im.import_tagtype ^ "))"
@@ -3685,7 +3898,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
   let func_terms =
     ir.funcs
     |> List.map (fun fn ->
-           "CTORFUNCA3(" ^ string_of_int fn.func_typeidx ^ ", "
+           "CTORFUNCA3(" ^ wrap_source_category "Typeidx" (string_of_int fn.func_typeidx) ^ ", "
            ^ seq (List.map local_decl fn.func_locals)
            ^ ", " ^ seq fn.func_body ^ ")")
     |> seq
@@ -3702,18 +3915,20 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     |> seq
   in
   let start_terms =
-    match ir.start with Some i -> "CTORSTARTA1(" ^ string_of_int i ^ ")" | None -> "eps"
+    match ir.start with
+    | Some i -> "CTORSTARTA1(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
+    | None -> "eps"
   in
   let export_terms =
     ir.exports
     |> List.map (fun ex ->
            let desc =
              match ex.export_item_desc with
-             | ExportFunc i -> "CTORFUNCA1(" ^ string_of_int i ^ ")"
-             | ExportTag i -> "CTORTAGA1(" ^ string_of_int i ^ ")"
-             | ExportGlobal i -> "CTORGLOBALA1(" ^ string_of_int i ^ ")"
-             | ExportMemory i -> "CTORMEMA1(" ^ string_of_int i ^ ")"
-             | ExportTable i -> "CTORTABLEA1(" ^ string_of_int i ^ ")"
+             | ExportFunc i -> "CTORFUNCA1(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
+             | ExportTag i -> "CTORTAGA1(" ^ wrap_source_category "Tagidx" (string_of_int i) ^ ")"
+             | ExportGlobal i -> "CTORGLOBALA1(" ^ wrap_source_category "Globalidx" (string_of_int i) ^ ")"
+             | ExportMemory i -> "CTORMEMA1(" ^ wrap_source_category "Memidx" (string_of_int i) ^ ")"
+             | ExportTable i -> "CTORTABLEA1(" ^ wrap_source_category "Tableidx" (string_of_int i) ^ ")"
            in
            "CTOREXPORTA2($wat-name(" ^ maude_qid ex.export_item_name ^ "), " ^ desc ^ ")")
     |> seq
@@ -3869,8 +4084,8 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     Printf.sprintf
     {|load %s
 
-mod WASM-FIB-GENERATED-BS is
-  inc WASM-FIB-BS .
+mod WASM-FIB-GENERATED is
+  inc WASM-FIB .
 
   var GEN-NVAL : Val .
   var GEN-S : Store .
@@ -4117,7 +4332,11 @@ let run_maude_command ~maude ~result_only generated command =
   Fun.protect
     ~finally:(fun () -> try Sys.remove file with Sys_error _ -> ())
     (fun () ->
-      let output = run_command_capture (Filename.quote maude ^ " " ^ Filename.quote file) in
+      let output =
+        run_command_capture
+          (Filename.quote maude ^ " " ^ Filename.quote file ^ " 2>&1")
+      in
+      check_maude_output output;
       if result_only then Printf.printf "result: %s\n" (extract_final_value output)
       else print_string output)
 
@@ -4129,7 +4348,7 @@ let run_maude_fib ~maude ~result_only ~checked ~rewrite_limit generated n =
       "steps(generated-fib-init-config(i32v(" ^ string_of_int n ^ ")))"
   in
   run_maude_command ~maude ~result_only generated
-    ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED-BS : " ^ term ^ " .\n")
+    ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : " ^ term ^ " .\n")
 
 let run_maude_main ~maude ~result_only ~checked ~rewrite_limit ?search_expected generated args =
   let arg_terms = seq args in
@@ -4142,7 +4361,7 @@ let run_maude_main ~maude ~result_only ~checked ~rewrite_limit ?search_expected 
   match search_expected with
   | Some expected ->
       let command =
-        "\nsearch [1] in WASM-FIB-GENERATED-BS : " ^ term
+        "\nsearch [1] in WASM-FIB-GENERATED : " ^ term
         ^ " =>* (GENSEARCHZ:State ; " ^ expected ^ ") .\n"
       in
       if result_only then (
@@ -4152,19 +4371,21 @@ let run_maude_main ~maude ~result_only ~checked ~rewrite_limit ?search_expected 
           ~finally:(fun () -> try Sys.remove file with Sys_error _ -> ())
           (fun () ->
             let output =
-              run_command_capture (Filename.quote maude ^ " " ^ Filename.quote file)
+              run_command_capture
+                (Filename.quote maude ^ " " ^ Filename.quote file ^ " 2>&1")
             in
+            check_maude_output output;
             if last_sub_index output "Solution 1" <> None then
               Printf.printf "result: SEARCH-PASS\n"
             else Printf.printf "result: SEARCH-FAIL\n"))
       else run_maude_command ~maude ~result_only generated command
   | None ->
       run_maude_command ~maude ~result_only generated
-        ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED-BS : " ^ term ^ " .\n")
+        ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : " ^ term ^ " .\n")
 
 let run_maude_validation ~maude ~result_only ~rewrite_limit generated =
   run_maude_command ~maude ~result_only generated
-    ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED-BS : Module-ok(generated-fib-module, generated-module-type) .\n")
+    ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : Module-ok(generated-fib-module, generated-module-type) .\n")
 
 let usage () =
   prerr_endline
@@ -4173,7 +4394,7 @@ let usage () =
 
 let () =
   try
-    let harness = ref (Filename.concat (Sys.getcwd ()) "wasm-exec-bs.maude") in
+    let harness = ref (Filename.concat (Sys.getcwd ()) "wasm-exec.maude") in
     let maude = ref "maude" in
     let output = ref None in
     let run = ref None in
@@ -4228,18 +4449,18 @@ let () =
           search_expected := Some term;
           parse_args rest
       | "--arg-i32" :: n :: rest ->
-          arg_terms := !arg_terms @ [ "CTORCONSTA2(CTORI32A0, " ^ n ^ ")" ];
+          arg_terms := !arg_terms @ [ i32_const n ];
           parse_args rest
       | "--arg-i64" :: n :: rest ->
-          arg_terms := !arg_terms @ [ "CTORCONSTA2(CTORI64A0, " ^ n ^ ")" ];
+          arg_terms := !arg_terms @ [ i64_const n ];
           parse_args rest
       | "--arg-f32" :: n :: rest ->
           arg_terms :=
-            !arg_terms @ [ "CTORCONSTA2(CTORF32A0, " ^ simple_float_literal 32 n ^ ")" ];
+            !arg_terms @ [ f32_const (simple_float_literal 32 n) ];
           parse_args rest
       | "--arg-f64" :: n :: rest ->
           arg_terms :=
-            !arg_terms @ [ "CTORCONSTA2(CTORF64A0, " ^ simple_float_literal 64 n ^ ")" ];
+            !arg_terms @ [ f64_const (simple_float_literal 64 n) ];
           parse_args rest
       | "--arg-v128" :: n :: rest ->
           arg_terms := !arg_terms @ [ maude_arg_term "v128" n ];
