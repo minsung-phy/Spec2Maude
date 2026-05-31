@@ -31,16 +31,16 @@ execution, result comparison, import/WASI, or proposal edge cases.
 ## Active Components
 
 ```text
-translator_bs.ml       SpecTec-to-Maude translator
-main_bs.ml             translator CLI entry point
-output_bs.maude        generated WebAssembly Maude core
+translator.ml       SpecTec-to-Maude translator
+main.ml             translator CLI entry point
+output.maude        generated WebAssembly Maude core
 wasm_to_maude.ml       WAT/Wasm-to-Maude frontend
 spec2maude.ml          reproducible top-level CLI
 builtins.maude         Maude backend/builtin definitions
-wasm-init-bs.maude     init/config/runtime harness
-wasm-exec-bs.maude     direct execution smoke harness
+wasm-init.maude     init/config/runtime harness
+wasm-exec.maude     direct execution smoke harness
 wat_examples/          local smoke programs
-scripts/               regression and benchmark tools
+scripts/               benchmark/smoke runner
 ```
 
 Archived old path:
@@ -126,7 +126,7 @@ Still worth discussing:
 - `$cont-*` continuation lowering for ordered `def` premises;
 - mechanically generated lowering helpers for source meta-notation
   (`map`, ranges, optional/star forms, otherwise matching);
-- which pieces belong in `output_bs.maude` versus harness files.
+- which pieces belong in `output.maude` versus harness files.
 
 ## Immediate Next Work
 
@@ -134,7 +134,7 @@ Still worth discussing:
    - full source profile: includes all SpecTec validation definitions;
    - runtime profile: excludes static validation from the runtime artifact or
      erases validation premises after external validation.
-2. Continue reducing source-absent helpers in `output_bs.maude`.
+2. Continue reducing source-absent helpers in `output.maude`.
 3. Continue improving official `.wast` runner support for remaining vector and
    abstract reference result forms.  The runner now accepts the main GC
    reference families (`anyref`, `eqref`, `i31ref`, `structref`, `arrayref`,

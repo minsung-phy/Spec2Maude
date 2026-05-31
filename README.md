@@ -17,7 +17,7 @@ The intended pipeline is:
 ```text
 WebAssembly SpecTec source
   -> Spec2Maude translator
-  -> output_bs.maude
+  -> output.maude
   -> Maude execution/search/model-checking backend
 
 .wat / .wasm input program
@@ -58,18 +58,18 @@ definition.  They are not the default runtime gate for the WAT/Wasm frontend.
 ## Repository Layout
 
 ```text
-translator_bs.ml          active SpecTec-to-Maude translator
-main_bs.ml                translator entry point
-output_bs.maude           generated WebAssembly Maude core
+translator.ml          active SpecTec-to-Maude translator
+main.ml                translator entry point
+output.maude           generated WebAssembly Maude core
 builtins.maude            Maude backend/builtin definitions
-wasm-init-bs.maude        init/config/runtime harness outside output_bs.maude
-wasm-exec-bs.maude        execution smoke harness
+wasm-init.maude        init/config/runtime harness outside output.maude
+wasm-exec.maude        execution smoke harness
 wasm_to_maude.ml          .wat/.wasm frontend
 vendor/wasm/              vendored official SpecTec/WebAssembly parser/validator
 spec2maude.ml             reproducible CLI wrapper source
 wat_examples/             small local WAT examples
 wasm-3.0/                 WebAssembly 3.0 SpecTec source files
-scripts/                  benchmark, regression, and audit scripts
+scripts/                  benchmark/smoke runner
 docs/                     testing notes and current limitations
 legacy/old-baseline/      archived older translator/runtime path
 ```
@@ -190,8 +190,6 @@ Run a small official spec-test slice:
 ./spec2maude validate INPUT.wat|INPUT.wasm
 ./spec2maude maude-validate INPUT.wat|INPUT.wasm
 ./spec2maude test smoke|official|all [--limit N] [--timeout SEC]
-./spec2maude regression
-./spec2maude fetch-benchmarks
 ```
 
 `maude-validate` is an experimental debug command for the translated
@@ -208,7 +206,6 @@ make run-fib
 make validate-invalid
 make test-smoke
 make test-official LIMIT=20 TIMEOUT=10
-make regression
 ```
 
 ## Current Status

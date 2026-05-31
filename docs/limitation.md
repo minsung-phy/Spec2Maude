@@ -1,15 +1,10 @@
 # Current Limitations And Discussion Points
 
-Updated: 2026-05-29
+Updated: 2026-06-01
 
-This document records the current limitations after aligning the project with
-the professor-facing architecture:
-
-```text
-validated WAT/Wasm input
-  -> Maude module term
-  -> Maude dynamic execution
-```
+This document records the current state after replacing the old
+`SpectecType`/`typecheck` syntax-membership layer with Maude
+sort/membership encoding.
 
 ## 1. Parser / Validator
 
@@ -23,7 +18,63 @@ Current implementation:
 WABT is no longer the default `.wat` / `.wasm` validator.  It may still be used
 by benchmark scripts to expand official `.wast` tests into JSON.
 
-## 2. Module-ok Is Not The Default Gate
+## 2. Syntax Encoding Status
+
+The generated syntax layer now follows four AST-driven patterns:
+
+```text
+simple category              sort Category + mb constructor : Category
+argumented constructor       ctor returns SpectecTerminal + cmb with argument sorts
+parameterized family         finite specialization into concrete Maude sorts
+category alias/inclusion     subsort Child < Parent
+```
+
+The generated syntax layer should not contain:
+
+```text
+SpectecType
+SpectecCategory
+WasmType
+typecheck
+hasType / WellTyped / _hasType_
+SortCTOR...
+broad numeric subsorts such as Nat < U32 or Int < IN32
+```
+
+Numeric literal families are represented with object-level wrappers:
+
+```text
+i32.const 5 -> CTORCONSTA2(CTORI32A0, litU32(5))
+i64.const 5 -> CTORCONSTA2(CTORI64A0, litU64(5))
+```
+
+This is intentional.  Raw Maude numerals such as `5` are meta-level builtin
+numbers and cannot be classified exactly as generated object-language sorts
+such as `U32`/`IN32` using Maude membership axioms alone.  Wrappers give the
+object-language literal a real constructor that can receive precise `mb`/`cmb`
+membership.
+
+## 3. What Changed Beyond Syntax
+
+The source `relation`, `rule`, and `def` declarations are still translated
+from the SpecTec AST; the rewrite did not intentionally replace the Step,
+Step_pure, Step_read, or Steps semantics with a different execution strategy.
+In particular, `Steps` is generated as the source-shaped recursive
+reflexive-transitive closure.
+
+However, the literal representation changed from raw payloads to wrappers.
+Because of that, generated runtime equations and rules that consume numeric
+payloads need representation-boundary plumbing:
+
+```text
+unwrap object-level literal -> compute with Maude builtin number -> rewrap result
+```
+
+This plumbing is not a category-membership predicate and is not a replacement
+for `mb`/`cmb`.  It exists only because numeric operations still compute over
+Maude builtin integers internally.
+
+## 4. Module-ok Is Not The Default Gate
 
 The full generated core still contains SpecTec validation relations because
 they are part of the source:
@@ -43,11 +94,11 @@ execution by the official SpecTec/WebAssembly validator.
 Open point:
 
 ```text
-Should the paper artifact keep full source validation in output_bs.maude, or
+Should the paper artifact keep full source validation in output.maude, or
 should we produce a separate runtime-only profile after external validation?
 ```
 
-## 3. Runtime Profile Split Is Not Finished
+## 5. Runtime Profile Split Is Not Finished
 
 A clean final structure should probably provide two artifacts:
 
@@ -66,7 +117,7 @@ Therefore the next cleanup must be explicit:
 2. derive a runtime profile that erases or externalizes static validation
    premises only after the input has been validated.
 
-## 4. Remaining Non-Isomorphic Machinery
+## 6. Remaining Non-Isomorphic Machinery
 
 The main remaining source-absent mechanisms are:
 
@@ -74,13 +125,15 @@ The main remaining source-absent mechanisms are:
 $infer-*       witness inference for relation premises
 $cont-*        continuation lowering for ordered def premises
 meta-notation lowering helpers for star/optional/map/range/otherwise forms
+$raw-lit       representation-boundary numeric unwrap
+$wrap-lit      representation-boundary numeric rewrap
 ```
 
 These are not benchmark-specific hardcoding, but they are still not literally
-present in the SpecTec source.  They should be either justified as systematic
-lowering or moved into a clearly named execution-support layer.
+present in the SpecTec source.  They should be justified as systematic lowering
+or moved into a clearly named execution-support layer.
 
-## 5. WAT/Wasm Frontend Coverage
+## 7. WAT/Wasm Frontend Coverage
 
 The frontend supports the current local smoke suite through the official AST
 path and part of the official test corpus.  The lowering path now covers more
@@ -95,12 +148,24 @@ Known gaps include:
 - richer WASI/import linking;
 - more precise failure classification for real-world benchmarks.
 
-## 6. Benchmark Status
+## 8. Benchmark Status
 
 The local smoke suite currently passes through the default frontend/runtime
-path.  Larger official/external benchmark numbers should be regenerated after
-each frontend or translator change because the status buckets are sensitive to
-the chosen pipeline.
+path:
+
+```bash
+./spec2maude test smoke --timeout 10
+```
+
+Current expected status:
+
+```text
+PASS: 13
+```
+
+Larger official/external benchmark numbers should be regenerated after each
+frontend or translator change because the status buckets are sensitive to the
+chosen pipeline.
 
 Important interpretation:
 
@@ -108,22 +173,23 @@ Important interpretation:
 - `STUCK_STEP` and `WRONG_RESULT` are the more important runtime execution gaps
   for the default architecture.
 
-## 7. What To Say In A Meeting
+## 9. What To Say In A Meeting
 
 Short version:
 
 ```text
-I separated the default runtime story from Maude-internal Module-ok checking.
-The default path now validates WAT/Wasm before Maude, converts the validated
-program into a Maude module term, and runs the dynamic semantics.  The full
-SpecTec validation relations are still generated for source coverage/debug, but
-they are no longer presented as the main execution gate.
+The syntax membership layer is now Maude-native: SpecTec categories are sorts,
+constructors return SpectecTerminal, and membership is represented by
+subsort/mb/cmb.  Numeric literals use explicit object-level wrappers because
+raw Maude numerals cannot be exact U32/IN32 members.  The Step/Step_pure/
+Step_read/Steps relations are still generated from the SpecTec source; wrapper
+unwrap/rewrap code is representation plumbing, not a semantic replacement.
 ```
 
 Open question:
 
 ```text
 Should the final artifact ship both a full SpecTec translation and a smaller
-runtime-only profile, or should output_bs.maude always remain the full source
+runtime-only profile, or should output.maude always remain the full source
 translation?
 ```

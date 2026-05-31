@@ -1,8 +1,0 @@
-load ../builtins
-
-red in WASM-BUILTINS : $ibits(4, 6) .
-red in WASM-BUILTINS : $inv-ibits(4, 0 1 1 0) .
-red in WASM-BUILTINS : $irev(4, 6) .
-red in WASM-BUILTINS : $lanes(CTORXA2(CTORI32A0, 4), 1 2 3 4) .
-red in WASM-BUILTINS : $inv-lanes(CTORXA2(CTORI32A0, 4), 1 2 3 4) .
-red in WASM-BUILTINS : $vbitmaskop(CTORXA2(CTORI32A0, 4), 1 -1 2 -3) .

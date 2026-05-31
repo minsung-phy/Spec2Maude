@@ -20,7 +20,7 @@ let () =
     let (il_defs, _env) = Frontend.Elab.elab all_frontend_defs in
     
     (* 3. 번역 및 Maude 형식 출력 (토큰 프리스캔 포함) *)
-    print_endline (Translator_bs.translate il_defs)
+    print_endline (Translator.translate il_defs)
     
   with
   | Util.Error.Error (at, msg) ->
