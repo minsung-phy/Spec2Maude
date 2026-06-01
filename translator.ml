@@ -56,8 +56,16 @@ type opt_ctor_helper = {
   opt_arity : int;
 }
 
+type source_compound_case = {
+  compound_parent_sort : string;
+  compound_ctor : string;
+  compound_fields : (string option * typ) list;
+  compound_prems : prem list;
+}
+
 let star_ctor_unzip_helpers : star_ctor_unzip_helper list ref = ref []
 let opt_ctor_helpers : opt_ctor_helper list ref = ref []
+let source_compound_cases : source_compound_case list ref = ref []
 
 let tconcat sep ts =
   { text = String.concat sep (List.map (fun t -> t.text) ts);
@@ -573,6 +581,8 @@ let listn_index_vars : SSet.t ref = ref SSet.empty
 let ctor_arg_sort_hints : (string, string list) Hashtbl.t = Hashtbl.create 512
 let ctor_arg_membership_sort_hints : (string, string list) Hashtbl.t = Hashtbl.create 512
 let ctor_result_sort_hints : (string, SSet.t) Hashtbl.t = Hashtbl.create 512
+let ctor_arg_literal_type_dependencies : (string, (int * int) list) Hashtbl.t =
+  Hashtbl.create 128
 
 let ctor_decl_arg_sort s =
   if s = "SpectecTerminals" || s = "SpectecTerminal" then s
@@ -607,6 +617,17 @@ let register_ctor_arg_membership_sorts ctor sorts =
             old sorts
         in
         Hashtbl.replace ctor_arg_membership_sort_hints ctor merged
+
+let register_ctor_arg_literal_type_dependencies ctor deps =
+  if deps <> [] then begin
+    let old =
+      match Hashtbl.find_opt ctor_arg_literal_type_dependencies ctor with
+      | Some deps -> deps
+      | None -> []
+    in
+    Hashtbl.replace ctor_arg_literal_type_dependencies ctor
+      (List.sort_uniq compare (old @ deps))
+  end
 
 let register_ctor_result_sort ctor sort =
   let old =
@@ -799,10 +820,51 @@ let unmap_call_helper_name map_helper_name =
   else
     map_helper_name ^ "-unmap"
 
-let literal_family_roots =
-  SSet.of_list ["UN"; "SN"; "IN"; "FN"; "VN"]
+let literal_family_roots : SSet.t ref = ref SSet.empty
 
-let sort_of_type_name raw =
+type literal_family_info = {
+  literal_family_raw : string;
+  literal_family_sort : string;
+  literal_family_nullary_prefix : string;
+  literal_family_concrete_prefix : string;
+}
+
+let literal_family_infos : (string, literal_family_info) Hashtbl.t =
+  Hashtbl.create 16
+
+let source_ground_int_call_values : (string, string) Hashtbl.t =
+  Hashtbl.create 128
+
+let source_unary_int_functions : SSet.t ref = ref SSet.empty
+
+type source_unary_int_alias = {
+  source_alias_fn : string;
+  source_alias_arg_sort : string;
+  source_alias_target_fn : string;
+}
+
+let source_unary_int_aliases : source_unary_int_alias list ref = ref []
+
+let is_literal_family_root sort = SSet.mem sort !literal_family_roots
+
+let source_ground_int_key fn arg =
+  fn ^ "\x1f" ^ (strip_wrapping_parens arg |> String.trim)
+
+let register_source_ground_int_value fn arg value =
+  Hashtbl.replace source_ground_int_call_values
+    (source_ground_int_key fn arg)
+    value
+
+let find_source_ground_int_value fn arg =
+  Hashtbl.find_opt source_ground_int_call_values
+    (source_ground_int_key fn arg)
+
+let maude_builtin_sort_names =
+  SSet.of_list ["Char"; "Zero"; "NzNat"; "Nat"; "Int"; "Bool"]
+
+let source_sort_name_overrides : (string, string) Hashtbl.t = Hashtbl.create 32
+
+let source_sort_base_name raw =
   let s = sanitize raw in
   if String.length s >= 2 && String.sub s 0 2 = "w-" then "SpectecTerminal"
   else
@@ -813,14 +875,20 @@ let sort_of_type_name raw =
     then String.capitalize_ascii hyphen_to_under
     else hyphen_to_under
 
+let sort_of_type_name raw =
+  match Hashtbl.find_opt source_sort_name_overrides raw with
+  | Some override -> override
+  | None -> source_sort_base_name raw
+
 let rec simple_sort_of_typ (t : typ) vm : string option =
   match t.it with
-  | VarT (id, []) ->
+  | VarT (id, args) ->
       let resolved = match List.assoc_opt id.it vm with
         | Some mapped when mapped <> String.uppercase_ascii mapped -> mapped
         | _ -> sanitize id.it
       in
       if is_upper_token resolved then None
+      else if String.lowercase_ascii id.it = "list" && args <> [] then None
       else Some (sort_of_type_name resolved)
   | IterT (_, (List | List1 | ListN _)) -> None
   | IterT (inner, Opt) -> simple_sort_of_typ inner vm
@@ -858,6 +926,7 @@ let plural_types : (string, bool) Hashtbl.t = Hashtbl.create 32
 let zero_arity_source_sorts : SSet.t ref = ref SSet.empty
 let sequence_alias_sorts : SSet.t ref = ref SSet.empty
 let sequence_alias_type_terms : (string, string) Hashtbl.t = Hashtbl.create 32
+let sequence_alias_elem_sorts : (string, string) Hashtbl.t = Hashtbl.create 32
 let flat_sequence_source_sorts : SSet.t ref = ref SSet.empty
 let simple_alias_source_sorts : SSet.t ref = ref SSet.empty
 let source_membership_sorts : SSet.t ref = ref SSet.empty
@@ -881,15 +950,18 @@ let source_var_seq_elem_sorts : (string, string) Hashtbl.t = Hashtbl.create 512
 let typed_index_helper_sorts : SSet.t ref = ref SSet.empty
 let source_seq_pred_sorts : SSet.t ref = ref SSet.empty
 let source_category_subsort_edges : (string, SSet.t) Hashtbl.t = Hashtbl.create 128
+let source_conditional_alias_edges : (string, SSet.t) Hashtbl.t = Hashtbl.create 64
 let native_sequence_source_sorts : SSet.t ref = ref SSet.empty
 let source_nullary_terms_by_sort : (string, SSet.t) Hashtbl.t = Hashtbl.create 128
 let literal_family_parent_sorts : SSet.t ref = ref SSet.empty
 let literal_family_alias_edges : (string, SSet.t) Hashtbl.t = Hashtbl.create 16
 let specialized_syntax_sort_decls : SSet.t ref = ref SSet.empty
+let specialized_syntax_sort_names : SSet.t ref = ref SSet.empty
 let literal_wrapper_syntax_decls : SSet.t ref = ref SSet.empty
 let literal_wrapper_memberships : SSet.t ref = ref SSet.empty
 let literal_wrapper_payload_sorts : (string, string) Hashtbl.t = Hashtbl.create 16
 let literal_wrapper_by_type_term : (string, string) Hashtbl.t = Hashtbl.create 16
+let source_literal_wrapper_by_sort : (string, string) Hashtbl.t = Hashtbl.create 32
 let wrap_generic_const_payloads : bool ref = ref false
 
 let with_generic_const_payload_wrapping f =
@@ -904,6 +976,25 @@ let source_record_ctor_name sort arity =
 
 let native_sequence_sort_name sort =
   sort ^ "Seq"
+
+let register_native_sequence_sort sort =
+  if sort <> ""
+     && sort <> "SpectecTerminal"
+     && sort <> "SpectecTerminals"
+     && not (List.mem sort ["Bool"; "Nat"; "Int"; "Char"; "Zero"; "NzNat"])
+  then
+    native_sequence_source_sorts :=
+      SSet.add sort !native_sequence_source_sorts
+
+let sequence_sort_of_elem_sort sort =
+  if sort <> ""
+     && sort <> "SpectecTerminal"
+     && sort <> "SpectecTerminals"
+     && not (List.mem sort ["Bool"; "Nat"; "Int"; "Char"; "Zero"; "NzNat"])
+  then begin
+    register_native_sequence_sort sort;
+    Some (native_sequence_sort_name sort)
+  end else None
 
 let source_record_empty_const_name source_name =
   "$empty-" ^ String.lowercase_ascii (sanitize source_name)
@@ -975,16 +1066,53 @@ let rec typ_ref_sort (t : typ) : string option =
   | IterT (inner, Opt) -> typ_ref_sort inner
   | _ -> None
 
+let rec sequence_sort_of_typ (t : typ) vm : string option =
+  match t.it with
+  | IterT (inner, (List | List1 | ListN _)) ->
+      sequence_sort_of_inner_typ inner vm
+  | IterT (inner, Opt) ->
+      sequence_sort_of_typ inner vm
+  | VarT (id, args) when String.lowercase_ascii id.it = "list" && args <> [] ->
+      args |> List.find_map (fun a -> sequence_sort_of_arg a vm)
+  | VarT (id, []) ->
+      let alias_sort = sort_of_type_name id.it in
+      (match Hashtbl.find_opt sequence_alias_elem_sorts alias_sort with
+       | Some elem_sort -> sequence_sort_of_elem_sort elem_sort
+       | None -> None)
+  | TupT [(_, inner)] -> sequence_sort_of_typ inner vm
+  | _ -> None
+
+and sequence_sort_of_inner_typ (inner : typ) vm : string option =
+  match inner.it with
+  | IterT (inner', Opt) -> sequence_sort_of_inner_typ inner' vm
+  | _ ->
+      (match simple_sort_of_typ inner vm with
+       | Some elem_sort -> sequence_sort_of_elem_sort elem_sort
+       | None -> sequence_sort_of_typ inner vm)
+
+and sequence_sort_of_arg (a : arg) vm : string option =
+  match a.it with
+  | TypA t -> sequence_sort_of_inner_typ t vm
+  | ExpA {it = VarE id; _} ->
+      sequence_sort_of_elem_sort (sort_of_type_name id.it)
+  | _ -> None
+
 let build_type_env defs =
   Hashtbl.reset plural_types;
+  Hashtbl.reset source_sort_name_overrides;
   Hashtbl.reset source_record_shape_counts;
   Hashtbl.reset source_category_subsort_edges;
+  Hashtbl.reset source_conditional_alias_edges;
+  source_compound_cases := [];
   Hashtbl.reset sequence_alias_type_terms;
+  Hashtbl.reset sequence_alias_elem_sorts;
   Hashtbl.reset source_record_field_sorts;
   Hashtbl.reset source_record_field_seq_elem_sorts;
   Hashtbl.reset source_sort_type_atoms;
   Hashtbl.reset source_nullary_terms_by_sort;
   Hashtbl.reset literal_family_alias_edges;
+  Hashtbl.reset literal_family_infos;
+  Hashtbl.reset source_ground_int_call_values;
   Hashtbl.reset source_var_sorts;
   Hashtbl.reset source_var_seq_elem_sorts;
   zero_arity_source_sorts := SSet.empty;
@@ -996,9 +1124,22 @@ let build_type_env defs =
   int_subsort_sorts := SSet.empty;
   native_sequence_source_sorts := SSet.empty;
   literal_family_parent_sorts := SSet.empty;
+  literal_family_roots := SSet.empty;
+  source_unary_int_functions := SSet.empty;
+  source_unary_int_aliases := [];
   optional_literal_terms := SSet.empty;
   source_record_infos := [];
   typed_index_helper_sorts := SSet.empty;
+  let rec collect_source_sort_name_overrides d =
+    match d.it with
+    | RecD ds -> List.iter collect_source_sort_name_overrides ds
+    | TypD (id, _params, _insts) ->
+        let base = source_sort_base_name id.it in
+        if SSet.mem base maude_builtin_sort_names then
+          Hashtbl.replace source_sort_name_overrides id.it ("Source" ^ base)
+    | _ -> ()
+  in
+  List.iter collect_source_sort_name_overrides defs;
   let rec scan d = match d.it with
     | RecD ds -> List.iter scan ds
     | TypD (id, _params, insts) ->
@@ -1013,7 +1154,14 @@ let build_type_env defs =
 	                        SSet.add alias_sort !sequence_alias_sorts;
                       (match source_type_term_of_typ_simple typ with
                        | Some ty -> Hashtbl.replace sequence_alias_type_terms alias_sort ty
-                       | None -> ())
+                       | None -> ());
+                      (match sequence_sort_of_typ typ [] with
+                       | Some seq_sort when ends_with seq_sort "Seq" ->
+                           let elem_sort =
+                             String.sub seq_sort 0 (String.length seq_sort - 3)
+                           in
+                           Hashtbl.replace sequence_alias_elem_sorts alias_sort elem_sort
+                       | _ -> ())
 	                  | VarT (tid, args)
 	                    when String.lowercase_ascii tid.it = "list" && args <> [] ->
                       let alias_sort = sort_of_type_name id.it in
@@ -1022,7 +1170,14 @@ let build_type_env defs =
 	                        SSet.add alias_sort !sequence_alias_sorts;
                       (match source_type_term_of_typ_simple typ with
                        | Some ty -> Hashtbl.replace sequence_alias_type_terms alias_sort ty
-                       | None -> ())
+                       | None -> ());
+                      (match sequence_sort_of_typ typ [] with
+                       | Some seq_sort when ends_with seq_sort "Seq" ->
+                           let elem_sort =
+                             String.sub seq_sort 0 (String.length seq_sort - 3)
+                           in
+                           Hashtbl.replace sequence_alias_elem_sorts alias_sort elem_sort
+                       | _ -> ())
 	                  | _ -> ())
               | StructT fields ->
                   let rec_sort = sort_of_type_name id.it in
@@ -1076,6 +1231,42 @@ let build_type_env defs =
     List.iter collect defs;
     !acc
   in
+  let literal_family_candidate raw params =
+    params <> []
+    &&
+    let s = sanitize raw in
+    ends_with s "N"
+    && String.exists (fun c -> c >= 'a' && c <= 'z') s
+  in
+  let concrete_prefix_of_family_sort sort =
+    if ends_with sort "N" && String.length sort > 1 then
+      let stem = String.sub sort 0 (String.length sort - 1) in
+      (* If the family has its own non-conflicting concrete aliases, prefer
+         their compact prefix (uN -> U32, sN -> S33).  Families whose compact
+         prefix collides with source type names keep the family prefix
+         (iN -> IN32, fN -> FN32, vN -> VN128). *)
+      if stem = "U" || stem = "S" then stem else sort
+    else sort
+  in
+  let nullary_prefix_of_family_raw raw sort =
+    let s = sanitize raw in
+    match String.index_opt s 'N' with
+    | Some idx when idx > 0 ->
+        String.sub s 0 idx |> String.uppercase_ascii
+    | _ -> concrete_prefix_of_family_sort sort
+  in
+  typ_defs
+  |> List.iter (fun (sort, raw, params, _insts) ->
+      if literal_family_candidate raw params then begin
+        let info = {
+          literal_family_raw = raw;
+          literal_family_sort = sort;
+          literal_family_nullary_prefix = nullary_prefix_of_family_raw raw sort;
+          literal_family_concrete_prefix = concrete_prefix_of_family_sort sort;
+        } in
+        Hashtbl.replace literal_family_infos sort info;
+        literal_family_roots := SSet.add sort !literal_family_roots
+      end);
   let rec typ_is_nat_carrier t =
     match t.it with
     | VarT (id, _) ->
@@ -1144,7 +1335,7 @@ let build_type_env defs =
   in
   typ_defs
   |> List.iter (fun (parent_sort, _raw, params, insts) ->
-      if params <> [] && SSet.mem parent_sort literal_family_roots then
+      if params <> [] && is_literal_family_root parent_sort then
         List.iter
           (fun inst ->
             let (InstD (_binders, _args, deftyp)) = inst.it in
@@ -1152,7 +1343,7 @@ let build_type_env defs =
             | AliasT {it = VarT (child_id, child_args); _}
                 when child_args <> [] ->
                 let child_sort = sort_of_type_name child_id.it in
-                if SSet.mem child_sort literal_family_roots then
+                if is_literal_family_root child_sort then
                   add_literal_family_alias_edge child_sort parent_sort
             | _ -> ())
           insts);
@@ -1212,6 +1403,15 @@ let build_type_env defs =
         in
         Hashtbl.replace source_category_subsort_edges child (SSet.add parent parents)
   in
+  let add_source_conditional_alias child parent =
+    if child <> parent then
+      let children =
+        match Hashtbl.find_opt source_conditional_alias_edges parent with
+        | Some children -> children
+        | None -> SSet.empty
+      in
+      Hashtbl.replace source_conditional_alias_edges parent (SSet.add child children)
+  in
   let mixop_is_empty mixop_val =
     mixop_val
     |> List.flatten
@@ -1246,13 +1446,137 @@ let build_type_env defs =
     | [] -> None
     | _ -> Some (Printf.sprintf "CTOR%sA%d" (String.concat "" atoms) arity)
   in
-  let add_source_nullary_term sort term =
+  let format_call_local fn args =
+    match args with
+    | [] -> fn
+    | _ -> Printf.sprintf "%s ( %s )" fn (String.concat " , " args)
+  in
+  let rec source_term_of_exp_for_static e =
+    match e.it with
+    | CaseE (mixop_val, payload) ->
+        let fields =
+          match payload.it with
+          | TupE es -> es
+          | OptE None -> []
+          | _ -> [payload]
+        in
+        (match canonical_ctor_name_arity_local mixop_val (List.length fields) with
+         | Some ctor when fields = [] -> Some ctor
+         | Some ctor ->
+             let args = List.filter_map source_term_of_exp_for_static fields in
+             if List.length args = List.length fields then
+               Some (format_call_local ctor args)
+             else None
+         | None -> None)
+    | VarE id when is_upper_start id.it ->
+        let b = Buffer.create (String.length id.it) in
+        String.iter
+          (fun c ->
+            if (c >= 'a' && c <= 'z')
+               || (c >= 'A' && c <= 'Z')
+               || (c >= '0' && c <= '9')
+            then Buffer.add_char b c)
+          (sanitize id.it);
+        let stem = String.uppercase_ascii (Buffer.contents b) in
+        if stem = "" then None else Some (Printf.sprintf "CTOR%sA0" stem)
+    | NumE (`Nat z | `Int z) -> Some (Z.to_string z)
+    | CvtE (inner, _, _) | SubE (inner, _, _) | LiftE inner
+    | TheE inner | OptE (Some inner) ->
+        source_term_of_exp_for_static inner
+    | _ -> None
+  in
+  let source_int_of_exp e =
+    match e.it with
+    | NumE (`Nat z | `Int z) -> Some (Z.to_string z)
+    | _ -> None
+  in
+  let source_call_alias_of_exp e =
+    match e.it with
+    | CallE (target_id, [{it = ExpA {it = VarE arg_id; _}; _}]) ->
+        Some (call_name target_id.it, arg_id.it)
+    | _ -> None
+  in
+  let rec typ_is_nat_or_int_result t =
+    match t.it with
+    | NumT (`NatT | `IntT) -> true
+    | VarT (id, _) ->
+        let raw = String.lowercase_ascii id.it in
+        raw = "nat" || raw = "int"
+    | IterT (inner, Opt) -> typ_is_nat_or_int_result inner
+    | _ -> false
+  in
+  let register_source_unary_int_alias fn arg_sort target_fn =
+    let rule = {
+      source_alias_fn = fn;
+      source_alias_arg_sort = arg_sort;
+      source_alias_target_fn = target_fn;
+    } in
+    if not (List.exists ((=) rule) !source_unary_int_aliases) then
+      source_unary_int_aliases := rule :: !source_unary_int_aliases
+  in
+  let collect_source_ground_int_defs d =
+    let rec go d =
+      match d.it with
+      | RecD ds -> List.iter go ds
+      | DecD (id, params, _result_typ, insts) ->
+          let fn = call_name id.it in
+          if List.length params = 1 && typ_is_nat_or_int_result _result_typ then
+            source_unary_int_functions := SSet.add fn !source_unary_int_functions;
+          let param_sorts =
+            params
+            |> List.filter_map (fun p ->
+                 match p.it with
+                 | ExpP (pid, t) ->
+                     let sort =
+                       match simple_sort_of_typ t [] with
+                       | Some s -> s
+                       | None -> "SpectecTerminal"
+                     in
+                     Some (pid.it, sort)
+                 | TypP _ | DefP _ | GramP _ -> None)
+          in
+          List.iter
+            (fun inst ->
+              match inst.it with
+              | DefD ([], [{it = ExpA lhs_e; _}], rhs_e, []) ->
+                  (match source_term_of_exp_for_static lhs_e, source_int_of_exp rhs_e with
+                   | Some lhs_term, Some rhs_int when not (is_plain_var_like lhs_term) ->
+                       register_source_ground_int_value fn lhs_term rhs_int
+                   | _ -> ());
+                  (match lhs_e.it, source_call_alias_of_exp rhs_e with
+                   | VarE lhs_id, Some (target_fn, rhs_arg)
+                       when lhs_id.it = rhs_arg ->
+                       (match List.assoc_opt lhs_id.it param_sorts with
+                        | Some arg_sort ->
+                            register_source_unary_int_alias fn arg_sort target_fn
+                        | None -> ())
+                   | _ -> ())
+              | _ -> ())
+            insts
+      | TypD _ | RelD _ | GramD _ | HintD _ -> ()
+    in
+    go d
+  in
+  List.iter collect_source_ground_int_defs defs;
+  let add_source_nullary_term_local sort term =
     let old =
       match Hashtbl.find_opt source_nullary_terms_by_sort sort with
       | Some terms -> terms
       | None -> SSet.empty
     in
     Hashtbl.replace source_nullary_terms_by_sort sort (SSet.add term old)
+  in
+  let field_name_of_exp e =
+    match e.it with
+    | VarE id -> Some id.it
+    | _ -> None
+  in
+  let compound_fields_of_typ t =
+    match t.it with
+    | TupT fields ->
+        Some (List.map (fun (fe, ft) -> (field_name_of_exp fe, ft)) fields)
+    | VarT _ | IterT _ | BoolT | NumT _ | TextT ->
+        Some [(None, t)]
   in
   List.iter
     (fun (parent_sort, _raw, params, insts) ->
@@ -1277,7 +1601,11 @@ let build_type_env defs =
                            else if typ_is_empty_payload case_typ then
                              match mixop_category_ref_sort mixop_val with
                              | Some child -> add_source_category_subsort child parent_sort
-                             | None -> ())
+                             | None -> ()
+                         else if mixop_is_empty mixop_val then
+                           match typ_ref_sort case_typ with
+                           | Some child -> add_source_conditional_alias child parent_sort
+                           | None -> ())
 	                       cases
 	                 | StructT _ -> ())
 	            | _ -> ())
@@ -1294,17 +1622,32 @@ let build_type_env defs =
                  | VariantT cases ->
                      List.iter
                        (fun (mixop_val, (_, case_typ, prems), _) ->
-                         if prems = [] then
-                           match canonical_ctor_name_arity_local mixop_val 0 with
-                           | Some ctor ->
-                               let has_payload =
-                                 match case_typ.it with
-                                 | TupT [] -> false
-                                 | _ -> true
-                               in
-                               if not has_payload then
-                                 add_source_nullary_term parent_sort ctor
-                           | None -> ())
+                         let arity =
+                           match case_typ.it with
+                           | TupT fields -> List.length fields
+                           | _ -> 1
+                         in
+                         match canonical_ctor_name_arity_local mixop_val arity with
+                         | Some ctor ->
+                             let has_payload =
+                               match case_typ.it with
+                               | TupT [] -> false
+                               | _ -> true
+                             in
+                             if not has_payload then begin
+                               if prems = [] then
+                                 add_source_nullary_term_local parent_sort ctor
+                             end else
+                               (match compound_fields_of_typ case_typ with
+                                | Some fields ->
+                                    source_compound_cases :=
+                                      { compound_parent_sort = parent_sort;
+                                        compound_ctor = ctor;
+                                        compound_fields = fields;
+                                        compound_prems = prems;
+                                      } :: !source_compound_cases
+                                | None -> ())
+                         | None -> ())
                        cases
                  | AliasT _ | StructT _ -> ())
             | _ -> ())
@@ -1418,7 +1761,7 @@ let build_type_env defs =
     match t.it with
     | VarT (id, _) ->
         let sort = sort_of_type_name id.it in
-        SSet.mem sort literal_family_roots || SSet.mem sort known
+        is_literal_family_root sort || SSet.mem sort known
     | IterT (inner, _) -> typ_uses_literal_family known inner
     | TupT fields ->
         List.exists (fun (_e, t) -> typ_uses_literal_family known t) fields
@@ -1444,12 +1787,20 @@ let build_type_env defs =
     if SSet.equal known next then known else fix_literal_parents next
   in
   literal_family_parent_sorts :=
-    fix_literal_parents literal_family_roots
+    fix_literal_parents !literal_family_roots
 
 let source_nullary_terms sort =
   match Hashtbl.find_opt source_nullary_terms_by_sort sort with
   | Some terms -> terms
   | None -> SSet.empty
+
+let add_source_nullary_term sort term =
+  let old =
+    match Hashtbl.find_opt source_nullary_terms_by_sort sort with
+    | Some terms -> terms
+    | None -> SSet.empty
+  in
+  Hashtbl.replace source_nullary_terms_by_sort sort (SSet.add term old)
 
 let finite_source_terms_for_sort sort =
   let rec go seen sort =
@@ -1469,7 +1820,7 @@ let finite_source_terms_for_sort sort =
   in
   go SSet.empty sort
 
-let nullary_ctor_suffix term =
+let rec nullary_ctor_suffix term =
   let term = strip_wrapping_parens term |> String.trim in
   let re = Str.regexp "^CTOR\\([A-Z0-9]+\\)A0$" in
   if Str.string_match re term 0 then
@@ -1477,48 +1828,91 @@ let nullary_ctor_suffix term =
     | Some suffix -> suffix
     | None -> String.uppercase_ascii (sanitize term)
   else
-    String.uppercase_ascii (sanitize term)
+    match parse_call_text term with
+    | Some (ctor, args) when starts_with ctor "CTOR" ->
+        let ctor_suffix =
+          let re = Str.regexp "^CTOR\\([A-Z0-9]+\\)A[0-9]+$" in
+          if Str.string_match re ctor 0 then
+            match str_matched_group_opt 1 ctor with Some s -> s | None -> ctor
+          else ctor
+        in
+        ctor_suffix ^ String.concat "" (List.map nullary_ctor_suffix args)
+    | Some (lit, [payload]) when starts_with lit "lit" ->
+        let stem =
+          String.sub lit 3 (String.length lit - 3)
+          |> String.uppercase_ascii
+        in
+        let payload =
+          strip_wrapping_parens payload
+          |> String.trim
+          |> String.map (function
+               | '0' .. '9' as c -> c
+               | _ -> '_')
+          |> String.split_on_char '_'
+          |> List.filter (fun s -> s <> "")
+          |> String.concat ""
+        in
+        stem ^ payload
+    | _ ->
+        let b = Buffer.create (String.length term) in
+        String.iter
+          (fun c ->
+            if (c >= 'a' && c <= 'z')
+               || (c >= 'A' && c <= 'Z')
+               || (c >= '0' && c <= '9')
+            then Buffer.add_char b c)
+          term;
+        let cleaned = Buffer.contents b in
+        if cleaned = "" then "TERM" else String.uppercase_ascii cleaned
 
 let concrete_literal_family_sort family_sort numeric_tail =
-  match family_sort with
-  | "UN" -> "U" ^ numeric_tail
-  | "SN" -> "S" ^ numeric_tail
-  | "IN" -> "IN" ^ numeric_tail
-  | "FN" -> "FN" ^ numeric_tail
-  | "VN" -> "VN" ^ numeric_tail
-  | _ -> family_sort ^ numeric_tail
+  match Hashtbl.find_opt literal_family_infos family_sort with
+  | Some info -> info.literal_family_concrete_prefix ^ numeric_tail
+  | None ->
+      if ends_with family_sort "N" && String.length family_sort > 1 then
+        let stem = String.sub family_sort 0 (String.length family_sort - 1) in
+        (if stem = "U" || stem = "S" then stem else family_sort) ^ numeric_tail
+      else family_sort ^ numeric_tail
 
 let literal_family_of_nullary_suffix suffix =
   let len = String.length suffix in
   if len < 2 then None
   else
-    let numeric_tail = String.sub suffix 1 (len - 1) in
-    let all_digits =
-      numeric_tail <> "" &&
-      String.for_all (fun c -> c >= '0' && c <= '9') numeric_tail
-    in
-    if not all_digits then None
-    else
-      match suffix.[0] with
-      | 'I' -> Some ("IN", numeric_tail)
-      | 'F' -> Some ("FN", numeric_tail)
-      | 'V' -> Some ("VN", numeric_tail)
-      | 'U' -> Some ("UN", numeric_tail)
-      | 'S' -> Some ("SN", numeric_tail)
-      | _ -> None
+    Hashtbl.to_seq_values literal_family_infos
+    |> Seq.filter_map (fun info ->
+         let prefix = info.literal_family_nullary_prefix in
+         let plen = String.length prefix in
+         if plen > 0 && len > plen && String.sub suffix 0 plen = prefix then
+           let numeric_tail = String.sub suffix plen (len - plen) in
+           if numeric_tail <> ""
+              && String.for_all (fun c -> c >= '0' && c <= '9') numeric_tail
+           then Some (info.literal_family_sort, numeric_tail)
+           else None
+         else None)
+    |> List.of_seq
+    |> List.sort_uniq compare
+    |> (function
+        | [one] -> Some one
+        | _ -> None)
 
 let literal_family_of_concrete_sort sort =
-  let candidates = [("IN", "IN"); ("FN", "FN"); ("VN", "VN"); ("U", "UN"); ("S", "SN")] in
-  candidates
-  |> List.find_map (fun (prefix, family_sort) ->
+  Hashtbl.to_seq_values literal_family_infos
+  |> Seq.filter_map (fun info ->
+       let prefix = info.literal_family_concrete_prefix in
        let plen = String.length prefix in
-       if String.length sort > plen && String.sub sort 0 plen = prefix then
+       if plen > 0 && String.length sort > plen
+          && String.sub sort 0 plen = prefix then
          let numeric_tail = String.sub sort plen (String.length sort - plen) in
          if numeric_tail <> ""
             && String.for_all (fun c -> c >= '0' && c <= '9') numeric_tail
-         then Some (family_sort, numeric_tail)
+         then Some (info.literal_family_sort, numeric_tail)
          else None
-	       else None)
+       else None)
+  |> List.of_seq
+  |> List.sort_uniq compare
+  |> (function
+      | [one] -> Some one
+      | _ -> None)
 
 let decimal_double digits =
   let carry = ref 0 in
@@ -1568,19 +1962,113 @@ let int_of_numeric_tail_opt tail =
   try Some (int_of_string tail) with Failure _ -> None
 
 let literal_wrapper_name family_sort numeric_tail =
-  match family_sort with
-  | "UN" -> Some ("litU" ^ numeric_tail)
-  | "FN" -> Some ("litF" ^ numeric_tail)
-  | _ -> None
+  match Hashtbl.find_opt literal_family_infos family_sort with
+  | Some info ->
+      let prefix = info.literal_family_concrete_prefix in
+      if prefix = "U" || prefix = "FN" then Some ("lit" ^ prefix ^ numeric_tail)
+      else None
+  | None ->
+      if family_sort = "UN" then Some ("litU" ^ numeric_tail)
+      else if family_sort = "FN" then Some ("litF" ^ numeric_tail)
+      else None
+
+let source_literal_wrapper_name sort =
+  "lit" ^ sort
+
+let finite_numeric_literals_from_condition var cond =
+  let cond_without_var =
+    Str.global_replace (Str.regexp_string var) "" cond
+  in
+  let cleaned =
+    cond_without_var
+    |> Str.global_replace (Str.regexp_string "_or_") ""
+    |> Str.global_replace (Str.regexp_string "_==_") ""
+    |> Str.global_replace (Str.regexp "[0-9]+") ""
+    |> Str.global_replace (Str.regexp "[(), \t\n\r]") ""
+    |> String.trim
+  in
+  if cleaned <> "" then []
+  else
+    let re = Str.regexp "[0-9]+" in
+    let rec loop pos acc =
+      match (try Some (Str.search_forward re cond pos) with Not_found -> None) with
+      | None -> List.rev acc |> List.sort_uniq String.compare
+      | Some _ ->
+          let lit = Str.matched_string cond in
+          loop (Str.match_end ()) (lit :: acc)
+    in
+    loop 0 []
+
+let register_source_literal_wrapper_for_sort sort payload_sort cond_template =
+  let wrapper = source_literal_wrapper_name sort in
+  let var =
+    String.uppercase_ascii wrapper ^
+    (if payload_sort = "Nat" then "-N" else "-I")
+  in
+  let cond =
+    replace_maude_var_token "$LIT" var cond_template
+  in
+  Hashtbl.replace literal_wrapper_payload_sorts wrapper payload_sort;
+  Hashtbl.replace source_literal_wrapper_by_sort sort wrapper;
+  literal_wrapper_syntax_decls :=
+    SSet.add
+      (Printf.sprintf "  op %s : %s -> SpectecTerminal [ctor] ."
+         wrapper payload_sort)
+      (SSet.add (Printf.sprintf "  var %s : %s ." var payload_sort)
+         !literal_wrapper_syntax_decls);
+  literal_wrapper_memberships :=
+    SSet.add
+      (Printf.sprintf "  cmb ( %s ( %s ) ) : %s\n   if %s ."
+         wrapper var sort cond)
+      !literal_wrapper_memberships;
+  wrapper
+
+let source_literal_membership_for_numeric_condition sort lhs rhs =
+  let lhs = strip_wrapping_parens lhs |> String.trim in
+  if lhs = "" || rhs = "" || not (is_plain_var_like lhs) then None
+  else
+    let raw_pat = Printf.sprintf "$raw-lit ( %s )" lhs in
+    if not (contains_substring rhs raw_pat) then None
+    else
+      let cond_template =
+        Str.global_replace (Str.regexp_string raw_pat) "$LIT" rhs
+      in
+      let number_re = Str.regexp "-?[0-9]+" in
+      let rec collect pos acc =
+        match (try Some (Str.search_forward number_re cond_template pos)
+               with Not_found -> None) with
+        | None -> List.rev acc
+        | Some _ ->
+            let n = Str.matched_string cond_template in
+            collect (Str.match_end ()) (n :: acc)
+      in
+      let payload_sort =
+        if List.exists (fun n -> starts_with n "-") (collect 0 []) then "Int"
+        else "Nat"
+      in
+  let wrapper =
+        register_source_literal_wrapper_for_sort sort payload_sort cond_template
+      in
+      finite_numeric_literals_from_condition "$LIT" cond_template
+      |> List.iter (fun lit ->
+           add_source_nullary_term sort
+             (Printf.sprintf "%s ( %s )" wrapper lit));
+      Some
+        (Printf.sprintf "  --- Source literal category %s uses object-level wrapper %s." sort wrapper)
 
 let literal_wrapper_direct_spec sort =
   match literal_family_of_concrete_sort sort with
-  | Some (("UN" as family_sort), numeric_tail) ->
-      Option.map (fun wrapper -> (wrapper, "Nat", numeric_tail))
-        (literal_wrapper_name family_sort numeric_tail)
-  | Some (("FN" as family_sort), ("32" | "64" as numeric_tail)) ->
-      Option.map (fun wrapper -> (wrapper, "Int", numeric_tail))
-        (literal_wrapper_name family_sort numeric_tail)
+  | Some (family_sort, numeric_tail) ->
+      (match Hashtbl.find_opt literal_family_infos family_sort with
+       | Some info when info.literal_family_concrete_prefix = "U" ->
+           Option.map (fun wrapper -> (wrapper, "Nat", numeric_tail))
+             (literal_wrapper_name family_sort numeric_tail)
+       | Some info
+           when info.literal_family_concrete_prefix = "FN"
+                && (numeric_tail = "32" || numeric_tail = "64") ->
+           Option.map (fun wrapper -> (wrapper, "Int", numeric_tail))
+             (literal_wrapper_name family_sort numeric_tail)
+       | _ -> None)
   | _ -> None
 
 let register_literal_wrapper_for_sort sort =
@@ -1636,6 +2124,15 @@ let literal_wrapper_for_sort ?(register=false) sort =
     if SSet.mem sort seen then None
     else
       let seen = SSet.add sort seen in
+      match Hashtbl.find_opt source_literal_wrapper_by_sort sort with
+      | Some wrapper ->
+          let payload_sort =
+            match Hashtbl.find_opt literal_wrapper_payload_sorts wrapper with
+            | Some s -> s
+            | None -> "SpectecTerminal"
+          in
+          Some (wrapper, payload_sort)
+      | None ->
       match literal_wrapper_direct_spec sort with
       | Some (wrapper, payload_sort, _numeric_tail) ->
           if register then register_literal_wrapper_for_sort sort;
@@ -1835,6 +2332,7 @@ let register_literal_family_alias_subsorts spec_sort =
 
 let register_specialized_syntax_sort parent_sort terms =
   let spec_sort = specialized_syntax_sort_name parent_sort terms in
+  specialized_syntax_sort_names := SSet.add spec_sort !specialized_syntax_sort_names;
   register_literal_wrapper_for_sort spec_sort;
   specialized_syntax_sort_decls :=
     SSet.add (Printf.sprintf "  sort %s ." spec_sort)
@@ -2384,6 +2882,20 @@ let wrap_const_payload_for_type nt payload =
         format_call "$wrap-lit" [nt; payload]
     | None -> payload
 
+let apply_ctor_literal_type_dependencies ctor args =
+  match Hashtbl.find_opt ctor_arg_literal_type_dependencies ctor with
+  | None -> args
+  | Some deps ->
+      List.mapi
+        (fun arg_index arg ->
+          match List.find_opt (fun (payload_i, _) -> payload_i = arg_index) deps with
+          | Some (_, type_i) ->
+              (match List.nth_opt args type_i with
+               | Some nt -> wrap_const_payload_for_type nt arg
+               | None -> arg)
+          | None -> arg)
+        args
+
 let arg_is_already_object_level_for_sort sort arg =
   let arg = strip_wrapping_parens arg |> String.trim in
   is_literal_wrapper_call arg
@@ -2408,17 +2920,14 @@ let wrap_source_arg_for_sort sort arg =
   | _ -> arg
 
 let format_source_ctor_call ctor args =
-  match ctor, args with
-  | "CTORCONSTA2", [nt; payload] ->
-      format_call ctor [nt; wrap_const_payload_for_type nt payload]
-  | _ ->
-      let args =
-        match Hashtbl.find_opt ctor_arg_membership_sort_hints ctor with
-        | Some sorts when List.length sorts = List.length args ->
-            List.map2 wrap_source_arg_for_sort sorts args
-        | _ -> args
-      in
-      format_call ctor args
+  let args = apply_ctor_literal_type_dependencies ctor args in
+  let args =
+    match Hashtbl.find_opt ctor_arg_membership_sort_hints ctor with
+    | Some sorts when List.length sorts = List.length args ->
+        List.map2 wrap_source_arg_for_sort sorts args
+    | _ -> args
+  in
+  format_call ctor args
 
 let raw_literal_text_for_numeric_context text =
   let core = strip_wrapping_parens text |> String.trim in
@@ -3381,9 +3890,18 @@ and bool_sort_safety_conds_path (p : path) vm =
       @ bool_sort_safety_conds_exp e2 vm
 
 let type_guard term typ vm =
+  match sequence_sort_of_typ typ vm with
+  | Some seq_sort ->
+      Printf.sprintf "%s : %s" term seq_sort
+  | None ->
   match simple_sort_of_typ typ vm with
   | Some s when SSet.mem s !sequence_alias_sorts ->
-      Printf.sprintf "%s : SpectecTerminals" term
+      (match Hashtbl.find_opt sequence_alias_elem_sorts s with
+       | Some elem_sort ->
+           let seq_sort = native_sequence_sort_name elem_sort in
+           register_native_sequence_sort elem_sort;
+           Printf.sprintf "%s : %s" term seq_sort
+       | None -> Printf.sprintf "%s : SpectecTerminals" term)
   | Some s -> Printf.sprintf "%s : %s" term s
   | None ->
       let ty = translate_typ typ vm in
@@ -3430,24 +3948,34 @@ let declared_sort_of_typ t =
     | _ -> "SpectecTerminal"
 
 let seq_decl_sort_of_inner_typ (inner : typ) =
-  let _ = inner in
-  "SpectecTerminals"
+  match sequence_sort_of_inner_typ inner [] with
+  | Some seq_sort -> seq_sort
+  | None -> "SpectecTerminals"
 
 let decl_sort_of_typ (t : typ) =
   match t.it with
   | IterT (inner, (List | List1 | ListN _)) ->
       seq_decl_sort_of_inner_typ inner
   | _ ->
+      (match sequence_sort_of_typ t [] with
+       | Some seq_sort -> seq_sort
+       | None ->
       match type_sort_of_typ t [] with
       | Some s when SSet.mem s !sequence_alias_sorts -> "SpectecTerminals"
-      | _ -> declared_sort_of_typ t
+      | _ -> declared_sort_of_typ t)
 
 let source_carrier_sort_of_typ (t : typ) vm =
-  if is_sequence_typ t then "SpectecTerminals"
-  else
+  match sequence_sort_of_typ t vm with
+  | Some seq_sort -> seq_sort
+  | None ->
 	    match simple_sort_of_typ t vm with
-	    | Some s when SSet.mem s !sequence_alias_sorts
-	               || SSet.mem s !flat_sequence_source_sorts -> "SpectecTerminals"
+	    | Some s when SSet.mem s !sequence_alias_sorts ->
+          (match Hashtbl.find_opt sequence_alias_elem_sorts s with
+           | Some elem_sort ->
+               register_native_sequence_sort elem_sort;
+               native_sequence_sort_name elem_sort
+           | None -> "SpectecTerminals")
+	    | Some s when SSet.mem s !flat_sequence_source_sorts -> "SpectecTerminals"
 	    | Some s when s <> "SpectecTerminal" -> s
 	    | _ -> "SpectecTerminal"
 
@@ -3471,6 +3999,636 @@ let source_param_var_sort (p : param) =
   | ExpP (id, _) -> Some (to_var_name id.it, source_param_sort p)
   | TypP id -> Some (sanitize id.it, "SpectecTerminal")
   | DefP _ | GramP _ -> None
+
+let source_sort_reaches start target =
+  let rec go seen sort =
+    sort = target
+    || (not (SSet.mem sort seen)
+        &&
+        let seen = SSet.add sort seen in
+        let parents =
+          match Hashtbl.find_opt source_category_subsort_edges sort with
+          | Some ps -> ps
+          | None -> SSet.empty
+        in
+        SSet.exists (go seen) parents)
+  in
+  go SSet.empty start
+
+let source_nullary_term_has_sort term target =
+  Hashtbl.fold
+    (fun sort terms acc ->
+      acc || (SSet.mem term terms && source_sort_reaches sort target))
+    source_nullary_terms_by_sort false
+
+let ctor_numeric_suffix term =
+  let t = strip_wrapping_parens term |> String.trim in
+  let re = Str.regexp "CTOR[A-Z]*\\([0-9]+\\)A0" in
+  if Str.string_match re t 0 then
+    try Some (int_of_string (Str.matched_group 1 t)) with _ -> None
+  else None
+
+let int_of_string_opt s =
+  try Some (int_of_string s) with Failure _ -> None
+
+let source_int_function_candidates fn =
+  let strip_trailing_digits s =
+    let rec loop i =
+      if i > 0 then
+        match s.[i - 1] with
+        | '0' .. '9' -> loop (i - 1)
+        | _ -> i
+      else i
+    in
+    let n = loop (String.length s) in
+    if n = String.length s then s else String.sub s 0 n
+  in
+  let strip_nn_suffix s =
+    if ends_with s "nn" && String.length s > 2 then
+      String.sub s 0 (String.length s - 2)
+    else s
+  in
+  [fn; strip_trailing_digits fn; strip_nn_suffix (strip_trailing_digits fn)]
+  |> List.sort_uniq String.compare
+
+let rec eval_source_ground_unary_int_call seen fn arg =
+  let arg = strip_wrapping_parens arg |> String.trim in
+  if SSet.mem fn seen then None
+  else
+    let seen = SSet.add fn seen in
+    let candidates = source_int_function_candidates fn in
+    let direct =
+      candidates
+      |> List.find_map (fun candidate ->
+           match find_source_ground_int_value candidate arg with
+           | Some value -> int_of_string_opt value
+           | None -> None)
+    in
+    match direct with
+    | Some _ as result -> result
+    | None ->
+        candidates
+        |> List.find_map (fun candidate ->
+             !source_unary_int_aliases
+             |> List.find_map (fun rule ->
+                  if rule.source_alias_fn = candidate
+                     && source_nullary_term_has_sort arg rule.source_alias_arg_sort
+                  then
+                    eval_source_ground_unary_int_call
+                      seen rule.source_alias_target_fn arg
+                  else None))
+
+let source_int_function_known fn =
+  let candidates = source_int_function_candidates fn in
+  candidates
+  |> List.exists (fun candidate ->
+       SSet.mem candidate !source_unary_int_functions
+       ||
+       Hashtbl.to_seq_keys source_ground_int_call_values
+       |> Seq.exists (fun key ->
+            starts_with key (candidate ^ "\x1f"))
+       || List.exists
+            (fun rule -> rule.source_alias_fn = candidate)
+            !source_unary_int_aliases)
+
+let rec eval_ground_int_expr text =
+  let text = strip_wrapping_parens text |> String.trim in
+  if text = "" then None
+  else
+    try Some (int_of_string text)
+    with Failure _ ->
+      match parse_call_text text with
+      | Some (fn, [arg]) when starts_with fn "lit" ->
+          eval_ground_int_expr arg
+      | Some (("$raw-lit" | "$raw-nat-lit" | "$raw-int-lit"), [arg]) ->
+          eval_ground_int_expr arg
+      | Some (fn, [arg]) ->
+          (match eval_source_ground_unary_int_call SSet.empty fn arg with
+           | Some _ as result -> result
+           | None when source_int_function_known fn -> ctor_numeric_suffix arg
+           | None -> None)
+      | Some ("_+_", [a; b]) ->
+          Option.bind (eval_ground_int_expr a)
+            (fun x -> Option.map (fun y -> x + y) (eval_ground_int_expr b))
+      | Some ("_-_", [a; b]) ->
+          Option.bind (eval_ground_int_expr a)
+            (fun x -> Option.map (fun y -> x - y) (eval_ground_int_expr b))
+      | Some ("_*_", [a; b]) ->
+          Option.bind (eval_ground_int_expr a)
+            (fun x -> Option.map (fun y -> x * y) (eval_ground_int_expr b))
+      | Some ("_quo_", [a; b]) ->
+          Option.bind (eval_ground_int_expr a)
+            (fun x ->
+              match eval_ground_int_expr b with
+              | Some y when y <> 0 -> Some (x / y)
+              | _ -> None)
+      | _ -> None
+
+let rec eval_ground_bool_expr text =
+  let text = strip_trailing_eq_true (strip_wrapping_parens text |> String.trim) in
+  let eval_infix re pred =
+    match split_once_re (Str.regexp re) text with
+    | Some (a, b) ->
+        Option.bind (eval_ground_int_expr a)
+          (fun x -> Option.map (fun y -> pred x y) (eval_ground_int_expr b))
+    | None -> None
+  in
+  match eval_infix "[ \t]+==[ \t]+" ( = ) with
+  | Some _ as r -> r
+  | None ->
+  match eval_infix "[ \t]+=/=[ \t]+" ( <> ) with
+  | Some _ as r -> r
+  | None ->
+  match eval_infix "[ \t]+<=[ \t]+" ( <= ) with
+  | Some _ as r -> r
+  | None ->
+  match eval_infix "[ \t]+>=[ \t]+" ( >= ) with
+  | Some _ as r -> r
+  | None ->
+  match eval_infix "[ \t]+<[ \t]+" ( < ) with
+  | Some _ as r -> r
+  | None ->
+  match eval_infix "[ \t]+>[ \t]+" ( > ) with
+  | Some _ as r -> r
+  | None ->
+  match parse_call_text text with
+  | Some (("_and_" | "and"), [a; b]) ->
+      (match eval_ground_bool_expr a, eval_ground_bool_expr b with
+       | Some false, _ | _, Some false -> Some false
+       | Some true, Some true -> Some true
+       | _ -> None)
+  | Some (("_or_" | "or"), [a; b]) ->
+      (match eval_ground_bool_expr a, eval_ground_bool_expr b with
+       | Some true, _ | _, Some true -> Some true
+       | Some false, Some false -> Some false
+       | _ -> None)
+  | Some (("_==_" | "=="), [a; b]) ->
+      Option.bind (eval_ground_int_expr a)
+        (fun x -> Option.map (fun y -> x = y) (eval_ground_int_expr b))
+  | Some (("_=/=_" | "=/="), [a; b]) ->
+      Option.bind (eval_ground_int_expr a)
+        (fun x -> Option.map (fun y -> x <> y) (eval_ground_int_expr b))
+  | Some (("_<_" | "<"), [a; b]) ->
+      Option.bind (eval_ground_int_expr a)
+        (fun x -> Option.map (fun y -> x < y) (eval_ground_int_expr b))
+  | Some (("_<=_" | "<="), [a; b]) ->
+      Option.bind (eval_ground_int_expr a)
+        (fun x -> Option.map (fun y -> x <= y) (eval_ground_int_expr b))
+  | Some (("_>_" | ">"), [a; b]) ->
+      Option.bind (eval_ground_int_expr a)
+        (fun x -> Option.map (fun y -> x > y) (eval_ground_int_expr b))
+  | Some (("_>=_" | ">="), [a; b]) ->
+      Option.bind (eval_ground_int_expr a)
+        (fun x -> Option.map (fun y -> x >= y) (eval_ground_int_expr b))
+  | _ -> None
+
+let ground_compound_membership_status term sort =
+  match ctor_call_pattern term with
+  | Some ("CTORXA2", [lane; dim])
+      when sort = "Shape" || sort = "Ishape" || sort = "Bshape" ->
+      let shape_ok =
+        match ctor_numeric_suffix lane, eval_ground_int_expr dim with
+        | Some lane_size, Some dim_n -> lane_size * dim_n = 128
+        | _ -> false
+      in
+      if not shape_ok then Some false
+      else if sort = "Shape" then Some true
+      else if sort = "Ishape" then
+        Some (source_nullary_term_has_sort lane "Jnn")
+      else
+        Some ((strip_wrapping_parens lane |> String.trim) = "CTORI8A0")
+  | _ -> None
+
+let eval_ground_condition text =
+  let text = strip_trailing_eq_true (strip_wrapping_parens text |> String.trim) in
+  match split_once_re (Str.regexp "[ \t]+:[ \t]+") text with
+  | Some (term, sort) ->
+      ground_compound_membership_status term (String.trim sort)
+  | None -> eval_ground_bool_expr text
+
+let simplify_static_conditions conds =
+  let rec go acc = function
+    | [] -> Some (List.rev acc)
+    | cond :: rest ->
+        (match eval_ground_condition cond with
+         | Some true -> go acc rest
+         | Some false -> None
+         | None -> go (cond :: acc) rest)
+  in
+  go [] conds
+
+let compound_term_allowed_for_sort term sort =
+  match ground_compound_membership_status term sort with
+  | Some false -> false
+  | _ -> true
+
+let finite_terms_for_sort sort =
+  let max_terms = 2048 in
+  let cartesian lists =
+    List.fold_right
+      (fun xs acc ->
+        List.concat_map (fun x -> List.map (fun ys -> x :: ys) acc) xs)
+      lists
+      [[]]
+  in
+  let limit xs =
+    let rec take n acc = function
+      | [] -> List.rev acc
+      | _ when n <= 0 -> List.rev acc
+      | x :: rest -> take (n - 1) (x :: acc) rest
+    in
+    take max_terms [] xs
+  in
+  let rec go seen sort =
+    if SSet.mem sort seen then []
+    else
+      let seen = SSet.add sort seen in
+      let direct = finite_source_terms_for_sort sort |> SSet.elements in
+      let conditional_alias_terms =
+        match Hashtbl.find_opt source_conditional_alias_edges sort with
+        | None -> []
+        | Some children ->
+            children
+            |> SSet.elements
+            |> List.concat_map (go seen)
+      in
+      let compound_terms =
+        !source_compound_cases
+        |> List.filter (fun c -> c.compound_parent_sort = sort)
+        |> List.concat_map (fun c ->
+             let per_field =
+               c.compound_fields
+               |> List.map (fun (_raw, ft) ->
+                    match simple_sort_of_typ ft [] with
+                    | Some field_sort -> go seen field_sort
+                    | None -> [])
+             in
+             if per_field = [] || List.exists ((=) []) per_field then []
+             else
+	               cartesian per_field
+               |> List.map (fun args -> format_call c.compound_ctor args)
+             |> List.filter (fun term -> compound_term_allowed_for_sort term sort))
+      in
+      direct @ conditional_alias_terms @ compound_terms
+      |> List.sort_uniq String.compare
+      |> limit
+  in
+  go SSet.empty sort
+
+let finite_axis_terms_for_sort sort =
+  let terms = finite_terms_for_sort sort in
+  if terms <> [] then terms
+  else
+    let max_terms = 2048 in
+    let cartesian lists =
+      List.fold_right
+        (fun xs acc ->
+          List.concat_map (fun x -> List.map (fun ys -> x :: ys) acc) xs)
+        lists
+        [[]]
+    in
+    let limit xs =
+      let rec take n acc = function
+        | [] -> List.rev acc
+        | _ when n <= 0 -> List.rev acc
+        | x :: rest -> take (n - 1) (x :: acc) rest
+      in
+      take max_terms [] xs
+    in
+    !source_compound_cases
+    |> List.concat_map (fun c ->
+         let per_field =
+           c.compound_fields
+           |> List.map (fun (_raw, ft) ->
+                match simple_sort_of_typ ft [] with
+                | Some field_sort -> finite_terms_for_sort field_sort
+                | None -> [])
+         in
+         if per_field = [] || List.exists ((=) []) per_field then []
+         else
+           cartesian per_field
+           |> List.filter_map (fun args ->
+                let term = format_call c.compound_ctor args in
+                match ground_compound_membership_status term sort with
+                | Some true -> Some term
+                | _ -> None))
+    |> List.sort_uniq String.compare
+    |> limit
+
+let compound_arg_choices_for_declared_sort declared_sort actual_typ v_map =
+  let cartesian lists =
+    List.fold_right
+      (fun xs acc ->
+        List.concat_map (fun x -> List.map (fun ys -> x :: ys) acc) xs)
+      lists
+      [[]]
+  in
+  let actual_fields =
+    match actual_typ.it with
+    | TupT fields -> fields
+    | _ -> []
+  in
+  if actual_fields = [] then []
+  else
+    let candidate_parent_sorts =
+      let direct = [declared_sort] in
+      let conditional =
+        match Hashtbl.find_opt source_conditional_alias_edges declared_sort with
+        | Some children -> SSet.elements children
+        | None -> []
+      in
+      direct @ conditional
+    in
+    let case_has_ground_status c =
+      let sample_args =
+        c.compound_fields
+        |> List.filter_map (fun (_raw, ft) ->
+             match simple_sort_of_typ ft [] with
+             | Some field_sort ->
+                 finite_terms_for_sort field_sort
+                 |> List.find_opt (fun _ -> true)
+             | None -> None)
+      in
+      List.length sample_args = List.length c.compound_fields
+      &&
+      match
+        ground_compound_membership_status
+          (format_call c.compound_ctor sample_args)
+          declared_sort
+      with
+      | Some _ -> true
+      | None -> false
+    in
+    let direct_cases =
+      candidate_parent_sorts
+      |> List.concat_map (fun parent_sort ->
+           !source_compound_cases
+           |> List.filter (fun c ->
+                c.compound_parent_sort = parent_sort
+                && List.length c.compound_fields = List.length actual_fields))
+    in
+    let candidate_cases =
+      if direct_cases <> [] then direct_cases
+      else
+        !source_compound_cases
+        |> List.filter (fun c ->
+             List.length c.compound_fields = List.length actual_fields
+             && case_has_ground_status c)
+    in
+    candidate_cases
+    |> List.concat_map (fun c ->
+              let per_field =
+                List.map2
+                  (fun (actual_exp, _actual_ft) (_decl_raw, decl_ft) ->
+                    let raw_opt =
+                      match actual_exp.it with
+                      | VarE id -> Some id.it
+                      | _ -> None
+                    in
+	                    match simple_sort_of_typ decl_ft [] with
+	                    | Some field_sort ->
+	                        finite_axis_terms_for_sort field_sort
+                        |> List.map (fun term ->
+                             let assigns =
+                               match raw_opt with
+                               | None -> []
+                               | Some raw ->
+                                   let subst_var =
+                                     match List.assoc_opt raw v_map with
+                                     | Some mv -> mv
+                                     | None -> to_var_name raw
+                                   in
+                                   [(subst_var, term)]
+                             in
+                             (term, assigns))
+                    | None -> [])
+                  actual_fields c.compound_fields
+              in
+              if per_field = [] || List.exists ((=) []) per_field then []
+              else
+	                cartesian per_field
+		                |> List.map (fun selected ->
+		                     let terms = List.map fst selected in
+		                     let assignments = List.concat_map snd selected in
+		                     let term = format_call c.compound_ctor terms in
+                     (term, assignments, [Printf.sprintf "%s : %s" term declared_sort]))
+                |> List.filter (fun (term, _, _) ->
+                     compound_term_allowed_for_sort term declared_sort))
+	    |> List.sort_uniq compare
+
+let compound_arg_choices_for_declared_sort_from_exp
+    declared_sort actual_exp v_map binder_sort_of_raw =
+  let cartesian lists =
+    List.fold_right
+      (fun xs acc ->
+        List.concat_map (fun x -> List.map (fun ys -> x :: ys) acc) xs)
+      lists
+      [[]]
+  in
+  let payload_exps e =
+    match e.it with
+    | TupE es -> es
+    | OptE None -> []
+    | _ -> [e]
+  in
+  let rec choices_for_sort expected_sort e =
+    match e.it with
+    | VarE id ->
+        let raw = id.it in
+        let domain_sort =
+          match binder_sort_of_raw raw with
+          | Some sort when finite_axis_terms_for_sort sort <> [] -> sort
+          | _ -> expected_sort
+        in
+        let subst_var =
+          match List.assoc_opt raw v_map with
+          | Some mv -> mv
+          | None -> to_var_name raw
+        in
+        finite_axis_terms_for_sort domain_sort
+        |> List.map (fun term -> (term, [(subst_var, term)], []))
+    | NumE _ ->
+        let raw = translate_exp TermCtx e v_map |> fun t -> t.text in
+        (match literal_wrapper_for_sort ~register:true expected_sort with
+         | Some (wrapper, _) -> [(Printf.sprintf "%s(%s)" wrapper raw, [], [])]
+         | None -> [(raw, [], [])])
+    | SubE (inner, _, _)
+    | CvtE (inner, _, _)
+    | LiftE inner
+    | TheE inner
+    | OptE (Some inner) ->
+        choices_for_sort expected_sort inner
+    | CaseE (mixop_arg, payload) ->
+        let fields = payload_exps payload in
+        let ctor_opt = canonical_ctor_name_arity mixop_arg (List.length fields) in
+        let compound_choices =
+          match ctor_opt with
+          | Some ctor -> choices_for_compound expected_sort ctor fields
+          | None -> []
+        in
+        if compound_choices <> [] then compound_choices
+        else
+          (match fields, ctor_opt with
+           | [], Some ctor -> [(ctor, [], [])]
+           | [inner], _ -> choices_for_sort expected_sort inner
+           | _ -> [])
+    | TupE fields ->
+        choices_for_compound expected_sort "" fields
+    | _ -> []
+  and choices_for_compound expected_sort actual_ctor actual_fields =
+    let candidate_parent_sorts =
+      let conditional =
+        match Hashtbl.find_opt source_conditional_alias_edges expected_sort with
+        | Some children -> SSet.elements children
+        | None -> []
+      in
+      expected_sort :: conditional
+    in
+    let direct_cases =
+      candidate_parent_sorts
+      |> List.concat_map (fun parent_sort ->
+           !source_compound_cases
+           |> List.filter (fun c ->
+                c.compound_parent_sort = parent_sort
+                && List.length c.compound_fields = List.length actual_fields
+                && (actual_ctor = "" || c.compound_ctor = actual_ctor)))
+    in
+    let candidate_cases =
+      if direct_cases <> [] then direct_cases
+      else
+        !source_compound_cases
+        |> List.filter (fun c ->
+             List.length c.compound_fields = List.length actual_fields
+             && (actual_ctor = "" || c.compound_ctor = actual_ctor))
+    in
+    candidate_cases
+    |> List.concat_map (fun c ->
+         let per_field =
+           List.map2
+             (fun actual_e (_decl_raw, decl_ft) ->
+               match simple_sort_of_typ decl_ft [] with
+               | Some field_sort -> choices_for_sort field_sort actual_e
+               | None -> [])
+             actual_fields c.compound_fields
+         in
+         if per_field = [] || List.exists ((=) []) per_field then []
+         else
+           cartesian per_field
+           |> List.map (fun selected ->
+                let terms = List.map (fun (term, _, _) -> term) selected in
+                let assignments = List.concat_map (fun (_, assigns, _) -> assigns) selected in
+                let guards = List.concat_map (fun (_, _, guards) -> guards) selected in
+                let term = format_call c.compound_ctor terms in
+                (term, assignments, guards @ [Printf.sprintf "%s : %s" term expected_sort]))
+           |> List.filter (fun (term, _, _) ->
+                compound_term_allowed_for_sort term expected_sort))
+    |> List.sort_uniq compare
+  in
+  choices_for_sort declared_sort actual_exp
+
+let compound_binder_choices_for_declared_sort declared_sort binders v_map =
+  let cartesian lists =
+    List.fold_right
+      (fun xs acc ->
+        List.concat_map (fun x -> List.map (fun ys -> x :: ys) acc) xs)
+      lists
+      [[]]
+  in
+  let binder_domain_sort bt =
+    match bt.it with
+    | VarT (tid, []) -> Some (sort_of_type_name tid.it)
+    | IterT (inner, Opt) -> simple_sort_of_typ inner []
+    | _ -> simple_sort_of_typ bt []
+  in
+  let exp_binders =
+    binders
+    |> List.filter_map (fun b -> match b.it with
+         | ExpB (bid, bt) -> Some (bid.it, bt)
+         | _ -> None)
+  in
+  if exp_binders = [] then []
+  else
+    let candidate_parent_sorts =
+      let direct = [declared_sort] in
+      let conditional =
+        match Hashtbl.find_opt source_conditional_alias_edges declared_sort with
+        | Some children -> SSet.elements children
+        | None -> []
+      in
+      direct @ conditional
+    in
+    let case_has_ground_status c =
+      let sample_args =
+        c.compound_fields
+        |> List.filter_map (fun (_raw, ft) ->
+             match simple_sort_of_typ ft [] with
+             | Some field_sort ->
+                 finite_terms_for_sort field_sort
+                 |> List.find_opt (fun _ -> true)
+             | None -> None)
+      in
+      List.length sample_args = List.length c.compound_fields
+      &&
+      match
+        ground_compound_membership_status
+          (format_call c.compound_ctor sample_args)
+          declared_sort
+      with
+      | Some _ -> true
+      | None -> false
+    in
+    let direct_cases =
+      candidate_parent_sorts
+      |> List.concat_map (fun parent_sort ->
+           !source_compound_cases
+           |> List.filter (fun c ->
+                c.compound_parent_sort = parent_sort
+                && List.length c.compound_fields = List.length exp_binders))
+    in
+    let candidate_cases =
+      if direct_cases <> [] then direct_cases
+      else
+        !source_compound_cases
+        |> List.filter (fun c ->
+             List.length c.compound_fields = List.length exp_binders
+             && case_has_ground_status c)
+    in
+    candidate_cases
+    |> List.concat_map (fun c ->
+              let per_field =
+                List.map2
+                  (fun (raw, bt) (_decl_raw, decl_ft) ->
+                    let domain_sort =
+	                      match binder_domain_sort bt with
+	                      | Some binder_sort
+	                          when finite_axis_terms_for_sort binder_sort <> [] ->
+	                          binder_sort
+                      | _ ->
+                          (match simple_sort_of_typ decl_ft [] with
+                           | Some field_sort -> field_sort
+                           | None -> "SpectecTerminal")
+                    in
+	                    let terms = finite_axis_terms_for_sort domain_sort in
+                    let subst_var =
+                      match List.assoc_opt raw v_map with
+                      | Some mv -> mv
+                      | None -> to_var_name raw
+                    in
+                    terms
+                    |> List.map (fun term -> (term, [(subst_var, term)])))
+                  exp_binders c.compound_fields
+              in
+              if per_field = [] || List.exists ((=) []) per_field then []
+              else
+	                cartesian per_field
+	                |> List.map (fun selected ->
+	                     let terms = List.map fst selected in
+	                     let assignments = List.concat_map snd selected in
+	                     let term = format_call c.compound_ctor terms in
+	                     (term, assignments, []))
+                |> List.filter (fun (term, _, _) ->
+                     compound_term_allowed_for_sort term declared_sort))
+    |> List.sort_uniq compare
 
 let is_pure_meta_category_sort sort =
   SSet.mem sort !nat_subsort_sorts || SSet.mem sort !int_subsort_sorts
@@ -3543,13 +4701,11 @@ let translate_typd id params insts =
      sorts without making every N-term a metadata tag. *)
   let pure_meta_var_names = SSet.of_list ["N"; "M"; "K"; "n"; "m"] in
   let is_pure_meta = SSet.mem id.it pure_meta_var_names in
-  (* Sorts already declared in Maude built-in modules — skip sort/subsort declarations *)
-  let maude_builtin_sorts = SSet.of_list ["Char"; "Zero"; "NzNat"; "Nat"; "Int"; "Bool"] in
   (* Sorts where instance axiom (cmb/mb) generation doesn't work — list-based or conflicting *)
-  let skip_instance_sorts = SSet.of_list ["Char"; "Zero"; "NzNat"; "Nat"; "Int"; "Bool"; "Name"] in
+  let skip_instance_sorts = SSet.of_list ["Char"; "Zero"; "NzNat"; "Nat"; "Int"; "Bool"] in
   let sort_decl =
     if SSet.mem name base_types || type_sort = "SpectecTerminal"
-       || SSet.mem type_sort maude_builtin_sorts then ""
+       || SSet.mem type_sort maude_builtin_sort_names then ""
     else
       Printf.sprintf "  sort %s .\n  subsort %s < SpectecTerminal .\n"
         type_sort type_sort in
@@ -3736,6 +4892,22 @@ let translate_typd id params insts =
         let t = translate_prem p vm in
         if t.text = "" || t.text = "owise" then None else Some (`Bool t)
   in
+  let finite_pattern_sort_of_var v =
+    !source_membership_sorts
+    |> SSet.elements
+    |> List.find_opt (fun sort ->
+         to_var_name sort = v && finite_axis_terms_for_sort sort <> [])
+  in
+  let category_pattern_bool var term =
+    match finite_pattern_sort_of_var var with
+    | None -> None
+    | Some sort ->
+        Some (`Bool,
+              (Printf.sprintf "%s : %s" term.text sort,
+               vars_of_texpr_local term,
+               []),
+              true)
+  in
   let classify_prem_typd bound = function
     | `Bool t ->
         let vars = vars_of_texpr_local t in
@@ -3750,22 +4922,48 @@ let translate_typd id params insts =
         let rhs_has_no_bound = SSet.is_empty (SSet.inter rhs_set bound) in
         let lhs_nonempty = not (SSet.is_empty lhs_set) in
         let rhs_nonempty = not (SSet.is_empty rhs_set) in
-        if lhs_nonempty && lhs_has_no_bound && subset_bound_local bound rhs_vars then
-          (`Match,
-           (Printf.sprintf "%s := %s" lhs.text rhs.text,
-            uniq_vars_local (lhs_vars @ rhs_vars),
-            lhs_vars),
-           true)
-        else if rhs_nonempty && rhs_has_no_bound && subset_bound_local bound lhs_vars then
-          (`Match,
-           (Printf.sprintf "%s := %s" rhs.text lhs.text,
-            uniq_vars_local (lhs_vars @ rhs_vars),
-            rhs_vars),
-           true)
-        else
+        let default_bool () =
           let vars = vars_of_texpr_local bool_t in
           let ready = subset_bound_local bound vars in
           (`Bool, (bool_t.text, vars, []), ready)
+        in
+        if is_plain_var_like lhs.text
+           && lhs_nonempty && lhs_has_no_bound && subset_bound_local bound rhs_vars then
+          match lhs_vars with
+          | [v] ->
+              (match category_pattern_bool v rhs with
+               | Some classified -> classified
+               | None ->
+                   (`Match,
+                    (Printf.sprintf "%s := %s" lhs.text rhs.text,
+                     uniq_vars_local (lhs_vars @ rhs_vars),
+                     lhs_vars),
+                    true))
+          | _ ->
+              (`Match,
+               (Printf.sprintf "%s := %s" lhs.text rhs.text,
+                uniq_vars_local (lhs_vars @ rhs_vars),
+                lhs_vars),
+               true)
+        else if is_plain_var_like rhs.text
+                && rhs_nonempty && rhs_has_no_bound && subset_bound_local bound lhs_vars then
+          match rhs_vars with
+          | [v] ->
+              (match category_pattern_bool v lhs with
+               | Some classified -> classified
+               | None ->
+                   (`Match,
+                    (Printf.sprintf "%s := %s" rhs.text lhs.text,
+                     uniq_vars_local (lhs_vars @ rhs_vars),
+                     rhs_vars),
+                    true))
+          | _ ->
+              (`Match,
+               (Printf.sprintf "%s := %s" rhs.text lhs.text,
+                uniq_vars_local (lhs_vars @ rhs_vars),
+                rhs_vars),
+               true)
+        else default_bool ()
   in
   let normalize_sched_typd bound (txt, vars, binds) =
     match split_once_re (Str.regexp "[ \t]+:=[ \t]+") txt with
@@ -3838,25 +5036,26 @@ let translate_typd id params insts =
         (match deftyp.it with
          | VariantT cases ->
              List.filter_map (fun (mixop_val, (_, case_typ, prems), _) ->
-               let debug_numeric_variant =
-                 debug_iter_enabled &&
-	                 List.mem (String.lowercase_ascii id.it) ["bit"; "byte"; "un"; "sn"; "uN"; "sN"]
-               in
+	               let debug_numeric_variant =
+	                 debug_iter_enabled &&
+		                 List.mem (String.lowercase_ascii id.it)
+	                       ["bit"; "byte"; "un"; "sn"; "uN"; "sN"; "vunop"; "vbinop"]
+	               in
                let type_counters = ref [] in
                let get_count tname =
                  let c = (try List.assoc tname !type_counters with Not_found -> 0) + 1 in
                  type_counters := (tname, c) :: (List.remove_assoc tname !type_counters); c in
-               let membership_guard v sort =
-                 match sort with
-                 | "SpectecTerminal" | "SpectecTerminals" -> "true"
-                 | _ -> Printf.sprintf "%s : %s" v sort
-               in
-               let broad_ctor_arg_sort sort =
+	               let broad_ctor_arg_sort sort =
                  match sort with
                  | "SpectecTerminals" -> "SpectecTerminals"
-                 | _ when ends_with sort "Seq" -> sort
+                 | _ when ends_with sort "Seq" -> "SpectecTerminals"
                  | _ -> "SpectecTerminal"
                in
+	               let guard_for_sort v sort =
+	                 match sort with
+	                 | "SpectecTerminal" | "SpectecTerminals" -> "true"
+	                 | _ -> Printf.sprintf "%s : %s" v sort
+	               in
                let rec collect_params cur_vm t is_list = match t.it with
 	                 | VarT (tid, args) ->
                      let vb = to_var_name tid.it in
@@ -3870,10 +5069,24 @@ let translate_typd id params insts =
 	                     let ms =
 	                       if is_list || is_plural_type tid.it
 	                          || (String.lowercase_ascii tid.it = "list" && args <> []) then
-                         "SpectecTerminals"
-	                       else source_carrier_sort_of_typ t cur_vm
-                     in
-                    let guard = membership_guard indexed ms in
+                         (match sequence_sort_of_typ t cur_vm with
+                          | Some seq_sort -> seq_sort
+                          | None ->
+                              (match simple_sort_of_typ t cur_vm with
+                               | Some elem_sort ->
+                                   (match sequence_sort_of_elem_sort elem_sort with
+                                    | Some seq_sort -> seq_sort
+                                    | None -> "SpectecTerminals")
+	                               | None -> "SpectecTerminals"))
+		                       else source_carrier_sort_of_typ t cur_vm
+	                     in
+	                    Hashtbl.replace source_var_sorts indexed ms;
+	                    let guard =
+	                      if is_list || is_plural_type tid.it
+                         || (String.lowercase_ascii tid.it = "list" && args <> [])
+                      then guard_for_sort indexed ms
+                      else type_guard indexed t cur_vm
+                    in
                     ([(indexed, guard, ms)], new_vm)
 	                 | IterT (inner, iter) ->
 	                     let sequence_like =
@@ -3894,13 +5107,20 @@ let translate_typd id params insts =
 	                               ^ string_of_int count
 	                             else vb ^ string_of_int count in
                        let vm' = (tid.it, indexed) :: vm in
-                       let ms =
-                             if is_list then
-                               "SpectecTerminals"
-                             else
-	                               source_carrier_sort_of_typ ft vm'
-                        in
-                        (acc @ [(indexed, membership_guard indexed ms, ms)], vm')
+	                       let ms =
+	                             if is_list then
+	                               (match sequence_sort_of_inner_typ ft vm' with
+	                                | Some seq_sort -> seq_sort
+	                                | None -> "SpectecTerminals")
+	                             else
+			                               source_carrier_sort_of_typ ft vm'
+		                        in
+		                        Hashtbl.replace source_var_sorts indexed ms;
+		                        let guard =
+	                          if is_list then guard_for_sort indexed ms
+	                          else type_guard indexed ft vm'
+	                        in
+	                        (acc @ [(indexed, guard, ms)], vm')
                        | _ ->
                            let (ps, vm') = collect_params vm ft is_list in
                            (acc @ ps, vm')
@@ -3910,8 +5130,10 @@ let translate_typd id params insts =
                let enriched_vm = build_suffix_map binders @ v_map in
                let rec ctor_arg_sorts cur_vm t is_list =
                  let seq_or_broad sort =
-                   let _ = sort in
-                   "SpectecTerminals"
+                   if ends_with sort "Seq" then sort
+                   else match sequence_sort_of_elem_sort sort with
+                   | Some seq_sort -> seq_sort
+                   | None -> "SpectecTerminals"
                  in
                  match t.it with
                  | VarT (tid, args) ->
@@ -3919,7 +5141,10 @@ let translate_typd id params insts =
                      let ms =
                        if is_list || is_plural_type tid.it
                           || (String.lowercase_ascii tid.it = "list" && args <> [])
-                       then seq_or_broad base_sort
+                       then
+                         (match sequence_sort_of_typ t cur_vm with
+                          | Some seq_sort -> seq_sort
+                          | None -> seq_or_broad base_sort)
                        else base_sort
                      in
                      [ms]
@@ -3953,10 +5178,11 @@ let translate_typd id params insts =
                            | Some v -> v
                            | None -> to_var_name tid.it
                          in
-                         let ms =
-	                           source_carrier_sort_of_typ t param_vm
-                         in
-                         Some (mv, membership_guard mv ms, ms)
+		                         let ms =
+			                           source_carrier_sort_of_typ t param_vm
+		                         in
+		                         Hashtbl.replace source_var_sorts mv ms;
+		                         Some (mv, type_guard mv t param_vm, ms)
                      | _ -> None
 	                   ) binders
 	               in
@@ -3991,10 +5217,10 @@ let translate_typd id params insts =
                      (i, v, g, ms, raw_opt, typ_opt))
                    params
                in
-	               let p_vars = List.map (fun (v, _, _) -> v) params in
-	               let v_decl () =
-	                 String.concat "" (List.map (fun (v, _, ms) -> declare_var v ms) params)
-	               in
+		               let p_vars = List.map (fun (v, _, _) -> v) params in
+		               let v_decl () =
+		                 String.concat "" (List.map (fun (v, _, ms) -> declare_var v ms) params)
+		               in
                let binder_decl () = String.concat "" (List.map (fun b -> match b.it with
                  | ExpB (tid, _) -> declare_var (to_var_name tid.it) "SpectecTerminal"
                  | _ -> "") binders) in
@@ -4076,9 +5302,17 @@ let translate_typd id params insts =
                let sort_and_raw_of_family_arg arg =
                  match arg.it with
                  | TypA t ->
-                     (match simple_sort_of_typ t param_vm with
-                      | Some sort -> Some (sort, None)
-                      | None -> None)
+                     (match t.it with
+                      | VarT (tid, []) ->
+                          let raw = tid.it in
+                          let sort =
+                            sort_of_type_name (strip_source_index_suffix raw)
+                          in
+                          Some (sort, Some raw)
+                      | _ ->
+                          (match simple_sort_of_typ t param_vm with
+                           | Some sort -> Some (sort, None)
+                           | None -> None))
                  | ExpA e ->
                      (match e.it with
                       | VarE eid ->
@@ -4133,10 +5367,10 @@ let translate_typd id params insts =
                    lists
                    [[]]
                in
-               let parametric_arg_specializations () =
-                 param_infos
-                 |> List.filter_map
-                      (fun (i, dep_v, _dep_g, _dep_ms, _raw_opt, typ_opt) ->
+	               let parametric_arg_specializations () =
+	                 param_infos
+	                 |> List.filter_map
+	                      (fun (i, dep_v, _dep_g, _dep_ms, _raw_opt, typ_opt) ->
                         match typ_opt with
                         | Some {it = VarT (family_id, family_args); _}
                             when family_args <> [] ->
@@ -4148,8 +5382,7 @@ let translate_typd id params insts =
                                    | None -> None
                                    | Some (domain_sort, raw_opt) ->
                                        let terms =
-                                         finite_source_terms_for_sort domain_sort
-                                         |> SSet.elements
+                                         finite_axis_terms_for_sort domain_sort
                                        in
                                        match terms, find_axis_param i domain_sort raw_opt with
                                        | [], _ -> None
@@ -4163,12 +5396,42 @@ let translate_typd id params insts =
                               record_unsupported_syntax_family family_sort
                                 ("cannot derive finite constructor specialization in " ^ full_type_sort);
                               None
-                            end
-                        | _ -> None)
-               in
-               let compatible_assignments a b =
-                 List.for_all
-                   (fun (v, t) ->
+	                            end
+	                        | _ -> None)
+	               in
+	               let parametric_literal_type_dependencies () =
+	                 param_infos
+	                 |> List.filter_map
+	                      (fun (i, _dep_v, _dep_g, _dep_ms, _raw_opt, typ_opt) ->
+	                        match typ_opt with
+	                        | Some {it = VarT (family_id, family_args); _}
+	                            when family_args <> [] ->
+	                            let family_sort = sort_of_type_name family_id.it in
+	                            if not (SSet.mem family_sort !literal_family_parent_sorts) then None
+	                            else
+	                              let axes =
+	                                family_args
+	                                |> List.filter_map (fun arg ->
+	                                     match sort_and_raw_of_family_arg arg with
+	                                     | None -> None
+	                                     | Some (domain_sort, raw_opt) ->
+	                                         let terms =
+	                                           finite_axis_terms_for_sort domain_sort
+	                                         in
+	                                         match terms, find_axis_param i domain_sort raw_opt with
+	                                         | [], _ -> None
+	                                         | _, Some (axis_i, _axis_v, _axis_g, _axis_sort, _, _) ->
+	                                             Some axis_i
+	                                         | _, None -> None)
+	                              in
+	                              (match axes with
+	                               | [axis_i] when axis_i <> i -> Some (i, axis_i)
+	                               | _ -> None)
+	                        | _ -> None)
+	               in
+	               let compatible_assignments a b =
+	                 List.for_all
+	                   (fun (v, t) ->
                      match List.assoc_opt v b with
                      | Some t' -> t = t'
                      | None -> true)
@@ -4182,17 +5445,31 @@ let translate_typd id params insts =
                      | None -> (v, t) :: acc)
                    a b
                in
-               let specialized_membership_statements op_line lhs rhs_conds =
-                 let apps = parametric_arg_specializations () in
-                 if apps = [] then None
-                 else
-                   let app_choices =
-                     apps
-                     |> List.map (fun (dep_v, family_sort, axes) ->
-                          let axis_term_choices =
-                            axes
-                            |> List.map (fun (axis_v, _axis_g, _axis_sort, terms) ->
-                                 List.map (fun term -> (axis_v, term)) terms)
+	               let specialized_membership_statements op_line lhs rhs_conds =
+	                 let apps = parametric_arg_specializations () in
+	                 let finite_axis_choices =
+	                   param_infos
+	                   |> List.filter_map
+	                        (fun (_i, v, _g, ms, _raw_opt, _typ_opt) ->
+	                          let direct_terms = finite_terms_for_sort ms in
+	                          let axis_terms = finite_axis_terms_for_sort ms in
+	                          if direct_terms = [] && axis_terms <> [] then
+	                            Some
+	                              (axis_terms
+	                               |> List.map (fun term ->
+	                                    ([(v, term)], [],
+	                                     [Printf.sprintf "%s : %s" v ms])))
+	                          else None)
+	                 in
+	                 if apps = [] && finite_axis_choices = [] then None
+	                 else
+			                 let app_choices =
+			                   apps
+			                   |> List.map (fun (dep_v, family_sort, axes) ->
+			                        let axis_term_choices =
+			                          axes
+	                            |> List.map (fun (axis_v, _axis_g, _axis_sort, terms) ->
+	                                 List.map (fun term -> (axis_v, term)) terms)
                           in
                           cartesian axis_term_choices
                           |> List.map (fun assignments ->
@@ -4203,63 +5480,206 @@ let translate_typd id params insts =
                                       | Some term -> term
                                       | None -> "")
                                in
-                               let spec_sort =
-                                 register_specialized_syntax_sort family_sort terms
-                               in
-                               (assignments, [Printf.sprintf "%s : %s" dep_v spec_sort])))
-                   in
-                   let combined =
-                     List.fold_left
-                       (fun acc choices ->
-                         List.concat_map
-                           (fun (acc_assigns, acc_guards) ->
-                             choices
-                             |> List.filter_map (fun (assigns, guards) ->
-                                  if compatible_assignments acc_assigns assigns then
-                                    Some (merge_assignments acc_assigns assigns,
-                                          acc_guards @ guards)
-                                  else None))
-                           acc)
-                       [([], [])]
-                       app_choices
-                   in
+		                            let spec_sort =
+		                              register_specialized_syntax_sort family_sort terms
+		                            in
+		                            (assignments,
+                                 [Printf.sprintf "%s : %s" dep_v spec_sort],
+                                 [Printf.sprintf "%s : %s" dep_v family_sort])))
+		                 in
+			                 let combined =
+			                   List.fold_left
+			                     (fun acc choices ->
+			                       List.concat_map
+		                         (fun (acc_assigns, acc_guards, acc_removable) ->
+		                           choices
+		                           |> List.filter_map (fun (assigns, guards, removable) ->
+		                                if compatible_assignments acc_assigns assigns then
+		                                  Some (merge_assignments acc_assigns assigns,
+		                                        acc_guards @ guards,
+                                            acc_removable @ removable)
+		                                else None))
+		                         acc)
+			                     [([], [], [])]
+			                     (app_choices @ finite_axis_choices)
+		                 in
                    let apply_assignments text assignments =
                      List.fold_left
                        (fun acc (v, term) -> replace_maude_var_token v term acc)
                        text assignments
                    in
-                   let is_replaced_axis_guard cond assignments =
-                     List.exists
-                       (fun (v, _) ->
-                         param_infos
-                         |> List.exists (fun (_, pv, pg, _, _, _) -> pv = v && String.trim pg = String.trim cond))
-                       assignments
-                   in
-                   let body =
-                     combined
-                     |> List.map (fun (assignments, extra_guards) ->
-                          let lhs' = apply_assignments lhs assignments in
-                          let conds' =
-                            rhs_conds
-                            |> List.filter (fun c -> not (is_replaced_axis_guard c assignments))
-                            |> List.map (fun c -> apply_assignments c assignments)
-                          in
-                          let rhs' = cond_join (conds' @ extra_guards) in
-                          Printf.sprintf "%s  %s ( %s ) : %s%s ."
-                            (decl_prefix ())
-                            (if rhs' = "" then "mb" else "cmb")
-                            lhs' full_type_sort
-                            (if rhs' = "" then "" else "\n   if " ^ rhs'))
-                     |> String.concat "\n"
+                      let is_replaced_axis_guard _cond _assignments = false in
+		                 let body =
+		                   combined
+		                   |> List.filter_map (fun (assignments, extra_guards, removable_guards) ->
+		                        let lhs' = apply_assignments lhs assignments in
+		                        let conds' =
+		                          rhs_conds
+		                          |> List.filter (fun c ->
+                                 not (List.mem (String.trim c) removable_guards)
+                                 && not (is_replaced_axis_guard c assignments))
+		                          |> List.map (fun c -> apply_assignments c assignments)
+		                        in
+                            match simplify_static_conditions (conds' @ extra_guards) with
+                            | None -> None
+                            | Some simplified_conds ->
+		                            let rhs' = cond_join simplified_conds in
+		                            Some (Printf.sprintf "%s  %s ( %s ) : %s%s ."
+		                              (decl_prefix ())
+		                              (if rhs' = "" then "mb" else "cmb")
+		                              lhs' full_type_sort
+		                              (if rhs' = "" then "" else "\n   if " ^ rhs')))
+		                   |> String.concat "\n"
                    in
                    Some (op_line ^ body)
                in
-               let parametric_inst_arg_choices () =
-                 let binder_choices () =
-                   let rec binder_domain_sort bt =
-                     match bt.it with
-                     | VarT (tid, []) -> Some (sort_of_type_name tid.it)
-                     | IterT (inner, Opt) -> binder_domain_sort inner
+	               let parametric_inst_arg_choices () =
+                 let declared_sort_for_arg index =
+                   match List.nth_opt typd_params index with
+                 | Some p -> Some (source_param_sort p)
+                 | None -> None
+                 in
+                 let compound_binder_choices () =
+                   let exp_binders =
+                     binders
+                     |> List.filter (fun b -> match b.it with
+                          | ExpB _ -> true
+                          | _ -> false)
+                   in
+                   let candidate_parent_sorts declared_sort =
+                     let conditional =
+                       match Hashtbl.find_opt source_conditional_alias_edges
+                               declared_sort with
+                       | Some children -> SSet.elements children
+                       | None -> []
+                     in
+                     declared_sort :: conditional
+                   in
+                   let compound_arity_for_declared_sort declared_sort =
+                     let arities_for_cases cases =
+                       cases
+                       |> List.filter_map (fun c ->
+                            let arity = List.length c.compound_fields in
+                            if arity > 0 then Some arity else None)
+                       |> List.sort_uniq compare
+                     in
+                     let direct_cases =
+                       candidate_parent_sorts declared_sort
+                       |> List.concat_map (fun parent_sort ->
+                            !source_compound_cases
+                            |> List.filter (fun c ->
+                                 c.compound_parent_sort = parent_sort))
+                     in
+                     let fallback_cases =
+                       if direct_cases <> [] then []
+                       else
+                         !source_compound_cases
+                         |> List.filter (fun c ->
+                              c.compound_fields
+                              |> List.exists (fun (_raw, ft) ->
+                                   match simple_sort_of_typ ft [] with
+                                   | Some field_sort ->
+                                       finite_terms_for_sort field_sort <> []
+                                   | None -> false)
+                              &&
+                              let sample_args =
+                                c.compound_fields
+                                |> List.filter_map (fun (_raw, ft) ->
+                                     match simple_sort_of_typ ft [] with
+                                     | Some field_sort ->
+                                         finite_terms_for_sort field_sort
+                                         |> List.find_opt (fun _ -> true)
+                                     | None -> None)
+                              in
+                              List.length sample_args = List.length c.compound_fields
+                              &&
+                              match
+                                ground_compound_membership_status
+                                  (format_call c.compound_ctor sample_args)
+                                  declared_sort
+                              with
+                              | Some _ -> true
+                              | None -> false)
+                     in
+                     arities_for_cases
+                       (if direct_cases <> [] then direct_cases else fallback_cases)
+                     |> List.sort_uniq compare
+                     |> function
+                        | [n] when n > 0 -> Some n
+                        | _ -> None
+                   in
+                   let rec split_groups specs bs =
+                     match specs with
+                     | [] -> if bs = [] then Some [] else None
+                     | n :: rest ->
+                         let rec take i acc remaining =
+                           if i = 0 then Some (List.rev acc, remaining)
+                           else
+                             match remaining with
+                             | [] -> None
+                             | b :: tl -> take (i - 1) (b :: acc) tl
+                         in
+                         (match take n [] bs with
+                          | None -> None
+                          | Some (group, tail) ->
+                              Option.map
+                                (fun groups -> group :: groups)
+                                (split_groups rest tail))
+                   in
+                   let declared_sorts = List.map source_param_sort typd_params in
+                   let arity_options =
+                     List.map compound_arity_for_declared_sort declared_sorts
+                   in
+                   match
+                     List.fold_right
+                          (fun arity acc ->
+                            match arity, acc with
+                            | Some n, Some ns -> Some (n :: ns)
+                            | _ -> None)
+                          arity_options
+                          (Some [])
+                   with
+                   | None -> []
+                   | Some arities ->
+                       (match split_groups arities exp_binders with
+                        | None -> []
+                        | Some groups ->
+                            let per_group =
+                              List.map2
+                                (fun declared_sort group ->
+                                  compound_binder_choices_for_declared_sort
+                                    declared_sort group v_map)
+                                declared_sorts groups
+                            in
+                            if per_group = [] || List.exists ((=) []) per_group then []
+                            else
+                              cartesian per_group
+                              |> List.map (fun selected ->
+                                   let terms =
+                                     List.map
+                                       (fun (term, _, _) -> term)
+                                       selected
+                                   in
+                                   let assignments =
+                                     List.concat_map
+                                       (fun (_, a, _) -> a)
+                                       selected
+                                   in
+                                   let guards =
+                                     List.concat_map
+                                       (fun (_, _, g) -> g)
+                                       selected
+                                   in
+                                   (register_specialized_syntax_sort
+                                      full_type_sort terms,
+                                    assignments,
+                                    guards)))
+                 in
+		                 let binder_choices () =
+	                   let rec binder_domain_sort bt =
+	                     match bt.it with
+	                     | VarT (tid, []) -> Some (sort_of_type_name tid.it)
+	                     | IterT (inner, Opt) -> binder_domain_sort inner
                      | _ -> simple_sort_of_typ bt param_vm
                    in
                    let exp_binders =
@@ -4275,38 +5695,72 @@ let translate_typd id params insts =
                        |> List.map (fun (raw, bt) ->
                             match binder_domain_sort bt with
                             | Some domain_sort ->
-                                let terms =
-                                  finite_source_terms_for_sort domain_sort |> SSet.elements
-                                in
+                                let terms = finite_axis_terms_for_sort domain_sort in
                                 let subst_var =
                                   match List.assoc_opt raw v_map with
                                   | Some mv -> mv
                                   | None -> to_var_name raw
                                 in
-                                List.map (fun term -> (term, [(subst_var, term)])) terms
+                                List.map (fun term -> (term, [(subst_var, term)], [])) terms
                             | None -> [])
                      in
                      if per_binder = [] || List.exists ((=) []) per_binder then []
                      else
                        cartesian per_binder
-                       |> List.map (fun selected ->
-                            let terms = List.map fst selected in
-                            let assignments = List.concat_map snd selected in
-                            (register_specialized_syntax_sort full_type_sort terms,
-                             assignments))
-                 in
-                 let choice_for_arg arg =
-                   match arg.it with
-                   | ExpA e ->
-                       (match e.it with
+		                       |> List.map (fun selected ->
+		                            let terms = List.map (fun (t, _, _) -> t) selected in
+                            let assignments =
+                              List.concat_map (fun (_, a, _) -> a) selected
+                            in
+                            let guards =
+                              List.concat_map (fun (_, _, g) -> g) selected
+	                            in
+		                            (register_specialized_syntax_sort full_type_sort terms,
+		                             assignments,
+		                             guards))
+		                 in
+		                 let binder_sort_of_raw raw =
+		                   let base = strip_source_index_suffix raw in
+		                   binders
+		                   |> List.find_map (fun b ->
+		                        match b.it with
+		                        | ExpB (bid, bt)
+		                            when strip_source_index_suffix bid.it = base ->
+		                            let sort = source_param_sort_of_typ bt param_vm in
+		                            if sort = "SpectecTerminal" then None else Some sort
+		                        | _ -> None)
+		                 in
+			                 let choice_for_arg index arg =
+	                   let singleton_declared_choices () =
+	                     match declared_sort_for_arg index with
+	                     | Some declared_sort ->
+	                         let terms = finite_axis_terms_for_sort declared_sort in
+	                         if List.length terms = 1 then
+	                           terms
+	                           |> List.map (fun term -> (term, [], []))
+	                         else []
+	                     | None -> []
+	                   in
+	                   match arg.it with
+	                   | ExpA e ->
+	                       let compound_choices =
+	                         match declared_sort_for_arg index with
+	                         | Some declared_sort ->
+	                             compound_arg_choices_for_declared_sort_from_exp
+	                               declared_sort e v_map binder_sort_of_raw
+	                             |> List.map (fun (term, assignments, guards) ->
+	                                  (term, assignments, guards))
+	                         | None -> []
+	                       in
+	                       if compound_choices <> [] then compound_choices
+	                       else
+	                       (match e.it with
                         | VarE eid ->
                             let raw = eid.it in
                             let domain_sort =
                               sort_of_type_name (strip_source_index_suffix raw)
                             in
-                            let terms =
-                              finite_source_terms_for_sort domain_sort |> SSet.elements
-                            in
+                            let terms = finite_axis_terms_for_sort domain_sort in
                             let subst_var =
                               match List.assoc_opt raw v_map with
                               | Some mv -> mv
@@ -4317,55 +5771,98 @@ let translate_typd id params insts =
                                 ("cannot derive finite domain for parameter " ^ raw);
                               []
                             end else
-                              List.map (fun term -> (term, [(subst_var, term)])) terms
-                        | CaseE _ -> []
-                        | _ -> [])
+                              List.map (fun term -> (term, [(subst_var, term)], [])) terms
+	                        | CaseE (mixop_arg, payload) ->
+	                            let has_payload =
+	                              match payload.it with
+	                              | OptE None | TupE [] -> false
+	                              | _ -> true
+	                            in
+	                            if not has_payload then
+	                              (match canonical_ctor_name_arity mixop_arg 0 with
+	                               | Some ctor -> [(ctor, [], [])]
+	                               | None -> singleton_declared_choices ())
+	                            else singleton_declared_choices ()
+	                        | _ ->
+	                            singleton_declared_choices ())
                    | TypA t ->
-                       (match simple_sort_of_typ t param_vm with
-                        | Some domain_sort ->
-                            let terms =
-                              finite_source_terms_for_sort domain_sort |> SSet.elements
+                       (match declared_sort_for_arg index with
+                        | Some declared_sort ->
+                            let compound_choices =
+                              compound_arg_choices_for_declared_sort
+                                declared_sort t v_map
                             in
-                            List.map (fun term -> (term, [])) terms
-                        | None -> [])
+	                            if compound_choices <> [] then compound_choices
+	                            else
+	                              let declared_terms =
+	                                finite_axis_terms_for_sort declared_sort
+	                              in
+	                              if List.length declared_terms = 1 then
+	                                declared_terms
+	                                |> List.map (fun term -> (term, [], []))
+	                              else
+	                                (match simple_sort_of_typ t param_vm with
+	                                 | Some domain_sort ->
+	                                     finite_axis_terms_for_sort domain_sort
+	                                     |> List.map (fun term -> (term, [], []))
+	                                 | None -> [])
+                        | None ->
+                            (match simple_sort_of_typ t param_vm with
+                             | Some domain_sort ->
+                                 finite_axis_terms_for_sort domain_sort
+                                 |> List.map (fun term -> (term, [], []))
+                             | None -> []))
                    | DefA _ | GramA _ -> []
                  in
-                 if args = [] then binder_choices ()
+                 if args = [] then
+                   let direct = binder_choices () in
+                   if direct <> [] then direct else compound_binder_choices ()
                  else
-                   let per_arg = List.map choice_for_arg args in
-                   if List.exists ((=) []) per_arg then binder_choices ()
+                   let per_arg = List.mapi choice_for_arg args in
+                   if List.exists ((=) []) per_arg then
+                     let direct = binder_choices () in
+                     if direct <> [] then direct else compound_binder_choices ()
                    else
                      cartesian per_arg
                      |> List.map (fun selected ->
-                          let terms = List.map fst selected in
-                          let assignments = List.concat_map snd selected in
+                          let terms = List.map (fun (t, _, _) -> t) selected in
+                          let assignments =
+                            List.concat_map (fun (_, a, _) -> a) selected
+                          in
+                          let guards =
+                            List.concat_map (fun (_, _, g) -> g) selected
+                          in
                           (register_specialized_syntax_sort full_type_sort terms,
-                           assignments))
+                           assignments,
+                           guards))
                in
-               let parametric_specialized_memberships op_line lhs rhs_conds =
-                 let choices = parametric_inst_arg_choices () in
-                 if choices = [] then None
+	               let parametric_specialized_memberships op_line lhs rhs_conds =
+	                 let choices = parametric_inst_arg_choices () in
+	                 if choices = [] then None
                  else
                    let apply_assignments text assignments =
                      List.fold_left
                        (fun acc (v, term) -> replace_maude_var_token v term acc)
                        text assignments
                    in
-                   let body =
-                     choices
-                     |> List.map (fun (target_sort, assignments) ->
-                          let lhs' = apply_assignments lhs assignments in
-                          let conds' =
-                            rhs_conds
-                            |> List.map (fun c -> apply_assignments c assignments)
-                          in
-                          let rhs' = cond_join conds' in
-                          Printf.sprintf "%s  %s ( %s ) : %s%s ."
-                            (decl_prefix ())
-                            (if rhs' = "" then "mb" else "cmb")
-                            lhs' target_sort
-                            (if rhs' = "" then "" else "\n   if " ^ rhs'))
-                     |> String.concat "\n"
+	                   let body =
+	                     choices
+	                     |> List.filter_map (fun (target_sort, assignments, extra_guards) ->
+	                          let lhs' = apply_assignments lhs assignments in
+	                          let conds' =
+	                            rhs_conds
+	                            |> List.map (fun c -> apply_assignments c assignments)
+	                          in
+                            match simplify_static_conditions (conds' @ extra_guards) with
+                            | None -> None
+                            | Some simplified_conds ->
+	                            let rhs' = cond_join simplified_conds in
+	                            Some (Printf.sprintf "%s  %s ( %s ) : %s%s ."
+	                              (decl_prefix ())
+	                              (if rhs' = "" then "mb" else "cmb")
+	                              lhs' target_sort
+	                              (if rhs' = "" then "" else "\n   if " ^ rhs')))
+	                     |> String.concat "\n"
                    in
                    Some (op_line ^ body)
                in
@@ -4454,14 +5951,14 @@ let translate_typd id params insts =
                          typed_index_pattern full_type_sort lhs rhs opt_param_indices params
                        in
                        let lhs_with_rest = Printf.sprintf "%s %s" typed_lhs rest_v in
-                       let cond_suffix =
-                         if typed_cond = "" then ""
-                         else "\n   if " ^ typed_cond
-                       in
-                       let eq0 =
-                         Printf.sprintf
-                           "  eq $typed-index(%s, eps, %s) = eps ."
-                           type_atom n_v
+	                       let cond_suffix =
+	                         if typed_cond = "" then ""
+	                         else "\n   if " ^ typed_cond
+	                       in
+	                       let eq0 =
+	                         Printf.sprintf
+	                           "  eq $typed-index(%s, eps, %s) = eps ."
+	                           type_atom n_v
                        in
                        let eq_head =
                          Printf.sprintf
@@ -4475,23 +5972,30 @@ let translate_typd id params insts =
                            (if typed_cond = "" then "eq" else "ceq")
                            type_atom lhs_with_rest n_v type_atom rest_v n_v cond_suffix
                        in
-                       let header =
-                         if first_for_sort then
-                           "\n  --- Source-derived typed index for " ^ name ^ "* elements.\n"
-                           ^ decls ^ broad_decls ^ eq0 ^ "\n"
-                         else ""
-                       in
-                       (if first_for_sort then header else broad_decls)
-                       ^ eq_head ^ "\n" ^ eq_tail ^ "\n"
-                     end
+	                       let header =
+	                         if first_for_sort then
+	                           "\n  --- Source-derived typed index for " ^ name ^ "* elements.\n"
+	                           ^ decls ^ broad_decls ^ eq0 ^ "\n"
+	                         else ""
+	                       in
+	                       (if first_for_sort then header else broad_decls)
+	                       ^ eq_head ^ "\n" ^ eq_tail ^ "\n"
+	                     end
                      else ""
                    in
 	                 let main =
-	                   if cons_name = "" then
-	                     if is_parametric then
-	                       unsupported_parametric_membership
-                         ("empty constructor case for " ^ type_term)
+		                   if cons_name = "" then
+		                     if is_parametric then
+		                       (match parametric_specialized_memberships "" lhs rhs_conds with
+		                        | Some stmts -> stmts
+		                        | None ->
+		                            unsupported_parametric_membership
+	                              ("empty constructor case for " ^ type_term))
                      else if is_plain_var_like lhs then
+                       (match source_literal_membership_for_numeric_condition
+                                full_type_sort lhs rhs with
+                        | Some note -> note ^ "\n"
+                        | None ->
                        let finite_lits = finite_numeric_membership_literals lhs rhs in
                        if finite_lits <> [] then
                          finite_lits
@@ -4508,8 +6012,20 @@ let translate_typd id params insts =
                          in
                          ""
                        else
-                         Printf.sprintf "\n%s  cmb ( %s ) : %s\n   if %s ."
-                           (decl_prefix ()) lhs full_type_sort rhs
+                         let finite_terms =
+                           if prems = [] then []
+                           else finite_axis_terms_for_sort full_type_sort
+                         in
+                         if finite_terms <> [] then
+                           finite_terms
+                           |> List.map (fun term ->
+                                Printf.sprintf "  mb ( %s ) : %s ."
+                                  term full_type_sort)
+                           |> String.concat "\n"
+                           |> fun s -> s ^ "\n"
+                         else
+                           Printf.sprintf "\n%s  cmb ( %s ) : %s\n   if %s ."
+                             (decl_prefix ()) lhs full_type_sort rhs)
 		                       else
 		                         Printf.sprintf "\n%s  %s ( %s ) : %s%s ."
 	                         (decl_prefix ()) (if rhs = "" then "mb" else "cmb") lhs full_type_sort
@@ -4531,11 +6047,13 @@ let translate_typd id params insts =
                              then ctor_param_sorts
                              else param_sorts
                            in
-                           register_ctor_arg_sorts ctor
-                             (List.map broad_ctor_arg_sort op_sorts);
-                           register_ctor_arg_membership_sorts ctor op_sorts;
-                           register_ctor_result_sort ctor full_type_sort
-                       | None -> ()
+	                           register_ctor_arg_sorts ctor
+	                             (List.map broad_ctor_arg_sort op_sorts);
+	                           register_ctor_arg_membership_sorts ctor op_sorts;
+	                           register_ctor_arg_literal_type_dependencies ctor
+	                             (parametric_literal_type_dependencies ());
+	                           register_ctor_result_sort ctor full_type_sort
+	                       | None -> ()
                      in
 	                     let arg_sorts =
                        param_sorts
@@ -4604,14 +6122,14 @@ let translate_typd id params insts =
                                  params
                              in
                              let lhs_with_rest = Printf.sprintf "%s %s" typed_lhs rest_v in
-                             let cond_suffix =
-                               if typed_cond = "" then ""
-                               else "\n   if " ^ typed_cond
-                             in
-                             let eq_head =
-                               Printf.sprintf
-                                 "  %s $typed-index(%s, %s, 0) = %s%s ."
-                                 (if typed_cond = "" then "eq" else "ceq")
+	                             let cond_suffix =
+	                               if typed_cond = "" then ""
+	                               else "\n   if " ^ typed_cond
+	                             in
+	                             let eq_head =
+	                               Printf.sprintf
+	                                 "  %s $typed-index(%s, %s, 0) = %s%s ."
+	                                 (if typed_cond = "" then "eq" else "ceq")
                                  type_atom lhs_with_rest typed_lhs cond_suffix
                              in
                              let eq_tail =
@@ -4620,23 +6138,23 @@ let translate_typd id params insts =
                                  (if typed_cond = "" then "eq" else "ceq")
                                  type_atom lhs_with_rest n_v type_atom rest_v n_v cond_suffix
                              in
-                             "\n" ^ broad_decls ^ eq_head ^ "\n" ^ eq_tail ^ "\n"
-                           else ""
+	                             "\n" ^ broad_decls ^ eq_head ^ "\n" ^ eq_tail ^ "\n"
+	                           else ""
                          in
                          membership ^ typed_index_opt_block
 	                     ) opt_param_indices
                  in
                  Some (main ^ typed_index_block ^ String.concat "" opts)
              ) cases |> String.concat "\n"
-         | AliasT typ ->
-             let bd () = String.concat "" (List.map (fun b -> match b.it with
+	         | AliasT typ ->
+	             let bd () = String.concat "" (List.map (fun b -> match b.it with
                | ExpB (tid, _) -> declare_var (to_var_name tid.it) "SpectecTerminal"
                | _ -> "") binders) in
              let concrete_literal_alias_sort typ =
                match typ.it with
                | VarT (tid, args) when args <> [] ->
                    let family_sort = sort_of_type_name tid.it in
-                   if SSet.mem family_sort literal_family_roots then
+                   if is_literal_family_root family_sort then
                      let arg_texts =
                        List.map (fun a -> translate_arg a v_map |> fun t -> t.text) args
                      in
@@ -4656,24 +6174,398 @@ let translate_typd id params insts =
                    else None
                | _ -> None
              in
-             let register_literal_alias child parent =
-               register_literal_wrapper_for_sort child;
-               register_literal_family_alias_subsorts child;
-               if child <> parent then begin
-                 specialized_syntax_sort_decls :=
-                   SSet.add (Printf.sprintf "  sort %s ." child)
+		             let register_literal_alias child parent =
+		               register_literal_wrapper_for_sort child;
+		               register_literal_family_alias_subsorts child;
+			               if child <> parent then begin
+                   specialized_syntax_sort_names :=
+                     SSet.add child !specialized_syntax_sort_names;
+	                 specialized_syntax_sort_decls :=
+	                   SSet.add (Printf.sprintf "  sort %s ." child)
                      (SSet.add
                         (Printf.sprintf "  subsort %s < SpectecTerminal ." child)
                         (SSet.add
                            (Printf.sprintf "  subsort %s < %s ." child parent)
                            !specialized_syntax_sort_decls));
-                 add_generated_source_subsort child parent
-               end
-             in
-             let var = match typ.it with IterT (_, (List | List1)) -> "TS" | _ -> "T" in
-             let lhs = if SSet.mem name base_types then "T" else var in
-             let alias_guard_opt =
-               match typ.it with
+		                   add_generated_source_subsort child parent
+		               end
+		             in
+		             let apply_alias_assignments text assignments =
+		               List.fold_left
+		                 (fun acc (v, term) -> replace_maude_var_token v term acc)
+		                 text assignments
+		             in
+		             let strip_source_index_suffix_alias raw =
+		               let re = Str.regexp "^\\(.+\\)_[0-9]+$" in
+		               if Str.string_match re raw 0 then
+		                 match str_matched_group_opt 1 raw with Some s -> s | None -> raw
+		               else raw
+		             in
+			             let finite_source_sort_alias sort =
+			               if finite_axis_terms_for_sort sort <> [] then Some sort else None
+			             in
+		             let source_sort_from_text_alias text =
+		               let text = strip_wrapping_parens text |> String.trim in
+		               let ident = "[A-Za-z][A-Za-z0-9_/-]*" in
+		               let annotated =
+		                 Str.regexp
+		                   (".*:[ \t]*\\(" ^ ident ^ "\\)[ \t]*<:.*")
+		               in
+		               let plain = Str.regexp ("^\\(" ^ ident ^ "\\)$") in
+		               let candidates =
+		                 if Str.string_match annotated text 0 then
+		                   match str_matched_group_opt 1 text with
+		                   | Some raw -> [raw; String.lowercase_ascii raw]
+		                   | None -> []
+		                 else if Str.string_match plain text 0 then
+		                   match str_matched_group_opt 1 text with
+		                   | Some raw -> [raw; String.lowercase_ascii raw]
+		                   | None -> []
+		                 else []
+		               in
+		               candidates
+		               |> List.sort_uniq String.compare
+		               |> List.find_map (fun raw ->
+		                    finite_source_sort_alias (sort_of_type_name raw))
+		             in
+			             let source_sort_of_binder_typ_alias bt =
+			               match simple_sort_of_typ bt v_map with
+			               | Some sort when finite_axis_terms_for_sort sort <> [] -> Some sort
+		               | _ ->
+		                   (match
+		                      finite_source_sort_alias
+		                        (source_param_sort_of_typ bt v_map)
+		                    with
+		                    | Some _ as hit -> hit
+		                    | None ->
+		                        source_sort_from_text_alias
+		                          (Il.Print.string_of_typ bt))
+		             in
+		             let binder_sort_for_raw_alias raw =
+		               let base = strip_source_index_suffix_alias raw in
+		               binders
+		               |> List.find_map (fun b ->
+		                    match b.it with
+		                    | ExpB (bid, bt)
+		                        when strip_source_index_suffix_alias bid.it = base ->
+		                        source_sort_of_binder_typ_alias bt
+		                    | _ -> None)
+		             in
+			             let source_sort_of_type_arg_alias t =
+			               match simple_sort_of_typ t v_map with
+			               | Some sort when finite_axis_terms_for_sort sort <> [] -> Some sort
+		               | _ ->
+		                   (match
+		                      source_sort_from_text_alias
+		                        (Il.Print.string_of_typ t)
+		                    with
+		                    | Some _ as hit -> hit
+		                    | None ->
+		                        let text =
+		                          translate_typ_texpr t v_map
+		                          |> fun tx ->
+		                          strip_wrapping_parens tx.text |> String.trim
+		                        in
+		                        source_sort_from_text_alias text)
+		             in
+		             let source_sort_of_exp_arg_raw_alias raw =
+		               match binder_sort_for_raw_alias raw with
+		               | Some _ as hit -> hit
+		               | None ->
+		                   let base = strip_source_index_suffix_alias raw in
+		                   let candidates =
+		                     [base; String.lowercase_ascii base]
+		                     |> List.sort_uniq String.compare
+		                   in
+		                   candidates
+		                   |> List.find_map (fun candidate ->
+		                        finite_source_sort_alias
+		                          (sort_of_type_name candidate))
+		             in
+		             let parametric_alias_choices () =
+		               let cartesian lists =
+		                 List.fold_right
+		                   (fun xs acc ->
+		                     List.concat_map
+		                       (fun x -> List.map (fun ys -> x :: ys) acc)
+		                       xs)
+		                   lists
+		                   [[]]
+		               in
+		               let declared_sort_for_arg index =
+		                 match List.nth_opt typd_params index with
+		                 | Some p -> Some (source_param_sort p)
+		                 | None -> None
+		               in
+		               let choice_for_arg index arg =
+		                 match arg.it with
+		                 | ExpA e ->
+		                     (match e.it with
+		                      | VarE eid ->
+		                          let raw = eid.it in
+		                          let domain_sort =
+		                            match source_sort_of_exp_arg_raw_alias raw with
+		                            | Some actual_sort -> actual_sort
+		                            | None ->
+		                              match declared_sort_for_arg index with
+		                              | Some sort -> sort
+		                              | None ->
+		                                  sort_of_type_name
+		                                    (strip_source_index_suffix_alias raw)
+		                          in
+		                          let subst_var =
+		                            match List.assoc_opt raw v_map with
+		                            | Some mv -> mv
+		                            | None -> to_var_name raw
+		                          in
+		                          finite_axis_terms_for_sort domain_sort
+		                          |> List.map (fun term -> (term, [(subst_var, term)]))
+		                      | CaseE (mixop_arg, _) ->
+		                          (match canonical_ctor_name_arity mixop_arg 0 with
+		                           | Some ctor -> [(ctor, [])]
+		                           | None -> [])
+		                      | _ ->
+		                          let t = translate_exp TermCtx e v_map in
+		                          (match eval_ground_int_expr t.text with
+		                           | Some _ -> [(t.text, [])]
+		                           | None -> []))
+		                 | TypA t ->
+		                     let domain_sort =
+		                       match source_sort_of_type_arg_alias t with
+		                       | Some sort -> Some sort
+		                       | None -> declared_sort_for_arg index
+		                     in
+		                     (match domain_sort with
+		                      | Some sort ->
+		                          finite_axis_terms_for_sort sort
+		                          |> List.map (fun term -> (term, []))
+		                      | None -> [])
+		                 | DefA _ | GramA _ -> []
+		               in
+		               let choices_from_args () =
+		                 if args = [] then []
+		                 else
+		                   let per_arg = List.mapi choice_for_arg args in
+		                   if per_arg = [] || List.exists ((=) []) per_arg then []
+		                   else
+		                     cartesian per_arg
+		                     |> List.map (fun selected ->
+		                          let terms = List.map fst selected in
+		                          let assignments = List.concat_map snd selected in
+		                          (register_specialized_syntax_sort full_type_sort terms,
+		                           terms,
+		                           assignments))
+		               in
+		               let choices_from_binders () =
+		                 let exp_binders =
+		                   binders
+		                   |> List.filter_map (fun b -> match b.it with
+		                        | ExpB (bid, bt) -> Some (bid.it, bt)
+		                        | _ -> None)
+		                 in
+		                 if List.length exp_binders <> List.length typd_params then []
+		                 else
+		                   let per_binder =
+		                     exp_binders
+		                     |> List.mapi (fun i (raw, bt) ->
+		                          let domain_sort =
+		                            match source_sort_of_binder_typ_alias bt with
+		                            | Some _ as hit -> hit
+		                            | None ->
+		                                (match declared_sort_for_arg i with
+		                                 | Some sort
+		                                     when finite_axis_terms_for_sort sort <> [] ->
+		                                     Some sort
+		                                 | _ -> None)
+		                          in
+		                          match domain_sort with
+		                          | None -> []
+		                          | Some sort ->
+		                              let subst_var =
+		                                match List.assoc_opt raw v_map with
+		                                | Some mv -> mv
+		                                | None -> to_var_name raw
+		                              in
+		                              finite_axis_terms_for_sort sort
+		                              |> List.map (fun term -> (term, [(subst_var, term)])))
+		                   in
+		                   if per_binder = [] || List.exists ((=) []) per_binder then []
+		                   else
+		                     cartesian per_binder
+		                     |> List.map (fun selected ->
+		                          let terms = List.map fst selected in
+		                          let assignments = List.concat_map snd selected in
+		                          (register_specialized_syntax_sort full_type_sort terms,
+		                           terms,
+		                           assignments))
+		               in
+		               match choices_from_args () with
+		               | [] -> choices_from_binders ()
+		               | choices -> choices
+		             in
+		             let parametric_alias_rhs_sort selected_terms assignments rhs_typ =
+		               let selected_term_for_arg index arg =
+		                 match arg.it with
+		                 | ExpA {it = VarE eid; _} ->
+		                     let subst_var =
+		                       match List.assoc_opt eid.it v_map with
+		                       | Some mv -> mv
+		                       | None -> to_var_name eid.it
+		                     in
+		                     List.assoc_opt subst_var assignments
+		                 | TypA t ->
+		                     let domain_sort_opt = source_sort_of_type_arg_alias t in
+		                     (match domain_sort_opt with
+		                      | None -> List.nth_opt selected_terms index
+		                      | Some domain_sort ->
+		                          let matching =
+		                            typd_params
+		                            |> List.mapi (fun i p -> (i, source_param_sort p))
+		                            |> List.filter (fun (_i, sort) -> sort = domain_sort)
+		                          in
+		                          (match matching with
+		                           | [(i, _)] -> List.nth_opt selected_terms i
+		                           | _ -> List.nth_opt selected_terms index))
+		                 | _ -> None
+		               in
+		               match rhs_typ.it with
+		               | VarT (tid, []) -> Some (sort_of_type_name tid.it)
+		               | VarT (tid, rhs_args) when rhs_args <> [] ->
+		                   let family_sort = sort_of_type_name tid.it in
+		                   let rhs_arg_terms =
+		                     rhs_args
+		                     |> List.mapi (fun i arg ->
+		                          match selected_term_for_arg i arg with
+		                          | Some term -> term
+		                          | None ->
+		                              translate_arg arg v_map
+		                              |> fun t ->
+		                              apply_alias_assignments t.text assignments)
+		                   in
+		                   (match family_sort, rhs_arg_terms with
+		                    | _, [arg_text] when is_literal_family_root family_sort ->
+		                        (match eval_ground_int_expr arg_text with
+		                         | Some n ->
+		                             Some
+		                               (concrete_literal_family_sort family_sort
+		                                  (string_of_int n))
+		                         | None -> None)
+		                    | _, _ when SSet.mem family_sort !literal_family_parent_sorts ->
+		                        Some (register_specialized_syntax_sort family_sort rhs_arg_terms)
+		                    | _, _ ->
+		                        Some (register_specialized_syntax_sort family_sort rhs_arg_terms))
+		               | _ ->
+		                   (match simple_sort_of_typ rhs_typ v_map with
+		                    | Some sort -> Some sort
+		                    | None -> None)
+		             in
+		             let parametric_alias_membership () =
+		               if not is_parametric then None
+		               else
+		                 match parametric_alias_choices () with
+		                 | [] -> None
+		                 | choices ->
+		                     let statements =
+		                       choices
+		                       |> List.filter_map
+		                            (fun (target_sort, selected_terms, assignments) ->
+		                              match
+		                                parametric_alias_rhs_sort
+		                                  selected_terms assignments typ
+		                              with
+		                              | None ->
+		                                  record_unsupported_syntax_family name
+		                                    ("cannot derive parametric alias target for "
+		                                     ^ type_term);
+		                                  None
+		                              | Some child_sort ->
+		                                  register_literal_alias child_sort target_sort;
+		                                  None)
+		                     in
+		                     Some (String.concat "\n" statements)
+		             in
+		             let complex_alias_membership () =
+	               let cartesian lists =
+	                 List.fold_right
+	                   (fun xs acc ->
+	                     List.concat_map
+	                       (fun x -> List.map (fun ys -> x :: ys) acc)
+	                       xs)
+	                   lists
+	                   [[]]
+	               in
+	               let counters = ref [] in
+	               let fresh_var_for_typ t =
+	                 let base =
+	                   match simple_sort_of_typ t v_map with
+	                   | Some s -> String.uppercase_ascii (sanitize s)
+	                   | None -> "ALIAS"
+	                 in
+	                 let n =
+	                   (try List.assoc base !counters with Not_found -> 0) + 1
+	                 in
+	                 counters := (base, n) :: List.remove_assoc base !counters;
+	                 base ^ string_of_int n
+	               in
+	               let rec alts t =
+	                 match t.it with
+	                 | TupT fields ->
+	                     let per_field =
+	                       fields |> List.map (fun (_fe, ft) -> alts ft)
+	                     in
+	                     if per_field = [] || List.exists ((=) []) per_field then []
+	                     else cartesian per_field |> List.map List.concat
+	                 | IterT (inner, Opt) ->
+	                     [] :: alts inner
+	                 | IterT (_, (List | List1 | ListN _))
+	                 | VarT _ ->
+	                     let v = fresh_var_for_typ t in
+	                     [[(v, t)]]
+	                 | _ -> []
+	               in
+	               let is_complex =
+	                 match typ.it with
+	                 | TupT _ | IterT (_, Opt) -> true
+	                 | _ -> false
+	               in
+	               if not is_complex then None
+	               else
+	                 match alts typ with
+	                 | [] -> None
+	                 | alternatives ->
+	                     alternatives
+	                     |> List.map (fun comps ->
+	                          let decls =
+	                            comps
+	                            |> List.map (fun (v, t) ->
+	                                 declare_var v
+	                                   (source_carrier_sort_of_typ t v_map))
+	                            |> String.concat ""
+	                          in
+	                          let lhs =
+	                            match List.map fst comps with
+	                            | [] -> "eps"
+	                            | vars -> String.concat " " vars
+	                          in
+	                          let cond =
+	                            comps
+	                            |> List.map (fun (v, t) -> type_guard v t v_map)
+	                            |> List.filter (fun g -> g <> "true")
+	                            |> fun guards ->
+	                              if binder_conds = [] then cond_join guards
+	                              else cond_join (binder_conds @ guards)
+	                          in
+	                          Printf.sprintf "%s  %s ( %s ) : %s%s ."
+	                            decls (if cond = "" then "mb" else "cmb")
+	                            lhs full_type_sort
+	                            (if cond = "" then "" else "\n   if " ^ cond))
+	                     |> String.concat "\n"
+	                     |> fun s -> Some s
+	             in
+	             let var = match typ.it with IterT (_, (List | List1)) -> "TS" | _ -> "T" in
+	             let lhs = if SSet.mem name base_types then "T" else var in
+	             let alias_guard_opt =
+	               match typ.it with
                | NumT `NatT -> Some (Printf.sprintf "%s : Nat" lhs)
                | NumT `IntT -> Some (Printf.sprintf "%s : Int" lhs)
                | VarT (tid, _) ->
@@ -4687,16 +6579,22 @@ let translate_typd id params insts =
                | _ -> Some (type_guard lhs typ v_map)
              in
              (match concrete_literal_alias_sort typ, typ_ref_sort typ with
-             | Some child, _ when not is_parametric ->
-                 register_literal_alias child full_type_sort;
-                 ""
-             | _, Some child when not is_parametric ->
-                 add_generated_source_subsort child full_type_sort;
-                 ""
-             | _ ->
-             match alias_guard_opt with
-             | None -> ""
-             | Some alias_guard ->
+	             | Some child, _ when not is_parametric ->
+	                 register_literal_alias child full_type_sort;
+	                 ""
+		             | _, Some child when not is_parametric ->
+		                 add_generated_source_subsort child full_type_sort;
+		                 ""
+		             | _ ->
+		             match parametric_alias_membership () with
+		             | Some stmts -> stmts
+		             | None ->
+		             match complex_alias_membership () with
+	             | Some stmts -> stmts
+	             | None ->
+	             match alias_guard_opt with
+	             | None -> ""
+	             | Some alias_guard ->
                   let cond =
                     if alias_guard = "true" then ""
                     else if binder_conds = [] then alias_guard
@@ -4704,6 +6602,16 @@ let translate_typd id params insts =
                   if is_parametric then
                     unsupported_parametric_membership
                       ("alias membership for " ^ type_term)
+                  else
+                    let finite_alias_terms =
+                      if binder_conds = [] then []
+                      else finite_axis_terms_for_sort full_type_sort
+                    in
+                    if finite_alias_terms <> [] then
+                      finite_alias_terms
+                      |> List.map (fun term ->
+                           Printf.sprintf "  mb ( %s ) : %s ." term full_type_sort)
+                      |> String.concat "\n"
                   else
                     Printf.sprintf "%s  %s ( %s ) : %s%s ."
                       (bd ()) (if cond = "" then "mb" else "cmb") lhs full_type_sort
@@ -5476,24 +7384,16 @@ let redundant_or_warning_prone_category_membership stmt =
     let re = Str.regexp "^[0-9]+$" in
     Str.string_match re p 0
   in
-  let pattern_has_flat_sequence_head pattern =
-    let p = strip_wrapping_parens pattern |> String.trim in
-    starts_with p "eps "
-    || contains_substring p ") ("
-  in
-	  match parse_membership_statement stmt with
-  | Some ("Nonfuncs", pattern, None)
-      when contains_substring pattern "GLOBAL-LIST-GLOBAL"
-        && contains_substring pattern "MEM-LIST-MEM"
-        && contains_substring pattern "TABLE-LIST-TABLE"
-        && contains_substring pattern "ELEM-LIST-ELEM" ->
-      true
-  | Some (_, pattern, _)
-      when pattern_has_flat_sequence_head pattern ->
-      true
-  | Some (_, pattern, None)
-      when pattern_is_plain_variable pattern ->
-      true
+		  match parse_membership_statement stmt with
+	  | Some ("Nonfuncs", pattern, None)
+	      when contains_substring pattern "GLOBAL-LIST-GLOBAL"
+	        && contains_substring pattern "MEM-LIST-MEM"
+	        && contains_substring pattern "TABLE-LIST-TABLE"
+	        && contains_substring pattern "ELEM-LIST-ELEM" ->
+	      true
+	  | Some (_, pattern, None)
+	      when pattern_is_plain_variable pattern ->
+	      true
   | Some (_, pattern, None)
       when pattern_is_numeric_literal pattern ->
       true
@@ -7788,9 +9688,38 @@ let relation_execution_kind mixop rules =
 
 let collect_native_sequence_sorts_from_source defs =
   let add_native_sequence_sort sort =
-    if sort = "Instr" || sort = "Val" then
-      native_sequence_source_sorts :=
-        SSet.add sort !native_sequence_source_sorts
+    register_native_sequence_sort sort
+  in
+  let rec collect_typ_sequences t =
+    (match sequence_sort_of_typ t [] with
+     | Some seq_sort when ends_with seq_sort "Seq" ->
+         add_native_sequence_sort
+           (String.sub seq_sort 0 (String.length seq_sort - 3))
+     | _ -> ());
+    match t.it with
+    | VarT (_, args) ->
+        List.iter collect_arg_sequences args
+    | TupT fields ->
+        List.iter (fun (_e, ft) -> collect_typ_sequences ft) fields
+    | IterT (inner, _) ->
+        collect_typ_sequences inner
+    | BoolT | NumT _ | TextT -> ()
+  and collect_arg_sequences a =
+    match a.it with
+    | TypA t -> collect_typ_sequences t
+    | ExpA _ | DefA _ | GramA _ -> ()
+  in
+  let collect_deftyp_sequences deftyp =
+    match deftyp.it with
+    | AliasT t -> collect_typ_sequences t
+    | StructT fields ->
+        List.iter (fun (_atom, (_binders, ft, _prems), _hints) ->
+          collect_typ_sequences ft
+        ) fields
+    | VariantT cases ->
+        List.iter (fun (_mixop, (_binders, case_typ, _prems), _hints) ->
+          collect_typ_sequences case_typ
+        ) cases
   in
   let rec exp_var_names (e : exp) =
     match e.it with
@@ -7864,6 +9793,12 @@ let collect_native_sequence_sorts_from_source defs =
   let rec scan_def d =
     match d.it with
     | RecD ds -> List.iter scan_def ds
+    | TypD (_, _, insts) ->
+        List.iter
+          (fun inst ->
+            let (InstD (_binders, _args, deftyp)) = inst.it in
+            collect_deftyp_sequences deftyp)
+          insts
     | RelD (_, mixop, _, rules) -> List.iter (scan_rule mixop) rules
     | _ -> ()
   in
@@ -9275,13 +11210,18 @@ let generated_prelude_modules features =
 
 let native_sequence_sort_decls () =
   let source_sorts = SSet.elements !native_sequence_source_sorts in
+  if source_sorts = [] then ""
+  else
+  let empty_seq_decl =
+    "  sort EmptySeq .\n  subsort EmptySeq < SpectecTerminals .\n  op eps : -> EmptySeq .\n\n"
+  in
   let seq_decls =
     source_sorts
     |> List.map (fun source_sort ->
        let seq_sort = native_sequence_sort_name source_sort in
        Printf.sprintf
-         "  sort %s .\n  subsort %s < %s .\n  subsort %s < SpectecTerminals .\n  op eps : -> %s .\n  op _ _ : %s %s -> %s [ctor assoc id: eps] .\n\n"
-         seq_sort source_sort seq_sort seq_sort seq_sort seq_sort seq_sort seq_sort)
+         "  sort %s .\n  subsort EmptySeq < %s .\n  subsort %s < %s .\n  subsort %s < SpectecTerminals .\n\n"
+         seq_sort seq_sort source_sort seq_sort seq_sort)
     |> String.concat ""
   in
   let seq_subsort_decls =
@@ -9297,7 +11237,7 @@ let native_sequence_sort_decls () =
     |> List.sort_uniq String.compare
     |> String.concat ""
   in
-  seq_decls
+  empty_seq_decl ^ seq_decls
   ^ (if seq_subsort_decls = "" then "" else
        "  --- Source-derived sequence subsorts lifted from category subsorts.\n"
        ^ seq_subsort_decls ^ "\n")
@@ -9361,8 +11301,8 @@ let execution_wrapper_block wrappers =
       "  --- satisfied by zero-step matching an unreduced relation call.\n" ^
       Printf.sprintf "  sorts %s .\n" wrapper_sorts ^
       subsorts ^
-      "  op _;_ : Store Frame -> State [ctor prec 55] .\n" ^
-      "  op _;_ : State SpectecTerminals -> Config [ctor prec 60] .\n" ^
+	      "  op _;_ : Store Frame -> SpectecTerminal [ctor prec 55] .\n" ^
+	      "  op _;_ : State SpectecTerminals -> SpectecTerminal [ctor prec 60] .\n" ^
       op_decls ^
       "\n"
 
@@ -10910,6 +12850,73 @@ let collect_ctor_decl_lines eq_lines =
 		             Printf.sprintf "  op %s : %s -> SpectecTerminal [ctor] ."
 		               nm args)
 
+let normalize_shared_nullary_memberships memberships =
+  let re =
+    Str.regexp "^[ \t]*mb[ \t]+([ \t]*\\(CTOR[A-Z0-9]+A0\\)[ \t]*)[ \t]*:[ \t]*\\([A-Za-z0-9_-]+\\)[ \t]*\\."
+  in
+  let groups = Hashtbl.create 128 in
+  let parsed =
+    memberships
+    |> List.map (fun stmt ->
+         if Str.string_match re stmt 0 then
+           match str_matched_group_opt 1 stmt, str_matched_group_opt 2 stmt with
+           | Some ctor, Some sort ->
+               let sorts =
+                 match Hashtbl.find_opt groups ctor with
+                 | Some sorts -> sorts
+                 | None -> SSet.empty
+               in
+               Hashtbl.replace groups ctor (SSet.add sort sorts);
+               Some (stmt, ctor, sort)
+           | _ -> None
+         else None)
+  in
+  let shared_sort ctor =
+    "SharedNullary" ^ nullary_ctor_suffix ctor
+  in
+  let shared_ctors =
+    Hashtbl.fold
+      (fun ctor sorts acc ->
+        if SSet.cardinal sorts > 1 then SSet.add ctor acc else acc)
+      groups SSet.empty
+  in
+  if SSet.is_empty shared_ctors then ([], memberships)
+  else
+    let emitted_shared_mb = Hashtbl.create 128 in
+    let memberships' =
+      List.map2
+        (fun stmt parsed ->
+          match parsed with
+          | Some (_stmt, ctor, _sort) when SSet.mem ctor shared_ctors ->
+              if Hashtbl.mem emitted_shared_mb ctor then None
+              else begin
+                Hashtbl.add emitted_shared_mb ctor ();
+                Some
+                  (Printf.sprintf "  mb ( %s ) : %s ."
+                     ctor (shared_sort ctor))
+              end
+          | _ -> Some stmt)
+        memberships parsed
+      |> List.filter_map (fun x -> x)
+    in
+    let decls =
+      SSet.elements shared_ctors
+      |> List.concat_map (fun ctor ->
+           let ss = shared_sort ctor in
+           let sorts =
+             match Hashtbl.find_opt groups ctor with
+             | Some sorts -> SSet.elements sorts
+             | None -> []
+           in
+           (Printf.sprintf "  sort %s ." ss) ::
+           (Printf.sprintf "  subsort %s < SpectecTerminal ." ss) ::
+           List.map
+             (fun parent -> Printf.sprintf "  subsort %s < %s ." ss parent)
+             sorts)
+      |> List.sort_uniq String.compare
+    in
+    (decls, memberships')
+
 let infer_category_subsort_decls eq_lines =
   let eq_lines = List.concat_map (String.split_on_char '\n') eq_lines in
   let re =
@@ -10945,8 +12952,10 @@ let infer_category_subsort_decls eq_lines =
   |> List.concat_map (fun (child, child_lhs) ->
        pairs
        |> List.filter_map (fun (parent, parent_lhs) ->
-            if child <> parent
-               && SSet.cardinal child_lhs > 0
+	            if child <> parent
+                 && not (SSet.mem child !specialized_syntax_sort_names)
+                 && not (SSet.mem parent !specialized_syntax_sort_names)
+	               && SSet.cardinal child_lhs > 0
                && SSet.cardinal child_lhs < SSet.cardinal parent_lhs
                && SSet.subset child_lhs parent_lhs
             then Some (Printf.sprintf "  subsort %s < %s ." child parent)
@@ -11007,6 +13016,7 @@ let translate defs =
   opt_ctor_helpers := [];
   Hashtbl.clear ctor_arg_sort_hints;
   Hashtbl.clear ctor_arg_membership_sort_hints;
+  Hashtbl.clear ctor_arg_literal_type_dependencies;
   Hashtbl.clear ctor_result_sort_hints;
   source_seq_pred_sorts := SSet.empty;
 	  feature_uses_bool_wrapper := false;
@@ -11015,10 +13025,12 @@ let translate defs =
 	  feature_uses_steps_final_predicate := false;
   unsupported_syntax_families := SSet.empty;
   specialized_syntax_sort_decls := SSet.empty;
+  specialized_syntax_sort_names := SSet.empty;
   literal_wrapper_syntax_decls := SSet.empty;
   literal_wrapper_memberships := SSet.empty;
   Hashtbl.clear literal_wrapper_payload_sorts;
   Hashtbl.clear literal_wrapper_by_type_term;
+  Hashtbl.clear source_literal_wrapper_by_sort;
   build_type_env defs;
   collect_native_sequence_sorts_from_source defs;
   init_declared_vars ();
@@ -11163,6 +13175,12 @@ let translate defs =
 	    |> List.filter (fun stmt -> not (is_helper_type_witness stmt))
 	    |> List.filter (fun stmt -> not (redundant_or_warning_prone_category_membership stmt))
 	  in
+  let shared_nullary_decls, category_memberships =
+    normalize_shared_nullary_memberships category_memberships
+  in
+  let decls =
+    List.sort_uniq String.compare (decls @ shared_nullary_decls)
+  in
   let eqs = core_eqs @ pred_eqs @ category_memberships in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^
   "\n\n  --- Equations\n" ^
