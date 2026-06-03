@@ -1,6 +1,6 @@
 # Spec2Maude Status
 
-Updated: 2026-05-29
+Updated: 2026-06-03
 
 ## One-Line State
 
@@ -77,18 +77,25 @@ Heaptype-sub
 But the default WAT/Wasm execution CLI does not use them as the input gate.
 `maude-validate` remains an experimental/debug command.
 
-## Latest Known Benchmark Shape
+## Latest Known Check Shape
 
-The local smoke suite currently passes through the default frontend/runtime
-path:
+The current JHS-carrier restoration should be judged first by syntax/load
+checks, then by direct source-shaped execution.  Latest local checks:
 
 ```text
-scripts/run_wasm_benchmarks.py --skip-external
-PASS: 13
+make build                                           PASS
+./spec2maude translate -o output.maude               PASS
+maude -no-banner output.maude                        PASS, no warnings
+maude -no-banner wasm-exec.maude                     PASS, no warnings
+./spec2maude validate wat_examples/fib.wat           PASS
+rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
+./spec2maude run wat_examples/fib.wat --fib 5        PASS
+./spec2maude run wat_examples/data-load.wat          PASS
+./spec2maude test smoke --timeout 10                 PASS: 13
 ```
 
-The larger official/external benchmark table should be regenerated after any
-translator or frontend change:
+Larger official/external benchmark tables should still be regenerated after
+translator/runtime changes:
 
 ```bash
 ./spec2maude test official --limit 200 --timeout 10
@@ -114,9 +121,13 @@ Resolved:
 
 - old `step-from-step-pure-*` bridge rules are gone;
 - old `$is-spectec-val-seq` guard is gone;
-- `SpectecType` is separated from runtime `SpectecTerminal`;
-- broad constructors such as `iN : SpectecTerminal -> SpectecType` were
-  narrowed to source-shaped parameter sorts such as `iN : N -> SpectecType`;
+- the JHS-style `SpectecType`/`typecheck` syntax carrier is restored;
+- source syntax constructors are generated over the broad `SpectecTerminal`
+  carrier instead of source category Maude sorts;
+- source category validity is generated as `typecheck(term, category-term)`;
+- syntax constructor cases also emit `mb`/`cmb` membership on
+  `SpectecTerminal`;
+- bulk source category sort/subsort generation is removed from the syntax path;
 - generated WAT harnesses no longer include `Module-ok` checked-run code unless
   explicitly requested with the debug path.
 

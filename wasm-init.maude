@@ -13,41 +13,48 @@ load builtins
 mod WASM-INIT is
   inc WASM-BUILTINS .
 
+  --- Runtime addresses are represented by natural-number offsets in the
+  --- Wasm harness.  The JHS-style syntax carrier keeps numbers as terminals,
+  --- so reconnect them to the structural address hierarchy for execution.
+  subsort Nat < Addr .
+
   --- Harness support helpers.  These build imported function/store pieces
   --- and initial module instances for validated frontend-generated modules.
   var INIT-LOWS : Store .
-  var INIT-MODULEINST : Moduleinst .
+  var INIT-MODULEINST : SpectecTerminal .
   vars INIT-TYPES INIT-IMPORTS INIT-FUNCS INIT-EXPORTS INIT-EXTERNADDRS : SpectecTerminals .
   vars INIT-TYPESQ INIT-FUNCSQ INIT-LOCALS INIT-BODY : SpectecTerminals .
   vars INIT-RECTYPE INIT-TYPEIDX : SpectecTerminal .
   var INIT-I : Int .
   var INIT-INT : Int .
-  var INIT-NUMTYPE : Numtype .
-  var INIT-NUM : Num .
-  var INIT-VECTYPE : Vectype .
-  var INIT-VEC : Vec .
+  var INIT-NUMTYPE : SpectecTerminal .
+  var INIT-NUM : SpectecTerminal .
+  var INIT-VECTYPE : SpectecTerminal .
+  var INIT-VEC : SpectecTerminal .
   var INIT-VEC-TERM : SpectecTerminal .
-  var INIT-HEAPTYPE : Heaptype .
-  var INIT-HEAPTYPE-IDX : Typeidx .
-  var INIT-HEAPTYPE-REC : Rectype .
+  var INIT-HEAPTYPE : SpectecTerminal .
+  var INIT-HEAPTYPE-IDX : SpectecTerminal .
+  var INIT-HEAPTYPE-REC : SpectecTerminal .
   var INIT-RECTYPE-TERMS : SpectecTerminals .
-  var INIT-HEAPTYPE-N : N .
-  var INIT-U31 : U31 .
+  var INIT-HEAPTYPE-N : SpectecTerminal .
+  var INIT-U31 : SpectecTerminal .
   var INIT-STRUCTADDR : Structaddr .
   var INIT-ARRAYADDR : Arrayaddr .
   var INIT-FUNCADDR : Funcaddr .
   var INIT-EXNADDR : Exnaddr .
   var INIT-HOSTADDR : Hostaddr .
-  var INIT-ADDRREF : Addrref .
+  var INIT-ADDRREF : SpectecTerminal .
   var INIT-ADDRREF-N : Nat .
-  op $wat-name : Qid -> Name [ctor] .
+  var INIT-NAME-QID : Qid .
+  op $wat-name : Qid -> SpectecTerminal [ctor] .
+  eq typecheck($wat-name(INIT-NAME-QID), name) = true .
   op $init-deftypes : SpectecTerminals Int -> SpectecTerminals .
   op $init-funcaddrs : SpectecTerminals Int -> SpectecTerminals .
-  op $init-funcinst : SpectecTerminals Moduleinst SpectecTerminal SpectecTerminals SpectecTerminals -> Funcinst [ctor] .
-  op $init-funcinsts : SpectecTerminals SpectecTerminals Moduleinst -> SpectecTerminals .
-  op $init-moduleinst : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Moduleinst [ctor] .
+  op $init-funcinst : SpectecTerminals SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
+  op $init-funcinsts : SpectecTerminals SpectecTerminals SpectecTerminal -> SpectecTerminals .
+  op $init-moduleinst : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $init-store : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Store [ctor] .
-  op $seq-set-terminal : SpectecTerminals Nat Ref -> SpectecTerminals .
+  op $seq-set-terminal : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals .
   eq $init-deftypes(eps, INIT-I) = eps .
   eq $init-deftypes(CTORTYPEA1(INIT-RECTYPE) INIT-TYPESQ, INIT-I) = CTORWDEFA2(INIT-RECTYPE, 0) $init-deftypes(INIT-TYPESQ, INIT-I + 1) .
   eq $init-funcaddrs(eps, INIT-I) = eps .
@@ -81,12 +88,12 @@ mod WASM-INIT is
   --- checking was removed from the execution core.
   var INITFULL-LOWS : Store .
   var INITFULL-LOWF : Frame .
-  var INITFULL-MODULEINST : Moduleinst .
+  var INITFULL-MODULEINST : SpectecTerminal .
   var INITFULL-Z : State .
   vars INITFULL-TYPES INITFULL-IMPORTS INITFULL-TAGS INITFULL-GLOBALS INITFULL-MEMS INITFULL-TABLES INITFULL-FUNCS INITFULL-DATAS INITFULL-ELEMS INITFULL-STARTS INITFULL-EXPORTS INITFULL-EXTERNADDRS INITFULL-REST INITFULL-LIMJS INITFULL-TT INITFULL-GT INITFULL-GEXPR INITFULL-TEXPR INITFULL-BYTES INITFULL-EEXPRS INITFULL-LOCALS INITFULL-BODY : SpectecTerminals .
   vars INITFULL-MEMTYPE INITFULL-MEMBYTES INITFULL-NEWBYTES INITFULL-OLD-BYTES : SpectecTerminals .
   vars INITFULL-MT INITFULL-DMODE INITFULL-RT INITFULL-EMODE INITFULL-TYPEIDX INITFULL-RECTYPE INITFULL-EXPR INITFULL-HT INITFULL-X INITFULL-AT INITFULL-LIMN INITFULL-TABLEIDX INITFULL-DEFAULTREF INITFULL-MUTS INITFULL-ZT INITFULL-VAL : SpectecTerminal .
-  var INITFULL-MEMX : Memidx .
+  var INITFULL-MEMX : SpectecTerminal .
   vars INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3 INITFULL-B4 INITFULL-B5 INITFULL-B6 INITFULL-B7 : Nat .
   vars INITFULL-N INITFULL-M : Nat .
   var INITFULL-A : Nat .
@@ -94,41 +101,48 @@ mod WASM-INIT is
   vars INITFULL-OFF INITFULL-COUNT INITFULL-J INITFULL-JQ INITFULL-OLD-OFF INITFULL-OLD-COUNT : Nat .
   vars INITFULL-TABLE-I INITFULL-DATA-I INITFULL-ELEM-I : Nat .
   vars INITFULL-R INITFULL-RQ : SpectecTerminal .
-  var INITFULL-RREF : Ref .
+  var INITFULL-RREF : SpectecTerminal .
   var INITFULL-I : Int .
   op $init-globaladdrs : SpectecTerminals Int -> SpectecTerminals .
   op $init-memaddrs : SpectecTerminals Int -> SpectecTerminals .
   op $init-tableaddrs : SpectecTerminals Int -> SpectecTerminals .
   op $init-dataaddrs : SpectecTerminals Int -> SpectecTerminals .
   op $init-elemaddrs : SpectecTerminals Int -> SpectecTerminals .
-  op $init-const-val : SpectecTerminals -> Val .
-  op $init-const-ref : Moduleinst SpectecTerminals -> Ref .
-  op $init-const-refs : Moduleinst SpectecTerminals -> SpectecTerminals .
+  op $init-const-val : SpectecTerminals -> SpectecTerminal .
+  op $init-const-ref : SpectecTerminal SpectecTerminals -> SpectecTerminal .
+  op $init-const-refs : SpectecTerminal SpectecTerminals -> SpectecTerminals .
   op $init-globalinsts : SpectecTerminals -> SpectecTerminals .
   op $init-globalinsts-full : State SpectecTerminals Nat -> SpectecTerminals .
   op $init-global-arrayinsts : State SpectecTerminals -> SpectecTerminals .
   op $init-repeat-field : SpectecTerminal SpectecTerminal Nat -> SpectecTerminals .
   op $zero-membytes : SpectecTerminal -> SpectecTerminals [ctor] .
   op $mem-bytes : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals [ctor] .
+  ceq typecheck(INITFULL-N, byte) = true
+    if typecheck(litByte(INITFULL-N), byte) = true .
+  eq typecheck($zero-membytes(INITFULL-LIMN), byte) = true .
+  ceq typecheck($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES), byte) = true
+    if typecheck(INITFULL-OLD-BYTES, byte) = true /\ typecheck(INITFULL-BYTES, byte) = true .
   op $mem-byte : SpectecTerminals Nat -> SpectecTerminal .
   op $mem-write : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals .
-  op $memaddr : Frame Memidx -> Nat .
-  op $with-mem-slice : State Memidx SpectecTerminal SpectecTerminal SpectecTerminals -> State .
+  op $memaddr : Frame SpectecTerminal -> Nat .
+  op $with-mem-slice : State SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals -> State .
+  ceq typecheck(INITFULL-N, storeop(INITFULL-ZT)) = true
+    if typecheck(litSz(INITFULL-N), storeop(INITFULL-ZT)) = true .
   op $init-membytes : SpectecTerminal -> SpectecTerminals .
   op $init-meminsts : SpectecTerminals -> SpectecTerminals .
   op $table-refs : SpectecTerminal SpectecTerminals -> SpectecTerminals [ctor] .
   op $table-refs-set : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals [ctor] .
-  op $active-table-refs : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals Moduleinst -> SpectecTerminals [ctor] .
-  op $active-table-ref-at : SpectecTerminal SpectecTerminal SpectecTerminals Moduleinst Nat -> SpectecTerminal .
+  op $active-table-refs : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminal -> SpectecTerminals [ctor] .
+  op $active-table-ref-at : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminal Nat -> SpectecTerminal .
   op $init-tablerefs : SpectecTerminal SpectecTerminals -> SpectecTerminals .
-  op $init-tableinsts : SpectecTerminals SpectecTerminals Moduleinst Nat -> SpectecTerminals .
+  op $init-tableinsts : SpectecTerminals SpectecTerminals SpectecTerminal Nat -> SpectecTerminals .
   op $init-datainsts : SpectecTerminals -> SpectecTerminals .
-  op $init-eleminsts : SpectecTerminals Moduleinst -> SpectecTerminals .
+  op $init-eleminsts : SpectecTerminals SpectecTerminal -> SpectecTerminals .
   op $init-run-datas : SpectecTerminals Nat -> SpectecTerminals .
   op $init-run-elems : SpectecTerminals Nat -> SpectecTerminals .
   op $init-start-instrs : SpectecTerminals -> SpectecTerminals .
   op $init-state-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> State .
-  op $init-moduleinst-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Moduleinst [ctor] .
+  op $init-moduleinst-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $init-store-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Store [ctor] .
 
   --- Runtime-only bridge for memory stores and passive segment drops under
@@ -138,22 +152,22 @@ mod WASM-INIT is
   var STEP-MEM-CTX-VALS : SpectecTerminals .
   vars STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS STEP-MEM-CTX-LIM : SpectecTerminals .
   var STEP-MEM-CTX-AT : SpectecTerminal .
-  var STEP-MEM-CTX-NT : Numtype .
-  var STEP-MEM-CTX-INN : Numtype .
-  var STEP-MEM-CTX-AO : Memarg .
-  var STEP-MEM-CTX-X : Memidx .
+  var STEP-MEM-CTX-NT : SpectecTerminal .
+  var STEP-MEM-CTX-INN : SpectecTerminal .
+  var STEP-MEM-CTX-AO : SpectecTerminal .
+  var STEP-MEM-CTX-X : SpectecTerminal .
   var STEP-MEM-CTX-I : SpectecTerminal .
   var STEP-MEM-CTX-C : SpectecTerminal .
-  var STEP-MEM-CTX-N : N .
+  var STEP-MEM-CTX-N : SpectecTerminal .
   var STEP-MEM-GROW-I : SpectecTerminal .
   vars STEP-MEM-GROW-MIN STEP-MEM-GROW-MAX STEP-MEM-GROW-IQ : Nat .
   vars STEP-MEM-GROW-BS : SpectecTerminals .
   var STEP-MEM-GROW-MAT : SpectecTerminal .
-  var STEP-MEM-CTX-DATAIDX : Dataidx .
-  var STEP-MEM-CTX-ELEMIDX : Elemidx .
+  var STEP-MEM-CTX-DATAIDX : SpectecTerminal .
+  var STEP-MEM-CTX-ELEMIDX : SpectecTerminal .
   var INIT-CALL-Z : State .
   var INIT-CALL-A : Funcaddr .
-  var INIT-CALL-FI : Funcinst .
+  var INIT-CALL-FI : SpectecTerminal .
   var INIT-CALL-F : Frame .
   var INIT-CALL-X : SpectecTerminal .
   vars INIT-CALL-VALS INIT-CALL-TS1 INIT-CALL-TS2 INIT-CALL-LOCALS INIT-CALL-LOCALTS INIT-CALL-INSTRS INIT-CALL-YY : SpectecTerminals .
@@ -165,7 +179,7 @@ mod WASM-INIT is
   var INIT-TABLE-NEG-Z : State .
   var INIT-TABLE-NEG-AT : SpectecTerminal .
   var INIT-TABLE-NEG-I : Int .
-  var INIT-TABLE-NEG-X : Tableidx .
+  var INIT-TABLE-NEG-X : SpectecTerminal .
   vars INIT-REFCAST-LOWS INIT-REFCAST-F : SpectecTerminals .
   vars INIT-REFCAST-HT INIT-REFCAST-TARGET : SpectecTerminal .
   vars INIT-SIMD-LANES1 INIT-SIMD-LANES2 : SpectecTerminals .
@@ -176,7 +190,7 @@ mod WASM-INIT is
   vars INIT-SIMD-C1 INIT-SIMD-C2 INIT-SIMD-CQ INIT-SIMD-SH INIT-SIMD-OP : SpectecTerminal .
   var INIT-SIMD-LOWS : Store .
   vars INIT-SIMD-F INIT-SIMD-FQ : Frame .
-  vars INIT-SIMD-FRAMEN INIT-SIMD-LABELN : N .
+  vars INIT-SIMD-FRAMEN INIT-SIMD-LABELN : SpectecTerminal .
   vars INIT-SIMD-LABEL-INSTRS0 : SpectecTerminals .
 
   --- Concrete evaluator for the relaxed SIMD instruction used by the
@@ -209,12 +223,14 @@ mod WASM-INIT is
     step((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVBINOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1))
     =>
     (INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1)
-      if INIT-SIMD-CQ := $vbinop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) .
+      if typecheck(INIT-SIMD-VALS, val)
+      /\ INIT-SIMD-CQ := $vbinop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) .
   crl [init-step-vrelop-ctxt-instrs] :
     step((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVRELOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1))
     =>
     (INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1)
-      if INIT-SIMD-CQ := $vrelop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) .
+      if typecheck(INIT-SIMD-VALS, val)
+      /\ INIT-SIMD-CQ := $vrelop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) .
   ceq steps((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVBINOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1)) =
     steps((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1))
       if INIT-SIMD-CQ := $vbinop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) /\ INIT-SIMD-CQ =/= eps .
@@ -258,25 +274,30 @@ mod WASM-INIT is
     step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-NT, eps, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( $raw-nat-lit(STEP-MEM-CTX-I), $raw-nat-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( $size ( STEP-MEM-CTX-NT ), 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
-      if STEP-MEM-CTX-BS := $nbytes ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) .
+      if typecheck(STEP-MEM-CTX-VALS, val)
+      /\ STEP-MEM-CTX-BS := $nbytes ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) .
   crl [step-store-pack-ctxt-instrs] :
     step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-N, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( $raw-nat-lit(STEP-MEM-CTX-I), $raw-nat-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( STEP-MEM-CTX-N, 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
-      if STEP-MEM-CTX-BS := $ibytes ( STEP-MEM-CTX-N, $wrap ( $size ( STEP-MEM-CTX-INN ), STEP-MEM-CTX-N, STEP-MEM-CTX-C ) ) .
+      if typecheck(STEP-MEM-CTX-VALS, val)
+      /\ STEP-MEM-CTX-BS := $ibytes ( STEP-MEM-CTX-N, $wrap ( $size ( STEP-MEM-CTX-INN ), STEP-MEM-CTX-N, STEP-MEM-CTX-C ) ) .
   crl [step-data-drop-ctxt-instrs] :
     step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORDATADROPA1 ( STEP-MEM-CTX-DATAIDX ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-data ( STEP-MEM-CTX-Z, STEP-MEM-CTX-DATAIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
-      if _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
+      if typecheck(STEP-MEM-CTX-VALS, val)
+      /\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
   crl [step-elem-drop-ctxt-instrs] :
     step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORELEMDROPA1 ( STEP-MEM-CTX-ELEMIDX ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
-      if _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
+      if typecheck(STEP-MEM-CTX-VALS, val)
+      /\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
   ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORELEMDROPA1 ( STEP-MEM-CTX-ELEMIDX ) STEP-MEM-CTX-INSTRS1 ) ) =
     steps ( ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 ) )
-      if _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
+      if typecheck(STEP-MEM-CTX-VALS, val)
+      /\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
   crl [init-step-read-memory-size] :
     step-read ( ( STEP-MEM-CTX-Z ; CTORMEMORYSIZEA1 ( STEP-MEM-CTX-X ) ) )
     =>
@@ -286,17 +307,20 @@ mod WASM-INIT is
   ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORMEMORYSIZEA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) ) =
     steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, $wrap-lit(STEP-MEM-CTX-AT, STEP-MEM-CTX-N) ) STEP-MEM-CTX-INSTRS1 ) )
       if RECMeminstA2 ( CTORPAGEA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-LIM ), STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
       /\ STEP-MEM-CTX-N := _quo_ ( len ( STEP-MEM-CTX-BS ), _*_ ( 64, $Ki ) ) .
   crl [step-memory-grow-fail-negative-ctxt-instrs] :
     step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-GROW-I ) CTORMEMORYGROWA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) STEP-MEM-CTX-INSTRS1 )
-      if $raw-lit(STEP-MEM-GROW-I) < 0 .
+      if typecheck(STEP-MEM-CTX-VALS, val)
+      /\ $raw-lit(STEP-MEM-GROW-I) < 0 .
   crl [step-memory-grow-fail-max-ctxt-instrs] :
     step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORMEMORYGROWA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) STEP-MEM-CTX-INSTRS1 )
       if RECMeminstA2 ( CTORPAGEA2 ( STEP-MEM-GROW-MAT, CTORLBRACKDOTDOTRBRACKA2 ( STEP-MEM-GROW-MIN, STEP-MEM-GROW-MAX ) ), STEP-MEM-GROW-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
       /\ STEP-MEM-GROW-IQ := _+_ ( _quo_ ( len ( STEP-MEM-GROW-BS ), _*_ ( 64, $Ki ) ), $raw-nat-lit(STEP-MEM-CTX-I) )
       /\ _>_ ( STEP-MEM-GROW-IQ, STEP-MEM-GROW-MAX ) .
 
@@ -400,6 +424,12 @@ mod WASM-INIT is
     $table-refs-set($table-refs-set(INITFULL-REST, INITFULL-JQ, INITFULL-RQ), INITFULL-J, INITFULL-RREF) .
   eq $seq-set-terminal($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST), INITFULL-J, INITFULL-RREF) =
     $table-refs-set($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST), INITFULL-J, INITFULL-RREF) .
+  ceq typecheck($table-refs(INITFULL-LIMN, INITFULL-RREF), ref) = true
+    if typecheck(INITFULL-RREF, ref) = true .
+  ceq typecheck($table-refs-set(INITFULL-REST, INITFULL-J, INITFULL-RREF), ref) = true
+    if typecheck(INITFULL-REST, ref) = true /\ typecheck(INITFULL-RREF, ref) = true .
+  ceq typecheck($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST), ref) = true
+    if typecheck(INITFULL-DEFAULTREF, ref) = true .
   eq ($table-refs(INITFULL-LIMN, INITFULL-RQ)) [ INITFULL-J <- INITFULL-R ] = $table-refs-set($table-refs(INITFULL-LIMN, INITFULL-RQ), INITFULL-J, INITFULL-R) .
   eq ($table-refs-set(INITFULL-REST, INITFULL-JQ, INITFULL-RQ)) [ INITFULL-J <- INITFULL-R ] = $table-refs-set($table-refs-set(INITFULL-REST, INITFULL-JQ, INITFULL-RQ), INITFULL-J, INITFULL-R) .
   eq index($table-refs(INITFULL-LIMN, INITFULL-R), INITFULL-J) = INITFULL-R .
@@ -466,4 +496,5 @@ mod WASM-INIT is
   eq value('STRUCTS, $init-store-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)) = value('STRUCTS, INITFULL-LOWS) .
   eq value('ARRAYS, $init-store-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)) = value('ARRAYS, INITFULL-LOWS) $init-global-arrayinsts($init-state-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), INITFULL-GLOBALS) .
   eq value('EXNS, $init-store-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)) = value('EXNS, INITFULL-LOWS) .
+
 endm
