@@ -203,6 +203,15 @@ let cond_join conds =
   |> List.filter (fun c -> c <> "" && c <> "true" && c <> "( true )" && c <> "(true)")
   |> String.concat " /\\ "
 
+let cond_join_preserve_eq_true conds =
+  conds
+  |> List.map String.trim
+  |> List.map strip_trailing_dot
+  |> List.map strip_trailing_dot
+  |> List.filter (fun c ->
+       c <> "" && c <> "true" && c <> "( true )" && c <> "(true)")
+  |> String.concat " /\\ "
+
 let safe_term_text s =
   let t = String.trim s in
   if t = "" then "T" else t
@@ -221,6 +230,16 @@ let is_plain_var_like s =
   && not (String.contains b ' ')
   && not (String.contains b '(')
   && not (String.contains b ')')
+
+let rec typ_is_raw_numeric_payload (t : typ) =
+  match t.it with
+  | NumT (`NatT | `IntT) -> true
+  | VarT (id, []) ->
+      let raw = String.lowercase_ascii id.it in
+      raw = "nat" || raw = "int"
+  | TupT [(_, inner)] -> typ_is_raw_numeric_payload inner
+  | IterT (inner, Opt) -> typ_is_raw_numeric_payload inner
+  | _ -> false
 
 let bool_cond s =
   let t = String.trim s in
@@ -1160,6 +1179,11 @@ let unique_source_record_by_fields fields =
       List.find_opt (fun info -> record_shape_key info.rec_fields = key)
         !source_record_infos
   | _ -> None
+
+let source_record_by_sort_and_fields sort fields =
+  List.find_opt
+    (fun info -> info.rec_sort = sort && info.rec_fields = fields)
+    !source_record_infos
 
 let rec source_record_empty_term_for_sort seen sort =
   if sort = "SpectecTerminals" then Some "eps"
@@ -2249,15 +2273,9 @@ let int_of_numeric_tail_opt tail =
   try Some (int_of_string tail) with Failure _ -> None
 
 let literal_wrapper_name family_sort numeric_tail =
-  match Hashtbl.find_opt literal_family_infos family_sort with
-  | Some info ->
-      let prefix = info.literal_family_concrete_prefix in
-      if prefix = "U" || prefix = "FN" then Some ("lit" ^ prefix ^ numeric_tail)
-      else None
-  | None ->
-      if family_sort = "UN" then Some ("litU" ^ numeric_tail)
-      else if family_sort = "FN" then Some ("litF" ^ numeric_tail)
-      else None
+  let _ = family_sort in
+  let _ = numeric_tail in
+  None
 
 let source_literal_wrapper_name sort =
   "lit" ^ sort
@@ -2310,15 +2328,34 @@ let register_source_literal_wrapper_for_sort sort payload_sort cond_template =
       !literal_wrapper_memberships;
   wrapper
 
-let source_literal_membership_for_numeric_condition sort lhs rhs =
+let source_literal_membership_for_numeric_condition sort type_term lhs rhs =
   let lhs = strip_wrapping_parens lhs |> String.trim in
   if lhs = "" || rhs = "" || not (is_plain_var_like lhs) then None
   else
     let raw_pat = Printf.sprintf "$raw-lit ( %s )" lhs in
-    if not (contains_substring rhs raw_pat) then None
-    else
-      let cond_template =
-        Str.global_replace (Str.regexp_string raw_pat) "$LIT" rhs
+    let cond_template =
+      if contains_substring rhs raw_pat then
+        Some (Str.global_replace (Str.regexp_string raw_pat) "$LIT" rhs)
+      else
+        let replaced = replace_maude_var_token lhs "$LIT" rhs in
+        if replaced <> rhs then Some replaced else None
+    in
+    match cond_template with
+    | None -> None
+    | Some cond_template ->
+      let cond_without_lit =
+        Str.global_replace (Str.regexp_string "$LIT") "" cond_template
+      in
+      let other_vars =
+        let re = Str.regexp "[A-Z][A-Z0-9-]*" in
+        let rec loop pos acc =
+          match (try Some (Str.search_forward re cond_without_lit pos)
+                 with Not_found -> None) with
+          | None -> List.sort_uniq String.compare acc
+          | Some _ ->
+              loop (Str.match_end ()) (Str.matched_string cond_without_lit :: acc)
+        in
+        loop 0 []
       in
       let number_re = Str.regexp "-?[0-9]+" in
       let rec collect pos acc =
@@ -2330,18 +2367,53 @@ let source_literal_membership_for_numeric_condition sort lhs rhs =
             collect (Str.match_end ()) (n :: acc)
       in
       let payload_sort =
-        if List.exists (fun n -> starts_with n "-") (collect 0 []) then "Int"
-        else "Nat"
+        match literal_family_of_concrete_sort sort with
+        | Some (family_sort, _numeric_tail) ->
+            (match Hashtbl.find_opt literal_family_infos family_sort with
+             | Some info when info.literal_family_concrete_prefix = "FN" -> "Int"
+             | _ ->
+                 if List.exists (fun n -> starts_with n "-") (collect 0 [])
+                 then "Int"
+                 else "Nat")
+        | None ->
+            if List.exists (fun n -> starts_with n "-") (collect 0 []) then "Int"
+            else "Nat"
       in
-  let wrapper =
-        register_source_literal_wrapper_for_sort sort payload_sort cond_template
+      let var =
+        Printf.sprintf "RAW-%s-%s"
+          (String.uppercase_ascii (sanitize sort))
+          (if payload_sort = "Nat" then "N" else "I")
       in
-      finite_numeric_literals_from_condition "$LIT" cond_template
-      |> List.iter (fun lit ->
-           add_source_nullary_term sort
-             (Printf.sprintf "%s ( %s )" wrapper lit));
+      let param_substs =
+        other_vars
+        |> List.map (fun v ->
+             (v,
+              Printf.sprintf "RAW-%s-P-%s"
+                (String.uppercase_ascii (sanitize sort))
+                v))
+      in
+      let cond =
+        let raw_cond = replace_maude_var_token "$LIT" var cond_template in
+        param_substs
+        |> List.fold_left
+             (fun acc (src, dst) -> replace_maude_var_token src dst acc)
+             raw_cond
+      in
+      let type_term =
+        param_substs
+        |> List.fold_left
+             (fun acc (src, dst) -> replace_maude_var_token src dst acc)
+             type_term
+      in
+      let param_decls =
+        param_substs
+        |> List.map (fun (_, v) -> Printf.sprintf "  var %s : Nat .\n" v)
+        |> String.concat ""
+      in
       Some
-        (Printf.sprintf "  --- Source literal category %s uses object-level wrapper %s." sort wrapper)
+        (Printf.sprintf
+           "%s  var %s : %s .\n  ceq typecheck(( %s ), %s) = true\n   if %s ."
+           param_decls var payload_sort var type_term cond)
 
 let literal_wrapper_direct_spec sort =
   match literal_family_of_concrete_sort sort with
@@ -2492,12 +2564,7 @@ let literal_wrapper_runtime_helper_block () =
     |> List.sort_uniq String.compare
     |> String.concat "\n"
   in
-  if SSet.is_empty !literal_wrapper_syntax_decls
-     && Hashtbl.length literal_wrapper_by_type_term = 0
-     && syntax_wrapper_helper_block = ""
-  then ""
-  else
-	    let wrap_lit_eqs =
+  let wrap_lit_eqs =
 	      Hashtbl.fold
 	        (fun type_term wrapper acc ->
 	          let payload_sort =
@@ -2573,28 +2640,30 @@ let literal_wrapper_runtime_helper_block () =
 	      |> List.sort_uniq String.compare
 	      |> String.concat "\n"
 	    in
-	    "\n  --- Object-level numeric literal wrapper plumbing.\n"
+	    "\n  --- Object-level numeric literal boundary plumbing.\n"
 	    ^ "  vars WRAP-LIT-N : Nat .\n"
 	    ^ "  vars WRAP-LIT-I : Int .\n"
 	    ^ "  vars WRAP-LIT-NT WRAP-LIT-C : SpectecTerminal .\n"
 	    ^ "  op $wrap-lit : SpectecTerminal SpectecTerminal -> SpectecTerminal .\n"
-    ^ (if wrap_lit_eqs = "" then "" else wrap_lit_eqs ^ "\n")
-    ^ "  eq $wrap-lit(WRAP-LIT-NT, WRAP-LIT-C) = WRAP-LIT-C [owise] .\n"
-    ^ "  op $raw-lit : SpectecTerminal -> SpectecTerminal .\n"
-    ^ (if raw_lit_eqs = "" then "" else raw_lit_eqs ^ "\n")
-    ^ "  eq $raw-lit(WRAP-LIT-C) = WRAP-LIT-C [owise] .\n"
-    ^ (if raw_nat_lit_eqs = "" then "" else
-         "  op $raw-nat-lit : SpectecTerminal -> Nat .\n"
-         ^ raw_nat_lit_eqs ^ "\n"
-         ^ "  eq $raw-nat-lit(WRAP-LIT-N) = WRAP-LIT-N .\n")
-	    ^ (if raw_int_lit_eqs = "" then "" else
-	         "  op $raw-int-lit : SpectecTerminal -> Int .\n"
-	         ^ raw_int_lit_eqs ^ "\n"
-	         ^ "  eq $raw-int-lit(WRAP-LIT-I) = WRAP-LIT-I .\n")
+	    ^ (if wrap_lit_eqs = "" then "" else wrap_lit_eqs ^ "\n")
+	    ^ "  eq $wrap-lit(WRAP-LIT-NT, WRAP-LIT-N) = WRAP-LIT-N .\n"
+	    ^ "  eq $wrap-lit(WRAP-LIT-NT, WRAP-LIT-I) = WRAP-LIT-I .\n"
+	    ^ "  eq $wrap-lit(WRAP-LIT-NT, WRAP-LIT-C) = WRAP-LIT-C [owise] .\n"
+	    ^ "  op $raw-lit : SpectecTerminal -> SpectecTerminal .\n"
+	    ^ (if raw_lit_eqs = "" then "" else raw_lit_eqs ^ "\n")
+	    ^ "  eq $raw-lit(WRAP-LIT-N) = WRAP-LIT-N .\n"
+	    ^ "  eq $raw-lit(WRAP-LIT-I) = WRAP-LIT-I .\n"
+	    ^ "  eq $raw-lit(WRAP-LIT-C) = WRAP-LIT-C [owise] .\n"
+	    ^ "  op $raw-nat-lit : SpectecTerminal -> Nat .\n"
+	    ^ (if raw_nat_lit_eqs = "" then "" else raw_nat_lit_eqs ^ "\n")
+	    ^ "  eq $raw-nat-lit(WRAP-LIT-N) = WRAP-LIT-N .\n"
+		    ^ "  op $raw-int-lit : SpectecTerminal -> Int .\n"
+		    ^ (if raw_int_lit_eqs = "" then "" else raw_int_lit_eqs ^ "\n")
+		    ^ "  eq $raw-int-lit(WRAP-LIT-I) = WRAP-LIT-I .\n"
 	    ^ (if wrapper_payload_typecheck_eqs = "" then "" else
 	         wrapper_payload_typecheck_eqs ^ "\n")
-	    ^ (if syntax_wrapper_helper_block = "" then ""
-	       else "\n  --- Source-category immediate wrapper helpers.\n"
+	            ^ (if syntax_wrapper_helper_block = "" then ""
+	       else "\n  --- Source-category immediate boundary helpers.\n"
 	            ^ syntax_wrapper_helper_block ^ "\n")
 
 let specialized_syntax_sort_name parent_sort terms =
@@ -2606,7 +2675,7 @@ let specialized_syntax_sort_name parent_sort terms =
     | None -> None
   in
   match terms with
-  | [term] when SSet.mem parent_sort !literal_family_parent_sorts ->
+  | [term] when is_literal_family_root parent_sort ->
       (match literal_sort_from_single_axis term with
        | Some sort -> sort
        | None -> parent_sort ^ nullary_ctor_suffix term)
@@ -3976,32 +4045,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | TupE el | ListE el -> tconcat " " (List.map (fun x -> translate_exp TermCtx x vm) el)
   | BoolE b -> texpr (wrap_bool ctx (if b then "true" else "false"))
   | TextE s -> texpr ("\"" ^ s ^ "\"")
-  | StrE fields ->
-      let field_values = List.map (fun (atom, e1) ->
-        let name = to_var_name (Xl.Atom.name atom) in
-        let t = translate_exp TermCtx e1 vm in
-        (name, t)
-      ) fields in
-      let field_names = List.map fst field_values in
-      (match unique_source_record_by_fields field_names with
-       | Some info ->
-           let args =
-             List.map (fun (name, t) ->
-               match Hashtbl.find_opt source_record_field_sorts
-                       (source_record_field_key info.rec_sort name) with
-               | Some sort ->
-                   { t with text = wrap_source_arg_for_sort sort t.text }
-               | None -> t)
-               field_values
-           in
-           { text = format_call info.rec_ctor (List.map (fun t -> t.text) args);
-             vars = List.concat_map (fun t -> t.vars) args }
-       | None ->
-           let items = List.map (fun (name, t) ->
-             { t with text = Printf.sprintf "item('%s, %s)" name t.text }
-           ) field_values in
-           { text = "{" ^ String.concat " ; " (List.map (fun t -> t.text) items) ^ "}";
-             vars = List.concat_map (fun t -> t.vars) items })
+  | StrE fields -> translate_record_expr fields vm None
   | DotE (e1, atom) ->
       tmap (Printf.sprintf "value('%s, %s)" (to_var_name (Xl.Atom.name atom)))
         (translate_exp TermCtx e1 vm)
@@ -4050,11 +4094,39 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
     in
     let suffix = match iter_type with
       | List -> "*" | List1 -> "+" | Opt -> "?" | ListN _ -> "" in
-    (match e1.it with
+    let iter_inner_exp = unwrap_exp_for_source_sort e1 in
+    (match iter_inner_exp.it with
      | VarE id ->
-         let full = id.it ^ suffix in
-         (match resolve_var_name full vm with
-          | Some mapped ->
+         let repeat_of_scalar mapped =
+           match iter_type with
+           | ListN (count_e, _) ->
+               let count_t =
+                 translate_exp TermCtx count_e vm
+                 |> raw_literal_texpr_for_numeric_context
+               in
+               Some
+                 { text = Printf.sprintf "$repeat ( %s, %s )" mapped count_t.text;
+                   vars = List.sort_uniq String.compare (mapped :: count_t.vars) }
+           | _ -> None
+         in
+         let full =
+           match iter_type with
+           | ListN _ -> id.it ^ "*"
+           | _ -> id.it ^ suffix
+         in
+         let resolved_full =
+           match iter_type with
+           | ListN _ -> find_vm_case_insensitive full vm
+           | _ -> resolve_var_name full vm
+         in
+         (match resolved_full with
+          | Some mapped
+            when (match iter_type with
+                  | ListN _ ->
+                      (match Hashtbl.find_opt source_var_sorts mapped with
+                       | Some "SpectecTerminals" -> true
+                       | _ -> false)
+                  | _ -> true) ->
               debug_iter "[ITER-MAP] kind=%s raw=%s probe=%s mapped=%s"
                 suffix id.it full mapped;
               (match iter_type with
@@ -4067,14 +4139,24 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                     | _ -> ())
                | _ -> ());
               texpr_with_var mapped mapped
+          | Some mapped ->
+              (match repeat_of_scalar mapped with
+               | Some repeated -> repeated
+               | None -> texpr_with_var mapped mapped)
           | None ->
-              let fallback_raw =
-                match iter_type with
-                | List | List1 | ListN _ -> pluralize_sequence_var_source_name id.it
-                | Opt -> id.it ^ "?"
-              in
-              let v = String.uppercase_ascii (sanitize fallback_raw) in
-              texpr_with_var v v)
+              (match iter_type, resolve_var_name id.it vm with
+               | ListN _, Some mapped ->
+                   (match repeat_of_scalar mapped with
+                    | Some repeated -> repeated
+                    | None -> texpr_with_var mapped mapped)
+               | _ ->
+                   let fallback_raw =
+                     match iter_type with
+                     | List | List1 | ListN _ -> pluralize_sequence_var_source_name id.it
+                     | Opt -> id.it ^ "?"
+                   in
+                   let v = String.uppercase_ascii (sanitize fallback_raw) in
+                   texpr_with_var v v))
      | _ ->
          let inner = translate_exp ctx e1 vm in
          (match iter_type, e1.it with
@@ -4277,6 +4359,46 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | IfE (c, e1, e2) ->
       tjoin3 (Printf.sprintf "if %s then %s else %s fi")
         (translate_exp BoolCtx c vm) (translate_exp ctx e1 vm) (translate_exp ctx e2 vm)
+
+and translate_record_expr fields vm sort_hint =
+  let field_values = List.map (fun (atom, e1) ->
+    let name = to_var_name (Xl.Atom.name atom) in
+    let t = translate_exp TermCtx e1 vm in
+    (name, t)
+  ) fields in
+  let field_names = List.map fst field_values in
+  let record_info =
+    match sort_hint with
+    | Some sort ->
+        (match source_record_by_sort_and_fields sort field_names with
+         | Some _ as hit -> hit
+         | None -> unique_source_record_by_fields field_names)
+    | None -> unique_source_record_by_fields field_names
+  in
+  match record_info with
+  | Some info ->
+      let args =
+        List.map (fun (name, t) ->
+          match Hashtbl.find_opt source_record_field_sorts
+                  (source_record_field_key info.rec_sort name) with
+          | Some sort ->
+              { t with text = wrap_source_arg_for_sort sort t.text }
+          | None -> t)
+          field_values
+      in
+      { text = format_call info.rec_ctor (List.map (fun t -> t.text) args);
+        vars = List.concat_map (fun t -> t.vars) args }
+  | None ->
+      let items = List.map (fun (name, t) ->
+        { t with text = Printf.sprintf "item('%s, %s)" name t.text }
+      ) field_values in
+      { text = "{" ^ String.concat " ; " (List.map (fun t -> t.text) items) ^ "}";
+        vars = List.concat_map (fun t -> t.vars) items }
+
+and translate_exp_with_record_sort_hint ctx e vm sort_hint =
+  match e.it with
+  | StrE fields -> translate_record_expr fields vm sort_hint
+  | _ -> translate_exp ctx e vm
 
 and translate_var ctx name vm =
   match resolve_var_name name vm with
@@ -4742,13 +4864,32 @@ let base_types = SSet.empty
 let binder_var_map binders =
   List.filter_map (fun b -> match b.it with
     | ExpB (tid, t) -> Some (tid.it, to_source_var_name (source_name_for_binder tid.it t))
+    | TypB tid -> Some (tid.it, to_var_name tid.it)
     | _ -> None
   ) binders
 
 let binder_type_conds binders =
+  let has_lowercase s =
+    String.exists (fun c -> c >= 'a' && c <= 'z') s
+  in
   List.filter_map (fun b -> match b.it with
     | ExpB (tid, t) ->
         Some (type_guard (to_source_var_name (source_name_for_binder tid.it t)) t [])
+    | TypB tid ->
+        let source_sort = sort_of_type_name tid.it in
+        let var = to_var_name tid.it in
+        let guard_for_atom atom =
+          if SSet.mem (jhs_type_term_key atom) !raw_payload_type_terms then None
+          else Some (Printf.sprintf "typecheck(%s, %s) = true" var atom)
+        in
+        (match Hashtbl.find_opt source_sort_type_atoms source_sort with
+         | Some type_atom -> guard_for_atom type_atom
+         | None ->
+             if SSet.mem source_sort !source_membership_sorts then
+               guard_for_atom (sanitize tid.it)
+             else if String.length tid.it > 1 && has_lowercase tid.it then
+               guard_for_atom (sanitize tid.it)
+             else None)
     | _ -> None
   ) binders
 
@@ -7025,47 +7166,69 @@ let translate_typd id params insts =
                    in
 	                 let main =
 		                   if cons_name = "" then
-		                     if is_parametric then
+                         if is_plain_var_like lhs then
+                           (match
+                              if typ_is_raw_numeric_payload case_typ then
+                                source_literal_membership_for_numeric_condition
+                                  full_type_sort type_term lhs rhs
+                              else None
+                            with
+                            | Some note -> note ^ "\n"
+                            | None ->
+                                if is_parametric then
+		                            (match parametric_specialized_memberships "" lhs rhs_conds with
+		                             | Some stmts -> stmts
+		                             | None ->
+		                                 unsupported_parametric_membership
+	                                   ("empty constructor case for " ^ type_term))
+                                else
+                                  let finite_lits =
+                                    finite_numeric_membership_literals lhs rhs
+                                  in
+                                  if finite_lits <> [] then
+                                    finite_lits
+                                    |> List.map (fun lit ->
+                                         Printf.sprintf "  mb ( %s ) : %s ."
+                                           lit full_type_sort)
+                                    |> String.concat "\n"
+                                    |> fun s -> s ^ "\n"
+                                  else if rhs = "" then
+                                    let () =
+                                      List.iter
+                                        (fun (v, _, _) ->
+                                          Hashtbl.remove declared_vars v)
+                                        params;
+                                      List.iter
+                                        (fun b -> match b.it with
+                                          | ExpB (tid, _) ->
+                                              Hashtbl.remove declared_vars
+                                                (to_var_name tid.it)
+                                          | _ -> ())
+                                        binders
+                                    in
+                                    ""
+                                  else
+                                    let finite_terms =
+                                      if prems = [] then []
+                                      else finite_axis_terms_for_sort full_type_sort
+                                    in
+                                    if finite_terms <> [] then
+                                      finite_terms
+                                      |> List.map (fun term ->
+                                           Printf.sprintf "  mb ( %s ) : %s ."
+                                             term full_type_sort)
+                                      |> String.concat "\n"
+                                      |> fun s -> s ^ "\n"
+                                    else
+                                      Printf.sprintf
+                                        "\n%s  cmb ( %s ) : %s\n   if %s ."
+                                        (decl_prefix ()) lhs full_type_sort rhs)
+                         else if is_parametric then
 		                       (match parametric_specialized_memberships "" lhs rhs_conds with
 		                        | Some stmts -> stmts
 		                        | None ->
 		                            unsupported_parametric_membership
 	                              ("empty constructor case for " ^ type_term))
-                     else if is_plain_var_like lhs then
-                       (match source_literal_membership_for_numeric_condition
-                                full_type_sort lhs rhs with
-                        | Some note -> note ^ "\n"
-                        | None ->
-                       let finite_lits = finite_numeric_membership_literals lhs rhs in
-                       if finite_lits <> [] then
-                         finite_lits
-                         |> List.map (fun lit ->
-                             Printf.sprintf "  mb ( %s ) : %s ." lit full_type_sort)
-                         |> String.concat "\n"
-                         |> fun s -> s ^ "\n"
-                       else if rhs = "" then
-                         let () =
-                           List.iter (fun (v, _, _) -> Hashtbl.remove declared_vars v) params;
-                           List.iter (fun b -> match b.it with
-                             | ExpB (tid, _) -> Hashtbl.remove declared_vars (to_var_name tid.it)
-                             | _ -> ()) binders
-                         in
-                         ""
-                       else
-                         let finite_terms =
-                           if prems = [] then []
-                           else finite_axis_terms_for_sort full_type_sort
-                         in
-                         if finite_terms <> [] then
-                           finite_terms
-                           |> List.map (fun term ->
-                                Printf.sprintf "  mb ( %s ) : %s ."
-                                  term full_type_sort)
-                           |> String.concat "\n"
-                           |> fun s -> s ^ "\n"
-                         else
-                           Printf.sprintf "\n%s  cmb ( %s ) : %s\n   if %s ."
-                             (decl_prefix ()) lhs full_type_sort rhs)
 		                       else
 		                         Printf.sprintf "\n%s  %s ( %s ) : %s%s ."
 	                         (decl_prefix ()) (if rhs = "" then "mb" else "cmb") lhs full_type_sort
@@ -7616,9 +7779,60 @@ let translate_typd id params insts =
                         Some (Printf.sprintf "%s : Nat" lhs)
                     | "sn" | "in" | "i32" | "i64" | "i128" | "exp" ->
                         Some (Printf.sprintf "%s : Int" lhs)
-                    | _ ->
-                        Some (type_guard lhs typ v_map))
+	                    | _ ->
+	                        Some (type_guard lhs typ v_map))
                | _ -> Some (type_guard lhs typ v_map)
+             in
+             let alias_param_typecheck_guards =
+               let type_atom_for_source_sort source_sort raw =
+                 let has_lowercase s =
+                   String.exists (fun c -> c >= 'a' && c <= 'z') s
+                 in
+                 match Hashtbl.find_opt source_sort_type_atoms source_sort with
+                 | Some atom -> Some atom
+                 | None ->
+                     if SSet.mem source_sort !source_membership_sorts then
+                       Some (sanitize raw)
+                     else if String.length raw > 1 && has_lowercase raw then
+                       Some (sanitize raw)
+                     else None
+               in
+               let guard_for_var_and_raw var raw =
+                 let source_sort = sort_of_type_name raw in
+                 match type_atom_for_source_sort source_sort raw with
+                 | Some atom
+                     when is_plain_var_like var
+                          && var <> atom
+                          && not (SSet.mem (jhs_type_term_key atom) !raw_payload_type_terms) ->
+                     Some
+                       (Printf.sprintf "typecheck(%s, %s) = true" var atom)
+                 | _ -> None
+               in
+               let guards_from_args =
+                 args
+                 |> List.filter_map (fun arg ->
+                    match arg.it with
+                    | TypA {it = VarT (tid, []); _} ->
+                        let arg_text =
+                          translate_arg arg v_map
+                          |> fun tx -> strip_wrapping_parens tx.text |> String.trim
+                        in
+                        guard_for_var_and_raw arg_text tid.it
+                    | _ -> None)
+               in
+               let guards_from_type_term =
+                 let raw_source_name_of_type_var v =
+                   let lower = String.lowercase_ascii v in
+                   if ends_with lower "type" then lower
+                   else String.capitalize_ascii lower
+                 in
+                 vars_of_texpr_local type_term_t
+                 |> List.filter (fun v -> v <> "JHS-T")
+                 |> List.filter_map (fun v ->
+                      guard_for_var_and_raw v (raw_source_name_of_type_var v))
+               in
+               guards_from_args @ guards_from_type_term
+               |> List.sort_uniq String.compare
              in
              let alias_typecheck_eq =
                let rhs_t =
@@ -7636,7 +7850,10 @@ let translate_typd id params insts =
                    |> List.filter (fun v -> v <> "JHS-T")
                  in
                  let decls = declare_vars_same_sort vars "SpectecTerminal" in
-                 let cond = cond_join binder_conds in
+                 let cond =
+                   cond_join_preserve_eq_true
+                     (binder_conds @ alias_param_typecheck_guards)
+                 in
                  Printf.sprintf "%s  %s typecheck(JHS-T, %s) = typecheck(JHS-T, %s)%s ."
                    decls
                    (if cond = "" then "eq" else "ceq")
@@ -8183,8 +8400,8 @@ let has_narrow_runtime_sort sort =
 let has_runtime_lhs_match_sort sort =
   (* Rewriting rules should only keep sorts that are structural or builtin at
      the pattern boundary.  Source syntax categories such as Idx/Typeuse/Instr
-     are encoded by membership axioms; using them directly on the LHS makes
-     wrapper terms like litU32(0) fail to match before the rule condition is
+     are encoded by membership/typecheck axioms; using them directly on the
+     LHS makes raw source terms fail to match before the rule condition is
      even considered. *)
   List.mem sort
       [ "SpectecTerminal"; "SpectecTerminals";
@@ -8273,7 +8490,9 @@ let is_runtime_typecheck_guard cond =
 
 let drop_typecheck_guard_conds conds =
   if drop_runtime_typecheck_guards then
-    List.filter (fun cond -> not (is_runtime_typecheck_guard cond)) conds
+    List.filter
+      (fun cond -> not (is_runtime_typecheck_guard cond))
+      conds
   else conds
 
 let contains_maude_call name text =
@@ -9029,7 +9248,6 @@ let jhs_membership_statements memberships =
     match lhs_head lhs with
     | Some head ->
         starts_with head "CTOR"
-        || starts_with head "lit"
         || starts_with head "$"
         || starts_with head "REC"
     | None -> false
@@ -10288,6 +10506,25 @@ let opt_ctor_prem_items (lhs : texpr) (rhs : texpr) =
   | None, Some (ctor, args) -> make lhs.text ctor args
   | _ -> None
 
+let record_sort_hint_of_exp vm e =
+  match (unwrap_exp_for_meta e).it with
+  | VarE id ->
+      let t = translate_var TermCtx id.it vm in
+      (match source_sort_of_plain_texpr_var t with
+       | Some sort when
+           List.exists (fun info -> info.rec_sort = sort) !source_record_infos ->
+           Some sort
+       | _ -> None)
+  | _ -> None
+
+let translate_equality_side_with_record_hint vm side_e other_e =
+  let hint =
+    match (unwrap_exp_for_meta side_e).it with
+    | StrE _ -> record_sort_hint_of_exp vm other_e
+    | _ -> None
+  in
+  translate_exp_with_record_sort_hint TermCtx side_e vm hint
+
 (** Collect individual prem_items from an expression, splitting AND conjunctions.
     Each equality sub-expression becomes its own PremEq so the scheduler can
     independently bind variables from each clause (fixes missing :=  bindings). *)
@@ -10305,8 +10542,8 @@ let rec collect_prem_items_of_exp vm e : prem_item list =
       (* outer "= true" wrapper — recurse into lhs *)
       collect_prem_items_of_exp vm lhs_e
 	  | CmpE (`EqOp, _, lhs_e, rhs_e) ->
-	      let lhs = translate_exp TermCtx lhs_e vm in
-	      let rhs = translate_exp TermCtx rhs_e vm in
+	      let lhs = translate_equality_side_with_record_hint vm lhs_e rhs_e in
+	      let rhs = translate_equality_side_with_record_hint vm rhs_e lhs_e in
 	      (* For bool_t fallback, keep BoolCtx for ordinary equalities, but
 	         unwrap object-level numeric/category literals when the equality is
 	         really a numeric guard such as l == 0 or c == 0. *)
@@ -10371,8 +10608,8 @@ let rec collect_prem_items_of_exp vm e : prem_item list =
             | Some items -> items
             | None -> [PremEq { lhs = lhs_for_bind; rhs = rhs_for_bind; bool_t }])))
   | BinE (`EquivOp, _, lhs_e, rhs_e) ->
-      let lhs = translate_exp TermCtx lhs_e vm in
-      let rhs = translate_exp TermCtx rhs_e vm in
+      let lhs = translate_equality_side_with_record_hint vm lhs_e rhs_e in
+      let rhs = translate_equality_side_with_record_hint vm rhs_e lhs_e in
       let lhs_b = translate_exp BoolCtx lhs_e vm in
       let rhs_b = translate_exp BoolCtx rhs_e vm in
       let bool_t = { text = Printf.sprintf "( %s == %s )" lhs_b.text rhs_b.text;
@@ -10514,8 +10751,8 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
                | None -> [PremEq eq])
           | item -> [item])
   | LetPr (e1, e2, _) ->
-      let lhs = translate_exp TermCtx e1 vm in
-      let rhs = translate_exp TermCtx e2 vm in
+      let lhs = translate_equality_side_with_record_hint vm e1 e2 in
+      let rhs = translate_equality_side_with_record_hint vm e2 e1 in
       let bool_t =
         { text = Printf.sprintf "( %s == %s )" lhs.text rhs.text;
           vars = uniq_vars (lhs.vars @ rhs.vars) }
@@ -10548,8 +10785,8 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
       else
         (match decompose_eq_expr e with
          | Some (e1, e2) ->
-             let lhs = translate_exp TermCtx e1 vm in
-             let rhs = translate_exp TermCtx e2 vm in
+             let lhs = translate_equality_side_with_record_hint vm e1 e2 in
+             let rhs = translate_equality_side_with_record_hint vm e2 e1 in
              let bool_t = translate_exp BoolCtx e vm in
              (match map_call_prem_items lhs rhs with
               | Some items -> items
@@ -15366,7 +15603,7 @@ let translate defs =
     ^ otherwise_match_helper_block ()
     ^ literal_wrapper_runtime_helper_block ()
     ^ (if SSet.is_empty !literal_wrapper_memberships then ""
-       else "\n  --- Object-level numeric literal wrapper memberships.\n"
+       else "\n  --- Object-level numeric literal boundary memberships.\n"
             ^ String.concat "\n" (SSet.elements !literal_wrapper_memberships)
             ^ "\n")
   in
@@ -15382,15 +15619,8 @@ let translate defs =
   in
   let lines = String.split_on_char '\n' body in
   let eqs = List.filter (fun l -> not (is_decl_line l)) lines in
-  let early_inferred_category_subsort_decls =
-    infer_category_subsort_decls lines
-  in
-  record_inferred_category_subsorts early_inferred_category_subsort_decls;
   let ctor_decl_lines = collect_ctor_decl_lines eqs in
-  let inferred_category_subsort_decls =
-    infer_category_subsort_decls (lines @ ctor_decl_lines)
-  in
-  record_inferred_category_subsorts inferred_category_subsort_decls;
+  let inferred_category_subsort_decls = [] in
   let inferred_sequence_subsort_decls =
     lift_category_subsorts_to_sequence_subsorts inferred_category_subsort_decls
   in

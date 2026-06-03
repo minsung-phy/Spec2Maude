@@ -92,6 +92,7 @@ rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
 ./spec2maude run wat_examples/fib.wat --fib 5        PASS
 ./spec2maude run wat_examples/data-load.wat          PASS
 ./spec2maude test smoke --timeout 10                 PASS: 13
+./spec2maude test official --limit 30 --timeout 5    PASS: 111, STEPPED: 22, STUCK_STEP: 3
 ```
 
 Larger official/external benchmark tables should still be regenerated after
@@ -127,6 +128,8 @@ Resolved:
 - source category validity is generated as `typecheck(term, category-term)`;
 - syntax constructor cases also emit `mb`/`cmb` membership on
   `SpectecTerminal`;
+- numeric literal payloads are raw Maude numerals again, classified through
+  source-derived `typecheck(raw-number, numeric-type)` equations;
 - bulk source category sort/subsort generation is removed from the syntax path;
 - generated WAT harnesses no longer include `Module-ok` checked-run code unless
   explicitly requested with the debug path.
@@ -146,11 +149,13 @@ Still worth discussing:
    - runtime profile: excludes static validation from the runtime artifact or
      erases validation premises after external validation.
 2. Continue reducing source-absent helpers in `output.maude`.
-3. Continue improving official `.wast` runner support for remaining vector and
-   abstract reference result forms.  The runner now accepts the main GC
-   reference families (`anyref`, `eqref`, `i31ref`, `structref`, `arrayref`,
-   `exnref`) as invoke arguments and expected results.
-4. Reduce remaining `STUCK_STEP` / `WRONG_RESULT` cases by instruction family.
-5. Continue expanding proposal/module coverage where the official AST lowers
+3. Continue improving official `.wast` runner support for remaining vector,
+   abstract-reference, and module instance/linking identity forms.  The runner
+   now accepts the main GC reference families (`anyref`, `eqref`, `i31ref`,
+   `structref`, `arrayref`, `exnref`) as invoke arguments and expected results.
+4. Decide how to implement SpecTec `hint(builtin)` IEEE-float operations:
+   Maude equations, a trusted numeric backend, or an explicit external oracle.
+5. Reduce remaining `STUCK_STEP` / `WRONG_RESULT` cases by instruction family.
+6. Continue expanding proposal/module coverage where the official AST lowers
    successfully but the Maude runtime or harness still gets stuck.
-6. Keep docs and CLI aligned with the default pipeline.
+7. Keep docs and CLI aligned with the default pipeline.

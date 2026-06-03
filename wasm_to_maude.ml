@@ -145,10 +145,19 @@ type import_memory_binding = {
   memory_binding_name : string;
   memory_binding_pages : int;
   memory_binding_max : int option;
+  memory_binding_overlays : memory_overlay list;
+}
+
+and memory_overlay = { overlay_offset : int; overlay_bytes : int list }
+
+type memory_data_binding = {
+  memory_data_name : string;
+  memory_data_overlays : memory_overlay list;
 }
 
 type prelude_call = {
-  prelude_field : string;
+  prelude_field : string option;
+  prelude_funcidx : int option;
   prelude_args : string list;
   prelude_drop_count : int;
 }
@@ -669,7 +678,8 @@ let collect_ref_func_indices terms =
   |> seq
 
 let wrap_source_category sort payload =
-  "$wrap-" ^ sort ^ "(" ^ payload ^ ")"
+  let _ = sort in
+  String.trim payload
 
 let sz_term n =
   wrap_source_category "Sz" (string_of_int n)
@@ -754,7 +764,7 @@ let tabletype_term ?(addrtype = "CTORI32A0") min max_opt rt =
 let globaltype_term mut t =
   if mut then "CTORMUTA0 " ^ t else t
 
-let bytes_seq bytes = byte_seq (List.map (fun b -> "litByte(" ^ string_of_int b ^ ")") bytes)
+let bytes_seq bytes = byte_seq (List.map string_of_int bytes)
 
 let unquote s =
   let n = String.length s in
@@ -876,8 +886,13 @@ let decimal_sub a b =
   in
   String.sub raw (first_non_zero 0) (String.length raw - first_non_zero 0)
 
+let strip_numeric_separators s =
+  let b = Buffer.create (String.length s) in
+  String.iter (fun c -> if c <> '_' then Buffer.add_char b c) s;
+  Buffer.contents b
+
 let unsigned_payload bits s =
-  let s = String.trim s in
+  let s = String.trim s |> strip_numeric_separators in
   if String.length s > 0 && s.[0] = '-' then
     decimal_sub (decimal_pow2 bits) (String.sub s 1 (String.length s - 1))
   else s
@@ -1019,7 +1034,8 @@ let simple_float_literal width s =
 
 let wrapped_num_payload = function
   | ("i32" | "i64" | "f32" | "f64" as ty), payload ->
-      "$wrap-lit(" ^ numtype_of_prefix ty ^ ", " ^ payload ^ ")"
+      let _ = ty in
+      String.trim payload |> strip_numeric_separators
   | ty, _ -> fail ("unsupported numeric literal wrapper type: " ^ ty)
 
 let num_const_term ty payload =
@@ -1145,7 +1161,7 @@ let signedness_ctor = function
   | "u" -> "CTORUA0"
   | sx -> fail ("unsupported signedness suffix: " ^ sx)
 
-let dim_lit n = "litDim(" ^ string_of_int n ^ ")"
+let dim_lit n = string_of_int n
 
 let shape_term lane dim =
   "CTORXA2(" ^ lane ^ ", " ^ dim_lit dim ^ ")"
@@ -2692,6 +2708,37 @@ let parse_import_global_binding body =
     global_binding_value = value;
   }
 
+let parse_int_auto s =
+  let s = String.trim s in
+  if starts_with s "0x" || starts_with s "0X" then
+    int_of_string s
+  else int_of_string s
+
+let parse_byte_list s =
+  String.split_on_char ',' s
+  |> List.filter_map (fun item ->
+         let item = String.trim item in
+         if item = "" then None
+         else
+           let b = parse_int_auto item in
+           if b < 0 || b > 255 then fail "--memory byte values must be in 0..255";
+           Some b)
+
+let parse_memory_overlay body =
+  match String.split_on_char ':' body with
+  | [ offset; bytes ] ->
+      let overlay_bytes = parse_byte_list bytes in
+      {
+        overlay_offset = parse_int_auto offset;
+        overlay_bytes;
+      }
+  | _ -> fail "memory overlay expects OFFSET:BYTE,..."
+
+let split_memory_base_and_overlays rhs =
+  match String.split_on_char '@' (String.trim rhs) with
+  | [] -> ("", [])
+  | base :: overlays -> (base, List.map parse_memory_overlay overlays)
+
 let parse_import_memory_binding body =
   let eq =
     match String.index_opt body '=' with
@@ -2700,6 +2747,7 @@ let parse_import_memory_binding body =
   in
   let lhs = String.sub body 0 eq in
   let rhs = String.sub body (eq + 1) (String.length body - eq - 1) in
+  let rhs_base, overlays = split_memory_base_and_overlays rhs in
   let dot =
     match String.rindex_opt lhs '.' with
     | Some i -> i
@@ -2709,14 +2757,27 @@ let parse_import_memory_binding body =
     memory_binding_module = String.sub lhs 0 dot;
     memory_binding_name = String.sub lhs (dot + 1) (String.length lhs - dot - 1);
     memory_binding_pages =
-      (match String.split_on_char '/' (String.trim rhs) with
+      (match String.split_on_char '/' (String.trim rhs_base) with
       | pages :: _ -> int_of_string pages
       | [] -> fail "--import-memory expects MODULE.NAME=PAGES[/MAX]");
     memory_binding_max =
-      (match String.split_on_char '/' (String.trim rhs) with
+      (match String.split_on_char '/' (String.trim rhs_base) with
       | [ _; max_pages ] -> Some (int_of_string max_pages)
       | _ -> None);
+    memory_binding_overlays = overlays;
   }
+
+let parse_memory_data_binding body =
+  let eq =
+    match String.index_opt body '=' with
+    | Some i -> i
+    | None -> fail "--memory-data expects MEMORY=OFFSET:BYTE,..."
+  in
+  let lhs = String.sub body 0 eq |> String.trim in
+  let rhs = String.sub body (eq + 1) (String.length body - eq - 1) in
+  let _, overlays = split_memory_base_and_overlays ("@" ^ rhs) in
+  if lhs = "" then fail "--memory-data expects MEMORY=OFFSET:BYTE,...";
+  { memory_data_name = lhs; memory_data_overlays = overlays }
 
 let maude_arg_term typ value =
   let ref_heaptype = function
@@ -2759,12 +2820,22 @@ let maude_arg_term typ value =
 
 let parse_prelude_call body =
   let parts = String.split_on_char ';' body |> List.map String.trim in
-  let field, args_part, drop_part =
+  let target, args_part, drop_part =
     match parts with
-    | [ field ] -> (field, "", "")
-    | [ field; args ] -> (field, args, "")
-    | [ field; args; drop ] -> (field, args, drop)
+    | [ target ] -> (target, "", "")
+    | [ target; args ] -> (target, args, "")
+    | [ target; args; drop ] -> (target, args, drop)
     | _ -> fail "--prelude-call expects FIELD;TYPE=VALUE,...;drop=N"
+  in
+  let prelude_field, prelude_funcidx =
+    let index_prefix = "@index=" in
+    if starts_with target index_prefix then
+      ( None,
+        Some
+          (int_of_string
+             (String.sub target (String.length index_prefix)
+                (String.length target - String.length index_prefix))) )
+    else (Some target, None)
   in
   let prelude_args =
     if args_part = "" then []
@@ -2795,7 +2866,7 @@ let parse_prelude_call body =
         int_of_string (String.sub drop_part (String.length prefix) (String.length drop_part - String.length prefix))
       else fail "--prelude-call drop expects drop=N"
   in
-  { prelude_field = field; prelude_args; prelude_drop_count }
+  { prelude_field; prelude_funcidx; prelude_args; prelude_drop_count }
 
 let parse_module ?invoke_index text =
   match parse (tokenize text) with
@@ -3698,6 +3769,56 @@ let find_import_memory_binding bindings module_name item_name =
       && b.memory_binding_name = unquote item_name)
     bindings
 
+let membytes_term pages overlays =
+  let base = "$zero-membytes(" ^ string_of_int pages ^ ")" in
+  overlays
+  |> List.filter (fun overlay -> overlay.overlay_bytes <> [])
+  |> List.fold_left
+       (fun acc overlay ->
+         "$mem-bytes(" ^ acc ^ ", " ^ string_of_int overlay.overlay_offset ^ ", "
+         ^ string_of_int (List.length overlay.overlay_bytes)
+         ^ ", " ^ bytes_seq overlay.overlay_bytes ^ ")")
+       base
+
+let memory_index_of_name ir name =
+  let raw = unquote name in
+  match int_of_string_opt raw with
+  | Some i -> i
+  | None -> (
+      match
+        List.find_map
+          (fun ex ->
+            if unquote ex.export_item_name = raw then
+              match ex.export_item_desc with ExportMemory i -> Some i | _ -> None
+            else None)
+          ir.exports
+      with
+      | Some i -> i
+      | None -> (
+          match
+            List.find_map
+              (fun mem ->
+                match mem.memory_id with
+                | Some id when id = raw -> Some mem.memory_wat_index
+                | _ -> None)
+              ir.memories
+          with
+          | Some i -> i
+          | None -> fail ("no memory export or index named " ^ raw)))
+
+let memory_data_terms ir bindings =
+  bindings
+  |> List.concat_map (fun binding ->
+         let memidx = memory_index_of_name ir binding.memory_data_name in
+         binding.memory_data_overlays
+         |> List.filter (fun overlay -> overlay.overlay_bytes <> [])
+         |> List.map (fun overlay ->
+                "CTORDATAA2(" ^ bytes_seq overlay.overlay_bytes ^ ", CTORACTIVEA2("
+                ^ wrap_source_category "Memidx" (string_of_int memidx)
+                ^ ", "
+                ^ i32_const (string_of_int overlay.overlay_offset)
+                ^ "))"))
+
 let default_import_global_value globaltype =
   if contains_sub globaltype "CTORI32A0" then
     i32_const "0"
@@ -3745,10 +3866,32 @@ let default_import_func_body ir im =
 	        else None
 
 let emit_import_runtime func_bindings global_bindings memory_bindings ir type_terms =
+  let import_key module_name item_name =
+    unquote module_name ^ "\000" ^ unquote item_name
+  in
+  let unique_by key xs =
+    let rec loop seen acc = function
+      | [] -> List.rev acc
+      | x :: rest ->
+          let k = key x in
+          if List.mem k seen then loop seen acc rest
+          else loop (k :: seen) (x :: acc) rest
+    in
+    loop [] [] xs
+  in
+  let index_of_key key xs wanted =
+    let rec loop i = function
+      | [] -> 0
+      | x :: rest -> if key x = wanted then i else loop (i + 1) rest
+    in
+    loop 0 xs
+  in
   let func_imports =
     ir.imports
     |> List.filter_map (function ImportFunc im -> Some im | _ -> None)
   in
+  let func_key im = import_key im.import_module im.import_name in
+  let unique_func_imports = unique_by func_key func_imports in
   let missing =
     func_imports
     |> List.filter (fun im ->
@@ -3764,7 +3907,7 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
     fail ("missing --import-func implementation for: " ^ names)
   else ();
   let func_defs =
-    func_imports
+    unique_func_imports
     |> List.mapi (fun i im ->
            let binding =
              match find_import_binding func_bindings im with
@@ -3787,84 +3930,108 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
     |> String.concat "\n"
   in
   let func_names =
-    func_imports
+    unique_func_imports
     |> List.mapi (fun i _ -> "generated-import-func-" ^ string_of_int i)
     |> seq
   in
+  let tag_imports =
+    ir.imports |> List.filter (function ImportTag _ -> true | _ -> false)
+  in
+  let tag_key = function
+    | ImportTag im -> import_key im.import_module im.import_name
+    | _ -> assert false
+  in
+  let unique_tag_imports = unique_by tag_key tag_imports in
   let tag_names =
-    ir.imports
-    |> List.filter_map (function
-         | ImportTag im -> Some ("RECTaginstA1(" ^ im.import_tagtype ^ ")")
-         | _ -> None)
+    unique_tag_imports
+    |> List.map (function
+         | ImportTag im -> "RECTaginstA1(" ^ im.import_tagtype ^ ")"
+         | _ -> assert false)
     |> seq
   in
+  let global_imports =
+    ir.imports |> List.filter (function ImportGlobal _ -> true | _ -> false)
+  in
+  let global_key = function
+    | ImportGlobal im -> import_key im.import_module im.import_name
+    | _ -> assert false
+  in
+  let unique_global_imports = unique_by global_key global_imports in
   let global_names =
-    ir.imports
-    |> List.filter_map (function
+    unique_global_imports
+    |> List.map (function
          | ImportGlobal im ->
            let value =
              match find_import_global_binding global_bindings im.import_module im.import_name with
              | Some b -> b.global_binding_value
              | None -> default_import_global_value im.import_globaltype
            in
-           Some ("RECGlobalinstA2(" ^ im.import_globaltype ^ ", " ^ value ^ ")")
-         | _ -> None)
+           "RECGlobalinstA2(" ^ im.import_globaltype ^ ", " ^ value ^ ")"
+         | _ -> assert false)
     |> seq
   in
+  let memory_imports =
+    ir.imports |> List.filter (function ImportMemory _ -> true | _ -> false)
+  in
+  let memory_key = function
+    | ImportMemory im -> import_key im.import_module im.import_name
+    | _ -> assert false
+  in
+  let unique_memory_imports = unique_by memory_key memory_imports in
   let memory_names =
-    ir.imports
-    |> List.filter_map (function
+    unique_memory_imports
+    |> List.map (function
          | ImportMemory im ->
+             let binding = find_import_memory_binding memory_bindings im.import_module im.import_name in
              let pages =
-               match find_import_memory_binding memory_bindings im.import_module im.import_name with
-               | Some b -> b.memory_binding_pages
-               | None -> im.import_mem_min
+               match binding with Some b -> b.memory_binding_pages | None -> im.import_mem_min
              in
              let runtime_memtype =
-               match find_import_memory_binding memory_bindings im.import_module im.import_name with
-               | Some b ->
-                  memtype_term pages b.memory_binding_max
+               match binding with
+               | Some b -> memtype_term pages b.memory_binding_max
                | None -> im.import_memtype
              in
-             Some
-               ("RECMeminstA2(" ^ runtime_memtype ^ ", $zero-membytes("
-              ^ string_of_int pages ^ "))")
-         | _ -> None)
+             let overlays =
+               match binding with Some b -> b.memory_binding_overlays | None -> []
+             in
+             "RECMeminstA2(" ^ runtime_memtype ^ ", " ^ membytes_term pages overlays ^ ")"
+         | _ -> assert false)
     |> seq
   in
+  let table_imports =
+    ir.imports |> List.filter (function ImportTable _ -> true | _ -> false)
+  in
+  let table_key = function
+    | ImportTable im -> import_key im.import_module im.import_name
+    | _ -> assert false
+  in
+  let unique_table_imports = unique_by table_key table_imports in
   let table_names =
-    ir.imports
-    |> List.filter_map (function
+    unique_table_imports
+    |> List.map (function
          | ImportTable im ->
-             Some
-               ("RECTableinstA2(" ^ im.import_tabletype ^ ", $table-refs("
-              ^ string_of_int im.import_table_min ^ ", " ^ im.import_table_default_ref ^ "))")
-         | _ -> None)
+           "RECTableinstA2(" ^ im.import_tabletype ^ ", $table-refs("
+           ^ string_of_int im.import_table_min ^ ", " ^ im.import_table_default_ref ^ "))"
+         | _ -> assert false)
     |> seq
   in
   let externaddrs =
-    let fi = ref 0 and ji = ref 0 and gi = ref 0 and mi = ref 0 and ti = ref 0 in
     ir.imports
     |> List.map (function
-         | ImportFunc _ ->
-             let i = !fi in
-             incr fi;
+         | ImportFunc im ->
+             let i = index_of_key func_key unique_func_imports (func_key im) in
              "CTORFUNCA1(" ^ string_of_int i ^ ")"
-         | ImportTag _ ->
-             let i = !ji in
-             incr ji;
+         | ImportTag im ->
+             let i = index_of_key tag_key unique_tag_imports (import_key im.import_module im.import_name) in
              "CTORTAGA1(" ^ string_of_int i ^ ")"
-         | ImportGlobal _ ->
-             let i = !gi in
-             incr gi;
+         | ImportGlobal im ->
+             let i = index_of_key global_key unique_global_imports (import_key im.import_module im.import_name) in
              "CTORGLOBALA1(" ^ string_of_int i ^ ")"
-         | ImportMemory _ ->
-             let i = !mi in
-             incr mi;
+         | ImportMemory im ->
+             let i = index_of_key memory_key unique_memory_imports (import_key im.import_module im.import_name) in
              "CTORMEMA1(" ^ string_of_int i ^ ")"
-         | ImportTable _ ->
-             let i = !ti in
-             incr ti;
+         | ImportTable im ->
+             let i = index_of_key table_key unique_table_imports (import_key im.import_module im.import_name) in
              "CTORTABLEA1(" ^ string_of_int i ^ ")")
     |> seq
   in
@@ -3883,7 +4050,7 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
 
 let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = false)
     ?(import_bindings = []) ?(import_global_bindings = []) ?(import_memory_bindings = [])
-    ?(prelude_calls = []) ir =
+    ?(memory_data_bindings = []) ?(prelude_calls = []) ir =
 	  let type_terms = ir.types |> List.map (fun typ -> typ.type_term) |> type_seq in
   let import_runtime =
     if ir.imports = [] || not link_imports then ""
@@ -3940,10 +4107,22 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
 	           ^ ", " ^ instr_seq fn.func_body ^ ")")
 	    |> func_seq
   in
-  let data_terms =
+  let source_data_terms =
     ir.datas
     |> List.map (fun d -> "CTORDATAA2(" ^ bytes_seq d.data_bytes ^ ", " ^ d.data_mode ^ ")")
-	    |> data_seq
+  in
+  let extra_data_terms = memory_data_terms ir memory_data_bindings in
+  let all_data_terms = source_data_terms @ extra_data_terms in
+  let all_data_modes =
+    List.map (fun d -> d.data_mode) ir.datas
+    @ List.map
+        (fun term ->
+          match sub_index term "CTORACTIVEA2(" with
+          | Some _ -> term
+          | None -> "")
+        extra_data_terms
+  in
+  let data_terms = data_seq all_data_terms
   in
   let elem_terms =
     ir.elems
@@ -4035,7 +4214,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     ir.tables |> List.map (fun t -> t.table_type) |> seq
   in
   let validation_local_datatypes =
-    ir.datas |> List.map (fun _ -> "CTOROKA0") |> seq
+    all_data_terms |> List.map (fun _ -> "CTOROKA0") |> seq
   in
   let validation_local_elemtypes =
     ir.elems |> List.map (fun e -> e.elem_type) |> seq
@@ -4051,7 +4230,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
          [
            List.concat (List.map (fun g -> g.global_init) ir.globals);
            List.concat (List.map (fun t -> t.table_init) ir.tables);
-           List.map (fun d -> d.data_mode) ir.datas;
+           all_data_modes;
            List.concat (List.map (fun e -> e.elem_exprs @ [ e.elem_mode ]) ir.elems);
          ])
   in
@@ -4107,8 +4286,13 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
   let prelude_terms =
     prelude_calls
     |> List.map (fun call ->
-           call_instr (funcidx_of_export call.prelude_field) call.prelude_args
-             call.prelude_drop_count)
+           let funcidx =
+             match (call.prelude_funcidx, call.prelude_field) with
+             | Some i, _ -> i
+             | None, Some field -> funcidx_of_export field
+             | None, None -> fail "prelude call has no target"
+           in
+           call_instr funcidx call.prelude_args call.prelude_drop_count)
     |> String.concat " "
     |> String.trim
   in
@@ -4440,7 +4624,7 @@ let run_maude_validation ~maude ~result_only ~rewrite_limit generated =
 
 let usage () =
   prerr_endline
-    "usage: wasm_to_maude [--harness FILE] [--output FILE] [--run N] [--run-main] [--run-export NAME] [--maude-validate-only] [--checked-run|--unchecked-run] [--rewrite-limit N] [--arg-i32 N] [--arg-i64 N] [--arg-f32 LIT] [--arg-f64 LIT] [--arg-v128 LANES] [--arg-ref-null REF] [--arg-externref N] [--arg-funcref N] [--arg-anyref N] [--arg-eqref N] [--arg-i31ref N] [--arg-structref N] [--arg-arrayref N] [--arg-exnref N] [--prelude-call FIELD;TYPE=VALUE,...;drop=N] [--maude PATH] [--invoke-index N] [--result-only] [--search-expected TERM] [--legacy-wat-parser] [--no-canonicalize] [--import-func MODULE.NAME=INSTRUCTIONS] [--import-global MODULE.NAME=VALUE] [--import-memory MODULE.NAME=PAGES] INPUT.wat|INPUT.wasm";
+    "usage: wasm_to_maude [--harness FILE] [--output FILE] [--run N] [--run-main] [--run-export NAME] [--maude-validate-only] [--checked-run|--unchecked-run] [--rewrite-limit N] [--arg-i32 N] [--arg-i64 N] [--arg-f32 LIT] [--arg-f64 LIT] [--arg-v128 LANES] [--arg-ref-null REF] [--arg-externref N] [--arg-funcref N] [--arg-anyref N] [--arg-eqref N] [--arg-i31ref N] [--arg-structref N] [--arg-arrayref N] [--arg-exnref N] [--prelude-call FIELD;TYPE=VALUE,...;drop=N] [--maude PATH] [--invoke-index N] [--result-only] [--search-expected TERM] [--legacy-wat-parser] [--no-canonicalize] [--import-func MODULE.NAME=INSTRUCTIONS] [--import-global MODULE.NAME=VALUE] [--import-memory MODULE.NAME=PAGES[@OFFSET:BYTE,...]] [--memory-data MEMORY=OFFSET:BYTE,...] INPUT.wat|INPUT.wasm";
   exit 2
 
 let () =
@@ -4462,6 +4646,7 @@ let () =
     let import_func_specs = ref [] in
     let import_global_specs = ref [] in
     let import_memory_specs = ref [] in
+    let memory_data_specs = ref [] in
     let prelude_calls = ref [] in
     let rewrite_limit = ref 10000 in
     let input = ref None in
@@ -4567,6 +4752,9 @@ let () =
       | "--import-memory" :: spec :: rest ->
           import_memory_specs := !import_memory_specs @ [ spec ];
           parse_args rest
+      | "--memory-data" :: spec :: rest ->
+          memory_data_specs := !memory_data_specs @ [ spec ];
+          parse_args rest
       | "--prelude-call" :: spec :: rest ->
           prelude_calls := !prelude_calls @ [ parse_prelude_call spec ];
           parse_args rest
@@ -4608,6 +4796,9 @@ let () =
     let import_memory_bindings =
       !import_memory_specs |> List.map parse_import_memory_binding
     in
+    let memory_data_bindings =
+      !memory_data_specs |> List.map parse_memory_data_binding
+    in
     if (!run <> None || !run_main) && ir.invoke_index = None then
       fail "module has no function to invoke"
     else ();
@@ -4631,7 +4822,8 @@ let () =
     let generated =
       emit_maude ~harness ~link_imports:(!run <> None || !run_main)
         ~include_maude_validation:(!validate_only || !checked_run) ~import_bindings
-        ~import_global_bindings ~import_memory_bindings ~prelude_calls:!prelude_calls ir
+        ~import_global_bindings ~import_memory_bindings ~memory_data_bindings
+        ~prelude_calls:!prelude_calls ir
     in
     (match !output with
     | Some path -> write_file path generated

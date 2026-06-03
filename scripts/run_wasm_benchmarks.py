@@ -26,10 +26,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RAW_NUM_CONST_RE = re.compile(r"CTORCONSTA2\(CTOR(I32|I64|F32|F64)A0,\s*([+-]?\d+)\)")
 NUM_CONST_SHAPES = {
-    "I32": ("CTORI32A0", "litU32", 32),
-    "I64": ("CTORI64A0", "litU64", 64),
-    "F32": ("CTORF32A0", "litF32", None),
-    "F64": ("CTORF64A0", "litF64", None),
+    "I32": ("CTORI32A0", 32),
+    "I64": ("CTORI64A0", 64),
+    "F32": ("CTORF32A0", None),
+    "F64": ("CTORF64A0", None),
 }
 WAST_NUM_TYPES = {
     "i32": "I32",
@@ -37,6 +37,7 @@ WAST_NUM_TYPES = {
     "f32": "F32",
     "f64": "F64",
 }
+NAN_EXPECT_RE = re.compile(r"__EXPECT_(F32|F64)_NAN__")
 
 
 @dataclass
@@ -54,6 +55,24 @@ class Result:
     instantiate_status: str = ""
     step_status: str = ""
     result_status: str = ""
+
+
+@dataclass
+class MemoryDataSegment:
+    memory_index: int
+    offset: int
+    bytes: list[int]
+
+
+@dataclass
+class MemoryExportState:
+    pages: int
+    max_pages: int | None
+    data: dict[int, int]
+
+    def write(self, offset: int, bytes_: list[int]) -> None:
+        for i, byte in enumerate(bytes_):
+            self.data[offset + i] = byte
 
 
 def run(cmd: list[str], timeout: int) -> tuple[int, str]:
@@ -91,9 +110,14 @@ def wrapped_num_const(typ: str, value: str) -> str:
     shape = NUM_CONST_SHAPES.get(typ)
     if shape is None:
         return value
-    ctor, wrapper, bits = shape
-    payload = unsigned_payload(value, bits) if bits is not None else int(value)
-    return f"CTORCONSTA2({ctor}, {wrapper}({payload}))"
+    ctor, bits = shape
+    if typ == "F32":
+        payload = signed_int(value, 32)
+    elif typ == "F64":
+        payload = signed_int(value, 64)
+    else:
+        payload = unsigned_payload(value, bits) if bits is not None else int(value)
+    return f"CTORCONSTA2({ctor}, {payload})"
 
 
 def wrapped_numeric_equivalent(term: str) -> str:
@@ -104,39 +128,218 @@ def wrapped_numeric_equivalent(term: str) -> str:
 
 
 def expected_alternatives(expected: str) -> list[str]:
-    """Accept current wrapped expectations plus old raw numeric fixtures."""
+    """Accept explicit expectations plus their canonical raw numeric form."""
     alternatives: list[str] = []
     for item in (part.strip() for part in expected.split(" || ")):
         if not item:
             continue
         alternatives.append(item)
-        wrapped = wrapped_numeric_equivalent(item)
-        if wrapped != item:
-            alternatives.append(wrapped)
+        raw = wrapped_numeric_equivalent(item)
+        if raw != item:
+            alternatives.append(raw)
     return alternatives
 
 
-def memory_exports_from_wasm(wasm: Path, timeout: int) -> dict[str, tuple[int, int | None]]:
+def compact_expected_alternatives(expected: str) -> list[str]:
+    alternatives: list[str] = []
+    for item in expected_alternatives(expected):
+        compact = " ".join(item.split())
+        if compact:
+            alternatives.append(compact)
+    return alternatives
+
+
+def whitespace_free(text: str) -> str:
+    return "".join(text.split())
+
+
+def wasm2wat_text(wasm: Path, timeout: int) -> str:
     code, out = run(["wasm2wat", "--enable-all", str(wasm)], timeout)
     if code != 0:
-        return {}
+        return ""
+    return out
+
+
+def wat_string_bytes(literal: str) -> list[int]:
+    raw = literal[1:-1] if len(literal) >= 2 and literal[0] == '"' and literal[-1] == '"' else literal
+    out: list[int] = []
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        if ch != "\\":
+            out.append(ord(ch))
+            i += 1
+            continue
+        if i + 2 < len(raw) and re.fullmatch(r"[0-9a-fA-F]{2}", raw[i + 1 : i + 3]):
+            out.append(int(raw[i + 1 : i + 3], 16))
+            i += 3
+            continue
+        if i + 1 >= len(raw):
+            out.append(ord("\\"))
+            i += 1
+            continue
+        escaped = raw[i + 1]
+        escapes = {"n": 10, "t": 9, "r": 13, '"': 34, "'": 39, "\\": 92}
+        out.append(escapes.get(escaped, ord(escaped)))
+        i += 2
+    return out
+
+
+def wat_name(literal: str) -> str:
+    return bytes(wat_string_bytes(literal)).decode("utf-8", errors="replace")
+
+
+def quoted_wat_strings(text: str) -> list[str]:
+    strings: list[str] = []
+    i = 0
+    while i < len(text):
+        if text[i] != '"':
+            i += 1
+            continue
+        start = i
+        i += 1
+        while i < len(text):
+            if text[i] == "\\":
+                i += 3 if i + 2 < len(text) and re.fullmatch(r"[0-9a-fA-F]{2}", text[i + 1 : i + 3]) else 2
+                continue
+            if text[i] == '"':
+                strings.append(text[start : i + 1])
+                i += 1
+                break
+            i += 1
+    return strings
+
+
+def wasm_memory_info(
+    wasm: Path, timeout: int
+) -> tuple[
+    dict[int, tuple[int, int | None]],
+    dict[int, tuple[str, str]],
+    dict[str, int],
+    list[MemoryDataSegment],
+]:
+    out = wasm2wat_text(wasm, timeout)
     memory_pages: dict[int, tuple[int, int | None]] = {}
-    exports: dict[str, tuple[int, int | None]] = {}
+    memory_imports: dict[int, tuple[str, str]] = {}
+    exports: dict[str, int] = {}
+    active_data: list[MemoryDataSegment] = []
     for line in out.splitlines():
         line = line.strip()
-        m = re.match(r'^\(memory\s+\(;(\d+);\)\s+(\d+)(?:\s+(\d+))?', line)
+        m = re.match(
+            r'^\(import\s+"([^"]+)"\s+"([^"]+)"\s+\(memory\s+\(;(\d+);\)\s+(?:i64\s+)?(\d+)(?:\s+(\d+))?',
+            line,
+        )
+        if m:
+            idx = int(m.group(3))
+            memory_imports[idx] = (m.group(1), m.group(2))
+            memory_pages[idx] = (
+                int(m.group(4)),
+                int(m.group(5)) if m.group(5) is not None else None,
+            )
+            continue
+        m = re.match(r'^\(memory\s+\(;(\d+);\)\s+(?:i64\s+)?(\d+)(?:\s+(\d+))?', line)
         if m:
             memory_pages[int(m.group(1))] = (
                 int(m.group(2)),
                 int(m.group(3)) if m.group(3) is not None else None,
             )
             continue
-        m = re.match(r'^\(export\s+"([^"]+)"\s+\(memory\s+(\d+)\)\)', line)
+        if line.startswith("(export "):
+            strings = quoted_wat_strings(line)
+            m = re.search(r"\(memory\s+(\d+)\)", line)
+            if strings and m:
+                exports[wat_name(strings[0])] = int(m.group(1))
+            continue
+        m = re.match(
+            r'^\(data\s+\(;\d+;\)\s+(?:\(memory\s+(\d+)\)\s+)?\((?:i32|i64)\.const\s+([0-9]+)\)\s+(.*)\)$',
+            line,
+        )
         if m:
-            idx = int(m.group(2))
-            if idx in memory_pages:
-                exports[m.group(1)] = memory_pages[idx]
-    return exports
+            memidx = int(m.group(1) or "0")
+            offset = int(m.group(2))
+            data_bytes: list[int] = []
+            for literal in quoted_wat_strings(m.group(3)):
+                data_bytes.extend(wat_string_bytes(literal))
+            active_data.append(MemoryDataSegment(memidx, offset, data_bytes))
+    return memory_pages, memory_imports, exports, active_data
+
+
+def function_export_index_from_wasm(wasm: Path, field: str, timeout: int) -> int | None:
+    for line in wasm2wat_text(wasm, timeout).splitlines():
+        line = line.strip()
+        if not line.startswith("(export "):
+            continue
+        strings = quoted_wat_strings(line)
+        if not strings or wat_name(strings[0]) != field:
+            continue
+        m = re.search(r"\(func\s+(\d+)\)", line)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def invoke_flags_for_export(wasm: Path, field: str, timeout: int) -> list[str] | None:
+    funcidx = function_export_index_from_wasm(wasm, field, timeout)
+    if funcidx is not None:
+        return ["--invoke-index", str(funcidx), "--run-main"]
+    if "\x00" in field:
+        return None
+    return ["--run-export", field]
+
+
+def memory_exports_from_wasm(wasm: Path, timeout: int) -> dict[str, MemoryExportState]:
+    memory_pages, _, exports, active_data = wasm_memory_info(wasm, timeout)
+    exported: dict[str, MemoryExportState] = {}
+    state_by_index: dict[int, MemoryExportState] = {}
+    for name, idx in exports.items():
+        if idx not in memory_pages:
+            continue
+        state = state_by_index.get(idx)
+        if state is None:
+            pages, max_pages = memory_pages[idx]
+            state = MemoryExportState(pages, max_pages, {})
+            for segment in active_data:
+                if segment.memory_index == idx:
+                    state.write(segment.offset, segment.bytes)
+            state_by_index[idx] = state
+        exported[name] = state
+    return exported
+
+
+def memory_overlay_ranges(data: dict[int, int]) -> list[tuple[int, list[int]]]:
+    ranges: list[tuple[int, list[int]]] = []
+    for offset in sorted(data):
+        byte = data[offset]
+        if not ranges:
+            ranges.append((offset, [byte]))
+            continue
+        start, bytes_ = ranges[-1]
+        if start + len(bytes_) == offset:
+            bytes_.append(byte)
+        else:
+            ranges.append((offset, [byte]))
+    return ranges
+
+
+def overlay_specs(data: dict[int, int]) -> list[str]:
+    return [
+        f"{offset}:{','.join(str(byte) for byte in bytes_)}"
+        for offset, bytes_ in memory_overlay_ranges(data)
+        if bytes_
+    ]
+
+
+def format_import_memory_spec(module: str, name: str, state: MemoryExportState) -> str:
+    limits = f"{state.pages}" + (f"/{state.max_pages}" if state.max_pages is not None else "")
+    overlays = overlay_specs(state.data)
+    return f"{module}.{name}={limits}" + (f"@{'@'.join(overlays)}" if overlays else "")
+
+
+def format_memory_data_spec(name: str, state: MemoryExportState) -> str | None:
+    overlays = overlay_specs(state.data)
+    if not overlays:
+        return None
+    return f"{name}={'@'.join(overlays)}"
 
 
 def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, str]:
@@ -210,7 +413,17 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
             ]
         ):
             return ("STUCK_STEP", observed, "administrative/runtime term remains")
-        if any(item in compact for item in expected_alternatives(expected)):
+        nan_expected = NAN_EXPECT_RE.findall(expected)
+        if nan_expected:
+            if all(observed_has_nan_const(observed or compact, typ) for typ in nan_expected):
+                return ("PASS", observed, "")
+            return ("WRONG_RESULT", observed or compact[-240:], "expected NaN result not found")
+        expected_items = compact_expected_alternatives(expected)
+        compact_no_ws = whitespace_free(compact)
+        if any(
+            item in compact or whitespace_free(item) in compact_no_ws
+            for item in expected_items
+        ):
             return ("PASS", observed, "")
         return ("WRONG_RESULT", observed or compact[-240:], "expected result not found")
     return ("GENERATED", observed, "")
@@ -280,7 +493,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
         (
             "fib",
             ["--unchecked-run", "--result-only", "--run", "5", "wat_examples/fib.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(5))",
+            "CTORCONSTA2(CTORI32A0, 5)",
         ),
         (
             "fib-wrapper",
@@ -297,37 +510,37 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "1",
                 "wat_examples/fib-wrapper.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, litU32(5))",
+            "CTORCONSTA2(CTORI32A0, 5)",
         ),
         (
             "global-get",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/global-get.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(42))",
+            "CTORCONSTA2(CTORI32A0, 42)",
         ),
         (
             "memory-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/memory-size.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(0))",
+            "CTORCONSTA2(CTORI32A0, 0)",
         ),
         (
             "table-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/table-size.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(3))",
+            "CTORCONSTA2(CTORI32A0, 3)",
         ),
         (
             "start-global",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/start-global.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(7))",
+            "CTORCONSTA2(CTORI32A0, 7)",
         ),
         (
             "data-load",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/data-load.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(42))",
+            "CTORCONSTA2(CTORI32A0, 42)",
         ),
         (
             "elem-call-ref",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/elem-call-ref.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(9))",
+            "CTORCONSTA2(CTORI32A0, 9)",
         ),
         (
             "import-func",
@@ -342,7 +555,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.bump=local.get 0 i32.const 1 i32.add",
                 "wat_examples/import-func.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, litU32(42))",
+            "CTORCONSTA2(CTORI32A0, 42)",
         ),
         (
             "import-global",
@@ -355,17 +568,17 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.g=i32.const 77",
                 "wat_examples/import-global.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, litU32(77))",
+            "CTORCONSTA2(CTORI32A0, 77)",
         ),
         (
             "import-memory",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-memory.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(1))",
+            "CTORCONSTA2(CTORI32A0, 1)",
         ),
         (
             "import-table",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-table.wat"],
-            "CTORCONSTA2(CTORI32A0, litU32(4))",
+            "CTORCONSTA2(CTORI32A0, 4)",
         ),
     ]
 
@@ -614,6 +827,44 @@ def signed_int(value: str, bits: int) -> int:
     return n
 
 
+def is_nan_bits(value: int, bits: int) -> bool:
+    if bits == 32:
+        value %= 1 << 32
+        return (value & 0x7F800000) == 0x7F800000 and (value & 0x007FFFFF) != 0
+    if bits == 64:
+        value %= 1 << 64
+        return (value & 0x7FF0000000000000) == 0x7FF0000000000000 and (value & 0x000FFFFFFFFFFFFF) != 0
+    return False
+
+
+def observed_has_nan_const(text: str, typ: str) -> bool:
+    if typ == "F32":
+        ctor, bits = "CTORF32A0", 32
+    elif typ == "F64":
+        ctor, bits = "CTORF64A0", 64
+    else:
+        return False
+    raw_pattern = re.compile(
+        rf"CTORCONSTA2\s*\(\s*{ctor}\s*,\s*([+-]?\d+)\s*\)"
+    )
+    return any(is_nan_bits(int(match.group(1)), bits) for match in raw_pattern.finditer(text))
+
+
+def packed_v128_lanes(value: str) -> int | None:
+    lanes = [part for part in value.split() if part]
+    if not lanes:
+        return None
+    width_by_count = {16: 8, 8: 16, 4: 32, 2: 64, 1: 128}
+    width = width_by_count.get(len(lanes))
+    if width is None:
+        return None
+    packed = 0
+    mask = (1 << width) - 1
+    for i, lane in enumerate(lanes):
+        packed |= (int(lane) & mask) << (i * width)
+    return packed
+
+
 REF_HEAPTYPES = {
     "funcref": "CTORFUNCA0",
     "externref": "CTOREXTERNA0",
@@ -679,9 +930,15 @@ def maude_num_alternatives(typ: str, value: str | None) -> list[str] | None:
         return None
     source_typ = WAST_NUM_TYPES.get(typ)
     if source_typ is not None:
+        if typ in {"f32", "f64"} and value.startswith("nan"):
+            return [f"__EXPECT_{source_typ}_NAN__"]
         return [wrapped_num_const(source_typ, value)]
     if typ == "v128":
-        return [f"CTORVCONSTA2(CTORV128A0, $v128lanes({value}))"]
+        alts = [f"CTORVCONSTA2(CTORV128A0, $v128lanes({value}))"]
+        packed = packed_v128_lanes(value)
+        if packed is not None:
+            alts.append(f"CTORVCONSTA2(CTORV128A0, {packed})")
+        return alts
     return None
 
 
@@ -719,9 +976,13 @@ def prelude_arg_spec(typ: str, value: object) -> str | None:
     return None
 
 
-def action_prelude_spec(action: dict, drop_count: int) -> str | None:
+def action_prelude_spec(action: dict, drop_count: int, wasm: Path, timeout: int) -> str | None:
     field = action.get("field")
     if not field:
+        return None
+    funcidx = function_export_index_from_wasm(wasm, field, timeout)
+    target = f"@index={funcidx}" if funcidx is not None else field
+    if "\x00" in target:
         return None
     arg_specs: list[str] = []
     for arg in action.get("args", []):
@@ -729,7 +990,7 @@ def action_prelude_spec(action: dict, drop_count: int) -> str | None:
         if spec is None:
             return None
         arg_specs.append(spec)
-    return f"{field};{','.join(arg_specs)};drop={drop_count}"
+    return f"{target};{','.join(arg_specs)};drop={drop_count}"
 
 
 def action_args(action: dict) -> list[str] | None:
@@ -783,6 +1044,7 @@ def run_wast_assert(
     path: Path,
     prelude_specs: list[str] | None = None,
     import_memory_specs: list[str] | None = None,
+    memory_data_specs: list[str] | None = None,
     rewrite_limit: int = 10000,
 ) -> Result:
     action = cmd.get("action", {})
@@ -794,6 +1056,9 @@ def run_wast_assert(
     field = action.get("field")
     if not field:
         return Result("spec-tests", name, str(path), "wast-assert", "UNSUPPORTED", "", "", "missing invoke field")
+    invoke_flags = invoke_flags_for_export(wasm, field, timeout)
+    if invoke_flags is None:
+        return Result("spec-tests", name, str(path), "wast-assert", "UNSUPPORTED", "", "", "cannot pass export name through argv")
     if cmd.get("type") == "assert_return":
         if cmd.get("expected") is None:
             return Result(
@@ -819,6 +1084,9 @@ def run_wast_assert(
     import_memory_args: list[str] = []
     for spec in import_memory_specs or []:
         import_memory_args.extend(["--import-memory", spec])
+    memory_data_args: list[str] = []
+    for spec in memory_data_specs or []:
+        memory_data_args.extend(["--memory-data", spec])
     code, out = run(
         cli_prefix(cli)
         + [
@@ -828,10 +1096,10 @@ def run_wast_assert(
             "--result-only",
             "--rewrite-limit",
             str(rewrite_limit),
-            "--run-export",
-            field,
         ]
+        + invoke_flags
         + import_memory_args
+        + memory_data_args
         + prelude_args
         + arg_flags
         + [str(wasm)],
@@ -866,6 +1134,7 @@ def run_wast_action(
     path: Path,
     prelude_specs: list[str] | None = None,
     import_memory_specs: list[str] | None = None,
+    memory_data_specs: list[str] | None = None,
     rewrite_limit: int = 10000,
 ) -> Result:
     if action.get("type") != "invoke":
@@ -876,12 +1145,18 @@ def run_wast_action(
     field = action.get("field")
     if not field:
         return Result("spec-tests", name, str(path), "wast-action", "UNSUPPORTED", "", "", "missing invoke field")
+    invoke_flags = invoke_flags_for_export(wasm, field, timeout)
+    if invoke_flags is None:
+        return Result("spec-tests", name, str(path), "wast-action", "UNSUPPORTED", "", "", "cannot pass export name through argv")
     prelude_args: list[str] = []
     for spec in prelude_specs or []:
         prelude_args.extend(["--prelude-call", spec])
     import_memory_args: list[str] = []
     for spec in import_memory_specs or []:
         import_memory_args.extend(["--import-memory", spec])
+    memory_data_args: list[str] = []
+    for spec in memory_data_specs or []:
+        memory_data_args.extend(["--memory-data", spec])
     code, out = run(
         cli_prefix(cli)
         + [
@@ -891,10 +1166,10 @@ def run_wast_action(
             "--result-only",
             "--rewrite-limit",
             str(rewrite_limit),
-            "--run-export",
-            field,
         ]
+        + invoke_flags
         + import_memory_args
+        + memory_data_args
         + prelude_args
         + arg_flags
         + [str(wasm)],
@@ -1043,9 +1318,93 @@ def run_wast_probe(
         module_files: list[Path] = []
         module_by_name: dict[str, Path] = {}
         register_by_name: dict[str, Path] = {}
-        registered_memory_exports: dict[str, dict[str, tuple[int, int | None]]] = {}
+        registered_memory_exports: dict[str, dict[str, MemoryExportState]] = {
+            "spectest": {"memory": MemoryExportState(1, 2, {})}
+        }
+        memory_exports_by_wasm: dict[str, dict[str, MemoryExportState]] = {}
         prelude_by_module: dict[str, list[str]] = {}
         failed_prelude_by_module: dict[str, str] = {}
+
+        def import_memory_specs() -> list[str]:
+            return [
+                format_import_memory_spec(module, name, state)
+                for module, exports in registered_memory_exports.items()
+                for name, state in exports.items()
+            ]
+
+        def memory_data_specs_for(wasm: Path) -> list[str]:
+            specs: list[str] = []
+            for name, state in memory_exports_by_wasm.get(str(wasm), {}).items():
+                spec = format_memory_data_spec(name, state)
+                if spec is not None:
+                    specs.append(spec)
+            return specs
+
+        def remember_registered_memory(alias: str, wasm: Path) -> None:
+            exports = memory_exports_by_wasm.get(str(wasm))
+            if exports is None:
+                exports = memory_exports_from_wasm(wasm, timeout)
+                memory_exports_by_wasm[str(wasm)] = exports
+            registered_memory_exports[alias] = exports
+
+        def apply_active_data_to_registered_imports(wasm: Path) -> None:
+            _, imports, _, active_data = wasm_memory_info(wasm, timeout)
+            for segment in active_data:
+                target = imports.get(segment.memory_index)
+                if target is None:
+                    continue
+                module, name = target
+                state = registered_memory_exports.get(module, {}).get(name)
+                if state is not None:
+                    if segment.offset + len(segment.bytes) > state.pages * 65536:
+                        break
+                    state.write(segment.offset, segment.bytes)
+
+        def registered_aliases_for_wasm(wasm: Path) -> list[str]:
+            return [
+                alias
+                for alias, alias_wasm in register_by_name.items()
+                if str(alias_wasm) == str(wasm)
+            ]
+
+        def memory_grow_delta(action: dict) -> int | None:
+            field = str(action.get("field") or "").lower()
+            if "grow" not in field:
+                return None
+            args = action.get("args", [])
+            if args:
+                try:
+                    return int(str(args[0].get("value", "0")))
+                except ValueError:
+                    return None
+            return 1
+
+        def observed_i32_result(term: str) -> int | None:
+            m = re.search(r"CTORCONSTA2\(CTORI32A0,\s*(\d+)\)", term)
+            if not m:
+                return None
+            value = int(m.group(1))
+            if value == 0xFFFFFFFF:
+                return None
+            return value
+
+        def remember_memory_growth(wasm: Path, action: dict, observed: str) -> None:
+            delta = memory_grow_delta(action)
+            old_size = observed_i32_result(observed)
+            if delta is None or old_size is None or delta < 0:
+                return
+            exports = memory_exports_by_wasm.get(str(wasm))
+            if exports is None:
+                exports = memory_exports_from_wasm(wasm, timeout)
+                memory_exports_by_wasm[str(wasm)] = exports
+            if not exports:
+                return
+            new_size = old_size + delta
+            for state in exports.values():
+                if new_size > state.pages:
+                    state.pages = new_size
+            for alias in registered_aliases_for_wasm(wasm):
+                registered_memory_exports[alias] = exports
         for cmd in data.get("commands", []):
             if cmd.get("type") == "module":
                 current_module_index += 1
@@ -1054,20 +1413,18 @@ def run_wast_probe(
                 module_files.append(wasm)
                 if cmd.get("name"):
                     module_by_name[cmd["name"]] = wasm
+                if wasm.exists():
+                    apply_active_data_to_registered_imports(wasm)
                 continue
             if cmd.get("type") == "register":
                 source = cmd.get("name")
                 alias = cmd.get("as")
                 if source and source in module_by_name and alias:
                     register_by_name[alias] = module_by_name[source]
-                    registered_memory_exports[alias] = memory_exports_from_wasm(
-                        module_by_name[source], timeout
-                    )
+                    remember_registered_memory(alias, module_by_name[source])
                 elif current_module_index >= 0 and alias:
                     register_by_name[alias] = module_files[current_module_index]
-                    registered_memory_exports[alias] = memory_exports_from_wasm(
-                        module_files[current_module_index], timeout
-                    )
+                    remember_registered_memory(alias, module_files[current_module_index])
                 continue
             if cmd.get("type") == "action":
                 action = cmd.get("action", {})
@@ -1092,18 +1449,15 @@ def run_wast_probe(
                     f"{path.stem}:action:line{cmd.get('line', '')}",
                     path,
                     prelude_by_module.get(wasm_key, []),
-                    [
-                        f"{module}.{name}={pages}"
-                        + (f"/{max_pages}" if max_pages is not None else "")
-                        for module, exports in registered_memory_exports.items()
-                        for name, (pages, max_pages) in exports.items()
-                    ],
+                    import_memory_specs(),
+                    memory_data_specs_for(wasm),
                     rewrite_limit=rewrite_limit,
                 )
                 results.append(action_result)
                 if action_result.status == "PASS":
+                    remember_memory_growth(wasm, action, action_result.observed)
                     spec = action_prelude_spec(
-                        action, observed_result_arity(action_result.observed)
+                        action, observed_result_arity(action_result.observed), wasm, timeout
                     )
                     if spec is not None:
                         prelude_by_module.setdefault(wasm_key, []).append(spec)
@@ -1132,6 +1486,13 @@ def run_wast_probe(
                     )
                 )
                 asserts += 1
+                continue
+            if cmd.get("type") == "assert_uninstantiable":
+                filename = cmd.get("filename")
+                if filename:
+                    wasm = Path(tmpdir) / filename
+                    if wasm.exists():
+                        apply_active_data_to_registered_imports(wasm)
                 continue
             if cmd.get("type") not in {"assert_return", "assert_trap"}:
                 continue
@@ -1180,16 +1541,14 @@ def run_wast_probe(
                 f"{path.stem}:assert:{asserts}:line{cmd.get('line', '')}",
                 path,
                 prelude_by_module.get(wasm_key, []),
-                [
-                    f"{module}.{name}={pages}" + (f"/{max_pages}" if max_pages is not None else "")
-                    for module, exports in registered_memory_exports.items()
-                    for name, (pages, max_pages) in exports.items()
-                ],
+                import_memory_specs(),
+                memory_data_specs_for(wasm),
                 rewrite_limit=rewrite_limit,
             )
             results.append(result)
             if cmd.get("type") == "assert_return" and result.status == "PASS":
-                spec = action_prelude_spec(action, len(cmd.get("expected", [])))
+                remember_memory_growth(wasm, action, result.observed)
+                spec = action_prelude_spec(action, len(cmd.get("expected", [])), wasm, timeout)
                 if spec is not None:
                     prelude_by_module.setdefault(wasm_key, []).append(spec)
             asserts += 1
