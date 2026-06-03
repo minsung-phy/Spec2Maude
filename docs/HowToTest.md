@@ -79,7 +79,7 @@ make validate-invalid
 Expected Fibonacci result:
 
 ```text
-result: CTORCONSTA2(CTORI32A0, litU32(5))
+result: CTORCONSTA2(CTORI32A0, 5)
 ```
 
 `validate` checks the official SpecTec/WebAssembly parser-validator path.  It
@@ -97,13 +97,12 @@ rew [1] in WASM-FIB :
 Expected final value:
 
 ```maude
-CTORCONSTA2(CTORI32A0, litU32(5))
+CTORCONSTA2(CTORI32A0, 5)
 ```
 
 `steps` is the source-shaped reflexive-transitive closure generated from the
-SpecTec `Steps` relation.  The numeric payload is wrapped because object-level
-SpecTec/Wasm numeric literals are represented with explicit literal
-constructors such as `litU32`.
+SpecTec `Steps` relation.  Numeric payloads are raw Maude numerals; source
+numeric categories are checked by generated `typecheck` equations.
 
 ## 6. WAT/Wasm Frontend Smokes
 
@@ -146,12 +145,12 @@ Expected: matches.
 Expected values:
 
 ```text
-global-get    => CTORCONSTA2(CTORI32A0, litU32(42))
-memory-size   => CTORCONSTA2(CTORI32A0, litU32(0))
-table-size    => CTORCONSTA2(CTORI32A0, litU32(3))
-start-global  => CTORCONSTA2(CTORI32A0, litU32(7))
-data-load     => CTORCONSTA2(CTORI32A0, litU32(42))
-elem-call-ref => CTORCONSTA2(CTORI32A0, litU32(9))
+global-get    => CTORCONSTA2(CTORI32A0, 42)
+memory-size   => CTORCONSTA2(CTORI32A0, 0)
+table-size    => CTORCONSTA2(CTORI32A0, 3)
+start-global  => CTORCONSTA2(CTORI32A0, 7)
+data-load     => CTORCONSTA2(CTORI32A0, 42)
+elem-call-ref => CTORCONSTA2(CTORI32A0, 9)
 ```
 
 ## 8. Import Examples
@@ -168,7 +167,7 @@ Function import:
 Expected:
 
 ```text
-result: CTORCONSTA2(CTORI32A0, litU32(42))
+result: CTORCONSTA2(CTORI32A0, 42)
 ```
 
 Other imports:
@@ -185,9 +184,9 @@ Other imports:
 Expected:
 
 ```text
-import-global => CTORCONSTA2(CTORI32A0, litU32(77))
-import-memory => CTORCONSTA2(CTORI32A0, litU32(1))
-import-table  => CTORCONSTA2(CTORI32A0, litU32(4))
+import-global => CTORCONSTA2(CTORI32A0, 77)
+import-memory => CTORCONSTA2(CTORI32A0, 1)
+import-table  => CTORCONSTA2(CTORI32A0, 4)
 ```
 
 ## 9. Invalid Input

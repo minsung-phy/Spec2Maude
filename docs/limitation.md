@@ -42,18 +42,17 @@ source category subsorts such as subsort Instr < SpectecTerminal
 broad numeric subsorts such as Nat < U32 or Int < IN32
 ```
 
-Numeric literal families are represented with object-level wrappers:
+Numeric literal families are represented as raw Maude numerals carried by
+`SpectecTerminal`:
 
 ```text
-i32.const 5 -> CTORCONSTA2(CTORI32A0, litU32(5))
-i64.const 5 -> CTORCONSTA2(CTORI64A0, litU64(5))
+i32.const 5 -> CTORCONSTA2(CTORI32A0, 5)
+i64.const 5 -> CTORCONSTA2(CTORI64A0, 5)
 ```
 
-This is intentional.  Raw Maude numerals such as `5` are meta-level builtin
-numbers and cannot be classified exactly as generated object-language sorts
-such as `U32`/`IN32` using Maude membership axioms alone.  Wrappers give the
-object-language literal a real constructor that can receive precise `mb`/`cmb`
-membership.
+This follows the JHS carrier shape: `Nat`/`Int` are terminals, and generated
+`typecheck(raw-number, source-type)` equations classify source numeric
+categories such as `uN(32)`, `sN(33)`, and `byte`.
 
 ## 3. What Changed Beyond Syntax
 
@@ -70,12 +69,12 @@ not emitted for these execution rules; sequence variables already range over
 `eps`, so the source rule plus its source non-empty condition covers those
 cases.
 
-However, the literal representation changed from raw payloads to wrappers.
-Because of that, generated runtime equations and rules that consume numeric
-payloads need representation-boundary plumbing:
+The literal representation is raw again.  Generated runtime equations and
+rules that compute over numeric payloads still need representation-boundary
+plumbing:
 
 ```text
-unwrap object-level literal -> compute with Maude builtin number -> rewrap result
+project raw terminal to Maude builtin number -> compute -> preserve raw result
 ```
 
 This plumbing is not a source category predicate and is not a replacement for
@@ -133,8 +132,8 @@ The main remaining source-absent mechanisms are:
 $infer-*       witness inference for relation premises
 $cont-*        continuation lowering for ordered def premises
 meta-notation lowering helpers for star/optional/map/range/otherwise forms
-$raw-lit       representation-boundary numeric unwrap
-$wrap-lit      representation-boundary numeric rewrap
+$raw-lit       representation-boundary numeric projection
+$wrap-lit      representation-boundary numeric result preservation
 ```
 
 These are not benchmark-specific hardcoding, but they are still not literally
@@ -150,10 +149,17 @@ AST constructors.
 
 Known gaps include:
 
+- IEEE-754 float builtin semantics (`$fadd`, `$fsub`, `$fmul`, `$fdiv`,
+  conversions, NaN propagation, rounding-sensitive cases).  The SpecTec source
+  marks these definitions as `hint(builtin)`, so a source-isomorphic
+  translator can expose the operations but still needs a backend/oracle to
+  compute them;
 - full benchmark-scale execution for exception/tag, GC, and SIMD-heavy cases;
 - richer vector expected-result comparison and more precise abstract-reference
   result matching in the `.wast` runner;
-- richer WASI/import linking;
+- richer WASI/import linking, especially official `.wast`
+  `module_definition`/`module_instance` identity and shared exported
+  global/table/tag aliases;
 - more precise failure classification for real-world benchmarks.
 
 ## 8. Benchmark Status
@@ -199,10 +205,10 @@ The syntax layer is back to the JHS carrier shape: SpecTec categories are
 SpectecType terms, constructors return SpectecTerminal, category validity is
 represented by typecheck, and constructor existence also emits Maude mb/cmb
 membership on SpectecTerminal.  Numeric literals use explicit object-level
-wrappers because raw Maude numerals cannot be exact U32/IN32 members.  The
-Step/Step_pure/Step_read/Steps relations are still generated from the SpecTec
-source; wrapper unwrap/rewrap code is representation plumbing, not a semantic
-replacement.
+raw Maude numerals, while source numeric categories are classified by
+generated typecheck equations.  The Step/Step_pure/Step_read/Steps relations
+are still generated from the SpecTec source; numeric boundary helpers are
+representation plumbing, not a semantic replacement.
 ```
 
 Open question:

@@ -39,33 +39,33 @@ mod WASM-FIB is
   var N : SpectecTerminal .
 
   op i32v : Nat -> SpectecTerminal .
-  eq i32v(I:Nat) = CTORCONSTA2(CTORI32A0, litU32(I:Nat)) .
+  eq i32v(I:Nat) = CTORCONSTA2(CTORI32A0, I:Nat) .
 
   op fib-loop-body : -> SpectecTerminals .
   eq fib-loop-body =
-    CTORLOCALGETA1($wrap-Localidx(0))
-    CTORCONSTA2(CTORI32A0, litU32(0))
+    CTORLOCALGETA1(0)
+    CTORCONSTA2(CTORI32A0, 0)
     CTORRELOPA2(CTORI32A0, CTORLEA1(CTORSA0))
-    CTORBRIFA1($wrap-Labelidx(1))
-    CTORLOCALGETA1($wrap-Localidx(1))
-    CTORLOCALGETA1($wrap-Localidx(2))
+    CTORBRIFA1(1)
+    CTORLOCALGETA1(1)
+    CTORLOCALGETA1(2)
     CTORBINOPA2(CTORI32A0, CTORADDA0)
-    CTORLOCALSETA1($wrap-Localidx(3))
-    CTORLOCALGETA1($wrap-Localidx(2))
-    CTORLOCALSETA1($wrap-Localidx(1))
-    CTORLOCALGETA1($wrap-Localidx(3))
-    CTORLOCALSETA1($wrap-Localidx(2))
-    CTORLOCALGETA1($wrap-Localidx(0))
-    CTORCONSTA2(CTORI32A0, litU32(1))
+    CTORLOCALSETA1(3)
+    CTORLOCALGETA1(2)
+    CTORLOCALSETA1(1)
+    CTORLOCALGETA1(3)
+    CTORLOCALSETA1(2)
+    CTORLOCALGETA1(0)
+    CTORCONSTA2(CTORI32A0, 1)
     CTORBINOPA2(CTORI32A0, CTORSUBA0)
-    CTORLOCALSETA1($wrap-Localidx(0))
-    CTORBRA1($wrap-Labelidx(0)) .
+    CTORLOCALSETA1(0)
+    CTORBRA1(0) .
 
   op fib-body : -> SpectecTerminals .
   eq fib-body =
     CTORBLOCKA2(CTORWRESULTA1(eps),
       CTORLOOPA2(CTORWRESULTA1(eps), fib-loop-body))
-    CTORLOCALGETA1($wrap-Localidx(1)) .
+    CTORLOCALGETA1(1) .
 
   op fib-type : -> SpectecTerminal .
   eq fib-type =
@@ -103,7 +103,7 @@ mod WASM-FIB is
 
   op fib-func : -> SpectecTerminal .
   eq fib-func =
-    CTORFUNCA3($wrap-Typeidx(0),
+    CTORFUNCA3(0,
       CTORLOCALA1(CTORI32A0),
       fib-body) .
 
