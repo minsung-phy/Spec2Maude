@@ -1,9 +1,9 @@
 # How To Test Spec2Maude
 
-Updated: 2026-06-01
+Updated: 2026-06-03
 
-Use this document for reproducible local checks after the membership-based
-syntax encoding rewrite.
+Use this document for reproducible local checks after restoring the JHS-style
+syntax/typecheck carrier and adding constructor membership axioms.
 
 ## 1. Tool Check
 
@@ -46,12 +46,21 @@ wasm-exec.maude
   -> output.maude
 ```
 
-The generated syntax layer should not contain the old JHS type-tag machinery:
+The generated syntax layer should contain the restored JHS carrier, category
+checks, and constructor membership axioms:
 
 ```bash
-rg 'SpectecType|SpectecCategory|WasmType' output.maude
-rg 'typecheck|hasType|WellTyped|_hasType_' output.maude
-rg 'SortCTOR' output.maude
+rg 'sort SpectecType|op typecheck|mb |cmb ' output.maude
+```
+
+Expected: matches.
+
+The generated syntax layer should not explode source categories into Maude
+sorts:
+
+```bash
+rg '^[[:space:]]+(sort|subsort).*\b(Instr|Valtype|U32|Typeuse)\b' output.maude
+rg 'SpectecCategory|WasmType|hasType|WellTyped|_hasType_|SortCTOR' output.maude
 rg 'subsort Nat < U32|subsort Int < IN|subsort Nat < Byte' output.maude
 ```
 
@@ -197,7 +206,9 @@ rejected by the frontend validation path before Maude runtime.
 ./spec2maude test official --limit 20 --timeout 10
 ```
 
-Test runs write artifacts under `artifacts/`.
+Test runs write artifacts under `artifacts/`.  Regenerate the expected bucket
+counts after syntax-carrier changes; parse/load regressions should be chased
+before runtime-result regressions.
 
 ## 11. Status Buckets
 

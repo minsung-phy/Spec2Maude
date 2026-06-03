@@ -1,10 +1,10 @@
 # Current Limitations And Discussion Points
 
-Updated: 2026-06-01
+Updated: 2026-06-03
 
-This document records the current state after replacing the old
-`SpectecType`/`typecheck` syntax-membership layer with Maude
-sort/membership encoding.
+This document records the current state after restoring the JHS-style
+`SpectecType`/`typecheck` syntax layer and adding Maude constructor membership
+axioms.
 
 ## 1. Parser / Validator
 
@@ -20,24 +20,25 @@ by benchmark scripts to expand official `.wast` tests into JSON.
 
 ## 2. Syntax Encoding Status
 
-The generated syntax layer now follows four AST-driven patterns:
+The generated syntax layer now follows AST-driven JHS carrier patterns:
 
 ```text
-simple category              sort Category + mb constructor : Category
-argumented constructor       ctor returns SpectecTerminal + cmb with argument sorts
-parameterized family         finite specialization into concrete Maude sorts
-category alias/inclusion     subsort Child < Parent
+category/type name           constructor term of sort SpectecType
+source syntax constructor    broad constructor returning SpectecTerminal
+category check               eq/ceq typecheck(pattern, category-term) = true
+constructor membership       mb/cmb pattern : SpectecTerminal
+category alias/inclusion     delegated typecheck equation
 ```
 
 The generated syntax layer should not contain:
 
 ```text
-SpectecType
 SpectecCategory
 WasmType
-typecheck
 hasType / WellTyped / _hasType_
 SortCTOR...
+bulk source category sorts such as sort Instr, sort Valtype, sort Typeuse
+source category subsorts such as subsort Instr < SpectecTerminal
 broad numeric subsorts such as Nat < U32 or Int < IN32
 ```
 
@@ -62,6 +63,13 @@ Step_pure, Step_read, or Steps semantics with a different execution strategy.
 In particular, `Steps` is generated as the source-shaped recursive
 reflexive-transitive closure.
 
+The context-lifting `Step/ctxt-instrs` rule is emitted as the source-shaped
+rule itself.  The translator does not add a separate `$run-*` fuel runner or a
+non-context `Step` helper for this path.  Redundant iterator-empty variants are
+not emitted for these execution rules; sequence variables already range over
+`eps`, so the source rule plus its source non-empty condition covers those
+cases.
+
 However, the literal representation changed from raw payloads to wrappers.
 Because of that, generated runtime equations and rules that consume numeric
 payloads need representation-boundary plumbing:
@@ -70,9 +78,9 @@ payloads need representation-boundary plumbing:
 unwrap object-level literal -> compute with Maude builtin number -> rewrap result
 ```
 
-This plumbing is not a category-membership predicate and is not a replacement
-for `mb`/`cmb`.  It exists only because numeric operations still compute over
-Maude builtin integers internally.
+This plumbing is not a source category predicate and is not a replacement for
+the generated `typecheck`/`mb`/`cmb` syntax layer.  It exists only because
+numeric operations still compute over Maude builtin integers internally.
 
 ## 4. Module-ok Is Not The Default Gate
 
@@ -157,10 +165,19 @@ path:
 ./spec2maude test smoke --timeout 10
 ```
 
-Current expected status:
+Most recent local check shape after the JHS-carrier restoration and constructor
+membership generation:
 
 ```text
-PASS: 13
+make build                                           PASS
+./spec2maude translate -o output.maude               PASS
+maude -no-banner output.maude                        PASS, no warnings
+maude -no-banner wasm-exec.maude                     PASS, no warnings
+./spec2maude validate wat_examples/fib.wat           PASS
+rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
+./spec2maude run wat_examples/fib.wat --fib 5        PASS
+./spec2maude run wat_examples/data-load.wat          PASS
+./spec2maude test smoke --timeout 10                 PASS: 13
 ```
 
 Larger official/external benchmark numbers should be regenerated after each
@@ -178,12 +195,14 @@ Important interpretation:
 Short version:
 
 ```text
-The syntax membership layer is now Maude-native: SpecTec categories are sorts,
-constructors return SpectecTerminal, and membership is represented by
-subsort/mb/cmb.  Numeric literals use explicit object-level wrappers because
-raw Maude numerals cannot be exact U32/IN32 members.  The Step/Step_pure/
-Step_read/Steps relations are still generated from the SpecTec source; wrapper
-unwrap/rewrap code is representation plumbing, not a semantic replacement.
+The syntax layer is back to the JHS carrier shape: SpecTec categories are
+SpectecType terms, constructors return SpectecTerminal, category validity is
+represented by typecheck, and constructor existence also emits Maude mb/cmb
+membership on SpectecTerminal.  Numeric literals use explicit object-level
+wrappers because raw Maude numerals cannot be exact U32/IN32 members.  The
+Step/Step_pure/Step_read/Steps relations are still generated from the SpecTec
+source; wrapper unwrap/rewrap code is representation plumbing, not a semantic
+replacement.
 ```
 
 Open question:

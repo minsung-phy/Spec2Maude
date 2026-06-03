@@ -424,7 +424,7 @@ let extract_final_value output =
              || contains_sub compact_output "StepsConf]: steps("
           then
             fail
-              "Maude returned a stuck steps(...) term instead of a final Config; \
+              "Maude returned a stuck execution term instead of a final Config; \
                increase the rewrite limit or inspect the full Maude output."
           else
 		      let value =
@@ -591,6 +591,33 @@ let seq xs =
   let xs = List.filter (fun x -> x <> "" && x <> "eps") xs in
   match xs with [] -> "eps" | _ -> String.concat " " xs
 
+let typed_seq seq_sort xs =
+  ignore seq_sort;
+  let xs = List.filter (fun x -> x <> "" && x <> "eps") xs in
+  match xs with
+  | [] -> "eps"
+  | _ -> String.concat " " xs
+
+let valtype_seq xs = typed_seq "ValtypeSeq" xs
+let instr_seq xs = typed_seq "InstrSeq" xs
+let typeuse_seq xs = typed_seq "TypeuseSeq" xs
+let subtype_seq xs = typed_seq "SubtypeSeq" xs
+let fieldtype_seq xs = typed_seq "FieldtypeSeq" xs
+let local_seq xs = typed_seq "LocalSeq" xs
+let labelidx_seq xs = typed_seq "LabelidxSeq" xs
+let catch_seq xs = typed_seq "CatchSeq" xs
+let byte_seq xs = typed_seq "ByteSeq" xs
+let type_seq xs = typed_seq "TypeSeq" xs
+let import_seq xs = typed_seq "ImportSeq" xs
+let tag_seq xs = typed_seq "TagSeq" xs
+let global_seq xs = typed_seq "GlobalSeq" xs
+let mem_seq xs = typed_seq "MemSeq" xs
+let table_seq xs = typed_seq "TableSeq" xs
+let func_seq xs = typed_seq "FuncSeq" xs
+let data_seq xs = typed_seq "DataSeq" xs
+let elem_seq xs = typed_seq "ElemSeq" xs
+let export_seq xs = typed_seq "ExportSeq" xs
+
 let collect_ref_func_indices terms =
   let prefix = "CTORREFFUNCA1(" in
   let plen = String.length prefix in
@@ -723,7 +750,7 @@ let tabletype_term ?(addrtype = "CTORI32A0") min max_opt rt =
 let globaltype_term mut t =
   if mut then "CTORMUTA0 " ^ t else t
 
-let bytes_seq bytes = seq (List.map string_of_int bytes)
+let bytes_seq bytes = byte_seq (List.map (fun b -> "litByte(" ^ string_of_int b ^ ")") bytes)
 
 let unquote s =
   let n = String.length s in
@@ -902,8 +929,8 @@ let read_func_type_fields fields =
 	  { params = !params; results = !results }
 
 let type_term typ =
-  let params = seq typ.params in
-  let results = seq typ.results in
+  let params = valtype_seq typ.params in
+  let results = valtype_seq typ.results in
   "CTORTYPEA1(CTORRECA1(CTORSUBA3(eps, eps, CTORFUNCARROWA2("
   ^ params ^ ", " ^ results ^ "))))"
 
@@ -1679,7 +1706,7 @@ let parse_br_table env labels =
     | x :: xs -> split_last (x :: acc) xs
   in
   let prefix, default = split_last [] labels in
-  "CTORBRTABLEA2(" ^ seq prefix ^ ", " ^ default ^ ")"
+  "CTORBRTABLEA2(" ^ labelidx_seq prefix ^ ", " ^ default ^ ")"
 
 let collect_br_table_operands rest =
   let rec loop acc = function
@@ -1724,17 +1751,17 @@ let rec parse_instr env = function
       in
       let bt, instrs = parse_blocktype env body in
       let env = enter_label env id in
-      "CTORBLOCKA2(" ^ bt ^ ", " ^ seq (parse_instr_list env instrs) ^ ")"
+      "CTORBLOCKA2(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ")"
   | List (Atom "loop" :: body) ->
       let id, body =
         match body with Atom id :: rest when is_id id -> (Some id, rest) | _ -> (None, body)
       in
       let bt, instrs = parse_blocktype env body in
       let env = enter_label env id in
-      "CTORLOOPA2(" ^ bt ^ ", " ^ seq (parse_instr_list env instrs) ^ ")"
+      "CTORLOOPA2(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ")"
   | List (Atom "if" :: body) ->
       let bt, instrs = parse_blocktype env body in
-      "CTORWIFELSEA3(" ^ bt ^ ", " ^ seq (parse_instr_list env instrs) ^ ", eps)"
+      "CTORWIFELSEA3(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ", eps)"
   | List (Atom "try_table" :: body) ->
       let id, body =
         match body with Atom id :: rest when is_id id -> (Some id, rest) | _ -> (None, body)
@@ -1742,8 +1769,8 @@ let rec parse_instr env = function
       let bt, rest = parse_blocktype env body in
       let catches, instrs = List.partition is_catch_clause rest in
       let body_env = enter_label env id in
-      "CTORTRYTABLEA3(" ^ bt ^ ", " ^ seq (List.map (parse_catch_clause env) catches)
-      ^ ", " ^ seq (parse_instr_list body_env instrs) ^ ")"
+      "CTORTRYTABLEA3(" ^ bt ^ ", " ^ catch_seq (List.map (parse_catch_clause env) catches)
+      ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
   | List [ Atom "call_indirect"; List [ Atom "type"; x ] ] ->
       "CTORCALLINDIRECTA2(" ^ wrap_source_category "Tableidx" "0" ^ ", CTORWIDXA1("
       ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
@@ -1760,7 +1787,7 @@ let rec parse_instr env = function
   | List (Atom "select" :: List (Atom "result" :: tys) :: operands) ->
       seq
         (parse_instr_list env operands
-        @ [ "CTORSELECTA1(" ^ seq (List.map valtype_of_sexpr tys) ^ ")" ])
+        @ [ "CTORSELECTA1(" ^ valtype_seq (List.map valtype_of_sexpr tys) ^ ")" ])
   | List (Atom (("i32.const" | "i64.const" | "f32.const" | "f64.const" | "global.get") as head)
           :: imm :: rest) ->
       seq (parse_flat_instr env head (Some imm) :: parse_instr_list env rest)
@@ -2006,7 +2033,7 @@ and parse_instr_list env items =
       let lanes, rest = collect_shuffle_lanes rest in
       shuffle_term lanes :: parse_instr_list env rest
   | Atom "select" :: List (Atom "result" :: tys) :: rest ->
-      ("CTORSELECTA1(" ^ seq (List.map valtype_of_sexpr tys) ^ ")")
+      ("CTORSELECTA1(" ^ valtype_seq (List.map valtype_of_sexpr tys) ^ ")")
       :: parse_instr_list env rest
   | Atom head :: rest when List.mem head load_store_names ->
       let term, rest = parse_load_store_instr env head rest in
@@ -2042,8 +2069,8 @@ and parse_flat_structured env head rest =
   let body_env = enter_label env id in
   let term =
     match head with
-    | "block" -> "CTORBLOCKA2(" ^ bt ^ ", " ^ seq (parse_instr_list body_env instrs) ^ ")"
-    | "loop" -> "CTORLOOPA2(" ^ bt ^ ", " ^ seq (parse_instr_list body_env instrs) ^ ")"
+    | "block" -> "CTORBLOCKA2(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
+    | "loop" -> "CTORLOOPA2(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
     | _ -> assert false
   in
   (term, rest)
@@ -2071,8 +2098,8 @@ and parse_flat_if env rest =
   let bt, then_instrs = parse_blocktype env then_body in
   let body_env = enter_label env id in
   let term =
-    "CTORWIFELSEA3(" ^ bt ^ ", " ^ seq (parse_instr_list body_env then_instrs) ^ ", "
-    ^ seq (parse_instr_list body_env else_body) ^ ")"
+    "CTORWIFELSEA3(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env then_instrs) ^ ", "
+    ^ instr_seq (parse_instr_list body_env else_body) ^ ")"
   in
   (term, rest)
 
@@ -2097,8 +2124,8 @@ and parse_flat_try_table env rest =
   in
   let catches, instrs = split_catches [] body in
   let body_env = enter_label env id in
-  ( "CTORTRYTABLEA3(" ^ bt ^ ", " ^ seq (List.map (parse_catch_clause env) catches)
-    ^ ", " ^ seq (parse_instr_list body_env instrs) ^ ")",
+  ( "CTORTRYTABLEA3(" ^ bt ^ ", " ^ catch_seq (List.map (parse_catch_clause env) catches)
+    ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")",
     rest )
 
 let parse_typeuse type_names types_ref fields =
@@ -3066,18 +3093,18 @@ module Official = struct
 	    | T.FieldT (T.Cons, t) -> storagetype t
 	    | T.FieldT (T.Var, t) -> "CTORMUTA0 " ^ storagetype t
 
-	  let comptype = function
-	    | T.FuncT (params, results) ->
-	        "CTORFUNCARROWA2(" ^ seq (List.map valtype params) ^ ", "
-	        ^ seq (List.map valtype results) ^ ")"
-	    | T.StructT fields -> "CTORSTRUCTA1(" ^ seq (List.map fieldtype fields) ^ ")"
+		  let comptype = function
+		    | T.FuncT (params, results) ->
+		        "CTORFUNCARROWA2(" ^ valtype_seq (List.map valtype params) ^ ", "
+		        ^ valtype_seq (List.map valtype results) ^ ")"
+		    | T.StructT fields -> "CTORSTRUCTA1(" ^ fieldtype_seq (List.map fieldtype fields) ^ ")"
 	    | T.ArrayT field -> "CTORARRAYA1(" ^ fieldtype field ^ ")"
 
 	  let final = function T.NoFinal -> "eps" | T.Final -> "CTORFINALA0"
 
-	  let subtype (T.SubT (fin, supers, ct)) =
-	    "CTORSUBA3(" ^ final fin ^ ", " ^ seq (List.map typeuse supers) ^ ", " ^ comptype ct
-	    ^ ")"
+		  let subtype (T.SubT (fin, supers, ct)) =
+		    "CTORSUBA3(" ^ final fin ^ ", " ^ typeuse_seq (List.map typeuse supers) ^ ", " ^ comptype ct
+		    ^ ")"
 
 	  let type_def_of_rectype rt =
 	    let func =
@@ -3088,7 +3115,7 @@ module Official = struct
 	    in
 	    {
 	      type_id = None;
-	      type_term = "CTORTYPEA1(CTORRECA1(" ^ seq (List.map subtype (match rt with T.RecT sts -> sts)) ^ "))";
+		      type_term = "CTORTYPEA1(CTORRECA1(" ^ subtype_seq (List.map subtype (match rt with T.RecT sts -> sts)) ^ "))";
 	      type_func = func;
 	    }
 
@@ -3287,15 +3314,15 @@ module Official = struct
     | A.Nop -> "CTORNOPA0"
     | A.Drop -> "CTORDROPA0"
     | A.Select None -> "CTORSELECTA1(eps)"
-    | A.Select (Some ts) -> "CTORSELECTA1(" ^ seq (List.map valtype ts) ^ ")"
-    | A.Block (bt, es) -> "CTORBLOCKA2(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
-    | A.Loop (bt, es) -> "CTORLOOPA2(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
+	    | A.Select (Some ts) -> "CTORSELECTA1(" ^ valtype_seq (List.map valtype ts) ^ ")"
+	    | A.Block (bt, es) -> "CTORBLOCKA2(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
+	    | A.Loop (bt, es) -> "CTORLOOPA2(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
     | A.If (bt, es1, es2) ->
         "CTORWIFELSEA3(" ^ blocktype bt ^ ", " ^ instrs es1 ^ ", " ^ instrs es2 ^ ")"
 	    | A.Br x -> "CTORBRA1(" ^ labelidx x ^ ")"
 	    | A.BrIf x -> "CTORBRIFA1(" ^ labelidx x ^ ")"
 	    | A.BrTable (xs, x) ->
-	        "CTORBRTABLEA2(" ^ seq (List.map labelidx xs) ^ ", " ^ labelidx x ^ ")"
+		        "CTORBRTABLEA2(" ^ labelidx_seq (List.map labelidx xs) ^ ", " ^ labelidx x ^ ")"
 	    | A.BrOnNull x -> "CTORBRONNULLA1(" ^ labelidx x ^ ")"
 	    | A.BrOnNonNull x -> "CTORBRONNONNULLA1(" ^ labelidx x ^ ")"
 	    | A.BrOnCast (x, rt1, rt2) ->
@@ -3315,8 +3342,8 @@ module Official = struct
 	    | A.Throw x -> "CTORTHROWA1(" ^ tagidx x ^ ")"
 	    | A.ThrowRef -> "CTORTHROWREFA0"
 	    | A.TryTable (bt, cs, es) ->
-	        "CTORTRYTABLEA3(" ^ blocktype bt ^ ", " ^ seq (List.map catch cs) ^ ", "
-	        ^ instrs es ^ ")"
+		        "CTORTRYTABLEA3(" ^ blocktype bt ^ ", " ^ catch_seq (List.map catch cs) ^ ", "
+		        ^ instrs es ^ ")"
 	    | A.LocalGet x -> "CTORLOCALGETA1(" ^ localidx x ^ ")"
 	    | A.LocalSet x -> "CTORLOCALSETA1(" ^ localidx x ^ ")"
 	    | A.LocalTee x -> "CTORLOCALTEEA1(" ^ localidx x ^ ")"
@@ -3394,7 +3421,7 @@ module Official = struct
 	    | A.ArrayInitElem (x, y) -> "CTORARRAYINITELEMA2(" ^ typeidx x ^ ", " ^ elemidx y ^ ")"
 	    | A.ExternConvert op -> externop op
 
-  and instrs es = seq (List.map instr es)
+	  and instrs es = instr_seq (List.map instr es)
 
   let const c = instrs (it c)
 
@@ -3739,7 +3766,7 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
            in
            Printf.sprintf
              {|
-  op generated-import-func-%d : -> Funcinst [ctor] .
+  op generated-import-func-%d : -> SpectecTerminal [ctor] .
   eq value('TYPE, generated-import-func-%d) = index(generated-import-deftypes, %d) .
   eq value('MODULE, generated-import-func-%d) = $empty-moduleinst .
   eq value('CODE, generated-import-func-%d) = CTORFUNCA3(%s, eps, %s) .
@@ -3847,7 +3874,7 @@ let emit_import_runtime func_bindings global_bindings memory_bindings ir type_te
 let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = false)
     ?(import_bindings = []) ?(import_global_bindings = []) ?(import_memory_bindings = [])
     ?(prelude_calls = []) ir =
-	  let type_terms = ir.types |> List.map (fun typ -> typ.type_term) |> seq in
+	  let type_terms = ir.types |> List.map (fun typ -> typ.type_term) |> type_seq in
   let import_runtime =
     if ir.imports = [] || not link_imports then ""
     else
@@ -3877,42 +3904,42 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
          | ImportTable im ->
              "CTORIMPORTA3($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
              ^ maude_qid im.import_name ^ "), CTORTABLEA1(" ^ im.import_tabletype ^ "))")
-    |> seq
+	    |> import_seq
   in
   let global_terms =
     ir.globals
-    |> List.map (fun g -> "CTORGLOBALA2(" ^ g.global_type ^ ", " ^ seq g.global_init ^ ")")
-    |> seq
+	    |> List.map (fun g -> "CTORGLOBALA2(" ^ g.global_type ^ ", " ^ instr_seq g.global_init ^ ")")
+	    |> global_seq
   in
   let tag_terms =
-    ir.tags |> List.map (fun t -> "CTORTAGA1(" ^ t.tag_type ^ ")") |> seq
+	    ir.tags |> List.map (fun t -> "CTORTAGA1(" ^ t.tag_type ^ ")") |> tag_seq
   in
   let memory_terms =
-    ir.memories |> List.map (fun m -> "CTORMEMORYA1(" ^ m.memory_type ^ ")") |> seq
+	    ir.memories |> List.map (fun m -> "CTORMEMORYA1(" ^ m.memory_type ^ ")") |> mem_seq
   in
   let table_terms =
     ir.tables
-    |> List.map (fun t -> "CTORTABLEA2(" ^ t.table_type ^ ", " ^ seq t.table_init ^ ")")
-    |> seq
+	    |> List.map (fun t -> "CTORTABLEA2(" ^ t.table_type ^ ", " ^ instr_seq t.table_init ^ ")")
+	    |> table_seq
   in
   let func_terms =
     ir.funcs
     |> List.map (fun fn ->
            "CTORFUNCA3(" ^ wrap_source_category "Typeidx" (string_of_int fn.func_typeidx) ^ ", "
-           ^ seq (List.map local_decl fn.func_locals)
-           ^ ", " ^ seq fn.func_body ^ ")")
-    |> seq
+	           ^ local_seq (List.map local_decl fn.func_locals)
+	           ^ ", " ^ instr_seq fn.func_body ^ ")")
+	    |> func_seq
   in
   let data_terms =
     ir.datas
     |> List.map (fun d -> "CTORDATAA2(" ^ bytes_seq d.data_bytes ^ ", " ^ d.data_mode ^ ")")
-    |> seq
+	    |> data_seq
   in
   let elem_terms =
     ir.elems
     |> List.map (fun e ->
-           "CTORELEMA3(" ^ e.elem_type ^ ", " ^ seq e.elem_exprs ^ ", " ^ e.elem_mode ^ ")")
-    |> seq
+	           "CTORELEMA3(" ^ e.elem_type ^ ", " ^ instr_seq e.elem_exprs ^ ", " ^ e.elem_mode ^ ")")
+	    |> elem_seq
   in
   let start_terms =
     match ir.start with
@@ -3931,7 +3958,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
              | ExportTable i -> "CTORTABLEA1(" ^ wrap_source_category "Tableidx" (string_of_int i) ^ ")"
            in
            "CTOREXPORTA2($wat-name(" ^ maude_qid ex.export_item_name ^ "), " ^ desc ^ ")")
-    |> seq
+	    |> export_seq
   in
   let import_func_dts =
     ir.imports
@@ -4087,7 +4114,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
 mod WASM-FIB-GENERATED is
   inc WASM-FIB .
 
-  var GEN-NVAL : Val .
+  var GEN-NVAL : SpectecTerminal .
   var GEN-S : Store .
   var GEN-F : Frame .
   var GEN-CONFIG : Config .
@@ -4245,8 +4272,8 @@ mod WASM-FIB-GENERATED is
     Module-ok(GEN-MODULE, GEN-MODULETYPE)
     =>
     valid
-    if (GEN-MODULE == generated-fib-module)
-    /\ (GEN-MODULETYPE == generated-module-type)
+    if (GEN-MODULE == generated-fib-module) = true
+    /\ (GEN-MODULETYPE == generated-module-type) = true
     /\ Types-ok(RECContextA13(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps),
          %s, generated-validation-deftypes) => valid
     /\ Import-oks(generated-validation-import-context, %s, %s) => valid
@@ -4259,26 +4286,26 @@ mod WASM-FIB-GENERATED is
     /\ Elem-oks(generated-validation-context, %s, generated-validation-elemtypes) => valid
     /\ Start-ok(generated-validation-context, %s) => valid
     /\ Export-oks(generated-validation-context, %s, generated-validation-export-names, %s) => valid
-    /\ $disjoint(name, generated-validation-export-names)
-    /\ (generated-module-type == $clos-moduletype(generated-validation-context, CTORARROWA2(%s, %s))) .
+    /\ $disjoint(name, generated-validation-export-names) = true
+    /\ (generated-module-type == $clos-moduletype(generated-validation-context, CTORARROWA2(%s, %s))) = true .
 
   op generated-checked-run-config : SpectecTerminals -> Config .
   eq generated-checked-run-config(GEN-ARGS) =
     generated-checked-run-config-with(%s, %s, GEN-ARGS) .
 
-  op generated-fib-init-config-with : Store SpectecTerminals Val -> Config .
+  op generated-fib-init-config-with : Store SpectecTerminals SpectecTerminal -> Config .
   eq generated-fib-init-config-with(GEN-BASE, GEN-EXTERNADDRS, GEN-NVAL) =
     generated-run-config-with(GEN-BASE, GEN-EXTERNADDRS, GEN-NVAL i32v(0) i32v(1)) .
 
-  op generated-checked-fib-init-config-with : Store SpectecTerminals Val -> Config .
+  op generated-checked-fib-init-config-with : Store SpectecTerminals SpectecTerminal -> Config .
   eq generated-checked-fib-init-config-with(GEN-BASE, GEN-EXTERNADDRS, GEN-NVAL) =
     generated-checked-run-config-with(GEN-BASE, GEN-EXTERNADDRS, GEN-NVAL i32v(0) i32v(1)) .
 
-  op generated-fib-init-config : Val -> Config .
+  op generated-fib-init-config : SpectecTerminal -> Config .
   eq generated-fib-init-config(GEN-NVAL) =
     generated-fib-init-config-with(%s, %s, GEN-NVAL) .
 
-  op generated-checked-fib-init-config : Val -> Config .
+  op generated-checked-fib-init-config : SpectecTerminal -> Config .
   eq generated-checked-fib-init-config(GEN-NVAL) =
     generated-checked-fib-init-config-with(%s, %s, GEN-NVAL) .
 endm
@@ -4315,13 +4342,13 @@ endm
       "  op generated-init-config-with : Store SpectecTerminals -> Config ."
     |> fun s ->
     strip_between s "  --- Experimental Maude-internal validation/debug path."
-      "  op generated-fib-init-config-with : Store SpectecTerminals Val -> Config ."
+      "  op generated-fib-init-config-with : Store SpectecTerminals SpectecTerminal -> Config ."
     |> fun s ->
     strip_between s
-      "  op generated-checked-fib-init-config-with : Store SpectecTerminals Val -> Config ."
-      "  op generated-fib-init-config : Val -> Config ."
+      "  op generated-checked-fib-init-config-with : Store SpectecTerminals SpectecTerminal -> Config ."
+      "  op generated-fib-init-config : SpectecTerminal -> Config ."
     |> fun s ->
-    strip_between s "  op generated-checked-fib-init-config : Val -> Config ."
+    strip_between s "  op generated-checked-fib-init-config : SpectecTerminal -> Config ."
       "endm"
 
 let run_maude_command ~maude ~result_only generated command =
@@ -4341,14 +4368,21 @@ let run_maude_command ~maude ~result_only generated command =
       else print_string output)
 
 let run_maude_fib ~maude ~result_only ~checked ~rewrite_limit generated n =
-  let term =
+  let config_term =
     if checked then
       "generated-checked-fib-init-config(i32v(" ^ string_of_int n ^ "))"
     else
-      "steps(generated-fib-init-config(i32v(" ^ string_of_int n ^ ")))"
+      "generated-fib-init-config(i32v(" ^ string_of_int n ^ "))"
   in
-  run_maude_command ~maude ~result_only generated
-    ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : " ^ term ^ " .\n")
+  let command =
+    if checked then
+      "\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : "
+      ^ config_term ^ " .\n"
+    else
+      "\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : "
+      ^ "steps(" ^ config_term ^ ") .\n"
+  in
+  run_maude_command ~maude ~result_only generated command
 
 let run_maude_main ~maude ~result_only ~checked ~rewrite_limit ?search_expected generated args =
   let arg_terms = seq args in
@@ -4380,8 +4414,15 @@ let run_maude_main ~maude ~result_only ~checked ~rewrite_limit ?search_expected 
             else Printf.printf "result: SEARCH-FAIL\n"))
       else run_maude_command ~maude ~result_only generated command
   | None ->
-      run_maude_command ~maude ~result_only generated
-        ("\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : " ^ term ^ " .\n")
+      let command =
+        if checked then
+          "\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : "
+          ^ term ^ " .\n"
+        else
+          "\nrew [" ^ string_of_int rewrite_limit ^ "] in WASM-FIB-GENERATED : "
+          ^ term ^ " .\n"
+      in
+      run_maude_command ~maude ~result_only generated command
 
 let run_maude_validation ~maude ~result_only ~rewrite_limit generated =
   run_maude_command ~maude ~result_only generated
