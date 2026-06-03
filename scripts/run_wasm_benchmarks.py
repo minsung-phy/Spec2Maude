@@ -145,7 +145,12 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
     if code == 124:
         return ("TIMEOUT", "", "timeout")
     if code != 0:
-        if "stack overflow" in lower or "timeout" in lower:
+        if (
+            "stack overflow" in lower
+            or "timeout" in lower
+            or "stuck execution term" in lower
+            or "did not rewrite to a concrete config" in lower
+        ):
             return ("STUCK_STEP", "", first_line(out))
         if (
             "rejected invalid wat" in lower
@@ -755,6 +760,13 @@ def expected_terms(expected: list[dict]) -> str | None:
     return " || ".join(alternatives)
 
 
+def observed_result_arity(observed: str) -> int:
+    observed = observed.strip()
+    if not observed or observed == "eps":
+        return 0
+    return 1
+
+
 def format_wast_value(value: object) -> str:
     if isinstance(value, list):
         return " ".join(str(item) for item in value)
@@ -840,6 +852,69 @@ def run_wast_assert(
         validation_status="VALIDATED" if final_status in {"PASS", "WRONG_RESULT", "STEPPED"} else "",
         instantiate_status="INSTANTIATED" if final_status in {"PASS", "WRONG_RESULT", "STEPPED"} else "",
         step_status="STEPPED" if final_status in {"PASS", "WRONG_RESULT", "STEPPED"} else final_status,
+        result_status=final_status,
+    )
+
+
+def run_wast_action(
+    cli: str,
+    maude: str,
+    wasm: Path,
+    action: dict,
+    timeout: int,
+    name: str,
+    path: Path,
+    prelude_specs: list[str] | None = None,
+    import_memory_specs: list[str] | None = None,
+    rewrite_limit: int = 10000,
+) -> Result:
+    if action.get("type") != "invoke":
+        return Result("spec-tests", name, str(path), "wast-action", "UNSUPPORTED", "", "", "only invoke actions are supported")
+    arg_flags = action_args(action)
+    if arg_flags is None:
+        return Result("spec-tests", name, str(path), "wast-action", "UNSUPPORTED", "", "", "only numeric invoke args are supported")
+    field = action.get("field")
+    if not field:
+        return Result("spec-tests", name, str(path), "wast-action", "UNSUPPORTED", "", "", "missing invoke field")
+    prelude_args: list[str] = []
+    for spec in prelude_specs or []:
+        prelude_args.extend(["--prelude-call", spec])
+    import_memory_args: list[str] = []
+    for spec in import_memory_specs or []:
+        import_memory_args.extend(["--import-memory", spec])
+    code, out = run(
+        cli_prefix(cli)
+        + [
+            "--maude",
+            maude,
+            "--unchecked-run",
+            "--result-only",
+            "--rewrite-limit",
+            str(rewrite_limit),
+            "--run-export",
+            field,
+        ]
+        + import_memory_args
+        + prelude_args
+        + arg_flags
+        + [str(wasm)],
+        timeout,
+    )
+    step_status, observed, reason = classify_step_output(code, out)
+    final_status = "PASS" if step_status == "STEPPED" else step_status
+    return Result(
+        "spec-tests",
+        name,
+        str(path),
+        "wast-action",
+        final_status,
+        "",
+        observed,
+        reason,
+        parse_status="GENERATED" if final_status not in {"UNSUPPORTED", "WABT_FAIL", "FRONTEND_FAIL"} else "",
+        validation_status="VALIDATED" if final_status in {"PASS", "WRONG_RESULT", "STEPPED"} else "",
+        instantiate_status="INSTANTIATED" if final_status in {"PASS", "WRONG_RESULT", "STEPPED"} else "",
+        step_status=step_status,
         result_status=final_status,
     )
 
@@ -1008,11 +1083,11 @@ def run_wast_probe(
                 else:
                     wasm = module_files[current_module_index]
                 wasm_key = str(wasm)
-                action_result = run_wast_assert(
+                action_result = run_wast_action(
                     cli,
                     maude,
                     wasm,
-                    {"type": "assert_return", "action": action, "expected": []},
+                    action,
                     timeout,
                     f"{path.stem}:action:line{cmd.get('line', '')}",
                     path,
@@ -1025,10 +1100,11 @@ def run_wast_probe(
                     ],
                     rewrite_limit=rewrite_limit,
                 )
-                action_result.mode = "wast-action"
                 results.append(action_result)
                 if action_result.status == "PASS":
-                    spec = action_prelude_spec(action, len(cmd.get("expected", [])))
+                    spec = action_prelude_spec(
+                        action, observed_result_arity(action_result.observed)
+                    )
                     if spec is not None:
                         prelude_by_module.setdefault(wasm_key, []).append(spec)
                     failed_prelude_by_module.pop(wasm_key, None)

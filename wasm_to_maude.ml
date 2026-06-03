@@ -422,6 +422,7 @@ let extract_final_value output =
           let compact_output = compact_spaces output in
           if contains_sub compact_output "result StepsConf: steps("
              || contains_sub compact_output "StepsConf]: steps("
+             || contains_sub compact_output "]: steps("
           then
             fail
               "Maude returned a stuck execution term instead of a final Config; \
@@ -669,6 +670,9 @@ let collect_ref_func_indices terms =
 
 let wrap_source_category sort payload =
   "$wrap-" ^ sort ^ "(" ^ payload ^ ")"
+
+let sz_term n =
+  wrap_source_category "Sz" (string_of_int n)
 
 let rec valtype = function
   | "i32" -> "CTORI32A0"
@@ -1141,13 +1145,18 @@ let signedness_ctor = function
   | "u" -> "CTORUA0"
   | sx -> fail ("unsupported signedness suffix: " ^ sx)
 
+let dim_lit n = "litDim(" ^ string_of_int n ^ ")"
+
+let shape_term lane dim =
+  "CTORXA2(" ^ lane ^ ", " ^ dim_lit dim ^ ")"
+
 let vector_shape = function
-  | "i8x16" -> Some "CTORXA2(CTORI8A0, 16)"
-  | "i16x8" -> Some "CTORXA2(CTORI16A0, 8)"
-  | "i32x4" -> Some "CTORXA2(CTORI32A0, 4)"
-  | "i64x2" -> Some "CTORXA2(CTORI64A0, 2)"
-  | "f32x4" -> Some "CTORXA2(CTORF32A0, 4)"
-  | "f64x2" -> Some "CTORXA2(CTORF64A0, 2)"
+  | "i8x16" -> Some (shape_term "CTORI8A0" 16)
+  | "i16x8" -> Some (shape_term "CTORI16A0" 8)
+  | "i32x4" -> Some (shape_term "CTORI32A0" 4)
+  | "i64x2" -> Some (shape_term "CTORI64A0" 2)
+  | "f32x4" -> Some (shape_term "CTORF32A0" 4)
+  | "f64x2" -> Some (shape_term "CTORF64A0" 2)
   | _ -> None
 
 let vector_shape_exn name =
@@ -1247,20 +1256,20 @@ let vector_extunop_term prefix op =
   match (prefix, op) with
   | "i32x4", "extadd_pairwise_i16x8_s" ->
       Some
-        "CTORVEXTUNOPA3(CTORXA2(CTORI32A0, 4), CTORXA2(CTORI16A0, 8), \
-         CTOREXTADDPAIRWISEA1(CTORSA0))"
+        ("CTORVEXTUNOPA3(" ^ vector_shape_exn "i32x4" ^ ", "
+        ^ vector_shape_exn "i16x8" ^ ", CTOREXTADDPAIRWISEA1(CTORSA0))")
   | "i32x4", "extadd_pairwise_i16x8_u" ->
       Some
-        "CTORVEXTUNOPA3(CTORXA2(CTORI32A0, 4), CTORXA2(CTORI16A0, 8), \
-         CTOREXTADDPAIRWISEA1(CTORUA0))"
+        ("CTORVEXTUNOPA3(" ^ vector_shape_exn "i32x4" ^ ", "
+        ^ vector_shape_exn "i16x8" ^ ", CTOREXTADDPAIRWISEA1(CTORUA0))")
   | "i16x8", "extadd_pairwise_i8x16_s" ->
       Some
-        "CTORVEXTUNOPA3(CTORXA2(CTORI16A0, 8), CTORXA2(CTORI8A0, 16), \
-         CTOREXTADDPAIRWISEA1(CTORSA0))"
+        ("CTORVEXTUNOPA3(" ^ vector_shape_exn "i16x8" ^ ", "
+        ^ vector_shape_exn "i8x16" ^ ", CTOREXTADDPAIRWISEA1(CTORSA0))")
   | "i16x8", "extadd_pairwise_i8x16_u" ->
       Some
-        "CTORVEXTUNOPA3(CTORXA2(CTORI16A0, 8), CTORXA2(CTORI8A0, 16), \
-         CTOREXTADDPAIRWISEA1(CTORUA0))"
+        ("CTORVEXTUNOPA3(" ^ vector_shape_exn "i16x8" ^ ", "
+        ^ vector_shape_exn "i8x16" ^ ", CTOREXTADDPAIRWISEA1(CTORUA0))")
   | _ -> None
 
 let vector_extbinop_term prefix op =
@@ -1551,34 +1560,34 @@ let parse_load_store_instr env head rest =
     | "f32.load" -> "CTORLOADA4(CTORF32A0, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
     | "f64.load" -> "CTORLOADA4(CTORF64A0, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load8_s" ->
-        "CTORLOADA4(CTORI32A0, CTORANYA2(8, CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI32A0, CTORANYA2(" ^ sz_term 8 ^ ", CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load8_u" ->
-        "CTORLOADA4(CTORI32A0, CTORANYA2(8, CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI32A0, CTORANYA2(" ^ sz_term 8 ^ ", CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load16_s" ->
-        "CTORLOADA4(CTORI32A0, CTORANYA2(16, CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI32A0, CTORANYA2(" ^ sz_term 16 ^ ", CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load16_u" ->
-        "CTORLOADA4(CTORI32A0, CTORANYA2(16, CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI32A0, CTORANYA2(" ^ sz_term 16 ^ ", CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load8_s" ->
-        "CTORLOADA4(CTORI64A0, CTORANYA2(8, CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI64A0, CTORANYA2(" ^ sz_term 8 ^ ", CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load8_u" ->
-        "CTORLOADA4(CTORI64A0, CTORANYA2(8, CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI64A0, CTORANYA2(" ^ sz_term 8 ^ ", CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load16_s" ->
-        "CTORLOADA4(CTORI64A0, CTORANYA2(16, CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI64A0, CTORANYA2(" ^ sz_term 16 ^ ", CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load16_u" ->
-        "CTORLOADA4(CTORI64A0, CTORANYA2(16, CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI64A0, CTORANYA2(" ^ sz_term 16 ^ ", CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load32_s" ->
-        "CTORLOADA4(CTORI64A0, CTORANYA2(32, CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI64A0, CTORANYA2(" ^ sz_term 32 ^ ", CTORSA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load32_u" ->
-        "CTORLOADA4(CTORI64A0, CTORANYA2(32, CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "CTORLOADA4(CTORI64A0, CTORANYA2(" ^ sz_term 32 ^ ", CTORUA0), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.store" -> "CTORSTOREA4(CTORI32A0, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.store" -> "CTORSTOREA4(CTORI64A0, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
     | "f32.store" -> "CTORSTOREA4(CTORF32A0, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
     | "f64.store" -> "CTORSTOREA4(CTORF64A0, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i32.store8" -> "CTORSTOREA4(CTORI32A0, 8, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i32.store16" -> "CTORSTOREA4(CTORI32A0, 16, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.store8" -> "CTORSTOREA4(CTORI64A0, 8, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.store16" -> "CTORSTOREA4(CTORI64A0, 16, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.store32" -> "CTORSTOREA4(CTORI64A0, 32, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i32.store8" -> "CTORSTOREA4(CTORI32A0, " ^ sz_term 8 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i32.store16" -> "CTORSTOREA4(CTORI32A0, " ^ sz_term 16 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.store8" -> "CTORSTOREA4(CTORI64A0, " ^ sz_term 8 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.store16" -> "CTORSTOREA4(CTORI64A0, " ^ sz_term 16 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.store32" -> "CTORSTOREA4(CTORI64A0, " ^ sz_term 32 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
     | _ -> assert false
   in
   (term, rest)
@@ -1646,18 +1655,18 @@ let parse_vector_memory_instr env head rest =
       | "v128.load" -> "CTORVLOADA4(CTORV128A0, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
       | "v128.store" -> "CTORVSTOREA3(CTORV128A0, " ^ memidx ^ ", " ^ memarg ^ ")"
       | "v128.load32_zero" ->
-          "CTORVLOADA4(CTORV128A0, CTORZEROA1(32), " ^ memidx ^ ", " ^ memarg ^ ")"
+          "CTORVLOADA4(CTORV128A0, CTORZEROA1(" ^ sz_term 32 ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
       | "v128.load64_zero" ->
-          "CTORVLOADA4(CTORV128A0, CTORZEROA1(64), " ^ memidx ^ ", " ^ memarg ^ ")"
+          "CTORVLOADA4(CTORV128A0, CTORZEROA1(" ^ sz_term 64 ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
       | "v128.load8_splat" | "v128.load16_splat" | "v128.load32_splat"
       | "v128.load64_splat" ->
-          "CTORVLOADA4(CTORV128A0, CTORSPLATA1(" ^ string_of_int (splat_size head)
+          "CTORVLOADA4(CTORV128A0, CTORSPLATA1(" ^ sz_term (splat_size head)
           ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
       | _ -> (
           match packed_load head with
           | Some (m, k, sx) ->
               "CTORVLOADA4(CTORV128A0, CTORSHAPEXANYA3("
-              ^ string_of_int m ^ ", " ^ string_of_int k ^ ", " ^ sx ^ "), "
+              ^ sz_term m ^ ", " ^ string_of_int k ^ ", " ^ sx ^ "), "
               ^ memidx ^ ", " ^ memarg ^ ")"
           | None -> fail ("unsupported vector memory instruction: " ^ head))
     in
@@ -1686,7 +1695,8 @@ let collect_shuffle_lanes rest =
   in
   loop 0 [] rest
 
-let shuffle_term lanes = "CTORVSHUFFLEA2(CTORXA2(CTORI8A0, 16), " ^ seq lanes ^ ")"
+let shuffle_term lanes =
+  "CTORVSHUFFLEA2(" ^ vector_shape_exn "i8x16" ^ ", " ^ seq lanes ^ ")"
 
 let resolve_label env = function
   | Atom id when is_id id ->
@@ -3266,11 +3276,11 @@ module Official = struct
 
   let load_pack = function
     | None -> "eps"
-    | Some (sz, sx') -> "CTORANYA2(" ^ string_of_int (pack_bits sz) ^ ", " ^ sx_term sx' ^ ")"
+    | Some (sz, sx') -> "CTORANYA2(" ^ sz_term (pack_bits sz) ^ ", " ^ sx_term sx' ^ ")"
 
 	  let store_pack = function
 	    | None -> "eps"
-	    | Some sz -> string_of_int (pack_bits sz)
+	    | Some sz -> sz_term (pack_bits sz)
 
 	  let idx x = string_of_int (i32_index x)
     let idx_as sort x = wrap_source_category sort (idx x)
