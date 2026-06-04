@@ -58,6 +58,8 @@ mod WASM-INIT is
   op $init-moduleinst : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $init-store : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Store [ctor] .
   op $seq-set-terminal : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals .
+  eq typecheck($init-funcinst(INIT-TYPES, INIT-MODULEINST, INIT-TYPEIDX, INIT-LOCALS, INIT-BODY), funcinst) = true .
+  eq typecheck($init-moduleinst(INIT-LOWS, INIT-TYPES, INIT-IMPORTS, INIT-FUNCS, INIT-EXPORTS, INIT-EXTERNADDRS), moduleinst) = true .
   eq $init-deftypes(eps, INIT-I) = eps .
   eq $init-deftypes(CTORTYPEA1(INIT-RECTYPE) INIT-TYPESQ, INIT-I) = CTORWDEFA2(INIT-RECTYPE, 0) $init-deftypes(INIT-TYPESQ, INIT-I + 1) .
   eq $init-funcaddrs(eps, INIT-I) = eps .
@@ -148,6 +150,7 @@ mod WASM-INIT is
   op $init-state-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> State .
   op $init-moduleinst-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $init-store-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Store [ctor] .
+  eq typecheck($init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), moduleinst) = true .
 
   --- Runtime-only bridge for memory stores and passive segment drops under
   --- a surrounding instruction suffix.  This belongs in the execution harness,

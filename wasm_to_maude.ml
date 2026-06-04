@@ -228,19 +228,16 @@ let write_file path text =
 let run_command_capture cmd =
   let ic = Unix.open_process_in cmd in
   let buf = Buffer.create 4096 in
-  Fun.protect
-    ~finally:(fun () ->
-      match Unix.close_process_in ic with
-      | Unix.WEXITED 0 -> ()
-      | _ -> fail ("command failed: " ^ cmd))
-    (fun () ->
-      (try
-         while true do
-           Buffer.add_string buf (input_line ic);
-           Buffer.add_char buf '\n'
-         done
-       with End_of_file -> ());
-      Buffer.contents buf)
+  (try
+     while true do
+       Buffer.add_string buf (input_line ic);
+       Buffer.add_char buf '\n'
+     done
+   with End_of_file -> ());
+  let out = Buffer.contents buf in
+  match Unix.close_process_in ic with
+  | Unix.WEXITED 0 -> out
+  | _ -> fail ("command failed: " ^ cmd ^ "\n" ^ out)
 
 let command_exists tool =
   Sys.command ("command -v " ^ Filename.quote tool ^ " >/dev/null 2>&1") = 0

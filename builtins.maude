@@ -14,11 +14,14 @@ mod WASM-BUILTINS is
   inc SPECTEC-CORE .
 
   vars N I W ACC B COUNT MOD : Int .
+  vars I1 I2 I3 S1 S2 K D : Int .
+  vars B1 B2 : Int .
   var BS : SpectecTerminals .
   vars SH V NT NT1 NT2 OP CVTOP C C1 C2 VAL1 VAL2 BT L : SpectecTerminal .
   vars INSTRS1 INSTRS2 TS : SpectecTerminals .
   var LANES : SpectecTerminals .
   op $v128lanes : SpectecTerminals -> SpectecTerminal [ctor] .
+  eq typecheck($v128lanes(LANES), vec) = true .
 
   --- Object-level numeric literal wrappers are the syntax representation.
   --- Runtime numeric helpers operate on their raw numeric payloads.
@@ -72,6 +75,13 @@ mod WASM-BUILTINS is
     if _and_(_>=_(B, 0), _<=_(B, 255)) .
 
   eq $wrap(NT1, NT2, C) = $unsigned-mod($raw-lit(C), _^_(2, $raw-lit(NT2))) .
+  eq $extend(NT1, NT2, CTORUA0, C) =
+      $unsigned-mod($raw-lit(C), _^_(2, $raw-lit(NT1))) .
+  eq $extend(NT1, NT2, CTORSA0, C) =
+      $inv-signed(
+        $raw-lit(NT2),
+        $signed($raw-lit(NT1), $unsigned-mod($raw-lit(C), _^_(2, $raw-lit(NT1))))
+      ) .
   eq $ibytes(NT, C) = $bytes-le(_quo_($raw-lit(NT), 8), $raw-lit(C)) .
   eq $nbytes(NT, C) = $ibytes($size(NT), C) .
   eq $inv-ibytes(NT, BS) = $from-bytes-le(BS, 1, 0) .
@@ -103,11 +113,142 @@ mod WASM-BUILTINS is
 
   eq $irev(N, I) = $inv-ibits(N, $reverse-bits($ibits(N, I))) .
 
+  --- Deterministic backend choices for SpecTec relaxed selectors that are
+  --- declared as hint(builtin). The source $relaxed2/$relaxed4 definitions
+  --- then take their ordinary index-0 branch.
+  eq $R-fmadd = 0 .
+  eq $R-fmin = 0 .
+  eq $R-fmax = 0 .
+  eq $R-idot = 0 .
+  eq $R-iq15mulr = 0 .
+  eq $R-trunc-u = 0 .
+  eq $R-trunc-s = 0 .
+  eq $R-swizzle = 0 .
+  eq $R-laneselect = 0 .
+
+  --- Integer bit operations marked hint(builtin) in the SpecTec source.
+  op $bitnot-bits : SpectecTerminals -> SpectecTerminals .
+  op $bitand-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $bitandnot-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $bitor-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $bitxor-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $clz-int : Int Int -> Int .
+  op $ctz-int : Int Int -> Int .
+  op $popcnt-int : Int Int -> Int .
+  op $shift-count : Int Int -> Int .
+  op $floor-div-pos : Int Int -> Int .
+  op $rotl-int : Int Int Int -> Int .
+  op $rotr-int : Int Int Int -> Int .
+
+  eq $bitnot-bits(eps) = eps .
+  ceq $bitnot-bits(B BS) = _-_(1, B) $bitnot-bits(BS)
+    if (B == 0) or (B == 1) .
+
+  eq $bitand-bits(eps, eps) = eps .
+  ceq $bitand-bits(B1 BS, B2 LANES) =
+      _*_(B1, B2) $bitand-bits(BS, LANES)
+    if ((B1 == 0) or (B1 == 1)) and ((B2 == 0) or (B2 == 1)) .
+
+  eq $bitandnot-bits(eps, eps) = eps .
+  ceq $bitandnot-bits(B1 BS, B2 LANES) =
+      _*_(B1, _-_(1, B2)) $bitandnot-bits(BS, LANES)
+    if ((B1 == 0) or (B1 == 1)) and ((B2 == 0) or (B2 == 1)) .
+
+  eq $bitor-bits(eps, eps) = eps .
+  ceq $bitor-bits(B1 BS, B2 LANES) =
+      1 $bitor-bits(BS, LANES)
+    if ((B1 == 0) or (B1 == 1)) and ((B2 == 0) or (B2 == 1)) and _>_(_+_(B1, B2), 0) .
+  ceq $bitor-bits(B1 BS, B2 LANES) =
+      0 $bitor-bits(BS, LANES)
+    if ((B1 == 0) or (B1 == 1)) and ((B2 == 0) or (B2 == 1)) and _==_(_+_(B1, B2), 0) .
+
+  eq $bitxor-bits(eps, eps) = eps .
+  ceq $bitxor-bits(B1 BS, B2 LANES) =
+      _rem_(_+_(B1, B2), 2) $bitxor-bits(BS, LANES)
+    if ((B1 == 0) or (B1 == 1)) and ((B2 == 0) or (B2 == 1)) .
+
+  eq $clz-int(0, I) = 0 .
+  ceq $clz-int(N, I) = 0
+    if _>_(N, 0) /\ _==_(_quo_(I, _^_(2, _-_(N, 1))), 1) .
+  ceq $clz-int(N, I) = _+_(1, $clz-int(_-_(N, 1), I))
+    if _>_(N, 0) /\ _==_(_quo_(I, _^_(2, _-_(N, 1))), 0) .
+
+  eq $ctz-int(0, I) = 0 .
+  ceq $ctz-int(N, I) = 0
+    if _>_(N, 0) /\ _==_(_rem_(I, 2), 1) .
+  ceq $ctz-int(N, I) = _+_(1, $ctz-int(_-_(N, 1), _quo_(I, 2)))
+    if _>_(N, 0) /\ _==_(_rem_(I, 2), 0) .
+
+  eq $popcnt-int(0, I) = 0 .
+  ceq $popcnt-int(N, I) = _+_(_rem_(I, 2), $popcnt-int(_-_(N, 1), _quo_(I, 2)))
+    if _>_(N, 0) .
+
+  eq $shift-count(N, I) = _rem_(I, N) .
+  ceq $floor-div-pos(I, D) = _quo_(I, D)
+    if _>=_(I, 0) .
+  ceq $floor-div-pos(I, D) =
+      _-_(0, _quo_(_+_(_-_(0, I), _-_(D, 1)), D))
+    if _<_(I, 0) .
+  eq $rotl-int(N, I, K) =
+      $unsigned-mod(
+        _+_(
+          _*_(I, _^_(2, K)),
+          _quo_(I, _^_(2, _-_(N, K)))
+        ),
+        _^_(2, N)
+      ) .
+  eq $rotr-int(N, I, K) =
+      _+_(
+        _quo_(I, _^_(2, K)),
+        _*_(_rem_(I, _^_(2, K)), _^_(2, _-_(N, K)))
+      ) .
+
+  eq $iclz(N, I) = $clz-int(N, $unsigned-mod($raw-lit(I), _^_(2, N))) .
+  eq $ictz(N, I) = $ctz-int(N, $unsigned-mod($raw-lit(I), _^_(2, N))) .
+  eq $ipopcnt(N, I) = $popcnt-int(N, $unsigned-mod($raw-lit(I), _^_(2, N))) .
+  eq $inot(N, I) = $inv-ibits(N, $bitnot-bits($ibits(N, $raw-lit(I)))) .
+  eq $iand(N, I1, I2) =
+      $inv-ibits(N, $bitand-bits($ibits(N, $raw-lit(I1)), $ibits(N, $raw-lit(I2)))) .
+  eq $iandnot(N, I1, I2) =
+      $inv-ibits(N, $bitandnot-bits($ibits(N, $raw-lit(I1)), $ibits(N, $raw-lit(I2)))) .
+  eq $ior(N, I1, I2) =
+      $inv-ibits(N, $bitor-bits($ibits(N, $raw-lit(I1)), $ibits(N, $raw-lit(I2)))) .
+  eq $ixor(N, I1, I2) =
+      $inv-ibits(N, $bitxor-bits($ibits(N, $raw-lit(I1)), $ibits(N, $raw-lit(I2)))) .
+  eq $ishl(N, I1, I2) =
+      $unsigned-mod(_*_(($raw-lit(I1)), _^_(2, $shift-count(N, $raw-lit(I2)))), _^_(2, N)) .
+  eq $ishr(N, CTORUA0, I1, I2) =
+      _quo_($raw-lit(I1), _^_(2, $shift-count(N, $raw-lit(I2)))) .
+  eq $ishr(N, CTORSA0, I1, I2) =
+      $inv-signed(N, $floor-div-pos($signed(N, I1), _^_(2, $shift-count(N, $raw-lit(I2))))) .
+  eq $irotl(N, I1, I2) = $rotl-int(N, $raw-lit(I1), $shift-count(N, $raw-lit(I2))) .
+  eq $irotr(N, I1, I2) = $rotr-int(N, $raw-lit(I1), $shift-count(N, $raw-lit(I2))) .
+  eq $iavgr(N, CTORUA0, I1, I2) = _quo_(_+_(_+_($raw-lit(I1), $raw-lit(I2)), 1), 2) .
+  eq $ibitselect(N, I1, I2, I3) =
+      $inv-ibits(
+        N,
+        $bitor-bits(
+          $bitand-bits($ibits(N, $raw-lit(I1)), $ibits(N, $raw-lit(I3))),
+          $bitandnot-bits($ibits(N, $raw-lit(I2)), $ibits(N, $raw-lit(I3)))
+        )
+      ) .
+  eq $irelaxed-laneselect(N, I1, I2, I3) = $ibitselect(N, I1, I2, I3) .
+
+  --- Q15 multiply-round-saturate builtins from SpecTec hint(builtin).
+  op $q15-round : Int Int -> Int .
+  eq $q15-round(S1, S2) =
+      $floor-div-pos(_+_(_*_(S1, S2), 16384), 32768) .
+  eq $iq15mulr-sat(16, CTORSA0, I1, I2) =
+      $inv-signed(16, $sat-s(16, $q15-round($signed(16, I1), $signed(16, I2)))) .
+  eq $irelaxed-q15mulr(16, CTORSA0, I1, I2) =
+      $iq15mulr-sat(16, CTORSA0, I1, I2) .
+
   --- Vector lane packing/unpacking.
   --- Until byte-level v128 packing is implemented, this backend supports
   --- the canonical executable representation used by tests: a vector value
   --- may be represented directly as its lane sequence.
   eq $lanes(SH, $v128lanes(LANES)) = LANES .
+  eq $inv-lanes(SH, $seq(LANES)) = $v128lanes(LANES) .
   eq $inv-lanes(SH, LANES) = $v128lanes(LANES) .
   eq $lanes(SH, V) = V [owise] .
 endm
