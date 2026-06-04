@@ -19,6 +19,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,6 +39,26 @@ WAST_NUM_TYPES = {
     "f64": "F64",
 }
 NAN_EXPECT_RE = re.compile(r"__EXPECT_(F32|F64)_NAN__")
+OFFICIAL_CORE_ROOT = ROOT / "benchmarks" / "external" / "webassembly-spec" / "test" / "core"
+OFFICIAL_FEATURE_DIRS = {
+    "bulk-memory",
+    "exceptions",
+    "gc",
+    "memory64",
+    "multi-memory",
+    "relaxed-simd",
+    "simd",
+}
+PROBLEM_STATUSES = {
+    "STEPPED",
+    "STUCK_STEP",
+    "WABT_FAIL",
+    "WRONG_RESULT",
+    "FAIL",
+    "FRONTEND_FAIL",
+    "STUCK_INIT",
+    "STUCK_VALIDATION",
+}
 
 
 @dataclass
@@ -691,6 +712,27 @@ def discover_bench_files(roots: list[Path]) -> list[Path]:
     return sorted(set(files), key=key)
 
 
+def feature_of_path(path_text: str) -> str:
+    path = Path(path_text)
+    try:
+        rel = path.relative_to(OFFICIAL_CORE_ROOT)
+    except ValueError:
+        try:
+            rel = path.relative_to(ROOT)
+        except ValueError:
+            rel = path
+    parts = rel.parts
+    if not parts:
+        return "unknown"
+    if parts[0] in OFFICIAL_FEATURE_DIRS:
+        return parts[0]
+    if "webassembly-spec" in path.parts:
+        return "core"
+    if len(parts) >= 2:
+        return parts[0]
+    return path.parent.name or "unknown"
+
+
 def generated_maude_command(maude: str, generated: Path, command: str, timeout: int) -> tuple[int, str]:
     with tempfile.NamedTemporaryFile("w", suffix=".maude", delete=False) as cmd_file:
         cmd_file.write(f"load {generated}\n{command}\nq\n")
@@ -796,10 +838,35 @@ def run_stage_probe(
                 instantiate_status=init_status,
                 result_status=init_status,
             )
+        if mode == "wast-module-stage":
+            return Result(
+                suite,
+                path.stem,
+                rel,
+                mode,
+                "MODULE_STAGE",
+                "",
+                "",
+                "module-stage probe instantiated without an expected assertion",
+                parse_status="GENERATED",
+                validation_status="FRONTEND_VALIDATED",
+                instantiate_status="INSTANTIATED",
+                step_status="MODULE_STAGE",
+                result_status="MODULE_STAGE",
+            )
         step_status, step_observed, step_reason = run_step_stage(
             cli, maude, path, timeout, rewrite_limit=rewrite_limit
         )
-        final_status = step_status if step_status != "STEPPED" else "STEPPED"
+        final_status = (
+            "MODULE_STAGE"
+            if mode == "wast-module-stage" and step_status == "STEPPED"
+            else step_status
+        )
+        reason = (
+            "module-stage probe terminated without an expected assertion"
+            if final_status == "MODULE_STAGE"
+            else step_reason
+        )
         return Result(
             suite,
             path.stem,
@@ -808,7 +875,7 @@ def run_stage_probe(
             final_status,
             "",
             step_observed,
-            step_reason,
+            reason,
             parse_status="GENERATED",
             validation_status="FRONTEND_VALIDATED",
             instantiate_status="INSTANTIATED",
@@ -853,6 +920,8 @@ def observed_has_nan_const(text: str, typ: str) -> bool:
 def packed_v128_lanes(value: str) -> int | None:
     lanes = [part for part in value.split() if part]
     if not lanes:
+        return None
+    if any(re.fullmatch(r"[+-]?\d+", lane) is None for lane in lanes):
         return None
     width_by_count = {16: 8, 8: 16, 4: 32, 2: 64, 1: 128}
     width = width_by_count.get(len(lanes))
@@ -934,6 +1003,8 @@ def maude_num_alternatives(typ: str, value: str | None) -> list[str] | None:
             return [f"__EXPECT_{source_typ}_NAN__"]
         return [wrapped_num_const(source_typ, value)]
     if typ == "v128":
+        if any(re.fullmatch(r"[+-]?\d+", lane) is None for lane in value.split()):
+            return None
         alts = [f"CTORVCONSTA2(CTORV128A0, $v128lanes({value}))"]
         packed = packed_v128_lanes(value)
         if packed is not None:
@@ -1021,6 +1092,24 @@ def expected_terms(expected: list[dict]) -> str | None:
     return " || ".join(alternatives)
 
 
+def expected_terms_for_assert_return(cmd: dict) -> tuple[str | None, str]:
+    if cmd.get("expected") is not None:
+        expected = expected_terms(cmd.get("expected", []))
+        reason = "" if expected is not None else "only numeric/ref expected results are supported"
+        return expected, reason
+    if cmd.get("either") is not None:
+        alternatives: list[str] = []
+        for item in cmd.get("either", []):
+            items = item if isinstance(item, list) else [item]
+            expected = expected_terms(items)
+            if expected is None:
+                return None, "only numeric/ref either expected results are supported"
+            alternatives.extend(part.strip() for part in expected.split(" || ") if part.strip())
+        if alternatives:
+            return " || ".join(alternatives), ""
+    return None, "wast2json omitted expected value"
+
+
 def observed_result_arity(observed: str) -> int:
     observed = observed.strip()
     if not observed or observed == "eps":
@@ -1060,7 +1149,8 @@ def run_wast_assert(
     if invoke_flags is None:
         return Result("spec-tests", name, str(path), "wast-assert", "UNSUPPORTED", "", "", "cannot pass export name through argv")
     if cmd.get("type") == "assert_return":
-        if cmd.get("expected") is None:
+        expected, expected_reason = expected_terms_for_assert_return(cmd)
+        if expected is None:
             return Result(
                 "spec-tests",
                 name,
@@ -1069,11 +1159,8 @@ def run_wast_assert(
                 "UNSUPPORTED",
                 "",
                 "",
-                "wast2json omitted expected value, usually for nondeterministic/either assertion",
+                expected_reason,
             )
-        expected = expected_terms(cmd.get("expected", []))
-        if expected is None:
-            return Result("spec-tests", name, str(path), "wast-assert-return", "UNSUPPORTED", "", "", "only numeric/ref expected results are supported")
     elif cmd.get("type") == "assert_trap":
         expected = "CTORTRAPA0"
     else:
@@ -1291,7 +1378,7 @@ def run_wast_probe(
             ]
         count = 0
         for cmd in data.get("commands", []):
-            if count >= max_modules:
+            if max_modules > 0 and count >= max_modules:
                 break
             if cmd.get("type") != "module":
                 continue
@@ -1466,7 +1553,7 @@ def run_wast_probe(
                     failed_prelude_by_module[wasm_key] = action_result.name
                 continue
             if cmd.get("type") == "assert_invalid":
-                if asserts >= max_asserts:
+                if max_asserts > 0 and asserts >= max_asserts:
                     break
                 filename = cmd.get("filename")
                 if not filename:
@@ -1496,7 +1583,7 @@ def run_wast_probe(
                 continue
             if cmd.get("type") not in {"assert_return", "assert_trap"}:
                 continue
-            if asserts >= max_asserts:
+            if max_asserts > 0 and asserts >= max_asserts:
                 break
             action = cmd.get("action", {})
             action_module = action.get("module")
@@ -1513,6 +1600,7 @@ def run_wast_probe(
             wasm_key = str(wasm)
             failed_prelude = failed_prelude_by_module.get(wasm_key)
             if failed_prelude is not None:
+                expected, _expected_reason = expected_terms_for_assert_return(cmd)
                 results.append(
                     Result(
                         "spec-tests",
@@ -1520,7 +1608,7 @@ def run_wast_probe(
                         str(path),
                         "wast-assert",
                         "STUCK_STEP",
-                        expected_terms(cmd.get("expected", [])) or "",
+                        expected or "",
                         "",
                         f"previous stateful action did not finish: {failed_prelude}",
                         "PARSED",
@@ -1548,7 +1636,12 @@ def run_wast_probe(
             results.append(result)
             if cmd.get("type") == "assert_return" and result.status == "PASS":
                 remember_memory_growth(wasm, action, result.observed)
-                spec = action_prelude_spec(action, len(cmd.get("expected", [])), wasm, timeout)
+                spec = action_prelude_spec(
+                    action,
+                    observed_result_arity(result.observed),
+                    wasm,
+                    timeout,
+                )
                 if spec is not None:
                     prelude_by_module.setdefault(wasm_key, []).append(spec)
             asserts += 1
@@ -1602,6 +1695,69 @@ def write_csv(path: Path, rows: list[Result]) -> None:
             )
 
 
+def write_feature_reports(artifact_dir: Path, rows: list[Result]) -> None:
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    feature_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    file_counts: dict[tuple[str, str, str], Counter[str]] = defaultdict(Counter)
+    for row in rows:
+        feature = feature_of_path(row.path)
+        feature_counts[feature][row.status] += 1
+        file_counts[(feature, row.path, row.mode)][row.status] += 1
+
+    with (artifact_dir / "feature_summary.csv").open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["feature", "status", "count"])
+        for feature in sorted(feature_counts):
+            for status, count in sorted(feature_counts[feature].items()):
+                writer.writerow([feature, status, count])
+
+    with (artifact_dir / "file_status_summary.csv").open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["feature", "path", "mode", "status", "count"])
+        for (feature, path, mode), counts in sorted(file_counts.items()):
+            for status, count in sorted(counts.items()):
+                writer.writerow([feature, path, mode, status, count])
+
+    with (artifact_dir / "problem_cases.csv").open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "feature",
+                "suite",
+                "name",
+                "path",
+                "mode",
+                "status",
+                "step_status",
+                "expected",
+                "observed",
+                "reason",
+            ]
+        )
+        for row in rows:
+            if row.status not in PROBLEM_STATUSES:
+                continue
+            writer.writerow(
+                [
+                    feature_of_path(row.path),
+                    row.suite,
+                    row.name,
+                    row.path,
+                    row.mode,
+                    row.status,
+                    row.step_status,
+                    row.expected,
+                    row.observed,
+                    row.reason,
+                ]
+            )
+
+
+def write_reports(artifact_dir: Path, rows: list[Result]) -> None:
+    write_csv(artifact_dir / "benchmark_results.csv", rows)
+    write_feature_reports(artifact_dir, rows)
+
+
 def print_summary(rows: list[Result]) -> None:
     counts: dict[str, int] = {}
     for r in rows:
@@ -1609,6 +1765,23 @@ def print_summary(rows: list[Result]) -> None:
     print("Benchmark summary:")
     for status in sorted(counts):
         print(f"  {status}: {counts[status]}")
+    feature_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    for row in rows:
+        feature_counts[feature_of_path(row.path)][row.status] += 1
+    if feature_counts:
+        print("Feature problem summary:")
+        for feature in sorted(feature_counts):
+            problems = {
+                status: count
+                for status, count in feature_counts[feature].items()
+                if status in PROBLEM_STATUSES
+            }
+            if not problems:
+                continue
+            rendered = ", ".join(
+                f"{status}: {count}" for status, count in sorted(problems.items())
+            )
+            print(f"  {feature}: {rendered}")
 
 
 def main() -> int:
@@ -1649,9 +1822,15 @@ def main() -> int:
     args = parser.parse_args()
 
     rows: list[Result] = []
+    artifact_dir = ROOT / args.artifact_dir
+
+    def flush_reports() -> None:
+        write_reports(artifact_dir, rows)
+
     if not args.skip_smokes:
         rows.extend(run_smokes(args.cli, args.maude, args.timeout))
         rows.extend(run_invalid_smokes(args.cli, args.maude, args.timeout))
+        flush_reports()
 
     external_files: list[Path] = []
     if not args.skip_external:
@@ -1660,7 +1839,14 @@ def main() -> int:
         external_files = discover_bench_files(roots)
     if args.max_external_files > 0:
         external_files = external_files[: args.max_external_files]
-    for path in external_files:
+    total_external = len(external_files)
+    for index, path in enumerate(external_files, start=1):
+        rel_for_progress = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+        print(
+            f"[{index}/{total_external}] {rel_for_progress}",
+            file=sys.stderr,
+            flush=True,
+        )
         if args.max_file_bytes > 0 and path.suffix in {".wat", ".wasm"}:
             try:
                 size = path.stat().st_size
@@ -1679,6 +1865,7 @@ def main() -> int:
                         f"{size} bytes > {args.max_file_bytes}",
                     )
                 )
+                flush_reports()
                 continue
         if "wat_examples" in path.parts:
             # Local examples are already run by the frontend/runtime smoke suite.
@@ -1705,11 +1892,13 @@ def main() -> int:
                     rewrite_limit=args.rewrite_limit,
                 )
             )
+        flush_reports()
 
-    artifact_dir = ROOT / args.artifact_dir
-    write_csv(artifact_dir / "benchmark_results.csv", rows)
+    flush_reports()
     print_summary(rows)
     print(f"CSV: {artifact_dir / 'benchmark_results.csv'}")
+    print(f"Feature summary: {artifact_dir / 'feature_summary.csv'}")
+    print(f"Problem cases: {artifact_dir / 'problem_cases.csv'}")
 
     smoke_failed = any(r.suite == "wat_examples" and r.status != "PASS" for r in rows)
     invalid_failed = any(r.suite == "wat_examples_invalid" and r.status != "PASS" for r in rows)
