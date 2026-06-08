@@ -496,15 +496,75 @@ let compact_surface_is_ident_char = function
   | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '-' | '$' -> true
   | _ -> false
 
+let maude_keywords =
+  [ "if"; "var"; "op"; "eq"; "sort"; "mod"; "quo"; "rem"; "or"; "and"; "not" ]
+
+let maude_source_op_token name =
+  let lowered = String.lowercase_ascii (String.trim name) in
+  if lowered = "" then lowered
+  else if List.mem lowered maude_keywords then "w-" ^ lowered
+  else lowered
+
 let compact_surface_token_aliases =
   [
-    ("ANYCONVERTEXTERN", "ANY-CONVERT-EXTERN");
-    ("EXTERNCONVERTANY", "EXTERN-CONVERT-ANY");
-    ("REFASNONNULL", "REF-AS-NON-NULL");
-    ("REFEQ", "REF-EQ");
-    ("REFI31", "REF-I31");
-    ("REFISNULL", "REF-IS-NULL");
-    ("THROWREF", "THROW-REF");
+    ("ABS", "abs");
+    ("ADD", "add");
+    ("ANY", "any");
+    ("ANYCONVERTEXTERN", "any-convert-extern");
+    ("ARRAY", "array");
+    ("CEIL", "ceil");
+    ("CLZ", "clz");
+    ("COPYSIGN", "copysign");
+    ("CTZ", "ctz");
+    ("DECLARE", "declare");
+    ("DEMOTE", "demote");
+    ("DIV", "div");
+    ("EQZ", "eqz");
+    ("EXN", "exn");
+    ("EXTERN", "extern");
+    ("EXTERNCONVERTANY", "extern-convert-any");
+    ("F32", "f32");
+    ("F64", "f64");
+    ("FINAL", "final");
+    ("FLOOR", "floor");
+    ("FUNC", "func");
+    ("GE", "ge");
+    ("GT", "gt");
+    ("I31", "i31");
+    ("I32", "i32");
+    ("I64", "i64");
+    ("LE", "le");
+    ("LT", "lt");
+    ("MAX", "max");
+    ("MIN", "min");
+    ("MUL", "mul");
+    ("MUT", "mut");
+    ("NE", "ne");
+    ("NEAREST", "nearest");
+    ("NEG", "neg");
+    ("NULL", "null");
+    ("PASSIVE", "passive");
+    ("POPCNT", "popcnt");
+    ("PROMOTE", "promote");
+    ("REFASNONNULL", "ref-as-non-null");
+    ("REFEQ", "ref-eq");
+    ("REFI31", "ref-i31");
+    ("REFISNULL", "ref-is-null");
+    ("REINTERPRET", "reinterpret");
+    ("S", "s");
+    ("SQRT", "sqrt");
+    ("STRUCT", "struct");
+    ("SUB", "sub");
+    ("THROWREF", "throw-ref");
+    ("TRUNC", "trunc");
+    ("U", "u");
+    ("V128", "v128");
+    ("WAND", "w-and");
+    ("WEQ", "w-eq");
+    ("WOR", "w-or");
+    ("WREM", "w-rem");
+    ("WRAP", "wrap");
+    ("XOR", "xor");
   ]
 
 let replace_compact_surface_token_aliases text =
@@ -564,27 +624,64 @@ let compact_prefix_name old sections =
     |> List.filter (fun s -> s <> "")
   in
   match meaningful with
-  | [single] -> single
+  | [single] -> maude_source_op_token single
   | _ ->
       let components =
         meaningful
         |> List.map compact_prefix_component
         |> List.filter (fun s -> s <> "")
       in
-      if components <> [] then String.concat "" components
+      if components <> [] then maude_source_op_token (String.concat "" components)
       else
         let rec trim = function
           | s when s <> "" && s.[String.length s - 1] = '_' ->
               trim (String.sub s 0 (String.length s - 1))
           | s -> s
         in
-        trim old
+        maude_source_op_token (trim old)
 
 let render_compact_surface sections args =
   let _ = compact_surface_needs_parens in
   let op_name = compact_prefix_name "" sections in
   if args = [] then op_name
   else op_name ^ "(" ^ String.concat ", " (List.map String.trim args) ^ ")"
+
+let source_surface_atom_of_compact_atom atom =
+  let atom = String.trim atom in
+  match atom with
+  | "WAND" -> "w-and"
+  | "WEQ" -> "w-eq"
+  | "WOR" -> "w-or"
+  | "WREM" -> "w-rem"
+  | _ ->
+  let is_source_like =
+    let n = String.length atom in
+    n > 0
+    &&
+    ((atom.[0] >= 'A' && atom.[0] <= 'Z')
+     || (n > 3 && String.sub atom 0 3 = "w--"
+         && atom.[3] >= 'A' && atom.[3] <= 'Z'))
+    && String.for_all
+         (fun c ->
+            (c >= 'A' && c <= 'Z')
+            || (c >= '0' && c <= '9')
+            || (n > 3 && String.sub atom 0 3 = "w--" && c = '-'))
+         (if n > 3 && String.sub atom 0 3 = "w--"
+          then String.sub atom 3 (n - 3)
+          else atom)
+  in
+  if is_source_like then maude_source_op_token atom else atom
+
+let source_surface_plain_atom_sequence text =
+  let text = String.trim text in
+  if text = "" then text
+  else
+    text
+    |> String.split_on_char ' '
+    |> List.map String.trim
+    |> List.filter (fun tok -> tok <> "")
+    |> List.map source_surface_atom_of_compact_atom
+    |> String.concat " "
 
 let source_surface_syntax_of_compact text =
   let len = String.length text in
@@ -686,7 +783,33 @@ let source_surface_syntax_of_compact text =
             loop (i + 1)
     in
     loop 0;
-    Buffer.contents b
+    let rendered = Buffer.contents b in
+    let simple_atom =
+      let t = String.trim s in
+      t <> ""
+      && not
+           (String.exists
+              (function
+                | ' ' | '\n' | '\r' | '\t' | '(' | ')' | ',' -> true
+                | _ -> false)
+              t)
+    in
+    let plain_atom_sequence =
+      let t = String.trim s in
+      t <> ""
+      && not
+           (String.exists
+              (function
+                | '(' | ')' | ',' -> true
+                | _ -> false)
+              t)
+      && String.exists
+           (function ' ' | '\n' | '\r' | '\t' -> true | _ -> false)
+           t
+    in
+    if simple_atom then source_surface_atom_of_compact_atom rendered
+    else if plain_atom_sequence then source_surface_plain_atom_sequence rendered
+    else rendered
   in
   ignore find_matching_paren;
   convert text |> replace_compact_surface_token_aliases

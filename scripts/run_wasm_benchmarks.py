@@ -496,7 +496,7 @@ def whitespace_free(text: str) -> str:
 
 def maude_compare_key(text: str) -> str:
     """Normalize prefix and readable Maude result spellings for substring checks."""
-    return re.sub(r"[\s(),_]+", "", text)
+    return re.sub(r"[\s(),_]+", "", text).lower()
 
 
 def wasm2wat_text(wasm: Path, timeout: int) -> str:

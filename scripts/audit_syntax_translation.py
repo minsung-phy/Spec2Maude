@@ -31,6 +31,7 @@ class OpDecl:
     arrow: str
     holes: int
     line: int
+    result_sort: str
 
 
 def normalize_ws(text: str) -> str:
@@ -102,19 +103,60 @@ def collect_statements(text: str) -> list[tuple[int, str]]:
 def parse_op_decls(text: str) -> list[OpDecl]:
     decls: list[OpDecl] = []
     op_re = re.compile(
-        r"^\s*op\s+(.+?)\s*:\s+(.+?)\s+(~>|->)\s+SpectecTerminal\b"
+        r"^\s*op\s+(.+?)\s*:\s*(.*?)\s+(~>|->)\s+(SpectecTerminal|SpectecType)\b"
     )
     for line_no, line in enumerate(text.splitlines(), 1):
         m = op_re.match(line)
         if not m:
             continue
         surface = normalize_ws(m.group(1))
-        holes = sum(1 for part in surface.split() if part == "_")
-        decls.append(OpDecl(surface, normalize_ws(m.group(2)), m.group(3), holes, line_no))
+        arg_sorts = normalize_ws(m.group(2))
+        surface_holes = sum(1 for part in surface.split() if part == "_")
+        arg_count = 0 if not arg_sorts else len(arg_sorts.split())
+        arity = surface_holes if surface_holes > 0 else arg_count
+        decls.append(OpDecl(surface, arg_sorts, m.group(3), arity, line_no, m.group(4)))
     return decls
 
 
+def split_top_level_commas(text: str) -> list[str]:
+    parts: list[str] = []
+    start = 0
+    depth = 0
+    quote = False
+    for i, ch in enumerate(text):
+        if ch == "'":
+            quote = not quote
+        elif not quote and ch in "([{":
+            depth += 1
+        elif not quote and ch in ")]}":
+            depth = max(0, depth - 1)
+        elif not quote and depth == 0 and ch == ",":
+            part = text[start:i].strip()
+            if part:
+                parts.append(part)
+            start = i + 1
+    tail = text[start:].strip()
+    if tail:
+        parts.append(tail)
+    return parts
+
+
+def parse_prefix_call(text: str) -> tuple[str, list[str]] | None:
+    text = strip_outer_parens(text)
+    m = re.match(r"^([A-Za-z_$][A-Za-z0-9_$-]*)\s*\((.*)\)$", text, re.S)
+    if not m:
+        return None
+    return m.group(1), split_top_level_commas(m.group(2))
+
+
 def match_surface(surface: str, lhs: str) -> bool:
+    prefix = parse_prefix_call(lhs)
+    if "_" not in surface.split():
+        arity = len(surface.split()) - 1 if " " in surface else None
+        if prefix is None:
+            return lhs_key(lhs) == surface
+        head, args = prefix
+        return head == surface and (arity is None or len(args) == arity)
     pattern = surface.split()
     terms = split_top_level_terms(lhs)
     i = 0
@@ -131,6 +173,14 @@ def match_surface(surface: str, lhs: str) -> bool:
 
 
 def matching_ops(op_decls: list[OpDecl], lhs: str) -> list[OpDecl]:
+    prefix = parse_prefix_call(lhs)
+    if prefix is not None:
+        head, args = prefix
+        return [
+            decl
+            for decl in op_decls
+            if decl.surface == head and decl.holes == len(args)
+        ]
     return [decl for decl in op_decls if match_surface(decl.surface, lhs)]
 
 
@@ -179,11 +229,12 @@ def condition_typecheck_vars(cond: str) -> set[str]:
 
 
 def lhs_vars(lhs: str) -> set[str]:
-    tokens = split_top_level_terms(lhs)
     vars_: set[str] = set()
-    for tok in tokens:
-        if re.match(r"^[A-Z][A-Z0-9_-]*$", tok):
-            vars_.add(tok)
+    for m in re.finditer(r"\b([A-Z][A-Z0-9_-]*)\b", lhs):
+        rest = lhs[m.end() :]
+        if re.match(r"\s*\(", rest):
+            continue
+        vars_.add(m.group(1))
     return vars_
 
 
@@ -207,10 +258,97 @@ def statement_condition_has_eq_true(stmt: str) -> bool:
     return re.search(r"typecheck\s*\([^)]*\)\s*=\s*true\b", m.group(1)) is not None
 
 
-def audit_output(output_path: Path) -> tuple[list[str], list[str]]:
+def condition_has_lhs_membership(cond: str, lhs: str) -> bool:
+    normalized = normalize_ws(cond)
+    candidates = [
+        normalize_ws(f"( {lhs} ) : SpectecTerminal"),
+        normalize_ws(f"{lhs} : SpectecTerminal"),
+    ]
+    return any(candidate in normalized for candidate in candidates)
+
+
+def source_key(text: str) -> str:
+    text = text.strip().strip("`")
+    text = re.sub(r"[^A-Za-z0-9_$]+", "-", text)
+    text = re.sub(r"-+", "-", text).strip("-")
+    return text
+
+
+def audit_source_type_constructor_overlap(
+    source_dir: Path, op_decls: list[OpDecl]
+) -> list[str]:
+    if not source_dir.exists():
+        return [f"source directory not found for SpectecType audit: {source_dir}"]
+
+    type_heads: set[str] = set()
+    alt_heads: set[str] = set()
+    syntax_re = re.compile(r"^\s*syntax\s+([A-Za-z_$][A-Za-z0-9_$'-]*)")
+    alt_re = re.compile(r"^\s*\|\s*([A-Za-z_$][A-Za-z0-9_.$'-]*)")
+    for path in sorted(source_dir.rglob("*.spectec")):
+        for raw in path.read_text(errors="ignore").splitlines():
+            line = raw.split("---", 1)[0]
+            m = syntax_re.match(line)
+            if m:
+                type_heads.add(source_key(m.group(1)))
+            m = alt_re.match(line)
+            if m:
+                alt_heads.add(source_key(m.group(1)))
+
+    overlaps = sorted(h for h in alt_heads & type_heads if h)
+    if not overlaps:
+        return []
+
+    terminal_ops = {
+        (decl.surface, decl.holes)
+        for decl in op_decls
+        if decl.result_sort == "SpectecTerminal"
+    }
+    type_ops = {
+        (decl.surface, decl.holes)
+        for decl in op_decls
+        if decl.result_sort == "SpectecType"
+    }
+    warnings: list[str] = []
+    for head in overlaps:
+        terminal_arities = sorted(arity for surface, arity in terminal_ops if surface == head)
+        type_arities = sorted(arity for surface, arity in type_ops if surface == head)
+        if terminal_arities and not type_arities:
+            warnings.append(
+                "source head appears both as syntax alternative and syntax type name, "
+                f"but only SpectecTerminal op was generated: {head}"
+            )
+        elif terminal_arities and type_arities:
+            warnings.append(
+                "source head appears in both terminal/type roles and has both generated op families: "
+                f"{head} terminal arities={terminal_arities}, type arities={type_arities}"
+            )
+    return warnings
+
+
+def audit_generated_terminal_type_overlaps(op_decls: list[OpDecl]) -> list[str]:
+    terminal_ops = {
+        (decl.surface, decl.holes)
+        for decl in op_decls
+        if decl.result_sort == "SpectecTerminal"
+    }
+    type_ops = {
+        (decl.surface, decl.holes)
+        for decl in op_decls
+        if decl.result_sort == "SpectecType"
+    }
+    overlaps = sorted(terminal_ops & type_ops)
+    return [
+        "generated op has both SpectecTerminal and SpectecType result roles: "
+        f"{surface}/{arity}"
+        for surface, arity in overlaps
+    ]
+
+
+def audit_output(output_path: Path, source_dir: Path) -> tuple[list[str], list[str]]:
     text = output_path.read_text()
     statements = collect_statements(text)
     ops = parse_op_decls(text)
+    terminal_ops = [decl for decl in ops if decl.result_sort == "SpectecTerminal"]
     mb, cmb, memberships = parse_terminal_memberships(statements)
     all_memberships = mb | cmb
     failures: list[str] = []
@@ -233,7 +371,7 @@ def audit_output(output_path: Path) -> tuple[list[str], list[str]]:
         if statement_condition_has_eq_true(stmt):
             failures.append(f"condition keeps trailing '= true' at {output_path}:{line}")
 
-    nullary = {decl.surface: decl for decl in ops if decl.holes == 0}
+    nullary = {decl.surface: decl for decl in terminal_ops if decl.holes == 0}
     for line, kind, lhs in memberships:
         if lhs in nullary:
             failures.append(
@@ -243,7 +381,7 @@ def audit_output(output_path: Path) -> tuple[list[str], list[str]]:
     for line, kind, lhs in memberships:
         if kind != "cmb":
             continue
-        matches = matching_ops(ops, lhs)
+        matches = matching_ops(terminal_ops, lhs)
         if not matches:
             warnings.append(f"no op declaration matched cmb lhs '{lhs}' at {output_path}:{line}")
             continue
@@ -255,7 +393,7 @@ def audit_output(output_path: Path) -> tuple[list[str], list[str]]:
             )
 
     for line, lhs, cond in parse_constructor_typechecks(statements):
-        matches = [decl for decl in matching_ops(ops, lhs) if decl.holes > 0]
+        matches = [decl for decl in matching_ops(terminal_ops, lhs) if decl.holes > 0]
         if not matches:
             continue
         actual_arg_guard = condition_has_actual_arg_guard(cond, lhs_vars(lhs))
@@ -263,6 +401,16 @@ def audit_output(output_path: Path) -> tuple[list[str], list[str]]:
             failures.append(
                 f"missing terminal cmb/mb for conditional constructor typecheck "
                 f"'{lhs}' at {output_path}:{line}"
+            )
+        if actual_arg_guard and lhs in all_memberships:
+            failures.append(
+                f"constructor typecheck duplicates actual argument guard instead of "
+                f"using terminal membership for '{lhs}' at {output_path}:{line}"
+            )
+        if lhs in all_memberships and not condition_has_lhs_membership(cond, lhs):
+            failures.append(
+                f"constructor typecheck with terminal membership does not guard on "
+                f"'{lhs} : SpectecTerminal' at {output_path}:{line}"
             )
 
     concrete_patterns = [
@@ -273,6 +421,9 @@ def audit_output(output_path: Path) -> tuple[list[str], list[str]]:
         if re.search(pattern, text):
             failures.append("parameterized binop/relop was flattened to concrete I32/I64 cases")
             break
+
+    warnings.extend(audit_source_type_constructor_overlap(source_dir, ops))
+    warnings.extend(audit_generated_terminal_type_overlaps(ops))
 
     return failures, warnings
 
@@ -300,12 +451,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("output", nargs="?", default="output.maude")
     parser.add_argument("--translator", default="translator.ml")
+    parser.add_argument("--source-dir", default="wasm-3.0")
     parser.add_argument("--strict-translator", action="store_true")
     args = parser.parse_args()
 
     output_path = Path(args.output)
     translator_path = Path(args.translator)
-    failures, warnings = audit_output(output_path)
+    source_dir = Path(args.source_dir)
+    failures, warnings = audit_output(output_path, source_dir)
     tr_failures, tr_warnings = audit_translator(translator_path, args.strict_translator)
     failures.extend(tr_failures)
     warnings.extend(tr_warnings)

@@ -1,6 +1,6 @@
 # Spec2Maude Status
 
-Updated: 2026-06-03
+Updated: 2026-06-08
 
 ## One-Line State
 
@@ -85,15 +85,21 @@ checks, then by direct source-shaped execution.  Latest local checks:
 ```text
 make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
-maude -no-banner output.maude                        PASS, no warnings
-maude -no-banner wasm-exec.maude                     PASS, no warnings
+maude -no-banner output.maude                        PASS, warnings: 164, no-parse: 0
+maude -no-banner wasm-exec.maude                     PASS, warnings: 177, no-parse: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
 ./spec2maude run wat_examples/fib.wat --fib 5        PASS
 ./spec2maude run wat_examples/data-load.wat          PASS
 ./spec2maude test smoke --timeout 10                 PASS: 13
-./spec2maude test official --limit 30 --timeout 5    PASS: 111, STEPPED: 22, STUCK_STEP: 3
+./spec2maude test official --limit 30 --timeout 5    PASS: 45, MODULE_STAGE: 43, INVALID: 10,
+                                                     STUCK_INIT: 13, STUCK_STEP: 67,
+                                                     WRONG_RESULT: 3
 ```
+
+The Maude warnings above are parser ambiguity warnings, not load failures.
+They should still be reduced, but current load checks have zero errors, zero
+bad tokens, and zero no-parse diagnostics.
 
 Larger official/external benchmark tables should still be regenerated after
 translator/runtime changes:
@@ -106,11 +112,15 @@ translator/runtime changes:
 Bucket meanings:
 
 - `PASS`: execution result matched the expected result.
+- `MODULE_STAGE`: an official `.wast` command was module/linking/setup only and
+  was not a runtime assertion to compare.
 - `STEPPED`: execution terminated, but no expected result was available.
 - `INVALID`: input was rejected before runtime.
 - `NO_ENTRY`: no exported/main entry was available to call.
 - `IMPORT_MISSING`: required host import was not supplied.
 - `UNSUPPORTED`: frontend/runner does not support the syntax yet.
+- `STUCK_INIT`: initialization, instantiation, or harness state setup stuck or
+  timed out.
 - `STUCK_VALIDATION`: experimental Maude validation path stuck or timed out
   when that debug path is explicitly enabled.
 - `STUCK_STEP`: dynamic execution stuck or timed out.
@@ -123,13 +133,17 @@ Resolved:
 - old `step-from-step-pure-*` bridge rules are gone;
 - old `$is-spectec-val-seq` guard is gone;
 - the JHS-style `SpectecType`/`typecheck` syntax carrier is restored;
+- source category/type witnesses are consistently generated as `syn-*`
+  `SpectecType` terms, for example `syn-instr`, `syn-func`, and `syn-i32`;
 - source syntax constructors are generated over the broad `SpectecTerminal`
-  carrier instead of source category Maude sorts;
-- source category validity is generated as `typecheck(term, category-term)`;
+  carrier instead of source category Maude sorts; their Maude surface names are
+  source-readable lowercase constructors such as `const(i32, 5)` and
+  `local-get(0)`;
+- source category validity is generated as `typecheck(term, syn-category-term)`;
 - syntax constructor cases also emit `mb`/`cmb` membership on
   `SpectecTerminal`;
 - numeric literal payloads are raw Maude numerals again, classified through
-  source-derived `typecheck(raw-number, numeric-type)` equations;
+  source-derived `typecheck(raw-number, syn-numeric-type)` equations;
 - bulk source category sort/subsort generation is removed from the syntax path;
 - generated WAT harnesses no longer include `Module-ok` checked-run code unless
   explicitly requested with the debug path.
@@ -148,14 +162,17 @@ Still worth discussing:
    - full source profile: includes all SpecTec validation definitions;
    - runtime profile: excludes static validation from the runtime artifact or
      erases validation premises after external validation.
-2. Continue reducing source-absent helpers in `output.maude`.
-3. Continue improving official `.wast` runner support for remaining vector,
+2. Continue reducing parser ambiguity warnings without changing source rule
+   semantics.
+3. Continue reducing source-absent helpers in `output.maude`.
+4. Continue improving official `.wast` runner support for remaining vector,
    abstract-reference, and module instance/linking identity forms.  The runner
    now accepts the main GC reference families (`anyref`, `eqref`, `i31ref`,
    `structref`, `arrayref`, `exnref`) as invoke arguments and expected results.
-4. Decide how to implement SpecTec `hint(builtin)` IEEE-float operations:
+5. Decide how to implement SpecTec `hint(builtin)` IEEE-float operations:
    Maude equations, a trusted numeric backend, or an explicit external oracle.
-5. Reduce remaining `STUCK_STEP` / `WRONG_RESULT` cases by instruction family.
-6. Continue expanding proposal/module coverage where the official AST lowers
+6. Reduce remaining `STUCK_INIT` / `STUCK_STEP` / `WRONG_RESULT` cases by
+   instruction family.
+7. Continue expanding proposal/module coverage where the official AST lowers
    successfully but the Maude runtime or harness still gets stuck.
-7. Keep docs and CLI aligned with the default pipeline.
+8. Keep docs and CLI aligned with the default pipeline.

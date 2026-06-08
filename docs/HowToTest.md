@@ -1,6 +1,6 @@
 # How To Test Spec2Maude
 
-Updated: 2026-06-03
+Updated: 2026-06-08
 
 Use this document for reproducible local checks after restoring the JHS-style
 syntax/typecheck carrier and adding constructor membership axioms.
@@ -51,20 +51,30 @@ checks, and constructor membership axioms:
 
 ```bash
 rg 'sort SpectecType|op typecheck|mb |cmb ' output.maude
+rg 'op syn-(instr|func|i32) : -> SpectecType' output.maude
 ```
 
 Expected: matches.
 
-The generated syntax layer should not explode source categories into Maude
-sorts:
+Source category/type witnesses are generated as `syn-* : SpectecType`; concrete
+syntax constructors are generated as source-readable lowercase
+`SpectecTerminal` terms such as `const(i32, 5)`.  The generated syntax layer
+should not explode source categories into Maude sorts or emit old category
+encodings:
 
 ```bash
 rg '^[[:space:]]+(sort|subsort).*\b(Instr|Valtype|U32|Typeuse)\b' output.maude
 rg 'SpectecCategory|WasmType|hasType|WellTyped|_hasType_|SortCTOR' output.maude
 rg 'subsort Nat < U32|subsort Int < IN|subsort Nat < Byte' output.maude
+rg --pcre2 '^[[:space:]]*op (?!syn-)[A-Za-z][A-Za-z0-9-]*.*-> SpectecType' output.maude
 ```
 
 Expected: no matches.
+
+Current load expectation: Maude should load with no errors, bad tokens, or
+no-parse diagnostics.  Some parser-ambiguity warnings may remain because the
+generated syntax intentionally keeps source-readable constructors and sequence
+operators.
 
 ## 4. Recommended CLI Checks
 
@@ -79,7 +89,7 @@ make validate-invalid
 Expected Fibonacci result:
 
 ```text
-result: CTORCONSTA2(CTORI32A0, 5)
+result: const(i32, 5)
 ```
 
 `validate` checks the official SpecTec/WebAssembly parser-validator path.  It
@@ -97,7 +107,7 @@ rew [1] in WASM-FIB :
 Expected final value:
 
 ```maude
-CTORCONSTA2(CTORI32A0, 5)
+const(i32, 5)
 ```
 
 `steps` is the source-shaped reflexive-transitive closure generated from the
@@ -145,12 +155,12 @@ Expected: matches.
 Expected values:
 
 ```text
-global-get    => CTORCONSTA2(CTORI32A0, 42)
-memory-size   => CTORCONSTA2(CTORI32A0, 0)
-table-size    => CTORCONSTA2(CTORI32A0, 3)
-start-global  => CTORCONSTA2(CTORI32A0, 7)
-data-load     => CTORCONSTA2(CTORI32A0, 42)
-elem-call-ref => CTORCONSTA2(CTORI32A0, 9)
+global-get    => const(i32, 42)
+memory-size   => const(i32, 0)
+table-size    => const(i32, 3)
+start-global  => const(i32, 7)
+data-load     => const(i32, 42)
+elem-call-ref => const(i32, 9)
 ```
 
 ## 8. Import Examples
@@ -167,7 +177,7 @@ Function import:
 Expected:
 
 ```text
-result: CTORCONSTA2(CTORI32A0, 42)
+result: const(i32, 42)
 ```
 
 Other imports:
@@ -184,9 +194,9 @@ Other imports:
 Expected:
 
 ```text
-import-global => CTORCONSTA2(CTORI32A0, 77)
-import-memory => CTORCONSTA2(CTORI32A0, 1)
-import-table  => CTORCONSTA2(CTORI32A0, 4)
+import-global => const(i32, 77)
+import-memory => const(i32, 1)
+import-table  => const(i32, 4)
 ```
 
 ## 9. Invalid Input
@@ -214,10 +224,12 @@ before runtime-result regressions.
 ```text
 PASS              expected result matched
 STEPPED           execution terminated, no expected result available
+MODULE_STAGE      official .wast command was module/link/setup only
 INVALID           frontend validation rejected the input
 NO_ENTRY          no exported/main function to call
 IMPORT_MISSING    required host import was not supplied
 UNSUPPORTED       syntax/instruction not supported yet
+STUCK_INIT        initialization, instantiation, or harness setup stuck/timeout
 STUCK_VALIDATION  experimental Maude validation path stuck/timeout
 STUCK_STEP        runtime steps stuck/timeout
 WRONG_RESULT      execution terminated with wrong value
