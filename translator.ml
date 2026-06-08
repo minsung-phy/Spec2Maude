@@ -473,6 +473,13 @@ let trim_tail_hyphen s =
   in
   go s
 
+let trim_tail_underscore s =
+  let rec go x =
+    let n = String.length x in
+    if n > 0 && x.[n - 1] = '_' then go (String.sub x 0 (n - 1)) else x
+  in
+  go s
+
 let compact_ctor_component s =
   let b = Buffer.create (String.length s) in
   String.iter
@@ -617,7 +624,27 @@ let is_source_ctor_name name =
   Hashtbl.mem source_ctor_by_name name || Hashtbl.mem source_ctor_by_legacy name
 
 let source_ctor_op_name info =
-  source_ctor_interleave_op info.source_ctor_sections info.source_ctor_arity
+  match
+    info.source_ctor_sections
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  with
+  | [single] -> single
+  | _ -> trim_tail_underscore info.source_ctor_name
+
+let source_ctor_op_key op_name arity =
+  op_name ^ "#" ^ string_of_int arity
+
+let source_ctor_info_by_op_name_arity op_name arity =
+  let found = ref None in
+  Hashtbl.iter
+    (fun _ info ->
+       if !found = None
+          && info.source_ctor_arity = arity
+          && source_ctor_op_name info = op_name
+       then found := Some info)
+    source_ctor_by_name;
+  !found
 
 let is_source_ctor_var_token name =
   SSet.mem name !source_ctor_blocked_var_names
@@ -845,6 +872,21 @@ let parse_call_text text =
 
 let parse_source_ctor_surface_text text =
   let text = strip_wrapping_parens text |> String.trim in
+  match parse_call_text text with
+  | Some (head, args) ->
+      (match Hashtbl.find_opt source_ctor_by_surface_head_arity
+               (source_ctor_surface_head_arity_key head (List.length args))
+       with
+       | Some info -> Some (info.source_ctor_name, args)
+       | None ->
+           (match Hashtbl.find_opt source_ctor_by_name head with
+            | Some info when info.source_ctor_arity = List.length args ->
+                Some (info.source_ctor_name, args)
+            | _ ->
+                (match source_ctor_info_by_op_name_arity head (List.length args) with
+                 | Some info -> Some (info.source_ctor_name, args)
+                 | None -> None)))
+  | None ->
   match split_top_level_terms_preserve_eps text with
   | [] -> None
   | [head] ->
@@ -1082,10 +1124,15 @@ let ctor_call_pattern text =
            Some (info.source_ctor_name,
                  List.map (fun s -> strip_wrapping_parens s |> String.trim) args)
        | None ->
+           (match source_ctor_info_by_op_name_arity head (List.length args) with
+            | Some info ->
+                Some (info.source_ctor_name,
+                      List.map (fun s -> strip_wrapping_parens s |> String.trim) args)
+            | None ->
            (match parse_source_ctor_surface_text text with
             | Some (ctor, args) ->
                 Some (ctor, List.map (fun s -> strip_wrapping_parens s |> String.trim) args)
-            | None -> None))
+            | None -> None)))
   | _ ->
       (match parse_source_ctor_surface_text text with
        | Some (ctor, args) ->
@@ -4403,7 +4450,7 @@ let format_call fn = function
         let s = String.trim a in
         if String.contains s ' ' then Printf.sprintf "( %s )" s else s
       in
-      Printf.sprintf "%s ( %s )" fn (String.concat ", " (List.map norm_arg args))
+      Printf.sprintf "%s(%s)" fn (String.concat ", " (List.map norm_arg args))
 
 let erase_source_typ_param_args fn args =
   match Hashtbl.find_opt source_typ_param_positions fn with
@@ -5120,28 +5167,7 @@ let format_source_ctor_call ctor args =
   in
   match Hashtbl.find_opt source_ctor_by_name ctor with
   | None -> format_call ctor args
-  | Some info ->
-      let norm_arg arg =
-        let arg = String.trim arg in
-        if arg = "" then arg
-        else
-          let already_wrapped =
-            String.length arg >= 2 && arg.[0] = '('
-            && arg.[String.length arg - 1] = ')'
-          in
-          if already_wrapped || not (contains_ws arg) then arg
-          else Printf.sprintf "( %s )" arg
-      in
-      let rec go sections args =
-        match sections, args with
-        | [], rest -> List.map norm_arg rest
-        | s :: ss, a :: rest ->
-            (if s = "" then [] else [s]) @ [norm_arg a] @ go ss rest
-        | [s], [] -> if s = "" then [] else [s]
-        | _ :: ss, [] -> go ss []
-      in
-      let parts = go info.source_ctor_sections args in
-      if parts = [] then format_call ctor args else String.concat " " parts
+  | Some info -> format_call (source_ctor_op_name info) args
 
 let format_source_def_call fn args =
   let args = erase_source_typ_param_args fn args in
@@ -11152,6 +11178,15 @@ let source_ctor_lhs_head_arity lhs =
   match parse_call_text lhs with
   | Some (head, args) when is_source_ctor_name head || starts_with head "CTOR" ->
       Some (head, List.length args)
+  | Some (head, args) ->
+      (match Hashtbl.find_opt source_ctor_by_surface_head_arity
+               (source_ctor_surface_head_arity_key head (List.length args))
+       with
+       | Some info -> Some (info.source_ctor_name, List.length args)
+       | None ->
+           (match source_ctor_info_by_op_name_arity head (List.length args) with
+            | Some info -> Some (info.source_ctor_name, List.length args)
+            | None -> None))
 	  | _ ->
 	      (match strict_source_ctor_terms (split_top_level_terms_preserve_eps lhs) with
 	       | Some (head, args) -> Some (head, List.length args)
@@ -11636,7 +11671,7 @@ let jhs_partial_constructor_ops memberships =
 	                    (split_top_level_terms_preserve_eps
 	                       (strip_wrapping_parens lhs |> String.trim)) with
 	            | Some (info, _args) when info.source_ctor_arity > 0 ->
-	                Some (source_ctor_op_name info |> String.trim)
+	                Some (source_ctor_op_key (source_ctor_op_name info |> String.trim) info.source_ctor_arity)
 	            | _ ->
 	           (match source_ctor_lhs_head_arity lhs with
 	            | Some (name, arity) when arity > 0 ->
@@ -11645,11 +11680,27 @@ let jhs_partial_constructor_ops memberships =
 	                  | Some info -> source_ctor_op_name info
                   | None -> name
                 in
-	                Some (op_name |> String.trim)
+	                Some (source_ctor_op_key (op_name |> String.trim) arity)
 	            | _ -> None))
 	       | _ -> None)
   |> List.filter (fun op -> op <> "" && op <> "eps")
   |> List.fold_left (fun acc op -> SSet.add op acc) SSet.empty
+
+let jhs_op_decl_arity line =
+  try
+    let colon = String.index line ':' in
+    let arrow =
+      try Str.search_forward (Str.regexp "[ \t]+\\(~>\\|->\\)[ \t]+") line colon
+      with Not_found -> String.length line
+    in
+    let sorts =
+      String.sub line (colon + 1) (arrow - colon - 1)
+      |> String.trim
+      |> Str.split (Str.regexp "[ \t\n\r]+")
+      |> List.filter (fun s -> s <> "")
+    in
+    List.length sorts
+  with Not_found -> 0
 
 let jhs_partialize_decl_line partial_ops line =
   let s = String.trim line in
@@ -11666,7 +11717,8 @@ let jhs_partialize_decl_line partial_ops line =
             |> String.trim
           else ""
         in
-        if SSet.mem op_part partial_ops
+        let key = source_ctor_op_key op_part (jhs_op_decl_arity line) in
+        if SSet.mem key partial_ops
            && contains_substring line " -> SpectecTerminal"
         then
           Str.replace_first
@@ -11689,7 +11741,7 @@ let partialize_cmb_constructor_ops_in_output text =
                       (split_top_level_terms_preserve_eps
                          (strip_wrapping_parens lhs |> String.trim)) with
               | Some (info, _args) when info.source_ctor_arity > 0 ->
-                  Some (source_ctor_op_name info |> String.trim)
+                  Some (source_ctor_op_key (source_ctor_op_name info |> String.trim) info.source_ctor_arity)
               | _ ->
                   (match source_ctor_lhs_head_arity lhs with
                    | Some (name, arity) when arity > 0 ->
@@ -11698,7 +11750,7 @@ let partialize_cmb_constructor_ops_in_output text =
                          | Some info -> source_ctor_op_name info
                          | None -> name
                        in
-                       Some (op_name |> String.trim)
+                       Some (source_ctor_op_key (op_name |> String.trim) arity)
                    | _ -> None))
          | _ -> None)
     |> List.fold_left (fun acc op -> if op = "" then acc else SSet.add op acc) SSet.empty
@@ -13048,7 +13100,7 @@ let opt_ctor_prem_items (lhs : texpr) (rhs : texpr) =
         register_opt_ctor_helper ctor 1;
         let lhs_t = texpr_with_var seq_var seq_var in
         let rhs_t =
-          { text = Printf.sprintf "%s ( %s )" (opt_prefix_name ctor) arg;
+          { text = format_call (opt_prefix_name ctor) [arg];
             vars = [arg] }
         in
         Some [PremEq {
@@ -13413,8 +13465,7 @@ let classify_prem bound = function
                | Some h when SSet.mem seq_var bound
                              && not (SSet.mem arg_var bound) ->
                    let rhs_text =
-                     Printf.sprintf "%s ( %s )"
-                       (opt_unzip_name h.opt_ctor 0) seq_var
+                     format_call (opt_unzip_name h.opt_ctor 0) [seq_var]
                    in
                    Some (`Match,
                     { text = Printf.sprintf "%s := %s" arg_var rhs_text;
@@ -16899,10 +16950,10 @@ let star_ctor_unzip_helper_block () =
           args
           |> List.mapi (fun i arg ->
               let helper = star_ctor_unzip_name h.star_unzip_ctor i in
+              let ctor_call = format_source_ctor_call h.star_unzip_ctor args in
               Printf.sprintf
-                "  eq %s(eps) = eps .\n  eq %s(%s(%s) %s) = %s %s(%s) .\n"
-                helper helper h.star_unzip_ctor
-                (String.concat ", " args) rest arg helper rest)
+                "  eq %s(eps) = eps .\n  eq %s(%s %s) = %s %s(%s) .\n"
+                helper helper ctor_call rest arg helper rest)
           |> String.concat ""
         in
         var_decl ^ op_decls ^ eqs)
@@ -16923,10 +16974,11 @@ let opt_ctor_helper_block () =
         let arg = Printf.sprintf "OPT-%s-A0" stem in
         let prefix = opt_prefix_name h.opt_ctor in
         let unzip = opt_unzip_name h.opt_ctor 0 in
+        let ctor_call = format_source_ctor_call h.opt_ctor [arg] in
         Printf.sprintf
-          "  var %s : SpectecTerminal .\n  op %s : SpectecTerminals -> SpectecTerminals .\n  op %s : SpectecTerminals -> SpectecTerminals .\n  eq %s(eps) = eps .\n  eq %s(%s) = %s(%s) .\n  eq %s(eps) = eps .\n  eq %s(%s(%s)) = %s .\n"
-          arg prefix unzip prefix prefix arg h.opt_ctor arg unzip unzip
-          h.opt_ctor arg arg)
+          "  var %s : SpectecTerminal .\n  op %s : SpectecTerminals -> SpectecTerminals .\n  op %s : SpectecTerminals -> SpectecTerminals .\n  eq %s(eps) = eps .\n  eq %s(%s) = %s .\n  eq %s(eps) = eps .\n  eq %s(%s) = %s .\n"
+          arg prefix unzip prefix prefix arg ctor_call unzip unzip
+          ctor_call arg)
     |> String.concat ""
 
 let result_rel_helper_block () =
@@ -18639,13 +18691,8 @@ let collect_ctor_decl_lines _eq_lines =
            | _ ->
                List.init arity (fun _ -> "SpectecTerminal")
          in
-         let gather =
-           args
-           |> List.map (fun sort -> if sort = "SpectecTerminals" then "E" else "e")
-           |> String.concat " "
-         in
-         Printf.sprintf "  op %s : %s %s SpectecTerminal [ctor gather (%s)] ."
-           op_nm (String.concat " " args) arrow gather)
+        Printf.sprintf "  op %s : %s %s SpectecTerminal [ctor] ."
+          op_nm (String.concat " " args) arrow)
 
 let infer_category_subsort_decls eq_lines =
   let eq_lines = List.concat_map (String.split_on_char '\n') eq_lines in
