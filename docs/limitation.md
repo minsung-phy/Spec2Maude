@@ -30,6 +30,24 @@ constructor membership       mb/cmb pattern : SpectecTerminal
 category alias/inclusion     delegated typecheck equation
 ```
 
+When the same source constructor head is reused in multiple source categories,
+the generated Maude constructor name is disambiguated from source information.
+For example, source uses `FUNC` in several places, and the generated code uses
+names such as:
+
+```text
+func-externidx
+func-externtype
+func-externaddr
+func-func
+func-funccode
+func-heaptype
+func-absheaptype
+```
+
+This is source-derived naming, not a Wasm-specific special case: the translator
+detects reused heads and appends the source category name.
+
 The generated syntax layer should not contain:
 
 ```text
@@ -179,18 +197,18 @@ make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
                                                      PASS
-maude -no-banner output.maude                        PASS, warnings: 164,
-                                                     no-parse: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 177,
-                                                     no-parse: 0
+maude -no-banner output.maude                        PASS, warnings: 9,
+                                                     fatal diagnostics: 0
+maude -no-banner wasm-exec.maude                     PASS, warnings: 9,
+                                                     fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
 ./spec2maude run wat_examples/fib.wat --fib 5        PASS
 ./spec2maude run wat_examples/data-load.wat          PASS
 ./spec2maude test smoke --timeout 10                 PASS: 13
-./spec2maude test official --limit 30 --timeout 5    PASS: 45, MODULE_STAGE: 43,
-                                                     INVALID: 10, STUCK_INIT: 13,
-                                                     STUCK_STEP: 67, WRONG_RESULT: 3
+./spec2maude test official --limit 30 --timeout 5    PASS: 43, MODULE_STAGE: 40,
+                                                     INVALID: 10, STUCK_INIT: 16,
+                                                     STUCK_STEP: 69, WRONG_RESULT: 3
 ```
 
 Larger official/external benchmark numbers should be regenerated after each
@@ -200,13 +218,38 @@ chosen pipeline.
 Important interpretation:
 
 - Maude load warnings are currently parser-ambiguity warnings, not load errors.
+- The remaining warnings are mainly:
+  - sequence-pattern ambiguity from the associative source-sequence operator
+    `_ _`;
+  - a few numeric/range conditions using overloaded Maude arithmetic;
+  - one `norm(...)` membership axiom with a still-ambiguous argument shape.
+- The earlier nullary/unary overload warning class, such as `DIV` versus
+  `DIV sx`, `LE` versus `LE sx`, and vector signed variants, is now resolved by
+  source-derived argument-shape suffixes such as `div-sx-binop`,
+  `le-sx-relop`, and `le-sx-vrelop`.
 - `MODULE_STAGE` is not a runtime failure; it is an official `.wast` command
   with no assertion result to compare.
 - `STUCK_VALIDATION` belongs only to the experimental Maude validation path.
 - `STUCK_INIT`, `STUCK_STEP`, and `WRONG_RESULT` are the more important default
   pipeline gaps.
 
-## 9. What To Say In A Meeting
+## 9. Artifact Claim Boundary
+
+For a PLDI-style artifact submission, the current defensible claim is:
+
+```text
+The artifact regenerates a full WebAssembly SpecTec-to-Maude translation,
+restores the JHS-style SpectecTerminal/SpectecType/typecheck/mb-cmb syntax
+carrier, loads the generated Maude core without fatal diagnostics, and executes
+the local smoke suite through the official parser/validator frontend.
+```
+
+The current artifact should not claim full WebAssembly official-suite
+conformance.  The official `.wast` runner is useful for progress tracking, but
+remaining `STUCK_INIT`, `STUCK_STEP`, and `WRONG_RESULT` cases are still active
+research/engineering work.
+
+## 10. What To Say In A Meeting
 
 Short version:
 
