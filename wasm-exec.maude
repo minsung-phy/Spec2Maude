@@ -45,7 +45,7 @@ mod WASM-FIB is
   eq fib-loop-body =
     local-get(0)
     const(i32, 0)
-    relop(i32, le(s))
+    relop(i32, le-relop(s))
     br-if(1)
     local-get(1)
     local-get(2)
@@ -57,7 +57,7 @@ mod WASM-FIB is
     local-set(2)
     local-get(0)
     const(i32, 1)
-    binop(i32, sub)
+    binop(i32, sub-binop)
     local-set(0)
     br(0) .
 
@@ -68,11 +68,11 @@ mod WASM-FIB is
 
   op fib-type : -> SpectecTerminal .
   eq fib-type =
-    w--def(rec(sub(eps, eps, funcarrow(i32 i32 i32, i32))), 0) .
+    w--def(rec-rectype(sub-subtype(eps, eps, funccomptypearrow(i32 i32 i32, i32))), 0) .
 
   op fib-rectype : -> SpectecTerminal .
   eq fib-rectype =
-    rec(sub(eps, eps, funcarrow(i32 i32 i32, i32))) .
+    rec-rectype(sub-subtype(eps, eps, funccomptypearrow(i32 i32 i32, i32))) .
 
   op fib-source-type : -> SpectecTerminal .
   eq fib-source-type = type(fib-rectype) .
@@ -83,7 +83,7 @@ mod WASM-FIB is
 
   op fib-func : -> SpectecTerminal .
   eq fib-func =
-    func(0, local(i32), fib-body) .
+    func-func(0, local(i32), fib-body) .
 
   op fib-funcinst : -> SpectecTerminal .
   eq fib-funcinst =

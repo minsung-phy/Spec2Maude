@@ -451,6 +451,8 @@ type source_ctor_info = {
   source_ctor_legacy_name : string;
   source_ctor_arity : int;
   source_ctor_key : string;
+  source_ctor_category : string option;
+  source_ctor_original_sections : string list;
   source_ctor_sections : string list;
 }
 
@@ -462,8 +464,15 @@ let source_ctor_by_name : (string, source_ctor_info) Hashtbl.t =
   Hashtbl.create 512
 let source_ctor_by_surface_head_arity : (string, source_ctor_info) Hashtbl.t =
   Hashtbl.create 512
+let source_ctor_by_original_head_arity : (string, source_ctor_info list) Hashtbl.t =
+  Hashtbl.create 512
 let source_ctor_name_counts : (string, int) Hashtbl.t =
   Hashtbl.create 512
+let source_ctor_head_categories : (string, SSet.t) Hashtbl.t =
+  Hashtbl.create 512
+let source_ctor_head_occurrences : (string, (int * string * string) list) Hashtbl.t =
+  Hashtbl.create 512
+let source_ctor_heads_requiring_category_suffix : SSet.t ref = ref SSet.empty
 let source_ctor_blocked_var_names : SSet.t ref = ref SSet.empty
 
 let trim_tail_hyphen s =
@@ -550,12 +559,35 @@ let source_ctor_surface_head sections =
 let source_ctor_surface_op_head sections =
   source_ctor_surface_head sections |> Option.map maude_source_op_token
 
+let register_source_ctor_head_category sections category =
+  match source_ctor_surface_op_head sections with
+  | None -> ()
+  | Some head ->
+      let category = maude_source_op_token category in
+      let old =
+        match Hashtbl.find_opt source_ctor_head_categories head with
+        | Some cats -> cats
+        | None -> SSet.empty
+      in
+      Hashtbl.replace source_ctor_head_categories head (SSet.add category old)
+
+let source_ctor_head_needs_category_suffix sections =
+  match source_ctor_surface_op_head sections with
+  | None -> false
+  | Some head -> SSet.mem head !source_ctor_heads_requiring_category_suffix
+
+let source_ctor_effective_sections ?category sections =
+  match category with
+  | Some category when source_ctor_head_needs_category_suffix sections ->
+      source_ctor_suffix_sections sections ("-" ^ maude_source_op_token category)
+  | _ -> sections
+
 let legacy_ctor_name_from_components components arity =
   match components with
   | [] -> None
   | _ -> Some (Printf.sprintf "CTOR%sA%d" (String.concat "" components) arity)
 
-let register_source_ctor key legacy_name base sections arity =
+let register_source_ctor key legacy_name base ?category original_sections sections arity =
   match Hashtbl.find_opt source_ctor_by_key key with
   | Some info -> info.source_ctor_name
   | None ->
@@ -574,6 +606,8 @@ let register_source_ctor key legacy_name base sections arity =
           source_ctor_legacy_name = legacy_name;
           source_ctor_arity = arity;
           source_ctor_key = key;
+          source_ctor_category = Option.map maude_source_op_token category;
+          source_ctor_original_sections = original_sections;
           source_ctor_sections = sections }
       in
       Hashtbl.replace source_ctor_by_key key info;
@@ -591,13 +625,42 @@ let register_source_ctor key legacy_name base sections arity =
 	             (source_ctor_surface_head_arity_key head arity)
 	             info
 	       | None -> ());
+	      (match source_ctor_surface_op_head original_sections with
+	       | Some head ->
+	           let key = source_ctor_surface_head_arity_key head arity in
+	           let old =
+	             match Hashtbl.find_opt source_ctor_by_original_head_arity key with
+	             | Some xs -> xs
+	             | None -> []
+	           in
+	           if not (List.exists (fun i -> i.source_ctor_key = info.source_ctor_key) old) then
+	             Hashtbl.replace source_ctor_by_original_head_arity key (info :: old)
+	       | None -> ());
       source_ctor_blocked_var_names :=
         !source_ctor_blocked_var_names
         |> SSet.add name
         |> SSet.add (String.trim (Str.global_replace (Str.regexp "_+") "" name));
       name
 
-let source_ctor_name_from_sections sections arity =
+let source_ctor_candidates_by_original_head_arity head arity =
+  match Hashtbl.find_opt source_ctor_by_original_head_arity
+          (source_ctor_surface_head_arity_key head arity)
+  with
+  | Some infos -> infos
+  | None -> []
+
+let source_ctor_name_from_sections ?category sections arity =
+  let original_sections = sections in
+  (match category, source_ctor_head_needs_category_suffix sections with
+   | None, true ->
+       (match source_ctor_surface_op_head sections with
+        | Some head ->
+            (match source_ctor_candidates_by_original_head_arity head arity with
+             | [info] -> Some info.source_ctor_name
+             | _ -> None)
+        | None -> None)
+   | _ ->
+  let sections = source_ctor_effective_sections ?category sections in
   match source_ctor_components_from_sections sections with
   | [] -> None
   | components ->
@@ -608,10 +671,10 @@ let source_ctor_name_from_sections sections arity =
         | Some legacy -> legacy
         | None -> base
       in
-      Some (register_source_ctor key legacy base sections arity)
+      Some (register_source_ctor key legacy base ?category original_sections sections arity))
 
-let source_ctor_name_from_mixop mixop arity =
-  source_ctor_name_from_sections (source_ctor_sections_from_mixop mixop) arity
+let source_ctor_name_from_mixop ?category mixop arity =
+  source_ctor_name_from_sections ?category (source_ctor_sections_from_mixop mixop) arity
 
 let source_mixop_has_constructor_name mixop =
   source_ctor_sections_from_mixop mixop
@@ -713,12 +776,6 @@ let avoid_source_ctor_var_name name =
 
 let to_var_name name =
   String.uppercase_ascii (sanitize name)
-
-let source_nullary_ctor_name_if_registered raw =
-  let sections = [sanitize raw |> trim_tail_hyphen] in
-  match Hashtbl.find_opt source_ctor_by_key (source_ctor_key sections 0) with
-  | Some info -> Some info.source_ctor_name
-  | None -> None
 
 let source_var_component name =
   let normalized =
@@ -2682,8 +2739,8 @@ let build_type_env defs =
 	    |> List.flatten
 	    |> List.for_all (fun atom -> Xl.Atom.name atom = "")
 	  in
-  let canonical_ctor_name_arity_local mixop_val arity =
-    source_ctor_name_from_mixop mixop_val arity
+  let canonical_ctor_name_arity_local ?category mixop_val arity =
+    source_ctor_name_from_mixop ?category mixop_val arity
   in
   let format_call_local fn args =
     match args with
@@ -2859,7 +2916,7 @@ let build_type_env defs =
                            | TupT fields -> List.length fields
                            | _ -> 1
                          in
-                         match canonical_ctor_name_arity_local mixop_val arity with
+                         match canonical_ctor_name_arity_local ~category:_raw mixop_val arity with
                          | Some ctor ->
                              let has_payload =
                                match case_typ.it with
@@ -3200,6 +3257,54 @@ let source_sort_reaches start target =
         SSet.exists (go seen) parents)
   in
   go SSet.empty start
+
+let source_ctor_category_sort info =
+  info.source_ctor_category |> Option.map sort_of_type_name
+
+let choose_most_specific_source_ctor infos =
+  let infos =
+    infos
+    |> List.sort (fun a b -> String.compare a.source_ctor_name b.source_ctor_name)
+  in
+  let is_ancestor a b =
+    match source_ctor_category_sort a, source_ctor_category_sort b with
+    | Some a_sort, Some b_sort ->
+        a_sort <> b_sort && source_sort_reaches b_sort a_sort
+    | _ -> false
+  in
+  infos
+  |> List.filter (fun info ->
+       not (List.exists (fun other -> is_ancestor info other) infos))
+  |> function
+     | [info] -> Some info
+     | _ -> None
+
+let filter_source_ctor_candidates_by_expected_sort expected_sort infos =
+  match expected_sort with
+  | None -> infos
+  | Some expected ->
+      let filtered =
+        infos
+        |> List.filter (fun info ->
+             match source_ctor_category_sort info with
+             | Some category ->
+                 category = expected || source_sort_reaches category expected
+             | None -> false)
+      in
+      if filtered = [] then infos else filtered
+
+let source_nullary_ctor_name_if_registered ?expected_sort raw =
+  let sections = [sanitize raw |> trim_tail_hyphen] in
+  match Hashtbl.find_opt source_ctor_by_key (source_ctor_key sections 0) with
+  | Some info -> Some info.source_ctor_name
+  | None ->
+      (match source_ctor_surface_op_head sections with
+       | None -> None
+       | Some head ->
+           source_ctor_candidates_by_original_head_arity head 0
+           |> filter_source_ctor_candidates_by_expected_sort expected_sort
+           |> choose_most_specific_source_ctor
+           |> Option.map (fun info -> info.source_ctor_name))
 
 let source_field_sort_reaches typ target_sort =
   match simple_sort_of_typ typ [] with
@@ -4447,6 +4552,81 @@ let rec scan_def ss (d : def) = match d.it with
       ) rules
   | GramD _ | HintD _ -> ()
 
+let collect_source_ctor_head_categories defs =
+  let arity_of_typ t =
+    match t.it with
+    | TupT fields -> List.length fields
+    | _ -> 1
+  in
+  let signature_of_typ t =
+    Il.Print.string_of_typ t
+  in
+  let add_occurrence sections category case_typ =
+    register_source_ctor_head_category sections category;
+    match source_ctor_surface_op_head sections with
+    | None -> ()
+    | Some head ->
+        let old =
+          match Hashtbl.find_opt source_ctor_head_occurrences head with
+          | Some xs -> xs
+          | None -> []
+        in
+        Hashtbl.replace source_ctor_head_occurrences head
+          ((arity_of_typ case_typ, signature_of_typ case_typ,
+            maude_source_op_token category) :: old)
+  in
+  let rec scan d =
+    match d.it with
+    | RecD ds -> List.iter scan ds
+    | TypD (id, _params, insts) ->
+        List.iter
+          (fun inst ->
+            match inst.it with
+            | InstD (_, _, deftyp) ->
+                (match deftyp.it with
+                 | VariantT cases ->
+                     List.iter
+                       (fun (mixop_val, (_, case_typ, _prems), _) ->
+                         let sections = source_ctor_sections_from_mixop mixop_val in
+                         if source_ctor_components_from_sections sections <> [] then
+                           add_occurrence sections id.it case_typ)
+                       cases
+                 | AliasT _ | StructT _ -> ())
+          )
+          insts
+    | DecD _ | RelD _ | GramD _ | HintD _ -> ()
+  in
+  List.iter scan defs;
+  Hashtbl.iter
+    (fun head occs ->
+       let categories =
+         occs
+         |> List.map (fun (_, _, category) -> category)
+         |> List.sort_uniq String.compare
+       in
+       let arities =
+         occs
+         |> List.map (fun (arity, _, _) -> arity)
+         |> List.sort_uniq compare
+       in
+       let signature_conflict =
+         arities
+         |> List.exists (fun arity ->
+              occs
+              |> List.filter (fun (a, _, _) -> a = arity)
+              |> List.map (fun (_, signature, _) -> signature)
+              |> List.sort_uniq String.compare
+              |> List.length
+              |> fun n -> n > 1)
+       in
+       let multi_shape =
+         List.length categories > 1 && List.length arities > 1
+       in
+       if signature_conflict || multi_shape then
+         source_ctor_heads_requiring_category_suffix :=
+           SSet.add head !source_ctor_heads_requiring_category_suffix)
+    source_ctor_head_occurrences
+
 let build_token_ops ss =
   let starts_with s p =
     let ls = String.length s and lp = String.length p in
@@ -5476,6 +5656,145 @@ and source_seq_elem_sort_of_exp (e : exp) vm =
        | None -> None)
   | _ -> None
 
+let source_expected_sort_of_typ typ vm =
+  let meaningful = function
+    | Some ("SpectecTerminal" | "SpectecTerminals") -> None
+    | other -> other
+  in
+  match sequence_sort_of_typ typ vm with
+  | Some seq_sort -> meaningful (Some seq_sort)
+  | None -> meaningful (simple_sort_of_typ typ vm)
+
+let precise_source_sort_of_field_typ typ =
+  match sequence_sort_of_typ typ [] with
+  | Some seq_sort -> Some seq_sort
+  | None ->
+      (match simple_sort_of_typ typ [] with
+       | Some ("SpectecTerminal" | "SpectecTerminals") -> None
+       | other -> other)
+
+let source_sort_is_sequence_like sort =
+  sort = "SpectecTerminals"
+  || ends_with sort "Seq"
+  || SSet.mem sort !sequence_alias_sorts
+  || SSet.mem sort !flat_sequence_source_sorts
+
+let source_sort_compatible_for_ctor_arg actual expected =
+  actual = expected
+  || expected = "SpectecTerminal"
+  || (source_sort_is_sequence_like expected
+      && source_sort_is_sequence_like actual
+      && sequence_sort_compatible actual expected)
+  || (not (source_sort_is_sequence_like expected)
+      && not (source_sort_is_sequence_like actual)
+      && source_sort_reaches actual expected)
+
+let source_sort_of_numeric_exp e =
+  match (unwrap_exp_for_source_sort e).it with
+  | NumE (`Nat _) -> Some "Nat"
+  | NumE (`Int _) -> Some "Int"
+  | _ -> None
+
+let source_sort_of_case_arg e t vm =
+  let text = strip_wrapping_parens t.text |> String.trim in
+  match sequence_sort_of_text text with
+  | Some seq_sort -> Some seq_sort
+  | None ->
+      (match source_sort_of_exp e vm with
+       | Some sort -> Some sort
+       | None ->
+           (match source_sort_of_plain_text_var text with
+            | Some sort -> Some sort
+            | None -> source_sort_of_numeric_exp e))
+
+let source_ctor_precise_field_sorts info =
+  !source_compound_cases
+  |> List.filter (fun c ->
+       c.compound_ctor = info.source_ctor_name
+       && List.length c.compound_fields = info.source_ctor_arity)
+  |> List.filter_map (fun c ->
+       let sorts =
+         c.compound_fields
+         |> List.map (fun (_, field_typ) -> precise_source_sort_of_field_typ field_typ)
+       in
+       if List.exists Option.is_none sorts then None
+       else Some (List.map Option.get sorts))
+
+let source_ctor_candidate_score expected_sort arg_sorts info =
+  let category_score =
+    match expected_sort, source_ctor_category_sort info with
+    | Some expected, Some category when category = expected -> Some 32
+    | Some expected, Some category when source_sort_reaches category expected -> Some 24
+    | Some _, Some _ -> None
+    | Some _, None -> None
+    | None, _ -> Some 0
+  in
+  match category_score with
+  | None -> None
+  | Some base ->
+      let field_sorts = source_ctor_precise_field_sorts info in
+      let score_for_fields expected_fields =
+        if List.length expected_fields <> List.length arg_sorts then None
+        else
+          List.fold_left2
+            (fun acc actual_opt expected ->
+               match acc with
+               | None -> None
+               | Some score ->
+                   (match actual_opt with
+                    | Some actual when source_sort_compatible_for_ctor_arg actual expected ->
+                        Some (score + 4)
+                    | Some _ -> None
+                    | None -> Some score))
+            (Some base) arg_sorts expected_fields
+      in
+      (match field_sorts with
+       | [] -> Some base
+       | _ ->
+           field_sorts
+           |> List.filter_map score_for_fields
+           |> List.sort_uniq compare
+           |> List.rev
+           |> function
+              | best :: _ -> Some best
+              | [] -> None)
+
+let choose_source_ctor_for_case expected_sort mixop field_exps arg_ts vm =
+  let sections = source_ctor_sections_from_mixop mixop in
+  match source_ctor_surface_op_head sections with
+  | None -> None
+  | Some head ->
+      let arity = List.length arg_ts in
+      let candidates =
+        source_ctor_candidates_by_original_head_arity head arity
+        |> filter_source_ctor_candidates_by_expected_sort expected_sort
+      in
+      let arg_sorts =
+        List.map2 (fun e t -> source_sort_of_case_arg e t vm) field_exps arg_ts
+      in
+      let scored =
+        candidates
+        |> List.filter_map (fun info ->
+             source_ctor_candidate_score expected_sort arg_sorts info
+             |> Option.map (fun score -> (score, info)))
+      in
+      match scored with
+      | [] ->
+          candidates
+          |> choose_most_specific_source_ctor
+          |> Option.map (fun info -> info.source_ctor_name)
+      | _ ->
+          let best_score =
+            scored |> List.map fst |> List.fold_left max min_int
+          in
+          let best =
+            scored
+            |> List.filter (fun (score, _) -> score = best_score)
+            |> List.map snd
+          in
+          choose_most_specific_source_ctor best
+          |> Option.map (fun info -> info.source_ctor_name)
+
 let typed_index_helper_name sort =
   "$typed-index-" ^ sort
 
@@ -5642,8 +5961,9 @@ let source_call_sequence_positions args arg_ts vm =
   | xs -> xs
 
 let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
-  | VarE id -> translate_var ctx id.it vm
-  | CaseE (mixop, inner) -> translate_case ctx mixop inner vm
+  | VarE id -> translate_var ctx id.it vm (source_expected_sort_of_typ e.note vm)
+  | CaseE (mixop, inner) ->
+      translate_case ctx mixop inner vm (source_expected_sort_of_typ e.note vm)
   | NumE n -> texpr (match n with
       | `Nat z | `Int z -> Z.to_string z
       | `Rat q -> Z.to_string (Q.num q) ^ "/" ^ Z.to_string (Q.den q)
@@ -6242,7 +6562,7 @@ and translate_exp_with_record_sort_hint ctx e vm sort_hint =
   | StrE fields -> translate_record_expr fields vm sort_hint
   | _ -> translate_exp ctx e vm
 
-and translate_var ctx name vm =
+and translate_var ctx name vm expected_sort =
   match resolve_var_name name vm with
   | Some mapped -> texpr_with_var mapped mapped
   | None ->
@@ -6250,28 +6570,33 @@ and translate_var ctx name vm =
       if low = "true" then texpr (wrap_bool ctx "true")
       else if low = "false" then texpr (wrap_bool ctx "false")
       else
-        match source_nullary_ctor_name_if_registered name with
+        match source_nullary_ctor_name_if_registered ?expected_sort name with
         | Some ctor -> texpr ctor
         | None ->
             if is_lower_token_id name then texpr (sanitize name)
             else let v = to_var_name name in texpr_with_var v v
 
-and translate_case ctx mixop inner vm =
+and translate_case ctx mixop inner vm expected_sort =
   let op_name =
     try List.flatten mixop |> List.map Xl.Atom.name |> String.concat ""
     with _ -> "" in
   if op_name = "$" || op_name = "%" || op_name = "" then
     translate_exp ctx inner vm
   else
-    let args = match inner.it with
-      | TupE es -> List.map (fun e -> translate_exp TermCtx e vm) es
-      | _ -> [translate_exp TermCtx inner vm] in
+    let field_exps = match inner.it with
+      | TupE es -> es
+      | _ -> [inner] in
+    let args = List.map (fun e -> translate_exp TermCtx e vm) field_exps in
     let arg_texts = List.map (fun t -> t.text) args in
     match format_source_semicolon_pair arg_texts with
     | Some text when mixop_is_source_semicolon_pair mixop (List.length arg_texts) ->
         { text; vars = List.concat_map (fun t -> t.vars) args }
     | _ ->
-	    match canonical_ctor_name_arity mixop (List.length arg_texts) with
+	    match
+        match canonical_ctor_name_arity mixop (List.length arg_texts) with
+        | Some _ as hit -> hit
+        | None -> choose_source_ctor_for_case expected_sort mixop field_exps args vm
+      with
 	    | Some ctor ->
 	        let arg_texts, tail_texts =
 	          split_ctor_nonsequence_arg_tails ctor arg_texts
@@ -7604,6 +7929,9 @@ let translate_typd id params insts =
   let typd_params = params in
   let is_parametric = params <> [] in
   let type_sort = sort_of_type_name id.it in
+  let canonical_ctor_name_arity mixop arity =
+    source_ctor_name_from_mixop ~category:id.it mixop arity
+  in
   let is_meta_numeric_alias = is_meta_numeric_alias_sort type_sort in
   let mk_type_term_texpr args v_map =
     let arg_ts = List.map (fun a -> translate_arg a v_map) args in
@@ -13224,7 +13552,9 @@ let opt_ctor_prem_items (lhs : texpr) (rhs : texpr) =
 let record_sort_hint_of_exp vm e =
   match (unwrap_exp_for_meta e).it with
   | VarE id ->
-      let t = translate_var TermCtx id.it vm in
+      let t =
+        translate_var TermCtx id.it vm (source_expected_sort_of_typ e.note vm)
+      in
       (match source_sort_of_plain_texpr_var t with
        | Some sort when
            List.exists (fun info -> info.rec_sort = sort) !source_record_infos ->
@@ -14375,7 +14705,9 @@ let lhs_pattern_typecheck_conds lhs_args vm =
   let rec of_exp (e : exp) =
     match (unwrap_exp_for_source_sort e).it with
     | VarE id ->
-        let t = translate_var TermCtx id.it vm in
+        let t =
+          translate_var TermCtx id.it vm (source_expected_sort_of_typ e.note vm)
+        in
         (match source_pattern_typecheck_guard id.it t.text with
          | Some cond when List.mem t.text t.vars -> [cond]
          | _ -> [])
@@ -18910,7 +19242,12 @@ let translate defs =
   Hashtbl.clear source_ctor_by_key;
   Hashtbl.clear source_ctor_by_legacy;
   Hashtbl.clear source_ctor_by_name;
+  Hashtbl.clear source_ctor_by_surface_head_arity;
+  Hashtbl.clear source_ctor_by_original_head_arity;
   Hashtbl.clear source_ctor_name_counts;
+  Hashtbl.clear source_ctor_head_categories;
+  Hashtbl.clear source_ctor_head_occurrences;
+  source_ctor_heads_requiring_category_suffix := SSet.empty;
   source_ctor_blocked_var_names := SSet.empty;
   Hashtbl.clear ctor_arg_sort_hints;
   Hashtbl.clear ctor_arg_membership_sort_hints;
@@ -18936,6 +19273,7 @@ let translate defs =
   def_apply_op_decls := SSet.empty;
   def_apply_dispatches := SSet.empty;
   def_tag_decls := SSet.empty;
+  collect_source_ctor_head_categories defs;
   build_type_env defs;
   collect_native_sequence_sorts_from_source defs;
   init_declared_vars ();

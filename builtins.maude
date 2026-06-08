@@ -88,7 +88,7 @@ mod WASM-BUILTINS is
 
   ceq $float-from-bits(W, I) = pos($float-mag-from-bits(W, I))
     if $float-sign-field(W, I) == 0 .
-  ceq $float-from-bits(W, I) = neg($float-mag-from-bits(W, I))
+  ceq $float-from-bits(W, I) = neg-fn($float-mag-from-bits(W, I))
     if $float-sign-field(W, I) == 1 .
 
   eq $float-mag-to-bits(W, subnorm(CN)) = CN .
@@ -101,20 +101,20 @@ mod WASM-BUILTINS is
 
   eq $float-to-bits(W, I) = I .
   eq $float-to-bits(W, pos(C)) = $float-mag-to-bits(W, C) .
-  eq $float-to-bits(W, neg(C)) =
+  eq $float-to-bits(W, neg-fn(C)) =
       _+_(_^_(2, _-_(W, 1)), $float-mag-to-bits(W, C)) .
 
   eq $wrap-lit(f32, I) = $float-from-bits(32, I) .
   eq $wrap-lit(f32, pos(C)) = pos(C) .
-  eq $wrap-lit(f32, neg(C)) = neg(C) .
+  eq $wrap-lit(f32, neg-fn(C)) = neg-fn(C) .
   eq $wrap-lit(f64, I) = $float-from-bits(64, I) .
   eq $wrap-lit(f64, pos(C)) = pos(C) .
-  eq $wrap-lit(f64, neg(C)) = neg(C) .
+  eq $wrap-lit(f64, neg-fn(C)) = neg-fn(C) .
   eq $num-raw(f32, pos(C)) = $float-to-bits(32, pos(C)) .
-  eq $num-raw(f32, neg(C)) = $float-to-bits(32, neg(C)) .
+  eq $num-raw(f32, neg-fn(C)) = $float-to-bits(32, neg-fn(C)) .
   eq $num-raw(f32, I) = I .
   eq $num-raw(f64, pos(C)) = $float-to-bits(64, pos(C)) .
-  eq $num-raw(f64, neg(C)) = $float-to-bits(64, neg(C)) .
+  eq $num-raw(f64, neg-fn(C)) = $float-to-bits(64, neg-fn(C)) .
   eq $num-raw(f64, I) = I .
   eq $num-raw(NT, C) = $raw-lit(C) [owise] .
 
@@ -127,9 +127,9 @@ mod WASM-BUILTINS is
     const(f32, $wrap-lit(f32, $fabs(32, $num-raw(f32, FK)))) .
   eq step-pure(const(f64, FK) unop(f64, abs)) =
     const(f64, $wrap-lit(f64, $fabs(64, $num-raw(f64, FK)))) .
-  eq step-pure(const(f32, FK) unop(f32, neg)) =
+  eq step-pure(const(f32, FK) unop(f32, neg-unop)) =
     const(f32, $wrap-lit(f32, $fneg(32, $num-raw(f32, FK)))) .
-  eq step-pure(const(f64, FK) unop(f64, neg)) =
+  eq step-pure(const(f64, FK) unop(f64, neg-unop)) =
     const(f64, $wrap-lit(f64, $fneg(64, $num-raw(f64, FK)))) .
   eq step-pure(const(f32, FK) unop(f32, sqrt)) =
     const(f32, $wrap-lit(f32, $fsqrt(32, $num-raw(f32, FK)))) .
@@ -143,9 +143,9 @@ mod WASM-BUILTINS is
     const(f32, $wrap-lit(f32, $ffloor(32, $num-raw(f32, FK)))) .
   eq step-pure(const(f64, FK) unop(f64, floor)) =
     const(f64, $wrap-lit(f64, $ffloor(64, $num-raw(f64, FK)))) .
-  eq step-pure(const(f32, FK) unop(f32, trunc)) =
+  eq step-pure(const(f32, FK) unop(f32, trunc-unop)) =
     const(f32, $wrap-lit(f32, $ftrunc(32, $num-raw(f32, FK)))) .
-  eq step-pure(const(f64, FK) unop(f64, trunc)) =
+  eq step-pure(const(f64, FK) unop(f64, trunc-unop)) =
     const(f64, $wrap-lit(f64, $ftrunc(64, $num-raw(f64, FK)))) .
   eq step-pure(const(f32, FK) unop(f32, nearest)) =
     const(f32, $wrap-lit(f32, $fnearest(32, $num-raw(f32, FK)))) .
@@ -156,25 +156,25 @@ mod WASM-BUILTINS is
     const(f32, $wrap-lit(f32, $fadd(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
   eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, add)) =
     const(f64, $wrap-lit(f64, $fadd(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, sub)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, sub-binop)) =
     const(f32, $wrap-lit(f32, $fsub(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, sub)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, sub-binop)) =
     const(f64, $wrap-lit(f64, $fsub(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
   eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, mul)) =
     const(f32, $wrap-lit(f32, $fmul(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
   eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, mul)) =
     const(f64, $wrap-lit(f64, $fmul(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, div)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, div-binop)) =
     const(f32, $wrap-lit(f32, $fdiv(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, div)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, div-binop)) =
     const(f64, $wrap-lit(f64, $fdiv(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, min)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, min-binop)) =
     const(f32, $wrap-lit(f32, $fmin(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, min)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, min-binop)) =
     const(f64, $wrap-lit(f64, $fmin(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, max)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, max-binop)) =
     const(f32, $wrap-lit(f32, $fmax(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, max)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) binop(f64, max-binop)) =
     const(f64, $wrap-lit(f64, $fmax(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
   eq step-pure(const(f32, FK1) const(f32, FK2) binop(f32, copysign)) =
     const(f32, $wrap-lit(f32, $fcopysign(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
@@ -189,21 +189,21 @@ mod WASM-BUILTINS is
     const(i32, $wrap-lit(i32, $fne(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
   eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, ne)) =
     const(i32, $wrap-lit(i32, $fne(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, lt)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, lt-relop)) =
     const(i32, $wrap-lit(i32, $flt(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, lt)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, lt-relop)) =
     const(i32, $wrap-lit(i32, $flt(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, gt)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, gt-relop)) =
     const(i32, $wrap-lit(i32, $fgt(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, gt)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, gt-relop)) =
     const(i32, $wrap-lit(i32, $fgt(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, le)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, le-relop)) =
     const(i32, $wrap-lit(i32, $fle(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, le)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, le-relop)) =
     const(i32, $wrap-lit(i32, $fle(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
-  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, ge)) =
+  eq step-pure(const(f32, FK1) const(f32, FK2) relop(f32, ge-relop)) =
     const(i32, $wrap-lit(i32, $fge(32, $num-raw(f32, FK1), $num-raw(f32, FK2)))) .
-  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, ge)) =
+  eq step-pure(const(f64, FK1) const(f64, FK2) relop(f64, ge-relop)) =
     const(i32, $wrap-lit(i32, $fge(64, $num-raw(f64, FK1), $num-raw(f64, FK2)))) .
 
   eq step-pure(const(NT, C) unop(NT, OP)) =
@@ -262,10 +262,10 @@ mod WASM-BUILTINS is
       ) .
   eq $ibytes(NT, C) = $bytes-le(_quo_($raw-lit(NT), 8), $raw-lit(C)) .
   eq $nbytes(f32, pos(C)) = $bytes-le(4, $num-raw(f32, pos(C))) .
-  eq $nbytes(f32, neg(C)) = $bytes-le(4, $num-raw(f32, neg(C))) .
+  eq $nbytes(f32, neg-fn(C)) = $bytes-le(4, $num-raw(f32, neg-fn(C))) .
   eq $nbytes(f32, C) = $bytes-le(4, $num-raw(f32, C)) .
   eq $nbytes(f64, pos(C)) = $bytes-le(8, $num-raw(f64, pos(C))) .
-  eq $nbytes(f64, neg(C)) = $bytes-le(8, $num-raw(f64, neg(C))) .
+  eq $nbytes(f64, neg-fn(C)) = $bytes-le(8, $num-raw(f64, neg-fn(C))) .
   eq $nbytes(f64, C) = $bytes-le(8, $num-raw(f64, C)) .
   eq $nbytes(NT, C) = $ibytes($size(NT), C) [owise] .
   eq $inv-ibytes(NT, BS) = $from-bytes-le(BS, 1, 0) .

@@ -354,7 +354,9 @@ let compact_spaces s =
 
 let compact_surface_specs =
   [
-    ("ACTIVE__", [ "ACTIVE"; ""; "" ]);
+    ("ACTIVEDATAMODE__", [ "ACTIVE-DATAMODE"; ""; "" ]);
+    ("ACTIVEELEMMODE__", [ "ACTIVE-ELEMMODE"; ""; "" ]);
+    ("ACTIVE__", [ "ACTIVE-DATAMODE"; ""; "" ]);
     ("ANY__", [ "ANY"; ""; "" ]);
     ("ARROW__", [ ""; "arrow"; "" ]);
     ("ARRAYCOPY__", [ "ARRAY-COPY"; ""; "" ]);
@@ -391,19 +393,27 @@ let compact_surface_specs =
     ("DATA__", [ "DATA"; ""; "" ]);
     ("DATADROP_", [ "DATA-DROP"; "" ]);
     ("DEMOTE_", [ "DEMOTE"; "" ]);
-    ("DIV_", [ "DIV"; "" ]);
+    ("DIVBINOP_", [ "DIV-BINOP"; "" ]);
+    ("DIVVBINOP_", [ "DIV-VBINOP"; "" ]);
+    ("DIV_", [ "DIV-BINOP"; "" ]);
     ("ELEMDROP_", [ "ELEM-DROP"; "" ]);
     ("ELEM___", [ "ELEM"; ""; ""; "" ]);
     ("EXPORT__", [ "EXPORT"; ""; "" ]);
     ("EXTEND_", [ "EXTEND"; "" ]);
     ("FRAMELBRACERBRACE___", [ "FRAME"; "lbrace"; "rbrace"; "" ]);
-    ("FUNCARROW__", [ "FUNC"; "arrow"; "" ]);
-    ("FUNC___", [ "FUNC"; ""; ""; "" ]);
-    ("FUNC_", [ "FUNC"; "" ]);
+    ("FUNCARROW__", [ "FUNCCOMPTYPEARROW"; ""; "" ]);
+    ("FUNCEXTERNADDR_", [ "FUNC-EXTERNADDR"; "" ]);
+    ("FUNCEXTERNIDX_", [ "FUNC-EXTERNIDX"; "" ]);
+    ("FUNCEXTERNTYPE_", [ "FUNC-EXTERNTYPE"; "" ]);
+    ("FUNC___", [ "FUNC-FUNC"; ""; ""; "" ]);
+    ("FUNC_", [ "FUNC-EXTERNTYPE"; "" ]);
     ("GLOBALGET_", [ "GLOBAL-GET"; "" ]);
     ("GLOBALSET_", [ "GLOBAL-SET"; "" ]);
-    ("GLOBAL__", [ "GLOBAL"; ""; "" ]);
-    ("GLOBAL_", [ "GLOBAL"; "" ]);
+    ("GLOBALEXTERNADDR_", [ "GLOBAL-EXTERNADDR"; "" ]);
+    ("GLOBALEXTERNIDX_", [ "GLOBAL-EXTERNIDX"; "" ]);
+    ("GLOBALEXTERNTYPE_", [ "GLOBAL-EXTERNTYPE"; "" ]);
+    ("GLOBAL__", [ "GLOBAL-GLOBAL"; ""; "" ]);
+    ("GLOBAL_", [ "GLOBAL-EXTERNTYPE"; "" ]);
     ("I31GET_", [ "I31-GET"; "" ]);
     ("IMPORT___", [ "IMPORT"; ""; ""; "" ]);
     ("LABELLBRACERBRACE___", [ "LABEL"; "lbrace"; "rbrace"; "" ]);
@@ -414,25 +424,36 @@ let compact_surface_specs =
     ("LOCALTEE_", [ "LOCAL-TEE"; "" ]);
     ("LOCAL_", [ "LOCAL"; "" ]);
     ("LOOP__", [ "LOOP"; ""; "" ]);
-    ("LE_", [ "LE"; "" ]);
-    ("LT_", [ "LT"; "" ]);
-    ("MAX_", [ "MAX"; "" ]);
+    ("GERELOP_", [ "GE-RELOP"; "" ]);
+    ("GTRELOP_", [ "GT-RELOP"; "" ]);
+    ("LERELOP_", [ "LE-RELOP"; "" ]);
+    ("LTRELOP_", [ "LT-RELOP"; "" ]);
+    ("LE_", [ "LE-RELOP"; "" ]);
+    ("LT_", [ "LT-RELOP"; "" ]);
+    ("MAX_", [ "MAX-VBINOP"; "" ]);
     ("MEMORYCOPY__", [ "MEMORY-COPY"; ""; "" ]);
     ("MEMORYFILL_", [ "MEMORY-FILL"; "" ]);
     ("MEMORYGROW_", [ "MEMORY-GROW"; "" ]);
     ("MEMORYINIT__", [ "MEMORY-INIT"; ""; "" ]);
     ("MEMORYSIZE_", [ "MEMORY-SIZE"; "" ]);
     ("MEMORY_", [ "MEMORY"; "" ]);
-    ("MEM_", [ "MEM"; "" ]);
-    ("MIN_", [ "MIN"; "" ]);
+    ("MEMEXTERNADDR_", [ "MEM-EXTERNADDR"; "" ]);
+    ("MEMEXTERNIDX_", [ "MEM-EXTERNIDX"; "" ]);
+    ("MEMEXTERNTYPE_", [ "MEM-EXTERNTYPE"; "" ]);
+    ("MEM_", [ "MEM-EXTERNTYPE"; "" ]);
+    ("MIN_", [ "MIN-VBINOP"; "" ]);
     ("MODULE___________", [ "MODULE"; ""; ""; ""; ""; ""; ""; ""; ""; ""; ""; "" ]);
     ("NAN_", [ "NAN"; "" ]);
-    ("NEG_", [ "NEG"; "" ]);
+    ("NEG_", [ "NEG-FN"; "" ]);
     ("NORM__", [ "NORM"; ""; "" ]);
     ("PACK__", [ "PACK"; ""; "" ]);
     ("PAGE__", [ ""; ""; "PAGE" ]);
     ("POS_", [ "POS"; "" ]);
-    ("REC_", [ "REC"; "" ]);
+    ("RECHEAPTYPE_", [ "REC-HEAPTYPE"; "" ]);
+    ("RECRECTYPE_", [ "REC-RECTYPE"; "" ]);
+    ("RECTYPEUSE_", [ "REC-TYPEUSE"; "" ]);
+    ("RECTYPEVAR_", [ "REC-TYPEVAR"; "" ]);
+    ("REC_", [ "REC-RECTYPE"; "" ]);
     ("REFARRAYADDR_", [ "REF-ARRAY-ADDR"; "" ]);
     ("REFCAST_", [ "REF-CAST"; "" ]);
     ("REFEXNADDR_", [ "REF-EXN-ADDR"; "" ]);
@@ -449,8 +470,8 @@ let compact_surface_specs =
     ("RETURNCALLINDIRECT__", [ "RETURN-CALL-INDIRECT"; ""; "" ]);
     ("RETURNCALLREF_", [ "RETURN-CALL-REF"; "" ]);
     ("RETURNCALL_", [ "RETURN-CALL"; "" ]);
-    ("GE_", [ "GE"; "" ]);
-    ("GT_", [ "GT"; "" ]);
+    ("GE_", [ "GE-RELOP"; "" ]);
+    ("GT_", [ "GT-RELOP"; "" ]);
     ("SELECT_", [ "SELECT"; "" ]);
     ("SHR_", [ "SHR"; "" ]);
     ("START_", [ "START"; "" ]);
@@ -459,8 +480,8 @@ let compact_surface_specs =
     ("STRUCTNEWDEFAULT_", [ "STRUCT-NEW-DEFAULT"; "" ]);
     ("STRUCTNEW_", [ "STRUCT-NEW"; "" ]);
     ("STRUCTSET__", [ "STRUCT-SET"; ""; "" ]);
-    ("STRUCT_", [ "STRUCT"; "" ]);
-    ("SUB___", [ "SUB"; ""; ""; "" ]);
+    ("STRUCT_", [ "STRUCT-COMPTYPE"; "" ]);
+    ("SUB___", [ "SUB-SUBTYPE"; ""; ""; "" ]);
     ("SUBNORM_", [ "SUBNORM"; "" ]);
     ("TABLECOPY__", [ "TABLE-COPY"; ""; "" ]);
     ("TABLEFILL_", [ "TABLE-FILL"; "" ]);
@@ -469,9 +490,16 @@ let compact_surface_specs =
     ("TABLEINIT__", [ "TABLE-INIT"; ""; "" ]);
     ("TABLESET_", [ "TABLE-SET"; "" ]);
     ("TABLESIZE_", [ "TABLE-SIZE"; "" ]);
-    ("TABLE__", [ "TABLE"; ""; "" ]);
-    ("TABLE_", [ "TABLE"; "" ]);
-    ("TAG_", [ "TAG"; "" ]);
+    ("TABLEEXTERNADDR_", [ "TABLE-EXTERNADDR"; "" ]);
+    ("TABLEEXTERNIDX_", [ "TABLE-EXTERNIDX"; "" ]);
+    ("TABLEEXTERNTYPE_", [ "TABLE-EXTERNTYPE"; "" ]);
+    ("TABLE__", [ "TABLE-TABLE"; ""; "" ]);
+    ("TABLE_", [ "TABLE-EXTERNTYPE"; "" ]);
+    ("TAGEXTERNADDR_", [ "TAG-EXTERNADDR"; "" ]);
+    ("TAGEXTERNIDX_", [ "TAG-EXTERNIDX"; "" ]);
+    ("TAGEXTERNTYPE_", [ "TAG-EXTERNTYPE"; "" ]);
+    ("TAGTAG_", [ "TAG-TAG"; "" ]);
+    ("TAG_", [ "TAG-EXTERNTYPE"; "" ]);
     ("TESTOP__", [ "TESTOP"; ""; "" ]);
     ("THROW_", [ "THROW"; "" ]);
     ("TRUNCSAT_", [ "TRUNC-SAT"; "" ]);
@@ -511,14 +539,18 @@ let compact_surface_token_aliases =
     ("ADD", "add");
     ("ANY", "any");
     ("ANYCONVERTEXTERN", "any-convert-extern");
-    ("ARRAY", "array");
+    ("ARRAY", "array-absheaptype");
     ("CEIL", "ceil");
     ("CLZ", "clz");
     ("COPYSIGN", "copysign");
     ("CTZ", "ctz");
     ("DECLARE", "declare");
     ("DEMOTE", "demote");
-    ("DIV", "div");
+    ("DIV", "div-binop");
+    ("DIVBINOP", "div-binop");
+    ("DIVVBINOP", "div-vbinop");
+    ("divbinop", "div-binop");
+    ("divvbinop", "div-vbinop");
     ("EQZ", "eqz");
     ("EXN", "exn");
     ("EXTERN", "extern");
@@ -527,21 +559,49 @@ let compact_surface_token_aliases =
     ("F64", "f64");
     ("FINAL", "final");
     ("FLOOR", "floor");
-    ("FUNC", "func");
-    ("GE", "ge");
-    ("GT", "gt");
+    ("FUNC", "func-absheaptype");
+    ("GE", "ge-relop");
+    ("GERELOP", "ge-relop");
+    ("GEVRELOP", "ge-vrelop");
+    ("gerelop", "ge-relop");
+    ("gevrelop", "ge-vrelop");
+    ("GT", "gt-relop");
+    ("GTRELOP", "gt-relop");
+    ("GTVRELOP", "gt-vrelop");
+    ("gtrelop", "gt-relop");
+    ("gtvrelop", "gt-vrelop");
     ("I31", "i31");
     ("I32", "i32");
     ("I64", "i64");
-    ("LE", "le");
-    ("LT", "lt");
-    ("MAX", "max");
-    ("MIN", "min");
+    ("LE", "le-relop");
+    ("LERELOP", "le-relop");
+    ("LEVRELOP", "le-vrelop");
+    ("lerelop", "le-relop");
+    ("levrelop", "le-vrelop");
+    ("LT", "lt-relop");
+    ("LTRELOP", "lt-relop");
+    ("LTVRELOP", "lt-vrelop");
+    ("ltrelop", "lt-relop");
+    ("ltvrelop", "lt-vrelop");
+    ("MAX", "max-binop");
+    ("MAXBINOP", "max-binop");
+    ("MAXVBINOP", "max-vbinop");
+    ("maxbinop", "max-binop");
+    ("maxvbinop", "max-vbinop");
+    ("MIN", "min-binop");
+    ("MINBINOP", "min-binop");
+    ("MINVBINOP", "min-vbinop");
+    ("minbinop", "min-binop");
+    ("minvbinop", "min-vbinop");
     ("MUL", "mul");
     ("MUT", "mut");
     ("NE", "ne");
     ("NEAREST", "nearest");
-    ("NEG", "neg");
+    ("NEG", "neg-unop");
+    ("NEGFN", "neg-fn");
+    ("NEGUNOP", "neg-unop");
+    ("negfn", "neg-fn");
+    ("negunop", "neg-unop");
     ("NULL", "null");
     ("PASSIVE", "passive");
     ("POPCNT", "popcnt");
@@ -553,10 +613,16 @@ let compact_surface_token_aliases =
     ("REINTERPRET", "reinterpret");
     ("S", "s");
     ("SQRT", "sqrt");
-    ("STRUCT", "struct");
-    ("SUB", "sub");
+    ("STRUCT", "struct-absheaptype");
+    ("SUB", "sub-binop");
+    ("SUBBINOP", "sub-binop");
+    ("SUBVBINOP", "sub-vbinop");
+    ("subbinop", "sub-binop");
+    ("subvbinop", "sub-vbinop");
     ("THROWREF", "throw-ref");
-    ("TRUNC", "trunc");
+    ("TRUNC", "trunc-unop");
+    ("TRUNCUNOP", "trunc-unop");
+    ("truncunop", "trunc-unop");
     ("U", "u");
     ("V128", "v128");
     ("WAND", "w-and");
@@ -567,10 +633,19 @@ let compact_surface_token_aliases =
     ("XOR", "xor");
   ]
 
+let compact_surface_token_aliases_by_length =
+  compact_surface_token_aliases
+  |> List.sort (fun (a, _) (b, _) -> compare (String.length b) (String.length a))
+
+let compact_surface_token_alias atom =
+  compact_surface_token_aliases_by_length
+  |> List.find_map (fun (old, repl) ->
+       if atom = old then Some repl else None)
+
 let replace_compact_surface_token_aliases text =
   let len = String.length text in
   let alias_at i =
-    compact_surface_token_aliases
+    compact_surface_token_aliases_by_length
     |> List.find_map (fun (old, repl) ->
          let n = String.length old in
          if i + n <= len
@@ -648,6 +723,9 @@ let render_compact_surface sections args =
 
 let source_surface_atom_of_compact_atom atom =
   let atom = String.trim atom in
+  match compact_surface_token_alias atom with
+  | Some alias -> alias
+  | None -> (
   match atom with
   | "WAND" -> "w-and"
   | "WEQ" -> "w-eq"
@@ -670,7 +748,7 @@ let source_surface_atom_of_compact_atom atom =
           then String.sub atom 3 (n - 3)
           else atom)
   in
-  if is_source_like then maude_source_op_token atom else atom
+  if is_source_like then maude_source_op_token atom else atom)
 
 let source_surface_plain_atom_sequence text =
   let text = String.trim text in
@@ -1644,10 +1722,10 @@ let float_arg_const width value =
 
 let int_binop = function
   | "add" -> "ADD"
-  | "sub" -> "SUB"
+  | "sub" -> "SUBBINOP"
   | "mul" -> "MUL"
-  | "div_s" -> "DIV_(S)"
-  | "div_u" -> "DIV_(U)"
+  | "div_s" -> "DIVBINOP_(S)"
+  | "div_u" -> "DIVBINOP_(U)"
   | "rem_s" -> "WREM_(S)"
   | "rem_u" -> "WREM_(U)"
   | "and" -> "WAND"
@@ -1662,34 +1740,34 @@ let int_binop = function
 
 let float_binop = function
   | "add" -> "ADD"
-  | "sub" -> "SUB"
+  | "sub" -> "SUBBINOP"
   | "mul" -> "MUL"
-  | "div" -> "DIV"
-  | "min" -> "MIN"
-  | "max" -> "MAX"
+  | "div" -> "DIVBINOP"
+  | "min" -> "MINBINOP"
+  | "max" -> "MAXBINOP"
   | "copysign" -> "COPYSIGN"
   | op -> fail ("unsupported float binop: " ^ op)
 
 let int_relop = function
   | "eq" -> "WEQ"
   | "ne" -> "NE"
-  | "lt_s" -> "LT_(S)"
-  | "lt_u" -> "LT_(U)"
-  | "gt_s" -> "GT_(S)"
-  | "gt_u" -> "GT_(U)"
-  | "le_s" -> "LE_(S)"
-  | "le_u" -> "LE_(U)"
-  | "ge_s" -> "GE_(S)"
-  | "ge_u" -> "GE_(U)"
+  | "lt_s" -> "LTRELOP_(S)"
+  | "lt_u" -> "LTRELOP_(U)"
+  | "gt_s" -> "GTRELOP_(S)"
+  | "gt_u" -> "GTRELOP_(U)"
+  | "le_s" -> "LERELOP_(S)"
+  | "le_u" -> "LERELOP_(U)"
+  | "ge_s" -> "GERELOP_(S)"
+  | "ge_u" -> "GERELOP_(U)"
   | op -> fail ("unsupported integer relop: " ^ op)
 
 let float_relop = function
   | "eq" -> "WEQ"
   | "ne" -> "NE"
-  | "lt" -> "LT"
-  | "gt" -> "GT"
-  | "le" -> "LE"
-  | "ge" -> "GE"
+  | "lt" -> "LTRELOP"
+  | "gt" -> "GTRELOP"
+  | "le" -> "LERELOP"
+  | "ge" -> "GERELOP"
   | op -> fail ("unsupported float relop: " ^ op)
 
 let int_unop = function
@@ -1703,11 +1781,11 @@ let int_unop = function
 
 let float_unop = function
   | "abs" -> "ABS"
-  | "neg" -> "NEG"
+  | "neg" -> "NEGUNOP"
   | "sqrt" -> "SQRT"
   | "ceil" -> "CEIL"
   | "floor" -> "FLOOR"
-  | "trunc" -> "TRUNC"
+  | "trunc" -> "TRUNCUNOP"
   | "nearest" -> "NEAREST"
   | op -> fail ("unsupported float unop: " ^ op)
 
@@ -3103,7 +3181,7 @@ let parse_data memory_names table_names global_names func_names tag_names type_n
         | (List (Atom ("i32.const" | "i64.const" | "global.get") :: _) as expr) :: rest ->
             mode :=
               Some
-                ("ACTIVE__(" ^ wrap_source_category "Memidx" (string_of_int !memidx) ^ ", "
+                ("ACTIVEDATAMODE__(" ^ wrap_source_category "Memidx" (string_of_int !memidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -3159,7 +3237,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             mode :=
               Some
-                ("ACTIVE__(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
+                ("ACTIVEELEMMODE__(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -3167,7 +3245,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             mode :=
               Some
-                ("ACTIVE__(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
+                ("ACTIVEELEMMODE__(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -3784,7 +3862,7 @@ module Official = struct
   let typeuse = function
     | T.Idx x ->
         "WIDX_(" ^ wrap_source_category "Typeidx" (string_of_int (Int32.to_int x)) ^ ")"
-    | T.Rec x -> "REC_(" ^ Int32.to_string x ^ ")"
+    | T.Rec x -> "RECTYPEUSE_(" ^ Int32.to_string x ^ ")"
     | T.Def _ -> fail "unsupported resolved deftype in source type use"
 
   let rec heaptype = function
@@ -3884,9 +3962,9 @@ module Official = struct
 
   let int_binop = function
     | A.IntOp.Add -> "ADD"
-    | A.IntOp.Sub -> "SUB"
+    | A.IntOp.Sub -> "SUBBINOP"
     | A.IntOp.Mul -> "MUL"
-    | A.IntOp.Div sx -> "DIV_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Div sx -> "DIVBINOP_(" ^ sx_term sx ^ ")"
     | A.IntOp.Rem sx -> "WREM_(" ^ sx_term sx ^ ")"
     | A.IntOp.And -> "WAND"
     | A.IntOp.Or -> "WOR"
@@ -3899,36 +3977,36 @@ module Official = struct
   let int_relop = function
     | A.IntOp.Eq -> "WEQ"
     | A.IntOp.Ne -> "NE"
-    | A.IntOp.Lt sx -> "LT_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Gt sx -> "GT_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Le sx -> "LE_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Ge sx -> "GE_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Lt sx -> "LTRELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Gt sx -> "GTRELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Le sx -> "LERELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Ge sx -> "GERELOP_(" ^ sx_term sx ^ ")"
 
   let float_unop = function
-    | A.FloatOp.Neg -> "NEG"
+    | A.FloatOp.Neg -> "NEGUNOP"
     | A.FloatOp.Abs -> "ABS"
     | A.FloatOp.Ceil -> "CEIL"
     | A.FloatOp.Floor -> "FLOOR"
-    | A.FloatOp.Trunc -> "TRUNC"
+    | A.FloatOp.Trunc -> "TRUNCUNOP"
     | A.FloatOp.Nearest -> "NEAREST"
     | A.FloatOp.Sqrt -> "SQRT"
 
   let float_binop = function
     | A.FloatOp.Add -> "ADD"
-    | A.FloatOp.Sub -> "SUB"
+    | A.FloatOp.Sub -> "SUBBINOP"
     | A.FloatOp.Mul -> "MUL"
-    | A.FloatOp.Div -> "DIV"
-    | A.FloatOp.Min -> "MIN"
-    | A.FloatOp.Max -> "MAX"
+    | A.FloatOp.Div -> "DIVBINOP"
+    | A.FloatOp.Min -> "MINBINOP"
+    | A.FloatOp.Max -> "MAXBINOP"
     | A.FloatOp.CopySign -> "COPYSIGN"
 
   let float_relop = function
     | A.FloatOp.Eq -> "WEQ"
     | A.FloatOp.Ne -> "NE"
-    | A.FloatOp.Lt -> "LT"
-    | A.FloatOp.Gt -> "GT"
-    | A.FloatOp.Le -> "LE"
-    | A.FloatOp.Ge -> "GE"
+    | A.FloatOp.Lt -> "LTRELOP"
+    | A.FloatOp.Gt -> "GTRELOP"
+    | A.FloatOp.Le -> "LERELOP"
+    | A.FloatOp.Ge -> "GERELOP"
 
   let testop = function
     | V.I32 A.IntOp.Eqz -> "TESTOP__(I32, EQZ)"
@@ -4160,7 +4238,11 @@ module Official = struct
   let segmentmode index_sort = function
     | A.Passive -> "PASSIVE"
     | A.Active (x, c) ->
-        "ACTIVE__(" ^ wrap_source_category index_sort (string_of_int (i32_index x))
+        let ctor =
+          if index_sort = "Memidx" then "ACTIVEDATAMODE__"
+          else "ACTIVEELEMMODE__"
+        in
+        ctor ^ "(" ^ wrap_source_category index_sort (string_of_int (i32_index x))
         ^ ", " ^ const c ^ ")"
     | A.Declarative -> "DECLARE"
 
@@ -4462,7 +4544,7 @@ let memory_data_terms ir bindings =
          binding.memory_data_overlays
          |> List.filter (fun overlay -> overlay.overlay_bytes <> [])
          |> List.map (fun overlay ->
-                "DATA__(" ^ bytes_seq overlay.overlay_bytes ^ ", ACTIVE__("
+                "DATA__(" ^ bytes_seq overlay.overlay_bytes ^ ", ACTIVEDATAMODE__("
                 ^ wrap_source_category "Memidx" (string_of_int memidx)
                 ^ ", "
                 ^ i32_const (string_of_int overlay.overlay_offset)
@@ -4503,7 +4585,7 @@ let table_data_terms ir bindings =
                 overlay.table_overlay_refs
                 |> List.mapi (fun i ref_term ->
                        "ELEM___(REF__(NULL, FUNC), "
-                       ^ ref_term ^ ", ACTIVE__("
+                       ^ ref_term ^ ", ACTIVEELEMMODE__("
                        ^ wrap_source_category "Tableidx" (string_of_int tableidx)
                        ^ ", "
                        ^ i32_const
@@ -4563,7 +4645,7 @@ let last_int_in_string s =
   loop 0 None None
 
 let active_elem_info mode =
-  let prefix = "ACTIVE__(" in
+  let prefix = "ACTIVEDATAMODE__(" in
   if not (starts_with mode prefix) || String.length mode <= String.length prefix then
     None
   else
@@ -4875,19 +4957,19 @@ let emit_import_runtime func_bindings global_bindings memory_bindings
     |> List.map (function
          | ImportFunc im ->
              let i = index_of_key func_key unique_func_imports (func_key im) in
-             "FUNC_(" ^ string_of_int (state_func_count + i) ^ ")"
+             "FUNCEXTERNADDR_(" ^ string_of_int (state_func_count + i) ^ ")"
          | ImportTag im ->
              let i = index_of_key tag_key unique_tag_imports (import_key im.import_module im.import_name) in
-             "TAG_(" ^ string_of_int i ^ ")"
+             "TAGEXTERNADDR_(" ^ string_of_int i ^ ")"
          | ImportGlobal im ->
              let i = index_of_key global_key unique_global_imports (import_key im.import_module im.import_name) in
-             "GLOBAL_(" ^ string_of_int i ^ ")"
+             "GLOBALEXTERNADDR_(" ^ string_of_int i ^ ")"
          | ImportMemory im ->
              let i = index_of_key memory_key unique_memory_imports (import_key im.import_module im.import_name) in
-             "MEM_(" ^ string_of_int i ^ ")"
+             "MEMEXTERNADDR_(" ^ string_of_int i ^ ")"
          | ImportTable im ->
              let i = index_of_key table_key unique_table_imports (import_key im.import_module im.import_name) in
-             "TABLE_(" ^ string_of_int i ^ ")")
+             "TABLEEXTERNADDR_(" ^ string_of_int i ^ ")")
     |> seq
   in
   Printf.sprintf
@@ -4931,20 +5013,20 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     |> List.map (function
          | ImportFunc im ->
              "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), FUNC_(WIDX_("
+             ^ maude_qid im.import_name ^ "), FUNCEXTERNTYPE_(WIDX_("
              ^ wrap_source_category "Typeidx" (string_of_int im.import_typeidx) ^ ")))"
          | ImportTag im ->
              "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), TAG_(" ^ im.import_tagtype ^ "))"
+             ^ maude_qid im.import_name ^ "), TAGEXTERNTYPE_(" ^ im.import_tagtype ^ "))"
          | ImportGlobal im ->
              "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), GLOBAL_(" ^ im.import_globaltype ^ "))"
+             ^ maude_qid im.import_name ^ "), GLOBALEXTERNTYPE_(" ^ im.import_globaltype ^ "))"
          | ImportMemory im ->
              "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), MEM_(" ^ im.import_memtype ^ "))"
+             ^ maude_qid im.import_name ^ "), MEMEXTERNTYPE_(" ^ im.import_memtype ^ "))"
          | ImportTable im ->
              "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), TABLE_(" ^ im.import_tabletype ^ "))")
+             ^ maude_qid im.import_name ^ "), TABLEEXTERNTYPE_(" ^ im.import_tabletype ^ "))")
 	    |> import_seq
   in
   let global_terms =
@@ -4953,7 +5035,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
 	    |> global_seq
   in
   let tag_terms =
-	    ir.tags |> List.map (fun t -> "TAG_(" ^ t.tag_type ^ ")") |> tag_seq
+	    ir.tags |> List.map (fun t -> "TAGTAG_(" ^ t.tag_type ^ ")") |> tag_seq
   in
   let memory_terms =
 	    ir.memories |> List.map (fun m -> "MEMORY_(" ^ m.memory_type ^ ")") |> mem_seq
@@ -4981,7 +5063,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     List.map (fun d -> d.data_mode) ir.datas
     @ List.map
         (fun term ->
-          match sub_index term "ACTIVE__(" with
+          match sub_index term "ACTIVEDATAMODE__(" with
           | Some _ -> term
           | None -> "")
         extra_data_terms
@@ -5007,11 +5089,11 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     |> List.map (fun ex ->
            let desc =
              match ex.export_item_desc with
-             | ExportFunc i -> "FUNC_(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
-             | ExportTag i -> "TAG_(" ^ wrap_source_category "Tagidx" (string_of_int i) ^ ")"
-             | ExportGlobal i -> "GLOBAL_(" ^ wrap_source_category "Globalidx" (string_of_int i) ^ ")"
-             | ExportMemory i -> "MEM_(" ^ wrap_source_category "Memidx" (string_of_int i) ^ ")"
-             | ExportTable i -> "TABLE_(" ^ wrap_source_category "Tableidx" (string_of_int i) ^ ")"
+             | ExportFunc i -> "FUNCEXTERNIDX_(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
+             | ExportTag i -> "TAGEXTERNIDX_(" ^ wrap_source_category "Tagidx" (string_of_int i) ^ ")"
+             | ExportGlobal i -> "GLOBALEXTERNIDX_(" ^ wrap_source_category "Globalidx" (string_of_int i) ^ ")"
+             | ExportMemory i -> "MEMEXTERNIDX_(" ^ wrap_source_category "Memidx" (string_of_int i) ^ ")"
+             | ExportTable i -> "TABLEEXTERNIDX_(" ^ wrap_source_category "Tableidx" (string_of_int i) ^ ")"
            in
            "EXPORT__($wat-name(" ^ maude_qid ex.export_item_name ^ "), " ^ desc ^ ")")
 	    |> export_seq
@@ -5108,23 +5190,23 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     ir.imports
     |> List.map (function
          | ImportFunc im ->
-             "FUNC_(index(generated-validation-deftypes, "
+             "FUNCEXTERNTYPE_(index(generated-validation-deftypes, "
              ^ string_of_int im.import_typeidx ^ "))"
-         | ImportTag im -> "TAG_(" ^ im.import_tagtype ^ ")"
-         | ImportGlobal im -> "GLOBAL_(" ^ im.import_globaltype ^ ")"
-         | ImportMemory im -> "MEM_(" ^ im.import_memtype ^ ")"
-         | ImportTable im -> "TABLE_(" ^ im.import_tabletype ^ ")")
+         | ImportTag im -> "TAGEXTERNTYPE_(" ^ im.import_tagtype ^ ")"
+         | ImportGlobal im -> "GLOBALEXTERNTYPE_(" ^ im.import_globaltype ^ ")"
+         | ImportMemory im -> "MEMEXTERNTYPE_(" ^ im.import_memtype ^ ")"
+         | ImportTable im -> "TABLEEXTERNTYPE_(" ^ im.import_tabletype ^ ")")
     |> seq
   in
   let export_exttype = function
-    | ExportFunc i -> "FUNC_(index(generated-validation-functypes, " ^ string_of_int i ^ "))"
-    | ExportTag i -> "TAG_(index(generated-validation-tagtypes, " ^ string_of_int i ^ "))"
+    | ExportFunc i -> "FUNCEXTERNTYPE_(index(generated-validation-functypes, " ^ string_of_int i ^ "))"
+    | ExportTag i -> "TAGEXTERNTYPE_(index(generated-validation-tagtypes, " ^ string_of_int i ^ "))"
     | ExportGlobal i ->
-        "GLOBAL_($typed-index(globaltype, generated-validation-globaltypes, "
+        "GLOBALEXTERNTYPE_($typed-index(globaltype, generated-validation-globaltypes, "
         ^ string_of_int i ^ "))"
-    | ExportMemory i -> "MEM_(index(generated-validation-memtypes, " ^ string_of_int i ^ "))"
+    | ExportMemory i -> "MEMEXTERNTYPE_(index(generated-validation-memtypes, " ^ string_of_int i ^ "))"
     | ExportTable i ->
-        "TABLE_($typed-index(tabletype, generated-validation-tabletypes, "
+        "TABLEEXTERNTYPE_($typed-index(tabletype, generated-validation-tabletypes, "
         ^ string_of_int i ^ "))"
   in
   let export_exttypes =
