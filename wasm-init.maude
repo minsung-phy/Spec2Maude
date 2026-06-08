@@ -22,10 +22,10 @@ mod WASM-INIT is
   --- and initial module instances for validated frontend-generated modules.
   var INIT-LOWS : Store .
   var INIT-MODULEINST : SpectecTerminal .
-  vars INIT-TYPES INIT-IMPORTS INIT-FUNCS INIT-EXPORTS INIT-EXTERNADDRS : SpectecTerminals .
-  vars INIT-TYPESQ INIT-FUNCSQ INIT-LOCALS INIT-BODY : SpectecTerminals .
+  vars INIT-TYPES INIT-IMPORTS INIT-FUNCS INIT-EXPORTS INIT-EXTERNADDRS INIT-DEFTYPES : SpectecTerminals .
+  vars INIT-LOCALS INIT-BODY : SpectecTerminals .
   vars INIT-RECTYPE INIT-TYPEIDX : SpectecTerminal .
-  var INIT-I : Int .
+  var INIT-I : Nat .
   var INIT-INT : Int .
   var INIT-NUMTYPE : SpectecTerminal .
   var INIT-NUM : SpectecTerminal .
@@ -51,8 +51,8 @@ mod WASM-INIT is
   eq typecheck($wat-name(INIT-NAME-QID), name) = true .
   op $v128lanes : SpectecTerminals -> SpectecTerminal [ctor] .
   eq typecheck($v128lanes(INIT-V128-LANES), vec) = true .
-  op $init-deftypes : SpectecTerminals Int -> SpectecTerminals .
-  op $init-funcaddrs : SpectecTerminals Int -> SpectecTerminals .
+  op $init-deftypes : SpectecTerminals Nat -> SpectecTerminals .
+  op $init-funcaddrs : SpectecTerminals Nat -> SpectecTerminals .
   op $init-funcinst : SpectecTerminals SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $init-funcinsts : SpectecTerminals SpectecTerminals SpectecTerminal -> SpectecTerminals .
   op $init-moduleinst : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
@@ -61,14 +61,19 @@ mod WASM-INIT is
   eq typecheck($init-funcinst(INIT-TYPES, INIT-MODULEINST, INIT-TYPEIDX, INIT-LOCALS, INIT-BODY), funcinst) = true .
   eq typecheck($init-moduleinst(INIT-LOWS, INIT-TYPES, INIT-IMPORTS, INIT-FUNCS, INIT-EXPORTS, INIT-EXTERNADDRS), moduleinst) = true .
   eq $init-deftypes(eps, INIT-I) = eps .
-  eq $init-deftypes(CTORTYPEA1(INIT-RECTYPE) INIT-TYPESQ, INIT-I) = CTORWDEFA2(INIT-RECTYPE, 0) $init-deftypes(INIT-TYPESQ, INIT-I + 1) .
+  ceq $init-deftypes((TYPE INIT-RECTYPE) INIT-TYPES, INIT-I) =
+    INIT-DEFTYPES $init-deftypes(INIT-TYPES, INIT-I + len(INIT-DEFTYPES))
+    if INIT-DEFTYPES := $rolldt(INIT-I, INIT-RECTYPE) .
   eq $init-funcaddrs(eps, INIT-I) = eps .
-  eq $init-funcaddrs(CTORFUNCA3(INIT-TYPEIDX, INIT-LOCALS, INIT-BODY) INIT-FUNCSQ, INIT-I) = INIT-I $init-funcaddrs(INIT-FUNCSQ, INIT-I + 1) .
+  eq $init-funcaddrs((FUNC INIT-TYPEIDX INIT-LOCALS INIT-BODY) INIT-FUNCS, INIT-I) =
+    INIT-I $init-funcaddrs(INIT-FUNCS, INIT-I + 1) .
   eq value('TYPE, $init-funcinst(INIT-TYPES, INIT-MODULEINST, INIT-TYPEIDX, INIT-LOCALS, INIT-BODY)) = index($init-deftypes(INIT-TYPES, 0), $raw-nat-lit(INIT-TYPEIDX)) .
   eq value('MODULE, $init-funcinst(INIT-TYPES, INIT-MODULEINST, INIT-TYPEIDX, INIT-LOCALS, INIT-BODY)) = INIT-MODULEINST .
-  eq value('CODE, $init-funcinst(INIT-TYPES, INIT-MODULEINST, INIT-TYPEIDX, INIT-LOCALS, INIT-BODY)) = CTORFUNCA3(INIT-TYPEIDX, INIT-LOCALS, INIT-BODY) .
+  eq value('CODE, $init-funcinst(INIT-TYPES, INIT-MODULEINST, INIT-TYPEIDX, INIT-LOCALS, INIT-BODY)) = FUNC INIT-TYPEIDX INIT-LOCALS INIT-BODY .
   eq $init-funcinsts(INIT-TYPES, eps, INIT-MODULEINST) = eps .
-  eq $init-funcinsts(INIT-TYPES, CTORFUNCA3(INIT-TYPEIDX, INIT-LOCALS, INIT-BODY) INIT-FUNCSQ, INIT-MODULEINST) = $init-funcinst(INIT-TYPES, INIT-MODULEINST, INIT-TYPEIDX, INIT-LOCALS, INIT-BODY) $init-funcinsts(INIT-TYPES, INIT-FUNCSQ, INIT-MODULEINST) .
+  eq $init-funcinsts(INIT-TYPES, (FUNC INIT-TYPEIDX INIT-LOCALS INIT-BODY) INIT-FUNCS, INIT-MODULEINST) =
+    RECFuncinstA3(index($init-deftypes(INIT-TYPES, 0), $raw-nat-lit(INIT-TYPEIDX)), INIT-MODULEINST, FUNC INIT-TYPEIDX INIT-LOCALS INIT-BODY)
+    $init-funcinsts(INIT-TYPES, INIT-FUNCS, INIT-MODULEINST) .
   eq value('TYPES, $init-moduleinst(INIT-LOWS, INIT-TYPES, INIT-IMPORTS, INIT-FUNCS, INIT-EXPORTS, INIT-EXTERNADDRS)) = $init-deftypes(INIT-TYPES, 0) .
   eq value('TAGS, $init-moduleinst(INIT-LOWS, INIT-TYPES, INIT-IMPORTS, INIT-FUNCS, INIT-EXPORTS, INIT-EXTERNADDRS)) = $tagsxa(INIT-EXTERNADDRS) .
   eq value('GLOBALS, $init-moduleinst(INIT-LOWS, INIT-TYPES, INIT-IMPORTS, INIT-FUNCS, INIT-EXPORTS, INIT-EXTERNADDRS)) = $globalsxa(INIT-EXTERNADDRS) .
@@ -97,7 +102,7 @@ mod WASM-INIT is
   var INITFULL-Z : State .
   vars INITFULL-TYPES INITFULL-IMPORTS INITFULL-TAGS INITFULL-GLOBALS INITFULL-MEMS INITFULL-TABLES INITFULL-FUNCS INITFULL-DATAS INITFULL-ELEMS INITFULL-STARTS INITFULL-EXPORTS INITFULL-EXTERNADDRS INITFULL-REST INITFULL-LIMJS INITFULL-TT INITFULL-GT INITFULL-GEXPR INITFULL-TEXPR INITFULL-BYTES INITFULL-EEXPRS INITFULL-LOCALS INITFULL-BODY : SpectecTerminals .
   vars INITFULL-MEMTYPE INITFULL-MEMBYTES INITFULL-NEWBYTES INITFULL-OLD-BYTES : SpectecTerminals .
-  vars INITFULL-MT INITFULL-DMODE INITFULL-RT INITFULL-EMODE INITFULL-TYPEIDX INITFULL-RECTYPE INITFULL-EXPR INITFULL-HT INITFULL-X INITFULL-AT INITFULL-LIMN INITFULL-TABLEIDX INITFULL-DEFAULTREF INITFULL-MUTS INITFULL-ZT INITFULL-VAL : SpectecTerminal .
+  vars INITFULL-MT INITFULL-DMODE INITFULL-RT INITFULL-EMODE INITFULL-TYPEIDX INITFULL-RECTYPE INITFULL-EXPR INITFULL-HT INITFULL-X INITFULL-AT INITFULL-LIMN INITFULL-TABLEIDX INITFULL-DEFAULTREF INITFULL-MUTS INITFULL-ZT INITFULL-VAL INITFULL-OFFTERM : SpectecTerminal .
   var INITFULL-MEMX : SpectecTerminal .
   vars INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3 INITFULL-B4 INITFULL-B5 INITFULL-B6 INITFULL-B7 : Nat .
   vars INITFULL-N INITFULL-M : Nat .
@@ -107,12 +112,14 @@ mod WASM-INIT is
   vars INITFULL-TABLE-I INITFULL-DATA-I INITFULL-ELEM-I : Nat .
   vars INITFULL-R INITFULL-RQ : SpectecTerminal .
   var INITFULL-RREF : SpectecTerminal .
-  var INITFULL-I : Int .
-  op $init-globaladdrs : SpectecTerminals Int -> SpectecTerminals .
-  op $init-memaddrs : SpectecTerminals Int -> SpectecTerminals .
-  op $init-tableaddrs : SpectecTerminals Int -> SpectecTerminals .
-  op $init-dataaddrs : SpectecTerminals Int -> SpectecTerminals .
-  op $init-elemaddrs : SpectecTerminals Int -> SpectecTerminals .
+  var INIT-REPEAT-ELEM : SpectecTerminal .
+  vars INIT-REPEAT-N INIT-REPEAT-I : Nat .
+  var INITFULL-I : Nat .
+  op $init-globaladdrs : SpectecTerminals Nat -> SpectecTerminals .
+  op $init-memaddrs : SpectecTerminals Nat -> SpectecTerminals .
+  op $init-tableaddrs : SpectecTerminals Nat -> SpectecTerminals .
+  op $init-dataaddrs : SpectecTerminals Nat -> SpectecTerminals .
+  op $init-elemaddrs : SpectecTerminals Nat -> SpectecTerminals .
   op $init-const-val : SpectecTerminals -> SpectecTerminal .
   op $init-const-ref : SpectecTerminal SpectecTerminals -> SpectecTerminal .
   op $init-const-refs : SpectecTerminal SpectecTerminals -> SpectecTerminals .
@@ -126,14 +133,15 @@ mod WASM-INIT is
   eq typecheck($zero-membytes(INITFULL-LIMN) INITFULL-REST, byte) =
     typecheck(INITFULL-REST, byte) .
   ceq typecheck($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES), byte) = true
-    if typecheck(INITFULL-OLD-BYTES, byte) = true /\ typecheck(INITFULL-BYTES, byte) = true .
+    if typecheck(INITFULL-OLD-BYTES, byte) /\ typecheck(INITFULL-BYTES, byte) .
   ceq typecheck($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) INITFULL-REST, byte) =
     typecheck(INITFULL-REST, byte)
-    if typecheck(INITFULL-OLD-BYTES, byte) = true /\ typecheck(INITFULL-BYTES, byte) = true .
+    if typecheck(INITFULL-OLD-BYTES, byte) /\ typecheck(INITFULL-BYTES, byte) .
   op $mem-byte : SpectecTerminals Nat -> SpectecTerminal .
   op $mem-write : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals .
   op $memaddr : Frame SpectecTerminal -> Nat .
   op $with-mem-slice : State SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals -> State .
+  op $runtime-memlimits : SpectecTerminal -> SpectecTerminal .
   op $init-membytes : SpectecTerminal -> SpectecTerminals .
   op $init-meminsts : SpectecTerminals -> SpectecTerminals .
   op $table-refs : SpectecTerminal SpectecTerminals -> SpectecTerminals [ctor] .
@@ -143,13 +151,18 @@ mod WASM-INIT is
   op $init-tablerefs : SpectecTerminal SpectecTerminals -> SpectecTerminals .
   op $init-tableinsts : SpectecTerminals SpectecTerminals SpectecTerminal Nat -> SpectecTerminals .
   op $init-datainsts : SpectecTerminals -> SpectecTerminals .
+  op $init-active-data-store : Store SpectecTerminal SpectecTerminals Nat -> Store .
+  op $init-active-data-store-write : Store SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals -> Store .
+  op $init-active-data-store-drop : Store Nat -> Store .
   op $init-eleminsts : SpectecTerminals SpectecTerminal -> SpectecTerminals .
   op $init-run-datas : SpectecTerminals Nat -> SpectecTerminals .
   op $init-run-elems : SpectecTerminals Nat -> SpectecTerminals .
   op $init-start-instrs : SpectecTerminals -> SpectecTerminals .
   op $init-state-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> State .
+  op $init-moduleinst-full-base : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal .
   op $init-moduleinst-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $init-store-full : Store SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> Store [ctor] .
+  eq typecheck($init-moduleinst-full-base(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), moduleinst) = true .
   eq typecheck($init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), moduleinst) = true .
 
   --- Runtime-only bridge for memory stores and passive segment drops under
@@ -157,47 +170,56 @@ mod WASM-INIT is
   --- not in the source-translated output.maude core.
   var STEP-MEM-CTX-Z : State .
   var STEP-MEM-CTX-VALS : SpectecTerminals .
-  vars STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS STEP-MEM-CTX-LIM : SpectecTerminals .
-  var STEP-MEM-CTX-AT : SpectecTerminal .
-  var STEP-MEM-CTX-NT : SpectecTerminal .
-  var STEP-MEM-CTX-INN : SpectecTerminal .
-  var STEP-MEM-CTX-AO : SpectecTerminal .
-  var STEP-MEM-CTX-X : SpectecTerminal .
-  var STEP-MEM-CTX-I : SpectecTerminal .
-  var STEP-MEM-CTX-C : SpectecTerminal .
-  var STEP-MEM-CTX-N : SpectecTerminal .
-  var STEP-MEM-GROW-I : SpectecTerminal .
+  vars STEP-MEM-CTX-INSTRS1 STEP-MEM-CTX-BS STEP-MEM-CTX-MEMBS STEP-MEM-CTX-LIM : SpectecTerminals .
+  var STEP-MEM-CTX-AT : [SpectecTerminal] .
+  var STEP-MEM-CTX-NT : [SpectecTerminal] .
+  var STEP-MEM-CTX-INN : [SpectecTerminal] .
+  var STEP-MEM-CTX-AO : [SpectecTerminal] .
+  var STEP-MEM-CTX-X : [SpectecTerminal] .
+  var STEP-MEM-CTX-I : [SpectecTerminal] .
+  var STEP-MEM-CTX-C : [SpectecTerminal] .
+  var STEP-MEM-CTX-N : [SpectecTerminal] .
+  var STEP-MEM-CTX-VAL : [SpectecTerminal] .
+  var STEP-MEM-CTX-MT : [SpectecTerminal] .
+  var STEP-MEM-GROW-I : [SpectecTerminal] .
   vars STEP-MEM-GROW-MIN STEP-MEM-GROW-MAX STEP-MEM-GROW-IQ : Nat .
   vars STEP-MEM-GROW-BS : SpectecTerminals .
-  var STEP-MEM-GROW-MAT : SpectecTerminal .
-  var STEP-MEM-CTX-DATAIDX : SpectecTerminal .
-  var STEP-MEM-CTX-ELEMIDX : SpectecTerminal .
+  var STEP-MEM-GROW-MAT : [SpectecTerminal] .
+  var STEP-MEM-CTX-DATAIDX : [SpectecTerminal] .
+  var STEP-MEM-CTX-ELEMIDX : [SpectecTerminal] .
   var INIT-CALL-Z : State .
   var INIT-CALL-A : Funcaddr .
   var INIT-CALL-FI : SpectecTerminal .
-  var INIT-CALL-F : Frame .
-  var INIT-CALL-X : SpectecTerminal .
-  vars INIT-CALL-VALS INIT-CALL-TS1 INIT-CALL-TS2 INIT-CALL-LOCALS INIT-CALL-LOCALTS INIT-CALL-INSTRS INIT-CALL-YY : SpectecTerminals .
+  var INIT-CALL-F : SpectecTerminal .
+  var INIT-CALL-X : [SpectecTerminal] .
+  var INIT-CALL-YY : [SpectecTerminal] .
+  vars INIT-CALL-VALS INIT-CALL-TS1 INIT-CALL-TS2 INIT-CALL-LOCALS INIT-CALL-LOCALTS INIT-CALL-INSTRS : SpectecTerminals .
+  var INIT-CALL-LOCAL-T : SpectecTerminal .
+  var INIT-CALL-LOCAL-REST : SpectecTerminals .
   vars INIT-CALL-M INIT-CALL-N : Nat .
+  op $init-localtypes : SpectecTerminals -> SpectecTerminals .
+  eq $init-localtypes(eps) = eps .
+  eq $init-localtypes((LOCAL INIT-CALL-LOCAL-T) INIT-CALL-LOCAL-REST) =
+    INIT-CALL-LOCAL-T $init-localtypes(INIT-CALL-LOCAL-REST) .
   var INIT-RET-Z : State .
   var INIT-RET-F : Frame .
   vars INIT-RET-VALS INIT-RET-INSTRS0 : SpectecTerminals .
   var INIT-RET-N : Nat .
   var INIT-TABLE-NEG-Z : State .
-  var INIT-TABLE-NEG-AT : SpectecTerminal .
+  var INIT-TABLE-NEG-AT : [SpectecTerminal] .
   var INIT-TABLE-NEG-I : Int .
-  var INIT-TABLE-NEG-X : SpectecTerminal .
+  var INIT-TABLE-NEG-X : [SpectecTerminal] .
   vars INIT-REFCAST-LOWS INIT-REFCAST-F : SpectecTerminals .
-  vars INIT-REFCAST-HT INIT-REFCAST-TARGET : SpectecTerminal .
+  vars INIT-REFCAST-HT INIT-REFCAST-TARGET : [SpectecTerminal] .
   vars INIT-SIMD-LANES1 INIT-SIMD-LANES2 : SpectecTerminals .
-  vars INIT-SIMD-LANE1 INIT-SIMD-LANE2 : SpectecTerminal .
+  vars INIT-SIMD-LANE1 INIT-SIMD-LANE2 : [SpectecTerminal] .
   var INIT-SIMD-Z : State .
   var INIT-SIMD-VALS : SpectecTerminals .
   vars INIT-SIMD-INSTRS1 : SpectecTerminals .
-  vars INIT-SIMD-C1 INIT-SIMD-C2 INIT-SIMD-CQ INIT-SIMD-SH INIT-SIMD-OP : SpectecTerminal .
+  vars INIT-SIMD-C1 INIT-SIMD-C2 INIT-SIMD-CQ INIT-SIMD-SH INIT-SIMD-OP : [SpectecTerminal] .
   var INIT-SIMD-LOWS : Store .
   vars INIT-SIMD-F INIT-SIMD-FQ : Frame .
-  vars INIT-SIMD-FRAMEN INIT-SIMD-LABELN : SpectecTerminal .
+  vars INIT-SIMD-FRAMEN INIT-SIMD-LABELN : [SpectecTerminal] .
   vars INIT-SIMD-LABEL-INSTRS0 : SpectecTerminals .
 
   --- Concrete evaluator for the relaxed SIMD instruction used by the
@@ -216,120 +238,166 @@ mod WASM-INIT is
       if len(INIT-SIMD-LANES1) > 0 /\ len(INIT-SIMD-LANES2) > 0 .
   eq $init-i16x8-eq-lanes(eps, eps) = eps .
   ceq $init-i16x8-eq-lanes(INIT-SIMD-LANES1, INIT-SIMD-LANES2) =
-    $extend(1, 16, CTORSA0, $ieq(16, index(INIT-SIMD-LANES1, 0), index(INIT-SIMD-LANES2, 0)))
+    $extend(1, 16, S, $ieq(16, index(INIT-SIMD-LANES1, 0), index(INIT-SIMD-LANES2, 0)))
     $init-i16x8-eq-lanes(slice(INIT-SIMD-LANES1, 1, _-_(len(INIT-SIMD-LANES1), 1)), slice(INIT-SIMD-LANES2, 1, _-_(len(INIT-SIMD-LANES2), 1)))
       if len(INIT-SIMD-LANES1) > 0 /\ len(INIT-SIMD-LANES2) > 0 .
-  ceq $vbinop(CTORXA2(CTORI16A0, 8), CTORRELAXEDQ15MULRSA0, $v128lanes(INIT-SIMD-LANES1), $v128lanes(INIT-SIMD-LANES2)) =
+  ceq $vbinop(I16 X 8, RELAXED-Q15MULRS, $v128lanes(INIT-SIMD-LANES1), $v128lanes(INIT-SIMD-LANES2)) =
     $v128lanes($init-i16x8-q15mulr-s-lanes(INIT-SIMD-LANES1, INIT-SIMD-LANES2))
       if len(INIT-SIMD-LANES1) == 8 /\ len(INIT-SIMD-LANES2) == 8 .
-  ceq $vrelop(CTORXA2(CTORI16A0, 8), CTORWEQA0, $v128lanes(INIT-SIMD-LANES1), $v128lanes(INIT-SIMD-LANES2)) =
+  ceq $vrelop(I16 X 8, EQ, $v128lanes(INIT-SIMD-LANES1), $v128lanes(INIT-SIMD-LANES2)) =
     $v128lanes($init-i16x8-eq-lanes(INIT-SIMD-LANES1, INIT-SIMD-LANES2))
       if len(INIT-SIMD-LANES1) == 8 /\ len(INIT-SIMD-LANES2) == 8 .
 
   crl [init-step-vbinop-ctxt-instrs] :
-    step((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVBINOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1))
+    step((INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-C1 ) ( VCONST V128 INIT-SIMD-C2 ) ( VBINOP INIT-SIMD-SH INIT-SIMD-OP ) INIT-SIMD-INSTRS1))
     =>
-    (INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1)
+    (INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-CQ ) INIT-SIMD-INSTRS1)
       if typecheck(INIT-SIMD-VALS, val)
       /\ INIT-SIMD-CQ := $vbinop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) .
   crl [init-step-vrelop-ctxt-instrs] :
-    step((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVRELOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1))
+    step((INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-C1 ) ( VCONST V128 INIT-SIMD-C2 ) ( VRELOP INIT-SIMD-SH INIT-SIMD-OP ) INIT-SIMD-INSTRS1))
     =>
-    (INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1)
+    (INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-CQ ) INIT-SIMD-INSTRS1)
       if typecheck(INIT-SIMD-VALS, val)
       /\ INIT-SIMD-CQ := $vrelop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) .
-  ceq steps((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVBINOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1)) =
-    steps((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1))
+  ceq steps((INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-C1 ) ( VCONST V128 INIT-SIMD-C2 ) ( VBINOP INIT-SIMD-SH INIT-SIMD-OP ) INIT-SIMD-INSTRS1)) =
+    steps((INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-CQ ) INIT-SIMD-INSTRS1))
       if INIT-SIMD-CQ := $vbinop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) /\ INIT-SIMD-CQ =/= eps .
-  ceq steps((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVRELOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1)) =
-    steps((INIT-SIMD-Z ; INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1))
+  ceq steps((INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-C1 ) ( VCONST V128 INIT-SIMD-C2 ) ( VRELOP INIT-SIMD-SH INIT-SIMD-OP ) INIT-SIMD-INSTRS1)) =
+    steps((INIT-SIMD-Z ; INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-CQ ) INIT-SIMD-INSTRS1))
       if INIT-SIMD-CQ := $vrelop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) /\ INIT-SIMD-CQ =/= eps .
-  ceq steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; CTORFRAMELBRACERBRACEA3(INIT-SIMD-FRAMEN, INIT-SIMD-FQ, CTORLABELLBRACERBRACEA3(INIT-SIMD-LABELN, INIT-SIMD-LABEL-INSTRS0, INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVBINOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1)))) =
-    steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; CTORFRAMELBRACERBRACEA3(INIT-SIMD-FRAMEN, INIT-SIMD-FQ, CTORLABELLBRACERBRACEA3(INIT-SIMD-LABELN, INIT-SIMD-LABEL-INSTRS0, INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1))))
+  ceq steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; FRAME INIT-SIMD-FRAMEN lbrace INIT-SIMD-FQ rbrace ( LABEL INIT-SIMD-LABELN lbrace INIT-SIMD-LABEL-INSTRS0 rbrace ( INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-C1 ) ( VCONST V128 INIT-SIMD-C2 ) ( VBINOP INIT-SIMD-SH INIT-SIMD-OP ) INIT-SIMD-INSTRS1 ) ))) =
+    steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; FRAME INIT-SIMD-FRAMEN lbrace INIT-SIMD-FQ rbrace ( LABEL INIT-SIMD-LABELN lbrace INIT-SIMD-LABEL-INSTRS0 rbrace ( INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-CQ ) INIT-SIMD-INSTRS1 ) )))
       if INIT-SIMD-CQ := $vbinop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) /\ INIT-SIMD-CQ =/= eps .
-  ceq steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; CTORFRAMELBRACERBRACEA3(INIT-SIMD-FRAMEN, INIT-SIMD-FQ, CTORLABELLBRACERBRACEA3(INIT-SIMD-LABELN, INIT-SIMD-LABEL-INSTRS0, INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-C1) CTORVCONSTA2(CTORV128A0, INIT-SIMD-C2) CTORVRELOPA2(INIT-SIMD-SH, INIT-SIMD-OP) INIT-SIMD-INSTRS1)))) =
-    steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; CTORFRAMELBRACERBRACEA3(INIT-SIMD-FRAMEN, INIT-SIMD-FQ, CTORLABELLBRACERBRACEA3(INIT-SIMD-LABELN, INIT-SIMD-LABEL-INSTRS0, INIT-SIMD-VALS CTORVCONSTA2(CTORV128A0, INIT-SIMD-CQ) INIT-SIMD-INSTRS1))))
+  ceq steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; FRAME INIT-SIMD-FRAMEN lbrace INIT-SIMD-FQ rbrace ( LABEL INIT-SIMD-LABELN lbrace INIT-SIMD-LABEL-INSTRS0 rbrace ( INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-C1 ) ( VCONST V128 INIT-SIMD-C2 ) ( VRELOP INIT-SIMD-SH INIT-SIMD-OP ) INIT-SIMD-INSTRS1 ) ))) =
+    steps(((INIT-SIMD-LOWS ; INIT-SIMD-F) ; FRAME INIT-SIMD-FRAMEN lbrace INIT-SIMD-FQ rbrace ( LABEL INIT-SIMD-LABELN lbrace INIT-SIMD-LABEL-INSTRS0 rbrace ( INIT-SIMD-VALS ( VCONST V128 INIT-SIMD-CQ ) INIT-SIMD-INSTRS1 ) )))
       if INIT-SIMD-CQ := $vrelop(INIT-SIMD-SH, INIT-SIMD-OP, INIT-SIMD-C1, INIT-SIMD-C2) /\ INIT-SIMD-CQ =/= eps .
 
   crl [init-step-read-call-ref-func] :
-    step-read ( ( INIT-CALL-Z ; INIT-CALL-VALS CTORREFFUNCADDRA1 ( INIT-CALL-A ) CTORCALLREFA1 ( INIT-CALL-YY ) ) )
+    step-read ( ( INIT-CALL-Z ; INIT-CALL-VALS (REF-FUNC-ADDR INIT-CALL-A) (CALL-REF INIT-CALL-YY) ) )
     =>
-    CTORFRAMELBRACERBRACEA3 ( INIT-CALL-M, INIT-CALL-F, CTORLABELLBRACERBRACEA3 ( INIT-CALL-M, eps, INIT-CALL-INSTRS ) )
+    FRAME INIT-CALL-M lbrace INIT-CALL-F rbrace ( LABEL INIT-CALL-M lbrace eps rbrace INIT-CALL-INSTRS )
       if INIT-CALL-FI := index ( $funcinst ( INIT-CALL-Z ), INIT-CALL-A )
-      /\ CTORFUNCARROWA2 ( INIT-CALL-TS1, INIT-CALL-TS2 ) := $expanddt ( value('TYPE, INIT-CALL-FI) )
-      /\ CTORFUNCA3 ( INIT-CALL-X, INIT-CALL-LOCALS, INIT-CALL-INSTRS ) := value('CODE, INIT-CALL-FI)
-      /\ INIT-CALL-LOCALTS := $unmap-ctorlocala1-a1-s0 ( INIT-CALL-LOCALS )
-      /\ INIT-CALL-F := RECFrameA2 ( INIT-CALL-VALS $map-Sdefault-a1-s0 ( INIT-CALL-LOCALTS ), value('MODULE, INIT-CALL-FI) )
+      /\ FUNC INIT-CALL-TS1 arrow INIT-CALL-TS2 := $expanddt ( value('TYPE, INIT-CALL-FI) )
+      /\ FUNC INIT-CALL-X INIT-CALL-LOCALS INIT-CALL-INSTRS := value('CODE, INIT-CALL-FI)
+      /\ INIT-CALL-LOCALTS := $init-localtypes(INIT-CALL-LOCALS)
+      /\ INIT-CALL-F := RECFrameA2 ( $mapexpr-1138a4fa48cf ( INIT-CALL-VALS ) $map-Sdefault-a1-s0 ( INIT-CALL-LOCALTS ), value('MODULE, INIT-CALL-FI) )
       /\ INIT-CALL-M := len ( INIT-CALL-TS2 )
       /\ INIT-CALL-N := len ( INIT-CALL-TS1 )
       /\ ( INIT-CALL-N == len ( INIT-CALL-VALS ) ) .
   crl [init-step-frame-label-vals] :
-    step ( ( INIT-RET-Z ; CTORFRAMELBRACERBRACEA3 ( INIT-RET-N, INIT-RET-F, CTORLABELLBRACERBRACEA3 ( INIT-RET-N, INIT-RET-INSTRS0, INIT-RET-VALS ) ) ) )
+    step ( ( INIT-RET-Z ; FRAME INIT-RET-N lbrace INIT-RET-F rbrace ( LABEL INIT-RET-N lbrace INIT-RET-INSTRS0 rbrace INIT-RET-VALS ) ) )
     =>
     ( INIT-RET-Z ; INIT-RET-VALS )
       if ( len ( INIT-RET-VALS ) == INIT-RET-N ) .
   crl [init-step-read-table-get-negative-oob] :
-    step-read ( ( INIT-TABLE-NEG-Z ; CTORCONSTA2 ( INIT-TABLE-NEG-AT, INIT-TABLE-NEG-I ) CTORTABLEGETA1 ( INIT-TABLE-NEG-X ) ) )
+    step-read ( ( INIT-TABLE-NEG-Z ; ( CONST INIT-TABLE-NEG-AT INIT-TABLE-NEG-I ) ( TABLE-GET INIT-TABLE-NEG-X ) ) )
     =>
-    CTORTRAPA0
+    TRAP
       if INIT-TABLE-NEG-I < 0 .
   rl [init-step-read-ref-cast-null-to-null] :
-    step-read ( ( ( INIT-REFCAST-LOWS ; INIT-REFCAST-F ) ; CTORREFNULLA1 ( INIT-REFCAST-HT ) CTORREFCASTA1 ( CTORREFA2 ( CTORNULLA0, INIT-REFCAST-TARGET ) ) ) )
+    step-read ( ( ( INIT-REFCAST-LOWS ; INIT-REFCAST-F ) ; ( REF-NULL INIT-REFCAST-HT ) ( REF-CAST ( REF NULL INIT-REFCAST-TARGET ) ) ) )
     =>
-    CTORREFNULLA1 ( INIT-REFCAST-HT ) .
+    ( REF-NULL INIT-REFCAST-HT ) .
+  crl [step-store-num-oob-ctxt-instrs] :
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( CONST STEP-MEM-CTX-NT STEP-MEM-CTX-C ) ( STORE STEP-MEM-CTX-NT eps STEP-MEM-CTX-X STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
+    =>
+    ( STEP-MEM-CTX-Z ; TRAP )
+      if RECMeminstA2 ( STEP-MEM-CTX-MT, STEP-MEM-CTX-MEMBS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
+      /\ _>_ ( _+_ ( _+_ ( $raw-lit(STEP-MEM-CTX-I), $raw-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( $size ( STEP-MEM-CTX-NT ), 8 ) ), len ( STEP-MEM-CTX-MEMBS ) ) .
   crl [step-store-num-ctxt-instrs] :
-    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-NT, eps, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( CONST STEP-MEM-CTX-NT STEP-MEM-CTX-C ) ( STORE STEP-MEM-CTX-NT eps STEP-MEM-CTX-X STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( $raw-nat-lit(STEP-MEM-CTX-I), $raw-nat-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( $size ( STEP-MEM-CTX-NT ), 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
-      if typecheck(STEP-MEM-CTX-VALS, val)
+      if RECMeminstA2 ( STEP-MEM-CTX-MT, STEP-MEM-CTX-MEMBS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
+      /\ _<=_ ( _+_ ( _+_ ( $raw-lit(STEP-MEM-CTX-I), $raw-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( $size ( STEP-MEM-CTX-NT ), 8 ) ), len ( STEP-MEM-CTX-MEMBS ) )
       /\ STEP-MEM-CTX-BS := $nbytes ( STEP-MEM-CTX-NT, STEP-MEM-CTX-C ) .
+  crl [step-store-pack-oob-ctxt-instrs] :
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( CONST STEP-MEM-CTX-INN STEP-MEM-CTX-C ) ( STORE STEP-MEM-CTX-INN STEP-MEM-CTX-N STEP-MEM-CTX-X STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
+    =>
+    ( STEP-MEM-CTX-Z ; TRAP )
+      if RECMeminstA2 ( STEP-MEM-CTX-MT, STEP-MEM-CTX-MEMBS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
+      /\ _>_ ( _+_ ( _+_ ( $raw-lit(STEP-MEM-CTX-I), $raw-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( $raw-lit(STEP-MEM-CTX-N), 8 ) ), len ( STEP-MEM-CTX-MEMBS ) ) .
   crl [step-store-pack-ctxt-instrs] :
-    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORCONSTA2 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-C ) CTORSTOREA4 ( STEP-MEM-CTX-INN, STEP-MEM-CTX-N, STEP-MEM-CTX-X, STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( CONST STEP-MEM-CTX-INN STEP-MEM-CTX-C ) ( STORE STEP-MEM-CTX-INN STEP-MEM-CTX-N STEP-MEM-CTX-X STEP-MEM-CTX-AO ) STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, _+_ ( $raw-nat-lit(STEP-MEM-CTX-I), $raw-nat-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( $raw-nat-lit(STEP-MEM-CTX-N), 8 ), STEP-MEM-CTX-BS ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
-      if typecheck(STEP-MEM-CTX-VALS, val)
+      if RECMeminstA2 ( STEP-MEM-CTX-MT, STEP-MEM-CTX-MEMBS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
+      /\ _<=_ ( _+_ ( _+_ ( $raw-lit(STEP-MEM-CTX-I), $raw-lit(value('OFFSET, STEP-MEM-CTX-AO)) ), _quo_ ( $raw-lit(STEP-MEM-CTX-N), 8 ) ), len ( STEP-MEM-CTX-MEMBS ) )
       /\ STEP-MEM-CTX-BS := $ibytes ( $raw-nat-lit(STEP-MEM-CTX-N), $wrap ( $size ( STEP-MEM-CTX-INN ), $raw-nat-lit(STEP-MEM-CTX-N), STEP-MEM-CTX-C ) ) .
   crl [step-data-drop-ctxt-instrs] :
-    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORDATADROPA1 ( STEP-MEM-CTX-DATAIDX ) STEP-MEM-CTX-INSTRS1 ) )
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS DATA-DROP STEP-MEM-CTX-DATAIDX STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-data ( STEP-MEM-CTX-Z, STEP-MEM-CTX-DATAIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
       if typecheck(STEP-MEM-CTX-VALS, val)
       /\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
   crl [step-elem-drop-ctxt-instrs] :
-    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORELEMDROPA1 ( STEP-MEM-CTX-ELEMIDX ) STEP-MEM-CTX-INSTRS1 ) )
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ELEM-DROP STEP-MEM-CTX-ELEMIDX STEP-MEM-CTX-INSTRS1 ) )
     =>
     ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 )
       if typecheck(STEP-MEM-CTX-VALS, val)
       /\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
-  ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORELEMDROPA1 ( STEP-MEM-CTX-ELEMIDX ) STEP-MEM-CTX-INSTRS1 ) ) =
+  ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ELEM-DROP STEP-MEM-CTX-ELEMIDX STEP-MEM-CTX-INSTRS1 ) ) =
     steps ( ( $with-elem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-ELEMIDX, eps ) ; STEP-MEM-CTX-VALS STEP-MEM-CTX-INSTRS1 ) )
       if typecheck(STEP-MEM-CTX-VALS, val)
       /\ _or_ ( _=/=_ ( STEP-MEM-CTX-VALS, eps ), _=/=_ ( STEP-MEM-CTX-INSTRS1, eps ) ) .
   crl [init-step-read-memory-size] :
-    step-read ( ( STEP-MEM-CTX-Z ; CTORMEMORYSIZEA1 ( STEP-MEM-CTX-X ) ) )
+    step-read ( ( STEP-MEM-CTX-Z ; MEMORY-SIZE STEP-MEM-CTX-X ) )
     =>
-    CTORCONSTA2 ( STEP-MEM-CTX-AT, $wrap-lit(STEP-MEM-CTX-AT, STEP-MEM-CTX-N) )
-      if RECMeminstA2 ( CTORPAGEA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-LIM ), STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+    ( CONST STEP-MEM-CTX-AT ( $wrap-lit(STEP-MEM-CTX-AT, STEP-MEM-CTX-N) ) )
+      if RECMeminstA2 ( STEP-MEM-CTX-AT STEP-MEM-CTX-LIM PAGE, STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
       /\ STEP-MEM-CTX-N := _quo_ ( len ( STEP-MEM-CTX-BS ), _*_ ( 64, $Ki ) ) .
-  ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORMEMORYSIZEA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) ) =
-    steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, $wrap-lit(STEP-MEM-CTX-AT, STEP-MEM-CTX-N) ) STEP-MEM-CTX-INSTRS1 ) )
-      if RECMeminstA2 ( CTORPAGEA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-LIM ), STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+  ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( MEMORY-SIZE STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) ) =
+    steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT ( $wrap-lit(STEP-MEM-CTX-AT, STEP-MEM-CTX-N) ) ) STEP-MEM-CTX-INSTRS1 ) )
+      if RECMeminstA2 ( STEP-MEM-CTX-AT STEP-MEM-CTX-LIM PAGE, STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
       /\ typecheck(STEP-MEM-CTX-VALS, val)
       /\ STEP-MEM-CTX-N := _quo_ ( len ( STEP-MEM-CTX-BS ), _*_ ( 64, $Ki ) ) .
   crl [step-memory-grow-fail-negative-ctxt-instrs] :
-    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-GROW-I ) CTORMEMORYGROWA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-GROW-I ) ( MEMORY-GROW STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
     =>
-    ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) STEP-MEM-CTX-INSTRS1 )
+    ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT ( $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) ) STEP-MEM-CTX-INSTRS1 )
       if typecheck(STEP-MEM-CTX-VALS, val)
       /\ $raw-lit(STEP-MEM-GROW-I) < 0 .
   crl [step-memory-grow-fail-max-ctxt-instrs] :
-    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, STEP-MEM-CTX-I ) CTORMEMORYGROWA1 ( STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( MEMORY-GROW STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
     =>
-    ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS CTORCONSTA2 ( STEP-MEM-CTX-AT, $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) STEP-MEM-CTX-INSTRS1 )
-      if RECMeminstA2 ( CTORPAGEA2 ( STEP-MEM-GROW-MAT, CTORLBRACKDOTDOTRBRACKA2 ( STEP-MEM-GROW-MIN, STEP-MEM-GROW-MAX ) ), STEP-MEM-GROW-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+    ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT ( $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) ) STEP-MEM-CTX-INSTRS1 )
+      if RECMeminstA2 ( STEP-MEM-GROW-MAT ( lbrack STEP-MEM-GROW-MIN dotdot STEP-MEM-GROW-MAX rbrack ) PAGE, STEP-MEM-GROW-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
       /\ typecheck(STEP-MEM-CTX-VALS, val)
       /\ STEP-MEM-GROW-IQ := _+_ ( _quo_ ( len ( STEP-MEM-GROW-BS ), _*_ ( 64, $Ki ) ), $raw-nat-lit(STEP-MEM-CTX-I) )
       /\ _>_ ( STEP-MEM-GROW-IQ, STEP-MEM-GROW-MAX ) .
+  crl [step-memory-grow-fail-unbounded-ctxt-instrs] :
+    step ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( MEMORY-GROW STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) )
+    =>
+    ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT ( $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) ) STEP-MEM-CTX-INSTRS1 )
+      if RECMeminstA2 ( STEP-MEM-GROW-MAT ( lbrack STEP-MEM-GROW-MIN dotdot eps rbrack ) PAGE, STEP-MEM-GROW-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
+      /\ STEP-MEM-GROW-IQ := _+_ ( _quo_ ( len ( STEP-MEM-GROW-BS ), _*_ ( 64, $Ki ) ), $raw-nat-lit(STEP-MEM-CTX-I) )
+      /\ _>_ ( STEP-MEM-GROW-IQ, 65536 ) .
+  ceq steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( MEMORY-GROW STEP-MEM-CTX-X ) STEP-MEM-CTX-INSTRS1 ) ) =
+    steps ( ( STEP-MEM-CTX-Z ; STEP-MEM-CTX-VALS ( CONST STEP-MEM-CTX-AT ( $wrap-lit(STEP-MEM-CTX-AT, $inv-signed ( $size ( STEP-MEM-CTX-AT ), _-_ ( 0, 1 ) )) ) ) STEP-MEM-CTX-INSTRS1 ) )
+      if RECMeminstA2 ( STEP-MEM-GROW-MAT ( lbrack STEP-MEM-GROW-MIN dotdot eps rbrack ) PAGE, STEP-MEM-GROW-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ typecheck(STEP-MEM-CTX-VALS, val)
+      /\ STEP-MEM-GROW-IQ := _+_ ( _quo_ ( len ( STEP-MEM-GROW-BS ), _*_ ( 64, $Ki ) ), $raw-nat-lit(STEP-MEM-CTX-I) )
+      /\ _>_ ( STEP-MEM-GROW-IQ, 65536 ) .
+  ceq step ( ( STEP-MEM-CTX-Z ; ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) STEP-MEM-CTX-VAL ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-N ) ( MEMORY-FILL STEP-MEM-CTX-X ) ) ) =
+    ( STEP-MEM-CTX-Z ; TRAP )
+      if RECMeminstA2 ( STEP-MEM-CTX-MT, STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ _>_ ( _+_ ( $raw-lit ( STEP-MEM-CTX-I ), $raw-lit ( STEP-MEM-CTX-N ) ), len ( STEP-MEM-CTX-BS ) ) .
+  ceq step ( ( STEP-MEM-CTX-Z ; ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) STEP-MEM-CTX-VAL ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-N ) ( MEMORY-FILL STEP-MEM-CTX-X ) ) ) =
+    ( STEP-MEM-CTX-Z ; eps )
+      if RECMeminstA2 ( STEP-MEM-CTX-MT, STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ $raw-lit ( STEP-MEM-CTX-N ) == 0
+      /\ _<=_ ( $raw-lit ( STEP-MEM-CTX-I ), len ( STEP-MEM-CTX-BS ) ) .
+  ceq step ( ( STEP-MEM-CTX-Z ; ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-I ) ( CONST I32 STEP-MEM-CTX-C ) ( CONST STEP-MEM-CTX-AT STEP-MEM-CTX-N ) ( MEMORY-FILL STEP-MEM-CTX-X ) ) ) =
+    ( $with-mem-slice ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X, $raw-nat-lit ( STEP-MEM-CTX-I ), $raw-nat-lit ( STEP-MEM-CTX-N ), $repeat ( _rem_ ( $raw-lit ( STEP-MEM-CTX-C ), 256 ), $raw-nat-lit ( STEP-MEM-CTX-N ) ) ) ; eps )
+      if RECMeminstA2 ( STEP-MEM-CTX-MT, STEP-MEM-CTX-BS ) := $mem ( STEP-MEM-CTX-Z, STEP-MEM-CTX-X )
+      /\ _>_ ( $raw-lit ( STEP-MEM-CTX-N ), 0 )
+      /\ _<=_ ( _+_ ( $raw-lit ( STEP-MEM-CTX-I ), $raw-lit ( STEP-MEM-CTX-N ) ), len ( STEP-MEM-CTX-BS ) ) .
 
   --- Runtime init uses syntax constructors after category checking has been removed,
   --- so meminst record access must not depend on the Memtype membership layer.
@@ -339,66 +407,97 @@ mod WASM-INIT is
   eq RECMeminstA2(INITFULL-MEMTYPE, INITFULL-MEMBYTES) [. 'BYTES <- INITFULL-NEWBYTES] = RECMeminstA2(INITFULL-MEMTYPE, INITFULL-NEWBYTES) .
   eq $ibytes(8, INITFULL-B0) = INITFULL-B0 .
   eq $ibytes(8, $wrap(INITFULL-COUNT, 8, INITFULL-B0)) = INITFULL-B0 .
-  eq $nbytes(CTORI32A0, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) .
-  eq $inv-nbytes(CTORI32A0, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) .
-  eq $nbytes(CTORI64A0, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) ((INITFULL-B0 quo 4294967296) rem 256) ((INITFULL-B0 quo 1099511627776) rem 256) ((INITFULL-B0 quo 281474976710656) rem 256) ((INITFULL-B0 quo 72057594037927936) rem 256) .
-  eq $inv-nbytes(CTORI64A0, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3 INITFULL-B4 INITFULL-B5 INITFULL-B6 INITFULL-B7) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) + (4294967296 * INITFULL-B4) + (1099511627776 * INITFULL-B5) + (281474976710656 * INITFULL-B6) + (72057594037927936 * INITFULL-B7) .
-  eq $nbytes(CTORF32A0, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) .
-  eq $inv-nbytes(CTORF32A0, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) .
-  eq $nbytes(CTORF64A0, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) ((INITFULL-B0 quo 4294967296) rem 256) ((INITFULL-B0 quo 1099511627776) rem 256) ((INITFULL-B0 quo 281474976710656) rem 256) ((INITFULL-B0 quo 72057594037927936) rem 256) .
-  eq $inv-nbytes(CTORF64A0, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3 INITFULL-B4 INITFULL-B5 INITFULL-B6 INITFULL-B7) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) + (4294967296 * INITFULL-B4) + (1099511627776 * INITFULL-B5) + (281474976710656 * INITFULL-B6) + (72057594037927936 * INITFULL-B7) .
+  eq $nbytes(I32, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) .
+  eq $inv-nbytes(I32, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) .
+  eq $nbytes(I64, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) ((INITFULL-B0 quo 4294967296) rem 256) ((INITFULL-B0 quo 1099511627776) rem 256) ((INITFULL-B0 quo 281474976710656) rem 256) ((INITFULL-B0 quo 72057594037927936) rem 256) .
+  eq $inv-nbytes(I64, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3 INITFULL-B4 INITFULL-B5 INITFULL-B6 INITFULL-B7) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) + (4294967296 * INITFULL-B4) + (1099511627776 * INITFULL-B5) + (281474976710656 * INITFULL-B6) + (72057594037927936 * INITFULL-B7) .
+  eq $nbytes(F32, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) .
+  eq $inv-nbytes(F32, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) .
+  eq $nbytes(F64, INITFULL-B0) = (INITFULL-B0 rem 256) ((INITFULL-B0 quo 256) rem 256) ((INITFULL-B0 quo 65536) rem 256) ((INITFULL-B0 quo 16777216) rem 256) ((INITFULL-B0 quo 4294967296) rem 256) ((INITFULL-B0 quo 1099511627776) rem 256) ((INITFULL-B0 quo 281474976710656) rem 256) ((INITFULL-B0 quo 72057594037927936) rem 256) .
+  eq $inv-nbytes(F64, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3 INITFULL-B4 INITFULL-B5 INITFULL-B6 INITFULL-B7) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) + (4294967296 * INITFULL-B4) + (1099511627776 * INITFULL-B5) + (281474976710656 * INITFULL-B6) + (72057594037927936 * INITFULL-B7) .
   eq $inv-ibytes(8, INITFULL-B0) = INITFULL-B0 .
   eq $inv-ibytes(16, INITFULL-B0 INITFULL-B1) = INITFULL-B0 + (256 * INITFULL-B1) .
   eq $inv-ibytes(32, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) .
   eq $inv-ibytes(64, INITFULL-B0 INITFULL-B1 INITFULL-B2 INITFULL-B3 INITFULL-B4 INITFULL-B5 INITFULL-B6 INITFULL-B7) = INITFULL-B0 + (256 * INITFULL-B1) + (65536 * INITFULL-B2) + (16777216 * INITFULL-B3) + (4294967296 * INITFULL-B4) + (1099511627776 * INITFULL-B5) + (281474976710656 * INITFULL-B6) + (72057594037927936 * INITFULL-B7) .
-  eq $extend(INITFULL-N, INITFULL-M, CTORUA0, INITFULL-B0) = INITFULL-B0 .
+  eq $extend(INITFULL-N, INITFULL-M, U, INITFULL-B0) = INITFULL-B0 .
   eq $iclz(32, 0) = 32 .
   eq $iclz(64, 0) = 64 .
   eq $init-globaladdrs(eps, INITFULL-I) = eps .
-  eq $init-globaladdrs(CTORGLOBALA2(INITFULL-GT, INITFULL-GEXPR) INITFULL-REST, INITFULL-I) = INITFULL-I $init-globaladdrs(INITFULL-REST, INITFULL-I + 1) .
+  ceq $init-globaladdrs(INITFULL-GLOBALS, INITFULL-I) =
+    INITFULL-I $init-globaladdrs(slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)), INITFULL-I + 1)
+    if len(INITFULL-GLOBALS) > 0 .
   eq $init-memaddrs(eps, INITFULL-I) = eps .
-  eq $init-memaddrs(CTORMEMORYA1(INITFULL-MT) INITFULL-REST, INITFULL-I) = INITFULL-I $init-memaddrs(INITFULL-REST, INITFULL-I + 1) .
+  ceq $init-memaddrs(INITFULL-MEMS, INITFULL-I) =
+    INITFULL-I $init-memaddrs(slice(INITFULL-MEMS, 1, _-_(len(INITFULL-MEMS), 1)), INITFULL-I + 1)
+    if len(INITFULL-MEMS) > 0 .
   eq $init-tableaddrs(eps, INITFULL-I) = eps .
-  eq $init-tableaddrs(CTORTABLEA2(INITFULL-TT, INITFULL-TEXPR) INITFULL-REST, INITFULL-I) = INITFULL-I $init-tableaddrs(INITFULL-REST, INITFULL-I + 1) .
+  ceq $init-tableaddrs(INITFULL-TABLES, INITFULL-I) =
+    INITFULL-I $init-tableaddrs(slice(INITFULL-TABLES, 1, _-_(len(INITFULL-TABLES), 1)), INITFULL-I + 1)
+    if len(INITFULL-TABLES) > 0 .
   eq $init-dataaddrs(eps, INITFULL-I) = eps .
-  eq $init-dataaddrs(CTORDATAA2(INITFULL-BYTES, INITFULL-DMODE) INITFULL-REST, INITFULL-I) = INITFULL-I $init-dataaddrs(INITFULL-REST, INITFULL-I + 1) .
+  ceq $init-dataaddrs(INITFULL-DATAS, INITFULL-I) =
+    INITFULL-I $init-dataaddrs(slice(INITFULL-DATAS, 1, _-_(len(INITFULL-DATAS), 1)), INITFULL-I + 1)
+    if len(INITFULL-DATAS) > 0 .
   eq $init-elemaddrs(eps, INITFULL-I) = eps .
-  eq $init-elemaddrs(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, INITFULL-EMODE) INITFULL-REST, INITFULL-I) = INITFULL-I $init-elemaddrs(INITFULL-REST, INITFULL-I + 1) .
-  eq $init-const-val(CTORCONSTA2(INITFULL-AT, INITFULL-X)) = CTORCONSTA2(INITFULL-AT, INITFULL-X) .
-  eq $init-const-val(CTORVCONSTA2(INITFULL-AT, INITFULL-X)) = CTORVCONSTA2(INITFULL-AT, INITFULL-X) .
-  eq $init-const-ref(INITFULL-MODULEINST, CTORREFNULLA1(INITFULL-HT)) = CTORREFNULLA1(INITFULL-HT) .
-  eq $init-const-ref(INITFULL-MODULEINST, CTORREFFUNCA1(INITFULL-X)) = CTORREFFUNCADDRA1(index(value('FUNCS, INITFULL-MODULEINST), $raw-nat-lit(INITFULL-X))) .
+  ceq $init-elemaddrs(INITFULL-ELEMS, INITFULL-I) =
+    INITFULL-I $init-elemaddrs(slice(INITFULL-ELEMS, 1, _-_(len(INITFULL-ELEMS), 1)), INITFULL-I + 1)
+    if len(INITFULL-ELEMS) > 0 .
+  eq $init-const-val(( CONST INITFULL-AT INITFULL-X )) = ( CONST INITFULL-AT INITFULL-X ) .
+  eq $init-const-val(( VCONST INITFULL-AT INITFULL-X )) = ( VCONST INITFULL-AT INITFULL-X ) .
+  eq $init-const-val(( REF-NULL INITFULL-HT )) = ( REF-NULL INITFULL-HT ) .
+  eq $init-const-ref(INITFULL-MODULEINST, ( REF-NULL INITFULL-HT )) = ( REF-NULL INITFULL-HT ) .
+  eq $init-const-ref(INITFULL-MODULEINST, ( REF-FUNC-ADDR INITFULL-A )) = ( REF-FUNC-ADDR INITFULL-A ) .
+  eq $init-const-ref(INITFULL-MODULEINST, ( REF-FUNC INITFULL-X )) = ( REF-FUNC-ADDR ( index(value('FUNCS, INITFULL-MODULEINST), $raw-nat-lit(INITFULL-X)) ) ) .
   eq $init-const-refs(INITFULL-MODULEINST, eps) = eps .
-  eq $init-const-refs(INITFULL-MODULEINST, INITFULL-EXPR INITFULL-REST) = $init-const-ref(INITFULL-MODULEINST, INITFULL-EXPR) $init-const-refs(INITFULL-MODULEINST, INITFULL-REST) .
+  ceq $init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS) =
+    $init-const-ref(INITFULL-MODULEINST, index(INITFULL-EEXPRS, 0))
+    $init-const-refs(INITFULL-MODULEINST, slice(INITFULL-EEXPRS, 1, _-_(len(INITFULL-EEXPRS), 1)))
+    if len(INITFULL-EEXPRS) > 0 .
   eq $init-globalinsts(eps) = eps .
-  eq $init-globalinsts(CTORGLOBALA2(INITFULL-GT, INITFULL-GEXPR) INITFULL-REST) = RECGlobalinstA2(INITFULL-GT, $init-const-val(INITFULL-GEXPR)) $init-globalinsts(INITFULL-REST) .
-  eq $init-globalinsts-full(INITFULL-Z, eps, INITFULL-A) = eps .
-  ceq $init-globalinsts-full(INITFULL-Z, CTORGLOBALA2(INITFULL-GT, CTORCONSTA2(CTORI32A0, INITFULL-N) CTORARRAYNEWDEFAULTA1(INITFULL-X)) INITFULL-REST, INITFULL-A) =
-    RECGlobalinstA2(INITFULL-GT, CTORREFARRAYADDRA1(INITFULL-A))
-    $init-globalinsts-full(INITFULL-Z, INITFULL-REST, _+_ (INITFULL-A, 1))
-      if CTORARRAYA1(INITFULL-MUTS INITFULL-ZT) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
-  ceq $init-globalinsts-full(INITFULL-Z, CTORGLOBALA2(INITFULL-GT, INITFULL-VAL CTORCONSTA2(CTORI32A0, INITFULL-N) CTORARRAYNEWA1(INITFULL-X)) INITFULL-REST, INITFULL-A) =
-    RECGlobalinstA2(INITFULL-GT, CTORREFARRAYADDRA1(INITFULL-A))
-    $init-globalinsts-full(INITFULL-Z, INITFULL-REST, _+_ (INITFULL-A, 1))
-      if CTORARRAYA1(INITFULL-MUTS INITFULL-ZT) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
-  eq $init-globalinsts-full(INITFULL-Z, CTORGLOBALA2(INITFULL-GT, INITFULL-GEXPR) INITFULL-REST, INITFULL-A) =
+  ceq $init-globalinsts(INITFULL-GLOBALS) =
     RECGlobalinstA2(INITFULL-GT, $init-const-val(INITFULL-GEXPR))
-    $init-globalinsts-full(INITFULL-Z, INITFULL-REST, INITFULL-A) .
+    $init-globalinsts(slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)))
+    if len(INITFULL-GLOBALS) > 0
+    /\ GLOBAL INITFULL-GT INITFULL-GEXPR := index(INITFULL-GLOBALS, 0) .
+  eq $init-globalinsts-full(INITFULL-Z, eps, INITFULL-A) = eps .
+  ceq $init-globalinsts-full(INITFULL-Z, INITFULL-GLOBALS, INITFULL-A) =
+    RECGlobalinstA2(INITFULL-GT, REF-ARRAY-ADDR INITFULL-A)
+    $init-globalinsts-full(INITFULL-Z, slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)), _+_ (INITFULL-A, 1))
+      if len(INITFULL-GLOBALS) > 0
+      /\ GLOBAL INITFULL-GT ( ( CONST I32 INITFULL-N ) ( ARRAY-NEW-DEFAULT INITFULL-X ) ) := index(INITFULL-GLOBALS, 0)
+      /\ ARRAY ( INITFULL-MUTS INITFULL-ZT ) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
+  ceq $init-globalinsts-full(INITFULL-Z, INITFULL-GLOBALS, INITFULL-A) =
+    RECGlobalinstA2(INITFULL-GT, REF-ARRAY-ADDR INITFULL-A)
+    $init-globalinsts-full(INITFULL-Z, slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)), _+_ (INITFULL-A, 1))
+      if len(INITFULL-GLOBALS) > 0
+      /\ GLOBAL INITFULL-GT ( INITFULL-VAL ( CONST I32 INITFULL-N ) ( ARRAY-NEW INITFULL-X ) ) := index(INITFULL-GLOBALS, 0)
+      /\ ARRAY ( INITFULL-MUTS INITFULL-ZT ) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
+  ceq $init-globalinsts-full(INITFULL-Z, INITFULL-GLOBALS, INITFULL-A) =
+    RECGlobalinstA2(INITFULL-GT, $init-const-val(INITFULL-GEXPR))
+    $init-globalinsts-full(INITFULL-Z, slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)), INITFULL-A)
+    if len(INITFULL-GLOBALS) > 0
+    /\ GLOBAL INITFULL-GT INITFULL-GEXPR := index(INITFULL-GLOBALS, 0) .
   eq $init-repeat-field(INITFULL-ZT, INITFULL-VAL, 0) = eps .
   ceq $init-repeat-field(INITFULL-ZT, INITFULL-VAL, INITFULL-N) =
     $packfield(INITFULL-ZT, INITFULL-VAL) $init-repeat-field(INITFULL-ZT, INITFULL-VAL, _-_ (INITFULL-N, 1))
       if INITFULL-N > 0 .
   eq $init-global-arrayinsts(INITFULL-Z, eps) = eps .
-  ceq $init-global-arrayinsts(INITFULL-Z, CTORGLOBALA2(INITFULL-GT, CTORCONSTA2(CTORI32A0, INITFULL-N) CTORARRAYNEWDEFAULTA1(INITFULL-X)) INITFULL-REST) =
+  ceq $init-global-arrayinsts(INITFULL-Z, INITFULL-GLOBALS) =
     RECArrayinstA2($type(INITFULL-Z, INITFULL-X), $init-repeat-field(INITFULL-ZT, $default($unpack(INITFULL-ZT)), INITFULL-N))
-    $init-global-arrayinsts(INITFULL-Z, INITFULL-REST)
-      if CTORARRAYA1(INITFULL-MUTS INITFULL-ZT) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
-  ceq $init-global-arrayinsts(INITFULL-Z, CTORGLOBALA2(INITFULL-GT, INITFULL-VAL CTORCONSTA2(CTORI32A0, INITFULL-N) CTORARRAYNEWA1(INITFULL-X)) INITFULL-REST) =
+    $init-global-arrayinsts(INITFULL-Z, slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)))
+      if len(INITFULL-GLOBALS) > 0
+      /\ GLOBAL INITFULL-GT ( ( CONST I32 INITFULL-N ) ( ARRAY-NEW-DEFAULT INITFULL-X ) ) := index(INITFULL-GLOBALS, 0)
+      /\ ARRAY ( INITFULL-MUTS INITFULL-ZT ) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
+  ceq $init-global-arrayinsts(INITFULL-Z, INITFULL-GLOBALS) =
     RECArrayinstA2($type(INITFULL-Z, INITFULL-X), $init-repeat-field(INITFULL-ZT, INITFULL-VAL, INITFULL-N))
-    $init-global-arrayinsts(INITFULL-Z, INITFULL-REST)
-      if CTORARRAYA1(INITFULL-MUTS INITFULL-ZT) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
-  eq $init-global-arrayinsts(INITFULL-Z, CTORGLOBALA2(INITFULL-GT, INITFULL-GEXPR) INITFULL-REST) =
-    $init-global-arrayinsts(INITFULL-Z, INITFULL-REST) .
+    $init-global-arrayinsts(INITFULL-Z, slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)))
+      if len(INITFULL-GLOBALS) > 0
+      /\ GLOBAL INITFULL-GT ( INITFULL-VAL ( CONST I32 INITFULL-N ) ( ARRAY-NEW INITFULL-X ) ) := index(INITFULL-GLOBALS, 0)
+      /\ ARRAY ( INITFULL-MUTS INITFULL-ZT ) := $expanddt($type(INITFULL-Z, INITFULL-X)) .
+  ceq $init-global-arrayinsts(INITFULL-Z, INITFULL-GLOBALS) =
+    $init-global-arrayinsts(INITFULL-Z, slice(INITFULL-GLOBALS, 1, _-_(len(INITFULL-GLOBALS), 1)))
+    if len(INITFULL-GLOBALS) > 0
+    /\ GLOBAL INITFULL-GT INITFULL-GEXPR := index(INITFULL-GLOBALS, 0) .
   eq len($zero-membytes(INITFULL-LIMN)) = _*_ ($raw-nat-lit(INITFULL-LIMN), _*_ (64, $Ki)) .
   eq len($zero-membytes(INITFULL-LIMN) INITFULL-REST) =
     _+_ (len($zero-membytes(INITFULL-LIMN)), len(INITFULL-REST)) .
@@ -407,6 +506,14 @@ mod WASM-INIT is
     _+_ (len(INITFULL-OLD-BYTES), len(INITFULL-REST)) .
   ceq $mem-write($zero-membytes(INITFULL-LIMN), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) = $mem-bytes($zero-membytes(INITFULL-LIMN), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES)
    if _>_ ( INITFULL-COUNT, 0 ) .
+  ceq $mem-write($zero-membytes(0) INITFULL-REST, INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) = $mem-write(INITFULL-REST, INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES)
+   if _>_ ( INITFULL-COUNT, 0 ) .
+  ceq $mem-write($repeat(INIT-REPEAT-ELEM, INIT-REPEAT-N), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) = $mem-bytes($repeat(INIT-REPEAT-ELEM, INIT-REPEAT-N), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES)
+   if _>_ ( INITFULL-COUNT, 0 ) .
+  eq $mem-write(INITFULL-OLD-BYTES, INITFULL-OFF, 0, INITFULL-BYTES) = INITFULL-OLD-BYTES .
+  ceq $mem-write($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-NEWBYTES), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) = $mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, _+_ ( INITFULL-OLD-COUNT, INITFULL-COUNT ), INITFULL-NEWBYTES INITFULL-BYTES)
+   if _>_ ( INITFULL-COUNT, 0 )
+   /\ INITFULL-OFF == _+_ ( INITFULL-OLD-OFF, INITFULL-OLD-COUNT ) .
   ceq $mem-write($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-NEWBYTES), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) = $mem-bytes($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-NEWBYTES), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES)
    if _>_ ( INITFULL-COUNT, 0 ) .
   eq $mem-byte($zero-membytes(INITFULL-LIMN), INITFULL-J) = 0 .
@@ -416,6 +523,14 @@ mod WASM-INIT is
    if _<_ ( INITFULL-J, INITFULL-OFF ) .
   ceq $mem-byte($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES), INITFULL-J) = $mem-byte(INITFULL-OLD-BYTES, INITFULL-J)
    if _>=_ ( INITFULL-J, _+_ ( INITFULL-OFF, INITFULL-COUNT ) ) .
+  ceq $mem-byte($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES) INITFULL-REST, INITFULL-J) =
+    $mem-byte($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES), INITFULL-J)
+   if _<_ ( INITFULL-J, len($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES)) ) .
+  ceq $mem-byte($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES) INITFULL-REST, INITFULL-J) =
+    $mem-byte(INITFULL-REST, _-_ ( INITFULL-J, len($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES)) ))
+   if _>=_ ( INITFULL-J, len($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES)) ) .
+  ceq $mem-byte($repeat(INIT-REPEAT-ELEM, INIT-REPEAT-N), INITFULL-J) = INIT-REPEAT-ELEM
+   if _<_ ( INITFULL-J, INIT-REPEAT-N ) .
   ceq slice($zero-membytes(INITFULL-LIMN), INITFULL-J, INITFULL-COUNT) =
     0 slice($zero-membytes(INITFULL-LIMN), _+_ ( INITFULL-J, 1 ), _-_ ( INITFULL-COUNT, 1 ))
    if _>_ ( INITFULL-COUNT, 0 ) /\ _<_ ( INITFULL-J, len($zero-membytes(INITFULL-LIMN)) ) .
@@ -427,15 +542,46 @@ mod WASM-INIT is
   ceq slice($zero-membytes(INITFULL-LIMN) INITFULL-REST, INITFULL-J, INITFULL-COUNT) =
     slice(INITFULL-REST, _-_ ( INITFULL-J, len($zero-membytes(INITFULL-LIMN)) ), INITFULL-COUNT)
    if _>_ ( INITFULL-COUNT, 0 ) /\ _>=_ ( INITFULL-J, len($zero-membytes(INITFULL-LIMN)) ) .
+  ceq slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES), INITFULL-J, INITFULL-COUNT) =
+    slice(INITFULL-BYTES, _-_ ( INITFULL-J, INITFULL-OLD-OFF ), INITFULL-COUNT)
+   if _>_ ( INITFULL-COUNT, 0 )
+   /\ _>=_ ( INITFULL-J, INITFULL-OLD-OFF )
+   /\ _<=_ ( _+_ ( INITFULL-J, INITFULL-COUNT ), _+_ ( INITFULL-OLD-OFF, INITFULL-OLD-COUNT ) ) .
   ceq slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES), INITFULL-J, INITFULL-COUNT) = $mem-byte($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES), INITFULL-J) slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES), _+_ ( INITFULL-J, 1 ), _-_ ( INITFULL-COUNT, 1 ))
    if _>_ ( INITFULL-COUNT, 0 ) .
+  ceq slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES) INITFULL-REST, INITFULL-J, INITFULL-COUNT) =
+    slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES), INITFULL-J, INITFULL-COUNT)
+   if _>_ ( INITFULL-COUNT, 0 )
+   /\ _<=_ ( _+_ ( INITFULL-J, INITFULL-COUNT ), len($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES)) ) .
+  ceq slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES) INITFULL-REST, INITFULL-J, INITFULL-COUNT) =
+    slice(INITFULL-REST, _-_ ( INITFULL-J, len($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES)) ), INITFULL-COUNT)
+   if _>_ ( INITFULL-COUNT, 0 )
+   /\ _>=_ ( INITFULL-J, len($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES)) ) .
+  ceq slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES) INITFULL-REST, INITFULL-J, INITFULL-COUNT) =
+    $mem-byte($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES) INITFULL-REST, INITFULL-J)
+    slice($mem-bytes(INITFULL-OLD-BYTES, INITFULL-OLD-OFF, INITFULL-OLD-COUNT, INITFULL-BYTES) INITFULL-REST, _+_ ( INITFULL-J, 1 ), _-_ ( INITFULL-COUNT, 1 ))
+   if _>_ ( INITFULL-COUNT, 0 ) .
+  ceq index($repeat(INIT-REPEAT-ELEM, INIT-REPEAT-N), INIT-REPEAT-I) = INIT-REPEAT-ELEM
+   if INIT-REPEAT-I < INIT-REPEAT-N .
+  ceq index($repeat(INIT-REPEAT-ELEM, INIT-REPEAT-N) INITFULL-REST, INIT-REPEAT-I) = INIT-REPEAT-ELEM
+   if INIT-REPEAT-I < INIT-REPEAT-N .
+  ceq index($repeat(INIT-REPEAT-ELEM, INIT-REPEAT-N) INITFULL-REST, INIT-REPEAT-I) =
+    index(INITFULL-REST, _-_ ( INIT-REPEAT-I, INIT-REPEAT-N ))
+   if INIT-REPEAT-I >= INIT-REPEAT-N .
   eq $memaddr(INITFULL-LOWF, INITFULL-MEMX) =
     index(value('MEMS, value('MODULE, INITFULL-LOWF)), $raw-nat-lit(INITFULL-MEMX)) .
   eq $with-mem-slice((INITFULL-LOWS ; INITFULL-LOWF), INITFULL-MEMX, INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) =
     ((INITFULL-LOWS [. 'MEMS <- (value('MEMS, INITFULL-LOWS) [ $memaddr(INITFULL-LOWF, INITFULL-MEMX) <- (index(value('MEMS, INITFULL-LOWS), $memaddr(INITFULL-LOWF, INITFULL-MEMX)) [. 'BYTES <- $mem-write(value('BYTES, index(value('MEMS, INITFULL-LOWS), $memaddr(INITFULL-LOWF, INITFULL-MEMX))), INITFULL-OFF, INITFULL-COUNT, INITFULL-BYTES) ]) ])]) ; INITFULL-LOWF) .
+  eq $runtime-memlimits(lbrack INITFULL-LIMN dotdot eps rbrack) = lbrack INITFULL-LIMN dotdot 65536 rbrack .
+  ceq $runtime-memlimits(lbrack INITFULL-LIMN dotdot INITFULL-LIMJS rbrack) = lbrack INITFULL-LIMN dotdot INITFULL-LIMJS rbrack
+   if INITFULL-LIMJS =/= eps .
   eq $init-membytes(INITFULL-LIMN) = $zero-membytes(INITFULL-LIMN) .
   eq $init-meminsts(eps) = eps .
-  eq $init-meminsts(CTORMEMORYA1(CTORPAGEA2(INITFULL-AT, CTORLBRACKDOTDOTRBRACKA2(INITFULL-LIMN, INITFULL-LIMJS))) INITFULL-REST) = RECMeminstA2(CTORPAGEA2(INITFULL-AT, CTORLBRACKDOTDOTRBRACKA2(INITFULL-LIMN, INITFULL-LIMJS)), $init-membytes(INITFULL-LIMN)) $init-meminsts(INITFULL-REST) .
+  ceq $init-meminsts(INITFULL-MEMS) =
+    RECMeminstA2(INITFULL-AT ( $runtime-memlimits(lbrack INITFULL-LIMN dotdot INITFULL-LIMJS rbrack) ) PAGE, $init-membytes(INITFULL-LIMN))
+    $init-meminsts(slice(INITFULL-MEMS, 1, _-_(len(INITFULL-MEMS), 1)))
+    if len(INITFULL-MEMS) > 0
+    /\ MEMORY ( INITFULL-AT ( lbrack INITFULL-LIMN dotdot INITFULL-LIMJS rbrack ) PAGE ) := index(INITFULL-MEMS, 0) .
   eq len($table-refs(INITFULL-LIMN, INITFULL-REST)) = $raw-nat-lit(INITFULL-LIMN) .
   eq len($table-refs(INITFULL-LIMN, INITFULL-RQ) INITFULL-REST) =
     _+_ (len($table-refs(INITFULL-LIMN, INITFULL-RQ)), len(INITFULL-REST)) .
@@ -452,20 +598,20 @@ mod WASM-INIT is
   eq $seq-set-terminal($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST), INITFULL-J, INITFULL-RREF) =
     $table-refs-set($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST), INITFULL-J, INITFULL-RREF) .
   ceq typecheck($table-refs(INITFULL-LIMN, INITFULL-RREF), ref) = true
-    if typecheck(INITFULL-RREF, ref) = true .
+    if typecheck(INITFULL-RREF, ref) .
   ceq typecheck($table-refs(INITFULL-LIMN, INITFULL-RREF) INITFULL-REST, ref) =
     typecheck(INITFULL-REST, ref)
-    if typecheck(INITFULL-RREF, ref) = true .
+    if typecheck(INITFULL-RREF, ref) .
   ceq typecheck($table-refs-set(INITFULL-REST, INITFULL-J, INITFULL-RREF), ref) = true
-    if typecheck(INITFULL-REST, ref) = true /\ typecheck(INITFULL-RREF, ref) = true .
+    if typecheck(INITFULL-REST, ref) /\ typecheck(INITFULL-RREF, ref) .
   ceq typecheck($table-refs-set(INITFULL-OLD-BYTES, INITFULL-J, INITFULL-RREF) INITFULL-REST, ref) =
     typecheck(INITFULL-REST, ref)
-    if typecheck(INITFULL-OLD-BYTES, ref) = true /\ typecheck(INITFULL-RREF, ref) = true .
+    if typecheck(INITFULL-OLD-BYTES, ref) /\ typecheck(INITFULL-RREF, ref) .
   ceq typecheck($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST), ref) = true
-    if typecheck(INITFULL-DEFAULTREF, ref) = true .
+    if typecheck(INITFULL-DEFAULTREF, ref) .
   ceq typecheck($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST) INITFULL-REST, ref) =
     typecheck(INITFULL-REST, ref)
-    if typecheck(INITFULL-DEFAULTREF, ref) = true .
+    if typecheck(INITFULL-DEFAULTREF, ref) .
   eq ($table-refs(INITFULL-LIMN, INITFULL-RQ)) [ INITFULL-J <- INITFULL-R ] = $table-refs-set($table-refs(INITFULL-LIMN, INITFULL-RQ), INITFULL-J, INITFULL-R) .
   ceq ($table-refs(INITFULL-LIMN, INITFULL-RQ) INITFULL-REST) [ INITFULL-J <- INITFULL-R ] =
     $table-refs-set($table-refs(INITFULL-LIMN, INITFULL-RQ), INITFULL-J, INITFULL-R) INITFULL-REST
@@ -521,45 +667,121 @@ mod WASM-INIT is
   ceq slice($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST), INITFULL-J, INITFULL-COUNT) = eps
     if INITFULL-COUNT > 0 /\ INITFULL-J >= len($active-table-refs(INITFULL-LIMN, INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-ELEMS, INITFULL-MODULEINST)) .
   eq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, eps, INITFULL-MODULEINST, INITFULL-J) = INITFULL-DEFAULTREF .
-  eq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORPASSIVEA0) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) .
-  eq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORDECLAREA0) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-X, CTORCONSTA2(CTORI32A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
+  eq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS PASSIVE INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) .
+  eq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS DECLARE INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) .
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-X ( CONST I32 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
    if INITFULL-TABLEIDX =/= INITFULL-X .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-TABLEIDX, CTORCONSTA2(CTORI32A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = index($init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS), _-_ ( INITFULL-J, INITFULL-OFF ))
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-TABLEIDX ( CONST I32 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = index($init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS), _-_ ( INITFULL-J, INITFULL-OFF ))
    if _and_ ( _>=_ ( INITFULL-J, INITFULL-OFF ), _<_ ( INITFULL-J, _+_ ( INITFULL-OFF, len(INITFULL-EEXPRS) ) ) ) .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-TABLEIDX, CTORCONSTA2(CTORI32A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-TABLEIDX ( CONST I32 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
    if _<_ ( INITFULL-J, INITFULL-OFF ) .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-TABLEIDX, CTORCONSTA2(CTORI32A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-TABLEIDX ( CONST I32 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
    if _>=_ ( INITFULL-J, _+_ ( INITFULL-OFF, len(INITFULL-EEXPRS) ) ) .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-X, CTORCONSTA2(CTORI64A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-X ( CONST I64 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
    if INITFULL-TABLEIDX =/= INITFULL-X .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-TABLEIDX, CTORCONSTA2(CTORI64A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = index($init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS), _-_ ( INITFULL-J, INITFULL-OFF ))
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-TABLEIDX ( CONST I64 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = index($init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS), _-_ ( INITFULL-J, INITFULL-OFF ))
    if _and_ ( _>=_ ( INITFULL-J, INITFULL-OFF ), _<_ ( INITFULL-J, _+_ ( INITFULL-OFF, len(INITFULL-EEXPRS) ) ) ) .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-TABLEIDX, CTORCONSTA2(CTORI64A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-TABLEIDX ( CONST I64 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
    if _<_ ( INITFULL-J, INITFULL-OFF ) .
-  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-TABLEIDX, CTORCONSTA2(CTORI64A0, INITFULL-OFF))) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
+  ceq $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-TABLEIDX ( CONST I64 INITFULL-OFF ) ) INITFULL-REST, INITFULL-MODULEINST, INITFULL-J) = $active-table-ref-at(INITFULL-DEFAULTREF, INITFULL-TABLEIDX, INITFULL-REST, INITFULL-MODULEINST, INITFULL-J)
    if _>=_ ( INITFULL-J, _+_ ( INITFULL-OFF, len(INITFULL-EEXPRS) ) ) .
   eq $init-tablerefs(INITFULL-LIMN, INITFULL-REST) = $table-refs(INITFULL-LIMN, INITFULL-REST) .
   eq $init-tableinsts(eps, INITFULL-ELEMS, INITFULL-MODULEINST, INITFULL-TABLE-I) = eps .
-  eq $init-tableinsts(CTORTABLEA2(INITFULL-AT CTORLBRACKDOTDOTRBRACKA2(INITFULL-LIMN, INITFULL-LIMJS) INITFULL-RT, INITFULL-TEXPR) INITFULL-REST, INITFULL-ELEMS, INITFULL-MODULEINST, INITFULL-TABLE-I) = RECTableinstA2(INITFULL-AT CTORLBRACKDOTDOTRBRACKA2(INITFULL-LIMN, INITFULL-LIMJS) INITFULL-RT, $active-table-refs(INITFULL-LIMN, $init-const-ref(INITFULL-MODULEINST, INITFULL-TEXPR), INITFULL-TABLE-I, INITFULL-ELEMS, INITFULL-MODULEINST)) $init-tableinsts(INITFULL-REST, INITFULL-ELEMS, INITFULL-MODULEINST, INITFULL-TABLE-I + 1) .
+  ceq $init-tableinsts(INITFULL-TABLES, INITFULL-ELEMS, INITFULL-MODULEINST, INITFULL-TABLE-I) =
+    RECTableinstA2(INITFULL-AT lbrack INITFULL-LIMN dotdot INITFULL-LIMJS rbrack INITFULL-RT, $active-table-refs(INITFULL-LIMN, $init-const-ref(INITFULL-MODULEINST, INITFULL-TEXPR), INITFULL-TABLE-I, INITFULL-ELEMS, INITFULL-MODULEINST))
+    $init-tableinsts(slice(INITFULL-TABLES, 1, _-_(len(INITFULL-TABLES), 1)), INITFULL-ELEMS, INITFULL-MODULEINST, INITFULL-TABLE-I + 1)
+    if len(INITFULL-TABLES) > 0
+    /\ TABLE ( INITFULL-AT lbrack INITFULL-LIMN dotdot INITFULL-LIMJS rbrack INITFULL-RT ) INITFULL-TEXPR := index(INITFULL-TABLES, 0) .
   eq $init-datainsts(eps) = eps .
-  eq $init-datainsts(CTORDATAA2(INITFULL-BYTES, INITFULL-DMODE) INITFULL-REST) = RECDatainstA1(INITFULL-BYTES) $init-datainsts(INITFULL-REST) .
+  ceq $init-datainsts(INITFULL-DATAS) =
+    RECDatainstA1(INITFULL-BYTES)
+    $init-datainsts(slice(INITFULL-DATAS, 1, _-_(len(INITFULL-DATAS), 1)))
+    if len(INITFULL-DATAS) > 0
+    /\ DATA INITFULL-BYTES INITFULL-DMODE := index(INITFULL-DATAS, 0) .
+  eq $init-active-data-store(INITFULL-LOWS, INITFULL-MODULEINST, eps, INITFULL-DATA-I) = INITFULL-LOWS .
+  ceq $init-active-data-store(INITFULL-LOWS, INITFULL-MODULEINST, INITFULL-DATAS, INITFULL-DATA-I) =
+    $init-active-data-store(INITFULL-LOWS, INITFULL-MODULEINST, slice(INITFULL-DATAS, 1, _-_(len(INITFULL-DATAS), 1)), INITFULL-DATA-I + 1)
+    if len(INITFULL-DATAS) > 0
+    /\ DATA INITFULL-BYTES PASSIVE := index(INITFULL-DATAS, 0) .
+  eq $init-active-data-store-write(INITFULL-LOWS, INITFULL-MODULEINST, INITFULL-X, INITFULL-OFFTERM, INITFULL-BYTES) =
+    (INITFULL-LOWS
+      [. 'MEMS <- (value('MEMS, INITFULL-LOWS) [ index(value('MEMS, INITFULL-MODULEINST), $raw-nat-lit(INITFULL-X)) <- (index(value('MEMS, INITFULL-LOWS), index(value('MEMS, INITFULL-MODULEINST), $raw-nat-lit(INITFULL-X))) [. 'BYTES <- $mem-write(value('BYTES, index(value('MEMS, INITFULL-LOWS), index(value('MEMS, INITFULL-MODULEINST), $raw-nat-lit(INITFULL-X)))), $raw-nat-lit(INITFULL-OFFTERM), len(INITFULL-BYTES), INITFULL-BYTES) ]) ])]) .
+  eq $init-active-data-store-drop(INITFULL-LOWS, INITFULL-DATA-I) =
+    (INITFULL-LOWS
+      [. 'DATAS <- (value('DATAS, INITFULL-LOWS) [ INITFULL-DATA-I <- RECDatainstA1(eps) ])]) .
+  ceq $init-active-data-store(INITFULL-LOWS, INITFULL-MODULEINST, INITFULL-DATAS, INITFULL-DATA-I) =
+    $init-active-data-store(
+      $init-active-data-store-drop(
+        $init-active-data-store-write(INITFULL-LOWS, INITFULL-MODULEINST, INITFULL-X, INITFULL-OFFTERM, INITFULL-BYTES),
+        INITFULL-DATA-I),
+      INITFULL-MODULEINST,
+      slice(INITFULL-DATAS, 1, _-_(len(INITFULL-DATAS), 1)),
+      INITFULL-DATA-I + 1)
+    if len(INITFULL-DATAS) > 0
+    /\ DATA INITFULL-BYTES ( ACTIVE INITFULL-X ( CONST INITFULL-AT INITFULL-OFFTERM ) ) := index(INITFULL-DATAS, 0) .
   eq $init-eleminsts(eps, INITFULL-MODULEINST) = eps .
-  eq $init-eleminsts(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORDECLAREA0) INITFULL-REST, INITFULL-MODULEINST) = RECEleminstA2(INITFULL-RT, eps) $init-eleminsts(INITFULL-REST, INITFULL-MODULEINST) .
-  eq $init-eleminsts(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, INITFULL-EMODE) INITFULL-REST, INITFULL-MODULEINST) = RECEleminstA2(INITFULL-RT, $init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS)) $init-eleminsts(INITFULL-REST, INITFULL-MODULEINST) .
+  ceq $init-eleminsts(INITFULL-ELEMS, INITFULL-MODULEINST) =
+    RECEleminstA2(INITFULL-RT, eps)
+    $init-eleminsts(slice(INITFULL-ELEMS, 1, _-_(len(INITFULL-ELEMS), 1)), INITFULL-MODULEINST)
+    if len(INITFULL-ELEMS) > 0
+    /\ ELEM INITFULL-RT INITFULL-EEXPRS DECLARE := index(INITFULL-ELEMS, 0) .
+  ceq $init-eleminsts(INITFULL-ELEMS, INITFULL-MODULEINST) =
+    RECEleminstA2(INITFULL-RT, $init-const-refs(INITFULL-MODULEINST, INITFULL-EEXPRS))
+    $init-eleminsts(slice(INITFULL-ELEMS, 1, _-_(len(INITFULL-ELEMS), 1)), INITFULL-MODULEINST)
+    if len(INITFULL-ELEMS) > 0
+    /\ ELEM INITFULL-RT INITFULL-EEXPRS INITFULL-EMODE := index(INITFULL-ELEMS, 0) .
   eq $init-run-datas(eps, INITFULL-DATA-I) = eps .
-  eq $init-run-datas(CTORDATAA2(INITFULL-BYTES, CTORPASSIVEA0) INITFULL-REST, INITFULL-DATA-I) = $init-run-datas(INITFULL-REST, INITFULL-DATA-I + 1) .
-  eq $init-run-datas(CTORDATAA2(INITFULL-BYTES, CTORACTIVEA2(INITFULL-X, INITFULL-EXPR)) INITFULL-REST, INITFULL-DATA-I) = $rundata(INITFULL-DATA-I, CTORDATAA2(INITFULL-BYTES, CTORACTIVEA2(INITFULL-X, INITFULL-EXPR))) $init-run-datas(INITFULL-REST, INITFULL-DATA-I + 1) .
+  ceq $init-run-datas(INITFULL-DATAS, INITFULL-DATA-I) =
+    $init-run-datas(slice(INITFULL-DATAS, 1, _-_(len(INITFULL-DATAS), 1)), INITFULL-DATA-I + 1)
+    if len(INITFULL-DATAS) > 0
+    /\ DATA INITFULL-BYTES PASSIVE := index(INITFULL-DATAS, 0) .
+  ceq $init-run-datas(INITFULL-DATAS, INITFULL-DATA-I) =
+    $init-run-datas(slice(INITFULL-DATAS, 1, _-_(len(INITFULL-DATAS), 1)), INITFULL-DATA-I + 1)
+    if len(INITFULL-DATAS) > 0
+    /\ DATA INITFULL-BYTES ( ACTIVE INITFULL-X ( CONST INITFULL-AT INITFULL-OFFTERM ) ) := index(INITFULL-DATAS, 0) .
+  ceq $init-run-datas(INITFULL-DATAS, INITFULL-DATA-I) =
+    $rundata(INITFULL-DATA-I, DATA INITFULL-BYTES ( ACTIVE INITFULL-X INITFULL-EXPR ))
+    $init-run-datas(slice(INITFULL-DATAS, 1, _-_(len(INITFULL-DATAS), 1)), INITFULL-DATA-I + 1)
+    if len(INITFULL-DATAS) > 0
+    /\ DATA INITFULL-BYTES ( ACTIVE INITFULL-X INITFULL-EXPR ) := index(INITFULL-DATAS, 0) .
   eq $init-run-elems(eps, INITFULL-ELEM-I) = eps .
-  eq $init-run-elems(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORPASSIVEA0) INITFULL-REST, INITFULL-ELEM-I) = $init-run-elems(INITFULL-REST, INITFULL-ELEM-I + 1) .
-  eq $init-run-elems(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORDECLAREA0) INITFULL-REST, INITFULL-ELEM-I) = $init-run-elems(INITFULL-REST, INITFULL-ELEM-I + 1) .
-  eq $init-run-elems(CTORELEMA3(INITFULL-RT, INITFULL-EEXPRS, CTORACTIVEA2(INITFULL-X, INITFULL-EXPR)) INITFULL-REST, INITFULL-ELEM-I) = CTORELEMDROPA1(INITFULL-ELEM-I) $init-run-elems(INITFULL-REST, INITFULL-ELEM-I + 1) .
+  ceq $init-run-elems(INITFULL-ELEMS, INITFULL-ELEM-I) =
+    $init-run-elems(slice(INITFULL-ELEMS, 1, _-_(len(INITFULL-ELEMS), 1)), INITFULL-ELEM-I + 1)
+    if len(INITFULL-ELEMS) > 0
+    /\ ELEM INITFULL-RT INITFULL-EEXPRS PASSIVE := index(INITFULL-ELEMS, 0) .
+  ceq $init-run-elems(INITFULL-ELEMS, INITFULL-ELEM-I) =
+    $init-run-elems(slice(INITFULL-ELEMS, 1, _-_(len(INITFULL-ELEMS), 1)), INITFULL-ELEM-I + 1)
+    if len(INITFULL-ELEMS) > 0
+    /\ ELEM INITFULL-RT INITFULL-EEXPRS DECLARE := index(INITFULL-ELEMS, 0) .
+  ceq $init-run-elems(INITFULL-ELEMS, INITFULL-ELEM-I) =
+    ELEM-DROP INITFULL-ELEM-I
+    $init-run-elems(slice(INITFULL-ELEMS, 1, _-_(len(INITFULL-ELEMS), 1)), INITFULL-ELEM-I + 1)
+    if len(INITFULL-ELEMS) > 0
+    /\ ELEM INITFULL-RT INITFULL-EEXPRS ( ACTIVE INITFULL-X INITFULL-EXPR ) := index(INITFULL-ELEMS, 0) .
   eq $init-start-instrs(eps) = eps .
-  eq $init-start-instrs(CTORSTARTA1(INITFULL-X)) = CTORCALLA1(INITFULL-X) .
+  eq $init-start-instrs(START INITFULL-X) = CALL INITFULL-X .
+  eq $init-moduleinst-full-base(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS) =
+    RECModuleinstA9(
+      $init-deftypes(INITFULL-TYPES, 0),
+      $tagsxa(INITFULL-EXTERNADDRS),
+      $globalsxa(INITFULL-EXTERNADDRS) $init-globaladdrs(INITFULL-GLOBALS, len(value('GLOBALS, INITFULL-LOWS))),
+      $memsxa(INITFULL-EXTERNADDRS) $init-memaddrs(INITFULL-MEMS, len(value('MEMS, INITFULL-LOWS))),
+      $tablesxa(INITFULL-EXTERNADDRS) $init-tableaddrs(INITFULL-TABLES, len(value('TABLES, INITFULL-LOWS))),
+      $funcsxa(INITFULL-EXTERNADDRS) $init-funcaddrs(INITFULL-FUNCS, len(value('FUNCS, INITFULL-LOWS))),
+      $init-dataaddrs(INITFULL-DATAS, len(value('DATAS, INITFULL-LOWS))),
+      $init-elemaddrs(INITFULL-ELEMS, len(value('ELEMS, INITFULL-LOWS))),
+      eps) .
+  eq $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS) =
+    ($init-moduleinst-full-base(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)
+      [. 'EXPORTS <- $allocexports($init-moduleinst-full-base(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), INITFULL-EXPORTS)]) .
   eq $init-state-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS) =
     (INITFULL-LOWS ; RECFrameA2(eps, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS))) .
   eq $init-store-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS) =
-    RECStoreA10(value('TAGS, INITFULL-LOWS), value('GLOBALS, INITFULL-LOWS) $init-globalinsts-full($init-state-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), INITFULL-GLOBALS, len(value('ARRAYS, INITFULL-LOWS))), value('MEMS, INITFULL-LOWS) $init-meminsts(INITFULL-MEMS), value('TABLES, INITFULL-LOWS) $init-tableinsts(INITFULL-TABLES, INITFULL-ELEMS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), len($tablesxa(INITFULL-EXTERNADDRS))), value('FUNCS, INITFULL-LOWS) $init-funcinsts(INITFULL-TYPES, INITFULL-FUNCS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)), value('DATAS, INITFULL-LOWS) $init-datainsts(INITFULL-DATAS), value('ELEMS, INITFULL-LOWS) $init-eleminsts(INITFULL-ELEMS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)), value('STRUCTS, INITFULL-LOWS), value('ARRAYS, INITFULL-LOWS) $init-global-arrayinsts($init-state-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), INITFULL-GLOBALS), value('EXNS, INITFULL-LOWS)) .
+    $init-active-data-store(
+      RECStoreA10(value('TAGS, INITFULL-LOWS), value('GLOBALS, INITFULL-LOWS) $init-globalinsts-full($init-state-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), INITFULL-GLOBALS, len(value('ARRAYS, INITFULL-LOWS))), value('MEMS, INITFULL-LOWS) $init-meminsts(INITFULL-MEMS), value('TABLES, INITFULL-LOWS) $init-tableinsts(INITFULL-TABLES, INITFULL-ELEMS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), len($tablesxa(INITFULL-EXTERNADDRS))), value('FUNCS, INITFULL-LOWS) $init-funcinsts(INITFULL-TYPES, INITFULL-FUNCS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)), value('DATAS, INITFULL-LOWS) $init-datainsts(INITFULL-DATAS), value('ELEMS, INITFULL-LOWS) $init-eleminsts(INITFULL-ELEMS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)), value('STRUCTS, INITFULL-LOWS), value('ARRAYS, INITFULL-LOWS) $init-global-arrayinsts($init-state-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS), INITFULL-GLOBALS), value('EXNS, INITFULL-LOWS)),
+      $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS),
+      INITFULL-DATAS,
+      0) .
   eq value('TYPES, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)) = $init-deftypes(INITFULL-TYPES, 0) .
   eq value('TAGS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)) = $tagsxa(INITFULL-EXTERNADDRS) .
   eq value('GLOBALS, $init-moduleinst-full(INITFULL-LOWS, INITFULL-TYPES, INITFULL-IMPORTS, INITFULL-TAGS, INITFULL-GLOBALS, INITFULL-MEMS, INITFULL-TABLES, INITFULL-FUNCS, INITFULL-DATAS, INITFULL-ELEMS, INITFULL-STARTS, INITFULL-EXPORTS, INITFULL-EXTERNADDRS)) = $globalsxa(INITFULL-EXTERNADDRS) $init-globaladdrs(INITFULL-GLOBALS, len(value('GLOBALS, INITFULL-LOWS))) .

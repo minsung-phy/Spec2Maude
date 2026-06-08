@@ -39,114 +39,81 @@ mod WASM-FIB is
   var N : SpectecTerminal .
 
   op i32v : Nat -> SpectecTerminal .
-  eq i32v(I:Nat) = CTORCONSTA2(CTORI32A0, I:Nat) .
+  eq i32v(I:Nat) = CONST I32 I:Nat .
 
   op fib-loop-body : -> SpectecTerminals .
   eq fib-loop-body =
-    CTORLOCALGETA1(0)
-    CTORCONSTA2(CTORI32A0, 0)
-    CTORRELOPA2(CTORI32A0, CTORLEA1(CTORSA0))
-    CTORBRIFA1(1)
-    CTORLOCALGETA1(1)
-    CTORLOCALGETA1(2)
-    CTORBINOPA2(CTORI32A0, CTORADDA0)
-    CTORLOCALSETA1(3)
-    CTORLOCALGETA1(2)
-    CTORLOCALSETA1(1)
-    CTORLOCALGETA1(3)
-    CTORLOCALSETA1(2)
-    CTORLOCALGETA1(0)
-    CTORCONSTA2(CTORI32A0, 1)
-    CTORBINOPA2(CTORI32A0, CTORSUBA0)
-    CTORLOCALSETA1(0)
-    CTORBRA1(0) .
+    (LOCAL-GET 0)
+    (CONST I32 0)
+    (RELOP I32 (LE S))
+    (BR-IF 1)
+    (LOCAL-GET 1)
+    (LOCAL-GET 2)
+    (BINOP I32 ADD)
+    (LOCAL-SET 3)
+    (LOCAL-GET 2)
+    (LOCAL-SET 1)
+    (LOCAL-GET 3)
+    (LOCAL-SET 2)
+    (LOCAL-GET 0)
+    (CONST I32 1)
+    (BINOP I32 SUB)
+    (LOCAL-SET 0)
+    (BR 0) .
 
   op fib-body : -> SpectecTerminals .
   eq fib-body =
-    CTORBLOCKA2(CTORWRESULTA1(eps),
-      CTORLOOPA2(CTORWRESULTA1(eps), fib-loop-body))
-    CTORLOCALGETA1(1) .
+    (BLOCK (w--RESULT eps) ((LOOP (w--RESULT eps) fib-loop-body)))
+    (LOCAL-GET 1) .
 
   op fib-type : -> SpectecTerminal .
   eq fib-type =
-    CTORWDEFA2(
-      CTORRECA1(CTORSUBA3(eps, eps,
-        CTORFUNCARROWA2(
-          CTORI32A0
-          CTORI32A0
-          CTORI32A0,
-          CTORI32A0))),
-      0) .
+    w--DEF ( REC ( SUB eps eps ( FUNC ( I32
+          I32
+          I32 ) arrow I32 ) ) ) 0 .
 
   op fib-rectype : -> SpectecTerminal .
   eq fib-rectype =
-    CTORRECA1(CTORSUBA3(eps, eps,
-      CTORFUNCARROWA2(
-        CTORI32A0
-        CTORI32A0
-        CTORI32A0,
-        CTORI32A0))) .
+    REC ( SUB eps eps ( FUNC ( I32
+        I32
+        I32 ) arrow I32 ) ) .
 
   op fib-source-type : -> SpectecTerminal .
-  eq fib-source-type = CTORTYPEA1(fib-rectype) .
+  eq fib-source-type = TYPE fib-rectype .
 
-  op fib-moduleinst : -> SpectecTerminal [ctor] .
-  eq value('TYPES,   fib-moduleinst) = fib-type .
-  eq value('TAGS,    fib-moduleinst) = eps .
-  eq value('GLOBALS, fib-moduleinst) = eps .
-  eq value('MEMS,    fib-moduleinst) = eps .
-  eq value('TABLES,  fib-moduleinst) = eps .
-  eq value('FUNCS,   fib-moduleinst) = 0 .
-  eq value('DATAS,   fib-moduleinst) = eps .
-  eq value('ELEMS,   fib-moduleinst) = eps .
-  eq value('EXPORTS, fib-moduleinst) = eps .
+  op fib-moduleinst : -> SpectecTerminal .
+  eq fib-moduleinst =
+    RECModuleinstA9(
+      fib-type, eps, eps, eps, eps, 0, eps, eps, eps) .
 
   op fib-func : -> SpectecTerminal .
   eq fib-func =
-    CTORFUNCA3(0,
-      CTORLOCALA1(CTORI32A0),
-      fib-body) .
+    FUNC 0 (LOCAL I32) fib-body .
 
-  op fib-funcinst : -> SpectecTerminal [ctor] .
-  eq value('TYPE,   fib-funcinst) = fib-type .
-  eq value('MODULE, fib-funcinst) = fib-moduleinst .
-  eq value('CODE,   fib-funcinst) = fib-func .
+  op fib-funcinst : -> SpectecTerminal .
+  eq fib-funcinst =
+    RECFuncinstA3(fib-type, fib-moduleinst, fib-func) .
 
-  op fib-store : -> Store [ctor] .
-  eq value('TAGS,    fib-store) = eps .
-  eq value('GLOBALS, fib-store) = eps .
-  eq value('MEMS,    fib-store) = eps .
-  eq value('TABLES,  fib-store) = eps .
-  eq value('FUNCS,   fib-store) = fib-funcinst .
-  eq value('DATAS,   fib-store) = eps .
-  eq value('ELEMS,   fib-store) = eps .
-  eq value('STRUCTS, fib-store) = eps .
-  eq value('ARRAYS,  fib-store) = eps .
-  eq value('EXNS,    fib-store) = eps .
+  op fib-store : -> Store .
+  eq fib-store =
+    RECStoreA10(
+      eps, eps, eps, eps, fib-funcinst,
+      eps, eps, eps, eps, eps) .
 
   op fib-config : SpectecTerminal -> Config .
-  op empty-moduleinst : -> SpectecTerminal [ctor] .
-  eq value('TYPES,   empty-moduleinst) = eps .
-  eq value('TAGS,    empty-moduleinst) = eps .
-  eq value('GLOBALS, empty-moduleinst) = eps .
-  eq value('MEMS,    empty-moduleinst) = eps .
-  eq value('TABLES,  empty-moduleinst) = eps .
-  eq value('FUNCS,   empty-moduleinst) = eps .
-  eq value('DATAS,   empty-moduleinst) = eps .
-  eq value('ELEMS,   empty-moduleinst) = eps .
-  eq value('EXPORTS, empty-moduleinst) = eps .
+  op empty-moduleinst : -> SpectecTerminal .
+  eq empty-moduleinst = $empty-moduleinst .
 
-  op empty-frame : -> Frame [ctor] .
-  eq value('LOCALS, empty-frame) = eps .
-  eq value('MODULE, empty-frame) = empty-moduleinst .
+  op empty-frame : -> Frame .
+  eq empty-frame = $empty-frame .
 
   eq fib-config(NVAL) =
     (((fib-store ; empty-frame).State) ;
       (NVAL
       i32v(0)
-      i32v(1))
-      CTORREFFUNCADDRA1(0)
-      CTORCALLREFA1(fib-type)) .
+      i32v(1)
+      (REF-FUNC-ADDR 0)
+      (CALL-REF fib-type))) .
 
   op fib-config-invoke : SpectecTerminal -> Config .
   eq fib-config-invoke(NVAL) =
@@ -155,34 +122,23 @@ mod WASM-FIB is
       i32v(0)
       i32v(1)) .
 
-  op empty-store : -> Store [ctor] .
-  eq value('TAGS,    empty-store) = eps .
-  eq value('GLOBALS, empty-store) = eps .
-  eq value('MEMS,    empty-store) = eps .
-  eq value('TABLES,  empty-store) = eps .
-  eq value('FUNCS,   empty-store) = eps .
-  eq value('DATAS,   empty-store) = eps .
-  eq value('ELEMS,   empty-store) = eps .
-  eq value('STRUCTS, empty-store) = eps .
-  eq value('ARRAYS,  empty-store) = eps .
-  eq value('EXNS,    empty-store) = eps .
+  op empty-store : -> Store .
   eq empty-store = $empty-store .
 
   op fib-module : -> SpectecTerminal .
   eq fib-module =
-    CTORMODULEA11(
-      fib-source-type, --- types
-      eps, --- imports
-      eps, --- tags
-      eps, --- globals
-      eps, --- mems
-      eps, --- tables
-      fib-func, --- funcs
-      eps, --- datas
-      eps, --- elems
-      eps,        --- start
-      eps --- exports
-    ) .
+    MODULE
+      fib-source-type
+      eps
+      eps
+      eps
+      eps
+      eps
+      fib-func
+      eps
+      eps
+      eps
+      eps .
 
   op fib-init-config : SpectecTerminal -> Config .
   ceq fib-init-config(NVAL) =
