@@ -155,7 +155,7 @@ Run Fibonacci from WAT:
 Expected result:
 
 ```text
-result: CTORCONSTA2(CTORI32A0, 5)
+result: const(i32, 5)
 ```
 
 Validate a WAT/Wasm input before Maude execution:
@@ -212,7 +212,9 @@ make test-official LIMIT=20 TIMEOUT=10
 
 The active C1 baseline currently has:
 
-- warning-free Maude loading for the execution harness;
+- Maude loading with no errors/no-parse diagnostics; parser-ambiguity warnings
+  remain because the generated code preserves source-readable constructors and
+  sequence syntax;
 - local smoke examples for functions, globals, memory, tables, data, elements,
   starts, and imports;
 - official SpecTec/WebAssembly parser-validator based `.wat` / `.wasm` input;
@@ -222,6 +224,9 @@ The active C1 baseline currently has:
   handles the main numeric, vector, and GC/reference expected-result forms;
 - a separated default path where WAT/Wasm validation happens before Maude and
   Maude focuses on dynamic execution.
+- a JHS-style syntax carrier where source category witnesses are generated as
+  `syn-* : SpectecType` terms and concrete syntax constructors are generated as
+  source-readable `SpectecTerminal` terms such as `const(i32, 5)`.
 
 See:
 

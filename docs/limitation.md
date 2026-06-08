@@ -1,6 +1,6 @@
 # Current Limitations And Discussion Points
 
-Updated: 2026-06-03
+Updated: 2026-06-08
 
 This document records the current state after restoring the JHS-style
 `SpectecType`/`typecheck` syntax layer and adding Maude constructor membership
@@ -23,9 +23,9 @@ by benchmark scripts to expand official `.wast` tests into JSON.
 The generated syntax layer now follows AST-driven JHS carrier patterns:
 
 ```text
-category/type name           constructor term of sort SpectecType
-source syntax constructor    broad constructor returning SpectecTerminal
-category check               eq/ceq typecheck(pattern, category-term) = true
+category/type name           syn-* constructor term of sort SpectecType
+source syntax constructor    lowercase source-readable constructor returning SpectecTerminal
+category check               eq/ceq typecheck(pattern, syn-category-term) = true
 constructor membership       mb/cmb pattern : SpectecTerminal
 category alias/inclusion     delegated typecheck equation
 ```
@@ -46,13 +46,13 @@ Numeric literal families are represented as raw Maude numerals carried by
 `SpectecTerminal`:
 
 ```text
-i32.const 5 -> CTORCONSTA2(CTORI32A0, 5)
-i64.const 5 -> CTORCONSTA2(CTORI64A0, 5)
+i32.const 5 -> const(i32, 5)
+i64.const 5 -> const(i64, 5)
 ```
 
 This follows the JHS carrier shape: `Nat`/`Int` are terminals, and generated
-`typecheck(raw-number, source-type)` equations classify source numeric
-categories such as `uN(32)`, `sN(33)`, and `byte`.
+`typecheck(raw-number, syn-source-type)` equations classify source numeric
+categories such as `syn-uN(32)`, `syn-sN(33)`, and `syn-byte`.
 
 ## 3. What Changed Beyond Syntax
 
@@ -177,13 +177,20 @@ membership generation:
 ```text
 make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
-maude -no-banner output.maude                        PASS, no warnings
-maude -no-banner wasm-exec.maude                     PASS, no warnings
+python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
+                                                     PASS
+maude -no-banner output.maude                        PASS, warnings: 164,
+                                                     no-parse: 0
+maude -no-banner wasm-exec.maude                     PASS, warnings: 177,
+                                                     no-parse: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
 ./spec2maude run wat_examples/fib.wat --fib 5        PASS
 ./spec2maude run wat_examples/data-load.wat          PASS
 ./spec2maude test smoke --timeout 10                 PASS: 13
+./spec2maude test official --limit 30 --timeout 5    PASS: 45, MODULE_STAGE: 43,
+                                                     INVALID: 10, STUCK_INIT: 13,
+                                                     STUCK_STEP: 67, WRONG_RESULT: 3
 ```
 
 Larger official/external benchmark numbers should be regenerated after each
@@ -192,9 +199,12 @@ chosen pipeline.
 
 Important interpretation:
 
+- Maude load warnings are currently parser-ambiguity warnings, not load errors.
+- `MODULE_STAGE` is not a runtime failure; it is an official `.wast` command
+  with no assertion result to compare.
 - `STUCK_VALIDATION` belongs only to the experimental Maude validation path.
-- `STUCK_STEP` and `WRONG_RESULT` are the more important runtime execution gaps
-  for the default architecture.
+- `STUCK_INIT`, `STUCK_STEP`, and `WRONG_RESULT` are the more important default
+  pipeline gaps.
 
 ## 9. What To Say In A Meeting
 
@@ -202,13 +212,13 @@ Short version:
 
 ```text
 The syntax layer is back to the JHS carrier shape: SpecTec categories are
-SpectecType terms, constructors return SpectecTerminal, category validity is
-represented by typecheck, and constructor existence also emits Maude mb/cmb
-membership on SpectecTerminal.  Numeric literals use explicit object-level
-raw Maude numerals, while source numeric categories are classified by
-generated typecheck equations.  The Step/Step_pure/Step_read/Steps relations
-are still generated from the SpecTec source; numeric boundary helpers are
-representation plumbing, not a semantic replacement.
+syn-* SpectecType terms, source syntax constructors return SpectecTerminal,
+category validity is represented by typecheck, and constructor existence also
+emits Maude mb/cmb membership on SpectecTerminal.  Numeric literals use
+explicit object-level raw Maude numerals, while source numeric categories are
+classified by generated typecheck equations.  The Step/Step_pure/Step_read/Steps
+relations are still generated from the SpecTec source; numeric boundary helpers
+are representation plumbing, not a semantic replacement.
 ```
 
 Open question:
