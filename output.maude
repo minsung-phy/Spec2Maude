@@ -9582,7 +9582,7 @@ mod SPECTEC-CORE is
   eq $free-instr(nop) = RECFreeA10(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps) .
   eq $free-instr(unreachable) = RECFreeA10(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps) .
   eq $free-instr(drop) = RECFreeA10(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps) .
-  ceq $free-instr(select(FREE-INSTR3-VALTYPES)) = $free-opt($free-list($free-valtype(VALTYPE)))
+  ceq $free-instr(select(FREE-INSTR3-VALTYPES)) = $free-opt($free-list($free-valtypes(FREE-INSTR3-VALTYPES)))
       if typecheck(FREE-INSTR3-VALTYPES, syn-valtype) .
   ceq $free-instr(( block(FREE-INSTR4-BLOCKTYPE, FREE-INSTR4-INSTRS) )) = merge ( $free-blocktype(FREE-INSTR4-BLOCKTYPE) , $free-block(FREE-INSTR4-INSTRS) )
       if typecheck(FREE-INSTR4-BLOCKTYPE, syn-blocktype) /\ typecheck(FREE-INSTR4-INSTRS, syn-instr) .
