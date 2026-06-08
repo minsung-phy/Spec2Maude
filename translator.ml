@@ -12719,7 +12719,7 @@ let normalize_unbound_free_list_star_maps lhs rhs =
   in
   let re =
     Str.regexp
-      "\\$free-list ( ( \\$\\(free-[A-Za-z0-9-]+\\) ( \\([A-Z][A-Z0-9-]*\\) ) ) )"
+      "\\$free-list[ \t\n\r]*([ \t\n\r]*\\$\\(free-[A-Za-z0-9-]+\\)[ \t\n\r]*([ \t\n\r]*\\([A-Z][A-Z0-9-]*\\)[ \t\n\r]*)[ \t\n\r]*)"
   in
   Str.global_substitute re
     (fun s ->
@@ -12730,7 +12730,7 @@ let normalize_unbound_free_list_star_maps lhs rhs =
           let helper =
             register_map_call_helper ("$" ^ fn_stem) 1 0 ["SpectecTerminals"]
           in
-          Printf.sprintf "$free-list ( ( %s ( %s ) ) )" helper seq_var
+          Printf.sprintf "$free-list(%s(%s))" helper seq_var
       | _ -> Str.matched_string s)
     rhs
 
