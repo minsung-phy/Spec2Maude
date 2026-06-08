@@ -25,12 +25,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW_NUM_CONST_RE = re.compile(r"CTORCONSTA2\(CTOR(I32|I64|F32|F64)A0,\s*([+-]?\d+)\)")
+RAW_NUM_CONST_RE = re.compile(r"CONST__\(\s*(I32|I64|F32|F64)\s*,\s*([+-]?\d+)\)")
 NUM_CONST_SHAPES = {
-    "I32": ("CTORI32A0", 32),
-    "I64": ("CTORI64A0", 64),
-    "F32": ("CTORF32A0", None),
-    "F64": ("CTORF64A0", None),
+    "I32": ("I32", 32),
+    "I64": ("I64", 64),
+    "F32": ("F32", None),
+    "F64": ("F64", None),
 }
 WAST_NUM_TYPES = {
     "i32": "I32",
@@ -58,7 +58,131 @@ PROBLEM_STATUSES = {
     "FRONTEND_FAIL",
     "STUCK_INIT",
     "STUCK_VALIDATION",
+    "UNSUPPORTED",
+    "IMPORT_MISSING",
 }
+
+FRONTEND_FAILURE_STATUSES = {
+    "WABT_FAIL",
+    "FRONTEND_FAIL",
+    "UNSUPPORTED",
+}
+
+HARNESS_MARKERS = {
+    "$instantiate",
+    "$mem-bytes",
+    "$zero-membytes",
+    "$with-mem-slice",
+    "BLOCK__",
+    "BLOCK ",
+    "BRIF_",
+    "BRIF ",
+    "BRTABLE__",
+    "BRTABLE ",
+    "BR_",
+    "BR ",
+    "CALL_",
+    "FRAMELBRACERBRACE___",
+    "LABELLBRACERBRACE___",
+    "FRAMELBRACERBRACE",
+    "LABELLBRACERBRACE",
+    "GLOBALGET_",
+    "GLOBALGET ",
+    "GLOBALSET_",
+    "GLOBALSET ",
+    "LOAD____",
+    "LOAD ",
+    "LOCALGET_",
+    "LOCALGET ",
+    "LOCALSET_",
+    "LOCALSET ",
+    "LOCALTEE_",
+    "LOCALTEE ",
+    "LOOP__",
+    "LOOP ",
+    "MEMORYCOPY__",
+    "MEMORYCOPY ",
+    "MEMORYFILL_",
+    "MEMORYFILL ",
+    "MEMORYGROW_",
+    "MEMORYGROW ",
+    "MEMORYINIT__",
+    "MEMORYINIT ",
+    "MEMORYSIZE_",
+    "MEMORYSIZE ",
+    "STORE____",
+    "STORE ",
+    "TABLECOPY__",
+    "TABLECOPY ",
+    "TABLEFILL_",
+    "TABLEFILL ",
+    "TABLEGET_",
+    "TABLEGET ",
+    "TABLEGROW_",
+    "TABLEGROW ",
+    "TABLEINIT__",
+    "TABLEINIT ",
+    "TABLESET_",
+    "TABLESET ",
+    "WIFELSE___",
+    "WIFELSE ",
+    "CALLREF_",
+    "CALLINDIRECT__",
+    "RETURNCALL_",
+    "CALLREF",
+    "CALLINDIRECT",
+    "RETURNCALL",
+    "RECStoreA10",
+    "RECFrameA2",
+    "generated-init-config",
+    "generated-run-config",
+    "previous stateful action",
+    "administrative/runtime term remains",
+}
+
+BUILTIN_MARKERS = {
+    "$binop",
+    "$unop",
+    "$testop",
+    "$relop",
+    "$cvtop",
+    "$f",
+    "$i",
+    "$nbytes",
+    "$ibytes",
+    "$load",
+    "$store",
+    "$wrap",
+    "$extend",
+    "$trunc",
+    "$nearest",
+    "$sqrt",
+    "$v128",
+    "expected result not found",
+    "expected nan result not found",
+}
+
+STATE_MUTATION_MARKERS = {
+    "GLOBALSET_",
+    "STORE____",
+    "MEMORYGROW_",
+    "MEMORYFILL_",
+    "MEMORYCOPY__",
+    "MEMORYINIT__",
+    "DATADROP_",
+    "TABLESET_",
+    "TABLEGROW_",
+    "TABLEFILL_",
+    "TABLECOPY__",
+    "TABLEINIT__",
+    "ELEMDROP_",
+}
+DIRECT_CALL_RE = re.compile(r"(?:RETURNCALL_|CALL_)\s*\(\s*([0-9]+)\s*\)")
+CALL_REF_RE = re.compile(r"(?:RETURNCALLREF_|CALLREF_)")
+INDIRECT_CALL_RE = re.compile(r"(?:RETURNCALLINDIRECT__|CALLINDIRECT__)")
+STATIC_REF_FUNC_CALL_RE = re.compile(
+    r"REFFUNC(?:ADDR)?_\s*\(\s*([0-9]+)\s*\)\s*(?:RETURNCALLREF_|CALLREF_)"
+)
 
 
 @dataclass
@@ -78,6 +202,38 @@ class Result:
     result_status: str = ""
 
 
+def failure_category(row: Result) -> str:
+    if row.status not in PROBLEM_STATUSES:
+        return ""
+    text = " ".join(
+        [
+            row.status,
+            row.mode,
+            row.step_status,
+            row.observed,
+            row.reason,
+        ]
+    )
+    lower = text.lower()
+    if row.status in FRONTEND_FAILURE_STATUSES:
+        return "FRONTEND_LOWERING"
+    if row.status == "IMPORT_MISSING":
+        return "HARNESS_STATE"
+    if row.status in {"STUCK_INIT", "STUCK_VALIDATION", "STEPPED"}:
+        return "HARNESS_STATE"
+    if any(marker.lower() in lower for marker in HARNESS_MARKERS):
+        return "HARNESS_STATE"
+    if any(marker.lower() in lower for marker in BUILTIN_MARKERS):
+        return "BUILTIN"
+    if row.status == "WRONG_RESULT":
+        return "BUILTIN"
+    if row.status == "STUCK_STEP":
+        return "HARNESS_STATE"
+    if row.status == "FAIL":
+        return "FRONTEND_LOWERING" if "parse" in lower or "lower" in lower else "HARNESS_STATE"
+    return "HARNESS_STATE"
+
+
 @dataclass
 class MemoryDataSegment:
     memory_index: int
@@ -94,6 +250,22 @@ class MemoryExportState:
     def write(self, offset: int, bytes_: list[int]) -> None:
         for i, byte in enumerate(bytes_):
             self.data[offset + i] = byte
+
+
+@dataclass
+class TableExportState:
+    data: dict[int, str]
+
+    def write(self, offset: int, refs: list[str]) -> None:
+        for i, ref in enumerate(refs):
+            self.data[offset + i] = ref
+
+
+@dataclass
+class StateFunc:
+    type_term: str
+    locals_term: str
+    body_term: str
 
 
 def run(cmd: list[str], timeout: int) -> tuple[int, str]:
@@ -138,7 +310,31 @@ def wrapped_num_const(typ: str, value: str) -> str:
         payload = signed_int(value, 64)
     else:
         payload = unsigned_payload(value, bits) if bits is not None else int(value)
-    return f"CTORCONSTA2({ctor}, {payload})"
+    return f"CONST__({ctor}, {payload})"
+
+
+def source_float_const(typ: str, value: str) -> str | None:
+    if typ == "F32":
+        bits, fracbits, ebits, bias = 32, 23, 8, 127
+    elif typ == "F64":
+        bits, fracbits, ebits, bias = 64, 52, 11, 1023
+    else:
+        return None
+    raw = int(value) % (1 << bits)
+    sign = raw >> (bits - 1)
+    exp = (raw >> fracbits) & ((1 << ebits) - 1)
+    frac = raw & ((1 << fracbits) - 1)
+    max_exp = (1 << ebits) - 1
+    if exp == 0:
+        mag = f"SUBNORM_({frac})"
+    elif exp == max_exp and frac == 0:
+        mag = "INF"
+    elif exp == max_exp:
+        mag = f"NAN_({frac})"
+    else:
+        mag = f"NORM__({frac}, {exp - bias})"
+    sign_ctor = "NEG_" if sign else "POS_"
+    return f"CONST__({typ}, {sign_ctor}({mag}))"
 
 
 def wrapped_numeric_equivalent(term: str) -> str:
@@ -148,16 +344,140 @@ def wrapped_numeric_equivalent(term: str) -> str:
     )
 
 
+def source_float_equivalent(term: str) -> str:
+    def repl(match: re.Match[str]) -> str:
+        source = source_float_const(match.group(1), match.group(2))
+        return source if source is not None else match.group(0)
+
+    return RAW_NUM_CONST_RE.sub(repl, term)
+
+
+SOURCE_FLOAT_CONST_RE = re.compile(
+    r"CONST__\(\s*(F32|F64)\s*,\s*(POS_|NEG_)\((SUBNORM_|NAN_|NORM__)\(([^()]*)\)\)\s*\)"
+)
+SOURCE_FLOAT_INF_RE = re.compile(
+    r"CONST__\(\s*(F32|F64)\s*,\s*(POS_|NEG_)\(INF\)\s*\)"
+)
+
+
+def maude_source_float_equivalent(term: str) -> str:
+    """Render source float constants the way Maude prints trailing-underscore ops."""
+
+    def repl_mag(match: re.Match[str]) -> str:
+        typ = match.group(1)
+        sign = match.group(2)[:-1]
+        mag = match.group(3)[:-1].replace("NORM_", "NORM")
+        args = " ".join(part.strip() for part in match.group(4).split(","))
+        return f"CONST {typ} {sign}({mag} {args})"
+
+    def repl_inf(match: re.Match[str]) -> str:
+        return f"CONST {match.group(1)} {match.group(2)[:-1]} INF"
+
+    rendered = SOURCE_FLOAT_CONST_RE.sub(repl_mag, term)
+    rendered = SOURCE_FLOAT_INF_RE.sub(repl_inf, rendered)
+    return rendered
+
+
+def pretty_numeric_equivalent(term: str) -> str:
+    return RAW_NUM_CONST_RE.sub(
+        lambda match: f"CONST {match.group(1)} {match.group(2)}",
+        term,
+    )
+
+
+def split_top_level_args(text: str) -> list[str] | None:
+    args: list[str] = []
+    start = 0
+    depth = 0
+    for index, ch in enumerate(text):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            if depth == 0:
+                return None
+            depth -= 1
+        elif ch == "," and depth == 0:
+            args.append(text[start:index].strip())
+            start = index + 1
+    if depth != 0:
+        return None
+    args.append(text[start:].strip())
+    return args
+
+
+def find_matching_paren(text: str, open_index: int) -> int | None:
+    depth = 0
+    for index in range(open_index, len(text)):
+        ch = text[index]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def readable_mixfix_equivalent(term: str) -> str:
+    """Render generated prefix constructor expectations like K_(X) as K X."""
+    out: list[str] = []
+    index = 0
+    changed = False
+    while index < len(term):
+        match = re.match(r"([A-Z][A-Z0-9]*)(_{1,})\(", term[index:])
+        if match is None:
+            out.append(term[index])
+            index += 1
+            continue
+        name = match.group(1)
+        holes = len(match.group(2))
+        open_index = index + match.end() - 1
+        close_index = find_matching_paren(term, open_index)
+        if close_index is None:
+            out.append(name + " ")
+            index = open_index + 1
+            changed = True
+            continue
+        inner = term[open_index + 1 : close_index]
+        args = split_top_level_args(inner)
+        if args is None or len(args) != holes:
+            out.append(term[index : close_index + 1])
+            index = close_index + 1
+            continue
+        pretty_args = [readable_mixfix_equivalent(arg).strip() for arg in args]
+        out.append(" ".join([name, *pretty_args]).strip())
+        index = close_index + 1
+        changed = True
+    rendered = "".join(out)
+    return " ".join(rendered.split()) if changed else term
+
+
+def append_unique(items: list[str], item: str) -> None:
+    if item and item not in items:
+        items.append(item)
+
+
 def expected_alternatives(expected: str) -> list[str]:
     """Accept explicit expectations plus their canonical raw numeric form."""
     alternatives: list[str] = []
     for item in (part.strip() for part in expected.split(" || ")):
         if not item:
             continue
-        alternatives.append(item)
+        append_unique(alternatives, item)
+        mixfix = readable_mixfix_equivalent(item)
+        append_unique(alternatives, mixfix)
         raw = wrapped_numeric_equivalent(item)
         if raw != item:
-            alternatives.append(raw)
+            append_unique(alternatives, raw)
+            append_unique(alternatives, readable_mixfix_equivalent(raw))
+        source_float = source_float_equivalent(raw)
+        if source_float != raw:
+            append_unique(alternatives, source_float)
+            append_unique(alternatives, readable_mixfix_equivalent(source_float))
+            append_unique(alternatives, maude_source_float_equivalent(source_float))
+        pretty = pretty_numeric_equivalent(raw)
+        if pretty != raw:
+            append_unique(alternatives, pretty)
     return alternatives
 
 
@@ -172,6 +492,11 @@ def compact_expected_alternatives(expected: str) -> list[str]:
 
 def whitespace_free(text: str) -> str:
     return "".join(text.split())
+
+
+def maude_compare_key(text: str) -> str:
+    """Normalize prefix and readable Maude result spellings for substring checks."""
+    return re.sub(r"[\s(),_]+", "", text)
 
 
 def wasm2wat_text(wasm: Path, timeout: int) -> str:
@@ -285,6 +610,20 @@ def wasm_memory_info(
     return memory_pages, memory_imports, exports, active_data
 
 
+def wasm_import_kinds(wasm: Path, timeout: int) -> set[str]:
+    out = wasm2wat_text(wasm, timeout)
+    kinds: set[str] = set()
+    for line in out.splitlines():
+        line = line.strip()
+        if not line.startswith("(import "):
+            continue
+        for kind in ("func", "memory", "table", "global", "tag"):
+            if f"({kind}" in line:
+                kinds.add(kind)
+                break
+    return kinds
+
+
 def function_export_index_from_wasm(wasm: Path, field: str, timeout: int) -> int | None:
     for line in wasm2wat_text(wasm, timeout).splitlines():
         line = line.strip()
@@ -363,6 +702,17 @@ def format_memory_data_spec(name: str, state: MemoryExportState) -> str | None:
     return f"{name}={'@'.join(overlays)}"
 
 
+def format_table_data_spec(name: str, state: TableExportState) -> str | None:
+    overlays = [f"{offset}:{state.data[offset]}" for offset in sorted(state.data)]
+    if not overlays:
+        return None
+    return f"{name}={'@'.join(overlays)}"
+
+
+def format_state_func_spec(func: StateFunc) -> str:
+    return f"type={func.type_term}|locals={func.locals_term}|body={func.body_term}"
+
+
 def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, str]:
     compact = " ".join(out.split())
     lower = out.lower()
@@ -406,6 +756,45 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
     marker = "result:"
     if marker in out:
         observed = out[out.rindex(marker) + len(marker) :].strip().splitlines()[0].strip()
+    admin_terms = [
+        "FRAMELBRACERBRACE___",
+        "LABELLBRACERBRACE___",
+        "FRAMELBRACERBRACE",
+        "LABELLBRACERBRACE",
+        "CALLREF_",
+        "CALLINDIRECT__",
+        "RETURNCALL_",
+        "BLOCK ",
+        "BR ",
+        "BRIF ",
+        "BRTABLE ",
+        "CALL ",
+        "GLOBALGET ",
+        "GLOBALSET ",
+        "LOAD ",
+        "LOCALGET ",
+        "LOCALSET ",
+        "LOCALTEE ",
+        "LOOP ",
+        "MEMORYCOPY ",
+        "MEMORYFILL ",
+        "MEMORYGROW ",
+        "MEMORYINIT ",
+        "MEMORYSIZE ",
+        "STORE ",
+        "TABLECOPY ",
+        "TABLEFILL ",
+        "TABLEGET ",
+        "TABLEGROW ",
+        "TABLEINIT ",
+        "TABLESET ",
+        "WIFELSE ",
+        "CALLREF",
+        "CALLINDIRECT",
+        "RETURNCALL",
+    ]
+    if observed and any(admin in observed for admin in admin_terms):
+        return ("STUCK_STEP", observed, "administrative/runtime term remains")
     if expected:
         if "SEARCH-PASS" in compact:
             return ("PASS", "SEARCH-PASS", "")
@@ -423,17 +812,6 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
             or "steps(generated-checked-run-config" in compact
         ):
             return ("STUCK_STEP", observed or compact[-240:], "steps did not rewrite to a concrete Config")
-        if any(
-            admin in observed
-            for admin in [
-                "CTORFRAMELBRACERBRACEA3",
-                "CTORLABELLBRACERBRACEA3",
-                "CTORCALLREFA1",
-                "CTORCALLINDIRECTA2",
-                "CTORRETURN_CALLA1",
-            ]
-        ):
-            return ("STUCK_STEP", observed, "administrative/runtime term remains")
         nan_expected = NAN_EXPECT_RE.findall(expected)
         if nan_expected:
             if all(observed_has_nan_const(observed or compact, typ) for typ in nan_expected):
@@ -441,8 +819,10 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
             return ("WRONG_RESULT", observed or compact[-240:], "expected NaN result not found")
         expected_items = compact_expected_alternatives(expected)
         compact_no_ws = whitespace_free(compact)
+        compact_key = maude_compare_key(compact)
         if any(
             item in compact or whitespace_free(item) in compact_no_ws
+            or maude_compare_key(item) in compact_key
             for item in expected_items
         ):
             return ("PASS", observed, "")
@@ -509,12 +889,31 @@ def cli_prefix(cli: str) -> list[str]:
     return cli.split()
 
 
+def state_effects_from_wasm(cli: str, wasm: Path, timeout: int) -> dict:
+    code, out = run(cli_prefix(cli) + ["--dump-state-effects", str(wasm)], timeout)
+    if code != 0:
+        code, out = run(
+            cli_prefix(cli) + ["--legacy-wat-parser", "--dump-state-effects", str(wasm)],
+            timeout,
+        )
+    if code != 0:
+        return {"funcs": [], "table_imports": [], "table_exports": [], "active_elems": []}
+    try:
+        data = json.loads(out)
+    except json.JSONDecodeError:
+        return {"funcs": [], "table_imports": [], "table_exports": [], "active_elems": []}
+    for key in ("funcs", "table_imports", "table_exports", "active_elems"):
+        if not isinstance(data.get(key), list):
+            data[key] = []
+    return data
+
+
 def smoke_cases() -> list[tuple[str, list[str], str]]:
     return [
         (
             "fib",
             ["--unchecked-run", "--result-only", "--run", "5", "wat_examples/fib.wat"],
-            "CTORCONSTA2(CTORI32A0, 5)",
+            "CONST__(I32, 5)",
         ),
         (
             "fib-wrapper",
@@ -531,37 +930,37 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "1",
                 "wat_examples/fib-wrapper.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, 5)",
+            "CONST__(I32, 5)",
         ),
         (
             "global-get",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/global-get.wat"],
-            "CTORCONSTA2(CTORI32A0, 42)",
+            "CONST__(I32, 42)",
         ),
         (
             "memory-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/memory-size.wat"],
-            "CTORCONSTA2(CTORI32A0, 0)",
+            "CONST__(I32, 0)",
         ),
         (
             "table-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/table-size.wat"],
-            "CTORCONSTA2(CTORI32A0, 3)",
+            "CONST__(I32, 3)",
         ),
         (
             "start-global",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/start-global.wat"],
-            "CTORCONSTA2(CTORI32A0, 7)",
+            "CONST__(I32, 7)",
         ),
         (
             "data-load",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/data-load.wat"],
-            "CTORCONSTA2(CTORI32A0, 42)",
+            "CONST__(I32, 42)",
         ),
         (
             "elem-call-ref",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/elem-call-ref.wat"],
-            "CTORCONSTA2(CTORI32A0, 9)",
+            "CONST__(I32, 9)",
         ),
         (
             "import-func",
@@ -576,7 +975,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.bump=local.get 0 i32.const 1 i32.add",
                 "wat_examples/import-func.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, 42)",
+            "CONST__(I32, 42)",
         ),
         (
             "import-global",
@@ -589,17 +988,17 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.g=i32.const 77",
                 "wat_examples/import-global.wat",
             ],
-            "CTORCONSTA2(CTORI32A0, 77)",
+            "CONST__(I32, 77)",
         ),
         (
             "import-memory",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-memory.wat"],
-            "CTORCONSTA2(CTORI32A0, 1)",
+            "CONST__(I32, 1)",
         ),
         (
             "import-table",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-table.wat"],
-            "CTORCONSTA2(CTORI32A0, 4)",
+            "CONST__(I32, 4)",
         ),
     ]
 
@@ -642,7 +1041,7 @@ def classify_checked_run_block_output(code: int, out: str) -> tuple[str, str, st
         return ("STUCK_VALIDATION", "", first_line(out))
     if "generated-checked-run-config" in compact or "Module-ok(" in compact:
         return ("PASS", compact[-240:], "")
-    if "steps(" in compact or "result Config:" in out or "CTORTRAPA0" in compact:
+    if "steps(" in compact or "result Config:" in out or "TRAP" in compact:
         return ("WRONG_RESULT", compact[-240:], "invalid module reached runtime")
     return ("PASS", compact[-240:], "")
 
@@ -746,8 +1145,19 @@ def generated_maude_command(maude: str, generated: Path, command: str, timeout: 
             pass
 
 
-def run_generate(cli: str, path: Path, timeout: int, out_path: Path) -> tuple[str, str, str]:
-    code, out = run(cli_prefix(cli) + ["--output", str(out_path), str(path)], timeout)
+def run_generate(
+    cli: str,
+    path: Path,
+    timeout: int,
+    out_path: Path,
+    extra_args: list[str] | None = None,
+) -> tuple[str, str, str]:
+    code, out = run(
+        cli_prefix(cli)
+        + (extra_args or [])
+        + ["--output", str(out_path), str(path)],
+        timeout,
+    )
     return classify_output(code, out)
 
 
@@ -804,11 +1214,14 @@ def run_stage_probe(
     suite: str = "external",
     mode: str = "stage",
     rewrite_limit: int = 10000,
+    extra_cli_args: list[str] | None = None,
 ) -> Result:
     rel = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
     with tempfile.TemporaryDirectory(prefix="spec2maude-stage-") as tmpdir:
         generated = Path(tmpdir) / "generated.maude"
-        gen_status, gen_observed, gen_reason = run_generate(cli, path, timeout, generated)
+        gen_status, gen_observed, gen_reason = run_generate(
+            cli, path, timeout, generated, extra_cli_args
+        )
         if gen_status != "GENERATED":
             return Result(
                 suite,
@@ -906,15 +1319,24 @@ def is_nan_bits(value: int, bits: int) -> bool:
 
 def observed_has_nan_const(text: str, typ: str) -> bool:
     if typ == "F32":
-        ctor, bits = "CTORF32A0", 32
+        ctor, bits = "F32", 32
     elif typ == "F64":
-        ctor, bits = "CTORF64A0", 64
+        ctor, bits = "F64", 64
     else:
         return False
     raw_pattern = re.compile(
-        rf"CTORCONSTA2\s*\(\s*{ctor}\s*,\s*([+-]?\d+)\s*\)"
+        rf"CONST__\s*\(\s*{ctor}\s*,\s*([+-]?\d+)\s*\)"
     )
-    return any(is_nan_bits(int(match.group(1)), bits) for match in raw_pattern.finditer(text))
+    pretty_pattern = re.compile(rf"\bCONST\s+{ctor}\s+([+-]?\d+)\b")
+    source_pattern = re.compile(
+        rf"(?:CONST__\s*\(\s*{ctor}\s*,\s*(?:POS_|NEG_)\s*\(\s*NAN_|"
+        rf"\bCONST\s+{ctor}\s+(?:POS|NEG)\s+NAN\b)"
+    )
+    return (
+        any(is_nan_bits(int(match.group(1)), bits) for match in raw_pattern.finditer(text))
+        or any(is_nan_bits(int(match.group(1)), bits) for match in pretty_pattern.finditer(text))
+        or source_pattern.search(text) is not None
+    )
 
 
 def packed_v128_lanes(value: str) -> int | None:
@@ -935,14 +1357,35 @@ def packed_v128_lanes(value: str) -> int | None:
 
 
 REF_HEAPTYPES = {
-    "funcref": "CTORFUNCA0",
-    "externref": "CTOREXTERNA0",
-    "anyref": "CTORANYA0",
-    "eqref": "CTORWEQA0",
-    "i31ref": "CTORI31A0",
-    "structref": "CTORSTRUCTA0",
-    "arrayref": "CTORARRAYA0",
-    "exnref": "CTOREXNA0",
+    "funcref": "FUNC",
+    "externref": "EXTERN",
+    "anyref": "ANY",
+    "eqref": "WEQ",
+    "i31ref": "I31",
+    "structref": "STRUCT",
+    "arrayref": "ARRAY",
+    "exnref": "EXN",
+    "nullref": "NONE",
+    "nullfuncref": "NOFUNC",
+    "nullexnref": "NOEXN",
+    "nullexternref": "NOEXTERN",
+    "refnull": "NONE",
+}
+
+NULL_REF_ALTERNATIVES = {
+    "anyref": ["ANY", "NONE"],
+    "funcref": ["FUNC", "NOFUNC"],
+    "exnref": ["EXN", "NOEXN"],
+    "externref": ["EXTERN", "NOEXTERN"],
+    "eqref": ["WEQ", "NONE"],
+    "i31ref": ["I31", "NONE"],
+    "structref": ["STRUCT", "NONE"],
+    "arrayref": ["ARRAY", "NONE"],
+    "nullref": ["NONE"],
+    "nullfuncref": ["NOFUNC"],
+    "nullexnref": ["NOEXN"],
+    "nullexternref": ["NOEXTERN"],
+    "refnull": ["ANY", "NONE", "FUNC", "NOFUNC", "EXN", "NOEXN", "EXTERN", "NOEXTERN"],
 }
 
 REF_ARG_FLAGS = {
@@ -957,37 +1400,40 @@ REF_ARG_FLAGS = {
 }
 
 REF_VALUE_CTORS = {
-    "funcref": ["CTORREFFUNCADDRA1"],
-    "externref": ["CTORREFEXTERNA1"],
+    "funcref": ["REFFUNCADDR_"],
+    "externref": ["REFEXTERN_"],
     "anyref": [
-        "CTORREFHOSTADDRA1",
-        "CTORREFEXTERNA1",
-        "CTORREFFUNCADDRA1",
-        "CTORREFI31NUMA1",
-        "CTORREFSTRUCTADDRA1",
-        "CTORREFARRAYADDRA1",
+        "REFHOSTADDR_",
+        "REFEXTERN_",
+        "REFFUNCADDR_",
+        "REFI31NUM_",
+        "REFSTRUCTADDR_",
+        "REFARRAYADDR_",
     ],
-    "eqref": ["CTORREFI31NUMA1", "CTORREFSTRUCTADDRA1", "CTORREFARRAYADDRA1"],
-    "i31ref": ["CTORREFI31NUMA1"],
-    "structref": ["CTORREFSTRUCTADDRA1"],
-    "arrayref": ["CTORREFARRAYADDRA1"],
-    "exnref": ["CTORREFEXNADDRA1"],
+    "eqref": ["REFI31NUM_", "REFSTRUCTADDR_", "REFARRAYADDR_"],
+    "i31ref": ["REFI31NUM_"],
+    "structref": ["REFSTRUCTADDR_"],
+    "arrayref": ["REFARRAYADDR_"],
+    "exnref": ["REFEXNADDR_"],
 }
 
 
 def maude_ref_alternatives(typ: str, value: str | None) -> list[str] | None:
     heap = REF_HEAPTYPES.get(typ)
     ctors = REF_VALUE_CTORS.get(typ)
+    null_heaps = NULL_REF_ALTERNATIVES.get(typ)
+    if typ == "refnull" and value is None:
+        return ["REFNULL_("]
+    if value == "null" or (value is None and null_heaps is not None):
+        return [f"REFNULL_({heap})" for heap in (null_heaps or [heap]) if heap is not None]
     if heap is None or ctors is None:
         return None
-    if value == "null":
-        return [f"CTORREFNULLA1({heap})"]
     if value is None:
         return [f"{ctor}(" for ctor in ctors]
     if typ == "externref":
         return [
-            f"CTORREFEXTERNA1({value})",
-            f"CTORREFEXTERNA1(CTORREFHOSTADDRA1({value}))",
+            f"REFEXTERN_({value})",
+            f"REFEXTERN_(REFHOSTADDR_({value}))",
         ]
     return [f"{ctor}({value})" for ctor in ctors]
 
@@ -1005,10 +1451,10 @@ def maude_num_alternatives(typ: str, value: str | None) -> list[str] | None:
     if typ == "v128":
         if any(re.fullmatch(r"[+-]?\d+", lane) is None for lane in value.split()):
             return None
-        alts = [f"CTORVCONSTA2(CTORV128A0, $v128lanes({value}))"]
+        alts = [f"VCONST__(V128, $v128lanes({value}))"]
         packed = packed_v128_lanes(value)
         if packed is not None:
-            alts.append(f"CTORVCONSTA2(CTORV128A0, {packed})")
+            alts.append(f"VCONST__(V128, {packed})")
         return alts
     return None
 
@@ -1019,9 +1465,9 @@ def maude_arg_flags(typ: str, value: str) -> list[str] | None:
     if typ == "i64":
         return ["--arg-i64", str(signed_int(value, 64))]
     if typ == "f32":
-        return ["--arg-f32", str(int(value))]
+        return ["--arg-f32", f"bits:{int(value)}"]
     if typ == "f64":
-        return ["--arg-f64", str(int(value))]
+        return ["--arg-f64", f"bits:{int(value)}"]
     if typ == "v128":
         return ["--arg-v128", str(value)]
     if typ in REF_ARG_FLAGS:
@@ -1037,9 +1483,9 @@ def prelude_arg_spec(typ: str, value: object) -> str | None:
     if typ == "i64":
         return f"i64={signed_int(str(value), 64)}"
     if typ == "f32":
-        return f"f32={int(str(value))}"
+        return f"f32=bits:{int(str(value))}"
     if typ == "f64":
-        return f"f64={int(str(value))}"
+        return f"f64=bits:{int(str(value))}"
     if typ == "v128":
         return f"v128={format_wast_value(value)}"
     if typ in REF_HEAPTYPES:
@@ -1134,7 +1580,10 @@ def run_wast_assert(
     prelude_specs: list[str] | None = None,
     import_memory_specs: list[str] | None = None,
     memory_data_specs: list[str] | None = None,
+    table_data_specs: list[str] | None = None,
+    state_func_specs: list[str] | None = None,
     rewrite_limit: int = 10000,
+    search_fallback: bool = False,
 ) -> Result:
     action = cmd.get("action", {})
     if action.get("type") != "invoke":
@@ -1162,7 +1611,7 @@ def run_wast_assert(
                 expected_reason,
             )
     elif cmd.get("type") == "assert_trap":
-        expected = "CTORTRAPA0"
+        expected = "TRAP"
     else:
         return Result("spec-tests", name, str(path), "wast-assert", "UNSUPPORTED", "", "", f"unsupported assertion {cmd.get('type')}")
     prelude_args: list[str] = []
@@ -1174,7 +1623,13 @@ def run_wast_assert(
     memory_data_args: list[str] = []
     for spec in memory_data_specs or []:
         memory_data_args.extend(["--memory-data", spec])
-    code, out = run(
+    table_data_args: list[str] = []
+    for spec in table_data_specs or []:
+        table_data_args.extend(["--table-data", spec])
+    state_func_args: list[str] = []
+    for spec in state_func_specs or []:
+        state_func_args.extend(["--state-func", spec])
+    base_cmd = (
         cli_prefix(cli)
         + [
             "--maude",
@@ -1187,12 +1642,62 @@ def run_wast_assert(
         + invoke_flags
         + import_memory_args
         + memory_data_args
+        + table_data_args
+        + state_func_args
         + prelude_args
         + arg_flags
-        + [str(wasm)],
-        timeout,
     )
-    status, observed, reason = classify_step_output(code, out, expected)
+    search_terms = [
+        part.strip()
+        for part in expected.split(" || ")
+        if part.strip() and not part.strip().startswith("__EXPECT_")
+    ]
+    if search_terms:
+        code, out = run(base_cmd + [str(wasm)], timeout)
+        status, observed, reason = classify_step_output(code, out, expected)
+        if status == "PASS":
+            return Result(
+                "spec-tests",
+                name,
+                str(path),
+                "wast-" + cmd.get("type", "assert"),
+                "PASS",
+                expected,
+                observed,
+                reason,
+                parse_status="GENERATED",
+                validation_status="VALIDATED",
+                instantiate_status="INSTANTIATED",
+                step_status="STEPPED",
+                result_status="PASS",
+            )
+        attempts: list[tuple[str, str, str]] = [(status, observed, reason)]
+        if search_fallback:
+            for term in search_terms:
+                code, out = run(base_cmd + ["--search-expected", term, str(wasm)], timeout)
+                status, observed, reason = classify_step_output(code, out, expected)
+                if status == "PASS":
+                    final_status = "PASS"
+                    return Result(
+                        "spec-tests",
+                        name,
+                        str(path),
+                        "wast-" + cmd.get("type", "assert"),
+                        final_status,
+                        expected,
+                        term,
+                        reason,
+                        parse_status="GENERATED",
+                        validation_status="VALIDATED",
+                        instantiate_status="INSTANTIATED",
+                        step_status="STEPPED",
+                        result_status=final_status,
+                    )
+                attempts.append((status, observed, reason))
+        status, observed, reason = attempts[-1] if attempts else ("WRONG_RESULT", "", "expected result is not reachable")
+    else:
+        code, out = run(base_cmd + [str(wasm)], timeout)
+        status, observed, reason = classify_step_output(code, out, expected)
     final_status = "PASS" if status == "PASS" else status
     return Result(
         "spec-tests",
@@ -1222,6 +1727,8 @@ def run_wast_action(
     prelude_specs: list[str] | None = None,
     import_memory_specs: list[str] | None = None,
     memory_data_specs: list[str] | None = None,
+    table_data_specs: list[str] | None = None,
+    state_func_specs: list[str] | None = None,
     rewrite_limit: int = 10000,
 ) -> Result:
     if action.get("type") != "invoke":
@@ -1244,6 +1751,12 @@ def run_wast_action(
     memory_data_args: list[str] = []
     for spec in memory_data_specs or []:
         memory_data_args.extend(["--memory-data", spec])
+    table_data_args: list[str] = []
+    for spec in table_data_specs or []:
+        table_data_args.extend(["--table-data", spec])
+    state_func_args: list[str] = []
+    for spec in state_func_specs or []:
+        state_func_args.extend(["--state-func", spec])
     code, out = run(
         cli_prefix(cli)
         + [
@@ -1257,6 +1770,8 @@ def run_wast_action(
         + invoke_flags
         + import_memory_args
         + memory_data_args
+        + table_data_args
+        + state_func_args
         + prelude_args
         + arg_flags
         + [str(wasm)],
@@ -1317,6 +1832,7 @@ def run_wast_probe(
     max_modules: int,
     max_asserts: int,
     rewrite_limit: int = 10000,
+    search_fallback: bool = False,
 ) -> list[Result]:
     results: list[Result] = []
     if not shutil_which("wast2json") and not shutil_which("wasm-tools"):
@@ -1376,32 +1892,9 @@ def run_wast_probe(
                     f"cannot parse wast2json output: {exc}",
                 )
             ]
-        count = 0
-        for cmd in data.get("commands", []):
-            if max_modules > 0 and count >= max_modules:
-                break
-            if cmd.get("type") != "module":
-                continue
-            filename = cmd.get("filename")
-            if not filename:
-                continue
-            wasm = Path(tmpdir) / filename
-            result = run_stage_probe(
-                cli,
-                maude,
-                wasm,
-                timeout,
-                suite="spec-tests",
-                mode="wast-module-stage",
-                rewrite_limit=rewrite_limit,
-            )
-            result.suite = "spec-tests"
-            result.name = f"{path.stem}:{count}"
-            result.path = str(path)
-            results.append(result)
-            count += 1
         current_module_index = -1
         asserts = 0
+        module_stage_count = 0
         module_files: list[Path] = []
         module_by_name: dict[str, Path] = {}
         register_by_name: dict[str, Path] = {}
@@ -1409,6 +1902,10 @@ def run_wast_probe(
             "spectest": {"memory": MemoryExportState(1, 2, {})}
         }
         memory_exports_by_wasm: dict[str, dict[str, MemoryExportState]] = {}
+        registered_table_exports: dict[str, dict[str, TableExportState]] = {}
+        table_exports_by_wasm: dict[str, dict[str, TableExportState]] = {}
+        state_funcs: list[StateFunc] = []
+        state_effects_cache: dict[str, dict] = {}
         prelude_by_module: dict[str, list[str]] = {}
         failed_prelude_by_module: dict[str, str] = {}
 
@@ -1427,12 +1924,130 @@ def run_wast_probe(
                     specs.append(spec)
             return specs
 
+        def table_data_specs_for(wasm: Path) -> list[str]:
+            specs: list[str] = []
+            for name, state in table_exports_by_wasm.get(str(wasm), {}).items():
+                spec = format_table_data_spec(name, state)
+                if spec is not None:
+                    specs.append(spec)
+            return specs
+
+        def state_func_specs() -> list[str]:
+            return [format_state_func_spec(func) for func in state_funcs]
+
+        def state_cli_args_for(wasm: Path) -> list[str]:
+            args: list[str] = []
+            for spec in import_memory_specs():
+                args.extend(["--import-memory", spec])
+            for spec in memory_data_specs_for(wasm):
+                args.extend(["--memory-data", spec])
+            for spec in table_data_specs_for(wasm):
+                args.extend(["--table-data", spec])
+            for spec in state_func_specs():
+                args.extend(["--state-func", spec])
+            return args
+
+        def effects_for(wasm: Path) -> dict:
+            key = str(wasm)
+            effects = state_effects_cache.get(key)
+            if effects is None:
+                effects = state_effects_from_wasm(cli, wasm, timeout)
+                state_effects_cache[key] = effects
+            return effects
+
+        def action_may_mutate_state(wasm: Path, action: dict) -> bool:
+            field = action.get("field")
+            if not field:
+                return True
+            funcidx = function_export_index_from_wasm(wasm, field, timeout)
+            if funcidx is None:
+                return True
+            effects = effects_for(wasm)
+            funcs = {
+                int(item["index"]): item
+                for item in effects.get("funcs", [])
+                if item.get("index") is not None
+            }
+            table_targets: set[int] | None = set()
+            if effects.get("table_imports"):
+                table_targets = None
+            else:
+                for segment in effects.get("active_elems", []):
+                    for ref in segment.get("refs", []):
+                        raw_index = ref.get("func_index")
+                        if raw_index is None:
+                            term = str(ref.get("term", ""))
+                            if "REFNULL_" in term:
+                                continue
+                            table_targets = None
+                            break
+                        table_targets.add(int(raw_index))
+                    if table_targets is None:
+                        break
+
+            mutation_cache: dict[int, bool] = {}
+            visiting: set[int] = set()
+
+            def body_may_mutate(index: int) -> bool:
+                cached = mutation_cache.get(index)
+                if cached is not None:
+                    return cached
+                if index in visiting:
+                    return False
+                visiting.add(index)
+                body = str(funcs.get(index, {}).get("body", ""))
+                result = True
+                if body:
+                    result = any(marker in body for marker in STATE_MUTATION_MARKERS)
+                    if not result:
+                        for match in DIRECT_CALL_RE.finditer(body):
+                            if body_may_mutate(int(match.group(1))):
+                                result = True
+                                break
+                    if not result and CALL_REF_RE.search(body):
+                        static_targets = [
+                            int(match.group(1))
+                            for match in STATIC_REF_FUNC_CALL_RE.finditer(body)
+                        ]
+                        if len(static_targets) < len(CALL_REF_RE.findall(body)):
+                            result = True
+                        else:
+                            for target in static_targets:
+                                if body_may_mutate(target):
+                                    result = True
+                                    break
+                    if not result and INDIRECT_CALL_RE.search(body):
+                        if table_targets is None:
+                            result = True
+                        else:
+                            for target in table_targets:
+                                if body_may_mutate(target):
+                                    result = True
+                                    break
+                visiting.remove(index)
+                mutation_cache[index] = result
+                return result
+
+            return body_may_mutate(funcidx)
+
         def remember_registered_memory(alias: str, wasm: Path) -> None:
             exports = memory_exports_by_wasm.get(str(wasm))
             if exports is None:
                 exports = memory_exports_from_wasm(wasm, timeout)
                 memory_exports_by_wasm[str(wasm)] = exports
             registered_memory_exports[alias] = exports
+
+        def remember_registered_table(alias: str, wasm: Path) -> None:
+            exports = table_exports_by_wasm.get(str(wasm))
+            if exports is None:
+                effects = effects_for(wasm)
+                exports = {
+                    str(item.get("name")): TableExportState({})
+                    for item in effects.get("table_exports", [])
+                    if item.get("name") is not None
+                }
+                table_exports_by_wasm[str(wasm)] = exports
+            registered_table_exports[alias] = exports
 
         def apply_active_data_to_registered_imports(wasm: Path) -> None:
             _, imports, _, active_data = wasm_memory_info(wasm, timeout)
@@ -1446,6 +2061,52 @@ def run_wast_probe(
                     if segment.offset + len(segment.bytes) > state.pages * 65536:
                         break
                     state.write(segment.offset, segment.bytes)
+
+        def apply_active_elems_to_registered_imports(wasm: Path) -> None:
+            effects = effects_for(wasm)
+            table_imports = {
+                int(item["index"]): (str(item["module"]), str(item["name"]))
+                for item in effects.get("table_imports", [])
+                if item.get("index") is not None
+                and item.get("module") is not None
+                and item.get("name") is not None
+            }
+            funcs = {
+                int(item["index"]): item
+                for item in effects.get("funcs", [])
+                if item.get("index") is not None
+            }
+            func_addr_by_index: dict[int, int] = {}
+            for elem in effects.get("active_elems", []):
+                target = table_imports.get(int(elem.get("table", -1)))
+                if target is None:
+                    continue
+                module, name = target
+                state = registered_table_exports.get(module, {}).get(name)
+                if state is None:
+                    continue
+                refs: list[str] = []
+                for ref in elem.get("refs", []):
+                    term = str(ref.get("term", ""))
+                    func_index = ref.get("func_index")
+                    if isinstance(func_index, int) and func_index in funcs:
+                        addr = func_addr_by_index.get(func_index)
+                        if addr is None:
+                            func = funcs[func_index]
+                            addr = len(state_funcs)
+                            state_funcs.append(
+                                StateFunc(
+                                    str(func.get("type", "eps")),
+                                    str(func.get("locals", "eps")),
+                                    str(func.get("body", "eps")),
+                                )
+                            )
+                            func_addr_by_index[func_index] = addr
+                        refs.append(f"REFFUNCADDR_({addr})")
+                    elif term:
+                        refs.append(term)
+                if refs:
+                    state.write(int(elem.get("offset", 0)), refs)
 
         def registered_aliases_for_wasm(wasm: Path) -> list[str]:
             return [
@@ -1467,7 +2128,9 @@ def run_wast_probe(
             return 1
 
         def observed_i32_result(term: str) -> int | None:
-            m = re.search(r"CTORCONSTA2\(CTORI32A0,\s*(\d+)\)", term)
+            m = re.search(r"CONST__\(I32,\s*(\d+)\)", term)
+            if not m:
+                m = re.search(r"\bCONST\s+I32\s+(\d+)\b", term)
             if not m:
                 return None
             value = int(m.group(1))
@@ -1501,7 +2164,44 @@ def run_wast_probe(
                 if cmd.get("name"):
                     module_by_name[cmd["name"]] = wasm
                 if wasm.exists():
+                    if max_modules <= 0 or module_stage_count < max_modules:
+                        import_kinds = wasm_import_kinds(wasm, timeout)
+                        if "func" in import_kinds:
+                            results.append(
+                                Result(
+                                    "spec-tests",
+                                    f"{path.stem}:{current_module_index}",
+                                    str(path),
+                                    "wast-module-stage",
+                                    "MODULE_STAGE",
+                                    "",
+                                    "",
+                                    "module-stage has function imports; WAST action/assert path carries the stateful import environment",
+                                    parse_status="GENERATED",
+                                    validation_status="FRONTEND_VALIDATED",
+                                    instantiate_status="DEFERRED",
+                                    step_status="MODULE_STAGE",
+                                    result_status="MODULE_STAGE",
+                                )
+                            )
+                        else:
+                            result = run_stage_probe(
+                                cli,
+                                maude,
+                                wasm,
+                                timeout,
+                                suite="spec-tests",
+                                mode="wast-module-stage",
+                                rewrite_limit=rewrite_limit,
+                                extra_cli_args=state_cli_args_for(wasm),
+                            )
+                            result.suite = "spec-tests"
+                            result.name = f"{path.stem}:{current_module_index}"
+                            result.path = str(path)
+                            results.append(result)
+                        module_stage_count += 1
                     apply_active_data_to_registered_imports(wasm)
+                    apply_active_elems_to_registered_imports(wasm)
                 continue
             if cmd.get("type") == "register":
                 source = cmd.get("name")
@@ -1509,9 +2209,11 @@ def run_wast_probe(
                 if source and source in module_by_name and alias:
                     register_by_name[alias] = module_by_name[source]
                     remember_registered_memory(alias, module_by_name[source])
+                    remember_registered_table(alias, module_by_name[source])
                 elif current_module_index >= 0 and alias:
                     register_by_name[alias] = module_files[current_module_index]
                     remember_registered_memory(alias, module_files[current_module_index])
+                    remember_registered_table(alias, module_files[current_module_index])
                 continue
             if cmd.get("type") == "action":
                 action = cmd.get("action", {})
@@ -1538,16 +2240,19 @@ def run_wast_probe(
                     prelude_by_module.get(wasm_key, []),
                     import_memory_specs(),
                     memory_data_specs_for(wasm),
+                    table_data_specs_for(wasm),
+                    state_func_specs(),
                     rewrite_limit=rewrite_limit,
                 )
                 results.append(action_result)
                 if action_result.status == "PASS":
                     remember_memory_growth(wasm, action, action_result.observed)
-                    spec = action_prelude_spec(
-                        action, observed_result_arity(action_result.observed), wasm, timeout
-                    )
-                    if spec is not None:
-                        prelude_by_module.setdefault(wasm_key, []).append(spec)
+                    if action_may_mutate_state(wasm, action):
+                        spec = action_prelude_spec(
+                            action, observed_result_arity(action_result.observed), wasm, timeout
+                        )
+                        if spec is not None:
+                            prelude_by_module.setdefault(wasm_key, []).append(spec)
                     failed_prelude_by_module.pop(wasm_key, None)
                 else:
                     failed_prelude_by_module[wasm_key] = action_result.name
@@ -1580,6 +2285,7 @@ def run_wast_probe(
                     wasm = Path(tmpdir) / filename
                     if wasm.exists():
                         apply_active_data_to_registered_imports(wasm)
+                        apply_active_elems_to_registered_imports(wasm)
                 continue
             if cmd.get("type") not in {"assert_return", "assert_trap"}:
                 continue
@@ -1631,19 +2337,23 @@ def run_wast_probe(
                 prelude_by_module.get(wasm_key, []),
                 import_memory_specs(),
                 memory_data_specs_for(wasm),
+                table_data_specs_for(wasm),
+                state_func_specs(),
                 rewrite_limit=rewrite_limit,
+                search_fallback=search_fallback,
             )
             results.append(result)
             if cmd.get("type") == "assert_return" and result.status == "PASS":
                 remember_memory_growth(wasm, action, result.observed)
-                spec = action_prelude_spec(
-                    action,
-                    observed_result_arity(result.observed),
-                    wasm,
-                    timeout,
-                )
-                if spec is not None:
-                    prelude_by_module.setdefault(wasm_key, []).append(spec)
+                if action_may_mutate_state(wasm, action):
+                    spec = action_prelude_spec(
+                        action,
+                        observed_result_arity(result.observed),
+                        wasm,
+                        timeout,
+                    )
+                    if spec is not None:
+                        prelude_by_module.setdefault(wasm_key, []).append(spec)
             asserts += 1
     return results
 
@@ -1670,6 +2380,7 @@ def write_csv(path: Path, rows: list[Result]) -> None:
                 "instantiate_status",
                 "step_status",
                 "result_status",
+                "failure_category",
                 "expected",
                 "observed",
                 "reason",
@@ -1688,6 +2399,7 @@ def write_csv(path: Path, rows: list[Result]) -> None:
                     r.instantiate_status,
                     r.step_status,
                     r.result_status,
+                    failure_category(r),
                     r.expected,
                     r.observed,
                     r.reason,
@@ -1698,10 +2410,14 @@ def write_csv(path: Path, rows: list[Result]) -> None:
 def write_feature_reports(artifact_dir: Path, rows: list[Result]) -> None:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     feature_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    category_counts: dict[str, Counter[str]] = defaultdict(Counter)
     file_counts: dict[tuple[str, str, str], Counter[str]] = defaultdict(Counter)
     for row in rows:
         feature = feature_of_path(row.path)
         feature_counts[feature][row.status] += 1
+        category = failure_category(row)
+        if category:
+            category_counts[feature][category] += 1
         file_counts[(feature, row.path, row.mode)][row.status] += 1
 
     with (artifact_dir / "feature_summary.csv").open("w", newline="") as f:
@@ -1718,6 +2434,13 @@ def write_feature_reports(artifact_dir: Path, rows: list[Result]) -> None:
             for status, count in sorted(counts.items()):
                 writer.writerow([feature, path, mode, status, count])
 
+    with (artifact_dir / "failure_category_summary.csv").open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["feature", "failure_category", "count"])
+        for feature in sorted(category_counts):
+            for category, count in sorted(category_counts[feature].items()):
+                writer.writerow([feature, category, count])
+
     with (artifact_dir / "problem_cases.csv").open("w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(
@@ -1729,6 +2452,7 @@ def write_feature_reports(artifact_dir: Path, rows: list[Result]) -> None:
                 "mode",
                 "status",
                 "step_status",
+                "failure_category",
                 "expected",
                 "observed",
                 "reason",
@@ -1746,6 +2470,7 @@ def write_feature_reports(artifact_dir: Path, rows: list[Result]) -> None:
                     row.mode,
                     row.status,
                     row.step_status,
+                    failure_category(row),
                     row.expected,
                     row.observed,
                     row.reason,
@@ -1766,8 +2491,12 @@ def print_summary(rows: list[Result]) -> None:
     for status in sorted(counts):
         print(f"  {status}: {counts[status]}")
     feature_counts: dict[str, Counter[str]] = defaultdict(Counter)
+    category_counts: dict[str, Counter[str]] = defaultdict(Counter)
     for row in rows:
         feature_counts[feature_of_path(row.path)][row.status] += 1
+        category = failure_category(row)
+        if category:
+            category_counts[feature_of_path(row.path)][category] += 1
     if feature_counts:
         print("Feature problem summary:")
         for feature in sorted(feature_counts):
@@ -1780,6 +2509,14 @@ def print_summary(rows: list[Result]) -> None:
                 continue
             rendered = ", ".join(
                 f"{status}: {count}" for status, count in sorted(problems.items())
+            )
+            print(f"  {feature}: {rendered}")
+    if category_counts:
+        print("Failure category summary:")
+        for feature in sorted(category_counts):
+            rendered = ", ".join(
+                f"{category}: {count}"
+                for category, count in sorted(category_counts[feature].items())
             )
             print(f"  {feature}: {rendered}")
 
@@ -1813,8 +2550,13 @@ def main() -> int:
     parser.add_argument(
         "--rewrite-limit",
         type=int,
-        default=10000,
+        default=1000000,
         help="Maude rewrite bound for runtime assertions",
+    )
+    parser.add_argument(
+        "--search-fallback",
+        action="store_true",
+        help="after deterministic rewrite misses an expected term, try Maude search",
     )
     parser.add_argument("--skip-smokes", action="store_true")
     parser.add_argument("--skip-external", action="store_true")
@@ -1880,6 +2622,7 @@ def main() -> int:
                     args.max_wast_modules,
                     args.max_wast_asserts,
                     args.rewrite_limit,
+                    args.search_fallback,
                 )
             )
         else:

@@ -17,6 +17,7 @@ let () =
   (* 2. 합쳐진 AST를 단 한 번만 엘라보레이션 (모든 참조 해결) *)
   try
     Printf.eprintf "[INFO] Elaborating all definitions together...\n%!";
+    Translator.set_pre_elab_source_category_edges all_frontend_defs;
     let (il_defs, _env) = Frontend.Elab.elab all_frontend_defs in
     
     (* 3. 번역 및 Maude 형식 출력 (토큰 프리스캔 포함) *)

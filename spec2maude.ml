@@ -104,7 +104,8 @@ let option_takes_value = function
   | "--arg-i32" | "--arg-i64" | "--arg-f32" | "--arg-f64" | "--arg-v128"
   | "--arg-ref-null" | "--arg-externref" | "--arg-funcref" | "--search-expected"
   | "--invoke-index" | "--import-func" | "--import-global" | "--import-memory"
-  | "--prelude-call" | "--harness" | "--output" ->
+  | "--memory-data" | "--table-data" | "--state-func" | "--prelude-call"
+  | "--harness" | "--output" ->
       true
   | _ -> false
 
