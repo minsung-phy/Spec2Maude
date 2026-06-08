@@ -23,12 +23,17 @@ export MAUDE_BIN=/path/to/maude
 ## 2. Build And Regenerate
 
 ```bash
-dune build ./main.exe ./wasm_to_maude.exe ./spec2maude.exe
-_build/default/spec2maude.exe translate -o output.maude
+make build
+./spec2maude translate -o output.maude
 ```
 
 `output.maude` is generated.  Do not hand-edit it; change
 `translator.ml` and regenerate.
+
+For artifact review, start from a clean checkout and keep the generated
+`output.maude` under version control only as a reproducible snapshot.  If it
+differs after regeneration, inspect the translator diff rather than editing
+the generated file.
 
 ## 3. Load Checks
 
@@ -52,6 +57,7 @@ checks, and constructor membership axioms:
 ```bash
 rg 'sort SpectecType|op typecheck|mb |cmb ' output.maude
 rg 'op syn-(instr|func|i32) : -> SpectecType' output.maude
+rg 'op (func-externidx|func-externtype|func-func|sub-binop|sub-subtype)' output.maude
 ```
 
 Expected: matches.
@@ -75,6 +81,31 @@ Current load expectation: Maude should load with no errors, bad tokens, or
 no-parse diagnostics.  Some parser-ambiguity warnings may remain because the
 generated syntax intentionally keeps source-readable constructors and sequence
 operators.
+
+Current 2026-06-08 warning baseline:
+
+```text
+maude -no-banner output.maude      warnings: 9, fatal diagnostics: 0
+maude -no-banner wasm-exec.maude   warnings: 9, fatal diagnostics: 0
+```
+
+Fatal diagnostics means any `Error:`, `no parse`, `bad token`,
+`used before bound`, or `unpatchable` diagnostic.
+
+## 3.1 Syntax Audit
+
+Run the generated syntax/typecheck/membership audit:
+
+```bash
+python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
+```
+
+Expected:
+
+```text
+Syntax audit: output.maude
+PASS: no required syntax/typecheck/membership failures found
+```
 
 ## 4. Recommended CLI Checks
 
@@ -218,6 +249,34 @@ rejected by the frontend validation path before Maude runtime.
 Test runs write artifacts under `artifacts/`.  Regenerate the expected bucket
 counts after syntax-carrier changes; parse/load regressions should be chased
 before runtime-result regressions.
+
+Current local smoke expectation:
+
+```text
+Benchmark summary:
+  PASS: 13
+```
+
+Current small official-slice reference, using the artifact command below:
+
+```bash
+./spec2maude test official --limit 30 --timeout 5
+```
+
+Expected 2026-06-08 bucket shape:
+
+```text
+Benchmark summary:
+  INVALID: 10
+  MODULE_STAGE: 40
+  PASS: 43
+  STUCK_INIT: 16
+  STUCK_STEP: 69
+  WRONG_RESULT: 3
+```
+
+This official-slice command is a progress probe, not a pass/fail artifact
+claim.  The local smoke suite is the current required pass set.
 
 ## 11. Status Buckets
 

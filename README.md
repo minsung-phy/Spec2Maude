@@ -39,6 +39,33 @@ exception-related AST constructors.  Remaining failures in large benchmarks are
 mostly runtime execution, result-comparison, import/WASI, or proposal-coverage
 issues rather than the old hand-written WAT parser path.
 
+## Artifact-Evaluation Snapshot
+
+Use the root CLI for the short PLDI-style sanity check:
+
+```bash
+make build
+./spec2maude translate -o output.maude
+python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
+maude -no-banner output.maude
+maude -no-banner wasm-exec.maude
+./spec2maude run wat_examples/fib.wat --fib 5
+./spec2maude test smoke --timeout 10
+```
+
+Current expected results on 2026-06-08:
+
+```text
+syntax audit                 PASS
+maude output.maude           PASS, warnings: 9, fatal diagnostics: 0
+maude wasm-exec.maude        PASS, warnings: 9, fatal diagnostics: 0
+fib.wat --fib 5              result: const(i32, 5)
+local smoke suite            PASS: 13
+```
+
+The remaining Maude warnings are parser-ambiguity warnings, not load errors.
+They are tracked in [docs/limitation.md](docs/limitation.md).
+
 ## Important Design Choice
 
 The default runtime path does **not** use translated `Module-ok` as the
@@ -71,6 +98,7 @@ wat_examples/             small local WAT examples
 wasm-3.0/                 WebAssembly 3.0 SpecTec source files
 scripts/                  benchmark/smoke runner
 docs/                     testing notes and current limitations
+ARTIFACT.md               artifact-review checklist and expected outputs
 legacy/old-baseline/      archived older translator/runtime path
 ```
 
@@ -173,7 +201,7 @@ make validate-invalid
 Run local smoke tests:
 
 ```bash
-./spec2maude test smoke
+./spec2maude test smoke --timeout 10
 ```
 
 Run a small official spec-test slice:
@@ -212,9 +240,9 @@ make test-official LIMIT=20 TIMEOUT=10
 
 The active C1 baseline currently has:
 
-- Maude loading with no errors/no-parse diagnostics; parser-ambiguity warnings
-  remain because the generated code preserves source-readable constructors and
-  sequence syntax;
+- Maude loading with no errors, bad tokens, or no-parse diagnostics;
+  parser-ambiguity warnings remain because the generated code preserves
+  source-readable constructors and sequence syntax;
 - local smoke examples for functions, globals, memory, tables, data, elements,
   starts, and imports;
 - official SpecTec/WebAssembly parser-validator based `.wat` / `.wasm` input;
@@ -226,10 +254,17 @@ The active C1 baseline currently has:
   Maude focuses on dynamic execution.
 - a JHS-style syntax carrier where source category witnesses are generated as
   `syn-* : SpectecType` terms and concrete syntax constructors are generated as
-  source-readable `SpectecTerminal` terms such as `const(i32, 5)`.
+  source-readable `SpectecTerminal` terms such as `const(i32, 5)`;
+- automatic source-derived constructor disambiguation for reused source heads,
+  for example `func-externidx`, `func-externtype`, and `func-func`.
+- automatic source-derived argument-shape suffixes for constructor heads that
+  have both nullary and argument-taking cases in the same source category, for
+  example `div-binop` versus `div-sx-binop` and `le-relop` versus
+  `le-sx-relop`.
 
 See:
 
+- [ARTIFACT.md](ARTIFACT.md) for the reviewer-facing checklist;
 - [STATUS.md](STATUS.md) for the current project state;
 - [docs/HowToTest.md](docs/HowToTest.md) for reproducible commands;
 - [docs/limitation.md](docs/limitation.md) for limitations and discussion

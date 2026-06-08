@@ -393,9 +393,10 @@ let compact_surface_specs =
     ("DATA__", [ "DATA"; ""; "" ]);
     ("DATADROP_", [ "DATA-DROP"; "" ]);
     ("DEMOTE_", [ "DEMOTE"; "" ]);
-    ("DIVBINOP_", [ "DIV-BINOP"; "" ]);
+    ("DIVSXBINOP_", [ "DIV-SX-BINOP"; "" ]);
+    ("DIVBINOP_", [ "DIV-SX-BINOP"; "" ]);
     ("DIVVBINOP_", [ "DIV-VBINOP"; "" ]);
-    ("DIV_", [ "DIV-BINOP"; "" ]);
+    ("DIV_", [ "DIV-SX-BINOP"; "" ]);
     ("ELEMDROP_", [ "ELEM-DROP"; "" ]);
     ("ELEM___", [ "ELEM"; ""; ""; "" ]);
     ("EXPORT__", [ "EXPORT"; ""; "" ]);
@@ -424,13 +425,22 @@ let compact_surface_specs =
     ("LOCALTEE_", [ "LOCAL-TEE"; "" ]);
     ("LOCAL_", [ "LOCAL"; "" ]);
     ("LOOP__", [ "LOOP"; ""; "" ]);
-    ("GERELOP_", [ "GE-RELOP"; "" ]);
-    ("GTRELOP_", [ "GT-RELOP"; "" ]);
-    ("LERELOP_", [ "LE-RELOP"; "" ]);
-    ("LTRELOP_", [ "LT-RELOP"; "" ]);
-    ("LE_", [ "LE-RELOP"; "" ]);
-    ("LT_", [ "LT-RELOP"; "" ]);
-    ("MAX_", [ "MAX-VBINOP"; "" ]);
+    ("GESXVRELOP_", [ "GE-SX-VRELOP"; "" ]);
+    ("GTSXVRELOP_", [ "GT-SX-VRELOP"; "" ]);
+    ("LESXVRELOP_", [ "LE-SX-VRELOP"; "" ]);
+    ("LTSXVRELOP_", [ "LT-SX-VRELOP"; "" ]);
+    ("GESXRELOP_", [ "GE-SX-RELOP"; "" ]);
+    ("GTSXRELOP_", [ "GT-SX-RELOP"; "" ]);
+    ("LESXRELOP_", [ "LE-SX-RELOP"; "" ]);
+    ("LTSXRELOP_", [ "LT-SX-RELOP"; "" ]);
+    ("GERELOP_", [ "GE-SX-RELOP"; "" ]);
+    ("GTRELOP_", [ "GT-SX-RELOP"; "" ]);
+    ("LERELOP_", [ "LE-SX-RELOP"; "" ]);
+    ("LTRELOP_", [ "LT-SX-RELOP"; "" ]);
+    ("LE_", [ "LE-SX-VRELOP"; "" ]);
+    ("LT_", [ "LT-SX-VRELOP"; "" ]);
+    ("MAXSXVBINOP_", [ "MAX-SX-VBINOP"; "" ]);
+    ("MAX_", [ "MAX-SX-VBINOP"; "" ]);
     ("MEMORYCOPY__", [ "MEMORY-COPY"; ""; "" ]);
     ("MEMORYFILL_", [ "MEMORY-FILL"; "" ]);
     ("MEMORYGROW_", [ "MEMORY-GROW"; "" ]);
@@ -441,7 +451,8 @@ let compact_surface_specs =
     ("MEMEXTERNIDX_", [ "MEM-EXTERNIDX"; "" ]);
     ("MEMEXTERNTYPE_", [ "MEM-EXTERNTYPE"; "" ]);
     ("MEM_", [ "MEM-EXTERNTYPE"; "" ]);
-    ("MIN_", [ "MIN-VBINOP"; "" ]);
+    ("MINSXVBINOP_", [ "MIN-SX-VBINOP"; "" ]);
+    ("MIN_", [ "MIN-SX-VBINOP"; "" ]);
     ("MODULE___________", [ "MODULE"; ""; ""; ""; ""; ""; ""; ""; ""; ""; ""; "" ]);
     ("NAN_", [ "NAN"; "" ]);
     ("NEG_", [ "NEG-FN"; "" ]);
@@ -470,8 +481,8 @@ let compact_surface_specs =
     ("RETURNCALLINDIRECT__", [ "RETURN-CALL-INDIRECT"; ""; "" ]);
     ("RETURNCALLREF_", [ "RETURN-CALL-REF"; "" ]);
     ("RETURNCALL_", [ "RETURN-CALL"; "" ]);
-    ("GE_", [ "GE-RELOP"; "" ]);
-    ("GT_", [ "GT-RELOP"; "" ]);
+    ("GE_", [ "GE-SX-VRELOP"; "" ]);
+    ("GT_", [ "GT-SX-VRELOP"; "" ]);
     ("SELECT_", [ "SELECT"; "" ]);
     ("SHR_", [ "SHR"; "" ]);
     ("START_", [ "START"; "" ]);
@@ -548,8 +559,10 @@ let compact_surface_token_aliases =
     ("DEMOTE", "demote");
     ("DIV", "div-binop");
     ("DIVBINOP", "div-binop");
+    ("DIVSXBINOP", "div-sx-binop");
     ("DIVVBINOP", "div-vbinop");
     ("divbinop", "div-binop");
+    ("divsxbinop", "div-sx-binop");
     ("divvbinop", "div-vbinop");
     ("EQZ", "eqz");
     ("EXN", "exn");
@@ -562,36 +575,56 @@ let compact_surface_token_aliases =
     ("FUNC", "func-absheaptype");
     ("GE", "ge-relop");
     ("GERELOP", "ge-relop");
+    ("GESXRELOP", "ge-sx-relop");
+    ("GESXVRELOP", "ge-sx-vrelop");
     ("GEVRELOP", "ge-vrelop");
     ("gerelop", "ge-relop");
+    ("gesxrelop", "ge-sx-relop");
+    ("gesxvrelop", "ge-sx-vrelop");
     ("gevrelop", "ge-vrelop");
     ("GT", "gt-relop");
     ("GTRELOP", "gt-relop");
+    ("GTSXRELOP", "gt-sx-relop");
+    ("GTSXVRELOP", "gt-sx-vrelop");
     ("GTVRELOP", "gt-vrelop");
     ("gtrelop", "gt-relop");
+    ("gtsxrelop", "gt-sx-relop");
+    ("gtsxvrelop", "gt-sx-vrelop");
     ("gtvrelop", "gt-vrelop");
     ("I31", "i31");
     ("I32", "i32");
     ("I64", "i64");
     ("LE", "le-relop");
     ("LERELOP", "le-relop");
+    ("LESXRELOP", "le-sx-relop");
+    ("LESXVRELOP", "le-sx-vrelop");
     ("LEVRELOP", "le-vrelop");
     ("lerelop", "le-relop");
+    ("lesxrelop", "le-sx-relop");
+    ("lesxvrelop", "le-sx-vrelop");
     ("levrelop", "le-vrelop");
     ("LT", "lt-relop");
     ("LTRELOP", "lt-relop");
+    ("LTSXRELOP", "lt-sx-relop");
+    ("LTSXVRELOP", "lt-sx-vrelop");
     ("LTVRELOP", "lt-vrelop");
     ("ltrelop", "lt-relop");
+    ("ltsxrelop", "lt-sx-relop");
+    ("ltsxvrelop", "lt-sx-vrelop");
     ("ltvrelop", "lt-vrelop");
     ("MAX", "max-binop");
     ("MAXBINOP", "max-binop");
+    ("MAXSXVBINOP", "max-sx-vbinop");
     ("MAXVBINOP", "max-vbinop");
     ("maxbinop", "max-binop");
+    ("maxsxvbinop", "max-sx-vbinop");
     ("maxvbinop", "max-vbinop");
     ("MIN", "min-binop");
     ("MINBINOP", "min-binop");
+    ("MINSXVBINOP", "min-sx-vbinop");
     ("MINVBINOP", "min-vbinop");
     ("minbinop", "min-binop");
+    ("minsxvbinop", "min-sx-vbinop");
     ("minvbinop", "min-vbinop");
     ("MUL", "mul");
     ("MUT", "mut");
@@ -600,8 +633,10 @@ let compact_surface_token_aliases =
     ("NEG", "neg-unop");
     ("NEGFN", "neg-fn");
     ("NEGUNOP", "neg-unop");
+    ("NEGVUNOP", "neg-vunop");
     ("negfn", "neg-fn");
     ("negunop", "neg-unop");
+    ("negvunop", "neg-vunop");
     ("NULL", "null");
     ("PASSIVE", "passive");
     ("POPCNT", "popcnt");
@@ -622,7 +657,9 @@ let compact_surface_token_aliases =
     ("THROWREF", "throw-ref");
     ("TRUNC", "trunc-unop");
     ("TRUNCUNOP", "trunc-unop");
+    ("TRUNCVUNOP", "trunc-vunop");
     ("truncunop", "trunc-unop");
+    ("truncvunop", "trunc-vunop");
     ("U", "u");
     ("V128", "v128");
     ("WAND", "w-and");
@@ -1724,8 +1761,8 @@ let int_binop = function
   | "add" -> "ADD"
   | "sub" -> "SUBBINOP"
   | "mul" -> "MUL"
-  | "div_s" -> "DIVBINOP_(S)"
-  | "div_u" -> "DIVBINOP_(U)"
+  | "div_s" -> "DIVSXBINOP_(S)"
+  | "div_u" -> "DIVSXBINOP_(U)"
   | "rem_s" -> "WREM_(S)"
   | "rem_u" -> "WREM_(U)"
   | "and" -> "WAND"
@@ -1751,14 +1788,14 @@ let float_binop = function
 let int_relop = function
   | "eq" -> "WEQ"
   | "ne" -> "NE"
-  | "lt_s" -> "LTRELOP_(S)"
-  | "lt_u" -> "LTRELOP_(U)"
-  | "gt_s" -> "GTRELOP_(S)"
-  | "gt_u" -> "GTRELOP_(U)"
-  | "le_s" -> "LERELOP_(S)"
-  | "le_u" -> "LERELOP_(U)"
-  | "ge_s" -> "GERELOP_(S)"
-  | "ge_u" -> "GERELOP_(U)"
+  | "lt_s" -> "LTSXRELOP_(S)"
+  | "lt_u" -> "LTSXRELOP_(U)"
+  | "gt_s" -> "GTSXRELOP_(S)"
+  | "gt_u" -> "GTSXRELOP_(U)"
+  | "le_s" -> "LESXRELOP_(S)"
+  | "le_u" -> "LESXRELOP_(U)"
+  | "ge_s" -> "GESXRELOP_(S)"
+  | "ge_u" -> "GESXRELOP_(U)"
   | op -> fail ("unsupported integer relop: " ^ op)
 
 let float_relop = function
@@ -1861,22 +1898,22 @@ let vector_half_ctor = function
 
 let vector_unop = function
   | "abs" -> Some "ABS"
-  | "neg" -> Some "NEG"
+  | "neg" -> Some "NEGVUNOP"
   | "sqrt" -> Some "SQRT"
   | "ceil" -> Some "CEIL"
   | "floor" -> Some "FLOOR"
-  | "trunc" -> Some "TRUNC"
+  | "trunc" -> Some "TRUNCVUNOP"
   | "nearest" -> Some "NEAREST"
   | "popcnt" -> Some "POPCNT"
   | _ -> None
 
 let vector_binop = function
   | "add" -> Some "ADD"
-  | "sub" -> Some "SUB"
+  | "sub" -> Some "SUBVBINOP"
   | "mul" -> Some "MUL"
-  | "div" -> Some "DIV"
-  | "min" -> Some "MIN"
-  | "max" -> Some "MAX"
+  | "div" -> Some "DIVVBINOP"
+  | "min" -> Some "MINVBINOP"
+  | "max" -> Some "MAXVBINOP"
   | "pmin" -> Some "PMIN"
   | "pmax" -> Some "PMAX"
   | "relaxed_min" -> Some "RELAXEDMIN"
@@ -1889,26 +1926,26 @@ let vector_binop = function
   | op when starts_with op "sub_sat_" ->
       Some ("SUBSAT_(" ^ signedness_ctor (String.sub op 8 (String.length op - 8)) ^ ")")
   | op when starts_with op "min_" ->
-      Some ("MIN_(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
+      Some ("MINSXVBINOP_(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
   | op when starts_with op "max_" ->
-      Some ("MAX_(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
+      Some ("MAXSXVBINOP_(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
   | _ -> None
 
 let vector_relop = function
   | "eq" -> Some "WEQ"
   | "ne" -> Some "NE"
-  | "lt" -> Some "LT"
-  | "gt" -> Some "GT"
-  | "le" -> Some "LE"
-  | "ge" -> Some "GE"
+  | "lt" -> Some "LTVRELOP"
+  | "gt" -> Some "GTVRELOP"
+  | "le" -> Some "LEVRELOP"
+  | "ge" -> Some "GEVRELOP"
   | op when starts_with op "lt_" ->
-      Some ("LT_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("LTSXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | op when starts_with op "gt_" ->
-      Some ("GT_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("GTSXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | op when starts_with op "le_" ->
-      Some ("LE_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("LESXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | op when starts_with op "ge_" ->
-      Some ("GE_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("GESXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | _ -> None
 
 let vector_shiftop = function
@@ -3964,7 +4001,7 @@ module Official = struct
     | A.IntOp.Add -> "ADD"
     | A.IntOp.Sub -> "SUBBINOP"
     | A.IntOp.Mul -> "MUL"
-    | A.IntOp.Div sx -> "DIVBINOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Div sx -> "DIVSXBINOP_(" ^ sx_term sx ^ ")"
     | A.IntOp.Rem sx -> "WREM_(" ^ sx_term sx ^ ")"
     | A.IntOp.And -> "WAND"
     | A.IntOp.Or -> "WOR"
@@ -3977,10 +4014,10 @@ module Official = struct
   let int_relop = function
     | A.IntOp.Eq -> "WEQ"
     | A.IntOp.Ne -> "NE"
-    | A.IntOp.Lt sx -> "LTRELOP_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Gt sx -> "GTRELOP_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Le sx -> "LERELOP_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Ge sx -> "GERELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Lt sx -> "LTSXRELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Gt sx -> "GTSXRELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Le sx -> "LESXRELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Ge sx -> "GESXRELOP_(" ^ sx_term sx ^ ")"
 
   let float_unop = function
     | A.FloatOp.Neg -> "NEGUNOP"

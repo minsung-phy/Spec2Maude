@@ -1293,7 +1293,7 @@ mod SPECTEC-CORE is
   op demote-cvtop : -> SpectecTerminal [ctor] .
   op demote-vcvtop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op div-binop : -> SpectecTerminal [ctor] .
-  op div-binop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op div-sx-binop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op div-vbinop : -> SpectecTerminal [ctor] .
   op dots : -> SpectecTerminal [ctor] .
   op dotsc2 : -> SpectecTerminal [ctor] .
@@ -1324,9 +1324,9 @@ mod SPECTEC-CORE is
   op func-heaptype : -> SpectecTerminal [ctor] .
   op funccomptypearrow : SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
   op ge-relop : -> SpectecTerminal [ctor] .
-  op ge-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op ge-sx-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op ge-sx-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op ge-vrelop : -> SpectecTerminal [ctor] .
-  op ge-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op global-externaddr : SpectecTerminal -> SpectecTerminal [ctor] .
   op global-externidx : SpectecTerminal ~> SpectecTerminal [ctor] .
   op global-externtype : SpectecTerminals ~> SpectecTerminal [ctor] .
@@ -1334,9 +1334,9 @@ mod SPECTEC-CORE is
   op global-global : SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
   op global-set : SpectecTerminal ~> SpectecTerminal [ctor] .
   op gt-relop : -> SpectecTerminal [ctor] .
-  op gt-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op gt-sx-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op gt-sx-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op gt-vrelop : -> SpectecTerminal [ctor] .
-  op gt-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op handlerlbracerbrace : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
   op high : -> SpectecTerminal [ctor] .
   op i16 : -> SpectecTerminal [ctor] .
@@ -1351,9 +1351,9 @@ mod SPECTEC-CORE is
   op labellbracerbrace : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
   op lbrackdotdotrbrack : SpectecTerminal SpectecTerminals ~> SpectecTerminal [ctor] .
   op le-relop : -> SpectecTerminal [ctor] .
-  op le-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op le-sx-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op le-sx-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op le-vrelop : -> SpectecTerminal [ctor] .
-  op le-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op load : SpectecTerminal SpectecTerminals SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
   op local : SpectecTerminal ~> SpectecTerminal [ctor] .
   op local-get : SpectecTerminal ~> SpectecTerminal [ctor] .
@@ -1363,12 +1363,12 @@ mod SPECTEC-CORE is
   op low : -> SpectecTerminal [ctor] .
   op lparenrefexnaddrrparenthrowref : SpectecTerminal ~> SpectecTerminal [ctor] .
   op lt-relop : -> SpectecTerminal [ctor] .
-  op lt-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op lt-sx-relop : SpectecTerminal ~> SpectecTerminal [ctor] .
+  op lt-sx-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op lt-vrelop : -> SpectecTerminal [ctor] .
-  op lt-vrelop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op max-binop : -> SpectecTerminal [ctor] .
+  op max-sx-vbinop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op max-vbinop : -> SpectecTerminal [ctor] .
-  op max-vbinop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op mem-externaddr : SpectecTerminal -> SpectecTerminal [ctor] .
   op mem-externidx : SpectecTerminal ~> SpectecTerminal [ctor] .
   op mem-externtype : SpectecTerminal ~> SpectecTerminal [ctor] .
@@ -1379,8 +1379,8 @@ mod SPECTEC-CORE is
   op memory-init : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
   op memory-size : SpectecTerminal ~> SpectecTerminal [ctor] .
   op min-binop : -> SpectecTerminal [ctor] .
+  op min-sx-vbinop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op min-vbinop : -> SpectecTerminal [ctor] .
-  op min-vbinop : SpectecTerminal ~> SpectecTerminal [ctor] .
   op module : SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
   op mul : -> SpectecTerminal [ctor] .
   op mut : -> SpectecTerminal [ctor] .
@@ -12821,7 +12821,7 @@ mod SPECTEC-CORE is
       if typecheck(BINOP1-I1, syn-num(BINOP1-INN)) /\ typecheck(BINOP1-I2, syn-num(BINOP1-INN)) /\ typecheck(BINOP1-INN, syn-Inn) .
   ceq $binop(BINOP2-INN, mul, BINOP2-I1, BINOP2-I2) = $imul($sizenn(BINOP2-INN), BINOP2-I1, BINOP2-I2)
       if typecheck(BINOP2-I1, syn-num(BINOP2-INN)) /\ typecheck(BINOP2-I2, syn-num(BINOP2-INN)) /\ typecheck(BINOP2-INN, syn-Inn) .
-  ceq $binop(BINOP3-INN, div-binop(BINOP3-SX), BINOP3-I1, BINOP3-I2) = $idiv($sizenn(BINOP3-INN), BINOP3-SX, BINOP3-I1, BINOP3-I2)
+  ceq $binop(BINOP3-INN, div-sx-binop(BINOP3-SX), BINOP3-I1, BINOP3-I2) = $idiv($sizenn(BINOP3-INN), BINOP3-SX, BINOP3-I1, BINOP3-I2)
       if typecheck(BINOP3-SX, syn-sx) /\ typecheck(BINOP3-I1, syn-num(BINOP3-INN)) /\ typecheck(BINOP3-I2, syn-num(BINOP3-INN)) /\ typecheck(BINOP3-INN, syn-Inn) .
   ceq $binop(BINOP4-INN, w-rem(BINOP4-SX), BINOP4-I1, BINOP4-I2) = $irem($sizenn(BINOP4-INN), BINOP4-SX, BINOP4-I1, BINOP4-I2)
       if typecheck(BINOP4-SX, syn-sx) /\ typecheck(BINOP4-I1, syn-num(BINOP4-INN)) /\ typecheck(BINOP4-I2, syn-num(BINOP4-INN)) /\ typecheck(BINOP4-INN, syn-Inn) .
@@ -12869,13 +12869,13 @@ mod SPECTEC-CORE is
       if typecheck(RELOP0-I1, syn-num(RELOP0-INN)) /\ typecheck(RELOP0-I2, syn-num(RELOP0-INN)) /\ typecheck(RELOP0-INN, syn-Inn) .
   ceq $relop(RELOP1-INN, ne, RELOP1-I1, RELOP1-I2) = $ine($sizenn(RELOP1-INN), RELOP1-I1, RELOP1-I2)
       if typecheck(RELOP1-I1, syn-num(RELOP1-INN)) /\ typecheck(RELOP1-I2, syn-num(RELOP1-INN)) /\ typecheck(RELOP1-INN, syn-Inn) .
-  ceq $relop(RELOP2-INN, lt-relop(RELOP2-SX), RELOP2-I1, RELOP2-I2) = $ilt($sizenn(RELOP2-INN), RELOP2-SX, RELOP2-I1, RELOP2-I2)
+  ceq $relop(RELOP2-INN, lt-sx-relop(RELOP2-SX), RELOP2-I1, RELOP2-I2) = $ilt($sizenn(RELOP2-INN), RELOP2-SX, RELOP2-I1, RELOP2-I2)
       if typecheck(RELOP2-SX, syn-sx) /\ typecheck(RELOP2-I1, syn-num(RELOP2-INN)) /\ typecheck(RELOP2-I2, syn-num(RELOP2-INN)) /\ typecheck(RELOP2-INN, syn-Inn) .
-  ceq $relop(RELOP3-INN, gt-relop(RELOP3-SX), RELOP3-I1, RELOP3-I2) = $igt($sizenn(RELOP3-INN), RELOP3-SX, RELOP3-I1, RELOP3-I2)
+  ceq $relop(RELOP3-INN, gt-sx-relop(RELOP3-SX), RELOP3-I1, RELOP3-I2) = $igt($sizenn(RELOP3-INN), RELOP3-SX, RELOP3-I1, RELOP3-I2)
       if typecheck(RELOP3-SX, syn-sx) /\ typecheck(RELOP3-I1, syn-num(RELOP3-INN)) /\ typecheck(RELOP3-I2, syn-num(RELOP3-INN)) /\ typecheck(RELOP3-INN, syn-Inn) .
-  ceq $relop(RELOP4-INN, le-relop(RELOP4-SX), RELOP4-I1, RELOP4-I2) = $ile($sizenn(RELOP4-INN), RELOP4-SX, RELOP4-I1, RELOP4-I2)
+  ceq $relop(RELOP4-INN, le-sx-relop(RELOP4-SX), RELOP4-I1, RELOP4-I2) = $ile($sizenn(RELOP4-INN), RELOP4-SX, RELOP4-I1, RELOP4-I2)
       if typecheck(RELOP4-SX, syn-sx) /\ typecheck(RELOP4-I1, syn-num(RELOP4-INN)) /\ typecheck(RELOP4-I2, syn-num(RELOP4-INN)) /\ typecheck(RELOP4-INN, syn-Inn) .
-  ceq $relop(RELOP5-INN, ge-relop(RELOP5-SX), RELOP5-I1, RELOP5-I2) = $ige($sizenn(RELOP5-INN), RELOP5-SX, RELOP5-I1, RELOP5-I2)
+  ceq $relop(RELOP5-INN, ge-sx-relop(RELOP5-SX), RELOP5-I1, RELOP5-I2) = $ige($sizenn(RELOP5-INN), RELOP5-SX, RELOP5-I1, RELOP5-I2)
       if typecheck(RELOP5-SX, syn-sx) /\ typecheck(RELOP5-I1, syn-num(RELOP5-INN)) /\ typecheck(RELOP5-I2, syn-num(RELOP5-INN)) /\ typecheck(RELOP5-INN, syn-Inn) .
   ceq $relop(RELOP6-FNN, w-eq, RELOP6-F1, RELOP6-F2) = $feq($sizenn(RELOP6-FNN), RELOP6-F1, RELOP6-F2)
       if typecheck(RELOP6-F1, syn-num(RELOP6-FNN)) /\ typecheck(RELOP6-F2, syn-num(RELOP6-FNN)) /\ typecheck(RELOP6-FNN, syn-Fnn) .
@@ -13150,9 +13150,9 @@ mod SPECTEC-CORE is
       if typecheck(VBINOP3-SX, syn-sx) /\ typecheck(VBINOP3-V1, syn-vec(v128)) /\ typecheck(VBINOP3-V2, syn-vec(v128)) /\ typecheck(VBINOP3-JNN, syn-Jnn) .
   ceq $vbinop(( x(VBINOP4-JNN, VBINOP4-M) ), sub-sat(VBINOP4-SX), VBINOP4-V1, VBINOP4-V2) = $ivbinopsx(( x(VBINOP4-JNN, VBINOP4-M) ), $def-isub-sat, VBINOP4-SX, VBINOP4-V1, VBINOP4-V2)
       if typecheck(VBINOP4-SX, syn-sx) /\ typecheck(VBINOP4-V1, syn-vec(v128)) /\ typecheck(VBINOP4-V2, syn-vec(v128)) /\ typecheck(VBINOP4-JNN, syn-Jnn) .
-  ceq $vbinop(( x(VBINOP5-JNN, VBINOP5-M) ), min-vbinop(VBINOP5-SX), VBINOP5-V1, VBINOP5-V2) = $ivbinopsx(( x(VBINOP5-JNN, VBINOP5-M) ), $def-imin, VBINOP5-SX, VBINOP5-V1, VBINOP5-V2)
+  ceq $vbinop(( x(VBINOP5-JNN, VBINOP5-M) ), min-sx-vbinop(VBINOP5-SX), VBINOP5-V1, VBINOP5-V2) = $ivbinopsx(( x(VBINOP5-JNN, VBINOP5-M) ), $def-imin, VBINOP5-SX, VBINOP5-V1, VBINOP5-V2)
       if typecheck(VBINOP5-SX, syn-sx) /\ typecheck(VBINOP5-V1, syn-vec(v128)) /\ typecheck(VBINOP5-V2, syn-vec(v128)) /\ typecheck(VBINOP5-JNN, syn-Jnn) .
-  ceq $vbinop(( x(VBINOP6-JNN, VBINOP6-M) ), max-vbinop(VBINOP6-SX), VBINOP6-V1, VBINOP6-V2) = $ivbinopsx(( x(VBINOP6-JNN, VBINOP6-M) ), $def-imax, VBINOP6-SX, VBINOP6-V1, VBINOP6-V2)
+  ceq $vbinop(( x(VBINOP6-JNN, VBINOP6-M) ), max-sx-vbinop(VBINOP6-SX), VBINOP6-V1, VBINOP6-V2) = $ivbinopsx(( x(VBINOP6-JNN, VBINOP6-M) ), $def-imax, VBINOP6-SX, VBINOP6-V1, VBINOP6-V2)
       if typecheck(VBINOP6-SX, syn-sx) /\ typecheck(VBINOP6-V1, syn-vec(v128)) /\ typecheck(VBINOP6-V2, syn-vec(v128)) /\ typecheck(VBINOP6-JNN, syn-Jnn) .
   ceq $vbinop(( x(VBINOP7-JNN, VBINOP7-M) ), avgru, VBINOP7-V1, VBINOP7-V2) = $ivbinopsx(( x(VBINOP7-JNN, VBINOP7-M) ), $def-iavgr, u, VBINOP7-V1, VBINOP7-V2)
       if typecheck(VBINOP7-V1, syn-vec(v128)) /\ typecheck(VBINOP7-V2, syn-vec(v128)) /\ typecheck(VBINOP7-JNN, syn-Jnn) .
@@ -13200,13 +13200,13 @@ mod SPECTEC-CORE is
       if typecheck(VRELOP0-V1, syn-vec(v128)) /\ typecheck(VRELOP0-V2, syn-vec(v128)) /\ typecheck(VRELOP0-JNN, syn-Jnn) .
   ceq $vrelop(( x(VRELOP1-JNN, VRELOP1-M) ), ne, VRELOP1-V1, VRELOP1-V2) = $ivrelop(( x(VRELOP1-JNN, VRELOP1-M) ), $def-ine, VRELOP1-V1, VRELOP1-V2)
       if typecheck(VRELOP1-V1, syn-vec(v128)) /\ typecheck(VRELOP1-V2, syn-vec(v128)) /\ typecheck(VRELOP1-JNN, syn-Jnn) .
-  ceq $vrelop(( x(VRELOP2-JNN, VRELOP2-M) ), lt-vrelop(VRELOP2-SX), VRELOP2-V1, VRELOP2-V2) = $ivrelopsx(( x(VRELOP2-JNN, VRELOP2-M) ), $def-ilt, VRELOP2-SX, VRELOP2-V1, VRELOP2-V2)
+  ceq $vrelop(( x(VRELOP2-JNN, VRELOP2-M) ), lt-sx-vrelop(VRELOP2-SX), VRELOP2-V1, VRELOP2-V2) = $ivrelopsx(( x(VRELOP2-JNN, VRELOP2-M) ), $def-ilt, VRELOP2-SX, VRELOP2-V1, VRELOP2-V2)
       if typecheck(VRELOP2-SX, syn-sx) /\ typecheck(VRELOP2-V1, syn-vec(v128)) /\ typecheck(VRELOP2-V2, syn-vec(v128)) /\ typecheck(VRELOP2-JNN, syn-Jnn) .
-  ceq $vrelop(( x(VRELOP3-JNN, VRELOP3-M) ), gt-vrelop(VRELOP3-SX), VRELOP3-V1, VRELOP3-V2) = $ivrelopsx(( x(VRELOP3-JNN, VRELOP3-M) ), $def-igt, VRELOP3-SX, VRELOP3-V1, VRELOP3-V2)
+  ceq $vrelop(( x(VRELOP3-JNN, VRELOP3-M) ), gt-sx-vrelop(VRELOP3-SX), VRELOP3-V1, VRELOP3-V2) = $ivrelopsx(( x(VRELOP3-JNN, VRELOP3-M) ), $def-igt, VRELOP3-SX, VRELOP3-V1, VRELOP3-V2)
       if typecheck(VRELOP3-SX, syn-sx) /\ typecheck(VRELOP3-V1, syn-vec(v128)) /\ typecheck(VRELOP3-V2, syn-vec(v128)) /\ typecheck(VRELOP3-JNN, syn-Jnn) .
-  ceq $vrelop(( x(VRELOP4-JNN, VRELOP4-M) ), le-vrelop(VRELOP4-SX), VRELOP4-V1, VRELOP4-V2) = $ivrelopsx(( x(VRELOP4-JNN, VRELOP4-M) ), $def-ile, VRELOP4-SX, VRELOP4-V1, VRELOP4-V2)
+  ceq $vrelop(( x(VRELOP4-JNN, VRELOP4-M) ), le-sx-vrelop(VRELOP4-SX), VRELOP4-V1, VRELOP4-V2) = $ivrelopsx(( x(VRELOP4-JNN, VRELOP4-M) ), $def-ile, VRELOP4-SX, VRELOP4-V1, VRELOP4-V2)
       if typecheck(VRELOP4-SX, syn-sx) /\ typecheck(VRELOP4-V1, syn-vec(v128)) /\ typecheck(VRELOP4-V2, syn-vec(v128)) /\ typecheck(VRELOP4-JNN, syn-Jnn) .
-  ceq $vrelop(( x(VRELOP5-JNN, VRELOP5-M) ), ge-vrelop(VRELOP5-SX), VRELOP5-V1, VRELOP5-V2) = $ivrelopsx(( x(VRELOP5-JNN, VRELOP5-M) ), $def-ige, VRELOP5-SX, VRELOP5-V1, VRELOP5-V2)
+  ceq $vrelop(( x(VRELOP5-JNN, VRELOP5-M) ), ge-sx-vrelop(VRELOP5-SX), VRELOP5-V1, VRELOP5-V2) = $ivrelopsx(( x(VRELOP5-JNN, VRELOP5-M) ), $def-ige, VRELOP5-SX, VRELOP5-V1, VRELOP5-V2)
       if typecheck(VRELOP5-SX, syn-sx) /\ typecheck(VRELOP5-V1, syn-vec(v128)) /\ typecheck(VRELOP5-V2, syn-vec(v128)) /\ typecheck(VRELOP5-JNN, syn-Jnn) .
   ceq $vrelop(( x(VRELOP6-FNN, VRELOP6-M) ), w-eq, VRELOP6-V1, VRELOP6-V2) = $fvrelop(( x(VRELOP6-FNN, VRELOP6-M) ), $def-feq, VRELOP6-V1, VRELOP6-V2)
       if typecheck(VRELOP6-V1, syn-vec(v128)) /\ typecheck(VRELOP6-V2, syn-vec(v128)) /\ typecheck(VRELOP6-FNN, syn-Fnn) .
@@ -19543,9 +19543,9 @@ if SSUBST-VALTYPES-S =/= eps .
   ceq typecheck(( div-binop ), syn-binop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( div-binop(SX) ), syn-binop(INN)) = true
+  ceq typecheck(( div-sx-binop(SX) ), syn-binop(INN)) = true
 
-      if ( div-binop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+      if ( div-sx-binop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
   ceq typecheck(( div-vbinop ), syn-vbinop(x(FNN, M))) = true
 
 
@@ -19626,18 +19626,18 @@ if SSUBST-VALTYPES-S =/= eps .
   ceq typecheck(( ge-relop ), syn-relop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( ge-relop(SX) ), syn-relop(INN)) = true
+  ceq typecheck(( ge-sx-relop(SX) ), syn-relop(INN)) = true
 
-      if ( ge-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+      if ( ge-sx-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+  ceq typecheck(( ge-sx-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
+
+
+
+      if ( ge-sx-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( ge-vrelop ), syn-vrelop(x(FNN, M))) = true
 
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( ge-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
-
-
-
-      if ( ge-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( global-externidx(GLOBALIDX) ), syn-externidx) = true
 
       if ( global-externidx(GLOBALIDX) ) : SpectecTerminal .
@@ -19656,18 +19656,18 @@ if SSUBST-VALTYPES-S =/= eps .
   ceq typecheck(( gt-relop ), syn-relop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( gt-relop(SX) ), syn-relop(INN)) = true
+  ceq typecheck(( gt-sx-relop(SX) ), syn-relop(INN)) = true
 
-      if ( gt-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+      if ( gt-sx-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+  ceq typecheck(( gt-sx-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
+
+
+
+      if ( gt-sx-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( gt-vrelop ), syn-vrelop(x(FNN, M))) = true
 
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( gt-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
-
-
-
-      if ( gt-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( handlerlbracerbrace(LOWN, CATCHSEQ, INSTRSEQ) ), syn-instr) = true
 
       if ( handlerlbracerbrace(LOWN, CATCHSEQ, INSTRSEQ) ) : SpectecTerminal .
@@ -19694,18 +19694,18 @@ if SSUBST-VALTYPES-S =/= eps .
   ceq typecheck(( le-relop ), syn-relop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( le-relop(SX) ), syn-relop(INN)) = true
+  ceq typecheck(( le-sx-relop(SX) ), syn-relop(INN)) = true
 
-      if ( le-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+      if ( le-sx-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+  ceq typecheck(( le-sx-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
+
+
+
+      if ( le-sx-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( le-vrelop ), syn-vrelop(x(FNN, M))) = true
 
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( le-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
-
-
-
-      if ( le-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( load(NUMTYPE, LOADOPSEQ, MEMIDX, MEMARG) ), syn-instr) = true
 
       if ( load(NUMTYPE, LOADOPSEQ, MEMIDX, MEMARG) ) : SpectecTerminal .
@@ -19733,31 +19733,31 @@ if SSUBST-VALTYPES-S =/= eps .
   ceq typecheck(( lt-relop ), syn-relop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( lt-relop(SX) ), syn-relop(INN)) = true
+  ceq typecheck(( lt-sx-relop(SX) ), syn-relop(INN)) = true
 
-      if ( lt-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+      if ( lt-sx-relop(SX) ) : SpectecTerminal /\ typecheck(INN, syn-Inn) .
+  ceq typecheck(( lt-sx-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
+
+
+
+      if ( lt-sx-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( lt-vrelop ), syn-vrelop(x(FNN, M))) = true
 
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( lt-vrelop(SX) ), syn-vrelop(x(JNN, M))) = true
-
-
-
-      if ( lt-vrelop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) =/= 64 ) or ( SX == s ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( max-binop ), syn-binop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
+  ceq typecheck(( max-sx-vbinop(SX) ), syn-vbinop(x(JNN, M))) = true
+
+
+
+
+      if ( max-sx-vbinop(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 32 /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( max-vbinop ), syn-vbinop(x(FNN, M))) = true
 
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( max-vbinop(SX) ), syn-vbinop(x(JNN, M))) = true
-
-
-
-
-      if ( max-vbinop(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 32 /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( mem-externidx(MEMIDX) ), syn-externidx) = true
 
       if ( mem-externidx(MEMIDX) ) : SpectecTerminal .
@@ -19785,16 +19785,16 @@ if SSUBST-VALTYPES-S =/= eps .
   ceq typecheck(( min-binop ), syn-binop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
+  ceq typecheck(( min-sx-vbinop(SX) ), syn-vbinop(x(JNN, M))) = true
+
+
+
+
+      if ( min-sx-vbinop(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 32 /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( min-vbinop ), syn-vbinop(x(FNN, M))) = true
 
 
       if typecheck(FNN, syn-Fnn) .
-  ceq typecheck(( min-vbinop(SX) ), syn-vbinop(x(JNN, M))) = true
-
-
-
-
-      if ( min-vbinop(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 32 /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( module(TYPESEQ, IMPORTSEQ, TAGSEQ, GLOBALSEQ, MEMSEQ, TABLESEQ, FUNCSEQ, DATASEQ, ELEMSEQ, STARTSEQ, EXPORTSEQ) ), syn-module) = true
 
       if ( module(TYPESEQ, IMPORTSEQ, TAGSEQ, GLOBALSEQ, MEMSEQ, TABLESEQ, FUNCSEQ, DATASEQ, ELEMSEQ, STARTSEQ, EXPORTSEQ) ) : SpectecTerminal .
@@ -20569,7 +20569,7 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( demote-vcvtop(ZERO) ) : SpectecTerminal
 
       if typecheck(ZERO, syn-zero) .
-  cmb ( div-binop(SX) ) : SpectecTerminal
+  cmb ( div-sx-binop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
   cmb ( elem(REFTYPE, INSTRSEQ, ELEMMODE) ) : SpectecTerminal
@@ -20618,10 +20618,10 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( funccomptypearrow(RESULTTYPE, VALTYPESEQ) ) : SpectecTerminal
 
       if typecheck(RESULTTYPE, syn-valtype) /\ typecheck(VALTYPESEQ, syn-valtype) .
-  cmb ( ge-relop(SX) ) : SpectecTerminal
+  cmb ( ge-sx-relop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
-  cmb ( ge-vrelop(SX) ) : SpectecTerminal
+  cmb ( ge-sx-vrelop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
   cmb ( global-externaddr(GLOBALADDR) ) : Externaddr
@@ -20642,10 +20642,10 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( global-set(GLOBALIDX) ) : SpectecTerminal
 
       if typecheck(GLOBALIDX, syn-globalidx) .
-  cmb ( gt-relop(SX) ) : SpectecTerminal
+  cmb ( gt-sx-relop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
-  cmb ( gt-vrelop(SX) ) : SpectecTerminal
+  cmb ( gt-sx-vrelop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
   cmb ( handlerlbracerbrace(LOWN, CATCHSEQ, INSTRSEQ) ) : SpectecTerminal
@@ -20671,10 +20671,10 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( lbrackdotdotrbrack(U64, eps) ) : SpectecTerminal
 
       if typecheck(U64, syn-uN ( 64 )) .
-  cmb ( le-relop(SX) ) : SpectecTerminal
+  cmb ( le-sx-relop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
-  cmb ( le-vrelop(SX) ) : SpectecTerminal
+  cmb ( le-sx-vrelop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
   cmb ( load(NUMTYPE, LOADOPSEQ, MEMIDX, MEMARG) ) : SpectecTerminal
@@ -20701,13 +20701,13 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( lparenrefexnaddrrparenthrowref(EXNADDR) ) : SpectecTerminal
 
       if EXNADDR : Exnaddr .
-  cmb ( lt-relop(SX) ) : SpectecTerminal
+  cmb ( lt-sx-relop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
-  cmb ( lt-vrelop(SX) ) : SpectecTerminal
+  cmb ( lt-sx-vrelop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
-  cmb ( max-vbinop(SX) ) : SpectecTerminal
+  cmb ( max-sx-vbinop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
   cmb ( mem-externaddr(MEMADDR) ) : Externaddr
@@ -20737,7 +20737,7 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( memory-size(MEMIDX) ) : SpectecTerminal
 
       if typecheck(MEMIDX, syn-memidx) .
-  cmb ( min-vbinop(SX) ) : SpectecTerminal
+  cmb ( min-sx-vbinop(SX) ) : SpectecTerminal
 
       if typecheck(SX, syn-sx) .
   cmb ( module(TYPESEQ, IMPORTSEQ, TAGSEQ, GLOBALSEQ, MEMSEQ, TABLESEQ, FUNCSEQ, DATASEQ, ELEMSEQ, STARTSEQ, EXPORTSEQ) ) : SpectecTerminal

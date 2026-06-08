@@ -472,7 +472,10 @@ let source_ctor_head_categories : (string, SSet.t) Hashtbl.t =
   Hashtbl.create 512
 let source_ctor_head_occurrences : (string, (int * string * string) list) Hashtbl.t =
   Hashtbl.create 512
+let source_ctor_head_category_arities : (string, int list) Hashtbl.t =
+  Hashtbl.create 512
 let source_ctor_heads_requiring_category_suffix : SSet.t ref = ref SSet.empty
+let source_ctor_head_categories_requiring_arg_suffix : SSet.t ref = ref SSet.empty
 let source_ctor_blocked_var_names : SSet.t ref = ref SSet.empty
 
 let trim_tail_hyphen s =
@@ -559,6 +562,9 @@ let source_ctor_surface_head sections =
 let source_ctor_surface_op_head sections =
   source_ctor_surface_head sections |> Option.map maude_source_op_token
 
+let source_ctor_head_category_key head category =
+  head ^ "\x1e" ^ maude_source_op_token category
+
 let register_source_ctor_head_category sections category =
   match source_ctor_surface_op_head sections with
   | None -> ()
@@ -576,11 +582,84 @@ let source_ctor_head_needs_category_suffix sections =
   | None -> false
   | Some head -> SSet.mem head !source_ctor_heads_requiring_category_suffix
 
-let source_ctor_effective_sections ?category sections =
-  match category with
-  | Some category when source_ctor_head_needs_category_suffix sections ->
-      source_ctor_suffix_sections sections ("-" ^ maude_source_op_token category)
-  | _ -> sections
+let source_ctor_head_category_needs_arg_suffix sections category arity =
+  arity > 0
+  &&
+  match source_ctor_surface_op_head sections with
+  | None -> false
+  | Some head ->
+      SSet.mem
+        (source_ctor_head_category_key head category)
+        !source_ctor_head_categories_requiring_arg_suffix
+
+let source_ctor_strip_index_suffix raw =
+  let re = Str.regexp "^\\(.+\\)_[0-9]+$" in
+  if Str.string_match re raw 0 then
+    match str_matched_group_opt 1 raw with Some s -> s | None -> raw
+  else raw
+
+let rec source_ctor_arg_shape_component_of_typ (t : typ) =
+  match t.it with
+  | VarT (id, []) ->
+      maude_source_op_token (source_ctor_strip_index_suffix id.it)
+  | VarT (id, args) ->
+      let base = maude_source_op_token (source_ctor_strip_index_suffix id.it) in
+      let arg_parts =
+        args
+        |> List.filter_map (fun arg ->
+             match arg.it with
+             | TypA t -> Some (source_ctor_arg_shape_component_of_typ t)
+             | ExpA e -> (
+                 match e.it with
+                 | VarE id -> Some (maude_source_op_token (source_ctor_strip_index_suffix id.it))
+                 | _ -> None)
+             | DefA _ | GramA _ -> None)
+        |> List.filter (fun s -> s <> "")
+      in
+      if arg_parts = [] then base else base ^ "-" ^ String.concat "-" arg_parts
+  | IterT (inner, iter) ->
+      let base = source_ctor_arg_shape_component_of_typ inner in
+      (match iter with
+       | List | List1 | ListN _ -> base ^ "s"
+       | Opt -> base)
+  | TupT fields ->
+      fields
+      |> List.map (fun (_field_exp, field_typ) ->
+           source_ctor_arg_shape_component_of_typ field_typ)
+      |> List.filter (fun s -> s <> "")
+      |> String.concat "-"
+  | BoolT -> "bool"
+  | NumT _ -> "num"
+  | TextT -> "text"
+
+let source_ctor_arg_shape_suffix_of_typ (t : typ) =
+  match t.it with
+  | TupT fields ->
+      fields
+      |> List.map (fun (_field_exp, field_typ) ->
+           source_ctor_arg_shape_component_of_typ field_typ)
+      |> List.filter (fun s -> s <> "")
+      |> String.concat "-"
+      |> fun s -> if s = "" then None else Some s
+  | _ ->
+      let s = source_ctor_arg_shape_component_of_typ t in
+      if s = "" then None else Some s
+
+let source_ctor_effective_sections ?category ?arg_shape sections arity =
+  let arg_suffix =
+    match category, arg_shape with
+    | Some category, Some arg_shape
+        when source_ctor_head_category_needs_arg_suffix sections category arity ->
+        "-" ^ maude_source_op_token arg_shape
+    | _ -> ""
+  in
+  let category_suffix =
+    match category with
+    | Some category when source_ctor_head_needs_category_suffix sections ->
+        "-" ^ maude_source_op_token category
+    | _ -> ""
+  in
+  source_ctor_suffix_sections sections (arg_suffix ^ category_suffix)
 
 let legacy_ctor_name_from_components components arity =
   match components with
@@ -649,7 +728,7 @@ let source_ctor_candidates_by_original_head_arity head arity =
   | Some infos -> infos
   | None -> []
 
-let source_ctor_name_from_sections ?category sections arity =
+let source_ctor_name_from_sections ?category ?case_typ sections arity =
   let original_sections = sections in
   (match category, source_ctor_head_needs_category_suffix sections with
    | None, true ->
@@ -660,7 +739,8 @@ let source_ctor_name_from_sections ?category sections arity =
              | _ -> None)
         | None -> None)
    | _ ->
-  let sections = source_ctor_effective_sections ?category sections in
+  let arg_shape = Option.bind case_typ source_ctor_arg_shape_suffix_of_typ in
+  let sections = source_ctor_effective_sections ?category ?arg_shape sections arity in
   match source_ctor_components_from_sections sections with
   | [] -> None
   | components ->
@@ -673,8 +753,8 @@ let source_ctor_name_from_sections ?category sections arity =
       in
       Some (register_source_ctor key legacy base ?category original_sections sections arity))
 
-let source_ctor_name_from_mixop ?category mixop arity =
-  source_ctor_name_from_sections ?category (source_ctor_sections_from_mixop mixop) arity
+let source_ctor_name_from_mixop ?category ?case_typ mixop arity =
+  source_ctor_name_from_sections ?category ?case_typ (source_ctor_sections_from_mixop mixop) arity
 
 let source_mixop_has_constructor_name mixop =
   source_ctor_sections_from_mixop mixop
@@ -2739,8 +2819,8 @@ let build_type_env defs =
 	    |> List.flatten
 	    |> List.for_all (fun atom -> Xl.Atom.name atom = "")
 	  in
-  let canonical_ctor_name_arity_local ?category mixop_val arity =
-    source_ctor_name_from_mixop ?category mixop_val arity
+  let canonical_ctor_name_arity_local ?category ?case_typ mixop_val arity =
+    source_ctor_name_from_mixop ?category ?case_typ mixop_val arity
   in
   let format_call_local fn args =
     match args with
@@ -2916,7 +2996,7 @@ let build_type_env defs =
                            | TupT fields -> List.length fields
                            | _ -> 1
                          in
-                         match canonical_ctor_name_arity_local ~category:_raw mixop_val arity with
+                         match canonical_ctor_name_arity_local ~category:_raw ~case_typ mixop_val arity with
                          | Some ctor ->
                              let has_payload =
                                match case_typ.it with
@@ -4566,13 +4646,22 @@ let collect_source_ctor_head_categories defs =
     match source_ctor_surface_op_head sections with
     | None -> ()
     | Some head ->
+        let arity = arity_of_typ case_typ in
+        let category_key = source_ctor_head_category_key head category in
+        let arities =
+          match Hashtbl.find_opt source_ctor_head_category_arities category_key with
+          | Some xs -> xs
+          | None -> []
+        in
+        if not (List.mem arity arities) then
+          Hashtbl.replace source_ctor_head_category_arities category_key (arity :: arities);
         let old =
           match Hashtbl.find_opt source_ctor_head_occurrences head with
           | Some xs -> xs
           | None -> []
         in
         Hashtbl.replace source_ctor_head_occurrences head
-          ((arity_of_typ case_typ, signature_of_typ case_typ,
+          ((arity, signature_of_typ case_typ,
             maude_source_op_token category) :: old)
   in
   let rec scan d =
@@ -4626,6 +4715,13 @@ let collect_source_ctor_head_categories defs =
          source_ctor_heads_requiring_category_suffix :=
            SSet.add head !source_ctor_heads_requiring_category_suffix)
     source_ctor_head_occurrences
+  ;
+  Hashtbl.iter
+    (fun key arities ->
+       if List.mem 0 arities && List.exists (fun arity -> arity > 0) arities then
+         source_ctor_head_categories_requiring_arg_suffix :=
+           SSet.add key !source_ctor_head_categories_requiring_arg_suffix)
+    source_ctor_head_category_arities
 
 let build_token_ops ss =
   let starts_with s p =
@@ -7929,8 +8025,8 @@ let translate_typd id params insts =
   let typd_params = params in
   let is_parametric = params <> [] in
   let type_sort = sort_of_type_name id.it in
-  let canonical_ctor_name_arity mixop arity =
-    source_ctor_name_from_mixop ~category:id.it mixop arity
+  let canonical_ctor_name_arity ?case_typ mixop arity =
+    source_ctor_name_from_mixop ~category:id.it ?case_typ mixop arity
   in
   let is_meta_numeric_alias = is_meta_numeric_alias_sort type_sort in
   let mk_type_term_texpr args v_map =
@@ -9475,8 +9571,8 @@ let translate_typd id params insts =
                  | Some text when mixop_is_source_semicolon_pair mixop_val (List.length p_vars) ->
                      text
                  | _ ->
-                     (match canonical_ctor_name_arity mixop_val (List.length p_vars) with
-                      | Some ctor -> format_source_ctor_call ctor p_vars
+	                     (match canonical_ctor_name_arity ~case_typ mixop_val (List.length p_vars) with
+	                      | Some ctor -> format_source_ctor_call ctor p_vars
                       | None -> interleave_lhs sections p_vars)
                in
                let () =
@@ -9635,7 +9731,7 @@ let translate_typd id params insts =
 	                         (decl_prefix ()) (if rhs = "" then "mb" else "cmb") lhs full_type_sort
 	                         (if rhs = "" then "" else "\n   if " ^ rhs)
 	                   else
-	                     let canonical_name = canonical_ctor_name_arity mixop_val (List.length p_vars) in
+                           let canonical_name = canonical_ctor_name_arity ~case_typ mixop_val (List.length p_vars) in
                      let op_sig =
                        match canonical_name with
                        | Some ctor -> ctor
@@ -9692,7 +9788,7 @@ let translate_typd id params insts =
                          | Some text when mixop_is_source_semicolon_pair mixop_val (List.length eps_args) ->
                              text
                          | _ ->
-                             (match canonical_ctor_name_arity mixop_val (List.length eps_args) with
+	                             (match canonical_ctor_name_arity ~case_typ mixop_val (List.length eps_args) with
                               | Some ctor -> format_source_ctor_call ctor eps_args
                               | None -> interleave_lhs sections eps_args) in
                        let lhs_eps = safe_term_text lhs_eps in
@@ -19247,7 +19343,9 @@ let translate defs =
   Hashtbl.clear source_ctor_name_counts;
   Hashtbl.clear source_ctor_head_categories;
   Hashtbl.clear source_ctor_head_occurrences;
+  Hashtbl.clear source_ctor_head_category_arities;
   source_ctor_heads_requiring_category_suffix := SSet.empty;
+  source_ctor_head_categories_requiring_arg_suffix := SSet.empty;
   source_ctor_blocked_var_names := SSet.empty;
   Hashtbl.clear ctor_arg_sort_hints;
   Hashtbl.clear ctor_arg_membership_sort_hints;

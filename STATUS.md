@@ -85,21 +85,40 @@ checks, then by direct source-shaped execution.  Latest local checks:
 ```text
 make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
-maude -no-banner output.maude                        PASS, warnings: 164, no-parse: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 177, no-parse: 0
+python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
+                                                     PASS
+maude -no-banner output.maude                        PASS, warnings: 9,
+                                                     fatal diagnostics: 0
+maude -no-banner wasm-exec.maude                     PASS, warnings: 9,
+                                                     fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
 ./spec2maude run wat_examples/fib.wat --fib 5        PASS
 ./spec2maude run wat_examples/data-load.wat          PASS
 ./spec2maude test smoke --timeout 10                 PASS: 13
-./spec2maude test official --limit 30 --timeout 5    PASS: 45, MODULE_STAGE: 43, INVALID: 10,
-                                                     STUCK_INIT: 13, STUCK_STEP: 67,
+./spec2maude test official --limit 30 --timeout 5    PASS: 43, MODULE_STAGE: 40, INVALID: 10,
+                                                     STUCK_INIT: 16, STUCK_STEP: 69,
                                                      WRONG_RESULT: 3
 ```
 
 The Maude warnings above are parser ambiguity warnings, not load failures.
 They should still be reduced, but current load checks have zero errors, zero
-bad tokens, and zero no-parse diagnostics.
+bad tokens, zero used-before-bound diagnostics, and zero no-parse diagnostics.
+
+Remaining warning sources are currently:
+
+- source-derived typed-index sequence patterns that interact with the
+  source-style `SpectecTerminal < SpectecTerminals` carrier and associative
+  `_ _` sequence operator;
+- a small number of numeric/range expressions involving overloaded Maude
+  arithmetic;
+- one `norm(...)` membership axiom with an argument shape Maude can still parse
+  in more than one way.
+
+The earlier nullary/unary constructor overload warning class, for example
+`DIV` versus `DIV sx` and `LE` versus `LE sx`, is resolved by source-derived
+argument-shape suffixes such as `div-sx-binop`, `le-sx-relop`, and
+`le-sx-vrelop`.
 
 Larger official/external benchmark tables should still be regenerated after
 translator/runtime changes:
@@ -139,6 +158,10 @@ Resolved:
   carrier instead of source category Maude sorts; their Maude surface names are
   source-readable lowercase constructors such as `const(i32, 5)` and
   `local-get(0)`;
+- reused constructor heads are disambiguated from source category information
+  rather than by Wasm-specific lists, for example `func-externidx`,
+  `func-externtype`, `func-func`, `rec-rectype`, `sub-binop`, and
+  `sub-subtype`;
 - source category validity is generated as `typecheck(term, syn-category-term)`;
 - syntax constructor cases also emit `mb`/`cmb` membership on
   `SpectecTerminal`;
@@ -163,7 +186,8 @@ Still worth discussing:
    - runtime profile: excludes static validation from the runtime artifact or
      erases validation premises after external validation.
 2. Continue reducing parser ambiguity warnings without changing source rule
-   semantics.
+   semantics.  Highest-impact next targets: typed-index sequence patterns and
+   numeric/range-condition rendering.
 3. Continue reducing source-absent helpers in `output.maude`.
 4. Continue improving official `.wast` runner support for remaining vector,
    abstract-reference, and module instance/linking identity forms.  The runner
