@@ -546,20 +546,45 @@ let compact_surface_needs_parens arg =
        (String.length arg >= 2 && arg.[0] = '('
         && arg.[String.length arg - 1] = ')')
 
+let compact_prefix_component s =
+  let b = Buffer.create (String.length s) in
+  String.iter
+    (fun c ->
+      if (c >= 'a' && c <= 'z')
+         || (c >= 'A' && c <= 'Z')
+         || (c >= '0' && c <= '9')
+      then Buffer.add_char b c)
+    s;
+  String.uppercase_ascii (Buffer.contents b)
+
+let compact_prefix_name old sections =
+  let meaningful =
+    sections
+    |> List.map String.trim
+    |> List.filter (fun s -> s <> "")
+  in
+  match meaningful with
+  | [single] -> single
+  | _ ->
+      let components =
+        meaningful
+        |> List.map compact_prefix_component
+        |> List.filter (fun s -> s <> "")
+      in
+      if components <> [] then String.concat "" components
+      else
+        let rec trim = function
+          | s when s <> "" && s.[String.length s - 1] = '_' ->
+              trim (String.sub s 0 (String.length s - 1))
+          | s -> s
+        in
+        trim old
+
 let render_compact_surface sections args =
-  let arg_text arg =
-    let arg = String.trim arg in
-    if compact_surface_needs_parens arg then "( " ^ arg ^ " )" else arg
-  in
-  let rec go sections args =
-    match (sections, args) with
-    | [], rest -> List.map arg_text rest
-    | s :: ss, a :: rest ->
-        (if String.trim s = "" then [] else [ s ]) @ [ arg_text a ] @ go ss rest
-    | [ s ], [] -> if String.trim s = "" then [] else [ s ]
-    | _ :: ss, [] -> go ss []
-  in
-  go sections args |> List.filter (fun s -> String.trim s <> "") |> String.concat " "
+  let _ = compact_surface_needs_parens in
+  let op_name = compact_prefix_name "" sections in
+  if args = [] then op_name
+  else op_name ^ "(" ^ String.concat ", " (List.map String.trim args) ^ ")"
 
 let source_surface_syntax_of_compact text =
   let len = String.length text in
@@ -3289,6 +3314,7 @@ let maude_arg_term typ value =
     | "exnref" -> "EXN"
     | t -> fail ("unsupported reference arg type: " ^ t)
   in
+  let compact =
   match typ with
   | "i32" -> i32_const value
   | "i64" -> i64_const value
@@ -3315,6 +3341,8 @@ let maude_arg_term typ value =
   | "arrayref" -> "REFARRAYADDR_(" ^ value ^ ")"
   | "exnref" -> "REFEXNADDR_(" ^ value ^ ")"
   | _ -> fail ("unsupported invoke arg type: " ^ typ)
+  in
+  source_surface_syntax_of_compact compact
 
 let parse_prelude_call body =
   let parts = String.split_on_char ';' body |> List.map String.trim in
@@ -5445,16 +5473,16 @@ let () =
           search_expected := Some term;
           parse_args rest
       | "--arg-i32" :: n :: rest ->
-          arg_terms := !arg_terms @ [ i32_const n ];
+          arg_terms := !arg_terms @ [ maude_arg_term "i32" n ];
           parse_args rest
       | "--arg-i64" :: n :: rest ->
-          arg_terms := !arg_terms @ [ i64_const n ];
+          arg_terms := !arg_terms @ [ maude_arg_term "i64" n ];
           parse_args rest
       | "--arg-f32" :: n :: rest ->
-          arg_terms := !arg_terms @ [ float_arg_const 32 n ];
+          arg_terms := !arg_terms @ [ maude_arg_term "f32" n ];
           parse_args rest
       | "--arg-f64" :: n :: rest ->
-          arg_terms := !arg_terms @ [ float_arg_const 64 n ];
+          arg_terms := !arg_terms @ [ maude_arg_term "f64" n ];
           parse_args rest
       | "--arg-v128" :: n :: rest ->
           arg_terms := !arg_terms @ [ maude_arg_term "v128" n ];

@@ -39,56 +39,51 @@ mod WASM-FIB is
   var N : SpectecTerminal .
 
   op i32v : Nat -> SpectecTerminal .
-  eq i32v(I:Nat) = CONST I32 I:Nat .
+  eq i32v(I:Nat) = CONST(I32, I:Nat) .
 
   op fib-loop-body : -> SpectecTerminals .
   eq fib-loop-body =
-    (LOCAL-GET 0)
-    (CONST I32 0)
-    (RELOP I32 (LE S))
-    (BR-IF 1)
-    (LOCAL-GET 1)
-    (LOCAL-GET 2)
-    (BINOP I32 ADD)
-    (LOCAL-SET 3)
-    (LOCAL-GET 2)
-    (LOCAL-SET 1)
-    (LOCAL-GET 3)
-    (LOCAL-SET 2)
-    (LOCAL-GET 0)
-    (CONST I32 1)
-    (BINOP I32 SUB)
-    (LOCAL-SET 0)
-    (BR 0) .
+    LOCAL-GET(0)
+    CONST(I32, 0)
+    RELOP(I32, LE(S))
+    BR-IF(1)
+    LOCAL-GET(1)
+    LOCAL-GET(2)
+    BINOP(I32, ADD)
+    LOCAL-SET(3)
+    LOCAL-GET(2)
+    LOCAL-SET(1)
+    LOCAL-GET(3)
+    LOCAL-SET(2)
+    LOCAL-GET(0)
+    CONST(I32, 1)
+    BINOP(I32, SUB)
+    LOCAL-SET(0)
+    BR(0) .
 
   op fib-body : -> SpectecTerminals .
   eq fib-body =
-    (BLOCK (w--RESULT eps) ((LOOP (w--RESULT eps) fib-loop-body)))
-    (LOCAL-GET 1) .
+    BLOCK(w--RESULT(eps), LOOP(w--RESULT(eps), fib-loop-body))
+    LOCAL-GET(1) .
 
   op fib-type : -> SpectecTerminal .
   eq fib-type =
-    w--DEF ( REC ( SUB eps eps ( FUNC ( I32
-          I32
-          I32 ) arrow I32 ) ) ) 0 .
+    w--DEF(REC(SUB(eps, eps, FUNCARROW(I32 I32 I32, I32))), 0) .
 
   op fib-rectype : -> SpectecTerminal .
   eq fib-rectype =
-    REC ( SUB eps eps ( FUNC ( I32
-        I32
-        I32 ) arrow I32 ) ) .
+    REC(SUB(eps, eps, FUNCARROW(I32 I32 I32, I32))) .
 
   op fib-source-type : -> SpectecTerminal .
-  eq fib-source-type = TYPE fib-rectype .
+  eq fib-source-type = TYPE(fib-rectype) .
 
   op fib-moduleinst : -> SpectecTerminal .
   eq fib-moduleinst =
-    RECModuleinstA9(
-      fib-type, eps, eps, eps, eps, 0, eps, eps, eps) .
+    RECModuleinstA9(fib-type, eps, eps, eps, eps, 0, eps, eps, eps) .
 
   op fib-func : -> SpectecTerminal .
   eq fib-func =
-    FUNC 0 (LOCAL I32) fib-body .
+    FUNC(0, LOCAL(I32), fib-body) .
 
   op fib-funcinst : -> SpectecTerminal .
   eq fib-funcinst =
@@ -96,9 +91,7 @@ mod WASM-FIB is
 
   op fib-store : -> Store .
   eq fib-store =
-    RECStoreA10(
-      eps, eps, eps, eps, fib-funcinst,
-      eps, eps, eps, eps, eps) .
+    RECStoreA10(eps, eps, eps, eps, fib-funcinst, eps, eps, eps, eps, eps) .
 
   op fib-config : SpectecTerminal -> Config .
   op empty-moduleinst : -> SpectecTerminal .
@@ -112,8 +105,8 @@ mod WASM-FIB is
       (NVAL
       i32v(0)
       i32v(1)
-      (REF-FUNC-ADDR 0)
-      (CALL-REF fib-type))) .
+      REF-FUNC-ADDR(0)
+      CALL-REF(fib-type) ) ) .
 
   op fib-config-invoke : SpectecTerminal -> Config .
   eq fib-config-invoke(NVAL) =
@@ -127,18 +120,7 @@ mod WASM-FIB is
 
   op fib-module : -> SpectecTerminal .
   eq fib-module =
-    MODULE
-      fib-source-type
-      eps
-      eps
-      eps
-      eps
-      eps
-      fib-func
-      eps
-      eps
-      eps
-      eps .
+    MODULE(fib-source-type, eps, eps, eps, eps, eps, fib-func, eps, eps, eps, eps) .
 
   op fib-init-config : SpectecTerminal -> Config .
   ceq fib-init-config(NVAL) =
