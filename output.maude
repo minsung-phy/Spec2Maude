@@ -201,7 +201,8 @@ mod SPECTEC-CORE is
 
 
 
-      if REPEAT_N > 0 /\ typecheck(REPEAT_ELEM, REPEAT_WT) .
+
+      if ( REPEAT_N > 0 ) /\ typecheck(REPEAT_ELEM, REPEAT_WT) .
   eq slice($repeat(REPEAT_SINGLE, REPEAT_N), REPEAT_I, 0) = eps .
   ceq slice($repeat(REPEAT_SINGLE, REPEAT_N), 0, REPEAT_COUNT) = REPEAT_SINGLE slice($repeat(REPEAT_SINGLE, _-_ ( REPEAT_N, 1 )), 0, _-_ ( REPEAT_COUNT, 1 ))
 
@@ -950,12 +951,12 @@ mod SPECTEC-CORE is
   op $tuple-mapexpr-a887579edc3a : SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $tuple-mapexpr-dd8217fba1af : SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
   op $type : State SpectecTerminal -> SpectecTerminal .
-  op $typed-index-Globaltype : SpectecTerminals Nat -> SpectecTerminals .
-  op $typed-index-Globaltype : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  op $typed-index-Localtype : SpectecTerminals Nat -> SpectecTerminals .
-  op $typed-index-Localtype : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  op $typed-index-Tabletype : SpectecTerminals Nat -> SpectecTerminals .
-  op $typed-index-Tabletype : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $typed-index-Globaltype-nat : SpectecTerminals Nat -> SpectecTerminals .
+  op $typed-index-Globaltype-seq : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $typed-index-Localtype-nat : SpectecTerminals Nat -> SpectecTerminals .
+  op $typed-index-Localtype-seq : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $typed-index-Tabletype-nat : SpectecTerminals Nat -> SpectecTerminals .
+  op $typed-index-Tabletype-seq : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $unmap-Sdefault-a1-s0 : SpectecTerminals -> SpectecTerminals .
   op $unmap-Sunpack-a1-s0 : SpectecTerminals -> SpectecTerminals .
   op $unmap-mapexpr-0070b5d4579c : SpectecTerminals -> SpectecTerminal .
@@ -8128,24 +8129,28 @@ mod SPECTEC-CORE is
 
   ceq typecheck(I, syn-bit) = true
 
-      if I == 0 or I == 1 .
+
+      if ( I == 0 or I == 1 ) .
 
 
   ceq typecheck(( RAW-BYTE-N ), syn-byte) = true
 
 
 
-      if RAW-BYTE-N >= 0 /\ RAW-BYTE-N <= 255 .
+
+      if ( RAW-BYTE-N >= 0 ) /\ ( RAW-BYTE-N <= 255 ) .
 
 
   ceq typecheck(I, syn-uN(N_UN)) = true
 
-      if typecheck(N_UN, syn-N) /\ 0 <= I /\ I <= ((2 ^ N_UN) - 1) .
+
+      if typecheck(N_UN, syn-N) /\ ( 0 <= I ) /\ ( I <= ((2 ^ N_UN) - 1) ) .
 
 
   ceq typecheck(I, syn-sN(N_SN)) = true
 
-      if typecheck(N_SN, syn-N) /\ - (2 ^ (N_SN - 1)) <= I /\ I <= ((2 ^ (N_SN - 1)) - 1) .
+
+      if typecheck(N_SN, syn-N) /\ ( - (2 ^ (N_SN - 1)) <= I ) /\ ( I <= ((2 ^ (N_SN - 1)) - 1) ) .
 
 
   eq typecheck(T_SPECTEC, syn-iN(N)) = typecheck(T_SPECTEC, syn-uN(N)) .
@@ -8557,25 +8562,25 @@ mod SPECTEC-CORE is
 
 
   --- Source-derived typed index for globaltype* elements.
-  eq $typed-index-Globaltype(eps, TYPED-INDEX-GLOBALTYPE-N) = eps .
-  eq $typed-index-Globaltype(( TYPED-INDEX-GLOBALTYPE-P0 ) ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, 0) = ( TYPED-INDEX-GLOBALTYPE-P0 ) ( TYPED-INDEX-GLOBALTYPE-P1 )
+  eq $typed-index-Globaltype-nat(eps, TYPED-INDEX-GLOBALTYPE-N) = eps .
+  eq $typed-index-Globaltype-nat(( TYPED-INDEX-GLOBALTYPE-P0 ) ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, 0) = ( TYPED-INDEX-GLOBALTYPE-P0 ) ( TYPED-INDEX-GLOBALTYPE-P1 )
    .
-  eq $typed-index-Globaltype(( TYPED-INDEX-GLOBALTYPE-P0 ) ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, s(TYPED-INDEX-GLOBALTYPE-N)) = $typed-index-Globaltype(TYPED-INDEX-GLOBALTYPE-REST, TYPED-INDEX-GLOBALTYPE-N)
+  eq $typed-index-Globaltype-nat(( TYPED-INDEX-GLOBALTYPE-P0 ) ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, s(TYPED-INDEX-GLOBALTYPE-N)) = $typed-index-Globaltype-nat(TYPED-INDEX-GLOBALTYPE-REST, TYPED-INDEX-GLOBALTYPE-N)
    .
 
-  eq $typed-index-Globaltype(eps ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, 0) = eps ( TYPED-INDEX-GLOBALTYPE-P1 )
+  eq $typed-index-Globaltype-nat(eps ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, 0) = eps ( TYPED-INDEX-GLOBALTYPE-P1 )
    .
-  eq $typed-index-Globaltype(eps ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, s(TYPED-INDEX-GLOBALTYPE-N)) = $typed-index-Globaltype(TYPED-INDEX-GLOBALTYPE-REST, TYPED-INDEX-GLOBALTYPE-N)
+  eq $typed-index-Globaltype-nat(eps ( TYPED-INDEX-GLOBALTYPE-P1 ) TYPED-INDEX-GLOBALTYPE-REST, s(TYPED-INDEX-GLOBALTYPE-N)) = $typed-index-Globaltype-nat(TYPED-INDEX-GLOBALTYPE-REST, TYPED-INDEX-GLOBALTYPE-N)
    .
 
 
 
 
   --- Source-derived typed index for tabletype* elements.
-  eq $typed-index-Tabletype(eps, TYPED-INDEX-TABLETYPE-N) = eps .
-  eq $typed-index-Tabletype(( TYPED-INDEX-TABLETYPE-P0 ) ( TYPED-INDEX-TABLETYPE-P1 ) ( TYPED-INDEX-TABLETYPE-P2 ) TYPED-INDEX-TABLETYPE-REST, 0) = ( TYPED-INDEX-TABLETYPE-P0 ) ( TYPED-INDEX-TABLETYPE-P1 ) ( TYPED-INDEX-TABLETYPE-P2 )
+  eq $typed-index-Tabletype-nat(eps, TYPED-INDEX-TABLETYPE-N) = eps .
+  eq $typed-index-Tabletype-nat(( TYPED-INDEX-TABLETYPE-P0 ) ( TYPED-INDEX-TABLETYPE-P1 ) ( TYPED-INDEX-TABLETYPE-P2 ) TYPED-INDEX-TABLETYPE-REST, 0) = ( TYPED-INDEX-TABLETYPE-P0 ) ( TYPED-INDEX-TABLETYPE-P1 ) ( TYPED-INDEX-TABLETYPE-P2 )
    .
-  eq $typed-index-Tabletype(( TYPED-INDEX-TABLETYPE-P0 ) ( TYPED-INDEX-TABLETYPE-P1 ) ( TYPED-INDEX-TABLETYPE-P2 ) TYPED-INDEX-TABLETYPE-REST, s(TYPED-INDEX-TABLETYPE-N)) = $typed-index-Tabletype(TYPED-INDEX-TABLETYPE-REST, TYPED-INDEX-TABLETYPE-N)
+  eq $typed-index-Tabletype-nat(( TYPED-INDEX-TABLETYPE-P0 ) ( TYPED-INDEX-TABLETYPE-P1 ) ( TYPED-INDEX-TABLETYPE-P2 ) TYPED-INDEX-TABLETYPE-REST, s(TYPED-INDEX-TABLETYPE-N)) = $typed-index-Tabletype-nat(TYPED-INDEX-TABLETYPE-REST, TYPED-INDEX-TABLETYPE-N)
    .
 
 
@@ -9399,13 +9404,15 @@ mod SPECTEC-CORE is
       if typecheck(PACKTYPE, syn-packtype) .
   ceq typecheck(I, syn-sz) = true
 
-      if I == 8 or I == 16 or I == 32 or I == 64 .
+
+      if ( I == 8 or I == 16 or I == 32 or I == 64 ) .
 
 
 
   ceq typecheck(I, syn-dim) = true
 
-      if I == 1 or I == 2 or I == 4 or I == 8 or I == 16 .
+
+      if ( I == 1 or I == 2 or I == 4 or I == 8 or I == 16 ) .
 
 
 
@@ -9954,10 +9961,10 @@ mod SPECTEC-CORE is
 
 
   --- Source-derived typed index for localtype* elements.
-  eq $typed-index-Localtype(eps, TYPED-INDEX-LOCALTYPE-N) = eps .
-  eq $typed-index-Localtype(( TYPED-INDEX-LOCALTYPE-P0 ) ( TYPED-INDEX-LOCALTYPE-P1 ) TYPED-INDEX-LOCALTYPE-REST, 0) = ( TYPED-INDEX-LOCALTYPE-P0 ) ( TYPED-INDEX-LOCALTYPE-P1 )
+  eq $typed-index-Localtype-nat(eps, TYPED-INDEX-LOCALTYPE-N) = eps .
+  eq $typed-index-Localtype-nat(( TYPED-INDEX-LOCALTYPE-P0 ) ( TYPED-INDEX-LOCALTYPE-P1 ) TYPED-INDEX-LOCALTYPE-REST, 0) = ( TYPED-INDEX-LOCALTYPE-P0 ) ( TYPED-INDEX-LOCALTYPE-P1 )
    .
-  eq $typed-index-Localtype(( TYPED-INDEX-LOCALTYPE-P0 ) ( TYPED-INDEX-LOCALTYPE-P1 ) TYPED-INDEX-LOCALTYPE-REST, s(TYPED-INDEX-LOCALTYPE-N)) = $typed-index-Localtype(TYPED-INDEX-LOCALTYPE-REST, TYPED-INDEX-LOCALTYPE-N)
+  eq $typed-index-Localtype-nat(( TYPED-INDEX-LOCALTYPE-P0 ) ( TYPED-INDEX-LOCALTYPE-P1 ) TYPED-INDEX-LOCALTYPE-REST, s(TYPED-INDEX-LOCALTYPE-N)) = $typed-index-Localtype-nat(TYPED-INDEX-LOCALTYPE-REST, TYPED-INDEX-LOCALTYPE-N)
    .
 
 
@@ -10520,7 +10527,7 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if INSTRTYPE-OK-R00-LCTS := $typed-index-Localtype ( value('LOCALS, INSTRTYPE-OK-R00-C), INSTRTYPE-OK-R00-XS ) /\ Resulttype-ok(INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-TS1) => valid /\ Resulttype-ok(INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-TS2) => valid .
+      if INSTRTYPE-OK-R00-LCTS := $typed-index-Localtype-seq ( value('LOCALS, INSTRTYPE-OK-R00-C), INSTRTYPE-OK-R00-XS ) /\ Resulttype-ok(INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-TS1) => valid /\ Resulttype-ok(INSTRTYPE-OK-R00-C, INSTRTYPE-OK-R00-TS2) => valid .
 
 
 
@@ -10654,7 +10661,7 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if INSTRTYPE-SUB-R00-XS := $setminus(INSTRTYPE-SUB-R00-XS2, INSTRTYPE-SUB-R00-XS1) /\ set INSTRTYPE-SUB-R00-TS := $typed-index-Localtype ( value('LOCALS, INSTRTYPE-SUB-R00-C), INSTRTYPE-SUB-R00-XS ) /\ Resulttype-sub(INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-TS21, INSTRTYPE-SUB-R00-TS11) => valid /\ Resulttype-sub(INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-TS12, INSTRTYPE-SUB-R00-TS22) => valid .
+      if INSTRTYPE-SUB-R00-XS := $setminus(INSTRTYPE-SUB-R00-XS2, INSTRTYPE-SUB-R00-XS1) /\ set INSTRTYPE-SUB-R00-TS := $typed-index-Localtype-seq ( value('LOCALS, INSTRTYPE-SUB-R00-C), INSTRTYPE-SUB-R00-XS ) /\ Resulttype-sub(INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-TS21, INSTRTYPE-SUB-R00-TS11) => valid /\ Resulttype-sub(INSTRTYPE-SUB-R00-C, INSTRTYPE-SUB-R00-TS12, INSTRTYPE-SUB-R00-TS22) => valid .
 
 
 
@@ -10938,7 +10945,7 @@ mod SPECTEC-CORE is
     valid
 
 
-      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWX) ) /\ Reftype-sub(INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( ref(null, func-heaptype) )) => valid /\ funccomptypearrow(INSTR-OK-CALL-INDIRECT17-TS1, INSTR-OK-CALL-INDIRECT17-TS2) == $expanddt ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWY) ) ) .
+      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWX) ) /\ Reftype-sub(INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( ref(null, func-heaptype) )) => valid /\ funccomptypearrow(INSTR-OK-CALL-INDIRECT17-TS1, INSTR-OK-CALL-INDIRECT17-TS2) == $expanddt ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWY) ) ) .
   crl [instr-ok-return-exec-tail-empty0] :
     Instr-ok ( INSTR-OK-RETURN18-C , return , arrow-instrtype(( INSTR-OK-RETURN18-TS1 eps ), eps, INSTR-OK-RETURN18-TS2) )
     =>
@@ -10980,13 +10987,13 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX) ) /\ funccomptypearrow(eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY) ) ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQS2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ Reftype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( ref(null, func-heaptype) )) => valid /\ Resulttype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-TS2, INSTR-OK-RETURN-CALL-INDIRECT21-TQS2) => valid /\ Instrtype-ok(INSTR-OK-RETURN-CALL-INDIRECT21-C, ( arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )) => valid .
+      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX) ) /\ funccomptypearrow(eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY) ) ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQS2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ Reftype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( ref(null, func-heaptype) )) => valid /\ Resulttype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-TS2, INSTR-OK-RETURN-CALL-INDIRECT21-TQS2) => valid /\ Instrtype-ok(INSTR-OK-RETURN-CALL-INDIRECT21-C, ( arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )) => valid .
   crl [instr-ok-return-call-indirect] :
     Instr-ok ( INSTR-OK-RETURN-CALL-INDIRECT21-C , return-call-indirect(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX, w--idx(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY)) , arrow-instrtype(( INSTR-OK-RETURN-CALL-INDIRECT21-TS3 INSTR-OK-RETURN-CALL-INDIRECT21-TS1 INSTR-OK-RETURN-CALL-INDIRECT21-AT ), eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )
     =>
     valid
 
-      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX) ) /\ funccomptypearrow(INSTR-OK-RETURN-CALL-INDIRECT21-TS1, INSTR-OK-RETURN-CALL-INDIRECT21-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY) ) ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQS2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ Reftype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( ref(null, func-heaptype) )) => valid /\ Resulttype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-TS2, INSTR-OK-RETURN-CALL-INDIRECT21-TQS2) => valid /\ Instrtype-ok(INSTR-OK-RETURN-CALL-INDIRECT21-C, ( arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )) => valid .
+      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX) ) /\ funccomptypearrow(INSTR-OK-RETURN-CALL-INDIRECT21-TS1, INSTR-OK-RETURN-CALL-INDIRECT21-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY) ) ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQS2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ Reftype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( ref(null, func-heaptype) )) => valid /\ Resulttype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-TS2, INSTR-OK-RETURN-CALL-INDIRECT21-TQS2) => valid /\ Instrtype-ok(INSTR-OK-RETURN-CALL-INDIRECT21-C, ( arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )) => valid .
   crl [instr-ok-throw-exec-tail-empty0] :
     Instr-ok ( INSTR-OK-THROW22-C , throw(INSTR-OK-THROW22-LOWX) , arrow-instrtype(( INSTR-OK-THROW22-TS1 eps ), eps, INSTR-OK-THROW22-TS2) )
     =>
@@ -11208,74 +11215,74 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if $typed-index-Localtype ( value('LOCALS, INSTR-OK-LOCAL-GET52-C), $raw-lit(INSTR-OK-LOCAL-GET52-LOWX) ) == set INSTR-OK-LOCAL-GET52-LOWT .
+      if $typed-index-Localtype-nat ( value('LOCALS, INSTR-OK-LOCAL-GET52-C), $raw-lit(INSTR-OK-LOCAL-GET52-LOWX) ) == set INSTR-OK-LOCAL-GET52-LOWT .
   crl [instr-ok-local-set] :
     Instr-ok ( INSTR-OK-LOCAL-SET53-C , local-set(INSTR-OK-LOCAL-SET53-LOWX) , arrow-instrtype(INSTR-OK-LOCAL-SET53-LOWT, INSTR-OK-LOCAL-SET53-LOWX, eps) )
     =>
     valid
 
-      if INSTR-OK-LOCAL-SET53-INIT INSTR-OK-LOCAL-SET53-LOWT := $typed-index-Localtype ( value('LOCALS, INSTR-OK-LOCAL-SET53-C), $raw-lit(INSTR-OK-LOCAL-SET53-LOWX) ) .
+      if INSTR-OK-LOCAL-SET53-INIT INSTR-OK-LOCAL-SET53-LOWT := $typed-index-Localtype-nat ( value('LOCALS, INSTR-OK-LOCAL-SET53-C), $raw-lit(INSTR-OK-LOCAL-SET53-LOWX) ) .
   crl [instr-ok-local-tee] :
     Instr-ok ( INSTR-OK-LOCAL-TEE54-C , local-tee(INSTR-OK-LOCAL-TEE54-LOWX) , arrow-instrtype(INSTR-OK-LOCAL-TEE54-LOWT, INSTR-OK-LOCAL-TEE54-LOWX, INSTR-OK-LOCAL-TEE54-LOWT) )
     =>
     valid
 
-      if INSTR-OK-LOCAL-TEE54-INIT INSTR-OK-LOCAL-TEE54-LOWT := $typed-index-Localtype ( value('LOCALS, INSTR-OK-LOCAL-TEE54-C), $raw-lit(INSTR-OK-LOCAL-TEE54-LOWX) ) .
+      if INSTR-OK-LOCAL-TEE54-INIT INSTR-OK-LOCAL-TEE54-LOWT := $typed-index-Localtype-nat ( value('LOCALS, INSTR-OK-LOCAL-TEE54-C), $raw-lit(INSTR-OK-LOCAL-TEE54-LOWX) ) .
   crl [instr-ok-global-get] :
     Instr-ok ( INSTR-OK-GLOBAL-GET55-C , global-get(INSTR-OK-GLOBAL-GET55-LOWX) , arrow-instrtype(eps, eps, INSTR-OK-GLOBAL-GET55-LOWT) )
     =>
     valid
 
-      if INSTR-OK-GLOBAL-GET55-MUTS INSTR-OK-GLOBAL-GET55-LOWT := $typed-index-Globaltype ( value('GLOBALS, INSTR-OK-GLOBAL-GET55-C), $raw-lit(INSTR-OK-GLOBAL-GET55-LOWX) ) .
+      if INSTR-OK-GLOBAL-GET55-MUTS INSTR-OK-GLOBAL-GET55-LOWT := $typed-index-Globaltype-nat ( value('GLOBALS, INSTR-OK-GLOBAL-GET55-C), $raw-lit(INSTR-OK-GLOBAL-GET55-LOWX) ) .
   crl [instr-ok-global-set] :
     Instr-ok ( INSTR-OK-GLOBAL-SET56-C , global-set(INSTR-OK-GLOBAL-SET56-LOWX) , arrow-instrtype(INSTR-OK-GLOBAL-SET56-LOWT, eps, eps) )
     =>
     valid
 
-      if $typed-index-Globaltype ( value('GLOBALS, INSTR-OK-GLOBAL-SET56-C), $raw-lit(INSTR-OK-GLOBAL-SET56-LOWX) ) == mut INSTR-OK-GLOBAL-SET56-LOWT .
+      if $typed-index-Globaltype-nat ( value('GLOBALS, INSTR-OK-GLOBAL-SET56-C), $raw-lit(INSTR-OK-GLOBAL-SET56-LOWX) ) == mut INSTR-OK-GLOBAL-SET56-LOWT .
   crl [instr-ok-table-get] :
     Instr-ok ( INSTR-OK-TABLE-GET57-C , table-get(INSTR-OK-TABLE-GET57-LOWX) , arrow-instrtype(INSTR-OK-TABLE-GET57-AT, eps, INSTR-OK-TABLE-GET57-RT) )
     =>
     valid
 
-      if INSTR-OK-TABLE-GET57-AT INSTR-OK-TABLE-GET57-LIM INSTR-OK-TABLE-GET57-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-GET57-C), $raw-lit(INSTR-OK-TABLE-GET57-LOWX) ) .
+      if INSTR-OK-TABLE-GET57-AT INSTR-OK-TABLE-GET57-LIM INSTR-OK-TABLE-GET57-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-GET57-C), $raw-lit(INSTR-OK-TABLE-GET57-LOWX) ) .
   crl [instr-ok-table-set] :
     Instr-ok ( INSTR-OK-TABLE-SET58-C , table-set(INSTR-OK-TABLE-SET58-LOWX) , arrow-instrtype(( INSTR-OK-TABLE-SET58-AT INSTR-OK-TABLE-SET58-RT ), eps, eps) )
     =>
     valid
 
-      if INSTR-OK-TABLE-SET58-AT INSTR-OK-TABLE-SET58-LIM INSTR-OK-TABLE-SET58-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-SET58-C), $raw-lit(INSTR-OK-TABLE-SET58-LOWX) ) .
+      if INSTR-OK-TABLE-SET58-AT INSTR-OK-TABLE-SET58-LIM INSTR-OK-TABLE-SET58-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-SET58-C), $raw-lit(INSTR-OK-TABLE-SET58-LOWX) ) .
   crl [instr-ok-table-size] :
     Instr-ok ( INSTR-OK-TABLE-SIZE59-C , table-size(INSTR-OK-TABLE-SIZE59-LOWX) , arrow-instrtype(eps, eps, INSTR-OK-TABLE-SIZE59-AT) )
     =>
     valid
 
-      if INSTR-OK-TABLE-SIZE59-AT INSTR-OK-TABLE-SIZE59-LIM INSTR-OK-TABLE-SIZE59-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-SIZE59-C), $raw-lit(INSTR-OK-TABLE-SIZE59-LOWX) ) .
+      if INSTR-OK-TABLE-SIZE59-AT INSTR-OK-TABLE-SIZE59-LIM INSTR-OK-TABLE-SIZE59-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-SIZE59-C), $raw-lit(INSTR-OK-TABLE-SIZE59-LOWX) ) .
   crl [instr-ok-table-grow] :
     Instr-ok ( INSTR-OK-TABLE-GROW60-C , table-grow(INSTR-OK-TABLE-GROW60-LOWX) , arrow-instrtype(( INSTR-OK-TABLE-GROW60-RT INSTR-OK-TABLE-GROW60-AT ), eps, i32) )
     =>
     valid
 
-      if INSTR-OK-TABLE-GROW60-AT INSTR-OK-TABLE-GROW60-LIM INSTR-OK-TABLE-GROW60-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-GROW60-C), $raw-lit(INSTR-OK-TABLE-GROW60-LOWX) ) .
+      if INSTR-OK-TABLE-GROW60-AT INSTR-OK-TABLE-GROW60-LIM INSTR-OK-TABLE-GROW60-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-GROW60-C), $raw-lit(INSTR-OK-TABLE-GROW60-LOWX) ) .
   crl [instr-ok-table-fill] :
     Instr-ok ( INSTR-OK-TABLE-FILL61-C , table-fill(INSTR-OK-TABLE-FILL61-LOWX) , arrow-instrtype(( INSTR-OK-TABLE-FILL61-AT INSTR-OK-TABLE-FILL61-RT INSTR-OK-TABLE-FILL61-AT ), eps, eps) )
     =>
     valid
 
-      if INSTR-OK-TABLE-FILL61-AT INSTR-OK-TABLE-FILL61-LIM INSTR-OK-TABLE-FILL61-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-FILL61-C), $raw-lit(INSTR-OK-TABLE-FILL61-LOWX) ) .
+      if INSTR-OK-TABLE-FILL61-AT INSTR-OK-TABLE-FILL61-LIM INSTR-OK-TABLE-FILL61-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-FILL61-C), $raw-lit(INSTR-OK-TABLE-FILL61-LOWX) ) .
   crl [instr-ok-table-copy] :
     Instr-ok ( INSTR-OK-TABLE-COPY62-C , table-copy(INSTR-OK-TABLE-COPY62-X1, INSTR-OK-TABLE-COPY62-X2) , arrow-instrtype(( INSTR-OK-TABLE-COPY62-AT1 INSTR-OK-TABLE-COPY62-AT2 INSTR-OK-TABLE-COPY-MINAT0 ), eps, eps) )
     =>
     valid
 
 
-      if INSTR-OK-TABLE-COPY62-AT1 INSTR-OK-TABLE-COPY62-LIM1 INSTR-OK-TABLE-COPY62-RT1 := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X1) ) /\ INSTR-OK-TABLE-COPY62-AT2 INSTR-OK-TABLE-COPY62-LIM2 INSTR-OK-TABLE-COPY62-RT2 := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X2) ) /\ INSTR-OK-TABLE-COPY-MINAT0 == $minat(INSTR-OK-TABLE-COPY62-AT1, INSTR-OK-TABLE-COPY62-AT2) /\ Reftype-sub(INSTR-OK-TABLE-COPY62-C, INSTR-OK-TABLE-COPY62-RT2, INSTR-OK-TABLE-COPY62-RT1) => valid .
+      if INSTR-OK-TABLE-COPY62-AT1 INSTR-OK-TABLE-COPY62-LIM1 INSTR-OK-TABLE-COPY62-RT1 := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X1) ) /\ INSTR-OK-TABLE-COPY62-AT2 INSTR-OK-TABLE-COPY62-LIM2 INSTR-OK-TABLE-COPY62-RT2 := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X2) ) /\ INSTR-OK-TABLE-COPY-MINAT0 == $minat(INSTR-OK-TABLE-COPY62-AT1, INSTR-OK-TABLE-COPY62-AT2) /\ Reftype-sub(INSTR-OK-TABLE-COPY62-C, INSTR-OK-TABLE-COPY62-RT2, INSTR-OK-TABLE-COPY62-RT1) => valid .
   crl [instr-ok-table-init] :
     Instr-ok ( INSTR-OK-TABLE-INIT63-C , table-init(INSTR-OK-TABLE-INIT63-LOWX, INSTR-OK-TABLE-INIT63-LOWY) , arrow-instrtype(( INSTR-OK-TABLE-INIT63-AT i32 i32 ), eps, eps) )
     =>
     valid
 
-      if INSTR-OK-TABLE-INIT63-AT INSTR-OK-TABLE-INIT63-LIM INSTR-OK-TABLE-INIT63-RT1 := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWX) ) /\ INSTR-OK-TABLE-INIT63-RT2 := index ( value('ELEMS, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWY) ) /\ Reftype-sub(INSTR-OK-TABLE-INIT63-C, INSTR-OK-TABLE-INIT63-RT2, INSTR-OK-TABLE-INIT63-RT1) => valid .
+      if INSTR-OK-TABLE-INIT63-AT INSTR-OK-TABLE-INIT63-LIM INSTR-OK-TABLE-INIT63-RT1 := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWX) ) /\ INSTR-OK-TABLE-INIT63-RT2 := index ( value('ELEMS, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWY) ) /\ Reftype-sub(INSTR-OK-TABLE-INIT63-C, INSTR-OK-TABLE-INIT63-RT2, INSTR-OK-TABLE-INIT63-RT1) => valid .
   crl [instr-ok-elem-drop] :
     Instr-ok ( INSTR-OK-ELEM-DROP64-C , elem-drop(INSTR-OK-ELEM-DROP64-LOWX) , arrow-instrtype(eps, eps, eps) )
     =>
@@ -11546,19 +11553,19 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), eps, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, eps, INSTRS-OK-SEQ1-TS3) )) => valid .
+      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype-seq ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), eps, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, eps, INSTRS-OK-SEQ1-TS3) )) => valid .
   crl [instrs-ok-seq-exec-tail-empty1] :
     Instrs-ok ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 eps , arrow-instrtype(INSTRS-OK-SEQ1-TS1, ( INSTRS-OK-SEQ1-XS1 INSTRS-OK-SEQ1-XS2 ), INSTRS-OK-SEQ1-TS3) )
     =>
     valid
 
-      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), eps, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
+      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype-seq ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), eps, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
   crl [instrs-ok-seq-exec-tail-empty2] :
     Instrs-ok ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 INSTRS-OK-SEQ1-INSTRS2 , arrow-instrtype(INSTRS-OK-SEQ1-TS1, ( INSTRS-OK-SEQ1-XS1 eps ), INSTRS-OK-SEQ1-TS3) )
     =>
     valid
 
-      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), INSTRS-OK-SEQ1-INSTRS2, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, eps, INSTRS-OK-SEQ1-TS3) )) => valid .
+      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype-seq ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), INSTRS-OK-SEQ1-INSTRS2, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, eps, INSTRS-OK-SEQ1-TS3) )) => valid .
   crl [instrs-ok-seq-typed-index-empty0] :
     Instrs-ok ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 INSTRS-OK-SEQ1-INSTRS2 , arrow-instrtype(INSTRS-OK-SEQ1-TS1, ( eps INSTRS-OK-SEQ1-XS2 ), INSTRS-OK-SEQ1-TS3) )
     =>
@@ -11570,7 +11577,7 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), INSTRS-OK-SEQ1-INSTRS2, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
+      if INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype-seq ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), INSTRS-OK-SEQ1-INSTRS2, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
   crl [instrs-ok-sub] :
     Instrs-ok ( INSTRS-OK-SUB2-C , INSTRS-OK-SUB2-INSTRS , INSTRS-OK-SUB2-ITQ )
     =>
@@ -11663,7 +11670,7 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if eps INSTR-CONST-GLOBAL-GET12-LOWT := $typed-index-Globaltype ( value('GLOBALS, INSTR-CONST-GLOBAL-GET12-C), $raw-lit(INSTR-CONST-GLOBAL-GET12-LOWX) ) .
+      if eps INSTR-CONST-GLOBAL-GET12-LOWT := $typed-index-Globaltype-nat ( value('GLOBALS, INSTR-CONST-GLOBAL-GET12-C), $raw-lit(INSTR-CONST-GLOBAL-GET12-LOWX) ) .
   crl [instr-const-binop] :
     Instr-const ( INSTR-CONST-BINOP13-C , binop(INSTR-CONST-BINOP13-INN, INSTR-CONST-BINOP13-BINOP) )
     =>
@@ -11790,7 +11797,7 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if ELEMMODE-OK-ACTIVE2-AT ELEMMODE-OK-ACTIVE2-LIM ELEMMODE-OK-ACTIVE2-RTQ := $typed-index-Tabletype ( value('TABLES, ELEMMODE-OK-ACTIVE2-C), $raw-lit(ELEMMODE-OK-ACTIVE2-LOWX) ) /\ Reftype-sub(ELEMMODE-OK-ACTIVE2-C, ELEMMODE-OK-ACTIVE2-RT, ELEMMODE-OK-ACTIVE2-RTQ) => valid /\ Expr-ok-const(ELEMMODE-OK-ACTIVE2-C, ELEMMODE-OK-ACTIVE2-EXPR, ELEMMODE-OK-ACTIVE2-AT) => valid .
+      if ELEMMODE-OK-ACTIVE2-AT ELEMMODE-OK-ACTIVE2-LIM ELEMMODE-OK-ACTIVE2-RTQ := $typed-index-Tabletype-nat ( value('TABLES, ELEMMODE-OK-ACTIVE2-C), $raw-lit(ELEMMODE-OK-ACTIVE2-LOWX) ) /\ Reftype-sub(ELEMMODE-OK-ACTIVE2-C, ELEMMODE-OK-ACTIVE2-RT, ELEMMODE-OK-ACTIVE2-RTQ) => valid /\ Expr-ok-const(ELEMMODE-OK-ACTIVE2-C, ELEMMODE-OK-ACTIVE2-EXPR, ELEMMODE-OK-ACTIVE2-AT) => valid .
 
 
   crl [elem-ok-r0] :
@@ -11833,7 +11840,7 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if $typed-index-Globaltype ( value('GLOBALS, EXTERNIDX-OK-GLOBAL1-C), $raw-lit(EXTERNIDX-OK-GLOBAL1-LOWX) ) == EXTERNIDX-OK-GLOBAL1-GT .
+      if $typed-index-Globaltype-nat ( value('GLOBALS, EXTERNIDX-OK-GLOBAL1-C), $raw-lit(EXTERNIDX-OK-GLOBAL1-LOWX) ) == EXTERNIDX-OK-GLOBAL1-GT .
   crl [externidx-ok-mem] :
     Externidx-ok ( EXTERNIDX-OK-MEM2-C , mem-externidx(EXTERNIDX-OK-MEM2-LOWX) , mem-externtype(EXTERNIDX-OK-MEM2-MT) )
     =>
@@ -11845,7 +11852,7 @@ mod SPECTEC-CORE is
     =>
     valid
 
-      if $typed-index-Tabletype ( value('TABLES, EXTERNIDX-OK-TABLE3-C), $raw-lit(EXTERNIDX-OK-TABLE3-LOWX) ) == EXTERNIDX-OK-TABLE3-TT .
+      if $typed-index-Tabletype-nat ( value('TABLES, EXTERNIDX-OK-TABLE3-C), $raw-lit(EXTERNIDX-OK-TABLE3-LOWX) ) == EXTERNIDX-OK-TABLE3-TT .
   crl [externidx-ok-func] :
     Externidx-ok ( EXTERNIDX-OK-FUNC4-C , func-externidx(EXTERNIDX-OK-FUNC4-LOWX) , func-externtype(EXTERNIDX-OK-FUNC4-DT) )
     =>
@@ -11943,11 +11950,13 @@ mod SPECTEC-CORE is
 
   ceq typecheck(I, syn-relaxed2) = true
 
-      if I == 0 or I == 1 .
+
+      if ( I == 0 or I == 1 ) .
 
   ceq typecheck(I, syn-relaxed4) = true
 
-      if I == 0 or I == 1 or I == 2 or I == 3 .
+
+      if ( I == 0 or I == 1 or I == 2 or I == 3 ) .
 
 
 
@@ -15462,7 +15471,7 @@ mod SPECTEC-CORE is
   ceq $valid-elemmode-ok ( VALID-ELEMMODE-OK-ACTIVE2-C , active-elemmode(VALID-ELEMMODE-OK-ACTIVE2-LOWX, VALID-ELEMMODE-OK-ACTIVE2-EXPR) , VALID-ELEMMODE-OK-ACTIVE2-RT ) = true
 
 
-      if VALID-ELEMMODE-OK-ACTIVE2-AT VALID-ELEMMODE-OK-ACTIVE2-LIM VALID-ELEMMODE-OK-ACTIVE2-RTQ := $typed-index-Tabletype ( value('TABLES, VALID-ELEMMODE-OK-ACTIVE2-C), $raw-lit(VALID-ELEMMODE-OK-ACTIVE2-LOWX) ) /\ $valid-reftype-sub(VALID-ELEMMODE-OK-ACTIVE2-C, VALID-ELEMMODE-OK-ACTIVE2-RT, VALID-ELEMMODE-OK-ACTIVE2-RTQ) == true /\ $valid-expr-ok-const(VALID-ELEMMODE-OK-ACTIVE2-C, VALID-ELEMMODE-OK-ACTIVE2-EXPR, VALID-ELEMMODE-OK-ACTIVE2-AT) == true /\ VALID-ELEMMODE-OK-ACTIVE2-C : Context /\ VALID-ELEMMODE-OK-ACTIVE2-EXPR : SpectecTerminals .
+      if VALID-ELEMMODE-OK-ACTIVE2-AT VALID-ELEMMODE-OK-ACTIVE2-LIM VALID-ELEMMODE-OK-ACTIVE2-RTQ := $typed-index-Tabletype-nat ( value('TABLES, VALID-ELEMMODE-OK-ACTIVE2-C), $raw-lit(VALID-ELEMMODE-OK-ACTIVE2-LOWX) ) /\ $valid-reftype-sub(VALID-ELEMMODE-OK-ACTIVE2-C, VALID-ELEMMODE-OK-ACTIVE2-RT, VALID-ELEMMODE-OK-ACTIVE2-RTQ) == true /\ $valid-expr-ok-const(VALID-ELEMMODE-OK-ACTIVE2-C, VALID-ELEMMODE-OK-ACTIVE2-EXPR, VALID-ELEMMODE-OK-ACTIVE2-AT) == true /\ VALID-ELEMMODE-OK-ACTIVE2-C : Context /\ VALID-ELEMMODE-OK-ACTIVE2-EXPR : SpectecTerminals .
 
   ceq $valid-expr-const ( VALID-EXPR-CONST-R00-C , VALID-EXPR-CONST-R00-INSTRS ) = true
 
@@ -15685,7 +15694,7 @@ mod SPECTEC-CORE is
       if VALID-INSTR-CONST-EXTERN-CONVERT-ANY11-C : Context .
   ceq $valid-instr-const ( VALID-INSTR-CONST-GLOBAL-GET12-C , global-get(VALID-INSTR-CONST-GLOBAL-GET12-LOWX) ) = true
 
-      if eps VALID-INSTR-CONST-GLOBAL-GET12-LOWT := $typed-index-Globaltype ( value('GLOBALS, VALID-INSTR-CONST-GLOBAL-GET12-C), $raw-lit(VALID-INSTR-CONST-GLOBAL-GET12-LOWX) ) /\ VALID-INSTR-CONST-GLOBAL-GET12-C : Context .
+      if eps VALID-INSTR-CONST-GLOBAL-GET12-LOWT := $typed-index-Globaltype-nat ( value('GLOBALS, VALID-INSTR-CONST-GLOBAL-GET12-C), $raw-lit(VALID-INSTR-CONST-GLOBAL-GET12-LOWX) ) /\ VALID-INSTR-CONST-GLOBAL-GET12-C : Context .
   ceq $valid-instr-const ( VALID-INSTR-CONST-BINOP13-C , binop(VALID-INSTR-CONST-BINOP13-INN, VALID-INSTR-CONST-BINOP13-BINOP) ) = true
 
 
@@ -15703,7 +15712,7 @@ mod SPECTEC-CORE is
 
   ceq $valid-instrtype-ok ( VALID-INSTRTYPE-OK-R00-C , arrow-instrtype(VALID-INSTRTYPE-OK-R00-TS1, VALID-INSTRTYPE-OK-R00-XS, VALID-INSTRTYPE-OK-R00-TS2) ) = true
 
-      if $valid-resulttype-ok(VALID-INSTRTYPE-OK-R00-C, VALID-INSTRTYPE-OK-R00-TS1) == true /\ $valid-resulttype-ok(VALID-INSTRTYPE-OK-R00-C, VALID-INSTRTYPE-OK-R00-TS2) == true /\ VALID-INSTRTYPE-OK-R00-LCTS := $typed-index-Localtype ( value('LOCALS, VALID-INSTRTYPE-OK-R00-C), VALID-INSTRTYPE-OK-R00-XS ) /\ VALID-INSTRTYPE-OK-R00-C : Context /\ VALID-INSTRTYPE-OK-R00-LCTS : SpectecTerminals /\ VALID-INSTRTYPE-OK-R00-TS1 : SpectecTerminals /\ VALID-INSTRTYPE-OK-R00-TS2 : SpectecTerminals /\ VALID-INSTRTYPE-OK-R00-XS : SpectecTerminals .
+      if $valid-resulttype-ok(VALID-INSTRTYPE-OK-R00-C, VALID-INSTRTYPE-OK-R00-TS1) == true /\ $valid-resulttype-ok(VALID-INSTRTYPE-OK-R00-C, VALID-INSTRTYPE-OK-R00-TS2) == true /\ VALID-INSTRTYPE-OK-R00-LCTS := $typed-index-Localtype-seq ( value('LOCALS, VALID-INSTRTYPE-OK-R00-C), VALID-INSTRTYPE-OK-R00-XS ) /\ VALID-INSTRTYPE-OK-R00-C : Context /\ VALID-INSTRTYPE-OK-R00-LCTS : SpectecTerminals /\ VALID-INSTRTYPE-OK-R00-TS1 : SpectecTerminals /\ VALID-INSTRTYPE-OK-R00-TS2 : SpectecTerminals /\ VALID-INSTRTYPE-OK-R00-XS : SpectecTerminals .
 
   ceq $valid-limits-ok ( VALID-LIMITS-OK-R00-C , lbrackdotdotrbrack(VALID-LIMITS-OK-R00-LOWN, VALID-LIMITS-OK-R00-MS) , VALID-LIMITS-OK-R00-LOWK ) = true
 
@@ -16348,7 +16357,7 @@ mod SPECTEC-CORE is
     $infer-instr-ok-arg2 ( INSTR-OK-CALL-INDIRECT17-C , call-indirect(INSTR-OK-CALL-INDIRECT17-LOWX, w--idx(INSTR-OK-CALL-INDIRECT17-LOWY)) )
     =>
     ( arrow-instrtype(( INSTR-OK-CALL-INDIRECT17-TS1 INSTR-OK-CALL-INDIRECT17-AT ), eps, INSTR-OK-CALL-INDIRECT17-TS2) )
-      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWX) ) /\ funccomptypearrow(INSTR-OK-CALL-INDIRECT17-TS1, INSTR-OK-CALL-INDIRECT17-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWY) ) ) /\ Reftype-sub(INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( ref(null, func-heaptype) )) => valid .
+      if INSTR-OK-CALL-INDIRECT17-AT INSTR-OK-CALL-INDIRECT17-LIM INSTR-OK-CALL-INDIRECT17-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWX) ) /\ funccomptypearrow(INSTR-OK-CALL-INDIRECT17-TS1, INSTR-OK-CALL-INDIRECT17-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-CALL-INDIRECT17-C), $raw-lit(INSTR-OK-CALL-INDIRECT17-LOWY) ) ) /\ Reftype-sub(INSTR-OK-CALL-INDIRECT17-C, INSTR-OK-CALL-INDIRECT17-RT, ( ref(null, func-heaptype) )) => valid .
   crl [infer-instr-ok-arg2-r18] :
     $infer-instr-ok-arg2 ( INSTR-OK-RETURN18-C , return )
     =>
@@ -16368,7 +16377,7 @@ mod SPECTEC-CORE is
     $infer-instr-ok-arg2 ( INSTR-OK-RETURN-CALL-INDIRECT21-C , return-call-indirect(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX, w--idx(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY)) )
     =>
     ( arrow-instrtype(( INSTR-OK-RETURN-CALL-INDIRECT21-TS3 INSTR-OK-RETURN-CALL-INDIRECT21-TS1 INSTR-OK-RETURN-CALL-INDIRECT21-AT ), eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )
-      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX) ) /\ funccomptypearrow(INSTR-OK-RETURN-CALL-INDIRECT21-TS1, INSTR-OK-RETURN-CALL-INDIRECT21-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY) ) ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQS2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ $infer-instrtype-ok-arg1 ( INSTR-OK-RETURN-CALL-INDIRECT21-C ) => arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) /\ Reftype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( ref(null, func-heaptype) )) => valid /\ Resulttype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-TS2, INSTR-OK-RETURN-CALL-INDIRECT21-TQS2) => valid /\ Instrtype-ok(INSTR-OK-RETURN-CALL-INDIRECT21-C, ( arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )) => valid .
+      if INSTR-OK-RETURN-CALL-INDIRECT21-AT INSTR-OK-RETURN-CALL-INDIRECT21-LIM INSTR-OK-RETURN-CALL-INDIRECT21-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWX) ) /\ funccomptypearrow(INSTR-OK-RETURN-CALL-INDIRECT21-TS1, INSTR-OK-RETURN-CALL-INDIRECT21-TS2) := $expanddt ( index ( value('TYPES, INSTR-OK-RETURN-CALL-INDIRECT21-C), $raw-lit(INSTR-OK-RETURN-CALL-INDIRECT21-LOWY) ) ) /\ INSTR-OK-RETURN-CALL-INDIRECT21-TQS2 := value('RETURN, INSTR-OK-RETURN-CALL-INDIRECT21-C) /\ $infer-instrtype-ok-arg1 ( INSTR-OK-RETURN-CALL-INDIRECT21-C ) => arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) /\ Reftype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-RT, ( ref(null, func-heaptype) )) => valid /\ Resulttype-sub(INSTR-OK-RETURN-CALL-INDIRECT21-C, INSTR-OK-RETURN-CALL-INDIRECT21-TS2, INSTR-OK-RETURN-CALL-INDIRECT21-TQS2) => valid /\ Instrtype-ok(INSTR-OK-RETURN-CALL-INDIRECT21-C, ( arrow-instrtype(INSTR-OK-RETURN-CALL-INDIRECT21-TS3, eps, INSTR-OK-RETURN-CALL-INDIRECT21-TS4) )) => valid .
   crl [infer-instr-ok-arg2-r22] :
     $infer-instr-ok-arg2 ( INSTR-OK-THROW22-C , throw(INSTR-OK-THROW22-LOWX) )
     =>
@@ -16510,62 +16519,62 @@ mod SPECTEC-CORE is
     $infer-instr-ok-arg2 ( INSTR-OK-LOCAL-GET52-C , local-get(INSTR-OK-LOCAL-GET52-LOWX) )
     =>
     ( arrow-instrtype(eps, eps, INSTR-OK-LOCAL-GET52-LOWT) )
-      if set INSTR-OK-LOCAL-GET52-LOWT := $typed-index-Localtype ( value('LOCALS, INSTR-OK-LOCAL-GET52-C), $raw-lit(INSTR-OK-LOCAL-GET52-LOWX) ) .
+      if set INSTR-OK-LOCAL-GET52-LOWT := $typed-index-Localtype-nat ( value('LOCALS, INSTR-OK-LOCAL-GET52-C), $raw-lit(INSTR-OK-LOCAL-GET52-LOWX) ) .
   crl [infer-instr-ok-arg2-r53] :
     $infer-instr-ok-arg2 ( INSTR-OK-LOCAL-SET53-C , local-set(INSTR-OK-LOCAL-SET53-LOWX) )
     =>
     ( arrow-instrtype(INSTR-OK-LOCAL-SET53-LOWT, INSTR-OK-LOCAL-SET53-LOWX, eps) )
-      if INSTR-OK-LOCAL-SET53-INIT INSTR-OK-LOCAL-SET53-LOWT := $typed-index-Localtype ( value('LOCALS, INSTR-OK-LOCAL-SET53-C), $raw-lit(INSTR-OK-LOCAL-SET53-LOWX) ) .
+      if INSTR-OK-LOCAL-SET53-INIT INSTR-OK-LOCAL-SET53-LOWT := $typed-index-Localtype-nat ( value('LOCALS, INSTR-OK-LOCAL-SET53-C), $raw-lit(INSTR-OK-LOCAL-SET53-LOWX) ) .
   crl [infer-instr-ok-arg2-r54] :
     $infer-instr-ok-arg2 ( INSTR-OK-LOCAL-TEE54-C , local-tee(INSTR-OK-LOCAL-TEE54-LOWX) )
     =>
     ( arrow-instrtype(INSTR-OK-LOCAL-TEE54-LOWT, INSTR-OK-LOCAL-TEE54-LOWX, INSTR-OK-LOCAL-TEE54-LOWT) )
-      if INSTR-OK-LOCAL-TEE54-INIT INSTR-OK-LOCAL-TEE54-LOWT := $typed-index-Localtype ( value('LOCALS, INSTR-OK-LOCAL-TEE54-C), $raw-lit(INSTR-OK-LOCAL-TEE54-LOWX) ) .
+      if INSTR-OK-LOCAL-TEE54-INIT INSTR-OK-LOCAL-TEE54-LOWT := $typed-index-Localtype-nat ( value('LOCALS, INSTR-OK-LOCAL-TEE54-C), $raw-lit(INSTR-OK-LOCAL-TEE54-LOWX) ) .
   crl [infer-instr-ok-arg2-r55] :
     $infer-instr-ok-arg2 ( INSTR-OK-GLOBAL-GET55-C , global-get(INSTR-OK-GLOBAL-GET55-LOWX) )
     =>
     ( arrow-instrtype(eps, eps, INSTR-OK-GLOBAL-GET55-LOWT) )
-      if INSTR-OK-GLOBAL-GET55-MUTS INSTR-OK-GLOBAL-GET55-LOWT := $typed-index-Globaltype ( value('GLOBALS, INSTR-OK-GLOBAL-GET55-C), $raw-lit(INSTR-OK-GLOBAL-GET55-LOWX) ) .
+      if INSTR-OK-GLOBAL-GET55-MUTS INSTR-OK-GLOBAL-GET55-LOWT := $typed-index-Globaltype-nat ( value('GLOBALS, INSTR-OK-GLOBAL-GET55-C), $raw-lit(INSTR-OK-GLOBAL-GET55-LOWX) ) .
   crl [infer-instr-ok-arg2-r56] :
     $infer-instr-ok-arg2 ( INSTR-OK-GLOBAL-SET56-C , global-set(INSTR-OK-GLOBAL-SET56-LOWX) )
     =>
     ( arrow-instrtype(INSTR-OK-GLOBAL-SET56-LOWT, eps, eps) )
-      if mut INSTR-OK-GLOBAL-SET56-LOWT := $typed-index-Globaltype ( value('GLOBALS, INSTR-OK-GLOBAL-SET56-C), $raw-lit(INSTR-OK-GLOBAL-SET56-LOWX) ) .
+      if mut INSTR-OK-GLOBAL-SET56-LOWT := $typed-index-Globaltype-nat ( value('GLOBALS, INSTR-OK-GLOBAL-SET56-C), $raw-lit(INSTR-OK-GLOBAL-SET56-LOWX) ) .
   crl [infer-instr-ok-arg2-r57] :
     $infer-instr-ok-arg2 ( INSTR-OK-TABLE-GET57-C , table-get(INSTR-OK-TABLE-GET57-LOWX) )
     =>
     ( arrow-instrtype(INSTR-OK-TABLE-GET57-AT, eps, INSTR-OK-TABLE-GET57-RT) )
-      if INSTR-OK-TABLE-GET57-AT INSTR-OK-TABLE-GET57-LIM INSTR-OK-TABLE-GET57-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-GET57-C), $raw-lit(INSTR-OK-TABLE-GET57-LOWX) ) .
+      if INSTR-OK-TABLE-GET57-AT INSTR-OK-TABLE-GET57-LIM INSTR-OK-TABLE-GET57-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-GET57-C), $raw-lit(INSTR-OK-TABLE-GET57-LOWX) ) .
   crl [infer-instr-ok-arg2-r58] :
     $infer-instr-ok-arg2 ( INSTR-OK-TABLE-SET58-C , table-set(INSTR-OK-TABLE-SET58-LOWX) )
     =>
     ( arrow-instrtype(( INSTR-OK-TABLE-SET58-AT INSTR-OK-TABLE-SET58-RT ), eps, eps) )
-      if INSTR-OK-TABLE-SET58-AT INSTR-OK-TABLE-SET58-LIM INSTR-OK-TABLE-SET58-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-SET58-C), $raw-lit(INSTR-OK-TABLE-SET58-LOWX) ) .
+      if INSTR-OK-TABLE-SET58-AT INSTR-OK-TABLE-SET58-LIM INSTR-OK-TABLE-SET58-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-SET58-C), $raw-lit(INSTR-OK-TABLE-SET58-LOWX) ) .
   crl [infer-instr-ok-arg2-r59] :
     $infer-instr-ok-arg2 ( INSTR-OK-TABLE-SIZE59-C , table-size(INSTR-OK-TABLE-SIZE59-LOWX) )
     =>
     ( arrow-instrtype(eps, eps, INSTR-OK-TABLE-SIZE59-AT) )
-      if INSTR-OK-TABLE-SIZE59-AT INSTR-OK-TABLE-SIZE59-LIM INSTR-OK-TABLE-SIZE59-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-SIZE59-C), $raw-lit(INSTR-OK-TABLE-SIZE59-LOWX) ) .
+      if INSTR-OK-TABLE-SIZE59-AT INSTR-OK-TABLE-SIZE59-LIM INSTR-OK-TABLE-SIZE59-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-SIZE59-C), $raw-lit(INSTR-OK-TABLE-SIZE59-LOWX) ) .
   crl [infer-instr-ok-arg2-r60] :
     $infer-instr-ok-arg2 ( INSTR-OK-TABLE-GROW60-C , table-grow(INSTR-OK-TABLE-GROW60-LOWX) )
     =>
     ( arrow-instrtype(( INSTR-OK-TABLE-GROW60-RT INSTR-OK-TABLE-GROW60-AT ), eps, i32) )
-      if INSTR-OK-TABLE-GROW60-AT INSTR-OK-TABLE-GROW60-LIM INSTR-OK-TABLE-GROW60-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-GROW60-C), $raw-lit(INSTR-OK-TABLE-GROW60-LOWX) ) .
+      if INSTR-OK-TABLE-GROW60-AT INSTR-OK-TABLE-GROW60-LIM INSTR-OK-TABLE-GROW60-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-GROW60-C), $raw-lit(INSTR-OK-TABLE-GROW60-LOWX) ) .
   crl [infer-instr-ok-arg2-r61] :
     $infer-instr-ok-arg2 ( INSTR-OK-TABLE-FILL61-C , table-fill(INSTR-OK-TABLE-FILL61-LOWX) )
     =>
     ( arrow-instrtype(( INSTR-OK-TABLE-FILL61-AT INSTR-OK-TABLE-FILL61-RT INSTR-OK-TABLE-FILL61-AT ), eps, eps) )
-      if INSTR-OK-TABLE-FILL61-AT INSTR-OK-TABLE-FILL61-LIM INSTR-OK-TABLE-FILL61-RT := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-FILL61-C), $raw-lit(INSTR-OK-TABLE-FILL61-LOWX) ) .
+      if INSTR-OK-TABLE-FILL61-AT INSTR-OK-TABLE-FILL61-LIM INSTR-OK-TABLE-FILL61-RT := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-FILL61-C), $raw-lit(INSTR-OK-TABLE-FILL61-LOWX) ) .
   crl [infer-instr-ok-arg2-r62] :
     $infer-instr-ok-arg2 ( INSTR-OK-TABLE-COPY62-C , table-copy(INSTR-OK-TABLE-COPY62-X1, INSTR-OK-TABLE-COPY62-X2) )
     =>
     ( arrow-instrtype(( INSTR-OK-TABLE-COPY62-AT1 INSTR-OK-TABLE-COPY62-AT2 $minat(INSTR-OK-TABLE-COPY62-AT1, INSTR-OK-TABLE-COPY62-AT2) ), eps, eps) )
-      if INSTR-OK-TABLE-COPY62-AT1 INSTR-OK-TABLE-COPY62-LIM1 INSTR-OK-TABLE-COPY62-RT1 := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X1) ) /\ INSTR-OK-TABLE-COPY62-AT2 INSTR-OK-TABLE-COPY62-LIM2 INSTR-OK-TABLE-COPY62-RT2 := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X2) ) /\ Reftype-sub(INSTR-OK-TABLE-COPY62-C, INSTR-OK-TABLE-COPY62-RT2, INSTR-OK-TABLE-COPY62-RT1) => valid .
+      if INSTR-OK-TABLE-COPY62-AT1 INSTR-OK-TABLE-COPY62-LIM1 INSTR-OK-TABLE-COPY62-RT1 := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X1) ) /\ INSTR-OK-TABLE-COPY62-AT2 INSTR-OK-TABLE-COPY62-LIM2 INSTR-OK-TABLE-COPY62-RT2 := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-COPY62-C), $raw-lit(INSTR-OK-TABLE-COPY62-X2) ) /\ Reftype-sub(INSTR-OK-TABLE-COPY62-C, INSTR-OK-TABLE-COPY62-RT2, INSTR-OK-TABLE-COPY62-RT1) => valid .
   crl [infer-instr-ok-arg2-r63] :
     $infer-instr-ok-arg2 ( INSTR-OK-TABLE-INIT63-C , table-init(INSTR-OK-TABLE-INIT63-LOWX, INSTR-OK-TABLE-INIT63-LOWY) )
     =>
     ( arrow-instrtype(( INSTR-OK-TABLE-INIT63-AT i32 i32 ), eps, eps) )
-      if INSTR-OK-TABLE-INIT63-AT INSTR-OK-TABLE-INIT63-LIM INSTR-OK-TABLE-INIT63-RT1 := $typed-index-Tabletype ( value('TABLES, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWX) ) /\ INSTR-OK-TABLE-INIT63-RT2 := index ( value('ELEMS, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWY) ) /\ Reftype-sub(INSTR-OK-TABLE-INIT63-C, INSTR-OK-TABLE-INIT63-RT2, INSTR-OK-TABLE-INIT63-RT1) => valid .
+      if INSTR-OK-TABLE-INIT63-AT INSTR-OK-TABLE-INIT63-LIM INSTR-OK-TABLE-INIT63-RT1 := $typed-index-Tabletype-nat ( value('TABLES, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWX) ) /\ INSTR-OK-TABLE-INIT63-RT2 := index ( value('ELEMS, INSTR-OK-TABLE-INIT63-C), $raw-lit(INSTR-OK-TABLE-INIT63-LOWY) ) /\ Reftype-sub(INSTR-OK-TABLE-INIT63-C, INSTR-OK-TABLE-INIT63-RT2, INSTR-OK-TABLE-INIT63-RT1) => valid .
   crl [infer-instr-ok-arg2-r64] :
     $infer-instr-ok-arg2 ( INSTR-OK-ELEM-DROP64-C , elem-drop(INSTR-OK-ELEM-DROP64-LOWX) )
     =>
@@ -16809,7 +16818,7 @@ mod SPECTEC-CORE is
     $infer-instrs-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 INSTRS-OK-SEQ1-INSTRS2 )
     =>
     ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, ( INSTRS-OK-SEQ1-XS1 INSTRS-OK-SEQ1-XS2 ), INSTRS-OK-SEQ1-TS3) )
-      if $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instrs-ok-arg2 ( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) , INSTRS-OK-SEQ1-INSTRS2 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), INSTRS-OK-SEQ1-INSTRS2, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
+      if $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype-seq ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instrs-ok-arg2 ( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) , INSTRS-OK-SEQ1-INSTRS2 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), INSTRS-OK-SEQ1-INSTRS2, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
   crl [infer-instrs-ok-arg2-r1-typed-index-empty0] :
     $infer-instrs-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 INSTRS-OK-SEQ1-INSTRS2 )
     =>
@@ -16819,7 +16828,7 @@ mod SPECTEC-CORE is
     $infer-instrs-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 )
     =>
     ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, ( INSTRS-OK-SEQ1-XS1 INSTRS-OK-SEQ1-XS2 ), INSTRS-OK-SEQ1-TS3) )
-      if $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instrs-ok-arg2 ( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) , eps ) => arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), eps, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
+      if $infer-instr-ok-arg2 ( INSTRS-OK-SEQ1-C , INSTRS-OK-SEQ1-INSTR1 ) => arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) /\ INSTRS-OK-SEQ1-INITS INSTRS-OK-SEQ1-TS := $typed-index-Localtype-seq ( value('LOCALS, INSTRS-OK-SEQ1-C), INSTRS-OK-SEQ1-XS1 ) /\ $infer-instrs-ok-arg2 ( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) , eps ) => arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) /\ Instr-ok(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-INSTR1, ( arrow-instrtype(INSTRS-OK-SEQ1-TS1, INSTRS-OK-SEQ1-XS1, INSTRS-OK-SEQ1-TS2) )) => valid /\ Instrs-ok(( $with-locals(INSTRS-OK-SEQ1-C, INSTRS-OK-SEQ1-XS1, $mapexpr-ea3dd9aaaea4(INSTRS-OK-SEQ1-TS)) ), eps, ( arrow-instrtype(INSTRS-OK-SEQ1-TS2, INSTRS-OK-SEQ1-XS2, INSTRS-OK-SEQ1-TS3) )) => valid .
   rl [infer-instrs-ok-arg2-r0] :
     $infer-instrs-ok-arg2 ( INSTRS-OK-EMPTY0-C , eps )
     =>
@@ -19335,12 +19344,14 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if len ( ( $utf8 ( SOURCECHARSEQ ) ) ) < ( 2 ^ 32 ) /\ typecheck(SOURCECHARSEQ, syn-char) .
+
+      if ( len ( ( $utf8 ( SOURCECHARSEQ ) ) ) < ( 2 ^ 32 ) ) /\ typecheck(SOURCECHARSEQ, syn-char) .
   ceq typecheck(( SPECTECTERMINALS ), syn-X) = true
 
 
 
-      if len ( SPECTECTERMINALS ) < ( 2 ^ 32 ) .
+
+      if ( len ( SPECTECTERMINALS ) < ( 2 ^ 32 ) ) .
   ceq typecheck(( SZ ), syn-storeop(INN)) = true
 
 
@@ -19382,7 +19393,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( add-sat(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 16 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( add-sat(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) <= 16 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( all-true ), syn-vtestop(x(JNN, M))) = true
 
 
@@ -19442,7 +19454,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if $lsizenn ( JNN ) <= 16 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( $lsizenn ( JNN ) <= 16 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( binop(NUMTYPE, BINOP_NUMTYPE) ), syn-instr) = true
 
       if ( binop(NUMTYPE, BINOP_NUMTYPE) ) : SpectecTerminal .
@@ -19539,7 +19552,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( demote-vcvtop(ZERO) ) : SpectecTerminal /\ $sizenn1 ( FNN1 ) == ( 2 * $sizenn2 ( FNN2 ) ) /\ typecheck(FNN1, syn-Fnn) /\ typecheck(FNN2, syn-Fnn) .
+
+      if ( demote-vcvtop(ZERO) ) : SpectecTerminal /\ ( $sizenn1 ( FNN1 ) == ( 2 * $sizenn2 ( FNN2 ) ) ) /\ typecheck(FNN1, syn-Fnn) /\ typecheck(FNN2, syn-Fnn) .
   ceq typecheck(( div-binop ), syn-binop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
@@ -19554,7 +19568,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) /\ $lsizenn2 ( JNN2 ) == 32 /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
+
+      if ( ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) ) /\ ( $lsizenn2 ( JNN2 ) == 32 ) /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
   ceq typecheck(( elem(REFTYPE, INSTRSEQ, ELEMMODE) ), syn-elem) = true
 
       if ( elem(REFTYPE, INSTRSEQ, ELEMMODE) ) : SpectecTerminal .
@@ -19577,7 +19592,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( extadd-pairwise(SX) ) : SpectecTerminal /\ 16 <= ( 2 * $lsizenn1 ( JNN1 ) ) /\ ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) /\ $lsizenn2 ( JNN2 ) <= 32 /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
+
+      if ( extadd-pairwise(SX) ) : SpectecTerminal /\ ( 16 <= ( 2 * $lsizenn1 ( JNN1 ) ) ) /\ ( ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) ) /\ ( $lsizenn2 ( JNN2 ) <= 32 ) /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
   ceq typecheck(( extend-cvtop(SX) ), syn-cvtop(INN1, INN2)) = true
 
 
@@ -19592,12 +19608,14 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( extend-vcvtop(HALF, SX) ) : SpectecTerminal /\ $lsizenn2 ( JNN2 ) == ( 2 * $lsizenn1 ( JNN1 ) ) /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
+
+      if ( extend-vcvtop(HALF, SX) ) : SpectecTerminal /\ ( $lsizenn2 ( JNN2 ) == ( 2 * $lsizenn1 ( JNN1 ) ) ) /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
   ceq typecheck(( extmul(HALF, SX) ), syn-vextbinop(x(JNN1, M1), x(JNN2, M2))) = true
 
 
 
-      if ( extmul(HALF, SX) ) : SpectecTerminal /\ ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) /\ $lsizenn2 ( JNN2 ) >= 16 /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
+
+      if ( extmul(HALF, SX) ) : SpectecTerminal /\ ( ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) ) /\ ( $lsizenn2 ( JNN2 ) >= 16 ) /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
   ceq typecheck(( floor ), syn-unop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
@@ -19753,7 +19771,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( max-sx-vbinop(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 32 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( max-sx-vbinop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) <= 32 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( max-vbinop ), syn-vbinop(x(FNN, M))) = true
 
 
@@ -19790,7 +19809,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( min-sx-vbinop(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 32 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( min-sx-vbinop(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) <= 32 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( min-vbinop ), syn-vbinop(x(FNN, M))) = true
 
 
@@ -19816,12 +19836,14 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if $lsizenn ( JNN ) >= 16 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( $lsizenn ( JNN ) >= 16 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( nan(LOWM) ), syn-fNmag(N)) = true
 
 
 
-      if ( nan(LOWM) ) : SpectecTerminal /\ 1 <= LOWM /\ LOWM < ( 2 ^ $M ( N ) ) .
+
+      if ( nan(LOWM) ) : SpectecTerminal /\ ( 1 <= LOWM ) /\ ( LOWM < ( 2 ^ $M ( N ) ) ) .
   ceq typecheck(( ne ), syn-relop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
@@ -19862,7 +19884,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( norm(LOWM, EXP) ) : SpectecTerminal /\ LOWM < ( 2 ^ $M ( N ) ) /\ ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) <= EXP /\ EXP <= ( ( 2 ^ ( $E ( N ) - 1 ) ) - 1 ) .
+
+      if ( norm(LOWM, EXP) ) : SpectecTerminal /\ ( LOWM < ( 2 ^ $M ( N ) ) ) /\ ( ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) <= EXP ) /\ ( EXP <= ( ( 2 ^ ( $E ( N ) - 1 ) ) - 1 ) ) .
   ceq typecheck(( ok-oktypeidx(TYPEIDX) ), syn-oktypeidx) = true
 
       if ( ok-oktypeidx(TYPEIDX) ) : SpectecTerminal .
@@ -19890,7 +19913,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if $lsizenn ( JNN ) == 8 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( $lsizenn ( JNN ) == 8 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( pos(FNMAG_N) ), syn-fN(N)) = true
 
 
@@ -19904,12 +19928,14 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( 2 * $sizenn1 ( FNN1 ) ) == $sizenn2 ( FNN2 ) /\ typecheck(FNN1, syn-Fnn) /\ typecheck(FNN2, syn-Fnn) .
+
+      if ( ( 2 * $sizenn1 ( FNN1 ) ) == $sizenn2 ( FNN2 ) ) /\ typecheck(FNN1, syn-Fnn) /\ typecheck(FNN2, syn-Fnn) .
   ceq typecheck(( q15mulr-sats ), syn-vbinop(x(JNN, M))) = true
 
 
 
-      if $lsizenn ( JNN ) == 16 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( $lsizenn ( JNN ) == 16 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( rec-heaptype(LOWN) ), syn-heaptype) = true
 
       if ( rec-heaptype(LOWN) ) : SpectecTerminal .
@@ -19976,12 +20002,14 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( 4 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) /\ $lsizenn2 ( JNN2 ) == 32 /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
+
+      if ( ( 4 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) ) /\ ( $lsizenn2 ( JNN2 ) == 32 ) /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
   ceq typecheck(( relaxed-dots ), syn-vextbinop(x(JNN1, M1), x(JNN2, M2))) = true
 
 
 
-      if ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) /\ $lsizenn2 ( JNN2 ) == 16 /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
+
+      if ( ( 2 * $lsizenn1 ( JNN1 ) ) == $lsizenn2 ( JNN2 ) ) /\ ( $lsizenn2 ( JNN2 ) == 16 ) /\ typecheck(JNN1, syn-Jnn) /\ typecheck(JNN2, syn-Jnn) .
   ceq typecheck(( relaxed-laneselect ), syn-vternop(x(JNN, M))) = true
 
 
@@ -20006,7 +20034,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if $lsizenn ( JNN ) == 16 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( $lsizenn ( JNN ) == 16 ) /\ typecheck(JNN, syn-Jnn) .
   eq typecheck(( relaxed-swizzle ), syn-vswizzlop(x(i8, M))) = true
    .
   ceq typecheck(( relaxed-trunc(SX, SOURCEZEROSEQ) ), syn-vcvtop(x(FNN1, M1), x(JNN2, M2))) = true
@@ -20041,7 +20070,8 @@ if SSUBST-VALTYPES-S =/= eps .
   ceq typecheck(( shapexany(SZ, M, SX) ), syn-vloadop(VECTYPE)) = true
 
 
-      if ( shapexany(SZ, M, SX) ) : SpectecTerminal /\ ( SZ * M ) == ( $vsize ( VECTYPE ) quo 2 ) /\ typecheck(VECTYPE, syn-vectype) /\ typecheck(VECTYPE, syn-vectype) .
+
+      if ( shapexany(SZ, M, SX) ) : SpectecTerminal /\ ( ( SZ * M ) == ( $vsize ( VECTYPE ) quo 2 ) ) /\ typecheck(VECTYPE, syn-vectype) /\ typecheck(VECTYPE, syn-vectype) .
   ceq typecheck(( shl ), syn-binop(INN)) = true
 
       if typecheck(INN, syn-Inn) .
@@ -20104,7 +20134,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( sub-sat(SX) ) : SpectecTerminal /\ $lsizenn ( JNN ) <= 16 /\ typecheck(JNN, syn-Jnn) .
+
+      if ( sub-sat(SX) ) : SpectecTerminal /\ ( $lsizenn ( JNN ) <= 16 ) /\ typecheck(JNN, syn-Jnn) .
   ceq typecheck(( sub-subtype(FINALSEQ, TYPEUSESEQ, COMPTYPE) ), syn-subtype) = true
 
       if ( sub-subtype(FINALSEQ, TYPEUSESEQ, COMPTYPE) ) : SpectecTerminal .
@@ -20123,7 +20154,8 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( subnorm(LOWM) ) : SpectecTerminal /\ LOWM < ( 2 ^ $M ( N ) ) /\ ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) == EXP .
+
+      if ( subnorm(LOWM) ) : SpectecTerminal /\ ( LOWM < ( 2 ^ $M ( N ) ) ) /\ ( ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) == EXP ) .
   eq typecheck(( swizzle ), syn-vswizzlop(x(i8, M))) = true
    .
   ceq typecheck(( table-copy(TABLEIDX, TABLEIDX2) ), syn-instr) = true
@@ -20983,7 +21015,8 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( vnarrow(ISHAPE, ISHAPE2, SX) ) : SpectecTerminal
 
 
-      if $lsize ( ( $lanetype ( ISHAPE2 ) ) ) == ( 2 * $lsize ( ( $lanetype ( ISHAPE ) ) ) ) /\ ( 2 * $lsize ( ( $lanetype ( ISHAPE ) ) ) ) <= 32 /\ typecheck(ISHAPE, syn-ishape) /\ typecheck(ISHAPE2, syn-ishape) /\ typecheck(SX, syn-sx) .
+
+      if ( $lsize ( ( $lanetype ( ISHAPE2 ) ) ) == ( 2 * $lsize ( ( $lanetype ( ISHAPE ) ) ) ) ) /\ ( ( 2 * $lsize ( ( $lanetype ( ISHAPE ) ) ) ) <= 32 ) /\ typecheck(ISHAPE, syn-ishape) /\ typecheck(ISHAPE2, syn-ishape) /\ typecheck(SX, syn-sx) .
   cmb ( vrelop(SHAPE, VRELOP_SHAPE) ) : SpectecTerminal
 
       if typecheck(SHAPE, syn-shape) /\ typecheck(VRELOP_SHAPE, syn-vrelop ( SHAPE )) .
@@ -21049,12 +21082,14 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( x(LANETYPE, DIM) ) : SpectecTerminal
 
 
-      if ( $lsize ( LANETYPE ) * DIM ) == 128 /\ typecheck(LANETYPE, syn-lanetype) /\ typecheck(DIM, syn-dim) .
+
+      if ( ( $lsize ( LANETYPE ) * DIM ) == 128 ) /\ typecheck(LANETYPE, syn-lanetype) /\ typecheck(DIM, syn-dim) .
   cmb ( zero-vloadop(SZ) ) : SpectecTerminal
 
 
 
-      if SZ >= 32 /\ typecheck(SZ, syn-sz) .
+
+      if ( SZ >= 32 ) /\ typecheck(SZ, syn-sz) .
   mb ( {item('LOCALS, ( F-FRAME-LOCALS-0 )) ; item('MODULE, ( F-FRAME-MODULE-1 ))} ) : Frame
    .
   mb ( {item('TAGS, ( F-STORE-TAGS-0 )) ; item('GLOBALS, ( F-STORE-GLOBALS-1 )) ; item('MEMS, ( F-STORE-MEMS-2 )) ; item('TABLES, ( F-STORE-TABLES-3 )) ; item('FUNCS, ( F-STORE-FUNCS-4 )) ; item('DATAS, ( F-STORE-DATAS-5 )) ; item('ELEMS, ( F-STORE-ELEMS-6 )) ; item('STRUCTS, ( F-STORE-STRUCTS-7 )) ; item('ARRAYS, ( F-STORE-ARRAYS-8 )) ; item('EXNS, ( F-STORE-EXNS-9 ))} ) : Store

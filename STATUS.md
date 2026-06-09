@@ -1,6 +1,6 @@
 # Spec2Maude Status
 
-Updated: 2026-06-08
+Updated: 2026-06-09
 
 ## One-Line State
 
@@ -107,13 +107,16 @@ bad tokens, zero used-before-bound diagnostics, and zero no-parse diagnostics.
 
 Remaining warning sources are currently:
 
-- source-derived typed-index sequence patterns that interact with the
+- 4 warnings from source-derived typed-index sequence patterns that interact with the
   source-style `SpectecTerminal < SpectecTerminals` carrier and associative
   `_ _` sequence operator;
-- a small number of numeric/range expressions involving overloaded Maude
-  arithmetic;
-- one `norm(...)` membership axiom with an argument shape Maude can still parse
-  in more than one way.
+- 2 warnings from readable numeric/range `typecheck` conditions such as
+  `syn-uN` and `syn-sN`; these are intentionally left in infix form for
+  source readability instead of being rendered as Maude internal prefix
+  operators such as `_<=_`;
+- 3 warnings from float syntax around `norm(...)`/`subnorm(...)`, where
+  partial constructor membership and numeric conditions still give Maude more
+  than one parse.
 
 The earlier nullary/unary constructor overload warning class, for example
 `DIV` versus `DIV sx` and `LE` versus `LE sx`, is resolved by source-derived
@@ -167,6 +170,9 @@ Resolved:
   `SpectecTerminal`;
 - numeric literal payloads are raw Maude numerals again, classified through
   source-derived `typecheck(raw-number, syn-numeric-type)` equations;
+- readable numeric guards are preserved in source-shaped infix notation instead
+  of being rewritten into Maude internal prefix notation just to reduce warning
+  count;
 - bulk source category sort/subsort generation is removed from the syntax path;
 - generated WAT harnesses no longer include `Module-ok` checked-run code unless
   explicitly requested with the debug path.

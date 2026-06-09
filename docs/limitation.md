@@ -1,6 +1,6 @@
 # Current Limitations And Discussion Points
 
-Updated: 2026-06-08
+Updated: 2026-06-09
 
 This document records the current state after restoring the JHS-style
 `SpectecType`/`typecheck` syntax layer and adding Maude constructor membership
@@ -219,10 +219,15 @@ Important interpretation:
 
 - Maude load warnings are currently parser-ambiguity warnings, not load errors.
 - The remaining warnings are mainly:
-  - sequence-pattern ambiguity from the associative source-sequence operator
-    `_ _`;
-  - a few numeric/range conditions using overloaded Maude arithmetic;
-  - one `norm(...)` membership axiom with a still-ambiguous argument shape.
+  - 4 typed-index/sequence-pattern ambiguities from the associative
+    source-sequence operator `_ _`;
+  - 2 readable numeric/range `typecheck` conditions using overloaded Maude
+    arithmetic;
+  - 3 `norm(...)`/`subnorm(...)` float syntax warnings with still-ambiguous
+    partial constructor membership and numeric conditions.
+- The numeric warnings could be reduced by rendering expressions as Maude
+  internal prefix forms such as `_<=_`, but the current artifact keeps readable
+  infix guards because they are closer to the SpecTec/JHS presentation.
 - The earlier nullary/unary overload warning class, such as `DIV` versus
   `DIV sx`, `LE` versus `LE sx`, and vector signed variants, is now resolved by
   source-derived argument-shape suffixes such as `div-sx-binop`,

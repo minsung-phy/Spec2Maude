@@ -1,6 +1,6 @@
 # Spec2Maude Artifact Guide
 
-Updated: 2026-06-08
+Updated: 2026-06-09
 
 This guide is the reviewer-facing checklist for the current Spec2Maude
 artifact snapshot.
@@ -121,7 +121,7 @@ For a small progress probe:
 ./spec2maude test official --limit 30 --timeout 5
 ```
 
-Current 2026-06-08 reference bucket shape:
+Current 2026-06-09 reference bucket shape:
 
 ```text
 Benchmark summary:
@@ -154,11 +154,13 @@ The most useful files for debugging are `problem_cases.csv` and
 
 ## Known Limitations
 
-- Remaining Maude warnings are parser-ambiguity warnings from source numeric
-  range conditions, source-derived typed-index sequence patterns, and one
-  `norm(...)` membership axiom.  The earlier nullary/unary constructor overload
-  warning class is resolved by source-derived argument-shape suffixes such as
-  `div-sx-binop` and `le-sx-relop`.
+- Remaining Maude warnings are parser-ambiguity warnings: 4 from
+  source-derived typed-index sequence patterns, 2 from readable numeric/range
+  `typecheck` conditions, and 3 from `norm(...)`/`subnorm(...)` float syntax.
+  The numeric guards are deliberately left source-readable rather than rendered
+  as Maude internal prefix operators such as `_<=_`.  The earlier nullary/unary
+  constructor overload warning class is resolved by source-derived
+  argument-shape suffixes such as `div-sx-binop` and `le-sx-relop`.
 - The default WAT/Wasm execution path validates input with the official
   WebAssembly parser/validator before Maude execution; translated `Module-ok`
   remains in `output.maude` but is not the default execution gate.

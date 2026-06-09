@@ -5891,12 +5891,58 @@ let choose_source_ctor_for_case expected_sort mixop field_exps arg_ts vm =
           choose_most_specific_source_ctor best
           |> Option.map (fun info -> info.source_ctor_name)
 
-let typed_index_helper_name sort =
-  "$typed-index-" ^ sort
+let typed_index_helper_name ?(index_kind = `Nat) sort =
+  "$typed-index-" ^ sort ^
+  match index_kind with
+  | `Nat -> "-nat"
+  | `Seq -> "-seq"
 
-let typed_index_call elem_sort base_text idx_text =
+let typed_index_index_kind (idx_t : texpr) =
+  let core = strip_wrapping_parens idx_t.text |> String.trim in
+  let var_sort v =
+    match Hashtbl.find_opt declared_vars v with
+    | Some sort -> Some sort
+    | None -> source_sort_of_plain_text_var v
+  in
+  if core = "eps" then `Seq
+  else if is_raw_numeric_text core
+          || starts_with core "$raw-lit"
+          || starts_with core "$raw-nat-lit"
+  then `Nat
+  else if is_plain_var_like core then
+    match var_sort core with
+    | Some "SpectecTerminals" -> `Seq
+    | _ -> `Nat
+  else if
+    List.exists
+      (fun v ->
+         match var_sort v with
+         | Some "SpectecTerminals" -> true
+         | _ -> Hashtbl.mem source_var_seq_elem_sorts v)
+      idx_t.vars
+  then `Seq
+  else `Nat
+
+let typed_index_nat_arg idx_text =
+  let core = strip_wrapping_parens idx_text |> String.trim in
+  if core = "" || is_raw_numeric_text core || starts_with core "$raw-nat-lit"
+  then idx_text
+  else
+    match
+      if is_plain_var_like core then Hashtbl.find_opt declared_vars core else None
+    with
+    | Some "Nat" -> idx_text
+    | _ -> format_call "$raw-nat-lit" [idx_text]
+
+let typed_index_call elem_sort base_text idx_t =
+  let index_kind = typed_index_index_kind idx_t in
+  let idx_text =
+    match index_kind with
+    | `Nat -> typed_index_nat_arg idx_t.text
+    | `Seq -> idx_t.text
+  in
   Printf.sprintf "%s ( %s, %s )"
-    (typed_index_helper_name elem_sort) base_text idx_text
+    (typed_index_helper_name ~index_kind elem_sort) base_text idx_text
 
 (* Global accumulator: ListN count variable -> sequence variable pairs.
    Populated by translate_exp when it encounters IterE with ListN iter.
@@ -6154,7 +6200,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
        | Some elem_sort
          when SSet.mem elem_sort !flat_sequence_source_sorts
               && source_record_sequence_elem_sort_exists elem_sort ->
-           { text = typed_index_call elem_sort base_t.text idx_t.text;
+           { text = typed_index_call elem_sort base_t.text idx_t;
              vars = base_t.vars @ idx_t.vars }
        | _ ->
            { text = Printf.sprintf "index ( %s, %s )" base_t.text idx_t.text;
@@ -9629,7 +9675,12 @@ let translate_typd id params insts =
                            declare_var n_v "Nat"
                          else ""
                        in
-                       let typed_index_helper = typed_index_helper_name full_type_sort in
+                       let typed_index_nat_helper =
+                         typed_index_helper_name ~index_kind:`Nat full_type_sort
+                       in
+                       let typed_index_seq_helper =
+                         typed_index_helper_name ~index_kind:`Seq full_type_sort
+                       in
                        let broad_decls, typed_lhs, typed_cond =
                          typed_index_pattern full_type_sort lhs rhs opt_param_indices params
                        in
@@ -9641,26 +9692,26 @@ let translate_typd id params insts =
                        let eq0 =
                          Printf.sprintf
                            "  eq %s(eps, %s) = eps ."
-                           typed_index_helper n_v
+                           typed_index_nat_helper n_v
                        in
                        let eq_head =
                          Printf.sprintf
                            "  %s %s(%s, 0) = %s%s ."
                            (if typed_cond = "" then "eq" else "ceq")
-                           typed_index_helper lhs_with_rest typed_lhs cond_suffix
+                           typed_index_nat_helper lhs_with_rest typed_lhs cond_suffix
                        in
                        let eq_tail =
                          Printf.sprintf
                            "  %s %s(%s, s(%s)) = %s(%s, %s)%s ."
                            (if typed_cond = "" then "eq" else "ceq")
-                           typed_index_helper lhs_with_rest n_v typed_index_helper rest_v n_v cond_suffix
+                           typed_index_nat_helper lhs_with_rest n_v typed_index_nat_helper rest_v n_v cond_suffix
                        in
 	                       let header =
 	                         if first_for_sort then
 	                           "\n  --- Source-derived typed index for " ^ name ^ "* elements.\n"
 	                           ^ decls
-                             ^ Printf.sprintf "  op %s : SpectecTerminals Nat -> SpectecTerminals .\n" typed_index_helper
-                             ^ Printf.sprintf "  op %s : SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" typed_index_helper
+                             ^ Printf.sprintf "  op %s : SpectecTerminals Nat -> SpectecTerminals .\n" typed_index_nat_helper
+                             ^ Printf.sprintf "  op %s : SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" typed_index_seq_helper
                              ^ broad_decls ^ eq0 ^ "\n"
 	                         else ""
 	                       in
@@ -9812,7 +9863,9 @@ let translate_typd id params insts =
                            then
                              let rest_v = "TYPED-INDEX-" ^ String.uppercase_ascii full_type_sort ^ "-REST" in
                              let n_v = "TYPED-INDEX-" ^ String.uppercase_ascii full_type_sort ^ "-N" in
-                             let typed_index_helper = typed_index_helper_name full_type_sort in
+                             let typed_index_nat_helper =
+                               typed_index_helper_name ~index_kind:`Nat full_type_sort
+                             in
                              let broad_decls, typed_lhs, typed_cond =
                                typed_index_pattern full_type_sort lhs_eps r
                                  (List.filter (fun i -> i <> opt_idx) opt_param_indices)
@@ -9827,13 +9880,13 @@ let translate_typd id params insts =
 	                               Printf.sprintf
 	                                 "  %s %s(%s, 0) = %s%s ."
 	                                 (if typed_cond = "" then "eq" else "ceq")
-                                 typed_index_helper lhs_with_rest typed_lhs cond_suffix
+                                 typed_index_nat_helper lhs_with_rest typed_lhs cond_suffix
                              in
                              let eq_tail =
                                Printf.sprintf
                                  "  %s %s(%s, s(%s)) = %s(%s, %s)%s ."
                                  (if typed_cond = "" then "eq" else "ceq")
-                                 typed_index_helper lhs_with_rest n_v typed_index_helper rest_v n_v cond_suffix
+                                 typed_index_nat_helper lhs_with_rest n_v typed_index_nat_helper rest_v n_v cond_suffix
                              in
 	                             "\n" ^ broad_decls ^ eq_head ^ "\n" ^ eq_tail ^ "\n"
 	                           else ""
@@ -12521,6 +12574,107 @@ let split_condition_conjuncts cond =
   Str.split (Str.regexp_string "/\\") cond
   |> List.map String.trim
   |> List.filter (fun s -> s <> "")
+
+let condition_has_numeric_signal cond =
+  contains_substring cond "^"
+  || contains_substring cond " quo "
+  || contains_substring cond " rem "
+  || contains_substring cond "$raw-"
+  || Str.string_match
+       (Str.regexp ".*\\(^\\|[^A-Za-z0-9_'$-]\\)[0-9]+\\([^A-Za-z0-9_'$-]\\|$\\).*")
+       cond 0
+
+let condition_has_top_level_comparator cond =
+  let len = String.length cond in
+  let rec loop i depth =
+    if i >= len then false
+    else
+      let depth =
+        match cond.[i] with
+        | '(' -> depth + 1
+        | ')' -> max 0 (depth - 1)
+        | _ -> depth
+      in
+      if depth = 0 then
+        let has_next c = i + 1 < len && cond.[i + 1] = c in
+        match cond.[i] with
+        | '<' | '>' -> true
+        | '=' when has_next '=' -> true
+        | '=' when has_next '/' -> true
+        | _ -> loop (i + 1) depth
+      else loop (i + 1) depth
+  in
+  loop 0 0
+
+let condition_is_fully_parenthesized cond =
+  let cond = String.trim cond in
+  let stripped = safe_strip_source_syntax_wrapping_parens cond in
+  stripped <> cond
+
+let parenthesize_numeric_condition_conjunct cond =
+  let cond = String.trim cond in
+  if cond = ""
+     || not (condition_has_numeric_signal cond)
+     || not (condition_has_top_level_comparator cond)
+  then cond
+  else if condition_is_fully_parenthesized cond then cond
+  else "( " ^ cond ^ " )"
+
+let parenthesize_numeric_condition_conjuncts_in_statement stmt =
+  match last_condition_if stmt, last_non_space_index stmt with
+  | Some (if_pos, cond_start), Some dot_pos
+      when dot_pos > cond_start && stmt.[dot_pos] = '.' ->
+      let first_nonempty =
+        stmt
+        |> String.split_on_char '\n'
+        |> List.map String.trim
+        |> List.find_opt (fun line -> line <> "")
+      in
+      let is_source_syntax_head =
+        match first_nonempty with
+        | Some head ->
+            starts_with head "ceq typecheck("
+            || starts_with head "cmb "
+        | None -> false
+      in
+      if not is_source_syntax_head
+      then stmt
+      else
+      let prefix = String.sub stmt 0 if_pos in
+      let cond = String.sub stmt cond_start (dot_pos - cond_start) in
+      let suffix = String.sub stmt dot_pos (String.length stmt - dot_pos) in
+      let conds = split_condition_conjuncts cond in
+      let wrapped = List.map parenthesize_numeric_condition_conjunct conds in
+      if wrapped = conds then stmt
+      else
+        let suffix =
+          if starts_with (String.trim suffix) "." then " " ^ String.trim suffix
+          else suffix
+        in
+        prefix ^ "\n      if " ^ String.concat " /\\ " wrapped ^ suffix
+  | _ -> stmt
+
+let parenthesize_numeric_condition_conjuncts_in_output text =
+  let flush current acc =
+    match current with
+    | [] -> acc
+    | _ ->
+        let stmt = List.rev current |> String.concat "\n" in
+        parenthesize_numeric_condition_conjuncts_in_statement stmt :: acc
+  in
+  let rec loop current acc = function
+    | [] -> List.rev (flush current acc)
+    | line :: rest ->
+        let current' = line :: current in
+        if ends_with (String.trim line) "." then
+          loop [] (flush current' acc) rest
+        else
+          loop current' acc rest
+  in
+  text
+  |> String.split_on_char '\n'
+  |> loop [] []
+  |> String.concat "\n"
 
 let strip_source_sort_guards_from_statement stmt =
   match last_condition_if stmt, last_non_space_index stmt with
@@ -19786,9 +19940,10 @@ let translate defs =
   |> normalize_numeric_sequence_comparators_in_output
 	  |> strip_typecheck_guards_from_output
 	  |> strip_source_sort_guards_from_output
-	  |> strip_redundant_builtin_sort_guards_from_output
-	  |> pretty_source_syntax_conditions_in_output
-	  |> strip_condition_eq_true_from_output
-	  |> partialize_cmb_constructor_ops_in_output
-	  |> normalize_empty_condition_statements
-	  |> trim_trailing_whitespace_from_output
+		  |> strip_redundant_builtin_sort_guards_from_output
+		  |> pretty_source_syntax_conditions_in_output
+		  |> strip_condition_eq_true_from_output
+		  |> parenthesize_numeric_condition_conjuncts_in_output
+		  |> partialize_cmb_constructor_ops_in_output
+		  |> normalize_empty_condition_statements
+		  |> trim_trailing_whitespace_from_output
