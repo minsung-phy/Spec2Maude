@@ -53,7 +53,7 @@ maude -no-banner wasm-exec.maude
 ./spec2maude test smoke --timeout 10
 ```
 
-Current expected results on 2026-06-08:
+Current expected results on 2026-06-09:
 
 ```text
 syntax audit                 PASS
@@ -64,7 +64,10 @@ local smoke suite            PASS: 13
 ```
 
 The remaining Maude warnings are parser-ambiguity warnings, not load errors.
-They are tracked in [docs/limitation.md](docs/limitation.md).
+They are tracked in [docs/limitation.md](docs/limitation.md).  The current
+warning baseline is intentionally kept in a source-readable form: numeric
+guards such as `0 <= I` are not rewritten into Maude's internal `_<=_` prefix
+notation merely to hide warnings.
 
 ## Important Design Choice
 
