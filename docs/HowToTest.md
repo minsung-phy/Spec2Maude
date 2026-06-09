@@ -174,6 +174,16 @@ rg 'Module-ok|generated-checked|generated-validation' /tmp/fib.generated.maude
 
 Expected: no matches.
 
+Generated harness terms should use the current source-readable prefix surface,
+not the old compact constructor surface:
+
+```bash
+rg 'const\(i32|func-func|local-get|binop|relop' /tmp/fib.generated.maude
+rg 'CONST__|FUNC___|CALL_|WRESULT_|REFNULL_|VCONST__' /tmp/fib.generated.maude
+```
+
+Expected: the first command matches; the second command has no matches.
+
 If you explicitly want the experimental Maude validation/debug block:
 
 ```bash
@@ -260,6 +270,12 @@ rejected by the frontend validation path before Maude runtime.
 Test runs write artifacts under `artifacts/`.  Regenerate the expected bucket
 counts after syntax-carrier changes; parse/load regressions should be chased
 before runtime-result regressions.
+
+The benchmark runner compares expected results against the same source-readable
+prefix terms emitted by the frontend, for example `const(i32, 5)`,
+`ref-null(func-absheaptype)`, and `vconst(v128, ...)`.  It should not classify
+results by searching for the old compact `CONST__`/`REFNULL_`/`VCONST__`
+spelling.
 
 Current local smoke expectation:
 

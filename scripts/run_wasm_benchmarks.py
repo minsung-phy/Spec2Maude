@@ -25,20 +25,20 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RAW_NUM_CONST_RE = re.compile(r"CONST__\(\s*(I32|I64|F32|F64)\s*,\s*([+-]?\d+)\)")
+RAW_NUM_CONST_RE = re.compile(r"const\(\s*(i32|i64|f32|f64)\s*,\s*([+-]?\d+)\)")
 NUM_CONST_SHAPES = {
-    "I32": ("I32", 32),
-    "I64": ("I64", 64),
-    "F32": ("F32", None),
-    "F64": ("F64", None),
+    "i32": ("i32", 32),
+    "i64": ("i64", 64),
+    "f32": ("f32", None),
+    "f64": ("f64", None),
 }
 WAST_NUM_TYPES = {
-    "i32": "I32",
-    "i64": "I64",
-    "f32": "F32",
-    "f64": "F64",
+    "i32": "i32",
+    "i64": "i64",
+    "f32": "f32",
+    "f64": "f64",
 }
-NAN_EXPECT_RE = re.compile(r"__EXPECT_(F32|F64)_NAN__")
+NAN_EXPECT_RE = re.compile(r"__EXPECT_(f32|f64)_NAN__")
 OFFICIAL_CORE_ROOT = ROOT / "benchmarks" / "external" / "webassembly-spec" / "test" / "core"
 OFFICIAL_FEATURE_DIRS = {
     "bulk-memory",
@@ -73,65 +73,38 @@ HARNESS_MARKERS = {
     "$mem-bytes",
     "$zero-membytes",
     "$with-mem-slice",
-    "BLOCK__",
-    "BLOCK ",
-    "BRIF_",
-    "BRIF ",
-    "BRTABLE__",
-    "BRTABLE ",
-    "BR_",
-    "BR ",
-    "CALL_",
-    "FRAMELBRACERBRACE___",
-    "LABELLBRACERBRACE___",
-    "FRAMELBRACERBRACE",
-    "LABELLBRACERBRACE",
-    "GLOBALGET_",
-    "GLOBALGET ",
-    "GLOBALSET_",
-    "GLOBALSET ",
-    "LOAD____",
-    "LOAD ",
-    "LOCALGET_",
-    "LOCALGET ",
-    "LOCALSET_",
-    "LOCALSET ",
-    "LOCALTEE_",
-    "LOCALTEE ",
-    "LOOP__",
-    "LOOP ",
-    "MEMORYCOPY__",
-    "MEMORYCOPY ",
-    "MEMORYFILL_",
-    "MEMORYFILL ",
-    "MEMORYGROW_",
-    "MEMORYGROW ",
-    "MEMORYINIT__",
-    "MEMORYINIT ",
-    "MEMORYSIZE_",
-    "MEMORYSIZE ",
-    "STORE____",
-    "STORE ",
-    "TABLECOPY__",
-    "TABLECOPY ",
-    "TABLEFILL_",
-    "TABLEFILL ",
-    "TABLEGET_",
-    "TABLEGET ",
-    "TABLEGROW_",
-    "TABLEGROW ",
-    "TABLEINIT__",
-    "TABLEINIT ",
-    "TABLESET_",
-    "TABLESET ",
-    "WIFELSE___",
-    "WIFELSE ",
-    "CALLREF_",
-    "CALLINDIRECT__",
-    "RETURNCALL_",
-    "CALLREF",
-    "CALLINDIRECT",
-    "RETURNCALL",
+    "block(",
+    "br-if(",
+    "br-table(",
+    "br(",
+    "call(",
+    "call-ref(",
+    "call-indirect(",
+    "return-call(",
+    "return-call-ref(",
+    "return-call-indirect(",
+    "framelbracerbrace(",
+    "labellbracerbrace(",
+    "global-get(",
+    "global-set(",
+    "load(",
+    "local-get(",
+    "local-set(",
+    "local-tee(",
+    "loop(",
+    "memory-copy(",
+    "memory-fill(",
+    "memory-grow(",
+    "memory-init(",
+    "memory-size(",
+    "store(",
+    "table-copy(",
+    "table-fill(",
+    "table-get(",
+    "table-grow(",
+    "table-init(",
+    "table-set(",
+    "ifelse(",
     "RECStoreA10",
     "RECFrameA2",
     "generated-init-config",
@@ -163,25 +136,25 @@ BUILTIN_MARKERS = {
 }
 
 STATE_MUTATION_MARKERS = {
-    "GLOBALSET_",
-    "STORE____",
-    "MEMORYGROW_",
-    "MEMORYFILL_",
-    "MEMORYCOPY__",
-    "MEMORYINIT__",
-    "DATADROP_",
-    "TABLESET_",
-    "TABLEGROW_",
-    "TABLEFILL_",
-    "TABLECOPY__",
-    "TABLEINIT__",
-    "ELEMDROP_",
+    "global-set(",
+    "store(",
+    "memory-grow(",
+    "memory-fill(",
+    "memory-copy(",
+    "memory-init(",
+    "data-drop(",
+    "table-set(",
+    "table-grow(",
+    "table-fill(",
+    "table-copy(",
+    "table-init(",
+    "elem-drop(",
 }
-DIRECT_CALL_RE = re.compile(r"(?:RETURNCALL_|CALL_)\s*\(\s*([0-9]+)\s*\)")
-CALL_REF_RE = re.compile(r"(?:RETURNCALLREF_|CALLREF_)")
-INDIRECT_CALL_RE = re.compile(r"(?:RETURNCALLINDIRECT__|CALLINDIRECT__)")
+DIRECT_CALL_RE = re.compile(r"\b(?:return-call|call)\s*\(\s*([0-9]+)\s*\)")
+CALL_REF_RE = re.compile(r"\b(?:return-call-ref|call-ref)\s*\(")
+INDIRECT_CALL_RE = re.compile(r"\b(?:return-call-indirect|call-indirect)\s*\(")
 STATIC_REF_FUNC_CALL_RE = re.compile(
-    r"REFFUNC(?:ADDR)?_\s*\(\s*([0-9]+)\s*\)\s*(?:RETURNCALLREF_|CALLREF_)"
+    r"ref-func(?:-addr)?\s*\(\s*([0-9]+)\s*\)\s*(?:return-call-ref|call-ref)\s*\("
 )
 
 
@@ -304,19 +277,19 @@ def wrapped_num_const(typ: str, value: str) -> str:
     if shape is None:
         return value
     ctor, bits = shape
-    if typ == "F32":
+    if typ == "f32":
         payload = signed_int(value, 32)
-    elif typ == "F64":
+    elif typ == "f64":
         payload = signed_int(value, 64)
     else:
         payload = unsigned_payload(value, bits) if bits is not None else int(value)
-    return f"CONST__({ctor}, {payload})"
+    return f"const({ctor}, {payload})"
 
 
 def source_float_const(typ: str, value: str) -> str | None:
-    if typ == "F32":
+    if typ == "f32":
         bits, fracbits, ebits, bias = 32, 23, 8, 127
-    elif typ == "F64":
+    elif typ == "f64":
         bits, fracbits, ebits, bias = 64, 52, 11, 1023
     else:
         return None
@@ -326,15 +299,15 @@ def source_float_const(typ: str, value: str) -> str | None:
     frac = raw & ((1 << fracbits) - 1)
     max_exp = (1 << ebits) - 1
     if exp == 0:
-        mag = f"SUBNORM_({frac})"
+        mag = f"subnorm({frac})"
     elif exp == max_exp and frac == 0:
-        mag = "INF"
+        mag = "inf"
     elif exp == max_exp:
-        mag = f"NAN_({frac})"
+        mag = f"nan({frac})"
     else:
-        mag = f"NORM__({frac}, {exp - bias})"
-    sign_ctor = "NEG_" if sign else "POS_"
-    return f"CONST__({typ}, {sign_ctor}({mag}))"
+        mag = f"norm({frac}, {exp - bias})"
+    sign_ctor = "neg-fn" if sign else "pos"
+    return f"const({typ}, {sign_ctor}({mag}))"
 
 
 def wrapped_numeric_equivalent(term: str) -> str:
@@ -353,36 +326,21 @@ def source_float_equivalent(term: str) -> str:
 
 
 SOURCE_FLOAT_CONST_RE = re.compile(
-    r"CONST__\(\s*(F32|F64)\s*,\s*(POS_|NEG_)\((SUBNORM_|NAN_|NORM__)\(([^()]*)\)\)\s*\)"
+    r"const\(\s*(f32|f64)\s*,\s*(pos|neg-fn)\((subnorm|nan|norm)\(([^()]*)\)\)\s*\)"
 )
 SOURCE_FLOAT_INF_RE = re.compile(
-    r"CONST__\(\s*(F32|F64)\s*,\s*(POS_|NEG_)\(INF\)\s*\)"
+    r"const\(\s*(f32|f64)\s*,\s*(pos|neg-fn)\(inf\)\s*\)"
 )
 
 
 def maude_source_float_equivalent(term: str) -> str:
-    """Render source float constants the way Maude prints trailing-underscore ops."""
+    """Current generated float constants are already Maude prefix terms."""
 
-    def repl_mag(match: re.Match[str]) -> str:
-        typ = match.group(1)
-        sign = match.group(2)[:-1]
-        mag = match.group(3)[:-1].replace("NORM_", "NORM")
-        args = " ".join(part.strip() for part in match.group(4).split(","))
-        return f"CONST {typ} {sign}({mag} {args})"
-
-    def repl_inf(match: re.Match[str]) -> str:
-        return f"CONST {match.group(1)} {match.group(2)[:-1]} INF"
-
-    rendered = SOURCE_FLOAT_CONST_RE.sub(repl_mag, term)
-    rendered = SOURCE_FLOAT_INF_RE.sub(repl_inf, rendered)
-    return rendered
+    return term
 
 
 def pretty_numeric_equivalent(term: str) -> str:
-    return RAW_NUM_CONST_RE.sub(
-        lambda match: f"CONST {match.group(1)} {match.group(2)}",
-        term,
-    )
+    return term
 
 
 def split_top_level_args(text: str) -> list[str] | None:
@@ -757,41 +715,38 @@ def classify_output(code: int, out: str, expected: str = "") -> tuple[str, str, 
     if marker in out:
         observed = out[out.rindex(marker) + len(marker) :].strip().splitlines()[0].strip()
     admin_terms = [
-        "FRAMELBRACERBRACE___",
-        "LABELLBRACERBRACE___",
-        "FRAMELBRACERBRACE",
-        "LABELLBRACERBRACE",
-        "CALLREF_",
-        "CALLINDIRECT__",
-        "RETURNCALL_",
-        "BLOCK ",
-        "BR ",
-        "BRIF ",
-        "BRTABLE ",
-        "CALL ",
-        "GLOBALGET ",
-        "GLOBALSET ",
-        "LOAD ",
-        "LOCALGET ",
-        "LOCALSET ",
-        "LOCALTEE ",
-        "LOOP ",
-        "MEMORYCOPY ",
-        "MEMORYFILL ",
-        "MEMORYGROW ",
-        "MEMORYINIT ",
-        "MEMORYSIZE ",
-        "STORE ",
-        "TABLECOPY ",
-        "TABLEFILL ",
-        "TABLEGET ",
-        "TABLEGROW ",
-        "TABLEINIT ",
-        "TABLESET ",
-        "WIFELSE ",
-        "CALLREF",
-        "CALLINDIRECT",
-        "RETURNCALL",
+        "framelbracerbrace(",
+        "labellbracerbrace(",
+        "call-ref(",
+        "call-indirect(",
+        "return-call(",
+        "return-call-ref(",
+        "return-call-indirect(",
+        "block(",
+        "br(",
+        "br-if(",
+        "br-table(",
+        "call(",
+        "global-get(",
+        "global-set(",
+        "load(",
+        "local-get(",
+        "local-set(",
+        "local-tee(",
+        "loop(",
+        "memory-copy(",
+        "memory-fill(",
+        "memory-grow(",
+        "memory-init(",
+        "memory-size(",
+        "store(",
+        "table-copy(",
+        "table-fill(",
+        "table-get(",
+        "table-grow(",
+        "table-init(",
+        "table-set(",
+        "ifelse(",
     ]
     if observed and any(admin in observed for admin in admin_terms):
         return ("STUCK_STEP", observed, "administrative/runtime term remains")
@@ -913,7 +868,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
         (
             "fib",
             ["--unchecked-run", "--result-only", "--run", "5", "wat_examples/fib.wat"],
-            "CONST__(I32, 5)",
+            "const(i32, 5)",
         ),
         (
             "fib-wrapper",
@@ -930,37 +885,37 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "1",
                 "wat_examples/fib-wrapper.wat",
             ],
-            "CONST__(I32, 5)",
+            "const(i32, 5)",
         ),
         (
             "global-get",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/global-get.wat"],
-            "CONST__(I32, 42)",
+            "const(i32, 42)",
         ),
         (
             "memory-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/memory-size.wat"],
-            "CONST__(I32, 0)",
+            "const(i32, 0)",
         ),
         (
             "table-size",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/table-size.wat"],
-            "CONST__(I32, 3)",
+            "const(i32, 3)",
         ),
         (
             "start-global",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/start-global.wat"],
-            "CONST__(I32, 7)",
+            "const(i32, 7)",
         ),
         (
             "data-load",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/data-load.wat"],
-            "CONST__(I32, 42)",
+            "const(i32, 42)",
         ),
         (
             "elem-call-ref",
             ["--unchecked-run", "--result-only", "--run-main", "wat_examples/elem-call-ref.wat"],
-            "CONST__(I32, 9)",
+            "const(i32, 9)",
         ),
         (
             "import-func",
@@ -975,7 +930,7 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.bump=local.get 0 i32.const 1 i32.add",
                 "wat_examples/import-func.wat",
             ],
-            "CONST__(I32, 42)",
+            "const(i32, 42)",
         ),
         (
             "import-global",
@@ -988,17 +943,17 @@ def smoke_cases() -> list[tuple[str, list[str], str]]:
                 "env.g=i32.const 77",
                 "wat_examples/import-global.wat",
             ],
-            "CONST__(I32, 77)",
+            "const(i32, 77)",
         ),
         (
             "import-memory",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-memory.wat"],
-            "CONST__(I32, 1)",
+            "const(i32, 1)",
         ),
         (
             "import-table",
             ["--unchecked-run", "--result-only", "--run-export", "main", "wat_examples/import-table.wat"],
-            "CONST__(I32, 4)",
+            "const(i32, 4)",
         ),
     ]
 
@@ -1318,23 +1273,19 @@ def is_nan_bits(value: int, bits: int) -> bool:
 
 
 def observed_has_nan_const(text: str, typ: str) -> bool:
-    if typ == "F32":
-        ctor, bits = "F32", 32
-    elif typ == "F64":
-        ctor, bits = "F64", 64
+    typ = typ.lower()
+    if typ == "f32":
+        ctor, bits = "f32", 32
+    elif typ == "f64":
+        ctor, bits = "f64", 64
     else:
         return False
     raw_pattern = re.compile(
-        rf"CONST__\s*\(\s*{ctor}\s*,\s*([+-]?\d+)\s*\)"
+        rf"const\s*\(\s*{ctor}\s*,\s*([+-]?\d+)\s*\)"
     )
-    pretty_pattern = re.compile(rf"\bCONST\s+{ctor}\s+([+-]?\d+)\b")
-    source_pattern = re.compile(
-        rf"(?:CONST__\s*\(\s*{ctor}\s*,\s*(?:POS_|NEG_)\s*\(\s*NAN_|"
-        rf"\bCONST\s+{ctor}\s+(?:POS|NEG)\s+NAN\b)"
-    )
+    source_pattern = re.compile(rf"const\s*\(\s*{ctor}\s*,\s*(?:pos|neg-fn)\s*\(\s*nan\s*\(")
     return (
         any(is_nan_bits(int(match.group(1)), bits) for match in raw_pattern.finditer(text))
-        or any(is_nan_bits(int(match.group(1)), bits) for match in pretty_pattern.finditer(text))
         or source_pattern.search(text) is not None
     )
 
@@ -1357,35 +1308,44 @@ def packed_v128_lanes(value: str) -> int | None:
 
 
 REF_HEAPTYPES = {
-    "funcref": "FUNC",
-    "externref": "EXTERN",
-    "anyref": "ANY",
-    "eqref": "WEQ",
-    "i31ref": "I31",
-    "structref": "STRUCT",
-    "arrayref": "ARRAY",
-    "exnref": "EXN",
-    "nullref": "NONE",
-    "nullfuncref": "NOFUNC",
-    "nullexnref": "NOEXN",
-    "nullexternref": "NOEXTERN",
-    "refnull": "NONE",
+    "funcref": "func-absheaptype",
+    "externref": "extern",
+    "anyref": "any-heaptype",
+    "eqref": "w-eq",
+    "i31ref": "i31",
+    "structref": "struct-absheaptype",
+    "arrayref": "array-absheaptype",
+    "exnref": "exn",
+    "nullref": "none",
+    "nullfuncref": "nofunc",
+    "nullexnref": "noexn",
+    "nullexternref": "noextern",
+    "refnull": "none",
 }
 
 NULL_REF_ALTERNATIVES = {
-    "anyref": ["ANY", "NONE"],
-    "funcref": ["FUNC", "NOFUNC"],
-    "exnref": ["EXN", "NOEXN"],
-    "externref": ["EXTERN", "NOEXTERN"],
-    "eqref": ["WEQ", "NONE"],
-    "i31ref": ["I31", "NONE"],
-    "structref": ["STRUCT", "NONE"],
-    "arrayref": ["ARRAY", "NONE"],
-    "nullref": ["NONE"],
-    "nullfuncref": ["NOFUNC"],
-    "nullexnref": ["NOEXN"],
-    "nullexternref": ["NOEXTERN"],
-    "refnull": ["ANY", "NONE", "FUNC", "NOFUNC", "EXN", "NOEXN", "EXTERN", "NOEXTERN"],
+    "anyref": ["any-heaptype", "none"],
+    "funcref": ["func-absheaptype", "nofunc"],
+    "exnref": ["exn", "noexn"],
+    "externref": ["extern", "noextern"],
+    "eqref": ["w-eq", "none"],
+    "i31ref": ["i31", "none"],
+    "structref": ["struct-absheaptype", "none"],
+    "arrayref": ["array-absheaptype", "none"],
+    "nullref": ["none"],
+    "nullfuncref": ["nofunc"],
+    "nullexnref": ["noexn"],
+    "nullexternref": ["noextern"],
+    "refnull": [
+        "any-heaptype",
+        "none",
+        "func-absheaptype",
+        "nofunc",
+        "exn",
+        "noexn",
+        "extern",
+        "noextern",
+    ],
 }
 
 REF_ARG_FLAGS = {
@@ -1400,21 +1360,21 @@ REF_ARG_FLAGS = {
 }
 
 REF_VALUE_CTORS = {
-    "funcref": ["REFFUNCADDR_"],
-    "externref": ["REFEXTERN_"],
+    "funcref": ["ref-func-addr"],
+    "externref": ["ref-extern"],
     "anyref": [
-        "REFHOSTADDR_",
-        "REFEXTERN_",
-        "REFFUNCADDR_",
-        "REFI31NUM_",
-        "REFSTRUCTADDR_",
-        "REFARRAYADDR_",
+        "ref-host-addr",
+        "ref-extern",
+        "ref-func-addr",
+        "ref-i31-num",
+        "ref-struct-addr",
+        "ref-array-addr",
     ],
-    "eqref": ["REFI31NUM_", "REFSTRUCTADDR_", "REFARRAYADDR_"],
-    "i31ref": ["REFI31NUM_"],
-    "structref": ["REFSTRUCTADDR_"],
-    "arrayref": ["REFARRAYADDR_"],
-    "exnref": ["REFEXNADDR_"],
+    "eqref": ["ref-i31-num", "ref-struct-addr", "ref-array-addr"],
+    "i31ref": ["ref-i31-num"],
+    "structref": ["ref-struct-addr"],
+    "arrayref": ["ref-array-addr"],
+    "exnref": ["ref-exn-addr"],
 }
 
 
@@ -1423,17 +1383,17 @@ def maude_ref_alternatives(typ: str, value: str | None) -> list[str] | None:
     ctors = REF_VALUE_CTORS.get(typ)
     null_heaps = NULL_REF_ALTERNATIVES.get(typ)
     if typ == "refnull" and value is None:
-        return ["REFNULL_("]
+        return ["ref-null("]
     if value == "null" or (value is None and null_heaps is not None):
-        return [f"REFNULL_({heap})" for heap in (null_heaps or [heap]) if heap is not None]
+        return [f"ref-null({heap})" for heap in (null_heaps or [heap]) if heap is not None]
     if heap is None or ctors is None:
         return None
     if value is None:
         return [f"{ctor}(" for ctor in ctors]
     if typ == "externref":
         return [
-            f"REFEXTERN_({value})",
-            f"REFEXTERN_(REFHOSTADDR_({value}))",
+            f"ref-extern({value})",
+            f"ref-extern(ref-host-addr({value}))",
         ]
     return [f"{ctor}({value})" for ctor in ctors]
 
@@ -1451,10 +1411,10 @@ def maude_num_alternatives(typ: str, value: str | None) -> list[str] | None:
     if typ == "v128":
         if any(re.fullmatch(r"[+-]?\d+", lane) is None for lane in value.split()):
             return None
-        alts = [f"VCONST__(V128, $v128lanes({value}))"]
+        alts = [f"vconst(v128, $v128lanes({value}))"]
         packed = packed_v128_lanes(value)
         if packed is not None:
-            alts.append(f"VCONST__(V128, {packed})")
+            alts.append(f"vconst(v128, {packed})")
         return alts
     return None
 
@@ -1977,7 +1937,7 @@ def run_wast_probe(
                         raw_index = ref.get("func_index")
                         if raw_index is None:
                             term = str(ref.get("term", ""))
-                            if "REFNULL_" in term:
+                            if "ref-null(" in term:
                                 continue
                             table_targets = None
                             break
@@ -2102,7 +2062,7 @@ def run_wast_probe(
                                 )
                             )
                             func_addr_by_index[func_index] = addr
-                        refs.append(f"REFFUNCADDR_({addr})")
+                        refs.append(f"ref-func-addr({addr})")
                     elif term:
                         refs.append(term)
                 if refs:
@@ -2128,9 +2088,7 @@ def run_wast_probe(
             return 1
 
         def observed_i32_result(term: str) -> int | None:
-            m = re.search(r"CONST__\(I32,\s*(\d+)\)", term)
-            if not m:
-                m = re.search(r"\bCONST\s+I32\s+(\d+)\b", term)
+            m = re.search(r"const\s*\(\s*i32\s*,\s*(\d+)\s*\)", term)
             if not m:
                 return None
             value = int(m.group(1))

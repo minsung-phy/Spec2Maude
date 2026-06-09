@@ -352,582 +352,11 @@ let compact_spaces s =
   let s = String.concat "(" (List.map String.trim (String.split_on_char '(' s)) in
   String.concat ")" (List.map String.trim (String.split_on_char ')' s))
 
-let compact_surface_specs =
-  [
-    ("ACTIVEDATAMODE__", [ "ACTIVE-DATAMODE"; ""; "" ]);
-    ("ACTIVEELEMMODE__", [ "ACTIVE-ELEMMODE"; ""; "" ]);
-    ("ACTIVE__", [ "ACTIVE-DATAMODE"; ""; "" ]);
-    ("ANY__", [ "ANY"; ""; "" ]);
-    ("ARROW__", [ ""; "arrow"; "" ]);
-    ("ARRAYCOPY__", [ "ARRAY-COPY"; ""; "" ]);
-    ("ARRAYFILL_", [ "ARRAY-FILL"; "" ]);
-    ("ARRAYGET__", [ "ARRAY-GET"; ""; "" ]);
-    ("ARRAYINITDATA__", [ "ARRAY-INIT-DATA"; ""; "" ]);
-    ("ARRAYINITELEM__", [ "ARRAY-INIT-ELEM"; ""; "" ]);
-    ("ARRAYNEWDATA__", [ "ARRAY-NEW-DATA"; ""; "" ]);
-    ("ARRAYNEWELEM__", [ "ARRAY-NEW-ELEM"; ""; "" ]);
-    ("ARRAYNEWFIXED__", [ "ARRAY-NEW-FIXED"; ""; "" ]);
-    ("ARRAYNEWDEFAULT_", [ "ARRAY-NEW-DEFAULT"; "" ]);
-    ("ARRAYNEW_", [ "ARRAY-NEW"; "" ]);
-    ("ARRAYSET_", [ "ARRAY-SET"; "" ]);
-    ("ARRAY_", [ "ARRAY"; "" ]);
-    ("BINOP__", [ "BINOP"; ""; "" ]);
-    ("BLOCK__", [ "BLOCK"; ""; "" ]);
-    ("BRONCASTFAIL___", [ "BR-ON-CAST-FAIL"; ""; ""; "" ]);
-    ("BRONCAST___", [ "BR-ON-CAST"; ""; ""; "" ]);
-    ("BRONNONNULL_", [ "BR-ON-NON-NULL"; "" ]);
-    ("BRONNULL_", [ "BR-ON-NULL"; "" ]);
-    ("BRTABLE__", [ "BR-TABLE"; ""; "" ]);
-    ("BRIF_", [ "BR-IF"; "" ]);
-    ("BR_", [ "BR"; "" ]);
-    ("CALLINDIRECT__", [ "CALL-INDIRECT"; ""; "" ]);
-    ("CALLREF_", [ "CALL-REF"; "" ]);
-    ("CALL_", [ "CALL"; "" ]);
-    ("CATCHALLREF_", [ "CATCH-ALL-REF"; "" ]);
-    ("CATCHALL_", [ "CATCH-ALL"; "" ]);
-    ("CATCHREF__", [ "CATCH-REF"; ""; "" ]);
-    ("CATCH__", [ "CATCH"; ""; "" ]);
-    ("CONST__", [ "CONST"; ""; "" ]);
-    ("CONVERT_", [ "CONVERT"; "" ]);
-    ("CVTOP___", [ "CVTOP"; ""; ""; "" ]);
-    ("DATA__", [ "DATA"; ""; "" ]);
-    ("DATADROP_", [ "DATA-DROP"; "" ]);
-    ("DEMOTE_", [ "DEMOTE"; "" ]);
-    ("DIVSXBINOP_", [ "DIV-SX-BINOP"; "" ]);
-    ("DIVBINOP_", [ "DIV-SX-BINOP"; "" ]);
-    ("DIVVBINOP_", [ "DIV-VBINOP"; "" ]);
-    ("DIV_", [ "DIV-SX-BINOP"; "" ]);
-    ("ELEMDROP_", [ "ELEM-DROP"; "" ]);
-    ("ELEM___", [ "ELEM"; ""; ""; "" ]);
-    ("EXPORT__", [ "EXPORT"; ""; "" ]);
-    ("EXTEND_", [ "EXTEND"; "" ]);
-    ("FRAMELBRACERBRACE___", [ "FRAME"; "lbrace"; "rbrace"; "" ]);
-    ("FUNCARROW__", [ "FUNCCOMPTYPEARROW"; ""; "" ]);
-    ("FUNCEXTERNADDR_", [ "FUNC-EXTERNADDR"; "" ]);
-    ("FUNCEXTERNIDX_", [ "FUNC-EXTERNIDX"; "" ]);
-    ("FUNCEXTERNTYPE_", [ "FUNC-EXTERNTYPE"; "" ]);
-    ("FUNC___", [ "FUNC-FUNC"; ""; ""; "" ]);
-    ("FUNC_", [ "FUNC-EXTERNTYPE"; "" ]);
-    ("GLOBALGET_", [ "GLOBAL-GET"; "" ]);
-    ("GLOBALSET_", [ "GLOBAL-SET"; "" ]);
-    ("GLOBALEXTERNADDR_", [ "GLOBAL-EXTERNADDR"; "" ]);
-    ("GLOBALEXTERNIDX_", [ "GLOBAL-EXTERNIDX"; "" ]);
-    ("GLOBALEXTERNTYPE_", [ "GLOBAL-EXTERNTYPE"; "" ]);
-    ("GLOBAL__", [ "GLOBAL-GLOBAL"; ""; "" ]);
-    ("GLOBAL_", [ "GLOBAL-EXTERNTYPE"; "" ]);
-    ("I31GET_", [ "I31-GET"; "" ]);
-    ("IMPORT___", [ "IMPORT"; ""; ""; "" ]);
-    ("LABELLBRACERBRACE___", [ "LABEL"; "lbrace"; "rbrace"; "" ]);
-    ("LBRACKDOTDOTRBRACK__", [ "lbrack"; "dotdot"; "rbrack" ]);
-    ("LOAD____", [ "LOAD"; ""; ""; ""; "" ]);
-    ("LOCALGET_", [ "LOCAL-GET"; "" ]);
-    ("LOCALSET_", [ "LOCAL-SET"; "" ]);
-    ("LOCALTEE_", [ "LOCAL-TEE"; "" ]);
-    ("LOCAL_", [ "LOCAL"; "" ]);
-    ("LOOP__", [ "LOOP"; ""; "" ]);
-    ("GESXVRELOP_", [ "GE-SX-VRELOP"; "" ]);
-    ("GTSXVRELOP_", [ "GT-SX-VRELOP"; "" ]);
-    ("LESXVRELOP_", [ "LE-SX-VRELOP"; "" ]);
-    ("LTSXVRELOP_", [ "LT-SX-VRELOP"; "" ]);
-    ("GESXRELOP_", [ "GE-SX-RELOP"; "" ]);
-    ("GTSXRELOP_", [ "GT-SX-RELOP"; "" ]);
-    ("LESXRELOP_", [ "LE-SX-RELOP"; "" ]);
-    ("LTSXRELOP_", [ "LT-SX-RELOP"; "" ]);
-    ("GERELOP_", [ "GE-SX-RELOP"; "" ]);
-    ("GTRELOP_", [ "GT-SX-RELOP"; "" ]);
-    ("LERELOP_", [ "LE-SX-RELOP"; "" ]);
-    ("LTRELOP_", [ "LT-SX-RELOP"; "" ]);
-    ("LE_", [ "LE-SX-VRELOP"; "" ]);
-    ("LT_", [ "LT-SX-VRELOP"; "" ]);
-    ("MAXSXVBINOP_", [ "MAX-SX-VBINOP"; "" ]);
-    ("MAX_", [ "MAX-SX-VBINOP"; "" ]);
-    ("MEMORYCOPY__", [ "MEMORY-COPY"; ""; "" ]);
-    ("MEMORYFILL_", [ "MEMORY-FILL"; "" ]);
-    ("MEMORYGROW_", [ "MEMORY-GROW"; "" ]);
-    ("MEMORYINIT__", [ "MEMORY-INIT"; ""; "" ]);
-    ("MEMORYSIZE_", [ "MEMORY-SIZE"; "" ]);
-    ("MEMORY_", [ "MEMORY"; "" ]);
-    ("MEMEXTERNADDR_", [ "MEM-EXTERNADDR"; "" ]);
-    ("MEMEXTERNIDX_", [ "MEM-EXTERNIDX"; "" ]);
-    ("MEMEXTERNTYPE_", [ "MEM-EXTERNTYPE"; "" ]);
-    ("MEM_", [ "MEM-EXTERNTYPE"; "" ]);
-    ("MINSXVBINOP_", [ "MIN-SX-VBINOP"; "" ]);
-    ("MIN_", [ "MIN-SX-VBINOP"; "" ]);
-    ("MODULE___________", [ "MODULE"; ""; ""; ""; ""; ""; ""; ""; ""; ""; ""; "" ]);
-    ("NAN_", [ "NAN"; "" ]);
-    ("NEG_", [ "NEG-FN"; "" ]);
-    ("NORM__", [ "NORM"; ""; "" ]);
-    ("PACK__", [ "PACK"; ""; "" ]);
-    ("PAGE__", [ ""; ""; "PAGE" ]);
-    ("POS_", [ "POS"; "" ]);
-    ("RECHEAPTYPE_", [ "REC-HEAPTYPE"; "" ]);
-    ("RECRECTYPE_", [ "REC-RECTYPE"; "" ]);
-    ("RECTYPEUSE_", [ "REC-TYPEUSE"; "" ]);
-    ("RECTYPEVAR_", [ "REC-TYPEVAR"; "" ]);
-    ("REC_", [ "REC-RECTYPE"; "" ]);
-    ("REFARRAYADDR_", [ "REF-ARRAY-ADDR"; "" ]);
-    ("REFCAST_", [ "REF-CAST"; "" ]);
-    ("REFEXNADDR_", [ "REF-EXN-ADDR"; "" ]);
-    ("REFEXTERN_", [ "REF-EXTERN"; "" ]);
-    ("REFFUNCADDR_", [ "REF-FUNC-ADDR"; "" ]);
-    ("REFFUNC_", [ "REF-FUNC"; "" ]);
-    ("REFHOSTADDR_", [ "REF-HOST-ADDR"; "" ]);
-    ("REFI31NUM_", [ "REF-I31-NUM"; "" ]);
-    ("REFNULL_", [ "REF-NULL"; "" ]);
-    ("REFSTRUCTADDR_", [ "REF-STRUCT-ADDR"; "" ]);
-    ("REFTEST_", [ "REF-TEST"; "" ]);
-    ("REF__", [ "REF"; ""; "" ]);
-    ("RELOP__", [ "RELOP"; ""; "" ]);
-    ("RETURNCALLINDIRECT__", [ "RETURN-CALL-INDIRECT"; ""; "" ]);
-    ("RETURNCALLREF_", [ "RETURN-CALL-REF"; "" ]);
-    ("RETURNCALL_", [ "RETURN-CALL"; "" ]);
-    ("GE_", [ "GE-SX-VRELOP"; "" ]);
-    ("GT_", [ "GT-SX-VRELOP"; "" ]);
-    ("SELECT_", [ "SELECT"; "" ]);
-    ("SHR_", [ "SHR"; "" ]);
-    ("START_", [ "START"; "" ]);
-    ("STORE____", [ "STORE"; ""; ""; ""; "" ]);
-    ("STRUCTGET___", [ "STRUCT-GET"; ""; ""; "" ]);
-    ("STRUCTNEWDEFAULT_", [ "STRUCT-NEW-DEFAULT"; "" ]);
-    ("STRUCTNEW_", [ "STRUCT-NEW"; "" ]);
-    ("STRUCTSET__", [ "STRUCT-SET"; ""; "" ]);
-    ("STRUCT_", [ "STRUCT-COMPTYPE"; "" ]);
-    ("SUB___", [ "SUB-SUBTYPE"; ""; ""; "" ]);
-    ("SUBNORM_", [ "SUBNORM"; "" ]);
-    ("TABLECOPY__", [ "TABLE-COPY"; ""; "" ]);
-    ("TABLEFILL_", [ "TABLE-FILL"; "" ]);
-    ("TABLEGET_", [ "TABLE-GET"; "" ]);
-    ("TABLEGROW_", [ "TABLE-GROW"; "" ]);
-    ("TABLEINIT__", [ "TABLE-INIT"; ""; "" ]);
-    ("TABLESET_", [ "TABLE-SET"; "" ]);
-    ("TABLESIZE_", [ "TABLE-SIZE"; "" ]);
-    ("TABLEEXTERNADDR_", [ "TABLE-EXTERNADDR"; "" ]);
-    ("TABLEEXTERNIDX_", [ "TABLE-EXTERNIDX"; "" ]);
-    ("TABLEEXTERNTYPE_", [ "TABLE-EXTERNTYPE"; "" ]);
-    ("TABLE__", [ "TABLE-TABLE"; ""; "" ]);
-    ("TABLE_", [ "TABLE-EXTERNTYPE"; "" ]);
-    ("TAGEXTERNADDR_", [ "TAG-EXTERNADDR"; "" ]);
-    ("TAGEXTERNIDX_", [ "TAG-EXTERNIDX"; "" ]);
-    ("TAGEXTERNTYPE_", [ "TAG-EXTERNTYPE"; "" ]);
-    ("TAGTAG_", [ "TAG-TAG"; "" ]);
-    ("TAG_", [ "TAG-EXTERNTYPE"; "" ]);
-    ("TESTOP__", [ "TESTOP"; ""; "" ]);
-    ("THROW_", [ "THROW"; "" ]);
-    ("TRUNCSAT_", [ "TRUNC-SAT"; "" ]);
-    ("TRUNC_", [ "TRUNC"; "" ]);
-    ("TRYTABLE___", [ "TRY-TABLE"; ""; ""; "" ]);
-    ("TYPE_", [ "TYPE"; "" ]);
-    ("UNOP__", [ "UNOP"; ""; "" ]);
-    ("VBINOP__", [ "VBINOP"; ""; "" ]);
-    ("VCONST__", [ "VCONST"; ""; "" ]);
-    ("VCVTOP___", [ "VCVTOP"; ""; ""; "" ]);
-    ("VRELOP__", [ "VRELOP"; ""; "" ]);
-    ("WDEF__", [ "w--DEF"; ""; "" ]);
-    ("WIDX_", [ "w--IDX"; "" ]);
-    ("WIFELSE___", [ "IF"; ""; "ELSE"; "" ]);
-    ("WREM_", [ "REM"; "" ]);
-    ("WRESULT_", [ "w--RESULT"; "" ]);
-    ("X__", [ ""; "X"; "" ]);
-  ]
-  |> List.sort (fun (a, _) (b, _) -> compare (String.length b) (String.length a))
-
-let compact_surface_is_ident_char = function
-  | 'A' .. 'Z' | 'a' .. 'z' | '0' .. '9' | '_' | '-' | '$' -> true
-  | _ -> false
-
-let maude_keywords =
-  [ "if"; "var"; "op"; "eq"; "sort"; "mod"; "quo"; "rem"; "or"; "and"; "not" ]
-
-let maude_source_op_token name =
-  let lowered = String.lowercase_ascii (String.trim name) in
-  if lowered = "" then lowered
-  else if List.mem lowered maude_keywords then "w-" ^ lowered
-  else lowered
-
-let compact_surface_token_aliases =
-  [
-    ("ABS", "abs");
-    ("ADD", "add");
-    ("ANY", "any");
-    ("ANYCONVERTEXTERN", "any-convert-extern");
-    ("ARRAY", "array-absheaptype");
-    ("CEIL", "ceil");
-    ("CLZ", "clz");
-    ("COPYSIGN", "copysign");
-    ("CTZ", "ctz");
-    ("DECLARE", "declare");
-    ("DEMOTE", "demote");
-    ("DIV", "div-binop");
-    ("DIVBINOP", "div-binop");
-    ("DIVSXBINOP", "div-sx-binop");
-    ("DIVVBINOP", "div-vbinop");
-    ("divbinop", "div-binop");
-    ("divsxbinop", "div-sx-binop");
-    ("divvbinop", "div-vbinop");
-    ("EQZ", "eqz");
-    ("EXN", "exn");
-    ("EXTERN", "extern");
-    ("EXTERNCONVERTANY", "extern-convert-any");
-    ("F32", "f32");
-    ("F64", "f64");
-    ("FINAL", "final");
-    ("FLOOR", "floor");
-    ("FUNC", "func-absheaptype");
-    ("GE", "ge-relop");
-    ("GERELOP", "ge-relop");
-    ("GESXRELOP", "ge-sx-relop");
-    ("GESXVRELOP", "ge-sx-vrelop");
-    ("GEVRELOP", "ge-vrelop");
-    ("gerelop", "ge-relop");
-    ("gesxrelop", "ge-sx-relop");
-    ("gesxvrelop", "ge-sx-vrelop");
-    ("gevrelop", "ge-vrelop");
-    ("GT", "gt-relop");
-    ("GTRELOP", "gt-relop");
-    ("GTSXRELOP", "gt-sx-relop");
-    ("GTSXVRELOP", "gt-sx-vrelop");
-    ("GTVRELOP", "gt-vrelop");
-    ("gtrelop", "gt-relop");
-    ("gtsxrelop", "gt-sx-relop");
-    ("gtsxvrelop", "gt-sx-vrelop");
-    ("gtvrelop", "gt-vrelop");
-    ("I31", "i31");
-    ("I32", "i32");
-    ("I64", "i64");
-    ("LE", "le-relop");
-    ("LERELOP", "le-relop");
-    ("LESXRELOP", "le-sx-relop");
-    ("LESXVRELOP", "le-sx-vrelop");
-    ("LEVRELOP", "le-vrelop");
-    ("lerelop", "le-relop");
-    ("lesxrelop", "le-sx-relop");
-    ("lesxvrelop", "le-sx-vrelop");
-    ("levrelop", "le-vrelop");
-    ("LT", "lt-relop");
-    ("LTRELOP", "lt-relop");
-    ("LTSXRELOP", "lt-sx-relop");
-    ("LTSXVRELOP", "lt-sx-vrelop");
-    ("LTVRELOP", "lt-vrelop");
-    ("ltrelop", "lt-relop");
-    ("ltsxrelop", "lt-sx-relop");
-    ("ltsxvrelop", "lt-sx-vrelop");
-    ("ltvrelop", "lt-vrelop");
-    ("MAX", "max-binop");
-    ("MAXBINOP", "max-binop");
-    ("MAXSXVBINOP", "max-sx-vbinop");
-    ("MAXVBINOP", "max-vbinop");
-    ("maxbinop", "max-binop");
-    ("maxsxvbinop", "max-sx-vbinop");
-    ("maxvbinop", "max-vbinop");
-    ("MIN", "min-binop");
-    ("MINBINOP", "min-binop");
-    ("MINSXVBINOP", "min-sx-vbinop");
-    ("MINVBINOP", "min-vbinop");
-    ("minbinop", "min-binop");
-    ("minsxvbinop", "min-sx-vbinop");
-    ("minvbinop", "min-vbinop");
-    ("MUL", "mul");
-    ("MUT", "mut");
-    ("NE", "ne");
-    ("NEAREST", "nearest");
-    ("NEG", "neg-unop");
-    ("NEGFN", "neg-fn");
-    ("NEGUNOP", "neg-unop");
-    ("NEGVUNOP", "neg-vunop");
-    ("negfn", "neg-fn");
-    ("negunop", "neg-unop");
-    ("negvunop", "neg-vunop");
-    ("NULL", "null");
-    ("PASSIVE", "passive");
-    ("POPCNT", "popcnt");
-    ("PROMOTE", "promote");
-    ("REFASNONNULL", "ref-as-non-null");
-    ("REFEQ", "ref-eq");
-    ("REFI31", "ref-i31");
-    ("REFISNULL", "ref-is-null");
-    ("REINTERPRET", "reinterpret");
-    ("S", "s");
-    ("SQRT", "sqrt");
-    ("STRUCT", "struct-absheaptype");
-    ("SUB", "sub-binop");
-    ("SUBBINOP", "sub-binop");
-    ("SUBVBINOP", "sub-vbinop");
-    ("subbinop", "sub-binop");
-    ("subvbinop", "sub-vbinop");
-    ("THROWREF", "throw-ref");
-    ("TRUNC", "trunc-unop");
-    ("TRUNCUNOP", "trunc-unop");
-    ("TRUNCVUNOP", "trunc-vunop");
-    ("truncunop", "trunc-unop");
-    ("truncvunop", "trunc-vunop");
-    ("U", "u");
-    ("V128", "v128");
-    ("WAND", "w-and");
-    ("WEQ", "w-eq");
-    ("WOR", "w-or");
-    ("WREM", "w-rem");
-    ("WRAP", "wrap");
-    ("XOR", "xor");
-  ]
-
-let compact_surface_token_aliases_by_length =
-  compact_surface_token_aliases
-  |> List.sort (fun (a, _) (b, _) -> compare (String.length b) (String.length a))
-
-let compact_surface_token_alias atom =
-  compact_surface_token_aliases_by_length
-  |> List.find_map (fun (old, repl) ->
-       if atom = old then Some repl else None)
-
-let replace_compact_surface_token_aliases text =
-  let len = String.length text in
-  let alias_at i =
-    compact_surface_token_aliases_by_length
-    |> List.find_map (fun (old, repl) ->
-         let n = String.length old in
-         if i + n <= len
-            && String.sub text i n = old
-            && (i = 0 || not (compact_surface_is_ident_char text.[i - 1]))
-            && (i + n = len
-                || not (compact_surface_is_ident_char text.[i + n]))
-         then Some (old, repl)
-         else None)
-  in
-  let b = Buffer.create len in
-  let rec loop i =
-    if i >= len then ()
-    else
-      match alias_at i with
-      | Some (old, repl) ->
-          Buffer.add_string b repl;
-          loop (i + String.length old)
-      | None ->
-          Buffer.add_char b text.[i];
-          loop (i + 1)
-  in
-  loop 0;
-  Buffer.contents b
-
-let compact_surface_needs_parens arg =
-  let arg = String.trim arg in
-  arg <> ""
-  && (String.exists
-        (function ' ' | '\n' | '\r' | '\t' -> true | _ -> false)
-        arg)
-  && not
-       (String.length arg >= 2 && arg.[0] = '('
-        && arg.[String.length arg - 1] = ')')
-
-let compact_prefix_component s =
-  let b = Buffer.create (String.length s) in
-  String.iter
-    (fun c ->
-      if (c >= 'a' && c <= 'z')
-         || (c >= 'A' && c <= 'Z')
-         || (c >= '0' && c <= '9')
-      then Buffer.add_char b c)
-    s;
-  String.uppercase_ascii (Buffer.contents b)
-
-let compact_prefix_name old sections =
-  let meaningful =
-    sections
-    |> List.map String.trim
-    |> List.filter (fun s -> s <> "")
-  in
-  match meaningful with
-  | [single] -> maude_source_op_token single
-  | _ ->
-      let components =
-        meaningful
-        |> List.map compact_prefix_component
-        |> List.filter (fun s -> s <> "")
-      in
-      if components <> [] then maude_source_op_token (String.concat "" components)
-      else
-        let rec trim = function
-          | s when s <> "" && s.[String.length s - 1] = '_' ->
-              trim (String.sub s 0 (String.length s - 1))
-          | s -> s
-        in
-        maude_source_op_token (trim old)
-
-let render_compact_surface sections args =
-  let _ = compact_surface_needs_parens in
-  let op_name = compact_prefix_name "" sections in
-  if args = [] then op_name
-  else op_name ^ "(" ^ String.concat ", " (List.map String.trim args) ^ ")"
-
-let source_surface_atom_of_compact_atom atom =
-  let atom = String.trim atom in
-  match compact_surface_token_alias atom with
-  | Some alias -> alias
-  | None -> (
-  match atom with
-  | "WAND" -> "w-and"
-  | "WEQ" -> "w-eq"
-  | "WOR" -> "w-or"
-  | "WREM" -> "w-rem"
-  | _ ->
-  let is_source_like =
-    let n = String.length atom in
-    n > 0
-    &&
-    ((atom.[0] >= 'A' && atom.[0] <= 'Z')
-     || (n > 3 && String.sub atom 0 3 = "w--"
-         && atom.[3] >= 'A' && atom.[3] <= 'Z'))
-    && String.for_all
-         (fun c ->
-            (c >= 'A' && c <= 'Z')
-            || (c >= '0' && c <= '9')
-            || (n > 3 && String.sub atom 0 3 = "w--" && c = '-'))
-         (if n > 3 && String.sub atom 0 3 = "w--"
-          then String.sub atom 3 (n - 3)
-          else atom)
-  in
-  if is_source_like then maude_source_op_token atom else atom)
-
-let source_surface_plain_atom_sequence text =
-  let text = String.trim text in
-  if text = "" then text
-  else
-    text
-    |> String.split_on_char ' '
-    |> List.map String.trim
-    |> List.filter (fun tok -> tok <> "")
-    |> List.map source_surface_atom_of_compact_atom
-    |> String.concat " "
-
-let source_surface_syntax_of_compact text =
-  let len = String.length text in
-  let find_matching_paren open_i =
-    let rec loop i depth =
-      if i >= len then None
-      else
-        match text.[i] with
-        | '(' -> loop (i + 1) (depth + 1)
-        | ')' ->
-            let depth' = depth - 1 in
-            if depth' = 0 then Some i else loop (i + 1) depth'
-        | _ -> loop (i + 1) depth
-    in
-    loop open_i 0
-  in
-  let rec convert s =
-    let len_s = String.length s in
-    let find_matching_in_s open_i =
-      let rec loop i depth =
-        if i >= len_s then None
-        else
-          match s.[i] with
-          | '(' -> loop (i + 1) (depth + 1)
-          | ')' ->
-              let depth' = depth - 1 in
-              if depth' = 0 then Some i else loop (i + 1) depth'
-          | _ -> loop (i + 1) depth
-      in
-      loop open_i 0
-    in
-    let split_commas inner =
-      let len_i = String.length inner in
-      let rec loop i depth start acc =
-        if i >= len_i then
-          List.rev ((String.sub inner start (len_i - start) |> String.trim) :: acc)
-        else
-          match inner.[i] with
-          | '(' -> loop (i + 1) (depth + 1) start acc
-          | ')' -> loop (i + 1) (max 0 (depth - 1)) start acc
-          | ',' when depth = 0 ->
-              let part = String.sub inner start (i - start) |> String.trim in
-              loop (i + 1) depth (i + 1) (part :: acc)
-          | _ -> loop (i + 1) depth start acc
-      in
-      if String.trim inner = "" then [] else loop 0 0 0 []
-    in
-    let starts_at i old =
-      let n = String.length old in
-      i + n < len_s
-      && String.sub s i n = old
-      && (i = 0 || not (compact_surface_is_ident_char s.[i - 1]))
-      &&
-      let rec skip_ws j =
-        if j < len_s then
-          match s.[j] with
-          | ' ' | '\n' | '\r' | '\t' -> skip_ws (j + 1)
-          | _ -> j
-        else j
-      in
-      let j = skip_ws (i + n) in
-      j < len_s && s.[j] = '('
-    in
-    let spec_at i =
-      compact_surface_specs
-      |> List.find_map (fun (old, sections) ->
-           if starts_at i old then Some (old, sections) else None)
-    in
-    let b = Buffer.create len_s in
-    let rec loop i =
-      if i >= len_s then ()
-      else
-        match spec_at i with
-        | Some (old, sections) ->
-            let after_old = i + String.length old in
-            let rec skip_ws j =
-              if j < len_s then
-                match s.[j] with
-                | ' ' | '\n' | '\r' | '\t' -> skip_ws (j + 1)
-                | _ -> j
-              else j
-            in
-            let open_i = skip_ws after_old in
-            (match find_matching_in_s open_i with
-            | Some close_i ->
-                let inner =
-                  String.sub s (open_i + 1) (close_i - open_i - 1)
-                in
-	                let args = split_commas inner |> List.map convert in
-	                let rendered = render_compact_surface sections args in
-	                Buffer.add_string b
-	                  ("( " ^ rendered ^ " ).SpectecTerminal");
-	                loop (close_i + 1)
-            | None ->
-                Buffer.add_char b s.[i];
-                loop (i + 1))
-        | None ->
-            Buffer.add_char b s.[i];
-            loop (i + 1)
-    in
-    loop 0;
-    let rendered = Buffer.contents b in
-    let simple_atom =
-      let t = String.trim s in
-      t <> ""
-      && not
-           (String.exists
-              (function
-                | ' ' | '\n' | '\r' | '\t' | '(' | ')' | ',' -> true
-                | _ -> false)
-              t)
-    in
-    let plain_atom_sequence =
-      let t = String.trim s in
-      t <> ""
-      && not
-           (String.exists
-              (function
-                | '(' | ')' | ',' -> true
-                | _ -> false)
-              t)
-      && String.exists
-           (function ' ' | '\n' | '\r' | '\t' -> true | _ -> false)
-           t
-    in
-    if simple_atom then source_surface_atom_of_compact_atom rendered
-    else if plain_atom_sequence then source_surface_plain_atom_sequence rendered
-    else rendered
-  in
-  ignore find_matching_paren;
-  convert text |> replace_compact_surface_token_aliases
+let ctor name args =
+  let args = List.map String.trim args in
+  match args with
+  | [] -> name
+  | _ -> name ^ "(" ^ String.concat ", " args ^ ")"
 
 let balanced_term_from text start =
   let len = String.length text in
@@ -1045,13 +474,13 @@ let extract_final_value output =
             in
             compact_spaces body
         | None -> (
-        match last_sub_index output "CONST__(" with
+        match last_sub_index output "const(" with
         | Some start -> balanced_term_from output start
         | None -> (
             let ref_prefixes =
-              [ "REFNULL_"; "REFFUNCADDR_"; "REFEXTERN_";
-                "REFHOSTADDR_"; "REFI31NUM_"; "REFSTRUCTADDR_";
-                "REFARRAYADDR_"; "REFEXNADDR_"; "REFFUNC_" ]
+              [ "ref-null("; "ref-func-addr("; "ref-extern(";
+                "ref-host-addr("; "ref-i31-num("; "ref-struct-addr(";
+                "ref-array-addr("; "ref-exn-addr("; "ref-func(" ]
             in
             let ref_start =
               ref_prefixes
@@ -1231,7 +660,7 @@ let elem_seq xs = typed_seq "ElemSeq" xs
 let export_seq xs = typed_seq "ExportSeq" xs
 
 let collect_ref_func_indices terms =
-  let prefix = "REFFUNC_(" in
+  let prefix = "ref-func(" in
   let plen = String.length prefix in
   let wrap_prefix = "$wrap-Funcidx(" in
   let wplen = String.length wrap_prefix in
@@ -1287,11 +716,11 @@ let sz_term n =
   wrap_source_category "Sz" (string_of_int n)
 
 let rec valtype = function
-  | "i32" -> "I32"
-  | "i64" -> "I64"
-  | "f32" -> "F32"
-  | "f64" -> "F64"
-  | "v128" -> "V128"
+  | "i32" -> "i32"
+  | "i64" -> "i64"
+  | "f32" -> "f32"
+  | "f64" -> "f64"
+  | "v128" -> "v128"
   | "funcref" | "externref" | "anyref" | "eqref" | "i31ref" | "structref"
   | "arrayref" | "exnref" as t ->
       reftype t
@@ -1307,36 +736,36 @@ and heaptype = function
         i = n || (t.[i] >= '0' && t.[i] <= '9' && loop (i + 1))
       in
       loop 0 ->
-      "WIDX_(" ^ wrap_source_category "Typeidx" t ^ ")"
-  | "func" | "funcref" -> "FUNC"
-  | "extern" | "externref" -> "EXTERN"
-  | "any" | "anyref" -> "ANY"
-  | "eq" | "eqref" -> "WEQ"
-  | "i31" | "i31ref" -> "I31"
-  | "struct" | "structref" -> "STRUCT"
-  | "array" | "arrayref" -> "ARRAY"
-  | "exn" | "exnref" -> "EXN"
+      "w--idx(" ^ wrap_source_category "Typeidx" t ^ ")"
+  | "func" | "funcref" -> "func-absheaptype"
+  | "extern" | "externref" -> "extern"
+  | "any" | "anyref" -> "any"
+  | "eq" | "eqref" -> "w-eq"
+  | "i31" | "i31ref" -> "i31"
+  | "struct" | "structref" -> "struct-absheaptype"
+  | "array" | "arrayref" -> "array-absheaptype"
+  | "exn" | "exnref" -> "exn"
   | t -> fail ("unsupported heap/ref type: " ^ t)
 
 and reftype = function
-  | "funcref" -> "REF__(NULL, FUNC)"
-  | "externref" -> "REF__(NULL, EXTERN)"
-  | "exnref" -> "REF__(NULL, EXN)"
+  | "funcref" -> "ref(null, func-absheaptype)"
+  | "externref" -> "ref(null, extern)"
+  | "exnref" -> "ref(null, exn)"
   | t when String.length t >= 4 && String.sub t (String.length t - 3) 3 = "ref"
-    -> "REF__(NULL, " ^ heaptype t ^ ")"
+    -> "ref(null, " ^ heaptype t ^ ")"
   | t -> fail ("unsupported reference type: " ^ t)
 
 let rec heaptype_of_sexpr = function
   | Atom t -> heaptype t
   | List [ Atom "type"; x ] ->
-      "WIDX_(" ^ wrap_source_category "Typeidx" (atom x) ^ ")"
+      "w--idx(" ^ wrap_source_category "Typeidx" (atom x) ^ ")"
   | x -> fail ("unsupported heap type expression: " ^ atom_or_shape x)
 
 and reftype_of_sexpr = function
   | Atom t -> reftype t
   | List [ Atom "ref"; Atom "null"; ht ] ->
-      "REF__(NULL, " ^ heaptype_of_sexpr ht ^ ")"
-  | List [ Atom "ref"; ht ] -> "REF__(eps, " ^ heaptype_of_sexpr ht ^ ")"
+      ctor "ref" [ "null"; heaptype_of_sexpr ht ]
+  | List [ Atom "ref"; ht ] -> ctor "ref" [ "eps"; heaptype_of_sexpr ht ]
   | x -> fail ("unsupported reference type expression: " ^ atom_or_shape x)
 
 and valtype_of_sexpr = function
@@ -1351,20 +780,22 @@ and atom_or_shape = function
   | List [] -> "()"
 
 let limits_term min max_opt =
-  "LBRACKDOTDOTRBRACK__(" ^ wrap_source_category "U64" (string_of_int min) ^ ", "
-  ^ (match max_opt with
-     | Some max -> wrap_source_category "U64" (string_of_int max)
-     | None -> "eps")
-  ^ ")"
+  ctor "lbrackdotdotrbrack"
+    [
+      wrap_source_category "U64" (string_of_int min);
+      (match max_opt with
+      | Some max -> wrap_source_category "U64" (string_of_int max)
+      | None -> "eps");
+    ]
 
-let memtype_term ?(addrtype = "I32") min max_opt =
-  "PAGE__(" ^ addrtype ^ ", " ^ limits_term min max_opt ^ ")"
+let memtype_term ?(addrtype = "i32") min max_opt =
+  ctor "page" [ addrtype; limits_term min max_opt ]
 
-let tabletype_term ?(addrtype = "I32") min max_opt rt =
+let tabletype_term ?(addrtype = "i32") min max_opt rt =
   addrtype ^ " " ^ limits_term min max_opt ^ " " ^ rt
 
 let globaltype_term mut t =
-  if mut then "MUT " ^ t else t
+  if mut then "mut " ^ t else t
 
 let bytes_seq bytes = byte_seq (List.map string_of_int bytes)
 
@@ -1587,7 +1018,7 @@ let read_func_type_fields fields =
 let type_term typ =
   let params = valtype_seq typ.params in
   let results = valtype_seq typ.results in
-  "TYPE_(REC_(SUB___(FINAL, eps, FUNCARROW__("
+  "type(rec-rectype(sub-subtype(final, eps, funccomptypearrow("
   ^ params ^ ", " ^ results ^ "))))"
 
 let func_type_def id typ = { type_id = id; type_term = type_term typ; type_func = Some typ }
@@ -1607,7 +1038,7 @@ let read_type_decl = function
 	      func_type_def id typ
 	  | _ -> fail "expected (type ...)"
 
-let local_decl t = "LOCAL_(" ^ t ^ ")"
+let local_decl t = "local(" ^ t ^ ")"
 
 let parse_blocktype env fields =
   let params = ref [] and results = ref [] in
@@ -1624,15 +1055,15 @@ let parse_blocktype env fields =
     fields;
   match !rest with
   | List [ Atom "type"; x ] :: instrs ->
-      ("WIDX_("
+      ("w--idx("
       ^ wrap_source_category "Typeidx"
           (string_of_int (resolve_index "type" env.type_names x))
       ^ ")", instrs)
   | instrs ->
       if !params <> [] || List.length !results > 1 then
         let idx = env.fresh_type { params = !params; results = !results } in
-        ("WIDX_(" ^ wrap_source_category "Typeidx" (string_of_int idx) ^ ")", instrs)
-      else ("WRESULT_(" ^ seq !results ^ ")", instrs)
+        ("w--idx(" ^ wrap_source_category "Typeidx" (string_of_int idx) ^ ")", instrs)
+      else ("w--result(" ^ seq !results ^ ")", instrs)
 
 let memarg_term ?(align = "0") offset =
   "RECMemargA2("
@@ -1642,10 +1073,10 @@ let memarg_term ?(align = "0") offset =
   ^ ")"
 
 let numtype_of_prefix = function
-  | "i32" -> "I32"
-  | "i64" -> "I64"
-  | "f32" -> "F32"
-  | "f64" -> "F64"
+  | "i32" -> "i32"
+  | "i64" -> "i64"
+  | "f32" -> "f32"
+  | "f64" -> "f64"
   | t -> fail ("unsupported numeric type prefix: " ^ t)
 
 let int64_numeric s =
@@ -1681,16 +1112,16 @@ let float_bits_term width payload =
   let max_exp = (1 lsl ebits) - 1 in
   let mag =
     if exp_field = 0 then
-      "SUBNORM_(" ^ Int64.to_string frac ^ ")"
+      "subnorm(" ^ Int64.to_string frac ^ ")"
     else if exp_field = max_exp && frac = 0L then
       "INF"
     else if exp_field = max_exp then
-      "NAN_(" ^ Int64.to_string frac ^ ")"
+      "nan(" ^ Int64.to_string frac ^ ")"
     else
-      "NORM__(" ^ Int64.to_string frac ^ ", "
+      "norm(" ^ Int64.to_string frac ^ ", "
       ^ string_of_int (exp_field - bias) ^ ")"
   in
-  if sign = 0 then "POS_(" ^ mag ^ ")" else "NEG_(" ^ mag ^ ")"
+  if sign = 0 then "pos(" ^ mag ^ ")" else "neg-fn(" ^ mag ^ ")"
 
 let nan_float_bits width normalized =
   let sign, rest =
@@ -1741,12 +1172,12 @@ let wrapped_num_payload = function
   | ty, _ -> fail ("unsupported numeric literal wrapper type: " ^ ty)
 
 let num_const_term ty payload =
-  "CONST__(" ^ numtype_of_prefix ty ^ ", " ^ wrapped_num_payload (ty, payload) ^ ")"
+  ctor "const" [ numtype_of_prefix ty; wrapped_num_payload (ty, payload) ]
 
 let i32_const payload = num_const_term "i32" (unsigned_payload 32 payload)
 let i64_const payload = num_const_term "i64" (unsigned_payload 64 payload)
-let f32_const payload = "CONST__(F32, " ^ float_bits_term 32 payload ^ ")"
-let f64_const payload = "CONST__(F64, " ^ float_bits_term 64 payload ^ ")"
+let f32_const payload = ctor "const" [ "f32"; float_bits_term 32 payload ]
+let f64_const payload = ctor "const" [ "f64"; float_bits_term 64 payload ]
 let float_arg_const width value =
   let bits_prefix = "bits:" in
   let payload =
@@ -1758,72 +1189,72 @@ let float_arg_const width value =
   if width = 32 then f32_const payload else f64_const payload
 
 let int_binop = function
-  | "add" -> "ADD"
-  | "sub" -> "SUBBINOP"
-  | "mul" -> "MUL"
-  | "div_s" -> "DIVSXBINOP_(S)"
-  | "div_u" -> "DIVSXBINOP_(U)"
-  | "rem_s" -> "WREM_(S)"
-  | "rem_u" -> "WREM_(U)"
-  | "and" -> "WAND"
-  | "or" -> "WOR"
-  | "xor" -> "XOR"
-  | "shl" -> "SHL"
-  | "shr_s" -> "SHR_(S)"
-  | "shr_u" -> "SHR_(U)"
-  | "rotl" -> "ROTL"
-  | "rotr" -> "ROTR"
+  | "add" -> "add"
+  | "sub" -> "sub-binop"
+  | "mul" -> "mul"
+  | "div_s" -> "div-sx-binop(s)"
+  | "div_u" -> "div-sx-binop(u)"
+  | "rem_s" -> "w-rem(s)"
+  | "rem_u" -> "w-rem(u)"
+  | "and" -> "w-and"
+  | "or" -> "w-or"
+  | "xor" -> "xor"
+  | "shl" -> "shl"
+  | "shr_s" -> "shr(s)"
+  | "shr_u" -> "shr(u)"
+  | "rotl" -> "rotl"
+  | "rotr" -> "rotr"
   | op -> fail ("unsupported integer binop: " ^ op)
 
 let float_binop = function
-  | "add" -> "ADD"
-  | "sub" -> "SUBBINOP"
-  | "mul" -> "MUL"
-  | "div" -> "DIVBINOP"
-  | "min" -> "MINBINOP"
-  | "max" -> "MAXBINOP"
-  | "copysign" -> "COPYSIGN"
+  | "add" -> "add"
+  | "sub" -> "sub-binop"
+  | "mul" -> "mul"
+  | "div" -> "div-binop"
+  | "min" -> "min-binop"
+  | "max" -> "max-binop"
+  | "copysign" -> "copysign"
   | op -> fail ("unsupported float binop: " ^ op)
 
 let int_relop = function
-  | "eq" -> "WEQ"
-  | "ne" -> "NE"
-  | "lt_s" -> "LTSXRELOP_(S)"
-  | "lt_u" -> "LTSXRELOP_(U)"
-  | "gt_s" -> "GTSXRELOP_(S)"
-  | "gt_u" -> "GTSXRELOP_(U)"
-  | "le_s" -> "LESXRELOP_(S)"
-  | "le_u" -> "LESXRELOP_(U)"
-  | "ge_s" -> "GESXRELOP_(S)"
-  | "ge_u" -> "GESXRELOP_(U)"
+  | "eq" -> "w-eq"
+  | "ne" -> "ne"
+  | "lt_s" -> "lt-sx-relop(s)"
+  | "lt_u" -> "lt-sx-relop(u)"
+  | "gt_s" -> "gt-sx-relop(s)"
+  | "gt_u" -> "gt-sx-relop(u)"
+  | "le_s" -> "le-sx-relop(s)"
+  | "le_u" -> "le-sx-relop(u)"
+  | "ge_s" -> "ge-sx-relop(s)"
+  | "ge_u" -> "ge-sx-relop(u)"
   | op -> fail ("unsupported integer relop: " ^ op)
 
 let float_relop = function
-  | "eq" -> "WEQ"
-  | "ne" -> "NE"
-  | "lt" -> "LTRELOP"
-  | "gt" -> "GTRELOP"
-  | "le" -> "LERELOP"
-  | "ge" -> "GERELOP"
+  | "eq" -> "w-eq"
+  | "ne" -> "ne"
+  | "lt" -> "lt-relop"
+  | "gt" -> "gt-relop"
+  | "le" -> "le-relop"
+  | "ge" -> "ge-relop"
   | op -> fail ("unsupported float relop: " ^ op)
 
 let int_unop = function
-  | "clz" -> "CLZ"
-  | "ctz" -> "CTZ"
-  | "popcnt" -> "POPCNT"
-  | "extend8_s" -> "EXTEND_(8)"
-  | "extend16_s" -> "EXTEND_(16)"
-  | "extend32_s" -> "EXTEND_(32)"
+  | "clz" -> "clz"
+  | "ctz" -> "ctz"
+  | "popcnt" -> "popcnt"
+  | "extend8_s" -> "extend-unop(8)"
+  | "extend16_s" -> "extend-unop(16)"
+  | "extend32_s" -> "extend-unop(32)"
   | op -> fail ("unsupported integer unop: " ^ op)
 
 let float_unop = function
-  | "abs" -> "ABS"
-  | "neg" -> "NEGUNOP"
-  | "sqrt" -> "SQRT"
-  | "ceil" -> "CEIL"
-  | "floor" -> "FLOOR"
-  | "trunc" -> "TRUNCUNOP"
-  | "nearest" -> "NEAREST"
+  | "abs" -> "abs"
+  | "neg" -> "neg-unop"
+  | "sqrt" -> "sqrt"
+  | "ceil" -> "ceil"
+  | "floor" -> "floor"
+  | "trunc" -> "trunc-unop"
+  | "nearest" -> "nearest"
   | op -> fail ("unsupported float unop: " ^ op)
 
 let split_opcode head =
@@ -1832,58 +1263,58 @@ let split_opcode head =
   | _ -> None
 
 let cvtop_term = function
-  | "i64.extend_i32_s" -> Some "CVTOP___(I64, I32, EXTEND_(S))"
-  | "i64.extend_i32_u" -> Some "CVTOP___(I64, I32, EXTEND_(U))"
-  | "i32.wrap_i64" -> Some "CVTOP___(I32, I64, WRAP)"
-  | "i32.trunc_f32_s" -> Some "CVTOP___(I32, F32, TRUNC_(S))"
-  | "i32.trunc_f32_u" -> Some "CVTOP___(I32, F32, TRUNC_(U))"
-  | "i32.trunc_f64_s" -> Some "CVTOP___(I32, F64, TRUNC_(S))"
-  | "i32.trunc_f64_u" -> Some "CVTOP___(I32, F64, TRUNC_(U))"
-  | "i64.trunc_f32_s" -> Some "CVTOP___(I64, F32, TRUNC_(S))"
-  | "i64.trunc_f32_u" -> Some "CVTOP___(I64, F32, TRUNC_(U))"
-  | "i64.trunc_f64_s" -> Some "CVTOP___(I64, F64, TRUNC_(S))"
-  | "i64.trunc_f64_u" -> Some "CVTOP___(I64, F64, TRUNC_(U))"
-  | "i32.trunc_sat_f32_s" -> Some "CVTOP___(I32, F32, TRUNCSAT_(S))"
-  | "i32.trunc_sat_f32_u" -> Some "CVTOP___(I32, F32, TRUNCSAT_(U))"
-  | "i32.trunc_sat_f64_s" -> Some "CVTOP___(I32, F64, TRUNCSAT_(S))"
-  | "i32.trunc_sat_f64_u" -> Some "CVTOP___(I32, F64, TRUNCSAT_(U))"
-  | "i64.trunc_sat_f32_s" -> Some "CVTOP___(I64, F32, TRUNCSAT_(S))"
-  | "i64.trunc_sat_f32_u" -> Some "CVTOP___(I64, F32, TRUNCSAT_(U))"
-  | "i64.trunc_sat_f64_s" -> Some "CVTOP___(I64, F64, TRUNCSAT_(S))"
-  | "i64.trunc_sat_f64_u" -> Some "CVTOP___(I64, F64, TRUNCSAT_(U))"
-  | "f32.convert_i32_s" -> Some "CVTOP___(F32, I32, CONVERT_(S))"
-  | "f32.convert_i32_u" -> Some "CVTOP___(F32, I32, CONVERT_(U))"
-  | "f32.convert_i64_s" -> Some "CVTOP___(F32, I64, CONVERT_(S))"
-  | "f32.convert_i64_u" -> Some "CVTOP___(F32, I64, CONVERT_(U))"
-  | "f64.convert_i32_s" -> Some "CVTOP___(F64, I32, CONVERT_(S))"
-  | "f64.convert_i32_u" -> Some "CVTOP___(F64, I32, CONVERT_(U))"
-  | "f64.convert_i64_s" -> Some "CVTOP___(F64, I64, CONVERT_(S))"
-  | "f64.convert_i64_u" -> Some "CVTOP___(F64, I64, CONVERT_(U))"
-  | "f64.promote_f32" -> Some "CVTOP___(F64, F32, PROMOTE)"
-  | "f32.demote_f64" -> Some "CVTOP___(F32, F64, DEMOTE)"
-  | "i32.reinterpret_f32" -> Some "CVTOP___(I32, F32, REINTERPRET)"
-  | "i64.reinterpret_f64" -> Some "CVTOP___(I64, F64, REINTERPRET)"
-  | "f32.reinterpret_i32" -> Some "CVTOP___(F32, I32, REINTERPRET)"
-  | "f64.reinterpret_i64" -> Some "CVTOP___(F64, I64, REINTERPRET)"
+  | "i64.extend_i32_s" -> Some "cvtop(i64, i32, extend-cvtop(s))"
+  | "i64.extend_i32_u" -> Some "cvtop(i64, i32, extend-cvtop(u))"
+  | "i32.wrap_i64" -> Some "cvtop(i32, i64, wrap)"
+  | "i32.trunc_f32_s" -> Some "cvtop(i32, f32, trunc-cvtop(s))"
+  | "i32.trunc_f32_u" -> Some "cvtop(i32, f32, trunc-cvtop(u))"
+  | "i32.trunc_f64_s" -> Some "cvtop(i32, f64, trunc-cvtop(s))"
+  | "i32.trunc_f64_u" -> Some "cvtop(i32, f64, trunc-cvtop(u))"
+  | "i64.trunc_f32_s" -> Some "cvtop(i64, f32, trunc-cvtop(s))"
+  | "i64.trunc_f32_u" -> Some "cvtop(i64, f32, trunc-cvtop(u))"
+  | "i64.trunc_f64_s" -> Some "cvtop(i64, f64, trunc-cvtop(s))"
+  | "i64.trunc_f64_u" -> Some "cvtop(i64, f64, trunc-cvtop(u))"
+  | "i32.trunc_sat_f32_s" -> Some "cvtop(i32, f32, trunc-sat-cvtop(s))"
+  | "i32.trunc_sat_f32_u" -> Some "cvtop(i32, f32, trunc-sat-cvtop(u))"
+  | "i32.trunc_sat_f64_s" -> Some "cvtop(i32, f64, trunc-sat-cvtop(s))"
+  | "i32.trunc_sat_f64_u" -> Some "cvtop(i32, f64, trunc-sat-cvtop(u))"
+  | "i64.trunc_sat_f32_s" -> Some "cvtop(i64, f32, trunc-sat-cvtop(s))"
+  | "i64.trunc_sat_f32_u" -> Some "cvtop(i64, f32, trunc-sat-cvtop(u))"
+  | "i64.trunc_sat_f64_s" -> Some "cvtop(i64, f64, trunc-sat-cvtop(s))"
+  | "i64.trunc_sat_f64_u" -> Some "cvtop(i64, f64, trunc-sat-cvtop(u))"
+  | "f32.convert_i32_s" -> Some "cvtop(f32, i32, convert-cvtop(s))"
+  | "f32.convert_i32_u" -> Some "cvtop(f32, i32, convert-cvtop(u))"
+  | "f32.convert_i64_s" -> Some "cvtop(f32, i64, convert-cvtop(s))"
+  | "f32.convert_i64_u" -> Some "cvtop(f32, i64, convert-cvtop(u))"
+  | "f64.convert_i32_s" -> Some "cvtop(f64, i32, convert-cvtop(s))"
+  | "f64.convert_i32_u" -> Some "cvtop(f64, i32, convert-cvtop(u))"
+  | "f64.convert_i64_s" -> Some "cvtop(f64, i64, convert-cvtop(s))"
+  | "f64.convert_i64_u" -> Some "cvtop(f64, i64, convert-cvtop(u))"
+  | "f64.promote_f32" -> Some "cvtop(f64, f32, promote)"
+  | "f32.demote_f64" -> Some "cvtop(f32, f64, demote-cvtop)"
+  | "i32.reinterpret_f32" -> Some "cvtop(i32, f32, reinterpret)"
+  | "i64.reinterpret_f64" -> Some "cvtop(i64, f64, reinterpret)"
+  | "f32.reinterpret_i32" -> Some "cvtop(f32, i32, reinterpret)"
+  | "f64.reinterpret_i64" -> Some "cvtop(f64, i64, reinterpret)"
   | _ -> None
 
 let signedness_ctor = function
-  | "s" -> "S"
-  | "u" -> "U"
+  | "s" -> "s"
+  | "u" -> "u"
   | sx -> fail ("unsupported signedness suffix: " ^ sx)
 
 let dim_lit n = string_of_int n
 
 let shape_term lane dim =
-  "X__(" ^ lane ^ ", " ^ dim_lit dim ^ ")"
+  ctor "x" [ lane; dim_lit dim ]
 
 let vector_shape = function
-  | "i8x16" -> Some (shape_term "I8" 16)
-  | "i16x8" -> Some (shape_term "I16" 8)
-  | "i32x4" -> Some (shape_term "I32" 4)
-  | "i64x2" -> Some (shape_term "I64" 2)
-  | "f32x4" -> Some (shape_term "F32" 4)
-  | "f64x2" -> Some (shape_term "F64" 2)
+  | "i8x16" -> Some (shape_term "i8" 16)
+  | "i16x8" -> Some (shape_term "i16" 8)
+  | "i32x4" -> Some (shape_term "i32" 4)
+  | "i64x2" -> Some (shape_term "i64" 2)
+  | "f32x4" -> Some (shape_term "f32" 4)
+  | "f64x2" -> Some (shape_term "f64" 2)
   | _ -> None
 
 let vector_shape_exn name =
@@ -1892,150 +1323,150 @@ let vector_shape_exn name =
   | None -> fail ("unsupported vector shape: " ^ name)
 
 let vector_half_ctor = function
-  | "low" -> "LOW"
-  | "high" -> "HIGH"
+  | "low" -> "low"
+  | "high" -> "high"
   | half -> fail ("unsupported vector half: " ^ half)
 
 let vector_unop = function
-  | "abs" -> Some "ABS"
-  | "neg" -> Some "NEGVUNOP"
-  | "sqrt" -> Some "SQRT"
-  | "ceil" -> Some "CEIL"
-  | "floor" -> Some "FLOOR"
-  | "trunc" -> Some "TRUNCVUNOP"
-  | "nearest" -> Some "NEAREST"
-  | "popcnt" -> Some "POPCNT"
+  | "abs" -> Some "abs"
+  | "neg" -> Some "neg-vunop"
+  | "sqrt" -> Some "sqrt"
+  | "ceil" -> Some "ceil"
+  | "floor" -> Some "floor"
+  | "trunc" -> Some "trunc-vunop"
+  | "nearest" -> Some "nearest"
+  | "popcnt" -> Some "popcnt"
   | _ -> None
 
 let vector_binop = function
-  | "add" -> Some "ADD"
-  | "sub" -> Some "SUBVBINOP"
-  | "mul" -> Some "MUL"
-  | "div" -> Some "DIVVBINOP"
-  | "min" -> Some "MINVBINOP"
-  | "max" -> Some "MAXVBINOP"
-  | "pmin" -> Some "PMIN"
-  | "pmax" -> Some "PMAX"
-  | "relaxed_min" -> Some "RELAXEDMIN"
-  | "relaxed_max" -> Some "RELAXEDMAX"
-  | "q15mulr_sat_s" -> Some "Q15MULRSATS"
-  | "relaxed_q15mulr_s" -> Some "RELAXEDQ15MULRS"
-  | "avgr_u" -> Some "AVGRU"
+  | "add" -> Some "add"
+  | "sub" -> Some "sub-vbinop"
+  | "mul" -> Some "mul"
+  | "div" -> Some "div-vbinop"
+  | "min" -> Some "min-vbinop"
+  | "max" -> Some "max-vbinop"
+  | "pmin" -> Some "pmin"
+  | "pmax" -> Some "pmax"
+  | "relaxed_min" -> Some "relaxed-min"
+  | "relaxed_max" -> Some "relaxed-max"
+  | "q15mulr_sat_s" -> Some "q15mulr-sats"
+  | "relaxed_q15mulr_s" -> Some "relaxed-q15mulrs"
+  | "avgr_u" -> Some "avgru"
   | op when starts_with op "add_sat_" ->
-      Some ("ADDSAT_(" ^ signedness_ctor (String.sub op 8 (String.length op - 8)) ^ ")")
+      Some ("add-sat(" ^ signedness_ctor (String.sub op 8 (String.length op - 8)) ^ ")")
   | op when starts_with op "sub_sat_" ->
-      Some ("SUBSAT_(" ^ signedness_ctor (String.sub op 8 (String.length op - 8)) ^ ")")
+      Some ("sub-sat(" ^ signedness_ctor (String.sub op 8 (String.length op - 8)) ^ ")")
   | op when starts_with op "min_" ->
-      Some ("MINSXVBINOP_(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
+      Some ("min-sx-vbinop(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
   | op when starts_with op "max_" ->
-      Some ("MAXSXVBINOP_(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
+      Some ("max-sx-vbinop(" ^ signedness_ctor (String.sub op 4 (String.length op - 4)) ^ ")")
   | _ -> None
 
 let vector_relop = function
-  | "eq" -> Some "WEQ"
-  | "ne" -> Some "NE"
-  | "lt" -> Some "LTVRELOP"
-  | "gt" -> Some "GTVRELOP"
-  | "le" -> Some "LEVRELOP"
-  | "ge" -> Some "GEVRELOP"
+  | "eq" -> Some "w-eq"
+  | "ne" -> Some "ne"
+  | "lt" -> Some "lt-vrelop"
+  | "gt" -> Some "gt-vrelop"
+  | "le" -> Some "le-vrelop"
+  | "ge" -> Some "ge-vrelop"
   | op when starts_with op "lt_" ->
-      Some ("LTSXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("lt-sx-vrelop(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | op when starts_with op "gt_" ->
-      Some ("GTSXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("gt-sx-vrelop(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | op when starts_with op "le_" ->
-      Some ("LESXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("le-sx-vrelop(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | op when starts_with op "ge_" ->
-      Some ("GESXVRELOP_(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
+      Some ("ge-sx-vrelop(" ^ signedness_ctor (String.sub op 3 (String.length op - 3)) ^ ")")
   | _ -> None
 
 let vector_shiftop = function
-  | "shl" -> Some "SHL"
-  | "shr_s" -> Some "SHR_(S)"
-  | "shr_u" -> Some "SHR_(U)"
+  | "shl" -> Some "shl"
+  | "shr_s" -> Some "shr(s)"
+  | "shr_u" -> Some "shr(u)"
   | _ -> None
 
 let vector_cvtop_term prefix op =
   let dest = vector_shape_exn prefix in
-  let term src opctor = Some ("VCVTOP___(" ^ dest ^ ", " ^ src ^ ", " ^ opctor ^ ")") in
+  let term src opctor = Some ("vcvtop(" ^ dest ^ ", " ^ src ^ ", " ^ opctor ^ ")") in
   match String.split_on_char '_' op with
   | [ "trunc"; "sat"; src; sx ] ->
-      term (vector_shape_exn src) ("TRUNCSAT__(" ^ signedness_ctor sx ^ ", eps)")
+      term (vector_shape_exn src) ("trunc-sat-vcvtop(" ^ signedness_ctor sx ^ ", eps)")
   | [ "trunc"; "sat"; src; sx; "zero" ] ->
       term (vector_shape_exn src)
-        ("TRUNCSAT__(" ^ signedness_ctor sx ^ ", ZERO)")
+        ("trunc-sat-vcvtop(" ^ signedness_ctor sx ^ ", zero-zero)")
   | [ "relaxed"; "trunc"; src; sx ] ->
-      term (vector_shape_exn src) ("RELAXEDTRUNC__(" ^ signedness_ctor sx ^ ", eps)")
+      term (vector_shape_exn src) ("relaxed-trunc(" ^ signedness_ctor sx ^ ", eps)")
   | [ "relaxed"; "trunc"; src; sx; "zero" ] ->
       term (vector_shape_exn src)
-        ("RELAXEDTRUNC__(" ^ signedness_ctor sx ^ ", ZERO)")
+        ("relaxed-trunc(" ^ signedness_ctor sx ^ ", zero-zero)")
   | [ "convert"; src; sx ] ->
-      term (vector_shape_exn src) ("CONVERT__(eps, " ^ signedness_ctor sx ^ ")")
+      term (vector_shape_exn src) ("convert-vcvtop(eps, " ^ signedness_ctor sx ^ ")")
   | [ "convert"; "low"; src; sx ] ->
-      term (vector_shape_exn src) ("CONVERT__(LOW, " ^ signedness_ctor sx ^ ")")
+      term (vector_shape_exn src) ("convert-vcvtop(low, " ^ signedness_ctor sx ^ ")")
   | [ "extend"; half; src; sx ] ->
       term (vector_shape_exn src)
-        ("EXTEND__(" ^ vector_half_ctor half ^ ", " ^ signedness_ctor sx ^ ")")
-  | [ "demote"; src; "zero" ] -> term (vector_shape_exn src) "DEMOTE_(ZERO)"
-  | [ "promote"; "low"; src ] -> term (vector_shape_exn src) "PROMOTELOW"
+        ("extend-vcvtop(" ^ vector_half_ctor half ^ ", " ^ signedness_ctor sx ^ ")")
+  | [ "demote"; src; "zero" ] -> term (vector_shape_exn src) "demote-vcvtop(zero-zero)"
+  | [ "promote"; "low"; src ] -> term (vector_shape_exn src) "promotelow"
   | _ -> None
 
 let vector_extunop_term prefix op =
   match (prefix, op) with
   | "i32x4", "extadd_pairwise_i16x8_s" ->
       Some
-        ("VEXTUNOP___(" ^ vector_shape_exn "i32x4" ^ ", "
-        ^ vector_shape_exn "i16x8" ^ ", EXTADDPAIRWISE_(S))")
+        ("vextunop(" ^ vector_shape_exn "i32x4" ^ ", "
+        ^ vector_shape_exn "i16x8" ^ ", extadd-pairwise(s))")
   | "i32x4", "extadd_pairwise_i16x8_u" ->
       Some
-        ("VEXTUNOP___(" ^ vector_shape_exn "i32x4" ^ ", "
-        ^ vector_shape_exn "i16x8" ^ ", EXTADDPAIRWISE_(U))")
+        ("vextunop(" ^ vector_shape_exn "i32x4" ^ ", "
+        ^ vector_shape_exn "i16x8" ^ ", extadd-pairwise(u))")
   | "i16x8", "extadd_pairwise_i8x16_s" ->
       Some
-        ("VEXTUNOP___(" ^ vector_shape_exn "i16x8" ^ ", "
-        ^ vector_shape_exn "i8x16" ^ ", EXTADDPAIRWISE_(S))")
+        ("vextunop(" ^ vector_shape_exn "i16x8" ^ ", "
+        ^ vector_shape_exn "i8x16" ^ ", extadd-pairwise(s))")
   | "i16x8", "extadd_pairwise_i8x16_u" ->
       Some
-        ("VEXTUNOP___(" ^ vector_shape_exn "i16x8" ^ ", "
-        ^ vector_shape_exn "i8x16" ^ ", EXTADDPAIRWISE_(U))")
+        ("vextunop(" ^ vector_shape_exn "i16x8" ^ ", "
+        ^ vector_shape_exn "i8x16" ^ ", extadd-pairwise(u))")
   | _ -> None
 
 let vector_extbinop_term prefix op =
   let dest = vector_shape_exn prefix in
-  let term src opctor = Some ("VEXTBINOP___(" ^ dest ^ ", " ^ src ^ ", " ^ opctor ^ ")") in
+  let term src opctor = Some ("vextbinop(" ^ dest ^ ", " ^ src ^ ", " ^ opctor ^ ")") in
   match String.split_on_char '_' op with
   | [ "extmul"; half; src; sx ] ->
       term (vector_shape_exn src)
-        ("EXTMUL__(" ^ vector_half_ctor half ^ ", " ^ signedness_ctor sx ^ ")")
-  | [ "dot"; src; "s" ] -> term (vector_shape_exn src) "DOTS"
+        ("extmul(" ^ vector_half_ctor half ^ ", " ^ signedness_ctor sx ^ ")")
+  | [ "dot"; src; "s" ] -> term (vector_shape_exn src) "dots"
   | [ "relaxed"; "dot"; "i8x16"; "i7x16"; "s" ] ->
-      term (vector_shape_exn "i8x16") "RELAXEDDOTS"
+      term (vector_shape_exn "i8x16") "RELAXEDdots"
   | _ -> None
 
 let vector_extternop_term prefix op =
   let dest = vector_shape_exn prefix in
-  let term src opctor = Some ("VEXTTERNOP___(" ^ dest ^ ", " ^ src ^ ", " ^ opctor ^ ")") in
+  let term src opctor = Some ("vextternop(" ^ dest ^ ", " ^ src ^ ", " ^ opctor ^ ")") in
   match String.split_on_char '_' op with
   | [ "relaxed"; "dot"; "i8x16"; "i7x16"; "add"; "s" ] ->
-      term (vector_shape_exn "i8x16") "RELAXEDDOTADDS"
+      term (vector_shape_exn "i8x16") "relaxed-dot-adds"
   | _ -> None
 
 let vector_narrow_term prefix op =
   match String.split_on_char '_' op with
   | [ "narrow"; src; sx ] ->
       Some
-        ("VNARROW___(" ^ vector_shape_exn prefix ^ ", " ^ vector_shape_exn src ^ ", "
+        ("vnarrow(" ^ vector_shape_exn prefix ^ ", " ^ vector_shape_exn src ^ ", "
         ^ signedness_ctor sx ^ ")")
   | _ -> None
 
 let vector_instr_term head =
   match String.split_on_char '.' head with
-  | [ "v128"; "not" ] -> Some "VVUNOP__(V128, WNOT)"
-  | [ "v128"; "and" ] -> Some "VVBINOP__(V128, WAND)"
-  | [ "v128"; "andnot" ] -> Some "VVBINOP__(V128, ANDNOT)"
-  | [ "v128"; "or" ] -> Some "VVBINOP__(V128, WOR)"
-  | [ "v128"; "xor" ] -> Some "VVBINOP__(V128, XOR)"
-  | [ "v128"; "bitselect" ] -> Some "VVTERNOP__(V128, BITSELECT)"
-  | [ "v128"; "any_true" ] -> Some "VVTESTOP__(V128, ANYTRUE)"
+  | [ "v128"; "not" ] -> Some "VVunop(v128, WNOT)"
+  | [ "v128"; "and" ] -> Some "Vvbinop(v128, w-and)"
+  | [ "v128"; "andnot" ] -> Some "Vvbinop(v128, ANDNOT)"
+  | [ "v128"; "or" ] -> Some "Vvbinop(v128, w-or)"
+  | [ "v128"; "xor" ] -> Some "Vvbinop(v128, xor)"
+  | [ "v128"; "bitselect" ] -> Some "vvternop(v128, bitselect)"
+  | [ "v128"; "any_true" ] -> Some "VVtestop(v128, ANYTRUE)"
   | [ prefix; op ] -> (
       match vector_shape prefix with
       | None -> None
@@ -2056,29 +1487,29 @@ let vector_instr_term head =
               | Some term -> Some term
               | None -> (
               match vector_unop op with
-              | Some vop -> Some ("VUNOP__(" ^ sh ^ ", " ^ vop ^ ")")
+              | Some vop -> Some ("Vunop(" ^ sh ^ ", " ^ vop ^ ")")
               | None -> (
                   match vector_binop op with
-                  | Some vop -> Some ("VBINOP__(" ^ sh ^ ", " ^ vop ^ ")")
+                  | Some vop -> Some ("vbinop(" ^ sh ^ ", " ^ vop ^ ")")
                   | None -> (
                       match vector_relop op with
-                      | Some vop -> Some ("VRELOP__(" ^ sh ^ ", " ^ vop ^ ")")
+                      | Some vop -> Some ("vrelop(" ^ sh ^ ", " ^ vop ^ ")")
                       | None -> (
                           match vector_shiftop op with
-                          | Some vop -> Some ("VSHIFTOP__(" ^ sh ^ ", " ^ vop ^ ")")
+                          | Some vop -> Some ("vshiftop(" ^ sh ^ ", " ^ vop ^ ")")
                           | None ->
-                              if op = "all_true" then Some ("VTESTOP__(" ^ sh ^ ", ALLTRUE)")
-                              else if op = "bitmask" then Some ("VBITMASK_(" ^ sh ^ ")")
-                              else if op = "swizzle" then Some ("VSWIZZLOP__(" ^ sh ^ ", SWIZZLE)")
+                              if op = "all_true" then Some ("Vtestop(" ^ sh ^ ", ALLTRUE)")
+                              else if op = "bitmask" then Some ("vbitmask(" ^ sh ^ ")")
+                              else if op = "swizzle" then Some ("vswizzlop(" ^ sh ^ ", swizzle)")
                               else if op = "relaxed_swizzle" then
-                                Some ("VSWIZZLOP__(" ^ sh ^ ", RELAXEDSWIZZLE)")
+                                Some ("vswizzlop(" ^ sh ^ ", RELAXEDswizzle)")
                               else if op = "relaxed_laneselect" then
-                                Some ("VTERNOP__(" ^ sh ^ ", RELAXEDLANESELECT)")
+                                Some ("vternop(" ^ sh ^ ", relaxed-laneselect)")
                               else if op = "relaxed_madd" then
-                                Some ("VTERNOP__(" ^ sh ^ ", RELAXEDMADD)")
+                                Some ("vternop(" ^ sh ^ ", relaxed-madd)")
                               else if op = "relaxed_nmadd" then
-                                Some ("VTERNOP__(" ^ sh ^ ", RELAXEDNMADD)")
-                              else if op = "splat" then Some ("VSPLAT_(" ^ sh ^ ")")
+                                Some ("vternop(" ^ sh ^ ", relaxed-nmadd)")
+                              else if op = "splat" then Some ("vsplat(" ^ sh ^ ")")
                               else None))))))))))
   | _ -> None
 
@@ -2090,13 +1521,13 @@ let vector_lane_instr_term head lane =
         match vector_shape prefix with
         | None -> None
         | Some sh ->
-            if op = "replace_lane" then Some ("VREPLACELANE__(" ^ sh ^ ", " ^ lane ^ ")")
+            if op = "replace_lane" then Some ("vreplace-lane(" ^ sh ^ ", " ^ lane ^ ")")
             else if op = "extract_lane" then
-              Some ("VEXTRACTLANE___(" ^ sh ^ ", eps, " ^ lane ^ ")")
+              Some ("vextract-lane(" ^ sh ^ ", eps, " ^ lane ^ ")")
             else if starts_with op "extract_lane_" then
               let sx = String.sub op 13 (String.length op - 13) in
               Some
-                ("VEXTRACTLANE___(" ^ sh ^ ", " ^ signedness_ctor sx ^ ", " ^ lane
+                ("vextract-lane(" ^ sh ^ ", " ^ signedness_ctor sx ^ ", " ^ lane
                ^ ")")
             else None)
     | _ -> None
@@ -2282,39 +1713,39 @@ let parse_load_store_instr env head rest =
   let memidx, memarg, rest = parse_memory_operands env rest in
   let term =
     match head with
-    | "i32.load" -> "LOAD____(I32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.load" -> "LOAD____(I64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "f32.load" -> "LOAD____(F32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "f64.load" -> "LOAD____(F64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i32.load" -> "load(i32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.load" -> "load(i64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "f32.load" -> "load(f32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "f64.load" -> "load(f64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load8_s" ->
-        "LOAD____(I32, ANY__(" ^ sz_term 8 ^ ", S), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i32, any(" ^ sz_term 8 ^ ", s), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load8_u" ->
-        "LOAD____(I32, ANY__(" ^ sz_term 8 ^ ", U), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i32, any(" ^ sz_term 8 ^ ", u), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load16_s" ->
-        "LOAD____(I32, ANY__(" ^ sz_term 16 ^ ", S), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i32, any(" ^ sz_term 16 ^ ", s), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i32.load16_u" ->
-        "LOAD____(I32, ANY__(" ^ sz_term 16 ^ ", U), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i32, any(" ^ sz_term 16 ^ ", u), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load8_s" ->
-        "LOAD____(I64, ANY__(" ^ sz_term 8 ^ ", S), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i64, any(" ^ sz_term 8 ^ ", s), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load8_u" ->
-        "LOAD____(I64, ANY__(" ^ sz_term 8 ^ ", U), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i64, any(" ^ sz_term 8 ^ ", u), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load16_s" ->
-        "LOAD____(I64, ANY__(" ^ sz_term 16 ^ ", S), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i64, any(" ^ sz_term 16 ^ ", s), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load16_u" ->
-        "LOAD____(I64, ANY__(" ^ sz_term 16 ^ ", U), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i64, any(" ^ sz_term 16 ^ ", u), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load32_s" ->
-        "LOAD____(I64, ANY__(" ^ sz_term 32 ^ ", S), " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i64, any(" ^ sz_term 32 ^ ", s), " ^ memidx ^ ", " ^ memarg ^ ")"
     | "i64.load32_u" ->
-        "LOAD____(I64, ANY__(" ^ sz_term 32 ^ ", U), " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i32.store" -> "STORE____(I32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.store" -> "STORE____(I64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "f32.store" -> "STORE____(F32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "f64.store" -> "STORE____(F64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i32.store8" -> "STORE____(I32, " ^ sz_term 8 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i32.store16" -> "STORE____(I32, " ^ sz_term 16 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.store8" -> "STORE____(I64, " ^ sz_term 8 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.store16" -> "STORE____(I64, " ^ sz_term 16 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
-    | "i64.store32" -> "STORE____(I64, " ^ sz_term 32 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+        "load(i64, any(" ^ sz_term 32 ^ ", u), " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i32.store" -> "store(i32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.store" -> "store(i64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "f32.store" -> "store(f32, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "f64.store" -> "store(f64, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i32.store8" -> "store(i32, " ^ sz_term 8 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i32.store16" -> "store(i32, " ^ sz_term 16 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.store8" -> "store(i64, " ^ sz_term 8 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.store16" -> "store(i64, " ^ sz_term 16 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
+    | "i64.store32" -> "store(i64, " ^ sz_term 32 ^ ", " ^ memidx ^ ", " ^ memarg ^ ")"
     | _ -> assert false
   in
   (term, rest)
@@ -2335,12 +1766,12 @@ let parse_vector_memory_instr env head rest =
     | _ -> fail ("not a vector splat memory instruction: " ^ head)
   in
   let packed_load = function
-    | "v128.load8x8_s" -> Some (8, 8, "S")
-    | "v128.load8x8_u" -> Some (8, 8, "U")
-    | "v128.load16x4_s" -> Some (16, 4, "S")
-    | "v128.load16x4_u" -> Some (16, 4, "U")
-    | "v128.load32x2_s" -> Some (32, 2, "S")
-    | "v128.load32x2_u" -> Some (32, 2, "U")
+    | "v128.load8x8_s" -> Some (8, 8, "s")
+    | "v128.load8x8_u" -> Some (8, 8, "u")
+    | "v128.load16x4_s" -> Some (16, 4, "s")
+    | "v128.load16x4_u" -> Some (16, 4, "u")
+    | "v128.load32x2_s" -> Some (32, 2, "s")
+    | "v128.load32x2_u" -> Some (32, 2, "u")
     | _ -> None
   in
   if contains_sub head "_lane" then
@@ -2366,10 +1797,10 @@ let parse_vector_memory_instr env head rest =
           let n = string_of_int (lane_size head) in
           let ctor =
             if starts_with head "v128.load" then
-              "VLOADLANE_____(V128, " ^ n ^ ", " ^ memidx ^ ", " ^ memarg
+              "vload-lane(v128, " ^ n ^ ", " ^ memidx ^ ", " ^ memarg
               ^ ", " ^ lane ^ ")"
             else
-              "VSTORELANE_____(V128, " ^ n ^ ", " ^ memidx ^ ", " ^ memarg
+              "vstore-lane(v128, " ^ n ^ ", " ^ memidx ^ ", " ^ memarg
               ^ ", " ^ lane ^ ")"
           in
           (ctor, xs)
@@ -2379,20 +1810,20 @@ let parse_vector_memory_instr env head rest =
     let memidx, memarg, rest = parse_memory_operands env rest in
     let term =
       match head with
-      | "v128.load" -> "VLOAD____(V128, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
-      | "v128.store" -> "VSTORE___(V128, " ^ memidx ^ ", " ^ memarg ^ ")"
+      | "v128.load" -> "vload(v128, eps, " ^ memidx ^ ", " ^ memarg ^ ")"
+      | "v128.store" -> "vstore(v128, " ^ memidx ^ ", " ^ memarg ^ ")"
       | "v128.load32_zero" ->
-          "VLOAD____(V128, ZERO_(" ^ sz_term 32 ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
+          "vload(v128, zero-vloadop(" ^ sz_term 32 ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
       | "v128.load64_zero" ->
-          "VLOAD____(V128, ZERO_(" ^ sz_term 64 ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
+          "vload(v128, zero-vloadop(" ^ sz_term 64 ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
       | "v128.load8_splat" | "v128.load16_splat" | "v128.load32_splat"
       | "v128.load64_splat" ->
-          "VLOAD____(V128, SPLAT_(" ^ sz_term (splat_size head)
+          "vload(v128, splat(" ^ sz_term (splat_size head)
           ^ "), " ^ memidx ^ ", " ^ memarg ^ ")"
       | _ -> (
           match packed_load head with
           | Some (m, k, sx) ->
-              "VLOAD____(V128, SHAPEXANY___("
+              "vload(v128, shapexany("
               ^ sz_term m ^ ", " ^ string_of_int k ^ ", " ^ sx ^ "), "
               ^ memidx ^ ", " ^ memarg ^ ")"
           | None -> fail ("unsupported vector memory instruction: " ^ head))
@@ -2410,8 +1841,8 @@ let v128_const_term operands =
   match operands with
   | Atom _shape :: lanes ->
       let lane_terms = List.map atom lanes in
-      "VCONST__(V128, $v128lanes(" ^ seq lane_terms ^ "))"
-  | [] -> "VCONST__(V128, $v128lanes(eps))"
+      "vconst(v128, $v128lanes(" ^ seq lane_terms ^ "))"
+  | [] -> "vconst(v128, $v128lanes(eps))"
   | _ -> fail "unsupported v128.const operands"
 
 let collect_shuffle_lanes rest =
@@ -2423,7 +1854,7 @@ let collect_shuffle_lanes rest =
   loop 0 [] rest
 
 let shuffle_term lanes =
-  "VSHUFFLE__(" ^ vector_shape_exn "i8x16" ^ ", " ^ seq lanes ^ ")"
+  ctor "vshuffle" [ vector_shape_exn "i8x16"; seq lanes ]
 
 let resolve_label env = function
   | Atom id when is_id id ->
@@ -2443,7 +1874,7 @@ let parse_br_table env labels =
     | x :: xs -> split_last (x :: acc) xs
   in
   let prefix, default = split_last [] labels in
-  "BRTABLE__(" ^ labelidx_seq prefix ^ ", " ^ default ^ ")"
+  "br-table(" ^ labelidx_seq prefix ^ ", " ^ default ^ ")"
 
 let collect_br_table_operands rest =
   let rec loop acc = function
@@ -2454,13 +1885,13 @@ let collect_br_table_operands rest =
 
 let parse_catch_clause env = function
   | List [ Atom "catch"; tag; label ] ->
-      "CATCH__(" ^ resolve_tag env tag ^ ", " ^ resolve_label env label ^ ")"
+      "catch(" ^ resolve_tag env tag ^ ", " ^ resolve_label env label ^ ")"
   | List [ Atom "catch_ref"; tag; label ] ->
-      "CATCHREF__(" ^ resolve_tag env tag ^ ", " ^ resolve_label env label ^ ")"
+      "catch-ref(" ^ resolve_tag env tag ^ ", " ^ resolve_label env label ^ ")"
   | List [ Atom "catch_all"; label ] ->
-      "CATCHALL_(" ^ resolve_label env label ^ ")"
+      "catch-all(" ^ resolve_label env label ^ ")"
   | List [ Atom "catch_all_ref"; label ] ->
-      "CATCHALLREF_(" ^ resolve_label env label ^ ")"
+      "catch-all-ref(" ^ resolve_label env label ^ ")"
   | x -> fail ("unsupported catch clause: " ^ atom_or_shape x)
 
 let is_catch_clause = function
@@ -2488,17 +1919,17 @@ let rec parse_instr env = function
       in
       let bt, instrs = parse_blocktype env body in
       let env = enter_label env id in
-      "BLOCK__(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ")"
+      "block(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ")"
   | List (Atom "loop" :: body) ->
       let id, body =
         match body with Atom id :: rest when is_id id -> (Some id, rest) | _ -> (None, body)
       in
       let bt, instrs = parse_blocktype env body in
       let env = enter_label env id in
-      "LOOP__(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ")"
+      "loop(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ")"
   | List (Atom "if" :: body) ->
       let bt, instrs = parse_blocktype env body in
-      "WIFELSE___(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ", eps)"
+      "ifelse(" ^ bt ^ ", " ^ instr_seq (parse_instr_list env instrs) ^ ", eps)"
   | List (Atom "try_table" :: body) ->
       let id, body =
         match body with Atom id :: rest when is_id id -> (Some id, rest) | _ -> (None, body)
@@ -2506,10 +1937,10 @@ let rec parse_instr env = function
       let bt, rest = parse_blocktype env body in
       let catches, instrs = List.partition is_catch_clause rest in
       let body_env = enter_label env id in
-      "TRYTABLE___(" ^ bt ^ ", " ^ catch_seq (List.map (parse_catch_clause env) catches)
+      "try-table(" ^ bt ^ ", " ^ catch_seq (List.map (parse_catch_clause env) catches)
       ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
   | List [ Atom "call_indirect"; List [ Atom "type"; x ] ] ->
-      "CALLINDIRECT__(" ^ wrap_source_category "Tableidx" "0" ^ ", WIDX_("
+      "call-indirect(" ^ wrap_source_category "Tableidx" "0" ^ ", w--idx("
       ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))"
   | List (Atom "return_call" :: target :: operands) ->
@@ -2524,7 +1955,7 @@ let rec parse_instr env = function
   | List (Atom "select" :: List (Atom "result" :: tys) :: operands) ->
       seq
         (parse_instr_list env operands
-        @ [ "SELECT_(" ^ valtype_seq (List.map valtype_of_sexpr tys) ^ ")" ])
+        @ [ "select(" ^ valtype_seq (List.map valtype_of_sexpr tys) ^ ")" ])
   | List (Atom (("i32.const" | "i64.const" | "f32.const" | "f64.const" | "global.get") as head)
           :: imm :: rest) ->
       seq (parse_flat_instr env head (Some imm) :: parse_instr_list env rest)
@@ -2574,51 +2005,51 @@ and parse_flat_instr env head imm =
       (string_of_int (resolve_index "type" env.type_names x))
   in
   match (head, imm) with
-  | "local.get", Some x -> "LOCALGET_(" ^ local x ^ ")"
-  | "local.set", Some x -> "LOCALSET_(" ^ local x ^ ")"
-  | "local.tee", Some x -> "LOCALTEE_(" ^ local x ^ ")"
-  | "global.get", Some x -> "GLOBALGET_(" ^ resolve_global env x ^ ")"
-  | "global.set", Some x -> "GLOBALSET_(" ^ resolve_global env x ^ ")"
-  | "table.get", Some x -> "TABLEGET_(" ^ resolve_table env x ^ ")"
-  | "table.set", Some x -> "TABLESET_(" ^ resolve_table env x ^ ")"
-  | "table.size", Some x -> "TABLESIZE_(" ^ resolve_table env x ^ ")"
-  | "table.size", None -> "TABLESIZE_(" ^ wrap_source_category "Tableidx" "0" ^ ")"
-  | "memory.size", Some x -> "MEMORYSIZE_(" ^ resolve_mem env (Some x) ^ ")"
-  | "memory.grow", Some x -> "MEMORYGROW_(" ^ resolve_mem env (Some x) ^ ")"
+  | "local.get", Some x -> "local-get(" ^ local x ^ ")"
+  | "local.set", Some x -> "local-set(" ^ local x ^ ")"
+  | "local.tee", Some x -> "local-tee(" ^ local x ^ ")"
+  | "global.get", Some x -> "global-get(" ^ resolve_global env x ^ ")"
+  | "global.set", Some x -> "global-set(" ^ resolve_global env x ^ ")"
+  | "table.get", Some x -> "table-get(" ^ resolve_table env x ^ ")"
+  | "table.set", Some x -> "table-set(" ^ resolve_table env x ^ ")"
+  | "table.size", Some x -> "table-size(" ^ resolve_table env x ^ ")"
+  | "table.size", None -> "table-size(" ^ wrap_source_category "Tableidx" "0" ^ ")"
+  | "memory.size", Some x -> "memory-size(" ^ resolve_mem env (Some x) ^ ")"
+  | "memory.grow", Some x -> "memory-grow(" ^ resolve_mem env (Some x) ^ ")"
   | "i32.const", Some x -> i32_const (int_arg x)
   | "i64.const", Some x -> i64_const (int_arg x)
   | "f32.const", Some x -> f32_const (simple_float_literal 32 (atom x))
   | "f64.const", Some x -> f64_const (simple_float_literal 64 (atom x))
-  | "br", Some x -> "BR_(" ^ resolve_label env x ^ ")"
-  | "br_if", Some x -> "BRIF_(" ^ resolve_label env x ^ ")"
-  | "br_on_null", Some x -> "BRONNULL_(" ^ resolve_label env x ^ ")"
-  | "br_on_non_null", Some x -> "BRONNONNULL_(" ^ resolve_label env x ^ ")"
-  | "call", Some x -> "CALL_(" ^ func x ^ ")"
-  | "return_call", Some x -> "RETURNCALL_(" ^ func x ^ ")"
+  | "br", Some x -> "br(" ^ resolve_label env x ^ ")"
+  | "br_if", Some x -> "br-if(" ^ resolve_label env x ^ ")"
+  | "br_on_null", Some x -> "br-on-null(" ^ resolve_label env x ^ ")"
+  | "br_on_non_null", Some x -> "br-on-non-null(" ^ resolve_label env x ^ ")"
+  | "call", Some x -> "call(" ^ func x ^ ")"
+  | "return_call", Some x -> "return-call(" ^ func x ^ ")"
   | "call_ref", Some (List [ Atom "type"; x ]) ->
-      "CALLREF_(WIDX_(" ^ typeidx x ^ "))"
+      "call-ref(w--idx(" ^ typeidx x ^ "))"
   | "call_ref", Some x ->
-      "CALLREF_(WIDX_(" ^ typeidx x ^ "))"
+      "call-ref(w--idx(" ^ typeidx x ^ "))"
   | "return_call_ref", Some (List [ Atom "type"; x ]) ->
-      "RETURNCALLREF_(WIDX_("
+      "return-call-ref(w--idx("
       ^ typeidx x
       ^ "))"
   | "return_call_ref", Some x ->
-      "RETURNCALLREF_(WIDX_("
+      "return-call-ref(w--idx("
       ^ typeidx x
       ^ "))"
-  | "ref.null", Some x -> "REFNULL_(" ^ heaptype (atom x) ^ ")"
-  | "ref.func", Some x -> "REFFUNC_(" ^ func x ^ ")"
-  | "ref.test", Some x -> "REFTEST_(" ^ reftype_of_sexpr x ^ ")"
-  | "ref.cast", Some x -> "REFCAST_(" ^ reftype_of_sexpr x ^ ")"
-  | "ref.is_null", None -> "REFISNULL"
-  | "ref.as_non_null", None -> "REFASNONNULL"
-  | "ref.eq", None -> "REFEQ"
-  | "ref.i31", None -> "REFI31"
-  | "throw_ref", None -> "THROWREF"
-  | "throw", Some x -> "THROW_(" ^ resolve_tag env x ^ ")"
-  | "v128.const", Some x -> "VCONST__(V128, $v128lanes(" ^ atom x ^ "))"
-  | "v128.const", None -> "VCONST__(V128, $v128lanes(eps))"
+  | "ref.null", Some x -> "ref-null(" ^ heaptype (atom x) ^ ")"
+  | "ref.func", Some x -> "ref-func(" ^ func x ^ ")"
+  | "ref.test", Some x -> "ref-test(" ^ reftype_of_sexpr x ^ ")"
+  | "ref.cast", Some x -> "ref-cast(" ^ reftype_of_sexpr x ^ ")"
+  | "ref.is_null", None -> "ref-is-null"
+  | "ref.as_non_null", None -> "ref-as-non-null"
+  | "ref.eq", None -> "ref-eq"
+  | "ref.i31", None -> "ref-i31"
+  | "throw_ref", None -> "throw-ref"
+  | "throw", Some x -> "throw(" ^ resolve_tag env x ^ ")"
+  | "v128.const", Some x -> "vconst(v128, $v128lanes(" ^ atom x ^ "))"
+  | "v128.const", None -> "vconst(v128, $v128lanes(eps))"
   | head, None when Option.is_some (vector_instr_term head) ->
       Option.get (vector_instr_term head)
   | head, None when Option.is_some (cvtop_term head) ->
@@ -2632,27 +2063,27 @@ and parse_flat_instr env head imm =
       | _ -> false) -> (
       match split_opcode head with
       | Some ((("i32" | "i64") as ty), "eqz") ->
-          "TESTOP__(" ^ numtype_of_prefix ty ^ ", EQZ)"
+          "testop(" ^ numtype_of_prefix ty ^ ", eqz)"
       | Some ((("i32" | "i64") as ty), op) -> (
-          try "BINOP__(" ^ numtype_of_prefix ty ^ ", " ^ int_binop op ^ ")"
+          try "binop(" ^ numtype_of_prefix ty ^ ", " ^ int_binop op ^ ")"
           with Error _ -> (
-            try "RELOP__(" ^ numtype_of_prefix ty ^ ", " ^ int_relop op ^ ")"
+            try "relop(" ^ numtype_of_prefix ty ^ ", " ^ int_relop op ^ ")"
             with Error _ ->
-              "UNOP__(" ^ numtype_of_prefix ty ^ ", " ^ int_unop op ^ ")"))
+              "unop(" ^ numtype_of_prefix ty ^ ", " ^ int_unop op ^ ")"))
       | Some ((("f32" | "f64") as ty), op) -> (
-          try "BINOP__(" ^ numtype_of_prefix ty ^ ", " ^ float_binop op ^ ")"
+          try "binop(" ^ numtype_of_prefix ty ^ ", " ^ float_binop op ^ ")"
           with Error _ -> (
-            try "RELOP__(" ^ numtype_of_prefix ty ^ ", " ^ float_relop op ^ ")"
+            try "relop(" ^ numtype_of_prefix ty ^ ", " ^ float_relop op ^ ")"
             with Error _ ->
-              "UNOP__(" ^ numtype_of_prefix ty ^ ", " ^ float_unop op ^ ")"))
+              "unop(" ^ numtype_of_prefix ty ^ ", " ^ float_unop op ^ ")"))
       | _ -> fail ("unsupported instruction form: " ^ head))
-  | "memory.size", None -> "MEMORYSIZE_(" ^ wrap_source_category "Memidx" "0" ^ ")"
-  | "memory.grow", None -> "MEMORYGROW_(" ^ wrap_source_category "Memidx" "0" ^ ")"
-  | "select", None -> "SELECT_(eps)"
-  | "drop", None -> "DROP"
-  | "return", None -> "RETURN"
-  | "nop", None -> "NOP"
-  | "unreachable", None -> "UNREACHABLE"
+  | "memory.size", None -> "memory-size(" ^ wrap_source_category "Memidx" "0" ^ ")"
+  | "memory.grow", None -> "memory-grow(" ^ wrap_source_category "Memidx" "0" ^ ")"
+  | "select", None -> "select(eps)"
+  | "drop", None -> "drop"
+  | "return", None -> "return"
+  | "nop", None -> "nop"
+  | "unreachable", None -> "unreachable"
   | _ -> fail ("unsupported instruction form: " ^ head)
 
 and parse_instr_list env items =
@@ -2673,87 +2104,87 @@ and parse_instr_list env items =
   | Atom "end" :: _ -> fail "unexpected end"
   | List _ as x :: rest -> parse_instr env x :: parse_instr_list env rest
   | Atom "call_indirect" :: List [ Atom "type"; x ] :: rest ->
-      ("CALLINDIRECT__(" ^ wrap_source_category "Tableidx" "0" ^ ", WIDX_("
+      ("call-indirect(" ^ wrap_source_category "Tableidx" "0" ^ ", w--idx("
       ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "return_call_indirect" :: List [ Atom "type"; x ] :: rest ->
-      ("RETURNCALLINDIRECT__(" ^ wrap_source_category "Tableidx" "0" ^ ", WIDX_("
+      ("return-call-indirect(" ^ wrap_source_category "Tableidx" "0" ^ ", w--idx("
       ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "call_indirect" :: Atom tableidx :: List [ Atom "type"; x ] :: rest
     when not (is_known_opcode tableidx) ->
-      ("CALLINDIRECT__("
+      ("call-indirect("
       ^ wrap_source_category "Tableidx"
           (string_of_int (resolve_index "table" env.table_names (Atom tableidx)))
-      ^ ", WIDX_("
+      ^ ", w--idx("
       ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "return_call_indirect" :: Atom tableidx :: List [ Atom "type"; x ] :: rest
     when not (is_known_opcode tableidx) ->
-      ("RETURNCALLINDIRECT__("
+      ("return-call-indirect("
       ^ wrap_source_category "Tableidx"
           (string_of_int (resolve_index "table" env.table_names (Atom tableidx)))
-      ^ ", WIDX_("
+      ^ ", w--idx("
       ^ wrap_source_category "Typeidx" (string_of_int (resolve_index "type" env.type_names x))
       ^ "))")
       :: parse_instr_list env rest
   | Atom "table.init" :: Atom tableidx :: Atom elemidx :: rest
     when (not (is_known_opcode tableidx)) && not (is_known_opcode elemidx) ->
-      ("TABLEINIT__(" ^ wrap_source_category "Tableidx" (int_arg (Atom tableidx))
+      ("table-init(" ^ wrap_source_category "Tableidx" (int_arg (Atom tableidx))
       ^ ", " ^ wrap_source_category "Elemidx" (int_arg (Atom elemidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "table.init" :: Atom elemidx :: rest when not (is_known_opcode elemidx) ->
-      ("TABLEINIT__(" ^ wrap_source_category "Tableidx" "0"
+      ("table-init(" ^ wrap_source_category "Tableidx" "0"
       ^ ", " ^ wrap_source_category "Elemidx" (int_arg (Atom elemidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "table.copy" :: Atom dst :: Atom src :: rest
     when (not (is_known_opcode dst)) && not (is_known_opcode src) ->
-      ("TABLECOPY__(" ^ wrap_source_category "Tableidx" (int_arg (Atom dst))
+      ("table-copy(" ^ wrap_source_category "Tableidx" (int_arg (Atom dst))
       ^ ", " ^ wrap_source_category "Tableidx" (int_arg (Atom src)) ^ ")")
       :: parse_instr_list env rest
   | Atom "table.copy" :: rest ->
-      ("TABLECOPY__(" ^ wrap_source_category "Tableidx" "0"
+      ("table-copy(" ^ wrap_source_category "Tableidx" "0"
       ^ ", " ^ wrap_source_category "Tableidx" "0" ^ ")")
       :: parse_instr_list env rest
   | Atom (("table.grow" | "table.fill") as head) :: Atom tableidx :: rest
     when not (is_known_opcode tableidx) ->
-      let ctor = if head = "table.grow" then "TABLEGROW_" else "TABLEFILL_" in
+      let ctor = if head = "table.grow" then "table-grow" else "table-fill" in
       (ctor ^ "(" ^ resolve_table env (Atom tableidx) ^ ")") :: parse_instr_list env rest
   | Atom (("table.grow" | "table.fill") as head) :: rest ->
-      let ctor = if head = "table.grow" then "TABLEGROW_" else "TABLEFILL_" in
+      let ctor = if head = "table.grow" then "table-grow" else "table-fill" in
       (ctor ^ "(" ^ wrap_source_category "Tableidx" "0" ^ ")") :: parse_instr_list env rest
   | Atom "elem.drop" :: Atom elemidx :: rest when not (is_known_opcode elemidx) ->
-      ("ELEMDROP_(" ^ wrap_source_category "Elemidx" (int_arg (Atom elemidx)) ^ ")")
+      ("elem-drop(" ^ wrap_source_category "Elemidx" (int_arg (Atom elemidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "data.drop" :: Atom dataidx :: rest when not (is_known_opcode dataidx) ->
-      ("DATADROP_(" ^ wrap_source_category "Dataidx" (int_arg (Atom dataidx)) ^ ")")
+      ("data-drop(" ^ wrap_source_category "Dataidx" (int_arg (Atom dataidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.init" :: Atom dataidx :: Atom memidx :: rest
     when (not (is_known_opcode dataidx)) && not (is_known_opcode memidx) ->
-      ("MEMORYINIT__(" ^ resolve_mem env (Some (Atom memidx)) ^ ", "
+      ("memory-init(" ^ resolve_mem env (Some (Atom memidx)) ^ ", "
       ^ wrap_source_category "Dataidx" (int_arg (Atom dataidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.init" :: Atom dataidx :: rest when not (is_known_opcode dataidx) ->
-      ("MEMORYINIT__(" ^ wrap_source_category "Memidx" "0"
+      ("memory-init(" ^ wrap_source_category "Memidx" "0"
       ^ ", " ^ wrap_source_category "Dataidx" (int_arg (Atom dataidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.copy" :: Atom dst :: Atom src :: rest
     when (not (is_known_opcode dst)) && not (is_known_opcode src) ->
-      ("MEMORYCOPY__(" ^ resolve_mem env (Some (Atom dst)) ^ ", "
+      ("memory-copy(" ^ resolve_mem env (Some (Atom dst)) ^ ", "
       ^ resolve_mem env (Some (Atom src)) ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.copy" :: rest ->
-      ("MEMORYCOPY__(" ^ wrap_source_category "Memidx" "0"
+      ("memory-copy(" ^ wrap_source_category "Memidx" "0"
       ^ ", " ^ wrap_source_category "Memidx" "0" ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.fill" :: Atom memidx :: rest when not (is_known_opcode memidx) ->
-      ("MEMORYFILL_(" ^ resolve_mem env (Some (Atom memidx)) ^ ")")
+      ("memory-fill(" ^ resolve_mem env (Some (Atom memidx)) ^ ")")
       :: parse_instr_list env rest
   | Atom "memory.fill" :: rest ->
-      ("MEMORYFILL_(" ^ wrap_source_category "Memidx" "0" ^ ")")
+      ("memory-fill(" ^ wrap_source_category "Memidx" "0" ^ ")")
       :: parse_instr_list env rest
   | Atom (("memory.size" | "memory.grow") as head) :: Atom x :: rest
     when not (is_known_opcode x) ->
@@ -2770,7 +2201,7 @@ and parse_instr_list env items =
       let lanes, rest = collect_shuffle_lanes rest in
       shuffle_term lanes :: parse_instr_list env rest
   | Atom "select" :: List (Atom "result" :: tys) :: rest ->
-      ("SELECT_(" ^ valtype_seq (List.map valtype_of_sexpr tys) ^ ")")
+      ("select(" ^ valtype_seq (List.map valtype_of_sexpr tys) ^ ")")
       :: parse_instr_list env rest
   | Atom head :: rest when List.mem head load_store_names ->
       let term, rest = parse_load_store_instr env head rest in
@@ -2806,8 +2237,8 @@ and parse_flat_structured env head rest =
   let body_env = enter_label env id in
   let term =
     match head with
-    | "block" -> "BLOCK__(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
-    | "loop" -> "LOOP__(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
+    | "block" -> "block(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
+    | "loop" -> "loop(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")"
     | _ -> assert false
   in
   (term, rest)
@@ -2835,7 +2266,7 @@ and parse_flat_if env rest =
   let bt, then_instrs = parse_blocktype env then_body in
   let body_env = enter_label env id in
   let term =
-    "WIFELSE___(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env then_instrs) ^ ", "
+    "ifelse(" ^ bt ^ ", " ^ instr_seq (parse_instr_list body_env then_instrs) ^ ", "
     ^ instr_seq (parse_instr_list body_env else_body) ^ ")"
   in
   (term, rest)
@@ -2861,7 +2292,7 @@ and parse_flat_try_table env rest =
   in
   let catches, instrs = split_catches [] body in
   let body_env = enter_label env id in
-  ( "TRYTABLE___(" ^ bt ^ ", " ^ catch_seq (List.map (parse_catch_clause env) catches)
+  ( "try-table(" ^ bt ^ ", " ^ catch_seq (List.map (parse_catch_clause env) catches)
     ^ ", " ^ instr_seq (parse_instr_list body_env instrs) ^ ")",
     rest )
 
@@ -2914,7 +2345,7 @@ let parse_memory_fields body =
   let addrtype, body =
     match body with
     | Atom ("i32" | "i64" as at) :: rest -> (valtype at, rest)
-    | _ -> ("I32", body)
+    | _ -> ("i32", body)
   in
   let min, max, rest = parse_limits body in
   match rest with
@@ -2927,16 +2358,16 @@ let parse_table_fields body =
   let addrtype, body =
     match body with
     | Atom ("i32" | "i64" as at) :: rest -> (valtype at, rest)
-    | _ -> ("I32", body)
+    | _ -> ("i32", body)
   in
   let min, max, rest = parse_limits body in
   let parse_rt = function
-    | [ Atom rt ] -> (reftype rt, "REFNULL_(" ^ heaptype rt ^ ")")
+    | [ Atom rt ] -> (reftype rt, "ref-null(" ^ heaptype rt ^ ")")
     | [ List [ Atom "ref"; Atom "null"; Atom ht ] ] ->
-        ( "REF__(NULL, " ^ heaptype ht ^ ")",
-          "REFNULL_(" ^ heaptype ht ^ ")" )
+        ( "ref(null, " ^ heaptype ht ^ ")",
+          "ref-null(" ^ heaptype ht ^ ")" )
     | [ List [ Atom "ref"; Atom ht ] ] ->
-        ("REF__(eps, " ^ heaptype ht ^ ")", "REFNULL_(" ^ heaptype ht ^ ")")
+        ("ref(eps, " ^ heaptype ht ^ ")", "ref-null(" ^ heaptype ht ^ ")")
     | _ -> fail "unsupported table declaration"
   in
   match rest with
@@ -2955,7 +2386,7 @@ let parse_tag_fields type_names types_ref fields =
   let inline_exports, fields = split_inline_exports fields in
   let typeidx = parse_typeuse type_names types_ref fields in
   (id, inline_exports,
-   "WIDX_(" ^ wrap_source_category "Typeidx" (string_of_int typeidx) ^ ")")
+   "w--idx(" ^ wrap_source_category "Typeidx" (string_of_int typeidx) ^ ")")
 
 let parse_import type_names types_ref func_index tag_index global_index memory_index table_index =
   function
@@ -3218,7 +2649,7 @@ let parse_data memory_names table_names global_names func_names tag_names type_n
         | (List (Atom ("i32.const" | "i64.const" | "global.get") :: _) as expr) :: rest ->
             mode :=
               Some
-                ("ACTIVEDATAMODE__(" ^ wrap_source_category "Memidx" (string_of_int !memidx) ^ ", "
+                ("active-datamode(" ^ wrap_source_category "Memidx" (string_of_int !memidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -3228,7 +2659,7 @@ let parse_data memory_names table_names global_names func_names tag_names type_n
         | _ -> fail "unsupported data segment"
       in
       loop body;
-      { data_bytes = !bytes; data_mode = Option.value !mode ~default:"PASSIVE" }
+      { data_bytes = !bytes; data_mode = Option.value !mode ~default:"passive" }
   | _ -> fail "expected data"
 
 let parse_elem memory_names table_names global_names func_names tag_names type_names = function
@@ -3236,19 +2667,19 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
       let tableidx = ref 0 in
       let mode = ref None in
       let exprs = ref [] in
-      let elem_type = ref "REF__(NULL, FUNC)" in
+      let elem_type = ref "ref(NULL, FUNC)" in
       let saw_segment_body = ref false in
       let env = make_env ~type_names ~func_names ~tag_names ~global_names ~memory_names ~table_names () in
       let rec elem_item = function
         | List [ Atom "item"; item ] -> elem_item item
         | List [ Atom "ref.func"; x ] ->
-            "REFFUNC_("
+            "ref-func("
             ^ wrap_source_category "Funcidx"
                 (string_of_int (resolve_index "func" func_names x))
             ^ ")"
-        | List [ Atom "ref.null"; Atom ht ] -> "REFNULL_(" ^ heaptype ht ^ ")"
+        | List [ Atom "ref.null"; Atom ht ] -> "ref-null(" ^ heaptype ht ^ ")"
         | Atom x when is_id x || is_int_literal x ->
-            "REFFUNC_("
+            "ref-func("
             ^ wrap_source_category "Funcidx"
                 (string_of_int (resolve_index "func" func_names (Atom x)))
             ^ ")"
@@ -3260,7 +2691,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             loop rest
         | Atom "declare" :: rest ->
             saw_segment_body := true;
-            mode := Some "DECLARE";
+            mode := Some "declare";
             loop rest
         | Atom "func" :: rest ->
             saw_segment_body := true;
@@ -3274,7 +2705,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             mode :=
               Some
-                ("ACTIVEELEMMODE__(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
+                ("active-elemmode(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -3282,7 +2713,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             mode :=
               Some
-                ("ACTIVEELEMMODE__(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
+                ("active-elemmode(" ^ wrap_source_category "Tableidx" (string_of_int !tableidx) ^ ", "
                 ^ seq (parse_instr_list env [ expr ])
                 ^ ")");
             loop rest
@@ -3290,7 +2721,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             saw_segment_body := true;
             exprs :=
               !exprs
-              @ [ "REFFUNC_("
+              @ [ "ref-func("
                   ^ wrap_source_category "Funcidx"
                       (string_of_int (resolve_index "func" func_names x))
                   ^ ")" ];
@@ -3307,15 +2738,15 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
             loop rest
         | List [ Atom "ref"; Atom "null"; Atom ht ] :: rest ->
             saw_segment_body := true;
-            elem_type := "REF__(NULL, " ^ heaptype ht ^ ")";
+            elem_type := "ref(NULL, " ^ heaptype ht ^ ")";
             loop rest
         | List [ Atom "ref"; Atom ht ] :: rest ->
             saw_segment_body := true;
-            elem_type := "REF__(eps, " ^ heaptype ht ^ ")";
+            elem_type := "ref(eps, " ^ heaptype ht ^ ")";
             loop rest
         | List [ Atom "ref.null"; Atom ht ] :: rest ->
             saw_segment_body := true;
-            exprs := !exprs @ [ "REFNULL_(" ^ heaptype ht ^ ")" ];
+            exprs := !exprs @ [ "ref-null(" ^ heaptype ht ^ ")" ];
             loop rest
         | Atom x :: rest when is_id x || (String.length x > 0 && x.[0] <> '"') ->
             saw_segment_body := true;
@@ -3324,7 +2755,7 @@ let parse_elem memory_names table_names global_names func_names tag_names type_n
         | _ -> fail "unsupported elem segment"
       in
       loop body;
-      { elem_type = !elem_type; elem_exprs = !exprs; elem_mode = Option.value !mode ~default:"PASSIVE" }
+      { elem_type = !elem_type; elem_exprs = !exprs; elem_mode = Option.value !mode ~default:"passive" }
   | _ -> fail "expected elem"
 
 let parse_start func_names = function
@@ -3470,7 +2901,7 @@ let parse_import_memory_binding body =
     memory_binding_pages =
       (match String.split_on_char '/' (String.trim rhs_base) with
       | pages :: _ -> int_of_string pages
-      | [] -> fail "--import-memory expects MODULE.NAME=PAGES[/MAX]");
+      | [] -> fail "--import-memory expects MODULE.NAME=PAGES[/max-binop]");
     memory_binding_max =
       (match String.split_on_char '/' (String.trim rhs_base) with
       | [ _; max_pages ] -> Some (int_of_string max_pages)
@@ -3542,14 +2973,14 @@ let parse_state_func_binding body =
 
 let maude_arg_term typ value =
   let ref_heaptype = function
-    | "funcref" -> "FUNC"
-    | "externref" -> "EXTERN"
-    | "anyref" -> "ANY"
-    | "eqref" -> "WEQ"
-    | "i31ref" -> "I31"
-    | "structref" -> "STRUCT"
-    | "arrayref" -> "ARRAY"
-    | "exnref" -> "EXN"
+    | "funcref" -> "func-absheaptype"
+    | "externref" -> "extern"
+    | "anyref" -> "any"
+    | "eqref" -> "w-eq"
+    | "i31ref" -> "i31"
+    | "structref" -> "struct-absheaptype"
+    | "arrayref" -> "array-absheaptype"
+    | "exnref" -> "exn"
     | t -> fail ("unsupported reference arg type: " ^ t)
   in
   let compact =
@@ -3566,21 +2997,21 @@ let maude_arg_term typ value =
         |> List.map String.trim
         |> List.filter (fun s -> s <> "")
       in
-      "VCONST__(V128, $v128lanes(" ^ seq lanes ^ "))"
+      "vconst(v128, $v128lanes(" ^ seq lanes ^ "))"
   | ( "funcref" | "externref" | "anyref" | "eqref" | "i31ref" | "structref"
     | "arrayref" | "exnref" ) when value = "null" ->
-      "REFNULL_(" ^ ref_heaptype typ ^ ")"
-  | "funcref" -> "REFFUNCADDR_(" ^ value ^ ")"
-  | "externref" -> "REFEXTERN_(REFHOSTADDR_(" ^ value ^ "))"
-  | "anyref" -> "REFHOSTADDR_(" ^ value ^ ")"
-  | "eqref" -> "REFI31NUM_(" ^ value ^ ")"
-  | "i31ref" -> "REFI31NUM_(" ^ value ^ ")"
-  | "structref" -> "REFSTRUCTADDR_(" ^ value ^ ")"
-  | "arrayref" -> "REFARRAYADDR_(" ^ value ^ ")"
-  | "exnref" -> "REFEXNADDR_(" ^ value ^ ")"
+      "ref-null(" ^ ref_heaptype typ ^ ")"
+  | "funcref" -> "ref-func-addr(" ^ value ^ ")"
+  | "externref" -> "ref-extern(ref-host-addr(" ^ value ^ "))"
+  | "anyref" -> "ref-host-addr(" ^ value ^ ")"
+  | "eqref" -> "ref-i31-num(" ^ value ^ ")"
+  | "i31ref" -> "ref-i31-num(" ^ value ^ ")"
+  | "structref" -> "ref-struct-addr(" ^ value ^ ")"
+  | "arrayref" -> "ref-array-addr(" ^ value ^ ")"
+  | "exnref" -> "ref-exn-addr(" ^ value ^ ")"
   | _ -> fail ("unsupported invoke arg type: " ^ typ)
   in
-  source_surface_syntax_of_compact compact
+  compact
 
 let parse_prelude_call body =
   let parts = String.split_on_char ';' body |> List.map String.trim in
@@ -3875,7 +3306,7 @@ module Official = struct
 
   let name n = quote_wat_string (Wasm.Utf8.encode n)
 
-  let sx_term = function P.S -> "S" | P.U -> "U"
+  let sx_term = function P.S -> "s" | P.U -> "u"
 
   let pack_bits = function
     | P.Pack8 -> 8
@@ -3886,49 +3317,49 @@ module Official = struct
   let limits (lim : T.limits) =
     limits_term (int64_to_int lim.min) (Option.map int64_to_int lim.max)
 
-  let addrtype = function T.I32AT -> "I32" | T.I64AT -> "I64"
+  let addrtype = function T.I32AT -> "i32" | T.I64AT -> "i64"
 
   let numtype = function
-    | T.I32T -> "I32"
-    | T.I64T -> "I64"
-    | T.F32T -> "F32"
-    | T.F64T -> "F64"
+    | T.I32T -> "i32"
+    | T.I64T -> "i64"
+    | T.F32T -> "f32"
+    | T.F64T -> "f64"
 
-  let vectype = function T.V128T -> "V128"
+  let vectype = function T.V128T -> "v128"
 
   let typeuse = function
     | T.Idx x ->
-        "WIDX_(" ^ wrap_source_category "Typeidx" (string_of_int (Int32.to_int x)) ^ ")"
-    | T.Rec x -> "RECTYPEUSE_(" ^ Int32.to_string x ^ ")"
+        "w--idx(" ^ wrap_source_category "Typeidx" (string_of_int (Int32.to_int x)) ^ ")"
+    | T.Rec x -> "rec-typeuse(" ^ Int32.to_string x ^ ")"
     | T.Def _ -> fail "unsupported resolved deftype in source type use"
 
   let rec heaptype = function
-    | T.AnyHT -> "ANY"
-    | T.NoneHT -> "NONE"
-    | T.EqHT -> "WEQ"
-    | T.I31HT -> "I31"
-    | T.StructHT -> "STRUCT"
-    | T.ArrayHT -> "ARRAY"
-    | T.FuncHT -> "FUNC"
-    | T.NoFuncHT -> "NOFUNC"
-    | T.ExnHT -> "EXN"
-    | T.NoExnHT -> "NOEXN"
-    | T.ExternHT -> "EXTERN"
-    | T.NoExternHT -> "NOEXTERN"
+    | T.AnyHT -> "any"
+    | T.NoneHT -> "none"
+    | T.EqHT -> "w-eq"
+    | T.I31HT -> "i31"
+    | T.StructHT -> "struct-absheaptype"
+    | T.ArrayHT -> "array-absheaptype"
+    | T.FuncHT -> "func-absheaptype"
+    | T.NoFuncHT -> "nofunc"
+    | T.ExnHT -> "exn"
+    | T.NoExnHT -> "noexn"
+    | T.ExternHT -> "extern"
+    | T.NoExternHT -> "noextern"
     | T.UseHT tu -> typeuse tu
-    | T.BotHT -> "BOT"
+    | T.BotHT -> "bot"
 
   and reftype (nul, ht) =
-    let nul = match nul with T.NoNull -> "eps" | T.Null -> "NULL" in
-    "REF__(" ^ nul ^ ", " ^ heaptype ht ^ ")"
+    let nul = match nul with T.NoNull -> "eps" | T.Null -> "null" in
+    "ref(" ^ nul ^ ", " ^ heaptype ht ^ ")"
 
   let valtype = function
     | T.NumT nt -> numtype nt
     | T.VecT vt -> vectype vt
     | T.RefT rt -> reftype rt
-    | T.BotT -> "BOT"
+    | T.BotT -> "bot"
 
-	  let packtype = function T.I8T -> "I8" | T.I16T -> "I16"
+	  let packtype = function T.I8T -> "i8" | T.I16T -> "i16"
 
 	  let storagetype = function
 	    | T.ValStorageT t -> valtype t
@@ -3936,19 +3367,19 @@ module Official = struct
 
 	  let fieldtype = function
 	    | T.FieldT (T.Cons, t) -> storagetype t
-	    | T.FieldT (T.Var, t) -> "MUT " ^ storagetype t
+	    | T.FieldT (T.Var, t) -> "mut " ^ storagetype t
 
 		  let comptype = function
 		    | T.FuncT (params, results) ->
-		        "FUNCARROW__(" ^ valtype_seq (List.map valtype params) ^ ", "
+		        "funccomptypearrow(" ^ valtype_seq (List.map valtype params) ^ ", "
 		        ^ valtype_seq (List.map valtype results) ^ ")"
-		    | T.StructT fields -> "STRUCT_(" ^ fieldtype_seq (List.map fieldtype fields) ^ ")"
-	    | T.ArrayT field -> "ARRAY_(" ^ fieldtype field ^ ")"
+		    | T.StructT fields -> "struct-comptype(" ^ fieldtype_seq (List.map fieldtype fields) ^ ")"
+	    | T.ArrayT field -> "array(" ^ fieldtype field ^ ")"
 
-	  let final = function T.NoFinal -> "eps" | T.Final -> "FINAL"
+	  let final = function T.NoFinal -> "eps" | T.Final -> "final"
 
 		  let subtype (T.SubT (fin, supers, ct)) =
-		    "SUB___(" ^ final fin ^ ", " ^ typeuse_seq (List.map typeuse supers) ^ ", " ^ comptype ct
+		    "sub-subtype(" ^ final fin ^ ", " ^ typeuse_seq (List.map typeuse supers) ^ ", " ^ comptype ct
 		    ^ ")"
 
 	  let type_def_of_rectype rt =
@@ -3960,16 +3391,16 @@ module Official = struct
 	    in
 	    {
 	      type_id = None;
-		      type_term = "TYPE_(REC_(" ^ subtype_seq (List.map subtype (match rt with T.RecT sts -> sts)) ^ "))";
+		      type_term = "type(rec-rectype(" ^ subtype_seq (List.map subtype (match rt with T.RecT sts -> sts)) ^ "))";
 	      type_func = func;
 	    }
 
   let globaltype = function
     | T.GlobalT (T.Cons, t) -> valtype t
-    | T.GlobalT (T.Var, t) -> "MUT " ^ valtype t
+    | T.GlobalT (T.Var, t) -> "mut " ^ valtype t
 
   let memtype = function
-    | T.MemoryT (at, lim) -> "PAGE__(" ^ addrtype at ^ ", " ^ limits lim ^ ")"
+    | T.MemoryT (at, lim) -> "page(" ^ addrtype at ^ ", " ^ limits lim ^ ")"
 
   let tabletype = function
     | T.TableT (at, lim, rt) -> addrtype at ^ " " ^ limits lim ^ " " ^ reftype rt
@@ -3978,9 +3409,9 @@ module Official = struct
 
   let blocktype = function
     | A.VarBlockType x ->
-        "WIDX_(" ^ wrap_source_category "Typeidx" (string_of_int (i32_index x)) ^ ")"
-    | A.ValBlockType None -> "WRESULT_(eps)"
-    | A.ValBlockType (Some t) -> "WRESULT_(" ^ valtype t ^ ")"
+        "w--idx(" ^ wrap_source_category "Typeidx" (string_of_int (i32_index x)) ^ ")"
+    | A.ValBlockType None -> "w--result(eps)"
+    | A.ValBlockType (Some t) -> "w--result(" ^ valtype t ^ ")"
 
   let memarg offset =
     memarg_term (Int64.to_string offset)
@@ -3992,126 +3423,126 @@ module Official = struct
     | V.F64 f -> f64_const (Int64.to_string (Wasm.F64.to_bits f))
 
   let int_unop = function
-    | A.IntOp.Clz -> "CLZ"
-    | A.IntOp.Ctz -> "CTZ"
-    | A.IntOp.Popcnt -> "POPCNT"
-    | A.IntOp.ExtendS sz -> "EXTEND_(" ^ string_of_int (8 * P.packed_size sz) ^ ")"
+    | A.IntOp.Clz -> "clz"
+    | A.IntOp.Ctz -> "ctz"
+    | A.IntOp.Popcnt -> "popcnt"
+    | A.IntOp.ExtendS sz -> "extend(" ^ string_of_int (8 * P.packed_size sz) ^ ")"
 
   let int_binop = function
-    | A.IntOp.Add -> "ADD"
-    | A.IntOp.Sub -> "SUBBINOP"
-    | A.IntOp.Mul -> "MUL"
-    | A.IntOp.Div sx -> "DIVSXBINOP_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Rem sx -> "WREM_(" ^ sx_term sx ^ ")"
-    | A.IntOp.And -> "WAND"
-    | A.IntOp.Or -> "WOR"
-    | A.IntOp.Xor -> "XOR"
-    | A.IntOp.Shl -> "SHL"
-    | A.IntOp.Shr sx -> "SHR_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Rotl -> "ROTL"
-    | A.IntOp.Rotr -> "ROTR"
+    | A.IntOp.Add -> "add"
+    | A.IntOp.Sub -> "sub-binop"
+    | A.IntOp.Mul -> "mul"
+    | A.IntOp.Div sx -> "div-sx-binop(" ^ sx_term sx ^ ")"
+    | A.IntOp.Rem sx -> "w-rem(" ^ sx_term sx ^ ")"
+    | A.IntOp.And -> "w-and"
+    | A.IntOp.Or -> "w-or"
+    | A.IntOp.Xor -> "xor"
+    | A.IntOp.Shl -> "shl"
+    | A.IntOp.Shr sx -> "shr(" ^ sx_term sx ^ ")"
+    | A.IntOp.Rotl -> "rotl"
+    | A.IntOp.Rotr -> "rotr"
 
   let int_relop = function
-    | A.IntOp.Eq -> "WEQ"
-    | A.IntOp.Ne -> "NE"
-    | A.IntOp.Lt sx -> "LTSXRELOP_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Gt sx -> "GTSXRELOP_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Le sx -> "LESXRELOP_(" ^ sx_term sx ^ ")"
-    | A.IntOp.Ge sx -> "GESXRELOP_(" ^ sx_term sx ^ ")"
+    | A.IntOp.Eq -> "w-eq"
+    | A.IntOp.Ne -> "ne"
+    | A.IntOp.Lt sx -> "lt-sx-relop(" ^ sx_term sx ^ ")"
+    | A.IntOp.Gt sx -> "gt-sx-relop(" ^ sx_term sx ^ ")"
+    | A.IntOp.Le sx -> "le-sx-relop(" ^ sx_term sx ^ ")"
+    | A.IntOp.Ge sx -> "ge-sx-relop(" ^ sx_term sx ^ ")"
 
   let float_unop = function
-    | A.FloatOp.Neg -> "NEGUNOP"
-    | A.FloatOp.Abs -> "ABS"
-    | A.FloatOp.Ceil -> "CEIL"
-    | A.FloatOp.Floor -> "FLOOR"
-    | A.FloatOp.Trunc -> "TRUNCUNOP"
-    | A.FloatOp.Nearest -> "NEAREST"
-    | A.FloatOp.Sqrt -> "SQRT"
+    | A.FloatOp.Neg -> "neg-unop"
+    | A.FloatOp.Abs -> "abs"
+    | A.FloatOp.Ceil -> "ceil"
+    | A.FloatOp.Floor -> "floor"
+    | A.FloatOp.Trunc -> "trunc-unop"
+    | A.FloatOp.Nearest -> "nearest"
+    | A.FloatOp.Sqrt -> "sqrt"
 
   let float_binop = function
-    | A.FloatOp.Add -> "ADD"
-    | A.FloatOp.Sub -> "SUBBINOP"
-    | A.FloatOp.Mul -> "MUL"
-    | A.FloatOp.Div -> "DIVBINOP"
-    | A.FloatOp.Min -> "MINBINOP"
-    | A.FloatOp.Max -> "MAXBINOP"
-    | A.FloatOp.CopySign -> "COPYSIGN"
+    | A.FloatOp.Add -> "add"
+    | A.FloatOp.Sub -> "sub-binop"
+    | A.FloatOp.Mul -> "mul"
+    | A.FloatOp.Div -> "div-binop"
+    | A.FloatOp.Min -> "min-binop"
+    | A.FloatOp.Max -> "max-binop"
+    | A.FloatOp.CopySign -> "copysign"
 
   let float_relop = function
-    | A.FloatOp.Eq -> "WEQ"
-    | A.FloatOp.Ne -> "NE"
-    | A.FloatOp.Lt -> "LTRELOP"
-    | A.FloatOp.Gt -> "GTRELOP"
-    | A.FloatOp.Le -> "LERELOP"
-    | A.FloatOp.Ge -> "GERELOP"
+    | A.FloatOp.Eq -> "w-eq"
+    | A.FloatOp.Ne -> "ne"
+    | A.FloatOp.Lt -> "lt-relop"
+    | A.FloatOp.Gt -> "gt-relop"
+    | A.FloatOp.Le -> "le-relop"
+    | A.FloatOp.Ge -> "ge-relop"
 
   let testop = function
-    | V.I32 A.IntOp.Eqz -> "TESTOP__(I32, EQZ)"
-    | V.I64 A.IntOp.Eqz -> "TESTOP__(I64, EQZ)"
+    | V.I32 A.IntOp.Eqz -> "testop(i32, eqz)"
+    | V.I64 A.IntOp.Eqz -> "testop(i64, eqz)"
     | V.F32 _ | V.F64 _ -> fail "invalid floating-point testop in official AST"
 
   let unop = function
-    | V.I32 op -> "UNOP__(I32, " ^ int_unop op ^ ")"
-    | V.I64 op -> "UNOP__(I64, " ^ int_unop op ^ ")"
-    | V.F32 op -> "UNOP__(F32, " ^ float_unop op ^ ")"
-    | V.F64 op -> "UNOP__(F64, " ^ float_unop op ^ ")"
+    | V.I32 op -> "unop(i32, " ^ int_unop op ^ ")"
+    | V.I64 op -> "unop(i64, " ^ int_unop op ^ ")"
+    | V.F32 op -> "unop(f32, " ^ float_unop op ^ ")"
+    | V.F64 op -> "unop(f64, " ^ float_unop op ^ ")"
 
   let binop = function
-    | V.I32 op -> "BINOP__(I32, " ^ int_binop op ^ ")"
-    | V.I64 op -> "BINOP__(I64, " ^ int_binop op ^ ")"
-    | V.F32 op -> "BINOP__(F32, " ^ float_binop op ^ ")"
-    | V.F64 op -> "BINOP__(F64, " ^ float_binop op ^ ")"
+    | V.I32 op -> "binop(i32, " ^ int_binop op ^ ")"
+    | V.I64 op -> "binop(i64, " ^ int_binop op ^ ")"
+    | V.F32 op -> "binop(f32, " ^ float_binop op ^ ")"
+    | V.F64 op -> "binop(f64, " ^ float_binop op ^ ")"
 
   let relop = function
-    | V.I32 op -> "RELOP__(I32, " ^ int_relop op ^ ")"
-    | V.I64 op -> "RELOP__(I64, " ^ int_relop op ^ ")"
-    | V.F32 op -> "RELOP__(F32, " ^ float_relop op ^ ")"
-    | V.F64 op -> "RELOP__(F64, " ^ float_relop op ^ ")"
+    | V.I32 op -> "relop(i32, " ^ int_relop op ^ ")"
+    | V.I64 op -> "relop(i64, " ^ int_relop op ^ ")"
+    | V.F32 op -> "relop(f32, " ^ float_relop op ^ ")"
+    | V.F64 op -> "relop(f64, " ^ float_relop op ^ ")"
 
   let cvtop = function
-    | V.I32 (A.IntOp.WrapI64) -> "CVTOP___(I32, I64, WRAP)"
+    | V.I32 (A.IntOp.WrapI64) -> "cvtop(i32, i64, wrap)"
     | V.I64 (A.IntOp.ExtendI32 sx) ->
-        "CVTOP___(I64, I32, EXTEND_(" ^ sx_term sx ^ "))"
+        "cvtop(i64, i32, extend-cvtop(" ^ sx_term sx ^ "))"
     | V.I32 (A.IntOp.TruncF32 sx) ->
-        "CVTOP___(I32, F32, TRUNC_(" ^ sx_term sx ^ "))"
+        "cvtop(i32, f32, trunc-cvtop(" ^ sx_term sx ^ "))"
     | V.I32 (A.IntOp.TruncF64 sx) ->
-        "CVTOP___(I32, F64, TRUNC_(" ^ sx_term sx ^ "))"
+        "cvtop(i32, f64, trunc-cvtop(" ^ sx_term sx ^ "))"
     | V.I64 (A.IntOp.TruncF32 sx) ->
-        "CVTOP___(I64, F32, TRUNC_(" ^ sx_term sx ^ "))"
+        "cvtop(i64, f32, trunc-cvtop(" ^ sx_term sx ^ "))"
     | V.I64 (A.IntOp.TruncF64 sx) ->
-        "CVTOP___(I64, F64, TRUNC_(" ^ sx_term sx ^ "))"
+        "cvtop(i64, f64, trunc-cvtop(" ^ sx_term sx ^ "))"
     | V.I32 (A.IntOp.TruncSatF32 sx) ->
-        "CVTOP___(I32, F32, TRUNCSAT_(" ^ sx_term sx ^ "))"
+        "cvtop(i32, f32, trunc-sat-cvtop(" ^ sx_term sx ^ "))"
     | V.I32 (A.IntOp.TruncSatF64 sx) ->
-        "CVTOP___(I32, F64, TRUNCSAT_(" ^ sx_term sx ^ "))"
+        "cvtop(i32, f64, trunc-sat-cvtop(" ^ sx_term sx ^ "))"
     | V.I64 (A.IntOp.TruncSatF32 sx) ->
-        "CVTOP___(I64, F32, TRUNCSAT_(" ^ sx_term sx ^ "))"
+        "cvtop(i64, f32, trunc-sat-cvtop(" ^ sx_term sx ^ "))"
     | V.I64 (A.IntOp.TruncSatF64 sx) ->
-        "CVTOP___(I64, F64, TRUNCSAT_(" ^ sx_term sx ^ "))"
+        "cvtop(i64, f64, trunc-sat-cvtop(" ^ sx_term sx ^ "))"
     | V.I32 A.IntOp.ReinterpretFloat ->
-        "CVTOP___(I32, F32, REINTERPRET)"
+        "cvtop(i32, f32, reinterpret)"
     | V.I64 A.IntOp.ReinterpretFloat ->
-        "CVTOP___(I64, F64, REINTERPRET)"
+        "cvtop(i64, f64, reinterpret)"
     | V.F32 (A.FloatOp.ConvertI32 sx) ->
-        "CVTOP___(F32, I32, CONVERT_(" ^ sx_term sx ^ "))"
+        "cvtop(f32, i32, convert-cvtop(" ^ sx_term sx ^ "))"
     | V.F32 (A.FloatOp.ConvertI64 sx) ->
-        "CVTOP___(F32, I64, CONVERT_(" ^ sx_term sx ^ "))"
+        "cvtop(f32, i64, convert-cvtop(" ^ sx_term sx ^ "))"
     | V.F64 (A.FloatOp.ConvertI32 sx) ->
-        "CVTOP___(F64, I32, CONVERT_(" ^ sx_term sx ^ "))"
+        "cvtop(f64, i32, convert-cvtop(" ^ sx_term sx ^ "))"
     | V.F64 (A.FloatOp.ConvertI64 sx) ->
-        "CVTOP___(F64, I64, CONVERT_(" ^ sx_term sx ^ "))"
-    | V.F64 A.FloatOp.PromoteF32 -> "CVTOP___(F64, F32, PROMOTE)"
-    | V.F32 A.FloatOp.DemoteF64 -> "CVTOP___(F32, F64, DEMOTE)"
+        "cvtop(f64, i64, convert-cvtop(" ^ sx_term sx ^ "))"
+    | V.F64 A.FloatOp.PromoteF32 -> "cvtop(f64, f32, promote)"
+    | V.F32 A.FloatOp.DemoteF64 -> "cvtop(f32, f64, demote-cvtop)"
     | V.F32 A.FloatOp.ReinterpretInt ->
-        "CVTOP___(F32, I32, REINTERPRET)"
+        "cvtop(f32, i32, reinterpret)"
     | V.F64 A.FloatOp.ReinterpretInt ->
-        "CVTOP___(F64, I64, REINTERPRET)"
+        "cvtop(f64, i64, reinterpret)"
     | V.I32 _ | V.I64 _ | V.F32 _ | V.F64 _ ->
         fail "unsupported conversion operator in official AST"
 
   let load_pack = function
     | None -> "eps"
-    | Some (sz, sx') -> "ANY__(" ^ sz_term (pack_bits sz) ^ ", " ^ sx_term sx' ^ ")"
+    | Some (sz, sx') -> "any(" ^ sz_term (pack_bits sz) ^ ", " ^ sx_term sx' ^ ")"
 
 	  let store_pack = function
 	    | None -> "eps"
@@ -4133,10 +3564,10 @@ module Official = struct
 
 	  let catch c =
 	    match it c with
-	    | A.Catch (tag, label) -> "CATCH__(" ^ tagidx tag ^ ", " ^ labelidx label ^ ")"
-	    | A.CatchRef (tag, label) -> "CATCHREF__(" ^ tagidx tag ^ ", " ^ labelidx label ^ ")"
-	    | A.CatchAll label -> "CATCHALL_(" ^ labelidx label ^ ")"
-	    | A.CatchAllRef label -> "CATCHALLREF_(" ^ labelidx label ^ ")"
+	    | A.Catch (tag, label) -> "catch(" ^ tagidx tag ^ ", " ^ labelidx label ^ ")"
+	    | A.CatchRef (tag, label) -> "catch-ref(" ^ tagidx tag ^ ", " ^ labelidx label ^ ")"
+	    | A.CatchAll label -> "catch-all(" ^ labelidx label ^ ")"
+	    | A.CatchAllRef label -> "catch-all-ref(" ^ labelidx label ^ ")"
 
 	  let initop explicit default x =
 	    match x with A.Explicit -> explicit | A.Implicit -> default
@@ -4144,8 +3575,8 @@ module Official = struct
 	  let optional_sx = function None -> "eps" | Some sx -> sx_term sx
 
 	  let externop = function
-	    | A.Internalize -> "ANYCONVERTEXTERN"
-	    | A.Externalize -> "EXTERNCONVERTANY"
+	    | A.Internalize -> "any-convert-extern"
+	    | A.Externalize -> "extern-convert-any"
 
 	  let lower_arranged_instr e =
 	    let text = Wasm.Sexpr.to_string 1_000_000 (Wasm.Arrange.instr e) in
@@ -4155,77 +3586,77 @@ module Official = struct
 
 	  let rec instr e =
 	    match it e with
-    | A.Unreachable -> "UNREACHABLE"
-    | A.Nop -> "NOP"
-    | A.Drop -> "DROP"
-    | A.Select None -> "SELECT_(eps)"
-	    | A.Select (Some ts) -> "SELECT_(" ^ valtype_seq (List.map valtype ts) ^ ")"
-	    | A.Block (bt, es) -> "BLOCK__(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
-	    | A.Loop (bt, es) -> "LOOP__(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
+    | A.Unreachable -> "unreachable"
+    | A.Nop -> "nop"
+    | A.Drop -> "drop"
+    | A.Select None -> "select(eps)"
+	    | A.Select (Some ts) -> "select(" ^ valtype_seq (List.map valtype ts) ^ ")"
+	    | A.Block (bt, es) -> "block(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
+	    | A.Loop (bt, es) -> "loop(" ^ blocktype bt ^ ", " ^ instrs es ^ ")"
     | A.If (bt, es1, es2) ->
-        "WIFELSE___(" ^ blocktype bt ^ ", " ^ instrs es1 ^ ", " ^ instrs es2 ^ ")"
-	    | A.Br x -> "BR_(" ^ labelidx x ^ ")"
-	    | A.BrIf x -> "BRIF_(" ^ labelidx x ^ ")"
+        "ifelse(" ^ blocktype bt ^ ", " ^ instrs es1 ^ ", " ^ instrs es2 ^ ")"
+	    | A.Br x -> "br(" ^ labelidx x ^ ")"
+	    | A.BrIf x -> "br-if(" ^ labelidx x ^ ")"
 	    | A.BrTable (xs, x) ->
-		        "BRTABLE__(" ^ labelidx_seq (List.map labelidx xs) ^ ", " ^ labelidx x ^ ")"
-	    | A.BrOnNull x -> "BRONNULL_(" ^ labelidx x ^ ")"
-	    | A.BrOnNonNull x -> "BRONNONNULL_(" ^ labelidx x ^ ")"
+		        "br-table(" ^ labelidx_seq (List.map labelidx xs) ^ ", " ^ labelidx x ^ ")"
+	    | A.BrOnNull x -> "br-on-null(" ^ labelidx x ^ ")"
+	    | A.BrOnNonNull x -> "br-on-non-null(" ^ labelidx x ^ ")"
 	    | A.BrOnCast (x, rt1, rt2) ->
-	        "BRONCAST___(" ^ labelidx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2 ^ ")"
+	        "br-on-cast(" ^ labelidx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2 ^ ")"
 	    | A.BrOnCastFail (x, rt1, rt2) ->
-	        "BRONCASTFAIL___(" ^ labelidx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2
+	        "br-on-cast-fail(" ^ labelidx x ^ ", " ^ reftype rt1 ^ ", " ^ reftype rt2
 	        ^ ")"
-	    | A.Return -> "RETURN"
-	    | A.Call x -> "CALL_(" ^ funcidx x ^ ")"
-	    | A.CallRef x -> "CALLREF_(WIDX_(" ^ typeidx x ^ "))"
+	    | A.Return -> "return"
+	    | A.Call x -> "call(" ^ funcidx x ^ ")"
+	    | A.CallRef x -> "call-ref(w--idx(" ^ typeidx x ^ "))"
 	    | A.CallIndirect (tx, x) ->
-	        "CALLINDIRECT__(" ^ tableidx tx ^ ", WIDX_(" ^ typeidx x ^ "))"
-	    | A.ReturnCall x -> "RETURNCALL_(" ^ funcidx x ^ ")"
-	    | A.ReturnCallRef x -> "RETURNCALLREF_(WIDX_(" ^ typeidx x ^ "))"
+	        "call-indirect(" ^ tableidx tx ^ ", w--idx(" ^ typeidx x ^ "))"
+	    | A.ReturnCall x -> "return-call(" ^ funcidx x ^ ")"
+	    | A.ReturnCallRef x -> "return-call-ref(w--idx(" ^ typeidx x ^ "))"
 	    | A.ReturnCallIndirect (tx, x) ->
-	        "RETURNCALLINDIRECT__(" ^ tableidx tx ^ ", WIDX_(" ^ typeidx x ^ "))"
-	    | A.Throw x -> "THROW_(" ^ tagidx x ^ ")"
-	    | A.ThrowRef -> "THROWREF"
+	        "return-call-indirect(" ^ tableidx tx ^ ", w--idx(" ^ typeidx x ^ "))"
+	    | A.Throw x -> "throw(" ^ tagidx x ^ ")"
+	    | A.ThrowRef -> "throw-ref"
 	    | A.TryTable (bt, cs, es) ->
-		        "TRYTABLE___(" ^ blocktype bt ^ ", " ^ catch_seq (List.map catch cs) ^ ", "
+		        "try-table(" ^ blocktype bt ^ ", " ^ catch_seq (List.map catch cs) ^ ", "
 		        ^ instrs es ^ ")"
-	    | A.LocalGet x -> "LOCALGET_(" ^ localidx x ^ ")"
-	    | A.LocalSet x -> "LOCALSET_(" ^ localidx x ^ ")"
-	    | A.LocalTee x -> "LOCALTEE_(" ^ localidx x ^ ")"
-	    | A.GlobalGet x -> "GLOBALGET_(" ^ globalidx x ^ ")"
-	    | A.GlobalSet x -> "GLOBALSET_(" ^ globalidx x ^ ")"
-	    | A.TableGet x -> "TABLEGET_(" ^ tableidx x ^ ")"
-	    | A.TableSet x -> "TABLESET_(" ^ tableidx x ^ ")"
-	    | A.TableSize x -> "TABLESIZE_(" ^ tableidx x ^ ")"
-	    | A.TableGrow x -> "TABLEGROW_(" ^ tableidx x ^ ")"
-	    | A.TableFill x -> "TABLEFILL_(" ^ tableidx x ^ ")"
+	    | A.LocalGet x -> "local-get(" ^ localidx x ^ ")"
+	    | A.LocalSet x -> "local-set(" ^ localidx x ^ ")"
+	    | A.LocalTee x -> "local-tee(" ^ localidx x ^ ")"
+	    | A.GlobalGet x -> "global-get(" ^ globalidx x ^ ")"
+	    | A.GlobalSet x -> "global-set(" ^ globalidx x ^ ")"
+	    | A.TableGet x -> "table-get(" ^ tableidx x ^ ")"
+	    | A.TableSet x -> "table-set(" ^ tableidx x ^ ")"
+	    | A.TableSize x -> "table-size(" ^ tableidx x ^ ")"
+	    | A.TableGrow x -> "table-grow(" ^ tableidx x ^ ")"
+	    | A.TableFill x -> "table-fill(" ^ tableidx x ^ ")"
 	    | A.TableCopy (x1, x2) ->
-	        "TABLECOPY__(" ^ tableidx x1 ^ ", " ^ tableidx x2 ^ ")"
+	        "table-copy(" ^ tableidx x1 ^ ", " ^ tableidx x2 ^ ")"
 	    | A.TableInit (x1, x2) ->
-	        "TABLEINIT__(" ^ tableidx x1 ^ ", " ^ elemidx x2 ^ ")"
-	    | A.ElemDrop x -> "ELEMDROP_(" ^ elemidx x ^ ")"
+	        "table-init(" ^ tableidx x1 ^ ", " ^ elemidx x2 ^ ")"
+	    | A.ElemDrop x -> "elem-drop(" ^ elemidx x ^ ")"
     | A.Load (x, op) ->
-        "LOAD____(" ^ numtype op.ty ^ ", " ^ load_pack op.pack ^ ", "
+        "load(" ^ numtype op.ty ^ ", " ^ load_pack op.pack ^ ", "
 	        ^ memidx x ^ ", " ^ memarg op.offset ^ ")"
 	    | A.Store (x, op) ->
-	        "STORE____(" ^ numtype op.ty ^ ", " ^ store_pack op.pack ^ ", "
+	        "store(" ^ numtype op.ty ^ ", " ^ store_pack op.pack ^ ", "
 	        ^ memidx x ^ ", " ^ memarg op.offset ^ ")"
-	    | A.MemorySize x -> "MEMORYSIZE_(" ^ memidx x ^ ")"
-	    | A.MemoryGrow x -> "MEMORYGROW_(" ^ memidx x ^ ")"
-	    | A.MemoryFill x -> "MEMORYFILL_(" ^ memidx x ^ ")"
+	    | A.MemorySize x -> "memory-size(" ^ memidx x ^ ")"
+	    | A.MemoryGrow x -> "memory-grow(" ^ memidx x ^ ")"
+	    | A.MemoryFill x -> "memory-fill(" ^ memidx x ^ ")"
 	    | A.MemoryCopy (x1, x2) ->
-	        "MEMORYCOPY__(" ^ memidx x1 ^ ", " ^ memidx x2 ^ ")"
+	        "memory-copy(" ^ memidx x1 ^ ", " ^ memidx x2 ^ ")"
 	    | A.MemoryInit (x1, x2) ->
-	        "MEMORYINIT__(" ^ memidx x1 ^ ", " ^ dataidx x2 ^ ")"
-	    | A.DataDrop x -> "DATADROP_(" ^ dataidx x ^ ")"
-	    | A.RefNull ht -> "REFNULL_(" ^ heaptype ht ^ ")"
-	    | A.RefFunc x -> "REFFUNC_(" ^ funcidx x ^ ")"
-    | A.RefIsNull -> "REFISNULL"
-    | A.RefAsNonNull -> "REFASNONNULL"
-    | A.RefTest rt -> "REFTEST_(" ^ reftype rt ^ ")"
-    | A.RefCast rt -> "REFCAST_(" ^ reftype rt ^ ")"
-    | A.RefEq -> "REFEQ"
-    | A.RefI31 -> "REFI31"
+	        "memory-init(" ^ memidx x1 ^ ", " ^ dataidx x2 ^ ")"
+	    | A.DataDrop x -> "data-drop(" ^ dataidx x ^ ")"
+	    | A.RefNull ht -> "ref-null(" ^ heaptype ht ^ ")"
+	    | A.RefFunc x -> "ref-func(" ^ funcidx x ^ ")"
+    | A.RefIsNull -> "ref-is-null"
+    | A.RefAsNonNull -> "ref-as-non-null"
+    | A.RefTest rt -> "ref-test(" ^ reftype rt ^ ")"
+    | A.RefCast rt -> "ref-cast(" ^ reftype rt ^ ")"
+    | A.RefEq -> "ref-eq"
+    | A.RefI31 -> "ref-i31"
     | A.Const n -> num_const (it n)
     | A.Test op -> testop op
     | A.Compare op -> relop op
@@ -4239,31 +3670,31 @@ module Official = struct
 	    | A.VecUnaryBits _ | A.VecBinaryBits _ | A.VecTernaryBits _ | A.VecSplat _
 	    | A.VecExtract _ | A.VecReplace _ ->
 	        lower_arranged_instr e
-	    | A.I31Get sx -> "I31GET_(" ^ sx_term sx ^ ")"
+	    | A.I31Get sx -> "i31-get(" ^ sx_term sx ^ ")"
 	    | A.StructNew (x, op) ->
-	        initop ("STRUCTNEW_(" ^ typeidx x ^ ")")
-	          ("STRUCTNEWDEFAULT_(" ^ typeidx x ^ ")") op
+	        initop ("struct-new(" ^ typeidx x ^ ")")
+	          ("struct-new-default(" ^ typeidx x ^ ")") op
 	    | A.StructGet (x, field, sx) ->
-	        "STRUCTGET___(" ^ optional_sx sx ^ ", " ^ typeidx x ^ ", "
+	        "struct-get(" ^ optional_sx sx ^ ", " ^ typeidx x ^ ", "
           ^ field_u32 field
 	        ^ ")"
 	    | A.StructSet (x, field) ->
-	        "STRUCTSET__(" ^ typeidx x ^ ", " ^ field_u32 field ^ ")"
+	        "struct-set(" ^ typeidx x ^ ", " ^ field_u32 field ^ ")"
 	    | A.ArrayNew (x, op) ->
-	      initop ("ARRAYNEW_(" ^ typeidx x ^ ")")
-	          ("ARRAYNEWDEFAULT_(" ^ typeidx x ^ ")") op
+	      initop ("array-new(" ^ typeidx x ^ ")")
+	          ("array-new-default(" ^ typeidx x ^ ")") op
 	    | A.ArrayNewFixed (x, n) ->
-          "ARRAYNEWFIXED__(" ^ typeidx x ^ ", "
+          "array-new-fixed(" ^ typeidx x ^ ", "
           ^ wrap_source_category "U32" (Int32.to_string n) ^ ")"
-	    | A.ArrayNewData (x, y) -> "ARRAYNEWDATA__(" ^ typeidx x ^ ", " ^ dataidx y ^ ")"
-	    | A.ArrayNewElem (x, y) -> "ARRAYNEWELEM__(" ^ typeidx x ^ ", " ^ elemidx y ^ ")"
-	    | A.ArrayGet (x, sx) -> "ARRAYGET__(" ^ optional_sx sx ^ ", " ^ typeidx x ^ ")"
-	    | A.ArraySet x -> "ARRAYSET_(" ^ typeidx x ^ ")"
+	    | A.ArrayNewData (x, y) -> "array-new-data(" ^ typeidx x ^ ", " ^ dataidx y ^ ")"
+	    | A.ArrayNewElem (x, y) -> "array-new-elem(" ^ typeidx x ^ ", " ^ elemidx y ^ ")"
+	    | A.ArrayGet (x, sx) -> "array-get(" ^ optional_sx sx ^ ", " ^ typeidx x ^ ")"
+	    | A.ArraySet x -> "array-set(" ^ typeidx x ^ ")"
 	    | A.ArrayLen -> "ARRAYLEN"
-	    | A.ArrayCopy (x, y) -> "ARRAYCOPY__(" ^ typeidx x ^ ", " ^ typeidx y ^ ")"
-	    | A.ArrayFill x -> "ARRAYFILL_(" ^ typeidx x ^ ")"
-	    | A.ArrayInitData (x, y) -> "ARRAYINITDATA__(" ^ typeidx x ^ ", " ^ dataidx y ^ ")"
-	    | A.ArrayInitElem (x, y) -> "ARRAYINITELEM__(" ^ typeidx x ^ ", " ^ elemidx y ^ ")"
+	    | A.ArrayCopy (x, y) -> "array-copy(" ^ typeidx x ^ ", " ^ typeidx y ^ ")"
+	    | A.ArrayFill x -> "array-fill(" ^ typeidx x ^ ")"
+	    | A.ArrayInitData (x, y) -> "array-init-data(" ^ typeidx x ^ ", " ^ dataidx y ^ ")"
+	    | A.ArrayInitElem (x, y) -> "array-init-elem(" ^ typeidx x ^ ", " ^ elemidx y ^ ")"
 	    | A.ExternConvert op -> externop op
 
 	  and instrs es = instr_seq (List.map instr es)
@@ -4273,15 +3704,15 @@ module Official = struct
   let local = function A.Local t -> valtype t
 
   let segmentmode index_sort = function
-    | A.Passive -> "PASSIVE"
+    | A.Passive -> "passive"
     | A.Active (x, c) ->
         let ctor =
-          if index_sort = "Memidx" then "ACTIVEDATAMODE__"
-          else "ACTIVEELEMMODE__"
+          if index_sort = "Memidx" then "active-datamode"
+          else "active-elemmode"
         in
         ctor ^ "(" ^ wrap_source_category index_sort (string_of_int (i32_index x))
         ^ ", " ^ const c ^ ")"
-    | A.Declarative -> "DECLARE"
+    | A.Declarative -> "declare"
 
   let module_definition_of_file path =
     if has_suffix path ".wasm" then (
@@ -4369,7 +3800,7 @@ module Official = struct
               import_id = None;
               import_tabletype = tabletype tt;
               import_table_min = int64_to_int lim.min;
-              import_table_default_ref = "REFNULL_(" ^ heaptype (snd rt) ^ ")";
+              import_table_default_ref = "ref-null(" ^ heaptype (snd rt) ^ ")";
               import_wat_index = wat_index;
             }
     in
@@ -4581,7 +4012,7 @@ let memory_data_terms ir bindings =
          binding.memory_data_overlays
          |> List.filter (fun overlay -> overlay.overlay_bytes <> [])
          |> List.map (fun overlay ->
-                "DATA__(" ^ bytes_seq overlay.overlay_bytes ^ ", ACTIVEDATAMODE__("
+                "data(" ^ bytes_seq overlay.overlay_bytes ^ ", active-datamode("
                 ^ wrap_source_category "Memidx" (string_of_int memidx)
                 ^ ", "
                 ^ i32_const (string_of_int overlay.overlay_offset)
@@ -4621,8 +4052,8 @@ let table_data_terms ir bindings =
          |> List.concat_map (fun overlay ->
                 overlay.table_overlay_refs
                 |> List.mapi (fun i ref_term ->
-                       "ELEM___(REF__(NULL, FUNC), "
-                       ^ ref_term ^ ", ACTIVEELEMMODE__("
+                       "elem(ref(null, func-absheaptype), "
+                       ^ ref_term ^ ", active-elemmode("
                        ^ wrap_source_category "Tableidx" (string_of_int tableidx)
                        ^ ", "
                        ^ i32_const
@@ -4682,7 +4113,7 @@ let last_int_in_string s =
   loop 0 None None
 
 let active_elem_info mode =
-  let prefix = "ACTIVEDATAMODE__(" in
+  let prefix = "active-datamode(" in
   if not (starts_with mode prefix) || String.length mode <= String.length prefix then
     None
   else
@@ -4698,17 +4129,17 @@ let active_elem_info mode =
     | _ -> None
 
 let ref_func_index ref_term =
-  let prefix = "REFFUNC_(" in
+  let prefix = "ref-func(" in
   if starts_with ref_term prefix then last_int_in_string ref_term else None
 
 let deftype_of_type_term type_term =
-  let prefix = "TYPE_(" in
+  let prefix = "type(" in
   if starts_with type_term prefix && String.length type_term > String.length prefix then
     let inner =
       String.sub type_term (String.length prefix)
         (String.length type_term - String.length prefix - 1)
     in
-    "WDEF__(" ^ inner ^ ", 0)"
+    "w--def(" ^ inner ^ ", 0)"
   else type_term
 
 let print_state_effects ir =
@@ -4784,31 +4215,31 @@ let print_state_effects ir =
     ^ "],\"active_elems\":[" ^ active_elem_json ^ "]}\n")
 
 let default_import_global_value globaltype =
-  if contains_sub globaltype "I32" then
+  if contains_sub globaltype "i32" then
     i32_const "0"
-  else if contains_sub globaltype "I64" then
+  else if contains_sub globaltype "i64" then
     i64_const "0"
-  else if contains_sub globaltype "F32" then
+  else if contains_sub globaltype "f32" then
     f32_const "0"
-  else if contains_sub globaltype "F64" then
+  else if contains_sub globaltype "f64" then
     f64_const "0"
-  else if contains_sub globaltype "V128" then
-    "VCONST__(V128, eps)"
-  else "REFNULL_(FUNC)"
+  else if contains_sub globaltype "v128" then
+    "vconst(v128, eps)"
+  else "ref-null(func-absheaptype)"
 
 let default_result_instr = function
   | "i32" -> Some (i32_const "0")
   | "i64" -> Some (i64_const "0")
   | "f32" -> Some (f32_const "0")
   | "f64" -> Some (f64_const "0")
-  | "v128" -> Some "VCONST__(V128, 0)"
-  | "funcref" -> Some "REFNULL_(FUNC)"
-  | "externref" -> Some "REFNULL_(EXTERN)"
-  | "anyref" -> Some "REFNULL_(ANY)"
-  | "eqref" -> Some "REFNULL_(WEQ)"
-  | "i31ref" -> Some "REFNULL_(I31)"
-  | "structref" -> Some "REFNULL_(STRUCT)"
-  | "arrayref" -> Some "REFNULL_(ARRAY)"
+  | "v128" -> Some "vconst(v128, 0)"
+  | "funcref" -> Some "ref-null(func-absheaptype)"
+  | "externref" -> Some "ref-null(extern)"
+  | "anyref" -> Some "ref-null(any)"
+  | "eqref" -> Some "ref-null(w-eq)"
+  | "i31ref" -> Some "ref-null(i31)"
+  | "structref" -> Some "ref-null(struct-absheaptype)"
+  | "arrayref" -> Some "ref-null(array-absheaptype)"
   | _ -> None
 
 let default_import_func_body ir im =
@@ -4826,7 +4257,7 @@ let default_import_func_body ir im =
 	    | Some { type_func = Some typ; _ } ->
 	        let defaults = List.filter_map default_result_instr typ.results in
 	        if List.length defaults = List.length typ.results then Some defaults
-	        else if import_name = "proc_exit" then Some [ "TRAP" ]
+	        else if import_name = "proc_exit" then Some [ "trap" ]
 	        else None
 
 let emit_import_runtime func_bindings global_bindings memory_bindings
@@ -4875,7 +4306,7 @@ let emit_import_runtime func_bindings global_bindings memory_bindings
     state_func_bindings
     |> List.map (fun binding ->
            "RECFuncinstA3(" ^ binding.state_func_type ^ ", $empty-moduleinst, "
-           ^ "FUNC___(0, " ^ binding.state_func_locals ^ ", "
+           ^ "func-func(0, " ^ binding.state_func_locals ^ ", "
            ^ binding.state_func_body ^ "))")
   in
   let state_func_count = List.length state_func_names in
@@ -4895,7 +4326,7 @@ let emit_import_runtime func_bindings global_bindings memory_bindings
   op generated-import-func-%d : -> SpectecTerminal [ctor] .
   eq value('TYPE, generated-import-func-%d) = index(generated-import-deftypes, %d) .
   eq value('MODULE, generated-import-func-%d) = $empty-moduleinst .
-  eq value('CODE, generated-import-func-%d) = FUNC___(%s, eps, %s) .
+  eq value('CODE, generated-import-func-%d) = func-func(%s, eps, %s) .
 |}
              i i im.import_typeidx i i
              (wrap_source_category "Typeidx" (string_of_int im.import_typeidx))
@@ -4994,19 +4425,19 @@ let emit_import_runtime func_bindings global_bindings memory_bindings
     |> List.map (function
          | ImportFunc im ->
              let i = index_of_key func_key unique_func_imports (func_key im) in
-             "FUNCEXTERNADDR_(" ^ string_of_int (state_func_count + i) ^ ")"
+             "func-externaddr(" ^ string_of_int (state_func_count + i) ^ ")"
          | ImportTag im ->
              let i = index_of_key tag_key unique_tag_imports (import_key im.import_module im.import_name) in
-             "TAGEXTERNADDR_(" ^ string_of_int i ^ ")"
+             "tag-externaddr(" ^ string_of_int i ^ ")"
          | ImportGlobal im ->
              let i = index_of_key global_key unique_global_imports (import_key im.import_module im.import_name) in
-             "GLOBALEXTERNADDR_(" ^ string_of_int i ^ ")"
+             "global-externaddr(" ^ string_of_int i ^ ")"
          | ImportMemory im ->
              let i = index_of_key memory_key unique_memory_imports (import_key im.import_module im.import_name) in
-             "MEMEXTERNADDR_(" ^ string_of_int i ^ ")"
+             "mem-externaddr(" ^ string_of_int i ^ ")"
          | ImportTable im ->
              let i = index_of_key table_key unique_table_imports (import_key im.import_module im.import_name) in
-             "TABLEEXTERNADDR_(" ^ string_of_int i ^ ")")
+             "table-externaddr(" ^ string_of_int i ^ ")")
     |> seq
   in
   Printf.sprintf
@@ -5049,50 +4480,50 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     ir.imports
     |> List.map (function
          | ImportFunc im ->
-             "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), FUNCEXTERNTYPE_(WIDX_("
+             "import($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
+             ^ maude_qid im.import_name ^ "), func-externtype(w--idx("
              ^ wrap_source_category "Typeidx" (string_of_int im.import_typeidx) ^ ")))"
          | ImportTag im ->
-             "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), TAGEXTERNTYPE_(" ^ im.import_tagtype ^ "))"
+             "import($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
+             ^ maude_qid im.import_name ^ "), tag-externtype(" ^ im.import_tagtype ^ "))"
          | ImportGlobal im ->
-             "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), GLOBALEXTERNTYPE_(" ^ im.import_globaltype ^ "))"
+             "import($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
+             ^ maude_qid im.import_name ^ "), global-externtype(" ^ im.import_globaltype ^ "))"
          | ImportMemory im ->
-             "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), MEMEXTERNTYPE_(" ^ im.import_memtype ^ "))"
+             "import($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
+             ^ maude_qid im.import_name ^ "), mem-externtype(" ^ im.import_memtype ^ "))"
          | ImportTable im ->
-             "IMPORT___($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
-             ^ maude_qid im.import_name ^ "), TABLEEXTERNTYPE_(" ^ im.import_tabletype ^ "))")
+             "import($wat-name(" ^ maude_qid im.import_module ^ "), $wat-name("
+             ^ maude_qid im.import_name ^ "), table-externtype(" ^ im.import_tabletype ^ "))")
 	    |> import_seq
   in
   let global_terms =
     ir.globals
-	    |> List.map (fun g -> "GLOBAL__(" ^ g.global_type ^ ", " ^ instr_seq g.global_init ^ ")")
+	    |> List.map (fun g -> "global-global(" ^ g.global_type ^ ", " ^ instr_seq g.global_init ^ ")")
 	    |> global_seq
   in
   let tag_terms =
-	    ir.tags |> List.map (fun t -> "TAGTAG_(" ^ t.tag_type ^ ")") |> tag_seq
+	    ir.tags |> List.map (fun t -> "tag-tag(" ^ t.tag_type ^ ")") |> tag_seq
   in
   let memory_terms =
-	    ir.memories |> List.map (fun m -> "MEMORY_(" ^ m.memory_type ^ ")") |> mem_seq
+	    ir.memories |> List.map (fun m -> "memory(" ^ m.memory_type ^ ")") |> mem_seq
   in
   let table_terms =
     ir.tables
-	    |> List.map (fun t -> "TABLE__(" ^ t.table_type ^ ", " ^ instr_seq t.table_init ^ ")")
+	    |> List.map (fun t -> "table-table(" ^ t.table_type ^ ", " ^ instr_seq t.table_init ^ ")")
 	    |> table_seq
   in
   let func_terms =
     ir.funcs
     |> List.map (fun fn ->
-           "FUNC___(" ^ wrap_source_category "Typeidx" (string_of_int fn.func_typeidx) ^ ", "
+           "func-func(" ^ wrap_source_category "Typeidx" (string_of_int fn.func_typeidx) ^ ", "
 	           ^ local_seq (List.map local_decl fn.func_locals)
 	           ^ ", " ^ instr_seq fn.func_body ^ ")")
 	    |> func_seq
   in
   let source_data_terms =
     ir.datas
-    |> List.map (fun d -> "DATA__(" ^ bytes_seq d.data_bytes ^ ", " ^ d.data_mode ^ ")")
+    |> List.map (fun d -> "data(" ^ bytes_seq d.data_bytes ^ ", " ^ d.data_mode ^ ")")
   in
   let extra_data_terms = memory_data_terms ir memory_data_bindings in
   let all_data_terms = source_data_terms @ extra_data_terms in
@@ -5100,7 +4531,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     List.map (fun d -> d.data_mode) ir.datas
     @ List.map
         (fun term ->
-          match sub_index term "ACTIVEDATAMODE__(" with
+          match sub_index term "active-datamode(" with
           | Some _ -> term
           | None -> "")
         extra_data_terms
@@ -5110,7 +4541,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
   let source_elem_terms =
     ir.elems
     |> List.map (fun e ->
-	           "ELEM___(" ^ e.elem_type ^ ", " ^ instr_seq e.elem_exprs ^ ", " ^ e.elem_mode ^ ")")
+	           "elem(" ^ e.elem_type ^ ", " ^ instr_seq e.elem_exprs ^ ", " ^ e.elem_mode ^ ")")
   in
   let extra_elem_terms = table_data_terms ir table_data_bindings in
   let all_elem_terms = source_elem_terms @ extra_elem_terms in
@@ -5118,7 +4549,7 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
   in
   let start_terms =
     match ir.start with
-    | Some i -> "START_(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
+    | Some i -> "start(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
     | None -> "eps"
   in
   let export_terms =
@@ -5126,13 +4557,13 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     |> List.map (fun ex ->
            let desc =
              match ex.export_item_desc with
-             | ExportFunc i -> "FUNCEXTERNIDX_(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
-             | ExportTag i -> "TAGEXTERNIDX_(" ^ wrap_source_category "Tagidx" (string_of_int i) ^ ")"
-             | ExportGlobal i -> "GLOBALEXTERNIDX_(" ^ wrap_source_category "Globalidx" (string_of_int i) ^ ")"
-             | ExportMemory i -> "MEMEXTERNIDX_(" ^ wrap_source_category "Memidx" (string_of_int i) ^ ")"
-             | ExportTable i -> "TABLEEXTERNIDX_(" ^ wrap_source_category "Tableidx" (string_of_int i) ^ ")"
+             | ExportFunc i -> "func-externidx(" ^ wrap_source_category "Funcidx" (string_of_int i) ^ ")"
+             | ExportTag i -> "tag-externidx(" ^ wrap_source_category "Tagidx" (string_of_int i) ^ ")"
+             | ExportGlobal i -> "global-externidx(" ^ wrap_source_category "Globalidx" (string_of_int i) ^ ")"
+             | ExportMemory i -> "mem-externidx(" ^ wrap_source_category "Memidx" (string_of_int i) ^ ")"
+             | ExportTable i -> "table-externidx(" ^ wrap_source_category "Tableidx" (string_of_int i) ^ ")"
            in
-           "EXPORT__($wat-name(" ^ maude_qid ex.export_item_name ^ "), " ^ desc ^ ")")
+           "export($wat-name(" ^ maude_qid ex.export_item_name ^ "), " ^ desc ^ ")")
 	    |> export_seq
   in
   let import_func_dts =
@@ -5200,11 +4631,11 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     ir.tables |> List.map (fun t -> t.table_type) |> seq
   in
   let validation_local_datatypes =
-    all_data_terms |> List.map (fun _ -> "OK") |> seq
+    all_data_terms |> List.map (fun _ -> "ok-datatype") |> seq
   in
   let validation_local_elemtypes =
     (ir.elems |> List.map (fun e -> e.elem_type))
-    @ List.map (fun _ -> "REF__(NULL, FUNC)") extra_elem_terms
+    @ List.map (fun _ -> "ref(null, func-absheaptype)") extra_elem_terms
     |> seq
   in
   let validation_export_names =
@@ -5227,23 +4658,23 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     ir.imports
     |> List.map (function
          | ImportFunc im ->
-             "FUNCEXTERNTYPE_(index(generated-validation-deftypes, "
+             "func-externtype(index(generated-validation-deftypes, "
              ^ string_of_int im.import_typeidx ^ "))"
-         | ImportTag im -> "TAGEXTERNTYPE_(" ^ im.import_tagtype ^ ")"
-         | ImportGlobal im -> "GLOBALEXTERNTYPE_(" ^ im.import_globaltype ^ ")"
-         | ImportMemory im -> "MEMEXTERNTYPE_(" ^ im.import_memtype ^ ")"
-         | ImportTable im -> "TABLEEXTERNTYPE_(" ^ im.import_tabletype ^ ")")
+         | ImportTag im -> "tag-externtype(" ^ im.import_tagtype ^ ")"
+         | ImportGlobal im -> "global-externtype(" ^ im.import_globaltype ^ ")"
+         | ImportMemory im -> "mem-externtype(" ^ im.import_memtype ^ ")"
+         | ImportTable im -> "table-externtype(" ^ im.import_tabletype ^ ")")
     |> seq
   in
   let export_exttype = function
-    | ExportFunc i -> "FUNCEXTERNTYPE_(index(generated-validation-functypes, " ^ string_of_int i ^ "))"
-    | ExportTag i -> "TAGEXTERNTYPE_(index(generated-validation-tagtypes, " ^ string_of_int i ^ "))"
+    | ExportFunc i -> "func-externtype(index(generated-validation-functypes, " ^ string_of_int i ^ "))"
+    | ExportTag i -> "tag-externtype(index(generated-validation-tagtypes, " ^ string_of_int i ^ "))"
     | ExportGlobal i ->
-        "GLOBALEXTERNTYPE_($typed-index(globaltype, generated-validation-globaltypes, "
+        "global-externtype($typed-index(globaltype, generated-validation-globaltypes, "
         ^ string_of_int i ^ "))"
-    | ExportMemory i -> "MEMEXTERNTYPE_(index(generated-validation-memtypes, " ^ string_of_int i ^ "))"
+    | ExportMemory i -> "mem-externtype(index(generated-validation-memtypes, " ^ string_of_int i ^ "))"
     | ExportTable i ->
-        "TABLEEXTERNTYPE_($typed-index(tabletype, generated-validation-tabletypes, "
+        "table-externtype($typed-index(tabletype, generated-validation-tabletypes, "
         ^ string_of_int i ^ "))"
   in
   let export_exttypes =
@@ -5267,10 +4698,10 @@ let emit_maude ~harness ?(link_imports = false) ?(include_maude_validation = fal
     seq
       (args
       @ [
-          "REFFUNCADDR_(" ^ faddr ^ ")";
-          "CALLREF_(" ^ ftype ^ ")";
+          "ref-func-addr(" ^ faddr ^ ")";
+          "call-ref(" ^ ftype ^ ")";
         ]
-      @ List.init drop_count (fun _ -> "DROP"))
+      @ List.init drop_count (fun _ -> "drop"))
   in
   let prelude_terms =
     prelude_calls
@@ -5309,7 +4740,7 @@ mod WASM-FIB-GENERATED is
 
 	  op generated-fib-module : -> SpectecTerminal .
 	  eq generated-fib-module =
-	    MODULE___________(
+	    module(
 	      %s,
       %s,
       %s,
@@ -5439,7 +4870,7 @@ mod WASM-FIB-GENERATED is
 
   op generated-module-type : -> SpectecTerminal .
   eq generated-module-type =
-    $clos-moduletype(generated-validation-context, ARROW__(%s, %s)) .
+    $clos-moduletype(generated-validation-context, arrow(%s, %s)) .
 
 	  op generated-init-config-with : Store SpectecTerminals -> Config .
 	  eq generated-init-config-with(GEN-BASE, GEN-EXTERNADDRS) =
@@ -5463,12 +4894,12 @@ mod WASM-FIB-GENERATED is
 
   op generated-run-config-with : Store SpectecTerminals SpectecTerminals -> Config .
   ceq generated-run-config-with(GEN-BASE, GEN-EXTERNADDRS, GEN-ARGS) =
-    (GEN-S ; GEN-F) ; GEN-INITS %s GEN-ARGS REFFUNCADDR_(GEN-FADDR) CALLREF_(value('TYPE, index(value('FUNCS, GEN-S), GEN-FADDR)))
+    (GEN-S ; GEN-F) ; GEN-INITS %s GEN-ARGS ref-func-addr(GEN-FADDR) call-ref(value('TYPE, index(value('FUNCS, GEN-S), GEN-FADDR)))
     if ((GEN-S ; GEN-F) ; GEN-INITS) := generated-init-config-with(GEN-BASE, GEN-EXTERNADDRS)
     /\ GEN-FADDR := index(value('FUNCS, value('MODULE, GEN-F)), %d) .
 
   ceq steps(generated-run-config-with(GEN-BASE, GEN-EXTERNADDRS, GEN-ARGS)) =
-    steps((GEN-S ; GEN-F) ; GEN-INITS %s GEN-ARGS REFFUNCADDR_(GEN-FADDR) CALLREF_(value('TYPE, index(value('FUNCS, GEN-S), GEN-FADDR))))
+    steps((GEN-S ; GEN-F) ; GEN-INITS %s GEN-ARGS ref-func-addr(GEN-FADDR) call-ref(value('TYPE, index(value('FUNCS, GEN-S), GEN-FADDR))))
     if ((GEN-S ; GEN-F) ; GEN-INITS) := generated-init-config-with(GEN-BASE, GEN-EXTERNADDRS)
     /\ GEN-FADDR := index(value('FUNCS, value('MODULE, GEN-F)), %d) .
 
@@ -5505,7 +4936,7 @@ mod WASM-FIB-GENERATED is
     /\ Start-ok(generated-validation-context, %s) => valid
     /\ Export-oks(generated-validation-context, %s, generated-validation-export-names, %s) => valid
     /\ $disjoint(name, generated-validation-export-names) = true
-    /\ (generated-module-type == $clos-moduletype(generated-validation-context, ARROW__(%s, %s))) = true .
+    /\ (generated-module-type == $clos-moduletype(generated-validation-context, arrow(%s, %s))) = true .
 
   op generated-checked-run-config : SpectecTerminals -> Config .
   eq generated-checked-run-config(GEN-ARGS) =
@@ -5871,7 +5302,6 @@ let () =
         ~include_maude_validation:(!validate_only || !checked_run) ~import_bindings
         ~import_global_bindings ~import_memory_bindings ~memory_data_bindings
         ~table_data_bindings ~state_func_bindings ~prelude_calls:!prelude_calls ir
-      |> source_surface_syntax_of_compact
     in
     (match !output with
     | Some path -> write_file path generated

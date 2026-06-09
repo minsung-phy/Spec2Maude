@@ -21,6 +21,11 @@ This artifact demonstrates that Spec2Maude can:
 
 It does not claim full official WebAssembly test-suite conformance yet.
 
+The WAT/Wasm frontend and benchmark runner use the same generated surface
+syntax.  Runtime values are expected as source-readable prefix terms such as
+`const(i32, 5)`, `ref-null(func-absheaptype)`, and `vconst(v128, ...)`, not the
+old compact constructor spelling such as `CONST__` or `REFNULL_`.
+
 ## Requirements
 
 Required:
@@ -94,6 +99,16 @@ rg '^[[:space:]]+(sort|subsort).*\b(Instr|Valtype|U32|Typeuse)\b' output.maude
 ```
 
 Expected: no matches for the old encoding checks.
+
+Generated WAT/Wasm harnesses should likewise use the current prefix spelling:
+
+```bash
+dune exec ./wasm_to_maude.exe -- --output /tmp/fib.generated.maude wat_examples/fib.wat
+rg 'const\(i32|func-func|local-get|binop|relop' /tmp/fib.generated.maude
+rg 'CONST__|FUNC___|CALL_|WRESULT_|REFNULL_|VCONST__' /tmp/fib.generated.maude
+```
+
+Expected: matches for the first harness check and no matches for the second.
 
 ## Direct Maude Execution Check
 
