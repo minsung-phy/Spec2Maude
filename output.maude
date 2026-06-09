@@ -1385,7 +1385,7 @@ mod SPECTEC-CORE is
   op module : SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
   op mul : -> SpectecTerminal [ctor] .
   op mut : -> SpectecTerminal [ctor] .
-  op nan : Nat ~> SpectecTerminal [ctor] .
+  op nan : Nat -> SpectecTerminal [ctor] .
   op ne : -> SpectecTerminal [ctor] .
   op nearest : -> SpectecTerminal [ctor] .
   op neg-fn : SpectecTerminal -> SpectecTerminal [ctor] .
@@ -1396,7 +1396,7 @@ mod SPECTEC-CORE is
   op nofunc : -> SpectecTerminal [ctor] .
   op none : -> SpectecTerminal [ctor] .
   op nop : -> SpectecTerminal [ctor] .
-  op norm : Nat Int ~> SpectecTerminal [ctor] .
+  op norm : Nat Int -> SpectecTerminal [ctor] .
   op null : -> SpectecTerminal [ctor] .
   op ok-datatype : -> SpectecTerminal [ctor] .
   op ok-oktypeidx : SpectecTerminal ~> SpectecTerminal [ctor] .
@@ -1411,10 +1411,10 @@ mod SPECTEC-CORE is
   op promote : -> SpectecTerminal [ctor] .
   op promotelow : -> SpectecTerminal [ctor] .
   op q15mulr-sats : -> SpectecTerminal [ctor] .
-  op rec-heaptype : Nat ~> SpectecTerminal [ctor] .
+  op rec-heaptype : Nat -> SpectecTerminal [ctor] .
   op rec-rectype : SpectecTerminals ~> SpectecTerminal [ctor] .
-  op rec-typeuse : Nat ~> SpectecTerminal [ctor] .
-  op rec-typevar : Nat ~> SpectecTerminal [ctor] .
+  op rec-typeuse : Nat -> SpectecTerminal [ctor] .
+  op rec-typevar : Nat -> SpectecTerminal [ctor] .
   op ref : SpectecTerminals SpectecTerminal ~> SpectecTerminal [ctor] .
   op ref-array-addr : SpectecTerminal ~> SpectecTerminal [ctor] .
   op ref-as-non-null : -> SpectecTerminal [ctor] .
@@ -1472,7 +1472,7 @@ mod SPECTEC-CORE is
   op sub-sat : SpectecTerminal ~> SpectecTerminal [ctor] .
   op sub-subtype : SpectecTerminals SpectecTerminals SpectecTerminal ~> SpectecTerminal [ctor] .
   op sub-vbinop : -> SpectecTerminal [ctor] .
-  op subnorm : Nat ~> SpectecTerminal [ctor] .
+  op subnorm : Nat -> SpectecTerminal [ctor] .
   op swizzle : -> SpectecTerminal [ctor] .
   op syn-Cnn : -> SpectecType .
   op syn-Fnn : -> SpectecType .
@@ -19625,6 +19625,7 @@ if SSUBST-VALTYPES-S =/= eps .
       if typecheck(FNN, syn-Fnn) .
   ceq typecheck(( framelbracerbrace(LOWN, FRAME, INSTRSEQ) ), syn-instr) = true
 
+
       if ( framelbracerbrace(LOWN, FRAME, INSTRSEQ) ) : SpectecTerminal .
   ceq typecheck(( func-externidx(FUNCIDX) ), syn-externidx) = true
 
@@ -19688,6 +19689,7 @@ if SSUBST-VALTYPES-S =/= eps .
       if typecheck(FNN, syn-Fnn) .
   ceq typecheck(( handlerlbracerbrace(LOWN, CATCHSEQ, INSTRSEQ) ), syn-instr) = true
 
+
       if ( handlerlbracerbrace(LOWN, CATCHSEQ, INSTRSEQ) ) : SpectecTerminal .
   ceq typecheck(( i31-get(SX) ), syn-instr) = true
 
@@ -19701,6 +19703,7 @@ if SSUBST-VALTYPES-S =/= eps .
   eq typecheck(( inf ), syn-fNmag(N)) = true
    .
   ceq typecheck(( labellbracerbrace(LOWN, INSTRSEQ, INSTRSEQ2) ), syn-instr) = true
+
 
       if ( labellbracerbrace(LOWN, INSTRSEQ, INSTRSEQ2) ) : SpectecTerminal .
   ceq typecheck(( lbrackdotdotrbrack(U64, U64SEQ) ), syn-limits) = true
@@ -19843,7 +19846,7 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( nan(LOWM) ) : SpectecTerminal /\ ( 1 <= LOWM ) /\ ( LOWM < ( 2 ^ $M ( N ) ) ) .
+      if ( 1 <= LOWM ) /\ ( LOWM < ( 2 ^ $M ( N ) ) ) .
   ceq typecheck(( ne ), syn-relop(FNN)) = true
 
       if typecheck(FNN, syn-Fnn) .
@@ -19885,11 +19888,12 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( norm(LOWM, EXP) ) : SpectecTerminal /\ ( LOWM < ( 2 ^ $M ( N ) ) ) /\ ( ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) <= EXP ) /\ ( EXP <= ( ( 2 ^ ( $E ( N ) - 1 ) ) - 1 ) ) .
+      if ( LOWM < ( 2 ^ $M ( N ) ) ) /\ ( ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) <= EXP ) /\ ( EXP <= ( ( 2 ^ ( $E ( N ) - 1 ) ) - 1 ) ) .
   ceq typecheck(( ok-oktypeidx(TYPEIDX) ), syn-oktypeidx) = true
 
       if ( ok-oktypeidx(TYPEIDX) ) : SpectecTerminal .
   ceq typecheck(( ok-oktypeidxnat(TYPEIDX, NAT) ), syn-oktypeidxnat) = true
+
 
       if ( ok-oktypeidxnat(TYPEIDX, NAT) ) : SpectecTerminal .
   ceq typecheck(( pack(PACKTYPE, IN) ), syn-packval) = true
@@ -19936,18 +19940,15 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
       if ( $lsizenn ( JNN ) == 16 ) /\ typecheck(JNN, syn-Jnn) .
-  ceq typecheck(( rec-heaptype(LOWN) ), syn-heaptype) = true
-
-      if ( rec-heaptype(LOWN) ) : SpectecTerminal .
+  eq typecheck(( rec-heaptype(LOWN) ), syn-heaptype) = true
+   .
   ceq typecheck(( rec-rectype(LIST) ), syn-rectype) = true
 
       if ( rec-rectype(LIST) ) : SpectecTerminal .
-  ceq typecheck(( rec-typeuse(LOWN) ), syn-typeuse) = true
-
-      if ( rec-typeuse(LOWN) ) : SpectecTerminal .
-  ceq typecheck(( rec-typevar(LOWN) ), syn-typevar) = true
-
-      if ( rec-typevar(LOWN) ) : SpectecTerminal .
+  eq typecheck(( rec-typeuse(LOWN) ), syn-typeuse) = true
+   .
+  eq typecheck(( rec-typevar(LOWN) ), syn-typevar) = true
+   .
   ceq typecheck(( ref(NULLSEQ, HEAPTYPE) ), syn-reftype) = true
 
       if ( ref(NULLSEQ, HEAPTYPE) ) : SpectecTerminal .
@@ -20071,6 +20072,7 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
+
       if ( shapexany(SZ, M, SX) ) : SpectecTerminal /\ ( ( SZ * M ) == ( $vsize ( VECTYPE ) quo 2 ) ) /\ typecheck(VECTYPE, syn-vectype) /\ typecheck(VECTYPE, syn-vectype) .
   ceq typecheck(( shl ), syn-binop(INN)) = true
 
@@ -20155,7 +20157,7 @@ if SSUBST-VALTYPES-S =/= eps .
 
 
 
-      if ( subnorm(LOWM) ) : SpectecTerminal /\ ( LOWM < ( 2 ^ $M ( N ) ) ) /\ ( ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) == EXP ) .
+      if ( LOWM < ( 2 ^ $M ( N ) ) ) /\ ( ( 2 - ( 2 ^ ( $E ( N ) - 1 ) ) ) == EXP ) .
   eq typecheck(( swizzle ), syn-vswizzlop(x(i8, M))) = true
    .
   ceq typecheck(( table-copy(TABLEIDX, TABLEIDX2) ), syn-instr) = true
@@ -20315,6 +20317,7 @@ if SSUBST-VALTYPES-S =/= eps .
 
       if ( vvunop(VECTYPE, VVUNOP) ) : SpectecTerminal .
   ceq typecheck(( w--def(RECTYPE, LOWN) ), syn-deftype) = true
+
 
       if ( w--def(RECTYPE, LOWN) ) : SpectecTerminal .
   ceq typecheck(( w--idx(TYPEIDX) ), syn-blocktype) = true
@@ -20630,7 +20633,6 @@ if SSUBST-VALTYPES-S =/= eps .
       if typecheck(HALF, syn-half) /\ typecheck(SX, syn-sx) .
   cmb ( framelbracerbrace(LOWN, FRAME, INSTRSEQ) ) : SpectecTerminal
 
-
       if FRAME : Frame /\ typecheck(INSTRSEQ, syn-instr) .
   cmb ( func-externaddr(FUNCADDR) ) : Externaddr
 
@@ -20682,7 +20684,6 @@ if SSUBST-VALTYPES-S =/= eps .
       if typecheck(SX, syn-sx) .
   cmb ( handlerlbracerbrace(LOWN, CATCHSEQ, INSTRSEQ) ) : SpectecTerminal
 
-
       if typecheck(CATCHSEQ, syn-catch) /\ typecheck(INSTRSEQ, syn-instr) .
   cmb ( i31-get(SX) ) : SpectecTerminal
 
@@ -20694,7 +20695,6 @@ if SSUBST-VALTYPES-S =/= eps .
 
       if typecheck(NAME, syn-name) /\ typecheck(NAME2, syn-name) /\ typecheck(EXTERNTYPE, syn-externtype) .
   cmb ( labellbracerbrace(LOWN, INSTRSEQ, INSTRSEQ2) ) : SpectecTerminal
-
 
       if typecheck(INSTRSEQ, syn-instr) /\ typecheck(INSTRSEQ2, syn-instr) .
   cmb ( lbrackdotdotrbrack(U64, U64SEQ) ) : SpectecTerminal
@@ -20778,15 +20778,10 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( module(TYPESEQ, IMPORTSEQ, TAGSEQ, GLOBALSEQ, MEMSEQ, TABLESEQ, FUNCSEQ, DATASEQ, ELEMSEQ, eps, EXPORTSEQ) ) : SpectecTerminal
 
       if typecheck(TYPESEQ, syn-type) /\ typecheck(IMPORTSEQ, syn-import) /\ typecheck(TAGSEQ, syn-tag) /\ typecheck(GLOBALSEQ, syn-global) /\ typecheck(MEMSEQ, syn-mem) /\ typecheck(TABLESEQ, syn-table) /\ typecheck(FUNCSEQ, syn-func) /\ typecheck(DATASEQ, syn-data) /\ typecheck(ELEMSEQ, syn-elem) /\ typecheck(EXPORTSEQ, syn-export) .
-  mb ( nan(LOWM) ) : SpectecTerminal
-   .
-  mb ( norm(LOWM, EXP) ) : SpectecTerminal
-   .
   cmb ( ok-oktypeidx(TYPEIDX) ) : SpectecTerminal
 
       if typecheck(TYPEIDX, syn-typeidx) .
   cmb ( ok-oktypeidxnat(TYPEIDX, NAT) ) : SpectecTerminal
-
 
       if typecheck(TYPEIDX, syn-typeidx) .
   cmb ( pack(PACKTYPE, IN) ) : SpectecTerminal
@@ -20795,15 +20790,9 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( page(ADDRTYPE, LIMITS) ) : SpectecTerminal
 
       if typecheck(ADDRTYPE, syn-addrtype) /\ typecheck(LIMITS, syn-limits) .
-  mb ( rec-heaptype(LOWN) ) : SpectecTerminal
-   .
   cmb ( rec-rectype(LIST) ) : SpectecTerminal
 
       if typecheck(LIST, syn-subtype) .
-  mb ( rec-typeuse(LOWN) ) : SpectecTerminal
-   .
-  mb ( rec-typevar(LOWN) ) : SpectecTerminal
-   .
   cmb ( ref(NULLSEQ, HEAPTYPE) ) : SpectecTerminal
 
       if typecheck(NULLSEQ, syn-null) /\ typecheck(HEAPTYPE, syn-heaptype) .
@@ -20863,7 +20852,6 @@ if SSUBST-VALTYPES-S =/= eps .
       if typecheck(VALTYPESEQ, syn-valtype) .
   cmb ( shapexany(SZ, M, SX) ) : SpectecTerminal
 
-
       if typecheck(SZ, syn-sz) /\ typecheck(SX, syn-sx) .
   cmb ( shr(SX) ) : SpectecTerminal
 
@@ -20907,8 +20895,6 @@ if SSUBST-VALTYPES-S =/= eps .
   cmb ( sub-subtype(eps, TYPEUSESEQ, COMPTYPE) ) : SpectecTerminal
 
       if typecheck(TYPEUSESEQ, syn-typeuse) /\ typecheck(COMPTYPE, syn-comptype) .
-  mb ( subnorm(LOWM) ) : SpectecTerminal
-   .
   cmb ( table-copy(TABLEIDX, TABLEIDX2) ) : SpectecTerminal
 
       if typecheck(TABLEIDX, syn-tableidx) /\ typecheck(TABLEIDX2, syn-tableidx) .
@@ -21064,7 +21050,6 @@ if SSUBST-VALTYPES-S =/= eps .
 
       if typecheck(VECTYPE, syn-vectype) /\ typecheck(VVUNOP, syn-vvunop) .
   cmb ( w--def(RECTYPE, LOWN) ) : SpectecTerminal
-
 
       if typecheck(RECTYPE, syn-rectype) .
   cmb ( w--idx(TYPEIDX) ) : SpectecTerminal

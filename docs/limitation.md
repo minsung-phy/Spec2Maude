@@ -2,7 +2,7 @@
 
 Updated: 2026-06-09
 
-This document records the current state after restoring the JHS-style
+This document records the current state after restoring the
 `SpectecType`/`typecheck` syntax layer and adding Maude constructor membership
 axioms.
 
@@ -20,7 +20,7 @@ by benchmark scripts to expand official `.wast` tests into JSON.
 
 ## 2. Syntax Encoding Status
 
-The generated syntax layer now follows AST-driven JHS carrier patterns:
+The generated syntax layer now follows AST-driven carrier patterns:
 
 ```text
 category/type name           syn-* constructor term of sort SpectecType
@@ -68,7 +68,7 @@ i32.const 5 -> const(i32, 5)
 i64.const 5 -> const(i64, 5)
 ```
 
-This follows the JHS carrier shape: `Nat`/`Int` are terminals, and generated
+This follows the carrier shape: `Nat`/`Int` are terminals, and generated
 `typecheck(raw-number, syn-source-type)` equations classify source numeric
 categories such as `syn-uN(32)`, `syn-sN(33)`, and `syn-byte`.
 
@@ -189,7 +189,7 @@ path:
 ./spec2maude test smoke --timeout 10
 ```
 
-Most recent local check shape after the JHS-carrier restoration and constructor
+Most recent local check shape after the carrier restoration and constructor
 membership generation:
 
 ```text
@@ -197,9 +197,9 @@ make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
                                                      PASS
-maude -no-banner output.maude                        PASS, warnings: 7,
+maude -no-banner output.maude                        PASS, warnings: 6,
                                                      fatal diagnostics: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 7,
+maude -no-banner wasm-exec.maude                     PASS, warnings: 6,
                                                      fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
@@ -221,9 +221,9 @@ Important interpretation:
 - The remaining warnings are mainly:
   - 4 typed-index/sequence-pattern ambiguities from the associative
     source-sequence operator `_ _`;
-  - 3 `norm(...)`/`subnorm(...)` float syntax warnings with still-ambiguous
-    partial constructor membership and numeric conditions.
-- Numeric `uN`/`sN` range conditions are now rendered in a JHS-style readable
+  - 2 `norm(...)`/`subnorm(...)` float syntax warnings from source numeric
+    conditions and numeric constructor arguments.
+- Numeric `uN`/`sN` range conditions are now rendered in a source-readable
   form, for example `I < 2 ^ N` and `N + - 1`, which avoids the previous
   numeric range parser warnings without switching to Maude internal prefix
   forms such as `_<=_`.
@@ -243,7 +243,7 @@ For a PLDI-style artifact submission, the current defensible claim is:
 
 ```text
 The artifact regenerates a full WebAssembly SpecTec-to-Maude translation,
-restores the JHS-style SpectecTerminal/SpectecType/typecheck/mb-cmb syntax
+restores the SpectecTerminal/SpectecType/typecheck/mb-cmb syntax
 carrier, loads the generated Maude core without fatal diagnostics, and executes
 the local smoke suite through the official parser/validator frontend.
 ```
@@ -258,7 +258,8 @@ research/engineering work.
 Short version:
 
 ```text
-The syntax layer is back to the JHS carrier shape: SpecTec categories are
+The syntax layer is back to the SpectecTerminal/SpectecType carrier shape:
+SpecTec categories are
 syn-* SpectecType terms, source syntax constructors return SpectecTerminal,
 category validity is represented by typecheck, and constructor existence also
 emits Maude mb/cmb membership on SpectecTerminal.  Numeric literals use
