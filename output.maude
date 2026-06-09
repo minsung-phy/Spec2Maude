@@ -8144,13 +8144,13 @@ mod SPECTEC-CORE is
   ceq typecheck(I, syn-uN(N_UN)) = true
 
 
-      if typecheck(N_UN, syn-N) /\ ( 0 <= I ) /\ ( I <= ((2 ^ N_UN) - 1) ) .
+      if typecheck(N_UN, syn-N) /\ ( 0 <= I ) /\ ( I < 2 ^ N_UN ) .
 
 
   ceq typecheck(I, syn-sN(N_SN)) = true
 
 
-      if typecheck(N_SN, syn-N) /\ ( - (2 ^ (N_SN - 1)) <= I ) /\ ( I <= ((2 ^ (N_SN - 1)) - 1) ) .
+      if typecheck(N_SN, syn-N) /\ ( -2 ^ (N_SN + - 1) <= I ) /\ ( I <= (2 ^ (N_SN + - 1)) + - 1 ) .
 
 
   eq typecheck(T_SPECTEC, syn-iN(N)) = typecheck(T_SPECTEC, syn-uN(N)) .

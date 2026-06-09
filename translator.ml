@@ -3784,13 +3784,13 @@ let source_literal_membership_for_numeric_condition sort type_term lhs rhs =
                  in
                  let range_conds =
                    if has_pow && signed_lower then
-                     [Printf.sprintf "(- (2 ^ (%s - 1)) <= %s)"
+                     [Printf.sprintf "(-2 ^ (%s + - 1) <= %s)"
                         param_var payload_var;
-                      Printf.sprintf "(%s <= ((2 ^ (%s - 1)) - 1))"
+                      Printf.sprintf "(%s <= (2 ^ (%s + - 1)) + - 1)"
                         payload_var param_var]
                    else if has_pow && nonnegative_lower then
-                     [Printf.sprintf "(0 <= %s)" payload_var;
-                      Printf.sprintf "(%s <= ((2 ^ %s) - 1))"
+                     [Printf.sprintf "0 <= %s" payload_var;
+                      Printf.sprintf "%s < 2 ^ %s"
                         payload_var param_var]
                    else []
                  in
