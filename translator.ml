@@ -7321,14 +7321,6 @@ let source_ctor_has_parent_sort ctor target_sort =
   source_compound_cases_for_ctor ctor
   |> List.exists (fun c -> source_sort_reaches c.compound_parent_sort target_sort)
 
-let source_unary_ctors_for_parent_sort parent_sort =
-  source_ctors_by_compound_case (fun c ->
-      source_sort_reaches c.compound_parent_sort parent_sort
-      &&
-      match c.compound_fields with
-      | [_] -> true
-      | _ -> false)
-
 let source_final_trap_instr_term () =
   let instr_sort = sort_of_type_name "instr" in
   finite_source_terms_for_sort instr_sort
@@ -15129,24 +15121,6 @@ let translate_decd ss id params result_typ insts =
         | ExpP (id, _) -> Some (to_var_name id.it, param_sort p)
         | TypP _ -> None
         | DefP _ | GramP _ -> None);
-  let extra_op_decls = ref [] in
-  let used_continuation = ref false in
-  let continuation_name eq_idx cont_idx =
-    Printf.sprintf "$cont-%s-r%d-c%d"
-      (String.lowercase_ascii func_name) eq_idx cont_idx
-  in
-  let declare_continuation name arg_count =
-    let args =
-      if arg_count <= 0 then ""
-      else String.concat " " (List.init arg_count (fun _ -> "SpectecTerminals"))
-    in
-    let decl =
-      if args = "" then Printf.sprintf "  op %s : -> %s .\n" name ret_sort
-      else Printf.sprintf "  op %s : %s -> %s .\n" name args ret_sort
-    in
-    if not (List.mem decl !extra_op_decls) then
-      extra_op_decls := decl :: !extra_op_decls
-  in
   let relation_result_rewrite bound text =
     match split_once "=> valid" text with
     | None -> None
@@ -15380,36 +15354,6 @@ let translate_decd ss id params result_typ insts =
         (if has_owise then " [owise]" else "")
     in
 	    let continuation_lines =
-	      let cont_idx = ref 0 in
-      let vars_in_conds conds =
-        conds
-        |> List.concat_map extract_vars_from_maude
-      in
-      let vars_in_future rest =
-        let rest_vars =
-          rest
-          |> List.concat_map (fun (p : prem_sched) ->
-              p.vars @ p.binds @ extract_vars_from_maude p.text)
-        in
-        rhs_t.vars @ rest_vars @ vars_in_conds final_tail_conds
-        |> List.sort_uniq String.compare
-      in
-      let pass_vars bound rest =
-        let base =
-          SSet.elements bound
-          |> List.filter (fun v -> not (is_generated_free_const_name v))
-          |> List.sort_uniq String.compare
-        in
-        if maude_fn = "$evalexprs" || maude_fn = "$evalexprss" then
-          let live = vars_in_future rest |> SSet.of_list in
-          base |> List.filter (fun v -> SSet.mem v live)
-        else
-          base
-      in
-      let cont_call name first args =
-        let all_args = first :: args in
-        Printf.sprintf "%s ( %s )" name (String.concat " , " all_args)
-      in
       let parse_rewrite rw =
         match split_once "=>" rw with
         | Some (lhs, rhs) -> Some (String.trim lhs, String.trim rhs)
@@ -15465,26 +15409,16 @@ let translate_decd ss id params result_typ insts =
                          (match rewriteify_prem_text ~extra_heads:[maude_fn] p.text with
                           | Some rw -> parse_rewrite rw
                           | None -> None)
-                 in
-                 match rewrite with
-                 | Some (redex, target) ->
-                     used_continuation := true;
-                     let name = continuation_name eq_idx !cont_idx in
-                     incr cont_idx;
-                     let args = pass_vars bound rest in
-                     declare_continuation name (1 + List.length args);
-                     let first_eq =
-                       format_eq current_lhs
-                         (cont_call name redex args)
-                         pending_conds
-                     in
-                     let target_vars = extract_vars_from_maude target in
-                     let bound' =
-                       List.fold_left (fun b v -> SSet.add v b) bound
-                         target_vars
-                     in
-                     first_eq ::
-                     loop (cont_call name target args) bound' [] rest
+	                 in
+	                 match rewrite with
+	                 | Some (redex, target) ->
+	                     let cond = Printf.sprintf "%s := %s" target redex in
+	                     let target_vars = extract_vars_from_maude target in
+	                     let bound' =
+	                       List.fold_left (fun b v -> SSet.add v b) bound
+	                         target_vars
+	                     in
+	                     loop current_lhs bound' (pending_conds @ [cond]) rest
                  | None ->
                      let cond = cond_for_sched bound p in
                      let cond_binds =
@@ -15552,7 +15486,7 @@ let translate_decd ss id params result_typ insts =
         contains_substring line "\n    =>\n")
       eq_lines
   in
-  if saw_rewrite_clause || !used_continuation then
+  if saw_rewrite_clause then
     rewrite_defs_seen := SSet.add maude_fn !rewrite_defs_seen;
   let op_decl = Printf.sprintf "\n\n  op %s : %s -> %s .\n" maude_fn arg_sorts ret_sort in
   let typed_decl = declare_vars_by_sort !all_typed in
@@ -15563,8 +15497,7 @@ let translate_decd ss id params result_typ insts =
   in
   let bound_decl = declare_vars_same_sort bound_untyped "SpectecTerminal" in
   let free_decl = declare_ops_const_list truly_free "SpectecTerminal" in
-  "\n" ^ op_decl ^ (String.concat "" (List.rev !extra_op_decls))
-  ^ typed_decl ^ bound_decl ^ free_decl
+  "\n" ^ op_decl ^ typed_decl ^ bound_decl ^ free_decl
   ^ String.concat "\n" eq_lines ^ "\n"
 
 (* --- Step execution relation helpers ------------------------------------- *)
@@ -16447,9 +16380,6 @@ let maude_ceq_supports_condition_text cond =
 let maude_ceq_supports_condition_texts conds =
   List.for_all maude_ceq_supports_condition_text conds
 
-let equational_result_helper_name rel_name =
-  "$result-" ^ String.lowercase_ascii (sanitize rel_name)
-
 let condition_rewrite_parts cond =
   match split_once "=>" (String.trim cond) with
   | Some (lhs, rhs) -> Some (String.trim lhs, String.trim rhs)
@@ -16468,13 +16398,8 @@ let translate_reld ?(result_execution=false) _id rel_name rules =
   register_infer_rel_rules rel_name rules;
   let translate_result_execution_reld () =
     let try_equational = true in
-    let result_helper = equational_result_helper_name rel_name in
     let op_decl =
-      Printf.sprintf "\n  op %s : Config -> SpectecTerminals [frozen (1)] .\n" rel_name ^
-      if try_equational then
-        Printf.sprintf "  op %s : StepsConf -> SpectecTerminals .\n" result_helper
-      else
-        ""
+      Printf.sprintf "\n  op %s : Config -> SpectecTerminals [frozen (1)] .\n" rel_name
     in
     let all_bound = ref [] and all_free = ref [] and all_typed_vars = ref [] in
     let relation_args vm conclusion =
@@ -16541,9 +16466,8 @@ let translate_reld ?(result_execution=false) _id rel_name rules =
                              when same_maude_surface target
                                     (config_text zq_t.text vals_t.text) ->
                              Printf.sprintf
-                               "  eq %s ( ( %s ; %s ) ) = %s .\n  eq %s = %s ( %s ) ."
-                               result_helper zq_t.text vals_t.text rhs lhs
-                               result_helper steps_term
+                               "  ceq %s = %s\n      if %s := %s ."
+                               lhs rhs target steps_term
                          | _ when maude_ceq_supports_condition_texts prem_strs ->
                              if cond = "" then
                                Printf.sprintf "  eq %s = %s ." lhs rhs
@@ -17586,21 +17510,6 @@ let prelude_helper_decls features =
     "  eq $setproduct2-nested(NESTED-W, eps) = eps .\n" ^
     "  eq $setproduct2-nested(NESTED-W, $seq(NESTED-HEAD) NESTED-REST) = $seq(NESTED-W NESTED-HEAD) $setproduct2-nested(NESTED-W, NESTED-REST) .\n"
   in
-  let localtype_ctors =
-    source_unary_ctors_for_parent_sort (sort_of_type_name "localtype")
-  in
-  let replace_eqs =
-    localtype_ctors
-    |> List.map (fun ctor ->
-         Printf.sprintf
-           "  eq $replace-localtype ( %s LOCALTYPE-T LOCALTYPE-REST, 0, LOCALTYPE-LCT ) = LOCALTYPE-LCT LOCALTYPE-REST .\n"
-           ctor
-         ^
-         Printf.sprintf
-           "  eq $replace-localtype ( %s LOCALTYPE-T LOCALTYPE-REST, s ( LOCALTYPE-N ), LOCALTYPE-LCT ) = %s LOCALTYPE-T $replace-localtype ( LOCALTYPE-REST, LOCALTYPE-N, LOCALTYPE-LCT ) .\n"
-           ctor ctor)
-    |> String.concat ""
-  in
   nested_sequence_block ^
   (if !feature_uses_steps_final_predicate then
      "  op $is-final-steps-config : Config -> Bool .\n" ^
@@ -17612,11 +17521,7 @@ let prelude_helper_decls features =
 	         (source_category_seq_pred sort))
 	   |> String.concat "")
   ^
-  "  op $replace-localtype : SpectecTerminals SpectecTerminal SpectecTerminals -> SpectecTerminals .\n" ^
-  "  vars LOCALTYPE-REST LOCALTYPE-LCT : SpectecTerminals .\n" ^
-  "  vars LOCALTYPE-X LOCALTYPE-T : SpectecTerminal .\n" ^
-  "  var LOCALTYPE-N : Nat .\n" ^
-  replace_eqs
+  ""
 
 let star_ctor_unzip_helper_block () =
   let helpers =
