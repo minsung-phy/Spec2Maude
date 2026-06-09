@@ -1529,10 +1529,10 @@ let register_result_rel_helper rel_name arity arg_indices =
 
 let pluralize_map_suffix s =
   match s with
-  | "typeuse" -> "typeuses"
-  | "catch" -> "catches"
-  | _ when ends_with s "type" -> s ^ "s"
   | _ when ends_with s "idx" -> s ^ "s"
+  | _ when ends_with s "ch" || ends_with s "sh" -> s ^ "es"
+  | _ when ends_with s "s" || ends_with s "x" || ends_with s "z" -> s ^ "es"
+  | _ when ends_with s "type" -> s ^ "s"
   | _ when ends_with s "y" ->
       String.sub s 0 (String.length s - 1) ^ "ies"
   | _ -> s ^ "s"
@@ -10289,18 +10289,15 @@ let translate_typd id params insts =
 	             let lhs = if SSet.mem name base_types then "T" else var in
 	             let alias_guard_opt =
 	               match typ.it with
-               | NumT `NatT -> Some (Printf.sprintf "%s : Nat" lhs)
-               | NumT `IntT -> Some (Printf.sprintf "%s : Int" lhs)
-               | VarT (tid, _) ->
-                   (match String.lowercase_ascii tid.it with
-                    | "un" | "u8" | "u16" | "u31" | "u32" | "u64" ->
-                        Some (Printf.sprintf "%s : Nat" lhs)
-                    | "sn" | "in" | "i32" | "i64" | "i128" | "exp" ->
-                        Some (Printf.sprintf "%s : Int" lhs)
-	                    | _ ->
-	                        Some (type_guard lhs typ v_map))
-               | _ -> Some (type_guard lhs typ v_map)
-             in
+	               | NumT `NatT -> Some (Printf.sprintf "%s : Nat" lhs)
+	               | NumT `IntT -> Some (Printf.sprintf "%s : Int" lhs)
+	               | VarT (tid, _) ->
+	                   (match meta_numeric_carrier_sort (sort_of_type_name tid.it) with
+	                    | Some ("Nat" | "Int" as carrier) ->
+	                        Some (Printf.sprintf "%s : %s" lhs carrier)
+	                    | _ -> Some (type_guard lhs typ v_map))
+	               | _ -> Some (type_guard lhs typ v_map)
+	             in
              let alias_param_typecheck_guards =
                let type_atom_for_source_sort source_sort raw =
                  let has_lowercase s =
@@ -13293,27 +13290,6 @@ let normalize_unbound_free_list_star_maps lhs rhs =
       | _ -> Str.matched_string s)
     rhs
 
-let rhs_inline_from_sched rhs_text prem_scheduled =
-  let rhs_key = strip_wrapping_parens rhs_text |> String.trim in
-  let match_rhs_binding (p : prem_sched) =
-    match split_once_re (Str.regexp "[ \t]+:=[ \t]+") p.text with
-    | Some (lhs, rhs) when String.trim (strip_wrapping_parens lhs) = rhs_key ->
-        Some (String.trim rhs)
-    | Some (lhs, rhs) when String.trim (strip_wrapping_parens rhs) = rhs_key ->
-        Some (String.trim lhs)
-    | _ -> None
-  in
-  match List.find_map match_rhs_binding prem_scheduled with
-  | Some rhs_expr ->
-      let kept =
-        List.filter (fun (p : prem_sched) ->
-          match match_rhs_binding p with
-          | Some _ -> false
-          | None -> true) prem_scheduled
-      in
-      (rhs_expr, kept)
-  | None -> (rhs_text, prem_scheduled)
-
 let uniq_vars vs = List.sort_uniq String.compare vs
 
 let rec unwrap_exp_for_meta (e : exp) =
@@ -16028,12 +16004,7 @@ let translate_step_reld exec_kind rel_name rules =
                   List.filter (fun v -> not (SSet.mem v prem_binding_set)) vm_vars)
               in
               let prem_scheduled = schedule_prems lhs_set [] prem_items in
-              let rhs_text_out, prem_scheduled =
-                if exec_kind = ExecConfigToTerm
-                   && (case_id.it = "local-get" || case_id.it = "global-get")
-                then rhs_inline_from_sched rhs_t.text prem_scheduled
-                else (rhs_t.text, prem_scheduled)
-              in
+              let rhs_text_out, prem_scheduled = (rhs_t.text, prem_scheduled) in
               let ctxt_focus_rewrite = None in
               let rewrite_ctxt_focus_text text =
                 match ctxt_focus_rewrite with
@@ -16145,29 +16116,32 @@ let translate_step_reld exec_kind rel_name rules =
 	                    Some cond
 	                  else None)
 	              in
-	              let recursive_step_focus_nonempty_conds =
-	                if exec_kind = ExecConfigToConfig && case_id.it = "ctxt-instrs" then
-	                  let focus_var_of_step_cond cond =
-	                    let re =
-	                      Str.regexp
+		              let recursive_step_focus_nonempty_conds =
+		                if exec_kind = ExecConfigToConfig && case_id.it = "ctxt-instrs" then
+		                  let focus_var_of_step_cond cond =
+		                    let re =
+		                      Str.regexp
 	                        "step[ \t\n]*( *( *[^;]+;[ \t\n]*\\([A-Z][A-Za-z0-9_'-]*\\)[ \t\n]*)[ \t\n]*)[ \t\n]*=>"
 	                    in
 	                    try
 	                      ignore (Str.search_forward re cond 0);
 	                      Some (Str.matched_group 1 cond)
-	                    with Not_found -> None
-	                  in
-	                  prem_rewrite_conds
-	                  |> List.filter_map focus_var_of_step_cond
-	                  |> List.filter (fun v ->
-	                      match List.assoc_opt v raw_typed_vars with
-	                      | Some sort -> sort = "SpectecTerminals" || ends_with sort "Seq"
+		                    with Not_found -> None
+		                  in
+		                  prem_rewrite_conds
+		                  |> List.filter_map focus_var_of_step_cond
+		                  |> List.filter (fun v ->
+		                      match List.assoc_opt v raw_typed_vars with
+		                      | Some sort -> sort = "SpectecTerminals" || ends_with sort "Seq"
 	                      | None -> false)
 	                  |> List.sort_uniq String.compare
 	                  |> List.map (fun v ->
 	                      Printf.sprintf "_>_ ( ( len ( %s ) ), 0 )" v)
 	                else []
 	              in
+              let has_recursive_step_focus =
+                recursive_step_focus_nonempty_conds <> []
+              in
 	              let prem_match_conds =
 	                prem_scheduled |> List.filter_map (fun p ->
 	                  if p.binds = [] || is_rewrite_cond p.text then None else Some (prem_cond p.text))
@@ -16179,7 +16153,7 @@ let translate_step_reld exec_kind rel_name rules =
               let allvals_conds = [] in
               let listn_len_conds = listn_len_conditions lhs_set2 in
               let base_conds =
-                if exec_kind = ExecConfigToConfig && case_id.it = "ctxt-instrs" then
+                if exec_kind = ExecConfigToConfig && has_recursive_step_focus then
                   let before_rewrite_bconds, after_rewrite_bconds =
                     let lhs_available_vars =
                       lhs_pattern_vars
