@@ -448,7 +448,6 @@ let sanitize_rule_label_part name =
 
 type source_ctor_info = {
   source_ctor_name : string;
-  source_ctor_legacy_name : string;
   source_ctor_arity : int;
   source_ctor_key : string;
   source_ctor_category : string option;
@@ -457,8 +456,6 @@ type source_ctor_info = {
 }
 
 let source_ctor_by_key : (string, source_ctor_info) Hashtbl.t =
-  Hashtbl.create 512
-let source_ctor_by_legacy : (string, source_ctor_info) Hashtbl.t =
   Hashtbl.create 512
 let source_ctor_by_name : (string, source_ctor_info) Hashtbl.t =
   Hashtbl.create 512
@@ -498,7 +495,7 @@ let maude_source_op_token name =
   else if SSet.mem lowered maude_keywords then "w-" ^ lowered
   else lowered
 
-let compact_ctor_component s =
+let source_ctor_component s =
   let b = Buffer.create (String.length s) in
   String.iter
     (fun c ->
@@ -522,7 +519,7 @@ let source_ctor_components_from_sections sections =
   sections
   |> List.filter (fun s -> s <> "")
   |> List.filter (fun s -> s <> "%" && s <> "$")
-  |> List.map compact_ctor_component
+  |> List.map source_ctor_component
   |> List.filter (fun s -> s <> "")
 
 let source_ctor_key sections arity =
@@ -661,12 +658,7 @@ let source_ctor_effective_sections ?category ?arg_shape sections arity =
   in
   source_ctor_suffix_sections sections (arg_suffix ^ category_suffix)
 
-let legacy_ctor_name_from_components components arity =
-  match components with
-  | [] -> None
-  | _ -> Some (Printf.sprintf "CTOR%sA%d" (String.concat "" components) arity)
-
-let register_source_ctor key legacy_name base ?category original_sections sections arity =
+let register_source_ctor key base ?category original_sections sections arity =
   match Hashtbl.find_opt source_ctor_by_key key with
   | Some info -> info.source_ctor_name
   | None ->
@@ -682,7 +674,6 @@ let register_source_ctor key legacy_name base ?category original_sections sectio
       let sections = source_ctor_suffix_sections sections suffix in
       let info =
         { source_ctor_name = name;
-          source_ctor_legacy_name = legacy_name;
           source_ctor_arity = arity;
           source_ctor_key = key;
           source_ctor_category = Option.map maude_source_op_token category;
@@ -691,7 +682,6 @@ let register_source_ctor key legacy_name base ?category original_sections sectio
       in
       Hashtbl.replace source_ctor_by_key key info;
       Hashtbl.replace source_ctor_by_name name info;
-      Hashtbl.replace source_ctor_by_legacy legacy_name info;
 	      (match source_ctor_surface_head sections with
 	       | Some head ->
 	           Hashtbl.replace source_ctor_by_surface_head_arity
@@ -746,12 +736,7 @@ let source_ctor_name_from_sections ?category ?case_typ sections arity =
   | components ->
       let base = String.concat "" components in
       let key = source_ctor_key sections arity in
-      let legacy =
-        match legacy_ctor_name_from_components components arity with
-        | Some legacy -> legacy
-        | None -> base
-      in
-      Some (register_source_ctor key legacy base ?category original_sections sections arity))
+      Some (register_source_ctor key base ?category original_sections sections arity))
 
 let source_ctor_name_from_mixop ?category ?case_typ mixop arity =
   source_ctor_name_from_sections ?category ?case_typ (source_ctor_sections_from_mixop mixop) arity
@@ -765,21 +750,13 @@ let source_nullary_ctor_name_from_id raw =
   let sections = [sanitize raw |> trim_tail_hyphen] in
   source_ctor_name_from_sections sections 0
 
-let source_ctor_name_of_legacy legacy =
-  match Hashtbl.find_opt source_ctor_by_legacy legacy with
-  | Some info -> info.source_ctor_name
-  | None -> legacy
-
 let source_ctor_arity name =
   match Hashtbl.find_opt source_ctor_by_name name with
   | Some info -> Some info.source_ctor_arity
-  | None ->
-      (match Hashtbl.find_opt source_ctor_by_legacy name with
-       | Some info -> Some info.source_ctor_arity
-       | None -> None)
+  | None -> None
 
 let is_source_ctor_name name =
-  Hashtbl.mem source_ctor_by_name name || Hashtbl.mem source_ctor_by_legacy name
+  Hashtbl.mem source_ctor_by_name name
 
 let source_ctor_op_name info =
   match
@@ -808,7 +785,6 @@ let is_source_ctor_var_token name =
   SSet.mem name !source_ctor_blocked_var_names
 
 let source_ctor_suffix ctor =
-  let ctor = source_ctor_name_of_legacy ctor in
   let b = Buffer.create (String.length ctor) in
   String.iter
     (fun c ->
@@ -1272,7 +1248,7 @@ let pretty_source_syntax_condition_text cond =
 
 let ctor_call_pattern text =
   match parse_call_text text with
-  | Some (ctor, args) when is_source_ctor_name ctor || starts_with ctor "CTOR" ->
+  | Some (ctor, args) when is_source_ctor_name ctor ->
       Some (ctor, List.map (fun s -> strip_wrapping_parens s |> String.trim) args)
   | Some (head, args) ->
       (match Hashtbl.find_opt source_ctor_by_surface_head_arity
@@ -1715,7 +1691,7 @@ let register_zip_map_call_helper ?(preserve_nested=false) fn arity seq_indices a
 let friendly_expr_map_helper_name body seq_vars fixed_vars =
   match seq_vars, fixed_vars, parse_call_text body with
   | [seq_var], [], Some (ctor, [arg])
-      when (starts_with ctor "CTOR" || is_source_ctor_name ctor)
+      when is_source_ctor_name ctor
            && (strip_wrapping_parens arg |> String.trim) = seq_var ->
       Some
         (Printf.sprintf "$map-%s-a1-s0"
@@ -3445,14 +3421,11 @@ let source_indexed_deftype_ctor () =
 
 let rec nullary_ctor_suffix term =
   let term = strip_wrapping_parens term |> String.trim in
-  let re = Str.regexp "^CTOR\\([A-Z0-9]+\\)A0$" in
   if is_source_ctor_name term then
-    source_ctor_suffix term
-  else if Str.string_match re term 0 then
     source_ctor_suffix term
   else
     match parse_call_text term with
-    | Some (ctor, args) when is_source_ctor_name ctor || starts_with ctor "CTOR" ->
+    | Some (ctor, args) when is_source_ctor_name ctor ->
         source_ctor_suffix ctor ^ String.concat "" (List.map nullary_ctor_suffix args)
     | _ ->
         (match parse_source_ctor_surface_text term with
@@ -4724,17 +4697,13 @@ let collect_source_ctor_head_categories defs =
     source_ctor_head_category_arities
 
 let build_token_ops ss =
-  let starts_with s p =
-    let ls = String.length s and lp = String.length p in
-    ls >= lp && String.sub s 0 lp = p
-  in
   let source_type_atoms = source_type_atom_tokens () in
   let toks =
     SSet.diff ss.tokens ss.ctors
     |> fun toks -> SSet.diff toks source_type_atoms
     |> SSet.elements
     |> List.filter (fun t ->
-         not (starts_with t "CTOR" || is_source_ctor_var_token t || is_source_ctor_name t))
+         not (is_source_ctor_var_token t || is_source_ctor_name t))
   in
   if toks = [] then ""
   else
@@ -6361,7 +6330,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                      in
                      let ctor_args ctor =
                        match ctor_call_pattern text with
-                       | Some (found, args) when source_ctor_name_of_legacy found = ctor ->
+                       | Some (found, args) when found = ctor ->
                            Some args
                        | _ -> None
                      in
@@ -6522,7 +6491,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
 	                     in
 	                     let ctor_args ctor =
 	                       match ctor_call_pattern text with
-	                       | Some (found, args) when source_ctor_name_of_legacy found = ctor ->
+	                       | Some (found, args) when found = ctor ->
 	                           Some args
 	                       | _ -> None
 	                     in
@@ -8139,7 +8108,6 @@ let translate_typd id params insts =
   in
   let is_bindable_name_local v =
     v <> "" && is_upper_initial_local v && is_hyphen_var_like_local v
-    && not (starts_with v "CTOR")
     && not (source_protected_nonvariable_token v)
   in
   let vars_of_texpr_local (t : texpr) =
@@ -8351,7 +8319,7 @@ let translate_typd id params insts =
             | Some _ ->
                 let tok = Str.matched_string lhs in
                 let acc =
-                  if starts_with tok "CTOR" || is_source_ctor_var_token tok || is_source_ctor_name tok
+                  if is_source_ctor_var_token tok || is_source_ctor_name tok
                   then acc
                   else tok :: acc
                 in
@@ -8735,7 +8703,7 @@ let translate_typd id params insts =
                      | Some _ ->
                          let tok = Str.matched_string text in
                          let acc =
-                           if starts_with tok "CTOR" || is_source_ctor_var_token tok || is_source_ctor_name tok
+                           if is_source_ctor_var_token tok || is_source_ctor_name tok
                            then acc
                            else tok :: acc
                          in
@@ -10720,8 +10688,7 @@ let extract_vars_from_maude s =
      "ADDR"; "LABEL"; "LABEL"; "LABEL"; "IMPORT"] in
   (* Also exclude generated/source constructor ops, not variables. *)
   let is_ctor_name t =
-    (String.length t >= 4 && String.sub t 0 4 = "CTOR")
-    || is_source_ctor_var_token t
+    is_source_ctor_var_token t
     || is_source_ctor_name t
   in
   let is_name_char c =
@@ -11341,7 +11308,7 @@ let redundant_or_warning_prone_category_membership stmt =
 	    let p = strip_wrapping_parens pattern |> String.trim in
 	    let re = Str.regexp "^[A-Z][A-Z0-9-]*$" in
 	    Str.string_match re p 0
-      && not (starts_with p "CTOR" || is_source_ctor_var_token p || is_source_ctor_name p)
+      && not (is_source_ctor_var_token p || is_source_ctor_name p)
   in
   let pattern_is_numeric_literal pattern =
     let p = strip_wrapping_parens pattern |> String.trim in
@@ -11707,8 +11674,7 @@ let source_ctor_lhs_head_arity lhs =
   let lhs = strip_wrapping_parens lhs |> String.trim in
   match parse_call_text lhs with
   | Some (head, args)
-      when is_source_ctor_name head || starts_with head "CTOR"
-        || starts_with head "REC" ->
+      when is_source_ctor_name head || starts_with head "REC" ->
       Some (head, List.length args)
   | Some (head, args) ->
       (match Hashtbl.find_opt source_ctor_by_surface_head_arity
@@ -11977,7 +11943,6 @@ let jhs_membership_statements memberships =
     match lhs_head lhs with
     | Some head ->
         is_source_ctor_name head
-        || starts_with head "CTOR"
         || starts_with head "$"
         || starts_with head "REC"
     | None -> false
@@ -15027,7 +14992,6 @@ let lhs_pattern_typecheck_conds lhs_args vm =
   |> List.sort_uniq String.compare
 
 let source_ctor_field_sorts ctor arity =
-  let ctor = source_ctor_name_of_legacy ctor in
   match Hashtbl.find_opt ctor_arg_sort_hints ctor,
         Hashtbl.find_opt ctor_arg_membership_sort_hints ctor with
   | Some sorts, _ when List.length sorts = arity ->
@@ -15050,7 +15014,6 @@ let rhs_computed_sequence_ctor_arg_bindings prefix eq_idx (rhs_t : texpr) =
   match ctor_call_pattern rhs_t.text with
   | None -> (rhs_t, [], [])
   | Some (ctor, args) ->
-      let ctor = source_ctor_name_of_legacy ctor in
       match source_ctor_field_sorts ctor (List.length args) with
       | None -> (rhs_t, [], [])
       | Some field_sorts ->
@@ -19025,7 +18988,7 @@ let expr_map_helper_block () =
       match h.expr_map_seq_vars, h.expr_map_fixed_vars,
             parse_call_text h.expr_map_body with
       | [seq_var], [], Some (ctor, [arg])
-          when (starts_with ctor "CTOR" || is_source_ctor_name ctor)
+          when is_source_ctor_name ctor
                && (strip_wrapping_parens arg |> String.trim) = seq_var ->
           Some ctor
       | _ -> None
@@ -19326,7 +19289,7 @@ let is_canonical_ctor_decl_line l =
   else
     let rest = String.sub s 3 (String.length s - 3) |> String.trim in
     match Str.split (Str.regexp "[ \t]+") rest with
-    | name :: _ -> is_source_ctor_name name || starts_with name "CTOR"
+    | name :: _ -> is_source_ctor_name name
     | [] -> false
 
 let zero_arity_ctor_sort_name ctor =
@@ -19341,8 +19304,7 @@ let collect_zero_arity_ctor_memberships eq_lines =
     if Str.string_match re l 0 then
       match str_matched_group_opt 1 l, str_matched_group_opt 2 l with
       | Some ctor, Some sort
-          when (match source_ctor_arity ctor with Some 0 -> true | Some _ | None -> false)
-               || (starts_with ctor "CTOR" && ends_with ctor "A0") ->
+          when (match source_ctor_arity ctor with Some 0 -> true | Some _ | None -> false) ->
           let sorts =
             match Hashtbl.find_opt tbl ctor with
             | Some xs -> xs
@@ -19414,7 +19376,7 @@ let infer_category_subsort_decls eq_lines =
     in
     (match head with
      | Some head when is_source_ctor_name head -> true
-     | _ -> starts_with pattern "CTOR" || not (is_plain_var_like pattern))
+     | _ -> not (is_plain_var_like pattern))
   in
   let by_sort = Hashtbl.create 128 in
   let add sort lhs =
@@ -19506,7 +19468,6 @@ let translate defs =
   star_ctor_unzip_helpers := [];
   opt_ctor_helpers := [];
   Hashtbl.clear source_ctor_by_key;
-  Hashtbl.clear source_ctor_by_legacy;
   Hashtbl.clear source_ctor_by_name;
   Hashtbl.clear source_ctor_by_surface_head_arity;
   Hashtbl.clear source_ctor_by_original_head_arity;
