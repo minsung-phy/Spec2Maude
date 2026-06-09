@@ -858,6 +858,7 @@ mod SPECTEC-CORE is
   op $relaxed4 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
   op $relop : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
   op $replace-localtype : SpectecTerminals SpectecTerminal SpectecTerminals -> SpectecTerminals .
+  op $result-eval-expr : StepsConf -> SpectecTerminals .
   op $rolldt : SpectecTerminal SpectecTerminal -> SpectecTerminals .
   op $rollrt : SpectecTerminal SpectecTerminal -> SpectecTerminal .
   op $rundata : SpectecTerminal SpectecTerminal -> SpectecTerminals .
@@ -15161,12 +15162,8 @@ mod SPECTEC-CORE is
 
 
 
-  --- equational lowering skipped for [eval-expr-r0]: Maude ceq conditions cannot contain rewrite conditions.
-  crl [eval-expr-r0] :
-    Eval-expr ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) )
-    =>
-    EVAL-EXPR-R00-ZQ EVAL-EXPR-R00-VALS
-      if steps ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) ) => ( EVAL-EXPR-R00-ZQ ; EVAL-EXPR-R00-VALS ) .
+  eq $result-eval-expr ( ( EVAL-EXPR-R00-ZQ ; EVAL-EXPR-R00-VALS ) ) = EVAL-EXPR-R00-ZQ EVAL-EXPR-R00-VALS .
+  eq Eval-expr ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) ) = $result-eval-expr ( steps ( ( EVAL-EXPR-R00-LOWZ ; EVAL-EXPR-R00-INSTRS ) ) ) .
 
 
 
