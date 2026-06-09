@@ -72,6 +72,12 @@ This follows the carrier shape: `Nat`/`Int` are terminals, and generated
 `typecheck(raw-number, syn-source-type)` equations classify source numeric
 categories such as `syn-uN(32)`, `syn-sN(33)`, and `syn-byte`.
 
+The WAT/Wasm frontend and benchmark runner now use this same source-readable
+prefix spelling for generated terms and expected results.  For example,
+`const(i32, 5)` and `ref-null(func-absheaptype)` are current terms;
+`CONST__`, `REFNULL_`, and `VCONST__` are legacy compact spellings and should
+not be used for new result comparison.
+
 ## 3. What Changed Beyond Syntax
 
 The source `relation`, `rule`, and `def` declarations are still translated

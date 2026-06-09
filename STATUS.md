@@ -169,6 +169,10 @@ Resolved:
 - numeric range guards are rendered in a source-readable form such as
   `I < 2 ^ N` and `N + - 1`, avoiding Maude internal prefix notation while also
   removing the previous `uN`/`sN` parser warnings;
+- the benchmark/smoke runner compares expected results against the same
+  source-readable prefix terms emitted by the frontend, such as
+  `const(i32, 5)`, `ref-null(func-absheaptype)`, and `vconst(v128, ...)`,
+  instead of the old compact constructor spelling;
 - bulk source category sort/subsort generation is removed from the syntax path;
 - generated WAT harnesses no longer include `Module-ok` checked-run code unless
   explicitly requested with the debug path.
