@@ -2,7 +2,7 @@
 
 Updated: 2026-06-09
 
-Use this document for reproducible local checks after restoring the JHS-style
+Use this document for reproducible local checks after restoring the
 syntax/typecheck carrier and adding constructor membership axioms.
 
 ## 1. Tool Check
@@ -51,7 +51,7 @@ wasm-exec.maude
   -> output.maude
 ```
 
-The generated syntax layer should contain the restored JHS carrier, category
+The generated syntax layer should contain the restored carrier, category
 checks, and constructor membership axioms:
 
 ```bash
@@ -85,8 +85,8 @@ operators.
 Current 2026-06-09 warning baseline:
 
 ```text
-maude -no-banner output.maude      warnings: 7, fatal diagnostics: 0
-maude -no-banner wasm-exec.maude   warnings: 7, fatal diagnostics: 0
+maude -no-banner output.maude      warnings: 6, fatal diagnostics: 0
+maude -no-banner wasm-exec.maude   warnings: 6, fatal diagnostics: 0
 ```
 
 Fatal diagnostics means any `Error:`, `no parse`, `bad token`,
@@ -96,10 +96,10 @@ Current warning breakdown:
 
 ```text
 4 typed-index / source-sequence parser ambiguities
-3 norm/subnorm float syntax ambiguities
+2 norm/subnorm float syntax ambiguities
 ```
 
-Numeric `uN`/`sN` range equations are rendered in a JHS-style readable form,
+Numeric `uN`/`sN` range equations are rendered in a source-readable form,
 for example `I < 2 ^ N` and `N + - 1`, instead of Maude internal prefix
 notation such as `_<=_(0, I)`.
 

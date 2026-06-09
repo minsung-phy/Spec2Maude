@@ -57,15 +57,15 @@ Current expected results on 2026-06-09:
 
 ```text
 syntax audit                 PASS
-maude output.maude           PASS, warnings: 7, fatal diagnostics: 0
-maude wasm-exec.maude        PASS, warnings: 7, fatal diagnostics: 0
+maude output.maude           PASS, warnings: 6, fatal diagnostics: 0
+maude wasm-exec.maude        PASS, warnings: 6, fatal diagnostics: 0
 fib.wat --fib 5              result: const(i32, 5)
 local smoke suite            PASS: 13
 ```
 
 The remaining Maude warnings are parser-ambiguity warnings, not load errors.
 They are tracked in [docs/limitation.md](docs/limitation.md).  Numeric range
-guards are rendered in a JHS-style readable form, for example `I < 2 ^ N`,
+guards are rendered in a source-readable form, for example `I < 2 ^ N`,
 instead of Maude's internal `_<=_` prefix notation.
 
 ## Important Design Choice
@@ -254,7 +254,7 @@ The active C1 baseline currently has:
   handles the main numeric, vector, and GC/reference expected-result forms;
 - a separated default path where WAT/Wasm validation happens before Maude and
   Maude focuses on dynamic execution.
-- a JHS-style syntax carrier where source category witnesses are generated as
+- a carrier-based syntax layer where source category witnesses are generated as
   `syn-* : SpectecType` terms and concrete syntax constructors are generated as
   source-readable `SpectecTerminal` terms such as `const(i32, 5)`;
 - automatic source-derived constructor disambiguation for reused source heads,

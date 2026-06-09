@@ -10,7 +10,7 @@ artifact snapshot.
 This artifact demonstrates that Spec2Maude can:
 
 1. translate the WebAssembly 3.0 SpecTec source into Maude;
-2. generate the JHS-style syntax carrier:
+2. generate the carrier-based syntax layer:
    `SpectecTerminal`, `SpectecType`, `typecheck`, and `mb`/`cmb` membership;
 3. keep source syntax constructors readable while disambiguating reused source
    heads from source category information, for example `func-func`,
@@ -63,8 +63,8 @@ Expected summary:
 Syntax audit: output.maude
 PASS: no required syntax/typecheck/membership failures found
 
-maude output.maude        warnings: 7, fatal diagnostics: 0
-maude wasm-exec.maude     warnings: 7, fatal diagnostics: 0
+maude output.maude        warnings: 6, fatal diagnostics: 0
+maude wasm-exec.maude     warnings: 6, fatal diagnostics: 0
 
 result: const(i32, 5)
 
@@ -155,9 +155,9 @@ The most useful files for debugging are `problem_cases.csv` and
 ## Known Limitations
 
 - Remaining Maude warnings are parser-ambiguity warnings: 4 from
-  source-derived typed-index sequence patterns and 3 from
+  source-derived typed-index sequence patterns and 2 from
   `norm(...)`/`subnorm(...)` float syntax.  Numeric `uN`/`sN` range guards are
-  rendered in a JHS-style source-readable form rather than Maude internal prefix
+  rendered in a source-readable form rather than Maude internal prefix
   operators such as `_<=_`.  The earlier nullary/unary constructor overload
   warning class is resolved by source-derived
   argument-shape suffixes such as `div-sx-binop` and `le-sx-relop`.

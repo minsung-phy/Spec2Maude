@@ -11754,6 +11754,15 @@ let rec source_ctor_lhs_is_ground lhs =
 	             | Some _ -> false
 	             | None -> not (is_plain_var_like lhs)))
 
+let non_ground_total_constructor_membership stmt =
+  match parse_category_membership_statement stmt with
+  | Some ("mb", lhs, "SpectecTerminal", []) ->
+      (match source_ctor_lhs_head_arity lhs with
+       | Some (_head, arity) when arity > 0 ->
+           not (source_ctor_lhs_is_ground lhs)
+       | _ -> false)
+  | _ -> false
+
 let conditional_source_ctor_heads_from_memberships memberships =
   memberships
   |> List.fold_left
@@ -12040,9 +12049,16 @@ let jhs_membership_statements memberships =
          && not (is_source_ctor_name v)
          && not (SSet.mem v !generated_zero_arity_ctor_names))
   in
+  let is_redundant_builtin_membership_guard cond =
+    match parse_sort_guard_condition cond with
+    | Some (term, ("Nat" | "Int" | "Bool")) ->
+        is_plain_var_like (strip_wrapping_parens term |> String.trim)
+    | _ -> false
+  in
   let terminal_membership_conds lhs conds =
     let lhs_vars = membership_lhs_vars lhs in
     conds
+    |> List.filter (fun cond -> not (is_redundant_builtin_membership_guard cond))
     |> List.filter (fun cond ->
          condition_vars cond
          |> List.for_all (fun v -> SSet.mem v lhs_vars))
@@ -19907,6 +19923,10 @@ let translate defs =
   in
   let jhs_category_memberships, membership_type_terms =
     jhs_membership_statements category_memberships
+  in
+  let jhs_category_memberships =
+    jhs_category_memberships
+    |> List.filter (fun stmt -> not (non_ground_total_constructor_membership stmt))
   in
   let jhs_partial_ops =
     jhs_partial_constructor_ops jhs_category_memberships

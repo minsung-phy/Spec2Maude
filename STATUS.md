@@ -79,7 +79,7 @@ But the default WAT/Wasm execution CLI does not use them as the input gate.
 
 ## Latest Known Check Shape
 
-The current JHS-carrier restoration should be judged first by syntax/load
+The current carrier restoration should be judged first by syntax/load
 checks, then by direct source-shaped execution.  Latest local checks:
 
 ```text
@@ -87,9 +87,9 @@ make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
                                                      PASS
-maude -no-banner output.maude                        PASS, warnings: 7,
+maude -no-banner output.maude                        PASS, warnings: 6,
                                                      fatal diagnostics: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 7,
+maude -no-banner wasm-exec.maude                     PASS, warnings: 6,
                                                      fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
@@ -110,9 +110,9 @@ Remaining warning sources are currently:
 - 4 warnings from source-derived typed-index sequence patterns that interact with the
   source-style `SpectecTerminal < SpectecTerminals` carrier and associative
   `_ _` sequence operator;
-- 3 warnings from float syntax around `norm(...)`/`subnorm(...)`, where
-  partial constructor membership and numeric conditions still give Maude more
-  than one parse.
+- 2 warnings from float syntax around `norm(...)`/`subnorm(...)`, where
+  source numeric conditions and numeric constructor arguments still give Maude
+  more than one parse.
 
 The earlier nullary/unary constructor overload warning class, for example
 `DIV` versus `DIV sx` and `LE` versus `LE sx`, is resolved by source-derived
@@ -150,7 +150,7 @@ Resolved:
 
 - old `step-from-step-pure-*` bridge rules are gone;
 - old `$is-spectec-val-seq` guard is gone;
-- the JHS-style `SpectecType`/`typecheck` syntax carrier is restored;
+- the `SpectecType`/`typecheck` syntax carrier is restored;
 - source category/type witnesses are consistently generated as `syn-*`
   `SpectecType` terms, for example `syn-instr`, `syn-func`, and `syn-i32`;
 - source syntax constructors are generated over the broad `SpectecTerminal`
@@ -166,7 +166,7 @@ Resolved:
   `SpectecTerminal`;
 - numeric literal payloads are raw Maude numerals again, classified through
   source-derived `typecheck(raw-number, syn-numeric-type)` equations;
-- numeric range guards are rendered in a JHS-style source-readable form such as
+- numeric range guards are rendered in a source-readable form such as
   `I < 2 ^ N` and `N + - 1`, avoiding Maude internal prefix notation while also
   removing the previous `uN`/`sN` parser warnings;
 - bulk source category sort/subsort generation is removed from the syntax path;

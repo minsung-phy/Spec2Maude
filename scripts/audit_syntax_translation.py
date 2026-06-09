@@ -6,7 +6,10 @@ The script checks properties that are easy to regress by visual inspection:
 * source syntax constructors should use the Spectec carrier/typecheck shape;
 * conditional constructor typecheck cases should have corresponding cmb axioms;
 * constructors with cmb axioms should be partial (~>) at the op declaration;
+* partial constructor declarations should have a corresponding cmb witness;
 * nullary constructors should not get terminal mb/cmb axioms;
+* non-ground argument constructors should not get unconditional terminal mb;
+* source syntax declarations should have corresponding syn-* SpectecType witnesses;
 * old internal names such as JHS-T, NTC, iN- should not leak into output.
 
 It intentionally audits generated output, not the SpecTec source itself.
@@ -274,6 +277,44 @@ def source_key(text: str) -> str:
     return text
 
 
+def source_syntax_type_key(text: str) -> str:
+    return source_key(text).strip("-_")
+
+
+def audit_source_syntax_type_witnesses(
+    source_dir: Path, op_decls: list[OpDecl]
+) -> list[str]:
+    if not source_dir.exists():
+        return [f"source directory not found for syntax witness audit: {source_dir}"]
+
+    source_types: list[tuple[Path, int, str, str]] = []
+    syntax_re = re.compile(r"^\s*syntax\s+([A-Za-z_$][A-Za-z0-9_$'-]*)")
+    for path in sorted(source_dir.rglob("*.spectec")):
+        for line_no, raw in enumerate(path.read_text(errors="ignore").splitlines(), 1):
+            line = raw.split("---", 1)[0]
+            m = syntax_re.match(line)
+            if not m:
+                continue
+            raw_name = m.group(1)
+            key = source_syntax_type_key(raw_name)
+            if not key or key == "list":
+                continue
+            source_types.append((path, line_no, raw_name, key))
+
+    generated_type_ops = {
+        decl.surface for decl in op_decls if decl.result_sort == "SpectecType"
+    }
+    failures: list[str] = []
+    for path, line_no, raw_name, key in source_types:
+        expected = f"syn-{key}"
+        if expected not in generated_type_ops:
+            failures.append(
+                f"missing SpectecType witness for source syntax '{raw_name}' "
+                f"from {path}:{line_no}; expected op {expected}"
+            )
+    return failures
+
+
 def audit_source_type_constructor_overlap(
     source_dir: Path, op_decls: list[OpDecl]
 ) -> list[str]:
@@ -377,7 +418,15 @@ def audit_output(output_path: Path, source_dir: Path) -> tuple[list[str], list[s
             failures.append(
                 f"nullary constructor has terminal {kind}: {lhs} at {output_path}:{line}"
             )
+        if kind == "mb":
+            matches = [decl for decl in matching_ops(terminal_ops, lhs) if decl.holes > 0]
+            if matches and lhs_vars(lhs):
+                failures.append(
+                    f"non-ground constructor has unconditional terminal mb: "
+                    f"'{lhs}' at {output_path}:{line}"
+                )
 
+    cmb_op_keys: set[tuple[str, int]] = set()
     for line, kind, lhs in memberships:
         if kind != "cmb":
             continue
@@ -385,11 +434,20 @@ def audit_output(output_path: Path, source_dir: Path) -> tuple[list[str], list[s
         if not matches:
             warnings.append(f"no op declaration matched cmb lhs '{lhs}' at {output_path}:{line}")
             continue
+        for decl in matches:
+            cmb_op_keys.add((decl.surface, decl.holes))
         if any(decl.holes > 0 and decl.arrow == "->" for decl in matches):
             bad = [decl for decl in matches if decl.holes > 0 and decl.arrow == "->"]
             failures.append(
                 f"cmb lhs '{lhs}' is declared total instead of partial; "
                 f"op line(s): {', '.join(str(d.line) for d in bad)}"
+            )
+
+    for decl in terminal_ops:
+        if decl.holes > 0 and decl.arrow == "~>" and (decl.surface, decl.holes) not in cmb_op_keys:
+            failures.append(
+                f"partial constructor op has no generated cmb witness: "
+                f"'{decl.surface}/{decl.holes}' at {output_path}:{decl.line}"
             )
 
     for line, lhs, cond in parse_constructor_typechecks(statements):
@@ -422,6 +480,7 @@ def audit_output(output_path: Path, source_dir: Path) -> tuple[list[str], list[s
             failures.append("parameterized binop/relop was flattened to concrete I32/I64 cases")
             break
 
+    failures.extend(audit_source_syntax_type_witnesses(source_dir, ops))
     warnings.extend(audit_source_type_constructor_overlap(source_dir, ops))
     warnings.extend(audit_generated_terminal_type_overlaps(ops))
 
