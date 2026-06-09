@@ -16466,12 +16466,6 @@ let translate_steps_reld rel_name rules =
 
 let lower_all_reld_as_rewrite = true
 
-let equational_relations =
-  ["Eval-expr"]
-
-let relation_is_allowlisted_equational rel_name =
-  List.exists (( = ) rel_name) equational_relations
-
 let maude_ceq_supports_condition_text cond =
   let cond = String.trim cond in
   cond <> "owise" && not (contains_substring cond "=>")
@@ -16479,11 +16473,35 @@ let maude_ceq_supports_condition_text cond =
 let maude_ceq_supports_condition_texts conds =
   List.for_all maude_ceq_supports_condition_text conds
 
+let equational_result_helper_name rel_name =
+  "$result-" ^ String.lowercase_ascii (sanitize rel_name)
+
+let condition_rewrite_parts cond =
+  match split_once "=>" (String.trim cond) with
+  | Some (lhs, rhs) -> Some (String.trim lhs, String.trim rhs)
+  | None -> None
+
+let same_maude_surface a b =
+  let normalize s =
+    s
+    |> strip_wrapping_parens
+    |> String.trim
+    |> Str.global_replace (Str.regexp "[ \t\n\r]+") " "
+  in
+  normalize a = normalize b
+
 let translate_reld ?(result_execution=false) _id rel_name rules =
   register_infer_rel_rules rel_name rules;
   let translate_result_execution_reld () =
-    let op_decl = Printf.sprintf "\n  op %s : Config -> SpectecTerminals [frozen (1)] .\n" rel_name in
-    let try_equational = relation_is_allowlisted_equational rel_name in
+    let try_equational = true in
+    let result_helper = equational_result_helper_name rel_name in
+    let op_decl =
+      Printf.sprintf "\n  op %s : Config -> SpectecTerminals [frozen (1)] .\n" rel_name ^
+      if try_equational then
+        Printf.sprintf "  op %s : StepsConf -> SpectecTerminals .\n" result_helper
+      else
+        ""
+    in
     let all_bound = ref [] and all_free = ref [] and all_typed_vars = ref [] in
     let relation_args vm conclusion =
       match conclusion.it with
@@ -16539,11 +16557,51 @@ let translate_reld ?(result_execution=false) _id rel_name rules =
                        (config_text z_t.text instrs_t.text)
                    in
                    let rhs = Printf.sprintf "%s %s" zq_t.text vals_t.text in
-                   if try_equational && maude_ceq_supports_condition_texts prem_strs then
-                     if cond = "" then
-                       Printf.sprintf "  eq %s = %s ." lhs rhs
-                     else
-                       Printf.sprintf "  ceq %s = %s\n      if %s ." lhs rhs cond
+                   if try_equational then
+                     match prem_strs with
+                     | [] ->
+                         Printf.sprintf "  eq %s = %s ." lhs rhs
+                     | [prem] -> (
+                         match condition_rewrite_parts prem with
+                         | Some (steps_term, target)
+                             when same_maude_surface target
+                                    (config_text zq_t.text vals_t.text) ->
+                             Printf.sprintf
+                               "  eq %s ( ( %s ; %s ) ) = %s .\n  eq %s = %s ( %s ) ."
+                               result_helper zq_t.text vals_t.text rhs lhs
+                               result_helper steps_term
+                         | _ when maude_ceq_supports_condition_texts prem_strs ->
+                             if cond = "" then
+                               Printf.sprintf "  eq %s = %s ." lhs rhs
+                             else
+                               Printf.sprintf "  ceq %s = %s\n      if %s ." lhs rhs cond
+                         | _ ->
+                             let fallback_comment =
+                               "  --- equational lowering skipped for [" ^ label ^
+                               "]: unsupported condition shape for deterministic result projection.\n"
+                             in
+                             if cond = "" then
+                               Printf.sprintf "%s  rl [%s] :\n    %s\n    =>\n    %s ."
+                                 fallback_comment label lhs rhs
+                             else
+                               Printf.sprintf "%s  crl [%s] :\n    %s\n    =>\n    %s\n      if %s ."
+                                 fallback_comment label lhs rhs cond)
+                     | _ when maude_ceq_supports_condition_texts prem_strs ->
+                         if cond = "" then
+                           Printf.sprintf "  eq %s = %s ." lhs rhs
+                         else
+                           Printf.sprintf "  ceq %s = %s\n      if %s ." lhs rhs cond
+                     | _ ->
+                         let fallback_comment =
+                           "  --- equational lowering skipped for [" ^ label ^
+                           "]: unsupported condition shape for deterministic result projection.\n"
+                         in
+                         if cond = "" then
+                           Printf.sprintf "%s  rl [%s] :\n    %s\n    =>\n    %s ."
+                             fallback_comment label lhs rhs
+                         else
+                           Printf.sprintf "%s  crl [%s] :\n    %s\n    =>\n    %s\n      if %s ."
+                             fallback_comment label lhs rhs cond
                    else
                      let fallback_comment =
                        if try_equational then
