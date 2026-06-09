@@ -85,8 +85,8 @@ operators.
 Current 2026-06-09 warning baseline:
 
 ```text
-maude -no-banner output.maude      warnings: 9, fatal diagnostics: 0
-maude -no-banner wasm-exec.maude   warnings: 9, fatal diagnostics: 0
+maude -no-banner output.maude      warnings: 7, fatal diagnostics: 0
+maude -no-banner wasm-exec.maude   warnings: 7, fatal diagnostics: 0
 ```
 
 Fatal diagnostics means any `Error:`, `no parse`, `bad token`,
@@ -96,13 +96,12 @@ Current warning breakdown:
 
 ```text
 4 typed-index / source-sequence parser ambiguities
-2 readable numeric range typecheck ambiguities
 3 norm/subnorm float syntax ambiguities
 ```
 
-The numeric range equations are intentionally kept in readable infix notation,
-for example `0 <= I`, instead of Maude internal prefix notation such as
-`_<=_(0, I)`.
+Numeric `uN`/`sN` range equations are rendered in a JHS-style readable form,
+for example `I < 2 ^ N` and `N + - 1`, instead of Maude internal prefix
+notation such as `_<=_(0, I)`.
 
 ## 3.1 Syntax Audit
 

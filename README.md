@@ -57,17 +57,16 @@ Current expected results on 2026-06-09:
 
 ```text
 syntax audit                 PASS
-maude output.maude           PASS, warnings: 9, fatal diagnostics: 0
-maude wasm-exec.maude        PASS, warnings: 9, fatal diagnostics: 0
+maude output.maude           PASS, warnings: 7, fatal diagnostics: 0
+maude wasm-exec.maude        PASS, warnings: 7, fatal diagnostics: 0
 fib.wat --fib 5              result: const(i32, 5)
 local smoke suite            PASS: 13
 ```
 
 The remaining Maude warnings are parser-ambiguity warnings, not load errors.
-They are tracked in [docs/limitation.md](docs/limitation.md).  The current
-warning baseline is intentionally kept in a source-readable form: numeric
-guards such as `0 <= I` are not rewritten into Maude's internal `_<=_` prefix
-notation merely to hide warnings.
+They are tracked in [docs/limitation.md](docs/limitation.md).  Numeric range
+guards are rendered in a JHS-style readable form, for example `I < 2 ^ N`,
+instead of Maude's internal `_<=_` prefix notation.
 
 ## Important Design Choice
 

@@ -63,8 +63,8 @@ Expected summary:
 Syntax audit: output.maude
 PASS: no required syntax/typecheck/membership failures found
 
-maude output.maude        warnings: 9, fatal diagnostics: 0
-maude wasm-exec.maude     warnings: 9, fatal diagnostics: 0
+maude output.maude        warnings: 7, fatal diagnostics: 0
+maude wasm-exec.maude     warnings: 7, fatal diagnostics: 0
 
 result: const(i32, 5)
 
@@ -155,11 +155,11 @@ The most useful files for debugging are `problem_cases.csv` and
 ## Known Limitations
 
 - Remaining Maude warnings are parser-ambiguity warnings: 4 from
-  source-derived typed-index sequence patterns, 2 from readable numeric/range
-  `typecheck` conditions, and 3 from `norm(...)`/`subnorm(...)` float syntax.
-  The numeric guards are deliberately left source-readable rather than rendered
-  as Maude internal prefix operators such as `_<=_`.  The earlier nullary/unary
-  constructor overload warning class is resolved by source-derived
+  source-derived typed-index sequence patterns and 3 from
+  `norm(...)`/`subnorm(...)` float syntax.  Numeric `uN`/`sN` range guards are
+  rendered in a JHS-style source-readable form rather than Maude internal prefix
+  operators such as `_<=_`.  The earlier nullary/unary constructor overload
+  warning class is resolved by source-derived
   argument-shape suffixes such as `div-sx-binop` and `le-sx-relop`.
 - The default WAT/Wasm execution path validates input with the official
   WebAssembly parser/validator before Maude execution; translated `Module-ok`

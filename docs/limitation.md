@@ -197,9 +197,9 @@ make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
                                                      PASS
-maude -no-banner output.maude                        PASS, warnings: 9,
+maude -no-banner output.maude                        PASS, warnings: 7,
                                                      fatal diagnostics: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 9,
+maude -no-banner wasm-exec.maude                     PASS, warnings: 7,
                                                      fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
@@ -221,13 +221,12 @@ Important interpretation:
 - The remaining warnings are mainly:
   - 4 typed-index/sequence-pattern ambiguities from the associative
     source-sequence operator `_ _`;
-  - 2 readable numeric/range `typecheck` conditions using overloaded Maude
-    arithmetic;
   - 3 `norm(...)`/`subnorm(...)` float syntax warnings with still-ambiguous
     partial constructor membership and numeric conditions.
-- The numeric warnings could be reduced by rendering expressions as Maude
-  internal prefix forms such as `_<=_`, but the current artifact keeps readable
-  infix guards because they are closer to the SpecTec/JHS presentation.
+- Numeric `uN`/`sN` range conditions are now rendered in a JHS-style readable
+  form, for example `I < 2 ^ N` and `N + - 1`, which avoids the previous
+  numeric range parser warnings without switching to Maude internal prefix
+  forms such as `_<=_`.
 - The earlier nullary/unary overload warning class, such as `DIV` versus
   `DIV sx`, `LE` versus `LE sx`, and vector signed variants, is now resolved by
   source-derived argument-shape suffixes such as `div-sx-binop`,

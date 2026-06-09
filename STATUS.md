@@ -87,9 +87,9 @@ make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
                                                      PASS
-maude -no-banner output.maude                        PASS, warnings: 9,
+maude -no-banner output.maude                        PASS, warnings: 7,
                                                      fatal diagnostics: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 9,
+maude -no-banner wasm-exec.maude                     PASS, warnings: 7,
                                                      fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
@@ -110,10 +110,6 @@ Remaining warning sources are currently:
 - 4 warnings from source-derived typed-index sequence patterns that interact with the
   source-style `SpectecTerminal < SpectecTerminals` carrier and associative
   `_ _` sequence operator;
-- 2 warnings from readable numeric/range `typecheck` conditions such as
-  `syn-uN` and `syn-sN`; these are intentionally left in infix form for
-  source readability instead of being rendered as Maude internal prefix
-  operators such as `_<=_`;
 - 3 warnings from float syntax around `norm(...)`/`subnorm(...)`, where
   partial constructor membership and numeric conditions still give Maude more
   than one parse.
@@ -170,9 +166,9 @@ Resolved:
   `SpectecTerminal`;
 - numeric literal payloads are raw Maude numerals again, classified through
   source-derived `typecheck(raw-number, syn-numeric-type)` equations;
-- readable numeric guards are preserved in source-shaped infix notation instead
-  of being rewritten into Maude internal prefix notation just to reduce warning
-  count;
+- numeric range guards are rendered in a JHS-style source-readable form such as
+  `I < 2 ^ N` and `N + - 1`, avoiding Maude internal prefix notation while also
+  removing the previous `uN`/`sN` parser warnings;
 - bulk source category sort/subsort generation is removed from the syntax path;
 - generated WAT harnesses no longer include `Module-ok` checked-run code unless
   explicitly requested with the debug path.
@@ -193,7 +189,7 @@ Still worth discussing:
      erases validation premises after external validation.
 2. Continue reducing parser ambiguity warnings without changing source rule
    semantics.  Highest-impact next targets: typed-index sequence patterns and
-   numeric/range-condition rendering.
+   `norm(...)`/`subnorm(...)` float syntax membership.
 3. Continue reducing source-absent helpers in `output.maude`.
 4. Continue improving official `.wast` runner support for remaining vector,
    abstract-reference, and module instance/linking identity forms.  The runner
