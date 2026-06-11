@@ -1,6 +1,6 @@
 # How To Test Spec2Maude
 
-Updated: 2026-06-09
+Updated: 2026-06-11
 
 Use this document for reproducible local checks after restoring the
 syntax/typecheck carrier and adding constructor membership axioms.
@@ -82,11 +82,11 @@ no-parse diagnostics.  Some parser-ambiguity warnings may remain because the
 generated syntax intentionally keeps source-readable constructors and sequence
 operators.
 
-Current 2026-06-09 warning baseline:
+Current 2026-06-11 warning baseline:
 
 ```text
-maude -no-banner output.maude      warnings: 6, fatal diagnostics: 0
-maude -no-banner wasm-exec.maude   warnings: 6, fatal diagnostics: 0
+maude -no-banner output.maude      warnings: 2, fatal diagnostics: 0
+maude -no-banner wasm-exec.maude   warnings: 2, fatal diagnostics: 0
 ```
 
 Fatal diagnostics means any `Error:`, `no parse`, `bad token`,
@@ -95,7 +95,6 @@ Fatal diagnostics means any `Error:`, `no parse`, `bad token`,
 Current warning breakdown:
 
 ```text
-4 typed-index / source-sequence parser ambiguities
 2 norm/subnorm float syntax ambiguities
 ```
 
@@ -109,6 +108,7 @@ Run the generated syntax/typecheck/membership audit:
 
 ```bash
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
+python3 scripts/audit_translator_cleanup.py
 ```
 
 Expected:
@@ -116,6 +116,9 @@ Expected:
 ```text
 Syntax audit: output.maude
 PASS: no required syntax/typecheck/membership failures found
+
+Translator cleanup audit
+PASS: no forbidden cleanup regressions found
 ```
 
 ## 4. Recommended CLI Checks
@@ -164,8 +167,7 @@ Low-level Fibonacci:
 dune exec ./wasm_to_maude.exe -- --result-only --run 5 wat_examples/fib.wat
 ```
 
-Generated harness should not include the experimental `Module-ok` block by
-default:
+Generated harness should not include a validation gate by default:
 
 ```bash
 dune exec ./wasm_to_maude.exe -- --output /tmp/fib.generated.maude wat_examples/fib.wat
@@ -184,7 +186,9 @@ rg 'CONST__|FUNC___|CALL_|WRESULT_|REFNULL_|VCONST__' /tmp/fib.generated.maude
 
 Expected: the first command matches; the second command has no matches.
 
-If you explicitly want the experimental Maude validation/debug block:
+The `maude-validate`/checked-run path is experimental validation-profile work,
+not part of the current artifact pass criteria.  If you inspect it, treat any
+result as diagnostic rather than as the main runtime result:
 
 ```bash
 dune exec ./wasm_to_maude.exe -- --output /tmp/fib.checked.maude --checked-run wat_examples/fib.wat
@@ -290,7 +294,7 @@ Current small official-slice reference, using the artifact command below:
 ./spec2maude test official --limit 30 --timeout 5
 ```
 
-Expected 2026-06-09 bucket shape:
+Last recorded small official-slice bucket shape:
 
 ```text
 Benchmark summary:

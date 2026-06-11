@@ -150,7 +150,7 @@ let debug_iter fmt =
   if debug_iter_enabled then Printf.eprintf (fmt ^^ "\n")
   else Printf.ifprintf stderr (fmt ^^ "\n")
 
-(* C1 runtime-cleanup experiment:
+(* Runtime profile policy:
    The generated runtime assumes the input Wasm program has already been
    validated, so source category/typecheck guards should not be required for
    execution.  We still keep source syntax/category labels as data when source
@@ -2122,7 +2122,6 @@ let () =
     (fun var -> Hashtbl.find_opt source_var_sorts var);
   source_def_arg_sorts_lookup :=
     (fun fn -> Hashtbl.find_opt source_def_arg_sorts fn)
-let typed_index_helper_sorts : SSet.t ref = ref SSet.empty
 let used_unmap_helper_names : SSet.t ref = ref SSet.empty
 let mark_unmap_helper_used name =
   used_unmap_helper_names := SSet.add name !used_unmap_helper_names
@@ -2168,7 +2167,7 @@ let spectec_type_prefix = "syn-"
 let raw_payload_type_terms : SSet.t ref =
   ref (SSet.of_list [spectec_type_prefix ^ "nat"; spectec_type_prefix ^ "int"])
 
-let jhs_type_term_key text =
+let spectec_type_term_key text =
   strip_wrapping_parens text |> String.trim
 
 let spectec_type_constructor_head raw arity =
@@ -2227,8 +2226,8 @@ let spectec_type_term_of_name raw arg_texts =
   format_spectec_type_term head arg_texts
 
 let record_raw_payload_type_alias lhs rhs =
-  let lhs = jhs_type_term_key lhs in
-  let rhs = jhs_type_term_key rhs in
+  let lhs = spectec_type_term_key lhs in
+  let rhs = spectec_type_term_key rhs in
   if lhs <> "" && SSet.mem rhs !raw_payload_type_terms then
     raw_payload_type_terms := SSet.add lhs !raw_payload_type_terms
 let wrap_generic_const_payloads : bool ref = ref false
@@ -2464,7 +2463,6 @@ let build_type_env defs =
   source_unary_int_aliases := [];
   optional_literal_terms := SSet.empty;
   source_record_infos := [];
-  typed_index_helper_sorts := SSet.empty;
   used_unmap_helper_names := SSet.empty;
   let rec collect_source_sort_name_overrides d =
     match d.it with
@@ -2610,7 +2608,7 @@ let build_type_env defs =
                     when binders = [] && args = [] ->
                     (match raw_payload_key_of_typ typ with
                      | Some rhs
-                         when SSet.mem (jhs_type_term_key rhs) !raw_payload_type_terms ->
+                         when SSet.mem (spectec_type_term_key rhs) !raw_payload_type_terms ->
                          let before = !raw_payload_type_terms in
                          record_raw_payload_type_alias (sanitize raw) rhs;
                          if not (SSet.equal before !raw_payload_type_terms) then
@@ -4334,44 +4332,6 @@ let declare_var name sort =
   else (Hashtbl.replace declared_vars name sort;
         Printf.sprintf "  var %s : %s .\n" name sort)
 
-let typed_index_pattern full_type_sort lhs rhs preserve_source_sort_indices params =
-  let broad_of i _v =
-    "TYPED-INDEX-" ^ String.uppercase_ascii full_type_sort ^ "-P" ^
-    string_of_int i
-  in
-  let replacements =
-    params
-    |> List.mapi (fun i (v, _, ms) -> (v, broad_of i v, ms))
-  in
-  let replace_all text =
-    List.fold_left
-      (fun acc (old_v, broad_v, _) -> replace_maude_var_token old_v broad_v acc)
-      text replacements
-  in
-  let decls =
-    replacements
-    |> List.mapi (fun i (_, broad_v, ms) ->
-         let sort =
-           if List.mem i preserve_source_sort_indices then ms
-           else "SpectecTerminal"
-         in
-         declare_var broad_v sort)
-    |> String.concat ""
-  in
-  let rhs' = replace_all rhs in
-  (* $typed-index is a representation helper for source meta-expressions like
-     xs[i] when xs is a flat sequence of composite source elements.  The type
-     tag (for example tabletype) determines the element width.  Re-checking
-     each component with membership conditions makes legacy prefix-call
-     renderings fail to match because many source
-     categories are represented by membership axioms over the broad terminal
-     carrier rather than by constructor result sorts.  Optional-prefix
-     positions are the exception: keeping their source sort prevents the
-     non-optional typed-index equation from swallowing the optional-empty
-     case after eps is normalized away. *)
-  let cond = cond_join [rhs'] in
-  (decls, replace_all lhs, cond)
-
 let _declare_op_const name sort =
   if Hashtbl.mem declared_vars name then ""
   else (Hashtbl.replace declared_vars name sort;
@@ -5880,59 +5840,6 @@ let choose_source_ctor_for_case expected_sort mixop field_exps arg_ts vm =
           choose_most_specific_source_ctor best
           |> Option.map (fun info -> info.source_ctor_name)
 
-let typed_index_helper_name ?(index_kind = `Nat) sort =
-  "$typed-index-" ^ sort ^
-  match index_kind with
-  | `Nat -> "-nat"
-  | `Seq -> "-seq"
-
-let typed_index_index_kind (idx_t : texpr) =
-  let core = strip_wrapping_parens idx_t.text |> String.trim in
-  let var_sort v =
-    match Hashtbl.find_opt declared_vars v with
-    | Some sort -> Some sort
-    | None -> source_sort_of_plain_text_var v
-  in
-  if core = "eps" then `Seq
-  else if is_raw_numeric_text core
-          || starts_with core "$raw-lit"
-          || starts_with core "$raw-nat-lit"
-  then `Nat
-  else if is_plain_var_like core then
-    match var_sort core with
-    | Some "SpectecTerminals" -> `Seq
-    | _ -> `Nat
-  else if
-    List.exists
-      (fun v ->
-         match var_sort v with
-         | Some "SpectecTerminals" -> true
-         | _ -> Hashtbl.mem source_var_seq_elem_sorts v)
-      idx_t.vars
-  then `Seq
-  else `Nat
-
-let typed_index_nat_arg idx_text =
-  let core = strip_wrapping_parens idx_text |> String.trim in
-  if core = "" || is_raw_numeric_text core || starts_with core "$raw-nat-lit"
-  then idx_text
-  else
-    match
-      if is_plain_var_like core then Hashtbl.find_opt declared_vars core else None
-    with
-    | Some "Nat" -> idx_text
-    | _ -> format_call "$raw-nat-lit" [idx_text]
-
-let typed_index_call elem_sort base_text idx_t =
-  let index_kind = typed_index_index_kind idx_t in
-  let idx_text =
-    match index_kind with
-    | `Nat -> typed_index_nat_arg idx_t.text
-    | `Seq -> idx_t.text
-  in
-  Printf.sprintf "%s ( %s, %s )"
-    (typed_index_helper_name ~index_kind elem_sort) base_text idx_text
-
 (* Global accumulator: ListN count variable -> sequence variable pairs.
    Populated by translate_exp when it encounters IterE with ListN iter.
    Reset at the start of each Step rule translation. *)
@@ -6091,6 +5998,13 @@ let source_call_sequence_positions args arg_ts vm =
       |> List.filter_map (fun x -> x)
   | xs -> xs
 
+(** Translate one SpecTec IL expression into Maude text.
+
+    Result text is paired with the Maude variables mentioned by that text, so
+    later phases can declare variables and schedule premises without reparsing
+    the whole source.  This function may use generic source metadata such as
+    binders, type terms, mixops, and registered constructor names; it must not
+    branch on Wasm-specific constructor names. *)
 let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | VarE id -> translate_var ctx id.it vm (source_expected_sort_of_typ e.note vm)
   | CaseE (mixop, inner) ->
@@ -7240,7 +7154,7 @@ let binder_type_conds binders =
 	        let source_sort = sort_of_type_name tid.it in
 	        let var = to_var_name tid.it in
 	        let guard_for_atom atom =
-	          if SSet.mem (jhs_type_term_key atom) !raw_payload_type_terms then None
+	          if SSet.mem (spectec_type_term_key atom) !raw_payload_type_terms then None
 	          else Some (Printf.sprintf "typecheck(%s, %s) = true" var atom)
 	        in
 	        if is_pure_meta_category_sort source_sort then None
@@ -7990,7 +7904,7 @@ let compound_binder_choices_for_declared_sort declared_sort binders v_map =
                      compound_term_allowed_for_sort term declared_sort))
     |> List.sort_uniq compare
 
-(* DecD helper functions operate on C1's coarse CTOR carrier, but must
+(* DecD helper functions operate on the broad Spectec carrier, but must
    preserve runtime structural sorts used by generated configs/states. *)
 let structural_decd_sorts =
   ["Config"; "State"; "Store"; "Frame"; "Judgement"]
@@ -8040,6 +7954,16 @@ let build_suffix_map binders =
 
 (* --- TypD handler -------------------------------------------------------- *)
 
+(** Translate a SpecTec [TypD] declaration.
+
+    The syntax path emits the carrier representation:
+    - source category/type witnesses as [syn-* : SpectecType],
+    - source syntax constructors as [SpectecTerminal] operators,
+    - category recognition as [typecheck],
+    - constructor well-formedness as [mb]/[cmb].
+
+    Constructor names and argument conditions must be derived from the TypD
+    AST, its mixop, binders, parameters, and premises. *)
 let translate_typd id params insts =
   let name = sanitize id.it in
   let typd_params = params in
@@ -8767,7 +8691,7 @@ let translate_typd id params insts =
                        when is_plain_var_like var
                             && var <> atom
                             && not
-                                 (SSet.mem (jhs_type_term_key atom)
+                                 (SSet.mem (spectec_type_term_key atom)
                                     !raw_payload_type_terms) ->
                        Some (Printf.sprintf "%s : %s" var source_sort)
                    | _ -> None
@@ -9628,9 +9552,7 @@ let translate_typd id params insts =
                    let opt_param_indices =
                      if prems <> [] then [] else find_opt_param_indices case_typ
                    in
-                   let typed_index_block = ""
-                   in
-	                 let main =
+		                 let main =
 		                   if cons_name = "" then
                          if is_plain_var_like lhs then
                            (match
@@ -9760,17 +9682,15 @@ let translate_typd id params insts =
                          unsupported_parametric_membership
                            ("optional constructor membership for " ^ type_term)
 	                       else
-                         let membership =
-	                         Printf.sprintf "\n  %s ( %s ) : %s%s ."
-	                           (if r = "" then "mb" else "cmb") lhs_eps full_type_sort
-	                           (if r = "" then "" else "\n   if " ^ r)
-                         in
-                         let typed_index_opt_block = ""
-                         in
-                         membership ^ typed_index_opt_block
-	                     ) opt_param_indices
-                 in
-                 Some (main ^ typed_index_block ^ String.concat "" opts)
+	                         let membership =
+		                         Printf.sprintf "\n  %s ( %s ) : %s%s ."
+		                           (if r = "" then "mb" else "cmb") lhs_eps full_type_sort
+		                           (if r = "" then "" else "\n   if " ^ r)
+	                         in
+	                         membership
+		                     ) opt_param_indices
+	                 in
+	                 Some (main ^ String.concat "" opts)
              ) cases |> String.concat "\n"
 	         | AliasT typ ->
              let concrete_literal_alias_sort typ =
@@ -10227,7 +10147,7 @@ let translate_typd id params insts =
 	                 | Some atom
 	                     when is_plain_var_like var
                           && var <> atom
-                          && not (SSet.mem (jhs_type_term_key atom) !raw_payload_type_terms) ->
+                          && not (SSet.mem (spectec_type_term_key atom) !raw_payload_type_terms) ->
                      Some
                        (Printf.sprintf "typecheck(%s, %s) = true" var atom)
                  | _ -> None
@@ -10870,7 +10790,7 @@ let is_sequence_shape_predicate cond =
   let cond = String.trim cond |> strip_wrapping_parens |> String.trim in
   starts_with cond "$is-spectec-" && contains_substring cond "-seq"
 
-let is_jhs_typecheck_guard cond =
+let is_spectec_typecheck_guard cond =
   let cond =
     cond
     |> strip_trailing_eq_true
@@ -11483,7 +11403,7 @@ let rec is_source_syntax_sort sort =
         | Some elem -> is_source_syntax_sort elem
         | None -> false)
 
-let jhs_carrier_sort_for_source_sort sort =
+let spectec_carrier_sort_for_source_sort sort =
   if is_structural_runtime_sort sort then None
   else if is_meta_numeric_alias_sort sort then None
   else
@@ -11550,23 +11470,23 @@ let parse_sort_guard_condition cond =
       else None
   | None -> None
 
-let jhs_condition_of_source_guard cond =
+let spectec_condition_of_source_guard cond =
   match parse_sort_guard_condition cond with
   | Some (term, sort) ->
       (match source_type_term_for_sort sort with
-       | Some type_term when jhs_carrier_sort_for_source_sort sort <> None ->
+       | Some type_term when spectec_carrier_sort_for_source_sort sort <> None ->
            Some (Printf.sprintf "typecheck(%s, %s) = true" term type_term)
-       | _ when jhs_carrier_sort_for_source_sort sort <> None -> None
+       | _ when spectec_carrier_sort_for_source_sort sort <> None -> None
        | _ -> Some cond)
   | None -> Some cond
 
-let jhs_convert_conditions conds =
+let spectec_convert_conditions conds =
   conds
-  |> List.filter_map jhs_condition_of_source_guard
+  |> List.filter_map spectec_condition_of_source_guard
   |> List.map String.trim
   |> List.filter (fun c -> c <> "" && c <> "true" && c <> "( true )")
 
-let jhs_cond_join conds =
+let spectec_cond_join conds =
   conds
   |> List.map String.trim
   |> List.map strip_trailing_dot
@@ -11640,8 +11560,8 @@ let conditional_source_ctor_heads_from_memberships memberships =
        (fun acc stmt ->
          match parse_category_membership_statement stmt with
          | Some (_kind, lhs, sort, conds)
-             when jhs_carrier_sort_for_source_sort sort <> None ->
-             let rhs = jhs_cond_join (jhs_convert_conditions conds) in
+             when spectec_carrier_sort_for_source_sort sort <> None ->
+             let rhs = spectec_cond_join (spectec_convert_conditions conds) in
              (match source_ctor_lhs_head_arity lhs with
               | Some (head, arity) when arity > 0 && rhs <> "" ->
                   SSet.add head acc
@@ -11649,15 +11569,15 @@ let conditional_source_ctor_heads_from_memberships memberships =
          | _ -> acc)
        SSet.empty
 
-let is_keywordish_jhs_membership_token v =
+let is_keywordish_spectec_membership_token v =
   source_protected_nonvariable_token v
 
-let is_upper_initial_jhs_membership_var v =
+let is_upper_initial_spectec_membership_var v =
   String.length v > 0 &&
   let c = v.[0] in
   c >= 'A' && c <= 'Z'
 
-let is_hyphen_jhs_membership_var_like v =
+let is_hyphen_spectec_membership_var_like v =
   if not (String.contains v '-') then true
   else
     let parts = String.split_on_char '-' v |> List.filter (fun s -> s <> "") in
@@ -11666,38 +11586,38 @@ let is_hyphen_jhs_membership_var_like v =
     | last :: _ ->
         String.exists (fun c -> c >= '0' && c <= '9') v || String.length last <= 2
 
-let is_bindable_jhs_membership_var v =
+let is_bindable_spectec_membership_var v =
   v <> ""
-  && is_upper_initial_jhs_membership_var v
-  && is_hyphen_jhs_membership_var_like v
-  && not (is_keywordish_jhs_membership_token v)
+  && is_upper_initial_spectec_membership_var v
+  && is_hyphen_spectec_membership_var_like v
+  && not (is_keywordish_spectec_membership_token v)
 
-let jhs_membership_lhs_vars lhs =
+let spectec_membership_lhs_vars lhs =
   extract_vars_from_maude lhs
-  |> List.filter is_bindable_jhs_membership_var
+  |> List.filter is_bindable_spectec_membership_var
   |> List.filter (fun v ->
        not (is_source_ctor_var_token v)
        && not (is_source_ctor_name v)
        && not (SSet.mem v !generated_zero_arity_ctor_names))
   |> SSet.of_list
 
-let jhs_kind_terminal_vars_from_memberships memberships =
+let spectec_kind_terminal_vars_from_memberships memberships =
   let partial_heads = conditional_source_ctor_heads_from_memberships memberships in
   memberships
   |> List.fold_left
        (fun acc stmt ->
          match parse_category_membership_statement stmt with
          | Some (_kind, lhs, sort, _conds)
-             when jhs_carrier_sort_for_source_sort sort <> None ->
+             when spectec_carrier_sort_for_source_sort sort <> None ->
              (match source_ctor_lhs_head_arity lhs with
               | Some (head, arity)
                   when arity > 0 && SSet.mem head partial_heads ->
-                  SSet.union acc (jhs_membership_lhs_vars lhs)
+                  SSet.union acc (spectec_membership_lhs_vars lhs)
               | _ -> acc)
          | _ -> acc)
        SSet.empty
 
-let jhs_type_head type_term =
+let spectec_type_head type_term =
   let t = strip_wrapping_parens type_term |> String.trim in
   let len = String.length t in
   let rec loop i =
@@ -11760,7 +11680,7 @@ let rewrite_literal_payload_typecheck_cond payload_wrapped_terms cond =
   match parse_call_text core with
   | Some ("typecheck", [term; type_term]) ->
       let term = strip_wrapping_parens term |> String.trim in
-      let type_term = jhs_type_term_key type_term in
+      let type_term = spectec_type_term_key type_term in
       if is_plain_var_like term
          && not (SSet.mem type_term !raw_payload_type_terms)
       then
@@ -11819,7 +11739,7 @@ let spectec_type_constructor_decls defs =
   |> List.fold_left collect []
   |> List.sort_uniq String.compare
 
-let jhs_membership_statements memberships =
+let spectec_membership_statements memberships =
   let conditional_ctor_heads =
     conditional_source_ctor_heads_from_memberships memberships
   in
@@ -11935,7 +11855,7 @@ let jhs_membership_statements memberships =
   in
   let terminal_membership_rhs lhs conds =
     terminal_membership_conds lhs conds
-    |> jhs_cond_join
+    |> spectec_cond_join
   in
   let normalize_condition_key cond =
     cond
@@ -11989,7 +11909,7 @@ let jhs_membership_statements memberships =
            | Some (term, child_sort)
                when lhs_membership_key term = lhs_key
                  && child_sort <> parent_sort
-                 && jhs_carrier_sort_for_source_sort child_sort <> None ->
+                 && spectec_carrier_sort_for_source_sort child_sort <> None ->
                (match source_type_term_for_sort child_sort,
                       source_type_term_for_sort parent_sort with
                 | Some _, Some _ -> Some child_sort
@@ -12010,7 +11930,7 @@ let jhs_membership_statements memberships =
   |> List.iter (fun stmt ->
        match parse_category_membership_statement stmt with
        | Some (_kind, lhs, parent_sort, conds)
-           when jhs_carrier_sort_for_source_sort parent_sort <> None ->
+           when spectec_carrier_sort_for_source_sort parent_sort <> None ->
            (match category_reference_inclusion lhs parent_sort conds with
             | Some child_sort -> add_category_reference_edge child_sort parent_sort
             | None -> ())
@@ -12029,7 +11949,7 @@ let jhs_membership_statements memberships =
   |> List.iter (fun stmt ->
        match parse_category_membership_statement stmt with
        | Some (_kind, lhs, sort, _conds)
-           when jhs_carrier_sort_for_source_sort sort <> None ->
+           when spectec_carrier_sort_for_source_sort sort <> None ->
            remember_lhs_sort lhs sort
        | _ -> ());
   let inherited_parent_membership lhs sort =
@@ -12046,22 +11966,22 @@ let jhs_membership_statements memberships =
     |> List.concat_map (fun stmt ->
          match parse_category_membership_statement stmt with
          | Some (_kind, lhs, sort, conds)
-             when jhs_carrier_sort_for_source_sort sort <> None ->
+             when spectec_carrier_sort_for_source_sort sort <> None ->
              if category_reference_inclusion lhs sort conds <> None
                 || inherited_parent_membership lhs sort then []
              else
              (match source_type_term_for_sort sort with
               | None ->
-                  let conds = jhs_convert_conditions conds in
+                  let conds = spectec_convert_conditions conds in
                   let membership_rhs = terminal_membership_rhs lhs conds in
                   terminal_membership lhs membership_rhs
               | Some type_term ->
 	                  remember_type_term type_term;
-	                  let conds = jhs_convert_conditions conds in
+	                  let conds = spectec_convert_conditions conds in
 	                  let membership_rhs = terminal_membership_rhs lhs conds in
 	                  let rhs =
 	                    typecheck_rhs_conds lhs conds membership_rhs
-	                    |> jhs_cond_join
+	                    |> spectec_cond_join
 	                  in
 	                  let typecheck_stmt =
 	                    if rhs = "" then
@@ -12078,7 +11998,7 @@ let jhs_membership_statements memberships =
   in
   (converted |> List.sort_uniq String.compare, !used_type_terms)
 
-let jhs_subsort_typecheck_eqs () =
+let spectec_subsort_typecheck_eqs () =
   let used_type_terms = ref SSet.empty in
   let remember t = used_type_terms := SSet.add t !used_type_terms in
   let eqs =
@@ -12113,7 +12033,7 @@ let jhs_subsort_typecheck_eqs () =
   in
   (eqs, !used_type_terms)
 
-let jhs_membership_lhs_head lhs =
+let spectec_membership_lhs_head lhs =
   let t = strip_wrapping_parens lhs |> String.trim in
   let len = String.length t in
   let rec loop i =
@@ -12126,7 +12046,7 @@ let jhs_membership_lhs_head lhs =
   let stop = loop 0 in
   if stop = 0 then None else Some (String.sub t 0 stop)
 
-let jhs_partial_constructor_ops memberships =
+let spectec_partial_constructor_ops memberships =
   memberships
   |> List.filter_map (fun stmt ->
 	       match parse_category_membership_statement stmt with
@@ -12150,7 +12070,7 @@ let jhs_partial_constructor_ops memberships =
   |> List.filter (fun op -> op <> "" && op <> "eps")
   |> List.fold_left (fun acc op -> SSet.add op acc) SSet.empty
 
-let jhs_op_decl_arity line =
+let spectec_op_decl_arity line =
   try
     let colon = String.index line ':' in
     let arrow =
@@ -12166,7 +12086,7 @@ let jhs_op_decl_arity line =
     List.length sorts
   with Not_found -> 0
 
-let jhs_partialize_decl_line partial_ops line =
+let spectec_partialize_decl_line partial_ops line =
   let s = String.trim line in
   if starts_with s "op " then
     match (try Some (String.index line ':') with Not_found -> None) with
@@ -12181,7 +12101,7 @@ let jhs_partialize_decl_line partial_ops line =
             |> String.trim
           else ""
         in
-        let key = source_ctor_op_key op_part (jhs_op_decl_arity line) in
+        let key = source_ctor_op_key op_part (spectec_op_decl_arity line) in
         if SSet.mem key partial_ops
            && contains_substring line " -> SpectecTerminal"
         then
@@ -12220,13 +12140,13 @@ let partialize_cmb_constructor_ops_in_output text =
     |> List.fold_left (fun acc op -> if op = "" then acc else SSet.add op acc) SSet.empty
   in
   lines
-  |> List.map (jhs_partialize_decl_line partial_ops)
+  |> List.map (spectec_partialize_decl_line partial_ops)
   |> String.concat "\n"
 
-let jhs_extra_type_constructor_decls declared_heads used_type_terms =
+let spectec_extra_type_constructor_decls declared_heads used_type_terms =
   used_type_terms
   |> SSet.elements
-  |> List.map jhs_type_head
+  |> List.map spectec_type_head
   |> List.map ensure_spectec_type_term
   |> List.filter (fun h ->
        h <> ""
@@ -12252,7 +12172,7 @@ let rewrite_sort_tokens text =
       done;
       let tok = String.sub text i (!j - i) in
       let tok' =
-        match jhs_carrier_sort_for_source_sort tok with
+        match spectec_carrier_sort_for_source_sort tok with
         | Some carrier -> carrier
         | None -> tok
       in
@@ -12266,20 +12186,20 @@ let rewrite_sort_tokens text =
   loop 0;
   Buffer.contents buf
 
-let jhs_rewrite_decl_line line =
+let spectec_rewrite_decl_line line =
   let s = String.trim line in
   if starts_with s "sorts " && ends_with s "." then
     let payload =
       String.sub s 6 (String.length s - 7)
       |> Str.split (Str.regexp "[ \t]+")
-      |> List.filter (fun sort -> jhs_carrier_sort_for_source_sort sort = None)
+      |> List.filter (fun sort -> spectec_carrier_sort_for_source_sort sort = None)
     in
     (match payload with
      | [] -> None
      | sorts -> Some ("  sorts " ^ String.concat " " sorts ^ " ."))
   else if starts_with s "sort " && ends_with s "." then
     let sort = String.sub s 5 (String.length s - 7) |> String.trim in
-    if jhs_carrier_sort_for_source_sort sort <> None then None else Some line
+    if spectec_carrier_sort_for_source_sort sort <> None then None else Some line
   else if starts_with s "subsort " then
     let re =
       Str.regexp
@@ -12288,8 +12208,8 @@ let jhs_rewrite_decl_line line =
     if Str.string_match re s 0 then
       let child = Str.matched_group 1 s in
       let parent = Str.matched_group 2 s in
-      if jhs_carrier_sort_for_source_sort child <> None
-         || jhs_carrier_sort_for_source_sort parent <> None
+      if spectec_carrier_sort_for_source_sort child <> None
+         || spectec_carrier_sort_for_source_sort parent <> None
       then None
       else Some line
     else Some line
@@ -12578,7 +12498,7 @@ let strip_source_sort_guards_from_statement stmt =
         |> List.filter (fun cond ->
              match parse_sort_guard_condition cond with
              | Some (_term, sort) ->
-                 jhs_carrier_sort_for_source_sort sort = None
+                 spectec_carrier_sort_for_source_sort sort = None
              | None -> true)
       in
       if List.length kept = List.length conds then stmt
@@ -13851,6 +13771,14 @@ let iter_rule_prem_item vm rel_id e xes =
       text = call;
     })
 
+(** Lower one source premise into scheduler items.
+
+    A premise may contribute more than one item because source notation such as
+    iterated maps, pair sequences, or Expand premises sometimes needs an
+    explicit binding item plus the original Boolean/relation check.  This
+    function preserves source relation premises; it only skips relations that
+    [collect_skipped_relation_names] classified as static validation/typecheck
+    relations for the runtime profile. *)
 let rec prem_items_of_prem vm (p : prem) : prem_item list =
   match p.it with
   | RulePr (id, _, e) when sanitize id.it = "Expand" ->
@@ -13966,7 +13894,8 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
       let t = translate_prem inner vm in
       if t.text = "" || t.text = "owise" then [] else [PremBool t]
 
-(* Legacy single-result wrapper kept for callers that haven't migrated *)
+(* Compatibility single-result wrapper kept for callers that still consume a
+   single scheduled premise item. *)
 let prem_item_of_prem vm (p : prem) : prem_item option =
   match prem_items_of_prem vm p with
   | [] -> None
@@ -14724,48 +14653,6 @@ let optional_empty_substs binders vm lhs_texts =
 let cond_mentions_optional opt_subst cond =
   List.exists (fun (opt_v, _) -> maude_var_occurs cond opt_v) opt_subst
 
-let typed_index_last_arg_vars cond =
-  try
-    let comma = String.rindex cond ',' in
-    let tail =
-      String.sub cond (comma + 1) (String.length cond - comma - 1)
-      |> Str.global_replace (Str.regexp "[). \t\n\r]+$") ""
-    in
-    extract_vars_from_maude tail |> List.filter is_bindable_name
-  with Not_found -> []
-
-let typed_index_empty_substs binders vm conds =
-  let star_vars = star_binder_vars binders vm in
-  conds
-  |> List.filter_map (fun cond ->
-      let cond = String.trim cond in
-      if not (contains_substring cond "$typed-index") then None
-      else
-        let index_vars = typed_index_last_arg_vars cond in
-        match
-          List.find_opt
-            (fun v ->
-              List.mem v star_vars || Hashtbl.mem source_var_seq_elem_sorts v)
-            index_vars
-        with
-        | None -> None
-        | Some index_v ->
-            (try
-               let pos = Str.search_forward (Str.regexp_string ":=") cond 0 in
-               let lhs = String.sub cond 0 pos in
-               let rhs =
-                 String.sub cond (pos + 2) (String.length cond - pos - 2)
-                 |> String.trim
-               in
-               if not (starts_with rhs "$typed-index") then None else
-               let lhs_vars =
-                 extract_vars_from_maude lhs
-                 |> List.filter is_bindable_name
-               in
-               Some (cond, List.sort_uniq String.compare (index_v :: lhs_vars))
-             with Not_found -> None))
-  |> List.sort_uniq compare
-
 let optionalize_cond_parts opt_vars ~drop_guards conds =
   conds
   |> List.filter (fun cond ->
@@ -14825,7 +14712,7 @@ let source_pattern_typecheck_guard raw term =
     candidates
     |> List.find_map (fun sort ->
         match source_type_term_for_sort sort with
-        | Some type_term when jhs_carrier_sort_for_source_sort sort <> None ->
+        | Some type_term when spectec_carrier_sort_for_source_sort sort <> None ->
             Some (Printf.sprintf "typecheck(%s, %s) = true" term type_term)
         | _ -> None)
 
@@ -14952,6 +14839,12 @@ let rhs_computed_sequence_ctor_arg_bindings prefix eq_idx (rhs_t : texpr) =
              List.rev !scheds,
              List.rev !typed_vars)
 
+(** Translate a SpecTec [DecD] definition to Maude [eq]/[ceq] clauses.
+
+    The source function name determines the Maude function name.  Premises are
+    scheduled so variables are bound before use, but unconditional source defs
+    remain equations and conditional source defs remain conditional equations
+    whenever Maude can express their premises as conditions. *)
 let translate_decd ss id params result_typ insts =
   let func_name = sanitize id.it in
   let maude_fn =
@@ -15035,7 +14928,7 @@ let translate_decd ss id params result_typ insts =
     let by_type_term =
       let type_term =
         (translate_typ_texpr result_typ []).text
-        |> jhs_type_term_key
+        |> spectec_type_term_key
       in
       SSet.mem type_term !raw_payload_type_terms
     in
@@ -15127,7 +15020,7 @@ let translate_decd ss id params result_typ insts =
     let bconds =
       binder_to_type_conds binders vm
       |> List.filter_map (fun (mv, cond) ->
-          match jhs_condition_of_source_guard cond with
+          match spectec_condition_of_source_guard cond with
           | Some cond' -> Some (mv, cond')
           | None -> None)
     in
@@ -15249,7 +15142,7 @@ let translate_decd ss id params result_typ insts =
       |> List.filter (fun (mv, cond) ->
           List.mem mv lhs_set
           && not (List.mem mv prem_binds)
-          && (not (List.mem mv lhs_vars) || is_jhs_typecheck_guard cond))
+          && (not (List.mem mv lhs_vars) || is_spectec_typecheck_guard cond))
       |> List.map snd
       |> rewrite_literal_payload_typecheck_conds
            (String.concat " " (lhs_strs @ [rhs_t.text] @ prem_strs)) in
@@ -15762,10 +15655,10 @@ let translate_step_reld exec_kind rel_name rules =
             | Some (_term, sort) ->
                 (match source_type_term_for_sort sort with
                  | Some type_term
-                     when jhs_carrier_sort_for_source_sort sort <> None
-                          && source_name_of_spectec_type_head (jhs_type_head type_term) = "instr" ->
+                     when spectec_carrier_sort_for_source_sort sort <> None
+                          && source_name_of_spectec_type_head (spectec_type_head type_term) = "instr" ->
                      None
-                 | _ -> jhs_condition_of_source_guard cond)
+                 | _ -> spectec_condition_of_source_guard cond)
             | None -> Some cond
           in
           let bconds =
@@ -16336,6 +16229,12 @@ let same_maude_surface a b =
   in
   normalize a = normalize b
 
+(** Translate a SpecTec [RelD] relation to Maude rewrite rules.
+
+    Source relation rules lower to [rl]/[crl] over the [Judgement] carrier.
+    Validation/typecheck relations may be skipped by the runtime profile, but
+    execution relations and source premises such as [Expand] must stay
+    source-derived rather than being replaced by harness-only shortcuts. *)
 let translate_reld ?(result_execution=false) _id rel_name rules =
   register_infer_rel_rules rel_name rules;
   let translate_result_execution_reld () =
@@ -16488,8 +16387,8 @@ let translate_reld ?(result_execution=false) _id rel_name rules =
         (match c.it with TupE el -> List.length el | _ -> 1))
     | [] -> 0 in
   let use_rewrite_judgement =
-    (* C1 policy experiment:
-       A SpecTec relation rule should be emitted as a Maude rl/crl,
+    (* Relation lowering policy:
+       a SpecTec relation rule should be emitted as a Maude rl/crl,
        rather than as an equational validity test. *)
     lower_all_reld_as_rewrite
   in
@@ -16776,20 +16675,7 @@ let translate_reld ?(result_execution=false) _id rel_name rules =
                 ~suffix:(Printf.sprintf "-opt-var-empty%d" i)
                 lhs_text (cond_join conds))
         in
-        let typed_index_empty_rules =
-          typed_index_empty_substs binders vm all_conds
-          |> List.mapi (fun i (drop_cond, empty_vars) ->
-              let lhs_text = replace_maude_vars_with_eps empty_vars lhs_t.text in
-              let conds =
-                all_conds
-                |> List.filter (fun c -> String.trim c <> String.trim drop_cond)
-                |> List.map (replace_maude_vars_with_eps empty_vars)
-              in
-              emit_rule
-                ~suffix:(Printf.sprintf "-typed-index-empty%d" i)
-                lhs_text (cond_join conds))
-        in
-	        let iter_empty_rules =
+        let iter_empty_rules =
 	          let optional_subsets =
 	            [] :: (optional_literal_indices |> nonempty_subsets)
 	          in
@@ -16832,7 +16718,7 @@ let translate_reld ?(result_execution=false) _id rel_name rules =
         in
         String.concat "\n"
           (exec_tail_rules @ optional_literal_rules @ optional_binder_rules
-           @ typed_index_empty_rules @ iter_empty_rules @ [base_rule])
+           @ iter_empty_rules @ [base_rule])
   ) rules in
 
   let truly_free = List.filter (fun v -> not (List.mem v !all_bound)) !all_free in
@@ -16910,7 +16796,6 @@ type prelude_features = {
   uses_bool_wrapper : bool;
   uses_has_type : bool;
   uses_sequence_index : bool;
-  uses_typed_index : bool;
   uses_repeat : bool;
   uses_slice : bool;
   uses_star_prefix : bool;
@@ -17016,7 +16901,6 @@ let prelude_features_of_source defs ss generated_text token_ops =
     uses_has_type =
       (not drop_runtime_typecheck_guards) && !feature_uses_has_type;
     uses_sequence_index = ss.scan_uses_sequence_index || has "index (" || has "index(";
-    uses_typed_index = has "$typed-index";
     uses_repeat = ss.scan_uses_repeat || has "$repeat";
     uses_slice = ss.scan_uses_slice || has "slice (" || has "slice(";
     uses_star_prefix = !feature_uses_star_prefix;
@@ -17252,7 +17136,7 @@ let header_prefix features =
    else "") ^
   "  --- Source category names are not emitted as Maude syntax sorts.\n\n" ^
   "  --- Judgement sort for RelD relations.\n" ^
-  "  --- Strict C1: source relation rules lower to primary `rl/crl => valid`.\n" ^
+  "  --- Source relation rules lower to primary `rl/crl => valid`.\n" ^
   "  --- Definitional equations remain `eq/ceq` when they translate source defs.\n" ^
   "  sort Judgement .\n" ^
   "  sort ValidJudgement .\n" ^
@@ -18121,33 +18005,6 @@ let infer_rel_helper_block () =
                                 helper_name inputs' target' cond')
                           |> String.concat ""
                         in
-                        let typed_index_empty_eqs =
-                          let cond_parts = cond_parts_of_text cond in
-                          typed_index_empty_substs binders vm cond_parts
-                          |> List.mapi (fun empty_i (drop_cond, empty_vars) ->
-                              let rewrite_texpr (t : texpr) =
-                                let text = replace_maude_vars_with_eps empty_vars t.text in
-                                { text;
-                                  vars =
-                                    extract_vars_from_maude text
-                                    |> List.filter is_bindable_name
-                                    |> uniq_vars }
-                              in
-                              let inputs' = List.map rewrite_texpr inputs in
-                              let target' = rewrite_texpr target in
-                              let cond' =
-                                cond_parts
-                                |> List.filter (fun c ->
-                                    String.trim c <> String.trim drop_cond)
-                                |> List.map (replace_maude_vars_with_eps empty_vars)
-                                |> cond_join
-                              in
-                              emit_infer_eq
-                                (rule_label ^
-                                 Printf.sprintf "-typed-index-empty%d" empty_i)
-                                helper_name inputs' target' cond')
-                          |> String.concat ""
-                        in
                         let singleton_eq =
                           match singleton_seq_input inputs with
                           | None -> ""
@@ -18165,7 +18022,7 @@ let infer_rel_helper_block () =
                               let cond' = replace_maude_var_token rest "eps" cond in
                               emit_infer_eq (rule_label ^ "-singleton") helper_name inputs' target' cond'
                           in
-                          base_eq ^ optional_binder_eqs ^ typed_index_empty_eqs ^ singleton_eq)
+                          base_eq ^ optional_binder_eqs ^ singleton_eq)
             |> List.mapi (fun order text -> (infer_chunk_priority text, order, text))
             |> List.sort (fun (pa, oa, _) (pb, ob, _) -> compare (pa, oa) (pb, ob))
             |> List.map (fun (_, _, text) -> text)
@@ -18183,10 +18040,10 @@ let infer_rel_helper_block () =
     in
     discover_closure ();
     let helpers = current_helpers () in
-    "\n  --- Non-C1-final execution support for source relation premises with\n" ^
+    "\n  --- Execution support for source relation premises with\n" ^
     "  --- witness variables that Maude rewriting cannot synthesize directly.\n" ^
     "  --- Helpers are generated from source RelD rules; primary rl/crl rules\n" ^
-    "  --- remain the authoritative strict C1 translation.\n" ^
+    "  --- remain the authoritative source-rule translation.\n" ^
     String.concat "" (List.map op_decl_for helpers) ^
     "\n" ^
     String.concat "\n" (List.map emit_helper helpers) ^ "\n"
@@ -19340,6 +19197,12 @@ let lift_category_subsorts_to_sequence_subsorts subsort_decls =
        else None)
   |> List.sort_uniq String.compare
 
+(** Top-level backend pipeline.
+
+    This is the only function that sees the whole SpecTec IL program.  It
+    resets translation state, collects source metadata, translates every
+    definition, emits source-derived helper blocks, rewrites the syntax layer to
+    the Spectec carrier shape, and returns the final Maude module text. *)
 let translate defs =
   iter_rel_helpers := [];
   infer_rel_helpers := [];
@@ -19580,11 +19443,11 @@ let translate defs =
     then "SpectecTerminal"
     else sort
   in
-  let _core_eqs_for_jhs_decl, category_memberships_for_jhs_decl =
+  let _core_eqs_for_spectec_decl, category_memberships_for_spectec_decl =
     partition_membership_statements eqs
   in
-  let jhs_kind_terminal_var_names =
-    jhs_kind_terminal_vars_from_memberships category_memberships_for_jhs_decl
+  let spectec_kind_terminal_var_names =
+    spectec_kind_terminal_vars_from_memberships category_memberships_for_spectec_decl
   in
   let final_var_decl_sort_for_name name sort =
     if sort = "Frame"
@@ -19599,7 +19462,7 @@ let translate defs =
       | _ ->
           let sort' = final_var_decl_sort sort in
           if sort' = "SpectecTerminal"
-             && SSet.mem name jhs_kind_terminal_var_names
+             && SSet.mem name spectec_kind_terminal_var_names
           then "[SpectecTerminal]"
           else sort')
   in
@@ -19690,7 +19553,7 @@ let translate defs =
 	    raw_decls
 	    |> List.filter_map filter_ctor_conflicting_var_decl
 	    |> List.concat_map normalize_source_category_var_decl
-	    |> List.filter_map jhs_rewrite_decl_line
+	    |> List.filter_map spectec_rewrite_decl_line
 	    |> List.concat_map (fun line ->
 	         if Str.string_match re_var_decl line 0 then
 	           let names = Str.matched_group 1 line in
@@ -19769,38 +19632,38 @@ let translate defs =
   in
   let conflict_var_decls =
     conflict_var_decls
-    |> List.filter_map jhs_rewrite_decl_line
+    |> List.filter_map spectec_rewrite_decl_line
   in
-  let jhs_category_memberships, membership_type_terms =
-    jhs_membership_statements category_memberships
+  let spectec_category_memberships, spectec_membership_type_terms =
+    spectec_membership_statements category_memberships
   in
-  let jhs_category_memberships =
-    jhs_category_memberships
+  let spectec_category_memberships =
+    spectec_category_memberships
     |> List.filter (fun stmt -> not (non_ground_total_constructor_membership stmt))
   in
-  let jhs_partial_ops =
-    jhs_partial_constructor_ops jhs_category_memberships
+  let spectec_partial_ops =
+    spectec_partial_constructor_ops spectec_category_memberships
   in
-  let jhs_subsort_eqs, subsort_type_terms =
-    jhs_subsort_typecheck_eqs ()
+  let spectec_subsort_eqs, spectec_subsort_type_terms =
+    spectec_subsort_typecheck_eqs ()
   in
   let used_type_terms =
-    SSet.union membership_type_terms subsort_type_terms
+    SSet.union spectec_membership_type_terms spectec_subsort_type_terms
   in
   let declared_type_heads = collect_typd_type_constructor_heads defs in
   let type_constructor_decls =
     spectec_type_constructor_decls defs
-    @ jhs_extra_type_constructor_decls declared_type_heads used_type_terms
+    @ spectec_extra_type_constructor_decls declared_type_heads used_type_terms
     @ [Printf.sprintf "  var %s : [SpectecTerminal] ." spectec_term_var]
   in
   let decls =
     List.sort_uniq String.compare
       (decls @ conflict_var_decls @ type_constructor_decls)
-    |> List.map (jhs_partialize_decl_line jhs_partial_ops)
+    |> List.map (spectec_partialize_decl_line spectec_partial_ops)
     |> collapse_var_decls
   in
   let eqs =
-    core_eqs @ pred_eqs @ jhs_subsort_eqs @ jhs_category_memberships
+    core_eqs @ pred_eqs @ spectec_subsort_eqs @ spectec_category_memberships
     |> List.map simplify_trivial_membership_statement
   in
   header ^ "\n  --- Declarations\n" ^ String.concat "\n" decls ^

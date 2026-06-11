@@ -1,6 +1,6 @@
 # Current Limitations And Discussion Points
 
-Updated: 2026-06-09
+Updated: 2026-06-11
 
 This document records the current state after restoring the
 `SpectecType`/`typecheck` syntax layer and adding Maude constructor membership
@@ -105,10 +105,10 @@ This plumbing is not a source category predicate and is not a replacement for
 the generated `typecheck`/`mb`/`cmb` syntax layer.  It exists only because
 numeric operations still compute over Maude builtin integers internally.
 
-## 4. Module-ok Is Not The Default Gate
+## 4. Validation Is Externalized In The Runtime Artifact
 
-The full generated core still contains SpecTec validation relations because
-they are part of the source:
+The current runtime artifact does not use translated SpecTec validation
+relations as the execution gate:
 
 ```text
 Module-ok
@@ -118,15 +118,17 @@ Instrs-ok
 ...
 ```
 
-But the default WAT/Wasm frontend path does not use translated `Module-ok` to
+The default WAT/Wasm frontend path does not use translated `Module-ok` to
 decide whether execution may start.  Invalid programs are rejected before Maude
-execution by the official SpecTec/WebAssembly validator.
+execution by the official SpecTec/WebAssembly validator, and Maude focuses on
+dynamic execution.
 
 Open point:
 
 ```text
-Should the paper artifact keep full source validation in output.maude, or
-should we produce a separate runtime-only profile after external validation?
+Should the paper artifact include a separate full validation profile, or should
+the submitted runtime artifact keep validation externalized through the
+official parser-validator?
 ```
 
 ## 5. Runtime Profile Split Is Not Finished
@@ -134,13 +136,12 @@ should we produce a separate runtime-only profile after external validation?
 A clean final structure should probably provide two artifacts:
 
 ```text
-output_full_bs.maude      full SpecTec translation, including validation
-output_runtime_bs.maude   dynamic runtime profile after external validation
+output_full.maude      full SpecTec translation, including validation
+output_runtime.maude   dynamic runtime profile after external validation
 ```
 
-This is not fully implemented yet.  A naive removal of validation files fails
-because `4.4-execution.modules.spectec` contains `$instantiate` premises that
-refer to `Module_ok`.
+This is not fully implemented yet.  The current artifact is the runtime-facing
+profile.
 
 Therefore the next cleanup must be explicit:
 
@@ -153,11 +154,11 @@ Therefore the next cleanup must be explicit:
 The main remaining source-absent mechanisms are:
 
 ```text
-$infer-*       witness inference for relation premises
 $cont-*        continuation lowering for ordered def premises
 meta-notation lowering helpers for star/optional/map/range/otherwise forms
 $raw-lit       representation-boundary numeric projection
 $wrap-lit      representation-boundary numeric result preservation
+$unmap-*       source pair-sequence inversion for vector definitions
 ```
 
 These are not benchmark-specific hardcoding, but they are still not literally
@@ -203,9 +204,10 @@ make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
                                                      PASS
-maude -no-banner output.maude                        PASS, warnings: 6,
+python3 scripts/audit_translator_cleanup.py          PASS
+maude -no-banner output.maude                        PASS, warnings: 2,
                                                      fatal diagnostics: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 6,
+maude -no-banner wasm-exec.maude                     PASS, warnings: 2,
                                                      fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
@@ -225,8 +227,6 @@ Important interpretation:
 
 - Maude load warnings are currently parser-ambiguity warnings, not load errors.
 - The remaining warnings are mainly:
-  - 4 typed-index/sequence-pattern ambiguities from the associative
-    source-sequence operator `_ _`;
   - 2 `norm(...)`/`subnorm(...)` float syntax warnings from source numeric
     conditions and numeric constructor arguments.
 - Numeric `uN`/`sN` range conditions are now rendered in a source-readable

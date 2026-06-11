@@ -64,7 +64,7 @@ Examples:
 Notes:
   - run defaults to execution-only (--unchecked-run) so small demos print a result.
   - validate checks the official SpecTec/Wasm parser-validator input path.
-  - maude-validate is an experimental debug command for the generated Module-ok path.
+  - maude-validate is an experimental debug command for validation-profile work.
 |};
   exit 0
 
