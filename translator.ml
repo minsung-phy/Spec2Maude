@@ -13853,8 +13853,6 @@ let iter_rule_prem_item vm rel_id e xes =
 
 let rec prem_items_of_prem vm (p : prem) : prem_item list =
   match p.it with
-  | RulePr (id, _, _) when is_skipped_relation_name id.it ->
-      []
   | RulePr (id, _, e) when sanitize id.it = "Expand" ->
       (match e.it with
        | TupE [dt_e; out_e] ->
@@ -13869,6 +13867,8 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
        | _ ->
            let t = translate_prem p vm in
            if t.text = "" || t.text = "owise" then [] else [PremBool t])
+  | RulePr (id, _, _) when is_skipped_relation_name id.it ->
+      []
   | RulePr (id, _, e) ->
       let args =
         match e.it with
@@ -13880,7 +13880,9 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
       else [PremRel { rel_name = sanitize id.it; args; text = t.text }]
   | ElsePr -> []
   | IterPr ({ it = RulePr (rel_id, mixop, e); _ } as inner, (List, xes)) ->
-      if is_skipped_relation_name rel_id.it then []
+      if sanitize rel_id.it = "Expand" then
+        prem_items_of_prem vm { inner with it = RulePr (rel_id, mixop, e) }
+      else if is_skipped_relation_name rel_id.it then []
       else
       (match iter_rule_prem_item vm rel_id e xes with
        | Some item -> [item]
