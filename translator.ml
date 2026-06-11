@@ -965,19 +965,35 @@ let split_top_level_terms ?(drop_eps=true) s =
 let split_top_level_terms_preserve_eps s =
   split_top_level_terms ~drop_eps:false s
 
+let matching_closing_paren text open_i =
+  let len = String.length text in
+  let rec loop i depth =
+    if i >= len then None
+    else
+      match text.[i] with
+      | '(' -> loop (i + 1) (depth + 1)
+      | ')' ->
+          let depth = depth - 1 in
+          if depth = 0 then Some i else loop (i + 1) depth
+      | _ -> loop (i + 1) depth
+  in
+  if open_i >= 0 && open_i < len && text.[open_i] = '(' then
+    loop open_i 0
+  else None
+
 let parse_call_text text =
   let text = strip_wrapping_parens text |> String.trim in
   try
     let open_i = String.index text '(' in
-    let close_i = String.rindex text ')' in
-    if close_i <= open_i then None
-    else
+    match matching_closing_paren text open_i with
+    | Some close_i when close_i = String.length text - 1 ->
       let fn = String.sub text 0 open_i |> String.trim in
       let args =
         String.sub text (open_i + 1) (close_i - open_i - 1)
         |> split_top_level_commas
       in
       if fn = "" then None else Some (fn, args)
+    | _ -> None
   with Not_found -> None
 
 let parse_source_ctor_surface_text text =
@@ -1140,9 +1156,8 @@ let parse_full_call_text text =
   let text = safe_strip_source_syntax_wrapping_parens text in
   try
     let open_i = String.index text '(' in
-    let close_i = String.rindex text ')' in
-    if close_i <> String.length text - 1 || close_i <= open_i then None
-    else
+    match matching_closing_paren text open_i with
+    | Some close_i when close_i = String.length text - 1 ->
       let fn = String.sub text 0 open_i |> String.trim in
       if fn = "" || String.contains fn ' ' then None
       else
@@ -1151,6 +1166,7 @@ let parse_full_call_text text =
           |> split_top_level_commas
         in
         Some (fn, args)
+    | _ -> None
   with Not_found -> None
 
 let pretty_source_call_text fn args =
@@ -1180,6 +1196,10 @@ let rec pretty_source_syntax_expr text =
     Printf.sprintf "( %s %s %s )"
       (pretty_source_syntax_expr a) sym (pretty_source_syntax_expr b)
   in
+  let sub_as_plus_neg a b =
+    Printf.sprintf "( %s + - %s )"
+      (pretty_source_syntax_expr a) (pretty_source_syntax_expr b)
+  in
   match parse_full_call_text core with
   | Some ("$raw-lit", [arg]) -> pretty_source_syntax_expr arg
   | Some ("$wrap-lit", [_typ; arg]) -> pretty_source_syntax_expr arg
@@ -1192,7 +1212,7 @@ let rec pretty_source_syntax_expr text =
   | Some ("_>_", [a; b]) -> bin ">" a b
   | Some ("_>=_", [a; b]) -> bin ">=" a b
   | Some ("_+_", [a; b]) -> bin "+" a b
-  | Some ("_-_", [a; b]) -> bin "-" a b
+  | Some ("_-_", [a; b]) -> sub_as_plus_neg a b
   | Some ("_*_", [a; b]) -> bin "*" a b
   | Some ("_^_", [a; b]) -> bin "^" a b
   | Some ("_quo_", [a; b]) -> bin "quo" a b
@@ -4843,12 +4863,66 @@ let format_call fn = function
       in
       Printf.sprintf "%s(%s)" fn (String.concat ", " (List.map norm_arg args))
 
+let maude_infix op a b =
+  Printf.sprintf "( %s %s %s )" (String.trim a) op (String.trim b)
+
+let maude_sub_as_plus_neg a b =
+  maude_infix "+" a (Printf.sprintf "- %s" (String.trim b))
+
+let maude_builtin_call fn args =
+  match fn, List.map String.trim args with
+  | "_and_", [a; b] -> maude_infix "and" a b
+  | "_or_", [a; b] -> maude_infix "or" a b
+  | "_implies_", [a; b] -> maude_infix "implies" a b
+  | "_==_", [a; b] -> maude_infix "==" a b
+  | "_=/=_", [a; b] -> maude_infix "=/=" a b
+  | "_<_", [a; b] -> maude_infix "<" a b
+  | "_<=_", [a; b] -> maude_infix "<=" a b
+  | "_>_", [a; b] -> maude_infix ">" a b
+  | "_>=_", [a; b] -> maude_infix ">=" a b
+  | "_+_", [a; b] -> maude_infix "+" a b
+  | "_-_", [a; b] -> maude_sub_as_plus_neg a b
+  | "_*_", [a; b] -> maude_infix "*" a b
+  | "_quo_", [a; b] -> maude_infix "quo" a b
+  | "_rem_", [a; b] -> maude_infix "rem" a b
+  | "_^_", [a; b] -> maude_infix "^" a b
+  | _ -> format_call fn args
+
+let split_top_level_infix_symbol symbol text =
+  let text = safe_strip_source_syntax_wrapping_parens text in
+  let len = String.length text in
+  let sym_len = String.length symbol in
+  let boundary i =
+    i < 0 || i >= len || text.[i] = ' ' || text.[i] = '\t'
+    || text.[i] = '\n' || text.[i] = '\r'
+    || text.[i] = '(' || text.[i] = ')'
+  in
+  let rec loop i depth =
+    if i + sym_len > len then None
+    else
+      let depth =
+        match text.[i] with
+        | '(' -> depth + 1
+        | ')' -> max 0 (depth - 1)
+        | _ -> depth
+      in
+      if depth = 0
+         && String.sub text i sym_len = symbol
+         && boundary (i - 1)
+         && boundary (i + sym_len)
+      then
+        Some (String.sub text 0 i,
+              String.sub text (i + sym_len) (len - i - sym_len))
+      else loop (i + 1) depth
+  in
+  loop 0 0
+
 let format_bool_source_call fn args =
   let args = List.map pretty_source_syntax_expr args in
   match fn, args with
-  | "_or_", [a; b] -> Printf.sprintf "%s or %s" a b
-  | "_and_", [a; b] -> Printf.sprintf "%s and %s" a b
-  | _ -> format_call fn args
+  | "_or_", [a; b] -> maude_infix "or" a b
+  | "_and_", [a; b] -> maude_infix "and" a b
+  | _ -> maude_builtin_call fn args
 
 let erase_source_typ_param_args fn args =
   match Hashtbl.find_opt source_typ_param_positions fn with
@@ -5248,7 +5322,7 @@ let rec normalize_empty_sequence_nil_conditions text =
       if (is_typed_sequence_nil_text left && String.trim right = "eps")
          || (String.trim left = "eps" && is_typed_sequence_nil_text right)
       then if fn = "_=/=_" then "false" else "true"
-      else format_call fn [left; right]
+      else maude_builtin_call fn [left; right]
   | Some (fn, args) when fn = "_or_" || fn = "_and_" ->
       let args =
         List.map normalize_empty_sequence_nil_conditions args
@@ -5284,12 +5358,10 @@ let normalize_sequence_eps_conditions typed_vars text =
            || (left_is_eps && is_typed_sequence_nil_text right)
         then if fn = "_=/=_" then "false" else "true"
         else if is_seq_var left && right_is_eps then
-          if fn = "_=/=_" then format_call "_>_" [format_call "len" [left]; "0"]
-          else format_call "_==_" [format_call "len" [left]; "0"]
+          maude_builtin_call fn [left; "eps"]
         else if left_is_eps && is_seq_var right then
-          if fn = "_=/=_" then format_call "_>_" [format_call "len" [right]; "0"]
-          else format_call "_==_" [format_call "len" [right]; "0"]
-        else format_call fn [left; right]
+          maude_builtin_call fn ["eps"; right]
+        else maude_builtin_call fn [left; right]
     | Some (fn, args) when fn = "_or_" || fn = "_and_" ->
         let args = List.map go args |> List.map String.trim in
         (match fn, args with
@@ -6146,7 +6218,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
   | CvtE (e1, _, _) | SubE (e1, _, _) | ProjE (e1, _)
   | UncaseE (e1, _) -> translate_exp ctx e1 vm
   | UnE (op, _, e1) -> (match op with
-      | `MinusOp -> tmap (Printf.sprintf "_-_ ( 0, %s )") (translate_exp TermCtx e1 vm)
+      | `MinusOp -> tmap (maude_sub_as_plus_neg "0") (translate_exp TermCtx e1 vm)
       | `PlusOp -> translate_exp TermCtx e1 vm
       | `NotOp ->
           let t = translate_exp BoolCtx e1 vm in
@@ -6161,7 +6233,7 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
       and t2 =
         translate_exp TermCtx e2 vm |> raw_literal_texpr_for_numeric_context
       in
-      { text = wrap_bool ctx (Printf.sprintf "%s ( %s, %s )" op_str t1.text t2.text);
+      { text = wrap_bool ctx (maude_builtin_call op_str [t1.text; t2.text]);
         vars = t1.vars @ t2.vars }
   | CallE (id, args) ->
       let fn = call_name id.it in
@@ -6389,12 +6461,21 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                            Some args
                        | _ -> None
                      in
-                     let same_arg arg expected =
-                       norm_ws (strip_wrapping_parens arg) = norm_ws expected
-                     in
                      match listn_index_var with
                      | None -> None
                      | Some idx ->
+                         let idx_names =
+                           if starts_with idx "FREE-" then
+                             [idx; String.sub idx 5 (String.length idx - 5)]
+                           else [idx; "FREE-" ^ idx]
+                         in
+                         let is_idx_text text =
+                           let text =
+                             norm_ws
+                               (safe_strip_source_syntax_wrapping_parens text)
+                           in
+                           List.exists (fun cand -> text = norm_ws cand) idx_names
+                         in
                          let widx_ctor =
                            Option.value (source_index_wrapper_ctor ())
                              ~default:""
@@ -6407,16 +6488,27 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                            Option.value (source_indexed_deftype_ctor ())
                              ~default:""
                          in
-                         if exact (format_source_ctor_call widx_ctor [idx])
+                         let infix_add_start haystack =
+                           match split_top_level_infix_symbol "+" haystack with
+                           | Some (start, right)
+                               when is_idx_text right ->
+                               Some (String.trim start)
+                           | _ -> None
+                         in
+                         if List.exists
+                              (fun idx -> exact (format_source_ctor_call widx_ctor [idx]))
+                              idx_names
                             || (match ctor_args widx_ctor with
-                                | Some [arg] when same_arg arg idx -> true
+                                | Some [arg] when is_idx_text arg -> true
                                 | _ -> false)
                          then
                            Some { text = Printf.sprintf "$idx-range ( %s )" count_text;
                                   vars = vars_without_index idx }
-                         else if exact (format_source_ctor_call rec_ctor [idx])
+                         else if List.exists
+                                   (fun idx -> exact (format_source_ctor_call rec_ctor [idx]))
+                                   idx_names
                                  || (match ctor_args rec_ctor with
-                                     | Some [arg] when same_arg arg idx -> true
+                                     | Some [arg] when is_idx_text arg -> true
                                      | _ -> false)
                          then
                            Some { text = Printf.sprintf "$rec-range ( %s )" count_text;
@@ -6430,6 +6522,11 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                                Some { text = Printf.sprintf "$nat-range-from ( %s, %s )" start count_text;
                                        vars = vars_without_index idx }
                            | None ->
+                           (match infix_add_start text with
+                            | Some start ->
+                                Some { text = Printf.sprintf "$nat-range-from ( %s, %s )" start count_text;
+                                       vars = vars_without_index idx }
+                            | None ->
                            (match extract_between
                                     (Printf.sprintf "%s ( ( _+_ ( " widx_ctor)
                                     (Printf.sprintf ", %s ) ) )" idx)
@@ -6440,11 +6537,21 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                             | None ->
                                 (match ctor_args widx_ctor with
                                  | Some [arg] ->
-                                     (match extract_between_text arg "_+_ ( " (Printf.sprintf ", %s )" idx) with
+                                     (match
+                                        idx_names
+                                        |> List.find_map (fun idx ->
+                                             extract_between_text arg "_+_ ( "
+                                               (Printf.sprintf ", %s )" idx))
+                                      with
                                       | Some start ->
                                           Some { text = Printf.sprintf "$idx-range-from ( %s, %s )" start count_text;
                                                  vars = vars_without_index idx }
-                                      | None -> None)
+                                      | None ->
+                                          (match infix_add_start arg with
+                                           | Some start ->
+                                               Some { text = Printf.sprintf "$idx-range-from ( %s, %s )" start count_text;
+                                                      vars = vars_without_index idx }
+                                           | None -> None))
                                  | _ -> None)
                                 |> (function
                                     | Some _ as found -> found
@@ -6458,10 +6565,10 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
                                             vars = vars_without_index idx }
                                  | None ->
                                      (match ctor_args wdef_ctor with
-                                      | Some [rt; arg] when same_arg arg idx ->
+                                      | Some [rt; arg] when is_idx_text arg ->
                                           Some { text = Printf.sprintf "$def-range ( %s, %s )" rt count_text;
                                                  vars = vars_without_index idx }
-                                      | _ -> None)))))
+                                      | _ -> None))))))
                    in
                    (match indexed_listn () with
                     | Some t -> t
@@ -6550,12 +6657,21 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
 	                           Some args
 	                       | _ -> None
 	                     in
-	                     let same_arg arg expected =
-	                       norm_ws (strip_wrapping_parens arg) = norm_ws expected
-	                     in
 	                     match listn_index_var with
 	                     | None -> None
 	                     | Some idx ->
+	                         let idx_names =
+	                           if starts_with idx "FREE-" then
+	                             [idx; String.sub idx 5 (String.length idx - 5)]
+	                           else [idx; "FREE-" ^ idx]
+	                         in
+	                         let is_idx_text text =
+	                           let text =
+	                             norm_ws
+	                               (safe_strip_source_syntax_wrapping_parens text)
+	                           in
+	                           List.exists (fun cand -> text = norm_ws cand) idx_names
+	                         in
 	                         let widx_ctor =
 	                           Option.value (source_index_wrapper_ctor ())
 	                             ~default:""
@@ -6568,16 +6684,27 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
 	                           Option.value (source_indexed_deftype_ctor ())
 	                             ~default:""
 	                         in
-	                         if exact (format_source_ctor_call widx_ctor [idx])
+	                         let infix_add_start haystack =
+	                           match split_top_level_infix_symbol "+" haystack with
+	                           | Some (start, right)
+	                               when is_idx_text right ->
+	                               Some (String.trim start)
+	                           | _ -> None
+	                         in
+	                         if List.exists
+	                              (fun idx -> exact (format_source_ctor_call widx_ctor [idx]))
+	                              idx_names
 	                            || (match ctor_args widx_ctor with
-	                                | Some [arg] when same_arg arg idx -> true
+	                                | Some [arg] when is_idx_text arg -> true
 	                                | _ -> false)
 	                         then
 	                           Some { text = Printf.sprintf "$idx-range ( %s )" count_text;
 	                                  vars = vars_without_index idx }
-	                         else if exact (format_source_ctor_call rec_ctor [idx])
+	                         else if List.exists
+	                                   (fun idx -> exact (format_source_ctor_call rec_ctor [idx]))
+	                                   idx_names
 	                                 || (match ctor_args rec_ctor with
-	                                     | Some [arg] when same_arg arg idx -> true
+	                                     | Some [arg] when is_idx_text arg -> true
 	                                     | _ -> false)
 	                         then
 	                           Some { text = Printf.sprintf "$rec-range ( %s )" count_text;
@@ -6591,6 +6718,11 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
 	                                Some { text = Printf.sprintf "$nat-range-from ( %s, %s )" start count_text;
 	                                       vars = vars_without_index idx }
 	                            | None ->
+	                                (match infix_add_start text with
+	                                 | Some start ->
+	                                     Some { text = Printf.sprintf "$nat-range-from ( %s, %s )" start count_text;
+	                                            vars = vars_without_index idx }
+	                                 | None ->
 	                                (match extract_between
 	                                         (Printf.sprintf "%s ( ( _+_ ( " widx_ctor)
 	                                         (Printf.sprintf ", %s ) ) )" idx)
@@ -6601,11 +6733,21 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
 	                                 | None ->
 	                                     (match ctor_args widx_ctor with
 	                                      | Some [arg] ->
-	                                          (match extract_between_text arg "_+_ ( " (Printf.sprintf ", %s )" idx) with
+	                                          (match
+	                                             idx_names
+	                                             |> List.find_map (fun idx ->
+	                                                  extract_between_text arg "_+_ ( "
+	                                                    (Printf.sprintf ", %s )" idx))
+	                                           with
 	                                           | Some start ->
 	                                               Some { text = Printf.sprintf "$idx-range-from ( %s, %s )" start count_text;
 	                                                      vars = vars_without_index idx }
-	                                           | None -> None)
+	                                           | None ->
+	                                               (match infix_add_start arg with
+	                                                | Some start ->
+	                                                    Some { text = Printf.sprintf "$idx-range-from ( %s, %s )" start count_text;
+	                                                           vars = vars_without_index idx }
+	                                                | None -> None))
 	                                      | _ -> None)
 	                                     |> (function
 	                                         | Some _ as found -> found
@@ -6619,10 +6761,10 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
 	                                                 vars = vars_without_index idx }
 	                                      | None ->
 	                                          (match ctor_args wdef_ctor with
-	                                           | Some [rt; arg] when same_arg arg idx ->
+	                                           | Some [rt; arg] when is_idx_text arg ->
 	                                               Some { text = Printf.sprintf "$def-range ( %s, %s )" rt count_text;
 	                                                      vars = vars_without_index idx }
-	                                           | _ -> None)))))
+	                                           | _ -> None))))))
 	                   in
 	                   (match indexed_listn () with
 	                    | Some t -> t
@@ -6795,7 +6937,7 @@ and translate_binop ctx op e1 e2 vm =
       (raw_literal_texpr_for_numeric_context t1,
        raw_literal_texpr_for_numeric_context t2)
   in
-  let text = Printf.sprintf "%s ( %s, %s )" op_name t1.text t2.text in
+  let text = maude_builtin_call op_name [t1.text; t2.text] in
   { text = if is_bool then wrap_bool ctx text else text; vars = t1.vars @ t2.vars }
 
 (* Translate `base [ path op= value ]` where `path` may be a chain of
@@ -12336,7 +12478,7 @@ let normalize_numeric_sequence_comparator_condition cond =
     | Some (fn, [a; b]) when numeric_comparator fn ->
         let a' = normalize_arg b a in
         let b' = normalize_arg a b in
-        let text' = format_call fn [a'; b'] in
+        let text' = maude_builtin_call fn [a'; b'] in
         if text' = core then None else Some text'
     | _ -> None
   in
@@ -12790,7 +12932,7 @@ let rec category_disjunction_side_condition vm e =
       (match category_disjunction_side_condition vm e1,
              category_disjunction_side_condition vm e2 with
        | Some t1, Some t2 ->
-           Some { text = Printf.sprintf "_or_ ( %s, %s )" t1.text t2.text;
+           Some { text = maude_builtin_call "_or_" [t1.text; t2.text];
                   vars = uniq_vars (t1.vars @ t2.vars) }
        | _ -> None)
   | _ -> None
@@ -16685,21 +16827,33 @@ let header_prefix features =
   let sequence_elem text =
     Printf.sprintf "( %s )" text
   in
-  let idx_range_prev = idx_range_ctor_term "_-_ ( LISTN-N, 1 )" in
+  let add a b = maude_builtin_call "_+_" [a; b] in
+  let sub a b = maude_sub_as_plus_neg a b in
+  let mul a b = maude_builtin_call "_*_" [a; b] in
+  let gt a b = maude_builtin_call "_>_" [a; b] in
+  let ge a b = maude_builtin_call "_>=_" [a; b] in
+  let le a b = maude_builtin_call "_<=_" [a; b] in
+  let listn_prev = sub "LISTN-N" "1" in
+  let repeat_n_prev = sub "REPEAT_N" "1" in
+  let repeat_count_prev = sub "REPEAT_COUNT" "1" in
+  let repeat_n_minus_i = sub "REPEAT_N" "REPEAT_I" in
+  let slice_n_prev = sub "SLICE_N" "1" in
+  let slice_i_prev = sub "SLICE_I" "1" in
+  let idx_range_prev = idx_range_ctor_term listn_prev in
   let idx_range_from_next =
-    idx_range_ctor_term "_+_ ( LISTN-START, _-_ ( LISTN-N, 1 ) )"
+    idx_range_ctor_term (add "LISTN-START" listn_prev)
   in
   let rec_range_next =
     match source_recursive_typevar_ctor () with
     | Some rec_ctor ->
-        format_source_ctor_call rec_ctor ["_-_ ( LISTN-N, 1 )"]
-    | None -> "_-_ ( LISTN-N, 1 )"
+        format_source_ctor_call rec_ctor [listn_prev]
+    | None -> listn_prev
   in
   let def_range_next =
     match source_indexed_deftype_ctor () with
     | Some wdef_ctor ->
-        format_source_ctor_call wdef_ctor ["LISTN-RT"; "_-_ ( LISTN-N, 1 )"]
-    | None -> "LISTN-RT _-_ ( LISTN-N, 1 )"
+        format_source_ctor_call wdef_ctor ["LISTN-RT"; listn_prev]
+    | None -> Printf.sprintf "LISTN-RT %s" listn_prev
   in
   generated_prelude_modules features ^
   "mod SPECTEC-CORE is\n" ^
@@ -16806,47 +16960,57 @@ let header_prefix features =
 	     "  eq $repeat(REPEAT_KIND_ELEM, 0) = eps .\n" ^
 	     "  eq $repeat(REPEAT_ELEM, 0) = eps .\n" ^
 	     "  eq len($repeat(REPEAT_ELEM, 0) REPEAT_REST) = len(REPEAT_REST) .\n" ^
-	     "  ceq len($repeat(REPEAT_ELEM, REPEAT_N) REPEAT_REST) = _+_ ( _*_ ( REPEAT_N, len(REPEAT_ELEM) ), len(REPEAT_REST) )\n" ^
-	     "   if _>_ ( REPEAT_N, 0 ) .\n" ^
+	     Printf.sprintf "  ceq len($repeat(REPEAT_ELEM, REPEAT_N) REPEAT_REST) = %s\n"
+	       (add (mul "REPEAT_N" "len(REPEAT_ELEM)") "len(REPEAT_REST)") ^
+	     Printf.sprintf "   if %s .\n" (gt "REPEAT_N" "0") ^
 	     "  eq typecheck($repeat(REPEAT_ELEM, 0) REPEAT_REST, REPEAT_WT) = typecheck(REPEAT_REST, REPEAT_WT) .\n" ^
 	     "  ceq typecheck($repeat(REPEAT_ELEM, REPEAT_N) REPEAT_REST, REPEAT_WT) = typecheck(REPEAT_REST, REPEAT_WT)\n" ^
-	     "   if _>_ ( REPEAT_N, 0 ) /\\ typecheck(REPEAT_ELEM, REPEAT_WT) .\n" ^
+	     Printf.sprintf "   if %s /\\ typecheck(REPEAT_ELEM, REPEAT_WT) .\n" (gt "REPEAT_N" "0") ^
 	     "  eq slice($repeat(REPEAT_SINGLE, REPEAT_N), REPEAT_I, 0) = eps .\n" ^
-	     "  ceq slice($repeat(REPEAT_SINGLE, REPEAT_N), 0, REPEAT_COUNT) = REPEAT_SINGLE slice($repeat(REPEAT_SINGLE, _-_ ( REPEAT_N, 1 )), 0, _-_ ( REPEAT_COUNT, 1 ))\n" ^
-	     "   if _>_ ( REPEAT_N, 0 ) /\\ _>_ ( REPEAT_COUNT, 0 ) .\n" ^
-	     "  ceq slice($repeat(REPEAT_SINGLE, REPEAT_N), REPEAT_I, REPEAT_COUNT) = slice($repeat(REPEAT_SINGLE, _-_ ( REPEAT_N, REPEAT_I )), 0, REPEAT_COUNT)\n" ^
-	     "   if _>_ ( REPEAT_I, 0 ) /\\ _>=_ ( REPEAT_N, REPEAT_I ) .\n" ^
-	     "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, _-_ ( REPEAT_N, 1 )) )\n" ^
-	     "   if _>_ ( REPEAT_N, 0 ) /\\ _<=_ ( REPEAT_N, 1024 ) .\n\n"
+	     Printf.sprintf "  ceq slice($repeat(REPEAT_SINGLE, REPEAT_N), 0, REPEAT_COUNT) = REPEAT_SINGLE slice($repeat(REPEAT_SINGLE, %s), 0, %s)\n"
+	       repeat_n_prev repeat_count_prev ^
+	     Printf.sprintf "   if %s /\\ %s .\n"
+	       (gt "REPEAT_N" "0") (gt "REPEAT_COUNT" "0") ^
+	     Printf.sprintf "  ceq slice($repeat(REPEAT_SINGLE, REPEAT_N), REPEAT_I, REPEAT_COUNT) = slice($repeat(REPEAT_SINGLE, %s), 0, REPEAT_COUNT)\n"
+	       repeat_n_minus_i ^
+	     Printf.sprintf "   if %s /\\ %s .\n"
+	       (gt "REPEAT_I" "0") (ge "REPEAT_N" "REPEAT_I") ^
+	     Printf.sprintf "  ceq $repeat(REPEAT_ELEM, REPEAT_N) = ( REPEAT_ELEM $repeat(REPEAT_ELEM, %s) )\n"
+	       repeat_n_prev ^
+	     Printf.sprintf "   if %s /\\ %s .\n\n"
+	       (gt "REPEAT_N" "0") (le "REPEAT_N" "1024")
 	   else "") ^
 	  "  --- Generic SpecTec indexed repetition: e^(i<n) for source index i.\n" ^
 		  "  vars LISTN-N LISTN-START : Nat .\n" ^
 		  "  var LISTN-RT : SpectecTerminal .\n" ^
 		  "  eq $nat-range-from(LISTN-START, 0) = eps .\n" ^
-		  "  ceq $nat-range-from(LISTN-START, LISTN-N) = $nat-range-from(LISTN-START, _-_ ( LISTN-N, 1 )) _+_ ( LISTN-START, _-_ ( LISTN-N, 1 ) )\n" ^
-		  "   if _>_ ( LISTN-N, 0 ) .\n" ^
+		  Printf.sprintf "  ceq $nat-range-from(LISTN-START, LISTN-N) = $nat-range-from(LISTN-START, %s) %s\n"
+		    listn_prev (add "LISTN-START" listn_prev) ^
+		  Printf.sprintf "   if %s .\n" (gt "LISTN-N" "0") ^
 		  "  eq $idx-range(0) = eps .\n" ^
-		  Printf.sprintf "  ceq $idx-range(LISTN-N) = $idx-range(_-_ ( LISTN-N, 1 )) %s\n" (sequence_elem idx_range_prev) ^
-		  "   if _>_ ( LISTN-N, 0 ) .\n" ^
+		  Printf.sprintf "  ceq $idx-range(LISTN-N) = $idx-range(%s) %s\n" listn_prev (sequence_elem idx_range_prev) ^
+		  Printf.sprintf "   if %s .\n" (gt "LISTN-N" "0") ^
 		  "  eq $idx-range-from(LISTN-START, 0) = eps .\n" ^
-		  Printf.sprintf "  ceq $idx-range-from(LISTN-START, LISTN-N) = $idx-range-from(LISTN-START, _-_ ( LISTN-N, 1 )) %s\n" (sequence_elem idx_range_from_next) ^
-		  "   if _>_ ( LISTN-N, 0 ) .\n" ^
+		  Printf.sprintf "  ceq $idx-range-from(LISTN-START, LISTN-N) = $idx-range-from(LISTN-START, %s) %s\n" listn_prev (sequence_elem idx_range_from_next) ^
+		  Printf.sprintf "   if %s .\n" (gt "LISTN-N" "0") ^
 	  "  eq $rec-range(0) = eps .\n" ^
-	  Printf.sprintf "  ceq $rec-range(LISTN-N) = %s $rec-range(_-_ ( LISTN-N, 1 ))\n" (sequence_elem rec_range_next) ^
-	  "   if _>_ ( LISTN-N, 0 ) .\n" ^
+	  Printf.sprintf "  ceq $rec-range(LISTN-N) = %s $rec-range(%s)\n" (sequence_elem rec_range_next) listn_prev ^
+	  Printf.sprintf "   if %s .\n" (gt "LISTN-N" "0") ^
 	  "  eq $def-range(LISTN-RT, 0) = eps .\n" ^
-	  Printf.sprintf "  ceq $def-range(LISTN-RT, LISTN-N) = %s $def-range(LISTN-RT, _-_ ( LISTN-N, 1 ))\n" (sequence_elem def_range_next) ^
-	  "   if _>_ ( LISTN-N, 0 ) .\n\n" ^
+	  Printf.sprintf "  ceq $def-range(LISTN-RT, LISTN-N) = %s $def-range(LISTN-RT, %s)\n" (sequence_elem def_range_next) listn_prev ^
+	  Printf.sprintf "   if %s .\n\n" (gt "LISTN-N" "0") ^
 	  (if features.uses_slice then
 	     "  --- Generic SpecTec sequence slicing: xs[i : n].\n" ^
      "  vars SLICE_I SLICE_N : Int .\n" ^
      "  var SLICE_ELEM : SpectecTerminal .\n" ^
      "  var SLICE_REST : SpectecTerminals .\n" ^
      "  eq slice(SLICE_REST, SLICE_I, 0) = eps .\n" ^
-     "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, _-_ ( SLICE_N, 1 )) )\n" ^
-     "   if _>_ ( SLICE_N, 0 ) .\n" ^
-     "  ceq slice(( SLICE_ELEM SLICE_REST ), SLICE_I, SLICE_N) = slice(SLICE_REST, _-_ ( SLICE_I, 1 ), SLICE_N)\n" ^
-     "   if _>_ ( SLICE_I, 0 ) .\n\n"
+     Printf.sprintf "  ceq slice(( SLICE_ELEM SLICE_REST ), 0, SLICE_N) = ( SLICE_ELEM slice(SLICE_REST, 0, %s) )\n"
+       slice_n_prev ^
+     Printf.sprintf "   if %s .\n" (gt "SLICE_N" "0") ^
+     Printf.sprintf "  ceq slice(( SLICE_ELEM SLICE_REST ), SLICE_I, SLICE_N) = slice(SLICE_REST, %s, SLICE_N)\n"
+       slice_i_prev ^
+     Printf.sprintf "   if %s .\n\n" (gt "SLICE_I" "0")
    else "") ^
   (if features.uses_star_prefix then
      "  --- Generic SpecTec star-map lowering for flat prefix constructors.\n" ^
@@ -17224,7 +17388,7 @@ let infer_rel_helper_block () =
             && List.exists
                  (fun (p : prem_sched) -> not (maude_var_token_occurs v p.text))
                  self_prems)
-        |> List.map (fun v -> Printf.sprintf "_=/=_ ( %s, eps )" v)
+        |> List.map (fun v -> maude_builtin_call "_=/=_" [v; "eps"])
 	    in
 	    let emit_infer_eq rule_label helper_name (inputs : texpr list) (target : texpr) cond =
 	      let lhs = infer_lhs helper_name inputs in
@@ -18123,16 +18287,17 @@ let map_call_helper_block () =
         else
           let head = Printf.sprintf "index ( %s, 0 )" seq in
           let tail =
-            Printf.sprintf "slice ( %s, 1, _-_ ( len ( %s ), 1 ) )" seq seq
+            Printf.sprintf "slice ( %s, 1, %s )"
+              seq (maude_sub_as_plus_neg (Printf.sprintf "len ( %s )" seq) "1")
           in
           if optional_result_map then
             Printf.sprintf
               "  op %s : %s -> SpectecTerminals .\n%s\
                \n  eq %s ( %s ) = eps .\n\
                \n  ceq %s ( %s ) = $none %s ( %s )\n\
-                    if _>_ ( len ( %s ), 0 ) /\\ %s == eps .\n\
+                    if %s =/= eps /\\ %s == eps .\n\
                \n  ceq %s ( %s ) = %s %s ( %s )\n\
-                    if _>_ ( len ( %s ), 0 ) /\\ %s =/= eps .\n"
+                    if %s =/= eps /\\ %s =/= eps .\n"
               h.map_helper_name op_sorts var_decl
               h.map_helper_name (helper_args "eps")
               h.map_helper_name (helper_args seq)
@@ -18148,7 +18313,7 @@ let map_call_helper_block () =
             Printf.sprintf
               "  op %s : %s -> SpectecTerminals .\n%s\
                \n  eq %s ( %s ) = eps .\n\
-               \n  ceq %s ( %s ) = %s %s ( %s )\n      if _>_ ( len ( %s ), 0 ) .\n"
+               \n  ceq %s ( %s ) = %s %s ( %s )\n      if %s =/= eps .\n"
               h.map_helper_name op_sorts var_decl
               h.map_helper_name (helper_args "eps")
               h.map_helper_name (helper_args seq)
