@@ -18,6 +18,9 @@ from pathlib import Path
 FORBIDDEN_OUTPUT_PATTERNS = [
     (r"\bCTOR[A-Z0-9]*A[0-9]+\b", "old compact CTOR...A... constructor leaked"),
     (r"\$typed-index", "typed-index helper leaked into generated output"),
+    (r"\$stepto\b", "old relation macro fallback $stepto leaked into generated output"),
+    (r"\$steptostar\b", "old relation macro fallback $steptostar leaked into generated output"),
+    (r"\$module\s*\(", "old relation macro fallback $module leaked into generated output"),
     (r"\$valid-", "validation mirror helper leaked into generated output"),
     (r"\$infer-", "inference helper leaked into generated output"),
     (r"\bJHS-T\b", "old JHS-T variable leaked into generated output"),
@@ -31,6 +34,11 @@ FORBIDDEN_TRANSLATOR_PATTERNS = [
     (r"\bC1\b", "old C1 baseline terminology remains"),
     (r"source_ctor_name_of_legacy", "legacy constructor lookup remains"),
     (r"\bCTOR[A-Z0-9]*A[0-9]+\b", "hard-coded old compact constructor name remains"),
+    (r"SPEC2MAUDE_BS_DISABLE_CTXT", "debug environment hook remains"),
+    (r"bs_skip_ctxt_rule", "debug ctxt skip hook remains"),
+    (r"\bInstrSeq\b", "hard-coded InstrSeq sort remains"),
+    (r"\bValSeq\b", "hard-coded ValSeq sort remains"),
+    (r"case_id\.it\s*=", "case-id string special-case remains"),
 ]
 
 STALE_DOC_PATTERNS = [
@@ -39,12 +47,15 @@ STALE_DOC_PATTERNS = [
     (r"typed-index sequence", "stale typed-index warning text remains"),
 ]
 
-HELPER_FAMILIES = [
+GENERATED_HELPER_FAMILIES = [
     r"\$raw-lit",
     r"\$wrap-lit",
     r"\$unmap-mapexpr",
     r"\$map-",
     r"\$zipmap-",
+]
+
+SOURCE_DEF_FAMILIES = [
     r"\$free-",
     r"\$expanddt",
 ]
@@ -102,10 +113,14 @@ def main() -> int:
         failures.extend(scan_patterns(doc, STALE_DOC_PATTERNS))
 
     if output.exists():
-        for family in HELPER_FAMILIES:
+        for family in GENERATED_HELPER_FAMILIES:
             count = count_pattern(output, family)
             if count:
-                warnings.append(f"{output}: remaining helper family {family}: {count}")
+                warnings.append(f"{output}: remaining generated helper family {family}: {count}")
+        for family in SOURCE_DEF_FAMILIES:
+            count = count_pattern(output, family)
+            if count:
+                warnings.append(f"{output}: source-defined dollar family {family}: {count}")
 
     if translator.exists():
         for pattern, message in TRANSLATOR_COMPAT_PATTERNS:
@@ -122,7 +137,7 @@ def main() -> int:
         print("PASS: no forbidden cleanup regressions found")
 
     if warnings:
-        print("Remaining helper families to document or redesign:")
+        print("Remaining generated helper/source-dollar families to document or redesign:")
         for warning in warnings:
             print(f"  - {warning}")
 
