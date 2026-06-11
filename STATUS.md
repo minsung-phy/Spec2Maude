@@ -1,10 +1,10 @@
 # Spec2Maude Status
 
-Updated: 2026-06-09
+Updated: 2026-06-11
 
 ## One-Line State
 
-Spec2Maude has an active WebAssembly C1 baseline that translates the
+Spec2Maude has an active WebAssembly artifact baseline that translates the
 WebAssembly SpecTec source to Maude and runs validated WAT/Wasm programs through
 Maude dynamic execution.  The repository is now organized around the
 professor-facing pipeline:
@@ -61,8 +61,8 @@ Current policy:
 2. The frontend emits a Maude module term for accepted input.
 3. Maude runs initialization and dynamic execution with `steps(...)`.
 
-The translated SpecTec validation relations still exist in the full generated
-core because they are part of the source definition:
+The current runtime artifact does not use translated SpecTec validation
+relations as the execution gate:
 
 ```text
 Module-ok
@@ -74,8 +74,9 @@ Heaptype-sub
 ...
 ```
 
-But the default WAT/Wasm execution CLI does not use them as the input gate.
-`maude-validate` remains an experimental/debug command.
+The default WAT/Wasm execution CLI does not use them as the input gate.
+`maude-validate` remains an experimental/debug command for future
+validation-profile work.
 
 ## Latest Known Check Shape
 
@@ -87,9 +88,10 @@ make build                                           PASS
 ./spec2maude translate -o output.maude               PASS
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
                                                      PASS
-maude -no-banner output.maude                        PASS, warnings: 6,
+python3 scripts/audit_translator_cleanup.py          PASS
+maude -no-banner output.maude                        PASS, warnings: 2,
                                                      fatal diagnostics: 0
-maude -no-banner wasm-exec.maude                     PASS, warnings: 6,
+maude -no-banner wasm-exec.maude                     PASS, warnings: 2,
                                                      fatal diagnostics: 0
 ./spec2maude validate wat_examples/fib.wat           PASS
 rew [1] in WASM-FIB : steps(fib-config(i32v(5))) .   PASS
@@ -107,12 +109,9 @@ bad tokens, zero used-before-bound diagnostics, and zero no-parse diagnostics.
 
 Remaining warning sources are currently:
 
-- 4 warnings from source-derived typed-index sequence patterns that interact with the
-  source-style `SpectecTerminal < SpectecTerminals` carrier and associative
-  `_ _` sequence operator;
-- 2 warnings from float syntax around `norm(...)`/`subnorm(...)`, where
-  source numeric conditions and numeric constructor arguments still give Maude
-  more than one parse.
+- 2 warnings from float syntax around `norm(...)`/`subnorm(...)`, where source
+  numeric conditions and numeric constructor arguments still give Maude more
+  than one parse.
 
 The earlier nullary/unary constructor overload warning class, for example
 `DIV` versus `DIV sx` and `LE` versus `LE sx`, is resolved by source-derived
@@ -179,7 +178,6 @@ Resolved:
 
 Still worth discussing:
 
-- `$infer-*` witness inference helpers;
 - `$cont-*` continuation lowering for ordered `def` premises;
 - mechanically generated lowering helpers for source meta-notation
   (`map`, ranges, optional/star forms, otherwise matching);
@@ -192,8 +190,8 @@ Still worth discussing:
    - runtime profile: excludes static validation from the runtime artifact or
      erases validation premises after external validation.
 2. Continue reducing parser ambiguity warnings without changing source rule
-   semantics.  Highest-impact next targets: typed-index sequence patterns and
-   `norm(...)`/`subnorm(...)` float syntax membership.
+   semantics.  The current visible target is the `norm(...)`/`subnorm(...)`
+   float syntax equations.
 3. Continue reducing source-absent helpers in `output.maude`.
 4. Continue improving official `.wast` runner support for remaining vector,
    abstract-reference, and module instance/linking identity forms.  The runner

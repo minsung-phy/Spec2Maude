@@ -47,18 +47,20 @@ Use the root CLI for the short PLDI-style sanity check:
 make build
 ./spec2maude translate -o output.maude
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
+python3 scripts/audit_translator_cleanup.py
 maude -no-banner output.maude
 maude -no-banner wasm-exec.maude
 ./spec2maude run wat_examples/fib.wat --fib 5
 ./spec2maude test smoke --timeout 10
 ```
 
-Current expected results on 2026-06-09:
+Current expected results on 2026-06-11:
 
 ```text
 syntax audit                 PASS
-maude output.maude           PASS, warnings: 6, fatal diagnostics: 0
-maude wasm-exec.maude        PASS, warnings: 6, fatal diagnostics: 0
+translator cleanup audit     PASS
+maude output.maude           PASS, warnings: 2, fatal diagnostics: 0
+maude wasm-exec.maude        PASS, warnings: 2, fatal diagnostics: 0
 fib.wat --fib 5              result: const(i32, 5)
 local smoke suite            PASS: 13
 ```
@@ -80,9 +82,10 @@ Instead:
 2. Maude receives a validated module term;
 3. Maude executes the dynamic semantics through `steps(...)`.
 
-`Module-ok`, `Func-ok`, `Instr-ok`, and related validation relations are still
-present in the full generated SpecTec core because they are part of the source
-definition.  They are not the default runtime gate for the WAT/Wasm frontend.
+`Module-ok`, `Func-ok`, `Instr-ok`, and related validation/typechecking
+relations are not the default runtime gate for the WAT/Wasm frontend.  The
+current artifact relies on the official parser-validator before Maude
+execution and keeps Maude focused on dynamic execution.
 
 ## Repository Layout
 
@@ -222,8 +225,9 @@ Run a small official spec-test slice:
 ./spec2maude test smoke|official|all [--limit N] [--timeout SEC]
 ```
 
-`maude-validate` is an experimental debug command for the translated
-`Module-ok` path.  It is not the recommended execution path.
+`maude-validate` is an experimental debug command for validation-profile work.
+It is not the recommended execution path and is not part of the artifact sanity
+claim.
 
 ## Make Targets
 
@@ -240,7 +244,7 @@ make test-official LIMIT=20 TIMEOUT=10
 
 ## Current Status
 
-The active C1 baseline currently has:
+The active artifact baseline currently has:
 
 - Maude loading with no errors, bad tokens, or no-parse diagnostics;
   parser-ambiguity warnings remain because the generated code preserves
@@ -269,6 +273,8 @@ See:
 - [ARTIFACT.md](ARTIFACT.md) for the reviewer-facing checklist;
 - [STATUS.md](STATUS.md) for the current project state;
 - [docs/HowToTest.md](docs/HowToTest.md) for reproducible commands;
+- [docs/translator-cleanup.md](docs/translator-cleanup.md) for the cleanup
+  plan and translator map;
 - [docs/limitation.md](docs/limitation.md) for limitations and discussion
   points.
 

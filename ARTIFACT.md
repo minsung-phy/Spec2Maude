@@ -1,6 +1,6 @@
 # Spec2Maude Artifact Guide
 
-Updated: 2026-06-09
+Updated: 2026-06-11
 
 This guide is the reviewer-facing checklist for the current Spec2Maude
 artifact snapshot.
@@ -56,6 +56,7 @@ From the repository root:
 make build
 ./spec2maude translate -o output.maude
 python3 scripts/audit_syntax_translation.py output.maude --source-dir wasm-3.0
+python3 scripts/audit_translator_cleanup.py
 maude -no-banner output.maude
 maude -no-banner wasm-exec.maude
 ./spec2maude run wat_examples/fib.wat --fib 5
@@ -68,8 +69,11 @@ Expected summary:
 Syntax audit: output.maude
 PASS: no required syntax/typecheck/membership failures found
 
-maude output.maude        warnings: 6, fatal diagnostics: 0
-maude wasm-exec.maude     warnings: 6, fatal diagnostics: 0
+Translator cleanup audit
+PASS: no forbidden cleanup regressions found
+
+maude output.maude        warnings: 2, fatal diagnostics: 0
+maude wasm-exec.maude     warnings: 2, fatal diagnostics: 0
 
 result: const(i32, 5)
 
@@ -136,7 +140,7 @@ For a small progress probe:
 ./spec2maude test official --limit 30 --timeout 5
 ```
 
-Current 2026-06-09 reference bucket shape:
+Last recorded small official-slice reference bucket shape:
 
 ```text
 Benchmark summary:
@@ -169,16 +173,16 @@ The most useful files for debugging are `problem_cases.csv` and
 
 ## Known Limitations
 
-- Remaining Maude warnings are parser-ambiguity warnings: 4 from
-  source-derived typed-index sequence patterns and 2 from
-  `norm(...)`/`subnorm(...)` float syntax.  Numeric `uN`/`sN` range guards are
-  rendered in a source-readable form rather than Maude internal prefix
-  operators such as `_<=_`.  The earlier nullary/unary constructor overload
-  warning class is resolved by source-derived
-  argument-shape suffixes such as `div-sx-binop` and `le-sx-relop`.
+- Remaining Maude warnings are parser-ambiguity warnings from the
+  `norm(...)`/`subnorm(...)` float syntax equations.  Numeric `uN`/`sN` range
+  guards are rendered in a source-readable form rather than Maude internal
+  prefix operators such as `_<=_`.  The earlier nullary/unary constructor
+  overload warning class is resolved by source-derived argument-shape suffixes
+  such as `div-sx-binop` and `le-sx-relop`, and the old typed-index warning
+  class is no longer present in generated output.
 - The default WAT/Wasm execution path validates input with the official
-  WebAssembly parser/validator before Maude execution; translated `Module-ok`
-  remains in `output.maude` but is not the default execution gate.
+  WebAssembly parser/validator before Maude execution.  The current runtime
+  artifact does not use translated `Module-ok` as an execution gate.
 - The full official WebAssembly suite still has `STUCK_INIT`, `STUCK_STEP`,
   and `WRONG_RESULT` cases, mainly from harness state, builtins, and proposal
   coverage gaps.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Audit the generated JHS-style SpecTec syntax/typecheck layer.
+"""Audit the generated SpecTec carrier syntax/typecheck layer.
 
 The script checks properties that are easy to regress by visual inspection:
 
@@ -10,12 +10,12 @@ The script checks properties that are easy to regress by visual inspection:
 * nullary constructors should not get terminal mb/cmb axioms;
 * non-ground argument constructors should not get unconditional terminal mb;
 * source syntax declarations should have corresponding syn-* SpectecType witnesses;
-* old internal names such as JHS-T, NTC, iN- should not leak into output.
+* old internal variable names such as JHS-T, NTC, iN- should not leak into output.
 
 It intentionally audits generated output, not the SpecTec source itself.
-Translator legacy-constructor references are reported as warnings by default,
-because some are compatibility registry lookups rather than direct generated
-syntax output. Pass --strict-translator to make them failures.
+Translator legacy-constructor references are reported as warnings by default if
+they appear, because older compatibility registry lookups are not direct
+generated syntax output. Pass --strict-translator to make them failures.
 """
 
 from __future__ import annotations
