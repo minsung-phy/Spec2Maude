@@ -801,13 +801,19 @@ let rule_label_prefix rel_name case_id rule_idx =
   let case_part = if case_part_raw = "" then Printf.sprintf "R%d" rule_idx else case_part_raw in
   Printf.sprintf "%s-%s" rel_part case_part
 
+let skipped_relation_names : SSet.t ref = ref SSet.empty
+
+let is_skipped_relation_name rel_name =
+  SSet.mem (sanitize rel_name) !skipped_relation_names
+
 let valid_rel_mirrors : SSet.t ref = ref SSet.empty
 
 let valid_mirror_name rel_name =
   "$valid-" ^ String.lowercase_ascii (sanitize rel_name)
 
 let register_valid_rel_mirror rel_name =
-  valid_rel_mirrors := SSet.add (sanitize rel_name) !valid_rel_mirrors
+  if not (is_skipped_relation_name rel_name) then
+    valid_rel_mirrors := SSet.add (sanitize rel_name) !valid_rel_mirrors
 
 let valid_mirror_call_of_rewrite_text text =
   match split_once "=> valid" text with
@@ -817,6 +823,7 @@ let valid_mirror_call_of_rewrite_text text =
       (match head_symbol_of_text call with
        | None -> None
        | Some rel_name ->
+           if is_skipped_relation_name rel_name then None else
            let mirror = valid_mirror_name rel_name in
            register_valid_rel_mirror rel_name;
            let n = String.length rel_name in
@@ -1456,9 +1463,10 @@ let infer_rel_helper_name rel_name arg_index =
 
 let register_infer_rel_rules rel_name rules =
   let rel_name = sanitize rel_name in
-  infer_rel_rules :=
-    (rel_name, rules) ::
-    List.remove_assoc rel_name !infer_rel_rules
+  if not (is_skipped_relation_name rel_name) then
+    infer_rel_rules :=
+      (rel_name, rules) ::
+      List.remove_assoc rel_name !infer_rel_rules
 
 let has_infer_rel_rules rel_name =
   List.mem_assoc (sanitize rel_name) !infer_rel_rules
@@ -1472,6 +1480,9 @@ let has_infer_rel_source rel_name =
   has_infer_rel_rules rel_name || find_iter_rel_helper_for_name rel_name <> None
 
 let register_infer_rel_helper rel_name arity arg_index =
+  if is_skipped_relation_name rel_name then
+    failwith (Printf.sprintf "skipped non-execution relation cannot register infer helper: %s" rel_name)
+  else
   let helper =
     { infer_rel_name = sanitize rel_name;
       infer_arity = arity;
@@ -1512,6 +1523,9 @@ let register_otherwise_match_helper name pattern =
   then otherwise_match_helpers := helper :: !otherwise_match_helpers
 
 let register_result_rel_helper rel_name arity arg_indices =
+  if is_skipped_relation_name rel_name then
+    failwith (Printf.sprintf "skipped non-execution relation cannot register result helper: %s" rel_name)
+  else
   let arg_indices = List.sort_uniq compare arg_indices in
   let helper =
     { result_rel_name = sanitize rel_name;
@@ -2109,6 +2123,11 @@ let () =
   source_def_arg_sorts_lookup :=
     (fun fn -> Hashtbl.find_opt source_def_arg_sorts fn)
 let typed_index_helper_sorts : SSet.t ref = ref SSet.empty
+let used_unmap_helper_names : SSet.t ref = ref SSet.empty
+let mark_unmap_helper_used name =
+  used_unmap_helper_names := SSet.add name !used_unmap_helper_names
+let unmap_helper_is_used name =
+  SSet.mem name !used_unmap_helper_names
 let source_seq_pred_sorts : SSet.t ref = ref SSet.empty
 let source_category_subsort_edges : (string, SSet.t) Hashtbl.t = Hashtbl.create 128
 let source_conditional_alias_edges : (string, SSet.t) Hashtbl.t = Hashtbl.create 64
@@ -2446,6 +2465,7 @@ let build_type_env defs =
   optional_literal_terms := SSet.empty;
   source_record_infos := [];
   typed_index_helper_sorts := SSet.empty;
+  used_unmap_helper_names := SSet.empty;
   let rec collect_source_sort_name_overrides d =
     match d.it with
     | RecD ds -> List.iter collect_source_sort_name_overrides ds
@@ -6165,15 +6185,8 @@ let rec translate_exp ctx (e : exp) vm : texpr = match e.it with
       let idx_t =
         translate_exp TermCtx e2 vm |> raw_literal_texpr_for_numeric_context
       in
-      (match source_seq_elem_sort_of_exp e1 vm with
-       | Some elem_sort
-         when SSet.mem elem_sort !flat_sequence_source_sorts
-              && source_record_sequence_elem_sort_exists elem_sort ->
-           { text = typed_index_call elem_sort base_t.text idx_t;
-             vars = base_t.vars @ idx_t.vars }
-       | _ ->
-           { text = Printf.sprintf "index ( %s, %s )" base_t.text idx_t.text;
-             vars = base_t.vars @ idx_t.vars })
+      { text = Printf.sprintf "index ( %s, %s )" base_t.text idx_t.text;
+        vars = base_t.vars @ idx_t.vars }
   | SliceE (e1, e2, e3) ->
       tjoin3 (Printf.sprintf "slice ( %s, %s, %s )")
         (translate_exp TermCtx e1 vm)
@@ -9615,70 +9628,7 @@ let translate_typd id params insts =
                    let opt_param_indices =
                      if prems <> [] then [] else find_opt_param_indices case_typ
                    in
-                   let typed_index_block =
-                     if (cons_name = "" || cons_name = "eps") && (not is_parametric)
-                        && String.trim lhs <> "eps"
-                        && SSet.mem full_type_sort !flat_sequence_source_sorts
-                        && source_record_sequence_elem_sort_exists full_type_sort
-                     then begin
-                       let first_for_sort =
-                         not (SSet.mem full_type_sort !typed_index_helper_sorts)
-                       in
-                       if first_for_sort then
-                         typed_index_helper_sorts :=
-                           SSet.add full_type_sort !typed_index_helper_sorts;
-                       let rest_v = "TYPED-INDEX-" ^ String.uppercase_ascii full_type_sort ^ "-REST" in
-                       let n_v = "TYPED-INDEX-" ^ String.uppercase_ascii full_type_sort ^ "-N" in
-                       let decls =
-                         if first_for_sort then
-                           declare_var rest_v "SpectecTerminals" ^
-                           declare_var n_v "Nat"
-                         else ""
-                       in
-                       let typed_index_nat_helper =
-                         typed_index_helper_name ~index_kind:`Nat full_type_sort
-                       in
-                       let typed_index_seq_helper =
-                         typed_index_helper_name ~index_kind:`Seq full_type_sort
-                       in
-                       let broad_decls, typed_lhs, typed_cond =
-                         typed_index_pattern full_type_sort lhs rhs opt_param_indices params
-                       in
-                       let lhs_with_rest = Printf.sprintf "%s %s" typed_lhs rest_v in
-	                       let cond_suffix =
-	                         if typed_cond = "" then ""
-	                         else "\n   if " ^ typed_cond
-	                       in
-                       let eq0 =
-                         Printf.sprintf
-                           "  eq %s(eps, %s) = eps ."
-                           typed_index_nat_helper n_v
-                       in
-                       let eq_head =
-                         Printf.sprintf
-                           "  %s %s(%s, 0) = %s%s ."
-                           (if typed_cond = "" then "eq" else "ceq")
-                           typed_index_nat_helper lhs_with_rest typed_lhs cond_suffix
-                       in
-                       let eq_tail =
-                         Printf.sprintf
-                           "  %s %s(%s, s(%s)) = %s(%s, %s)%s ."
-                           (if typed_cond = "" then "eq" else "ceq")
-                           typed_index_nat_helper lhs_with_rest n_v typed_index_nat_helper rest_v n_v cond_suffix
-                       in
-	                       let header =
-	                         if first_for_sort then
-	                           "\n  --- Source-derived typed index for " ^ name ^ "* elements.\n"
-	                           ^ decls
-                             ^ Printf.sprintf "  op %s : SpectecTerminals Nat -> SpectecTerminals .\n" typed_index_nat_helper
-                             ^ Printf.sprintf "  op %s : SpectecTerminals SpectecTerminals -> SpectecTerminals .\n" typed_index_seq_helper
-                             ^ broad_decls ^ eq0 ^ "\n"
-	                         else ""
-	                       in
-	                       (if first_for_sort then header else broad_decls)
-	                       ^ eq_head ^ "\n" ^ eq_tail ^ "\n"
-	                     end
-                     else ""
+                   let typed_index_block = ""
                    in
 	                 let main =
 		                   if cons_name = "" then
@@ -9815,41 +9765,7 @@ let translate_typd id params insts =
 	                           (if r = "" then "mb" else "cmb") lhs_eps full_type_sort
 	                           (if r = "" then "" else "\n   if " ^ r)
                          in
-                         let typed_index_opt_block =
-                           if (not is_parametric)
-                              && String.trim lhs_eps <> "eps"
-                              && SSet.mem full_type_sort !flat_sequence_source_sorts
-                              && source_record_sequence_elem_sort_exists full_type_sort
-                           then
-                             let rest_v = "TYPED-INDEX-" ^ String.uppercase_ascii full_type_sort ^ "-REST" in
-                             let n_v = "TYPED-INDEX-" ^ String.uppercase_ascii full_type_sort ^ "-N" in
-                             let typed_index_nat_helper =
-                               typed_index_helper_name ~index_kind:`Nat full_type_sort
-                             in
-                             let broad_decls, typed_lhs, typed_cond =
-                               typed_index_pattern full_type_sort lhs_eps r
-                                 (List.filter (fun i -> i <> opt_idx) opt_param_indices)
-                                 params
-                             in
-                             let lhs_with_rest = Printf.sprintf "%s %s" typed_lhs rest_v in
-	                             let cond_suffix =
-	                               if typed_cond = "" then ""
-	                               else "\n   if " ^ typed_cond
-	                             in
-	                             let eq_head =
-	                               Printf.sprintf
-	                                 "  %s %s(%s, 0) = %s%s ."
-	                                 (if typed_cond = "" then "eq" else "ceq")
-                                 typed_index_nat_helper lhs_with_rest typed_lhs cond_suffix
-                             in
-                             let eq_tail =
-                               Printf.sprintf
-                                 "  %s %s(%s, s(%s)) = %s(%s, %s)%s ."
-                                 (if typed_cond = "" then "eq" else "ceq")
-                                 typed_index_nat_helper lhs_with_rest n_v typed_index_nat_helper rest_v n_v cond_suffix
-                             in
-	                             "\n" ^ broad_decls ^ eq_head ^ "\n" ^ eq_tail ^ "\n"
-	                           else ""
+                         let typed_index_opt_block = ""
                          in
                          membership ^ typed_index_opt_block
 	                     ) opt_param_indices
@@ -13621,9 +13537,11 @@ let map_call_prem_items (lhs : texpr) (rhs : texpr) =
     in
     let seq_t = texpr_with_var occ.map_seq_var occ.map_seq_var in
     let unmap_t =
+      let unmap_name = unmap_call_helper_name occ.map_helper.map_helper_name in
+      mark_unmap_helper_used unmap_name;
       { text =
           Printf.sprintf "%s ( %s )"
-            (unmap_call_helper_name occ.map_helper.map_helper_name)
+            unmap_name
             mapped_var;
         vars = [mapped_var] }
     in
@@ -13935,6 +13853,8 @@ let iter_rule_prem_item vm rel_id e xes =
 
 let rec prem_items_of_prem vm (p : prem) : prem_item list =
   match p.it with
+  | RulePr (id, _, _) when is_skipped_relation_name id.it ->
+      []
   | RulePr (id, _, e) when sanitize id.it = "Expand" ->
       (match e.it with
        | TupE [dt_e; out_e] ->
@@ -13960,6 +13880,8 @@ let rec prem_items_of_prem vm (p : prem) : prem_item list =
       else [PremRel { rel_name = sanitize id.it; args; text = t.text }]
   | ElsePr -> []
   | IterPr ({ it = RulePr (rel_id, mixop, e); _ } as inner, (List, xes)) ->
+      if is_skipped_relation_name rel_id.it then []
+      else
       (match iter_rule_prem_item vm rel_id e xes with
        | Some item -> [item]
        | None -> prem_items_of_prem vm { inner with it = RulePr (rel_id, mixop, e) })
@@ -14129,9 +14051,11 @@ let classify_prem bound = function
             when subset_bound bound rhs_vars
                  && not (SSet.mem occ.map_seq_var bound) ->
             let rhs_text =
-              Printf.sprintf "%s ( %s )"
-                (unmap_call_helper_name occ.map_helper.map_helper_name)
-                rhs.text
+              let unmap_name =
+                unmap_call_helper_name occ.map_helper.map_helper_name
+              in
+              mark_unmap_helper_used unmap_name;
+              Printf.sprintf "%s ( %s )" unmap_name rhs.text
             in
             Some (`Match,
              { text = Printf.sprintf "%s := %s" occ.map_seq_var rhs_text;
@@ -14142,9 +14066,11 @@ let classify_prem bound = function
             when subset_bound bound lhs_vars
                  && not (SSet.mem occ.map_seq_var bound) ->
             let rhs_text =
-              Printf.sprintf "%s ( %s )"
-                (unmap_call_helper_name occ.map_helper.map_helper_name)
-                lhs.text
+              let unmap_name =
+                unmap_call_helper_name occ.map_helper.map_helper_name
+              in
+              mark_unmap_helper_used unmap_name;
+              Printf.sprintf "%s ( %s )" unmap_name lhs.text
             in
             Some (`Match,
              { text = Printf.sprintf "%s := %s" occ.map_seq_var rhs_text;
@@ -14164,6 +14090,7 @@ let classify_prem bound = function
               let helper_name = occ.expr_tuple_helper.expr_map_helper_name in
               let tuple_name = expr_map_tuple_helper_name helper_name in
               let unmap_name = unmap_call_helper_name helper_name in
+              mark_unmap_helper_used unmap_name;
               Some (`Match,
                { text =
                    Printf.sprintf "%s ( %s ) := %s ( %s )"
@@ -14234,7 +14161,7 @@ let classify_prem bound = function
         (`Bool, { text = bool_t.text; vars; binds = [] }, ready)))
 
 let infer_sched_for_rel bound rel_name (args : texpr list) =
-  if not (has_infer_rel_source rel_name) then None
+  if is_skipped_relation_name rel_name || not (has_infer_rel_source rel_name) then None
   else
     let rel_low = String.lowercase_ascii (sanitize rel_name) in
     let relation_first_arg_is_context_like =
@@ -15548,6 +15475,19 @@ let relation_execution_kind mixop rules =
          | TupE [_z; _instrs; _zq; _vals] ->
              Some ExecResultConfigToTerms
          | _ -> None)
+
+let collect_skipped_relation_names defs =
+  skipped_relation_names := SSet.empty;
+  let rec collect d =
+    match d.it with
+    | RecD ds -> List.iter collect ds
+    | RelD (id, mixop, _, rules) ->
+        if relation_execution_kind mixop rules = None then
+          skipped_relation_names :=
+            SSet.add (sanitize id.it) !skipped_relation_names
+    | TypD _ | DecD _ | GramD _ | HintD _ -> ()
+  in
+  List.iter collect defs
 
 let collect_native_sequence_sorts_from_source defs =
   let add_native_sequence_sort sort =
@@ -16914,6 +16854,8 @@ let rec translate_definition ss (d : def) = match d.it with
   | DecD (id, params, result_typ, insts) -> translate_decd ss id params result_typ insts
   | RelD (id, mixop, _, rules) ->
       let name = sanitize id.it in
+      if is_skipped_relation_name name then ""
+      else
       (match relation_execution_kind mixop rules with
        | Some (ExecTermToTerm as kind)
        | Some (ExecConfigToTerm as kind)
@@ -16932,6 +16874,8 @@ let rec pre_register_relation_rules (d : def) =
   | RecD defs -> List.iter pre_register_relation_rules defs
   | RelD (id, mixop, _, rules) ->
       let name = sanitize id.it in
+      if is_skipped_relation_name name then ()
+      else
       (match relation_execution_kind mixop rules with
        | Some ExecTermToTerm
        | Some ExecConfigToTerm
@@ -18858,8 +18802,9 @@ let map_call_helper_block () =
         ""
       in
       let unmap_block =
-        if h.map_arity = 1 && h.map_seq_index = 0 then
-          let unmap_name = unmap_call_helper_name h.map_helper_name in
+        let unmap_name = unmap_call_helper_name h.map_helper_name in
+        if h.map_arity = 1 && h.map_seq_index = 0
+           && unmap_helper_is_used unmap_name then
           match explicit_seq_sort,
                 List.nth_opt h.map_arg_sorts h.map_seq_index with
           | Some _out_seq_sort, Some _in_seq_sort when false ->
@@ -18999,6 +18944,8 @@ let expr_map_helper_block () =
                  let unmap_name =
                    unmap_call_helper_name h.expr_map_helper_name
                  in
+                 if not (unmap_helper_is_used unmap_name) then ""
+                 else
                  let unmap_elem_names =
                    List.init arity
                      (fun i -> Printf.sprintf "%s-UNMAP-E%d" base i)
@@ -19059,6 +19006,8 @@ let expr_map_helper_block () =
                    tuple_name tuple_state_args unmap_name unmap_rest)
         | Some ctor ->
             let unmap_name = unmap_call_helper_name h.expr_map_helper_name in
+            if not (unmap_helper_is_used unmap_name) then ""
+            else
             let elem = base ^ "-UNMAP-E" in
             let rest = base ^ "-UNMAP-R" in
             let unmap_decl =
@@ -19442,6 +19391,7 @@ let translate defs =
   collect_source_ctor_head_categories defs;
   build_type_env defs;
   collect_native_sequence_sorts_from_source defs;
+  collect_skipped_relation_names defs;
   init_declared_vars ();
   let ss = new_scan () in
   List.iter (scan_def ss) defs;
