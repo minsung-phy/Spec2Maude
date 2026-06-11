@@ -683,18 +683,22 @@ mod SPECTEC-CORE is
   op $mapexpr-3e6c2855daea : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-410495c16d8e : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-45160eb531e0 : Nat SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $mapexpr-6205783f8583 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-6731814f0922 : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-6850f4bc8ed6 : SpectecTerminal SpectecTerminals -> SpectecTerminals .
+  op $mapexpr-6a663a5338b2 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-7494696db1e4 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-8af84d2a2d40 : SpectecTerminals -> SpectecTerminals .
   op $mapexpr-9103ee0fd1ad : SpectecTerminal SpectecTerminals -> SpectecTerminals .
   op $mapexpr-91d33a06135c : SpectecTerminals -> SpectecTerminals .
   op $mapexpr-9cd3388542b1 : SpectecTerminals -> SpectecTerminals .
+  op $mapexpr-9e26560e53b9 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-ad57801021a5 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-c1f4cfb505d2 : SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-ca7041986bcf : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-cae4dfacf62c : SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-da5681d25fd8 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  op $mapexpr-dd8217fba1af : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-e3fcdc39b165 : SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-e7e412605708 : SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op $mapexpr-e8cf5a2f450e : SpectecTerminals -> SpectecTerminals .
@@ -879,8 +883,6 @@ mod SPECTEC-CORE is
   op $zsize : SpectecTerminal -> SpectecTerminal .
   op ALLOCMODULE0-IFS : -> Nat .
   op Eval-expr : Config -> SpectecTerminals [frozen (1)] .
-  op FREE-BLOCKTYPE0-TS1 : -> SpectecTerminal .
-  op FREE-BLOCKTYPE0-TS2 : -> SpectecTerminal .
   op FREE-FREE-BLOCK0-FREE : -> SpectecTerminal .
   op FREE-ROLLRT0-IS : -> Nat .
   op INSTANTIATE0-IDS : -> Nat .
@@ -3418,6 +3420,10 @@ mod SPECTEC-CORE is
   var SMAPEXPR-DA5681D25FD8-E1 : SpectecTerminal .
   var SMAPEXPR-DA5681D25FD8-R0 : SpectecTerminals .
   var SMAPEXPR-DA5681D25FD8-R1 : SpectecTerminals .
+  var SMAPEXPR-DD8217FBA1AF-E0 : SpectecTerminal .
+  var SMAPEXPR-DD8217FBA1AF-E1 : SpectecTerminal .
+  var SMAPEXPR-DD8217FBA1AF-R0 : SpectecTerminals .
+  var SMAPEXPR-DD8217FBA1AF-R1 : SpectecTerminals .
   var SMAPEXPR-E3FCDC39B165-E0 : SpectecTerminal .
   var SMAPEXPR-E3FCDC39B165-E1 : SpectecTerminal .
   var SMAPEXPR-E3FCDC39B165-R0 : SpectecTerminals .
@@ -3479,12 +3485,20 @@ mod SPECTEC-CORE is
   var SMAPEXPR45160EB531E0-E1 : SpectecTerminal .
   var SMAPEXPR45160EB531E0-R0 : SpectecTerminals .
   var SMAPEXPR45160EB531E0-R1 : SpectecTerminals .
+  var SMAPEXPR6205783F8583-E0 : SpectecTerminal .
+  var SMAPEXPR6205783F8583-E1 : SpectecTerminal .
+  var SMAPEXPR6205783F8583-R0 : SpectecTerminals .
+  var SMAPEXPR6205783F8583-R1 : SpectecTerminals .
   var SMAPEXPR6731814F0922-E0 : SpectecTerminal .
   var SMAPEXPR6731814F0922-E1 : SpectecTerminal .
   var SMAPEXPR6731814F0922-R0 : SpectecTerminals .
   var SMAPEXPR6731814F0922-R1 : SpectecTerminals .
   var SMAPEXPR6850F4BC8ED6-E0 : SpectecTerminal .
   var SMAPEXPR6850F4BC8ED6-R0 : SpectecTerminals .
+  var SMAPEXPR6A663A5338B2-E0 : SpectecTerminal .
+  var SMAPEXPR6A663A5338B2-E1 : SpectecTerminal .
+  var SMAPEXPR6A663A5338B2-R0 : SpectecTerminals .
+  var SMAPEXPR6A663A5338B2-R1 : SpectecTerminals .
   var SMAPEXPR7494696DB1E4-E0 : SpectecTerminal .
   var SMAPEXPR7494696DB1E4-E1 : SpectecTerminal .
   var SMAPEXPR7494696DB1E4-R0 : SpectecTerminals .
@@ -3497,6 +3511,10 @@ mod SPECTEC-CORE is
   var SMAPEXPR91D33A06135C-R0 : SpectecTerminals .
   var SMAPEXPR9CD3388542B1-E0 : SpectecTerminal .
   var SMAPEXPR9CD3388542B1-R0 : SpectecTerminals .
+  var SMAPEXPR9E26560E53B9-E0 : SpectecTerminal .
+  var SMAPEXPR9E26560E53B9-E1 : SpectecTerminal .
+  var SMAPEXPR9E26560E53B9-R0 : SpectecTerminals .
+  var SMAPEXPR9E26560E53B9-R1 : SpectecTerminals .
   var SOURCECHARSEQ : SpectecTerminals .
   var SOURCEZEROSEQ : SpectecTerminals .
   var SPECTECTERMINALS : SpectecTerminals .
@@ -10262,8 +10280,8 @@ mod SPECTEC-CORE is
 
 
 
-  ceq $blocktype(BLOCKTYPE0-LOWZ, w--idx(BLOCKTYPE0-LOWX)) = arrow-instrtype(FREE-BLOCKTYPE0-TS1, eps, FREE-BLOCKTYPE0-TS2)
-      if typecheck(BLOCKTYPE0-LOWX, syn-idx) .
+  ceq $blocktype(BLOCKTYPE0-LOWZ, w--idx(BLOCKTYPE0-LOWX)) = arrow-instrtype(BLOCKTYPE0-TS1, eps, BLOCKTYPE0-TS2)
+      if funccomptypearrow(BLOCKTYPE0-TS1, BLOCKTYPE0-TS2) := $expanddt ( $type(BLOCKTYPE0-LOWZ, BLOCKTYPE0-LOWX) ) /\ typecheck(BLOCKTYPE0-LOWX, syn-idx) .
   ceq $blocktype(BLOCKTYPE1-LOWZ, w--result(BLOCKTYPE1-TS)) = arrow-instrtype(eps, eps, BLOCKTYPE1-TS)
       if typecheck(BLOCKTYPE1-TS, syn-valtype) .
 
@@ -10311,7 +10329,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-CALL-REF-FUNC8-LOWZ ; STEP-READ-CALL-REF-FUNC8-VALS ( ref-func-addr(STEP-READ-CALL-REF-FUNC8-LOWA) ) ( call-ref(STEP-READ-CALL-REF-FUNC8-YY) ) ) )
     =>
     ( framelbracerbrace(STEP-READ-CALL-REF-FUNC8-LOWM, STEP-READ-CALL-REF-FUNC8-LOWF, ( ( labellbracerbrace(STEP-READ-CALL-REF-FUNC8-LOWM, eps, STEP-READ-CALL-REF-FUNC8-INSTRS) ) )) )
-      if STEP-READ-CALL-REF-FUNC8-FI := index ( $funcinst(STEP-READ-CALL-REF-FUNC8-LOWZ), $raw-lit(STEP-READ-CALL-REF-FUNC8-LOWA) ) /\ func-funccode(STEP-READ-CALL-REF-FUNC8-LOWX, $mapexpr-3b7eb3020d2e(STEP-READ-CALL-REF-FUNC8-TS), STEP-READ-CALL-REF-FUNC8-INSTRS) := value('CODE, STEP-READ-CALL-REF-FUNC8-FI) /\ STEP-READ-CALL-REF-FUNC8-LOWF := RECFrameA2(( $mapexpr-1138a4fa48cf(STEP-READ-CALL-REF-FUNC8-VALS) $map-Sdefault-a1-s0(STEP-READ-CALL-REF-FUNC8-TS) ), ( value('MODULE, STEP-READ-CALL-REF-FUNC8-FI) )) /\ STEP-READ-CALL-REF-FUNC8-LOWN := len ( STEP-READ-CALL-REF-FUNC8-VALS ) /\ typecheck(STEP-READ-CALL-REF-FUNC8-VALS, syn-val) /\ typecheck(STEP-READ-CALL-REF-FUNC8-YY, syn-typeuse) /\ typecheck(STEP-READ-CALL-REF-FUNC8-FI, syn-funcinst) /\ typecheck(STEP-READ-CALL-REF-FUNC8-LOWX, syn-idx) /\ typecheck(STEP-READ-CALL-REF-FUNC8-TS, syn-valtype) .
+      if STEP-READ-CALL-REF-FUNC8-FI := index ( $funcinst(STEP-READ-CALL-REF-FUNC8-LOWZ), $raw-lit(STEP-READ-CALL-REF-FUNC8-LOWA) ) /\ funccomptypearrow(STEP-READ-CALL-REF-FUNC8-TS1, STEP-READ-CALL-REF-FUNC8-TS2) := $expanddt ( value('TYPE, STEP-READ-CALL-REF-FUNC8-FI) ) /\ func-funccode(STEP-READ-CALL-REF-FUNC8-LOWX, $mapexpr-3b7eb3020d2e(STEP-READ-CALL-REF-FUNC8-TS), STEP-READ-CALL-REF-FUNC8-INSTRS) := value('CODE, STEP-READ-CALL-REF-FUNC8-FI) /\ STEP-READ-CALL-REF-FUNC8-LOWF := RECFrameA2(( $mapexpr-1138a4fa48cf(STEP-READ-CALL-REF-FUNC8-VALS) $map-Sdefault-a1-s0(STEP-READ-CALL-REF-FUNC8-TS) ), ( value('MODULE, STEP-READ-CALL-REF-FUNC8-FI) )) /\ STEP-READ-CALL-REF-FUNC8-LOWM := len ( STEP-READ-CALL-REF-FUNC8-TS2 ) /\ STEP-READ-CALL-REF-FUNC8-LOWN := len ( STEP-READ-CALL-REF-FUNC8-TS1 ) /\ STEP-READ-CALL-REF-FUNC8-LOWN == len ( STEP-READ-CALL-REF-FUNC8-VALS ) /\ typecheck(STEP-READ-CALL-REF-FUNC8-VALS, syn-val) /\ typecheck(STEP-READ-CALL-REF-FUNC8-YY, syn-typeuse) /\ typecheck(STEP-READ-CALL-REF-FUNC8-FI, syn-funcinst) /\ typecheck(STEP-READ-CALL-REF-FUNC8-TS1, syn-valtype) /\ typecheck(STEP-READ-CALL-REF-FUNC8-TS2, syn-valtype) /\ typecheck(STEP-READ-CALL-REF-FUNC8-LOWX, syn-idx) /\ typecheck(STEP-READ-CALL-REF-FUNC8-TS, syn-valtype) .
   crl [step-read-return-call] :
     step-read ( ( STEP-READ-RETURN-CALL9-LOWZ ; ( return-call(STEP-READ-RETURN-CALL9-LOWX) ) ) )
     =>
@@ -10336,7 +10354,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWZ ; ( framelbracerbrace(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWK, STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWF, ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALSQ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALS ( ref-func-addr(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWA) ) ( return-call-ref(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-YY) ) STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-INSTRS )) ) ) )
     =>
     STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALS ( ref-func-addr(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWA) ) ( call-ref(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-YY) )
-      if STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWN := len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALS ) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALSQ, syn-val) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALS, syn-val) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-YY, syn-typeuse) .
+      if funccomptypearrow(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-TS1, STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-TS2) := $expanddt ( value('TYPE, index ( $funcinst(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWZ), $raw-lit(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWA) )) ) /\ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWM := len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-TS2 ) /\ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWN := len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-TS1 ) /\ STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-LOWN == len ( STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALS ) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALSQ, syn-val) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-VALS, syn-val) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-YY, syn-typeuse) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-TS1, syn-valtype) /\ typecheck(STEP-READ-RETURN-CALL-REF-FRAME-ADDR13-TS2, syn-valtype) .
   crl [step-read-throw-ref-null] :
     step-read ( ( STEP-READ-THROW-REF-NULL14-LOWZ ; ( ref-null(STEP-READ-THROW-REF-NULL14-HT) ) throw-ref ) )
     =>
@@ -10636,7 +10654,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-STRUCT-NEW-DEFAULT71-LOWZ ; ( struct-new-default(STEP-READ-STRUCT-NEW-DEFAULT71-LOWX) ) ) )
     =>
     STEP-READ-STRUCT-NEW-DEFAULT71-VALS ( struct-new(STEP-READ-STRUCT-NEW-DEFAULT71-LOWX) )
-      if $default($unpack(STEP-READ-STRUCT-NEW-DEFAULT71-ZTS)) == STEP-READ-STRUCT-NEW-DEFAULT71-VALS /\ typecheck(STEP-READ-STRUCT-NEW-DEFAULT71-LOWX, syn-idx) /\ typecheck(STEP-READ-STRUCT-NEW-DEFAULT71-VALS, syn-val) /\ typecheck(STEP-READ-STRUCT-NEW-DEFAULT71-ZTS, syn-storagetype) .
+      if struct-comptype(( $mapexpr-dd8217fba1af(STEP-READ-STRUCT-NEW-DEFAULT71-MUTS, STEP-READ-STRUCT-NEW-DEFAULT71-ZTS) )) := $expanddt ( $type(STEP-READ-STRUCT-NEW-DEFAULT71-LOWZ, STEP-READ-STRUCT-NEW-DEFAULT71-LOWX) ) /\ STEP-READ-STRUCT-NEW-DEFAULT71-VALS := $default($unpack(STEP-READ-STRUCT-NEW-DEFAULT71-ZTS)) /\ typecheck(STEP-READ-STRUCT-NEW-DEFAULT71-LOWX, syn-idx) /\ typecheck(STEP-READ-STRUCT-NEW-DEFAULT71-VALS, syn-val) /\ typecheck(STEP-READ-STRUCT-NEW-DEFAULT71-MUTS, syn-mut) /\ typecheck(STEP-READ-STRUCT-NEW-DEFAULT71-ZTS, syn-storagetype) .
   crl [step-read-struct-get-null] :
     step-read ( ( STEP-READ-STRUCT-GET-NULL72-LOWZ ; ( ref-null(STEP-READ-STRUCT-GET-NULL72-HT) ) ( struct-get(STEP-READ-STRUCT-GET-NULL72-SXS, STEP-READ-STRUCT-GET-NULL72-LOWX, STEP-READ-STRUCT-GET-NULL72-LOWI) ) ) )
     =>
@@ -10646,12 +10664,12 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-STRUCT-GET-STRUCT73-LOWZ ; ( ref-struct-addr(STEP-READ-STRUCT-GET-STRUCT73-LOWA) ) ( struct-get(STEP-READ-STRUCT-GET-STRUCT73-SXS, STEP-READ-STRUCT-GET-STRUCT73-LOWX, STEP-READ-STRUCT-GET-STRUCT73-LOWI) ) ) )
     =>
     $unpackfield(( index ( STEP-READ-STRUCT-GET-STRUCT73-ZTS, $raw-lit(STEP-READ-STRUCT-GET-STRUCT73-LOWI) ) ), STEP-READ-STRUCT-GET-STRUCT73-SXS, ( index ( value('FIELDS, index ( $structinst(STEP-READ-STRUCT-GET-STRUCT73-LOWZ), $raw-lit(STEP-READ-STRUCT-GET-STRUCT73-LOWA) )), $raw-lit(STEP-READ-STRUCT-GET-STRUCT73-LOWI) ) ))
-      if typecheck(STEP-READ-STRUCT-GET-STRUCT73-SXS, syn-sx) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-LOWX, syn-idx) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-LOWI, syn-uN(32)) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-ZTS, syn-storagetype) .
+      if struct-comptype(( $mapexpr-6205783f8583(STEP-READ-STRUCT-GET-STRUCT73-MUTS, STEP-READ-STRUCT-GET-STRUCT73-ZTS) )) := $expanddt ( $type(STEP-READ-STRUCT-GET-STRUCT73-LOWZ, STEP-READ-STRUCT-GET-STRUCT73-LOWX) ) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-SXS, syn-sx) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-LOWX, syn-idx) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-LOWI, syn-uN(32)) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-ZTS, syn-storagetype) /\ typecheck(STEP-READ-STRUCT-GET-STRUCT73-MUTS, syn-mut) .
   crl [step-read-array-new-default] :
     step-read ( ( STEP-READ-ARRAY-NEW-DEFAULT74-LOWZ ; ( const(i32, STEP-READ-ARRAY-NEW-DEFAULT74-LOWN) ) ( array-new-default(STEP-READ-ARRAY-NEW-DEFAULT74-LOWX) ) ) )
     =>
     $repeat ( STEP-READ-ARRAY-NEW-DEFAULT74-VAL, STEP-READ-ARRAY-NEW-DEFAULT74-LOWN ) ( array-new-fixed(STEP-READ-ARRAY-NEW-DEFAULT74-LOWX, STEP-READ-ARRAY-NEW-DEFAULT74-LOWN) )
-      if $default($unpack(STEP-READ-ARRAY-NEW-DEFAULT74-ZT)) == $raw-lit(STEP-READ-ARRAY-NEW-DEFAULT74-VAL) /\ typecheck(STEP-READ-ARRAY-NEW-DEFAULT74-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DEFAULT74-VAL, syn-val) /\ typecheck(STEP-READ-ARRAY-NEW-DEFAULT74-ZT, syn-storagetype) .
+      if array-comptype(( STEP-READ-ARRAY-NEW-DEFAULT74-MUTS STEP-READ-ARRAY-NEW-DEFAULT74-ZT )) := $expanddt ( $type(STEP-READ-ARRAY-NEW-DEFAULT74-LOWZ, STEP-READ-ARRAY-NEW-DEFAULT74-LOWX) ) /\ STEP-READ-ARRAY-NEW-DEFAULT74-VAL := $default($unpack(STEP-READ-ARRAY-NEW-DEFAULT74-ZT)) /\ typecheck(STEP-READ-ARRAY-NEW-DEFAULT74-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DEFAULT74-VAL, syn-val) /\ typecheck(STEP-READ-ARRAY-NEW-DEFAULT74-MUTS, syn-mut) /\ typecheck(STEP-READ-ARRAY-NEW-DEFAULT74-ZT, syn-storagetype) .
   crl [step-read-array-new-elem-oob] :
     step-read ( ( STEP-READ-ARRAY-NEW-ELEM-OOB75-LOWZ ; ( const(i32, STEP-READ-ARRAY-NEW-ELEM-OOB75-LOWI) ) ( const(i32, STEP-READ-ARRAY-NEW-ELEM-OOB75-LOWN) ) ( array-new-elem(STEP-READ-ARRAY-NEW-ELEM-OOB75-LOWX, STEP-READ-ARRAY-NEW-ELEM-OOB75-LOWY) ) ) )
     =>
@@ -10668,12 +10686,12 @@ mod SPECTEC-CORE is
     =>
     trap
 
-      if _>_(( _+_($raw-lit(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWI), ( _quo_(( _*_(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWN, $zsize(STEP-READ-ARRAY-NEW-DATA-OOB77-ZT)) ), 8) )) ), ( len ( value('BYTES, $data(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWZ, STEP-READ-ARRAY-NEW-DATA-OOB77-LOWY)) ) )) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-ZT, syn-storagetype) .
+      if array-comptype(( STEP-READ-ARRAY-NEW-DATA-OOB77-MUTS STEP-READ-ARRAY-NEW-DATA-OOB77-ZT )) := $expanddt ( $type(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWZ, STEP-READ-ARRAY-NEW-DATA-OOB77-LOWX) ) /\ _>_(( _+_($raw-lit(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWI), ( _quo_(( _*_(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWN, $zsize(STEP-READ-ARRAY-NEW-DATA-OOB77-ZT)) ), 8) )) ), ( len ( value('BYTES, $data(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWZ, STEP-READ-ARRAY-NEW-DATA-OOB77-LOWY)) ) )) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-MUTS, syn-mut) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-OOB77-ZT, syn-storagetype) .
   crl [step-read-array-new-data-num] :
     step-read ( ( STEP-READ-ARRAY-NEW-DATA-NUM78-LOWZ ; ( const(i32, STEP-READ-ARRAY-NEW-DATA-NUM78-LOWI) ) ( const(i32, STEP-READ-ARRAY-NEW-DATA-NUM78-LOWN) ) ( array-new-data(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWX, STEP-READ-ARRAY-NEW-DATA-NUM78-LOWY) ) ) )
     =>
     $const($cunpack(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT), ( $cunpacknum(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, STEP-READ-ARRAY-NEW-DATA-NUM78-CS) )) ( array-new-fixed(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWX, STEP-READ-ARRAY-NEW-DATA-NUM78-LOWN) )
-      if $concatn(( $map-Szbytes-a2-s1-nested(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, STEP-READ-ARRAY-NEW-DATA-NUM78-CS) ), ( _quo_($zsize(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT), 8) )) == slice ( value('BYTES, $data(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWZ, STEP-READ-ARRAY-NEW-DATA-NUM78-LOWY)), $raw-lit(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWI), _quo_(( _*_(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWN, $zsize(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT)) ), 8) ) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, syn-storagetype) .
+      if array-comptype(( STEP-READ-ARRAY-NEW-DATA-NUM78-MUTS STEP-READ-ARRAY-NEW-DATA-NUM78-ZT )) := $expanddt ( $type(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWZ, STEP-READ-ARRAY-NEW-DATA-NUM78-LOWX) ) /\ $concatn(( $map-Szbytes-a2-s1-nested(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, STEP-READ-ARRAY-NEW-DATA-NUM78-CS) ), ( _quo_($zsize(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT), 8) )) := slice ( value('BYTES, $data(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWZ, STEP-READ-ARRAY-NEW-DATA-NUM78-LOWY)), $raw-lit(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWI), _quo_(( _*_(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWN, $zsize(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT)) ), 8) ) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-ZT, syn-storagetype) /\ typecheck(STEP-READ-ARRAY-NEW-DATA-NUM78-MUTS, syn-mut) .
   crl [step-read-array-get-null] :
     step-read ( ( STEP-READ-ARRAY-GET-NULL79-LOWZ ; ( ref-null(STEP-READ-ARRAY-GET-NULL79-HT) ) ( const(i32, STEP-READ-ARRAY-GET-NULL79-LOWI) ) ( array-get(STEP-READ-ARRAY-GET-NULL79-SXS, STEP-READ-ARRAY-GET-NULL79-LOWX) ) ) )
     =>
@@ -10689,7 +10707,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-ARRAY-GET-ARRAY81-LOWZ ; ( ref-array-addr(STEP-READ-ARRAY-GET-ARRAY81-LOWA) ) ( const(i32, STEP-READ-ARRAY-GET-ARRAY81-LOWI) ) ( array-get(STEP-READ-ARRAY-GET-ARRAY81-SXS, STEP-READ-ARRAY-GET-ARRAY81-LOWX) ) ) )
     =>
     $unpackfield(STEP-READ-ARRAY-GET-ARRAY81-ZT, STEP-READ-ARRAY-GET-ARRAY81-SXS, ( index ( value('FIELDS, index ( $arrayinst(STEP-READ-ARRAY-GET-ARRAY81-LOWZ), $raw-lit(STEP-READ-ARRAY-GET-ARRAY81-LOWA) )), $raw-lit(STEP-READ-ARRAY-GET-ARRAY81-LOWI) ) ))
-      if typecheck(STEP-READ-ARRAY-GET-ARRAY81-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-SXS, syn-sx) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-ZT, syn-storagetype) .
+      if array-comptype(( STEP-READ-ARRAY-GET-ARRAY81-MUTS STEP-READ-ARRAY-GET-ARRAY81-ZT )) := $expanddt ( $type(STEP-READ-ARRAY-GET-ARRAY81-LOWZ, STEP-READ-ARRAY-GET-ARRAY81-LOWX) ) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-SXS, syn-sx) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-ZT, syn-storagetype) /\ typecheck(STEP-READ-ARRAY-GET-ARRAY81-MUTS, syn-mut) .
   crl [step-read-array-len-null] :
     step-read ( ( STEP-READ-ARRAY-LEN-NULL82-LOWZ ; ( ref-null(STEP-READ-ARRAY-LEN-NULL82-HT) ) array-len ) )
     =>
@@ -10752,12 +10770,12 @@ mod SPECTEC-CORE is
     =>
     ( ref-array-addr(STEP-READ-ARRAY-COPY-LE93-A1) ) ( const(i32, ( $wrap-lit(i32, STEP-READ-ARRAY-COPY-LE93-I1) )) ) ( ref-array-addr(STEP-READ-ARRAY-COPY-LE93-A2) ) ( const(i32, ( $wrap-lit(i32, STEP-READ-ARRAY-COPY-LE93-I2) )) ) ( array-get(STEP-READ-ARRAY-COPY-LE93-SXS, STEP-READ-ARRAY-COPY-LE93-X2) ) ( array-set(STEP-READ-ARRAY-COPY-LE93-X1) ) ( ref-array-addr(STEP-READ-ARRAY-COPY-LE93-A1) ) ( const(i32, ( $wrap-lit(i32, ( _+_ ( $raw-lit(STEP-READ-ARRAY-COPY-LE93-I1), 1 ) )) )) ) ( ref-array-addr(STEP-READ-ARRAY-COPY-LE93-A2) ) ( const(i32, ( $wrap-lit(i32, ( _+_ ( $raw-lit(STEP-READ-ARRAY-COPY-LE93-I2), 1 ) )) )) ) ( const(i32, ( $wrap-lit(i32, ( _-_ ( STEP-READ-ARRAY-COPY-LE93-LOWN, 1 ) )) )) ) ( array-copy(STEP-READ-ARRAY-COPY-LE93-X1, STEP-READ-ARRAY-COPY-LE93-X2) )
 
-      if _<=_($raw-lit(STEP-READ-ARRAY-COPY-LE93-I1), $raw-lit(STEP-READ-ARRAY-COPY-LE93-I2)) /\ STEP-READ-ARRAY-COPY-LE93-SXS == $sx(STEP-READ-ARRAY-COPY-LE93-ZT2) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-LE93-I1) ), syn-num(i32)) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-LE93-I2) ), syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-X1, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-X2, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-SXS, syn-sx) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-ZT2, syn-storagetype) .
+      if array-comptype(( STEP-READ-ARRAY-COPY-LE93-MUTS STEP-READ-ARRAY-COPY-LE93-ZT2 )) := $expanddt ( $type(STEP-READ-ARRAY-COPY-LE93-LOWZ, STEP-READ-ARRAY-COPY-LE93-X2) ) /\ STEP-READ-ARRAY-COPY-LE93-SXS := $sx(STEP-READ-ARRAY-COPY-LE93-ZT2) /\ _<=_($raw-lit(STEP-READ-ARRAY-COPY-LE93-I1), $raw-lit(STEP-READ-ARRAY-COPY-LE93-I2)) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-LE93-I1) ), syn-num(i32)) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-LE93-I2) ), syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-X1, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-X2, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-SXS, syn-sx) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-MUTS, syn-mut) /\ typecheck(STEP-READ-ARRAY-COPY-LE93-ZT2, syn-storagetype) .
   crl [step-read-array-copy-gt] :
     step-read ( ( STEP-READ-ARRAY-COPY-GT94-LOWZ ; ( ref-array-addr(STEP-READ-ARRAY-COPY-GT94-A1) ) ( const(i32, STEP-READ-ARRAY-COPY-GT94-I1) ) ( ref-array-addr(STEP-READ-ARRAY-COPY-GT94-A2) ) ( const(i32, STEP-READ-ARRAY-COPY-GT94-I2) ) ( const(i32, STEP-READ-ARRAY-COPY-GT94-LOWN) ) ( array-copy(STEP-READ-ARRAY-COPY-GT94-X1, STEP-READ-ARRAY-COPY-GT94-X2) ) ) )
     =>
     ( ref-array-addr(STEP-READ-ARRAY-COPY-GT94-A1) ) ( const(i32, ( $wrap-lit(i32, ( _-_ ( _+_($raw-lit(STEP-READ-ARRAY-COPY-GT94-I1), STEP-READ-ARRAY-COPY-GT94-LOWN), 1 ) )) )) ) ( ref-array-addr(STEP-READ-ARRAY-COPY-GT94-A2) ) ( const(i32, ( $wrap-lit(i32, ( _-_ ( _+_($raw-lit(STEP-READ-ARRAY-COPY-GT94-I2), STEP-READ-ARRAY-COPY-GT94-LOWN), 1 ) )) )) ) ( array-get(STEP-READ-ARRAY-COPY-GT94-SXS, STEP-READ-ARRAY-COPY-GT94-X2) ) ( array-set(STEP-READ-ARRAY-COPY-GT94-X1) ) ( ref-array-addr(STEP-READ-ARRAY-COPY-GT94-A1) ) ( const(i32, ( $wrap-lit(i32, STEP-READ-ARRAY-COPY-GT94-I1) )) ) ( ref-array-addr(STEP-READ-ARRAY-COPY-GT94-A2) ) ( const(i32, ( $wrap-lit(i32, STEP-READ-ARRAY-COPY-GT94-I2) )) ) ( const(i32, ( $wrap-lit(i32, ( _-_ ( STEP-READ-ARRAY-COPY-GT94-LOWN, 1 ) )) )) ) ( array-copy(STEP-READ-ARRAY-COPY-GT94-X1, STEP-READ-ARRAY-COPY-GT94-X2) )
-      if STEP-READ-ARRAY-COPY-GT94-SXS == $sx(STEP-READ-ARRAY-COPY-GT94-ZT2) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-GT94-I1) ), syn-num(i32)) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-GT94-I2) ), syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-X1, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-X2, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-SXS, syn-sx) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-ZT2, syn-storagetype) .
+      if array-comptype(( STEP-READ-ARRAY-COPY-GT94-MUTS STEP-READ-ARRAY-COPY-GT94-ZT2 )) := $expanddt ( $type(STEP-READ-ARRAY-COPY-GT94-LOWZ, STEP-READ-ARRAY-COPY-GT94-X2) ) /\ STEP-READ-ARRAY-COPY-GT94-SXS := $sx(STEP-READ-ARRAY-COPY-GT94-ZT2) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-GT94-I1) ), syn-num(i32)) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-COPY-GT94-I2) ), syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-X1, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-X2, syn-idx) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-SXS, syn-sx) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-MUTS, syn-mut) /\ typecheck(STEP-READ-ARRAY-COPY-GT94-ZT2, syn-storagetype) .
   crl [step-read-array-init-elem-null] :
     step-read ( ( STEP-READ-ARRAY-INIT-ELEM-NULL95-LOWZ ; ( ref-null(STEP-READ-ARRAY-INIT-ELEM-NULL95-HT) ) ( const(i32, STEP-READ-ARRAY-INIT-ELEM-NULL95-LOWI) ) ( const(i32, STEP-READ-ARRAY-INIT-ELEM-NULL95-LOWJ) ) ( const(i32, STEP-READ-ARRAY-INIT-ELEM-NULL95-LOWN) ) ( array-init-elem(STEP-READ-ARRAY-INIT-ELEM-NULL95-LOWX, STEP-READ-ARRAY-INIT-ELEM-NULL95-LOWY) ) ) )
     =>
@@ -10801,7 +10819,7 @@ mod SPECTEC-CORE is
     =>
     trap
 
-      if _>_(( _+_($raw-lit(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWJ), ( _quo_(( _*_(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWN, $zsize(STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT)) ), 8) )) ), ( len ( value('BYTES, $data(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWZ, STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWY)) ) )) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWJ, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT, syn-storagetype) .
+      if array-comptype(( STEP-READ-ARRAY-INIT-DATA-OOB2102-MUTS STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT )) := $expanddt ( $type(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWZ, STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWX) ) /\ _>_(( _+_($raw-lit(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWJ), ( _quo_(( _*_(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWN, $zsize(STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT)) ), 8) )) ), ( len ( value('BYTES, $data(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWZ, STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWY)) ) )) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWI, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWJ, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-MUTS, syn-mut) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-OOB2102-ZT, syn-storagetype) .
   crl [step-read-array-init-data-zero] :
     step-read ( ( STEP-READ-ARRAY-INIT-DATA-ZERO103-LOWZ ; ( ref-array-addr(STEP-READ-ARRAY-INIT-DATA-ZERO103-LOWA) ) ( const(i32, STEP-READ-ARRAY-INIT-DATA-ZERO103-LOWI) ) ( const(i32, STEP-READ-ARRAY-INIT-DATA-ZERO103-LOWJ) ) ( const(i32, STEP-READ-ARRAY-INIT-DATA-ZERO103-LOWN) ) ( array-init-data(STEP-READ-ARRAY-INIT-DATA-ZERO103-LOWX, STEP-READ-ARRAY-INIT-DATA-ZERO103-LOWY) ) ) )
     =>
@@ -10811,7 +10829,7 @@ mod SPECTEC-CORE is
     step-read ( ( STEP-READ-ARRAY-INIT-DATA-NUM104-LOWZ ; ( ref-array-addr(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWA) ) ( const(i32, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWI) ) ( const(i32, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWJ) ) ( const(i32, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWN) ) ( array-init-data(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWX, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWY) ) ) )
     =>
     ( ref-array-addr(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWA) ) ( const(i32, ( $wrap-lit(i32, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWI) )) ) $const($cunpack(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT), ( $cunpacknum(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWC) )) ( array-set(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWX) ) ( ref-array-addr(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWA) ) ( const(i32, ( $wrap-lit(i32, ( _+_ ( $raw-lit(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWI), 1 ) )) )) ) ( const(i32, ( $wrap-lit(i32, ( _+_ ( $raw-lit(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWJ), _quo_($zsize(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT), 8) ) )) )) ) ( const(i32, ( $wrap-lit(i32, ( _-_ ( STEP-READ-ARRAY-INIT-DATA-NUM104-LOWN, 1 ) )) )) ) ( array-init-data(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWX, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWY) )
-      if $zbytes(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWC) == slice ( value('BYTES, $data(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWZ, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWY)), $raw-lit(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWJ), _quo_($zsize(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT), 8) ) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWI) ), syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWJ, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, syn-storagetype) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWC, syn-lit(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT)) .
+      if array-comptype(( STEP-READ-ARRAY-INIT-DATA-NUM104-MUTS STEP-READ-ARRAY-INIT-DATA-NUM104-ZT )) := $expanddt ( $type(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWZ, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWX) ) /\ STEP-READ-ARRAY-INIT-DATA-NUM104-LOWC := $inv-zbytes(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, ( slice ( value('BYTES, $data(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWZ, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWY)), $raw-lit(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWJ), _quo_($zsize(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT), 8) ) )) /\ typecheck(( $wrap-lit(i32, STEP-READ-ARRAY-INIT-DATA-NUM104-LOWI) ), syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWJ, syn-num(i32)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWX, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWY, syn-idx) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT, syn-storagetype) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-LOWC, syn-lit(STEP-READ-ARRAY-INIT-DATA-NUM104-ZT)) /\ typecheck(STEP-READ-ARRAY-INIT-DATA-NUM104-MUTS, syn-mut) .
 
   crl [step-pure] :
     step ( ( STEP-PURE0-LOWZ ; STEP-PURE0-INSTRS ) )
@@ -10848,7 +10866,7 @@ mod SPECTEC-CORE is
     step ( ( STEP-THROW6-LOWZ ; STEP-THROW6-VALS ( throw(STEP-THROW6-LOWX) ) ) )
     =>
     ( $add-exninst(STEP-THROW6-LOWZ, STEP-THROW6-EXN) ; ( ref-exn-addr(STEP-THROW6-LOWA) ) throw-ref )
-      if STEP-THROW6-LOWA := len ( $exninst(STEP-THROW6-LOWZ) ) /\ STEP-THROW6-EXN := RECExninstA2(( index ( $tagaddr(STEP-THROW6-LOWZ), $raw-lit(STEP-THROW6-LOWX) ) ), STEP-THROW6-VALS) /\ STEP-THROW6-LOWN := len ( STEP-THROW6-VALS ) /\ typecheck(STEP-THROW6-VALS, syn-val) /\ typecheck(STEP-THROW6-LOWX, syn-idx) /\ typecheck(STEP-THROW6-EXN, syn-exninst) .
+      if funccomptypearrow(STEP-THROW6-TS, eps) := $expanddt ( $as-deftype(( value('TYPE, $tag(STEP-THROW6-LOWZ, STEP-THROW6-LOWX)) )) ) /\ STEP-THROW6-LOWA := len ( $exninst(STEP-THROW6-LOWZ) ) /\ STEP-THROW6-EXN := RECExninstA2(( index ( $tagaddr(STEP-THROW6-LOWZ), $raw-lit(STEP-THROW6-LOWX) ) ), STEP-THROW6-VALS) /\ STEP-THROW6-LOWN := len ( STEP-THROW6-TS ) /\ STEP-THROW6-LOWN == len ( STEP-THROW6-VALS ) /\ typecheck(STEP-THROW6-VALS, syn-val) /\ typecheck(STEP-THROW6-LOWX, syn-idx) /\ typecheck(STEP-THROW6-EXN, syn-exninst) /\ typecheck(STEP-THROW6-TS, syn-valtype) .
   crl [step-local-set] :
     step ( ( STEP-LOCAL-SET7-LOWZ ; STEP-LOCAL-SET7-VAL ( local-set(STEP-LOCAL-SET7-LOWX) ) ) )
     =>
@@ -10949,7 +10967,7 @@ mod SPECTEC-CORE is
     step ( ( STEP-STRUCT-NEW25-LOWZ ; STEP-STRUCT-NEW25-VALS ( struct-new(STEP-STRUCT-NEW25-LOWX) ) ) )
     =>
     ( $add-structinst(STEP-STRUCT-NEW25-LOWZ, STEP-STRUCT-NEW25-SI) ; ( ref-struct-addr(STEP-STRUCT-NEW25-LOWA) ) )
-      if STEP-STRUCT-NEW25-LOWA := len ( $structinst(STEP-STRUCT-NEW25-LOWZ) ) /\ STEP-STRUCT-NEW25-LOWN := len ( STEP-STRUCT-NEW25-VALS ) /\ $raw-lit(STEP-STRUCT-NEW25-SI) == RECStructinstA2(( $type(STEP-STRUCT-NEW25-LOWZ, STEP-STRUCT-NEW25-LOWX) ), ( $zipmap-Spackfield-a2-s0-1(STEP-STRUCT-NEW25-ZTS, STEP-STRUCT-NEW25-VALS) )) /\ typecheck(STEP-STRUCT-NEW25-VALS, syn-val) /\ typecheck(STEP-STRUCT-NEW25-LOWX, syn-idx) /\ typecheck(STEP-STRUCT-NEW25-SI, syn-structinst) /\ typecheck(STEP-STRUCT-NEW25-ZTS, syn-storagetype) .
+      if struct-comptype(( $mapexpr-9e26560e53b9(STEP-STRUCT-NEW25-MUTS, STEP-STRUCT-NEW25-ZTS) )) := $expanddt ( $type(STEP-STRUCT-NEW25-LOWZ, STEP-STRUCT-NEW25-LOWX) ) /\ STEP-STRUCT-NEW25-LOWA := len ( $structinst(STEP-STRUCT-NEW25-LOWZ) ) /\ STEP-STRUCT-NEW25-SI := RECStructinstA2(( $type(STEP-STRUCT-NEW25-LOWZ, STEP-STRUCT-NEW25-LOWX) ), ( $zipmap-Spackfield-a2-s0-1(STEP-STRUCT-NEW25-ZTS, STEP-STRUCT-NEW25-VALS) )) /\ STEP-STRUCT-NEW25-LOWN := len ( STEP-STRUCT-NEW25-VALS ) /\ typecheck(STEP-STRUCT-NEW25-VALS, syn-val) /\ typecheck(STEP-STRUCT-NEW25-LOWX, syn-idx) /\ typecheck(STEP-STRUCT-NEW25-SI, syn-structinst) /\ typecheck(STEP-STRUCT-NEW25-MUTS, syn-mut) /\ typecheck(STEP-STRUCT-NEW25-ZTS, syn-storagetype) .
   crl [step-struct-set-null] :
     step ( ( STEP-STRUCT-SET-NULL26-LOWZ ; ( ref-null(STEP-STRUCT-SET-NULL26-HT) ) STEP-STRUCT-SET-NULL26-VAL ( struct-set(STEP-STRUCT-SET-NULL26-LOWX, STEP-STRUCT-SET-NULL26-LOWI) ) ) )
     =>
@@ -10959,12 +10977,12 @@ mod SPECTEC-CORE is
     step ( ( STEP-STRUCT-SET-STRUCT27-LOWZ ; ( ref-struct-addr(STEP-STRUCT-SET-STRUCT27-LOWA) ) STEP-STRUCT-SET-STRUCT27-VAL ( struct-set(STEP-STRUCT-SET-STRUCT27-LOWX, STEP-STRUCT-SET-STRUCT27-LOWI) ) ) )
     =>
     ( $with-struct(STEP-STRUCT-SET-STRUCT27-LOWZ, $raw-lit(STEP-STRUCT-SET-STRUCT27-LOWA), $raw-lit(STEP-STRUCT-SET-STRUCT27-LOWI), ( $packfield(( index ( STEP-STRUCT-SET-STRUCT27-ZTS, $raw-lit(STEP-STRUCT-SET-STRUCT27-LOWI) ) ), STEP-STRUCT-SET-STRUCT27-VAL) )) ; eps )
-      if typecheck(STEP-STRUCT-SET-STRUCT27-VAL, syn-val) /\ typecheck(STEP-STRUCT-SET-STRUCT27-LOWX, syn-idx) /\ typecheck(STEP-STRUCT-SET-STRUCT27-LOWI, syn-uN(32)) /\ typecheck(STEP-STRUCT-SET-STRUCT27-ZTS, syn-storagetype) .
+      if struct-comptype(( $mapexpr-6a663a5338b2(STEP-STRUCT-SET-STRUCT27-MUTS, STEP-STRUCT-SET-STRUCT27-ZTS) )) := $expanddt ( $type(STEP-STRUCT-SET-STRUCT27-LOWZ, STEP-STRUCT-SET-STRUCT27-LOWX) ) /\ typecheck(STEP-STRUCT-SET-STRUCT27-VAL, syn-val) /\ typecheck(STEP-STRUCT-SET-STRUCT27-LOWX, syn-idx) /\ typecheck(STEP-STRUCT-SET-STRUCT27-LOWI, syn-uN(32)) /\ typecheck(STEP-STRUCT-SET-STRUCT27-ZTS, syn-storagetype) /\ typecheck(STEP-STRUCT-SET-STRUCT27-MUTS, syn-mut) .
   crl [step-array-new-fixed] :
     step ( ( STEP-ARRAY-NEW-FIXED28-LOWZ ; STEP-ARRAY-NEW-FIXED28-VALS ( array-new-fixed(STEP-ARRAY-NEW-FIXED28-LOWX, STEP-ARRAY-NEW-FIXED28-LOWN) ) ) )
     =>
     ( $add-arrayinst(STEP-ARRAY-NEW-FIXED28-LOWZ, STEP-ARRAY-NEW-FIXED28-AI) ; ( ref-array-addr(STEP-ARRAY-NEW-FIXED28-LOWA) ) )
-      if STEP-ARRAY-NEW-FIXED28-LOWA := len ( $arrayinst(STEP-ARRAY-NEW-FIXED28-LOWZ) ) /\ len ( STEP-ARRAY-NEW-FIXED28-VALS ) == STEP-ARRAY-NEW-FIXED28-LOWN /\ $raw-lit(STEP-ARRAY-NEW-FIXED28-AI) == RECArrayinstA2(( $type(STEP-ARRAY-NEW-FIXED28-LOWZ, STEP-ARRAY-NEW-FIXED28-LOWX) ), ( $map-Spackfield-a2-s1(STEP-ARRAY-NEW-FIXED28-ZT, STEP-ARRAY-NEW-FIXED28-VALS) )) /\ typecheck(STEP-ARRAY-NEW-FIXED28-VALS, syn-val) /\ typecheck(STEP-ARRAY-NEW-FIXED28-LOWX, syn-idx) /\ typecheck(STEP-ARRAY-NEW-FIXED28-AI, syn-arrayinst) /\ typecheck(STEP-ARRAY-NEW-FIXED28-ZT, syn-storagetype) .
+      if array-comptype(( STEP-ARRAY-NEW-FIXED28-MUTS STEP-ARRAY-NEW-FIXED28-ZT )) := $expanddt ( $type(STEP-ARRAY-NEW-FIXED28-LOWZ, STEP-ARRAY-NEW-FIXED28-LOWX) ) /\ STEP-ARRAY-NEW-FIXED28-LOWA := len ( $arrayinst(STEP-ARRAY-NEW-FIXED28-LOWZ) ) /\ STEP-ARRAY-NEW-FIXED28-AI := RECArrayinstA2(( $type(STEP-ARRAY-NEW-FIXED28-LOWZ, STEP-ARRAY-NEW-FIXED28-LOWX) ), ( $map-Spackfield-a2-s1(STEP-ARRAY-NEW-FIXED28-ZT, STEP-ARRAY-NEW-FIXED28-VALS) )) /\ len ( STEP-ARRAY-NEW-FIXED28-VALS ) == STEP-ARRAY-NEW-FIXED28-LOWN /\ typecheck(STEP-ARRAY-NEW-FIXED28-VALS, syn-val) /\ typecheck(STEP-ARRAY-NEW-FIXED28-LOWX, syn-idx) /\ typecheck(STEP-ARRAY-NEW-FIXED28-AI, syn-arrayinst) /\ typecheck(STEP-ARRAY-NEW-FIXED28-MUTS, syn-mut) /\ typecheck(STEP-ARRAY-NEW-FIXED28-ZT, syn-storagetype) .
   crl [step-array-set-null] :
     step ( ( STEP-ARRAY-SET-NULL29-LOWZ ; ( ref-null(STEP-ARRAY-SET-NULL29-HT) ) ( const(i32, STEP-ARRAY-SET-NULL29-LOWI) ) STEP-ARRAY-SET-NULL29-VAL ( array-set(STEP-ARRAY-SET-NULL29-LOWX) ) ) )
     =>
@@ -10980,7 +10998,7 @@ mod SPECTEC-CORE is
     step ( ( STEP-ARRAY-SET-ARRAY31-LOWZ ; ( ref-array-addr(STEP-ARRAY-SET-ARRAY31-LOWA) ) ( const(i32, STEP-ARRAY-SET-ARRAY31-LOWI) ) STEP-ARRAY-SET-ARRAY31-VAL ( array-set(STEP-ARRAY-SET-ARRAY31-LOWX) ) ) )
     =>
     ( $with-array(STEP-ARRAY-SET-ARRAY31-LOWZ, $raw-lit(STEP-ARRAY-SET-ARRAY31-LOWA), $raw-lit(STEP-ARRAY-SET-ARRAY31-LOWI), ( $packfield(STEP-ARRAY-SET-ARRAY31-ZT, STEP-ARRAY-SET-ARRAY31-VAL) )) ; eps )
-      if typecheck(STEP-ARRAY-SET-ARRAY31-LOWI, syn-num(i32)) /\ typecheck(STEP-ARRAY-SET-ARRAY31-VAL, syn-val) /\ typecheck(STEP-ARRAY-SET-ARRAY31-LOWX, syn-idx) /\ typecheck(STEP-ARRAY-SET-ARRAY31-ZT, syn-storagetype) .
+      if array-comptype(( STEP-ARRAY-SET-ARRAY31-MUTS STEP-ARRAY-SET-ARRAY31-ZT )) := $expanddt ( $type(STEP-ARRAY-SET-ARRAY31-LOWZ, STEP-ARRAY-SET-ARRAY31-LOWX) ) /\ typecheck(STEP-ARRAY-SET-ARRAY31-LOWI, syn-num(i32)) /\ typecheck(STEP-ARRAY-SET-ARRAY31-VAL, syn-val) /\ typecheck(STEP-ARRAY-SET-ARRAY31-LOWX, syn-idx) /\ typecheck(STEP-ARRAY-SET-ARRAY31-ZT, syn-storagetype) /\ typecheck(STEP-ARRAY-SET-ARRAY31-MUTS, syn-mut) .
 
 
 
@@ -11188,7 +11206,7 @@ mod SPECTEC-CORE is
 
 
   ceq $invoke(INVOKE0-LOWS, INVOKE0-FUNCADDR, INVOKE0-VALS) = ( ( INVOKE0-LOWS ; RECFrameA2(eps, ( RECModuleinstA9(eps, eps, eps, eps, eps, eps, eps, eps, eps) )) ) ; INVOKE0-VALS ( ref-func-addr(INVOKE0-FUNCADDR) ) ( call-ref(( value('TYPE, index ( value('FUNCS, INVOKE0-LOWS), $raw-lit(INVOKE0-FUNCADDR) )) )) ) )
-      if typecheck(INVOKE0-VALS, syn-val) .
+      if funccomptypearrow(INVOKE0-TS1, INVOKE0-TS2) := $expanddt ( value('TYPE, index ( value('FUNCS, INVOKE0-LOWS), $raw-lit(INVOKE0-FUNCADDR) )) ) /\ typecheck(INVOKE0-VALS, syn-val) .
 
 
   --- Generic SpecTec expression-star lowering for source expressions e*.
@@ -11608,6 +11626,12 @@ if SSUBST-VALTYPES-S =/= eps .
   eq $mapexpr-45160eb531e0 ( IVADD-PAIRWISE0-N , SMAPEXPR45160EB531E0-E0 SMAPEXPR45160EB531E0-R0 , SMAPEXPR45160EB531E0-E1 SMAPEXPR45160EB531E0-R1 ) = $iadd(IVADD-PAIRWISE0-N, SMAPEXPR45160EB531E0-E0, SMAPEXPR45160EB531E0-E1) $mapexpr-45160eb531e0 ( IVADD-PAIRWISE0-N , SMAPEXPR45160EB531E0-R0 , SMAPEXPR45160EB531E0-R1 ) .
 
 
+  eq $mapexpr-6205783f8583 ( eps , STEP-READ-STRUCT-GET-STRUCT73-ZTS ) = eps .
+  eq $mapexpr-6205783f8583 ( STEP-READ-STRUCT-GET-STRUCT73-MUTS , eps ) = eps .
+
+  eq $mapexpr-6205783f8583 ( SMAPEXPR6205783F8583-E0 SMAPEXPR6205783F8583-R0 , SMAPEXPR6205783F8583-E1 SMAPEXPR6205783F8583-R1 ) = SMAPEXPR6205783F8583-E0 SMAPEXPR6205783F8583-E1 $mapexpr-6205783f8583 ( SMAPEXPR6205783F8583-R0 , SMAPEXPR6205783F8583-R1 ) .
+
+
   eq $mapexpr-6731814f0922 ( IVRELOP0-F , IVRELOP0-JNN , eps , IVRELOP0-CS2 ) = eps .
   eq $mapexpr-6731814f0922 ( IVRELOP0-F , IVRELOP0-JNN , IVRELOP0-CS1 , eps ) = eps .
 
@@ -11617,6 +11641,12 @@ if SSUBST-VALTYPES-S =/= eps .
   eq $mapexpr-6850f4bc8ed6 ( ALLOCMODULE0-BYTES , eps ) = eps .
 
   eq $mapexpr-6850f4bc8ed6 ( ALLOCMODULE0-BYTES , SMAPEXPR6850F4BC8ED6-E0 SMAPEXPR6850F4BC8ED6-R0 ) = data(ALLOCMODULE0-BYTES, SMAPEXPR6850F4BC8ED6-E0) $mapexpr-6850f4bc8ed6 ( ALLOCMODULE0-BYTES , SMAPEXPR6850F4BC8ED6-R0 ) .
+
+
+  eq $mapexpr-6a663a5338b2 ( eps , STEP-STRUCT-SET-STRUCT27-ZTS ) = eps .
+  eq $mapexpr-6a663a5338b2 ( STEP-STRUCT-SET-STRUCT27-MUTS , eps ) = eps .
+
+  eq $mapexpr-6a663a5338b2 ( SMAPEXPR6A663A5338B2-E0 SMAPEXPR6A663A5338B2-R0 , SMAPEXPR6A663A5338B2-E1 SMAPEXPR6A663A5338B2-R1 ) = SMAPEXPR6A663A5338B2-E0 SMAPEXPR6A663A5338B2-E1 $mapexpr-6a663a5338b2 ( SMAPEXPR6A663A5338B2-R0 , SMAPEXPR6A663A5338B2-R1 ) .
 
 
   eq $mapexpr-7494696db1e4 ( eps , ALLOCMODULE0-XS ) = eps .
@@ -11643,6 +11673,12 @@ if SSUBST-VALTYPES-S =/= eps .
   eq $mapexpr-9cd3388542b1 ( eps ) = eps .
 
   eq $mapexpr-9cd3388542b1 ( SMAPEXPR9CD3388542B1-E0 SMAPEXPR9CD3388542B1-R0 ) = memory(SMAPEXPR9CD3388542B1-E0) $mapexpr-9cd3388542b1 ( SMAPEXPR9CD3388542B1-R0 ) .
+
+
+  eq $mapexpr-9e26560e53b9 ( eps , STEP-STRUCT-NEW25-ZTS ) = eps .
+  eq $mapexpr-9e26560e53b9 ( STEP-STRUCT-NEW25-MUTS , eps ) = eps .
+
+  eq $mapexpr-9e26560e53b9 ( SMAPEXPR9E26560E53B9-E0 SMAPEXPR9E26560E53B9-R0 , SMAPEXPR9E26560E53B9-E1 SMAPEXPR9E26560E53B9-R1 ) = SMAPEXPR9E26560E53B9-E0 SMAPEXPR9E26560E53B9-E1 $mapexpr-9e26560e53b9 ( SMAPEXPR9E26560E53B9-R0 , SMAPEXPR9E26560E53B9-R1 ) .
 
 
   eq $mapexpr-ad57801021a5 ( eps , INSTANTIATE0-TABLETYPES ) = eps .
@@ -11674,6 +11710,12 @@ if SSUBST-VALTYPES-S =/= eps .
   eq $mapexpr-da5681d25fd8 ( IVRELOPSX0-F , IVRELOPSX0-JNN , IVRELOPSX0-SX , IVRELOPSX0-CS1 , eps ) = eps .
 
   eq $mapexpr-da5681d25fd8 ( IVRELOPSX0-F , IVRELOPSX0-JNN , IVRELOPSX0-SX , SMAPEXPR-DA5681D25FD8-E0 SMAPEXPR-DA5681D25FD8-R0 , SMAPEXPR-DA5681D25FD8-E1 SMAPEXPR-DA5681D25FD8-R1 ) = $extend(1, $lsizenn(IVRELOPSX0-JNN), s, ( $apply-ivrelopsx-f(IVRELOPSX0-F, $lsizenn(IVRELOPSX0-JNN), IVRELOPSX0-SX, SMAPEXPR-DA5681D25FD8-E0, SMAPEXPR-DA5681D25FD8-E1) )) $mapexpr-da5681d25fd8 ( IVRELOPSX0-F , IVRELOPSX0-JNN , IVRELOPSX0-SX , SMAPEXPR-DA5681D25FD8-R0 , SMAPEXPR-DA5681D25FD8-R1 ) .
+
+
+  eq $mapexpr-dd8217fba1af ( eps , STEP-READ-STRUCT-NEW-DEFAULT71-ZTS ) = eps .
+  eq $mapexpr-dd8217fba1af ( STEP-READ-STRUCT-NEW-DEFAULT71-MUTS , eps ) = eps .
+
+  eq $mapexpr-dd8217fba1af ( SMAPEXPR-DD8217FBA1AF-E0 SMAPEXPR-DD8217FBA1AF-R0 , SMAPEXPR-DD8217FBA1AF-E1 SMAPEXPR-DD8217FBA1AF-R1 ) = SMAPEXPR-DD8217FBA1AF-E0 SMAPEXPR-DD8217FBA1AF-E1 $mapexpr-dd8217fba1af ( SMAPEXPR-DD8217FBA1AF-R0 , SMAPEXPR-DD8217FBA1AF-R1 ) .
 
 
   eq $mapexpr-e3fcdc39b165 ( ALLOCMODULE0-LOCALS , eps , ALLOCMODULE0-XS ) = eps .
