@@ -1,5 +1,5 @@
 (* ========================================================================= *)
-(* Spec2Maude: SpecTec IL AST → Maude Algebraic Specification Translator     *)
+(* Spec2Maude: SpecTec IL AST -> Maude Algebraic Specification Translator     *)
 (*                                                                           *)
 (* Architecture:                                                             *)
 (*  1. Foundation types (StringSet, texpr, var_map, exp_ctx)                 *)
@@ -10,7 +10,7 @@
 (*  6. Pre-scan phase (collect tokens, call signatures, ctors)               *)
 (*  7. Expression translation (pure: returns texpr = text + vars)            *)
 (*  8. Definition handlers (TypD / DecD / RelD)                              *)
-(*  9. Top-level: prescan → header → translate → reorder → emit             *)
+(*  9. Top-level: prescan -> header -> translate -> reorder -> emit             *)
 (* ========================================================================= *)
 
 open Util.Source
