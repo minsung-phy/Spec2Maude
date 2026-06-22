@@ -1,18 +1,1 @@
-; Spec2Maude/dune
-
-(data_only_dirs benchmarks)
-
-(executable
- (name main)
- (modules main translator)
- (libraries il util frontend)) ; lib/ 밑에 있는 라이브러리들 연결
-
-(executable
- (name wasm_to_maude)
- (modules wasm_to_maude)
- (libraries unix wasm))
-
-(executable
- (name spec2maude)
- (modules spec2maude)
- (libraries unix))
+(data_only_dirs benchmarks docs legacy reference wasm-3.0 wat_examples)
