@@ -68,6 +68,11 @@ let translate ?(profile = Context.Runtime_after_external_validation) script =
   in
   let translated = Def_translate.translate_script ctx script in
   let helper_statements = Helper.materialize (Context.helpers ctx) in
+  let helper_diagnostics =
+    Helper.unmaterialized_diagnostics
+      ~profile:(Context.profile_name ctx)
+      (Context.helpers ctx)
+  in
   let statements =
     Prelude.statements @ translated.statements @ helper_statements
     |> dedup_var_declarations
@@ -100,7 +105,7 @@ let translate ?(profile = Context.Runtime_after_external_validation) script =
   in
   let diagnostics =
     naming_diagnostics @ function_graph_diagnostics @ translated.diagnostics
-    @ constructor_registry_diagnostics @ registry_diagnostics
+    @ helper_diagnostics @ constructor_registry_diagnostics @ registry_diagnostics
     |> Diagnostics.dedup
   in
   { module_; diagnostics; source_index; maude_registry; builtin_registry }

@@ -176,13 +176,15 @@ let is_nested_list_typ = Type_shape.is_nested_list_typ
 
 let is_optional_list_typ = Type_shape.is_optional_list_typ
 
+let is_list_optional_typ = Type_shape.is_list_optional_typ
+
 let carrier_sort_of_typ = function
   | { it = BoolT | NumT `RatT | NumT `RealT | TextT | VarT _; _ } -> Some spectec_terminal
   | { it = NumT `NatT; _ } -> Some (s "Nat")
   | { it = NumT `IntT; _ } -> Some (s "Int")
   | typ
     when is_flat_list_typ typ || is_flat_optional_typ typ || is_nested_list_typ typ
-         || is_optional_list_typ typ ->
+         || is_optional_list_typ typ || is_list_optional_typ typ ->
     Some spectec_terminals
   | { it = TupT _; _ } -> Some spectec_terminal
   | { it = IterT _; _ } -> None
@@ -267,11 +269,31 @@ let record_items = function
 
 let typecheck value typ = app "typecheck" [ value; typ ]
 let typecheck_seq value typ = app "typecheckSeq" [ value; typ ]
+let typecheck_opt_seq value typ = app "typecheckOptSeq" [ value; typ ]
+let typecheck_seq_opt value typ = app "typecheckSeqOpt" [ value; typ ]
+let typecheck_nested_seq value typ = app "typecheckNestedSeq" [ value; typ ]
 let typecheck_for_sort sort value typ =
   if sort_name sort = sort_name spectec_terminals then
     typecheck_seq value typ
   else
     typecheck value typ
+
+let typecheck_conditions_for_typ typ sort value witness =
+  match typ.it with
+  | IterT (inner, Opt) when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (app "isOpt" [ value ])
+    ; BoolCond (typecheck_seq value witness)
+    ]
+  | IterT ({ it = IterT (inner, Opt); _ }, List)
+    when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (typecheck_opt_seq value witness) ]
+  | IterT ({ it = IterT (inner, List); _ }, Opt)
+    when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (typecheck_seq_opt value witness) ]
+  | IterT ({ it = IterT (inner, List); _ }, List)
+    when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (typecheck_nested_seq value witness) ]
+  | _ -> [ BoolCond (typecheck_for_sort sort value witness) ]
 
 let typ_components = Type_shape.typ_components
 
@@ -482,8 +504,81 @@ let type_note_free_var_ids typ =
   |> List.of_seq
   |> List.sort_uniq String.compare
 
+let rec expression_note_free_var_ids exp =
+  let child_ids =
+    match exp.it with
+    | VarE _ | BoolE _ | NumE _ | TextE _ -> []
+    | UnE (_, _, inner)
+    | LiftE inner
+    | LenE inner
+    | ProjE (inner, _)
+    | TheE inner
+    | DotE (inner, _)
+    | CaseE (_, inner)
+    | UncaseE (inner, _)
+    | CvtE (inner, _, _) ->
+      expression_note_free_var_ids inner
+    | BinE (_, _, left, right)
+    | CmpE (_, _, left, right)
+    | IdxE (left, right)
+    | CompE (left, right)
+    | MemE (left, right)
+    | CatE (left, right) ->
+      expression_note_free_var_ids left @ expression_note_free_var_ids right
+    | SliceE (base, first, last) | IfE (base, first, last) ->
+      expression_note_free_var_ids base
+      @ expression_note_free_var_ids first
+      @ expression_note_free_var_ids last
+    | OptE None -> []
+    | OptE (Some inner) -> expression_note_free_var_ids inner
+    | TupE fields | ListE fields ->
+      fields |> List.concat_map expression_note_free_var_ids
+    | UpdE (base, path, value) | ExtE (base, path, value) ->
+      expression_note_free_var_ids base
+      @ path_note_free_var_ids path
+      @ expression_note_free_var_ids value
+    | StrE fields ->
+      fields
+      |> List.concat_map (fun (_atom, field) ->
+        expression_note_free_var_ids field)
+    | CallE (_id, args) ->
+      args |> List.concat_map arg_note_free_var_ids
+    | IterE (body, (_iter, sources)) ->
+      expression_note_free_var_ids body
+      @ (sources
+         |> List.concat_map (fun (_id, source) ->
+           expression_note_free_var_ids source))
+    | SubE (inner, from_typ, to_typ) ->
+      expression_note_free_var_ids inner
+      @ type_note_free_var_ids from_typ
+      @ type_note_free_var_ids to_typ
+  in
+  type_note_free_var_ids exp.note @ child_ids
+  |> List.sort_uniq String.compare
+
+and path_note_free_var_ids path =
+  let child_ids =
+    match path.it with
+    | RootP -> []
+    | IdxP (inner, index) ->
+      path_note_free_var_ids inner @ expression_note_free_var_ids index
+    | SliceP (inner, first, last) ->
+      path_note_free_var_ids inner
+      @ expression_note_free_var_ids first
+      @ expression_note_free_var_ids last
+    | DotP (inner, _) -> path_note_free_var_ids inner
+  in
+  type_note_free_var_ids path.note @ child_ids
+  |> List.sort_uniq String.compare
+
+and arg_note_free_var_ids arg =
+  match arg.it with
+  | ExpA exp -> expression_note_free_var_ids exp
+  | TypA typ -> type_note_free_var_ids typ
+  | DefA _ | GramA _ -> []
+
 let source_and_note_free_var_ids exp =
-  source_free_var_ids exp @ type_note_free_var_ids exp.note
+  source_free_var_ids exp @ expression_note_free_var_ids exp
   |> List.sort_uniq String.compare
 
 let unique_source_ids ids =
@@ -493,16 +588,30 @@ let vars_within allowed vars =
   vars
   |> List.for_all (fun var -> List.exists (( = ) var) allowed)
 
-let helper_local_stem origin exp =
-  let material =
-    String.concat
-      "\000"
-      [ Origin.source_location origin
-      ; Origin.path origin
-      ; source_echo_exp exp
-      ]
+let short_source_stem source =
+  let words =
+    Naming.maude_var ~fallback:"BODY" source
+    |> String.split_on_char '_'
+    |> List.filter (fun word -> word <> "")
   in
-  String.uppercase_ascii (String.sub (Digest.to_hex (Digest.string material)) 0 8)
+  let rec take count length acc = function
+    | [] -> List.rev acc
+    | word :: words ->
+      if count >= 3 then
+        List.rev acc
+      else
+      let next_length = length + String.length word + if acc = [] then 0 else 1 in
+      if next_length > 24 && acc <> [] then
+        List.rev acc
+      else
+        take (count + 1) next_length (word :: acc) words
+  in
+  match take 0 0 [] words with
+  | [] -> "BODY"
+  | words -> String.concat "_" words
+
+let helper_local_stem origin exp =
+  Naming.helper_local_var_stem origin ^ "_" ^ short_source_stem (source_echo_exp exp)
 
 let helper_local_prefix origin exp =
   "CAP" ^ helper_local_stem origin exp ^ "X"

@@ -61,7 +61,9 @@ let is_builtin_hint hint =
   match Analysis.Hint_policy.classify hint with
   | Analysis.Hint_policy.Semantic_obligation ->
     hint.Il.Ast.hintid.it = "builtin"
-  | Analysis.Hint_policy.Presentation | Analysis.Hint_policy.Unknown ->
+  | Analysis.Hint_policy.Presentation
+  | Analysis.Hint_policy.Translator_annotation
+  | Analysis.Hint_policy.Unknown ->
     false
 
 let dec_hint_parts hintdef =

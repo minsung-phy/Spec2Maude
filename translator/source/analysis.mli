@@ -48,6 +48,7 @@ module Function_graph : sig
     ; params : param_kind list
     ; result : Il.Ast.typ
     ; clause_count : int
+    ; inverse_id : string option
     }
 
   type relation =
@@ -57,6 +58,8 @@ module Function_graph : sig
     ; mixop : Il.Ast.mixop
     ; result : Il.Ast.typ
     ; rule_count : int
+    ; hints : string list
+    ; maude_equational_view : bool
     }
 
   type relation_demand =
@@ -98,6 +101,13 @@ module Function_graph : sig
     | Unsupported_call of string
     | Prelude_gap_call of string
 
+  type runtime_search_capability =
+    | Runtime_search_candidate of string list
+    | Runtime_search_blocked of
+        { closure : string list
+        ; blockers : string list
+        }
+
   type t
 
   val build : Source_index.t -> t
@@ -106,9 +116,12 @@ module Function_graph : sig
   val definitions : t -> definition list
   val relations : t -> relation list
   val find_definition : t -> string -> definition option
+  val definition_inverse : t -> string -> string option
   val find_relation : t -> string -> relation option
+  val relation_has_maude_equational_view : relation -> bool
   val relation_runtime_demand_reason : t -> string -> string option
   val relation_is_runtime_demanded : t -> string -> bool
+  val runtime_predicate_search_capability : t -> string -> runtime_search_capability
   val definition_has_static_params : definition -> bool
   val specializations_for : t -> string -> specialization list
   val has_specialization : t -> specialization -> bool
@@ -137,6 +150,7 @@ module Hint_policy : sig
   type classification =
     | Presentation
     | Semantic_obligation
+    | Translator_annotation
     | Unknown
 
   val classify_hint_name : string -> classification

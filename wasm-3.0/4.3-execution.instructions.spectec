@@ -1108,7 +1108,7 @@ rule Step_pure/vcvtop:
 
 ;; Expressions
 
-relation Eval_expr: state; expr ~>* state; val*  hint(name "E-expr") hint(macro "steptostar") hint(tabular)
+relation Eval_expr: state; expr ~>* state; val*  hint(name "E-expr") hint(macro "steptostar") hint(tabular) hint(maude_equational_view)
 
 rule Eval_expr:
   z; instr*  ~>*  z'; val*

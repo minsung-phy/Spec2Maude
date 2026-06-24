@@ -2,17 +2,7 @@ open Il.Ast
 open Maude_ir
 open Util.Source
 
-type output =
-  { statements : Maude_ir.generated list
-  ; diagnostics : Diagnostics.t list
-  }
-
-let empty = { statements = []; diagnostics = [] }
-
-let append left right =
-  { statements = left.statements @ right.statements
-  ; diagnostics = left.diagnostics @ right.diagnostics
-  }
+include Reld_common
 
 let source_echo origin =
   origin.Origin.source_echo
@@ -86,6 +76,17 @@ let dedup_rule_conditions conditions =
       if List.exists (( = ) condition) acc then acc else condition :: acc)
     conditions
     []
+
+let dedup_generated statements =
+  let rec loop seen = function
+    | [] -> List.rev seen
+    | statement :: rest ->
+      if List.exists (fun old -> old.Maude_ir.node = statement.Maude_ir.node) seen then
+        loop seen rest
+      else
+        loop (statement :: seen) rest
+  in
+  loop [] statements
 
 let child_origin parent segment ast_constructor region source_echo =
   Origin.with_child ?source_echo parent segment ~ast_constructor region
@@ -539,16 +540,20 @@ let lower_execution_rule_premise ctx env ~bound_vars origin prem rel_id exp =
         | Some input_terms, Some [ output_pattern ] ->
           let lhs = relation_call (Naming.relation_op rel_id) input_terms in
           let rewrite_condition = RewriteCond (lhs, output_pattern) in
+          let rule_conditions =
+            rewrite_condition
+            :: List.map (fun condition -> EqCondition condition) output_guards
+          in
           let env_after = add_introduced_bindings env introduced in
           let bound_vars_after =
-            Condition_closure.term_vars output_pattern @ bound_vars
+            Condition_closure.conditions_bound_vars bound_vars input_guards
+            |> fun bound ->
+            Condition_closure.rule_conditions_bound_vars bound rule_conditions
             |> List.sort_uniq String.compare
           in
           { (Premise_translate.empty) with
             eq_conditions = input_guards
-          ; rule_conditions =
-              rewrite_condition
-              :: List.map (fun condition -> EqCondition condition) output_guards
+          ; rule_conditions
           ; env_after
           ; bound_vars_after
           ; diagnostics = arity_diags @ input_diags @ output_diags
@@ -587,7 +592,7 @@ let prem_origin parent prem =
     ~ast_constructor:"Premise"
     prem.at
 
-let translate_execution_premise ctx env ~bound_vars origin prem =
+let translate_execution_premise ctx env ~bound_vars ~future_prems origin prem =
   let origin = prem_origin origin prem in
   match prem.it with
   | RulePr (rel_id, mixop, exp) ->
@@ -614,16 +619,18 @@ let translate_execution_premise ctx env ~bound_vars origin prem =
       | Relation_shape.Execution _ ->
         lower_execution_rule_premise ctx env ~bound_vars origin prem rel_id exp
       | Relation_shape.Deterministic_candidate _ ->
-        Premise_translate.translate_premise ctx env ~bound_vars origin prem
+        Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
       | Relation_shape.Static_validation _ ->
-        Premise_translate.translate_premise ctx env ~bound_vars origin prem
+        Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
       | Relation_shape.Runtime_predicate _ | Relation_shape.Unknown _ ->
-        Premise_translate.translate_premise ctx env ~bound_vars origin prem)
-    | None -> Premise_translate.translate_premise ctx env ~bound_vars origin prem)
+        Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem)
+    | None -> Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem)
   | IfPr _ | LetPr _ ->
-    Premise_translate.translate_premise ctx env ~bound_vars origin prem
+    Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
   | ElsePr ->
-    let result = Premise_translate.translate_premise ctx env ~bound_vars origin prem in
+    let result =
+      Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
+    in
     { result with
       diagnostics =
         result.diagnostics
@@ -640,31 +647,320 @@ let translate_execution_premise ctx env ~bound_vars origin prem =
           ]
     }
   | IterPr _ | NegPr _ ->
-    Premise_translate.translate_premise ctx env ~bound_vars origin prem
+    Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
 
-let translate_execution_premises ctx env ~bound_terms origin prems =
+let translate_execution_premises
+    ctx env ?(bound_conditions = []) ~bound_terms origin prems =
   let bound_vars =
     bound_terms
     |> List.map Condition_closure.term_vars
     |> List.concat
     |> List.sort_uniq String.compare
+    |> fun vars -> Condition_closure.conditions_bound_vars vars bound_conditions
   in
+  let rec loop acc = function
+    | [] -> acc
+    | prem :: future_prems ->
+      let result =
+        translate_execution_premise
+          ctx
+          acc.Premise_translate.env_after
+          ~bound_vars:acc.Premise_translate.bound_vars_after
+          ~future_prems
+          origin
+          prem
+      in
+      loop (append_execution_premise_result acc result) future_prems
+  in
+  let result =
+    loop
+      { Premise_translate.empty with
+        env_after = env
+      ; bound_vars_after = bound_vars
+      }
+      prems
+  in
+  { result with
+    env_after =
+      Expr_translate.with_condition_bound_vars
+        result.Premise_translate.env_after
+        result.Premise_translate.bound_vars_after
+  }
+
+let rec term_skeleton = function
+  | Var _ -> "?"
+  | Const name -> "c:" ^ name
+  | Qid name -> "q:" ^ name
+  | App (name, args) ->
+    "a:" ^ name ^ "(" ^ String.concat "," (List.map term_skeleton args) ^ ")"
+
+let term_skeletons terms =
+  List.map term_skeleton terms
+
+let has_else_premise prems =
   prems
-  |> List.fold_left
-       (fun acc prem ->
-         let result =
-           translate_execution_premise
-             ctx
-             acc.Premise_translate.env_after
-             ~bound_vars:acc.Premise_translate.bound_vars_after
-             origin
-             prem
-         in
-         append_execution_premise_result acc result)
-       { Premise_translate.empty with
-         env_after = env
-       ; bound_vars_after = bound_vars
-       }
+  |> List.exists (fun prem ->
+    match prem.it with
+    | ElsePr -> true
+    | _ -> false)
+
+let without_else_premises prems =
+  prems
+  |> List.filter (fun prem ->
+    match prem.it with
+    | ElsePr -> false
+    | _ -> true)
+
+let gen_helper helper_name origin node =
+  Maude_ir.generated ~provenance:(Helper helper_name) ~origin node
+
+type enabledness_info =
+  { helper_name : string
+  ; output : output
+  }
+
+type enabledness_result =
+  | Not_applicable
+  | Enabledness of enabledness_info
+
+let enabledness_helper_name relation_id rule_id index =
+  "enabled-" ^ rule_label relation_id rule_id index
+
+let translate_enabledness_helper
+    ctx
+    rel_origin
+    relation_id
+    relation_kind
+    relation_mixop
+    (shape : Relation_shape.execution_shape)
+    input_sorts
+    current_lhs_skeleton
+    index
+    rule =
+  let origin = rule_origin rel_origin index rule in
+  match rule.it with
+  | RuleD (rule_id, binds, _mixop, exp, prems) ->
+    let ctx = Context.with_rule ctx rule_id.it in
+    let marker_diags =
+      validate_rule_marker
+        ctx
+        origin
+        ~expected_kind:relation_kind
+        ~expected_mixop:relation_mixop
+        rule
+    in
+    if has_fatal marker_diags then
+      Enabledness
+        { helper_name = enabledness_helper_name relation_id rule_id index
+        ; output = { empty with diagnostics = marker_diags }
+        }
+    else
+      let input_typs = Relation_shape.component_typs shape.Relation_shape.inputs in
+      let output_typs = Relation_shape.component_typs shape.Relation_shape.outputs in
+      let expected_typs = input_typs @ output_typs in
+      let components_opt, arity_diags =
+        exp_components_match
+          ctx
+          origin
+          "RelD/ElsePr/enabledness/arity"
+          expected_typs
+          exp
+      in
+      (match components_opt with
+      | None ->
+        Enabledness
+          { helper_name = enabledness_helper_name relation_id rule_id index
+          ; output = { empty with diagnostics = arity_diags }
+          }
+      | Some components ->
+        let input_count = List.length input_typs in
+        let rec split n left right =
+          if n = 0 then List.rev left, right
+          else
+            match right with
+            | [] -> List.rev left, []
+            | item :: rest -> split (n - 1) (item :: left) rest
+        in
+        let input_exps, _output_exps = split input_count [] components in
+        let seed =
+          enabledness_helper_name relation_id rule_id index
+        in
+        let env, var_decls, bind_diags =
+          translate_rule_binds ctx origin seed binds
+        in
+        let lhs_terms_opt, lhs_guards, lhs_bindings, lhs_diags =
+          lower_pattern_components ctx env origin input_exps
+        in
+        (match lhs_terms_opt with
+        | Some lhs_terms when term_skeletons lhs_terms = current_lhs_skeleton ->
+          let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
+          let premise_result =
+            Premise_translate.translate_premises
+              ctx
+              env
+              ~bound_conditions:lhs_guards
+              ~bound_terms:lhs_terms
+              origin
+              (without_else_premises prems)
+          in
+          let helper_name = enabledness_helper_name relation_id rule_id index in
+          let helper_call = app helper_name lhs_terms in
+          let conditions =
+            lhs_guards @ premise_result.eq_conditions
+            |> Condition_closure.normalize_binding_conditions lhs_terms
+            |> dedup_conditions
+          in
+          let op_decl =
+            gen_helper helper_name origin
+              (op helper_name (List.map sort_ref input_sorts) (sort "Bool"))
+          in
+          let equation =
+            gen_helper helper_name origin
+              (ceq helper_call (Const "true") conditions)
+          in
+          let rule_condition_diags =
+            match premise_result.rule_conditions with
+            | [] -> []
+            | _ :: _ ->
+              [ unsupported
+                  ~ctx
+                  ~origin
+                  ~constructor:"RelD/ElsePr/enabledness/rewrite-condition"
+                  ~source_echo:(Il.Print.string_of_rule rule)
+                  ~reason:
+                    "enabledness helper for an otherwise predecessor cannot contain rewrite conditions in this slice"
+                  ~suggestion:
+                    "Keep this otherwise complement Unsupported until rewrite-dependent enabledness helpers are implemented"
+                  ()
+              ]
+          in
+          let admissibility_diags =
+            Condition_closure.ceq_admissibility_diagnostics
+              ctx
+              origin
+              helper_call
+              (Const "true")
+              conditions
+          in
+          let registry_diags =
+            generated_statement_diagnostics ctx op_decl
+            @ generated_statement_diagnostics ctx equation
+          in
+          Enabledness
+            { helper_name
+            ; output =
+                { statements = var_decls @ [ op_decl; equation ]
+                ; diagnostics =
+                    bind_diags @ arity_diags @ lhs_diags
+                    @ premise_result.diagnostics
+                    @ rule_condition_diags
+                    @ admissibility_diags
+                    @ registry_diags
+                }
+            }
+        | Some _ -> Not_applicable
+        | None ->
+          Enabledness
+            { helper_name = enabledness_helper_name relation_id rule_id index
+            ; output =
+                { statements = var_decls
+                ; diagnostics = bind_diags @ arity_diags @ lhs_diags
+                }
+            }))
+
+let else_complement
+    ctx
+    rel_origin
+    relation_id
+    relation_kind
+    relation_mixop
+    shape
+    input_sorts
+    origin
+    current_lhs_terms
+    previous_rules =
+  let current_lhs_skeleton = term_skeletons current_lhs_terms in
+  let enabledness =
+    previous_rules
+    |> List.mapi (fun index rule ->
+      translate_enabledness_helper
+        ctx
+        rel_origin
+        relation_id
+        relation_kind
+        relation_mixop
+        shape
+        input_sorts
+        current_lhs_skeleton
+        (index + 1)
+        rule)
+  in
+  let applicable =
+    enabledness
+    |> List.filter_map (function
+      | Not_applicable -> None
+      | Enabledness result -> Some result)
+  in
+  match applicable with
+  | [] ->
+    { statements = []
+    ; diagnostics =
+        [ unsupported
+            ~ctx
+            ~origin
+            ~constructor:"RelD/RuleD/ElsePr/complement"
+            ~reason:
+              "source otherwise rule has no earlier rule with the same relation input skeleton, so the translator cannot derive a source enabledness complement"
+            ~suggestion:
+              "Keep this ElsePr Unsupported until rule grouping/preprocessing can prove the relevant predecessor rules"
+            ()
+        ]
+    },
+    []
+  | _ ->
+    let statements =
+      applicable
+      |> List.map (fun result -> result.output.statements)
+      |> List.concat
+    in
+    let diagnostics =
+      applicable
+      |> List.map (fun result -> result.output.diagnostics)
+      |> List.concat
+    in
+    let has_blocking = has_fatal diagnostics in
+    let statements =
+      if has_blocking then
+        []
+      else
+        statements
+    in
+    let complement_conditions =
+      if has_blocking then
+        []
+      else
+        applicable
+        |> List.map (fun result ->
+          let call = app result.helper_name current_lhs_terms in
+          EqCondition (BoolCond (app "_=/=_" [ call; Const "true" ])))
+    in
+    let diagnostics =
+      if has_blocking then
+        diagnostics
+        @ [ unsupported
+              ~ctx
+              ~origin
+              ~constructor:"RelD/RuleD/ElsePr/complement-unsupported"
+              ~reason:
+                "at least one predecessor rule in this otherwise group needs enabledness conditions that are not safely expressible by the current source-derived helper slice"
+              ~suggestion:
+                "Leave this ElsePr Unsupported until the blocking predecessor premise shape has a documented helper"
+              ()
+          ]
+      else
+        diagnostics
+    in
+    { statements; diagnostics }, complement_conditions
 
 let rec premise_has_execution_dependency ctx prem =
   match prem.it with
@@ -674,7 +970,8 @@ let rec premise_has_execution_dependency ctx prem =
       (match
          (Relation_shape.of_relation relation).Relation_shape.decision
        with
-      | Relation_shape.Execution _ -> true
+      | Relation_shape.Execution _ ->
+        not (Analysis.Function_graph.relation_has_maude_equational_view relation)
       | Relation_shape.Static_validation _
       | Relation_shape.Runtime_predicate _
       | Relation_shape.Deterministic_candidate _
@@ -759,7 +1056,13 @@ let translate_deterministic_rule
       | Some lhs_terms ->
         let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
         let premise_result =
-          Premise_translate.translate_premises ctx env ~bound_terms:lhs_terms origin prems
+          Premise_translate.translate_premises
+            ctx
+            env
+            ~bound_conditions:lhs_guards
+            ~bound_terms:lhs_terms
+            origin
+            prems
         in
         let rhs_result =
           Expr_translate.lower_value ctx premise_result.env_after origin output_exp
@@ -863,6 +1166,8 @@ let translate_execution_rule
     relation_kind
     relation_mixop
     (shape : Relation_shape.execution_shape)
+    input_sorts
+    previous_rules
     index
     rule
   =
@@ -909,8 +1214,31 @@ let translate_execution_rule
       (match lhs_terms_opt with
       | Some lhs_terms ->
         let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
+        let has_else = has_else_premise prems in
+        let else_output, else_conditions =
+          if has_else then
+            else_complement
+              ctx
+              rel_origin
+              relation_id
+              relation_kind
+              relation_mixop
+              shape
+              input_sorts
+              origin
+              lhs_terms
+              previous_rules
+          else
+            empty, []
+        in
         let premise_result =
-          translate_execution_premises ctx env ~bound_terms:lhs_terms origin prems
+          translate_execution_premises
+            ctx
+            env
+            ~bound_conditions:lhs_guards
+            ~bound_terms:lhs_terms
+            origin
+            (without_else_premises prems)
         in
         let output_terms_opt, output_guards, output_diags =
           lower_value_components
@@ -922,42 +1250,56 @@ let translate_execution_rule
         in
         let diagnostics =
           bind_diags @ arity_diags @ lhs_diags @ output_diags
-          @ premise_result.diagnostics
+          @ else_output.diagnostics @ premise_result.diagnostics
         in
         if has_fatal diagnostics then
-          { statements = var_decls; diagnostics }
+          { statements = var_decls @ else_output.statements; diagnostics }
         else
           (match output_terms_opt with
           | Some [ rhs_term ] ->
             let lhs = relation_call op_name lhs_terms in
             let conditions =
               List.map (fun condition -> EqCondition condition) lhs_guards
+              @ else_conditions
               @ premise_result.rule_conditions
               @ List.map (fun condition -> EqCondition condition) output_guards
               |> Condition_closure.normalize_rule_conditions [ lhs ]
               |> dedup_rule_conditions
             in
-            let statement =
-              gen origin
-                (crl
-                   ~label:(rule_label relation_id rule_id index)
-                   lhs
-                   rhs_term
-                   conditions)
+            let admissibility_diags =
+              Condition_closure.crl_admissibility_diagnostics
+                ctx
+                origin
+                lhs
+                rhs_term
+                conditions
             in
-            let registry_diags =
-              generated_statement_diagnostics ctx statement
-            in
-            if has_fatal registry_diags then
-              { statements = []
-              ; diagnostics = diagnostics @ registry_diags
+            if has_fatal admissibility_diags then
+              { statements = var_decls
+              ; diagnostics = diagnostics @ admissibility_diags
               }
             else
-              { statements = var_decls @ [ statement ]
-              ; diagnostics
-              }
+              let statement =
+                gen origin
+                  (crl
+                     ~label:(rule_label relation_id rule_id index)
+                     lhs
+                     rhs_term
+                     conditions)
+              in
+              let registry_diags =
+                generated_statement_diagnostics ctx statement
+              in
+              if has_fatal registry_diags then
+                { statements = []
+                ; diagnostics = diagnostics @ registry_diags
+                }
+              else
+                { statements = var_decls @ else_output.statements @ [ statement ]
+                ; diagnostics
+                }
           | Some _ ->
-            { statements = var_decls
+            { statements = var_decls @ else_output.statements
             ; diagnostics =
                 diagnostics
                 @ [ unsupported
@@ -970,7 +1312,7 @@ let translate_execution_rule
                       ()
                   ]
             }
-          | None -> { statements = var_decls; diagnostics })
+          | None -> { statements = var_decls @ else_output.statements; diagnostics })
       | _ ->
         { statements = var_decls
         ; diagnostics = bind_diags @ arity_diags @ lhs_diags
@@ -1012,21 +1354,28 @@ let translate_execution
           ]
         in
         let rules_output =
-          rules
-          |> List.mapi (fun index rule ->
-            translate_execution_rule
-              ctx
-              origin
-              op_name
-              id
-              relation_kind
-              relation_mixop
-              shape
-              (index + 1)
-              rule)
-          |> List.fold_left append empty
+          let rec loop previous index = function
+            | [] -> empty
+            | rule :: rest ->
+              let current =
+                translate_execution_rule
+                  ctx
+                  origin
+                  op_name
+                  id
+                  relation_kind
+                  relation_mixop
+                  shape
+                  input_sorts
+                  previous
+                  index
+                  rule
+              in
+              append current (loop (previous @ [ rule ]) (index + 1) rest)
+          in
+          loop [] 1 rules
         in
-        { statements = header @ rules_output.statements
+        { statements = header @ dedup_generated rules_output.statements
         ; diagnostics = diagnostics @ rules_output.diagnostics
         }
       | Some _, Some _ ->
@@ -1089,7 +1438,13 @@ let translate_runtime_predicate_rule
         | Some lhs_terms ->
           let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
           let premise_result =
-            Premise_translate.translate_premises ctx env ~bound_terms:lhs_terms origin prems
+            Premise_translate.translate_premises
+              ctx
+              env
+              ~bound_conditions:lhs_guards
+              ~bound_terms:lhs_terms
+              origin
+              prems
           in
           let diagnostics =
             bind_diags @ arity_diags @ lhs_diags @ premise_result.diagnostics
@@ -1188,9 +1543,13 @@ let translate_runtime_predicate
       let diagnostics =
         input_diags @ rules_output.diagnostics
       in
-      { statements = op_decl :: rules_output.statements
-      ; diagnostics
-      }
+      let statements =
+        if has_fatal diagnostics then
+          [ op_decl ]
+        else
+          op_decl :: rules_output.statements
+      in
+      { statements; diagnostics }
     | None ->
       { empty with
         diagnostics =
@@ -1254,7 +1613,10 @@ let translate ctx origin id mixop result_typ rules =
   | Relation_shape.Deterministic_candidate shape ->
     translate_deterministic ctx origin id relation_kind mixop shape rules
   | Relation_shape.Execution shape ->
-    translate_execution ctx origin id relation_kind mixop shape rules
+    if Reld_equational_view.relation_has_maude_equational_view ctx id then
+      Reld_equational_view.translate ctx origin id shape rules
+    else
+      translate_execution ctx origin id relation_kind mixop shape rules
   | Relation_shape.Unknown reason ->
     one_diagnostic
       (unsupported

@@ -98,11 +98,11 @@ let helper_decls ~has_float_rep ~has_num_bytes ~has_storage_const_bytes ~has_lan
       ; "  ceq builtin.inv-nbytes-float(NB_N, NB_BYTES) = numx5f.wrap_(builtin.float-from-bits(NB_N, NB_RAW))"
       ; "    if _rem_(NB_N, 8) = 0"
       ; "       /\\ len(NB_BYTES) = _quo_(NB_N, 8)"
-	      ; "       /\\ typecheckSeq(NB_BYTES, syn-byte)"
-	      ; "       /\\ NB_RAW := builtin.inv-ibytes-aux(NB_BYTES, 1, 0) ."
-	      ]
-	    else
-	      [])
+        ; "       /\\ typecheckSeq(NB_BYTES, syn-byte)"
+        ; "       /\\ NB_RAW := builtin.inv-ibytes-aux(NB_BYTES, 1, 0) ."
+        ]
+      else
+        [])
     @
     (if has_storage_const_bytes then
       [ ""
@@ -341,15 +341,15 @@ let implemented_equations ~has_entry =
     else
       [])
     @
-	    (if has_entry "inv_vbytes_" then
-	      [ ""
-	      ; "  ceq definvx5fxvbytesx5fx(vectype.v128, BY_BYTES) = vecx5f.wrap_(BY_RESULT)"
-	      ; "    if len(BY_BYTES) = _quo_(defvsize(vectype.v128), 8)"
-	      ; "       /\\ typecheckSeq(BY_BYTES, syn-byte)"
-	      ; "       /\\ BY_RESULT := builtin.inv-ibytes-aux(BY_BYTES, 1, 0) ."
-	      ]
-	    else
-	      [])
+      (if has_entry "inv_vbytes_" then
+        [ ""
+        ; "  ceq definvx5fxvbytesx5fx(vectype.v128, BY_BYTES) = vecx5f.wrap_(BY_RESULT)"
+        ; "    if len(BY_BYTES) = _quo_(defvsize(vectype.v128), 8)"
+        ; "       /\\ typecheckSeq(BY_BYTES, syn-byte)"
+        ; "       /\\ BY_RESULT := builtin.inv-ibytes-aux(BY_BYTES, 1, 0) ."
+        ]
+      else
+        [])
     @
     (if has_entry "zbytes_" then
       [ ""

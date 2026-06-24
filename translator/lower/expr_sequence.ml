@@ -9,12 +9,14 @@ type callbacks =
   ; lower_iter : Context.t -> env -> Origin.t -> exp -> exp -> iterexp -> result
   }
 
+let seq term = app "seq" [ term ]
+
 let rec lower_tuple_component callbacks ctx env origin exp =
   match carrier_sort_of_typ exp.note with
   | Some sort when is_sequence_sort sort ->
     let result = lower_sequence callbacks ctx env origin exp in
     (match result.term with
-    | Some term -> { result with term = Some (app "seq" [ term ]) }
+    | Some term -> { result with term = Some (seq term) }
     | None -> result)
   | _ -> callbacks.lower_value ctx env origin exp
 
@@ -49,6 +51,8 @@ and lower_list callbacks ctx env origin exp exps =
     lower_nested_list callbacks ctx env origin exp exps
   else if is_optional_list_typ exp.note then
     lower_optional_list callbacks ctx env origin exp exps
+  else if is_list_optional_typ exp.note then
+    lower_list_optional callbacks ctx env origin exp exps
   else
     lower_flat_list callbacks ctx env origin exps
 
@@ -95,7 +99,7 @@ and lower_nested_list callbacks ctx env origin exp exps =
             else
               result.guards
           in
-          { result with term = Some (app "seq" [ term ]); guards }
+          { result with term = Some (seq term); guards }
         | None -> result)
       else
         with_diagnostics [ nested_list_element_diagnostic ctx origin exp inner ]
@@ -134,7 +138,7 @@ and lower_optional_list callbacks ctx env origin exp exps =
         (match result.term with
         | Some term ->
           { result with
-            term = Some (app "seq" [ term ])
+            term = Some (seq term)
           ; guards = result.guards @ [ EqCond (is_opt term, Const "true") ]
           }
         | None -> result)
@@ -153,6 +157,12 @@ and lower_optional_list callbacks ctx env origin exp exps =
       { term = Some term; guards; diagnostics }
     else
       { term = None; guards; diagnostics }
+
+and lower_list_optional callbacks ctx env origin _exp exps =
+  let result = lower_flat_list callbacks ctx env origin exps in
+  match result.term with
+  | Some term -> { result with term = Some (seq term) }
+  | None -> result
 
 and lower_sequence callbacks ctx env origin exp =
   match exp.it with
@@ -193,6 +203,23 @@ and lower_cat callbacks ctx env origin exp left right =
     }
 
 and lower_opt callbacks ctx env origin exp opt =
+  if is_list_optional_typ exp.note then
+    match opt with
+    | None -> with_term (Const "eps")
+    | Some inner ->
+      let result =
+        lower_sequence callbacks ctx env (Origin.with_child
+          ~source_echo:(source_echo_exp inner)
+          origin
+          "opt-list-some"
+          ~ast_constructor:"Expr"
+          inner.at)
+          inner
+      in
+      (match result.term with
+      | Some term -> { result with term = Some (seq term) }
+      | None -> result)
+  else
   match carrier_sort_of_typ exp.note with
   | Some sort when is_sequence_sort sort ->
     (match opt with

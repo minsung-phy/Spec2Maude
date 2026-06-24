@@ -22,6 +22,11 @@ type lookup =
   | Missing
   | Ambiguous of entry list
 
+type projection_lookup =
+  | Projection_found of entry
+  | Projection_missing
+  | Projection_ambiguous of entry list
+
 type inclusion =
   { parent_category : string
   ; parent_static_args_key : string option
@@ -228,6 +233,23 @@ let lookup_emitted t ~source_category ~static_args_key ~mixop ~arity =
           | entries -> Ambiguous entries)))
   in
   lookup_category [] source_category static_args_key
+
+let lookup_unary_projection t ~projection_op =
+  let matches =
+    t.entries
+    |> List.filter (fun entry ->
+      entry.status = Emitted
+      && entry.arity = 1
+      && entry.projection_ops = [ projection_op ])
+  in
+  match matches with
+  | [] -> Projection_missing
+  | [ entry ] -> Projection_found entry
+  | entry :: rest ->
+    if List.for_all (fun candidate -> same_emitted_surface entry candidate) rest then
+      Projection_found entry
+    else
+      Projection_ambiguous matches
 
 let has_wrapper t ~source_category ~static_args_key =
   t.entries

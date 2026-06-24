@@ -282,10 +282,32 @@ let validate_rule_condition origin constructor index bound condition =
   | Maude_ir.EqCondition condition ->
     validate_eq_condition origin constructor index bound condition
   | Maude_ir.RewriteCond (lhs, rhs) ->
-    let violations =
+    let lhs_violations =
       require_bound origin constructor index "rewrite lhs" bound lhs
     in
-    add_vars (term_vars rhs) bound, violations
+    let rhs_violations =
+      if Condition_closure.is_match_pattern rhs then
+        []
+      else
+        [ violation
+            ~origin
+            ~constructor
+            ~reason:
+              (Printf.sprintf
+                 "condition %d rewrite rhs is not a Maude pattern, so it cannot introduce witness variables soundly"
+                 index)
+            ~suggestion:
+              "Lower the rewrite condition rhs to a constructor/variable pattern before using it to bind variables"
+            ()
+        ]
+    in
+    let bound =
+      if lhs_violations = [] && rhs_violations = [] then
+        add_vars (term_vars rhs) bound
+      else
+        bound
+    in
+    bound, lhs_violations @ rhs_violations
 
 let validate_condition_list validate_one origin constructor initial_bound conditions =
   conditions

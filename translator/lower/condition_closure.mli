@@ -3,6 +3,8 @@ val is_match_pattern : Maude_ir.term -> bool
 val vars_subset : string list -> string list -> bool
 val conditions_bound_vars :
   string list -> Maude_ir.eq_condition list -> string list
+val rule_conditions_bound_vars :
+  string list -> Maude_ir.rule_condition list -> string list
 val external_vars_of_term_after_conditions :
   string list -> Maude_ir.term -> Maude_ir.eq_condition list -> string list
 val external_vars_of_conditions :
@@ -23,4 +25,11 @@ val ceq_admissibility_diagnostics :
   Maude_ir.term ->
   Maude_ir.term ->
   Maude_ir.eq_condition list ->
+  Diagnostics.t list
+val crl_admissibility_diagnostics :
+  Context.t ->
+  Origin.t ->
+  Maude_ir.term ->
+  Maude_ir.term ->
+  Maude_ir.rule_condition list ->
   Diagnostics.t list

@@ -214,9 +214,9 @@ let helper_decls
 
 
 let implemented_equations ~has_entry =
-	    (if has_entry "wrap__" then
-	       [ ""
-	       ; "  ceq defwrapx5fxx5fx(BW_M, BW_N, iN.wrap_(BW_I)) = iN.wrap_(_rem_(BW_I, _^_(2, BW_N)))"
+      (if has_entry "wrap__" then
+         [ ""
+         ; "  ceq defwrapx5fxx5fx(BW_M, BW_N, iN.wrap_(BW_I)) = iN.wrap_(_rem_(BW_I, _^_(2, BW_N)))"
       ; "    if _>_(BW_N, 0)"
       ; "       /\\ _<_(BW_N, BW_M)"
       ; "       /\\ _<_(BW_I, _^_(2, BW_M)) ."
