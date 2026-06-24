@@ -17,5 +17,9 @@ val record_constructor : Il.Ast.id -> string
 val definition_op : Il.Ast.id -> string
 val specialized_definition_op : Il.Ast.id -> string list -> string
 val relation_op : Il.Ast.id -> string
+val relation_equational_view_op : Il.Ast.id -> string
+val helper_context_name : Origin.t -> string
+val helper_context_var_stem : Origin.t -> string
+val helper_local_var_stem : Origin.t -> string
 val maude_var : ?fallback:string -> string -> string
 val maude_module_name : string -> string

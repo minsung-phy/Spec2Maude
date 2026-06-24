@@ -361,8 +361,20 @@ let rec lower_value ctx env origin exp =
     (match find_var env id.it with
     | Some binding -> with_term binding.term
     | None ->
-      unsupported_exp ctx origin "Expr/VarE" exp
-        ("unbound variable `" ^ id.it ^ "` in expression lowering"))
+      (match env.condition_bound_vars, carrier_sort_of_typ exp.note with
+      | Some bound_vars, Some sort ->
+        let raw_var = Naming.maude_var id.it in
+        let typed_var = raw_var ^ ":" ^ sort_name sort in
+        if List.mem typed_var bound_vars then
+          with_term (Var typed_var)
+        else if List.mem raw_var bound_vars then
+          with_term (Var raw_var)
+        else
+          unsupported_exp ctx origin "Expr/VarE" exp
+            ("unbound variable `" ^ id.it ^ "` in expression lowering")
+      | Some _, None | None, _ ->
+        unsupported_exp ctx origin "Expr/VarE" exp
+          ("unbound variable `" ^ id.it ^ "` in expression lowering")))
   | BoolE b -> with_term (bool_wrapper (Const (string_of_bool b)))
   | NumE n -> literal_num_value ctx origin exp n
   | TextE text -> with_term (text_literal text)
@@ -372,9 +384,8 @@ let rec lower_value ctx env origin exp =
     lower_unary_value ctx env origin exp (Il.Print.string_of_unop op) exp1
   | BinE ((`AndOp | `OrOp | `ImplOp | `EquivOp), _, _, _) ->
     lower_bool_value ctx env origin exp
-  | BinE (`ModOp, _, _, _) ->
-    unsupported_exp ctx origin "Expr/BinE" exp
-      "numeric modulo uses source operator `\\`, which needs a verified Maude/prelude encoding before it can be emitted parse-safely"
+  | BinE (`ModOp, _, left, right) ->
+    lower_binary_value ctx env origin exp "\\" left right
   | BinE (op, _, left, right) ->
     lower_binary_value ctx env origin exp (Il.Print.string_of_binop op) left right
   | CmpE _ ->
@@ -482,6 +493,9 @@ and witness_of_typ_with_guards ctx env origin constructor typ =
     ; witness_diagnostics = []
     }
   | IterT (inner, (List | Opt)) when not (typ_is_iter inner) ->
+    witness_of_typ_with_guards ctx env origin constructor inner
+  | IterT ({ it = IterT (inner, (List | Opt)); _ }, (List | Opt))
+    when not (typ_is_iter inner) ->
     witness_of_typ_with_guards ctx env origin constructor inner
   | IterT _ | TupT _ ->
     { witness_term = None
@@ -606,7 +620,7 @@ and category_guards_for_term ctx env origin constructor exp term typ =
   | Some sort, Some witness ->
     Some
       (witness_result.witness_guards
-       @ [ BoolCond (typecheck_for_sort sort term witness) ]),
+       @ typecheck_conditions_for_typ typ sort term witness),
     witness_result.witness_diagnostics
   | None, _ ->
     None,

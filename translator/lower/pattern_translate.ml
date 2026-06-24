@@ -160,8 +160,34 @@ let typecheck value typ =
 let typecheck_seq value typ =
   app "typecheckSeq" [ value; typ ]
 
+let typecheck_opt_seq value typ =
+  app "typecheckOptSeq" [ value; typ ]
+
+let typecheck_seq_opt value typ =
+  app "typecheckSeqOpt" [ value; typ ]
+
+let typecheck_nested_seq value typ =
+  app "typecheckNestedSeq" [ value; typ ]
+
 let typecheck_for_sort sort value typ =
   if is_sequence_sort sort then typecheck_seq value typ else typecheck value typ
+
+let typecheck_conditions_for_typ typ sort value witness =
+  match typ.it with
+  | IterT (inner, Opt) when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (app "isOpt" [ value ])
+    ; BoolCond (typecheck_seq value witness)
+    ]
+  | IterT ({ it = IterT (inner, Opt); _ }, List)
+    when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (typecheck_opt_seq value witness) ]
+  | IterT ({ it = IterT (inner, List); _ }, Opt)
+    when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (typecheck_seq_opt value witness) ]
+  | IterT ({ it = IterT (inner, List); _ }, List)
+    when not (Type_shape.typ_is_iter inner) ->
+    [ BoolCond (typecheck_nested_seq value witness) ]
+  | _ -> [ BoolCond (typecheck_for_sort sort value witness) ]
 
 let len term =
   app "len" [ term ]
@@ -174,6 +200,35 @@ let is_opt term =
 
 let all_opt term =
   app "allOpt" [ term ]
+
+let bool_eq left right =
+  app "_==_" [ left; right ]
+
+let bool_or left right =
+  app "_or_" [ left; right ]
+
+let seq term = app "seq" [ term ]
+
+let iter_pattern_zip_request
+    ~source_shape
+    ~subject_item_term
+    ~subject_tail_var
+    ~sources
+    ~body_eq_conditions
+    ~reason
+    ~origin
+  =
+  { Helper.kind =
+      Helper.Iter_pattern_zip
+        { source_shape
+        ; subject_item_term
+        ; subject_tail_var
+        ; sources
+        ; body_eq_conditions
+        }
+  ; reason
+  ; origin
+  }
 
 let bool_wrapper term =
   app "bool" [ term ]
@@ -221,6 +276,40 @@ let is_optional_list_typ typ =
     not (typ_is_iter element_typ)
   | _ -> false
 
+let is_list_optional_typ typ =
+  match typ.it with
+  | IterT ({ it = IterT (element_typ, List); _ }, Opt) ->
+    not (typ_is_iter element_typ)
+  | _ -> false
+
+type iter_source_descriptor =
+  { source_item_shape : Helper.iter_map_source_item_shape
+  ; source_element_typ : typ
+  ; source_element_sort : sort
+  }
+
+let iter_source_descriptor callbacks typ =
+  let descriptor item_shape element_typ =
+    match callbacks.carrier_sort_of_typ element_typ with
+    | Some source_element_sort ->
+      Some { source_item_shape = item_shape; source_element_typ = element_typ; source_element_sort }
+    | None -> None
+  in
+  match typ.it with
+  | IterT (element_typ, (List | List1 | ListN _)) when not (typ_is_iter element_typ) ->
+    descriptor Helper.Source_flat_terminal element_typ
+  | IterT
+      (({ it = IterT (inner_typ, (List | Opt)); _ } as element_typ), (List | List1 | ListN _))
+    when not (typ_is_iter inner_typ) ->
+    descriptor Helper.Source_nested_seq element_typ
+  | _ -> None
+
+let flat_subject_iter_typ typ =
+  match typ.it with
+  | IterT (element_typ, (List | List1 | ListN _)) when not (typ_is_iter element_typ) ->
+    Some element_typ
+  | _ -> None
+
 let pattern_var_name origin id =
   if id.it = "_" then
     Naming.maude_var
@@ -233,6 +322,13 @@ let pattern_var_name origin id =
 
 let typed_pattern_var origin id sort =
   Var (pattern_var_name origin id ^ ":" ^ sort_name sort)
+
+let anonymous_pattern_var origin label sort =
+  Var
+    (Naming.maude_var
+       ("pattern-" ^ label ^ "-" ^ String.concat "-" origin.Origin.path)
+     ^ ":"
+     ^ sort_name sort)
 
 let guard_for_typ ctx callbacks origin constructor exp term typ =
   match callbacks.carrier_sort_of_typ typ with
@@ -253,7 +349,7 @@ let guard_for_typ ctx callbacks origin constructor exp term typ =
     in
     (match witness_opt with
     | Some witness ->
-      Some (witness_guards @ [ BoolCond (typecheck_for_sort sort term witness) ]),
+      Some (witness_guards @ typecheck_conditions_for_typ typ sort term witness),
       witness_diagnostics
     | None ->
       None,
@@ -301,15 +397,62 @@ let rec lower ctx callbacks origin exp =
     lower_numeric_conversion ctx callbacks origin exp inner source_typ target_typ
   | SubE (inner, _source_typ, target_typ) ->
     lower_subtyping ctx callbacks origin exp inner target_typ
+  | LiftE inner -> lower_lift ctx callbacks origin exp inner
+  | CallE _ -> lower_call_pattern ctx callbacks origin exp
   | TupE exps -> lower_tuple ctx callbacks origin exp exps
   | StrE fields -> lower_record ctx callbacks origin exp fields
   | DotE (record, atom) -> lower_dot ctx callbacks origin exp record atom
   | IdxE (base, index_exp) -> lower_idx ctx callbacks origin exp base index_exp
   | UnE _ | BinE _ | CmpE _ | ProjE _ | UncaseE _ | TheE _
-  | CompE _ | LiftE _ | MemE _ | LenE _ | SliceE _ | UpdE _
-  | ExtE _ | CallE _ | IfE _ ->
+  | CompE _ | MemE _ | LenE _ | SliceE _ | UpdE _
+  | ExtE _ | IfE _ ->
     unsupported_pattern ctx origin (form_name (classify exp)) exp
       "this expression constructor is not a documented safe pattern form for this slice"
+
+and lower_call_pattern ctx callbacks origin exp =
+  match callbacks.carrier_sort_of_typ exp.note with
+  | None ->
+    unsupported_pattern ctx origin "CallE" exp
+      "pattern CallE hoisting requires a known carrier sort for the function result"
+  | Some sort ->
+    let call_result = callbacks.lower_guard_value origin exp in
+    (match call_result.term with
+    | Some call_term ->
+      let pattern_term = anonymous_pattern_var origin "call" sort in
+      { term = Some pattern_term
+      ; guards = call_result.guards @ [ MatchCond (pattern_term, call_term) ]
+      ; introduced_bindings = []
+      ; diagnostics = call_result.diagnostics
+      }
+    | None ->
+      { term = None
+      ; guards = call_result.guards
+      ; introduced_bindings = []
+      ; diagnostics =
+          call_result.diagnostics
+          @ [ unsupported
+                ~ctx ~origin ~constructor:"Pattern/CallE"
+                ~source_echo:(source_echo_exp exp)
+                ~reason:
+                  "pattern CallE could not lower the function call as an already-bound value; inverse/search is not introduced in this direct hoisting slice"
+                ~suggestion:
+                  "Keep this pattern Unsupported until the call arguments are bound or an explicit inverse helper is available"
+                ()
+            ]
+      })
+
+and lower_lift ctx callbacks origin exp inner =
+  if is_flat_list_typ exp.note && is_flat_optional_typ inner.note then
+    let result =
+      lower_sequence ctx callbacks (child_origin origin "lift-inner" inner) inner
+    in
+    match result.term with
+    | Some term ->
+      { result with guards = result.guards @ [ EqCond (app "isOpt" [ term ], Const "true") ] }
+    | None -> result
+  else
+    unsupported_pattern ctx origin "LiftE" exp
+      "pattern LiftE is supported only for identity lifting from a flat optional carrier to a flat list carrier"
 
 and lower_dot ctx callbacks origin exp record atom =
   let record_result =
@@ -479,7 +622,7 @@ and lower_tuple_component ctx callbacks origin exp =
   | Some sort when is_sequence_sort sort ->
     let result = lower_sequence ctx callbacks origin exp in
     (match result_term result with
-    | Some term -> { result with term = Some (app "seq" [ term ]) }
+    | Some term -> { result with term = Some (seq term) }
     | None -> result)
   | _ -> lower ctx callbacks origin exp
 
@@ -558,6 +701,8 @@ and lower_list ctx callbacks origin exp exps =
     lower_nested_list ctx callbacks origin exp exps
   else if is_optional_list_typ exp.note then
     lower_optional_list ctx callbacks origin exp exps
+  else if is_list_optional_typ exp.note then
+    lower_list_optional ctx callbacks origin exps
   else
     lower_flat_list ctx callbacks origin exps
 
@@ -581,6 +726,12 @@ and lower_flat_list ctx callbacks origin exps =
       { term = Some term; guards; introduced_bindings; diagnostics }
     else
       { term = None; guards; introduced_bindings; diagnostics }
+
+and lower_list_optional ctx callbacks origin exps =
+  let result = lower_flat_list ctx callbacks origin exps in
+  match result.term with
+  | Some term -> { result with term = Some (seq term) }
+  | None -> result
 
 and lower_sequence ctx callbacks origin exp =
   match exp.it with
@@ -643,6 +794,20 @@ and lower_cat ctx callbacks origin exp left right =
     }
 
 and lower_opt ctx callbacks origin exp opt =
+  if is_list_optional_typ exp.note then
+    match opt with
+    | None -> with_term (Const "eps")
+    | Some inner ->
+      let result =
+        lower_sequence
+          ctx callbacks
+          (child_origin origin "opt-list-some" inner)
+          inner
+      in
+      (match result.term with
+      | Some term -> { result with term = Some (seq term) }
+      | None -> result)
+  else
   match callbacks.carrier_sort_of_typ exp.note with
   | Some sort when is_sequence_sort sort ->
     (match opt with
@@ -672,7 +837,7 @@ and lower_nested_list ctx callbacks origin _exp exps =
             else
               result.guards
           in
-          { result with term = Some (app "seq" [ term ]); guards }
+          { result with term = Some (seq term); guards }
         | None -> result)
       else
         unsupported_pattern ctx (child_origin origin (Printf.sprintf "nested-list[%d]" index) inner)
@@ -696,7 +861,7 @@ and lower_optional_list ctx callbacks origin _exp exps =
         (match result.term with
         | Some term ->
           { result with
-            term = Some (app "seq" [ term ])
+            term = Some (seq term)
           ; guards = result.guards @ [ EqCond (is_opt term, Const "true") ]
           }
         | None -> result)
@@ -723,6 +888,8 @@ and lower_sequence_elements lower_inner exps =
 
 and lower_iter ctx callbacks origin exp body (iter, generators) =
   match iter, generators, body.it with
+  | Opt, [], _ ->
+    lower_exact_optional_pattern ctx callbacks origin exp body
   | List, [ generator_id, source_exp ], VarE body_id
     when body_id.it = generator_id.it && is_optional_list_typ exp.note ->
     lower_optional_list_identity ctx callbacks origin source_exp
@@ -735,6 +902,17 @@ and lower_iter ctx callbacks origin exp body (iter, generators) =
   | List, [ generator_id, source_exp ], VarE body_id
     when body_id.it = generator_id.it ->
     lower_sequence ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
+  | List1, [ generator_id, source_exp ], VarE body_id
+    when body_id.it = generator_id.it ->
+    lower_nonempty_sequence ctx callbacks origin source_exp
+  | List, [ generator_id, source_exp ], _
+    when is_source_preserving_iter_body generator_id.it body ->
+    lower_sequence_with_target_guard
+      ctx callbacks origin exp source_exp
+  | List1, [ generator_id, source_exp ], _
+    when is_source_preserving_iter_body generator_id.it body ->
+    lower_nonempty_sequence_with_target_guard
+      ctx callbacks origin exp source_exp
   | List, [ generator_id, source_exp ], _
     when is_nested_list_typ exp.note && is_identity_list_expr_over generator_id.it body ->
     lower_sequence ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
@@ -744,9 +922,24 @@ and lower_iter ctx callbacks origin exp body (iter, generators) =
   | ListN (n_exp, _), [ generator_id, source_exp ], VarE body_id
     when body_id.it = generator_id.it ->
     lower_flat_identity_listn ctx callbacks origin source_exp n_exp
+  | ListN (n_exp, _), [ generator_id, source_exp ], _
+    when is_source_preserving_iter_body generator_id.it body ->
+    lower_flat_listn_with_target_guard
+      ctx callbacks origin exp source_exp n_exp
+  | List, generators, CaseE _ when generators <> [] ->
+    lower_constructor_zip_iter_pattern ctx callbacks origin exp body iter generators None
+  | ListN (n_exp, None), generators, CaseE _ when generators <> [] ->
+    lower_constructor_zip_iter_pattern ctx callbacks origin exp body iter generators (Some n_exp)
+  | ListN (_n_exp, Some _index_id), _, CaseE _ ->
+    unsupported_pattern ctx origin "IterE" exp
+      "constructor pattern ListN with an index binder needs an index-aware pattern helper and remains outside this slice"
   | Opt, [ generator_id, source_exp ], VarE body_id
     when body_id.it = generator_id.it ->
     lower_flat_identity_opt ctx callbacks origin source_exp
+  | Opt, [ generator_id, source_exp ], _
+    when is_list_optional_typ exp.note
+         && is_identity_list_expr_over generator_id.it body ->
+    lower_sequence ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
   | (Opt | List1), _, _ ->
     unsupported_pattern ctx origin "IterE" exp
       "Opt/List1 pattern iteration requires helper semantics outside this identity sequence slice"
@@ -756,6 +949,351 @@ and lower_iter ctx callbacks origin exp body (iter, generators) =
   | List, _, _ ->
     unsupported_pattern ctx origin "IterE" exp
       "only identity list pattern iteration VarE x over one generator x <- xs is supported in this slice"
+
+and helper_tail_var origin label =
+  Naming.maude_var
+    ("pattern-iter-"
+     ^ label
+     ^ "-"
+     ^ String.concat "-" origin.Origin.path
+     ^ "-"
+     ^ Origin.source_location origin)
+
+and binding_for_generator ctx origin exp body_result generator_id =
+  let matching =
+    body_result.introduced_bindings
+    |> List.filter (fun (id, _) -> id = generator_id.it)
+  in
+  match matching with
+  | [ _, binding ] -> Ok binding
+  | [] ->
+    Error
+      (unsupported
+         ~ctx ~origin ~constructor:"Pattern/IterE"
+         ~source_echo:(source_echo_exp exp)
+         ~reason:
+           ("constructor iteration body did not introduce generator `"
+            ^ generator_id.it
+            ^ "` as a local element pattern")
+         ~suggestion:
+           "Keep this IterE Unsupported until the pattern body exposes each generator as a source-shaped local pattern"
+         ())
+  | _ ->
+    Error
+      (unsupported
+         ~ctx ~origin ~constructor:"Pattern/IterE"
+         ~source_echo:(source_echo_exp exp)
+         ~reason:
+           ("constructor iteration body introduced generator `"
+            ^ generator_id.it
+            ^ "` more than once")
+         ~suggestion:
+           "Keep this IterE Unsupported until duplicate local generator bindings can be represented without ambiguity"
+         ())
+
+and lower_constructor_zip_iter_pattern
+    ctx callbacks origin exp body iter generators listn_count_exp_opt =
+  let unsupported_result reason =
+    unsupported_pattern ctx origin "IterE" exp reason
+  in
+  match flat_subject_iter_typ exp.note with
+  | None ->
+    unsupported_result
+      "constructor zip pattern helper requires the IterE result to be a flat list/ListN carrier"
+  | Some _subject_element_typ ->
+    let body_origin = child_origin origin "iter-body" body in
+    let body_result = lower ctx callbacks body_origin body in
+    let source_results =
+      generators
+      |> List.mapi (fun index (generator_id, source_exp) ->
+        let source_origin =
+          child_origin origin (Printf.sprintf "iter-source[%d]" index) source_exp
+        in
+        let source_result = lower_sequence ctx callbacks source_origin source_exp in
+        match
+          (match source_exp.it with
+          | VarE _ -> iter_source_descriptor callbacks source_exp.note
+          | _ -> None),
+          source_result.term,
+          binding_for_generator ctx source_origin source_exp body_result generator_id
+        with
+        | Some descriptor, Some source_term, Ok binding ->
+          Ok
+            ( generator_id
+            , source_exp
+            , descriptor
+            , source_term
+            , source_result
+            , binding )
+        | None, _, _ ->
+          Error
+            (unsupported_result
+               ("constructor zip pattern generator `"
+                ^ generator_id.it
+                ^ "` source must be a plain sequence variable with a supported flat or boundary-preserving sequence carrier"))
+        | _, None, _ ->
+          Error
+            { source_result with
+              diagnostics =
+                source_result.diagnostics
+                @ [ unsupported
+                      ~ctx ~origin:source_origin ~constructor:"Pattern/IterE"
+                      ~source_echo:(source_echo_exp source_exp)
+                      ~reason:
+                        ("constructor zip pattern generator `"
+                         ^ generator_id.it
+                         ^ "` source could not be lowered as a sequence pattern")
+                      ~suggestion:
+                        "Bind the generator source as a sequence pattern before using it in an iterated constructor pattern"
+                      ()
+                  ]
+            }
+        | _, _, Error diagnostic ->
+          Error { source_result with diagnostics = source_result.diagnostics @ [ diagnostic ] })
+    in
+    let extra_body_bindings =
+      body_result.introduced_bindings
+      |> List.filter (fun (id, _) ->
+        not (List.exists (fun (generator_id, _) -> generator_id.it = id) generators))
+    in
+    let extra_body_diagnostics =
+      extra_body_bindings
+      |> List.map (fun (id, _) ->
+        unsupported
+          ~ctx ~origin:body_origin ~constructor:"Pattern/IterE"
+          ~source_echo:(source_echo_exp body)
+          ~reason:
+            ("constructor iteration body introduces non-generator binding `"
+             ^ id
+             ^ "`; branch-local element bindings cannot escape the pattern helper")
+          ~suggestion:
+            "Keep this IterE Unsupported until the helper explicitly models local-only pattern bindings"
+          ())
+    in
+    let successful_sources =
+      source_results
+      |> List.filter_map (function Ok source -> Some source | Error _ -> None)
+    in
+    let source_diagnostics =
+      source_results
+      |> List.concat_map (function
+        | Ok (_, _, _, _, result, _) -> result.diagnostics
+        | Error result -> result.diagnostics)
+    in
+    (match body_result.term, extra_body_diagnostics, source_results with
+    | Some body_term, [], _ when List.length successful_sources = List.length generators ->
+      let subject_term = anonymous_pattern_var origin "iter" spectec_terminals in
+      let subject_tail_var = helper_tail_var origin "subject-tail" in
+      let helper_sources =
+        successful_sources
+        |> List.mapi (fun index (generator_id, source_exp, descriptor, _source_term, _source_result, (binding : binding)) ->
+          let source_shape : Helper.iter_zip_source_shape =
+            { generator_source_id = generator_id.it
+            ; source_source = source_echo_exp source_exp
+            ; source_typ_source = Il.Print.string_of_typ source_exp.note
+            }
+          in
+          { Helper.source_shape = source_shape
+          ; source_item_shape = descriptor.source_item_shape
+          ; source_head_term = binding.term
+          ; source_tail_var = helper_tail_var origin (Printf.sprintf "source-tail-%d" index)
+          })
+      in
+      let helper_request =
+        iter_pattern_zip_request
+          ~source_shape:
+            { pattern_source = source_echo_exp exp
+            ; body_source = source_echo_exp body
+            ; iter_source =
+                (match iter with
+                | List -> "List"
+                | ListN _ -> "ListN"
+                | List1 -> "List1"
+                | Opt -> "Opt")
+            ; sources =
+                List.map
+                  (fun (source : Helper.iter_pattern_zip_source) ->
+                    source.Helper.source_shape)
+                  helper_sources
+            }
+          ~subject_item_term:body_term
+          ~subject_tail_var
+          ~sources:helper_sources
+          ~body_eq_conditions:body_result.guards
+          ~reason:"source-preserving iterated constructor pattern helper"
+          ~origin
+      in
+      let helper_name = Helper.request (Context.helpers ctx) helper_request in
+      let source_terms =
+        successful_sources |> List.map (fun (_, _, _, source_term, _, _) -> source_term)
+      in
+      let source_tuple =
+        let wrapped = List.map (fun source_term -> app "seq" [ source_term ]) source_terms in
+        let tuple_items =
+          match wrapped with
+          | [] -> Const "eps"
+          | hd :: tl -> List.fold_left (fun acc term -> app "_ _" [ acc; term ]) hd tl
+        in
+        app "tuple" [ tuple_items ]
+      in
+      let source_guards =
+        successful_sources |> List.concat_map (fun (_, _, _, _, result, _) -> result.guards)
+      in
+      let source_bindings =
+        successful_sources
+        |> List.concat_map (fun (_, _, _, _, result, _) -> result.introduced_bindings)
+      in
+      let listn_result =
+        match listn_count_exp_opt with
+        | None -> with_term (Const "0")
+        | Some n_exp ->
+          lower_length_pattern_or_value
+            ctx callbacks
+            (child_origin origin "iter-length" n_exp)
+            n_exp
+      in
+      let length_guards, length_bindings, length_diagnostics =
+        match listn_count_exp_opt, listn_result.term with
+        | None, _ -> [], [], []
+        | Some _, Some n_term ->
+          let len_condition =
+            match n_term with
+            | Var _ -> MatchCond (n_term, len subject_term)
+            | _ -> EqCond (len subject_term, n_term)
+          in
+          listn_result.guards @ [ len_condition ],
+          listn_result.introduced_bindings,
+          listn_result.diagnostics
+        | Some _, None ->
+          listn_result.guards,
+          listn_result.introduced_bindings,
+          listn_result.diagnostics
+          @ [ unsupported
+                ~ctx ~origin ~constructor:"Pattern/IterE"
+                ~source_echo:(source_echo_exp exp)
+                ~reason:"constructor ListN pattern could not lower its count expression"
+                ~suggestion:
+                  "Bind the ListN count before using it in an iterated constructor pattern"
+                ()
+            ]
+      in
+      let guard_opt, guard_diagnostics =
+        guard_for_typ ctx callbacks origin "Pattern/IterE" exp subject_term exp.note
+      in
+      let helper_guard =
+        MatchCond (source_tuple, app helper_name [ subject_term ])
+      in
+      (match guard_opt with
+      | Some target_guards ->
+        { term = Some subject_term
+        ; guards =
+            length_guards @ [ helper_guard ] @ source_guards @ target_guards
+        ; introduced_bindings = source_bindings @ length_bindings
+        ; diagnostics =
+            source_diagnostics @ body_result.diagnostics @ length_diagnostics
+            @ guard_diagnostics
+        }
+      | None ->
+        { term = None
+        ; guards = length_guards @ [ helper_guard ] @ source_guards
+        ; introduced_bindings = source_bindings @ length_bindings
+        ; diagnostics =
+            source_diagnostics @ body_result.diagnostics @ length_diagnostics
+            @ guard_diagnostics
+        })
+    | _ ->
+      { term = None
+      ; guards =
+          body_result.guards
+          @ (source_results
+             |> List.concat_map (function
+               | Ok (_, _, _, _, result, _) | Error result -> result.guards))
+      ; introduced_bindings =
+          source_results
+          |> List.concat_map (function
+            | Ok (_, _, _, _, result, _) | Error result -> result.introduced_bindings)
+      ; diagnostics =
+          body_result.diagnostics @ source_diagnostics @ extra_body_diagnostics
+      })
+
+and lower_exact_optional_pattern ctx callbacks origin exp body =
+  let body_result =
+    lower ctx callbacks (child_origin origin "iter-body" body) body
+  in
+  match body_result.term with
+  | Some body_term when body_result.introduced_bindings = [] ->
+    let opt_term = anonymous_pattern_var origin "opt" spectec_terminals in
+    { term = Some opt_term
+    ; guards =
+        body_result.guards
+        @ [ EqCond (is_opt opt_term, Const "true")
+          ; BoolCond
+              (bool_or
+                 (bool_eq opt_term (Const "eps"))
+                 (bool_eq opt_term body_term))
+          ]
+    ; introduced_bindings = []
+    ; diagnostics = body_result.diagnostics
+    }
+  | Some _ ->
+    { term = None
+    ; guards = body_result.guards
+    ; introduced_bindings = body_result.introduced_bindings
+    ; diagnostics =
+        body_result.diagnostics
+        @ [ unsupported
+              ~ctx ~origin ~constructor:"Pattern/IterE"
+              ~source_echo:(source_echo_exp exp)
+              ~reason:
+                "exact optional pattern body introduces variables; lowering it as eps-or-present would leak bindings across the absent branch"
+              ~suggestion:
+                "Keep this optional pattern Unsupported until branch-local optional pattern bindings are represented explicitly"
+              ()
+          ]
+    }
+  | None -> body_result
+
+and lower_sequence_with_target_guard ctx callbacks origin exp source_exp =
+  let source_result =
+    lower_sequence ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
+  in
+  match source_result.term with
+  | Some source_term ->
+    let guard_opt, diagnostics =
+      guard_for_typ ctx callbacks origin "Pattern/IterE" exp source_term exp.note
+    in
+    (match guard_opt with
+    | Some guards ->
+      { source_result with
+        guards = source_result.guards @ guards
+      ; diagnostics = source_result.diagnostics @ diagnostics
+      }
+    | None ->
+      { source_result with
+        term = None
+      ; diagnostics = source_result.diagnostics @ diagnostics
+      })
+  | None -> source_result
+
+and lower_nonempty_sequence ctx callbacks origin source_exp =
+  let result =
+    lower_sequence ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
+  in
+  match result.term with
+  | Some term ->
+    { result with
+      guards = result.guards @ [ BoolCond (app "_=/=_" [ term; Const "eps" ]) ]
+    }
+  | None -> result
+
+and lower_nonempty_sequence_with_target_guard ctx callbacks origin exp source_exp =
+  let result = lower_sequence_with_target_guard ctx callbacks origin exp source_exp in
+  match result.term with
+  | Some term ->
+    { result with
+      guards = result.guards @ [ BoolCond (app "_=/=_" [ term; Const "eps" ]) ]
+    }
+  | None -> result
 
 and lower_optional_list_identity ctx callbacks origin source_exp =
   let source_result =
@@ -783,12 +1321,21 @@ and lower_flat_identity_opt ctx callbacks origin source_exp =
     }
   | None -> source_result
 
+and lower_length_pattern_or_value ctx callbacks origin exp =
+  match exp.it with
+  | VarE id -> lower_bound_or_fresh_var ctx callbacks origin exp id
+  | _ -> callbacks.lower_guard_value origin exp
+
 and lower_flat_identity_listn ctx callbacks origin source_exp n_exp =
   let source_result =
     lower_sequence ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
   in
   let n_result =
-    callbacks.lower_guard_value (child_origin origin "iter-length" n_exp) n_exp
+    lower_length_pattern_or_value
+      ctx
+      callbacks
+      (child_origin origin "iter-length" n_exp)
+      n_exp
   in
   match source_result.term, n_result.term with
   | Some source_term, Some n_term ->
@@ -822,6 +1369,26 @@ and lower_flat_identity_listn ctx callbacks origin source_exp n_exp =
           ]
     }
 
+and lower_flat_listn_with_target_guard ctx callbacks origin exp source_exp n_exp =
+  let result = lower_flat_identity_listn ctx callbacks origin source_exp n_exp in
+  match result.term with
+  | Some term ->
+    let guard_opt, diagnostics =
+      guard_for_typ ctx callbacks origin "Pattern/IterE" exp term exp.note
+    in
+    (match guard_opt with
+    | Some guards ->
+      { result with
+        guards = result.guards @ guards
+      ; diagnostics = result.diagnostics @ diagnostics
+      }
+    | None ->
+      { result with
+        term = None
+      ; diagnostics = result.diagnostics @ diagnostics
+      })
+  | None -> result
+
 and lower_nested_outer_identity_listn ctx callbacks origin exp outer_id source_exp body =
   match listn_body_over_outer outer_id body with
   | Some n_exp ->
@@ -829,7 +1396,11 @@ and lower_nested_outer_identity_listn ctx callbacks origin exp outer_id source_e
       lower_sequence ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
     in
     let n_result =
-      callbacks.lower_guard_value (child_origin origin "iter-length" n_exp) n_exp
+      lower_length_pattern_or_value
+        ctx
+        callbacks
+        (child_origin origin "iter-length" n_exp)
+        n_exp
     in
     (match source_result.term, n_result.term with
     | Some source_term, Some n_term ->
@@ -884,6 +1455,13 @@ and is_identity_optional_expr_over outer_id exp =
 and is_lifted_identity_optional_expr_over outer_id exp =
   match exp.it with
   | LiftE inner -> is_identity_optional_expr_over outer_id inner
+  | _ -> false
+
+and is_source_preserving_iter_body generator_id exp =
+  match exp.it with
+  | VarE id -> id.it = generator_id
+  | CvtE (inner, _, _) | SubE (inner, _, _) ->
+    is_source_preserving_iter_body generator_id inner
   | _ -> false
 
 and listn_body_over_outer outer_id exp =

@@ -36,6 +36,13 @@ let nested_list_inner_typ typ =
     Some inner_list_typ
   | _ -> None
 
+let optional_list_inner_typ typ =
+  match typ.it with
+  | IterT (({ it = IterT (element_typ, Opt); _ } as inner_optional_typ), List)
+    when not (typ_is_iter element_typ) ->
+    Some inner_optional_typ
+  | _ -> None
+
 let optional_nested_list_inner_typ typ =
   match typ.it with
   | IterT (({ it = IterT (element_typ, List); _ } as inner_list_typ), Opt)
@@ -53,9 +60,35 @@ let output_descriptor typ =
       (match nested_list_inner_typ typ with
       | Some inner_typ -> Some (Helper.Output_nested_seq, inner_typ)
       | None ->
-        (match optional_nested_list_inner_typ typ with
+        (match optional_list_inner_typ typ with
         | Some inner_typ -> Some (Helper.Output_nested_seq, inner_typ)
-        | None -> None)))
+        | None ->
+          (match optional_nested_list_inner_typ typ with
+          | Some inner_typ -> Some (Helper.Output_nested_seq, inner_typ)
+          | None -> None))))
+
+let current_bound_vars env =
+  match env.condition_bound_vars with
+  | Some bound_vars -> bound_vars
+  | None -> env_bound_vars env
+
+let helper_call_missing_after_conditions bound guards helper_args =
+  match Condition_closure.conditions_admissible_bound bound guards with
+  | None -> None
+  | Some bound_after ->
+    helper_args
+    |> List.concat_map Condition_closure.term_vars
+    |> List.sort_uniq String.compare
+    |> List.filter (fun var -> not (List.mem var bound_after))
+    |> fun vars -> Some vars
+
+let premise_admissibility_reason fallback bound guards helper_args =
+  match helper_call_missing_after_conditions bound guards helper_args with
+  | None -> fallback ^ "; one of the helper argument guards is itself inadmissible"
+  | Some [] -> fallback
+  | Some missing ->
+    fallback ^ "; missing helper argument variable(s): "
+    ^ String.concat ", " missing
 
 let source_descriptor_of_exp source_exp =
   match source_exp.note.it with
@@ -197,7 +230,7 @@ and lower_listn_count callbacks ctx env origin exp n_exp =
               ()
           ]
     }
-	  | None, _ -> count_result
+    | None, _ -> count_result
 
 and source_listn_count_metadata callbacks ctx env origin exp source_term source_listn_count =
   match source_listn_count with
@@ -212,7 +245,7 @@ and source_listn_count_metadata callbacks ctx env origin exp source_term source_
     | None -> false, count_result.guards, count_result.diagnostics)
 
 and listn_source_length_guard _callbacks env source_term count_term =
-  let bound_vars = env_bound_vars env in
+  let bound_vars = current_bound_vars env in
   let source_vars = term_vars source_term in
   let count_vars = term_vars count_term in
   if vars_within bound_vars count_vars then
@@ -226,7 +259,7 @@ and listn_source_length_guard _callbacks env source_term count_term =
 and source_term_is_bound _callbacks env source_guards count_guards source_term =
   let bound =
     Condition_closure.conditions_bound_vars
-      (env_bound_vars env)
+      (current_bound_vars env)
       (source_guards @ count_guards)
   in
   vars_within bound (term_vars source_term)
@@ -398,26 +431,13 @@ and lower_source_consuming_listn_helper callbacks
                     not (List.exists (( = ) id) local_source_ids))
                 in
                 let capture_candidates =
-                  source_ids
-                  |> List.fold_left
-                       (fun captures source_id ->
-                         match find_var env source_id with
-                         | Some ({ term = Var var_name; _ } as binding)
-                           when List.exists (( = ) var_name) required_vars ->
-                           (source_id, var_name, binding) :: captures
-                         | Some _ | None -> captures)
-                       []
-                  |> List.rev
+                  Capture_support.required_capture_candidates env ~required_vars source_ids
                 in
                 let captured_vars =
-                  capture_candidates
-                  |> List.map (fun (_source_id, var_name, _binding) -> var_name)
-                  |> List.sort_uniq String.compare
+                  Capture_support.captured_vars capture_candidates
                 in
                 let missing_required_vars =
-                  required_vars
-                  |> List.filter (fun var_name ->
-                    not (List.exists (( = ) var_name) captured_vars))
+                  Capture_support.missing_required_vars ~required_vars ~captured_vars
                 in
                 let missing_required_diagnostics =
                   missing_required_vars
@@ -442,28 +462,11 @@ and lower_source_consuming_listn_helper callbacks
                       @ missing_required_diagnostics
                   }
                 else
-                  let capture_prefix = helper_local_prefix origin exp in
                   let captures =
-                    capture_candidates
-                    |> List.mapi
-                         (fun index (source_id, _var_name, (binding : binding)) ->
-                           { Helper.source_id = source_id
-                           ; call_term = binding.term
-                           ; formal_var = capture_prefix ^ string_of_int index
-                           ; sort = binding.sort
-                           ; typ = binding.typ
-                           })
+                    Capture_support.make_required_captures stem capture_candidates
                   in
                   let helper_env =
-                    captures
-                    |> List.fold_left
-                         (fun helper_env capture ->
-                           add_var helper_env capture.Helper.source_id
-                             { term = Var capture.Helper.formal_var
-                             ; sort = capture.Helper.sort
-                             ; typ = capture.Helper.typ
-                             })
-                         empty_env
+                    Capture_support.capture_env captures
                     |> fun helper_env ->
                     add_var helper_env generator_id.it generator_binding
                     |> fun helper_env ->
@@ -553,22 +556,32 @@ and lower_source_consuming_listn_helper callbacks
                           caller_guards
                           helper_args
                     in
-                    if not premise_admissible then
-                      { term = None
-                      ; guards = caller_guards
-                      ; diagnostics =
-                          source_result.diagnostics @ count_result.diagnostics
-                          @ source_listn_diagnostics @ body_result.diagnostics
+                if not premise_admissible then
+                  let reason =
+                    match premise_bound_vars with
+                    | None ->
+                      "premise-local source-consuming ListN helper call would use variables that are not bound by the enclosing lhs or earlier admissible premise conditions"
+                    | Some bound ->
+                      premise_admissibility_reason
+                        "premise-local source-consuming ListN helper call would use variables that are not bound by the enclosing lhs or earlier admissible premise conditions"
+                        bound
+                        caller_guards
+                        helper_args
+                  in
+                  { term = None
+                  ; guards = caller_guards
+                  ; diagnostics =
+                      source_result.diagnostics @ count_result.diagnostics
+                      @ source_listn_diagnostics @ body_result.diagnostics
                           @ [ unsupported
-                                ~ctx ~origin
-                                ~constructor:"Expr/IterE/ListN/premise-admissibility"
-                                ~source_echo:(source_echo_exp exp)
-                                ~reason:
-                                  "premise-local source-consuming ListN helper call would use variables that are not bound by the enclosing lhs or earlier admissible premise conditions"
-                                ~suggestion:
-                                  "Keep this premise ListN Unsupported until the count, source, and captures can be proven bound before the helper call"
-                                ()
-                            ]
+                            ~ctx ~origin
+                            ~constructor:"Expr/IterE/ListN/premise-admissibility"
+                            ~source_echo:(source_echo_exp exp)
+                            ~reason
+                            ~suggestion:
+                              "Keep this premise ListN Unsupported until the count, source, and captures can be proven bound before the helper call"
+                            ()
+                        ]
                       }
                     else
                     { term =
@@ -594,6 +607,11 @@ and lower_source_consuming_listn_helper callbacks
             })
 
 and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp index_id_opt generators body =
+  let premise_bound_vars =
+    match premise_bound_vars with
+    | Some _ as bound_vars -> bound_vars
+    | None -> env.condition_bound_vars
+  in
   let mode =
     match index_id_opt with
     | None -> Helper.Repeat_count
@@ -650,6 +668,22 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
     | Some count_term ->
       let stem = helper_local_stem origin exp in
       let count_var = "N" ^ stem in
+      let count_binding_opt =
+        match n_exp.it with
+        | VarE count_id ->
+          Some
+            ( count_id
+            , { term = Var count_var
+              ; sort = s "Nat"
+              ; typ = n_exp.note
+              } )
+        | _ -> None
+      in
+      let add_count_binding env =
+        match count_binding_opt with
+        | Some (count_id, binding) -> add_var env count_id.it binding
+        | None -> env
+      in
       let index_var_opt =
         index_id_opt |> Option.map (fun _ -> "I" ^ stem)
       in
@@ -657,6 +691,7 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
       let source_guards = [] in
       let source_diagnostics = [] in
       let preliminary_body_env =
+        let env = add_count_binding env in
         match index_id_opt, index_var_opt with
         | Some index_id, Some index_var ->
           add_var env index_id.it
@@ -699,40 +734,31 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
           generators |> List.map (fun (generator_id, _source_exp) -> generator_id.it)
         in
         let local_source_ids =
+          (match count_binding_opt with
+          | Some (count_id, _) -> [ count_id.it ]
+          | None -> [])
+          @
           (match index_id_opt with
           | Some index_id -> [ index_id.it ]
           | None -> [])
           @ generator_ids
         in
         let source_ids =
-	          source_and_note_free_var_ids body
+          source_and_note_free_var_ids body
             @ source_and_note_free_var_ids n_exp
             @ type_note_free_var_ids exp.note
-	          |> List.sort_uniq String.compare
+          |> List.sort_uniq String.compare
           |> List.filter (fun id ->
             not (List.exists (( = ) id) local_source_ids))
         in
         let capture_candidates =
-          source_ids
-          |> List.fold_left
-               (fun captures source_id ->
-                 match find_var env source_id with
-                 | Some ({ term = Var var_name; _ } as binding)
-                   when List.exists (( = ) var_name) required_vars ->
-                   (source_id, var_name, binding) :: captures
-                 | Some _ | None -> captures)
-               []
-          |> List.rev
+          Capture_support.required_capture_candidates env ~required_vars source_ids
         in
         let captured_vars =
-          capture_candidates
-          |> List.map (fun (_source_id, var_name, _binding) -> var_name)
-          |> List.sort_uniq String.compare
+          Capture_support.captured_vars capture_candidates
         in
         let missing_required_vars =
-          required_vars
-          |> List.filter (fun var_name ->
-            not (List.exists (( = ) var_name) captured_vars))
+          Capture_support.missing_required_vars ~required_vars ~captured_vars
         in
         let missing_required_diagnostics =
           missing_required_vars
@@ -757,16 +783,8 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
               @ missing_required_diagnostics
           }
         else
-          let capture_prefix = "CAP" ^ stem ^ "X" in
           let captures =
-            capture_candidates
-            |> List.mapi (fun index (source_id, _var_name, (binding : binding)) ->
-              { Helper.source_id = source_id
-              ; call_term = binding.term
-              ; formal_var = capture_prefix ^ string_of_int index
-              ; sort = binding.sort
-              ; typ = binding.typ
-              })
+            Capture_support.make_required_captures stem capture_candidates
           in
           let helper_env =
             let captured_env =
@@ -780,6 +798,7 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
                        })
                    empty_env
             in
+            let captured_env = add_count_binding captured_env in
             match index_id_opt, index_var_opt with
             | Some index_id, Some index_var ->
               add_var captured_env index_id.it
@@ -839,6 +858,17 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
                   helper_args
             in
             if not premise_admissible then
+              let reason =
+                match premise_bound_vars with
+                | None ->
+                  "premise-local ListN helper call would use variables that are not bound by the enclosing lhs or earlier admissible premise conditions"
+                | Some bound ->
+                  premise_admissibility_reason
+                    "premise-local ListN helper call would use variables that are not bound by the enclosing lhs or earlier admissible premise conditions"
+                    bound
+                    caller_guards
+                    helper_args
+              in
               { term = None
               ; guards = caller_guards
               ; diagnostics =
@@ -848,8 +878,7 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
                         ~ctx ~origin
                         ~constructor:"Expr/IterE/ListN/premise-admissibility"
                         ~source_echo:(source_echo_exp exp)
-                        ~reason:
-                          "premise-local ListN helper call would use variables that are not bound by the enclosing lhs or earlier admissible premise conditions"
+                        ~reason
                         ~suggestion:
                           "Keep this premise ListN Unsupported until the count and captures can be proven bound before the helper call"
                         ()
@@ -914,7 +943,7 @@ and lower_list_map_helper callbacks ctx env origin exp generator_id source_exp b
   match output_descriptor, source_descriptor with
   | None, _ ->
     unsupported_exp ctx origin "Expr/IterE" exp
-      "generic List/Opt map helper lowering is supported only when the IterE output note is a flat List/Opt or boundary-preserving nested List carrier"
+      "generic List/Opt map helper lowering is supported only when the IterE output note is a flat List/Opt, T?*, or boundary-preserving nested List carrier"
   | _, None ->
     unsupported_exp ctx origin "Expr/IterE" exp
       ("generic List/Opt map helper lowering requires the source expression note to be a flat List, flat Opt, or nested T** carrier with flat T* outer elements; source_note="
@@ -977,31 +1006,14 @@ and lower_list_map_helper callbacks ctx env origin exp generator_id source_exp b
         |> unique_source_ids
         |> List.filter (fun id -> id <> generator_id.it)
       in
-      let capture_prefix = helper_local_prefix origin exp in
-      let capture_candidates, capture_diagnostics =
-        body_source_ids
-        |> List.fold_left
-             (fun (captures, diagnostics) source_id ->
-               match find_var env source_id with
-               | None -> captures, diagnostics
-               | Some ({ term = Var var_name; _ } as binding) ->
-                 if List.exists (( = ) var_name) required_vars then
-                   ((source_id, var_name, binding) :: captures), diagnostics
-                 else
-                   captures, diagnostics
-               | Some _ -> captures, diagnostics)
-             ([], [])
-        |> fun (captures, diagnostics) ->
-        List.rev captures, diagnostics
+      let capture_candidates =
+        Capture_support.required_capture_candidates env ~required_vars body_source_ids
       in
       let captured_vars =
-        capture_candidates
-        |> List.map (fun (_source_id, var_name, _binding) -> var_name)
-        |> List.sort_uniq String.compare
+        Capture_support.captured_vars capture_candidates
       in
       let missing_required_vars =
-        required_vars
-        |> List.filter (fun var_name -> not (List.exists (( = ) var_name) captured_vars))
+        Capture_support.missing_required_vars ~required_vars ~captured_vars
       in
       let missing_required_diagnostics =
         missing_required_vars
@@ -1017,26 +1029,16 @@ and lower_list_map_helper callbacks ctx env origin exp generator_id source_exp b
               "Keep this IterE Unsupported until the free variable can be represented by an explicit source binding"
             ())
       in
-      let capture_diagnostics =
-        capture_diagnostics @ missing_required_diagnostics
-      in
-      if capture_diagnostics <> [] then
+      if missing_required_diagnostics <> [] then
         { term = None
         ; guards = source_result.guards
         ; diagnostics =
             source_result.diagnostics @ preliminary_body_result.diagnostics
-            @ capture_diagnostics
+            @ missing_required_diagnostics
         }
       else
         let captures =
-          capture_candidates
-          |> List.mapi (fun index (source_id, _var_name, (binding : binding)) ->
-            { Helper.source_id = source_id
-            ; call_term = binding.term
-            ; formal_var = capture_prefix ^ string_of_int index
-            ; sort = binding.sort
-            ; typ = binding.typ
-            })
+          Capture_support.make_required_captures stem capture_candidates
         in
         let helper_env =
           captures
@@ -1122,10 +1124,10 @@ and lower_list_map_helper callbacks ctx env origin exp generator_id source_exp b
                   ; generator_var = generator_id.it
                   ; helper_head_var
                   ; source_tail_var
-	                  ; body_result_var
-	                  ; source_item_shape
-	                  ; output_item_shape
-	                  ; source_element_sort
+                    ; body_result_var
+                    ; source_item_shape
+                    ; output_item_shape
+                    ; source_element_sort
                   ; captures
                   ; lowered_body
                   ; body_eq_conditions = body_result.guards
@@ -1187,10 +1189,10 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
           "nested-list zip-map helper requires the body expression to lower to a sequence so the result can be wrapped as a single outer element"
       ]
   | Some (output_item_shape, _), Some _body_sort ->
-	    let stem = helper_local_stem origin exp in
-	    let body_result_var = "OUT" ^ stem in
-	    let prepare_source index (generator_id, source_exp) =
-	      let one_based = string_of_int (index + 1) in
+      let stem = helper_local_stem origin exp in
+      let body_result_var = "OUT" ^ stem in
+      let prepare_source index (generator_id, source_exp) =
+        let one_based = string_of_int (index + 1) in
         let source_descriptor = source_descriptor_of_exp source_exp in
         match source_descriptor with
         | None ->
@@ -1225,69 +1227,76 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
               ; zip_head_var = "HEAD" ^ stem ^ "X" ^ one_based
               ; zip_tail_var = "TAIL" ^ stem ^ "X" ^ one_based
               })
-	    in
-    let prepared = List.mapi prepare_source generators in
-    let source_shape_diagnostics =
-      prepared
-      |> List.filter_map (function
-        | Ok _ -> None
-        | Error diagnostic -> Some diagnostic)
-    in
-    if source_shape_diagnostics <> [] then
-      with_diagnostics source_shape_diagnostics
-    else
-      let sources =
+      in
+      let prepared = List.mapi prepare_source generators in
+      let source_shape_diagnostics =
         prepared
         |> List.filter_map (function
-          | Ok source -> Some source
-          | Error _ -> None)
+          | Ok _ -> None
+          | Error diagnostic -> Some diagnostic)
       in
-      let source_results =
-        sources
-        |> List.map (fun source -> callbacks.lower_sequence ctx env origin source.zip_source_exp)
-      in
-      let source_guards, source_diagnostics = append_result_metadata source_results in
-      let source_terms =
-        source_results |> List.filter_map (fun result -> result.term)
-      in
-      if List.length source_terms <> List.length sources then
-        { term = None; guards = source_guards; diagnostics = source_diagnostics }
+      if source_shape_diagnostics <> [] then
+        with_diagnostics source_shape_diagnostics
       else
-        let length_guards =
-          match source_terms with
-          | [] | [ _ ] -> []
-          | first :: rest ->
-            rest |> List.map (fun source_term -> EqCond (len source_term, len first))
+        let sources =
+          prepared
+          |> List.filter_map (function
+            | Ok source -> Some source
+            | Error _ -> None)
         in
-        let source_listn_metadata =
-          List.map2
-            (fun source source_term ->
-              source_listn_count_metadata callbacks ctx env origin exp source_term source.zip_source_listn_count)
-            sources
-            source_terms
+        let source_results =
+          sources
+          |> List.map (fun source -> callbacks.lower_sequence ctx env origin source.zip_source_exp)
         in
-        let source_listn_ok =
-          List.for_all (fun (ok, _, _) -> ok) source_listn_metadata
+        let source_guards, source_diagnostics = append_result_metadata source_results in
+        let source_terms =
+          source_results |> List.filter_map (fun result -> result.term)
         in
-        let source_listn_guards =
-          source_listn_metadata
-          |> List.map (fun (_, guards, _) -> guards)
-          |> List.concat
-        in
-        let source_listn_diagnostics =
-          source_listn_metadata
-          |> List.map (fun (_, _, diagnostics) -> diagnostics)
-          |> List.concat
-        in
-        let caller_guards =
-          source_guards @ source_listn_guards @ length_guards
-        in
-        if not source_listn_ok then
-          { term = None
-          ; guards = caller_guards
-          ; diagnostics = source_diagnostics @ source_listn_diagnostics
-          }
+        if List.length source_terms <> List.length sources then
+          { term = None; guards = source_guards; diagnostics = source_diagnostics }
         else
+          let length_guards =
+            match source_terms with
+            | [] | [ _ ] -> []
+            | first :: rest ->
+              rest |> List.map (fun source_term -> EqCond (len source_term, len first))
+          in
+          let source_listn_metadata =
+            List.map2
+              (fun source source_term ->
+                source_listn_count_metadata
+                  callbacks
+                  ctx
+                  env
+                  origin
+                  exp
+                  source_term
+                  source.zip_source_listn_count)
+              sources
+              source_terms
+          in
+          let source_listn_ok =
+            List.for_all (fun (ok, _, _) -> ok) source_listn_metadata
+          in
+          let source_listn_guards =
+            source_listn_metadata
+            |> List.map (fun (_, guards, _) -> guards)
+            |> List.concat
+          in
+          let source_listn_diagnostics =
+            source_listn_metadata
+            |> List.map (fun (_, _, diagnostics) -> diagnostics)
+            |> List.concat
+          in
+          let caller_guards =
+            source_guards @ source_listn_guards @ length_guards
+          in
+          if not source_listn_ok then
+            { term = None
+            ; guards = caller_guards
+            ; diagnostics = source_diagnostics @ source_listn_diagnostics
+            }
+          else
         let preliminary_body_env =
           sources
           |> List.fold_left
@@ -1327,35 +1336,22 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
             sources |> List.map (fun source -> source.zip_id.it)
           in
           let body_source_ids =
-	            source_free_var_ids body
+            source_free_var_ids body
               @ type_note_free_var_ids body.note
               @ type_note_free_var_ids exp.note
               @ (sources
                  |> List.map (fun source -> type_note_free_var_ids source.zip_source_exp.note)
                  |> List.concat)
-	            |> List.filter (fun id -> not (List.exists (( = ) id) generator_ids))
+            |> List.filter (fun id -> not (List.exists (( = ) id) generator_ids))
           in
           let capture_candidates =
-            body_source_ids
-            |> List.fold_left
-                 (fun captures source_id ->
-                   match find_var env source_id with
-                   | Some ({ term = Var var_name; _ } as binding)
-                     when List.exists (( = ) var_name) required_vars ->
-                     (source_id, var_name, binding) :: captures
-                   | Some _ | None -> captures)
-                 []
-            |> List.rev
+            Capture_support.required_capture_candidates env ~required_vars body_source_ids
           in
           let captured_vars =
-            capture_candidates
-            |> List.map (fun (_source_id, var_name, _binding) -> var_name)
-            |> List.sort_uniq String.compare
+            Capture_support.captured_vars capture_candidates
           in
           let missing_required_vars =
-            required_vars
-            |> List.filter (fun var_name ->
-              not (List.exists (( = ) var_name) captured_vars))
+            Capture_support.missing_required_vars ~required_vars ~captured_vars
           in
           let missing_required_diagnostics =
             missing_required_vars
@@ -1380,28 +1376,12 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
                 @ missing_required_diagnostics
             }
           else
-            let capture_prefix = "CAP" ^ stem ^ "X" in
             let captures =
-              capture_candidates
-              |> List.mapi (fun index (source_id, _var_name, (binding : binding)) ->
-                { Helper.source_id = source_id
-                ; call_term = binding.term
-                ; formal_var = capture_prefix ^ string_of_int index
-                ; sort = binding.sort
-                ; typ = binding.typ
-                })
+              Capture_support.make_required_captures stem capture_candidates
             in
             let helper_env =
               let captured_env =
-                captures
-                |> List.fold_left
-                     (fun helper_env capture ->
-                       add_var helper_env capture.Helper.source_id
-                         { term = Var capture.Helper.formal_var
-                         ; sort = capture.Helper.sort
-                         ; typ = capture.Helper.typ
-                         })
-                     empty_env
+                Capture_support.capture_env captures
               in
               sources
               |> List.fold_left
@@ -1424,9 +1404,7 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
               | None -> []
             in
             let captures =
-              captures
-              |> List.filter (fun capture ->
-                List.exists (( = ) capture.Helper.formal_var) body_vars)
+              Capture_support.filter_used_captures body_vars captures
             in
             let allowed_body_vars =
               helper_head_vars
@@ -1460,18 +1438,18 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
                               |> List.map (fun source -> source.zip_source_shape)
                           }
                       ; call_shape = Helper.Source_then_captures
-	                      ; sources =
-		                          sources
-		                          |> List.map (fun source ->
-		                            ({ Helper.source_shape = source.zip_source_shape
-	                              ; source_item_shape = source.zip_source_item_shape
-		                            ; helper_head_var = source.zip_head_var
-		                            ; source_tail_var = source.zip_tail_var
-		                            ; source_element_sort = source.zip_element_sort
-		                            } : Helper.iter_zip_source))
-	                      ; body_result_var
+                      ; sources =
+                          sources
+                          |> List.map (fun source ->
+                            ({ Helper.source_shape = source.zip_source_shape
+                            ; source_item_shape = source.zip_source_item_shape
+                            ; helper_head_var = source.zip_head_var
+                            ; source_tail_var = source.zip_tail_var
+                            ; source_element_sort = source.zip_element_sort
+                            } : Helper.iter_zip_source))
+                      ; body_result_var
                       ; output_item_shape
-	                      ; captures
+                      ; captures
                       ; lowered_body
                       ; body_eq_conditions = body_result.guards
                       }

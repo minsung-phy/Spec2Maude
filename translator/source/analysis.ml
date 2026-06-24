@@ -92,7 +92,7 @@ module Source_index = struct
         ; def
         }
       in
-      entries := !entries @ [ entry ];
+      entries := entry :: !entries;
       add_by_id table entry;
       match def.it with
       | RecD defs ->
@@ -105,7 +105,7 @@ module Source_index = struct
     List.iteri
       (fun index def -> visit [ Printf.sprintf "script[%d]" index ] def)
       script;
-    { entries = !entries; by_id = table }
+    { entries = List.rev !entries; by_id = table }
 
   let entries t = t.entries
 
@@ -191,6 +191,7 @@ module Function_graph = struct
     ; params : param_kind list
     ; result : typ
     ; clause_count : int
+    ; inverse_id : string option
     }
 
   type relation =
@@ -200,6 +201,8 @@ module Function_graph = struct
     ; mixop : mixop
     ; result : typ
     ; rule_count : int
+    ; hints : string list
+    ; maude_equational_view : bool
     }
 
   type relation_demand =
@@ -241,11 +244,24 @@ module Function_graph = struct
     | Unsupported_call of string
     | Prelude_gap_call of string
 
+  type runtime_search_capability =
+    | Runtime_search_candidate of string list
+    | Runtime_search_blocked of
+        { closure : string list
+        ; blockers : string list
+        }
+
   type def_body =
     { body_id : id
     ; body_origin : Origin.t
     ; body_params : param list
     ; body_clauses : clause list
+    }
+
+  type relation_body =
+    { relation_id : id
+    ; relation_origin : Origin.t
+    ; relation_rules : rule list
     }
 
   type t =
@@ -254,6 +270,8 @@ module Function_graph = struct
     ; definitions_by_id : (string, definition) Hashtbl.t
     ; relations_by_id : (string, relation) Hashtbl.t
     ; bodies_by_id : (string, def_body) Hashtbl.t
+    ; relation_bodies_by_id : (string, relation_body) Hashtbl.t
+    ; relation_bodies : relation_body list
     ; relation_edges_by_id : (string, string list) Hashtbl.t
     ; relation_runtime_demands : (string, relation_demand) Hashtbl.t
     ; specializations_by_id : (string, specialization list) Hashtbl.t
@@ -398,11 +416,21 @@ module Function_graph = struct
     | Some body, Some definition ->
       let formal_sig = def_signature_key formal_params formal_result in
       let actual_sig = def_signature_key body.body_params definition.result in
-      Some
-        ("def:" ^ formal_id ^ "->" ^ target_id
-         ^ ":formal:" ^ formal_sig
-         ^ ":actual:" ^ actual_sig)
-    | _ -> None
+      if formal_sig = actual_sig then
+        Ok
+          ("def:" ^ formal_id ^ "->" ^ target_id
+           ^ ":formal:" ^ formal_sig
+           ^ ":actual:" ^ actual_sig)
+      else
+        Error
+          ("DefA target `" ^ target_id
+           ^ "` has signature `" ^ actual_sig
+           ^ "`, but static DefP parameter `" ^ formal_id
+           ^ "` requires `" ^ formal_sig ^ "`")
+    | _ ->
+      Error
+        ("DefA target `" ^ target_id
+         ^ "` is not a known DecD, so the static definition specialization cannot be trusted")
 
   let call_target_id static_def_env id =
     match List.assoc_opt id.it static_def_env with
@@ -483,18 +511,12 @@ module Function_graph = struct
                        ~formal_result
                        ~target_id:actual_id.it
                    with
-                  | Some key ->
+                  | Ok key ->
                     let binding =
                       { param_id = param_id.it; target_id = actual_id.it; key }
                     in
                     typ_bindings, binding :: def_bindings, key :: keys, None
-                  | None ->
-                    typ_bindings,
-                    def_bindings,
-                    keys,
-                    Some
-                      ("DefA target `" ^ actual_id.it
-                       ^ "` is not a known DecD, so the static definition specialization cannot be trusted"))
+                  | Error reason -> typ_bindings, def_bindings, keys, Some reason)
                 | DefP _, (ExpA _ | TypA _ | GramA _) ->
                   typ_bindings, def_bindings, keys, Some "DefP parameter position requires a DefA argument"
                 | ExpP _, ExpA _ -> typ_bindings, def_bindings, keys, None
@@ -645,6 +667,15 @@ module Function_graph = struct
       []
       body.body_clauses
 
+  let collect_rule_calls t static_typ_env static_def_env origin acc rule =
+    match rule.it with
+    | RuleD (_id, _binds, _mixop, exp, prems) ->
+      let acc = collect_exp_calls t static_typ_env static_def_env origin acc exp in
+      List.fold_left
+        (collect_prem_calls t static_typ_env static_def_env origin)
+        acc
+        prems
+
   let rec collect_relation_refs_from_prem acc prem =
     match prem.it with
     | RulePr (rel_id, _, _) ->
@@ -666,6 +697,44 @@ module Function_graph = struct
       prems
       |> List.fold_left collect_relation_refs_from_prem []
       |> List.rev
+
+  let rec search_premise_dependencies prem =
+    match prem.it with
+    | IfPr _ | LetPr _ -> [], []
+    | RulePr (rel_id, _, _) ->
+      [ rel_id.it ], []
+    | ElsePr ->
+      [],
+      [ "otherwise premise needs enabledness complement before it can be part of a search relation" ]
+    | IterPr (body, _) ->
+      let deps, blockers = search_premise_dependencies body in
+      deps,
+      "iterated premise needs a source-shaped IterPr helper before search generation"
+      :: blockers
+    | NegPr body ->
+      let deps, blockers = search_premise_dependencies body in
+      deps,
+      "negated premise needs decidable complement before search generation"
+      :: blockers
+
+  let search_rule_dependencies relation_mixop rule =
+    match rule.it with
+    | RuleD (_id, _binds, mixop, _exp, prems) ->
+      let marker_blockers =
+        if Relation_graph.eq_mixop relation_mixop mixop then
+          []
+        else
+          [ "rule mixop skeleton does not match the enclosing RelD skeleton" ]
+      in
+      let deps, blockers =
+        prems
+        |> List.map search_premise_dependencies
+        |> List.fold_left
+             (fun (deps, blockers) (new_deps, new_blockers) ->
+               deps @ new_deps, blockers @ new_blockers)
+             ([], [])
+      in
+      deps, marker_blockers @ blockers
 
   let add_specialization t queue specialization =
     if has_specialization t specialization then
@@ -709,6 +778,13 @@ module Function_graph = struct
           collect_body_calls t [] [] body
           |> List.iter (add_specialization t queue))
       t.bodies_by_id;
+    t.relation_bodies
+    |> List.iter (fun body ->
+      body.relation_rules
+      |> List.fold_left
+           (collect_rule_calls t [] [] body.relation_origin)
+           []
+      |> List.iter (add_specialization t queue));
     let rec drain steps =
       match !queue with
       | [] -> ()
@@ -744,9 +820,34 @@ module Function_graph = struct
       Some "execution relation is emitted as Maude rewrite rules, so its RulePr dependencies are runtime-relevant"
     | Relation_graph.Execution_star ->
       Some "execution-star relation is emitted as Maude rewrite rules, so its RulePr dependencies are runtime-relevant"
+    | Relation_graph.Deterministic_candidate
+    | Relation_graph.Predicate_candidate
+    | Relation_graph.Unknown -> None
+
+  let decd_runtime_seed_reason relation_id decd_id (relation : relation) =
+    match relation.kind with
+    | Relation_graph.Execution ->
+      Some
+        (Printf.sprintf
+           "execution relation `%s` is used as a RulePr premise while lowering DecD `%s`; pure equations cannot erase this runtime dependency"
+           relation_id
+           decd_id)
+    | Relation_graph.Execution_star ->
+      Some
+        (Printf.sprintf
+           "execution-star relation `%s` is used as a RulePr premise while lowering DecD `%s`; pure equations cannot erase this runtime dependency"
+           relation_id
+           decd_id)
     | Relation_graph.Deterministic_candidate ->
-      Some "deterministic relation is emitted as Maude equations, so its premise relations constrain generated equations"
-    | Relation_graph.Predicate_candidate | Relation_graph.Unknown -> None
+      Some
+        (Printf.sprintf
+           "deterministic relation `%s` is used as a RulePr premise while lowering DecD `%s`; its equational result constrains the generated definition"
+           relation_id
+           decd_id)
+    | Relation_graph.Predicate_candidate ->
+      None
+    | Relation_graph.Unknown ->
+      None
 
   let add_runtime_demand t queue id reason =
     if not (Hashtbl.mem t.relation_runtime_demands id) then (
@@ -761,9 +862,13 @@ module Function_graph = struct
       | None -> ()
       | Some reason -> add_runtime_demand t queue relation.id reason);
     decd_relation_seeds
-    |> List.iter (fun (target_id, reason) ->
-      if Hashtbl.mem t.relations_by_id target_id then
-        add_runtime_demand t queue target_id reason);
+    |> List.iter (fun (target_id, decd_id) ->
+      match Hashtbl.find_opt t.relations_by_id target_id with
+      | None -> ()
+      | Some relation ->
+        (match decd_runtime_seed_reason target_id decd_id relation with
+        | None -> ()
+        | Some reason -> add_runtime_demand t queue target_id reason));
     let rec drain () =
       match !queue with
       | [] -> ()
@@ -789,17 +894,82 @@ module Function_graph = struct
     in
     drain ()
 
+  let maude_equational_view_hint = "maude_equational_view"
+
+  let inverse_hint_target (hint : hint) =
+    if hint.hintid.it <> "inverse" then
+      None
+    else
+      match hint.hintexp.it with
+      | El.Ast.CallE (id, [])
+      | El.Ast.VarE (id, []) -> Some id.it
+      | _ -> None
+
+  let dec_inverse_table entries =
+    let table = Hashtbl.create 127 in
+    entries
+    |> List.iter (fun (entry : Source_index.entry) ->
+      match entry.def.it with
+      | HintD hintdef ->
+        (match hintdef.it with
+        | DecH (id, hints) ->
+          (match List.find_map inverse_hint_target hints with
+          | None -> ()
+          | Some inverse_id -> Hashtbl.replace table id.it inverse_id)
+        | TypH _ | RelH _ | GramH _ -> ())
+      | TypD _ | RelD _ | DecD _ | GramD _ | RecD _ -> ());
+    table
+
+  let dec_inverse table id =
+    Hashtbl.find_opt table id
+
+  let relation_hint_table entries =
+    let table = Hashtbl.create 127 in
+    entries
+    |> List.iter (fun (entry : Source_index.entry) ->
+      match entry.def.it with
+      | HintD hintdef ->
+        (match hintdef.it with
+        | RelH (id, hints) ->
+          let old =
+            match Hashtbl.find_opt table id.it with
+            | None -> []
+            | Some names -> names
+          in
+          let names =
+            hints
+            |> List.map (fun hint -> hint.hintid.it)
+            |> List.fold_left
+                 (fun acc name -> if List.mem name acc then acc else name :: acc)
+                 (List.rev old)
+            |> List.rev
+          in
+          Hashtbl.replace table id.it names
+        | TypH _ | DecH _ | GramH _ -> ())
+      | TypD _ | RelD _ | DecD _ | GramD _ | RecD _ -> ());
+    table
+
+  let relation_hints table id =
+    match Hashtbl.find_opt table id with
+    | None -> []
+    | Some hints -> hints
+
   let build index =
     let definitions_by_id = Hashtbl.create 127 in
     let relations_by_id = Hashtbl.create 127 in
     let bodies_by_id = Hashtbl.create 127 in
+    let relation_bodies_by_id = Hashtbl.create 127 in
     let relation_edges_by_id = Hashtbl.create 127 in
     let relation_runtime_demands = Hashtbl.create 127 in
     let specializations_by_id = Hashtbl.create 127 in
     let definitions = ref [] in
     let relations = ref [] in
+    let relation_bodies = ref [] in
     let decd_relation_seeds = ref [] in
-    Source_index.entries index
+    let entries = Source_index.entries index in
+    let relation_hints_by_id = relation_hint_table entries in
+    let dec_inverses_by_id = dec_inverse_table entries in
+    entries
     |> List.iter (fun (entry : Source_index.entry) ->
       match entry.def.it with
       | DecD (id, params, result, clauses) ->
@@ -809,9 +979,10 @@ module Function_graph = struct
           ; params = List.map param_kind params
           ; result
           ; clause_count = List.length clauses
+          ; inverse_id = dec_inverse dec_inverses_by_id id.it
           }
         in
-        definitions := !definitions @ [ definition ];
+        definitions := definition :: !definitions;
         add_once definitions_by_id id.it definition;
         add_once
           bodies_by_id
@@ -827,13 +998,10 @@ module Function_graph = struct
         |> List.sort_uniq String.compare
         |> List.iter (fun rel_id ->
           decd_relation_seeds :=
-            ( rel_id
-            , Printf.sprintf
-                "relation `%s` is used as a RulePr premise while lowering DecD `%s`; skipping it could erase a source branch or guard"
-                rel_id
-                id.it )
+            (rel_id, id.it)
             :: !decd_relation_seeds)
       | RelD (id, mixop, result, rules) ->
+        let hints = relation_hints relation_hints_by_id id.it in
         let relation =
           { id = id.it
           ; origin = entry.origin
@@ -841,10 +1009,17 @@ module Function_graph = struct
           ; mixop
           ; result
           ; rule_count = List.length rules
+          ; hints
+          ; maude_equational_view = List.mem maude_equational_view_hint hints
           }
         in
-        relations := !relations @ [ relation ];
+        relations := relation :: !relations;
+        let relation_body =
+          { relation_id = id; relation_origin = entry.origin; relation_rules = rules }
+        in
+        relation_bodies := relation_body :: !relation_bodies;
         add_once relations_by_id id.it relation;
+        add_once relation_bodies_by_id id.it relation_body;
         Hashtbl.replace
           relation_edges_by_id
           id.it
@@ -853,11 +1028,13 @@ module Function_graph = struct
            |> List.concat
            |> List.sort_uniq String.compare)
       | TypD _ | GramD _ | RecD _ | HintD _ -> ());
-    { definitions = !definitions
-    ; relations = !relations
+    { definitions = List.rev !definitions
+    ; relations = List.rev !relations
     ; definitions_by_id
     ; relations_by_id
     ; bodies_by_id
+    ; relation_bodies_by_id
+    ; relation_bodies = List.rev !relation_bodies
     ; relation_edges_by_id
     ; relation_runtime_demands
     ; specializations_by_id
@@ -892,8 +1069,16 @@ module Function_graph = struct
   let find_definition t id =
     Hashtbl.find_opt t.definitions_by_id id
 
+  let definition_inverse t id =
+    match find_definition t id with
+    | None -> None
+    | Some definition -> definition.inverse_id
+
   let find_relation t id =
     Hashtbl.find_opt t.relations_by_id id
+
+  let relation_has_maude_equational_view relation =
+    relation.maude_equational_view
 
   let relation_runtime_demand_reason t id =
     match Hashtbl.find_opt t.relation_runtime_demands id with
@@ -902,6 +1087,95 @@ module Function_graph = struct
 
   let relation_is_runtime_demanded t id =
     Option.is_some (relation_runtime_demand_reason t id)
+
+  let runtime_predicate_search_capability t id =
+    let closure = ref [] in
+    let blockers = ref [] in
+    let add_closure id =
+      if not (List.mem id !closure) then
+        closure := id :: !closure
+    in
+    let add_blocker relation_id reason =
+      blockers :=
+        (Printf.sprintf "%s: %s" relation_id reason)
+        :: !blockers
+    in
+    let rec visit stack id =
+      if List.mem id stack then (
+        add_closure id;
+        add_blocker
+          id
+          ("recursive predicate-search dependency cycle `"
+           ^ String.concat " -> " (List.rev (id :: stack))
+           ^ "` needs a bounded/source-complete witness-space proof before helper emission"))
+      else (
+        add_closure id;
+        match Hashtbl.find_opt t.relations_by_id id with
+        | None ->
+          add_blocker id "referenced relation is not known in the source index"
+        | Some relation ->
+          (match relation.kind with
+          | Relation_graph.Predicate_candidate -> ()
+          | kind ->
+            add_blocker
+              id
+              ("referenced relation is classified as `"
+               ^ Relation_graph.string_of_relation_kind kind
+               ^ "`, not as a predicate relation"));
+          if not (relation_is_runtime_demanded t id) then
+            add_blocker id "referenced relation is not runtime-demanded in the relation graph";
+          (match Hashtbl.find_opt t.relation_bodies_by_id id with
+          | None ->
+            add_blocker id "referenced relation has no source RuleD body in the source index"
+          | Some body when body.relation_rules = [] ->
+            add_blocker
+              id
+              "referenced relation has no source RuleD clauses to generate a search relation from"
+          | Some body ->
+            let deps, rule_blockers =
+              body.relation_rules
+              |> List.map (search_rule_dependencies relation.mixop)
+              |> List.fold_left
+                   (fun (deps, blockers) (new_deps, new_blockers) ->
+                     deps @ new_deps, blockers @ new_blockers)
+                   ([], [])
+            in
+            rule_blockers
+            |> List.sort_uniq String.compare
+            |> List.iter (add_blocker id);
+            deps
+            |> List.sort_uniq String.compare
+            |> List.iter (fun dep_id ->
+              match Hashtbl.find_opt t.relations_by_id dep_id with
+              | None ->
+                add_blocker
+                  id
+                  ("rule premise references unknown relation `" ^ dep_id ^ "`")
+              | Some dep_relation ->
+                (match dep_relation.kind with
+                | Relation_graph.Predicate_candidate ->
+                  visit (id :: stack) dep_id
+                | Relation_graph.Deterministic_candidate ->
+                  add_blocker
+                    id
+                    ("rule premise depends on deterministic relation `" ^ dep_id
+                     ^ "`; predicate search generation cannot yet call deterministic result matching source-completely")
+                | Relation_graph.Execution | Relation_graph.Execution_star ->
+                  add_blocker
+                    id
+                    ("rule premise depends on execution relation `" ^ dep_id
+                     ^ "`; predicate search generation cannot contain rewrite semantics in this slice")
+                | Relation_graph.Unknown ->
+                  add_blocker
+                    id
+                    ("rule premise depends on unknown relation `" ^ dep_id
+                     ^ "`; predicate search generation cannot classify it source-completely")))))
+    in
+    visit [] id;
+    let closure = List.rev !closure |> List.sort_uniq String.compare in
+    match !blockers |> List.rev |> List.sort_uniq String.compare with
+    | [] -> Runtime_search_candidate closure
+    | blockers -> Runtime_search_blocked { closure; blockers }
 
   let definition_has_static_params definition =
     List.exists
@@ -928,6 +1202,7 @@ module Hint_policy = struct
   type classification =
     | Presentation
     | Semantic_obligation
+    | Translator_annotation
     | Unknown
 
   let string_has_prefix ~prefix text =
@@ -938,6 +1213,8 @@ module Hint_policy = struct
   let classify_hint_name = function
     | "desc" | "show" | "name" ->
       Presentation
+    | "maude_equational_view" ->
+      Translator_annotation
     | "builtin" | "partial" | "inverse" | "macro" | "tabular" ->
       Semantic_obligation
     | name when string_has_prefix ~prefix:"prose" name -> Presentation
@@ -949,5 +1226,6 @@ module Hint_policy = struct
   let string_of_classification = function
     | Presentation -> "presentation"
     | Semantic_obligation -> "semantic-obligation"
+    | Translator_annotation -> "translator-annotation"
     | Unknown -> "unknown"
 end

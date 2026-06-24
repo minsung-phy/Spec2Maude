@@ -128,6 +128,14 @@ let translate_hintdef ctx origin hintdef =
           ~suggestion:
             "Implement the corresponding prelude/builtin contract before generated code depends on this hint"
           ()
+      | Translator_annotation ->
+        skipped
+          ~ctx ~origin ~constructor
+          ~reason:
+            "translator annotation has been consumed by analysis and emits no runtime Maude statement"
+          ~suggestion:
+            "Keep the annotation in source/provenance metadata; do not turn it into a Maude equation"
+          ()
       | Unknown ->
         unsupported
           ~ctx ~origin ~constructor
@@ -467,8 +475,14 @@ let translate_rhs ctx env origin exp =
   in
   Expr_translate.lower_value ctx env exp_origin exp
 
-let translate_clause_premises ctx env origin lhs_terms prems =
-  Premise_translate.translate_premises ctx env ~bound_terms:lhs_terms origin prems
+let translate_clause_premises ctx env origin lhs_terms lhs_guards prems =
+  Premise_translate.translate_premises
+    ctx
+    env
+    ~bound_conditions:lhs_guards
+    ~bound_terms:lhs_terms
+    origin
+    prems
 
 let rec premise_has_execution_dependency ctx prem =
   match prem.it with
@@ -476,7 +490,8 @@ let rec premise_has_execution_dependency ctx prem =
     (match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
     | Some relation ->
       (match (Relation_shape.of_relation relation).Relation_shape.decision with
-      | Relation_shape.Execution _ -> true
+      | Relation_shape.Execution _ ->
+        not (Analysis.Function_graph.relation_has_maude_equational_view relation)
       | Relation_shape.Static_validation _
       | Relation_shape.Runtime_predicate _
       | Relation_shape.Deterministic_candidate _
@@ -529,6 +544,7 @@ let translate_decd_clause ctx dec_origin op_name id params index clause =
         env
         origin
         (Option.value ~default:[] lhs_terms_opt)
+        lhs_guards
         prems
     in
     let rhs_result = translate_rhs ctx premise_result.env_after origin rhs in

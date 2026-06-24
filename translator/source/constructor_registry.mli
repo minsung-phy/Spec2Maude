@@ -22,6 +22,11 @@ type lookup =
   | Missing
   | Ambiguous of entry list
 
+type projection_lookup =
+  | Projection_found of entry
+  | Projection_missing
+  | Projection_ambiguous of entry list
+
 type inclusion =
   { parent_category : string
   ; parent_static_args_key : string option
@@ -59,6 +64,10 @@ val lookup_emitted :
   mixop:Il.Ast.mixop ->
   arity:int ->
   lookup
+val lookup_unary_projection :
+  t ->
+  projection_op:string ->
+  projection_lookup
 val has_wrapper :
   t ->
   source_category:string ->

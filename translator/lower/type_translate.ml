@@ -29,6 +29,14 @@ let hint_diagnostics ctx origin owner hints =
         ~reason:"semantic hint creates an external prelude/builtin obligation"
         ~suggestion:"Provide the hinted behavior in a verified prelude or builtin module before generated code depends on it"
         ()
+    | Translator_annotation ->
+      false,
+      skipped
+        ~ctx ~origin ~constructor
+        ~source_echo:hint.hintid.it
+        ~reason:"translator annotation is consumed by analysis and has no direct runtime Maude statement"
+        ~suggestion:"Keep the hint in provenance rather than emitting Maude code for it"
+        ()
     | Unknown ->
       true,
       unsupported

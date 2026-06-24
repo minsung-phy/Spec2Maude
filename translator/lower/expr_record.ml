@@ -1,4 +1,5 @@
 open Il.Ast
+open Maude_ir
 open Util.Source
 
 include Expr_support
@@ -70,22 +71,28 @@ let lower_len callbacks ctx env origin (inner : exp) =
   | Some term -> { inner_result with term = Some (len term) }
   | None -> inner_result
 
+let nat_index_diagnostics ctx origin constructor exp =
+  if typ_is_nat ctx exp.note then
+    []
+  else
+    [ unsupported
+        ~ctx ~origin ~constructor
+        ~source_echo:(source_echo_exp exp)
+        ~reason:
+          "sequence index/slice bound must have Nat type because the Maude prelude sequence operators use Nat positions"
+        ~suggestion:
+          "Lower a verified numeric conversion to Nat before using this expression as a sequence position"
+        ()
+    ]
+
+let slice_bounds_guards sequence first count =
+  [ BoolCond (app "_<=_" [ app "_+_" [ first; count ]; app "len" [ sequence ] ]) ]
+
 let lower_index callbacks ctx env origin (base : exp) (index : exp) =
   let base_result = callbacks.lower_sequence ctx env origin base in
   let index_result = callbacks.lower_value ctx env origin index in
   let index_sort_diagnostics =
-    if typ_is_nat ctx index.note then
-      []
-    else
-      [ unsupported
-          ~ctx ~origin ~constructor:"Expr/IdxE/index-sort"
-          ~source_echo:(source_echo_exp index)
-          ~reason:
-            "IdxE requires a Nat index because Maude prelude declares index : SpectecTerminals Nat -> SpectecTerminal"
-          ~suggestion:
-            "Keep this expression Unsupported until the source index type is known to be Nat or a source-preserving numeric conversion is available"
-          ()
-      ]
+    nat_index_diagnostics ctx origin "Expr/IdxE/index-sort" index
   in
   match base_result.term, index_result.term with
   | Some base_term, Some index_term when index_sort_diagnostics = [] ->
@@ -100,22 +107,29 @@ let lower_index callbacks ctx env origin (base : exp) (index : exp) =
         base_result.diagnostics @ index_result.diagnostics @ index_sort_diagnostics
     }
 
-let lower_slice callbacks ctx env origin (base : exp) (first : exp) (last : exp) =
+let lower_slice callbacks ctx env origin (base : exp) (first : exp) (count : exp) =
   let base_result = callbacks.lower_sequence ctx env origin base in
   let first_result = callbacks.lower_value ctx env origin first in
-  let last_result = callbacks.lower_value ctx env origin last in
-  match base_result.term, first_result.term, last_result.term with
-  | Some base_term, Some first_term, Some last_term ->
-    { term = Some (app "slice" [ base_term; first_term; last_term ])
-    ; guards = base_result.guards @ first_result.guards @ last_result.guards
+  let count_result = callbacks.lower_value ctx env origin count in
+  let position_diagnostics =
+    nat_index_diagnostics ctx origin "Expr/SliceE/first-sort" first
+    @ nat_index_diagnostics ctx origin "Expr/SliceE/count-sort" count
+  in
+  match base_result.term, first_result.term, count_result.term with
+  | Some base_term, Some first_term, Some count_term when position_diagnostics = [] ->
+    { term = Some (app "slice" [ base_term; first_term; count_term ])
+    ; guards =
+        base_result.guards @ first_result.guards @ count_result.guards
+        @ slice_bounds_guards base_term first_term count_term
     ; diagnostics =
-        base_result.diagnostics @ first_result.diagnostics @ last_result.diagnostics
+        base_result.diagnostics @ first_result.diagnostics @ count_result.diagnostics
     }
   | _ ->
     { term = None
-    ; guards = base_result.guards @ first_result.guards @ last_result.guards
+    ; guards = base_result.guards @ first_result.guards @ count_result.guards
     ; diagnostics =
-        base_result.diagnostics @ first_result.diagnostics @ last_result.diagnostics
+        base_result.diagnostics @ first_result.diagnostics @ count_result.diagnostics
+        @ position_diagnostics
     }
 
 let combine_binary left right term =
@@ -141,31 +155,43 @@ let rec lower_path_select callbacks ctx env origin (path_source : path) record_t
       lower_path_select callbacks ctx env origin path_source record_term parent
     in
     let index_result = callbacks.lower_value ctx env origin index_exp in
+    let index_diagnostics =
+      nat_index_diagnostics ctx origin "Expr/Path/IdxP/index-sort" index_exp
+    in
     (match parent_result.term, index_result.term with
-    | Some parent_term, Some index_term ->
+    | Some parent_term, Some index_term when index_diagnostics = [] ->
       combine_binary parent_result index_result
         (Some (app "index" [ parent_term; index_term ]))
-    | _ -> combine_binary parent_result index_result None)
-  | SliceP (parent, first, last) ->
+    | _ ->
+      let result = combine_binary parent_result index_result None in
+      { result with diagnostics = result.diagnostics @ index_diagnostics })
+  | SliceP (parent, first, count) ->
     let parent_result =
       lower_path_select callbacks ctx env origin path_source record_term parent
     in
     let first_result = callbacks.lower_value ctx env origin first in
-    let last_result = callbacks.lower_value ctx env origin last in
-    (match parent_result.term, first_result.term, last_result.term with
-    | Some parent_term, Some first_term, Some last_term ->
-      { term = Some (app "slice" [ parent_term; first_term; last_term ])
-      ; guards = parent_result.guards @ first_result.guards @ last_result.guards
+    let count_result = callbacks.lower_value ctx env origin count in
+    let position_diagnostics =
+      nat_index_diagnostics ctx origin "Expr/Path/SliceP/first-sort" first
+      @ nat_index_diagnostics ctx origin "Expr/Path/SliceP/count-sort" count
+    in
+    (match parent_result.term, first_result.term, count_result.term with
+    | Some parent_term, Some first_term, Some count_term when position_diagnostics = [] ->
+      { term = Some (app "slice" [ parent_term; first_term; count_term ])
+      ; guards =
+          parent_result.guards @ first_result.guards @ count_result.guards
+          @ slice_bounds_guards parent_term first_term count_term
       ; diagnostics =
           parent_result.diagnostics @ first_result.diagnostics
-          @ last_result.diagnostics
+          @ count_result.diagnostics
       }
     | _ ->
       { term = None
-      ; guards = parent_result.guards @ first_result.guards @ last_result.guards
+      ; guards = parent_result.guards @ first_result.guards @ count_result.guards
       ; diagnostics =
           parent_result.diagnostics @ first_result.diagnostics
-          @ last_result.diagnostics
+          @ count_result.diagnostics
+          @ position_diagnostics
       })
 
 let rec lower_path_update callbacks ctx env origin (exp : exp) record_term
@@ -196,8 +222,11 @@ let rec lower_path_update callbacks ctx env origin (exp : exp) record_term
       lower_path_select callbacks ctx env origin path record_term parent
     in
     let index_result = callbacks.lower_value ctx env origin index_exp in
+    let index_diagnostics =
+      nat_index_diagnostics ctx origin "Expr/UpdE/IdxP/index-sort" index_exp
+    in
     (match parent_result.term, index_result.term with
-    | Some parent_term, Some index_term ->
+    | Some parent_term, Some index_term when index_diagnostics = [] ->
       let nested_update =
         app "_[_<-_]" [ parent_term; index_term; replacement_term ]
       in
@@ -210,10 +239,44 @@ let rec lower_path_update callbacks ctx env origin (exp : exp) record_term
           parent_result.diagnostics @ index_result.diagnostics
           @ updated_parent.diagnostics
       }
-    | _ -> combine_binary parent_result index_result None)
-  | SliceP _ ->
-    unsupported_exp ctx origin "Expr/UpdE/SliceP" exp
-      "path update through SliceP needs a splice helper; direct source-shaped update is not implemented"
+    | _ ->
+      let result = combine_binary parent_result index_result None in
+      { result with diagnostics = result.diagnostics @ index_diagnostics })
+  | SliceP (parent, first, count) ->
+    let parent_result =
+      lower_path_select callbacks ctx env origin path record_term parent
+    in
+    let first_result = callbacks.lower_value ctx env origin first in
+    let count_result = callbacks.lower_value ctx env origin count in
+    let position_diagnostics =
+      nat_index_diagnostics ctx origin "Expr/UpdE/SliceP/first-sort" first
+      @ nat_index_diagnostics ctx origin "Expr/UpdE/SliceP/count-sort" count
+    in
+    (match parent_result.term, first_result.term, count_result.term with
+    | Some parent_term, Some first_term, Some count_term when position_diagnostics = [] ->
+      let nested_update =
+        app "splice" [ parent_term; first_term; count_term; replacement_term ]
+      in
+      let updated_parent =
+        lower_path_update callbacks ctx env origin exp record_term parent nested_update
+      in
+      { updated_parent with
+        guards =
+          parent_result.guards @ first_result.guards @ count_result.guards
+          @ slice_bounds_guards parent_term first_term count_term
+          @ updated_parent.guards
+      ; diagnostics =
+          parent_result.diagnostics @ first_result.diagnostics
+          @ count_result.diagnostics @ updated_parent.diagnostics
+      }
+    | _ ->
+      { term = None
+      ; guards = parent_result.guards @ first_result.guards @ count_result.guards
+      ; diagnostics =
+          parent_result.diagnostics @ first_result.diagnostics
+          @ count_result.diagnostics
+          @ position_diagnostics
+      })
 
 let lower_path_extension callbacks ctx env origin (exp : exp) record_term
     (path : path) extension_term =
@@ -239,13 +302,32 @@ let lower_path_extension callbacks ctx env origin (exp : exp) record_term
       }
     | None -> parent_result)
   | IdxP _ | SliceP _ ->
-    unsupported_exp ctx origin "Expr/ExtE/path" exp
-      "path extension is implemented only for direct record fields because index/slice extension needs a sequence splice helper"
+    with_diagnostics
+      [ unsupported
+          ~ctx ~origin ~constructor:"Expr/ExtE/path"
+          ~source_echo:(source_echo_exp exp)
+          ~reason:
+            "ExtE over index or slice paths requires preserving the selected sequence and then writing it back; this slice only supports helper-free field extension"
+          ~suggestion:
+            "Keep this as an explicit Unsupported case until indexed/sliced ExtE is documented and tested separately"
+          ()
+      ]
 
 let lower_record_update callbacks ctx env origin (exp : exp) (record : exp)
     (path : path) (replacement : exp) =
   let record_result = callbacks.lower_value ctx env origin record in
-  let replacement_result = callbacks.lower_value ctx env origin replacement in
+  let rec path_has_slice path =
+    match path.it with
+    | RootP -> false
+    | DotP (parent, _) | IdxP (parent, _) -> path_has_slice parent
+    | SliceP _ -> true
+  in
+  let replacement_result =
+    if path_has_slice path then
+      callbacks.lower_sequence ctx env origin replacement
+    else
+      callbacks.lower_value ctx env origin replacement
+  in
   match record_result.term, replacement_result.term with
   | Some record_term, Some replacement_term ->
     let update_result =

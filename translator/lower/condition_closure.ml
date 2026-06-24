@@ -30,6 +30,62 @@ let string_has_prefix ~prefix text =
   String.length text >= prefix_len
   && String.sub text 0 prefix_len = prefix
 
+let string_for_all predicate text =
+  let rec loop index =
+    index = String.length text || (predicate text.[index] && loop (index + 1))
+  in
+  loop 0
+
+let source_constructor_name name =
+  let valid_char = function
+    | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> true
+    | _ -> false
+  in
+  name <> ""
+  && string_for_all valid_char name
+  && not (string_has_prefix ~prefix:"def" name)
+  && not (string_has_prefix ~prefix:"helper" name)
+  && not (string_has_prefix ~prefix:"proj." name)
+
+let non_pattern_op_name = function
+  | "typecheck"
+  | "typecheckSeq"
+  | "typecheckOptSeq"
+  | "typecheckSeqOpt"
+  | "typecheckNestedSeq"
+  | "isOpt"
+  | "allOpt"
+  | "allLen"
+  | "len"
+  | "drop"
+  | "splice"
+  | "contains"
+  | "isTrue"
+  | "value"
+  | "index"
+  | "slice"
+  | "natOfInt"
+  | "intOfRat"
+  | "natOfRat"
+  | "ratIsInt"
+  | "modNat"
+  | "modInt"
+  | "_+_"
+  | "_-_"
+  | "_*_"
+  | "_/_"
+  | "_^_"
+  | "_==_"
+  | "_=/=_"
+  | "_<_"
+  | "_<=_"
+  | "_>_"
+  | "_>=_"
+  | "_and_"
+  | "_or_"
+  | "not_" -> true
+  | name -> String.length name > 0 && name.[0] = '_'
+
 let pattern_op_name = function
   | "eps"
   | "_ _"
@@ -40,16 +96,28 @@ let pattern_op_name = function
   | "seq"
   | "tuple"
   | "{_}"
-  | "item"
-  | "value" -> true
+  | "_;_"
+  | "item" -> true
   | name ->
-    String.contains name '.'
+    (String.contains name '.' && not (string_has_prefix ~prefix:"proj." name))
     || string_has_prefix ~prefix:"rec-" name
+    || ((not (non_pattern_op_name name)) && source_constructor_name name)
 
 let rec is_match_pattern = function
   | Var _ | Const _ | Qid _ -> true
   | App (name, args) ->
     pattern_op_name name && List.for_all is_match_pattern args
+
+let rule_condition_bound_vars bound = function
+  | EqCondition condition -> condition_bound_vars bound condition
+  | RewriteCond (_lhs, rhs) ->
+    if is_match_pattern rhs then
+      add_vars (term_vars rhs) bound
+    else
+      bound
+
+let rule_conditions_bound_vars initial_bound conditions =
+  conditions |> List.fold_left rule_condition_bound_vars initial_bound
 
 let unbound_vars term bound =
   term_vars term
@@ -549,3 +617,107 @@ let ceq_admissibility_diagnostics ctx origin lhs rhs conditions =
             ("statement rhs uses variable(s) before they are bound by lhs or conditions: "
              ^ vars_text ordinary_missing)
         ])
+
+let crl_admissibility_diagnostics ctx origin lhs rhs conditions =
+  let mk_diag constructor reason =
+    unsupported
+      ~ctx
+      ~origin
+      ~constructor
+      ~reason
+      ~suggestion:
+        "Bind variables through the rule lhs or an admissible earlier matching/rewrite condition before emitting this rewrite rule"
+      ()
+  in
+  let condition_diag index role missing =
+    match missing with
+    | [] -> []
+    | _ :: _ ->
+      [ mk_diag
+          "MaudeRegistry/crl-condition-admissibility"
+          (Printf.sprintf
+             "condition %d uses variable(s) before they are bound in %s: %s"
+             index
+             role
+             (vars_text missing))
+      ]
+  in
+  let rec check_conditions index bound diagnostics = function
+    | [] -> bound, diagnostics
+    | condition :: rest ->
+      let bound, diagnostics =
+        match condition with
+        | EqCondition (EqCond (condition_lhs, condition_rhs)) ->
+          bound,
+          diagnostics
+          @ condition_diag index "equation lhs" (unbound_vars condition_lhs bound)
+          @ condition_diag index "equation rhs" (unbound_vars condition_rhs bound)
+        | EqCondition (MatchCond (pattern, subject)) ->
+          let subject_missing = unbound_vars subject bound in
+          let pattern_diags =
+            if is_match_pattern pattern then
+              []
+            else
+              [ mk_diag
+                  "MaudeRegistry/crl-condition-admissibility"
+                  (Printf.sprintf
+                     "condition %d matching lhs is not a Maude pattern, so it cannot introduce variables soundly"
+                     index)
+              ]
+          in
+          let bound =
+            if subject_missing = [] && pattern_diags = [] then
+              add_vars (term_vars pattern) bound
+            else
+              bound
+          in
+          bound,
+          diagnostics
+          @ condition_diag index "matching subject" subject_missing
+          @ pattern_diags
+        | EqCondition (MembershipCond (term, _)) ->
+          bound,
+          diagnostics
+          @ condition_diag index "membership term" (unbound_vars term bound)
+        | EqCondition (BoolCond term) ->
+          bound,
+          diagnostics
+          @ condition_diag index "Bool condition" (unbound_vars term bound)
+        | RewriteCond (condition_lhs, condition_rhs) ->
+          let lhs_missing = unbound_vars condition_lhs bound in
+          let rhs_pattern_diags =
+            if is_match_pattern condition_rhs then
+              []
+            else
+              [ mk_diag
+                  "MaudeRegistry/crl-condition-admissibility"
+                  (Printf.sprintf
+                     "condition %d rewrite rhs is not a Maude pattern, so it cannot introduce witness variables soundly"
+                     index)
+              ]
+          in
+          let bound =
+            if lhs_missing = [] && rhs_pattern_diags = [] then
+              add_vars (term_vars condition_rhs) bound
+            else
+              bound
+          in
+          bound,
+          diagnostics
+          @ condition_diag index "rewrite lhs" lhs_missing
+          @ rhs_pattern_diags
+      in
+      check_conditions (index + 1) bound diagnostics rest
+  in
+  let bound, diagnostics =
+    check_conditions 1 (term_vars lhs) [] conditions
+  in
+  match unbound_vars rhs bound with
+  | [] -> diagnostics
+  | missing ->
+    diagnostics
+    @ [ mk_diag
+          "MaudeRegistry/crl-condition-admissibility"
+          ("statement rhs uses variable(s) before they are bound by lhs or conditions: "
+           ^ vars_text missing)
+      ]

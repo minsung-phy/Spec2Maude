@@ -62,6 +62,12 @@ let statements =
     ; op "_ _" [ sr "SpectecTerminals"; sr "SpectecTerminals" ] spectec_terminals
         ~attrs:[ Ctor; Assoc; Id (Const "eps") ]
     ; op "len" [ sr "SpectecTerminals" ] (s "Nat")
+    ; op "natOfInt" [ sr "Int" ] (s "Nat") ~kind:Partial
+    ; op "intOfRat" [ sr "Rat" ] (s "Int") ~kind:Partial
+    ; op "natOfRat" [ sr "Rat" ] (s "Nat") ~kind:Partial
+    ; op "ratIsInt" [ sr "Rat" ] (s "Bool")
+    ; op "modNat" [ sr "Nat"; sr "Nat" ] (s "Nat") ~kind:Partial
+    ; op "modInt" [ sr "Int"; sr "Int" ] (s "Int") ~kind:Partial
     ; op "allLen" [ sr "SpectecTerminals"; sr "Nat" ] (s "Bool")
     ; op "isOpt" [ sr "SpectecTerminals" ] (s "Bool")
     ; op "allOpt" [ sr "SpectecTerminals" ] (s "Bool")
@@ -90,12 +96,15 @@ let statements =
     ; op "_[_<-_]" [ sr "SpectecTerminals"; sr "Nat"; sr "SpectecTerminal" ] spectec_terminals
     ; op "index" [ sr "SpectecTerminals"; sr "Nat" ] spectec_terminal
     ; op "slice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat" ] spectec_terminals
+    ; op "drop" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
+    ; op "splice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
     ; op "merge" [ sr "SpectecTerminal"; sr "SpectecTerminal" ] spectec_terminal
         ~attrs:[ Ctor ]
     ; var "B" (sr "Bool")
     ; var "N" (sr "Nat")
     ; var "N2" (sr "Nat")
     ; var "I" (sr "Int")
+    ; var "I2" (sr "Int")
     ; var "R" (sr "Rat")
     ; var "F" (sr "Float")
     ; var "FQ" (sr "Qid")
@@ -118,6 +127,19 @@ let statements =
         (app "len" [ app "_ _" [ Var "X"; Var "XS" ] ])
         (app "_+_" [ Const "1"; app "len" [ Var "XS" ] ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
+    ; eq (app "natOfInt" [ Var "N" ]) (Var "N")
+    ; eq (app "intOfRat" [ Var "I" ]) (Var "I")
+    ; eq (app "natOfRat" [ Var "N" ]) (Var "N")
+    ; eq (app "ratIsInt" [ Var "I" ]) (Const "true")
+    ; eq ~attrs:[ Owise ] (app "ratIsInt" [ Var "R" ]) (Const "false")
+    ; ceq
+        (app "modNat" [ Var "N"; Var "N2" ])
+        (app "_rem_" [ Var "N"; Var "N2" ])
+        [ BoolCond (app "_=/=_" [ Var "N2"; Const "0" ]) ]
+    ; ceq
+        (app "modInt" [ Var "I"; Var "I2" ])
+        (app "_rem_" [ Var "I"; Var "I2" ])
+        [ BoolCond (app "_=/=_" [ Var "I2"; Const "0" ]) ]
     ; eq (app "allLen" [ Const "eps"; Var "N" ]) (Const "true")
     ; eq
         (app "allLen" [ app "seq" [ Var "YS" ]; Var "N" ])
@@ -242,5 +264,48 @@ let statements =
     ; eq
         (app "_[_<-_]" [ app "_ _" [ Var "X"; Var "XS" ]; app "s_" [ Var "N2" ]; Var "Y" ])
         (app "_ _" [ Var "X"; app "_[_<-_]" [ Var "XS"; Var "N2"; Var "Y" ] ])
+    ; eq (app "drop" [ Const "0"; Var "XS" ]) (Var "XS")
+    ; eq (app "drop" [ app "s_" [ Var "N" ]; Const "eps" ]) (Const "eps")
+    ; eq
+        (app "drop" [ app "s_" [ Var "N" ]; app "_ _" [ Var "X"; Var "XS" ] ])
+        (app "drop" [ Var "N"; Var "XS" ])
+    ; eq (app "slice" [ Var "XS"; Var "N"; Const "0" ]) (Const "eps")
+    ; eq
+        (app "slice" [ Const "eps"; app "s_" [ Var "N" ]; Var "N2" ])
+        (Const "eps")
+    ; eq
+        (app "slice" [ Const "eps"; Const "0"; app "s_" [ Var "N" ] ])
+        (Const "eps")
+    ; eq
+        (app "slice" [ app "_ _" [ Var "X"; Var "XS" ]; Const "0"; app "s_" [ Var "N" ] ])
+        (app "_ _" [ Var "X"; app "slice" [ Var "XS"; Const "0"; Var "N" ] ])
+    ; eq
+        (app "slice"
+           [ app "_ _" [ Var "X"; Var "XS" ]
+           ; app "s_" [ Var "N" ]
+           ; Var "N2"
+           ])
+        (app "slice" [ Var "XS"; Var "N"; Var "N2" ])
+    ; eq
+        (app "splice" [ Var "XS"; Const "0"; Var "N"; Var "VAL" ])
+        (app "_ _" [ Var "VAL"; app "drop" [ Var "N"; Var "XS" ] ])
+    ; eq
+        (app "splice"
+           [ app "_ _" [ Var "X"; Var "XS" ]; app "s_" [ Var "N" ]; Const "0"; Var "VAL" ])
+        (app "_ _"
+           [ Var "X"; app "splice" [ Var "XS"; Var "N"; Const "0"; Var "VAL" ] ])
+    ; eq
+        (app "splice"
+           [ Const "eps"; app "s_" [ Var "N" ]; app "s_" [ Var "N2" ]; Var "VAL" ])
+        (Const "eps")
+    ; eq
+        (app "splice"
+           [ app "_ _" [ Var "X"; Var "XS" ]
+           ; app "s_" [ Var "N" ]
+           ; app "s_" [ Var "N2" ]
+           ; Var "VAL"
+           ])
+        (app "_ _"
+           [ Var "X"; app "splice" [ Var "XS"; Var "N"; Var "N2"; Var "VAL" ] ])
     ; eq (typecheck (Var "K") (Var "T")) (Const "false") ~attrs:[ Owise ]
     ]

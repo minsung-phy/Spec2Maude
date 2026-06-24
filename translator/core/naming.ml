@@ -156,6 +156,37 @@ let specialized_definition_op id static_keys =
 let relation_op id =
   source_atom_slug id.Util.Source.it
 
+let relation_equational_view_op id =
+  relation_op id ^ "-view"
+
+let substring_after_marker marker text =
+  let marker_len = String.length marker in
+  let text_len = String.length text in
+  let rec loop index =
+    if index + marker_len > text_len then
+      None
+    else if String.sub text index marker_len = marker then
+      Some (String.sub text (index + marker_len) (text_len - index - marker_len))
+    else
+      loop (index + 1)
+  in
+  loop 0
+
+let helper_source_context origin =
+  let markers = [ "DecD-"; "RelD-"; "TypD-"; "RuleD-"; "DefD-" ] in
+  let rec find_in_segments = function
+    | [] -> None
+    | segment :: segments ->
+      (match
+         markers |> List.find_map (fun marker -> substring_after_marker marker segment)
+       with
+      | Some context when context <> "" -> Some context
+      | _ -> find_in_segments segments)
+  in
+  match find_in_segments (List.rev origin.Origin.path) with
+  | Some context -> context
+  | None -> origin.Origin.ast_constructor
+
 let trim_var_separators text =
   let len = String.length text in
   let left = ref 0 in
@@ -233,6 +264,29 @@ let maude_var ?(fallback = "V") source =
   match raw.[0] with
   | 'A' .. 'Z' -> raw
   | _ -> fallback ^ raw
+
+let split_words text =
+  text
+  |> String.split_on_char '_'
+  |> List.filter (fun word -> word <> "")
+
+let capitalize_word word =
+  match String.lowercase_ascii word with
+  | "" -> ""
+  | word ->
+    String.make 1 (Char.uppercase_ascii word.[0])
+    ^ String.sub word 1 (String.length word - 1)
+
+let helper_context_var_stem origin =
+  maude_var ~fallback:"HELPER" (helper_source_context origin)
+
+let helper_local_var_stem origin =
+  helper_context_var_stem origin
+
+let helper_context_name origin =
+  match split_words (helper_context_var_stem origin) with
+  | [] -> "Source"
+  | words -> String.concat "" (List.map capitalize_word words)
 
 let maude_module_name source =
   source

@@ -1,4 +1,4 @@
-type output =
+type output = Reld_common.output =
   { statements : Maude_ir.generated list
   ; diagnostics : Diagnostics.t list
   }

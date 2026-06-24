@@ -11,14 +11,79 @@ type callbacks =
   ; witness_of_typ : Context.t -> env -> Origin.t -> typ -> term option * Diagnostics.t list
   }
 
-let lower_numeric_conversion callbacks ctx env origin exp inner source_typ target_typ =
-  if numeric_conversion_preserves_runtime_representation source_typ target_typ then
-    callbacks.lower_value ctx env origin inner
-  else
-    unsupported_exp ctx origin "Expr/CvtE" exp
-      "only representation-preserving numeric conversions are erased in this slice; sign-changing, narrowing, Rat, and Real conversions still need a verified carrier strategy"
+let numeric_cast source_sort target_sort term =
+  match sort_name source_sort, sort_name target_sort with
+  | source, target when source = target -> Some (term, [])
+  | "Nat", ("Int" | "Rat") -> Some (term, [])
+  | "Int", "Rat" -> Some (term, [])
+  | "Int", "Nat" ->
+    Some
+      ( app "natOfInt" [ term ]
+      , [ BoolCond (app "_>=_" [ term; Const "0" ]) ] )
+  | "Rat", "Int" ->
+    Some
+      ( app "intOfRat" [ term ]
+      , [ BoolCond (app "ratIsInt" [ term ]) ] )
+  | "Rat", "Nat" ->
+    Some
+      ( app "natOfRat" [ term ]
+      , [ BoolCond (app "ratIsInt" [ term ])
+        ; BoolCond (app "_>=_" [ term; Const "0" ])
+        ] )
+  | _ -> None
 
-let lower_numeric_subtyping callbacks ctx env origin exp inner source_typ target_typ =
+let wrap_numeric_value target_sort term =
+  match sort_name target_sort with
+  | "Nat" | "Int" -> Some term
+  | "Rat" -> Some (app "rat" [ term ])
+  | _ -> None
+
+let modulo_lowering sort left right =
+  match sort_name sort with
+  | "Nat" ->
+    Some
+      ( app "modNat" [ left; right ]
+      , [ BoolCond (app "_=/=_" [ right; Const "0" ]) ] )
+  | "Int" ->
+    Some
+      ( app "modInt" [ left; right ]
+      , [ BoolCond (app "_=/=_" [ right; Const "0" ]) ] )
+  | _ -> None
+
+let division_guards op right =
+  if op = "/" then [ BoolCond (app "_=/=_" [ right; Const "0" ]) ] else []
+
+let rec lower_raw_numeric_conversion callbacks ctx env origin exp inner source_sort target_sort =
+  let lowered = lower_numeric_guard_value callbacks ctx env origin inner in
+  match lowered.term with
+  | Some term ->
+    (match numeric_cast source_sort target_sort term with
+    | Some (term, guards) ->
+      { lowered with term = Some term; guards = lowered.guards @ guards }
+    | None ->
+      unsupported_exp ctx origin "Expr/CvtE" exp
+        "numeric conversion has no verified Maude carrier conversion for this source/target sort pair")
+  | None -> lowered
+
+and lower_numeric_conversion callbacks ctx env origin exp inner source_typ target_typ =
+  match raw_numeric_sort_of_numtyp source_typ, raw_numeric_sort_of_numtyp target_typ with
+  | Some source_sort, Some target_sort ->
+    let lowered =
+      lower_raw_numeric_conversion callbacks ctx env origin exp inner source_sort target_sort
+    in
+    (match lowered.term with
+    | Some term ->
+      (match wrap_numeric_value target_sort term with
+      | Some term -> { lowered with term = Some term }
+      | None ->
+        unsupported_exp ctx origin "Expr/CvtE" exp
+          "numeric conversion target has no verified runtime carrier wrapper")
+    | None -> lowered)
+  | _ ->
+    unsupported_exp ctx origin "Expr/CvtE" exp
+      "Real/Float numeric conversions need the builtin float policy before lowering"
+
+and lower_numeric_subtyping callbacks ctx env origin exp inner source_typ target_typ =
   match primitive_numeric_alias_sort ctx source_typ, primitive_numeric_alias_sort ctx target_typ with
   | Some source_sort, Some target_sort
     when numeric_sort_coercion_preserves_runtime_representation source_sort target_sort ->
@@ -53,7 +118,7 @@ let lower_numeric_subtyping callbacks ctx env origin exp inner source_typ target
             ]
       })
 
-let rec lower_bool_value callbacks ctx env origin exp =
+and lower_bool_value callbacks ctx env origin exp =
   let lowered = lower_bool_raw callbacks ctx env origin exp in
   match lowered.term with
   | Some term -> { lowered with term = Some (bool_wrapper term) }
@@ -79,23 +144,63 @@ and lower_unary_value callbacks ctx env origin exp op exp1 =
         "unary operator result type is not a supported pure DecD value carrier")
 
 and lower_binary_value callbacks ctx env origin exp op left right =
-  let left_result = callbacks.lower_value ctx env origin left in
-  let right_result = callbacks.lower_value ctx env origin right in
+  let lower_operand =
+    if op = "\\" || op = "/" then
+      lower_numeric_guard_value callbacks ctx env origin
+    else
+      callbacks.lower_value ctx env origin
+  in
+  let left_result = lower_operand left in
+  let right_result = lower_operand right in
   match left_result.term, right_result.term with
   | Some left_term, Some right_term ->
-    let raw = app (maude_op_of_source op) [ left_term; right_term ] in
     let numeric_sort = raw_numeric_sort_of_typ ctx exp.note in
+    let raw_opt, modulo_guards, modulo_diagnostics =
+      if op = "\\" then
+        match numeric_sort with
+        | Some sort ->
+          (match modulo_lowering sort left_term right_term with
+          | Some (raw, guards) -> Some raw, guards, []
+          | None ->
+            None, [],
+            [ unsupported
+                ~ctx ~origin ~constructor:"Expr/BinE"
+                ~source_echo:(source_echo_exp exp)
+                ~reason:
+                  ("numeric modulo is implemented only for Nat/Int value carriers, not "
+                   ^ sort_name sort)
+                ()
+            ])
+        | None ->
+          None, [],
+          [ unsupported
+              ~ctx ~origin ~constructor:"Expr/BinE"
+              ~source_echo:(source_echo_exp exp)
+              ~reason:
+                "numeric modulo requires a Nat/Int carrier; result type did not provide one"
+              ()
+          ]
+      else
+        ( Some (app (maude_op_of_source op) [ left_term; right_term ])
+        , division_guards op right_term
+        , [] )
+    in
+    let lowered_term =
+      match raw_opt, exp.note.it, numeric_sort with
+      | Some raw, BoolT, _ -> Some (bool_wrapper raw)
+      | Some raw, _, Some sort -> wrap_numeric_value sort raw
+      | _ -> None
+    in
     { term =
-        (match exp.note.it, numeric_sort with
-        | BoolT, _ -> Some (bool_wrapper raw)
-        | _, Some sort when is_nat_int_sort sort -> Some raw
-        | _ -> None)
-    ; guards = left_result.guards @ right_result.guards
+        lowered_term
+    ; guards = left_result.guards @ right_result.guards @ modulo_guards
     ; diagnostics =
         left_result.diagnostics @ right_result.diagnostics
-        @ (match exp.note.it, numeric_sort with
-          | BoolT, _ -> []
-          | _, Some sort when is_nat_int_sort sort -> []
+        @ modulo_diagnostics
+        @ (match raw_opt, exp.note.it, numeric_sort with
+          | None, _, _ -> []
+          | _, BoolT, _ -> []
+          | Some raw, _, Some sort when Option.is_some (wrap_numeric_value sort raw) -> []
           | _ ->
             [ unsupported
                 ~ctx ~origin ~constructor:"Expr/BinE"
@@ -145,10 +250,27 @@ and lower_numeric_guard_value callbacks ctx env origin exp =
                  [ term ])
         }
       | None -> lowered)
-    | BinE (`ModOp, _, _, _) ->
-      unsupported_exp ctx origin "Expr/NumericGuard/BinE" exp
-        "numeric modulo uses source operator `\\`, which needs a verified Maude/prelude encoding before it can be emitted parse-safely"
+    | BinE (`ModOp, _, left, right) ->
+      let left_result = lower_numeric_guard_value callbacks ctx env origin left in
+      let right_result = lower_numeric_guard_value callbacks ctx env origin right in
+      (match left_result.term, right_result.term, raw_numeric_sort_of_typ ctx exp.note with
+      | Some left_term, Some right_term, Some sort ->
+        (match modulo_lowering sort left_term right_term with
+        | Some (raw, modulo_guards) ->
+          { term = Some raw
+          ; guards = left_result.guards @ right_result.guards @ modulo_guards
+          ; diagnostics = left_result.diagnostics @ right_result.diagnostics
+          }
+        | None ->
+          unsupported_exp ctx origin "Expr/NumericGuard/BinE" exp
+            "numeric modulo is implemented only for Nat/Int guard carriers")
+      | _ ->
+        { term = None
+        ; guards = left_result.guards @ right_result.guards
+        ; diagnostics = left_result.diagnostics @ right_result.diagnostics
+        })
     | BinE (op, _, left, right) ->
+      let op_text = Il.Print.string_of_binop op in
       let left_result = lower_numeric_guard_value callbacks ctx env origin left in
       let right_result = lower_numeric_guard_value callbacks ctx env origin right in
       (match left_result.term, right_result.term with
@@ -156,9 +278,11 @@ and lower_numeric_guard_value callbacks ctx env origin exp =
         { term =
             Some
               (app
-                 (maude_op_of_source (Il.Print.string_of_binop op))
+                 (maude_op_of_source op_text)
                  [ left_term; right_term ])
-        ; guards = left_result.guards @ right_result.guards
+        ; guards =
+            left_result.guards @ right_result.guards
+            @ division_guards op_text right_term
         ; diagnostics = left_result.diagnostics @ right_result.diagnostics
         }
       | _ ->
@@ -168,12 +292,11 @@ and lower_numeric_guard_value callbacks ctx env origin exp =
         })
     | CvtE (inner, source_typ, target_typ) ->
       (match raw_numeric_sort_of_numtyp source_typ, raw_numeric_sort_of_numtyp target_typ with
-      | Some source_sort, Some target_sort
-        when numeric_sort_coercion_preserves_runtime_representation source_sort target_sort ->
-        lower_numeric_guard_value callbacks ctx env origin inner
+      | Some source_sort, Some target_sort ->
+        lower_raw_numeric_conversion callbacks ctx env origin exp inner source_sort target_sort
       | _ ->
         unsupported_exp ctx origin "Expr/NumericGuard/CvtE" exp
-          "numeric guard conversion is supported only when it preserves the raw numeric representation")
+          "Real/Float numeric guard conversion needs the builtin float policy before lowering")
     | SubE (inner, source_typ, target_typ) ->
       (match raw_numeric_sort_of_typ ctx source_typ, raw_numeric_sort_of_typ ctx target_typ with
       | Some source_sort, Some target_sort
@@ -220,15 +343,61 @@ and lower_projection_equality_binding callbacks ctx env origin projection_exp va
     | _ -> None)
   | _ -> None
 
+and binding_is_condition_bound env (binding : binding) =
+  match env.condition_bound_vars with
+  | None -> false
+  | Some bound ->
+    Condition_closure.term_vars binding.term
+    |> List.for_all (fun var -> List.mem var bound)
+
+and category_named_var ctx id =
+  Analysis.Source_index.find_by_id (Context.source_index ctx) id.it
+  |> List.find_map (fun entry ->
+    match entry.Analysis.Source_index.def.it with
+    | TypD (typ_id, [], _) when typ_id.it = id.it ->
+      Some (Const (Naming.category_witness id))
+    | _ -> None)
+
+and source_category_witness ctx env exp =
+  match exp.it with
+  | VarE id when find_var env id.it = None -> category_named_var ctx id
+  | SubE ({ it = VarE id; _ }, { it = VarT (typ_id, []); _ }, _)
+    when id.it = typ_id.it
+         && (match find_var env id.it with
+             | None -> true
+             | Some binding -> not (binding_is_condition_bound env binding)) ->
+    category_named_var ctx id
+  | _ -> None
+
+and lower_category_membership_equality callbacks ctx env origin value_exp category_exp =
+  match source_category_witness ctx env category_exp with
+  | None -> None
+  | Some witness ->
+    let value_result = callbacks.lower_value ctx env origin value_exp in
+    let sort_opt = carrier_sort_of_typ value_exp.note in
+    Some
+      (match value_result.term, sort_opt with
+      | Some value_term, Some value_sort ->
+        { value_result with
+          term = Some (typecheck_for_sort value_sort value_term witness)
+        }
+      | _ -> value_result)
+
 and lower_cmp_raw callbacks ctx env origin _exp op left right =
   match op with
   | `EqOp ->
-    (match lower_projection_equality_binding callbacks ctx env origin left right with
+    (match lower_category_membership_equality callbacks ctx env origin left right with
     | Some result -> result
     | None ->
-      (match lower_projection_equality_binding callbacks ctx env origin right left with
+      (match lower_category_membership_equality callbacks ctx env origin right left with
       | Some result -> result
-      | None -> lower_cmp_raw_default callbacks ctx env origin op left right))
+      | None ->
+        (match lower_projection_equality_binding callbacks ctx env origin left right with
+        | Some result -> result
+        | None ->
+          (match lower_projection_equality_binding callbacks ctx env origin right left with
+          | Some result -> result
+          | None -> lower_cmp_raw_default callbacks ctx env origin op left right))))
   | _ -> lower_cmp_raw_default callbacks ctx env origin op left right
 
 and lower_cmp_raw_default callbacks ctx env origin op left right =

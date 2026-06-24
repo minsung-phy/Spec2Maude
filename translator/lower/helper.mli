@@ -143,12 +143,101 @@ type iter_premise_opt_bool =
   ; body_eq_conditions : Maude_ir.eq_condition list
   }
 
+type iter_premise_list_bool_shape =
+  { prem_source : string
+  ; body_source : string
+  ; source_source : string
+  ; source_typ_source : string
+  ; iter_source : string
+  }
+
+type iter_premise_list_bool =
+  { source_shape : iter_premise_list_bool_shape
+  ; generator_var : string
+  ; helper_head_var : string
+  ; source_tail_var : string
+  ; source_element_sort : Maude_ir.sort
+  ; captures : capture list
+  ; body_eq_conditions : Maude_ir.eq_condition list
+  }
+
+type iter_premise_zip_bool_shape =
+  { prem_source : string
+  ; body_source : string
+  ; iter_source : string
+  ; sources : iter_zip_source_shape list
+  }
+
+type iter_premise_zip_bool =
+  { source_shape : iter_premise_zip_bool_shape
+  ; sources : iter_zip_source list
+  ; captures : capture list
+  ; body_eq_conditions : Maude_ir.eq_condition list
+  }
+
+type iter_pattern_zip_shape =
+  { pattern_source : string
+  ; body_source : string
+  ; iter_source : string
+  ; sources : iter_zip_source_shape list
+  }
+
+type iter_pattern_zip_source =
+  { source_shape : iter_zip_source_shape
+  ; source_item_shape : iter_map_source_item_shape
+  ; source_head_term : Maude_ir.term
+  ; source_tail_var : string
+  }
+
+type iter_pattern_zip =
+  { source_shape : iter_pattern_zip_shape
+  ; subject_item_term : Maude_ir.term
+  ; subject_tail_var : string
+  ; sources : iter_pattern_zip_source list
+  ; body_eq_conditions : Maude_ir.eq_condition list
+  }
+
+type inverse_pair_split =
+  { source : string
+  ; left_source_id : string
+  ; right_source_id : string
+  ; pair_source : string
+  ; left_head_var : string
+  ; right_head_var : string
+  ; left_stream_var : string
+  ; right_stream_var : string
+  ; source_tail_var : string
+  }
+
+type inverse_concatn_chunks =
+  { source : string
+  ; target_source_id : string
+  ; bytes_op : string
+  ; inverse_op : string
+  ; captures : capture list
+  ; bytes_call_formals : Maude_ir.term list
+  ; inverse_call_formals : Maude_ir.term list
+  ; target_head_var : string
+  ; target_stream_var : string
+  ; bytes_var : string
+  ; bytes_head_var : string
+  ; bytes_tail_var : string
+  ; width_var : string
+  ; count_tail_var : string
+  ; chunk_var : string
+  }
+
 type request_kind =
   | Iter_map of iter_map
   | Iter_zip_map of iter_zip_map
   | Iter_listn of iter_listn
   | Iter_listn_source of iter_listn_source
   | Iter_premise_opt_bool of iter_premise_opt_bool
+  | Iter_premise_list_bool of iter_premise_list_bool
+  | Iter_premise_zip_bool of iter_premise_zip_bool
+  | Iter_pattern_zip of iter_pattern_zip
+  | Inverse_pair_split of inverse_pair_split
+  | Inverse_concatn_chunks of inverse_concatn_chunks
   | Optional_branch of { shape : string }
   | List1_guard of { shape : string }
   | Listn_indexed of { shape : string }
@@ -169,4 +258,9 @@ val create : unit -> t
 val request : t -> request -> string
 val requests : t -> request list
 val key_of_kind : request_kind -> string
+val pair_split_result_op : string -> string
+val pair_split_unzip_op : string -> string
+val concatn_chunks_result_op : string -> string
+val concatn_chunks_inverse_op : string -> string
+val unmaterialized_diagnostics : profile:string -> t -> Diagnostics.t list
 val materialize : t -> Maude_ir.generated list
