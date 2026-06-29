@@ -177,6 +177,8 @@ let rec lower_iter callbacks ctx env origin exp body (iter, generators) =
     lower_listn_map_helper callbacks ctx env origin exp n_exp generator_id source_exp body
   | ListN (n_exp, None), [], _ ->
     lower_listn_repeat_helper callbacks ctx env origin exp n_exp body
+  | ListN (n_exp, None), _ :: _ :: _, _ ->
+    lower_listn_zip_map_helper callbacks ctx env origin exp n_exp body generators
   | ListN (n_exp, Some index_id), generators, _ ->
     lower_listn_helper callbacks ctx env origin exp n_exp (Some index_id) generators body
   | Opt, [ generator_id, source_exp ], VarE body_id
@@ -187,14 +189,6 @@ let rec lower_iter callbacks ctx env origin exp body (iter, generators) =
   | (Opt | List1), _, _ ->
     unsupported_exp ctx origin "Expr/IterE" exp
       "Opt/List1 IterE lowering requires helper semantics and is outside this sequence slice"
-  | ListN (_, index_id_opt), _, _ ->
-    unsupported_exp ctx origin "Expr/IterE" exp
-      (Printf.sprintf
-         "this ListN IterE shape is outside the terminal-body repeat/index helper slice: generators=%d, index_binder=%s, output_note=%s, body_note=%s"
-         (List.length generators)
-         (match index_id_opt with None -> "none" | Some id -> id.it)
-         (Il.Print.string_of_typ exp.note)
-         (Il.Print.string_of_typ body.note))
   | List, [ generator_id, source_exp ], _ ->
     lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body
   | List, generators, _ when List.length generators >= 2 ->
@@ -282,6 +276,35 @@ and lower_listn_map_helper callbacks ctx env origin exp n_exp generator_id sourc
     ; diagnostics =
         mapped.diagnostics @ count_result.diagnostics @ source_result.diagnostics
     }
+
+and lower_listn_zip_map_helper callbacks ctx env origin exp n_exp body generators =
+  let count_result = lower_listn_count callbacks ctx env origin exp n_exp in
+  match generators with
+  | (_, source_exp) :: _ ->
+    let source_result = callbacks.lower_sequence ctx env origin source_exp in
+    (match count_result.term, source_result.term with
+    | Some count_term, Some source_term ->
+      let mapped = lower_list_zip_map_helper callbacks ctx env origin exp body generators in
+      (match mapped.term with
+      | Some _ ->
+      { mapped with
+        guards =
+          mapped.guards @ count_result.guards
+          @ [ listn_source_length_guard callbacks env source_term count_term ]
+      ; diagnostics = mapped.diagnostics @ count_result.diagnostics
+      }
+      | None ->
+        { term = None
+        ; guards = mapped.guards @ count_result.guards @ source_result.guards
+        ; diagnostics =
+            mapped.diagnostics @ count_result.diagnostics @ source_result.diagnostics
+        })
+    | _ ->
+      { term = None
+      ; guards = count_result.guards @ source_result.guards
+      ; diagnostics = count_result.diagnostics @ source_result.diagnostics
+      })
+  | [] -> lower_list_zip_map_helper callbacks ctx env origin exp body generators
 
 and lower_source_consuming_listn_helper callbacks
     ?premise_bound_vars ctx env origin exp n_exp index_id generator_id source_exp body =

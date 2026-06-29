@@ -100,6 +100,21 @@ let with_conditions env bound_vars conditions diagnostics =
   ; diagnostics
   }
 
+let take_match_binding var conditions =
+  let rec loop acc = function
+    | [] -> None
+    | MatchCond (Var actual, term) :: rest when actual = var ->
+      Some (term, List.rev_append acc rest)
+    | condition :: rest -> loop (condition :: acc) rest
+  in
+  loop [] conditions
+
+let rec is_direct_var_exp var exp =
+  match exp.it with
+  | VarE id -> id.it = var
+  | OptE (Some inner) -> is_direct_var_exp var inner
+  | _ -> false
+
 let result_metadata
     (left : Expr_translate.result)
     (right : Expr_translate.result)
@@ -316,6 +331,16 @@ type inverse_arg =
   | Inverse_known of Maude_ir.term
   | Inverse_target of string * Expr_translate.binding
 
+type binding_map_target =
+  { target_generator : id
+  ; target_source_id : id
+  ; target_source_exp : exp
+  ; target_source_term : Maude_ir.term
+  ; target_source_binding : Expr_translate.binding
+  ; target_element_typ : typ
+  ; target_element_sort : Maude_ir.sort
+  }
+
 let call_target_id ctx id =
   match Context.find_static_def ctx id.it with
   | Some target_id -> { id with it = target_id }
@@ -351,6 +376,36 @@ let typed_var_for_exp id exp =
   | Some sort ->
     let term = Var (Naming.maude_var id.it ^ ":" ^ sort_name sort) in
     Some (term, { Expr_translate.term; sort; typ = exp.note })
+
+let binding_map_targets env ~bound_vars generators =
+  generators
+  |> List.filter_map (fun (target_generator, target_source_exp) ->
+    match
+      unbound_direct_var env ~bound_vars target_source_exp,
+      flat_list_element_typ target_source_exp.note
+    with
+    | Some target_source_id, Some target_element_typ ->
+      (match Expr_translate.carrier_sort_of_typ target_element_typ with
+      | Some target_element_sort ->
+        let source_binding =
+          match Expr_translate.find_var env target_source_id.it with
+          | Some binding -> Some (binding.term, binding)
+          | None -> typed_var_for_exp target_source_id target_source_exp
+        in
+        (match source_binding with
+        | Some (target_source_term, target_source_binding) ->
+          Some
+            { target_generator
+            ; target_source_id
+            ; target_source_exp
+            ; target_source_term
+            ; target_source_binding
+            ; target_element_typ
+            ; target_element_sort
+            }
+        | None -> None)
+      | None -> None)
+    | _ -> None)
 
 let inverse_binding_unsupported ctx origin exp reason suggestion =
   unsupported
@@ -2832,19 +2887,218 @@ and lower_zip_iter_premise ctx env ~bound_vars origin prem body iter generators 
                 ]
           }
 
+and try_binding_map_iter_premise ctx env ~bound_vars origin prem body iter generators =
+  let targets = binding_map_targets env ~bound_vars generators in
+  match iter, body.it, targets with
+  | List, IfPr ({ it = CmpE (`EqOp, _, left, right); _ }), [ target ] ->
+    let target_generator_id = target.target_generator.it in
+    let target_on_left = is_direct_var_exp target_generator_id left in
+    let target_on_right = is_direct_var_exp target_generator_id right in
+    if target_on_left = target_on_right then
+      None
+    else
+      let input_generators =
+        generators
+        |> List.filter (fun (generator_id, _) ->
+          generator_id.it <> target_generator_id)
+      in
+      (match input_generators with
+      | [ source_generator, source_exp ] ->
+        (match
+           zip_source_descriptor source_exp.note,
+           Expr_translate.lower_sequence ctx env origin source_exp
+         with
+        | Some (source_item_shape, source_element_typ), source_result ->
+          (match
+             Expr_translate.carrier_sort_of_typ source_element_typ,
+             source_result.term
+           with
+          | Some source_element_sort, Some source_term
+            when not (diagnostics_have_fatal source_result.diagnostics) ->
+            let source_bound =
+              conditions_bound_vars bound_vars source_result.guards
+            in
+            if
+              not
+                (vars_subset
+                   (Condition_closure.term_vars source_term)
+                   source_bound)
+            then
+              None
+            else
+              let stem = helper_local_stem origin (source_echo_prem prem) in
+              let suffix =
+                "_"
+                ^ Naming.maude_var ~fallback:"GEN" source_generator.it
+              in
+              let helper_head_var = "HEAD" ^ stem ^ suffix in
+              let source_tail_var = "TAIL" ^ stem ^ suffix in
+              let body_result_var = "OUT" ^ stem in
+              let generator_ids =
+                generators |> List.map (fun (id, _) -> id.it)
+              in
+              let body_source_ids =
+                prem_free_var_ids body
+                |> List.filter (fun id -> not (List.mem id generator_ids))
+                |> List.sort_uniq String.compare
+              in
+              let captures =
+                body_source_ids
+                |> capture_candidates env
+                |> make_captures stem
+              in
+              let helper_env =
+                capture_env captures
+                |> fun helper_env ->
+                Expr_translate.add_var helper_env source_generator.it
+                  { Expr_translate.term = Var helper_head_var
+                  ; sort = source_element_sort
+                  ; typ = source_element_typ
+                  }
+                |> fun helper_env ->
+                Expr_translate.add_var helper_env target_generator_id
+                  { Expr_translate.term = Var body_result_var
+                  ; sort = target.target_element_sort
+                  ; typ = target.target_element_typ
+                  }
+              in
+              let helper_bound =
+                helper_head_var :: capture_vars captures
+              in
+              let body_result =
+                translate_premise ctx helper_env ~bound_vars:helper_bound origin body
+              in
+              (match take_match_binding body_result_var body_result.eq_conditions with
+              | None -> None
+              | Some (lowered_body, body_eq_conditions) ->
+              let helper_conditions =
+                body_eq_conditions @ [ MatchCond (Var body_result_var, lowered_body) ]
+              in
+              let body_used_vars =
+                Condition_closure.external_vars_of_conditions
+                  (body_result_var :: [ helper_head_var ])
+                  helper_conditions
+              in
+              let captures =
+                captures |> filter_used_captures body_used_vars
+              in
+              let helper_bound =
+                helper_head_var :: capture_vars captures
+              in
+              let helper_bound_with_output =
+                body_result_var :: helper_bound
+              in
+              let body_external =
+                Condition_closure.external_vars_of_conditions
+                  helper_bound_with_output
+                  helper_conditions
+              in
+              let introduced_vars =
+                body_result.bound_vars_after
+                |> List.filter (fun var ->
+                  var <> body_result_var && not (List.mem var helper_bound))
+              in
+              (match
+                 Condition_closure.conditions_admissible_bound
+                   helper_bound
+                   helper_conditions
+               with
+              | Some body_bound_after
+                when List.mem body_result_var body_bound_after
+                     && body_external = []
+                     && introduced_vars = []
+                     && body_result.rule_conditions = []
+                     && not body_result.has_else
+                     && body_result.let_bound_ids = []
+                     && not (diagnostics_have_fatal body_result.diagnostics) ->
+                if not (Condition_closure.is_match_pattern target.target_source_term) then
+                  None
+                else
+                let helper_request =
+                  { Helper.kind =
+                      Helper.Iter_map
+                        { source_shape =
+                            { iter_source = source_echo_prem prem
+                            ; body_source = source_echo_prem body
+                            ; source_source = source_echo_exp source_exp
+                            ; output_typ_source =
+                                Il.Print.string_of_typ target.target_source_exp.note
+                            ; source_typ_source =
+                                Il.Print.string_of_typ source_exp.note
+                            }
+                        ; call_shape = Helper.Source_then_captures
+                        ; generator_var = source_generator.it
+                        ; helper_head_var
+                        ; source_tail_var
+                        ; body_result_var
+                        ; source_item_shape
+                        ; output_item_shape = Helper.Output_flat_terminal
+                        ; source_element_sort
+                        ; captures
+                        ; lowered_body
+                        ; body_eq_conditions
+                        }
+                  ; reason = "IterPr binding-map helper"
+                  ; origin
+                  }
+                in
+                let helper_name =
+                  Helper.request (Context.helpers ctx) helper_request
+                in
+                let helper_call =
+                  app helper_name
+                    (source_term
+                     :: List.map (fun capture -> capture.Helper.call_term) captures)
+                in
+                let caller_conditions =
+                  source_result.guards
+                  @ [ MatchCond (target.target_source_term, helper_call) ]
+                in
+                if
+                  Condition_closure.external_vars_of_conditions
+                    bound_vars
+                    caller_conditions
+                  = []
+                then
+                  let result =
+                    with_conditions
+                      env
+                      bound_vars
+                      caller_conditions
+                      (source_result.diagnostics @ body_result.diagnostics)
+                  in
+                  Some
+                    { result with
+                      env_after =
+                        Expr_translate.add_var
+                          result.env_after
+                          target.target_source_id.it
+                          target.target_source_binding
+                    }
+                else
+                  None
+              | _ -> None))
+          | _ -> None)
+        | _ -> None)
+      | [] | _ :: _ :: _ -> None)
+  | _ -> None
+
 and lower_iter_premise ctx env ~bound_vars origin prem body iter generators =
-  match iter, generators, body.it with
-  | Opt, [ source_generator, source_exp ], IfPr body_exp ->
-    lower_optional_if_iter_premise
-      ctx env ~bound_vars origin prem body_exp source_generator source_exp
-  | (List | List1 | ListN (_, None)), [ source_generator, source_exp ], _ ->
-    lower_list_iter_premise
-      ctx env ~bound_vars origin prem body iter source_generator source_exp
-  | (List | List1 | ListN (_, None)), _ :: _ :: _, _ ->
-    lower_zip_iter_premise ctx env ~bound_vars origin prem body iter generators
-  | _ ->
-    unsupported_prem ctx env ~bound_vars origin "Premise/IterPr" prem
-      "iterated premises require all/optional/ListN premise helpers; this slice supports optional IfPr, one-source list all, and flat lockstep list zip helpers"
+  match try_binding_map_iter_premise ctx env ~bound_vars origin prem body iter generators with
+  | Some result -> result
+  | None ->
+    match iter, generators, body.it with
+    | Opt, [ source_generator, source_exp ], IfPr body_exp ->
+      lower_optional_if_iter_premise
+        ctx env ~bound_vars origin prem body_exp source_generator source_exp
+    | (List | List1 | ListN (_, None)), [ source_generator, source_exp ], _ ->
+      lower_list_iter_premise
+        ctx env ~bound_vars origin prem body iter source_generator source_exp
+    | (List | List1 | ListN (_, None)), _ :: _ :: _, _ ->
+      lower_zip_iter_premise ctx env ~bound_vars origin prem body iter generators
+    | _ ->
+      unsupported_prem ctx env ~bound_vars origin "Premise/IterPr" prem
+        "iterated premises require all/optional/ListN premise helpers; this slice supports optional IfPr, one-source list all, and flat lockstep list zip helpers"
 
 and translate_premise ?(future_prems = []) ctx env ~bound_vars parent_origin prem =
   let origin = origin_for_premise parent_origin prem in
