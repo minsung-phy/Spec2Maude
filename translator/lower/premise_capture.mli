@@ -1,5 +1,6 @@
 val source_and_note_free_var_ids : Il.Ast.exp -> string list
 val prem_free_var_ids : Il.Ast.prem -> string list
+val prem_source_and_note_free_var_ids : Il.Ast.prem -> string list
 val helper_local_stem : Origin.t -> string -> string
 
 val capture_candidates :

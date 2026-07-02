@@ -10,6 +10,8 @@ let source_echo_of_def def =
       | RelH (id, hints) -> "RelH", id, hints
       | DecH (id, hints) -> "DecH", id, hints
       | GramH (id, hints) -> "GramH", id, hints
+      | RuleH (rel_id, rule_id, hints) ->
+        "RuleH", { rel_id with it = rel_id.it ^ "/" ^ rule_id.it }, hints
     in
     let hint_names =
       hints
@@ -31,7 +33,7 @@ let constructor_of_def def =
 let id_of_def def =
   match def.it with
   | TypD (id, _, _)
-  | RelD (id, _, _, _)
+  | RelD (id, _, _, _, _)
   | DecD (id, _, _, _)
   | GramD (id, _, _, _) -> Some id.it
   | RecD _ -> None
@@ -41,7 +43,8 @@ let id_of_def def =
       | TypH (id, _)
       | RelH (id, _)
       | DecH (id, _)
-      | GramH (id, _) -> id
+      | GramH (id, _)
+      | RuleH (id, _, _) -> id
     in
     Some id.it
 
@@ -131,9 +134,9 @@ module Relation_graph = struct
     | Unknown -> "unknown"
 
   let mixop_has_atom predicate mixop =
-    List.exists
-      (fun atoms -> List.exists (fun atom -> predicate atom.it) atoms)
-      mixop
+    Xl.Mixop.flatten mixop
+    |> List.exists (fun atoms ->
+      atoms |> List.exists (fun atom -> predicate atom.it))
 
   let classify_mixop mixop =
     let markers =
@@ -197,6 +200,7 @@ module Function_graph = struct
   type relation =
     { id : string
     ; origin : Origin.t
+    ; source_params : param list
     ; kind : Relation_graph.relation_kind
     ; mixop : mixop
     ; result : typ
@@ -208,6 +212,13 @@ module Function_graph = struct
   type relation_demand =
     { id : string
     ; reason : string
+    }
+
+  type rule_hint =
+    { relation_id : string
+    ; rule_id : string
+    ; origin : Origin.t
+    ; hints : hint list
     }
 
   type static_typ_binding =
@@ -251,6 +262,52 @@ module Function_graph = struct
         ; blockers : string list
         }
 
+  type runtime_search_blocker =
+    { relation_id : string
+    ; rule_id : string option
+    ; origin : Origin.t option
+    ; constructor : string
+    ; reason : string
+    ; suggestion : string
+    ; source_echo : string option
+    ; premise_origin : Origin.t option
+    ; premise_constructor : string option
+    ; premise_source_echo : string option
+    }
+
+  type runtime_search_rule =
+    { relation_id : string
+    ; relation_result : typ
+    ; rule_id : string option
+    ; origin : Origin.t
+    ; source_echo : string option
+    ; binds : quant list
+    ; mixop : mixop
+    ; head : exp
+    ; prems : prem list
+    }
+
+  type runtime_predicate_search_plan =
+    | Runtime_search_no_shape_blockers of
+        { closure : string list
+        ; rules : runtime_search_rule list
+        }
+    | Runtime_search_blocked_plan of
+        { closure : string list
+        ; rules : runtime_search_rule list
+        ; blockers : runtime_search_blocker list
+        }
+
+  type runtime_predicate_dependency_completeness =
+    | Runtime_predicate_dependencies_complete of
+        { closure : string list
+        }
+    | Runtime_predicate_dependencies_incomplete of
+        { closure : string list
+        ; rules : runtime_search_rule list
+        ; blockers : runtime_search_blocker list
+        }
+
   type def_body =
     { body_id : id
     ; body_origin : Origin.t
@@ -261,6 +318,7 @@ module Function_graph = struct
   type relation_body =
     { relation_id : id
     ; relation_origin : Origin.t
+    ; relation_params : param list
     ; relation_rules : rule list
     }
 
@@ -269,6 +327,7 @@ module Function_graph = struct
     ; relations : relation list
     ; definitions_by_id : (string, definition) Hashtbl.t
     ; relations_by_id : (string, relation) Hashtbl.t
+    ; rule_hints_by_id : (string, rule_hint) Hashtbl.t
     ; bodies_by_id : (string, def_body) Hashtbl.t
     ; relation_bodies_by_id : (string, relation_body) Hashtbl.t
     ; relation_bodies : relation_body list
@@ -385,8 +444,8 @@ module Function_graph = struct
     List.exists
       (fun param ->
         match param.it with
-        | TypP _ | DefP _ -> true
-        | ExpP _ | GramP _ -> false)
+        | DefP _ -> true
+        | ExpP _ | TypP _ | GramP _ -> false)
       params
 
   let specialization_identity specialization =
@@ -437,7 +496,7 @@ module Function_graph = struct
     | Some target_id -> target_id
     | None -> id.it
 
-  let resolve_call t ~static_typ_env ~static_def_env ~origin id args =
+  let resolve_call t ~static_typ_env:_static_typ_env ~static_def_env ~origin id args =
     let target_id = call_target_id static_def_env id in
     match Hashtbl.find_opt t.bodies_by_id target_id with
     | None ->
@@ -481,27 +540,17 @@ module Function_graph = struct
       else if not (definition_body_has_static_params body.body_params) then
         Plain_call
       else
-        let typ_bindings_rev, def_bindings_rev, keys_rev, error =
+        let def_bindings_rev, keys_rev, error =
           List.fold_left2
-            (fun (typ_bindings, def_bindings, keys, error) param arg ->
+            (fun (def_bindings, keys, error) param arg ->
               match error with
-              | Some _ -> typ_bindings, def_bindings, keys, error
+              | Some _ -> def_bindings, keys, error
               | None ->
                 (match param.it, arg.it with
-                | TypP param_id, TypA typ ->
-                  (match resolve_typ_static static_typ_env typ with
-                  | Some (typ, key) ->
-                    let binding = { param_id = param_id.it; typ; key } in
-                    binding :: typ_bindings, def_bindings, key :: keys, None
-                  | None ->
-                    typ_bindings,
-                    def_bindings,
-                    keys,
-                    Some
-                      ("TypA argument `" ^ Il.Print.string_of_typ typ
-                       ^ "` is not a concrete finite specialization key"))
+                | TypP _, TypA _ ->
+                  def_bindings, keys, None
                 | TypP _, (ExpA _ | DefA _ | GramA _) ->
-                  typ_bindings, def_bindings, keys, Some "TypP parameter position requires a TypA argument"
+                  def_bindings, keys, Some "TypP parameter position requires a TypA argument"
                 | DefP (param_id, formal_params, formal_result), DefA actual_id ->
                   (match
                      static_def_key
@@ -515,30 +564,33 @@ module Function_graph = struct
                     let binding =
                       { param_id = param_id.it; target_id = actual_id.it; key }
                     in
-                    typ_bindings, binding :: def_bindings, key :: keys, None
-                  | Error reason -> typ_bindings, def_bindings, keys, Some reason)
+                    binding :: def_bindings, key :: keys, None
+                  | Error reason -> def_bindings, keys, Some reason)
                 | DefP _, (ExpA _ | TypA _ | GramA _) ->
-                  typ_bindings, def_bindings, keys, Some "DefP parameter position requires a DefA argument"
-                | ExpP _, ExpA _ -> typ_bindings, def_bindings, keys, None
+                  def_bindings, keys, Some "DefP parameter position requires a DefA argument"
+                | ExpP _, ExpA _ -> def_bindings, keys, None
                 | ExpP _, (TypA _ | DefA _ | GramA _) ->
-                  typ_bindings, def_bindings, keys, Some "runtime ExpP parameter position received a static argument"
+                  def_bindings, keys, Some "runtime ExpP parameter position received a static argument"
                 | GramP _, _ ->
-                  typ_bindings,
                   def_bindings,
                   keys,
                   Some "GramP static parameters are outside the finite TypP/DefP monomorphization slice"))
-            ([], [], [], None)
+            ([], [], None)
             body.body_params
             args
         in
         (match error with
         | Some reason -> Unsupported_call reason
         | None ->
-          let static_typs = List.rev typ_bindings_rev in
           let static_defs = List.rev def_bindings_rev in
           let key_components = List.rev keys_rev in
           Specialized_call
-            { def_id = target_id; key_components; static_typs; static_defs; origin })
+            { def_id = target_id
+            ; key_components
+            ; static_typs = []
+            ; static_defs
+            ; origin
+            })
 
   let rec collect_exp_calls t static_typ_env static_def_env origin acc exp =
     let acc =
@@ -627,9 +679,21 @@ module Function_graph = struct
 
   let rec collect_prem_calls t static_typ_env static_def_env origin acc prem =
     match prem.it with
-    | RulePr (_, _, exp) | IfPr exp ->
+    | RulePr (_, args, _, exp) ->
+      let acc =
+        args
+        |> List.fold_left
+             (fun acc arg ->
+               match arg.it with
+               | ExpA exp ->
+                 collect_exp_calls t static_typ_env static_def_env origin acc exp
+               | TypA _ | DefA _ | GramA _ -> acc)
+             acc
+      in
       collect_exp_calls t static_typ_env static_def_env origin acc exp
-    | LetPr (lhs, rhs, _ids) ->
+    | IfPr exp ->
+      collect_exp_calls t static_typ_env static_def_env origin acc exp
+    | LetPr (_quants, lhs, rhs) ->
       let acc = collect_exp_calls t static_typ_env static_def_env origin acc lhs in
       collect_exp_calls t static_typ_env static_def_env origin acc rhs
     | ElsePr -> acc
@@ -678,7 +742,7 @@ module Function_graph = struct
 
   let rec collect_relation_refs_from_prem acc prem =
     match prem.it with
-    | RulePr (rel_id, _, _) ->
+    | RulePr (rel_id, _, _, _) ->
       if List.mem rel_id.it acc then acc else rel_id.it :: acc
     | IterPr (prem, _) | NegPr prem ->
       collect_relation_refs_from_prem acc prem
@@ -697,44 +761,6 @@ module Function_graph = struct
       prems
       |> List.fold_left collect_relation_refs_from_prem []
       |> List.rev
-
-  let rec search_premise_dependencies prem =
-    match prem.it with
-    | IfPr _ | LetPr _ -> [], []
-    | RulePr (rel_id, _, _) ->
-      [ rel_id.it ], []
-    | ElsePr ->
-      [],
-      [ "otherwise premise needs enabledness complement before it can be part of a search relation" ]
-    | IterPr (body, _) ->
-      let deps, blockers = search_premise_dependencies body in
-      deps,
-      "iterated premise needs a source-shaped IterPr helper before search generation"
-      :: blockers
-    | NegPr body ->
-      let deps, blockers = search_premise_dependencies body in
-      deps,
-      "negated premise needs decidable complement before search generation"
-      :: blockers
-
-  let search_rule_dependencies relation_mixop rule =
-    match rule.it with
-    | RuleD (_id, _binds, mixop, _exp, prems) ->
-      let marker_blockers =
-        if Relation_graph.eq_mixop relation_mixop mixop then
-          []
-        else
-          [ "rule mixop skeleton does not match the enclosing RelD skeleton" ]
-      in
-      let deps, blockers =
-        prems
-        |> List.map search_premise_dependencies
-        |> List.fold_left
-             (fun (deps, blockers) (new_deps, new_blockers) ->
-               deps @ new_deps, blockers @ new_blockers)
-             ([], [])
-      in
-      deps, marker_blockers @ blockers
 
   let add_specialization t queue specialization =
     if has_specialization t specialization then
@@ -849,10 +875,37 @@ module Function_graph = struct
     | Relation_graph.Unknown ->
       None
 
-  let add_runtime_demand t queue id reason =
-    if not (Hashtbl.mem t.relation_runtime_demands id) then (
+  let add_runtime_demand t id reason =
+    if Hashtbl.mem t.relation_runtime_demands id then
+      false
+    else (
       Hashtbl.add t.relation_runtime_demands id { id; reason };
-      queue := !queue @ [ id ])
+      true)
+
+  let runtime_dependency_reason target_id source_id =
+    Printf.sprintf
+      "relation `%s` is used directly as a RulePr premise while lowering runtime-emitted relation `%s`; skipping it would erase a source branch or guard"
+      target_id
+      source_id
+
+  let add_runtime_dependencies t queue source_id =
+    match Hashtbl.find_opt t.relation_edges_by_id source_id with
+    | None -> ()
+    | Some targets ->
+      targets
+      |> List.iter (fun target_id ->
+        if Hashtbl.mem t.relations_by_id target_id then
+          let added =
+            add_runtime_demand
+            t
+            target_id
+            (runtime_dependency_reason target_id source_id)
+          in
+          if added then queue := target_id :: !queue)
+
+  let seed_runtime_demand t queue id reason =
+    if add_runtime_demand t id reason then
+      queue := id :: !queue
 
   let compute_relation_runtime_demands t decd_relation_seeds =
     let queue = ref [] in
@@ -860,7 +913,8 @@ module Function_graph = struct
     |> List.iter (fun relation ->
       match runtime_seed_reason relation with
       | None -> ()
-      | Some reason -> add_runtime_demand t queue relation.id reason);
+      | Some reason ->
+        seed_runtime_demand t queue relation.id reason);
     decd_relation_seeds
     |> List.iter (fun (target_id, decd_id) ->
       match Hashtbl.find_opt t.relations_by_id target_id with
@@ -868,31 +922,16 @@ module Function_graph = struct
       | Some relation ->
         (match decd_runtime_seed_reason target_id decd_id relation with
         | None -> ()
-        | Some reason -> add_runtime_demand t queue target_id reason));
-    let rec drain () =
-      match !queue with
+        | Some reason ->
+          seed_runtime_demand t queue target_id reason));
+    let rec drain = function
       | [] -> ()
       | source_id :: rest ->
         queue := rest;
-        let targets =
-          match Hashtbl.find_opt t.relation_edges_by_id source_id with
-          | None -> []
-          | Some targets -> targets
-        in
-        targets
-        |> List.iter (fun target_id ->
-          if Hashtbl.mem t.relations_by_id target_id then
-            add_runtime_demand
-              t
-              queue
-              target_id
-              (Printf.sprintf
-                 "relation `%s` is used as a RulePr premise while lowering runtime-demanded relation `%s`; skipping it would erase a source branch or guard"
-                 target_id
-                 source_id));
-        drain ()
+        add_runtime_dependencies t queue source_id;
+        drain !queue
     in
-    drain ()
+    drain !queue
 
   let maude_equational_view_hint = "maude_equational_view"
 
@@ -916,7 +955,7 @@ module Function_graph = struct
           (match List.find_map inverse_hint_target hints with
           | None -> ()
           | Some inverse_id -> Hashtbl.replace table id.it inverse_id)
-        | TypH _ | RelH _ | GramH _ -> ())
+        | TypH _ | RelH _ | GramH _ | RuleH _ -> ())
       | TypD _ | RelD _ | DecD _ | GramD _ | RecD _ -> ());
     table
 
@@ -945,7 +984,7 @@ module Function_graph = struct
             |> List.rev
           in
           Hashtbl.replace table id.it names
-        | TypH _ | DecH _ | GramH _ -> ())
+        | TypH _ | DecH _ | GramH _ | RuleH _ -> ())
       | TypD _ | RelD _ | DecD _ | GramD _ | RecD _ -> ());
     table
 
@@ -954,9 +993,34 @@ module Function_graph = struct
     | None -> []
     | Some hints -> hints
 
+  let rule_hint_key ~relation_id ~rule_id =
+    relation_id ^ "\000" ^ rule_id
+
+  let rule_hint_table entries =
+    let table = Hashtbl.create 127 in
+    entries
+    |> List.iter (fun (entry : Source_index.entry) ->
+      match entry.def.it with
+      | HintD hintdef ->
+        (match hintdef.it with
+        | RuleH (rel_id, rule_id, hints) ->
+          let key = rule_hint_key ~relation_id:rel_id.it ~rule_id:rule_id.it in
+          Hashtbl.replace
+            table
+            key
+            { relation_id = rel_id.it
+            ; rule_id = rule_id.it
+            ; origin = entry.origin
+            ; hints
+            }
+        | TypH _ | RelH _ | DecH _ | GramH _ -> ())
+      | TypD _ | RelD _ | DecD _ | GramD _ | RecD _ -> ());
+    table
+
   let build index =
     let definitions_by_id = Hashtbl.create 127 in
     let relations_by_id = Hashtbl.create 127 in
+    let rule_hints_by_id = Hashtbl.create 127 in
     let bodies_by_id = Hashtbl.create 127 in
     let relation_bodies_by_id = Hashtbl.create 127 in
     let relation_edges_by_id = Hashtbl.create 127 in
@@ -968,6 +1032,10 @@ module Function_graph = struct
     let decd_relation_seeds = ref [] in
     let entries = Source_index.entries index in
     let relation_hints_by_id = relation_hint_table entries in
+    let source_rule_hints_by_id = rule_hint_table entries in
+    Hashtbl.iter
+      (fun key value -> Hashtbl.replace rule_hints_by_id key value)
+      source_rule_hints_by_id;
     let dec_inverses_by_id = dec_inverse_table entries in
     entries
     |> List.iter (fun (entry : Source_index.entry) ->
@@ -1000,11 +1068,12 @@ module Function_graph = struct
           decd_relation_seeds :=
             (rel_id, id.it)
             :: !decd_relation_seeds)
-      | RelD (id, mixop, result, rules) ->
+      | RelD (id, params, mixop, result, rules) ->
         let hints = relation_hints relation_hints_by_id id.it in
         let relation =
           { id = id.it
           ; origin = entry.origin
+          ; source_params = params
           ; kind = Relation_graph.classify_mixop mixop
           ; mixop
           ; result
@@ -1015,7 +1084,11 @@ module Function_graph = struct
         in
         relations := relation :: !relations;
         let relation_body =
-          { relation_id = id; relation_origin = entry.origin; relation_rules = rules }
+          { relation_id = id
+          ; relation_origin = entry.origin
+          ; relation_params = params
+          ; relation_rules = rules
+          }
         in
         relation_bodies := relation_body :: !relation_bodies;
         add_once relations_by_id id.it relation;
@@ -1032,6 +1105,7 @@ module Function_graph = struct
     ; relations = List.rev !relations
     ; definitions_by_id
     ; relations_by_id
+    ; rule_hints_by_id
     ; bodies_by_id
     ; relation_bodies_by_id
     ; relation_bodies = List.rev !relation_bodies
@@ -1050,7 +1124,7 @@ module Function_graph = struct
 
   let diagnostics ~profile t =
     t.violations
-    |> List.map (fun violation ->
+    |> List.map (fun (violation : violation) ->
       Diagnostics.make
         ?suggestion:violation.suggestion
         ?source_echo:violation.source_echo
@@ -1077,6 +1151,11 @@ module Function_graph = struct
   let find_relation t id =
     Hashtbl.find_opt t.relations_by_id id
 
+  let rule_hints t ~relation_id ~rule_id =
+    Hashtbl.find_opt
+      t.rule_hints_by_id
+      (rule_hint_key ~relation_id ~rule_id)
+
   let relation_has_maude_equational_view relation =
     relation.maude_equational_view
 
@@ -1088,94 +1167,137 @@ module Function_graph = struct
   let relation_is_runtime_demanded t id =
     Option.is_some (relation_runtime_demand_reason t id)
 
+  let runtime_closure_kind = function
+    | Relation_graph.Predicate_candidate ->
+      Runtime_predicate_closure.Predicate_candidate
+    | Relation_graph.Deterministic_candidate ->
+      Runtime_predicate_closure.Deterministic_candidate
+    | Relation_graph.Execution ->
+      Runtime_predicate_closure.Execution
+    | Relation_graph.Execution_star ->
+      Runtime_predicate_closure.Execution_star
+    | Relation_graph.Unknown ->
+      Runtime_predicate_closure.Unknown
+        (Relation_graph.string_of_relation_kind Relation_graph.Unknown)
+
+  let runtime_closure_rule rule =
+    match rule.it with
+    | RuleD (rule_id, binds, mixop, exp, prems) ->
+      { Runtime_predicate_closure.rule_id =
+          if rule_id.it = "" || rule_id.it = "_" then None else Some rule_id.it
+      ; origin =
+          Origin.make
+            ~source_echo:(Il.Print.string_of_rule rule)
+            ~ast_constructor:"RuleD"
+            rule.at
+      ; source_echo = Some (Il.Print.string_of_rule rule)
+      ; binds
+      ; mixop
+      ; head = exp
+      ; prems
+      }
+
+  let runtime_closure_relation t (relation : relation) =
+    let rules =
+      match Hashtbl.find_opt t.relation_bodies_by_id relation.id with
+      | None -> None
+      | Some body -> Some (List.map runtime_closure_rule body.relation_rules)
+    in
+    { Runtime_predicate_closure.id = relation.id
+    ; origin = relation.origin
+    ; source_params = relation.source_params
+    ; kind = runtime_closure_kind relation.kind
+    ; mixop = relation.mixop
+    ; result = relation.result
+    ; rules
+    ; runtime_demanded = relation_is_runtime_demanded t relation.id
+    }
+
+  let runtime_closure_graph t =
+    let find_relation id =
+      Hashtbl.find_opt t.relations_by_id id
+      |> Option.map (runtime_closure_relation t)
+    in
+    let dependencies id =
+      match Hashtbl.find_opt t.relation_edges_by_id id with
+      | None -> []
+      | Some deps -> deps
+    in
+    Runtime_predicate_closure.make
+      ~find_relation
+      ~dependencies
+      ~mixop_equal:Relation_graph.eq_mixop
+
+  let runtime_search_blocker
+      (blocker : Runtime_predicate_closure.blocker)
+    =
+    { relation_id = blocker.relation_id
+    ; rule_id = blocker.rule_id
+    ; origin = blocker.origin
+    ; constructor = blocker.constructor
+    ; reason = blocker.reason
+    ; suggestion = blocker.suggestion
+    ; source_echo = blocker.source_echo
+    ; premise_origin = blocker.premise_origin
+    ; premise_constructor = blocker.premise_constructor
+    ; premise_source_echo = blocker.premise_source_echo
+    }
+
+  let runtime_search_rule
+      (search_rule : Runtime_predicate_closure.search_rule)
+    =
+    let rule = search_rule.rule in
+    { relation_id = search_rule.relation_id
+    ; relation_result = search_rule.relation_result
+    ; rule_id = rule.rule_id
+    ; origin = rule.origin
+    ; source_echo = rule.source_echo
+    ; binds = rule.binds
+    ; mixop = rule.mixop
+    ; head = rule.head
+    ; prems = rule.prems
+    }
+
+  let runtime_predicate_closure_plan t use id =
+    match Runtime_predicate_closure.plan (runtime_closure_graph t) use id with
+    | Complete { closure; rules } ->
+      Runtime_search_no_shape_blockers
+        { closure; rules = List.map runtime_search_rule rules }
+    | Blocked { closure; rules; blockers } ->
+      Runtime_search_blocked_plan
+        { closure
+        ; rules = List.map runtime_search_rule rules
+        ; blockers = List.map runtime_search_blocker blockers
+        }
+
+  let runtime_predicate_search_plan t id =
+    runtime_predicate_closure_plan t Runtime_predicate_closure.Search_helper id
+
+  let runtime_predicate_truth_plan t id =
+    runtime_predicate_closure_plan t Runtime_predicate_closure.Truth_helper id
+
+  let runtime_predicate_dependency_completeness t id =
+    match Runtime_predicate_closure.dependency_completeness (runtime_closure_graph t) id with
+    | Complete { closure; _ } ->
+      Runtime_predicate_dependencies_complete { closure }
+    | Blocked { closure; rules; blockers } ->
+      Runtime_predicate_dependencies_incomplete
+        { closure
+        ; rules = List.map runtime_search_rule rules
+        ; blockers = List.map runtime_search_blocker blockers
+        }
+
   let runtime_predicate_search_capability t id =
-    let closure = ref [] in
-    let blockers = ref [] in
-    let add_closure id =
-      if not (List.mem id !closure) then
-        closure := id :: !closure
-    in
-    let add_blocker relation_id reason =
-      blockers :=
-        (Printf.sprintf "%s: %s" relation_id reason)
-        :: !blockers
-    in
-    let rec visit stack id =
-      if List.mem id stack then (
-        add_closure id;
-        add_blocker
-          id
-          ("recursive predicate-search dependency cycle `"
-           ^ String.concat " -> " (List.rev (id :: stack))
-           ^ "` needs a bounded/source-complete witness-space proof before helper emission"))
-      else (
-        add_closure id;
-        match Hashtbl.find_opt t.relations_by_id id with
-        | None ->
-          add_blocker id "referenced relation is not known in the source index"
-        | Some relation ->
-          (match relation.kind with
-          | Relation_graph.Predicate_candidate -> ()
-          | kind ->
-            add_blocker
-              id
-              ("referenced relation is classified as `"
-               ^ Relation_graph.string_of_relation_kind kind
-               ^ "`, not as a predicate relation"));
-          if not (relation_is_runtime_demanded t id) then
-            add_blocker id "referenced relation is not runtime-demanded in the relation graph";
-          (match Hashtbl.find_opt t.relation_bodies_by_id id with
-          | None ->
-            add_blocker id "referenced relation has no source RuleD body in the source index"
-          | Some body when body.relation_rules = [] ->
-            add_blocker
-              id
-              "referenced relation has no source RuleD clauses to generate a search relation from"
-          | Some body ->
-            let deps, rule_blockers =
-              body.relation_rules
-              |> List.map (search_rule_dependencies relation.mixop)
-              |> List.fold_left
-                   (fun (deps, blockers) (new_deps, new_blockers) ->
-                     deps @ new_deps, blockers @ new_blockers)
-                   ([], [])
-            in
-            rule_blockers
-            |> List.sort_uniq String.compare
-            |> List.iter (add_blocker id);
-            deps
-            |> List.sort_uniq String.compare
-            |> List.iter (fun dep_id ->
-              match Hashtbl.find_opt t.relations_by_id dep_id with
-              | None ->
-                add_blocker
-                  id
-                  ("rule premise references unknown relation `" ^ dep_id ^ "`")
-              | Some dep_relation ->
-                (match dep_relation.kind with
-                | Relation_graph.Predicate_candidate ->
-                  visit (id :: stack) dep_id
-                | Relation_graph.Deterministic_candidate ->
-                  add_blocker
-                    id
-                    ("rule premise depends on deterministic relation `" ^ dep_id
-                     ^ "`; predicate search generation cannot yet call deterministic result matching source-completely")
-                | Relation_graph.Execution | Relation_graph.Execution_star ->
-                  add_blocker
-                    id
-                    ("rule premise depends on execution relation `" ^ dep_id
-                     ^ "`; predicate search generation cannot contain rewrite semantics in this slice")
-                | Relation_graph.Unknown ->
-                  add_blocker
-                    id
-                    ("rule premise depends on unknown relation `" ^ dep_id
-                     ^ "`; predicate search generation cannot classify it source-completely")))))
-    in
-    visit [] id;
-    let closure = List.rev !closure |> List.sort_uniq String.compare in
-    match !blockers |> List.rev |> List.sort_uniq String.compare with
-    | [] -> Runtime_search_candidate closure
-    | blockers -> Runtime_search_blocked { closure; blockers }
+    match runtime_predicate_search_plan t id with
+    | Runtime_search_no_shape_blockers { closure; _ } ->
+      Runtime_search_candidate closure
+    | Runtime_search_blocked_plan { closure; blockers; _ } ->
+      let blockers =
+        blockers
+        |> List.map (fun (blocker : runtime_search_blocker) ->
+          Printf.sprintf "%s: %s" blocker.relation_id blocker.reason)
+      in
+      Runtime_search_blocked { closure; blockers }
 
   let definition_has_static_params definition =
     List.exists

@@ -125,6 +125,176 @@ let lower_uncase_projection_impl
       unsupported_exp ctx origin "Expr/UncaseE" exp
         "constructor registry has multiple emitted candidates for this destructor shape, so UncaseE refuses to guess"
 
+let rec lower_type_witness_impl ~lower_value ctx env origin constructor typ =
+  match typ.it with
+  | VarT (id, []) ->
+    (match Context.find_phantom_typ ctx id.it with
+    | Some var_name ->
+      { witness_term = Some (Var var_name)
+      ; witness_guards = []
+      ; witness_diagnostics = []
+      }
+    | None ->
+      { witness_term = Some (app (Naming.category_witness id) [])
+      ; witness_guards = []
+      ; witness_diagnostics = []
+      })
+  | VarT (id, args) ->
+    let results =
+      List.map (lower_type_witness_arg_impl ~lower_value ctx env origin constructor) args
+    in
+    let terms = List.filter_map (fun result -> result.witness_term) results in
+    let guards =
+      results |> List.map (fun result -> result.witness_guards) |> List.concat
+    in
+    let diagnostics =
+      results |> List.map (fun result -> result.witness_diagnostics) |> List.concat
+    in
+    if List.length terms = List.length args then
+      { witness_term = Some (app (Naming.category_witness id) terms)
+      ; witness_guards = guards
+      ; witness_diagnostics = diagnostics
+      }
+    else
+      { witness_term = None
+      ; witness_guards = guards
+      ; witness_diagnostics = diagnostics
+      }
+  | BoolT ->
+    { witness_term = Some (Const (Naming.primitive_witness "bool"))
+    ; witness_guards = []
+    ; witness_diagnostics = []
+    }
+  | NumT `NatT ->
+    { witness_term = Some (Const (Naming.primitive_witness "nat"))
+    ; witness_guards = []
+    ; witness_diagnostics = []
+    }
+  | NumT `IntT ->
+    { witness_term = Some (Const (Naming.primitive_witness "int"))
+    ; witness_guards = []
+    ; witness_diagnostics = []
+    }
+  | NumT `RatT ->
+    { witness_term = Some (Const (Naming.primitive_witness "rat"))
+    ; witness_guards = []
+    ; witness_diagnostics = []
+    }
+  | NumT `RealT ->
+    { witness_term = Some (Const (Naming.primitive_witness "real"))
+    ; witness_guards = []
+    ; witness_diagnostics = []
+    }
+  | TextT ->
+    { witness_term = Some (Const (Naming.primitive_witness "text"))
+    ; witness_guards = []
+    ; witness_diagnostics = []
+    }
+  | IterT (inner, (List | Opt)) when not (typ_is_iter inner) ->
+    lower_type_witness_impl ~lower_value ctx env origin constructor inner
+  | IterT ({ it = IterT (inner, (List | Opt)); _ }, (List | Opt))
+    when not (typ_is_iter inner) ->
+    lower_type_witness_impl ~lower_value ctx env origin constructor inner
+  | IterT _ | TupT _ ->
+    { witness_term = None
+    ; witness_guards = []
+    ; witness_diagnostics =
+        [ unsupported_witness
+            ctx origin (constructor ^ "/type-witness")
+            (Il.Print.string_of_typ typ)
+            "nested iteration or tuple type witness is not implemented for this lowering"
+        ]
+    }
+
+and lower_type_witness_arg_impl ~lower_value ctx env origin constructor arg =
+  match arg.it with
+  | ExpA exp ->
+    (match exp.it with
+    | VarE id ->
+      (match find_var env id.it with
+      | Some binding ->
+        { witness_term = Some binding.term
+        ; witness_guards = []
+        ; witness_diagnostics = []
+        }
+      | None ->
+        { witness_term = None
+        ; witness_guards = []
+        ; witness_diagnostics =
+            [ unsupported_witness
+                ctx origin (constructor ^ "/type-arg/VarE")
+                (Il.Print.string_of_exp exp)
+                ("unbound type witness expression argument `" ^ id.it ^ "`")
+            ]
+        })
+    | NumE n ->
+      (match Xl.Num.to_typ n with
+      | `NatT | `IntT ->
+        { witness_term = Some (Const (maude_numeric_literal n))
+        ; witness_guards = []
+        ; witness_diagnostics = []
+        }
+      | `RatT | `RealT ->
+        { witness_term = None
+        ; witness_guards = []
+        ; witness_diagnostics =
+            [ unsupported_witness
+                ctx origin (constructor ^ "/type-arg/NumE")
+                (Il.Print.string_of_exp exp)
+                "Rat/Real numeric type witness arguments need the primitive wrapper strategy"
+            ]
+        })
+    | BoolE b ->
+      { witness_term = Some (bool_wrapper (Const (string_of_bool b)))
+      ; witness_guards = []
+      ; witness_diagnostics = []
+      }
+    | TextE text ->
+      { witness_term = Some (text_literal text)
+      ; witness_guards = []
+      ; witness_diagnostics = []
+      }
+    | _ ->
+      let result = lower_value ctx env origin exp in
+      (match result.term with
+      | Some term ->
+        { witness_term = Some term
+        ; witness_guards = result.guards
+        ; witness_diagnostics = result.diagnostics
+        }
+      | None ->
+        { witness_term = None
+        ; witness_guards = result.guards
+        ; witness_diagnostics =
+            result.diagnostics
+            @ [ unsupported_witness
+                  ctx origin (constructor ^ "/type-arg")
+                  (Il.Print.string_of_exp exp)
+                  "type witness expression argument could not be lowered with its required guards"
+              ]
+        }))
+  | TypA typ ->
+    lower_type_witness_impl ~lower_value ctx env origin constructor typ
+  | DefA id ->
+    { witness_term = None
+    ; witness_guards = []
+    ; witness_diagnostics =
+        [ unsupported_witness
+            ctx origin (constructor ^ "/type-arg/DefA") id.it
+            "definition-valued type witness arguments require DefP specialization"
+        ]
+    }
+  | GramA sym ->
+    { witness_term = None
+    ; witness_guards = []
+    ; witness_diagnostics =
+        [ unsupported_witness
+            ctx origin (constructor ^ "/type-arg/GramA")
+            (Il.Print.string_of_sym sym)
+            "grammar-valued type witness arguments require monomorphization"
+        ]
+    }
+
 let lower_call_impl ~lower_value ctx env origin exp id args =
   let graph = Context.function_graph ctx in
   let target_id =
@@ -164,7 +334,21 @@ let lower_call_impl ~lower_value ctx env origin exp id args =
            arg
            "runtime ExpP parameter position received a static argument"
            "Expr/CallE/runtime-arg")
-    | Analysis.Function_graph.Static_typ, TypA _ -> None
+    | Analysis.Function_graph.Static_typ, TypA typ ->
+      let witness =
+        lower_type_witness_impl
+          ~lower_value
+          ctx
+          env
+          origin
+          "Expr/CallE/static-arg/TypP"
+          typ
+      in
+      Some
+        { term = witness.witness_term
+        ; guards = witness.witness_guards
+        ; diagnostics = witness.witness_diagnostics
+        }
     | Analysis.Function_graph.Static_typ, (ExpA _ | DefA _ | GramA _) ->
       Some
         (unsupported_arg
@@ -440,161 +624,16 @@ let rec lower_value ctx env origin exp =
       "this expression constructor is outside the conservative pure DecD slice"
 
 and witness_of_typ_with_guards ctx env origin constructor typ =
-  match typ.it with
-  | VarT (id, args) ->
-    let results =
-      List.map (witness_term_of_arg_with_guards ctx env origin constructor) args
-    in
-    let terms = List.filter_map (fun result -> result.witness_term) results in
-    let guards =
-      results |> List.map (fun result -> result.witness_guards) |> List.concat
-    in
-    let diagnostics =
-      results |> List.map (fun result -> result.witness_diagnostics) |> List.concat
-    in
-    if List.length terms = List.length args then
-      { witness_term = Some (app (Naming.category_witness id) terms)
-      ; witness_guards = guards
-      ; witness_diagnostics = diagnostics
-      }
-    else
-      { witness_term = None
-      ; witness_guards = guards
-      ; witness_diagnostics = diagnostics
-      }
-  | BoolT ->
-    { witness_term = Some (Const (Naming.primitive_witness "bool"))
-    ; witness_guards = []
-    ; witness_diagnostics = []
-    }
-  | NumT `NatT ->
-    { witness_term = Some (Const (Naming.primitive_witness "nat"))
-    ; witness_guards = []
-    ; witness_diagnostics = []
-    }
-  | NumT `IntT ->
-    { witness_term = Some (Const (Naming.primitive_witness "int"))
-    ; witness_guards = []
-    ; witness_diagnostics = []
-    }
-  | NumT `RatT ->
-    { witness_term = Some (Const (Naming.primitive_witness "rat"))
-    ; witness_guards = []
-    ; witness_diagnostics = []
-    }
-  | NumT `RealT ->
-    { witness_term = Some (Const (Naming.primitive_witness "real"))
-    ; witness_guards = []
-    ; witness_diagnostics = []
-    }
-  | TextT ->
-    { witness_term = Some (Const (Naming.primitive_witness "text"))
-    ; witness_guards = []
-    ; witness_diagnostics = []
-    }
-  | IterT (inner, (List | Opt)) when not (typ_is_iter inner) ->
-    witness_of_typ_with_guards ctx env origin constructor inner
-  | IterT ({ it = IterT (inner, (List | Opt)); _ }, (List | Opt))
-    when not (typ_is_iter inner) ->
-    witness_of_typ_with_guards ctx env origin constructor inner
-  | IterT _ | TupT _ ->
-    { witness_term = None
-    ; witness_guards = []
-    ; witness_diagnostics =
-        [ unsupported_witness
-            ctx origin (constructor ^ "/type-witness")
-            (Il.Print.string_of_typ typ)
-            "nested iteration or tuple type witness is not implemented for SubE guard lowering"
-        ]
-    }
+  lower_type_witness_impl ~lower_value ctx env origin constructor typ
 
-and witness_term_of_arg_with_guards ctx env origin constructor arg =
-  match arg.it with
-  | ExpA exp ->
-    (match exp.it with
-    | VarE id ->
-      (match find_var env id.it with
-      | Some binding ->
-        { witness_term = Some binding.term
-        ; witness_guards = []
-        ; witness_diagnostics = []
-        }
-      | None ->
-        { witness_term = None
-        ; witness_guards = []
-        ; witness_diagnostics =
-            [ unsupported_witness
-                ctx origin (constructor ^ "/type-arg/VarE")
-                (Il.Print.string_of_exp exp)
-                ("unbound type witness expression argument `" ^ id.it ^ "`")
-            ]
-        })
-    | NumE n ->
-      (match Xl.Num.to_typ n with
-      | `NatT | `IntT ->
-        { witness_term = Some (Const (maude_numeric_literal n))
-        ; witness_guards = []
-        ; witness_diagnostics = []
-        }
-      | `RatT | `RealT ->
-        { witness_term = None
-        ; witness_guards = []
-        ; witness_diagnostics =
-            [ unsupported_witness
-                ctx origin (constructor ^ "/type-arg/NumE")
-                (Il.Print.string_of_exp exp)
-                "Rat/Real numeric type witness arguments need the primitive wrapper strategy"
-            ]
-        })
-    | BoolE b ->
-      { witness_term = Some (bool_wrapper (Const (string_of_bool b)))
-      ; witness_guards = []
-      ; witness_diagnostics = []
-      }
-    | TextE text ->
-      { witness_term = Some (text_literal text)
-      ; witness_guards = []
-      ; witness_diagnostics = []
-      }
-    | _ ->
-      let result = lower_value ctx env origin exp in
-      (match result.term with
-      | Some term ->
-        { witness_term = Some term
-        ; witness_guards = result.guards
-        ; witness_diagnostics = result.diagnostics
-        }
-      | None ->
-        { witness_term = None
-        ; witness_guards = result.guards
-        ; witness_diagnostics =
-            result.diagnostics
-            @ [ unsupported_witness
-                  ctx origin (constructor ^ "/type-arg")
-                  (Il.Print.string_of_exp exp)
-                  "type witness expression argument could not be lowered with its required guards"
-              ]
-        }))
-  | TypA typ -> witness_of_typ_with_guards ctx env origin constructor typ
-  | DefA id ->
-    { witness_term = None
-    ; witness_guards = []
-    ; witness_diagnostics =
-        [ unsupported_witness
-            ctx origin (constructor ^ "/type-arg/DefA") id.it
-            "definition-valued type witness arguments require monomorphization"
-        ]
-    }
-  | GramA sym ->
-    { witness_term = None
-    ; witness_guards = []
-    ; witness_diagnostics =
-        [ unsupported_witness
-            ctx origin (constructor ^ "/type-arg/GramA")
-            (Il.Print.string_of_sym sym)
-            "grammar-valued type witness arguments require monomorphization"
-        ]
-    }
+and lower_type_witness ctx env origin ~constructor typ =
+  let result =
+    lower_type_witness_impl ~lower_value ctx env origin constructor typ
+  in
+  { term = result.witness_term
+  ; guards = result.witness_guards
+  ; diagnostics = result.witness_diagnostics
+  }
 
 and witness_of_typ_for ctx env origin constructor typ =
   let result = witness_of_typ_with_guards ctx env origin constructor typ in

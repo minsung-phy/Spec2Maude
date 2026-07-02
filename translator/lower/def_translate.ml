@@ -9,6 +9,8 @@ type output =
 
 let empty = { statements = []; diagnostics = [] }
 
+let spectec_type = sort "SpectecType"
+
 let append left right =
   { statements = left.statements @ right.statements
   ; diagnostics = left.diagnostics @ right.diagnostics
@@ -97,6 +99,8 @@ let hintdef_parts hintdef =
   | RelH (id, hints) -> "RelH", id, hints
   | DecH (id, hints) -> "DecH", id, hints
   | GramH (id, hints) -> "GramH", id, hints
+  | RuleH (rel_id, rule_id, hints) ->
+    "RuleH", { rel_id with it = rel_id.it ^ "/" ^ rule_id.it }, hints
 
 let translate_hintdef ctx origin hintdef =
   let hintdef_constructor, target_id, hints = hintdef_parts hintdef in
@@ -145,20 +149,10 @@ let translate_hintdef ctx origin hintdef =
     |> fun diagnostics -> { empty with diagnostics }
 
 type decd_param_lowering =
-  | Runtime_param of sort
-  | Static_typ_param of Analysis.Function_graph.static_typ_binding
+  | Runtime_param of sort * typ
+  | Phantom_typ_param of string
   | Static_def_param of Analysis.Function_graph.static_def_binding
   | Unsupported_param
-
-let unsupported_static_typ_param ctx origin param =
-  unsupported
-    ~ctx ~origin ~constructor:"DecD/param/TypP"
-    ~source_echo:(Il.Print.string_of_param param)
-    ~reason:
-      "compile-time syntax parameter cannot be erased from DecD without collapsing distinct source specializations"
-    ~suggestion:
-      "Implement finite TypP/TypA monomorphization and emit deterministic specialized operators for this DecD"
-    ()
 
 let unsupported_static_param ctx origin param =
   unsupported
@@ -176,22 +170,6 @@ let unsupported_type ctx origin constructor typ =
       ("unsupported DecD carrier type `" ^ Il.Print.string_of_typ typ ^ "`")
     ~suggestion:"Add a source-preserving carrier/witness encoding for this type before lowering the DecD"
     ()
-
-let static_typ_binding_for_param ctx origin param =
-  match param.it with
-  | TypP id ->
-    (match Context.current_specialization ctx with
-    | None -> None, [ unsupported_static_typ_param ctx origin param ]
-    | Some specialization ->
-      (match
-         List.find_opt
-           (fun (binding : Analysis.Function_graph.static_typ_binding) ->
-             binding.param_id = id.it)
-           specialization.static_typs
-       with
-      | Some binding -> Some binding, []
-      | None -> None, [ unsupported_static_typ_param ctx origin param ]))
-  | ExpP _ | DefP _ | GramP _ -> None, []
 
 let static_def_binding_for_param ctx origin param =
   match param.it with
@@ -213,12 +191,9 @@ let decd_param_lowering ctx origin param =
   match param.it with
   | ExpP (_, typ) ->
     (match Expr_translate.carrier_sort_of_typ typ with
-    | Some sort -> Runtime_param sort, []
+    | Some sort -> Runtime_param (sort, typ), []
     | None -> Unsupported_param, [ unsupported_type ctx origin "DecD/param/ExpP" typ ])
-  | TypP _ ->
-    (match static_typ_binding_for_param ctx origin param with
-    | Some binding, diagnostics -> Static_typ_param binding, diagnostics
-    | None, diagnostics -> Unsupported_param, diagnostics)
+  | TypP id -> Phantom_typ_param id.it, []
   | DefP _ ->
     (match static_def_binding_for_param ctx origin param with
     | Some binding, diagnostics -> Static_def_param binding, diagnostics
@@ -239,12 +214,12 @@ let maude_var_of_bind seed index id =
 
 let translate_exp_bind ctx origin seed index env bind =
   match bind.it with
-  | ExpB (id, typ) ->
+  | ExpP (id, typ) ->
     if id.it = "_" then
       env, [], 
       [ unsupported
-          ~ctx ~origin ~constructor:"DecD/DefD/ExpB"
-          ~reason:"wildcard ExpB bind cannot be referenced safely in generated equation scope"
+          ~ctx ~origin ~constructor:"DecD/DefD/ExpP"
+          ~reason:"wildcard ExpP bind cannot be referenced safely in generated equation scope"
           ~suggestion:"Implement anonymous pattern bind handling before lowering this clause"
           ()
       ]
@@ -257,15 +232,15 @@ let translate_exp_bind ctx origin seed index env bind =
         env, [ gen origin (var name (Expr_translate.type_ref_of_sort sort)) ], []
       | None ->
         env, [],
-        [ unsupported_type ctx origin "DecD/DefD/ExpB" typ ])
-  | TypB id ->
-    if Context.find_static_typ ctx id.it <> None then
+        [ unsupported_type ctx origin "DecD/DefD/ExpP" typ ])
+  | TypP id ->
+    if Context.find_static_typ ctx id.it <> None || Context.find_phantom_typ ctx id.it <> None then
       env, [],
       [ skipped
-          ~ctx ~origin ~constructor:"DecD/DefD/bind/TypB"
-          ~source_echo:(Il.Print.string_of_bind bind)
+          ~ctx ~origin ~constructor:"DecD/DefD/bind/TypP"
+          ~source_echo:(Il.Print.string_of_quant bind)
           ~reason:
-            "compile-time syntax binder is already fixed by the current TypP/TypA specialization and has no runtime Maude variable"
+            "compile-time syntax binder is represented by the current static context and has no runtime value variable"
           ~suggestion:
             "Keep the binder origin in diagnostics; do not emit it as a runtime argument"
           ()
@@ -273,20 +248,20 @@ let translate_exp_bind ctx origin seed index env bind =
     else
       env, [],
       [ unsupported
-          ~ctx ~origin ~constructor:"DecD/DefD/bind/TypB"
-          ~source_echo:(Il.Print.string_of_bind bind)
+          ~ctx ~origin ~constructor:"DecD/DefD/bind/TypP"
+          ~source_echo:(Il.Print.string_of_quant bind)
           ~reason:
             "compile-time syntax binder is not bound by the current specialization, so erasing it would collapse source structure"
           ~suggestion:
             "Extend finite monomorphization to introduce this local static binder before lowering the clause"
           ()
       ]
-  | DefB (id, _, _) ->
+  | DefP (id, _, _) ->
     if Context.find_static_def ctx id.it <> None then
       env, [],
       [ skipped
-          ~ctx ~origin ~constructor:"DecD/DefD/bind/DefB"
-          ~source_echo:(Il.Print.string_of_bind bind)
+          ~ctx ~origin ~constructor:"DecD/DefD/bind/DefP"
+          ~source_echo:(Il.Print.string_of_quant bind)
           ~reason:
             "compile-time definition binder is already fixed by the current DefP/DefA specialization and has no runtime Maude variable"
           ~suggestion:
@@ -297,13 +272,13 @@ let translate_exp_bind ctx origin seed index env bind =
       env, [],
       [ unsupported
           ~ctx ~origin ~constructor:"DecD/DefD/static-bind"
-          ~source_echo:(Il.Print.string_of_bind bind)
+          ~source_echo:(Il.Print.string_of_quant bind)
           ~reason:
             "local definition static clause bind is not bound by the current specialization"
           ~suggestion:"Specialize the enclosing DecD before lowering this clause"
           ()
       ]
-  | GramB _ ->
+  | GramP _ ->
     env, [],
     [ unsupported
         ~ctx ~origin ~constructor:"DecD/DefD/static-bind"
@@ -345,41 +320,84 @@ let clause_arg_from_pattern (result : Expr_translate.pattern_result) =
   ; arg_diagnostics = result.pattern_diagnostics
   }
 
+let rec typ_mentions_phantom ctx typ =
+  match typ.it with
+  | VarT (id, args) ->
+    Context.find_phantom_typ ctx id.it <> None
+    || List.exists (arg_mentions_phantom ctx) args
+  | TupT fields -> List.exists (fun (_, typ) -> typ_mentions_phantom ctx typ) fields
+  | IterT (typ, _) -> typ_mentions_phantom ctx typ
+  | BoolT | NumT _ | TextT -> false
+
+and arg_mentions_phantom ctx arg =
+  match arg.it with
+  | TypA typ -> typ_mentions_phantom ctx typ
+  | ExpA _ | DefA _ | GramA _ -> false
+
+let add_phantom_runtime_guards ctx env origin typ sort arg =
+  if not (typ_mentions_phantom ctx typ) then
+    arg
+  else
+    match arg.arg_term with
+    | None -> arg
+    | Some term ->
+      let witness =
+        Expr_translate.lower_type_witness
+          ctx
+          env
+          origin
+          ~constructor:"DecD/DefD/runtime-arg/type-witness"
+          typ
+      in
+      let witness_guards =
+        match witness.term with
+        | Some typ_term ->
+          witness.guards
+          @ Expr_translate.typecheck_conditions_for_typ typ sort term typ_term
+        | None -> witness.guards
+      in
+      { arg with
+        arg_guards = arg.arg_guards @ witness_guards
+      ; arg_diagnostics = arg.arg_diagnostics @ witness.diagnostics
+      }
+
 let clause_arg_none diagnostics =
   { arg_term = None; arg_guards = []; arg_bindings = []; arg_diagnostics = diagnostics }
 
 let translate_clause_arg ctx env origin param arg =
   match param, arg.it with
-  | Runtime_param _, ExpA exp ->
+  | Runtime_param (sort, typ), ExpA exp ->
     let exp_origin =
       child_origin origin "lhs-arg" "Expr" exp.at (Some (Il.Print.string_of_exp exp))
     in
     Expr_translate.lower_pattern_with_bindings ctx env exp_origin exp
     |> clause_arg_from_pattern
+    |> add_phantom_runtime_guards ctx env exp_origin typ sort
   | Runtime_param _, (TypA _ | DefA _ | GramA _) ->
     clause_arg_none
         [ unsupported_clause_arg ctx origin "DecD/DefD/runtime-arg"
             arg
             "runtime DecD parameter position received a static clause argument"
         ]
-  | Static_typ_param expected, TypA typ ->
-    let actual_key =
-      Analysis.Function_graph.typ_static_key_with_env (Context.static_typ_env ctx) typ
+  | Phantom_typ_param _, TypA typ ->
+    let result =
+      Expr_translate.lower_type_witness
+        ctx
+        env
+        origin
+        ~constructor:"DecD/DefD/static-arg/TypA"
+        typ
     in
-    if actual_key = Some expected.key then
-      clause_arg_none []
-    else
-      clause_arg_none
-          [ unsupported_clause_arg ctx origin "DecD/DefD/static-arg/TypA"
-              arg
-              ("static clause argument does not match current specialization key `"
-               ^ expected.key ^ "`")
-          ]
-  | Static_typ_param _, (ExpA _ | DefA _ | GramA _) ->
+    { arg_term = result.term
+    ; arg_guards = result.guards
+    ; arg_bindings = []
+    ; arg_diagnostics = result.diagnostics
+    }
+  | Phantom_typ_param _, (ExpA _ | DefA _ | GramA _) ->
     clause_arg_none
         [ unsupported_clause_arg ctx origin "DecD/DefD/static-arg/TypP"
             arg
-            "TypP parameter position requires a TypA clause argument in this specialization slice"
+            "TypP parameter position requires a TypA clause argument"
         ]
   | Static_def_param expected, DefA actual_id ->
     let resolved_actual_id =
@@ -414,10 +432,46 @@ let runtime_param_count params =
   |> List.fold_left
        (fun count -> function
          | Runtime_param _ -> count + 1
-         | Static_typ_param _ -> count
+         | Phantom_typ_param _ -> count + 1
          | Static_def_param _ -> count
          | Unsupported_param -> count)
        0
+
+let arg_terms results =
+  List.filter_map (fun result -> result.arg_term) results
+
+let arg_guards results =
+  results |> List.map (fun result -> result.arg_guards) |> List.concat
+
+let arg_bindings results =
+  results |> List.map (fun result -> result.arg_bindings) |> List.concat
+
+let arg_diagnostics results =
+  results |> List.map (fun result -> result.arg_diagnostics) |> List.concat
+
+let add_safe_arg_bindings env results =
+  let terms = arg_terms results in
+  let guards = arg_guards results in
+  let lhs_bound_vars =
+    Condition_closure.conditions_bound_vars
+      (terms
+       |> List.map Condition_closure.term_vars
+       |> List.concat
+       |> List.sort_uniq String.compare)
+      guards
+  in
+  arg_bindings results
+  |> List.fold_left
+       (fun env (id, (binding : Expr_translate.binding)) ->
+         let binding_vars = Condition_closure.term_vars binding.term in
+         if
+           Expr_translate.find_var env id = None
+           && Condition_closure.vars_subset binding_vars lhs_bound_vars
+         then
+           Expr_translate.add_var env id binding
+         else
+           env)
+       env
 
 let translate_clause_args ctx env origin params args =
   if List.length params <> List.length args then
@@ -435,35 +489,20 @@ let translate_clause_args ctx env origin params args =
         ()
     ]
   else
-  let results = List.map2 (translate_clause_arg ctx env origin) params args in
-  let terms = List.filter_map (fun result -> result.arg_term) results in
-  let guards = List.concat (List.map (fun result -> result.arg_guards) results) in
-  let bindings = List.concat (List.map (fun result -> result.arg_bindings) results) in
-  let diagnostics =
-    List.concat (List.map (fun result -> result.arg_diagnostics) results)
+  let rec lower_args env results_rev params args =
+    match params, args with
+    | [], [] -> env, List.rev results_rev
+    | param :: params, arg :: args ->
+      let result = translate_clause_arg ctx env origin param arg in
+      let results = List.rev (result :: results_rev) in
+      let env = add_safe_arg_bindings env results in
+      lower_args env (result :: results_rev) params args
+    | [], _ :: _ | _ :: _, [] -> env, List.rev results_rev
   in
-  let lhs_bound_vars =
-    Condition_closure.conditions_bound_vars
-      (terms
-       |> List.map Condition_closure.term_vars
-       |> List.concat
-       |> List.sort_uniq String.compare)
-      guards
-  in
-  let env_after =
-    bindings
-    |> List.fold_left
-         (fun env (id, (binding : Expr_translate.binding)) ->
-           let binding_vars = Condition_closure.term_vars binding.term in
-           if
-             Expr_translate.find_var env id = None
-             && Condition_closure.vars_subset binding_vars lhs_bound_vars
-           then
-             Expr_translate.add_var env id binding
-           else
-             env)
-         env
-  in
+  let env_after, results = lower_args env [] params args in
+  let terms = arg_terms results in
+  let guards = arg_guards results in
+  let diagnostics = arg_diagnostics results in
   if List.length terms = runtime_param_count params then
     Some terms, env_after, guards, diagnostics
   else
@@ -475,18 +514,19 @@ let translate_rhs ctx env origin exp =
   in
   Expr_translate.lower_value ctx env exp_origin exp
 
-let translate_clause_premises ctx env origin lhs_terms lhs_guards prems =
+let translate_clause_premises ctx env origin lhs_terms lhs_guards ~escape_source_ids prems =
   Premise_translate.translate_premises
     ctx
     env
     ~bound_conditions:lhs_guards
+    ~escape_source_ids
     ~bound_terms:lhs_terms
     origin
     prems
 
 let rec premise_has_execution_dependency ctx prem =
   match prem.it with
-  | RulePr (rel_id, _, _) ->
+  | RulePr (rel_id, _, _, _) ->
     (match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
     | Some relation ->
       (match (Relation_shape.of_relation relation).Relation_shape.decision with
@@ -514,6 +554,18 @@ let rewrite_dependent_decd_diagnostic ctx origin id clause =
 
 let clause_seed id index =
   Naming.sanitize id.it ^ "-clause-" ^ string_of_int index
+
+let phantom_typ_var_name id =
+  Naming.maude_var ("typ-" ^ id) ^ ":SpectecType"
+
+let with_phantom_params ctx params =
+  params
+  |> List.fold_left
+       (fun ctx -> function
+         | Phantom_typ_param id ->
+           Context.with_phantom_typ ctx id (phantom_typ_var_name id)
+         | Runtime_param _ | Static_def_param _ | Unsupported_param -> ctx)
+       ctx
 
 let translate_decd_clause ctx dec_origin op_name id params index clause =
   let origin =
@@ -545,6 +597,7 @@ let translate_decd_clause ctx dec_origin op_name id params index clause =
         origin
         (Option.value ~default:[] lhs_terms_opt)
         lhs_guards
+        ~escape_source_ids:(Premise_capture.source_and_note_free_var_ids rhs)
         prems
     in
     let rhs_result = translate_rhs ctx premise_result.env_after origin rhs in
@@ -586,6 +639,7 @@ let translate_decd_with_op ctx origin op_name id params result_typ clauses =
     |> List.map (decd_param_lowering ctx origin)
     |> List.split
   in
+  let ctx = with_phantom_params ctx param_lowerings in
   let result_sort_opt, result_diags = decd_result_sort ctx origin result_typ in
   let diagnostics = List.concat param_diags @ result_diags in
   if has_fatal diagnostics then
@@ -599,8 +653,8 @@ let translate_decd_with_op ctx origin op_name id params result_typ clauses =
           (op op_name
              (param_lowerings
               |> List.filter_map (function
-                | Runtime_param sort -> Some sort
-                | Static_typ_param _ -> None
+                | Runtime_param (sort, _) -> Some sort
+                | Phantom_typ_param _ -> Some spectec_type
                 | Static_def_param _ -> None
                 | Unsupported_param -> None)
               |> List.map sort_ref)
@@ -627,12 +681,12 @@ let skipped_static_template_without_instances ctx origin id =
     ()
 
 let translate_decd ctx origin id params result_typ clauses =
-  let has_static_param =
+  let has_static_def_param =
     params
     |> List.exists (fun param ->
       match param.it with
-      | TypP _ | DefP _ -> true
-      | ExpP _ | GramP _ -> false)
+      | DefP _ -> true
+      | ExpP _ | TypP _ | GramP _ -> false)
   in
   let has_unsupported_static_param =
     params
@@ -650,7 +704,7 @@ let translate_decd ctx origin id params result_typ clauses =
         | ExpP _ | TypP _ | DefP _ -> None)
     in
     { empty with diagnostics }
-  else if has_static_param then
+  else if has_static_def_param then
     let specializations =
       Analysis.Function_graph.specializations_for (Context.function_graph ctx) id.it
     in
@@ -677,9 +731,9 @@ let rec translate_def ctx path ordinal def =
   | DecD (id, params, result_typ, clauses) ->
     let ctx = Context.with_def ctx id.it in
     translate_decd ctx origin id params result_typ clauses
-  | RelD (id, mixop, result_typ, rules) ->
+  | RelD (id, params, mixop, result_typ, rules) ->
     let ctx = Context.with_def ctx id.it in
-    let translated = Reld_translate.translate ctx origin id mixop result_typ rules in
+    let translated = Reld_translate.translate ctx origin id params mixop result_typ rules in
     { statements = translated.statements; diagnostics = translated.diagnostics }
   | GramD (id, _, _, _) ->
     let ctx = Context.with_def ctx id.it in

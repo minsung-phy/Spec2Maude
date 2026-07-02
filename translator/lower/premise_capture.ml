@@ -1,26 +1,61 @@
+open Il.Ast
 open Maude_ir
+open Util.Source
 
-let source_free_var_ids exp =
-  Il.Free.(free_exp exp).varid
-  |> Il.Free.Set.to_seq
-  |> List.of_seq
-  |> List.sort_uniq String.compare
-
-let type_note_free_var_ids typ =
-  Il.Free.(free_typ typ).varid
-  |> Il.Free.Set.to_seq
-  |> List.of_seq
-  |> List.sort_uniq String.compare
-
-let source_and_note_free_var_ids exp =
-  source_free_var_ids exp @ type_note_free_var_ids exp.note
-  |> List.sort_uniq String.compare
+let source_and_note_free_var_ids = Expr_support.source_and_note_free_var_ids
 
 let prem_free_var_ids prem =
   Il.Free.(free_prem prem).varid
   |> Il.Free.Set.to_seq
   |> List.of_seq
   |> List.sort_uniq String.compare
+
+let iter_source_and_note_free_var_ids = function
+  | ListN (count_exp, _) -> source_and_note_free_var_ids count_exp
+  | Opt | List | List1 -> []
+
+let rec arg_source_and_note_free_var_ids arg =
+  match arg.it with
+  | ExpA exp -> source_and_note_free_var_ids exp
+  | TypA typ -> typ_source_and_note_free_var_ids typ
+  | DefA _ | GramA _ -> []
+
+and typ_source_and_note_free_var_ids typ =
+  match typ.it with
+  | VarT (_id, args) -> List.concat_map arg_source_and_note_free_var_ids args
+  | TupT components ->
+    components
+    |> List.concat_map (fun (_id, typ) -> typ_source_and_note_free_var_ids typ)
+  | IterT (typ, ListN (count_exp, index)) ->
+    let ids =
+      typ_source_and_note_free_var_ids typ
+      @ source_and_note_free_var_ids count_exp
+    in
+    (match index with
+    | None -> ids
+    | Some id -> id.it :: ids)
+  | IterT (typ, _) -> typ_source_and_note_free_var_ids typ
+  | BoolT | NumT _ | TextT -> []
+
+let rec prem_source_and_note_free_var_ids prem =
+  let ids =
+    match prem.it with
+    | RulePr (_, args, _, exp) ->
+      source_and_note_free_var_ids exp
+      @ List.concat_map arg_source_and_note_free_var_ids args
+    | IfPr exp -> source_and_note_free_var_ids exp
+    | LetPr (_quants, left, right) ->
+      source_and_note_free_var_ids left @ source_and_note_free_var_ids right
+    | ElsePr -> []
+    | IterPr (body, (iter, generators)) ->
+      prem_source_and_note_free_var_ids body
+      @ iter_source_and_note_free_var_ids iter
+      @ (generators
+         |> List.concat_map (fun (_id, source_exp) ->
+           source_and_note_free_var_ids source_exp))
+    | NegPr body -> prem_source_and_note_free_var_ids body
+  in
+  ids |> List.sort_uniq String.compare
 
 let short_source_stem source =
   let words =

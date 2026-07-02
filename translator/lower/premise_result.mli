@@ -5,6 +5,9 @@ type result =
   ; let_bound_ids : string list list
   ; env_after : Expr_translate.env
   ; bound_vars_after : string list
+  ; blocked_witness_source_ids : string list
+  ; runtime_search_requests : Runtime_search_helper.request list
+  ; runtime_truth_search_requests : Runtime_truth_search_helper.request list
   ; diagnostics : Diagnostics.t list
   }
 

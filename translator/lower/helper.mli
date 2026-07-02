@@ -161,6 +161,23 @@ type iter_premise_list_bool =
   ; body_eq_conditions : Maude_ir.eq_condition list
   }
 
+type iter_premise_exists_bool_shape =
+  { prem_source : string
+  ; indexed_source : string
+  ; source_typ_source : string
+  ; predicate_source : string
+  }
+
+type iter_premise_exists_bool =
+  { source_shape : iter_premise_exists_bool_shape
+  ; index_source_id : string
+  ; helper_head_var : string
+  ; source_tail_var : string
+  ; source_element_sort : Maude_ir.sort
+  ; captures : capture list
+  ; body_eq_conditions : Maude_ir.eq_condition list
+  }
+
 type iter_premise_zip_bool_shape =
   { prem_source : string
   ; body_source : string
@@ -227,6 +244,16 @@ type inverse_concatn_chunks =
   ; chunk_var : string
   }
 
+type optional_map_inverse =
+  { source_shape : iter_map_source_shape
+  ; generator_var : string
+  ; helper_head_var : string
+  ; source_element_sort : Maude_ir.sort
+  ; captures : capture list
+  ; lowered_body : Maude_ir.term
+  ; body_eq_conditions : Maude_ir.eq_condition list
+  }
+
 type request_kind =
   | Iter_map of iter_map
   | Iter_zip_map of iter_zip_map
@@ -234,10 +261,12 @@ type request_kind =
   | Iter_listn_source of iter_listn_source
   | Iter_premise_opt_bool of iter_premise_opt_bool
   | Iter_premise_list_bool of iter_premise_list_bool
+  | Iter_premise_exists_bool of iter_premise_exists_bool
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_pattern_zip of iter_pattern_zip
   | Inverse_pair_split of inverse_pair_split
   | Inverse_concatn_chunks of inverse_concatn_chunks
+  | Optional_map_inverse of optional_map_inverse
   | Optional_branch of { shape : string }
   | List1_guard of { shape : string }
   | Listn_indexed of { shape : string }
@@ -245,6 +274,10 @@ type request_kind =
   | Sequence_splice of { shape : string }
   | Enabledness_complement of { shape : string }
   | Rewrite_dependent of { shape : string }
+  | Runtime_predicate_search of Runtime_search_helper.request
+  | Runtime_predicate_truth_search of Runtime_truth_search_helper.request
+  | Runtime_predicate_truth_decision of Runtime_truth_decision_helper.request
+  | Runtime_enabledness of Runtime_enabledness_helper.request
 
 type request =
   { kind : request_kind
@@ -257,6 +290,14 @@ type t
 val create : unit -> t
 val request : t -> request -> string
 val requests : t -> request list
+val runtime_predicate_search_requests :
+  t -> (string * Origin.t * Runtime_search_helper.request) list
+val runtime_predicate_truth_search_requests :
+  t -> (string * Origin.t * Runtime_truth_search_helper.request) list
+val runtime_predicate_truth_decision_requests :
+  t -> (string * Origin.t * Runtime_truth_decision_helper.request) list
+val runtime_enabledness_requests :
+  t -> (string * Origin.t * Runtime_enabledness_helper.request) list
 val key_of_kind : request_kind -> string
 val pair_split_result_op : string -> string
 val pair_split_unzip_op : string -> string

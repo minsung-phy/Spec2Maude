@@ -87,7 +87,7 @@ let source_mixop mixop =
     |> List.map atom_slug
     |> String.concat "."
   in
-  match List.map segment mixop with
+  match Xl.Mixop.flatten mixop |> List.map segment with
   | [] -> "unnamed"
   | [ "" ] -> "unnamed"
   | [ segment ] -> segment
@@ -98,7 +98,7 @@ let source_mixop_projection_label mixop =
     source_atom_slug (Xl.Atom.to_string atom)
   in
   let atoms =
-    mixop
+    Xl.Mixop.flatten mixop
     |> List.concat
     |> List.map atom_slug
   in

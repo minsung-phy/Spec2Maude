@@ -27,6 +27,7 @@ type decision =
 type t =
   { marker : Analysis.Relation_graph.relation_kind
   ; marker_text : string
+  ; params : param list
   ; mixop : mixop option
   ; result : typ
   ; components : component list
@@ -37,7 +38,9 @@ let components_of_typ typ =
   match typ.it with
   | TupT components ->
     List.map
-      (fun (payload, typ) -> { payload = Some payload; typ })
+      (fun (id, typ) ->
+        let payload = VarE id $$ id.at % typ in
+        { payload = Some payload; typ })
       components
   | _ -> [ { payload = None; typ } ]
 
@@ -96,10 +99,11 @@ let decide marker _result components =
     Unknown
       "relation marker is not classified as validation, deterministic, or execution"
 
-let make ?mixop marker result =
+let make ?(params = []) ?mixop marker result =
   let components = components_of_typ result in
   { marker
   ; marker_text = Analysis.Relation_graph.string_of_relation_kind marker
+  ; params
   ; mixop
   ; result
   ; components
@@ -110,11 +114,11 @@ let of_kind marker result =
   make marker result
 
 let of_relation (relation : Analysis.Function_graph.relation) =
-  make ~mixop:relation.mixop relation.kind relation.result
+  make ~params:relation.source_params ~mixop:relation.mixop relation.kind relation.result
 
-let of_reld mixop result =
+let of_reld params mixop result =
   Analysis.Relation_graph.classify_mixop mixop
-  |> fun marker -> make ~mixop marker result
+  |> fun marker -> make ~params ~mixop marker result
 
 let decision_name = function
   | Static_validation _ -> "static-validation"

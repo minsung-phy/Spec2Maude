@@ -5,6 +5,9 @@ type result =
   ; let_bound_ids : string list list
   ; env_after : Expr_translate.env
   ; bound_vars_after : string list
+  ; blocked_witness_source_ids : string list
+  ; runtime_search_requests : Runtime_search_helper.request list
+  ; runtime_truth_search_requests : Runtime_truth_search_helper.request list
   ; diagnostics : Diagnostics.t list
   }
 
@@ -18,6 +21,9 @@ let empty_with_env ?(bound_vars = []) env =
   ; let_bound_ids = []
   ; env_after = env
   ; bound_vars_after = normalize_vars bound_vars
+  ; blocked_witness_source_ids = []
+  ; runtime_search_requests = []
+  ; runtime_truth_search_requests = []
   ; diagnostics = []
   }
 
@@ -30,5 +36,12 @@ let append left right =
   ; let_bound_ids = left.let_bound_ids @ right.let_bound_ids
   ; env_after = right.env_after
   ; bound_vars_after = right.bound_vars_after
+  ; blocked_witness_source_ids =
+      normalize_vars
+        (left.blocked_witness_source_ids @ right.blocked_witness_source_ids)
+  ; runtime_search_requests =
+      left.runtime_search_requests @ right.runtime_search_requests
+  ; runtime_truth_search_requests =
+      left.runtime_truth_search_requests @ right.runtime_truth_search_requests
   ; diagnostics = left.diagnostics @ right.diagnostics
   }

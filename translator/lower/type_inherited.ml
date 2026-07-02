@@ -15,7 +15,7 @@ let region_contains outer inner =
   && pos_leq inner.right outer.right
 
 let mixop_atom_regions mixop =
-  mixop
+  Xl.Mixop.flatten mixop
   |> List.concat
   |> List.map (fun atom -> atom.at)
 
@@ -30,7 +30,7 @@ let atom_text_has_word_char text =
   loop 0
 
 let mixop_has_source_word mixop =
-  mixop
+  Xl.Mixop.flatten mixop
   |> List.concat
   |> List.exists (fun atom -> atom_text_has_word_char (Xl.Atom.to_string atom))
 
@@ -46,7 +46,7 @@ let mixop_is_native_to_region mixop region =
   | atom_regions ->
     List.for_all (region_contains region) atom_regions
 
-let typcase_is_inherited_from_other_region (mixop, (_binds, typ, _prems), _hints) =
+let typcase_is_inherited_from_other_region (mixop, (typ, _quants, _prems), _hints) =
   match mixop_atom_regions mixop with
   | [] -> false
   | _ -> not (mixop_is_native_to_region mixop typ.at)
@@ -57,7 +57,7 @@ type typcase_signature =
   ; signature_atom_regions : region list
   }
 
-let signature_of_typcase (mixop, (_binds, typ, _prems), _hints) =
+let signature_of_typcase (mixop, (typ, _quants, _prems), _hints) =
   { signature_mixop = mixop
   ; signature_arity = List.length (typ_components typ)
   ; signature_atom_regions = mixop_atom_regions mixop
@@ -82,7 +82,7 @@ let native_variant_case_signatures ctx target_id =
             (match deftyp.it with
             | VariantT cases ->
               cases
-              |> List.filter (fun (mixop, (_binds, typ, _prems), _hints) ->
+              |> List.filter (fun (mixop, (typ, _quants, _prems), _hints) ->
                 mixop_is_native_to_region mixop typ.at)
               |> List.map signature_of_typcase
               |> Option.some
@@ -185,4 +185,3 @@ let unsupported_incomplete_inherited_group ctx parent_origin target_id group =
           "Recover the original source union alternative before lowering this partial inherited case group"
         ()
     ]
-

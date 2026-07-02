@@ -498,13 +498,29 @@ let source_free_var_ids exp =
   |> List.of_seq
   |> List.sort_uniq String.compare
 
-let type_note_free_var_ids typ =
+let rec type_note_free_var_ids typ =
+  let child_ids =
+    match typ.it with
+    | VarT (_id, args) -> args |> List.concat_map arg_note_free_var_ids
+    | BoolT | NumT _ | TextT -> []
+    | TupT fields ->
+      fields
+      |> List.concat_map (fun (id, typ) ->
+        id.it :: type_note_free_var_ids typ)
+    | IterT (inner_typ, iter) ->
+      type_note_free_var_ids inner_typ @ iter_note_free_var_ids iter
+  in
   Il.Free.(free_typ typ).varid
   |> Il.Free.Set.to_seq
   |> List.of_seq
+  |> fun ids -> ids @ child_ids
   |> List.sort_uniq String.compare
 
-let rec expression_note_free_var_ids exp =
+and iter_note_free_var_ids = function
+  | ListN (count_exp, _) -> expression_note_free_var_ids count_exp
+  | Opt | List | List1 -> []
+
+and expression_note_free_var_ids exp =
   let child_ids =
     match exp.it with
     | VarE _ | BoolE _ | NumE _ | TextE _ -> []

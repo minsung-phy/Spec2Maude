@@ -25,6 +25,109 @@ let dedup_var_declarations statements =
   in
   List.rev statements
 
+type runtime_materialization =
+  { statements : Maude_ir.generated list
+  ; diagnostics : Diagnostics.t list
+  }
+
+let runtime_search_item_id name = "search:" ^ name
+let runtime_truth_search_item_id name = "truth:" ^ name
+let runtime_truth_decision_item_id name = "truth-decision:" ^ name
+let runtime_enabledness_item_id name = "enabledness:" ^ name
+
+let pending_runtime_search_items ctx processed =
+  Context.helpers ctx
+  |> Helper.runtime_predicate_search_requests
+  |> List.filter_map (fun (name, origin, request) ->
+    let id = runtime_search_item_id name in
+    if List.mem id processed then
+      None
+    else
+      Some (id, { Runtime_search_materializer.name; origin; request }))
+
+let pending_runtime_truth_search_items ctx processed =
+  Context.helpers ctx
+  |> Helper.runtime_predicate_truth_search_requests
+  |> List.filter_map (fun (name, origin, request) ->
+    let id = runtime_truth_search_item_id name in
+    if List.mem id processed then
+      None
+    else
+      Some (id, { Runtime_truth_search_materializer.name; origin; request }))
+
+let pending_runtime_truth_decision_items ctx processed =
+  Context.helpers ctx
+  |> Helper.runtime_predicate_truth_decision_requests
+  |> List.filter_map (fun (name, origin, request) ->
+    let id = runtime_truth_decision_item_id name in
+    if List.mem id processed then
+      None
+    else
+      Some (id, { Runtime_truth_decision_materializer.name; origin; request }))
+
+let pending_runtime_enabledness_items ctx processed =
+  Context.helpers ctx
+  |> Helper.runtime_enabledness_requests
+  |> List.filter_map (fun (name, origin, request) ->
+    let id = runtime_enabledness_item_id name in
+    if List.mem id processed then
+      None
+    else
+      Some (id, { Runtime_enabledness_materializer.name; origin; request }))
+
+let materialize_runtime_helpers ctx =
+  let rec loop fuel processed statements diagnostics =
+    let search_items = pending_runtime_search_items ctx processed in
+    let truth_items = pending_runtime_truth_search_items ctx processed in
+    let truth_decision_items =
+      pending_runtime_truth_decision_items ctx processed
+    in
+    let enabledness_items = pending_runtime_enabledness_items ctx processed in
+    match search_items, truth_items, truth_decision_items, enabledness_items with
+    | [], [], [], [] -> { statements; diagnostics }
+    | _ when fuel = 0 -> { statements; diagnostics }
+    | _ ->
+      let processed =
+        List.map fst search_items
+        @ List.map fst truth_items
+        @ List.map fst truth_decision_items
+        @ List.map fst enabledness_items
+        @ processed
+      in
+      let search_materialization =
+        search_items
+        |> List.map snd
+        |> Runtime_search_materializer.materialize ctx
+      in
+      let truth_materialization =
+        truth_items
+        |> List.map snd
+        |> Runtime_truth_search_materializer.materialize ctx
+      in
+      let truth_decision_materialization =
+        truth_decision_items
+        |> List.map snd
+        |> Runtime_truth_decision_materializer.materialize ctx
+      in
+      let enabledness_materialization =
+        enabledness_items
+        |> List.map snd
+        |> Runtime_enabledness_materializer.materialize ctx
+      in
+      loop
+        (fuel - 1)
+        processed
+        (statements @ search_materialization.statements
+         @ truth_materialization.statements
+         @ truth_decision_materialization.statements
+         @ enabledness_materialization.statements)
+        (diagnostics @ search_materialization.diagnostics
+         @ truth_materialization.diagnostics
+         @ truth_decision_materialization.diagnostics
+         @ enabledness_materialization.diagnostics)
+  in
+  loop 32 [] [] []
+
 let category_slug_collision_diagnostics ctx source_index =
   let seen = Hashtbl.create 127 in
   Analysis.Source_index.entries source_index
@@ -67,14 +170,17 @@ let translate ?(profile = Context.Runtime_after_external_validation) script =
     category_slug_collision_diagnostics ctx source_index
   in
   let translated = Def_translate.translate_script ctx script in
+  let runtime_materialization = materialize_runtime_helpers ctx in
   let helper_statements = Helper.materialize (Context.helpers ctx) in
   let helper_diagnostics =
-    Helper.unmaterialized_diagnostics
+    runtime_materialization.diagnostics
+    @ Helper.unmaterialized_diagnostics
       ~profile:(Context.profile_name ctx)
       (Context.helpers ctx)
   in
   let statements =
     Prelude.statements @ translated.statements @ helper_statements
+    @ runtime_materialization.statements
     |> dedup_var_declarations
   in
   let module_ =
@@ -119,5 +225,5 @@ let emit_builtins ?output_load result =
 let emit_builtin_report result =
   Builtin_registry.render_markdown result.builtin_registry
 
-let has_fatal_diagnostics result =
+let has_fatal_diagnostics (result : result) =
   List.exists Diagnostics.is_fatal result.diagnostics

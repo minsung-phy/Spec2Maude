@@ -24,6 +24,7 @@ type decision =
 type t =
   { marker : Analysis.Relation_graph.relation_kind
   ; marker_text : string
+  ; params : Il.Ast.param list
   ; mixop : Il.Ast.mixop option
   ; result : Il.Ast.typ
   ; components : component list
@@ -32,6 +33,6 @@ type t =
 
 val of_kind : Analysis.Relation_graph.relation_kind -> Il.Ast.typ -> t
 val of_relation : Analysis.Function_graph.relation -> t
-val of_reld : Il.Ast.mixop -> Il.Ast.typ -> t
+val of_reld : Il.Ast.param list -> Il.Ast.mixop -> Il.Ast.typ -> t
 val component_typs : component list -> Il.Ast.typ list
 val decision_name : decision -> string
