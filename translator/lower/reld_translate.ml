@@ -225,6 +225,28 @@ let component_sorts ctx origin constructor typs =
   else
     None, diagnostics
 
+let sequence_of_terms = function
+  | [] -> Const "eps"
+  | term :: terms ->
+    List.fold_left (fun acc term -> app "_ _" [ acc; term ]) term terms
+
+let is_sequence_sort sort =
+  sort_name sort = "SpectecTerminals"
+
+let tuple_item sort term =
+  if is_sequence_sort sort then app "seq" [ term ] else term
+
+let tuple_carrier sorts terms =
+  match sorts, terms with
+  | [ _ ], [ term ] -> term
+  | _ ->
+    let items = List.map2 tuple_item sorts terms in
+    app "tuple" [ sequence_of_terms items ]
+
+let execution_output_sort = function
+  | [ sort ] -> sort
+  | _ -> sort "SpectecTerminal"
+
 let relation_conf_sort id =
   let relation_slug = Naming.relation_op id in
   let suffix =
@@ -248,17 +270,17 @@ let frozen_all count =
 
 let lower_exp_bind ctx origin seed index env bind =
   match bind.it with
-  | ExpB (id, typ) ->
+  | ExpP (id, typ) ->
     if id.it = "_" then
       env,
       [],
       [ unsupported
           ~ctx
           ~origin
-          ~constructor:"RelD/RuleD/ExpB"
-          ~source_echo:(Il.Print.string_of_bind bind)
+          ~constructor:"RelD/RuleD/ExpP"
+          ~source_echo:(Il.Print.string_of_quant bind)
           ~reason:
-            "wildcard ExpB bind cannot be referenced safely in generated relation rule scope"
+            "wildcard ExpP bind cannot be referenced safely in generated relation rule scope"
           ~suggestion:
             "Implement anonymous pattern bind handling before lowering this RuleD"
           ()
@@ -271,16 +293,16 @@ let lower_exp_bind ctx origin seed index env bind =
         let env = Expr_translate.add_var env id.it binding in
         env, [ gen origin (var name (Expr_translate.type_ref_of_sort sort)) ], []
       | None ->
-        env, [], [ unsupported_type ctx origin "RelD/RuleD/ExpB" typ ])
-  | TypB id ->
+        env, [], [ unsupported_type ctx origin "RelD/RuleD/ExpP" typ ])
+  | TypP id ->
     if Context.find_static_typ ctx id.it <> None then
       env,
       [],
       [ skipped
           ~ctx
           ~origin
-          ~constructor:"RelD/RuleD/bind/TypB"
-          ~source_echo:(Il.Print.string_of_bind bind)
+          ~constructor:"RelD/RuleD/bind/TypP"
+          ~source_echo:(Il.Print.string_of_quant bind)
           ~reason:
             "compile-time syntax binder is already fixed by the current specialization and has no runtime Maude variable"
           ~suggestion:
@@ -293,22 +315,22 @@ let lower_exp_bind ctx origin seed index env bind =
       [ unsupported
           ~ctx
           ~origin
-          ~constructor:"RelD/RuleD/bind/TypB"
-          ~source_echo:(Il.Print.string_of_bind bind)
+          ~constructor:"RelD/RuleD/bind/TypP"
+          ~source_echo:(Il.Print.string_of_quant bind)
           ~reason:
             "compile-time syntax binder is not bound by the current specialization, so erasing it would collapse source structure"
           ~suggestion:
             "Extend finite monomorphization to introduce this local static binder before lowering the RuleD"
           ()
       ]
-  | DefB _ | GramB _ ->
+  | DefP _ | GramP _ ->
     env,
     [],
     [ unsupported
         ~ctx
         ~origin
         ~constructor:"RelD/RuleD/static-bind"
-        ~source_echo:(Il.Print.string_of_bind bind)
+        ~source_echo:(Il.Print.string_of_quant bind)
         ~reason:
           "definition/grammar static RuleD binds require monomorphization and are outside this relation lowering slice"
         ~suggestion:
@@ -472,6 +494,17 @@ let append_execution_premise_result left right =
       left.Premise_translate.let_bound_ids @ right.Premise_translate.let_bound_ids
   ; env_after = right.Premise_translate.env_after
   ; bound_vars_after = right.Premise_translate.bound_vars_after
+  ; blocked_witness_source_ids =
+      List.sort_uniq
+        String.compare
+        (left.Premise_translate.blocked_witness_source_ids
+         @ right.Premise_translate.blocked_witness_source_ids)
+  ; runtime_search_requests =
+      left.Premise_translate.runtime_search_requests
+      @ right.Premise_translate.runtime_search_requests
+  ; runtime_truth_search_requests =
+      left.Premise_translate.runtime_truth_search_requests
+      @ right.Premise_translate.runtime_truth_search_requests
   ; diagnostics = left.Premise_translate.diagnostics @ right.Premise_translate.diagnostics
   }
 
@@ -493,6 +526,56 @@ let unsupported_rule_prem ctx env ~bound_vars origin prem constructor reason =
             ()
         ]
   }
+
+let rule_hint_diagnostics ctx origin relation_id rule_id =
+  match
+    Analysis.Function_graph.rule_hints
+      (Context.function_graph ctx)
+      ~relation_id
+      ~rule_id:rule_id.it
+  with
+  | None -> []
+  | Some rule_hint ->
+    rule_hint.hints
+    |> List.map (fun hint ->
+      let constructor = "RuleD/RuleH/hint(" ^ hint.hintid.it ^ ")" in
+      let source_echo =
+        Some
+          ("RuleH "
+           ^ relation_id
+           ^ "/"
+           ^ rule_id.it
+           ^ " hint("
+           ^ hint.hintid.it
+           ^ ")")
+      in
+      match Analysis.Hint_policy.classify hint with
+      | Analysis.Hint_policy.Presentation ->
+        skipped
+          ~ctx
+          ~origin
+          ~constructor
+          ?source_echo
+          ~reason:
+            "rule-local presentation hint is preserved as metadata and does not affect Maude lowering"
+          ~suggestion:
+            "Keep the RuleH attached to the source rule; no Maude semantic fragment is required for presentation hints"
+          ()
+      | Analysis.Hint_policy.Semantic_obligation
+      | Analysis.Hint_policy.Translator_annotation
+      | Analysis.Hint_policy.Unknown ->
+        unsupported
+          ~ctx
+          ~origin
+          ~constructor
+          ?source_echo
+          ~reason:
+            ("rule-local hint `"
+             ^ hint.hintid.it
+             ^ "` is not consumed by this RuleD lowering path")
+          ~suggestion:
+            "Add a source-shaped RuleH policy before emitting Maude for rules carrying semantic or unknown rule-local hints"
+          ())
 
 let lower_execution_rule_premise ctx env ~bound_vars origin prem rel_id exp =
   match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
@@ -533,11 +616,20 @@ let lower_execution_rule_premise ctx env ~bound_vars origin prem rel_id exp =
         let input_terms_opt, input_guards, input_diags =
           lower_value_components ctx env origin "rewrite-input" input_exps
         in
+        let output_sorts_opt, output_sort_diags =
+          component_sorts
+            ctx
+            origin
+            "Premise/RulePr/execution/output"
+            output_typs
+        in
         let output_pattern_opt, output_guards, introduced, output_diags =
           lower_pattern_components ctx env origin output_exps
         in
-        (match input_terms_opt, output_pattern_opt with
-        | Some input_terms, Some [ output_pattern ] ->
+        (match input_terms_opt, output_pattern_opt, output_sorts_opt with
+        | Some input_terms, Some output_patterns, Some output_sorts
+          when List.length output_patterns = List.length output_sorts ->
+          let output_pattern = tuple_carrier output_sorts output_patterns in
           let lhs = relation_call (Naming.relation_op rel_id) input_terms in
           let rewrite_condition = RewriteCond (lhs, output_pattern) in
           let rule_conditions =
@@ -556,14 +648,15 @@ let lower_execution_rule_premise ctx env ~bound_vars origin prem rel_id exp =
           ; rule_conditions
           ; env_after
           ; bound_vars_after
-          ; diagnostics = arity_diags @ input_diags @ output_diags
+          ; diagnostics =
+              arity_diags @ input_diags @ output_sort_diags @ output_diags
           }
         | _ ->
           { (Premise_translate.empty) with
             env_after = env
           ; bound_vars_after = bound_vars
           ; diagnostics =
-              arity_diags @ input_diags @ output_diags
+              arity_diags @ input_diags @ output_sort_diags @ output_diags
               @ [ unsupported
                     ~ctx
                     ~origin
@@ -592,10 +685,40 @@ let prem_origin parent prem =
     ~ast_constructor:"Premise"
     prem.at
 
-let translate_execution_premise ctx env ~bound_vars ~future_prems origin prem =
+let translate_execution_premise
+    ctx
+    env
+    ~bound_vars
+    ~blocked_witness_source_ids
+    ~future_prems
+    ~escape_source_ids
+    origin
+  prem =
   let origin = prem_origin origin prem in
   match prem.it with
-  | RulePr (rel_id, mixop, exp) ->
+  | RulePr (rel_id, args, mixop, exp) ->
+    if args <> [] then
+      { Premise_translate.empty with
+        env_after = env
+      ; bound_vars_after = bound_vars
+      ; diagnostics =
+          [ unsupported
+              ~ctx
+              ~origin
+              ~constructor:"RelD/RulePr/args"
+              ~source_echo:(Il.Print.string_of_prem prem)
+              ~reason:
+                ("execution premise `"
+                 ^ rel_id.it
+                 ^ "` carries explicit RulePr arguments `"
+                 ^ Il.Print.string_of_args args
+                 ^ "`, but relation-argument instantiation is not lowered yet")
+              ~suggestion:
+                "Preserve the RulePr args in analysis and add source-shaped argument instantiation before emitting Maude for this execution premise"
+              ()
+          ]
+      }
+    else
     (match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
     | Some relation ->
       let marker_diags =
@@ -619,17 +742,72 @@ let translate_execution_premise ctx env ~bound_vars ~future_prems origin prem =
       | Relation_shape.Execution _ ->
         lower_execution_rule_premise ctx env ~bound_vars origin prem rel_id exp
       | Relation_shape.Deterministic_candidate _ ->
-        Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
+        Premise_translate.translate_premise
+          ~allow_runtime_search:true
+          ~future_prems
+          ~escape_source_ids
+          ~blocked_witness_source_ids
+          ctx
+          env
+          ~bound_vars
+          origin
+          prem
       | Relation_shape.Static_validation _ ->
-        Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
+        Premise_translate.translate_premise
+          ~allow_runtime_search:true
+          ~future_prems
+          ~escape_source_ids
+          ~blocked_witness_source_ids
+          ctx
+          env
+          ~bound_vars
+          origin
+          prem
       | Relation_shape.Runtime_predicate _ | Relation_shape.Unknown _ ->
-        Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem)
-    | None -> Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem)
+        Premise_translate.translate_premise
+          ~allow_runtime_search:true
+          ~future_prems
+          ~escape_source_ids
+          ~blocked_witness_source_ids
+          ctx
+          env
+          ~bound_vars
+          origin
+          prem)
+    | None ->
+      Premise_translate.translate_premise
+        ~allow_runtime_search:true
+        ~future_prems
+        ~escape_source_ids
+        ~blocked_witness_source_ids
+        ctx
+        env
+        ~bound_vars
+        origin
+        prem)
   | IfPr _ | LetPr _ ->
-    Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
+    Premise_translate.translate_premise
+      ~allow_runtime_search:true
+      ~future_prems
+      ~escape_source_ids
+      ~blocked_witness_source_ids
+      ctx
+      env
+      ~bound_vars
+      origin
+      prem
   | ElsePr ->
     let result =
-      Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
+      Premise_translate.translate_premise
+        ~allow_runtime_search:true
+        ~future_prems
+        ~escape_source_ids
+        ~blocked_witness_source_ids
+        ctx
+        env
+        ~bound_vars
+        origin
+        prem
     in
     { result with
       diagnostics =
@@ -647,10 +825,19 @@ let translate_execution_premise ctx env ~bound_vars ~future_prems origin prem =
           ]
     }
   | IterPr _ | NegPr _ ->
-    Premise_translate.translate_premise ~future_prems ctx env ~bound_vars origin prem
+    Premise_translate.translate_premise
+      ~allow_runtime_search:true
+      ~future_prems
+      ~escape_source_ids
+      ~blocked_witness_source_ids
+      ctx
+      env
+      ~bound_vars
+      origin
+      prem
 
 let translate_execution_premises
-    ctx env ?(bound_conditions = []) ~bound_terms origin prems =
+    ctx env ?(bound_conditions = []) ?(escape_source_ids = []) ~bound_terms origin prems =
   let bound_vars =
     bound_terms
     |> List.map Condition_closure.term_vars
@@ -666,7 +853,9 @@ let translate_execution_premises
           ctx
           acc.Premise_translate.env_after
           ~bound_vars:acc.Premise_translate.bound_vars_after
+          ~blocked_witness_source_ids:acc.Premise_translate.blocked_witness_source_ids
           ~future_prems
+          ~escape_source_ids
           origin
           prem
       in
@@ -687,15 +876,20 @@ let translate_execution_premises
         result.Premise_translate.bound_vars_after
   }
 
-let rec term_skeleton = function
-  | Var _ -> "?"
-  | Const name -> "c:" ^ name
-  | Qid name -> "q:" ^ name
-  | App (name, args) ->
-    "a:" ^ name ^ "(" ^ String.concat "," (List.map term_skeleton args) ^ ")"
+let rec term_matches_general general specific =
+  match general, specific with
+  | Var _, _ -> true
+  | Const left, Const right -> left = right
+  | Qid left, Qid right -> left = right
+  | App (left_name, left_args), App (right_name, right_args) ->
+    left_name = right_name
+    && List.length left_args = List.length right_args
+    && List.for_all2 term_matches_general left_args right_args
+  | _ -> false
 
-let term_skeletons terms =
-  List.map term_skeleton terms
+let terms_match_general general specific =
+  List.length general = List.length specific
+  && List.for_all2 term_matches_general general specific
 
 let has_else_premise prems =
   prems
@@ -717,6 +911,7 @@ let gen_helper helper_name origin node =
 type enabledness_info =
   { helper_name : string
   ; output : output
+  ; complement_conditions : Maude_ir.rule_condition list
   }
 
 type enabledness_result =
@@ -734,13 +929,14 @@ let translate_enabledness_helper
     relation_mixop
     (shape : Relation_shape.execution_shape)
     input_sorts
-    current_lhs_skeleton
+    current_lhs_terms
     index
     rule =
   let origin = rule_origin rel_origin index rule in
   match rule.it with
   | RuleD (rule_id, binds, _mixop, exp, prems) ->
     let ctx = Context.with_rule ctx rule_id.it in
+    let hint_diags = rule_hint_diagnostics ctx origin relation_id.it rule_id in
     let marker_diags =
       validate_rule_marker
         ctx
@@ -749,10 +945,11 @@ let translate_enabledness_helper
         ~expected_mixop:relation_mixop
         rule
     in
-    if has_fatal marker_diags then
+    if has_fatal hint_diags || has_fatal marker_diags then
       Enabledness
         { helper_name = enabledness_helper_name relation_id rule_id index
-        ; output = { empty with diagnostics = marker_diags }
+        ; output = { empty with diagnostics = hint_diags @ marker_diags }
+        ; complement_conditions = []
         }
     else
       let input_typs = Relation_shape.component_typs shape.Relation_shape.inputs in
@@ -771,6 +968,7 @@ let translate_enabledness_helper
         Enabledness
           { helper_name = enabledness_helper_name relation_id rule_id index
           ; output = { empty with diagnostics = arity_diags }
+          ; complement_conditions = []
           }
       | Some components ->
         let input_count = List.length input_typs in
@@ -792,10 +990,11 @@ let translate_enabledness_helper
           lower_pattern_components ctx env origin input_exps
         in
         (match lhs_terms_opt with
-        | Some lhs_terms when term_skeletons lhs_terms = current_lhs_skeleton ->
+        | Some lhs_terms when terms_match_general current_lhs_terms lhs_terms ->
           let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
           let premise_result =
             Premise_translate.translate_premises
+              ~allow_runtime_search:true
               ctx
               env
               ~bound_conditions:lhs_guards
@@ -810,62 +1009,153 @@ let translate_enabledness_helper
             |> Condition_closure.normalize_binding_conditions lhs_terms
             |> dedup_conditions
           in
-          let op_decl =
-            gen_helper helper_name origin
-              (op helper_name (List.map sort_ref input_sorts) (sort "Bool"))
-          in
-          let equation =
-            gen_helper helper_name origin
-              (ceq helper_call (Const "true") conditions)
-          in
-          let rule_condition_diags =
-            match premise_result.rule_conditions with
-            | [] -> []
-            | _ :: _ ->
-              [ unsupported
-                  ~ctx
-                  ~origin
-                  ~constructor:"RelD/ElsePr/enabledness/rewrite-condition"
-                  ~source_echo:(Il.Print.string_of_rule rule)
-                  ~reason:
-                    "enabledness helper for an otherwise predecessor cannot contain rewrite conditions in this slice"
-                  ~suggestion:
-                    "Keep this otherwise complement Unsupported until rewrite-dependent enabledness helpers are implemented"
-                  ()
-              ]
-          in
-          let admissibility_diags =
-            Condition_closure.ceq_admissibility_diagnostics
-              ctx
-              origin
-              helper_call
-              (Const "true")
-              conditions
-          in
-          let registry_diags =
-            generated_statement_diagnostics ctx op_decl
-            @ generated_statement_diagnostics ctx equation
-          in
-          Enabledness
-            { helper_name
-            ; output =
-                { statements = var_decls @ [ op_decl; equation ]
-                ; diagnostics =
-                    bind_diags @ arity_diags @ lhs_diags
-                    @ premise_result.diagnostics
-                    @ rule_condition_diags
-                    @ admissibility_diags
-                    @ registry_diags
+          if premise_result.rule_conditions = [] then
+            let op_decl =
+              gen_helper helper_name origin
+                (op helper_name (List.map sort_ref input_sorts) (sort "Bool"))
+            in
+            let equation =
+              gen_helper helper_name origin
+                (ceq helper_call (Const "true") conditions)
+            in
+            let admissibility_diags =
+              Condition_closure.ceq_admissibility_diagnostics
+                ctx
+                origin
+                helper_call
+                (Const "true")
+                conditions
+            in
+            let registry_diags =
+              generated_statement_diagnostics ctx op_decl
+              @ generated_statement_diagnostics ctx equation
+            in
+            Enabledness
+              { helper_name
+              ; output =
+                  { statements = var_decls @ [ op_decl; equation ]
+                  ; diagnostics =
+                      hint_diags
+                      @ bind_diags @ arity_diags @ lhs_diags
+                      @ premise_result.diagnostics
+                      @ admissibility_diags
+                      @ registry_diags
+                  }
+              ; complement_conditions =
+                  [ EqCondition
+                      (BoolCond
+                         (app
+                            "_=/=_"
+                            [ app helper_name current_lhs_terms; Const "true" ]))
+                  ]
+              }
+          else if premise_result.runtime_truth_search_requests <> [] then
+            let runtime_truth_decisions =
+              premise_result.runtime_truth_search_requests
+              |> List.map (fun truth_request ->
+                let truth_helper_name =
+                  Helper.request
+                    (Context.helpers ctx)
+                    { Helper.kind =
+                        Helper.Runtime_predicate_truth_search truth_request
+                    ; reason = Runtime_truth_search_helper.reason truth_request
+                    ; origin
+                    }
+                in
+                let decision_request =
+                  { Runtime_truth_decision_helper.truth_helper_name =
+                      truth_helper_name
+                  ; truth_request
+                  }
+                in
+                let decision_helper_name =
+                  Helper.request
+                    (Context.helpers ctx)
+                    { Helper.kind =
+                        Helper.Runtime_predicate_truth_decision
+                          decision_request
+                    ; reason =
+                        Runtime_truth_decision_helper.reason
+                          decision_request
+                    ; origin
+                    }
+                in
+                { Runtime_enabledness_helper.helper_name =
+                    decision_helper_name
+                ; request = decision_request
+                })
+            in
+            let request =
+              { Runtime_enabledness_helper.relation_id = relation_id.it
+              ; rule_id = Some rule_id.it
+              ; call_terms = current_lhs_terms
+              ; predecessor_terms = lhs_terms
+              ; input_sorts
+              ; lhs_conditions = lhs_guards
+              ; premise_eq_conditions = premise_result.eq_conditions
+              ; premise_rule_conditions = premise_result.rule_conditions
+              ; runtime_search_requests = premise_result.runtime_search_requests
+              ; runtime_truth_search_requests =
+                  premise_result.runtime_truth_search_requests
+              ; runtime_truth_decisions
+              ; source_echo = Some (Il.Print.string_of_rule rule)
+              }
+            in
+            let runtime_helper_name =
+              Helper.request
+                (Context.helpers ctx)
+                { Helper.kind = Helper.Runtime_enabledness request
+                ; reason = Runtime_enabledness_helper.reason request
+                ; origin
                 }
-            }
+            in
+            Enabledness
+              { helper_name = runtime_helper_name
+              ; output =
+                  { statements = var_decls
+                  ; diagnostics =
+                      hint_diags
+                      @ bind_diags @ arity_diags @ lhs_diags
+                      @ premise_result.diagnostics
+                  }
+              ; complement_conditions =
+                  [ Runtime_enabledness_helper.false_rewrite_condition
+                      ~helper_name:runtime_helper_name
+                      request
+                  ]
+              }
+          else
+            Enabledness
+              { helper_name
+              ; output =
+                  { statements = var_decls
+                  ; diagnostics =
+                      hint_diags
+                      @ bind_diags @ arity_diags @ lhs_diags
+                      @ premise_result.diagnostics
+                      @ [ unsupported
+                            ~ctx
+                            ~origin
+                            ~constructor:"RelD/ElsePr/enabledness/rewrite-condition"
+                            ~source_echo:(Il.Print.string_of_rule rule)
+                            ~reason:
+                              "enabledness helper for an otherwise predecessor contains rewrite conditions that are not runtime truth-search decisions"
+                            ~suggestion:
+                              "Keep this otherwise complement Unsupported until this rewrite-dependent premise shape has a source-complete enabledness decision helper"
+                            ()
+                        ]
+                  }
+              ; complement_conditions = []
+              }
         | Some _ -> Not_applicable
         | None ->
           Enabledness
             { helper_name = enabledness_helper_name relation_id rule_id index
             ; output =
                 { statements = var_decls
-                ; diagnostics = bind_diags @ arity_diags @ lhs_diags
+                ; diagnostics = hint_diags @ bind_diags @ arity_diags @ lhs_diags
                 }
+            ; complement_conditions = []
             }))
 
 let else_complement
@@ -879,7 +1169,6 @@ let else_complement
     origin
     current_lhs_terms
     previous_rules =
-  let current_lhs_skeleton = term_skeletons current_lhs_terms in
   let enabledness =
     previous_rules
     |> List.mapi (fun index rule ->
@@ -891,7 +1180,7 @@ let else_complement
         relation_mixop
         shape
         input_sorts
-        current_lhs_skeleton
+        current_lhs_terms
         (index + 1)
         rule)
   in
@@ -940,23 +1229,21 @@ let else_complement
         []
       else
         applicable
-        |> List.map (fun result ->
-          let call = app result.helper_name current_lhs_terms in
-          EqCondition (BoolCond (app "_=/=_" [ call; Const "true" ])))
+        |> List.map (fun result -> result.complement_conditions)
+        |> List.concat
     in
     let diagnostics =
       if has_blocking then
-        diagnostics
-        @ [ unsupported
-              ~ctx
-              ~origin
-              ~constructor:"RelD/RuleD/ElsePr/complement-unsupported"
-              ~reason:
-                "at least one predecessor rule in this otherwise group needs enabledness conditions that are not safely expressible by the current source-derived helper slice"
-              ~suggestion:
-                "Leave this ElsePr Unsupported until the blocking predecessor premise shape has a documented helper"
-              ()
-          ]
+        [ unsupported
+            ~ctx
+            ~origin
+            ~constructor:"RelD/RuleD/ElsePr/complement-unsupported"
+            ~reason:
+              "at least one predecessor rule in this otherwise group needs enabledness conditions that are not safely expressible by the current source-derived helper slice; the predecessor rule itself reports the blocking premise"
+            ~suggestion:
+              "Leave this ElsePr Unsupported until the blocking predecessor premise shape has a documented helper"
+            ()
+        ]
       else
         diagnostics
     in
@@ -964,7 +1251,7 @@ let else_complement
 
 let rec premise_has_execution_dependency ctx prem =
   match prem.it with
-  | RulePr (rel_id, _, _) ->
+  | RulePr (rel_id, _, _, _) ->
     (match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
     | Some relation ->
       (match
@@ -1016,6 +1303,7 @@ let translate_deterministic_rule
   match rule.it with
   | RuleD (rule_id, binds, _mixop, exp, prems) ->
     let ctx = Context.with_rule ctx rule_id.it in
+    let hint_diags = rule_hint_diagnostics ctx origin id.it rule_id in
     let marker_diags =
       validate_rule_marker
         ctx
@@ -1024,8 +1312,8 @@ let translate_deterministic_rule
         ~expected_mixop:relation_mixop
         rule
     in
-    if has_fatal marker_diags then
-      { empty with diagnostics = marker_diags }
+    if has_fatal hint_diags || has_fatal marker_diags then
+      { empty with diagnostics = hint_diags @ marker_diags }
     else
     let input_typs = Relation_shape.component_typs shape.Relation_shape.inputs in
     let _output_typ = shape.Relation_shape.output.typ in
@@ -1038,7 +1326,10 @@ let translate_deterministic_rule
       translate_rule_binds ctx origin seed binds
     in
     (match components_opt with
-    | None -> { statements = var_decls; diagnostics = bind_diags @ arity_diags }
+    | None ->
+      { statements = var_decls
+      ; diagnostics = hint_diags @ bind_diags @ arity_diags
+      }
     | Some components ->
       let input_exps, output_exp =
         match List.rev components with
@@ -1051,7 +1342,7 @@ let translate_deterministic_rule
       (match lhs_terms_opt with
       | None ->
         { statements = var_decls
-        ; diagnostics = bind_diags @ arity_diags @ lhs_diags
+        ; diagnostics = hint_diags @ bind_diags @ arity_diags @ lhs_diags
         }
       | Some lhs_terms ->
         let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
@@ -1060,6 +1351,7 @@ let translate_deterministic_rule
             ctx
             env
             ~bound_conditions:lhs_guards
+            ~escape_source_ids:(Premise_capture.source_and_note_free_var_ids output_exp)
             ~bound_terms:lhs_terms
             origin
             prems
@@ -1068,7 +1360,8 @@ let translate_deterministic_rule
           Expr_translate.lower_value ctx premise_result.env_after origin output_exp
         in
         let diagnostics =
-          bind_diags @ arity_diags @ lhs_diags @ premise_result.diagnostics
+          hint_diags
+          @ bind_diags @ arity_diags @ lhs_diags @ premise_result.diagnostics
           @ rhs_result.diagnostics
         in
         if has_fatal diagnostics then
@@ -1167,6 +1460,7 @@ let translate_execution_rule
     relation_mixop
     (shape : Relation_shape.execution_shape)
     input_sorts
+    output_sorts
     previous_rules
     index
     rule
@@ -1175,6 +1469,7 @@ let translate_execution_rule
   match rule.it with
   | RuleD (rule_id, binds, _mixop, exp, prems) ->
     let ctx = Context.with_rule ctx rule_id.it in
+    let hint_diags = rule_hint_diagnostics ctx origin relation_id.it rule_id in
     let marker_diags =
       validate_rule_marker
         ctx
@@ -1183,8 +1478,8 @@ let translate_execution_rule
         ~expected_mixop:relation_mixop
         rule
     in
-    if has_fatal marker_diags then
-      { empty with diagnostics = marker_diags }
+    if has_fatal hint_diags || has_fatal marker_diags then
+      { empty with diagnostics = hint_diags @ marker_diags }
     else
     let input_typs = Relation_shape.component_typs shape.Relation_shape.inputs in
     let output_typs = Relation_shape.component_typs shape.Relation_shape.outputs in
@@ -1197,7 +1492,10 @@ let translate_execution_rule
       translate_rule_binds ctx origin seed binds
     in
     (match components_opt with
-    | None -> { statements = var_decls; diagnostics = bind_diags @ arity_diags }
+    | None ->
+      { statements = var_decls
+      ; diagnostics = hint_diags @ bind_diags @ arity_diags
+      }
     | Some components ->
       let input_count = List.length input_typs in
       let rec split n left right =
@@ -1236,6 +1534,10 @@ let translate_execution_rule
             ctx
             env
             ~bound_conditions:lhs_guards
+            ~escape_source_ids:
+              (output_exps
+               |> List.concat_map Premise_capture.source_and_note_free_var_ids
+               |> List.sort_uniq String.compare)
             ~bound_terms:lhs_terms
             origin
             (without_else_premises prems)
@@ -1249,14 +1551,17 @@ let translate_execution_rule
             output_exps
         in
         let diagnostics =
-          bind_diags @ arity_diags @ lhs_diags @ output_diags
+          hint_diags
+          @ bind_diags @ arity_diags @ lhs_diags @ output_diags
           @ else_output.diagnostics @ premise_result.diagnostics
         in
         if has_fatal diagnostics then
           { statements = var_decls @ else_output.statements; diagnostics }
         else
           (match output_terms_opt with
-          | Some [ rhs_term ] ->
+          | Some output_terms
+            when List.length output_terms = List.length output_sorts ->
+            let rhs_term = tuple_carrier output_sorts output_terms in
             let lhs = relation_call op_name lhs_terms in
             let conditions =
               List.map (fun condition -> EqCondition condition) lhs_guards
@@ -1315,7 +1620,7 @@ let translate_execution_rule
           | None -> { statements = var_decls @ else_output.statements; diagnostics })
       | _ ->
         { statements = var_decls
-        ; diagnostics = bind_diags @ arity_diags @ lhs_diags
+        ; diagnostics = hint_diags @ bind_diags @ arity_diags @ lhs_diags
         }))
 let translate_execution
     ctx
@@ -1339,9 +1644,10 @@ let translate_execution
       { empty with diagnostics }
     else
       match input_sorts_opt, output_sorts_opt with
-      | Some input_sorts, Some [ output_sort ] ->
+      | Some input_sorts, Some output_sorts ->
         let op_name = Naming.relation_op id in
         let conf_sort = relation_conf_sort id in
+        let output_sort = execution_output_sort output_sorts in
         let header =
           [ gen origin (sort_decl conf_sort)
           ; gen origin (subsort output_sort conf_sort)
@@ -1367,6 +1673,7 @@ let translate_execution
                   relation_mixop
                   shape
                   input_sorts
+                  output_sorts
                   previous
                   index
                   rule
@@ -1378,23 +1685,13 @@ let translate_execution
         { statements = header @ dedup_generated rules_output.statements
         ; diagnostics = diagnostics @ rules_output.diagnostics
         }
-      | Some _, Some _ ->
-        one_diagnostic
-          (unsupported
-             ~ctx
-             ~origin
-             ~constructor:"RelD/execution/output"
-             ~reason:
-               "execution relation lowering currently supports exactly one output carrier; multi-output execution relations need a source-shaped config carrier"
-             ~suggestion:
-               "Add an isomorphic tuple/config carrier before lowering this execution relation"
-             ())
       | _ -> { empty with diagnostics }
 
 let translate_runtime_predicate_rule
     ctx
     rel_origin
     op_name
+    relation_id
     relation_kind
     relation_mixop
     components
@@ -1405,6 +1702,7 @@ let translate_runtime_predicate_rule
   match rule.it with
   | RuleD (rule_id, binds, _mixop, exp, prems) ->
     let ctx = Context.with_rule ctx rule_id.it in
+    let hint_diags = rule_hint_diagnostics ctx origin relation_id rule_id in
     let marker_diags =
       validate_rule_marker
         ctx
@@ -1413,8 +1711,8 @@ let translate_runtime_predicate_rule
         ~expected_mixop:relation_mixop
         rule
     in
-    if has_fatal marker_diags then
-      { empty with diagnostics = marker_diags }
+    if has_fatal hint_diags || has_fatal marker_diags then
+      { empty with diagnostics = hint_diags @ marker_diags }
     else
       let expected_typs = Relation_shape.component_typs components in
       let components_opt, arity_diags =
@@ -1425,16 +1723,19 @@ let translate_runtime_predicate_rule
         translate_rule_binds ctx origin seed binds
       in
       (match components_opt with
-      | None -> { statements = var_decls; diagnostics = bind_diags @ arity_diags }
+      | None ->
+        { statements = var_decls
+        ; diagnostics = hint_diags @ bind_diags @ arity_diags
+        }
       | Some body_components ->
         let lhs_terms_opt, lhs_guards, lhs_bindings, lhs_diags =
           lower_pattern_components ctx env origin body_components
         in
         (match lhs_terms_opt with
         | None ->
-          { statements = var_decls
-          ; diagnostics = bind_diags @ arity_diags @ lhs_diags
-          }
+        { statements = var_decls
+        ; diagnostics = hint_diags @ bind_diags @ arity_diags @ lhs_diags
+        }
         | Some lhs_terms ->
           let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
           let premise_result =
@@ -1442,12 +1743,14 @@ let translate_runtime_predicate_rule
               ctx
               env
               ~bound_conditions:lhs_guards
+              ~escape_source_ids:(Premise_capture.source_and_note_free_var_ids exp)
               ~bound_terms:lhs_terms
               origin
               prems
           in
           let diagnostics =
-            bind_diags @ arity_diags @ lhs_diags @ premise_result.diagnostics
+            hint_diags
+            @ bind_diags @ arity_diags @ lhs_diags @ premise_result.diagnostics
           in
           if premise_result.rule_conditions <> [] then
             { statements = var_decls
@@ -1507,6 +1810,119 @@ let translate_runtime_predicate_rule
               ; diagnostics
               }))
 
+let runtime_predicate_blocker_text
+    (blocker : Analysis.Function_graph.runtime_search_blocker)
+  =
+  let rule =
+    match blocker.Analysis.Function_graph.rule_id with
+    | None -> ""
+    | Some rule_id -> "/" ^ rule_id
+  in
+  let premise =
+    match
+      ( blocker.Analysis.Function_graph.premise_constructor
+      , blocker.Analysis.Function_graph.premise_source_echo )
+    with
+    | None, None -> ""
+    | Some constructor, None -> " via " ^ constructor
+    | None, Some source -> " via premise `" ^ source ^ "`"
+    | Some constructor, Some source -> " via " ^ constructor ^ " `" ^ source ^ "`"
+  in
+  Printf.sprintf
+    "%s%s%s [%s]: %s"
+    blocker.Analysis.Function_graph.relation_id
+    rule
+    premise
+    blocker.Analysis.Function_graph.constructor
+    blocker.Analysis.Function_graph.reason
+
+let format_runtime_predicate_blockers blockers =
+  let rec take n values =
+    match n, values with
+    | 0, rest -> [], List.length rest
+    | _, [] -> [], 0
+    | n, value :: rest ->
+      let kept, omitted = take (n - 1) rest in
+      value :: kept, omitted
+  in
+  let kept, omitted = take 8 (List.map runtime_predicate_blocker_text blockers) in
+  let rendered = String.concat "; " kept in
+  if omitted = 0 then rendered
+  else if rendered = "" then Printf.sprintf "... and %d more" omitted
+  else Printf.sprintf "%s; ... and %d more" rendered omitted
+
+let runtime_predicate_dependency_diagnostics ctx origin id =
+  match
+    Analysis.Function_graph.runtime_predicate_dependency_completeness
+      (Context.function_graph ctx)
+      id.it
+  with
+  | Analysis.Function_graph.Runtime_predicate_dependencies_complete _ -> []
+  | Analysis.Function_graph.Runtime_predicate_dependencies_incomplete
+      { closure; blockers; _ } ->
+    [ unsupported
+        ~ctx
+        ~origin
+        ~constructor:"RelD/runtime-predicate/incomplete-dependency"
+        ~reason:
+          ("runtime predicate relation depends on runtime-demanded predicate relation(s) whose source predicate closure is not complete; dependency closure: "
+           ^ String.concat " -> " closure
+           ^ "; blockers: "
+           ^ format_runtime_predicate_blockers blockers)
+        ~suggestion:
+          "Emit only the predicate op until every runtime predicate dependency can be lowered source-completely; partial true equations would turn missing source branches into false Maude results"
+        ()
+    ]
+
+let source_rule_of_runtime_search_rule
+    (rule : Analysis.Function_graph.runtime_search_rule)
+  =
+  { Runtime_witness_proof.relation_id = rule.relation_id
+  ; rule_id = rule.rule_id
+  ; origin = rule.origin
+  ; source_echo = rule.source_echo
+  ; head = rule.head
+  ; prems = rule.prems
+  }
+
+let rule_has_transitive_witness_domain rule =
+  rule
+  |> source_rule_of_runtime_search_rule
+  |> Runtime_witness_proof.transitive_domain
+  |> Option.is_some
+
+let rule_has_target_guided_witness rule =
+  rule
+  |> source_rule_of_runtime_search_rule
+  |> Runtime_witness_proof.target_chain
+  |> Option.is_some
+
+let runtime_predicate_needs_truth_search ctx id =
+  match
+    Analysis.Function_graph.runtime_predicate_search_plan
+      (Context.function_graph ctx)
+      id.it
+  with
+  | Analysis.Function_graph.Runtime_search_no_shape_blockers { rules; _ }
+  | Analysis.Function_graph.Runtime_search_blocked_plan { rules; _ } ->
+    List.exists
+      (fun rule ->
+        rule_has_transitive_witness_domain rule
+        || rule_has_target_guided_witness rule)
+      rules
+
+let runtime_predicate_truth_search_deferred ctx origin id =
+  skipped
+    ~ctx
+    ~origin
+    ~constructor:"RelD/runtime-predicate/truth-search-deferred"
+    ~reason:
+      "runtime predicate relation has a source recursive witness rule; emitting only some Bool ceq true branches would make missing source branches look false in Maude"
+    ~suggestion:
+      "Represent this predicate through a source-complete rewrite-backed truth-search helper before using it in runtime premises"
+    ~source_echo:("RelD " ^ id.it)
+    ()
+
 let translate_runtime_predicate
     ctx origin id relation_kind relation_mixop runtime_reason components rules =
   let typs = Relation_shape.component_typs components in
@@ -1526,30 +1942,41 @@ let translate_runtime_predicate
              (List.map sort_ref input_sorts)
              (sort "Bool"))
       in
-      let rules_output =
-        rules
-        |> List.mapi (fun index rule ->
-          translate_runtime_predicate_rule
-            ctx
-            origin
-            op_name
-            relation_kind
-            relation_mixop
-            components
-            (index + 1)
-            rule)
-        |> List.fold_left append empty
+      let dependency_diags =
+        runtime_predicate_dependency_diagnostics ctx origin id
       in
-      let diagnostics =
-        input_diags @ rules_output.diagnostics
-      in
-      let statements =
-        if has_fatal diagnostics then
-          [ op_decl ]
-        else
-          op_decl :: rules_output.statements
-      in
-      { statements; diagnostics }
+      if runtime_predicate_needs_truth_search ctx id then
+        { statements = [ op_decl ]
+        ; diagnostics =
+            input_diags @ dependency_diags
+            @ [ runtime_predicate_truth_search_deferred ctx origin id ]
+        }
+      else
+        let rules_output =
+          rules
+          |> List.mapi (fun index rule ->
+            translate_runtime_predicate_rule
+              ctx
+              origin
+              op_name
+              id.it
+              relation_kind
+              relation_mixop
+              components
+              (index + 1)
+              rule)
+          |> List.fold_left append empty
+        in
+        let diagnostics =
+          input_diags @ dependency_diags @ rules_output.diagnostics
+        in
+        let statements =
+          if has_fatal diagnostics then
+            [ op_decl ]
+          else
+            op_decl :: rules_output.statements
+        in
+        { statements; diagnostics }
     | None ->
       { empty with
         diagnostics =
@@ -1567,10 +1994,26 @@ let translate_runtime_predicate
             ]
       }
 
-let translate ctx origin id mixop result_typ rules =
-  let relation_shape = Relation_shape.of_reld mixop result_typ in
+let translate ctx origin id params mixop result_typ rules =
+  let relation_shape = Relation_shape.of_reld params mixop result_typ in
   let relation_kind = relation_shape.Relation_shape.marker in
   let relation_kind_text = relation_shape.Relation_shape.marker_text in
+  if params <> [] then
+    one_diagnostic
+      (unsupported
+         ~ctx
+         ~origin
+         ~constructor:"RelD/params"
+         ~reason:
+           ("relation `"
+            ^ id.it
+            ^ "` has source parameters `"
+            ^ Il.Print.string_of_params params
+            ^ "`, but parameterized relation lowering is not implemented yet")
+         ~suggestion:
+           "Preserve this RelD as Unsupported until RulePr argument instantiation and relation specialization/tag lowering are designed source-completely"
+         ())
+  else
   match relation_shape.Relation_shape.decision with
   | Relation_shape.Static_validation _ ->
     (match

@@ -16,6 +16,7 @@ type t =
   ; enclosing : enclosing
   ; static_typ_env : (string * Il.Ast.typ) list
   ; static_def_env : (string * string) list
+  ; phantom_typ_env : (string * string) list
   ; current_specialization : Analysis.Function_graph.specialization option
   }
 
@@ -31,6 +32,7 @@ let create ?(profile = Runtime_after_external_validation) source_index =
   ; enclosing = { def_id = None; rule_id = None; clause_id = None }
   ; static_typ_env = []
   ; static_def_env = []
+  ; phantom_typ_env = []
   ; current_specialization = None
   }
 
@@ -66,6 +68,12 @@ let with_static_def t id target_id =
 
 let find_static_def t id =
   List.assoc_opt id t.static_def_env
+
+let with_phantom_typ t id var_name =
+  { t with phantom_typ_env = (id, var_name) :: List.remove_assoc id t.phantom_typ_env }
+
+let find_phantom_typ t id =
+  List.assoc_opt id t.phantom_typ_env
 
 let with_specialization t specialization =
   let static_typ_env =

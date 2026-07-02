@@ -63,6 +63,20 @@ let unsupported_prem ctx env ~bound_vars origin constructor prem reason =
       ]
   }
 
+let unsupported_rulepr_args ctx env ~bound_vars origin prem rel_id args =
+  unsupported_prem
+    ctx
+    env
+    ~bound_vars
+    origin
+    "Premise/RulePr/args"
+    prem
+    ("relation premise `"
+     ^ rel_id.it
+     ^ "` carries explicit RulePr arguments `"
+     ^ Il.Print.string_of_args args
+     ^ "`, but relation-argument instantiation is not lowered yet; keep the args in the IL path instead of silently dropping them")
+
 let skipped_prem ctx env ~bound_vars origin constructor prem reason suggestion =
   { (empty_with_env ~bound_vars env) with
     diagnostics =
@@ -127,6 +141,15 @@ let result_has_fatal (result : Expr_translate.result) =
 let diagnostics_have_fatal diagnostics =
   List.exists Diagnostics.is_fatal diagnostics
 
+let premise_result_has_fatal result =
+  diagnostics_have_fatal result.diagnostics
+
+let result_is_deferrable_listn_admissibility result =
+  result.diagnostics
+  |> List.exists (fun diagnostic ->
+    Diagnostics.is_fatal diagnostic
+    && diagnostic.Diagnostics.constructor = "Expr/IterE/ListN/premise-admissibility")
+
 let typ_is_iter = Type_shape.typ_is_iter
 
 let flat_optional_element_typ typ =
@@ -155,6 +178,9 @@ let zip_source_descriptor typ =
 
 let app name args =
   App (name, args)
+
+let sequence_concat left right =
+  app "_ _" [ left; right ]
 
 let is_opt term =
   app "isOpt" [ term ]
@@ -377,6 +403,28 @@ let typed_var_for_exp id exp =
     let term = Var (Naming.maude_var id.it ^ ":" ^ sort_name sort) in
     Some (term, { Expr_translate.term; sort; typ = exp.note })
 
+let same_sort left right =
+  sort_name left = sort_name right
+
+let unbound_var_binding env ~bound_vars exp =
+  match exp.it with
+  | VarE id ->
+    let typed_binding =
+      typed_var_for_exp id exp |> Option.map snd
+    in
+    (match Expr_translate.find_var env id.it with
+    | Some binding when not (binding_is_bound bound_vars binding) ->
+      (match typed_binding with
+      | Some typed when not (same_sort typed.Expr_translate.sort binding.sort) ->
+        Some (id.it, typed)
+      | Some _ | None -> Some (id.it, binding))
+    | Some _ -> None
+    | None ->
+      (match typed_binding with
+      | Some binding -> Some (id.it, binding)
+      | None -> None))
+  | _ -> None
+
 let binding_map_targets env ~bound_vars generators =
   generators
   |> List.filter_map (fun (target_generator, target_source_exp) ->
@@ -418,8 +466,21 @@ let inverse_binding_unsupported ctx origin exp reason suggestion =
     ()
 
 let lower_inverse_arg ctx env ~bound_vars origin exp =
-  match unbound_direct_var env ~bound_vars exp with
-  | Some id ->
+  match unbound_env_var_binding env ~bound_vars exp with
+  | Some (id, binding) ->
+    if Condition_closure.is_match_pattern binding.term then
+      Ok (Inverse_target (id, binding), binding.term, [], [])
+    else
+      Error
+        [ inverse_binding_unsupported
+            ctx origin exp
+            ("unbound inverse target `" ^ id
+             ^ "` is not represented by a Maude match pattern")
+            "Keep this equality Unsupported until the target can be bound by a matching condition"
+        ]
+  | None ->
+    (match unbound_direct_var env ~bound_vars exp with
+    | Some id ->
     (match typed_var_for_exp id exp with
     | Some (term, binding) -> Ok (Inverse_target (id.it, binding), term, [], [])
     | None ->
@@ -430,11 +491,11 @@ let lower_inverse_arg ctx env ~bound_vars origin exp =
              ^ "` has no known Maude carrier sort")
             "Keep this equality Unsupported until the target type has a carrier-preserving encoding"
         ])
-  | None ->
+    | None ->
     let result = lower_with_source_carrier ctx env origin exp in
     (match result.term with
     | Some term -> Ok (Inverse_known term, term, result.guards, result.diagnostics)
-    | None -> Error result.diagnostics)
+    | None -> Error result.diagnostics))
 
 let collect_inverse_args ctx env ~bound_vars origin exps =
   let step acc item =
@@ -1190,15 +1251,131 @@ let try_inverse_concatn_chunks_eq ctx env ~bound_vars origin exp left right () =
 let try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp left right () =
   lower_numeric_inverse_binding_eq_premise ctx env ~bound_vars origin exp left right
 
+let lower_projection_binding_value ctx env origin exp =
+  let numeric_result =
+    Expr_translate.lower_numeric_guard_value ctx env origin exp
+  in
+  if numeric_result.term <> None && not (result_has_fatal numeric_result) then
+    numeric_result
+  else
+    Expr_translate.lower_value ctx env origin exp
+
+let inverse_numeric_conversion_exp value_exp source_numtyp target_numtyp =
+  { value_exp with
+    it = CvtE (value_exp, target_numtyp, source_numtyp)
+  ; note = { value_exp.note with it = NumT source_numtyp }
+  }
+
+let projection_binding_sides projection_exp value_exp =
+  match projection_exp.it with
+  | CvtE (inner_projection, source_numtyp, target_numtyp) ->
+    ( inner_projection
+    , inverse_numeric_conversion_exp value_exp source_numtyp target_numtyp )
+  | _ -> projection_exp, value_exp
+
+let lower_unary_projection_binding_eq_premise
+    ctx env ~bound_vars origin _exp projection_exp value_exp =
+  let projection_exp, value_exp =
+    projection_binding_sides projection_exp value_exp
+  in
+  match projection_exp.it with
+  | ProjE (({ it = UncaseE (scrutinee_exp, _mixop); _ } as _uncase_exp), 0) ->
+    (match scrutinee_exp.it with
+    | VarE scrutinee_id ->
+      (match Expr_translate.find_var env scrutinee_id.it with
+      | Some scrutinee_binding when not (binding_is_bound bound_vars scrutinee_binding) ->
+        (match lower_projection_binding_value ctx env origin projection_exp with
+        | { term = Some (App (projection_op, [ scrutinee_term ])); guards = projection_guards; diagnostics = projection_diagnostics } ->
+          (match
+             Constructor_registry.lookup_unary_projection
+               (Context.constructors ctx)
+               ~projection_op
+           with
+          | Constructor_registry.Projection_found entry ->
+            let value_result =
+              lower_projection_binding_value ctx env origin value_exp
+            in
+            (match value_result.term with
+            | Some value_term ->
+              let prefix_conditions = value_result.guards in
+              (match
+                 Condition_closure.conditions_admissible_bound
+                   bound_vars
+                   prefix_conditions
+               with
+              | None -> None
+              | Some bound_after_prefix ->
+                if
+                  vars_subset
+                    (Condition_closure.term_vars value_term)
+                    bound_after_prefix
+                then (
+                  let match_condition =
+                    MatchCond
+                      ( scrutinee_term
+                      , app entry.Constructor_registry.constructor_op [ value_term ] )
+                  in
+                  let conditions =
+                    prefix_conditions @ [ match_condition ] @ projection_guards
+                  in
+                  let env_after =
+                    Expr_translate.add_var
+                      env
+                      scrutinee_id.it
+                      scrutinee_binding
+                  in
+                  Some
+                    (with_conditions
+                       env_after
+                       bound_vars
+                       conditions
+                       (projection_diagnostics @ value_result.diagnostics)))
+                else
+                  None)
+            | None -> None)
+          | Constructor_registry.Projection_missing
+          | Constructor_registry.Projection_ambiguous _ -> None)
+        | _ -> None)
+      | Some _ | None -> None)
+    | _ -> None)
+  | _ -> None
+
+let try_unary_projection_binding_eq ctx env ~bound_vars origin exp left right () =
+  lower_unary_projection_binding_eq_premise ctx env ~bound_vars origin exp left right
+
+let is_raw_numeric_sort sort =
+  match sort_name sort with
+  | "Nat" | "Int" | "Rat" -> true
+  | _ -> false
+
+let direct_binding_sides target_exp value_exp =
+  projection_binding_sides target_exp value_exp
+
+let lower_direct_binding_value ctx env origin target_binding value_exp =
+  let value_result = Expr_translate.lower_value ctx env origin value_exp in
+  match value_result.term with
+  | Some _ -> value_result
+  | None when is_raw_numeric_sort target_binding.Expr_translate.sort ->
+    let numeric_result =
+      Expr_translate.lower_numeric_guard_value ctx env origin value_exp
+    in
+    (match numeric_result.term with
+    | Some _ -> numeric_result
+    | None -> value_result)
+  | None -> value_result
+
 let lower_direct_var_binding_eq_premise ctx env ~bound_vars origin _exp target_exp value_exp =
-  match unbound_env_var_binding env ~bound_vars target_exp with
+  let target_exp, value_exp =
+    direct_binding_sides target_exp value_exp
+  in
+  match unbound_var_binding env ~bound_vars target_exp with
   | None -> None
-  | Some (_target_id, target_binding) ->
+  | Some (target_id, target_binding) ->
     if not (Condition_closure.is_match_pattern target_binding.term) then
       None
     else
       let value_result =
-        Expr_translate.lower_value ctx env origin value_exp
+        lower_direct_binding_value ctx env origin target_binding value_exp
       in
       (match value_result.term with
       | Some value_term ->
@@ -1206,9 +1383,12 @@ let lower_direct_var_binding_eq_premise ctx env ~bound_vars origin _exp target_e
           conditions_bound_vars bound_vars value_result.guards
         in
         if vars_subset (Condition_closure.term_vars value_term) prefix_bound then
+          let env_after =
+            Expr_translate.add_var env target_id target_binding
+          in
           Some
             (with_conditions
-               env
+               env_after
                bound_vars
                (value_result.guards @ [ MatchCond (target_binding.term, value_term) ])
                value_result.diagnostics)
@@ -1218,6 +1398,184 @@ let lower_direct_var_binding_eq_premise ctx env ~bound_vars origin _exp target_e
 
 let try_direct_var_binding_eq ctx env ~bound_vars origin exp left right () =
   lower_direct_var_binding_eq_premise ctx env ~bound_vars origin exp left right
+
+let lower_optional_map_inverse_eq_premise
+    ctx env ~bound_vars origin exp known_exp mapped_exp =
+  let optional_iter =
+    match mapped_exp.it with
+    | IterE (body, (Opt, [ generator_id, source_exp ])) ->
+      (match
+         unbound_var_binding env ~bound_vars source_exp,
+         flat_optional_element_typ source_exp.note,
+         flat_optional_element_typ known_exp.note
+       with
+      | Some (source_id, source_binding), Some source_element_typ, Some _ ->
+        (match Expr_translate.carrier_sort_of_typ source_element_typ with
+        | Some source_element_sort ->
+          Some
+            ( body
+            , generator_id
+            , source_exp
+            , source_id
+            , source_binding
+            , source_element_typ
+            , source_element_sort )
+        | None -> None)
+      | _ -> None)
+    | _ -> None
+  in
+  match optional_iter with
+  | None -> None
+  | Some
+      ( body
+      , generator_id
+      , source_exp
+      , source_id
+      , source_binding
+      , source_element_typ
+      , source_element_sort ) ->
+    let source_result = Expr_translate.lower_sequence ctx env origin known_exp in
+    (match source_result.term with
+    | None -> None
+    | Some source_term ->
+      let source_bound =
+        conditions_bound_vars bound_vars source_result.guards
+      in
+      if
+        (not
+           (vars_subset
+              (Condition_closure.term_vars source_term)
+              source_bound))
+        || diagnostics_have_fatal source_result.diagnostics
+      then
+        None
+      else
+        let stem = helper_local_stem origin (source_echo_exp exp) in
+        let helper_head_var = "HEAD" ^ stem in
+        let generator_binding =
+          { Expr_translate.term = Var helper_head_var
+          ; sort = source_element_sort
+          ; typ = source_element_typ
+          }
+        in
+        let body_source_ids =
+          source_and_note_free_var_ids body
+          |> List.filter (fun id -> id <> generator_id.it)
+          |> List.sort_uniq String.compare
+        in
+        let captures =
+          body_source_ids
+          |> capture_candidates env
+          |> make_captures stem
+        in
+        let lower_body captures =
+          let helper_env =
+            Expr_translate.add_var
+              (capture_env captures)
+              generator_id.it
+              generator_binding
+          in
+          Expr_translate.lower_value ctx helper_env origin body
+        in
+        let body_result = lower_body captures in
+        (match body_result.term with
+        | None -> None
+        | Some body_term ->
+          let body_used_vars =
+            Condition_closure.external_vars_of_term_after_conditions
+              [ helper_head_var ]
+              body_term
+              body_result.guards
+          in
+          let captures = captures |> filter_used_captures body_used_vars in
+          let body_result = lower_body captures in
+          (match body_result.term with
+          | None -> None
+          | Some body_term ->
+            let allowed_vars = helper_head_var :: capture_vars captures in
+            let body_external =
+              Condition_closure.external_vars_of_term_after_conditions
+                allowed_vars
+                body_term
+                body_result.guards
+            in
+            let helper_bound_after =
+              Condition_closure.conditions_admissible_bound
+                allowed_vars
+                body_result.guards
+            in
+            if
+              diagnostics_have_fatal body_result.diagnostics
+              || body_external <> []
+              || helper_bound_after = None
+              || not (List.mem helper_head_var (Condition_closure.term_vars body_term))
+              || not (Condition_closure.is_match_pattern body_term)
+            then
+              None
+            else
+              let helper_request =
+                { Helper.kind =
+                    Helper.Optional_map_inverse
+                      { source_shape =
+                          { iter_source = source_echo_exp mapped_exp
+                          ; body_source = source_echo_exp body
+                          ; source_source = source_echo_exp source_exp
+                          ; output_typ_source =
+                              Il.Print.string_of_typ known_exp.note
+                          ; source_typ_source =
+                              Il.Print.string_of_typ source_exp.note
+                          }
+                      ; generator_var = generator_id.it
+                      ; helper_head_var
+                      ; source_element_sort
+                      ; captures
+                      ; lowered_body = body_term
+                      ; body_eq_conditions = body_result.guards
+                      }
+                ; reason = "optional IterE inverse binding helper"
+                ; origin
+                }
+              in
+              let helper_name =
+                Helper.request (Context.helpers ctx) helper_request
+              in
+              let helper_call =
+                app helper_name
+                  (source_term
+                   :: List.map (fun capture -> capture.Helper.call_term) captures)
+              in
+              let caller_conditions =
+                source_result.guards
+                @ [ BoolCond (is_opt source_term)
+                  ; MatchCond (source_binding.Expr_translate.term, helper_call)
+                  ]
+              in
+              if
+                Condition_closure.external_vars_of_conditions
+                  bound_vars
+                  caller_conditions
+                <> []
+              then
+                None
+              else
+                let result =
+                  with_conditions
+                    env
+                    bound_vars
+                    caller_conditions
+                    (source_result.diagnostics @ body_result.diagnostics)
+                in
+                Some
+                  { result with
+                    env_after =
+                      Expr_translate.add_var
+                        result.env_after
+                        source_id
+                        source_binding
+                  })))
+
+let try_optional_map_inverse_eq ctx env ~bound_vars origin exp left right () =
+  lower_optional_map_inverse_eq_premise ctx env ~bound_vars origin exp left right
 
 let try_record_eq_match env ~bound_vars left right left_value right_value left_pattern right_pattern () =
   let record_match =
@@ -1266,10 +1624,14 @@ let lower_eq_premise ctx env ~bound_vars origin (exp : exp) (left : exp) (right 
       ; try_inverse_concatn_chunks_eq ctx env ~bound_vars origin exp right left
       ; try_inverse_pair_split_eq ctx env ~bound_vars origin exp left right
       ; try_inverse_pair_split_eq ctx env ~bound_vars origin exp right left
+      ; try_optional_map_inverse_eq ctx env ~bound_vars origin exp left right
+      ; try_optional_map_inverse_eq ctx env ~bound_vars origin exp right left
       ; try_inverse_binding_eq ctx env ~bound_vars origin exp left right
       ; try_inverse_binding_eq ctx env ~bound_vars origin exp right left
       ; try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp left right
       ; try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp right left
+      ; try_unary_projection_binding_eq ctx env ~bound_vars origin exp left right
+      ; try_unary_projection_binding_eq ctx env ~bound_vars origin exp right left
       ; try_direct_var_binding_eq ctx env ~bound_vars origin exp left right
       ; try_direct_var_binding_eq ctx env ~bound_vars origin exp right left
       ]
@@ -1439,6 +1801,92 @@ let lower_direct_call_result_binding
             ]
       }
 
+let lower_flat_sequence_membership_binding
+    ctx
+    env
+    ~bound_vars
+    origin
+    exp
+    (left_pattern : Expr_translate.pattern_result)
+    right
+  =
+  match flat_list_element_typ right.note with
+  | None -> None
+  | Some element_typ ->
+    (match Expr_translate.carrier_sort_of_typ element_typ with
+    | None -> None
+    | Some element_sort when sort_name element_sort = "SpectecTerminals" -> None
+    | Some _ ->
+      let right_result = Expr_translate.lower_sequence ctx env origin right in
+      (match left_pattern.pattern_term, right_result.term with
+      | Some left_term, Some right_term
+        when (not (pattern_result_has_fatal left_pattern))
+             && (not (result_has_fatal right_result)) ->
+        let guard_bound =
+          conditions_bound_vars bound_vars right_result.guards
+        in
+        if vars_subset (Condition_closure.term_vars right_term) guard_bound then
+          let stem = helper_local_stem origin (source_echo_exp exp) in
+          let sequence_sort_name = sort_name (sort "SpectecTerminals") in
+          let prefix =
+            Var ("PREFIX" ^ stem ^ ":" ^ sequence_sort_name)
+          in
+          let suffix =
+            Var ("SUFFIX" ^ stem ^ ":" ^ sequence_sort_name)
+          in
+          let membership_pattern =
+            sequence_concat prefix (sequence_concat left_term suffix)
+          in
+          let conditions =
+            right_result.guards
+            @ [ MatchCond (membership_pattern, right_term) ]
+            @ left_pattern.pattern_guards
+          in
+          let env_after =
+            add_introduced_bindings env left_pattern.introduced_bindings
+          in
+          Some
+            (with_conditions
+               env_after
+               bound_vars
+               conditions
+               (right_result.diagnostics @ left_pattern.pattern_diagnostics))
+        else
+          Some
+            { (empty_with_env ~bound_vars env) with
+              eq_conditions = right_result.guards
+            ; diagnostics =
+                right_result.diagnostics @ left_pattern.pattern_diagnostics
+                @ [ unsupported
+                      ~ctx
+                      ~origin
+                      ~constructor:"Premise/IfPr/MemE/binding"
+                      ~source_echo:(source_echo_exp exp)
+                      ~reason:
+                        "binding membership source sequence uses variables that are not bound before the matching condition"
+                      ~suggestion:
+                        "Bind the sequence source through earlier source premises before emitting the membership MatchCond"
+                      ()
+                  ]
+            }
+      | _ ->
+        Some
+          { (empty_with_env ~bound_vars env) with
+            diagnostics =
+              right_result.diagnostics @ left_pattern.pattern_diagnostics
+              @ [ unsupported
+                    ~ctx
+                    ~origin
+                    ~constructor:"Premise/IfPr/MemE/binding"
+                    ~source_echo:(source_echo_exp exp)
+                    ~reason:
+                      "binding membership over a flat sequence could not lower the left pattern or right sequence source"
+                    ~suggestion:
+                      "Keep this premise Unsupported until both sides have source-shaped Maude terms"
+                    ()
+                ]
+          }))
+
 let lower_binding_mem_premise ctx env ~bound_vars origin exp left right =
   let left_pattern =
     Expr_translate.lower_pattern_with_bindings ctx env origin left
@@ -1461,24 +1909,36 @@ let lower_binding_mem_premise ctx env ~bound_vars origin exp left right =
         lower_direct_call_result_binding
           ctx env ~bound_vars origin exp left_pattern right_result
       else
-        Some
-          { (empty_with_env ~bound_vars env) with
-            diagnostics =
-              left_pattern.pattern_diagnostics
-              @ [ unsupported
-                    ~ctx
-                    ~origin
-                    ~constructor:"Premise/IfPr/MemE/binding"
-                    ~source_echo:(source_echo_exp exp)
-                    ~reason:
-                      ("binding membership requires an optional singleton source or a flat sequence-producing CallE in this helper-free slice; source note is `"
-                       ^ Il.Print.string_of_typ right.note
-                       ^ "`")
-                    ~suggestion:
-                      "Use a source-preserving membership-search helper before lowering binding membership over general lists"
-                    ()
-                ]
-          }
+        (match
+           lower_flat_sequence_membership_binding
+             ctx
+             env
+             ~bound_vars
+             origin
+             exp
+             left_pattern
+             right
+         with
+        | Some result -> Some result
+        | None ->
+          Some
+            { (empty_with_env ~bound_vars env) with
+              diagnostics =
+                left_pattern.pattern_diagnostics
+                @ [ unsupported
+                      ~ctx
+                      ~origin
+                      ~constructor:"Premise/IfPr/MemE/binding"
+                      ~source_echo:(source_echo_exp exp)
+                      ~reason:
+                        ("binding membership requires an optional singleton source or a flat sequence source whose elements have a terminal carrier; source note is `"
+                         ^ Il.Print.string_of_typ right.note
+                         ^ "`")
+                      ~suggestion:
+                        "Use a source-preserving membership-search helper before lowering binding membership over non-flat or nested lists"
+                      ()
+                  ]
+            })
 
 let rec lower_if_premise ctx env ~bound_vars origin (exp : exp) =
   match exp.it with
@@ -1592,16 +2052,109 @@ let lower_value_components ctx env origin exps =
   else
     None, guards, diagnostics
 
+let runtime_predicate_var_term ~bound_vars source_id sort =
+  let raw_var = Naming.maude_var source_id in
+  let typed_var = raw_var ^ ":" ^ sort_name sort in
+  if List.mem typed_var bound_vars then
+    Var typed_var
+  else if List.mem raw_var bound_vars then
+    Var raw_var
+  else
+    Var typed_var
+
+let rec lower_runtime_predicate_value ctx env ~bound_vars origin exp =
+  match exp.it with
+  | VarE id when Expr_translate.find_var env id.it = None ->
+    (match Expr_translate.carrier_sort_of_typ exp.note with
+    | Some sort ->
+      { Expr_translate.term =
+          Some (runtime_predicate_var_term ~bound_vars id.it sort)
+      ; guards = []
+      ; diagnostics = []
+      }
+    | None -> Expr_translate.lower_value ctx env origin exp)
+  | IdxE (base, index_exp) ->
+    let base_result =
+      lower_runtime_predicate_value
+        ctx
+        env
+        ~bound_vars
+        (Origin.with_child
+           origin
+           "idx-base"
+           ~ast_constructor:"Expr/IdxE"
+           base.at
+           ~source_echo:(Il.Print.string_of_exp base))
+        base
+    in
+    let index_result =
+      lower_runtime_predicate_value
+        ctx
+        env
+        ~bound_vars
+        (Origin.with_child
+           origin
+           "idx-index"
+           ~ast_constructor:"Expr/IdxE"
+           index_exp.at
+           ~source_echo:(Il.Print.string_of_exp index_exp))
+        index_exp
+    in
+    (match base_result.term, index_result.term with
+    | Some base_term, Some index_term ->
+      { Expr_translate.term = Some (app "index" [ base_term; index_term ])
+      ; guards = base_result.guards @ index_result.guards
+      ; diagnostics = base_result.diagnostics @ index_result.diagnostics
+      }
+    | _ ->
+      { Expr_translate.term = None
+      ; guards = base_result.guards @ index_result.guards
+      ; diagnostics = base_result.diagnostics @ index_result.diagnostics
+      })
+  | SubE (inner, _source_typ, _target_typ) ->
+    lower_runtime_predicate_value ctx env ~bound_vars origin inner
+  | CvtE (inner, _source_typ, _target_typ) ->
+    lower_runtime_predicate_value ctx env ~bound_vars origin inner
+  | _ -> Expr_translate.lower_value ctx env origin exp
+
+let lower_runtime_predicate_value_components ctx env ~bound_vars origin exps =
+  let results =
+    exps |> List.map (lower_runtime_predicate_value ctx env ~bound_vars origin)
+  in
+  let terms =
+    results
+    |> List.filter_map (fun (result : Expr_translate.result) -> result.term)
+  in
+  let guards =
+    results
+    |> List.map (fun (result : Expr_translate.result) -> result.guards)
+    |> List.concat
+  in
+  let diagnostics =
+    results
+    |> List.map (fun (result : Expr_translate.result) -> result.diagnostics)
+    |> List.concat
+  in
+  if List.length terms = List.length exps then
+    Some terms, guards, diagnostics
+  else
+    None, guards, diagnostics
+
 type runtime_predicate_analysis =
   | Runtime_predicate_ready of
       { guards : eq_condition list
       ; predicate_term : term
+      ; components : exp list
+      ; terms : term list
+      ; input_sorts : sort list option
       ; bound_after_guards : string list
       ; diagnostics : Diagnostics.t list
       }
   | Runtime_predicate_needs_binding of
       { guards : eq_condition list
       ; diagnostics : Diagnostics.t list
+      ; components : exp list
+      ; terms : term list
       ; missing_sources : string list
       ; reason : string
       ; suggestion : string
@@ -1612,9 +2165,11 @@ type runtime_predicate_analysis =
       }
 
 let runtime_predicate_unsupported
+    ?(blocked_witness_source_ids = [])
     ctx env ~bound_vars origin prem constructor diagnostics guards reason suggestion =
   { (empty_with_env ~bound_vars env) with
     eq_conditions = guards
+  ; blocked_witness_source_ids
   ; diagnostics =
       diagnostics
       @ [ unsupported
@@ -1624,82 +2179,52 @@ let runtime_predicate_unsupported
             ~source_echo:(source_echo_prem prem)
             ~reason
             ~suggestion
+        ()
+        ]
+  }
+
+let runtime_predicate_blocked_by_prior_witness
+    ctx env ~bound_vars origin prem diagnostics guards missing_sources =
+  { (empty_with_env ~bound_vars env) with
+    eq_conditions = guards
+  ; diagnostics =
+      diagnostics
+      @ [ skipped
+            ~ctx
+            ~origin
+            ~constructor:"Premise/RulePr/runtime-predicate/blocked-by-witness-search"
+            ~source_echo:(source_echo_prem prem)
+            ~reason:
+              ("this predicate uses witness variable(s) that an earlier premise in the same source block was supposed to introduce, but that earlier witness search is still Unsupported: "
+               ^ String.concat ", " missing_sources)
+            ~suggestion:
+              "Implement the earlier source-derived rewrite-backed local-existential helper; this dependent predicate will then be checked after the witness is introduced"
             ()
         ]
   }
 
-let direct_runtime_predicate_missing_sources bound components terms =
+let runtime_predicate_missing_sources bound components terms =
   List.combine components terms
-  |> List.filter_map (fun (component, term) ->
-    match component.it with
-    | VarE id ->
-      let missing =
-        Condition_closure.term_vars term
-        |> List.filter (fun var -> not (List.mem var bound))
-      in
-      if missing = [] then None else Some id.it
-    | _ -> None)
+  |> List.concat_map (fun (component, term) ->
+    let missing =
+      Condition_closure.term_vars term
+      |> List.filter (fun var -> not (List.mem var bound))
+    in
+    if missing = [] then
+      []
+    else
+      source_and_note_free_var_ids component)
   |> List.sort_uniq String.compare
 
-let future_premise_source_ids prems =
-  prems
-  |> List.concat_map prem_free_var_ids
-  |> List.sort_uniq String.compare
-
-let local_existential_candidate missing_sources future_prems =
-  match missing_sources with
-  | [] -> false
-  | _ ->
-    let future_ids = future_premise_source_ids future_prems in
-    missing_sources
-    |> List.for_all (fun id -> List.mem id future_ids)
-
-let format_search_list ?(limit = 8) values =
-  let rec take n values =
-    match n, values with
-    | 0, rest -> [], List.length rest
-    | _, [] -> [], 0
-    | n, value :: rest ->
-      let kept, omitted = take (n - 1) rest in
-      value :: kept, omitted
+let runtime_predicate_input_sorts components =
+  let rec loop acc = function
+    | [] -> Some (List.rev acc)
+    | component :: components ->
+      (match Expr_translate.carrier_sort_of_typ component.note with
+      | Some sort -> loop (sort :: acc) components
+      | None -> None)
   in
-  let kept, omitted = take limit values in
-  let rendered = String.concat "; " kept in
-  if omitted = 0 then
-    rendered
-  else if rendered = "" then
-    Printf.sprintf "... and %d more" omitted
-  else
-    Printf.sprintf "%s; ... and %d more" rendered omitted
-
-let runtime_predicate_binding_diagnostic
-    ctx rel_id ~missing_sources ~future_prems =
-  if local_existential_candidate missing_sources future_prems then
-    match
-      Analysis.Function_graph.runtime_predicate_search_capability
-        (Context.function_graph ctx)
-        rel_id.it
-    with
-    | Analysis.Function_graph.Runtime_search_candidate closure ->
-      ( "Premise/RulePr/runtime-predicate/local-existential-helper-unimplemented"
-      , "This RulePr has unbound argument(s) that are used by later premises in the same source block, and the referenced relation passes the conservative source-complete search gate: "
-        ^ String.concat ", " missing_sources
-        ^ ". Search closure: "
-        ^ String.concat " -> " closure
-      , "Lower this only after implementing the rewrite-backed local-existential helper materializer; do not encode it as a Bool predicate or deterministic witness function" )
-    | Analysis.Function_graph.Runtime_search_blocked { closure; blockers } ->
-      ( "Premise/RulePr/runtime-predicate/local-existential-search-blocked"
-      , "This RulePr has unbound argument(s) used by later premises, but the referenced relation cannot yet be emitted as a source-complete search helper: "
-        ^ String.concat ", " missing_sources
-        ^ ". Search closure: "
-        ^ String.concat " -> " closure
-        ^ ". Search blockers: "
-        ^ format_search_list blockers
-      , "Keep this Unsupported until every source RuleD of the referenced predicate relation can be represented by a rewrite-backed search relation; partial search helpers are unsound" )
-  else
-    ( "Premise/RulePr/runtime-predicate/binding-needed"
-    , ""
-    , "" )
+  loop [] components
 
 let analyze_runtime_predicate_args
     ctx env ~bound_vars origin rel_id exp relation_shape =
@@ -1712,7 +2237,7 @@ let analyze_runtime_predicate_args
          expected_count)
   | Some components ->
     let terms_opt, guards, diagnostics =
-      lower_value_components ctx env origin components
+      lower_runtime_predicate_value_components ctx env ~bound_vars origin components
     in
     let guards =
       Condition_closure.normalize_binding_conditions
@@ -1728,7 +2253,9 @@ let analyze_runtime_predicate_args
           (Runtime_predicate_needs_binding
              { guards
              ; diagnostics
-             ; missing_sources = direct_runtime_predicate_missing_sources bound_vars components terms
+             ; components
+             ; terms
+             ; missing_sources = runtime_predicate_missing_sources bound_vars components terms
              ; reason =
                  "runtime predicate argument guards are not admissible from variables bound by the enclosing lhs or earlier premises; Bool predicates cannot introduce or search for their arguments"
              ; suggestion =
@@ -1744,14 +2271,23 @@ let analyze_runtime_predicate_args
         if missing = [] then
           Ok
             (Runtime_predicate_ready
-               { guards; predicate_term; bound_after_guards; diagnostics })
+               { guards
+               ; predicate_term
+               ; components
+               ; terms
+               ; input_sorts = runtime_predicate_input_sorts components
+               ; bound_after_guards
+               ; diagnostics
+               })
         else
           Ok
             (Runtime_predicate_needs_binding
                { guards
                ; diagnostics
+               ; components
+               ; terms
                ; missing_sources =
-                   direct_runtime_predicate_missing_sources bound_after_guards components terms
+                   runtime_predicate_missing_sources bound_after_guards components terms
                ; reason =
                    "runtime predicate premise would need to bind/search variable(s), but Bool predicates can only test already-bound values in Maude conditions: "
                    ^ String.concat ", " missing
@@ -1759,37 +2295,607 @@ let analyze_runtime_predicate_args
                    "Do not encode this predicate as a matching condition or deterministic witness function; keep it Unsupported until a source-derived rewrite-backed local-existential helper can introduce the witness before later guards use it"
                }))
 
+let local_witness_arguments missing_sources components terms =
+  match missing_sources with
+  | [ witness_source_id ] ->
+    let component_sort component =
+      Expr_translate.carrier_sort_of_typ component.note
+    in
+    let rec terms_with_sorts components terms =
+      match components, terms with
+      | [], [] -> Some []
+      | component :: components, term :: terms ->
+        (match component_sort component, terms_with_sorts components terms with
+        | Some sort, Some rest -> Some ((term, sort) :: rest)
+        | None, _ | _, None -> None)
+      | _ -> None
+    in
+    let rec loop index inputs_rev = function
+      | [], [] -> None
+      | component :: components, term :: terms ->
+        (match component.it with
+        | VarE id when id.it = witness_source_id ->
+          (match component_sort component with
+          | None -> None
+          | Some witness_sort ->
+            (match terms_with_sorts components terms with
+            | None -> None
+            | Some rest ->
+              let input_pairs = List.rev inputs_rev @ rest in
+              Some
+                ( List.map fst input_pairs
+                , List.map snd input_pairs
+                , index
+                , term
+                , witness_sort )))
+        | _ ->
+          (match component_sort component with
+          | None -> None
+          | Some sort -> loop (index + 1) ((term, sort) :: inputs_rev) (components, terms)))
+      | _ -> None
+    in
+    loop 0 [] (components, terms)
+  | _ -> None
+
+let runtime_predicate_relation ctx rel_id mixop =
+  match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id with
+  | None -> None
+  | Some relation ->
+    let relation_shape = Relation_shape.of_relation relation in
+    let local_kind = Analysis.Relation_graph.classify_mixop mixop in
+    let runtime_predicate =
+      local_kind = relation_shape.Relation_shape.marker
+      && Analysis.Relation_graph.eq_mixop relation.mixop mixop
+      &&
+      match relation_shape.Relation_shape.decision with
+      | Relation_shape.Runtime_predicate _ -> true
+      | Relation_shape.Static_validation _ ->
+        Analysis.Function_graph.relation_is_runtime_demanded
+          (Context.function_graph ctx)
+          rel_id
+      | Relation_shape.Deterministic_candidate _
+      | Relation_shape.Execution _
+      | Relation_shape.Unknown _ -> false
+    in
+    if runtime_predicate then Some relation_shape else None
+
+let direct_witness_index witness_source_id components =
+  let rec loop index = function
+    | [] -> None
+    | component :: components ->
+      if is_direct_var_exp witness_source_id component then
+        Some index
+      else
+        loop (index + 1) components
+  in
+  loop 0 components
+
+let local_witness_guides
+    ctx
+    env
+    ~bound_vars
+    origin
+    ~witness_source_id
+    ~witness_term
+    ~witness_sort
+    future_prems
+  =
+  let guide_of_prem prem =
+    match prem.it with
+    | RulePr (rel_id, [], mixop, exp) ->
+      (match runtime_predicate_relation ctx rel_id.it mixop with
+      | None -> None
+      | Some relation_shape ->
+        let expected_count =
+          List.length relation_shape.Relation_shape.components
+        in
+        (match Analysis.Relation_graph.exp_components_for_count expected_count exp with
+        | None -> None
+        | Some components ->
+          (match direct_witness_index witness_source_id components with
+          | None -> None
+          | Some guide_witness_index ->
+            let witness_binding =
+              { Expr_translate.term = witness_term
+              ; sort = witness_sort
+              ; typ = (List.nth components guide_witness_index).note
+              }
+            in
+            let guide_env =
+              Expr_translate.with_condition_bound_vars
+                (Expr_translate.add_var env witness_source_id witness_binding)
+                bound_vars
+            in
+            let terms_opt, guards, diagnostics =
+              lower_value_components ctx guide_env origin components
+            in
+            (match
+               ( terms_opt
+               , guards
+               , diagnostics
+               , runtime_predicate_input_sorts components )
+             with
+            | Some guide_input_terms, [], [], Some guide_input_sorts ->
+              Some
+                { Runtime_search_helper.guide_rel_id = rel_id.it
+                ; guide_source = Some (source_echo_prem prem)
+                ; guide_input_terms
+                ; guide_input_sorts
+                ; guide_witness_index
+                }
+            | _ -> None))))
+    | RulePr (_, _ :: _, _, _)
+    | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> None
+  in
+  future_prems |> List.filter_map guide_of_prem
+
+let rec replace_term needle replacement term =
+  if term = needle then
+    replacement
+  else
+    match term with
+    | Var _ | Const _ | Qid _ -> term
+    | App (op, args) -> App (op, List.map (replace_term needle replacement) args)
+
+let replace_condition needle replacement = function
+  | EqCond (left, right) ->
+    EqCond (replace_term needle replacement left, replace_term needle replacement right)
+  | MatchCond (left, right) ->
+    MatchCond (replace_term needle replacement left, replace_term needle replacement right)
+  | MembershipCond (term, sort) ->
+    MembershipCond (replace_term needle replacement term, sort)
+  | BoolCond term -> BoolCond (replace_term needle replacement term)
+
+let replace_capture_terms captures conditions =
+  captures
+  |> List.fold_left
+       (fun conditions capture ->
+         conditions
+         |> List.map
+              (replace_condition capture.Helper.call_term (Var capture.Helper.formal_var)))
+       conditions
+
+let filter_captures_by_call_vars used_vars captures =
+  captures
+  |> List.filter (fun capture ->
+    Condition_closure.term_vars capture.Helper.call_term
+    |> List.exists (fun var -> List.mem var used_vars))
+
+type indexed_predicate_source =
+  { index_source_id : string
+  ; source_exp : exp
+  ; source_term : term
+  ; indexed_term : term
+  }
+
+let rec indexed_predicate_source missing_source component term =
+  match component.it, term with
+  | SubE (inner, _, _), _ | CvtE (inner, _, _), _ ->
+    indexed_predicate_source missing_source inner term
+  | IdxE (source_exp, index_exp), App ("index", [ source_term; _index_term ]) ->
+    (match index_exp.it with
+    | VarE index_id when index_id.it = missing_source ->
+      Some { index_source_id = index_id.it; source_exp; source_term; indexed_term = term }
+    | _ -> None)
+  | _ -> None
+
+let indexed_predicate_sources missing_source components terms =
+  List.combine components terms
+  |> List.filter_map (fun (component, term) ->
+    indexed_predicate_source missing_source component term)
+
+let indexed_predicate_candidates missing_sources escape_source_ids components terms =
+  missing_sources
+  |> List.filter (fun source_id -> not (List.mem source_id escape_source_ids))
+  |> List.concat_map (fun source_id ->
+    indexed_predicate_sources source_id components terms)
+  |> List.sort_uniq (fun left right ->
+    match String.compare left.index_source_id right.index_source_id with
+    | 0 -> compare left.indexed_term right.indexed_term
+    | order -> order)
+
+let lower_indexed_predicate_exists
+    ctx
+    env
+    ~bound_vars
+    origin
+    prem
+    rel_id
+    components
+    terms
+    guards
+    diagnostics
+    missing_sources
+    escape_source_ids =
+  let build indexed source_element_sort source_term =
+    if
+      not
+        (vars_subset
+           (Condition_closure.term_vars source_term)
+           bound_vars)
+    then
+      None
+    else
+      let stem = helper_local_stem origin (source_echo_prem prem) in
+      let helper_head_var =
+        Naming.maude_var ~fallback:"HEAD" (stem ^ "-head")
+      in
+      let source_tail_var =
+        Naming.maude_var ~fallback:"TAIL" (stem ^ "-tail")
+      in
+      let head_term = Var helper_head_var in
+      let body_conditions =
+        guards @ [ BoolCond (relation_call rel_id terms) ]
+        |> List.map (replace_condition indexed.indexed_term head_term)
+      in
+      let body_used_vars =
+        Condition_closure.external_vars_of_conditions
+          [ helper_head_var ]
+          body_conditions
+      in
+      let capture_ids =
+        components
+        |> List.concat_map source_and_note_free_var_ids
+        |> List.filter (fun id -> id <> indexed.index_source_id)
+        |> List.sort_uniq String.compare
+      in
+      let captures =
+        capture_candidates env capture_ids
+        |> make_captures stem
+        |> filter_captures_by_call_vars body_used_vars
+      in
+      let body_conditions = replace_capture_terms captures body_conditions in
+      let helper_bound = helper_head_var :: capture_vars captures in
+      let body_external =
+        Condition_closure.external_vars_of_conditions helper_bound body_conditions
+      in
+      if body_external <> [] then
+        None
+      else
+        let helper_request =
+          { Helper.kind =
+              Helper.Iter_premise_exists_bool
+                { source_shape =
+                    { prem_source = source_echo_prem prem
+                    ; indexed_source = source_echo_exp indexed.source_exp
+                    ; source_typ_source =
+                        Il.Print.string_of_typ indexed.source_exp.note
+                    ; predicate_source = source_echo_prem prem
+                    }
+                ; index_source_id = indexed.index_source_id
+                ; helper_head_var
+                ; source_tail_var
+                ; source_element_sort
+                ; captures
+                ; body_eq_conditions = body_conditions
+                }
+          ; reason = "finite indexed runtime-predicate existential over a source list"
+          ; origin
+          }
+        in
+        let helper_name = Helper.request (Context.helpers ctx) helper_request in
+        let helper_call =
+          app helper_name
+            (source_term
+             :: List.map (fun capture -> capture.Helper.call_term) captures)
+        in
+        Some
+          (with_conditions
+             env
+             bound_vars
+             [ BoolCond helper_call ]
+             diagnostics)
+  in
+  match
+    indexed_predicate_candidates
+      missing_sources
+      escape_source_ids
+      components
+      terms
+  with
+    | [ indexed ] ->
+      (match flat_list_element_typ indexed.source_exp.note with
+      | None -> None
+      | Some source_element_typ ->
+        (match Expr_translate.carrier_sort_of_typ source_element_typ with
+        | None -> None
+        | Some source_element_sort ->
+          build indexed source_element_sort indexed.source_term))
+    | _ -> None
+
 let lower_runtime_predicate_rule_premise
-    ctx env ~bound_vars ~future_prems origin prem rel_id exp relation_shape =
+    ctx
+    env
+    ~allow_runtime_search
+    ~bound_vars
+    ~blocked_witness_source_ids
+    ~escape_source_ids
+    ~future_prems
+    origin
+    prem
+    rel_id
+    exp
+    relation_shape =
   match analyze_runtime_predicate_args ctx env ~bound_vars origin rel_id exp relation_shape with
   | Error reason ->
     unsupported_prem ctx env ~bound_vars origin "Premise/RulePr/runtime-predicate/arity" prem reason
-  | Ok (Runtime_predicate_ready { guards; predicate_term; bound_after_guards; diagnostics }) ->
-    { (empty_with_env ~bound_vars:bound_after_guards env) with
-      eq_conditions = guards @ [ BoolCond predicate_term ]
-    ; diagnostics
-    }
-  | Ok (Runtime_predicate_needs_binding { guards; diagnostics; missing_sources; reason; suggestion }) ->
-    let candidate_constructor, candidate_reason, candidate_suggestion =
-      runtime_predicate_binding_diagnostic ctx rel_id ~missing_sources ~future_prems
-    in
-    let constructor, reason, suggestion =
-      if candidate_reason = "" then
-        "Premise/RulePr/runtime-predicate/binding-needed", reason, suggestion
+  | Ok (Runtime_predicate_ready
+          { guards
+          ; predicate_term
+          ; terms
+          ; input_sorts
+          ; bound_after_guards
+          ; diagnostics
+          ; _
+          }) ->
+    (match Runtime_predicate_search.truth_plan ctx rel_id.it with
+    | Runtime_predicate_search.Truth_not_needed ->
+      { (empty_with_env ~bound_vars:bound_after_guards env) with
+        eq_conditions = guards @ [ BoolCond predicate_term ]
+      ; diagnostics
+      }
+    | truth_plan when allow_runtime_search ->
+      (match input_sorts with
+      | Some input_sorts ->
+        (match
+           Runtime_predicate_search.truth_helper_request
+             ~input_terms:terms
+             ~input_sorts
+             truth_plan
+         with
+        | Some request ->
+          let helper_name =
+            Helper.request
+              (Context.helpers ctx)
+              { Helper.kind = Helper.Runtime_predicate_truth_search request
+              ; reason = Runtime_truth_search_helper.reason request
+              ; origin
+              }
+          in
+          { (empty_with_env ~bound_vars:bound_after_guards env) with
+            eq_conditions = guards
+          ; rule_conditions =
+              [ Runtime_truth_search_helper.rewrite_condition ~helper_name request ]
+          ; runtime_truth_search_requests = [ request ]
+          ; diagnostics
+          }
+        | None ->
+          let diagnostic =
+            Runtime_predicate_search.truth_diagnostic ctx rel_id.it
+          in
+          let constructor, reason, suggestion =
+            match diagnostic with
+            | None ->
+              ( "Premise/RulePr/runtime-predicate/truth-search-needed"
+              , "runtime predicate needs a rewrite-backed truth-search helper, but no source-complete helper request could be built"
+              , "Keep this predicate Unsupported until its source closure can be materialized as rewrite-backed helper rules"
+              )
+            | Some diagnostic ->
+              ( diagnostic.Runtime_predicate_search.constructor
+              , diagnostic.Runtime_predicate_search.reason
+              , diagnostic.Runtime_predicate_search.suggestion
+              )
+          in
+          runtime_predicate_unsupported
+            ctx
+            env
+            ~bound_vars
+            origin
+            prem
+            constructor
+            diagnostics
+            guards
+            reason
+            suggestion)
+      | None ->
+        runtime_predicate_unsupported
+          ctx
+          env
+          ~bound_vars
+          origin
+          prem
+          "Premise/RulePr/runtime-predicate/truth-search-sort"
+          diagnostics
+          guards
+          "runtime predicate needs a rewrite-backed truth-search helper, but at least one argument type has no Maude carrier sort"
+          "Keep this predicate Unsupported until the source relation component types can be mapped to helper argument sorts")
+    | _ ->
+      let diagnostic =
+        Runtime_predicate_search.truth_diagnostic ctx rel_id.it
+      in
+      let constructor, reason, suggestion =
+        match diagnostic with
+        | None ->
+          ( "Premise/RulePr/runtime-predicate/truth-search-in-ceq"
+          , "runtime predicate needs a rewrite-backed truth-search helper, but this premise is being lowered in a pure equational context"
+          , "Use this predicate only inside a crl/helper context, or add an explicit rewrite-dependent carrier before lowering it"
+          )
+        | Some diagnostic ->
+          ( diagnostic.Runtime_predicate_search.constructor
+          , diagnostic.Runtime_predicate_search.reason
+          , diagnostic.Runtime_predicate_search.suggestion
+          )
+      in
+      runtime_predicate_unsupported
+        ctx
+        env
+        ~bound_vars
+        origin
+        prem
+        constructor
+        diagnostics
+        guards
+        reason
+        suggestion)
+  | Ok (Runtime_predicate_needs_binding
+          { guards
+          ; diagnostics
+          ; components
+          ; terms
+          ; missing_sources
+          ; reason
+          ; suggestion
+          }) ->
+    (match
+       lower_indexed_predicate_exists
+         ctx
+         env
+         ~bound_vars
+         origin
+         prem
+         rel_id
+         components
+         terms
+         guards
+         diagnostics
+         missing_sources
+         escape_source_ids
+     with
+    | Some result -> result
+    | None ->
+      if
+        missing_sources <> []
+        && List.for_all
+             (fun id -> List.mem id blocked_witness_source_ids)
+             missing_sources
+      then
+        runtime_predicate_blocked_by_prior_witness
+          ctx
+          env
+          ~bound_vars
+          origin
+          prem
+          diagnostics
+          guards
+          missing_sources
       else
-        candidate_constructor, candidate_reason, candidate_suggestion
-    in
-    runtime_predicate_unsupported
-      ctx
-      env
-      ~bound_vars
-      origin
-      prem
-      constructor
-      diagnostics
-      guards
-      reason
-      suggestion
+      (match
+         Runtime_predicate_search.local_existential_plan
+           ctx
+           rel_id.it
+           ~missing_sources
+           ~escape_source_ids
+           ~future_prems
+      with
+      | Some plan when allow_runtime_search ->
+        (match local_witness_arguments missing_sources components terms with
+        | Some (input_terms, input_sorts, witness_index, witness_term, witness_sort) ->
+          let guides =
+            match missing_sources with
+            | [ witness_source_id ] ->
+              local_witness_guides
+                ctx
+                env
+                ~bound_vars
+                origin
+                ~witness_source_id
+                ~witness_term
+                ~witness_sort
+                future_prems
+            | [] | _ :: _ :: _ -> []
+          in
+          (match
+             Runtime_predicate_search.helper_request
+               ~input_terms
+               ~input_sorts
+               ~guides
+               ~witness_index
+               ~witness_term
+               ~witness_sort
+               plan
+           with
+        | Some request ->
+          let helper_name =
+            Helper.request
+              (Context.helpers ctx)
+              { Helper.kind = Helper.Runtime_predicate_search request
+              ; reason = Runtime_search_helper.reason request
+              ; origin
+              }
+          in
+          let witness_vars = Condition_closure.term_vars witness_term in
+          { (empty_with_env ~bound_vars:(normalize_vars (bound_vars @ witness_vars)) env)
+            with
+            eq_conditions = guards
+          ; rule_conditions =
+              [ Runtime_search_helper.rewrite_condition ~helper_name request ]
+          ; runtime_search_requests = [ request ]
+          ; diagnostics
+          }
+        | None ->
+          let diagnostic =
+            Runtime_predicate_search.binding_diagnostic
+              ctx
+              rel_id.it
+              ~missing_sources
+              ~escape_source_ids
+              ~future_prems
+          in
+          let constructor, reason, suggestion, blocked_witness_source_ids =
+            match diagnostic with
+            | None ->
+              "Premise/RulePr/runtime-predicate/binding-needed", reason, suggestion, []
+            | Some diagnostic ->
+              ( diagnostic.Runtime_predicate_search.constructor
+              , diagnostic.Runtime_predicate_search.reason
+              , diagnostic.Runtime_predicate_search.suggestion
+              , diagnostic.Runtime_predicate_search.blocked_witness_source_ids )
+          in
+          runtime_predicate_unsupported
+            ~blocked_witness_source_ids
+            ctx
+            env
+            ~bound_vars
+            origin
+            prem
+            constructor
+            diagnostics
+            guards
+            reason
+            suggestion)
+        | None ->
+          runtime_predicate_unsupported
+            ctx
+            env
+            ~bound_vars
+            origin
+            prem
+            "Premise/RulePr/runtime-predicate/binding-needed"
+            diagnostics
+            guards
+            reason
+            "Runtime search currently requires exactly one direct VarE witness argument; keep this premise Unsupported until a source-derived helper can preserve the more complex witness pattern")
+      | _ ->
+        let diagnostic =
+          Runtime_predicate_search.binding_diagnostic
+            ctx
+            rel_id.it
+            ~missing_sources
+            ~escape_source_ids
+            ~future_prems
+        in
+        let constructor, reason, suggestion, blocked_witness_source_ids =
+          match diagnostic with
+          | None ->
+            "Premise/RulePr/runtime-predicate/binding-needed", reason, suggestion, []
+          | Some diagnostic ->
+            ( diagnostic.Runtime_predicate_search.constructor
+            , diagnostic.Runtime_predicate_search.reason
+            , diagnostic.Runtime_predicate_search.suggestion
+            , diagnostic.Runtime_predicate_search.blocked_witness_source_ids )
+        in
+        runtime_predicate_unsupported
+          ~blocked_witness_source_ids
+          ctx
+          env
+          ~bound_vars
+          origin
+          prem
+          constructor
+          diagnostics
+          guards
+          reason
+          suggestion))
   | Ok (Runtime_predicate_bad_value { guards; diagnostics }) ->
     runtime_predicate_unsupported
       ctx
@@ -2065,7 +3171,18 @@ let lower_annotated_execution_equational_view_premise
             ]
       })
 
-let lower_rule_premise ctx env ~bound_vars ~future_prems origin prem rel_id mixop =
+let lower_rule_premise
+    ctx
+    env
+    ~allow_runtime_search
+    ~bound_vars
+    ~blocked_witness_source_ids
+    ~future_prems
+    ~escape_source_ids
+    origin
+    prem
+    rel_id
+    mixop =
   match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
   | None ->
     unsupported_prem ctx env ~bound_vars origin "Premise/RulePr/unresolved" prem
@@ -2099,11 +3216,14 @@ let lower_rule_premise ctx env ~bound_vars ~future_prems origin prem rel_id mixo
        with
       | Some runtime_reason ->
         (match prem.it with
-        | RulePr (_, _, exp) ->
+        | RulePr (_, _, _, exp) ->
           lower_runtime_predicate_rule_premise
             ctx
             env
+            ~allow_runtime_search
             ~bound_vars
+            ~blocked_witness_source_ids
+            ~escape_source_ids
             ~future_prems
             origin
             prem
@@ -2121,11 +3241,14 @@ let lower_rule_premise ctx env ~bound_vars ~future_prems origin prem rel_id mixo
           "Keep the source premise in diagnostics/metadata; emit no runtime Maude condition for this validation-only premise")
     | Relation_shape.Runtime_predicate _ ->
       (match prem.it with
-      | RulePr (_, _, exp) ->
+      | RulePr (_, _, _, exp) ->
         lower_runtime_predicate_rule_premise
           ctx
           env
+          ~allow_runtime_search
           ~bound_vars
+          ~blocked_witness_source_ids
+          ~escape_source_ids
           ~future_prems
           origin
           prem
@@ -2137,7 +3260,7 @@ let lower_rule_premise ctx env ~bound_vars ~future_prems origin prem rel_id mixo
           "runtime predicate premise lowering expected a RulePr AST node")
     | Relation_shape.Deterministic_candidate shape ->
       (match prem.it with
-      | RulePr (_, _, exp) ->
+      | RulePr (_, _, _, exp) ->
         lower_deterministic_rule_premise
           ctx
           env
@@ -2153,7 +3276,7 @@ let lower_rule_premise ctx env ~bound_vars ~future_prems origin prem rel_id mixo
     | Relation_shape.Execution shape ->
       if Analysis.Function_graph.relation_has_maude_equational_view relation then
         (match prem.it with
-        | RulePr (_, _, exp) ->
+        | RulePr (_, _, _, exp) ->
           lower_annotated_execution_equational_view_premise
             ctx
             env
@@ -2366,6 +3489,244 @@ let lower_optional_if_iter_premise
                     @ variable_diagnostics
                 }))))
 
+let structural_static_validation_rule_premise ctx rel_id mixop =
+  match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
+  | None -> None
+  | Some relation ->
+    let relation_shape = Relation_shape.of_relation relation in
+    let local_kind = Analysis.Relation_graph.classify_mixop mixop in
+    if local_kind <> relation_shape.Relation_shape.marker
+       || not (Analysis.Relation_graph.eq_mixop relation.mixop mixop)
+    then
+      None
+    else
+      match relation_shape.Relation_shape.decision with
+      | Relation_shape.Static_validation reason -> Some reason
+      | _ -> None
+
+type static_validation_body =
+  { reasons : string list
+  ; has_relation : bool
+  }
+
+let validation_body reason has_relation =
+  { reasons = [ reason ]; has_relation }
+
+let rec static_validation_iter_body ctx prem =
+  match prem.it with
+  | IfPr _ -> Some (validation_body "source side condition" false)
+  | RulePr (rel_id, [], mixop, _) ->
+    (match structural_static_validation_rule_premise ctx rel_id mixop with
+    | Some reason -> Some (validation_body reason true)
+    | None -> None)
+  | RulePr (_, _ :: _, _, _) -> None
+  | IterPr (body, _) -> static_validation_iter_body ctx body
+  | NegPr _ | LetPr _ | ElsePr -> None
+
+let enclosing_static_validation_relation ctx =
+  match Context.enclosing_path ctx with
+  | relation_id :: _ ->
+    (match
+       Analysis.Function_graph.find_relation
+         (Context.function_graph ctx)
+         relation_id
+     with
+    | Some relation ->
+      (match (Relation_shape.of_relation relation).Relation_shape.decision with
+      | Relation_shape.Static_validation _ -> true
+      | Relation_shape.Runtime_predicate _
+      | Relation_shape.Deterministic_candidate _
+      | Relation_shape.Execution _
+      | Relation_shape.Unknown _ -> false)
+    | None -> false)
+  | [] -> false
+
+let source_id_is_bound env bound_vars id =
+  match Expr_translate.find_var env id with
+  | None -> false
+  | Some binding ->
+    Condition_closure.term_vars binding.Expr_translate.term
+    |> List.for_all (fun var -> List.mem var bound_vars)
+
+let unbound_external_source_ids env ~bound_vars local_ids prem =
+  prem_source_and_note_free_var_ids prem
+  |> List.filter (fun id ->
+    not (List.mem id local_ids) && not (source_id_is_bound env bound_vars id))
+  |> List.sort_uniq String.compare
+
+let iter_local_source_ids = function
+  | ListN (_, Some id) -> [ id.it ]
+  | Opt | List | List1 | ListN (_, None) -> []
+
+let validation_local_generator_ids env ~bound_vars generators =
+  generators
+  |> List.filter_map (fun (id, source_exp) ->
+    let source_ids = source_and_note_free_var_ids source_exp in
+    if source_ids = []
+       || List.exists
+            (fun source_id -> not (source_id_is_bound env bound_vars source_id))
+            source_ids
+    then
+      Some id.it
+    else
+      None)
+  |> List.sort_uniq String.compare
+
+let future_runtime_source_ids ctx prems =
+  prems
+  |> List.filter (fun prem ->
+    match static_validation_iter_body ctx prem with
+    | Some _ -> false
+    | None -> true)
+  |> List.concat_map prem_source_and_note_free_var_ids
+  |> List.sort_uniq String.compare
+
+let skip_eligible_static_validation_premise ctx prem =
+  match prem.it with
+  | RulePr (rel_id, [], mixop, _) ->
+    Option.is_some (structural_static_validation_rule_premise ctx rel_id mixop)
+  | RulePr (_, _ :: _, _, _) -> false
+  | IterPr (body, _) -> Option.is_some (static_validation_iter_body ctx body)
+  | IfPr _ | LetPr _ | ElsePr | NegPr _ -> false
+
+let future_skipped_static_validation_source_ids ctx prems =
+  prems
+  |> List.filter (skip_eligible_static_validation_premise ctx)
+  |> List.concat_map prem_source_and_note_free_var_ids
+  |> List.sort_uniq String.compare
+
+let mixop_has_validation_subtyping_marker mixop =
+  Xl.Mixop.flatten mixop
+  |> List.exists (fun atoms ->
+    atoms
+    |> List.exists (fun atom ->
+      match atom.it with
+      | Xl.Atom.TurnstileSub | Xl.Atom.Sub -> true
+      | _ -> false))
+
+let enclosing_relation_id ctx =
+  match Context.enclosing_path ctx with
+  | relation_id :: _ -> Some relation_id
+  | [] -> None
+
+let enclosing_relation_has_subtyping_marker ctx =
+  match enclosing_relation_id ctx with
+  | None -> false
+  | Some relation_id ->
+    (match
+       Analysis.Function_graph.find_relation
+         (Context.function_graph ctx)
+         relation_id
+     with
+    | None -> false
+    | Some relation -> mixop_has_validation_subtyping_marker relation.mixop)
+
+let try_static_validation_rule_skip
+    ctx env ~bound_vars ~future_prems ~escape_source_ids origin prem rel_id mixop =
+  match structural_static_validation_rule_premise ctx rel_id mixop with
+  | None -> None
+  | Some reason ->
+    let enclosing_id = enclosing_relation_id ctx in
+    if not (enclosing_static_validation_relation ctx) then
+      None
+    else if mixop_has_validation_subtyping_marker mixop then
+      None
+    else if enclosing_relation_has_subtyping_marker ctx then
+      None
+    else if enclosing_id = Some rel_id.it then
+      None
+    else
+      let unbound_ids = unbound_external_source_ids env ~bound_vars [] prem in
+      if unbound_ids = [] then
+        None
+      else
+        let later_runtime_ids = future_runtime_source_ids ctx future_prems in
+        let later_static_ids =
+          future_skipped_static_validation_source_ids ctx future_prems
+        in
+        let later_ids =
+          future_prems
+          |> List.concat_map prem_source_and_note_free_var_ids
+          |> List.sort_uniq String.compare
+        in
+        let escaping_ids =
+          unbound_ids
+          |> List.filter (fun id ->
+            List.mem id escape_source_ids
+            || List.mem id later_runtime_ids
+            || (List.mem id later_ids && not (List.mem id later_static_ids)))
+        in
+        if escaping_ids <> [] then
+          None
+        else
+          let reason =
+            "static validation relation premise is discharged by the official validator in Runtime_after_external_validation; structural relation classification is "
+            ^ reason
+            ^ "; validation-local variable(s) are used only by later static-validation premises and do not escape runtime output or later runtime/non-validation conditions: "
+            ^ String.concat ", " unbound_ids
+          in
+          Some
+            (skipped_prem ctx env ~bound_vars origin
+               "Premise/RulePr/static-validation"
+               prem
+               reason
+               "Keep this validation-only witness premise in diagnostics/metadata; emit no runtime Maude condition for the local validation witness")
+
+let try_static_validation_iter_skip
+    ctx env ~bound_vars ~future_prems ~escape_source_ids origin prem body iter generators =
+  match static_validation_iter_body ctx body with
+  | None -> None
+  | Some body_info ->
+    let scoped_local_ids =
+      iter_local_source_ids iter
+      @ (generators |> List.map (fun (id, _source) -> id.it))
+      |> List.sort_uniq String.compare
+    in
+    let guarded_local_ids =
+      iter_local_source_ids iter
+      @ validation_local_generator_ids env ~bound_vars generators
+      |> List.sort_uniq String.compare
+    in
+    let unbound_ids =
+      unbound_external_source_ids env ~bound_vars scoped_local_ids prem
+    in
+    let enclosing_static = enclosing_static_validation_relation ctx in
+    if
+      (not body_info.has_relation)
+      && not enclosing_static
+    then
+      None
+    else
+      let later_ids = future_runtime_source_ids ctx future_prems in
+      let guarded_ids =
+        guarded_local_ids @ unbound_ids |> List.sort_uniq String.compare
+      in
+      if enclosing_static && guarded_ids = [] then
+        None
+      else
+        let escaping_ids =
+          guarded_ids
+          |> List.filter (fun id ->
+            List.mem id escape_source_ids || List.mem id later_ids)
+        in
+        if escaping_ids <> [] then
+          None
+        else
+          let reason =
+            "iterated static validation premise is discharged by the official validator in Runtime_after_external_validation; body structural classification is "
+            ^ (body_info.reasons |> List.sort_uniq String.compare |> String.concat "; ")
+            ^ "; validation-local variable(s) do not escape runtime output or later runtime/non-validation conditions: "
+            ^ (match guarded_ids with
+               | [] -> "<none>"
+               | ids -> String.concat ", " ids)
+          in
+          Some
+            (skipped_prem ctx env ~bound_vars origin
+               "Premise/IterPr/static-validation"
+               prem
+               reason
+               "Keep the iterated source premise in diagnostics/metadata; emit no runtime Maude condition for this validation-only IterPr")
+
 let rec lower_list_iter_premise
     ctx env ~bound_vars origin prem body iter source_generator source_exp =
   let unsupported_list_iter reason =
@@ -2454,6 +3815,7 @@ let rec lower_list_iter_premise
           let body_result =
             translate_premise ctx helper_env ~bound_vars:helper_bound origin body
           in
+          let body_input_bound = helper_bound in
           let body_used_vars =
             Condition_closure.external_vars_of_conditions
               [ helper_head_var ]
@@ -2472,7 +3834,7 @@ let rec lower_list_iter_premise
           in
           let introduced_vars =
             body_result.bound_vars_after
-            |> List.filter (fun var -> not (List.mem var helper_bound))
+            |> List.filter (fun var -> not (List.mem var body_input_bound))
             |> List.sort_uniq String.compare
           in
           let structural_diagnostics =
@@ -2723,6 +4085,7 @@ and lower_zip_iter_premise ctx env ~bound_vars origin prem body iter generators 
       let body_result =
         translate_premise ctx helper_env ~bound_vars:helper_bound origin body
       in
+      let body_input_bound = helper_bound in
       let body_used_vars =
         Condition_closure.external_vars_of_conditions
           helper_heads
@@ -2741,7 +4104,7 @@ and lower_zip_iter_premise ctx env ~bound_vars origin prem body iter generators 
       in
       let introduced_vars =
         body_result.bound_vars_after
-        |> List.filter (fun var -> not (List.mem var helper_bound))
+        |> List.filter (fun var -> not (List.mem var body_input_bound))
         |> List.sort_uniq String.compare
       in
       let structural_diagnostics =
@@ -2889,7 +4252,299 @@ and lower_zip_iter_premise ctx env ~bound_vars origin prem body iter generators 
 
 and try_binding_map_iter_premise ctx env ~bound_vars origin prem body iter generators =
   let targets = binding_map_targets env ~bound_vars generators in
+  let lower_indexed_listn_target count_exp index_id target =
+    let stem = helper_local_stem origin (source_echo_prem prem) in
+    let body_result_var = "OUT" ^ stem in
+    let count_var = "N" ^ stem in
+    let index_var = "I" ^ stem in
+    let target_generator_id = target.target_generator.it in
+    let generator_ids = generators |> List.map (fun (id, _) -> id.it) in
+    let count_binding =
+      match count_exp.it with
+      | VarE count_id ->
+        Some
+          ( count_id.it
+          , { Expr_translate.term = Var count_var
+            ; sort = sort "Nat"
+            ; typ = count_exp.note
+            } )
+      | _ -> None
+    in
+    let local_source_ids =
+      let count_ids =
+        match count_binding with
+        | Some (count_id, _) -> [ count_id ]
+        | None -> []
+      in
+      index_id.it :: target_generator_id :: (count_ids @ generator_ids)
+    in
+    let body_source_ids =
+      prem_source_and_note_free_var_ids body
+      @ source_and_note_free_var_ids count_exp
+      @ source_and_note_free_var_ids target.target_source_exp
+      |> List.filter (fun id -> not (List.mem id local_source_ids))
+      |> List.sort_uniq String.compare
+    in
+    let captures =
+      body_source_ids |> capture_candidates env |> make_captures stem
+    in
+    let add_count_binding helper_env =
+      match count_binding with
+      | Some (count_id, binding) ->
+        Expr_translate.add_var helper_env count_id binding
+      | None -> helper_env
+    in
+    let helper_env =
+      capture_env captures
+      |> add_count_binding
+      |> fun helper_env ->
+      Expr_translate.add_var helper_env index_id.it
+        { Expr_translate.term = Var index_var
+        ; sort = sort "Nat"
+        ; typ = NumT `NatT $ index_id.at
+        }
+      |> fun helper_env ->
+      Expr_translate.add_var helper_env target_generator_id
+        { Expr_translate.term = Var body_result_var
+        ; sort = target.target_element_sort
+        ; typ = target.target_element_typ
+        }
+    in
+    let helper_bound = count_var :: index_var :: capture_vars captures in
+    let body_result =
+      translate_premise ctx helper_env ~bound_vars:helper_bound origin body
+    in
+    let body_initial_bound = helper_bound in
+    match take_match_binding body_result_var body_result.eq_conditions with
+    | None ->
+      Some
+        { (empty_with_env ~bound_vars env) with
+          diagnostics =
+            body_result.diagnostics
+            @ [ unsupported
+                  ~ctx
+                  ~origin
+                  ~constructor:"Premise/IterPr/ListNBindingMap/body"
+                  ~source_echo:(source_echo_prem body)
+                  ~reason:
+                    "indexed ListN binding-map body did not introduce the target element through a matching condition"
+                  ~suggestion:
+                    "Keep this premise Unsupported until the body equality can bind the target element source-locally"
+                  ()
+              ]
+        }
+	    | Some (lowered_body, body_eq_conditions) ->
+	      let helper_conditions =
+	        MatchCond (Var body_result_var, lowered_body) :: body_eq_conditions
+	      in
+	      let body_used_vars =
+	        Condition_closure.external_vars_of_conditions
+	          [ body_result_var; count_var; index_var ]
+	          helper_conditions
+	      in
+	      let captures = captures |> filter_used_captures body_used_vars in
+	      let helper_bound = count_var :: index_var :: capture_vars captures in
+      let helper_bound_with_output = body_result_var :: helper_bound in
+      let body_external =
+        Condition_closure.external_vars_of_conditions
+          helper_bound_with_output
+          helper_conditions
+      in
+	      let introduced_vars =
+	        body_result.bound_vars_after
+	        |> List.filter (fun var ->
+	          var <> body_result_var && not (List.mem var body_initial_bound))
+	        |> List.sort_uniq String.compare
+	      in
+	      let helper_bound_after =
+	        Condition_closure.conditions_admissible_bound
+	          helper_bound
+	          helper_conditions
+	      in
+	      let helper_failure_reasons =
+	        [ (match helper_bound_after with
+	           | None -> Some "conditions are not Maude-admissible in helper order"
+	           | Some body_bound_after ->
+	             if List.mem body_result_var body_bound_after then
+	               None
+	             else
+	               Some
+	                 ("target variable `" ^ body_result_var
+	                  ^ "` is not bound by helper conditions"))
+	        ; (match body_external with
+	           | [] -> None
+	           | vars ->
+	             Some
+	               ("helper body still references uncaptured variable(s): "
+	                ^ String.concat ", " vars))
+	        ; (match introduced_vars with
+	           | [] -> None
+	           | vars ->
+	             Some
+	               ("helper body introduces extra variable(s): "
+	                ^ String.concat ", " vars))
+	        ; if body_result.rule_conditions = [] then
+	            None
+	          else
+	            Some "helper body produced rewrite/rule conditions"
+	        ; if body_result.has_else then
+	            Some "helper body contains ElsePr"
+	          else
+	            None
+	        ; if body_result.let_bound_ids = [] then
+	            None
+	          else
+	            Some "helper body contains source LetPr binding"
+	        ; if diagnostics_have_fatal body_result.diagnostics then
+	            Some "helper body produced fatal diagnostics"
+	          else
+	            None
+	        ]
+	        |> List.filter_map (fun reason -> reason)
+	      in
+	      (match helper_bound_after with
+	      | Some body_bound_after
+	        when List.mem body_result_var body_bound_after
+	             && body_external = []
+             && introduced_vars = []
+             && body_result.rule_conditions = []
+             && not body_result.has_else
+             && body_result.let_bound_ids = []
+             && not (diagnostics_have_fatal body_result.diagnostics) ->
+        if not (Condition_closure.is_match_pattern target.target_source_term) then
+          None
+        else
+          let count_result =
+            Expr_translate.lower_numeric_guard_value ctx env origin count_exp
+          in
+          (match count_result.term with
+          | None -> None
+          | Some count_term ->
+            let helper_request =
+              { Helper.kind =
+                  Helper.Iter_listn
+                    { source_shape =
+                        { iter_source = source_echo_prem prem
+                        ; body_source = source_echo_prem body
+                        ; count_source = source_echo_exp count_exp
+                        ; count_typ_source = Il.Print.string_of_typ count_exp.note
+                        ; output_typ_source =
+                            Il.Print.string_of_typ target.target_source_exp.note
+                        ; mode = Helper.Indexed_from_zero
+                        }
+                    ; call_shape = Helper.Source_then_captures
+	      ; count_var
+                    ; index_var = Some index_var
+                    ; body_result_var
+                    ; output_item_shape = Helper.Output_flat_terminal
+                    ; captures
+                    ; lowered_body
+                    ; body_eq_conditions
+                    }
+              ; reason = "indexed ListN IterPr binding-map helper"
+              ; origin
+              }
+            in
+            let helper_name =
+              Helper.request (Context.helpers ctx) helper_request
+            in
+            let helper_call =
+              app helper_name
+                (count_term
+                 :: Const "0"
+                 :: List.map (fun capture -> capture.Helper.call_term) captures)
+            in
+            let caller_conditions =
+              count_result.guards
+              @ [ MatchCond (target.target_source_term, helper_call) ]
+            in
+            if
+              Condition_closure.external_vars_of_conditions
+                bound_vars
+                caller_conditions
+              = []
+            then
+              let result =
+                with_conditions
+                  env
+                  bound_vars
+                  caller_conditions
+                  (count_result.diagnostics @ body_result.diagnostics)
+              in
+              Some
+                { result with
+                  env_after =
+                    Expr_translate.add_var
+                      result.env_after
+                      target.target_source_id.it
+                      target.target_source_binding
+                }
+            else
+              None)
+      | _ ->
+        Some
+          { (empty_with_env ~bound_vars env) with
+            diagnostics =
+              body_result.diagnostics
+              @ [ unsupported
+                    ~ctx
+                    ~origin
+                    ~constructor:"Premise/IterPr/ListNBindingMap/body"
+	                    ~source_echo:(source_echo_prem body)
+	                    ~reason:
+	                      ("indexed ListN binding-map body equality is not admissible inside the source-local helper"
+	                       ^
+	                       if helper_failure_reasons = [] then
+	                         ""
+	                       else
+	                         ": " ^ String.concat "; " helper_failure_reasons)
+	                    ~suggestion:
+	                      "Keep this premise Unsupported until the body has only equation conditions over the index, target, and captures"
+	                    ()
+                ]
+          })
+  in
   match iter, body.it, targets with
+  | ListN (_count_exp, Some index_id), _, _ ->
+    let targets =
+      targets
+      |> List.filter (fun target -> target.target_generator.it <> index_id.it)
+    in
+    (match body.it, targets with
+    | IfPr ({ it = CmpE (`EqOp, _, _left, _right); _ }), [ target ] ->
+      (match lower_indexed_listn_target _count_exp index_id target with
+      | Some result -> Some result
+      | None ->
+        Some
+          (unsupported_prem
+             ctx
+             env
+             ~bound_vars
+             origin
+             "Premise/IterPr/ListNBindingMap"
+             prem
+             "indexed ListN binding-map shape was detected, but the body equality could not be lowered to a source-local binding-map helper"))
+    | IfPr ({ it = CmpE (`EqOp, _, _, _); _ }), [] ->
+      Some
+        (unsupported_prem
+           ctx
+           env
+           ~bound_vars
+           origin
+           "Premise/IterPr/ListNBindingMap"
+           prem
+           "indexed ListN binding-map premise has no unbound output sequence target after ignoring the index generator")
+    | IfPr ({ it = CmpE (`EqOp, _, _, _); _ }), _ :: _ :: _ ->
+      Some
+        (unsupported_prem
+           ctx
+           env
+           ~bound_vars
+           origin
+           "Premise/IterPr/ListNBindingMap"
+           prem
+           "indexed ListN binding-map premise has more than one unbound output sequence target")
+    | _ -> None)
   | List, IfPr ({ it = CmpE (`EqOp, _, left, right); _ }), [ target ] ->
     let target_generator_id = target.target_generator.it in
     let target_on_left = is_direct_var_exp target_generator_id left in
@@ -2970,10 +4625,10 @@ and try_binding_map_iter_premise ctx env ~bound_vars origin prem body iter gener
               in
               (match take_match_binding body_result_var body_result.eq_conditions with
               | None -> None
-              | Some (lowered_body, body_eq_conditions) ->
-              let helper_conditions =
-                body_eq_conditions @ [ MatchCond (Var body_result_var, lowered_body) ]
-              in
+	              | Some (lowered_body, body_eq_conditions) ->
+	              let helper_conditions =
+	                MatchCond (Var body_result_var, lowered_body) :: body_eq_conditions
+	              in
               let body_used_vars =
                 Condition_closure.external_vars_of_conditions
                   (body_result_var :: [ helper_head_var ])
@@ -3083,7 +4738,14 @@ and try_binding_map_iter_premise ctx env ~bound_vars origin prem body iter gener
       | [] | _ :: _ :: _ -> None)
   | _ -> None
 
-and lower_iter_premise ctx env ~bound_vars origin prem body iter generators =
+and lower_iter_premise
+    ctx env ~bound_vars ~future_prems ~escape_source_ids origin prem body iter generators =
+  match
+    try_static_validation_iter_skip
+      ctx env ~bound_vars ~future_prems ~escape_source_ids origin prem body iter generators
+  with
+  | Some result -> result
+  | None ->
   match try_binding_map_iter_premise ctx env ~bound_vars origin prem body iter generators with
   | Some result -> result
   | None ->
@@ -3100,12 +4762,28 @@ and lower_iter_premise ctx env ~bound_vars origin prem body iter generators =
       unsupported_prem ctx env ~bound_vars origin "Premise/IterPr" prem
         "iterated premises require all/optional/ListN premise helpers; this slice supports optional IfPr, one-source list all, and flat lockstep list zip helpers"
 
-and translate_premise ?(future_prems = []) ctx env ~bound_vars parent_origin prem =
+and translate_premise
+    ?(allow_runtime_search = false)
+    ?(future_prems = [])
+    ?(escape_source_ids = [])
+    ?(blocked_witness_source_ids = [])
+    ctx
+    env
+    ~bound_vars
+    parent_origin
+    prem =
   let origin = origin_for_premise parent_origin prem in
   let env = Expr_translate.with_condition_bound_vars env bound_vars in
   match prem.it with
   | IfPr exp -> lower_if_premise ctx env ~bound_vars origin exp
-  | LetPr (lhs, rhs, ids) ->
+  | LetPr (quants, lhs, rhs) ->
+    let ids =
+      quants
+      |> List.filter_map (fun quant ->
+        match quant.it with
+        | ExpP (id, _) -> Some id.it
+        | TypP _ | DefP _ | GramP _ -> None)
+    in
     let lhs_result = Expr_translate.lower_pattern_with_bindings ctx env origin lhs in
     let rhs_result = Expr_translate.lower_value ctx env origin rhs in
     (match lhs_result.pattern_term, rhs_result.term with
@@ -3137,15 +4815,46 @@ and translate_premise ?(future_prems = []) ctx env ~bound_vars parent_origin pre
             ]
       })
   | ElsePr -> { (empty_with_env ~bound_vars env) with has_else = true }
-  | RulePr (rel_id, mixop, _exp) ->
-    lower_rule_premise ctx env ~bound_vars ~future_prems origin prem rel_id mixop
+  | RulePr (rel_id, args, mixop, _exp) ->
+    if args <> [] then
+      unsupported_rulepr_args ctx env ~bound_vars origin prem rel_id args
+    else
+    (match
+       try_static_validation_rule_skip
+         ctx
+         env
+         ~bound_vars
+         ~future_prems
+         ~escape_source_ids
+         origin
+         prem
+         rel_id
+         mixop
+     with
+    | Some result -> result
+    | None ->
+      lower_rule_premise
+        ctx
+        env
+        ~allow_runtime_search
+        ~bound_vars
+        ~blocked_witness_source_ids
+        ~future_prems
+        ~escape_source_ids
+        origin
+        prem
+        rel_id
+        mixop)
   | IterPr (body, (iter, generators)) ->
-    lower_iter_premise ctx env ~bound_vars origin prem body iter generators
+    lower_iter_premise
+      ctx env ~bound_vars ~future_prems ~escape_source_ids origin prem body iter generators
   | NegPr _ ->
     unsupported_prem ctx env ~bound_vars origin "Premise/NegPr" prem
       "negated premises require a total Bool/complement helper, which is outside this pure DecD slice"
 
-let translate_premises ctx env ?(bound_conditions = []) ~bound_terms origin prems =
+let translate_premises
+    ?(allow_runtime_search = false)
+    ctx env ?(bound_conditions = []) ?(escape_source_ids = []) ~bound_terms origin prems =
   let bound_vars =
     bound_terms
     |> List.map Condition_closure.term_vars
@@ -3153,21 +4862,63 @@ let translate_premises ctx env ?(bound_conditions = []) ~bound_terms origin prem
     |> normalize_vars
     |> fun vars -> conditions_bound_vars vars bound_conditions
   in
-  let rec loop acc = function
-    | [] -> acc
-    | prem :: future_prems ->
+  let stalled_fatal_diagnostics stalled =
+    stalled
+    |> List.concat_map (fun (_prem, result) ->
+      result.diagnostics |> List.filter Diagnostics.is_fatal)
+  in
+  let no_progress_result acc stalled =
+    match stalled_fatal_diagnostics stalled with
+    | _ :: _ as diagnostics -> { acc with diagnostics = acc.diagnostics @ diagnostics }
+    | [] ->
+      (match stalled with
+      | [] -> acc
+      | (prem, result) :: _ ->
+        let prem_origin = origin_for_premise origin prem in
+        { acc with
+          diagnostics =
+            acc.diagnostics @ result.diagnostics
+            @ [ unsupported
+                  ~ctx
+                  ~origin:prem_origin
+                  ~constructor:"Premise/dependency-cycle"
+                  ~source_echo:(source_echo_prem prem)
+                  ~reason:
+                    "premise conditions cannot be ordered so every generated Maude condition uses only variables bound by the enclosing lhs or earlier admissible premises"
+                  ~suggestion:
+                    "Keep this premise block Unsupported until the source dependency cycle is removed or a source-derived rewrite/search helper can introduce the witness"
+                  ()
+              ]
+        })
+  in
+  let rec pass acc progressed deferred = function
+    | [] ->
+      (match List.rev deferred with
+      | [] -> acc
+      | pending when progressed -> pass acc false [] (List.map fst pending)
+      | stalled -> no_progress_result acc stalled)
+    | prem :: rest ->
+      let future_prems = rest @ (List.rev_map fst deferred) in
       let result =
         translate_premise
+          ~allow_runtime_search
           ~future_prems
+          ~escape_source_ids
+          ~blocked_witness_source_ids:acc.blocked_witness_source_ids
           ctx
           acc.env_after
           ~bound_vars:acc.bound_vars_after
           origin
           prem
       in
-      loop (append acc result) future_prems
+      if premise_result_has_fatal result
+         && result_is_deferrable_listn_admissibility result
+      then
+        pass acc progressed ((prem, result) :: deferred) rest
+      else
+        pass (append acc result) true deferred rest
   in
-  let result = loop (empty_with_env ~bound_vars env) prems in
+  let result = pass (empty_with_env ~bound_vars env) false [] prems in
   { result with
     env_after =
       Expr_translate.with_condition_bound_vars

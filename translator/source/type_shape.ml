@@ -36,7 +36,11 @@ let is_list_optional_typ typ =
 
 let typ_components typ =
   match typ.it with
-  | TupT components -> components
+  | TupT components ->
+    components
+    |> List.map (fun (id, typ) ->
+      let payload = VarE id $$ id.at % typ in
+      payload, typ)
   | VarT (id, _) ->
     let payload = VarE id $$ typ.at % typ in
     [ payload, typ ]
@@ -45,4 +49,4 @@ let typ_components typ =
     [ wildcard, typ ]
 
 let mixop_is_hole_only mixop =
-  List.for_all (( = ) []) mixop
+  Xl.Mixop.flatten mixop |> List.for_all (( = ) [])

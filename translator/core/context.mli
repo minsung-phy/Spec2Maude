@@ -16,6 +16,8 @@ val find_static_typ : t -> string -> Il.Ast.typ option
 val static_def_env : t -> (string * string) list
 val with_static_def : t -> string -> string -> t
 val find_static_def : t -> string -> string option
+val with_phantom_typ : t -> string -> string -> t
+val find_phantom_typ : t -> string -> string option
 val with_specialization : t -> Analysis.Function_graph.specialization -> t
 val current_specialization : t -> Analysis.Function_graph.specialization option
 val with_def : t -> string -> t

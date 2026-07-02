@@ -335,7 +335,7 @@ and lower_projection_equality_binding callbacks ctx env origin projection_exp va
             { term = Some (Const "true")
             ; guards =
                 value_result.guards
-                @ [ MatchCond (app constructor [ value_term ], scrutinee_term) ]
+                @ [ MatchCond (scrutinee_term, app constructor [ value_term ]) ]
             ; diagnostics = value_result.diagnostics
             }
         | None -> Some value_result)

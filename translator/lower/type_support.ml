@@ -211,7 +211,7 @@ let source_echo_typ typ =
 let source_echo_prem prem =
   Some (Il.Print.string_of_prem prem)
 
-let source_echo_typcase (mixop, (_binds, typ, prems), _hints) =
+let source_echo_typcase (mixop, (typ, _quants, prems), _hints) =
   let prems =
     prems
     |> List.map Il.Print.string_of_prem
@@ -220,7 +220,7 @@ let source_echo_typcase (mixop, (_binds, typ, prems), _hints) =
   let suffix = if prems = "" then "" else " -- " ^ prems in
   Some (Il.Print.string_of_mixop mixop ^ " " ^ Il.Print.string_of_typ typ ^ suffix)
 
-let source_echo_typfield (atom, (_binds, typ, prems), _hints) =
+let source_echo_typfield (atom, (typ, _quants, prems), _hints) =
   let prems =
     prems
     |> List.map Il.Print.string_of_prem
@@ -304,7 +304,7 @@ let bool_wrapper term =
 let text_wrapper text =
   app "text" [ Const ("\"" ^ String.escaped text ^ "\"") ]
 
-let alias_projection_mixop : mixop = [[]; []]
+let alias_projection_mixop : mixop = Xl.Mixop.Arg ()
 
 let mixop_is_hole_only = Type_shape.mixop_is_hole_only
 
@@ -433,7 +433,7 @@ let rec hidden_bind_extract_from_exp bind_id exp =
 let hidden_bind_extract_from_prem bind_id prem =
   match prem.it with
   | IfPr exp -> hidden_bind_extract_from_exp bind_id exp
-  | LetPr (lhs, rhs, _ids) ->
+  | LetPr (_quants, lhs, rhs) ->
     hidden_bind_rhs_from_equality bind_id lhs rhs
     |> Option.map (fun rhs -> rhs, [])
   | RulePr _ | ElsePr | IterPr _ | NegPr _ -> None

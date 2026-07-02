@@ -7,6 +7,7 @@ val translate :
   Context.t ->
   Origin.t ->
   Il.Ast.id ->
+  Il.Ast.param list ->
   Il.Ast.mixop ->
   Il.Ast.typ ->
   Il.Ast.rule list ->

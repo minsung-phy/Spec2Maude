@@ -69,7 +69,7 @@ let is_builtin_hint hint =
 let dec_hint_parts hintdef =
   match hintdef.it with
   | Il.Ast.DecH (id, hints) -> Some (id, hints)
-  | TypH _ | RelH _ | GramH _ -> None
+  | TypH _ | RelH _ | GramH _ | RuleH _ -> None
 
 let entry_of_hint signatures origin hintdef =
   match dec_hint_parts hintdef with

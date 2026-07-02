@@ -7,11 +7,7 @@ let source_free_var_ids exp =
   |> List.of_seq
   |> List.sort_uniq String.compare
 
-let type_note_free_var_ids typ =
-  Il.Free.(free_typ typ).varid
-  |> Il.Free.Set.to_seq
-  |> List.of_seq
-  |> List.sort_uniq String.compare
+let type_note_free_var_ids = Expr_support.type_note_free_var_ids
 
 let source_and_note_free_var_ids exp =
   source_free_var_ids exp @ type_note_free_var_ids exp.note

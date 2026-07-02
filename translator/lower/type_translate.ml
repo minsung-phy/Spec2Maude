@@ -51,9 +51,9 @@ let unsupported_binds ctx origin owner binds =
   |> List.map (fun bind ->
     unsupported
       ~ctx ~origin ~constructor:(owner ^ "/binds")
-      ~source_echo:(Il.Print.string_of_bind bind)
+      ~source_echo:(Il.Print.string_of_quant bind)
       ~reason:
-        "typcase/typfield/InstD bind lists require local scope extension; this fix slice treats every nonempty bind list as unsupported rather than silently accepting ExpB"
+        "typcase/typfield/InstD bind lists require local scope extension; this fix slice treats every nonempty quant list as unsupported rather than silently accepting ExpP"
       ~suggestion:"Implement bind scope extension before emitting guarded constructor, record, or family-instance fragments"
       ())
 
@@ -67,25 +67,25 @@ let component_matches_exp_bind bind_id bind_typ (payload, typ) =
 let constructor_bind_diagnostics ctx origin owner binds components prems =
   let bind_source bind =
     match prems with
-    | [] -> Il.Print.string_of_bind bind
+    | [] -> Il.Print.string_of_quant bind
     | _ ->
-      Il.Print.string_of_bind bind ^ " -- "
+      Il.Print.string_of_quant bind ^ " -- "
       ^ String.concat "; " (List.map Il.Print.string_of_prem prems)
   in
   binds
   |> List.filter_map (fun bind ->
     match bind.it with
-    | ExpB (id, typ) when List.exists (component_matches_exp_bind id typ) components ->
+    | ExpP (id, typ) when List.exists (component_matches_exp_bind id typ) components ->
       None
-    | ExpB (id, _) when hidden_exp_bind_supported id components prems ->
+    | ExpP (id, _) when hidden_exp_bind_supported id components prems ->
       None
-    | ExpB _ when prems = [] ->
+    | ExpP _ when prems = [] ->
       Some
         (skipped
            ~ctx ~origin ~constructor:(owner ^ "/binds")
            ~source_echo:(bind_source bind)
            ~reason:
-             "constructor ExpB binder is not referenced by premises; payload shape is preserved by the constructor arguments and the binder is recorded as metadata"
+             "constructor ExpP binder is not referenced by premises; payload shape is preserved by the constructor arguments and the binder is recorded as metadata"
            ~suggestion:
              "Keep this non-fatal only while the binder is unused by typcase premises"
            ())
@@ -95,7 +95,7 @@ let constructor_bind_diagnostics ctx origin owner binds components prems =
            ~ctx ~origin ~constructor:(owner ^ "/binds")
            ~source_echo:(bind_source bind)
            ~reason:
-             "typcase bind lowering only supports payload ExpB binders, or unused ExpB binders on premise-free constructor cases"
+             "typcase bind lowering only supports payload ExpP binders, or unused ExpP binders on premise-free constructor cases"
            ~suggestion:
              "Implement full typcase scope extension before emitting guarded constructor fragments with independent binders"
            ()))
@@ -103,16 +103,16 @@ let constructor_bind_diagnostics ctx origin owner binds components prems =
 let unsupported_inst_bind ctx origin bind =
   unsupported
     ~ctx ~origin ~constructor:"TypD/InstD/binds"
-    ~source_echo:(Il.Print.string_of_bind bind)
+    ~source_echo:(Il.Print.string_of_quant bind)
     ~reason:
-      "InstD bind lowering only supports type-level TypB binders in this parse-safety slice; value, definition, and grammar binders require their own scope semantics"
+      "InstD bind lowering only supports type-level TypP binders in this parse-safety slice; value, definition, and grammar binders require their own scope semantics"
     ~suggestion:"Implement the corresponding InstD binder scope extension before emitting this family instance"
     ()
 
 let unsupported_inst_numeric_bind ctx origin bind =
   unsupported
-    ~ctx ~origin ~constructor:"TypD/InstD/binds/ExpB"
-    ~source_echo:(Il.Print.string_of_bind bind)
+    ~ctx ~origin ~constructor:"TypD/InstD/binds/ExpP"
+    ~source_echo:(Il.Print.string_of_quant bind)
     ~reason:
       "InstD expression binders are lowered here only when their carrier resolves structurally to primitive Nat or Int; this binder would otherwise make arithmetic over SpectecTerminal"
     ~suggestion:
@@ -125,7 +125,7 @@ let translate_inst_binds ctx origin seed env binds =
   |> List.fold_left
        (fun (env, statements, diagnostics) (index, bind) ->
          match bind.it with
-         | TypB id ->
+         | TypP id ->
            (match lookup id.it env.typ_vars with
            | Some _ -> env, statements, diagnostics
            | None ->
@@ -134,12 +134,12 @@ let translate_inst_binds ctx origin seed env binds =
              { env with typ_vars = (id.it, term) :: env.typ_vars },
              statements @ [ gen origin (var name (sr spectec_type)) ],
              diagnostics)
-         | ExpB (id, typ) ->
+         | ExpP (id, typ) ->
            (match lookup id.it env.exp_vars with
            | Some _ -> env, statements, diagnostics
            | None ->
              let sort_opt, sort_diags =
-               carrier_sort_of_typ ctx origin "TypD/InstD/binds/ExpB" typ
+               carrier_sort_of_typ ctx origin "TypD/InstD/binds/ExpP" typ
              in
              (match sort_opt with
              | Some sort ->
@@ -155,7 +155,7 @@ let translate_inst_binds ctx origin seed env binds =
                env,
                statements,
                diagnostics @ sort_diags @ [ unsupported_inst_numeric_bind ctx origin bind ]))
-         | DefB _ | GramB _ ->
+         | DefP _ | GramP _ ->
            env, statements, diagnostics @ [ unsupported_inst_bind ctx origin bind ])
        (env, [], [])
 
@@ -339,7 +339,7 @@ let lower_hidden_exp_binds env ctx origin seed components prems binds =
   |> List.mapi (fun index bind -> index + 1, bind)
   |> List.filter_map (fun (index, bind) ->
     match bind.it with
-    | ExpB (id, typ)
+    | ExpP (id, typ)
       when hidden_exp_bind_supported id components prems ->
       let sort_opt, sort_diags =
         carrier_sort_of_typ ctx origin "VariantT/constructor/hidden-bind" typ
@@ -370,15 +370,15 @@ let lower_hidden_exp_binds env ctx origin seed components prems binds =
               @ [ unsupported
                     ~ctx ~origin
                     ~constructor:"VariantT/constructor/hidden-bind"
-                    ~source_echo:(Il.Print.string_of_bind bind)
+                    ~source_echo:(Il.Print.string_of_quant bind)
                     ~reason:
-                      "hidden typcase ExpB binder could not lower its carrier or type witness"
+                      "hidden typcase ExpP binder could not lower its carrier or type witness"
                     ~suggestion:
                       "Keep this typcase Unsupported until the hidden binder type can be represented without guessing"
                     ()
                 ]
           })
-    | ExpB _ | TypB _ | DefB _ | GramB _ -> None)
+    | ExpP _ | TypP _ | DefP _ | GramP _ -> None)
 
 let condition_admissibility_diagnostics ctx origin mixop initial_bound conditions =
   let _, diagnostics =
@@ -821,7 +821,7 @@ let translate_typcase
     target
     ~case_count
     index
-    (mixop, (binds, typ, prems), hints)
+    (mixop, (typ, binds, prems), hints)
   =
   let origin =
     child_origin
@@ -829,7 +829,7 @@ let translate_typcase
       (Printf.sprintf "VariantT[%d]" index)
       "typcase"
       typ.at
-      (source_echo_typcase (mixop, (binds, typ, prems), hints))
+      (source_echo_typcase (mixop, (typ, binds, prems), hints))
   in
   let owner = "VariantT/typcase" in
   let components = typ_components typ in
@@ -855,7 +855,7 @@ let translate_typcase
         (translate_numeric_literal_case ctx origin seed static_args_key target mixop payload_sort literal_terms)
         (with_diagnostics hint_diags)
     | Some `Range ->
-      with_diagnostics (hint_diags @ [ unsupported_numeric_range ctx origin (mixop, (binds, typ, prems), hints) ])
+      with_diagnostics (hint_diags @ [ unsupported_numeric_range ctx origin (mixop, (typ, binds, prems), hints) ])
     | _ ->
       let components = typ_components typ in
       if List.length components > 1 || (components <> [] && (binds <> [] || prems <> [])) then
@@ -900,7 +900,7 @@ let translate_typcase
             (diagnostics
              @ [ unsupported
                    ~ctx ~origin ~constructor:"VariantT/hole-only-case"
-                   ?source_echo:(source_echo_typcase (mixop, (binds, typ, prems), hints))
+                   ?source_echo:(source_echo_typcase (mixop, (typ, binds, prems), hints))
                    ~reason:
                      "hole-only typcase is a category union only when it has one supported type and no binds/premises; multi-component hole-only cases are tuple-style constructors"
                    ~suggestion:"Implement numeric range, extension metadata, or guarded subtype lowering before emitting this case"
@@ -931,7 +931,7 @@ let translate_typcase
       (with_diagnostics diagnostics)
 
 let inherited_union_origin parent_origin index typcase =
-  let _mixop, (_binds, typ, _prems), _hints = typcase in
+  let _mixop, (typ, _binds, _prems), _hints = typcase in
   child_origin
     parent_origin
     (Printf.sprintf "VariantT[%d]/category-union" index)
@@ -1001,14 +1001,14 @@ let translate_variant env ctx origin seed key_env static_args_key target id case
   append union_result case_result
   |> fun result -> { result with diagnostics = result.diagnostics @ incomplete_diagnostics }
 
-let translate_struct_field env ctx origin seed index (atom, (binds, typ, prems), hints) =
+let translate_struct_field env ctx origin seed index (atom, (typ, binds, prems), hints) =
   let field_origin =
     child_origin
       origin
       (Printf.sprintf "StructT[%d]" index)
       "typfield"
       typ.at
-      (source_echo_typfield (atom, (binds, typ, prems), hints))
+      (source_echo_typfield (atom, (typ, binds, prems), hints))
   in
   let owner = "StructT/typfield" in
   let components = typ_components typ in
@@ -1040,7 +1040,7 @@ let translate_struct_field env ctx origin seed index (atom, (binds, typ, prems),
     bind_diags @ prem_diags @ hint_diags
     @ [ unsupported
           ~ctx ~origin:field_origin ~constructor:"StructT/field-shape"
-          ?source_echo:(source_echo_typfield (atom, (binds, typ, prems), hints))
+          ?source_echo:(source_echo_typfield (atom, (typ, binds, prems), hints))
           ~reason:"record fields with zero or multiple tuple components require a tuple-preserving field encoding"
           ~suggestion:"Implement tuple field carriers before lowering this struct field"
           ()
@@ -1230,7 +1230,7 @@ let preload_typcase_registry
     target
     ~case_count
     index
-    (mixop, (binds, typ, prems), hints)
+    (mixop, (typ, binds, prems), hints)
   =
   let origin =
     child_origin
@@ -1238,7 +1238,7 @@ let preload_typcase_registry
       (Printf.sprintf "VariantT[%d]" index)
       "typcase"
       typ.at
-      (source_echo_typcase (mixop, (binds, typ, prems), hints))
+      (source_echo_typcase (mixop, (typ, binds, prems), hints))
   in
   let owner = "VariantT/typcase" in
   let components = typ_components typ in

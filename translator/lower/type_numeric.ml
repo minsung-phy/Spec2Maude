@@ -59,7 +59,7 @@ let rec is_range_predicate_for_payload payload_id exp =
 let numeric_literal_bind_supported binds payload_id typ =
   match binds with
   | [] -> true
-  | [ { it = ExpB (id, bind_typ); _ } ] ->
+  | [ { it = ExpP (id, bind_typ); _ } ] ->
     id.it = payload_id && bind_typ.it = typ.it
   | _ -> false
 

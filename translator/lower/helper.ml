@@ -163,6 +163,23 @@ type iter_premise_list_bool =
   ; body_eq_conditions : eq_condition list
   }
 
+type iter_premise_exists_bool_shape =
+  { prem_source : string
+  ; indexed_source : string
+  ; source_typ_source : string
+  ; predicate_source : string
+  }
+
+type iter_premise_exists_bool =
+  { source_shape : iter_premise_exists_bool_shape
+  ; index_source_id : string
+  ; helper_head_var : string
+  ; source_tail_var : string
+  ; source_element_sort : sort
+  ; captures : capture list
+  ; body_eq_conditions : eq_condition list
+  }
+
 type iter_premise_zip_bool_shape =
   { prem_source : string
   ; body_source : string
@@ -229,6 +246,16 @@ type inverse_concatn_chunks =
   ; chunk_var : string
   }
 
+type optional_map_inverse =
+  { source_shape : iter_map_source_shape
+  ; generator_var : string
+  ; helper_head_var : string
+  ; source_element_sort : sort
+  ; captures : capture list
+  ; lowered_body : term
+  ; body_eq_conditions : eq_condition list
+  }
+
 type request_kind =
   | Iter_map of iter_map
   | Iter_zip_map of iter_zip_map
@@ -236,10 +263,12 @@ type request_kind =
   | Iter_listn_source of iter_listn_source
   | Iter_premise_opt_bool of iter_premise_opt_bool
   | Iter_premise_list_bool of iter_premise_list_bool
+  | Iter_premise_exists_bool of iter_premise_exists_bool
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_pattern_zip of iter_pattern_zip
   | Inverse_pair_split of inverse_pair_split
   | Inverse_concatn_chunks of inverse_concatn_chunks
+  | Optional_map_inverse of optional_map_inverse
   | Optional_branch of { shape : string }
   | List1_guard of { shape : string }
   | Listn_indexed of { shape : string }
@@ -247,6 +276,10 @@ type request_kind =
   | Sequence_splice of { shape : string }
   | Enabledness_complement of { shape : string }
   | Rewrite_dependent of { shape : string }
+  | Runtime_predicate_search of Runtime_search_helper.request
+  | Runtime_predicate_truth_search of Runtime_truth_search_helper.request
+  | Runtime_predicate_truth_decision of Runtime_truth_decision_helper.request
+  | Runtime_enabledness of Runtime_enabledness_helper.request
 
 type request =
   { kind : request_kind
@@ -414,6 +447,15 @@ let premise_list_bool_shape_key (shape : iter_premise_list_bool_shape) =
     ; shape.iter_source
     ]
 
+let premise_exists_bool_shape_key (shape : iter_premise_exists_bool_shape) =
+  String.concat
+    "\000"
+    [ shape.prem_source
+    ; shape.indexed_source
+    ; shape.source_typ_source
+    ; shape.predicate_source
+    ]
+
 let premise_zip_bool_shape_key (shape : iter_premise_zip_bool_shape) =
   String.concat
     "\000"
@@ -552,6 +594,18 @@ let iter_premise_list_bool_key (prem : iter_premise_list_bool) =
     ; String.concat "\001" (List.map eq_condition_key prem.body_eq_conditions)
     ]
 
+let iter_premise_exists_bool_key (prem : iter_premise_exists_bool) =
+  String.concat
+    "\000"
+    [ premise_exists_bool_shape_key prem.source_shape
+    ; prem.index_source_id
+    ; prem.helper_head_var
+    ; prem.source_tail_var
+    ; sort_name prem.source_element_sort
+    ; String.concat "\001" (List.map capture_key prem.captures)
+    ; String.concat "\001" (List.map eq_condition_key prem.body_eq_conditions)
+    ]
+
 let iter_premise_zip_bool_key (prem : iter_premise_zip_bool) =
   String.concat
     "\000"
@@ -614,6 +668,18 @@ let inverse_concatn_chunks_key (inverse : inverse_concatn_chunks) =
     ; inverse.chunk_var
     ]
 
+let optional_map_inverse_key (inverse : optional_map_inverse) =
+  String.concat
+    "\000"
+    [ source_shape_key inverse.source_shape
+    ; inverse.generator_var
+    ; inverse.helper_head_var
+    ; sort_name inverse.source_element_sort
+    ; String.concat "\001" (List.map capture_key inverse.captures)
+    ; term_key inverse.lowered_body
+    ; String.concat "\001" (List.map eq_condition_key inverse.body_eq_conditions)
+    ]
+
 let origin_key origin =
   String.concat
     "\000"
@@ -629,10 +695,12 @@ let kind_name = function
   | Iter_listn_source _ -> "IterListNSource"
   | Iter_premise_opt_bool _ -> "IterPremiseOptBool"
   | Iter_premise_list_bool _ -> "IterPremiseListBool"
+  | Iter_premise_exists_bool _ -> "IterPremiseExistsBool"
   | Iter_premise_zip_bool _ -> "IterPremiseZipBool"
   | Iter_pattern_zip _ -> "IterPatternZip"
   | Inverse_pair_split _ -> "InversePairSplit"
   | Inverse_concatn_chunks _ -> "InverseConcatnChunks"
+  | Optional_map_inverse _ -> "OptionalMapInverse"
   | Optional_branch _ -> "OptionalBranch"
   | List1_guard _ -> "List1Guard"
   | Listn_indexed _ -> "ListNIndexed"
@@ -640,6 +708,10 @@ let kind_name = function
   | Sequence_splice _ -> "SequenceSplice"
   | Enabledness_complement _ -> "EnablednessComplement"
   | Rewrite_dependent _ -> "RewriteDependent"
+  | Runtime_predicate_search _ -> "RuntimePredicateSearch"
+  | Runtime_predicate_truth_search _ -> "RuntimePredicateTruthSearch"
+  | Runtime_predicate_truth_decision _ -> "RuntimePredicateTruthDecision"
+  | Runtime_enabledness _ -> "RuntimeEnabledness"
 
 let helper_base_name request =
   "helper" ^ kind_name request.kind ^ Naming.helper_context_name request.origin
@@ -670,6 +742,9 @@ let key_of_kind = function
   | Iter_premise_list_bool prem ->
     "iter-premise-list-bool:"
     ^ Digest.to_hex (Digest.string (iter_premise_list_bool_key prem))
+  | Iter_premise_exists_bool prem ->
+    "iter-premise-exists-bool:"
+    ^ Digest.to_hex (Digest.string (iter_premise_exists_bool_key prem))
   | Iter_premise_zip_bool prem ->
     "iter-premise-zip-bool:"
     ^ Digest.to_hex (Digest.string (iter_premise_zip_bool_key prem))
@@ -681,6 +756,9 @@ let key_of_kind = function
   | Inverse_concatn_chunks inverse ->
     "inverse-concatn-chunks:"
     ^ Digest.to_hex (Digest.string (inverse_concatn_chunks_key inverse))
+  | Optional_map_inverse inverse ->
+    "optional-map-inverse:"
+    ^ Digest.to_hex (Digest.string (optional_map_inverse_key inverse))
   | Optional_branch { shape } -> "optional-branch:" ^ shape
   | List1_guard { shape } -> "list1-guard:" ^ shape
   | Listn_indexed { shape } -> "listn-indexed:" ^ shape
@@ -688,19 +766,39 @@ let key_of_kind = function
   | Sequence_splice { shape } -> "sequence-splice:" ^ shape
   | Enabledness_complement { shape } -> "enabledness-complement:" ^ shape
   | Rewrite_dependent { shape } -> "rewrite-dependent:" ^ shape
+  | Runtime_predicate_search request ->
+    "runtime-predicate-search:"
+    ^ Digest.to_hex (Digest.string (Runtime_search_helper.key request))
+  | Runtime_predicate_truth_search request ->
+    "runtime-predicate-truth-search:"
+    ^ Digest.to_hex (Digest.string (Runtime_truth_search_helper.key request))
+  | Runtime_predicate_truth_decision request ->
+    "runtime-predicate-truth-decision:"
+    ^ Digest.to_hex (Digest.string (Runtime_truth_decision_helper.key request))
+  | Runtime_enabledness request ->
+    "runtime-enabledness:"
+    ^ Digest.to_hex (Digest.string (Runtime_enabledness_helper.key request))
 
 let kind_has_materializer = function
   | Iter_map _ | Iter_zip_map _ | Iter_listn _ | Iter_listn_source _
   | Iter_premise_opt_bool _ | Iter_premise_list_bool _
-  | Iter_premise_zip_bool _ | Iter_pattern_zip _ | Inverse_pair_split _
-  | Inverse_concatn_chunks _ -> true
+  | Iter_premise_exists_bool _ | Iter_premise_zip_bool _ | Iter_pattern_zip _
+  | Inverse_pair_split _ | Inverse_concatn_chunks _ | Optional_map_inverse _
+  | Runtime_predicate_search _ | Runtime_predicate_truth_search _
+  | Runtime_predicate_truth_decision _ | Runtime_enabledness _ -> true
   | Optional_branch _ | List1_guard _ | Listn_indexed _ | Membership_binding _
   | Sequence_splice _ | Enabledness_complement _ | Rewrite_dependent _ -> false
 
+let request_key request =
+  match request.kind with
+  | Runtime_predicate_search _ | Runtime_predicate_truth_search _
+  | Runtime_predicate_truth_decision _ | Runtime_enabledness _ ->
+    key_of_kind request.kind
+  | _ -> origin_key request.origin ^ "\000" ^ key_of_kind request.kind
+
 let request registry request =
   let key =
-    Digest.to_hex
-      (Digest.string (origin_key request.origin ^ "\000" ^ key_of_kind request.kind))
+    Digest.to_hex (Digest.string (request_key request))
   in
   match List.find_opt (fun entry -> entry.key = key) registry.entries with
   | Some entry -> entry.name
@@ -712,6 +810,38 @@ let request registry request =
 
 let requests registry =
   registry.entries |> List.map (fun entry -> entry.request)
+
+let runtime_predicate_search_requests registry =
+  registry.entries
+  |> List.filter_map (fun entry ->
+    match entry.request.kind with
+    | Runtime_predicate_search request ->
+      Some (entry.name, entry.request.origin, request)
+    | _ -> None)
+
+let runtime_predicate_truth_search_requests registry =
+  registry.entries
+  |> List.filter_map (fun entry ->
+    match entry.request.kind with
+    | Runtime_predicate_truth_search request ->
+      Some (entry.name, entry.request.origin, request)
+    | _ -> None)
+
+let runtime_predicate_truth_decision_requests registry =
+  registry.entries
+  |> List.filter_map (fun entry ->
+    match entry.request.kind with
+    | Runtime_predicate_truth_decision request ->
+      Some (entry.name, entry.request.origin, request)
+    | _ -> None)
+
+let runtime_enabledness_requests registry =
+  registry.entries
+  |> List.filter_map (fun entry ->
+    match entry.request.kind with
+    | Runtime_enabledness request ->
+      Some (entry.name, entry.request.origin, request)
+    | _ -> None)
 
 let unmaterialized_diagnostics ~profile registry =
   registry.entries
@@ -1155,6 +1285,52 @@ let materialize_iter_premise_list_bool entry (prem : iter_premise_list_bool) =
     ; statement (ceq recursive_lhs recursive_rhs recursive_conditions)
     ]
 
+let materialize_iter_premise_exists_bool entry (prem : iter_premise_exists_bool) =
+  let name = entry.name in
+  let origin = entry.request.origin in
+  let capture_sorts =
+    prem.captures |> List.map (fun capture -> sort_ref capture.sort)
+  in
+  let formal_captures =
+    prem.captures |> List.map (fun capture -> Var capture.formal_var)
+  in
+  let helper_on source =
+    app name (source :: formal_captures)
+  in
+  let head = Var prem.helper_head_var in
+  let tail = Var prem.source_tail_var in
+  let recursive_lhs = helper_on (concat head tail) in
+  let recursive_rhs = helper_on tail in
+  let body_conditions =
+    match
+      schedule_eq_conditions
+        (prem.helper_head_var
+         :: List.map (fun capture -> capture.formal_var) prem.captures)
+        prem.body_eq_conditions
+    with
+    | Some scheduled -> scheduled
+    | None -> prem.body_eq_conditions
+  in
+  let statement node = generated name origin node in
+  [ statement
+      (op name
+         (sort_ref spectec_terminals :: capture_sorts)
+         (sort "Bool"))
+  ; statement (var prem.helper_head_var (sort_ref prem.source_element_sort))
+  ; statement (var prem.source_tail_var (sort_ref spectec_terminals))
+  ]
+  @ (prem.captures
+     |> List.map (fun capture ->
+     statement (var capture.formal_var (sort_ref capture.sort))))
+  @ [ statement (eq (helper_on (Const "eps")) (Const "false"))
+    ; statement (ceq (helper_on head) (Const "true") body_conditions)
+    ; statement
+        (ceq
+           recursive_lhs
+           (Const "true")
+           [ BoolCond recursive_rhs ])
+    ]
+
 let materialize_iter_premise_zip_bool entry (prem : iter_premise_zip_bool) =
   let name = entry.name in
   let origin = entry.request.origin in
@@ -1422,6 +1598,43 @@ let materialize_inverse_concatn_chunks entry (inverse : inverse_concatn_chunks) 
     ; statement (eq (prepend target_head fail) fail)
     ]
 
+let materialize_optional_map_inverse entry (inverse : optional_map_inverse) =
+  let name = entry.name in
+  let origin = entry.request.origin in
+  let capture_sorts =
+    inverse.captures |> List.map (fun capture -> sort_ref capture.sort)
+  in
+  let formal_captures =
+    inverse.captures |> List.map (fun capture -> Var capture.formal_var)
+  in
+  let helper_on term =
+    app name (term :: formal_captures)
+  in
+  let head = Var inverse.helper_head_var in
+  let result_conditions =
+    match
+      schedule_eq_conditions
+        (inverse.helper_head_var
+         :: List.map (fun capture -> capture.formal_var) inverse.captures)
+        inverse.body_eq_conditions
+    with
+    | Some scheduled -> scheduled
+    | None -> inverse.body_eq_conditions
+  in
+  let statement node = generated name origin node in
+  [ statement
+      (op name
+         (sort_ref spectec_terminals :: capture_sorts)
+         spectec_terminals)
+  ; statement (var inverse.helper_head_var (sort_ref inverse.source_element_sort))
+  ]
+  @ (inverse.captures
+     |> List.map (fun capture ->
+       statement (var capture.formal_var (sort_ref capture.sort))))
+  @ [ statement (eq (helper_on (Const "eps")) (Const "eps"))
+    ; statement (ceq (helper_on inverse.lowered_body) head result_conditions)
+    ]
+
 let materialize_entry entry =
   match entry.request.kind with
   | Iter_map map -> materialize_iter_map entry map
@@ -1430,12 +1643,16 @@ let materialize_entry entry =
   | Iter_listn_source map -> materialize_iter_listn_source entry map
   | Iter_premise_opt_bool prem -> materialize_iter_premise_opt_bool entry prem
   | Iter_premise_list_bool prem -> materialize_iter_premise_list_bool entry prem
+  | Iter_premise_exists_bool prem -> materialize_iter_premise_exists_bool entry prem
   | Iter_premise_zip_bool prem -> materialize_iter_premise_zip_bool entry prem
   | Iter_pattern_zip pattern -> materialize_iter_pattern_zip entry pattern
   | Inverse_pair_split split -> materialize_inverse_pair_split entry split
   | Inverse_concatn_chunks inverse -> materialize_inverse_concatn_chunks entry inverse
+  | Optional_map_inverse inverse -> materialize_optional_map_inverse entry inverse
   | Optional_branch _ | List1_guard _ | Listn_indexed _ | Membership_binding _
-  | Sequence_splice _ | Enabledness_complement _ | Rewrite_dependent _ -> []
+  | Sequence_splice _ | Enabledness_complement _ | Rewrite_dependent _
+  | Runtime_predicate_search _ | Runtime_predicate_truth_search _
+  | Runtime_predicate_truth_decision _ | Runtime_enabledness _ -> []
 
 let materialize registry =
   registry.entries |> List.concat_map materialize_entry

@@ -126,6 +126,15 @@ let source_descriptor_of_exp source_exp =
       ; source_is_optional = false
       ; source_listn_count = None
       }
+  | IterT (({ it = IterT (element_typ, ListN _); _ } as source_element_typ), List)
+    when not (typ_is_iter element_typ) ->
+    Some
+      { source_item_shape = Helper.Source_nested_seq
+      ; helper_head_prefix = "HEADS"
+      ; source_element_typ
+      ; source_is_optional = false
+      ; source_listn_count = None
+      }
   | IterT (({ it = IterT (element_typ, List); _ } as source_element_typ), Opt)
     when not (typ_is_iter element_typ) ->
     Some
@@ -146,6 +155,24 @@ let source_descriptor_of_exp source_exp =
       ; source_is_optional = false
       ; source_listn_count = Some count_exp
       }
+  | _ -> None
+
+let source_element_carrier_sort typ =
+  match typ.it with
+  | IterT (element_typ, ListN _) when not (typ_is_iter element_typ) ->
+    Some spectec_terminals
+  | _ -> carrier_sort_of_typ typ
+
+let all_len term n =
+  app "allLen" [ term; n ]
+
+let listn_body_over_outer outer_id exp =
+  match exp.it with
+  | IterE ({ it = VarE body_id; _ }, (ListN (n_exp, _), [ generator_id, source_exp ]))
+    when body_id.it = generator_id.it ->
+    (match source_exp.it with
+    | VarE source_id when source_id.it = outer_id -> Some n_exp
+    | _ -> None)
   | _ -> None
 
 let rec lower_iter callbacks ctx env origin exp body (iter, generators) =
@@ -169,7 +196,11 @@ let rec lower_iter callbacks ctx env origin exp body (iter, generators) =
     callbacks.lower_sequence ctx env origin source_exp
   | List, [ generator_id, source_exp ], _
     when is_nested_list_typ exp.note ->
-    lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body
+    (match listn_body_over_outer generator_id.it body with
+    | Some n_exp ->
+      lower_nested_outer_identity_listn callbacks ctx env origin exp source_exp n_exp
+    | None ->
+      lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body)
   | ListN (n_exp, None), [ generator_id, source_exp ], VarE body_id
     when body_id.it = generator_id.it ->
     lower_flat_identity_listn callbacks ctx env origin exp source_exp n_exp
@@ -358,7 +389,7 @@ and lower_source_consuming_listn_helper callbacks
               "source-consuming indexed ListN does not consume optional sources in this slice; the source must expose a deterministic head/tail sequence"
           ]
       else
-        match carrier_sort_of_typ source_descriptor.source_element_typ with
+        match source_element_carrier_sort source_descriptor.source_element_typ with
         | None ->
           with_diagnostics
             [ unsupported_source_listn
@@ -957,6 +988,23 @@ and lower_listn_repeat_helper callbacks ctx env origin exp n_exp body =
       callbacks ctx env origin exp n_exp None [] body
   | None -> lower_listn_helper callbacks ctx env origin exp n_exp None [] body
 
+and lower_nested_outer_identity_listn callbacks ctx env origin exp source_exp n_exp =
+  let source_result = callbacks.lower_sequence ctx env origin source_exp in
+  let count_result = lower_listn_count callbacks ctx env origin exp n_exp in
+  match source_result.term, count_result.term with
+  | Some source_term, Some count_term ->
+    { term = Some source_term
+    ; guards =
+        source_result.guards @ count_result.guards
+        @ [ EqCond (all_len source_term count_term, Const "true") ]
+    ; diagnostics = source_result.diagnostics @ count_result.diagnostics
+    }
+  | _ ->
+    { term = None
+    ; guards = source_result.guards @ count_result.guards
+    ; diagnostics = source_result.diagnostics @ count_result.diagnostics
+    }
+
 and lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body =
   let stem = helper_local_stem origin exp in
   let source_descriptor =
@@ -981,7 +1029,7 @@ and lower_list_map_helper callbacks ctx env origin exp generator_id source_exp b
     let source_element_typ = source_descriptor.source_element_typ in
     let source_is_optional = source_descriptor.source_is_optional in
     let source_listn_count = source_descriptor.source_listn_count in
-    (match carrier_sort_of_typ source_element_typ, carrier_sort_of_typ body.note with
+    (match source_element_carrier_sort source_element_typ, carrier_sort_of_typ body.note with
     | None, _ ->
       unsupported_exp ctx origin "Expr/IterE" exp
         "generic List map helper lowering could not determine a carrier for the source element type"
@@ -1226,7 +1274,7 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
         | Some source_descriptor ->
           let source_item_shape = source_descriptor.source_item_shape in
           let element_typ = source_descriptor.source_element_typ in
-          (match carrier_sort_of_typ element_typ with
+          (match source_element_carrier_sort element_typ with
           | None ->
             Error
               (unsupported_zip

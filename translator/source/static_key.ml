@@ -141,8 +141,8 @@ and key_of_typ env typ =
   | TupT fields ->
     let fields =
       fields
-      |> List.map (fun (exp, typ) ->
-        key_of_exp env exp ^ ":" ^ key_of_typ env typ)
+      |> List.map (fun (id, typ) ->
+        id.Util.Source.it ^ ":" ^ key_of_typ env typ)
     in
     "typ:tup" ^ parens fields
   | IterT (inner, iter) ->
@@ -218,14 +218,14 @@ let bind_param_arg env (param : param) (arg : arg) =
   | ExpP (id, _), ExpA exp -> Ok (add_exp env id.it exp)
   | TypP id, TypA typ -> Ok (add_typ env id.it typ)
   | DefP (id, _, _), DefA target_id -> Ok (add_def env id.it target_id.it)
-  | GramP (id, _), GramA sym -> Ok (add_gram env id.it sym)
+  | GramP (id, _, _), GramA sym -> Ok (add_gram env id.it sym)
   | ExpP (id, _), _ ->
     Error ("ExpP parameter `" ^ id.it ^ "` requires an ExpA argument")
   | TypP id, _ ->
     Error ("TypP parameter `" ^ id.it ^ "` requires a TypA argument")
   | DefP (id, _, _), _ ->
     Error ("DefP parameter `" ^ id.it ^ "` requires a DefA argument")
-  | GramP (id, _), _ ->
+  | GramP (id, _, _), _ ->
     Error ("GramP parameter `" ^ id.it ^ "` requires a GramA argument")
 
 let rec fold_params_args env params args =

@@ -1,0 +1,68 @@
+load wasm-exec-bs
+load /home/minsung/tools/Maude-3.5.1-linux-x86_64/model-checker
+
+mod WASM-FIB-BS-PROPS is
+  inc WASM-FIB-BS .
+  pr MODEL-CHECKER .
+  pr LTL-SIMPLIFIER .
+
+  subsort StepsConf Config < State .
+
+  ops done trap-seen result-neg : -> Prop .
+  op result-is : Int -> Prop .
+
+  var I : Int .
+  var IS : WasmTerminals .
+  var Z : State .
+  var C : Config .
+  var SC : StepsConf .
+  
+  var F : Frame .
+  var N : N .
+
+  ceq (Z ; IS) |= done = true
+    if all-vals(IS) = true .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, IS)) |= done = true
+    if all-vals(IS) = true .
+
+  ceq (Z ; IS) |= result-is(I) = true
+    if IS = CTORCONSTA2(CTORI32A0, I) .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, IS)) |= result-is(I) = true
+    if IS = CTORCONSTA2(CTORI32A0, I) .
+
+  ceq (Z ; IS) |= trap-seen = true
+    if IS = CTORTRAPA0 .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, CTORLABELLBRACERBRACEA3(N, eps, IS))) |= trap-seen = true
+    if IS = CTORTRAPA0 .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, CTORLABELLBRACERBRACEA3(N, eps, IS))) |= done = true
+    if all-vals(IS) = true .
+
+  ceq (Z ; CTORFRAMELBRACERBRACEA3(N, F, CTORLABELLBRACERBRACEA3(N, eps, IS))) |= result-is(I) = true
+    if IS = CTORCONSTA2(CTORI32A0, I) .
+
+  eq C |= done = false [owise] .
+  eq C |= trap-seen = false [owise] .
+  eq C |= result-neg = false [owise] .
+  eq C |= result-is(I) = false [owise] .
+
+  eq SC |= done = false [owise] .
+  eq SC |= trap-seen = false [owise] .
+  eq SC |= result-neg = false [owise] .
+  eq SC |= result-is(I) = false [owise] .
+endm
+
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(0))), [](done -> result-is(5))) . --- 끝난 상태라면 결과가 0이어야 함
+
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(1))), [](done -> result-is(1))) .
+
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(5))), [](done -> result-is(5))) .
+
+--- red in WASM-FIB-BS-PROPS :
+---   modelCheck(steps(fib-config(i32v(5))), [] ~ trap-seen) .

@@ -25,6 +25,12 @@ val find_var : env -> string -> binding option
 val env_bound_vars : env -> string list
 val with_condition_bound_vars : env -> string list -> env
 val carrier_sort_of_typ : Il.Ast.typ -> Maude_ir.sort option
+val typecheck_conditions_for_typ :
+  Il.Ast.typ ->
+  Maude_ir.sort ->
+  Maude_ir.term ->
+  Maude_ir.term ->
+  Maude_ir.eq_condition list
 val type_ref_of_sort : Maude_ir.sort -> Maude_ir.type_ref
 val lower_value : Context.t -> env -> Origin.t -> Il.Ast.exp -> result
 val lower_numeric_guard_value : Context.t -> env -> Origin.t -> Il.Ast.exp -> result
@@ -33,3 +39,5 @@ val lower_pattern_with_bindings :
   Context.t -> env -> Origin.t -> Il.Ast.exp -> pattern_result
 val lower_bool_condition : Context.t -> env -> Origin.t -> Il.Ast.exp -> result
 val lower_sequence : Context.t -> env -> Origin.t -> Il.Ast.exp -> result
+val lower_type_witness :
+  Context.t -> env -> Origin.t -> constructor:string -> Il.Ast.typ -> result
