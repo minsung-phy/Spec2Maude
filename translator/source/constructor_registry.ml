@@ -297,25 +297,27 @@ let duplicate_shape_groups entries =
 
 let diagnostics ~profile t =
   duplicate_shape_groups t.entries
-  |> List.map (function
-    | [] -> assert false
+  |> List.filter_map (function
+    | [] ->
+      invalid_arg "Constructor_registry.diagnostics: empty duplicate-shape group"
     | entry :: rest ->
       let constructors =
         (entry :: rest)
         |> List.map (fun entry -> entry.constructor_op)
         |> List.sort_uniq String.compare
       in
-      Diagnostics.make
-        ~category:Diagnostics.Unsupported
-        ~origin:entry.origin
-        ~constructor:"ConstructorRegistry/duplicate-shape"
-        ~enclosing:entry.enclosing
-        ~profile
-        ~reason:
-          (Printf.sprintf
-             "source category `%s` mixop/arity shape maps to multiple emitted constructors: %s"
-             entry.source_category
-             (String.concat ", " constructors))
-        ~suggestion:
-          "Preserve the declaring category/static arguments in the registry key, or keep this shape Unsupported instead of guessing"
-        ())
+      Some
+        (Diagnostics.make
+           ~category:Diagnostics.Unsupported
+           ~origin:entry.origin
+           ~constructor:"ConstructorRegistry/duplicate-shape"
+           ~enclosing:entry.enclosing
+           ~profile
+           ~reason:
+             (Printf.sprintf
+                "source category `%s` mixop/arity shape maps to multiple emitted constructors: %s"
+                entry.source_category
+                (String.concat ", " constructors))
+           ~suggestion:
+             "Preserve the declaring category/static arguments in the registry key, or keep this shape Unsupported instead of guessing"
+           ()))

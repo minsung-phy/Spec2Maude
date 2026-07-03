@@ -1,5 +1,7 @@
 open Maude_ir
 
+module Rule_components = Runtime_truth_rule_components
+
 type result =
   { statements : Maude_ir.generated list
   ; conditions : Maude_ir.rule_condition list
@@ -86,12 +88,7 @@ let frozen_all sorts =
     in
     [ Frozen (range 1 sorts) ]
 
-let local_rules request =
-  let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  let rel_id = truth_request.Runtime_truth_search_helper.rel_id in
-  truth_request.rules
-  |> List.filter (fun rule ->
-    String.equal rule.Analysis.Function_graph.relation_id rel_id)
+let local_rules = Rule_components.local_rules
 
 let same_source_rule
     (source_rule : Runtime_witness_proof.source_rule)
@@ -296,64 +293,6 @@ let no_path_vars helper_name origin witness_source_id =
          (sort_ref (sort "SpectecTerminal")))
   ]
 
-let child_origin parent segment ast_constructor region source_echo =
-  Origin.with_child ?source_echo parent segment ~ast_constructor region
-
-let add_binding env (id, binding) =
-  Expr_translate.add_var env id binding
-
-let lower_head_patterns ctx origin components =
-  let rec loop env terms guards diagnostics = function
-    | [] ->
-      Some (List.rev terms), env, List.rev guards, List.rev diagnostics
-    | exp :: exps ->
-      let result = Expr_translate.lower_pattern_with_bindings ctx env origin exp in
-      let env = List.fold_left add_binding env result.introduced_bindings in
-      (match result.pattern_term with
-      | Some term ->
-        loop
-          env
-          (term :: terms)
-          (List.rev_append result.pattern_guards guards)
-          (List.rev_append result.pattern_diagnostics diagnostics)
-          exps
-      | None ->
-        None,
-        env,
-        List.rev_append result.pattern_guards guards |> List.rev,
-        List.rev_append result.pattern_diagnostics diagnostics |> List.rev)
-  in
-  loop Expr_translate.empty_env [] [] [] components
-
-let component_sort (exp : Il.Ast.exp) =
-  Expr_translate.carrier_sort_of_typ exp.note
-
-let lower_value_components ctx env origin components =
-  let rec loop terms sorts guards diagnostics = function
-    | [] ->
-      Some (List.rev terms, List.rev sorts),
-      List.rev guards,
-      List.rev diagnostics
-    | exp :: exps ->
-      (match component_sort exp with
-      | None -> None, List.rev guards, List.rev diagnostics
-      | Some sort ->
-        let lowered = Expr_translate.lower_value ctx env origin exp in
-        (match lowered.term with
-        | Some term ->
-          loop
-            (term :: terms)
-            (sort :: sorts)
-            (List.rev_append lowered.guards guards)
-            (List.rev_append lowered.diagnostics diagnostics)
-            exps
-        | None ->
-          None,
-          List.rev_append lowered.guards guards,
-          List.rev_append lowered.diagnostics diagnostics))
-  in
-  loop [] [] [] [] components
-
 let rec is_closed_pattern = function
   | Var _ -> false
   | Const _ | Qid _ -> true
@@ -440,7 +379,7 @@ let premise_refuter_rules
     (prem : Il.Ast.prem)
   =
   let prem_origin =
-    child_origin
+    Rule_components.child_origin
       origin
       (Printf.sprintf "premise[%d]" prem_index)
       "Premise"
@@ -472,18 +411,14 @@ let premise_refuter_rules
       lowered.diagnostics
     | None -> [], lowered.diagnostics)
   | Il.Ast.RulePr (rel_id, [], _mixop, exp) ->
-    let components =
-      match exp.it with
-      | Il.Ast.TupE components -> components
-      | _ -> [ exp ]
+    let components = Rule_components.exp_components exp in
+    let lowered =
+      Rule_components.lower_value_components ctx env prem_origin components
     in
-    let lowered, guards, diagnostics =
-      lower_value_components ctx env prem_origin components
-    in
-    if List.exists Diagnostics.is_fatal diagnostics then
-      [], diagnostics
+    if List.exists Diagnostics.is_fatal lowered.diagnostics then
+      [], lowered.diagnostics
     else
-      (match lowered with
+      (match lowered.values with
       | Some (terms, _sorts)
         when String.equal
                rel_id.it
@@ -500,10 +435,10 @@ let premise_refuter_rules
                   ^ string_of_int prem_index)
                lhs
                (rule_refuter_ok refuter)
-               (List.map (fun condition -> EqCondition condition) guards
+               (List.map (fun condition -> EqCondition condition) lowered.guards
                 @ [ same_relation_no_hit_condition helper_name request terms ]))
         ],
-        diagnostics
+        lowered.diagnostics
       | Some _ ->
         (* A dependent predicate can refute this premise only when the
            dependent relation already has a source-complete false helper.
@@ -511,8 +446,8 @@ let premise_refuter_rules
            unrelated closures and can make an incomplete refuter look like
            several separate fatal failures. Keep the local no-hit helper
            conservative until dependent false proofs are available. *)
-        [], diagnostics
-      | None -> [], diagnostics)
+        [], lowered.diagnostics
+      | None -> [], lowered.diagnostics)
   | Il.Ast.RulePr (_, _ :: _, _, _)
   | Il.Ast.LetPr _ | Il.Ast.ElsePr | Il.Ast.IterPr _ | Il.Ast.NegPr _ ->
     [], []
@@ -524,7 +459,7 @@ let rule_refuter_rules ctx helper_name origin request rules =
   let lower_rule index rule =
     let refuter = rule_refuter helper_name index in
     let origin =
-      child_origin
+      Rule_components.child_origin
         origin
         (Printf.sprintf "RuleD[%d]" index)
         "RuleD"
@@ -536,16 +471,21 @@ let rule_refuter_rules ctx helper_name origin request rules =
     with
     | None -> [], []
     | Some components ->
-      let pattern_terms, env, head_guards, head_diags =
-        lower_head_patterns ctx origin components
+      let lowered_head =
+        Rule_components.lower_complete_head_patterns ctx origin components
       in
-      (match pattern_terms with
-      | None -> [], head_diags
+      (match lowered_head.terms with
+      | None -> [], lowered_head.diagnostics
       | Some pattern_terms ->
         let lhs = rule_refuter_call refuter pattern_terms in
         let head_rules =
           head_mismatch_rules helper_name origin refuter input_terms pattern_terms
-          @ head_guard_refuter_rules helper_name origin refuter lhs head_guards
+          @ head_guard_refuter_rules
+              helper_name
+              origin
+              refuter
+              lhs
+              lowered_head.guards
         in
         let premise_rules, premise_diags =
           rule.Analysis.Function_graph.prems
@@ -556,7 +496,7 @@ let rule_refuter_rules ctx helper_name origin request rules =
               origin
               request
               refuter
-              env
+              lowered_head.env
               lhs
               (prem_index + 1)
               prem)
@@ -567,7 +507,7 @@ let rule_refuter_rules ctx helper_name origin request rules =
                ([], [])
         in
         List.rev_append premise_rules head_rules,
-        head_diags @ List.rev premise_diags)
+        lowered_head.diagnostics @ List.rev premise_diags)
   in
   rules
   |> List.mapi (fun index rule -> lower_rule (index + 1) rule)
@@ -696,7 +636,7 @@ let no_hit_entry_rule helper_name origin request =
 
 let no_hit_rules ctx helper_name origin request domain =
   let rules = base_rules request domain in
-  let refuter_rules, _refuter_diagnostics =
+  let refuter_rules, refuter_diagnostics =
     rule_refuter_rules ctx helper_name origin request rules
   in
   ( generated_input_vars helper_name origin request
@@ -709,7 +649,7 @@ let no_hit_rules ctx helper_name origin request domain =
     @ no_path_empty_rule helper_name origin request
     @ no_path_step_rules helper_name origin request domain
     @ no_hit_entry_rule helper_name origin request
-  , [] )
+  , refuter_diagnostics )
 
 let finite_domain_reason domain =
   match Runtime_witness_domain.prepare domain with
@@ -751,9 +691,13 @@ let finite_transitive ctx ~helper_name ~origin request domain =
   let no_hit_statements, no_hit_diagnostics =
     no_hit_rules ctx helper_name origin request domain
   in
-  { statements =
-      helper_surface helper_name origin request rules
-      @ no_hit_statements
-  ; conditions = [ RewriteCond (call.lhs, call.rhs) ]
-  ; diagnostics = no_hit_diagnostics @ [ unsupported ctx origin request domain ]
-  }
+  let diagnostics = no_hit_diagnostics @ [ unsupported ctx origin request domain ] in
+  if List.exists Diagnostics.is_fatal diagnostics then
+    { statements = []; conditions = []; diagnostics }
+  else
+    { statements =
+        helper_surface helper_name origin request rules
+        @ no_hit_statements
+    ; conditions = [ RewriteCond (call.lhs, call.rhs) ]
+    ; diagnostics
+    }

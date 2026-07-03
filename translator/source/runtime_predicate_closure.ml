@@ -274,11 +274,6 @@ let exp_components exp =
   | TupE components -> components
   | _ -> [ exp ]
 
-let string_starts_with ~prefix text =
-  let prefix_len = String.length prefix in
-  String.length text >= prefix_len
-  && String.sub text 0 prefix_len = prefix
-
 let strip_backticks text =
   let len = String.length text in
   if len >= 2 && text.[0] = '`' && text.[len - 1] = '`' then
@@ -286,11 +281,9 @@ let strip_backticks text =
   else
     text
 
-let exp_is_ok_result_marker exp =
-  let text = Il.Print.string_of_exp exp |> strip_backticks in
+let text_is_validation_ok_marker text =
+  let text = strip_backticks text in
   String.equal text "OK"
-  || string_starts_with ~prefix:"OK(" text
-  || string_starts_with ~prefix:"OK#(" text
 
 let mixop_has_ok_marker mixop =
   Xl.Mixop.flatten mixop
@@ -299,9 +292,17 @@ let mixop_has_ok_marker mixop =
     |> List.exists (fun atom ->
       match atom.it with
       | Xl.Atom.Atom text ->
-        let text = strip_backticks text in
-        String.equal text "OK" || string_starts_with ~prefix:"OK" text
+        text_is_validation_ok_marker text
       | _ -> false))
+
+let exp_is_ok_result_marker exp =
+  (* SpecTec validation relations mark success with an OK result term.
+     Keep this check on the IL result marker itself; relation names never
+     control the skip policy. *)
+  match exp.it with
+  | VarE id -> text_is_validation_ok_marker id.it
+  | CaseE (mixop, _) -> mixop_has_ok_marker mixop
+  | _ -> false
 
 let truth_external_validation_premise graph rel_id mixop exp =
   match graph.find_relation rel_id.it with

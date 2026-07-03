@@ -100,7 +100,7 @@ let false_rule ctx item =
       item.request
   in
   if List.exists Diagnostics.is_fatal refutation.diagnostics then
-    [], refutation.statements, refutation.diagnostics
+    [], [], refutation.diagnostics
   else
     let conditions =
       refutation.conditions
@@ -118,7 +118,7 @@ let false_rule ctx item =
           conditions
       in
       if List.exists Diagnostics.is_fatal diagnostics then
-        [], refutation.statements, refutation.diagnostics @ diagnostics
+        [], [], refutation.diagnostics @ diagnostics
       else
         ( [ generated
               item.name
@@ -132,16 +132,43 @@ let false_rule ctx item =
         , refutation.statements
         , refutation.diagnostics @ diagnostics )
 
+let unsupported_false ctx item =
+  Diagnostics.make
+    ~category:Diagnostics.Unsupported
+    ~origin:item.origin
+    ~constructor:"RuntimeTruthDecision/materializer/false-unimplemented"
+    ~enclosing:(Context.enclosing_path ctx)
+    ~profile:(Context.profile_name ctx)
+    ~reason:
+      "runtime truth decision needs a source-complete false proof, but the refuter did not produce a usable false rule"
+    ~suggestion:
+      "Do not emit a partial truth decision surface; implement a source-complete no-hit/refutation helper before using runtimeTruthFalse"
+    ~source_echo:(Runtime_truth_decision_helper.reason item.request)
+    ()
+
 let materialize_item ctx item =
   let true_statements, true_diagnostics = true_rule ctx item in
   let false_statements, refutation_statements, false_diagnostics =
     false_rule ctx item
   in
-  { statements =
-      helper_surface item @ true_statements
-      @ refutation_statements @ false_statements
-  ; diagnostics = true_diagnostics @ false_diagnostics
-  }
+  let false_missing =
+    match false_statements with
+    | [] -> true
+    | _ :: _ -> false
+  in
+  let diagnostics =
+    true_diagnostics
+    @ false_diagnostics
+    @ (if false_missing then [ unsupported_false ctx item ] else [])
+  in
+  if false_missing || List.exists Diagnostics.is_fatal diagnostics then
+    { statements = []; diagnostics }
+  else
+    { statements =
+        helper_surface item @ true_statements
+        @ refutation_statements @ false_statements
+    ; diagnostics
+    }
 
 let append left right =
   { statements = left.statements @ right.statements
