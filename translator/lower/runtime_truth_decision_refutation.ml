@@ -20,6 +20,8 @@ type blocker =
   ; text : string
   }
 
+module Rule_components = Runtime_truth_rule_components
+
 let empty diagnostics =
   { statements = []; conditions = []; diagnostics }
 
@@ -206,10 +208,7 @@ let split_target_input prefix_arity terms =
   | Some (prefix, [ left; right ]) -> Some (prefix, left, right)
   | Some _ | None -> None
 
-let exp_components (exp : Il.Ast.exp) =
-  match exp.it with
-  | Il.Ast.TupE exps -> exps
-  | _ -> [ exp ]
+let exp_components = Rule_components.exp_components
 
 let bind_direct_component env (exp : Il.Ast.exp) term sort =
   match exp.it with
@@ -326,43 +325,11 @@ let find_witness_typ source_id components =
     | Il.Ast.VarE id when String.equal id.it source_id -> Some exp.note
     | _ -> None)
 
-let component_sort (exp : Il.Ast.exp) =
-  Expr_translate.carrier_sort_of_typ exp.note
-
 let lower_value_components ctx env origin components =
-  let rec loop terms sorts guards diagnostics = function
-    | [] ->
-      Some (List.rev terms, List.rev sorts),
-      List.rev guards,
-      List.rev diagnostics
-    | exp :: exps ->
-      (match component_sort exp with
-      | None ->
-        None, List.rev guards, List.rev diagnostics
-      | Some sort ->
-        let lowered = Expr_translate.lower_value ctx env origin exp in
-        (match lowered.term with
-        | Some term ->
-          loop
-            (term :: terms)
-            (sort :: sorts)
-            (List.rev_append lowered.guards guards)
-            (List.rev_append lowered.diagnostics diagnostics)
-            exps
-        | None ->
-          None,
-          List.rev_append lowered.guards guards,
-          List.rev_append lowered.diagnostics diagnostics))
-  in
-  loop [] [] [] [] components
+  let lowered = Rule_components.lower_value_components ctx env origin components in
+  lowered.values, lowered.guards, lowered.diagnostics
 
-let local_rules request =
-  let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  truth_request.Runtime_truth_search_helper.rules
-  |> List.filter (fun rule ->
-    String.equal
-      rule.Analysis.Function_graph.relation_id
-      truth_request.Runtime_truth_search_helper.rel_id)
+let local_rules = Rule_components.local_rules
 
 let generated helper_name origin node =
   Maude_ir.generated ~provenance:(Maude_ir.Helper helper_name) ~origin node
@@ -445,38 +412,16 @@ let acyclic_rule_refuted_surface helper_name origin request =
     ])
   |> List.concat
 
-let child_origin parent segment ast_constructor region source_echo =
-  Origin.with_child ?source_echo parent segment ~ast_constructor region
+let child_origin = Rule_components.child_origin
 
 let lower_head_patterns ctx origin components =
-  let rec loop env terms guards diagnostics = function
-    | [] ->
-      Some (List.rev terms), env, List.rev guards, List.rev diagnostics
-    | exp :: exps ->
-      let result = Expr_translate.lower_pattern_with_bindings ctx env origin exp in
-      let env =
-        result.introduced_bindings
-        |> List.fold_left
-             (fun env (id, binding) -> Expr_translate.add_var env id binding)
-             env
-      in
-      (match result.pattern_term with
-      | Some term ->
-        loop
-          env
-          (term :: terms)
-          (List.rev_append result.pattern_guards guards)
-          (List.rev_append result.pattern_diagnostics diagnostics)
-          exps
-      | None ->
-        loop
-          env
-          terms
-          (List.rev_append result.pattern_guards guards)
-          (List.rev_append result.pattern_diagnostics diagnostics)
-          exps)
+  let lowered =
+    Rule_components.lower_partial_head_patterns_for_acyclic_refutation
+      ctx
+      origin
+      components
   in
-  loop Expr_translate.empty_env [] [] [] components
+  lowered.terms, lowered.env, lowered.guards, lowered.diagnostics
 
 let dependent_false_conditions ctx origin request env rel_id components =
   let lowered, guards, diagnostics =

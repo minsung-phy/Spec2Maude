@@ -165,13 +165,17 @@ let materialize_item ctx item =
     | None -> true
     | Some _ -> false
   in
-  { statements = helper_surface item @ true_statements
-                 @ false_statements
-  ; diagnostics =
-      true_diagnostics
-      @ false_diagnostics
-      @ (if false_missing then [ unsupported ctx item ] else [])
-  }
+  let diagnostics =
+    true_diagnostics
+    @ false_diagnostics
+    @ (if false_missing then [ unsupported ctx item ] else [])
+  in
+  if false_missing || List.exists Diagnostics.is_fatal diagnostics then
+    { statements = []; diagnostics }
+  else
+    { statements = helper_surface item @ true_statements @ false_statements
+    ; diagnostics
+    }
 
 let append left right =
   { statements = left.statements @ right.statements

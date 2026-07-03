@@ -51,7 +51,11 @@ let render_mixfix_app render template args =
       add_piece piece;
       add_arg arg;
       interleave pieces args
-    | _ -> assert false
+    | _ ->
+      invalid_arg
+        (Printf.sprintf
+           "Maude mixfix render invariant failed for %S: %d piece(s), %d argument(s)"
+           template (List.length pieces) (List.length rendered_args))
   in
   interleave pieces rendered_args;
   String.concat " " (List.rev !tokens)

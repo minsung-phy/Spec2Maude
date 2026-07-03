@@ -266,6 +266,12 @@ let static_param_diagnostic ctx origin param =
     ~suggestion:"Implement finite static specialization or a type-level witness encoding before lowering this TypD"
     ()
 
+let param_binding_invariant param reason =
+  invalid_arg
+    (Printf.sprintf
+       "Type_translate.param_binding invariant failed for parameter %S: %s"
+       (Il.Print.string_of_param param) reason)
+
 let param_binding ctx origin _seed index param =
   let name =
     match param.it with
@@ -273,12 +279,16 @@ let param_binding ctx origin _seed index param =
       Naming.maude_var (id.it ^ "_P" ^ string_of_int index)
     | TypP id ->
       Naming.maude_var (id.it ^ "_T" ^ string_of_int index)
-    | DefP _ | GramP _ -> assert false
+    | DefP _ | GramP _ ->
+      param_binding_invariant param
+        "static DefP/GramP must be rejected before runtime parameter binding"
   in
   let type_ref, diagnostics =
     match param_type_ref ctx origin param with
     | Some type_ref, diagnostics -> type_ref, diagnostics
-    | None, _ -> assert false
+    | None, _ ->
+      param_binding_invariant param
+        "parameter has no Maude runtime type reference"
   in
   let term = Var name in
   let env_update env =
@@ -288,7 +298,9 @@ let param_binding ctx origin _seed index param =
       let binding = { static_term = term; static_sort = sort; static_typ = typ } in
       { env with exp_vars = (id.it, binding) :: env.exp_vars }
     | TypP id -> { env with typ_vars = (id.it, term) :: env.typ_vars }
-    | DefP _ | GramP _ -> assert false
+    | DefP _ | GramP _ ->
+      param_binding_invariant param
+        "static DefP/GramP cannot update runtime expression/type environments"
   in
   gen origin (var name type_ref), env_update, term, diagnostics
 
