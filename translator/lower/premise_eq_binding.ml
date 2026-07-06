@@ -173,11 +173,17 @@ let try_category_membership_eq ctx env ~bound_vars origin left right () =
 let try_inverse_binding_eq ctx env ~bound_vars origin exp left right () =
   Premise_eq_inverse_binding.lower ctx env ~bound_vars origin exp left right
 
-let try_inverse_pair_split_eq ctx env ~bound_vars origin exp left right () =
-  Premise_eq_inverse_pair_split.lower ctx env ~bound_vars origin exp left right
+let try_fixed_inverse_concat_eq ctx env ~bound_vars origin exp left right () =
+  Premise_eq_fixed_inverse_concat.lower
+    ctx env ~bound_vars origin exp left right
 
 let try_inverse_concatn_chunks_eq ctx env ~bound_vars origin exp left right () =
-  Premise_eq_inverse_concatn_chunks.lower ctx env ~bound_vars origin exp left right
+  Premise_eq_inverse_concatn_chunks.lower
+    ctx env ~bound_vars origin exp left right
+
+let try_declared_inverse_fallback_eq ctx env ~bound_vars origin exp left right () =
+  Premise_eq_declared_inverse_fallback.lower
+    ctx env ~bound_vars origin exp left right
 
 let try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp left right () =
   Premise_eq_numeric_inverse.lower ctx env ~bound_vars origin exp left right
@@ -236,20 +242,22 @@ let lower_ifpr_eq ctx env ~bound_vars origin (exp : exp) (left : exp) (right : e
     first_success
       [ try_category_membership_eq ctx env ~bound_vars origin left right
       ; try_category_membership_eq ctx env ~bound_vars origin right left
-      ; try_inverse_concatn_chunks_eq ctx env ~bound_vars origin exp left right
-      ; try_inverse_concatn_chunks_eq ctx env ~bound_vars origin exp right left
-      ; try_inverse_pair_split_eq ctx env ~bound_vars origin exp left right
-      ; try_inverse_pair_split_eq ctx env ~bound_vars origin exp right left
-      ; try_optional_map_inverse_eq ctx env ~bound_vars origin exp left right
-      ; try_optional_map_inverse_eq ctx env ~bound_vars origin exp right left
-      ; try_inverse_binding_eq ctx env ~bound_vars origin exp left right
-      ; try_inverse_binding_eq ctx env ~bound_vars origin exp right left
-      ; try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp left right
-      ; try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp right left
-      ; try_unary_projection_binding_eq ctx env ~bound_vars origin exp left right
-      ; try_unary_projection_binding_eq ctx env ~bound_vars origin exp right left
       ; try_direct_var_binding_eq ctx env ~bound_vars origin exp left right
       ; try_direct_var_binding_eq ctx env ~bound_vars origin exp right left
+      ; try_unary_projection_binding_eq ctx env ~bound_vars origin exp left right
+      ; try_unary_projection_binding_eq ctx env ~bound_vars origin exp right left
+      ; try_inverse_binding_eq ctx env ~bound_vars origin exp left right
+      ; try_inverse_binding_eq ctx env ~bound_vars origin exp right left
+      ; try_fixed_inverse_concat_eq ctx env ~bound_vars origin exp left right
+      ; try_fixed_inverse_concat_eq ctx env ~bound_vars origin exp right left
+      ; try_inverse_concatn_chunks_eq ctx env ~bound_vars origin exp left right
+      ; try_inverse_concatn_chunks_eq ctx env ~bound_vars origin exp right left
+      ; try_declared_inverse_fallback_eq ctx env ~bound_vars origin exp left right
+      ; try_declared_inverse_fallback_eq ctx env ~bound_vars origin exp right left
+      ; try_optional_map_inverse_eq ctx env ~bound_vars origin exp left right
+      ; try_optional_map_inverse_eq ctx env ~bound_vars origin exp right left
+      ; try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp left right
+      ; try_numeric_inverse_binding_eq ctx env ~bound_vars origin exp right left
       ]
   with
   | Some result -> result

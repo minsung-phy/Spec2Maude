@@ -50,12 +50,85 @@ let unsupported_source ctx origin source_echo reason suggestion =
     ~suggestion
     ()
 
-let runtime_args args =
-  args
-  |> List.filter_map (fun arg ->
-    match arg.it with
-    | ExpA exp -> Some exp
-    | TypA _ | DefA _ | GramA _ -> None)
+let lower_type_arg ctx env origin = function
+  | { it = TypA typ; _ } ->
+    Expr_translate.lower_type_witness
+      ctx
+      env
+      origin
+      ~constructor:"Premise/IfPr/inverse-concatn-chunks/static-arg"
+      typ
+  | arg ->
+    { Expr_translate.term = None
+    ; guards = []
+    ; diagnostics =
+        [ unsupported_source
+            ctx
+            origin
+            (Il.Print.string_of_arg arg)
+            "fixed-width concatn inverse requires TypP parameters to be passed as TypA witnesses"
+            "Keep this equality Unsupported until the static syntax argument is preserved"
+        ]
+    }
+
+type concatn_call_shape =
+  { static_guards : Maude_ir.eq_condition list
+  ; static_diagnostics : Diagnostics.t list
+  ; runtime_args : exp list
+  }
+
+let collect_concatn_call_shape ctx env origin params args =
+  let rec loop static_guards static_diagnostics runtime_args params args =
+    match params, args with
+    | [], [] ->
+      Ok
+        { static_guards = List.rev static_guards
+        ; static_diagnostics = List.rev static_diagnostics
+        ; runtime_args = List.rev runtime_args
+        }
+    | Analysis.Function_graph.Static_typ :: params, arg :: args ->
+      let result = lower_type_arg ctx env origin arg in
+      (match result.term with
+      | Some _ ->
+        loop
+          (List.rev_append result.guards static_guards)
+          (List.rev_append result.diagnostics static_diagnostics)
+          runtime_args
+          params
+          args
+      | None ->
+        Error result.diagnostics)
+    | Runtime_exp :: params, { it = ExpA exp; _ } :: args ->
+      loop static_guards static_diagnostics (exp :: runtime_args) params args
+    | (Static_def | Static_gram) :: _, arg :: _ ->
+      Error
+        [ unsupported_source
+            ctx
+            origin
+            (Il.Print.string_of_arg arg)
+            "fixed-width concatn inverse currently supports only TypP static arguments"
+            "Keep this equality Unsupported until DefP/GramP static arguments are represented in the helper contract"
+        ]
+    | Runtime_exp :: _, ({ it = TypA _ | DefA _ | GramA _; _ } as arg) :: _ ->
+      Error
+        [ unsupported_source
+            ctx
+            origin
+            (Il.Print.string_of_arg arg)
+            "runtime concatn argument position received a static argument"
+            "Preserve source parameter kinds before using fixed-width concatn inverse"
+        ]
+    | [], _ :: _ | _ :: _, [] ->
+      Error
+        [ unsupported_source
+            ctx
+            origin
+            (String.concat " " (List.map Il.Print.string_of_arg args))
+            "source-declared concatn inverse call arity does not match its DecD parameters"
+            "Keep this equality Unsupported until the forward definition parameters and call arguments align"
+        ]
+  in
+  loop [] [] [] params args
 
 let target env ~bound_vars source_exp =
   match unbound_direct_var env ~bound_vars source_exp with
@@ -161,9 +234,23 @@ let chunks_shape runtime_exp =
   | IterE (body, (ListN (count_exp, None), [ generator_id, source_exp ])) ->
     (match body.it with
     | CallE (bytes_id, bytes_args) ->
-      Some (body, bytes_id, bytes_args, count_exp, generator_id, source_exp)
+      Some (bytes_id, bytes_args, count_exp, generator_id, source_exp)
     | _ -> None)
   | _ -> None
+
+let inverse_definition_implemented
+    (inverse_definition : Analysis.Function_graph.definition) =
+  inverse_definition.clause_count > 0
+  ||
+  match Builtin_spec.status_of_source_id inverse_definition.id with
+  | Builtin_types.Implemented -> true
+  | Builtin_types.Obligation -> false
+
+let inverse_result_is_terminal
+    (inverse_definition : Analysis.Function_graph.definition) =
+  match Expr_translate.carrier_sort_of_typ inverse_definition.result with
+  | Some sort -> sort_name sort = "SpectecTerminal"
+  | None -> false
 
 let lower ctx env ~bound_vars origin exp call_exp known_exp =
   match call_exp.it with
@@ -174,19 +261,69 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
        Analysis.Function_graph.find_definition graph concatn_target.it,
        Analysis.Function_graph.definition_inverse graph concatn_target.it
      with
-    | Some _, Some _ ->
-      (match runtime_args concatn_args with
+    | Some definition, Some _ ->
+      (match collect_concatn_call_shape ctx env origin definition.params concatn_args with
+      | Error diagnostics ->
+        Some { (empty_with_env ~bound_vars env) with diagnostics }
+      | Ok { static_guards; static_diagnostics; runtime_args } ->
+      (match runtime_args with
       | [ runtime_exp; width_exp ] ->
         (match chunks_shape runtime_exp with
         | None -> None
-        | Some (_body, bytes_id, bytes_args, count_exp, generator_id, source_exp) ->
+        | Some (bytes_id, bytes_args, count_exp, generator_id, source_exp) ->
           let bytes_target = call_target_id ctx bytes_id in
           (match
              Analysis.Function_graph.find_definition graph bytes_target.it,
              Analysis.Function_graph.definition_inverse graph bytes_target.it,
              target env ~bound_vars source_exp
            with
-          | Some _, Some inverse_id, Some (target_source_id, target_binding) ->
+          | Some bytes_definition, Some inverse_id, Some (target_source_id, target_binding)
+            when List.length bytes_definition.params = List.length bytes_args ->
+            (match Analysis.Function_graph.find_definition graph inverse_id with
+            | None ->
+              Some
+                { (empty_with_env ~bound_vars env) with
+                  diagnostics =
+                    static_diagnostics
+                    @ [ unsupported_exp
+                          ctx
+                          origin
+                          exp
+                          ("source-declared inverse target `" ^ inverse_id
+                           ^ "` has no DecD declaration")
+                          "Declare the inverse function in SpecTec source or keep this equality Unsupported"
+                      ]
+                }
+            | Some inverse_definition ->
+            if not (inverse_definition_implemented inverse_definition) then
+              Some
+                { (empty_with_env ~bound_vars env) with
+                  diagnostics =
+                    static_diagnostics
+                    @ [ unsupported_exp
+                          ctx
+                          origin
+                          exp
+                          ("source-declared inverse `" ^ inverse_id
+                           ^ "` has no implemented source or builtin contract")
+                          "Implement the inverse in the verified builtin/prelude backend before using it in fixed-width concatn inverse"
+                      ]
+                }
+            else if not (inverse_result_is_terminal inverse_definition) then
+              Some
+                { (empty_with_env ~bound_vars env) with
+                  diagnostics =
+                    static_diagnostics
+                    @ [ unsupported_exp
+                          ctx
+                          origin
+                          exp
+                          ("source-declared inverse `" ^ inverse_id
+                           ^ "` does not return a terminal element")
+                          "Keep this equality Unsupported until the inverse result type matches the chunk element"
+                      ]
+                }
+            else
             let stem =
               Naming.helper_local_var_stem origin
               ^ "_"
@@ -195,15 +332,7 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
             let target_head_var =
               Naming.maude_var (stem ^ "-" ^ generator_id.it ^ "-head")
             in
-            (match
-               lower_bytes_args
-                 ctx
-                 env
-                 origin
-                 stem
-                 generator_id
-                 bytes_args
-             with
+            (match lower_bytes_args ctx env origin stem generator_id bytes_args with
             | Error diagnostics ->
               Some { (empty_with_env ~bound_vars env) with diagnostics }
             | Ok (arg_roles, arg_guards, arg_diagnostics) ->
@@ -233,6 +362,22 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
                    |> List.map (fun capture -> Var capture.Helper.formal_var))
                   @ [ Var (Naming.maude_var (stem ^ "-chunk")) ]
                 in
+                if List.length inverse_definition.params
+                   <> List.length inverse_call_formals then
+                  Some
+                    { (empty_with_env ~bound_vars env) with
+                      diagnostics =
+                        static_diagnostics @ arg_diagnostics
+                        @ [ unsupported_exp
+                              ctx
+                              origin
+                              exp
+                              ("source-declared inverse `" ^ inverse_id
+                               ^ "` arity does not match the generated chunk inverse call")
+                              "Keep this equality Unsupported until the inverse signature matches the chunk binding shape"
+                          ]
+                    }
+                else
                 let helper_request =
                   { Helper.kind =
                       Helper.Inverse_concatn_chunks
@@ -273,8 +418,8 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
                     [ target_binding.term ]
                 in
                 let prefix_conditions =
-                  arg_guards @ known_result.guards @ width_result.guards
-                  @ count_result.guards
+                  static_guards @ arg_guards @ known_result.guards
+                  @ width_result.guards @ count_result.guards
                 in
                 let prefix_bound =
                   conditions_bound_vars bound_vars prefix_conditions
@@ -286,8 +431,9 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
                 if not inverse_args_bound then
                   Some
                     { (empty_with_env ~bound_vars env) with
-                      diagnostics =
-                        arg_diagnostics @ known_result.diagnostics
+                        diagnostics =
+                        static_diagnostics @ arg_diagnostics
+                        @ known_result.diagnostics
                         @ width_result.diagnostics @ count_result.diagnostics
                         @ [ unsupported_exp
                               ctx
@@ -317,14 +463,16 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
                          env_after
                          bound_vars
                          conditions
-                         (arg_diagnostics @ known_result.diagnostics
+                         (static_diagnostics @ arg_diagnostics
+                          @ known_result.diagnostics
                           @ width_result.diagnostics @ count_result.diagnostics
                           @ original_result.diagnostics))
                   | None ->
                     Some
                       { (empty_with_env ~bound_vars env_after) with
-                        diagnostics =
-                          arg_diagnostics @ known_result.diagnostics
+                          diagnostics =
+                          static_diagnostics @ arg_diagnostics
+                          @ known_result.diagnostics
                           @ width_result.diagnostics @ count_result.diagnostics
                           @ original_result.diagnostics
                       })
@@ -332,7 +480,8 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
                 Some
                   { (empty_with_env ~bound_vars env) with
                     diagnostics =
-                      arg_diagnostics @ known_result.diagnostics
+                      static_diagnostics @ arg_diagnostics
+                      @ known_result.diagnostics
                       @ width_result.diagnostics @ count_result.diagnostics
                       @ [ unsupported_exp
                             ctx
@@ -342,11 +491,26 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
                             "Keep this equality Unsupported until bytes, count, and width are admissible before the inverse binding"
                         ]
                   }))
+            )
+          | Some _, Some _, Some _ ->
+            Some
+              { (empty_with_env ~bound_vars env) with
+                diagnostics =
+                  static_diagnostics
+                  @ [ unsupported_exp
+                        ctx
+                        origin
+                        exp
+                        "inner bytes function call arity does not match its DecD parameters"
+                        "Keep this equality Unsupported until the element bytes function parameters and call arguments align"
+                    ]
+              }
           | _ ->
             Some
               { (empty_with_env ~bound_vars env) with
                 diagnostics =
-                  [ unsupported_exp
+                  static_diagnostics
+                  @ [ unsupported_exp
                       ctx
                       origin
                       exp
@@ -354,6 +518,6 @@ let lower ctx env ~bound_vars origin exp call_exp known_exp =
                       "Do not lower arbitrary concatn inverse search without source inverse metadata for the element function"
                   ]
               }))
-      | [] | [ _ ] | _ :: _ :: _ :: _ -> None)
+      | [] | [ _ ] | _ :: _ :: _ :: _ -> None))
     | _ -> None)
   | _ -> None

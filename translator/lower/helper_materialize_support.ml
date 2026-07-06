@@ -63,6 +63,7 @@ let schedule_eq_conditions initial_bound conditions =
 
 let spectec_terminal = sort "SpectecTerminal"
 let spectec_terminals = sort "SpectecTerminals"
+let spectec_type = sort "SpectecType"
 let nat = sort "Nat"
 
 let app name args =

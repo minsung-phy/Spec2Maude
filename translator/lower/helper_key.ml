@@ -278,18 +278,16 @@ let iter_pattern_zip_key (pattern : iter_pattern_zip) =
     ; String.concat "\001" (List.map eq_condition_key pattern.body_eq_conditions)
     ]
 
-let inverse_pair_split_key (split : inverse_pair_split) =
+let optional_map_inverse_key (inverse : optional_map_inverse) =
   String.concat
     "\000"
-    [ split.source
-    ; split.left_source_id
-    ; split.right_source_id
-    ; split.pair_source
-    ; split.left_head_var
-    ; split.right_head_var
-    ; split.left_stream_var
-    ; split.right_stream_var
-    ; split.source_tail_var
+    [ source_shape_key inverse.source_shape
+    ; inverse.generator_var
+    ; inverse.helper_head_var
+    ; sort_name inverse.source_element_sort
+    ; String.concat "\001" (List.map capture_key inverse.captures)
+    ; term_key inverse.lowered_body
+    ; String.concat "\001" (List.map eq_condition_key inverse.body_eq_conditions)
     ]
 
 let inverse_concatn_chunks_key (inverse : inverse_concatn_chunks) =
@@ -312,17 +310,8 @@ let inverse_concatn_chunks_key (inverse : inverse_concatn_chunks) =
     ; inverse.chunk_var
     ]
 
-let optional_map_inverse_key (inverse : optional_map_inverse) =
-  String.concat
-    "\000"
-    [ source_shape_key inverse.source_shape
-    ; inverse.generator_var
-    ; inverse.helper_head_var
-    ; sort_name inverse.source_element_sort
-    ; String.concat "\001" (List.map capture_key inverse.captures)
-    ; term_key inverse.lowered_body
-    ; String.concat "\001" (List.map eq_condition_key inverse.body_eq_conditions)
-    ]
+let fixed_inverse_concat2_key (inverse : fixed_inverse_concat2) =
+  fixed_inverse_concat2_source inverse
 
 let origin_key origin =
   String.concat
@@ -342,7 +331,7 @@ let kind_name = function
   | Iter_premise_exists_bool _ -> "IterPremiseExistsBool"
   | Iter_premise_zip_bool _ -> "IterPremiseZipBool"
   | Iter_pattern_zip _ -> "IterPatternZip"
-  | Inverse_pair_split _ -> "InversePairSplit"
+  | Fixed_inverse_concat2 _ -> "FixedInverseConcat2"
   | Inverse_concatn_chunks _ -> "InverseConcatnChunks"
   | Optional_map_inverse _ -> "OptionalMapInverse"
   | Runtime_predicate_search _ -> "RuntimePredicateSearch"
@@ -377,8 +366,9 @@ let key_of_kind = function
   | Iter_pattern_zip pattern ->
     "iter-pattern-zip:"
     ^ Digest.to_hex (Digest.string (iter_pattern_zip_key pattern))
-  | Inverse_pair_split split ->
-    "inverse-pair-split:" ^ Digest.to_hex (Digest.string (inverse_pair_split_key split))
+  | Fixed_inverse_concat2 inverse ->
+    "fixed-inverse-concat2:"
+    ^ Digest.to_hex (Digest.string (fixed_inverse_concat2_key inverse))
   | Inverse_concatn_chunks inverse ->
     "inverse-concatn-chunks:"
     ^ Digest.to_hex (Digest.string (inverse_concatn_chunks_key inverse))
@@ -402,7 +392,7 @@ let has_materializer = function
   | Iter_map _ | Iter_zip_map _ | Iter_listn _ | Iter_listn_source _
   | Iter_premise_opt_bool _ | Iter_premise_list_bool _
   | Iter_premise_exists_bool _ | Iter_premise_zip_bool _ | Iter_pattern_zip _
-  | Inverse_pair_split _ | Inverse_concatn_chunks _ | Optional_map_inverse _
+  | Fixed_inverse_concat2 _ | Inverse_concatn_chunks _ | Optional_map_inverse _
   | Runtime_predicate_search _ | Runtime_predicate_truth_search _
   | Runtime_predicate_truth_decision _ | Runtime_enabledness _ -> true
 

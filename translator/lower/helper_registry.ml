@@ -23,11 +23,11 @@ let request registry request =
   | None ->
     let name = Helper_key.name ~used:(used_name registry) request in
     let entry = { name; request } in
-    registry.entries <- registry.entries @ [ { key; entry } ];
+    registry.entries <- { key; entry } :: registry.entries;
     name
 
 let entries registry =
-  registry.entries |> List.map (fun stored -> stored.entry)
+  registry.entries |> List.rev |> List.map (fun stored -> stored.entry)
 
 let runtime_predicate_search_requests registry =
   entries registry
