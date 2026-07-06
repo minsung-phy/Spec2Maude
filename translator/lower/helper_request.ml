@@ -216,16 +216,14 @@ type iter_pattern_zip =
   ; body_eq_conditions : eq_condition list
   }
 
-type inverse_pair_split =
-  { source : string
-  ; left_source_id : string
-  ; right_source_id : string
-  ; pair_source : string
-  ; left_head_var : string
-  ; right_head_var : string
-  ; left_stream_var : string
-  ; right_stream_var : string
-  ; source_tail_var : string
+type optional_map_inverse =
+  { source_shape : iter_map_source_shape
+  ; generator_var : string
+  ; helper_head_var : string
+  ; source_element_sort : sort
+  ; captures : capture list
+  ; lowered_body : term
+  ; body_eq_conditions : eq_condition list
   }
 
 type inverse_concatn_chunks =
@@ -246,14 +244,10 @@ type inverse_concatn_chunks =
   ; chunk_var : string
   }
 
-type optional_map_inverse =
-  { source_shape : iter_map_source_shape
-  ; generator_var : string
-  ; helper_head_var : string
-  ; source_element_sort : sort
-  ; captures : capture list
-  ; lowered_body : term
-  ; body_eq_conditions : eq_condition list
+(* See helper_request.mli: callers must recheck the original forward equality
+   after using this helper to bind the two source sequences. *)
+type fixed_inverse_concat2 =
+  { source : string
   }
 
 type request_kind =
@@ -266,7 +260,7 @@ type request_kind =
   | Iter_premise_exists_bool of iter_premise_exists_bool
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_pattern_zip of iter_pattern_zip
-  | Inverse_pair_split of inverse_pair_split
+  | Fixed_inverse_concat2 of fixed_inverse_concat2
   | Inverse_concatn_chunks of inverse_concatn_chunks
   | Optional_map_inverse of optional_map_inverse
   | Runtime_predicate_search of Runtime_search_helper.request
@@ -278,4 +272,16 @@ type request =
   { kind : request_kind
   ; reason : string
   ; origin : Origin.t
+  }
+
+let fixed_inverse_concat2 ~source =
+  { source }
+
+let fixed_inverse_concat2_source inverse =
+  inverse.source
+
+let fixed_inverse_concat2_request ~origin ~source ~reason =
+  { kind = Fixed_inverse_concat2 (fixed_inverse_concat2 ~source)
+  ; reason
+  ; origin
   }

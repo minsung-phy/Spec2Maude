@@ -2,73 +2,65 @@ open Maude_ir
 open Helper_request
 open Helper_materialize_support
 
-let pair_split_result_op name = "pairSplit" ^ name
-let pair_split_fail_op name = "pairSplit" ^ name ^ "Fail"
-let pair_split_unzip_op name = name ^ "Unzip"
-let pair_split_prepend_op name = name ^ "Prepend"
-
 let concatn_chunks_result_op name = "concatnChunks" ^ name
 let concatn_chunks_fail_op name = "concatnChunks" ^ name ^ "Fail"
 let concatn_chunks_inverse_op name = name ^ "Inverse"
 let concatn_chunks_prepend_op name = name ^ "Prepend"
-
-let pair_split_sort name =
-  sort ("PairSplit" ^ name)
+let fixed_concat_result_op name = "fixedConcat" ^ name
+let fixed_concat_inverse_op name = name ^ "FixedInverse"
 
 let concatn_chunks_sort name =
   sort ("ConcatnChunks" ^ name)
 
-let materialize_inverse_pair_split entry (split : inverse_pair_split) =
+let fixed_concat_sort name =
+  sort ("FixedConcat" ^ name)
+
+let fixed_concat2_match_condition name ~type_witness ~known ~left ~right =
+  MatchCond
+    ( app (fixed_concat_result_op name) [ left; right ]
+    , app (fixed_concat_inverse_op name) [ type_witness; known ] )
+
+let materialize_fixed_inverse_concat2 entry (_inverse : fixed_inverse_concat2) =
   let name = entry.Helper_registry.name in
   let origin = entry.request.origin in
-  let result_name = pair_split_result_op name in
-  let fail_name = pair_split_fail_op name in
-  let unzip_name = pair_split_unzip_op name in
-  let prepend_name = pair_split_prepend_op name in
-  let split_sort = pair_split_sort name in
-  let left_head = Var split.left_head_var in
-  let right_head = Var split.right_head_var in
-  let left_stream = Var split.left_stream_var in
-  let right_stream = Var split.right_stream_var in
-  let tail = Var split.source_tail_var in
-  let pair = concat left_head right_head in
-  let recursive_subject = concat pair tail in
-  let result left right = app result_name [ left; right ] in
-  let unzip source = app unzip_name [ source ] in
-  let prepend left right split = app prepend_name [ left; right; split ] in
-  let fail = Const fail_name in
+  let result_name = fixed_concat_result_op name in
+  let inverse_name = fixed_concat_inverse_op name in
+  let result_sort = fixed_concat_sort name in
+  let typ = Var "FIC_T" in
+  let x = Var "FIC_X" in
+  let y = Var "FIC_Y" in
+  let xs = Var "FIC_XS" in
+  let xs1 = Var "FIC_XS1" in
+  let xs2 = Var "FIC_XS2" in
   let statement node = generated name origin node in
-  [ statement (sort_decl split_sort)
+  [ statement (sort_decl result_sort)
   ; statement
       (op result_name
          [ sort_ref spectec_terminals; sort_ref spectec_terminals ]
-         split_sort
+         result_sort
          ~attrs:[ Ctor ])
-  ; statement (op fail_name [] split_sort ~attrs:[ Ctor ])
-  ; statement (op unzip_name [ sort_ref spectec_terminals ] split_sort)
   ; statement
-      (op prepend_name
-         [ sort_ref spectec_terminal
-         ; sort_ref spectec_terminal
-         ; sort_ref split_sort
-         ]
-         split_sort)
-  ; statement (var split.left_head_var (sort_ref spectec_terminal))
-  ; statement (var split.right_head_var (sort_ref spectec_terminal))
-  ; statement (var split.left_stream_var (sort_ref spectec_terminals))
-  ; statement (var split.right_stream_var (sort_ref spectec_terminals))
-  ; statement (var split.source_tail_var (sort_ref spectec_terminals))
-  ; statement (eq (unzip (Const "eps")) (result (Const "eps") (Const "eps")))
-  ; statement (eq (unzip left_head) fail)
+      (op inverse_name
+         [ sort_ref spectec_type; sort_ref spectec_terminals ]
+         result_sort)
+  ; statement (var "FIC_T" (sort_ref spectec_type))
+  ; statement (var "FIC_X" (sort_ref spectec_terminal))
+  ; statement (var "FIC_Y" (sort_ref spectec_terminal))
+  ; statement (var "FIC_XS" (sort_ref spectec_terminals))
+  ; statement (var "FIC_XS1" (sort_ref spectec_terminals))
+  ; statement (var "FIC_XS2" (sort_ref spectec_terminals))
   ; statement
       (eq
-         (unzip recursive_subject)
-         (prepend left_head right_head (unzip tail)))
+         (app inverse_name [ typ; Const "eps" ])
+         (app result_name [ Const "eps"; Const "eps" ]))
   ; statement
-      (eq
-         (prepend left_head right_head (result left_stream right_stream))
-         (result (concat left_head left_stream) (concat right_head right_stream)))
-  ; statement (eq (prepend left_head right_head fail) fail)
+      (ceq
+         (app inverse_name [ typ; concat x (concat y xs) ])
+         (app result_name [ concat x xs1; concat y xs2 ])
+         [ MatchCond
+             ( app result_name [ xs1; xs2 ]
+             , app inverse_name [ typ; xs ] )
+         ])
   ]
 
 let materialize_inverse_concatn_chunks entry (inverse : inverse_concatn_chunks) =

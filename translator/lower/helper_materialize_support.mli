@@ -4,6 +4,7 @@ val schedule_eq_conditions :
 
 val spectec_terminal : Maude_ir.sort
 val spectec_terminals : Maude_ir.sort
+val spectec_type : Maude_ir.sort
 val nat : Maude_ir.sort
 
 val app : string -> Maude_ir.term list -> Maude_ir.term

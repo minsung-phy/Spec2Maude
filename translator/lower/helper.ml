@@ -22,20 +22,17 @@ let runtime_predicate_truth_decision_requests =
 let runtime_enabledness_requests =
   Helper_registry.runtime_enabledness_requests
 
-let unmaterialized_diagnostics =
-  Helper_registry.unmaterialized_diagnostics
-
-let pair_split_result_op =
-  Helper_materialize_inverse.pair_split_result_op
-
-let pair_split_unzip_op =
-  Helper_materialize_inverse.pair_split_unzip_op
-
 let concatn_chunks_result_op =
   Helper_materialize_inverse.concatn_chunks_result_op
 
 let concatn_chunks_inverse_op =
   Helper_materialize_inverse.concatn_chunks_inverse_op
+
+let fixed_concat2_match_condition =
+  Helper_materialize_inverse.fixed_concat2_match_condition
+
+let unmaterialized_diagnostics =
+  Helper_registry.unmaterialized_diagnostics
 
 let materialize_entry entry =
   match entry.request.kind with
@@ -54,8 +51,8 @@ let materialize_entry entry =
     Helper_materialize_iter.materialize_iter_premise_zip_bool entry prem
   | Iter_pattern_zip pattern ->
     Helper_materialize_iter.materialize_iter_pattern_zip entry pattern
-  | Inverse_pair_split split ->
-    Helper_materialize_inverse.materialize_inverse_pair_split entry split
+  | Fixed_inverse_concat2 inverse ->
+    Helper_materialize_inverse.materialize_fixed_inverse_concat2 entry inverse
   | Inverse_concatn_chunks inverse ->
     Helper_materialize_inverse.materialize_inverse_concatn_chunks entry inverse
   | Optional_map_inverse inverse ->

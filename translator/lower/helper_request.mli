@@ -216,16 +216,14 @@ type iter_pattern_zip =
   ; body_eq_conditions : eq_condition list
   }
 
-type inverse_pair_split =
-  { source : string
-  ; left_source_id : string
-  ; right_source_id : string
-  ; pair_source : string
-  ; left_head_var : string
-  ; right_head_var : string
-  ; left_stream_var : string
-  ; right_stream_var : string
-  ; source_tail_var : string
+type optional_map_inverse =
+  { source_shape : iter_map_source_shape
+  ; generator_var : string
+  ; helper_head_var : string
+  ; source_element_sort : sort
+  ; captures : capture list
+  ; lowered_body : term
+  ; body_eq_conditions : eq_condition list
   }
 
 type inverse_concatn_chunks =
@@ -246,15 +244,11 @@ type inverse_concatn_chunks =
   ; chunk_var : string
   }
 
-type optional_map_inverse =
-  { source_shape : iter_map_source_shape
-  ; generator_var : string
-  ; helper_head_var : string
-  ; source_element_sort : sort
-  ; captures : capture list
-  ; lowered_body : term
-  ; body_eq_conditions : eq_condition list
-  }
+(* Fixed two-way inverse concat only materializes the source-derived splitter.
+   The caller must still emit the original forward equality as a recheck after
+   the helper MatchCond; otherwise this helper would replace, rather than
+   justify, the source inverse equality. *)
+type fixed_inverse_concat2
 
 type request_kind =
   | Iter_map of iter_map
@@ -266,7 +260,7 @@ type request_kind =
   | Iter_premise_exists_bool of iter_premise_exists_bool
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_pattern_zip of iter_pattern_zip
-  | Inverse_pair_split of inverse_pair_split
+  | Fixed_inverse_concat2 of fixed_inverse_concat2
   | Inverse_concatn_chunks of inverse_concatn_chunks
   | Optional_map_inverse of optional_map_inverse
   | Runtime_predicate_search of Runtime_search_helper.request
@@ -279,3 +273,15 @@ type request =
   ; reason : string
   ; origin : Origin.t
   }
+
+val fixed_inverse_concat2 :
+  source:string ->
+  fixed_inverse_concat2
+
+val fixed_inverse_concat2_source : fixed_inverse_concat2 -> string
+
+val fixed_inverse_concat2_request :
+  origin:Origin.t ->
+  source:string ->
+  reason:string ->
+  request

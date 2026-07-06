@@ -108,7 +108,12 @@ let is_raw_numeric_sort sort =
   | _ -> false
 
 let lower_direct_binding_value ctx env origin target_binding value_exp =
-  let value_result = Expr_translate.lower_value ctx env origin value_exp in
+  let value_result =
+    if sort_name target_binding.Expr_translate.sort = "SpectecTerminals" then
+      Expr_translate.lower_sequence ctx env origin value_exp
+    else
+      Expr_translate.lower_value ctx env origin value_exp
+  in
   match value_result.term with
   | Some _ -> value_result
   | None when is_raw_numeric_sort target_binding.Expr_translate.sort ->
