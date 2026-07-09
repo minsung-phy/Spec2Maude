@@ -11,3 +11,10 @@ val finite_transitive :
   Runtime_truth_decision_helper.request ->
   Runtime_witness_proof.closed_world_domain ->
   result
+
+val acyclic :
+  Context.t ->
+  helper_name:string ->
+  origin:Origin.t ->
+  Runtime_truth_decision_helper.request ->
+  result

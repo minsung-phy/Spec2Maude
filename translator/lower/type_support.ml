@@ -76,6 +76,7 @@ let register_constructor
     ctx origin
     ?(status = Constructor_registry.Emitted)
     ?(payload_witnesses = [])
+    ?(payload_sorts = [])
     ?static_args_key
     ~target
     ~mixop
@@ -94,6 +95,7 @@ let register_constructor
     ; constructor_op
     ; projection_ops
     ; payload_witnesses
+    ; payload_sorts
     ; origin
     ; enclosing = Context.enclosing_path ctx
     ; status

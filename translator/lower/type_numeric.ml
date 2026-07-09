@@ -90,7 +90,7 @@ let numeric_literal_terms_from_typcase binds typ prems =
     | _ -> None)
   | _ -> None
 
-let register_numeric_wrapper ctx ?mixop origin static_args_key target =
+let register_numeric_wrapper ctx ?mixop origin static_args_key target payload_sort =
   let constructor =
     Naming.wrapper_constructor_in_category (category_name_of_target target)
   in
@@ -115,6 +115,7 @@ let register_numeric_wrapper ctx ?mixop origin static_args_key target =
     ~constructor_op:constructor
     ~projection_ops
     ~payload_witnesses:[ target ]
+    ~payload_sorts:[ payload_sort ]
     ();
   constructor, projection_ops
 
@@ -122,7 +123,7 @@ let numeric_wrapper_statements ctx ?mixop origin seed static_args_key target pay
   let variable = var_name seed "WRAPNUM" 1 in
   let variable_term = Var variable in
   let constructor, projection_ops =
-    register_numeric_wrapper ctx ?mixop origin static_args_key target
+    register_numeric_wrapper ctx ?mixop origin static_args_key target payload_sort
   in
   let wrapper = app constructor [ variable_term ] in
   let base =
@@ -214,4 +215,3 @@ let unsupported_numeric_range ctx origin typcase =
     ~suggestion:
       "Add a generic Nat/Int range membership helper before lowering this typcase"
     ()
-

@@ -698,6 +698,7 @@ let register_constructor_case ctx origin static_args_key target mixop lowering =
     ~constructor_op:lowering.constructor_name
     ~projection_ops:lowering.projection_ops
     ~payload_witnesses:(List.map (fun component -> component.witness) lowering.components)
+    ~payload_sorts:(List.map (fun component -> component.sort) lowering.components)
     ()
 
 let lower_constructor_case_for_registry
@@ -1157,7 +1158,7 @@ let preload_alias_registry env ctx origin key_env static_args_key target typ =
     witness_of_typ env ctx origin "AliasT" typ
   in
   match carrier_opt, witness_opt with
-  | Some _carrier, Some witness ->
+  | Some carrier, Some witness ->
     register_category_inclusion
       ctx origin
       ~reason:"AliasT"
@@ -1183,6 +1184,7 @@ let preload_alias_registry env ctx origin key_env static_args_key target typ =
       ~constructor_op:wrapper_constructor
       ~projection_ops:[ destructor ]
       ~payload_witnesses:[ witness ]
+      ~payload_sorts:[ carrier ]
       ()
   | _ -> ()
 
@@ -1215,7 +1217,15 @@ let preload_numeric_predicate_registry env ctx origin static_args_key target mix
   in
   let lowered = Expr_translate.lower_bool_condition ctx expr_env origin predicate in
   match lowered.term with
-  | Some _ -> ignore (register_numeric_wrapper ctx ~mixop origin static_args_key target)
+  | Some _ ->
+    ignore
+      (register_numeric_wrapper
+         ctx
+         ~mixop
+         origin
+         static_args_key
+         target
+         payload_sort)
   | None -> ()
 
 let preload_inherited_union_registry env ctx parent_origin seed key_env static_args_key target group =
@@ -1270,8 +1280,14 @@ let preload_typcase_registry
       (match numeric_literal_terms_from_typcase binds typ prems with
       | Some (`Literals (payload_sort, _literal_terms))
         when not (List.exists Fun.id hint_blocks) ->
-        ignore payload_sort;
-        ignore (register_numeric_wrapper ctx ~mixop origin static_args_key target)
+        ignore
+          (register_numeric_wrapper
+             ctx
+             ~mixop
+             origin
+             static_args_key
+             target
+             payload_sort)
       | Some `Range -> ()
       | _ ->
         if List.length components > 1 || (components <> [] && (binds <> [] || prems <> [])) then

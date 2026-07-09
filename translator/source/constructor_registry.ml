@@ -12,6 +12,7 @@ type entry =
   ; constructor_op : string
   ; projection_ops : string list
   ; payload_witnesses : Maude_ir.term list
+  ; payload_sorts : Maude_ir.sort list
   ; origin : Origin.t
   ; enclosing : string list
   ; status : status
@@ -60,6 +61,7 @@ let same_entry left right =
   && left.constructor_op = right.constructor_op
   && left.projection_ops = right.projection_ops
   && left.payload_witnesses = right.payload_witnesses
+  && left.payload_sorts = right.payload_sorts
   && left.origin = right.origin
 
 let register t entry =

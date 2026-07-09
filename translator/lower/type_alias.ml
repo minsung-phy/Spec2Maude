@@ -44,6 +44,7 @@ let translate_alias env ctx origin seed key_env static_args_key target typ =
       ~constructor_op:wrapper_constructor
       ~projection_ops:[ destructor ]
       ~payload_witnesses:[ witness ]
+      ~payload_sorts:[ carrier ]
       ();
     { statements =
         [ gen origin (var variable variable_type)
