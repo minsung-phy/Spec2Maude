@@ -451,7 +451,7 @@ let rec terms_of_static_exps env ctx origin exps =
     |> List.split
   in
   if List.for_all Option.is_some terms then
-    Some (List.map Option.get terms), List.concat diagnostics
+    Some (List.filter_map Fun.id terms), List.concat diagnostics
   else
     None, List.concat diagnostics
 
@@ -634,7 +634,7 @@ and terms_of_args env ctx origin args =
     |> List.split
   in
   if List.for_all Option.is_some terms then
-    Some (List.map Option.get terms), List.concat diagnostics
+    Some (List.filter_map Fun.id terms), List.concat diagnostics
   else
     None, List.concat diagnostics
 

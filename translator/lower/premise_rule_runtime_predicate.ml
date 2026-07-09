@@ -21,6 +21,12 @@ let app name args =
 let relation_call rel_id inputs =
   App (Naming.relation_op rel_id, inputs)
 
+let rec nth_opt items index =
+  match items, index with
+  | item :: _, 0 -> Some item
+  | _ :: rest, index when index > 0 -> nth_opt rest (index - 1)
+  | _ -> None
+
 let rec is_direct_var_exp var exp =
   match exp.it with
   | VarE id -> id.it = var
@@ -393,35 +399,38 @@ let local_witness_guides
           (match direct_witness_index witness_source_id components with
           | None -> None
           | Some guide_witness_index ->
-            let witness_binding =
-              { Expr_translate.term = witness_term
-              ; sort = witness_sort
-              ; typ = (List.nth components guide_witness_index).note
-              }
-            in
-            let guide_env =
-              Expr_translate.with_condition_bound_vars
-                (Expr_translate.add_var env witness_source_id witness_binding)
-                bound_vars
-            in
-            let terms_opt, guards, diagnostics =
-              lower_value_components ctx guide_env origin components
-            in
-            (match
-               ( terms_opt
-               , guards
-               , diagnostics
-               , runtime_predicate_input_sorts components )
-             with
-            | Some guide_input_terms, [], [], Some guide_input_sorts ->
-              Some
-                { Runtime_search_helper.guide_rel_id = rel_id.it
-                ; guide_source = Some (source_echo_prem prem)
-                ; guide_input_terms
-                ; guide_input_sorts
-                ; guide_witness_index
+            (match nth_opt components guide_witness_index with
+            | None -> None
+            | Some guide_witness ->
+              let witness_binding =
+                { Expr_translate.term = witness_term
+                ; sort = witness_sort
+                ; typ = guide_witness.note
                 }
-            | _ -> None))))
+              in
+              let guide_env =
+                Expr_translate.with_condition_bound_vars
+                  (Expr_translate.add_var env witness_source_id witness_binding)
+                  bound_vars
+              in
+              let terms_opt, guards, diagnostics =
+                lower_value_components ctx guide_env origin components
+              in
+              (match
+                 ( terms_opt
+                 , guards
+                 , diagnostics
+                 , runtime_predicate_input_sorts components )
+               with
+              | Some guide_input_terms, [], [], Some guide_input_sorts ->
+                Some
+                  { Runtime_search_helper.guide_rel_id = rel_id.it
+                  ; guide_source = Some (source_echo_prem prem)
+                  ; guide_input_terms
+                  ; guide_input_sorts
+                  ; guide_witness_index
+                  }
+              | _ -> None)))))
     | RulePr (_, _ :: _, _, _)
     | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> None
   in
