@@ -74,8 +74,10 @@ let numeric_predicate_from_typcase binds typ prems =
 
 let numeric_literal_terms_from_typcase binds typ prems =
   match typ_components typ with
-  | [ payload, payload_typ ] when numeric_literal_type_supported payload_typ ->
-    let payload_sort = Option.get (numeric_payload_sort payload_typ) in
+  | [ payload, payload_typ ] ->
+    (match numeric_payload_sort payload_typ with
+    | None -> None
+    | Some payload_sort ->
     (match payload.it, prems with
     | NumE _, [] ->
       Option.map
@@ -87,7 +89,7 @@ let numeric_literal_terms_from_typcase binds typ prems =
       | Some terms -> Some (`Literals (payload_sort, terms))
       | None ->
         if is_range_predicate_for_payload payload_id.it exp then Some `Range else None)
-    | _ -> None)
+    | _ -> None))
   | _ -> None
 
 let register_numeric_wrapper ctx ?mixop origin static_args_key target payload_sort =

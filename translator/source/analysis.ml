@@ -391,7 +391,7 @@ module Function_graph = struct
         Some
           ( typ
           , "typ:" ^ Naming.sanitize id.it ^ "("
-            ^ String.concat "," (List.map Option.get arg_keys)
+            ^ String.concat "," (List.filter_map Fun.id arg_keys)
             ^ ")" )
       else
         None

@@ -4,6 +4,12 @@ open Util.Source
 
 include Expr_support
 
+let rec nth_opt items index =
+  match items, index with
+  | item :: _, 0 -> Some item
+  | _ :: rest, index when index > 0 -> nth_opt rest (index - 1)
+  | _ -> None
+
 let lower_case_impl ~lower_value ~category_guards_for_term ctx env origin exp mixop arg_exp =
   let lower_arg exp = lower_value ctx env origin exp in
   let arg_results =
@@ -90,31 +96,29 @@ let lower_uncase_projection_impl
     | `Found resolution ->
       let scrutinee_result : result = lower_value ctx env origin scrutinee in
       (match scrutinee_result.term with
-      | Some scrutinee_term when index < List.length resolution.projection_ops ->
-        let scrutinee_guards_opt, scrutinee_guard_diagnostics =
-          category_guards_for_term
-            ctx env origin "Expr/UncaseE/scrutinee" scrutinee scrutinee_term scrutinee.note
-        in
-        (match scrutinee_guards_opt with
-        | Some scrutinee_guards ->
-          { term =
-              Some
-                (app
-                   (List.nth resolution.projection_ops index)
-                   [ scrutinee_term ])
-          ; guards = scrutinee_result.guards @ scrutinee_guards
-          ; diagnostics =
-              scrutinee_result.diagnostics @ scrutinee_guard_diagnostics
-          }
+      | Some scrutinee_term ->
+        (match nth_opt resolution.projection_ops index with
+        | Some projection_op ->
+          let scrutinee_guards_opt, scrutinee_guard_diagnostics =
+            category_guards_for_term
+              ctx env origin "Expr/UncaseE/scrutinee" scrutinee scrutinee_term scrutinee.note
+          in
+          (match scrutinee_guards_opt with
+          | Some scrutinee_guards ->
+            { term = Some (app projection_op [ scrutinee_term ])
+            ; guards = scrutinee_result.guards @ scrutinee_guards
+            ; diagnostics =
+                scrutinee_result.diagnostics @ scrutinee_guard_diagnostics
+            }
+          | None ->
+            { scrutinee_result with
+              term = None
+            ; diagnostics =
+                scrutinee_result.diagnostics @ scrutinee_guard_diagnostics
+            })
         | None ->
-          { scrutinee_result with
-            term = None
-          ; diagnostics =
-              scrutinee_result.diagnostics @ scrutinee_guard_diagnostics
-          })
-      | Some _ ->
-        unsupported_exp ctx origin "Expr/UncaseE" exp
-          "constructor registry entry does not provide the requested projection index"
+          unsupported_exp ctx origin "Expr/UncaseE" exp
+            "constructor registry entry does not provide the requested projection index")
       | None -> scrutinee_result)
     | `Missing ->
       unsupported_exp ctx origin "Expr/UncaseE" exp

@@ -134,7 +134,10 @@ let group_inherited_category_cases inherited =
        (fun groups item ->
          match
            List.partition
-             (fun group -> (List.hd group).inherited_child_id.it = item.inherited_child_id.it)
+             (function
+               | first :: _ ->
+                 first.inherited_child_id.it = item.inherited_child_id.it
+               | [] -> false)
              groups
          with
          | [], rest -> [ item ] :: rest

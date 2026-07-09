@@ -1063,6 +1063,12 @@ let replace_nth index replacement values =
   values
   |> List.mapi (fun i value -> if i = index then replacement else value)
 
+let option_all items =
+  if List.for_all Option.is_some items then
+    Some (List.filter_map Fun.id items)
+  else
+    None
+
 let translate_struct env ctx origin seed target id fields =
   let lowered, diagnostics =
     fields
@@ -1070,8 +1076,8 @@ let translate_struct env ctx origin seed target id fields =
     |> List.split
   in
   let diagnostics = List.concat diagnostics in
-  if List.for_all Option.is_some lowered then
-    let fields = List.map Option.get lowered in
+  match option_all lowered with
+  | Some fields ->
     let constructor_name = Naming.record_constructor id in
     let field_components = List.map snd fields in
     let field_terms = List.map (fun component -> Var component.variable) field_components in
@@ -1147,7 +1153,7 @@ let translate_struct env ctx origin seed target id fields =
         vars @ [ op_decl ] @ membership @ [ typecheck_statement ] @ accessor_and_updates
     ; diagnostics = diagnostics @ guard_diagnostics
     }
-  else
+  | None ->
     with_diagnostics diagnostics
 
 let preload_alias_registry env ctx origin key_env static_args_key target typ =
