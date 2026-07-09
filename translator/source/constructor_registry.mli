@@ -12,6 +12,7 @@ type entry =
   ; constructor_op : string
   ; projection_ops : string list
   ; payload_witnesses : Maude_ir.term list
+  ; payload_sorts : Maude_ir.sort list
   ; origin : Origin.t
   ; enclosing : string list
   ; status : status

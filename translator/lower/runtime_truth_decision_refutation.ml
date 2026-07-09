@@ -248,466 +248,12 @@ let target_premise_components target =
   | Il.Ast.IfPr _ | Il.Ast.LetPr _ | Il.Ast.ElsePr
   | Il.Ast.IterPr _ | Il.Ast.NegPr _ -> None
 
-let string_of_prem prem =
-  Il.Print.string_of_prem prem
-
-let contains_source_premise source_premise prems =
-  let source = string_of_prem source_premise in
-  prems
-  |> List.exists (fun prem -> String.equal source (string_of_prem prem))
-
-let is_target_guided_source_rule target rule =
-  contains_source_premise target.Runtime_witness_proof.recursive_premise rule.Analysis.Function_graph.prems
-  && contains_source_premise target.Runtime_witness_proof.target_premise rule.prems
-
-let split_source_target_input prefix_arity components =
-  let rec take n acc rest =
-    if n = 0 then Some (List.rev acc, rest)
-    else
-      match rest with
-      | [] -> None
-      | exp :: rest -> take (n - 1) (exp :: acc) rest
-  in
-  match take prefix_arity [] components with
-  | Some (_prefix, [ left; right ]) -> Some (left, right)
-  | Some _ | None -> None
-
-let seed_head_key (exp : Il.Ast.exp) =
-  match exp.it with
-  | Il.Ast.CaseE (mixop, _) ->
-    Some ("case:" ^ Analysis.Relation_graph.mixop_shape_text mixop)
-  | Il.Ast.VarE _ -> None
-  | Il.Ast.BoolE _ | Il.Ast.NumE _ | Il.Ast.TextE _
-  | Il.Ast.UnE _ | Il.Ast.BinE _ | Il.Ast.CmpE _
-  | Il.Ast.TupE _ | Il.Ast.ProjE _ | Il.Ast.UncaseE _
-  | Il.Ast.OptE _ | Il.Ast.TheE _ | Il.Ast.StrE _
-  | Il.Ast.DotE _ | Il.Ast.CompE _ | Il.Ast.ListE _
-  | Il.Ast.LiftE _ | Il.Ast.MemE _ | Il.Ast.LenE _
-  | Il.Ast.CatE _ | Il.Ast.IdxE _ | Il.Ast.SliceE _
-  | Il.Ast.UpdE _ | Il.Ast.ExtE _ | Il.Ast.IfE _
-  | Il.Ast.CallE _ | Il.Ast.IterE _ | Il.Ast.CvtE _
-  | Il.Ast.SubE _ -> None
-
-let target_guided_seed_is_functional request target =
-  let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  let rel_id = truth_request.Runtime_truth_search_helper.rel_id in
-  let input_count = List.length truth_request.input_terms in
-  let seed_rules =
-    truth_request.rules
-    |> List.filter (fun rule ->
-      String.equal rule.Analysis.Function_graph.relation_id rel_id
-      && not (is_target_guided_source_rule target rule))
-  in
-  let keys =
-    seed_rules
-    |> List.map (fun (rule : Analysis.Function_graph.runtime_search_rule) ->
-      match
-        Analysis.Relation_graph.exp_components_for_count input_count rule.head
-      with
-      | Some components ->
-        (match
-           split_source_target_input target.Runtime_witness_proof.prefix_arity components
-         with
-        | Some (left, _witness) -> seed_head_key left
-        | None -> None)
-      | None -> None)
-  in
-  keys <> []
-  && List.for_all Option.is_some keys
-  &&
-  let keys = List.filter_map (fun key -> key) keys in
-  List.length keys = List.length (List.sort_uniq String.compare keys)
-
 let find_witness_typ source_id components =
   components
   |> List.find_map (fun (exp : Il.Ast.exp) ->
     match exp.it with
     | Il.Ast.VarE id when String.equal id.it source_id -> Some exp.note
     | _ -> None)
-
-let lower_value_components ctx env origin components =
-  let lowered = Rule_components.lower_value_components ctx env origin components in
-  lowered.values, lowered.guards, lowered.diagnostics
-
-let local_rules = Rule_components.local_rules
-
-let generated helper_name origin node =
-  Maude_ir.generated ~provenance:(Maude_ir.Helper helper_name) ~origin node
-
-let acyclic_no_hit_sort helper_name =
-  Maude_ir.sort ("RuntimeTruthAcyclicNoHit" ^ helper_name ^ "Conf")
-
-let acyclic_no_hit_op helper_name =
-  "runtimeTruthAcyclicNoHit" ^ helper_name
-
-let acyclic_no_hit_ok_op helper_name =
-  "runtimeTruthAcyclicNoHitOk" ^ helper_name
-
-let acyclic_rule_refuted_sort helper_name index =
-  Maude_ir.sort
-    ("RuntimeTruthAcyclicRuleRefuted"
-     ^ helper_name
-     ^ string_of_int index
-     ^ "Conf")
-
-let acyclic_rule_refuted_op helper_name index =
-  "runtimeTruthAcyclicRuleRefuted" ^ helper_name ^ string_of_int index
-
-let acyclic_rule_refuted_ok_op helper_name index =
-  "runtimeTruthAcyclicRuleRefutedOk" ^ helper_name ^ string_of_int index
-
-let frozen_all sorts =
-  match sorts with
-  | [] -> []
-  | _ ->
-    let rec range index = function
-      | [] -> []
-      | _ :: sorts -> index :: range (index + 1) sorts
-    in
-    [ Maude_ir.Frozen (range 1 sorts) ]
-
-let acyclic_no_hit_surface helper_name origin request =
-  let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  let result_sort = acyclic_no_hit_sort helper_name in
-  let input_sorts = truth_request.Runtime_truth_search_helper.input_sorts in
-  [ generated helper_name origin (Maude_ir.sort_decl result_sort)
-  ; generated
-      helper_name
-      origin
-      (Maude_ir.op
-         (acyclic_no_hit_op helper_name)
-         (List.map Maude_ir.sort_ref input_sorts)
-         result_sort
-         ~attrs:(frozen_all input_sorts))
-  ; generated
-      helper_name
-      origin
-      (Maude_ir.op (acyclic_no_hit_ok_op helper_name) [] result_sort ~attrs:[ Maude_ir.Ctor ])
-  ]
-
-let acyclic_rule_refuted_surface helper_name origin request =
-  let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  let input_sorts = truth_request.Runtime_truth_search_helper.input_sorts in
-  local_rules request
-  |> List.mapi (fun index _rule ->
-    let index = index + 1 in
-    let result_sort = acyclic_rule_refuted_sort helper_name index in
-    [ generated helper_name origin (Maude_ir.sort_decl result_sort)
-    ; generated
-        helper_name
-        origin
-        (Maude_ir.op
-           (acyclic_rule_refuted_op helper_name index)
-           (List.map Maude_ir.sort_ref input_sorts)
-           result_sort
-           ~attrs:(frozen_all input_sorts))
-    ; generated
-        helper_name
-        origin
-        (Maude_ir.op
-           (acyclic_rule_refuted_ok_op helper_name index)
-           []
-           result_sort
-           ~attrs:[ Maude_ir.Ctor ])
-    ])
-  |> List.concat
-
-let child_origin = Rule_components.child_origin
-
-let lower_head_patterns ctx origin components =
-  let lowered =
-    Rule_components.lower_partial_head_patterns_for_acyclic_refutation
-      ctx
-      origin
-      components
-  in
-  lowered.terms, lowered.env, lowered.guards, lowered.diagnostics
-
-let dependent_false_conditions ctx origin request env rel_id components =
-  let lowered, guards, diagnostics =
-    lower_value_components ctx env origin components
-  in
-  if List.exists Diagnostics.is_fatal diagnostics then
-    Error diagnostics
-  else
-    match lowered, Runtime_predicate_search.truth_plan ctx rel_id with
-    | Some (terms, sorts), truth_plan ->
-      (match
-         Runtime_predicate_search.truth_helper_request
-           ~input_terms:terms
-           ~input_sorts:sorts
-           truth_plan
-       with
-      | Some truth_request ->
-        let truth_name =
-          Helper.request
-            (Context.helpers ctx)
-            { Helper.kind =
-                Helper.Runtime_predicate_truth_search truth_request
-            ; reason = Runtime_truth_search_helper.reason truth_request
-            ; origin
-            }
-        in
-        let decision_request =
-          { Runtime_truth_decision_helper.truth_helper_name = truth_name
-          ; truth_request
-          }
-        in
-        let decision_name =
-          Helper.request
-            (Context.helpers ctx)
-            { Helper.kind =
-                Helper.Runtime_predicate_truth_decision decision_request
-            ; reason = Runtime_truth_decision_helper.reason decision_request
-            ; origin
-            }
-        in
-        Ok
-          (List.map (fun condition -> Maude_ir.EqCondition condition) guards
-           @ [ Runtime_truth_decision_helper.false_rewrite_condition
-                 ~helper_name:decision_name
-                 decision_request
-             ])
-      | None ->
-        Error
-          [ unsupported
-              ctx
-              origin
-              request
-              [ blocker
-                  Dependent_truth_decision
-                  ("dependent relation `"
-                   ^ rel_id
-                   ^ "` does not have a truth request for wrapper-rule refutation")
-              ]
-          ])
-    | None, _ ->
-      Error
-        [ unsupported
-            ctx
-            origin
-            request
-            [ blocker
-                Dependent_truth_decision
-                "dependent RulePr components did not lower to already-bound Maude values"
-            ]
-        ]
-
-let wrapper_rule_refuters ctx ~helper_name ~origin request =
-  let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  let input_count =
-    List.length truth_request.Runtime_truth_search_helper.input_terms
-  in
-  let no_hit_op = acyclic_no_hit_op helper_name in
-  let no_hit_ok = Maude_ir.Const (acyclic_no_hit_ok_op helper_name) in
-  let local_rules = local_rules request in
-  let aggregate_rule =
-    let input_terms = truth_request.Runtime_truth_search_helper.input_terms in
-    let lhs = Maude_ir.App (no_hit_op, input_terms) in
-    let conditions =
-      local_rules
-      |> List.mapi (fun index _rule ->
-        let index = index + 1 in
-        Maude_ir.RewriteCond
-          ( Maude_ir.App (acyclic_rule_refuted_op helper_name index, input_terms)
-          , Maude_ir.Const (acyclic_rule_refuted_ok_op helper_name index) ))
-    in
-    generated
-      helper_name
-      origin
-      (Maude_ir.crl
-         ~label:(helper_name ^ "-acyclic-all-rules-refuted")
-         lhs
-         no_hit_ok
-         conditions)
-  in
-  let lower_rule rule_index rule =
-    let origin =
-      child_origin
-        origin
-        (Printf.sprintf "RuleD[%d]" rule_index)
-        "RuleD"
-        rule.Analysis.Function_graph.origin.region
-        rule.Analysis.Function_graph.source_echo
-    in
-    match
-      Analysis.Relation_graph.exp_components_for_count input_count rule.head
-    with
-    | None ->
-      Error
-        [ unsupported
-            ctx
-            origin
-            request
-            [ blocker
-                Rule_refuter
-                ((rule_name rule_index rule)
-                 ^ " head does not match the relation arity for wrapper-rule false refutation")
-            ]
-        ]
-    | Some head_components ->
-      let head_terms, env, head_guards, head_diags =
-        lower_head_patterns ctx origin head_components
-      in
-      if List.exists Diagnostics.is_fatal head_diags then
-        Error head_diags
-      else
-        match head_terms with
-        | None ->
-          Error
-            (head_diags
-             @ [ unsupported
-                   ctx
-                   origin
-                   request
-                   [ blocker
-                       Rule_refuter
-                       ((rule_name rule_index rule)
-                        ^ " head pattern did not lower to a Maude term for wrapper-rule refutation")
-                   ]
-               ])
-        | Some head_terms ->
-        let lhs =
-          Maude_ir.App (acyclic_rule_refuted_op helper_name rule_index, head_terms)
-        in
-        let rule_refuted_ok =
-          Maude_ir.Const (acyclic_rule_refuted_ok_op helper_name rule_index)
-        in
-        let lower_prem prem_index (prem : Il.Ast.prem) =
-          match prem.it with
-          | Il.Ast.RulePr (rel_id, [], _mixop, exp)
-            when not
-                   (String.equal
-                      rel_id.it
-                      truth_request.Runtime_truth_search_helper.rel_id) ->
-            let prem_origin =
-              child_origin
-                origin
-                (Printf.sprintf "premise[%d]" prem_index)
-                "Premise"
-                prem.at
-                (Some (Il.Print.string_of_prem prem))
-            in
-            (match
-               dependent_false_conditions
-                 ctx
-                 prem_origin
-                 request
-                 env
-                 rel_id.it
-                 (exp_components exp)
-             with
-            | Ok dependent_conditions ->
-              let conditions =
-                List.map (fun condition -> Maude_ir.EqCondition condition) head_guards
-                @ dependent_conditions
-                |> Condition_closure.normalize_rule_conditions [ lhs ]
-              in
-              let diagnostics =
-                Condition_closure.crl_admissibility_diagnostics
-                  ctx
-                  prem_origin
-                  lhs
-                  rule_refuted_ok
-                  conditions
-              in
-              if List.exists Diagnostics.is_fatal diagnostics then
-                Error diagnostics
-              else
-                Ok
-                  (generated
-                     helper_name
-                     prem_origin
-                     (Maude_ir.crl
-                        ~label:
-                          (helper_name
-                           ^ "-wrapper-refuted-"
-                           ^ string_of_int rule_index
-                           ^ "-"
-                           ^ string_of_int prem_index)
-                        lhs
-                        rule_refuted_ok
-                        conditions))
-            | Error diagnostics -> Error diagnostics)
-          | _ -> Error []
-        in
-        let rec prems index statements diagnostics = function
-          | [] ->
-            if statements = [] then
-              Error
-                (diagnostics
-                 @ [ unsupported
-                       ctx
-                       origin
-                       request
-                       [ blocker
-                           Rule_refuter
-                           ((rule_name rule_index rule)
-                            ^ " is not a wrapper RuleD with a dependent zero-argument RulePr premise")
-                       ]
-                   ])
-            else if List.exists Diagnostics.is_fatal diagnostics then
-              Error diagnostics
-            else
-              Ok (List.rev statements, diagnostics)
-          | prem :: rest ->
-            (match lower_prem index prem with
-            | Ok statement -> prems (index + 1) (statement :: statements) diagnostics rest
-            | Error [] -> prems (index + 1) statements diagnostics rest
-            | Error new_diagnostics ->
-              prems (index + 1) statements (diagnostics @ new_diagnostics) rest)
-        in
-        prems 1 [] head_diags rule.prems
-  in
-  let rec rules index statements diagnostics = function
-    | [] ->
-      if statements = [] || List.exists Diagnostics.is_fatal diagnostics then
-        Error diagnostics
-      else
-        Ok (List.rev (aggregate_rule :: statements), diagnostics)
-    | rule :: rest ->
-      (match lower_rule index rule with
-      | Ok (new_statements, new_diagnostics) ->
-        rules
-          (index + 1)
-          (List.rev_append new_statements statements)
-          (diagnostics @ new_diagnostics)
-          rest
-      | Error new_diagnostics ->
-        rules (index + 1) statements (diagnostics @ new_diagnostics) rest)
-  in
-  rules 1 [] [] local_rules
-
-let acyclic_wrapper_refutation ctx ~helper_name ~origin request =
-  let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  match wrapper_rule_refuters ctx ~helper_name ~origin request with
-  | Ok (rules, diagnostics) ->
-    let call =
-      Maude_ir.App
-        ( acyclic_no_hit_op helper_name
-        , truth_request.Runtime_truth_search_helper.input_terms )
-    in
-    { statements =
-        acyclic_no_hit_surface helper_name origin request @ rules
-        @ acyclic_rule_refuted_surface helper_name origin request
-    ; conditions =
-        [ Maude_ir.RewriteCond
-            (call, Maude_ir.Const (acyclic_no_hit_ok_op helper_name))
-        ]
-    ; diagnostics
-    }
-  | Error diagnostics ->
-    empty
-      (diagnostics
-       @ [ unsupported
-             ctx
-             origin
-             request
-             [ blocker
-                 Rule_refuter
-                 "acyclic relation is not a wrapper-only source shape whose false branch can be delegated to dependent runtimeTruthFalse helpers"
-             ]
-         ])
 
 let target_truth_decision
     ctx
@@ -744,79 +290,29 @@ let target_truth_decision
           witness_typ
           witness
       in
-      let lowered, guards, diagnostics =
-        lower_value_components ctx env origin target_components
-      in
-      if List.exists Diagnostics.is_fatal diagnostics then
+      (match
+         Runtime_truth_dependent_false.lower
+           ctx
+           origin
+           env
+           ~rel_id:target_rel_id
+           ~components:target_components
+       with
+      | Ok conditions -> Ok conditions
+      | Error (Runtime_truth_dependent_false.Diagnostics diagnostics) ->
         Error diagnostics
-      else
-        (match lowered, Runtime_predicate_search.truth_plan ctx target_rel_id with
-        | Some (target_terms, target_sorts), truth_plan ->
-          (match
-             Runtime_predicate_search.truth_helper_request
-               ~input_terms:target_terms
-               ~input_sorts:target_sorts
-               truth_plan
-           with
-          | Some target_truth_request ->
-            let target_truth_name =
-              Helper.request
-                (Context.helpers ctx)
-                { Helper.kind =
-                    Helper.Runtime_predicate_truth_search target_truth_request
-                ; reason =
-                    Runtime_truth_search_helper.reason target_truth_request
-                ; origin
-                }
-            in
-            let target_decision_request =
-              { Runtime_truth_decision_helper.truth_helper_name =
-                  target_truth_name
-              ; truth_request = target_truth_request
-              }
-            in
-            let target_decision_name =
-              Helper.request
-                (Context.helpers ctx)
-                { Helper.kind =
-                    Helper.Runtime_predicate_truth_decision
-                      target_decision_request
-                ; reason =
-                    Runtime_truth_decision_helper.reason
-                      target_decision_request
-                ; origin
-                }
-            in
-            Ok
-              ( List.map (fun condition -> Maude_ir.EqCondition condition) guards
-                @ [ Runtime_truth_decision_helper.false_rewrite_condition
-                      ~helper_name:target_decision_name
-                      target_decision_request
-                  ] )
-          | None ->
-            Error
-              [ unsupported
-                  ctx
-                  origin
-                  request
-                  [ blocker
-                      Dependent_truth_decision
-                      ("target-guided premise relation `"
-                       ^ target_rel_id
-                       ^ "` does not have a source-complete truth request for false refutation")
-                  ]
-              ])
-        | None, _ ->
-          Error
-            [ unsupported
-                ctx
-                origin
-                request
-                [ blocker
-                    Dependent_truth_decision
-                    "target-guided target premise components did not lower to already-bound Maude values"
-                ]
-            ])
+      | Error (Runtime_truth_dependent_false.Blocked blockers) ->
+        Error
+          [ unsupported
+              ctx
+              origin
+              request
+              [ blocker
+                  Dependent_truth_decision
+                  ("target-guided target premise has no source-complete false decision: "
+                   ^ String.concat "; " blockers)
+              ]
+          ])
     | None, _ ->
       Error
         [ unsupported
@@ -855,7 +351,12 @@ let target_truth_decision
 
 let target_guided_refutation ctx ~origin request target =
   let truth_request = request.Runtime_truth_decision_helper.truth_request in
-  if not (target_guided_seed_is_functional request target) then
+  if
+    not
+      (Runtime_truth_decision_false_support.target_guided_seed_is_functional
+         request
+         target)
+  then
     empty
       [ unsupported
           ctx
@@ -958,10 +459,15 @@ let materialize ctx ~helper_name ~origin request =
       request
       domain
     |> of_no_hit_result
+  | Runtime_truth_search_helper.Acyclic ->
+    Runtime_truth_no_hit_materializer.acyclic
+      ctx
+      ~helper_name
+      ~origin
+      request
+    |> of_no_hit_result
   | Runtime_truth_search_helper.Target_guided_self target ->
     target_guided_refutation ctx ~origin request target
-  | Runtime_truth_search_helper.Acyclic ->
-    acyclic_wrapper_refutation ctx ~helper_name ~origin request
   | Runtime_truth_search_helper.Recursive _ ->
     let blockers = plan truth_request in
     empty [ unsupported ctx origin request blockers ]
