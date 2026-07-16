@@ -19,6 +19,14 @@ __pycache__/
 # 4. 기타 파일 제외
 artifacts/
 benchmarks/
+!benchmarks/
+benchmarks/*
+!benchmarks/fibonacci/
+!benchmarks/fibonacci/**
+!benchmarks/subtyping/
+!benchmarks/subtyping/**
+!benchmarks/builtins/
+!benchmarks/builtins/**
 reference/
 .codex/
 .agents/

@@ -1,1 +1,2 @@
-val render_markdown : Builtin_types.t -> string
+val render_markdown :
+  Builtin_backend.t -> Builtin_registry.t -> string

@@ -1,0 +1,95 @@
+--- Executable reductions for the hand-written builtin backend ABI.
+red in WASM-BUILTINS : builtin.inv-concat(syn.nat, 1 2 3 4) .
+red in WASM-BUILTINS : builtin.inv-concat(syn.nat, 1 2 3) .
+red in WASM-BUILTINS : builtin.inv-concat(syn.nat, 1 2 3) :: SpectecTerminals .
+red in WASM-BUILTINS : builtin.inv-concatn(syn.nat, 2, 1 2 3 4) .
+red in WASM-BUILTINS : builtin.inv-concatn(syn.nat, 2, 1 2 3) .
+red in WASM-BUILTINS : builtin.inv-concatn(syn.nat, 0, 1 2) .
+red in WASM-BUILTINS : builtin.inv-concatn(syn.nat, 2, 1 2 3) :: SpectecTerminals .
+red in WASM-BUILTINS : builtin.inv-concatn(syn.nat, 0, 1 2) :: SpectecTerminals .
+red in WASM-BUILTINS : builtin.nd .
+red in WASM-BUILTINS : builtin.r-fmadd .
+red in WASM-BUILTINS : builtin.r-fmin .
+red in WASM-BUILTINS : builtin.r-fmax .
+red in WASM-BUILTINS : builtin.r-idot .
+red in WASM-BUILTINS : builtin.r-iq15mulr .
+red in WASM-BUILTINS : builtin.r-trunc-u .
+red in WASM-BUILTINS : builtin.r-trunc-s .
+red in WASM-BUILTINS : builtin.r-swizzle .
+red in WASM-BUILTINS : builtin.r-laneselect .
+red in WASM-BUILTINS : builtin.ibits(4, uN.wrap(5)) .
+red in WASM-BUILTINS : builtin.fbits(32, fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.ibytes(16, uN.wrap(4660)) .
+red in WASM-BUILTINS : builtin.fbytes(32, fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.nbytes(numtype.f32, fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.vbytes(vectype.v128, uN.wrap(4660)) .
+red in WASM-BUILTINS : builtin.zbytes(packtype.i16, uN.wrap(4660)) .
+red in WASM-BUILTINS : builtin.cbytes(numtype.f32, fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.inv-ibits(4, 0 1 0 1) .
+red in WASM-BUILTINS : builtin.inv-fbits(32, 0 0 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) .
+red in WASM-BUILTINS : builtin.inv-ibytes(16, 52 18) .
+red in WASM-BUILTINS : builtin.inv-fbytes(32, 0 0 128 63) .
+red in WASM-BUILTINS : builtin.inv-nbytes(numtype.f32, 0 0 128 63) .
+red in WASM-BUILTINS : builtin.inv-vbytes(vectype.v128, 52 18 0 0 0 0 0 0 0 0 0 0 0 0 0 0) .
+red in WASM-BUILTINS : builtin.inv-zbytes(packtype.i16, 52 18) .
+red in WASM-BUILTINS : builtin.inv-cbytes(numtype.f32, 0 0 128 63) .
+red in WASM-BUILTINS : builtin.truncz(rat(-3/2)) .
+red in WASM-BUILTINS : builtin.ceilz(rat(-3/2)) .
+red in WASM-BUILTINS : builtin.iclz(4, uN.wrap(1)) .
+red in WASM-BUILTINS : builtin.ictz(4, uN.wrap(8)) .
+red in WASM-BUILTINS : builtin.ipopcnt(4, uN.wrap(13)) .
+red in WASM-BUILTINS : builtin.iq15mulr-sat(16, sx.s, uN.wrap(32768), uN.wrap(32768)) .
+red in WASM-BUILTINS : builtin.irelaxed-q15mulr(16, sx.s, uN.wrap(1), uN.wrap(2)) .
+red in WASM-BUILTINS : builtin.iavgr(8, sx.u, uN.wrap(254), uN.wrap(255)) .
+red in WASM-BUILTINS : builtin.inot(4, uN.wrap(5)) .
+red in WASM-BUILTINS : builtin.irev(4, uN.wrap(2)) .
+red in WASM-BUILTINS : builtin.iand(4, uN.wrap(12), uN.wrap(10)) .
+red in WASM-BUILTINS : builtin.iandnot(4, uN.wrap(12), uN.wrap(10)) .
+red in WASM-BUILTINS : builtin.ior(4, uN.wrap(12), uN.wrap(10)) .
+red in WASM-BUILTINS : builtin.ixor(4, uN.wrap(12), uN.wrap(10)) .
+red in WASM-BUILTINS : builtin.ishl(4, uN.wrap(3), uN.wrap(1)) .
+red in WASM-BUILTINS : builtin.ishr(4, sx.s, uN.wrap(8), uN.wrap(1)) .
+red in WASM-BUILTINS : builtin.irotl(4, uN.wrap(9), uN.wrap(1)) .
+red in WASM-BUILTINS : builtin.irotr(4, uN.wrap(9), uN.wrap(1)) .
+red in WASM-BUILTINS : builtin.ibitselect(4, uN.wrap(12), uN.wrap(3), uN.wrap(10)) .
+red in WASM-BUILTINS : builtin.irelaxed-laneselect(8, uN.wrap(1), uN.wrap(2), uN.wrap(255)) .
+red in WASM-BUILTINS : builtin.fabs(32, fN.neg(fNmag.norm(1, 0))) .
+red in WASM-BUILTINS : builtin.fneg(32, fN.pos(fNmag.inf)) .
+red in WASM-BUILTINS : builtin.fsqrt(32, fN.pos(fNmag.norm(0, 2))) .
+red in WASM-BUILTINS : builtin.fceil(32, fN.neg(fNmag.norm(0, -1))) .
+red in WASM-BUILTINS : builtin.ffloor(32, fN.pos(fNmag.norm(0, -1))) .
+red in WASM-BUILTINS : builtin.ftrunc(32, fN.neg(fNmag.norm(0, -1))) .
+red in WASM-BUILTINS : builtin.fnearest(32, fN.pos(fNmag.norm(0, -1))) .
+red in WASM-BUILTINS : builtin.fadd(32, fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.fsub(32, fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.fmul(32, fN.pos(fNmag.norm(0, 1)), fN.pos(fNmag.norm(0, 1))) .
+red in WASM-BUILTINS : builtin.fdiv(32, fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 1))) .
+red in WASM-BUILTINS : builtin.fmin(32, fN.pos(fNmag.subnorm(0)), fN.neg(fNmag.subnorm(0))) .
+red in WASM-BUILTINS : builtin.fmax(32, fN.pos(fNmag.subnorm(0)), fN.neg(fNmag.subnorm(0))) .
+red in WASM-BUILTINS : builtin.fpmin(32, fN.pos(fNmag.norm(2, 0)), fN.pos(fNmag.norm(1, 0))) .
+red in WASM-BUILTINS : builtin.fpmax(32, fN.pos(fNmag.norm(1, 0)), fN.pos(fNmag.norm(2, 0))) .
+red in WASM-BUILTINS : builtin.frelaxed-min(32, fN.pos(fNmag.subnorm(0)), fN.neg(fNmag.subnorm(0))) .
+red in WASM-BUILTINS : builtin.frelaxed-max(32, fN.pos(fNmag.subnorm(0)), fN.neg(fNmag.subnorm(0))) .
+red in WASM-BUILTINS : builtin.fcopysign(32, fN.pos(fNmag.inf), fN.neg(fNmag.subnorm(0))) .
+red in WASM-BUILTINS : builtin.feq(32, fN.pos(fNmag.subnorm(0)), fN.neg(fNmag.subnorm(0))) .
+red in WASM-BUILTINS : builtin.fne(32, fN.pos(fNmag.nan(1)), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.flt(32, fN.neg(fNmag.inf), fN.neg(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.fgt(32, fN.pos(fNmag.inf), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.fle(32, fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.fge(32, fN.pos(fNmag.nan(1)), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.frelaxed-madd(32, fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.frelaxed-nmadd(32, fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 0)), fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.wrap(8, 4, uN.wrap(255)) .
+red in WASM-BUILTINS : builtin.extend(4, 8, sx.s, uN.wrap(15)) .
+red in WASM-BUILTINS : builtin.trunc(32, 8, sx.u, fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.trunc-sat(32, 8, sx.u, fN.neg(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.relaxed-trunc(32, 8, sx.u, fN.pos(fNmag.norm(0, 0))) .
+red in WASM-BUILTINS : builtin.demote(64, 32, fN.pos(fNmag.norm(0, 128))) .
+red in WASM-BUILTINS : builtin.promote(32, 64, fN.neg(fNmag.subnorm(1))) .
+red in WASM-BUILTINS : builtin.convert(64, 32, sx.u, uN.wrap(16777217)) .
+red in WASM-BUILTINS : builtin.narrow(16, 8, sx.s, uN.wrap(65535)) .
+red in WASM-BUILTINS : builtin.reinterpret(numtype.i32, numtype.f32, uN.wrap(1065353216)) .
+red in WASM-BUILTINS : builtin.lanes(shape.x(numtype.i32, dim.wrap(4)), uN.wrap(67305985)) .
+red in WASM-BUILTINS : builtin.inv-lanes(shape.x(packtype.i8, dim.wrap(16)), uN.wrap(1) uN.wrap(2) uN.wrap(3) uN.wrap(4) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0)) .
+red in WASM-BUILTINS : def.utf8(char.wrap(65)) .
+quit

@@ -116,7 +116,8 @@ let find_cycle closure rules =
 let source_rule_of_runtime_rule
     (rule : Analysis.Function_graph.runtime_search_rule)
   =
-  { Runtime_witness_proof.relation_id = rule.relation_id
+  { Runtime_witness_proof.identity = rule.identity
+  ; relation_id = rule.relation_id
   ; rule_id = rule.rule_id
   ; origin = rule.origin
   ; source_echo = rule.source_echo

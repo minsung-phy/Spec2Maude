@@ -34,12 +34,14 @@ separately generated initial Maude configuration:
 ```text
 bin/           command-line entry point
 translator/    SpecTec-to-Maude translator
+builtins.maude hand-written builtin backend semantics
+builtins.contract builtin backend ABI metadata
 wasm-3.0/      WebAssembly 3.0 SpecTec source
 wat_examples/  small local WebAssembly examples
 legacy/        previous implementation attempts, kept only for reference
 ```
 
-Generated files such as `output.maude` and `builtins.maude` are build artifacts.
+`output.maude` and any copy requested with `--builtins` are generated artifacts.
 
 ## Build
 
@@ -62,7 +64,7 @@ Generate Maude from the default WebAssembly SpecTec source:
 ```sh
 dune exec ./bin/spec2maude.exe -- translate \
   -o output.maude \
-  --builtins builtins.maude
+  --builtins output-builtins.maude
 ```
 
 If no input files are provided, Spec2Maude reads `wasm-3.0/*.spectec` in lexical
@@ -80,7 +82,7 @@ Load the generated modules in Maude:
 
 ```sh
 maude -no-banner output.maude
-maude -no-banner builtins.maude
+maude -no-banner output-builtins.maude
 ```
 
 Run the OCaml test suite:

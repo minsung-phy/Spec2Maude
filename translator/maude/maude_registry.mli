@@ -17,8 +17,15 @@ type violation =
 
 type t
 
-val build : Maude_ir.generated list -> t * violation list
-val validate_module : Maude_ir.module_ -> violation list
+val dedup_var_declarations : Maude_ir.generated list -> Maude_ir.generated list
+val build :
+  ?ambient_patterns:Condition_pattern_certificate.t ->
+  Maude_ir.generated list ->
+  t * violation list
+val validate_module :
+  ?ambient_patterns:Condition_pattern_certificate.t ->
+  Maude_ir.module_ ->
+  violation list
 val diagnostics : profile:string -> violation list -> Diagnostics.t list
 val has_sort : t -> string -> bool
 val has_op : t -> name:string -> arity:int -> bool

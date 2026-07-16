@@ -2,4 +2,33 @@
 
 (library
  (name translator)
+ (private_modules
+  carrier_sort
+  condition_schedule
+  decd_translate
+  definition_analysis
+  expr_diagnostic
+  head_specialization
+  helper_capture
+  helper_emission
+  hint_translate
+  premise_if
+  premise_rule
+  primitive_term
+  relation_analysis
+  relation_graph
+  runtime_materialize
+  runtime_truth_false_support
+  runtime_truth_worklist_core
+  runtime_truth_worklist_positive
+  runtime_truth_worklist_refutation
+  source_free_vars
+  source_condition_certificate_internal
+  source_index
+  typd_registry
+  typd_witness
+  typcase_constructor
+  type_diagnostic
+  typecheck_guard
+  typecheck_term)
  (libraries il util xl))
