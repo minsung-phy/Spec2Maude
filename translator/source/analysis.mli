@@ -48,11 +48,33 @@ module Function_graph : sig
     ; params : param_kind list
     ; result : Il.Ast.typ
     ; clause_count : int
-    ; inverse_id : string option
+    ; partial : bool
     }
 
+  type definition_identity =
+    { def_id : string
+    ; specialization_key : string list
+    }
+
+  type emitted_definition =
+    { identity : definition_identity
+    ; source_id : string
+    ; op_name : string
+    ; result : Il.Ast.typ
+    ; rewrite_backed : bool
+    }
+
+  type inverse_status =
+    | No_inverse
+    | Valid_inverse of string
+    | Invalid_inverse of
+        { reason : string
+        ; hint_origin : Origin.t
+        }
+
   type relation =
-    { id : string
+    { identity : Source_rule_identity.relation
+    ; id : string
     ; origin : Origin.t
     ; source_params : Il.Ast.param list
     ; kind : Relation_graph.relation_kind
@@ -61,6 +83,7 @@ module Function_graph : sig
     ; rule_count : int
     ; hints : string list
     ; maude_equational_view : bool
+    ; external_validation_shape : bool
     }
 
   type relation_demand =
@@ -130,7 +153,8 @@ module Function_graph : sig
     }
 
   type runtime_search_rule =
-    { relation_id : string
+    { identity : Source_rule_identity.rule
+    ; relation_id : string
     ; relation_result : Il.Ast.typ
     ; rule_id : string option
     ; origin : Origin.t
@@ -165,24 +189,29 @@ module Function_graph : sig
   type t
 
   val build : Source_index.t -> t
-  val violations : t -> violation list
   val diagnostics : profile:string -> t -> Diagnostics.t list
   val definitions : t -> definition list
-  val relations : t -> relation list
   val find_definition : t -> string -> definition option
   val definition_inverse : t -> string -> string option
+  val definition_is_partial : t -> string -> bool
+  val definition_is_rewrite_backed : t -> string -> bool
+  val plain_identity : string -> definition_identity
+  val identity_of_specialization : specialization -> definition_identity
+  val identity_is_rewrite_backed : t -> definition_identity -> bool
+  val definition_is_runtime_entry : t -> string -> bool
+  val emitted_definition : t -> definition_identity -> emitted_definition option
+  val definition_inverse_status : t -> string -> inverse_status
   val find_relation : t -> string -> relation option
   val rule_hints :
     t -> relation_id:string -> rule_id:string -> rule_hint option
   val relation_has_maude_equational_view : relation -> bool
   val relation_runtime_demand_reason : t -> string -> string option
   val relation_is_runtime_demanded : t -> string -> bool
-  val runtime_predicate_search_capability : t -> string -> runtime_search_capability
   val runtime_predicate_search_plan : t -> string -> runtime_predicate_search_plan
   val runtime_predicate_truth_plan : t -> string -> runtime_predicate_search_plan
+  val runtime_relation_rules : t -> string -> runtime_search_rule list option
   val runtime_predicate_dependency_completeness :
     t -> string -> runtime_predicate_dependency_completeness
-  val definition_has_static_params : definition -> bool
   val specializations_for : t -> string -> specialization list
   val has_specialization : t -> specialization -> bool
   val resolve_call :
@@ -193,8 +222,6 @@ module Function_graph : sig
     Il.Ast.id ->
     Il.Ast.arg list ->
     call_resolution
-  val typ_static_key : Il.Ast.typ -> string option
-  val typ_static_key_with_env : (string * Il.Ast.typ) list -> Il.Ast.typ -> string option
 end
 
 module Profile_policy : sig

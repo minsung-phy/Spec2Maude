@@ -1,5 +1,6 @@
 type source_rule =
-  { relation_id : string
+  { identity : Source_rule_identity.rule
+  ; relation_id : string
   ; rule_id : string option
   ; origin : Origin.t
   ; source_echo : string option

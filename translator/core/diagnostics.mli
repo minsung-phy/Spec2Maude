@@ -9,6 +9,11 @@ type severity =
   | Warning
   | Fatal
 
+type deferral =
+  | ListN_premise_admissibility
+  | Binding_membership_admissibility
+  | Runtime_predicate_binding_admissibility
+
 type t = private
   { category : category
   ; severity : severity
@@ -19,6 +24,7 @@ type t = private
   ; reason : string
   ; suggestion : string option
   ; source_echo : string option
+  ; deferral : deferral option
   }
 
 val string_of_category : category -> string
@@ -29,6 +35,7 @@ val make :
   ?severity:severity ->
   ?suggestion:string ->
   ?source_echo:string ->
+  ?deferral:deferral ->
   category:category ->
   origin:Origin.t ->
   constructor:string ->

@@ -27,22 +27,25 @@ let create () =
   ; ops_by_name = Hashtbl.create 257
   }
 
+let dedup_var_declarations statements =
+  let _seen, statements =
+    statements
+    |> List.fold_left
+         (fun (seen, acc) statement ->
+           match statement.Maude_ir.node with
+           | VarDecl { name; type_ref } ->
+             let key = name, type_ref in
+             if List.mem key seen then seen, acc
+             else key :: seen, statement :: acc
+           | _ -> seen, statement :: acc)
+         ([], [])
+  in
+  List.rev statements
+
 let type_ref_key = function
   | Maude_ir.SortRef sort -> "sort:" ^ Maude_ir.sort_name sort
   | Maude_ir.KindRef kind ->
     "kind:[" ^ Maude_ir.sort_name (Maude_ir.kind_sort kind) ^ "]"
-
-let attr_key = function
-  | Maude_ir.Assoc -> "assoc"
-  | Maude_ir.Comm -> "comm"
-  | Maude_ir.Ctor -> "ctor"
-  | Maude_ir.Id term -> "id:" ^ string_of_int (Hashtbl.hash term)
-  | Maude_ir.Frozen positions ->
-    "frozen(" ^ String.concat "," (List.map string_of_int positions) ^ ")"
-
-let op_kind_key = function
-  | Maude_ir.Total -> "total"
-  | Maude_ir.Partial -> "partial"
 
 let op_domain_key (decl : Maude_ir.op_decl) =
   String.concat
@@ -51,15 +54,12 @@ let op_domain_key (decl : Maude_ir.op_decl) =
     ; String.concat "," (List.map type_ref_key decl.args)
     ]
 
-let op_shape_key signature =
-  String.concat
-    "|"
-    [ signature.name
-    ; String.concat "," (List.map type_ref_key signature.args)
-    ; Maude_ir.sort_name signature.result
-    ; op_kind_key signature.kind
-    ; String.concat "," (List.map attr_key signature.attrs)
-    ]
+let same_op_shape left right =
+  String.equal left.name right.name
+  && left.args = right.args
+  && left.result = right.result
+  && left.kind = right.kind
+  && left.attrs = right.attrs
 
 let source_echo origin = origin.Origin.source_echo
 
@@ -70,6 +70,31 @@ let violation ?suggestion ~origin ~constructor ~reason () =
   ; suggestion
   ; source_echo = source_echo origin
   }
+
+let validate_var_declarations statements =
+  let variables = Hashtbl.create 31 in
+  statements
+  |> List.concat_map (fun (statement : Maude_ir.generated) ->
+    match statement.Maude_ir.node with
+    | Maude_ir.VarDecl { name; type_ref } ->
+      (match Hashtbl.find_opt variables name with
+      | None ->
+        Hashtbl.add variables name type_ref;
+        []
+      | Some existing when existing = type_ref -> []
+      | Some existing ->
+        [ violation
+            ~origin:statement.origin
+            ~constructor:"MaudeRegistry/variable-sort-collision"
+            ~reason:
+              ("variable `" ^ name
+               ^ "` is declared at conflicting Maude types `"
+               ^ type_ref_key existing ^ "` and `" ^ type_ref_key type_ref ^ "`")
+            ~suggestion:
+              "Use one sort per visible variable spelling, or emit statement-local generated variables inline-qualified with distinct names"
+            ()
+        ])
+    | _ -> [])
 
 let has_sort t name =
   Hashtbl.mem t.sorts name
@@ -149,7 +174,7 @@ let add_op t origin (decl : Maude_ir.op_decl) =
     match Hashtbl.find_opt t.ops_by_exact_signature domain_key with
     | None -> []
     | Some existing ->
-      if op_shape_key existing = op_shape_key signature then
+      if same_op_shape existing signature then
         []
       else
         [ violation
@@ -173,7 +198,7 @@ let add_op t origin (decl : Maude_ir.op_decl) =
   if
     not
       (List.exists
-         (fun existing -> op_shape_key existing = op_shape_key signature)
+         (fun existing -> same_op_shape existing signature)
          by_name)
   then
     Hashtbl.replace t.ops_by_name decl.name (by_name @ [ signature ]);
@@ -214,6 +239,64 @@ let rec term_vars = function
     |> List.concat
     |> List.fold_left (fun vars name -> add_var vars name) []
 
+let eq_condition_vars = function
+  | Maude_ir.EqCond (left, right) | Maude_ir.MatchCond (left, right) ->
+    term_vars left @ term_vars right
+  | Maude_ir.MembershipCond (term, _) | Maude_ir.BoolCond term ->
+    term_vars term
+
+let rule_condition_vars = function
+  | Maude_ir.EqCondition condition -> eq_condition_vars condition
+  | Maude_ir.RewriteCond (left, right) -> term_vars left @ term_vars right
+
+let statement_vars = function
+  | Maude_ir.Mb (term, _) -> term_vars term
+  | Maude_ir.Cmb (term, _, conditions) ->
+    term_vars term @ List.concat_map eq_condition_vars conditions
+  | Maude_ir.Eq (left, right, _) -> term_vars left @ term_vars right
+  | Maude_ir.Ceq (left, right, conditions, _) ->
+    term_vars left @ term_vars right @ List.concat_map eq_condition_vars conditions
+  | Maude_ir.Rl (_, left, right) -> term_vars left @ term_vars right
+  | Maude_ir.Crl (_, left, right, conditions) ->
+    term_vars left @ term_vars right @ List.concat_map rule_condition_vars conditions
+  | Maude_ir.SortDecl _ | Maude_ir.SubsortDecl _ | Maude_ir.OpDecl _
+  | Maude_ir.VarDecl _ -> []
+
+let qualified_variable name =
+  match String.index_opt name ':' with
+  | None -> None
+  | Some index ->
+    let base = String.sub name 0 index in
+    let qualifier =
+      String.sub name (index + 1) (String.length name - index - 1)
+    in
+    Some (base, qualifier)
+
+let validate_inline_variable_sorts statements =
+  statements
+  |> List.concat_map (fun (statement : Maude_ir.generated) ->
+    let variables = Hashtbl.create 17 in
+    statement_vars statement.Maude_ir.node
+    |> List.filter_map qualified_variable
+    |> List.filter_map (fun (name, qualifier) ->
+      match Hashtbl.find_opt variables name with
+      | None ->
+        Hashtbl.add variables name qualifier;
+        None
+      | Some existing when String.equal existing qualifier -> None
+      | Some existing ->
+        Some
+          (violation
+             ~origin:statement.origin
+             ~constructor:"MaudeRegistry/variable-sort-collision"
+             ~reason:
+               ("inline variable `" ^ name
+                ^ "` occurs at conflicting Maude types `" ^ existing
+                ^ "` and `" ^ qualifier ^ "` in one statement")
+             ~suggestion:
+               "Preserve one source binder sort within a statement, or allocate distinct statement-local generated variables"
+             ())))
+
 let unbound_vars term bound =
   term_vars term
   |> List.filter (fun name -> not (List.mem name bound))
@@ -238,7 +321,7 @@ let require_bound origin constructor index role bound term =
         ()
     ]
 
-let validate_eq_condition origin constructor index bound condition =
+let validate_eq_condition certificate origin constructor index bound condition =
   match condition with
   | Maude_ir.EqCond (lhs, rhs) ->
     let violations =
@@ -250,7 +333,7 @@ let validate_eq_condition origin constructor index bound condition =
     let subject_violations =
       require_bound origin constructor index "matching subject" bound subject
     in
-    if Condition_closure.is_match_pattern pattern then
+    if Condition_pattern_certificate.is_pattern certificate pattern then
       add_vars (term_vars pattern) bound, subject_violations
     else
       bound,
@@ -260,8 +343,8 @@ let validate_eq_condition origin constructor index bound condition =
             ~constructor
             ~reason:
               (Printf.sprintf
-                 "condition %d matching lhs is not a Maude pattern, so it cannot introduce variables soundly"
-                 index)
+                 "condition %d matching lhs `%s` is not a Maude pattern, so it cannot introduce variables soundly"
+                 index (Emit.render_term pattern))
             ~suggestion:
               "Lower the source lhs to a constructor/variable pattern before emitting a Maude matching condition"
             ()
@@ -277,16 +360,16 @@ let validate_eq_condition origin constructor index bound condition =
     in
     bound, violations
 
-let validate_rule_condition origin constructor index bound condition =
+let validate_rule_condition certificate origin constructor index bound condition =
   match condition with
   | Maude_ir.EqCondition condition ->
-    validate_eq_condition origin constructor index bound condition
+    validate_eq_condition certificate origin constructor index bound condition
   | Maude_ir.RewriteCond (lhs, rhs) ->
     let lhs_violations =
       require_bound origin constructor index "rewrite lhs" bound lhs
     in
     let rhs_violations =
-      if Condition_closure.is_match_pattern rhs then
+      if Condition_pattern_certificate.is_pattern certificate rhs then
         []
       else
         [ violation
@@ -294,8 +377,8 @@ let validate_rule_condition origin constructor index bound condition =
             ~constructor
             ~reason:
               (Printf.sprintf
-                 "condition %d rewrite rhs is not a Maude pattern, so it cannot introduce witness variables soundly"
-                 index)
+                 "condition %d rewrite rhs `%s` is not a Maude pattern, so it cannot introduce witness variables soundly"
+                 index (Emit.render_term rhs))
             ~suggestion:
               "Lower the rewrite condition rhs to a constructor/variable pattern before using it to bind variables"
             ()
@@ -335,10 +418,10 @@ let validate_rhs_admissible origin constructor bound rhs =
         ()
     ]
 
-let validate_cmb_conditions origin term conditions =
+let validate_cmb_conditions certificate origin term conditions =
   let _bound, violations =
     validate_condition_list
-      validate_eq_condition
+      (validate_eq_condition certificate)
       origin
       "MaudeRegistry/cmb-condition-admissibility"
       (term_vars term)
@@ -346,10 +429,10 @@ let validate_cmb_conditions origin term conditions =
   in
   violations
 
-let validate_ceq_conditions origin lhs rhs conditions =
+let validate_ceq_conditions certificate origin lhs rhs conditions =
   let bound, violations =
     validate_condition_list
-      validate_eq_condition
+      (validate_eq_condition certificate)
       origin
       "MaudeRegistry/ceq-condition-admissibility"
       (term_vars lhs)
@@ -357,10 +440,10 @@ let validate_ceq_conditions origin lhs rhs conditions =
   in
   violations @ validate_rhs_admissible origin "MaudeRegistry/ceq-condition-admissibility" bound rhs
 
-let validate_crl_conditions origin lhs rhs conditions =
+let validate_crl_conditions certificate origin lhs rhs conditions =
   let bound, violations =
     validate_condition_list
-      validate_rule_condition
+      (validate_rule_condition certificate)
       origin
       "MaudeRegistry/crl-condition-admissibility"
       (term_vars lhs)
@@ -368,7 +451,7 @@ let validate_crl_conditions origin lhs rhs conditions =
   in
   violations @ validate_rhs_admissible origin "MaudeRegistry/crl-condition-admissibility" bound rhs
 
-let register_generated t generated =
+let register_generated certificate t generated =
   let origin = generated.Maude_ir.origin in
   match generated.Maude_ir.node with
   | Maude_ir.SortDecl sort ->
@@ -394,22 +477,30 @@ let register_generated t generated =
     add_sort t origin decl.result;
     add_op t origin decl
   | Maude_ir.Cmb (term, _, conditions) ->
-    validate_cmb_conditions origin term conditions
+    validate_cmb_conditions certificate origin term conditions
   | Maude_ir.Ceq (lhs, rhs, conditions, _) ->
-    validate_ceq_conditions origin lhs rhs conditions
+    validate_ceq_conditions certificate origin lhs rhs conditions
   | Maude_ir.Crl (label, lhs, rhs, conditions) ->
     validate_label origin "MaudeRegistry/rule-label" label
-    @ validate_crl_conditions origin lhs rhs conditions
+    @ validate_crl_conditions certificate origin lhs rhs conditions
   | Maude_ir.Rl (label, _, _) ->
     validate_label origin "MaudeRegistry/rule-label" label
   | Maude_ir.VarDecl _ | Maude_ir.Mb _ | Maude_ir.Eq _ ->
     []
 
-let build statements =
+let build ?(ambient_patterns = Condition_pattern_certificate.empty) statements =
   let t = create () in
+  let certificate =
+    Condition_pattern_certificate.union
+      Condition_pattern_certificate.imported
+      (Condition_pattern_certificate.union
+         ambient_patterns
+         (Condition_pattern_certificate.generated (Prelude.statements @ statements)))
+  in
   let violations =
-    statements
-    |> List.concat_map (register_generated t)
+    validate_var_declarations statements
+    @ validate_inline_variable_sorts statements
+    @ (statements |> List.concat_map (register_generated certificate t))
   in
   t, violations
 
@@ -421,8 +512,10 @@ let module_has_rule module_ =
       | _ -> false)
     module_.Maude_ir.statements
 
-let validate_module module_ =
-  let _registry, violations = build module_.Maude_ir.statements in
+let validate_module ?ambient_patterns module_ =
+  let _registry, violations =
+    build ?ambient_patterns module_.Maude_ir.statements
+  in
   match module_.Maude_ir.kind with
   | Maude_ir.System -> violations
   | Maude_ir.Functional ->
@@ -453,7 +546,8 @@ let diagnostics ~profile violations =
       ~category:Diagnostics.Unsupported
       ~origin:violation.origin
       ~constructor:violation.constructor
-      ~enclosing:[]
+      ~enclosing:
+        (Diagnostic_provenance.enclosing ~context:[] violation.origin)
       ~profile
       ~reason:violation.reason
       ())

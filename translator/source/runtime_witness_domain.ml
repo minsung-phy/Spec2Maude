@@ -26,21 +26,44 @@ type t =
   }
 
 type blocker =
-  { constructor : string
+  { origin : Origin.t
+  ; constructor : string
+  ; ast_constructor : string
+  ; relation_id : string
+  ; rule_id : string option
+  ; premise_index : int option
+  ; premise_context : string option
   ; reason : string
   ; suggestion : string
+  ; source_echo : string option
   }
 
-let blocker constructor reason suggestion =
-  { constructor; reason; suggestion }
-
-let default_candidate_sources =
-  [ Query_inputs
-  ; Rule_head_closed_terms
-  ; Witness_category_zero_arity_constructors
-  ; Prefix_finite_indexed_fields
-  ; Deterministic_source_closure
-  ]
+let blocker domain ?premise ast_constructor constructor reason suggestion =
+  let rule = domain.Runtime_witness_proof.transitive.rule in
+  let premise_index =
+    let rec find index = function
+      | [] -> None
+      | candidate :: rest ->
+        (match premise with
+        | Some premise when Il.Eq.eq_prem candidate premise -> Some index
+        | Some _ | None -> find (index + 1) rest)
+    in
+    find 0 rule.prems
+  in
+  { origin = rule.origin
+  ; constructor
+  ; ast_constructor
+  ; relation_id = rule.relation_id
+  ; rule_id = rule.rule_id
+  ; premise_index
+  ; premise_context = Option.map Il.Print.string_of_prem premise
+  ; reason
+  ; suggestion
+  ; source_echo =
+      (match premise with
+      | Some premise -> Some (Il.Print.string_of_prem premise)
+      | None -> rule.source_echo)
+  }
 
 let describe_candidate_source = function
   | Query_inputs -> "query inputs/endpoints"
@@ -96,7 +119,7 @@ let domain_candidate
           }
       | Some witness_source_id ->
         Error
-          [ blocker
+          [ blocker domain ~premise:transitive.domain_premise "VarE"
               "RuntimeWitnessDomain/witness-source"
               ("finite-domain premise introduces witness `"
                ^ witness_source_id
@@ -107,21 +130,21 @@ let domain_candidate
           ]
       | None ->
         Error
-          [ blocker
+          [ blocker domain ~premise:transitive.domain_premise "VarE"
               "RuntimeWitnessDomain/witness-shape"
               "finite-domain premise does not end in a direct VarE witness"
               "Materialize only source domains whose candidate witness is a direct IL variable"
           ])
     | _ ->
       Error
-        [ blocker
+        [ blocker domain ~premise:transitive.domain_premise "RulePr"
             "RuntimeWitnessDomain/domain-arity"
             "finite-domain premise does not have the same prefix arity plus one witness component as the transitive rule"
             "Keep this recursive predicate Unsupported until the domain premise can be mapped to a finite candidate sequence"
         ])
   | RulePr (_, _ :: _, _, _) | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ ->
     Error
-      [ blocker
+      [ blocker domain ~premise:transitive.domain_premise "RulePr"
           "RuntimeWitnessDomain/domain-premise"
           "finite transitive proof domain is not a RulePr premise"
           "Closed-world witness domains must come from a source predicate premise D(prefix, witness)"
@@ -130,15 +153,18 @@ let domain_candidate
 let prepare domain =
   match domain_candidate domain with
   | Error blockers -> Error blockers
-  | Ok candidate ->
-    Ok
-      { proof = domain
-      ; candidate
-      ; cycle_rel_ids = domain.domain_plan.cycle_rel_ids
-      ; fuel_source_ids = domain.fuel_source_ids
-      ; visited_key_source_ids = domain.visited_key_source_ids
-      ; candidate_sources = default_candidate_sources
-      }
+  | Ok _candidate ->
+    (* The proof domain is an SCC-wide AND/OR graph, not a flat closure over
+       trans-free rules: a non-transitive RuleD may itself have a recursive
+       subtype premise. Every node is the complete concrete relation goal and
+       every RuleD contributes all premises as AND children. Query endpoints
+       and closed heads do not prove this successor graph finite or complete. *)
+    Error
+      [ blocker domain "RuntimeWitnessDomain"
+          "RuntimeWitnessDomain/unproved-successor-closure"
+          "the source transitivity shape is recognized, but the available endpoint and closed-head candidates do not form a source-complete witness domain"
+          "Implement a finitely branching source-derived AND/OR SCC worklist keyed by the complete ground goal, with separate positive and total-false proofs"
+      ]
 
 let describe plan =
   "candidate relation `"

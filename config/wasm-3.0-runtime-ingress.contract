@@ -1,0 +1,3 @@
+# capability definition clause producer-premise consumer-premise producer-relation consumer-relation producer-output-components source-digest trusted-formula-digest
+linking instantiate 0 0 1 Module_ok Externaddr_ok 1 a886bfbdbab0b6ac7804faaad98734ab 5fbef3c8b3a6cc0e3789628df0cf0877
+invocation invoke 0 0 1 Expand Val_ok 1 b5fc904a35aa3107b71bc772f527a9b4 66219a0d15efc85cb74efe2099fa4e31

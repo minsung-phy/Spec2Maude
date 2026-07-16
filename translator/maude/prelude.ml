@@ -4,12 +4,8 @@ let s = sort
 let sr name = sort_ref (s name)
 let kr name = kind_ref (kind_of_sort (s name))
 let app name args = App (name, args)
-let typecheck value typ = app "typecheck" [ value; typ ]
-let typecheck_seq value typ = app "typecheckSeq" [ value; typ ]
-let typecheck_opt_seq value typ = app "typecheckOptSeq" [ value; typ ]
-let typecheck_seq_opt value typ = app "typecheckSeqOpt" [ value; typ ]
-let typecheck_nested_seq value typ = app "typecheckNestedSeq" [ value; typ ]
-
+let witness name = Naming.primitive_witness name
+module T = Typecheck_term
 let spectec_terminal = s "SpectecTerminal"
 let spectec_terminals = s "SpectecTerminals"
 let spectec_type = s "SpectecType"
@@ -46,12 +42,12 @@ let statements =
     ; subsort (s "Int") spectec_terminal
     ; subsort spectec_terminal spectec_terminals
     ; subsort spectec_type spectec_types
-    ; op "syn-bool" [] spectec_type
-    ; op "syn-nat" [] spectec_type
-    ; op "syn-int" [] spectec_type
-    ; op "syn-rat" [] spectec_type
-    ; op "syn-real" [] spectec_type
-    ; op "syn-text" [] spectec_type
+    ; op (witness "bool") [] spectec_type
+    ; op (witness "nat") [] spectec_type
+    ; op (witness "int") [] spectec_type
+    ; op (witness "rat") [] spectec_type
+    ; op (witness "real") [] spectec_type
+    ; op (witness "text") [] spectec_type
     ; op "bool" [ sr "Bool" ] spectec_terminal ~attrs:[ Ctor ]
     ; op "rat" [ sr "Rat" ] spectec_terminal ~attrs:[ Ctor ]
     ; op "float" [ sr "Float" ] spectec_terminal ~attrs:[ Ctor ]
@@ -72,7 +68,7 @@ let statements =
     ; op "isOpt" [ sr "SpectecTerminals" ] (s "Bool")
     ; op "allOpt" [ sr "SpectecTerminals" ] (s "Bool")
     ; op "contains" [ sr "SpectecTerminal"; sr "SpectecTerminals" ] (s "Bool")
-    ; op "isTrue" [ kr "SpectecTerminal" ] (s "Bool")
+    ; op "isTrue" [ sr "SpectecTerminal" ] (s "Bool") ~kind:Partial
     ; op "typecheck" [ kr "SpectecTerminal"; sr "SpectecType" ] (s "Bool")
     ; op "typecheckSeq" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
     ; op "typecheckSeq" [ sr "SpectecTerminals"; sr "SpectecTypes" ] (s "Bool")
@@ -85,8 +81,8 @@ let statements =
     ; op "EMPTY" [] record_item
     ; op "_;_" [ sr "RecordItems"; sr "RecordItems" ] record_items
         ~attrs:[ Ctor; Assoc; Id (Const "EMPTY") ]
-    ; op "{_}" [ sr "RecordItems" ] spectec_terminal
-    ; op "item" [ sr "Qid"; sr "SpectecTerminals" ] record_item
+    ; op "{_}" [ sr "RecordItems" ] spectec_terminal ~attrs:[ Ctor ]
+    ; op "item" [ sr "Qid"; sr "SpectecTerminals" ] record_item ~attrs:[ Ctor ]
     ; op "value" [ sr "Qid"; sr "SpectecTerminal" ] spectec_terminal
     ; op "value" [ sr "Qid"; sr "RecordItems" ] spectec_terminals
     ; op "_++_" [ sr "RecordItems"; sr "RecordItems" ] spectec_terminal
@@ -95,6 +91,8 @@ let statements =
     ; op "setItem" [ sr "RecordItems"; sr "Qid"; sr "SpectecTerminals" ] record_items
     ; op "_[_<-_]" [ sr "SpectecTerminals"; sr "Nat"; sr "SpectecTerminal" ] spectec_terminals
     ; op "index" [ sr "SpectecTerminals"; sr "Nat" ] spectec_terminal
+    ; op "indexSeq" [ sr "SpectecTerminals"; sr "Nat" ] spectec_terminals
+    ; op "indexDefined" [ sr "SpectecTerminals"; sr "Nat" ] (s "Bool")
     ; op "slice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat" ] spectec_terminals
     ; op "drop" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
     ; op "splice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
@@ -168,46 +166,46 @@ let statements =
         (app "contains" [ Var "X"; app "_ _" [ Var "Y"; Var "XS" ] ])
         (app "_or_" [ app "_==_" [ Var "X"; Var "Y" ]; app "contains" [ Var "X"; Var "XS" ] ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
-    ; eq (app "isTrue" [ app "bool" [ Var "B" ] ]) (Var "B")
-    ; eq (app "isTrue" [ Var "K" ]) (Const "false") ~attrs:[ Owise ]
-    ; eq (typecheck (app "bool" [ Var "B" ]) (Const "syn-bool")) (Const "true")
-    ; eq (typecheck (Var "N") (Const "syn-nat")) (Const "true")
-    ; eq (typecheck (Var "I") (Const "syn-int")) (Const "true")
-    ; eq (typecheck (app "rat" [ Var "R" ]) (Const "syn-rat")) (Const "true")
-    ; eq (typecheck (app "float" [ Var "F" ]) (Const "syn-real")) (Const "true")
-    ; eq (typecheck (app "text" [ Var "S" ]) (Const "syn-text")) (Const "true")
-    ; eq (typecheck_seq (Const "eps") (Var "T")) (Const "true")
-    ; eq (typecheck_seq (Var "X") (Var "T")) (typecheck (Var "X") (Var "T"))
+    ; eq (app "isTrue" [ app "bool" [ Const "true" ] ]) (Const "true")
+    ; eq (app "isTrue" [ app "bool" [ Const "false" ] ]) (Const "false")
+    ; eq (T.typecheck (app "bool" [ Var "B" ]) (Const (witness "bool"))) (Const "true")
+    ; eq (T.typecheck (Var "N") (Const (witness "nat"))) (Const "true")
+    ; eq (T.typecheck (Var "I") (Const (witness "int"))) (Const "true")
+    ; eq (T.typecheck (app "rat" [ Var "R" ]) (Const (witness "rat"))) (Const "true")
+    ; eq (T.typecheck (app "float" [ Var "F" ]) (Const (witness "real"))) (Const "true")
+    ; eq (T.typecheck (app "text" [ Var "S" ]) (Const (witness "text"))) (Const "true")
+    ; eq (T.typecheck_seq (Const "eps") (Var "T")) (Const "true")
+    ; eq (T.typecheck_seq (Var "X") (Var "T")) (T.typecheck (Var "X") (Var "T"))
     ; ceq
-        (typecheck_seq (app "_ _" [ Var "X"; Var "XS" ]) (Var "T"))
-        (app "_and_" [ typecheck (Var "X") (Var "T"); typecheck_seq (Var "XS") (Var "T") ])
+        (T.typecheck_seq (app "_ _" [ Var "X"; Var "XS" ]) (Var "T"))
+        (app "_and_" [ T.typecheck (Var "X") (Var "T"); T.typecheck_seq (Var "XS") (Var "T") ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
-    ; eq (typecheck_opt_seq (Const "eps") (Var "T")) (Const "true")
+    ; eq (T.typecheck_opt_seq (Const "eps") (Var "T")) (Const "true")
     ; eq
-        (typecheck_opt_seq (app "seq" [ Var "YS" ]) (Var "T"))
-        (app "_and_" [ app "isOpt" [ Var "YS" ]; typecheck_seq (Var "YS") (Var "T") ])
+        (T.typecheck_opt_seq (app "seq" [ Var "YS" ]) (Var "T"))
+        (app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck_seq (Var "YS") (Var "T") ])
     ; ceq
-        (typecheck_opt_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
+        (T.typecheck_opt_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
         (app "_and_"
-           [ app "_and_" [ app "isOpt" [ Var "YS" ]; typecheck_seq (Var "YS") (Var "T") ]
-           ; typecheck_opt_seq (Var "XS") (Var "T")
+           [ app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck_seq (Var "YS") (Var "T") ]
+           ; T.typecheck_opt_seq (Var "XS") (Var "T")
            ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
-    ; eq (typecheck_opt_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
-    ; eq (typecheck_seq_opt (Const "eps") (Var "T")) (Const "true")
+    ; eq (T.typecheck_opt_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
+    ; eq (T.typecheck_seq_opt (Const "eps") (Var "T")) (Const "true")
     ; eq
-        (typecheck_seq_opt (app "seq" [ Var "YS" ]) (Var "T"))
-        (typecheck_seq (Var "YS") (Var "T"))
-    ; eq (typecheck_seq_opt (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
-    ; eq (typecheck_nested_seq (Const "eps") (Var "T")) (Const "true")
+        (T.typecheck_seq_opt (app "seq" [ Var "YS" ]) (Var "T"))
+        (T.typecheck_seq (Var "YS") (Var "T"))
+    ; eq (T.typecheck_seq_opt (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
+    ; eq (T.typecheck_nested_seq (Const "eps") (Var "T")) (Const "true")
     ; eq
-        (typecheck_nested_seq (app "seq" [ Var "YS" ]) (Var "T"))
-        (typecheck_seq (Var "YS") (Var "T"))
+        (T.typecheck_nested_seq (app "seq" [ Var "YS" ]) (Var "T"))
+        (T.typecheck_seq (Var "YS") (Var "T"))
     ; ceq
-        (typecheck_nested_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
-        (app "_and_" [ typecheck_seq (Var "YS") (Var "T"); typecheck_nested_seq (Var "XS") (Var "T") ])
+        (T.typecheck_nested_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
+        (app "_and_" [ T.typecheck_seq (Var "YS") (Var "T"); T.typecheck_nested_seq (Var "XS") (Var "T") ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
-    ; eq (typecheck_nested_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
+    ; eq (T.typecheck_nested_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
     ; eq
         (app "value" [ Var "FQ"; app "{_}" [ Var "RI" ] ])
         (app "value" [ Var "FQ"; Var "RI" ])
@@ -257,6 +255,23 @@ let statements =
     ; eq
         (app "index" [ app "_ _" [ Var "X"; Var "XS" ]; app "s_" [ Var "N2" ] ])
         (app "index" [ Var "XS"; Var "N2" ])
+    ; eq
+        (app "indexSeq" [ app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]; Const "0" ])
+        (Var "YS")
+    ; eq
+        (app "indexSeq"
+           [ app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]
+           ; app "s_" [ Var "N2" ]
+           ])
+        (app "indexSeq" [ Var "XS"; Var "N2" ])
+    ; eq (app "indexDefined" [ Const "eps"; Var "N" ]) (Const "false")
+    ; eq
+        (app "indexDefined" [ app "_ _" [ Var "X"; Var "XS" ]; Const "0" ])
+        (Const "true")
+    ; eq
+        (app "indexDefined"
+           [ app "_ _" [ Var "X"; Var "XS" ]; app "s_" [ Var "N2" ] ])
+        (app "indexDefined" [ Var "XS"; Var "N2" ])
     ; eq (app "_[_<-_]" [ Const "eps"; Var "N"; Var "Y" ]) (Const "eps")
     ; eq
         (app "_[_<-_]" [ app "_ _" [ Var "X"; Var "XS" ]; Const "0"; Var "Y" ])
@@ -307,5 +322,5 @@ let statements =
            ])
         (app "_ _"
            [ Var "X"; app "splice" [ Var "XS"; Var "N"; Var "N2"; Var "VAL" ] ])
-    ; eq (typecheck (Var "K") (Var "T")) (Const "false") ~attrs:[ Owise ]
+    ; eq (T.typecheck (Var "K") (Var "T")) (Const "false") ~attrs:[ Owise ]
     ]

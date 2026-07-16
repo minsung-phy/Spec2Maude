@@ -1,0 +1,103 @@
+# Spec2Maude builtin backend ABI.
+backend official-spectec-deterministic
+description deterministic choices from spectec/src/backend-interpreter/numerics.ml at revision d34a973e70ab127476b5d8591c6f558be289b929
+source spectec/src/backend-interpreter/numerics.ml
+revision d34a973e70ab127476b5d8591c6f558be289b929
+module WASM-BUILTINS
+abi 1
+maude builtins.maude
+smoke test/builtin_backend_smoke.maude
+
+# key scope source-category arity payload-sort public-constructor witness
+representation unsigned global uN 1 Nat uN.wrap -
+representation utf8-char scoped char 1 Nat char.wrap syn.char
+representation utf8-byte scoped byte 1 Nat byte.wrap -
+
+# source-key public-op totality demand dependencies representations
+require inv_concat_ builtin.inv-concat partial indirect - -
+require inv_concatn_ builtin.inv-concatn partial indirect - -
+require ND builtin.nd total direct - -
+require R_fmadd builtin.r-fmadd total direct - -
+require R_fmin builtin.r-fmin total direct - -
+require R_fmax builtin.r-fmax total direct - -
+require R_idot builtin.r-idot total direct - -
+require R_iq15mulr builtin.r-iq15mulr total direct - -
+require R_trunc_u builtin.r-trunc-u total direct - -
+require R_trunc_s builtin.r-trunc-s total direct - -
+require R_swizzle builtin.r-swizzle total direct - -
+require R_laneselect builtin.r-laneselect total direct - -
+require ibits_ builtin.ibits total direct - -
+require fbits_ builtin.fbits total direct - -
+require ibytes_ builtin.ibytes total direct - -
+require fbytes_ builtin.fbytes total direct - -
+require nbytes_ builtin.nbytes total direct ibytes_,fbytes_ -
+require vbytes_ builtin.vbytes total direct ibytes_ -
+require zbytes_ builtin.zbytes total direct nbytes_,vbytes_ -
+require cbytes_ builtin.cbytes total direct nbytes_,vbytes_ -
+require inv_ibits_ builtin.inv-ibits total direct - -
+require inv_fbits_ builtin.inv-fbits total direct - -
+require inv_ibytes_ builtin.inv-ibytes total direct - -
+require inv_fbytes_ builtin.inv-fbytes total direct - -
+require inv_nbytes_ builtin.inv-nbytes total direct inv_ibytes_,inv_fbytes_ -
+require inv_vbytes_ builtin.inv-vbytes total direct inv_ibytes_ -
+require inv_zbytes_ builtin.inv-zbytes total direct inv_nbytes_,inv_vbytes_ -
+require inv_cbytes_ builtin.inv-cbytes total direct inv_nbytes_,inv_vbytes_ -
+require truncz builtin.truncz total direct - -
+require ceilz builtin.ceilz total direct - -
+require iclz_ builtin.iclz total direct ibits_ -
+require ictz_ builtin.ictz total direct ibits_ -
+require ipopcnt_ builtin.ipopcnt total direct ibits_ -
+require iq15mulr_sat_ builtin.iq15mulr-sat total direct - -
+require irelaxed_q15mulr_ builtin.irelaxed-q15mulr total direct iq15mulr_sat_ -
+require iavgr_ builtin.iavgr total direct - -
+require inot_ builtin.inot total direct ibits_,inv_ibits_ -
+require irev_ builtin.irev total direct ibits_,inv_ibits_ -
+require iand_ builtin.iand total direct ibits_,inv_ibits_ -
+require iandnot_ builtin.iandnot total direct ibits_,inv_ibits_ -
+require ior_ builtin.ior total direct ibits_,inv_ibits_ -
+require ixor_ builtin.ixor total direct ibits_,inv_ibits_ -
+require ishl_ builtin.ishl total direct - -
+require ishr_ builtin.ishr total direct - -
+require irotl_ builtin.irotl total direct - -
+require irotr_ builtin.irotr total direct - -
+require ibitselect_ builtin.ibitselect total direct - -
+require irelaxed_laneselect_ builtin.irelaxed-laneselect total direct ibitselect_ -
+require fabs_ builtin.fabs total direct - -
+require fneg_ builtin.fneg total direct - -
+require fsqrt_ builtin.fsqrt total direct - -
+require fceil_ builtin.fceil total direct - -
+require ffloor_ builtin.ffloor total direct - -
+require ftrunc_ builtin.ftrunc total direct - -
+require fnearest_ builtin.fnearest total direct - -
+require fadd_ builtin.fadd total direct - -
+require fsub_ builtin.fsub total direct fneg_,fadd_ -
+require fmul_ builtin.fmul total direct - -
+require fdiv_ builtin.fdiv total direct - -
+require fmin_ builtin.fmin total direct - -
+require fmax_ builtin.fmax total direct - -
+require fpmin_ builtin.fpmin total direct - -
+require fpmax_ builtin.fpmax total direct - -
+require frelaxed_min_ builtin.frelaxed-min total direct fmin_ -
+require frelaxed_max_ builtin.frelaxed-max total direct fmax_ -
+require fcopysign_ builtin.fcopysign total direct - -
+require feq_ builtin.feq total direct - -
+require fne_ builtin.fne total direct - -
+require flt_ builtin.flt total direct - -
+require fgt_ builtin.fgt total direct - -
+require fle_ builtin.fle total direct - -
+require fge_ builtin.fge total direct - -
+require frelaxed_madd_ builtin.frelaxed-madd total direct fmul_,fadd_ -
+require frelaxed_nmadd_ builtin.frelaxed-nmadd total direct fneg_,fmul_,fadd_ -
+require wrap__ builtin.wrap total direct - -
+require extend__ builtin.extend total direct - -
+require trunc__ builtin.trunc total direct - -
+require trunc_sat__ builtin.trunc-sat total direct - -
+require relaxed_trunc__ builtin.relaxed-trunc total direct trunc_sat__ -
+require demote__ builtin.demote total direct - -
+require promote__ builtin.promote total direct - -
+require convert__ builtin.convert total direct - -
+require narrow__ builtin.narrow total direct - -
+require reinterpret__ builtin.reinterpret total direct nbytes_,inv_nbytes_ -
+require lanes_ builtin.lanes total direct - -
+require inv_lanes_ builtin.inv-lanes total direct - -
+require utf8 def.utf8 total direct - utf8-char,utf8-byte

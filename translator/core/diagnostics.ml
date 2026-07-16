@@ -9,6 +9,11 @@ type severity =
   | Warning
   | Fatal
 
+type deferral =
+  | ListN_premise_admissibility
+  | Binding_membership_admissibility
+  | Runtime_predicate_binding_admissibility
+
 type t =
   { category : category
   ; severity : severity
@@ -19,6 +24,7 @@ type t =
   ; reason : string
   ; suggestion : string option
   ; source_echo : string option
+  ; deferral : deferral option
   }
 
 let string_of_category = function
@@ -37,7 +43,7 @@ let default_severity = function
   | Skipped -> Info
   | Obligation -> Warning
 
-let make ?severity ?suggestion ?source_echo ~category ~origin ~constructor
+let make ?severity ?suggestion ?source_echo ?deferral ~category ~origin ~constructor
     ~enclosing ~profile ~reason () =
   let severity =
     match severity with
@@ -53,6 +59,7 @@ let make ?severity ?suggestion ?source_echo ~category ~origin ~constructor
   ; reason
   ; suggestion
   ; source_echo
+  ; deferral
   }
 
 let is_fatal diagnostic =

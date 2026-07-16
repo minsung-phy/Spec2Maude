@@ -23,9 +23,16 @@ type t =
   }
 
 type blocker =
-  { constructor : string
+  { origin : Origin.t
+  ; constructor : string
+  ; ast_constructor : string
+  ; relation_id : string
+  ; rule_id : string option
+  ; premise_index : int option
+  ; premise_context : string option
   ; reason : string
   ; suggestion : string
+  ; source_echo : string option
   }
 
 val prepare :

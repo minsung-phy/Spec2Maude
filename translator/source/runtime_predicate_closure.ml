@@ -14,7 +14,8 @@ type relation_kind =
   | Unknown of string
 
 type rule =
-  { rule_id : string option
+  { identity : Source_rule_identity.rule
+  ; rule_id : string option
   ; origin : Origin.t
   ; source_echo : string option
   ; binds : quant list
@@ -32,6 +33,7 @@ type relation =
   ; result : typ
   ; rules : rule list option
   ; runtime_demanded : bool
+  ; external_validation_shape : bool
   }
 
 type search_rule =
@@ -269,53 +271,20 @@ let rulepr_args_blocker rel_id args =
   ; premise_source_echo = None
   }
 
-let exp_components exp =
-  match exp.it with
-  | TupE components -> components
-  | _ -> [ exp ]
-
-let strip_backticks text =
-  let len = String.length text in
-  if len >= 2 && text.[0] = '`' && text.[len - 1] = '`' then
-    String.sub text 1 (len - 2)
-  else
-    text
-
-let text_is_validation_ok_marker text =
-  let text = strip_backticks text in
-  String.equal text "OK"
-
-let mixop_has_ok_marker mixop =
-  Xl.Mixop.flatten mixop
-  |> List.exists (fun atoms ->
-    atoms
-    |> List.exists (fun atom ->
-      match atom.it with
-      | Xl.Atom.Atom text ->
-        text_is_validation_ok_marker text
-      | _ -> false))
-
-let exp_is_ok_result_marker exp =
-  (* SpecTec validation relations mark success with an OK result term.
-     Keep this check on the IL result marker itself; relation names never
-     control the skip policy. *)
-  match exp.it with
-  | VarE id -> text_is_validation_ok_marker id.it
-  | CaseE (mixop, _) -> mixop_has_ok_marker mixop
-  | _ -> false
-
-let truth_external_validation_premise graph rel_id mixop exp =
+let truth_external_validation_premise graph rel_id args mixop exp =
   match graph.find_relation rel_id.it with
   | None -> false
   | Some relation ->
-    relation.kind = Predicate_candidate
-    && graph.mixop_equal relation.mixop mixop
-    &&
-    (mixop_has_ok_marker mixop
-     ||
-     match List.rev (exp_components exp) with
-     | result :: _ -> exp_is_ok_result_marker result
-     | [] -> false)
+    Runtime_validation_certificate.certified
+      ~predicate_marker:(relation.kind = Predicate_candidate)
+      ~source_params:relation.source_params
+      ~runtime_demanded:relation.runtime_demanded
+      ~mixop_equal:graph.mixop_equal
+      ~declaration_mixop:relation.mixop
+      ~premise_args:args
+      ~premise_mixop:mixop
+      ~result:relation.result
+      ~premise_exp:exp
 
 let rec premise_dependencies graph use prem =
   match prem.it with
@@ -333,10 +302,12 @@ let rec premise_dependencies graph use prem =
       | Some blocker -> [ with_premise prem blocker ]
     in
     [], blockers
-  | RulePr (rel_id, [], mixop, exp) ->
-    if use = Truth_helper && truth_external_validation_premise graph rel_id mixop exp then
+  | RulePr (rel_id, args, mixop, exp) ->
+    if use = Truth_helper
+       && truth_external_validation_premise graph rel_id args mixop exp
+    then
       [], []
-    else
+    else if args = [] then
       [ { dep_id = rel_id.it
         ; rule_id = None
         ; rule_origin = None
@@ -346,8 +317,8 @@ let rec premise_dependencies graph use prem =
         ; premise_source_echo = premise_source_echo prem
         }
       ], []
-  | RulePr (rel_id, args, _, _) ->
-    [], [ with_premise prem (rulepr_args_blocker rel_id args) ]
+    else
+      [], [ with_premise prem (rulepr_args_blocker rel_id args) ]
   | ElsePr ->
     [], [ with_premise prem (otherwise_blocker use) ]
   | IterPr (body, (iter, generators)) ->
@@ -413,7 +384,8 @@ let dependency_blocker relation_id dependency premise =
 
 let transitive_domain_premise relation_id (rule : rule) =
   let source_rule =
-    { Runtime_witness_proof.relation_id = relation_id
+    { Runtime_witness_proof.identity = rule.identity
+    ; relation_id
     ; rule_id = rule.rule_id
     ; origin = rule.origin
     ; source_echo = rule.source_echo
@@ -477,7 +449,8 @@ let rule_dependencies graph use relation_id relation_mixop (rule : rule) =
   List.rev deps, blockers
 
 let source_rule relation_id (rule : rule) =
-  { Runtime_witness_proof.relation_id = relation_id
+  { Runtime_witness_proof.identity = rule.identity
+  ; relation_id
   ; rule_id = rule.rule_id
   ; origin = rule.origin
   ; source_echo = rule.source_echo
@@ -495,32 +468,52 @@ let source_target_chain_rule relation_id rule =
   |> Runtime_witness_proof.target_chain
   |> Option.is_some
 
-let cycle_has_source_recursive_witness graph cycle =
+let cycle_has_source_target_chain graph cycle =
+  match List.rev cycle with
+  | relation_id :: _ ->
+    (match graph.find_relation relation_id with
+    | Some { rules = Some rules; _ } ->
+      List.exists (source_target_chain_rule relation_id) rules
+    | _ -> false)
+  | [] -> false
+
+let cycle_has_source_transitive_rule graph cycle =
   cycle
   |> List.exists (fun relation_id ->
     match graph.find_relation relation_id with
     | Some { rules = Some rules; _ } ->
-      List.exists
-        (fun rule ->
-          source_transitive_witness_rule relation_id rule
-          || source_target_chain_rule relation_id rule)
-        rules
+      List.exists (source_transitive_witness_rule relation_id) rules
     | _ -> false)
 
 let recursive_blocker graph use cycle =
   let cycle_text = String.concat " -> " cycle in
   match use with
-  | (Search_helper | Truth_helper) when cycle_has_source_recursive_witness graph cycle ->
+  | (Truth_helper | Search_helper)
+    when cycle_has_source_target_chain graph cycle ->
     None
-  | Search_helper | Truth_helper ->
+  | (Truth_helper | Search_helper)
+    when cycle_has_source_transitive_rule graph cycle ->
     Some
-      { constructor = "RuntimePredicateClosure/recursive-search-cycle"
+      { constructor = "RuntimePredicateClosure/recursive-transitive-cycle"
       ; reason =
-          "recursive predicate-search dependency cycle `"
+          "recursive predicate dependency cycle `"
           ^ cycle_text
-          ^ "` needs a bounded/source-complete witness-space proof before helper emission"
+          ^ "` contains a source transitivity rule, but no source-complete goal worklist proof has been established"
       ; suggestion =
-          "Provide a source-complete recursive search strategy or keep this relation Unsupported for witness search"
+          "Build a finitely branching source-derived AND/OR SCC worklist keyed by complete ground goals, with separate positive and total-false proofs, before emitting truth or search helpers"
+      ; premise_origin = None
+      ; premise_constructor = None
+      ; premise_source_echo = None
+      }
+  | Truth_helper | Search_helper ->
+    Some
+      { constructor = "RuntimePredicateClosure/recursive-truth-cycle"
+      ; reason =
+          "recursive predicate dependency cycle `"
+          ^ cycle_text
+          ^ "` has no recognized source-decreasing or source-finite recursion proof"
+      ; suggestion =
+          "Provide a structural recursion proof for positive search and a separate source-complete no-hit proof, or keep this relation Unsupported"
       ; premise_origin = None
       ; premise_constructor = None
       ; premise_source_echo = None

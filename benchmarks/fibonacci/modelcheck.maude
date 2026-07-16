@@ -1,0 +1,60 @@
+load model-checker.maude
+
+mod SPEC2MAUDE-FIBONACCI is
+  protecting SPEC2MAUDE-GENERATED .
+  including MODEL-CHECKER .
+
+  sort FibState .
+  subsort FibState < State .
+
+  op run : SpectecTerminal -> FibState [ctor frozen (1)] .
+  op done : Nat -> Prop [ctor] .
+
+  op fib-store : -> SpectecTerminal .
+  op fib-module : -> SpectecTerminal .
+  op fib-state : -> SpectecTerminal .
+  op fib-val : Nat -> SpectecTerminal .
+  op fib-program : -> SpectecTerminals .
+  op fib-init : -> SpectecTerminal .
+
+  vars C C2 S : SpectecTerminal .
+  var IS : SpectecTerminals .
+  var N : Nat .
+
+  eq fib-store = rec.store(eps, eps, eps, eps, eps,
+    eps, eps, eps, eps, eps) .
+  eq fib-module = rec.moduleinst(eps, eps, eps, eps, eps,
+    eps, eps, eps, eps) .
+  eq fib-state = state.sym(fib-store, rec.frame(eps, fib-module)) .
+
+  eq fib-val(N) = instr.const(numtype.i32, uN.wrap(N)) .
+
+  --- fib(5) = fib(3) + fib(4) = (1 + 1) + ((1 + 1) + 1)
+  eq fib-program =
+    fib-val(1) fib-val(1) instr.binop(numtype.i32, binop.add)
+    fib-val(1) fib-val(1) instr.binop(numtype.i32, binop.add)
+    fib-val(1) instr.binop(numtype.i32, binop.add)
+    instr.binop(numtype.i32, binop.add) .
+
+  eq fib-init = config.sym(fib-state, fib-program) .
+
+  crl [tick] : run(C) => run(C2) if rel.step(C) => C2 .
+
+  eq run(config.sym(S, IS)) |= done(N) = (IS == fib-val(N)) .
+endm
+
+select SPEC2MAUDE-FIBONACCI .
+
+rew [20] in SPEC2MAUDE-FIBONACCI : run(fib-init) .
+
+search [1, 20] in SPEC2MAUDE-FIBONACCI :
+  run(fib-init) =>* run(config.sym(S, instr.const(numtype.i32, uN.wrap(5)))) .
+
+search [1, 20] in SPEC2MAUDE-FIBONACCI :
+  run(fib-init) =>* run(config.sym(S, instr.const(numtype.i32, uN.wrap(6)))) .
+
+red in SPEC2MAUDE-FIBONACCI : modelCheck(run(fib-init), <> done(5)) .
+red in SPEC2MAUDE-FIBONACCI : modelCheck(run(fib-init), [] ~ done(6)) .
+red in SPEC2MAUDE-FIBONACCI : modelCheck(run(fib-init), <> done(6)) .
+
+quit

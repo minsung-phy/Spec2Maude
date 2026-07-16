@@ -13,7 +13,8 @@ type relation_kind =
   | Unknown of string
 
 type rule =
-  { rule_id : string option
+  { identity : Source_rule_identity.rule
+  ; rule_id : string option
   ; origin : Origin.t
   ; source_echo : string option
   ; binds : quant list
@@ -31,6 +32,7 @@ type relation =
   ; result : typ
   ; rules : rule list option
   ; runtime_demanded : bool
+  ; external_validation_shape : bool
   }
 
 type search_rule =

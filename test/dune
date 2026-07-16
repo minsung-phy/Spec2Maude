@@ -1,0 +1,89 @@
+(test
+ (name semantic_false_green)
+ (modules semantic_false_green)
+ (libraries translator il util xl))
+
+(test
+ (name rewrite_decd_regression)
+ (modules rewrite_decd_regression)
+ (libraries translator il util xl))
+
+(test
+ (name runtime_truth_head_guard_unsupported)
+ (modules runtime_truth_head_guard_unsupported)
+ (libraries translator il util xl))
+
+(test
+ (name naming_regression)
+ (modules naming_regression)
+ (libraries translator il util xl))
+
+(executable
+ (name runtime_truth_decision_fixture)
+ (modules runtime_truth_decision_fixture)
+ (libraries translator il util xl))
+
+(executable
+ (name rewrite_decd_fixture)
+ (modules rewrite_decd_fixture)
+ (libraries translator il util xl))
+
+(executable
+ (name iter_rule_fixture)
+ (modules iter_rule_fixture)
+ (libraries translator il util xl))
+
+(executable
+ (name membership_witness_fixture)
+ (modules membership_witness_fixture)
+ (libraries translator il util xl))
+
+(rule
+ (alias runtest)
+ (deps rewrite_decd_reduction.sh)
+ (action
+  (run sh %{dep:rewrite_decd_reduction.sh}
+    %{exe:rewrite_decd_fixture.exe})))
+
+(rule
+ (alias runtest)
+ (deps iter_rule_fixture.sh)
+ (action
+  (run sh %{dep:iter_rule_fixture.sh}
+    %{exe:iter_rule_fixture.exe})))
+
+(rule
+ (alias runtest)
+ (deps membership_witness_search.sh)
+ (action
+  (run sh %{dep:membership_witness_search.sh}
+    %{exe:membership_witness_fixture.exe})))
+
+(rule
+ (alias runtest)
+ (deps runtime_truth_decision_reductions.sh)
+ (action
+  (run sh %{dep:runtime_truth_decision_reductions.sh}
+    %{exe:runtime_truth_decision_fixture.exe})))
+
+(rule
+ (alias runtest)
+ (deps
+  runtime_truth_generated.sh
+  ../builtins.maude
+  ../config/wasm-3.0-runtime-ingress.contract
+  (glob_files ../wasm-3.0/*.spectec))
+ (action
+  (run sh %{dep:runtime_truth_generated.sh} %{exe:../bin/spec2maude.exe} %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps
+  builtin_backend_generated.sh
+  builtin_backend_smoke.maude
+  ../builtins.contract
+  ../builtins.maude
+  ../config/wasm-3.0-runtime-ingress.contract
+  (glob_files ../wasm-3.0/*.spectec))
+ (action
+  (run sh %{dep:builtin_backend_generated.sh} %{exe:../bin/spec2maude.exe} %{workspace_root})))

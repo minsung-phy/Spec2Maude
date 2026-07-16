@@ -1,37 +1,3 @@
-let is_word_char = function
-  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' -> true
-  | _ -> false
-
-let is_source_slug_char = function
-  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '-' | '/' | '.' -> true
-  | _ -> false
-
-let sanitize source =
-  let b = Buffer.create (String.length source) in
-  String.iter
-    (fun ch ->
-      if is_word_char ch then (
-        Buffer.add_char b (Char.lowercase_ascii ch))
-      else
-        Buffer.add_string b (Printf.sprintf "x%02xx" (Char.code ch)))
-    source;
-  let raw = Buffer.contents b in
-  if raw = "" then "unnamed" else raw
-
-let source_slug ?(lower = false) source =
-  let b = Buffer.create (String.length source) in
-  String.iter
-    (fun ch ->
-      if is_source_slug_char ch then
-        Buffer.add_char b (if lower then Char.lowercase_ascii ch else ch)
-      else if ch = '_' then
-        Buffer.add_string b "x5f"
-      else
-        Buffer.add_string b (Printf.sprintf "x%02xx" (Char.code ch)))
-    source;
-  let raw = Buffer.contents b in
-  if raw = "" then "unnamed" else raw
-
 let trim_separator_edges text =
   let len = String.length text in
   let left = ref 0 in
@@ -44,25 +10,33 @@ let trim_separator_edges text =
   done;
   if !left > !right then "" else String.sub text !left (!right - !left + 1)
 
-let source_atom_slug source =
+let source_slug ?(lower = false) source =
   let b = Buffer.create (String.length source) in
-  let last_was_sep = ref false in
-  let add_sep () =
-    if Buffer.length b > 0 && not !last_was_sep then (
+  let separator = ref false in
+  let add_separator () =
+    if Buffer.length b > 0 && not !separator then (
       Buffer.add_char b '-';
-      last_was_sep := true)
+      separator := true)
   in
   String.iter
     (fun ch ->
       match ch with
       | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' ->
-        Buffer.add_char b (Char.lowercase_ascii ch);
-        last_was_sep := false
-      | '_' | '-' | '.' | '/' -> add_sep ()
-      | _ -> add_sep ())
+        Buffer.add_char b (if lower then Char.lowercase_ascii ch else ch);
+        separator := false
+      | _ -> add_separator ())
     source;
   let raw = trim_separator_edges (Buffer.contents b) in
-  if raw = "" then "sym" else raw
+  if raw = "" then "unnamed" else raw
+
+let sanitize source = source_slug ~lower:true source
+
+let source_owner source = source
+
+let source_atom_slug source =
+  match source_slug ~lower:true source with
+  | "unnamed" -> "sym"
+  | slug -> slug
 
 let source_id id = sanitize id.Util.Source.it
 
@@ -70,53 +44,27 @@ let category_slug id =
   source_slug id.Util.Source.it
 
 let primitive_witness = function
-  | "bool" -> "syn-bool"
-  | "nat" -> "syn-nat"
-  | "int" -> "syn-int"
-  | "rat" -> "syn-rat"
-  | "real" -> "syn-real"
-  | "text" -> "syn-text"
-  | name -> "syn-" ^ source_slug name
+  | name -> "syn." ^ source_slug name
 
 let source_mixop mixop =
-  let atom_slug atom =
-    source_atom_slug (Xl.Atom.to_string atom)
-  in
-  let segment atoms =
-    atoms
-    |> List.map atom_slug
-    |> String.concat "."
-  in
-  match Xl.Mixop.flatten mixop |> List.map segment with
-  | [] -> "unnamed"
-  | [ "" ] -> "unnamed"
-  | [ segment ] -> segment
-  | segments -> String.concat "_" segments
-
-let source_mixop_projection_label mixop =
-  let atom_slug atom =
-    source_atom_slug (Xl.Atom.to_string atom)
-  in
-  let atoms =
+  match
     Xl.Mixop.flatten mixop
     |> List.concat
-    |> List.map atom_slug
-  in
-  match atoms with
+    |> List.map (fun atom -> source_atom_slug (Xl.Atom.to_string atom))
+  with
   | [] -> "wrap"
-  | _ -> String.concat "." atoms
+  | atoms -> String.concat "-" atoms
+
+let source_mixop_projection_label = source_mixop
 
 let category_witness id =
-  "syn-" ^ category_slug id
+  "syn." ^ category_slug id
 
 let constructor_op mixop =
   source_mixop mixop
 
-let constructor_op_in_category ?(record_like_single_constructor = false) category mixop =
-  if record_like_single_constructor then
-    source_slug category
-  else
-    source_slug category ^ "." ^ source_mixop mixop
+let constructor_op_in_category ?record_like_single_constructor:_ category mixop =
+  source_slug category ^ "." ^ source_mixop mixop
 
 let constructor_op_for_typ typ mixop =
   match typ.Util.Source.it with
@@ -125,39 +73,45 @@ let constructor_op_for_typ typ mixop =
 
 let destructor_op_in_category category mixop index =
   "proj." ^ source_slug category ^ "." ^ source_mixop_projection_label mixop
-  ^ "." ^ string_of_int index ^ "_"
+  ^ "." ^ string_of_int index
+
+let projection_op constructor_op index =
+  "proj." ^ constructor_op ^ "." ^ string_of_int index
 
 let destructor_op_for_typ typ mixop index =
   match typ.Util.Source.it with
   | Il.Ast.VarT (id, _) ->
     destructor_op_in_category (category_slug id) mixop index
   | _ ->
-    "proj." ^ source_mixop_projection_label mixop ^ "." ^ string_of_int index ^ "_"
+    "proj." ^ source_mixop_projection_label mixop ^ "." ^ string_of_int index
 
 let wrapper_constructor_in_category category =
-  source_slug category ^ ".wrap_"
+  source_slug category ^ ".wrap"
 
 let wrapper_constructor_for_id id =
   wrapper_constructor_in_category (category_slug id)
 
 let record_constructor id =
-  "rec-" ^ category_slug id
+  "rec." ^ category_slug id
 
 let definition_op id =
-  "def" ^ sanitize id.Util.Source.it
+  "def." ^ source_slug ~lower:true id.Util.Source.it
 
-let specialized_definition_op id static_keys =
-  match static_keys with
-  | [] -> definition_op id
-  | keys ->
-    let material = String.concat "\000" keys in
-    definition_op id ^ "x2dxspecx" ^ Digest.to_hex (Digest.string material)
+let builtin_definition_op id =
+  "builtin." ^ source_slug ~lower:true id.Util.Source.it
+
+let specialized_definition_op ?(builtin = false) id target_ids =
+  let base =
+    if builtin then builtin_definition_op id else definition_op id
+  in
+  match target_ids with
+  | [] -> base
+  | targets ->
+    base ^ ".with."
+    ^ String.concat "." (List.map (source_slug ~lower:true) targets)
 
 let relation_op id =
-  source_atom_slug id.Util.Source.it
-
-let relation_equational_view_op id =
-  relation_op id ^ "-view"
+  "rel." ^ source_slug ~lower:true id.Util.Source.it
 
 let substring_after_marker marker text =
   let marker_len = String.length marker in
@@ -187,6 +141,45 @@ let helper_source_context origin =
   | Some context -> context
   | None -> origin.Origin.ast_constructor
 
+let helper_owner origin =
+  source_slug ~lower:true (helper_source_context origin)
+
+let helper_op ~role ~owner =
+  "helper." ^ source_slug ~lower:true role ^ "." ^ source_slug ~lower:true owner
+
+let helper_ordinal name ordinal =
+  if ordinal <= 1 then name else name ^ "." ^ string_of_int ordinal
+
+let helper_companion ~role name =
+  match String.split_on_char '.' name with
+  | "helper" :: _ :: owner ->
+    "helper." ^ source_slug ~lower:true role ^ "." ^ String.concat "." owner
+  | _ -> helper_op ~role ~owner:name
+
+let sort_token source =
+  let words =
+    source
+    |> String.map (function '.' | '-' -> '_' | ch -> ch)
+    |> String.split_on_char '_'
+    |> List.filter (fun word -> word <> "")
+  in
+  match words with
+  | [] -> "Generated"
+  | words -> String.concat "" (List.map String.capitalize_ascii words)
+
+let source_sort_token source =
+  sort_token (source_slug ~lower:true source)
+
+let definition_config_sort id target_ids =
+  let base = "DecConf" ^ source_sort_token id.Util.Source.it in
+  match target_ids with
+  | [] -> base
+  | targets ->
+    base ^ "With" ^ String.concat "" (List.map source_sort_token targets)
+
+let relation_config_sort id =
+  "RelConf" ^ source_sort_token id.Util.Source.it
+
 let trim_var_separators text =
   let len = String.length text in
   let left = ref 0 in
@@ -199,49 +192,18 @@ let trim_var_separators text =
   done;
   if !left > !right then "" else String.sub text !left (!right - !left + 1)
 
-let is_hex = function
-  | '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> true
-  | _ -> false
-
-let hex_value = function
-  | '0' .. '9' as ch -> Char.code ch - Char.code '0'
-  | 'a' .. 'f' as ch -> 10 + Char.code ch - Char.code 'a'
-  | 'A' .. 'F' as ch -> 10 + Char.code ch - Char.code 'A'
-  | _ -> 0
-
-let decode_sanitize_escapes source =
-  let len = String.length source in
-  let b = Buffer.create len in
-  let rec loop index =
-    if index >= len then
-      ()
-    else if
-      index + 3 < len
-      && source.[index] = 'x'
-      && is_hex source.[index + 1]
-      && is_hex source.[index + 2]
-      && source.[index + 3] = 'x'
-    then (
-      let code =
-        (hex_value source.[index + 1] * 16) + hex_value source.[index + 2]
-      in
-      Buffer.add_char b (Char.chr code);
-      loop (index + 4))
-    else (
-      Buffer.add_char b source.[index];
-      loop (index + 1))
-  in
-  loop 0;
-  Buffer.contents b
-
-let readable_var_slug source =
-  let source = decode_sanitize_escapes source in
+let readable_var_slug ?(source_identity = false) source =
   let b = Buffer.create (String.length source) in
   let last_was_sep = ref false in
   let add_sep () =
     if Buffer.length b > 0 && not !last_was_sep then (
       Buffer.add_char b '_';
       last_was_sep := true)
+  in
+  let add_word word =
+    add_sep ();
+    Buffer.add_string b word;
+    last_was_sep := false
   in
   String.iter
     (fun ch ->
@@ -252,6 +214,9 @@ let readable_var_slug source =
       | '0' .. '9' ->
         Buffer.add_char b ch;
         last_was_sep := false
+      | '\'' when source_identity -> add_word "PRIME"
+      | '*' when source_identity -> add_word "STAR"
+      | '?' when source_identity -> add_word "OPT"
       | '_' | '-' | '.' | '/' | '\'' | '`' | '*' | '?' -> add_sep ()
       | _ -> add_sep ())
     source;
@@ -259,6 +224,14 @@ let readable_var_slug source =
 
 let maude_var ?(fallback = "V") source =
   let raw = readable_var_slug source in
+  let fallback = readable_var_slug fallback |> fun slug -> if slug = "" then "V" else slug in
+  let raw = if raw = "" then fallback else raw in
+  match raw.[0] with
+  | 'A' .. 'Z' -> raw
+  | _ -> fallback ^ raw
+
+let source_var ?(fallback = "V") source =
+  let raw = readable_var_slug ~source_identity:true source in
   let fallback = readable_var_slug fallback |> fun slug -> if slug = "" then "V" else slug in
   let raw = if raw = "" then fallback else raw in
   match raw.[0] with
@@ -277,14 +250,11 @@ let capitalize_word word =
     String.make 1 (Char.uppercase_ascii word.[0])
     ^ String.sub word 1 (String.length word - 1)
 
-let helper_context_var_stem origin =
+let helper_context_stem origin =
   maude_var ~fallback:"HELPER" (helper_source_context origin)
 
-let helper_local_var_stem origin =
-  helper_context_var_stem origin
-
 let helper_context_name origin =
-  match split_words (helper_context_var_stem origin) with
+  match split_words (helper_context_stem origin) with
   | [] -> "Source"
   | words -> String.concat "" (List.map capitalize_word words)
 

@@ -2,7 +2,8 @@ open Il.Ast
 open Util.Source
 
 type source_rule =
-  { relation_id : string
+  { identity : Source_rule_identity.rule
+  ; relation_id : string
   ; rule_id : string option
   ; origin : Origin.t
   ; source_echo : string option
@@ -67,7 +68,7 @@ let key t =
     String.concat
       ":"
       [ "finite-transitive"
-      ; domain.transitive.rule.relation_id
+      ; Source_rule_identity.rule_key domain.transitive.rule.identity
       ; domain.transitive.domain_rel_id
       ; domain.transitive.witness_source_id
       ; string_of_int domain.transitive.prefix_arity
@@ -81,7 +82,7 @@ let key t =
     String.concat
       ":"
       [ "target-guided-self"
-      ; target.rule.relation_id
+      ; Source_rule_identity.rule_key target.rule.identity
       ; target.target_rel_id
       ; target.witness_source_id
       ; string_of_int target.prefix_arity
