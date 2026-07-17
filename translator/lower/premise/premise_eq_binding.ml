@@ -297,7 +297,7 @@ let attach_total_equality_certificate
   | Error blockers ->
     let blockers =
       blockers
-      |> List.map (fun (blocker : Runtime_truth_total_equality.blocker) ->
+      |> List.map (fun (blocker : Runtime_truth_totality.blocker) ->
         Source_condition_certificate.failure
           ~origin:blocker.origin
           ~constructor:blocker.constructor
@@ -359,7 +359,7 @@ let attach_binding_certificate
     | Error blockers ->
       let blockers =
         blockers
-        |> List.map (fun (blocker : Runtime_truth_total_equality.blocker) ->
+        |> List.map (fun (blocker : Runtime_truth_totality.blocker) ->
           Source_condition_certificate.failure
             ~origin:blocker.origin
             ~constructor:blocker.constructor

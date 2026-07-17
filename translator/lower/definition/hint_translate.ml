@@ -10,7 +10,8 @@ let diagnostic ?suggestion ?source_echo ~category ~ctx ~origin ~constructor ~rea
     ~category
     ~origin
     ~constructor
-    ~enclosing:(Context.enclosing_path ctx)
+    ~enclosing:
+      (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
     ~profile:(Context.profile_name ctx)
     ~reason
     ()

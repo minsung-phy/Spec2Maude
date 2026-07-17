@@ -105,7 +105,7 @@ let current_bound_vars env =
 
 let helper_call_missing_after_conditions ctx bound guards helper_args =
   match
-    Condition_closure.conditions_admissible_bound
+    Condition_admissibility.conditions_admissible_bound
       ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
       bound guards
   with
@@ -655,7 +655,7 @@ and lower_source_consuming_listn_helper callbacks
                       match premise_bound_vars with
                       | None -> true
                       | Some bound ->
-                        Condition_closure.helper_call_admissible_after_conditions
+                        Condition_admissibility.helper_call_admissible_after_conditions
                           ~constructor_op:
                             (Condition_closure.source_constructor_certificate ctx)
                           bound
@@ -778,17 +778,11 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
     (match count_result.term with
     | None -> count_result
     | Some count_term ->
-      let count_id_opt =
-        match n_exp.it with
-        | VarE count_id -> Some count_id
-        | _ -> None
-      in
       let generator_ids =
         generators |> List.map (fun (generator_id, _source_exp) -> generator_id.it)
       in
       let local_source_ids =
-        Option.to_list (Option.map (fun id -> id.it) count_id_opt)
-        @ Option.to_list (Option.map (fun id -> id.it) index_id_opt)
+        Option.to_list (Option.map (fun id -> id.it) index_id_opt)
         @ generator_ids
       in
       let source_ids =
@@ -804,30 +798,26 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
           Local_name.empty (local_source_ids @ source_ids)
       in
       let count_var, names =
-        match count_id_opt with
-        | Some count_id ->
-          ( Local_name.source_qualified_name
-              names count_id.it (sort_ref (s "Nat"))
-          , names )
-        | None ->
-          Local_name.fresh_qualified_name
-            names Local_name.Count (sort_ref (s "Nat"))
+        Local_name.fresh_qualified_name
+          names Local_name.Count (sort_ref (s "Nat"))
       in
-      let count_binding_opt =
-        match count_id_opt with
-        | Some count_id ->
+      let count_capture =
+        match n_exp.it with
+        | VarE count_id
+          when List.mem count_id.it (Source_free_vars.exp_and_note_ids body)
+               && (match index_id_opt with
+                  | None -> true
+                  | Some index_id -> index_id.it <> count_id.it) ->
           Some
-            ( count_id
-            , { term = Var count_var
-              ; sort = s "Nat"
-              ; typ = n_exp.note
-              } )
-        | None -> None
-      in
-      let add_count_binding env =
-        match count_binding_opt with
-        | Some (count_id, binding) -> Expr_env.add env count_id.it binding
-        | None -> env
+            { Request.source_id = count_id.it
+            ; call_term = count_term
+            ; formal_var =
+                Local_name.source_qualified_name
+                  names count_id.it (sort_ref (s "Nat"))
+            ; sort = s "Nat"
+            ; typ = n_exp.note
+            }
+        | _ -> None
       in
       let index_var_opt =
         index_id_opt
@@ -842,7 +832,16 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
       let source_guards = [] in
       let source_diagnostics = [] in
       let preliminary_body_env =
-        let env = add_count_binding env in
+        let env =
+          match count_capture with
+          | Some capture ->
+            Expr_env.add env capture.Request.source_id
+              { term = Var capture.formal_var
+              ; sort = capture.sort
+              ; typ = capture.typ
+              }
+          | None -> env
+        in
         match index_id_opt, index_var_opt with
         | Some index_id, Some index_var ->
           Expr_env.add env index_id.it
@@ -867,6 +866,10 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
       | Some preliminary_body ->
         let helper_local_vars =
           count_var :: body_result_var :: Option.to_list index_var_opt
+          @ Option.to_list
+              (Option.map
+                 (fun capture -> capture.Request.formal_var)
+                 count_capture)
         in
         let body_required_vars =
           Condition_closure.external_vars_of_term_after_conditions
@@ -883,6 +886,10 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
         in
         let capture_candidates =
           Helper_capture.required_capture_candidates env ~required_vars source_ids
+          |> List.filter (fun (source_id, _, _) ->
+            match count_capture with
+            | None -> true
+            | Some capture -> capture.Request.source_id <> source_id)
         in
         let captured_vars =
           Helper_capture.captured_vars capture_candidates
@@ -914,11 +921,11 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
           }
         else
           let captures =
-            Helper_capture.make_required_captures names capture_candidates
+            Option.to_list count_capture
+            @ Helper_capture.make_required_captures names capture_candidates
           in
           let helper_env =
             let captured_env = Helper_capture.capture_env captures in
-            let captured_env = add_count_binding captured_env in
             match index_id_opt, index_var_opt with
             | Some index_id, Some index_var ->
               Expr_env.add captured_env index_id.it
@@ -972,7 +979,7 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
               match premise_bound_vars with
               | None -> true
               | Some bound ->
-                Condition_closure.helper_call_admissible_after_conditions
+                Condition_admissibility.helper_call_admissible_after_conditions
                   ~constructor_op:
                     (Condition_closure.source_constructor_certificate ctx)
                   bound

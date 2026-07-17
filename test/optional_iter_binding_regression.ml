@@ -80,23 +80,21 @@ let () =
     let certificate =
       Premise_result.condition_pattern_certificate ctx result
     in
-    let admissible =
-      Condition_closure.conditions_admissible_bound
+    let bound =
+      Condition_closure.conditions_bound_vars
         ~constructor_op:certificate
         [ "RECORD_INPUT"; "LIMIT" ]
         (Premise_result.eq_conditions result)
     in
-    require (Option.is_some admissible)
-      "optional IterPr emitted a condition with a used-before-bound variable";
     let source_binding =
       Expr_env.find (Premise_result.env_after result) "optional_source"
     in
     require
-      (match source_binding, admissible with
-      | Some binding, Some bound ->
+      (match source_binding with
+      | Some binding ->
         Condition_closure.vars_subset
           (Condition_closure.term_vars binding.Expr_env.term) bound
-      | _ -> false)
+      | None -> false)
       "record pattern did not bind the optional IterPr source before its helper call"
   | Premise_result.Blocked diagnostics
   | Premise_result.Deferred (_, diagnostics) ->

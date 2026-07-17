@@ -779,13 +779,13 @@ let premise_refuter_rules
   | Il.Ast.IfPr exp ->
     let source_boolean_refuter () =
       match
-        Runtime_truth_total_equality.source_boolean_alternatives
+        Runtime_truth_condition_complement.source_boolean_alternatives
           ctx env prem_origin exp
       with
       | Error blockers ->
         blocked
           ~diagnostics:
-            (List.map (Runtime_truth_total_equality.diagnostic ctx) blockers)
+            (List.map (Runtime_truth_totality.diagnostic ctx) blockers)
           "RuntimeTruthNoHit/IfPr/total-complement"
           ("IfPr premise `"
            ^ Il.Print.string_of_prem prem
@@ -793,26 +793,26 @@ let premise_refuter_rules
            ^ String.concat "; "
                (List.map
                   (fun blocker ->
-                    blocker.Runtime_truth_total_equality.reason)
+                    blocker.Runtime_truth_totality.reason)
                   blockers))
-      | Ok (_, [], diagnostics) ->
+      | Ok proof when proof.failures = [] ->
         blocked
-          ~diagnostics
+          ~diagnostics:proof.diagnostics
           "RuntimeTruthNoHit/IfPr/no-false-alternative"
           ("IfPr premise `"
            ^ Il.Print.string_of_prem prem
            ^ "` has no AST-derived false alternative")
-      | Ok (_, _ :: _, diagnostics)
-        when List.exists Diagnostics.is_fatal diagnostics ->
+      | Ok proof
+        when List.exists Diagnostics.is_fatal proof.diagnostics ->
         blocked
-          ~diagnostics
+          ~diagnostics:proof.diagnostics
           "RuntimeTruthNoHit/IfPr/fatal-complement"
           ("IfPr premise `"
            ^ Il.Print.string_of_prem prem
            ^ "` retained a fatal totality/lowering diagnostic")
-      | Ok (_, alternatives, diagnostics) ->
+      | Ok proof ->
         let statements =
-          alternatives
+          proof.failures
           |> List.mapi (fun alternative conditions ->
             generated
               helper_name
@@ -834,7 +834,7 @@ let premise_refuter_rules
                        (fun condition -> EqCondition condition)
                        conditions))))
         in
-        complete statements diagnostics
+        complete statements proof.diagnostics
     in
     (match exp.it with
     | Il.Ast.CmpE (`EqOp, _, left, right) ->

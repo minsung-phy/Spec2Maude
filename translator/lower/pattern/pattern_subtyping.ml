@@ -40,7 +40,8 @@ let unsupported ctx origin constructor exp reason suggestion =
     ~category:Diagnostics.Unsupported
     ~origin
     ~constructor
-    ~enclosing:(Context.enclosing_path ctx)
+    ~enclosing:
+      (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
     ~profile:(Context.profile_name ctx)
     ~source_echo:(source_echo_exp exp)
     ~reason

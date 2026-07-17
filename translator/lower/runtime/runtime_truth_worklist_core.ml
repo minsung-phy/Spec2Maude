@@ -13,6 +13,8 @@ type relation =
   ; rules : Runtime_truth_scc.rule list
   }
 
+type positive_phase = Ordinary | Transitive
+
 let generated item origin node =
   Maude_ir.generated ~provenance:(Helper item.name) ~origin node
 
@@ -23,6 +25,8 @@ let terminals = sort "SpectecTerminals"
 
 let role source role = role ^ "-" ^ Naming.source_slug ~lower:true source
 let prove_op item id = Naming.helper_companion ~role:(role id "truth-prove") item.name
+let positive_worker_op item id =
+  Naming.helper_companion ~role:(role id "truth-positive-worker") item.name
 let refute_op item id = Naming.helper_companion ~role:(role id "truth-refute") item.name
 let all_op item id = Naming.helper_companion ~role:(role id "truth-all") item.name
 let goal_op item id = Naming.helper_companion ~role:(role id "truth-goal") item.name
@@ -33,6 +37,16 @@ let match_op item index =
 let rule_refute_op item index =
   Naming.helper_companion
     ~role:("truth-rule-refute-" ^ string_of_int index) item.name
+
+let positive_phase_sort item =
+  sort
+    ("RuntimeTruthWorklist" ^ Naming.sort_token item.name ^ "PositivePhase")
+
+let positive_phase_op item = function
+  | Ordinary -> Naming.helper_companion ~role:"truth-positive-ordinary" item.name
+  | Transitive -> Naming.helper_companion ~role:"truth-positive-transitive" item.name
+
+let positive_phase_term item phase = Const (positive_phase_op item phase)
 
 let frozen_all sorts =
   match sorts with
@@ -70,6 +84,13 @@ let public_lhs item =
 let history_var names =
   Local_name.fresh_qualified
     names Local_name.History (sort_ref terminals)
+
+let reserve_names env source_ids terms =
+  Local_name.reserve_sources Local_name.empty source_ids
+  |> fun names ->
+  Local_name.reserve_existing_many names
+    (Expr_env.bound_vars env
+     @ List.concat_map Condition_closure.term_vars terms)
 
 let goal item relation terms = App (goal_op item relation.id, terms)
 let visited item relation terms history =
@@ -117,6 +138,15 @@ let helper_surface item =
   Runtime_truth_worklist_helper.surface
     ~helper_name:item.name ~origin:item.origin item.request
 
+let positive_phase_surface item =
+  let phase_sort = positive_phase_sort item in
+  [ generated item item.origin (sort_decl phase_sort)
+  ; generated item item.origin
+      (op (positive_phase_op item Ordinary) [] phase_sort ~attrs:[ Ctor ])
+  ; generated item item.origin
+      (op (positive_phase_op item Transitive) [] phase_sort ~attrs:[ Ctor ])
+  ]
+
 let surface_pattern_certificate ctx statements =
   Condition_pattern_certificate.union
     (Condition_closure.source_constructor_certificate ctx)
@@ -132,6 +162,12 @@ let relation_surface item relation =
       (op (prove_op item relation.id) (List.map sort_ref internal_sorts) result
          ~attrs:(frozen_all internal_sorts))
   ; generated item item.origin
+      (op (positive_worker_op item relation.id)
+         (sort_ref (positive_phase_sort item)
+          :: List.map sort_ref internal_sorts)
+         result
+         ~attrs:(frozen_all (positive_phase_sort item :: internal_sorts)))
+  ; generated item item.origin
       (op (goal_op item relation.id) (List.map sort_ref relation.sorts) terminal ~attrs:[ Ctor ])
   ]
   @ match item.request.mode with
@@ -144,6 +180,29 @@ let relation_surface item relation =
           (op (all_op item relation.id) (List.map sort_ref internal_sorts) result
              ~attrs:(frozen_all internal_sorts))
       ]
+
+let positive_dispatcher item relation =
+  let invocation =
+    Runtime_truth_worklist_helper.invocation
+      ~helper_name:item.name item.request
+  in
+  let args, names = input_vars Local_name.empty relation.sorts in
+  let history, _ = history_var names in
+  let lhs = App (prove_op item relation.id, args @ [ history ]) in
+  let dispatch phase label =
+    generated item item.origin
+      (crl
+         ~label:
+           (item.name ^ "-positive-" ^ label ^ "-"
+            ^ Naming.sanitize relation.id)
+         lhs invocation.proved_rhs
+         [ RewriteCond
+             ( App
+                 ( positive_worker_op item relation.id
+                 , positive_phase_term item phase :: args @ [ history ] )
+             , invocation.proved_rhs ) ])
+  in
+  [ dispatch Ordinary "ordinary"; dispatch Transitive "transitive" ]
 
 let rule_surface item relation index =
   let result = result_sort item in

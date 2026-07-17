@@ -209,7 +209,7 @@ let lower names ctx env ~bound_vars ~factor_head_domain origin prem rel_id exp
           , names )
         in
         (match
-           Condition_closure.conditions_admissible_bound bound_vars input_guards
+           Condition_admissibility.conditions_admissible_bound bound_vars input_guards
              ~constructor_op:
                (Condition_closure.source_constructor_certificate ctx)
          with

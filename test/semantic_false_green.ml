@@ -795,11 +795,11 @@ let delegated_graph ?(include_definition = true) ?(bound_call = true)
   let graph = Analysis.Function_graph.build index in
   let ctx = Context.create index (Builtin_registry.of_source_index index) in
   let source_total ~bound exp =
-    Runtime_truth_total_equality.source_total ctx ~bound
+    Runtime_truth_totality.source_total ctx ~bound
       (origin "delegated-call-totality") exp
   in
   let source_zero_or_one ~bound exp =
-    Runtime_truth_total_equality.source_zero_or_one ctx ~bound
+    Runtime_truth_totality.source_zero_or_one ctx ~bound
       (origin "delegated-call-definedness") exp
   in
   graph, source_total, source_zero_or_one
@@ -1245,7 +1245,7 @@ let test_runtime_truth_dependency_schedule () =
   let index = Analysis.Source_index.of_script script in
   let ctx = Context.create index (Builtin_registry.of_source_index index) in
   let total_value ~bound exp =
-    Runtime_truth_total_equality.source_total
+    Runtime_truth_totality.source_total
       ctx ~bound (origin "renamed-dependency-schedule") exp
   in
   let graph = Context.function_graph ctx in
@@ -1332,6 +1332,7 @@ let test_runtime_truth_worklist_key () =
   let closure_left = { base with plan = { plan with closure = [ "a,b"; "c" ] } } in
   let closure_right = { base with plan = { plan with closure = [ "a"; "b,c" ] } } in
   let key = Runtime_truth_worklist_helper.key base in
+  let program_key = Runtime_truth_worklist_helper.program_key base in
   if key = Runtime_truth_worklist_helper.key term then
     failwith "worklist key erased a complete input term";
   if key = Runtime_truth_worklist_helper.key sort_key then
@@ -1345,7 +1346,78 @@ let test_runtime_truth_worklist_key () =
   then failwith "worklist key has a comma/constructor boundary collision";
   if Runtime_truth_worklist_helper.key closure_left
      = Runtime_truth_worklist_helper.key closure_right
-  then failwith "worklist key has a closure-list boundary collision"
+  then failwith "worklist key has a closure-list boundary collision";
+  if program_key <> Runtime_truth_worklist_helper.program_key term then
+    failwith "worklist program key retained a concrete input term";
+  if program_key = Runtime_truth_worklist_helper.program_key decide then
+    failwith "worklist program key merged Prove and Decide capabilities";
+  if program_key = Runtime_truth_worklist_helper.program_key sort_key then
+    failwith "worklist program key erased an input sort";
+  if program_key = Runtime_truth_worklist_helper.program_key phase then
+    failwith "worklist program key erased the indexed/list phase";
+  if Runtime_truth_worklist_helper.program_key closure_left
+     = Runtime_truth_worklist_helper.program_key closure_right
+  then failwith "worklist program key has a closure-list boundary collision"
+
+let test_runtime_truth_worklist_registry_capability () =
+  let graph = function_graph [ relation_def "shared_relation" [] ] "shared_relation" in
+  let plan = Runtime_truth_scc.plan graph "shared_relation" in
+  let request input_terms mode =
+    { Runtime_truth_worklist_helper.relation_id = "shared_relation"
+    ; specialization = "terminal"
+    ; input_terms
+    ; input_sorts = [ sort "SpectecTerminal" ]
+    ; phase = Runtime_truth_scc.Goal
+    ; mode
+    ; plan
+    }
+  in
+  let alpha = request [ Var "ALPHA:SpectecTerminal" ] Prove in
+  let beta = request [ Var "BETA:SpectecTerminal" ] Prove in
+  let total = request [ Var "TOTAL:SpectecTerminal" ] Decide in
+  let gamma = request [ Var "GAMMA:SpectecTerminal" ] Prove in
+  let helper_request request =
+    { Helper_request.kind = Runtime_predicate_truth_worklist request
+    ; reason = Runtime_truth_worklist_helper.reason request
+    ; origin = origin "shared-worklist-program"
+    }
+  in
+  let helpers = Helper.create () in
+  let alpha_name = Helper.request helpers (helper_request alpha) in
+  let beta_name = Helper.request helpers (helper_request beta) in
+  if alpha_name <> beta_name then
+    failwith "alpha-renamed runtime truth inputs did not share one program";
+  let alpha_call =
+    Runtime_truth_worklist_helper.invocation ~helper_name:alpha_name alpha
+  in
+  let beta_call =
+    Runtime_truth_worklist_helper.invocation ~helper_name:beta_name beta
+  in
+  if alpha_call.lhs <> App (alpha_name, alpha.input_terms)
+     || beta_call.lhs <> App (beta_name, beta.input_terms)
+  then failwith "shared worklist helper erased caller-specific invocation terms";
+  if Helper.find helpers (helper_request total) <> None then
+    failwith "a Prove registration satisfied an unrequested Decide query";
+  let total_name = Helper.request helpers (helper_request total) in
+  if total_name = alpha_name then
+    failwith "Prove and Decide shared one runtime truth program";
+  let mode name =
+    Helper.runtime_predicate_truth_worklist_requests helpers
+    |> List.find_map (fun (entry_name, _, request) ->
+         if entry_name = name then Some request.Runtime_truth_worklist_helper.mode
+         else None)
+  in
+  if mode alpha_name <> Some Runtime_truth_worklist_helper.Prove
+     || mode total_name <> Some Runtime_truth_worklist_helper.Decide
+  then failwith "runtime truth registry changed a stored helper capability";
+  let gamma_name = Helper.request helpers (helper_request gamma) in
+  if gamma_name <> alpha_name then
+    failwith "a later Prove request allocated a second worklist program";
+  if mode alpha_name <> Some Runtime_truth_worklist_helper.Prove
+     || mode total_name <> Some Runtime_truth_worklist_helper.Decide
+  then failwith "a later query mutated a stored helper capability";
+  if List.length (Helper.runtime_predicate_truth_worklist_requests helpers) <> 2 then
+    failwith "runtime truth registry did not retain exactly two capability programs"
 
 let test_worklist_enabledness_requires_equation_first_failures () =
   let graph = function_graph [ relation_def "enabledness_leaf" [] ] "enabledness_leaf" in
@@ -1788,18 +1860,22 @@ let test_exact_case_constructor_domains () =
       { term = Var "PAYLOAD"; sort = sort "Nat"; typ = nat_typ }
   in
   (match
-     Runtime_truth_total_equality.source_equality_alternatives
+     Runtime_truth_condition_complement.source_equality_alternatives
        ~bound_vars:[ "PAYLOAD" ] ctx env (origin "nested-total-case") nested nested
    with
-  | Ok (_, _, _, _ :: _, diagnostics)
-    when not (List.exists Diagnostics.is_fatal diagnostics) -> ()
+  | Ok equality
+    when equality.conditions.failures <> []
+         && not
+              (List.exists Diagnostics.is_fatal
+                 equality.conditions.diagnostics) ->
+    ()
   | Ok _ -> failwith "nested exact constructor lost its false equality branch"
   | Error blockers ->
     failwith
       ("nested exact constructor was not certified from registry identity: "
        ^ String.concat "; "
            (List.map
-              (fun blocker -> blocker.Runtime_truth_total_equality.reason)
+              (fun blocker -> blocker.Runtime_truth_totality.reason)
               blockers)));
   let guarded_category = "renamed_guarded_shape" in
   let guarded_ctx = Context.create index (Builtin_registry.of_source_index index) in
@@ -1812,14 +1888,14 @@ let test_exact_case_constructor_domains () =
   let guarded_typ = VarT (id guarded_category, []) $ region in
   let guarded = CaseE (mixop, payload) $$ region % guarded_typ in
   match
-    Runtime_truth_total_equality.source_equality_alternatives
+    Runtime_truth_condition_complement.source_equality_alternatives
       ~bound_vars:[ "PAYLOAD" ] guarded_ctx env
       (origin "guarded-case") guarded guarded
   with
   | Error blockers
     when List.exists
            (fun blocker ->
-             blocker.Runtime_truth_total_equality.constructor
+             blocker.Runtime_truth_totality.constructor
              = "RuntimeTruthTotalEquality/CaseE/constructor-domain")
            blockers -> ()
   | Error _ -> failwith "guarded constructor lost its exact domain blocker"
@@ -1883,7 +1959,7 @@ let length_guarded_map_result name make_payload =
       ; typ = guarded_typ
       }
   in
-  Runtime_truth_total_equality.false_conditions
+  Runtime_truth_condition_complement.false_conditions
     ~bound_vars:[ "GUARDED-INPUT" ] ctx env (origin name) `EqOp call call
 
 let list_map_payload sequence_typ source =
@@ -1900,7 +1976,7 @@ let test_length_guarded_case_map_totality () =
       ("single-generator List map lost its source length certificate: "
        ^ String.concat "; "
            (List.map
-              (fun blocker -> blocker.Runtime_truth_total_equality.reason)
+              (fun blocker -> blocker.Runtime_truth_totality.reason)
               blockers))
 
 let expect_length_guard_block name make_payload =
@@ -1908,7 +1984,7 @@ let expect_length_guard_block name make_payload =
   | Error blockers
     when List.exists
            (fun blocker ->
-             blocker.Runtime_truth_total_equality.constructor
+             blocker.Runtime_truth_totality.constructor
              = "RuntimeTruthTotalEquality/CaseE/constructor-domain")
            blockers -> ()
   | Error _ -> failwith (name ^ " lost its exact CaseE domain blocker")
@@ -1989,7 +2065,7 @@ let test_open_length_guarded_constructor_is_refutable () =
     CaseE (mixop, typed_var sequence_typ "open_payload")
     $$ region % category_typ
   in
-  if Runtime_truth_total_equality.certified_binding_pattern ctx [] pattern then
+  if Runtime_truth_totality.certified_binding_pattern ctx [] pattern then
     failwith "open constructor family was certified by one length-guarded case"
 
 let test_constructor_family_static_key_isolation () =
@@ -2166,16 +2242,51 @@ let test_zip_rule_order_and_frozen () =
       "rewrite-backed zip did not preserve RewriteCond binding order with recursion last"
 
 let test_recursive_rule_condition_progress_order () =
-  let lhs = App ("recursiveSchedule", [ Var "STATE" ]) in
+  let lhs =
+    App ("recursiveSchedule", [ Var "VALUES"; Var "INSTRUCTIONS" ])
+  in
   let recursive = RewriteCond (lhs, Var "RESULT") in
   let guard =
-    EqCondition (BoolCond (App ("progress", [ Var "STATE" ])))
+    EqCondition
+      (BoolCond
+         (App
+            ( "_or_"
+            , [ App ("_=/=_", [ Var "VALUES"; Const "eps" ])
+              ; App ("_=/=_", [ Var "INSTRUCTIONS"; Const "eps" ])
+              ] )))
   in
   if
     Condition_closure.normalize_rule_conditions
       [ lhs ] [ recursive; guard ]
     <> [ guard; recursive ]
   then failwith "self-recursive RewriteCond ran before an LHS-bound progress guard";
+  let arbitrary_observer =
+    EqCondition (BoolCond (App ("observe", [ Var "VALUES" ])))
+  in
+  if
+    Condition_closure.normalize_rule_conditions
+      [ lhs ] [ recursive; arbitrary_observer ]
+    <> [ recursive; arbitrary_observer ]
+  then failwith "arbitrary closed Bool observer was treated as progress";
+  let closed_equality = EqCondition (EqCond (Var "VALUES", Var "VALUES")) in
+  if
+    Condition_closure.normalize_rule_conditions
+      [ lhs ] [ recursive; closed_equality ]
+    <> [ recursive; closed_equality ]
+  then failwith "closed equality was mistaken for a recursive progress guard";
+  let closed_membership =
+    EqCondition (MembershipCond (Var "VALUES", sort "SpectecTerminal"))
+  in
+  if
+    Condition_closure.normalize_rule_conditions
+      [ lhs ] [ recursive; closed_membership ]
+    <> [ recursive; closed_membership ]
+  then failwith "closed membership was mistaken for a recursive progress guard";
+  if
+    Condition_closure.normalize_rule_conditions
+      [ lhs ] [ recursive; arbitrary_observer; guard ]
+    <> [ recursive; arbitrary_observer; guard ]
+  then failwith "progress guard crossed an earlier ready source condition";
   let producing_recursive = RewriteCond (lhs, Var "NEXT") in
   let dependent =
     EqCondition (BoolCond (App ("observe", [ Var "NEXT" ])))
@@ -2185,9 +2296,9 @@ let test_recursive_rule_condition_progress_order () =
       [ lhs ] [ producing_recursive; dependent ]
     <> [ producing_recursive; dependent ]
   then failwith "recursive RewriteCond consumer moved before its witness producer";
-  let binding = EqCondition (EqCond (Var "BOUND", Var "STATE")) in
+  let binding = EqCondition (EqCond (Var "BOUND", Var "VALUES")) in
   let normalized_binding =
-    EqCondition (MatchCond (Var "BOUND", Var "STATE"))
+    EqCondition (MatchCond (Var "BOUND", Var "VALUES"))
   in
   if
     Condition_closure.normalize_rule_conditions
@@ -2643,7 +2754,7 @@ let test_source_indexed_equality_certificate () =
   in
   let bound_vars = [ "STATE"; "ADDRESS"; "INDEX" ] in
   match
-    Runtime_truth_total_equality.source_equality_alternatives
+    Runtime_truth_condition_complement.source_equality_alternatives
       ~bound_vars ctx env (origin "source-indexed-equality") tag address
   with
   | Error blockers ->
@@ -2651,9 +2762,11 @@ let test_source_indexed_equality_certificate () =
       ("source-indexed equality was not structurally certified: "
        ^ String.concat "; "
            (List.map
-              (fun blocker -> blocker.Runtime_truth_total_equality.reason)
+              (fun blocker -> blocker.Runtime_truth_totality.reason)
               blockers))
-  | Ok (_, _, _, failures, diagnostics) ->
+  | Ok equality ->
+    let failures = equality.conditions.failures in
+    let diagnostics = equality.conditions.diagnostics in
     if List.exists Diagnostics.is_fatal diagnostics then
       failwith "source-indexed equality certificate retained a fatal lowering";
     if List.length failures <> 3 then
@@ -2875,7 +2988,7 @@ let test_irrefutable_binding_patterns () =
   let index = Analysis.Source_index.of_script [] in
   let ctx = Context.create index (Builtin_registry.of_source_index index) in
   let certified ?(bound = []) pattern =
-    Runtime_truth_total_equality.certified_binding_pattern ctx bound pattern
+    Runtime_truth_totality.certified_binding_pattern ctx bound pattern
   in
   let element = typed_var nat_typ "binding_element" in
   let values = typed_var list_typ "binding_values" in
@@ -2943,12 +3056,12 @@ let test_stuck_call_cannot_refute_equality () =
     $$ region % nat_typ
   in
   match
-    Runtime_truth_total_equality.false_conditions
+    Runtime_truth_condition_complement.false_conditions
       ctx env (origin "stuck-totality") `EqOp call (nat 0)
   with
   | Error blockers
     when List.exists (fun blocker ->
-      blocker.Runtime_truth_total_equality.constructor
+      blocker.Runtime_truth_totality.constructor
       = "RuntimeTruthTotalEquality/CallE/clause-free-call") blockers -> ()
   | Error _ -> failwith "stuck equality reported an imprecise totality blocker"
   | Ok _ -> failwith "clause-free call was treated as false by inequality"
@@ -2996,21 +3109,21 @@ let test_iter_evaluator_domains () =
     let index = Analysis.Source_index.of_script script in
     let ctx = Context.create index (Builtin_registry.of_source_index index) in
     match
-      Runtime_truth_total_equality.false_conditions
+      Runtime_truth_condition_complement.false_conditions
         ctx Expr_env.empty (origin (name ^ "-direct"))
         `EqOp exp (list [])
     with
     | Error blockers
       when List.exists
              (fun blocker ->
-               blocker.Runtime_truth_total_equality.constructor = expected)
+               blocker.Runtime_truth_totality.constructor = expected)
              blockers -> ()
     | Error blockers ->
       failwith
         (name ^ " direct IterE had the wrong blocker: "
          ^ String.concat "; "
              (List.map
-                (fun blocker -> blocker.Runtime_truth_total_equality.constructor)
+                (fun blocker -> blocker.Runtime_truth_totality.constructor)
                 blockers))
     | Ok _ -> failwith (name ^ " direct IterE was admitted as total")
   in
@@ -3029,14 +3142,14 @@ let test_iter_evaluator_domains () =
       CallE (id (name ^ "_wrapper"), []) $$ region % list_typ
     in
     match
-      Runtime_truth_total_equality.false_conditions
+      Runtime_truth_condition_complement.false_conditions
         ctx Expr_env.empty (origin (name ^ "-call"))
         `EqOp call (list [])
     with
     | Error blockers
       when List.exists
              (fun blocker ->
-               blocker.Runtime_truth_total_equality.constructor = expected)
+               blocker.Runtime_truth_totality.constructor = expected)
              blockers -> ()
     | Error _ -> failwith (name ^ " CallE lost its iterator-domain blocker")
     | Ok _ -> failwith (name ^ " CallE was certified through a partial IterE")
@@ -3083,12 +3196,12 @@ let test_iter_evaluator_domains () =
   in
   let check_alternatives name exp =
     match
-      Runtime_truth_total_equality.source_equality_alternatives
+      Runtime_truth_condition_complement.source_equality_alternatives
         ctx Expr_env.empty (origin (name ^ "-domain-alternatives"))
         exp (list [])
     with
-    | Ok (_, _, _, failures, _) when List.length failures >= 2 ->
-      if List.exists contradictory failures then
+    | Ok equality when List.length equality.conditions.failures >= 2 ->
+      if List.exists contradictory equality.conditions.failures then
         failwith
           (name
            ^ " equality prepended a proven positive length guard to its own failure branch")
@@ -3101,7 +3214,7 @@ let test_iter_evaluator_domains () =
         (name ^ " equality domain alternatives were not representable: "
          ^ String.concat "; "
              (List.map
-                (fun blocker -> blocker.Runtime_truth_total_equality.reason)
+                (fun blocker -> blocker.Runtime_truth_totality.reason)
                 blockers))
   in
   check_alternatives "zip" zip_mismatch;
@@ -3143,7 +3256,7 @@ let test_clause_proven_indexed_enumeration () =
     CallE (id name, [ ExpA input $ region ]) $$ region % list_typ
   in
   match
-    Runtime_truth_total_equality.false_conditions
+    Runtime_truth_condition_complement.false_conditions
       ctx Expr_env.empty (origin name) `EqOp call input
   with
   | Ok (_, diagnostics) when not (List.exists Diagnostics.is_fatal diagnostics) -> ()
@@ -3153,7 +3266,7 @@ let test_clause_proven_indexed_enumeration () =
       ("source-pattern count proof did not certify indexed enumeration: "
        ^ String.concat "; "
            (List.map
-              (fun blocker -> blocker.Runtime_truth_total_equality.reason)
+              (fun blocker -> blocker.Runtime_truth_totality.reason)
               blockers))
 
 let boolean_worklist_result partial =
@@ -3794,12 +3907,12 @@ let test_partial_numeric_operators_cannot_refute_equality () =
   let int value = NumE (`Int (Z.of_int value)) $$ region % int_typ in
   let check name exp zero =
     match
-      Runtime_truth_total_equality.false_conditions
+      Runtime_truth_condition_complement.false_conditions
         ctx Expr_env.empty (origin name) `EqOp exp zero
     with
     | Error blockers
       when List.exists (fun blocker ->
-        blocker.Runtime_truth_total_equality.constructor
+        blocker.Runtime_truth_totality.constructor
         = "RuntimeTruthTotalEquality/BinE/partial-operator") blockers -> ()
     | Error _ -> failwith (name ^ " reported an imprecise totality blocker")
     | Ok _ -> failwith (name ^ " was treated as total by inequality")
@@ -3833,7 +3946,7 @@ let test_partial_destructor_domains_blocked () =
   List.iter (fun (name, exp) ->
     let condition = CmpE (`EqOp, `NatT, exp, nat 0) $$ region % bool_typ in
     match
-      Runtime_truth_total_equality.source_boolean_alternatives
+      Runtime_truth_condition_complement.source_boolean_alternatives
         ctx Expr_env.empty (origin ("partial-" ^ name)) condition
     with
     | Error (_ :: _) -> ()
@@ -3930,7 +4043,7 @@ let synchronized_call ctx name left right =
     CallE (id name, [ ExpA left $ region; ExpA right $ region ])
     $$ region % nat_typ
   in
-  Runtime_truth_total_equality.false_conditions
+  Runtime_truth_condition_complement.false_conditions
     ctx Expr_env.empty (origin name) `EqOp call (nat 1)
 
 let list values =
@@ -3948,11 +4061,11 @@ let test_synchronized_totality_domain () =
       ("equal-length synchronized call was not certified: "
        ^ String.concat "; "
            (List.map (fun blocker ->
-              blocker.Runtime_truth_total_equality.reason) blockers)));
+              blocker.Runtime_truth_totality.reason) blockers)));
   match synchronized_call ctx name (list [ 1 ]) (list [ 2; 3 ]) with
   | Error blockers
     when List.exists (fun blocker ->
-      blocker.Runtime_truth_total_equality.constructor
+      blocker.Runtime_truth_totality.constructor
       = "RuntimeTruthTotalEquality/CallE/open-clause-domain") blockers -> ()
   | Error _ -> failwith "unequal synchronized domains lost their blocker"
   | Ok _ -> failwith "unequal synchronized sequence domains were certified"
@@ -3965,7 +4078,7 @@ let test_nondecreasing_recursion_rejected () =
   match synchronized_call ctx name (list [ 1 ]) (list [ 2 ]) with
   | Error blockers
     when List.exists (fun blocker ->
-      blocker.Runtime_truth_total_equality.constructor
+      blocker.Runtime_truth_totality.constructor
       = "RuntimeTruthTotalEquality/CallE/recursive-call") blockers -> ()
   | Error _ -> failwith "non-decreasing recursion lost its exact blocker"
   | Ok _ -> failwith "non-decreasing recursive call was certified total"
@@ -3986,7 +4099,7 @@ let guarded_partition_definition ?(with_guard = true) name =
 
 let partition_call ctx name =
   let call = CallE (id name, [ ExpA (nat 0) $ region ]) $$ region % nat_typ in
-  Runtime_truth_total_equality.false_conditions
+  Runtime_truth_condition_complement.false_conditions
     ctx Expr_env.empty (origin name) `EqOp call (nat 2)
 
 let test_guard_else_partition_certificate () =
@@ -4004,7 +4117,7 @@ let test_guard_else_partition_certificate () =
   match partition_call ctx lone_name with
   | Error blockers
     when List.exists (fun blocker ->
-      blocker.Runtime_truth_total_equality.constructor
+      blocker.Runtime_truth_totality.constructor
       = "RuntimeTruthTotalEquality/CallE/open-clause-domain") blockers -> ()
   | Error _ -> failwith "lone Else partition lost its exact blocker"
   | Ok _ -> failwith "lone ElsePr was treated as a complete total partition"
@@ -4824,12 +4937,6 @@ let test_equality_binding_orientation () =
   if not (List.mem "EQUALITY-TARGET" bound) then
     failwith "ready EqCond did not expose its certified pattern binding";
   (match
-     Condition_closure.conditions_admissible_bound
-       ~constructor_op:certificate [ "EQUALITY-FIELD" ] [ condition ]
-   with
-  | Some bound when List.mem "EQUALITY-TARGET" bound -> ()
-  | _ -> failwith "early EqCond admissibility disagreed with final orientation");
-  (match
      Condition_closure.normalize_binding_conditions
        ~constructor_op:certificate [ field ] [ condition ]
    with
@@ -4843,12 +4950,6 @@ let test_equality_binding_orientation () =
   in
   if List.mem "EQUALITY-TARGET" bound then
     failwith "EqCond bound its pattern while the opposite side remained open";
-  (match
-     Condition_closure.conditions_admissible_bound
-       ~constructor_op:certificate [ "EQUALITY-FIELD" ] [ blocked ]
-   with
-  | None -> ()
-  | Some _ -> failwith "early EqCond admissibility accepted an open opposite side");
   match
     Condition_closure.normalize_binding_conditions
       ~constructor_op:certificate [ field ] [ blocked ]
@@ -4922,23 +5023,12 @@ let test_rewrite_condition_readiness () =
   in
   if not (List.mem "REWRITE-WITNESS" bound) then
     failwith "ready RewriteCond did not introduce its certified RHS pattern";
-  (match
-     Condition_closure.rule_conditions_admissible_bound
-       ~constructor_op:certificate [ "REWRITE-SOURCE" ] [ condition ]
-   with
-  | Some bound when List.mem "REWRITE-WITNESS" bound -> ()
-  | _ -> failwith "ready RewriteCond was rejected by early admissibility");
   let unready =
     Condition_closure.rule_conditions_bound_vars
       ~constructor_op:certificate [] [ condition ]
   in
   if List.mem "REWRITE-WITNESS" unready then
     failwith "RewriteCond introduced RHS variables before its LHS was bound";
-  if
-    Condition_closure.rule_conditions_admissible_bound
-      ~constructor_op:certificate [] [ condition ]
-    <> None
-  then failwith "early admissibility accepted an open RewriteCond LHS";
   let uncertified =
     RewriteCond
       (lhs, App ("rewriteComputedResult", [ Var "REWRITE-UNCERTIFIED" ]))
@@ -4949,11 +5039,7 @@ let test_rewrite_condition_readiness () =
   in
   if List.mem "REWRITE-UNCERTIFIED" bound then
     failwith "RewriteCond introduced variables from an uncertified RHS";
-  if
-    Condition_closure.rule_conditions_admissible_bound
-      ~constructor_op:certificate [ "REWRITE-SOURCE" ] [ uncertified ]
-    <> None
-  then failwith "early admissibility accepted an uncertified RewriteCond RHS"
+  ()
 
 let test_optional_binding_membership_representation () =
   let optional_typ = IterT (nat_typ, Opt) $ region in
@@ -5151,6 +5237,7 @@ let () =
   test_delegated_binding_blockers ();
   test_delegated_zero_or_one_binding ();
   test_runtime_truth_worklist_key ();
+  test_runtime_truth_worklist_registry_capability ();
   test_worklist_enabledness_requires_equation_first_failures ();
   test_legacy_truth_enabledness_rejects_equations ();
   test_transitive_support_materialization ();

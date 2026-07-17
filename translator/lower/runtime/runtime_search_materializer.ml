@@ -399,7 +399,7 @@ let lower_rule_with_surface
                 |> dedup_rule_conditions
               in
               let admissibility_diags =
-                Condition_closure.crl_admissibility_diagnostics ctx origin lhs rhs conditions
+                Condition_admissibility.crl_admissibility_diagnostics ctx origin lhs rhs conditions
               in
               if List.exists Diagnostics.is_fatal admissibility_diags then
                 Error (diagnostics @ admissibility_diags)

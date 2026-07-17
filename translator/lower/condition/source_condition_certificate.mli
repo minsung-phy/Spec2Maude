@@ -47,7 +47,7 @@ val prove_if :
   Origin.t ->
   source:Il.Ast.exp ->
   emitted:Maude_ir.eq_condition list ->
-  (t, Runtime_truth_total_equality.blocker list) result
+  (t, Runtime_truth_totality.blocker list) result
 
 val prove_binding :
   Context.t ->
@@ -56,4 +56,4 @@ val prove_binding :
   Origin.t ->
   source:Il.Ast.exp ->
   emitted:Maude_ir.eq_condition list ->
-  (t option, Runtime_truth_total_equality.blocker list) result
+  (t option, Runtime_truth_totality.blocker list) result

@@ -270,7 +270,7 @@ let materialize_direct_complement
       |> dedup_rule_conditions
     in
     let diagnostics =
-      Condition_closure.crl_admissibility_diagnostics ctx origin lhs rhs conditions
+      Condition_admissibility.crl_admissibility_diagnostics ctx origin lhs rhs conditions
     in
     generated
       (Maude_ir.crl

@@ -95,25 +95,28 @@ let blockers failures conditions =
 
 let mismatch origin source reason =
   Error
-    [ Runtime_truth_total_equality.source_condition_blocker
+    [ Runtime_truth_condition_complement.source_condition_blocker
         origin source ~reason ]
 
 let prove_if ctx env ~bound_vars origin ~(source : Il.Ast.exp) ~emitted =
   match source.it with
   | Il.Ast.CmpE (`EqOp, _, left, right) ->
     (match
-       Runtime_truth_total_equality.source_equality_alternatives
+       Runtime_truth_condition_complement.source_equality_alternatives
          ~bound_vars ctx env origin left right
      with
     | Error blockers -> Error blockers
-    | Ok (_, _, _, _, diagnostics)
-      when List.exists Diagnostics.is_fatal diagnostics ->
+    | Ok equality
+      when List.exists Diagnostics.is_fatal equality.conditions.diagnostics ->
       mismatch origin source
         "source equality totality proof retained a fatal lowering diagnostic"
-    | Ok (left, right, requirements, failure, _) ->
+    | Ok equality ->
+      let conditions = equality.conditions in
       (match
          Source_condition_certificate_internal.certify_equality
-           ~bound_vars ~left ~right ~requirements ~failure emitted
+           ~bound_vars ~left:equality.left ~right:equality.right
+           ~requirements:conditions.positive ~failure:conditions.failures
+           emitted
        with
       | Some certificate -> Ok certificate
       | None ->
@@ -121,41 +124,40 @@ let prove_if ctx env ~bound_vars origin ~(source : Il.Ast.exp) ~emitted =
           "emitted equality conditions are not the exact LHS-bound image of the source IfPr equality proof"))
   | _ ->
     (match
-       Runtime_truth_total_equality.source_boolean_alternatives
+       Runtime_truth_condition_complement.source_boolean_alternatives
          ~bound_vars ctx env origin source
      with
     | Error blockers -> Error blockers
-    | Ok (_, _, diagnostics)
-      when List.exists Diagnostics.is_fatal diagnostics ->
+    | Ok proof
+      when List.exists Diagnostics.is_fatal proof.diagnostics ->
       mismatch origin source
         "source Boolean totality proof retained a fatal lowering diagnostic"
-    | Ok (positive, failure, _) ->
+    | Ok proof ->
       (match
          Source_condition_certificate_internal.certify
-           ~bound_vars ~positive ~failure
+           ~bound_vars ~positive:proof.positive ~failure:proof.failures
        with
-      | Some certificate when positive = emitted -> Ok certificate
+      | Some certificate when proof.positive = emitted -> Ok certificate
       | Some _ | None ->
         mismatch origin source
           "emitted Boolean conditions are not the exact LHS-bound image of the source IfPr observer proof"))
 
 let prove_binding ctx env ~bound_vars origin ~(source : Il.Ast.exp) ~emitted =
   match
-    Runtime_truth_total_equality.source_definedness_alternatives
+    Runtime_truth_condition_complement.source_definedness_alternatives
       ~bound_vars ctx env origin source
   with
   | Error blockers -> Error blockers
-  | Ok (_, _, diagnostics)
-    when List.exists Diagnostics.is_fatal diagnostics ->
+  | Ok proof when List.exists Diagnostics.is_fatal proof.diagnostics ->
     mismatch origin source
       "source binding-domain proof retained a fatal lowering diagnostic"
-  | Ok (positive, failure, _) when positive = emitted ->
-    (match positive with
+  | Ok proof when proof.positive = emitted ->
+    (match proof.positive with
     | [] -> Ok None
     | _ ->
       (match
          Source_condition_certificate_internal.certify
-           ~bound_vars ~positive ~failure
+           ~bound_vars ~positive:proof.positive ~failure:proof.failures
        with
       | Some certificate -> Ok (Some certificate)
       | None ->

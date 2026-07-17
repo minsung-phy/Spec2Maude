@@ -10,7 +10,9 @@ let empty term = { term; conditions = []; diagnostics = [] }
 
 let diagnostic ctx origin constructor reason suggestion =
   Diagnostics.make ~category:Diagnostics.Unsupported ~origin ~constructor
-    ~enclosing:(Context.enclosing_path ctx) ~profile:(Context.profile_name ctx)
+    ~enclosing:
+      (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
+    ~profile:(Context.profile_name ctx)
     ~reason ~suggestion ()
 
 type call_kind =

@@ -7,17 +7,33 @@ open Expr_result
 
 let app name args = App (name, args)
 
-let maude_op_of_source op =
-  "_" ^ op ^ "_"
+let maude_unop (op : unop) =
+  match op with
+  | `NotOp -> "~_"
+  | `PlusOp -> "+_"
+  | `MinusOp -> "-_"
 
-let maude_unop_of_source op =
-  op ^ "_"
+let maude_binop (op : binop) =
+  match op with
+  | `AndOp -> "_/\\_"
+  | `OrOp -> "_\\/_"
+  | `ImplOp -> "_=>_"
+  | `EquivOp -> "_<=>_"
+  | `AddOp -> "_+_"
+  | `SubOp -> "_-_"
+  | `MulOp -> "_*_"
+  | `DivOp -> "_/_"
+  | `ModOp -> "_\\_"
+  | `PowOp -> "_^_"
 
-let maude_cmp_op op =
+let maude_cmp_op (op : cmpop) =
   match op with
   | `EqOp -> "_==_"
   | `NeOp -> "_=/=_"
-  | _ -> maude_op_of_source (Il.Print.string_of_cmpop op)
+  | `LtOp -> "_<_"
+  | `GtOp -> "_>_"
+  | `LeOp -> "_<=_"
+  | `GeOp -> "_>=_"
 
 let contains term sequence =
   app "contains" [ term; sequence ]
@@ -74,8 +90,11 @@ let modulo_lowering sort left right =
       , [ BoolCond (app "_=/=_" [ right; Const "0" ]) ] )
   | _ -> None
 
-let division_guards op right =
-  if op = "/" then [ BoolCond (app "_=/=_" [ right; Const "0" ]) ] else []
+let division_guards (op : binop) right =
+  match op with
+  | `DivOp -> [ BoolCond (app "_=/=_" [ right; Const "0" ]) ]
+  | `AndOp | `OrOp | `ImplOp | `EquivOp
+  | `AddOp | `SubOp | `MulOp | `ModOp | `PowOp -> []
 
 let rec lower_raw_numeric_conversion callbacks ctx env origin exp inner source_sort target_sort =
   let lowered = lower_numeric_guard_value callbacks ctx env origin inner in
@@ -118,16 +137,16 @@ and lower_bool_value callbacks ctx env origin exp =
 
 and lower_unary_value callbacks ctx env origin exp op exp1 =
   let lowered = callbacks.lower_value ctx env origin exp1 in
-  match lowered.term with
-  | None -> lowered
-  | Some term when op = "+" ->
+  match op, lowered.term with
+  | (`NotOp | `PlusOp | `MinusOp), None -> lowered
+  | `PlusOp, Some term ->
     (match Carrier_sort.raw_numeric_sort_of_typ ctx exp.note with
     | Some sort when Carrier_sort.is_nat_int_sort sort -> { lowered with term = Some term }
     | _ ->
       unsupported_exp ctx origin "Expr/UnE" exp
         "unary plus erasure is only valid for Nat/Int value carriers")
-  | Some term ->
-    let raw = app (maude_unop_of_source op) [ term ] in
+  | (`NotOp | `MinusOp), Some term ->
+    let raw = app (maude_unop op) [ term ] in
     (match exp.note.it, Carrier_sort.raw_numeric_sort_of_typ ctx exp.note with
     | BoolT, _ -> { lowered with term = Some (Primitive_term.bool raw) }
     | _, Some sort when Carrier_sort.is_nat_int_sort sort -> { lowered with term = Some raw }
@@ -137,10 +156,10 @@ and lower_unary_value callbacks ctx env origin exp op exp1 =
 
 and lower_binary_value callbacks ctx env origin exp op left right =
   let lower_operand =
-    if op = "\\" || op = "/" then
-      lower_numeric_guard_value callbacks ctx env origin
-    else
-      callbacks.lower_value ctx env origin
+    match op with
+    | `ModOp | `DivOp -> lower_numeric_guard_value callbacks ctx env origin
+    | `AndOp | `OrOp | `ImplOp | `EquivOp
+    | `AddOp | `SubOp | `MulOp | `PowOp -> callbacks.lower_value ctx env origin
   in
   let left_result = lower_operand left in
   let right_result = lower_operand right in
@@ -148,8 +167,9 @@ and lower_binary_value callbacks ctx env origin exp op left right =
   | Some left_term, Some right_term ->
     let numeric_sort = Carrier_sort.raw_numeric_sort_of_typ ctx exp.note in
     let raw_opt, modulo_guards, modulo_diagnostics =
-      if op = "\\" then
-        match numeric_sort with
+      match op with
+      | `ModOp ->
+        (match numeric_sort with
         | Some sort ->
           (match modulo_lowering sort left_term right_term with
           | Some (raw, guards) -> Some raw, guards, []
@@ -171,9 +191,10 @@ and lower_binary_value callbacks ctx env origin exp op left right =
               ~reason:
                 "numeric modulo requires a Nat/Int carrier; result type did not provide one"
               ()
-          ]
-      else
-        ( Some (app (maude_op_of_source op) [ left_term; right_term ])
+          ])
+      | `AndOp | `OrOp | `ImplOp | `EquivOp
+      | `AddOp | `SubOp | `MulOp | `DivOp | `PowOp ->
+        ( Some (app (maude_binop op) [ left_term; right_term ])
         , division_guards op right_term
         , [] )
     in
@@ -231,16 +252,11 @@ and lower_numeric_guard_value callbacks ctx env origin exp =
     | UnE (op, _, inner) ->
       let lowered = lower_numeric_guard_value callbacks ctx env origin inner in
       (match lowered.term with
-      | Some term when Il.Print.string_of_unop op = "+" ->
-        { lowered with term = Some term }
       | Some term ->
-        { lowered with
-          term =
-            Some
-              (app
-                 (maude_unop_of_source (Il.Print.string_of_unop op))
-                 [ term ])
-        }
+        (match op with
+        | `PlusOp -> { lowered with term = Some term }
+        | `NotOp | `MinusOp ->
+          { lowered with term = Some (app (maude_unop op) [ term ]) })
       | None -> lowered)
     | BinE (`ModOp, _, left, right) ->
       let left_result = lower_numeric_guard_value callbacks ctx env origin left in
@@ -266,19 +282,15 @@ and lower_numeric_guard_value callbacks ctx env origin exp =
         ; diagnostics = left_result.diagnostics @ right_result.diagnostics
         })
     | BinE (op, _, left, right) ->
-      let op_text = Il.Print.string_of_binop op in
       let left_result = lower_numeric_guard_value callbacks ctx env origin left in
       let right_result = lower_numeric_guard_value callbacks ctx env origin right in
       (match left_result.term, right_result.term with
       | Some left_term, Some right_term ->
         { term =
-            Some
-              (app
-                 (maude_op_of_source op_text)
-                 [ left_term; right_term ])
+            Some (app (maude_binop op) [ left_term; right_term ])
         ; guards =
             left_result.guards @ right_result.guards
-            @ division_guards op_text right_term
+            @ division_guards op right_term
         ; diagnostics = left_result.diagnostics @ right_result.diagnostics
         }
       | _ ->

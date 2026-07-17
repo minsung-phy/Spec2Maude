@@ -46,7 +46,7 @@ let true_rule ctx item =
          [ call.lhs ]
   in
   let diagnostics =
-    Condition_closure.crl_admissibility_diagnostics
+    Condition_admissibility.crl_admissibility_diagnostics
       ~constructor_op:
         (Condition_pattern_certificate.generated
            (helper_surface item
@@ -99,7 +99,7 @@ let false_rule ctx item =
     | [] -> [], refutation.statements, refutation.diagnostics
     | _ ->
       let diagnostics =
-        Condition_closure.crl_admissibility_diagnostics
+        Condition_admissibility.crl_admissibility_diagnostics
           ~constructor_op:
             (Condition_pattern_certificate.generated
                (helper_surface item @ refutation.statements))

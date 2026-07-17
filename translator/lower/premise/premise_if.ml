@@ -8,7 +8,7 @@ let with_conditions = Premise_state.with_conditions
 let result_has_fatal result =
   List.exists Diagnostics.is_fatal result.Premise_result.diagnostics
 
-let source_failure (blocker : Runtime_truth_total_equality.blocker) =
+let source_failure (blocker : Runtime_truth_totality.blocker) =
   Source_condition_certificate.failure
     ~origin:blocker.origin
     ~constructor:blocker.constructor

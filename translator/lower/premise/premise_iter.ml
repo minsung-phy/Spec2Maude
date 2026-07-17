@@ -29,7 +29,7 @@ let count_is_total ctx env ~bound_vars origin exp =
     |> Il.Free.Set.elements
     |> List.filter (Premise_state.source_id_is_bound env bound_vars)
   in
-  Runtime_truth_total_equality.source_total ctx ~bound origin exp
+  Runtime_truth_totality.source_total ctx ~bound origin exp
 
 let rec lower_list_iter_premise
     names lower_body
@@ -190,7 +190,7 @@ let rec lower_list_iter_premise
           in
           let structural_diagnostics =
             match
-              Condition_closure.rule_conditions_admissible_bound
+              Condition_admissibility.rule_conditions_admissible_bound
                 ~constructor_op:
                   (Condition_closure.source_constructor_certificate ctx)
                 helper_bound helper_rule_conditions
@@ -573,7 +573,7 @@ and lower_zip_iter_premise names lower_body ctx env ~bound_vars origin prem body
       in
       let structural_diagnostics =
         match
-          Condition_closure.rule_conditions_admissible_bound
+          Condition_admissibility.rule_conditions_admissible_bound
             ~constructor_op:
               (Condition_closure.source_constructor_certificate ctx)
             helper_bound helper_rule_conditions

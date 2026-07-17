@@ -212,7 +212,8 @@ let runtime_predicate_unsupported
       ~category:Diagnostics.Unsupported
       ~origin
       ~constructor
-      ~enclosing:(Context.enclosing_path ctx)
+      ~enclosing:
+        (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
       ~profile:(Context.profile_name ctx)
       ~reason
       ~suggestion
@@ -299,7 +300,7 @@ let analyze_runtime_predicate_args
     | None -> Ok (Runtime_predicate_bad_value { guards; diagnostics })
     | Some terms ->
       (match
-         Condition_closure.conditions_admissible_bound
+         Condition_admissibility.conditions_admissible_bound
            ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
            bound_vars guards
        with
@@ -719,7 +720,7 @@ let lower_indexed_predicate_exists
                         (Runtime_truth_search_helper.surface
                            ~helper_name:truth_name ~origin truth_request))
                  in
-                 Condition_closure.rule_conditions_admissible_bound
+                 Condition_admissibility.rule_conditions_admissible_bound
                    ~constructor_op:pattern_certificate
                    helper_bound body_conditions
                with

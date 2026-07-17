@@ -83,7 +83,7 @@ let witness_space_blockers fallback_origin blockers =
 
 let totality_blockers blockers =
   blockers
-  |> List.map (fun (blocker : Runtime_truth_total_equality.blocker) ->
+  |> List.map (fun (blocker : Runtime_truth_totality.blocker) ->
     { origin = blocker.origin
     ; constructor = blocker.constructor
     ; reason = blocker.reason
@@ -154,18 +154,20 @@ and premise ctx ~allow_self seen closure rules rel_id env rule_origin prem =
   match prem.it with
   | Il.Ast.IfPr exp ->
     (match
-       Runtime_truth_total_equality.source_boolean_alternatives
+       Runtime_truth_condition_complement.source_boolean_alternatives
          ctx env prem_origin exp
      with
-    | Ok (_, _ :: _, diagnostics)
-      when not (List.exists Diagnostics.is_fatal diagnostics) -> Supported
-    | Ok (_, [], _) ->
+    | Ok proof
+      when proof.failures <> []
+           && not (List.exists Diagnostics.is_fatal proof.diagnostics) ->
+      Supported
+    | Ok proof when proof.failures = [] ->
       blocked
         ~source_echo:(Il.Print.string_of_prem prem)
         prem_origin
         "RuntimeTruthDecisionFalseSupport/IfPr/no-failure-alternative"
         "source IfPr totality proof produced no false alternative"
-    | Ok (_, _ :: _, _) ->
+    | Ok _ ->
       blocked
         ~source_echo:(Il.Print.string_of_prem prem)
         prem_origin

@@ -17,11 +17,6 @@ let condition_free_vars = function
   | MembershipCond (term, _) | BoolCond term ->
     Condition_closure.term_vars term
 
-let add_bound_vars vars names =
-  List.fold_left
-    (fun vars name -> if List.mem name vars then vars else name :: vars)
-    vars names
-
 let rec payload_source_id exp =
   match exp.it with
   | VarE id when id.it <> "_" -> Some id.it
@@ -493,6 +488,8 @@ let translate_alias
   Type_alias.translate_alias
     env ctx origin key_env static_args_key source_category target typ
 
+module Variant = struct
+
 let translate_category_union
     env ctx origin key_env static_args_key source_category target child_typ =
   Type_alias.translate_category_union
@@ -576,69 +573,6 @@ let lower_hidden_exp_binds env ctx origin names components prems binds =
     | ExpP _ | TypP _ | DefP _ | GramP _ -> hidden, names)
        ([], names)
   |> fun (hidden, names) -> List.rev hidden, names
-
-let condition_admissibility_diagnostics ctx origin mixop initial_bound conditions =
-  let _, diagnostics =
-    conditions
-    |> List.fold_left
-         (fun (bound, diagnostics) condition ->
-           match condition with
-           | EqCond (lhs, rhs) ->
-             let vars =
-               Condition_closure.term_vars lhs @ Condition_closure.term_vars rhs
-             in
-             if Condition_closure.vars_subset vars bound then
-               bound, diagnostics
-             else
-               bound,
-               diagnostics
-               @ [ unsupported
-                     ~ctx ~origin
-                     ~constructor:"VariantT/constructor/premise/admissibility"
-                     ~source_echo:(Il.Print.string_of_mixop mixop)
-                     ~reason:
-                       "equational typcase premise condition mentions variables that are not bound by the constructor head or earlier matching conditions"
-                     ~suggestion:
-                       "Introduce the variable through a source-derived MatchCond before using it in this condition"
-                     ()
-                 ]
-           | BoolCond term | MembershipCond (term, _) ->
-             let vars = Condition_closure.term_vars term in
-             if Condition_closure.vars_subset vars bound then
-               bound, diagnostics
-             else
-               bound,
-               diagnostics
-               @ [ unsupported
-                     ~ctx ~origin
-                     ~constructor:"VariantT/constructor/premise/admissibility"
-                     ~source_echo:(Il.Print.string_of_mixop mixop)
-                     ~reason:
-                       "typcase premise condition mentions variables that are not bound by the constructor head or earlier matching conditions"
-                     ~suggestion:
-                       "Introduce the variable through a source-derived MatchCond before using it in this condition"
-                     ()
-                 ]
-           | MatchCond (lhs, rhs) ->
-             let rhs_vars = Condition_closure.term_vars rhs in
-             if Condition_closure.vars_subset rhs_vars bound then
-               add_bound_vars bound (Condition_closure.term_vars lhs), diagnostics
-             else
-               bound,
-               diagnostics
-               @ [ unsupported
-                     ~ctx ~origin
-                     ~constructor:"VariantT/constructor/premise/admissibility"
-                     ~source_echo:(Il.Print.string_of_mixop mixop)
-                     ~reason:
-                       "typcase matching condition would bind variables from a right-hand side that itself is not bound yet"
-                     ~suggestion:
-                       "Reorder or split the source-derived conditions before emitting this typcase"
-                     ()
-                 ])
-         (initial_bound, [])
-  in
-  diagnostics
 
 let condition_or_true (lowered : Expr_result.result) =
   match lowered.term with
@@ -889,7 +823,8 @@ let describe_constructor_case
         env ctx origin source_category components hidden_binds prems
     in
     let condition_diagnostics =
-      condition_admissibility_diagnostics ctx origin mixop lhs_bound prem_conditions
+      Condition_admissibility.typcase_premise_admissibility_diagnostics
+        ctx origin mixop lhs_bound prem_conditions
     in
     let projection_ops =
       components
@@ -1372,6 +1307,222 @@ let translate_variant
   append union_result (append subtype_result case_result)
   |> fun result -> { result with diagnostics = result.diagnostics @ incomplete_diagnostics }
 
+let preload_category_union_registry
+    env ctx origin key_env static_args_key source_category child_typ =
+  let carrier_opt, _carrier_diagnostics =
+    typd_carrier ctx origin "VariantT/category-union" child_typ
+  in
+  let witness_opt, _witness_diagnostics =
+    Typd_witness.of_typ
+      env ctx origin ~constructor:"VariantT/category-union" child_typ
+  in
+  match carrier_opt, witness_opt with
+  | Some _, Some _ ->
+    Typd_registry.register_inclusion
+      ctx origin
+      ~reason:"VariantT/category-union"
+      ~key_env
+      ?parent_static_args_key:static_args_key
+      ~parent_category:source_category
+      child_typ
+  | _ -> ()
+
+let preload_numeric_predicate_registry
+    env ctx origin static_args_key source_category target mixop
+    payload_id payload_typ payload_sort predicate =
+  let variable_term =
+    Type_static_env.reserve_static_env Local_name.empty env
+    |> fun names -> Local_name.reserve_sources names [ payload_id.it ]
+    |> fun names -> Local_name.source_qualified names payload_id.it (sr payload_sort)
+  in
+  let expr_env =
+    Expr_env.add
+      (Type_static_env.to_expr_env env)
+      payload_id.it
+      { Expr_env.term = variable_term; sort = payload_sort; typ = payload_typ }
+  in
+  let lowered = Expr_translate.lower_bool_condition ctx expr_env origin predicate in
+  match lowered.term with
+  | Some _ ->
+    ignore
+      (register_numeric_wrapper
+         ctx
+         ~mixop
+         origin
+         static_args_key
+         source_category
+         target
+         payload_sort)
+  | None -> ()
+
+let preload_inherited_union_registry
+    env ctx parent_origin key_env static_args_key source_category group =
+  match group with
+  | [] -> ()
+  | first :: _ ->
+    let origin =
+      inherited_union_origin
+        parent_origin
+        (first.inherited_index + 1)
+        first.inherited_typcase
+    in
+    let child_typ = VarT (first.inherited_child_id, []) $ first.inherited_child_id.at in
+    preload_category_union_registry
+      env ctx origin key_env static_args_key source_category child_typ
+
+let preload_typcase_registry
+    env
+    ctx
+    parent_origin
+    key_env
+    static_args_key
+    source_category
+    target
+    ~case_count
+    index
+    (mixop, (typ, binds, prems), hints)
+  =
+  let origin =
+    child_origin
+      parent_origin
+      (Printf.sprintf "VariantT[%d]" index)
+      "typcase"
+      typ.at
+      (source_echo_typcase (mixop, (typ, binds, prems), hints))
+  in
+  let owner = "VariantT/typcase" in
+  let components = Type_shape.typ_components typ in
+  let record_like_single_constructor =
+    record_like_single_constructor_case ~case_count mixop components
+  in
+  let hint_pairs = hint_diagnostics ctx origin owner hints in
+  let hint_blocks, _hint_diags = List.split hint_pairs in
+  if Type_shape.mixop_is_hole_only mixop then
+    match numeric_predicate_from_typcase binds typ prems with
+    | Some (payload_id, payload_typ, payload_sort, predicate)
+      when not (List.exists Fun.id hint_blocks) ->
+      preload_numeric_predicate_registry
+        env ctx origin static_args_key source_category target mixop
+        payload_id payload_typ payload_sort predicate
+    | Some _ -> ()
+    | None ->
+      (match numeric_literal_terms_from_typcase binds typ prems with
+      | Some (`Literals (payload_sort, _literal_terms))
+        when not (List.exists Fun.id hint_blocks) ->
+        ignore
+          (register_numeric_wrapper
+             ctx
+             ~mixop
+             origin
+             static_args_key
+             source_category
+             target
+             payload_sort)
+      | Some `Range -> ()
+      | _ ->
+        if List.length components > 1 || (components <> [] && (binds <> [] || prems <> [])) then
+          let bind_diags =
+            constructor_bind_diagnostics ctx origin owner binds components prems
+          in
+          let blocking =
+            List.exists Diagnostics.is_fatal bind_diags || List.exists Fun.id hint_blocks
+          in
+          if not blocking then
+            ignore
+              (lower_constructor_case_for_registry
+                 ~record_like_single_constructor
+                 env
+                 ctx
+                 origin
+                 static_args_key
+                 source_category
+                 target
+                 mixop
+                 binds
+                 prems
+                 components)
+        else
+          let bind_diags = unsupported_binds ctx origin owner binds in
+          let prem_diags = unsupported_prems ctx origin owner prems in
+          let blocking =
+            bind_diags <> [] || prem_diags <> [] || List.exists Fun.id hint_blocks
+          in
+          (match components with
+          | [ _payload, child_typ ] when not blocking ->
+            preload_category_union_registry
+              env ctx origin key_env static_args_key source_category child_typ
+          | _ -> ()))
+  else
+    let bind_diags = constructor_bind_diagnostics ctx origin owner binds components prems in
+    let blocking =
+      List.exists Diagnostics.is_fatal bind_diags || List.exists Fun.id hint_blocks
+    in
+    if not blocking then
+      ignore
+        (lower_constructor_case_for_registry
+           ~record_like_single_constructor
+           env
+           ctx
+           origin
+           static_args_key
+           source_category
+           target
+           mixop
+           binds
+           prems
+           components)
+
+let preload_variant_registry
+    env ctx origin key_env static_args_key target id target_region cases =
+  let source_category = Naming.source_owner id.it in
+  cases
+  |> List.iteri (fun index ((_, (typ, _, _), _) as typcase) ->
+    let case_origin =
+      child_origin
+        origin
+        (Printf.sprintf "VariantT[%d]" (index + 1))
+        "typcase"
+        typ.at
+        (source_echo_typcase typcase)
+    in
+    Constructor_registry.note_source_case
+      (Context.constructors ctx)
+      ~source_category
+      ~static_args_key
+      case_origin);
+  let inherited_groups =
+    inherited_category_cases ctx id target_region cases
+    |> group_inherited_category_cases
+  in
+  let complete_groups, _incomplete_groups =
+    inherited_groups |> List.partition inherited_group_is_complete
+  in
+  let complete_groups = maximal_inherited_groups ctx complete_groups in
+  let skip_indices = inherited_skip_indices complete_groups in
+  complete_groups
+  |> List.iter
+       (preload_inherited_union_registry
+          env ctx origin key_env static_args_key source_category);
+  cases
+  |> List.iteri (fun index typcase ->
+    if not (List.mem index skip_indices) then
+      preload_typcase_registry
+        env
+        ctx
+        origin
+        key_env
+        static_args_key
+        source_category
+        target
+        ~case_count:(List.length cases)
+        (index + 1)
+        typcase)
+
+
+end
+
+module Struct = struct
+
 let translate_struct_field env ctx origin names index (atom, (typ, binds, prems), hints) =
   let field_origin =
     child_origin
@@ -1688,6 +1839,8 @@ let translate_struct env ctx origin target id source_fields =
   | None ->
     with_diagnostics diagnostics
 
+end
+
 let preload_alias_inclusion
     env ctx origin key_env static_args_key source_category typ =
   let carrier_opt, _carrier_diagnostics =
@@ -1707,216 +1860,6 @@ let preload_alias_inclusion
       typ
   | _ -> ()
 
-let preload_category_union_registry
-    env ctx origin key_env static_args_key source_category child_typ =
-  let carrier_opt, _carrier_diagnostics =
-    typd_carrier ctx origin "VariantT/category-union" child_typ
-  in
-  let witness_opt, _witness_diagnostics =
-    Typd_witness.of_typ
-      env ctx origin ~constructor:"VariantT/category-union" child_typ
-  in
-  match carrier_opt, witness_opt with
-  | Some _, Some _ ->
-    Typd_registry.register_inclusion
-      ctx origin
-      ~reason:"VariantT/category-union"
-      ~key_env
-      ?parent_static_args_key:static_args_key
-      ~parent_category:source_category
-      child_typ
-  | _ -> ()
-
-let preload_numeric_predicate_registry
-    env ctx origin static_args_key source_category target mixop
-    payload_id payload_typ payload_sort predicate =
-  let variable_term =
-    Type_static_env.reserve_static_env Local_name.empty env
-    |> fun names -> Local_name.reserve_sources names [ payload_id.it ]
-    |> fun names -> Local_name.source_qualified names payload_id.it (sr payload_sort)
-  in
-  let expr_env =
-    Expr_env.add
-      (Type_static_env.to_expr_env env)
-      payload_id.it
-      { Expr_env.term = variable_term; sort = payload_sort; typ = payload_typ }
-  in
-  let lowered = Expr_translate.lower_bool_condition ctx expr_env origin predicate in
-  match lowered.term with
-  | Some _ ->
-    ignore
-      (register_numeric_wrapper
-         ctx
-         ~mixop
-         origin
-         static_args_key
-         source_category
-         target
-         payload_sort)
-  | None -> ()
-
-let preload_inherited_union_registry
-    env ctx parent_origin key_env static_args_key source_category group =
-  match group with
-  | [] -> ()
-  | first :: _ ->
-    let origin =
-      inherited_union_origin
-        parent_origin
-        (first.inherited_index + 1)
-        first.inherited_typcase
-    in
-    let child_typ = VarT (first.inherited_child_id, []) $ first.inherited_child_id.at in
-    preload_category_union_registry
-      env ctx origin key_env static_args_key source_category child_typ
-
-let preload_typcase_registry
-    env
-    ctx
-    parent_origin
-    key_env
-    static_args_key
-    source_category
-    target
-    ~case_count
-    index
-    (mixop, (typ, binds, prems), hints)
-  =
-  let origin =
-    child_origin
-      parent_origin
-      (Printf.sprintf "VariantT[%d]" index)
-      "typcase"
-      typ.at
-      (source_echo_typcase (mixop, (typ, binds, prems), hints))
-  in
-  let owner = "VariantT/typcase" in
-  let components = Type_shape.typ_components typ in
-  let record_like_single_constructor =
-    record_like_single_constructor_case ~case_count mixop components
-  in
-  let hint_pairs = hint_diagnostics ctx origin owner hints in
-  let hint_blocks, _hint_diags = List.split hint_pairs in
-  if Type_shape.mixop_is_hole_only mixop then
-    match numeric_predicate_from_typcase binds typ prems with
-    | Some (payload_id, payload_typ, payload_sort, predicate)
-      when not (List.exists Fun.id hint_blocks) ->
-      preload_numeric_predicate_registry
-        env ctx origin static_args_key source_category target mixop
-        payload_id payload_typ payload_sort predicate
-    | Some _ -> ()
-    | None ->
-      (match numeric_literal_terms_from_typcase binds typ prems with
-      | Some (`Literals (payload_sort, _literal_terms))
-        when not (List.exists Fun.id hint_blocks) ->
-        ignore
-          (register_numeric_wrapper
-             ctx
-             ~mixop
-             origin
-             static_args_key
-             source_category
-             target
-             payload_sort)
-      | Some `Range -> ()
-      | _ ->
-        if List.length components > 1 || (components <> [] && (binds <> [] || prems <> [])) then
-          let bind_diags =
-            constructor_bind_diagnostics ctx origin owner binds components prems
-          in
-          let blocking =
-            List.exists Diagnostics.is_fatal bind_diags || List.exists Fun.id hint_blocks
-          in
-          if not blocking then
-            ignore
-              (lower_constructor_case_for_registry
-                 ~record_like_single_constructor
-                 env
-                 ctx
-                 origin
-                 static_args_key
-                 source_category
-                 target
-                 mixop
-                 binds
-                 prems
-                 components)
-        else
-          let bind_diags = unsupported_binds ctx origin owner binds in
-          let prem_diags = unsupported_prems ctx origin owner prems in
-          let blocking =
-            bind_diags <> [] || prem_diags <> [] || List.exists Fun.id hint_blocks
-          in
-          (match components with
-          | [ _payload, child_typ ] when not blocking ->
-            preload_category_union_registry
-              env ctx origin key_env static_args_key source_category child_typ
-          | _ -> ()))
-  else
-    let bind_diags = constructor_bind_diagnostics ctx origin owner binds components prems in
-    let blocking =
-      List.exists Diagnostics.is_fatal bind_diags || List.exists Fun.id hint_blocks
-    in
-    if not blocking then
-      ignore
-        (lower_constructor_case_for_registry
-           ~record_like_single_constructor
-           env
-           ctx
-           origin
-           static_args_key
-           source_category
-           target
-           mixop
-           binds
-           prems
-           components)
-
-let preload_variant_registry
-    env ctx origin key_env static_args_key target id target_region cases =
-  let source_category = Naming.source_owner id.it in
-  cases
-  |> List.iteri (fun index ((_, (typ, _, _), _) as typcase) ->
-    let case_origin =
-      child_origin
-        origin
-        (Printf.sprintf "VariantT[%d]" (index + 1))
-        "typcase"
-        typ.at
-        (source_echo_typcase typcase)
-    in
-    Constructor_registry.note_source_case
-      (Context.constructors ctx)
-      ~source_category
-      ~static_args_key
-      case_origin);
-  let inherited_groups =
-    inherited_category_cases ctx id target_region cases
-    |> group_inherited_category_cases
-  in
-  let complete_groups, _incomplete_groups =
-    inherited_groups |> List.partition inherited_group_is_complete
-  in
-  let complete_groups = maximal_inherited_groups ctx complete_groups in
-  let skip_indices = inherited_skip_indices complete_groups in
-  complete_groups
-  |> List.iter
-       (preload_inherited_union_registry
-          env ctx origin key_env static_args_key source_category);
-  cases
-  |> List.iteri (fun index typcase ->
-    if not (List.mem index skip_indices) then
-      preload_typcase_registry
-        env
-        ctx
-        origin
-        key_env
-        static_args_key
-        source_category
-        target
-        ~case_count:(List.length cases)
-        (index + 1)
-        typcase)
 
 let preload_deftyp_registry env ctx origin key_env static_args_key target id deftyp =
   let source_category = Naming.source_owner id.it in
@@ -1925,7 +1868,7 @@ let preload_deftyp_registry env ctx origin key_env static_args_key target id def
     preload_alias_inclusion
       env ctx origin key_env static_args_key source_category typ
   | VariantT cases ->
-    preload_variant_registry
+    Variant.preload_variant_registry
       env ctx origin key_env static_args_key target id deftyp.at cases
   | StructT _fields -> ()
 
@@ -1936,9 +1879,9 @@ let translate_deftyp env ctx origin key_env static_args_key target id deftyp =
     translate_alias
       env ctx origin key_env static_args_key source_category target typ
   | VariantT cases ->
-    translate_variant
+    Variant.translate_variant
       env ctx origin key_env static_args_key target id deftyp.at cases
-  | StructT fields -> translate_struct env ctx origin target id fields
+  | StructT fields -> Struct.translate_struct env ctx origin target id fields
 
 type typd_setup =
   { witness_name : string
