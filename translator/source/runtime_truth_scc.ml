@@ -74,6 +74,13 @@ let decision_complete plan =
        Runtime_truth_successor_domain.decision_complete
        plan.successor_domains
 
+let incomplete_decision_relations plan =
+  plan.successor_domains
+  |> List.filter_map (fun domain ->
+       if Runtime_truth_successor_domain.decision_complete domain then None
+       else Some domain.transitive.rule.relation_id)
+  |> List.sort_uniq String.compare
+
 let find_scc plan relation_id =
   List.find_opt (fun scc -> List.mem relation_id scc.relations) plan.sccs
 
@@ -626,6 +633,7 @@ let tarjan vertices successors =
 
 let plan
     ?(total_value = fun ~bound exp -> total_bound_value bound exp)
+    ?(zero_or_one_value = fun ~bound:_ _ -> false)
     ?(total_value_with_facts = fun ~facts:_ ~bound exp -> total_value ~bound exp)
     ?constructors
     ?resolve_constructor
@@ -652,6 +660,7 @@ let plan
             (match
                Runtime_truth_successor_domain.certify
                  ~source_total:total_value
+                 ~source_zero_or_one:zero_or_one_value
                  ~source_total_with_facts:total_value_with_facts
                  ?constructors ?resolve_constructor graph transitive
              with

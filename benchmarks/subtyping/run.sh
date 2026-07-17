@@ -20,28 +20,28 @@ awk '
 
 # The first minat clause compares both address operands through their certified
 # representation change; each operand occurs in both the size call and guard.
-test "$(grep -o 'coerce-numtype-from-addrtype(' "$minat" | wc -l | tr -d ' ')" -eq 4
+test "$(grep -o 'helper\.subtype-inject\.unop(' "$minat" | wc -l | tr -d ' ')" -eq 4
 
 # The two audited execution rules inject unpackfield's val result into instr.
-test "$(grep -c '=> coerce-instr-from-val(defunpackfield' "$output")" -eq 2
+test "$(grep -c '=> helper\.subtype-inject\.step-pure(def\.unpackfield' "$output")" -eq 2
 
 # The exact addrtype surface is I32/I64. No target-only valtype case projects.
-test "$(grep -c '^  eq coerce-valtype-from-addrtype(addrtype\.' "$output")" -eq 2
-test "$(grep -c '^  eq project-coerce-valtype-from-addrtype(numtype\.' "$output")" -eq 2
-if grep -q '^  eq project-coerce-valtype-from-addrtype(\(numtype\.f32\|numtype\.f64\|vectype\.\|ref\.\)' "$output"; then
+test "$(grep -c '^  eq helper\.subtype-inject\.unop(addrtype\.' "$output")" -eq 2
+test "$(grep -c '^  eq helper\.subtype-project\.unop(numtype\.' "$output")" -eq 2
+if grep -q '^  eq helper\.subtype-project\.unop(\(numtype\.f32\|numtype\.f64\|vectype\.\|ref\.\)' "$output"; then
   echo "target-only valtype value received an addrtype projection" >&2
   exit 1
 fi
 
 # Pattern injection binds a fresh target carrier before projecting the source.
-grep -q 'PATTERN_SUB_TARGET.*:= project-coerce-instr-from-val(PATTERN_SUB_TARGET' "$output"
+grep -q 'VAL[^ ]*:SpectecTerminal := helper\.subtype-project\.step-pure(PATTERN[0-9]*:SpectecTerminal)' "$output"
 
 # instr.drop is outside the certified val image. Retraction remains partial.
-if grep -q 'project-coerce-instr-from-val(instr\.drop' "$output"; then
+if grep -q 'helper\.subtype-project\.step-pure(instr\.drop' "$output"; then
   echo "target-only instr.drop received a val projection" >&2
   exit 1
 fi
-if grep 'project-\(seq-\)\?coerce-.*\[owise\]' "$output"; then
+if grep 'helper\.subtype-project\(-seq\)\?\..*\[owise\]' "$output"; then
   echo "subtype projection contains an [owise] fallback" >&2
   exit 1
 fi

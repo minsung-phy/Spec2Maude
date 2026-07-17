@@ -15,17 +15,18 @@ rm -f "$output" "$builtins" "$report" "$log" \
   "$smoke_output" "$smoke_builtins" "$smoke_log"
 
 cd "$root"
-if "$exe" translate -o "$output" --builtins "$builtins" \
+if ! "$exe" translate -o "$output" --builtins "$builtins" \
     --builtin-report "$report" >"$log" 2>&1
 then
-  echo 'unsafe builtin backend translation unexpectedly became nonfatal' >&2
+  cat "$log" >&2
+  echo 'builtin backend translation failed' >&2
   exit 1
 fi
-grep -q '\[spec2maude\] diagnostics: total=1301 fatal=12 unsupported=12 skipped=1289 obligations=0 prelude_gaps=0' "$log"
+grep -q '\[spec2maude\] diagnostics: total=1289 fatal=0 unsupported=0 skipped=1289 obligations=0 prelude_gaps=0' "$log"
 grep -q 'from contract config/wasm-3.0-runtime-ingress.contract:2' "$log"
 grep -q 'from contract config/wasm-3.0-runtime-ingress.contract:3' "$log"
-test ! -e "$output"
-test ! -e "$builtins"
+test -f "$output"
+test -f "$builtins"
 test -f "$report"
 
 grep -q -- '- backend semantics: `official-spectec-deterministic`' "$report"
@@ -42,10 +43,11 @@ if grep -q '/Users/.*/spectec/src/backend-interpreter/numerics.ml' "$report"; th
   exit 1
 fi
 
-if "$exe" translate -o "$smoke_output" --builtins "$smoke_builtins" \
-    --emit-partial >"$smoke_log.translate" 2>&1
+if ! "$exe" translate -o "$smoke_output" --builtins "$smoke_builtins" \
+    >"$smoke_log.translate" 2>&1
 then
-  echo 'unsafe builtin smoke translation unexpectedly became nonfatal' >&2
+  cat "$smoke_log.translate" >&2
+  echo 'builtin smoke translation failed' >&2
   exit 1
 fi
 test -f "$smoke_output"
@@ -57,13 +59,8 @@ then
   cat "$smoke_log" >&2
   exit 1
 fi
-warning_count=$(grep -c '^Warning:' "$smoke_log" || true)
-if test "$warning_count" -ne 2 \
-    || grep -E 'Advisory:|Error:' "$smoke_log" >/dev/null; then
+if grep -E 'Warning:|Advisory:|Error:' "$smoke_log" >/dev/null; then
   cat "$smoke_log" >&2
   exit 1
 fi
-grep -q 'bad token rel.step-read' "$smoke_log"
-grep -q 'no parse for statement' "$smoke_log"
-echo 'known generated-output warning: rel.step-read does not parse' >&2
 grep -q 'result' "$smoke_log"

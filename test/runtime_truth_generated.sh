@@ -15,19 +15,28 @@ explicit_log="$prefix-explicit.log"
 rm -f "$output" "$builtins" "$report" "$log" "$maude_log" \
   "$builtins_maude_log" "$explicit_output" "$explicit_log"
 cd "$root"
-if "$exe" translate --emit-partial \
+if ! "$exe" translate \
     -o "$output" --builtins "$builtins" --builtin-report "$report" \
     >"$log" 2>&1
 then
-  echo 'unsafe runtime truth translation unexpectedly became nonfatal' >&2
+  cat "$log" >&2
+  echo 'runtime truth translation failed' >&2
   exit 1
 fi
 
-grep -q '\[spec2maude\] diagnostics: total=1301 fatal=12 unsupported=12 skipped=1289 obligations=0 prelude_gaps=0' "$log"
-grep -q 'WARNING: fatal diagnostics remain; writing marked partial/incomplete verification output' "$log"
-grep -q 'Deftype_sub/super \[RuntimeTruthSuccessorDomain/delegated/call-not-source-complete-deterministic\]' "$log"
-grep -q 'Heaptype_sub/trans \[RuntimeTruthScc/RulePr/open-successor\]' "$log"
-grep -q 'no finite ground enumerator has been established' "$log"
+grep -q '\[spec2maude\] diagnostics: total=1289 fatal=0 unsupported=0 skipped=1289 obligations=0 prelude_gaps=0' "$log"
+if grep -Eq '^fatal:|PARTIAL/INCOMPLETE' "$log"; then
+  echo 'runtime truth translation retained fatal or partial-output diagnostics' >&2
+  exit 1
+fi
+if grep -q 'Deftype_sub/super \[RuntimeTruthSuccessorDomain/delegated/call-not-source-complete-deterministic\]' "$log"; then
+  echo 'single-clause zero-or-one successor binding regressed' >&2
+  exit 1
+fi
+if grep -q 'Heaptype_sub/trans \[RuntimeTruthScc/RulePr/open-successor\]' "$log"; then
+  echo 'finite direct-successor worklist regressed' >&2
+  exit 1
+fi
 if grep -q 'RelD/ElsePr/enabledness/group-complement' "$log"; then
   echo 'throw_ref constructor-group complement remained fatal' >&2
   exit 1
@@ -36,10 +45,14 @@ fi
 test -f "$output"
 test -f "$builtins"
 test -f "$report"
-grep -q '^--- PARTIAL/INCOMPLETE VERIFICATION OUTPUT:' "$output"
-grep -q '^--- PARTIAL/INCOMPLETE VERIFICATION BUILTINS:' "$builtins"
+if grep -Eq '^--- PARTIAL/INCOMPLETE VERIFICATION' "$output" "$builtins"; then
+  echo 'successful runtime truth translation was marked partial' >&2
+  exit 1
+fi
 grep -q '^  op def.instantiate ' "$output"
 grep -q '^  op def.invoke ' "$output"
+grep -q 'helper-enabledness-step-read-enabled-false' "$output"
+grep -q 'helper-enabledness-step-read-4-enabled-false' "$output"
 if grep -Eq '^[[:space:]]*(rl|crl).*\[owise\]' "$output"; then
   echo 'partial output contains execution [owise]' >&2
   exit 1
@@ -54,24 +67,21 @@ for load_log in "$maude_log" "$builtins_maude_log"; do
     echo 'generated constructor surface remains parse-ambiguous' >&2
     exit 1
   fi
-  if grep -E "didn't expect token|bad token" "$load_log" \
-      | grep -v 'step-read' >/dev/null; then
-    echo 'Maude load contains a stale bad-token warning' >&2
-    exit 1
-  fi
   if grep -Eq 'Warning:|Advisory:|Error:' "$load_log"; then
-    grep -Eq "(didn't expect token|bad token) rel[.]step-read" "$load_log"
-    grep -q 'no parse for statement' "$load_log"
+    cat "$load_log" >&2
+    echo 'generated Maude load emitted a warning or error' >&2
+    exit 1
   fi
 done
 
-if "$exe" translate -o "$explicit_output" "$root"/wasm-3.0/*.spectec \
+if ! "$exe" translate -o "$explicit_output" "$root"/wasm-3.0/*.spectec \
     >"$explicit_log" 2>&1
 then
-  echo 'unsafe explicit-input translation unexpectedly became nonfatal' >&2
+  cat "$explicit_log" >&2
+  echo 'explicit-input translation failed' >&2
   exit 1
 fi
-grep -q '\[spec2maude\] diagnostics: total=1301 fatal=12 unsupported=12 skipped=1289 obligations=0 prelude_gaps=0' "$explicit_log"
+grep -q '\[spec2maude\] diagnostics: total=1289 fatal=0 unsupported=0 skipped=1289 obligations=0 prelude_gaps=0' "$explicit_log"
 grep -q 'from contract config/wasm-3.0-runtime-ingress.contract:2' "$explicit_log"
 grep -q 'from contract config/wasm-3.0-runtime-ingress.contract:3' "$explicit_log"
-test ! -e "$explicit_output"
+test -f "$explicit_output"

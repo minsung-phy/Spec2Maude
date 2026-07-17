@@ -50,6 +50,15 @@ let read_file path =
     ~finally:(fun () -> close_in_noerr channel)
     (fun () -> really_input_string channel (in_channel_length channel))
 
+let partial_marker =
+  "--- PARTIAL/INCOMPLETE VERIFICATION BUILTINS:"
+
+let read_maude path =
+  read_file path |> String.split_on_char '\n'
+  |> List.filter (fun line ->
+       not (String.starts_with ~prefix:partial_marker line))
+  |> String.concat "\n"
+
 let fields line =
   line |> String.split_on_char ' ' |> List.filter (( <> ) "")
 
@@ -193,7 +202,7 @@ let parse path =
     ; smoke_fixture = required path "smoke" !smoke_fixture
     ; requirements = List.rev !requirements
     ; representations = List.rev !representations
-    ; maude = read_file maude_path
+    ; maude = read_maude maude_path
     }
   in
   validate backend;

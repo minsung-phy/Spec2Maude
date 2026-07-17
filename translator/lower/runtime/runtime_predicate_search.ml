@@ -361,8 +361,12 @@ let truth_worklist_request ctx ~rel_id ~input_terms ~input_sorts =
   let total_value_with_facts ~facts ~bound exp =
     Runtime_truth_total_equality.source_total ~facts ctx ~bound origin exp
   in
+  let zero_or_one_value ~bound exp =
+    Runtime_truth_total_equality.source_zero_or_one ctx ~bound origin exp
+  in
   let plan =
-    Runtime_truth_scc.plan ~total_value ~total_value_with_facts
+    Runtime_truth_scc.plan
+      ~total_value ~zero_or_one_value ~total_value_with_facts
       ~constructors:(Context.constructors ctx)
       ~resolve_constructor:(runtime_constructor ctx)
       (Context.function_graph ctx) rel_id
@@ -427,8 +431,12 @@ let truth_worklist_blockers ctx rel_id =
   let total_value_with_facts ~facts ~bound exp =
     Runtime_truth_total_equality.source_total ~facts ctx ~bound origin exp
   in
+  let zero_or_one_value ~bound exp =
+    Runtime_truth_total_equality.source_zero_or_one ctx ~bound origin exp
+  in
   let plan =
-    Runtime_truth_scc.plan ~total_value ~total_value_with_facts
+    Runtime_truth_scc.plan
+      ~total_value ~zero_or_one_value ~total_value_with_facts
       ~constructors:(Context.constructors ctx)
       ~resolve_constructor:(runtime_constructor ctx)
       (Context.function_graph ctx) rel_id

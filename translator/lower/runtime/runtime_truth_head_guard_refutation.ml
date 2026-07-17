@@ -17,7 +17,7 @@ let total_op = function
   | _ -> false
 
 let total_observer = function
-  | "typecheck" | "typecheckOptSeq" | "typecheckSeqOpt"
+  | "typecheck" | "typecheckSeq" | "typecheckOptSeq" | "typecheckSeqOpt"
   | "typecheckNestedSeq" -> true
   | _ -> false
 

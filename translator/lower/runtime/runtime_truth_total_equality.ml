@@ -1250,6 +1250,53 @@ let source_total ?(facts = []) ctx ~bound origin exp =
   | Total -> true
   | Blocked _ -> false
 
+let source_zero_or_one ctx ~bound origin exp =
+  match exp.it with
+  | CallE (id, args) ->
+    (match
+       combine
+         (List.map
+            (total_arg ctx [] [] bound empty_facts origin)
+            args)
+     with
+    | Blocked _ -> false
+    | Total ->
+      let target =
+        Option.value ~default:id.it (Context.find_static_def ctx id.it)
+      in
+      let graph = Context.function_graph ctx in
+      let identity =
+        match
+          Analysis.Function_graph.resolve_call graph
+            ~static_typ_env:(Context.static_typ_env ctx)
+            ~static_def_env:(Context.static_def_env ctx)
+            ~origin id args
+        with
+        | Analysis.Function_graph.Plain_call ->
+          Some (Analysis.Function_graph.plain_identity target)
+        | Specialized_call specialization ->
+          Some
+            (Analysis.Function_graph.identity_of_specialization specialization)
+        | Unsupported_call _ | Prelude_gap_call _ -> None
+      in
+      (match
+         identity,
+         Analysis.Function_graph.find_definition graph target,
+         definition_entry ctx target
+       with
+      | Some identity, Some definition, Some (_, [ _ ]) ->
+        definition.clause_count = 1
+        && not
+             (Analysis.Function_graph.identity_is_rewrite_backed
+                graph identity)
+      | None, _, _ | _, None, _ | _, _, None | _, _, Some (_, _ :: _ :: _)
+      | _, _, Some (_, []) -> false))
+  | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
+  | TupE _ | ProjE _ | CaseE _ | UncaseE _ | OptE _ | TheE _ | StrE _
+  | DotE _ | CompE _ | ListE _ | LiftE _ | MemE _ | LenE _ | CatE _
+  | IdxE _ | SliceE _ | UpdE _ | ExtE _ | IfE _ | IterE _ | CvtE _
+  | SubE _ -> false
+
 let diagnostic ctx blocker =
   Diagnostics.make ~category:Diagnostics.Unsupported ~origin:blocker.origin
     ~constructor:blocker.constructor

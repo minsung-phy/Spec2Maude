@@ -5,6 +5,11 @@ type decision =
   ; total_request : Runtime_truth_worklist_helper.request
   }
 
+type total_request_result =
+  | Ready of Runtime_truth_worklist_helper.request
+  | Head_mismatch
+  | Incomplete_decision of string list
+
 let total_request_for_source_binders
     ~current_terms ~predecessor_terms
     (request : Runtime_truth_worklist_helper.request) =
@@ -12,10 +17,12 @@ let total_request_for_source_binders
     Head_specialization.specialize_terms
       current_terms predecessor_terms request.input_terms
   with
-  | None -> None
+  | None -> Head_mismatch
   | Some _ when Runtime_truth_scc.decision_complete request.plan ->
-    Some { request with Runtime_truth_worklist_helper.mode = Decide }
-  | Some _ -> None
+    Ready { request with Runtime_truth_worklist_helper.mode = Decide }
+  | Some _ ->
+    Incomplete_decision
+      (Runtime_truth_scc.incomplete_decision_relations request.plan)
 
 let positive_condition decision =
   Runtime_truth_worklist_helper.true_condition

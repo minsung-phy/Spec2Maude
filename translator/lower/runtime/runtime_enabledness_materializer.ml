@@ -222,7 +222,10 @@ let materialize_item ctx item =
   if false_missing || List.exists Diagnostics.is_fatal diagnostics then
     { statements = []; diagnostics }
   else
-    { statements = helper_surface item @ true_statements @ false_statements
+    (* [Reld_enabledness] emits the surface beside the ElsePr rule that calls
+       it.  The materializer owns only the defining rules; repeating the
+       surface here redeclares its result sort in the final module. *)
+    { statements = true_statements @ false_statements
     ; diagnostics
     }
 
