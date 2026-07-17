@@ -129,7 +129,7 @@ let lower names ctx env ~bound_vars origin _exp known_exp mapped_exp =
                 body_result.guards
             in
             let helper_bound_after =
-              Condition_closure.conditions_admissible_bound
+              Condition_admissibility.conditions_admissible_bound
                 ~constructor_op:
                   (Condition_closure.source_constructor_certificate ctx)
                 allowed_vars

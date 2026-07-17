@@ -356,13 +356,13 @@ let truth_worklist_request ctx ~rel_id ~input_terms ~input_sorts =
     Origin.synthetic ~ast_constructor:"RuntimeTruthScc" "premise-schedule"
   in
   let total_value ~bound exp =
-    Runtime_truth_total_equality.source_total ctx ~bound origin exp
+    Runtime_truth_totality.source_total ctx ~bound origin exp
   in
   let total_value_with_facts ~facts ~bound exp =
-    Runtime_truth_total_equality.source_total ~facts ctx ~bound origin exp
+    Runtime_truth_totality.source_total ~facts ctx ~bound origin exp
   in
   let zero_or_one_value ~bound exp =
-    Runtime_truth_total_equality.source_zero_or_one ctx ~bound origin exp
+    Runtime_truth_totality.source_zero_or_one ctx ~bound origin exp
   in
   let plan =
     Runtime_truth_scc.plan
@@ -426,13 +426,13 @@ let truth_worklist_blockers ctx rel_id =
     Origin.synthetic ~ast_constructor:"RuntimeTruthScc" "premise-schedule"
   in
   let total_value ~bound exp =
-    Runtime_truth_total_equality.source_total ctx ~bound origin exp
+    Runtime_truth_totality.source_total ctx ~bound origin exp
   in
   let total_value_with_facts ~facts ~bound exp =
-    Runtime_truth_total_equality.source_total ~facts ctx ~bound origin exp
+    Runtime_truth_totality.source_total ~facts ctx ~bound origin exp
   in
   let zero_or_one_value ~bound exp =
-    Runtime_truth_total_equality.source_zero_or_one ctx ~bound origin exp
+    Runtime_truth_totality.source_zero_or_one ctx ~bound origin exp
   in
   let plan =
     Runtime_truth_scc.plan

@@ -249,7 +249,7 @@ let lower_indexed_head_contains ctx item premise_result indexed =
               "Do not silently drop the indexed-head membership; keep the helper Unsupported"
     | Some source_term ->
       let bound_after_source =
-        Condition_closure.conditions_admissible_bound
+        Condition_admissibility.conditions_admissible_bound
           ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
           (Premise_result.bound_vars_after premise_result)
           source_result.guards
@@ -427,7 +427,7 @@ let lower_rule_with_surface
             |> dedup_rule_conditions
           in
           let admissibility_diags =
-            Condition_closure.crl_admissibility_diagnostics
+            Condition_admissibility.crl_admissibility_diagnostics
               ctx
               origin
               lhs
@@ -495,6 +495,11 @@ let lower_acyclic_item ctx item =
       (helper_surface item)
       local_rules
 
+let recursion_detail = function
+  | Runtime_truth_search_helper.Recursive cycle ->
+    "; cycle: `" ^ String.concat " -> " cycle ^ "`"
+  | Acyclic | Finite_transitive _ | Target_guided_self _ -> ""
+
 let materialize_item ctx item =
   match item.request.recursion with
   | Runtime_truth_search_helper.Acyclic -> lower_acyclic_item ctx item
@@ -509,11 +514,7 @@ let materialize_item ctx item =
             item.origin
             "RuntimeTruthSearch/materializer/recursive-unimplemented"
             ("runtime truth-search request is recursive/transitive and is exclusively owned by the SCC worklist engine"
-             ^ (match recursion with
-                | Runtime_truth_search_helper.Recursive cycle ->
-                  "; cycle: `" ^ String.concat " -> " cycle ^ "`"
-                | Finite_transitive _ | Target_guided_self _ -> ""
-                | Acyclic -> assert false))
+             ^ recursion_detail recursion)
             "Route this request through Runtime_truth_scc; the legacy truth-search engine accepts only acyclic request shapes"
         ]
     }

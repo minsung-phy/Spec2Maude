@@ -163,7 +163,7 @@ let translate_rule
                   |> dedup_rule_conditions
                 in
                 let diagnostics =
-                  Condition_closure.crl_admissibility_diagnostics
+                  Condition_admissibility.crl_admissibility_diagnostics
                     ~constructor_op:pattern_certificate
                     ctx origin lhs rhs_term conditions
                 in

@@ -62,17 +62,20 @@ let scc_key (scc : Runtime_truth_scc.scc) =
   "scc" ^ field (string_of_int scc.index)
   ^ list Fun.id scc.relations ^ list rule_key scc.rules
 
-let key request =
+let program_key request =
   "runtime-truth-worklist"
   ^ field request.relation_id
   ^ field request.specialization
   ^ field (Runtime_truth_scc.phase_key request.phase)
   ^ field (match request.mode with Prove -> "prove" | Decide -> "decide")
-  ^ list term_key request.input_terms
   ^ list Maude_ir.sort_name request.input_sorts
   ^ list Fun.id request.plan.closure
   ^ list scc_key request.plan.sccs
   ^ list Runtime_truth_successor_domain.key request.plan.successor_domains
+
+let key request =
+  program_key request
+  ^ list term_key request.input_terms
 
 let reason request =
   (match request.mode with

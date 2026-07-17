@@ -150,7 +150,7 @@ let translate_rule
               |> dedup_conditions
             in
             let admissibility_diags =
-              Condition_closure.ceq_admissibility_diagnostics
+              Condition_admissibility.ceq_admissibility_diagnostics
                 ~constructor_op:pattern_certificate
                 ctx
                 origin

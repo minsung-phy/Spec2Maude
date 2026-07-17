@@ -4,6 +4,7 @@
  (name translator)
  (private_modules
   carrier_sort
+  condition_admissibility
   condition_schedule
   decd_translate
   definition_analysis
@@ -12,6 +13,7 @@
   helper_capture
   helper_emission
   hint_translate
+  naming_collision
   premise_if
   premise_rule
   primitive_term
@@ -21,8 +23,10 @@
   runtime_materialize
   runtime_truth_false_support
   runtime_truth_worklist_core
+  runtime_truth_worklist_premise
   runtime_truth_worklist_positive
   runtime_truth_worklist_refutation
+  runtime_truth_worklist_rule
   source_free_vars
   source_condition_certificate_internal
   source_index

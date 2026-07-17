@@ -347,7 +347,35 @@ let translate_premises_named
   match outcome with
   | Complete result -> Premise_result.finalize_condition_bound_vars result, names
   | Blocked _ as blocked -> blocked, incoming_names
-  | Deferred _ -> assert false
+  | Deferred (deferral, diagnostics) ->
+    let deferral =
+      match deferral with
+      | ListN_premise_admissibility -> "ListN premise admissibility"
+      | Binding_membership_admissibility -> "binding membership admissibility"
+      | Runtime_predicate_binding_admissibility ->
+        "runtime predicate binding admissibility"
+    in
+    let invariant_origin, source_echo =
+      match prems with
+      | [] -> origin, None
+      | prem :: _ ->
+        origin_for_premise origin prem, Some (source_echo_prem prem)
+    in
+    Premise_result.blocked
+      (diagnostics
+       @ [ unsupported
+             ~ctx
+             ~origin:invariant_origin
+             ~constructor:"Premise/internal-invariant/deferred-after-fixpoint"
+             ?source_echo
+             ~reason:
+               ("premise retry reached its fixpoint but returned an unresolved "
+                ^ deferral ^ " deferral")
+             ~suggestion:
+               "Report this translator invariant; the retry loop must convert every stalled deferral into a structured Blocked result"
+             ()
+         ]),
+    incoming_names
 
 let translate_premises
     ?allow_runtime_search

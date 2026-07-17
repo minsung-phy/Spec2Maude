@@ -112,9 +112,10 @@ let rec strip_pattern_coercion (exp : Il.Ast.exp) =
     strip_pattern_coercion inner
   | _ -> exp
 
-let is_binding_refutation_pattern exp =
+let is_binding_refutation_pattern env exp =
   match (strip_pattern_coercion exp).it with
-  | Il.Ast.VarE _ | Il.Ast.ListE [] | Il.Ast.OptE None | Il.Ast.CaseE _ ->
+  | Il.Ast.VarE id -> Option.is_none (Expr_env.find env id.it)
+  | Il.Ast.ListE [] | Il.Ast.OptE None | Il.Ast.CaseE _ ->
     true
   | _ -> false
 
@@ -244,7 +245,7 @@ let refute
     ~right
   =
   let try_orientation subject_exp pattern_exp =
-    if not (is_binding_refutation_pattern pattern_exp) then
+    if not (is_binding_refutation_pattern env pattern_exp) then
       None
     else
       let subject = Expr_translate.lower_value ctx env origin subject_exp in
@@ -262,14 +263,30 @@ let refute
             subject_term
             pattern_exp
         in
-        if pattern_refuter.branches = [] && pattern_refuter.diagnostics = [] then
-          Some { statements = []; diagnostics = subject.diagnostics }
-        else if pattern_refuter.branches = [] then
-          None
-        else
+        (match
+           Runtime_truth_condition_complement.source_definedness_alternatives
+             ctx env origin subject_exp
+         with
+        | Error _ -> None
+        | Ok definedness ->
+          let branches =
+            definedness.failures
+            @ List.map
+                (fun branch -> definedness.positive @ branch)
+                pattern_refuter.branches
+          in
+          if branches = [] && pattern_refuter.diagnostics = [] then
+            Some
+              { statements = []
+              ; diagnostics =
+                  subject.diagnostics @ definedness.diagnostics
+              }
+          else if branches = [] then
+            None
+          else
           let statements =
             pattern_refuter.declarations
-            @ (pattern_refuter.branches
+            @ (branches
                |> List.mapi (fun index branch ->
                  generated
                    helper_name
@@ -288,16 +305,15 @@ let refute
                       (append_prefix_conditions
                          prefix_conditions
                          (List.map
-                            (fun condition -> EqCondition condition)
-                            subject.guards
-                          @ List.map
                               (fun condition -> EqCondition condition)
                               branch)))))
           in
           Some
             { statements
-            ; diagnostics = subject.diagnostics @ pattern_refuter.diagnostics
-            }
+            ; diagnostics =
+                subject.diagnostics @ definedness.diagnostics
+                @ pattern_refuter.diagnostics
+            })
   in
   match try_orientation left right with
   | Some result -> Some result

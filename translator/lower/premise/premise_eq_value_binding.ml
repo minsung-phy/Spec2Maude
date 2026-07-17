@@ -61,7 +61,7 @@ let lower_unary_projection ctx env ~bound_vars origin _exp projection_exp value_
             | Some value_term ->
               let prefix_conditions = value_result.guards in
               (match
-                 Condition_closure.conditions_admissible_bound
+                 Condition_admissibility.conditions_admissible_bound
                    ~constructor_op:
                      (Condition_closure.source_constructor_certificate ctx)
                    bound_vars

@@ -627,13 +627,13 @@ let rec lower_value ctx env origin exp =
   | UnE (`NotOp, _, _) ->
     lower_bool_value ctx env origin exp
   | UnE (op, _, exp1) ->
-    lower_unary_value ctx env origin exp (Il.Print.string_of_unop op) exp1
+    lower_unary_value ctx env origin exp op exp1
   | BinE ((`AndOp | `OrOp | `ImplOp | `EquivOp), _, _, _) ->
     lower_bool_value ctx env origin exp
   | BinE (`ModOp, _, left, right) ->
-    lower_binary_value ctx env origin exp "\\" left right
+    lower_binary_value ctx env origin exp `ModOp left right
   | BinE (op, _, left, right) ->
-    lower_binary_value ctx env origin exp (Il.Print.string_of_binop op) left right
+    lower_binary_value ctx env origin exp op left right
   | CmpE _ ->
     lower_bool_value ctx env origin exp
   | ProjE (inner, index) ->

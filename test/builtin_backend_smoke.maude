@@ -92,4 +92,5 @@ red in WASM-BUILTINS : builtin.reinterpret(numtype.i32, numtype.f32, uN.wrap(106
 red in WASM-BUILTINS : builtin.lanes(shape.x(numtype.i32, dim.wrap(4)), uN.wrap(67305985)) .
 red in WASM-BUILTINS : builtin.inv-lanes(shape.x(packtype.i8, dim.wrap(16)), uN.wrap(1) uN.wrap(2) uN.wrap(3) uN.wrap(4) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0)) .
 red in WASM-BUILTINS : def.utf8(char.wrap(65)) .
+red in WASM-BUILTINS : helper.iter-count.rolldt(2, 0, 2, subtype.sub(eps, eps, comptype.func-sym(list.wrap(eps), list.wrap(eps))) subtype.sub(eps, eps, comptype.func-sym(list.wrap(eps), list.wrap(eps)))) .
 quit

@@ -20,6 +20,8 @@ type invocation =
   }
 
 val key : request -> string
+(* Compiled-program ownership includes capability but excludes concrete query terms. *)
+val program_key : request -> string
 val reason : request -> string
 val invocation : helper_name:string -> request -> invocation
 val true_condition : helper_name:string -> request -> Maude_ir.rule_condition

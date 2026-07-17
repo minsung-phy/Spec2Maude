@@ -6,7 +6,8 @@ let diagnostic ctx origin id constructor rule reason suggestion =
     ~category:Diagnostics.Unsupported
     ~origin
     ~constructor
-    ~enclosing:(Context.enclosing_path ctx)
+    ~enclosing:
+      (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
     ~profile:(Context.profile_name ctx)
     ~reason:("annotated execution relation `" ^ id.it ^ "`: " ^ reason)
     ~suggestion

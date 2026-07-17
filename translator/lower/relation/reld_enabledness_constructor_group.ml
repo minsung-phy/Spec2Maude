@@ -209,7 +209,7 @@ let false_branch
                     |> dedup_rule_conditions
                   in
                   let diagnostics =
-                    Condition_closure.crl_admissibility_diagnostics
+                    Condition_admissibility.crl_admissibility_diagnostics
                       ctx origin lhs rhs conditions
                   in
                   let statement =

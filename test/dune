@@ -28,6 +28,11 @@
  (modules optional_iter_binding_regression)
  (libraries translator il util xl))
 
+(test
+ (name expr_bool_numeric_operator_regression)
+ (modules expr_bool_numeric_operator_regression)
+ (libraries translator il util xl))
+
 (executable
  (name runtime_truth_decision_fixture)
  (modules runtime_truth_decision_fixture)
@@ -57,6 +62,11 @@
  (name record_composition_fixture)
  (modules record_composition_fixture)
  (libraries translator il util xl))
+
+(executable
+ (name translate_subset_fixture)
+ (modules translate_subset_fixture)
+ (libraries frontend translator util))
 
 (rule
  (alias runtest)
@@ -115,6 +125,16 @@
 (rule
  (alias runtest)
  (deps
+  premise_order_generated.sh
+  ../builtins.maude
+  ../config/wasm-3.0-runtime-ingress.contract
+  (glob_files ../wasm-3.0/*.spectec))
+ (action
+  (run sh %{dep:premise_order_generated.sh} %{exe:../bin/spec2maude.exe} %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps
   builtin_backend_generated.sh
   builtin_backend_smoke.maude
   ../builtins.contract
@@ -122,4 +142,5 @@
   ../config/wasm-3.0-runtime-ingress.contract
   (glob_files ../wasm-3.0/*.spectec))
  (action
-  (run sh %{dep:builtin_backend_generated.sh} %{exe:../bin/spec2maude.exe} %{workspace_root})))
+  (run sh %{dep:builtin_backend_generated.sh} %{exe:../bin/spec2maude.exe} %{workspace_root}
+    %{exe:translate_subset_fixture.exe})))

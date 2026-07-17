@@ -21,10 +21,10 @@ val lower_bool_value :
   callbacks -> Context.t -> Expr_env.t -> Origin.t -> exp -> Expr_result.result
 
 val lower_unary_value :
-  callbacks -> Context.t -> Expr_env.t -> Origin.t -> exp -> string -> exp -> Expr_result.result
+  callbacks -> Context.t -> Expr_env.t -> Origin.t -> exp -> unop -> exp -> Expr_result.result
 
 val lower_binary_value :
-  callbacks -> Context.t -> Expr_env.t -> Origin.t -> exp -> string -> exp -> exp -> Expr_result.result
+  callbacks -> Context.t -> Expr_env.t -> Origin.t -> exp -> binop -> exp -> exp -> Expr_result.result
 
 val lower_numeric_guard_value :
   callbacks -> Context.t -> Expr_env.t -> Origin.t -> exp -> Expr_result.result

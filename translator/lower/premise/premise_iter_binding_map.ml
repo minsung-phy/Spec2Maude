@@ -190,7 +190,7 @@ let lower_indexed_listn_target
       |> List.sort_uniq String.compare
     in
     let helper_bound_after =
-      Condition_closure.conditions_admissible_bound
+      Condition_admissibility.conditions_admissible_bound
         ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
         helper_bound helper_conditions
     in
@@ -456,7 +456,7 @@ let lower_list_target
                   var <> body_result_var && not (List.mem var helper_bound))
               in
               (match
-                 Condition_closure.conditions_admissible_bound
+                 Condition_admissibility.conditions_admissible_bound
                    ~constructor_op:
                      (Condition_closure.source_constructor_certificate ctx)
                    helper_bound
@@ -726,7 +726,7 @@ let lower_multi_list_targets
       in
       let helper_bound = input_heads @ capture_vars captures in
       let body_bound_after =
-        Condition_closure.conditions_admissible_bound
+        Condition_admissibility.conditions_admissible_bound
           ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
           helper_bound body_conditions
       in

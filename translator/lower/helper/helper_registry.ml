@@ -4,9 +4,14 @@ type entry =
   }
 
 type stored_entry =
-  { key : string
+  { program_key : string
   ; entry : entry
-  ; mutable uses : int
+  ; mutable uses : use list
+  }
+
+and use =
+  { query_key : string
+  ; mutable count : int
   }
 
 type t = { mutable entries : stored_entry list }
@@ -19,7 +24,10 @@ type stage =
 let create () = { entries = [] }
 
 let copy_entries entries =
-  List.map (fun stored -> { stored with uses = stored.uses }) entries
+  let copy_use use = { use with count = use.count } in
+  List.map
+    (fun stored -> { stored with uses = List.map copy_use stored.uses })
+    entries
 
 let begin_stage target =
   { target; staged = { entries = copy_entries target.entries } }
@@ -28,16 +36,37 @@ let used_name registry name =
   registry.entries
   |> List.exists (fun stored -> stored.entry.name = name)
 
-let request registry request =
-  let key = Helper_key.key request in
-  match List.find_opt (fun stored -> stored.key = key) registry.entries with
+let program_key request =
+  match request.Helper_request.kind with
+  | Runtime_predicate_truth_worklist request ->
+    "runtime-predicate-truth-worklist:"
+    ^ Digest.to_hex
+        (Digest.string (Runtime_truth_worklist_helper.program_key request))
+  | _ -> Helper_key.key request
+
+let add_use query_key uses =
+  match List.find_opt (fun use -> use.query_key = query_key) uses with
+  | Some use ->
+    use.count <- use.count + 1;
+    uses
+  | None -> { query_key; count = 1 } :: uses
+
+let request registry requested =
+  let query_key = Helper_key.key requested in
+  let program_key = program_key requested in
+  match
+    List.find_opt
+      (fun stored -> stored.program_key = program_key)
+      registry.entries
+  with
   | Some stored ->
-    stored.uses <- stored.uses + 1;
+    stored.uses <- add_use query_key stored.uses;
     stored.entry.name
   | None ->
-    let name = Helper_key.name ~used:(used_name registry) request in
-    let entry = { name; request } in
-    registry.entries <- { key; entry; uses = 1 } :: registry.entries;
+    let name = Helper_key.name ~used:(used_name registry) requested in
+    let entry = { name; request = requested } in
+    let uses = [ { query_key; count = 1 } ] in
+    registry.entries <- { program_key; entry; uses } :: registry.entries;
     name
 
 let request_staged stage requested =
@@ -49,18 +78,31 @@ let commit_stage stage =
   stage.target.entries <- copy_entries stage.staged.entries
 
 let find registry request =
-  let key = Helper_key.key request in
+  let query_key = Helper_key.key request in
   registry.entries
-  |> List.find_opt (fun stored -> stored.key = key)
+  |> List.find_opt (fun stored ->
+       List.exists (fun use -> use.query_key = query_key) stored.uses)
   |> Option.map (fun stored -> stored.entry.name)
 
 let release registry request =
-  let key = Helper_key.key request in
-  match List.find_opt (fun stored -> stored.key = key) registry.entries with
+  let query_key = Helper_key.key request in
+  let has_query stored =
+    List.exists (fun use -> use.query_key = query_key) stored.uses
+  in
+  match List.find_opt has_query registry.entries with
   | None -> ()
-  | Some stored when stored.uses > 1 -> stored.uses <- stored.uses - 1
-  | Some _ ->
-    registry.entries <- List.filter (fun stored -> stored.key <> key) registry.entries
+  | Some stored ->
+    (match List.find_opt (fun use -> use.query_key = query_key) stored.uses with
+    | Some use when use.count > 1 -> use.count <- use.count - 1
+    | Some _ ->
+      stored.uses <-
+        List.filter (fun use -> use.query_key <> query_key) stored.uses
+    | None -> ());
+    if stored.uses = [] then
+      registry.entries <-
+        List.filter
+          (fun entry -> entry.program_key <> stored.program_key)
+          registry.entries
 
 let entries registry =
   registry.entries |> List.rev |> List.map (fun stored -> stored.entry)

@@ -35,7 +35,8 @@ let unsupported ?deferral ctx origin exp reason suggestion =
       ~category:Diagnostics.Unsupported
       ~origin
       ~constructor:"Premise/IfPr/MemE/binding"
-      ~enclosing:(Context.enclosing_path ctx)
+      ~enclosing:
+        (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
       ~profile:(Context.profile_name ctx)
       ~source_echo:(Premise_diagnostic.source_echo_exp exp)
       ~reason

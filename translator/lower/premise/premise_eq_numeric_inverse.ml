@@ -63,7 +63,7 @@ let lower names ctx env ~bound_vars origin exp product_exp known_exp =
     | Some factor_term, Some known_term ->
       let prefix_conditions = factor_result.guards @ known_result.guards in
       (match
-         Condition_closure.conditions_admissible_bound
+         Condition_admissibility.conditions_admissible_bound
            ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
            bound_vars
            prefix_conditions

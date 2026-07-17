@@ -3,14 +3,8 @@ open Il.Ast
 open Util.Source
 
 open Runtime_truth_worklist_core
+open Runtime_truth_worklist_premise
 open Runtime_truth_worklist_positive
-
-module Refutation : sig
-  val lower_rule :
-    Context.t -> item -> relation list -> relation -> int ->
-    Runtime_truth_scc.rule -> generated list * Diagnostics.t list
-  val solver : item -> relation -> (int * Runtime_truth_scc.rule) list -> generated list
-end = struct
 
 let match_equations item relation index terms =
   let vars, _ = input_vars Local_name.empty relation.sorts in
@@ -24,6 +18,37 @@ type false_child =
   | Refutable of generated list * Diagnostics.t list
   | Irrefutable of Diagnostics.t list
   | False_blocked of Diagnostics.t list
+
+let premise_source = function
+  | Runtime_truth_scc.Finite_rule_call { premise; _ }
+  | Finite_domain_call premise
+  | Finite_successor_call { premise; _ }
+  | Deterministic_total premise
+  | Externally_validated premise
+  | Source_boolean premise
+  | Deterministic_binding_iter premise
+  | Finite_iter { premise; _ } -> premise
+
+let premise_constructor prem =
+  match prem.it with
+  | RulePr _ -> "RulePr"
+  | IfPr _ -> "IfPr"
+  | LetPr _ -> "LetPr"
+  | ElsePr -> "ElsePr"
+  | IterPr _ -> "IterPr"
+  | NegPr _ -> "NegPr"
+
+let false_blocked ctx item origin prem_index premise constructor reason suggestion =
+  let prem = premise_source premise in
+  let origin =
+    Origin.with_child
+      ~source_echo:(Il.Print.string_of_prem prem)
+      origin ("premise-" ^ string_of_int prem_index)
+      ~ast_constructor:(premise_constructor prem) prem.at
+  in
+  False_blocked
+    [ diagnostic ctx item origin constructor reason suggestion
+        (Some (Il.Print.string_of_prem prem)) ]
 
 let deterministic_false_child
     ctx item relations origin rule_index prem_index head head_guards
@@ -43,16 +68,16 @@ let deterministic_false_child
         ~ast_constructor:"IfPr" prem.at
     in
     match
-      Runtime_truth_total_equality.source_boolean_alternatives
+      Runtime_truth_condition_complement.source_boolean_alternatives
         ctx state.env premise_origin exp
     with
     | Error blockers ->
       False_blocked
-        (List.map (Runtime_truth_total_equality.diagnostic ctx) blockers)
-    | Ok (_, [], diagnostics) -> Irrefutable diagnostics
-    | Ok (_, failures, diagnostics) ->
+        (List.map (Runtime_truth_totality.diagnostic ctx) blockers)
+    | Ok proof when proof.failures = [] -> Irrefutable proof.diagnostics
+    | Ok proof ->
       let rules =
-        failures
+        proof.failures
         |> List.mapi (fun alternative failure ->
           let conditions =
             prefix @ List.map (fun condition -> EqCondition condition) failure
@@ -69,7 +94,7 @@ let deterministic_false_child
                   ^ "-" ^ string_of_int (alternative + 1))
                lhs rhs conditions))
       in
-      Refutable (state.statements @ rules, diagnostics)
+      Refutable (state.statements @ rules, proof.diagnostics)
   in
   match premise with
   | Runtime_truth_scc.Finite_rule_call _ as premise ->
@@ -90,7 +115,11 @@ let deterministic_false_child
                     ^ "-" ^ string_of_int prem_index)
                  lhs rhs conditions) ]
         , diagnostics )
-    | None -> False_blocked [])
+    | None ->
+      false_blocked ctx item origin prem_index premise
+        "RuntimeTruthWorklist/false/finite-call"
+        "finite RulePr child has no materializable total refute call"
+        "Keep this decision Unsupported until the exact child relation has a complete false surface")
   | Runtime_truth_scc.Externally_validated _ -> Irrefutable []
   | Runtime_truth_scc.Source_boolean prem ->
     (match prem.it with
@@ -132,7 +161,11 @@ let deterministic_false_child
       | Some result when result.statements <> [] ->
         Refutable (state.statements @ result.statements, result.diagnostics)
       | Some result -> Irrefutable result.diagnostics
-      | None -> False_blocked [])
+      | None ->
+        false_blocked ctx item origin prem_index premise
+          "RuntimeTruthWorklist/false/let-equality"
+          "deterministic LetPr equality has no source-complete false branch"
+          "Prove a total equality complement for this exact LetPr before admitting decision mode")
     | RulePr (rel_id, [], _, exp) ->
       (match Runtime_truth_deterministic_false.materialize
                ~prefix_conditions:prefix
@@ -150,7 +183,10 @@ let deterministic_false_child
            externally validated profile; it cannot refute this RuleD. *)
         Irrefutable [])
     | RulePr (_, _ :: _, _, _) | ElsePr | IterPr _ | NegPr _ ->
-      False_blocked [])
+      false_blocked ctx item origin prem_index premise
+        "RuntimeTruthWorklist/false/deterministic-shape"
+        "deterministic premise classification reached a shape without a total false materializer"
+        "Keep this exact premise Unsupported until its source constructor has a complete false branch")
   | Runtime_truth_scc.Deterministic_binding_iter _ ->
     Irrefutable []
   | Runtime_truth_scc.Finite_iter finite ->
@@ -200,13 +236,22 @@ let deterministic_false_child
                  "indexed premise was materialized without its decision-mode refuter"
                  "Request Decide mode before constructing an indexed false edge"
                  None ]))
-    | None, diagnostics -> False_blocked diagnostics)
+    | None, (_ :: _ as diagnostics) -> False_blocked diagnostics
+    | None, [] ->
+      false_blocked ctx item origin prem_index premise
+        "RuntimeTruthWorklist/false/finite-iter"
+        "finite iterator premise has no complete universal false edge"
+        "Materialize the exact finite iterator complement before admitting decision mode")
   | Runtime_truth_scc.Finite_domain_call _
-  | Runtime_truth_scc.Finite_successor_call _ -> False_blocked []
+  | Runtime_truth_scc.Finite_successor_call _ ->
+    false_blocked ctx item origin prem_index premise
+      "RuntimeTruthWorklist/false/finite-successor"
+      "finite successor premise reached ordinary RuleD refutation without an exhaustive successor certificate"
+      "Route this premise through its certified finite-domain refuter before admitting decision mode"
 
 let lower_rule ctx item relations relation index rule =
   let origin, declarations, bind_diagnostics, head =
-    lower_head ctx item relation index rule
+    Runtime_truth_worklist_rule.lower_head ctx item relation index rule
   in
   match head.terms with
   | None -> [], bind_diagnostics @ head.diagnostics
@@ -411,5 +456,3 @@ let solver item relation indexed_rules =
          ])
   in
   [ cycle; all_rule; exhaustive ]
-
-end

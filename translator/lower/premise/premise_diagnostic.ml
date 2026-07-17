@@ -5,7 +5,8 @@ let unsupported ?suggestion ~ctx ~origin ~constructor ~reason ?source_echo () =
     ~category:Diagnostics.Unsupported
     ~origin
     ~constructor
-    ~enclosing:(Context.enclosing_path ctx)
+    ~enclosing:
+      (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
     ~profile:(Context.profile_name ctx)
     ~reason
     ?suggestion
@@ -17,7 +18,8 @@ let skipped ?suggestion ~ctx ~origin ~constructor ~reason ?source_echo () =
     ~category:Diagnostics.Skipped
     ~origin
     ~constructor
-    ~enclosing:(Context.enclosing_path ctx)
+    ~enclosing:
+      (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
     ~profile:(Context.profile_name ctx)
     ~reason
     ?suggestion

@@ -53,7 +53,7 @@ let true_rule ctx item =
          [ lhs ]
   in
   let diagnostics =
-    Condition_closure.crl_admissibility_diagnostics
+    Condition_admissibility.crl_admissibility_diagnostics
       ~constructor_op:(pattern_certificate ctx item)
       ctx
       item.origin
@@ -113,7 +113,7 @@ let false_rule ctx item =
            [ lhs ]
     in
     let diagnostics =
-      Condition_closure.crl_admissibility_diagnostics
+      Condition_admissibility.crl_admissibility_diagnostics
         ~constructor_op:(pattern_certificate ctx item)
         ctx
         item.origin
@@ -148,7 +148,7 @@ let false_rule ctx item =
            [ lhs ]
     in
     let diagnostics =
-      Condition_closure.crl_admissibility_diagnostics
+      Condition_admissibility.crl_admissibility_diagnostics
         ~constructor_op:(pattern_certificate ctx item)
         ctx item.origin lhs call.false_rhs conditions
     in

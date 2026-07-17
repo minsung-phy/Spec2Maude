@@ -25,7 +25,8 @@ let diagnostic ?suggestion ?source_echo ~category ~ctx ~origin ~constructor ~rea
     ~category
     ~origin
     ~constructor
-    ~enclosing:(Context.enclosing_path ctx)
+    ~enclosing:
+      (Diagnostic_provenance.enclosing ~context:(Context.enclosing_path ctx) origin)
     ~profile:(Context.profile_name ctx)
     ~reason
     ()
@@ -709,7 +710,7 @@ let translate_decd_clause ctx dec_origin op_name id params index clause =
           |> dedup_conditions
         in
         let admissibility_diags =
-          Condition_closure.ceq_admissibility_diagnostics
+          Condition_admissibility.ceq_admissibility_diagnostics
             ~constructor_op:pattern_certificate
             ctx origin lhs rhs_term conditions
         in
@@ -864,7 +865,7 @@ let translate_rewrite_decd_clause ctx dec_origin op_name id params index clause 
           |> Reld_result.dedup_rule_conditions
         in
         let admissibility_diags =
-          Condition_closure.crl_admissibility_diagnostics
+          Condition_admissibility.crl_admissibility_diagnostics
             ~constructor_op:pattern_certificate
             ctx origin lhs rhs_result.term conditions
         in

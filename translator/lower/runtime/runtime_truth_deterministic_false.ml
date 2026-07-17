@@ -353,7 +353,7 @@ let materialize
           |> List.concat_map (fun statement ->
             match statement.Maude_ir.node with
             | Maude_ir.Crl (_label, lhs, rhs, conditions) ->
-              Condition_closure.crl_admissibility_diagnostics
+              Condition_admissibility.crl_admissibility_diagnostics
                 ctx
                 origin
                 lhs
