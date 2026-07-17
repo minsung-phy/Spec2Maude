@@ -26,6 +26,7 @@ type t =
   ; definition_calls :
       (Maude_ir.term, Analysis.Function_graph.definition_identity list) Hashtbl.t
   ; emitted_definition_ops : (string, unit) Hashtbl.t
+  ; record_certificates : Record_certificate.t
   }
 
 type stage =
@@ -96,6 +97,7 @@ let create
   ; runtime_relation_uses = []
   ; definition_calls = Hashtbl.create 127
   ; emitted_definition_ops = emitted_definition_ops function_graph builtins
+  ; record_certificates = Record_certificate.create ()
   }
 
 let profile_name ctx =
@@ -121,6 +123,7 @@ let begin_stage target =
     ; constructors = Constructor_registry.copy target.constructors
     ; definition_calls = copy_table target.definition_calls
     ; runtime_ingress_uses = copy_table target.runtime_ingress_uses
+    ; record_certificates = Record_certificate.copy target.record_certificates
     }
   in
   { target; helper_stage; staged }
@@ -140,7 +143,10 @@ let commit_stage stage =
   Hashtbl.clear stage.target.runtime_ingress_uses;
   Hashtbl.iter
     (Hashtbl.add stage.target.runtime_ingress_uses)
-    stage.staged.runtime_ingress_uses
+    stage.staged.runtime_ingress_uses;
+  Record_certificate.replace
+    ~target:stage.target.record_certificates
+    ~source:stage.staged.record_certificates
 
 let constructors t =
   t.constructors
@@ -250,6 +256,9 @@ let definition_call_identities t term =
 
 let emitted_definition_operator t op_name =
   Hashtbl.mem t.emitted_definition_ops op_name
+
+let record_certificates t =
+  t.record_certificates
 
 let with_def t id =
   { t with enclosing = { def_id = Some id; rule_id = None; clause_id = None } }

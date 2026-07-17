@@ -94,6 +94,9 @@ let wrapper_constructor_for_id id =
 let record_constructor id =
   "rec." ^ category_slug id
 
+let record_composition id =
+  "compose." ^ record_constructor id
+
 let definition_op id =
   "def." ^ source_slug ~lower:true id.Util.Source.it
 

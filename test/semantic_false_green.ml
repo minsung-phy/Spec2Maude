@@ -5081,7 +5081,12 @@ let test_deferred_listn_retries_after_producer () =
       (CmpE (`EqOp, `NatT, left, right) $$ region % (BoolT $ region))
     $ region
   in
-  let index = Analysis.Source_index.of_script [] in
+  let record_typ = StructT [ field, (nat_typ, [], []), [] ] $ region in
+  let record_inst = InstD ([], [], record_typ) $ region in
+  let record_def =
+    TypD (id "renamed_module_instance", [], [ record_inst ]) $ region
+  in
+  let index = Analysis.Source_index.of_script [ record_def ] in
   let ctx = Context.create index (Builtin_registry.of_source_index index) in
   let env =
     Expr_env.empty

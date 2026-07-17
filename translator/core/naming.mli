@@ -16,6 +16,7 @@ val destructor_op_for_typ : Il.Ast.typ -> Il.Ast.mixop -> int -> string
 val wrapper_constructor_in_category : string -> string
 val wrapper_constructor_for_id : Il.Ast.id -> string
 val record_constructor : Il.Ast.id -> string
+val record_composition : Il.Ast.id -> string
 val definition_op : Il.Ast.id -> string
 val builtin_definition_op : Il.Ast.id -> string
 val specialized_definition_op :

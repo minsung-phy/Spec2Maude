@@ -337,18 +337,24 @@ let variable_name = function
     invalid_arg "Type_translate.variable_name: expected Maude variable"
 
 let component_names env target binds components =
-  let sources =
-    (components |> List.filter_map (fun (payload, _) -> payload_source_id payload))
-    @ (binds
-       |> List.filter_map (fun bind ->
-         match bind.it with
-         | ExpP (id, _) | TypP id when id.it <> "_" -> Some id.it
-         | ExpP _ | TypP _ | DefP _ | GramP _ -> None))
+  (* Repeated component labels do not assert equality; equality is an explicit
+     source premise.  Reserve only hidden binders here and name each occurrence. *)
+  let component_sources =
+    components |> List.filter_map (fun (payload, _) -> payload_source_id payload)
+  in
+  let hidden_sources =
+    binds
+    |> List.filter_map (fun bind ->
+      match bind.it with
+      | ExpP (id, _) | TypP id
+        when id.it <> "_" && not (List.mem id.it component_sources) ->
+        Some id.it
+      | ExpP _ | TypP _ | DefP _ | GramP _ -> None)
   in
   Type_static_env.reserve_static_env Local_name.empty env
   |> fun names ->
      Local_name.reserve_existing_many names (Condition_closure.term_vars target)
-  |> fun names -> Local_name.reserve_sources names sources
+  |> fun names -> Local_name.reserve_sources names hidden_sources
 
 let lower_component env ctx origin constructor names (payload, typ) =
   let payload_diagnostics =
@@ -364,7 +370,7 @@ let lower_component env ctx origin constructor names (payload, typ) =
     let source_id = payload_source_id payload in
     let variable, names =
       match source_id with
-      | Some id -> Local_name.source_qualified names id (sr sort), names
+      | Some id -> Local_name.fresh_source_qualified names id (sr sort)
       | None -> Local_name.fresh_qualified names Local_name.Component (sr sort)
     in
     Some
@@ -1427,17 +1433,132 @@ let option_all items =
   else
     None
 
-let translate_struct env ctx origin target id fields =
+let record_composition_term plan left right =
+  match plan with
+  | Record_certificate.Append -> app "_ _" [ left; right ]
+  | Record_certificate.Compose_optional -> app "composeOpt" [ left; right ]
+  | Record_certificate.Compose_record nested ->
+    app
+      (Naming.record_composition (Record_certificate.plan_id nested))
+      [ left; right ]
+
+let rec record_composition_fields names fields plans =
+  match fields, plans with
+  | [], [] -> Some ([], [], []), names
+  | (atom, component) :: fields, plan :: plans ->
+    let atom_name = qid_of_atom atom in
+    let left, names =
+      Local_name.fresh_source_qualified
+        names ("LEFT_" ^ atom_name) (sr component.sort)
+    in
+    let right, names =
+      Local_name.fresh_source_qualified
+        names ("RIGHT_" ^ atom_name) (sr component.sort)
+    in
+    (match record_composition_fields names fields plans with
+    | Some (lefts, rights, results), names ->
+      Some
+        ( left :: lefts
+        , right :: rights
+        , record_composition_term plan left right :: results )
+      , names
+    | None, names -> None, names)
+  | _ -> None, names
+
+let record_composition_statements origin names fields plan =
+  let id = Record_certificate.plan_id plan in
+  let plans = Record_certificate.plan_fields plan |> List.map snd in
+  match record_composition_fields names fields plans with
+  | None, _ -> None
+  | Some (lefts, rights, results), _ ->
+    let constructor = Naming.record_constructor id in
+    let left = app constructor lefts in
+    let right = app constructor rights in
+    let result = app constructor results in
+    let composition = app (Naming.record_composition id) [ left; right ] in
+    let declaration =
+      gen origin
+        (op (Naming.record_composition id)
+           [ sr spectec_terminal; sr spectec_terminal ]
+           spectec_terminal ~kind:Partial)
+    in
+    let equation =
+      match fields with
+      | [] -> gen origin (eq composition result)
+      | _ ->
+        gen origin
+          (ceq composition result
+             [ MembershipCond (left, spectec_terminal)
+             ; MembershipCond (right, spectec_terminal)
+             ])
+    in
+    Some [ declaration; equation ]
+
+let record_surface_diagnostic ctx origin source_fields conflict =
+  unsupported
+    ~ctx ~origin ~constructor:"TypD/StructT/record-surface"
+    ~source_echo:
+      (source_fields
+       |> List.filter_map source_echo_typfield
+       |> String.concat ", ")
+    ~reason:(Record_certificate.describe_conflict conflict)
+    ~suggestion:
+      "Ensure every specialization sharing this canonical StructT surface has identical field identities, carriers, and recursive composition plan"
+    ()
+
+let record_helper_invariant_diagnostic ctx origin id reason =
+  unsupported
+    ~ctx ~origin ~constructor:"TypD/StructT/composition-helper-invariant"
+    ~reason:
+      ("composition helper `" ^ Naming.record_composition id ^ "` " ^ reason)
+    ~suggestion:
+      "Keep this StructT unsupported until its canonical record certificate and helper plan agree"
+    ()
+
+let materialize_record_composition ctx origin names fields plan =
+  let certificates = Context.record_certificates ctx in
+  match Record_certificate.helper_status certificates plan with
+  | Record_certificate.Helper_emitted -> [], []
+  | Record_certificate.Helper_unavailable _ ->
+    let missing = Record_certificate.missing_dependencies certificates plan in
+    if missing <> [] then (
+      Record_certificate.note_helper_unavailable certificates plan missing;
+      [], [])
+    else
+      (match record_composition_statements origin names fields plan with
+      | Some statements ->
+        Record_certificate.note_helper_emitted certificates plan;
+        statements, []
+      | None ->
+        [],
+        [ record_helper_invariant_diagnostic
+            ctx origin (Record_certificate.plan_id plan)
+            "has a field arity inconsistent with its lowered constructor"
+        ])
+  | Record_certificate.Helper_missing ->
+    [],
+    [ record_helper_invariant_diagnostic
+        ctx origin (Record_certificate.plan_id plan)
+        "was requested before its record surface was registered"
+    ]
+  | Record_certificate.Helper_incompatible ->
+    [],
+    [ record_helper_invariant_diagnostic
+        ctx origin (Record_certificate.plan_id plan)
+        "does not match the registered specialized StructT plan"
+    ]
+
+let translate_struct env ctx origin target id source_fields =
   let all_components =
-    fields
+    source_fields
     |> List.concat_map (fun (_, (typ, _, _), _) -> Type_shape.typ_components typ)
   in
   let all_binds =
-    fields |> List.concat_map (fun (_, (_, binds, _), _) -> binds)
+    source_fields |> List.concat_map (fun (_, (_, binds, _), _) -> binds)
   in
   let names = component_names env target all_binds all_components in
   let lowered, diagnostics, names =
-    fields
+    source_fields
     |> List.mapi (fun index field -> index + 1, field)
     |> List.fold_left
          (fun (lowered, diagnostics, names) (index, field) ->
@@ -1490,7 +1611,7 @@ let translate_struct env ctx origin target id fields =
              (Const "true")
              [ MembershipCond (record_term, spectec_terminal) ])
     in
-    let accessor_and_updates, _names =
+    let accessor_and_updates, names =
       fields
       |> List.mapi (fun index (atom, component) ->
         index, atom, component)
@@ -1516,10 +1637,54 @@ let translate_struct env ctx origin target id fields =
         names)
            ([], names)
     in
-    { statements =
-        [ op_decl ] @ membership @ [ typecheck_statement ] @ accessor_and_updates
-    ; diagnostics
-    }
+    let composition =
+      let shape : Record_shape.t = { id; fields = source_fields } in
+      match Record_shape.composition ctx shape with
+      | Ok plan -> Some plan
+      | Error _ -> None
+    in
+    let surface_statements =
+      [ op_decl ] @ membership @ [ typecheck_statement ] @ accessor_and_updates
+    in
+    let composition_surface =
+      match composition with
+      | None -> []
+      | Some plan ->
+        record_composition_statements origin names fields plan
+        |> Option.value ~default:[]
+    in
+    let definition =
+      Record_certificate.definition
+        ~origin ~id
+        ~fields:
+          (fields
+           |> List.map (fun (atom, component) -> atom, component.sort))
+        ~composition
+        ~surface:
+          ((surface_statements @ composition_surface)
+           |> List.map (fun statement -> statement.node))
+    in
+    let emit_registered_surface record_statements =
+      let composition_statements, composition_diagnostics =
+        match composition with
+        | None -> [], []
+        | Some plan ->
+          materialize_record_composition ctx origin names fields plan
+      in
+      { statements = record_statements @ composition_statements
+      ; diagnostics = diagnostics @ composition_diagnostics
+      }
+    in
+    (match
+       Record_certificate.register (Context.record_certificates ctx) definition
+     with
+    | Record_certificate.Conflict conflict ->
+      { statements = []
+      ; diagnostics =
+          diagnostics @ [ record_surface_diagnostic ctx origin source_fields conflict ]
+      }
+    | Record_certificate.Fresh -> emit_registered_surface surface_statements
+    | Record_certificate.Duplicate -> emit_registered_surface [])
   | None ->
     with_diagnostics diagnostics
 

@@ -18,6 +18,16 @@
  (modules naming_regression)
  (libraries translator il util xl))
 
+(test
+ (name record_semantics_regression)
+ (modules record_semantics_regression)
+ (libraries translator il util xl))
+
+(test
+ (name optional_iter_binding_regression)
+ (modules optional_iter_binding_regression)
+ (libraries translator il util xl))
+
 (executable
  (name runtime_truth_decision_fixture)
  (modules runtime_truth_decision_fixture)
@@ -36,6 +46,16 @@
 (executable
  (name membership_witness_fixture)
  (modules membership_witness_fixture)
+ (libraries translator il util xl))
+
+(executable
+ (name optional_composition_fixture)
+ (modules optional_composition_fixture)
+ (libraries translator il util xl))
+
+(executable
+ (name record_composition_fixture)
+ (modules record_composition_fixture)
  (libraries translator il util xl))
 
 (rule
@@ -68,8 +88,24 @@
 
 (rule
  (alias runtest)
+ (deps optional_composition_reductions.sh)
+ (action
+  (run sh %{dep:optional_composition_reductions.sh}
+    %{exe:optional_composition_fixture.exe})))
+
+(rule
+ (alias runtest)
+ (deps record_composition_reductions.sh)
+ (action
+  (run sh %{dep:record_composition_reductions.sh}
+    %{exe:record_composition_fixture.exe})))
+
+(rule
+ (alias runtest)
  (deps
   runtime_truth_generated.sh
+  constructor_component_generated.sh
+  record_semantics_generated.sh
   ../builtins.maude
   ../config/wasm-3.0-runtime-ingress.contract
   (glob_files ../wasm-3.0/*.spectec))
