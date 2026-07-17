@@ -58,6 +58,7 @@ type t =
 
 val plan :
   ?total_value:(bound:string list -> Il.Ast.exp -> bool) ->
+  ?zero_or_one_value:(bound:string list -> Il.Ast.exp -> bool) ->
   ?total_value_with_facts:
     (facts:Runtime_truth_successor_domain.total_fact list ->
      bound:string list -> Il.Ast.exp -> bool) ->
@@ -67,6 +68,7 @@ val plan :
   Analysis.Function_graph.t -> string -> t
 val complete : t -> bool
 val decision_complete : t -> bool
+val incomplete_decision_relations : t -> string list
 val find_scc : t -> string -> scc option
 val scheduled_premises : rule -> (int * premise) list
 val successor_domain :

@@ -1,7 +1,12 @@
+type binding_domain =
+  | Total
+  | Zero_or_one
+
 type binding =
   { premise : Il.Ast.prem
   ; pattern : Il.Ast.exp
   ; value : Il.Ast.exp
+  ; domain : binding_domain
   }
 
 type producer =
@@ -91,6 +96,7 @@ type decision =
 
 val certify :
   ?source_total:(bound:string list -> Il.Ast.exp -> bool) ->
+  ?source_zero_or_one:(bound:string list -> Il.Ast.exp -> bool) ->
   ?source_total_with_facts:
     (facts:total_fact list -> bound:string list -> Il.Ast.exp -> bool) ->
   ?constructors:Constructor_registry.t ->

@@ -34,6 +34,14 @@ let predicate_mixop =
   let marker = Xl.Atom.Turnstile $$ region % Xl.Atom.info "regression" in
   Xl.Mixop.Infix (Xl.Mixop.Arg (), marker, Xl.Mixop.Arg ())
 
+let subtyping_mixop =
+  let turnstile = Xl.Atom.Turnstile $$ region % Xl.Atom.info "regression" in
+  let sub = Xl.Atom.Sub $$ region % Xl.Atom.info "regression" in
+  Xl.Mixop.Seq
+    [ Xl.Mixop.Arg (); Xl.Mixop.Atom turnstile; Xl.Mixop.Arg ()
+    ; Xl.Mixop.Atom sub; Xl.Mixop.Arg ()
+    ]
+
 let fixed_literal_predicate_mixop =
   let marker = Xl.Atom.Turnstile $$ region % Xl.Atom.info "regression" in
   let fixed = Xl.Atom.Atom "PROOF" $$ region % Xl.Atom.info "regression" in
@@ -384,6 +392,12 @@ let test_rewrite_exists_head_and_tail_success () =
 
 let rulepr relation components =
   RulePr (id relation, [], mixop, TupE components $$ region % nat_typ) $ region
+
+let rulepr_with relation_mixop relation components =
+  RulePr
+    (id relation, [], relation_mixop,
+     TupE components $$ region % nat_typ)
+  $ region
 
 let test_finite_transitive_proof () =
   let c, left, right, witness = var "c", var "left", var "right", var "witness" in
@@ -784,7 +798,11 @@ let delegated_graph ?(include_definition = true) ?(bound_call = true)
     Runtime_truth_total_equality.source_total ctx ~bound
       (origin "delegated-call-totality") exp
   in
-  graph, source_total
+  let source_zero_or_one ~bound exp =
+    Runtime_truth_total_equality.source_zero_or_one ctx ~bound
+      (origin "delegated-call-definedness") exp
+  in
+  graph, source_total, source_zero_or_one
 
 let delegated_certificate graph =
   let rules =
@@ -820,7 +838,7 @@ let has_successor_blocker constructor = function
   | Materialized _ -> false
 
 let test_delegated_indexed_binding_certificate () =
-  let graph, source_total = delegated_graph () in
+  let graph, source_total, _ = delegated_graph () in
   match Runtime_truth_successor_domain.certify ~source_total graph (delegated_certificate graph) with
   | Materialized
       { producers =
@@ -843,14 +861,14 @@ let test_delegated_indexed_binding_certificate () =
               blockers))
 
 let test_delegated_binding_orientation () =
-  let graph, source_total = delegated_graph ~call_on_left:false () in
+  let graph, source_total, _ = delegated_graph ~call_on_left:false () in
   match Runtime_truth_successor_domain.certify ~source_total graph (delegated_certificate graph) with
   | Materialized _ -> ()
   | Blocked _ ->
     failwith "delegated LetPr rejected the symmetric deterministic-call orientation"
 
 let test_delegated_binding_blockers () =
-  let check (graph, source_total) constructor message =
+  let check (graph, source_total, _) constructor message =
     let decision =
       Runtime_truth_successor_domain.certify
         ~source_total graph (delegated_certificate graph)
@@ -875,6 +893,35 @@ let test_delegated_binding_blockers () =
     ; delegated_graph ~partial_definition:true ()
     ; delegated_graph ~stuck_definition:true ()
     ]
+
+let test_delegated_zero_or_one_binding () =
+  let graph, source_total, source_zero_or_one =
+    delegated_graph ~partial_definition:true ~stuck_definition:true ()
+  in
+  match
+    Runtime_truth_successor_domain.certify
+      ~source_total ~source_zero_or_one
+      graph (delegated_certificate graph)
+  with
+  | Materialized
+      { producers =
+          [ Delegated
+              { producers =
+                  [ Indexed
+                      { bindings =
+                          [ { domain = Zero_or_one; _ } ]
+                      ; _ } ]
+              ; _ } ]
+      ; _ } -> ()
+  | Materialized _ ->
+    failwith "zero-or-one DecD binding lost its explicit domain certificate"
+  | Blocked blockers ->
+    failwith
+      ("single-clause partial DecD was not admitted as zero-or-one: "
+       ^ String.concat "; "
+           (List.map
+              (fun blocker -> blocker.Runtime_truth_successor_domain.reason)
+              blockers))
 
 let test_runtime_truth_scc_renaming () =
   let x = var "x" in
@@ -980,6 +1027,100 @@ let test_open_rules_cannot_prove_zero_successors () =
   | Blocked _ -> failwith "open target-conditional rule produced the wrong blocker"
   | Materialized _ ->
     failwith "target-conditional rule with an unbound witness was admitted")
+
+let rooted_subtyping_certificate ~excluded_bottom =
+  let relation_id = "rooted_subtyping" in
+  let domain_id = "rooted_domain" in
+  let context, left, right, witness =
+    var "context", var "left", var "right", var "witness"
+  in
+  let bottom = NumE (`Nat Z.zero) $$ region % nat_typ in
+  let excluded = NumE (`Nat (Z.of_int excluded_bottom)) $$ region % nat_typ in
+  let root = NumE (`Nat (Z.of_int 9)) $$ region % nat_typ in
+  let sub_rule name head prems =
+    RuleD (id name, [], subtyping_mixop, head, prems) $ region
+  in
+  let rooted =
+    sub_rule "rooted"
+      (TupE [ context; bottom; right ] $$ region % nat_typ)
+      [ rulepr_with subtyping_mixop relation_id [ context; right; root ]
+      ; IfPr
+          (CmpE (`NeOp, `NatT, right, excluded)
+           $$ region % (BoolT $ region))
+        $ region
+      ]
+  in
+  let universal =
+    sub_rule "bottom"
+      (TupE [ context; bottom; right ] $$ region % nat_typ) []
+  in
+  let transitive =
+    sub_rule "transitive"
+      (TupE [ context; left; right ] $$ region % nat_typ)
+      [ rulepr_with predicate_mixop domain_id [ context; witness ]
+      ; rulepr_with subtyping_mixop relation_id [ context; left; witness ]
+      ; rulepr_with subtyping_mixop relation_id [ context; witness; right ]
+      ]
+  in
+  let domain_result =
+    TupT [ id "context", nat_typ; id "value", nat_typ ] $ region
+  in
+  let domain_rule =
+    RuleD
+      (id "domain", [], predicate_mixop,
+       TupE [ context; witness ] $$ region % domain_result, [])
+    $ region
+  in
+  let domain =
+    RelD
+      (id domain_id, [], predicate_mixop, domain_result, [ domain_rule ])
+    $ region
+  in
+  let relation_result =
+    TupT
+      [ id "context", nat_typ; id "left", nat_typ; id "right", nat_typ ]
+    $ region
+  in
+  let relation =
+    RelD
+      (id relation_id, [], subtyping_mixop, relation_result,
+       [ rooted; universal; transitive ])
+    $ region
+  in
+  let graph = function_graph [ domain; relation ] relation_id in
+  let transitive =
+    Analysis.Function_graph.runtime_relation_rules graph relation_id
+    |> Option.value ~default:[]
+    |> List.find_map (fun rule ->
+         if rule.Analysis.Function_graph.rule_id <> Some "transitive" then None
+         else
+           Runtime_witness_proof.transitive_domain
+             { Runtime_witness_proof.identity = rule.identity
+             ; relation_id = rule.relation_id
+             ; rule_id = rule.rule_id
+             ; origin = rule.origin
+             ; source_echo = rule.source_echo
+             ; head = rule.head
+             ; prems = rule.prems
+             })
+    |> Option.get
+  in
+  Runtime_truth_successor_domain.certify graph transitive
+
+let test_rooted_subtyping_cut_certificate () =
+  (match rooted_subtyping_certificate ~excluded_bottom:0 with
+  | Materialized certificate
+    when Runtime_truth_successor_domain.decision_complete certificate -> ()
+  | Materialized _ ->
+    failwith "rooted subtyping schema did not acquire complete successor coverage"
+  | Blocked _ -> failwith "rooted subtyping schema was not materialized");
+  match rooted_subtyping_certificate ~excluded_bottom:1 with
+  | Materialized certificate
+    when not (Runtime_truth_successor_domain.decision_complete certificate) -> ()
+  | Materialized _ ->
+    failwith "rooted subtyping schema accepted a guard excluding another bottom"
+  | Blocked _ ->
+    failwith "mutated rooted subtyping schema lost its conservative materialization"
 
 let planned_rule plan relation_id =
   plan.Runtime_truth_scc.sccs
@@ -1149,7 +1290,21 @@ let test_runtime_validation_certificate_is_closed_and_use_exact () =
        [ ExpA (NumE (`Nat Z.zero) $$ region % nat_typ) $ region ] false then
     failwith "caller-supplied RulePr arguments acquired a validation certificate";
   if certified [] [] true then
-    failwith "an exact runtime-demanded RulePr use was discharged as validation-only"
+    failwith "an exact runtime-demanded RulePr use was discharged as validation-only";
+  match
+    Runtime_validation_certificate.premise_shape
+      ~predicate_marker:true
+      ~source_params:[]
+      ~mixop_equal:Il.Eq.eq_mixop
+      ~declaration_mixop:predicate_mixop
+      ~premise_args:[]
+      ~premise_mixop:predicate_mixop
+      ~result:nat_typ
+      ~premise_exp:(NumE (`Nat Z.zero) $$ region % nat_typ)
+  with
+  | Certified -> ()
+  | Unavailable _ ->
+    failwith "runtime-computed validation guard lost its declaration/use shape certificate"
 
 let test_runtime_truth_worklist_key () =
   let graph = function_graph [ relation_def "ground_relation" [] ] "ground_relation" in
@@ -1517,7 +1672,7 @@ let constructor_entry case_origin constructor_op status =
   ; construction_domain = Constructor_registry.Total_constructor
   }
 
-let test_positive_domain_is_not_exhaustive_coverage () =
+let test_direct_successors_cover_transitive_decision () =
   let context, left, right, witness =
     var "partial_context", var "partial_left", var "partial_right",
     var "partial_witness"
@@ -1587,8 +1742,8 @@ let test_positive_domain_is_not_exhaustive_coverage () =
   | Materialized certificate ->
     if certificate.domain_candidates = [] then
       failwith "positive domain proof retained no certified candidate";
-    if Runtime_truth_successor_domain.decision_complete certificate then
-      failwith "partial positive producer set was promoted to exhaustive coverage"
+    if not (Runtime_truth_successor_domain.decision_complete certificate) then
+      failwith "complete direct-successor rules did not certify transitive decision"
 
 let unary_case_entry
     category constructor_op projection_op payload_sort construction_domain =
@@ -2233,6 +2388,21 @@ let test_head_guard_refutation () =
   | Complete [ [ EqCond (term, Const "false") ] ]
     when term = App ("isOpt", [ Var "RENAMED" ]) -> ()
   | _ -> failwith "matched-head false guard lacks a refutation alternative");
+  let sequence_guard =
+    BoolCond
+      (App
+         ("typecheckSeq",
+          [ App ("_ _", [ Var "HEAD"; Var "TAIL" ]); Const "syn.item" ]))
+  in
+  (match Runtime_truth_head_guard_refutation.complement
+           ~bound_terms:[ Var "HEAD"; Var "TAIL" ] [ sequence_guard ] with
+  | Complete [ [ EqCond (term, Const "false") ] ]
+    when term =
+         App
+           ("typecheckSeq",
+            [ App ("_ _", [ Var "HEAD"; Var "TAIL" ]); Const "syn.item" ]) ->
+    ()
+  | _ -> failwith "total sequence typecheck guard was treated as partial");
   (match Runtime_truth_head_guard_refutation.complement
            ~bound_terms:[ Var "RENAMED" ]
            [ BoolCond (App ("partialGuard", [ Var "RENAMED" ])) ] with
@@ -4961,6 +5131,7 @@ let () =
   test_runtime_truth_scc_renaming ();
   test_runtime_truth_open_successor ();
   test_open_rules_cannot_prove_zero_successors ();
+  test_rooted_subtyping_cut_certificate ();
   test_runtime_truth_iter_local_scope ();
   test_runtime_truth_dependency_schedule ();
   test_runtime_validation_certificate_is_closed_and_use_exact ();
@@ -4973,6 +5144,7 @@ let () =
   test_delegated_indexed_binding_certificate ();
   test_delegated_binding_orientation ();
   test_delegated_binding_blockers ();
+  test_delegated_zero_or_one_binding ();
   test_runtime_truth_worklist_key ();
   test_worklist_enabledness_requires_equation_first_failures ();
   test_legacy_truth_enabledness_rejects_equations ();
@@ -4980,7 +5152,7 @@ let () =
   test_renamed_synthetic_positive ();
   test_renamed_synthetic_negative ();
   test_renamed_synthetic_cyclic_false ();
-  test_positive_domain_is_not_exhaustive_coverage ();
+  test_direct_successors_cover_transitive_decision ();
   test_constructor_family_completeness ();
   test_open_length_guarded_constructor_is_refutable ();
   test_constructor_family_static_key_isolation ();

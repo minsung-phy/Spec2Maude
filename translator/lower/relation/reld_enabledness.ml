@@ -489,7 +489,8 @@ let translate_helper
                      ~predecessor_terms:lhs_terms
                      request
                  with
-                | Some _ when Premise_result.eq_conditions premise_result <> [] ->
+                | Runtime_truth_worklist_enabledness.Ready _
+                  when Premise_result.eq_conditions premise_result <> [] ->
                   enabled
                     [ runtime_enabledness_unsupported ctx origin rule
                         ~reason:
@@ -497,7 +498,7 @@ let translate_helper
                         ~suggestion:
                           "Preserve one ordered mixed condition sequence and certify every equation-failure branch before lowering this otherwise predecessor"
                     ]
-                | Some total_request ->
+                | Runtime_truth_worklist_enabledness.Ready total_request ->
                   let total_helper_name =
                     Helper.request (Context.helpers ctx)
                       { Request.kind =
@@ -514,7 +515,16 @@ let translate_helper
                   in
                   enabled ~statements:surface
                     ~complement_alternatives:[[ complement_condition ]] []
-                | None ->
+                | Runtime_truth_worklist_enabledness.Incomplete_decision relations ->
+                  enabled
+                    [ runtime_enabledness_unsupported ctx origin rule
+                        ~reason:
+                          ("runtime truth worklist has finite positive successors, but transitive relation(s) lack exhaustive direct-successor coverage: "
+                           ^ String.concat ", " relations)
+                        ~suggestion:
+                          "Classify every non-transitive source RuleD as an exhaustive finite successor producer before emitting the false decision"
+                    ]
+                | Runtime_truth_worklist_enabledness.Head_mismatch ->
                   enabled
                     [ runtime_enabledness_unsupported ctx origin rule
                         ~reason:

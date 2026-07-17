@@ -1363,10 +1363,13 @@ let producer_candidate ctx item relation arity call_terms index producer =
         "Expand the delegated certificate structurally before materializing its child producers"
         entry_rule.source_echo)
 
-let rec producer_candidates ctx item relation arity call_terms query_term next producer =
+let rec producer_candidates
+    ctx item relation arity call_terms query_term
+    ~query_endpoint_complete next producer =
   match producer with
   | Runtime_truth_successor_domain.Query_endpoint _
-    when item.request.mode = Runtime_truth_worklist_helper.Prove ->
+    when item.request.mode = Runtime_truth_worklist_helper.Prove
+         || query_endpoint_complete ->
     [ Materialized (query_term, [], []) ], next
   | Runtime_truth_successor_domain.Query_endpoint { rule; _ } ->
     [ edge_blocker ctx item rule.origin
@@ -1381,7 +1384,8 @@ let rec producer_candidates ctx item relation arity call_terms query_term next p
     |> List.fold_left
          (fun (results, next) producer ->
            let nested, next =
-             producer_candidates ctx item relation arity call_terms query_term next producer
+             producer_candidates ctx item relation arity call_terms query_term
+               ~query_endpoint_complete next producer
            in
            List.rev_append nested results, next)
          ([], next)
@@ -1673,7 +1677,10 @@ let transitive_edge
                (fun (results, next) producer ->
                  let children, next =
                    producer_candidates
-                     ctx item relation transitive.prefix_arity known right next producer
+                     ctx item relation transitive.prefix_arity known right
+                     ~query_endpoint_complete:
+                       (Runtime_truth_successor_domain.decision_complete domain)
+                     next producer
                  in
                  List.rev_append children results, next)
                ([], 0)

@@ -1,10 +1,15 @@
 open Il.Ast
 open Util.Source
 
+type binding_domain =
+  | Total
+  | Zero_or_one
+
 type binding =
   { premise : prem
   ; pattern : exp
   ; value : exp
+  ; domain : binding_domain
   }
 
 type producer =
@@ -586,7 +591,7 @@ let exact_domain_candidates graph constructors resolve_constructor
           in
           Some (List.rev candidates, List.rev facts, coverage))
 
-let delegated_prefix source_total known rule prefix =
+let delegated_prefix source_total source_zero_or_one known rule prefix =
   let blocked prem constructor reason suggestion =
     let origin =
       Origin.with_child ~source_echo:(Il.Print.string_of_prem prem)
@@ -599,6 +604,19 @@ let delegated_prefix source_total known rule prefix =
   in
   let bind_result prem bound introduced pattern value =
     let missing = Il.Free.Set.diff (free value) bound |> Il.Free.Set.elements in
+    let finish domain =
+      let fresh = Il.Free.Set.diff (free pattern) bound in
+      if Il.Free.Set.is_empty fresh || not (safe_result_pattern pattern) then
+        blocked prem
+          "RuntimeTruthSuccessorDomain/delegated/result-pattern-unsafe"
+          "delegated deterministic result is not matched by a constructor pattern that safely introduces source variables"
+          "Match the deterministic result with a constructor-shaped IL pattern before using introduced variables"
+      else
+        Ok
+          ( Il.Free.Set.union bound fresh
+          , Il.Free.Set.union introduced fresh
+          , { premise = prem; pattern; value; domain } )
+    in
     if missing <> [] then
       blocked prem
         "RuntimeTruthSuccessorDomain/delegated/call-input-unbound"
@@ -606,24 +624,22 @@ let delegated_prefix source_total known rule prefix =
          ^ String.concat ", " missing)
         "Bind every deterministic input before matching its result pattern"
     else match call_result value with
-    | Some (call_id, call) when not (source_total ~bound:(Il.Free.Set.elements bound) call) ->
-      blocked prem
-        "RuntimeTruthSuccessorDomain/delegated/call-not-source-complete-deterministic"
-        ("delegated binding calls `" ^ call_id.it
-         ^ "`, but that exact CallE is not total under the currently bound source/domain facts")
-        "Prove this exact call total with the source clause-partition analyzer before relying on its result as a finite successor source"
-    | Some _ | None ->
-      let fresh = Il.Free.Set.diff (free pattern) bound in
-      if Il.Free.Set.is_empty fresh || not (safe_result_pattern pattern) then
+    | Some (call_id, call) ->
+      let bound_ids = Il.Free.Set.elements bound in
+      let domain =
+        if source_total ~bound:bound_ids call then Some Total
+        else if source_zero_or_one ~bound:bound_ids call then Some Zero_or_one
+        else None
+      in
+      (match domain with
+      | None ->
         blocked prem
-          "RuntimeTruthSuccessorDomain/delegated/result-pattern-unsafe"
-          "delegated deterministic call result is not matched by a constructor pattern that safely introduces source variables"
-          "Match the deterministic result with a constructor-shaped IL pattern before using introduced variables"
-      else
-        Ok
-          ( Il.Free.Set.union bound fresh
-          , Il.Free.Set.union introduced fresh
-          , { premise = prem; pattern; value } )
+          "RuntimeTruthSuccessorDomain/delegated/call-not-source-complete-deterministic"
+          ("delegated binding calls `" ^ call_id.it
+           ^ "`, but that exact CallE is neither total nor a certified zero-or-one source value")
+          "Use a total DecD call, or a single-clause equation-backed DecD observed through a constructor result pattern"
+      | Some domain -> finish domain)
+    | None -> finish Zero_or_one
   in
   let rec scan bound introduced bindings = function
     | [] -> Ok (bound, introduced, List.rev bindings)
@@ -681,7 +697,8 @@ let delegated_prefix source_total known rule prefix =
   in
   scan known Il.Free.Set.empty [] prefix
 
-let delegated_producers source_total graph relation_id arity entry_rule delegated_id =
+let delegated_producers
+    source_total source_zero_or_one graph relation_id arity entry_rule delegated_id =
   match Analysis.Function_graph.runtime_relation_rules graph delegated_id with
   | None -> Error (blocker entry_rule "delegated predicate has no indexed source RuleD body")
   | Some rules ->
@@ -701,7 +718,10 @@ let delegated_producers source_total graph relation_id arity entry_rule delegate
                   | Some (head_prefix, left, _) -> union (left :: head_prefix)
                   | None -> Il.Free.Set.empty
                 in
-                (match delegated_prefix source_total known rule prefix with
+                (match
+                   delegated_prefix
+                     source_total source_zero_or_one known rule prefix
+                 with
                 | Error blocker -> Error blocker
                 | Ok (bound, introduced, bindings) ->
                   let missing = Il.Free.Set.diff (free source) bound |> Il.Free.Set.elements in
@@ -745,7 +765,7 @@ let delegated_producers source_total graph relation_id arity entry_rule delegate
     | Some blocker -> Error blocker
     | None -> Ok (List.concat_map (function Ok ps -> ps | Error _ -> []) results)
 
-let classify_rule source_total graph relation_id arity rule =
+let classify_rule source_total source_zero_or_one graph relation_id arity rule =
   match split_endpoints arity rule.Analysis.Function_graph.head with
   | None -> Error (blocker rule "RuleD head does not expose the transitive relation prefix and two endpoints")
   | Some (prefix, left, right) ->
@@ -755,7 +775,10 @@ let classify_rule source_total graph relation_id arity rule =
     else
       (match indexed_head arity rule rule with
       | Some (Indexed indexed) ->
-        (match delegated_prefix source_total known rule indexed.prefix with
+        (match
+           delegated_prefix
+             source_total source_zero_or_one known rule indexed.prefix
+         with
         | Error blocker -> Error blocker
         | Ok (_, _, bindings) -> Ok [ Indexed { indexed with bindings } ])
       | Some
@@ -782,7 +805,9 @@ let classify_rule source_total graph relation_id arity rule =
                       Some
                         ( prem
                         , id
-                        , delegated_producers source_total graph relation_id arity rule id )
+                        , delegated_producers
+                            source_total source_zero_or_one
+                            graph relation_id arity rule id )
                 | _ -> None)
               | _ -> None)
           in
@@ -802,8 +827,169 @@ let classify_rule source_total graph relation_id arity rule =
               (blocker rule
                  "RuleD has an open right endpoint and no typed proof that the clause produces zero successors")))))
 
+let source_rule_is rules rule =
+  List.exists
+    (Source_rule_identity.equal_rule
+       rule.Analysis.Function_graph.identity)
+    rules
+
+let rec exhaustive_producer query_endpoints = function
+  | Direct _ | Projection _ | Indexed _ | Indexed_constructor _ -> true
+  | Delegated { producers; _ } ->
+    List.for_all (exhaustive_producer query_endpoints) producers
+  | Query_endpoint { rule; _ } -> source_rule_is query_endpoints rule
+
+let producer_coverage relation_id rules query_endpoints producer_groups =
+  let exhaustive = function
+    | [] -> false
+    | producers ->
+      List.for_all (exhaustive_producer query_endpoints) producers
+  in
+  if List.for_all exhaustive producer_groups then
+    Some
+      { relation_id
+      ; source_rules =
+          List.map
+            (fun rule -> rule.Analysis.Function_graph.identity)
+            rules
+      }
+  else None
+
+let subtyping_mixop mixop =
+  Xl.Mixop.flatten mixop
+  |> List.exists (List.exists (fun atom -> atom.it = Xl.Atom.Sub))
+
+let closed_over prefix exp = subset (free exp) (union prefix)
+
+let endpoint_var exp =
+  match (representation exp).it with
+  | VarE id -> Some id.it
+  | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _ | TupE _
+  | ProjE _ | CaseE _ | UncaseE _ | OptE _ | TheE _ | StrE _ | DotE _
+  | CompE _ | ListE _ | LiftE _ | MemE _ | LenE _ | CatE _ | IdxE _
+  | SliceE _ | UpdE _ | ExtE _ | IfE _ | CallE _ | IterE _ | CvtE _
+  | SubE _ -> None
+
+let excluded_endpoint prefix endpoint prem =
+  let excluded left right =
+    if same left endpoint && closed_over prefix right then Some right
+    else if same right endpoint && closed_over prefix left then Some left
+    else None
+  in
+  match prem.it with
+  | IfPr { it = CmpE (`NeOp, _, left, right); _ } -> excluded left right
+  | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> None
+
+let rooted_endpoint_rule relation_id arity rule =
+  match split_endpoints arity rule.Analysis.Function_graph.head with
+  | Some (prefix, left, right) ->
+    (match endpoint_var right with
+    | None -> Some `Target
+    | Some _ ->
+      let recursive, guards =
+        rule.prems
+        |> List.fold_left
+             (fun (recursive, guards) prem ->
+               match rulepr prem with
+               | Some (id, exp) when String.equal id relation_id ->
+                 (match split_endpoints arity exp with
+                 | Some (child_prefix, child_left, root)
+                   when same_prefix prefix child_prefix
+                        && same child_left right
+                        && closed_over prefix root ->
+                   (root :: recursive, guards)
+                 | Some _ | None -> recursive, guards)
+               | Some _ -> recursive, guards
+               | None -> recursive, prem :: guards)
+             ([], [])
+      in
+      match recursive, guards with
+      | [], [] when closed_over prefix left -> Some (`Universal left)
+      | [], [] -> None
+      | [ root ], [ guard ] ->
+        Option.map
+          (fun bottom -> `Rooted (left, root, bottom))
+          (excluded_endpoint prefix right guard)
+      | [], _ :: _ | _ :: _ :: _, _ | [ _ ], [] | [ _ ], _ :: _ :: _ ->
+        None)
+  | None -> None
+
+let validation_domain graph
+    (transitive : Runtime_witness_proof.transitive_domain) =
+  match transitive.Runtime_witness_proof.domain_premise.it with
+  | RulePr (id, args, mixop, exp)
+    when String.equal id.it transitive.Runtime_witness_proof.domain_rel_id ->
+    (match Analysis.Function_graph.find_relation graph id.it with
+    | Some relation ->
+      let certificate =
+        Runtime_validation_certificate.premise_shape
+        ~predicate_marker:
+          (relation.kind = Analysis.Relation_graph.Predicate_candidate)
+        ~source_params:relation.source_params
+        ~mixop_equal:Il.Eq.eq_mixop
+        ~declaration_mixop:relation.mixop
+        ~premise_args:args
+        ~premise_mixop:mixop
+        ~result:relation.result
+        ~premise_exp:exp
+      in
+      certificate = Runtime_validation_certificate.Certified
+    | None -> false)
+  | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> false
+
+(* For a validated subtyping judgement, nominal supertypes are kind-preserving
+   and strictly decrease the validated type index.  Hence a derivation ending at
+   a fixed target admits cut elimination: an open bottom-family edge can use the
+   target itself, while every other first edge is one of the finite producers.
+   The certificate below admits that theorem only for the source schema that
+   states it: one universal bottom and target-directed rooted rules excluding
+   that same bottom.  Arbitrary open relations remain incomplete. *)
+let rooted_subtyping_endpoints graph
+    (transitive : Runtime_witness_proof.transitive_domain) producer_groups =
+  let relation_id = transitive.Runtime_witness_proof.rule.relation_id in
+  match Analysis.Function_graph.find_relation graph relation_id with
+  | None -> []
+  | Some relation ->
+    let is_subtyping = subtyping_mixop relation.mixop in
+    let has_validation_domain = validation_domain graph transitive in
+    if not is_subtyping || not has_validation_domain then []
+    else
+    let query_rules =
+      producer_groups
+      |> List.concat_map (List.filter_map (function
+           | Query_endpoint { rule; _ } -> Some rule
+           | Direct _ | Projection _ | Indexed _ | Indexed_constructor _
+           | Delegated _ -> None))
+    in
+    let classified =
+      List.map
+        (fun rule -> rule, rooted_endpoint_rule relation_id transitive.prefix_arity rule)
+        query_rules
+    in
+    let universals =
+      classified
+      |> List.filter_map (function _, Some (`Universal bottom) -> Some bottom | _ -> None)
+    in
+    let rooted =
+      classified
+      |> List.filter_map (function
+           | _, Some (`Rooted (left, root, bottom)) ->
+             Some (left, root, bottom)
+           | _ -> None)
+    in
+    match universals with
+    | [ bottom ]
+      when rooted <> []
+           && List.for_all (fun (_, _, excluded) -> same bottom excluded) rooted
+           && List.for_all (fun (_, result) -> Option.is_some result) classified ->
+      List.map
+        (fun (rule, _) -> rule.Analysis.Function_graph.identity)
+        classified
+    | [] | _ :: _ :: _ | [ _ ] -> []
+
 let certify
     ?(source_total = fun ~bound:_ _ -> false)
+    ?(source_zero_or_one = fun ~bound:_ _ -> false)
     ?source_total_with_facts
     ?constructors
     ?(resolve_constructor = fun _ _ _ -> None)
@@ -839,18 +1025,44 @@ let certify
         ; source_echo = transitive.rule.source_echo
         } ]
   | Some rules ->
+    let base_rules = List.filter (fun rule -> not (is_transitive rule)) rules in
     let results =
-      rules |> List.filter (fun rule -> not (is_transitive rule))
-      |> List.map
-           (classify_rule source_total graph transitive.rule.relation_id
+      base_rules |> List.map
+           (classify_rule source_total source_zero_or_one
+              graph transitive.rule.relation_id
               transitive.prefix_arity)
     in
     let blockers = results |> List.filter_map (function Error blocker -> Some blocker | Ok _ -> None) in
     if blockers <> [] then Blocked blockers
     else
+      let producer_groups =
+        results |> List.filter_map (function Ok producers -> Some producers | Error _ -> None)
+      in
+      let producers = List.concat producer_groups
+      in
+      let decision_coverage =
+        match decision_coverage with
+        | Some _ as coverage -> coverage
+        | None ->
+          let query_endpoints =
+            rooted_subtyping_endpoints graph transitive producer_groups
+          in
+          (* For R(x,y) with the source transitivity clause
+
+               D(w), R(x,w), R(w,y) / R(x,y),
+
+             every nonempty proof starts with one edge produced by a
+             non-transitive RuleD.  Exhaustively classifying those RuleDs
+             therefore gives a finite direct-successor basis.  The visited
+             worklist computes its least reflexive-transitive closure.  A
+             target-directed open endpoint counts as exhaustive only under the
+             rooted-subtyping cut certificate above. *)
+          producer_coverage transitive.rule.relation_id rules
+            query_endpoints producer_groups
+      in
       Materialized
         { transitive
-        ; producers = results |> List.concat_map (function Ok producers -> producers | Error _ -> [])
+        ; producers
         ; domain_candidates
         ; total_facts
         ; decision_coverage
