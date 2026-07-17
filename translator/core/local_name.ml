@@ -206,6 +206,19 @@ let source_qualified_name names source type_ref =
 let source_qualified names source type_ref =
   qualified (source_name names source) type_ref
 
+let fresh_source_name names source =
+  let base = Naming.source_var source in
+  let name = available_source_name names.reserved base 1 in
+  name, { names with reserved = Names.add name names.reserved }
+
+let fresh_source_qualified_name names source type_ref =
+  let name, names = fresh_source_name names source in
+  qualified_name name type_ref, names
+
+let fresh_source_qualified names source type_ref =
+  let name, names = fresh_source_qualified_name names source type_ref in
+  Var name, names
+
 let phantom_qualified_name names source type_ref =
   qualified_name (phantom_name names source) type_ref
 

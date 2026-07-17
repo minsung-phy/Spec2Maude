@@ -66,6 +66,8 @@ let statements =
     ; op "modInt" [ sr "Int"; sr "Int" ] (s "Int") ~kind:Partial
     ; op "allLen" [ sr "SpectecTerminals"; sr "Nat" ] (s "Bool")
     ; op "isOpt" [ sr "SpectecTerminals" ] (s "Bool")
+    ; op "composeOpt" [ sr "SpectecTerminals"; sr "SpectecTerminals" ]
+        spectec_terminals ~kind:Partial
     ; op "allOpt" [ sr "SpectecTerminals" ] (s "Bool")
     ; op "contains" [ sr "SpectecTerminal"; sr "SpectecTerminals" ] (s "Bool")
     ; op "isTrue" [ sr "SpectecTerminal" ] (s "Bool") ~kind:Partial
@@ -96,8 +98,6 @@ let statements =
     ; op "slice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat" ] spectec_terminals
     ; op "drop" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
     ; op "splice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
-    ; op "merge" [ sr "SpectecTerminal"; sr "SpectecTerminal" ] spectec_terminal
-        ~attrs:[ Ctor ]
     ; var "B" (sr "Bool")
     ; var "N" (sr "Nat")
     ; var "N2" (sr "Nat")
@@ -152,6 +152,13 @@ let statements =
         (app "isOpt" [ app "_ _" [ Var "X"; Var "XS" ] ])
         (Const "false")
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
+    ; ceq
+        (app "composeOpt" [ Const "eps"; Var "XS" ])
+        (Var "XS")
+        [ BoolCond (app "isOpt" [ Var "XS" ]) ]
+    ; eq
+        (app "composeOpt" [ Var "X"; Const "eps" ])
+        (Var "X")
     ; eq (app "allOpt" [ Const "eps" ]) (Const "true")
     ; eq
         (app "allOpt" [ app "seq" [ Var "YS" ] ])

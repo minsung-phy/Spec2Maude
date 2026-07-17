@@ -78,16 +78,6 @@ let source_echo_exp exp =
 let qid_of_atom atom =
   Qid (Xl.Atom.to_string atom)
 
-let record_item atom value =
-  app "item" [ qid_of_atom atom; value ]
-
-let record_literal items =
-  app "{_}" [ items ]
-
-let record_items = function
-  | [] -> Const "EMPTY"
-  | hd :: tl -> List.fold_left (fun acc item -> app "_;_" [ acc; item ]) hd tl
-
 let record_value atom record =
   app "value" [ qid_of_atom atom; record ]
 
@@ -621,43 +611,53 @@ and lower_record_field names ctx callbacks origin (atom, field_exp) =
   in
   (atom, result), names
 
-and lower_record names ctx callbacks origin _exp fields =
-  let results, names =
-    lower_list_with_names
-      (fun names field -> lower_record_field names ctx callbacks origin field)
-      names fields
-  in
-  let guards =
-    results
-    |> List.map (fun (_atom, result) -> result.guards)
-    |> List.concat
-  in
-  let introduced_bindings =
-    results
-    |> List.map (fun (_atom, result) -> result.introduced_bindings)
-    |> List.concat
-  in
-  let diagnostics =
-    results
-    |> List.map (fun (_atom, result) -> result.diagnostics)
-    |> List.concat
-  in
-  let items =
-    results
-    |> List.filter_map (fun (atom, result) ->
-      match result.term with
-      | Some term -> Some (record_item atom term)
-      | None -> None)
-  in
-  if List.length items = List.length fields then
-    ( { term = Some (record_literal (record_items items))
-      ; guards
-      ; introduced_bindings
-      ; diagnostics
-      }
-    , names )
-  else
-    { term = None; guards; introduced_bindings; diagnostics }, names
+and lower_record names ctx callbacks origin exp fields =
+  match Record_shape.of_typ ctx exp.note with
+  | Error error ->
+    return names
+      (unsupported_pattern ctx origin "StrE/type" exp
+         (Record_shape.describe_error error))
+  | Ok shape ->
+    (match Record_shape.match_fields shape fields with
+    | Error error ->
+      return names
+        (unsupported_pattern ctx origin "StrE/fields" exp
+           (Record_shape.describe_error error))
+    | Ok fields ->
+      let results, names =
+        lower_list_with_names
+          (fun names (_, field) ->
+            lower_record_field names ctx callbacks origin field)
+          names fields
+      in
+      let guards =
+        results
+        |> List.map (fun (_atom, result) -> result.guards)
+        |> List.concat
+      in
+      let introduced_bindings =
+        results
+        |> List.map (fun (_atom, result) -> result.introduced_bindings)
+        |> List.concat
+      in
+      let diagnostics =
+        results
+        |> List.map (fun (_atom, result) -> result.diagnostics)
+        |> List.concat
+      in
+      let terms =
+        results
+        |> List.filter_map (fun (_atom, result) -> result.term)
+      in
+      if List.length terms = List.length fields then
+        ( { term = Some (app (Naming.record_constructor shape.id) terms)
+          ; guards
+          ; introduced_bindings
+          ; diagnostics
+          }
+        , names )
+      else
+        { term = None; guards; introduced_bindings; diagnostics }, names)
 
 and lower_tuple names ctx callbacks origin _exp exps =
   let indexed_exps = List.mapi (fun index exp -> index, exp) exps in

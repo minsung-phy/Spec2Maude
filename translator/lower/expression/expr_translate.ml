@@ -655,7 +655,7 @@ let rec lower_value ctx env origin exp =
   | DotE (record, atom) ->
     lower_record_dot ctx env origin record atom
   | CompE (left, right) ->
-    lower_comp ctx env origin left right
+    lower_comp ctx env origin exp left right
   | LenE inner ->
     lower_len ctx env origin inner
   | IdxE (base, index) ->
@@ -839,8 +839,8 @@ and lower_record_literal ctx env origin exp fields =
 and lower_record_dot ctx env origin record atom =
   Expr_record.lower_record_dot expr_record_callbacks ctx env origin record atom
 
-and lower_comp ctx env origin left right =
-  Expr_record.lower_comp expr_record_callbacks ctx env origin left right
+and lower_comp ctx env origin exp left right =
+  Expr_record.lower_comp expr_record_callbacks ctx env origin exp left right
 
 and lower_len ctx env origin inner =
   Expr_record.lower_len expr_record_callbacks ctx env origin inner

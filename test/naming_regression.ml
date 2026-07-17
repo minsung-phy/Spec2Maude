@@ -552,6 +552,45 @@ let test_typd_source_binder () =
   if contains rendered "SCRIPT_" then
     failwith "TypD path-derived binder seed remains in generated output"
 
+let test_constructor_component_occurrences () =
+  let pair_typ =
+    TupT [ id "item", nat_typ; id "item", nat_typ ] $ region
+  in
+  let mixop =
+    Xl.Mixop.Seq
+      [ Xl.Mixop.Atom (atom "PAIR")
+      ; Xl.Mixop.Arg ()
+      ; Xl.Mixop.Atom (atom "WITH")
+      ; Xl.Mixop.Arg ()
+      ]
+  in
+  let typcase = mixop, (pair_typ, [], []), [] in
+  let variant = VariantT [ typcase ] $ region in
+  let inst = InstD ([], [], variant) $ region in
+  let typd = TypD (id "pair_family", [], [ inst ]) $ region in
+  let constructor =
+    Naming.constructor_op_in_category "pair_family" mixop
+  in
+  let result = Driver.translate [ typd ] in
+  let variables =
+    result.module_.statements
+    |> List.find_map (fun statement ->
+      match statement.node with
+      | Cmb (App (name, [ Var left; Var right ]), _, _)
+        when name = constructor ->
+        Some (left, right)
+      | SortDecl _ | SubsortDecl _ | OpDecl _ | VarDecl _
+      | Mb _ | Cmb _ | Eq _ | Ceq _ | Rl _ | Crl _ -> None)
+  in
+  match variables with
+  | Some ("ITEM:Nat", "ITEM2:Nat") -> ()
+  | Some (left, right) ->
+    failwith
+      (Printf.sprintf
+         "constructor component occurrences were not named independently: %S, %S"
+         left right)
+  | None -> failwith "repeated-component constructor membership was not emitted"
+
 let constructor_entry
     ?static_args_key
     ?payload_labels
@@ -852,6 +891,7 @@ let () =
   test_readable_prefix_names ();
   test_builtin_declaration_and_call ();
   test_typd_source_binder ();
+  test_constructor_component_occurrences ();
   test_constructor_surface_resolution ();
   test_constructor_lossy_collision ();
   test_constructor_static_key_sharing ();

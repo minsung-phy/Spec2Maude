@@ -89,8 +89,9 @@ let imported =
   |> add_signature "eps" [] "sort:SpectecTerminals"
 
 let source ctx =
-  Constructor_registry.entries (Context.constructors ctx)
-  |> List.fold_left
+  let constructors =
+    Constructor_registry.entries (Context.constructors ctx)
+    |> List.fold_left
        (fun certificate (entry : Constructor_registry.entry) ->
          match entry.status with
          | Constructor_registry.Emitted ->
@@ -101,6 +102,17 @@ let source ctx =
          | Constructor_registry.Skipped | Constructor_registry.Unsupported ->
            certificate)
        empty
+  in
+  Record_certificate.constructors (Context.record_certificates ctx)
+  |> List.fold_left
+       (fun certificate constructor ->
+         add_signature
+           (Record_certificate.constructor_name constructor)
+           (Record_certificate.constructor_payload_sorts constructor
+            |> List.map sort_key)
+           "sort:SpectecTerminal"
+           certificate)
+       constructors
 
 let generated statements =
   statements

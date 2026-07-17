@@ -26,6 +26,10 @@ val reserve_existing_many : t -> string list -> t
 val fresh_typed : t -> role -> Maude_ir.sort -> Maude_ir.term * t
 val source_qualified_name : t -> string -> Maude_ir.type_ref -> string
 val source_qualified : t -> string -> Maude_ir.type_ref -> Maude_ir.term
+val fresh_source_qualified_name :
+  t -> string -> Maude_ir.type_ref -> string * t
+val fresh_source_qualified :
+  t -> string -> Maude_ir.type_ref -> Maude_ir.term * t
 val phantom_qualified_name : t -> string -> Maude_ir.type_ref -> string
 val fresh_qualified_name : t -> role -> Maude_ir.type_ref -> string * t
 val fresh_qualified : t -> role -> Maude_ir.type_ref -> Maude_ir.term * t

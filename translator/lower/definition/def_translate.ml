@@ -46,8 +46,16 @@ let rec translate_def ctx path ordinal def =
   match def.it with
   | TypD (id, params, insts) ->
     let ctx = Context.with_def ctx id.it in
-    let translated = Type_translate.translate_typd ctx origin id params insts in
-    { statements = translated.statements; diagnostics = translated.diagnostics }
+    let stage = Context.begin_stage ctx in
+    let translated =
+      Type_translate.translate_typd
+        (Context.staged stage) origin id params insts
+    in
+    if has_fatal translated.diagnostics then
+      { statements = []; diagnostics = translated.diagnostics }
+    else (
+      Context.commit_stage stage;
+      { statements = translated.statements; diagnostics = translated.diagnostics })
   | DecD (id, params, result_typ, clauses) ->
     let ctx = Context.with_def ctx id.it in
     let stage = Context.begin_stage ctx in

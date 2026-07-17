@@ -16,16 +16,6 @@ let qid_of_atom atom =
 let record_value atom record =
   app "value" [ qid_of_atom atom; record ]
 
-let record_item atom value =
-  app "item" [ qid_of_atom atom; value ]
-
-let record_literal items =
-  app "{_}" [ items ]
-
-let record_items = function
-  | [] -> Const "EMPTY"
-  | hd :: tl -> List.fold_left (fun acc item -> app "_;_" [ acc; item ]) hd tl
-
 type env = Expr_env.t
 
 type callbacks =
@@ -33,39 +23,33 @@ type callbacks =
   ; lower_sequence : Context.t -> env -> Origin.t -> exp -> result
   }
 
-let lower_record_literal callbacks ctx env origin (_exp : exp) (fields : expfield list) =
-  let results =
-    fields
-    |> List.map (fun (atom, field_exp) ->
-      let result =
-        match Carrier_sort.for_expression field_exp.note with
-        | Some sort when Carrier_sort.is_sequence_sort sort ->
-          callbacks.lower_sequence ctx env origin field_exp
-        | _ -> callbacks.lower_value ctx env origin field_exp
+let record_shape_diagnostic ctx origin constructor exp error =
+  unsupported_exp ctx origin constructor exp (Record_shape.describe_error error)
+
+let lower_record_literal callbacks ctx env origin (exp : exp) (fields : expfield list) =
+  match Record_shape.of_typ ctx exp.note with
+  | Error error -> record_shape_diagnostic ctx origin "Expr/StrE/type" exp error
+  | Ok shape ->
+    (match Record_shape.match_fields shape fields with
+    | Error error -> record_shape_diagnostic ctx origin "Expr/StrE/fields" exp error
+    | Ok fields ->
+      let results =
+        fields
+        |> List.map (fun (_, (_, field_exp)) ->
+          match Carrier_sort.for_expression field_exp.note with
+          | Some sort when Carrier_sort.is_sequence_sort sort ->
+            callbacks.lower_sequence ctx env origin field_exp
+          | _ -> callbacks.lower_value ctx env origin field_exp)
       in
-      atom, result)
-  in
-  let guards =
-    results
-    |> List.map (fun (_atom, result) -> result.guards)
-    |> List.concat
-  in
-  let diagnostics =
-    results
-    |> List.map (fun (_atom, result) -> result.diagnostics)
-    |> List.concat
-  in
-  let items =
-    results
-    |> List.filter_map (fun (atom, result) ->
-      match result.term with
-      | Some term -> Some (record_item atom term)
-      | None -> None)
-  in
-  if List.length items = List.length fields then
-    { term = Some (record_literal (record_items items)); guards; diagnostics }
-  else
-    { term = None; guards; diagnostics }
+      let guards, diagnostics = append_result_metadata results in
+      let terms = List.filter_map (fun result -> result.term) results in
+      if List.length terms = List.length fields then
+        { term = Some (app (Naming.record_constructor shape.id) terms)
+        ; guards
+        ; diagnostics
+        }
+      else
+        { term = None; guards; diagnostics })
 
 let lower_record_dot callbacks ctx env origin (record : exp) (atom : atom) =
   let record_result = callbacks.lower_value ctx env origin record in
@@ -74,20 +58,105 @@ let lower_record_dot callbacks ctx env origin (record : exp) (atom : atom) =
     { record_result with term = Some (record_value atom record_term) }
   | None -> record_result
 
-let lower_comp callbacks ctx env origin (left : exp) (right : exp) =
-  let left_result = callbacks.lower_value ctx env origin left in
-  let right_result = callbacks.lower_value ctx env origin right in
-  match left_result.term, right_result.term with
-  | Some left_term, Some right_term ->
-    { term = Some (app "merge" [ left_term; right_term ])
+let composition_error_origin origin error =
+  List.fold_left
+    (fun origin atom ->
+      Origin.with_child origin (Xl.Atom.to_string atom)
+        ~ast_constructor:"Expr/CompE/StructT-field" atom.at)
+    origin (Record_shape.error_path error)
+
+let rec dependency_path target plan =
+  Record_certificate.plan_fields plan
+  |> List.find_map (fun (atom, field) ->
+       match field with
+       | Record_certificate.Compose_record nested ->
+         if Il.Eq.eq_id target (Record_certificate.plan_id nested) then
+           Some [ atom ]
+         else
+           dependency_path target nested
+           |> Option.map (fun path -> atom :: path)
+       | Record_certificate.Append | Record_certificate.Compose_optional -> None)
+
+let helper_error_origin origin plan = function
+  | Record_certificate.Helper_unavailable (dependency :: _) ->
+    dependency_path dependency plan
+    |> Option.value ~default:[]
+    |> List.fold_left
+         (fun origin atom ->
+           Origin.with_child origin (Xl.Atom.to_string atom)
+             ~ast_constructor:"Expr/CompE/StructT-field" atom.at)
+         origin
+  | Record_certificate.Helper_emitted
+  | Record_certificate.Helper_missing
+  | Record_certificate.Helper_unavailable []
+  | Record_certificate.Helper_incompatible -> origin
+
+let helper_error_reason plan = function
+  | Record_certificate.Helper_missing ->
+    "the canonical StructT definition did not commit a record composition certificate"
+  | Record_certificate.Helper_unavailable dependencies ->
+    let helpers =
+      match dependencies with
+      | [] -> "its helper was not emitted"
+      | _ ->
+        "nested helpers are unavailable: "
+        ^ (dependencies
+           |> List.map Naming.record_composition
+           |> String.concat ", ")
+    in
+    "the canonical helper `"
+    ^ Naming.record_composition (Record_certificate.plan_id plan)
+    ^ "` was not emitted because " ^ helpers
+  | Record_certificate.Helper_incompatible ->
+    "the elaborated StructT specialization disagrees with the committed record composition certificate"
+  | Record_certificate.Helper_emitted ->
+    "the emitted record composition helper was unexpectedly rejected"
+
+let lower_comp callbacks ctx env origin (exp : exp) (left : exp) (right : exp) =
+  let lower shape =
+    let lower =
+      match shape with
+      | Record_shape.Sequence | Record_shape.Optional -> callbacks.lower_sequence
+      | Record_shape.Record _ -> callbacks.lower_value
+    in
+    let left_result = lower ctx env origin left in
+    let right_result = lower ctx env origin right in
+    let term, shape_diagnostics =
+      match shape, left_result.term, right_result.term with
+      | Record_shape.Sequence, Some left, Some right ->
+        Some (app "_ _" [ left; right ]), []
+      | Record_shape.Optional, Some left, Some right ->
+        Some (app "composeOpt" [ left; right ]), []
+      | Record_shape.Record shape, Some left, Some right ->
+        Some (app (Naming.record_composition shape.id) [ left; right ]), []
+      | _ -> None, []
+    in
+    { term
     ; guards = left_result.guards @ right_result.guards
-    ; diagnostics = left_result.diagnostics @ right_result.diagnostics
+    ; diagnostics =
+        left_result.diagnostics @ right_result.diagnostics @ shape_diagnostics
     }
-  | _ ->
-    { term = None
-    ; guards = left_result.guards @ right_result.guards
-    ; diagnostics = left_result.diagnostics @ right_result.diagnostics
-    }
+  in
+  match Record_shape.concatenable ctx exp.note with
+  | Error error -> record_shape_diagnostic ctx origin "Expr/CompE/type" exp error
+  | Ok (Record_shape.Record shape as composition) ->
+    (match Record_shape.composition ctx shape with
+    | Ok plan ->
+      let status =
+        Record_certificate.helper_status (Context.record_certificates ctx) plan
+      in
+      (match status with
+      | Record_certificate.Helper_emitted -> lower composition
+      | Record_certificate.Helper_missing
+      | Record_certificate.Helper_unavailable _
+      | Record_certificate.Helper_incompatible ->
+        unsupported_exp ctx (helper_error_origin origin plan status)
+          "Expr/CompE/composition-helper" exp
+          (helper_error_reason plan status))
+    | Error error ->
+      record_shape_diagnostic ctx (composition_error_origin origin error)
+        "Expr/CompE/field" exp error)
+  | Ok composition -> lower composition
 
 let lower_len callbacks ctx env origin (inner : exp) =
   let inner_result = callbacks.lower_sequence ctx env origin inner in

@@ -44,6 +44,7 @@ val record_definition_call :
 val definition_call_identities :
   t -> Maude_ir.term -> Analysis.Function_graph.definition_identity list
 val emitted_definition_operator : t -> string -> bool
+val record_certificates : t -> Record_certificate.t
 val with_def : t -> string -> t
 val with_rule : t -> string -> t
 val with_clause : t -> string -> t

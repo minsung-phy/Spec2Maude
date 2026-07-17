@@ -45,6 +45,8 @@ fi
 test -f "$output"
 test -f "$builtins"
 test -f "$report"
+sh "$root/test/constructor_component_generated.sh" "$output"
+sh "$root/test/record_semantics_generated.sh" "$output"
 if grep -Eq '^--- PARTIAL/INCOMPLETE VERIFICATION' "$output" "$builtins"; then
   echo 'successful runtime truth translation was marked partial' >&2
   exit 1
