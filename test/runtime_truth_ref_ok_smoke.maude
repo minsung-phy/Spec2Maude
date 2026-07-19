@@ -1,0 +1,51 @@
+mod SPEC2MAUDE-REFOK-SMOKE is
+  protecting WASM-BUILTINS .
+
+  op smoke-store : -> SpectecTerminal .
+  op smoke-module : -> SpectecTerminal .
+  op smoke-frame : -> SpectecTerminal .
+  op ref-test-nullable-any : -> SpectecTerminal .
+  op ref-test-nonnull-any : -> SpectecTerminal .
+  op ref-test-extern-null : -> SpectecTerminal .
+
+  eq smoke-store = rec.store(eps, eps, eps, eps, eps,
+    eps, eps, eps, eps, eps) .
+  eq smoke-module = rec.moduleinst(eps, eps, eps, eps, eps,
+    eps, eps, eps, eps) .
+  eq smoke-frame = rec.frame(eps, smoke-module) .
+
+  eq ref-test-nullable-any =
+    config.sym(
+      state.sym(smoke-store, smoke-frame),
+      ref.ref-null-addr instr.ref-test(reftype.ref(null.null, absheaptype.any))) .
+
+  eq ref-test-nonnull-any =
+    config.sym(
+      state.sym(smoke-store, smoke-frame),
+      ref.ref-null-addr instr.ref-test(reftype.ref(eps, absheaptype.any))) .
+
+  eq ref-test-extern-null =
+    config.sym(
+      state.sym(smoke-store, smoke-frame),
+      ref.ref-extern(ref.ref-null-addr)
+        instr.ref-test(reftype.ref(eps, absheaptype.extern))) .
+endm
+
+select SPEC2MAUDE-REFOK-SMOKE .
+
+red 'ref-ok-positive-begin .
+search [1] rel.step-read(ref-test-nullable-any)
+  =>+ instr.const(numtype.i32, uN.wrap(1)) .
+red 'ref-ok-positive-end .
+
+red 'ref-ok-negative-begin .
+search [1] rel.step-read(ref-test-nonnull-any)
+  =>+ instr.const(numtype.i32, uN.wrap(0)) .
+red 'ref-ok-negative-end .
+
+red 'ref-ok-no-seed-begin .
+search [1] rel.step-read(ref-test-extern-null)
+  =>+ instr.const(numtype.i32, uN.wrap(0)) .
+red 'ref-ok-no-seed-end .
+
+quit

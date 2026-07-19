@@ -38,6 +38,7 @@ val source_equality_alternatives :
 
 val source_definedness_alternatives :
   ?bound_vars:string list ->
+  ?assumed:Maude_ir.eq_condition list ->
   Context.t ->
   Expr_env.t ->
   Origin.t ->

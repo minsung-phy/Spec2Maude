@@ -8,6 +8,8 @@ val refute :
   helper_name:string ->
   origin:Origin.t ->
   env:Expr_env.t ->
+  bound_vars:string list ->
+  label_prefix:string ->
   refuter_index:int ->
   prem_index:int ->
   prefix_conditions:Maude_ir.rule_condition list ->

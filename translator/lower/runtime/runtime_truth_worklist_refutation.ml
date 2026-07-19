@@ -50,16 +50,9 @@ let false_blocked ctx item origin prem_index premise constructor reason suggesti
     [ diagnostic ctx item origin constructor reason suggestion
         (Some (Il.Print.string_of_prem prem)) ]
 
-let deterministic_false_child
-    ctx item relations origin rule_index prem_index head head_guards
-    (state : positive_children) lhs rhs history premise
-  =
-  let prefix =
-    EqCondition (BoolCond (App (match_op item rule_index, head)))
-    :: List.map (fun guard -> EqCondition guard) head_guards
-    @ List.map (fun guard -> EqCondition guard) state.eq_conditions
-    @ state.rule_conditions
-  in
+let false_child
+    ctx item relations origin rule_index prem_index
+    (state : positive_children) ~label_prefix ~prefix lhs rhs history premise =
   let source_boolean_false prem exp =
     let premise_origin =
       Origin.with_child
@@ -89,12 +82,17 @@ let deterministic_false_child
           generated item premise_origin
             (crl
                ~label:
-                 (item.name ^ "-rule-refute-" ^ string_of_int rule_index
-                  ^ "-source-boolean-" ^ string_of_int prem_index
+                 (label_prefix ^ "-source-boolean-" ^ string_of_int prem_index
                   ^ "-" ^ string_of_int (alternative + 1))
                lhs rhs conditions))
       in
       Refutable (state.statements @ rules, proof.diagnostics)
+  in
+  let refutation_bound_vars =
+    Condition_closure.rule_conditions_bound_vars
+      ~constructor_op:(worklist_pattern_certificate ctx item relations)
+      (Condition_closure.term_vars lhs)
+      prefix
   in
   match premise with
   | Runtime_truth_scc.Finite_rule_call _ as premise ->
@@ -111,8 +109,7 @@ let deterministic_false_child
         ( state.statements @ [ generated item origin
               (crl
                  ~label:
-                   (item.name ^ "-rule-refute-" ^ string_of_int rule_index
-                    ^ "-" ^ string_of_int prem_index)
+                   (label_prefix ^ "-" ^ string_of_int prem_index)
                  lhs rhs conditions) ]
         , diagnostics )
     | None ->
@@ -127,6 +124,8 @@ let deterministic_false_child
       (match
          Runtime_truth_equality_pattern_refuter.refute
            ctx ~helper_name:item.name ~origin ~env:state.env
+           ~bound_vars:refutation_bound_vars
+           ~label_prefix
            ~refuter_index:rule_index ~prem_index
            ~prefix_conditions:prefix ~lhs ~rhs ~left ~right
        with
@@ -155,6 +154,8 @@ let deterministic_false_child
       (match
          Runtime_truth_equality_pattern_refuter.refute
            ctx ~helper_name:item.name ~origin ~env:state.env
+           ~bound_vars:refutation_bound_vars
+           ~label_prefix
            ~refuter_index:rule_index ~prem_index
            ~prefix_conditions:prefix ~lhs ~rhs ~left ~right
        with
@@ -171,8 +172,7 @@ let deterministic_false_child
                ~prefix_conditions:prefix
                ctx ~helper_name:item.name ~origin ~env:state.env
                ~label:
-                 (item.name ^ "-rule-refute-" ^ string_of_int rule_index
-                  ^ "-det-" ^ string_of_int prem_index)
+                 (label_prefix ^ "-det-" ^ string_of_int prem_index)
                ~lhs ~rhs ~rel_id ~exp with
       | Runtime_truth_deterministic_false.Materialized result ->
         Refutable (state.statements @ result.statements, result.diagnostics)
@@ -224,8 +224,7 @@ let deterministic_false_child
             @ [ generated item origin
                   (crl
                      ~label:
-                       (item.name ^ "-rule-refute-" ^ string_of_int rule_index
-                        ^ "-indexed-" ^ string_of_int prem_index)
+                       (label_prefix ^ "-indexed-" ^ string_of_int prem_index)
                      lhs rhs conditions) ]
           , diagnostics )
       | None ->
@@ -248,6 +247,140 @@ let deterministic_false_child
       "RuntimeTruthWorklist/false/finite-successor"
       "finite successor premise reached ordinary RuleD refutation without an exhaustive successor certificate"
       "Route this premise through its certified finite-domain refuter before admitting decision mode"
+
+let deterministic_false_child
+    ctx item relations origin rule_index prem_index head head_guards
+    (state : positive_children) lhs rhs history premise =
+  let prefix =
+    EqCondition (BoolCond (App (match_op item rule_index, head)))
+    :: List.map (fun guard -> EqCondition guard) head_guards
+    @ List.map (fun guard -> EqCondition guard) state.eq_conditions
+    @ state.rule_conditions
+  in
+  false_child
+    ctx item relations origin rule_index prem_index state
+    ~label_prefix:(item.name ^ "-rule-refute-" ^ string_of_int rule_index)
+    ~prefix
+    lhs rhs history premise
+
+let same_source_rule target (rule : Runtime_truth_scc.rule) =
+  Source_rule_identity.equal_rule
+    target.Runtime_witness_proof.rule.identity rule.source.identity
+
+let seed_rule
+    ctx item relations relation known_count rule_index rule =
+  let origin, declarations, bind_diagnostics, head =
+    Runtime_truth_worklist_rule.lower_head_prefix
+      ctx item relation rule_index rule known_count
+  in
+  match head.terms with
+  | None -> [], bind_diagnostics @ head.diagnostics
+  | Some known ->
+    let history, _ = history_var head.local_names in
+    let lhs = App (seed_op item relation, known @ [ history ]) in
+    let rhs = Const (seed_miss_op item relation) in
+    let label_prefix =
+      item.name ^ "-seed-refute-" ^ string_of_int rule_index
+    in
+    let head_rules, head_diagnostics, head_blocked =
+      match
+        Runtime_truth_head_guard_refutation.complement
+          ~pattern_certificate:(worklist_pattern_certificate ctx item relations)
+          ~bound_terms:known head.guards
+      with
+      | Runtime_truth_head_guard_refutation.Complete alternatives ->
+        ( alternatives
+          |> List.mapi (fun index alternative ->
+            let conditions =
+              List.map (fun guard -> EqCondition guard) alternative
+              |> Condition_closure.normalize_rule_conditions
+                   ~constructor_op:
+                     (worklist_pattern_certificate ctx item relations)
+                   [ lhs ]
+            in
+            generated item origin
+              (crl
+                 ~label:
+                   (label_prefix ^ "-head-" ^ string_of_int (index + 1))
+                 lhs rhs conditions))
+        , []
+        , false )
+      | Runtime_truth_head_guard_refutation.Blocked reason ->
+        ( []
+        , [ diagnostic ctx item origin
+              "RuntimeTruthWorklist/seed/guard-complement"
+              ("principal seed head has no total guard complement: " ^ reason)
+              "Keep target-chain decision Unsupported until the selected seed head has a source-complete complement"
+              rule.source.source_echo ]
+        , true )
+    in
+    let rec premise_rules prefix = function
+      | [] -> []
+      | (prem_index, premise) as indexed_premise :: rest ->
+        let state =
+          lower_positive_children
+            ctx item relations origin
+            Runtime_truth_worklist_indexed.Seed_premise
+            rule_index known head.env history (List.rev prefix)
+        in
+        let prefix_conditions =
+          List.map (fun guard -> EqCondition guard) head.guards
+          @ List.map (fun guard -> EqCondition guard) state.eq_conditions
+          @ state.rule_conditions
+        in
+        let child =
+          if state.complete then
+            false_child
+              ctx item relations origin rule_index prem_index state
+              ~label_prefix ~prefix:prefix_conditions lhs rhs history premise
+          else
+            False_blocked state.diagnostics
+        in
+        child :: premise_rules (indexed_premise :: prefix) rest
+    in
+    let children =
+      premise_rules [] (Runtime_truth_scc.scheduled_premises rule)
+    in
+    let blocked =
+      head_blocked
+      || List.exists
+           (function False_blocked _ -> true | Refutable _ | Irrefutable _ -> false)
+           children
+    in
+    let child_statements =
+      children
+      |> List.concat_map (function
+           | Refutable (statements, _) -> statements
+           | Irrefutable _ | False_blocked _ -> [])
+    in
+    let child_diagnostics =
+      children
+      |> List.concat_map (function
+           | Refutable (_, diagnostics) | Irrefutable diagnostics
+           | False_blocked diagnostics -> diagnostics)
+    in
+    let blockers =
+      if blocked then
+        [ diagnostic ctx item origin
+            "RuntimeTruthWorklist/seed/open-child"
+            "principal seed RuleD has no exhaustive source-derived failure edge"
+            "Keep target-chain decision Unsupported until every selected seed premise has a total complement"
+            rule.source.source_echo ]
+      else []
+    in
+    ( declarations @ head_rules @ child_statements
+    , bind_diagnostics @ head.diagnostics @ head_diagnostics
+      @ child_diagnostics @ blockers )
+
+let seed_rules ctx item relations relation indexed_rules target =
+  let known_count = target.Runtime_witness_proof.prefix_arity + 1 in
+  indexed_rules
+  |> List.filter (fun (_, rule) -> not (same_source_rule target rule))
+  |> List.map (fun (index, rule) ->
+       seed_rule ctx item relations relation known_count index rule)
+  |> List.split
+  |> fun (statements, diagnostics) ->
+     List.concat statements, List.concat diagnostics
 
 let lower_rule ctx item relations relation index rule =
   let origin, declarations, bind_diagnostics, head =

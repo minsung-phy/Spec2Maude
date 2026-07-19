@@ -17,7 +17,6 @@ val contract_path : t -> string
 val smoke_fixture : t -> string
 val find : t -> string -> requirement option
 val requirements : t -> requirement list
-val requirement_key : requirement -> string
 val public_op : requirement -> string
 val totality : requirement -> totality
 val demand : requirement -> demand

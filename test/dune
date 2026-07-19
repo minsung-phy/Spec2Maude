@@ -113,7 +113,8 @@
 (rule
  (alias runtest)
  (deps
-  runtime_truth_generated.sh
+ runtime_truth_generated.sh
+  runtime_truth_ref_ok_smoke.maude
   constructor_component_generated.sh
   record_semantics_generated.sh
   ../builtins.maude

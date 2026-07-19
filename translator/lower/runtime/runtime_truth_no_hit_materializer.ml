@@ -838,12 +838,21 @@ let premise_refuter_rules
     in
     (match exp.it with
     | Il.Ast.CmpE (`EqOp, _, left, right) ->
+      let bound_vars =
+        Condition_closure.rule_conditions_bound_vars
+          ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
+          (Condition_closure.term_vars lhs)
+          prefix_conditions
+      in
       (match
          Runtime_truth_equality_pattern_refuter.refute
            ctx
            ~helper_name
            ~origin:prem_origin
            ~env
+           ~bound_vars
+           ~label_prefix:
+             (helper_name ^ "-rule-refuted-" ^ string_of_int refuter.index)
            ~refuter_index:refuter.index
            ~prem_index
            ~prefix_conditions

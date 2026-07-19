@@ -17,21 +17,18 @@ rm -f "$output" "$builtins" "$report" "$log" \
   "$smoke_output" "$smoke_builtins" "$smoke_log" "$smoke_translate_log"
 
 cd "$root"
-set +e
-"$exe" translate -o "$output" --builtins "$builtins" \
+if ! "$exe" translate -o "$output" --builtins "$builtins" \
   --builtin-report "$report" >"$log" 2>&1
-translate_status=$?
-set -e
-if [ "$translate_status" -ne 1 ]; then
+then
   cat "$log" >&2
-  echo "production builtin report translation exited $translate_status, expected 1" >&2
+  echo 'production builtin report translation failed' >&2
   exit 1
 fi
-grep -Eq '^\[spec2maude\] diagnostics: .*fatal=[1-9][0-9]* unsupported=[1-9][0-9]* .*obligations=0 prelude_gaps=0' "$log"
+grep -Eq '^\[spec2maude\] diagnostics: .*fatal=0 unsupported=0 .*obligations=0 prelude_gaps=0' "$log"
 grep -q 'from contract config/wasm-3.0-runtime-ingress.contract:2' "$log"
 grep -q 'from contract config/wasm-3.0-runtime-ingress.contract:3' "$log"
-test ! -e "$output"
-test ! -e "$builtins"
+test -f "$output"
+test -f "$builtins"
 test -f "$report"
 
 grep -q -- '- backend semantics: `official-spectec-deterministic`' "$report"

@@ -8,3 +8,13 @@ val lower_head :
   Runtime_truth_scc.rule ->
   Origin.t * Maude_ir.generated list * Diagnostics.t list *
   Runtime_truth_rule_components.head_patterns
+
+val lower_head_prefix :
+  Context.t ->
+  item ->
+  relation ->
+  int ->
+  Runtime_truth_scc.rule ->
+  int ->
+  Origin.t * Maude_ir.generated list * Diagnostics.t list *
+  Runtime_truth_rule_components.head_patterns

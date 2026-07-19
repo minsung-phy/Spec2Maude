@@ -221,39 +221,39 @@ let domain_first_failures domains =
   in
   loop [] [] domains
 
-let source_definedness_alternatives ?bound_vars ctx env origin exp =
+let source_definedness_alternatives
+    ?bound_vars ?(assumed = []) ctx env origin exp =
   match Runtime_truth_totality.definedness ?bound_vars ctx env origin exp with
   | Error blockers -> Error blockers
-  | Ok { domains; guards = _; diagnostics = domain_diagnostics } ->
+  | Ok { domains; guards; diagnostics = domain_diagnostics } ->
     let lowered = Expr_translate.lower_value ctx env origin exp in
     (match lowered.term with
     | Some _ when not (result_has_fatal lowered) ->
-      let positive = stable_unique lowered.guards in
+      let emitted = stable_unique lowered.guards in
       let domains = stable_unique domains in
-      let emitted_domains =
-        positive
-        |> List.filter_map (fun condition ->
-          List.find_opt
-            (fun domain -> condition_matches_domain domain condition)
-            domains)
+      let guards = stable_unique guards in
+      let unproved_guards =
+        emitted
+        |> List.filter (fun condition ->
+          not (condition_is_domain domains condition)
+          && (not (List.mem condition guards)
+              || not (List.mem condition assumed)))
       in
-      if List.length emitted_domains <> List.length positive
-         || not
-              (List.for_all
-                 (fun domain ->
-                   List.exists
-                     (fun condition -> condition_matches_domain domain condition)
-                     positive)
-                 domains)
+      if unproved_guards <> []
       then
         Error
           [ Runtime_truth_totality.blocker origin exp "binding-domain"
-              "binding RHS guards are not the exact emitted image of its source-definedness domains"
+              "binding RHS has a non-domain guard that is not established by earlier source conditions"
           ]
       else
+        let positive =
+          stable_unique
+            (emitted
+             @ List.map (fun domain -> Maude_ir.BoolCond domain) domains)
+        in
         Ok
           { positive
-          ; failures = domain_first_failures emitted_domains
+          ; failures = domain_first_failures domains
           ; diagnostics = domain_diagnostics @ lowered.diagnostics
           }
     | Some _ | None ->

@@ -69,9 +69,18 @@ let materialize_complete ctx item relations =
     let relation_results = relations |> List.map (fun relation ->
       let rules = relation.rules |> List.map (fun rule -> incr indexed; !indexed, rule) in
       let seed_statements, seed_diagnostics =
-        match relation.rules |> List.find_map target_chain with
+        match relation.rules |> List.find_map target_chain_seed with
         | None -> [], []
         | Some target -> seed_rules ctx item relations relation rules target
+      in
+      let seed_refuters, seed_refuter_diagnostics =
+        match item.request.mode,
+              relation.rules |> List.find_map target_chain_seed with
+        | Runtime_truth_worklist_helper.Decide, Some target ->
+          Runtime_truth_worklist_refutation.seed_rules
+            ctx item relations relation rules target
+        | Runtime_truth_worklist_helper.Prove, _
+        | Runtime_truth_worklist_helper.Decide, None -> [], []
       in
       let positives = rules |> List.map (fun (index, rule) ->
         Positive_rule.lower ctx item relations relation index rule) in
@@ -86,6 +95,7 @@ let materialize_complete ctx item relations =
       let statements = relation_surface item relation
         @ positive_dispatcher item relation
         @ seed_statements
+        @ seed_refuters
         @ List.concat_map (fun (index, _) -> rule_surface item relation index) rules
         @ List.concat_map fst positives @ List.concat_map fst refuters
         @ (match item.request.mode with
@@ -94,7 +104,8 @@ let materialize_complete ctx item relations =
              Runtime_truth_worklist_refutation.solver item relation rules)
       in
       let diagnostics =
-        seed_diagnostics @ List.concat_map snd positives @ List.concat_map snd refuters
+        seed_diagnostics @ seed_refuter_diagnostics
+        @ List.concat_map snd positives @ List.concat_map snd refuters
       in
       statements, diagnostics)
     in
@@ -114,37 +125,54 @@ let materialize_complete ctx item relations =
       in
       complete_result statements diagnostics
 
-let target_chain_decision_diagnostics ctx item =
+let target_chain_decision_diagnostics ctx item relations =
   match item.request.mode with
   | Runtime_truth_worklist_helper.Prove -> []
   | Decide ->
     item.request.plan.Runtime_truth_scc.sccs
     |> List.concat_map (fun scc -> scc.Runtime_truth_scc.rules)
-    |> List.filter_map target_chain
-    |> List.map (fun target ->
+    |> List.filter_map (fun rule ->
+      match target_chain_seed rule with
+      | None -> None
+      | Some target ->
+        (match find_relation relations target.rule.relation_id with
+        | Some relation -> Some (target, relation)
+        | None -> None))
+    |> List.filter_map (fun (target, relation) ->
+      match
+        Runtime_truth_target_chain_certificate.decide
+          ctx item.request.plan relations relation target
+      with
+      | Runtime_truth_target_chain_certificate.Certified -> None
+      | Blocked certificate_reason ->
       let source = target.Runtime_witness_proof.rule in
       let identity =
         source.relation_id ^ "/"
         ^ Option.value ~default:"_" source.rule_id
       in
-      diagnostic ctx item source.origin
-        "RuntimeTruthWorklist/target-chain/decision-unsupported"
-        ("source target-chain RuleD `" ^ identity
-         ^ "` has no concise source-complete universal refutation certificate; one failing seed witness cannot establish false")
-        "Use Prove mode, or implement and audit a finite certificate that refutes every source-complete seed witness before admitting Decide"
-        source.source_echo)
+      Some
+        (diagnostic ctx item source.origin
+           "RuntimeTruthWorklist/target-chain/decision-unsupported"
+           ("source target-chain RuleD `" ^ identity
+            ^ "` has no source-complete principal-witness certificate: "
+            ^ certificate_reason)
+           "Use Prove mode, or provide a closed constructor partition, functional seed witness, and source-complete lifted subtype decision before admitting Decide"
+           source.source_echo))
 
 let materialize_item ctx item =
+  let relations = relations item.request.plan in
   let planner_diagnostics = List.map (planner_diagnostic ctx item) item.request.plan.blockers in
   let domain_diagnostics = successor_domain_diagnostics ctx item in
-  let target_chain_diagnostics = target_chain_decision_diagnostics ctx item in
+  let target_chain_diagnostics =
+    target_chain_decision_diagnostics ctx item relations
+  in
   if planner_diagnostics <> [] || domain_diagnostics <> []
      || target_chain_diagnostics <> []
   then
     Blocked_result
       (planner_diagnostics @ domain_diagnostics @ target_chain_diagnostics)
   else
-    materialize_complete ctx item (relations item.request.plan)
+    materialize_complete ctx item relations
 
 let materialize ctx items =
   let stage = Context.begin_stage ctx in
