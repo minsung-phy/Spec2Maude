@@ -1,4 +1,3 @@
---- PARTIAL/INCOMPLETE VERIFICATION BUILTINS: the loaded generated module has fatal translation diagnostics.
 --- Spec2Maude builtin backend interface.
 --- This module intentionally contains no fake default equations.
 --- Implement a builtin here only after its WebAssembly semantics is fixed.

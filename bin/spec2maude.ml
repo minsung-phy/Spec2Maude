@@ -67,12 +67,14 @@ let parse_translate_args args =
       loop rest
     | "--help" :: _ -> usage ~code:0 ()
     | file :: rest ->
-      files := !files @ [ file ];
+      files := file :: !files;
       loop rest
   in
   loop args;
   let files =
-    if !files = [] then sorted_default_spectec_files () else !files
+    match !files with
+    | [] -> sorted_default_spectec_files ()
+    | files -> List.rev files
   in
   !output, !builtins_output, !builtin_report, !emit_partial, files
 

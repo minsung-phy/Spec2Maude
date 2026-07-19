@@ -3000,6 +3000,25 @@ let test_irrefutable_binding_patterns () =
     failwith "exact identity List iteration binding was not certified";
   if certified ~bound:[ "binding_values" ] identity then
     failwith "identity List iteration accepted an already-bound pattern source";
+  let count = typed_var nat_typ "binding_count" in
+  let counted_identity =
+    IterE
+      (element,
+       (ListN (count, None), [ id "binding_element", values ]))
+    $$ region % list_typ
+  in
+  if not (certified counted_identity) then
+    failwith "identity ListN pattern did not bind its source length";
+  if certified ~bound:[ "binding_count" ] counted_identity then
+    failwith "identity ListN pattern accepted an already-bound length";
+  let fixed_count =
+    IterE
+      (element,
+       (ListN (nat 1, None), [ id "binding_element", values ]))
+    $$ region % list_typ
+  in
+  if certified fixed_count then
+    failwith "fixed-count ListN pattern was certified as irrefutable";
   let nonidentity =
     IterE
       (typed_var nat_typ "other_element",
@@ -3065,6 +3084,77 @@ let test_stuck_call_cannot_refute_equality () =
       = "RuntimeTruthTotalEquality/CallE/clause-free-call") blockers -> ()
   | Error _ -> failwith "stuck equality reported an imprecise totality blocker"
   | Ok _ -> failwith "clause-free call was treated as false by inequality"
+
+let test_partial_index_call_uses_structural_domain () =
+  let name = "renamed_partial_index" in
+  let list_typ = IterT (nat_typ, List) $ region in
+  let values = typed_var list_typ "values" in
+  let index = typed_var nat_typ "index" in
+  let rhs = IdxE (values, index) $$ region % nat_typ in
+  let clause =
+    DefD
+      ([], [ ExpA values $ region; ExpA index $ region ], rhs, [])
+    $ region
+  in
+  let declaration =
+    DecD
+      ( id name
+      , [ ExpP (id "values", list_typ) $ region
+        ; ExpP (id "index", nat_typ) $ region
+        ]
+      , nat_typ
+      , [ clause ] )
+    $ region
+  in
+  let source_index = Analysis.Source_index.of_script [ declaration ] in
+  let ctx =
+    Context.create source_index (Builtin_registry.of_source_index source_index)
+  in
+  let env =
+    Expr_env.empty
+    |> fun env ->
+    Expr_env.add env "actual_values"
+      { term = Var "VALUES"
+      ; sort = sort "SpectecTerminals"
+      ; typ = list_typ
+      }
+    |> fun env ->
+    Expr_env.add env "actual_index"
+      { term = Var "INDEX"; sort = sort "Nat"; typ = nat_typ }
+  in
+  let call =
+    CallE
+      ( id name
+      , [ ExpA (typed_var list_typ "actual_values") $ region
+        ; ExpA (typed_var nat_typ "actual_index") $ region
+        ] )
+    $$ region % nat_typ
+  in
+  match
+    Runtime_truth_totality.definedness
+      ctx env (origin "partial-index-result-domain") call
+  with
+  | Ok { domains; _ }
+    when List.exists
+           (function
+             | App ("indexDefined", [ _; _ ]) -> true
+             | Var _ | Const _ | Qid _ | App _ -> false)
+           domains
+         && not
+              (List.exists
+                 (function
+                   | App ("typecheck", [ App (_, _); _ ]) -> true
+                   | Var _ | Const _ | Qid _ | App _ -> false)
+                 domains) -> ()
+  | Ok _ ->
+    failwith "partial indexed call used a result recognizer instead of its structural index domain"
+  | Error blockers ->
+    failwith
+      ("partial indexed call lost its structural domain: "
+       ^ String.concat "; "
+           (List.map
+              (fun blocker -> blocker.Runtime_truth_totality.constructor)
+              blockers))
 
 let test_iter_evaluator_domains () =
   let list_typ = IterT (nat_typ, List) $ region in
@@ -5265,6 +5355,7 @@ let () =
   test_irrefutable_binding_patterns ();
   test_unproven_matchcond_complement_rejected ();
   test_stuck_call_cannot_refute_equality ();
+  test_partial_index_call_uses_structural_domain ();
   test_iter_evaluator_domains ();
   test_clause_proven_indexed_enumeration ();
   test_old_dependent_false_requires_total_boolean ();

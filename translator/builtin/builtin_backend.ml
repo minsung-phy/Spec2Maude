@@ -219,7 +219,6 @@ let abi backend = backend.abi
 let contract_path backend = backend.contract_path
 let smoke_fixture backend = backend.smoke_fixture
 let requirements backend = backend.requirements
-let requirement_key (requirement : requirement) = requirement.key
 let public_op (requirement : requirement) = requirement.public_op
 let totality (requirement : requirement) = requirement.totality
 let demand (requirement : requirement) = requirement.demand

@@ -25,6 +25,11 @@ let target_chain rule =
 let transitive_domain rule =
   Runtime_witness_proof.transitive_domain (source_rule rule)
 
+let target_chain_seed rule =
+  match transitive_domain rule with
+  | Some _ -> None
+  | None -> target_chain rule
+
 let successor_domain_diagnostics ctx item =
   item.request.plan.Runtime_truth_scc.sccs
   |> List.concat_map (fun scc -> scc.Runtime_truth_scc.rules)
@@ -68,6 +73,11 @@ let seed_hit_op item relation =
     ~role:("truth-seed-hit-" ^ Naming.source_slug ~lower:true relation.id)
     item.name
 
+let seed_miss_op item relation =
+  Naming.helper_companion
+    ~role:("truth-seed-miss-" ^ Naming.source_slug ~lower:true relation.id)
+    item.name
+
 let split_at count values =
   let rec split count left right =
     if count = 0 then Some (List.rev left, right)
@@ -108,7 +118,12 @@ let seed_surface item relation target =
                ~attrs:(frozen_all sorts))
         ; generated item item.origin
             (op (seed_hit_op item relation) [ sort_ref witness_sort ] result ~attrs:[ Ctor ])
-        ] )
+        ]
+        @ (match item.request.mode with
+           | Runtime_truth_worklist_helper.Prove -> []
+           | Decide ->
+             [ generated item item.origin
+                 (op (seed_miss_op item relation) [] result ~attrs:[ Ctor ]) ]) )
   | _ -> None
 
 let worklist_pattern_certificate ctx item relations =
@@ -119,7 +134,7 @@ let worklist_pattern_certificate ctx item relations =
     relations
     |> List.concat_map (fun relation ->
       relation.rules
-      |> List.filter_map target_chain
+      |> List.filter_map target_chain_seed
       |> List.filter_map (fun target -> seed_surface item relation target)
       |> List.concat_map (fun (_, _, statements) -> statements))
   in
@@ -397,8 +412,11 @@ let target_chain_edge
                     @ List.map (fun guard -> EqCondition guard) lowered.guards
                     @ [ target_condition ] ]
                 else
-                  List.map (fun failure -> seed :: failure)
-                    guards.false_conditions
+                  [ [ RewriteCond
+                        ( App (seed_op item relation, known @ [ history ])
+                        , Const (seed_miss_op item relation) ) ] ]
+                  @ List.map (fun failure -> seed :: failure)
+                      guards.false_conditions
                   @ [ seed
                       :: guards.true_conditions
                       @ List.map (fun guard -> EqCondition guard) lowered.guards

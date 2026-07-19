@@ -243,7 +243,8 @@ let definition_entry ctx id =
   Analysis.Source_index.find_by_id (Context.source_index ctx) id
   |> List.find_map (fun entry ->
     match entry.Analysis.Source_index.def.it with
-    | DecD (source_id, params, _, clauses) when source_id.it = id -> Some (params, clauses)
+    | DecD (source_id, params, result, clauses) when source_id.it = id ->
+      Some (params, result, clauses)
     | TypD _ | RelD _ | DecD _ | GramD _ | RecD _ | HintD _ -> None)
 
 let runtime_args params clause =
@@ -274,6 +275,71 @@ let representation_preserving_type ctx source target =
   try Il.Eval.equiv_typ (Context.il_env ctx) source target with
   | Il.Eval.Irred -> false
 
+let exact_total_constructor ctx typ mixop arity =
+  match
+    Subtype_plan.canonical_typ
+      ~il_env:(Context.il_env ctx)
+      ~static_typ_env:(Context.static_typ_env ctx)
+      typ
+  with
+  | Error _ -> Error "constructor result type is not canonically reducible"
+  | Ok typ ->
+    let key_env = Static_key.of_static_typ_env (Context.static_typ_env ctx) in
+    (match Static_key.typ_ref ~env:key_env typ with
+    | None -> Error "constructor result type has no exact static category key"
+    | Some { Static_key.category_id; static_args_key } ->
+      let source_category = Naming.source_owner category_id in
+      let certify_entry (entry : Constructor_registry.entry) =
+        match entry.status with
+        | Constructor_registry.Emitted -> Ok entry
+        | Constructor_registry.Skipped | Constructor_registry.Unsupported ->
+          Error
+            ("exact constructor is "
+             ^ Constructor_registry.status_to_string entry.status)
+      in
+      match
+        Constructor_registry.lookup_visible
+          (Context.constructors ctx)
+          ~source_category
+          ~static_args_key
+          ~mixop
+          ~arity
+      with
+      | Constructor_registry.Found entry -> certify_entry entry
+      | Constructor_registry.Missing ->
+        (match Typcase_constructor.resolve_emitted ctx typ mixop ~arity with
+        | Typcase_constructor.Found resolution ->
+          let entry = resolution.Typcase_constructor.registry_entry in
+          if entry.arity <> arity
+             || entry.constructor_op <> resolution.resolved_constructor
+             || entry.projection_ops <> resolution.projection_ops
+          then
+            Error "resolved emitted constructor disagrees with its registry identity"
+          else
+            certify_entry entry
+        | Typcase_constructor.Missing
+        | Typcase_constructor.Blocked _
+        | Typcase_constructor.Ambiguous _ ->
+          Error
+            "no emitted constructor has the exact category/static-key/mixop/arity identity")
+      | Constructor_registry.Ambiguous _ ->
+        Error "exact category/static-key/mixop/arity constructor identity is ambiguous")
+
+let singleton_constructor ctx typ mixop arity =
+  match exact_total_constructor ctx typ mixop arity with
+  | Error _ -> false
+  | Ok entry ->
+    (match
+       Constructor_registry.family_coverage (Context.constructors ctx)
+         ~source_category:entry.source_category
+         ~static_args_key:entry.static_args_key
+     with
+    | Constructor_registry.Closed [ only ] ->
+      only.Constructor_registry.constructor_op = entry.constructor_op
+      && only.arity = entry.arity
+      && Il.Eq.eq_mixop only.mixop entry.mixop
+    | Constructor_registry.Closed _ | Constructor_registry.Open _ -> false)
+
 let rec certified_binding_pattern ctx bound exp =
   let rec tuple bound = function
     | [] -> true
@@ -294,6 +360,17 @@ let rec certified_binding_pattern ctx bound exp =
       ((List | Opt), [ generator, { it = VarE source; _ } ])) ->
     body.it = generator.it && source.it <> "_"
     && fresh_pattern_id bound source
+  | IterE ({ it = VarE body; _ },
+      (ListN ({ it = VarE count; _ }, None),
+       [ generator, { it = VarE source; _ } ])) ->
+    (* [x^n] is an irrefutable sequence pattern only when it binds both the
+       complete source sequence and its length.  A fixed count or an indexed
+       generator would restrict the matched domain. *)
+    body.it = generator.it
+    && source.it <> "_"
+    && count.it <> source.it
+    && fresh_pattern_id bound source
+    && fresh_pattern_id bound count
   | LiftE inner
     when representation_preserving_type ctx inner.note exp.note ->
     certified_binding_pattern ctx bound inner
@@ -304,17 +381,8 @@ let rec certified_binding_pattern ctx bound exp =
     certified_binding_pattern ctx bound inner
   | _ ->
   match constructor_pattern exp with
-  | Some (category, key, mixop, arity) when constructor_payload exp ->
-    let coverage =
-       Constructor_registry.family_coverage (Context.constructors ctx)
-         ~source_category:category ~static_args_key:key
-    in
-    (match coverage with
-    | Constructor_registry.Closed [ entry ] ->
-      entry.status = Constructor_registry.Emitted
-      && entry.arity = arity && Il.Eq.eq_mixop entry.mixop mixop
-    | Constructor_registry.Open _ -> false
-    | Closed _ -> false)
+  | Some (_, _, mixop, arity) when constructor_payload exp ->
+    singleton_constructor ctx exp.note mixop arity
   | Some _ -> false
   | None -> false
 
@@ -676,58 +744,6 @@ let total_cmpop = function
   | (`LtOp | `GtOp | `LeOp | `GeOp), (`NatT | `IntT | `RatT | `RealT) -> true
   | (`EqOp | `NeOp | `LtOp | `GtOp | `LeOp | `GeOp), _ -> false
 
-let exact_total_constructor ctx typ mixop arity =
-  match
-    Subtype_plan.canonical_typ
-      ~il_env:(Context.il_env ctx)
-      ~static_typ_env:(Context.static_typ_env ctx)
-      typ
-  with
-  | Error _ -> Error "constructor result type is not canonically reducible"
-  | Ok typ ->
-    let key_env = Static_key.of_static_typ_env (Context.static_typ_env ctx) in
-    (match Static_key.typ_ref ~env:key_env typ with
-    | None -> Error "constructor result type has no exact static category key"
-    | Some { Static_key.category_id; static_args_key } ->
-      let source_category = Naming.source_owner category_id in
-      let certify_entry (entry : Constructor_registry.entry) =
-        match entry.status with
-        | Constructor_registry.Emitted -> Ok entry
-        | Constructor_registry.Skipped | Constructor_registry.Unsupported ->
-          Error
-            ("exact constructor is "
-             ^ Constructor_registry.status_to_string entry.status)
-      in
-      match
-        Constructor_registry.lookup_visible
-          (Context.constructors ctx)
-          ~source_category
-          ~static_args_key
-          ~mixop
-          ~arity
-      with
-      | Constructor_registry.Found entry -> certify_entry entry
-      | Constructor_registry.Missing ->
-        (match
-           Typcase_constructor.resolve_emitted ctx typ mixop ~arity
-         with
-        | Typcase_constructor.Found resolution ->
-          let entry = resolution.Typcase_constructor.registry_entry in
-          if entry.arity <> arity
-             || entry.constructor_op <> resolution.resolved_constructor
-             || entry.projection_ops <> resolution.projection_ops
-          then
-            Error "resolved emitted constructor disagrees with its registry identity"
-          else
-            certify_entry entry
-        | Typcase_constructor.Missing
-        | Typcase_constructor.Blocked _
-        | Typcase_constructor.Ambiguous _ ->
-          Error
-            "no emitted constructor has the exact category/static-key/mixop/arity identity")
-      | Constructor_registry.Ambiguous _ ->
-        Error "exact category/static-key/mixop/arity constructor identity is ambiguous")
-
 let constructor_payload payload_index arg =
   let payloads =
     match arg.it with
@@ -857,17 +873,7 @@ let exact_singleton_constructor ctx pattern =
   match pattern.it with
   | CaseE (mixop, payload) ->
     let arity = match payload.it with TupE exps -> List.length exps | _ -> 1 in
-    (match exact_total_constructor ctx pattern.note mixop arity with
-    | Ok entry ->
-      (match
-         Constructor_registry.family_coverage (Context.constructors ctx)
-           ~source_category:entry.source_category
-           ~static_args_key:entry.static_args_key
-       with
-      | Constructor_registry.Closed [ only ] ->
-        only.Constructor_registry.constructor_op = entry.constructor_op
-      | Closed _ | Open _ -> false)
-    | Error _ -> false)
+    singleton_constructor ctx pattern.note mixop arity
   | _ -> false
 
 let validated_partial_clauses ctx facts params clauses call_args =
@@ -1055,7 +1061,7 @@ and total_call ctx visited strict bound facts origin exp id args =
       match arg.it with ExpA exp -> Some exp | TypA _ | DefA _ | GramA _ -> None) in
     let sequence_tokens =
       match definition_entry ctx target with
-      | Some (params, clauses) ->
+      | Some (params, _, clauses) ->
         sequence_parameter_indices params clauses |> List.filter_map (fun index ->
           Option.bind (nth_opt runtime_exps index) (length_token facts))
       | None -> [] in
@@ -1101,7 +1107,7 @@ and total_definition ctx visited facts origin call_exp target call_args =
   | Some definition, _ when definition.clause_count = 0 ->
     Blocked [ blocker origin call_exp "clause-free-call"
       ("CallE target `" ^ target ^ "` has no source clause and no implemented total backend contract") ]
-  | Some _, Some (params, clauses) ->
+  | Some _, Some (params, _, clauses) ->
     let coverage =
       match Analysis.Function_graph.find_definition graph target with
       | Some definition when definition.partial ->
@@ -1115,7 +1121,8 @@ and total_definition ctx visited facts origin call_exp target call_args =
       | None -> None
     in
     (match coverage with
-    | None -> Blocked [ blocker origin call_exp "open-clause-domain"
+    | None ->
+      Blocked [ blocker origin call_exp "open-clause-domain"
         ("CallE target `" ^ target
          ^ "` clauses do not structurally cover its source domain; clause patterns: "
          ^ clause_shapes params clauses) ]
@@ -1292,13 +1299,13 @@ let source_zero_or_one ctx ~bound origin exp =
          Analysis.Function_graph.find_definition graph target,
          definition_entry ctx target
        with
-      | Some identity, Some definition, Some (_, [ _ ]) ->
+      | Some identity, Some definition, Some (_, _, [ _ ]) ->
         definition.clause_count = 1
         && not
              (Analysis.Function_graph.identity_is_rewrite_backed
                 graph identity)
-      | None, _, _ | _, None, _ | _, _, None | _, _, Some (_, _ :: _ :: _)
-      | _, _, Some (_, []) -> false))
+      | None, _, _ | _, None, _ | _, _, None
+      | _, _, Some (_, _, _ :: _ :: _) | _, _, Some (_, _, []) -> false))
   | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
   | TupE _ | ProjE _ | CaseE _ | UncaseE _ | OptE _ | TheE _ | StrE _
   | DotE _ | CompE _ | ListE _ | LiftE _ | MemE _ | LenE _ | CatE _
@@ -1389,6 +1396,73 @@ let bool_fold op = function
   | [] -> None
   | first :: rest ->
     Some (List.fold_left (fun left right -> Maude_ir.App (op, [ left; right ])) first rest)
+
+let closed_emitted_result_category ctx typ =
+  match
+    Subtype_plan.canonical_typ
+      ~il_env:(Context.il_env ctx)
+      ~static_typ_env:(Context.static_typ_env ctx)
+      typ
+  with
+  | Error _ -> false
+  | Ok typ ->
+    let key_env = Static_key.of_static_typ_env (Context.static_typ_env ctx) in
+    (match Static_key.typ_ref ~env:key_env typ with
+    | None -> false
+    | Some { Static_key.category_id; static_args_key } ->
+      let source_category = Naming.source_owner category_id in
+      (match
+         Constructor_registry.family_coverage (Context.constructors ctx)
+           ~source_category ~static_args_key
+       with
+      | Constructor_registry.Closed (_ :: _ as entries) ->
+        List.for_all
+          (fun (entry : Constructor_registry.entry) ->
+            entry.status = Constructor_registry.Emitted)
+          entries
+      | Constructor_registry.Closed [] | Constructor_registry.Open _ -> false))
+
+let result_type_domain ctx env origin exp declared_result =
+  let result = Expr_translate.lower_value ctx env origin exp in
+  let witness =
+    Expr_translate.lower_type_witness
+      ctx env origin
+      ~constructor:"RuntimeTruthTotalEquality/CallE/result-domain"
+      declared_result
+  in
+  match
+    result.term,
+    witness.term,
+    Expr_translate.carrier_sort_of_typ declared_result
+  with
+  | Some term, Some typ, Some sort
+    when representation_preserving_type ctx declared_result exp.note
+         && Maude_ir.sort_name sort = "SpectecTerminal"
+         && closed_emitted_result_category ctx declared_result
+         && witness.guards = []
+         && not (result_has_fatal result)
+         && not (result_has_fatal witness) ->
+    let conditions =
+      Expr_translate.typecheck_conditions_for_typ declared_result sort term typ
+    in
+    (match conditions with
+    | [ Maude_ir.BoolCond
+          (Maude_ir.App ("typecheck", [ observed; observed_typ ])) ]
+      when observed = term && observed_typ = typ ->
+      Some
+        ( [ Maude_ir.App ("typecheck", [ term; typ ]) ]
+        , result.guards @ witness.guards
+        , result.diagnostics @ witness.diagnostics )
+    | _ -> None)
+  | _ -> None
+
+let result_domain_covers blockers =
+  blockers <> []
+  && List.for_all
+       (fun blocker ->
+         blocker.constructor =
+         "RuntimeTruthTotalEquality/IdxE/index-domain")
+       blockers
 
 let subtype_pattern_domain ctx env origin actual pattern =
   match pattern.it with
@@ -1654,14 +1728,32 @@ let rec index_domains ?bound_vars ?(visited = []) ctx env origin exp =
         | Some identity
           when not (Analysis.Function_graph.identity_is_rewrite_backed graph identity) ->
           (match definition_entry ctx target with
-          | Some (params, [ clause ]) ->
+          | Some (params, result_typ, [ clause ]) ->
+            let result_domain_or blockers =
+              if not (result_domain_covers blockers) then Error blockers
+              else
+                match result_type_domain ctx env origin exp result_typ with
+                | None -> Error blockers
+                | Some (call_domains, call_guards, call_diagnostics) ->
+                  (* A validated DecD can only return a value of its declared
+                     result type.  For a clause whose only unresolved partial
+                     operation is IdxE, generated typechecking is therefore
+                     an exact operational definedness test: a successful
+                     index reduces to a typed value, while an out-of-domain
+                     index leaves the call stuck and reaches typecheck's
+                     false catch-all. *)
+                  Ok
+                    ( domains @ call_domains
+                    , guards @ call_guards
+                    , diagnostics @ call_diagnostics )
+            in
             (match direct_call_substitution params clause args with
             | Some rhs ->
               (match
                  index_domains ?bound_vars ~visited:(target :: visited)
                    ctx env origin rhs
                with
-              | Error blockers -> Error blockers
+              | Error blockers -> result_domain_or blockers
               | Ok (rhs_domains, rhs_guards, rhs_diagnostics) ->
                 Ok
                   ( domains @ rhs_domains
@@ -1670,8 +1762,8 @@ let rec index_domains ?bound_vars ?(visited = []) ctx env origin exp =
             | None ->
               (match total_exp ?bound_vars ctx env origin exp with
               | Total -> Ok (domains, guards, diagnostics)
-              | Blocked blockers -> Error blockers))
-          | Some (params, clauses) ->
+              | Blocked blockers -> result_domain_or blockers))
+          | Some (params, _, clauses) ->
             (match
                partial_call_domain
                  ctx env origin target params clauses args
@@ -1753,4 +1845,3 @@ let definedness ?bound_vars ctx env origin exp =
   | Ok (domains, guards, diagnostics) ->
     Ok { domains; guards; diagnostics }
   | Error blockers -> Error blockers
-

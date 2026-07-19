@@ -27,6 +27,7 @@
   runtime_truth_worklist_positive
   runtime_truth_worklist_refutation
   runtime_truth_worklist_rule
+  runtime_truth_target_chain_certificate
   source_free_vars
   source_condition_certificate_internal
   source_index

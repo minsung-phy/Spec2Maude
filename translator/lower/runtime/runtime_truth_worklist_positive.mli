@@ -6,6 +6,8 @@ type 'a edge_result =
 
 val target_chain :
   Runtime_truth_scc.rule -> Runtime_witness_proof.target_chain option
+val target_chain_seed :
+  Runtime_truth_scc.rule -> Runtime_witness_proof.target_chain option
 val transitive_domain :
   Runtime_truth_scc.rule -> Runtime_witness_proof.transitive_domain option
 val successor_domain_diagnostics :
@@ -18,6 +20,9 @@ val seed_rules :
   (int * Runtime_truth_scc.rule) list ->
   Runtime_witness_proof.target_chain ->
   Maude_ir.generated list * Diagnostics.t list
+val seed_op : item -> relation -> string
+val seed_hit_op : item -> relation -> string
+val seed_miss_op : item -> relation -> string
 val worklist_pattern_certificate :
   Context.t -> item -> relation list -> Condition_pattern_certificate.t
 val target_chain_edge :

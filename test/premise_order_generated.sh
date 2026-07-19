@@ -10,21 +10,20 @@ else
   translate_log=/tmp/spec2maude-premise-order-translate.log
   cd "$root"
   rm -f "$output" "$translate_log"
-  set +e
-  perl -e '$SIG{ALRM}=sub { exit 124 }; alarm shift; exec @ARGV' \
-    120 "$exe" translate --emit-partial -o "$output" >"$translate_log" 2>&1
-  translate_status=$?
-  set -e
-  if [ "$translate_status" -ne 1 ]; then
+  if ! perl -e '$SIG{ALRM}=sub { exit 124 }; alarm shift; exec @ARGV' \
+    120 "$exe" translate -o "$output" >"$translate_log" 2>&1
+  then
     cat "$translate_log" >&2
-    echo "partial premise-order translation exited $translate_status, expected 1" >&2
+    echo 'premise-order translation failed' >&2
     exit 1
   fi
-  grep -q 'writing marked partial/incomplete verification output and exiting nonzero' "$translate_log"
-  grep -Eq '^\[spec2maude\] diagnostics: .*fatal=[1-9][0-9]* unsupported=[1-9][0-9]*' "$translate_log"
+  grep -Eq '^\[spec2maude\] diagnostics: .*fatal=0 unsupported=0' "$translate_log"
 fi
 
-grep -q '^--- PARTIAL/INCOMPLETE VERIFICATION OUTPUT:' "$output"
+if grep -q '^--- PARTIAL/INCOMPLETE VERIFICATION OUTPUT:' "$output"; then
+  echo 'complete premise-order output was marked partial' >&2
+  exit 1
+fi
 
 condition_line () {
   awk -v head="$1" 'index($0, head) { getline; print; exit }' "$output"
