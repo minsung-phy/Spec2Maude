@@ -30,6 +30,13 @@ type env = Expr_env.t
 
 let carrier_sort_of_typ = Carrier_sort.for_expression
 
+let carrier_sort_of_typ_in ctx typ =
+  match Carrier_sort.for_typd ctx typ with
+  | Ok sort -> Some sort
+  | Error _ -> carrier_sort_of_typ typ
+
+let typecheck_conditions_for_typ = Typecheck_guard.for_typ
+
 let numeric_literal_diagnostic ctx origin exp =
   unsupported
     ~ctx ~origin ~constructor:"Expr/NumE"
@@ -44,7 +51,23 @@ let literal_num_value ctx origin exp n =
   | `NatT | `IntT -> with_term (Primitive_term.number n)
   | `RatT | `RealT -> with_diagnostics [ numeric_literal_diagnostic ctx origin exp ]
 
-let typecheck_conditions_for_typ = Typecheck_guard.for_typ
+let checks_value value = function
+  | BoolCond
+      (App
+        ( ( "typecheck"
+          | "typecheckSeq"
+          | "typecheckOptSeq"
+          | "typecheckSeqOpt"
+          | "typecheckNestedSeq" )
+        , checked :: _ )) ->
+    checked = value
+  | EqCond _ | MatchCond _ | MembershipCond _ | BoolCond _ -> false
+
+let trust_builtin_argument (result : result) =
+  match result.term with
+  | None -> result
+  | Some value ->
+    { result with guards = List.filter (fun guard -> not (checks_value value guard)) result.guards }
 
 type witness_result =
   { witness_term : term option
@@ -455,6 +478,12 @@ let lower_call_impl ~lower_value ctx env origin exp id args =
             "static argument targets an unknown DecD and cannot be specialized"
             "Expr/CallE/static-arg")
   in
+  let results =
+    if Builtin_registry.is_hint_builtin (Context.builtins ctx) target_id.it then
+      List.map trust_builtin_argument results
+    else
+      results
+  in
   let _all_guards, diagnostics = append_result_metadata results in
   let terms = List.filter_map (fun (result : result) -> result.term) results in
   let guards = List.concat_map (fun (result : result) -> result.guards) results in
@@ -598,7 +627,7 @@ let lower_pattern_raw names callbacks ctx env origin exp =
           ; introduced_bindings = []
           ; diagnostics = result.diagnostics
           })
-    ; carrier_sort_of_typ
+    ; carrier_sort_of_typ = carrier_sort_of_typ_in ctx
     ; is_nat_typ = Carrier_sort.typ_is_nat ctx
     ; witness_of_typ =
         (fun ~constructor origin typ ->
@@ -721,7 +750,7 @@ and category_guards_for_term ctx env origin constructor exp term typ =
   | Some sort, Some witness ->
     Some
       (witness_result.witness_guards
-       @ typecheck_conditions_for_typ typ sort term witness),
+       @ typecheck_conditions_for_typ ctx typ sort term witness),
     witness_result.witness_diagnostics
   | None, _ ->
     None,
@@ -858,7 +887,10 @@ and lower_record_extension ctx env origin exp record path extension =
   Expr_record.lower_record_extension expr_record_callbacks ctx env origin exp record path extension
 
 and expr_iter_callbacks =
-  { Expr_iter.lower_value; lower_sequence }
+  { Expr_iter.lower_value
+  ; lower_sequence
+  ; carrier_sort = carrier_sort_of_typ_in
+  }
 
 and lower_iter ctx env origin exp body iterexp =
   Expr_iter.lower_iter expr_iter_callbacks ctx env origin exp body iterexp

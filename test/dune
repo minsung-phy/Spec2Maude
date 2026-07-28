@@ -33,6 +33,210 @@
  (modules expr_bool_numeric_operator_regression)
  (libraries translator il util xl))
 
+(test
+ (name wasm_to_maude_regression)
+ (modules wasm_to_maude_regression)
+ (deps
+  wast_assert_unlinkable_unsupported.wast
+  wast_custom_syntax.wast
+  wast_import_mismatch_unsupported.wast
+  wast_import_missing_export_unsupported.wast
+  wast_import_unsupported.wast
+  wast_linking_function_subset.wast
+  wast_named_instances.wast
+  wast_register_imports.wast
+  wast_result_patterns.wast
+  wast_quoted_invalid.wast
+  wast_quoted_malformed.wast
+  wast_quoted_modules.wast
+  wast_quoted_wrong_invalid.wast
+  wast_quoted_wrong_malformed.wast
+  wast_spectest_global_i32_value.wast
+  wast_spectest_print_completes.wast
+  wast_spectest_unknown_export_unsupported.wast
+  wast_spectest_wrong_type_unsupported.wast
+  wast_vector_nan_lanes.wast
+  wast_vectors.wast)
+ (libraries wasm_to_maude))
+
+(rule
+ (alias runtest)
+ (deps suite_run_generated.sh i32_eqz.wast ../builtins.maude ../output.maude)
+ (action
+  (run sh %{dep:suite_run_generated.sh} %{exe:../bin/wasm2maude.exe}
+    %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps wast_custom_syntax_cli.sh wast_custom_syntax.wast ../builtins.maude)
+ (action
+  (run sh %{dep:wast_custom_syntax_cli.sh} %{exe:../bin/wasm2maude.exe}
+    %{dep:wast_custom_syntax.wast} %{dep:../builtins.maude})))
+
+(rule
+ (alias runtest)
+ (deps
+  quoted_wast_generated.sh
+  wast_quoted_invalid.wast
+  wast_quoted_malformed.wast
+  wast_quoted_modules.wast
+  ../builtins.maude
+  ../output.maude)
+ (action
+  (run sh %{dep:quoted_wast_generated.sh} %{exe:../bin/wasm2maude.exe}
+    %{workspace_root})))
+
+(test
+ (name wast_host_regression)
+ (modules wast_host_regression)
+ (deps
+  wast_spectest_fresh_lookup_lifetimes.wast
+  wast_spectest_register_override.wast
+  wast_spectest_tables_shared.wast)
+ (libraries wasm_to_maude))
+
+(test
+ (name wast_live_import_regression)
+ (modules wast_live_import_regression)
+ (deps
+  wast_live_memory_import.wast
+  wast_live_table_import.wast
+  wast_live_import_before_grow.wast
+  wast_live_spectest_imports.wast
+  wast_live_import_max_unsupported.wast
+  wast_live_import_addr_unsupported.wast
+  wast_live_import_ref_unsupported.wast
+  wast_register_imports.wast)
+ (libraries wasm_to_maude))
+
+(test
+ (name wast_unlinkable_regression)
+ (modules wast_unlinkable_regression)
+ (deps
+  wast_assert_unlinkable_static.wast
+  wast_assert_unlinkable_live_before.wast
+  wast_assert_unlinkable_live_transition.wast
+  wast_assert_unlinkable_linkable.wast
+  wast_assert_unlinkable_start_trap.wast
+  wast_assert_unlinkable_invalid.wast
+  wast_import_missing_export_unsupported.wast
+  wast_import_mismatch_unsupported.wast)
+ (libraries wasm_to_maude))
+
+(test
+ (name wast_uninstantiable_regression)
+ (modules wast_uninstantiable_regression)
+ (deps
+  wast_assert_uninstantiable_trap.wast
+  wast_assert_uninstantiable_normal.wast
+  wast_assert_uninstantiable_static.wast
+  wast_assert_uninstantiable_live_link_error.wast
+  wast_assert_uninstantiable_memory.wast)
+ (libraries wasm_to_maude))
+
+(test
+ (name wast_exception_regression)
+ (modules wast_exception_regression)
+ (deps
+  wast_assert_exception_uncaught.wast
+  wast_assert_exception_zero_result.wast
+  wast_assert_exception_multiple_results.wast
+  wast_assert_exception_trap.wast
+  wast_assert_exception_caught.wast
+  wast_assert_exception_get.wast)
+ (libraries wasm_to_maude))
+
+(test
+ (name wast_exhaustion_regression)
+ (modules wast_exhaustion_regression)
+ (deps
+  wast_assert_exhaustion_recursive.wast
+  wast_assert_exhaustion_num_prefix.wast
+  wast_assert_exhaustion_vector_prefix.wast
+  wast_assert_exhaustion_store_continuation.wast
+  wast_assert_exhaustion_zero.wast
+  wast_assert_exhaustion_get.wast)
+ (libraries wasm_to_maude))
+
+(rule
+ (alias runtest)
+ (deps
+  wast_live_import_generated.sh
+  wast_live_memory_import.wast
+  wast_live_table_import.wast
+  wast_live_import_before_grow.wast
+  wast_live_spectest_imports.wast
+  ../builtins.maude)
+ (action
+  (run sh %{dep:wast_live_import_generated.sh} %{exe:../bin/wasm2maude.exe}
+    %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps
+  wast_uninstantiable_generated.sh
+  wast_assert_uninstantiable_trap.wast
+  wast_assert_uninstantiable_normal.wast
+  wast_assert_uninstantiable_static.wast
+  wast_assert_uninstantiable_static_incompatible.wast
+  wast_assert_uninstantiable_live_link_error.wast
+  wast_assert_uninstantiable_memory.wast
+  wast_assert_uninstantiable_exception.wast
+  ../builtins.maude)
+ (action
+  (run sh %{dep:wast_uninstantiable_generated.sh}
+    %{exe:../bin/wasm2maude.exe} %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps
+  wast_exhaustion_generated.sh
+  wast_assert_exhaustion_recursive.wast
+  wast_assert_exhaustion_num_prefix.wast
+  wast_assert_exhaustion_vector_prefix.wast
+  wast_assert_exhaustion_ref_prefix.wast
+  wast_assert_exhaustion_store_continuation.wast
+  wast_assert_exhaustion_finite.wast
+  wast_assert_exhaustion_zero.wast
+  wast_assert_exhaustion_one.wast
+  wast_assert_exhaustion_multiple.wast
+  wast_assert_exhaustion_trap.wast
+  wast_assert_exhaustion_exception.wast
+  wast_assert_exhaustion_loop.wast
+  wast_assert_exhaustion_tail.wast
+  ../builtins.maude)
+ (action
+  (run sh %{dep:wast_exhaustion_generated.sh}
+    %{exe:../bin/wasm2maude.exe} %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps
+  wast_exception_generated.sh
+  wast_assert_exception_uncaught.wast
+  wast_assert_exception_zero_result.wast
+  wast_assert_exception_multiple_results.wast
+  wast_assert_exception_trap.wast
+  wast_assert_exception_caught.wast
+  ../builtins.maude)
+ (action
+  (run sh %{dep:wast_exception_generated.sh}
+    %{exe:../bin/wasm2maude.exe} %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps
+  wast_unlinkable_generated.sh
+  wast_assert_unlinkable_static.wast
+  wast_assert_unlinkable_live_before.wast
+  wast_assert_unlinkable_live_transition.wast
+  wast_assert_unlinkable_linkable.wast
+  wast_assert_unlinkable_start_trap.wast
+  ../builtins.maude)
+ (action
+  (run sh %{dep:wast_unlinkable_generated.sh} %{exe:../bin/wasm2maude.exe}
+    %{workspace_root})))
+
 (executable
  (name runtime_truth_decision_fixture)
  (modules runtime_truth_decision_fixture)
@@ -115,13 +319,48 @@
  (deps
  runtime_truth_generated.sh
   runtime_truth_ref_ok_smoke.maude
+  i32_eqz.wast
+  i64_shift.wast
+  wast_actions.wast
+  wast_modules.wast
+  wast_linking_function_subset.wast
+  wast_named_instances.wast
+  wast_register_imports.wast
+  wast_result_patterns.wast
+  wast_refs.wast
+  wast_spectest_global_i32_value.wast
+  wast_spectest_memory_shared.wast
+  wast_spectest_print_completes.wast
+  wast_spectest_register_override.wast
+  wast_spectest_tables_shared.wast
+  wast_vector_nan_lanes.wast
+  wast_vectors.wast
+  wast_wrong_either.wast
+  wast_wrong_get.wast
+  wast_wrong_invoke.wast
+  wast_wrong_nan.wast
+  wast_wrong_nan_arithmetic.wast
+  wast_wrong_null.wast
+  wast_wrong_reftype.wast
+  wast_wrong_vector_canonical_nan.wast
+  wast_wrong_vector_exact_lane.wast
+  wast_wrong_vector_signaling_nan.wast
   constructor_component_generated.sh
   record_semantics_generated.sh
   ../builtins.maude
   ../config/wasm-3.0-runtime-ingress.contract
+  ../wat_examples/data-load.wat
+  ../wat_examples/elem-call-ref.wat
+  ../wat_examples/fib-wrapper.wat
+  ../wat_examples/global-get.wat
+  ../wat_examples/memory-zero-load.wat
+  ../wat_examples/simd-special.wat
+  ../wat_examples/start-global.wat
+  ../wat_examples/table-size.wat
   (glob_files ../wasm-3.0/*.spectec))
  (action
-  (run sh %{dep:runtime_truth_generated.sh} %{exe:../bin/spec2maude.exe} %{workspace_root})))
+  (run sh %{dep:runtime_truth_generated.sh} %{exe:../bin/spec2maude.exe}
+    %{workspace_root} %{exe:../bin/wasm2maude.exe})))
 
 (rule
  (alias runtest)

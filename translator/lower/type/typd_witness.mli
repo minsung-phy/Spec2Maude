@@ -5,6 +5,13 @@ val terms_of_args :
   Il.Ast.arg list ->
   Maude_ir.term list option * Diagnostics.t list
 
+val pattern_terms_of_args :
+  Type_static_env.static_env ->
+  Context.t ->
+  Origin.t ->
+  Il.Ast.arg list ->
+  Maude_ir.term list option * Maude_ir.eq_condition list * Diagnostics.t list
+
 val of_typ :
   Type_static_env.static_env ->
   Context.t ->

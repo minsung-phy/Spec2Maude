@@ -34,6 +34,7 @@ separately generated initial Maude configuration:
 ```text
 bin/           command-line entry point
 translator/    SpecTec-to-Maude translator
+wasm_to_maude/ WebAssembly-to-Maude initial configuration frontend
 builtins.maude hand-written builtin backend semantics
 builtins.contract builtin backend ABI metadata
 wasm-3.0/      WebAssembly 3.0 SpecTec source
@@ -77,6 +78,44 @@ dune exec ./bin/spec2maude.exe -- translate \
 ```
 
 ## Check
+
+Translate and instantiate a validated WebAssembly module with the generated
+semantics:
+
+```sh
+dune exec ./bin/wasm2maude.exe -- module wat_examples/fib-wrapper.wat
+dune exec ./bin/wasm2maude.exe -- instantiate wat_examples/fib-wrapper.wat
+```
+
+The first command checks the encoded module against `syn.module`. The second
+rewrites the official SpecTec `instantiate` definition; modules with imports
+require an explicit host-address mapping and are rejected for now.
+
+Audit the module payloads in a local checkout of the official WebAssembly test
+suite with:
+
+```sh
+dune exec ./bin/wasm2maude.exe -- suite-audit \
+  benchmarks/external/webassembly-spec/test/core
+```
+
+This audit covers WAT and binary module decoding, validation, and Maude term
+encoding. Execution of WAST commands such as `invoke` and `assert_return` is a
+separate runner stage.
+
+Execute each WAST script independently in Maude and write a tab-separated report:
+
+```sh
+dune exec ./bin/wasm2maude.exe -- suite-run \
+  benchmarks/external/webassembly-spec/test/core \
+  --timeout 60 \
+  --log-dir /tmp/spec2maude-suite-logs \
+  -o /tmp/spec2maude-suite.tsv
+```
+
+The report distinguishes passing scripts, wrong results, unsupported inputs,
+frontend failures, Maude errors, timeouts, and stuck executions.  The command exits
+nonzero unless every selected script passes.
 
 Load the generated modules in Maude:
 

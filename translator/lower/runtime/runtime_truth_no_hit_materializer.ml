@@ -443,6 +443,7 @@ let typecheck_for_indexed_element_typ ctx env origin typ target target_sort =
   | Some witness_term ->
     ( witness.guards
       @ Expr_translate.typecheck_conditions_for_typ
+          ctx
           typ
           target_sort
           target

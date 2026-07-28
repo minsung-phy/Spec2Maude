@@ -1443,7 +1443,7 @@ let result_type_domain ctx env origin exp declared_result =
          && not (result_has_fatal result)
          && not (result_has_fatal witness) ->
     let conditions =
-      Expr_translate.typecheck_conditions_for_typ declared_result sort term typ
+      Expr_translate.typecheck_conditions_for_typ ctx declared_result sort term typ
     in
     (match conditions with
     | [ Maude_ir.BoolCond
@@ -1483,7 +1483,7 @@ let subtype_pattern_domain ctx env origin actual pattern =
            && not (result_has_fatal witness_result) ->
       let conditions =
         Expr_translate.typecheck_conditions_for_typ
-          source sort actual witness
+          ctx source sort actual witness
       in
       Option.map
         (fun terms ->

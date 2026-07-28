@@ -172,22 +172,13 @@ let dedup_guards guards =
 let is_sequence_sort sort =
   sort_name sort = sort_name spectec_terminals
 
-let typecheck_conditions_for_typ typ sort value witness =
+let has_sequence_elements callbacks typ =
   match typ.it with
-  | IterT (inner, Opt) when not (Type_shape.typ_is_iter inner) ->
-    [ BoolCond (app "isOpt" [ value ])
-    ; BoolCond (Typecheck_term.typecheck_seq value witness)
-    ]
-  | IterT ({ it = IterT (inner, Opt); _ }, List)
-    when not (Type_shape.typ_is_iter inner) ->
-    [ BoolCond (Typecheck_term.typecheck_opt_seq value witness) ]
-  | IterT ({ it = IterT (inner, List); _ }, Opt)
-    when not (Type_shape.typ_is_iter inner) ->
-    [ BoolCond (Typecheck_term.typecheck_seq_opt value witness) ]
-  | IterT ({ it = IterT (inner, List); _ }, List)
-    when not (Type_shape.typ_is_iter inner) ->
-    [ BoolCond (Typecheck_term.typecheck_nested_seq value witness) ]
-  | _ -> [ BoolCond (Typecheck_term.typecheck_for_sort sort value witness) ]
+  | IterT (element_typ, (List | List1 | ListN _)) ->
+    (match callbacks.carrier_sort_of_typ element_typ with
+    | Some sort -> is_sequence_sort sort
+    | None -> false)
+  | _ -> false
 
 let len term =
   app "len" [ term ]
@@ -247,7 +238,13 @@ let iter_source_descriptor callbacks typ =
   let descriptor item_shape element_typ =
     match callbacks.carrier_sort_of_typ element_typ with
     | Some source_element_sort ->
-      Some { source_item_shape = item_shape; source_element_typ = element_typ; source_element_sort }
+      let source_item_shape =
+        if Carrier_sort.is_sequence_sort source_element_sort then
+          Request.Source_nested_seq
+        else
+          item_shape
+      in
+      Some { source_item_shape; source_element_typ = element_typ; source_element_sort }
     | None -> None
   in
   match typ.it with
@@ -292,7 +289,8 @@ let guard_for_typ ctx callbacks origin constructor exp term typ =
     in
     (match witness_opt with
     | Some witness ->
-      Some (witness_guards @ typecheck_conditions_for_typ typ sort term witness),
+      Some
+        (witness_guards @ Typecheck_guard.for_typ ctx typ sort term witness),
       witness_diagnostics
     | None ->
       None,
@@ -682,7 +680,9 @@ and lower_tuple names ctx callbacks origin _exp exps =
     { term = None; guards; introduced_bindings; diagnostics }, names
 
 and lower_list names ctx callbacks origin exp exps =
-  if Type_shape.is_nested_list_typ exp.note then
+  if Type_shape.is_nested_list_typ exp.note
+     || has_sequence_elements callbacks exp.note
+  then
     lower_nested_list names ctx callbacks origin exp exps
   else if Type_shape.is_optional_list_typ exp.note then
     lower_optional_list names ctx callbacks origin exp exps
@@ -823,6 +823,9 @@ and lower_nested_list names ctx callbacks origin _exp exps =
     let lower_inner names (index, inner) =
       if Type_shape.is_flat_list_typ inner.note
          || Type_shape.is_flat_optional_typ inner.note
+         || (match callbacks.carrier_sort_of_typ inner.note with
+             | Some sort -> is_sequence_sort sort
+             | None -> false)
       then
         let result, names =
           lower_sequence names ctx callbacks

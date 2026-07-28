@@ -127,7 +127,7 @@ let unsupported_type ctx origin constructor typ =
     ()
 
 let component_sort ctx origin constructor typ =
-  match Expr_translate.carrier_sort_of_typ typ with
+  match Expr_translate.carrier_sort_of_typ_in ctx typ with
   | Some sort -> Some sort, []
   | None -> None, [ unsupported_type ctx origin constructor typ ]
 
@@ -191,7 +191,7 @@ let lower_exp_bind ctx origin names env bind =
           ()
       ], names
     else
-      (match Expr_translate.carrier_sort_of_typ typ with
+      (match Expr_translate.carrier_sort_of_typ_in ctx typ with
       | Some sort ->
         let term =
           Local_name.source_qualified

@@ -14,6 +14,7 @@ mod WASM-BUILTINS is
   var BI_BITS : SpectecTerminals .
   op builtin.ibits-aux : Nat Nat -> SpectecTerminals .
   op builtin.inv-ibits-aux : SpectecTerminals Nat -> Nat .
+  op builtin.wrap-bits : SpectecTerminals -> SpectecTerminals .
   eq builtin.ibits-aux(0, BI_I) = eps .
   ceq builtin.ibits-aux(BI_N, BI_I) =
       _rem_(_quo_(BI_I, _^_(2, _-_(BI_N, 1))), 2) builtin.ibits-aux(_-_(BI_N, 1), BI_I)
@@ -21,6 +22,13 @@ mod WASM-BUILTINS is
   eq builtin.inv-ibits-aux(eps, BI_ACC) = BI_ACC .
   ceq builtin.inv-ibits-aux(BI_BIT BI_BITS, BI_ACC) =
       builtin.inv-ibits-aux(BI_BITS, _+_(_*_(BI_ACC, 2), BI_BIT))
+    if typecheck(BI_BIT, syn.bit) .
+  ceq builtin.inv-ibits-aux(bit.wrap(BI_BIT) BI_BITS, BI_ACC) =
+      builtin.inv-ibits-aux(BI_BITS, _+_(_*_(BI_ACC, 2), BI_BIT))
+    if typecheck(bit.wrap(BI_BIT), syn.bit) .
+  eq builtin.wrap-bits(eps) = eps .
+  ceq builtin.wrap-bits(BI_BIT BI_BITS) =
+      bit.wrap(BI_BIT) builtin.wrap-bits(BI_BITS)
     if typecheck(BI_BIT, syn.bit) .
 
   --- Implemented builtin family: integer bytes, little endian.
@@ -30,10 +38,14 @@ mod WASM-BUILTINS is
   op builtin.inv-ibytes-aux : SpectecTerminals Nat Nat -> Nat .
   eq builtin.ibytes-aux(0, BY_I) = eps .
   ceq builtin.ibytes-aux(BY_COUNT, BY_I) =
-      _rem_(BY_I, 256) builtin.ibytes-aux(_-_(BY_COUNT, 1), _quo_(BY_I, 256))
+      byte.wrap(_rem_(BY_I, 256))
+      builtin.ibytes-aux(_-_(BY_COUNT, 1), _quo_(BY_I, 256))
     if _>_(BY_COUNT, 0) .
   eq builtin.inv-ibytes-aux(eps, BY_SCALE, BY_ACC) = BY_ACC .
   ceq builtin.inv-ibytes-aux(BY_BYTE BY_BYTES, BY_SCALE, BY_ACC) =
+      builtin.inv-ibytes-aux(BY_BYTES, _*_(BY_SCALE, 256), _+_(BY_ACC, _*_(BY_BYTE, BY_SCALE)))
+    if typecheck(BY_BYTE, syn.byte) .
+  ceq builtin.inv-ibytes-aux(byte.wrap(BY_BYTE) BY_BYTES, BY_SCALE, BY_ACC) =
       builtin.inv-ibytes-aux(BY_BYTES, _*_(BY_SCALE, 256), _+_(BY_ACC, _*_(BY_BYTE, BY_SCALE)))
     if typecheck(BY_BYTE, syn.byte) .
 
@@ -974,7 +986,8 @@ mod WASM-BUILTINS is
     if LN_RAW := builtin.lane-to-bits(LN_LT, LN_HEAD)
        /\ _<_(LN_RAW, _^_(2, LN_W)) .
 
-  ceq builtin.ibits(BI_N, uN.wrap(BI_I)) = builtin.ibits-aux(BI_N, BI_I)
+  ceq builtin.ibits(BI_N, uN.wrap(BI_I)) =
+      builtin.wrap-bits(builtin.ibits-aux(BI_N, BI_I))
     if _<_(BI_I, _^_(2, BI_N)) .
 
   ceq builtin.inv-ibits(BI_N, BI_BITS) = uN.wrap(BI_RESULT)
@@ -982,10 +995,12 @@ mod WASM-BUILTINS is
        /\ typecheckSeq(BI_BITS, syn.bit)
        /\ BI_RESULT := builtin.inv-ibits-aux(BI_BITS, 0) .
 
-  ceq builtin.fbits(FB_N, fN.pos(FB_MAG)) = builtin.ibits-aux(FB_N, FB_RAW)
+  ceq builtin.fbits(FB_N, fN.pos(FB_MAG)) =
+      builtin.wrap-bits(builtin.ibits-aux(FB_N, FB_RAW))
     if (builtin.fnmag-valid(FB_N, FB_MAG)) = true
        /\ FB_RAW := builtin.float-to-bits(FB_N, fN.pos(FB_MAG)) .
-  ceq builtin.fbits(FB_N, fN.neg(FB_MAG)) = builtin.ibits-aux(FB_N, FB_RAW)
+  ceq builtin.fbits(FB_N, fN.neg(FB_MAG)) =
+      builtin.wrap-bits(builtin.ibits-aux(FB_N, FB_RAW))
     if (builtin.fnmag-valid(FB_N, FB_MAG)) = true
        /\ FB_RAW := builtin.float-to-bits(FB_N, fN.neg(FB_MAG)) .
 
@@ -1155,22 +1170,18 @@ mod WASM-BUILTINS is
   ceq builtin.ishl(SH_N, uN.wrap(SH_I), uN.wrap(SH_J)) =
       uN.wrap(_rem_(_*_(SH_I, _^_(2, SH_K)), _^_(2, SH_N)))
     if _<_(SH_I, _^_(2, SH_N))
-       /\ _<_(SH_J, _^_(2, 32))
        /\ SH_K := builtin.shift-count(SH_N, SH_J) .
 
   ceq builtin.ishr(SH_N, sx.u, uN.wrap(SH_I), uN.wrap(SH_J)) =
       uN.wrap(_quo_(SH_I, _^_(2, SH_K)))
     if _<_(SH_I, _^_(2, SH_N))
-       /\ _<_(SH_J, _^_(2, 32))
        /\ SH_K := builtin.shift-count(SH_N, SH_J) .
   ceq builtin.ishr(SH_N, sx.s, uN.wrap(SH_I), uN.wrap(SH_J)) = uN.wrap(SH_I)
     if _<_(SH_I, _^_(2, SH_N))
-       /\ _<_(SH_J, _^_(2, 32))
        /\ builtin.shift-count(SH_N, SH_J) = 0 .
   ceq builtin.ishr(SH_N, sx.s, uN.wrap(SH_I), uN.wrap(SH_J)) =
       uN.wrap(builtin.sign-extend-nat(sd(SH_N, SH_K), SH_N, _quo_(SH_I, _^_(2, SH_K))))
     if _<_(SH_I, _^_(2, SH_N))
-       /\ _<_(SH_J, _^_(2, 32))
        /\ SH_K := builtin.shift-count(SH_N, SH_J)
        /\ _>_(SH_K, 0) .
 

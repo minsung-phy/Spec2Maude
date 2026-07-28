@@ -27,6 +27,7 @@ module Request = Helper_request
 type callbacks =
   { lower_value : Context.t -> env -> Origin.t -> exp -> result
   ; lower_sequence : Context.t -> env -> Origin.t -> exp -> result
+  ; carrier_sort : Context.t -> typ -> sort option
   }
 
 type source_descriptor =
@@ -187,12 +188,17 @@ let source_descriptor_of_exp source_exp =
       }
   | _ -> None
 
-let source_element_carrier_sort typ =
+let source_element_carrier_sort callbacks ctx typ =
   match typ.it with
   | IterT (element_typ, ListN _)
     when not (Type_shape.typ_is_iter element_typ) ->
     Some spectec_terminals
-  | _ -> Carrier_sort.for_expression typ
+  | _ -> callbacks.carrier_sort ctx typ
+
+let source_item_shape callbacks ctx descriptor =
+  match source_element_carrier_sort callbacks ctx descriptor.source_element_typ with
+  | Some sort when Carrier_sort.is_sequence_sort sort -> Request.Source_nested_seq
+  | _ -> descriptor.source_item_shape
 
 let all_len term n =
   app "allLen" [ term; n ]
@@ -264,7 +270,7 @@ let rec lower_iter callbacks ctx env origin exp body (iter, generators) =
 and lower_listn_count callbacks ctx env origin exp n_exp =
   let count_result = callbacks.lower_value ctx env origin n_exp in
   let nat_sort_opt =
-    match Carrier_sort.for_expression n_exp.note with
+    match callbacks.carrier_sort ctx n_exp.note with
     | Some sort when Carrier_sort.is_nat_sort sort -> Some sort
     | _ ->
       (match Carrier_sort.primitive_numeric_alias_sort ctx n_exp.note with
@@ -387,7 +393,7 @@ and lower_source_consuming_listn_helper callbacks
   else
   let output_descriptor = output_descriptor exp.note in
     let source_descriptor = source_descriptor_of_exp source_exp in
-    match output_descriptor, source_descriptor, Carrier_sort.for_expression body.note with
+    match output_descriptor, source_descriptor, callbacks.carrier_sort ctx body.note with
     | None, _, _ ->
       with_diagnostics
         [ unsupported_source_listn
@@ -423,7 +429,7 @@ and lower_source_consuming_listn_helper callbacks
               "source-consuming indexed ListN does not consume optional sources in this slice; the source must expose a deterministic head/tail sequence"
           ]
       else
-        match source_element_carrier_sort source_descriptor.source_element_typ with
+        match source_element_carrier_sort callbacks ctx source_descriptor.source_element_typ with
         | None ->
           with_diagnostics
             [ unsupported_source_listn
@@ -633,7 +639,7 @@ and lower_source_consuming_listn_helper callbacks
                             ; helper_head_var
                             ; source_tail_var
                             ; body_result_var
-                            ; source_item_shape = source_descriptor.source_item_shape
+                            ; source_item_shape = source_item_shape callbacks ctx source_descriptor
                             ; output_item_shape
                             ; source_element_sort
                             ; captures
@@ -750,7 +756,7 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
              (List.length generators))
       ]
   | _ ->
-  match output_descriptor exp.note, Carrier_sort.for_expression body.note with
+  match output_descriptor exp.note, callbacks.carrier_sort ctx body.note with
   | None, _ ->
     with_diagnostics
       [ unsupported_listn
@@ -1100,13 +1106,13 @@ and lower_list_map_helper callbacks ctx env origin exp generator_id source_exp b
        ^ "; body_note="
        ^ Il.Print.string_of_typ body.note)
   | Some (output_item_shape, _output_element_typ), Some source_descriptor ->
-    let source_item_shape = source_descriptor.source_item_shape in
+    let source_item_shape = source_item_shape callbacks ctx source_descriptor in
     let source_element_typ = source_descriptor.source_element_typ in
     let source_is_optional = source_descriptor.source_is_optional in
     let source_listn_count = source_descriptor.source_listn_count in
     (match
-       source_element_carrier_sort source_element_typ,
-       Carrier_sort.for_expression body.note
+       source_element_carrier_sort callbacks ctx source_element_typ,
+       callbacks.carrier_sort ctx body.note
      with
     | None, _ ->
       unsupported_exp ctx origin "Expr/IterE" exp
@@ -1322,7 +1328,7 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
       ()
   in
   let output_descriptor = output_descriptor exp.note in
-  match output_descriptor, Carrier_sort.for_expression body.note with
+  match output_descriptor, callbacks.carrier_sort ctx body.note with
   | None, _ ->
     with_diagnostics
       [ unsupported_zip
@@ -1372,9 +1378,9 @@ and lower_list_zip_map_helper callbacks ctx env origin exp body generators =
                ("zip-map generator `" ^ generator_id.it
                 ^ "` source is not a supported List carrier; expected flat T* or boundary-preserving nested T**"))
         | Some source_descriptor ->
-          let source_item_shape = source_descriptor.source_item_shape in
+          let source_item_shape = source_item_shape callbacks ctx source_descriptor in
           let element_typ = source_descriptor.source_element_typ in
-          (match source_element_carrier_sort element_typ with
+          (match source_element_carrier_sort callbacks ctx element_typ with
           | None ->
             Error
               (unsupported_zip

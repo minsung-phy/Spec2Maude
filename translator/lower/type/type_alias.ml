@@ -72,7 +72,7 @@ let translate_category_union
     in
     let term, _names = local_value env target variable_type in
     let union_guards =
-      Typecheck_guard.for_typ child_typ carrier term witness
+      Typecheck_guard.for_typ ctx child_typ carrier term witness
     in
     { statements =
         [ gen origin
@@ -102,7 +102,7 @@ let translate_subtype_membership env ctx origin target child_typ =
     in
     let term, _names = local_value env target variable_type in
     let guards =
-      Typecheck_guard.for_typ child_typ carrier term witness
+      Typecheck_guard.for_typ ctx child_typ carrier term witness
     in
     { statements =
         [ gen origin

@@ -260,27 +260,31 @@ let translate_inst_binds ctx origin env binds =
   in
   binds
   |> List.fold_left
-       (fun (env, statements, diagnostics) bind ->
+       (fun (env, guards, diagnostics) bind ->
          match bind.it with
          | TypP id ->
            (match Type_static_env.find_typ env id.it with
-           | Some _ -> env, statements, diagnostics
+           | Some _ -> env, guards, diagnostics
            | None ->
              let term =
                Local_name.source_qualified names id.it (sr spectec_type)
              in
              Type_static_env.add_typ env id.it term,
-             statements,
+             guards,
              diagnostics)
          | ExpP (id, typ) ->
            (match Type_static_env.find_exp env id.it with
-           | Some _ -> env, statements, diagnostics
+           | Some _ -> env, guards, diagnostics
            | None ->
              let sort_opt, sort_diags =
                typd_carrier ctx origin "TypD/InstD/binds/ExpP" typ
              in
-             (match sort_opt with
-             | Some sort ->
+             let witness_opt, witness_diags =
+               Typd_witness.of_typ
+                 env ctx origin ~constructor:"TypD/InstD/binds/ExpP" typ
+             in
+             (match sort_opt, witness_opt with
+             | Some sort, Some witness ->
                let term = Local_name.source_qualified names id.it (sr sort) in
                let binding =
                  { Type_static_env.static_term = term
@@ -289,14 +293,15 @@ let translate_inst_binds ctx origin env binds =
                  }
                in
                Type_static_env.add_exp env id.it binding,
-               statements,
-               diagnostics @ sort_diags
-             | None ->
+               guards @ Typecheck_guard.for_typ ctx typ sort term witness,
+               diagnostics @ sort_diags @ witness_diags
+             | _ ->
                env,
-               statements,
-               diagnostics @ sort_diags @ [ unsupported_inst_numeric_bind ctx origin bind ]))
+               guards,
+               diagnostics @ sort_diags @ witness_diags
+               @ [ unsupported_inst_numeric_bind ctx origin bind ]))
          | DefP _ | GramP _ ->
-           env, statements, diagnostics @ [ unsupported_inst_bind ctx origin bind ])
+           env, guards, diagnostics @ [ unsupported_inst_bind ctx origin bind ])
        (env, [], [])
 
 let unsupported_prems ctx origin owner prems =
@@ -590,6 +595,21 @@ let unsupported_typcase_prem ctx origin prem =
       "Route this premise through a source-preserving premise helper before emitting the constructor case"
     ()
 
+let project_hidden_rhs ctx origin hidden rhs_typ rhs =
+  match
+    Subtype_plan.make
+      ~il_env:(Context.il_env ctx)
+      ~source_index:(Context.source_index ctx)
+      ~constructors:(Context.constructors ctx)
+      ~static_typ_env:(Context.static_typ_env ctx)
+      hidden.hidden_typ rhs_typ
+  with
+  | Ok (Subtype_plan.Injection injection) ->
+    let request = Helper_request.subtype_injection_request ~origin injection in
+    let forward = Helper.request (Context.helpers ctx) request in
+    App (Subtype_injection.projection_name ~forward, [ rhs ])
+  | Ok Subtype_plan.Identity | Error _ -> rhs
+
 let lower_hidden_bind_premise ctx visible_expr_env expr_env origin hidden rhs_exp residual_exps =
   let rhs =
     if
@@ -602,7 +622,10 @@ let lower_hidden_bind_premise ctx visible_expr_env expr_env origin hidden rhs_ex
       Expr_translate.lower_value ctx visible_expr_env origin rhs_exp
   in
   match rhs.term with
-  | Some rhs_term ->
+  | Some raw_rhs_term ->
+    let rhs_term =
+      project_hidden_rhs ctx origin hidden rhs_exp.note raw_rhs_term
+    in
     let residual_conditions, residual_diagnostics =
       residual_exps
       |> List.fold_left
@@ -746,6 +769,7 @@ let length_guarded_representation origin source_components prems =
 
 let describe_constructor_case
     ?(record_like_single_constructor = false)
+    ?(instance_guards = [])
     env
     ctx
     origin
@@ -783,10 +807,12 @@ let describe_constructor_case
         (fun vars name -> if List.mem name vars then vars else name :: vars)
         head_bound
         (Condition_closure.term_vars target)
+      |> fun bound ->
+      Condition_closure.conditions_bound_vars bound instance_guards
     in
     let split_guard (membership_guards, dependent_guards, diagnostics) component =
       let guard_conditions =
-        Typecheck_guard.for_typ
+        Typecheck_guard.for_typ ctx
           component.typ component.sort (Var component.variable) component.witness
       in
       guard_conditions
@@ -910,6 +936,7 @@ let register_constructor_case
 
 let lower_constructor_case_for_registry
     ?(record_like_single_constructor = false)
+    ?(instance_guards = [])
     env
     ctx
     origin
@@ -924,6 +951,7 @@ let lower_constructor_case_for_registry
   match
     describe_constructor_case
       ~record_like_single_constructor
+      ~instance_guards
       env
       ctx
       origin
@@ -992,6 +1020,7 @@ let lower_constructor_case_for_registry
 
 let translate_constructor_case
     ?(record_like_single_constructor = false)
+    ?(instance_guards = [])
     env
     ctx
     origin
@@ -1006,6 +1035,7 @@ let translate_constructor_case
   match
     lower_constructor_case_for_registry
       ~record_like_single_constructor
+      ~instance_guards
       env
       ctx
       origin
@@ -1074,6 +1104,7 @@ let translate_constructor_case
       }
 
 let translate_typcase
+    ~instance_guards
     env
     ctx
     parent_origin
@@ -1137,6 +1168,7 @@ let translate_typcase
           append
             (translate_constructor_case
                ~record_like_single_constructor
+               ~instance_guards
                env
                ctx
                origin
@@ -1185,6 +1217,7 @@ let translate_typcase
     append
       (translate_constructor_case
          ~record_like_single_constructor
+         ~instance_guards
          env
          ctx
          origin
@@ -1243,6 +1276,7 @@ let subtype_inclusion_block env ctx parent_origin target child_id =
     env ctx origin target child_typ
 
 let translate_variant
+    ~instance_guards
     env ctx origin key_env static_args_key target id target_region cases =
   let source_category = Naming.source_owner id.it in
   let inherited_groups =
@@ -1292,6 +1326,7 @@ let translate_variant
         empty
       else
         translate_typcase
+          ~instance_guards
           env
           ctx
           origin
@@ -1371,6 +1406,7 @@ let preload_inherited_union_registry
       env ctx origin key_env static_args_key source_category child_typ
 
 let preload_typcase_registry
+    ~instance_guards
     env
     ctx
     parent_origin
@@ -1431,6 +1467,7 @@ let preload_typcase_registry
             ignore
               (lower_constructor_case_for_registry
                  ~record_like_single_constructor
+                 ~instance_guards
                  env
                  ctx
                  origin
@@ -1461,6 +1498,7 @@ let preload_typcase_registry
       ignore
         (lower_constructor_case_for_registry
            ~record_like_single_constructor
+           ~instance_guards
            env
            ctx
            origin
@@ -1473,6 +1511,7 @@ let preload_typcase_registry
            components)
 
 let preload_variant_registry
+    ~instance_guards
     env ctx origin key_env static_args_key target id target_region cases =
   let source_category = Naming.source_owner id.it in
   cases
@@ -1506,8 +1545,9 @@ let preload_variant_registry
   cases
   |> List.iteri (fun index typcase ->
     if not (List.mem index skip_indices) then
-      preload_typcase_registry
-        env
+        preload_typcase_registry
+          ~instance_guards
+          env
         ctx
         origin
         key_env
@@ -1741,7 +1781,7 @@ let translate_struct env ctx origin target id source_fields =
       |> List.fold_left
            (fun guards component ->
              let component_guards =
-               Typecheck_guard.for_typ
+               Typecheck_guard.for_typ ctx
                  component.typ component.sort (Var component.variable) component.witness
              in
              guards @ component_guards)
@@ -1861,7 +1901,8 @@ let preload_alias_inclusion
   | _ -> ()
 
 
-let preload_deftyp_registry env ctx origin key_env static_args_key target id deftyp =
+let preload_deftyp_registry
+    ~instance_guards env ctx origin key_env static_args_key target id deftyp =
   let source_category = Naming.source_owner id.it in
   match deftyp.it with
   | AliasT typ ->
@@ -1869,10 +1910,12 @@ let preload_deftyp_registry env ctx origin key_env static_args_key target id def
       env ctx origin key_env static_args_key source_category typ
   | VariantT cases ->
     Variant.preload_variant_registry
+      ~instance_guards
       env ctx origin key_env static_args_key target id deftyp.at cases
   | StructT _fields -> ()
 
-let translate_deftyp env ctx origin key_env static_args_key target id deftyp =
+let translate_deftyp
+    ~instance_guards env ctx origin key_env static_args_key target id deftyp =
   let source_category = Naming.source_owner id.it in
   match deftyp.it with
   | AliasT typ ->
@@ -1880,6 +1923,7 @@ let translate_deftyp env ctx origin key_env static_args_key target id deftyp =
       env ctx origin key_env static_args_key source_category target typ
   | VariantT cases ->
     Variant.translate_variant
+      ~instance_guards
       env ctx origin key_env static_args_key target id deftyp.at cases
   | StructT fields -> Struct.translate_struct env ctx origin target id fields
 
@@ -1954,8 +1998,8 @@ type preload_state =
 type ready =
   { ready_origin : Origin.t
   ; ready_env : Type_static_env.static_env
-  ; ready_bind_statements : generated list
   ; ready_target : term
+  ; ready_guards : eq_condition list
   ; ready_key_env : Static_key.env
   ; ready_static_args_key : string option
   ; ready_deftyp : deftyp
@@ -1983,13 +2027,13 @@ let prepare env ctx typ_origin witness_name param_terms id params index inst =
   in
   match inst.it with
   | InstD (binds, args, deftyp) ->
-    let inst_env, bind_statements, bind_diags =
+    let inst_env, bind_guards, bind_diags =
       translate_inst_binds ctx origin env binds
     in
-    let target_terms, arg_diags =
+    let target_terms, arg_guards, arg_diags =
       match args with
-      | [] -> Some param_terms, []
-      | _ -> Typd_witness.terms_of_args inst_env ctx origin args
+      | [] -> Some param_terms, [], []
+      | _ -> Typd_witness.pattern_terms_of_args inst_env ctx origin args
     in
     let target =
       target_terms |> Option.map (target_witness witness_name)
@@ -2028,8 +2072,8 @@ let prepare env ctx typ_origin witness_name param_terms id params index inst =
       Ready
         { ready_origin = origin
         ; ready_env = inst_env
-        ; ready_bind_statements = bind_statements
         ; ready_target = target
+        ; ready_guards = arg_guards @ bind_guards
         ; ready_key_env = key_env
         ; ready_static_args_key = static_args_key
         ; ready_deftyp = deftyp
@@ -2044,11 +2088,30 @@ let prepare env ctx typ_origin witness_name param_terms id params index inst =
 
 end
 
+let rec term_contains needle term =
+  term = needle
+  || match term with
+     | App (_, args) -> List.exists (term_contains needle) args
+     | Var _ | Const _ | Qid _ -> false
+
+let guard_instance_equation target guards generated =
+  if guards = [] then generated
+  else
+    match generated.node with
+    | Eq (lhs, rhs, attrs) when term_contains target lhs ->
+      { generated with node = ceq ~attrs lhs rhs guards }
+    | Ceq (lhs, rhs, conditions, attrs) when term_contains target lhs ->
+      { generated with node = ceq ~attrs lhs rhs (guards @ conditions) }
+    | SortDecl _ | SubsortDecl _ | OpDecl _ | VarDecl _ | Mb _ | Cmb _
+    | Eq _ | Ceq _ | Rl _ | Crl _ ->
+      generated
+
 let translate_prepared_inst ctx id prepared =
   match prepared with
   | Inst_prepare.Ready ready ->
     let translated =
       translate_deftyp
+        ~instance_guards:ready.Inst_prepare.ready_guards
         ready.Inst_prepare.ready_env
         ctx
         ready.Inst_prepare.ready_origin
@@ -2058,10 +2121,18 @@ let translate_prepared_inst ctx id prepared =
         id
         ready.Inst_prepare.ready_deftyp
     in
-    append
+    let translated =
       { translated with
-        statements = ready.Inst_prepare.ready_bind_statements @ translated.statements
+        statements =
+          List.map
+            (guard_instance_equation
+               ready.Inst_prepare.ready_target
+               ready.Inst_prepare.ready_guards)
+            translated.statements
       }
+    in
+    append
+      translated
       (with_diagnostics ready.Inst_prepare.ready_diagnostics)
   | Inst_prepare.Blocked blocked ->
     with_diagnostics blocked.Inst_prepare.blocked_diagnostics
@@ -2087,6 +2158,7 @@ let preload_inst_registry ctx origin id setup index inst =
   | Inst_prepare.Ready ready
     when ready.Inst_prepare.ready_preload_state = Inst_prepare.Preloadable ->
     preload_deftyp_registry
+      ~instance_guards:ready.Inst_prepare.ready_guards
       ready.Inst_prepare.ready_env
       ctx
       ready.Inst_prepare.ready_origin
