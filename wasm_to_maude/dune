@@ -1,0 +1,4 @@
+(library
+ (name wasm_to_maude)
+ (private_modules wast_command_encode wast_harness wast_host_encode)
+ (libraries unix wasm))

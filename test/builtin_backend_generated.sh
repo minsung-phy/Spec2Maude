@@ -86,3 +86,11 @@ if ! printf '%s\n' "$smoke_compact" | grep -Fq "$rolldt_result_compact"; then
   echo 'rolldt smoke did not preserve the original subtype sequence while producing indices 0 and 1' >&2
   exit 1
 fi
+
+setproduct_result='result SpectecTerminal: seq(uN.wrap(0) uN.wrap(1))'
+setproduct_result_compact=$(printf '%s' "$setproduct_result" | tr -d '[:space:]')
+if ! printf '%s\n' "$smoke_compact" | grep -Fq "$setproduct_result_compact"; then
+  cat "$smoke_log" >&2
+  echo 'setproduct smoke did not select the packed-lane type-family instance' >&2
+  exit 1
+fi

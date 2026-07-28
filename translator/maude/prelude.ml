@@ -57,6 +57,9 @@ let statements =
     ; op "eps" [] spectec_terminals
     ; op "_ _" [ sr "SpectecTerminals"; sr "SpectecTerminals" ] spectec_terminals
         ~attrs:[ Ctor; Assoc; Id (Const "eps") ]
+    ; op "compactRepeatThreshold" [] (s "Nat")
+    ; op "repeatSeq" [ sr "Nat"; sr "SpectecTerminal" ] spectec_terminals
+        ~attrs:[ Ctor ]
     ; op "len" [ sr "SpectecTerminals" ] (s "Nat")
     ; op "natOfInt" [ sr "Int" ] (s "Nat") ~kind:Partial
     ; op "intOfRat" [ sr "Rat" ] (s "Int") ~kind:Partial
@@ -97,6 +100,7 @@ let statements =
     ; op "indexDefined" [ sr "SpectecTerminals"; sr "Nat" ] (s "Bool")
     ; op "slice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat" ] spectec_terminals
     ; op "drop" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
+    ; op "take" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
     ; op "splice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
     ; var "B" (sr "Bool")
     ; var "N" (sr "Nat")
@@ -119,8 +123,35 @@ let statements =
     ; var "RI" (sr "RecordItems")
     ; var "RI2" (sr "RecordItems")
     ; var "T" (sr "SpectecType")
+    ; eq (Const "compactRepeatThreshold") (Const "1024")
+    ; eq (app "repeatSeq" [ Const "0"; Var "X" ]) (Const "eps")
+    ; eq (app "repeatSeq" [ Const "1"; Var "X" ]) (Var "X")
+    ; ceq
+        (app "repeatSeq" [ app "s_" [ Var "N" ]; Var "X" ])
+        (app "_ _"
+           [ Var "X"
+           ; app "repeatSeq" [ Var "N"; Var "X" ]
+           ])
+        [ BoolCond
+            (app "_<_"
+               [ app "s_" [ Var "N" ]
+               ; Const "compactRepeatThreshold"
+               ])
+        ]
     ; eq (app "len" [ Const "eps" ]) (Const "0")
     ; eq (app "len" [ Var "X" ]) (Const "1")
+    ; eq
+        (app "len" [ app "repeatSeq" [ Var "N"; Var "X" ] ])
+        (Var "N")
+    ; ceq
+        (app "len"
+           [ app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ])
+        (app "_+_" [ Var "N"; app "len" [ Var "XS" ] ])
+        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
     ; ceq
         (app "len" [ app "_ _" [ Var "X"; Var "XS" ] ])
         (app "_+_" [ Const "1"; app "len" [ Var "XS" ] ])
@@ -182,8 +213,30 @@ let statements =
     ; eq (T.typecheck (app "float" [ Var "F" ]) (Const (witness "real"))) (Const "true")
     ; eq (T.typecheck (app "text" [ Var "S" ]) (Const (witness "text"))) (Const "true")
     ; eq (T.typecheck_seq (Const "eps") (Var "T")) (Const "true")
-    ; eq (T.typecheck_seq (Var "X") (Var "T")) (T.typecheck (Var "X") (Var "T"))
     ; ceq
+        (T.typecheck_seq
+           (app "repeatSeq" [ Var "N"; Var "X" ])
+           (Var "T"))
+        (T.typecheck (Var "X") (Var "T"))
+        [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ]) ]
+    ; ceq
+        (T.typecheck_seq
+           (app "_ _"
+              [ app "repeatSeq" [ Var "N"; Var "X" ]
+              ; Var "XS"
+              ])
+           (Var "T"))
+        (app "_and_"
+           [ T.typecheck (Var "X") (Var "T")
+           ; T.typecheck_seq (Var "XS") (Var "T")
+           ])
+        [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ])
+        ; BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ])
+        ]
+    ; eq ~attrs:[ Owise ]
+        (T.typecheck_seq (Var "X") (Var "T"))
+        (T.typecheck (Var "X") (Var "T"))
+    ; ceq ~attrs:[ Owise ]
         (T.typecheck_seq (app "_ _" [ Var "X"; Var "XS" ]) (Var "T"))
         (app "_and_" [ T.typecheck (Var "X") (Var "T"); T.typecheck_seq (Var "XS") (Var "T") ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
@@ -258,6 +311,26 @@ let statements =
            ; Var "FQ"
            ; app "_ _" [ app "value" [ Var "FQ"; Var "REC" ]; Var "VAL2" ]
            ])
+    ; ceq
+        (app "index"
+           [ app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ; Var "N2"
+           ])
+        (Var "X")
+        [ BoolCond (app "_<_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (app "index"
+           [ app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ; Var "N2"
+           ])
+        (app "index" [ Var "XS"; app "_-_" [ Var "N2"; Var "N" ] ])
+        [ BoolCond (app "_<=_" [ Var "N"; Var "N2" ]) ]
     ; eq (app "index" [ app "_ _" [ Var "X"; Var "XS" ]; Const "0" ]) (Var "X")
     ; eq
         (app "index" [ app "_ _" [ Var "X"; Var "XS" ]; app "s_" [ Var "N2" ] ])
@@ -271,15 +344,54 @@ let statements =
            ; app "s_" [ Var "N2" ]
            ])
         (app "indexSeq" [ Var "XS"; Var "N2" ])
-    ; eq (app "indexDefined" [ Const "eps"; Var "N" ]) (Const "false")
     ; eq
-        (app "indexDefined" [ app "_ _" [ Var "X"; Var "XS" ]; Const "0" ])
-        (Const "true")
-    ; eq
-        (app "indexDefined"
-           [ app "_ _" [ Var "X"; Var "XS" ]; app "s_" [ Var "N2" ] ])
-        (app "indexDefined" [ Var "XS"; Var "N2" ])
+        (app "indexDefined" [ Var "XS"; Var "N" ])
+        (app "_<_" [ Var "N"; app "len" [ Var "XS" ] ])
     ; eq (app "_[_<-_]" [ Const "eps"; Var "N"; Var "Y" ]) (Const "eps")
+    ; ceq
+        (app "_[_<-_]"
+           [ app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ; Var "N2"
+           ; Var "Y"
+           ])
+        (app "_ _"
+           [ app "repeatSeq" [ Var "N2"; Var "X" ]
+           ; app "_ _"
+               [ Var "Y"
+               ; app "_ _"
+                   [ app "repeatSeq"
+                       [ app "_-_"
+                           [ Var "N"
+                           ; app "_+_" [ Var "N2"; Const "1" ]
+                           ]
+                       ; Var "X"
+                       ]
+                   ; Var "XS"
+                   ]
+               ]
+           ])
+        [ BoolCond (app "_<_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (app "_[_<-_]"
+           [ app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ; Var "N2"
+           ; Var "Y"
+           ])
+        (app "_ _"
+           [ app "repeatSeq" [ Var "N"; Var "X" ]
+           ; app "_[_<-_]"
+               [ Var "XS"
+               ; app "_-_" [ Var "N2"; Var "N" ]
+               ; Var "Y"
+               ]
+           ])
+        [ BoolCond (app "_<=_" [ Var "N"; Var "N2" ]) ]
     ; eq
         (app "_[_<-_]" [ app "_ _" [ Var "X"; Var "XS" ]; Const "0"; Var "Y" ])
         (app "_ _" [ Var "Y"; Var "XS" ])
@@ -288,46 +400,97 @@ let statements =
         (app "_ _" [ Var "X"; app "_[_<-_]" [ Var "XS"; Var "N2"; Var "Y" ] ])
     ; eq (app "drop" [ Const "0"; Var "XS" ]) (Var "XS")
     ; eq (app "drop" [ app "s_" [ Var "N" ]; Const "eps" ]) (Const "eps")
+    ; ceq
+        (app "drop"
+           [ Var "N2"
+           ; app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ])
+        (app "_ _"
+           [ app "repeatSeq"
+               [ app "_-_" [ Var "N"; Var "N2" ]
+               ; Var "X"
+               ]
+           ; Var "XS"
+           ])
+        [ BoolCond (app "_<=_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (app "drop"
+           [ Var "N2"
+           ; app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ])
+        (app "drop"
+           [ app "_-_" [ Var "N2"; Var "N" ]
+           ; Var "XS"
+           ])
+        [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
     ; eq
         (app "drop" [ app "s_" [ Var "N" ]; app "_ _" [ Var "X"; Var "XS" ] ])
         (app "drop" [ Var "N"; Var "XS" ])
-    ; eq (app "slice" [ Var "XS"; Var "N"; Const "0" ]) (Const "eps")
-    ; eq
-        (app "slice" [ Const "eps"; app "s_" [ Var "N" ]; Var "N2" ])
-        (Const "eps")
-    ; eq
-        (app "slice" [ Const "eps"; Const "0"; app "s_" [ Var "N" ] ])
-        (Const "eps")
-    ; eq
-        (app "slice" [ app "_ _" [ Var "X"; Var "XS" ]; Const "0"; app "s_" [ Var "N" ] ])
-        (app "_ _" [ Var "X"; app "slice" [ Var "XS"; Const "0"; Var "N" ] ])
-    ; eq
-        (app "slice"
-           [ app "_ _" [ Var "X"; Var "XS" ]
-           ; app "s_" [ Var "N" ]
-           ; Var "N2"
+    ; eq (app "take" [ Const "0"; Var "XS" ]) (Const "eps")
+    ; eq (app "take" [ app "s_" [ Var "N" ]; Const "eps" ]) (Const "eps")
+    ; ceq
+        (app "take"
+           [ Var "N2"
+           ; app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
            ])
+        (app "repeatSeq" [ Var "N2"; Var "X" ])
+        [ BoolCond (app "_<=_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (app "take"
+           [ Var "N2"
+           ; app "_ _"
+               [ app "repeatSeq" [ Var "N"; Var "X" ]
+               ; Var "XS"
+               ]
+           ])
+        (app "_ _"
+           [ app "repeatSeq" [ Var "N"; Var "X" ]
+           ; app "take"
+               [ app "_-_" [ Var "N2"; Var "N" ]
+               ; Var "XS"
+               ]
+           ])
+        [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
+    ; eq
+        (app "take"
+           [ app "s_" [ Var "N" ]
+           ; app "_ _" [ Var "X"; Var "XS" ]
+           ])
+        (app "_ _"
+           [ Var "X"
+           ; app "take" [ Var "N"; Var "XS" ]
+           ])
+    ; eq
         (app "slice" [ Var "XS"; Var "N"; Var "N2" ])
-    ; eq
-        (app "splice" [ Var "XS"; Const "0"; Var "N"; Var "VAL" ])
-        (app "_ _" [ Var "VAL"; app "drop" [ Var "N"; Var "XS" ] ])
-    ; eq
-        (app "splice"
-           [ app "_ _" [ Var "X"; Var "XS" ]; app "s_" [ Var "N" ]; Const "0"; Var "VAL" ])
-        (app "_ _"
-           [ Var "X"; app "splice" [ Var "XS"; Var "N"; Const "0"; Var "VAL" ] ])
-    ; eq
-        (app "splice"
-           [ Const "eps"; app "s_" [ Var "N" ]; app "s_" [ Var "N2" ]; Var "VAL" ])
-        (Const "eps")
-    ; eq
-        (app "splice"
-           [ app "_ _" [ Var "X"; Var "XS" ]
-           ; app "s_" [ Var "N" ]
-           ; app "s_" [ Var "N2" ]
-           ; Var "VAL"
+        (app "take"
+           [ Var "N2"
+           ; app "drop" [ Var "N"; Var "XS" ]
            ])
+    ; ceq
+        (app "splice" [ Var "XS"; Var "N"; Var "N2"; Var "VAL" ])
         (app "_ _"
-           [ Var "X"; app "splice" [ Var "XS"; Var "N"; Var "N2"; Var "VAL" ] ])
+           [ app "take" [ Var "N"; Var "XS" ]
+           ; app "_ _"
+               [ Var "VAL"
+               ; app "drop"
+                   [ app "_+_" [ Var "N"; Var "N2" ]
+                   ; Var "XS"
+                   ]
+               ]
+           ])
+        [ BoolCond (app "_<=_" [ Var "N"; app "len" [ Var "XS" ] ]) ]
+    ; ceq
+        (app "splice" [ Var "XS"; Var "N"; Var "N2"; Var "VAL" ])
+        (Var "XS")
+        [ BoolCond (app "_>_" [ Var "N"; app "len" [ Var "XS" ] ]) ]
     ; eq (T.typecheck (Var "K") (Var "T")) (Const "false") ~attrs:[ Owise ]
     ]

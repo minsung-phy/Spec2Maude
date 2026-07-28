@@ -20,12 +20,16 @@ red in WASM-BUILTINS : builtin.r-laneselect .
 red in WASM-BUILTINS : builtin.ibits(4, uN.wrap(5)) .
 red in WASM-BUILTINS : builtin.fbits(32, fN.pos(fNmag.norm(0, 0))) .
 red in WASM-BUILTINS : builtin.ibytes(16, uN.wrap(4660)) .
+red in WASM-BUILTINS : builtin.inv-ibytes(16,
+  builtin.ibytes(16, uN.wrap(4660))) .
 red in WASM-BUILTINS : builtin.fbytes(32, fN.pos(fNmag.norm(0, 0))) .
 red in WASM-BUILTINS : builtin.nbytes(numtype.f32, fN.pos(fNmag.norm(0, 0))) .
 red in WASM-BUILTINS : builtin.vbytes(vectype.v128, uN.wrap(4660)) .
 red in WASM-BUILTINS : builtin.zbytes(packtype.i16, uN.wrap(4660)) .
 red in WASM-BUILTINS : builtin.cbytes(numtype.f32, fN.pos(fNmag.norm(0, 0))) .
 red in WASM-BUILTINS : builtin.inv-ibits(4, 0 1 0 1) .
+red in WASM-BUILTINS :
+  builtin.inv-ibits(4, bit.wrap(0) bit.wrap(1) bit.wrap(0) bit.wrap(1)) .
 red in WASM-BUILTINS : builtin.inv-fbits(32, 0 0 1 1 1 1 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0) .
 red in WASM-BUILTINS : builtin.inv-ibytes(16, 52 18) .
 red in WASM-BUILTINS : builtin.inv-fbytes(32, 0 0 128 63) .
@@ -91,6 +95,9 @@ red in WASM-BUILTINS : builtin.narrow(16, 8, sx.s, uN.wrap(65535)) .
 red in WASM-BUILTINS : builtin.reinterpret(numtype.i32, numtype.f32, uN.wrap(1065353216)) .
 red in WASM-BUILTINS : builtin.lanes(shape.x(numtype.i32, dim.wrap(4)), uN.wrap(67305985)) .
 red in WASM-BUILTINS : builtin.inv-lanes(shape.x(packtype.i8, dim.wrap(16)), uN.wrap(1) uN.wrap(2) uN.wrap(3) uN.wrap(4) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0) uN.wrap(0)) .
+red in WASM-BUILTINS :
+  def.setproduct(syn.lane(packtype.i16),
+    seq(uN.wrap(0)) seq(uN.wrap(1))) .
 red in WASM-BUILTINS : def.utf8(char.wrap(65)) .
 red in WASM-BUILTINS : helper.iter-count.rolldt(2, 0, 2, subtype.sub(eps, eps, comptype.func-sym(list.wrap(eps), list.wrap(eps))) subtype.sub(eps, eps, comptype.func-sym(list.wrap(eps), list.wrap(eps)))) .
 quit

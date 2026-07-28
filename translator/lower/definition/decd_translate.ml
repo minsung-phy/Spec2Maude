@@ -113,7 +113,7 @@ let static_def_binding_for_param ctx origin param =
 let decd_param_lowering ctx origin param =
   match param.it with
   | ExpP (_, typ) ->
-    (match Expr_translate.carrier_sort_of_typ typ with
+    (match Expr_translate.carrier_sort_of_typ_in ctx typ with
     | Some sort -> Runtime_param (sort, typ), []
     | None -> Unsupported_param, [ unsupported_type ctx origin "DecD/param/ExpP" typ ])
   | TypP id -> Phantom_typ_param id.it, []
@@ -125,7 +125,7 @@ let decd_param_lowering ctx origin param =
     Unsupported_param, [ unsupported_static_param ctx origin param ]
 
 let decd_result_sort ctx origin typ =
-  match Expr_translate.carrier_sort_of_typ typ with
+  match Expr_translate.carrier_sort_of_typ_in ctx typ with
   | Some sort -> Some sort, []
   | None -> None, [ unsupported_type ctx origin "DecD/result" typ ]
 
@@ -141,7 +141,7 @@ let translate_exp_bind ctx origin names env bind =
           ()
       ], names
     else
-      (match Expr_translate.carrier_sort_of_typ typ with
+      (match Expr_translate.carrier_sort_of_typ_in ctx typ with
       | Some sort ->
         let term =
           Local_name.source_qualified
@@ -272,7 +272,7 @@ let add_phantom_runtime_guards ctx env origin typ sort arg =
         match witness.term with
         | Some typ_term ->
           witness.guards
-          @ Expr_translate.typecheck_conditions_for_typ typ sort term typ_term
+          @ Expr_translate.typecheck_conditions_for_typ ctx typ sort term typ_term
         | None -> witness.guards
       in
       { arg with

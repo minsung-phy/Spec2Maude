@@ -204,6 +204,13 @@ let materialize_iter_listn_repeat entry (map : Request.iter_listn) =
       ~lowered_body:map.lowered_body
       ~body_eq_conditions:map.body_eq_conditions
   in
+  let threshold = Const "compactRepeatThreshold" in
+  let linear_conditions =
+    BoolCond (app "_<_" [ succ count; threshold ]) :: result_conditions
+  in
+  let compact_conditions =
+    BoolCond (app "_>=_" [ succ count; threshold ]) :: result_conditions
+  in
   let statement node = generated name origin node in
   [ statement (op name (sort_ref nat :: capture_sorts) spectec_terminals) ]
   @ variable_declarations statement
@@ -215,7 +222,12 @@ let materialize_iter_listn_repeat entry (map : Request.iter_listn) =
         (ceq
            (helper_on (succ count))
            (concat out (helper_on count))
-           result_conditions)
+           linear_conditions)
+    ; statement
+        (ceq
+           (helper_on (succ count))
+           (app "repeatSeq" [ succ count; out ])
+           compact_conditions)
     ]
 
 let materialize_iter_listn_indexed entry (map : Request.iter_listn) =

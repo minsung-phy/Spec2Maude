@@ -103,6 +103,7 @@ let typecheck_for_indexed_head ctx env origin exp target target_sort =
   | Some witness_term ->
     ( witness.guards
       @ Expr_translate.typecheck_conditions_for_typ
+          ctx
           exp.note
           target_sort
           target

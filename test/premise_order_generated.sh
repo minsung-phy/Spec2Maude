@@ -103,11 +103,11 @@ grep -q '^  op helper.iter-count.rolldt : Nat Nat Nat SpectecTerminals -> Specte
 rolldt=$(matching_line 'ceq def.rolldt(X:SpectecTerminal')
 rolldt_conditions=$(condition_line 'ceq def.rolldt(X:SpectecTerminal')
 require_contains "$rolldt" \
-  'helper.iter-count.rolldt(N:SpectecTerminal, 0, N:SpectecTerminal, SUBTYPE_STAR:SpectecTerminals)' \
+  'helper.iter-count.rolldt(N:Nat, 0, N:Nat, SUBTYPE_STAR:SpectecTerminals)' \
   'rolldt no longer passes its count as an immutable ListN capture'
 require_before "$rolldt_conditions" \
   'rectype.rec(list.wrap(SUBTYPE_STAR:SpectecTerminals)) := def.rollrt(X:SpectecTerminal, RECTYPE:SpectecTerminal)' \
-  'N:SpectecTerminal := len(SUBTYPE_STAR:SpectecTerminals)' \
+  'N:Nat := len(SUBTYPE_STAR:SpectecTerminals)' \
   'rolldt no longer derives its caller count after binding the source subtype sequence'
 
 rolldt_step=$(matching_line 'ceq helper.iter-count.rolldt(s COUNT1:Nat')

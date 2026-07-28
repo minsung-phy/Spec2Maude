@@ -19,7 +19,9 @@ type pattern_result = Expr_result.pattern_result =
 
 type env = Expr_env.t
 val carrier_sort_of_typ : Il.Ast.typ -> Maude_ir.sort option
+val carrier_sort_of_typ_in : Context.t -> Il.Ast.typ -> Maude_ir.sort option
 val typecheck_conditions_for_typ :
+  Context.t ->
   Il.Ast.typ ->
   Maude_ir.sort ->
   Maude_ir.term ->

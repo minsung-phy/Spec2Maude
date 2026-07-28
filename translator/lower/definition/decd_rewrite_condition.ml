@@ -46,7 +46,7 @@ let classify_call ctx origin term op_name =
            "Materialize the exact specialization before lowering this call")
     | Some definition when not definition.rewrite_backed -> Ordinary
     | Some definition ->
-      (match Expr_translate.carrier_sort_of_typ definition.result with
+      (match Expr_translate.carrier_sort_of_typ_in ctx definition.result with
       | Some sort -> Rewrite sort
       | None ->
         Blocked

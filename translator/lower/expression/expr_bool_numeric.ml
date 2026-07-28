@@ -345,7 +345,10 @@ and lower_projection_equality_binding callbacks ctx env origin projection_exp va
     (match scrutinee.it, projection_inverse_constructor ctx scrutinee mixop uncase_exp.note with
     | VarE id, Some constructor ->
       (match Expr_env.find env id.it with
-      | Some { term = (Var _ as scrutinee_term); _ } ->
+      (* Constructor inversion binds an unknown scrutinee.  Once the lhs or an
+         earlier condition binds it, equality is observation, not unification. *)
+      | Some ({ term = (Var _ as scrutinee_term); _ } as binding)
+        when not (binding_is_condition_bound env binding) ->
         let value_result = callbacks.lower_value ctx env origin value_exp in
         (match value_result.term with
         | Some value_term ->

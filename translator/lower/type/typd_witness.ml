@@ -43,6 +43,30 @@ let unsupported_nested_iter_guard ctx origin constructor typ =
       "Implement the nested sequence helper/monomorphized representation before lowering this type"
     ()
 
+let subtype_plan ctx source_typ target_typ =
+  Subtype_plan.make
+    ~il_env:(Context.il_env ctx)
+    ~source_index:(Context.source_index ctx)
+    ~constructors:(Context.constructors ctx)
+    ~static_typ_env:(Context.static_typ_env ctx)
+    source_typ target_typ
+
+let lower_static_subtype ctx origin exp inner_term source_typ target_typ =
+  match subtype_plan ctx source_typ target_typ with
+  | Ok Subtype_plan.Identity -> Some inner_term, []
+  | Ok (Subtype_plan.Injection injection) ->
+    let request = Helper_request.subtype_injection_request ~origin injection in
+    let forward = Helper.request (Context.helpers ctx) request in
+    Some (App (forward, [ inner_term ])), []
+  | Error error ->
+    let reason, suggestion = Subtype_plan.describe_error error in
+    None,
+    [ unsupported
+        ~ctx ~origin ~constructor:"TypD/arg/ExpA/SubE"
+        ~source_echo:(Il.Print.string_of_exp exp)
+        ~reason ~suggestion ()
+    ]
+
 let rec terms_of_static_exps env ctx origin exps =
   let terms, diagnostics =
     exps
@@ -178,7 +202,16 @@ and term_of_static_exp env ctx origin exp =
   | LiftE inner -> term_of_static_exp env ctx origin inner
   | CaseE (mixop, arg_exp) ->
     lower_static_case env ctx origin exp mixop arg_exp
-  | SubE (inner, _, _) | CvtE (inner, _, _) ->
+  | SubE (inner, source_typ, target_typ) ->
+    let inner_term, diagnostics = term_of_static_exp env ctx origin inner in
+    (match inner_term with
+    | Some term ->
+      let coerced, coercion_diagnostics =
+        lower_static_subtype ctx origin exp term source_typ target_typ
+      in
+      coerced, diagnostics @ coercion_diagnostics
+    | None -> None, diagnostics)
+  | CvtE (inner, _, _) ->
     term_of_static_exp env ctx origin inner
   | CallE (id, args) ->
     let terms, diagnostics = terms_of_args env ctx origin args in
@@ -263,3 +296,103 @@ and of_typ env ctx origin ~constructor typ =
         ~suggestion:"Preserve tuple payload shape through a tuple witness helper before lowering this case"
         ()
     ]
+
+let rec open_subtype_pattern ctx origin names exp term =
+  match exp.it with
+  | SubE (inner, source_typ, target_typ) ->
+    (match subtype_plan ctx source_typ target_typ with
+    | Ok Subtype_plan.Identity ->
+      open_subtype_pattern ctx origin names inner term
+    | Ok (Subtype_plan.Injection injection) ->
+      let request = Helper_request.subtype_injection_request ~origin injection in
+      let forward = Helper.request (Context.helpers ctx) request in
+      let source_term =
+        match term with
+        | App (name, [ source_term ]) when name = forward -> Some source_term
+        | Var _ | Const _ | Qid _ | App _ -> None
+      in
+      (match source_term with
+      | Some source_term ->
+        let target_term, names =
+          Local_name.fresh_qualified
+            names Local_name.Pattern (sort_ref (sort "SpectecTerminal"))
+        in
+        let project = Subtype_injection.projection_name ~forward in
+        target_term,
+        [ MatchCond (source_term, App (project, [ target_term ])) ],
+        [], names
+      | None ->
+        term, [],
+        [ unsupported
+            ~ctx ~origin ~constructor:"TypD/InstD/arg/SubE"
+            ~source_echo:(Il.Print.string_of_exp exp)
+            ~reason:
+              "static subtype pattern did not retain its certified forward coercion"
+            ~suggestion:
+              "Keep this instance Unsupported until its SubE can be represented by a projection guard"
+            ()
+        ],
+        names)
+    | Error _ -> term, [], [], names)
+  | CaseE (_, arg_exp) ->
+    (match term with
+    | App (name, terms) ->
+      let exps =
+        match arg_exp.it with
+        | TupE exps -> exps
+        | _ -> [ arg_exp ]
+      in
+      if List.length exps <> List.length terms then
+        term, [], [], names
+      else
+        let terms, guards, diagnostics, names =
+          List.fold_left2
+            (fun (terms, guards, diagnostics, names) exp term ->
+              let term, more_guards, more_diagnostics, names =
+                open_subtype_pattern ctx origin names exp term
+              in
+              term :: terms,
+              guards @ more_guards,
+              diagnostics @ more_diagnostics,
+              names)
+            ([], [], [], names) exps terms
+        in
+        App (name, List.rev terms), guards, diagnostics, names
+    | Var _ | Const _ | Qid _ -> term, [], [], names)
+  | LiftE inner | CvtE (inner, _, _) ->
+    open_subtype_pattern ctx origin names inner term
+  | OptE (Some inner) ->
+    open_subtype_pattern ctx origin names inner term
+  | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
+  | TupE _ | ProjE _ | UncaseE _ | OptE None | TheE _ | StrE _ | DotE _
+  | CompE _ | ListE _ | MemE _ | LenE _ | CatE _ | IdxE _ | SliceE _
+  | UpdE _ | ExtE _ | IfE _ | CallE _ | IterE _ ->
+    term, [], [], names
+
+let pattern_terms_of_args env ctx origin args =
+  let terms, diagnostics = terms_of_args env ctx origin args in
+  match terms with
+  | None -> None, [], diagnostics
+  | Some terms ->
+    let names =
+      terms
+      |> List.concat_map Condition_closure.term_vars
+      |> Local_name.reserve_existing_many Local_name.empty
+    in
+    let terms, guards, pattern_diagnostics, _names =
+      List.fold_left2
+        (fun (terms, guards, diagnostics, names) arg term ->
+          match arg.it with
+          | ExpA exp ->
+            let term, more_guards, more_diagnostics, names =
+              open_subtype_pattern ctx origin names exp term
+            in
+            term :: terms,
+            guards @ more_guards,
+            diagnostics @ more_diagnostics,
+            names
+          | TypA _ | DefA _ | GramA _ ->
+            term :: terms, guards, diagnostics, names)
+        ([], [], [], names) args terms
+    in
+    Some (List.rev terms), guards, diagnostics @ pattern_diagnostics

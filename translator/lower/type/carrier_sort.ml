@@ -52,6 +52,21 @@ let is_nested_list_typ = Type_shape.is_nested_list_typ
 let is_optional_list_typ = Type_shape.is_optional_list_typ
 let is_list_optional_typ = Type_shape.is_list_optional_typ
 
+let zero_arg_alias_target ctx visited id =
+  if List.mem id.it visited then None
+  else
+    Analysis.Source_index.find_by_id (Context.source_index ctx) id.it
+    |> List.filter_map (fun entry ->
+      match entry.Analysis.Source_index.def.it with
+      | TypD (_, [], [ inst ]) ->
+        (match inst.it with
+        | InstD ([], [], { it = AliasT typ; _ }) -> Some typ
+        | _ -> None)
+      | _ -> None)
+    |> function
+    | [ typ ] -> Some typ
+    | _ -> None
+
 let for_expression = function
   | { it = BoolT | NumT `RatT | NumT `RealT | TextT | VarT _; _ } ->
     Some spectec_terminal
@@ -69,17 +84,10 @@ let primitive_numeric_alias_sort ctx typ =
     match typ.it with
     | NumT `NatT -> Some (s "Nat")
     | NumT `IntT -> Some (s "Int")
-    | VarT (id, []) when not (List.mem id.it visited) ->
-      let entries = Analysis.Source_index.find_by_id (Context.source_index ctx) id.it in
-      entries
-      |> List.find_map (fun entry ->
-        match entry.Analysis.Source_index.def.it with
-        | TypD (_, [], [ inst ]) ->
-          (match inst.it with
-          | InstD ([], [], { it = AliasT alias_typ; _ }) ->
-            resolve (id.it :: visited) alias_typ
-          | _ -> None)
-        | _ -> None)
+    | VarT (id, []) ->
+      (match zero_arg_alias_target ctx visited id with
+      | Some target -> resolve (id.it :: visited) target
+      | None -> None)
     | _ -> None
   in
   resolve [] typ
@@ -101,17 +109,25 @@ let typ_is_nat ctx typ =
     | _ -> false)
 
 let for_typd ctx typ =
-  match primitive_numeric_alias_sort ctx typ with
-  | Some sort -> Ok sort
-  | None ->
-    match typ.it with
-    | BoolT | NumT `RatT | NumT `RealT | TextT | VarT _ ->
-      Ok spectec_terminal
-    | NumT `NatT -> Ok (s "Nat")
-    | NumT `IntT -> Ok (s "Int")
-    | _ when is_flat_list_typ typ || is_flat_optional_typ typ || is_nested_list_typ typ
-             || is_optional_list_typ typ || is_list_optional_typ typ ->
-      Ok spectec_terminals
-    | IterT (_, (List | Opt)) -> Error Nested_sequence
-    | IterT (_, ((List1 | ListN _) as iter)) -> Error (Iteration_guard iter)
-    | TupT _ -> Error Tuple_carrier
+  let rec resolve visited typ =
+    match primitive_numeric_alias_sort ctx typ with
+    | Some sort -> Ok sort
+    | None ->
+      match typ.it with
+      | VarT (id, []) ->
+        (match zero_arg_alias_target ctx visited id with
+        | Some target -> resolve (id.it :: visited) target
+        | None -> Ok spectec_terminal)
+      | BoolT | NumT `RatT | NumT `RealT | TextT | VarT _ ->
+        Ok spectec_terminal
+      | NumT `NatT -> Ok (s "Nat")
+      | NumT `IntT -> Ok (s "Int")
+      | _ when is_flat_list_typ typ || is_flat_optional_typ typ
+               || is_nested_list_typ typ || is_optional_list_typ typ
+               || is_list_optional_typ typ ->
+        Ok spectec_terminals
+      | IterT (_, (List | Opt)) -> Error Nested_sequence
+      | IterT (_, ((List1 | ListN _) as iter)) -> Error (Iteration_guard iter)
+      | TupT _ -> Error Tuple_carrier
+  in
+  resolve [] typ
