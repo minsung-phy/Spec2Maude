@@ -82,6 +82,14 @@ let dedup_guards guards =
   in
   loop [] [] guards
 
+(** A projection is partial exactly outside the certified injection image.
+    A successful match therefore proves both source and target categories. *)
+let without_typechecks guards =
+  guards
+  |> List.filter (function
+       | BoolCond term -> not (Typecheck_term.is_typecheck term)
+       | EqCond _ | MatchCond _ | MembershipCond _ -> true)
+
 let projection_condition
     ctx callbacks origin constructor source_exp source_result source_term
     ~reason ~suggestion =
@@ -168,52 +176,31 @@ let lower_direct names ctx callbacks origin exp inner source_typ target_typ =
       let target_term, names =
         Local_name.fresh_typed names Local_name.Pattern target_sort
       in
-      let source_guards, source_diagnostics =
-        callbacks.guard_for_typ
-          origin ~constructor:"Pattern/SubE/source" exp source_term source_typ
-      in
-      let target_guards, target_diagnostics =
-        callbacks.guard_for_typ
-          origin ~constructor:"Pattern/SubE" exp target_term target_typ
-      in
-      (match source_guards, target_guards with
-      | Some source_guards, Some target_guards ->
-        (match
-           projection_condition
-             ctx callbacks origin "Pattern/SubE/projection"
-             inner inner_result source_term
-             ~reason:
-               "the inner source term is not an admissible match pattern and depends on variables not already bound"
-             ~suggestion:
-               "Keep this SubE Unsupported unless projection needs only equality over existing bindings"
-         with
-        | Ok make_condition ->
-          let project, _ = accept_injection ctx origin injection in
-          return names
-            { term = Some target_term
-            ; guards =
-                dedup_guards
-                  (inner_result.guards @ target_guards
-                   @ [ make_condition (app project [ target_term ]) ]
-                   @ source_guards)
-            ; introduced_bindings = inner_result.introduced_bindings
-            ; diagnostics =
-                inner_result.diagnostics @ source_diagnostics @ target_diagnostics
-            }
-        | Error diagnostic ->
-          return names
-            { inner_result with
-              term = None
-            ; diagnostics =
-                inner_result.diagnostics @ source_diagnostics @ target_diagnostics
-                @ [ diagnostic ]
-            })
-      | _ ->
+      (match
+         projection_condition
+           ctx callbacks origin "Pattern/SubE/projection"
+           inner inner_result source_term
+           ~reason:
+             "the inner source term is not an admissible match pattern and depends on variables not already bound"
+           ~suggestion:
+             "Keep this SubE Unsupported unless projection needs only equality over existing bindings"
+       with
+      | Ok make_condition ->
+        let project, _ = accept_injection ctx origin injection in
+        return names
+          { term = Some target_term
+          ; guards =
+              dedup_guards
+                (without_typechecks inner_result.guards
+                 @ [ make_condition (app project [ target_term ]) ])
+          ; introduced_bindings = inner_result.introduced_bindings
+          ; diagnostics = inner_result.diagnostics
+          }
+      | Error diagnostic ->
         return names
           { inner_result with
             term = None
-          ; diagnostics =
-              inner_result.diagnostics @ source_diagnostics @ target_diagnostics
+          ; diagnostics = inner_result.diagnostics @ [ diagnostic ]
           }))
 
 let sequence_typ typ =
@@ -253,50 +240,29 @@ let lower_iterated
     let target_term, names =
       Local_name.fresh_typed names Local_name.Pattern (sort "SpectecTerminals")
     in
-    let source_guards, source_diagnostics =
-      callbacks.guard_for_typ
-        origin ~constructor:"Pattern/IterE/coercion"
-        source_exp source_term (sequence_typ source_typ)
-    in
-    let target_guards, target_diagnostics =
-      callbacks.guard_for_typ
-        origin ~constructor:"Pattern/IterE/SubE/target" exp target_term exp.note
-    in
-    (match source_guards, target_guards with
-    | Some source_guards, Some target_guards ->
-      (match
-         projection_condition
-           ctx callbacks origin "Pattern/IterE/SubE/projection"
-           source_exp source_result source_term
-           ~reason:
-             "the projected source sequence is not an admissible match pattern and depends on variables not already bound"
-           ~suggestion:
-             "Keep this iterated SubE Unsupported unless projection needs only equality over existing bindings"
-       with
-      | Ok make_condition ->
-        let _, project_seq = accept_injection ctx origin injection in
-        return names { term = Some target_term
-        ; guards =
-            dedup_guards
-              (source_result.guards @ target_guards
-               @ [ make_condition (app project_seq [ target_term ]) ]
-               @ source_guards)
-        ; introduced_bindings = source_result.introduced_bindings
-        ; diagnostics =
-            source_result.diagnostics @ source_diagnostics @ target_diagnostics
-        }
-      | Error diagnostic ->
-        return names { source_result with
-          term = None
-        ; diagnostics =
-            source_result.diagnostics @ source_diagnostics @ target_diagnostics
-            @ [ diagnostic ]
-        })
-    | _ ->
+    (match
+       projection_condition
+         ctx callbacks origin "Pattern/IterE/SubE/projection"
+         source_exp source_result source_term
+         ~reason:
+           "the projected source sequence is not an admissible match pattern and depends on variables not already bound"
+         ~suggestion:
+           "Keep this iterated SubE Unsupported unless projection needs only equality over existing bindings"
+     with
+    | Ok make_condition ->
+      let _, project_seq = accept_injection ctx origin injection in
+      return names { term = Some target_term
+      ; guards =
+          dedup_guards
+            (without_typechecks source_result.guards
+             @ [ make_condition (app project_seq [ target_term ]) ])
+      ; introduced_bindings = source_result.introduced_bindings
+      ; diagnostics = source_result.diagnostics
+      }
+    | Error diagnostic ->
       return names { source_result with
         term = None
-      ; diagnostics =
-          source_result.diagnostics @ source_diagnostics @ target_diagnostics
+      ; diagnostics = source_result.diagnostics @ [ diagnostic ]
       })
   | Error error ->
     return names { source_result with

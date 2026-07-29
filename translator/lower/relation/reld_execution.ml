@@ -79,6 +79,9 @@ let translate_rule
       in
       (match lhs_terms_opt with
       | Some lhs_terms ->
+        let lhs_guards, head_facts =
+          split_execution_head_guards ctx lhs_terms lhs_guards
+        in
         let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
         let has_else = has_else_premise prems in
         let else_output, else_alternatives =
@@ -104,6 +107,7 @@ let translate_rule
             ctx
             env
             ~bound_conditions:lhs_guards
+            ~head_facts
             ~escape_source_ids:
               (output_exps
                |> List.concat_map Source_free_vars.exp_and_note_ids
@@ -129,6 +133,7 @@ let translate_rule
             "rhs"
             output_exps
         in
+        let output_guards = execution_result_guards output_guards in
         let diagnostics =
           hint_diags
           @ bind_diags @ arity_diags @ lhs_diags @ output_diags

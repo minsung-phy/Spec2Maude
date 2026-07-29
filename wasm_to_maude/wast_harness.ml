@@ -586,5 +586,6 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    if runtimeResults(ACTUAL) = true .\n\n\
        \  rl [done] : script.ready(S, ENV, commands.nil) => script.done .\n\
        endm\n\n\
-       rew [%d] in WASM2MAUDE-WAST : script.start .\n"
+       rew [%d] in WASM2MAUDE-WAST : script.start .\n\
+       continue 1 .\n"
       semantics commands host_store host_functions host_instances steps
