@@ -92,6 +92,12 @@ val lower_value_components :
   Maude_ir.term list option * Maude_ir.eq_condition list * Diagnostics.t list
 
 val relation_call : string -> Maude_ir.term list -> Maude_ir.term
+val split_execution_head_guards :
+  Context.t -> Maude_ir.term list -> Maude_ir.eq_condition list ->
+  Maude_ir.eq_condition list * Maude_ir.eq_condition list
+
+val execution_result_guards :
+  Maude_ir.eq_condition list -> Maude_ir.eq_condition list
 
 val generated_statement_diagnostics :
   ?pattern_certificate:Condition_pattern_certificate.t ->

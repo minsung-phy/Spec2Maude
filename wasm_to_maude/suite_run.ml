@@ -5,6 +5,7 @@ type status =
   | Frontend_error
   | Maude_error
   | Timeout
+  | Step_limit
   | Stuck
 
 type case = {
@@ -29,6 +30,7 @@ let status_name = function
   | Frontend_error -> "FRONTEND_ERROR"
   | Maude_error -> "MAUDE_ERROR"
   | Timeout -> "TIMEOUT"
+  | Step_limit -> "STEP_LIMIT"
   | Stuck -> "STUCK"
 
 let contains text pattern =
@@ -46,11 +48,26 @@ let find_line pattern text =
   |> Option.value ~default:""
   |> String.trim
 
-let last_result text =
+let result_lines text =
   String.split_on_char '\n' text
   |> List.filter (fun line -> contains line "result ")
-  |> List.rev
-  |> function line :: _ -> String.trim line | [] -> "no Maude result"
+
+let bounded_result text =
+  match List.rev (result_lines text) with
+  | _probe :: result :: _ -> String.trim result
+  | result :: _ -> String.trim result
+  | [] -> "no Maude result"
+
+let last_rewrite_count text =
+  let parse line =
+    String.split_on_char ' ' (String.trim line)
+    |> List.filter (fun field -> field <> "")
+    |> function
+    | "rewrites:" :: count :: _ -> int_of_string_opt count
+    | _ -> None
+  in
+  String.split_on_char '\n' text |> List.filter_map parse |> List.rev
+  |> function count :: _ -> count | [] -> 0
 
 let classify process output =
   if contains output "Warning:" then Maude_error, find_line "Warning:" output
@@ -58,12 +75,14 @@ let classify process output =
   else
     match process with
     | Timed_out -> Timeout, "Maude exceeded the per-file timeout"
-    | Exited (Unix.WEXITED 0) when contains output "script.wrong-" ->
-        Wrong_result, find_line "script.wrong-" output
-    | Exited (Unix.WEXITED 0)
-      when contains output "result ScriptState: script.done" ->
-        Pass, ""
-    | Exited (Unix.WEXITED 0) -> Stuck, last_result output
+    | Exited (Unix.WEXITED 0) ->
+        let result = bounded_result output in
+        if contains result "script.wrong-" then Wrong_result, result
+        else if contains result "script.done" then Pass, ""
+        else if last_rewrite_count output > 0 then
+          Step_limit,
+          "bounded rewrite budget exhausted while execution could still step"
+        else Stuck, result
     | Exited (Unix.WEXITED code) ->
         Maude_error, Printf.sprintf "Maude exited with status %d" code
     | Exited (Unix.WSIGNALED signal) ->
@@ -202,7 +221,14 @@ let to_tsv report =
 
 let summary report =
   let statuses =
-    [Pass; Wrong_result; Unsupported; Frontend_error; Maude_error; Timeout; Stuck]
+    [ Pass;
+      Wrong_result;
+      Unsupported;
+      Frontend_error;
+      Maude_error;
+      Timeout;
+      Step_limit;
+      Stuck ]
   in
   List.filter_map
     (fun status ->

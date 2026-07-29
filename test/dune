@@ -374,6 +374,12 @@
 
 (rule
  (alias runtest)
+ (deps execution_membership_generated.sh ../output.maude)
+ (action
+  (run sh %{dep:execution_membership_generated.sh} %{dep:../output.maude})))
+
+(rule
+ (alias runtest)
  (deps
   builtin_backend_generated.sh
   builtin_backend_smoke.maude

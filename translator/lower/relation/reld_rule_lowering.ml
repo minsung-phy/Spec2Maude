@@ -414,6 +414,54 @@ let lower_value_components ctx env origin segment exps =
 let relation_call op_name inputs =
   app op_name inputs
 
+let is_source_constructor certificate = function
+  | App (name, arguments) ->
+    Condition_pattern_certificate.admits certificate name (List.length arguments)
+  | Const name -> Condition_pattern_certificate.admits certificate name 0
+  | Var _ | Qid _ -> false
+
+(** Constructor membership entails the declared category of each component.
+    We remove only guards on those component terms; a bare pattern variable,
+    such as the value before [ref.is_null], keeps its category guard. *)
+let source_constructor_components certificate terms =
+  let rec collect components = function
+    | Var _ | Const _ | Qid _ -> components
+    | App (name, arguments) ->
+      let components =
+        if
+          Condition_pattern_certificate.admits
+            certificate name (List.length arguments)
+        then List.rev_append arguments components
+        else components
+      in
+      List.fold_left collect components arguments
+  in
+  terms
+  |> List.fold_left collect []
+  |> List.sort_uniq compare
+
+let split_execution_head_guards ctx lhs_terms guards =
+  let certificate = Condition_pattern_certificate.source ctx in
+  let constructor_components =
+    source_constructor_components certificate lhs_terms
+  in
+  let implied term =
+    List.mem term constructor_components || is_source_constructor certificate term
+  in
+  guards
+  |> List.partition (function
+       | BoolCond term ->
+         (match Typecheck_term.subject term with
+         | Some subject -> not (implied subject)
+         | None -> true)
+       | EqCond _ | MatchCond _ | MembershipCond _ -> true)
+
+let execution_result_guards guards =
+  guards
+  |> List.filter (function
+       | BoolCond term -> not (Typecheck_term.is_typecheck term)
+       | EqCond _ | MatchCond _ | MembershipCond _ -> true)
+
 let generated_statement_diagnostics
     ?(pattern_certificate = Condition_pattern_certificate.empty)
     ctx statement =

@@ -5,10 +5,15 @@ open Util.Source
 open Reld_result
 open Reld_rule_lowering
 
-let append_execution_premise_result ctx origin names left right =
+let append_execution_premise_result
+    ctx origin names ~head_facts left right =
+  let eq_conditions =
+    Premise_result.eq_conditions right
+    |> List.filter (fun condition -> not (List.mem condition head_facts))
+  in
   let right_conditions, rewrite_diagnostics, names =
     Decd_rewrite_condition.lower_eq_conditions
-      ctx origin names (Premise_result.eq_conditions right)
+      ctx origin names eq_conditions
   in
   ( { Premise_result.eq_conditions =
       []
@@ -130,6 +135,10 @@ let lower_execution_rule_premise
         (match input_terms_opt, output_pattern_opt, output_sorts_opt with
         | Some input_terms, Some output_patterns, Some output_sorts
           when List.length output_patterns = List.length output_sorts ->
+          let input_guards, _head_facts =
+            split_execution_head_guards ctx input_terms input_guards
+          in
+          let output_guards = execution_result_guards output_guards in
           let output_pattern = tuple_carrier output_sorts output_patterns in
           let lhs = relation_call (Naming.relation_op rel_id) input_terms in
           let rewrite_condition = RewriteCond (lhs, output_pattern) in
@@ -375,7 +384,8 @@ let translate_execution_premise
 let translate_premises_named
     names
     ?(require_equational_contract = false)
-    ctx env ?(bound_conditions = []) ?(escape_source_ids = []) ~bound_terms origin prems =
+    ctx env ?(bound_conditions = []) ?(head_facts = [])
+    ?(escape_source_ids = []) ~bound_terms origin prems =
   let incoming_names = names in
   let source_names =
     let free = Il.Free.(free_prems prems).varid |> Il.Free.Set.elements in
@@ -434,7 +444,7 @@ let translate_premises_named
       | Premise_result.Complete result ->
         let acc, candidate_names =
           append_execution_premise_result
-            staged origin candidate_names acc result
+            staged origin candidate_names ~head_facts acc result
         in
         (match Premise_result.classify acc with
         | Premise_result.Complete _ ->

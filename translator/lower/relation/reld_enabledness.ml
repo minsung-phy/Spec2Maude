@@ -358,6 +358,9 @@ let translate_helper
         (match lhs_terms_opt with
         | Some lhs_terms
           when predecessor_matches_current current_lhs_terms lhs_terms ->
+        let lhs_guards, _head_facts =
+          split_execution_head_guards ctx lhs_terms lhs_guards
+        in
           let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
           let premise_translation, _names =
             Premise_translate.translate_premises_named
