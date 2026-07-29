@@ -1203,6 +1203,10 @@ mod WASM-BUILTINS is
   ceq builtin.narrow(NW_M, NW_N, sx.u, uN.wrap(NW_I)) = uN.wrap(sd(1, _^_(2, NW_N)))
     if _>_(NW_M, NW_N)
        /\ _>=_(NW_I, _^_(2, NW_N))
+       /\ _<_(NW_I, _^_(2, sd(1, NW_M))) .
+  ceq builtin.narrow(NW_M, NW_N, sx.u, uN.wrap(NW_I)) = uN.wrap(0)
+    if _>_(NW_M, NW_N)
+       /\ _>=_(NW_I, _^_(2, sd(1, NW_M)))
        /\ _<_(NW_I, _^_(2, NW_M)) .
   ceq builtin.narrow(NW_M, NW_N, sx.s, uN.wrap(NW_I)) = uN.wrap(NW_I)
     if _>_(NW_M, NW_N)
