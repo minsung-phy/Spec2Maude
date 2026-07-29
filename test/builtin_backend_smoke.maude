@@ -91,6 +91,9 @@ red in WASM-BUILTINS : builtin.relaxed-trunc(32, 8, sx.u, fN.pos(fNmag.norm(0, 0
 red in WASM-BUILTINS : builtin.demote(64, 32, fN.pos(fNmag.norm(0, 128))) .
 red in WASM-BUILTINS : builtin.promote(32, 64, fN.neg(fNmag.subnorm(1))) .
 red in WASM-BUILTINS : builtin.convert(64, 32, sx.u, uN.wrap(16777217)) .
+red in WASM-BUILTINS : builtin.narrow(16, 8, sx.u, uN.wrap(0)) .
+red in WASM-BUILTINS : builtin.narrow(16, 8, sx.u, uN.wrap(256)) .
+red in WASM-BUILTINS : builtin.narrow(16, 8, sx.u, uN.wrap(65535)) .
 red in WASM-BUILTINS : builtin.narrow(16, 8, sx.s, uN.wrap(65535)) .
 red in WASM-BUILTINS : builtin.reinterpret(numtype.i32, numtype.f32, uN.wrap(1065353216)) .
 red in WASM-BUILTINS : builtin.lanes(shape.x(numtype.i32, dim.wrap(4)), uN.wrap(67305985)) .
