@@ -23,9 +23,13 @@ type request =
 
 type invocation =
   { enabled_op : string
+  ; true_entry_op : string
+  ; false_entry_op : string
   ; true_op : string
   ; false_op : string
   ; lhs : Maude_ir.term
+  ; true_lhs : Maude_ir.term
+  ; false_lhs : Maude_ir.term
   ; true_rhs : Maude_ir.term
   ; false_rhs : Maude_ir.term
   }
@@ -84,6 +88,12 @@ let reason request =
 let enabled_op ~helper_name =
   helper_name
 
+let true_entry_op ~helper_name =
+  Naming.helper_companion ~role:"enabled-true-entry" helper_name
+
+let false_entry_op ~helper_name =
+  Naming.helper_companion ~role:"enabled-false-entry" helper_name
+
 let true_op ~helper_name =
   Naming.helper_companion ~role:"enabled-true" helper_name
 
@@ -92,19 +102,25 @@ let false_op ~helper_name =
 
 let invocation ~helper_name request =
   let enabled_op = enabled_op ~helper_name in
+  let true_entry_op = true_entry_op ~helper_name in
+  let false_entry_op = false_entry_op ~helper_name in
   let true_op = true_op ~helper_name in
   let false_op = false_op ~helper_name in
   { enabled_op
+  ; true_entry_op
+  ; false_entry_op
   ; true_op
   ; false_op
   ; lhs = Maude_ir.App (enabled_op, request.call_terms)
+  ; true_lhs = Maude_ir.App (true_entry_op, request.call_terms)
+  ; false_lhs = Maude_ir.App (false_entry_op, request.call_terms)
   ; true_rhs = Maude_ir.Const true_op
   ; false_rhs = Maude_ir.Const false_op
   }
 
 let false_rewrite_condition ~helper_name request =
   let call = invocation ~helper_name request in
-  Maude_ir.RewriteCond (call.lhs, call.false_rhs)
+  Maude_ir.RewriteCond (call.false_lhs, call.false_rhs)
 
 let surface ~helper_name ~origin request =
   let open Maude_ir in
@@ -123,6 +139,12 @@ let surface ~helper_name ~origin request =
   [ generated (sort_decl result)
   ; generated
       (op call.enabled_op (List.map sort_ref request.input_sorts) result
+         ~attrs:frozen)
+  ; generated
+      (op call.true_entry_op (List.map sort_ref request.input_sorts) result
+         ~attrs:frozen)
+  ; generated
+      (op call.false_entry_op (List.map sort_ref request.input_sorts) result
          ~attrs:frozen)
   ; generated (op call.true_op [] result ~attrs:[ Ctor ])
   ; generated (op call.false_op [] result ~attrs:[ Ctor ])

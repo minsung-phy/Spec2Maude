@@ -75,6 +75,20 @@ grep -q 'truth-seed-miss-ref-ok' "$output"
 grep -q 'seed-refute-8-source-boolean' "$output"
 grep -q 'rule-refute-14-eq-pattern' "$output"
 grep -Eq '_=/=_\(RTPAThelper[^,]*, TYPEUSE_STAR:SpectecTerminals\)' "$output"
+
+assert_source_rule_order() {
+  earlier=$1
+  later=$2
+  earlier_line=$(grep -n -m 1 "\[$earlier\]" "$output" | cut -d: -f1)
+  later_line=$(grep -n -m 1 "\[$later\]" "$output" | cut -d: -f1)
+  if [ "$earlier_line" -ge "$later_line" ]; then
+    echo "generated execution rules reordered $earlier after $later" >&2
+    exit 1
+  fi
+}
+
+assert_source_rule_order step-read-ref-test-true step-read-ref-test-false
+assert_source_rule_order step-read-ref-cast-succeed step-read-ref-cast-fail
 if grep -Fq "_=/=_(index(value('TYPES'" "$output"; then
   echo 'type-index binding was emitted as a comparison against an unbound witness' >&2
   exit 1
@@ -113,6 +127,32 @@ assert_solution() {
 assert_solution ref-ok-positive
 assert_solution ref-ok-negative
 assert_solution ref-ok-no-seed
+
+section_between() {
+  marker=$1
+  awk -v begin="result Qid: '$marker-begin" \
+    -v end="result Qid: '$marker-end" '
+      $0 == begin { active = 1; next }
+      $0 == end { active = 0; next }
+      active { print }
+    ' "$smoke_log"
+}
+
+positive_subtype=$(section_between heaptype-sub-positive)
+if ! printf '%s\n' "$positive_subtype" |
+    grep -Fq 'helper.truth-proved.step-read'; then
+  cat "$smoke_log" >&2
+  echo 'recursive Heaptype_sub source path was not proved' >&2
+  exit 1
+fi
+
+negative_subtype=$(section_between heaptype-sub-negative)
+if printf '%s\n' "$negative_subtype" |
+    grep -Fq 'helper.truth-refuted.step-read'; then
+  cat "$smoke_log" >&2
+  echo 'a true recursive Heaptype_sub source path was falsely refuted' >&2
+  exit 1
+fi
 
 "$wasm_exe" module "$root/wat_examples/fib-wrapper.wat" \
   --semantics "$builtins" -o "$wasm_harness"

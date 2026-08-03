@@ -12,9 +12,13 @@ type request =
 
 type invocation =
   { worklist_op : string
+  ; prove_entry_op : string
+  ; refute_entry_op : string
   ; proved_op : string
   ; refuted_op : string
   ; lhs : Maude_ir.term
+  ; prove_lhs : Maude_ir.term
+  ; refute_lhs : Maude_ir.term
   ; proved_rhs : Maude_ir.term
   ; refuted_rhs : Maude_ir.term
   }

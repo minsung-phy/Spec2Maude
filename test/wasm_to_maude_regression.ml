@@ -240,6 +240,17 @@ let require_wast_unsupported path fragment =
       {kind = Ingress_error.Unsupported; message; _}
       when contains message fragment -> ()
 
+let require_run_unsupported source export args fragment =
+  let module_ = Frontend.text ~name:"invoke-ingress.wat" source in
+  try
+    ignore
+      (Emit.run ~semantics:"builtins.maude" ~export ~args ~steps:1 module_);
+    failwith "invalid direct invocation was accepted"
+  with
+  | Ingress_error.Error
+      {kind = Ingress_error.Unsupported; message; _}
+      when contains message fragment -> ()
+
 let assertion_definition path =
   Wasm.Parse.Script.parse_file path
   |> List.find_map (fun command ->
@@ -352,6 +363,14 @@ let () =
     "has no export";
   require_wast_unsupported "wast_import_mismatch_unsupported.wast"
     "incompatible import type";
+  require_wast_unsupported "wast_invoke_wrong_arity.wast"
+    "wrong number of arguments";
+  require_wast_unsupported "wast_invoke_wrong_type.wast"
+    "wrong type";
+  require_run_unsupported scalar_source (Wasm.Utf8.decode "add")
+    [Wasm.Value.I32 1l] "wrong number of arguments";
+  require_run_unsupported scalar_source (Wasm.Utf8.decode "add")
+    [Wasm.Value.I32 1l; Wasm.Value.I64 2L] "wrong type";
   require_checked "wast_assert_unlinkable_unsupported.wast" 1;
   require_wast_fragments ~checked:6 ~runtime:7 "wast_vectors.wast"
     [ "vec.vconst(vectype.v128,uN.wrap(";

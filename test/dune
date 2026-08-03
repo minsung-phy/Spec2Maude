@@ -42,6 +42,8 @@
   wast_import_mismatch_unsupported.wast
   wast_import_missing_export_unsupported.wast
   wast_import_unsupported.wast
+  wast_invoke_wrong_arity.wast
+  wast_invoke_wrong_type.wast
   wast_linking_function_subset.wast
   wast_named_instances.wast
   wast_register_imports.wast

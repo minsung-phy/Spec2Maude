@@ -1,5 +1,11 @@
 open Runtime_truth_worklist_core
 
+val emitted_head_guards :
+  Context.t ->
+  Maude_ir.term list ->
+  Maude_ir.eq_condition list ->
+  Maude_ir.eq_condition list
+
 val lower_head :
   Context.t ->
   item ->

@@ -1,5 +1,27 @@
 let term m = Maude_term.to_string (Encode.module_ m)
 
+let check_arguments m export args =
+  let arguments =
+    List.map
+      (fun argument -> Wasm.Types.NumT (Wasm.Value.type_of_num argument))
+      args
+  in
+  match Frontend.validate_invocation m export arguments with
+  | Ok () -> ()
+  | Error error ->
+      let message =
+        match error with
+        | Frontend.Missing_export -> "requested function export does not exist"
+        | Frontend.Non_function_export -> "requested export is not a function"
+        | Frontend.Unresolved_function_type ->
+            "validated function export retained an unresolved type index"
+        | Frontend.Wrong_arity ->
+            "function invocation has the wrong number of arguments"
+        | Frontend.Wrong_argument_type _ ->
+            "function invocation argument has the wrong type"
+      in
+      Ingress_error.raise Ingress_error.Unsupported m.source message
+
 let typecheck ~semantics m =
   Printf.sprintf
     "load %s\n\nmod WASM2MAUDE-INPUT is\n  protecting WASM-BUILTINS .\nendm\n\nred in WASM2MAUDE-INPUT :\n  typecheck(\n    %s,\n    syn.module) .\n"
@@ -19,6 +41,7 @@ let run ~semantics ~export ~args ~steps m =
     Ingress_error.raise Ingress_error.Unsupported m.source
       "running a module with imports needs an explicit host-address mapping"
   else
+    let () = check_arguments m export args in
     let export = Encode.name export |> Maude_term.to_string in
     let args =
       args |> List.map Encode.num_value |> Maude_term.seq |> Maude_term.to_string

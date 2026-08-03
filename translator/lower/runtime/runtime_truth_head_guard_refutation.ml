@@ -9,24 +9,14 @@ let vars terms =
 
 let subset left right = List.for_all (fun item -> List.mem item right) left
 
-let total_op = function
-  | "typecheck" | "typecheckSeq" | "typecheckOptSeq" | "typecheckSeqOpt"
-  | "typecheckNestedSeq" | "isOpt" | "allOpt" | "allLen" | "contains"
-  | "ratIsInt" | "_==_" | "_=/=_" | "_<_" | "_<=_" | "_>_" | "_>=_"
-  | "_and_" | "_or_" | "not_" -> true
-  | _ -> false
-
-let total_observer = function
-  | "typecheck" | "typecheckSeq" | "typecheckOptSeq" | "typecheckSeqOpt"
-  | "typecheckNestedSeq" -> true
-  | _ -> false
-
 let rec total_term pattern_certificate term =
   Condition_pattern_certificate.is_pattern pattern_certificate term
   || match term with
      | App (_, []) -> true
      | App (name, args) ->
-       total_op name && List.for_all (total_term pattern_certificate) args
+       Runtime_truth_totality_contract.is_total
+         ~name ~arity:(List.length args)
+       && List.for_all (total_term pattern_certificate) args
      | Var _ | Const _ | Qid _ -> true
 
 let total_terms pattern_certificate terms =
@@ -34,13 +24,21 @@ let total_terms pattern_certificate terms =
 
 let total_bool_term pattern_certificate = function
   | Const ("true" | "false") -> true
-  | App (name, _) when total_observer name -> true
+  | App (name, args)
+    when Runtime_truth_totality_contract.is_observer
+           ~name ~arity:(List.length args) ->
+    true
   | App (name, args) ->
-    total_op name && List.for_all (total_term pattern_certificate) args
+    Runtime_truth_totality_contract.is_total
+      ~name ~arity:(List.length args)
+    && List.for_all (total_term pattern_certificate) args
   | Var _ | Const _ | Qid _ -> false
 
 let bool_blocker = function
-  | App (name, _) when not (total_op name) ->
+  | App (name, args)
+    when not
+           (Runtime_truth_totality_contract.is_total
+              ~name ~arity:(List.length args)) ->
     "head Boolean guard uses non-total operator " ^ name
   | App _ -> "head Boolean guard contains a partial argument"
   | Var _ -> "head Boolean guard is an unconstrained variable"

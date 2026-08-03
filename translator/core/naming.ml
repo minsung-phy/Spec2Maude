@@ -159,6 +159,9 @@ let helper_companion ~role name =
     "helper." ^ source_slug ~lower:true role ^ "." ^ String.concat "." owner
   | _ -> helper_op ~role ~owner:name
 
+let runtime_truth_companion ~helper_name ~identity ~role =
+  "runtimeTruth" ^ role ^ helper_name ^ identity
+
 let sort_token source =
   let words =
     source
@@ -169,6 +172,9 @@ let sort_token source =
   match words with
   | [] -> "Generated"
   | words -> String.concat "" (List.map String.capitalize_ascii words)
+
+let runtime_truth_list_sort ~helper_name ~identity =
+  "RuntimeTruthList" ^ sort_token helper_name ^ identity
 
 let source_sort_token source =
   sort_token (source_slug ~lower:true source)

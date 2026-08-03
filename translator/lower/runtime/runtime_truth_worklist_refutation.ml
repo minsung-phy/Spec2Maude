@@ -6,6 +6,83 @@ open Runtime_truth_worklist_core
 open Runtime_truth_worklist_premise
 open Runtime_truth_worklist_positive
 
+type iter_head_guards =
+  | Iter_guards of eq_condition list * Diagnostics.t list
+  | Iter_guards_blocked of Diagnostics.t list
+
+let stable_uniq terms =
+  terms
+  |> List.fold_left
+       (fun unique term ->
+         if List.mem term unique then unique else term :: unique)
+       []
+  |> List.rev
+
+let finite_iter_head_guards ctx item env origin premises =
+  let blocked prem diagnostics reason =
+    let prem_origin = Premise_diagnostic.origin_for_premise origin prem in
+    Iter_guards_blocked
+      (diagnostics
+       @ [ diagnostic ctx item prem_origin
+             "RuntimeTruthWorklist/finite-iter-head"
+             reason
+             "Keep the runtime false decision Unsupported until every List IterPr generator lowers to an admissible sequence term"
+             (Some (Il.Print.string_of_prem prem)) ])
+  in
+  let list_guards = function
+    | Runtime_truth_scc.Finite_iter
+        { premise =
+            ({ it = IterPr (_, (List, ((_ :: _ :: _) as generators))); _ }
+             as prem)
+        ; _ } ->
+      let sources =
+        generators
+        |> List.map (fun (_, source) ->
+             Expr_translate.lower_sequence ctx env origin source)
+      in
+      let diagnostics =
+        sources
+        |> List.concat_map (fun source -> source.Expr_result.diagnostics)
+      in
+      if List.exists (fun source -> source.Expr_result.guards <> []) sources then
+        blocked prem diagnostics
+          "a List IterPr generator requires unresolved guards before its lockstep length can be certified"
+      else
+        (match List.map (fun source -> source.Expr_result.term) sources with
+        | Some first :: rest when List.for_all Option.is_some rest ->
+          Iter_guards
+            ( rest
+              |> List.filter_map Fun.id
+              |> List.map (fun source ->
+                   EqCond (App ("len", [ source ]), App ("len", [ first ])))
+            , diagnostics )
+        | [] | _ ->
+          blocked prem diagnostics
+            "a List IterPr generator could not be lowered to a sequence term")
+    | Runtime_truth_scc.Finite_rule_call _
+    | Finite_domain_call _
+    | Finite_successor_call _
+    | Deterministic_total _
+    | Externally_validated _
+    | Source_boolean _
+    | Deterministic_binding_iter _
+    | Finite_iter _ -> Iter_guards ([], [])
+  in
+  (* List IterPr is a lockstep universal quantifier.  A source RuleD can
+     succeed only when all generator lists have equal length.  Recording that
+     necessary condition at the head-match boundary makes an associative
+     prefix/suffix split unique without changing the source rule. *)
+  let rec collect guards diagnostics = function
+    | [] -> Iter_guards (stable_uniq guards, diagnostics)
+    | (_, premise) :: rest ->
+      (match list_guards premise with
+      | Iter_guards (next, next_diagnostics) ->
+        collect (guards @ next) (diagnostics @ next_diagnostics) rest
+      | Iter_guards_blocked blocked_diagnostics ->
+        Iter_guards_blocked (diagnostics @ blocked_diagnostics))
+  in
+  collect [] [] premises
+
 let match_equations item relation index terms =
   let vars, _ = input_vars Local_name.empty relation.sorts in
   [ generated item item.origin
@@ -389,6 +466,15 @@ let lower_rule ctx item relations relation index rule =
   match head.terms with
   | None -> [], bind_diagnostics @ head.diagnostics
   | Some terms ->
+    let iter_guard_result =
+      finite_iter_head_guards ctx item head.env origin
+        (Runtime_truth_scc.scheduled_premises rule)
+    in
+    (match iter_guard_result with
+    | Iter_guards_blocked diagnostics ->
+      declarations, bind_diagnostics @ head.diagnostics @ diagnostics
+    | Iter_guards (iter_guards, iter_diagnostics) ->
+    let head_guards = head.guards @ iter_guards in
     let args, names = input_vars head.local_names relation.sorts in
     let history, _ = history_var names in
     let call = App (rule_refute_op item index, args @ [ history ]) in
@@ -403,7 +489,7 @@ let lower_rule ctx item relations relation index rule =
       match
         Runtime_truth_head_guard_refutation.complement
           ~pattern_certificate:(worklist_pattern_certificate ctx item relations)
-          ~bound_terms:terms head.guards
+          ~bound_terms:terms head_guards
       with
       | Runtime_truth_head_guard_refutation.Complete alternatives ->
         ( alternatives
@@ -452,7 +538,7 @@ let lower_rule ctx item relations relation index rule =
           | Some false_condition ->
             let conditions =
               EqCondition (BoolCond (App (match_op item index, terms)))
-              :: List.map (fun guard -> EqCondition guard) head.guards
+              :: List.map (fun guard -> EqCondition guard) head_guards
               @ [ false_condition ]
               |> Condition_closure.normalize_rule_conditions
                    ~constructor_op:
@@ -487,7 +573,7 @@ let lower_rule ctx item relations relation index rule =
             alternatives |> List.mapi (fun alternative edge_conditions ->
               let conditions =
                 EqCondition (BoolCond (App (match_op item index, terms)))
-                :: List.map (fun guard -> EqCondition guard) head.guards
+                :: List.map (fun guard -> EqCondition guard) head_guards
                 @ edge_conditions
                 |> Condition_closure.normalize_rule_conditions
                      ~constructor_op:
@@ -517,7 +603,7 @@ let lower_rule ctx item relations relation index rule =
               if state.complete then
                 deterministic_false_child
                   ctx item relations origin index source_index
-                  terms head.guards state lhs refuted
+                  terms head_guards state lhs refuted
                   (push item relation terms history) premise
               else
                 False_blocked state.diagnostics
@@ -550,35 +636,41 @@ let lower_rule ctx item relations relation index rule =
       @ [ mismatch ]
       @ head_guard_rules
       @ child_rules
-    , bind_diagnostics @ head.diagnostics @ head_guard_diagnostics
+    , bind_diagnostics @ head.diagnostics @ iter_diagnostics
+      @ head_guard_diagnostics
       @ child_diagnostics @ blockers )
+    )
 
 (* The Tarjan-planned SCC history is an unfounded-set certificate: a repeated
    goal closes a cycle, while every source rule must still refute. *)
-let solver item relation indexed_rules =
-  let invocation = Runtime_truth_worklist_helper.invocation ~helper_name:item.name item.request in
-  let args, names = input_vars Local_name.empty relation.sorts in
-  let history, _ = history_var names in
-  let goal_term = goal item relation args in
-  let refute_call = App (refute_op item relation.id, args @ [ history ]) in
-  let all_call = App (all_op item relation.id, args @ [ App ("_ _", [ history; goal_term ]) ]) in
+let solver_group
+    item relation
+    (invocation : Runtime_truth_worklist_helper.invocation)
+    args history goal_term
+    ~cycle_label ~all_label ~certificate_label
+    ~rule_refute ~refute_call ~all_call indexed_rules =
+  let history_with_goal = App ("_ _", [ history; goal_term ]) in
   let cycle =
     generated item item.origin
-      (crl ~label:(item.name ^ "-unfounded-cycle-" ^ Naming.sanitize relation.id)
+      (crl ~label:(item.name ^ cycle_label ^ Naming.sanitize relation.id)
          refute_call invocation.refuted_rhs
          [ EqCondition (BoolCond (visited item relation args history)) ])
   in
-  let all_conditions = indexed_rules |> List.map (fun (index, _) ->
-    RewriteCond (App (rule_refute_op item index, args @ [ App ("_ _", [ history; goal_term ]) ]), invocation.refuted_rhs))
+  let conditions =
+    indexed_rules
+    |> List.map (fun (index, _) ->
+         RewriteCond
+           ( App (rule_refute index, args @ [ history_with_goal ])
+           , invocation.refuted_rhs ))
   in
   let all_rule =
     generated item item.origin
-      (crl ~label:(item.name ^ "-all-rules-" ^ Naming.sanitize relation.id)
-         all_call invocation.refuted_rhs all_conditions)
+      (crl ~label:(item.name ^ all_label ^ Naming.sanitize relation.id)
+         all_call invocation.refuted_rhs conditions)
   in
-  let exhaustive =
+  let certificate =
     generated item item.origin
-      (crl ~label:(item.name ^ "-unfounded-certificate-" ^ Naming.sanitize relation.id)
+      (crl ~label:(item.name ^ certificate_label ^ Naming.sanitize relation.id)
          refute_call invocation.refuted_rhs
          [ EqCondition
              (BoolCond
@@ -588,4 +680,48 @@ let solver item relation indexed_rules =
          ; RewriteCond (all_call, invocation.refuted_rhs)
          ])
   in
-  [ cycle; all_rule; exhaustive ]
+  [ cycle; all_rule; certificate ]
+
+let solver item relation indexed_rules =
+  let invocation = Runtime_truth_worklist_helper.invocation ~helper_name:item.name item.request in
+  let args, names = input_vars Local_name.empty relation.sorts in
+  let history, _ = history_var names in
+  let goal_term = goal item relation args in
+  let refute_call = App (refute_op item relation.id, args @ [ history ]) in
+  let all_call = App (all_op item relation.id, args @ [ App ("_ _", [ history; goal_term ]) ]) in
+  let base_rules, transitive_rules =
+    List.partition
+      (fun (_, rule) -> Option.is_none (transitive_domain rule))
+      indexed_rules
+  in
+  (* Rule refutation is a conjunction.  Checking non-recursive clauses first is
+     logically immaterial, but avoids starting a closure search when a direct
+     source clause already witnesses the goal. *)
+  let rules = base_rules @ transitive_rules in
+  let all_rules =
+    solver_group
+      item relation invocation args history goal_term
+      ~cycle_label:"-unfounded-cycle-"
+      ~all_label:"-all-rules-"
+      ~certificate_label:"-unfounded-certificate-"
+      ~rule_refute:(rule_refute_op item)
+      ~refute_call ~all_call rules
+  in
+  let base_refute_call =
+    App (base_refute_op item relation.id, args @ [ history ])
+  in
+  let base_all_call =
+    App
+      ( base_all_op item relation.id
+      , args @ [ App ("_ _", [ history; goal_term ]) ] )
+  in
+  let base_only =
+    solver_group
+      item relation invocation args history goal_term
+      ~cycle_label:"-base-cycle-"
+      ~all_label:"-base-rules-"
+      ~certificate_label:"-base-certificate-"
+      ~rule_refute:(rule_refute_op item)
+      ~refute_call:base_refute_call ~all_call:base_all_call base_rules
+  in
+  all_rules @ base_only

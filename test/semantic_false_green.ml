@@ -1549,75 +1549,137 @@ let test_transitive_support_materialization () =
     ; premise_index = None
     }
   in
-  let witness = Var "HEAD2:SpectecTerminal" in
-  let request : Runtime_truth_transitive_materializer.request =
-    { helper_name = "TransitiveSupport"
-    ; origin = origin "transitive-support"
-    ; identity
-    ; mode = Runtime_truth_worklist_indexed.Decide
-    ; candidates = App ("_ _", [ Var "A"; App ("_ _", [ Var "A"; Var "B" ]) ])
-    ; captures = []
-    ; support_head_var = "HEAD1:SpectecTerminal"
-    ; support_tail_var = "TAIL1:SpectecTerminals"
-    ; indexed_head_var = "HEAD2:SpectecTerminal"
-    ; indexed_tail_var = "TAIL2:SpectecTerminals"
-    ; domain_true = [ EqCondition (BoolCond (App ("domain", [ witness ]))) ]
-    ; domain_false = []
-    ; left_true = RewriteCond (App ("left", [ witness ]), Const "proved")
-    ; right_true = RewriteCond (App ("right", [ witness ]), Const "proved")
-    ; left_false = RewriteCond (App ("left", [ witness ]), Const "refuted")
-    ; right_false = RewriteCond (App ("right", [ witness ]), Const "refuted")
-    ; result_sort = sort "Truth"
-    ; proved = Const "proved"
-    ; refuted = Const "refuted"
-    }
+  let worklist, scope =
+    Runtime_truth_transitive_materializer.create
+      ~helper_name:"TransitiveSupport" ~identity ~env:Expr_env.empty
+      ~terms:[] ~sorts:[] ~history:(Var "HISTORY0:SpectecTerminals")
+  in
+  let witness = Runtime_truth_transitive_materializer.scope_witness scope in
+  let current = Runtime_truth_transitive_materializer.scope_current scope in
+  let domain_true =
+    [ EqCondition (BoolCond (App ("domain", [ witness ]))) ]
+  in
+  let direct_true =
+    RewriteCond (App ("direct", [ current; witness ]), Const "proved")
+  in
+  let direct_false =
+    RewriteCond (App ("direct", [ current; witness ]), Const "refuted")
+  in
+  let domain_false =
+    [ [ EqCondition (BoolCond (App ("not-domain", [ witness ]))) ] ]
+  in
+  let start = Var "START:SpectecTerminal" in
+  let target_term = Var "TARGET:SpectecTerminal" in
+  let request =
+    Runtime_truth_transitive_materializer.request
+      ~worklist ~origin:(origin "transitive-support")
+      ~mode:Runtime_truth_worklist_indexed.Decide
+      ~candidates:[ App ("successors", [ current ]); Var "B" ]
+      ~certified_successors:[ App ("successors", [ current ]) ]
+      ~start ~target:target_term ~domain_true ~domain_false
+      ~direct_true ~direct_false
+      ~result_sort:(sort "Truth")
+      ~proved:(Const "proved") ~refuted:(Const "refuted")
   in
   let result = Runtime_truth_transitive_materializer.materialize request in
-  let deduplicates =
+  let private_worklist =
     List.exists (fun statement ->
       match statement.Maude_ir.node with
-      | Ceq (App (op, [ App ("_ _", [ head; tail ]) ]), App (op', [ tail' ]),
-             [ BoolCond (App ("contains", [ head'; tail'' ])) ], _)
-        when op = op' && head = head' && tail = tail' && tail = tail'' -> true
+      | SortDecl declared ->
+          String.starts_with
+            ~prefix:"RuntimeTruthListTransitiveSupport"
+            (sort_name declared)
       | _ -> false)
       result.statements
   in
-  let domain_before_children =
-    List.exists (fun statement ->
-      match statement.Maude_ir.node with
-      | Crl (_, _, _, EqCondition (BoolCond (App ("domain", _)))
-                       :: RewriteCond (App ("left", _), _)
-                       :: RewriteCond (App ("right", _), _) :: _) -> true
-      | _ -> false)
-      result.statements
-  in
-  let first_failure_prefixes =
-    let has prefix =
-      List.exists (fun statement ->
-        match statement.Maude_ir.node with
-        | Crl (_, _, _, actual) ->
-          let rec starts_with prefix actual =
-            match prefix, actual with
-            | [], _ -> true
-            | expected :: prefix, condition :: actual
-              when expected = condition -> starts_with prefix actual
-            | _ -> false
-          in
-          starts_with prefix actual
-        | _ -> false)
-        result.statements
+  let ordered left right conditions =
+    let rec loop = function
+      | [] -> false
+      | condition :: rest when condition = left -> List.mem right rest
+      | _ :: rest -> loop rest
     in
-    has (request.domain_true @ [ request.left_false ])
-    && has
-         (request.domain_true
-          @ [ request.left_true; request.right_false ])
+    loop conditions
   in
-  if not deduplicates then
-    failwith "transitive support did not structurally deduplicate certified producers";
-  if not domain_before_children then
-    failwith "transitive AND edge did not preserve the domain child before recursion";
-  if not first_failure_prefixes then
-    failwith "transitive false alternatives lost their ordered first-failure prefixes"
+  let domain_before_direct =
+    List.exists (fun statement ->
+      match statement.Maude_ir.node with
+      | Crl (_, _, _, conditions) ->
+        ordered
+          (List.hd domain_true) direct_true conditions
+      | _ -> false)
+      result.statements
+  in
+  let total_direct_decision =
+    List.exists (fun statement ->
+      match statement.Maude_ir.node with
+      | Crl (_, _, _, conditions) -> List.mem direct_false conditions
+      | _ -> false)
+      result.statements
+  in
+  let conditions fragment =
+    result.statements |> List.find_map (fun statement ->
+      match statement.Maude_ir.node with
+      | Crl (Some label, _, _, conditions) when contains label fragment ->
+        Some conditions
+      | Crl (None, _, _, _) | Rl _ | _ -> None)
+    |> Option.get
+  in
+  let exact_successor_membership expected conditions =
+    List.exists (function
+      | EqCondition
+          (EqCond (App (_, [ candidate; Var _ ]), Const actual)) ->
+        candidate = witness
+        && String.equal expected actual
+      | _ -> false)
+      conditions
+  in
+  let source_hit = conditions "sourcehit" in
+  let direct_hit = conditions "directhit" in
+  let source_enqueue = conditions "sourceenqueue" in
+  let domain_miss = conditions "domainmiss1" in
+  let target_no_edge = conditions "targetnoedge" in
+  let no_edge = conditions "runtimetruthnoedge" in
+  let target = EqCondition (EqCond (witness, target_term)) in
+  let rec contains_dynamic_successors = function
+    | App ("successors", [ term ]) -> term = current
+    | App (_, terms) -> List.exists contains_dynamic_successors terms
+    | Var _ | Const _ | Qid _ -> false
+  in
+  let recomputes_per_current =
+    List.exists (fun statement ->
+      match statement.Maude_ir.node with
+      | Rl (Some label, _, rhs) when contains label "next" ->
+        contains_dynamic_successors rhs
+      | Rl (None, _, _) | Rl (Some _, _, _) | _ -> false)
+      result.statements
+  in
+  if not private_worklist then
+    failwith "transitive closure did not isolate its finite worklist from source sequences";
+  if not domain_before_direct then
+    failwith "transitive worklist did not check the source domain before a direct edge";
+  if not total_direct_decision then
+    failwith "transitive worklist omitted the source-complete direct-edge refutation";
+  if not (List.mem (List.hd domain_true) source_hit)
+     || not (List.mem target source_hit)
+     || not (exact_successor_membership "true" source_hit)
+  then failwith "source-certified target hit omitted its source domain premise";
+  if not (exact_successor_membership "false" direct_hit)
+     || not (List.mem (List.hd domain_true) direct_hit)
+     || not (ordered target direct_true direct_hit)
+  then failwith "ordinary target hit did not require exact successor absence";
+  if not (List.mem (List.hd domain_true) source_enqueue) then
+    failwith "source-certified intermediate successor skipped its domain guard";
+  if not (List.mem (List.hd domain_true) target_no_edge)
+     || not (exact_successor_membership "false" target_no_edge)
+     || not (ordered target direct_false target_no_edge)
+  then failwith "target no-edge refutation omitted its source domain premise";
+  if domain_miss <> List.hd domain_false then
+    failwith "domain-false candidate skip depends on target or history shape";
+  if not (List.mem (List.hd domain_true) no_edge)
+     || not (exact_successor_membership "false" no_edge)
+  then failwith "intermediate no-edge refutation lacks exact false evidence";
+  if not recomputes_per_current then
+    failwith "transitive closure reused the initial successor set after dequeue"
 
 let test_renamed_synthetic_cyclic_false () =
   let x = var "x" in
@@ -2514,6 +2576,20 @@ let test_head_guard_refutation () =
             [ App ("_ _", [ Var "HEAD"; Var "TAIL" ]); Const "syn.item" ]) ->
     ()
   | _ -> failwith "total sequence typecheck guard was treated as partial");
+  let same_length =
+    EqCond
+      (App ("len", [ Var "LEFT" ]), App ("len", [ Var "RIGHT" ]))
+  in
+  (match Runtime_truth_head_guard_refutation.complement
+           ~bound_terms:[ Var "LEFT"; Var "RIGHT" ] [ same_length ] with
+  | Complete
+      [ [ BoolCond
+            (App
+               ("_=/=_",
+                [ App ("len", [ Var "LEFT" ])
+                ; App ("len", [ Var "RIGHT" ])
+                ])) ] ] -> ()
+  | _ -> failwith "total lockstep length guard was treated as partial");
   (match Runtime_truth_head_guard_refutation.complement
            ~bound_terms:[ Var "RENAMED" ]
            [ BoolCond (App ("partialGuard", [ Var "RENAMED" ])) ] with

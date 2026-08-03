@@ -12,6 +12,10 @@ type relation =
 
 type positive_phase = Ordinary | Transitive
 
+type 'a edge_result =
+  | Materialized of 'a
+  | Blocked of Diagnostics.t list
+
 val generated :
   item -> Origin.t -> Maude_ir.statement_node -> Maude_ir.generated
 val result_sort : item -> Maude_ir.sort
@@ -22,12 +26,15 @@ val positive_worker_op : item -> string -> string
 val positive_phase_term : item -> positive_phase -> Maude_ir.term
 val refute_op : item -> string -> string
 val all_op : item -> string -> string
+val base_refute_op : item -> string -> string
+val base_all_op : item -> string -> string
 val match_op : item -> int -> string
 val rule_refute_op : item -> int -> string
 val frozen_all : 'a list -> Maude_ir.attr list
 val indexed_mode : item -> Runtime_truth_worklist_indexed.mode
 val input_vars :
   Local_name.t -> Maude_ir.sort list -> Maude_ir.term list * Local_name.t
+val split_at : int -> 'a list -> ('a list * 'a list) option
 val public_vars : item -> Maude_ir.term list * Local_name.t
 val public_lhs : item -> Maude_ir.term
 val history_var : Local_name.t -> Maude_ir.term * Local_name.t
@@ -46,6 +53,17 @@ val diagnostic :
   string ->
   string option ->
   Diagnostics.t
+val edge_blocker :
+  Context.t ->
+  item ->
+  Origin.t ->
+  string ->
+  string ->
+  string ->
+  string option ->
+  'a edge_result
+val classified_premise_source :
+  Runtime_truth_scc.premise -> Il.Ast.prem
 val planner_diagnostic :
   Context.t -> item -> Runtime_truth_scc.blocker -> Diagnostics.t
 val helper_surface : item -> Maude_ir.generated list

@@ -1,9 +1,5 @@
 open Runtime_truth_worklist_core
 
-type 'a edge_result =
-  | Materialized of 'a
-  | Blocked of Diagnostics.t list
-
 val target_chain :
   Runtime_truth_scc.rule -> Runtime_witness_proof.target_chain option
 val target_chain_seed :
@@ -37,7 +33,7 @@ val target_chain_edge :
   Maude_ir.term ->
   bool ->
   (Maude_ir.generated list * Maude_ir.rule_condition list list *
-   Diagnostics.t list) edge_result
+   Diagnostics.t list) Runtime_truth_worklist_core.edge_result
 val transitive_edge :
   Context.t ->
   item ->
@@ -50,15 +46,5 @@ val transitive_edge :
   Maude_ir.term list ->
   Maude_ir.term ->
   bool ->
-  (Runtime_truth_worklist_indexed.result * Diagnostics.t list) edge_result
-
-module Positive_rule : sig
-  val lower :
-    Context.t ->
-    item ->
-    relation list ->
-    relation ->
-    int ->
-    Runtime_truth_scc.rule ->
-    Maude_ir.generated list * Diagnostics.t list
-end
+  (Runtime_truth_worklist_indexed.result * Diagnostics.t list)
+  Runtime_truth_worklist_core.edge_result

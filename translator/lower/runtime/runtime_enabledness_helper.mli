@@ -23,18 +23,19 @@ type request =
 
 type invocation =
   { enabled_op : string
+  ; true_entry_op : string
+  ; false_entry_op : string
   ; true_op : string
   ; false_op : string
   ; lhs : Maude_ir.term
+  ; true_lhs : Maude_ir.term
+  ; false_lhs : Maude_ir.term
   ; true_rhs : Maude_ir.term
   ; false_rhs : Maude_ir.term
   }
 
 val key : request -> string
 val reason : request -> string
-val enabled_op : helper_name:string -> string
-val true_op : helper_name:string -> string
-val false_op : helper_name:string -> string
 val invocation : helper_name:string -> request -> invocation
 val false_rewrite_condition :
   helper_name:string -> request -> Maude_ir.rule_condition
