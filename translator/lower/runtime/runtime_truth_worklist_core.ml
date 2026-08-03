@@ -15,6 +15,10 @@ type relation =
 
 type positive_phase = Ordinary | Transitive
 
+type 'a edge_result =
+  | Materialized of 'a
+  | Blocked of Diagnostics.t list
+
 let generated item origin node =
   Maude_ir.generated ~provenance:(Helper item.name) ~origin node
 
@@ -29,6 +33,10 @@ let positive_worker_op item id =
   Naming.helper_companion ~role:(role id "truth-positive-worker") item.name
 let refute_op item id = Naming.helper_companion ~role:(role id "truth-refute") item.name
 let all_op item id = Naming.helper_companion ~role:(role id "truth-all") item.name
+let base_refute_op item id =
+  Naming.helper_companion ~role:(role id "truth-base-refute") item.name
+let base_all_op item id =
+  Naming.helper_companion ~role:(role id "truth-base-all") item.name
 let goal_op item id = Naming.helper_companion ~role:(role id "truth-goal") item.name
 let match_op item index =
   Naming.helper_companion
@@ -69,6 +77,15 @@ let input_vars names sorts =
          var :: vars, names)
        ([], names)
   |> fun (vars, names) -> List.rev vars, names
+
+let split_at count values =
+  let rec split count left right =
+    if count = 0 then Some (List.rev left, right)
+    else match right with
+      | [] -> None
+      | value :: right -> split (count - 1) (value :: left) right
+  in
+  split count [] values
 
 let public_vars item =
   input_vars Local_name.empty item.request.input_sorts
@@ -130,6 +147,20 @@ let diagnostic ctx _item origin constructor reason suggestion source_echo =
     ?source_echo
     ()
 
+let edge_blocker ctx item origin constructor reason suggestion source_echo =
+  Blocked
+    [ diagnostic ctx item origin constructor reason suggestion source_echo ]
+
+let classified_premise_source = function
+  | Runtime_truth_scc.Finite_rule_call { premise; _ }
+  | Finite_domain_call premise
+  | Finite_successor_call { premise; _ }
+  | Deterministic_total premise
+  | Externally_validated premise
+  | Source_boolean premise
+  | Deterministic_binding_iter premise
+  | Finite_iter { premise; _ } -> premise
+
 let planner_diagnostic ctx item blocker =
   diagnostic ctx item blocker.Runtime_truth_scc.origin blocker.constructor
     blocker.reason blocker.suggestion blocker.source_echo
@@ -178,6 +209,14 @@ let relation_surface item relation =
              ~attrs:(frozen_all internal_sorts))
       ; generated item item.origin
           (op (all_op item relation.id) (List.map sort_ref internal_sorts) result
+             ~attrs:(frozen_all internal_sorts))
+      ; generated item item.origin
+          (op (base_refute_op item relation.id)
+             (List.map sort_ref internal_sorts) result
+             ~attrs:(frozen_all internal_sorts))
+      ; generated item item.origin
+          (op (base_all_op item relation.id)
+             (List.map sort_ref internal_sorts) result
              ~attrs:(frozen_all internal_sorts))
       ]
 

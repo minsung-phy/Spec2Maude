@@ -40,20 +40,34 @@ let public_rules item root =
   let history = Const "eps" in
   let formals, _ = public_vars item in
   let lhs = public_lhs item in
-  [ generated item item.origin
-      (crl ~label:(item.name ^ "-proved") lhs invocation.proved_rhs
+  let prove_entry = App (invocation.prove_entry_op, formals) in
+  let prove_rule =
+    generated item item.origin
+      (crl ~label:(item.name ^ "-prove-entry")
+         prove_entry invocation.proved_rhs
          [ RewriteCond
-             (App (prove_op item root.id, formals @ [ history ]),
-              invocation.proved_rhs) ])
+             ( App (prove_op item root.id, formals @ [ history ])
+             , invocation.proved_rhs ) ])
+  in
+  [ prove_rule
+  ; generated item item.origin
+      (crl ~label:(item.name ^ "-proved") lhs invocation.proved_rhs
+         [ RewriteCond (prove_entry, invocation.proved_rhs) ])
   ]
   @ match item.request.mode with
     | Runtime_truth_worklist_helper.Prove -> []
     | Decide ->
+      let refute_entry = App (invocation.refute_entry_op, formals) in
       [ generated item item.origin
-          (crl ~label:(item.name ^ "-refuted") lhs invocation.refuted_rhs
+          (crl ~label:(item.name ^ "-refute-entry")
+             refute_entry invocation.refuted_rhs
              [ RewriteCond
-                 (App (refute_op item root.id, formals @ [ history ]),
-                  invocation.refuted_rhs) ]) ]
+                 ( App (refute_op item root.id, formals @ [ history ])
+                 , invocation.refuted_rhs ) ])
+      ; generated item item.origin
+          (crl ~label:(item.name ^ "-refuted") lhs invocation.refuted_rhs
+             [ RewriteCond (refute_entry, invocation.refuted_rhs) ])
+      ]
 
 (* Positive RuleD clauses are Horn alternatives, so searching Ordinary before
    Transitive preserves their least fixed point; admission still requires the
@@ -83,7 +97,8 @@ let materialize_complete ctx item relations =
         | Runtime_truth_worklist_helper.Decide, None -> [], []
       in
       let positives = rules |> List.map (fun (index, rule) ->
-        Positive_rule.lower ctx item relations relation index rule) in
+        Runtime_truth_worklist_positive_rule.lower
+          ctx item relations relation index rule) in
       let refuters =
         match item.request.mode with
         | Runtime_truth_worklist_helper.Prove -> []

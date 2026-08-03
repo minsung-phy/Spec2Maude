@@ -58,11 +58,37 @@ require_before () {
   fi
 }
 
+require_statement_before () {
+  first=$1
+  second=$2
+  message=$3
+  if ! awk -v first="$first" -v second="$second" '
+      index($0, first) && first_line == 0 { first_line = NR }
+      index($0, second) && second_line == 0 { second_line = NR }
+      END {
+        exit !(first_line > 0 && second_line > first_line)
+      }
+    ' "$output"
+  then
+    echo "$message" >&2
+    exit 1
+  fi
+}
+
 step=$(condition_line 'crl [step-ctxt-instrs]')
 require_before "$step" \
   '(_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
   'ctxt-instrs progress guard no longer precedes its self-recursive rewrite'
+
+require_statement_before \
+  'crl [step-read-ref-test-true]' \
+  'crl [step-read-ref-test-false]' \
+  'Step_read Ref.test clauses no longer preserve SpecTec source order'
+require_statement_before \
+  'crl [step-read-ref-cast-succeed]' \
+  'crl [step-read-ref-cast-fail]' \
+  'Step_read Ref.cast clauses no longer preserve SpecTec source order'
 
 alloctypes=$(condition_line 'ceq def.alloctypes(TYPE_PRIME_STAR:SpectecTerminals')
 require_before "$alloctypes" \

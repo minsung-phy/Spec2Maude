@@ -26,7 +26,10 @@ val helper_owner : Origin.t -> string
 val helper_op : role:string -> owner:string -> string
 val helper_ordinal : string -> int -> string
 val helper_companion : role:string -> string -> string
+val runtime_truth_companion :
+  helper_name:string -> identity:string -> role:string -> string
 val sort_token : string -> string
+val runtime_truth_list_sort : helper_name:string -> identity:string -> string
 val definition_config_sort : Il.Ast.id -> string list -> string
 val relation_config_sort : Il.Ast.id -> string
 val helper_context_name : Origin.t -> string

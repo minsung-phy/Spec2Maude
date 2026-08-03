@@ -12,9 +12,13 @@ type request =
 
 type invocation =
   { worklist_op : string
+  ; prove_entry_op : string
+  ; refute_entry_op : string
   ; proved_op : string
   ; refuted_op : string
   ; lhs : Maude_ir.term
+  ; prove_lhs : Maude_ir.term
+  ; refute_lhs : Maude_ir.term
   ; proved_rhs : Maude_ir.term
   ; refuted_rhs : Maude_ir.term
   }
@@ -85,28 +89,36 @@ let reason request =
   ^ "` (phase " ^ Runtime_truth_scc.phase_key request.phase ^ ")"
 
 let worklist_op name = name
+let prove_entry_op = Naming.helper_companion ~role:"truth-prove-entry"
+let refute_entry_op = Naming.helper_companion ~role:"truth-refute-entry"
 let proved_op = Naming.helper_companion ~role:"truth-proved"
 let refuted_op = Naming.helper_companion ~role:"truth-refuted"
 
 let invocation ~helper_name request =
   let worklist_op = worklist_op helper_name in
+  let prove_entry_op = prove_entry_op helper_name in
+  let refute_entry_op = refute_entry_op helper_name in
   let proved_op = proved_op helper_name in
   let refuted_op = refuted_op helper_name in
   { worklist_op
+  ; prove_entry_op
+  ; refute_entry_op
   ; proved_op
   ; refuted_op
   ; lhs = Maude_ir.App (worklist_op, request.input_terms)
+  ; prove_lhs = Maude_ir.App (prove_entry_op, request.input_terms)
+  ; refute_lhs = Maude_ir.App (refute_entry_op, request.input_terms)
   ; proved_rhs = Maude_ir.Const proved_op
   ; refuted_rhs = Maude_ir.Const refuted_op
   }
 
 let true_condition ~helper_name request =
   let call = invocation ~helper_name request in
-  Maude_ir.RewriteCond (call.lhs, call.proved_rhs)
+  Maude_ir.RewriteCond (call.prove_lhs, call.proved_rhs)
 
 let false_condition ~helper_name request =
   let call = invocation ~helper_name request in
-  Maude_ir.RewriteCond (call.lhs, call.refuted_rhs)
+  Maude_ir.RewriteCond (call.refute_lhs, call.refuted_rhs)
 
 let surface ~helper_name ~origin request =
   let open Maude_ir in
@@ -126,8 +138,16 @@ let surface ~helper_name ~origin request =
   ; generated
       (op call.worklist_op (List.map sort_ref request.input_sorts) result
          ~attrs:frozen)
+  ; generated
+      (op call.prove_entry_op (List.map sort_ref request.input_sorts) result
+         ~attrs:frozen)
   ; generated (op call.proved_op [] result ~attrs:[ Ctor ])
   ]
   @ match request.mode with
     | Prove -> []
-    | Decide -> [ generated (op call.refuted_op [] result ~attrs:[ Ctor ]) ]
+    | Decide ->
+      [ generated
+          (op call.refute_entry_op (List.map sort_ref request.input_sorts) result
+             ~attrs:frozen)
+      ; generated (op call.refuted_op [] result ~attrs:[ Ctor ])
+      ]

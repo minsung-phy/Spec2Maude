@@ -265,6 +265,29 @@ let result_heaptype source at = function
         "semantic heap type is not reachable in a source WAST result pattern"
   | heaptype -> heaptype
 
+let type_of_literal literal =
+  match literal.Source.it with
+  | Script.ValLit value -> Wasm.Value.type_of_value value
+  | Script.NullLit heaptype -> Wasm.Types.RefT (Wasm.Types.Null, heaptype)
+
+let check_invocation source at instance name args =
+  let arguments = List.map type_of_literal args in
+  match Frontend.validate_invocation instance.module_ name arguments with
+  | Ok () -> ()
+  | Error Frontend.Missing_export ->
+      unsupported source at "action names an undefined export"
+  | Error Frontend.Non_function_export ->
+      unsupported source at "action export is not a function"
+  | Error Frontend.Unresolved_function_type ->
+      unsupported source at
+        "validated function export retained an unresolved type index"
+  | Error Frontend.Wrong_arity ->
+      unsupported source at "function invocation has the wrong number of arguments"
+  | Error (Frontend.Wrong_argument_type index) ->
+      let literal = List.nth args index in
+      unsupported source literal.Source.at
+        "function invocation argument has the wrong type"
+
 let exact_ref source at = function
   | Wasm.Value.NullRef
   | Script.HostRef _
@@ -314,6 +337,7 @@ let action source env action =
   in
   match action.Source.it with
   | Script.Invoke (_, name, args) ->
+      check_invocation source action.at instance name args;
       Invoke (instance.id, name, List.map (literal source) args)
   | Script.Get (_, name) -> Get (instance.id, name)
 
@@ -359,17 +383,6 @@ let bind_module source env var module_ =
     | Some name -> bind source "module" env.modules name module_
   in
   {env with modules; latest_module = Some module_}
-
-let export_type provider name =
-  let Wasm.Types.ModuleT (_, exports) =
-    Wasm.Ast.moduletype_of provider.module_.ast
-  in
-  List.find_map
-    (function
-      | Wasm.Types.ExportT (export_name, actual) when export_name = name ->
-          Some actual
-      | Wasm.Types.ExportT _ -> None)
-    exports
 
 let shared_binding host key =
   let bindings = host.memories @ host.tables in
@@ -452,7 +465,7 @@ let plan_import env (module_ : Frontend.module_) import =
   | Some Host ->
       plan_host_import env module_key item_name expected import.at
   | Some (Instance provider) ->
-      (match export_type provider item_name with
+      (match Frontend.export_type provider.module_ item_name with
        | None ->
            Error (Missing_registered_export (import.at, module_key, item_name)), env
        | Some actual ->

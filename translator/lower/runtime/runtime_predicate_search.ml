@@ -410,6 +410,12 @@ let truth_worklist_request ctx ~rel_id ~input_terms ~input_sorts =
   in
   if not ready then None
   else
+    let mode =
+      if Runtime_truth_scc.decision_complete plan then
+        Runtime_truth_worklist_helper.Decide
+      else
+        Runtime_truth_worklist_helper.Prove
+    in
     Some
       { Runtime_truth_worklist_helper.relation_id = rel_id
       ; specialization =
@@ -417,7 +423,7 @@ let truth_worklist_request ctx ~rel_id ~input_terms ~input_sorts =
       ; input_terms
       ; input_sorts
       ; phase = Runtime_truth_scc.Goal
-      ; mode = Runtime_truth_worklist_helper.Prove
+      ; mode
       ; plan
       }
 

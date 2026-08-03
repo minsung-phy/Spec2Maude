@@ -42,7 +42,7 @@ let true_rule ctx item =
   let request = item.request in
   let call = Runtime_enabledness_helper.invocation ~helper_name:item.name request in
   let lhs =
-    App (call.enabled_op, request.predecessor_terms)
+    App (call.true_entry_op, request.predecessor_terms)
   in
   let conditions =
     List.map rule_condition_of_eq request.lhs_conditions
@@ -98,7 +98,7 @@ let false_rule ctx item =
     , []
     when request.premise_rule_conditions = expected_truth_conditions request ->
     let call = Runtime_enabledness_helper.invocation ~helper_name:item.name request in
-    let lhs = App (call.enabled_op, request.predecessor_terms) in
+    let lhs = App (call.false_entry_op, request.predecessor_terms) in
     let decision_condition =
       Runtime_truth_decision_helper.false_rewrite_condition
         ~helper_name:decision.helper_name
@@ -138,7 +138,7 @@ let false_rule ctx item =
     when request.premise_eq_conditions = []
          && request.premise_rule_conditions = expected_worklist_conditions request ->
     let call = Runtime_enabledness_helper.invocation ~helper_name:item.name request in
-    let lhs = App (call.enabled_op, request.predecessor_terms) in
+    let lhs = App (call.false_entry_op, request.predecessor_terms) in
     let conditions =
       List.map rule_condition_of_eq request.lhs_conditions
       @ List.map rule_condition_of_eq request.premise_eq_conditions
@@ -194,6 +194,24 @@ let legacy_equation_blocker ctx item =
     ~source_echo:(Runtime_enabledness_helper.reason item.request)
     ()
 
+let compatibility_rules item =
+  let request = item.request in
+  let call =
+    Runtime_enabledness_helper.invocation ~helper_name:item.name request
+  in
+  let lhs = App (call.enabled_op, request.predecessor_terms) in
+  let true_lhs = App (call.true_entry_op, request.predecessor_terms) in
+  let false_lhs = App (call.false_entry_op, request.predecessor_terms) in
+  (* New callers use the explicit true/false entries.  Keep the original
+     enabledness entry as an adapter until its remaining callers are migrated. *)
+  [ generated item.name item.origin
+      (crl ~label:(item.name ^ "-true") lhs call.true_rhs
+         [ RewriteCond (true_lhs, call.true_rhs) ])
+  ; generated item.name item.origin
+      (crl ~label:(item.name ^ "-false") lhs call.false_rhs
+         [ RewriteCond (false_lhs, call.false_rhs) ])
+  ]
+
 let materialize_item ctx item =
   let request = item.request in
   if request.runtime_truth_decisions <> []
@@ -225,7 +243,8 @@ let materialize_item ctx item =
     (* [Reld_enabledness] emits the surface beside the ElsePr rule that calls
        it.  The materializer owns only the defining rules; repeating the
        surface here redeclares its result sort in the final module. *)
-    { statements = true_statements @ false_statements
+    { statements =
+        true_statements @ false_statements @ compatibility_rules item
     ; diagnostics
     }
 

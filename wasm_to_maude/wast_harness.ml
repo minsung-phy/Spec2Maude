@@ -95,6 +95,9 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    -> ScriptState [ctor frozen (4)] .\n\
        \  op script.exhaustion : Nat Nat InstanceEnv Commands SpectecTerminal\n\
        \    -> ScriptState [ctor frozen (5)] .\n\
+       \  op script.exhaustion-check : Nat Nat InstanceEnv Commands\n\
+       \    SpectecTerminal SpectecTerminal\n\
+       \    -> ScriptState [ctor frozen (5 6)] .\n\
        \  op script.action : Nat InstanceEnv Commands SpectecTerminal\n\
        \    -> ScriptState [ctor frozen (4)] .\n\
        \  op script.uninstantiable : Nat InstanceEnv Commands SpectecTerminal\n\
@@ -112,7 +115,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op findGlobal : SpectecTerminals SpectecTerminal ~> Nat .\n\n\
        \  op runtimeResults : SpectecTerminals -> Bool .\n\n\
        \  op activeFrameDepth : SpectecTerminals -> Nat .\n\n\
-       \  vars C C2 M S MI CURRENT NAME OTHER XA : SpectecTerminal .\n\
+       \  vars C C2 M S S2 F2 MI CURRENT NAME OTHER XA : SpectecTerminal .\n\
        \  vars NT VALUE LT DIM AT RT : SpectecTerminal .\n\
        \  vars LOCALS EXPORTS ARGS ACTUAL LANES VALUES TYPES MAX : SpectecTerminals .\n\
        \  vars BODY INSTRS REST CATCHES : SpectecTerminals .\n\
@@ -556,19 +559,23 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    => script.exhaustion(ID, REQUIRED, ENV, CMDS,\n\
        \      def.invoke(S, findFunc(value('EXPORTS,\n\
        \        findInstance(ENV, TARGET)), NAME), ARGS)) .\n\
-       \  crl [exhaustion-done] :\n\
+       \  crl [exhaustion-step] :\n\
        \    script.exhaustion(ID, REQUIRED, ENV, CMDS,\n\
        \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), BODY))\n\
-       \    => script.ready(S, ENV, CMDS)\n\
+       \    => script.exhaustion-check(ID, REQUIRED, ENV, CMDS, S2,\n\
+       \      config.sym(state.sym(S2, F2), INSTRS))\n\
        \    if rel.step(config.sym(\n\
        \         state.sym(S, rec.frame(LOCALS, CURRENT)), BODY))\n\
-       \         => config.sym(C2, INSTRS)\n\
-       \       /\\ _>_(activeFrameDepth(INSTRS), REQUIRED) = true .\n\
-       \  crl [exhaustion-step] :\n\
-       \    script.exhaustion(ID, REQUIRED, ENV, CMDS, C)\n\
-       \    => script.exhaustion(ID, REQUIRED, ENV, CMDS,\n\
+       \         => config.sym(state.sym(S2, F2), INSTRS) .\n\
+       \  crl [exhaustion-done] :\n\
+       \    script.exhaustion-check(ID, REQUIRED, ENV, CMDS, S,\n\
        \      config.sym(C2, INSTRS))\n\
-       \    if rel.step(C) => config.sym(C2, INSTRS)\n\
+       \    => script.ready(S, ENV, CMDS)\n\
+       \    if _>_(activeFrameDepth(INSTRS), REQUIRED) = true .\n\
+       \  crl [exhaustion-continue] :\n\
+       \    script.exhaustion-check(ID, REQUIRED, ENV, CMDS, S, C)\n\
+       \    => script.exhaustion(ID, REQUIRED, ENV, CMDS, C)\n\
+       \    if config.sym(C2, INSTRS) := C\n\
        \       /\\ _<=_(activeFrameDepth(INSTRS), REQUIRED) = true .\n\
        \  rl [exhaustion-trap] :\n\
        \    script.exhaustion(ID, REQUIRED, ENV, CMDS,\n\

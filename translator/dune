@@ -22,9 +22,12 @@
   relation_graph
   runtime_materialize
   runtime_truth_false_support
+  runtime_truth_totality_contract
+  runtime_truth_transitive_edge
   runtime_truth_worklist_core
   runtime_truth_worklist_premise
   runtime_truth_worklist_positive
+  runtime_truth_worklist_positive_rule
   runtime_truth_worklist_refutation
   runtime_truth_worklist_rule
   runtime_truth_target_chain_certificate

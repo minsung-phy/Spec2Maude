@@ -7,6 +7,7 @@ mod SPEC2MAUDE-REFOK-SMOKE is
   op ref-test-nullable-any : -> SpectecTerminal .
   op ref-test-nonnull-any : -> SpectecTerminal .
   op ref-test-extern-null : -> SpectecTerminal .
+  op subtype-context : -> SpectecTerminal .
 
   eq smoke-store = rec.store(eps, eps, eps, eps, eps,
     eps, eps, eps, eps, eps) .
@@ -29,6 +30,18 @@ mod SPEC2MAUDE-REFOK-SMOKE is
       state.sym(smoke-store, smoke-frame),
       ref.ref-extern(ref.ref-null-addr)
         instr.ref-test(reftype.ref(eps, absheaptype.extern))) .
+
+  eq subtype-context =
+    rec.context(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps, eps,
+      subtype.sub(eps,
+        deftype.def(
+          rectype.rec(list.wrap(
+            subtype.sub(eps, eps,
+              comptype.func-sym(list.wrap(eps),
+                list.wrap(reftype.ref(null.null, absheaptype.func)))))),
+          0),
+        comptype.func-sym(list.wrap(eps),
+          list.wrap(reftype.ref(null.null, typeuse.rec(0)))))) .
 endm
 
 select SPEC2MAUDE-REFOK-SMOKE .
@@ -47,5 +60,15 @@ red 'ref-ok-no-seed-begin .
 search [1] rel.step-read(ref-test-extern-null)
   =>+ instr.const(numtype.i32, uN.wrap(0)) .
 red 'ref-ok-no-seed-end .
+
+red 'heaptype-sub-positive-begin .
+rew [100000] helper.truth-prove-heaptype-sub.step-read(
+  subtype-context, typeuse.rec(0), absheaptype.func, eps) .
+red 'heaptype-sub-positive-end .
+
+red 'heaptype-sub-negative-begin .
+rew [100000] helper.truth-refute-heaptype-sub.step-read(
+  subtype-context, typeuse.rec(0), absheaptype.func, eps) .
+red 'heaptype-sub-negative-end .
 
 quit

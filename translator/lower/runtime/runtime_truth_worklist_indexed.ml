@@ -99,17 +99,15 @@ let materialize request =
          |> List.mapi (fun index conditions ->
            generated request
              (crl ~label:(false_op ^ "-cons-" ^ string_of_int (index + 1))
-                (false_call cons) request.refuted
-                (conditions @ [ RewriteCond (false_call tail, request.refuted) ]))))
+                (false_call cons) (false_call tail) conditions)))
   in
   let statements = declarations
     @ [ generated request
           (crl ~label:(true_op ^ "-head")
              (true_call cons) request.proved request.body_true)
       ; generated request
-          (crl ~label:(true_op ^ "-tail")
-             (true_call cons) request.proved
-             [ RewriteCond (true_call tail, request.proved) ])
+          (rl ~label:(true_op ^ "-tail")
+             (true_call cons) (true_call tail))
       ]
     @ false_rules
   in

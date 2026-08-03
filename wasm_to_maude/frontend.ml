@@ -6,6 +6,13 @@ type module_ = {
   custom : Custom.section list;
 }
 
+type invocation_error =
+  | Missing_export
+  | Non_function_export
+  | Unresolved_function_type
+  | Wrong_arity
+  | Wrong_argument_type of int
+
 let validate source (ast, custom) =
   try
     ignore (Valid.check_module_with_custom (ast, custom));
@@ -71,3 +78,37 @@ let load path =
         (Printf.sprintf "expected a .wat or .wasm module, found %S" ext)
 
 let import_count m = List.length m.ast.Source.it.Ast.imports
+
+let export_type m name =
+  let Types.ModuleT (_, exports) = Ast.moduletype_of m.ast in
+  List.find_map
+    (function
+      | Types.ExportT (export_name, actual) when export_name = name ->
+          Some actual
+      | Types.ExportT _ -> None)
+    exports
+
+let function_parameters m name =
+  match export_type m name with
+  | Some (Types.ExternFuncT (Types.Def deftype)) ->
+      Ok (Types.(functype_of_comptype (expand_deftype deftype)) |> fst)
+  | Some (Types.ExternFuncT (Types.Idx _)) -> Error Unresolved_function_type
+  | Some _ -> Error Non_function_export
+  | None -> Error Missing_export
+
+let validate_invocation m name arguments =
+  match function_parameters m name with
+  | Error _ as error -> error
+  | Ok parameters when List.length arguments <> List.length parameters ->
+      Error Wrong_arity
+  | Ok parameters ->
+      let rec check index arguments parameters =
+        match arguments, parameters with
+        | [], [] -> Ok ()
+        | argument :: arguments, parameter :: parameters ->
+            if Match.match_valtype [] argument parameter then
+              check (index + 1) arguments parameters
+            else Error (Wrong_argument_type index)
+        | [], _ :: _ | _ :: _, [] -> Error Wrong_arity
+      in
+      check 0 arguments parameters

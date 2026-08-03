@@ -259,6 +259,22 @@ let declarations_first statements =
   in
   declarations @ definitions
 
+let check_structural_rule_matches statements =
+  let prefix = "helper.truth-rule-match-" in
+  let matches = ref 0 in
+  statements |> List.iter (fun statement ->
+    match statement.node with
+    | Eq (App (name, _), Const "true", [])
+      when String.starts_with ~prefix name ->
+      incr matches
+    | Ceq (App (name, _), Const "true", _, _)
+      when String.starts_with ~prefix name ->
+      failwith "runtime truth structural match retained head guards"
+    | SortDecl _ | SubsortDecl _ | OpDecl _ | VarDecl _ | Mb _ | Cmb _
+    | Eq _ | Ceq _ | Rl _ | Crl _ -> ());
+  if !matches = 0 then
+    failwith "runtime truth materializer emitted no structural match equation"
+
 let witness_rule (rule : Runtime_truth_scc.rule) =
   let source = rule.source in
   { Runtime_witness_proof.identity = source.identity
@@ -356,33 +372,33 @@ let check_statement_order ctx
          | Eq _ | Ceq _ | Rl _ | Crl _ -> None)
     |> Option.get
   in
-  let recursive_calls =
+  let private_reach_prefix =
+    String.lowercase_ascii
+      ("runtimeTruthProveReach" ^ transitive_item.name)
+  in
+  let private_edge_calls =
     statements
     |> List.filter_map (fun statement ->
          match statement.node with
-         | Crl (_, lhs, _, conditions) ->
-           (match lhs with
-           | App (op, _) when op = public_prove || op = positive_worker -> None
-           | Var _ | Const _ | Qid _ | App _ ->
-             let calls =
-               conditions
-               |> List.filter_map (function
-                    | RewriteCond (App (op, _), _)
-                      when op = public_prove || op = positive_worker ->
-                      Some op
-                    | EqCondition _ | RewriteCond _ -> None)
-             in
-             if List.length calls >= 2 then Some calls else None)
+         | Crl (Some label, _, _, conditions)
+           when String.starts_with ~prefix:private_reach_prefix label ->
+           let calls =
+             conditions
+             |> List.filter_map (function
+                  | RewriteCond (App (op, _), _)
+                    when op = public_prove || op = positive_worker ->
+                    Some op
+                  | EqCondition _ | RewriteCond _ -> None)
+           in
+           if calls = [] then None else Some calls
          | SortDecl _ | SubsortDecl _ | OpDecl _ | VarDecl _ | Mb _ | Cmb _
-         | Eq _ | Ceq _ | Rl _ -> None)
+         | Eq _ | Ceq _ | Rl _ | Crl _ -> None)
     |> List.concat
   in
-  if recursive_calls = [] then
-    failwith "recursive proof emitted no public RewriteCond";
-  if List.exists (( = ) positive_worker) recursive_calls then
-    failwith "recursive proof RewriteCond called the positive worker";
-  if not (List.for_all (( = ) public_prove) recursive_calls) then
-    failwith "recursive proof RewriteCond bypassed the public prove operator";
+  if not (List.exists (( = ) positive_worker) private_edge_calls) then
+    failwith "private transitive worklist emitted no ordinary edge proof";
+  if List.exists (( = ) public_prove) private_edge_calls then
+    failwith "private transitive worklist recursed through the public prove surface";
   let worker_positions =
     rules
     |> List.map (fun (rule : Runtime_truth_scc.rule) ->
@@ -494,6 +510,7 @@ let () =
     :: registry_statements @ direct_statements
     |> declarations_first
   in
+  check_structural_rule_matches statements;
   check_statement_order ctx transitive_item statements;
   let module_ =
     { name = "RUNTIME-TRUTH-DECISION-FIXTURE"
