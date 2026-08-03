@@ -48,7 +48,6 @@ let request ~worklist ~origin ~mode ~candidates ~certified_successors
 
 type surface_var =
   | Source
-  | Index
   | Count
   | Head
   | Value
@@ -58,7 +57,6 @@ let surface_var role sort =
   let name =
     match role with
     | Source -> "RTSOURCE"
-    | Index -> "RTINDEX"
     | Count -> "RTCOUNT"
     | Head -> "RTHEAD"
     | Value -> "RTVALUE"
@@ -140,13 +138,11 @@ let list_surface request =
   let nat = sort "Nat" in
   let nil = Const (list_op request "Nil") in
   let cons head tail = App (list_op request "Cons", [ head; tail ]) in
-  let build source index count =
-    App (list_op request "Build", [ source; index; count ])
-  in
-  let snoc values value = App (list_op request "Snoc", [ values; value ]) in
+  let prepend source tail = App (list_op request "Prepend", [ source; tail ]) in
+  let seq head tail = App ("_ _", [ head; tail ]) in
+  let repeat count value = App ("repeatSeq", [ count; value ]) in
   let member value values = App (list_op request "Member", [ value; values ]) in
   let source = surface_var Source sequence in
-  let index = surface_var Index nat in
   let count = surface_var Count nat in
   let head = surface_var Head terminal in
   let value = surface_var Value terminal in
@@ -157,23 +153,25 @@ let list_surface request =
       (op (list_op request "Cons") [ sort_ref terminal; sort_ref list ] list
          ~attrs:[ Ctor ])
   ; generated request
-      (op (list_op request "Build")
-         [ sort_ref sequence; sort_ref nat; sort_ref nat ] list)
-  ; generated request
-      (op (list_op request "Snoc") [ sort_ref list; sort_ref terminal ] list)
+      (op (list_op request "Prepend") [ sort_ref sequence; sort_ref list ] list)
   ; generated request
       (op (list_op request "Member") [ sort_ref terminal; sort_ref list ]
          (sort "Bool"))
-  ; generated request (eq (build source index (Const "0")) nil)
+  ; generated request (eq (prepend (Const "eps") tail) tail)
   ; generated request
       (eq
-         (build source index (App ("s_", [ count ])))
-         (cons
-            (App ("index", [ source; index ]))
-            (build source (App ("s_", [ index ])) count)))
-  ; generated request (eq (snoc nil value) (cons value nil))
+         (prepend (repeat (App ("s_", [ count ])) head) tail)
+         (cons head (prepend (repeat count head) tail)))
   ; generated request
-      (eq (snoc (cons head tail) value) (cons head (snoc tail value)))
+      (ceq
+         (prepend (seq (repeat (App ("s_", [ count ])) head) source) tail)
+         (cons head
+            (prepend (seq (repeat count head) source) tail))
+         [ BoolCond (App ("_=/=_", [ source; Const "eps" ])) ])
+  ; generated request
+      (eq
+         (prepend (seq head source) tail)
+         (cons head (prepend source tail)))
   ; generated request (eq (member value nil) (Const "false"))
   ; generated request
       (eq
@@ -221,13 +219,9 @@ let materialize_prove request =
   let nil = Const (list_op request "Nil") in
   let cons head tail = App (list_op request "Cons", [ head; tail ]) in
   let member value values = App (list_op request "Member", [ value; values ]) in
-  let build source =
-    App
-      ( list_op request "Build"
-      , [ source; Const "0"; App ("len", [ source ]) ] )
-  in
-  let candidates_value = build (stable_sequence request.candidates) in
-  let successors_value = build (stable_sequence request.certified_successors) in
+  let prepend source = App (list_op request "Prepend", [ source; nil ]) in
+  let candidates_value = prepend (stable_sequence request.candidates) in
+  let successors_value = prepend (stable_sequence request.certified_successors) in
   let choose = closure_op request "Choose" in
   let reach = closure_op request "ProveReach" in
   let choose_call values = App (choose, [ values ]) in
@@ -344,16 +338,11 @@ let materialize_decide request =
   let successors = Var worklist.successors_var in
   let nil = Const (list_op request "Nil") in
   let cons head tail = App (list_op request "Cons", [ head; tail ]) in
-  let append values value = App (list_op request "Snoc", [ values; value ]) in
   let member value values = App (list_op request "Member", [ value; values ]) in
   let frontier = cons request.start nil in
-  let build source =
-    App
-      ( list_op request "Build"
-      , [ source; Const "0"; App ("len", [ source ]) ] )
-  in
-  let candidates_value = build (stable_sequence request.candidates) in
-  let successors_value = build (stable_sequence request.certified_successors) in
+  let prepend source = App (list_op request "Prepend", [ source; nil ]) in
+  let candidates_value = prepend (stable_sequence request.candidates) in
+  let successors_value = prepend (stable_sequence request.certified_successors) in
   let actual_captures =
     List.map
       (fun capture -> capture.Runtime_truth_worklist_indexed.call_term)
@@ -431,8 +420,11 @@ let materialize_decide request =
                cons_lhs request.proved
                (EqCondition same_target :: evidence)) ]
     in
+    (* The worklist computes finite graph reachability, so DFS and BFS have the
+       same result.  Pushing at the front is constant-time; appending with Snoc
+       repeatedly traversed the queue without changing the reachable set. *)
     let enqueue_call =
-      expand_call current candidates successors (append queue candidate)
+      expand_call current candidates successors (cons candidate queue)
         (cons candidate seen)
     in
     let enqueue evidence role =

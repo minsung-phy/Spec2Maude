@@ -1653,6 +1653,20 @@ let test_transitive_support_materialization () =
       | Rl (None, _, _) | Rl (Some _, _, _) | _ -> false)
       result.statements
   in
+  let rec contains_op fragment = function
+    | App (op, terms) ->
+      contains (String.lowercase_ascii op) fragment
+      || List.exists (contains_op fragment) terms
+    | Var _ | Const _ | Qid _ -> false
+  in
+  let pushes_front =
+    List.exists (fun statement ->
+      match statement.Maude_ir.node with
+      | Crl (Some label, _, rhs, _) when contains label "sourceenqueue" ->
+        not (contains_op "listsnoc" rhs)
+      | Crl (None, _, _, _) | Crl (Some _, _, _, _) | _ -> false)
+      result.statements
+  in
   if not private_worklist then
     failwith "transitive closure did not isolate its finite worklist from source sequences";
   if not domain_before_direct then
@@ -1679,7 +1693,9 @@ let test_transitive_support_materialization () =
      || not (exact_successor_membership "false" no_edge)
   then failwith "intermediate no-edge refutation lacks exact false evidence";
   if not recomputes_per_current then
-    failwith "transitive closure reused the initial successor set after dequeue"
+    failwith "transitive closure reused the initial successor set after dequeue";
+  if not pushes_front then
+    failwith "transitive closure reintroduced linear queue append"
 
 let test_renamed_synthetic_cyclic_false () =
   let x = var "x" in

@@ -9,6 +9,8 @@ builtins="$prefix-builtins.maude"
 report="$prefix-builtins.md"
 log="$prefix.log"
 smoke_log="$prefix-smoke.log"
+prepend_log="$prefix-prepend.log"
+prepend_suffix_log="$prefix-prepend-suffix.log"
 wasm_log="$prefix-wasm.log"
 wasm_harness="$prefix-wasm.maude"
 instantiate_log="$prefix-instantiate.log"
@@ -49,6 +51,7 @@ vectors_fixture="$root/test/wast_vectors.wast"
 rm -f "$output" "$builtins" "$report" "$log" "$smoke_log" \
   "$wasm_log" "$wasm_harness" "$instantiate_log" "$instantiate_harness" \
   "$run_log" "$run_harness" "$simd_log" "$simd_harness"
+rm -f "$prepend_log" "$prepend_suffix_log"
 rm -f "$eqz_log" "$eqz_harness"
 rm -f "$shift_log" "$shift_harness"
 rm -f "$actions_log" "$actions_harness"
@@ -70,6 +73,34 @@ fi
 
 grep -Eq '\[spec2maude\] diagnostics: total=[0-9]+ fatal=0 unsupported=0 skipped=[0-9]+ obligations=0 prelude_gaps=0' "$log"
 grep -q 'target-chain-refute' "$output"
+if grep -Eq 'runtimeTruthList(Build|Snoc)' "$output"; then
+  echo 'runtime truth worklist regressed to repeated indexing or queue append' >&2
+  exit 1
+fi
+prepend_op=$(sed -n 's/^  op \(runtimeTruthListPrepend[^ :]*\) .*/\1/p' "$output" | head -n 1)
+cons_op=$(sed -n 's/^  op \(runtimeTruthListCons[^ :]*\) .*/\1/p' "$output" | head -n 1)
+nil_op=$(sed -n 's/^  op \(runtimeTruthListNil[^ :]*\) .*/\1/p' "$output" | head -n 1)
+printf '%s\n' \
+  "load $builtins" \
+  "red $prepend_op(repeatSeq(1024, absheaptype.any), $nil_op) ." \
+  quit \
+  | maude -no-banner >"$prepend_log" 2>&1
+if grep -Eq 'Warning:|Advisory:|Error:' "$prepend_log"; then
+  cat "$prepend_log" >&2
+  exit 1
+fi
+test "$(grep -Fo "$cons_op" "$prepend_log" | wc -l | tr -d ' ')" -eq 1024
+printf '%s\n' \
+  "load $builtins" \
+  "red $prepend_op(repeatSeq(1024, absheaptype.any) absheaptype.eq, $nil_op) ." \
+  quit \
+  | maude -no-banner >"$prepend_suffix_log" 2>&1
+if grep -Eq 'Warning:|Advisory:|Error:' "$prepend_suffix_log"; then
+  cat "$prepend_suffix_log" >&2
+  exit 1
+fi
+test "$(grep -Fo "$cons_op" "$prepend_suffix_log" | wc -l | tr -d ' ')" -eq 1025
+grep -q 'absheaptype.eq' "$prepend_suffix_log"
 grep -q 'seed-ref-ok-rule-8' "$output"
 grep -q 'truth-seed-miss-ref-ok' "$output"
 grep -q 'seed-refute-8-source-boolean' "$output"
