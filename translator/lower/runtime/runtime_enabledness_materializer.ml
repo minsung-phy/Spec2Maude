@@ -38,7 +38,7 @@ let pattern_certificate ctx item =
 let rule_condition_of_eq condition =
   EqCondition condition
 
-let true_rule ctx item =
+let true_rule ctx ~constructor_op item =
   let request = item.request in
   let call = Runtime_enabledness_helper.invocation ~helper_name:item.name request in
   let lhs =
@@ -49,12 +49,12 @@ let true_rule ctx item =
     @ request.premise_rule_conditions
     @ List.map rule_condition_of_eq request.premise_eq_conditions
     |> Condition_closure.normalize_rule_conditions
-         ~constructor_op:(pattern_certificate ctx item)
+         ~constructor_op
          [ lhs ]
   in
   let diagnostics =
     Condition_admissibility.crl_admissibility_diagnostics
-      ~constructor_op:(pattern_certificate ctx item)
+      ~constructor_op
       ctx
       item.origin
       lhs
@@ -87,7 +87,7 @@ let expected_worklist_conditions request =
   request.Runtime_enabledness_helper.runtime_truth_worklist_decisions
   |> List.map Runtime_truth_worklist_enabledness.positive_condition
 
-let false_rule ctx item =
+let false_rule ctx ~constructor_op item =
   let request = item.request in
   match
     ( request.runtime_search_requests
@@ -109,12 +109,12 @@ let false_rule ctx item =
       @ List.map rule_condition_of_eq request.premise_eq_conditions
       @ [ decision_condition ]
       |> Condition_closure.normalize_rule_conditions
-           ~constructor_op:(pattern_certificate ctx item)
+           ~constructor_op
            [ lhs ]
     in
     let diagnostics =
       Condition_admissibility.crl_admissibility_diagnostics
-        ~constructor_op:(pattern_certificate ctx item)
+        ~constructor_op
         ctx
         item.origin
         lhs
@@ -144,12 +144,12 @@ let false_rule ctx item =
       @ List.map rule_condition_of_eq request.premise_eq_conditions
       @ [ Runtime_truth_worklist_enabledness.false_condition decision ]
       |> Condition_closure.normalize_rule_conditions
-           ~constructor_op:(pattern_certificate ctx item)
+           ~constructor_op
            [ lhs ]
     in
     let diagnostics =
       Condition_admissibility.crl_admissibility_diagnostics
-        ~constructor_op:(pattern_certificate ctx item)
+        ~constructor_op
         ctx item.origin lhs call.false_rhs conditions
     in
     if List.exists Diagnostics.is_fatal diagnostics then None, diagnostics
@@ -220,8 +220,13 @@ let materialize_item ctx item =
   then
     { statements = []; diagnostics = [ legacy_equation_blocker ctx item ] }
   else
-  let true_statements, true_diagnostics = true_rule ctx item in
-  let false_statement, false_diagnostics = false_rule ctx item in
+  let constructor_op = pattern_certificate ctx item in
+  let true_statements, true_diagnostics =
+    true_rule ctx ~constructor_op item
+  in
+  let false_statement, false_diagnostics =
+    false_rule ctx ~constructor_op item
+  in
   let false_statements =
     match false_statement with
     | None -> []

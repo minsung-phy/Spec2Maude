@@ -4,6 +4,11 @@ let s = sort
 let sr name = sort_ref (s name)
 let kr name = kind_ref (kind_of_sort (s name))
 let app name args = App (name, args)
+let seq head tail = app "_ _" [ head; tail ]
+let repeat count value = app "repeatSeq" [ count; value ]
+let drop count values = app "drop" [ count; values ]
+let splice values index count replacement =
+  app "splice" [ values; index; count; replacement ]
 let witness name = Naming.primitive_witness name
 module T = Typecheck_term
 let spectec_terminal = s "SpectecTerminal"
@@ -105,6 +110,7 @@ let statements =
     ; var "B" (sr "Bool")
     ; var "N" (sr "Nat")
     ; var "N2" (sr "Nat")
+    ; var "N3" (sr "Nat")
     ; var "I" (sr "Int")
     ; var "I2" (sr "Int")
     ; var "R" (sr "Rat")
@@ -475,22 +481,55 @@ let statements =
            [ Var "N2"
            ; app "drop" [ Var "N"; Var "XS" ]
            ])
+      (* Splice follows the prefix once.  The repeat and ordinary cases rebuild
+         exactly the sequence produced by take/index/drop, without a new value
+         representation or a Wasm-specific shortcut. *)
+    ; eq
+        (splice (Const "eps") (Const "0") (Var "N2") (Var "VAL"))
+        (Var "VAL")
+    ; eq
+        (splice
+           (Const "eps") (app "s_" [ Var "N" ]) (Var "N2") (Var "VAL"))
+        (Const "eps")
     ; ceq
-        (app "splice" [ Var "XS"; Var "N"; Var "N2"; Var "VAL" ])
-        (app "_ _"
-           [ app "take" [ Var "N"; Var "XS" ]
-           ; app "_ _"
-               [ Var "VAL"
-               ; app "drop"
-                   [ app "_+_" [ Var "N"; Var "N2" ]
-                   ; Var "XS"
-                   ]
-               ]
-           ])
-        [ BoolCond (app "_<=_" [ Var "N"; app "len" [ Var "XS" ] ]) ]
+        (splice
+           (seq (repeat (Var "N") (Var "X")) (Var "XS"))
+           (Var "N2") (Var "N3") (Var "VAL"))
+        (seq
+           (repeat (Var "N2") (Var "X"))
+           (seq
+              (Var "VAL")
+              (drop
+                 (Var "N3")
+                 (seq
+                    (repeat (app "_-_" [ Var "N"; Var "N2" ]) (Var "X"))
+                    (Var "XS")))))
+        [ BoolCond (app "_<_" [ Var "N2"; Var "N" ]) ]
     ; ceq
-        (app "splice" [ Var "XS"; Var "N"; Var "N2"; Var "VAL" ])
-        (Var "XS")
-        [ BoolCond (app "_>_" [ Var "N"; app "len" [ Var "XS" ] ]) ]
+        (splice
+           (seq (repeat (Var "N") (Var "X")) (Var "XS"))
+           (Var "N2") (Var "N3") (Var "VAL"))
+        (seq
+           (repeat (Var "N") (Var "X"))
+           (splice
+              (Var "XS")
+              (app "_-_" [ Var "N2"; Var "N" ])
+              (Var "N3")
+              (Var "VAL")))
+        [ BoolCond (app "_<=_" [ Var "N"; Var "N2" ]) ]
+    ; eq
+        (splice
+           (seq (Var "X") (Var "XS"))
+           (Const "0") (Var "N2") (Var "VAL"))
+        (seq
+           (Var "VAL")
+           (drop (Var "N2") (seq (Var "X") (Var "XS"))))
+    ; eq
+        (splice
+           (seq (Var "X") (Var "XS"))
+           (app "s_" [ Var "N" ]) (Var "N2") (Var "VAL"))
+        (seq
+           (Var "X")
+           (splice (Var "XS") (Var "N") (Var "N2") (Var "VAL")))
     ; eq (T.typecheck (Var "K") (Var "T")) (Const "false") ~attrs:[ Owise ]
     ]

@@ -265,6 +265,11 @@
  (libraries translator il util xl))
 
 (executable
+ (name sequence_splice_fixture)
+ (modules sequence_splice_fixture)
+ (libraries translator il util xl))
+
+(executable
  (name record_composition_fixture)
  (modules record_composition_fixture)
  (libraries translator il util xl))
@@ -308,6 +313,13 @@
  (action
   (run sh %{dep:optional_composition_reductions.sh}
     %{exe:optional_composition_fixture.exe})))
+
+(rule
+ (alias runtest)
+ (deps sequence_splice_reductions.sh)
+ (action
+  (run sh %{dep:sequence_splice_reductions.sh}
+    %{exe:sequence_splice_fixture.exe})))
 
 (rule
  (alias runtest)
