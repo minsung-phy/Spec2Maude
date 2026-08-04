@@ -17,11 +17,62 @@ jobs:
       - name: Check out analysis branch
         uses: actions/checkout@v4
 
+      - name: Install Maude 3.5.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip \
+            -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          test -n "$maude_bin"
+          echo "$(dirname "$maude_bin")" >> "$GITHUB_PATH"
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+          "$maude_bin" --version
+
+      - name: Load Spec2Maude semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/emscripten-dlopen"
+          "$MAUDE" -no-banner output.maude \
+            > "$RUNNER_TEMP/emscripten-dlopen/output-load.log" 2>&1
+          "$MAUDE" -no-banner builtins.maude \
+            > "$RUNNER_TEMP/emscripten-dlopen/builtins-load.log" 2>&1
+          if grep -Eq '^(Warning|Advisory|Error):' \
+              "$RUNNER_TEMP/emscripten-dlopen/output-load.log" \
+              "$RUNNER_TEMP/emscripten-dlopen/builtins-load.log"; then
+            cat "$RUNNER_TEMP/emscripten-dlopen/output-load.log"
+            cat "$RUNNER_TEMP/emscripten-dlopen/builtins-load.log"
+            exit 1
+          fi
+
       - name: Reproduce repeated failed dlopen
         shell: bash
         run: |
           set -euo pipefail
           bash benchmarks/emscripten-dlopen/run.sh "$RUNNER_TEMP/emscripten-dlopen"
+
+      - name: Model check current and fixed loader protocols
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$MAUDE" -no-banner \
+            builtins.maude \
+            benchmarks/emscripten-dlopen/loader-modelcheck.maude \
+            > "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log" 2>&1
+
+          test "$(grep -c '^Solution 1' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 2
+          test "$(grep -c '^No solution\.' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 1
+          test "$(grep -c 'result ModelCheckResult: counterexample' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 1
+          grep -q 'result Bool: true' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log"
+
+          if grep -Eq '^(Warning|Advisory|Error):' \
+              "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log"; then
+            cat "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log"
+            exit 1
+          fi
 
       - name: Collect runner metadata
         if: always()
@@ -32,6 +83,7 @@ jobs:
             echo "github_sha=$GITHUB_SHA"
             echo "runner_os=$RUNNER_OS"
             docker --version || true
+            if [[ -n "${MAUDE:-}" ]]; then "$MAUDE" --version || true; fi
           } > "$RUNNER_TEMP/emscripten-dlopen/environment.txt"
 
       - name: Upload reproduction evidence
