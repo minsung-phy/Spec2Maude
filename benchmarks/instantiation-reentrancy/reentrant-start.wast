@@ -1,10 +1,17 @@
-;; Pure core-Wasm construction-reentrancy witness.
+;; Two pure core-Wasm lifecycle witnesses.
 ;;
-;; The provider owns a table and a hook. The victim imports both. During
-;; victim instantiation, its active element segment places $leaked into the
-;; already-existing provider table before the victim start function runs.
-;; The start function then calls provider.hook. provider.hook calls table[0],
-;; re-entering the victim before its $ready global is set to 1.
+;; 1. Construction reentrancy:
+;;    The provider owns a table and a hook. The victim imports both. During
+;;    victim instantiation, its active element segment places $leaked into the
+;;    already-existing provider table before the victim start function runs.
+;;    The start function then calls provider.hook. provider.hook calls table[0],
+;;    re-entering the victim before its $ready global is set to 1.
+;;
+;; 2. Failed-instantiation zombie capability:
+;;    A second victim publishes a function into another imported table and then
+;;    traps in its start function. Instantiation fails, but the table entry is
+;;    not rolled back, so the provider can still execute code allocated for the
+;;    failed module.
 
 (module $provider
   (type $slot (func (result i32)))
@@ -53,3 +60,35 @@
 
 ;; After start returns, the same leaked function observes ready == 1.
 (assert_return (invoke $provider "call_slot") (i32.const 1))
+
+(module $zombie-provider
+  (type $slot (func (result i32)))
+
+  (table (export "table") 1 funcref)
+
+  (func (export "call_slot") (result i32)
+    i32.const 0
+    call_indirect (type $slot)))
+
+(register "zombie-provider" $zombie-provider)
+
+(assert_trap
+  (module $zombie-victim
+    (type $slot (func (result i32)))
+
+    (import "zombie-provider" "table" (table 1 funcref))
+
+    (func $zombie (type $slot) (result i32)
+      i32.const 42)
+
+    ;; This mutates the already-live imported table before start executes.
+    (elem (i32.const 0) $zombie)
+
+    (func $start
+      unreachable)
+
+    (start $start))
+  "unreachable")
+
+;; The failed module has no instance binding, yet its function remains callable.
+(assert_return (invoke $zombie-provider "call_slot") (i32.const 42))
