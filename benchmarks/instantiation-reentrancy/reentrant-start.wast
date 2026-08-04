@@ -8,10 +8,10 @@
 ;;    re-entering the victim before its $ready global is set to 1.
 ;;
 ;; 2. Failed-instantiation zombie capability:
-;;    A second victim publishes a function into another imported table and then
-;;    traps in its start function. Instantiation fails, but the table entry is
-;;    not rolled back, so the provider can still execute code allocated for the
-;;    failed module.
+;;    A second victim publishes a stateful function into another imported table
+;;    and then traps in its start function. Instantiation fails, but the table
+;;    entry is not rolled back. The provider can repeatedly execute code from
+;;    the failed module, whose private mutable global also remains alive.
 
 (module $provider
   (type $slot (func (result i32)))
@@ -78,8 +78,14 @@
 
     (import "zombie-provider" "table" (table 1 funcref))
 
+    (global $counter (mut i32) (i32.const 40))
+
     (func $zombie (type $slot) (result i32)
-      i32.const 42)
+      global.get $counter
+      i32.const 1
+      i32.add
+      global.set $counter
+      global.get $counter)
 
     ;; This mutates the already-live imported table before start executes.
     (elem (i32.const 0) $zombie)
@@ -90,5 +96,7 @@
     (start $start))
   "unreachable")
 
-;; The failed module has no instance binding, yet its function remains callable.
+;; The failed module has no instance binding, yet its function and private
+;; mutable state remain live across calls.
+(assert_return (invoke $zombie-provider "call_slot") (i32.const 41))
 (assert_return (invoke $zombie-provider "call_slot") (i32.const 42))
