@@ -3,6 +3,7 @@
 
   (table (export "table") 1 funcref)
   (global $observed (mut i32) (i32.const -1))
+  (export "observed" (global $observed))
 
   (func (export "hook")
     i32.const 0
