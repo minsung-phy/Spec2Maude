@@ -24,7 +24,24 @@ jobs:
           dune-cache: true
 
       - name: Install OCaml dependencies
-        run: opam install dune menhir wasm -y
+        shell: bash
+        run: |
+          set -euo pipefail
+          opam install dune menhir -y
+
+          # The setup action creates a local opam switch inside this repository.
+          # wasm.2.0.2's Makefile invokes `dune build wasm.exe` from its own
+          # interpreter directory. Without a forced root, modern Dune walks up
+          # into Spec2Maude's outer dune-project and builds the wrong workspace.
+          real_dune=$(opam exec -- which dune)
+          wrapper_dir="$RUNNER_TEMP/dune-root-wrapper"
+          mkdir -p "$wrapper_dir"
+          cat > "$wrapper_dir/dune" <<EOF
+          #!/usr/bin/env bash
+          exec "$real_dune" --root "\$PWD" "\$@"
+          EOF
+          chmod +x "$wrapper_dir/dune"
+          PATH="$wrapper_dir:$PATH" opam install wasm -y
 
       - name: Build Spec2Maude and wasm2maude
         run: opam exec -- dune build
@@ -69,7 +86,7 @@ jobs:
             echo "runner_os=$RUNNER_OS"
             opam exec -- ocaml -version || true
             opam exec -- dune --version || true
-            "$MAUDE" --version || true
+            if [[ -n "${MAUDE:-}" ]]; then "$MAUDE" --version || true; fi
           } > "$RUNNER_TEMP/spec2maude-chat/environment.txt"
 
       - name: Upload model-checking evidence
