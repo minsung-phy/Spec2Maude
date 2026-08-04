@@ -20,9 +20,12 @@ try {
 }
 
 assert.equal(trapped, true, 'victim instantiation did not trap');
-const zombieResult = provider.exports.call_slot();
-assert.equal(zombieResult, 42, 'failed module function did not remain callable');
+const zombieResult1 = provider.exports.call_slot();
+const zombieResult2 = provider.exports.call_slot();
+assert.equal(zombieResult1, 41, 'first failed-module call lost private state');
+assert.equal(zombieResult2, 42, 'failed-module private state did not persist');
 
 console.log(`node=${process.version}`);
 console.log(`instantiation_trapped=${trapped}`);
-console.log(`zombie_result=${zombieResult}`);
+console.log(`zombie_result_1=${zombieResult1}`);
+console.log(`zombie_result_2=${zombieResult2}`);
