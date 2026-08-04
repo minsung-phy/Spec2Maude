@@ -4,63 +4,87 @@ mod EMSCRIPTEN-DLOPEN-MC is
   protecting WASM-BUILTINS .
   including MODEL-CHECKER .
 
-  sorts LoaderState LoaderMode CacheState Phase Outcome .
+  sorts LoaderState LoaderMode CacheState Phase Outcome ResidualState .
   subsort LoaderState < State .
 
-  ops current fixed : -> LoaderMode [ctor] .
+  ops current cache-fixed transactional-fixed : -> LoaderMode [ctor] .
   ops absent loading loaded : -> CacheState [ctor] .
   ops idle constructing : -> Phase [ctor] .
   ops none failed succeeded : -> Outcome [ctor] .
+  ops clean residual : -> ResidualState [ctor] .
 
-  op loader : LoaderMode CacheState Nat Phase Outcome -> LoaderState [ctor] .
+  op loader : LoaderMode CacheState Nat Phase Outcome ResidualState
+    -> LoaderState [ctor] .
   op current-init : -> LoaderState .
-  op fixed-init : -> LoaderState .
+  op cache-fixed-init : -> LoaderState .
+  op transactional-fixed-init : -> LoaderState .
 
-  eq current-init = loader(current, absent, 0, idle, none) .
-  eq fixed-init = loader(fixed, absent, 0, idle, none) .
+  eq current-init = loader(current, absent, 0, idle, none, clean) .
+  eq cache-fixed-init = loader(cache-fixed, absent, 0, idle, none, clean) .
+  eq transactional-fixed-init =
+    loader(transactional-fixed, absent, 0, idle, none, clean) .
 
   vars M : LoaderMode .
   vars N : Nat .
   vars O : Outcome .
+  vars R : ResidualState .
 
-  --- Both loaders reserve/cache a DSO as `loading` before instantiation.
+  --- All loaders reserve/cache a DSO as `loading` before side-module
+  --- instantiation and constructor execution.
   crl [begin-load] :
-    loader(M, absent, N, idle, O)
-    => loader(M, loading, N + 1, constructing, none)
+    loader(M, absent, N, idle, O, R)
+    => loader(M, loading, N + 1, constructing, none, R)
     if N < 2 .
 
-  --- Current libdylink.js rejection path returns to dlopen without evicting
-  --- LDSO.loadedLibsByName[libName].  The cache therefore remains `loading`.
+  --- Current libdylink.js returns from the rejected load without evicting the
+  --- DSO. WebAssembly table publication has already happened, so executable
+  --- code and its private state remain reachable as a residual capability.
   rl [constructor-trap-current] :
-    loader(current, loading, N, constructing, none)
-    => loader(current, loading, N, idle, failed) .
+    loader(current, loading, N, constructing, none, R)
+    => loader(current, loading, N, idle, failed, residual) .
 
   --- On the second dlopen, the existing-DSO fast path treats the stale entry
   --- as already loaded when ASSERTIONS=0 and returns a non-null handle.
   rl [reuse-stale-loading-dso] :
-    loader(current, loading, 1, idle, failed)
-    => loader(current, loading, 2, idle, succeeded) .
+    loader(current, loading, 1, idle, failed, residual)
+    => loader(current, loading, 2, idle, succeeded, residual) .
 
-  --- Minimal remediation: a rejected load evicts the cached loading DSO.
-  rl [constructor-trap-fixed] :
-    loader(fixed, loading, N, constructing, none)
-    => loader(fixed, absent, N, idle, failed) .
+  --- Minimal cache remediation: remove the DSO cache entry on rejection.
+  --- This fixes false-success handles but cannot retract the already-published
+  --- table function or its captured mutable state.
+  rl [constructor-trap-cache-fixed] :
+    loader(cache-fixed, loading, N, constructing, none, R)
+    => loader(cache-fixed, absent, N, idle, failed, residual) .
+
+  --- Strong lifecycle policy: instantiate against staged capabilities and
+  --- publish only after constructors succeed (or equivalently revoke every
+  --- publication on failure). Both cache and residual capability are clean.
+  rl [constructor-trap-transactional-fixed] :
+    loader(transactional-fixed, loading, N, constructing, none, R)
+    => loader(transactional-fixed, absent, N, idle, failed, clean) .
 
   op poisoned-handle : -> Prop [ctor] .
   op failed-dso-cached : -> Prop [ctor] .
+  op residual-code : -> Prop [ctor] .
   var LS : LoaderState .
 
-  eq loader(current, loading, 2, idle, succeeded) |= poisoned-handle = true .
+  eq loader(current, loading, 2, idle, succeeded, residual)
+    |= poisoned-handle = true .
   eq LS |= poisoned-handle = false [owise] .
 
-  eq loader(current, loading, 1, idle, failed) |= failed-dso-cached = true .
+  eq loader(current, loading, 1, idle, failed, residual)
+    |= failed-dso-cached = true .
   eq LS |= failed-dso-cached = false [owise] .
+
+  eq loader(M, loading, N, idle, O, residual) |= residual-code = true .
+  eq loader(M, absent, N, idle, O, residual) |= residual-code = true .
+  eq LS |= residual-code = false [owise] .
 endm
 
 select EMSCRIPTEN-DLOPEN-MC .
 
---- Current production loader: both the stale cache and poisoned success are
---- reachable, and the safety invariant has a counterexample.
+--- Current production loader violates both cache-consistency and lifecycle
+--- cleanup properties.
 search [1] in EMSCRIPTEN-DLOPEN-MC :
   current-init =>* LS:LoaderState
   such that LS:LoaderState |= failed-dso-cached .
@@ -69,16 +93,45 @@ search [1] in EMSCRIPTEN-DLOPEN-MC :
   current-init =>* LS:LoaderState
   such that LS:LoaderState |= poisoned-handle .
 
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  current-init =>* LS:LoaderState
+  such that LS:LoaderState |= residual-code .
+
 red in EMSCRIPTEN-DLOPEN-MC :
   modelCheck(current-init, [] ~ poisoned-handle) .
 
---- Cache-eviction remediation: poisoned success is unreachable and the same
---- invariant holds for the bounded two-attempt scenario.
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(current-init, [] ~ residual-code) .
+
+--- Cache eviction fixes the API false-success bug, but the concrete residual
+--- table-code experiment shows that lifecycle cleanup still fails.
 search [1] in EMSCRIPTEN-DLOPEN-MC :
-  fixed-init =>* LS:LoaderState
+  cache-fixed-init =>* LS:LoaderState
   such that LS:LoaderState |= poisoned-handle .
 
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  cache-fixed-init =>* LS:LoaderState
+  such that LS:LoaderState |= residual-code .
+
 red in EMSCRIPTEN-DLOPEN-MC :
-  modelCheck(fixed-init, [] ~ poisoned-handle) .
+  modelCheck(cache-fixed-init, [] ~ poisoned-handle) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(cache-fixed-init, [] ~ residual-code) .
+
+--- A staged/transactional loader satisfies both bounded safety properties.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  transactional-fixed-init =>* LS:LoaderState
+  such that LS:LoaderState |= poisoned-handle .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  transactional-fixed-init =>* LS:LoaderState
+  such that LS:LoaderState |= residual-code .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(transactional-fixed-init, [] ~ poisoned-handle) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(transactional-fixed-init, [] ~ residual-code) .
 
 quit
