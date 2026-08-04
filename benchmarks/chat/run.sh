@@ -9,7 +9,7 @@ cd "$root"
 maude_bin=${MAUDE:-maude}
 
 # 1. Exercise the actual wasm2maude frontend on the Wasm chat-client module.
-dune exec ./bin/wasm2maude.exe -- module \
+dune exec --profile release ./bin/wasm2maude.exe -- module \
   benchmarks/chat/chat-client.wat \
   --semantics builtins.maude \
   -o "$out_dir/chat-client-typecheck.maude"
@@ -19,7 +19,7 @@ dune exec ./bin/wasm2maude.exe -- module \
 grep -q 'result Bool: true' "$out_dir/chat-client-typecheck.log"
 
 # 2. End-to-end concrete executions of the same guard.
-dune exec ./bin/wasm2maude.exe -- run \
+dune exec --profile release ./bin/wasm2maude.exe -- run \
   benchmarks/chat/chat-client.wat \
   --invoke accept --arg i32:0 --arg i32:0 --steps 10000 \
   --semantics builtins.maude \
@@ -27,7 +27,7 @@ dune exec ./bin/wasm2maude.exe -- run \
 "$maude_bin" -no-banner "$out_dir/chat-accept-00.maude" \
   > "$out_dir/chat-accept-00.log" 2>&1
 
-dune exec ./bin/wasm2maude.exe -- run \
+dune exec --profile release ./bin/wasm2maude.exe -- run \
   benchmarks/chat/chat-client.wat \
   --invoke accept --arg i32:0 --arg i32:1 --steps 10000 \
   --semantics builtins.maude \
