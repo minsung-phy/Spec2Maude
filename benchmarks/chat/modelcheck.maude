@@ -98,6 +98,8 @@ mod SPEC2MAUDE-CHAT-MC is
       MS)
     => chat(P, client(I, _+_(E, 1), M :: L) CS, MS) .
 
+  --- Rejected messages are discarded. This preserves order safety, but an
+  --- early delivery of sequence 1 can therefore destroy eventual completion.
   rl [reject] :
     chat(P,
       checking(I, E, L, M,
@@ -111,11 +113,18 @@ mod SPEC2MAUDE-CHAT-MC is
   eq bad-log(1 :: 0 :: nil-log) = false .
   eq bad-log(L) = true [owise] .
 
-  op bad-order : -> Prop [ctor] .
+  ops bad-order all-complete : -> Prop [ctor] .
   var X : ChatState .
+
   ceq chat(P, client(I, E, L) CS, MS) |= bad-order = true
     if bad-log(L) .
   eq X |= bad-order = false [owise] .
+
+  eq chat(P,
+    client(alice, 2, 1 :: 0 :: nil-log)
+    client(bob, 2, 1 :: 0 :: nil-log),
+    no-messages) |= all-complete = true .
+  eq X |= all-complete = false [owise] .
 endm
 
 select SPEC2MAUDE-CHAT-MC .
@@ -138,9 +147,15 @@ search [1] in SPEC2MAUDE-CHAT-MC :
   buggy-init =>* X:ChatState
   such that X:ChatState |= bad-order .
 
+--- The correct guard preserves ordered logs in every interleaving.
 red in SPEC2MAUDE-CHAT-MC :
   modelCheck(correct-init, [] ~ bad-order) .
 
+--- But drop-on-reject does not guarantee that every client eventually completes.
+red in SPEC2MAUDE-CHAT-MC :
+  modelCheck(correct-init, <> all-complete) .
+
+--- The mutant also violates the safety invariant.
 red in SPEC2MAUDE-CHAT-MC :
   modelCheck(buggy-init, [] ~ bad-order) .
 
