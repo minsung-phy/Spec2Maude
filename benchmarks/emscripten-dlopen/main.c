@@ -10,8 +10,17 @@ EM_JS(int, wasm_table_length, (), {
   return Number(wasmTable.length);
 });
 
+EM_JS(int, wasm_table_slot_callable, (int index), {
+  return typeof wasmTable.get(index) === 'function';
+});
+
+EM_JS(int, call_wasm_table_slot, (int index), {
+  return wasmTable.get(index)();
+});
+
 static void attempt(int number) {
-  printf("attempt_%d_table_before=%d\n", number, wasm_table_length());
+  int table_before = wasm_table_length();
+  printf("attempt_%d_table_before=%d\n", number, table_before);
 
   dlerror();
   void *handle = dlopen("libbad.wasm", RTLD_NOW | RTLD_LOCAL);
@@ -23,6 +32,16 @@ static void attempt(int number) {
          open_error ? open_error : "<none>");
 
   if (!handle) {
+    if (number == 1) {
+      int callable = wasm_table_slot_callable(table_before);
+      printf("attempt_1_residual_slot_callable=%d\n", callable);
+      if (callable) {
+        printf("attempt_1_residual_result_1=%d\n",
+               call_wasm_table_slot(table_before));
+        printf("attempt_1_residual_result_2=%d\n",
+               call_wasm_table_slot(table_before));
+      }
+    }
     return;
   }
 
