@@ -54,13 +54,21 @@ grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/production.log"
 grep -q '^attempt_2_handle_nonnull=1$' "$out_dir/production.log"
 grep -q '^attempt_2_symbol_nonnull=0$' "$out_dir/production.log"
 
+# The failed module's table function and captured private counter remain live.
+for log in production fixed; do
+  grep -q '^attempt_1_residual_slot_callable=1$' "$out_dir/${log}.log"
+  grep -q '^attempt_1_residual_result_1=41$' "$out_dir/${log}.log"
+  grep -q '^attempt_1_residual_result_2=42$' "$out_dir/${log}.log"
+done
+
 # Minimal remediation: evict the `loading` DSO on rejection. Both calls now
-# execute a real load attempt and both correctly report failure.
+# execute a real load attempt and both correctly report failure. This fixes
+# the API/cache inconsistency, but not the residual table capability.
 grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/fixed.log"
 grep -q '^attempt_2_handle_nonnull=0$' "$out_dir/fixed.log"
 
 {
-  echo 'Emscripten repeated-failed-dlopen result'
+  echo 'Emscripten failed-dlopen lifecycle result'
   echo '========================================='
   echo "image=$image"
   cat "$out_dir/node-version.log"
@@ -71,7 +79,12 @@ grep -q '^attempt_2_handle_nonnull=0$' "$out_dir/fixed.log"
   echo '[Minimal cache-cleanup patch]'
   grep '^attempt_' "$out_dir/fixed.log"
   echo
-  echo 'Finding: failed side-module construction leaves a cached DSO in loading state.'
-  echo 'The first dlopen fails, but the second returns a non-null poisoned handle.'
-  echo 'Evicting the failed DSO prevents false-success handles; full table/memory cleanup remains separate.'
+  echo '[Finding 1] stale loading DSO / poisoned dlopen handle'
+  echo 'The first dlopen fails, but the second returns a non-null handle with no exports.'
+  echo 'Evicting the failed DSO prevents the false-success handle.'
+  echo
+  echo '[Finding 2] stateful residual capability after failed construction'
+  echo 'The failed side module grows the shared table and leaves callable code behind.'
+  echo 'That code retains private mutable state and returns 41, then 42 after dlopen returned NULL.'
+  echo 'Cache eviction alone does not revoke the residual table capability.'
 } | tee "$out_dir/results.txt"
