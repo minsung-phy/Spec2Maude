@@ -8,7 +8,11 @@ mod WASM2MAUDE-INSTANTIATION-REENTRANCY-MC is
 
   op observedName : -> SpectecTerminal .
   op partialObservation : ScriptState -> Bool .
+  op zombieExecution : ScriptState -> Bool .
+  op containsInstance : InstanceEnv Nat -> Bool .
+
   op partial-observation : -> Prop [ctor] .
+  op zombie-execution : -> Prop [ctor] .
 
   eq observedName = name.wrap(
     char.wrap(111) char.wrap(98) char.wrap(115) char.wrap(101)
@@ -16,10 +20,17 @@ mod WASM2MAUDE-INSTANTIATION-REENTRANCY-MC is
 
   vars S F MI : SpectecTerminal .
   var SS : ScriptState .
-  vars ID A : Nat .
+  vars ID A TARGET : Nat .
   var ENV : InstanceEnv .
   var CMDS : Commands .
+  var EXPECTED : ResultPatterns .
   var INSTRS : SpectecTerminals .
+
+  eq containsInstance(instances.nil, TARGET) = false .
+  eq containsInstance(instances.cons(TARGET, MI, ENV), TARGET) = true .
+  ceq containsInstance(instances.cons(ID, MI, ENV), TARGET) =
+      containsInstance(ENV, TARGET)
+    if ID =/= TARGET .
 
   ceq partialObservation(
     script.module(ID, ENV, CMDS,
@@ -30,7 +41,19 @@ mod WASM2MAUDE-INSTANTIATION-REENTRANCY-MC is
           = num.const(numtype.i32, uN.wrap(0)) .
   eq partialObservation(SS) = false [owise] .
 
+  --- Instance 4 is the victim whose start function trapped.  The WAST action
+  --- after that failure calls provider.table[0].  Reaching a normal result 42
+  --- while instance 4 is absent proves that code allocated for the failed
+  --- module remains executable through the imported table capability.
+  ceq zombieExecution(
+    script.return(ID, ENV, EXPECTED, CMDS,
+      config.sym(state.sym(S, F),
+        instr.const(numtype.i32, uN.wrap(42))))) = true
+    if containsInstance(ENV, 4) = false .
+  eq zombieExecution(SS) = false [owise] .
+
   eq SS |= partial-observation = partialObservation(SS) .
+  eq SS |= zombie-execution = zombieExecution(SS) .
 endm
 
 select WASM2MAUDE-INSTANTIATION-REENTRANCY-MC .
@@ -41,5 +64,12 @@ search [1] in WASM2MAUDE-INSTANTIATION-REENTRANCY-MC :
 
 red in WASM2MAUDE-INSTANTIATION-REENTRANCY-MC :
   modelCheck(script.start, [] ~ partial-observation) .
+
+search [1] in WASM2MAUDE-INSTANTIATION-REENTRANCY-MC :
+  script.start =>* SS:ScriptState
+  such that zombieExecution(SS:ScriptState) = true .
+
+red in WASM2MAUDE-INSTANTIATION-REENTRANCY-MC :
+  modelCheck(script.start, [] ~ zombie-execution) .
 
 quit
