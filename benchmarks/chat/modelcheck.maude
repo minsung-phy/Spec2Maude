@@ -130,6 +130,14 @@ select SPEC2MAUDE-CHAT-MC .
 search [1] in SPEC2MAUDE-CHAT-MC :
   correct-init =>* complete-correct .
 
+--- Diagnostic: inspect terminal states after all six network messages are consumed.
+search [10] in SPEC2MAUDE-CHAT-MC :
+  correct-init =>*
+  chat(correct,
+    client(alice, EA:Nat, LA:ChatLog)
+    client(bob, EB:Nat, LB:ChatLog),
+    no-messages) .
+
 --- Safety search: the correct sequence-equality guard must have no bad log.
 search [1] in SPEC2MAUDE-CHAT-MC :
   correct-init =>* X:ChatState
