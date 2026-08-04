@@ -1,8 +1,6 @@
-#include <stdlib.h>
-
 __attribute__((constructor))
 static void fail_constructor(void) {
-  abort();
+  __builtin_trap();
 }
 
 __attribute__((visibility("default")))
