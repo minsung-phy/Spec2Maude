@@ -11,6 +11,7 @@
 
   (table (export "table") 1 funcref)
   (global $observed (mut i32) (i32.const -1))
+  (export "observed" (global $observed))
 
   (func (export "hook")
     i32.const 0
@@ -47,6 +48,7 @@
   (start $start))
 
 ;; During start, provider.hook observed victim.ready == 0.
+(assert_return (get $provider "observed") (i32.const 0))
 (assert_return (invoke $provider "get_observed") (i32.const 0))
 
 ;; After start returns, the same leaked function observes ready == 1.
