@@ -35,6 +35,18 @@ if grep -Eq 'script\.(wrong-result|wrong-assertion|link-error)' "$out_dir/reentr
   exit 1
 fi
 
+# Reuse the generated WAST transition system as a Kripke structure.  The
+# reachability query asks whether provider.observed can become 0 while the
+# victim module is still in script.module (instantiation in progress).  The
+# LTL query checks the corresponding invariant on every execution prefix.
+"$maude_bin" -no-banner \
+  "$out_dir/reentrant-start.maude" \
+  benchmarks/instantiation-reentrancy/modelcheck.maude \
+  > "$out_dir/modelcheck.log" 2>&1
+
+grep -q '^Solution 1' "$out_dir/modelcheck.log"
+grep -q 'result ModelCheckResult: counterexample' "$out_dir/modelcheck.log"
+
 wat2wasm benchmarks/instantiation-reentrancy/provider.wat \
   -o "$out_dir/provider.wasm"
 wat2wasm benchmarks/instantiation-reentrancy/victim.wat \
@@ -61,12 +73,15 @@ fi
   echo 'provider.wat typecheck: PASS'
   echo 'victim.wat typecheck: PASS'
   echo 'Spec2Maude linked WAST execution: PASS'
+  echo 'reachability: partial observation DURING instantiation is reachable'
+  echo 'LTL [] ~ partial-observation: counterexample'
   echo 'during victim start, table-reentrant call observed ready=0'
   echo 'after victim start, the same table function observed ready=1'
   echo 'Node/V8 confirmation: PASS'
   echo
   echo 'WAST/Maude statistics:'
-  grep -E '^(rewrites:|result ScriptState:)' "$out_dir/reentrant-start.log" || true
+  grep -E '^(rewrites:|states:|result (ScriptState|ModelCheckResult):)' \
+    "$out_dir/reentrant-start.log" "$out_dir/modelcheck.log" || true
 } | tee "$out_dir/results.txt"
 
 echo "Artifacts written to $out_dir"
