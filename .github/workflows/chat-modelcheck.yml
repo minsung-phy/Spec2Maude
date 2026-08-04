@@ -24,29 +24,10 @@ jobs:
           dune-cache: true
 
       - name: Install OCaml dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          opam install dune menhir -y
-
-          # The setup action creates a local opam switch under this repository.
-          # Building wasm inside that switch makes modern Dune discover the
-          # outer Spec2Maude dune-project instead of wasm's interpreter project.
-          # Build it in an external directory and install its Dune package into
-          # the active switch, which is equivalent for downstream compilation.
-          switch=$(opam switch show)
-          prefix=$(opam var prefix --switch "$switch")
-          wasm_src="$RUNNER_TEMP/wasm-2.0.2"
-          opam source wasm.2.0.2 --dir "$wasm_src"
-          (
-            cd "$wasm_src/interpreter"
-            opam exec --switch "$switch" -- dune build -p wasm @install
-            opam exec --switch "$switch" -- dune install --prefix "$prefix" wasm
-          )
-          test -f "$prefix/lib/wasm/dune-package"
+        run: opam install dune menhir zarith -y
 
       - name: Build Spec2Maude and wasm2maude
-        run: opam exec -- dune build
+        run: opam exec -- dune build --profile release
 
       - name: Install Maude 3.5.1
         shell: bash
