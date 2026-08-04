@@ -6,25 +6,28 @@ mod WASM2MAUDE-INSTANTIATION-REENTRANCY-MC is
 
   subsort ScriptState < State .
 
-  op providerObservedZero : SpectecTerminal -> Bool .
+  op observedName : -> SpectecTerminal .
   op partialObservation : ScriptState -> Bool .
   op partial-observation : -> Prop [ctor] .
 
-  vars S F : SpectecTerminal .
+  eq observedName = name.wrap(
+    char.wrap(111) char.wrap(98) char.wrap(115) char.wrap(101)
+    char.wrap(114) char.wrap(118) char.wrap(101) char.wrap(100)) .
+
+  vars S F MI : SpectecTerminal .
   var SS : ScriptState .
-  vars ID : Nat .
+  vars ID A : Nat .
   var ENV : InstanceEnv .
   var CMDS : Commands .
   var INSTRS : SpectecTerminals .
 
-  ceq providerObservedZero(S) = true
-    if num.const(numtype.i32, uN.wrap(0)) :=
-         value('VALUE, index(value('GLOBALS, S), 0)) .
-  eq providerObservedZero(S) = false [owise] .
-
-  eq partialObservation(
+  ceq partialObservation(
     script.module(ID, ENV, CMDS,
-      config.sym(state.sym(S, F), INSTRS))) = providerObservedZero(S) .
+      config.sym(state.sym(S, F), INSTRS))) = true
+    if MI := findInstance(ENV, 1)
+       /\ A := findGlobal(value('EXPORTS, MI), observedName)
+       /\ value('VALUE, index(value('GLOBALS, S), A))
+          = num.const(numtype.i32, uN.wrap(0)) .
   eq partialObservation(SS) = false [owise] .
 
   eq SS |= partial-observation = partialObservation(SS) .
