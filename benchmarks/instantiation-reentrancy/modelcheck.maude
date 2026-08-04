@@ -1,0 +1,42 @@
+load model-checker.maude
+
+mod WASM2MAUDE-INSTANTIATION-REENTRANCY-MC is
+  protecting WASM2MAUDE-WAST .
+  including MODEL-CHECKER .
+
+  subsort ScriptState < State .
+
+  op providerObservedZero : SpectecTerminal -> Bool .
+  op partialObservation : ScriptState -> Bool .
+  op partial-observation : -> Prop [ctor] .
+
+  vars S F : SpectecTerminal .
+  var SS : ScriptState .
+  vars ID : Nat .
+  var ENV : InstanceEnv .
+  var CMDS : Commands .
+  var INSTRS : SpectecTerminals .
+
+  ceq providerObservedZero(S) = true
+    if num.const(numtype.i32, uN.wrap(0)) :=
+         value('VALUE, index(value('GLOBALS, S), 0)) .
+  eq providerObservedZero(S) = false [owise] .
+
+  eq partialObservation(
+    script.module(ID, ENV, CMDS,
+      config.sym(state.sym(S, F), INSTRS))) = providerObservedZero(S) .
+  eq partialObservation(SS) = false [owise] .
+
+  eq SS |= partial-observation = partialObservation(SS) .
+endm
+
+select WASM2MAUDE-INSTANTIATION-REENTRANCY-MC .
+
+search [1] in WASM2MAUDE-INSTANTIATION-REENTRANCY-MC :
+  script.start =>* SS:ScriptState
+  such that partialObservation(SS:ScriptState) = true .
+
+red in WASM2MAUDE-INSTANTIATION-REENTRANCY-MC :
+  modelCheck(script.start, [] ~ partial-observation) .
+
+quit
