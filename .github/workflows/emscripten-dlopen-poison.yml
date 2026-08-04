@@ -1,0 +1,44 @@
+name: Emscripten failed dlopen poisoning analysis
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repro:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out analysis branch
+        uses: actions/checkout@v4
+
+      - name: Reproduce repeated failed dlopen
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash benchmarks/emscripten-dlopen/run.sh "$RUNNER_TEMP/emscripten-dlopen"
+
+      - name: Collect runner metadata
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/emscripten-dlopen"
+          {
+            echo "github_sha=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            docker --version || true
+          } > "$RUNNER_TEMP/emscripten-dlopen/environment.txt"
+
+      - name: Upload reproduction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: emscripten-failed-dlopen
+          path: ${{ runner.temp }}/emscripten-dlopen
+          if-no-files-found: warn
+          retention-days: 14
