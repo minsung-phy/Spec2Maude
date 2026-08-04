@@ -33,7 +33,6 @@ mod SPEC2MAUDE-CHAT-MC is
 
   op correct-init : -> ChatState .
   op buggy-init : -> ChatState .
-  op complete-correct : -> ChatState .
 
   op wasm-store : -> SpectecTerminal .
   op wasm-module : -> SpectecTerminal .
@@ -81,11 +80,6 @@ mod SPEC2MAUDE-CHAT-MC is
     msg(alice, 0) msg(alice, 1) msg(alice, 0)
     msg(bob, 0) msg(bob, 1) msg(bob, 0)) .
 
-  eq complete-correct = chat(correct,
-    client(alice, 2, 1 :: 0 :: nil-log)
-    client(bob, 2, 1 :: 0 :: nil-log),
-    no-messages) .
-
   --- The AC network chooses any pending message for any idle client.
   rl [deliver] :
     chat(P, client(I, E, L) CS, msg(I, M) MS)
@@ -126,16 +120,12 @@ endm
 
 select SPEC2MAUDE-CHAT-MC .
 
---- Positive reachability: a delivery order exists in which both clients finish.
+--- Positive reachability: one network schedule delivers 0 then 1 to both clients.
 search [1] in SPEC2MAUDE-CHAT-MC :
-  correct-init =>* complete-correct .
-
---- Diagnostic: inspect terminal states after all six network messages are consumed.
-search [10] in SPEC2MAUDE-CHAT-MC :
   correct-init =>*
   chat(correct,
-    client(alice, EA:Nat, LA:ChatLog)
-    client(bob, EB:Nat, LB:ChatLog),
+    client(alice, 2, 1 :: 0 :: nil-log)
+    client(bob, 2, 1 :: 0 :: nil-log),
     no-messages) .
 
 --- Safety search: the correct sequence-equality guard must have no bad log.
