@@ -1,0 +1,162 @@
+load model-checker.maude
+
+mod SPEC2MAUDE-CHAT-MC is
+  protecting WASM-BUILTINS .
+  including MODEL-CHECKER .
+
+  --- A bounded distributed chat model.
+  --- Each client receives messages from an unordered network multiset.
+  --- The message-acceptance guard is executed by the generated Wasm semantics.
+
+  sorts ChatState ClientId ChatLog Client Clients Message Messages Protocol .
+  subsort ChatState < State .
+  subsort Client < Clients .
+  subsort Message < Messages .
+
+  ops alice bob : -> ClientId [ctor] .
+  ops correct buggy : -> Protocol [ctor] .
+
+  op nil-log : -> ChatLog [ctor] .
+  op _::_ : Nat ChatLog -> ChatLog [ctor] .
+
+  op no-clients : -> Clients [ctor] .
+  op __ : Clients Clients -> Clients [ctor assoc comm id: no-clients] .
+
+  op no-messages : -> Messages [ctor] .
+  op __ : Messages Messages -> Messages [ctor assoc comm id: no-messages] .
+
+  op client : ClientId Nat ChatLog -> Client [ctor] .
+  op checking : ClientId Nat ChatLog Nat SpectecTerminal -> Client
+    [ctor frozen (5)] .
+  op msg : ClientId Nat -> Message [ctor] .
+  op chat : Protocol Clients Messages -> ChatState [ctor] .
+
+  op correct-init : -> ChatState .
+  op buggy-init : -> ChatState .
+
+  op wasm-store : -> SpectecTerminal .
+  op wasm-module : -> SpectecTerminal .
+  op wasm-frame : -> SpectecTerminal .
+  op compare-program : Protocol Nat Nat -> SpectecTerminals .
+  op compare-config : Protocol Nat Nat -> SpectecTerminal .
+
+  vars P : Protocol .
+  vars I : ClientId .
+  vars E M : Nat .
+  var L : ChatLog .
+  vars CS : Clients .
+  vars MS : Messages .
+  vars C C2 S : SpectecTerminal .
+
+  eq wasm-store = rec.store(eps, eps, eps, eps, eps,
+    eps, eps, eps, eps, eps) .
+  eq wasm-module = rec.moduleinst(eps, eps, eps, eps, eps,
+    eps, eps, eps, eps) .
+  eq wasm-frame = state.sym(wasm-store, rec.frame(eps, wasm-module)) .
+
+  --- This is the instruction sequence emitted for the Wasm guard:
+  ---   incoming expected i32.eq
+  eq compare-program(correct, E, M) =
+    instr.const(numtype.i32, uN.wrap(M))
+    instr.const(numtype.i32, uN.wrap(E))
+    instr.relop(numtype.i32, relop.eq) .
+
+  --- Mutant: accepts any future sequence number (incoming >= expected).
+  eq compare-program(buggy, E, M) =
+    instr.const(numtype.i32, uN.wrap(M))
+    instr.const(numtype.i32, uN.wrap(E))
+    instr.relop(numtype.i32, relop.ge-sx(sx.u)) .
+
+  eq compare-config(P, E, M) =
+    config.sym(wasm-frame, compare-program(P, E, M)) .
+
+  eq correct-init = chat(correct,
+    client(alice, 0, nil-log) client(bob, 0, nil-log),
+    msg(alice, 0) msg(alice, 1) msg(alice, 0)
+    msg(bob, 0) msg(bob, 1) msg(bob, 0)) .
+
+  eq buggy-init = chat(buggy,
+    client(alice, 0, nil-log) client(bob, 0, nil-log),
+    msg(alice, 0) msg(alice, 1) msg(alice, 0)
+    msg(bob, 0) msg(bob, 1) msg(bob, 0)) .
+
+  --- The AC network chooses any pending message for any idle client.
+  rl [deliver] :
+    chat(P, client(I, E, L) CS, msg(I, M) MS)
+    => chat(P, checking(I, E, L, M, compare-config(P, E, M)) CS, MS) .
+
+  --- A message guard executes only through the generated rel.step relation.
+  crl [wasm-step] :
+    chat(P, checking(I, E, L, M, C) CS, MS)
+    => chat(P, checking(I, E, L, M, C2) CS, MS)
+    if rel.step(C) => C2 .
+
+  rl [accept] :
+    chat(P,
+      checking(I, E, L, M,
+        config.sym(S, instr.const(numtype.i32, uN.wrap(1)))) CS,
+      MS)
+    => chat(P, client(I, _+_(E, 1), M :: L) CS, MS) .
+
+  --- Rejected messages are discarded. This preserves order safety, but an
+  --- early delivery of sequence 1 can therefore destroy eventual completion.
+  rl [reject] :
+    chat(P,
+      checking(I, E, L, M,
+        config.sym(S, instr.const(numtype.i32, uN.wrap(0)))) CS,
+      MS)
+    => chat(P, client(I, E, L) CS, MS) .
+
+  op bad-log : ChatLog -> Bool .
+  eq bad-log(nil-log) = false .
+  eq bad-log(0 :: nil-log) = false .
+  eq bad-log(1 :: 0 :: nil-log) = false .
+  eq bad-log(L) = true [owise] .
+
+  ops bad-order all-complete : -> Prop [ctor] .
+  var X : ChatState .
+
+  ceq chat(P, client(I, E, L) CS, MS) |= bad-order = true
+    if bad-log(L) .
+  eq X |= bad-order = false [owise] .
+
+  eq chat(P,
+    client(alice, 2, 1 :: 0 :: nil-log)
+    client(bob, 2, 1 :: 0 :: nil-log),
+    no-messages) |= all-complete = true .
+  eq X |= all-complete = false [owise] .
+endm
+
+select SPEC2MAUDE-CHAT-MC .
+
+--- Positive reachability: one network schedule delivers 0 then 1 to both clients.
+search [1] in SPEC2MAUDE-CHAT-MC :
+  correct-init =>*
+  chat(correct,
+    client(alice, 2, 1 :: 0 :: nil-log)
+    client(bob, 2, 1 :: 0 :: nil-log),
+    no-messages) .
+
+--- Safety search: the correct sequence-equality guard must have no bad log.
+search [1] in SPEC2MAUDE-CHAT-MC :
+  correct-init =>* X:ChatState
+  such that X:ChatState |= bad-order .
+
+--- Mutation check: the >= guard should expose an out-of-order log.
+search [1] in SPEC2MAUDE-CHAT-MC :
+  buggy-init =>* X:ChatState
+  such that X:ChatState |= bad-order .
+
+--- The correct guard preserves ordered logs in every interleaving.
+red in SPEC2MAUDE-CHAT-MC :
+  modelCheck(correct-init, [] ~ bad-order) .
+
+--- But drop-on-reject does not guarantee that every client eventually completes.
+red in SPEC2MAUDE-CHAT-MC :
+  modelCheck(correct-init, <> all-complete) .
+
+--- The mutant also violates the safety invariant.
+red in SPEC2MAUDE-CHAT-MC :
+  modelCheck(buggy-init, [] ~ bad-order) .
+
+quit
