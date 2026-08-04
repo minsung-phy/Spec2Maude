@@ -43,15 +43,16 @@ grep -q 'instr.const(numtype.i32, uN.wrap(0))' "$out_dir/chat-accept-01.log"
   > "$out_dir/modelcheck.log" 2>&1
 
 # Expected command sequence:
-#   search complete state       -> Solution 1
-#   search bad correct state    -> No solution
-#   search bad mutant state     -> Solution 1
-#   LTL correct invariant       -> true
-#   LTL mutant invariant        -> counterexample
+#   search complete state                -> Solution 1
+#   search bad correct state             -> No solution
+#   search bad mutant state              -> Solution 1
+#   correct safety [] ~ bad-order        -> true
+#   correct liveness <> all-complete     -> counterexample
+#   mutant safety [] ~ bad-order         -> counterexample
 test "$(grep -c '^Solution 1' "$out_dir/modelcheck.log")" -ge 2
 test "$(grep -c '^No solution\.' "$out_dir/modelcheck.log")" -eq 1
 grep -q 'result Bool: true' "$out_dir/modelcheck.log"
-grep -q 'result ModelCheckResult: counterexample' "$out_dir/modelcheck.log"
+test "$(grep -c '^result ModelCheckResult: counterexample' "$out_dir/modelcheck.log")" -eq 2
 
 if grep -Eq '^(Warning|Advisory|Error):' \
     "$out_dir/chat-client-typecheck.log" \
@@ -74,8 +75,9 @@ fi
   echo 'accept(expected=0,incoming=1): 0 (PASS)'
   echo 'reachable complete correct state: YES'
   echo 'correct protocol bad-order state: NOT REACHABLE'
-  echo 'buggy >= mutant bad-order state: REACHABLE'
   echo 'correct LTL [] ~ bad-order: true'
+  echo 'correct LTL <> all-complete: counterexample'
+  echo 'buggy >= mutant bad-order state: REACHABLE'
   echo 'buggy LTL [] ~ bad-order: counterexample'
   echo
   echo 'Maude statistics:'
