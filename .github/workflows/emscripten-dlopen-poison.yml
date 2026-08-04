@@ -48,13 +48,13 @@ jobs:
             exit 1
           fi
 
-      - name: Reproduce repeated failed dlopen
+      - name: Reproduce failed dlopen lifecycle violations
         shell: bash
         run: |
           set -euo pipefail
           bash benchmarks/emscripten-dlopen/run.sh "$RUNNER_TEMP/emscripten-dlopen"
 
-      - name: Model check current and fixed loader protocols
+      - name: Model check current and repaired loader protocols
         shell: bash
         run: |
           set -euo pipefail
@@ -63,10 +63,10 @@ jobs:
             benchmarks/emscripten-dlopen/loader-modelcheck.maude \
             > "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log" 2>&1
 
-          test "$(grep -c '^Solution 1' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 2
-          test "$(grep -c '^No solution\.' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 1
-          test "$(grep -c 'result ModelCheckResult: counterexample' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 1
-          grep -q 'result Bool: true' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log"
+          test "$(grep -c '^Solution 1' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 4
+          test "$(grep -c '^No solution\.' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 3
+          test "$(grep -c 'result ModelCheckResult: counterexample' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 3
+          test "$(grep -c 'result Bool: true' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 3
 
           if grep -Eq '^(Warning|Advisory|Error):' \
               "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log"; then
