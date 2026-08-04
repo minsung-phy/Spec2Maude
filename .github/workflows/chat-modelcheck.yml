@@ -29,19 +29,20 @@ jobs:
           set -euo pipefail
           opam install dune menhir -y
 
-          # The setup action creates a local opam switch inside this repository.
-          # wasm.2.0.2's Makefile invokes `dune build wasm.exe` from its own
-          # interpreter directory. Without a forced root, modern Dune walks up
-          # into Spec2Maude's outer dune-project and builds the wrong workspace.
-          real_dune=$(opam exec -- which dune)
-          wrapper_dir="$RUNNER_TEMP/dune-root-wrapper"
-          mkdir -p "$wrapper_dir"
-          cat > "$wrapper_dir/dune" <<EOF
-          #!/usr/bin/env bash
-          exec "$real_dune" --root "\$PWD" "\$@"
-          EOF
-          chmod +x "$wrapper_dir/dune"
-          PATH="$wrapper_dir:$PATH" opam install wasm -y
+          # The setup action creates a local opam switch under this repository.
+          # Building wasm inside that switch makes modern Dune discover the
+          # outer Spec2Maude dune-project instead of wasm's interpreter project.
+          # Build it in an external directory and install its Dune package into
+          # the active switch, which is equivalent for downstream compilation.
+          wasm_src="$RUNNER_TEMP/wasm-2.0.2"
+          opam source wasm.2.0.2 --dir "$wasm_src"
+          prefix=$(opam var prefix)
+          (
+            cd "$wasm_src/interpreter"
+            opam exec -- dune build -p wasm @install
+            opam exec -- dune install --prefix "$prefix" wasm
+          )
+          test -f "$prefix/lib/wasm/dune-package"
 
       - name: Build Spec2Maude and wasm2maude
         run: opam exec -- dune build
