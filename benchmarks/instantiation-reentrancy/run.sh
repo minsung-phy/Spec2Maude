@@ -37,8 +37,8 @@ fi
 
 # Reuse the generated WAST transition system as a Kripke structure.
 # 1. A victim function observes partial initialization while its start runs.
-# 2. A function belonging to a failed instance remains executable through a
-#    table entry whose mutation was not rolled back.
+# 2. A stateful function belonging to a failed instance remains executable
+#    through a table entry whose mutation was not rolled back.
 "$maude_bin" -no-banner \
   "$out_dir/reentrant-start.maude" \
   benchmarks/instantiation-reentrancy/modelcheck.maude \
@@ -67,7 +67,8 @@ node benchmarks/instantiation-reentrancy/node-zombie.mjs \
   > "$out_dir/node-zombie.log"
 
 grep -q '^instantiation_trapped=true$' "$out_dir/node-zombie.log"
-grep -q '^zombie_result=42$' "$out_dir/node-zombie.log"
+grep -q '^zombie_result_1=41$' "$out_dir/node-zombie.log"
+grep -q '^zombie_result_2=42$' "$out_dir/node-zombie.log"
 
 if grep -Eq '^(Warning|Advisory|Error):' "$out_dir"/*.log; then
   grep -En '^(Warning|Advisory|Error):' "$out_dir"/*.log >&2 || true
@@ -92,11 +93,12 @@ fi
   echo 'after victim start, the same table function observed ready=1'
   echo 'Node/V8 confirmation: PASS'
   echo
-  echo '[Finding 2] failed-instantiation zombie capability'
-  echo 'reachability: failed-module code execution is reachable'
+  echo '[Finding 2] failed-instantiation stateful zombie capability'
+  echo 'reachability: failed-module stateful code execution is reachable'
   echo 'LTL [] ~ zombie-execution: counterexample'
-  echo 'victim start trapped, but provider.table still invoked victim code -> 42'
+  echo 'victim start trapped, but provider.table invoked failed victim twice -> 41, 42'
   echo 'failed victim instance is absent from the instance environment'
+  echo 'failed victim private global remains live across calls'
   echo 'Node/V8 confirmation: PASS'
   echo
   echo 'WAST/Maude statistics:'
