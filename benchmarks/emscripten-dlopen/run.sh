@@ -8,8 +8,8 @@ mkdir -p "$out_dir"
 image=${EMSDK_IMAGE:-emscripten/emsdk:latest}
 bench="$root/benchmarks/emscripten-dlopen"
 
-# Keep all generated files in the artifact directory while mounting the source
-# benchmark read-only.
+# Compile both the current production loader and a minimal cache-cleanup
+# variant in the same pinned container image.
 docker run --rm \
   -v "$bench:/src:ro" \
   -v "$out_dir:/out" \
@@ -25,26 +25,39 @@ docker run --rm \
       -Wl,--export=zombie_value \
       -o /out/libbad.wasm
 
-    emcc /src/main.c -O0 \
-      -sMAIN_MODULE=2 \
-      -sASSERTIONS=0 \
-      -sEXIT_RUNTIME=1 \
-      -sENVIRONMENT=node \
-      -sALLOW_TABLE_GROWTH=1 \
-      -o /out/main.js
+    compile_main() {
+      local output=$1
+      emcc /src/main.c -O0 \
+        -sMAIN_MODULE=2 \
+        -sASSERTIONS=0 \
+        -sEXIT_RUNTIME=1 \
+        -sENVIRONMENT=node \
+        -sALLOW_TABLE_GROWTH=1 \
+        -o "$output"
+    }
 
+    compile_main /out/main-production.js
     cd /out
-    node main.js > production.log 2>&1 || true
+    node main-production.js > production.log 2>&1 || true
+
+    python3 /src/patch_libdylink.py \
+      /emsdk/upstream/emscripten/src/lib/libdylink.js \
+      > /out/patch.log
+
+    compile_main /out/main-fixed.js
+    node main-fixed.js > fixed.log 2>&1 || true
   '
 
-cat "$out_dir/production.log"
-
-# A correct failed-load cache must not turn a later dlopen into a successful
-# handle without valid exports. Detect the production-build poison pattern:
-# first load fails, second load reports a non-null handle, dlsym fails.
+# Current production behavior: the first constructor trap is reported, but a
+# later dlopen of the same name returns a poisoned non-null handle.
 grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/production.log"
 grep -q '^attempt_2_handle_nonnull=1$' "$out_dir/production.log"
 grep -q '^attempt_2_symbol_nonnull=0$' "$out_dir/production.log"
+
+# Minimal remediation: evict the `loading` DSO on rejection. Both calls now
+# execute a real load attempt and both correctly report failure.
+grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/fixed.log"
+grep -q '^attempt_2_handle_nonnull=0$' "$out_dir/fixed.log"
 
 {
   echo 'Emscripten repeated-failed-dlopen result'
@@ -52,8 +65,13 @@ grep -q '^attempt_2_symbol_nonnull=0$' "$out_dir/production.log"
   echo "image=$image"
   cat "$out_dir/node-version.log"
   echo
+  echo '[Current production loader]'
   grep '^attempt_' "$out_dir/production.log"
+  echo
+  echo '[Minimal cache-cleanup patch]'
+  grep '^attempt_' "$out_dir/fixed.log"
   echo
   echo 'Finding: failed side-module construction leaves a cached DSO in loading state.'
   echo 'The first dlopen fails, but the second returns a non-null poisoned handle.'
+  echo 'Evicting the failed DSO prevents false-success handles; full table/memory cleanup remains separate.'
 } | tee "$out_dir/results.txt"
