@@ -114,7 +114,7 @@ for mode in current fixed; do
 
   opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
     "$wasm" --invoke wamr_decode_status --arg i32:2 \
-    --steps 500000 --call-depth 128 --semantics builtins.maude \
+    --steps 500000 --semantics builtins.maude \
     -o "$out_dir/${mode}-last2.maude"
   "$maude_bin" -no-banner "$out_dir/${mode}-last2.maude" \
     > "$out_dir/${mode}-last2.log" 2>&1
@@ -132,7 +132,7 @@ for mode in current fixed; do
   wasm="$out_dir/wamr-leb-${mode}.wasm"
   opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
     "$wasm" --invoke wamr_decode_status --arg i32:0 \
-    --steps 500000 --call-depth 128 --semantics builtins.maude \
+    --steps 500000 --semantics builtins.maude \
     -o "$out_dir/${mode}-base.maude"
   python3 "$bench/make_modelcheck.py" \
     "$out_dir/${mode}-base.maude" "$out_dir/${mode}-modelcheck.maude" \
