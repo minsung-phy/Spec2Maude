@@ -8,9 +8,8 @@ mkdir -p "$out_dir"
 image=${EMSDK_IMAGE:-emscripten/emsdk:latest}
 bench="$root/benchmarks/emscripten-dlopen"
 
-# Compile both the current production loader and a minimal cache-cleanup
-# variant in the same container image.  The second program probes whether a
-# failed module temporarily supplies a global symbol to a later consumer.
+# Compile the current production loader experiments and a minimal cache-cleanup
+# variant in the same container image.
 docker run --rm \
   -v "$bench:/src:ro" \
   -v "$out_dir:/out" \
@@ -38,23 +37,39 @@ docker run --rm \
     cp /out/libconsumer.wasm /out/libconsumer-pre.wasm
     cp /out/libconsumer.wasm /out/libconsumer-post.wasm
 
+    emcc /src/local_provider.c -O0 \
+      -sSIDE_MODULE=2 \
+      -Wl,--export=local_only \
+      -o /out/liblocal-provider.wasm
+
+    emcc /src/local_consumer.c -O0 \
+      -sSIDE_MODULE=2 \
+      -Wl,--export=call_local \
+      -o /out/liblocal-consumer.wasm
+
     compile_main() {
       local source=$1
       local output=$2
+      shift 2
       emcc "/src/$source" -O0 \
         -sMAIN_MODULE=2 \
         -sASSERTIONS=0 \
         -sEXIT_RUNTIME=1 \
         -sENVIRONMENT=node \
         -sALLOW_TABLE_GROWTH=1 \
+        "$@" \
         -o "$output"
     }
 
     compile_main main.c /out/main-production.js
     compile_main symbol_poison_main.c /out/symbol-production.js
+    compile_main local_scope_main.c /out/local-scope.js -DLOAD_GLOBAL=0
+    compile_main local_scope_main.c /out/global-scope.js -DLOAD_GLOBAL=1
     cd /out
     node main-production.js > production.log 2>&1 || true
     node symbol-production.js > symbol-production.log 2>&1 || true
+    node local-scope.js > emscripten-local-scope.log 2>&1 || true
+    node global-scope.js > emscripten-global-scope.log 2>&1 || true
 
     python3 /src/patch_libdylink.py \
       /emsdk/upstream/emscripten/src/lib/libdylink.js \
@@ -65,6 +80,17 @@ docker run --rm \
     node main-fixed.js > fixed.log 2>&1 || true
     node symbol-fixed.js > symbol-fixed.log 2>&1 || true
   '
+
+# Native Linux is the control for RTLD_LOCAL/RTLD_GLOBAL visibility.
+(
+  cd "$out_dir"
+  cc -fPIC -shared "$bench/local_provider.c" -o liblocal-provider.so
+  cc -fPIC -shared "$bench/local_consumer.c" -o liblocal-consumer.so
+  cc "$bench/local_scope_main.c" -DLOAD_GLOBAL=0 -ldl -o native-local-scope
+  cc "$bench/local_scope_main.c" -DLOAD_GLOBAL=1 -ldl -o native-global-scope
+  ./native-local-scope > native-local-scope.log 2>&1 || true
+  ./native-global-scope > native-global-scope.log 2>&1 || true
+)
 
 # Current production behavior: the first constructor trap is reported, but a
 # later dlopen of the same name returns a poisoned non-null handle.
@@ -104,6 +130,34 @@ for log in symbol-production symbol-fixed; do
   fi
 done
 
+# Native control: RTLD_LOCAL does not publish the provider to RTLD_DEFAULT and
+# an unrelated consumer with an unresolved symbol cannot load. RTLD_GLOBAL
+# makes both operations succeed.
+grep -q '^provider_handle_nonnull=1$' "$out_dir/native-local-scope.log"
+grep -q '^provider_direct_result=777$' "$out_dir/native-local-scope.log"
+grep -q '^default_symbol_nonnull=0$' "$out_dir/native-local-scope.log"
+grep -q '^consumer_handle_nonnull=0$' "$out_dir/native-local-scope.log"
+grep -q '^provider_handle_nonnull=1$' "$out_dir/native-global-scope.log"
+grep -q '^provider_direct_result=777$' "$out_dir/native-global-scope.log"
+grep -q '^default_symbol_nonnull=1$' "$out_dir/native-global-scope.log"
+grep -q '^default_result=777$' "$out_dir/native-global-scope.log"
+grep -q '^consumer_handle_nonnull=1$' "$out_dir/native-global-scope.log"
+grep -q '^consumer_result=777$' "$out_dir/native-global-scope.log"
+
+# Emscripten global control must work. The local case is classified rather
+# than assumed, because this is the behavior under investigation.
+grep -q '^provider_handle_nonnull=1$' "$out_dir/emscripten-local-scope.log"
+grep -q '^provider_direct_result=777$' "$out_dir/emscripten-local-scope.log"
+grep -Eq '^default_symbol_nonnull=(0|1)$' "$out_dir/emscripten-local-scope.log"
+grep -Eq '^consumer_handle_nonnull=(0|1)$' "$out_dir/emscripten-local-scope.log"
+if grep -q '^consumer_handle_nonnull=1$' "$out_dir/emscripten-local-scope.log"; then
+  grep -q '^consumer_result=777$' "$out_dir/emscripten-local-scope.log"
+fi
+grep -q '^provider_handle_nonnull=1$' "$out_dir/emscripten-global-scope.log"
+grep -q '^provider_direct_result=777$' "$out_dir/emscripten-global-scope.log"
+grep -q '^consumer_handle_nonnull=1$' "$out_dir/emscripten-global-scope.log"
+grep -q '^consumer_result=777$' "$out_dir/emscripten-global-scope.log"
+
 classify_pre_resolution() {
   local log=$1
   if grep -q '^pre_consumer_result_1=41$' "$log"; then
@@ -117,12 +171,24 @@ classify_pre_resolution() {
   fi
 }
 
+classify_local_scope() {
+  local log=$1
+  if grep -q '^default_symbol_nonnull=1$' "$log" ||
+     grep -q '^consumer_handle_nonnull=1$' "$log"; then
+    echo 'LEAKED'
+  else
+    echo 'ISOLATED'
+  fi
+}
+
 production_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-production.log")
 fixed_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-fixed.log")
+emscripten_local_scope=$(classify_local_scope "$out_dir/emscripten-local-scope.log")
+native_local_scope=$(classify_local_scope "$out_dir/native-local-scope.log")
 
 {
-  echo 'Emscripten failed-dlopen lifecycle result'
-  echo '========================================='
+  echo 'Emscripten failed-dlopen and loader-scope result'
+  echo '================================================'
   echo "image=$image"
   cat "$out_dir/node-version.log"
   echo
@@ -140,6 +206,20 @@ fixed_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-fixed.log")
   grep -E '^(bad|pre_consumer|good|post_consumer)_' "$out_dir/symbol-fixed.log"
   echo "fixed_pre_consumer_resolved_to=$fixed_pre_resolution"
   echo
+  echo '[Emscripten RTLD_LOCAL]'
+  grep -E '^(provider|default|consumer)_' "$out_dir/emscripten-local-scope.log"
+  echo "emscripten_local_scope=$emscripten_local_scope"
+  echo
+  echo '[Native Linux RTLD_LOCAL control]'
+  grep -E '^(provider|default|consumer)_' "$out_dir/native-local-scope.log"
+  echo "native_local_scope=$native_local_scope"
+  echo
+  echo '[Emscripten RTLD_GLOBAL control]'
+  grep -E '^(provider|default|consumer)_' "$out_dir/emscripten-global-scope.log"
+  echo
+  echo '[Native Linux RTLD_GLOBAL control]'
+  grep -E '^(provider|default|consumer)_' "$out_dir/native-global-scope.log"
+  echo
   echo '[Finding 1] stale loading DSO / poisoned dlopen handle'
   echo 'The first dlopen fails, but the second returns a non-null handle with no exports.'
   echo 'Evicting the failed DSO prevents the false-success handle.'
@@ -152,4 +232,7 @@ fixed_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-fixed.log")
   echo '[Finding 3 candidate] failed-load global symbol window'
   echo 'FAILED_MODULE means that a consumer loaded before a good provider executed failed-module code.'
   echo 'UNRESOLVED means the failed module did not supply the global symbol through the public loader path.'
+  echo
+  echo '[Finding 4 candidate] RTLD_LOCAL isolation'
+  echo 'LEAKED means a local provider became visible through RTLD_DEFAULT or to an unrelated consumer.'
 } | tee "$out_dir/results.txt"
