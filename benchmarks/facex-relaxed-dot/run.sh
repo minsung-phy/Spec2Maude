@@ -24,12 +24,16 @@ grep -q 'sum -= 128 \* col_sums\[n\]' "$prod"
 sha256sum "$prod" > "$out/facex-production-source.sha256"
 git -C "$facex" show -s --format=fuller HEAD > "$out/facex-commit.txt"
 
-# Prove the shipped detector binary contains the production relaxed-dot opcode.
+# The repository's checked-in detector binary may lag the current source.
+# Record its instruction coverage, but analyze the pinned current source below.
 wasm-objdump -d "$facex/wasm/detect.wasm" > "$out/detect.objdump"
-grep -Eq 'i32x4\.(relaxed_)?dot_i8x16_i7x16_add_s' "$out/detect.objdump"
-grep -q 'fd 93 02' "$out/detect.objdump"
+if grep -q 'fd 93 02' "$out/detect.objdump"; then
+  echo present > "$out/shipped-relaxed-dot.txt"
+else
+  echo absent > "$out/shipped-relaxed-dot.txt"
+fi
 
-# Compile the exact arithmetic slice used by the production hot loop.
+# Compile the exact arithmetic slice used by the current production hot loop.
 clang --target=wasm32-unknown-unknown -O2 -nostdlib \
   -msimd128 -mrelaxed-simd "$bench/facex_kernel.c" \
   -Wl,--no-entry \
@@ -63,18 +67,13 @@ run_case() {
   python3 "$common/check_i32_result.py" "$out/${name}-run.log" "$expected"
 }
 
-# Current production arithmetic is wrong in both legal profiles.
 run_case current-r0 0 facex_current_mismatch 1
 run_case current-r1 1 facex_current_mismatch 1
-# The tempting operand-swap patch works only in the unsigned-second profile.
 run_case swap-r0 0 facex_swap_mismatch 1
 run_case swap-r1 1 facex_swap_mismatch 0
-# Deterministic replacement is profile-independent.
 run_case portable-r0 0 facex_portable_mismatch 0
 run_case portable-r1 1 facex_portable_mismatch 0
 
-# Convert the violating full-program run to a reachability query. This asks
-# Maude to find a terminal Wasm state whose mismatch result is 1.
 python3 "$common/make_search.py" "$out/current-r0-run.maude" \
   "$out/current-r0-search.maude" --bad-result 1
 "$maude" -no-banner "$out/current-r0-search.maude" > "$out/current-r0-search.log" 2>&1
@@ -85,14 +84,14 @@ python3 "$common/make_search.py" "$out/swap-r0-run.maude" \
 "$maude" -no-banner "$out/swap-r0-search.maude" > "$out/swap-r0-search.log" 2>&1
 grep -q '^Solution 1' "$out/swap-r0-search.log"
 
-# Concrete current-engine replay over all signed-byte encodings.
 node "$bench/run_node.mjs" "$out/facex-kernel.wasm" > "$out/node.log" 2>&1
 
 {
-  echo 'FaceX production Relaxed-SIMD correctness result'
-  echo '================================================'
+  echo 'FaceX current-source Relaxed-SIMD correctness result'
+  echo '===================================================='
   echo "spec2maude_commit=$(git rev-parse HEAD)"
   echo "facex_commit=$facex_sha"
+  echo "checked_in_detect_dot=$(cat "$out/shipped-relaxed-dot.txt")"
   echo
   echo '[Spec2Maude executions at A=0, B=1, K=16]'
   echo 'current R_idot=0 mismatch=1'
