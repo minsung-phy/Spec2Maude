@@ -31,7 +31,7 @@ def module(flag: int) -> bytes:
         limits += b"\x01"
     table_sec = section(4, b"\x01\x70" + limits)
 
-    name = b"_start"
+    name = b"main"
     export_sec = section(7, b"\x01" + uleb(len(name)) + name + b"\x00\x00")
     code_sec = section(10, b"\x01\x02\x00\x0b")
     return header + type_sec + func_sec + table_sec + export_sec + code_sec
