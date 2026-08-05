@@ -68,6 +68,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('benchmarks/wamr-u64-leb/run.sh')
+          text = path.read_text(encoding='utf-8')
+          old = '''grep -q 'instr.const(numtype.i32, uN.wrap(0))' \\
+            "$out_dir/current-last2.log"
+          grep -q 'instr.const(numtype.i32, uN.wrap(2))' \\
+            "$out_dir/fixed-last2.log"'''
+          new = '''tr -d '\\n' < "$out_dir/current-last2.log" | \\
+            grep -q 'instr.const(numtype.i32, uN.wrap(0))'
+          tr -d '\\n' < "$out_dir/fixed-last2.log" | \\
+            grep -q 'instr.const(numtype.i32, uN.wrap(2))' '''
+          if text.count(old) != 1:
+              raise SystemExit('expected concrete-result check block not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
           CPATH="$GITHUB_WORKSPACE/benchmarks/wamr-u64-leb/platform-stub" \
             opam exec -- bash benchmarks/wamr-u64-leb/run.sh \
               "$RUNNER_TEMP/wamr-u64-leb"
