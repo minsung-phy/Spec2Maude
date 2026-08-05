@@ -70,7 +70,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for module in libbad liblocal-provider liblocal-consumer; do
+          for module in libbad libcallback-bad liblocal-provider liblocal-consumer; do
             opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
               "$RUNNER_TEMP/emscripten-dlopen/${module}.wasm" \
               --semantics builtins.maude \
