@@ -60,30 +60,32 @@ jobs:
             exit 1
           fi
 
-      - name: Reproduce failed dlopen lifecycle violations
+      - name: Reproduce dynamic-loader violations
         shell: bash
         run: |
           set -euo pipefail
           bash benchmarks/emscripten-dlopen/run.sh "$RUNNER_TEMP/emscripten-dlopen"
 
-      - name: Validate concrete Emscripten side module through wasm2maude
+      - name: Validate concrete Wasm modules through wasm2maude
         shell: bash
         run: |
           set -euo pipefail
-          opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
-            "$RUNNER_TEMP/emscripten-dlopen/libbad.wasm" \
-            --semantics builtins.maude \
-            -o "$RUNNER_TEMP/emscripten-dlopen/libbad-typecheck.maude"
-          "$MAUDE" -no-banner \
-            "$RUNNER_TEMP/emscripten-dlopen/libbad-typecheck.maude" \
-            > "$RUNNER_TEMP/emscripten-dlopen/libbad-typecheck.log" 2>&1
-          grep -q 'result Bool: true' \
-            "$RUNNER_TEMP/emscripten-dlopen/libbad-typecheck.log"
-          if grep -Eq '^(Warning|Advisory|Error):' \
-              "$RUNNER_TEMP/emscripten-dlopen/libbad-typecheck.log"; then
-            cat "$RUNNER_TEMP/emscripten-dlopen/libbad-typecheck.log"
-            exit 1
-          fi
+          for module in libbad liblocal-provider liblocal-consumer; do
+            opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
+              "$RUNNER_TEMP/emscripten-dlopen/${module}.wasm" \
+              --semantics builtins.maude \
+              -o "$RUNNER_TEMP/emscripten-dlopen/${module}-typecheck.maude"
+            "$MAUDE" -no-banner \
+              "$RUNNER_TEMP/emscripten-dlopen/${module}-typecheck.maude" \
+              > "$RUNNER_TEMP/emscripten-dlopen/${module}-typecheck.log" 2>&1
+            grep -q 'result Bool: true' \
+              "$RUNNER_TEMP/emscripten-dlopen/${module}-typecheck.log"
+            if grep -Eq '^(Warning|Advisory|Error):' \
+                "$RUNNER_TEMP/emscripten-dlopen/${module}-typecheck.log"; then
+              cat "$RUNNER_TEMP/emscripten-dlopen/${module}-typecheck.log"
+              exit 1
+            fi
+          done
 
       - name: Model check current and repaired loader protocols
         shell: bash
@@ -94,10 +96,10 @@ jobs:
             benchmarks/emscripten-dlopen/loader-modelcheck.maude \
             > "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log" 2>&1
 
-          test "$(grep -c '^Solution 1' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 4
-          test "$(grep -c '^No solution\.' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 3
-          test "$(grep -c 'result ModelCheckResult: counterexample' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 3
-          test "$(grep -c 'result Bool: true' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 3
+          test "$(grep -c '^Solution 1' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 6
+          test "$(grep -c '^No solution\.' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 5
+          test "$(grep -c 'result ModelCheckResult: counterexample' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 5
+          test "$(grep -c 'result Bool: true' "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log")" -eq 5
 
           if grep -Eq '^(Warning|Advisory|Error):' \
               "$RUNNER_TEMP/emscripten-dlopen/loader-modelcheck.log"; then
