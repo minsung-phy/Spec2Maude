@@ -25,6 +25,11 @@ docker run --rm \
       -Wl,--export=zombie_value \
       -o /out/libbad.wasm
 
+    emcc /src/callback_bad_side.c -O0 \
+      -sSIDE_MODULE=2 \
+      -Wl,--export=failed_plugin_callback \
+      -o /out/libcallback-bad.wasm
+
     emcc /src/good_side.c -O0 \
       -sSIDE_MODULE=2 \
       -Wl,--export=zombie_value \
@@ -62,12 +67,14 @@ docker run --rm \
     }
 
     compile_main main.c /out/main-production.js
+    compile_main callback_main.c /out/callback-production.js
     compile_main symbol_poison_main.c /out/symbol-production.js
     compile_main local_scope_main.c /out/local-scope.js -DLOAD_GLOBAL=0
     compile_main local_scope_main.c /out/global-scope.js -DLOAD_GLOBAL=1
 
     cd /out
     node main-production.js > production.log 2>&1 || true
+    node callback-production.js > callback-production.log 2>&1 || true
     node symbol-production.js > symbol-production.log 2>&1 || true
     node local-scope.js > emscripten-local-scope.log 2>&1 || true
     node global-scope.js > emscripten-global-scope.log 2>&1 || true
@@ -77,8 +84,10 @@ docker run --rm \
       > /out/patch.log
 
     compile_main main.c /out/main-fixed.js
+    compile_main callback_main.c /out/callback-fixed.js
     compile_main symbol_poison_main.c /out/symbol-fixed.js
     node main-fixed.js > fixed.log 2>&1 || true
+    node callback-fixed.js > callback-fixed.log 2>&1 || true
     node symbol-fixed.js > symbol-fixed.log 2>&1 || true
   '
 
@@ -100,7 +109,7 @@ grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/production.log"
 grep -q '^attempt_2_handle_nonnull=1$' "$out_dir/production.log"
 grep -q '^attempt_2_symbol_nonnull=0$' "$out_dir/production.log"
 
-# Finding 2: the failed side module has already grown the shared table and its
+# Finding 2a: the failed side module has already grown the shared table and its
 # stateful function remains callable after dlopen returned NULL.
 for log in production fixed; do
   grep -q '^attempt_1_residual_slot_callable=1$' "$out_dir/${log}.log"
@@ -108,15 +117,26 @@ for log in production fixed; do
   grep -q '^attempt_1_residual_result_2=42$' "$out_dir/${log}.log"
 done
 
-# Cache eviction fixes the false-success handle but cannot revoke the residual
-# table capability.
+# Finding 2b: the same lifecycle leak is reachable through an ordinary C
+# function pointer. The failed plugin registers its own callback in the host,
+# then traps. dlopen returns NULL, but the host invokes the failed plugin twice
+# and observes its private counter. No internal JS table API is used here.
+for log in callback-production callback-fixed; do
+  grep -q '^callback_before=7$' "$out_dir/${log}.log"
+  grep -q '^callback_load_handle_nonnull=0$' "$out_dir/${log}.log"
+  grep -q '^callback_after_failure_1=71$' "$out_dir/${log}.log"
+  grep -q '^callback_after_failure_2=72$' "$out_dir/${log}.log"
+done
+
+# Cache eviction fixes the false-success handle but cannot revoke either form
+# of residual capability.
 grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/fixed.log"
 grep -q '^attempt_2_handle_nonnull=0$' "$out_dir/fixed.log"
 
-# Finding 3: RTLD_NOW is accepted for a consumer whose required symbol is not
-# available. dlopen and dlsym both report success; the first call escapes the
-# Wasm boundary as a JavaScript TypeError. Failed-DSO cache cleanup does not
-# affect this independent behavior.
+# Documented Emscripten semantic gap: RTLD_NOW is accepted for a consumer whose
+# required symbol is not available. dlopen and dlsym both report success; the
+# first call escapes the Wasm boundary as a JavaScript TypeError. Failed-DSO
+# cache cleanup does not affect this independent behavior.
 for log in symbol-production symbol-fixed; do
   grep -q '^bad_handle_nonnull=0$' "$out_dir/${log}.log"
   grep -q '^pre_consumer_handle_nonnull=1$' "$out_dir/${log}.log"
@@ -141,8 +161,8 @@ grep -q '^consumer_handle_nonnull=1$' "$out_dir/native-global-scope.log"
 grep -q '^consumer_result=777$' "$out_dir/native-global-scope.log"
 
 # Emscripten preserves RTLD_LOCAL visibility for RTLD_DEFAULT, but violates the
-# RTLD_NOW failure boundary: the unrelated consumer is reported loaded and only
-# crashes when its unresolved import is called.
+# native RTLD_NOW failure boundary: the unrelated consumer is reported loaded
+# and only crashes when its unresolved import is called.
 grep -q '^provider_handle_nonnull=1$' "$out_dir/emscripten-local-scope.log"
 grep -q '^provider_direct_result=777$' "$out_dir/emscripten-local-scope.log"
 grep -q '^default_symbol_nonnull=0$' "$out_dir/emscripten-local-scope.log"
@@ -172,11 +192,15 @@ grep -q '^consumer_result=777$' "$out_dir/emscripten-global-scope.log"
   echo '[Cache-only repair]'
   grep '^attempt_' "$out_dir/fixed.log"
   echo
-  echo '[Finding 2: stateful residual Wasm capability]'
+  echo '[Finding 2a: residual Wasm table capability]'
   echo 'failed_dlopen_residual_results=41,42'
   echo 'cache_cleanup_residual_results=41,42'
   echo
-  echo '[Finding 3: Emscripten RTLD_NOW false success]'
+  echo '[Finding 2b: host-visible C callback from a failed plugin]'
+  grep '^callback_' "$out_dir/callback-production.log"
+  echo 'failed_plugin_callback_status=EXECUTABLE_AFTER_DLOPEN_NULL'
+  echo
+  echo '[Documented RTLD_NOW semantic gap]'
   grep -E '^(provider|default|consumer)_' "$out_dir/emscripten-local-scope.log"
   grep 'TypeError: resolved is not a function' "$out_dir/emscripten-local-scope.log"
   echo 'emscripten_rtld_now=LOAD_SUCCEEDED_THEN_HOST_TYPEERROR'
