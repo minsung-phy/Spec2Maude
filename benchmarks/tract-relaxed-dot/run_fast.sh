@@ -41,8 +41,8 @@ cp output.maude "$out/output.maude"
 python3 "$bench/make_profile.py" builtins.maude "$out/builtins-r-idot-0.maude" --r-idot 0
 python3 "$bench/make_profile.py" builtins.maude "$out/builtins-r-idot-1.maude" --r-idot 1
 
-run_case() {
-  local name=$1 profile=$2 export_name=$3 input=$4
+run_concrete() {
+  local name=$1 profile=$2 export_name=$3 input=$4 expected=$5
   local semantics="$out/builtins-r-idot-${profile}.maude"
 
   opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
@@ -55,23 +55,24 @@ run_case() {
   opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
     "$out/tract-relaxed-dot.wasm" --invoke "$export_name" \
     --arg "i32:${input}" --steps 500000 --semantics "$semantics" \
-    -o "$out/${name}-base.maude"
-  python3 "$bench/make_search.py" "$out/${name}-base.maude" \
-    "$out/${name}-search.maude" --bad-result 1
-  timeout 1200s "$maude" -no-banner "$out/${name}-search.maude" \
-    > "$out/${name}-search.log" 2>&1
+    -o "$out/${name}-run.maude"
+  "$maude" -no-banner "$out/${name}-run.maude" \
+    > "$out/${name}-run.log" 2>&1
+  python3 "$bench/check_i32_result.py" "$out/${name}-run.log" "$expected"
 }
 
-# 128 is the first signed i8 value whose signed and unsigned interpretations
-# differ.  The official R_idot=0 profile must preserve the scalar contract;
-# the equally legal R_idot=1 profile reaches mismatch=1.
-run_case profile-0 0 tract_mismatch 128
-run_case profile-1 1 tract_mismatch 128
-run_case fixed 1 fixed_mismatch 128
+# Execute both official profiles through the full generated semantics.  Then
+# model-check only the violating profile to obtain a counterexample quickly;
+# exhaustive proof of the non-violating profile belongs in the slower LTL run.
+run_concrete profile-0 0 tract_mismatch 128 0
+run_concrete profile-1 1 tract_mismatch 128 1
+run_concrete fixed 1 fixed_mismatch 128 0
 
-grep -q '^No solution\.' "$out/profile-0-search.log"
+python3 "$bench/make_search.py" "$out/profile-1-run.maude" \
+  "$out/profile-1-search.maude" --bad-result 1
+timeout 1200s "$maude" -no-banner "$out/profile-1-search.maude" \
+  > "$out/profile-1-search.log" 2>&1
 grep -q '^Solution 1' "$out/profile-1-search.log"
-grep -q '^No solution\.' "$out/fixed-search.log"
 
 # A complete concrete replay of all 256 byte values in V8 shows the operational
 # impact of the legal unsigned-second-operand profile.
@@ -98,19 +99,20 @@ grep -q '^first_mismatch=128$' "$out/node.log"
   echo "node=$(node --version)"
   echo "maude=$($maude --version 2>&1 | head -n 1 || true)"
   echo
-  echo '[Full Wasm program reachability at the signedness boundary byte 128]'
-  for name in profile-0 profile-1 fixed; do
-    echo "--- $name"
-    grep -E '^(Solution 1|No solution\.|states:|rewrites:)' \
-      "$out/${name}-search.log" || true
-  done
+  echo '[Full generated Wasm semantics at boundary byte 128]'
+  echo 'R_idot=0 mismatch=0'
+  echo 'R_idot=1 mismatch=1'
+  echo 'deterministic repair under R_idot=1 mismatch=0'
+  echo
+  echo '[Maude reachability counterexample under legal R_idot=1]'
+  grep -E '^(Solution 1|states:|rewrites:)' "$out/profile-1-search.log" || true
   echo
   echo '[Concrete V8 replay over byte values 0..255]'
   cat "$out/node.log"
 } | tee "$out/results.txt"
 
 if grep -Eq '^(Warning|Advisory|Error):' \
-    "$out"/*-typecheck.log "$out"/*-search.log; then
+    "$out"/*-typecheck.log "$out"/*-run.log "$out/profile-1-search.log"; then
   grep -En '^(Warning|Advisory|Error):' "$out"/*.log >&2 || true
   exit 1
 fi
