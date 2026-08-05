@@ -8,8 +8,8 @@ mkdir -p "$out_dir"
 image=${EMSDK_IMAGE:-emscripten/emsdk:latest}
 bench="$root/benchmarks/emscripten-dlopen"
 
-# Compile the current production loader experiments and a minimal cache-cleanup
-# variant in the same container image.
+# Compile the production-loader experiments and a minimal failed-DSO cache
+# cleanup variant in the same Emscripten container image.
 docker run --rm \
   -v "$bench:/src:ro" \
   -v "$out_dir:/out" \
@@ -65,6 +65,7 @@ docker run --rm \
     compile_main symbol_poison_main.c /out/symbol-production.js
     compile_main local_scope_main.c /out/local-scope.js -DLOAD_GLOBAL=0
     compile_main local_scope_main.c /out/global-scope.js -DLOAD_GLOBAL=1
+
     cd /out
     node main-production.js > production.log 2>&1 || true
     node symbol-production.js > symbol-production.log 2>&1 || true
@@ -81,7 +82,8 @@ docker run --rm \
     node symbol-fixed.js > symbol-fixed.log 2>&1 || true
   '
 
-# Native Linux is the control for RTLD_LOCAL/RTLD_GLOBAL visibility.
+# Native Linux is the semantic control for RTLD_LOCAL/RTLD_GLOBAL and
+# RTLD_NOW unresolved-symbol handling.
 (
   cd "$out_dir"
   cc -fPIC -shared "$bench/local_provider.c" -o liblocal-provider.so
@@ -92,47 +94,41 @@ docker run --rm \
   ./native-global-scope > native-global-scope.log 2>&1 || true
 )
 
-# Current production behavior: the first constructor trap is reported, but a
-# later dlopen of the same name returns a poisoned non-null handle.
+# Finding 1: a constructor trap leaves a stale `loading` DSO. With assertions
+# disabled, a second dlopen returns a non-null handle with no exports.
 grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/production.log"
 grep -q '^attempt_2_handle_nonnull=1$' "$out_dir/production.log"
 grep -q '^attempt_2_symbol_nonnull=0$' "$out_dir/production.log"
 
-# The failed module's table function and captured private counter remain live.
+# Finding 2: the failed side module has already grown the shared table and its
+# stateful function remains callable after dlopen returned NULL.
 for log in production fixed; do
   grep -q '^attempt_1_residual_slot_callable=1$' "$out_dir/${log}.log"
   grep -q '^attempt_1_residual_result_1=41$' "$out_dir/${log}.log"
   grep -q '^attempt_1_residual_result_2=42$' "$out_dir/${log}.log"
 done
 
-# Minimal remediation: evict the `loading` DSO on rejection. Both calls now
-# execute a real load attempt and both correctly report failure. This fixes
-# the API/cache inconsistency, but not the residual table capability.
+# Cache eviction fixes the false-success handle but cannot revoke the residual
+# table capability.
 grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/fixed.log"
 grep -q '^attempt_2_handle_nonnull=0$' "$out_dir/fixed.log"
 
-# Failed-load symbol experiment.  The pre-consumer is loaded immediately after
-# the constructor trap and before a good provider exists.  The post-consumer
-# is the control, loaded after the good provider.
+# Finding 3: RTLD_NOW is accepted for a consumer whose required symbol is not
+# available. dlopen and dlsym both report success; the first call escapes the
+# Wasm boundary as a JavaScript TypeError. Failed-DSO cache cleanup does not
+# affect this independent behavior.
 for log in symbol-production symbol-fixed; do
   grep -q '^bad_handle_nonnull=0$' "$out_dir/${log}.log"
-  grep -Eq '^pre_consumer_handle_nonnull=(0|1)$' "$out_dir/${log}.log"
-  grep -q '^good_handle_nonnull=1$' "$out_dir/${log}.log"
-  grep -q '^good_symbol_nonnull=1$' "$out_dir/${log}.log"
-  grep -q '^good_direct_result=900$' "$out_dir/${log}.log"
-  grep -q '^post_consumer_handle_nonnull=1$' "$out_dir/${log}.log"
-  grep -q '^post_consumer_symbol_nonnull=1$' "$out_dir/${log}.log"
-  grep -q '^post_consumer_result=900$' "$out_dir/${log}.log"
-  if grep -q '^pre_consumer_handle_nonnull=1$' "$out_dir/${log}.log"; then
-    grep -q '^pre_consumer_symbol_nonnull=1$' "$out_dir/${log}.log"
-    grep -Eq '^pre_consumer_result_1=(41|900)$' "$out_dir/${log}.log"
-    grep -Eq '^pre_consumer_after_good_result=(43|900)$' "$out_dir/${log}.log"
-  fi
+  grep -q '^pre_consumer_handle_nonnull=1$' "$out_dir/${log}.log"
+  grep -q '^pre_consumer_open_error=<none>$' "$out_dir/${log}.log"
+  grep -q '^pre_consumer_symbol_nonnull=1$' "$out_dir/${log}.log"
+  grep -q '^pre_consumer_symbol_error=<none>$' "$out_dir/${log}.log"
+  grep -q 'TypeError: resolved is not a function' "$out_dir/${log}.log"
 done
 
-# Native control: RTLD_LOCAL does not publish the provider to RTLD_DEFAULT and
-# an unrelated consumer with an unresolved symbol cannot load. RTLD_GLOBAL
-# makes both operations succeed.
+# Native RTLD_LOCAL control: direct dlsym on the provider works, but the symbol
+# is absent from RTLD_DEFAULT and an unrelated RTLD_NOW consumer is rejected at
+# dlopen time. RTLD_GLOBAL makes both operations succeed.
 grep -q '^provider_handle_nonnull=1$' "$out_dir/native-local-scope.log"
 grep -q '^provider_direct_result=777$' "$out_dir/native-local-scope.log"
 grep -q '^default_symbol_nonnull=0$' "$out_dir/native-local-scope.log"
@@ -144,95 +140,51 @@ grep -q '^default_result=777$' "$out_dir/native-global-scope.log"
 grep -q '^consumer_handle_nonnull=1$' "$out_dir/native-global-scope.log"
 grep -q '^consumer_result=777$' "$out_dir/native-global-scope.log"
 
-# Emscripten global control must work. The local case is classified rather
-# than assumed, because this is the behavior under investigation.
+# Emscripten preserves RTLD_LOCAL visibility for RTLD_DEFAULT, but violates the
+# RTLD_NOW failure boundary: the unrelated consumer is reported loaded and only
+# crashes when its unresolved import is called.
 grep -q '^provider_handle_nonnull=1$' "$out_dir/emscripten-local-scope.log"
 grep -q '^provider_direct_result=777$' "$out_dir/emscripten-local-scope.log"
-grep -Eq '^default_symbol_nonnull=(0|1)$' "$out_dir/emscripten-local-scope.log"
-grep -Eq '^consumer_handle_nonnull=(0|1)$' "$out_dir/emscripten-local-scope.log"
-if grep -q '^consumer_handle_nonnull=1$' "$out_dir/emscripten-local-scope.log"; then
-  grep -q '^consumer_result=777$' "$out_dir/emscripten-local-scope.log"
-fi
+grep -q '^default_symbol_nonnull=0$' "$out_dir/emscripten-local-scope.log"
+grep -q '^consumer_handle_nonnull=1$' "$out_dir/emscripten-local-scope.log"
+grep -q '^consumer_open_error=<none>$' "$out_dir/emscripten-local-scope.log"
+grep -q '^consumer_symbol_nonnull=1$' "$out_dir/emscripten-local-scope.log"
+grep -q 'TypeError: resolved is not a function' "$out_dir/emscripten-local-scope.log"
+
+# Emscripten RTLD_GLOBAL is the resolved-symbol control.
 grep -q '^provider_handle_nonnull=1$' "$out_dir/emscripten-global-scope.log"
 grep -q '^provider_direct_result=777$' "$out_dir/emscripten-global-scope.log"
+grep -q '^default_symbol_nonnull=1$' "$out_dir/emscripten-global-scope.log"
+grep -q '^default_result=777$' "$out_dir/emscripten-global-scope.log"
 grep -q '^consumer_handle_nonnull=1$' "$out_dir/emscripten-global-scope.log"
 grep -q '^consumer_result=777$' "$out_dir/emscripten-global-scope.log"
 
-classify_pre_resolution() {
-  local log=$1
-  if grep -q '^pre_consumer_result_1=41$' "$log"; then
-    echo 'FAILED_MODULE'
-  elif grep -q '^pre_consumer_result_1=900$' "$log"; then
-    echo 'GOOD_MODULE_BEFORE_LOAD'
-  elif grep -q '^pre_consumer_handle_nonnull=0$' "$log"; then
-    echo 'UNRESOLVED'
-  else
-    echo 'UNEXPECTED'
-  fi
-}
-
-classify_local_scope() {
-  local log=$1
-  if grep -q '^default_symbol_nonnull=1$' "$log" ||
-     grep -q '^consumer_handle_nonnull=1$' "$log"; then
-    echo 'LEAKED'
-  else
-    echo 'ISOLATED'
-  fi
-}
-
-production_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-production.log")
-fixed_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-fixed.log")
-emscripten_local_scope=$(classify_local_scope "$out_dir/emscripten-local-scope.log")
-native_local_scope=$(classify_local_scope "$out_dir/native-local-scope.log")
-
 {
-  echo 'Emscripten failed-dlopen and loader-scope result'
-  echo '================================================'
+  echo 'Emscripten dynamic-loader model-checking targets'
+  echo '================================================='
   echo "image=$image"
   cat "$out_dir/node-version.log"
+  head -n 1 "$out_dir/emcc-version.log"
   echo
-  echo '[Current production loader]'
+  echo '[Finding 1: stale failed-DSO cache]'
   grep '^attempt_' "$out_dir/production.log"
   echo
-  echo '[Minimal cache-cleanup patch]'
+  echo '[Cache-only repair]'
   grep '^attempt_' "$out_dir/fixed.log"
   echo
-  echo '[Symbol resolution before/after a good provider: production]'
-  grep -E '^(bad|pre_consumer|good|post_consumer)_' "$out_dir/symbol-production.log"
-  echo "production_pre_consumer_resolved_to=$production_pre_resolution"
+  echo '[Finding 2: stateful residual Wasm capability]'
+  echo 'failed_dlopen_residual_results=41,42'
+  echo 'cache_cleanup_residual_results=41,42'
   echo
-  echo '[Symbol resolution before/after a good provider: cache cleanup]'
-  grep -E '^(bad|pre_consumer|good|post_consumer)_' "$out_dir/symbol-fixed.log"
-  echo "fixed_pre_consumer_resolved_to=$fixed_pre_resolution"
-  echo
-  echo '[Emscripten RTLD_LOCAL]'
+  echo '[Finding 3: Emscripten RTLD_NOW false success]'
   grep -E '^(provider|default|consumer)_' "$out_dir/emscripten-local-scope.log"
-  echo "emscripten_local_scope=$emscripten_local_scope"
+  grep 'TypeError: resolved is not a function' "$out_dir/emscripten-local-scope.log"
+  echo 'emscripten_rtld_now=LOAD_SUCCEEDED_THEN_HOST_TYPEERROR'
   echo
-  echo '[Native Linux RTLD_LOCAL control]'
+  echo '[Native Linux RTLD_NOW control]'
   grep -E '^(provider|default|consumer)_' "$out_dir/native-local-scope.log"
-  echo "native_local_scope=$native_local_scope"
+  echo 'native_rtld_now=LOAD_REJECTED_FOR_UNRESOLVED_SYMBOL'
   echo
-  echo '[Emscripten RTLD_GLOBAL control]'
+  echo '[Resolved RTLD_GLOBAL control]'
   grep -E '^(provider|default|consumer)_' "$out_dir/emscripten-global-scope.log"
-  echo
-  echo '[Native Linux RTLD_GLOBAL control]'
-  grep -E '^(provider|default|consumer)_' "$out_dir/native-global-scope.log"
-  echo
-  echo '[Finding 1] stale loading DSO / poisoned dlopen handle'
-  echo 'The first dlopen fails, but the second returns a non-null handle with no exports.'
-  echo 'Evicting the failed DSO prevents the false-success handle.'
-  echo
-  echo '[Finding 2] stateful residual capability after failed construction'
-  echo 'The failed side module grows the shared table and leaves callable code behind.'
-  echo 'That code retains private mutable state and returns 41, then 42 after dlopen returned NULL.'
-  echo 'Cache eviction alone does not revoke the residual table capability.'
-  echo
-  echo '[Finding 3 candidate] failed-load global symbol window'
-  echo 'FAILED_MODULE means that a consumer loaded before a good provider executed failed-module code.'
-  echo 'UNRESOLVED means the failed module did not supply the global symbol through the public loader path.'
-  echo
-  echo '[Finding 4 candidate] RTLD_LOCAL isolation'
-  echo 'LEAKED means a local provider became visible through RTLD_DEFAULT or to an unrelated consumer.'
 } | tee "$out_dir/results.txt"
