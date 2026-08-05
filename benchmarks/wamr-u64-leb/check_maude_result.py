@@ -16,7 +16,7 @@ def main() -> None:
         raise SystemExit(f"no RunState result in {sys.argv[1]}")
     result = text[text.index(marker) :]
     matches = re.findall(
-        r"instr\.const\(numtype\.i32,\s*uN\.wrap\(([0-9]+)\)\)",
+        r"instr\.const\(\s*numtype\.i32,\s*uN\.wrap\(([0-9]+)\)\)",
         result,
         re.DOTALL,
     )
