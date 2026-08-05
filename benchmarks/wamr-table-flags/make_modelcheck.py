@@ -41,7 +41,7 @@ def main() -> None:
                 "  vars C C2 S MI NAME OTHER ADDR XA : SpectecTerminal .\n"
                 "  vars N R : Nat .")
     text, n = re.subn(
-        r"  eq inputArgs = num\.const\(numtype\.i32, uN\.wrap\([0-9]+\)\) \\.",
+        r"  eq inputArgs = num\.const\(numtype\.i32, uN\.wrap\([0-9]+\)\) \.",
         "  eq inputArgs(N) = num.const(numtype.i32, uN.wrap(N)) .",
         text,
         count=1,
@@ -67,7 +67,7 @@ def main() -> None:
   var X : RunState .
   ceq exec(N, config.sym(S, instr.const(numtype.i32, uN.wrap(1))))
       |= reserved-table-flag-accepted = true
-    if N == 2 or N == 3 .
+    if (N == 2) or (N == 3) .
   eq X |= reserved-table-flag-accepted = false [owise] .
 endm
 
