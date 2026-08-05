@@ -68,8 +68,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          opam exec -- bash benchmarks/wamr-u64-leb/run.sh \
-            "$RUNNER_TEMP/wamr-u64-leb"
+          CPATH="$GITHUB_WORKSPACE/benchmarks/wamr-u64-leb/platform-stub" \
+            opam exec -- bash benchmarks/wamr-u64-leb/run.sh \
+              "$RUNNER_TEMP/wamr-u64-leb"
 
       - name: Collect runner metadata
         if: always()
