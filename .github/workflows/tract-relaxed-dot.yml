@@ -1,8 +1,6 @@
 name: tract Relaxed-SIMD portability model checking
 
 on:
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
