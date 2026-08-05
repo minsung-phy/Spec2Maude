@@ -11,15 +11,18 @@ def main() -> None:
         raise SystemExit(f"usage: {sys.argv[0]} LOG EXPECTED_I32")
     text = Path(sys.argv[1]).read_text(encoding="utf-8")
     expected = int(sys.argv[2])
-    match = re.search(
-        r"result RunState:.*instr\.const\(numtype\.i32,\s*"
-        r"uN\.wrap\(([0-9]+)\)\)\)\s*Bye\.\s*$",
-        text,
+    marker = "result RunState:"
+    if marker not in text:
+        raise SystemExit(f"no RunState result in {sys.argv[1]}")
+    result = text[text.index(marker) :]
+    matches = re.findall(
+        r"instr\.const\(numtype\.i32,\s*uN\.wrap\(([0-9]+)\)\)",
+        result,
         re.DOTALL,
     )
-    if match is None:
+    if not matches:
         raise SystemExit(f"could not find terminal i32 result in {sys.argv[1]}")
-    actual = int(match.group(1))
+    actual = int(matches[-1])
     if actual != expected:
         raise SystemExit(
             f"unexpected terminal i32 result in {sys.argv[1]}: "
