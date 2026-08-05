@@ -39,7 +39,10 @@ clang --target=wasm32-unknown-unknown -O2 -nostdlib \
   -Wl,--export-memory \
   -o "$out/tract-relaxed-dot.wasm"
 wasm-objdump -d "$out/tract-relaxed-dot.wasm" > "$out/tract-relaxed-dot.objdump"
-grep -q 'i32x4.relaxed_dot_i8x16_i7x16_add_s' "$out/tract-relaxed-dot.objdump"
+# WABT 1.0.34 prints the relaxed opcode using its legacy mnemonic without the
+# word "relaxed"; opcode fd 93 02 is the proposal instruction emitted by Clang.
+grep -Eq 'i32x4\.(relaxed_)?dot_i8x16_i7x16_add_s' "$out/tract-relaxed-dot.objdump"
+grep -q 'fd 93 02' "$out/tract-relaxed-dot.objdump"
 
 # Produce both globally consistent profiles allowed by the official SpecTec
 # semantics for R_idot.
