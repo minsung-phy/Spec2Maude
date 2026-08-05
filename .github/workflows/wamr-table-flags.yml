@@ -1,0 +1,50 @@
+name: WAMR reserved table flag model checking
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  modelcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          dune-cache: true
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt cmake ninja-build
+          opam install dune menhir zarith -y
+      - name: Build Spec2Maude
+        run: opam exec -- dune build --profile release
+      - name: Install Maude
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+      - name: Load official generated semantics
+        run: |
+          mkdir -p "$RUNNER_TEMP/wamr-table-flags"
+          "$MAUDE" -no-banner output.maude > "$RUNNER_TEMP/wamr-table-flags/output-load.log" 2>&1
+          "$MAUDE" -no-banner builtins.maude > "$RUNNER_TEMP/wamr-table-flags/builtins-load.log" 2>&1
+          ! grep -Eq '^(Warning|Advisory|Error):' "$RUNNER_TEMP/wamr-table-flags"/*-load.log
+      - name: Run production parser model checking
+        run: opam exec -- bash benchmarks/wamr-table-flags/run.sh "$RUNNER_TEMP/wamr-table-flags"
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec2maude-wamr-table-flags
+          path: ${{ runner.temp }}/wamr-table-flags
+          retention-days: 30
