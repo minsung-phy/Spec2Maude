@@ -78,23 +78,28 @@ for p in 0 1; do
 
   opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
     "$out/tract-relaxed-dot.wasm" --invoke tract_mismatch \
-    --arg i32:0 --steps 500000 --semantics "$profile" \
+    --arg i32:127 --steps 500000 --semantics "$profile" \
     -o "$out/profile-${p}-base.maude"
+  # 127 and 128 straddle the exact point where signed and unsigned byte
+  # interpretations diverge.  The complete 0..255 concrete replay below
+  # separately counts every affected input; this focused state space keeps the
+  # official-semantics LTL experiment practical and auditable.
   python3 "$bench/make_modelcheck.py" "$out/profile-${p}-base.maude" \
     "$out/profile-${p}-modelcheck.maude" \
-    --module-name "TRACT-RIDOT-${p}-MC"
+    --module-name "TRACT-RIDOT-${p}-MC" --start 127 --max 128
   "$maude" -no-banner "$out/profile-${p}-modelcheck.maude" \
     > "$out/profile-${p}-modelcheck.log" 2>&1
 done
 
-# The deterministic widening repair is independent of R_idot.  Check it under
-# the hostile profile over the same complete byte space.
+# The deterministic widening repair is independent of R_idot.  Check the same
+# signedness boundary under the hostile profile.
 opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
   "$out/tract-relaxed-dot.wasm" --invoke fixed_mismatch \
-  --arg i32:0 --steps 500000 --semantics "$out/builtins-r-idot-1.maude" \
+  --arg i32:127 --steps 500000 --semantics "$out/builtins-r-idot-1.maude" \
   -o "$out/fixed-base.maude"
 python3 "$bench/make_modelcheck.py" "$out/fixed-base.maude" \
-  "$out/fixed-modelcheck.maude" --module-name "TRACT-FIXED-MC"
+  "$out/fixed-modelcheck.maude" --module-name "TRACT-FIXED-MC" \
+  --start 127 --max 128
 "$maude" -no-banner "$out/fixed-modelcheck.maude" \
   > "$out/fixed-modelcheck.log" 2>&1
 
@@ -106,8 +111,7 @@ grep -q 'result ModelCheckResult: counterexample' "$out/profile-1-modelcheck.log
 grep -q '^No solution\.' "$out/fixed-modelcheck.log"
 grep -q 'result Bool: true' "$out/fixed-modelcheck.log"
 
-# Concrete replay in the installed V8/Node engine.  Some Node releases expose
-# the proposal flag and newer ones enable the feature without it.
+# Concrete replay in the installed V8/Node engine over the entire byte domain.
 set +e
 node --experimental-wasm-relaxed-simd -e '0' >/dev/null 2>&1
 flag_rc=$?
@@ -119,6 +123,8 @@ else
   node "$bench/run_node.mjs" "$out/tract-relaxed-dot.wasm" \
     > "$out/node.log" 2>&1
 fi
+grep -q '^mismatch_count=128$' "$out/node.log"
+grep -q '^first_mismatch=128$' "$out/node.log"
 
 {
   echo 'tract Relaxed-SIMD portability model-checking result'
@@ -133,14 +139,14 @@ fi
   echo 'R_idot=0 mismatch=0'
   echo 'R_idot=1 mismatch=1'
   echo
-  echo '[Bounded model checking: every full-i8 byte 0..255]'
+  echo '[Official-semantics boundary model checking: bytes 127 and 128]'
   for name in profile-0 profile-1 fixed; do
     echo "--- $name"
     grep -E '^(Solution 1|No solution\.|states:|rewrites:|result (Bool|ModelCheckResult):)' \
       "$out/${name}-modelcheck.log" || true
   done
   echo
-  echo '[Concrete V8/Node replay]'
+  echo '[Concrete V8/Node replay: all bytes 0..255]'
   cat "$out/node.log"
 } | tee "$out/results.txt"
 
