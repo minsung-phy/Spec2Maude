@@ -5,11 +5,11 @@ import argparse
 from pathlib import Path
 
 
-def replace_once(text: str, old: str, new: str) -> str:
+def replace_all(text: str, old: str, new: str) -> str:
     count = text.count(old)
-    if count != 1:
-        raise RuntimeError(f"expected one occurrence, found {count}: {old!r}")
-    return text.replace(old, new, 1)
+    if count == 0:
+        raise RuntimeError(f"expected at least one occurrence: {old!r}")
+    return text.replace(old, new)
 
 
 def main() -> None:
@@ -20,17 +20,21 @@ def main() -> None:
     args = parser.parse_args()
 
     text = args.input.read_text(encoding="utf-8")
-    text = replace_once(
+    # builtins.maude intentionally repeats the backend-profile banner and may
+    # expose the profile equations through more than one generated module.
+    # Keep every occurrence globally consistent for a single legal execution
+    # profile, as required by the official relaxed-SIMD semantics.
+    text = replace_all(
         text,
         "--- Backend semantics: official-spectec-deterministic.",
         f"--- Backend semantics: official-spectec-relaxed-r-idot-{args.r_idot}.",
     )
-    text = replace_once(
+    text = replace_all(
         text,
         "eq builtin.nd = bool(false) .",
         "eq builtin.nd = bool(true) .",
     )
-    text = replace_once(
+    text = replace_all(
         text,
         "eq builtin.r-idot = relaxed2.wrap(0) .",
         f"eq builtin.r-idot = relaxed2.wrap({args.r_idot}) .",
