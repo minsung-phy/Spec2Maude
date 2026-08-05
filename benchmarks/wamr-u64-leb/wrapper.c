@@ -10,13 +10,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* WAMR's bh_leb128.h includes bh_platform.h only for these aliases.  Defining
- * its include guard keeps the extracted production decoder self-contained
- * while preserving the upstream function body verbatim. */
-typedef uint8_t uint8;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
-#define _BH_PLATFORM_H
 #include "bh_leb128.c"
 
 uint32_t
