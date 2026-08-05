@@ -9,8 +9,8 @@ image=${EMSDK_IMAGE:-emscripten/emsdk:latest}
 bench="$root/benchmarks/emscripten-dlopen"
 
 # Compile both the current production loader and a minimal cache-cleanup
-# variant in the same container image.  The second program tests whether a
-# failed module can poison the GOT used by later successful side modules.
+# variant in the same container image.  The second program probes whether a
+# failed module temporarily supplies a global symbol to a later consumer.
 docker run --rm \
   -v "$bench:/src:ro" \
   -v "$out_dir:/out" \
@@ -35,6 +35,8 @@ docker run --rm \
       -sSIDE_MODULE=2 \
       -Wl,--export=consumer_value \
       -o /out/libconsumer.wasm
+    cp /out/libconsumer.wasm /out/libconsumer-pre.wasm
+    cp /out/libconsumer.wasm /out/libconsumer-post.wasm
 
     compile_main() {
       local source=$1
@@ -83,33 +85,40 @@ done
 grep -q '^attempt_1_handle_nonnull=0$' "$out_dir/fixed.log"
 grep -q '^attempt_2_handle_nonnull=0$' "$out_dir/fixed.log"
 
-# Failed-load global symbol poisoning experiment.  A good module exporting
-# zombie_value is loaded after the failed module, followed by a consumer that
-# imports the same symbol.  The direct good handle must return 900.  The
-# consumer result tells us which module the global GOT resolved.
+# Failed-load symbol experiment.  The pre-consumer is loaded immediately after
+# the constructor trap and before a good provider exists.  The post-consumer
+# is the control, loaded after the good provider.
 for log in symbol-production symbol-fixed; do
   grep -q '^bad_handle_nonnull=0$' "$out_dir/${log}.log"
+  grep -Eq '^pre_consumer_handle_nonnull=(0|1)$' "$out_dir/${log}.log"
   grep -q '^good_handle_nonnull=1$' "$out_dir/${log}.log"
   grep -q '^good_symbol_nonnull=1$' "$out_dir/${log}.log"
   grep -q '^good_direct_result=900$' "$out_dir/${log}.log"
-  grep -q '^consumer_handle_nonnull=1$' "$out_dir/${log}.log"
-  grep -q '^consumer_symbol_nonnull=1$' "$out_dir/${log}.log"
-  grep -Eq '^consumer_result_1=(41|900)$' "$out_dir/${log}.log"
+  grep -q '^post_consumer_handle_nonnull=1$' "$out_dir/${log}.log"
+  grep -q '^post_consumer_symbol_nonnull=1$' "$out_dir/${log}.log"
+  grep -q '^post_consumer_result=900$' "$out_dir/${log}.log"
+  if grep -q '^pre_consumer_handle_nonnull=1$' "$out_dir/${log}.log"; then
+    grep -q '^pre_consumer_symbol_nonnull=1$' "$out_dir/${log}.log"
+    grep -Eq '^pre_consumer_result_1=(41|900)$' "$out_dir/${log}.log"
+    grep -Eq '^pre_consumer_after_good_result=(43|900)$' "$out_dir/${log}.log"
+  fi
 done
 
-classify_resolution() {
+classify_pre_resolution() {
   local log=$1
-  if grep -q '^consumer_result_1=41$' "$log"; then
+  if grep -q '^pre_consumer_result_1=41$' "$log"; then
     echo 'FAILED_MODULE'
-  elif grep -q '^consumer_result_1=900$' "$log"; then
-    echo 'GOOD_MODULE'
+  elif grep -q '^pre_consumer_result_1=900$' "$log"; then
+    echo 'GOOD_MODULE_BEFORE_LOAD'
+  elif grep -q '^pre_consumer_handle_nonnull=0$' "$log"; then
+    echo 'UNRESOLVED'
   else
     echo 'UNEXPECTED'
   fi
 }
 
-production_resolution=$(classify_resolution "$out_dir/symbol-production.log")
-fixed_resolution=$(classify_resolution "$out_dir/symbol-fixed.log")
+production_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-production.log")
+fixed_pre_resolution=$(classify_pre_resolution "$out_dir/symbol-fixed.log")
 
 {
   echo 'Emscripten failed-dlopen lifecycle result'
@@ -123,13 +132,13 @@ fixed_resolution=$(classify_resolution "$out_dir/symbol-fixed.log")
   echo '[Minimal cache-cleanup patch]'
   grep '^attempt_' "$out_dir/fixed.log"
   echo
-  echo '[Global symbol resolution after a failed load: production]'
-  grep -E '^(bad|good|consumer)_' "$out_dir/symbol-production.log"
-  echo "production_consumer_resolved_to=$production_resolution"
+  echo '[Symbol resolution before/after a good provider: production]'
+  grep -E '^(bad|pre_consumer|good|post_consumer)_' "$out_dir/symbol-production.log"
+  echo "production_pre_consumer_resolved_to=$production_pre_resolution"
   echo
-  echo '[Global symbol resolution after a failed load: cache cleanup]'
-  grep -E '^(bad|good|consumer)_' "$out_dir/symbol-fixed.log"
-  echo "fixed_consumer_resolved_to=$fixed_resolution"
+  echo '[Symbol resolution before/after a good provider: cache cleanup]'
+  grep -E '^(bad|pre_consumer|good|post_consumer)_' "$out_dir/symbol-fixed.log"
+  echo "fixed_pre_consumer_resolved_to=$fixed_pre_resolution"
   echo
   echo '[Finding 1] stale loading DSO / poisoned dlopen handle'
   echo 'The first dlopen fails, but the second returns a non-null handle with no exports.'
@@ -140,7 +149,7 @@ fixed_resolution=$(classify_resolution "$out_dir/symbol-fixed.log")
   echo 'That code retains private mutable state and returns 41, then 42 after dlopen returned NULL.'
   echo 'Cache eviction alone does not revoke the residual table capability.'
   echo
-  echo '[Finding 3 candidate] failed-load global symbol poisoning'
-  echo 'The direct good-module handle returns 900.'
-  echo 'FAILED_MODULE means that a later consumer nevertheless bound to the failed module.'
+  echo '[Finding 3 candidate] failed-load global symbol window'
+  echo 'FAILED_MODULE means that a consumer loaded before a good provider executed failed-module code.'
+  echo 'UNRESOLVED means the failed module did not supply the global symbol through the public loader path.'
 } | tee "$out_dir/results.txt"
