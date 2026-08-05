@@ -1,0 +1,81 @@
+name: tract Relaxed-SIMD portability model checking
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  modelcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          dune-cache: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt
+          opam install dune menhir zarith -y
+
+      - name: Build Spec2Maude
+        run: opam exec -- dune build --profile release
+
+      - name: Install Maude 3.5.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip \
+            -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          test -n "$maude_bin"
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+          "$maude_bin" --version
+
+      - name: Load generated official semantics
+        run: |
+          mkdir -p "$RUNNER_TEMP/tract-relaxed-dot"
+          "$MAUDE" -no-banner output.maude \
+            > "$RUNNER_TEMP/tract-relaxed-dot/output-load.log" 2>&1
+          "$MAUDE" -no-banner builtins.maude \
+            > "$RUNNER_TEMP/tract-relaxed-dot/builtins-load.log" 2>&1
+          ! grep -Eq '^(Warning|Advisory|Error):' \
+            "$RUNNER_TEMP/tract-relaxed-dot/output-load.log" \
+            "$RUNNER_TEMP/tract-relaxed-dot/builtins-load.log"
+
+      - name: Model check pinned tract production kernel
+        run: |
+          opam exec -- bash benchmarks/tract-relaxed-dot/run.sh \
+            "$RUNNER_TEMP/tract-relaxed-dot"
+
+      - name: Collect environment
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/tract-relaxed-dot"
+          {
+            echo "github_sha=$GITHUB_SHA"
+            opam exec -- ocaml -version || true
+            opam exec -- dune --version || true
+            clang --version | head -n 1 || true
+            wasm-objdump --version || true
+            node --version || true
+            "$MAUDE" --version || true
+          } > "$RUNNER_TEMP/tract-relaxed-dot/environment.txt"
+
+      - name: Upload full evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec2maude-tract-relaxed-dot
+          path: ${{ runner.temp }}/tract-relaxed-dot
+          retention-days: 30
