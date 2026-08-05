@@ -24,6 +24,24 @@ int main(void) {
   const char *bad_error = dlerror();
   print_open("bad", bad, bad_error);
 
+  /* Try to consume zombie_value immediately, before any successful provider
+     for that symbol has been loaded. */
+  dlerror();
+  void *pre_consumer =
+      dlopen("libconsumer-pre.wasm", RTLD_NOW | RTLD_LOCAL);
+  const char *pre_consumer_error = dlerror();
+  print_open("pre_consumer", pre_consumer, pre_consumer_error);
+
+  value_fn pre_consumer_value = NULL;
+  if (pre_consumer) {
+    pre_consumer_value =
+        lookup(pre_consumer, "consumer_value", "pre_consumer");
+    if (pre_consumer_value) {
+      printf("pre_consumer_result_1=%d\n", pre_consumer_value());
+      printf("pre_consumer_result_2=%d\n", pre_consumer_value());
+    }
+  }
+
   dlerror();
   void *good = dlopen("libgood.wasm", RTLD_NOW | RTLD_GLOBAL);
   const char *good_error = dlerror();
@@ -37,16 +55,22 @@ int main(void) {
     }
   }
 
-  dlerror();
-  void *consumer = dlopen("libconsumer.wasm", RTLD_NOW | RTLD_LOCAL);
-  const char *consumer_error = dlerror();
-  print_open("consumer", consumer, consumer_error);
+  if (pre_consumer_value) {
+    printf("pre_consumer_after_good_result=%d\n", pre_consumer_value());
+  }
 
-  if (consumer) {
-    value_fn consumer_value = lookup(consumer, "consumer_value", "consumer");
-    if (consumer_value) {
-      printf("consumer_result_1=%d\n", consumer_value());
-      printf("consumer_result_2=%d\n", consumer_value());
+  /* A fresh consumer loaded after the good provider is the control case. */
+  dlerror();
+  void *post_consumer =
+      dlopen("libconsumer-post.wasm", RTLD_NOW | RTLD_LOCAL);
+  const char *post_consumer_error = dlerror();
+  print_open("post_consumer", post_consumer, post_consumer_error);
+
+  if (post_consumer) {
+    value_fn post_consumer_value =
+        lookup(post_consumer, "consumer_value", "post_consumer");
+    if (post_consumer_value) {
+      printf("post_consumer_result=%d\n", post_consumer_value());
     }
   }
 
