@@ -1,0 +1,225 @@
+load model-checker.maude
+
+mod EMSCRIPTEN-DLOPEN-MC is
+  protecting WASM-BUILTINS .
+  including MODEL-CHECKER .
+
+  sorts LoaderState LoaderMode CacheState Phase Outcome ResidualState .
+  subsort LoaderState < State .
+
+  ops current cache-fixed transactional-fixed : -> LoaderMode [ctor] .
+  ops absent loading loaded : -> CacheState [ctor] .
+  ops idle constructing : -> Phase [ctor] .
+  ops none failed succeeded : -> Outcome [ctor] .
+  ops clean residual : -> ResidualState [ctor] .
+
+  op loader : LoaderMode CacheState Nat Phase Outcome ResidualState
+    -> LoaderState [ctor] .
+  op current-init : -> LoaderState .
+  op cache-fixed-init : -> LoaderState .
+  op transactional-fixed-init : -> LoaderState .
+
+  eq current-init = loader(current, absent, 0, idle, none, clean) .
+  eq cache-fixed-init = loader(cache-fixed, absent, 0, idle, none, clean) .
+  eq transactional-fixed-init =
+    loader(transactional-fixed, absent, 0, idle, none, clean) .
+
+  vars M : LoaderMode .
+  vars N : Nat .
+  vars O : Outcome .
+  vars R : ResidualState .
+
+  --- All loaders reserve/cache a DSO as `loading` before side-module
+  --- instantiation and constructor execution.
+  crl [begin-load] :
+    loader(M, absent, N, idle, O, R)
+    => loader(M, loading, N + 1, constructing, none, R)
+    if N < 2 .
+
+  --- Current libdylink.js returns from the rejected load without evicting the
+  --- DSO. WebAssembly table publication has already happened, so executable
+  --- code and its private state remain reachable as a residual capability.
+  rl [constructor-trap-current] :
+    loader(current, loading, N, constructing, none, R)
+    => loader(current, loading, N, idle, failed, residual) .
+
+  --- On the second dlopen, the existing-DSO fast path treats the stale entry
+  --- as already loaded when ASSERTIONS=0 and returns a non-null handle.
+  rl [reuse-stale-loading-dso] :
+    loader(current, loading, 1, idle, failed, residual)
+    => loader(current, loading, 2, idle, succeeded, residual) .
+
+  --- Minimal cache remediation: remove the DSO cache entry on rejection.
+  --- This fixes false-success handles but cannot retract the already-published
+  --- table function or its captured mutable state.
+  rl [constructor-trap-cache-fixed] :
+    loader(cache-fixed, loading, N, constructing, none, R)
+    => loader(cache-fixed, absent, N, idle, failed, residual) .
+
+  --- Strong lifecycle policy: instantiate against staged capabilities and
+  --- publish only after constructors succeed (or equivalently revoke every
+  --- publication on failure). Both cache and residual capability are clean.
+  rl [constructor-trap-transactional-fixed] :
+    loader(transactional-fixed, loading, N, constructing, none, R)
+    => loader(transactional-fixed, absent, N, idle, failed, clean) .
+
+  op poisoned-handle : -> Prop [ctor] .
+  op failed-dso-cached : -> Prop [ctor] .
+  op residual-code : -> Prop [ctor] .
+  var LS : LoaderState .
+
+  eq loader(current, loading, 2, idle, succeeded, residual)
+    |= poisoned-handle = true .
+  eq LS |= poisoned-handle = false [owise] .
+
+  eq loader(current, loading, 1, idle, failed, residual)
+    |= failed-dso-cached = true .
+  eq LS |= failed-dso-cached = false [owise] .
+
+  eq loader(M, loading, N, idle, O, residual) |= residual-code = true .
+  eq loader(M, absent, N, idle, O, residual) |= residual-code = true .
+  eq LS |= residual-code = false [owise] .
+
+  --- RTLD_NOW contract model. A successful return must not precede unresolved
+  --- required imports. The current Emscripten loader explicitly ignores the
+  --- distinction between RTLD_NOW and RTLD_LAZY; a strict loader rejects the
+  --- same consumer at dlopen time.
+  sorts NowState NowMode SymbolState OpenResult CallResult .
+  subsort NowState < State .
+
+  ops now-current now-strict : -> NowMode [ctor] .
+  ops symbol-unresolved symbol-resolved : -> SymbolState [ctor] .
+  ops open-pending open-failed open-succeeded : -> OpenResult [ctor] .
+  ops call-pending call-succeeded call-host-typeerror : -> CallResult [ctor] .
+
+  op now-loader : NowMode SymbolState OpenResult CallResult -> NowState [ctor] .
+  op now-current-init : -> NowState .
+  op now-strict-init : -> NowState .
+
+  eq now-current-init =
+    now-loader(now-current, symbol-unresolved, open-pending, call-pending) .
+  eq now-strict-init =
+    now-loader(now-strict, symbol-unresolved, open-pending, call-pending) .
+
+  --- Observed Emscripten behavior: dlopen(RTLD_NOW) reports success even though
+  --- the consumer's required function has no provider.
+  rl [ignore-rtld-now] :
+    now-loader(now-current, symbol-unresolved, open-pending, call-pending)
+    => now-loader(now-current, symbol-unresolved,
+         open-succeeded, call-pending) .
+
+  --- The unresolved function is represented by a late-binding JS stub. Its
+  --- first call escapes the Wasm execution as `resolved is not a function`.
+  rl [call-unresolved-stub] :
+    now-loader(now-current, symbol-unresolved, open-succeeded, call-pending)
+    => now-loader(now-current, symbol-unresolved,
+         open-succeeded, call-host-typeerror) .
+
+  --- Native/strict RTLD_NOW policy: reject the DSO before publication when a
+  --- required symbol cannot be resolved.
+  rl [enforce-rtld-now] :
+    now-loader(now-strict, symbol-unresolved, open-pending, call-pending)
+    => now-loader(now-strict, symbol-unresolved,
+         open-failed, call-pending) .
+
+  op rtld-now-false-success : -> Prop [ctor] .
+  op late-host-failure : -> Prop [ctor] .
+  var NS : NowState .
+
+  eq now-loader(now-current, symbol-unresolved,
+       open-succeeded, call-pending) |= rtld-now-false-success = true .
+  eq now-loader(now-current, symbol-unresolved,
+       open-succeeded, call-host-typeerror)
+       |= rtld-now-false-success = true .
+  eq NS |= rtld-now-false-success = false [owise] .
+
+  eq now-loader(now-current, symbol-unresolved,
+       open-succeeded, call-host-typeerror) |= late-host-failure = true .
+  eq NS |= late-host-failure = false [owise] .
+endm
+
+select EMSCRIPTEN-DLOPEN-MC .
+
+--- Current production loader violates both cache-consistency and lifecycle
+--- cleanup properties.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  current-init =>* LS:LoaderState
+  such that LS:LoaderState |= failed-dso-cached .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  current-init =>* LS:LoaderState
+  such that LS:LoaderState |= poisoned-handle .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  current-init =>* LS:LoaderState
+  such that LS:LoaderState |= residual-code .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(current-init, [] ~ poisoned-handle) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(current-init, [] ~ residual-code) .
+
+--- Cache eviction fixes the API false-success bug, but the concrete residual
+--- table-code experiment shows that lifecycle cleanup still fails.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  cache-fixed-init =>* LS:LoaderState
+  such that LS:LoaderState |= poisoned-handle .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  cache-fixed-init =>* LS:LoaderState
+  such that LS:LoaderState |= residual-code .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(cache-fixed-init, [] ~ poisoned-handle) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(cache-fixed-init, [] ~ residual-code) .
+
+--- A staged/transactional loader satisfies both bounded safety properties.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  transactional-fixed-init =>* LS:LoaderState
+  such that LS:LoaderState |= poisoned-handle .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  transactional-fixed-init =>* LS:LoaderState
+  such that LS:LoaderState |= residual-code .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(transactional-fixed-init, [] ~ poisoned-handle) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(transactional-fixed-init, [] ~ residual-code) .
+
+--- The observed Emscripten RTLD_NOW path reaches both a false-success state
+--- and a later host-language failure.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-current-init =>* NS:NowState
+  such that NS:NowState |= rtld-now-false-success .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-current-init =>* NS:NowState
+  such that NS:NowState |= late-host-failure .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-current-init, [] ~ rtld-now-false-success) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-current-init, [] ~ late-host-failure) .
+
+--- Enforcing the RTLD_NOW boundary makes both states unreachable.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-strict-init =>* NS:NowState
+  such that NS:NowState |= rtld-now-false-success .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-strict-init =>* NS:NowState
+  such that NS:NowState |= late-host-failure .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-strict-init, [] ~ rtld-now-false-success) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-strict-init, [] ~ late-host-failure) .
+
+quit
