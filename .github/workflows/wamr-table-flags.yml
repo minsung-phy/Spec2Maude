@@ -49,10 +49,8 @@ jobs:
           text = path.read_text(encoding='utf-8')
           old = '''grep -q 'instr.const(numtype.i32, uN.wrap(1))' "$out/current-flag2.log"
           grep -q 'instr.const(numtype.i32, uN.wrap(0))' "$out/fixed-flag2.log"'''
-          new = '''tr -d '\\n' < "$out/current-flag2.log" | \\
-            grep -q 'instr.const(numtype.i32, uN.wrap(1))'
-          tr -d '\\n' < "$out/fixed-flag2.log" | \\
-            grep -q 'instr.const(numtype.i32, uN.wrap(0))' '''
+          new = '''python3 "$bench/check_maude_result.py" "$out/current-flag2.log" 1
+          python3 "$bench/check_maude_result.py" "$out/fixed-flag2.log" 0'''
           if text.count(old) != 1:
               raise SystemExit('expected table concrete-result block not found')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
