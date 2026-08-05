@@ -79,6 +79,63 @@ mod EMSCRIPTEN-DLOPEN-MC is
   eq loader(M, loading, N, idle, O, residual) |= residual-code = true .
   eq loader(M, absent, N, idle, O, residual) |= residual-code = true .
   eq LS |= residual-code = false [owise] .
+
+  --- RTLD_NOW contract model. A successful return must not precede unresolved
+  --- required imports. The current Emscripten loader explicitly ignores the
+  --- distinction between RTLD_NOW and RTLD_LAZY; a strict loader rejects the
+  --- same consumer at dlopen time.
+  sorts NowState NowMode SymbolState OpenResult CallResult .
+  subsort NowState < State .
+
+  ops now-current now-strict : -> NowMode [ctor] .
+  ops symbol-unresolved symbol-resolved : -> SymbolState [ctor] .
+  ops open-pending open-failed open-succeeded : -> OpenResult [ctor] .
+  ops call-pending call-succeeded call-host-typeerror : -> CallResult [ctor] .
+
+  op now-loader : NowMode SymbolState OpenResult CallResult -> NowState [ctor] .
+  op now-current-init : -> NowState .
+  op now-strict-init : -> NowState .
+
+  eq now-current-init =
+    now-loader(now-current, symbol-unresolved, open-pending, call-pending) .
+  eq now-strict-init =
+    now-loader(now-strict, symbol-unresolved, open-pending, call-pending) .
+
+  --- Observed Emscripten behavior: dlopen(RTLD_NOW) reports success even though
+  --- the consumer's required function has no provider.
+  rl [ignore-rtld-now] :
+    now-loader(now-current, symbol-unresolved, open-pending, call-pending)
+    => now-loader(now-current, symbol-unresolved,
+         open-succeeded, call-pending) .
+
+  --- The unresolved function is represented by a late-binding JS stub. Its
+  --- first call escapes the Wasm execution as `resolved is not a function`.
+  rl [call-unresolved-stub] :
+    now-loader(now-current, symbol-unresolved, open-succeeded, call-pending)
+    => now-loader(now-current, symbol-unresolved,
+         open-succeeded, call-host-typeerror) .
+
+  --- Native/strict RTLD_NOW policy: reject the DSO before publication when a
+  --- required symbol cannot be resolved.
+  rl [enforce-rtld-now] :
+    now-loader(now-strict, symbol-unresolved, open-pending, call-pending)
+    => now-loader(now-strict, symbol-unresolved,
+         open-failed, call-pending) .
+
+  op rtld-now-false-success : -> Prop [ctor] .
+  op late-host-failure : -> Prop [ctor] .
+  var NS : NowState .
+
+  eq now-loader(now-current, symbol-unresolved,
+       open-succeeded, call-pending) |= rtld-now-false-success = true .
+  eq now-loader(now-current, symbol-unresolved,
+       open-succeeded, call-host-typeerror)
+       |= rtld-now-false-success = true .
+  eq NS |= rtld-now-false-success = false [owise] .
+
+  eq now-loader(now-current, symbol-unresolved,
+       open-succeeded, call-host-typeerror) |= late-host-failure = true .
+  eq NS |= late-host-failure = false [owise] .
 endm
 
 select EMSCRIPTEN-DLOPEN-MC .
@@ -133,5 +190,36 @@ red in EMSCRIPTEN-DLOPEN-MC :
 
 red in EMSCRIPTEN-DLOPEN-MC :
   modelCheck(transactional-fixed-init, [] ~ residual-code) .
+
+--- The observed Emscripten RTLD_NOW path reaches both a false-success state
+--- and a later host-language failure.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-current-init =>* NS:NowState
+  such that NS:NowState |= rtld-now-false-success .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-current-init =>* NS:NowState
+  such that NS:NowState |= late-host-failure .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-current-init, [] ~ rtld-now-false-success) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-current-init, [] ~ late-host-failure) .
+
+--- Enforcing the RTLD_NOW boundary makes both states unreachable.
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-strict-init =>* NS:NowState
+  such that NS:NowState |= rtld-now-false-success .
+
+search [1] in EMSCRIPTEN-DLOPEN-MC :
+  now-strict-init =>* NS:NowState
+  such that NS:NowState |= late-host-failure .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-strict-init, [] ~ rtld-now-false-success) .
+
+red in EMSCRIPTEN-DLOPEN-MC :
+  modelCheck(now-strict-init, [] ~ late-host-failure) .
 
 quit
