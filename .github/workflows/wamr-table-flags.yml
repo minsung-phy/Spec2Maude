@@ -53,7 +53,15 @@ jobs:
           python3 "$bench/check_maude_result.py" "$out/fixed-flag2.log" 0'''
           if text.count(old) != 1:
               raise SystemExit('expected table concrete-result block not found')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          text = text.replace(old, new, 1)
+          old_cmake = '''  -DWAMR_BUILD_FAST_JIT=0
+            -DWAMR_BUILD_SIMD=0'''
+          new_cmake = '''  -DWAMR_BUILD_FAST_JIT=0
+            -DWAMR_BUILD_FAST_INTERP=0
+            -DWAMR_BUILD_SIMD=0'''
+          if text.count(old_cmake) != 1:
+              raise SystemExit('expected cmake option block not found')
+          path.write_text(text.replace(old_cmake, new_cmake, 1), encoding='utf-8')
           PY
           opam exec -- bash benchmarks/wamr-table-flags/run.sh "$RUNNER_TEMP/wamr-table-flags"
       - name: Upload evidence
