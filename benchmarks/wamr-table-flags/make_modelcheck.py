@@ -61,7 +61,10 @@ def main() -> None:
     tail = f'''
 
   rl [launch] : choose(N) => boot(N) .
-  crl [next] : choose(N) => choose(N + 1) if N < 255 .
+  --- The official limits grammar uses only 0x00, 0x01, 0x04, and 0x05.
+  --- Exploring 0..5 therefore covers all valid encodings plus the two
+  --- reserved/shared encodings 0x02 and 0x03.
+  crl [next] : choose(N) => choose(N + 1) if N < 5 .
 
   op reserved-table-flag-accepted : -> Prop [ctor] .
   var X : RunState .
