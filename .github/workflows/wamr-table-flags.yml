@@ -40,7 +40,24 @@ jobs:
           "$MAUDE" -no-banner builtins.maude > "$RUNNER_TEMP/wamr-table-flags/builtins-load.log" 2>&1
           ! grep -Eq '^(Warning|Advisory|Error):' "$RUNNER_TEMP/wamr-table-flags"/*-load.log
       - name: Run production parser model checking
-        run: opam exec -- bash benchmarks/wamr-table-flags/run.sh "$RUNNER_TEMP/wamr-table-flags"
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('benchmarks/wamr-table-flags/run.sh')
+          text = path.read_text(encoding='utf-8')
+          old = '''grep -q 'instr.const(numtype.i32, uN.wrap(1))' "$out/current-flag2.log"
+          grep -q 'instr.const(numtype.i32, uN.wrap(0))' "$out/fixed-flag2.log"'''
+          new = '''tr -d '\\n' < "$out/current-flag2.log" | \\
+            grep -q 'instr.const(numtype.i32, uN.wrap(1))'
+          tr -d '\\n' < "$out/fixed-flag2.log" | \\
+            grep -q 'instr.const(numtype.i32, uN.wrap(0))' '''
+          if text.count(old) != 1:
+              raise SystemExit('expected table concrete-result block not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          opam exec -- bash benchmarks/wamr-table-flags/run.sh "$RUNNER_TEMP/wamr-table-flags"
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
