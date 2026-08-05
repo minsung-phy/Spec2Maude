@@ -45,14 +45,19 @@ grep -Eq 'i32x4\.(relaxed_)?dot_i8x16_i7x16_add_s' "$out/tract-relaxed-dot.objdu
 grep -q 'fd 93 02' "$out/tract-relaxed-dot.objdump"
 
 # Produce both globally consistent profiles allowed by the official SpecTec
-# semantics for R_idot.
+# semantics for R_idot.  builtins.maude loads `output` relative to its own
+# location, so copy the unchanged generated semantics beside the profiles.
+cp output.maude "$out/output.maude"
 python3 "$bench/make_profile.py" builtins.maude "$out/builtins-r-idot-0.maude" --r-idot 0
 python3 "$bench/make_profile.py" builtins.maude "$out/builtins-r-idot-1.maude" --r-idot 1
 
 for p in 0 1; do
   profile="$out/builtins-r-idot-${p}.maude"
   "$maude" -no-banner "$profile" > "$out/profile-${p}-load.log" 2>&1
-  ! grep -Eq '^(Warning|Advisory|Error):' "$out/profile-${p}-load.log"
+  if grep -Eq '^(Warning|Advisory|Error):' "$out/profile-${p}-load.log"; then
+    cat "$out/profile-${p}-load.log" >&2
+    exit 1
+  fi
 
   opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
     "$out/tract-relaxed-dot.wasm" --semantics "$profile" \
