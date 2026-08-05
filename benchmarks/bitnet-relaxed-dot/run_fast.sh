@@ -19,11 +19,13 @@ wasm_logits="$bitnet/src/transformer/logits_wasm.c"
 scalar_logits="$bitnet/src/transformer/logits_scalar.c"
 cpu_backend="$bitnet/src/transformer/cpu_backend.c"
 
-# Audit the exact production contract: signed int8 weight and signed int8
-# activation are passed in that order to the relaxed dot, while the scalar
-# implementation multiplies both operands as signed int8.  Quantization emits
-# negative values, so the disputed input domain is reachable in real inference.
-grep -q 'wasm_i32x4_relaxed_dot_i8x16_i7x16_add(w, x, acc)' "$wasm_logits"
+# Audit the exact production contract: signed int8 embedding weights and
+# signed int8 quantized activations are passed in that order to the relaxed
+# dot, while the scalar implementation multiplies both as signed int8.
+# Quantization emits negative values, so the disputed domain is reachable.
+grep -q 'const int8_t \*row = emb_i8' "$wasm_logits"
+grep -q 'const int8_t \*quantized = lc->quantized' "$wasm_logits"
+grep -q 'wasm_i32x4_relaxed_dot_i8x16_i7x16_add(wasm_v128_load(row+d),[[:space:]]*wasm_v128_load(quantized+d),[[:space:]]*acc0)' "$wasm_logits"
 grep -q 'const int8_t \*row' "$scalar_logits"
 grep -q 'const int8_t \*quantized' "$scalar_logits"
 grep -q 'total += (int32_t)row\[d\] \* (int32_t)quantized\[d\]' "$scalar_logits"
@@ -94,8 +96,6 @@ else
   node "$bench/run_node.mjs" "$out/bitnet-relaxed-dot.wasm" \
     > "$out/node.log" 2>&1
 fi
-grep -q '^mismatch_count=128$' "$out/node.log"
-grep -q '^first_mismatch=128$' "$out/node.log"
 
 {
   echo 'bitnet.c Relaxed-SIMD logits portability result'
@@ -118,6 +118,9 @@ grep -q '^first_mismatch=128$' "$out/node.log"
   cat "$out/node.log"
 } | tee "$out/results.txt"
 
+# Do not assume V8's legal global R_idot choice here; the authoritative bug
+# claim is the full-profile Spec2Maude counterexample.  Preserve concrete V8
+# behaviour as empirical evidence, whatever legal profile it implements.
 if grep -Eq '^(Warning|Advisory|Error):' \
     "$out"/*-typecheck.log "$out"/*-run.log "$out/profile-1-search.log"; then
   grep -En '^(Warning|Advisory|Error):' "$out"/*.log >&2 || true
