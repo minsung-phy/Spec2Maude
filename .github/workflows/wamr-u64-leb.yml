@@ -76,10 +76,10 @@ jobs:
             "$out_dir/current-last2.log"
           grep -q 'instr.const(numtype.i32, uN.wrap(2))' \\
             "$out_dir/fixed-last2.log"'''
-          new = '''tr -d '\\n' < "$out_dir/current-last2.log" | \\
-            grep -q 'instr.const(numtype.i32, uN.wrap(0))'
-          tr -d '\\n' < "$out_dir/fixed-last2.log" | \\
-            grep -q 'instr.const(numtype.i32, uN.wrap(2))' '''
+          new = '''python3 "$bench/check_maude_result.py" \\
+            "$out_dir/current-last2.log" 0
+          python3 "$bench/check_maude_result.py" \\
+            "$out_dir/fixed-last2.log" 2'''
           if text.count(old) != 1:
               raise SystemExit('expected concrete-result check block not found')
           path.write_text(text.replace(old, new, 1), encoding='utf-8')
