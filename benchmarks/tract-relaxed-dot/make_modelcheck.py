@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Parameterize a wasm2maude run over all 256 packed i8 byte values."""
+"""Parameterize a wasm2maude run over a finite packed-i8 byte interval."""
 
 from __future__ import annotations
 
@@ -20,7 +20,11 @@ def main() -> None:
     parser.add_argument("input", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--module-name", required=True)
+    parser.add_argument("--start", type=int, default=0)
+    parser.add_argument("--max", type=int, default=255)
     args = parser.parse_args()
+    if not (0 <= args.start <= args.max <= 255):
+        raise SystemExit("require 0 <= start <= max <= 255")
 
     text = args.input.read_text(encoding="utf-8")
     marker = "\nrew ["
@@ -108,9 +112,9 @@ def main() -> None:
 
     addition = f"""
 
-  --- Every possible byte value stored in one full-i8 PackedI8K4 position.
+  --- Finite boundary domain for one full-i8 PackedI8K4 position.
   rl [launch-input] : choose(N) => boot(N) .
-  crl [next-input] : choose(N) => choose(N + 1) if N < 255 .
+  crl [next-input] : choose(N) => choose(N + 1) if N < {args.max} .
 
   op mismatch-reachable : -> Prop [ctor] .
   var X : RunState .
@@ -122,10 +126,10 @@ endm
 
 select {args.module_name} .
 search [1] in {args.module_name} :
-  choose(0) =>* X:RunState
+  choose({args.start}) =>* X:RunState
   such that X:RunState |= mismatch-reachable .
 red in {args.module_name} :
-  modelCheck(choose(0), [] ~ mismatch-reachable) .
+  modelCheck(choose({args.start}), [] ~ mismatch-reachable) .
 quit
 """
 
