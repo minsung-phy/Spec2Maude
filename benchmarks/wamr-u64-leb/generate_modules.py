@@ -25,23 +25,36 @@ def section(section_id: int, payload: bytes) -> bytes:
     return bytes([section_id]) + uleb(len(payload)) + payload
 
 
-def module(memory_min_encoding: bytes) -> bytes:
+def module(offset_encoding: bytes) -> bytes:
     magic_and_version = b"\x00asm\x01\x00\x00\x00"
-
-    # One () -> () function used as an executable control.
     type_section = section(1, b"\x01\x60\x00\x00")
     function_section = section(3, b"\x01\x00")
 
-    # limits flags 0x04 select memory64 with no maximum.  Consequently the
-    # minimum is encoded as u64 rather than u32.
-    memory_section = section(5, b"\x01\x04" + memory_min_encoding)
+    # memory64, minimum one page.
+    memory_section = section(5, b"\x01\x04\x01")
 
-    name = b"_start"
-    export_payload = b"\x01" + uleb(len(name)) + name + b"\x00\x00"
-    export_section = section(7, export_payload)
+    # Export as main so the production iwasm CLI executes it.
+    name = b"main"
+    export_section = section(
+        7, b"\x01" + uleb(len(name)) + name + b"\x00\x00"
+    )
 
-    # Function body: no locals; end.
-    code_section = section(10, b"\x01\x02\x00\x0b")
+    # () -> () body:
+    #   i64.const 0
+    #   i32.load align=2 offset=<u64 candidate>
+    #   drop
+    #
+    # With memory64 enabled, the memarg offset is decoded as unsigned u64 by
+    # WAMR's read_leb_mem_offset path.  An invalid value 2^64 must be rejected
+    # during loading, not wrapped to offset zero and executed.
+    body = (
+        b"\x00"          # local decl vector
+        + b"\x42\x00"    # i64.const 0
+        + b"\x28\x02"    # i32.load, alignment 2
+        + offset_encoding
+        + b"\x1a\x0b"    # drop; end
+    )
+    code_section = section(10, b"\x01" + uleb(len(body)) + body)
 
     return (
         magic_and_version
@@ -59,17 +72,18 @@ def main() -> None:
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Valid zero-page memory64 module.
-    (args.output_dir / "memory64-valid-zero.wasm").write_bytes(module(b"\x00"))
+    (args.output_dir / "memory64-offset-valid-zero.wasm").write_bytes(
+        module(b"\x00")
+    )
 
-    # Ten-byte encodings with nine zero payload continuation bytes.  In a valid
-    # u64 encoding, the final payload may only be 0 or 1.  Final payloads 2 and
-    # 127 encode values beyond 2^64-1 and must be rejected as integer overflow.
+    # A ten-byte unsigned LEB may use only bit 0 of the final payload for u64.
+    # 0x80^9 0x02 denotes 2^64 and is invalid; current WAMR accepts it and
+    # wraps it to zero.  0x7f is a second invalid terminal payload.
     prefix = b"\x80" * 9
-    (args.output_dir / "memory64-overflow-2.wasm").write_bytes(
+    (args.output_dir / "memory64-offset-overflow-2.wasm").write_bytes(
         module(prefix + b"\x02")
     )
-    (args.output_dir / "memory64-overflow-127.wasm").write_bytes(
+    (args.output_dir / "memory64-offset-overflow-127.wasm").write_bytes(
         module(prefix + b"\x7f")
     )
 
