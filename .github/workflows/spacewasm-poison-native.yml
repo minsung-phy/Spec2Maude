@@ -14,15 +14,19 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Confirm rejected-load store poisoning
+      - name: Confirm poisoning and future private-function hijack
         shell: bash
         run: |
           set -o pipefail
           mkdir -p "$RUNNER_TEMP/spacewasm-native"
           cargo test \
             --manifest-path benchmarks/spacewasm-poison/runner/Cargo.toml \
-            --release rejected_module_poison_is_observable -- --nocapture 2>&1 \
-            | tee "$RUNNER_TEMP/spacewasm-native/poison-test.log"
+            --release rejected_module_ -- --nocapture 2>&1 \
+            | tee "$RUNNER_TEMP/spacewasm-native/poison-and-hijack-tests.log"
+          grep -q 'rejected_module_poison_is_observable ... ok' \
+            "$RUNNER_TEMP/spacewasm-native/poison-and-hijack-tests.log"
+          grep -q 'rejected_module_hijacks_future_private_function ... ok' \
+            "$RUNNER_TEMP/spacewasm-native/poison-and-hijack-tests.log"
       - name: Confirm delayed indirect-call crash
         shell: bash
         run: |
