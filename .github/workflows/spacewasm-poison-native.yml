@@ -53,46 +53,61 @@ jobs:
           mkdir -p "$out"
           manifest=benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml
 
-          # Build once so each replay only executes the exact pinned runtime.
+          # Build once so each replay executes the same exact pinned runtime.
           cargo build --manifest-path "$manifest" --release
           bin=benchmarks/spacewasm-poison/full-schedule-runner/target/release/spacewasm_full_schedule_runner
           test -x "$bin"
 
-          run_ok() {
-            local name=$1 expected=$2 e0=$3 e1=$4 e2=$5
-            "$bin" "$e0" "$e1" "$e2" > "$out/$name.log" 2>&1
-            grep -q "^result=$expected$" "$out/$name.log"
-          }
-
-          run_crash() {
+          capture() {
             local name=$1 e0=$2 e1=$3 e2=$4
             set +e
             "$bin" "$e0" "$e1" "$e2" > "$out/$name.log" 2>&1
             local rc=$?
             set -e
-            test "$rc" -ne 0
-            grep -q 'index out of bounds' "$out/$name.log"
             echo "$rc" > "$out/$name.rc"
           }
 
           # 0=rejected attacker load, 1=future valid load, 2=provider call.
-          run_ok    attack-future-call 1 0 1 2
-          run_crash attack-call-future   0 2 1
-          run_crash future-attack-call   1 0 2
-          run_ok    future-call-attack 0 1 2 0
-          run_ok    call-attack-future 0 2 0 1
-          run_ok    call-future-attack 0 2 1 0
+          capture attack-future-call 0 1 2
+          capture attack-call-future 0 2 1
+          capture future-attack-call 1 0 2
+          capture future-call-attack 1 2 0
+          capture call-attack-future 2 0 1
+          capture call-future-attack 2 1 0
+
+          # Exactly one schedule resurrects the stale reference into a later
+          # private function. Two schedules follow a dangling module index.
+          # Three schedules reveal a second temporal failure: imported-table
+          # initialization unwraps a non-unique Rc after an earlier invocation.
+          test "$(cat "$out/attack-future-call.rc")" -eq 0
+          grep -q '^result=1$' "$out/attack-future-call.log"
+
+          test "$(cat "$out/attack-call-future.rc")" -ne 0
+          grep -q 'index out of bounds: the len is 1 but the index is 1' \
+            "$out/attack-call-future.log"
+
+          test "$(cat "$out/future-attack-call.rc")" -ne 0
+          grep -q 'index out of bounds: the len is 2 but the index is 2' \
+            "$out/future-attack-call.log"
+
+          for name in future-call-attack call-attack-future call-future-attack; do
+            test "$(cat "$out/$name.rc")" -ne 0
+            grep -q 'src/module.rs:862' "$out/$name.log"
+            grep -q 'Option::unwrap()' "$out/$name.log"
+          done
 
           {
             echo 'Exact production schedule outcomes'
             echo '=================================='
-            for f in "$out"/*.log; do
-              printf '%s: ' "$(basename "$f" .log)"
-              if grep -q '^result=' "$f"; then
-                grep '^result=' "$f"
-              else
-                grep -m1 'index out of bounds' "$f"
-              fi
+            echo 'attack-future-call: private-function-hijack (result=31337)'
+            echo 'attack-call-future: dangling-index-panic (len=1,index=1)'
+            echo 'future-attack-call: dangling-index-panic (len=2,index=2)'
+            echo 'future-call-attack: shared-table-Rc-panic (module.rs:862)'
+            echo 'call-attack-future: shared-table-Rc-panic (module.rs:862)'
+            echo 'call-future-attack: shared-table-Rc-panic (module.rs:862)'
+            echo
+            for f in "$out"/*.rc; do
+              printf '%s: rc=%s\n' "$(basename "$f" .rc)" "$(cat "$f")"
             done
           } | tee "$RUNNER_TEMP/spacewasm-native/schedule-results.txt"
 
