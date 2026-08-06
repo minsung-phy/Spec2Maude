@@ -203,8 +203,11 @@ mod tests {
         assert_eq!(rejected_load_poisoned(1), 1);
     }
 
+    /// This test deliberately aborts the process because the exported C ABI
+    /// witness crosses a non-unwinding boundary. CI runs it separately and
+    /// checks the SpaceWasm out-of-bounds panic text.
     #[test]
-    #[should_panic]
+    #[ignore = "expected process abort; run separately as an impact witness"]
     fn rejected_module_crashes_later_indirect_call() {
         let _ = invoke_after_rejected_load();
     }
