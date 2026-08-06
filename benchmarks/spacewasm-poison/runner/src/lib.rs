@@ -7,7 +7,7 @@ const ATTACKER_INVALID: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/attacker-invalid.wasm"));
 
 struct ByteStream {
-    bytes: Vec<u8>,
+    bytes: std::vec::Vec<u8>,
     consumed: bool,
 }
 
