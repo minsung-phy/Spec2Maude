@@ -46,11 +46,14 @@ fn corrupt_code_vector_count(mut wasm: Vec<u8>) -> Vec<u8> {
 fn main() {
     println!("cargo:rerun-if-changed=../provider.wat");
     println!("cargo:rerun-if-changed=../attacker.wat");
+    println!("cargo:rerun-if-changed=../future.wat");
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     let provider = wat::parse_file("../provider.wat").unwrap();
     let attacker_valid = wat::parse_file("../attacker.wat").unwrap();
     let attacker_invalid = corrupt_code_vector_count(attacker_valid.clone());
+    let future = wat::parse_file("../future.wat").unwrap();
     fs::write(out.join("provider.wasm"), provider).unwrap();
     fs::write(out.join("attacker-valid.wasm"), attacker_valid).unwrap();
     fs::write(out.join("attacker-invalid.wasm"), attacker_invalid).unwrap();
+    fs::write(out.join("future.wasm"), future).unwrap();
 }
