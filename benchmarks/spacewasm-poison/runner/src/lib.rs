@@ -188,7 +188,7 @@ pub extern "C" fn invoke_after_rejected_load() -> i32 {
     // Function 1 is provider.call. Its call_indirect reads the poisoned slot.
     engine.invoke(WasmRef { module: provider_ref, index: 1 }, &[]).unwrap();
     match Interpreter.run(builder.pages(), &mut engine, 1000) {
-        InterpreterResult::Finished => engine.result.map(|v| v.low as i32).unwrap_or(-1),
+        InterpreterResult::Finished => engine.result.map(|v| v.read_i32()).unwrap_or(-1),
         _ => -2,
     }
 }
