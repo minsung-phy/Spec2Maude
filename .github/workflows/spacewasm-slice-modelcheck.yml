@@ -1,0 +1,159 @@
+name: SpaceWasm rejected-module schedule model check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  modelcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          dune-cache: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt
+          opam install dune menhir zarith -y
+
+      - name: Build Spec2Maude
+        run: opam exec -- dune build --profile release
+
+      - name: Install Maude 3.5.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip \
+            -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          test -n "$maude_bin"
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+          "$maude_bin" --version
+
+      - name: Build the executable loader-state slice
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-slice"
+          mkdir -p "$out"
+          wat2wasm benchmarks/spacewasm-poison/spacewasm-loader-slice.wat \
+            -o "$out/spacewasm-loader-slice.wasm"
+          wasm-validate "$out/spacewasm-loader-slice.wasm"
+          wasm-objdump -x "$out/spacewasm-loader-slice.wasm" \
+            > "$out/slice.objdump"
+          grep -q 'run3' "$out/slice.objdump"
+          sha256sum "$out/spacewasm-loader-slice.wasm" > "$out/slice.sha256"
+          cp benchmarks/spacewasm-poison/SLICE_MAPPING.md "$out/"
+
+      - name: Check all six schedules with generated official semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-slice"
+          wasm="$out/spacewasm-loader-slice.wasm"
+          schedules=(
+            '0 1 2 1 attack-future-call'
+            '0 2 1 0 attack-call-future'
+            '1 0 2 0 future-attack-call'
+            '1 2 0 0 future-call-attack'
+            '2 0 1 0 call-attack-future'
+            '2 1 0 0 call-future-attack'
+          )
+          for row in "${schedules[@]}"; do
+            read -r e0 e1 e2 expected name <<< "$row"
+            opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
+              "$wasm" --invoke run3 \
+              --arg "i32:$e0" --arg "i32:$e1" --arg "i32:$e2" \
+              --steps 1000000 --semantics builtins.maude \
+              -o "$out/concrete-$name.maude"
+            timeout 300s "$MAUDE" -no-banner "$out/concrete-$name.maude" \
+              > "$out/concrete-$name.log" 2>&1
+            python3 benchmarks/spacewasm-poison/check_i32_result.py \
+              "$out/concrete-$name.log" "$expected"
+          done
+
+      - name: Model check the complete bounded event space
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-slice"
+          wasm="$out/spacewasm-loader-slice.wasm"
+          opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
+            "$wasm" --invoke run3 \
+            --arg i32:0 --arg i32:1 --arg i32:2 \
+            --steps 1000000 --semantics builtins.maude \
+            -o "$out/modelcheck-raw.maude"
+          python3 benchmarks/spacewasm-poison/make_slice_modelcheck.py \
+            "$out/modelcheck-raw.maude" "$out/modelcheck.maude"
+          timeout 600s "$MAUDE" -no-banner "$out/modelcheck.maude" \
+            > "$out/modelcheck.log" 2>&1
+
+          ! grep -Eq '^(Warning|Advisory|Error):' "$out/modelcheck.log"
+          grep -q '^Solution 1' "$out/modelcheck.log"
+          grep -q 'order-attack-future-call' "$out/modelcheck.log"
+          grep -q 'result ModelCheckResult: counterexample' "$out/modelcheck.log"
+
+      - name: Confirm the abstraction against exact pinned NASA SpaceWasm
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-slice"
+          cargo test \
+            --manifest-path benchmarks/spacewasm-poison/runner/Cargo.toml \
+            --release rejected_module_ -- --nocapture 2>&1 \
+            | tee "$out/native-full-system.log"
+          grep -q 'rejected_module_hijacks_future_private_function ... ok' \
+            "$out/native-full-system.log"
+          grep -q 'rejected_module_poison_is_observable ... ok' \
+            "$out/native-full-system.log"
+
+      - name: Summarize evidence
+        if: always()
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/spacewasm-slice"
+          mkdir -p "$out"
+          {
+            echo 'NASA SpaceWasm rejected-module future-function hijack'
+            echo '======================================================'
+            echo "spec2maude_sha=$GITHUB_SHA"
+            echo 'spacewasm_sha=839feec79fcd7137e2e5f1a19922127f97d6d1d8'
+            echo "maude=$($MAUDE --version 2>&1 | head -n 1 || true)"
+            echo
+            echo '[Concrete schedules under generated official semantics]'
+            for f in "$out"/concrete-*.log; do
+              test -e "$f" || continue
+              printf '%s: ' "$(basename "$f" .log)"
+              grep -oE 'instr\.const\([^)]*i32[^)]*uN\.wrap\([0-9]+\)' "$f" \
+                | tail -n 1 || true
+            done
+            echo
+            echo '[Model checking]'
+            grep -E '^(Solution 1|state [0-9]+|states:|rewrites:|result ModelCheckResult:)' \
+              "$out/modelcheck.log" || true
+            grep 'order-attack-future-call' "$out/modelcheck.log" || true
+            echo
+            echo '[Exact production control]'
+            grep -E 'rejected_module_(poison_is_observable|hijacks_future_private_function).*ok' \
+              "$out/native-full-system.log" || true
+          } | tee "$out/results.txt"
+
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec2maude-spacewasm-schedule-modelcheck
+          path: ${{ runner.temp }}/spacewasm-slice
+          retention-days: 30
