@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Model check the exact SpaceWasm Wasm harness with semantic macro steps.
 
-Only wrapper-level scheduling is added.  The generated `rel.step` relation is
-unchanged.  Deterministic internal Wasm execution is hidden from the outer
-state graph through the *generated official* reflexive-transitive `rel.steps`
-relation.  Thus the reduction removes stuttering states without replacing the
-Wasm semantics by a handwritten evaluator.
+The generated `rel.step` relation is unchanged.  Module instantiation happens
+once.  The outer model then chooses one of all six event permutations, while
+deterministic internal Wasm execution is hidden through the *generated
+official* reflexive-transitive `rel.steps` relation.  This removes stuttering
+states without replacing the Wasm semantics by a handwritten evaluator.
 """
 
 from __future__ import annotations
@@ -51,14 +51,10 @@ def transform(text: str) -> str:
     text = once(
         text,
         "  op boot : -> RunState [ctor] .",
-        "  op choose : -> RunState [ctor] .\n"
-        "  op boot : Nat Nat Nat -> RunState [ctor] .\n"
+        "  op boot : -> RunState [ctor] .\n"
+        "  op ready : SpectecTerminal SpectecTerminal -> RunState "
+        "[ctor frozen (1 2)] .\n"
         "  op done : Nat Nat Nat Nat -> RunState [ctor] .",
-    )
-    text = once(
-        text,
-        "  op init : SpectecTerminal -> RunState [ctor frozen (1)] .",
-        "  op init : Nat Nat Nat SpectecTerminal -> RunState [ctor frozen (4)] .",
     )
     text = once(
         text,
@@ -94,12 +90,6 @@ def transform(text: str) -> str:
     if count != 1:
         raise RuntimeError("inputArgs equation not found")
 
-    text = once(
-        text,
-        "  crl [instantiate] : boot => init(C)\n",
-        "  crl [instantiate] : boot(E0, E1, E2) => init(E0, E1, E2, C)\n",
-    )
-
     old_driver = """  crl [init-step] : init(C) => init(C2)
     if rel.step(C) => C2 .
   rl [invoke] :
@@ -109,18 +99,34 @@ def transform(text: str) -> str:
   crl [step] : exec(C) => exec(C2)
     if rel.step(C) => C2 .
 """
-    new_driver = """  --- Initialization is deterministic.  Use the generated official
-  --- reflexive-transitive closure to hide only internal stuttering states.
-  crl [init-macro] :
-    init(E0, E1, E2, C)
-    => exec(E0, E1, E2, def.invoke(
-      S, findFunc(value('EXPORTS, MI), inputName), inputArgs(E0, E1, E2)))
+    new_driver = """  --- Complete deterministic initialization once, before schedule choice.
+  crl [init-macro] : init(C) => ready(S, MI)
     if rel.steps(C) =>
       config.sym(state.sym(S, rec.frame(LOCALS, MI)), eps) .
 
-  --- `def.invoke` needs its first official step; the remaining deterministic
-  --- execution is again closed by generated `rel.steps`.  No production
-  --- `rel.step` rule is edited or bypassed.
+  --- The six rules below are the complete bounded environment state space.
+  rl [order-attack-future-call] : ready(S, MI) =>
+    exec(0, 1, 2, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName), inputArgs(0, 1, 2))) .
+  rl [order-attack-call-future] : ready(S, MI) =>
+    exec(0, 2, 1, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName), inputArgs(0, 2, 1))) .
+  rl [order-future-attack-call] : ready(S, MI) =>
+    exec(1, 0, 2, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName), inputArgs(1, 0, 2))) .
+  rl [order-future-call-attack] : ready(S, MI) =>
+    exec(1, 2, 0, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName), inputArgs(1, 2, 0))) .
+  rl [order-call-attack-future] : ready(S, MI) =>
+    exec(2, 0, 1, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName), inputArgs(2, 0, 1))) .
+  rl [order-call-future-attack] : ready(S, MI) =>
+    exec(2, 1, 0, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName), inputArgs(2, 1, 0))) .
+
+  --- `def.invoke` needs its first official step; all remaining deterministic
+  --- execution is closed by generated `rel.steps`.  No generated rule is
+  --- edited, and the result is still computed by the official Wasm semantics.
   crl [exec-macro] :
     exec(E0, E1, E2, C) => done(E0, E1, E2, N)
     if rel.step(C) => C2 /\\
@@ -131,14 +137,6 @@ def transform(text: str) -> str:
 
     tail = r'''
 
-  --- 0 = rejected partial load, 1 = later valid load, 2 = provider call.
-  rl [order-attack-future-call] : choose => boot(0, 1, 2) .
-  rl [order-attack-call-future] : choose => boot(0, 2, 1) .
-  rl [order-future-attack-call] : choose => boot(1, 0, 2) .
-  rl [order-future-call-attack] : choose => boot(1, 2, 0) .
-  rl [order-call-attack-future] : choose => boot(2, 0, 1) .
-  rl [order-call-future-attack] : choose => boot(2, 1, 0) .
-
   op private-function-hijacked : -> Prop [ctor] .
   var X : RunState .
   eq done(E0, E1, E2, 1) |= private-function-hijacked = true .
@@ -147,11 +145,11 @@ endm
 
 select SPACEWASM-FULL-SCHEDULE-MC .
 search [1] in SPACEWASM-FULL-SCHEDULE-MC :
-  choose =>* X:RunState
+  boot =>* X:RunState
   such that X:RunState |= private-function-hijacked .
 show path labels 1 .
 red in SPACEWASM-FULL-SCHEDULE-MC :
-  modelCheck(choose, [] ~ private-function-hijacked) .
+  modelCheck(boot, [] ~ private-function-hijacked) .
 quit
 '''
     text = once(text, "endm\n", tail)
