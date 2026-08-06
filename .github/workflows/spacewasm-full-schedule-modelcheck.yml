@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y wabt binaryen
+          sudo apt-get install -y wabt
           opam install dune menhir zarith -y
           rustup target add wasm32-unknown-unknown
 
@@ -42,6 +42,21 @@ jobs:
           test -n "$maude_bin"
           echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
           "$maude_bin" --version
+
+      - name: Install pinned Binaryen 131
+        shell: bash
+        run: |
+          set -euo pipefail
+          url=https://github.com/WebAssembly/binaryen/releases/download/version_131/binaryen-version_131-x86_64-linux.tar.gz
+          curl -fL --retry 3 "$url" -o "$RUNNER_TEMP/binaryen.tar.gz"
+          echo 'b5bf1f0eaf17c63ee588ff7a5954dc8f6ce2c26989051c66f24dfe9ece3e46db  '"$RUNNER_TEMP/binaryen.tar.gz" \
+            | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/binaryen"
+          tar -xzf "$RUNNER_TEMP/binaryen.tar.gz" \
+            -C "$RUNNER_TEMP/binaryen" --strip-components=1
+          test -x "$RUNNER_TEMP/binaryen/bin/wasm-opt"
+          echo "WASM_OPT=$RUNNER_TEMP/binaryen/bin/wasm-opt" >> "$GITHUB_ENV"
+          "$RUNNER_TEMP/binaryen/bin/wasm-opt" --version
 
       - name: Reproduce the vulnerable schedule in the exact pinned SpaceWasm library
         shell: bash
@@ -72,13 +87,13 @@ jobs:
           # Binaryen's official lowering passes preserve behavior while
           # replacing memory.copy/fill, sign-extension operators, and
           # saturating float conversions by MVP instruction sequences.
-          wasm-opt "$raw" --all-features \
+          "$WASM_OPT" "$raw" --all-features \
             --llvm-memory-copy-fill-lowering \
             --signext-lowering \
             --llvm-nontrapping-fptoint-lowering \
             -Oz --strip-debug --strip-producers \
             -o "$out/full-lowered.wasm"
-          wasm-opt "$out/full-lowered.wasm" --mvp-features -Oz \
+          "$WASM_OPT" "$out/full-lowered.wasm" --mvp-features -Oz \
             -o "$out/full-optimized.wasm"
 
           wasm-validate "$out/full-optimized.wasm"
@@ -139,6 +154,7 @@ jobs:
             echo "spec2maude_sha=$GITHUB_SHA"
             echo 'spacewasm_sha=839feec79fcd7137e2e5f1a19922127f97d6d1d8'
             echo "maude=$($MAUDE --version 2>&1 | head -n 1 || true)"
+            echo "binaryen=$($WASM_OPT --version 2>&1 | head -n 1 || true)"
             cat "$out/sizes.txt" 2>/dev/null || true
             echo 'reduction=generated-rel.steps-stuttering-closure'
             echo
