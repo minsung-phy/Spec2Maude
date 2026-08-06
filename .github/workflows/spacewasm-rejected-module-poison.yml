@@ -1,0 +1,136 @@
+name: NASA SpaceWasm rejected-module table poisoning
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  modelcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          dune-cache: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt
+          opam install dune menhir zarith -y
+          rustup target add wasm32-unknown-unknown
+
+      - name: Build Spec2Maude
+        run: opam exec -- dune build --profile release
+
+      - name: Install Maude 3.5.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip \
+            -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          test -n "$maude_bin"
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+          "$maude_bin" --version
+
+      - name: Reproduce against exact pinned SpaceWasm source natively
+        run: |
+          cargo test --manifest-path benchmarks/spacewasm-poison/runner/Cargo.toml --release -- --nocapture
+
+      - name: Compile exact SpaceWasm harness to WebAssembly
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/spacewasm-poison"
+          RUSTFLAGS='-C target-feature=-bulk-memory,-reference-types,-multivalue' \
+            cargo build \
+              --manifest-path benchmarks/spacewasm-poison/runner/Cargo.toml \
+              --target wasm32-unknown-unknown --release
+          wasm=benchmarks/spacewasm-poison/runner/target/wasm32-unknown-unknown/release/spacewasm_poison_runner.wasm
+          cp "$wasm" "$RUNNER_TEMP/spacewasm-poison/spacewasm-poison-runner.wasm"
+          wasm-validate "$wasm"
+          wasm-objdump -x "$wasm" > "$RUNNER_TEMP/spacewasm-poison/runner.objdump"
+          grep -q 'rejected_load_poisoned' "$RUNNER_TEMP/spacewasm-poison/runner.objdump"
+          sha256sum "$wasm" > "$RUNNER_TEMP/spacewasm-poison/runner.sha256"
+
+      - name: Load generated official semantics
+        run: |
+          "$MAUDE" -no-banner output.maude > "$RUNNER_TEMP/spacewasm-poison/output-load.log" 2>&1
+          "$MAUDE" -no-banner builtins.maude > "$RUNNER_TEMP/spacewasm-poison/builtins-load.log" 2>&1
+          ! grep -Eq '^(Warning|Advisory|Error):' "$RUNNER_TEMP/spacewasm-poison"/*-load.log
+
+      - name: Validate and execute the production harness through Spec2Maude
+        shell: bash
+        run: |
+          set -euo pipefail
+          wasm="$RUNNER_TEMP/spacewasm-poison/spacewasm-poison-runner.wasm"
+          opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
+            "$wasm" --semantics builtins.maude \
+            -o "$RUNNER_TEMP/spacewasm-poison/typecheck.maude"
+          timeout 1800s "$MAUDE" -no-banner "$RUNNER_TEMP/spacewasm-poison/typecheck.maude" \
+            > "$RUNNER_TEMP/spacewasm-poison/typecheck.log" 2>&1
+          grep -q 'result Bool: true' "$RUNNER_TEMP/spacewasm-poison/typecheck.log"
+
+          for scenario in 0 1; do
+            opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
+              "$wasm" --invoke rejected_load_poisoned --arg "i32:${scenario}" \
+              --steps 50000000 --semantics builtins.maude \
+              -o "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.maude"
+            timeout 3600s "$MAUDE" -no-banner "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.maude" \
+              > "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.log" 2>&1
+          done
+          python3 benchmarks/spacewasm-poison/check_i32_result.py \
+            "$RUNNER_TEMP/spacewasm-poison/scenario-0.log" 0
+          python3 benchmarks/spacewasm-poison/check_i32_result.py \
+            "$RUNNER_TEMP/spacewasm-poison/scenario-1.log" 1
+
+      - name: Model check the rejected-load safety property
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 benchmarks/spacewasm-poison/make_modelcheck.py \
+            "$RUNNER_TEMP/spacewasm-poison/scenario-0.maude" \
+            "$RUNNER_TEMP/spacewasm-poison/modelcheck.maude"
+          timeout 3600s "$MAUDE" -no-banner "$RUNNER_TEMP/spacewasm-poison/modelcheck.maude" \
+            > "$RUNNER_TEMP/spacewasm-poison/modelcheck.log" 2>&1
+          grep -q '^Solution 1' "$RUNNER_TEMP/spacewasm-poison/modelcheck.log"
+          grep -q 'result ModelCheckResult: counterexample' "$RUNNER_TEMP/spacewasm-poison/modelcheck.log"
+
+      - name: Summarize evidence
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/spacewasm-poison"
+          {
+            echo 'NASA SpaceWasm rejected-module table-poison result'
+            echo '=================================================='
+            echo "spec2maude_sha=$GITHUB_SHA"
+            echo 'spacewasm_sha=839feec79fcd7137e2e5f1a19922127f97d6d1d8'
+            echo "rustc=$(rustc --version)"
+            echo "maude=$($MAUDE --version 2>&1 | head -n 1 || true)"
+            echo
+            echo '[Concrete official-semantics results]'
+            grep -E '^(rewrites:|result RunState:)' "$RUNNER_TEMP/spacewasm-poison"/scenario-*.log || true
+            echo
+            echo '[Model checking]'
+            grep -E '^(Solution 1|No solution\.|states:|rewrites:|result (Bool|ModelCheckResult):)' \
+              "$RUNNER_TEMP/spacewasm-poison/modelcheck.log" || true
+          } | tee "$RUNNER_TEMP/spacewasm-poison/results.txt"
+
+      - name: Upload full evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec2maude-spacewasm-rejected-module-poison
+          path: ${{ runner.temp }}/spacewasm-poison
+          retention-days: 30
