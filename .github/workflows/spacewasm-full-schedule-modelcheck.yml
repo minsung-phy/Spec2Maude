@@ -56,24 +56,37 @@ jobs:
           grep -q 'attack_then_future_then_call_hijacks_private_function ... ok' \
             "$out/native.log"
 
-      - name: Compile and minimize the exact SpaceWasm harness as WebAssembly
+      - name: Compile and lower the exact SpaceWasm harness to Wasm MVP
         shell: bash
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/spacewasm-full"
-          RUSTFLAGS='-C target-feature=-bulk-memory,-reference-types,-multivalue' \
-            cargo build \
-              --manifest-path benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml \
-              --target wasm32-unknown-unknown --release
+          cargo build \
+            --manifest-path benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml \
+            --target wasm32-unknown-unknown --release
           raw=benchmarks/spacewasm-poison/full-schedule-runner/target/wasm32-unknown-unknown/release/spacewasm_full_schedule_runner.wasm
           cp "$raw" "$out/full-raw.wasm"
-          wasm-opt -Oz --strip-debug --strip-producers "$raw" \
+
+          # Rust's standard library currently emits standardized post-MVP
+          # instructions even when the application logic is MVP-compatible.
+          # Binaryen's official lowering passes preserve behavior while
+          # replacing memory.copy/fill, sign-extension operators, and
+          # saturating float conversions by MVP instruction sequences.
+          wasm-opt "$raw" --all-features \
+            --llvm-memory-copy-fill-lowering \
+            --signext-lowering \
+            --llvm-nontrapping-fptoint-lowering \
+            -Oz --strip-debug --strip-producers \
+            -o "$out/full-lowered.wasm"
+          wasm-opt "$out/full-lowered.wasm" --mvp-features -Oz \
             -o "$out/full-optimized.wasm"
+
           wasm-validate "$out/full-optimized.wasm"
           wasm-objdump -x "$out/full-optimized.wasm" > "$out/full.objdump"
           grep -q 'spacewasm_run3' "$out/full.objdump"
           {
             stat --printf='raw_bytes=%s\n' "$out/full-raw.wasm"
+            stat --printf='lowered_bytes=%s\n' "$out/full-lowered.wasm"
             stat --printf='optimized_bytes=%s\n' "$out/full-optimized.wasm"
           } | tee "$out/sizes.txt"
           sha256sum "$out/full-optimized.wasm" > "$out/full.sha256"
