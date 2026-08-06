@@ -82,12 +82,15 @@ jobs:
           raw=benchmarks/spacewasm-poison/full-schedule-runner/target/wasm32-unknown-unknown/release/spacewasm_full_schedule_runner.wasm
           cp "$raw" "$out/full-raw.wasm"
 
-          # Rust's standard library currently emits standardized post-MVP
-          # instructions even when the application logic is MVP-compatible.
-          # Binaryen's official lowering passes preserve behavior while
-          # replacing memory.copy/fill, sign-extension operators, and
-          # saturating float conversions by MVP instruction sequences.
-          "$WASM_OPT" "$raw" --all-features \
+          # Rust's standard library emits standardized post-MVP instructions.
+          # Enable exactly those source features; --all-features would also
+          # enable Memory64/multi-memory and invalidate memory.copy lowering.
+          # These official Binaryen passes replace the post-MVP operations by
+          # behavior-preserving MVP instruction sequences.
+          "$WASM_OPT" "$raw" \
+            --enable-bulk-memory \
+            --enable-sign-ext \
+            --enable-nontrapping-float-to-int \
             --llvm-memory-copy-fill-lowering \
             --signext-lowering \
             --llvm-nontrapping-fptoint-lowering \
