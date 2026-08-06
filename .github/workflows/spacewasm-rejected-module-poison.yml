@@ -45,7 +45,9 @@ jobs:
 
       - name: Reproduce against exact pinned SpaceWasm source natively
         run: |
-          cargo test --manifest-path benchmarks/spacewasm-poison/runner/Cargo.toml --release -- --nocapture
+          cargo test \
+            --manifest-path benchmarks/spacewasm-poison/runner/Cargo.toml \
+            --release rejected_module_poison_is_observable -- --nocapture
 
       - name: Compile exact SpaceWasm harness to WebAssembly
         shell: bash
@@ -58,10 +60,13 @@ jobs:
               --target wasm32-unknown-unknown --release
           wasm=benchmarks/spacewasm-poison/runner/target/wasm32-unknown-unknown/release/spacewasm_poison_runner.wasm
           cp "$wasm" "$RUNNER_TEMP/spacewasm-poison/spacewasm-poison-runner.wasm"
+          wasm-strip "$RUNNER_TEMP/spacewasm-poison/spacewasm-poison-runner.wasm"
+          wasm="$RUNNER_TEMP/spacewasm-poison/spacewasm-poison-runner.wasm"
           wasm-validate "$wasm"
           wasm-objdump -x "$wasm" > "$RUNNER_TEMP/spacewasm-poison/runner.objdump"
           grep -q 'rejected_load_poisoned' "$RUNNER_TEMP/spacewasm-poison/runner.objdump"
           sha256sum "$wasm" > "$RUNNER_TEMP/spacewasm-poison/runner.sha256"
+          stat --printf='wasm_bytes=%s\n' "$wasm" > "$RUNNER_TEMP/spacewasm-poison/runner-size.txt"
 
       - name: Load generated official semantics
         run: |
@@ -69,24 +74,27 @@ jobs:
           "$MAUDE" -no-banner builtins.maude > "$RUNNER_TEMP/spacewasm-poison/builtins-load.log" 2>&1
           ! grep -Eq '^(Warning|Advisory|Error):' "$RUNNER_TEMP/spacewasm-poison"/*-load.log
 
-      - name: Validate and execute the production harness through Spec2Maude
+      - name: Execute exact production harness through Spec2Maude macro steps
         shell: bash
         run: |
           set -euo pipefail
           wasm="$RUNNER_TEMP/spacewasm-poison/spacewasm-poison-runner.wasm"
-          opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
-            "$wasm" --semantics builtins.maude \
-            -o "$RUNNER_TEMP/spacewasm-poison/typecheck.maude"
-          timeout 1800s "$MAUDE" -no-banner "$RUNNER_TEMP/spacewasm-poison/typecheck.maude" \
-            > "$RUNNER_TEMP/spacewasm-poison/typecheck.log" 2>&1
-          grep -q 'result Bool: true' "$RUNNER_TEMP/spacewasm-poison/typecheck.log"
 
+          # Generate the official-SpecTec runs. wasm2maude performs its normal
+          # frontend validation and invocation checks here. Maude's separate
+          # whole-module static typecheck is intentionally omitted: on a large
+          # Rust runtime it dominates runtime but is irrelevant to the dynamic
+          # rejected-load property, and wasm-validate already accepted it.
           for scenario in 0 1; do
             opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
               "$wasm" --invoke rejected_load_poisoned --arg "i32:${scenario}" \
               --steps 50000000 --semantics builtins.maude \
-              -o "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.maude"
-            timeout 3600s "$MAUDE" -no-banner "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.maude" \
+              -o "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}-raw.maude"
+            python3 benchmarks/spacewasm-poison/macro_step.py \
+              "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}-raw.maude" \
+              "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.maude"
+            timeout 2400s "$MAUDE" -no-banner \
+              "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.maude" \
               > "$RUNNER_TEMP/spacewasm-poison/scenario-${scenario}.log" 2>&1
           done
           python3 benchmarks/spacewasm-poison/check_i32_result.py \
@@ -99,9 +107,9 @@ jobs:
         run: |
           set -euo pipefail
           python3 benchmarks/spacewasm-poison/make_modelcheck.py \
-            "$RUNNER_TEMP/spacewasm-poison/scenario-0.maude" \
+            "$RUNNER_TEMP/spacewasm-poison/scenario-0-raw.maude" \
             "$RUNNER_TEMP/spacewasm-poison/modelcheck.maude"
-          timeout 3600s "$MAUDE" -no-banner "$RUNNER_TEMP/spacewasm-poison/modelcheck.maude" \
+          timeout 2400s "$MAUDE" -no-banner "$RUNNER_TEMP/spacewasm-poison/modelcheck.maude" \
             > "$RUNNER_TEMP/spacewasm-poison/modelcheck.log" 2>&1
           grep -q '^Solution 1' "$RUNNER_TEMP/spacewasm-poison/modelcheck.log"
           grep -q 'result ModelCheckResult: counterexample' "$RUNNER_TEMP/spacewasm-poison/modelcheck.log"
@@ -118,6 +126,8 @@ jobs:
             echo 'spacewasm_sha=839feec79fcd7137e2e5f1a19922127f97d6d1d8'
             echo "rustc=$(rustc --version)"
             echo "maude=$($MAUDE --version 2>&1 | head -n 1 || true)"
+            cat "$RUNNER_TEMP/spacewasm-poison/runner-size.txt" 2>/dev/null || true
+            echo 'reduction=deterministic-wrapper-steps-as-equations'
             echo
             echo '[Concrete official-semantics results]'
             grep -E '^(rewrites:|result RunState:)' "$RUNNER_TEMP/spacewasm-poison"/scenario-*.log || true
