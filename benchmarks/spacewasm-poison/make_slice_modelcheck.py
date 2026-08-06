@@ -2,9 +2,10 @@
 """Turn a wasm2maude `run` wrapper for `run3` into a Maude model checker.
 
 The generated SpecTec-derived WebAssembly semantics and its `rel.step` rules
-remain unchanged.  This wrapper adds only the externally observable scheduler:
+remain unchanged. This wrapper adds only the externally observable scheduler:
 all six permutations of rejected partial load (0), future valid load (1), and
-provider call_indirect (2).
+provider call_indirect (2). The Wasm projection returns the exact native outcome
+class established by six independent production replays.
 """
 
 from __future__ import annotations
@@ -22,8 +23,6 @@ def once(text: str, old: str, new: str) -> str:
 
 
 def transform(text: str) -> str:
-    # Remove the concrete command emitted by wasm2maude; the module itself is
-    # retained verbatim and generalized below.
     marker = "\nrew ["
     if marker not in text:
         raise RuntimeError("generated final rewrite command not found")
@@ -134,11 +133,28 @@ def transform(text: str) -> str:
   rl [order-call-future-attack] : choose => boot(2, 1, 0) .
 
   op private-function-hijacked : -> Prop [ctor] .
+  op lifecycle-unsafe : -> Prop [ctor] .
   var X : RunState .
+
+  --- Outcome 1: a stale rejected-module reference resolves to the later
+  --- module and invokes its private function.
   eq exec(E0, E1, E2,
       config.sym(S, instr.const(numtype.i32, uN.wrap(1))))
       |= private-function-hijacked = true .
   eq X |= private-function-hijacked = false [owise] .
+
+  --- Outcomes 1, 2, and 3 are all production-validated lifecycle failures:
+  --- future private execution, dangling-index panic, or shared-Rc panic.
+  eq exec(E0, E1, E2,
+      config.sym(S, instr.const(numtype.i32, uN.wrap(1))))
+      |= lifecycle-unsafe = true .
+  eq exec(E0, E1, E2,
+      config.sym(S, instr.const(numtype.i32, uN.wrap(2))))
+      |= lifecycle-unsafe = true .
+  eq exec(E0, E1, E2,
+      config.sym(S, instr.const(numtype.i32, uN.wrap(3))))
+      |= lifecycle-unsafe = true .
+  eq X |= lifecycle-unsafe = false [owise] .
 endm
 
 select SPACEWASM-SLICE-MC .
@@ -148,6 +164,8 @@ search [1] in SPACEWASM-SLICE-MC :
 show path labels 1 .
 red in SPACEWASM-SLICE-MC :
   modelCheck(choose, [] ~ private-function-hijacked) .
+red in SPACEWASM-SLICE-MC :
+  modelCheck(choose, [] ~ lifecycle-unsafe) .
 quit
 '''
     text = once(text, "endm\n", tail)
