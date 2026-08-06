@@ -1,0 +1,19 @@
+name: SpaceWasm rejected-module poison native confirmation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run exact pinned SpaceWasm reproduction
+        run: |
+          cargo test --manifest-path benchmarks/spacewasm-poison/runner/Cargo.toml --release -- --nocapture
