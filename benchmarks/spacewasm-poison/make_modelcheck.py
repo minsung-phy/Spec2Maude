@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Build a stuttering-reduced state space from an actual wasm2maude run.
 
-The official generated `rel.step` relation remains unchanged.  Deterministic
+The official generated `rel.step` relation remains unchanged. Deterministic
 module instantiation and Wasm execution are made equational in the wrapper, so
-only the two externally meaningful loader scenarios are rewrite transitions.
-The checked proposition observes a terminal result, hence removing internal
-stuttering states preserves this safety counterexample.
+only two externally meaningful loader scenarios are rewrite transitions. The
+checked proposition observes the terminal cross-module control-flow result;
+removing internal stuttering states preserves this safety counterexample.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ def main() -> None:
     text = text.split("\nrew [", 1)[0].rstrip() + "\n"
     first = text.find("\n")
     text = text[: first + 1] + "load model-checker.maude\n\n" + text[first + 1 :]
-    text = once(text, "mod WASM2MAUDE-RUN is", "mod SPACEWASM-POISON-MC is")
+    text = once(text, "mod WASM2MAUDE-RUN is", "mod SPACEWASM-HIJACK-MC is")
     text = once(
         text,
         "  protecting WASM-BUILTINS .",
@@ -69,7 +69,7 @@ def main() -> None:
         raise RuntimeError("inputArgs equation not found")
 
     # Deterministic internal Wasm execution is collapsed into equational
-    # normalization.  Only `try-*` below remain observable rewrite rules.
+    # normalization. Only `try-*` below remain observable rewrite rules.
     text = once(
         text,
         "  crl [instantiate] : boot => init(C)\n",
@@ -92,22 +92,22 @@ def main() -> None:
 
     tail = r'''
 
-  rl [try-baseline] : choose(0) => boot(0) .
-  rl [try-rejected-load] : choose(0) => boot(1) .
+  rl [run-without-rejected-module] : choose(0) => boot(0) .
+  rl [run-with-rejected-module] : choose(0) => boot(1) .
 
-  op rejected-load-side-effect : -> Prop [ctor] .
+  op future-private-function-hijack : -> Prop [ctor] .
   var X : RunState .
   eq exec(1, config.sym(S, instr.const(numtype.i32, uN.wrap(1))))
-      |= rejected-load-side-effect = true .
-  eq X |= rejected-load-side-effect = false [owise] .
+      |= future-private-function-hijack = true .
+  eq X |= future-private-function-hijack = false [owise] .
 endm
 
-select SPACEWASM-POISON-MC .
-search [1] in SPACEWASM-POISON-MC :
+select SPACEWASM-HIJACK-MC .
+search [1] in SPACEWASM-HIJACK-MC :
   choose(0) =>* X:RunState
-  such that X:RunState |= rejected-load-side-effect .
-red in SPACEWASM-POISON-MC :
-  modelCheck(choose(0), [] ~ rejected-load-side-effect) .
+  such that X:RunState |= future-private-function-hijack .
+red in SPACEWASM-HIJACK-MC :
+  modelCheck(choose(0), [] ~ future-private-function-hijack) .
 quit
 '''
     text = once(text, "endm\n", tail)
