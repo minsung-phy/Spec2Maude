@@ -11,9 +11,10 @@ permissions:
 jobs:
   native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
       - name: Confirm poisoning and future private-function hijack
         shell: bash
         run: |
@@ -27,6 +28,7 @@ jobs:
             "$RUNNER_TEMP/spacewasm-native/poison-and-hijack-tests.log"
           grep -q 'rejected_module_hijacks_future_private_function ... ok' \
             "$RUNNER_TEMP/spacewasm-native/poison-and-hijack-tests.log"
+
       - name: Confirm delayed indirect-call crash
         shell: bash
         run: |
@@ -42,6 +44,58 @@ jobs:
           grep -q 'index out of bounds: the len is 1 but the index is 1' \
             "$RUNNER_TEMP/spacewasm-native/delayed-crash.log"
           echo "$rc" > "$RUNNER_TEMP/spacewasm-native/delayed-crash.rc"
+
+      - name: Replay the complete six-schedule production state space
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-native/schedules"
+          mkdir -p "$out"
+          manifest=benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml
+
+          # Build once so each replay only executes the exact pinned runtime.
+          cargo build --manifest-path "$manifest" --release
+          bin=benchmarks/spacewasm-poison/full-schedule-runner/target/release/spacewasm_full_schedule_runner
+          test -x "$bin"
+
+          run_ok() {
+            local name=$1 expected=$2 e0=$3 e1=$4 e2=$5
+            "$bin" "$e0" "$e1" "$e2" > "$out/$name.log" 2>&1
+            grep -q "^result=$expected$" "$out/$name.log"
+          }
+
+          run_crash() {
+            local name=$1 e0=$2 e1=$3 e2=$4
+            set +e
+            "$bin" "$e0" "$e1" "$e2" > "$out/$name.log" 2>&1
+            local rc=$?
+            set -e
+            test "$rc" -ne 0
+            grep -q 'index out of bounds' "$out/$name.log"
+            echo "$rc" > "$out/$name.rc"
+          }
+
+          # 0=rejected attacker load, 1=future valid load, 2=provider call.
+          run_ok    attack-future-call 1 0 1 2
+          run_crash attack-call-future   0 2 1
+          run_crash future-attack-call   1 0 2
+          run_ok    future-call-attack 0 1 2 0
+          run_ok    call-attack-future 0 2 0 1
+          run_ok    call-future-attack 0 2 1 0
+
+          {
+            echo 'Exact production schedule outcomes'
+            echo '=================================='
+            for f in "$out"/*.log; do
+              printf '%s: ' "$(basename "$f" .log)"
+              if grep -q '^result=' "$f"; then
+                grep '^result=' "$f"
+              else
+                grep -m1 'index out of bounds' "$f"
+              fi
+            done
+          } | tee "$RUNNER_TEMP/spacewasm-native/schedule-results.txt"
+
       - name: Upload native diagnostics
         if: always()
         uses: actions/upload-artifact@v4
