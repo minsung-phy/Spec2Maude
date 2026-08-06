@@ -1,4 +1,13 @@
 #!/usr/bin/env python3
+"""Build a stuttering-reduced state space from an actual wasm2maude run.
+
+The official generated `rel.step` relation remains unchanged.  Deterministic
+module instantiation and Wasm execution are made equational in the wrapper, so
+only the two externally meaningful loader scenarios are rewrite transitions.
+The checked proposition observes a terminal result, hence removing internal
+stuttering states preserves this safety counterexample.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -58,12 +67,28 @@ def main() -> None:
     )
     if n != 1:
         raise RuntimeError("inputArgs equation not found")
-    text = once(text, "  crl [instantiate] : boot => init(C)\n", "  crl [instantiate] : boot(N) => init(N, C)\n")
-    text = once(text, "  crl [init-step] : init(C) => init(C2)\n", "  crl [init-step] : init(N, C) => init(N, C2)\n")
+
+    # Deterministic internal Wasm execution is collapsed into equational
+    # normalization.  Only `try-*` below remain observable rewrite rules.
+    text = once(
+        text,
+        "  crl [instantiate] : boot => init(C)\n",
+        "  ceq [instantiate-macro] : boot(N) = init(N, C)\n",
+    )
+    text = once(
+        text,
+        "  crl [init-step] : init(C) => init(C2)\n",
+        "  ceq [init-step-macro] : init(N, C) = init(N, C2)\n",
+    )
+    text = once(text, "  rl [invoke] :\n", "  eq [invoke-macro] :\n")
     text = once(text, "    init(config.sym(", "    init(N, config.sym(")
-    text = once(text, "    => exec(def.invoke(", "    => exec(N, def.invoke(")
+    text = once(text, "    => exec(def.invoke(\n", "    = exec(N, def.invoke(\n")
     text = once(text, ", inputArgs)) .", ", inputArgs(N))) .")
-    text = once(text, "  crl [step] : exec(C) => exec(C2)\n", "  crl [step] : exec(N, C) => exec(N, C2)\n")
+    text = once(
+        text,
+        "  crl [step] : exec(C) => exec(C2)\n",
+        "  ceq [step-macro] : exec(N, C) = exec(N, C2)\n",
+    )
 
     tail = r'''
 
