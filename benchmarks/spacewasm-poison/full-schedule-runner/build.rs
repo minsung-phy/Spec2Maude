@@ -32,9 +32,10 @@ fn corrupt_code_vector_count(mut wasm: Vec<u8>) -> Vec<u8> {
         }
         let payload = after_len;
         if section_id == 10 {
-            // The active element segment has already been decoded when this
-            // malformed code-vector count is observed.  The payload length is
-            // deliberately left unchanged, forcing MalformedSectionSize.
+            // The active element segment has already been decoded when the
+            // code section claims zero bodies although the function section
+            // declared one. SpaceWasm rejects with
+            // InvalidCodeSectionFunctionCount after the table write.
             assert_eq!(wasm[payload], 1);
             wasm[payload] = 0;
             return wasm;
