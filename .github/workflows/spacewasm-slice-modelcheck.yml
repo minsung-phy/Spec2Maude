@@ -42,7 +42,7 @@ jobs:
           echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
           "$maude_bin" --version
 
-      - name: Build the executable loader-state slice
+      - name: Build the executable loader-state projection
         shell: bash
         run: |
           set -euo pipefail
@@ -65,11 +65,11 @@ jobs:
           wasm="$out/spacewasm-loader-slice.wasm"
           schedules=(
             '0 1 2 1 attack-future-call'
-            '0 2 1 0 attack-call-future'
-            '1 0 2 0 future-attack-call'
-            '1 2 0 0 future-call-attack'
-            '2 0 1 0 call-attack-future'
-            '2 1 0 0 call-future-attack'
+            '0 2 1 2 attack-call-future'
+            '1 0 2 2 future-attack-call'
+            '1 2 0 3 future-call-attack'
+            '2 0 1 3 call-attack-future'
+            '2 1 0 3 call-future-attack'
           )
           for row in "${schedules[@]}"; do
             read -r e0 e1 e2 expected name <<< "$row"
@@ -103,9 +103,10 @@ jobs:
           ! grep -Eq '^(Warning|Advisory|Error):' "$out/modelcheck.log"
           grep -q '^Solution 1' "$out/modelcheck.log"
           grep -q 'order-attack-future-call' "$out/modelcheck.log"
-          grep -q 'result ModelCheckResult: counterexample' "$out/modelcheck.log"
+          test "$(grep -c 'result ModelCheckResult: counterexample' \
+            "$out/modelcheck.log")" -eq 2
 
-      - name: Confirm the abstraction against exact pinned NASA SpaceWasm
+      - name: Confirm key outcomes against exact pinned NASA SpaceWasm
         shell: bash
         run: |
           set -euo pipefail
@@ -126,11 +127,12 @@ jobs:
           out="$RUNNER_TEMP/spacewasm-slice"
           mkdir -p "$out"
           {
-            echo 'NASA SpaceWasm rejected-module future-function hijack'
-            echo '======================================================'
+            echo 'NASA SpaceWasm rejected-module lifecycle model check'
+            echo '===================================================='
             echo "spec2maude_sha=$GITHUB_SHA"
             echo 'spacewasm_sha=839feec79fcd7137e2e5f1a19922127f97d6d1d8'
             echo "maude=$($MAUDE --version 2>&1 | head -n 1 || true)"
+            echo 'outcomes=0:safe-prefix,1:private-hijack,2:dangling-index-panic,3:shared-table-panic'
             echo
             echo '[Concrete schedules under generated official semantics]'
             for f in "$out"/concrete-*.log; do
@@ -140,12 +142,12 @@ jobs:
                 | tail -n 1 || true
             done
             echo
-            echo '[Model checking]'
+            echo '[Reachability and two LTL properties]'
             grep -E '^(Solution 1|state [0-9]+|states:|rewrites:|result ModelCheckResult:)' \
               "$out/modelcheck.log" || true
             grep 'order-attack-future-call' "$out/modelcheck.log" || true
             echo
-            echo '[Exact production control]'
+            echo '[Exact production controls]'
             grep -E 'rejected_module_(poison_is_observable|hijacks_future_private_function).*ok' \
               "$out/native-full-system.log" || true
           } | tee "$out/results.txt"
