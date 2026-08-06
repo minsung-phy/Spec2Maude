@@ -5,6 +5,7 @@ use std::ptr::NonNull;
 const PROVIDER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/provider.wasm"));
 const ATTACKER_INVALID: &[u8] =
     include_bytes!(concat!(env!("OUT_DIR"), "/attacker-invalid.wasm"));
+const FUTURE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/future.wasm"));
 
 struct ByteStream {
     bytes: std::vec::Vec<u8>,
@@ -102,6 +103,19 @@ fn load(
     Module::new::<32, 64>(name, &mut stream, &mut engine.store, builder, alloc)
 }
 
+fn invoke_provider(
+    engine: &mut Engine,
+    builder: &CodeBuilder,
+    provider_ref: ModuleRef,
+) -> i32 {
+    // Function 1 is provider.call. It performs call_indirect through slot zero.
+    engine.invoke(WasmRef { module: provider_ref, index: 1 }, &[]).unwrap();
+    match Interpreter.run(builder.pages(), engine, 1000) {
+        InterpreterResult::Finished => engine.result.map(|v| v.read_i32()).unwrap_or(-1),
+        _ => -2,
+    }
+}
+
 fn run_scenario(load_rejected_attacker: bool) -> i32 {
     let mut engine = Engine::new(256, 4, spacewasm::Vec::zero()).unwrap();
     let mut builder = code_builder();
@@ -149,6 +163,50 @@ fn run_scenario(load_rejected_attacker: bool) -> i32 {
     if rejected && dangling { 1 } else { 0 }
 }
 
+/// Baseline result is 7. With a rejected attacker load in the middle, the
+/// stale ModuleRef(1) in the provider table becomes live when the next valid
+/// module is assigned module index 1, so provider.call invokes the future
+/// module's private (non-exported) function and returns 31337.
+fn future_alias_result(load_rejected_attacker: bool) -> i32 {
+    let mut engine = Engine::new(256, 4, spacewasm::Vec::zero()).unwrap();
+    let mut builder = code_builder();
+    let alloc = allocator();
+
+    let provider = load(
+        "provider",
+        PROVIDER,
+        &mut engine,
+        &mut builder,
+        alloc.clone(),
+    )
+    .unwrap();
+    let provider_ref = engine.push_module(provider).unwrap();
+
+    if load_rejected_attacker {
+        assert!(load(
+            "attacker",
+            ATTACKER_INVALID,
+            &mut engine,
+            &mut builder,
+            alloc.clone(),
+        )
+        .is_err());
+    }
+
+    let future = load(
+        "future",
+        FUTURE,
+        &mut engine,
+        &mut builder,
+        alloc,
+    )
+    .unwrap();
+    let future_ref = engine.push_module(future).unwrap();
+    assert_eq!(future_ref.0, 1);
+
+    invoke_provider(&mut engine, &builder, provider_ref)
+}
+
 /// Scenario 0 loads only the valid provider. Scenario 1 then attempts to load
 /// a malformed module whose active element section has already written into
 /// the provider's imported table. Returning 1 means a rejected module left a
@@ -158,10 +216,23 @@ pub extern "C" fn rejected_load_poisoned(scenario: i32) -> i32 {
     run_scenario(scenario != 0)
 }
 
-/// Invoke the provider's indirect call after the rejected attacker load. The
-/// current SpaceWasm implementation indexes a nonexistent module and therefore
-/// panics/traps. This export is a concrete impact witness, while
-/// `rejected_load_poisoned` is the model-checking predicate.
+/// Returns 1 exactly when a rejected module's stale table reference is
+/// resurrected by a later valid module and redirects a provider call into that
+/// later module's private, non-exported function.
+#[no_mangle]
+pub extern "C" fn rejected_load_hijacked_future(scenario: i32) -> i32 {
+    let result = future_alias_result(scenario != 0);
+    if scenario != 0 && result == 31337 { 1 } else { 0 }
+}
+
+#[no_mangle]
+pub extern "C" fn future_alias_observed_result(scenario: i32) -> i32 {
+    future_alias_result(scenario != 0)
+}
+
+/// Invoke the provider's indirect call immediately after the rejected attacker
+/// load. The dangling module reference has not yet been resurrected, so current
+/// SpaceWasm indexes a nonexistent module and panics/traps.
 #[no_mangle]
 pub extern "C" fn invoke_after_rejected_load() -> i32 {
     let mut engine = Engine::new(256, 4, spacewasm::Vec::zero()).unwrap();
@@ -185,12 +256,7 @@ pub extern "C" fn invoke_after_rejected_load() -> i32 {
     )
     .is_err());
 
-    // Function 1 is provider.call. Its call_indirect reads the poisoned slot.
-    engine.invoke(WasmRef { module: provider_ref, index: 1 }, &[]).unwrap();
-    match Interpreter.run(builder.pages(), &mut engine, 1000) {
-        InterpreterResult::Finished => engine.result.map(|v| v.read_i32()).unwrap_or(-1),
-        _ => -2,
-    }
+    invoke_provider(&mut engine, &builder, provider_ref)
 }
 
 #[cfg(test)]
@@ -201,6 +267,14 @@ mod tests {
     fn rejected_module_poison_is_observable() {
         assert_eq!(rejected_load_poisoned(0), 0);
         assert_eq!(rejected_load_poisoned(1), 1);
+    }
+
+    #[test]
+    fn rejected_module_hijacks_future_private_function() {
+        assert_eq!(future_alias_result(false), 7);
+        assert_eq!(future_alias_result(true), 31337);
+        assert_eq!(rejected_load_hijacked_future(0), 0);
+        assert_eq!(rejected_load_hijacked_future(1), 1);
     }
 
     /// This test deliberately aborts the process because the exported C ABI
