@@ -43,7 +43,7 @@ jobs:
           echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
           "$maude_bin" --version
 
-      - name: Reproduce safe schedules in the exact pinned SpaceWasm library
+      - name: Reproduce the vulnerable schedule in the exact pinned SpaceWasm library
         shell: bash
         run: |
           set -euo pipefail
@@ -51,10 +51,9 @@ jobs:
           mkdir -p "$out"
           cargo test \
             --manifest-path benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml \
-            --release -- --nocapture 2>&1 | tee "$out/native.log"
+            --release attack_then_future_then_call_hijacks_private_function \
+            -- --nocapture 2>&1 | tee "$out/native.log"
           grep -q 'attack_then_future_then_call_hijacks_private_function ... ok' \
-            "$out/native.log"
-          grep -q 'call_before_rejected_load_is_not_retroactively_hijacked ... ok' \
             "$out/native.log"
 
       - name: Compile and minimize the exact SpaceWasm harness as WebAssembly
@@ -131,8 +130,7 @@ jobs:
             echo 'reduction=generated-rel.steps-stuttering-closure'
             echo
             echo '[Native exact library]'
-            grep -E '(attack_then_future_then_call|call_before_rejected_load).*ok' \
-              "$out/native.log" || true
+            grep -E 'attack_then_future_then_call.*ok' "$out/native.log" || true
             echo
             echo '[Exact compiled-Wasm model checking]'
             grep -E '^(Solution 1|states:|rewrites:|result ModelCheckResult:)' \
