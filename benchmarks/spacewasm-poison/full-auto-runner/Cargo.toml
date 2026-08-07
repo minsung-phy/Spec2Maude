@@ -1,0 +1,21 @@
+[package]
+name = "spacewasm_full_auto_runner"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+spacewasm = { git = "https://github.com/nasa/spacewasm", rev = "839feec79fcd7137e2e5f1a19922127f97d6d1d8" }
+
+[build-dependencies]
+wat = "1"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
