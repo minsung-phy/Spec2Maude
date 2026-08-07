@@ -12,11 +12,12 @@ wamr_stable_ref=${WAMR_STABLE_REF:-WAMR-2.4.5}
 wamr_main_ref=${WAMR_MAIN_REF:-97c7b8fd30b309abfe3a60b86bc5abb112fedbfa}
 
 # ---------------------------------------------------------------------------
-# 1. Compile the exact linked Wasm program and check each module through the
-#    generated SpecTec-to-Maude semantics.
+# 1. Compile the exact linked Wasm program and check it through the generated
+#    SpecTec-to-Maude WebAssembly semantics.
 # ---------------------------------------------------------------------------
 for name in provider consumer; do
   wat2wasm "$bench/${name}.wat" -o "$out/modules/${name}.wasm"
+  wasm-validate "$out/modules/${name}.wasm"
 
   opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- module \
     "$bench/${name}.wat" --semantics builtins.maude \
@@ -57,22 +58,38 @@ node "$bench/node_oracle.mjs" \
 grep -q '^trapped=true$' "$out/node-oracle.log"
 
 # ---------------------------------------------------------------------------
-# 2. Run the unmodified, full WAMR interpreter in multi-module mode.
-#    We test both the latest stable release and a pinned current-main commit.
+# 2. Run the unmodified, full WAMR runtime in documented multi-module mode.
+#    We pin both the latest stable release and the current-main commit.  On
+#    current main we exercise classic, fast, and GC-enabled interpreters.
 # ---------------------------------------------------------------------------
-run_wamr_ref() {
-  local label=$1 ref=$2
-  local src="$out/wamr-$label"
-  local build="$out/wamr-$label-build"
-  local log="$out/wamr-$label.log"
+checkout_wamr_ref() {
+  local label=$1
+  local ref=$2
+  local src="$out/wamr-src-$label"
 
+  rm -rf "$src"
   git clone --quiet https://github.com/wasm-micro-runtime/wasm-micro-runtime.git \
     "$src"
   git -C "$src" checkout --quiet "$ref"
   git -C "$src" rev-parse HEAD > "$out/wamr-$label.sha"
+}
 
+run_wamr_mode() {
+  local source_label=$1
+  local mode=$2
+  local fast_interp=$3
+  local gc=$4
+  local src="$out/wamr-src-$source_label"
+  local label="$source_label-$mode"
+  local build="$out/wamr-$label-build"
+  local log="$out/wamr-$label.log"
+
+  rm -rf "$build"
   cmake -S "$bench" -B "$build" \
-    -DWAMR_ROOT_DIR="$src" -DCMAKE_BUILD_TYPE=Release \
+    -DWAMR_ROOT_DIR="$src" \
+    -DWAMR_TEST_FAST_INTERP="$fast_interp" \
+    -DWAMR_TEST_GC="$gc" \
+    -DCMAKE_BUILD_TYPE=Release \
     > "$out/wamr-$label-cmake.log" 2>&1
   cmake --build "$build" --parallel 2 \
     > "$out/wamr-$label-build.log" 2>&1
@@ -80,11 +97,18 @@ run_wamr_ref() {
   "$build/wamr-table-confusion" "$out/modules" > "$log" 2>&1
 }
 
-run_wamr_ref stable "$wamr_stable_ref"
-run_wamr_ref main "$wamr_main_ref"
+checkout_wamr_ref stable "$wamr_stable_ref"
+checkout_wamr_ref main "$wamr_main_ref"
+
+run_wamr_mode stable classic 0 0
+run_wamr_mode main classic 0 0
+run_wamr_mode main fast 1 0
+run_wamr_mode main gc 0 1
 
 classify_wamr() {
-  local label=$1 log="$out/wamr-$label.log"
+  local label=$1
+  local log="$out/wamr-$label.log"
+
   if grep -q '^call_ok=1$' "$log" && grep -q '^result_i32=1337$' "$log"; then
     echo vulnerable
   elif grep -q '^call_ok=0$' "$log" \
@@ -95,8 +119,10 @@ classify_wamr() {
   fi
 }
 
-stable_status=$(classify_wamr stable)
-main_status=$(classify_wamr main)
+stable_classic_status=$(classify_wamr stable-classic)
+main_classic_status=$(classify_wamr main-classic)
+main_fast_status=$(classify_wamr main-fast)
+main_gc_status=$(classify_wamr main-gc)
 
 {
   echo 'WAMR multi-module table function-origin experiment'
@@ -114,20 +140,33 @@ main_status=$(classify_wamr main)
   cat "$out/node-oracle.log"
   echo
   echo '[Unmodified full WAMR]'
-  echo "stable_status=$stable_status"
-  cat "$out/wamr-stable.log"
-  echo "main_status=$main_status"
-  cat "$out/wamr-main.log"
+  for label in stable-classic main-classic main-fast main-gc; do
+    case "$label" in
+      stable-classic) status=$stable_classic_status ;;
+      main-classic) status=$main_classic_status ;;
+      main-fast) status=$main_fast_status ;;
+      main-gc) status=$main_gc_status ;;
+    esac
+    echo "${label}_status=$status"
+    cat "$out/wamr-$label.log"
+  done
   echo
   echo '[Maude statistics]'
   grep -E '^(rewrites:|states:|result (ScriptState|Bool|ModelCheckResult):)' \
     "$out/spec2maude-execution.log" "$out/modelcheck.log" || true
 } | tee "$out/results.txt"
 
-# Preserve all evidence even if an implementation behaves unexpectedly.  The
-# workflow reads results.txt and uploads the complete build/run logs.
-if [[ "$stable_status" == unexpected || "$main_status" == unexpected ]]; then
-  echo 'one or more WAMR outcomes were unexpected; inspect uploaded logs' >&2
-fi
+# The refs above are intentionally pinned.  A green run means the complete
+# experiment reproduced the violation, rather than merely compiling the test.
+for status in \
+  "$stable_classic_status" \
+  "$main_classic_status" \
+  "$main_fast_status" \
+  "$main_gc_status"; do
+  if [[ "$status" != vulnerable ]]; then
+    echo "expected vulnerable WAMR outcome, got: $status" >&2
+    exit 1
+  fi
+done
 
 echo "Artifacts written to $out"
