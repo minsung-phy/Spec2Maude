@@ -109,7 +109,11 @@ def transform(text: str) -> str:
 
 mod SPACEWASM-EXACT-AUTO-MC is
   protecting SPACEWASM-EXACT-EVAL .
-  protecting META-LEVEL .
+  --- META-LEVEL imports the predefined generic list concatenation operator
+  --- `__`, while the generated SpecTec syntax also defines `__` with distinct
+  --- attributes. Rename the metalevel copy so both executable theories can be
+  --- composed without changing either theory's equations.
+  protecting META-LEVEL * (op __ to _metaConcat_) .
   including MODEL-CHECKER .
 
   sort MCState .
@@ -162,6 +166,8 @@ mod SPACEWASM-EXACT-AUTO-MC is
 endm
 
 select SPACEWASM-EXACT-AUTO-MC .
+red in SPACEWASM-EXACT-AUTO-MC : exactRun(0, 1, 2) .
+red in SPACEWASM-EXACT-AUTO-MC : exactRun(2, 0, 1) .
 search [1] in SPACEWASM-EXACT-AUTO-MC :
   initial =>* X:MCState
   such that X:MCState |= wrong-provider-result .
