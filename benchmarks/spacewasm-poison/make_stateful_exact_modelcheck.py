@@ -121,7 +121,9 @@ mod SPACEWASM-STATEFUL-AUTO-MC is
   vars S S1 S2 S3 S4 MI : SpectecTerminal .
   var X : MCState .
 
-  op exactPrepare : -> RunState .
+  --- The memo attribute prevents the reachability query and LTL checker from
+  --- repeating an already-completed exact production execution.
+  op exactPrepare : -> RunState [memo] .
   eq exactPrepare =
     downTerm(
       getTerm(metaRewrite(
@@ -129,7 +131,7 @@ mod SPACEWASM-STATEFUL-AUTO-MC is
         upTerm(boot), unbounded)),
       boot) .
 
-  op exactInit : SpectecTerminal SpectecTerminal -> RunState .
+  op exactInit : SpectecTerminal SpectecTerminal -> RunState [memo] .
   eq exactInit(S, MI) =
     downTerm(
       getTerm(metaRewrite(
@@ -137,7 +139,7 @@ mod SPACEWASM-STATEFUL-AUTO-MC is
         upTerm(callInit(S, MI)), unbounded)),
       callInit(S, MI)) .
 
-  op exactEvent : Nat SpectecTerminal SpectecTerminal -> RunState .
+  op exactEvent : Nat SpectecTerminal SpectecTerminal -> RunState [memo] .
   eq exactEvent(E0, S, MI) =
     downTerm(
       getTerm(metaRewrite(
@@ -145,7 +147,7 @@ mod SPACEWASM-STATEFUL-AUTO-MC is
         upTerm(callEvent(E0, S, MI)), unbounded)),
       callEvent(E0, S, MI)) .
 
-  op exactResult : SpectecTerminal SpectecTerminal -> RunState .
+  op exactResult : SpectecTerminal SpectecTerminal -> RunState [memo] .
   eq exactResult(S, MI) =
     downTerm(
       getTerm(metaRewrite(
