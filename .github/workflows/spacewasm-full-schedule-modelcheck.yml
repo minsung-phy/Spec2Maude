@@ -71,22 +71,21 @@ jobs:
           grep -q 'attack_then_future_then_call_hijacks_private_function ... ok' \
             "$out/native.log"
 
-      - name: Compile and lower the exact SpaceWasm harness to Wasm MVP
+      - name: Compile the exact reachable SpaceWasm implementation without std
         shell: bash
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/spacewasm-full"
-          cargo build \
+          cargo build --lib \
             --manifest-path benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml \
             --target wasm32-unknown-unknown --release
           raw=benchmarks/spacewasm-poison/full-schedule-runner/target/wasm32-unknown-unknown/release/spacewasm_full_schedule_runner.wasm
           cp "$raw" "$out/full-raw.wasm"
 
-          # Rust's standard library emits standardized post-MVP instructions.
-          # Enable exactly those source features; --all-features would also
-          # enable Memory64/multi-memory and invalidate memory.copy lowering.
-          # These official Binaryen passes replace the post-MVP operations by
-          # behavior-preserving MVP instruction sequences.
+          # SpaceWasm is no_std.  The exact analysis driver now is too, and its
+          # tiny bump allocator replaces only Rust std allocation machinery.
+          # Binaryen then lowers standardized post-MVP compiler instructions to
+          # equivalent MVP sequences understood by the current wasm2maude path.
           "$WASM_OPT" "$raw" \
             --enable-bulk-memory \
             --enable-sign-ext \
@@ -118,7 +117,7 @@ jobs:
           "$MAUDE" -no-banner builtins.maude > "$out/builtins-load.log" 2>&1
           ! grep -Eq '^(Warning|Advisory|Error):' "$out"/*-load.log
 
-      - name: Build the stuttering-reduced official-semantics model
+      - name: Automatically translate the exact compiled implementation
         shell: bash
         run: |
           set -euo pipefail
@@ -131,18 +130,26 @@ jobs:
           python3 benchmarks/spacewasm-poison/make_full_schedule_modelcheck.py \
             "$out/modelcheck-raw.maude" "$out/modelcheck.maude"
           grep -q 'rel.steps(C2)' "$out/modelcheck.maude"
-          grep -q 'order-attack-future-call' "$out/modelcheck.maude"
+          grep -q 'pick-first-attacker' "$out/modelcheck.maude"
+          grep -q 'pick-second-future' "$out/modelcheck.maude"
+          grep -q 'wrong-provider-result' "$out/modelcheck.maude"
 
-      - name: Reachability and LTL model check of the exact compiled runtime
+      - name: Automatically discover a bad schedule in the exact implementation
         shell: bash
         run: |
           set -euo pipefail
           out="$RUNNER_TEMP/spacewasm-full"
-          timeout 7200s "$MAUDE" -no-banner "$out/modelcheck.maude" \
+          set +e
+          timeout 5400s "$MAUDE" -no-banner "$out/modelcheck.maude" \
             > "$out/modelcheck.log" 2>&1
+          rc=$?
+          set -e
+          echo "$rc" > "$out/modelcheck.rc"
           ! grep -Eq '^(Warning|Advisory|Error):' "$out/modelcheck.log"
+          test "$rc" -eq 0
           grep -q '^Solution 1' "$out/modelcheck.log"
-          grep -q 'order-attack-future-call' "$out/modelcheck.log"
+          grep -q 'pick-first-attacker' "$out/modelcheck.log"
+          grep -q 'pick-second-future' "$out/modelcheck.log"
           grep -q 'result ModelCheckResult: counterexample' "$out/modelcheck.log"
 
       - name: Summarize exact-runtime evidence
@@ -152,14 +159,18 @@ jobs:
           out="$RUNNER_TEMP/spacewasm-full"
           mkdir -p "$out"
           {
-            echo 'Exact NASA SpaceWasm rejected-module schedule model check'
-            echo '========================================================'
+            echo 'Exact NASA SpaceWasm automatic model check'
+            echo '=========================================='
             echo "spec2maude_sha=$GITHUB_SHA"
             echo 'spacewasm_sha=839feec79fcd7137e2e5f1a19922127f97d6d1d8'
             echo "maude=$($MAUDE --version 2>&1 | head -n 1 || true)"
             echo "binaryen=$($WASM_OPT --version 2>&1 | head -n 1 || true)"
             cat "$out/sizes.txt" 2>/dev/null || true
+            echo 'implementation=exact-reachable-pinned-spacewasm'
+            echo 'scheduler=generic-permutation-generator'
+            echo 'property=provider-result-equals-7'
             echo 'reduction=generated-rel.steps-stuttering-closure'
+            echo "modelcheck_rc=$(cat "$out/modelcheck.rc" 2>/dev/null || echo missing)"
             echo
             echo '[Native exact library]'
             grep -E 'attack_then_future_then_call.*ok' "$out/native.log" || true
@@ -167,13 +178,14 @@ jobs:
             echo '[Exact compiled-Wasm model checking]'
             grep -E '^(Solution 1|states:|rewrites:|result ModelCheckResult:)' \
               "$out/modelcheck.log" || true
-            grep 'order-attack-future-call' "$out/modelcheck.log" || true
+            grep -E 'pick-first-attacker|pick-second-future' \
+              "$out/modelcheck.log" || true
           } | tee "$out/results.txt"
 
       - name: Upload exact-runtime evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: spec2maude-exact-spacewasm-schedule-modelcheck
+          name: spec2maude-exact-spacewasm-automatic-modelcheck
           path: ${{ runner.temp }}/spacewasm-full
           retention-days: 30
