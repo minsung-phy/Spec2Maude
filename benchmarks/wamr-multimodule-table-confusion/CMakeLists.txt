@@ -5,14 +5,20 @@ if(NOT DEFINED WAMR_ROOT_DIR)
   message(FATAL_ERROR "pass -DWAMR_ROOT_DIR=/path/to/wasm-micro-runtime")
 endif()
 
+set(WAMR_TEST_FAST_INTERP 0 CACHE STRING
+  "Build the fast interpreter instead of the classic interpreter")
+set(WAMR_TEST_GC 0 CACHE STRING
+  "Enable WAMR's Wasm GC implementation")
+
 set(WAMR_BUILD_PLATFORM "linux")
 set(WAMR_BUILD_TARGET "X86_64")
 set(WAMR_BUILD_INTERP 1)
-set(WAMR_BUILD_FAST_INTERP 0)
+set(WAMR_BUILD_FAST_INTERP ${WAMR_TEST_FAST_INTERP})
 set(WAMR_BUILD_AOT 0)
 set(WAMR_BUILD_JIT 0)
 set(WAMR_BUILD_FAST_JIT 0)
 set(WAMR_BUILD_SIMD 0)
+set(WAMR_BUILD_GC ${WAMR_TEST_GC})
 set(WAMR_BUILD_REF_TYPES 1)
 set(WAMR_BUILD_MULTI_MODULE 1)
 set(WAMR_BUILD_LIBC_BUILTIN 0)
