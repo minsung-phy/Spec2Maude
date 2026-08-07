@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Model check the exact SpaceWasm Wasm harness with semantic macro steps.
+"""Model check the exact compiled SpaceWasm implementation.
 
-The generated `rel.step` relation is unchanged.  Module instantiation happens
-once.  The outer model then chooses one of all six event permutations, while
-deterministic internal Wasm execution is hidden through the *generated
-official* reflexive-transitive `rel.steps` relation.  This removes stuttering
-states without replacing the Wasm semantics by a handwritten evaluator.
+No SpaceWasm loader transition is reimplemented in Maude.  The production Rust
+library plus a generic three-event driver is compiled to Wasm and translated by
+`wasm2maude`.  This script adds only (1) a generic nondeterministic permutation
+scheduler and (2) the observable contract that the provider must still return
+7.  All program behavior is computed by the generated SpecTec semantics.
+
+The generated `rel.step` relation is unchanged.  Deterministic internal Wasm
+execution is hidden through the generated official reflexive-transitive
+`rel.steps` relation, removing stuttering states without changing results.
 """
 
 from __future__ import annotations
@@ -54,6 +58,8 @@ def transform(text: str) -> str:
         "  op boot : -> RunState [ctor] .\n"
         "  op ready : SpectecTerminal SpectecTerminal -> RunState "
         "[ctor frozen (1 2)] .\n"
+        "  op picked : Nat SpectecTerminal SpectecTerminal -> RunState "
+        "[ctor frozen (2 3)] .\n"
         "  op done : Nat Nat Nat Nat -> RunState [ctor] .",
     )
     text = once(
@@ -99,34 +105,38 @@ def transform(text: str) -> str:
   crl [step] : exec(C) => exec(C2)
     if rel.step(C) => C2 .
 """
-    new_driver = """  --- Complete deterministic initialization once, before schedule choice.
+    new_driver = """  --- Complete deterministic module initialization once.
   crl [init-macro] : init(C) => ready(S, MI)
     if rel.steps(C) =>
       config.sym(state.sym(S, rec.frame(LOCALS, MI)), eps) .
 
-  --- The six rules below are the complete bounded environment state space.
-  rl [order-attack-future-call] : ready(S, MI) =>
-    exec(0, 1, 2, def.invoke(S,
-      findFunc(value('EXPORTS, MI), inputName), inputArgs(0, 1, 2))) .
-  rl [order-attack-call-future] : ready(S, MI) =>
-    exec(0, 2, 1, def.invoke(S,
-      findFunc(value('EXPORTS, MI), inputName), inputArgs(0, 2, 1))) .
-  rl [order-future-attack-call] : ready(S, MI) =>
-    exec(1, 0, 2, def.invoke(S,
-      findFunc(value('EXPORTS, MI), inputName), inputArgs(1, 0, 2))) .
-  rl [order-future-call-attack] : ready(S, MI) =>
-    exec(1, 2, 0, def.invoke(S,
-      findFunc(value('EXPORTS, MI), inputName), inputArgs(1, 2, 0))) .
-  rl [order-call-attack-future] : ready(S, MI) =>
-    exec(2, 0, 1, def.invoke(S,
-      findFunc(value('EXPORTS, MI), inputName), inputArgs(2, 0, 1))) .
-  rl [order-call-future-attack] : ready(S, MI) =>
-    exec(2, 1, 0, def.invoke(S,
-      findFunc(value('EXPORTS, MI), inputName), inputArgs(2, 1, 0))) .
+  --- Generic event scheduler.  The first event is chosen nondeterministically;
+  --- the second is any different event; the third is the unique remaining
+  --- member of {0,1,2}, computed from their fixed sum 3.  Thus all 3! schedules
+  --- are generated without encoding six bug-specific traces.
+  rl [pick-first-attacker] : ready(S, MI) => picked(0, S, MI) .
+  rl [pick-first-future]   : ready(S, MI) => picked(1, S, MI) .
+  rl [pick-first-call]     : ready(S, MI) => picked(2, S, MI) .
+
+  crl [pick-second-attacker] : picked(E0, S, MI) =>
+    exec(E0, 0, (3 - E0) - 0, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName),
+      inputArgs(E0, 0, (3 - E0) - 0)))
+    if not (E0 == 0) .
+  crl [pick-second-future] : picked(E0, S, MI) =>
+    exec(E0, 1, (3 - E0) - 1, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName),
+      inputArgs(E0, 1, (3 - E0) - 1)))
+    if not (E0 == 1) .
+  crl [pick-second-call] : picked(E0, S, MI) =>
+    exec(E0, 2, (3 - E0) - 2, def.invoke(S,
+      findFunc(value('EXPORTS, MI), inputName),
+      inputArgs(E0, 2, (3 - E0) - 2)))
+    if not (E0 == 2) .
 
   --- `def.invoke` needs its first official step; all remaining deterministic
-  --- execution is closed by generated `rel.steps`.  No generated rule is
-  --- edited, and the result is still computed by the official Wasm semantics.
+  --- execution is closed by generated `rel.steps`.  No production `rel.step`
+  --- rule or SpaceWasm operation is replaced by a handwritten transition.
   crl [exec-macro] :
     exec(E0, E1, E2, C) => done(E0, E1, E2, N)
     if rel.step(C) => C2 /\\
@@ -137,19 +147,22 @@ def transform(text: str) -> str:
 
     tail = r'''
 
-  op private-function-hijacked : -> Prop [ctor] .
+  --- The public contract is independent of the known exploit constant:
+  --- provider.call must return its original value 7 under every event order.
+  op wrong-provider-result : -> Prop [ctor] .
   var X : RunState .
-  eq done(E0, E1, E2, 1) |= private-function-hijacked = true .
-  eq X |= private-function-hijacked = false [owise] .
+  ceq done(E0, E1, E2, N) |= wrong-provider-result = true
+    if not (N == 7) .
+  eq X |= wrong-provider-result = false [owise] .
 endm
 
 select SPACEWASM-FULL-SCHEDULE-MC .
 search [1] in SPACEWASM-FULL-SCHEDULE-MC :
   boot =>* X:RunState
-  such that X:RunState |= private-function-hijacked .
+  such that X:RunState |= wrong-provider-result .
 show path labels 1 .
 red in SPACEWASM-FULL-SCHEDULE-MC :
-  modelCheck(boot, [] ~ private-function-hijacked) .
+  modelCheck(boot, [] ~ wrong-provider-result) .
 quit
 '''
     text = once(text, "endm\n", tail)
