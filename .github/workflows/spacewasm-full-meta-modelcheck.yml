@@ -1,0 +1,163 @@
+name: Exact SpaceWasm automatic reflective model check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  modelcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          dune-cache: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt
+          opam install dune menhir zarith -y
+          rustup target add wasm32-unknown-unknown
+
+      - name: Build Spec2Maude
+        run: opam exec -- dune build --profile release
+
+      - name: Install Maude and pinned Binaryen
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip \
+            -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+
+          url=https://github.com/WebAssembly/binaryen/releases/download/version_131/binaryen-version_131-x86_64-linux.tar.gz
+          curl -fL --retry 3 "$url" -o "$RUNNER_TEMP/binaryen.tar.gz"
+          echo 'b5bf1f0eaf17c63ee588ff7a5954dc8f6ce2c26989051c66f24dfe9ece3e46db  '"$RUNNER_TEMP/binaryen.tar.gz" \
+            | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/binaryen"
+          tar -xzf "$RUNNER_TEMP/binaryen.tar.gz" \
+            -C "$RUNNER_TEMP/binaryen" --strip-components=1
+          echo "WASM_OPT=$RUNNER_TEMP/binaryen/bin/wasm-opt" >> "$GITHUB_ENV"
+
+      - name: Build exact reachable pinned SpaceWasm implementation as Wasm
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-meta"
+          mkdir -p "$out"
+
+          cargo test \
+            --manifest-path benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml \
+            --release attack_then_future_then_call_hijacks_private_function \
+            -- --nocapture 2>&1 | tee "$out/native.log"
+          grep -q 'attack_then_future_then_call_hijacks_private_function ... ok' \
+            "$out/native.log"
+
+          cargo build --lib \
+            --manifest-path benchmarks/spacewasm-poison/full-schedule-runner/Cargo.toml \
+            --target wasm32-unknown-unknown --release
+          raw=benchmarks/spacewasm-poison/full-schedule-runner/target/wasm32-unknown-unknown/release/spacewasm_full_schedule_runner.wasm
+          cp "$raw" "$out/full-raw.wasm"
+          "$WASM_OPT" "$raw" \
+            --enable-bulk-memory \
+            --enable-sign-ext \
+            --enable-nontrapping-float-to-int \
+            --llvm-memory-copy-fill-lowering \
+            --signext-lowering \
+            --llvm-nontrapping-fptoint-lowering \
+            -Oz --strip-debug --strip-producers \
+            -o "$out/full-lowered.wasm"
+          "$WASM_OPT" "$out/full-lowered.wasm" --mvp-features -Oz \
+            -o "$out/full-optimized.wasm"
+          wasm-validate "$out/full-optimized.wasm"
+          wasm-objdump -x "$out/full-optimized.wasm" > "$out/full.objdump"
+          grep -q 'spacewasm_run3' "$out/full.objdump"
+          {
+            stat --printf='raw_bytes=%s\n' "$out/full-raw.wasm"
+            stat --printf='optimized_bytes=%s\n' "$out/full-optimized.wasm"
+          } | tee "$out/sizes.txt"
+          sha256sum "$out/full-optimized.wasm" > "$out/full.sha256"
+
+      - name: Automatically translate all reachable production code
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-meta"
+          "$MAUDE" -no-banner output.maude > "$out/output-load.log" 2>&1
+          "$MAUDE" -no-banner builtins.maude > "$out/builtins-load.log" 2>&1
+          ! grep -Eq '^(Warning|Advisory|Error):' "$out"/*-load.log
+
+          opam exec -- dune exec --profile release ./bin/wasm2maude.exe -- run \
+            "$out/full-optimized.wasm" --invoke spacewasm_run3 \
+            --arg i32:0 --arg i32:1 --arg i32:2 \
+            --steps 1 --semantics builtins.maude \
+            -o "$out/generated-raw.maude"
+          python3 benchmarks/spacewasm-poison/make_full_schedule_meta_modelcheck.py \
+            "$out/generated-raw.maude" "$out/modelcheck.maude"
+          grep -q "metaRewrite" "$out/modelcheck.maude"
+          grep -q "upModule('SPACEWASM-EXACT-EVAL" "$out/modelcheck.maude"
+          grep -q 'pick-first-attacker' "$out/modelcheck.maude"
+          grep -q 'wrong-provider-result' "$out/modelcheck.maude"
+
+      - name: Automatically discover the violating schedule
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-meta"
+          set +e
+          timeout 3600s "$MAUDE" -no-banner "$out/modelcheck.maude" \
+            > "$out/modelcheck.log" 2>&1
+          rc=$?
+          set -e
+          echo "$rc" > "$out/modelcheck.rc"
+          ! grep -Eq '^(Warning|Advisory|Error):' "$out/modelcheck.log"
+          test "$rc" -eq 0
+          grep -q '^Solution 1' "$out/modelcheck.log"
+          grep -q 'pick-first-attacker' "$out/modelcheck.log"
+          grep -q 'pick-second-future' "$out/modelcheck.log"
+          grep -q '31337' "$out/modelcheck.log"
+          grep -q 'result ModelCheckResult: counterexample' "$out/modelcheck.log"
+
+      - name: Summarize
+        if: always()
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/spacewasm-meta"
+          mkdir -p "$out"
+          {
+            echo 'Exact SpaceWasm automatic reflective model check'
+            echo '================================================'
+            echo "spec2maude_sha=$GITHUB_SHA"
+            echo 'spacewasm_sha=839feec79fcd7137e2e5f1a19922127f97d6d1d8'
+            cat "$out/sizes.txt" 2>/dev/null || true
+            echo 'implementation=exact-reachable-pinned-spacewasm'
+            echo 'manual_loader_model=false'
+            echo 'scheduler=generic-permutation-generator'
+            echo 'macro_evaluator=metaRewrite-generated-semantics'
+            echo 'property=provider-result-equals-7'
+            echo "modelcheck_rc=$(cat "$out/modelcheck.rc" 2>/dev/null || echo missing)"
+            echo
+            grep -E '^(Solution 1|states:|rewrites:|result ModelCheckResult:)' \
+              "$out/modelcheck.log" || true
+            grep -E 'pick-first-attacker|pick-second-future|31337' \
+              "$out/modelcheck.log" || true
+          } | tee "$out/results.txt"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec2maude-exact-spacewasm-reflective-modelcheck
+          path: ${{ runner.temp }}/spacewasm-meta
+          retention-days: 30
