@@ -1,0 +1,95 @@
+name: Automerge core standalone Wasm smoke
+
+on:
+  push:
+    branches: [analysis/automerge-policy-regrant-modelcheck-20260807]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wasm-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.0'
+
+      - name: Install Rust target and WABT
+        run: |
+          rustup target add wasm32-unknown-unknown
+          sudo apt-get update -qq
+          sudo apt-get install -y wabt
+
+      - name: Run native exhaustive schedule tests
+        working-directory: benchmarks/automerge-policy-regrant/runner
+        run: cargo test --release -- --nocapture
+
+      - name: Build standalone Wasm with deterministic custom entropy
+        working-directory: benchmarks/automerge-policy-regrant/runner
+        env:
+          RUSTFLAGS: '--cfg getrandom_backend="custom"'
+        run: cargo build --release --target wasm32-unknown-unknown
+
+      - name: Validate and inspect Wasm
+        shell: bash
+        run: |
+          set -euo pipefail
+          wasm=benchmarks/automerge-policy-regrant/runner/target/wasm32-unknown-unknown/release/automerge_policy_regrant_runner.wasm
+          test -s "$wasm"
+          wasm-validate "$wasm"
+          wasm-objdump -x "$wasm" | tee "$RUNNER_TEMP/automerge-core.objdump"
+          stat -c 'wasm_size=%s' "$wasm" | tee "$RUNNER_TEMP/wasm-size.txt"
+
+      - name: Execute all 24 schedules in Node
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/run.mjs" <<'EOF'
+          import fs from 'node:fs'
+          const bytes = fs.readFileSync(process.argv[2])
+          const { instance } = await WebAssembly.instantiate(bytes, {})
+          const e = instance.exports
+          let valid = 0, currentBad = 0, repairedBad = 0, witnesses = []
+          for (let encoded = 0; encoded < 256; encoded++) {
+            const digits = [0, 1, 2, 3].map(i => (encoded >>> (2 * i)) & 3)
+            if (new Set(digits).size !== 4) continue
+            valid++
+            const current = e.automerge_policy_schedule(encoded)
+            const repaired = e.automerge_policy_schedule_repaired(encoded)
+            if (current === 1) {
+              currentBad++
+              witnesses.push({ encoded, digits })
+            }
+            if (repaired === 1) repairedBad++
+          }
+          const result = {
+            valid,
+            currentBad,
+            repairedBad,
+            counterexample: e.automerge_policy_counterexample(),
+            witnesses,
+          }
+          console.log(JSON.stringify(result, null, 2))
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/node-result.json', JSON.stringify(result, null, 2))
+          if (valid !== 24 || currentBad === 0 || repairedBad !== 0 || result.counterexample !== 1) {
+            process.exit(1)
+          }
+          EOF
+          wasm=benchmarks/automerge-policy-regrant/runner/target/wasm32-unknown-unknown/release/automerge_policy_regrant_runner.wasm
+          node "$RUNNER_TEMP/run.mjs" "$wasm"
+
+      - name: Upload standalone Wasm evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automerge-core-wasm-smoke
+          path: |
+            benchmarks/automerge-policy-regrant/runner/target/wasm32-unknown-unknown/release/automerge_policy_regrant_runner.wasm
+            ${{ runner.temp }}/automerge-core.objdump
+            ${{ runner.temp }}/wasm-size.txt
+            ${{ runner.temp }}/node-result.json
+          retention-days: 30
