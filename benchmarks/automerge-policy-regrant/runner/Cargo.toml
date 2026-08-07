@@ -1,0 +1,19 @@
+[package]
+name = "automerge-policy-regrant-runner"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+automerge = { git = "https://github.com/automerge/automerge.git", tag = "rust/automerge@0.7.0", default-features = false }
+getrandom = "0.3"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
