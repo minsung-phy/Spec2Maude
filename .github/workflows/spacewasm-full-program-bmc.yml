@@ -1,0 +1,94 @@
+name: Full SpaceWasm whole-program bounded model checking
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  modelcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          dune-cache: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wabt
+          opam install dune menhir zarith -y
+          rustup target add wasm32-unknown-unknown
+
+      - name: Build Spec2Maude
+        run: opam exec -- dune build --profile release
+
+      - name: Install Maude and Binaryen
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+          curl -fL --retry 3 https://github.com/WebAssembly/binaryen/releases/download/version_131/binaryen-version_131-x86_64-linux.tar.gz -o "$RUNNER_TEMP/binaryen.tar.gz"
+          mkdir -p "$RUNNER_TEMP/binaryen"
+          tar -xzf "$RUNNER_TEMP/binaryen.tar.gz" -C "$RUNNER_TEMP/binaryen" --strip-components=1
+          echo "WASM_OPT=$RUNNER_TEMP/binaryen/bin/wasm-opt" >> "$GITHUB_ENV"
+
+      - name: Compile exact NASA SpaceWasm program
+        shell: bash
+        env:
+          RUSTFLAGS: "-C link-arg=-zstack-size=65536"
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-program-bmc"
+          mkdir -p "$out"
+          src=benchmarks/spacewasm-poison/full-auto-runner/src/lib.rs
+          sed -i 's/const ARENA_SIZE: usize = 4 \* 1024 \* 1024;/const ARENA_SIZE: usize = 512 * 1024;/' "$src"
+          cargo build \
+            --manifest-path benchmarks/spacewasm-poison/full-auto-runner/Cargo.toml \
+            --target wasm32-unknown-unknown --release \
+            > "$out/cargo-build.log" 2>&1
+          raw=benchmarks/spacewasm-poison/full-auto-runner/target/wasm32-unknown-unknown/release/spacewasm_full_auto_runner.wasm
+          "$WASM_OPT" "$raw" \
+            --enable-bulk-memory --enable-sign-ext --enable-nontrapping-float-to-int \
+            --llvm-memory-copy-fill-lowering --signext-lowering \
+            --llvm-nontrapping-fptoint-lowering \
+            -O4 --strip-debug --strip-producers -o "$out/full-lowered.wasm"
+          "$WASM_OPT" "$out/full-lowered.wasm" --mvp-features -O4 \
+            -o "$out/full-optimized.wasm"
+          wasm-validate "$out/full-optimized.wasm"
+          stat --printf='optimized_bytes=%s\n' "$out/full-optimized.wasm" | tee "$out/sizes.txt"
+
+      - name: Exhaustively evaluate all schedules through Spec2Maude
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/spacewasm-program-bmc"
+          python3 benchmarks/spacewasm-poison/full_program_schedule_bmc.py \
+            --root "$GITHUB_WORKSPACE" \
+            --wasm "$out/full-optimized.wasm" \
+            --semantics "$GITHUB_WORKSPACE/builtins.maude" \
+            --maude "$MAUDE" \
+            --output-dir "$out/schedules" \
+            --events 0,1,2 \
+            --bad-result 1 \
+            --timeout-seconds 6300 \
+            --steps 1000000000 \
+            --workers 6
+          grep -q 'counterexamples=\[\[0, 1, 2\]\]' "$out/schedules/results.txt"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec2maude-full-spacewasm-program-bmc
+          path: ${{ runner.temp }}/spacewasm-program-bmc
+          retention-days: 30
