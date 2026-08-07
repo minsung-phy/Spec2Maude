@@ -1,0 +1,41 @@
+load model-checker.maude
+
+mod WASM2MAUDE-WAMR-TABLE-CONFUSION-MC is
+  protecting WASM2MAUDE-WAST .
+  including MODEL-CHECKER .
+
+  subsort ScriptState < State .
+
+  op privateSecretReturned : ScriptState -> Bool .
+  op private-secret-returned : -> Prop [ctor] .
+
+  vars S F : SpectecTerminal .
+  var SS : ScriptState .
+  var ID : Nat .
+  var ENV : InstanceEnv .
+  var CMDS : Commands .
+  var EXPECTED : ResultPatterns .
+
+  --- A normal i32 result 1337 from consumer.trigger means that the provider's
+  --- private function was selected even though the table contains a reference
+  --- to consumer.$poison.  Correct core-Wasm semantics make this unreachable:
+  --- call_indirect must instead trap on the ()->i64 / ()->i32 mismatch.
+  eq privateSecretReturned(
+    script.return(ID, ENV, EXPECTED, CMDS,
+      config.sym(state.sym(S, F),
+        instr.const(numtype.i32, uN.wrap(1337))))) = true .
+  eq privateSecretReturned(SS) = false [owise] .
+
+  eq SS |= private-secret-returned = privateSecretReturned(SS) .
+endm
+
+select WASM2MAUDE-WAMR-TABLE-CONFUSION-MC .
+
+search [1] in WASM2MAUDE-WAMR-TABLE-CONFUSION-MC :
+  script.start =>* SS:ScriptState
+  such that privateSecretReturned(SS:ScriptState) = true .
+
+red in WASM2MAUDE-WAMR-TABLE-CONFUSION-MC :
+  modelCheck(script.start, [] ~ private-secret-returned) .
+
+quit
