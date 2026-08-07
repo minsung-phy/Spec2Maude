@@ -1,6 +1,7 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 use core::alloc::Layout;
+use core::mem::MaybeUninit;
 use core::ptr::NonNull;
 use spacewasm::*;
 
@@ -100,12 +101,9 @@ impl WasmMemoryAllocator for LinearAllocator {
 }
 
 /// A tiny single-threaded bump allocator for the `wasm32` analysis build.
-///
-/// The previous exact harness linked Rust's full `std` allocator and produced a
-/// 143 KiB module whose deterministic initialization dominated Maude's state
-/// space. SpaceWasm itself is `no_std`, so the analysis build can allocate
-/// directly above `__heap_base` and grow linear memory only when required.
-/// This changes allocation strategy, not any SpaceWasm loader/interpreter code.
+/// SpaceWasm itself is `no_std`, so the analysis build allocates directly above
+/// `__heap_base` and grows linear memory only when required. This changes only
+/// the host allocator, not any SpaceWasm loader or interpreter operation.
 #[cfg(target_arch = "wasm32")]
 struct WasmBump {
     cursor: core::cell::UnsafeCell<usize>,
@@ -173,9 +171,7 @@ unsafe impl Allocator for SystemAllocator {
     }
 
     unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        // All allocations made by one exported schedule run are reclaimed by
-        // resetting the bump pointer at the next entry. Model-checking paths
-        // invoke the export once from an identical initial Wasm state.
+        // A model path starts from a fresh Wasm state and initializes once.
     }
 
     fn memory_statistics(&self) -> MemoryStatistics {
@@ -271,28 +267,41 @@ fn invoke_provider(
     }
 }
 
-fn run_schedule(events: [i32; 3]) -> i32 {
-    #[cfg(target_arch = "wasm32")]
-    unsafe {
-        WASM_BUMP.reset();
+/// Exact production state retained across environment events. Splitting the
+/// driver into `init`, `event`, and `result` exports lets Maude branch *between*
+/// calls while preserving SpaceWasm's real heap, store, table, and code pages.
+struct HarnessState {
+    engine: Engine,
+    builder: CodeBuilder,
+    alloc: Rc<dyn WasmMemoryAllocator>,
+    provider_ref: ModuleRef,
+    observed: i32,
+}
+
+impl HarnessState {
+    fn new() -> Self {
+        let mut engine = Engine::new(256, 4, spacewasm::Vec::zero()).unwrap();
+        let mut builder = code_builder();
+        let alloc = allocator();
+        let provider = load(
+            "provider",
+            PROVIDER,
+            &mut engine,
+            &mut builder,
+            alloc.clone(),
+        )
+        .unwrap();
+        let provider_ref = engine.push_module(provider).unwrap();
+        Self {
+            engine,
+            builder,
+            alloc,
+            provider_ref,
+            observed: 7,
+        }
     }
 
-    let mut engine = Engine::new(256, 4, spacewasm::Vec::zero()).unwrap();
-    let mut builder = code_builder();
-    let alloc = allocator();
-
-    let provider = load(
-        "provider",
-        PROVIDER,
-        &mut engine,
-        &mut builder,
-        alloc.clone(),
-    )
-    .unwrap();
-    let provider_ref = engine.push_module(provider).unwrap();
-
-    let mut observed = 0;
-    for event in events {
+    fn apply(&mut self, event: i32) -> i32 {
         match event {
             // The malformed module reaches its active element section, writes
             // into provider.table, and then fails in the later code section.
@@ -300,42 +309,99 @@ fn run_schedule(events: [i32; 3]) -> i32 {
                 if load(
                     "attacker",
                     ATTACKER_INVALID,
-                    &mut engine,
-                    &mut builder,
-                    alloc.clone(),
+                    &mut self.engine,
+                    &mut self.builder,
+                    self.alloc.clone(),
                 )
                 .is_ok()
                 {
                     return -10;
                 }
             }
-            // A later, valid module is appended at the next available index.
+            // A later valid module is appended at the next available index.
             1 => {
                 let future = load(
                     "future",
                     FUTURE,
-                    &mut engine,
-                    &mut builder,
-                    alloc.clone(),
+                    &mut self.engine,
+                    &mut self.builder,
+                    self.alloc.clone(),
                 )
                 .unwrap();
-                engine.push_module(future).unwrap();
+                self.engine.push_module(future).unwrap();
             }
-            // The already-accepted provider follows slot zero with call_indirect.
+            // The accepted provider follows slot zero with call_indirect.
             2 => {
-                observed = invoke_provider(&mut engine, &builder, provider_ref);
+                self.observed =
+                    invoke_provider(&mut self.engine, &self.builder, self.provider_ref);
             }
             _ => return -20,
         }
+        0
     }
-
-    observed
 }
 
-/// Event identifiers are: 0 = rejected attacker load, 1 = valid future load,
-/// 2 = provider call_indirect. The return value is the provider's observed
-/// result, so the model property is simply `result == 7`; no bug-specific
-/// `31337` oracle is embedded in the production driver.
+static mut HARNESS_STATE: MaybeUninit<HarnessState> = MaybeUninit::uninit();
+static mut HARNESS_READY: bool = false;
+
+unsafe fn harness_mut() -> &'static mut HarnessState {
+    unsafe {
+        &mut *core::ptr::addr_of_mut!(HARNESS_STATE).cast::<HarnessState>()
+    }
+}
+
+/// Initialize the exact pinned SpaceWasm implementation once. The model checker
+/// executes this deterministic prefix before introducing event-order choices.
+#[unsafe(no_mangle)]
+pub extern "C" fn spacewasm_state_init() -> i32 {
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        WASM_BUMP.reset();
+    }
+    let state = HarnessState::new();
+    unsafe {
+        core::ptr::addr_of_mut!(HARNESS_STATE)
+            .cast::<HarnessState>()
+            .write(state);
+        HARNESS_READY = true;
+    }
+    0
+}
+
+/// Apply one environment event to the persistent exact SpaceWasm state.
+#[unsafe(no_mangle)]
+pub extern "C" fn spacewasm_state_event(event: i32) -> i32 {
+    if !unsafe { HARNESS_READY } {
+        return -30;
+    }
+    unsafe { harness_mut().apply(event) }
+}
+
+/// Observe the provider's most recent indirect-call result.
+#[unsafe(no_mangle)]
+pub extern "C" fn spacewasm_state_result() -> i32 {
+    if !unsafe { HARNESS_READY } {
+        return -30;
+    }
+    unsafe { harness_mut().observed }
+}
+
+fn run_schedule(events: [i32; 3]) -> i32 {
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        WASM_BUMP.reset();
+    }
+    let mut state = HarnessState::new();
+    for event in events {
+        let status = state.apply(event);
+        if status != 0 {
+            return status;
+        }
+    }
+    state.observed
+}
+
+/// Backward-compatible monolithic driver used for native differential controls.
 #[unsafe(no_mangle)]
 pub extern "C" fn spacewasm_run3(event0: i32, event1: i32, event2: i32) -> i32 {
     run_schedule([event0, event1, event2])
