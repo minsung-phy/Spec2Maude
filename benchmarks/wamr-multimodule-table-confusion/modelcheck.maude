@@ -14,14 +14,14 @@ mod WASM2MAUDE-WAMR-TABLE-CONFUSION-MC is
   var ID : Nat .
   var ENV : InstanceEnv .
   var CMDS : Commands .
-  var EXPECTED : ResultPatterns .
 
-  --- A normal i32 result 1337 from consumer.trigger means that the provider's
-  --- private function was selected even though the table contains a reference
-  --- to consumer.$poison.  Correct core-Wasm semantics make this unreachable:
-  --- call_indirect must instead trap on the ()->i64 / ()->i32 mismatch.
+  --- The WAST command is assert_trap, so an implementation that incorrectly
+  --- returns provider.$private-secret reaches script.trap with a normal i32
+  --- result before the assertion is rejected.  Correct core-Wasm semantics
+  --- make this state unreachable: the table contains consumer.$poison
+  --- (() -> i64), while call_indirect requires () -> i32.
   eq privateSecretReturned(
-    script.return(ID, ENV, EXPECTED, CMDS,
+    script.trap(ID, ENV, CMDS,
       config.sym(state.sym(S, F),
         instr.const(numtype.i32, uN.wrap(1337))))) = true .
   eq privateSecretReturned(SS) = false [owise] .
