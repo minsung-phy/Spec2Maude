@@ -93,10 +93,12 @@ jobs:
           corepack enable
           pnpm install --frozen-lockfile
 
-      - name: Run stable diagnostic
+      - name: Run stable diagnostic with sync trace
         continue-on-error: true
         working-directory: ${{ runner.temp }}/automerge-repo
         shell: bash
+        env:
+          DEBUG: 'automerge-repo:*'
         run: |
           set -o pipefail
           pnpm exec vitest run packages/automerge-repo/test/PolicyRegrantDiagnostic.test.ts --reporter=verbose 2>&1 \
