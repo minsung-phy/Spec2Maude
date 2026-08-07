@@ -1,0 +1,129 @@
+name: Automerge stable policy regrant diagnostic
+
+on:
+  push:
+    branches: [analysis/automerge-policy-regrant-modelcheck-20260807]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stable:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.0'
+
+      - name: Clone stable Automerge Repo
+        run: |
+          set -euo pipefail
+          corepack enable
+          git clone https://github.com/automerge/automerge-repo.git "$RUNNER_TEMP/automerge-repo"
+          git -C "$RUNNER_TEMP/automerge-repo" checkout v2.5.6
+          git -C "$RUNNER_TEMP/automerge-repo" rev-parse HEAD | tee "$RUNNER_TEMP/upstream-sha.txt"
+
+      - name: Add stable policy revoke/regrant diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$RUNNER_TEMP/automerge-repo"
+          cat > "$repo/packages/automerge-repo/test/PolicyRegrantDiagnostic.test.ts" <<'EOF'
+          import { describe, expect, it } from "vitest"
+          import assert from "assert"
+          import twoPeers from "./helpers/twoPeers.js"
+          import pause from "./helpers/pause.js"
+
+          describe("dynamic access revoke/regrant", () => {
+            it("resynchronizes changes generated and sent while access was denied", async () => {
+              const policy = { allowBob: true }
+              const { alice, bob } = await twoPeers({
+                alice: {
+                  shareConfig: {
+                    announce: async () => false,
+                    access: async peerId =>
+                      peerId === "bob" ? policy.allowBob : true,
+                  },
+                },
+                bob: { sharePolicy: async () => true },
+              })
+
+              const aliceHandle = alice.create<{ value: string }>({ value: "initial" })
+              const bobHandle = await bob.find<{ value: string }>(aliceHandle.url)
+              assert(bobHandle != null)
+              expect(bobHandle.doc()).toEqual({ value: "initial" })
+
+              policy.allowBob = false
+              alice.shareConfigChanged()
+              await pause(250)
+
+              bobHandle.change(doc => {
+                doc.value = "made-while-denied"
+              })
+              await pause(400)
+              console.log("after-denied-send", {
+                alice: aliceHandle.doc(),
+                bob: bobHandle.doc(),
+              })
+              expect(aliceHandle.doc()).toEqual({ value: "initial" })
+
+              policy.allowBob = true
+              alice.shareConfigChanged()
+              await pause(1200)
+
+              const finalAlice = aliceHandle.doc()
+              const finalBob = bobHandle.doc()
+              console.log("after-regrant", {
+                alice: finalAlice,
+                bob: finalBob,
+                equal: JSON.stringify(finalAlice) === JSON.stringify(finalBob),
+              })
+              expect(finalAlice).toEqual(finalBob)
+            })
+          })
+          EOF
+
+      - name: Install stable dependencies
+        working-directory: ${{ runner.temp }}/automerge-repo
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+
+      - name: Run stable diagnostic
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/automerge-repo
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm exec vitest run packages/automerge-repo/test/PolicyRegrantDiagnostic.test.ts --reporter=verbose 2>&1 \
+            | tee "$RUNNER_TEMP/policy-regrant-stable.log"
+
+      - name: Classify stable result
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/policy-regrant-stable.log"
+          test -s "$log"
+          if grep -q 'AssertionError' "$log" && grep -q 'made-while-denied' "$log"; then
+            echo 'classification=stable-divergence-after-regrant' | tee "$RUNNER_TEMP/stable-result.txt"
+          elif grep -q '1 passed' "$log"; then
+            echo 'classification=stable-no-bug-for-this-schedule' | tee "$RUNNER_TEMP/stable-result.txt"
+          else
+            echo 'classification=stable-inconclusive' | tee "$RUNNER_TEMP/stable-result.txt"
+            exit 1
+          fi
+
+      - name: Upload stable evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automerge-policy-regrant-stable
+          path: |
+            ${{ runner.temp }}/policy-regrant-stable.log
+            ${{ runner.temp }}/stable-result.txt
+            ${{ runner.temp }}/upstream-sha.txt
+          retention-days: 30
