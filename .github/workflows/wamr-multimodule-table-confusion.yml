@@ -1,0 +1,106 @@
+name: WAMR multi-module table confusion analysis
+
+on:
+  push:
+    branches:
+      - analysis/wamr-multimodule-table-confusion-20260808
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  table-confusion:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Check out analysis branch
+        uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.3"
+          dune-cache: true
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake wabt
+          opam install dune menhir zarith -y
+
+      - name: Build Spec2Maude and wasm2maude
+        run: opam exec -- dune build --profile release
+
+      - name: Install Maude 3.5.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 \
+            https://github.com/maude-lang/Maude/releases/download/Maude3.5.1/Maude-3.5.1-linux-x86_64.zip \
+            -o "$RUNNER_TEMP/maude.zip"
+          unzip -q "$RUNNER_TEMP/maude.zip" -d "$RUNNER_TEMP/maude"
+          maude_bin=$(find "$RUNNER_TEMP/maude" -type f -name maude -perm -u+x | head -n 1)
+          test -n "$maude_bin"
+          echo "$(dirname "$maude_bin")" >> "$GITHUB_PATH"
+          echo "MAUDE=$maude_bin" >> "$GITHUB_ENV"
+          "$maude_bin" --version
+
+      - name: Load generated semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$MAUDE" -no-banner output.maude > "$RUNNER_TEMP/output-load.log" 2>&1
+          "$MAUDE" -no-banner builtins.maude > "$RUNNER_TEMP/builtins-load.log" 2>&1
+          if grep -Eq '^(Warning|Advisory|Error):' \
+              "$RUNNER_TEMP/output-load.log" "$RUNNER_TEMP/builtins-load.log"; then
+            cat "$RUNNER_TEMP/output-load.log"
+            cat "$RUNNER_TEMP/builtins-load.log"
+            exit 1
+          fi
+
+      - name: Run full differential model-checking experiment
+        shell: bash
+        run: |
+          set -euo pipefail
+          opam exec -- bash benchmarks/wamr-multimodule-table-confusion/run.sh \
+            "$RUNNER_TEMP/spec2maude-wamr-table-confusion"
+
+      - name: Print result summary
+        if: always()
+        shell: bash
+        run: |
+          cat "$RUNNER_TEMP/spec2maude-wamr-table-confusion/results.txt" \
+            2>/dev/null || true
+
+      - name: Collect environment
+        if: always()
+        shell: bash
+        run: |
+          out="$RUNNER_TEMP/spec2maude-wamr-table-confusion"
+          mkdir -p "$out"
+          cp "$RUNNER_TEMP/output-load.log" "$out/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/builtins-load.log" "$out/" 2>/dev/null || true
+          {
+            echo "github_sha=$GITHUB_SHA"
+            echo "runner_os=$RUNNER_OS"
+            opam exec -- ocaml -version || true
+            opam exec -- dune --version || true
+            cmake --version | head -n 1 || true
+            cc --version | head -n 1 || true
+            node --version || true
+            wat2wasm --version || true
+            "$MAUDE" --version || true
+          } > "$out/environment.txt"
+
+      - name: Upload complete evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spec2maude-wamr-table-confusion
+          path: ${{ runner.temp }}/spec2maude-wamr-table-confusion
+          if-no-files-found: warn
+          retention-days: 30
