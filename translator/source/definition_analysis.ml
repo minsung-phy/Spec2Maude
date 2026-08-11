@@ -28,9 +28,15 @@ type emitted_definition =
   ; rewrite_backed : bool
   }
 
+type valid_inverse =
+  { inverse_id : string
+  ; omitted_param_index : int
+  ; hint_origin : Origin.t
+  }
+
 type inverse_status =
   | No_inverse
-  | Valid_inverse of string
+  | Valid_inverse of valid_inverse
   | Invalid_inverse of
       { reason : string
       ; hint_origin : Origin.t
@@ -766,13 +772,13 @@ let split_last items =
   | [] -> None
   | last :: rev_prefix -> Some (List.rev rev_prefix, last)
 
-let inverse_signature_compatible source_params source_result inverse_params inverse_result =
+let inverse_omitted_params source_params source_result inverse_params inverse_result =
   match split_last inverse_params with
   | Some (known_params, { it = ExpP (_, inverse_arg); _ })
     when Il.Eq.eq_typ source_result inverse_arg ->
     source_params
     |> List.mapi (fun index param -> index, param)
-    |> List.exists (fun (index, omitted) ->
+    |> List.filter_map (fun (index, omitted) ->
       match omitted.it with
       | ExpP (_, omitted_typ) ->
         let remaining =
@@ -781,11 +787,12 @@ let inverse_signature_compatible source_params source_result inverse_params inve
           |> List.filter_map (fun (current, param) ->
             if current = index then None else Some param)
         in
-        Il.Eq.eq_typ omitted_typ inverse_result
-        && List.length remaining = List.length known_params
-        && List.for_all2 Il.Eq.eq_param remaining known_params
-      | TypP _ | DefP _ | GramP _ -> false)
-  | _ -> false
+        if Il.Eq.eq_typ omitted_typ inverse_result
+           && List.length remaining = List.length known_params
+           && List.for_all2 Il.Eq.eq_param remaining known_params
+        then Some index else None
+      | TypP _ | DefP _ | GramP _ -> None)
+  | _ -> []
 
 let invalid_inverse t source_id hint_origin reason =
   Hashtbl.replace
@@ -805,22 +812,33 @@ let validate_inverse_hint t hint_origin source_id hint =
        Hashtbl.find_opt t.definitions_by_id source_id,
        Hashtbl.find_opt t.definitions_by_id inverse_id
      with
-    | Some source_body, Some inverse_body, Some source, Some inverse
-      when inverse_signature_compatible
-             source_body.body_params source.result
-             inverse_body.body_params inverse.result ->
-      Hashtbl.replace
-        t.inverse_statuses_by_id source_id (Valid_inverse inverse_id)
+    | Some source_body, Some inverse_body, Some source, Some inverse ->
+      (match
+         inverse_omitted_params
+           source_body.body_params source.result
+           inverse_body.body_params inverse.result
+       with
+      | [ omitted_param_index ] ->
+        Hashtbl.replace t.inverse_statuses_by_id source_id
+          (Valid_inverse { inverse_id; omitted_param_index; hint_origin })
+      | [] ->
+        invalid_inverse t source_id hint_origin
+          ("inverse target `" ^ inverse_id
+           ^ "` does not structurally omit exactly one forward runtime parameter, preserve every other parameter, and append the forward result")
+      | _ :: _ :: _ ->
+        invalid_inverse t source_id hint_origin
+          ("inverse target `" ^ inverse_id
+           ^ "` is compatible with more than one omitted forward runtime parameter"))
     | None, _, _, _ ->
       invalid_inverse t source_id hint_origin
         ("inverse metadata source `" ^ source_id ^ "` has no DecD declaration")
     | _, None, _, _ | _, _, _, None ->
       invalid_inverse t source_id hint_origin
         ("inverse target `" ^ inverse_id ^ "` has no DecD declaration")
-    | _ ->
+    | _, _, None, _ ->
       invalid_inverse t source_id hint_origin
-        ("inverse target `" ^ inverse_id
-         ^ "` does not structurally swap the forward final argument and result"))
+        ("inverse metadata source `" ^ source_id ^ "` has no indexed definition")
+    )
 
 let validate_inverse_metadata t entries =
   t.definitions
@@ -916,11 +934,6 @@ let definitions t = t.definitions
 
 let find_definition t id =
   Hashtbl.find_opt t.definitions_by_id id
-
-let definition_inverse t id =
-  match Hashtbl.find_opt t.inverse_statuses_by_id id with
-  | Some (Valid_inverse inverse_id) -> Some inverse_id
-  | Some No_inverse | Some (Invalid_inverse _) | None -> None
 
 let definition_is_partial t id =
   match find_definition t id with

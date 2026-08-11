@@ -191,30 +191,34 @@ let translate_rule
           | Some output_terms
             when List.length output_terms = List.length output_sorts ->
             let rhs_term = tuple_carrier output_sorts output_terms in
-            let lhs_terms, context_split, context_statements,
-                context_preserves_output_typing =
+            let lhs_terms, rhs_term, context, context_statements =
               match context_certificate with
-              | None -> lhs_terms, None, [], false
+              | None -> lhs_terms, rhs_term, None, []
               | Some certificate ->
                 (match
-                   Reld_context_split.lower
-                     ctx relation_id origin names env
-                     certificate lhs_terms
-                with
-                | None -> lhs_terms, None, [], false
-                | Some (context, _names) ->
-                  Reld_context_split.lhs_terms context,
+                   Reld_context.lower ctx origin names env certificate
+                 with
+                | None -> lhs_terms, rhs_term, None, []
+                | Some context ->
+                  Reld_context.specialize_terms context lhs_terms,
+                  Reld_context.specialize_term context rhs_term,
                   Some context,
-                  Reld_context_split.statements context,
-                  true)
+                  Reld_context.statements context)
             in
             let context_conditions =
-              context_split
-              |> Option.to_list
-              |> List.map Reld_context_split.condition
+              match context with
+              | None -> []
+              | Some context -> [ Reld_context.membership context ]
             in
             let output_guards =
-              if context_preserves_output_typing then
+              match context with
+              | None -> output_guards
+              | Some context ->
+                Reld_context.specialize_guards context output_guards
+            in
+            let output_guards =
+              match context with
+              | Some _ ->
                 (* The context certificate preserves the input prefix/suffix
                    and obtains the new state/focus from the recursive relation
                    premise.  From the validated-input invariant, recursive
@@ -223,8 +227,7 @@ let translate_rule
                 List.filter
                   (fun guard -> not (is_whole_typecheck rhs_term guard))
                   output_guards
-              else
-                output_guards
+              | None -> output_guards
             in
             let lhs = relation_call op_name lhs_terms in
             let pattern_certificate =
@@ -235,6 +238,12 @@ let translate_rule
                    (context_statements
                     @ else_output.statements
                     @ else_result.support_statements))
+            in
+            let specialize_conditions conditions =
+              match context with
+              | None -> conditions
+              | Some context ->
+                Reld_context.specialize_conditions context conditions
             in
             let alternatives =
               else_alternatives
@@ -253,8 +262,11 @@ let translate_rule
                 let premise_conditions =
                   Premise_result.rule_conditions premise_result
                 in
-                let lhs_conditions =
+                let raw_lhs_conditions =
                   List.map (fun condition -> EqCondition condition) lhs_guards
+                in
+                let lhs_conditions =
+                  specialize_conditions raw_lhs_conditions
                 in
                 let source_rewrites =
                   premise_conditions
@@ -272,19 +284,15 @@ let translate_rule
                         | EqCondition _ as condition -> Some condition
                         | RewriteCond _ -> None)
                       else_conditions
+                  |> specialize_conditions
                 in
                 let conditions =
                   context_conditions
-                  @ lhs_conditions
+                  @ raw_lhs_conditions
                   @ premise_conditions
                   @ else_conditions
                   @ output_conditions
-                  |> (fun conditions ->
-                       match context_split with
-                       | None -> conditions
-                       | Some context ->
-                         Reld_context_split.eliminate_witness_guards
-                           context ~lhs ~rhs:rhs_term conditions)
+                  |> specialize_conditions
                   |> Validated_guard_certificate.discharge
                        ctx
                        (Premise_result.env_after premise_result)

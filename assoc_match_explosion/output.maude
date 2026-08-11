@@ -15,9 +15,6 @@ mod SPEC2MAUDE-GENERATED is
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   sort SpectecTerminals .
 
-  --- Experimental execution sorts for the Step/ctxt-instrs benchmark.
-  sorts EmptyInstrSeq Val Instr Vals Instrs .
-
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   sort SpectecType .
 
@@ -32,16 +29,6 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   subsort SpectecTerminal < SpectecTerminals .
-
-  --- A value instruction is also an instruction.  Vals and Instrs preserve
-  --- that distinction for associative sequence matching.
-  subsort Val < Instr .
-  subsort Instr < SpectecTerminal .
-  subsort EmptyInstrSeq < Vals .
-  subsort Val < Vals .
-  subsort Vals < Instrs .
-  subsort Instr < Instrs .
-  subsort Instrs < SpectecTerminals .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   subsort SpectecType < SpectecTypes .
@@ -83,15 +70,10 @@ mod SPEC2MAUDE-GENERATED is
   op tuple : SpectecTerminals -> SpectecTerminal [ctor] .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  op eps : -> EmptyInstrSeq .
+  op eps : -> SpectecTerminals .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   op _ _ : SpectecTerminals SpectecTerminals -> SpectecTerminals [ctor assoc id: eps] .
-
-  --- Typed overloads retain the generic sequence representation while giving
-  --- Maude a least sort for value and instruction sequences.
-  op _ _ : Vals Vals -> Vals [ctor assoc id: eps] .
-  op _ _ : Instrs Instrs -> Instrs [ctor assoc id: eps] .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   op compactRepeatThreshold : -> Nat .
@@ -5665,10 +5647,10 @@ mod SPEC2MAUDE-GENERATED is
   op syn.ref : -> SpectecType .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:36.5-36.20 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[1] / typcase
-  op ref.ref-i31-num : SpectecTerminal ~> Val [ctor] .
+  op ref.ref-i31-num : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:36.5-36.20 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[1] / typcase
-  cmb ref.ref-i31-num(U31:SpectecTerminal) : Val
+  cmb ref.ref-i31-num(U31:SpectecTerminal) : SpectecTerminal
     if typecheck(U31:SpectecTerminal, syn.u31) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:36.5-36.20 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[1] / typcase
@@ -5683,16 +5665,16 @@ mod SPEC2MAUDE-GENERATED is
     if ref.ref-i31-num(U31:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:37.5-37.18 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[2] / typcase
-  op ref.ref-null-addr : -> Val [ctor] .
+  op ref.ref-null-addr : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:37.5-37.18 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[2] / typcase
   eq typecheck(ref.ref-null-addr, syn.ref) = true .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:38.5-38.31 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[3] / typcase
-  op ref.ref-struct-addr : Nat ~> Val [ctor] .
+  op ref.ref-struct-addr : Nat ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:38.5-38.31 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[3] / typcase
-  cmb ref.ref-struct-addr(STRUCTADDR:Nat) : Val
+  cmb ref.ref-struct-addr(STRUCTADDR:Nat) : SpectecTerminal
     if typecheck(STRUCTADDR:Nat, syn.structaddr) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:38.5-38.31 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[3] / typcase
@@ -5707,10 +5689,10 @@ mod SPEC2MAUDE-GENERATED is
     if ref.ref-struct-addr(STRUCTADDR:Nat) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:39.5-39.29 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[4] / typcase
-  op ref.ref-array-addr : Nat ~> Val [ctor] .
+  op ref.ref-array-addr : Nat ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:39.5-39.29 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[4] / typcase
-  cmb ref.ref-array-addr(ARRAYADDR:Nat) : Val
+  cmb ref.ref-array-addr(ARRAYADDR:Nat) : SpectecTerminal
     if typecheck(ARRAYADDR:Nat, syn.arrayaddr) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:39.5-39.29 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[4] / typcase
@@ -5725,10 +5707,10 @@ mod SPEC2MAUDE-GENERATED is
     if ref.ref-array-addr(ARRAYADDR:Nat) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:40.5-40.27 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[5] / typcase
-  op ref.ref-func-addr : Nat ~> Val [ctor] .
+  op ref.ref-func-addr : Nat ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:40.5-40.27 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[5] / typcase
-  cmb ref.ref-func-addr(FUNCADDR:Nat) : Val
+  cmb ref.ref-func-addr(FUNCADDR:Nat) : SpectecTerminal
     if typecheck(FUNCADDR:Nat, syn.funcaddr) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:40.5-40.27 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[5] / typcase
@@ -5743,10 +5725,10 @@ mod SPEC2MAUDE-GENERATED is
     if ref.ref-func-addr(FUNCADDR:Nat) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:41.5-41.25 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[6] / typcase
-  op ref.ref-exn-addr : Nat ~> Val [ctor] .
+  op ref.ref-exn-addr : Nat ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:41.5-41.25 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[6] / typcase
-  cmb ref.ref-exn-addr(EXNADDR:Nat) : Val
+  cmb ref.ref-exn-addr(EXNADDR:Nat) : SpectecTerminal
     if typecheck(EXNADDR:Nat, syn.exnaddr) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:41.5-41.25 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[6] / typcase
@@ -5761,10 +5743,10 @@ mod SPEC2MAUDE-GENERATED is
     if ref.ref-exn-addr(EXNADDR:Nat) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:42.5-42.27 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[7] / typcase
-  op ref.ref-host-addr : Nat ~> Val [ctor] .
+  op ref.ref-host-addr : Nat ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:42.5-42.27 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[7] / typcase
-  cmb ref.ref-host-addr(HOSTADDR:Nat) : Val
+  cmb ref.ref-host-addr(HOSTADDR:Nat) : SpectecTerminal
     if typecheck(HOSTADDR:Nat, syn.hostaddr) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:42.5-42.27 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[7] / typcase
@@ -5779,10 +5761,10 @@ mod SPEC2MAUDE-GENERATED is
     if ref.ref-host-addr(HOSTADDR:Nat) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:43.5-43.19 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[8] / typcase
-  op ref.ref-extern : SpectecTerminal ~> Val [ctor] .
+  op ref.ref-extern : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:43.5-43.19 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[8] / typcase
-  cmb ref.ref-extern(REF:SpectecTerminal) : Val
+  cmb ref.ref-extern(REF:SpectecTerminal) : SpectecTerminal
     if typecheck(REF:SpectecTerminal, syn.ref) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:43.5-43.19 / script[471]/0472-RecD/RecD[0]/0001-TypD-ref/InstD[1]/VariantT[8] / typcase
@@ -5848,28 +5830,28 @@ mod SPEC2MAUDE-GENERATED is
   op syn.instr : -> SpectecType .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:219.5-219.8 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[1] / typcase
-  op instr.nop : -> Instr [ctor] .
+  op instr.nop : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:219.5-219.8 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[1] / typcase
   eq typecheck(instr.nop, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:220.5-220.16 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[2] / typcase
-  op instr.unreachable : -> Instr [ctor] .
+  op instr.unreachable : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:220.5-220.16 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[2] / typcase
   eq typecheck(instr.unreachable, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:221.5-221.9 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[3] / typcase
-  op instr.drop : -> Instr [ctor] .
+  op instr.drop : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:221.5-221.9 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[3] / typcase
   eq typecheck(instr.drop, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:222.5-222.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[4] / typcase
-  op instr.select : SpectecTerminals ~> Instr [ctor] .
+  op instr.select : SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:222.5-222.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[4] / typcase
-  cmb instr.select(VALTYPE_STAR_OPT:SpectecTerminals) : Instr
+  cmb instr.select(VALTYPE_STAR_OPT:SpectecTerminals) : SpectecTerminal
     if (typecheckSeqOpt(VALTYPE_STAR_OPT:SpectecTerminals, syn.valtype)) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:222.5-222.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[4] / typcase
@@ -5884,10 +5866,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.select(VALTYPE_STAR_OPT:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:226.5-226.27 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[5] / typcase
-  op instr.block : SpectecTerminal SpectecTerminals ~> Instr [ctor] .
+  op instr.block : SpectecTerminal SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:226.5-226.27 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[5] / typcase
-  cmb instr.block(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : Instr
+  cmb instr.block(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal
     if typecheck(BLOCKTYPE:SpectecTerminal, syn.blocktype) /\ (typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr)) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:226.5-226.27 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[5] / typcase
@@ -5909,10 +5891,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.block(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:227.5-227.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[6] / typcase
-  op instr.loop : SpectecTerminal SpectecTerminals ~> Instr [ctor] .
+  op instr.loop : SpectecTerminal SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:227.5-227.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[6] / typcase
-  cmb instr.loop(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : Instr
+  cmb instr.loop(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal
     if typecheck(BLOCKTYPE:SpectecTerminal, syn.blocktype) /\ (typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr)) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:227.5-227.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[6] / typcase
@@ -5934,10 +5916,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.loop(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:228.5-228.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[7] / typcase
-  op instr.if-else : SpectecTerminal SpectecTerminals SpectecTerminals ~> Instr [ctor] .
+  op instr.if-else : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:228.5-228.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[7] / typcase
-  cmb instr.if-else(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals, INSTR_STAR2:SpectecTerminals) : Instr
+  cmb instr.if-else(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals, INSTR_STAR2:SpectecTerminals) : SpectecTerminal
     if typecheck(BLOCKTYPE:SpectecTerminal, syn.blocktype) /\ (typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr)) = true /\ (typecheckSeq(INSTR_STAR2:SpectecTerminals, syn.instr)) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:228.5-228.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[7] / typcase
@@ -5966,10 +5948,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.if-else(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals, INSTR_STAR2:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:232.5-232.16 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[8] / typcase
-  op instr.br : SpectecTerminal ~> Instr [ctor] .
+  op instr.br : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:232.5-232.16 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[8] / typcase
-  cmb instr.br(LABELIDX:SpectecTerminal) : Instr
+  cmb instr.br(LABELIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(LABELIDX:SpectecTerminal, syn.labelidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:232.5-232.16 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[8] / typcase
@@ -5984,10 +5966,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.br(LABELIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:233.5-233.19 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[9] / typcase
-  op instr.br-if : SpectecTerminal ~> Instr [ctor] .
+  op instr.br-if : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:233.5-233.19 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[9] / typcase
-  cmb instr.br-if(LABELIDX:SpectecTerminal) : Instr
+  cmb instr.br-if(LABELIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(LABELIDX:SpectecTerminal, syn.labelidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:233.5-233.19 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[9] / typcase
@@ -6002,10 +5984,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.br-if(LABELIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:234.5-234.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[10] / typcase
-  op instr.br-table : SpectecTerminals SpectecTerminal ~> Instr [ctor] .
+  op instr.br-table : SpectecTerminals SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:234.5-234.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[10] / typcase
-  cmb instr.br-table(LABELIDX_STAR:SpectecTerminals, LABELIDX:SpectecTerminal) : Instr
+  cmb instr.br-table(LABELIDX_STAR:SpectecTerminals, LABELIDX:SpectecTerminal) : SpectecTerminal
     if (typecheckSeq(LABELIDX_STAR:SpectecTerminals, syn.labelidx)) = true /\ typecheck(LABELIDX:SpectecTerminal, syn.labelidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:234.5-234.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[10] / typcase
@@ -6027,10 +6009,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.br-table(LABELIDX_STAR:SpectecTerminals, LABELIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:235.5-235.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[11] / typcase
-  op instr.br-on-null : SpectecTerminal ~> Instr [ctor] .
+  op instr.br-on-null : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:235.5-235.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[11] / typcase
-  cmb instr.br-on-null(LABELIDX:SpectecTerminal) : Instr
+  cmb instr.br-on-null(LABELIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(LABELIDX:SpectecTerminal, syn.labelidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:235.5-235.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[11] / typcase
@@ -6045,10 +6027,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.br-on-null(LABELIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:236.5-236.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[12] / typcase
-  op instr.br-on-non-null : SpectecTerminal ~> Instr [ctor] .
+  op instr.br-on-non-null : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:236.5-236.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[12] / typcase
-  cmb instr.br-on-non-null(LABELIDX:SpectecTerminal) : Instr
+  cmb instr.br-on-non-null(LABELIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(LABELIDX:SpectecTerminal, syn.labelidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:236.5-236.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[12] / typcase
@@ -6063,10 +6045,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.br-on-non-null(LABELIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:237.5-237.40 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[13] / typcase
-  op instr.br-on-cast : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.br-on-cast : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:237.5-237.40 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[13] / typcase
-  cmb instr.br-on-cast(LABELIDX:SpectecTerminal, REFTYPE:SpectecTerminal, REFTYPE2:SpectecTerminal) : Instr
+  cmb instr.br-on-cast(LABELIDX:SpectecTerminal, REFTYPE:SpectecTerminal, REFTYPE2:SpectecTerminal) : SpectecTerminal
     if typecheck(LABELIDX:SpectecTerminal, syn.labelidx) /\ typecheck(REFTYPE:SpectecTerminal, syn.reftype) /\ typecheck(REFTYPE2:SpectecTerminal, syn.reftype) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:237.5-237.40 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[13] / typcase
@@ -6095,10 +6077,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.br-on-cast(LABELIDX:SpectecTerminal, REFTYPE:SpectecTerminal, REFTYPE2:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:238.5-238.45 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[14] / typcase
-  op instr.br-on-cast-fail : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.br-on-cast-fail : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:238.5-238.45 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[14] / typcase
-  cmb instr.br-on-cast-fail(LABELIDX:SpectecTerminal, REFTYPE:SpectecTerminal, REFTYPE2:SpectecTerminal) : Instr
+  cmb instr.br-on-cast-fail(LABELIDX:SpectecTerminal, REFTYPE:SpectecTerminal, REFTYPE2:SpectecTerminal) : SpectecTerminal
     if typecheck(LABELIDX:SpectecTerminal, syn.labelidx) /\ typecheck(REFTYPE:SpectecTerminal, syn.reftype) /\ typecheck(REFTYPE2:SpectecTerminal, syn.reftype) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:238.5-238.45 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[14] / typcase
@@ -6127,10 +6109,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.br-on-cast-fail(LABELIDX:SpectecTerminal, REFTYPE:SpectecTerminal, REFTYPE2:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:242.5-242.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[15] / typcase
-  op instr.call : SpectecTerminal ~> Instr [ctor] .
+  op instr.call : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:242.5-242.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[15] / typcase
-  cmb instr.call(FUNCIDX:SpectecTerminal) : Instr
+  cmb instr.call(FUNCIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(FUNCIDX:SpectecTerminal, syn.funcidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:242.5-242.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[15] / typcase
@@ -6145,10 +6127,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.call(FUNCIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:243.5-243.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[16] / typcase
-  op instr.call-ref : SpectecTerminal ~> Instr [ctor] .
+  op instr.call-ref : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:243.5-243.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[16] / typcase
-  cmb instr.call-ref(TYPEUSE:SpectecTerminal) : Instr
+  cmb instr.call-ref(TYPEUSE:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEUSE:SpectecTerminal, syn.typeuse) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:243.5-243.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[16] / typcase
@@ -6163,10 +6145,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.call-ref(TYPEUSE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:244.5-244.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[17] / typcase
-  op instr.call-indirect : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.call-indirect : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:244.5-244.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[17] / typcase
-  cmb instr.call-indirect(TABLEIDX:SpectecTerminal, TYPEUSE:SpectecTerminal) : Instr
+  cmb instr.call-indirect(TABLEIDX:SpectecTerminal, TYPEUSE:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) /\ typecheck(TYPEUSE:SpectecTerminal, syn.typeuse) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:244.5-244.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[17] / typcase
@@ -6188,16 +6170,16 @@ mod SPEC2MAUDE-GENERATED is
     if instr.call-indirect(TABLEIDX:SpectecTerminal, TYPEUSE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:245.5-245.11 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[18] / typcase
-  op instr.return : -> Instr [ctor] .
+  op instr.return : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:245.5-245.11 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[18] / typcase
   eq typecheck(instr.return, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:246.5-246.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[19] / typcase
-  op instr.return-call : SpectecTerminal ~> Instr [ctor] .
+  op instr.return-call : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:246.5-246.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[19] / typcase
-  cmb instr.return-call(FUNCIDX:SpectecTerminal) : Instr
+  cmb instr.return-call(FUNCIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(FUNCIDX:SpectecTerminal, syn.funcidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:246.5-246.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[19] / typcase
@@ -6212,10 +6194,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.return-call(FUNCIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:247.5-247.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[20] / typcase
-  op instr.return-call-ref : SpectecTerminal ~> Instr [ctor] .
+  op instr.return-call-ref : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:247.5-247.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[20] / typcase
-  cmb instr.return-call-ref(TYPEUSE:SpectecTerminal) : Instr
+  cmb instr.return-call-ref(TYPEUSE:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEUSE:SpectecTerminal, syn.typeuse) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:247.5-247.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[20] / typcase
@@ -6230,10 +6212,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.return-call-ref(TYPEUSE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:248.5-248.42 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[21] / typcase
-  op instr.return-call-indirect : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.return-call-indirect : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:248.5-248.42 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[21] / typcase
-  cmb instr.return-call-indirect(TABLEIDX:SpectecTerminal, TYPEUSE:SpectecTerminal) : Instr
+  cmb instr.return-call-indirect(TABLEIDX:SpectecTerminal, TYPEUSE:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) /\ typecheck(TYPEUSE:SpectecTerminal, syn.typeuse) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:248.5-248.42 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[21] / typcase
@@ -6255,10 +6237,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.return-call-indirect(TABLEIDX:SpectecTerminal, TYPEUSE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:252.5-252.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[22] / typcase
-  op instr.throw : SpectecTerminal ~> Instr [ctor] .
+  op instr.throw : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:252.5-252.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[22] / typcase
-  cmb instr.throw(TAGIDX:SpectecTerminal) : Instr
+  cmb instr.throw(TAGIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TAGIDX:SpectecTerminal, syn.tagidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:252.5-252.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[22] / typcase
@@ -6273,16 +6255,16 @@ mod SPEC2MAUDE-GENERATED is
     if instr.throw(TAGIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:253.5-253.14 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[23] / typcase
-  op instr.throw-ref : -> Instr [ctor] .
+  op instr.throw-ref : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:253.5-253.14 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[23] / typcase
   eq typecheck(instr.throw-ref, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:254.5-254.43 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[24] / typcase
-  op instr.try-table : SpectecTerminal SpectecTerminal SpectecTerminals ~> Instr [ctor] .
+  op instr.try-table : SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:254.5-254.43 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[24] / typcase
-  cmb instr.try-table(BLOCKTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal, INSTR_STAR:SpectecTerminals) : Instr
+  cmb instr.try-table(BLOCKTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal
     if typecheck(BLOCKTYPE:SpectecTerminal, syn.blocktype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.list(syn.catch)) /\ (typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr)) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:254.5-254.43 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[24] / typcase
@@ -6311,10 +6293,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.try-table(BLOCKTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:264.5-264.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[25] / typcase
-  op instr.local-get : SpectecTerminal ~> Instr [ctor] .
+  op instr.local-get : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:264.5-264.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[25] / typcase
-  cmb instr.local-get(LOCALIDX:SpectecTerminal) : Instr
+  cmb instr.local-get(LOCALIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(LOCALIDX:SpectecTerminal, syn.localidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:264.5-264.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[25] / typcase
@@ -6329,10 +6311,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.local-get(LOCALIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:265.5-265.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[26] / typcase
-  op instr.local-set : SpectecTerminal ~> Instr [ctor] .
+  op instr.local-set : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:265.5-265.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[26] / typcase
-  cmb instr.local-set(LOCALIDX:SpectecTerminal) : Instr
+  cmb instr.local-set(LOCALIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(LOCALIDX:SpectecTerminal, syn.localidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:265.5-265.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[26] / typcase
@@ -6347,10 +6329,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.local-set(LOCALIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:266.5-266.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[27] / typcase
-  op instr.local-tee : SpectecTerminal ~> Instr [ctor] .
+  op instr.local-tee : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:266.5-266.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[27] / typcase
-  cmb instr.local-tee(LOCALIDX:SpectecTerminal) : Instr
+  cmb instr.local-tee(LOCALIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(LOCALIDX:SpectecTerminal, syn.localidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:266.5-266.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[27] / typcase
@@ -6365,10 +6347,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.local-tee(LOCALIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:270.5-270.25 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[28] / typcase
-  op instr.global-get : SpectecTerminal ~> Instr [ctor] .
+  op instr.global-get : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:270.5-270.25 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[28] / typcase
-  cmb instr.global-get(GLOBALIDX:SpectecTerminal) : Instr
+  cmb instr.global-get(GLOBALIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(GLOBALIDX:SpectecTerminal, syn.globalidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:270.5-270.25 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[28] / typcase
@@ -6383,10 +6365,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.global-get(GLOBALIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:271.5-271.25 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[29] / typcase
-  op instr.global-set : SpectecTerminal ~> Instr [ctor] .
+  op instr.global-set : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:271.5-271.25 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[29] / typcase
-  cmb instr.global-set(GLOBALIDX:SpectecTerminal) : Instr
+  cmb instr.global-set(GLOBALIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(GLOBALIDX:SpectecTerminal, syn.globalidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:271.5-271.25 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[29] / typcase
@@ -6401,10 +6383,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.global-set(GLOBALIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:275.5-275.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[30] / typcase
-  op instr.table-get : SpectecTerminal ~> Instr [ctor] .
+  op instr.table-get : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:275.5-275.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[30] / typcase
-  cmb instr.table-get(TABLEIDX:SpectecTerminal) : Instr
+  cmb instr.table-get(TABLEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:275.5-275.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[30] / typcase
@@ -6419,10 +6401,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.table-get(TABLEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:276.5-276.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[31] / typcase
-  op instr.table-set : SpectecTerminal ~> Instr [ctor] .
+  op instr.table-set : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:276.5-276.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[31] / typcase
-  cmb instr.table-set(TABLEIDX:SpectecTerminal) : Instr
+  cmb instr.table-set(TABLEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:276.5-276.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[31] / typcase
@@ -6437,10 +6419,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.table-set(TABLEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:277.5-277.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[32] / typcase
-  op instr.table-size : SpectecTerminal ~> Instr [ctor] .
+  op instr.table-size : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:277.5-277.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[32] / typcase
-  cmb instr.table-size(TABLEIDX:SpectecTerminal) : Instr
+  cmb instr.table-size(TABLEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:277.5-277.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[32] / typcase
@@ -6455,10 +6437,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.table-size(TABLEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:278.5-278.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[33] / typcase
-  op instr.table-grow : SpectecTerminal ~> Instr [ctor] .
+  op instr.table-grow : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:278.5-278.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[33] / typcase
-  cmb instr.table-grow(TABLEIDX:SpectecTerminal) : Instr
+  cmb instr.table-grow(TABLEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:278.5-278.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[33] / typcase
@@ -6473,10 +6455,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.table-grow(TABLEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:279.5-279.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[34] / typcase
-  op instr.table-fill : SpectecTerminal ~> Instr [ctor] .
+  op instr.table-fill : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:279.5-279.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[34] / typcase
-  cmb instr.table-fill(TABLEIDX:SpectecTerminal) : Instr
+  cmb instr.table-fill(TABLEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:279.5-279.24 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[34] / typcase
@@ -6491,10 +6473,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.table-fill(TABLEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:280.5-280.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[35] / typcase
-  op instr.table-copy : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.table-copy : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:280.5-280.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[35] / typcase
-  cmb instr.table-copy(TABLEIDX:SpectecTerminal, TABLEIDX2:SpectecTerminal) : Instr
+  cmb instr.table-copy(TABLEIDX:SpectecTerminal, TABLEIDX2:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) /\ typecheck(TABLEIDX2:SpectecTerminal, syn.tableidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:280.5-280.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[35] / typcase
@@ -6516,10 +6498,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.table-copy(TABLEIDX:SpectecTerminal, TABLEIDX2:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:281.5-281.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[36] / typcase
-  op instr.table-init : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.table-init : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:281.5-281.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[36] / typcase
-  cmb instr.table-init(TABLEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : Instr
+  cmb instr.table-init(TABLEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TABLEIDX:SpectecTerminal, syn.tableidx) /\ typecheck(ELEMIDX:SpectecTerminal, syn.elemidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:281.5-281.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[36] / typcase
@@ -6541,10 +6523,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.table-init(TABLEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:285.5-285.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[37] / typcase
-  op instr.elem-drop : SpectecTerminal ~> Instr [ctor] .
+  op instr.elem-drop : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:285.5-285.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[37] / typcase
-  cmb instr.elem-drop(ELEMIDX:SpectecTerminal) : Instr
+  cmb instr.elem-drop(ELEMIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(ELEMIDX:SpectecTerminal, syn.elemidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:285.5-285.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[37] / typcase
@@ -6559,10 +6541,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.elem-drop(ELEMIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:289.5-289.49 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[38] / typcase
-  op instr.load : SpectecTerminal SpectecTerminals SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.load : SpectecTerminal SpectecTerminals SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:289.5-289.49 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[38] / typcase
-  cmb instr.load(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : Instr
+  cmb instr.load(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) /\ (isOpt(COMPONENT1:SpectecTerminals)) = true /\ (typecheckSeq(COMPONENT1:SpectecTerminals, syn.loadop(NUMTYPE:SpectecTerminal))) = true /\ typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(MEMARG:SpectecTerminal, syn.memarg) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:289.5-289.49 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[38] / typcase
@@ -6598,10 +6580,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.load(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:290.5-290.51 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[39] / typcase
-  op instr.store : SpectecTerminal SpectecTerminals SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.store : SpectecTerminal SpectecTerminals SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:290.5-290.51 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[39] / typcase
-  cmb instr.store(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : Instr
+  cmb instr.store(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) /\ (isOpt(COMPONENT1:SpectecTerminals)) = true /\ (typecheckSeq(COMPONENT1:SpectecTerminals, syn.storeop(NUMTYPE:SpectecTerminal))) = true /\ typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(MEMARG:SpectecTerminal, syn.memarg) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:290.5-290.51 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[39] / typcase
@@ -6637,10 +6619,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.store(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:291.5-291.51 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[40] / typcase
-  op instr.vload : SpectecTerminal SpectecTerminals SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vload : SpectecTerminal SpectecTerminals SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:291.5-291.51 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[40] / typcase
-  cmb instr.vload(VECTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : Instr
+  cmb instr.vload(VECTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ (isOpt(COMPONENT1:SpectecTerminals)) = true /\ (typecheckSeq(COMPONENT1:SpectecTerminals, syn.vloadop(VECTYPE:SpectecTerminal))) = true /\ typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(MEMARG:SpectecTerminal, syn.memarg) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:291.5-291.51 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[40] / typcase
@@ -6676,10 +6658,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vload(VECTYPE:SpectecTerminal, COMPONENT1:SpectecTerminals, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:292.5-292.48 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[41] / typcase
-  op instr.vload-lane : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vload-lane : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:292.5-292.48 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[41] / typcase
-  cmb instr.vload-lane(VECTYPE:SpectecTerminal, SZ:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal, LANEIDX:SpectecTerminal) : Instr
+  cmb instr.vload-lane(VECTYPE:SpectecTerminal, SZ:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal, LANEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(SZ:SpectecTerminal, syn.sz) /\ typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(MEMARG:SpectecTerminal, syn.memarg) /\ typecheck(LANEIDX:SpectecTerminal, syn.laneidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:292.5-292.48 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[41] / typcase
@@ -6722,10 +6704,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vload-lane(VECTYPE:SpectecTerminal, SZ:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal, LANEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:293.5-293.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[42] / typcase
-  op instr.vstore : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vstore : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:293.5-293.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[42] / typcase
-  cmb instr.vstore(VECTYPE:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : Instr
+  cmb instr.vstore(VECTYPE:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(MEMARG:SpectecTerminal, syn.memarg) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:293.5-293.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[42] / typcase
@@ -6754,10 +6736,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vstore(VECTYPE:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:294.5-294.49 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[43] / typcase
-  op instr.vstore-lane : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vstore-lane : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:294.5-294.49 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[43] / typcase
-  cmb instr.vstore-lane(VECTYPE:SpectecTerminal, SZ:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal, LANEIDX:SpectecTerminal) : Instr
+  cmb instr.vstore-lane(VECTYPE:SpectecTerminal, SZ:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal, LANEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(SZ:SpectecTerminal, syn.sz) /\ typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(MEMARG:SpectecTerminal, syn.memarg) /\ typecheck(LANEIDX:SpectecTerminal, syn.laneidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:294.5-294.49 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[43] / typcase
@@ -6800,10 +6782,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vstore-lane(VECTYPE:SpectecTerminal, SZ:SpectecTerminal, MEMIDX:SpectecTerminal, MEMARG:SpectecTerminal, LANEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:295.5-295.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[44] / typcase
-  op instr.memory-size : SpectecTerminal ~> Instr [ctor] .
+  op instr.memory-size : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:295.5-295.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[44] / typcase
-  cmb instr.memory-size(MEMIDX:SpectecTerminal) : Instr
+  cmb instr.memory-size(MEMIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(MEMIDX:SpectecTerminal, syn.memidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:295.5-295.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[44] / typcase
@@ -6818,10 +6800,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.memory-size(MEMIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:296.5-296.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[45] / typcase
-  op instr.memory-grow : SpectecTerminal ~> Instr [ctor] .
+  op instr.memory-grow : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:296.5-296.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[45] / typcase
-  cmb instr.memory-grow(MEMIDX:SpectecTerminal) : Instr
+  cmb instr.memory-grow(MEMIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(MEMIDX:SpectecTerminal, syn.memidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:296.5-296.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[45] / typcase
@@ -6836,10 +6818,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.memory-grow(MEMIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:297.5-297.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[46] / typcase
-  op instr.memory-fill : SpectecTerminal ~> Instr [ctor] .
+  op instr.memory-fill : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:297.5-297.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[46] / typcase
-  cmb instr.memory-fill(MEMIDX:SpectecTerminal) : Instr
+  cmb instr.memory-fill(MEMIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(MEMIDX:SpectecTerminal, syn.memidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:297.5-297.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[46] / typcase
@@ -6854,10 +6836,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.memory-fill(MEMIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:298.5-298.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[47] / typcase
-  op instr.memory-copy : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.memory-copy : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:298.5-298.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[47] / typcase
-  cmb instr.memory-copy(MEMIDX:SpectecTerminal, MEMIDX2:SpectecTerminal) : Instr
+  cmb instr.memory-copy(MEMIDX:SpectecTerminal, MEMIDX2:SpectecTerminal) : SpectecTerminal
     if typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(MEMIDX2:SpectecTerminal, syn.memidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:298.5-298.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[47] / typcase
@@ -6879,10 +6861,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.memory-copy(MEMIDX:SpectecTerminal, MEMIDX2:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:299.5-299.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[48] / typcase
-  op instr.memory-init : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.memory-init : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:299.5-299.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[48] / typcase
-  cmb instr.memory-init(MEMIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : Instr
+  cmb instr.memory-init(MEMIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(MEMIDX:SpectecTerminal, syn.memidx) /\ typecheck(DATAIDX:SpectecTerminal, syn.dataidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:299.5-299.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[48] / typcase
@@ -6904,10 +6886,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.memory-init(MEMIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:303.5-303.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[49] / typcase
-  op instr.data-drop : SpectecTerminal ~> Instr [ctor] .
+  op instr.data-drop : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:303.5-303.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[49] / typcase
-  cmb instr.data-drop(DATAIDX:SpectecTerminal) : Instr
+  cmb instr.data-drop(DATAIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(DATAIDX:SpectecTerminal, syn.dataidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:303.5-303.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[49] / typcase
@@ -6922,10 +6904,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.data-drop(DATAIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:307.5-307.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[50] / typcase
-  op instr.ref-null : SpectecTerminal ~> Instr [ctor] .
+  op instr.ref-null : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:307.5-307.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[50] / typcase
-  cmb instr.ref-null(HEAPTYPE:SpectecTerminal) : Instr
+  cmb instr.ref-null(HEAPTYPE:SpectecTerminal) : SpectecTerminal
     if typecheck(HEAPTYPE:SpectecTerminal, syn.heaptype) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:307.5-307.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[50] / typcase
@@ -6940,28 +6922,28 @@ mod SPEC2MAUDE-GENERATED is
     if instr.ref-null(HEAPTYPE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:308.5-308.16 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[51] / typcase
-  op instr.ref-is-null : -> Instr [ctor] .
+  op instr.ref-is-null : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:308.5-308.16 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[51] / typcase
   eq typecheck(instr.ref-is-null, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:309.5-309.20 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[52] / typcase
-  op instr.ref-as-non-null : -> Instr [ctor] .
+  op instr.ref-as-non-null : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:309.5-309.20 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[52] / typcase
   eq typecheck(instr.ref-as-non-null, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:310.5-310.11 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[53] / typcase
-  op instr.ref-eq : -> Instr [ctor] .
+  op instr.ref-eq : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:310.5-310.11 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[53] / typcase
   eq typecheck(instr.ref-eq, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:311.5-311.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[54] / typcase
-  op instr.ref-test : SpectecTerminal ~> Instr [ctor] .
+  op instr.ref-test : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:311.5-311.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[54] / typcase
-  cmb instr.ref-test(REFTYPE:SpectecTerminal) : Instr
+  cmb instr.ref-test(REFTYPE:SpectecTerminal) : SpectecTerminal
     if typecheck(REFTYPE:SpectecTerminal, syn.reftype) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:311.5-311.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[54] / typcase
@@ -6976,10 +6958,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.ref-test(REFTYPE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:312.5-312.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[55] / typcase
-  op instr.ref-cast : SpectecTerminal ~> Instr [ctor] .
+  op instr.ref-cast : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:312.5-312.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[55] / typcase
-  cmb instr.ref-cast(REFTYPE:SpectecTerminal) : Instr
+  cmb instr.ref-cast(REFTYPE:SpectecTerminal) : SpectecTerminal
     if typecheck(REFTYPE:SpectecTerminal, syn.reftype) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:312.5-312.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[55] / typcase
@@ -6994,10 +6976,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.ref-cast(REFTYPE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:316.5-316.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[56] / typcase
-  op instr.ref-func : SpectecTerminal ~> Instr [ctor] .
+  op instr.ref-func : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:316.5-316.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[56] / typcase
-  cmb instr.ref-func(FUNCIDX:SpectecTerminal) : Instr
+  cmb instr.ref-func(FUNCIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(FUNCIDX:SpectecTerminal, syn.funcidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:316.5-316.21 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[56] / typcase
@@ -7012,16 +6994,16 @@ mod SPEC2MAUDE-GENERATED is
     if instr.ref-func(FUNCIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:320.5-320.12 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[57] / typcase
-  op instr.ref-i31 : -> Instr [ctor] .
+  op instr.ref-i31 : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:320.5-320.12 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[57] / typcase
   eq typecheck(instr.ref-i31, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:321.5-321.15 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[58] / typcase
-  op instr.i31-get : SpectecTerminal ~> Instr [ctor] .
+  op instr.i31-get : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:321.5-321.15 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[58] / typcase
-  cmb instr.i31-get(SX:SpectecTerminal) : Instr
+  cmb instr.i31-get(SX:SpectecTerminal) : SpectecTerminal
     if typecheck(SX:SpectecTerminal, syn.sx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:321.5-321.15 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[58] / typcase
@@ -7036,10 +7018,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.i31-get(SX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:325.5-325.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[59] / typcase
-  op instr.struct-new : SpectecTerminal ~> Instr [ctor] .
+  op instr.struct-new : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:325.5-325.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[59] / typcase
-  cmb instr.struct-new(TYPEIDX:SpectecTerminal) : Instr
+  cmb instr.struct-new(TYPEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:325.5-325.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[59] / typcase
@@ -7054,10 +7036,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.struct-new(TYPEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:326.5-326.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[60] / typcase
-  op instr.struct-new-default : SpectecTerminal ~> Instr [ctor] .
+  op instr.struct-new-default : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:326.5-326.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[60] / typcase
-  cmb instr.struct-new-default(TYPEIDX:SpectecTerminal) : Instr
+  cmb instr.struct-new-default(TYPEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:326.5-326.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[60] / typcase
@@ -7072,10 +7054,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.struct-new-default(TYPEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:327.5-327.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[61] / typcase
-  op instr.struct-get : SpectecTerminals SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.struct-get : SpectecTerminals SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:327.5-327.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[61] / typcase
-  cmb instr.struct-get(SX_OPT:SpectecTerminals, TYPEIDX:SpectecTerminal, FIELDIDX:SpectecTerminal) : Instr
+  cmb instr.struct-get(SX_OPT:SpectecTerminals, TYPEIDX:SpectecTerminal, FIELDIDX:SpectecTerminal) : SpectecTerminal
     if (isOpt(SX_OPT:SpectecTerminals)) = true /\ (typecheckSeq(SX_OPT:SpectecTerminals, syn.sx)) = true /\ typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(FIELDIDX:SpectecTerminal, syn.fieldidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:327.5-327.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[61] / typcase
@@ -7104,10 +7086,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.struct-get(SX_OPT:SpectecTerminals, TYPEIDX:SpectecTerminal, FIELDIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:328.5-328.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[62] / typcase
-  op instr.struct-set : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.struct-set : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:328.5-328.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[62] / typcase
-  cmb instr.struct-set(TYPEIDX:SpectecTerminal, FIELDIDX:SpectecTerminal) : Instr
+  cmb instr.struct-set(TYPEIDX:SpectecTerminal, FIELDIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(FIELDIDX:SpectecTerminal, syn.fieldidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:328.5-328.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[62] / typcase
@@ -7129,10 +7111,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.struct-set(TYPEIDX:SpectecTerminal, FIELDIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:332.5-332.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[63] / typcase
-  op instr.array-new : SpectecTerminal ~> Instr [ctor] .
+  op instr.array-new : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:332.5-332.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[63] / typcase
-  cmb instr.array-new(TYPEIDX:SpectecTerminal) : Instr
+  cmb instr.array-new(TYPEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:332.5-332.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[63] / typcase
@@ -7147,10 +7129,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-new(TYPEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:333.5-333.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[64] / typcase
-  op instr.array-new-default : SpectecTerminal ~> Instr [ctor] .
+  op instr.array-new-default : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:333.5-333.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[64] / typcase
-  cmb instr.array-new-default(TYPEIDX:SpectecTerminal) : Instr
+  cmb instr.array-new-default(TYPEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:333.5-333.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[64] / typcase
@@ -7165,10 +7147,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-new-default(TYPEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:334.5-334.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[65] / typcase
-  op instr.array-new-fixed : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.array-new-fixed : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:334.5-334.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[65] / typcase
-  cmb instr.array-new-fixed(TYPEIDX:SpectecTerminal, U32:SpectecTerminal) : Instr
+  cmb instr.array-new-fixed(TYPEIDX:SpectecTerminal, U32:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(U32:SpectecTerminal, syn.u32) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:334.5-334.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[65] / typcase
@@ -7190,10 +7172,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-new-fixed(TYPEIDX:SpectecTerminal, U32:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:335.5-335.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[66] / typcase
-  op instr.array-new-data : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.array-new-data : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:335.5-335.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[66] / typcase
-  cmb instr.array-new-data(TYPEIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : Instr
+  cmb instr.array-new-data(TYPEIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(DATAIDX:SpectecTerminal, syn.dataidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:335.5-335.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[66] / typcase
@@ -7215,10 +7197,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-new-data(TYPEIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:336.5-336.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[67] / typcase
-  op instr.array-new-elem : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.array-new-elem : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:336.5-336.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[67] / typcase
-  cmb instr.array-new-elem(TYPEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : Instr
+  cmb instr.array-new-elem(TYPEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(ELEMIDX:SpectecTerminal, syn.elemidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:336.5-336.35 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[67] / typcase
@@ -7240,10 +7222,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-new-elem(TYPEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:337.5-337.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[68] / typcase
-  op instr.array-get : SpectecTerminals SpectecTerminal ~> Instr [ctor] .
+  op instr.array-get : SpectecTerminals SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:337.5-337.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[68] / typcase
-  cmb instr.array-get(SX_OPT:SpectecTerminals, TYPEIDX:SpectecTerminal) : Instr
+  cmb instr.array-get(SX_OPT:SpectecTerminals, TYPEIDX:SpectecTerminal) : SpectecTerminal
     if (isOpt(SX_OPT:SpectecTerminals)) = true /\ (typecheckSeq(SX_OPT:SpectecTerminals, syn.sx)) = true /\ typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:337.5-337.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[68] / typcase
@@ -7265,10 +7247,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-get(SX_OPT:SpectecTerminals, TYPEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:338.5-338.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[69] / typcase
-  op instr.array-set : SpectecTerminal ~> Instr [ctor] .
+  op instr.array-set : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:338.5-338.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[69] / typcase
-  cmb instr.array-set(TYPEIDX:SpectecTerminal) : Instr
+  cmb instr.array-set(TYPEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:338.5-338.22 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[69] / typcase
@@ -7283,16 +7265,16 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-set(TYPEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:339.5-339.14 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[70] / typcase
-  op instr.array-len : -> Instr [ctor] .
+  op instr.array-len : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:339.5-339.14 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[70] / typcase
   eq typecheck(instr.array-len, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:340.5-340.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[71] / typcase
-  op instr.array-fill : SpectecTerminal ~> Instr [ctor] .
+  op instr.array-fill : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:340.5-340.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[71] / typcase
-  cmb instr.array-fill(TYPEIDX:SpectecTerminal) : Instr
+  cmb instr.array-fill(TYPEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:340.5-340.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[71] / typcase
@@ -7307,10 +7289,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-fill(TYPEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:341.5-341.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[72] / typcase
-  op instr.array-copy : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.array-copy : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:341.5-341.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[72] / typcase
-  cmb instr.array-copy(TYPEIDX:SpectecTerminal, TYPEIDX2:SpectecTerminal) : Instr
+  cmb instr.array-copy(TYPEIDX:SpectecTerminal, TYPEIDX2:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(TYPEIDX2:SpectecTerminal, syn.typeidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:341.5-341.31 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[72] / typcase
@@ -7332,10 +7314,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-copy(TYPEIDX:SpectecTerminal, TYPEIDX2:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:342.5-342.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[73] / typcase
-  op instr.array-init-data : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.array-init-data : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:342.5-342.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[73] / typcase
-  cmb instr.array-init-data(TYPEIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : Instr
+  cmb instr.array-init-data(TYPEIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(DATAIDX:SpectecTerminal, syn.dataidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:342.5-342.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[73] / typcase
@@ -7357,10 +7339,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-init-data(TYPEIDX:SpectecTerminal, DATAIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:343.5-343.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[74] / typcase
-  op instr.array-init-elem : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.array-init-elem : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:343.5-343.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[74] / typcase
-  cmb instr.array-init-elem(TYPEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : Instr
+  cmb instr.array-init-elem(TYPEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(TYPEIDX:SpectecTerminal, syn.typeidx) /\ typecheck(ELEMIDX:SpectecTerminal, syn.elemidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:343.5-343.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[74] / typcase
@@ -7382,22 +7364,22 @@ mod SPEC2MAUDE-GENERATED is
     if instr.array-init-elem(TYPEIDX:SpectecTerminal, ELEMIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:347.5-347.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[75] / typcase
-  op instr.extern-convert-any : -> Instr [ctor] .
+  op instr.extern-convert-any : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:347.5-347.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[75] / typcase
   eq typecheck(instr.extern-convert-any, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:348.5-348.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[76] / typcase
-  op instr.any-convert-extern : -> Instr [ctor] .
+  op instr.any-convert-extern : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:348.5-348.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[76] / typcase
   eq typecheck(instr.any-convert-extern, syn.instr) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:352.5-352.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[77] / typcase
-  op instr.const : SpectecTerminal SpectecTerminal ~> Val [ctor] .
+  op instr.const : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:352.5-352.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[77] / typcase
-  cmb instr.const(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Val
+  cmb instr.const(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.num(NUMTYPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:352.5-352.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[77] / typcase
@@ -7419,10 +7401,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.const(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:353.5-353.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[78] / typcase
-  op instr.unop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.unop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:353.5-353.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[78] / typcase
-  cmb instr.unop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.unop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.unop(NUMTYPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:353.5-353.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[78] / typcase
@@ -7444,10 +7426,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.unop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:354.5-354.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[79] / typcase
-  op instr.binop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.binop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:354.5-354.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[79] / typcase
-  cmb instr.binop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.binop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.binop(NUMTYPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:354.5-354.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[79] / typcase
@@ -7469,10 +7451,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.binop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:355.5-355.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[80] / typcase
-  op instr.testop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.testop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:355.5-355.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[80] / typcase
-  cmb instr.testop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.testop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.testop(NUMTYPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:355.5-355.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[80] / typcase
@@ -7494,10 +7476,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.testop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:356.5-356.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[81] / typcase
-  op instr.relop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.relop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:356.5-356.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[81] / typcase
-  cmb instr.relop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.relop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.relop(NUMTYPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:356.5-356.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[81] / typcase
@@ -7519,10 +7501,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.relop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:357.5-357.60 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[82] / typcase
-  op instr.cvtop : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.cvtop : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:357.5-357.60 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[82] / typcase
-  cmb instr.cvtop(NUMTYPE_1:SpectecTerminal, NUMTYPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.cvtop(NUMTYPE_1:SpectecTerminal, NUMTYPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(NUMTYPE_1:SpectecTerminal, syn.numtype) /\ typecheck(NUMTYPE_2:SpectecTerminal, syn.numtype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.cvtop(NUMTYPE_2:SpectecTerminal, NUMTYPE_1:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:357.5-357.60 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[82] / typcase
@@ -7551,10 +7533,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.cvtop(NUMTYPE_1:SpectecTerminal, NUMTYPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:361.5-361.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[83] / typcase
-  op instr.vconst : SpectecTerminal SpectecTerminal ~> Val [ctor] .
+  op instr.vconst : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:361.5-361.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[83] / typcase
-  cmb instr.vconst(VECTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Val
+  cmb instr.vconst(VECTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vec(VECTYPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:361.5-361.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[83] / typcase
@@ -7576,10 +7558,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vconst(VECTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:362.5-362.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[84] / typcase
-  op instr.vvunop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vvunop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:362.5-362.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[84] / typcase
-  cmb instr.vvunop(VECTYPE:SpectecTerminal, VVUNOP:SpectecTerminal) : Instr
+  cmb instr.vvunop(VECTYPE:SpectecTerminal, VVUNOP:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(VVUNOP:SpectecTerminal, syn.vvunop) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:362.5-362.26 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[84] / typcase
@@ -7601,10 +7583,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vvunop(VECTYPE:SpectecTerminal, VVUNOP:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:363.5-363.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[85] / typcase
-  op instr.vvbinop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vvbinop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:363.5-363.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[85] / typcase
-  cmb instr.vvbinop(VECTYPE:SpectecTerminal, VVBINOP:SpectecTerminal) : Instr
+  cmb instr.vvbinop(VECTYPE:SpectecTerminal, VVBINOP:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(VVBINOP:SpectecTerminal, syn.vvbinop) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:363.5-363.28 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[85] / typcase
@@ -7626,10 +7608,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vvbinop(VECTYPE:SpectecTerminal, VVBINOP:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:364.5-364.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[86] / typcase
-  op instr.vvternop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vvternop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:364.5-364.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[86] / typcase
-  cmb instr.vvternop(VECTYPE:SpectecTerminal, VVTERNOP:SpectecTerminal) : Instr
+  cmb instr.vvternop(VECTYPE:SpectecTerminal, VVTERNOP:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(VVTERNOP:SpectecTerminal, syn.vvternop) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:364.5-364.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[86] / typcase
@@ -7651,10 +7633,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vvternop(VECTYPE:SpectecTerminal, VVTERNOP:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:365.5-365.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[87] / typcase
-  op instr.vvtestop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vvtestop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:365.5-365.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[87] / typcase
-  cmb instr.vvtestop(VECTYPE:SpectecTerminal, VVTESTOP:SpectecTerminal) : Instr
+  cmb instr.vvtestop(VECTYPE:SpectecTerminal, VVTESTOP:SpectecTerminal) : SpectecTerminal
     if typecheck(VECTYPE:SpectecTerminal, syn.vectype) /\ typecheck(VVTESTOP:SpectecTerminal, syn.vvtestop) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:365.5-365.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[87] / typcase
@@ -7676,10 +7658,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vvtestop(VECTYPE:SpectecTerminal, VVTESTOP:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:366.5-366.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[88] / typcase
-  op instr.vunop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vunop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:366.5-366.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[88] / typcase
-  cmb instr.vunop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vunop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vunop(SHAPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:366.5-366.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[88] / typcase
@@ -7701,10 +7683,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vunop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:367.5-367.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[89] / typcase
-  op instr.vbinop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vbinop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:367.5-367.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[89] / typcase
-  cmb instr.vbinop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vbinop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vbinop(SHAPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:367.5-367.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[89] / typcase
@@ -7726,10 +7708,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vbinop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:368.5-368.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[90] / typcase
-  op instr.vternop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vternop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:368.5-368.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[90] / typcase
-  cmb instr.vternop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vternop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vternop(SHAPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:368.5-368.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[90] / typcase
@@ -7751,10 +7733,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vternop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:369.5-369.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[91] / typcase
-  op instr.vtestop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vtestop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:369.5-369.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[91] / typcase
-  cmb instr.vtestop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vtestop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vtestop(SHAPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:369.5-369.34 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[91] / typcase
@@ -7776,10 +7758,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vtestop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:370.5-370.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[92] / typcase
-  op instr.vrelop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vrelop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:370.5-370.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[92] / typcase
-  cmb instr.vrelop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vrelop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vrelop(SHAPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:370.5-370.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[92] / typcase
@@ -7801,10 +7783,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vrelop(SHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:371.5-371.38 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[93] / typcase
-  op instr.vshiftop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vshiftop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:371.5-371.38 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[93] / typcase
-  cmb instr.vshiftop(ISHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vshiftop(ISHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(ISHAPE:SpectecTerminal, syn.ishape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vshiftop(ISHAPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:371.5-371.38 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[93] / typcase
@@ -7826,10 +7808,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vshiftop(ISHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:372.5-372.20 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[94] / typcase
-  op instr.vbitmask : SpectecTerminal ~> Instr [ctor] .
+  op instr.vbitmask : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:372.5-372.20 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[94] / typcase
-  cmb instr.vbitmask(ISHAPE:SpectecTerminal) : Instr
+  cmb instr.vbitmask(ISHAPE:SpectecTerminal) : SpectecTerminal
     if typecheck(ISHAPE:SpectecTerminal, syn.ishape) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:372.5-372.20 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[94] / typcase
@@ -7844,10 +7826,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vbitmask(ISHAPE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:373.5-373.40 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[95] / typcase
-  op instr.vswizzlop : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vswizzlop : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:373.5-373.40 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[95] / typcase
-  cmb instr.vswizzlop(BSHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vswizzlop(BSHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(BSHAPE:SpectecTerminal, syn.bshape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vswizzlop(BSHAPE:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:373.5-373.40 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[95] / typcase
@@ -7869,10 +7851,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vswizzlop(BSHAPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:374.5-374.29 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[96] / typcase
-  op instr.vshuffle : SpectecTerminal SpectecTerminals ~> Instr [ctor] .
+  op instr.vshuffle : SpectecTerminal SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:374.5-374.29 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[96] / typcase
-  cmb instr.vshuffle(BSHAPE:SpectecTerminal, LANEIDX_STAR:SpectecTerminals) : Instr
+  cmb instr.vshuffle(BSHAPE:SpectecTerminal, LANEIDX_STAR:SpectecTerminals) : SpectecTerminal
     if typecheck(BSHAPE:SpectecTerminal, syn.bshape) /\ (typecheckSeq(LANEIDX_STAR:SpectecTerminals, syn.laneidx)) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:374.5-374.29 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[96] / typcase
@@ -7894,10 +7876,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vshuffle(BSHAPE:SpectecTerminal, LANEIDX_STAR:SpectecTerminals) : SpectecTerminal /\ typecheck(dim.wrap(len(LANEIDX_STAR:SpectecTerminals)), syn.dim) /\ typecheck(BSHAPE:SpectecTerminal, syn.bshape) /\ (_==_(dim.wrap(len(LANEIDX_STAR:SpectecTerminals)), def.dim(proj.bshape.wrap.0(BSHAPE:SpectecTerminal)))) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:376.5-376.62 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[97] / typcase
-  op instr.vextunop : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vextunop : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:376.5-376.62 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[97] / typcase
-  cmb instr.vextunop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vextunop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(ISHAPE_1:SpectecTerminal, syn.ishape) /\ typecheck(ISHAPE_2:SpectecTerminal, syn.ishape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vextunop(ISHAPE_2:SpectecTerminal, ISHAPE_1:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:376.5-376.62 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[97] / typcase
@@ -7926,10 +7908,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vextunop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:378.5-378.64 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[98] / typcase
-  op instr.vextbinop : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vextbinop : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:378.5-378.64 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[98] / typcase
-  cmb instr.vextbinop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vextbinop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(ISHAPE_1:SpectecTerminal, syn.ishape) /\ typecheck(ISHAPE_2:SpectecTerminal, syn.ishape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vextbinop(ISHAPE_2:SpectecTerminal, ISHAPE_1:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:378.5-378.64 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[98] / typcase
@@ -7958,10 +7940,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vextbinop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:380.5-380.66 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[99] / typcase
-  op instr.vextternop : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vextternop : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:380.5-380.66 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[99] / typcase
-  cmb instr.vextternop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vextternop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(ISHAPE_1:SpectecTerminal, syn.ishape) /\ typecheck(ISHAPE_2:SpectecTerminal, syn.ishape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vextternop(ISHAPE_2:SpectecTerminal, ISHAPE_1:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:380.5-380.66 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[99] / typcase
@@ -7990,10 +7972,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vextternop(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:382.5-382.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[100] / typcase
-  op instr.vnarrow : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vnarrow : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:382.5-382.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[100] / typcase
-  cmb instr.vnarrow(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, SX:SpectecTerminal) : Instr
+  cmb instr.vnarrow(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, SX:SpectecTerminal) : SpectecTerminal
     if typecheck(ISHAPE_1:SpectecTerminal, syn.ishape) /\ typecheck(ISHAPE_2:SpectecTerminal, syn.ishape) /\ typecheck(SX:SpectecTerminal, syn.sx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:382.5-382.33 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[100] / typcase
@@ -8022,10 +8004,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vnarrow(ISHAPE_1:SpectecTerminal, ISHAPE_2:SpectecTerminal, SX:SpectecTerminal) : SpectecTerminal /\ typecheck(ISHAPE_2:SpectecTerminal, syn.ishape) /\ typecheck(ISHAPE_1:SpectecTerminal, syn.ishape) /\ typecheck(ISHAPE_1:SpectecTerminal, syn.ishape) /\ (_and_(_==_(def.lsize(def.lanetype(proj.ishape.wrap.0(ISHAPE_2:SpectecTerminal))), _*_(2, def.lsize(def.lanetype(proj.ishape.wrap.0(ISHAPE_1:SpectecTerminal))))), _<=_(_*_(2, def.lsize(def.lanetype(proj.ishape.wrap.0(ISHAPE_1:SpectecTerminal)))), 32))) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:384.5-384.54 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[101] / typcase
-  op instr.vcvtop : SpectecTerminal SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vcvtop : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:384.5-384.54 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[101] / typcase
-  cmb instr.vcvtop(SHAPE_1:SpectecTerminal, SHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : Instr
+  cmb instr.vcvtop(SHAPE_1:SpectecTerminal, SHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE_1:SpectecTerminal, syn.shape) /\ typecheck(SHAPE_2:SpectecTerminal, syn.shape) /\ typecheck(COMPONENT1:SpectecTerminal, syn.vcvtop(SHAPE_2:SpectecTerminal, SHAPE_1:SpectecTerminal)) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:384.5-384.54 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[101] / typcase
@@ -8054,10 +8036,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vcvtop(SHAPE_1:SpectecTerminal, SHAPE_2:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:385.5-385.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[102] / typcase
-  op instr.vsplat : SpectecTerminal ~> Instr [ctor] .
+  op instr.vsplat : SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:385.5-385.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[102] / typcase
-  cmb instr.vsplat(SHAPE:SpectecTerminal) : Instr
+  cmb instr.vsplat(SHAPE:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:385.5-385.17 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[102] / typcase
@@ -8072,10 +8054,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vsplat(SHAPE:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:386.5-386.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[103] / typcase
-  op instr.vextract-lane : SpectecTerminal SpectecTerminals SpectecTerminal ~> Instr [ctor] .
+  op instr.vextract-lane : SpectecTerminal SpectecTerminals SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:386.5-386.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[103] / typcase
-  cmb instr.vextract-lane(SHAPE:SpectecTerminal, SX_OPT:SpectecTerminals, LANEIDX:SpectecTerminal) : Instr
+  cmb instr.vextract-lane(SHAPE:SpectecTerminal, SX_OPT:SpectecTerminals, LANEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) /\ (isOpt(SX_OPT:SpectecTerminals)) = true /\ (typecheckSeq(SX_OPT:SpectecTerminals, syn.sx)) = true /\ typecheck(LANEIDX:SpectecTerminal, syn.laneidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:386.5-386.36 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[103] / typcase
@@ -8104,10 +8086,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vextract-lane(SHAPE:SpectecTerminal, SX_OPT:SpectecTerminals, LANEIDX:SpectecTerminal) : SpectecTerminal /\ isOpt(SX_OPT:SpectecTerminals) = true /\ (_==_(_==_(SX_OPT:SpectecTerminals, eps), contains(def.lanetype(SHAPE:SpectecTerminal), ((numtype.i32 numtype.i64) numtype.f32) numtype.f64))) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:388.5-388.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[104] / typcase
-  op instr.vreplace-lane : SpectecTerminal SpectecTerminal ~> Instr [ctor] .
+  op instr.vreplace-lane : SpectecTerminal SpectecTerminal ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:388.5-388.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[104] / typcase
-  cmb instr.vreplace-lane(SHAPE:SpectecTerminal, LANEIDX:SpectecTerminal) : Instr
+  cmb instr.vreplace-lane(SHAPE:SpectecTerminal, LANEIDX:SpectecTerminal) : SpectecTerminal
     if typecheck(SHAPE:SpectecTerminal, syn.shape) /\ typecheck(LANEIDX:SpectecTerminal, syn.laneidx) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:388.5-388.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[104] / typcase
@@ -8129,10 +8111,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.vreplace-lane(SHAPE:SpectecTerminal, LANEIDX:SpectecTerminal) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:136.5-136.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[113] / typcase
-  op instr.label-sym-sym : Nat SpectecTerminals SpectecTerminals ~> Instr [ctor] .
+  op instr.label-sym-sym : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:136.5-136.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[113] / typcase
-  cmb instr.label-sym-sym(N:Nat, INSTR_STAR:SpectecTerminals, INSTR_STAR2:SpectecTerminals) : Instr
+  cmb instr.label-sym-sym(N:Nat, INSTR_STAR:SpectecTerminals, INSTR_STAR2:SpectecTerminals) : SpectecTerminal
     if typecheck(N:Nat, syn.n) /\ (typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr)) = true /\ (typecheckSeq(INSTR_STAR2:SpectecTerminals, syn.instr)) = true .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:136.5-136.30 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[113] / typcase
@@ -8161,10 +8143,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.label-sym-sym(N:Nat, INSTR_STAR:SpectecTerminals, INSTR_STAR2:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:137.5-137.29 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[114] / typcase
-  op instr.frame-sym-sym : Nat SpectecTerminal SpectecTerminals ~> Instr [ctor] .
+  op instr.frame-sym-sym : Nat SpectecTerminal SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:137.5-137.29 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[114] / typcase
-  cmb instr.frame-sym-sym(N:Nat, FRAME:SpectecTerminal, INSTR_STAR:SpectecTerminals) : Instr
+  cmb instr.frame-sym-sym(N:Nat, FRAME:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal
     if typecheck(N:Nat, syn.n) /\ typecheck(FRAME:SpectecTerminal, syn.frame) /\ (typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr)) = true .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:137.5-137.29 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[114] / typcase
@@ -8193,10 +8175,10 @@ mod SPEC2MAUDE-GENERATED is
     if instr.frame-sym-sym(N:Nat, FRAME:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:138.5-138.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[115] / typcase
-  op instr.handler-sym-sym : Nat SpectecTerminals SpectecTerminals ~> Instr [ctor] .
+  op instr.handler-sym-sym : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:138.5-138.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[115] / typcase
-  cmb instr.handler-sym-sym(N:Nat, CATCH_STAR:SpectecTerminals, INSTR_STAR:SpectecTerminals) : Instr
+  cmb instr.handler-sym-sym(N:Nat, CATCH_STAR:SpectecTerminals, INSTR_STAR:SpectecTerminals) : SpectecTerminal
     if typecheck(N:Nat, syn.n) /\ (typecheckSeq(CATCH_STAR:SpectecTerminals, syn.catch)) = true /\ (typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr)) = true .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:138.5-138.32 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[115] / typcase
@@ -8225,7 +8207,7 @@ mod SPEC2MAUDE-GENERATED is
     if instr.handler-sym-sym(N:Nat, CATCH_STAR:SpectecTerminals, INSTR_STAR:SpectecTerminals) : SpectecTerminal .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:139.5-139.9 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[116] / typcase
-  op instr.trap : -> Instr [ctor] .
+  op instr.trap : -> SpectecTerminal [ctor] .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:139.5-139.9 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[116] / typcase
   eq typecheck(instr.trap, syn.instr) = true .
@@ -11531,7 +11513,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:357.1-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1] / DefD
   ceq def.ivadd-pairwise(N:Nat, I_STAR:SpectecTerminals) = helper.iter-zip.ivadd-pairwise.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals, N:Nat)
-    if helper.inverse-pair-result.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.inverse-pair.ivadd-pairwise(syn.N, helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat)) /\ def.concat(syn.N, helper.iter-zip.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
+    if CHUNK1:SpectecTerminals := builtin.inv-concat(syn.N, helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat)) /\ helper.unzip2-result.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.unzip2.ivadd-pairwise(CHUNK1:SpectecTerminals) /\ def.concat(syn.N, helper.iter-zip.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:342.1-342.93 / script[1039]/1040-DecD-ivextunop / DecD
   op def.ivextunop.with.ivadd-pairwise : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
@@ -11552,14 +11534,14 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:364.1-365.59 / script[1042]/1043-DecD-ivdot/DefD[1] / DefD
   ceq def.ivdot(N:Nat, I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals) = helper.iter-zip.ivdot.3(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals, N:Nat)
-    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ helper.inverse-pair-result.ivdot(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.inverse-pair.ivdot(syn.iN(N:Nat), helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
+    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ CHUNK1:SpectecTerminals := builtin.inv-concat(syn.iN(N:Nat), helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ helper.unzip2-result.ivdot(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.unzip2.ivdot(CHUNK1:SpectecTerminals) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:367.1-367.76 / script[1043]/1044-DecD-ivdot-sat / DecD
   op def.ivdot-sat : Nat SpectecTerminals SpectecTerminals -> SpectecTerminals .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:368.1-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1] / DefD
   ceq def.ivdot-sat(N:Nat, I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals) = helper.iter-zip.ivdot-sat.3(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals, N:Nat)
-    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ helper.inverse-pair-result.ivdot-sat(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.inverse-pair.ivdot-sat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
+    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ CHUNK1:SpectecTerminals := builtin.inv-concat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ helper.unzip2-result.ivdot-sat(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.unzip2.ivdot-sat(CHUNK1:SpectecTerminals) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:348.1-348.136 / script[1044]/1045-DecD-ivextbinop / DecD
   op def.ivextbinop.with.ivdot-sat : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
@@ -13489,7 +13471,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:757.1-761.102 / script[1232]/1233-RelD-step-read/RuleD[79] / RuleD
   crl [step-read-array-new-data-num] : rel.step-read(config.sym(Z:SpectecTerminal, (instr.const(numtype.i32, I:SpectecTerminal) instr.const(numtype.i32, uN.wrap(N:Nat))) instr.array-new-data(X:SpectecTerminal, Y:SpectecTerminal))) => helper.iter-map.step-read.11(C_STAR:SpectecTerminals, ZT:SpectecTerminal) instr.array-new-fixed(X:SpectecTerminal, uN.wrap(N:Nat))
-    if typecheck(I:SpectecTerminal, syn.num(numtype.i32)) /\ typecheck(uN.wrap(N:Nat), syn.num(numtype.i32)) /\ RESULT1:SpectecTerminal := rel.expand(def.type(Z:SpectecTerminal, X:SpectecTerminal)) /\ comptype.array(fieldtype.wrap(MUT_OPT:SpectecTerminals, ZT:SpectecTerminal)) := RESULT1:SpectecTerminal /\ isOpt(MUT_OPT:SpectecTerminals) = true /\ _=/=_(8, 0) /\ (ratIsInt(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) = true /\ (_>=_(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8), 0)) = true /\ (_<=_(_+_(proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))), len(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal))))) = true /\ (ratIsInt(_/_(def.zsize(ZT:SpectecTerminal), 8))) = true /\ (_>=_(_/_(def.zsize(ZT:SpectecTerminal), 8), 0)) = true /\ helper.inverse-chunks-result.step-read(C_STAR:SpectecTerminals) := helper.inverse-chunks.step-read(ZT:SpectecTerminal, slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))), natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8)), N:Nat) /\ len(C_STAR:SpectecTerminals) = N:Nat /\ def.concatn(syn.byte, helper.iter-map.step-read.10(C_STAR:SpectecTerminals, ZT:SpectecTerminal), natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8))) = slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) /\ typecheck(uN.wrap(N:Nat), syn.u32) .
+    if typecheck(I:SpectecTerminal, syn.num(numtype.i32)) /\ typecheck(uN.wrap(N:Nat), syn.num(numtype.i32)) /\ RESULT1:SpectecTerminal := rel.expand(def.type(Z:SpectecTerminal, X:SpectecTerminal)) /\ comptype.array(fieldtype.wrap(MUT_OPT:SpectecTerminals, ZT:SpectecTerminal)) := RESULT1:SpectecTerminal /\ isOpt(MUT_OPT:SpectecTerminals) = true /\ _=/=_(8, 0) /\ (ratIsInt(_/_(def.zsize(ZT:SpectecTerminal), 8))) = true /\ (_>=_(_/_(def.zsize(ZT:SpectecTerminal), 8), 0)) = true /\ (ratIsInt(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) = true /\ (_>=_(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8), 0)) = true /\ (_<=_(_+_(proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))), len(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal))))) = true /\ CHUNK1:SpectecTerminals := builtin.inv-concatn(syn.byte, natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8)), slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8)))) /\ len(CHUNK1:SpectecTerminals) = N:Nat /\ helper.decode-chunks-result.step-read(C_STAR:SpectecTerminals) := helper.decode-chunks.step-read(ZT:SpectecTerminal, CHUNK1:SpectecTerminals) /\ len(C_STAR:SpectecTerminals) = N:Nat /\ def.concatn(syn.byte, helper.iter-map.step-read.10(C_STAR:SpectecTerminals, ZT:SpectecTerminal), natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8))) = slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) /\ typecheck(uN.wrap(N:Nat), syn.u32) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:764.1-765.63 / script[1232]/1233-RelD-step-read/RuleD[80] / RuleD
   crl [step-read-array-get-null] : rel.step-read(config.sym(Z:SpectecTerminal, (ref.ref-null-addr instr.const(numtype.i32, I:SpectecTerminal)) instr.array-get(SX_OPT:SpectecTerminals, X:SpectecTerminal))) => instr.trap
@@ -13873,197 +13855,16 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(I:SpectecTerminal, syn.num(numtype.i32)) /\ VAL:SpectecTerminal := helper.subtype-project.step-pure(PATTERN1:SpectecTerminal) /\ RESULT1:SpectecTerminal := rel.expand(def.type(Z:SpectecTerminal, X:SpectecTerminal)) /\ comptype.array(fieldtype.wrap(MUT_OPT:SpectecTerminals, ZT:SpectecTerminal)) := RESULT1:SpectecTerminal /\ isOpt(MUT_OPT:SpectecTerminals) = true .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  sort ContextMaybeFocusStep .
+  ceq typecheck(instr.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal), syn.val) = true
+    if typecheck(num.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal), syn.val) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  sort ContextSplitStep .
+  ceq typecheck(instr.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal), syn.val) = true
+    if typecheck(vec.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal), syn.val) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  sort ContextStackStep .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-split-result.step : SpectecTerminals SpectecTerminals SpectecTerminals -> ContextSplitStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-stop.step : -> ContextSplitStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-is-value.step : SpectecTerminal -> Bool .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-has-compact.step : SpectecTerminals -> Bool .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-no-focus.step : -> ContextMaybeFocusStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-at-focus.step : Nat -> ContextMaybeFocusStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-first-non-value.step : SpectecTerminals Nat Nat -> ContextMaybeFocusStep .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-first-defined.step : SpectecTerminals Nat Nat Bool -> ContextMaybeFocusStep [frozen (1 2 3 4)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-first-value.step : SpectecTerminals Nat Nat Bool -> ContextMaybeFocusStep [frozen (1 2 3 4)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-stack-empty.step : -> ContextStackStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-stack-item.step : SpectecTerminal SpectecTerminals ContextStackStep -> ContextStackStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan.step : SpectecTerminals SpectecTerminals ContextStackStep -> ContextSplitStep [frozen (1 2 3)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan-value.step : SpectecTerminal SpectecTerminals SpectecTerminals ContextStackStep Bool -> ContextSplitStep [frozen (1 2 3 4 5)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan-non-value.step : ContextStackStep SpectecTerminals SpectecTerminals SpectecTerminals ContextStackStep SpectecTerminals SpectecTerminals -> ContextSplitStep [frozen (1 2 3 4 5 6 7)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan-index.step : SpectecTerminals Nat Nat Nat Nat -> ContextSplitStep [frozen (1 2 3 4 5)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-split.step : SpectecTerminals -> ContextSplitStep [frozen (1)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-dispatch.step : SpectecTerminals Bool -> ContextSplitStep [frozen (1 2)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(instr.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(instr.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-i31-num(COMPONENT5:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-null-addr) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-struct-addr(COMPONENT6:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-array-addr(COMPONENT7:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-func-addr(COMPONENT8:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-exn-addr(COMPONENT9:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-host-addr(COMPONENT10:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-extern(COMPONENT11:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(VALUE1:SpectecTerminal) = false [owise] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(eps) = false .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(repeatSeq(COUNT1:Nat, VALUE1:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-has-compact.step(repeatSeq(COUNT1:Nat, VALUE1:SpectecTerminal) STREAM2:SpectecTerminals) = true
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(runSeq(COUNT1:Nat, VALUE1:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-has-compact.step(runSeq(COUNT1:Nat, VALUE1:SpectecTerminal) STREAM2:SpectecTerminals) = true
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(VALUE1:SpectecTerminal) = false .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-has-compact.step(VALUE1:SpectecTerminal STREAM2:SpectecTerminals) = helper.context-has-compact.step(STREAM2:SpectecTerminals)
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-split.step(STREAM1:SpectecTerminals) = helper.context-dispatch.step(STREAM1:SpectecTerminals, helper.context-has-compact.step(STREAM1:SpectecTerminals)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan.step(eps, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep) = helper.context-stop.step .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan.step(VALUE1:SpectecTerminal, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep) = helper.context-scan-value.step(VALUE1:SpectecTerminal, eps, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, helper.context-is-value.step(VALUE1:SpectecTerminal)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-scan.step(VALUE1:SpectecTerminal STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep) = helper.context-scan-value.step(VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, helper.context-is-value.step(VALUE1:SpectecTerminal))
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan-value.step(VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, true) = helper.context-scan.step(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals VALUE1:SpectecTerminal, helper.context-stack-item.step(VALUE1:SpectecTerminal, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan-value.step(VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, false) = helper.context-scan-non-value.step(HISTORY1:ContextStackStep, STREAM3:SpectecTerminals, VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, HISTORY1:ContextStackStep, STREAM3:SpectecTerminals, VALUE1:SpectecTerminal) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-non-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat) = helper.context-first-defined.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, _<_(COUNT1:Nat, COUNT4:Nat)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-defined.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, false) = helper.context-no-focus.step .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-defined.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, true) = helper.context-first-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, helper.context-is-value.step(index(STREAM1:SpectecTerminals, COUNT1:Nat))) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, true) = helper.context-first-non-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, s COUNT1:Nat) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, false) = helper.context-at-focus.step(COUNT1:Nat) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-cursor-start] : helper.context-dispatch.step(STREAM1:SpectecTerminals, false) => helper.context-scan.step(STREAM1:SpectecTerminals, eps, helper.context-stack-empty.step) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-index-start] : helper.context-dispatch.step(STREAM1:SpectecTerminals, true) => helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, COUNT1:Nat, s COUNT1:Nat)
-    if COUNT4:Nat := len(STREAM1:SpectecTerminals) /\ helper.context-at-focus.step(COUNT1:Nat) := helper.context-first-non-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, 0) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-non-value-result-prefix] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, helper.context-stack-item.step(VALUE1:SpectecTerminal, STREAM9:SpectecTerminals, HISTORY4:ContextStackStep), STREAM7:SpectecTerminals, STREAM8:SpectecTerminals) => helper.context-split-result.step(STREAM7:SpectecTerminals, STREAM8:SpectecTerminals, STREAM4:SpectecTerminals) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-non-value-result-suffix] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, helper.context-stack-empty.step, STREAM7:SpectecTerminals, STREAM8:SpectecTerminals) => helper.context-split-result.step(STREAM7:SpectecTerminals, STREAM8:SpectecTerminals, STREAM4:SpectecTerminals)
-    if _=/=_(STREAM4:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-non-value-pop] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, helper.context-stack-item.step(VALUE1:SpectecTerminal, STREAM9:SpectecTerminals, HISTORY4:ContextStackStep), STREAM7:SpectecTerminals, STREAM8:SpectecTerminals) => helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, HISTORY4:ContextStackStep, STREAM9:SpectecTerminals, VALUE1:SpectecTerminal STREAM8:SpectecTerminals) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-non-value-extend-one] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, VALUE1:SpectecTerminal, helper.context-stack-empty.step, eps, STREAM8:SpectecTerminals) => helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal, eps, HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-non-value-extend] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, VALUE1:SpectecTerminal STREAM2:SpectecTerminals, helper.context-stack-empty.step, eps, STREAM8:SpectecTerminals) => helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal)
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-index-result-prefix] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, s COUNT2:Nat, COUNT3:Nat) => helper.context-split-result.step(takeRun(s COUNT2:Nat, STREAM1:SpectecTerminals), slice(STREAM1:SpectecTerminals, s COUNT2:Nat, _-_(COUNT3:Nat, s COUNT2:Nat)), drop(COUNT3:Nat, STREAM1:SpectecTerminals)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-index-result-suffix] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, 0, COUNT3:Nat) => helper.context-split-result.step(takeRun(0, STREAM1:SpectecTerminals), slice(STREAM1:SpectecTerminals, 0, _-_(COUNT3:Nat, 0)), drop(COUNT3:Nat, STREAM1:SpectecTerminals))
-    if (_<_(COUNT3:Nat, COUNT4:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-index-prefix] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, s COUNT2:Nat, COUNT3:Nat) => helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, COUNT2:Nat, COUNT3:Nat) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-index-end] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, 0, COUNT3:Nat) => helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, COUNT1:Nat, s COUNT3:Nat)
-    if (_<_(COUNT3:Nat, COUNT4:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [step-ctxt-instrs] : rel.step(config.sym(Z:SpectecTerminal, PATTERN1:Vals (INSTR_STAR:Instrs INSTR_1_STAR:Instrs))) => config.sym(Z_PRIME:SpectecTerminal, PATTERN1:Vals (INSTR_PRIME_STAR:Instrs INSTR_1_STAR:Instrs))
-    if (_or_(_=/=_(PATTERN1:Vals, eps), _=/=_(INSTR_1_STAR:Instrs, eps))) = true /\ rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:Instrs)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:Instrs) /\ typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:Instrs), syn.config) .
+  crl [step-ctxt-instrs] : rel.step(config.sym(Z:SpectecTerminal, VAL_STAR:SpectecTerminals (INSTR_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))) => config.sym(Z_PRIME:SpectecTerminal, VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))
+    if (typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true /\ (_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true /\ rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:8.1-8.92 / script[1237]/1238-RecD/RecD[0]/0001-RelD-steps / RelD
   sort RelConfSteps .
@@ -16802,20 +16603,20 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ typecheck(I:SpectecTerminal, syn.iN(N:Nat)) /\ OUTPUT1:Nat := proj.uN.wrap.0(I:SpectecTerminal) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  sort FixedConcatHelperInversePairIvaddPairwise .
+  sort Unzip2HelperUnzip2IvaddPairwise .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  op helper.inverse-pair-result.ivadd-pairwise : SpectecTerminals SpectecTerminals -> FixedConcatHelperInversePairIvaddPairwise [ctor] .
+  op helper.unzip2-result.ivadd-pairwise : SpectecTerminals SpectecTerminals -> Unzip2HelperUnzip2IvaddPairwise [ctor] .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  op helper.inverse-pair.ivadd-pairwise : SpectecType SpectecTerminals -> FixedConcatHelperInversePairIvaddPairwise .
+  op helper.unzip2.ivadd-pairwise : SpectecTerminals -> Unzip2HelperUnzip2IvaddPairwise .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  eq helper.inverse-pair.ivadd-pairwise(TYPE1:SpectecType, eps) = helper.inverse-pair-result.ivadd-pairwise(eps, eps) .
+  eq helper.unzip2.ivadd-pairwise(eps) = helper.unzip2-result.ivadd-pairwise(eps, eps) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  ceq helper.inverse-pair.ivadd-pairwise(TYPE1:SpectecType, HEAD1:SpectecTerminal (HEAD2:SpectecTerminal STREAM1:SpectecTerminals)) = helper.inverse-pair-result.ivadd-pairwise(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
-    if helper.inverse-pair-result.ivadd-pairwise(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.inverse-pair.ivadd-pairwise(TYPE1:SpectecType, STREAM1:SpectecTerminals) .
+  ceq helper.unzip2.ivadd-pairwise(seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals) = helper.unzip2-result.ivadd-pairwise(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
+    if helper.unzip2-result.ivadd-pairwise(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.unzip2.ivadd-pairwise(STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
   op helper.iter-zip.ivadd-pairwise : SpectecTerminals SpectecTerminals -> SpectecTerminals .
@@ -16874,20 +16675,20 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ _=/=_(TAIL2:SpectecTerminals, eps) /\ OUTPUT1:SpectecTerminal := def.imul(N:Nat, I_1:SpectecTerminal, I_2:SpectecTerminal) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  sort FixedConcatHelperInversePairIvdot .
+  sort Unzip2HelperUnzip2Ivdot .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  op helper.inverse-pair-result.ivdot : SpectecTerminals SpectecTerminals -> FixedConcatHelperInversePairIvdot [ctor] .
+  op helper.unzip2-result.ivdot : SpectecTerminals SpectecTerminals -> Unzip2HelperUnzip2Ivdot [ctor] .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  op helper.inverse-pair.ivdot : SpectecType SpectecTerminals -> FixedConcatHelperInversePairIvdot .
+  op helper.unzip2.ivdot : SpectecTerminals -> Unzip2HelperUnzip2Ivdot .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  eq helper.inverse-pair.ivdot(TYPE1:SpectecType, eps) = helper.inverse-pair-result.ivdot(eps, eps) .
+  eq helper.unzip2.ivdot(eps) = helper.unzip2-result.ivdot(eps, eps) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  ceq helper.inverse-pair.ivdot(TYPE1:SpectecType, HEAD1:SpectecTerminal (HEAD2:SpectecTerminal STREAM1:SpectecTerminals)) = helper.inverse-pair-result.ivdot(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
-    if helper.inverse-pair-result.ivdot(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.inverse-pair.ivdot(TYPE1:SpectecType, STREAM1:SpectecTerminals) .
+  ceq helper.unzip2.ivdot(seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals) = helper.unzip2-result.ivdot(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
+    if helper.unzip2-result.ivdot(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.unzip2.ivdot(STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
   op helper.iter-zip.ivdot.2 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
@@ -16932,20 +16733,20 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ _=/=_(TAIL2:SpectecTerminals, eps) /\ OUTPUT1:SpectecTerminal := def.imul(N:Nat, I_1:SpectecTerminal, I_2:SpectecTerminal) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  sort FixedConcatHelperInversePairIvdotSat .
+  sort Unzip2HelperUnzip2IvdotSat .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  op helper.inverse-pair-result.ivdot-sat : SpectecTerminals SpectecTerminals -> FixedConcatHelperInversePairIvdotSat [ctor] .
+  op helper.unzip2-result.ivdot-sat : SpectecTerminals SpectecTerminals -> Unzip2HelperUnzip2IvdotSat [ctor] .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  op helper.inverse-pair.ivdot-sat : SpectecType SpectecTerminals -> FixedConcatHelperInversePairIvdotSat .
+  op helper.unzip2.ivdot-sat : SpectecTerminals -> Unzip2HelperUnzip2IvdotSat .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  eq helper.inverse-pair.ivdot-sat(TYPE1:SpectecType, eps) = helper.inverse-pair-result.ivdot-sat(eps, eps) .
+  eq helper.unzip2.ivdot-sat(eps) = helper.unzip2-result.ivdot-sat(eps, eps) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  ceq helper.inverse-pair.ivdot-sat(TYPE1:SpectecType, HEAD1:SpectecTerminal (HEAD2:SpectecTerminal STREAM1:SpectecTerminals)) = helper.inverse-pair-result.ivdot-sat(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
-    if helper.inverse-pair-result.ivdot-sat(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.inverse-pair.ivdot-sat(TYPE1:SpectecType, STREAM1:SpectecTerminals) .
+  ceq helper.unzip2.ivdot-sat(seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals) = helper.unzip2-result.ivdot-sat(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
+    if helper.unzip2-result.ivdot-sat(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.unzip2.ivdot-sat(STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
   op helper.iter-zip.ivdot-sat.2 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
@@ -17835,35 +17636,26 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ typecheck(REF:SpectecTerminal, syn.instr) /\ OUTPUT1:SpectecTerminal := REF:SpectecTerminal .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  sort ConcatnChunksHelperInverseChunksStepRead .
+  sort DecodeChunksHelperDecodeChunksStepRead .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks-result.step-read : SpectecTerminals -> ConcatnChunksHelperInverseChunksStepRead [ctor] .
+  op helper.decode-chunks-result.step-read : SpectecTerminals -> DecodeChunksHelperDecodeChunksStepRead [ctor] .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks-fail.step-read : -> ConcatnChunksHelperInverseChunksStepRead [ctor] .
+  op helper.decode-chunks.step-read : SpectecTerminal SpectecTerminals -> DecodeChunksHelperDecodeChunksStepRead .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks.step-read : SpectecTerminal SpectecTerminals Nat Nat -> ConcatnChunksHelperInverseChunksStepRead .
+  op helper.decode-chunks-prepend.step-read : SpectecTerminal DecodeChunksHelperDecodeChunksStepRead -> DecodeChunksHelperDecodeChunksStepRead .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks-prepend.step-read : SpectecTerminal ConcatnChunksHelperInverseChunksStepRead -> ConcatnChunksHelperInverseChunksStepRead .
+  eq helper.decode-chunks.step-read(ZT:SpectecTerminal, eps) = helper.decode-chunks-result.step-read(eps) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks.step-read(ZT:SpectecTerminal, eps, WIDTH1:Nat, 0) = helper.inverse-chunks-result.step-read(eps) .
+  ceq helper.decode-chunks.step-read(ZT:SpectecTerminal, seq(CHUNK1:SpectecTerminals) TAIL1:SpectecTerminals) = helper.decode-chunks-prepend.step-read(C:SpectecTerminal, helper.decode-chunks.step-read(ZT:SpectecTerminal, TAIL1:SpectecTerminals))
+    if C:SpectecTerminal := builtin.inv-zbytes(ZT:SpectecTerminal, CHUNK1:SpectecTerminals) /\ builtin.zbytes(ZT:SpectecTerminal, C:SpectecTerminal) = CHUNK1:SpectecTerminals .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks.step-read(ZT:SpectecTerminal, BYTE1:SpectecTerminal TAIL1:SpectecTerminals, WIDTH1:Nat, 0) = helper.inverse-chunks-fail.step-read .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  ceq helper.inverse-chunks.step-read(ZT:SpectecTerminal, STREAM2:SpectecTerminals, WIDTH1:Nat, s COUNT1:Nat) = helper.inverse-chunks-prepend.step-read(C:SpectecTerminal, helper.inverse-chunks.step-read(ZT:SpectecTerminal, drop(WIDTH1:Nat, STREAM2:SpectecTerminals), WIDTH1:Nat, COUNT1:Nat))
-    if CHUNK1:SpectecTerminals := slice(STREAM2:SpectecTerminals, 0, WIDTH1:Nat) /\ C:SpectecTerminal := builtin.inv-zbytes(ZT:SpectecTerminal, CHUNK1:SpectecTerminals) /\ builtin.zbytes(ZT:SpectecTerminal, C:SpectecTerminal) = CHUNK1:SpectecTerminals .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks-prepend.step-read(C:SpectecTerminal, helper.inverse-chunks-result.step-read(STREAM1:SpectecTerminals)) = helper.inverse-chunks-result.step-read(C:SpectecTerminal STREAM1:SpectecTerminals) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks-prepend.step-read(C:SpectecTerminal, helper.inverse-chunks-fail.step-read) = helper.inverse-chunks-fail.step-read .
+  eq helper.decode-chunks-prepend.step-read(C:SpectecTerminal, helper.decode-chunks-result.step-read(STREAM1:SpectecTerminals)) = helper.decode-chunks-result.step-read(C:SpectecTerminal STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
   op helper.iter-map.step-read.10 : SpectecTerminals SpectecTerminal -> SpectecTerminals .

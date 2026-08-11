@@ -213,6 +213,22 @@ if printf '%s\n' "$negative_subtype" |
   exit 1
 fi
 
+ref_ok_prove=$(section_between ref-ok-overlap-prove)
+if ! printf '%s\n' "$ref_ok_prove" |
+    grep -Fq 'helper.truth-proved.step-read'; then
+  cat "$smoke_log" >&2
+  echo 'ground Ref_ok query was not proved' >&2
+  exit 1
+fi
+
+ref_ok_refute=$(section_between ref-ok-overlap-refute)
+if printf '%s\n' "$ref_ok_refute" |
+    grep -Fq 'helper.truth-refuted.step-read'; then
+  cat "$smoke_log" >&2
+  echo 'ground Ref_ok query was both proved and refuted' >&2
+  exit 1
+fi
+
 "$wasm_exe" module "$root/wat_examples/fib-wrapper.wat" \
   --semantics "$builtins" -o "$wasm_harness"
 if ! maude -no-banner "$wasm_harness" >"$wasm_log" 2>&1; then

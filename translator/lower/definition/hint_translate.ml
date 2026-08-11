@@ -122,12 +122,13 @@ let translate ctx origin hintdef =
              Analysis.Function_graph.definition_inverse_status
                (Context.function_graph ctx) target_id.it
            with
-          | Valid_inverse inverse_id ->
+          | Valid_inverse inverse ->
             skipped
               ~ctx ~origin ~constructor
               ~reason:
                 ("inverse metadata was structurally validated and consumed; target is `"
-                 ^ inverse_id ^ "`")
+                 ^ inverse.inverse_id ^ "`; omitted runtime parameter index is "
+                 ^ string_of_int inverse.omitted_param_index)
               ~suggestion:
                 "Use the validated inverse only at source-shaped inverse binding sites"
               ()

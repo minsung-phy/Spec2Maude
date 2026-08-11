@@ -348,28 +348,24 @@ let optional_map_inverse_key (inverse : Request.optional_map_inverse) =
     ; String.concat "\001" (List.map eq_condition_key inverse.body_eq_conditions)
     ]
 
-let inverse_concatn_chunks_key (inverse : Request.inverse_concatn_chunks) =
+let decode_chunks_key (request : Request.decode_chunks) =
   String.concat
     "\000"
-    [ inverse.source
-    ; inverse.target_source_id
-    ; inverse.bytes_op
-    ; inverse.inverse_op
-    ; String.concat "\001" (List.map capture_key inverse.captures)
-    ; String.concat "\001" (List.map term_key inverse.bytes_call_formals)
-    ; String.concat "\001" (List.map term_key inverse.inverse_call_formals)
-    ; inverse.target_head_var
-    ; inverse.target_stream_var
-    ; inverse.bytes_var
-    ; inverse.bytes_head_var
-    ; inverse.bytes_tail_var
-    ; inverse.width_var
-    ; inverse.count_tail_var
-    ; inverse.chunk_var
+    [ request.source
+    ; request.target_source_id
+    ; request.bytes_op
+    ; request.inverse_op
+    ; String.concat "\001" (List.map capture_key request.captures)
+    ; String.concat "\001" (List.map term_key request.bytes_call_formals)
+    ; String.concat "\001" (List.map term_key request.inverse_call_formals)
+    ; request.target_head_var
+    ; request.target_stream_var
+    ; request.chunks_tail_var
+    ; request.chunk_var
     ]
 
-let fixed_inverse_concat2_key (inverse : Request.fixed_inverse_concat2) =
-  Request.fixed_inverse_concat2_source inverse
+let unzip2_key request =
+  Request.unzip2_source request
 
 let origin_key origin =
   String.concat
@@ -394,8 +390,8 @@ let kind_name = function
   | Request.Iter_premise_zip_bool _ -> "IterPremiseZipBool"
   | Request.Iter_premise_zip_rule _ -> "IterPremiseZipRule"
   | Request.Iter_pattern_zip _ -> "IterPatternZip"
-  | Request.Fixed_inverse_concat2 _ -> "FixedInverseConcat2"
-  | Request.Inverse_concatn_chunks _ -> "InverseConcatnChunks"
+  | Request.Unzip2 _ -> "Unzip2"
+  | Request.Decode_chunks _ -> "DecodeChunks"
   | Request.Optional_map_inverse _ -> "OptionalMapInverse"
   | Request.Subtype_injection _ -> "SubtypeInjection"
   | Request.Runtime_predicate_search _ -> "RuntimePredicateSearch"
@@ -419,8 +415,8 @@ let role_name = function
   | Request.Iter_premise_zip_bool _ -> "premise-zip"
   | Request.Iter_premise_zip_rule _ -> "premise-zip-rule"
   | Request.Iter_pattern_zip _ -> "pattern-zip"
-  | Request.Fixed_inverse_concat2 _ -> "inverse-pair"
-  | Request.Inverse_concatn_chunks _ -> "inverse-chunks"
+  | Request.Unzip2 _ -> "unzip2"
+  | Request.Decode_chunks _ -> "decode-chunks"
   | Request.Optional_map_inverse _ -> "inverse-opt"
   | Request.Subtype_injection _ -> "subtype-inject"
   | Request.Runtime_predicate_search _ -> "runtime-search"
@@ -473,12 +469,12 @@ let key_of_kind = function
   | Request.Iter_pattern_zip pattern ->
     "iter-pattern-zip:"
     ^ Digest.to_hex (Digest.string (iter_pattern_zip_key pattern))
-  | Request.Fixed_inverse_concat2 inverse ->
-    "fixed-inverse-concat2:"
-    ^ Digest.to_hex (Digest.string (fixed_inverse_concat2_key inverse))
-  | Request.Inverse_concatn_chunks inverse ->
-    "inverse-concatn-chunks:"
-    ^ Digest.to_hex (Digest.string (inverse_concatn_chunks_key inverse))
+  | Request.Unzip2 request ->
+    "unzip2:"
+    ^ Digest.to_hex (Digest.string (unzip2_key request))
+  | Request.Decode_chunks request ->
+    "decode-chunks:"
+    ^ Digest.to_hex (Digest.string (decode_chunks_key request))
   | Request.Optional_map_inverse inverse ->
     "optional-map-inverse:"
     ^ Digest.to_hex (Digest.string (optional_map_inverse_key inverse))
@@ -509,7 +505,7 @@ let has_materializer = function
   | Request.Iter_premise_exists_bool _ | Request.Iter_premise_zip_bool _ | Request.Iter_pattern_zip _
   | Request.Iter_premise_exists_rule _
   | Request.Iter_premise_zip_rule _
-  | Request.Fixed_inverse_concat2 _ | Request.Inverse_concatn_chunks _ | Request.Optional_map_inverse _
+  | Request.Unzip2 _ | Request.Decode_chunks _ | Request.Optional_map_inverse _
   | Request.Subtype_injection _
   | Request.Runtime_predicate_search _ | Request.Runtime_predicate_truth_search _
   | Request.Runtime_predicate_truth_decision _ | Request.Runtime_enabledness _ -> true

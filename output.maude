@@ -11513,7 +11513,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:357.1-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1] / DefD
   ceq def.ivadd-pairwise(N:Nat, I_STAR:SpectecTerminals) = helper.iter-zip.ivadd-pairwise.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals, N:Nat)
-    if helper.inverse-pair-result.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.inverse-pair.ivadd-pairwise(syn.N, helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat)) /\ def.concat(syn.N, helper.iter-zip.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
+    if CHUNK1:SpectecTerminals := builtin.inv-concat(syn.N, helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat)) /\ helper.unzip2-result.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.unzip2.ivadd-pairwise(CHUNK1:SpectecTerminals) /\ def.concat(syn.N, helper.iter-zip.ivadd-pairwise(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-map.ivadd-pairwise(I_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:342.1-342.93 / script[1039]/1040-DecD-ivextunop / DecD
   op def.ivextunop.with.ivadd-pairwise : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
@@ -11534,14 +11534,14 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:364.1-365.59 / script[1042]/1043-DecD-ivdot/DefD[1] / DefD
   ceq def.ivdot(N:Nat, I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals) = helper.iter-zip.ivdot.3(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals, N:Nat)
-    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ helper.inverse-pair-result.ivdot(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.inverse-pair.ivdot(syn.iN(N:Nat), helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
+    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ CHUNK1:SpectecTerminals := builtin.inv-concat(syn.iN(N:Nat), helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ helper.unzip2-result.ivdot(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.unzip2.ivdot(CHUNK1:SpectecTerminals) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:367.1-367.76 / script[1043]/1044-DecD-ivdot-sat / DecD
   op def.ivdot-sat : Nat SpectecTerminals SpectecTerminals -> SpectecTerminals .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:368.1-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1] / DefD
   ceq def.ivdot-sat(N:Nat, I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals) = helper.iter-zip.ivdot-sat.3(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals, N:Nat)
-    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ helper.inverse-pair-result.ivdot-sat(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.inverse-pair.ivdot-sat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
+    if len(I_2_STAR:SpectecTerminals) = len(I_1_STAR:SpectecTerminals) /\ CHUNK1:SpectecTerminals := builtin.inv-concat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat)) /\ helper.unzip2-result.ivdot-sat(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals) := helper.unzip2.ivdot-sat(CHUNK1:SpectecTerminals) /\ def.concat(syn.iN(N:Nat), helper.iter-zip.ivdot-sat.2(J_1_STAR:SpectecTerminals, J_2_STAR:SpectecTerminals)) = helper.iter-zip.ivdot-sat(I_1_STAR:SpectecTerminals, I_2_STAR:SpectecTerminals, N:Nat) /\ len(J_2_STAR:SpectecTerminals) = len(J_1_STAR:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:348.1-348.136 / script[1044]/1045-DecD-ivextbinop / DecD
   op def.ivextbinop.with.ivdot-sat : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
@@ -13471,7 +13471,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:757.1-761.102 / script[1232]/1233-RelD-step-read/RuleD[79] / RuleD
   crl [step-read-array-new-data-num] : rel.step-read(config.sym(Z:SpectecTerminal, (instr.const(numtype.i32, I:SpectecTerminal) instr.const(numtype.i32, uN.wrap(N:Nat))) instr.array-new-data(X:SpectecTerminal, Y:SpectecTerminal))) => helper.iter-map.step-read.11(C_STAR:SpectecTerminals, ZT:SpectecTerminal) instr.array-new-fixed(X:SpectecTerminal, uN.wrap(N:Nat))
-    if typecheck(I:SpectecTerminal, syn.num(numtype.i32)) /\ typecheck(uN.wrap(N:Nat), syn.num(numtype.i32)) /\ RESULT1:SpectecTerminal := rel.expand(def.type(Z:SpectecTerminal, X:SpectecTerminal)) /\ comptype.array(fieldtype.wrap(MUT_OPT:SpectecTerminals, ZT:SpectecTerminal)) := RESULT1:SpectecTerminal /\ isOpt(MUT_OPT:SpectecTerminals) = true /\ _=/=_(8, 0) /\ (ratIsInt(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) = true /\ (_>=_(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8), 0)) = true /\ (_<=_(_+_(proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))), len(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal))))) = true /\ (ratIsInt(_/_(def.zsize(ZT:SpectecTerminal), 8))) = true /\ (_>=_(_/_(def.zsize(ZT:SpectecTerminal), 8), 0)) = true /\ helper.inverse-chunks-result.step-read(C_STAR:SpectecTerminals) := helper.inverse-chunks.step-read(ZT:SpectecTerminal, slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))), natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8)), N:Nat) /\ len(C_STAR:SpectecTerminals) = N:Nat /\ def.concatn(syn.byte, helper.iter-map.step-read.10(C_STAR:SpectecTerminals, ZT:SpectecTerminal), natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8))) = slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) /\ typecheck(uN.wrap(N:Nat), syn.u32) .
+    if typecheck(I:SpectecTerminal, syn.num(numtype.i32)) /\ typecheck(uN.wrap(N:Nat), syn.num(numtype.i32)) /\ RESULT1:SpectecTerminal := rel.expand(def.type(Z:SpectecTerminal, X:SpectecTerminal)) /\ comptype.array(fieldtype.wrap(MUT_OPT:SpectecTerminals, ZT:SpectecTerminal)) := RESULT1:SpectecTerminal /\ isOpt(MUT_OPT:SpectecTerminals) = true /\ _=/=_(8, 0) /\ (ratIsInt(_/_(def.zsize(ZT:SpectecTerminal), 8))) = true /\ (_>=_(_/_(def.zsize(ZT:SpectecTerminal), 8), 0)) = true /\ (ratIsInt(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) = true /\ (_>=_(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8), 0)) = true /\ (_<=_(_+_(proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))), len(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal))))) = true /\ CHUNK1:SpectecTerminals := builtin.inv-concatn(syn.byte, natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8)), slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8)))) /\ len(CHUNK1:SpectecTerminals) = N:Nat /\ helper.decode-chunks-result.step-read(C_STAR:SpectecTerminals) := helper.decode-chunks.step-read(ZT:SpectecTerminal, CHUNK1:SpectecTerminals) /\ len(C_STAR:SpectecTerminals) = N:Nat /\ def.concatn(syn.byte, helper.iter-map.step-read.10(C_STAR:SpectecTerminals, ZT:SpectecTerminal), natOfRat(_/_(def.zsize(ZT:SpectecTerminal), 8))) = slice(value('BYTES, def.data(Z:SpectecTerminal, Y:SpectecTerminal)), proj.uN.wrap.0(I:SpectecTerminal), natOfRat(_/_(_*_(N:Nat, def.zsize(ZT:SpectecTerminal)), 8))) /\ typecheck(uN.wrap(N:Nat), syn.u32) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:764.1-765.63 / script[1232]/1233-RelD-step-read/RuleD[80] / RuleD
   crl [step-read-array-get-null] : rel.step-read(config.sym(Z:SpectecTerminal, (ref.ref-null-addr instr.const(numtype.i32, I:SpectecTerminal)) instr.array-get(SX_OPT:SpectecTerminals, X:SpectecTerminal))) => instr.trap
@@ -13855,197 +13855,16 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(I:SpectecTerminal, syn.num(numtype.i32)) /\ VAL:SpectecTerminal := helper.subtype-project.step-pure(PATTERN1:SpectecTerminal) /\ RESULT1:SpectecTerminal := rel.expand(def.type(Z:SpectecTerminal, X:SpectecTerminal)) /\ comptype.array(fieldtype.wrap(MUT_OPT:SpectecTerminals, ZT:SpectecTerminal)) := RESULT1:SpectecTerminal /\ isOpt(MUT_OPT:SpectecTerminals) = true .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  sort ContextMaybeFocusStep .
+  ceq typecheck(instr.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal), syn.val) = true
+    if typecheck(num.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal), syn.val) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  sort ContextSplitStep .
+  ceq typecheck(instr.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal), syn.val) = true
+    if typecheck(vec.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal), syn.val) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  sort ContextStackStep .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-split-result.step : SpectecTerminals SpectecTerminals SpectecTerminals -> ContextSplitStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-stop.step : -> ContextSplitStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-is-value.step : SpectecTerminal -> Bool .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-has-compact.step : SpectecTerminals -> Bool .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-no-focus.step : -> ContextMaybeFocusStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-at-focus.step : Nat -> ContextMaybeFocusStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-first-non-value.step : SpectecTerminals Nat Nat -> ContextMaybeFocusStep .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-first-defined.step : SpectecTerminals Nat Nat Bool -> ContextMaybeFocusStep [frozen (1 2 3 4)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-first-value.step : SpectecTerminals Nat Nat Bool -> ContextMaybeFocusStep [frozen (1 2 3 4)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-stack-empty.step : -> ContextStackStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-stack-item.step : SpectecTerminal SpectecTerminals ContextStackStep -> ContextStackStep [ctor] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan.step : SpectecTerminals SpectecTerminals ContextStackStep -> ContextSplitStep [frozen (1 2 3)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan-value.step : SpectecTerminal SpectecTerminals SpectecTerminals ContextStackStep Bool -> ContextSplitStep [frozen (1 2 3 4 5)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan-non-value.step : ContextStackStep SpectecTerminals SpectecTerminals SpectecTerminals ContextStackStep SpectecTerminals SpectecTerminals -> ContextSplitStep [frozen (1 2 3 4 5 6 7)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-scan-index.step : SpectecTerminals Nat Nat Nat Nat -> ContextSplitStep [frozen (1 2 3 4 5)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-split.step : SpectecTerminals -> ContextSplitStep [frozen (1)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  op helper.context-dispatch.step : SpectecTerminals Bool -> ContextSplitStep [frozen (1 2)] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(instr.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(instr.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-i31-num(COMPONENT5:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-null-addr) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-struct-addr(COMPONENT6:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-array-addr(COMPONENT7:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-func-addr(COMPONENT8:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-exn-addr(COMPONENT9:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-host-addr(COMPONENT10:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(ref.ref-extern(COMPONENT11:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-is-value.step(VALUE1:SpectecTerminal) = false [owise] .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(eps) = false .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(repeatSeq(COUNT1:Nat, VALUE1:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-has-compact.step(repeatSeq(COUNT1:Nat, VALUE1:SpectecTerminal) STREAM2:SpectecTerminals) = true
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(runSeq(COUNT1:Nat, VALUE1:SpectecTerminal)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-has-compact.step(runSeq(COUNT1:Nat, VALUE1:SpectecTerminal) STREAM2:SpectecTerminals) = true
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-has-compact.step(VALUE1:SpectecTerminal) = false .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-has-compact.step(VALUE1:SpectecTerminal STREAM2:SpectecTerminals) = helper.context-has-compact.step(STREAM2:SpectecTerminals)
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-split.step(STREAM1:SpectecTerminals) = helper.context-dispatch.step(STREAM1:SpectecTerminals, helper.context-has-compact.step(STREAM1:SpectecTerminals)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan.step(eps, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep) = helper.context-stop.step .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan.step(VALUE1:SpectecTerminal, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep) = helper.context-scan-value.step(VALUE1:SpectecTerminal, eps, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, helper.context-is-value.step(VALUE1:SpectecTerminal)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq helper.context-scan.step(VALUE1:SpectecTerminal STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep) = helper.context-scan-value.step(VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, helper.context-is-value.step(VALUE1:SpectecTerminal))
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan-value.step(VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, true) = helper.context-scan.step(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals VALUE1:SpectecTerminal, helper.context-stack-item.step(VALUE1:SpectecTerminal, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-scan-value.step(VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, STREAM3:SpectecTerminals, HISTORY1:ContextStackStep, false) = helper.context-scan-non-value.step(HISTORY1:ContextStackStep, STREAM3:SpectecTerminals, VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, HISTORY1:ContextStackStep, STREAM3:SpectecTerminals, VALUE1:SpectecTerminal) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-non-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat) = helper.context-first-defined.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, _<_(COUNT1:Nat, COUNT4:Nat)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-defined.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, false) = helper.context-no-focus.step .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-defined.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, true) = helper.context-first-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, helper.context-is-value.step(index(STREAM1:SpectecTerminals, COUNT1:Nat))) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, true) = helper.context-first-non-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, s COUNT1:Nat) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  eq helper.context-first-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, false) = helper.context-at-focus.step(COUNT1:Nat) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-cursor-start] : helper.context-dispatch.step(STREAM1:SpectecTerminals, false) => helper.context-scan.step(STREAM1:SpectecTerminals, eps, helper.context-stack-empty.step) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-index-start] : helper.context-dispatch.step(STREAM1:SpectecTerminals, true) => helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, COUNT1:Nat, s COUNT1:Nat)
-    if COUNT4:Nat := len(STREAM1:SpectecTerminals) /\ helper.context-at-focus.step(COUNT1:Nat) := helper.context-first-non-value.step(STREAM1:SpectecTerminals, COUNT4:Nat, 0) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-non-value-result-prefix] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, helper.context-stack-item.step(VALUE1:SpectecTerminal, STREAM9:SpectecTerminals, HISTORY4:ContextStackStep), STREAM7:SpectecTerminals, STREAM8:SpectecTerminals) => helper.context-split-result.step(STREAM7:SpectecTerminals, STREAM8:SpectecTerminals, STREAM4:SpectecTerminals) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-non-value-result-suffix] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, helper.context-stack-empty.step, STREAM7:SpectecTerminals, STREAM8:SpectecTerminals) => helper.context-split-result.step(STREAM7:SpectecTerminals, STREAM8:SpectecTerminals, STREAM4:SpectecTerminals)
-    if _=/=_(STREAM4:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-non-value-pop] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, helper.context-stack-item.step(VALUE1:SpectecTerminal, STREAM9:SpectecTerminals, HISTORY4:ContextStackStep), STREAM7:SpectecTerminals, STREAM8:SpectecTerminals) => helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, STREAM4:SpectecTerminals, HISTORY4:ContextStackStep, STREAM9:SpectecTerminals, VALUE1:SpectecTerminal STREAM8:SpectecTerminals) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-non-value-extend-one] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, VALUE1:SpectecTerminal, helper.context-stack-empty.step, eps, STREAM8:SpectecTerminals) => helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal, eps, HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-non-value-extend] : helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals, VALUE1:SpectecTerminal STREAM2:SpectecTerminals, helper.context-stack-empty.step, eps, STREAM8:SpectecTerminals) => helper.context-scan-non-value.step(HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal, STREAM2:SpectecTerminals, HISTORY2:ContextStackStep, STREAM5:SpectecTerminals, STREAM6:SpectecTerminals VALUE1:SpectecTerminal)
-    if _=/=_(STREAM2:SpectecTerminals, eps) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-index-result-prefix] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, s COUNT2:Nat, COUNT3:Nat) => helper.context-split-result.step(takeRun(s COUNT2:Nat, STREAM1:SpectecTerminals), slice(STREAM1:SpectecTerminals, s COUNT2:Nat, _-_(COUNT3:Nat, s COUNT2:Nat)), drop(COUNT3:Nat, STREAM1:SpectecTerminals)) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-index-result-suffix] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, 0, COUNT3:Nat) => helper.context-split-result.step(takeRun(0, STREAM1:SpectecTerminals), slice(STREAM1:SpectecTerminals, 0, _-_(COUNT3:Nat, 0)), drop(COUNT3:Nat, STREAM1:SpectecTerminals))
-    if (_<_(COUNT3:Nat, COUNT4:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  rl [helper-context-split-step-index-prefix] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, s COUNT2:Nat, COUNT3:Nat) => helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, COUNT2:Nat, COUNT3:Nat) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [helper-context-split-step-index-end] : helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, 0, COUNT3:Nat) => helper.context-scan-index.step(STREAM1:SpectecTerminals, COUNT4:Nat, COUNT1:Nat, COUNT1:Nat, s COUNT3:Nat)
-    if (_<_(COUNT3:Nat, COUNT4:Nat)) = true .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [step-ctxt-instrs] : rel.step(config.sym(Z:SpectecTerminal, STREAM1:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))
-    if helper.context-split.step(STREAM1:SpectecTerminals) => helper.context-split-result.step(PATTERN1:SpectecTerminals, INSTR_STAR:SpectecTerminals, INSTR_1_STAR:SpectecTerminals) /\ rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config) .
+  crl [step-ctxt-instrs] : rel.step(config.sym(Z:SpectecTerminal, VAL_STAR:SpectecTerminals (INSTR_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))) => config.sym(Z_PRIME:SpectecTerminal, VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))
+    if (typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true /\ (_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true /\ rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:8.1-8.92 / script[1237]/1238-RecD/RecD[0]/0001-RelD-steps / RelD
   sort RelConfSteps .
@@ -16784,20 +16603,20 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ typecheck(I:SpectecTerminal, syn.iN(N:Nat)) /\ OUTPUT1:Nat := proj.uN.wrap.0(I:SpectecTerminal) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  sort FixedConcatHelperInversePairIvaddPairwise .
+  sort Unzip2HelperUnzip2IvaddPairwise .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  op helper.inverse-pair-result.ivadd-pairwise : SpectecTerminals SpectecTerminals -> FixedConcatHelperInversePairIvaddPairwise [ctor] .
+  op helper.unzip2-result.ivadd-pairwise : SpectecTerminals SpectecTerminals -> Unzip2HelperUnzip2IvaddPairwise [ctor] .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  op helper.inverse-pair.ivadd-pairwise : SpectecType SpectecTerminals -> FixedConcatHelperInversePairIvaddPairwise .
+  op helper.unzip2.ivadd-pairwise : SpectecTerminals -> Unzip2HelperUnzip2IvaddPairwise .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  eq helper.inverse-pair.ivadd-pairwise(TYPE1:SpectecType, eps) = helper.inverse-pair-result.ivadd-pairwise(eps, eps) .
+  eq helper.unzip2.ivadd-pairwise(eps) = helper.unzip2-result.ivadd-pairwise(eps, eps) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
-  ceq helper.inverse-pair.ivadd-pairwise(TYPE1:SpectecType, HEAD1:SpectecTerminal (HEAD2:SpectecTerminal STREAM1:SpectecTerminals)) = helper.inverse-pair-result.ivadd-pairwise(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
-    if helper.inverse-pair-result.ivadd-pairwise(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.inverse-pair.ivadd-pairwise(TYPE1:SpectecType, STREAM1:SpectecTerminals) .
+  ceq helper.unzip2.ivadd-pairwise(seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals) = helper.unzip2-result.ivadd-pairwise(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
+    if helper.unzip2-result.ivadd-pairwise(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.unzip2.ivadd-pairwise(STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:358.6-358.37 / script[1038]/1039-DecD-ivadd-pairwise/DefD[1]/premise / Premise
   op helper.iter-zip.ivadd-pairwise : SpectecTerminals SpectecTerminals -> SpectecTerminals .
@@ -16856,20 +16675,20 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ _=/=_(TAIL2:SpectecTerminals, eps) /\ OUTPUT1:SpectecTerminal := def.imul(N:Nat, I_1:SpectecTerminal, I_2:SpectecTerminal) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  sort FixedConcatHelperInversePairIvdot .
+  sort Unzip2HelperUnzip2Ivdot .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  op helper.inverse-pair-result.ivdot : SpectecTerminals SpectecTerminals -> FixedConcatHelperInversePairIvdot [ctor] .
+  op helper.unzip2-result.ivdot : SpectecTerminals SpectecTerminals -> Unzip2HelperUnzip2Ivdot [ctor] .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  op helper.inverse-pair.ivdot : SpectecType SpectecTerminals -> FixedConcatHelperInversePairIvdot .
+  op helper.unzip2.ivdot : SpectecTerminals -> Unzip2HelperUnzip2Ivdot .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  eq helper.inverse-pair.ivdot(TYPE1:SpectecType, eps) = helper.inverse-pair-result.ivdot(eps, eps) .
+  eq helper.unzip2.ivdot(eps) = helper.unzip2-result.ivdot(eps, eps) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
-  ceq helper.inverse-pair.ivdot(TYPE1:SpectecType, HEAD1:SpectecTerminal (HEAD2:SpectecTerminal STREAM1:SpectecTerminals)) = helper.inverse-pair-result.ivdot(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
-    if helper.inverse-pair-result.ivdot(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.inverse-pair.ivdot(TYPE1:SpectecType, STREAM1:SpectecTerminals) .
+  ceq helper.unzip2.ivdot(seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals) = helper.unzip2-result.ivdot(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
+    if helper.unzip2-result.ivdot(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.unzip2.ivdot(STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:365.6-365.59 / script[1042]/1043-DecD-ivdot/DefD[1]/premise / Premise
   op helper.iter-zip.ivdot.2 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
@@ -16914,20 +16733,20 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ _=/=_(TAIL2:SpectecTerminals, eps) /\ OUTPUT1:SpectecTerminal := def.imul(N:Nat, I_1:SpectecTerminal, I_2:SpectecTerminal) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  sort FixedConcatHelperInversePairIvdotSat .
+  sort Unzip2HelperUnzip2IvdotSat .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  op helper.inverse-pair-result.ivdot-sat : SpectecTerminals SpectecTerminals -> FixedConcatHelperInversePairIvdotSat [ctor] .
+  op helper.unzip2-result.ivdot-sat : SpectecTerminals SpectecTerminals -> Unzip2HelperUnzip2IvdotSat [ctor] .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  op helper.inverse-pair.ivdot-sat : SpectecType SpectecTerminals -> FixedConcatHelperInversePairIvdotSat .
+  op helper.unzip2.ivdot-sat : SpectecTerminals -> Unzip2HelperUnzip2IvdotSat .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  eq helper.inverse-pair.ivdot-sat(TYPE1:SpectecType, eps) = helper.inverse-pair-result.ivdot-sat(eps, eps) .
+  eq helper.unzip2.ivdot-sat(eps) = helper.unzip2-result.ivdot-sat(eps, eps) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
-  ceq helper.inverse-pair.ivdot-sat(TYPE1:SpectecType, HEAD1:SpectecTerminal (HEAD2:SpectecTerminal STREAM1:SpectecTerminals)) = helper.inverse-pair-result.ivdot-sat(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
-    if helper.inverse-pair-result.ivdot-sat(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.inverse-pair.ivdot-sat(TYPE1:SpectecType, STREAM1:SpectecTerminals) .
+  ceq helper.unzip2.ivdot-sat(seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals) = helper.unzip2-result.ivdot-sat(HEAD1:SpectecTerminal STREAM2:SpectecTerminals, HEAD2:SpectecTerminal STREAM3:SpectecTerminals)
+    if helper.unzip2-result.ivdot-sat(STREAM2:SpectecTerminals, STREAM3:SpectecTerminals) := helper.unzip2.ivdot-sat(STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/3.2-numerics.vector.spectec:369.6-369.59 / script[1043]/1044-DecD-ivdot-sat/DefD[1]/premise / Premise
   op helper.iter-zip.ivdot-sat.2 : SpectecTerminals SpectecTerminals -> SpectecTerminals .
@@ -17817,35 +17636,26 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(TAIL1:SpectecTerminals, eps) /\ typecheck(REF:SpectecTerminal, syn.instr) /\ OUTPUT1:SpectecTerminal := REF:SpectecTerminal .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  sort ConcatnChunksHelperInverseChunksStepRead .
+  sort DecodeChunksHelperDecodeChunksStepRead .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks-result.step-read : SpectecTerminals -> ConcatnChunksHelperInverseChunksStepRead [ctor] .
+  op helper.decode-chunks-result.step-read : SpectecTerminals -> DecodeChunksHelperDecodeChunksStepRead [ctor] .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks-fail.step-read : -> ConcatnChunksHelperInverseChunksStepRead [ctor] .
+  op helper.decode-chunks.step-read : SpectecTerminal SpectecTerminals -> DecodeChunksHelperDecodeChunksStepRead .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks.step-read : SpectecTerminal SpectecTerminals Nat Nat -> ConcatnChunksHelperInverseChunksStepRead .
+  op helper.decode-chunks-prepend.step-read : SpectecTerminal DecodeChunksHelperDecodeChunksStepRead -> DecodeChunksHelperDecodeChunksStepRead .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  op helper.inverse-chunks-prepend.step-read : SpectecTerminal ConcatnChunksHelperInverseChunksStepRead -> ConcatnChunksHelperInverseChunksStepRead .
+  eq helper.decode-chunks.step-read(ZT:SpectecTerminal, eps) = helper.decode-chunks-result.step-read(eps) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks.step-read(ZT:SpectecTerminal, eps, WIDTH1:Nat, 0) = helper.inverse-chunks-result.step-read(eps) .
+  ceq helper.decode-chunks.step-read(ZT:SpectecTerminal, seq(CHUNK1:SpectecTerminals) TAIL1:SpectecTerminals) = helper.decode-chunks-prepend.step-read(C:SpectecTerminal, helper.decode-chunks.step-read(ZT:SpectecTerminal, TAIL1:SpectecTerminals))
+    if C:SpectecTerminal := builtin.inv-zbytes(ZT:SpectecTerminal, CHUNK1:SpectecTerminals) /\ builtin.zbytes(ZT:SpectecTerminal, C:SpectecTerminal) = CHUNK1:SpectecTerminals .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks.step-read(ZT:SpectecTerminal, BYTE1:SpectecTerminal TAIL1:SpectecTerminals, WIDTH1:Nat, 0) = helper.inverse-chunks-fail.step-read .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  ceq helper.inverse-chunks.step-read(ZT:SpectecTerminal, STREAM2:SpectecTerminals, WIDTH1:Nat, s COUNT1:Nat) = helper.inverse-chunks-prepend.step-read(C:SpectecTerminal, helper.inverse-chunks.step-read(ZT:SpectecTerminal, drop(WIDTH1:Nat, STREAM2:SpectecTerminals), WIDTH1:Nat, COUNT1:Nat))
-    if CHUNK1:SpectecTerminals := slice(STREAM2:SpectecTerminals, 0, WIDTH1:Nat) /\ C:SpectecTerminal := builtin.inv-zbytes(ZT:SpectecTerminal, CHUNK1:SpectecTerminals) /\ builtin.zbytes(ZT:SpectecTerminal, C:SpectecTerminal) = CHUNK1:SpectecTerminals .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks-prepend.step-read(C:SpectecTerminal, helper.inverse-chunks-result.step-read(STREAM1:SpectecTerminals)) = helper.inverse-chunks-result.step-read(C:SpectecTerminal STREAM1:SpectecTerminals) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
-  eq helper.inverse-chunks-prepend.step-read(C:SpectecTerminal, helper.inverse-chunks-fail.step-read) = helper.inverse-chunks-fail.step-read .
+  eq helper.decode-chunks-prepend.step-read(C:SpectecTerminal, helper.decode-chunks-result.step-read(STREAM1:SpectecTerminals)) = helper.decode-chunks-result.step-read(C:SpectecTerminal STREAM1:SpectecTerminals) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:761.6-761.102 / script[1232]/1233-RelD-step-read/RuleD[79]/premise/premise / Premise
   op helper.iter-map.step-read.10 : SpectecTerminals SpectecTerminal -> SpectecTerminals .

@@ -2,57 +2,52 @@ open Maude_ir
 module Request = Helper_request
 open Helper_emission
 
-let concatn_chunks_result_op = Naming.helper_companion ~role:"inverse-chunks-result"
-let concatn_chunks_fail_op = Naming.helper_companion ~role:"inverse-chunks-fail"
-let concatn_chunks_inverse_op = Naming.helper_companion ~role:"inverse-chunks"
-let concatn_chunks_prepend_op = Naming.helper_companion ~role:"inverse-chunks-prepend"
-let fixed_concat_result_op = Naming.helper_companion ~role:"inverse-pair-result"
-let fixed_concat_inverse_op = Naming.helper_companion ~role:"inverse-pair"
+let decode_chunks_result_op = Naming.helper_companion ~role:"decode-chunks-result"
+let decode_chunks_op = Naming.helper_companion ~role:"decode-chunks"
+let decode_chunks_prepend_op = Naming.helper_companion ~role:"decode-chunks-prepend"
+let unzip2_result_op = Naming.helper_companion ~role:"unzip2-result"
+let unzip2_op = Naming.helper_companion ~role:"unzip2"
 
-let concatn_chunks_sort name =
-  sort ("ConcatnChunks" ^ Naming.sort_token name)
+let decode_chunks_sort name =
+  sort ("DecodeChunks" ^ Naming.sort_token name)
 
-let fixed_concat_sort name =
-  sort ("FixedConcat" ^ Naming.sort_token name)
+let unzip2_sort name =
+  sort ("Unzip2" ^ Naming.sort_token name)
 
-let fixed_concat_result_constructor name origin =
+let unzip2_result_constructor name origin =
   generated name origin
-    (op (fixed_concat_result_op name)
+    (op (unzip2_result_op name)
        [ sort_ref spectec_terminals; sort_ref spectec_terminals ]
-       (fixed_concat_sort name)
+       (unzip2_sort name)
        ~attrs:[ Ctor ])
 
-let concatn_chunks_result_constructor name origin =
+let decode_chunks_result_constructor name origin =
   generated name origin
-    (op (concatn_chunks_result_op name)
+    (op (decode_chunks_result_op name)
        [ sort_ref spectec_terminals ]
-       (concatn_chunks_sort name)
+       (decode_chunks_sort name)
        ~attrs:[ Ctor ])
 
-let fixed_concat2_match_condition name ~type_witness ~known ~left ~right =
+let unzip2_match_condition name ~chunks ~left ~right =
   MatchCond
-    ( app (fixed_concat_result_op name) [ left; right ]
-    , app (fixed_concat_inverse_op name) [ type_witness; known ] )
+    ( app (unzip2_result_op name) [ left; right ]
+    , app (unzip2_op name) [ chunks ] )
 
-let materialize_fixed_inverse_concat2 entry (_inverse : Request.fixed_inverse_concat2) =
+let materialize_unzip2 entry (_request : Request.unzip2) =
   let name = entry.Helper_registry.name in
   let origin = entry.request.Request.origin in
-  let result_name = fixed_concat_result_op name in
-  let inverse_name = fixed_concat_inverse_op name in
-  let result_sort = fixed_concat_sort name in
-  let typ, names =
-    Local_name.fresh_qualified
-      Local_name.empty Local_name.Type (sort_ref spectec_type)
-  in
+  let result_name = unzip2_result_op name in
+  let unzip_name = unzip2_op name in
+  let result_sort = unzip2_sort name in
   let x, names =
     Local_name.fresh_qualified
-      names Local_name.Head (sort_ref spectec_terminal)
+      Local_name.empty Local_name.Head (sort_ref spectec_terminal)
   in
   let y, names =
     Local_name.fresh_qualified
       names Local_name.Head (sort_ref spectec_terminal)
   in
-  let xs, names =
+  let chunks, names =
     Local_name.fresh_qualified
       names Local_name.Stream (sort_ref spectec_terminals)
   in
@@ -66,63 +61,54 @@ let materialize_fixed_inverse_concat2 entry (_inverse : Request.fixed_inverse_co
   in
   let statement node = generated name origin node in
   [ statement (sort_decl result_sort)
-  ; fixed_concat_result_constructor name origin
+  ; unzip2_result_constructor name origin
   ; statement
-      (op inverse_name
-         [ sort_ref spectec_type; sort_ref spectec_terminals ]
+      (op unzip_name
+         [ sort_ref spectec_terminals ]
          result_sort)
   ; statement
       (eq
-         (app inverse_name [ typ; Const "eps" ])
+         (app unzip_name [ Const "eps" ])
          (app result_name [ Const "eps"; Const "eps" ]))
   ; statement
       (ceq
-         (app inverse_name [ typ; concat x (concat y xs) ])
+         (app unzip_name [ concat (app "seq" [ concat x y ]) chunks ])
          (app result_name [ concat x xs1; concat y xs2 ])
          [ MatchCond
              ( app result_name [ xs1; xs2 ]
-             , app inverse_name [ typ; xs ] )
+             , app unzip_name [ chunks ] )
          ])
   ]
 
-let materialize_inverse_concatn_chunks entry (inverse : Request.inverse_concatn_chunks) =
+let materialize_decode_chunks entry (request : Request.decode_chunks) =
   let name = entry.Helper_registry.name in
   let origin = entry.request.Request.origin in
-  let result_name = concatn_chunks_result_op name in
-  let fail_name = concatn_chunks_fail_op name in
-  let inverse_name = concatn_chunks_inverse_op name in
-  let prepend_name = concatn_chunks_prepend_op name in
-  let result_sort = concatn_chunks_sort name in
-  let target_head = Var inverse.target_head_var in
-  let target_stream = Var inverse.target_stream_var in
-  let bytes = Var inverse.bytes_var in
-  let bytes_head = Var inverse.bytes_head_var in
-  let bytes_tail = Var inverse.bytes_tail_var in
-  let width = Var inverse.width_var in
-  let count_tail = Var inverse.count_tail_var in
-  let chunk = Var inverse.chunk_var in
+  let result_name = decode_chunks_result_op name in
+  let decode_name = decode_chunks_op name in
+  let prepend_name = decode_chunks_prepend_op name in
+  let result_sort = decode_chunks_sort name in
+  let target_head = Var request.target_head_var in
+  let target_stream = Var request.target_stream_var in
+  let chunks_tail = Var request.chunks_tail_var in
+  let chunk = Var request.chunk_var in
   let capture_vars =
-    inverse.captures |> List.map (fun capture -> Var capture.Request.formal_var)
+    request.captures |> List.map (fun capture -> Var capture.Request.formal_var)
   in
-  let helper source width count =
-    app inverse_name (capture_vars @ [ source; width; count ])
+  let helper source =
+    app decode_name (capture_vars @ [ source ])
   in
   let result stream = app result_name [ stream ] in
-  let fail = Const fail_name in
   let prepend head tail = app prepend_name [ head; tail ] in
-  let source_nonempty = concat bytes_head bytes_tail in
-  let current_chunk = app "slice" [ bytes; Const "0"; width ] in
-  let source_tail = app "drop" [ width; bytes ] in
-  let inverse_call = app inverse.inverse_op inverse.inverse_call_formals in
-  let original_call = app inverse.bytes_op inverse.bytes_call_formals in
+  let source_nonempty = concat (app "seq" [ chunk ]) chunks_tail in
+  let inverse_call = app request.inverse_op request.inverse_call_formals in
+  let original_call = app request.bytes_op request.bytes_call_formals in
   let statement node = generated name origin node in
   [ statement (sort_decl result_sort)
-  ; concatn_chunks_result_constructor name origin
-  ; statement (op fail_name [] result_sort ~attrs:[ Ctor ])
+  ; decode_chunks_result_constructor name origin
   ; statement
-      (op inverse_name
-         ((inverse.captures |> List.map (fun capture -> sort_ref capture.Request.sort))
-          @ [ sort_ref spectec_terminals; sort_ref nat; sort_ref nat ])
+      (op decode_name
+         ((request.captures |> List.map (fun capture -> sort_ref capture.Request.sort))
+          @ [ sort_ref spectec_terminals ])
          result_sort)
   ; statement
       (op prepend_name
@@ -130,35 +116,28 @@ let materialize_inverse_concatn_chunks entry (inverse : Request.inverse_concatn_
          result_sort)
   ]
   @ variable_declarations statement
-      ((inverse.captures
+      ((request.captures
         |> List.map (fun capture -> capture.Request.formal_var, sort_ref capture.Request.sort))
-       @ [ inverse.target_head_var, sort_ref spectec_terminal
-         ; inverse.target_stream_var, sort_ref spectec_terminals
-         ; inverse.bytes_var, sort_ref spectec_terminals
-         ; inverse.bytes_head_var, sort_ref spectec_terminal
-         ; inverse.bytes_tail_var, sort_ref spectec_terminals
-         ; inverse.width_var, sort_ref nat
-         ; inverse.count_tail_var, sort_ref nat
-         ; inverse.chunk_var, sort_ref spectec_terminals
+       @ [ request.target_head_var, sort_ref spectec_terminal
+         ; request.target_stream_var, sort_ref spectec_terminals
+         ; request.chunks_tail_var, sort_ref spectec_terminals
+         ; request.chunk_var, sort_ref spectec_terminals
          ])
   @ [ statement
         (eq
-           (helper (Const "eps") width (Const "0"))
+           (helper (Const "eps"))
            (result (Const "eps")))
-    ; statement (eq (helper source_nonempty width (Const "0")) fail)
     ; statement
         (ceq
-           (helper bytes width (succ count_tail))
-           (prepend target_head (helper source_tail width count_tail))
-           [ MatchCond (chunk, current_chunk)
-           ; MatchCond (target_head, inverse_call)
+           (helper source_nonempty)
+           (prepend target_head (helper chunks_tail))
+           [ MatchCond (target_head, inverse_call)
            ; EqCond (original_call, chunk)
            ])
     ; statement
         (eq
            (prepend target_head (result target_stream))
            (result (concat target_head target_stream)))
-    ; statement (eq (prepend target_head fail) fail)
     ]
 
 let materialize_optional_map_inverse entry (inverse : Request.optional_map_inverse) =

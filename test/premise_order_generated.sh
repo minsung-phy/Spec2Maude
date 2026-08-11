@@ -87,13 +87,12 @@ require_statement_before () {
 
 step=$(condition_line 'crl [step-ctxt-instrs]')
 require_before "$step" \
-  'helper.context-split.step(STREAM1:SpectecTerminals)' \
+  '(typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true' \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
-  'ctxt-instrs split no longer precedes its self-recursive rewrite'
-if printf '%s\n' "$step" \
-    | grep -Eq 'helper\.subtype-project-seq\.step-pure|_or_\(_=/=_\(VAL_STAR'
+  'ctxt-instrs value-prefix membership no longer precedes its self-recursive rewrite'
+if printf '%s\n' "$step" | grep -Eq 'helper\.(context-|subtype-project-seq\.step-pure)'
 then
-  echo 'ctxt-instrs repeated projection/progress already certified by its strict split helper' >&2
+  echo 'ctxt-instrs retained a source-free split or projection helper' >&2
   exit 1
 fi
 
@@ -166,21 +165,23 @@ require_before "$step_context" \
   'Step/ctxt-instrs no longer retains its whole recursive rewrite-result config guard'
 step_context_rule=$(matching_line 'crl [step-ctxt-instrs]')
 require_contains "$step_context_rule" \
-  'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
-  'Step/ctxt-instrs no longer reuses its certified raw value-prefix pattern'
+  'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
+  'Step/ctxt-instrs no longer preserves its source value prefix'
 if printf '%s\n' "$step_context" \
-    | grep -Eq 'helper\.subtype-project-seq\.step-pure|_or_\(_=/=_\(VAL_STAR'
+    | grep -Eq 'helper\.(context-|subtype-project-seq\.step-pure)'
 then
-  echo 'Step/ctxt-instrs retained projection/progress implied by its strict split helper' >&2
+  echo 'Step/ctxt-instrs retained a source-free split or projection helper' >&2
   exit 1
 fi
 if printf '%s\n' "$step_context_rule" | grep -Fq 'helper.iter-map'; then
   echo 'Step/ctxt-instrs retained a direct projection/reinjection map' >&2
   exit 1
 fi
-if printf '%s\n' "$step_context" \
-    | grep -Eq 'syn\.state\)|typecheckSeq\('; then
-  echo 'Step/ctxt-instrs retained a payload check implied by its whole config guard' >&2
+require_contains "$step_context" \
+  '(typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true' \
+  'Step/ctxt-instrs lost its source val* constraint'
+if printf '%s\n' "$step_context" | grep -Eq 'syn\.state\)'; then
+  echo 'Step/ctxt-instrs retained an input-state check implied by config membership' >&2
   exit 1
 fi
 
@@ -214,6 +215,60 @@ require_contains "$eval_expr" \
 if printf '%s\n' "$eval_expr" \
     | grep -Eq 'syn\.state\)|typecheckSeq\('; then
   echo 'Eval_expr retained payload checks implied by its whole config guard' >&2
+  exit 1
+fi
+
+pair_inverse=$(condition_line 'ceq def.ivadd-pairwise(')
+require_contains "$pair_inverse" 'builtin.inv-concat(' \
+  'fixed pair reconstruction lost its declared outer inverse'
+require_contains "$pair_inverse" 'helper.unzip2.ivadd-pairwise(' \
+  'fixed pair reconstruction lost its structural unzip'
+require_contains "$pair_inverse" 'def.concat(' \
+  'fixed pair reconstruction lost its whole forward recheck'
+require_before "$pair_inverse" 'builtin.inv-concat(' \
+  'helper.unzip2.ivadd-pairwise(' \
+  'fixed pair reconstruction no longer calls the outer inverse first'
+require_before "$pair_inverse" 'helper.unzip2.ivadd-pairwise(' 'def.concat(' \
+  'fixed pair reconstruction no longer rechecks the forward call after unzip'
+
+unzip2=$(matching_line 'ceq helper.unzip2.ivadd-pairwise(')
+require_contains "$unzip2" \
+  'seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals' \
+  'unzip2 no longer consumes exact two-element chunks'
+for forbidden in 'builtin.inv-concat' 'slice(' 'drop('
+do
+  require_not_contains "$unzip2" "$forbidden" \
+    'unzip2 regained inverse or partition ownership'
+done
+
+concatn_inverse=$(condition_line 'crl [step-read-array-new-data-num]')
+require_contains "$concatn_inverse" 'builtin.inv-concatn(' \
+  'fixed concatn reconstruction lost its declared outer inverse'
+require_contains "$concatn_inverse" 'helper.decode-chunks.step-read(' \
+  'fixed concatn reconstruction lost its structural decoder'
+require_contains "$concatn_inverse" 'def.concatn(' \
+  'fixed concatn reconstruction lost its whole forward recheck'
+require_before "$concatn_inverse" 'builtin.inv-concatn(' \
+  'len(CHUNK1:SpectecTerminals) = N:Nat' \
+  'fixed concatn reconstruction no longer checks the inverse chunk count'
+require_before "$concatn_inverse" 'len(CHUNK1:SpectecTerminals) = N:Nat' \
+  'helper.decode-chunks.step-read(' \
+  'fixed concatn reconstruction decodes before validating the chunk count'
+require_before "$concatn_inverse" 'helper.decode-chunks.step-read(' 'def.concatn(' \
+  'fixed concatn reconstruction no longer rechecks the whole forward call'
+
+decode_chunks=$(condition_line 'ceq helper.decode-chunks.step-read(')
+require_contains "$decode_chunks" 'builtin.inv-zbytes(' \
+  'chunk decoder lost its declared element inverse'
+require_contains "$decode_chunks" 'builtin.zbytes(' \
+  'chunk decoder lost its element forward recheck'
+for forbidden in 'builtin.inv-concatn' 'slice(' 'drop('
+do
+  require_not_contains "$decode_chunks" "$forbidden" \
+    'chunk decoder regained outer inverse or partition ownership'
+done
+if grep -Eq 'helper\.(inverse-pair|inverse-chunks)' "$output"; then
+  echo 'obsolete partition-owning inverse helper survived' >&2
   exit 1
 fi
 

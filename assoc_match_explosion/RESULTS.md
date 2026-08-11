@@ -1,65 +1,77 @@
-# Associative Matching Sort Experiment
+# Associative Context Lowering
 
 Date: 2026-08-11
 
-This experiment changes files only under `assoc_match_explosion/`.
-`translator/`, the root `output.maude`, the root `builtins.maude`, and the
-existing benchmarks are not modified by the experiment.
+The translator now lowers `Step/ctxt-instrs` directly from its SpecTec shape.
+This is the unsorted baseline for a later `Val`/`Instr` sort experiment.
 
-## Inputs
+## Generated Rule
 
-- `output-baseline.maude`: the copied generated semantics before the experiment.
-- `output.maude`: the hand-edited sort experiment.
-- `fib.wat`: the same compiled-WAT Fibonacci benchmark used by the repository.
-- `fib-baseline.maude` and `fib-sorted.maude`: identical generated initial
-  configurations and properties, differing only in the loaded semantics.
-
-The sorted version adds `Val`, `Instr`, `Vals`, and `Instrs`, classifies all
-108 `instr.*` constructors as `Instr`, classifies the ten runtime value
-instruction constructors as `Val`, and replaces the generated context splitter
-in `step-ctxt-instrs` with a directly sorted associative pattern.
-
-## Results
-
-Both versions produce Fibonacci result 5, visit five model-checker states, reject
-result 6, satisfy the two true LTL properties, and produce a counterexample for
-the false LTL property.  Maude reports no warning or parse error.
-
-| Check | Baseline rewrites | Baseline real | Sorted rewrites | Sorted real |
-|---|---:|---:|---:|---:|
-| Rewrite to result 5 | 59,529 | 29 ms | 65,778 | 29 ms |
-| Search result 5 | 59,539 | 39 ms | 65,790 | 27 ms |
-| Search: no result 6 | 116,057,377 | 59.171 s | 186,609,248 | 98.982 s |
-| LTL: eventually result 5 | 116,057,408 | 61.108 s | 186,609,279 | 101.589 s |
-| LTL: always not result 6 | 116,057,409 | 60.574 s | 186,609,280 | 101.651 s |
-| LTL: eventually result 6 | 59,560 | 21 ms | 65,809 | 36 ms |
-
-For the three checks that exhaust the reachable state space, the sorted version
-performs about 60.8% more rewrites and takes about 67% more wall-clock time.
-
-## Interpretation
-
-The copied baseline is not the old naive three-way associative pattern.  It
-already uses `helper.context-split.step`, which scans for the first non-value and
-constructs context candidates explicitly.
-
-The hand-edited sort version removes invalid value-prefix matches, but it still
-contains two adjacent variables of the same sort:
+The rule uses associative matching and the source `val*` membership:
 
 ```maude
-INSTR_STAR:Instrs INSTR_1_STAR:Instrs
+crl [step-ctxt-instrs] :
+  rel.step(config.sym(Z, VAL_STAR INSTR_STAR INSTR_1_STAR))
+  =>
+  config.sym(Z_PRIME, VAL_STAR INSTR_PRIME_STAR INSTR_1_STAR)
+if
+  typecheckSeq(VAL_STAR, syn.val) = true
+  /\ (VAL_STAR =/= eps or INSTR_1_STAR =/= eps)
+  /\ rel.step(config.sym(Z, INSTR_STAR))
+       => config.sym(Z_PRIME, INSTR_PRIME_STAR)
+  /\ typecheck(config.sym(Z_PRIME, INSTR_PRIME_STAR), syn.config) .
 ```
 
-Therefore Maude must still try the possible boundaries between the executable
-middle sequence and the suffix.  In addition, the generic `SpectecTerminals`
-concatenation must coexist with the new `Vals` and `Instrs` overloads, and
-partial instruction constructors require membership normalization before their
-least sorts are available.
+No `Val`, `Vals`, `Instr`, or `Instrs` sort is introduced here. Maude still
+chooses the three associative fragments. `typecheckSeq` then accepts only a
+`val*` prefix.
 
-Consequently, adding these sorts locally does not improve the current generated
-semantics.  A useful sorted design would need instruction sequences to retain
-their precise sort throughout constructors, definitions, relations, and helper
-results, without repeatedly falling back to the generic sequence carrier.  It
-would also need a separate solution for the `instr*` / suffix boundary, because
-both are `Instrs` and cannot be distinguished by sort alone.
+The source and instruction representations of constants use different
+constructors. The translator derives the corresponding membership equations
+from the existing subtype injection metadata:
 
+```maude
+ceq typecheck(instr.const(T, N), syn.val) = true
+  if typecheck(num.const(T, N), syn.val) .
+
+ceq typecheck(instr.vconst(T, V), syn.val) = true
+  if typecheck(vec.vconst(T, V), syn.val) .
+```
+
+These equations preserve the source `val` membership on the emitted runtime
+representation. They do not scan or split an instruction sequence.
+
+## Removed Helpers
+
+The old lowering emitted 17 `helper.context-*` operators that scanned the
+instruction stream and selected a context. They were not present in SpecTec
+and existed only to optimize matching, so they have been removed. The direct
+rule also removes the projection/reinjection round trip:
+
+```text
+helper.subtype-project-seq.step-pure(PATTERN1)
+helper.iter-map.step(VAL_STAR)
+```
+
+Other subtype, iteration, inverse, enabledness, and runtime-truth helpers are
+unchanged. They lower source constructs that Maude cannot express directly.
+
+## Fibonacci Result
+
+The generated module and builtin module load without warnings. The compiled-WAT
+Fibonacci benchmark completes with the direct rule:
+
+```text
+rewrite to 5:          72,468 rewrites, 0.024 s CPU
+search result 5:       72,481 rewrites, 0.023 s CPU, solution
+search result 6:  370,051,815 rewrites, 107.6 s CPU, no solution
+<> result 5:      370,051,846 rewrites, 107.6 s CPU, true
+[] ~ result 6:    370,051,847 rewrites, 107.5 s CPU, true
+<> result 6:           72,499 rewrites, 0.023 s CPU, counterexample
+```
+
+The exhaustive checks are intentionally expensive in this unsorted baseline:
+Maude still explores associative splits and rejects invalid prefixes through
+membership. The next experiment may add source-derived sequence sorts, but it
+must compare against this direct semantics without introducing a scanner or a
+fast execution rule.

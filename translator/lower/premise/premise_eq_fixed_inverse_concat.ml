@@ -45,11 +45,18 @@ let fixed_pair_sources = function
     Some [ (left_id, left_source); (right_id, right_source) ]
   | _ -> None
 
-let has_fixed_pair_source args =
+let has_unbound_pair_source names env ~bound_vars args =
   args
   |> List.exists (fun arg ->
     match arg.it with
-    | ExpA exp -> Option.is_some (fixed_pair_sources exp)
+    | ExpA exp ->
+      (match fixed_pair_sources exp with
+      | Some sources ->
+        sources
+        |> List.exists (fun (_, source) ->
+          Option.is_some
+            (unbound_var_binding names env ~bound_vars source))
+      | None -> false)
     | TypA _ | DefA _ | GramA _ -> false)
 
 let lower_type_arg ctx env origin = function
@@ -76,30 +83,33 @@ let lower_type_arg ctx env origin = function
     }
 
 type call_shape =
-  { type_result : Expr_result.result option
+  { known_terms : term list
+  ; guards : eq_condition list
+  ; diagnostics : Diagnostics.t list
   ; pair_sources : (id * exp) list option
+  ; pair_param_index : int option
   }
 
 let collect_call_shape ctx env origin params args =
-  let rec loop type_result pair_sources params args =
+  let rec loop index known_terms guards diagnostics pair_sources pair_param_index params args =
     match params, args with
-    | [], [] -> Ok { type_result; pair_sources }
+    | [], [] ->
+      Ok
+        { known_terms = List.rev known_terms
+        ; guards = List.rev guards
+        ; diagnostics = List.rev diagnostics
+        ; pair_sources
+        ; pair_param_index
+        }
     | Analysis.Function_graph.Static_typ :: params, arg :: args ->
       let result = lower_type_arg ctx env origin arg in
-      (match type_result, result.term with
-      | None, Some _ -> loop (Some result) pair_sources params args
-      | None, None -> Error result.diagnostics
-      | Some _, _ ->
-        Error
-          [ unsupported
-              ~ctx
-              ~origin
-              ~constructor:"Premise/IfPr/fixed-inverse-concat/static-arg"
-              ~source_echo:(Il.Print.string_of_arg arg)
-              ~reason:"fixed inverse concat supports exactly one TypP static witness"
-              ~suggestion:"Keep this equality Unsupported until the helper contract records multiple static type witnesses"
-              ()
-          ])
+      (match result.term with
+      | Some term ->
+        loop (index + 1) (term :: known_terms)
+          (List.rev_append result.guards guards)
+          (List.rev_append result.diagnostics diagnostics)
+          pair_sources pair_param_index params args
+      | None -> Error result.diagnostics)
     | Runtime_exp :: params, { it = ExpA exp; _ } :: args ->
       (match pair_sources, fixed_pair_sources exp with
       | Some _, Some _ ->
@@ -113,9 +123,17 @@ let collect_call_shape ctx env origin params args =
               ()
           ]
       | None, Some sources ->
-        loop type_result (Some sources) params args
+        loop (index + 1) known_terms guards diagnostics
+          (Some sources) (Some index) params args
       | _, None ->
-        loop type_result pair_sources params args)
+        let result = lower_with_source_carrier ctx env origin exp in
+        (match result.term with
+        | Some term ->
+          loop (index + 1) (term :: known_terms)
+            (List.rev_append result.guards guards)
+            (List.rev_append result.diagnostics diagnostics)
+            pair_sources pair_param_index params args
+        | None -> Error result.diagnostics))
     | (Static_def | Static_gram) :: _, arg :: _ ->
       Error
         [ unsupported
@@ -149,7 +167,22 @@ let collect_call_shape ctx env origin params args =
             ()
         ]
   in
-  loop None None params args
+  loop 0 [] [] [] None None params args
+
+let inverse_definition_implemented
+    ctx
+    (inverse : Analysis.Function_graph.definition) =
+  inverse.clause_count > 0
+  ||
+  match Builtin_registry.find (Context.builtins ctx) inverse.id with
+  | Some { status = Builtin_registry.Implemented; _ } -> true
+  | Some { status = Obligation; _ } | None -> false
+
+let inverse_result_is_chunks
+    (inverse : Analysis.Function_graph.definition) =
+  match Expr_translate.carrier_sort_of_typ inverse.result with
+  | Some sort -> sort_name sort = "SpectecTerminals"
+  | None -> false
 
 let sequence_binding names ctx env ~bound_vars origin source_exp =
   match unbound_var_binding names env ~bound_vars source_exp with
@@ -203,118 +236,188 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
   | CallE (id, args) ->
     let graph = Context.function_graph ctx in
     let target_id = call_target_id ctx id in
-    (match
-       Analysis.Function_graph.find_definition graph target_id.it,
-       Analysis.Function_graph.definition_inverse graph target_id.it
-     with
-    | Some definition, Some _inverse_id
+    if not (has_unbound_pair_source names env ~bound_vars args) then None else
+    (match Analysis.Function_graph.find_definition graph target_id.it,
+           Analysis.Function_graph.definition_inverse_status graph target_id.it with
+    | Some definition, Invalid_inverse { reason; hint_origin }
       when List.length definition.params = List.length args ->
-      if not (has_fixed_pair_source args) then
-        None
-      else
+      Some
+        { (empty_with_env ~bound_vars env) with
+          diagnostics =
+            [ unsupported_exp ctx origin exp
+                (reason ^ "; inverse hint declared at " ^ Origin.summary hint_origin)
+                "Correct the source inverse metadata or keep this pair reconstruction Unsupported"
+            ]
+        }
+    | Some definition, Valid_inverse inverse
+      when List.length definition.params = List.length args ->
       (match collect_call_shape ctx env origin definition.params args with
       | Error diagnostics ->
         Some { (empty_with_env ~bound_vars env) with diagnostics }
-      | Ok { type_result = Some type_result; pair_sources = Some pair_sources } ->
+      | Ok { pair_sources = Some _; pair_param_index = Some pair_param_index; _ }
+        when pair_param_index <> inverse.omitted_param_index ->
+        Some
+          { (empty_with_env ~bound_vars env) with
+            diagnostics =
+              [ unsupported_exp ctx origin exp
+                  "fixed pair source is not the runtime parameter omitted by the validated inverse declaration"
+                  "Keep this equality Unsupported unless the pair structure occupies the declared inverse output position"
+              ]
+          }
+      | Ok ({ pair_sources = Some pair_sources; _ } as shape) ->
         (match bind_pair_sources names ctx env ~bound_vars origin pair_sources with
         | Error diagnostics ->
           Some { (empty_with_env ~bound_vars env) with diagnostics }
         | Ok ((left_id, left_binding), (right_id, right_binding)) ->
-          let known_result = lower_with_source_carrier ctx env origin known_exp in
-          (match type_result.term, known_result.term with
-          | Some type_term, Some known_term ->
-            let prefix_conditions =
-              type_result.guards @ known_result.guards
-            in
-            let prefix_bound =
-              conditions_bound_vars bound_vars prefix_conditions
-            in
-            if not (vars_subset (Condition_closure.term_vars known_term) prefix_bound) then
+          (match Analysis.Function_graph.find_definition graph inverse.inverse_id with
+          | None ->
+            Some
+              { (empty_with_env ~bound_vars env) with
+                diagnostics =
+                  shape.diagnostics
+                  @ [ unsupported_exp ctx origin exp
+                        ("source-declared inverse target `" ^ inverse.inverse_id
+                         ^ "` has no DecD declaration")
+                        "Declare the inverse function before using pair reconstruction"
+                    ]
+              }
+          | Some inverse_definition
+            when not (inverse_definition_implemented ctx inverse_definition) ->
+            Some
+              { (empty_with_env ~bound_vars env) with
+                diagnostics =
+                  shape.diagnostics
+                  @ [ unsupported_exp ctx origin exp
+                        ("source-declared inverse `" ^ inverse.inverse_id
+                         ^ "` has no implemented source or builtin contract")
+                        "Implement the declared inverse before using pair reconstruction"
+                    ]
+              }
+          | Some inverse_definition when not (inverse_result_is_chunks inverse_definition) ->
+            Some
+              { (empty_with_env ~bound_vars env) with
+                diagnostics =
+                  shape.diagnostics
+                  @ [ unsupported_exp ctx origin exp
+                        "declared outer inverse does not return a sequence of reconstructed chunks"
+                        "Keep this pair reconstruction Unsupported until the inverse result preserves chunk boundaries"
+                    ]
+              }
+          | Some inverse_definition ->
+            let known_result = lower_with_source_carrier ctx env origin known_exp in
+            match known_result.term with
+            | None ->
               Some
                 { (empty_with_env ~bound_vars env) with
-                  diagnostics =
-                    type_result.diagnostics @ known_result.diagnostics
-                    @ [ unsupported_exp
-                          ctx
-                          origin
-                          exp
-                          "fixed inverse concat input uses variables that are not bound before this premise"
-                          "Bind the known sequence through earlier source premises before splitting it"
-                      ]
+                  diagnostics = shape.diagnostics @ known_result.diagnostics
                 }
-            else
-              let helper_request =
-                Helper_request.fixed_inverse_concat2_request
-                  ~origin
-                  ~source:(source_echo_exp exp)
-                  ~reason:
-                    "fixed inverse concat over a source pair chunk from an inverse-hinted forward function"
+            | Some known_term ->
+              let inverse_terms = shape.known_terms @ [ known_term ] in
+              let inverse_call =
+                App
+                  ( Context.definition_op ctx
+                      { id with it = inverse.inverse_id }
+                  , inverse_terms )
               in
-              let helper_name =
-                Helper.request (Context.helpers ctx) helper_request
+              let prefix_conditions = shape.guards @ known_result.guards in
+              let prefix_bound =
+                conditions_bound_vars bound_vars prefix_conditions
               in
-              let split_match =
-                Helper_materialize_inverse.fixed_concat2_match_condition
-                  helper_name
-                  ~type_witness:type_term
-                  ~known:known_term
-                  ~left:left_binding.term
-                  ~right:right_binding.term
-              in
-              let env_after =
-                Expr_env.add
-                  (Expr_env.add env left_id left_binding)
-                  right_id
-                  right_binding
-              in
-              let original_result =
-                Expr_translate.lower_value ctx env_after origin call_exp
-              in
-              (match original_result.term with
-              | Some original_term ->
-                let conditions =
-                  prefix_conditions @ [ split_match ] @ original_result.guards
-                  @ [ EqCond (original_term, known_term) ]
-                in
-                let pattern_certificate =
-                  Condition_pattern_certificate.generated
-                    [ Helper_materialize_inverse.fixed_concat_result_constructor
-                        helper_name origin
-                    ]
-                in
-                Some
-                  (with_conditions
-                     ~pattern_certificate
-                     ctx
-                     env_after
-                     bound_vars
-                     conditions
-                     (type_result.diagnostics @ known_result.diagnostics
-                      @ original_result.diagnostics))
-              | None ->
+              if
+                List.length inverse_definition.params
+                <> List.length inverse_terms
+              then
                 Some
                   { (empty_with_env ~bound_vars env) with
                     diagnostics =
-                      type_result.diagnostics @ known_result.diagnostics
-                      @ original_result.diagnostics
-                  })
-          | _ ->
-            Some
-              { (empty_with_env ~bound_vars env) with
-                diagnostics = type_result.diagnostics @ known_result.diagnostics
-              }))
-      | Ok { type_result = None; pair_sources = Some _ } ->
-        Some
-          { (empty_with_env ~bound_vars env) with
-            diagnostics =
-              [ unsupported_exp
-                  ctx
-                  origin
-                  exp
-                  "fixed inverse concat found a pair source chunk but no TypP witness"
-                  "Keep this equality Unsupported until the source type witness is preserved"
-              ]
-          }
+                      shape.diagnostics @ known_result.diagnostics
+                      @ [ unsupported_exp ctx origin exp
+                            "declared outer inverse arity does not match the pair reconstruction call"
+                            "Keep this equality Unsupported until inverse metadata and call arguments agree"
+                        ]
+                  }
+              else if
+                not
+                  (vars_subset
+                     (Condition_closure.term_vars inverse_call)
+                     prefix_bound)
+              then
+                Some
+                  { (empty_with_env ~bound_vars env) with
+                    diagnostics =
+                      shape.diagnostics @ known_result.diagnostics
+                      @ [ unsupported_exp
+                            ctx
+                            origin
+                            exp
+                            "declared outer inverse uses variables that are not bound before pair reconstruction"
+                            "Bind every inverse input through earlier source premises"
+                        ]
+                  }
+              else
+                let chunks, _ =
+                  Local_name.fresh_qualified names Local_name.Chunk
+                    (sort_ref (sort "SpectecTerminals"))
+                in
+                let helper_request =
+                  Helper_request.unzip2_request
+                    ~origin
+                    ~source:(source_echo_exp exp)
+                    ~reason:
+                      "structural unzip of exact two-element chunks returned by a declared inverse"
+                in
+                let helper_name =
+                  Helper.request (Context.helpers ctx) helper_request
+                in
+                let unzip_match =
+                  Helper_materialize_inverse.unzip2_match_condition
+                    helper_name
+                    ~chunks
+                    ~left:left_binding.term
+                    ~right:right_binding.term
+                in
+                Context.record_definition_call ctx inverse_call
+                  (Analysis.Function_graph.plain_identity inverse.inverse_id);
+                let env_after =
+                  Expr_env.add
+                    (Expr_env.add env left_id left_binding)
+                    right_id
+                    right_binding
+                in
+                let original_result =
+                  Expr_translate.lower_value ctx env_after origin call_exp
+                in
+                match original_result.term with
+                | None ->
+                  Some
+                    { (empty_with_env ~bound_vars env) with
+                      diagnostics =
+                        shape.diagnostics @ known_result.diagnostics
+                        @ original_result.diagnostics
+                    }
+                | Some original_term ->
+                  let conditions =
+                    prefix_conditions
+                    @ [ MatchCond (chunks, inverse_call); unzip_match ]
+                    @ original_result.guards
+                    @ [ EqCond (original_term, known_term) ]
+                  in
+                  let pattern_certificate =
+                    Condition_pattern_certificate.generated
+                      [ Helper_materialize_inverse.unzip2_result_constructor
+                          helper_name origin
+                      ]
+                  in
+                  Some
+                    (with_conditions
+                       ~pattern_certificate
+                       ctx
+                       env_after
+                       bound_vars
+                       conditions
+                       (shape.diagnostics @ known_result.diagnostics
+                        @ original_result.diagnostics)))
+          )
       | Ok _ -> None)
-    | _ -> None)
+    | Some _, No_inverse | Some _, Invalid_inverse _ | Some _, Valid_inverse _ | None, _ -> None)
   | _ -> None
