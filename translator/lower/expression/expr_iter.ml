@@ -49,53 +49,20 @@ type zip_source =
   ; zip_source_shape : Request.iter_zip_source_shape
   }
 
-let flat_list_element_typ typ =
-  match typ.it with
-  | IterT (element_typ, List) when not (Type_shape.typ_is_iter element_typ) ->
-    Some element_typ
-  | _ -> None
-
-let flat_optional_element_typ typ =
-  match typ.it with
-  | IterT (element_typ, Opt) when not (Type_shape.typ_is_iter element_typ) ->
-    Some element_typ
-  | _ -> None
-
-let nested_list_inner_typ typ =
-  match typ.it with
-  | IterT (({ it = IterT (element_typ, List); _ } as inner_list_typ), List)
-    when not (Type_shape.typ_is_iter element_typ) ->
-    Some inner_list_typ
-  | _ -> None
-
-let optional_list_inner_typ typ =
-  match typ.it with
-  | IterT (({ it = IterT (element_typ, Opt); _ } as inner_optional_typ), List)
-    when not (Type_shape.typ_is_iter element_typ) ->
-    Some inner_optional_typ
-  | _ -> None
-
-let optional_nested_list_inner_typ typ =
-  match typ.it with
-  | IterT (({ it = IterT (element_typ, List); _ } as inner_list_typ), Opt)
-    when not (Type_shape.typ_is_iter element_typ) ->
-    Some inner_list_typ
-  | _ -> None
-
 let output_descriptor typ =
-  match flat_list_element_typ typ with
+  match Iteration_shape.flat_list_element typ with
   | Some element_typ -> Some (Request.Output_flat_terminal, element_typ)
   | None ->
-    (match flat_optional_element_typ typ with
+    (match Iteration_shape.flat_optional_element typ with
     | Some element_typ -> Some (Request.Output_flat_terminal, element_typ)
     | None ->
-      (match nested_list_inner_typ typ with
+      (match Iteration_shape.list_of_lists_element typ with
       | Some inner_typ -> Some (Request.Output_nested_seq, inner_typ)
       | None ->
-        (match optional_list_inner_typ typ with
+        (match Iteration_shape.list_of_optionals_element typ with
         | Some inner_typ -> Some (Request.Output_nested_seq, inner_typ)
         | None ->
-          (match optional_nested_list_inner_typ typ with
+          (match Iteration_shape.optional_list_element typ with
           | Some inner_typ -> Some (Request.Output_nested_seq, inner_typ)
           | None -> None))))
 

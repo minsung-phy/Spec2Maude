@@ -29,11 +29,6 @@ let local_rules request =
 let child_origin parent segment ast_constructor region source_echo =
   Origin.with_child ?source_echo parent segment ~ast_constructor region
 
-let exp_components (exp : Il.Ast.exp) =
-  match exp.it with
-  | Il.Ast.TupE exps -> exps
-  | _ -> [ exp ]
-
 let add_pattern_binding env binding =
   Expr_env.add_introduced env binding
 

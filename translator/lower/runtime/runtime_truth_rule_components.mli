@@ -24,8 +24,6 @@ val child_origin :
   string option ->
   Origin.t
 
-val exp_components : Il.Ast.exp -> Il.Ast.exp list
-
 val lower_complete_head_patterns :
   Local_name.t ->
   ?env:Expr_env.t ->

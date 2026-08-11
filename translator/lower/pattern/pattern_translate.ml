@@ -276,22 +276,16 @@ let iter_source_descriptor callbacks typ =
       Some { source_item_shape; source_element_typ = element_typ; source_element_sort }
     | None -> None
   in
-  match typ.it with
-  | IterT (element_typ, (List | List1 | ListN _))
-    when not (Type_shape.typ_is_iter element_typ) ->
+  match Iteration_shape.flat_repeated_element typ with
+  | Some element_typ ->
     descriptor Request.Source_flat_terminal element_typ
-  | IterT
-      (({ it = IterT (inner_typ, (List | Opt)); _ } as element_typ), (List | List1 | ListN _))
-    when not (Type_shape.typ_is_iter inner_typ) ->
+  | None ->
+    (match Iteration_shape.repeated_sequence_element typ with
+    | Some element_typ ->
     descriptor Request.Source_nested_seq element_typ
-  | _ -> None
+    | None -> None)
 
-let flat_subject_iter_typ typ =
-  match typ.it with
-  | IterT (element_typ, (List | List1 | ListN _))
-    when not (Type_shape.typ_is_iter element_typ) ->
-    Some element_typ
-  | _ -> None
+let flat_subject_iter_typ = Iteration_shape.flat_repeated_element
 
 let typed_pattern_var names id sort =
   if id.it = "_" then
@@ -397,13 +391,7 @@ let rec lower_internal names ctx callbacks origin exp =
     Pattern_subtyping.lower_direct
       names
       ctx
-      { bound_vars = callbacks.bound_vars
-      ; lower_pattern = (fun names -> lower_internal names ctx callbacks)
-      ; carrier_sort_of_typ = callbacks.carrier_sort_of_typ
-      ; guard_for_typ =
-          (fun origin ~constructor exp term typ ->
-            guard_for_typ ctx callbacks origin constructor exp term typ)
-      }
+      (subtyping_callbacks ctx callbacks)
       origin exp inner source_typ target_typ
   | LiftE inner -> lower_lift names ctx callbacks origin exp inner
   | CallE _ -> lower_call_pattern names ctx callbacks origin exp
@@ -417,6 +405,15 @@ let rec lower_internal names ctx callbacks origin exp =
     return names
       (unsupported_pattern ctx origin (form_name (classify exp)) exp
          "this expression constructor is not a documented safe pattern form for this slice")
+
+and subtyping_callbacks ctx callbacks : Pattern_subtyping.callbacks =
+  { bound_vars = callbacks.bound_vars
+  ; lower_pattern = (fun names -> lower_internal names ctx callbacks)
+  ; carrier_sort_of_typ = callbacks.carrier_sort_of_typ
+  ; guard_for_typ =
+      (fun origin ~constructor exp term typ ->
+        guard_for_typ ctx callbacks origin constructor exp term typ)
+  }
 
 and lower_call_pattern names ctx callbacks origin exp =
   match callbacks.carrier_sort_of_typ exp.note with
@@ -1443,13 +1440,7 @@ and lower_source_preserving_sequence
     Pattern_subtyping.lower_iterated
       names
       ctx
-      { bound_vars = callbacks.bound_vars
-      ; lower_pattern = (fun names -> lower_internal names ctx callbacks)
-      ; carrier_sort_of_typ = callbacks.carrier_sort_of_typ
-      ; guard_for_typ =
-          (fun origin ~constructor exp term typ ->
-            guard_for_typ ctx callbacks origin constructor exp term typ)
-      }
+      (subtyping_callbacks ctx callbacks)
       origin exp ~source_exp ~source_result ~source_term
       ~source_typ ~target_typ ~iter
   | Some _, _
