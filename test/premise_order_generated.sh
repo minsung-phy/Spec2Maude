@@ -87,12 +87,12 @@ require_statement_before () {
 
 step=$(condition_line 'crl [step-ctxt-instrs]')
 require_before "$step" \
-  '(typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true' \
+  'VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals)' \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
-  'ctxt-instrs value-prefix membership no longer precedes its self-recursive rewrite'
-if printf '%s\n' "$step" | grep -Eq 'helper\.(context-|subtype-project-seq\.step-pure)'
+  'ctxt-instrs value-prefix projection no longer precedes its self-recursive rewrite'
+if printf '%s\n' "$step" | grep -Eq 'helper\.context-'
 then
-  echo 'ctxt-instrs retained a source-free split or projection helper' >&2
+  echo 'ctxt-instrs retained a source-free context scanner' >&2
   exit 1
 fi
 
@@ -165,12 +165,12 @@ require_before "$step_context" \
   'Step/ctxt-instrs no longer retains its whole recursive rewrite-result config guard'
 step_context_rule=$(matching_line 'crl [step-ctxt-instrs]')
 require_contains "$step_context_rule" \
-  'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
+  'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
   'Step/ctxt-instrs no longer preserves its source value prefix'
 if printf '%s\n' "$step_context" \
-    | grep -Eq 'helper\.(context-|subtype-project-seq\.step-pure)'
+    | grep -Eq 'helper\.context-'
 then
-  echo 'Step/ctxt-instrs retained a source-free split or projection helper' >&2
+  echo 'Step/ctxt-instrs retained a source-free context scanner' >&2
   exit 1
 fi
 if printf '%s\n' "$step_context_rule" | grep -Fq 'helper.iter-map'; then
@@ -178,8 +178,8 @@ if printf '%s\n' "$step_context_rule" | grep -Fq 'helper.iter-map'; then
   exit 1
 fi
 require_contains "$step_context" \
-  '(typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true' \
-  'Step/ctxt-instrs lost its source val* constraint'
+  'VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals)' \
+  'Step/ctxt-instrs lost its source val* projection'
 if printf '%s\n' "$step_context" | grep -Eq 'syn\.state\)'; then
   echo 'Step/ctxt-instrs retained an input-state check implied by config membership' >&2
   exit 1

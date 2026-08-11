@@ -47,7 +47,6 @@
   premise_validation_skip
   primitive_term
   record_shape
-  reld_context
   reld_deterministic
   reld_enabledness
   reld_enabledness_constructor_group
