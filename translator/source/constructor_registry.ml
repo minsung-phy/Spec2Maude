@@ -27,6 +27,7 @@ type entry =
   ; constructor_op : string
   ; projection_ops : string list
   ; payload_labels : payload_label list
+  ; payload_typs : Il.Ast.typ list
   ; payload_witnesses : Maude_ir.term list
   ; payload_sorts : Maude_ir.sort list
   ; origin : Origin.t
@@ -112,10 +113,30 @@ let same_source_entry left right =
   same_shape left right
   && left.declaring_category = right.declaring_category
   && left.payload_labels = right.payload_labels
+  && List.length left.payload_typs = List.length right.payload_typs
+  && List.for_all2 Il.Eq.eq_typ left.payload_typs right.payload_typs
   && left.payload_witnesses = right.payload_witnesses
   && left.payload_sorts = right.payload_sorts
   && left.construction_domain = right.construction_domain
   && left.origin = right.origin
+
+let same_payload_schema left right =
+  left.status = Emitted
+  && right.status = Emitted
+  && left.constructor_op = right.constructor_op
+  && left.arity = right.arity
+  && List.length left.payload_typs = List.length right.payload_typs
+  && List.for_all2 Il.Eq.eq_typ left.payload_typs right.payload_typs
+  && left.payload_sorts = right.payload_sorts
+  && left.payload_witnesses = right.payload_witnesses
+  && left.construction_domain = right.construction_domain
+
+let uniform_payload_schema t entry =
+  t.entries
+  |> List.filter (fun candidate ->
+    candidate.status = Emitted
+    && candidate.constructor_op = entry.constructor_op)
+  |> List.for_all (same_payload_schema entry)
 
 type registration =
   | Registered
@@ -600,27 +621,31 @@ let construction_domain_to_string = function
       (Origin.summary certificate.guard_origin)
   | Guarded_constructor reason -> "guarded: " ^ reason
 
-let duplicate_shape_groups entries =
+type entry_group = entry * entry list
+
+let group_by same entries : entry_group list =
   entries
   |> List.fold_left
        (fun groups entry ->
-         let same, rest =
+         let matching, rest =
            List.partition
-             (function
-               | [] -> false
-               | head :: _ -> same_shape entry head)
+             (fun (head, _) -> same entry head)
              groups
          in
-         match same with
-         | [] -> [ entry ] :: rest
-         | group :: _ -> (entry :: group) :: rest)
+         match matching with
+         | [] -> (entry, []) :: rest
+         | (head, tail) :: _ -> (entry, head :: tail) :: rest)
        []
-  |> List.filter (fun group ->
-    match group with
-    | [] | [ _ ] -> false
-    | entries ->
+
+let duplicate_shape_groups entries =
+  entries
+  |> group_by same_shape
+  |> List.filter (fun (head, tail) ->
+    match tail with
+    | [] -> false
+    | _ ->
       let distinct =
-        entries
+        head :: tail
         |> List.map (fun entry ->
           entry.constructor_op,
           entry.projection_ops,
@@ -646,22 +671,9 @@ let same_raw_owner left right =
 let visible_collision_groups entries =
   entries
   |> List.filter (fun entry -> entry.status = Emitted)
-  |> List.fold_left
-       (fun groups entry ->
-         let same, rest =
-           List.partition
-             (function
-               | head :: _ -> same_visible_signature entry head
-               | [] -> false)
-             groups
-         in
-         match same with
-         | [] -> [ entry ] :: rest
-         | group :: _ -> (entry :: group) :: rest)
-       []
-  |> List.filter (function
-    | [] | [ _ ] -> false
-    | head :: rest -> not (List.for_all (same_raw_owner head) rest))
+  |> group_by same_visible_signature
+  |> List.filter (fun (head, tail) ->
+       tail <> [] && not (List.for_all (same_raw_owner head) tail))
 
 let diagnostics ~profile t =
   let late_registration_diagnostics =
@@ -685,37 +697,30 @@ let diagnostics ~profile t =
   in
   let duplicate_shape_diagnostics =
     duplicate_shape_groups t.entries
-    |> List.filter_map (function
-    | [] ->
-      invalid_arg "Constructor_registry.diagnostics: empty duplicate-shape group"
-    | entry :: rest ->
+    |> List.map (fun (entry, rest) ->
       let constructors =
         (entry :: rest)
         |> List.map (fun entry -> entry.constructor_op)
         |> List.sort_uniq String.compare
       in
-      Some
-        (Diagnostics.make
-           ~category:Diagnostics.Unsupported
-           ~origin:entry.origin
-           ~constructor:"ConstructorRegistry/duplicate-shape"
-           ~enclosing:entry.enclosing
-           ~profile
-           ~reason:
-             (Printf.sprintf
-                "source category `%s` mixop/arity shape maps to multiple emitted constructors: %s"
-                entry.source_category
-                (String.concat ", " constructors))
-           ~suggestion:
-             "Preserve the declaring category/static arguments in the registry key, or keep this shape Unsupported instead of guessing"
-           ()))
+      Diagnostics.make
+        ~category:Diagnostics.Unsupported
+        ~origin:entry.origin
+        ~constructor:"ConstructorRegistry/duplicate-shape"
+        ~enclosing:entry.enclosing
+        ~profile
+        ~reason:
+          (Printf.sprintf
+             "source category `%s` mixop/arity shape maps to multiple emitted constructors: %s"
+             entry.source_category
+             (String.concat ", " constructors))
+        ~suggestion:
+          "Preserve the declaring category/static arguments in the registry key, or keep this shape Unsupported instead of guessing"
+        ())
   in
   let visible_collision_diagnostics =
     visible_collision_groups t.entries
-    |> List.map (function
-      | [] | [ _ ] ->
-        invalid_arg "Constructor_registry.diagnostics: invalid visible collision group"
-      | entry :: rest ->
+    |> List.map (fun (entry, rest) ->
         let owners =
           entry :: rest
           |> List.map (fun candidate ->

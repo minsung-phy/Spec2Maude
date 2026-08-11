@@ -610,6 +610,7 @@ let constructor_entry
   ; projection_ops =
       List.init arity (Naming.projection_op constructor_op)
   ; payload_labels
+  ; payload_typs = List.init arity (fun _ -> nat_typ)
   ; payload_witnesses = witnesses
   ; payload_sorts = sorts
   ; origin
@@ -617,6 +618,34 @@ let constructor_entry
   ; status = Constructor_registry.Emitted
   ; construction_domain = Constructor_registry.Total_constructor
   }
+
+let test_constructor_payload_schema () =
+  let case_mixop = Xl.Mixop.Seq [ Xl.Mixop.Arg () ] in
+  let make key witness =
+    constructor_entry
+      ~static_args_key:key
+      ~constructor_op:"shared.payload"
+      ~origin:(origin key)
+      ~mixop:case_mixop
+      ~arity:1
+      ~witnesses:[ Const witness ]
+      ~sorts:[ sort "Nat" ]
+      ()
+  in
+  let registry = Constructor_registry.create () in
+  let first = make "first" "syn.first" in
+  let second = make "second" "syn.second" in
+  Constructor_registry.register registry first;
+  Constructor_registry.register registry second;
+  if Constructor_registry.uniform_payload_schema registry first then
+    failwith "different payload witnesses were accepted as one membership schema";
+  let uniform = Constructor_registry.create () in
+  let left = make "left" "syn.shared" in
+  let right = make "right" "syn.shared" in
+  Constructor_registry.register uniform left;
+  Constructor_registry.register uniform right;
+  if not (Constructor_registry.uniform_payload_schema uniform left) then
+    failwith "identical payload membership schemas were rejected"
 
 let test_constructor_surface_resolution () =
   let registry = Constructor_registry.create () in
@@ -892,6 +921,7 @@ let () =
   test_builtin_declaration_and_call ();
   test_typd_source_binder ();
   test_constructor_component_occurrences ();
+  test_constructor_payload_schema ();
   test_constructor_surface_resolution ();
   test_constructor_lossy_collision ();
   test_constructor_static_key_sharing ();

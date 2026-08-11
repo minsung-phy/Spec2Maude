@@ -99,7 +99,9 @@ let translate_rule
         ; diagnostics = hint_diags @ bind_diags @ arity_diags @ lhs_diags
         }
       | Some lhs_terms ->
-        let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
+        let env =
+          add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings
+        in
         let premise_translation, _names =
           Premise_translate.translate_premises_named
             names
@@ -148,6 +150,10 @@ let translate_rule
                    ~constructor_op:pattern_certificate
                    lhs_terms
               |> dedup_conditions
+              |> Validated_guard_certificate.discharge_eq
+                   ctx
+                   (Premise_result.env_after premise_result)
+                   ~lhs_terms
             in
             let admissibility_diags =
               Condition_admissibility.ceq_admissibility_diagnostics

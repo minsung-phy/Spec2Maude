@@ -26,6 +26,13 @@ let runtime_predicate_truth_worklist_requests =
 let runtime_enabledness_requests =
   Helper_registry.runtime_enabledness_requests
 
+let subtype_injections registry =
+  Helper_registry.entries registry
+  |> List.filter_map (fun entry ->
+       match entry.Helper_registry.request.kind with
+       | Request.Subtype_injection injection -> Some (entry.name, injection)
+       | _ -> None)
+
 let unmaterialized_diagnostics =
   Helper_registry.unmaterialized_diagnostics
 

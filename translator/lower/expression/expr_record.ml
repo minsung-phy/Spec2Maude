@@ -21,6 +21,8 @@ type env = Expr_env.t
 type callbacks =
   { lower_value : Context.t -> env -> Origin.t -> exp -> result
   ; lower_sequence : Context.t -> env -> Origin.t -> exp -> result
+  ; lower_sequence_as :
+      Sequence_representation.t -> Context.t -> env -> Origin.t -> exp -> result
   }
 
 let record_shape_diagnostic ctx origin constructor exp error =
@@ -35,10 +37,15 @@ let lower_record_literal callbacks ctx env origin (exp : exp) (fields : expfield
     | Ok fields ->
       let results =
         fields
-        |> List.map (fun (_, (_, field_exp)) ->
+        |> List.map (fun ((atom, _, _), (_, field_exp)) ->
           match Carrier_sort.for_expression field_exp.note with
           | Some sort when Carrier_sort.is_sequence_sort sort ->
-            callbacks.lower_sequence ctx env origin field_exp
+            let representation =
+              Analysis.Sequence_carrier.field_representation
+                (Context.sequence_carriers ctx)
+                ~owner_id:shape.id.it atom
+            in
+            callbacks.lower_sequence_as representation ctx env origin field_exp
           | _ -> callbacks.lower_value ctx env origin field_exp)
       in
       let guards, diagnostics = append_result_metadata results in
@@ -392,8 +399,17 @@ let rec lower_path_update callbacks ctx env origin (exp : exp) record_term
     in
     (match parent_result.term, first_result.term, count_result.term with
     | Some parent_term, Some first_term, Some count_term when position_diagnostics = [] ->
+      let splice_op =
+        match
+          Analysis.Sequence_carrier.path_representation
+            (Context.sequence_carriers ctx) path
+        with
+        | Sequence_representation.Ordinary -> "splice"
+        | Sequence_representation.Canonical_runs -> "spliceRun"
+      in
       let nested_update =
-        app "splice" [ parent_term; first_term; count_term; replacement_term ]
+        app splice_op
+          [ parent_term; first_term; count_term; replacement_term ]
       in
       let updated_parent =
         lower_path_update callbacks ctx env origin exp record_term parent nested_update
@@ -461,9 +477,16 @@ let lower_record_update callbacks ctx env origin (exp : exp) (record : exp)
     | SliceP _ -> true
   in
   let replacement_result =
-    if path_has_slice path then
+    let representation =
+      Analysis.Sequence_carrier.path_representation
+        (Context.sequence_carriers ctx) path
+    in
+    match representation with
+    | Sequence_representation.Canonical_runs ->
+      callbacks.lower_sequence_as representation ctx env origin replacement
+    | Sequence_representation.Ordinary when path_has_slice path ->
       callbacks.lower_sequence ctx env origin replacement
-    else
+    | Sequence_representation.Ordinary ->
       callbacks.lower_value ctx env origin replacement
   in
   match record_result.term, replacement_result.term with

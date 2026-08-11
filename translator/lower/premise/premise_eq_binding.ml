@@ -40,6 +40,7 @@ let lower_bool_premise ctx env ~bound_vars origin exp =
   | None -> { (empty_with_env ~bound_vars env) with diagnostics = lowered.diagnostics }
 
 let try_match_condition
+    ?typed_subject
     ~bound
     (pattern_result : Expr_result.pattern_result)
     (subject_result : Expr_result.result)
@@ -52,6 +53,11 @@ let try_match_condition
     if
       (not (pattern_result_has_fatal pattern_result))
       && (not (result_has_fatal subject_result))
+      && Option.fold
+           ~none:true
+           ~some:(fun certificate ->
+             Pattern_typed_subject.matches_result certificate subject_result)
+           typed_subject
       && vars_subset (Condition_closure.term_vars subject) guard_bound
     then
       let conditions =
@@ -117,8 +123,9 @@ let invert_unbound_unary_projection_conditions ctx bound conditions =
   in
   conditions |> List.fold_left step (bound, []) |> snd
 
-let try_record_match_condition ~bound pattern_result subject_result =
-  try_match_condition ~bound pattern_result subject_result
+let try_record_match_condition
+    ?typed_subject ~bound pattern_result subject_result =
+  try_match_condition ?typed_subject ~bound pattern_result subject_result
 let category_named_var ctx id =
   Analysis.Source_index.find_by_id (Context.source_index ctx) id.it
   |> List.find_map (fun entry ->
@@ -230,13 +237,18 @@ let try_optional_map_inverse_eq names ctx env ~bound_vars origin exp left right 
     names ctx env ~bound_vars origin exp left right
 
 let try_record_eq_match
-    ctx env ~bound_vars left right left_value right_value left_pattern right_pattern () =
+    ctx env ~bound_vars left right left_value right_value
+    left_pattern left_subject right_pattern right_subject () =
   let record_match =
     match left.it, right.it with
     | _, StrE _ ->
-      try_record_match_condition ~bound:bound_vars right_pattern left_value
+      try_record_match_condition
+        ?typed_subject:right_subject
+        ~bound:bound_vars right_pattern left_value
     | StrE _, _ ->
-      try_record_match_condition ~bound:bound_vars left_pattern right_value
+      try_record_match_condition
+        ?typed_subject:left_subject
+        ~bound:bound_vars left_pattern right_value
     | _ -> None
   in
   match record_match with
@@ -250,7 +262,8 @@ let try_record_eq_match
     Some (with_conditions ctx env_after bound_vars conditions diagnostics)
   | None -> None
 
-let try_pattern_eq_match ctx env ~bound_vars pattern_result value_result () =
+let try_pattern_eq_match
+    ctx env ~bound_vars ?typed_subject pattern_result value_result () =
   let introduces_unbound =
     match pattern_result.Expr_result.pattern_term with
     | None -> false
@@ -268,7 +281,10 @@ let try_pattern_eq_match ctx env ~bound_vars pattern_result value_result () =
       || not (vars_subset guard_bound pattern_bound)
   in
   if not introduces_unbound then None else
-    match try_match_condition ~bound:bound_vars pattern_result value_result with
+    match
+      try_match_condition
+        ?typed_subject ~bound:bound_vars pattern_result value_result
+    with
     | Some (conditions, diagnostics) ->
       let env_after =
         add_introduced_bindings env pattern_result.introduced_bindings
@@ -415,13 +431,36 @@ let lower_ifpr_eq
   with
   | Some (factored, result) -> factored, result, names
   | None ->
-    let left_value = Expr_translate.lower_value ctx env origin left in
-    let right_value = Expr_translate.lower_value ctx env origin right in
-    let left_pattern, names =
-      Expr_translate.lower_pattern_with_bindings_named names ctx env origin left
+    let left_value_source =
+      Pattern_typed_subject.lower_equality_value ctx env origin left
     in
-    let right_pattern, names =
-      Expr_translate.lower_pattern_with_bindings_named names ctx env origin right
+    let right_value_source =
+      Pattern_typed_subject.lower_equality_value ctx env origin right
+    in
+    let left_value = Pattern_typed_subject.value_result left_value_source in
+    let right_value = Pattern_typed_subject.value_result right_value_source in
+    let lower_typed_pattern names pattern value =
+      match
+        Pattern_typed_subject.equality_value ~value ~pattern
+      with
+      | Some certificate ->
+        let pattern_result, names =
+          Pattern_typed_subject.lower_pattern_named
+            certificate names ctx env origin pattern
+        in
+        (pattern_result, Some certificate), names
+      | None ->
+        let pattern_result, names =
+          Expr_translate.lower_pattern_with_bindings_named
+            names ctx env origin pattern
+        in
+        (pattern_result, None), names
+    in
+    let (left_pattern, left_certificate), names =
+      lower_typed_pattern names left right_value_source
+    in
+    let (right_pattern, right_certificate), names =
+      lower_typed_pattern names right left_value_source
     in
     match
       first_success
@@ -433,9 +472,15 @@ let lower_ifpr_eq
             left_value
             right_value
             left_pattern
+            left_certificate
             right_pattern
-        ; try_pattern_eq_match ctx env ~bound_vars left_pattern right_value
-        ; try_pattern_eq_match ctx env ~bound_vars right_pattern left_value
+            right_certificate
+        ; try_pattern_eq_match
+            ctx env ~bound_vars ?typed_subject:left_certificate
+            left_pattern right_value
+        ; try_pattern_eq_match
+            ctx env ~bound_vars ?typed_subject:right_certificate
+            right_pattern left_value
         ; try_plain_eq ctx env ~bound_vars left_value right_value
         ]
     with

@@ -19,10 +19,16 @@ type binding = Expr_env.binding =
   ; typ : typ
   }
 
+type introduced_binding = Expr_env.introduced_binding =
+  { id : string
+  ; binding : binding
+  ; subtype_roundtrip : Pattern_subtyping.subtype_roundtrip option
+  }
+
 type pattern_result = Expr_result.pattern_result =
   { pattern_term : term option
   ; pattern_guards : eq_condition list
-  ; introduced_bindings : (string * binding) list
+  ; introduced_bindings : introduced_binding list
   ; pattern_diagnostics : Diagnostics.t list
   }
 
@@ -75,19 +81,26 @@ type witness_result =
   ; witness_diagnostics : Diagnostics.t list
   }
 
+type guard_parts =
+  { witness_guards : eq_condition list
+  ; typecheck_guards : eq_condition list
+  }
+
 let rec nth_opt items index =
   match items, index with
   | item :: _, 0 -> Some item
   | _ :: rest, index when index > 0 -> nth_opt rest (index - 1)
   | _ -> None
 
-let lower_case_impl ~lower_value ~category_guards_for_term ctx env origin exp mixop arg_exp =
+let lower_case_impl
+    ~lower_value ~category_guard_parts_for_term ctx env origin exp mixop arg_exp =
   let lower_arg exp = lower_value ctx env origin exp in
-  let arg_results =
+  let arg_exps =
     match arg_exp.it with
-    | TupE exps -> List.map lower_arg exps
-    | _ -> [ lower_arg arg_exp ]
+    | TupE exps -> exps
+    | _ -> [ arg_exp ]
   in
+  let arg_results = List.map lower_arg arg_exps in
   let guards, diagnostics = append_result_metadata arg_results in
   let terms =
     List.filter_map (fun (result : result) -> result.term) arg_results
@@ -102,11 +115,28 @@ let lower_case_impl ~lower_value ~category_guards_for_term ctx env origin exp mi
         let constructor = resolution.Typcase_constructor.resolved_constructor in
         let constructor_term = app constructor terms in
         let category_guards_opt, category_diagnostics =
-          category_guards_for_term
+          category_guard_parts_for_term
             ctx env origin "Expr/CaseE/category" exp constructor_term exp.note
         in
         (match category_guards_opt with
         | Some category_guards ->
+          let category_guards =
+            match Typcase_constructor.payload_certificate resolution with
+            | Some certificate
+              when Typcase_constructor.certifies certificate
+                     ~constructor_op:constructor
+                     ~arity ->
+              category_guards.witness_guards
+            | Some _ | None
+              when Typcase_constructor.certifies_ground
+                     resolution ~constructor_op:constructor arg_exps ->
+              (* Exact elaborated payload notes plus no free source variables
+                 certify this ground constructor application statically. *)
+              category_guards.witness_guards
+            | Some _ | None ->
+              category_guards.witness_guards
+              @ category_guards.typecheck_guards
+          in
           { term = Some constructor_term
           ; guards = guards @ category_guards
           ; diagnostics = diagnostics @ category_diagnostics
@@ -227,12 +257,20 @@ let rec lower_type_witness_impl ~lower_value ctx env origin constructor typ =
     let results =
       List.map (lower_type_witness_arg_impl ~lower_value ctx env origin constructor) args
     in
-    let terms = List.filter_map (fun result -> result.witness_term) results in
+    let terms =
+      List.filter_map
+        (fun (result : witness_result) -> result.witness_term)
+        results
+    in
     let guards =
-      results |> List.map (fun result -> result.witness_guards) |> List.concat
+      results
+      |> List.map (fun (result : witness_result) -> result.witness_guards)
+      |> List.concat
     in
     let diagnostics =
-      results |> List.map (fun result -> result.witness_diagnostics) |> List.concat
+      results
+      |> List.map (fun (result : witness_result) -> result.witness_diagnostics)
+      |> List.concat
     in
     if List.length terms = List.length args then
       { witness_term = Some (app (Naming.category_witness id) terms)
@@ -559,7 +597,11 @@ let pattern_case_constructor ctx origin exp mixop arity =
   | VarT _ ->
     (match Typcase_constructor.resolve_emitted ctx exp.note mixop ~arity with
     | Typcase_constructor.Found resolution ->
-      Some resolution.Typcase_constructor.resolved_constructor, []
+      Some
+        { Pattern_translate.operator = resolution.resolved_constructor
+        ; payload_certificate = Typcase_constructor.payload_certificate resolution
+        },
+      []
     | Typcase_constructor.Missing ->
       None,
       pattern_unsupported
@@ -597,8 +639,7 @@ let pattern_case_constructor ctx origin exp mixop arity =
 let pattern_result_to_expr_pattern (result : Pattern_translate.result) =
   let introduced_bindings =
     result.introduced_bindings
-    |> List.map (fun (id, (binding : Pattern_translate.binding)) ->
-      id, { term = binding.term; sort = binding.sort; typ = binding.typ })
+    |> List.map Expr_env.of_pattern_introduction
   in
   { pattern_term = result.term
   ; pattern_guards = result.guards
@@ -606,7 +647,11 @@ let pattern_result_to_expr_pattern (result : Pattern_translate.result) =
   ; pattern_diagnostics = result.diagnostics
   }
 
-let lower_pattern_raw names callbacks ctx env origin exp =
+let lower_pattern_raw
+    ?(typed_subject = false) ~guard_policy names callbacks ctx env origin exp =
+  let bound_vars =
+    Expr_env.condition_bound_vars env |> Option.value ~default:[]
+  in
   let pattern_callbacks : Pattern_translate.callbacks =
     { find_var =
         (fun id ->
@@ -618,7 +663,10 @@ let lower_pattern_raw names callbacks ctx env origin exp =
               ; sort = binding.sort
               ; typ = binding.typ
               })
-    ; bound_vars = Expr_env.bound_vars env
+    ; bound_vars
+    ; guard_policy
+    ; typed_subject
+    ; typed_payload = false
     ; lower_guard_value =
         (fun origin exp ->
           let result = callbacks.lower_value ctx env origin exp in
@@ -698,7 +746,7 @@ let rec lower_value ctx env origin exp =
   | CallE (id, args) ->
     lower_call ctx env origin exp id args
   | IterE (body, iterexp) ->
-    lower_iter ctx env origin exp body iterexp
+    lower_iter Sequence_representation.Ordinary ctx env origin exp body iterexp
   | MemE (left, right) ->
     lower_mem_value ctx env origin exp left right
   | TupE exps ->
@@ -742,15 +790,16 @@ and witness_of_typ_for ctx env origin constructor typ =
 and witness_of_typ ctx env origin typ =
   witness_of_typ_for ctx env origin "Expr/SubE" typ
 
-and category_guards_for_term ctx env origin constructor exp term typ =
+and category_guard_parts_for_term ctx env origin constructor exp term typ =
   let witness_result =
     witness_of_typ_with_guards ctx env origin constructor typ
   in
   match carrier_sort_of_typ typ, witness_result.witness_term with
   | Some sort, Some witness ->
     Some
-      (witness_result.witness_guards
-       @ typecheck_conditions_for_typ ctx typ sort term witness),
+      { witness_guards = witness_result.witness_guards
+      ; typecheck_guards = typecheck_conditions_for_typ ctx typ sort term witness
+      },
     witness_result.witness_diagnostics
   | None, _ ->
     None,
@@ -776,6 +825,15 @@ and category_guards_for_term ctx env origin constructor exp term typ =
             "Extend witness lowering before emitting this constructor expression"
           ()
       ]
+
+and category_guards_for_term ctx env origin constructor exp term typ =
+  let parts_opt, diagnostics =
+    category_guard_parts_for_term ctx env origin constructor exp term typ
+  in
+  Option.map
+    (fun parts -> parts.witness_guards @ parts.typecheck_guards)
+    parts_opt,
+  diagnostics
 
 and expr_bool_numeric_callbacks =
   { Expr_bool_numeric.lower_value
@@ -813,7 +871,7 @@ and lower_mem_value ctx env origin exp left right =
 and lower_case ctx env origin _exp mixop arg_exp =
   lower_case_impl
     ~lower_value
-    ~category_guards_for_term
+    ~category_guard_parts_for_term
     ctx env origin _exp mixop arg_exp
 
 and expr_sequence_callbacks =
@@ -827,6 +885,10 @@ and lower_list ctx env origin exp exps =
 
 and lower_sequence ctx env origin exp =
   Expr_sequence.lower_sequence expr_sequence_callbacks ctx env origin exp
+
+and lower_sequence_as representation ctx env origin exp =
+  Expr_sequence.lower_sequence_as
+    representation expr_sequence_callbacks ctx env origin exp
 
 and lower_cat ctx env origin exp left right =
   Expr_sequence.lower_cat expr_sequence_callbacks ctx env origin exp left right
@@ -860,7 +922,7 @@ and lower_projection ctx env origin exp inner index =
       "projection lowering is implemented only for source constructor destructors of the form e!C.i"
 
 and expr_record_callbacks =
-  { Expr_record.lower_value; lower_sequence }
+  { Expr_record.lower_value; lower_sequence; lower_sequence_as }
 
 and lower_record_literal ctx env origin exp fields =
   Expr_record.lower_record_literal expr_record_callbacks ctx env origin exp fields
@@ -892,8 +954,10 @@ and expr_iter_callbacks =
   ; carrier_sort = carrier_sort_of_typ_in
   }
 
-and lower_iter ctx env origin exp body iterexp =
-  Expr_iter.lower_iter expr_iter_callbacks ctx env origin exp body iterexp
+and lower_iter representation ctx env origin exp body iterexp =
+  Expr_iter.lower_iter
+    ~output_representation:representation
+    expr_iter_callbacks ctx env origin exp body iterexp
 
 and lower_call ctx env origin exp id args =
   lower_call_impl ~lower_value ctx env origin exp id args
@@ -905,9 +969,27 @@ let pattern_callbacks =
         witness_of_typ_with_guards ctx env origin constructor typ)
   }
 
-let lower_pattern_with_bindings_named names ctx env origin exp =
+let lower_pattern_with_policy guard_policy names ctx env origin exp =
   let result, names =
-    lower_pattern_raw names pattern_callbacks ctx env origin exp
+    lower_pattern_raw ~guard_policy names pattern_callbacks ctx env origin exp
+  in
+  pattern_result_to_expr_pattern result, names
+
+let lower_pattern_with_bindings_named =
+  lower_pattern_with_policy Pattern_translate.Full
+
+let lower_validated_input_pattern_named =
+  lower_pattern_with_policy Pattern_translate.Validated_ingress
+
+let lower_rewrite_output_pattern_named =
+  lower_pattern_with_policy Pattern_translate.Whole_constructor
+
+let lower_typed_subject_pattern_named names ctx env origin exp =
+  let result, names =
+    lower_pattern_raw
+      ~typed_subject:true
+      ~guard_policy:Pattern_translate.Whole_constructor
+      names pattern_callbacks ctx env origin exp
   in
   pattern_result_to_expr_pattern result, names
 

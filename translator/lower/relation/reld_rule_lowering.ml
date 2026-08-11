@@ -258,9 +258,7 @@ let translate_rule_binds ctx origin names binds =
 
 let add_introduced_bindings env bindings =
   bindings
-  |> List.fold_left
-       (fun env (id, binding) -> Expr_env.add env id binding)
-       env
+  |> List.fold_left Expr_env.add_introduced env
 
 let lhs_bound_vars terms guards =
   Condition_closure.conditions_bound_vars
@@ -274,13 +272,14 @@ let add_safe_introduced_bindings env terms guards bindings =
   let bound_vars = lhs_bound_vars terms guards in
   bindings
   |> List.fold_left
-       (fun env (id, (binding : Expr_env.binding)) ->
+       (fun env (introduced : Expr_env.introduced_binding) ->
+         let binding = introduced.binding in
          if
            Condition_closure.vars_subset
                 (Condition_closure.term_vars binding.term)
                 bound_vars
          then
-           Expr_env.add env id binding
+           Expr_env.add_introduced env introduced
          else
            env)
        env
@@ -326,7 +325,7 @@ let local_names_for_rule rule =
   | RuleD (_, quants, _, head, prems) ->
     local_names_for_rule_parts quants head prems
 
-let lower_pattern_components_named names ctx env origin exps =
+let lower_pattern_components_with lower_pattern names ctx env origin exps =
   let source_names =
     exps
     |> List.concat_map (fun exp ->
@@ -346,8 +345,7 @@ let lower_pattern_components_named names ctx env origin exps =
           (Some (Il.Print.string_of_exp exp))
       in
       let result, names =
-        Expr_translate.lower_pattern_with_bindings_named
-          names ctx env exp_origin exp
+        lower_pattern names ctx env exp_origin exp
       in
       lower names (result :: results) (index + 1) exps
   in
@@ -376,6 +374,15 @@ let lower_pattern_components_named names ctx env origin exps =
     (Some terms, guards, bindings, diagnostics), names
   else
     (None, guards, bindings, diagnostics), names
+
+let lower_pattern_components_named =
+  lower_pattern_components_with Expr_translate.lower_pattern_with_bindings_named
+
+let lower_validated_input_components_named =
+  lower_pattern_components_with Expr_translate.lower_validated_input_pattern_named
+
+let lower_rewrite_output_components_named =
+  lower_pattern_components_with Expr_translate.lower_rewrite_output_pattern_named
 
 let lower_value_components ctx env origin segment exps =
   let results =
@@ -413,54 +420,6 @@ let lower_value_components ctx env origin segment exps =
 
 let relation_call op_name inputs =
   app op_name inputs
-
-let is_source_constructor certificate = function
-  | App (name, arguments) ->
-    Condition_pattern_certificate.admits certificate name (List.length arguments)
-  | Const name -> Condition_pattern_certificate.admits certificate name 0
-  | Var _ | Qid _ -> false
-
-(** Constructor membership entails the declared category of each component.
-    We remove only guards on those component terms; a bare pattern variable,
-    such as the value before [ref.is_null], keeps its category guard. *)
-let source_constructor_components certificate terms =
-  let rec collect components = function
-    | Var _ | Const _ | Qid _ -> components
-    | App (name, arguments) ->
-      let components =
-        if
-          Condition_pattern_certificate.admits
-            certificate name (List.length arguments)
-        then List.rev_append arguments components
-        else components
-      in
-      List.fold_left collect components arguments
-  in
-  terms
-  |> List.fold_left collect []
-  |> List.sort_uniq compare
-
-let split_execution_head_guards ctx lhs_terms guards =
-  let certificate = Condition_pattern_certificate.source ctx in
-  let constructor_components =
-    source_constructor_components certificate lhs_terms
-  in
-  let implied term =
-    List.mem term constructor_components || is_source_constructor certificate term
-  in
-  guards
-  |> List.partition (function
-       | BoolCond term ->
-         (match Typecheck_term.subject term with
-         | Some subject -> not (implied subject)
-         | None -> true)
-       | EqCond _ | MatchCond _ | MembershipCond _ -> true)
-
-let execution_result_guards guards =
-  guards
-  |> List.filter (function
-       | BoolCond term -> not (Typecheck_term.is_typecheck term)
-       | EqCond _ | MatchCond _ | MembershipCond _ -> true)
 
 let generated_statement_diagnostics
     ?(pattern_certificate = Condition_pattern_certificate.empty)

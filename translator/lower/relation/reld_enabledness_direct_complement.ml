@@ -1,4 +1,6 @@
 open Maude_ir
+open Reld_result
+open Reld_rule_lowering
 
 let terms_match_general = Head_specialization.terms_match_general
 let term_vars = Head_specialization.term_vars
@@ -22,6 +24,94 @@ type complement_result =
 type condition_block =
   | Source_conditions of eq_condition list
   | Head_domain_conditions of eq_condition list
+
+type materialized =
+  { statements : generated list
+  ; diagnostics : Diagnostics.t list
+  ; condition : rule_condition
+  ; established : eq_condition list
+  }
+
+let direct_false_op =
+  Naming.helper_companion ~role:"enabledness-direct-false"
+
+let direct_helper_sort name =
+  sort ("RuntimeEnablednessDirect" ^ Naming.sort_token name ^ "Conf")
+
+let direct_helper_surface name origin input_sorts =
+  let generated node = generated ~provenance:(Helper name) ~origin node in
+  let result_sort = direct_helper_sort name in
+  let attrs =
+    match input_sorts with
+    | [] -> []
+    | _ -> [ Frozen (List.init (List.length input_sorts) (fun index -> index + 1)) ]
+  in
+  [ generated (sort_decl result_sort)
+  ; generated (op name (List.map sort_ref input_sorts) result_sort ~attrs)
+  ; generated (op (direct_false_op name) [] result_sort ~attrs:[ Ctor ])
+  ]
+
+let common_eq_conditions alternatives =
+  match alternatives with
+  | [] -> []
+  | first :: rest ->
+    first
+    |> List.filter_map (function
+         | EqCondition condition -> Some condition
+         | RewriteCond _ -> None)
+    |> List.filter (fun condition ->
+         List.for_all
+           (List.exists (function
+              | EqCondition candidate -> candidate = condition
+              | RewriteCond _ -> false))
+           rest)
+
+let materialize ctx env origin name input_sorts lhs_terms alternatives =
+  let generated node = generated ~provenance:(Helper name) ~origin node in
+  let lhs = App (name, lhs_terms) in
+  let rhs = Const (direct_false_op name) in
+  let rules =
+    alternatives
+    |> List.mapi (fun index conditions -> index, conditions)
+    |> List.rev
+    |> List.map (fun (index, conditions) ->
+         let conditions =
+           Condition_closure.normalize_rule_conditions
+             ~constructor_op:
+               (Condition_closure.source_constructor_certificate ctx)
+             [ lhs ] conditions
+           |> dedup_rule_conditions
+           |> Validated_guard_certificate.discharge ctx env ~lhs_terms
+         in
+         let diagnostics =
+           Condition_admissibility.crl_admissibility_diagnostics
+             ctx origin lhs rhs conditions
+         in
+         let label =
+           sanitize_label
+             (name ^ "-source-false-" ^ string_of_int (index + 1))
+         in
+         generated (crl ~label lhs rhs conditions), diagnostics)
+  in
+  let statements = direct_helper_surface name origin input_sorts @ List.map fst rules in
+  let diagnostics =
+    List.concat_map snd rules
+    @ List.concat_map (generated_statement_diagnostics ctx) statements
+  in
+  let established =
+    rules
+    |> List.map (fun (statement, _) ->
+         match statement.node with
+         | Crl (_, _, _, conditions) -> conditions
+         | SortDecl _ | SubsortDecl _ | OpDecl _ | VarDecl _
+         | Mb _ | Cmb _ | Eq _ | Ceq _ | Rl _ -> [])
+    |> common_eq_conditions
+  in
+  { statements
+  ; diagnostics
+  ; condition = RewriteCond (lhs, rhs)
+  ; established
+  }
 
 let vars_subset vars bound =
   List.for_all (fun var -> List.mem var bound) vars
@@ -88,6 +178,53 @@ let first_condition_difference left right =
 let condition_alternative (prefix, negated) =
   List.map (fun condition -> EqCondition condition) prefix
   @ List.map (fun condition -> EqCondition condition) negated
+
+let eq_condition_vars = function
+  | EqCond (left, right) | MatchCond (left, right) ->
+    term_vars left @ term_vars right
+  | BoolCond term | MembershipCond (term, _) -> term_vars term
+
+let rule_condition_vars = function
+  | EqCondition condition -> eq_condition_vars condition
+  | RewriteCond (left, right) -> term_vars left @ term_vars right
+
+let factor_current_head_conditions
+    ~current_terms ~current_head_conditions conditions =
+  let repeated = function
+    | EqCondition condition -> List.mem condition current_head_conditions
+    | RewriteCond _ -> false
+  in
+  let omitted, retained = List.partition repeated conditions in
+  let lhs_vars =
+    current_terms
+    |> List.concat_map term_vars
+    |> List.sort_uniq String.compare
+  in
+  let hidden_vars =
+    omitted
+    |> List.concat_map (function
+         | EqCondition (MatchCond (pattern, _)) -> term_vars pattern
+         | EqCondition (EqCond _ | BoolCond _ | MembershipCond _)
+         | RewriteCond _ -> [])
+    |> List.filter (fun var -> not (List.mem var lhs_vars))
+    |> List.sort_uniq String.compare
+  in
+  let retained_vars = retained |> List.concat_map rule_condition_vars in
+  (* The current rule establishes the same specialized head facts before its
+     enabledness helper.  They may be omitted from the helper only when every
+     witness introduced by the omitted block is local to that block:
+
+       H(q) => exists w. O(q,w)
+       FV(w) disjoint FV(R)
+       --------------------------------
+       H(q) => (exists w. O(q,w) /\ R(q)) iff R(q).
+
+     Keeping the whole block when one witness escapes avoids partial,
+     order-sensitive elimination. *)
+  if List.exists (fun var -> List.mem var retained_vars) hidden_vars then
+    conditions
+  else
+    retained
 
 let proof_blocker_text blocker =
   blocker.Source_condition_certificate.constructor ^ " at "
@@ -263,7 +400,7 @@ let certified_sequential_complement_alternatives
       lhs_conditions bound eq_conditions
 
 let direct_complement_alternatives
-    ctx ~origin ~helper_name ~current_head_conditions:_
+    ctx ~origin ~helper_name ~current_head_conditions
     ~predecessor_head_conditions
     ~condition_blocks ~head_domain_failures
     ~condition_certificates ~condition_failures
@@ -354,20 +491,23 @@ let direct_complement_alternatives
           sequential_condition_complements
             ~certificate_ctx:ctx ~certificate_origin:origin
             ~certificate_helper:helper_name condition_certificates
-            condition_failures [] bound source_conditions
+            condition_failures current_head_conditions bound source_conditions
       in
       (match candidates with
       | Blocked reasons -> Blocked (head_domain_failures @ reasons)
       | Complete complete ->
         let head_constraints =
-          List.map (fun condition -> EqCondition condition)
-            (predecessor_head_conditions @ head_domain_conditions)
+          predecessor_head_conditions @ head_domain_conditions
+          |> List.map (fun condition -> EqCondition condition)
         in
         Complete
           { complete with
             alternatives =
               complete.alternatives
-              |> List.map (fun alternative -> head_constraints @ alternative)
+              |> List.map (fun alternative ->
+                   head_constraints @ alternative
+                   |> factor_current_head_conditions
+                        ~current_terms ~current_head_conditions)
           })
 
 let rec has_constructor_refinement current previous =

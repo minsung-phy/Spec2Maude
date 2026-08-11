@@ -18,6 +18,15 @@ module Source_index : sig
   val find_by_id : t -> string -> entry list
 end
 
+module Sequence_carrier : sig
+  type t
+
+  val analyze : Il.Env.t -> Source_index.t -> t
+  val field_representation :
+    t -> owner_id:string -> Il.Ast.atom -> Sequence_representation.t
+  val path_representation : t -> Il.Ast.path -> Sequence_representation.t
+end
+
 module Relation_graph : sig
   type relation_kind =
     | Execution
@@ -86,11 +95,6 @@ module Function_graph : sig
     ; external_validation_shape : bool
     }
 
-  type relation_demand =
-    { id : string
-    ; reason : string
-    }
-
   type rule_hint =
     { relation_id : string
     ; rule_id : string
@@ -131,13 +135,6 @@ module Function_graph : sig
     | Specialized_call of specialization
     | Unsupported_call of string
     | Prelude_gap_call of string
-
-  type runtime_search_capability =
-    | Runtime_search_candidate of string list
-    | Runtime_search_blocked of
-        { closure : string list
-        ; blockers : string list
-        }
 
   type runtime_search_blocker =
     { relation_id : string

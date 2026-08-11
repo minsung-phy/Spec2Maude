@@ -19,6 +19,44 @@ let without_else_premises prems =
     | ElsePr -> false
     | _ -> true)
 
+let condition_vars = function
+  | EqCond (left, right) | MatchCond (left, right) ->
+    Head_specialization.term_vars left @ Head_specialization.term_vars right
+  | BoolCond term | MembershipCond (term, _) ->
+    Head_specialization.term_vars term
+
+let discharge_established_guards ~lhs_vars ~established conditions =
+  let established_on_lhs condition =
+    List.mem condition established
+    && condition_vars condition
+       |> List.for_all (fun var -> List.mem var lhs_vars)
+  in
+  conditions
+  |> List.filter (function
+       | EqCondition ((EqCond _ | BoolCond _ | MembershipCond _) as condition) ->
+         not (established_on_lhs condition)
+       | EqCondition (MatchCond _) | RewriteCond _ -> true)
+
+let is_whole_typecheck subject = function
+  | BoolCond (App ("typecheck", [ guarded; _ ])) -> guarded = subject
+  | BoolCond _ | EqCond _ | MatchCond _ | MembershipCond _ -> false
+
+let schedule_context_blocks blocks =
+  let direct, contextual =
+    List.partition (fun (is_context, _output) -> not is_context) blocks
+  in
+  let statements blocks =
+    blocks
+    |> List.concat_map (fun (_is_context, output) -> output.statements)
+  in
+  let diagnostics =
+    blocks
+    |> List.concat_map (fun (_is_context, output) -> output.diagnostics)
+  in
+  { statements = statements direct @ statements contextual
+  ; diagnostics
+  }
+
 let translate_rule
     ctx
     rel_origin
@@ -29,6 +67,7 @@ let translate_rule
     (shape : Relation_shape.execution_shape)
     input_sorts
     output_sorts
+    context_certificate
     previous_rules
     index
     rule
@@ -75,16 +114,17 @@ let translate_rule
       in
       let input_exps, output_exps = split input_count [] components in
       let (lhs_terms_opt, lhs_guards, lhs_bindings, lhs_diags), names =
-        lower_pattern_components_named names ctx env origin input_exps
+        lower_validated_input_components_named
+          names ctx env origin input_exps
       in
       (match lhs_terms_opt with
       | Some lhs_terms ->
-        let lhs_guards, head_facts =
-          split_execution_head_guards ctx lhs_terms lhs_guards
+        let head_facts = lhs_guards in
+        let env =
+          add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings
         in
-        let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
         let has_else = has_else_premise prems in
-        let else_output, else_alternatives =
+        let else_result =
           if has_else then
             Reld_enabledness.complement
               ctx
@@ -99,9 +139,15 @@ let translate_rule
               lhs_guards
               previous_rules
           else
-            empty, [ [] ]
+            { Reld_enabledness.output = empty
+            ; alternatives =
+                [ { Reld_enabledness.conditions = []; established = [] } ]
+            ; support_statements = []
+            }
         in
-        let premise_translation, _names =
+        let else_output = else_result.Reld_enabledness.output in
+        let else_alternatives = else_result.alternatives in
+        let premise_translation, names =
           Reld_execution_premise.translate_premises_named
             names
             ctx
@@ -133,7 +179,6 @@ let translate_rule
             "rhs"
             output_exps
         in
-        let output_guards = execution_result_guards output_guards in
         let diagnostics =
           hint_diags
           @ bind_diags @ arity_diags @ lhs_diags @ output_diags
@@ -146,26 +191,114 @@ let translate_rule
           | Some output_terms
             when List.length output_terms = List.length output_sorts ->
             let rhs_term = tuple_carrier output_sorts output_terms in
+            let lhs_terms, context_split, context_statements,
+                context_preserves_output_typing =
+              match context_certificate with
+              | None -> lhs_terms, None, [], false
+              | Some certificate ->
+                (match
+                   Reld_context_split.lower
+                     ctx relation_id origin names env
+                     certificate lhs_terms
+                with
+                | None -> lhs_terms, None, [], false
+                | Some (context, _names) ->
+                  Reld_context_split.lhs_terms context,
+                  Some context,
+                  Reld_context_split.statements context,
+                  true)
+            in
+            let context_conditions =
+              context_split
+              |> Option.to_list
+              |> List.map Reld_context_split.condition
+            in
+            let output_guards =
+              if context_preserves_output_typing then
+                (* The context certificate preserves the input prefix/suffix
+                   and obtains the new state/focus from the recursive relation
+                   premise.  From the validated-input invariant, recursive
+                   output typing therefore implies typing of the reassembled
+                   source RHS. *)
+                List.filter
+                  (fun guard -> not (is_whole_typecheck rhs_term guard))
+                  output_guards
+              else
+                output_guards
+            in
             let lhs = relation_call op_name lhs_terms in
             let pattern_certificate =
               Condition_pattern_certificate.union
                 (Premise_result.condition_pattern_certificate
                    ~declarations:var_decls ctx premise_result)
                 (Condition_pattern_certificate.generated
-                   else_output.statements)
+                   (context_statements
+                    @ else_output.statements
+                    @ else_result.support_statements))
             in
             let alternatives =
               else_alternatives
-              |> List.mapi (fun alternative_index else_conditions ->
-                let conditions =
+              |> List.mapi (fun alternative_index else_alternative ->
+                let lhs_vars =
+                  lhs_terms
+                  |> List.concat_map Head_specialization.term_vars
+                  |> List.sort_uniq String.compare
+                in
+                let else_conditions =
+                  else_alternative.Reld_enabledness.conditions
+                in
+                let output_conditions =
+                  List.map (fun condition -> EqCondition condition) output_guards
+                in
+                let premise_conditions =
+                  Premise_result.rule_conditions premise_result
+                in
+                let lhs_conditions =
                   List.map (fun condition -> EqCondition condition) lhs_guards
+                in
+                let source_rewrites =
+                  premise_conditions
+                  |> List.filter (function
+                    | RewriteCond _ -> true
+                    | EqCondition _ -> false)
+                in
+                let source_decisions =
+                  source_rewrites
+                  @ (Premise_result.source_condition_certificates premise_result
+                   |> List.concat_map Source_condition_certificate.positive
+                   |> List.map (fun condition -> EqCondition condition))
+                  @ List.filter_map
+                      (function
+                        | EqCondition _ as condition -> Some condition
+                        | RewriteCond _ -> None)
+                      else_conditions
+                in
+                let conditions =
+                  context_conditions
+                  @ lhs_conditions
+                  @ premise_conditions
                   @ else_conditions
-                  @ Premise_result.rule_conditions premise_result
-                  @ List.map (fun condition -> EqCondition condition) output_guards
+                  @ output_conditions
+                  |> (fun conditions ->
+                       match context_split with
+                       | None -> conditions
+                       | Some context ->
+                         Reld_context_split.eliminate_witness_guards
+                           context ~lhs ~rhs:rhs_term conditions)
+                  |> Validated_guard_certificate.discharge
+                       ctx
+                       (Premise_result.env_after premise_result)
+                       ~lhs_terms
                   |> Condition_closure.normalize_rule_conditions
                        ~constructor_op:pattern_certificate
+                       ~source_decisions
+                       ~domain_guards:lhs_conditions
                        [ lhs ]
                   |> dedup_rule_conditions
+                  |> discharge_established_guards
+                       ~lhs_vars
+                       ~established:
+                         else_alternative.Reld_enabledness.established
                 in
                 let diagnostics =
                   Condition_admissibility.crl_admissibility_diagnostics
@@ -186,11 +319,11 @@ let translate_rule
               }
             else
               let registry_diags =
-                alternatives
-                |> List.concat_map (fun (statement, _) ->
-                  generated_statement_diagnostics
-                    ~pattern_certificate
-                    ctx statement)
+                (context_statements
+                 @ List.map fst alternatives)
+                |> List.concat_map
+                     (generated_statement_diagnostics
+                        ~pattern_certificate ctx)
               in
               if has_fatal registry_diags then
                 { statements = []
@@ -198,7 +331,10 @@ let translate_rule
                 }
               else
                 { statements =
-                    var_decls @ else_output.statements @ List.map fst alternatives
+                    var_decls
+                    @ context_statements
+                    @ else_output.statements
+                    @ List.map fst alternatives
                 ; diagnostics
                 }
           | Some _ ->
@@ -251,9 +387,12 @@ let translate ctx origin id relation_kind relation_mixop shape rules =
         ]
       in
       let rules_output =
-        let rec loop previous index = function
-          | [] -> empty
+        let rec loop previous index translated = function
+          | [] -> List.rev translated
           | rule :: rest ->
+            let context_certificate =
+              Execution_context_certificate.certify id rule
+            in
             let current =
               translate_rule
                 ctx
@@ -265,13 +404,19 @@ let translate ctx origin id relation_kind relation_mixop shape rules =
                 shape
                 input_sorts
                 output_sorts
+                context_certificate
                 previous
                 index
                 rule
             in
-            append current (loop (previous @ [ rule ]) (index + 1) rest)
+            let is_context = Option.is_some context_certificate in
+            loop
+              (previous @ [ rule ])
+              (index + 1)
+              ((is_context, current) :: translated)
+              rest
         in
-        loop [] 1 rules
+        loop [] 1 [] rules |> schedule_context_blocks
       in
       { statements = header @ dedup_generated rules_output.statements
       ; diagnostics = diagnostics @ rules_output.diagnostics

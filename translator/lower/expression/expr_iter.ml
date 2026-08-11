@@ -212,60 +212,130 @@ let listn_body_over_outer outer_id exp =
     | _ -> None)
   | _ -> None
 
-let rec lower_iter callbacks ctx env origin exp body (iter, generators) =
-  match iter, generators, body.it with
-  | List, [ generator_id, source_exp ], VarE body_id
+let subtype_plan ctx source_typ target_typ =
+  Subtype_plan.make
+    ~il_env:(Context.il_env ctx)
+    ~source_index:(Context.source_index ctx)
+    ~constructors:(Context.constructors ctx)
+    ~static_typ_env:(Context.static_typ_env ctx)
+    source_typ target_typ
+
+let pointwise_result_iter source_iter target_iter =
+  match source_iter, target_iter with
+  | (List | ListN _), List -> true
+  | _ -> false
+
+let direct_subtype_roundtrip ctx env exp iter generator_id source_exp body =
+  match source_exp.it, source_exp.note.it, body.it, exp.note.it with
+  | VarE source_id,
+    IterT (source_element_typ, source_iter),
+    SubE ({ it = VarE body_id; _ }, source_typ, target_typ),
+    IterT (target_element_typ, target_iter)
     when body_id.it = generator_id.it
-         && Type_shape.is_optional_list_typ exp.note ->
-    lower_optional_list_identity callbacks ctx env origin source_exp
-  | List, [ generator_id, source_exp ], _
-    when Type_shape.is_optional_list_typ exp.note
-         && is_identity_optional_expr_over callbacks generator_id.it body ->
-    lower_optional_list_identity callbacks ctx env origin source_exp
-  | List, [ generator_id, source_exp ], _
-    when Type_shape.is_nested_list_typ exp.note
-         && is_lifted_identity_optional_expr_over callbacks generator_id.it body ->
-    lower_optional_list_identity callbacks ctx env origin source_exp
-  | List, [ generator_id, source_exp ], VarE body_id
+         && Il.Eq.eq_iter source_iter iter
+         && pointwise_result_iter source_iter target_iter
+         && Il.Eq.eq_typ source_typ source_element_typ
+         && Il.Eq.eq_typ target_typ target_element_typ ->
+    (match
+       Expr_env.find env source_id.it,
+       Expr_env.find_subtype_roundtrip env source_id.it,
+       subtype_plan ctx source_typ target_typ
+     with
+    | Some binding, Some roundtrip, Ok (Subtype_plan.Injection injection) ->
+      Pattern_subtyping.reuse_iterated
+        roundtrip ~source:binding.term ~iter injection
+    | _ -> None)
+  | _ -> None
+
+let rec lower_iter
+    ?(output_representation = Sequence_representation.Ordinary)
+    callbacks ctx env origin exp body (iter, generators) =
+  match output_representation, iter, generators, body.it with
+  | Sequence_representation.Canonical_runs,
+    List, [ generator_id, source_exp ], VarE body_id
     when body_id.it = generator_id.it ->
-    callbacks.lower_sequence ctx env origin source_exp
-  | List, [ generator_id, source_exp ], _
-    when Type_shape.is_nested_list_typ exp.note
-         && is_identity_list_expr_over callbacks generator_id.it body ->
-    callbacks.lower_sequence ctx env origin source_exp
-  | List, [ generator_id, source_exp ], _
-    when Type_shape.is_nested_list_typ exp.note ->
-    (match listn_body_over_outer generator_id.it body with
-    | Some n_exp ->
-      lower_nested_outer_identity_listn callbacks ctx env origin exp source_exp n_exp
+    let env = Expr_env.forget_subtype_roundtrips env in
+    let result = callbacks.lower_sequence ctx env origin source_exp in
+    (match result.term with
+    | Some term ->
+      { result with term = Some (app "appendRuns" [ term; Const "eps" ]) }
+    | None -> result)
+  | Sequence_representation.Canonical_runs, ListN (n_exp, None), [], _ ->
+    let env = Expr_env.forget_subtype_roundtrips env in
+    lower_listn_repeat_helper
+      ~output_representation callbacks ctx env origin exp n_exp body
+  | Sequence_representation.Canonical_runs, _, _, _ ->
+    unsupported_exp ctx origin "Expr/IterE/canonical-runs" exp
+      "canonical run output is currently proved only for count-only ListN iteration"
+  | Sequence_representation.Ordinary, iter, generators, body_it ->
+    let roundtrip =
+      match iter, generators, body_it with
+      | (List | ListN _), [ generator_id, source_exp ], SubE _ ->
+        direct_subtype_roundtrip
+          ctx env exp iter generator_id source_exp body
+      | _ -> None
+    in
+    (match roundtrip with
+    | Some reuse ->
+      { term = Some reuse.Pattern_subtyping.target
+      ; guards = [ reuse.required_guard ]
+      ; diagnostics = []
+      }
     | None ->
-      lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body)
-  | ListN (n_exp, None), [ generator_id, source_exp ], VarE body_id
-    when body_id.it = generator_id.it ->
-    lower_flat_identity_listn callbacks ctx env origin exp source_exp n_exp
-  | ListN (n_exp, None), [ generator_id, source_exp ], _ ->
-    lower_listn_map_helper callbacks ctx env origin exp n_exp generator_id source_exp body
-  | ListN (n_exp, None), [], _ ->
-    lower_listn_repeat_helper callbacks ctx env origin exp n_exp body
-  | ListN (n_exp, None), _ :: _ :: _, _ ->
-    lower_listn_zip_map_helper callbacks ctx env origin exp n_exp body generators
-  | ListN (n_exp, Some index_id), generators, _ ->
-    lower_listn_helper callbacks ctx env origin exp n_exp (Some index_id) generators body
-  | Opt, [ generator_id, source_exp ], VarE body_id
-    when body_id.it = generator_id.it ->
-    lower_flat_identity_opt callbacks ctx env origin source_exp
-  | Opt, [ generator_id, source_exp ], _ ->
-    lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body
-  | (Opt | List1), _, _ ->
-    unsupported_exp ctx origin "Expr/IterE" exp
-      "Opt/List1 IterE lowering requires helper semantics and is outside this sequence slice"
-  | List, [ generator_id, source_exp ], _ ->
-    lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body
-  | List, generators, _ when List.length generators >= 2 ->
-    lower_list_zip_map_helper callbacks ctx env origin exp body generators
-  | List, _, _ ->
-    unsupported_exp ctx origin "Expr/IterE" exp
-      "zip-map List iteration with multiple generators is not implemented in this helper slice"
+      let env = Expr_env.forget_subtype_roundtrips env in
+      match iter, generators, body_it with
+      | List, [ generator_id, source_exp ], VarE body_id
+        when body_id.it = generator_id.it
+             && Type_shape.is_optional_list_typ exp.note ->
+        lower_optional_list_identity callbacks ctx env origin source_exp
+      | List, [ generator_id, source_exp ], _
+        when Type_shape.is_optional_list_typ exp.note
+             && is_identity_optional_expr_over callbacks generator_id.it body ->
+        lower_optional_list_identity callbacks ctx env origin source_exp
+      | List, [ generator_id, source_exp ], _
+        when Type_shape.is_nested_list_typ exp.note
+             && is_lifted_identity_optional_expr_over callbacks generator_id.it body ->
+        lower_optional_list_identity callbacks ctx env origin source_exp
+      | List, [ generator_id, source_exp ], VarE body_id
+        when body_id.it = generator_id.it ->
+        callbacks.lower_sequence ctx env origin source_exp
+      | List, [ generator_id, source_exp ], _
+        when Type_shape.is_nested_list_typ exp.note
+             && is_identity_list_expr_over callbacks generator_id.it body ->
+        callbacks.lower_sequence ctx env origin source_exp
+      | List, [ generator_id, source_exp ], _
+        when Type_shape.is_nested_list_typ exp.note ->
+        (match listn_body_over_outer generator_id.it body with
+        | Some n_exp ->
+          lower_nested_outer_identity_listn callbacks ctx env origin exp source_exp n_exp
+        | None ->
+          lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body)
+      | ListN (n_exp, None), [ generator_id, source_exp ], VarE body_id
+        when body_id.it = generator_id.it ->
+        lower_flat_identity_listn callbacks ctx env origin exp source_exp n_exp
+      | ListN (n_exp, None), [ generator_id, source_exp ], _ ->
+        lower_listn_map_helper callbacks ctx env origin exp n_exp generator_id source_exp body
+      | ListN (n_exp, None), [], _ ->
+        lower_listn_repeat_helper callbacks ctx env origin exp n_exp body
+      | ListN (n_exp, None), _ :: _ :: _, _ ->
+        lower_listn_zip_map_helper callbacks ctx env origin exp n_exp body generators
+      | ListN (n_exp, Some index_id), generators, _ ->
+        lower_listn_helper callbacks ctx env origin exp n_exp (Some index_id) generators body
+      | Opt, [ generator_id, source_exp ], VarE body_id
+        when body_id.it = generator_id.it ->
+        lower_flat_identity_opt callbacks ctx env origin source_exp
+      | Opt, [ generator_id, source_exp ], _ ->
+        lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body
+      | (Opt | List1), _, _ ->
+        unsupported_exp ctx origin "Expr/IterE" exp
+          "Opt/List1 IterE lowering requires helper semantics and is outside this sequence slice"
+      | List, [ generator_id, source_exp ], _ ->
+        lower_list_map_helper callbacks ctx env origin exp generator_id source_exp body
+      | List, generators, _ when List.length generators >= 2 ->
+        lower_list_zip_map_helper callbacks ctx env origin exp body generators
+      | List, _, _ ->
+        unsupported_exp ctx origin "Expr/IterE" exp
+          "zip-map List iteration with multiple generators is not implemented in this helper slice")
 
 and lower_listn_count callbacks ctx env origin exp n_exp =
   let count_result = callbacks.lower_value ctx env origin n_exp in
@@ -723,7 +793,9 @@ and lower_source_consuming_listn_helper callbacks
             ; diagnostics = source_result.diagnostics @ count_result.diagnostics
             })
 
-and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp index_id_opt generators body =
+and lower_listn_helper
+    ?(output_representation = Sequence_representation.Ordinary)
+    callbacks ?premise_bound_vars ctx env origin exp n_exp index_id_opt generators body =
   let premise_bound_vars =
     match premise_bound_vars with
     | Some _ as bound_vars -> bound_vars
@@ -1034,6 +1106,7 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
                           ; mode
                           }
                       ; call_shape = Request.Count_then_captures
+                      ; output_representation
                       ; count_var
                       ; index_var = index_var_opt
                       ; body_result_var
@@ -1063,13 +1136,18 @@ and lower_listn_helper callbacks ?premise_bound_vars ctx env origin exp n_exp in
                 @ body_result.diagnostics @ variable_diagnostics
             })))
 
-and lower_listn_repeat_helper callbacks ctx env origin exp n_exp body =
+and lower_listn_repeat_helper
+    ?(output_representation = Sequence_representation.Ordinary)
+    callbacks ctx env origin exp n_exp body =
   match Expr_env.condition_bound_vars env with
   | Some bound_vars ->
     lower_listn_helper
+      ~output_representation
       ~premise_bound_vars:bound_vars
       callbacks ctx env origin exp n_exp None [] body
-  | None -> lower_listn_helper callbacks ctx env origin exp n_exp None [] body
+  | None ->
+    lower_listn_helper
+      ~output_representation callbacks ctx env origin exp n_exp None [] body
 
 and lower_nested_outer_identity_listn callbacks ctx env origin exp source_exp n_exp =
   let source_result = callbacks.lower_sequence ctx env origin source_exp in

@@ -5,6 +5,7 @@ type resolution =
   ; resolved_typ : typ
   ; projection_ops : string list
   ; registry_entry : Constructor_registry.entry
+  ; uniform_payload_schema : bool
   }
 
 type lookup =
@@ -12,6 +13,109 @@ type lookup =
   | Missing
   | Blocked of string
   | Ambiguous of resolution list
+
+type payload_certificate =
+  { constructor_op : string
+  ; arity : int
+  ; payload_typs : typ list
+  ; payload_sorts : Maude_ir.sort list
+  ; payload_witnesses : Maude_ir.term list
+  }
+
+type ingress_certificate = payload_certificate
+
+let certifies certificate ~constructor_op ~arity =
+  String.equal certificate.constructor_op constructor_op
+  && certificate.arity = arity
+
+let certificate_of_entry entry =
+  { constructor_op = entry.Constructor_registry.constructor_op
+  ; arity = entry.arity
+  ; payload_typs = entry.payload_typs
+  ; payload_sorts = entry.payload_sorts
+  ; payload_witnesses = entry.payload_witnesses
+  }
+
+let complete_payload_schema entry =
+  List.length entry.Constructor_registry.payload_typs = entry.arity
+  && List.length entry.payload_sorts = entry.arity
+  && List.length entry.payload_witnesses = entry.arity
+
+let payload_certificate resolution =
+  let entry = resolution.registry_entry in
+  match entry.status, entry.construction_domain with
+  | Constructor_registry.Emitted, Constructor_registry.Total_constructor
+    when complete_payload_schema entry
+         && resolution.uniform_payload_schema ->
+    Some (certificate_of_entry entry)
+  | _ -> None
+
+let exact_payload_schema resolution =
+  let entry = resolution.registry_entry in
+  if entry.status = Constructor_registry.Emitted
+     && entry.arity > 0
+     && complete_payload_schema entry
+     && resolution.uniform_payload_schema
+  then
+    Some (certificate_of_entry entry)
+  else None
+
+let ingress_certificate ctx ~constructor_op ~arity =
+  Constructor_registry.entries (Context.constructors ctx)
+  |> List.filter (fun entry ->
+       entry.Constructor_registry.status = Constructor_registry.Emitted
+       && String.equal entry.constructor_op constructor_op
+       && entry.arity = arity)
+  |> function
+  | entry :: _ ->
+    if complete_payload_schema entry
+       && Constructor_registry.uniform_payload_schema
+            (Context.constructors ctx) entry
+    then Some (certificate_of_entry entry)
+    else None
+  | [] -> None
+
+let ingress_payload_guards ctx certificate args =
+  if List.length args <> certificate.arity then []
+  else
+    let rec guards typs sorts args witnesses =
+      match typs, sorts, args, witnesses with
+      | typ :: typs, sort :: sorts, arg :: args, witness :: witnesses ->
+        Typecheck_guard.for_typ ctx typ sort arg witness
+        @ guards typs sorts args witnesses
+      | [], [], [], [] -> []
+      | _ ->
+        invalid_arg
+          "Typcase_constructor.ingress_payload_guards: inconsistent certificate"
+    in
+    guards
+      certificate.payload_typs
+      certificate.payload_sorts
+      args
+      certificate.payload_witnesses
+
+let certifies_ground resolution ~constructor_op arg_exps =
+  match exact_payload_schema resolution with
+  | Some certificate
+    when certifies certificate
+           ~constructor_op
+           ~arity:(List.length arg_exps) ->
+    List.for_all2
+      (fun exp typ ->
+        Il.Free.Set.is_empty Il.Free.(free_exp exp).varid
+        && Il.Eq.eq_typ exp.note typ)
+      arg_exps certificate.payload_typs
+  | Some _ | None -> false
+
+let certifies_payloads certificate ~typs ~sorts ~witnesses =
+  List.length certificate.payload_typs = List.length typs
+  && List.for_all2 Il.Eq.eq_typ certificate.payload_typs typs
+  && certificate.payload_sorts = sorts
+  && certificate.payload_witnesses = witnesses
+
+let certifies_payload_typs certificate typs =
+  List.length certificate.payload_typs = List.length typs
+  && List.for_all2 Il.Eq.eq_typ certificate.payload_typs typs
 
 let canonical_constructor_typ ctx typ =
   match
@@ -92,11 +196,14 @@ let constructor_lookup_miss_detail ctx ~source_category ~static_args_key ~mixop 
       (describe_static_key static_args_key)
       (sample same_category_mixop)
 
-let resolution resolved_typ (entry : Constructor_registry.entry) =
+let resolution ctx resolved_typ (entry : Constructor_registry.entry) =
   { resolved_constructor = entry.constructor_op
   ; resolved_typ
   ; projection_ops = entry.projection_ops
   ; registry_entry = entry
+  ; uniform_payload_schema =
+      Constructor_registry.uniform_payload_schema
+        (Context.constructors ctx) entry
   }
 
 let resolve_emitted ctx typ mixop ~arity =
@@ -118,9 +225,9 @@ let resolve_emitted ctx typ mixop ~arity =
            ~mixop
            ~arity
        with
-      | Constructor_registry.Found entry -> Found (resolution resolved_typ entry)
+      | Constructor_registry.Found entry -> Found (resolution ctx resolved_typ entry)
       | Constructor_registry.Ambiguous entries ->
-        Ambiguous (List.map (resolution resolved_typ) entries)
+        Ambiguous (List.map (resolution ctx resolved_typ) entries)
       | Constructor_registry.Missing ->
         (match
            Constructor_registry.lookup_visible

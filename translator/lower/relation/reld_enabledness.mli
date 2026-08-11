@@ -1,3 +1,14 @@
+type complement_alternative =
+  { conditions : Maude_ir.rule_condition list
+  ; established : Maude_ir.eq_condition list
+  }
+
+type complement_result =
+  { output : Reld_result.output
+  ; alternatives : complement_alternative list
+  ; support_statements : Maude_ir.generated list
+  }
+
 val complement :
   Context.t ->
   Origin.t ->
@@ -10,4 +21,4 @@ val complement :
   Maude_ir.term list ->
   Maude_ir.eq_condition list ->
   Il.Ast.rule list ->
-  Reld_result.output * Maude_ir.rule_condition list list
+  complement_result

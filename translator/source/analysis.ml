@@ -4,6 +4,7 @@ let id_of_def = Source_index.id_of_def
 
 module Source_index = Source_index
 module Relation_graph = Relation_graph
+module Sequence_carrier = Sequence_carrier
 
 module Function_graph = struct
   type param_kind = Definition_analysis.param_kind =
@@ -56,11 +57,6 @@ module Function_graph = struct
     ; external_validation_shape : bool
     }
 
-  type relation_demand =
-    { id : string
-    ; reason : string
-    }
-
   type rule_hint = Relation_analysis.rule_hint =
     { relation_id : string
     ; rule_id : string
@@ -101,13 +97,6 @@ module Function_graph = struct
     | Specialized_call of specialization
     | Unsupported_call of string
     | Prelude_gap_call of string
-
-  type runtime_search_capability =
-    | Runtime_search_candidate of string list
-    | Runtime_search_blocked of
-        { closure : string list
-        ; blockers : string list
-        }
 
   type runtime_search_blocker = Relation_analysis.runtime_search_blocker =
     { relation_id : string

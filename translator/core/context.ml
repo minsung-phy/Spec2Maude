@@ -9,6 +9,7 @@ type enclosing =
 type t =
   { source_index : Analysis.Source_index.t
   ; il_env : Il.Env.t
+  ; sequence_carriers : Analysis.Sequence_carrier.t
   ; function_graph : Analysis.Function_graph.t
   ; runtime_ingress_contract : Runtime_ingress_contract.t
   ; runtime_ingress_validation : Runtime_ingress_validation.t
@@ -81,6 +82,7 @@ let create
   let function_graph = Analysis.Function_graph.build source_index in
   { source_index
   ; il_env
+  ; sequence_carriers = Analysis.Sequence_carrier.analyze il_env source_index
   ; function_graph
   ; runtime_ingress_contract
   ; runtime_ingress_validation = Runtime_ingress_validation.of_source_index source_index
@@ -171,6 +173,9 @@ let source_index t =
 
 let il_env t =
   t.il_env
+
+let sequence_carriers t =
+  t.sequence_carriers
 
 let function_graph t =
   t.function_graph

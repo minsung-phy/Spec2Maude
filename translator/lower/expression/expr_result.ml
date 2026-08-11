@@ -7,7 +7,7 @@ type result =
 type pattern_result =
   { pattern_term : Maude_ir.term option
   ; pattern_guards : Maude_ir.eq_condition list
-  ; introduced_bindings : (string * Expr_env.binding) list
+  ; introduced_bindings : Expr_env.introduced_binding list
   ; pattern_diagnostics : Diagnostics.t list
   }
 

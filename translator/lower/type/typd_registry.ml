@@ -5,6 +5,7 @@ let register_constructor
       Constructor_registry.Guarded_constructor
         "constructor source domain was not certified")
     ?payload_labels
+    ?(payload_typs = [])
     ?(payload_witnesses = [])
     ?(payload_sorts = [])
     ?static_args_key
@@ -28,6 +29,7 @@ let register_constructor
     ; constructor_op
     ; projection_ops
     ; payload_labels
+    ; payload_typs
     ; payload_witnesses
     ; payload_sorts
     ; origin

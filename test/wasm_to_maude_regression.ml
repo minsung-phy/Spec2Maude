@@ -251,6 +251,27 @@ let require_run_unsupported source export args fragment =
       {kind = Ingress_error.Unsupported; message; _}
       when contains message fragment -> ()
 
+let require_modelcheck_fragments () =
+  let module_ = Frontend.text ~name:"modelcheck.wat" scalar_source in
+  let actual =
+    Emit.modelcheck ~semantics:"builtins.maude"
+      ~export:(Wasm.Utf8.decode "add")
+      ~args:[Wasm.Value.I32 2l; Wasm.Value.I32 3l]
+      ~expected:(Wasm.Value.I32 5l) ~rejected:(Wasm.Value.I32 6l)
+      ~steps:100 module_
+    |> compact
+  in
+  List.iter
+    (fun fragment ->
+      if not (contains actual fragment) then
+        failwith ("missing model-checking fragment: " ^ fragment))
+    [ "includingMODEL-CHECKER.";
+      "subsortModelState<State.";
+      "ifdef.instantiate(emptyStore,inputModule,eps)=>C.";
+      "ifrel.steps(C)=>config.sym";
+      "modelCheck(boot,<>returned(expected))";
+      "modelCheck(boot,[]~returned(rejected))" ]
+
 let assertion_definition path =
   Wasm.Parse.Script.parse_file path
   |> List.find_map (fun command ->
@@ -314,6 +335,7 @@ let require_quoted_malformed_region path =
       then failwith "quoted syntax region did not retain its payload offset"
 
 let () =
+  require_modelcheck_fragments ();
   require_fragments "add.wat" scalar_source
     [ "module.module"; "func.func"; "instr.local-get"; "instr.binop";
       "export.export" ];

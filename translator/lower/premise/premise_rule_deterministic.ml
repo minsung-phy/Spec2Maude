@@ -153,9 +153,17 @@ let projected_output_bindings
              if Premise_state.source_id_is_bound env bound_vars id then
                Ok bindings
              else
-             match List.assoc_opt id introduced, Expr_env.find env id with
+             let introduced_binding =
+               introduced
+               |> List.find_opt (fun binding -> binding.Expr_env.id = id)
+               |> Option.map (fun introduced -> introduced.Expr_env.binding)
+             in
+             match introduced_binding, Expr_env.find env id with
              | Some binding, _ | None, Some binding ->
-               Ok ((id, { binding with Expr_env.term }) :: bindings)
+               Ok
+                 (Expr_env.introduce
+                    id { binding with Expr_env.term }
+                  :: bindings)
              | None, None ->
                Error
                  ("source output binder `" ^ id
@@ -183,8 +191,17 @@ let lower names ctx env ~bound_vars ~factor_head_domain origin prem rel_id exp
         lower_input_values ctx env origin input_exps
       in
       let output_pattern, names =
-        Expr_translate.lower_pattern_with_bindings_named
-          names ctx env origin output_exp
+        match
+          Pattern_typed_subject.deterministic_output
+            ~output_typ:shape.Relation_shape.output.typ
+            ~pattern:output_exp
+        with
+        | Some subject ->
+          Pattern_typed_subject.lower_pattern_named
+            subject names ctx env origin output_exp
+        | None ->
+          Expr_translate.lower_pattern_with_bindings_named
+            names ctx env origin output_exp
       in
       let output_sort_opt =
         Expr_translate.carrier_sort_of_typ shape.Relation_shape.output.typ

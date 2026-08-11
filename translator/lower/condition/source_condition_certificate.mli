@@ -14,6 +14,8 @@ type failure =
 
 type proof_failure
 
+val positive : t -> Maude_ir.eq_condition list
+
 val specialize : (string * Maude_ir.term) list -> t -> t
 val lookup : t list -> Maude_ir.eq_condition list -> lookup
 

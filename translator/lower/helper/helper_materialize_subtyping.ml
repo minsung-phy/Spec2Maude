@@ -34,6 +34,9 @@ let materialize entry injection =
          ([], Local_name.empty)
     |> fun (cases, names) -> List.rev cases, names
   in
+  let count_var, names =
+    Local_name.fresh_qualified_name names Local_name.Count (sort_ref nat)
+  in
   let tail_var, _ =
     Local_name.fresh_qualified_name
       names Local_name.Tail (sort_ref spectec_terminals)
@@ -47,6 +50,7 @@ let materialize entry injection =
       in
       let source = constructor (Subtype_injection.source_op case) args in
       let target = constructor (Subtype_injection.target_op case) args in
+      let count = Var count_var in
       let tail = Var tail_var in
       (* [Subtype_plan] proves a one-to-one constructor map.  These equations
          therefore define a partial retraction: project(forward(x)) = x.  The
@@ -57,9 +61,41 @@ let materialize entry injection =
       ; statement (eq (App (project_seq, [ target ])) source)
       ; statement
           (ceq
+             (App (project_seq, [ app "repeatSeq" [ count; target ] ]))
+             (app "repeatSeq" [ count; source ])
+             [ BoolCond (app "_=/=_" [ count; Const "0" ]) ])
+      ; statement
+          (ceq
+             (App (project_seq, [ app "runSeq" [ count; target ] ]))
+             (app "canonicalRun" [ count; source ])
+             [ BoolCond (app "_=/=_" [ count; Const "0" ]) ])
+      ; statement
+          (ceq
              (App (project_seq, [ concat target tail ]))
              (concat source (App (project_seq, [ tail ])))
              [ not_eps tail_var ])
+      ; statement
+          (ceq
+             (App
+                (project_seq,
+                 [ concat (app "repeatSeq" [ count; target ]) tail ]))
+             (concat
+                (app "repeatSeq" [ count; source ])
+                (App (project_seq, [ tail ])))
+             [ BoolCond (app "_=/=_" [ count; Const "0" ])
+             ; not_eps tail_var
+             ])
+      ; statement
+          (ceq
+             (App
+                (project_seq,
+                 [ concat (app "runSeq" [ count; target ]) tail ]))
+             (concat
+                (app "canonicalRun" [ count; source ])
+                (App (project_seq, [ tail ])))
+             [ BoolCond (app "_=/=_" [ count; Const "0" ])
+             ; not_eps tail_var
+             ])
       ])
     |> List.concat
   in

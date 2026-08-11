@@ -267,6 +267,7 @@ let lower_indexed_listn_target
                       ; mode = Request.Indexed_from_zero
                       }
                   ; call_shape = Request.Source_then_captures
+                  ; output_representation = Sequence_representation.Ordinary
                   ; count_var
                   ; index_var = Some index_var
                   ; body_result_var

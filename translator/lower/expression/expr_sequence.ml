@@ -14,7 +14,9 @@ type env = Expr_env.t
 
 type callbacks =
   { lower_value : Context.t -> env -> Origin.t -> exp -> result
-  ; lower_iter : Context.t -> env -> Origin.t -> exp -> exp -> iterexp -> result
+  ; lower_iter :
+      Sequence_representation.t ->
+      Context.t -> env -> Origin.t -> exp -> exp -> iterexp -> result
   }
 
 let seq term = app "seq" [ term ]
@@ -175,35 +177,49 @@ and lower_list_optional callbacks ctx env origin _exp exps =
   | None -> result
 
 and lower_sequence callbacks ctx env origin exp =
+  lower_sequence_as Sequence_representation.Ordinary callbacks ctx env origin exp
+
+and lower_sequence_as representation callbacks ctx env origin exp =
   match exp.it with
   | VarE id ->
     (match Expr_env.find env id.it with
-    | Some binding when Carrier_sort.is_sequence_sort binding.sort -> with_term binding.term
+    | Some binding when Carrier_sort.is_sequence_sort binding.sort ->
+      normalize representation (with_term binding.term)
     | Some _ -> with_diagnostics [ sequence_sort_diagnostic ctx origin exp ]
     | None ->
       unsupported_exp ctx origin "Expr/SequenceVarE" exp
         ("unbound sequence variable `" ^ id.it ^ "`"))
-  | ListE exps -> lower_list callbacks ctx env origin exp exps
-  | CatE (left, right) -> lower_cat callbacks ctx env origin exp left right
+  | ListE exps ->
+    normalize representation (lower_list callbacks ctx env origin exp exps)
+  | CatE (left, right) ->
+    lower_cat_as representation callbacks ctx env origin exp left right
   | IterE (body, iterexp) ->
-    callbacks.lower_iter ctx env origin exp body iterexp
+    callbacks.lower_iter representation ctx env origin exp body iterexp
   | _ ->
     (match Carrier_sort.for_expression exp.note with
     | Some sort when Carrier_sort.is_sequence_sort sort ->
-      callbacks.lower_value ctx env origin exp
+      normalize representation (callbacks.lower_value ctx env origin exp)
     | _ -> with_diagnostics [ sequence_sort_diagnostic ctx origin exp ])
 
 and lower_cat callbacks ctx env origin exp left right =
+  lower_cat_as Sequence_representation.Ordinary callbacks ctx env origin exp left right
+
+and lower_cat_as representation callbacks ctx env origin exp left right =
   let expected_sequence =
     match Carrier_sort.for_expression exp.note with
     | Some sort when Carrier_sort.is_sequence_sort sort -> []
     | _ -> [ sequence_sort_diagnostic ctx origin exp ]
   in
-  let left_result = lower_sequence callbacks ctx env origin left in
-  let right_result = lower_sequence callbacks ctx env origin right in
+  let left_result = lower_sequence_as representation callbacks ctx env origin left in
+  let right_result = lower_sequence_as representation callbacks ctx env origin right in
   match expected_sequence, left_result.term, right_result.term with
   | [], Some left_term, Some right_term ->
-    { term = Some (app "_ _" [ left_term; right_term ])
+    let op =
+      match representation with
+      | Sequence_representation.Ordinary -> "_ _"
+      | Sequence_representation.Canonical_runs -> "appendRuns"
+    in
+    { term = Some (app op [ left_term; right_term ])
     ; guards = left_result.guards @ right_result.guards
     ; diagnostics = left_result.diagnostics @ right_result.diagnostics
     }
@@ -212,6 +228,13 @@ and lower_cat callbacks ctx env origin exp left right =
     ; guards = left_result.guards @ right_result.guards
     ; diagnostics = expected_sequence @ left_result.diagnostics @ right_result.diagnostics
     }
+
+and normalize representation result =
+  match representation, result.term with
+  | Sequence_representation.Canonical_runs, Some term ->
+    { result with term = Some (app "appendRuns" [ term; Const "eps" ]) }
+  | Sequence_representation.Ordinary, _
+  | Sequence_representation.Canonical_runs, None -> result
 
 and lower_opt callbacks ctx env origin exp opt =
   if Type_shape.is_list_optional_typ exp.note then

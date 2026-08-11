@@ -17,6 +17,8 @@ type proof_failure =
   ; blockers : failure list
   }
 
+let positive (certificate : t) = certificate.positive
+
 let rec is_prefix prefix items =
   match prefix, items with
   | [], _ -> true

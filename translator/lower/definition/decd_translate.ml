@@ -228,7 +228,7 @@ let unsupported_clause_arg ctx origin constructor arg reason =
 type clause_arg_result =
   { arg_term : Maude_ir.term option
   ; arg_guards : Maude_ir.eq_condition list
-  ; arg_bindings : (string * Expr_env.binding) list
+  ; arg_bindings : Expr_env.introduced_binding list
   ; arg_diagnostics : Diagnostics.t list
   }
 
@@ -392,12 +392,13 @@ let add_safe_arg_bindings env results =
   in
   arg_bindings results
   |> List.fold_left
-       (fun env (id, (binding : Expr_env.binding)) ->
+       (fun env (introduced : Expr_env.introduced_binding) ->
+         let binding = introduced.binding in
          let binding_vars = Condition_closure.term_vars binding.term in
          if
            Condition_closure.vars_subset binding_vars lhs_bound_vars
          then
-           Expr_env.add env id binding
+           Expr_env.add_introduced env introduced
          else
            env)
        env
@@ -708,6 +709,10 @@ let translate_decd_clause ctx dec_origin op_name id params index clause =
                ~constructor_op:pattern_certificate
                lhs_terms
           |> dedup_conditions
+          |> Validated_guard_certificate.discharge_eq
+               ctx
+               (Premise_result.env_after premise_result)
+               ~lhs_terms
         in
         let admissibility_diags =
           Condition_admissibility.ceq_admissibility_diagnostics

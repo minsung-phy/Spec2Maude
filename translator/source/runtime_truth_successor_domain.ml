@@ -75,12 +75,16 @@ type coverage =
   ; source_rules : Source_rule_identity.rule list
   }
 
+type decision_basis =
+  | Successor_complete of coverage
+  | Domain_complete of coverage
+
 type t =
   { transitive : Runtime_witness_proof.transitive_domain
   ; producers : producer list
   ; domain_candidates : domain_candidate list
   ; total_facts : total_fact list
-  ; decision_coverage : coverage option
+  ; decision_basis : decision_basis option
   }
 
 type blocker =
@@ -995,7 +999,7 @@ let certify
     ?(resolve_constructor = fun _ _ _ -> None)
     graph
     (transitive : Runtime_witness_proof.transitive_domain) =
-  let domain_candidates, total_facts, decision_coverage =
+  let domain_candidates, total_facts, domain_coverage =
     match constructors with
     | None -> [], [], None
     | Some constructors ->
@@ -1040,32 +1044,31 @@ let certify
       in
       let producers = List.concat producer_groups
       in
-      let decision_coverage =
-        match decision_coverage with
-        | Some _ as coverage -> coverage
-        | None ->
-          let query_endpoints =
-            rooted_subtyping_endpoints graph transitive producer_groups
-          in
-          (* For R(x,y) with the source transitivity clause
+      let query_endpoints =
+        rooted_subtyping_endpoints graph transitive producer_groups
+      in
+      (* For R(x,y) with the source transitivity clause
 
-               D(w), R(x,w), R(w,y) / R(x,y),
+           D(w), R(x,w), R(w,y) / R(x,y),
 
-             every nonempty proof starts with one edge produced by a
-             non-transitive RuleD.  Exhaustively classifying those RuleDs
-             therefore gives a finite direct-successor basis.  The visited
-             worklist computes its least reflexive-transitive closure.  A
-             target-directed open endpoint counts as exhaustive only under the
-             rooted-subtyping cut certificate above. *)
+         every nonempty proof starts with one edge produced by a
+         non-transitive RuleD. Exhaustively classifying those RuleDs therefore
+         gives an exact direct-successor basis. Prefer that adjacency proof to
+         testing the complete finite domain again at every reached node. *)
+      let decision_basis =
+        match
           producer_coverage transitive.rule.relation_id rules
             query_endpoints producer_groups
+        with
+        | Some coverage -> Some (Successor_complete coverage)
+        | None -> Option.map (fun coverage -> Domain_complete coverage) domain_coverage
       in
       Materialized
         { transitive
         ; producers
         ; domain_candidates
         ; total_facts
-        ; decision_coverage
+        ; decision_basis
         }
 
 let same_rule left right =
@@ -1081,7 +1084,7 @@ let matches certificate (transitive : Runtime_witness_proof.transitive_domain) =
   && certificate.transitive.prefix_arity = transitive.prefix_arity
 
 let decision_complete certificate =
-  Option.is_some certificate.decision_coverage
+  Option.is_some certificate.decision_basis
 
 let key certificate =
   let rule_key rule =
@@ -1128,9 +1131,13 @@ let key certificate =
   ^ "\000domain\000"
   ^ String.concat "\000" (List.map domain_key certificate.domain_candidates)
   ^ "\000coverage\000"
-  ^ (match certificate.decision_coverage with
+  ^ (match certificate.decision_basis with
      | None -> "open"
-     | Some coverage ->
-       coverage.relation_id ^ "\000"
+     | Some (Successor_complete coverage) ->
+       "successor\000" ^ coverage.relation_id ^ "\000"
+       ^ String.concat "\000"
+           (List.map Source_rule_identity.rule_key coverage.source_rules)
+     | Some (Domain_complete coverage) ->
+       "domain\000" ^ coverage.relation_id ^ "\000"
        ^ String.concat "\000"
            (List.map Source_rule_identity.rule_key coverage.source_rules))

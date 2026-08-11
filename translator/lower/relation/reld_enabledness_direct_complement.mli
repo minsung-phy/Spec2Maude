@@ -21,6 +21,23 @@ type condition_block =
   | Source_conditions of Maude_ir.eq_condition list
   | Head_domain_conditions of Maude_ir.eq_condition list
 
+type materialized =
+  { statements : Maude_ir.generated list
+  ; diagnostics : Diagnostics.t list
+  ; condition : Maude_ir.rule_condition
+  ; established : Maude_ir.eq_condition list
+  }
+
+val materialize :
+  Context.t ->
+  Expr_env.t ->
+  Origin.t ->
+  string ->
+  Maude_ir.sort list ->
+  Maude_ir.term list ->
+  Maude_ir.rule_condition list list ->
+  materialized
+
 val sequential_complement_alternatives :
   Maude_ir.term list ->
   Maude_ir.eq_condition list ->

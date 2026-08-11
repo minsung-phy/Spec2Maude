@@ -1,5 +1,6 @@
 type worklist
 type scope
+type candidate
 type request
 
 val create :
@@ -15,12 +16,16 @@ val scope_formals : scope -> Maude_ir.term list
 val scope_witness : scope -> Maude_ir.term
 val scope_current : scope -> Maude_ir.term
 
+val candidate :
+  call:Maude_ir.term ->
+  certifies_edge:bool ->
+  candidate
+
 val request :
   worklist:worklist ->
   origin:Origin.t ->
   mode:Runtime_truth_worklist_indexed.mode ->
-  candidates:Maude_ir.term list ->
-  certified_successors:Maude_ir.term list ->
+  candidates:candidate list ->
   start:Maude_ir.term ->
   target:Maude_ir.term ->
   domain_true:Maude_ir.rule_condition list ->

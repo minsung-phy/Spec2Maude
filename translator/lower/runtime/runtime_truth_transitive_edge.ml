@@ -752,9 +752,16 @@ let transitive_successors
     (domain : Runtime_truth_successor_domain.t)
     env prefix right current =
   let fixed =
-    domain_candidates ctx item env transitive.rule.origin
-      transitive.rule.source_echo domain.domain_candidates
-    |> List.map (classify_candidate false)
+    match item.request.mode, domain.decision_basis with
+    | Runtime_truth_worklist_helper.Decide,
+      Some (Runtime_truth_successor_domain.Successor_complete _) ->
+      []
+    | Runtime_truth_worklist_helper.Prove, _
+    | Runtime_truth_worklist_helper.Decide,
+      (None | Some (Runtime_truth_successor_domain.Domain_complete _)) ->
+      domain_candidates ctx item env transitive.rule.origin
+        transitive.rule.source_echo domain.domain_candidates
+      |> List.map (classify_candidate false)
   in
   let known = prefix @ [ current ] in
   let produced =
@@ -841,12 +848,10 @@ let transitive_edge
             in
             let candidates =
               materialized
-              |> List.map (fun (candidate : successor_candidate) -> candidate.call)
-            in
-            let certified_successors =
-              materialized
-              |> List.filter_map (fun (candidate : successor_candidate) ->
-                   if candidate.certifies_edge then Some candidate.call else None)
+              |> List.map (fun (candidate : successor_candidate) ->
+                   Runtime_truth_transitive_materializer.candidate
+                     ~call:candidate.call
+                     ~certifies_edge:candidate.certifies_edge)
             in
             let statements =
               materialized
@@ -891,7 +896,7 @@ let transitive_edge
                   Runtime_truth_transitive_materializer.request
                     ~worklist ~origin:transitive.rule.origin
                     ~mode:(indexed_mode item)
-                    ~candidates ~certified_successors
+                    ~candidates
                     ~start:left ~target:formal_right
                     ~domain_true:domain_child.true_conditions
                     ~domain_false:

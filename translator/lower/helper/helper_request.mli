@@ -91,6 +91,7 @@ type iter_listn_shape =
 type iter_listn =
   { source_shape : iter_listn_shape
   ; call_shape : iter_map_call_shape
+  ; output_representation : Sequence_representation.t
   ; count_var : string
   ; index_var : string option
   ; body_result_var : string

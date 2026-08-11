@@ -18,5 +18,6 @@ val runtime_predicate_truth_worklist_requests :
   t -> (string * Origin.t * Runtime_truth_worklist_helper.request) list
 val runtime_enabledness_requests :
   t -> (string * Origin.t * Runtime_enabledness_helper.request) list
+val subtype_injections : t -> (string * Subtype_injection.t) list
 val unmaterialized_diagnostics : profile:string -> t -> Diagnostics.t list
 val materialize_static : t -> Maude_ir.generated list

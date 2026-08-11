@@ -99,15 +99,7 @@ let runtime_enabledness_complement
 
 let runtime_worklist_enabledness_complement
     ctx origin relation_id rule_id input_sorts current_lhs_terms lhs_terms
-    lhs_guards premise_result
-    positive_helper_name positive_request total_helper_name total_request rule =
-  let decision =
-    { Runtime_truth_worklist_enabledness.positive_helper_name
-    ; positive_request
-    ; total_helper_name
-    ; total_request
-    }
-  in
+    lhs_guards premise_result decision rule =
   let request =
     { Runtime_enabledness_helper.relation_id = relation_id.it
     ; rule_id = rule_id_opt rule_id
@@ -214,78 +206,46 @@ let without_else_premises prems =
     | ElsePr -> false
     | _ -> true)
 
+type complement_alternative =
+  { conditions : Maude_ir.rule_condition list
+  ; established : Maude_ir.eq_condition list
+  }
+
 type enabledness_info =
   { helper_name : string
   ; output : output
-  ; complement_alternatives : Maude_ir.rule_condition list list
+  ; support_statements : Maude_ir.generated list
+  ; complement_alternatives : complement_alternative list
   }
 
 type enabledness_result =
   | Not_applicable
   | Enabledness of enabledness_info
 
+type complement_result =
+  { output : output
+  ; alternatives : complement_alternative list
+  ; support_statements : Maude_ir.generated list
+  }
+
+let complement_alternative ?(established = []) conditions =
+  { conditions; established }
+
+let stable_union left right =
+  let fresh =
+    List.fold_left
+      (fun fresh item ->
+        if List.mem item left || List.mem item fresh then fresh
+        else item :: fresh)
+      [] right
+    |> List.rev
+  in
+  left @ fresh
+
 let helper_name relation_id rule_id index =
   Naming.helper_op
     ~role:"enabledness"
     ~owner:(rule_label relation_id rule_id index)
-
-let direct_helper_op name = name
-let direct_false_op = Naming.helper_companion ~role:"enabledness-direct-false"
-let direct_helper_sort name =
-  Maude_ir.sort ("RuntimeEnablednessDirect" ^ Naming.sort_token name ^ "Conf")
-
-let origin_label_suffix predecessor current =
-  ignore predecessor;
-  ignore current;
-  "source"
-
-let direct_helper_surface name origin input_sorts =
-  let generated node =
-    Maude_ir.generated ~provenance:(Maude_ir.Helper name) ~origin node
-  in
-  let result_sort = direct_helper_sort name in
-  let frozen = match input_sorts with
-    | [] -> []
-    | _ -> [ Maude_ir.Frozen (List.mapi (fun index _ -> index + 1) input_sorts) ]
-  in
-  [ generated (Maude_ir.sort_decl result_sort)
-  ; generated
-      (Maude_ir.op (direct_helper_op name)
-         (List.map Maude_ir.sort_ref input_sorts) result_sort ~attrs:frozen)
-  ; generated (Maude_ir.op (direct_false_op name) [] result_sort ~attrs:[ Maude_ir.Ctor ])
-  ]
-
-let materialize_direct_complement
-    ctx origin current_origin name input_sorts current_lhs_terms alternatives =
-  let generated node =
-    Maude_ir.generated ~provenance:(Maude_ir.Helper name) ~origin node
-  in
-  let lhs = Maude_ir.App (direct_helper_op name, current_lhs_terms) in
-  let rhs = Maude_ir.Const (direct_false_op name) in
-  let rules = alternatives |> List.mapi (fun index conditions ->
-    let conditions =
-      Condition_closure.normalize_rule_conditions
-        ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
-        [ lhs ] conditions
-      |> dedup_rule_conditions
-    in
-    let diagnostics =
-      Condition_admissibility.crl_admissibility_diagnostics ctx origin lhs rhs conditions
-    in
-    generated
-      (Maude_ir.crl
-         ~label:
-           (Maude_ir.sanitize_label
-              (name ^ "-" ^ origin_label_suffix origin current_origin ^ "-false-"
-               ^ string_of_int (index + 1)))
-         lhs rhs conditions),
-    diagnostics)
-  in
-  let statements = direct_helper_surface name origin input_sorts @ List.map fst rules in
-  let diagnostics = List.concat_map snd rules in
-  let diagnostics = diagnostics @ List.concat_map (generated_statement_diagnostics ctx) statements in
-  statements, diagnostics,
-  Maude_ir.RewriteCond (lhs, rhs)
 
 let translate_helper
     ctx
@@ -295,7 +255,6 @@ let translate_helper
     relation_mixop
     (shape : Relation_shape.execution_shape)
     input_sorts
-    current_origin
     current_lhs_terms
     current_lhs_guards
     index
@@ -318,6 +277,7 @@ let translate_helper
       Enabledness
         { helper_name = helper_name relation_id rule_id index
         ; output = { empty with diagnostics = hint_diags @ marker_diags }
+        ; support_statements = []
         ; complement_alternatives = []
         }
     else
@@ -337,6 +297,7 @@ let translate_helper
         Enabledness
           { helper_name = helper_name relation_id rule_id index
           ; output = { empty with diagnostics = arity_diags }
+          ; support_statements = []
           ; complement_alternatives = []
           }
       | Some components ->
@@ -353,15 +314,15 @@ let translate_helper
           translate_rule_binds ctx origin names binds
         in
         let (lhs_terms_opt, lhs_guards, lhs_bindings, lhs_diags), names =
-          lower_pattern_components_named names ctx env origin input_exps
+          lower_validated_input_components_named
+            names ctx env origin input_exps
         in
         (match lhs_terms_opt with
         | Some lhs_terms
           when predecessor_matches_current current_lhs_terms lhs_terms ->
-        let lhs_guards, _head_facts =
-          split_execution_head_guards ctx lhs_terms lhs_guards
-        in
-          let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
+          let env =
+            add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings
+          in
           let premise_translation, _names =
             Premise_translate.translate_premises_named
               names
@@ -386,6 +347,7 @@ let translate_helper
                       hint_diags @ bind_diags @ arity_diags @ lhs_diags
                       @ diagnostics
                   }
+              ; support_statements = []
               ; complement_alternatives = []
               }
           | Complete premise_result ->
@@ -398,10 +360,12 @@ let translate_helper
             }
           in
           let enabled
-              ?(statements = []) ?(complement_alternatives = []) diagnostics =
+              ?(statements = []) ?(support_statements = [])
+              ?(complement_alternatives = []) diagnostics =
             Enabledness
               { helper_name
               ; output = output ~statements diagnostics
+              ; support_statements
               ; complement_alternatives
               }
           in
@@ -436,10 +400,24 @@ let translate_helper
              with
             | Complete { alternatives = []; statements = _ } ->
               enabled ~complement_alternatives:[] []
+            | Complete
+                { alternatives = [ alternative ]
+                ; statements
+                } ->
+              let diagnostics =
+                List.concat_map
+                  (generated_statement_diagnostics ctx)
+                  statements
+              in
+              enabled
+                ~statements
+                ~complement_alternatives:
+                  [ complement_alternative alternative ]
+                diagnostics
             | Complete complete ->
-              let statements, diagnostics, complement =
-                materialize_direct_complement
-                  ctx origin current_origin helper_name input_sorts current_lhs_terms
+              let materialized =
+                Reld_enabledness_direct_complement.materialize
+                  ctx env origin helper_name input_sorts current_lhs_terms
                   complete.alternatives
               in
               let support_diagnostics =
@@ -447,19 +425,15 @@ let translate_helper
                   (generated_statement_diagnostics ctx)
                   complete.statements
               in
-              Enabledness
-                { helper_name
-                ; output =
-                    { statements =
-                        var_decls @ complete.statements @ statements
-                    ; diagnostics =
-                        hint_diags @ bind_diags @ arity_diags @ lhs_diags
-                        @ Premise_result.diagnostics premise_result
-                        @ support_diagnostics
-                        @ diagnostics
-                    }
-                ; complement_alternatives = [ [ complement ] ]
-                }
+              enabled
+                ~statements:
+                  (complete.statements @ materialized.statements)
+                ~complement_alternatives:
+                  [ complement_alternative
+                      ~established:materialized.established
+                      [ materialized.condition ]
+                  ]
+                (support_diagnostics @ materialized.diagnostics)
             | Blocked reasons ->
               enabled
                 [ unsupported
@@ -510,14 +484,43 @@ let translate_helper
                       ; origin
                       }
                   in
-                  let complement_condition, surface =
-                    runtime_worklist_enabledness_complement
-                      ctx origin relation_id rule_id input_sorts current_lhs_terms
-                      lhs_terms lhs_guards premise_result worklist_name request
-                      total_helper_name total_request rule
+                  let decision =
+                    { Runtime_truth_worklist_enabledness.positive_helper_name =
+                        worklist_name
+                    ; positive_request = request
+                    ; total_helper_name
+                    ; total_request
+                    }
                   in
-                  enabled ~statements:surface
-                    ~complement_alternatives:[[ complement_condition ]] []
+                  if current_lhs_terms = lhs_terms then
+                    let guards =
+                      List.map
+                        (fun condition -> Maude_ir.EqCondition condition)
+                        lhs_guards
+                    in
+                    enabled
+                      ~support_statements:
+                        (Runtime_truth_worklist_helper.surface
+                           ~helper_name:total_helper_name ~origin total_request)
+                      ~complement_alternatives:
+                        [ complement_alternative
+                            (guards
+                             @ [ Runtime_truth_worklist_enabledness.false_condition
+                                   decision
+                               ])
+                        ]
+                      []
+                  else
+                    let complement_condition, surface =
+                      runtime_worklist_enabledness_complement
+                        ctx origin relation_id rule_id input_sorts
+                        current_lhs_terms lhs_terms lhs_guards premise_result
+                        decision rule
+                    in
+                    enabled ~statements:surface
+                      ~complement_alternatives:
+                        [ complement_alternative [ complement_condition ] ]
+                      []
                 | Runtime_truth_worklist_enabledness.Incomplete_decision relations ->
                   enabled
                     [ runtime_enabledness_unsupported ctx origin rule
@@ -593,7 +596,10 @@ let translate_helper
                     truth_request
                     rule
                 in
-                enabled ~complement_alternatives:[[ complement_condition ]] []
+                enabled
+                  ~complement_alternatives:
+                    [ complement_alternative [ complement_condition ] ]
+                  []
               | Runtime_truth_false_support.Supported ->
                 enabled
                   [ runtime_enabledness_unsupported
@@ -660,6 +666,7 @@ let translate_helper
                 { statements = var_decls
                 ; diagnostics = hint_diags @ bind_diags @ arity_diags @ lhs_diags
                 }
+            ; support_statements = []
             ; complement_alternatives = []
             }))
 
@@ -686,7 +693,6 @@ let complement
         relation_mixop
         shape
         input_sorts
-        origin
         current_lhs_terms
         current_lhs_guards
         (index + 1)
@@ -700,29 +706,37 @@ let complement
   in
   match applicable with
   | [] ->
-    { statements = []
-    ; diagnostics =
-        [ unsupported
-            ~ctx
-            ~origin
-            ~constructor:"RelD/RuleD/ElsePr/complement"
-            ~reason:
-              "source otherwise rule has no earlier rule with the same relation input skeleton, so the translator cannot derive a source enabledness complement"
-            ~suggestion:
-              "Keep this ElsePr Unsupported until rule grouping/preprocessing can prove the relevant predecessor rules"
-            ()
-        ]
-    },
-    []
+    { output =
+        { statements = []
+        ; diagnostics =
+            [ unsupported
+                ~ctx
+                ~origin
+                ~constructor:"RelD/RuleD/ElsePr/complement"
+                ~reason:
+                  "source otherwise rule has no earlier rule with the same relation input skeleton, so the translator cannot derive a source enabledness complement"
+                ~suggestion:
+                  "Keep this ElsePr Unsupported until rule grouping/preprocessing can prove the relevant predecessor rules"
+                ()
+            ]
+        }
+    ; alternatives = []
+    ; support_statements = []
+    }
   | _ ->
     let statements =
       applicable
-      |> List.map (fun result -> result.output.statements)
+      |> List.map (fun (result : enabledness_info) -> result.output.statements)
       |> List.concat
     in
     let diagnostics =
       applicable
-      |> List.map (fun result -> result.output.diagnostics)
+      |> List.map (fun (result : enabledness_info) -> result.output.diagnostics)
+      |> List.concat
+    in
+    let support_statements =
+      applicable
+      |> List.map (fun (result : enabledness_info) -> result.support_statements)
       |> List.concat
     in
     let has_blocking = has_fatal diagnostics in
@@ -730,7 +744,11 @@ let complement
     let combine alternatives choices =
       alternatives
       |> List.concat_map (fun prefix ->
-        choices |> List.map (fun choice -> prefix @ choice))
+        choices
+        |> List.map (fun choice ->
+          { conditions = prefix.conditions @ choice.conditions
+          ; established = stable_union prefix.established choice.established
+          }))
     in
     let complement_alternatives =
       if has_blocking then
@@ -738,9 +756,9 @@ let complement
       else
         applicable
         |> List.fold_left
-             (fun alternatives result ->
+             (fun alternatives (result : enabledness_info) ->
                combine alternatives result.complement_alternatives)
-             [ [] ]
+             [ complement_alternative [] ]
     in
     if has_blocking then
       match
@@ -757,14 +775,21 @@ let complement
           ~previous_rules
       with
       | Reld_enabledness_constructor_group.Materialized
-          (output, complement_conditions) -> output, [ complement_conditions ]
+          (output, complement_conditions) ->
+        { output
+        ; alternatives = [ complement_alternative complement_conditions ]
+        ; support_statements = []
+        }
       | Blocked group_diagnostics ->
-        { statements = []
-        ; diagnostics =
-            without_subordinate_enabledness_blockers diagnostics
-            @ group_diagnostics
-        },
-        []
+        { output =
+            { statements = []
+            ; diagnostics =
+                without_subordinate_enabledness_blockers diagnostics
+                @ group_diagnostics
+            }
+        ; alternatives = []
+        ; support_statements = []
+        }
       | Not_applicable ->
         let enabledness_blockers =
           summarized_enabledness_blockers diagnostics
@@ -780,19 +805,25 @@ let complement
             "at least one predecessor rule in this otherwise group needs enabledness conditions that are not safely expressible by the current source-derived helper slice; predecessor blockers: "
             ^ String.concat "; " blockers
         in
-        { statements = []
-        ; diagnostics =
-            diagnostics
-            @ [ unsupported
-                ~ctx
-                ~origin
-                ~constructor:"RelD/RuleD/ElsePr/complement-unsupported"
-                ~reason:blocker_reason
-                ~suggestion:
-                  "Leave this ElsePr Unsupported until the blocking predecessor premise shape has a documented source-complete helper"
-                ()
-            ]
-        },
-        []
+        { output =
+            { statements = []
+            ; diagnostics =
+                diagnostics
+                @ [ unsupported
+                    ~ctx
+                    ~origin
+                    ~constructor:"RelD/RuleD/ElsePr/complement-unsupported"
+                    ~reason:blocker_reason
+                    ~suggestion:
+                      "Leave this ElsePr Unsupported until the blocking predecessor premise shape has a documented source-complete helper"
+                    ()
+                ]
+            }
+        ; alternatives = []
+        ; support_statements = []
+        }
     else
-      { statements; diagnostics }, complement_alternatives
+      { output = { statements; diagnostics }
+      ; alternatives = complement_alternatives
+      ; support_statements
+      }

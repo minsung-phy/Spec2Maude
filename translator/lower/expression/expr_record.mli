@@ -3,6 +3,9 @@ open Il.Ast
 type callbacks =
   { lower_value : Context.t -> Expr_env.t -> Origin.t -> exp -> Expr_result.result
   ; lower_sequence : Context.t -> Expr_env.t -> Origin.t -> exp -> Expr_result.result
+  ; lower_sequence_as :
+      Sequence_representation.t ->
+      Context.t -> Expr_env.t -> Origin.t -> exp -> Expr_result.result
   }
 
 val lower_record_literal :

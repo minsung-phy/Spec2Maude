@@ -5,11 +5,11 @@ type worklist =
   ; identity : Runtime_truth_worklist_indexed.identity
   ; captures : Runtime_truth_worklist_indexed.capture list
   ; indexed_head_var : string
-  ; indexed_tail_var : string
   ; current_var : string
   ; queue_var : string
   ; seen_var : string
-  ; successors_var : string
+  ; candidate_tail_var : string
+  ; evidence_var : string
   }
 
 type scope =
@@ -18,12 +18,16 @@ type scope =
   ; current : term
   }
 
+type candidate =
+  { call : term
+  ; certifies_edge : bool
+  }
+
 type request =
   { worklist : worklist
   ; origin : Origin.t
   ; mode : Runtime_truth_worklist_indexed.mode
-  ; candidates : term list
-  ; certified_successors : term list
+  ; candidates : candidate list
   ; start : term
   ; target : term
   ; domain_true : rule_condition list
@@ -39,10 +43,12 @@ let scope_formals scope = scope.formals
 let scope_witness scope = scope.witness
 let scope_current scope = scope.current
 
-let request ~worklist ~origin ~mode ~candidates ~certified_successors
+let candidate ~call ~certifies_edge = { call; certifies_edge }
+
+let request ~worklist ~origin ~mode ~candidates
     ~start ~target ~domain_true ~domain_false ~direct_true ~direct_false
     ~result_sort ~proved ~refuted =
-  { worklist; origin; mode; candidates; certified_successors; start; target
+  { worklist; origin; mode; candidates; start; target
   ; domain_true; domain_false; direct_true; direct_false; result_sort
   ; proved; refuted }
 
@@ -51,6 +57,7 @@ type surface_var =
   | Count
   | Head
   | Value
+  | Evidence
   | Tail
 
 let surface_var role sort =
@@ -60,6 +67,7 @@ let surface_var role sort =
     | Count -> "RTCOUNT"
     | Head -> "RTHEAD"
     | Value -> "RTVALUE"
+    | Evidence -> "RTEVIDENCE"
     | Tail -> "RTTAIL"
   in
   Var (name ^ ":" ^ sort_name sort)
@@ -67,6 +75,10 @@ let surface_var role sort =
 let closure_list_sort ~helper_name identity =
   let identity = Runtime_truth_worklist_indexed.identity_name identity in
   sort (Naming.runtime_truth_list_sort ~helper_name ~identity)
+
+let candidate_list_sort ~helper_name identity =
+  let list = closure_list_sort ~helper_name identity in
+  sort (sort_name list ^ "Candidates")
 
 let create ~helper_name ~identity ~env ~terms ~sorts ~history =
   let names =
@@ -94,16 +106,17 @@ let create ~helper_name ~identity ~env ~terms ~sorts ~history =
     fresh Local_name.Head Runtime_truth_worklist_core.terminal names
   in
   let list = closure_list_sort ~helper_name identity in
-  let indexed_tail_var, names = fresh Local_name.Tail list names in
   let current_var, names =
     fresh Local_name.Component Runtime_truth_worklist_core.terminal names
   in
   let queue_var, names = fresh Local_name.Tail list names in
   let seen_var, names = fresh Local_name.History list names in
-  let successors_var, _ = fresh Local_name.Stream list names in
+  let candidates = candidate_list_sort ~helper_name identity in
+  let candidate_tail_var, names = fresh Local_name.Stream candidates names in
+  let evidence_var, _ = fresh Local_name.Value (sort "Bool") names in
   let worklist =
-    { helper_name; identity; captures; indexed_head_var; indexed_tail_var
-    ; current_var; queue_var; seen_var; successors_var }
+    { helper_name; identity; captures; indexed_head_var; current_var
+    ; queue_var; seen_var; candidate_tail_var; evidence_var }
   in
   ( worklist
   , { formals =
@@ -127,6 +140,7 @@ let closure_op request role =
     ~helper_name:request.worklist.helper_name ~identity ~role
 
 let list_op request role = closure_op request ("List" ^ role)
+let candidate_op request role = closure_op request ("Candidate" ^ role)
 
 let list_surface request =
   let list =
@@ -179,126 +193,67 @@ let list_surface request =
          (App ("_or_", [ App ("_==_", [ value; head ]); member value tail ])))
   ]
 
-let stable_sequence calls =
-  let calls =
-    calls
-    |> List.fold_left
-         (fun unique call ->
-           if List.exists (( = ) call) unique then unique else call :: unique)
-         []
-    |> List.rev
+let candidate_surface request =
+  let candidates =
+    candidate_list_sort ~helper_name:request.worklist.helper_name
+      request.worklist.identity
   in
-  match calls with
-  | [] -> Const "eps"
-  | call :: calls ->
-    List.fold_left (fun left right -> App ("_ _", [ left; right ])) call calls
+  let sequence = sort "SpectecTerminals" in
+  let terminal = sort "SpectecTerminal" in
+  let bool = sort "Bool" in
+  let nat = sort "Nat" in
+  let cons head evidence tail =
+    App (candidate_op request "Cons", [ head; evidence; tail ])
+  in
+  let prepend source evidence tail =
+    App (candidate_op request "Prepend", [ source; evidence; tail ])
+  in
+  let seq head tail = App ("_ _", [ head; tail ]) in
+  let repeat count value = App ("repeatSeq", [ count; value ]) in
+  let source = surface_var Source sequence in
+  let count = surface_var Count nat in
+  let head = surface_var Head terminal in
+  let evidence = surface_var Evidence bool in
+  let tail = surface_var Tail candidates in
+  [ generated request (sort_decl candidates)
+  ; generated request (op (candidate_op request "Nil") [] candidates ~attrs:[ Ctor ])
+  ; generated request
+      (op (candidate_op request "Cons")
+         [ sort_ref terminal; sort_ref bool; sort_ref candidates ] candidates
+         ~attrs:[ Ctor ])
+  ; generated request
+      (op (candidate_op request "Prepend")
+         [ sort_ref sequence; sort_ref bool; sort_ref candidates ] candidates)
+  ; generated request (eq (prepend (Const "eps") evidence tail) tail)
+  ; generated request
+      (eq
+         (prepend (repeat (App ("s_", [ count ])) head) evidence tail)
+         (cons head evidence (prepend (repeat count head) evidence tail)))
+  ; generated request
+      (ceq
+         (prepend
+            (seq (repeat (App ("s_", [ count ])) head) source)
+            evidence tail)
+         (cons head evidence
+            (prepend (seq (repeat count head) source) evidence tail))
+         [ BoolCond (App ("_=/=_", [ source; Const "eps" ])) ])
+  ; generated request
+      (eq
+         (prepend (seq head source) evidence tail)
+         (cons head evidence (prepend source evidence tail)))
+  ]
 
-let materialize_prove request =
-  let worklist = request.worklist in
-  let list = closure_list_sort ~helper_name:worklist.helper_name worklist.identity in
-  let choice = sort (sort_name list ^ "Choice") in
-  let captures =
-    List.map
-      (fun capture -> Var capture.Runtime_truth_worklist_indexed.formal_var)
-      worklist.captures
-  in
-  let actual_captures =
-    List.map
-      (fun capture -> capture.Runtime_truth_worklist_indexed.call_term)
-      worklist.captures
-  in
-  let capture_sorts =
-    List.map
-      (fun capture -> capture.Runtime_truth_worklist_indexed.sort)
-      worklist.captures
-  in
-  let current = Var worklist.current_var in
-  let candidate = Var worklist.indexed_head_var in
-  let candidates = Var worklist.indexed_tail_var in
-  let seen = Var worklist.seen_var in
-  let nil = Const (list_op request "Nil") in
-  let cons head tail = App (list_op request "Cons", [ head; tail ]) in
-  let member value values = App (list_op request "Member", [ value; values ]) in
-  let prepend source = App (list_op request "Prepend", [ source; nil ]) in
-  let candidates_value = prepend (stable_sequence request.candidates) in
-  let successors_value = prepend (stable_sequence request.certified_successors) in
-  let choose = closure_op request "Choose" in
-  let reach = closure_op request "ProveReach" in
-  let choose_call values = App (choose, [ values ]) in
-  let reach_call current seen captures =
-    App (reach, current :: seen :: captures)
-  in
-  let args =
-    List.map sort_ref (sort "SpectecTerminal" :: list :: capture_sorts)
-  in
-  let frozen count =
-    if count = 0 then []
-    else [ Frozen (List.init count (fun index -> index + 1)) ]
-  in
-  let unseen = EqCondition (EqCond (member candidate seen, Const "false")) in
-  let choose_candidate = RewriteCond (choose_call candidates_value, candidate) in
-  let certified =
-    EqCondition (EqCond (member candidate successors_value, Const "true"))
-  in
-  let uncertified =
-    EqCondition (EqCond (member candidate successors_value, Const "false"))
-  in
-  let same_target = EqCondition (EqCond (candidate, request.target)) in
-  let other_target =
-    EqCondition
-      (BoolCond (App ("_=/=_", [ candidate; request.target ])))
-  in
-  let actual_call =
-    reach_call request.start (cons request.start nil) actual_captures
-  in
-  let recurse =
-    RewriteCond
-      ( reach_call candidate (cons candidate seen) captures
-      , request.proved )
-  in
-  let prove_rule role conditions =
-    generated request
-      (crl ~label:(String.lowercase_ascii (reach ^ role))
-         (reach_call current seen captures) request.proved
-         conditions)
-  in
-  let statements =
-    list_surface request
-    @ [ generated request (sort_decl choice)
-      ; generated request (subsort (sort "SpectecTerminal") choice)
-      ; generated request
-          (op choose [ sort_ref list ] choice ~attrs:[ Frozen [ 1 ] ])
-      ; generated request
-          (rl ~label:(String.lowercase_ascii (choose ^ "-head"))
-             (choose_call (cons candidate candidates)) candidate)
-      ; generated request
-          (rl ~label:(String.lowercase_ascii (choose ^ "-tail"))
-             (choose_call (cons candidate candidates))
-             (choose_call candidates))
-      ; generated request
-          (op reach args request.result_sort
-             ~attrs:(frozen (List.length args)))
-      ; prove_rule "-source-hit"
-          ([ choose_candidate; same_target ]
-           @ request.domain_true @ [ certified ])
-      ; prove_rule "-direct-hit"
-          ([ choose_candidate; same_target ]
-           @ request.domain_true @ [ uncertified; request.direct_true ])
-      ; prove_rule "-source-next"
-          ([ choose_candidate; other_target; unseen ]
-           @ request.domain_true @ [ certified; recurse ])
-      ; prove_rule "-direct-next"
-          ([ choose_candidate; other_target; unseen ]
-           @ request.domain_true
-           @ [ uncertified; request.direct_true; recurse ])
-      ]
-  in
-  { Runtime_truth_worklist_indexed.statements
-  ; true_condition = RewriteCond (actual_call, request.proved)
-  ; false_condition = None
-  }
+let rec merge_candidate candidate = function
+  | [] -> [ candidate ]
+  | current :: rest when current.call = candidate.call ->
+    { current with
+      certifies_edge = current.certifies_edge || candidate.certifies_edge }
+    :: rest
+  | current :: rest -> current :: merge_candidate candidate rest
 
-let closure_surface request list reach expand =
+let stable_candidates = List.fold_left (fun acc candidate -> merge_candidate candidate acc) []
+
+let closure_surface request list candidates reach expand =
   let terminal = sort "SpectecTerminal" in
   let capture_sorts =
     List.map (fun capture -> capture.Runtime_truth_worklist_indexed.sort)
@@ -316,10 +271,9 @@ let closure_surface request list reach expand =
   ; generated request
       (op expand
          (List.map sort_ref
-            (terminal :: list :: list :: list :: list
-             :: capture_sorts))
+            (terminal :: candidates :: list :: list :: capture_sorts))
          request.result_sort
-         ~attrs:(frozen (5 + List.length capture_sorts)))
+         ~attrs:(frozen (4 + List.length capture_sorts)))
   ]
 
 let materialize_decide request =
@@ -332,17 +286,28 @@ let materialize_decide request =
   in
   let current = Var worklist.current_var in
   let candidate = Var worklist.indexed_head_var in
-  let candidates = Var worklist.indexed_tail_var in
+  let candidates = Var worklist.candidate_tail_var in
+  let evidence = Var worklist.evidence_var in
   let queue = Var worklist.queue_var in
   let seen = Var worklist.seen_var in
-  let successors = Var worklist.successors_var in
   let nil = Const (list_op request "Nil") in
   let cons head tail = App (list_op request "Cons", [ head; tail ]) in
   let member value values = App (list_op request "Member", [ value; values ]) in
+  let candidate_nil = Const (candidate_op request "Nil") in
+  let candidate_cons head evidence tail =
+    App (candidate_op request "Cons", [ head; evidence; tail ])
+  in
+  let candidate_prepend source evidence tail =
+    App (candidate_op request "Prepend", [ source; evidence; tail ])
+  in
   let frontier = cons request.start nil in
-  let prepend source = App (list_op request "Prepend", [ source; nil ]) in
-  let candidates_value = prepend (stable_sequence request.candidates) in
-  let successors_value = prepend (stable_sequence request.certified_successors) in
+  let candidates_value =
+    List.fold_right
+      (fun candidate tail ->
+        candidate_prepend candidate.call
+          (Const (string_of_bool candidate.certifies_edge)) tail)
+      (stable_candidates request.candidates) candidate_nil
+  in
   let actual_captures =
     List.map
       (fun capture -> capture.Runtime_truth_worklist_indexed.call_term)
@@ -350,21 +315,19 @@ let materialize_decide request =
   in
   let visited = EqCond (member candidate seen, Const "true") in
   let unseen = EqCond (member candidate seen, Const "false") in
-  let certified = EqCond (member candidate successors, Const "true") in
-  (* Exact false is required here: a stuck membership test is not evidence
-     that the source-derived successor list excludes the candidate. *)
-  let uncertified = EqCond (member candidate successors, Const "false") in
+  let certified = EqCond (evidence, Const "true") in
+  let uncertified = EqCond (evidence, Const "false") in
   let same_target = EqCond (candidate, request.target) in
   let other_target = BoolCond (App ("_=/=_", [ candidate; request.target ])) in
-  let machine role ~emit_hit =
+  let machine role ~emit_hit ~complete =
     let name suffix = role ^ suffix in
     let reach = closure_op request (name "Reach") in
     let expand = closure_op request (name "Expand") in
     let reach_call queue seen =
       App (reach, queue :: seen :: captures)
     in
-    let expand_call current candidates successors queue seen =
-      App (expand, current :: candidates :: successors :: queue :: seen :: captures)
+    let expand_call current candidates queue seen =
+      App (expand, current :: candidates :: queue :: seen :: captures)
     in
     let step label lhs rhs =
       generated request
@@ -375,22 +338,25 @@ let materialize_decide request =
       App (reach, frontier :: frontier :: actual_captures)
     in
     let reach_empty =
-      generated request
-        (rl ~label:(String.lowercase_ascii (closure_op request (name "Empty")))
-           (reach_call nil seen) request.refuted)
+      if complete then
+        [ generated request
+            (rl ~label:(String.lowercase_ascii (closure_op request (name "Empty")))
+               (reach_call nil seen) request.refuted)
+        ]
+      else []
     in
     let reach_cons =
       let lhs = reach_call (cons current queue) seen in
       step "Next" lhs
-        (expand_call current candidates_value successors_value queue seen)
+        (expand_call current candidates_value queue seen)
     in
     let expand_empty =
-      let lhs = expand_call current nil successors queue seen in
+      let lhs = expand_call current candidate_nil queue seen in
       step "Expanded" lhs (reach_call queue seen)
     in
-    let tail_call = expand_call current candidates successors queue seen in
+    let tail_call = expand_call current candidates queue seen in
     let cons_lhs =
-      expand_call current (cons candidate candidates) successors queue seen
+      expand_call current (candidate_cons candidate evidence candidates) queue seen
     in
     let skip_visited =
       generated request
@@ -399,16 +365,17 @@ let materialize_decide request =
            [ EqCondition other_target; EqCondition visited ])
     in
     let skip_outside_domain =
-      request.domain_false
-      |> List.mapi (fun index conditions ->
-           generated request
-             (crl
-                ~label:
-                  (String.lowercase_ascii
-                     (closure_op request
-                        (name ("DomainMiss" ^ string_of_int (index + 1)))))
-                cons_lhs tail_call
-                conditions))
+      if not complete then [] else
+        request.domain_false
+        |> List.mapi (fun index conditions ->
+             generated request
+               (crl
+                  ~label:
+                    (String.lowercase_ascii
+                       (closure_op request
+                          (name ("DomainMiss" ^ string_of_int (index + 1)))))
+                  cons_lhs tail_call
+                  conditions))
     in
     let hit evidence role =
       if not emit_hit then []
@@ -424,7 +391,7 @@ let materialize_decide request =
        same result.  Pushing at the front is constant-time; appending with Snoc
        repeatedly traversed the queue without changing the reachable set. *)
     let enqueue_call =
-      expand_call current candidates successors (cons candidate queue)
+      expand_call current candidates (cons candidate queue)
         (cons candidate seen)
     in
     let enqueue evidence role =
@@ -442,8 +409,24 @@ let materialize_decide request =
         (crl ~label:(String.lowercase_ascii (closure_op request (name role)))
            cons_lhs tail_call prefix)
     in
-    ( closure_surface request list reach expand
-      @ [ reach_empty; reach_cons; expand_empty; skip_visited ]
+    let finish =
+      if not complete then [ step "Skip" cons_lhs tail_call ]
+      else
+        [ skip_non_edge "TargetNoEdge"
+            ([ EqCondition same_target ]
+             @ request.domain_true
+             @ [ EqCondition uncertified; request.direct_false ])
+        ; skip_non_edge "NoEdge"
+            ([ EqCondition other_target; EqCondition unseen ]
+             @ request.domain_true
+             @ [ EqCondition uncertified; request.direct_false ])
+        ]
+    in
+    ( closure_surface request list
+        (candidate_list_sort ~helper_name:worklist.helper_name worklist.identity)
+        reach expand
+      @ reach_empty
+      @ [ reach_cons; expand_empty; skip_visited ]
       @ skip_outside_domain
       @ hit (request.domain_true @ [ EqCondition certified ]) "SourceHit"
       @ hit
@@ -453,37 +436,33 @@ let materialize_decide request =
       @ [ enqueue [ EqCondition certified ] "SourceEnqueue"
         ; enqueue
             [ EqCondition uncertified; request.direct_true ] "DirectEnqueue"
-        ; skip_non_edge "TargetNoEdge"
-            ([ EqCondition same_target ]
-             @ request.domain_true
-             @ [ EqCondition uncertified; request.direct_false ])
-        ; skip_non_edge "NoEdge"
-            ([ EqCondition other_target; EqCondition unseen ]
-             @ request.domain_true
-             @ [ EqCondition uncertified; request.direct_false ])
         ]
+      @ finish
     , actual_call )
   in
   (* Both machines compute reachability over the same finite source-certified
      graph.  The target remains eligible even when it is the initial node: a
      reflexive source edge must block the negative machine. *)
-  let prove_statements, prove_call = machine "" ~emit_hit:true in
+  let prove_statements, prove_call =
+    machine "" ~emit_hit:true
+      ~complete:(request.mode = Runtime_truth_worklist_indexed.Decide)
+  in
   match request.mode with
   | Runtime_truth_worklist_indexed.Prove ->
     { Runtime_truth_worklist_indexed.statements =
-        list_surface request @ prove_statements
+        list_surface request @ candidate_surface request @ prove_statements
     ; true_condition = RewriteCond (prove_call, request.proved)
     ; false_condition = None
     }
   | Decide ->
-    let refute_statements, refute_call = machine "Refute" ~emit_hit:false in
+    let refute_statements, refute_call =
+      machine "Refute" ~emit_hit:false ~complete:true
+    in
     { Runtime_truth_worklist_indexed.statements =
-        list_surface request @ prove_statements @ refute_statements
+        list_surface request @ candidate_surface request
+        @ prove_statements @ refute_statements
     ; true_condition = RewriteCond (prove_call, request.proved)
     ; false_condition = Some (RewriteCond (refute_call, request.refuted))
     }
 
-let materialize request =
-  match request.mode with
-  | Runtime_truth_worklist_indexed.Prove -> materialize_prove request
-  | Decide -> materialize_decide request
+let materialize = materialize_decide
