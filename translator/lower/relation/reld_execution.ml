@@ -37,10 +37,6 @@ let discharge_established_guards ~lhs_vars ~established conditions =
          not (established_on_lhs condition)
        | EqCondition (MatchCond _) | RewriteCond _ -> true)
 
-let is_whole_typecheck subject = function
-  | BoolCond (App ("typecheck", [ guarded; _ ])) -> guarded = subject
-  | BoolCond _ | EqCond _ | MatchCond _ | MembershipCond _ -> false
-
 let schedule_context_blocks blocks =
   let direct, contextual =
     List.partition (fun (is_context, _output) -> not is_context) blocks
@@ -67,7 +63,6 @@ let translate_rule
     (shape : Relation_shape.execution_shape)
     input_sorts
     output_sorts
-    context_certificate
     previous_rules
     index
     rule
@@ -147,7 +142,7 @@ let translate_rule
         in
         let else_output = else_result.Reld_enabledness.output in
         let else_alternatives = else_result.alternatives in
-        let premise_translation, names =
+        let premise_translation, _ =
           Reld_execution_premise.translate_premises_named
             names
             ctx
@@ -191,59 +186,14 @@ let translate_rule
           | Some output_terms
             when List.length output_terms = List.length output_sorts ->
             let rhs_term = tuple_carrier output_sorts output_terms in
-            let lhs_terms, rhs_term, context, context_statements =
-              match context_certificate with
-              | None -> lhs_terms, rhs_term, None, []
-              | Some certificate ->
-                (match
-                   Reld_context.lower ctx origin names env certificate
-                 with
-                | None -> lhs_terms, rhs_term, None, []
-                | Some context ->
-                  Reld_context.specialize_terms context lhs_terms,
-                  Reld_context.specialize_term context rhs_term,
-                  Some context,
-                  Reld_context.statements context)
-            in
-            let context_conditions =
-              match context with
-              | None -> []
-              | Some context -> [ Reld_context.membership context ]
-            in
-            let output_guards =
-              match context with
-              | None -> output_guards
-              | Some context ->
-                Reld_context.specialize_guards context output_guards
-            in
-            let output_guards =
-              match context with
-              | Some _ ->
-                (* The context certificate preserves the input prefix/suffix
-                   and obtains the new state/focus from the recursive relation
-                   premise.  From the validated-input invariant, recursive
-                   output typing therefore implies typing of the reassembled
-                   source RHS. *)
-                List.filter
-                  (fun guard -> not (is_whole_typecheck rhs_term guard))
-                  output_guards
-              | None -> output_guards
-            in
             let lhs = relation_call op_name lhs_terms in
             let pattern_certificate =
               Condition_pattern_certificate.union
                 (Premise_result.condition_pattern_certificate
                    ~declarations:var_decls ctx premise_result)
                 (Condition_pattern_certificate.generated
-                   (context_statements
-                    @ else_output.statements
+                   (else_output.statements
                     @ else_result.support_statements))
-            in
-            let specialize_conditions conditions =
-              match context with
-              | None -> conditions
-              | Some context ->
-                Reld_context.specialize_conditions context conditions
             in
             let alternatives =
               else_alternatives
@@ -262,11 +212,8 @@ let translate_rule
                 let premise_conditions =
                   Premise_result.rule_conditions premise_result
                 in
-                let raw_lhs_conditions =
-                  List.map (fun condition -> EqCondition condition) lhs_guards
-                in
                 let lhs_conditions =
-                  specialize_conditions raw_lhs_conditions
+                  List.map (fun condition -> EqCondition condition) lhs_guards
                 in
                 let source_rewrites =
                   premise_conditions
@@ -284,15 +231,12 @@ let translate_rule
                         | EqCondition _ as condition -> Some condition
                         | RewriteCond _ -> None)
                       else_conditions
-                  |> specialize_conditions
                 in
                 let conditions =
-                  context_conditions
-                  @ raw_lhs_conditions
+                  lhs_conditions
                   @ premise_conditions
                   @ else_conditions
                   @ output_conditions
-                  |> specialize_conditions
                   |> Validated_guard_certificate.discharge
                        ctx
                        (Premise_result.env_after premise_result)
@@ -327,8 +271,7 @@ let translate_rule
               }
             else
               let registry_diags =
-                (context_statements
-                 @ List.map fst alternatives)
+                List.map fst alternatives
                 |> List.concat_map
                      (generated_statement_diagnostics
                         ~pattern_certificate ctx)
@@ -340,7 +283,6 @@ let translate_rule
               else
                 { statements =
                     var_decls
-                    @ context_statements
                     @ else_output.statements
                     @ List.map fst alternatives
                 ; diagnostics
@@ -412,7 +354,6 @@ let translate ctx origin id relation_kind relation_mixop shape rules =
                 shape
                 input_sorts
                 output_sorts
-                context_certificate
                 previous
                 index
                 rule

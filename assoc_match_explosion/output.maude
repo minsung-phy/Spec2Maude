@@ -13855,16 +13855,8 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(I:SpectecTerminal, syn.num(numtype.i32)) /\ VAL:SpectecTerminal := helper.subtype-project.step-pure(PATTERN1:SpectecTerminal) /\ RESULT1:SpectecTerminal := rel.expand(def.type(Z:SpectecTerminal, X:SpectecTerminal)) /\ comptype.array(fieldtype.wrap(MUT_OPT:SpectecTerminals, ZT:SpectecTerminal)) := RESULT1:SpectecTerminal /\ isOpt(MUT_OPT:SpectecTerminals) = true .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq typecheck(instr.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal), syn.val) = true
-    if typecheck(num.const(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal), syn.val) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  ceq typecheck(instr.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal), syn.val) = true
-    if typecheck(vec.vconst(COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal), syn.val) .
-
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:32.1-35.41 / script[1233]/1234-RecD/RecD[0]/0001-RelD-step/RuleD[3] / RuleD
-  crl [step-ctxt-instrs] : rel.step(config.sym(Z:SpectecTerminal, VAL_STAR:SpectecTerminals (INSTR_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))) => config.sym(Z_PRIME:SpectecTerminal, VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))
-    if (typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true /\ (_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true /\ rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config) .
+  crl [step-ctxt-instrs] : rel.step(config.sym(Z:SpectecTerminal, PATTERN1:SpectecTerminals (INSTR_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))) => config.sym(Z_PRIME:SpectecTerminal, PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals))
+    if VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals) /\ (_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true /\ rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config) .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:8.1-8.92 / script[1237]/1238-RecD/RecD[0]/0001-RelD-steps / RelD
   sort RelConfSteps .

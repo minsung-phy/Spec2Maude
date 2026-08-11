@@ -151,13 +151,13 @@ fi
 
 context_conditions=$(grep -A 1 -F 'crl [step-ctxt-instrs]' "$output")
 if ! printf '%s\n' "$context_conditions" \
-    | grep -Fq '(typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true'; then
-  echo 'step-ctxt-instrs lost its source val* membership check' >&2
+    | grep -Fq 'VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals)'; then
+  echo 'step-ctxt-instrs lost its source val* projection' >&2
   exit 1
 fi
 if printf '%s\n' "$context_conditions" \
-    | grep -Eq 'helper\.(context-|subtype-project-seq\.step-pure)|syn\.state\)'; then
-  echo 'step-ctxt-instrs retained a synthetic split/projection or redundant state check' >&2
+    | grep -Eq 'helper\.context-|syn\.state\)'; then
+  echo 'step-ctxt-instrs retained a synthetic scanner or redundant state check' >&2
   exit 1
 fi
 
