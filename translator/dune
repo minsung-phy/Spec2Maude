@@ -17,7 +17,6 @@
   expr_sequence
   expr_subtyping
   execution_context_certificate
-  execution_progress_certificate
   head_specialization
   helper_capture
   helper_emission
@@ -48,7 +47,7 @@
   premise_validation_skip
   primitive_term
   record_shape
-  reld_context_split
+  reld_context
   reld_deterministic
   reld_enabledness
   reld_enabledness_constructor_group

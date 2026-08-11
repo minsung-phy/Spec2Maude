@@ -71,4 +71,16 @@ rew [100000] helper.truth-refute-heaptype-sub.step-read(
   subtype-context, typeuse.rec(0), absheaptype.func, eps) .
 red 'heaptype-sub-negative-end .
 
+red 'ref-ok-overlap-prove-begin .
+rew [100000] helper.truth-prove-ref-ok.step-read(
+  smoke-store, ref.ref-null-addr,
+  reftype.ref(null.null, absheaptype.bot), eps) .
+red 'ref-ok-overlap-prove-end .
+
+red 'ref-ok-overlap-refute-begin .
+rew [100000] helper.truth-refute-ref-ok.step-read(
+  smoke-store, ref.ref-null-addr,
+  reftype.ref(null.null, absheaptype.bot), eps) .
+red 'ref-ok-overlap-refute-end .
+
 quit

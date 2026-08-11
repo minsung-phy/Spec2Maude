@@ -66,9 +66,10 @@ check_context_sequence_eliminated () {
   condition=$(condition_line "$label")
   require_contains "$statement" "$raw" "$label did not reuse its raw certified pattern"
   require_not_contains "$statement" 'helper.iter-map' "$label retained its direct reinjection map"
-  require_contains "$condition" 'helper.context-split.step' "$label lost its certified context split"
-  require_not_contains "$condition" ':= helper.subtype-project-seq.' "$label repeated the projection proved by its context split"
-  require_not_contains "$condition" '_or_(_=/=_(' "$label repeated the progress guard proved by its strict context split"
+  require_contains "$condition" '(typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true' "$label lost its source val* membership"
+  require_contains "$condition" '_or_(_=/=_(VAL_STAR:SpectecTerminals, eps)' "$label lost its source progress condition"
+  require_not_contains "$condition" 'helper.context-' "$label retained a source-free context scanner"
+  require_not_contains "$condition" ':= helper.subtype-project-seq.' "$label retained a projection round trip"
   sequence_rule_count=$((sequence_rule_count + 1))
 }
 
@@ -118,7 +119,7 @@ check_sequence_eliminated step-read-return-call-ref-label '=> PATTERN1:SpectecTe
 check_sequence_eliminated step-read-return-call-ref-handler '=> PATTERN1:SpectecTerminals instr.return-call-ref'
 check_sequence_eliminated step-read-return-call-ref-frame-addr '=> PATTERN2:SpectecTerminals (ref.ref-func-addr'
 check_sequence_eliminated step-read-try-table 'eps, PATTERN1:SpectecTerminals INSTR_STAR:SpectecTerminals'
-check_context_sequence_eliminated step-ctxt-instrs 'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
+check_context_sequence_eliminated step-ctxt-instrs 'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
 
 # Pointwise projection preserves cardinality on its exact domain.  The raw
 # target is reused while every source ListN guard remains present.

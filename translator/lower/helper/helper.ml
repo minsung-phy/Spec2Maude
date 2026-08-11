@@ -65,10 +65,10 @@ let materialize_entry (entry : Helper_registry.entry) =
     Helper_materialize_iter.materialize_iter_premise_zip_rule entry prem
   | Request.Iter_pattern_zip pattern ->
     Helper_materialize_iter.materialize_iter_pattern_zip entry pattern
-  | Request.Fixed_inverse_concat2 inverse ->
-    Helper_materialize_inverse.materialize_fixed_inverse_concat2 entry inverse
-  | Request.Inverse_concatn_chunks inverse ->
-    Helper_materialize_inverse.materialize_inverse_concatn_chunks entry inverse
+  | Request.Unzip2 request ->
+    Helper_materialize_inverse.materialize_unzip2 entry request
+  | Request.Decode_chunks request ->
+    Helper_materialize_inverse.materialize_decode_chunks entry request
   | Request.Optional_map_inverse inverse ->
     Helper_materialize_inverse.materialize_optional_map_inverse entry inverse
   | Request.Subtype_injection injection ->

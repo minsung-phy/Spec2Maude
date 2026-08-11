@@ -64,8 +64,8 @@ let lower ctx env ~bound_vars origin exp call_exp _known_exp =
                   ()
               ]
           }
-      | Valid_inverse inverse_id ->
-        let reason, suggestion = inverse_contract_reason ctx graph inverse_id in
+      | Valid_inverse inverse ->
+        let reason, suggestion = inverse_contract_reason ctx graph inverse.inverse_id in
         Some
           { (empty_with_env ~bound_vars env) with
             diagnostics =

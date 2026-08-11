@@ -149,7 +149,19 @@ then
   exit 1
 fi
 
-for label in step-ctxt-instrs step-ctxt-label step-ctxt-handler; do
+context_conditions=$(grep -A 1 -F 'crl [step-ctxt-instrs]' "$output")
+if ! printf '%s\n' "$context_conditions" \
+    | grep -Fq '(typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)) = true'; then
+  echo 'step-ctxt-instrs lost its source val* membership check' >&2
+  exit 1
+fi
+if printf '%s\n' "$context_conditions" \
+    | grep -Eq 'helper\.(context-|subtype-project-seq\.step-pure)|syn\.state\)'; then
+  echo 'step-ctxt-instrs retained a synthetic split/projection or redundant state check' >&2
+  exit 1
+fi
+
+for label in step-ctxt-label step-ctxt-handler; do
   conditions=$(grep -A 1 -F "crl [$label]" "$output")
   if ! printf '%s\n' "$conditions" | grep -Fq ', syn.config)'; then
     echo "$label lost its whole rewrite-result config guard" >&2

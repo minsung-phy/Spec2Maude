@@ -26,9 +26,15 @@ type emitted_definition =
   ; rewrite_backed : bool
   }
 
+type valid_inverse =
+  { inverse_id : string
+  ; omitted_param_index : int
+  ; hint_origin : Origin.t
+  }
+
 type inverse_status =
   | No_inverse
-  | Valid_inverse of string
+  | Valid_inverse of valid_inverse
   | Invalid_inverse of
       { reason : string
       ; hint_origin : Origin.t
@@ -66,7 +72,6 @@ val build : Source_index.t -> t
 val diagnostics : profile:string -> t -> Diagnostics.t list
 val definitions : t -> definition list
 val find_definition : t -> string -> definition option
-val definition_inverse : t -> string -> string option
 val definition_is_partial : t -> string -> bool
 val definition_is_rewrite_backed : t -> string -> bool
 val plain_identity : string -> definition_identity

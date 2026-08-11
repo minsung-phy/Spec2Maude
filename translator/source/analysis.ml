@@ -35,9 +35,15 @@ module Function_graph = struct
     ; rewrite_backed : bool
     }
 
+  type valid_inverse = Definition_analysis.valid_inverse =
+    { inverse_id : string
+    ; omitted_param_index : int
+    ; hint_origin : Origin.t
+    }
+
   type inverse_status = Definition_analysis.inverse_status =
     | No_inverse
-    | Valid_inverse of string
+    | Valid_inverse of valid_inverse
     | Invalid_inverse of
         { reason : string
         ; hint_origin : Origin.t
@@ -153,7 +159,6 @@ module Function_graph = struct
   let diagnostics = Definition_analysis.diagnostics
   let definitions = Definition_analysis.definitions
   let find_definition = Definition_analysis.find_definition
-  let definition_inverse = Definition_analysis.definition_inverse
   let definition_is_partial = Definition_analysis.definition_is_partial
   let definition_is_rewrite_backed = Definition_analysis.definition_is_rewrite_backed
   let plain_identity = Definition_analysis.plain_identity

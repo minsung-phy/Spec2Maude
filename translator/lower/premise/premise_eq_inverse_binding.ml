@@ -219,12 +219,6 @@ let inverse_known_terms args =
     | { arg = Inverse_known term; _ } -> Some term
     | { arg = Inverse_target _; _ } -> None)
 
-let inverse_target args =
-  args
-  |> List.filter_map (function
-    | { arg = Inverse_known _; _ } -> None
-    | { arg = Inverse_target (id, binding); _ } -> Some (id, binding))
-
 let inverse_original_terms args =
   args
   |> List.map (function
@@ -277,7 +271,7 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
             diagnostics =
               [ invalid_inverse_demand ctx origin exp reason hint_origin ]
           })
-    | Some definition, Valid_inverse inverse_id
+    | Some definition, Valid_inverse inverse
       when List.length definition.params = List.length args ->
       (match direct_runtime_targets names ctx env ~bound_vars origin definition.params args with
       | Error diagnostics ->
@@ -296,7 +290,7 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
               ]
           }
       | Ok [ _target ] ->
-        (match Analysis.Function_graph.find_definition graph inverse_id with
+        (match Analysis.Function_graph.find_definition graph inverse.inverse_id with
         | None ->
           Some
             { (empty_with_env ~bound_vars env) with
@@ -305,7 +299,7 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                     ctx
                     origin
                     exp
-                    ("source-declared inverse target `" ^ inverse_id
+                    ("source-declared inverse target `" ^ inverse.inverse_id
                      ^ "` has no DecD declaration")
                     "Declare the inverse function in SpecTec source or keep this equality Unsupported"
                 ]
@@ -319,7 +313,7 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                       ctx
                       origin
                       exp
-                      ("source-declared inverse `" ^ inverse_id
+                      ("source-declared inverse `" ^ inverse.inverse_id
                        ^ "` has no implemented source or builtin contract")
                       "Implement the inverse in the verified builtin/prelude backend before using it to bind a value"
                   ]
@@ -329,8 +323,16 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
           | Error diagnostics ->
             Some { (empty_with_env ~bound_vars env) with diagnostics }
           | Ok (arg_items, arg_guards, arg_diagnostics) ->
-            (match inverse_target arg_items with
-            | [ (target_id_text, target_binding) ] ->
+            (match
+               arg_items
+               |> List.mapi (fun index item -> index, item)
+               |> List.filter_map (fun (index, item) ->
+                 match item.arg with
+                 | Inverse_target (id, binding) -> Some (index, id, binding)
+                 | Inverse_known _ -> None)
+             with
+            | [ (target_index, target_id_text, target_binding) ]
+              when target_index = inverse.omitted_param_index ->
               let known_result = lower_with_source_carrier ctx env origin known_exp in
               (match known_result.term with
               | None ->
@@ -349,7 +351,7 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                               ctx
                               origin
                               exp
-                              ("source-declared inverse `" ^ inverse_id
+                              ("source-declared inverse `" ^ inverse.inverse_id
                                ^ "` arity does not match the generated inverse call")
                               "Keep this equality Unsupported until the inverse signature matches the forward binding shape"
                           ]
@@ -363,13 +365,13 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                               ctx
                               origin
                               exp
-                              ("source-declared inverse `" ^ inverse_id
+                              ("source-declared inverse `" ^ inverse.inverse_id
                                ^ "` result carrier does not match the unbound target carrier")
                               "Keep this equality Unsupported until the inverse result type matches the missing source argument"
                           ]
                     }
                 else
-                  let inverse_id_phrase = { id with it = inverse_id } in
+                  let inverse_id_phrase = { id with it = inverse.inverse_id } in
                   let inverse_call =
                     app (Context.definition_op ctx inverse_id_phrase) inverse_terms
                   in
@@ -379,7 +381,7 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                       (inverse_original_terms arg_items)
                   in
                   Context.record_definition_call ctx inverse_call
-                    (Analysis.Function_graph.plain_identity inverse_id);
+                    (Analysis.Function_graph.plain_identity inverse.inverse_id);
                   Context.record_definition_call ctx original_call
                     (Analysis.Function_graph.plain_identity target_id.it);
                   let prefix_conditions = arg_guards @ known_result.guards in
@@ -418,6 +420,16 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                          bound_vars
                          conditions
                          (arg_diagnostics @ known_result.diagnostics)))
+            | [ _ ] ->
+              Some
+                { (empty_with_env ~bound_vars env) with
+                  diagnostics =
+                    arg_diagnostics
+                    @ [ unsupported_exp ctx origin exp
+                          "the unbound direct target is not the forward runtime parameter omitted by the validated inverse declaration"
+                          "Correct the inverse signature or keep this equality Unsupported"
+                      ]
+                }
             | [] | _ :: _ :: _ -> None))))
     | Some _, No_inverse
     | Some _, Invalid_inverse _

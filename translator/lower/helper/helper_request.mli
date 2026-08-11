@@ -269,7 +269,7 @@ type optional_map_inverse =
   ; body_eq_conditions : eq_condition list
   }
 
-type inverse_concatn_chunks =
+type decode_chunks =
   { source : string
   ; target_source_id : string
   ; bytes_op : string
@@ -279,19 +279,13 @@ type inverse_concatn_chunks =
   ; inverse_call_formals : term list
   ; target_head_var : string
   ; target_stream_var : string
-  ; bytes_var : string
-  ; bytes_head_var : string
-  ; bytes_tail_var : string
-  ; width_var : string
-  ; count_tail_var : string
+  ; chunks_tail_var : string
   ; chunk_var : string
   }
 
-(* Fixed two-way inverse concat only materializes the source-derived splitter.
-   The caller must still emit the original forward equality as a recheck after
-   the helper MatchCond; otherwise this helper would replace, rather than
-   justify, the source inverse equality. *)
-type fixed_inverse_concat2
+(* Structural helpers consume only values already reconstructed by a declared
+   inverse.  They never partition the original flat result. *)
+type unzip2
 
 type request_kind =
   | Membership_witness of Membership_witness_helper.request
@@ -308,8 +302,8 @@ type request_kind =
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_premise_zip_rule of iter_premise_zip_rule
   | Iter_pattern_zip of iter_pattern_zip
-  | Fixed_inverse_concat2 of fixed_inverse_concat2
-  | Inverse_concatn_chunks of inverse_concatn_chunks
+  | Unzip2 of unzip2
+  | Decode_chunks of decode_chunks
   | Optional_map_inverse of optional_map_inverse
   | Subtype_injection of Subtype_injection.t
   | Runtime_predicate_search of Runtime_search_helper.request
@@ -324,13 +318,13 @@ type request =
   ; origin : Origin.t
   }
 
-val fixed_inverse_concat2 :
+val unzip2 :
   source:string ->
-  fixed_inverse_concat2
+  unzip2
 
-val fixed_inverse_concat2_source : fixed_inverse_concat2 -> string
+val unzip2_source : unzip2 -> string
 
-val fixed_inverse_concat2_request :
+val unzip2_request :
   origin:Origin.t ->
   source:string ->
   reason:string ->

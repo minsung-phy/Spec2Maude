@@ -269,7 +269,7 @@ type optional_map_inverse =
   ; body_eq_conditions : eq_condition list
   }
 
-type inverse_concatn_chunks =
+type decode_chunks =
   { source : string
   ; target_source_id : string
   ; bytes_op : string
@@ -279,17 +279,11 @@ type inverse_concatn_chunks =
   ; inverse_call_formals : term list
   ; target_head_var : string
   ; target_stream_var : string
-  ; bytes_var : string
-  ; bytes_head_var : string
-  ; bytes_tail_var : string
-  ; width_var : string
-  ; count_tail_var : string
+  ; chunks_tail_var : string
   ; chunk_var : string
   }
 
-(* See helper_request.mli: callers must recheck the original forward equality
-   after using this helper to bind the two source sequences. *)
-type fixed_inverse_concat2 =
+type unzip2 =
   { source : string
   }
 
@@ -308,8 +302,8 @@ type request_kind =
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_premise_zip_rule of iter_premise_zip_rule
   | Iter_pattern_zip of iter_pattern_zip
-  | Fixed_inverse_concat2 of fixed_inverse_concat2
-  | Inverse_concatn_chunks of inverse_concatn_chunks
+  | Unzip2 of unzip2
+  | Decode_chunks of decode_chunks
   | Optional_map_inverse of optional_map_inverse
   | Subtype_injection of Subtype_injection.t
   | Runtime_predicate_search of Runtime_search_helper.request
@@ -324,14 +318,14 @@ type request =
   ; origin : Origin.t
   }
 
-let fixed_inverse_concat2 ~source =
+let unzip2 ~source =
   { source }
 
-let fixed_inverse_concat2_source inverse =
-  inverse.source
+let unzip2_source request =
+  request.source
 
-let fixed_inverse_concat2_request ~origin ~source ~reason =
-  { kind = Fixed_inverse_concat2 (fixed_inverse_concat2 ~source)
+let unzip2_request ~origin ~source ~reason =
+  { kind = Unzip2 (unzip2 ~source)
   ; reason
   ; origin
   }
