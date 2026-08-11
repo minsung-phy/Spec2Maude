@@ -21,6 +21,7 @@ val specialized_definition_op :
 val with_builtins : t -> Builtin_registry.t -> t
 val source_index : t -> Analysis.Source_index.t
 val il_env : t -> Il.Env.t
+val sequence_carriers : t -> Analysis.Sequence_carrier.t
 val function_graph : t -> Analysis.Function_graph.t
 val runtime_ingress_validation : t -> Runtime_ingress_validation.t
 val use_runtime_ingress_attestation :

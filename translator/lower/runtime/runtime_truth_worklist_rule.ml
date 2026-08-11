@@ -1,9 +1,6 @@
 open Runtime_truth_worklist_core
 
-(* Constructor membership accounts for guards over components fixed by the
-   worker lhs.  Only the remaining guards belong in the generated rule. *)
-let emitted_head_guards ctx terms guards =
-  fst (Reld_rule_lowering.split_execution_head_guards ctx terms guards)
+let emitted_head_guards _ctx _terms guards = guards
 
 let rec take count acc values =
   if count = 0 then List.rev acc

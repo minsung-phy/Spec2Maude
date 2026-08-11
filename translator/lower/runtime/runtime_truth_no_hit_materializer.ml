@@ -1089,8 +1089,7 @@ let indexed_head_refuter_rules
               | Some term ->
                 let env =
                   List.fold_left
-                    (fun env (id, binding) ->
-                      Expr_env.add env id binding)
+                    Expr_env.add_introduced
                     env
                     result.introduced_bindings
                 in

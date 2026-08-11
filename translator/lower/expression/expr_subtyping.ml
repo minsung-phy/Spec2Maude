@@ -32,45 +32,69 @@ let accept_injection ctx origin injection =
   let forward = Helper.request (Context.helpers ctx) request in
   forward
 
+let direct_roundtrip env inner inner_term injection =
+  match inner.it with
+  | VarE id ->
+    (match
+       Expr_env.find env id.it,
+       Expr_env.find_subtype_roundtrip env id.it
+     with
+    | Some binding, Some roundtrip when binding.term = inner_term ->
+      Pattern_subtyping.reuse_direct
+        roundtrip ~source:binding.term injection
+    | _ -> None)
+  | _ -> None
+
+let lower_with_target_guard
+    callbacks ctx env origin exp target_typ inner_result term =
+  let witness, witness_diagnostics =
+    callbacks.witness_of_typ ctx env origin target_typ
+  in
+  match witness, Carrier_sort.for_expression target_typ with
+  | Some witness, Some sort
+    when not (List.exists Diagnostics.is_fatal witness_diagnostics) ->
+    { term = Some term
+    ; guards =
+        inner_result.guards
+        @ [ BoolCond (Typecheck_term.typecheck_for_sort sort term witness) ]
+    ; diagnostics = inner_result.diagnostics @ witness_diagnostics
+    }
+  | _ ->
+    { term = None
+    ; guards = inner_result.guards
+    ; diagnostics =
+        inner_result.diagnostics @ witness_diagnostics
+        @ [ unsupported
+              ~ctx ~origin ~constructor:"Expr/SubE/type-guard"
+              ~source_echo:(source_echo_exp exp)
+              ~reason:
+                "SubE target witness or carrier could not be lowered"
+              ~suggestion:
+                "Extend target type witness lowering before emitting the coercion call"
+              ()
+          ]
+    }
+
 let lower_atomic callbacks ctx env origin exp inner source_typ target_typ =
   let inner_result = callbacks.lower_value ctx env origin inner in
   let coercion = plan ctx source_typ target_typ in
   match inner_result.term, coercion with
-  | Some inner_term, Ok plan ->
-    let witness, witness_diagnostics =
-      callbacks.witness_of_typ ctx env origin target_typ
-    in
-    (match witness, Carrier_sort.for_expression target_typ with
-    | Some witness, Some sort
-      when not (List.exists Diagnostics.is_fatal witness_diagnostics) ->
-      let term =
-        match plan with
-        | Subtype_plan.Identity -> inner_term
-        | Subtype_plan.Injection injection ->
-          App (accept_injection ctx origin injection, [ inner_term ])
-      in
-      { term = Some term
-      ; guards =
-          inner_result.guards
-          @ [ BoolCond (Typecheck_term.typecheck_for_sort sort term witness) ]
-      ; diagnostics =
-          inner_result.diagnostics @ witness_diagnostics
+  | Some inner_term, Ok (Subtype_plan.Injection injection) ->
+    (match direct_roundtrip env inner inner_term injection with
+    | Some reuse ->
+      { term = Some reuse.Pattern_subtyping.target
+      ; guards = inner_result.guards @ [ reuse.required_guard ]
+      ; diagnostics = inner_result.diagnostics
       }
-    | _ ->
-      { term = None
-      ; guards = inner_result.guards
-      ; diagnostics =
-          inner_result.diagnostics @ witness_diagnostics
-          @ [ unsupported
-                ~ctx ~origin ~constructor:"Expr/SubE/type-guard"
-                ~source_echo:(source_echo_exp exp)
-                ~reason:
-                  "SubE target witness or carrier could not be lowered"
-                ~suggestion:
-                  "Extend target type witness lowering before emitting the coercion call"
-                ()
-            ]
-      })
+    | None ->
+      let term =
+        App (accept_injection ctx origin injection, [ inner_term ])
+      in
+      lower_with_target_guard
+        callbacks ctx env origin exp target_typ inner_result term)
+  | Some inner_term, Ok Subtype_plan.Identity ->
+    lower_with_target_guard
+      callbacks ctx env origin exp target_typ inner_result inner_term
   | Some _, Error error ->
     { term = None
     ; guards = inner_result.guards

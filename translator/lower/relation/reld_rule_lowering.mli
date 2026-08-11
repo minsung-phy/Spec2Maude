@@ -49,14 +49,14 @@ val translate_rule_binds :
 
 val add_introduced_bindings :
   Expr_env.t ->
-  (string * Expr_env.binding) list ->
+  Expr_env.introduced_binding list ->
   Expr_env.t
 
 val add_safe_introduced_bindings :
   Expr_env.t ->
   Maude_ir.term list ->
   Maude_ir.eq_condition list ->
-  (string * Expr_env.binding) list ->
+  Expr_env.introduced_binding list ->
   Expr_env.t
 
 val exp_components_match :
@@ -79,7 +79,31 @@ val lower_pattern_components_named :
   Il.Ast.exp list ->
   (Maude_ir.term list option
    * Maude_ir.eq_condition list
-   * (string * Expr_env.binding) list
+   * Expr_env.introduced_binding list
+   * Diagnostics.t list)
+  * Local_name.t
+
+val lower_validated_input_components_named :
+  Local_name.t ->
+  Context.t ->
+  Expr_env.t ->
+  Origin.t ->
+  Il.Ast.exp list ->
+  (Maude_ir.term list option
+   * Maude_ir.eq_condition list
+   * Expr_env.introduced_binding list
+   * Diagnostics.t list)
+  * Local_name.t
+
+val lower_rewrite_output_components_named :
+  Local_name.t ->
+  Context.t ->
+  Expr_env.t ->
+  Origin.t ->
+  Il.Ast.exp list ->
+  (Maude_ir.term list option
+   * Maude_ir.eq_condition list
+   * Expr_env.introduced_binding list
    * Diagnostics.t list)
   * Local_name.t
 
@@ -92,12 +116,6 @@ val lower_value_components :
   Maude_ir.term list option * Maude_ir.eq_condition list * Diagnostics.t list
 
 val relation_call : string -> Maude_ir.term list -> Maude_ir.term
-val split_execution_head_guards :
-  Context.t -> Maude_ir.term list -> Maude_ir.eq_condition list ->
-  Maude_ir.eq_condition list * Maude_ir.eq_condition list
-
-val execution_result_guards :
-  Maude_ir.eq_condition list -> Maude_ir.eq_condition list
 
 val generated_statement_diagnostics :
   ?pattern_certificate:Condition_pattern_certificate.t ->

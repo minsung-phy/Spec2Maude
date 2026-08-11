@@ -6,9 +6,18 @@ let kr name = kind_ref (kind_of_sort (s name))
 let app name args = App (name, args)
 let seq head tail = app "_ _" [ head; tail ]
 let repeat count value = app "repeatSeq" [ count; value ]
+let run count value = app "runSeq" [ count; value ]
+let canonical_run count value = app "canonicalRun" [ count; value ]
+let compact_run count value = app "compactRun" [ count; value ]
 let drop count values = app "drop" [ count; values ]
+let take_run count values = app "takeRun" [ count; values ]
 let splice values index count replacement =
   app "splice" [ values; index; count; replacement ]
+let splice_run values index count replacement =
+  app "spliceRun" [ values; index; count; replacement ]
+let prepend_run count value values =
+  app "prependRun" [ count; value; values ]
+let append_runs left right = app "appendRuns" [ left; right ]
 let witness name = Naming.primitive_witness name
 module T = Typecheck_term
 let spectec_terminal = s "SpectecTerminal"
@@ -37,9 +46,8 @@ let imports =
   ; Protecting "QID"
   ]
 
-let statements =
-  List.map gen
-    [ sort_decl spectec_terminal
+let declarations =
+  [ sort_decl spectec_terminal
     ; sort_decl spectec_terminals
     ; sort_decl spectec_type
     ; sort_decl spectec_types
@@ -65,6 +73,10 @@ let statements =
     ; op "compactRepeatThreshold" [] (s "Nat")
     ; op "repeatSeq" [ sr "Nat"; sr "SpectecTerminal" ] spectec_terminals
         ~attrs:[ Ctor ]
+    ; op "runSeq" [ sr "Nat"; sr "SpectecTerminal" ] spectec_terminals
+        ~attrs:[ Ctor ]
+    ; op "canonicalRun" [ sr "Nat"; sr "SpectecTerminal" ] spectec_terminals
+    ; op "compactRun" [ sr "Nat"; sr "SpectecTerminal" ] spectec_terminals
     ; op "len" [ sr "SpectecTerminals" ] (s "Nat")
     ; op "natOfInt" [ sr "Int" ] (s "Nat") ~kind:Partial
     ; op "intOfRat" [ sr "Rat" ] (s "Int") ~kind:Partial
@@ -106,8 +118,15 @@ let statements =
     ; op "slice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat" ] spectec_terminals
     ; op "drop" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
     ; op "take" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
+    ; op "takeRun" [ sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
     ; op "splice" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
-    ; var "B" (sr "Bool")
+    ; op "spliceRun" [ sr "SpectecTerminals"; sr "Nat"; sr "Nat"; sr "SpectecTerminals" ] spectec_terminals
+    ; op "prependRun" [ sr "Nat"; sr "SpectecTerminal"; sr "SpectecTerminals" ] spectec_terminals
+    ; op "appendRuns" [ sr "SpectecTerminals"; sr "SpectecTerminals" ] spectec_terminals
+  ]
+
+let variables =
+  [ var "B" (sr "Bool")
     ; var "N" (sr "Nat")
     ; var "N2" (sr "Nat")
     ; var "N3" (sr "Nat")
@@ -129,7 +148,10 @@ let statements =
     ; var "RI" (sr "RecordItems")
     ; var "RI2" (sr "RecordItems")
     ; var "T" (sr "SpectecType")
-    ; eq (Const "compactRepeatThreshold") (Const "1024")
+  ]
+
+let core_equations =
+  [ eq (Const "compactRepeatThreshold") (Const "1024")
     ; eq (app "repeatSeq" [ Const "0"; Var "X" ]) (Const "eps")
     ; eq (app "repeatSeq" [ Const "1"; Var "X" ]) (Var "X")
     ; ceq
@@ -144,6 +166,34 @@ let statements =
                ; Const "compactRepeatThreshold"
                ])
         ]
+    ; eq (run (Const "0") (Var "X")) (Const "eps")
+    ; eq (run (Const "1") (Var "X")) (Var "X")
+    ; eq (canonical_run (Const "0") (Var "X")) (Const "eps")
+    ; eq (canonical_run (Const "1") (Var "X")) (Var "X")
+    ; ceq
+        (canonical_run
+           (app "s_" [ app "s_" [ Var "N" ] ]) (Var "X"))
+        (repeat
+           (app "s_" [ app "s_" [ Var "N" ] ]) (Var "X"))
+        [ BoolCond
+            (app "_<_"
+               [ app "s_" [ app "s_" [ Var "N" ] ]
+               ; Const "compactRepeatThreshold"
+               ])
+        ]
+    ; ceq
+        (canonical_run (Var "N") (Var "X"))
+        (run (Var "N") (Var "X"))
+        [ BoolCond
+            (app "_>=_"
+               [ Var "N"; Const "compactRepeatThreshold" ])
+        ]
+    ; eq (compact_run (Const "0") (Var "X")) (Const "eps")
+    ; eq (compact_run (Const "1") (Var "X")) (Var "X")
+    ; eq
+        (compact_run
+           (app "s_" [ app "s_" [ Var "N" ] ]) (Var "X"))
+        (run (app "s_" [ app "s_" [ Var "N" ] ]) (Var "X"))
     ; eq (app "len" [ Const "eps" ]) (Const "0")
     ; eq (app "len" [ Var "X" ]) (Const "1")
     ; eq
@@ -156,6 +206,11 @@ let statements =
                ; Var "XS"
                ]
            ])
+        (app "_+_" [ Var "N"; app "len" [ Var "XS" ] ])
+        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
+    ; eq (app "len" [ run (Var "N") (Var "X") ]) (Var "N")
+    ; ceq
+        (app "len" [ seq (run (Var "N") (Var "X")) (Var "XS") ])
         (app "_+_" [ Var "N"; app "len" [ Var "XS" ] ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
     ; ceq
@@ -212,7 +267,10 @@ let statements =
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
     ; eq (app "isTrue" [ app "bool" [ Const "true" ] ]) (Const "true")
     ; eq (app "isTrue" [ app "bool" [ Const "false" ] ]) (Const "false")
-    ; eq (T.typecheck (app "bool" [ Var "B" ]) (Const (witness "bool"))) (Const "true")
+  ]
+
+let typecheck_equations =
+  [ eq (T.typecheck (app "bool" [ Var "B" ]) (Const (witness "bool"))) (Const "true")
     ; eq (T.typecheck (Var "N") (Const (witness "nat"))) (Const "true")
     ; eq (T.typecheck (Var "I") (Const (witness "int"))) (Const "true")
     ; eq (T.typecheck (app "rat" [ Var "R" ]) (Const (witness "rat"))) (Const "true")
@@ -231,6 +289,21 @@ let statements =
               [ app "repeatSeq" [ Var "N"; Var "X" ]
               ; Var "XS"
               ])
+           (Var "T"))
+        (app "_and_"
+           [ T.typecheck (Var "X") (Var "T")
+           ; T.typecheck_seq (Var "XS") (Var "T")
+           ])
+        [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ])
+        ; BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ])
+        ]
+    ; ceq
+        (T.typecheck_seq (run (Var "N") (Var "X")) (Var "T"))
+        (T.typecheck (Var "X") (Var "T"))
+        [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ]) ]
+    ; ceq
+        (T.typecheck_seq
+           (seq (run (Var "N") (Var "X")) (Var "XS"))
            (Var "T"))
         (app "_and_"
            [ T.typecheck (Var "X") (Var "T")
@@ -272,7 +345,10 @@ let statements =
         (app "_and_" [ T.typecheck_seq (Var "YS") (Var "T"); T.typecheck_nested_seq (Var "XS") (Var "T") ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
     ; eq (T.typecheck_nested_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
-    ; eq
+  ]
+
+let data_equations =
+  [ eq
         (app "value" [ Var "FQ"; app "{_}" [ Var "RI" ] ])
         (app "value" [ Var "FQ"; Var "RI" ])
     ; eq (app "value" [ Var "FQ"; Const "EMPTY" ]) (Const "eps")
@@ -333,6 +409,20 @@ let statements =
                [ app "repeatSeq" [ Var "N"; Var "X" ]
                ; Var "XS"
                ]
+           ; Var "N2"
+           ])
+        (app "index" [ Var "XS"; app "_-_" [ Var "N2"; Var "N" ] ])
+        [ BoolCond (app "_<=_" [ Var "N"; Var "N2" ]) ]
+    ; ceq
+        (app "index"
+           [ seq (run (Var "N") (Var "X")) (Var "XS")
+           ; Var "N2"
+           ])
+        (Var "X")
+        [ BoolCond (app "_<_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (app "index"
+           [ seq (run (Var "N") (Var "X")) (Var "XS")
            ; Var "N2"
            ])
         (app "index" [ Var "XS"; app "_-_" [ Var "N2"; Var "N" ] ])
@@ -435,6 +525,25 @@ let statements =
            ; Var "XS"
            ])
         [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
+    ; ceq
+        (app "drop"
+           [ Var "N2"
+           ; seq (run (Var "N") (Var "X")) (Var "XS")
+           ])
+        (seq
+           (run (app "_-_" [ Var "N"; Var "N2" ]) (Var "X"))
+           (Var "XS"))
+        [ BoolCond (app "_<=_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (app "drop"
+           [ Var "N2"
+           ; seq (run (Var "N") (Var "X")) (Var "XS")
+           ])
+        (app "drop"
+           [ app "_-_" [ Var "N2"; Var "N" ]
+           ; Var "XS"
+           ])
+        [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
     ; eq
         (app "drop" [ app "s_" [ Var "N" ]; app "_ _" [ Var "X"; Var "XS" ] ])
         (app "drop" [ Var "N"; Var "XS" ])
@@ -466,6 +575,25 @@ let statements =
                ]
            ])
         [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
+    ; ceq
+        (app "take"
+           [ Var "N2"
+           ; seq (run (Var "N") (Var "X")) (Var "XS")
+           ])
+        (repeat (Var "N2") (Var "X"))
+        [ BoolCond (app "_<=_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (app "take"
+           [ Var "N2"
+           ; seq (run (Var "N") (Var "X")) (Var "XS")
+           ])
+        (seq
+           (repeat (Var "N") (Var "X"))
+           (app "take"
+              [ app "_-_" [ Var "N2"; Var "N" ]
+              ; Var "XS"
+              ]))
+        [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
     ; eq
         (app "take"
            [ app "s_" [ Var "N" ]
@@ -475,6 +603,51 @@ let statements =
            [ Var "X"
            ; app "take" [ Var "N"; Var "XS" ]
            ])
+      (* [takeRun] is extensionally [take], but keeps equal adjacent elements
+         in the canonical carrier used by execution-state updates. *)
+    ; eq (take_run (Const "0") (Var "XS")) (Const "eps")
+    ; eq
+        (take_run (app "s_" [ Var "N" ]) (Const "eps"))
+        (Const "eps")
+    ; ceq
+        (take_run
+           (Var "N2")
+           (seq (repeat (Var "N") (Var "X")) (Var "XS")))
+        (canonical_run (Var "N2") (Var "X"))
+        [ BoolCond (app "_<=_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (take_run
+           (Var "N2")
+           (seq (repeat (Var "N") (Var "X")) (Var "XS")))
+        (prepend_run
+           (Var "N") (Var "X")
+           (take_run
+              (app "_-_" [ Var "N2"; Var "N" ])
+              (Var "XS")))
+        [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
+    ; ceq
+        (take_run
+           (Var "N2")
+           (seq (run (Var "N") (Var "X")) (Var "XS")))
+        (canonical_run (Var "N2") (Var "X"))
+        [ BoolCond (app "_<=_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (take_run
+           (Var "N2")
+           (seq (run (Var "N") (Var "X")) (Var "XS")))
+        (prepend_run
+           (Var "N") (Var "X")
+           (take_run
+              (app "_-_" [ Var "N2"; Var "N" ])
+              (Var "XS")))
+        [ BoolCond (app "_<_" [ Var "N"; Var "N2" ]) ]
+    ; eq
+        (take_run
+           (app "s_" [ Var "N" ])
+           (seq (Var "X") (Var "XS")))
+        (prepend_run
+           (Const "1") (Var "X")
+           (take_run (Var "N") (Var "XS")))
     ; eq
         (app "slice" [ Var "XS"; Var "N"; Var "N2" ])
         (app "take"
@@ -531,5 +704,208 @@ let statements =
         (seq
            (Var "X")
            (splice (Var "XS") (Var "N") (Var "N2") (Var "VAL")))
+      (* [runSeq] denotes the same sequence as [repeatSeq] but remains opaque.
+         [canonicalRun] leaves standalone short runs in ordinary source shape;
+         [compactRun] preserves runs created by internal updates.
+         The run helpers normalize reducible carriers before inspecting their
+         head.  Direct carrier rules only consume irreducible counts, so their
+         result is independent of Maude's argument-reduction strategy.
+         [prependRun] compares values by repeated-variable matching after Maude
+         canonicalization; it does not invent a value equivalence.  Thus the
+         equations below satisfy
+
+           denote (spliceRun xs i n ys) = splice (denote xs) i n (denote ys)
+
+         without changing the source transition relation. *)
+    ; eq
+        (prepend_run (Const "0") (Var "X") (Var "XS"))
+        (Var "XS")
+    ; eq
+        (prepend_run (app "s_" [ Var "N" ]) (Var "X") (Const "eps"))
+        (compact_run (app "s_" [ Var "N" ]) (Var "X"))
+    ; eq
+        (prepend_run
+           (app "s_" [ Var "N" ]) (Var "X")
+           (seq
+              (run
+                 (app "s_" [ app "s_" [ Var "N2" ] ])
+                 (Var "X"))
+              (Var "XS")))
+        (prepend_run
+           (app "_+_"
+              [ app "s_" [ Var "N" ]
+              ; app "s_" [ app "s_" [ Var "N2" ] ]
+              ])
+           (Var "X") (Var "XS"))
+    ; eq ~attrs:[ Owise ]
+        (prepend_run
+           (app "s_" [ Var "N" ]) (Var "X")
+           (seq
+              (run
+                 (app "s_" [ app "s_" [ Var "N2" ] ])
+                 (Var "Y"))
+              (Var "XS")))
+        (seq
+           (compact_run (app "s_" [ Var "N" ]) (Var "X"))
+           (seq
+              (run
+                 (app "s_" [ app "s_" [ Var "N2" ] ])
+                 (Var "Y"))
+              (Var "XS")))
+    ; eq
+        (prepend_run
+           (app "s_" [ Var "N" ]) (Var "X")
+           (seq (repeat (Var "N2") (Var "X")) (Var "XS")))
+        (prepend_run
+           (app "_+_" [ app "s_" [ Var "N" ]; Var "N2" ])
+           (Var "X") (Var "XS"))
+    ; ceq ~attrs:[ Owise ]
+        (prepend_run
+           (app "s_" [ Var "N" ]) (Var "X")
+           (seq (repeat (Var "N2") (Var "Y")) (Var "XS")))
+        (seq
+           (compact_run (app "s_" [ Var "N" ]) (Var "X"))
+           (seq (repeat (Var "N2") (Var "Y")) (Var "XS")))
+        [ BoolCond
+            (app "_>=_"
+               [ Var "N2"; Const "compactRepeatThreshold" ])
+        ]
+    ; eq
+        (prepend_run
+           (app "s_" [ Var "N" ]) (Var "X")
+           (seq (Var "X") (Var "XS")))
+        (prepend_run
+           (app "s_" [ app "s_" [ Var "N" ] ])
+           (Var "X") (Var "XS"))
+    ; eq ~attrs:[ Owise ]
+        (prepend_run
+           (app "s_" [ Var "N" ]) (Var "X")
+           (seq (Var "Y") (Var "XS")))
+        (seq
+           (compact_run (app "s_" [ Var "N" ]) (Var "X"))
+           (seq (Var "Y") (Var "XS")))
+    ; eq
+        (append_runs (Const "eps") (Var "XS"))
+        (Var "XS")
+    ; eq
+        (append_runs
+           (seq
+              (run
+                 (app "s_" [ app "s_" [ Var "N" ] ])
+                 (Var "X"))
+              (Var "XS"))
+           (Var "YS"))
+        (prepend_run
+           (app "s_" [ app "s_" [ Var "N" ] ]) (Var "X")
+           (append_runs (Var "XS") (Var "YS")))
+    ; eq
+        (append_runs
+           (seq (repeat (Var "N") (Var "X")) (Var "XS"))
+           (Var "YS"))
+        (prepend_run
+           (Var "N") (Var "X")
+           (append_runs (Var "XS") (Var "YS")))
+    ; eq
+        (append_runs
+           (seq (Var "X") (Var "XS"))
+           (Var "YS"))
+        (prepend_run
+           (Const "1") (Var "X")
+           (append_runs (Var "XS") (Var "YS")))
+    ; eq
+        (splice_run (Const "eps") (Const "0") (Var "N2") (Var "VAL"))
+        (append_runs (Var "VAL") (Const "eps"))
+    ; eq
+        (splice_run
+           (Const "eps") (app "s_" [ Var "N" ]) (Var "N2") (Var "VAL"))
+        (Const "eps")
+    ; ceq
+        (splice_run
+           (seq (repeat (Var "N") (Var "X")) (Var "XS"))
+           (Var "N2") (Var "N3") (Var "VAL"))
+        (prepend_run
+           (Var "N2") (Var "X")
+           (append_runs
+              (Var "VAL")
+              (drop
+                 (Var "N3")
+                 (seq
+                    (repeat (app "_-_" [ Var "N"; Var "N2" ]) (Var "X"))
+                    (Var "XS")))))
+        [ BoolCond (app "_<_" [ Var "N2"; Var "N" ]) ]
+    ; ceq
+        (splice_run
+           (seq (repeat (Var "N") (Var "X")) (Var "XS"))
+           (Var "N2") (Var "N3") (Var "VAL"))
+        (prepend_run
+           (Var "N") (Var "X")
+           (splice_run
+              (Var "XS")
+              (app "_-_" [ Var "N2"; Var "N" ])
+              (Var "N3") (Var "VAL")))
+        [ BoolCond (app "_<=_" [ Var "N"; Var "N2" ]) ]
+    ; ceq
+        (splice_run
+           (seq
+              (run
+                 (app "s_" [ app "s_" [ Var "N" ] ])
+                 (Var "X"))
+              (Var "XS"))
+           (Var "N2") (Var "N3") (Var "VAL"))
+        (prepend_run
+           (Var "N2") (Var "X")
+           (append_runs
+              (Var "VAL")
+              (drop
+                 (Var "N3")
+                 (seq
+                    (run
+                       (app "_-_"
+                          [ app "s_" [ app "s_" [ Var "N" ] ]
+                          ; Var "N2"
+                          ])
+                       (Var "X"))
+                    (Var "XS")))))
+        [ BoolCond
+            (app "_<_"
+               [ Var "N2"; app "s_" [ app "s_" [ Var "N" ] ] ])
+        ]
+    ; ceq
+        (splice_run
+           (seq
+              (run
+                 (app "s_" [ app "s_" [ Var "N" ] ])
+                 (Var "X"))
+              (Var "XS"))
+           (Var "N2") (Var "N3") (Var "VAL"))
+        (prepend_run
+           (app "s_" [ app "s_" [ Var "N" ] ]) (Var "X")
+           (splice_run
+              (Var "XS")
+              (app "_-_"
+                 [ Var "N2"; app "s_" [ app "s_" [ Var "N" ] ] ])
+              (Var "N3") (Var "VAL")))
+        [ BoolCond
+            (app "_<=_"
+               [ app "s_" [ app "s_" [ Var "N" ] ]; Var "N2" ])
+        ]
+    ; eq
+        (splice_run
+           (seq (Var "X") (Var "XS"))
+           (Const "0") (Var "N2") (Var "VAL"))
+        (append_runs
+           (Var "VAL")
+           (drop (Var "N2") (seq (Var "X") (Var "XS"))))
+    ; eq
+        (splice_run
+           (seq (Var "X") (Var "XS"))
+           (app "s_" [ Var "N" ]) (Var "N2") (Var "VAL"))
+        (prepend_run
+           (Const "1") (Var "X")
+           (splice_run (Var "XS") (Var "N") (Var "N2") (Var "VAL")))
     ; eq (T.typecheck (Var "K") (Var "T")) (Const "false") ~attrs:[ Owise ]
-    ]
+  ]
+
+let statements =
+  declarations @ variables @ core_equations @ typecheck_equations @ data_equations
+  |> List.map gen

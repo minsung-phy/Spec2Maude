@@ -11,6 +11,7 @@ log="$prefix.log"
 smoke_log="$prefix-smoke.log"
 prepend_log="$prefix-prepend.log"
 prepend_suffix_log="$prefix-prepend-suffix.log"
+calls="$prefix-producer-calls.txt"
 wasm_log="$prefix-wasm.log"
 wasm_harness="$prefix-wasm.maude"
 instantiate_log="$prefix-instantiate.log"
@@ -51,7 +52,7 @@ vectors_fixture="$root/test/wast_vectors.wast"
 rm -f "$output" "$builtins" "$report" "$log" "$smoke_log" \
   "$wasm_log" "$wasm_harness" "$instantiate_log" "$instantiate_harness" \
   "$run_log" "$run_harness" "$simd_log" "$simd_harness"
-rm -f "$prepend_log" "$prepend_suffix_log"
+rm -f "$prepend_log" "$prepend_suffix_log" "$calls"
 rm -f "$eqz_log" "$eqz_harness"
 rm -f "$shift_log" "$shift_harness"
 rm -f "$actions_log" "$actions_harness"
@@ -77,6 +78,33 @@ if grep -Eq 'runtimeTruthList(Build|Snoc)' "$output"; then
   echo 'runtime truth worklist regressed to repeated indexing or queue append' >&2
   exit 1
 fi
+if grep -Eq 'runtimeTruth(Choose|List[^ ]*Choice)' "$output"; then
+  echo 'positive transitive expansion retained its old unused choice surface' >&2
+  exit 1
+fi
+next_surface=$(grep -m1 '^  rl \[runtimetruthnext.*TransitiveRule51' "$output")
+printf '%s\n' "$next_surface" |
+  grep -o 'helper\.truth-successors-[^ (]*' >"$calls"
+if [ ! -s "$calls" ] || [ "$(wc -l <"$calls" | tr -d ' ')" -ne \
+    "$(sort -u "$calls" | wc -l | tr -d ' ')" ]; then
+  echo 'transitive expansion evaluates a source producer descriptor more than once' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$next_surface" |
+    grep -Eq 'runtimeTruthCandidatePrepend.*helper\.truth-successors-.*true'; then
+  echo 'transitive candidate stream lost certified-edge evidence' >&2
+  exit 1
+fi
+if printf '%s\n' "$next_surface" | grep -Fq 'absheaptype.'; then
+  echo 'successor-complete expansion retained the whole finite heaptype domain' >&2
+  exit 1
+fi
+grep -Eq '^  eq runtimeTruthCandidatePrepend.*\(eps, [^,]*:Bool, .*\) = ' "$output"
+grep -Eq '^  eq runtimeTruthCandidatePrepend.*\(RTHEAD:SpectecTerminal RTSOURCE:SpectecTerminals, [^,]*:Bool, ' "$output"
+grep -A1 -m1 '^  crl \[runtimetruthdirecthit.*TransitiveRule51' "$output" |
+  grep -Fq 'truth-positive-worker'
+grep -A1 -m1 '^  crl \[runtimetruthnoedge.*TransitiveRule51' "$output" |
+  grep -Fq 'truth-base-refute'
 prepend_op=$(sed -n 's/^  op \(runtimeTruthListPrepend[^ :]*\) .*/\1/p' "$output" | head -n 1)
 cons_op=$(sed -n 's/^  op \(runtimeTruthListCons[^ :]*\) .*/\1/p' "$output" | head -n 1)
 nil_op=$(sed -n 's/^  op \(runtimeTruthListNil[^ :]*\) .*/\1/p' "$output" | head -n 1)

@@ -23,6 +23,8 @@ benchmarks/
 benchmarks/*
 !benchmarks/fibonacci/
 !benchmarks/fibonacci/**
+!benchmarks/chat/
+!benchmarks/chat/**
 !benchmarks/subtyping/
 !benchmarks/subtyping/**
 !benchmarks/builtins/

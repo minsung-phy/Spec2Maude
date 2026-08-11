@@ -190,6 +190,7 @@ let iter_listn_key (map : Request.iter_listn) =
     "\000"
     [ listn_shape_key map.source_shape
     ; call_shape_key map.call_shape
+    ; Sequence_representation.key map.output_representation
     ; map.count_var
     ; Option.value map.index_var ~default:""
     ; map.body_result_var

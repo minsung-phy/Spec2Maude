@@ -8,3 +8,13 @@ val run :
   steps:int ->
   Frontend.module_ ->
   string
+
+val modelcheck :
+  semantics:string ->
+  export:Wasm.Ast.name ->
+  args:Wasm.Value.num list ->
+  expected:Wasm.Value.num ->
+  rejected:Wasm.Value.num ->
+  steps:int ->
+  Frontend.module_ ->
+  string

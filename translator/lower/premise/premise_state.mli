@@ -15,7 +15,7 @@ val take_match_binding :
 val add_introduced_bindings :
   ?ids:string list ->
   Expr_env.t ->
-  (string * Expr_env.binding) list ->
+  Expr_env.introduced_binding list ->
   Expr_env.t
 
 val binding_is_bound :

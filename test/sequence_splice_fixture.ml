@@ -77,6 +77,45 @@ let () =
     "red splice(repeatSeq(3, 0) XS:SpectecTerminals, 4, 1, 9) == repeatSeq(3, 0) splice(XS:SpectecTerminals, 1, 1, 9) .";
   print_endline
     "red splice(splice(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9) == 9 9 repeatSeq(2046, 0) .";
+  print_endline
+    "red spliceRun(spliceRun(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9) == runSeq(2, 9) repeatSeq(2046, 0) .";
+  print_endline
+    "red len(spliceRun(spliceRun(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9)) == 2048 .";
+  print_endline
+    "red index(spliceRun(spliceRun(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9), 0) == 9 .";
+  print_endline
+    "red index(spliceRun(spliceRun(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9), 1) == 9 .";
+  print_endline
+    "red index(spliceRun(spliceRun(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9), 2) == 0 .";
+  print_endline "red typecheckSeq(runSeq(2048, 7), syn.nat) .";
+  print_endline "red slice(runSeq(2048, 7), 1024, 2) == 7 7 .";
+  print_endline
+    "red takeRun(1024, runSeq(2048, 7)) == runSeq(1024, 7) .";
+  print_endline
+    "red len(takeRun(1024, repeatSeq(2048, 7))) == 1024 .";
+  print_endline
+    "red index(takeRun(1024, runSeq(2048, 7)), 1023) == 7 .";
+  print_endline "red takeRun(3, 7 7 8 8) == runSeq(2, 7) 8 .";
+  print_endline "red runSeq(1, 7) == 7 .";
+  print_endline "red canonicalRun(2, 7) == 7 7 .";
+  print_endline "red prependRun(0, 0, 0) == 0 .";
+  print_endline "red prependRun(1, 0, runSeq(0, 0)) == 0 .";
+  print_endline "red prependRun(1, 0, runSeq(1, 0)) == runSeq(2, 0) .";
+  print_endline "red prependRun(1, 0, runSeq(2, 0)) == runSeq(3, 0) .";
+  print_endline
+    "red prependRun(2, 0, repeatSeq(2, 0)) == runSeq(4, 0) .";
+  print_endline
+    "red spliceRun(runSeq(8, 0), 0, 1, 0) == runSeq(8, 0) .";
+  print_endline
+    "red spliceRun(spliceRun(runSeq(8, 0), 7, 1, 9), 6, 1, 9) == runSeq(6, 0) runSeq(2, 9) .";
+  print_endline
+    "red spliceRun(spliceRun(runSeq(8, 0), 3, 2, 9 9), 2, 1, 9) == runSeq(2, 0) runSeq(3, 9) runSeq(3, 0) .";
+  print_endline
+    "red appendRuns(repeatSeq(8, 0), eps) == runSeq(8, 0) .";
+  print_endline
+    "red appendRuns(0 0 1 1, eps) == runSeq(2, 0) runSeq(2, 1) .";
+  print_endline
+    "red spliceRun(eps, 0, 0, 0 0) == runSeq(2, 0) .";
   print_splice_reference "0 1 2 3" 4;
   print_splice_reference "0 0 0 0" 4;
   print_repeat_splice_reference ()

@@ -72,12 +72,16 @@ type coverage =
   ; source_rules : Source_rule_identity.rule list
   }
 
+type decision_basis =
+  | Successor_complete of coverage
+  | Domain_complete of coverage
+
 type t =
   { transitive : Runtime_witness_proof.transitive_domain
   ; producers : producer list
   ; domain_candidates : domain_candidate list
   ; total_facts : total_fact list
-  ; decision_coverage : coverage option
+  ; decision_basis : decision_basis option
   }
 
 type blocker =

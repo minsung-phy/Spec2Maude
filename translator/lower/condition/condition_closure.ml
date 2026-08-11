@@ -18,6 +18,29 @@ let add_vars vars bound =
 let vars_subset vars bound =
   List.for_all (fun var -> List.mem var bound) vars
 
+let prelude_true = function
+  | Const "true" -> true
+  | App ("isOpt", [ Const "eps" ])
+  | App ("allOpt", [ Const "eps" ])
+  | App ("allLen", [ Const "eps"; _ ])
+  | App
+      ( ( "typecheckSeq"
+        | "typecheckOptSeq"
+        | "typecheckSeqOpt"
+        | "typecheckNestedSeq" )
+      , [ Const "eps"; _ ] ) ->
+    true
+  | Var _ | Const _ | Qid _ | App _ -> false
+
+let tautological_condition bound = function
+  | BoolCond term ->
+    vars_subset (term_vars term) bound && prelude_true term
+  | EqCond (left, right) ->
+    vars_subset (term_vars left @ term_vars right) bound
+    && ((prelude_true left && right = Const "true")
+        || (left = Const "true" && prelude_true right))
+  | MatchCond _ | MembershipCond _ -> false
+
 let unbound_vars term bound =
   term_vars term
   |> List.filter (fun var -> not (List.mem var bound))
@@ -189,12 +212,54 @@ let external_vars_of_rule_conditions
   |> List.sort_uniq String.compare
 
 let split_bool_ands condition =
-  let rec loop = function
+  let rec loop acc = function
     | BoolCond (App ("_and_", [ left; right ])) ->
-      loop (BoolCond left) @ loop (BoolCond right)
-    | condition -> [ condition ]
+      loop (loop acc (BoolCond right)) (BoolCond left)
+    | condition -> condition :: acc
   in
-  loop condition
+  loop [] condition
+
+let index_bound = function
+  | BoolCond (App ("_<_", [ index; App ("len", [ sequence ]) ])) ->
+    Some (sequence, index)
+  | EqCond _ | MatchCond _ | MembershipCond _ | BoolCond _ -> None
+
+let indexed_domain = function
+  | BoolCond (App ("indexDefined", [ sequence; index ])) ->
+    Some (sequence, index)
+  | EqCond _ | MatchCond _ | MembershipCond _ | BoolCond _ -> None
+
+(* [indexDefined(xs, i)] is defined in the prelude as [i < len(xs)].  Once
+   the latter has been retained, the former is the same proposition. *)
+let drop_implied_index_domains eq_condition conditions =
+  let rec loop bounds retained = function
+    | [] -> List.rev retained
+    | item :: rest ->
+      (match eq_condition item with
+      | None -> loop bounds (item :: retained) rest
+      | Some condition ->
+        let implied =
+          match indexed_domain condition with
+          | Some domain -> List.mem domain bounds
+          | None -> false
+        in
+        let bounds =
+          match index_bound condition with
+          | Some bound when not (List.mem bound bounds) -> bound :: bounds
+          | Some _ | None -> bounds
+        in
+        if implied then loop bounds retained rest
+        else loop bounds (item :: retained) rest)
+  in
+  loop [] [] conditions
+
+let drop_implied_eq_domains =
+  drop_implied_index_domains (fun condition -> Some condition)
+
+let drop_implied_rule_domains =
+  drop_implied_index_domains (function
+    | EqCondition condition -> Some condition
+    | RewriteCond _ -> None)
 
 let bind_match_pattern bound pattern =
   add_vars (term_vars pattern) bound
@@ -217,6 +282,8 @@ let normalize_match_condition ~constructor_op bound pattern subject =
     None
 
 let normalize_ready ~constructor_op bound = function
+  | condition when tautological_condition bound condition ->
+    Some (bound, [])
   | MatchCond (pattern, subject) ->
     normalize_match_condition ~constructor_op bound pattern subject
   | EqCond (lhs, rhs) ->
@@ -253,16 +320,17 @@ let normalize_binding_conditions
   let rec schedule bound acc pending =
     match take_ready bound [] pending with
     | Some (bound, ready_conditions, pending) ->
-      schedule bound (acc @ ready_conditions) pending
-    | None ->
-      acc @ pending
+      schedule bound (List.rev_append ready_conditions acc) pending
+    | None -> List.rev_append acc pending
   in
   conditions
   |> List.concat_map split_bool_ands
   |> schedule initial_bound []
+  |> drop_implied_eq_domains
 
 let normalize_rule_conditions
     ?(constructor_op = Condition_pattern_certificate.empty)
+    ?(source_decisions = []) ?(domain_guards = [])
     lhs_terms conditions =
   let initial_bound =
     lhs_terms
@@ -275,6 +343,8 @@ let normalize_rule_conditions
       split_bool_ands condition |> List.map (fun condition -> EqCondition condition)
     | RewriteCond _ as condition -> [ condition ]
   in
+  let source_decisions = List.concat_map flatten_condition source_decisions in
+  let domain_guards = List.concat_map flatten_condition domain_guards in
   conditions
   |> List.concat_map flatten_condition
   |> fun pending ->
@@ -327,39 +397,103 @@ let normalize_rule_conditions
         Some (condition, bound, conditions, prefix, rest)
       | None -> take_ready bound (condition :: prefix) rest)
   in
-  (* Scheduling is stable: choose the least source-ready condition, considering
-     later conditions only while an earlier one has unbound inputs.  The sole
-     progress exception is a structurally total primitive Bool guard before a
-     ready self-recursive rewrite; this does not authorize arbitrary premise
-     reordering. *)
-  let take_ready bound pending =
-    match take_ready bound [] pending with
-    | None -> None
-    | Some (condition, next_bound, conditions, prefix, rest) ->
-      let ready () =
+  let rec take_progress_guard bound prefix = function
+    | [] -> None
+    | condition :: rest when total_bool_guard bound condition ->
+      (match normalize_rule_ready bound condition with
+      | Some (next_bound, conditions) when next_bound = bound ->
+        Some (condition, conditions, List.rev_append prefix rest)
+      | Some _ | None -> None)
+    | condition :: _ when List.mem condition source_decisions -> None
+    | condition :: rest ->
+      take_progress_guard bound (condition :: prefix) rest
+  in
+  let source_ready bound condition =
+    List.mem condition source_decisions
+    && (match normalize_rule_ready bound condition with
+        | Some (next_bound, _) ->
+          next_bound = bound
+          || (match condition with
+              | RewriteCond _ -> true
+              | EqCondition _ -> false)
+        | None -> false)
+  in
+  let rec take_source_decision bound skipped selected = function
+    | [] -> None
+    | condition :: rest when List.mem condition source_decisions ->
+      (match normalize_rule_ready bound condition with
+      | Some (next_bound, conditions) when self_recursive condition ->
+        (match take_progress_guard bound [] rest with
+        | Some (guard, guard_conditions, rest) ->
+          Some
+            ( guard
+            , next_bound
+            , List.rev_append selected (guard_conditions @ conditions)
+            , List.rev_append skipped rest )
+        | None -> None)
+      | Some (next_bound, conditions)
+        when next_bound = bound
+             || (match condition with
+                 | RewriteCond _ -> true
+                 | EqCondition _ -> false) ->
         Some
           ( condition
           , next_bound
-          , conditions
-          , List.rev_append prefix rest )
-      in
-      if not (self_recursive condition) then ready ()
-      else
-        match take_ready bound [] rest with
-        | Some (guard, guard_bound, guards, guard_prefix, guard_rest)
-          when total_bool_guard bound guard ->
+          , List.rev_append selected conditions
+          , List.rev_append skipped rest )
+      | Some _ | None -> None)
+    | condition :: rest when List.mem condition domain_guards ->
+      (match normalize_rule_ready bound condition with
+      | Some (next_bound, _) when next_bound <> bound
+          && List.exists (source_ready bound) rest ->
+        take_source_decision bound (condition :: skipped) selected rest
+      | Some (next_bound, conditions) when next_bound <> bound ->
+        take_source_decision next_bound skipped
+          (List.rev_append conditions selected) rest
+      | Some _ | None ->
+        take_source_decision bound (condition :: skipped) selected rest)
+    | _ -> None
+  in
+  (* Scheduling is stable: choose the least source-ready condition, considering
+     later conditions only while an earlier one has unbound inputs.  The sole
+     progress exception is a structurally total primitive Bool guard before a
+     ready self-recursive rewrite.  A source-total decision may also cross the
+     generated domain guards explicitly supplied by its lowering site.  A
+     source rewrite premise may bind its result while crossing those guards;
+     its inputs must still be bound before it moves.  This is a narrow
+     validated-ingress optimization, not arbitrary premise reordering. *)
+  let take_ready bound pending =
+    match take_source_decision bound [] [] pending with
+    | Some ready -> Some ready
+    | None ->
+      (match take_ready bound [] pending with
+      | None -> None
+      | Some (condition, next_bound, conditions, prefix, rest) ->
+        let ready () =
           Some
-            ( guard
-            , guard_bound
-            , guards
-            , List.rev_append prefix
-                (condition :: List.rev_append guard_prefix guard_rest) )
-        | Some _ | None -> ready ()
+            ( condition
+            , next_bound
+            , conditions
+            , List.rev_append prefix rest )
+        in
+        if not (self_recursive condition) then ready ()
+        else
+          match take_ready bound [] rest with
+          | Some (guard, guard_bound, guards, guard_prefix, guard_rest)
+            when total_bool_guard bound guard ->
+            Some
+              ( guard
+              , guard_bound
+              , guards
+              , List.rev_append prefix
+                  (condition :: List.rev_append guard_prefix guard_rest) )
+          | Some _ | None -> ready ())
   in
   let rec schedule bound acc pending =
     match take_ready bound pending with
     | Some (_, bound, ready_conditions, pending) ->
-      schedule bound (acc @ ready_conditions) pending
-    | None -> acc @ pending
+      schedule bound (List.rev_append ready_conditions acc) pending
+    | None -> List.rev_append acc pending
   in
   schedule initial_bound [] pending
+  |> drop_implied_rule_domains

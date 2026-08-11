@@ -159,8 +159,24 @@ let rec source_surface ~il_env ~source_index ~constructors ~static_typ_env typ =
   | Ok _ -> Error Unsupported_type_shape
 
 let same_payload_shape source target =
-  source.Constructor_registry.payload_sorts = target.Constructor_registry.payload_sorts
+  let source_typs = source.Constructor_registry.payload_typs in
+  let target_typs = target.Constructor_registry.payload_typs in
+  List.length source_typs = List.length target_typs
+  && List.for_all2 Il.Eq.eq_typ source_typs target_typs
+  && source.payload_sorts = target.payload_sorts
   && source.payload_witnesses = target.payload_witnesses
+
+let projects_totally constructors source target =
+  source.Constructor_registry.status = Constructor_registry.Emitted
+  && target.Constructor_registry.status = Constructor_registry.Emitted
+  && source.construction_domain = Constructor_registry.Total_constructor
+  && source.arity = target.arity
+  && List.length source.payload_typs = source.arity
+  && List.length source.payload_sorts = source.arity
+  && List.length source.payload_witnesses = source.arity
+  && Constructor_registry.uniform_payload_schema constructors source
+  && Constructor_registry.uniform_payload_schema constructors target
+  && same_payload_shape source target
 
 let mapped_case constructors target_id source =
   match
@@ -174,9 +190,11 @@ let mapped_case constructors target_id source =
   | Constructor_registry.Found target when same_payload_shape source target ->
     Ok
       (Subtype_injection.make_case
+         ~source_mixop:source.mixop
          ~source_op:source.constructor_op
          ~target_op:target.constructor_op
-         ~payload_sorts:source.payload_sorts)
+         ~payload_sorts:source.payload_sorts
+         ~projects_totally:(projects_totally constructors source target))
   | Constructor_registry.Found _ -> Error Incompatible_payload
   | Constructor_registry.Missing -> Error Missing_target_alternative
   | Constructor_registry.Ambiguous _ -> Error Ambiguous_target_alternative

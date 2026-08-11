@@ -38,9 +38,9 @@ let target_id ids id =
 let add_introduced_bindings ?ids env bindings =
   bindings
   |> List.fold_left
-       (fun env (id, binding) ->
-         if target_id ids id then
-           Expr_env.add env id binding
+       (fun env (introduced : Expr_env.introduced_binding) ->
+         if target_id ids introduced.id then
+           Expr_env.add_introduced env introduced
          else
            env)
        env

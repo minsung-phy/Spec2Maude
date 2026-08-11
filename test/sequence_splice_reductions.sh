@@ -6,6 +6,7 @@ output=/tmp/spec2maude-sequence-splice-fixture.maude
 log=/tmp/spec2maude-sequence-splice-fixture.log
 
 "$fixture" >"$output"
+expected=$(grep -c '^red ' "$output")
 printf '%s\n' quit | maude -no-banner "$output" >"$log" 2>&1
 
 if grep -Eq 'Warning:|Advisory:|Error:' "$log"; then
@@ -18,4 +19,4 @@ if grep '^result Bool:' "$log" | grep -v '^result Bool: true$'; then
   exit 1
 fi
 
-test "$(grep -c '^result Bool: true$' "$log")" -eq 361
+test "$(grep -c '^result Bool: true$' "$log")" -eq "$expected"

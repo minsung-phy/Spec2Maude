@@ -43,6 +43,16 @@ require_contains () {
   fi
 }
 
+require_not_contains () {
+  line=$1
+  text=$2
+  message=$3
+  if printf '%s\n' "$line" | grep -Fq "$text"; then
+    echo "$message" >&2
+    exit 1
+  fi
+}
+
 require_before () {
   line=$1
   left=$2
@@ -77,9 +87,15 @@ require_statement_before () {
 
 step=$(condition_line 'crl [step-ctxt-instrs]')
 require_before "$step" \
-  '(_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
+  'helper.context-split.step(STREAM1:SpectecTerminals)' \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
-  'ctxt-instrs progress guard no longer precedes its self-recursive rewrite'
+  'ctxt-instrs split no longer precedes its self-recursive rewrite'
+if printf '%s\n' "$step" \
+    | grep -Eq 'helper\.subtype-project-seq\.step-pure|_or_\(_=/=_\(VAL_STAR'
+then
+  echo 'ctxt-instrs repeated projection/progress already certified by its strict split helper' >&2
+  exit 1
+fi
 
 require_statement_before \
   'crl [step-read-ref-test-true]' \
@@ -115,6 +131,270 @@ require_before "$allocmodule" "$provisional" "$moduleinst" \
   'allocmodule no longer constructs exports before moduleinst'
 require_before "$allocmodule" "$moduleinst" "$allocfuncs" \
   'allocmodule no longer checks allocfuncs against the bound function addresses'
+
+memory_fill=$(condition_line 'crl [step-read-memory-fill-succ]')
+require_contains "$memory_fill" \
+  '_=/=_(N:Nat, 0)' \
+  'memory.fill successor no longer inlines the singleton complement of its zero predecessor'
+if grep -q 'helper.enabledness.step-read-memory-fill-zero' "$output"; then
+  echo 'memory.fill zero complement unexpectedly materialized a one-rule helper' >&2
+  exit 1
+fi
+
+step_pure=$(condition_line 'crl [step-pure]')
+require_contains "$step_pure" \
+  'rel.step-pure(INSTR_STAR:SpectecTerminals) => INSTR_PRIME_STAR:SpectecTerminals' \
+  'Step/pure lost its source relation premise'
+if printf '%s\n' "$step_pure" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.state)'; then
+  echo 'Step/pure repeated an input-state check already enforced by config membership' >&2
+  exit 1
+fi
+
+step_read=$(condition_line 'crl [step-read]')
+require_contains "$step_read" \
+  'rel.step-read(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => INSTR_PRIME_STAR:SpectecTerminals' \
+  'Step/read lost its source relation premise'
+if printf '%s\n' "$step_read" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.state)'; then
+  echo 'Step/read repeated an input-state check already enforced by config membership' >&2
+  exit 1
+fi
+
+step_context=$(condition_line 'crl [step-ctxt-instrs]')
+require_before "$step_context" \
+  'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals))' \
+  'typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)' \
+  'Step/ctxt-instrs no longer retains its whole recursive rewrite-result config guard'
+step_context_rule=$(matching_line 'crl [step-ctxt-instrs]')
+require_contains "$step_context_rule" \
+  'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
+  'Step/ctxt-instrs no longer reuses its certified raw value-prefix pattern'
+if printf '%s\n' "$step_context" \
+    | grep -Eq 'helper\.subtype-project-seq\.step-pure|_or_\(_=/=_\(VAL_STAR'
+then
+  echo 'Step/ctxt-instrs retained projection/progress implied by its strict split helper' >&2
+  exit 1
+fi
+if printf '%s\n' "$step_context_rule" | grep -Fq 'helper.iter-map'; then
+  echo 'Step/ctxt-instrs retained a direct projection/reinjection map' >&2
+  exit 1
+fi
+if printf '%s\n' "$step_context" \
+    | grep -Eq 'syn\.state\)|typecheckSeq\('; then
+  echo 'Step/ctxt-instrs retained a payload check implied by its whole config guard' >&2
+  exit 1
+fi
+
+step_frame=$(condition_line 'crl [step-ctxt-frame]')
+require_contains "$step_frame" \
+  'typecheck(config.sym(state.sym(S_PRIME:SpectecTerminal, F_PRIME_PRIME:SpectecTerminal), INSTR_PRIME_STAR:SpectecTerminals), syn.config)' \
+  'Step/ctxt-frame lost its whole recursive rewrite-result config guard'
+if printf '%s\n' "$step_frame" \
+    | grep -Eq 'syn\.(store|frame|state)\)|typecheckSeq\('; then
+  echo 'Step/ctxt-frame retained a nested payload check implied by its whole config guard' >&2
+  exit 1
+fi
+
+steps_trans=$(condition_line 'crl [steps-trans]')
+require_contains "$steps_trans" \
+  'typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)' \
+  'Steps/trans lost its first whole rewrite-result config guard'
+require_contains "$steps_trans" \
+  'typecheck(config.sym(Z_PRIME_PRIME:SpectecTerminal, INSTR_PRIME_PRIME_STAR:SpectecTerminals), syn.config)' \
+  'Steps/trans lost its transitive whole rewrite-result config guard'
+if printf '%s\n' "$steps_trans" \
+    | grep -Eq 'syn\.state\)|typecheckSeq\('; then
+  echo 'Steps/trans retained payload checks implied by its whole config guards' >&2
+  exit 1
+fi
+
+eval_expr=$(condition_line 'crl [eval-expr-rule-1]')
+require_contains "$eval_expr" \
+  'typecheck(config.sym(Z_PRIME:SpectecTerminal, PATTERN1:SpectecTerminals), syn.config)' \
+  'Eval_expr lost its whole Steps output config guard'
+if printf '%s\n' "$eval_expr" \
+    | grep -Eq 'syn\.state\)|typecheckSeq\('; then
+  echo 'Eval_expr retained payload checks implied by its whole config guard' >&2
+  exit 1
+fi
+
+
+memory_fill_oob=$(condition_line 'crl [step-read-memory-fill-oob]')
+require_contains "$memory_fill_oob" \
+  '(_>_(_+_(proj.uN.wrap.0(I:SpectecTerminal), N:Nat), len(value('\''BYTES, def.mem(Z:SpectecTerminal, X:SpectecTerminal))))) = true' \
+  'memory.fill lost its source OOB decision'
+if printf '%s\n' "$memory_fill_oob" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.state)'; then
+  echo 'memory.fill repeated an input-state check already enforced by config membership' >&2
+  exit 1
+fi
+
+memory_fill_bad_memidx=$(condition_line \
+  'crl [helper-enabledness-step-read-memory-fill-oob-source-false-1]')
+require_contains "$memory_fill_bad_memidx" \
+  '(not_(indexDefined(value('\''MEMS, value('\''MODULE, def.fof(Z:SpectecTerminal))), proj.uN.wrap.0(X:SpectecTerminal)))) = true' \
+  'memory.fill enabledness lost its invalid-memory-index complement'
+
+memory_fill_in_bounds=$(condition_line \
+  'crl [helper-enabledness-step-read-memory-fill-oob-source-false-3]')
+require_contains "$memory_fill_in_bounds" \
+  '(_<=_(_+_(proj.uN.wrap.0(I:SpectecTerminal), N:Nat), len(value('\''BYTES, def.mem(Z:SpectecTerminal, X:SpectecTerminal))))) = true' \
+  'memory.fill enabledness lost its in-bounds complement'
+if printf '%s\n' "$memory_fill_in_bounds" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.state)'; then
+  echo 'memory.fill enabledness repeated an input-state check already enforced by config membership' >&2
+  exit 1
+fi
+if printf '%s\n' "$memory_fill_in_bounds" | grep -Fq 'typecheckSeq(((instr.const'; then
+  echo 'memory.fill enabledness repeated an instruction check already enforced by config membership' >&2
+  exit 1
+fi
+for factored in \
+  'AT:SpectecTerminal := helper.subtype-project.num' \
+  'VAL:SpectecTerminal := helper.subtype-project.step-pure' \
+  'typecheck(I:SpectecTerminal, syn.num(helper.subtype-inject.num(AT:SpectecTerminal)))' \
+  'typecheck(uN.wrap(N:Nat), syn.num(helper.subtype-inject.num(AT:SpectecTerminal)))'
+do
+  require_not_contains "$memory_fill_in_bounds" "$factored" \
+    'memory.fill enabledness repeated a source-prefix guard already established by its caller'
+done
+
+require_statement_before \
+  'crl [helper-enabledness-step-read-memory-fill-oob-source-false-3]' \
+  'crl [helper-enabledness-step-read-memory-fill-oob-source-false-1]' \
+  'memory.fill enabledness no longer tries its validated in-bounds branch first'
+
+if printf '%s\n' "$memory_fill" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.state)'; then
+  echo 'memory.fill successor repeated a state guard already established by its enabledness helper' >&2
+  exit 1
+fi
+if printf '%s\n' "$memory_fill" | grep -Fq 'typecheckSeq(((instr.const'; then
+  echo 'memory.fill successor repeated an instruction guard already established by its enabledness helper' >&2
+  exit 1
+fi
+for retained in \
+  'VAL:SpectecTerminal := helper.subtype-project.step-pure' \
+  'typecheck(I:SpectecTerminal, syn.num(helper.subtype-inject.num(AT:SpectecTerminal)))' \
+  'typecheck(uN.wrap(N:Nat), syn.num(helper.subtype-inject.num(AT:SpectecTerminal)))'
+do
+  require_contains "$memory_fill" "$retained" \
+    'memory.fill successor lost a binding or dependent guard that cannot be factored across the helper witness'
+done
+require_not_contains "$memory_fill" \
+  'typecheck(N:Nat, syn.nat)' \
+  'memory.fill successor repeated an immutable LHS guard established by its enabledness helper'
+
+memory_fill_zero=$(condition_line 'crl [step-read-memory-fill-zero]')
+require_before "$memory_fill_zero" \
+  'N:Nat = 0' \
+  'helper.enabledness.step-read-memory-fill-oob' \
+  'memory.fill zero rule no longer checks its source decision before enabledness'
+if printf '%s\n' "$memory_fill_zero" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.state)'; then
+  echo 'memory.fill zero rule repeated a state guard already established by its enabledness helper' >&2
+  exit 1
+fi
+for retained in \
+  'AT:SpectecTerminal :=' \
+  'VAL:SpectecTerminal :=' \
+  'typecheck(I:SpectecTerminal' \
+  'typecheck(uN.wrap(N:Nat)'
+do
+  require_contains "$memory_fill_zero" "$retained" \
+    'memory.fill zero rule lost a binding or dependent guard that cannot be factored across the helper witness'
+done
+require_not_contains "$memory_fill_zero" \
+  'typecheck(N:Nat, syn.nat)' \
+  'memory.fill zero rule repeated an immutable LHS guard established by its enabledness helper'
+
+with_mem=$(condition_line 'ceq def.with-mem(Z:SpectecTerminal')
+with_mem_rhs=$(matching_line 'ceq def.with-mem(Z:SpectecTerminal')
+require_contains "$with_mem_rhs" \
+  'spliceRun(value('\''BYTES' \
+  'with_mem no longer uses the representation-preserving run splice for its source SliceP update'
+require_contains "$with_mem" \
+  'typecheck(X:SpectecTerminal, syn.idx)' \
+  'with_mem lost the source index guard required before memory lookup'
+if printf '%s\n' "$with_mem" | grep -Fq 'typecheck(state.sym'; then
+  echo 'with_mem retained a whole-state typecheck proved by its total constructor payloads' >&2
+  exit 1
+fi
+
+free_br_table=$(condition_line 'ceq def.free-instr(instr.br-table')
+require_contains "$free_br_table" \
+  'typecheck(instr.br-table' \
+  'free-instr lost the constructor category check required by its source clause'
+for redundant in \
+  'typecheckSeq(LABELIDX_STAR:SpectecTerminals, syn.labelidx)' \
+  'typecheck(LABELIDX_PRIME:SpectecTerminal, syn.labelidx)'
+do
+  require_not_contains "$free_br_table" "$redundant" \
+    'free-instr retained a payload check implied by its whole constructor check'
+done
+
+call_ref=$(condition_line 'crl [step-read-call-ref-func]')
+for redundant in \
+  'typecheck(comptype.func-sym(list.wrap(T_1_STAR:SpectecTerminals), list.wrap(T_2_STAR:SpectecTerminals)), syn.comptype)' \
+  'typecheck(func.func(X:SpectecTerminal, PATTERN2:SpectecTerminals, INSTR_STAR:SpectecTerminals), syn.funccode)' \
+  'typecheckSeq(T_1_STAR:SpectecTerminals, syn.valtype)' \
+  'typecheck(list.wrap(T_1_STAR:SpectecTerminals), syn.resulttype)' \
+  'typecheckSeq(T_2_STAR:SpectecTerminals, syn.valtype)' \
+  'typecheck(list.wrap(T_2_STAR:SpectecTerminals), syn.resulttype)' \
+  'typecheck(X:SpectecTerminal, syn.typeidx)' \
+  'typecheckSeq(PATTERN2:SpectecTerminals, syn.local)' \
+  'typecheckSeq(INSTR_STAR:SpectecTerminals, syn.expr)'
+do
+  require_not_contains "$call_ref" "$redundant" \
+    'call_ref retained constructor payload validation implied by its typed subject'
+done
+
+store_pack=$(condition_line 'crl [step-store-pack-val]')
+require_contains "$store_pack" \
+  'typecheck(storeop.wrap(sz.wrap(N:Nat)), syn.storeop(helper.subtype-inject.num(INN:SpectecTerminal)))' \
+  'store-pack lost its source constructor typecheck'
+require_not_contains "$store_pack" \
+  'typecheckSeq(storeop.wrap(sz.wrap(N:Nat)), syn.storeop(helper.subtype-inject.num(INN:SpectecTerminal)))' \
+  'store-pack retained a singleton sequence check implied by the preceding constructor typecheck'
+require_not_contains "$store_pack" \
+  'typecheck(I:SpectecTerminal, syn.num(PATTERN1:SpectecTerminal))' \
+  'store-pack retained a typecheck already established through the projection round-trip'
+
+for retained in \
+  'indexDefined(def.funcinst(Z:SpectecTerminal), A:Nat)' \
+  'N:Nat := len(VAL_STAR:SpectecTerminals)' \
+  'FI:SpectecTerminal := index(def.funcinst(Z:SpectecTerminal), A:Nat)' \
+  'RESULT1:SpectecTerminal := rel.expand(value('\''TYPE, FI:SpectecTerminal))' \
+  'comptype.func-sym(list.wrap(T_1_STAR:SpectecTerminals), list.wrap(T_2_STAR:SpectecTerminals)) := RESULT1:SpectecTerminal' \
+  'N:Nat = len(T_1_STAR:SpectecTerminals)' \
+  'M:Nat := len(T_2_STAR:SpectecTerminals)' \
+  'func.func(X:SpectecTerminal, PATTERN2:SpectecTerminals, INSTR_STAR:SpectecTerminals) := value('\''CODE, FI:SpectecTerminal)' \
+  'tuple(seq(T_STAR:SpectecTerminals)) := helper.pattern-zip.step-read(PATTERN2:SpectecTerminals)' \
+  'F:SpectecTerminal := rec.frame('
+do
+  require_contains "$call_ref" "$retained" \
+    'call_ref lost a source/dependent condition while removing payload validation'
+done
+
+step_block=$(condition_line 'crl [step-read-block]')
+require_contains "$step_block" \
+  'M:Nat = len(T_1_STAR:SpectecTerminals)' \
+  'typed-subject lowering removed a dependent block payload-length condition'
+require_not_contains "$step_block" \
+  'typecheck(instrtype.sym(list.wrap(T_1_STAR:SpectecTerminals), eps, list.wrap(T_2_STAR:SpectecTerminals)), syn.instrtype)' \
+  'block retained whole-result validation implied by its typed producer'
+cast_fail=$(condition_line 'crl [step-read-br-on-cast-fail-fail]')
+require_contains "$cast_fail" \
+  'helper.truth-refute-entry.step-read' \
+  'br_on_cast_fail no longer uses the source-complete false worklist decision'
+if printf '%s\n' "$cast_fail" | grep -Fq 'helper.enabled-false-entry'; then
+  echo 'br_on_cast_fail retained an administrative enabledness wrapper for an identical predecessor head' >&2
+  exit 1
+fi
+
+br_table=$(condition_line 'crl [step-pure-br-table-lt]')
+require_contains "$br_table" \
+  '_<_(proj.uN.wrap.0(I:SpectecTerminal), len(L_STAR:SpectecTerminals))' \
+  'br_table lost its source length comparison while removing an implied domain guard'
+if printf '%s\n' "$br_table" | grep -Fq 'indexDefined('; then
+  echo 'br_table retained indexDefined implied by the preceding exact length bound' >&2
+  exit 1
+fi
 
 forward_step=$(matching_line 'ceq helper.iter-count.allocmodule(s COUNT1:Nat')
 forward_formula=$(condition_line 'ceq helper.iter-count.allocmodule(s COUNT1:Nat')

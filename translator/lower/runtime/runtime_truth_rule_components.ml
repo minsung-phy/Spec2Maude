@@ -34,8 +34,8 @@ let exp_components (exp : Il.Ast.exp) =
   | Il.Ast.TupE exps -> exps
   | _ -> [ exp ]
 
-let add_pattern_binding env (id, binding) =
-  Expr_env.add env id binding
+let add_pattern_binding env binding =
+  Expr_env.add_introduced env binding
 
 let lower_head_patterns names ~require_all ?(env = Expr_env.empty) ctx origin components =
   let source_names =

@@ -8,10 +8,51 @@ type binding =
   ; typ : typ
   }
 
+type roundtrip_form =
+  | Direct
+  | Pointwise_sequence of iter
+
+type subtype_roundtrip =
+  { source : term
+  ; target : term
+  ; injection : Subtype_injection.t
+  ; guard : eq_condition
+  ; form : roundtrip_form
+  }
+
+type sequence_roundtrip =
+  { source : term
+  ; target : term
+  ; injection : Subtype_injection.t
+  ; required_guard : eq_condition
+  }
+
+let sequence_roundtrip roundtrip =
+  match roundtrip.form with
+  | Pointwise_sequence List ->
+    Some
+      { source = roundtrip.source
+      ; target = roundtrip.target
+      ; injection = roundtrip.injection
+      ; required_guard = roundtrip.guard
+      }
+  | Direct | Pointwise_sequence (Opt | List1 | ListN _) -> None
+
+type roundtrip_reuse =
+  { target : term
+  ; required_guard : eq_condition
+  }
+
+type introduced_binding =
+  { id : string
+  ; binding : binding
+  ; subtype_roundtrip : subtype_roundtrip option
+  }
+
 type result =
   { term : term option
   ; guards : eq_condition list
-  ; introduced_bindings : (string * binding) list
+  ; introduced_bindings : introduced_binding list
   ; diagnostics : Diagnostics.t list
   }
 
@@ -29,6 +70,9 @@ type callbacks =
   }
 
 let return names result = result, names
+
+let introduce id binding =
+  { id; binding; subtype_roundtrip = None }
 
 let app name args = App (name, args)
 
@@ -62,9 +106,7 @@ let subtype_diagnostic ctx origin constructor exp error =
 
 let accept_injection ctx origin injection =
   let request = Helper_request.subtype_injection_request ~origin injection in
-  let forward = Helper.request (Context.helpers ctx) request in
-  Subtype_injection.projection_name ~forward,
-  Subtype_injection.sequence_projection_name ~forward
+  Helper.request (Context.helpers ctx) request
 
 let child_origin parent segment exp =
   Origin.with_child
@@ -90,25 +132,129 @@ let without_typechecks guards =
        | BoolCond term -> not (Typecheck_term.is_typecheck term)
        | EqCond _ | MatchCond _ | MembershipCond _ -> true)
 
+type projection_condition =
+  | Projection_match
+  | Projection_equality
+
 let projection_condition
     ctx callbacks origin constructor source_exp source_result source_term
     ~reason ~suggestion =
   if Condition_closure.is_match_pattern
        ~constructor_op:(Condition_closure.source_constructor_certificate ctx)
        source_term then
-    Ok (fun projected -> MatchCond (source_term, projected))
+    Ok Projection_match
   else if
     source_result.introduced_bindings = []
     && Condition_closure.vars_subset
          (Condition_closure.term_vars source_term)
          callbacks.bound_vars
   then
-    Ok (fun projected -> EqCond (source_term, projected))
+    Ok Projection_equality
   else
     Error
       (unsupported
          ctx origin constructor source_exp
          reason suggestion)
+
+let make_projection_condition kind source projected =
+  match kind with
+  | Projection_match -> MatchCond (source, projected)
+  | Projection_equality -> EqCond (source, projected)
+
+let projection_guard project source target =
+  MatchCond (source, App (project, [ target ]))
+
+(** These constructors remain private to pattern lowering.  Each proof is made
+    only alongside the exact generated partial-projection guard that establishes
+    its image domain. *)
+let direct_roundtrip ~forward ~source ~target injection =
+  { source
+  ; target
+  ; injection
+  ; guard =
+      projection_guard
+        (Subtype_injection.projection_name ~forward)
+        source target
+  ; form = Direct
+  }
+
+(** Pointwise sequence projection is a partial retraction and preserves length
+    on its exact domain.  The stored iterator retains any [ListN] count/index
+    obligation checked by the reuse query. *)
+let iterated_roundtrip ~forward ~iter ~source ~target injection =
+  { source
+  ; target
+  ; injection
+  ; guard =
+      projection_guard
+        (Subtype_injection.sequence_projection_name ~forward)
+        source target
+  ; form = Pointwise_sequence iter
+  }
+
+let same_injection left right =
+  Subtype_injection.key left = Subtype_injection.key right
+
+let reuse (roundtrip : subtype_roundtrip) =
+  { target = roundtrip.target; required_guard = roundtrip.guard }
+
+let reuse_direct roundtrip ~source injection =
+  match roundtrip.form with
+  | Direct
+    when source = roundtrip.source
+         && same_injection injection roundtrip.injection ->
+    Some (reuse roundtrip)
+  | Direct | Pointwise_sequence _ -> None
+
+let reuse_iterated roundtrip ~source ~iter injection =
+  match roundtrip.form with
+  | Pointwise_sequence certified_iter
+    when source = roundtrip.source
+         && Il.Eq.eq_iter iter certified_iter
+         && same_injection injection roundtrip.injection ->
+    Some (reuse roundtrip)
+  | Direct | Pointwise_sequence _ -> None
+
+let attach_roundtrip source_result source_exp (roundtrip : subtype_roundtrip) =
+  match source_exp.it with
+  | VarE id ->
+    let matching =
+      source_result.introduced_bindings
+      |> List.filter (fun introduced -> introduced.id = id.it)
+    in
+    (match matching with
+    | [ introduced ] when introduced.binding.term = roundtrip.source ->
+      source_result.introduced_bindings
+      |> List.map (fun introduced ->
+        if introduced.id = id.it then
+          { introduced with subtype_roundtrip = Some roundtrip }
+        else introduced)
+    | [] | [ _ ] | _ :: _ :: _ -> source_result.introduced_bindings)
+  | _ -> source_result.introduced_bindings
+
+(** A bare source variable is introduced by the projection [MatchCond] even
+    when its RuleD quantifier already supplied a typed declaration.  Construct
+    that introduction from the exact pattern term and note; never copy an
+    arbitrary callback binding into the result. *)
+let projection_introductions
+    callbacks source_result source_exp source_term source_sort =
+  match source_exp.it with
+  | VarE id
+    when not
+      (List.exists
+         (fun introduced -> introduced.id = id.it)
+         source_result.introduced_bindings)
+      && not
+        (Condition_closure.vars_subset
+           (Condition_closure.term_vars source_term)
+           callbacks.bound_vars) ->
+    (match source_sort with
+    | Some sort ->
+      introduce id.it
+        { term = source_term; sort; typ = source_exp.note }
+      :: source_result.introduced_bindings
+    | None -> source_result.introduced_bindings)
+  | _ -> source_result.introduced_bindings
 
 let lower_direct names ctx callbacks origin exp inner source_typ target_typ =
   let inner_result, names =
@@ -185,15 +331,40 @@ let lower_direct names ctx callbacks origin exp inner source_typ target_typ =
            ~suggestion:
              "Keep this SubE Unsupported unless projection needs only equality over existing bindings"
        with
-      | Ok make_condition ->
-        let project, _ = accept_injection ctx origin injection in
+      | Ok condition_kind ->
+        let forward = accept_injection ctx origin injection in
+        let projected =
+          app (Subtype_injection.projection_name ~forward) [ target_term ]
+        in
+        let guard, introduced_bindings =
+          match condition_kind with
+          | Projection_match ->
+            let inner_result =
+              { inner_result with
+                introduced_bindings =
+                  projection_introductions
+                    callbacks inner_result inner source_term
+                    (callbacks.carrier_sort_of_typ inner.note)
+              }
+            in
+            let roundtrip =
+              direct_roundtrip
+                ~forward ~source:source_term ~target:target_term injection
+            in
+            roundtrip.guard,
+            attach_roundtrip inner_result inner roundtrip
+          | Projection_equality ->
+            make_projection_condition
+              condition_kind source_term projected,
+            inner_result.introduced_bindings
+        in
         return names
           { term = Some target_term
           ; guards =
               dedup_guards
                 (without_typechecks inner_result.guards
-                 @ [ make_condition (app project [ target_term ]) ])
-          ; introduced_bindings = inner_result.introduced_bindings
+                 @ [ guard ])
+          ; introduced_bindings
           ; diagnostics = inner_result.diagnostics
           }
       | Error diagnostic ->
@@ -208,7 +379,7 @@ let sequence_typ typ =
 
 let lower_iterated
     names ctx callbacks origin exp ~source_exp ~source_result ~source_term
-    ~source_typ ~target_typ =
+    ~source_typ ~target_typ ~iter =
   match subtype_plan ctx source_typ target_typ with
   | Ok Subtype_plan.Identity ->
     let source_guards, source_diagnostics =
@@ -249,14 +420,40 @@ let lower_iterated
          ~suggestion:
            "Keep this iterated SubE Unsupported unless projection needs only equality over existing bindings"
      with
-    | Ok make_condition ->
-      let _, project_seq = accept_injection ctx origin injection in
+    | Ok condition_kind ->
+      let forward = accept_injection ctx origin injection in
+      let projected =
+        app
+          (Subtype_injection.sequence_projection_name ~forward)
+          [ target_term ]
+      in
+      let guard, introduced_bindings =
+        match condition_kind with
+        | Projection_match ->
+          let source_result =
+            { source_result with
+              introduced_bindings =
+                projection_introductions
+                  callbacks source_result source_exp source_term
+                  (Some (sort "SpectecTerminals"))
+            }
+          in
+          let roundtrip =
+            iterated_roundtrip
+              ~forward ~iter ~source:source_term ~target:target_term injection
+          in
+          roundtrip.guard,
+          attach_roundtrip source_result source_exp roundtrip
+        | Projection_equality ->
+          make_projection_condition condition_kind source_term projected,
+          source_result.introduced_bindings
+      in
       return names { term = Some target_term
       ; guards =
           dedup_guards
             (without_typechecks source_result.guards
-             @ [ make_condition (app project_seq [ target_term ]) ])
-      ; introduced_bindings = source_result.introduced_bindings
+             @ [ guard ])
+      ; introduced_bindings
       ; diagnostics = source_result.diagnostics
       }
     | Error diagnostic ->

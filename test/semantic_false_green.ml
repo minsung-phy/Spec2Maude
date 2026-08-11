@@ -1570,18 +1570,36 @@ let test_transitive_support_materialization () =
   in
   let start = Var "START:SpectecTerminal" in
   let target_term = Var "TARGET:SpectecTerminal" in
-  let request =
+  let candidate call certifies_edge =
+    Runtime_truth_transitive_materializer.candidate ~call ~certifies_edge
+  in
+  let successors = App ("successors", [ current ]) in
+  let partial = App ("partial-successor", [ current ]) in
+  let sequence = App ("sequence-successors", [ current ]) in
+  let request mode =
     Runtime_truth_transitive_materializer.request
       ~worklist ~origin:(origin "transitive-support")
-      ~mode:Runtime_truth_worklist_indexed.Decide
-      ~candidates:[ App ("successors", [ current ]); Var "B" ]
-      ~certified_successors:[ App ("successors", [ current ]) ]
+      ~mode
+      ~candidates:
+        [ candidate successors false
+        ; candidate (Var "B") false
+        ; candidate partial false
+        ; candidate successors true
+        ; candidate sequence true
+        ]
       ~start ~target:target_term ~domain_true ~domain_false
       ~direct_true ~direct_false
       ~result_sort:(sort "Truth")
       ~proved:(Const "proved") ~refuted:(Const "refuted")
   in
-  let result = Runtime_truth_transitive_materializer.materialize request in
+  let result =
+    request Runtime_truth_worklist_indexed.Decide
+    |> Runtime_truth_transitive_materializer.materialize
+  in
+  let prove_result =
+    request Runtime_truth_worklist_indexed.Prove
+    |> Runtime_truth_transitive_materializer.materialize
+  in
   let private_worklist =
     List.exists (fun statement ->
       match statement.Maude_ir.node with
@@ -1624,11 +1642,10 @@ let test_transitive_support_materialization () =
       | Crl (None, _, _, _) | Rl _ | _ -> None)
     |> Option.get
   in
-  let exact_successor_membership expected conditions =
+  let exact_evidence expected conditions =
     List.exists (function
-      | EqCondition
-          (EqCond (App (_, [ candidate; Var _ ]), Const actual)) ->
-        candidate = witness
+      | EqCondition (EqCond (Var evidence, Const actual)) ->
+        String.starts_with ~prefix:"VALUE" evidence
         && String.equal expected actual
       | _ -> false)
       conditions
@@ -1644,6 +1661,88 @@ let test_transitive_support_materialization () =
     | App ("successors", [ term ]) -> term = current
     | App (_, terms) -> List.exists contains_dynamic_successors terms
     | Var _ | Const _ | Qid _ -> false
+  in
+  let count_term expected term =
+    let rec count = function
+      | App (_, terms) as term ->
+        (if term = expected then 1 else 0)
+        + List.fold_left (fun total term -> total + count term) 0 terms
+      | term -> if term = expected then 1 else 0
+    in
+    count term
+  in
+  let find_next_rhs statements =
+    statements |> List.find_map (fun statement ->
+      match statement.Maude_ir.node with
+      | Rl (Some label, _, rhs) when contains label "runtimetruthnext" -> Some rhs
+      | Rl (None, _, _) | Rl (Some _, _, _) | _ -> None)
+    |> Option.get
+  in
+  let next_rhs = find_next_rhs result.statements in
+  let prove_next_rhs = find_next_rhs prove_result.statements in
+  let unique_call_surface =
+    count_term successors next_rhs = 1
+    && count_term partial next_rhs = 1
+    && count_term sequence next_rhs = 1
+    && count_term successors prove_next_rhs = 1
+    && count_term partial prove_next_rhs = 1
+    && count_term sequence prove_next_rhs = 1
+  in
+  let rec candidate_evidence expected = function
+    | App (op, [ call; Const evidence; tail ])
+      when contains (String.lowercase_ascii op) "candidateprepend" ->
+      if call = expected then Some evidence else candidate_evidence expected tail
+    | App (_, terms) -> List.find_map (candidate_evidence expected) terms
+    | Var _ | Const _ | Qid _ -> None
+  in
+  let retained_evidence =
+    candidate_evidence successors next_rhs = Some "true"
+    && candidate_evidence partial next_rhs = Some "false"
+    && candidate_evidence sequence next_rhs = Some "true"
+    && candidate_evidence successors prove_next_rhs = Some "true"
+    && candidate_evidence partial prove_next_rhs = Some "false"
+    && candidate_evidence sequence prove_next_rhs = Some "true"
+  in
+  let prove_has_choice_surface =
+    List.exists (fun statement ->
+      match statement.Maude_ir.node with
+      | SortDecl declared ->
+        contains (String.lowercase_ascii (sort_name declared)) "choice"
+      | OpDecl declaration ->
+        contains (String.lowercase_ascii declaration.name) "choose"
+      | _ -> false)
+      prove_result.statements
+  in
+  let prove_uses_false_surface =
+    List.exists (fun statement ->
+      match statement.Maude_ir.node with
+      | Crl (_, _, _, conditions) ->
+        List.mem direct_false conditions
+        || List.exists (fun branch -> conditions = branch) domain_false
+      | _ -> false)
+      prove_result.statements
+  in
+  let candidate_equations =
+    result.statements |> List.filter_map (fun statement ->
+      match statement.Maude_ir.node with
+      | Eq (lhs, rhs, _) -> Some (lhs, rhs)
+      | _ -> None)
+  in
+  let supports_eps =
+    List.exists (fun (lhs, rhs) ->
+      match lhs with
+      | App (op, [ Const "eps"; Var _; tail ]) ->
+        contains (String.lowercase_ascii op) "candidateprepend" && rhs = tail
+      | _ -> false)
+      candidate_equations
+  in
+  let supports_sequences =
+    List.exists (fun (lhs, _) ->
+      match lhs with
+      | App (op, [ App ("_ _", _); Var _; Var _ ]) ->
+        contains (String.lowercase_ascii op) "candidateprepend"
+      | _ -> false)
+      candidate_equations
   in
   let recomputes_per_current =
     List.exists (fun statement ->
@@ -1675,25 +1774,33 @@ let test_transitive_support_materialization () =
     failwith "transitive worklist omitted the source-complete direct-edge refutation";
   if not (List.mem (List.hd domain_true) source_hit)
      || not (List.mem target source_hit)
-     || not (exact_successor_membership "true" source_hit)
+     || not (exact_evidence "true" source_hit)
   then failwith "source-certified target hit omitted its source domain premise";
-  if not (exact_successor_membership "false" direct_hit)
+  if not (exact_evidence "false" direct_hit)
      || not (List.mem (List.hd domain_true) direct_hit)
      || not (ordered target direct_true direct_hit)
   then failwith "ordinary target hit did not require exact successor absence";
   if not (List.mem (List.hd domain_true) source_enqueue) then
     failwith "source-certified intermediate successor skipped its domain guard";
   if not (List.mem (List.hd domain_true) target_no_edge)
-     || not (exact_successor_membership "false" target_no_edge)
+     || not (exact_evidence "false" target_no_edge)
      || not (ordered target direct_false target_no_edge)
   then failwith "target no-edge refutation omitted its source domain premise";
   if domain_miss <> List.hd domain_false then
     failwith "domain-false candidate skip depends on target or history shape";
   if not (List.mem (List.hd domain_true) no_edge)
-     || not (exact_successor_membership "false" no_edge)
+     || not (exact_evidence "false" no_edge)
   then failwith "intermediate no-edge refutation lacks exact false evidence";
   if not recomputes_per_current then
     failwith "transitive closure reused the initial successor set after dequeue";
+  if not unique_call_surface then
+    failwith "transitive expansion evaluated a duplicate producer descriptor";
+  if not retained_evidence then
+    failwith "transitive candidate deduplication lost certified-edge evidence";
+  if prove_has_choice_surface || prove_uses_false_surface then
+    failwith "positive transitive expansion retained an unused choice/false surface";
+  if not supports_eps || not supports_sequences then
+    failwith "evidence-carrying candidates lost eps or sequence producers";
   if not pushes_front then
     failwith "transitive closure reintroduced linear queue append"
 
@@ -1814,6 +1921,7 @@ let constructor_entry case_origin constructor_op status =
   ; constructor_op
   ; projection_ops = []
   ; payload_labels = []
+  ; payload_typs = []
   ; payload_witnesses = []
   ; payload_sorts = []
   ; origin = case_origin
@@ -1892,6 +2000,10 @@ let test_direct_successors_cover_transitive_decision () =
   | Materialized certificate ->
     if certificate.domain_candidates = [] then
       failwith "positive domain proof retained no certified candidate";
+    (match certificate.decision_basis with
+    | Some (Runtime_truth_successor_domain.Successor_complete _) -> ()
+    | Some (Runtime_truth_successor_domain.Domain_complete _) | None ->
+      failwith "complete direct-successor rules did not take precedence over domain enumeration");
     if not (Runtime_truth_successor_domain.decision_complete certificate) then
       failwith "complete direct-successor rules did not certify transitive decision"
 
@@ -1905,6 +2017,7 @@ let unary_case_entry
   ; constructor_op
   ; projection_ops = [ projection_op ]
   ; payload_labels = [ Constructor_registry.Structural_payload ]
+  ; payload_typs = []
   ; payload_witnesses = [ Const "renamed-payload-witness" ]
   ; payload_sorts = [ payload_sort ]
   ; origin = origin (category ^ "-case")
@@ -1979,6 +2092,36 @@ let test_exact_case_constructor_domains () =
   | Error _ -> failwith "guarded constructor lost its exact domain blocker"
   | Ok _ -> failwith "guarded constructor was certified total from its payload alone"
 
+let test_instance_guard_blocks_total_constructor () =
+  let category_id = id "renamed_guarded_family" in
+  let binder = ExpP (id "renamed_static_index", nat_typ) $ region in
+  let tag =
+    Xl.Atom.Atom "GUARDED" $$ region % Xl.Atom.info "regression"
+  in
+  let constructor = Xl.Mixop.Seq [ Xl.Mixop.Atom tag; Xl.Mixop.Arg () ] in
+  let body = VariantT [ constructor, (nat_typ, [], []), [] ] $ region in
+  let instance = InstD ([ binder ], [], body) $ region in
+  let definition = TypD (category_id, [], [ instance ]) $ region in
+  let index = Analysis.Source_index.of_script [ definition ] in
+  let ctx = Context.create index (Builtin_registry.of_source_index index) in
+  ignore (Def_translate.translate_script ctx [ definition ]);
+  let entry =
+    Context.constructors ctx
+    |> Constructor_registry.entries
+    |> List.find_opt (fun entry ->
+         entry.Constructor_registry.source_category
+         = Naming.source_owner category_id.it)
+  in
+  match entry with
+  | Some
+      { Constructor_registry.construction_domain =
+          Guarded_constructor _
+      ; _
+      } -> ()
+  | Some _ ->
+    failwith "InstD value guard was incorrectly certified as a total constructor"
+  | None -> failwith "guarded InstD constructor was not registered"
+
 let length_guarded_entry category =
   { Constructor_registry.source_category = Naming.source_owner category
   ; declaring_category = Naming.source_owner category
@@ -1988,6 +2131,7 @@ let length_guarded_entry category =
   ; constructor_op = "length.guard.wrap_"
   ; projection_ops = [ "length.guard.project_" ]
   ; payload_labels = [ Constructor_registry.Structural_payload ]
+  ; payload_typs = []
   ; payload_witnesses = [ Const "renamed-sequence-witness" ]
   ; payload_sorts = [ sort "SpectecTerminals" ]
   ; origin = origin (category ^ "-length-guard")
@@ -2384,6 +2528,54 @@ let test_recursive_rule_condition_progress_order () =
     <> [ recursive; normalized_binding ]
   then failwith "binding equality was promoted before a self-recursive RewriteCond"
 
+let test_source_decision_schedule () =
+  let lhs = App ("sourceDecision", [ Var "INPUT" ]) in
+  let domain_guard =
+    EqCondition
+      (BoolCond (App ("typecheck", [ Var "INPUT"; Const "syn.input" ])))
+  in
+  let domain_match =
+    EqCondition (MatchCond (Var "WITNESS", App ("project", [ Var "INPUT" ])))
+  in
+  let decision =
+    EqCondition (BoolCond (App ("sourceCheck", [ Var "INPUT" ])))
+  in
+  let normalize ?(source_decisions = []) ?(domain_guards = []) conditions =
+    Condition_closure.normalize_rule_conditions
+      ~source_decisions ~domain_guards [ lhs ] conditions
+  in
+  if
+    normalize
+      ~source_decisions:[ decision ]
+      ~domain_guards:[ domain_guard; domain_match ]
+      [ domain_guard; domain_match; decision ]
+    <> [ decision; domain_guard; domain_match ]
+  then failwith "certified source decision did not cross generated domain guards";
+  if
+    normalize
+      ~domain_guards:[ domain_guard ]
+      [ domain_guard; decision ]
+    <> [ domain_guard; decision ]
+  then failwith "uncertified source decision was reordered";
+  let barrier = RewriteCond (App ("observe", [ Var "INPUT" ]), Var "RESULT") in
+  if
+    normalize
+      ~source_decisions:[ decision ]
+      ~domain_guards:[ domain_guard ]
+      [ domain_guard; barrier; decision ]
+    <> [ domain_guard; barrier; decision ]
+  then failwith "source decision crossed a non-domain condition";
+  let binding_decision =
+    EqCondition (MatchCond (Var "BOUND", Var "INPUT"))
+  in
+  if
+    normalize
+      ~source_decisions:[ binding_decision ]
+      ~domain_guards:[ domain_guard ]
+      [ domain_guard; binding_decision ]
+    <> [ domain_guard; binding_decision ]
+  then failwith "binding source condition was treated as a decision"
+
 let test_zip_binding_traversal () =
   let source : Helper_request.iter_zip_source =
     { source_shape =
@@ -2634,6 +2826,29 @@ let test_missing_condition_certificates_blocked () =
   expect_missing_certificate_blocked
     "literal MatchCond" (MatchCond (Const "0", Var "X"))
 
+let test_prelude_true_condition_discharge () =
+  let keep = BoolCond (App ("keep", [ Var "X" ])) in
+  let tautologies =
+    [ BoolCond (App ("isOpt", [ Const "eps" ]))
+    ; BoolCond
+        (App ("typecheckSeq", [ Const "eps"; Const "syn.null" ]))
+    ; BoolCond (App ("allLen", [ Const "eps"; Var "X" ]))
+    ]
+  in
+  let binding_conditions =
+    Condition_closure.normalize_binding_conditions
+      [ Var "X" ] (tautologies @ [ keep ])
+  in
+  if binding_conditions <> [ keep ] then
+    failwith "binding closure retained an exact true prelude guard";
+  let rule_conditions =
+    Condition_closure.normalize_rule_conditions
+      [ Var "X" ]
+      (List.map (fun condition -> EqCondition condition) (tautologies @ [ keep ]))
+  in
+  if rule_conditions <> [ EqCondition keep ] then
+    failwith "rule closure retained an exact true prelude guard"
+
 let test_head_domain_factoring () =
   let registry = Constructor_registry.create () in
   let index = Analysis.Source_index.of_script [] in
@@ -2685,8 +2900,7 @@ let test_head_domain_factoring () =
   (match complete with
   | Complete { alternatives = [ alternative ]; _ } ->
     let required_prefix =
-      [ EqCondition (BoolCond (App ("typecheckHead", [ Var "X" ])))
-      ; EqCondition
+      [ EqCondition
           (MatchCond (Var "OUTPUT", App ("totalView", [ Var "X" ])))
       ; EqCondition
           (BoolCond (App ("typecheckPayload", [ Var "OUTPUT" ])))
@@ -2707,6 +2921,92 @@ let test_head_domain_factoring () =
   | Blocked reasons ->
     failwith
       ("structurally certified head-domain factoring was blocked: "
+       ^ String.concat "; " reasons));
+  let repeated_source =
+    [ MatchCond (Var "OUTPUT", App ("totalView", [ Var "P" ]))
+    ; BoolCond (App ("typecheckPayload", [ Var "OUTPUT" ]))
+    ]
+  in
+  (match
+     Reld_enabledness_direct_complement.direct_complement_alternatives
+       registry
+       ~origin:(origin "source-prefix-factoring")
+       ~helper_name:"SourcePrefix"
+       ~current_head_conditions:
+         [ MatchCond (Var "OUTPUT", App ("totalView", [ Var "X" ]))
+         ; BoolCond (App ("typecheckPayload", [ Var "OUTPUT" ]))
+         ]
+       ~predecessor_head_conditions:[]
+       ~condition_blocks:
+         [ Source_conditions (repeated_source @ source) ]
+       ~head_domain_failures:[]
+       ~condition_certificates:[ certificate ]
+       ~condition_failures:[]
+       [ Var "X" ] [ Var "P" ] (repeated_source @ source)
+   with
+  | Complete { alternatives = [ alternative ]; _ } ->
+    if
+      List.exists
+        (function
+          | EqCondition condition ->
+            List.mem condition
+              [ MatchCond (Var "OUTPUT", App ("totalView", [ Var "X" ]))
+              ; BoolCond (App ("typecheckPayload", [ Var "OUTPUT" ]))
+              ]
+          | RewriteCond _ -> false)
+        alternative
+    then
+      failwith "caller-proven source prefix remained in enabledness helper"
+  | Complete _ -> failwith "source-prefix factoring changed branch count"
+  | Blocked reasons ->
+    failwith
+      ("source-prefix factoring was blocked: " ^ String.concat "; " reasons));
+  let escaping_head =
+    [ MatchCond (Var "WITNESS", App ("headView", [ Var "P" ]))
+    ; BoolCond (App ("headOk", [ Var "P" ]))
+    ]
+  in
+  let escaping_domain =
+    [ BoolCond (App ("witnessOk", [ Var "WITNESS" ])) ]
+  in
+  (match
+     Reld_enabledness_direct_complement.direct_complement_alternatives
+       registry
+       ~origin:(origin "head-witness-escape")
+       ~helper_name:"HeadWitnessEscape"
+       ~current_head_conditions:
+         [ MatchCond (Var "WITNESS", App ("headView", [ Var "X" ]))
+         ; BoolCond (App ("headOk", [ Var "X" ]))
+         ]
+       ~predecessor_head_conditions:escaping_head
+       ~condition_blocks:
+         [ Head_domain_conditions escaping_domain; Source_conditions source ]
+       ~head_domain_failures:[]
+       ~condition_certificates:[ certificate ]
+       ~condition_failures:[]
+       [ Var "X" ] [ Var "P" ] (escaping_domain @ source)
+   with
+  | Complete { alternatives = [ alternative ]; _ } ->
+    let required_prefix =
+      [ EqCondition
+          (MatchCond (Var "WITNESS", App ("headView", [ Var "X" ])))
+      ; EqCondition (BoolCond (App ("headOk", [ Var "X" ])))
+      ; EqCondition (BoolCond (App ("witnessOk", [ Var "WITNESS" ])))
+      ]
+    in
+    let rec has_prefix prefix values =
+      match prefix, values with
+      | [], _ -> true
+      | expected :: prefix, actual :: values when expected = actual ->
+        has_prefix prefix values
+      | _ -> false
+    in
+    if not (has_prefix required_prefix alternative) then
+      failwith "escaping repeated head witness was removed"
+  | Complete _ -> failwith "escaping head witness changed branch count"
+  | Blocked reasons ->
+    failwith
+      ("escaping head witness complement was blocked: "
        ^ String.concat "; " reasons));
   match
     Reld_enabledness_direct_complement.direct_complement_alternatives
@@ -3881,6 +4181,7 @@ let test_context_stage_isolates_constructor_registry () =
     ; constructor_op = "stagedPattern"
     ; projection_ops = []
     ; payload_labels = [ Constructor_registry.Structural_payload ]
+    ; payload_typs = []
     ; payload_witnesses = [ Var "X" ]
     ; payload_sorts = [ sort "Nat" ]
     ; origin = origin "staged-pattern"
@@ -4558,6 +4859,7 @@ let test_structural_match_pattern_certificate () =
     ; constructor_op = "renamedUnknownPattern"
     ; projection_ops = []
     ; payload_labels = [ Constructor_registry.Structural_payload ]
+    ; payload_typs = []
     ; payload_witnesses = [ Var "X" ]
     ; payload_sorts = [ sort "Nat" ]
     ; origin = origin "pattern-certificate"
@@ -5434,11 +5736,13 @@ let () =
   test_list_rule_traversal ();
   test_zip_rule_order_and_frozen ();
   test_recursive_rule_condition_progress_order ();
+  test_source_decision_schedule ();
   test_zip_binding_traversal ();
   test_builtin_dependency_readiness ();
   test_runtime_ingress_validation ();
   test_head_guard_refutation ();
   test_missing_condition_certificates_blocked ();
+  test_prelude_true_condition_discharge ();
   test_head_domain_factoring ();
   test_source_ifpr_total_observers ();
   test_incomplete_sequential_complement_rejected ();
@@ -5459,6 +5763,7 @@ let () =
   test_partial_numeric_operators_cannot_refute_equality ();
   test_partial_destructor_domains_blocked ();
   test_exact_case_constructor_domains ();
+  test_instance_guard_blocks_total_constructor ();
   test_length_guarded_case_map_totality ();
   test_ambiguous_case_map_cardinality_blocked ();
   test_failed_proof_keeps_origin_and_lhs_scope ();

@@ -4,6 +4,11 @@
  (libraries translator il util xl))
 
 (test
+ (name reld_result_regression)
+ (modules reld_result_regression)
+ (libraries translator))
+
+(test
  (name rewrite_decd_regression)
  (modules rewrite_decd_regression)
  (libraries translator il util xl))
@@ -21,6 +26,11 @@
 (test
  (name record_semantics_regression)
  (modules record_semantics_regression)
+ (libraries translator il util xl))
+
+(test
+ (name sequence_carrier_regression)
+ (modules sequence_carrier_regression)
  (libraries translator il util xl))
 
 (test
@@ -388,9 +398,42 @@
 
 (rule
  (alias runtest)
- (deps execution_membership_generated.sh ../output.maude)
+ (deps
+  execution_membership_generated.sh
+  ../builtins.maude
+  ../config/wasm-3.0-runtime-ingress.contract
+  (glob_files ../wasm-3.0/*.spectec))
  (action
-  (run sh %{dep:execution_membership_generated.sh} %{dep:../output.maude})))
+  (run sh %{dep:execution_membership_generated.sh}
+    %{exe:../bin/spec2maude.exe} %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps
+  execution_context_generated.sh
+  ../builtins.maude
+  ../config/wasm-3.0-runtime-ingress.contract
+  (glob_files ../wasm-3.0/*.spectec))
+ (action
+  (run sh %{dep:execution_context_generated.sh}
+    %{exe:../bin/spec2maude.exe} %{workspace_root})))
+
+(rule
+ (alias runtest)
+ (deps sequence_carrier_generated.sh ../output.maude)
+ (action
+  (run sh %{dep:sequence_carrier_generated.sh} %{dep:../output.maude})))
+
+(rule
+ (alias runtest)
+ (deps
+  subtype_roundtrip_generated.sh
+  ../builtins.maude
+  ../config/wasm-3.0-runtime-ingress.contract
+  (glob_files ../wasm-3.0/*.spectec))
+ (action
+  (run sh %{dep:subtype_roundtrip_generated.sh}
+    %{exe:../bin/spec2maude.exe} %{workspace_root})))
 
 (rule
  (alias runtest)

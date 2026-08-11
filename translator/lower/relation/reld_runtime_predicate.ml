@@ -55,7 +55,9 @@ let translate_rule
           ; diagnostics = hint_diags @ bind_diags @ arity_diags @ lhs_diags
           }
         | Some lhs_terms ->
-          let env = add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings in
+          let env =
+            add_safe_introduced_bindings env lhs_terms lhs_guards lhs_bindings
+          in
           let premise_translation, _names =
             Premise_translate.translate_premises_named
               names

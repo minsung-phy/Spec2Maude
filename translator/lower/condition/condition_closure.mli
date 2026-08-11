@@ -25,6 +25,8 @@ val normalize_binding_conditions :
   Maude_ir.term list -> Maude_ir.eq_condition list -> Maude_ir.eq_condition list
 val normalize_rule_conditions :
   ?constructor_op:Condition_pattern_certificate.t ->
+  ?source_decisions:Maude_ir.rule_condition list ->
+  ?domain_guards:Maude_ir.rule_condition list ->
   Maude_ir.term list ->
   Maude_ir.rule_condition list ->
   Maude_ir.rule_condition list

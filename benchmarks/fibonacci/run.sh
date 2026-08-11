@@ -3,10 +3,22 @@ set -eu
 
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 tmp=${TMPDIR:-/tmp}
+modelcheck="$tmp/spec2maude-fibonacci-modelcheck.maude"
+wasm="$tmp/spec2maude-fibonacci.wasm"
 maude_log="$tmp/spec2maude-fibonacci-modelcheck.log"
 cd "$root"
 
-maude -no-banner builtins.maude benchmarks/fibonacci/modelcheck.maude 2>&1 \
+wat2wasm benchmarks/fibonacci/fib.wat -o "$wasm"
+
+dune exec ./bin/wasm2maude.exe -- modelcheck \
+  "$wasm" \
+  --invoke fib \
+  --arg i32:5 --arg i32:0 --arg i32:1 \
+  --expect i32:5 --reject i32:6 \
+  --semantics "$root/builtins.maude" \
+  -o "$modelcheck"
+
+maude -no-banner "$modelcheck" 2>&1 \
   | tee "$maude_log"
 
 grep -q 'Solution 1' "$maude_log"
@@ -19,4 +31,4 @@ if grep -Eq '^(Warning|Advisory|Error):' "$maude_log"; then
   exit 1
 fi
 
-echo "Fibonacci rewrite, search, and LTL checks passed."
+echo "Compiled-WAT Fibonacci rewrite, search, and LTL checks passed."

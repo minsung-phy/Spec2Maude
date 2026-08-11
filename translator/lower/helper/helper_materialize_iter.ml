@@ -204,31 +204,39 @@ let materialize_iter_listn_repeat entry (map : Request.iter_listn) =
       ~lowered_body:map.lowered_body
       ~body_eq_conditions:map.body_eq_conditions
   in
-  let threshold = Const "compactRepeatThreshold" in
-  let linear_conditions =
-    BoolCond (app "_<_" [ succ count; threshold ]) :: result_conditions
-  in
-  let compact_conditions =
-    BoolCond (app "_>=_" [ succ count; threshold ]) :: result_conditions
-  in
   let statement node = generated name origin node in
+  let equations =
+    match map.output_representation with
+    | Sequence_representation.Ordinary ->
+      let threshold = Const "compactRepeatThreshold" in
+      [ statement
+          (ceq
+             (helper_on (succ count))
+             (concat out (helper_on count))
+             (BoolCond (app "_<_" [ succ count; threshold ])
+              :: result_conditions))
+      ; statement
+          (ceq
+             (helper_on (succ count))
+             (app "repeatSeq" [ succ count; out ])
+             (BoolCond (app "_>=_" [ succ count; threshold ])
+              :: result_conditions))
+      ]
+    | Sequence_representation.Canonical_runs ->
+      [ statement
+          (ceq
+             (helper_on (succ count))
+             (app "canonicalRun" [ succ count; out ])
+             result_conditions)
+      ]
+  in
   [ statement (op name (sort_ref nat :: capture_sorts) spectec_terminals) ]
   @ variable_declarations statement
       ([ map.count_var, sort_ref nat
        ; map.body_result_var, sort_ref (output_item_sort map.output_item_shape)
        ] @ capture_variables map.captures)
-  @ [ statement (ceq (helper_on (Const "0")) (Const "eps") [])
-    ; statement
-        (ceq
-           (helper_on (succ count))
-           (concat out (helper_on count))
-           linear_conditions)
-    ; statement
-        (ceq
-           (helper_on (succ count))
-           (app "repeatSeq" [ succ count; out ])
-           compact_conditions)
-    ]
+  @ [ statement (ceq (helper_on (Const "0")) (Const "eps") []) ]
+  @ equations
 
 let materialize_iter_listn_indexed entry (map : Request.iter_listn) =
   match map.index_var with

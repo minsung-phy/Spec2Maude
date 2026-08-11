@@ -4,6 +4,7 @@ val register_constructor :
   ?status:Constructor_registry.status ->
   ?construction_domain:Constructor_registry.construction_domain ->
   ?payload_labels:Constructor_registry.payload_label list ->
+  ?payload_typs:Il.Ast.typ list ->
   ?payload_witnesses:Maude_ir.term list ->
   ?payload_sorts:Maude_ir.sort list ->
   ?static_args_key:string ->

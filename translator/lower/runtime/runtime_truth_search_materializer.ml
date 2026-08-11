@@ -67,8 +67,8 @@ let rule_origin parent index (rule : Analysis.Function_graph.runtime_search_rule
     rule.origin.region
     rule.source_echo
 
-let add_binding env (id, (binding : Expr_env.binding)) =
-  Expr_env.add env id binding
+let add_binding env (binding : Expr_env.introduced_binding) =
+  Expr_env.add_introduced env binding
 
 let typ_is_iter = Type_shape.typ_is_iter
 

@@ -7,6 +7,7 @@ type callbacks =
   }
 
 val lower_iter :
+  ?output_representation:Sequence_representation.t ->
   callbacks ->
   Context.t ->
   Expr_env.t ->

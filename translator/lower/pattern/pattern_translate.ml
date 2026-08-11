@@ -21,16 +21,42 @@ type binding = Pattern_subtyping.binding =
   ; typ : typ
   }
 
+type introduced_binding = Pattern_subtyping.introduced_binding =
+  { id : string
+  ; binding : binding
+  ; subtype_roundtrip : Pattern_subtyping.subtype_roundtrip option
+  }
+
 type result = Pattern_subtyping.result =
   { term : term option
   ; guards : eq_condition list
-  ; introduced_bindings : (string * binding) list
+  ; introduced_bindings : introduced_binding list
   ; diagnostics : Diagnostics.t list
+  }
+
+type constructor_case =
+  { operator : string
+  ; payload_certificate : Typcase_constructor.payload_certificate option
+  }
+
+type guard_policy =
+  | Full
+  | Whole_constructor
+  | Validated_ingress
+
+type guard_parts =
+  { sort : sort
+  ; witness : term
+  ; witness_guards : eq_condition list
+  ; typecheck_guards : eq_condition list
   }
 
 type callbacks =
   { find_var : string -> binding option
   ; bound_vars : string list
+  ; guard_policy : guard_policy
+  ; typed_subject : bool
+  ; typed_payload : bool
   ; lower_guard_value : Origin.t -> exp -> result
   ; carrier_sort_of_typ : typ -> sort option
   ; is_nat_typ : typ -> bool
@@ -40,7 +66,7 @@ type callbacks =
       typ ->
       term option * eq_condition list * Diagnostics.t list
   ; case_constructor :
-      Origin.t -> exp -> mixop -> int -> string option * Diagnostics.t list
+      Origin.t -> exp -> mixop -> int -> constructor_case option * Diagnostics.t list
   }
 
 let empty_result = { term = None; guards = []; introduced_bindings = []; diagnostics = [] }
@@ -169,6 +195,9 @@ let dedup_guards guards =
   in
   loop [] [] guards
 
+let remove_guards guards removed =
+  List.filter (fun guard -> not (List.mem guard removed)) guards
+
 let is_sequence_sort sort =
   sort_name sort = sort_name spectec_terminals
 
@@ -270,7 +299,7 @@ let typed_pattern_var names id sort =
   else
     Local_name.source_qualified names id.it (sort_ref sort), names
 
-let guard_for_typ ctx callbacks origin constructor exp term typ =
+let guard_parts_for_typ ctx callbacks origin constructor exp term typ =
   match callbacks.carrier_sort_of_typ typ with
   | None ->
     None,
@@ -290,7 +319,11 @@ let guard_for_typ ctx callbacks origin constructor exp term typ =
     (match witness_opt with
     | Some witness ->
       Some
-        (witness_guards @ Typecheck_guard.for_typ ctx typ sort term witness),
+        { sort
+        ; witness
+        ; witness_guards
+        ; typecheck_guards = Typecheck_guard.for_typ ctx typ sort term witness
+        },
       witness_diagnostics
     | None ->
       None,
@@ -305,8 +338,26 @@ let guard_for_typ ctx callbacks origin constructor exp term typ =
             ()
         ])
 
-let guard_for_lowered_pattern ctx callbacks origin constructor exp term =
-  guard_for_typ ctx callbacks origin constructor exp term exp.note
+let guard_for_typ ctx callbacks origin constructor exp term typ =
+  let parts_opt, diagnostics =
+    guard_parts_for_typ ctx callbacks origin constructor exp term typ
+  in
+  Option.map
+    (fun parts -> parts.witness_guards @ parts.typecheck_guards)
+    parts_opt,
+  diagnostics
+
+let guard_parts_for_lowered_pattern ctx callbacks origin constructor exp term =
+  let parts_opt, diagnostics =
+    guard_parts_for_typ ctx callbacks origin constructor exp term exp.note
+  in
+  let parts_opt =
+    if callbacks.typed_payload then
+      Option.map (fun parts -> { parts with typecheck_guards = [] }) parts_opt
+    else
+      parts_opt
+  in
+  parts_opt, diagnostics
 
 let lower_bound_or_fresh_var names ctx callbacks origin exp id =
   match callbacks.find_var id.it with
@@ -320,7 +371,11 @@ let lower_bound_or_fresh_var names ctx callbacks origin exp id =
     | Some sort ->
       let term, names = typed_pattern_var names id sort in
       let introduced_bindings =
-        if id.it = "_" then [] else [ id.it, { term; sort; typ = exp.note } ]
+        if id.it = "_" then []
+        else
+          [ Pattern_subtyping.introduce
+              id.it { term; sort; typ = exp.note }
+          ]
       in
       { (with_term term) with introduced_bindings }, names)
 
@@ -507,13 +562,35 @@ and lower_case names ctx callbacks origin exp mixop arg_exp =
     | _ -> [ arg_exp ]
   in
   let indexed_args = List.mapi (fun index arg -> index, arg) arg_exps in
+  let constructor_opt, constructor_diagnostics =
+    callbacks.case_constructor origin exp mixop (List.length arg_exps)
+  in
+  let source_payloads_certified =
+    match constructor_opt with
+    | Some { operator; payload_certificate = Some certificate } ->
+      Typcase_constructor.certifies certificate
+        ~constructor_op:operator ~arity:(List.length arg_exps)
+      && Typcase_constructor.certifies_payload_typs
+           certificate (List.map (fun arg -> arg.note) arg_exps)
+    | Some { payload_certificate = None; _ } | None -> false
+  in
+  let arg_callbacks =
+    if callbacks.typed_payload
+       || (callbacks.typed_subject
+           && callbacks.guard_policy = Whole_constructor
+           && source_payloads_certified)
+    then
+      { callbacks with typed_subject = false; typed_payload = true }
+    else
+      callbacks
+  in
   let arg_items, names =
     lower_list_with_names
       (fun names (index, arg) ->
       let arg_origin =
         child_origin origin (Printf.sprintf "case-arg[%d]" index) arg
       in
-      let result, names = lower_internal names ctx callbacks arg_origin arg in
+      let result, names = lower_internal names ctx arg_callbacks arg_origin arg in
       (arg, arg_origin, result), names)
       names indexed_args
   in
@@ -525,35 +602,85 @@ and lower_case names ctx callbacks origin exp mixop arg_exp =
       List.map2
         (fun (arg, arg_origin, _) term ->
           let guard_opt, guard_diagnostics =
-            guard_for_lowered_pattern
+            guard_parts_for_lowered_pattern
               ctx callbacks arg_origin "Pattern/CaseE/arg" arg term
           in
           guard_opt, guard_diagnostics)
         arg_items terms
     in
-    let arg_guards =
-      guarded_args
-      |> List.filter_map fst
-      |> List.concat
-    in
     let arg_guard_diagnostics =
       guarded_args |> List.map snd |> List.concat
     in
-    let constructor_opt, constructor_diagnostics =
-      callbacks.case_constructor origin exp mixop (List.length arg_results)
-    in
     match constructor_opt with
-    | Some constructor ->
+    | Some constructor_case ->
       if List.for_all (fun (guard_opt, _) -> Option.is_some guard_opt) guarded_args then
-        let constructor_term = app constructor terms in
+        let payload_certified =
+          match constructor_case.payload_certificate with
+          | Some certificate ->
+            Typcase_constructor.certifies certificate
+              ~constructor_op:constructor_case.operator
+              ~arity:(List.length terms)
+          | None -> false
+        in
+        let payloads_match =
+          match constructor_case.payload_certificate with
+          | Some certificate ->
+            Typcase_constructor.certifies_payloads
+              certificate
+              ~typs:(List.map (fun arg -> arg.note) arg_exps)
+              ~sorts:
+                (guarded_args
+                 |> List.filter_map fst
+                 |> List.map (fun guards -> guards.sort))
+              ~witnesses:
+                (guarded_args
+                 |> List.filter_map fst
+                 |> List.map (fun guards -> guards.witness))
+          | None -> false
+        in
+        let payloads_certified = payload_certified && payloads_match in
+        let payload_typecheck_guards =
+          guarded_args
+          |> List.filter_map fst
+          |> List.concat_map (fun guards -> guards.typecheck_guards)
+        in
+        let guards =
+          match callbacks.guard_policy with
+          | Whole_constructor when payloads_certified ->
+            remove_guards guards payload_typecheck_guards
+          | Full | Whole_constructor | Validated_ingress -> guards
+        in
+        let arg_guards =
+          guarded_args
+          |> List.filter_map fst
+          |> List.concat_map (fun guards ->
+            guards.witness_guards
+            @ (match callbacks.guard_policy with
+              | Whole_constructor | Validated_ingress when payloads_certified -> []
+              | Full | Whole_constructor | Validated_ingress ->
+                guards.typecheck_guards))
+        in
+        let constructor_term = app constructor_case.operator terms in
         let whole_guard_opt, whole_guard_diagnostics =
-          guard_for_lowered_pattern
+          guard_parts_for_lowered_pattern
             ctx callbacks origin "Pattern/CaseE/category" exp constructor_term
         in
         (match whole_guard_opt with
         | Some whole_guards ->
+          let category_guards =
+            whole_guards.witness_guards
+            @ (match callbacks.guard_policy with
+              | Whole_constructor when callbacks.typed_subject ->
+                (* The producer certificate establishes the subject's exact IL
+                   type.  Once this constructor matches that subject, checking
+                   the same whole constructor again adds no domain condition. *)
+                []
+              | Validated_ingress when payload_certified -> []
+              | Full | Whole_constructor | Validated_ingress ->
+                whole_guards.typecheck_guards)
+          in
           ( { term = Some constructor_term
-            ; guards = guards @ arg_guards @ whole_guards
+            ; guards = guards @ arg_guards @ category_guards
             ; introduced_bindings
             ; diagnostics =
                 diagnostics @ arg_guard_diagnostics @ whole_guard_diagnostics
@@ -941,10 +1068,10 @@ and lower_iter names ctx callbacks origin exp body (iter, generators) =
   | ListN (n_exp, _), [ generator_id, source_exp ], VarE body_id
     when body_id.it = generator_id.it ->
     lower_flat_identity_listn names ctx callbacks origin source_exp n_exp
-  | ListN (n_exp, _), [ generator_id, source_exp ], _
+  | (ListN (n_exp, _) as iter), [ generator_id, source_exp ], _
     when is_source_preserving_iter_body generator_id.it body ->
     lower_flat_listn_with_target_guard
-      names ctx callbacks origin exp generator_id.it body source_exp n_exp
+      names ctx callbacks origin exp generator_id.it body iter source_exp n_exp
   | List, generators, CaseE _ when generators <> [] ->
     lower_constructor_zip_iter_pattern names ctx callbacks origin exp body iter generators None
   | ListN (n_exp, None), generators, CaseE _ when generators <> [] ->
@@ -976,10 +1103,10 @@ and lower_iter names ctx callbacks origin exp body (iter, generators) =
 and binding_for_generator ctx origin exp body_result generator_id =
   let matching =
     body_result.introduced_bindings
-    |> List.filter (fun (id, _) -> id = generator_id.it)
+    |> List.filter (fun introduced -> introduced.id = generator_id.it)
   in
   match matching with
-  | [ _, binding ] -> Ok binding
+  | [ introduced ] -> Ok introduced.binding
   | [] ->
     Error
       (unsupported
@@ -1071,18 +1198,21 @@ and lower_constructor_zip_iter_pattern
     in
     let extra_body_bindings =
       body_result.introduced_bindings
-      |> List.filter (fun (id, _) ->
-        not (List.exists (fun (generator_id, _) -> generator_id.it = id) generators))
+      |> List.filter (fun introduced ->
+        not
+          (List.exists
+             (fun (generator_id, _) -> generator_id.it = introduced.id)
+             generators))
     in
     let extra_body_diagnostics =
       extra_body_bindings
-      |> List.map (fun (id, _) ->
+      |> List.map (fun introduced ->
         unsupported
           ~ctx ~origin:body_origin ~constructor:"Pattern/IterE"
           ~source_echo:(source_echo_exp body)
           ~reason:
             ("constructor iteration body introduces non-generator binding `"
-             ^ id
+             ^ introduced.id
              ^ "`; branch-local element bindings cannot escape the pattern helper")
           ~suggestion:
             "Keep this IterE Unsupported until the helper explicitly models local-only pattern bindings"
@@ -1305,7 +1435,7 @@ and source_preserving_body_guards ctx callbacks origin exp term generator_id bod
        ([], [])
 
 and lower_source_preserving_sequence
-    names ctx callbacks origin exp generator_id body source_exp source_result =
+    names ctx callbacks origin exp generator_id body iter source_exp source_result =
   match source_result.term, body.it with
   | Some source_term,
     SubE ({ it = VarE id; _ }, source_typ, target_typ)
@@ -1321,7 +1451,7 @@ and lower_source_preserving_sequence
             guard_for_typ ctx callbacks origin constructor exp term typ)
       }
       origin exp ~source_exp ~source_result ~source_term
-      ~source_typ ~target_typ
+      ~source_typ ~target_typ ~iter
   | Some _, _
     when source_preserving_body_types generator_id body <> [] ->
     ( { source_result with
@@ -1369,7 +1499,7 @@ and lower_sequence_with_target_guard names ctx callbacks origin exp generator_id
     lower_sequence names ctx callbacks (child_origin origin "iter-source" source_exp) source_exp
   in
   lower_source_preserving_sequence
-    names ctx callbacks origin exp generator_id body source_exp source_result
+    names ctx callbacks origin exp generator_id body List source_exp source_result
 
 and lower_nonempty_sequence names ctx callbacks origin source_exp =
   let result, names =
@@ -1386,8 +1516,12 @@ and lower_nonempty_sequence names ctx callbacks origin source_exp =
 and lower_nonempty_sequence_with_target_guard
     names ctx callbacks origin exp generator_id body source_exp =
   let result, names =
-    lower_sequence_with_target_guard
-      names ctx callbacks origin exp generator_id body source_exp
+    let source_result, names =
+      lower_sequence names ctx callbacks
+        (child_origin origin "iter-source" source_exp) source_exp
+    in
+    lower_source_preserving_sequence
+      names ctx callbacks origin exp generator_id body List1 source_exp source_result
   in
   match result.term with
   | Some term ->
@@ -1475,10 +1609,10 @@ and lower_flat_identity_listn names ctx callbacks origin source_exp n_exp =
     , names )
 
 and lower_flat_listn_with_target_guard
-    names ctx callbacks origin exp generator_id body source_exp n_exp =
+    names ctx callbacks origin exp generator_id body iter source_exp n_exp =
   let result, names = lower_flat_identity_listn names ctx callbacks origin source_exp n_exp in
   lower_source_preserving_sequence
-    names ctx callbacks origin exp generator_id body source_exp result
+    names ctx callbacks origin exp generator_id body iter source_exp result
 
 and lower_nested_outer_identity_listn names ctx callbacks origin exp outer_id source_exp body =
   match listn_body_over_outer outer_id body with

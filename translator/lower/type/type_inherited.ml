@@ -157,9 +157,9 @@ let group_inherited_category_cases inherited =
              groups
          with
          | [], rest -> [ item ] :: rest
-         | group :: same, rest -> (group @ [ item ]) :: (same @ rest))
+         | group :: same, rest -> (item :: group) :: (same @ rest))
        []
-  |> List.rev
+  |> List.rev_map List.rev
 
 let inherited_group_is_complete group =
   match group with

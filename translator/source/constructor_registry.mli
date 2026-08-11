@@ -27,6 +27,7 @@ type entry =
   ; constructor_op : string
   ; projection_ops : string list
   ; payload_labels : payload_label list
+  ; payload_typs : Il.Ast.typ list
   ; payload_witnesses : Maude_ir.term list
   ; payload_sorts : Maude_ir.sort list
   ; origin : Origin.t
@@ -70,6 +71,7 @@ val copy : t -> t
 val replace : target:t -> source:t -> unit
 val register : t -> entry -> unit
 val register_checked : t -> entry -> registration
+val uniform_payload_schema : t -> entry -> bool
 val resolve_surfaces : t -> unit
 val register_inclusion : t -> inclusion -> unit
 val note_source_case :

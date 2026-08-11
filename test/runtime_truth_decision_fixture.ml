@@ -372,16 +372,15 @@ let check_statement_order ctx
          | Eq _ | Ceq _ | Rl _ | Crl _ -> None)
     |> Option.get
   in
-  let private_reach_prefix =
-    String.lowercase_ascii
-      ("runtimeTruthProveReach" ^ transitive_item.name)
+  let private_edge_prefix =
+    String.lowercase_ascii "runtimeTruthDirect"
   in
   let private_edge_calls =
     statements
     |> List.filter_map (fun statement ->
          match statement.node with
          | Crl (Some label, _, _, conditions)
-           when String.starts_with ~prefix:private_reach_prefix label ->
+           when String.starts_with ~prefix:private_edge_prefix label ->
            let calls =
              conditions
              |> List.filter_map (function

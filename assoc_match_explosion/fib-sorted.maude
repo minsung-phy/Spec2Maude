@@ -1,0 +1,101 @@
+load /Users/minsung/Dev/projects/Spec2Maude/assoc_match_explosion/builtins-sorted.maude
+load model-checker.maude
+
+mod WASM2MAUDE-MODELCHECK is
+  protecting WASM-BUILTINS .
+  including MODEL-CHECKER .
+
+  sort ModelState .
+  subsort ModelState < State .
+  op boot : -> ModelState [ctor] .
+  op init : SpectecTerminal -> ModelState [ctor frozen (1)] .
+  op ready : SpectecTerminal SpectecTerminal -> ModelState [ctor] .
+  op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .
+  op finished : SpectecTerminal SpectecTerminal -> ModelState [ctor] .
+
+  op inputModule : -> SpectecTerminal .
+  op inputName : -> SpectecTerminal .
+  op inputArgs : -> SpectecTerminals .
+  op emptyStore : -> SpectecTerminal .
+  op expected : -> SpectecTerminal .
+  op rejected : -> SpectecTerminal .
+  op findFunc : SpectecTerminals SpectecTerminal ~> SpectecTerminal .
+  op returned : SpectecTerminals -> Prop [ctor] .
+
+  vars C S MI NAME OTHER ADDR XA VALUE RESULT : SpectecTerminal .
+  vars LOCALS EXPORTS : SpectecTerminals .
+  var ST : ModelState .
+  var P : Prop .
+
+  eq inputModule = module.module(
+  list.wrap(
+    type.type(
+      rectype.rec(
+        list.wrap(
+          subtype.sub(final.final, eps,
+          comptype.func-sym(list.wrap(numtype.i32 numtype.i32 numtype.i32),
+          list.wrap(numtype.i32))))))),
+list.wrap(eps), list.wrap(eps), list.wrap(eps), list.wrap(eps),
+list.wrap(eps),
+list.wrap(
+  func.func(uN.wrap(0), local.local(numtype.i32),
+  instr.block(blocktype.result(eps),
+  instr.loop(blocktype.result(eps),
+  instr.local-get(uN.wrap(0)) instr.testop(numtype.i32, testop.eqz)
+  instr.br-if(uN.wrap(1)) instr.local-get(uN.wrap(1))
+  instr.local-get(uN.wrap(2)) instr.binop(numtype.i32, binop.add)
+  instr.local-set(uN.wrap(3)) instr.local-get(uN.wrap(2))
+  instr.local-set(uN.wrap(1)) instr.local-get(uN.wrap(3))
+  instr.local-set(uN.wrap(2)) instr.local-get(uN.wrap(0))
+  instr.const(numtype.i32, uN.wrap(1)) instr.binop(numtype.i32, binop.sub)
+  instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0))))
+  instr.local-get(uN.wrap(1)))),
+list.wrap(eps), list.wrap(eps), eps,
+list.wrap(
+  export.export(name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)),
+  externidx.func(uN.wrap(0))))) .
+  eq inputName = name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)) .
+  eq inputArgs = num.const(numtype.i32, uN.wrap(5)) num.const(numtype.i32, uN.wrap(0))
+num.const(numtype.i32, uN.wrap(1)) .
+  eq expected = instr.const(numtype.i32, uN.wrap(5)) .
+  eq rejected = instr.const(numtype.i32, uN.wrap(6)) .
+  eq emptyStore = rec.store(eps, eps, eps, eps, eps,
+    eps, eps, eps, eps, eps) .
+
+  eq findFunc(
+    rec.exportinst(NAME, externaddr.func(ADDR)) EXPORTS, NAME) = ADDR .
+  ceq findFunc(rec.exportinst(OTHER, XA) EXPORTS, NAME) =
+      findFunc(EXPORTS, NAME)
+    if OTHER =/= NAME .
+
+  crl [instantiate] : boot => init(C)
+    if def.instantiate(emptyStore, inputModule, eps) => C .
+  crl [initialize] : init(C) => ready(S, MI)
+    if rel.steps(C) =>
+      config.sym(state.sym(S, rec.frame(LOCALS, MI)), eps) .
+  rl [invoke] :
+    ready(S, MI)
+    => exec(def.invoke(
+      S, findFunc(value('EXPORTS, MI), inputName), inputArgs)) .
+  crl [execute] : exec(C) =>
+      finished(S, instr.const(numtype.i32, VALUE))
+    if rel.steps(C) => config.sym(S, instr.const(numtype.i32, VALUE)) .
+
+  eq finished(S, RESULT) |= returned(RESULT) = true .
+  eq ST |= P = false [owise] .
+endm
+
+rew [100000] in WASM2MAUDE-MODELCHECK : boot .
+
+search [1, 100000] in WASM2MAUDE-MODELCHECK :
+  boot =>* finished(S, instr.const(numtype.i32, uN.wrap(5))) .
+
+search [1, 100000] in WASM2MAUDE-MODELCHECK :
+  boot =>* finished(S, instr.const(numtype.i32, uN.wrap(6))) .
+
+red in WASM2MAUDE-MODELCHECK :
+  modelCheck(boot, <> returned(expected)) .
+red in WASM2MAUDE-MODELCHECK :
+  modelCheck(boot, [] ~ returned(rejected)) .
+red in WASM2MAUDE-MODELCHECK :
+  modelCheck(boot, <> returned(rejected)) .

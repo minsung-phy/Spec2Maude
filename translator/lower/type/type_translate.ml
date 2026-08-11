@@ -410,17 +410,21 @@ let lower_components env ctx origin constructor names components =
            | Some lowered, names ->
              env_with_component env lowered,
              lowered :: lowered_rev,
-             diagnostics @ lowered.diagnostics,
+             List.rev_append lowered.diagnostics diagnostics,
              failed,
              names
            | None, names ->
+             let component_diagnostics =
+               component_diagnostics env ctx origin constructor component
+             in
              env,
              lowered_rev,
-             diagnostics @ component_diagnostics env ctx origin constructor component,
+             List.rev_append component_diagnostics diagnostics,
              true,
              names)
          (env, [], [], false, names)
   in
+  let diagnostics = List.rev diagnostics in
   if failed then None, diagnostics, names
   else Some (List.rev lowered_rev), diagnostics, names
 
@@ -864,6 +868,15 @@ let describe_constructor_case
       diagnostics @ hidden_diagnostics @ guard_diagnostics @ prem_diagnostics
       @ condition_diagnostics
     in
+    let guarded_constructor () =
+      Constructor_registry.Guarded_constructor
+        (Printf.sprintf
+           "source constructor retains instance guards=%d, hidden binds=%d, dependent guards=%d, premise conditions=%d"
+           (List.length instance_guards)
+           (List.length hidden_binds)
+           (List.length dependent_guards)
+           (List.length prem_conditions))
+    in
     Some
       { constructor_name
       ; components
@@ -874,32 +887,22 @@ let describe_constructor_case
       ; projection_ops
       ; diagnostics = lowering_diagnostics
       ; construction_domain =
-          (match hidden_binds, dependent_guards, prem_conditions with
-          | [], [], [] -> Constructor_registry.Total_constructor
-          | [], _, []
+          (match
+             instance_guards, hidden_binds, dependent_guards, prem_conditions
+           with
+          | [], [], [], [] -> Constructor_registry.Total_constructor
+          | [], [], _, []
             when Type_shape.mixop_is_hole_only mixop
                  && List.length components = 1 ->
             Constructor_registry.Certified_representation_constructor
-          | [], _, _
+          | [], [], _, _
             when binds = []
                  && Type_shape.mixop_is_hole_only mixop
                  && List.length components = 1 ->
             (match length_guarded_representation origin source_components prems with
             | Some certificate -> certificate
-            | None ->
-              Constructor_registry.Guarded_constructor
-                (Printf.sprintf
-                   "source typcase retains hidden binds=%d, dependent guards=%d, premise conditions=%d"
-                   (List.length hidden_binds)
-                   (List.length dependent_guards)
-                   (List.length prem_conditions)))
-          | _ ->
-            Constructor_registry.Guarded_constructor
-              (Printf.sprintf
-                 "source typcase retains hidden binds=%d, dependent guards=%d, premise conditions=%d"
-                 (List.length hidden_binds)
-                 (List.length dependent_guards)
-                 (List.length prem_conditions)))
+            | None -> guarded_constructor ())
+          | _ -> guarded_constructor ())
       },
     lowering_diagnostics
 
@@ -930,6 +933,7 @@ let register_constructor_case
     ~constructor_op:lowering.constructor_name
     ~projection_ops:lowering.projection_ops
     ~payload_labels:(List.map payload_label lowering.components)
+    ~payload_typs:(List.map (fun component -> component.typ) lowering.components)
     ~payload_witnesses:(List.map (fun component -> component.witness) lowering.components)
     ~payload_sorts:(List.map (fun component -> component.sort) lowering.components)
     ()
@@ -1275,6 +1279,14 @@ let subtype_inclusion_block env ctx parent_origin target child_id =
   Type_alias.translate_subtype_membership
     env ctx origin target child_typ
 
+let is_native_category_union = function
+  | mixop, (typ, [], []), _hints
+    when Type_shape.mixop_is_hole_only mixop ->
+    (match Type_shape.typ_components typ with
+    | [ _ ] -> true
+    | [] | _ :: _ :: _ -> false)
+  | _ -> false
+
 let translate_variant
     ~instance_guards
     env ctx origin key_env static_args_key target id target_region cases =
@@ -1319,28 +1331,53 @@ let translate_variant
     |> List.map (unsupported_incomplete_inherited_group ctx origin id)
     |> List.concat
   in
-  let case_result =
+  let translated_cases =
     cases
     |> List.mapi (fun index typcase ->
-      if List.mem index skip_indices then
-        empty
-      else
-        translate_typcase
-          ~instance_guards
-          env
-          ctx
-          origin
-          key_env
-          static_args_key
-          source_category
-          target
-          ~case_count:(List.length cases)
-          (index + 1)
-          typcase)
-    |> List.fold_left append empty
+      let result =
+        if List.mem index skip_indices then
+          empty
+        else
+          translate_typcase
+            ~instance_guards
+            env
+            ctx
+            origin
+            key_env
+            static_args_key
+            source_category
+            target
+            ~case_count:(List.length cases)
+            (index + 1)
+            typcase
+      in
+      typcase, result)
   in
-  append union_result (append subtype_result case_result)
-  |> fun result -> { result with diagnostics = result.diagnostics @ incomplete_diagnostics }
+  let case_statements select =
+    translated_cases
+    |> List.filter (fun (typcase, _result) -> select typcase)
+    |> List.concat_map (fun (_typcase, (result : result)) -> result.statements)
+  in
+  let case_result =
+    { statements =
+        case_statements (fun typcase -> not (is_native_category_union typcase))
+        @ case_statements is_native_category_union
+    ; diagnostics =
+        translated_cases
+        |> List.concat_map (fun (_typcase, (result : result)) -> result.diagnostics)
+    }
+  in
+  let source_result = append union_result (append subtype_result case_result) in
+  (* Direct cases decide the common constructor or primitive form before any
+     category inclusion recursively tests a narrower source category.  All
+     equations are positive recognizers for the same target; only their search
+     order changes.  Diagnostics retain the previous source order. *)
+  { statements =
+      case_result.statements
+      @ union_result.statements
+      @ subtype_result.statements
+  ; diagnostics = source_result.diagnostics @ incomplete_diagnostics
+  }
 
 let preload_category_union_registry
     env ctx origin key_env static_args_key source_category child_typ =

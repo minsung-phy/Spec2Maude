@@ -2,7 +2,7 @@ open Wasm_to_maude
 
 let usage () =
   Printf.eprintf
-    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--steps N]\n  wasm2maude wast-run FILE [-o FILE] [--semantics FILE] [--steps N] [--call-depth N]\n  wasm2maude suite-run PATH [-o REPORT] [--semantics FILE] [--maude FILE] [--timeout SEC] [--steps N] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
+    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--steps N]\n  wasm2maude wast-run FILE [-o FILE] [--semantics FILE] [--steps N] [--call-depth N]\n  wasm2maude suite-run PATH [-o REPORT] [--semantics FILE] [--maude FILE] [--timeout SEC] [--steps N] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
   exit 2
 
 let write output text =
@@ -92,6 +92,52 @@ let run_command args =
     try Wasm.Utf8.decode export with Wasm.Utf8.Utf8 -> usage ()
   in
   write output (Emit.run ~semantics ~export ~args ~steps m)
+
+let modelcheck_command args =
+  let rec options input output semantics export arguments expected rejected steps =
+    function
+    | [] ->
+        input, output, semantics, export, List.rev arguments, expected, rejected,
+        steps
+    | "-o" :: path :: rest ->
+        options input (Some path) semantics export arguments expected rejected
+          steps rest
+    | "--semantics" :: path :: rest ->
+        options input output path export arguments expected rejected steps rest
+    | "--invoke" :: name :: rest ->
+        options input output semantics (Some name) arguments expected rejected
+          steps rest
+    | "--arg" :: value :: rest ->
+        options input output semantics export (parse_arg value :: arguments)
+          expected rejected steps rest
+    | "--expect" :: value :: rest ->
+        options input output semantics export arguments (Some (parse_arg value))
+          rejected steps rest
+    | "--reject" :: value :: rest ->
+        options input output semantics export arguments expected
+          (Some (parse_arg value)) steps rest
+    | "--steps" :: value :: rest ->
+        options input output semantics export arguments expected rejected
+          (int_of_string value) rest
+    | arg :: rest when input = None ->
+        options (Some arg) output semantics export arguments expected rejected
+          steps rest
+    | _ -> usage ()
+  in
+  let input, output, semantics, export, args, expected, rejected, steps =
+    options None None "builtins.maude" None [] None None 100000 args
+  in
+  let input = match input with Some path -> path | None -> usage () in
+  let export = match export with Some name -> name | None -> usage () in
+  let expected = match expected with Some value -> value | None -> usage () in
+  let rejected = match rejected with Some value -> value | None -> usage () in
+  let export =
+    try Wasm.Utf8.decode export with Wasm.Utf8.Utf8 -> usage ()
+  in
+  let m = Frontend.load input in
+  write output
+    (Emit.modelcheck ~semantics:(resolve semantics) ~export ~args ~expected
+       ~rejected ~steps m)
 
 let wast_run args =
   let nonnegative value =
@@ -221,6 +267,7 @@ let main = function
   | "module" :: args -> module_command args
   | "instantiate" :: args -> instantiate_command args
   | "run" :: args -> run_command args
+  | "modelcheck" :: args -> modelcheck_command args
   | "wast-run" :: args -> wast_run args
   | "suite-run" :: args -> suite_run args
   | ["wast-summary"; path] -> wast_summary path

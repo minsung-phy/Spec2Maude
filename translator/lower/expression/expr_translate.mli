@@ -10,14 +10,21 @@ type binding = Expr_env.binding =
   ; typ : Il.Ast.typ
   }
 
+type introduced_binding = Expr_env.introduced_binding =
+  { id : string
+  ; binding : binding
+  ; subtype_roundtrip : Pattern_subtyping.subtype_roundtrip option
+  }
+
 type pattern_result = Expr_result.pattern_result =
   { pattern_term : Maude_ir.term option
   ; pattern_guards : Maude_ir.eq_condition list
-  ; introduced_bindings : (string * binding) list
+  ; introduced_bindings : introduced_binding list
   ; pattern_diagnostics : Diagnostics.t list
   }
 
 type env = Expr_env.t
+
 val carrier_sort_of_typ : Il.Ast.typ -> Maude_ir.sort option
 val carrier_sort_of_typ_in : Context.t -> Il.Ast.typ -> Maude_ir.sort option
 val typecheck_conditions_for_typ :
@@ -30,6 +37,15 @@ val typecheck_conditions_for_typ :
 val lower_value : Context.t -> env -> Origin.t -> Il.Ast.exp -> result
 val lower_numeric_guard_value : Context.t -> env -> Origin.t -> Il.Ast.exp -> result
 val lower_pattern_with_bindings_named :
+  Local_name.t ->
+  Context.t -> env -> Origin.t -> Il.Ast.exp -> pattern_result * Local_name.t
+val lower_validated_input_pattern_named :
+  Local_name.t ->
+  Context.t -> env -> Origin.t -> Il.Ast.exp -> pattern_result * Local_name.t
+val lower_rewrite_output_pattern_named :
+  Local_name.t ->
+  Context.t -> env -> Origin.t -> Il.Ast.exp -> pattern_result * Local_name.t
+val lower_typed_subject_pattern_named :
   Local_name.t ->
   Context.t -> env -> Origin.t -> Il.Ast.exp -> pattern_result * Local_name.t
 val lower_bool_condition : Context.t -> env -> Origin.t -> Il.Ast.exp -> result
