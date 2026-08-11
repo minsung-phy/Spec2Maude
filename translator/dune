@@ -3,12 +3,19 @@
 (library
  (name translator)
  (private_modules
+  builtin_report
+  builtin_usage
   carrier_sort
   condition_admissibility
   condition_schedule
   decd_translate
   definition_analysis
+  diagnostic_provenance
   expr_diagnostic
+  expr_iter
+  expr_record
+  expr_sequence
+  expr_subtyping
   execution_context_certificate
   execution_progress_certificate
   head_specialization
@@ -17,19 +24,56 @@
   helper_key
   helper_materialize_subtyping
   hint_translate
+  iteration_shape
   naming_collision
   pattern_translate
   pattern_typed_subject
+  premise_diagnostic
+  premise_eq_binding
+  premise_eq_declared_inverse_fallback
+  premise_eq_fixed_inverse_concat
+  premise_eq_inverse_binding
+  premise_eq_inverse_concatn_chunks
+  premise_eq_numeric_inverse
+  premise_eq_optional_map_inverse
+  premise_eq_value_binding
   premise_if
+  premise_iter_binding_map
+  premise_iter_opt
   premise_rule
+  premise_rule_deterministic
+  premise_rule_runtime_predicate
+  premise_shape
+  premise_state
+  premise_validation_skip
   primitive_term
   record_shape
   reld_context_split
+  reld_deterministic
+  reld_enabledness
+  reld_enabledness_constructor_group
+  reld_equational_contract
+  reld_execution
+  reld_execution_premise
+  reld_match_complement_certificate
   reld_rule_lowering
+  reld_runtime_predicate
+  reld_translate
   relation_analysis
   relation_graph
   runtime_materialize
+  runtime_search_helper
+  runtime_search_materializer
+  runtime_truth_constructor_pattern
+  runtime_truth_decision_refutation
+  runtime_truth_dependent_false
+  runtime_truth_deterministic_false
+  runtime_truth_equality_pattern_refuter
   runtime_truth_false_support
+  runtime_truth_indexed_refutation
+  runtime_truth_no_hit_surface
+  runtime_truth_rule_components
+  runtime_truth_search_materializer
   runtime_truth_totality_contract
   runtime_truth_transitive_edge
   runtime_truth_worklist_core
@@ -46,7 +90,12 @@
   typd_registry
   typd_witness
   typcase_constructor
+  type_alias
   type_diagnostic
+  type_inherited
+  type_numeric
+  type_result
+  type_shape
   typecheck_guard
   typecheck_term
   validated_guard_certificate)

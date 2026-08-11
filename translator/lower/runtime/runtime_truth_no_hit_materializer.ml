@@ -421,13 +421,13 @@ let same_relation_no_hit_condition helper_name request terms =
 
 let rulepr_components ctx rel_id exp =
   match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id with
-  | None -> Rule_components.exp_components exp
+  | None -> Analysis.Relation_graph.exp_components exp
   | Some relation ->
     let relation_shape = Relation_shape.of_relation relation in
     let expected_count = List.length relation_shape.Relation_shape.components in
     (match Analysis.Relation_graph.exp_components_for_count expected_count exp with
     | Some components -> components
-    | None -> Rule_components.exp_components exp)
+    | None -> Analysis.Relation_graph.exp_components exp)
 
 let typecheck_for_indexed_element_typ ctx env origin typ target target_sort =
   let witness =

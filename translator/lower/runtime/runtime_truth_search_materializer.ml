@@ -70,15 +70,6 @@ let rule_origin parent index (rule : Analysis.Function_graph.runtime_search_rule
 let add_binding env (binding : Expr_env.introduced_binding) =
   Expr_env.add_introduced env binding
 
-let typ_is_iter = Type_shape.typ_is_iter
-
-let flat_list_element_typ typ =
-  match typ.it with
-  | IterT (element_typ, (List | List1 | ListN _))
-    when not (typ_is_iter element_typ) ->
-    Some element_typ
-  | _ -> None
-
 let rec indexed_head_source exp =
   match exp.it with
   | SubE (inner, _, _) | CvtE (inner, _, _) ->
@@ -220,7 +211,7 @@ let lower_indexed_head_unsupported ctx item indexed constructor reason suggestio
   [ unsupported ctx item indexed.indexed_origin constructor reason suggestion ]
 
 let lower_indexed_head_contains ctx item premise_result indexed =
-  match flat_list_element_typ indexed.source_exp.note with
+  match Iteration_shape.flat_repeated_element indexed.source_exp.note with
   | None ->
     [], lower_indexed_head_unsupported
           ctx

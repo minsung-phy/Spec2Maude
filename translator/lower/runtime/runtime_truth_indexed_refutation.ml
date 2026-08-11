@@ -14,13 +14,6 @@ let source_preserving_iter exp =
     source
   | _ -> exp
 
-let flat_list_element typ =
-  match typ.it with
-  | IterT (element, (List | List1 | ListN _))
-    when not (Type_shape.typ_is_iter element) ->
-    Some element
-  | _ -> None
-
 let rec indexed_source exp =
   match exp.it with
   | SubE (inner, source_typ, _) ->
@@ -46,7 +39,7 @@ let single_source components =
         let element_typ =
           match element_typ with
           | Some _ -> element_typ
-          | None -> flat_list_element source_exp.note
+          | None -> Iteration_shape.flat_repeated_element source_exp.note
         in
         Some { component_index; source_exp; element_typ })
     |> List.filter_map Fun.id
