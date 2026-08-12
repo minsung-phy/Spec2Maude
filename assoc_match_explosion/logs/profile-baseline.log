@@ -1,0 +1,2555 @@
+==========================================
+search [1, 100000] in WASM2MAUDE-MODELCHECK : boot =>* finished(S, const(i32,
+    uN.wrap(6))) .
+
+No solution.
+states: 5  rewrites: 382410404 in 126457ms cpu (128739ms real) (3024029
+    rewrites/second)
+op _+_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] .
+built-in eq rewrites: 534075 (0.13966%)
+
+op _rem_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult] [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult] -> [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult] .
+built-in eq rewrites: 5140 (0.00134411%)
+
+op _^_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] .
+built-in eq rewrites: 545054 (0.142531%)
+
+op _<_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    ModelCheckResult] .
+built-in eq rewrites: 176090 (0.0460474%)
+
+op _<=_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    ModelCheckResult] .
+built-in eq rewrites: 539819 (0.141162%)
+
+op _>_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    ModelCheckResult] .
+built-in eq rewrites: 81 (2.11814e-05%)
+
+op _>=_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    ModelCheckResult] .
+built-in eq rewrites: 1079635 (0.282324%)
+
+op _-_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] .
+built-in eq rewrites: 539816 (0.141161%)
+
+op _=/=_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult] [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult] -> [ModelCheckResult] .
+built-in eq rewrites: 68908285 (18.0195%)
+
+op _==_ : [Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] [Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult] -> [
+    ModelCheckResult] .
+built-in eq rewrites: 49152 (0.0128532%)
+
+mb byte.wrap(VALUE1:Nat) : SpectecTerminal .
+rewrites: 6 (1.56899e-06%)
+
+mb uN.wrap(VALUE1:Nat) : SpectecTerminal .
+rewrites: 54305 (0.0142007%)
+
+mb list.wrap(X_STAR:SpectecTerminals) : SpectecTerminal .
+rewrites: 59 (1.54285e-05%)
+
+mb char.wrap(VALUE1:Nat) : SpectecTerminal .
+rewrites: 6 (1.56899e-06%)
+
+cmb name.wrap(CHAR_STAR:SpectecTerminals) : SpectecTerminal if typecheckSeq(
+    CHAR_STAR:SpectecTerminals, syn.char) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+cmb externidx.func(FUNCIDX:SpectecTerminal) : SpectecTerminal if typecheck(
+    FUNCIDX:SpectecTerminal, syn.funcidx) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+cmb idx(TYPEIDX:SpectecTerminal) : SpectecTerminal if typecheck(
+    TYPEIDX:SpectecTerminal, syn.typeidx) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+cmb rec(N:Nat) : SpectecTerminal if typecheck(N:Nat, syn.n) = true .
+lhs matches: 10	rewrites: 10 (2.61499e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		10		0		10		0
+
+cmb comptype.func-sym(RESULTTYPE:SpectecTerminal, RESULTTYPE2:SpectecTerminal)
+    : SpectecTerminal if typecheck(RESULTTYPE:SpectecTerminal, syn.resulttype)
+    = true /\ typecheck(RESULTTYPE2:SpectecTerminal, syn.resulttype) = true .
+lhs matches: 13	rewrites: 13 (3.39949e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		13		0		13		0
+2		13		0		13		0
+
+cmb subtype.sub(FINAL_OPT:SpectecTerminals, TYPEUSE_STAR:SpectecTerminals,
+    COMPTYPE:SpectecTerminal) : SpectecTerminal if isOpt(
+    FINAL_OPT:SpectecTerminals) = true /\ typecheckSeq(
+    FINAL_OPT:SpectecTerminals, syn.final) = true /\ typecheckSeq(
+    TYPEUSE_STAR:SpectecTerminals, syn.typeuse) = true /\ typecheck(
+    COMPTYPE:SpectecTerminal, syn.comptype) = true .
+lhs matches: 13	rewrites: 13 (3.39949e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		13		0		13		0
+2		13		0		13		0
+3		13		0		13		0
+4		13		0		13		0
+
+cmb rectype.rec(COMPONENT1:SpectecTerminal) : SpectecTerminal if typecheck(
+    COMPONENT1:SpectecTerminal, syn.list(syn.subtype)) = true .
+lhs matches: 15	rewrites: 15 (3.92249e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		0		15		0
+
+cmb deftype.def(RECTYPE:SpectecTerminal, N:Nat) : SpectecTerminal if typecheck(
+    RECTYPE:SpectecTerminal, syn.rectype) = true /\ typecheck(N:Nat, syn.n) =
+    true .
+lhs matches: 12	rewrites: 12 (3.13799e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		12		0		12		0
+2		12		0		12		0
+
+cmb blocktype.result(VALTYPE_OPT:SpectecTerminals) : SpectecTerminal if isOpt(
+    VALTYPE_OPT:SpectecTerminals) = true /\ typecheckSeq(
+    VALTYPE_OPT:SpectecTerminals, syn.valtype) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+cmb externaddr.func(FUNCADDR:Nat) : SpectecTerminal if typecheck(FUNCADDR:Nat,
+    syn.funcaddr) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+cmb rec.exportinst(NAME, EXTERNADDR:SpectecTerminal) : SpectecTerminal if
+    typecheck(NAME, syn.name) = true /\ typecheck(EXTERNADDR:SpectecTerminal,
+    syn.externaddr) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+cmb rec.moduleinst(COMPONENT1:SpectecTerminals, COMPONENT2:SpectecTerminals,
+    COMPONENT3:SpectecTerminals, COMPONENT4:SpectecTerminals,
+    COMPONENT5:SpectecTerminals, COMPONENT6:SpectecTerminals,
+    COMPONENT7:SpectecTerminals, COMPONENT8:SpectecTerminals,
+    COMPONENT9:SpectecTerminals) : SpectecTerminal if typecheckSeq(
+    COMPONENT1:SpectecTerminals, syn.deftype) = true /\ typecheckSeq(
+    COMPONENT2:SpectecTerminals, syn.tagaddr) = true /\ typecheckSeq(
+    COMPONENT3:SpectecTerminals, syn.globaladdr) = true /\ typecheckSeq(
+    COMPONENT4:SpectecTerminals, syn.memaddr) = true /\ typecheckSeq(
+    COMPONENT5:SpectecTerminals, syn.tableaddr) = true /\ typecheckSeq(
+    COMPONENT6:SpectecTerminals, syn.funcaddr) = true /\ typecheckSeq(
+    COMPONENT7:SpectecTerminals, syn.dataaddr) = true /\ typecheckSeq(
+    COMPONENT8:SpectecTerminals, syn.elemaddr) = true /\ typecheckSeq(
+    COMPONENT9:SpectecTerminals, syn.exportinst) = true .
+lhs matches: 4	rewrites: 4 (1.046e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		4		0		4		0
+2		4		0		4		0
+3		4		0		4		0
+4		4		0		4		0
+5		4		0		4		0
+6		4		0		4		0
+7		4		0		4		0
+8		4		0		4		0
+9		4		0		4		0
+
+cmb ref.ref-func-addr(FUNCADDR:Nat) : SpectecTerminal if typecheck(
+    FUNCADDR:Nat, syn.funcaddr) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+cmb rec.frame(COMPONENT1:SpectecTerminals, MODULEINST:SpectecTerminal) :
+    SpectecTerminal if typecheckOptSeq(COMPONENT1:SpectecTerminals, syn.val) =
+    true /\ typecheck(MODULEINST:SpectecTerminal, syn.moduleinst) = true .
+lhs matches: 1689	rewrites: 1689 (0.000441672%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1689		0		1689		0
+2		1689		0		1689		0
+
+cmb instr.block(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) :
+    SpectecTerminal if typecheck(BLOCKTYPE:SpectecTerminal, syn.blocktype) =
+    true /\ typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+cmb instr.loop(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) :
+    SpectecTerminal if typecheck(BLOCKTYPE:SpectecTerminal, syn.blocktype) =
+    true /\ typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr) = true .
+lhs matches: 7	rewrites: 7 (1.83049e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		7		0		7		0
+2		7		0		7		0
+
+cmb instr.br(LABELIDX:SpectecTerminal) : SpectecTerminal if typecheck(
+    LABELIDX:SpectecTerminal, syn.labelidx) = true .
+lhs matches: 4098	rewrites: 4098 (0.00107162%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		4098		0		4098		0
+
+cmb instr.br-if(LABELIDX:SpectecTerminal) : SpectecTerminal if typecheck(
+    LABELIDX:SpectecTerminal, syn.labelidx) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+cmb instr.call-ref(TYPEUSE:SpectecTerminal) : SpectecTerminal if typecheck(
+    TYPEUSE:SpectecTerminal, syn.typeuse) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+cmb instr.local-get(LOCALIDX:SpectecTerminal) : SpectecTerminal if typecheck(
+    LOCALIDX:SpectecTerminal, syn.localidx) = true .
+lhs matches: 4	rewrites: 4 (1.046e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		4		0		4		0
+
+cmb instr.local-set(LOCALIDX:SpectecTerminal) : SpectecTerminal if typecheck(
+    LOCALIDX:SpectecTerminal, syn.localidx) = true .
+lhs matches: 4	rewrites: 4 (1.046e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		4		0		4		0
+
+cmb const(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) :
+    SpectecTerminal if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) = true
+    /\ typecheck(COMPONENT1:SpectecTerminal, syn.num(NUMTYPE:SpectecTerminal))
+    = true .
+lhs matches: 135735	rewrites: 135735 (0.0354946%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		135735		0		135735		0
+2		135735		0		135735		0
+
+cmb instr.binop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) :
+    SpectecTerminal if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) = true
+    /\ typecheck(COMPONENT1:SpectecTerminal, syn.binop(
+    NUMTYPE:SpectecTerminal)) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+
+cmb instr.testop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) :
+    SpectecTerminal if typecheck(NUMTYPE:SpectecTerminal, syn.numtype) = true
+    /\ typecheck(COMPONENT1:SpectecTerminal, syn.testop(
+    NUMTYPE:SpectecTerminal)) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+cmb instr.label-sym-sym(N:Nat, INSTR_STAR:SpectecTerminals,
+    INSTR_STAR2:SpectecTerminals) : SpectecTerminal if typecheck(N:Nat, syn.n)
+    = true /\ typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr) = true /\
+    typecheckSeq(INSTR_STAR2:SpectecTerminals, syn.instr) = true .
+lhs matches: 254	rewrites: 254 (6.64208e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		254		0		254		0
+2		254		0		254		0
+3		254		0		254		0
+
+cmb instr.frame-sym-sym(N:Nat, FRAME:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals) : SpectecTerminal if typecheck(N:Nat, syn.n) =
+    true /\ typecheck(FRAME:SpectecTerminal, syn.frame) = true /\ typecheckSeq(
+    INSTR_STAR:SpectecTerminals, syn.instr) = true .
+lhs matches: 90	rewrites: 90 (2.35349e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		90		0		90		0
+2		90		0		90		0
+3		90		0		90		0
+
+cmb type.type(RECTYPE:SpectecTerminal) : SpectecTerminal if typecheck(
+    RECTYPE:SpectecTerminal, syn.rectype) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+cmb local.local(VALTYPE:SpectecTerminal) : SpectecTerminal if typecheck(
+    VALTYPE:SpectecTerminal, syn.valtype) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+cmb func.func(TYPEIDX:SpectecTerminal, LOCAL_STAR:SpectecTerminals,
+    EXPR:SpectecTerminals) : SpectecTerminal if typecheck(
+    TYPEIDX:SpectecTerminal, syn.typeidx) = true /\ typecheckSeq(
+    LOCAL_STAR:SpectecTerminals, syn.local) = true /\ typecheckSeq(
+    EXPR:SpectecTerminals, syn.expr) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+3		2		0		2		0
+
+cmb export.export(NAME, EXTERNIDX:SpectecTerminal) : SpectecTerminal if
+    typecheck(NAME, syn.name) = true /\ typecheck(EXTERNIDX:SpectecTerminal,
+    syn.externidx) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+cmb module.module(COMPONENT1:SpectecTerminal, COMPONENT2:SpectecTerminal,
+    COMPONENT3:SpectecTerminal, COMPONENT4:SpectecTerminal,
+    COMPONENT5:SpectecTerminal, COMPONENT6:SpectecTerminal,
+    COMPONENT7:SpectecTerminal, COMPONENT8:SpectecTerminal,
+    COMPONENT9:SpectecTerminal, START_OPT:SpectecTerminals,
+    COMPONENT10:SpectecTerminal) : SpectecTerminal if typecheck(
+    COMPONENT1:SpectecTerminal, syn.list(syn.type)) = true /\ typecheck(
+    COMPONENT2:SpectecTerminal, syn.list(syn.import)) = true /\ typecheck(
+    COMPONENT3:SpectecTerminal, syn.list(syn.tag)) = true /\ typecheck(
+    COMPONENT4:SpectecTerminal, syn.list(syn.global)) = true /\ typecheck(
+    COMPONENT5:SpectecTerminal, syn.list(syn.mem)) = true /\ typecheck(
+    COMPONENT6:SpectecTerminal, syn.list(syn.table)) = true /\ typecheck(
+    COMPONENT7:SpectecTerminal, syn.list(syn.func)) = true /\ typecheck(
+    COMPONENT8:SpectecTerminal, syn.list(syn.data)) = true /\ typecheck(
+    COMPONENT9:SpectecTerminal, syn.list(syn.elem)) = true /\ isOpt(
+    START_OPT:SpectecTerminals) = true /\ typecheckSeq(
+    START_OPT:SpectecTerminals, syn.start) = true /\ typecheck(
+    COMPONENT10:SpectecTerminal, syn.list(syn.export)) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+4		1		0		1		0
+5		1		0		1		0
+6		1		0		1		0
+7		1		0		1		0
+8		1		0		1		0
+9		1		0		1		0
+10		1		0		1		0
+11		1		0		1		0
+12		1		0		1		0
+
+cmb instrtype.sym(RESULTTYPE:SpectecTerminal, LOCALIDX_STAR:SpectecTerminals,
+    RESULTTYPE2:SpectecTerminal) : SpectecTerminal if typecheck(
+    RESULTTYPE:SpectecTerminal, syn.resulttype) = true /\ typecheckSeq(
+    LOCALIDX_STAR:SpectecTerminals, syn.localidx) = true /\ typecheck(
+    RESULTTYPE2:SpectecTerminal, syn.resulttype) = true .
+lhs matches: 7	rewrites: 7 (1.83049e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		7		0		7		0
+2		7		0		7		0
+3		7		0		7		0
+
+cmb rec.funcinst(DEFTYPE:SpectecTerminal, MODULEINST:SpectecTerminal,
+    FUNCCODE:SpectecTerminal) : SpectecTerminal if typecheck(
+    DEFTYPE:SpectecTerminal, syn.deftype) = true /\ typecheck(
+    MODULEINST:SpectecTerminal, syn.moduleinst) = true /\ typecheck(
+    FUNCCODE:SpectecTerminal, syn.funccode) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+
+cmb rec.store(COMPONENT1:SpectecTerminals, COMPONENT2:SpectecTerminals,
+    COMPONENT3:SpectecTerminals, COMPONENT4:SpectecTerminals,
+    COMPONENT5:SpectecTerminals, COMPONENT6:SpectecTerminals,
+    COMPONENT7:SpectecTerminals, COMPONENT8:SpectecTerminals,
+    COMPONENT9:SpectecTerminals, COMPONENT10:SpectecTerminals) :
+    SpectecTerminal if typecheckSeq(COMPONENT1:SpectecTerminals, syn.taginst) =
+    true /\ typecheckSeq(COMPONENT2:SpectecTerminals, syn.globalinst) = true /\
+    typecheckSeq(COMPONENT3:SpectecTerminals, syn.meminst) = true /\
+    typecheckSeq(COMPONENT4:SpectecTerminals, syn.tableinst) = true /\
+    typecheckSeq(COMPONENT5:SpectecTerminals, syn.funcinst) = true /\
+    typecheckSeq(COMPONENT6:SpectecTerminals, syn.datainst) = true /\
+    typecheckSeq(COMPONENT7:SpectecTerminals, syn.eleminst) = true /\
+    typecheckSeq(COMPONENT8:SpectecTerminals, syn.structinst) = true /\
+    typecheckSeq(COMPONENT9:SpectecTerminals, syn.arrayinst) = true /\
+    typecheckSeq(COMPONENT10:SpectecTerminals, syn.exninst) = true .
+lhs matches: 3	rewrites: 3 (7.84497e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3		0		3		0
+2		3		0		3		0
+3		3		0		3		0
+4		3		0		3		0
+5		3		0		3		0
+6		3		0		3		0
+7		3		0		3		0
+8		3		0		3		0
+9		3		0		3		0
+10		3		0		3		0
+
+cmb state.sym(STORE:SpectecTerminal, FRAME:SpectecTerminal) : SpectecTerminal
+    if typecheck(STORE:SpectecTerminal, syn.store) = true /\ typecheck(
+    FRAME:SpectecTerminal, syn.frame) = true .
+lhs matches: 1867	rewrites: 1867 (0.000488219%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1867		0		1867		0
+2		1867		0		1867		0
+
+cmb config.sym(STATE:SpectecTerminal, INSTR_STAR:SpectecTerminals) :
+    SpectecTerminal if typecheck(STATE:SpectecTerminal, syn.state) = true /\
+    typecheckSeq(INSTR_STAR:SpectecTerminals, syn.instr) = true .
+lhs matches: 15334347	rewrites: 15334347 (4.00992%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15334347		0		15334347	
+    	0
+2		15334347		0		15334347	
+    	0
+
+eq inputModule = module.module(list.wrap(type.type(rectype.rec(list.wrap(
+    subtype.sub(final.final, eps, comptype.func-sym(list.wrap(i32 i32 i32),
+    list.wrap(i32))))))), list.wrap(eps), list.wrap(eps), list.wrap(eps),
+    list.wrap(eps), list.wrap(eps), list.wrap(func.func(uN.wrap(0),
+    local.local(i32), instr.block(blocktype.result(eps), instr.loop(
+    blocktype.result(eps), instr.local-get(uN.wrap(0)) instr.testop(i32,
+    testop.eqz) instr.br-if(uN.wrap(1)) instr.local-get(uN.wrap(1))
+    instr.local-get(uN.wrap(2)) instr.binop(i32, binop.add) instr.local-set(
+    uN.wrap(3)) instr.local-get(uN.wrap(2)) instr.local-set(uN.wrap(1))
+    instr.local-get(uN.wrap(3)) instr.local-set(uN.wrap(2)) instr.local-get(
+    uN.wrap(0)) const(i32, uN.wrap(1)) instr.binop(i32, binop.sub)
+    instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0)))) instr.local-get(uN.wrap(
+    1)))), list.wrap(eps), list.wrap(eps), eps, list.wrap(export.export(
+    name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)), externidx.func(
+    uN.wrap(0))))) .
+rewrites: 1 (2.61499e-07%)
+
+eq inputName = name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)) .
+rewrites: 1 (2.61499e-07%)
+
+eq inputArgs = const(i32, uN.wrap(5)) const(i32, uN.wrap(0)) const(i32,
+    uN.wrap(1)) .
+rewrites: 1 (2.61499e-07%)
+
+eq emptyStore = rec.store(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps) .
+rewrites: 1 (2.61499e-07%)
+
+eq findFunc(rec.exportinst(NAME, externaddr.func(ADDR)) EXPORTS, NAME) = ADDR .
+rewrites: 1 (2.61499e-07%)
+
+eq true and A:Bool = A:Bool .
+rewrites: 26964768 (7.05126%)
+
+eq false and A:Bool = false .
+rewrites: 16469429 (4.30674%)
+
+eq false xor A:Bool = A:Bool .
+rewrites: 45450886 (11.8854%)
+
+eq A:Bool xor A:Bool = false .
+rewrites: 5462838 (1.42853%)
+
+eq A:Bool or B:Bool = A:Bool and B:Bool xor A:Bool xor B:Bool .
+rewrites: 25456862 (6.65695%)
+
+eq compactRepeatThreshold = 1024 .
+rewrites: 1 (2.61499e-07%)
+
+eq len(eps) = 0 .
+rewrites: 76 (1.98739e-05%)
+
+eq len(X:SpectecTerminal) = 1 .
+rewrites: 176301 (0.0461026%)
+
+ceq len(X:SpectecTerminal XS:SpectecTerminals) = 1 + len(XS:SpectecTerminals)
+    if XS:SpectecTerminals =/= eps = true .
+lhs matches: 528931	rewrites: 528931 (0.138315%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		528931		0		528931		0
+
+eq natOfInt(N:Nat) = N:Nat .
+rewrites: 539816 (0.141161%)
+
+ceq modNat(N:Nat, N2:Nat) = N:Nat rem N2:Nat if N2:Nat =/= 0 = true .
+lhs matches: 5120	rewrites: 5120 (0.00133888%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		5120		0		5120		0
+
+ceq modInt(I:Int, I2:Int) = I:Int rem I2:Int if I2:Int =/= 0 = true .
+lhs matches: 20	rewrites: 20 (5.22998e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		20		0		20		0
+
+eq isOpt(eps) = true .
+rewrites: 14 (3.66099e-06%)
+
+eq isOpt(X:SpectecTerminal) = true .
+rewrites: 6777 (0.00177218%)
+
+eq typecheck(N:Nat, syn.nat) = true .
+rewrites: 371 (9.70162e-05%)
+
+eq typecheckSeq(eps, T:SpectecType) = true .
+rewrites: 14138766 (3.69728%)
+
+eq typecheckSeq(X:SpectecTerminal, T:SpectecType) = typecheck(
+    X:SpectecTerminal, T:SpectecType) [owise] .
+rewrites: 19375142 (5.06658%)
+
+ceq typecheckSeq(X:SpectecTerminal XS:SpectecTerminals, T:SpectecType) =
+    typecheck(X:SpectecTerminal, T:SpectecType) and typecheckSeq(
+    XS:SpectecTerminals, T:SpectecType) if XS:SpectecTerminals =/= eps = true [
+    owise] .
+lhs matches: 17425714	rewrites: 17425714 (4.55681%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		17425714		0		17425714	
+    	0
+
+eq typecheckOptSeq(eps, T:SpectecType) = true .
+rewrites: 3 (7.84497e-07%)
+
+eq typecheckOptSeq(seq(YS:SpectecTerminals), T:SpectecType) = isOpt(
+    YS:SpectecTerminals) and typecheckSeq(YS:SpectecTerminals, T:SpectecType) .
+rewrites: 1686 (0.000440888%)
+
+ceq typecheckOptSeq(seq(YS:SpectecTerminals) XS:SpectecTerminals,
+    T:SpectecType) = (isOpt(YS:SpectecTerminals) and typecheckSeq(
+    YS:SpectecTerminals, T:SpectecType)) and typecheckOptSeq(
+    XS:SpectecTerminals, T:SpectecType) if XS:SpectecTerminals =/= eps = true .
+lhs matches: 5058	rewrites: 5058 (0.00132266%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		5058		0		5058		0
+
+eq index(X:SpectecTerminal XS:SpectecTerminals, 0) = X:SpectecTerminal .
+rewrites: 19 (4.96848e-06%)
+
+eq indexSeq(seq(YS:SpectecTerminals) XS:SpectecTerminals, 0) =
+    YS:SpectecTerminals .
+rewrites: 175945 (0.0460095%)
+
+eq indexSeq(seq(YS:SpectecTerminals) XS:SpectecTerminals, s N2:Nat) = indexSeq(
+    XS:SpectecTerminals, N2:Nat) .
+rewrites: 145121 (0.037949%)
+
+eq indexDefined(XS:SpectecTerminals, N:Nat) = N:Nat < len(XS:SpectecTerminals)
+    .
+rewrites: 175964 (0.0460144%)
+
+eq (X:SpectecTerminal XS:SpectecTerminals)[0 <- Y:SpectecTerminal] =
+    Y:SpectecTerminal XS:SpectecTerminals .
+rewrites: 1685 (0.000440626%)
+
+eq (X:SpectecTerminal XS:SpectecTerminals)[s N2:Nat <- Y:SpectecTerminal] =
+    X:SpectecTerminal (XS:SpectecTerminals[N2:Nat <- Y:SpectecTerminal]) .
+rewrites: 4320 (0.00112968%)
+
+eq typecheck(K:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], T:SpectecType) = false [owise] .
+rewrites: 80669160 (21.0949%)
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.n) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.nat) .
+rewrites: 366 (9.57087e-05%)
+
+eq def.concat(TYP_X:SpectecType, eps) = eps .
+rewrites: 2 (5.22998e-07%)
+
+ceq typecheck(I:Nat, syn.uN(N:Nat)) = true if 2 ^ N:Nat - 1 >= 0 = true /\
+    I:Nat <= natOfInt(2 ^ N:Nat - 1) and I:Nat >= 0 = true .
+lhs matches: 539795	rewrites: 539795 (0.141156%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		539795		0		539795		0
+2		539795		0		539795		0
+
+ceq typecheck(uN.wrap(VALUE1:Nat), syn.uN(N:Nat)) = true if uN.wrap(VALUE1:Nat)
+    : SpectecTerminal /\ typecheck(VALUE1:Nat, syn.uN(N:Nat)) = true .
+lhs matches: 539795	rewrites: 539795 (0.141156%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		539795		0		539795		0
+2		539795		0		539795		0
+
+ceq proj.uN.wrap.0(uN.wrap(VALUE1:Nat)) = VALUE1:Nat if uN.wrap(VALUE1:Nat) :
+    SpectecTerminal .
+lhs matches: 287077	rewrites: 287077 (0.0750704%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		287077		0		287077		0
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.iN(N:Nat)) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.uN(N:Nat)) .
+rewrites: 308892 (0.080775%)
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.u32) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.uN(32)) .
+rewrites: 230903 (0.0603809%)
+
+ceq typecheck(list.wrap(X_STAR:SpectecTerminals), syn.list(X:SpectecType)) =
+    true if list.wrap(X_STAR:SpectecTerminals) : SpectecTerminal /\
+    typecheckSeq(X_STAR:SpectecTerminals, X:SpectecType) = true /\ len(
+    X_STAR:SpectecTerminals) < 2 ^ 32 = true .
+lhs matches: 117	rewrites: 117 (3.05954e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		117		0		117		0
+2		117		0		117		0
+3		117		0		117		0
+
+ceq typecheck(I:Nat, syn.char) = true if I:Nat <= 55295 and I:Nat >= 0 or I:Nat
+    <= 1114111 and I:Nat >= 57344 = true .
+lhs matches: 12	rewrites: 12 (3.13799e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		12		0		12		0
+
+ceq typecheck(char.wrap(VALUE1:Nat), syn.char) = true if char.wrap(VALUE1:Nat)
+    : SpectecTerminal /\ typecheck(VALUE1:Nat, syn.char) = true .
+lhs matches: 12	rewrites: 12 (3.13799e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		12		0		12		0
+2		12		0		12		0
+
+ceq typecheck(name.wrap(CHAR_STAR:SpectecTerminals), syn.name) = true if
+    name.wrap(CHAR_STAR:SpectecTerminals) : SpectecTerminal /\ len(def.utf8(
+    CHAR_STAR:SpectecTerminals)) < 2 ^ 32 = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.idx) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.u32) .
+rewrites: 181751 (0.0475277%)
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.typeidx) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.idx) .
+rewrites: 6 (1.56899e-06%)
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.funcidx) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.idx) .
+rewrites: 1 (2.61499e-07%)
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.labelidx) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.idx) .
+rewrites: 4100 (0.00107215%)
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.localidx) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.idx) .
+rewrites: 8 (2.09199e-06%)
+
+ceq typecheck(externidx.func(FUNCIDX:SpectecTerminal), syn.externidx) = true if
+    externidx.func(FUNCIDX:SpectecTerminal) : SpectecTerminal .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq typecheck(i32, syn.addrtype) = true .
+rewrites: 407200 (0.106482%)
+
+eq typecheck(i32, syn.numtype) = true .
+rewrites: 532899 (0.139353%)
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.consttype) = true if typecheck(VALUE1:[Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult],
+    syn.numtype) = true .
+lhs matches: 149	rewrites: 149 (3.89634e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		149		0		149		0
+
+eq typecheck(final.final, syn.final) = true .
+rewrites: 13 (3.39949e-06%)
+
+ceq typecheck(rec(N:Nat), syn.typeuse) = true if rec(N:Nat) : SpectecTerminal .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.typeuse) = true if typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.deftype) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.valtype) = true if typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.consttype) = true .
+lhs matches: 149	rewrites: 149 (3.89634e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		149		0		149		0
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.resulttype) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.list(syn.valtype)) .
+rewrites: 78 (2.03969e-05%)
+
+ceq typecheck(comptype.func-sym(RESULTTYPE:SpectecTerminal,
+    RESULTTYPE2:SpectecTerminal), syn.comptype) = true if comptype.func-sym(
+    RESULTTYPE:SpectecTerminal, RESULTTYPE2:SpectecTerminal) : SpectecTerminal
+    .
+lhs matches: 25	rewrites: 25 (6.53748e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		25		0		25		0
+
+ceq typecheck(subtype.sub(FINAL_OPT:SpectecTerminals,
+    TYPEUSE_STAR:SpectecTerminals, COMPTYPE:SpectecTerminal), syn.subtype) =
+    true if subtype.sub(FINAL_OPT:SpectecTerminals,
+    TYPEUSE_STAR:SpectecTerminals, COMPTYPE:SpectecTerminal) : SpectecTerminal
+    .
+lhs matches: 43	rewrites: 43 (1.12445e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		43		0		43		0
+
+ceq typecheck(rectype.rec(COMPONENT1:SpectecTerminal), syn.rectype) = true if
+    rectype.rec(COMPONENT1:SpectecTerminal) : SpectecTerminal .
+lhs matches: 15	rewrites: 15 (3.92249e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		0		15		0
+
+ceq typecheck(deftype.def(RECTYPE:SpectecTerminal, N:Nat), syn.deftype) = true
+    if deftype.def(RECTYPE:SpectecTerminal, N:Nat) : SpectecTerminal .
+lhs matches: 15	rewrites: 15 (3.92249e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		0		15		0
+
+ceq typecheck(idx(TYPEIDX:SpectecTerminal), syn.typevar) = true if idx(
+    TYPEIDX:SpectecTerminal) : SpectecTerminal .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+ceq typecheck(rec(N:Nat), syn.typevar) = true if rec(N:Nat) : SpectecTerminal .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.Inn) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.addrtype) .
+rewrites: 352907 (0.0922849%)
+
+ceq def.size(i32) = 32 if typecheck(i32, syn.numtype) = true .
+lhs matches: 298612	rewrites: 298612 (0.0780868%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		298612		0		298612		0
+
+eq def.sizenn(NT:SpectecTerminal) = def.size(NT:SpectecTerminal) .
+rewrites: 298612 (0.0780868%)
+
+eq def.minus-recs(eps, eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 2 (5.22998e-07%)
+
+eq def.subst-numtype(NT:SpectecTerminal, TV_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals) = NT:SpectecTerminal .
+rewrites: 48 (1.2552e-05%)
+
+ceq def.subst-valtype(NT:SpectecTerminal, TV_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals) = def.subst-numtype(NT:SpectecTerminal,
+    TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals) if typecheck(
+    NT:SpectecTerminal, syn.numtype) = true /\ typecheck(def.subst-numtype(
+    NT:SpectecTerminal, TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals),
+    syn.numtype) = true .
+lhs matches: 48	rewrites: 48 (1.2552e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		48		0		48		0
+2		48		0		48		0
+
+ceq def.subst-comptype(comptype.func-sym(list.wrap(T_1_STAR:SpectecTerminals),
+    list.wrap(T_2_STAR:SpectecTerminals)), TV_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals) = comptype.func-sym(list.wrap(
+    helper.iter-map.subst-comptype.2(T_1_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals, TV_STAR:SpectecTerminals)), list.wrap(
+    helper.iter-map.subst-comptype.3(T_2_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals, TV_STAR:SpectecTerminals))) if typecheckSeq(
+    T_1_STAR:SpectecTerminals, syn.valtype) = true /\ typecheckSeq(
+    T_2_STAR:SpectecTerminals, syn.valtype) = true /\ typecheck(
+    comptype.func-sym(list.wrap(T_1_STAR:SpectecTerminals), list.wrap(
+    T_2_STAR:SpectecTerminals)), syn.comptype) = true /\ typecheck(list.wrap(
+    helper.iter-map.subst-comptype.2(T_1_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals, TV_STAR:SpectecTerminals)), syn.resulttype) =
+    true /\ typecheck(list.wrap(helper.iter-map.subst-comptype.3(
+    T_2_STAR:SpectecTerminals, TU_STAR:SpectecTerminals,
+    TV_STAR:SpectecTerminals)), syn.resulttype) = true .
+lhs matches: 12	rewrites: 12 (3.13799e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		12		0		12		0
+2		12		0		12		0
+3		12		0		12		0
+4		12		0		12		0
+5		12		0		12		0
+
+ceq def.subst-subtype(subtype.sub(FINAL_OPT:SpectecTerminals,
+    TU_PRIME_STAR:SpectecTerminals, CT:SpectecTerminal),
+    TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals) = subtype.sub(
+    FINAL_OPT:SpectecTerminals, helper.iter-map.subst-subtype(
+    TU_PRIME_STAR:SpectecTerminals, TU_STAR:SpectecTerminals,
+    TV_STAR:SpectecTerminals), def.subst-comptype(CT:SpectecTerminal,
+    TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals)) if isOpt(
+    FINAL_OPT:SpectecTerminals) = true /\ typecheck(subtype.sub(
+    FINAL_OPT:SpectecTerminals, TU_PRIME_STAR:SpectecTerminals,
+    CT:SpectecTerminal), syn.subtype) = true /\ isOpt(
+    FINAL_OPT:SpectecTerminals) = true .
+lhs matches: 12	rewrites: 12 (3.13799e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		12		0		12		0
+2		12		0		12		0
+3		12		0		12		0
+
+ceq def.subst-rectype(rectype.rec(list.wrap(ST_STAR:SpectecTerminals)),
+    TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals) = rectype.rec(
+    list.wrap(helper.iter-map.subst-rectype(ST_STAR:SpectecTerminals,
+    TU_PRIME_STAR:SpectecTerminals, TV_PRIME_STAR:SpectecTerminals))) if
+    typecheckSeq(ST_STAR:SpectecTerminals, syn.subtype) = true /\ typecheck(
+    rectype.rec(list.wrap(ST_STAR:SpectecTerminals)), syn.rectype) = true /\
+    tuple(seq(TV_PRIME_STAR:SpectecTerminals) seq(
+    TU_PRIME_STAR:SpectecTerminals)) := def.minus-recs(
+    TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals) /\ typecheck(list.wrap(
+    helper.iter-map.subst-rectype(ST_STAR:SpectecTerminals,
+    TU_PRIME_STAR:SpectecTerminals, TV_PRIME_STAR:SpectecTerminals)), syn.list(
+    syn.subtype)) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+3		2		0		2		0
+4		2		0		2		0
+
+ceq def.subst-deftype(deftype.def(QT:SpectecTerminal, I:Nat),
+    TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals) = deftype.def(
+    def.subst-rectype(QT:SpectecTerminal, TV_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals), I:Nat) if typecheck(deftype.def(
+    QT:SpectecTerminal, I:Nat), syn.deftype) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+ceq def.subst-all-deftype(DT:SpectecTerminal, TU_STAR:SpectecTerminals) =
+    def.subst-deftype(DT:SpectecTerminal, helper.iter-count.subst-all-deftype(
+    N:Nat, 0), TU_STAR:SpectecTerminals) if N:Nat := len(
+    TU_STAR:SpectecTerminals) /\ N:Nat = len(TU_STAR:SpectecTerminals) .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+
+eq def.subst-all-deftypes(eps, TU_STAR:SpectecTerminals) = eps .
+rewrites: 2 (5.22998e-07%)
+
+eq def.subst-all-deftypes(DT_1:SpectecTerminal DT_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals) = def.subst-all-deftype(DT_1:SpectecTerminal,
+    TU_STAR:SpectecTerminals) def.subst-all-deftypes(DT_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals) .
+rewrites: 2 (5.22998e-07%)
+
+ceq def.rollrt(X:SpectecTerminal, RECTYPE:SpectecTerminal) = rectype.rec(
+    list.wrap(helper.iter-map.rollrt(SUBTYPE_STAR:SpectecTerminals, N:Nat,
+    X:SpectecTerminal))) if rectype.rec(list.wrap(
+    SUBTYPE_STAR:SpectecTerminals)) := RECTYPE:SpectecTerminal /\ N:Nat := len(
+    SUBTYPE_STAR:SpectecTerminals) /\ len(SUBTYPE_STAR:SpectecTerminals) =
+    N:Nat /\ typecheck(list.wrap(helper.iter-map.rollrt(
+    SUBTYPE_STAR:SpectecTerminals, N:Nat, X:SpectecTerminal)), syn.list(
+    syn.subtype)) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+3		2		0		2		0
+4		2		0		2		0
+
+ceq def.unrollrt(RECTYPE:SpectecTerminal) = rectype.rec(list.wrap(
+    helper.iter-map.unrollrt(SUBTYPE_STAR:SpectecTerminals, N:Nat,
+    RECTYPE:SpectecTerminal))) if rectype.rec(list.wrap(
+    SUBTYPE_STAR:SpectecTerminals)) := RECTYPE:SpectecTerminal /\ N:Nat := len(
+    SUBTYPE_STAR:SpectecTerminals) /\ len(SUBTYPE_STAR:SpectecTerminals) =
+    N:Nat /\ typecheck(list.wrap(helper.iter-map.unrollrt(
+    SUBTYPE_STAR:SpectecTerminals, N:Nat, RECTYPE:SpectecTerminal)), syn.list(
+    syn.subtype)) = true .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+2		8		0		8		0
+3		8		0		8		0
+4		8		0		8		0
+
+ceq def.rolldt(X:SpectecTerminal, RECTYPE:SpectecTerminal) =
+    helper.iter-count.rolldt(N:Nat, 0, N:Nat, SUBTYPE_STAR:SpectecTerminals) if
+    rectype.rec(list.wrap(SUBTYPE_STAR:SpectecTerminals)) := def.rollrt(
+    X:SpectecTerminal, RECTYPE:SpectecTerminal) /\ N:Nat := len(
+    SUBTYPE_STAR:SpectecTerminals) .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+
+ceq def.unrolldt(deftype.def(RECTYPE:SpectecTerminal, I:Nat)) = index(
+    SUBTYPE_STAR:SpectecTerminals, I:Nat) if typecheck(deftype.def(
+    RECTYPE:SpectecTerminal, I:Nat), syn.deftype) = true /\ rectype.rec(
+    list.wrap(SUBTYPE_STAR:SpectecTerminals)) := def.unrollrt(
+    RECTYPE:SpectecTerminal) /\ indexDefined(SUBTYPE_STAR:SpectecTerminals,
+    I:Nat) = true .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+2		8		0		8		0
+3		8		0		8		0
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.num(INN:SpectecTerminal)) = typecheck(VALUE1:[Rat,
+    RelConfStepPure,RelConfStepRead,DecConfVcvtop,DecConfVextternop,
+    RelConfStep,RelConfSteps,RelConfEvalExpr,DecConfEvalexprs,
+    DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,FindResult],
+    syn.iN(def.sizenn(INN:SpectecTerminal))) if typecheck(INN:SpectecTerminal,
+    syn.Inn) = true .
+lhs matches: 244320	rewrites: 244320 (0.0638895%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		244320		0		244320		0
+
+ceq typecheck(binop.add, syn.binop(INN:SpectecTerminal)) = true if typecheck(
+    INN:SpectecTerminal, syn.Inn) = true .
+lhs matches: 10241	rewrites: 10241 (0.00267801%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		10241		0		10241		0
+
+ceq typecheck(binop.sub, syn.binop(INN:SpectecTerminal)) = true if typecheck(
+    INN:SpectecTerminal, syn.Inn) = true .
+lhs matches: 41	rewrites: 41 (1.07215e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		41		0		41		0
+
+ceq typecheck(testop.eqz, syn.testop(INN:SpectecTerminal)) = true if typecheck(
+    INN:SpectecTerminal, syn.Inn) = true .
+lhs matches: 98305	rewrites: 98305 (0.0257067%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		98305		0		98305		0
+
+ceq typecheck(blocktype.result(VALTYPE_OPT:SpectecTerminals), syn.blocktype) =
+    true if blocktype.result(VALTYPE_OPT:SpectecTerminals) : SpectecTerminal .
+lhs matches: 15	rewrites: 15 (3.92249e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		0		15		0
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.addr) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.nat) .
+rewrites: 5 (1.3075e-06%)
+
+eq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.funcaddr) = typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.addr) .
+rewrites: 5 (1.3075e-06%)
+
+ceq typecheck(externaddr.func(FUNCADDR:Nat), syn.externaddr) = true if
+    externaddr.func(FUNCADDR:Nat) : SpectecTerminal .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq typecheck(rec.exportinst(NAME, EXTERNADDR:SpectecTerminal), syn.exportinst)
+    = true if rec.exportinst(NAME, EXTERNADDR:SpectecTerminal) :
+    SpectecTerminal .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq typecheck(rec.moduleinst(COMPONENT1:SpectecTerminals,
+    COMPONENT2:SpectecTerminals, COMPONENT3:SpectecTerminals,
+    COMPONENT4:SpectecTerminals, COMPONENT5:SpectecTerminals,
+    COMPONENT6:SpectecTerminals, COMPONENT7:SpectecTerminals,
+    COMPONENT8:SpectecTerminals, COMPONENT9:SpectecTerminals), syn.moduleinst)
+    = true if rec.moduleinst(COMPONENT1:SpectecTerminals,
+    COMPONENT2:SpectecTerminals, COMPONENT3:SpectecTerminals,
+    COMPONENT4:SpectecTerminals, COMPONENT5:SpectecTerminals,
+    COMPONENT6:SpectecTerminals, COMPONENT7:SpectecTerminals,
+    COMPONENT8:SpectecTerminals, COMPONENT9:SpectecTerminals) : SpectecTerminal
+    .
+lhs matches: 1690	rewrites: 1690 (0.000441934%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1690		0		1690		0
+
+eq value('FUNCS, rec.moduleinst(COMPONENT1:SpectecTerminals,
+    COMPONENT2:SpectecTerminals, COMPONENT3:SpectecTerminals,
+    COMPONENT4:SpectecTerminals, COMPONENT5:SpectecTerminals,
+    COMPONENT6:SpectecTerminals, COMPONENT7:SpectecTerminals,
+    COMPONENT8:SpectecTerminals, COMPONENT9:SpectecTerminals)) =
+    COMPONENT6:SpectecTerminals .
+rewrites: 1 (2.61499e-07%)
+
+eq value('EXPORTS, rec.moduleinst(COMPONENT1:SpectecTerminals,
+    COMPONENT2:SpectecTerminals, COMPONENT3:SpectecTerminals,
+    COMPONENT4:SpectecTerminals, COMPONENT5:SpectecTerminals,
+    COMPONENT6:SpectecTerminals, COMPONENT7:SpectecTerminals,
+    COMPONENT8:SpectecTerminals, COMPONENT9:SpectecTerminals)) =
+    COMPONENT9:SpectecTerminals .
+rewrites: 1 (2.61499e-07%)
+
+ceq typecheck(ref.ref-func-addr(FUNCADDR:Nat), syn.ref) = true if
+    ref.ref-func-addr(FUNCADDR:Nat) : SpectecTerminal .
+lhs matches: 138	rewrites: 138 (3.60869e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		138		0		138		0
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.val) = true if typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.num) = true .
+lhs matches: 22179467	rewrites: 2012149 (0.526175%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		22179467		0		2012149	
+    	20167318
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.val) = true if typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.vec) = true .
+lhs matches: 20167318	rewrites: 0 (0%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		20167318		0		0	
+    	20167318
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.val) = true if typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.ref) = true .
+lhs matches: 20167318	rewrites: 56 (1.4644e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		20167318		0		56	
+    	20167262
+
+ceq typecheck(rec.frame(COMPONENT1:SpectecTerminals,
+    MODULEINST:SpectecTerminal), syn.frame) = true if rec.frame(
+    COMPONENT1:SpectecTerminals, MODULEINST:SpectecTerminal) : SpectecTerminal
+    .
+lhs matches: 1957	rewrites: 1957 (0.000511754%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1957		0		1957		0
+
+eq value('LOCALS, rec.frame(COMPONENT1:SpectecTerminals,
+    MODULEINST:SpectecTerminal)) = COMPONENT1:SpectecTerminals .
+rewrites: 177630 (0.0464501%)
+
+eq rec.frame(COMPONENT1:SpectecTerminals, MODULEINST:SpectecTerminal)[. 'LOCALS
+    <- UPDATE1:SpectecTerminals] = rec.frame(UPDATE1:SpectecTerminals,
+    MODULEINST:SpectecTerminal) .
+rewrites: 1685 (0.000440626%)
+
+ceq typecheck(instr.block(BLOCKTYPE:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals), syn.instr) = true if instr.block(
+    BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal .
+lhs matches: 7	rewrites: 7 (1.83049e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		7		0		7		0
+
+ceq typecheck(instr.loop(BLOCKTYPE:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals), syn.instr) = true if instr.loop(
+    BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals) : SpectecTerminal .
+lhs matches: 103	rewrites: 103 (2.69344e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		103		0		103		0
+
+ceq typecheck(instr.br(LABELIDX:SpectecTerminal), syn.instr) = true if
+    instr.br(LABELIDX:SpectecTerminal) : SpectecTerminal .
+lhs matches: 29796	rewrites: 29796 (0.00779163%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		29796		0		29796		0
+
+ceq typecheck(instr.br-if(LABELIDX:SpectecTerminal), syn.instr) = true if
+    instr.br-if(LABELIDX:SpectecTerminal) : SpectecTerminal .
+lhs matches: 3293197	rewrites: 3293197 (0.861168%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3293197		0		3293197		0
+
+ceq typecheck(instr.call-ref(TYPEUSE:SpectecTerminal), syn.instr) = true if
+    instr.call-ref(TYPEUSE:SpectecTerminal) : SpectecTerminal .
+lhs matches: 34	rewrites: 34 (8.89097e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		34		0		34		0
+
+ceq typecheck(instr.local-get(LOCALIDX:SpectecTerminal), syn.instr) = true if
+    instr.local-get(LOCALIDX:SpectecTerminal) : SpectecTerminal .
+lhs matches: 3710623	rewrites: 3710623 (0.970325%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3710623		0		3710623		0
+
+ceq typecheck(instr.local-set(LOCALIDX:SpectecTerminal), syn.instr) = true if
+    instr.local-set(LOCALIDX:SpectecTerminal) : SpectecTerminal .
+lhs matches: 1051416	rewrites: 1051416 (0.274944%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1051416		0		1051416		0
+
+ceq typecheck(const(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal),
+    syn.instr) = true if const(NUMTYPE:SpectecTerminal,
+    COMPONENT1:SpectecTerminal) : SpectecTerminal .
+lhs matches: 1811874	rewrites: 1811874 (0.473804%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1811874		0		1811874		0
+
+ceq typecheck(instr.binop(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal),
+    syn.instr) = true if instr.binop(NUMTYPE:SpectecTerminal,
+    COMPONENT1:SpectecTerminal) : SpectecTerminal .
+lhs matches: 1594530	rewrites: 1594530 (0.416968%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1594530		0		1594530		0
+
+ceq typecheck(instr.testop(NUMTYPE:SpectecTerminal,
+    COMPONENT1:SpectecTerminal), syn.instr) = true if instr.testop(
+    NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal) : SpectecTerminal .
+lhs matches: 3538957	rewrites: 3538957 (0.925434%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3538957		0		3538957		0
+
+ceq typecheck(instr.label-sym-sym(N:Nat, INSTR_STAR:SpectecTerminals,
+    INSTR_STAR2:SpectecTerminals), syn.instr) = true if instr.label-sym-sym(
+    N:Nat, INSTR_STAR:SpectecTerminals, INSTR_STAR2:SpectecTerminals) :
+    SpectecTerminal .
+lhs matches: 1273	rewrites: 1273 (0.000332888%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1273		0		1273		0
+
+ceq typecheck(instr.frame-sym-sym(N:Nat, FRAME:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals), syn.instr) = true if instr.frame-sym-sym(
+    N:Nat, FRAME:SpectecTerminal, INSTR_STAR:SpectecTerminals) :
+    SpectecTerminal .
+lhs matches: 360	rewrites: 360 (9.41397e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		360		0		360		0
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.instr) = true if typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.ref) = true .
+lhs matches: 82	rewrites: 82 (2.14429e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		82		0		82		0
+
+eq typecheckSeq(VALUE1:SpectecTerminals, syn.expr) = typecheckSeq(
+    VALUE1:SpectecTerminals, syn.instr) .
+rewrites: 2 (5.22998e-07%)
+
+ceq typecheck(type.type(RECTYPE:SpectecTerminal), syn.type) = true if
+    type.type(RECTYPE:SpectecTerminal) : SpectecTerminal .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq typecheck(local.local(VALTYPE:SpectecTerminal), syn.local) = true if
+    local.local(VALTYPE:SpectecTerminal) : SpectecTerminal .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+ceq typecheck(func.func(TYPEIDX:SpectecTerminal, LOCAL_STAR:SpectecTerminals,
+    EXPR:SpectecTerminals), syn.func) = true if func.func(
+    TYPEIDX:SpectecTerminal, LOCAL_STAR:SpectecTerminals,
+    EXPR:SpectecTerminals) : SpectecTerminal .
+lhs matches: 3	rewrites: 3 (7.84497e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3		0		3		0
+
+ceq typecheck(export.export(NAME, EXTERNIDX:SpectecTerminal), syn.export) =
+    true if export.export(NAME, EXTERNIDX:SpectecTerminal) : SpectecTerminal .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+ceq rel.expand(DEFTYPE:SpectecTerminal) = COMPTYPE:SpectecTerminal if
+    subtype.sub(FINAL_OPT:SpectecTerminals, TYPEUSE_STAR:SpectecTerminals,
+    COMPTYPE:SpectecTerminal) := def.unrolldt(DEFTYPE:SpectecTerminal) /\
+    isOpt(FINAL_OPT:SpectecTerminals) = true .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+2		8		0		8		0
+
+ceq def.default(INN:SpectecTerminal) = const(INN:SpectecTerminal, uN.wrap(0))
+    if typecheck(INN:SpectecTerminal, syn.addrtype) = true /\ typecheck(
+    uN.wrap(0), syn.num(INN:SpectecTerminal)) = true /\ typecheck(const(
+    INN:SpectecTerminal, uN.wrap(0)), syn.val) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+
+eq def.bool(bool(false)) = 0 .
+rewrites: 40960 (0.010711%)
+
+eq def.bool(bool(true)) = 1 .
+rewrites: 8192 (0.0021422%)
+
+ceq def.iadd(N:Nat, I_1:SpectecTerminal, I_2:SpectecTerminal) = uN.wrap(modNat(
+    proj.uN.wrap.0(I_1:SpectecTerminal) + proj.uN.wrap.0(I_2:SpectecTerminal),
+    2 ^ N:Nat)) if typecheck(I_1:SpectecTerminal, syn.iN(N:Nat)) = true /\
+    typecheck(I_2:SpectecTerminal, syn.iN(N:Nat)) = true /\ 2 ^ N:Nat =/= 0 =
+    true /\ typecheck(uN.wrap(modNat(proj.uN.wrap.0(I_1:SpectecTerminal) +
+    proj.uN.wrap.0(I_2:SpectecTerminal), 2 ^ N:Nat)), syn.iN(N:Nat)) = true .
+lhs matches: 5120	rewrites: 5120 (0.00133888%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		5120		0		5120		0
+2		5120		0		5120		0
+3		5120		0		5120		0
+4		5120		0		5120		0
+
+ceq def.isub(N:Nat, I_1:SpectecTerminal, I_2:SpectecTerminal) = uN.wrap(
+    natOfInt(modInt((proj.uN.wrap.0(I_1:SpectecTerminal) + 2 ^ N:Nat) -
+    proj.uN.wrap.0(I_2:SpectecTerminal), 2 ^ N:Nat))) if typecheck(
+    I_1:SpectecTerminal, syn.iN(N:Nat)) = true /\ typecheck(
+    I_2:SpectecTerminal, syn.iN(N:Nat)) = true /\ 2 ^ N:Nat =/= 0 = true /\
+    modInt((proj.uN.wrap.0(I_1:SpectecTerminal) + 2 ^ N:Nat) - proj.uN.wrap.0(
+    I_2:SpectecTerminal), 2 ^ N:Nat) >= 0 = true /\ typecheck(uN.wrap(natOfInt(
+    modInt((proj.uN.wrap.0(I_1:SpectecTerminal) + 2 ^ N:Nat) - proj.uN.wrap.0(
+    I_2:SpectecTerminal), 2 ^ N:Nat))), syn.iN(N:Nat)) = true .
+lhs matches: 20	rewrites: 20 (5.22998e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		20		0		20		0
+2		20		0		20		0
+3		20		0		20		0
+4		20		0		20		0
+5		20		0		20		0
+
+ceq def.ieqz(N:Nat, I_1:SpectecTerminal) = uN.wrap(def.bool(bool(
+    proj.uN.wrap.0(I_1:SpectecTerminal) == 0))) if typecheck(
+    I_1:SpectecTerminal, syn.iN(N:Nat)) = true /\ typecheck(uN.wrap(def.bool(
+    bool(proj.uN.wrap.0(I_1:SpectecTerminal) == 0))), syn.u32) = true .
+lhs matches: 49152	rewrites: 49152 (0.0128532%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		49152		0		49152		0
+2		49152		0		49152		0
+
+ceq def.binop(INN:SpectecTerminal, binop.add, I_1:SpectecTerminal,
+    I_2:SpectecTerminal) = def.iadd(def.sizenn(INN:SpectecTerminal),
+    I_1:SpectecTerminal, I_2:SpectecTerminal) if typecheck(binop.add,
+    syn.binop(INN:SpectecTerminal)) = true /\ typecheck(INN:SpectecTerminal,
+    syn.addrtype) = true .
+lhs matches: 5120	rewrites: 5120 (0.00133888%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		5120		0		5120		0
+2		5120		0		5120		0
+
+ceq def.binop(INN:SpectecTerminal, binop.sub, I_1:SpectecTerminal,
+    I_2:SpectecTerminal) = def.isub(def.sizenn(INN:SpectecTerminal),
+    I_1:SpectecTerminal, I_2:SpectecTerminal) if typecheck(binop.sub,
+    syn.binop(INN:SpectecTerminal)) = true /\ typecheck(INN:SpectecTerminal,
+    syn.addrtype) = true .
+lhs matches: 20	rewrites: 20 (5.22998e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		20		0		20		0
+2		20		0		20		0
+
+ceq def.testop(INN:SpectecTerminal, testop.eqz, I:SpectecTerminal) = def.ieqz(
+    def.sizenn(INN:SpectecTerminal), I:SpectecTerminal) if typecheck(
+    testop.eqz, syn.testop(INN:SpectecTerminal)) = true /\ typecheck(
+    INN:SpectecTerminal, syn.addrtype) = true .
+lhs matches: 49152	rewrites: 49152 (0.0128532%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		49152		0		49152		0
+2		49152		0		49152		0
+
+ceq typecheck(const(NUMTYPE:SpectecTerminal, COMPONENT1:SpectecTerminal),
+    syn.num) = true if const(NUMTYPE:SpectecTerminal,
+    COMPONENT1:SpectecTerminal) : SpectecTerminal .
+lhs matches: 2012149	rewrites: 2012149 (0.526175%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2012149		0		2012149		0
+
+ceq typecheck(VALUE1:[Rat,RelConfStepPure,RelConfStepRead,DecConfVcvtop,
+    DecConfVextternop,RelConfStep,RelConfSteps,RelConfEvalExpr,
+    DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,DecConfInstantiate,
+    FindResult], syn.funccode) = true if typecheck(VALUE1:[Rat,RelConfStepPure,
+    RelConfStepRead,DecConfVcvtop,DecConfVextternop,RelConfStep,RelConfSteps,
+    RelConfEvalExpr,DecConfEvalexprs,DecConfEvalexprss,DecConfEvalglobals,
+    DecConfInstantiate,FindResult], syn.func) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq typecheck(rec.funcinst(DEFTYPE:SpectecTerminal, MODULEINST:SpectecTerminal,
+    FUNCCODE:SpectecTerminal), syn.funcinst) = true if rec.funcinst(
+    DEFTYPE:SpectecTerminal, MODULEINST:SpectecTerminal,
+    FUNCCODE:SpectecTerminal) : SpectecTerminal .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+eq value('TYPE, rec.funcinst(DEFTYPE:SpectecTerminal,
+    MODULEINST:SpectecTerminal, FUNCCODE:SpectecTerminal)) =
+    DEFTYPE:SpectecTerminal .
+rewrites: 9 (2.35349e-06%)
+
+eq value('MODULE, rec.funcinst(DEFTYPE:SpectecTerminal,
+    MODULEINST:SpectecTerminal, FUNCCODE:SpectecTerminal)) =
+    MODULEINST:SpectecTerminal .
+rewrites: 1 (2.61499e-07%)
+
+eq value('CODE, rec.funcinst(DEFTYPE:SpectecTerminal,
+    MODULEINST:SpectecTerminal, FUNCCODE:SpectecTerminal)) =
+    FUNCCODE:SpectecTerminal .
+rewrites: 1 (2.61499e-07%)
+
+ceq typecheck(rec.store(COMPONENT1:SpectecTerminals,
+    COMPONENT2:SpectecTerminals, COMPONENT3:SpectecTerminals,
+    COMPONENT4:SpectecTerminals, COMPONENT5:SpectecTerminals,
+    COMPONENT6:SpectecTerminals, COMPONENT7:SpectecTerminals,
+    COMPONENT8:SpectecTerminals, COMPONENT9:SpectecTerminals,
+    COMPONENT10:SpectecTerminals), syn.store) = true if rec.store(
+    COMPONENT1:SpectecTerminals, COMPONENT2:SpectecTerminals,
+    COMPONENT3:SpectecTerminals, COMPONENT4:SpectecTerminals,
+    COMPONENT5:SpectecTerminals, COMPONENT6:SpectecTerminals,
+    COMPONENT7:SpectecTerminals, COMPONENT8:SpectecTerminals,
+    COMPONENT9:SpectecTerminals, COMPONENT10:SpectecTerminals) :
+    SpectecTerminal .
+lhs matches: 1867	rewrites: 1867 (0.000488219%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1867		0		1867		0
+
+eq value('FUNCS, rec.store(COMPONENT1:SpectecTerminals,
+    COMPONENT2:SpectecTerminals, COMPONENT3:SpectecTerminals,
+    COMPONENT4:SpectecTerminals, COMPONENT5:SpectecTerminals,
+    COMPONENT6:SpectecTerminals, COMPONENT7:SpectecTerminals,
+    COMPONENT8:SpectecTerminals, COMPONENT9:SpectecTerminals,
+    COMPONENT10:SpectecTerminals)) = COMPONENT5:SpectecTerminals .
+rewrites: 12 (3.13799e-06%)
+
+ceq compose.rec.store(rec.store(LEFT_TAGS:SpectecTerminals,
+    LEFT_GLOBALS:SpectecTerminals, LEFT_MEMS:SpectecTerminals,
+    LEFT_TABLES:SpectecTerminals, LEFT_FUNCS:SpectecTerminals,
+    LEFT_DATAS:SpectecTerminals, LEFT_ELEMS:SpectecTerminals,
+    LEFT_STRUCTS:SpectecTerminals, LEFT_ARRAYS:SpectecTerminals,
+    LEFT_EXNS:SpectecTerminals), rec.store(RIGHT_TAGS:SpectecTerminals,
+    RIGHT_GLOBALS:SpectecTerminals, RIGHT_MEMS:SpectecTerminals,
+    RIGHT_TABLES:SpectecTerminals, RIGHT_FUNCS:SpectecTerminals,
+    RIGHT_DATAS:SpectecTerminals, RIGHT_ELEMS:SpectecTerminals,
+    RIGHT_STRUCTS:SpectecTerminals, RIGHT_ARRAYS:SpectecTerminals,
+    RIGHT_EXNS:SpectecTerminals)) = rec.store(LEFT_TAGS:SpectecTerminals
+    RIGHT_TAGS:SpectecTerminals, LEFT_GLOBALS:SpectecTerminals
+    RIGHT_GLOBALS:SpectecTerminals, LEFT_MEMS:SpectecTerminals
+    RIGHT_MEMS:SpectecTerminals, LEFT_TABLES:SpectecTerminals
+    RIGHT_TABLES:SpectecTerminals, LEFT_FUNCS:SpectecTerminals
+    RIGHT_FUNCS:SpectecTerminals, LEFT_DATAS:SpectecTerminals
+    RIGHT_DATAS:SpectecTerminals, LEFT_ELEMS:SpectecTerminals
+    RIGHT_ELEMS:SpectecTerminals, LEFT_STRUCTS:SpectecTerminals
+    RIGHT_STRUCTS:SpectecTerminals, LEFT_ARRAYS:SpectecTerminals
+    RIGHT_ARRAYS:SpectecTerminals, LEFT_EXNS:SpectecTerminals
+    RIGHT_EXNS:SpectecTerminals) if rec.store(LEFT_TAGS:SpectecTerminals,
+    LEFT_GLOBALS:SpectecTerminals, LEFT_MEMS:SpectecTerminals,
+    LEFT_TABLES:SpectecTerminals, LEFT_FUNCS:SpectecTerminals,
+    LEFT_DATAS:SpectecTerminals, LEFT_ELEMS:SpectecTerminals,
+    LEFT_STRUCTS:SpectecTerminals, LEFT_ARRAYS:SpectecTerminals,
+    LEFT_EXNS:SpectecTerminals) : SpectecTerminal /\ rec.store(
+    RIGHT_TAGS:SpectecTerminals, RIGHT_GLOBALS:SpectecTerminals,
+    RIGHT_MEMS:SpectecTerminals, RIGHT_TABLES:SpectecTerminals,
+    RIGHT_FUNCS:SpectecTerminals, RIGHT_DATAS:SpectecTerminals,
+    RIGHT_ELEMS:SpectecTerminals, RIGHT_STRUCTS:SpectecTerminals,
+    RIGHT_ARRAYS:SpectecTerminals, RIGHT_EXNS:SpectecTerminals) :
+    SpectecTerminal .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+ceq typecheck(state.sym(STORE:SpectecTerminal, FRAME:SpectecTerminal),
+    syn.state) = true if state.sym(STORE:SpectecTerminal,
+    FRAME:SpectecTerminal) : SpectecTerminal .
+lhs matches: 15513670	rewrites: 15513670 (4.05681%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15513670		0		15513670	
+    	0
+
+ceq typecheck(config.sym(STATE:SpectecTerminal, INSTR_STAR:SpectecTerminals),
+    syn.config) = true if config.sym(STATE:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals) : SpectecTerminal .
+lhs matches: 512480	rewrites: 512480 (0.134013%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		512480		0		512480		0
+
+eq def.tagsxa(eps) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq def.globalsxa(eps) = eps .
+rewrites: 2 (5.22998e-07%)
+
+eq def.memsxa(eps) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq def.tablesxa(eps) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq def.funcsxa(eps) = eps .
+rewrites: 2 (5.22998e-07%)
+
+ceq def.store(state.sym(S, F:SpectecTerminal)) = S if typecheck(state.sym(S,
+    F:SpectecTerminal), syn.state) = true .
+lhs matches: 1685	rewrites: 1685 (0.000440626%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1685		0		1685		0
+
+ceq def.frame(state.sym(S, F:SpectecTerminal)) = F:SpectecTerminal if
+    typecheck(state.sym(S, F:SpectecTerminal), syn.state) = true .
+lhs matches: 177630	rewrites: 177630 (0.0464501%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		177630		0		177630		0
+
+ceq def.funcinst(state.sym(S, F:SpectecTerminal)) = value('FUNCS, S) if
+    typecheck(state.sym(S, F:SpectecTerminal), syn.state) = true .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+
+eq def.fof(Z:SpectecTerminal) = def.frame(Z:SpectecTerminal) .
+rewrites: 177630 (0.0464501%)
+
+eq def.sof(Z:SpectecTerminal) = def.store(Z:SpectecTerminal) .
+rewrites: 1685 (0.000440626%)
+
+ceq def.local(Z:SpectecTerminal, X:SpectecTerminal) = indexSeq(value('LOCALS,
+    def.fof(Z:SpectecTerminal)), proj.uN.wrap.0(X:SpectecTerminal)) if
+    typecheck(X:SpectecTerminal, syn.idx) = true /\ indexDefined(value('LOCALS,
+    def.fof(Z:SpectecTerminal)), proj.uN.wrap.0(X:SpectecTerminal)) = true .
+lhs matches: 175945	rewrites: 175945 (0.0460095%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		175945		0		175945		0
+2		175945		0		175945		0
+
+ceq def.with-local(Z:SpectecTerminal, X:SpectecTerminal, V:SpectecTerminal) =
+    state.sym(def.sof(Z:SpectecTerminal), def.fof(Z:SpectecTerminal)[. 'LOCALS
+    <- value('LOCALS, def.fof(Z:SpectecTerminal))[proj.uN.wrap.0(
+    X:SpectecTerminal) <- seq(V:SpectecTerminal)]]) if typecheck(
+    X:SpectecTerminal, syn.idx) = true .
+lhs matches: 1685	rewrites: 1685 (0.000440626%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1685		0		1685		0
+
+ceq def.blocktype(Z:SpectecTerminal, blocktype.result(T_OPT:SpectecTerminals))
+    = instrtype.sym(list.wrap(eps), eps, list.wrap(T_OPT:SpectecTerminals)) if
+    isOpt(T_OPT:SpectecTerminals) = true /\ typecheck(blocktype.result(
+    T_OPT:SpectecTerminals), syn.blocktype) = true /\ typecheck(list.wrap(eps),
+    syn.resulttype) = true /\ isOpt(T_OPT:SpectecTerminals) = true /\
+    typecheck(list.wrap(T_OPT:SpectecTerminals), syn.resulttype) = true .
+lhs matches: 7	rewrites: 7 (1.83049e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		7		0		7		0
+2		7		0		7		0
+3		7		0		7		0
+4		7		0		7		0
+5		7		0		7		0
+
+eq def.alloctypes(eps) = eps .
+rewrites: 2 (5.22998e-07%)
+
+ceq def.alloctypes(TYPE_PRIME_STAR:SpectecTerminals TYPE:SpectecTerminal) =
+    DEFTYPE_PRIME_STAR:SpectecTerminals DEFTYPE_STAR:SpectecTerminals if
+    DEFTYPE_PRIME_STAR:SpectecTerminals := def.alloctypes(
+    TYPE_PRIME_STAR:SpectecTerminals) /\ type.type(RECTYPE:SpectecTerminal) :=
+    TYPE:SpectecTerminal /\ typecheckSeq(DEFTYPE_PRIME_STAR:SpectecTerminals,
+    syn.deftype) = true /\ X:SpectecTerminal := uN.wrap(len(
+    DEFTYPE_PRIME_STAR:SpectecTerminals)) /\ DEFTYPE_STAR:SpectecTerminals :=
+    def.subst-all-deftypes(def.rolldt(X:SpectecTerminal,
+    RECTYPE:SpectecTerminal), DEFTYPE_PRIME_STAR:SpectecTerminals) /\
+    typecheck(X:SpectecTerminal, syn.idx) = true .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+3		2		0		2		0
+4		2		0		2		0
+5		2		0		2		0
+6		2		0		2		0
+
+eq def.alloctags(S, eps) = tuple(S seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq def.allocglobals(S, eps, eps) = tuple(S seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq def.allocmems(S, eps) = tuple(S seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq def.alloctables(S, eps, eps) = tuple(S seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+ceq def.allocfunc(S, DEFTYPE:SpectecTerminal, FUNCCODE:SpectecTerminal,
+    MODULEINST:SpectecTerminal) = tuple(compose.rec.store(S, rec.store(eps,
+    eps, eps, eps, FUNCINST:SpectecTerminal, eps, eps, eps, eps, eps)) len(
+    value('FUNCS, S))) if FUNCINST:SpectecTerminal := rec.funcinst(
+    DEFTYPE:SpectecTerminal, MODULEINST:SpectecTerminal,
+    FUNCCODE:SpectecTerminal) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq def.allocfuncs(S, eps, eps, eps) = tuple(S seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+ceq def.allocfuncs(S, DT:SpectecTerminal DT_PRIME_STAR:SpectecTerminals,
+    FUNCCODE:SpectecTerminal FUNCCODE_PRIME_STAR:SpectecTerminals,
+    MODULEINST:SpectecTerminal MODULEINST_PRIME_STAR:SpectecTerminals) = tuple(
+    S_2:SpectecTerminal seq(FA:Nat FA_PRIME_STAR:SpectecTerminals)) if tuple(
+    S_1:SpectecTerminal FA:Nat) := def.allocfunc(S, DT:SpectecTerminal,
+    FUNCCODE:SpectecTerminal, MODULEINST:SpectecTerminal) /\ tuple(
+    S_2:SpectecTerminal seq(FA_PRIME_STAR:SpectecTerminals)) := def.allocfuncs(
+    S_1:SpectecTerminal, DT_PRIME_STAR:SpectecTerminals,
+    FUNCCODE_PRIME_STAR:SpectecTerminals,
+    MODULEINST_PRIME_STAR:SpectecTerminals) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+eq def.allocdatas(S, eps, eps) = tuple(S seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq def.allocelems(S, eps, eps) = tuple(S seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+ceq def.allocexport(MODULEINST:SpectecTerminal, export.export(NAME,
+    externidx.func(X:SpectecTerminal))) = rec.exportinst(NAME, externaddr.func(
+    index(value('FUNCS, MODULEINST:SpectecTerminal), proj.uN.wrap.0(
+    X:SpectecTerminal)))) if typecheck(export.export(NAME, externidx.func(
+    X:SpectecTerminal)), syn.export) = true /\ typecheck(X:SpectecTerminal,
+    syn.idx) = true /\ indexDefined(value('FUNCS, MODULEINST:SpectecTerminal),
+    proj.uN.wrap.0(X:SpectecTerminal)) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+
+eq def.allocexports(MODULEINST:SpectecTerminal, EXPORT_STAR:SpectecTerminals) =
+    helper.iter-map.allocexports(EXPORT_STAR:SpectecTerminals,
+    MODULEINST:SpectecTerminal) .
+rewrites: 1 (2.61499e-07%)
+
+ceq def.allocmodule(S, MODULE:SpectecTerminal,
+    EXTERNADDR_STAR:SpectecTerminals, VAL_G_STAR:SpectecTerminals,
+    REF_T_STAR:SpectecTerminals, REF_E_STAR_STAR:SpectecTerminals) = tuple(
+    S_7:SpectecTerminal MODULEINST:SpectecTerminal) if module.module(list.wrap(
+    TYPE_STAR:SpectecTerminals), list.wrap(IMPORT_STAR:SpectecTerminals),
+    list.wrap(TAG_STAR:SpectecTerminals), list.wrap(
+    GLOBAL_STAR:SpectecTerminals), list.wrap(MEM_STAR:SpectecTerminals),
+    list.wrap(TABLE_STAR:SpectecTerminals), list.wrap(
+    FUNC_STAR:SpectecTerminals), list.wrap(DATA_STAR:SpectecTerminals),
+    list.wrap(ELEM_STAR:SpectecTerminals), START_OPT:SpectecTerminals,
+    list.wrap(EXPORT_STAR:SpectecTerminals)) := MODULE:SpectecTerminal /\
+    isOpt(START_OPT:SpectecTerminals) = true /\ PATTERN1:SpectecTerminals :=
+    TAG_STAR:SpectecTerminals /\ tuple(seq(TAGTYPE_STAR:SpectecTerminals)) :=
+    helper.pattern-zip.allocmodule(PATTERN1:SpectecTerminals) /\ typecheckSeq(
+    PATTERN1:SpectecTerminals, syn.tag) = true /\ PATTERN2:SpectecTerminals :=
+    GLOBAL_STAR:SpectecTerminals /\ tuple(seq(EXPR_G_STAR:SpectecTerminals)
+    seq(GLOBALTYPE_STAR:SpectecTerminals)) := helper.pattern-zip.allocmodule.2(
+    PATTERN2:SpectecTerminals) /\ typecheckSeq(PATTERN2:SpectecTerminals,
+    syn.global) = true /\ PATTERN3:SpectecTerminals :=
+    MEM_STAR:SpectecTerminals /\ tuple(seq(MEMTYPE_STAR:SpectecTerminals)) :=
+    helper.pattern-zip.allocmodule.3(PATTERN3:SpectecTerminals) /\
+    typecheckSeq(PATTERN3:SpectecTerminals, syn.mem) = true /\
+    PATTERN4:SpectecTerminals := TABLE_STAR:SpectecTerminals /\ tuple(seq(
+    EXPR_T_STAR:SpectecTerminals) seq(TABLETYPE_STAR:SpectecTerminals)) :=
+    helper.pattern-zip.allocmodule.4(PATTERN4:SpectecTerminals) /\
+    typecheckSeq(PATTERN4:SpectecTerminals, syn.table) = true /\
+    PATTERN5:SpectecTerminals := FUNC_STAR:SpectecTerminals /\ tuple(seq(
+    EXPR_F_STAR:SpectecTerminals) seq(LOCAL_STAR_STAR:SpectecTerminals) seq(
+    X_STAR:SpectecTerminals)) := helper.pattern-zip.allocmodule.5(
+    PATTERN5:SpectecTerminals) /\ typecheckSeq(PATTERN5:SpectecTerminals,
+    syn.func) = true /\ PATTERN6:SpectecTerminals := DATA_STAR:SpectecTerminals
+    /\ tuple(seq(BYTE_STAR_STAR:SpectecTerminals) seq(
+    DATAMODE_STAR:SpectecTerminals)) := helper.pattern-zip.allocmodule.6(
+    PATTERN6:SpectecTerminals) /\ typecheckSeq(PATTERN6:SpectecTerminals,
+    syn.data) = true /\ PATTERN7:SpectecTerminals := ELEM_STAR:SpectecTerminals
+    /\ tuple(seq(ELEMMODE_STAR:SpectecTerminals) seq(
+    ELEMTYPE_STAR:SpectecTerminals) seq(EXPR_E_STAR_STAR:SpectecTerminals)) :=
+    helper.pattern-zip.allocmodule.7(PATTERN7:SpectecTerminals) /\
+    typecheckSeq(PATTERN7:SpectecTerminals, syn.elem) = true /\
+    AA_I_STAR:SpectecTerminals := def.tagsxa(EXTERNADDR_STAR:SpectecTerminals)
+    /\ GA_I_STAR:SpectecTerminals := def.globalsxa(
+    EXTERNADDR_STAR:SpectecTerminals) /\ MA_I_STAR:SpectecTerminals :=
+    def.memsxa(EXTERNADDR_STAR:SpectecTerminals) /\ TA_I_STAR:SpectecTerminals
+    := def.tablesxa(EXTERNADDR_STAR:SpectecTerminals) /\
+    FA_I_STAR:SpectecTerminals := def.funcsxa(EXTERNADDR_STAR:SpectecTerminals)
+    /\ DT_STAR:SpectecTerminals := def.alloctypes(TYPE_STAR:SpectecTerminals)
+    /\ FA_STAR:SpectecTerminals := helper.iter-count.allocmodule(len(
+    FUNC_STAR:SpectecTerminals), 0, S) /\ tuple(S_1:SpectecTerminal seq(
+    AA_STAR:SpectecTerminals)) := def.alloctags(S,
+    helper.iter-map.allocmodule.3(TAGTYPE_STAR:SpectecTerminals,
+    DT_STAR:SpectecTerminals)) /\ tuple(S_2:SpectecTerminal seq(
+    GA_STAR:SpectecTerminals)) := def.allocglobals(S_1:SpectecTerminal,
+    helper.iter-map.allocmodule.4(GLOBALTYPE_STAR:SpectecTerminals,
+    DT_STAR:SpectecTerminals), VAL_G_STAR:SpectecTerminals) /\ tuple(
+    S_3:SpectecTerminal seq(MA_STAR:SpectecTerminals)) := def.allocmems(
+    S_2:SpectecTerminal, helper.iter-map.allocmodule.5(
+    MEMTYPE_STAR:SpectecTerminals, DT_STAR:SpectecTerminals)) /\ tuple(
+    S_4:SpectecTerminal seq(TA_STAR:SpectecTerminals)) := def.alloctables(
+    S_3:SpectecTerminal, helper.iter-map.allocmodule.6(
+    TABLETYPE_STAR:SpectecTerminals, DT_STAR:SpectecTerminals),
+    REF_T_STAR:SpectecTerminals) /\ tuple(S_5:SpectecTerminal seq(
+    DA_STAR:SpectecTerminals)) := def.allocdatas(S_4:SpectecTerminal,
+    helper.iter-count.allocmodule.2(len(DATA_STAR:SpectecTerminals)),
+    BYTE_STAR_STAR:SpectecTerminals) /\ tuple(S_6:SpectecTerminal seq(
+    EA_STAR:SpectecTerminals)) := def.allocelems(S_5:SpectecTerminal,
+    helper.iter-map.allocmodule.7(ELEMTYPE_STAR:SpectecTerminals,
+    DT_STAR:SpectecTerminals), REF_E_STAR_STAR:SpectecTerminals) /\
+    XI_STAR:SpectecTerminals := def.allocexports(rec.moduleinst(eps,
+    AA_I_STAR:SpectecTerminals AA_STAR:SpectecTerminals,
+    GA_I_STAR:SpectecTerminals GA_STAR:SpectecTerminals,
+    MA_I_STAR:SpectecTerminals MA_STAR:SpectecTerminals,
+    TA_I_STAR:SpectecTerminals TA_STAR:SpectecTerminals,
+    FA_I_STAR:SpectecTerminals FA_STAR:SpectecTerminals, eps, eps, eps),
+    EXPORT_STAR:SpectecTerminals) /\ MODULEINST:SpectecTerminal :=
+    rec.moduleinst(DT_STAR:SpectecTerminals, AA_I_STAR:SpectecTerminals
+    AA_STAR:SpectecTerminals, GA_I_STAR:SpectecTerminals
+    GA_STAR:SpectecTerminals, MA_I_STAR:SpectecTerminals
+    MA_STAR:SpectecTerminals, TA_I_STAR:SpectecTerminals
+    TA_STAR:SpectecTerminals, FA_I_STAR:SpectecTerminals
+    FA_STAR:SpectecTerminals, DA_STAR:SpectecTerminals,
+    EA_STAR:SpectecTerminals, XI_STAR:SpectecTerminals) /\ len(
+    LOCAL_STAR_STAR:SpectecTerminals) = len(EXPR_F_STAR:SpectecTerminals) /\
+    len(X_STAR:SpectecTerminals) = len(EXPR_F_STAR:SpectecTerminals) /\ tuple(
+    S_7:SpectecTerminal seq(FA_STAR:SpectecTerminals)) := def.allocfuncs(
+    S_6:SpectecTerminal, helper.iter-map.allocmodule.8(X_STAR:SpectecTerminals,
+    DT_STAR:SpectecTerminals), helper.iter-zip.allocmodule.6(
+    EXPR_F_STAR:SpectecTerminals, LOCAL_STAR_STAR:SpectecTerminals,
+    X_STAR:SpectecTerminals), helper.iter-count.allocmodule.3(len(
+    FUNC_STAR:SpectecTerminals), MODULEINST:SpectecTerminal)) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+4		1		0		1		0
+5		1		0		1		0
+6		1		0		1		0
+7		1		0		1		0
+8		1		0		1		0
+9		1		0		1		0
+10		1		0		1		0
+11		1		0		1		0
+12		1		0		1		0
+13		1		0		1		0
+14		1		0		1		0
+15		1		0		1		0
+16		1		0		1		0
+17		1		0		1		0
+18		1		0		1		0
+19		1		0		1		0
+20		1		0		1		0
+21		1		0		1		0
+22		1		0		1		0
+23		1		0		1		0
+24		1		0		1		0
+25		1		0		1		0
+26		1		0		1		0
+27		1		0		1		0
+28		1		0		1		0
+29		1		0		1		0
+30		1		0		1		0
+31		1		0		1		0
+32		1		0		1		0
+33		1		0		1		0
+34		1		0		1		0
+35		1		0		1		0
+36		1		0		1		0
+37		1		0		1		0
+38		1		0		1		0
+39		1		0		1		0
+40		1		0		1		0
+41		1		0		1		0
+
+ceq def.invoke(S, FUNCADDR:Nat, VAL_STAR:SpectecTerminals) = config.sym(
+    state.sym(S, rec.frame(eps, rec.moduleinst(eps, eps, eps, eps, eps, eps,
+    eps, eps, eps))), VAL_STAR:SpectecTerminals ref.ref-func-addr(FUNCADDR:Nat)
+    instr.call-ref(value('TYPE, index(value('FUNCS, S), FUNCADDR:Nat)))) if
+    typecheckSeq(VAL_STAR:SpectecTerminals, syn.val) = true /\ indexDefined(
+    value('FUNCS, S), FUNCADDR:Nat) = true /\ typecheck(value('TYPE, index(
+    value('FUNCS, S), FUNCADDR:Nat)), syn.deftype) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+
+ceq helper.iter-map.subst-comptype.2(T_1:SpectecTerminal,
+    TU_STAR:SpectecTerminals, TV_STAR:SpectecTerminals) =
+    OUTPUT1:SpectecTerminal if OUTPUT1:SpectecTerminal := def.subst-valtype(
+    T_1:SpectecTerminal, TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals) .
+lhs matches: 12	rewrites: 12 (3.13799e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		12		0		12		0
+
+ceq helper.iter-map.subst-comptype.2(T_1:SpectecTerminal
+    TAIL1:SpectecTerminals, TU_STAR:SpectecTerminals, TV_STAR:SpectecTerminals)
+    = OUTPUT1:SpectecTerminal helper.iter-map.subst-comptype.2(
+    TAIL1:SpectecTerminals, TU_STAR:SpectecTerminals, TV_STAR:SpectecTerminals)
+    if TAIL1:SpectecTerminals =/= eps = true /\ OUTPUT1:SpectecTerminal :=
+    def.subst-valtype(T_1:SpectecTerminal, TV_STAR:SpectecTerminals,
+    TU_STAR:SpectecTerminals) .
+lhs matches: 24	rewrites: 24 (6.27598e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		24		0		24		0
+2		24		0		24		0
+
+ceq helper.iter-map.subst-comptype.3(T_2:SpectecTerminal,
+    TU_STAR:SpectecTerminals, TV_STAR:SpectecTerminals) =
+    OUTPUT1:SpectecTerminal if OUTPUT1:SpectecTerminal := def.subst-valtype(
+    T_2:SpectecTerminal, TV_STAR:SpectecTerminals, TU_STAR:SpectecTerminals) .
+lhs matches: 12	rewrites: 12 (3.13799e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		12		0		12		0
+
+eq helper.iter-map.subst-subtype(eps, TU_STAR:SpectecTerminals,
+    TV_STAR:SpectecTerminals) = eps .
+rewrites: 12 (3.13799e-06%)
+
+ceq helper.iter-map.subst-rectype(ST:SpectecTerminal,
+    TU_PRIME_STAR:SpectecTerminals, TV_PRIME_STAR:SpectecTerminals) =
+    OUTPUT1:SpectecTerminal if OUTPUT1:SpectecTerminal := def.subst-subtype(
+    ST:SpectecTerminal, TV_PRIME_STAR:SpectecTerminals,
+    TU_PRIME_STAR:SpectecTerminals) .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+eq helper.iter-count.subst-all-deftype(0, I:Nat) = eps .
+rewrites: 2 (5.22998e-07%)
+
+eq helper.iter-count.rollrt(0, I:Nat, X:SpectecTerminal) = eps .
+rewrites: 2 (5.22998e-07%)
+
+ceq helper.iter-count.rollrt(s COUNT1:Nat, I:Nat, X:SpectecTerminal) =
+    OUTPUT1:SpectecTerminal helper.iter-count.rollrt(COUNT1:Nat, s I:Nat,
+    X:SpectecTerminal) if typecheck(X:SpectecTerminal, syn.idx) = true /\
+    typecheck(uN.wrap(I:Nat + proj.uN.wrap.0(X:SpectecTerminal)), syn.typeidx)
+    = true /\ typecheck(idx(uN.wrap(I:Nat + proj.uN.wrap.0(
+    X:SpectecTerminal))), syn.typevar) = true /\ OUTPUT1:SpectecTerminal :=
+    idx(uN.wrap(I:Nat + proj.uN.wrap.0(X:SpectecTerminal))) .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+3		2		0		2		0
+4		2		0		2		0
+
+eq helper.iter-count.rollrt.2(0, I:Nat) = eps .
+rewrites: 2 (5.22998e-07%)
+
+ceq helper.iter-count.rollrt.2(s COUNT1:Nat, I:Nat) = OUTPUT1:SpectecTerminal
+    helper.iter-count.rollrt.2(COUNT1:Nat, s I:Nat) if typecheck(rec(I:Nat),
+    syn.typeuse) = true /\ OUTPUT1:SpectecTerminal := rec(I:Nat) .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+
+ceq helper.iter-map.rollrt(SUBTYPE:SpectecTerminal, N:Nat, X:SpectecTerminal) =
+    OUTPUT1:SpectecTerminal if OUTPUT1:SpectecTerminal := def.subst-subtype(
+    SUBTYPE:SpectecTerminal, helper.iter-count.rollrt(N:Nat, 0,
+    X:SpectecTerminal), helper.iter-count.rollrt.2(N:Nat, 0)) .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+
+eq helper.iter-count.unrollrt(0, I:Nat) = eps .
+rewrites: 8 (2.09199e-06%)
+
+ceq helper.iter-count.unrollrt(s COUNT1:Nat, I:Nat) = OUTPUT1:SpectecTerminal
+    helper.iter-count.unrollrt(COUNT1:Nat, s I:Nat) if typecheck(rec(I:Nat),
+    syn.typevar) = true /\ OUTPUT1:SpectecTerminal := rec(I:Nat) .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+2		8		0		8		0
+
+eq helper.iter-count.unrollrt.2(0, I:Nat, RECTYPE:SpectecTerminal) = eps .
+rewrites: 8 (2.09199e-06%)
+
+ceq helper.iter-count.unrollrt.2(s COUNT1:Nat, I:Nat, RECTYPE:SpectecTerminal)
+    = OUTPUT1:SpectecTerminal helper.iter-count.unrollrt.2(COUNT1:Nat, s I:Nat,
+    RECTYPE:SpectecTerminal) if OUTPUT1:SpectecTerminal := deftype.def(
+    RECTYPE:SpectecTerminal, I:Nat) .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+
+ceq helper.iter-map.unrollrt(SUBTYPE:SpectecTerminal, N:Nat,
+    RECTYPE:SpectecTerminal) = OUTPUT1:SpectecTerminal if
+    OUTPUT1:SpectecTerminal := def.subst-subtype(SUBTYPE:SpectecTerminal,
+    helper.iter-count.unrollrt(N:Nat, 0), helper.iter-count.unrollrt.2(N:Nat,
+    0, RECTYPE:SpectecTerminal)) .
+lhs matches: 8	rewrites: 8 (2.09199e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		0		8		0
+
+eq helper.iter-count.rolldt(0, I:Nat, N:Nat, SUBTYPE_STAR:SpectecTerminals) =
+    eps .
+rewrites: 2 (5.22998e-07%)
+
+ceq helper.iter-count.rolldt(s COUNT1:Nat, I:Nat, N:Nat,
+    SUBTYPE_STAR:SpectecTerminals) = OUTPUT1:SpectecTerminal
+    helper.iter-count.rolldt(COUNT1:Nat, s I:Nat, N:Nat,
+    SUBTYPE_STAR:SpectecTerminals) if N:Nat = len(
+    SUBTYPE_STAR:SpectecTerminals) /\ typecheck(list.wrap(
+    SUBTYPE_STAR:SpectecTerminals), syn.list(syn.subtype)) = true /\
+    OUTPUT1:SpectecTerminal := deftype.def(rectype.rec(list.wrap(
+    SUBTYPE_STAR:SpectecTerminals)), I:Nat) .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+3		2		0		2		0
+
+eq helper.pattern-zip.step-read(local.local(T:SpectecTerminal)) = tuple(seq(
+    T:SpectecTerminal)) .
+rewrites: 1 (2.61499e-07%)
+
+ceq helper.iter-map.step-read.2(VAL:SpectecTerminal) = seq(
+    OUTPUT1:SpectecTerminals) if OUTPUT1:SpectecTerminals :=
+    VAL:SpectecTerminal .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq helper.iter-map.step-read.2(VAL:SpectecTerminal TAIL1:SpectecTerminals) =
+    seq(OUTPUT1:SpectecTerminals) helper.iter-map.step-read.2(
+    TAIL1:SpectecTerminals) if TAIL1:SpectecTerminals =/= eps = true /\
+    OUTPUT1:SpectecTerminals := VAL:SpectecTerminal .
+lhs matches: 2	rewrites: 2 (5.22998e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2		0		2		0
+2		2		0		2		0
+
+ceq helper.iter-map.step-read.3(T:SpectecTerminal) = seq(
+    OUTPUT1:SpectecTerminals) if OUTPUT1:SpectecTerminals := def.default(
+    T:SpectecTerminal) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq helper.iter-map.allocexports(EXPORT:SpectecTerminal,
+    MODULEINST:SpectecTerminal) = OUTPUT1:SpectecTerminal if
+    OUTPUT1:SpectecTerminal := def.allocexport(MODULEINST:SpectecTerminal,
+    EXPORT:SpectecTerminal) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq helper.pattern-zip.allocmodule(eps) = tuple(seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.allocmodule.2(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.allocmodule.3(eps) = tuple(seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.allocmodule.4(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.allocmodule.5(func.func(X:SpectecTerminal,
+    LOCAL_STAR:SpectecTerminals, EXPR_F:SpectecTerminals)) = tuple((seq(seq(
+    EXPR_F:SpectecTerminals)) seq(seq(LOCAL_STAR:SpectecTerminals))) seq(
+    X:SpectecTerminal)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.allocmodule.6(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.allocmodule.7(eps) = tuple((seq(eps) seq(eps)) seq(eps))
+    .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-count.allocmodule(0, I_F:Nat, S) = eps .
+rewrites: 1 (2.61499e-07%)
+
+ceq helper.iter-count.allocmodule(s COUNT1:Nat, I_F:Nat, S) = OUTPUT1:Nat
+    helper.iter-count.allocmodule(COUNT1:Nat, s I_F:Nat, S) if OUTPUT1:Nat :=
+    I_F:Nat + len(value('FUNCS, S)) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq helper.iter-map.allocmodule.3(eps, DT_STAR:SpectecTerminals) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-map.allocmodule.4(eps, DT_STAR:SpectecTerminals) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-map.allocmodule.5(eps, DT_STAR:SpectecTerminals) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-map.allocmodule.6(eps, DT_STAR:SpectecTerminals) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-count.allocmodule.2(0) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-map.allocmodule.7(eps, DT_STAR:SpectecTerminals) = eps .
+rewrites: 1 (2.61499e-07%)
+
+ceq helper.iter-map.allocmodule.8(X:SpectecTerminal, DT_STAR:SpectecTerminals)
+    = OUTPUT1:SpectecTerminal if typecheck(X:SpectecTerminal, syn.idx) = true
+    /\ indexDefined(DT_STAR:SpectecTerminals, proj.uN.wrap.0(
+    X:SpectecTerminal)) = true /\ OUTPUT1:SpectecTerminal := index(
+    DT_STAR:SpectecTerminals, proj.uN.wrap.0(X:SpectecTerminal)) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+
+ceq helper.iter-zip.allocmodule.6(seq(EXPR_F:SpectecTerminals), seq(
+    LOCAL_STAR:SpectecTerminals), X:SpectecTerminal) = OUTPUT1:SpectecTerminal
+    if OUTPUT1:SpectecTerminal := func.func(X:SpectecTerminal,
+    LOCAL_STAR:SpectecTerminals, EXPR_F:SpectecTerminals) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq helper.iter-count.allocmodule.3(0, MODULEINST:SpectecTerminal) = eps .
+rewrites: 1 (2.61499e-07%)
+
+ceq helper.iter-count.allocmodule.3(s COUNT1:Nat, MODULEINST:SpectecTerminal) =
+    OUTPUT1:SpectecTerminal helper.iter-count.allocmodule.3(COUNT1:Nat,
+    MODULEINST:SpectecTerminal) if s COUNT1:Nat < compactRepeatThreshold = true
+    /\ OUTPUT1:SpectecTerminal := MODULEINST:SpectecTerminal .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+eq helper.pattern-zip.instantiate(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.instantiate.2(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.instantiate.3(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.pattern-zip.instantiate.4(eps) = tuple((seq(eps) seq(eps)) seq(eps))
+    .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.inverse-opt.instantiate(eps) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-count.instantiate(0, I_F:Nat, S) = eps .
+rewrites: 1 (2.61499e-07%)
+
+ceq helper.iter-count.instantiate(s COUNT1:Nat, I_F:Nat, S) = OUTPUT1:Nat
+    helper.iter-count.instantiate(COUNT1:Nat, s I_F:Nat, S) if OUTPUT1:Nat :=
+    I_F:Nat + len(value('FUNCS, S)) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq helper.iter-count.instantiate.2(0, I_D:Nat, DATA_STAR:SpectecTerminals) =
+    eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-count.instantiate.3(0, I_E:Nat, ELEM_STAR:SpectecTerminals) =
+    eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.iter-map.instantiate(eps) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq helper.inverse-opt.instantiate.2(eps) = eps .
+rewrites: 1 (2.61499e-07%)
+
+eq def.utf8(eps) = eps .
+rewrites: 2 (5.22998e-07%)
+
+ceq def.utf8(char.wrap(UTF_C:Nat) UTF_REST:SpectecTerminals) = byte.wrap(
+    UTF_C:Nat) def.utf8(UTF_REST:SpectecTerminals) if UTF_C:Nat < 128 = true /\
+    typecheckSeq(UTF_REST:SpectecTerminals, syn.char) = true .
+lhs matches: 6	rewrites: 6 (1.56899e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		6		0		6		0
+2		6		0		6		0
+
+crl [instantiate] : boot => init(C) if def.instantiate(emptyStore, inputModule,
+    eps) => C .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+
+crl [initialize] : init(C) => ready(S, MI) if rel.steps(C) => config.sym(
+    state.sym(S, rec.frame(LOCALS, MI)), eps) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+
+rl [invoke] : ready(S, MI) => exec(def.invoke(S, findFunc(value('EXPORTS, MI),
+    inputName), inputArgs)) .
+rewrites: 1 (2.61499e-07%)
+
+crl [execute] : exec(C) => finished(S, const(i32, VALUE)) if rel.steps(C) =>
+    config.sym(S, const(i32, VALUE)) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+
+crl [step-pure-label-vals] : rel.step-pure(instr.label-sym-sym(N:Nat,
+    INSTR_STAR:SpectecTerminals, VAL_STAR:SpectecTerminals)) =>
+    VAL_STAR:SpectecTerminals if typecheckSeq(VAL_STAR:SpectecTerminals,
+    syn.val) = true .
+lhs matches: 254	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		254		1		1		254
+
+crl [step-pure-br-label-zero] : rel.step-pure(instr.label-sym-sym(N:Nat,
+    INSTR_PRIME_STAR:SpectecTerminals, VAL_PRIME_STAR:SpectecTerminals
+    VAL_STAR:SpectecTerminals instr.br(L:SpectecTerminal)
+    INSTR_STAR:SpectecTerminals)) => VAL_STAR:SpectecTerminals
+    INSTR_PRIME_STAR:SpectecTerminals if proj.uN.wrap.0(L:SpectecTerminal) = 0
+    /\ typecheckSeq(VAL_PRIME_STAR:SpectecTerminals, syn.val) = true /\ N:Nat =
+    len(VAL_STAR:SpectecTerminals) /\ typecheckSeq(VAL_STAR:SpectecTerminals,
+    syn.val) = true .
+lhs matches: 778	rewrites: 6 (1.56899e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		778		777		777		778
+2		777		137		137		777
+3		137		6		6		137
+4		6		6		6		6
+
+crl [step-pure-br-label-succ] : rel.step-pure(instr.label-sym-sym(N:Nat,
+    INSTR_PRIME_STAR:SpectecTerminals, VAL_STAR:SpectecTerminals instr.br(
+    L:SpectecTerminal) INSTR_STAR:SpectecTerminals)) =>
+    VAL_STAR:SpectecTerminals instr.br(uN.wrap(natOfInt(proj.uN.wrap.0(
+    L:SpectecTerminal) - 1))) if proj.uN.wrap.0(L:SpectecTerminal) > 0 = true
+    /\ typecheckSeq(VAL_STAR:SpectecTerminals, syn.val) = true /\
+    proj.uN.wrap.0(L:SpectecTerminal) - 1 >= 0 = true /\ typecheck(uN.wrap(
+    natOfInt(proj.uN.wrap.0(L:SpectecTerminal) - 1)), syn.labelidx) = true .
+lhs matches: 81	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		81		1		1		81
+2		1		1		1		1
+3		1		1		1		1
+4		1		1		1		1
+
+crl [step-pure-br-if-true] : rel.step-pure(const(i32, C) instr.br-if(
+    L:SpectecTerminal)) => instr.br(L:SpectecTerminal) if typecheck(i32,
+    syn.numtype) = true /\ typecheck(C, syn.num(i32)) = true /\ proj.uN.wrap.0(
+    C) =/= 0 = true /\ typecheck(const(i32, C), syn.instr) = true .
+lhs matches: 24576	rewrites: 4096 (0.0010711%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		24576		24576		24576		24576
+2		24576		24576		24576		24576
+3		24576		4096		4096		24576
+4		4096		4096		4096		4096
+
+crl [step-pure-br-if-false] : rel.step-pure(const(i32, C) instr.br-if(
+    L:SpectecTerminal)) => eps if typecheck(i32, syn.numtype) = true /\
+    typecheck(C, syn.num(i32)) = true /\ proj.uN.wrap.0(C) = 0 /\ typecheck(
+    const(i32, C), syn.instr) = true .
+lhs matches: 24576	rewrites: 20480 (0.0053555%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		24576		24576		24576		24576
+2		24576		24576		24576		24576
+3		24576		20480		20480		24576
+4		20480		20480		20480		20480
+
+crl [step-pure-frame-vals] : rel.step-pure(instr.frame-sym-sym(N:Nat,
+    F:SpectecTerminal, VAL_STAR:SpectecTerminals)) => VAL_STAR:SpectecTerminals
+    if N:Nat = len(VAL_STAR:SpectecTerminals) /\ typecheckSeq(
+    VAL_STAR:SpectecTerminals, syn.val) = true .
+lhs matches: 90	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		90		90		90		90
+2		90		1		1		90
+
+crl [step-pure-binop-val] : rel.step-pure(const(NT:SpectecTerminal,
+    C_1:SpectecTerminal) const(NT:SpectecTerminal, C_2:SpectecTerminal)
+    instr.binop(NT:SpectecTerminal, BINOP:SpectecTerminal)) => const(
+    NT:SpectecTerminal, C) if typecheck(C_1:SpectecTerminal, syn.num(
+    NT:SpectecTerminal)) = true /\ typecheck(const(NT:SpectecTerminal,
+    C_1:SpectecTerminal), syn.instr) = true /\ typecheck(C_2:SpectecTerminal,
+    syn.num(NT:SpectecTerminal)) = true /\ typecheck(const(NT:SpectecTerminal,
+    C_2:SpectecTerminal), syn.instr) = true /\ typecheck(BINOP:SpectecTerminal,
+    syn.binop(NT:SpectecTerminal)) = true /\ helper.membership.step-pure.2(
+    def.binop(NT:SpectecTerminal, BINOP:SpectecTerminal, C_1:SpectecTerminal,
+    C_2:SpectecTerminal)) => helper.membership-result.step-pure.2(C) /\
+    typecheck(const(NT:SpectecTerminal, C), syn.instr) = true .
+lhs matches: 2570	rewrites: 2570 (0.000672053%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2570		2570		2570		2570
+2		2570		2570		2570		2570
+3		2570		2570		2570		2570
+4		2570		2570		2570		2570
+5		2570		2570		2570		2570
+6		2570		2570		2570		2570
+7		2570		2570		2570		2570
+
+crl [step-pure-binop-trap] : rel.step-pure(const(NT:SpectecTerminal,
+    C_1:SpectecTerminal) const(NT:SpectecTerminal, C_2:SpectecTerminal)
+    instr.binop(NT:SpectecTerminal, BINOP:SpectecTerminal)) => instr.trap if
+    typecheck(C_1:SpectecTerminal, syn.num(NT:SpectecTerminal)) = true /\
+    typecheck(const(NT:SpectecTerminal, C_1:SpectecTerminal), syn.instr) = true
+    /\ typecheck(C_2:SpectecTerminal, syn.num(NT:SpectecTerminal)) = true /\
+    typecheck(const(NT:SpectecTerminal, C_2:SpectecTerminal), syn.instr) = true
+    /\ typecheck(BINOP:SpectecTerminal, syn.binop(NT:SpectecTerminal)) = true
+    /\ PATTERN1:SpectecTerminals := eps /\ PATTERN1:SpectecTerminals =
+    def.binop(NT:SpectecTerminal, BINOP:SpectecTerminal, C_1:SpectecTerminal,
+    C_2:SpectecTerminal) .
+lhs matches: 2570	rewrites: 0 (0%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2570		2570		2570		2570
+2		2570		2570		2570		2570
+3		2570		2570		2570		2570
+4		2570		2570		2570		2570
+5		2570		2570		2570		2570
+6		2570		2570		2570		2570
+7		2570		0		0		2570
+
+crl [step-pure-testop] : rel.step-pure(const(NT:SpectecTerminal,
+    C_1:SpectecTerminal) instr.testop(NT:SpectecTerminal,
+    TESTOP:SpectecTerminal)) => const(i32, C) if typecheck(C_1:SpectecTerminal,
+    syn.num(NT:SpectecTerminal)) = true /\ typecheck(const(NT:SpectecTerminal,
+    C_1:SpectecTerminal), syn.instr) = true /\ typecheck(
+    TESTOP:SpectecTerminal, syn.testop(NT:SpectecTerminal)) = true /\ C :=
+    def.testop(NT:SpectecTerminal, TESTOP:SpectecTerminal, C_1:SpectecTerminal)
+    /\ typecheck(i32, syn.numtype) = true /\ typecheck(const(i32, C),
+    syn.instr) = true .
+lhs matches: 49152	rewrites: 49152 (0.0128532%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		49152		49152		49152		49152
+2		49152		49152		49152		49152
+3		49152		49152		49152		49152
+4		49152		49152		49152		49152
+5		49152		49152		49152		49152
+6		49152		49152		49152		49152
+
+crl [step-read-block] : rel.step-read(config.sym(Z:SpectecTerminal,
+    VAL_STAR:SpectecTerminals instr.block(BT:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals))) => instr.label-sym-sym(N:Nat, eps,
+    VAL_STAR:SpectecTerminals INSTR_STAR:SpectecTerminals) if M:Nat := len(
+    VAL_STAR:SpectecTerminals) /\ typecheckSeq(VAL_STAR:SpectecTerminals,
+    syn.val) = true /\ instrtype.sym(list.wrap(T_1_STAR:SpectecTerminals), eps,
+    list.wrap(T_2_STAR:SpectecTerminals)) := def.blocktype(Z:SpectecTerminal,
+    BT:SpectecTerminal) /\ M:Nat = len(T_1_STAR:SpectecTerminals) /\ N:Nat :=
+    len(T_2_STAR:SpectecTerminals) .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+2		1		1		1		1
+3		1		1		1		1
+4		1		1		1		1
+5		1		1		1		1
+
+crl [step-read-loop] : rel.step-read(config.sym(Z:SpectecTerminal,
+    VAL_STAR:SpectecTerminals instr.loop(BT:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals))) => instr.label-sym-sym(M:Nat, instr.loop(
+    BT:SpectecTerminal, INSTR_STAR:SpectecTerminals), VAL_STAR:SpectecTerminals
+    INSTR_STAR:SpectecTerminals) if M:Nat := len(VAL_STAR:SpectecTerminals) /\
+    typecheckSeq(VAL_STAR:SpectecTerminals, syn.val) = true /\ instrtype.sym(
+    list.wrap(T_1_STAR:SpectecTerminals), eps, list.wrap(
+    T_2_STAR:SpectecTerminals)) := def.blocktype(Z:SpectecTerminal,
+    BT:SpectecTerminal) /\ M:Nat = len(T_1_STAR:SpectecTerminals) /\ N:Nat :=
+    len(T_2_STAR:SpectecTerminals) .
+lhs matches: 6	rewrites: 6 (1.56899e-06%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		6		6		6		6
+2		6		6		6		6
+3		6		6		6		6
+4		6		6		6		6
+5		6		6		6		6
+
+crl [step-read-call-ref-func] : rel.step-read(config.sym(Z:SpectecTerminal,
+    VAL_STAR:SpectecTerminals ref.ref-func-addr(A:Nat) instr.call-ref(
+    YY:SpectecTerminal))) => instr.frame-sym-sym(M:Nat, F:SpectecTerminal,
+    instr.label-sym-sym(M:Nat, eps, INSTR_STAR:SpectecTerminals)) if
+    indexDefined(def.funcinst(Z:SpectecTerminal), A:Nat) = true /\ N:Nat :=
+    len(VAL_STAR:SpectecTerminals) /\ typecheckSeq(VAL_STAR:SpectecTerminals,
+    syn.val) = true /\ FI:SpectecTerminal := index(def.funcinst(
+    Z:SpectecTerminal), A:Nat) /\ RESULT1:SpectecTerminal := rel.expand(value(
+    'TYPE, FI:SpectecTerminal)) /\ comptype.func-sym(list.wrap(
+    T_1_STAR:SpectecTerminals), list.wrap(T_2_STAR:SpectecTerminals)) :=
+    RESULT1:SpectecTerminal /\ N:Nat = len(T_1_STAR:SpectecTerminals) /\ M:Nat
+    := len(T_2_STAR:SpectecTerminals) /\ func.func(X:SpectecTerminal,
+    PATTERN1:SpectecTerminals, INSTR_STAR:SpectecTerminals) := value('CODE,
+    FI:SpectecTerminal) /\ tuple(seq(T_STAR:SpectecTerminals)) :=
+    helper.pattern-zip.step-read(PATTERN1:SpectecTerminals) /\
+    F:SpectecTerminal := rec.frame(helper.iter-map.step-read.2(
+    VAL_STAR:SpectecTerminals) helper.iter-map.step-read.3(
+    T_STAR:SpectecTerminals), value('MODULE, FI:SpectecTerminal)) .
+lhs matches: 8	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		8		8		8		8
+2		8		8		8		8
+3		8		8		8		8
+4		8		8		8		8
+5		8		8		8		8
+6		8		8		8		8
+7		8		1		1		8
+8		1		1		1		1
+9		1		1		1		1
+10		1		1		1		1
+11		1		1		1		1
+
+crl [step-read-local-get] : rel.step-read(config.sym(Z:SpectecTerminal,
+    instr.local-get(X:SpectecTerminal))) => VAL:SpectecTerminal if
+    VAL:SpectecTerminal := def.local(Z:SpectecTerminal, X:SpectecTerminal) /\
+    typecheck(VAL:SpectecTerminal, syn.val) = true .
+lhs matches: 175945	rewrites: 175945 (0.0460095%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		175945		175945		175945		175945
+2		175945		175945		175945		175945
+
+crl [step-pure] : rel.step(config.sym(Z:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals)) => config.sym(Z:SpectecTerminal,
+    INSTR_PRIME_STAR:SpectecTerminals) if rel.step-pure(
+    INSTR_STAR:SpectecTerminals) => INSTR_PRIME_STAR:SpectecTerminals .
+lhs matches: 7286052	rewrites: 76307 (0.0199542%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		7286052		76307		76307		7286052
+
+crl [step-read] : rel.step(config.sym(Z:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals)) => config.sym(Z:SpectecTerminal,
+    INSTR_PRIME_STAR:SpectecTerminals) if rel.step-read(config.sym(
+    Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>
+    INSTR_PRIME_STAR:SpectecTerminals .
+lhs matches: 7286052	rewrites: 175953 (0.0460116%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		7286052		175953		175953		7286052
+
+crl [step-ctxt-label] : rel.step(config.sym(Z:SpectecTerminal,
+    instr.label-sym-sym(N:Nat, INSTR_0_STAR:SpectecTerminals,
+    INSTR_STAR:SpectecTerminals))) => config.sym(Z_PRIME:SpectecTerminal,
+    instr.label-sym-sym(N:Nat, INSTR_0_STAR:SpectecTerminals,
+    INSTR_PRIME_STAR:SpectecTerminals)) if rel.step(config.sym(
+    Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(
+    Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(
+    config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals),
+    syn.config) = true .
+lhs matches: 254	rewrites: 246 (6.43288e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		254		246		246		254
+2		246		246		246		246
+
+crl [step-ctxt-frame] : rel.step(config.sym(state.sym(S, F:SpectecTerminal),
+    instr.frame-sym-sym(N:Nat, F_PRIME:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals))) => config.sym(state.sym(
+    S_PRIME:SpectecTerminal, F:SpectecTerminal), instr.frame-sym-sym(N:Nat,
+    F_PRIME_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals)) if
+    rel.step(config.sym(state.sym(S, F_PRIME:SpectecTerminal),
+    INSTR_STAR:SpectecTerminals)) => config.sym(state.sym(
+    S_PRIME:SpectecTerminal, F_PRIME_PRIME:SpectecTerminal),
+    INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(state.sym(
+    S_PRIME:SpectecTerminal, F_PRIME_PRIME:SpectecTerminal),
+    INSTR_PRIME_STAR:SpectecTerminals), syn.config) = true .
+lhs matches: 90	rewrites: 89 (2.32734e-05%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		90		89		89		90
+2		89		89		89		89
+
+crl [step-local-set] : rel.step(config.sym(Z:SpectecTerminal,
+    VAL:SpectecTerminal instr.local-set(X:SpectecTerminal))) => config.sym(
+    def.with-local(Z:SpectecTerminal, X:SpectecTerminal, VAL:SpectecTerminal),
+    eps) if typecheck(VAL:SpectecTerminal, syn.val) = true .
+lhs matches: 99405	rewrites: 1685 (0.000440626%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		99405		1685		1685		99405
+
+crl [step-ctxt-instrs] : rel.step(config.sym(Z:SpectecTerminal,
+    VAL_STAR:SpectecTerminals INSTR_STAR:SpectecTerminals
+    INSTR_1_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal,
+    VAL_STAR:SpectecTerminals INSTR_PRIME_STAR:SpectecTerminals
+    INSTR_1_STAR:SpectecTerminals) if INSTR_1_STAR:SpectecTerminals =/= eps or
+    VAL_STAR:SpectecTerminals =/= eps = true /\ typecheckSeq(
+    VAL_STAR:SpectecTerminals, syn.val) = true /\ rel.step(config.sym(
+    Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(
+    Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(
+    config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals),
+    syn.config) = true .
+lhs matches: 25456850	rewrites: 507868 (0.132807%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		25456850		18170798		18170798
+    		25456850
+2		18170798		7285615		7285615	
+    	18170798
+3		7285615		507868		507868		7285615
+4		507868		507868		507868		507868
+
+rl [steps-refl] : rel.steps(config.sym(Z:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals)) => config.sym(Z:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals) .
+rewrites: 93 (2.43194e-05%)
+
+crl [steps-trans] : rel.steps(config.sym(Z:SpectecTerminal,
+    INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME_PRIME:SpectecTerminal,
+    INSTR_PRIME_PRIME_STAR:SpectecTerminals) if rel.step(config.sym(
+    Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(
+    Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(
+    config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals),
+    syn.config) = true /\ rel.steps(config.sym(Z_PRIME:SpectecTerminal,
+    INSTR_PRIME_STAR:SpectecTerminals)) => config.sym(
+    Z_PRIME_PRIME:SpectecTerminal, INSTR_PRIME_PRIME_STAR:SpectecTerminals) /\
+    typecheck(config.sym(Z_PRIME_PRIME:SpectecTerminal,
+    INSTR_PRIME_PRIME_STAR:SpectecTerminals), syn.config) = true .
+lhs matches: 93	rewrites: 4186 (0.00109464%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		93		91		91		93
+2		91		91		91		91
+3		91		4186		4186		91
+4		4186		4186		4186		4186
+
+rl [evalexprs-clause-1] : def.evalexprs(Z:SpectecTerminal, eps) => tuple(
+    Z:SpectecTerminal seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+rl [evalexprss-clause-1] : def.evalexprss(Z:SpectecTerminal, eps) => tuple(
+    Z:SpectecTerminal seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+rl [evalglobals-clause-1] : def.evalglobals(Z:SpectecTerminal, eps, eps) =>
+    tuple(Z:SpectecTerminal seq(eps)) .
+rewrites: 1 (2.61499e-07%)
+
+crl [instantiate-clause-1] : def.instantiate(S, MODULE:SpectecTerminal,
+    EXTERNADDR_STAR:SpectecTerminals) => config.sym(state.sym(
+    S_PRIME_PRIME_PRIME_PRIME:SpectecTerminal, rec.frame(eps,
+    MODULEINST:SpectecTerminal)), INSTR_E_STAR:SpectecTerminals
+    INSTR_D_STAR:SpectecTerminals INSTR_S_OPT:SpectecTerminals) if
+    module.module(list.wrap(TYPE_STAR:SpectecTerminals), list.wrap(
+    IMPORT_STAR:SpectecTerminals), list.wrap(TAG_STAR:SpectecTerminals),
+    list.wrap(GLOBAL_STAR:SpectecTerminals), list.wrap(
+    MEM_STAR:SpectecTerminals), list.wrap(TABLE_STAR:SpectecTerminals),
+    list.wrap(FUNC_STAR:SpectecTerminals), list.wrap(
+    DATA_STAR:SpectecTerminals), list.wrap(ELEM_STAR:SpectecTerminals),
+    START_OPT:SpectecTerminals, list.wrap(EXPORT_STAR:SpectecTerminals)) :=
+    MODULE:SpectecTerminal /\ isOpt(START_OPT:SpectecTerminals) = true /\
+    PATTERN1:SpectecTerminals := GLOBAL_STAR:SpectecTerminals /\ tuple(seq(
+    EXPR_G_STAR:SpectecTerminals) seq(GLOBALTYPE_STAR:SpectecTerminals)) :=
+    helper.pattern-zip.instantiate(PATTERN1:SpectecTerminals) /\ typecheckSeq(
+    PATTERN1:SpectecTerminals, syn.global) = true /\ PATTERN2:SpectecTerminals
+    := TABLE_STAR:SpectecTerminals /\ tuple(seq(EXPR_T_STAR:SpectecTerminals)
+    seq(TABLETYPE_STAR:SpectecTerminals)) := helper.pattern-zip.instantiate.2(
+    PATTERN2:SpectecTerminals) /\ typecheckSeq(PATTERN2:SpectecTerminals,
+    syn.table) = true /\ PATTERN3:SpectecTerminals :=
+    DATA_STAR:SpectecTerminals /\ tuple(seq(BYTE_STAR_STAR:SpectecTerminals)
+    seq(DATAMODE_STAR:SpectecTerminals)) := helper.pattern-zip.instantiate.3(
+    PATTERN3:SpectecTerminals) /\ typecheckSeq(PATTERN3:SpectecTerminals,
+    syn.data) = true /\ PATTERN4:SpectecTerminals := ELEM_STAR:SpectecTerminals
+    /\ tuple(seq(ELEMMODE_STAR:SpectecTerminals) seq(
+    EXPR_E_STAR_STAR:SpectecTerminals) seq(REFTYPE_STAR:SpectecTerminals)) :=
+    helper.pattern-zip.instantiate.4(PATTERN4:SpectecTerminals) /\
+    typecheckSeq(PATTERN4:SpectecTerminals, syn.elem) = true /\ isOpt(
+    START_OPT:SpectecTerminals) = true /\ X_OPT:SpectecTerminals :=
+    helper.inverse-opt.instantiate(START_OPT:SpectecTerminals) /\
+    MODULEINST_0:SpectecTerminal := rec.moduleinst(def.alloctypes(
+    TYPE_STAR:SpectecTerminals), eps, def.globalsxa(
+    EXTERNADDR_STAR:SpectecTerminals), eps, eps, def.funcsxa(
+    EXTERNADDR_STAR:SpectecTerminals) helper.iter-count.instantiate(len(
+    FUNC_STAR:SpectecTerminals), 0, S), eps, eps, eps) /\ Z:SpectecTerminal :=
+    state.sym(S, rec.frame(eps, MODULEINST_0:SpectecTerminal)) /\
+    def.evalglobals(Z:SpectecTerminal, GLOBALTYPE_STAR:SpectecTerminals,
+    EXPR_G_STAR:SpectecTerminals) => RESULT4:SpectecTerminal /\
+    RESULT4:SpectecTerminal => RESULT1:SpectecTerminal /\ tuple(
+    Z_PRIME:SpectecTerminal seq(VAL_G_STAR:SpectecTerminals)) :=
+    RESULT1:SpectecTerminal /\ def.evalexprs(Z_PRIME:SpectecTerminal,
+    EXPR_T_STAR:SpectecTerminals) => RESULT5:SpectecTerminal /\
+    RESULT5:SpectecTerminal => RESULT2:SpectecTerminal /\ tuple(
+    Z_PRIME_PRIME:SpectecTerminal seq(REF_T_STAR:SpectecTerminals)) :=
+    RESULT2:SpectecTerminal /\ def.evalexprss(Z_PRIME_PRIME:SpectecTerminal,
+    EXPR_E_STAR_STAR:SpectecTerminals) => RESULT6:SpectecTerminal /\
+    RESULT6:SpectecTerminal => RESULT3:SpectecTerminal /\ tuple(
+    Z_PRIME_PRIME_PRIME:SpectecTerminal seq(REF_E_STAR_STAR:SpectecTerminals))
+    := RESULT3:SpectecTerminal /\ state.sym(
+    S_PRIME_PRIME_PRIME:SpectecTerminal, F:SpectecTerminal) :=
+    Z_PRIME_PRIME_PRIME:SpectecTerminal /\ tuple(
+    S_PRIME_PRIME_PRIME_PRIME:SpectecTerminal MODULEINST:SpectecTerminal) :=
+    def.allocmodule(S_PRIME_PRIME_PRIME:SpectecTerminal,
+    MODULE:SpectecTerminal, EXTERNADDR_STAR:SpectecTerminals,
+    VAL_G_STAR:SpectecTerminals, REF_T_STAR:SpectecTerminals,
+    REF_E_STAR_STAR:SpectecTerminals) /\ INSTR_D_STAR:SpectecTerminals :=
+    def.concat(syn.instr, helper.iter-count.instantiate.2(len(
+    DATA_STAR:SpectecTerminals), 0, DATA_STAR:SpectecTerminals)) /\
+    INSTR_E_STAR:SpectecTerminals := def.concat(syn.instr,
+    helper.iter-count.instantiate.3(len(ELEM_STAR:SpectecTerminals), 0,
+    ELEM_STAR:SpectecTerminals)) /\ isOpt(X_OPT:SpectecTerminals) = true /\
+    isOpt(helper.iter-map.instantiate(X_OPT:SpectecTerminals)) = true /\
+    INSTR_S_OPT:SpectecTerminals := helper.inverse-opt.instantiate.2(
+    helper.iter-map.instantiate(X_OPT:SpectecTerminals)) /\ isOpt(
+    INSTR_S_OPT:SpectecTerminals) = true .
+lhs matches: 1	rewrites: 1 (2.61499e-07%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+2		1		1		1		1
+3		1		1		1		1
+4		1		1		1		1
+5		1		1		1		1
+6		1		1		1		1
+7		1		1		1		1
+8		1		1		1		1
+9		1		1		1		1
+10		1		1		1		1
+11		1		1		1		1
+12		1		1		1		1
+13		1		1		1		1
+14		1		1		1		1
+15		1		1		1		1
+16		1		1		1		1
+17		1		1		1		1
+18		1		1		1		1
+19		1		1		1		1
+20		1		1		1		1
+21		1		1		1		1
+22		1		1		1		1
+23		1		1		1		1
+24		1		1		1		1
+25		1		1		1		1
+26		1		1		1		1
+27		1		1		1		1
+28		1		1		1		1
+29		1		1		1		1
+30		1		1		1		1
+31		1		1		1		1
+32		1		1		1		1
+33		1		1		1		1
+34		1		1		1		1
+35		1		1		1		1
+
+rl helper.membership.step-pure.2(HEAD1:SpectecTerminal TAIL1:SpectecTerminals)
+    => helper.membership-result.step-pure.2(HEAD1:SpectecTerminal) .
+rewrites: 2570 (0.000672053%)
+
+crl helper.membership.step-pure.2(HEAD1:SpectecTerminal TAIL1:SpectecTerminals)
+    => helper.membership-result.step-pure.2(WITNESS1:SpectecTerminal) if
+    helper.membership.step-pure.2(TAIL1:SpectecTerminals) =>
+    helper.membership-result.step-pure.2(WITNESS1:SpectecTerminal) .
+lhs matches: 2570	rewrites: 0 (0%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2570		0		0		2570
+
+Bye.

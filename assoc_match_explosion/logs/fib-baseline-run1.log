@@ -1,0 +1,136 @@
+==========================================
+rewrite [100000] in WASM2MAUDE-MODELCHECK : boot .
+rewrites: 89657 in 29ms cpu (29ms real) (3040354 rewrites/second)
+result ModelState: finished(state.sym(rec.store(eps, eps, eps, eps,
+    rec.funcinst(deftype.def(rectype.rec(list.wrap(subtype.sub(final.final,
+    eps, comptype.func-sym(list.wrap(i32 i32 i32), list.wrap(i32))))), 0),
+    rec.moduleinst(deftype.def(rectype.rec(list.wrap(subtype.sub(final.final,
+    eps, comptype.func-sym(list.wrap(i32 i32 i32), list.wrap(i32))))), 0), eps,
+    eps, eps, eps, 0, eps, eps, rec.exportinst(name.wrap(char.wrap(102)
+    char.wrap(105) char.wrap(98)), externaddr.func(0))), func.func(uN.wrap(0),
+    local.local(i32), instr.block(blocktype.result(eps), instr.loop(
+    blocktype.result(eps), instr.local-get(uN.wrap(0)) instr.testop(i32,
+    testop.eqz) instr.br-if(uN.wrap(1)) instr.local-get(uN.wrap(1))
+    instr.local-get(uN.wrap(2)) instr.binop(i32, binop.add) instr.local-set(
+    uN.wrap(3)) instr.local-get(uN.wrap(2)) instr.local-set(uN.wrap(1))
+    instr.local-get(uN.wrap(3)) instr.local-set(uN.wrap(2)) instr.local-get(
+    uN.wrap(0)) const(i32, uN.wrap(1)) instr.binop(i32, binop.sub)
+    instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0)))) instr.local-get(uN.wrap(
+    1)))), eps, eps, eps, eps, eps), rec.frame(eps, rec.moduleinst(eps, eps,
+    eps, eps, eps, eps, eps, eps, eps))), const(i32, uN.wrap(5)))
+==========================================
+search [1, 100000] in WASM2MAUDE-MODELCHECK : boot =>* finished(S, const(i32,
+    uN.wrap(5))) .
+
+Solution 1 (state 4)
+states: 5  rewrites: 89669 in 28ms cpu (29ms real) (3170420 rewrites/second)
+S --> state.sym(rec.store(eps, eps, eps, eps, rec.funcinst(deftype.def(
+    rectype.rec(list.wrap(subtype.sub(final.final, eps, comptype.func-sym(
+    list.wrap(i32 i32 i32), list.wrap(i32))))), 0), rec.moduleinst(deftype.def(
+    rectype.rec(list.wrap(subtype.sub(final.final, eps, comptype.func-sym(
+    list.wrap(i32 i32 i32), list.wrap(i32))))), 0), eps, eps, eps, eps, 0, eps,
+    eps, rec.exportinst(name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)),
+    externaddr.func(0))), func.func(uN.wrap(0), local.local(i32), instr.block(
+    blocktype.result(eps), instr.loop(blocktype.result(eps), instr.local-get(
+    uN.wrap(0)) instr.testop(i32, testop.eqz) instr.br-if(uN.wrap(1))
+    instr.local-get(uN.wrap(1)) instr.local-get(uN.wrap(2)) instr.binop(i32,
+    binop.add) instr.local-set(uN.wrap(3)) instr.local-get(uN.wrap(2))
+    instr.local-set(uN.wrap(1)) instr.local-get(uN.wrap(3)) instr.local-set(
+    uN.wrap(2)) instr.local-get(uN.wrap(0)) const(i32, uN.wrap(1)) instr.binop(
+    i32, binop.sub) instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0))))
+    instr.local-get(uN.wrap(1)))), eps, eps, eps, eps, eps), rec.frame(eps,
+    rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps)))
+==========================================
+search [1, 100000] in WASM2MAUDE-MODELCHECK : boot =>* finished(S, const(i32,
+    uN.wrap(6))) .
+
+No solution.
+states: 5  rewrites: 382410404 in 114481ms cpu (115467ms real) (3340368
+    rewrites/second)
+==========================================
+reduce in WASM2MAUDE-MODELCHECK : modelCheck(boot, <> returned(expected)) .
+rewrites: 382410433 in 115092ms cpu (116307ms real) (3322621 rewrites/second)
+result Bool: true
+==========================================
+reduce in WASM2MAUDE-MODELCHECK : modelCheck(boot, []~ returned(rejected)) .
+rewrites: 382410434 in 117796ms cpu (119265ms real) (3246365 rewrites/second)
+result Bool: true
+==========================================
+reduce in WASM2MAUDE-MODELCHECK : modelCheck(boot, <> returned(rejected)) .
+rewrites: 89686 in 27ms cpu (28ms real) (3222521 rewrites/second)
+result ModelCheckResult: counterexample({boot, 'instantiate} {init(config.sym(
+    state.sym(rec.store(eps, eps, eps, eps, rec.funcinst(deftype.def(
+    rectype.rec(list.wrap(subtype.sub(final.final, eps, comptype.func-sym(
+    list.wrap(i32 i32 i32), list.wrap(i32))))), 0), rec.moduleinst(deftype.def(
+    rectype.rec(list.wrap(subtype.sub(final.final, eps, comptype.func-sym(
+    list.wrap(i32 i32 i32), list.wrap(i32))))), 0), eps, eps, eps, eps, 0, eps,
+    eps, rec.exportinst(name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)),
+    externaddr.func(0))), func.func(uN.wrap(0), local.local(i32), instr.block(
+    blocktype.result(eps), instr.loop(blocktype.result(eps), instr.local-get(
+    uN.wrap(0)) instr.testop(i32, testop.eqz) instr.br-if(uN.wrap(1))
+    instr.local-get(uN.wrap(1)) instr.local-get(uN.wrap(2)) instr.binop(i32,
+    binop.add) instr.local-set(uN.wrap(3)) instr.local-get(uN.wrap(2))
+    instr.local-set(uN.wrap(1)) instr.local-get(uN.wrap(3)) instr.local-set(
+    uN.wrap(2)) instr.local-get(uN.wrap(0)) const(i32, uN.wrap(1)) instr.binop(
+    i32, binop.sub) instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0))))
+    instr.local-get(uN.wrap(1)))), eps, eps, eps, eps, eps), rec.frame(eps,
+    rec.moduleinst(deftype.def(rectype.rec(list.wrap(subtype.sub(final.final,
+    eps, comptype.func-sym(list.wrap(i32 i32 i32), list.wrap(i32))))), 0), eps,
+    eps, eps, eps, 0, eps, eps, rec.exportinst(name.wrap(char.wrap(102)
+    char.wrap(105) char.wrap(98)), externaddr.func(0))))), eps)), 'initialize}
+    {ready(rec.store(eps, eps, eps, eps, rec.funcinst(deftype.def(rectype.rec(
+    list.wrap(subtype.sub(final.final, eps, comptype.func-sym(list.wrap(i32 i32
+    i32), list.wrap(i32))))), 0), rec.moduleinst(deftype.def(rectype.rec(
+    list.wrap(subtype.sub(final.final, eps, comptype.func-sym(list.wrap(i32 i32
+    i32), list.wrap(i32))))), 0), eps, eps, eps, eps, 0, eps, eps,
+    rec.exportinst(name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)),
+    externaddr.func(0))), func.func(uN.wrap(0), local.local(i32), instr.block(
+    blocktype.result(eps), instr.loop(blocktype.result(eps), instr.local-get(
+    uN.wrap(0)) instr.testop(i32, testop.eqz) instr.br-if(uN.wrap(1))
+    instr.local-get(uN.wrap(1)) instr.local-get(uN.wrap(2)) instr.binop(i32,
+    binop.add) instr.local-set(uN.wrap(3)) instr.local-get(uN.wrap(2))
+    instr.local-set(uN.wrap(1)) instr.local-get(uN.wrap(3)) instr.local-set(
+    uN.wrap(2)) instr.local-get(uN.wrap(0)) const(i32, uN.wrap(1)) instr.binop(
+    i32, binop.sub) instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0))))
+    instr.local-get(uN.wrap(1)))), eps, eps, eps, eps, eps), rec.moduleinst(
+    deftype.def(rectype.rec(list.wrap(subtype.sub(final.final, eps,
+    comptype.func-sym(list.wrap(i32 i32 i32), list.wrap(i32))))), 0), eps, eps,
+    eps, eps, 0, eps, eps, rec.exportinst(name.wrap(char.wrap(102) char.wrap(
+    105) char.wrap(98)), externaddr.func(0)))), 'invoke} {exec(config.sym(
+    state.sym(rec.store(eps, eps, eps, eps, rec.funcinst(deftype.def(
+    rectype.rec(list.wrap(subtype.sub(final.final, eps, comptype.func-sym(
+    list.wrap(i32 i32 i32), list.wrap(i32))))), 0), rec.moduleinst(deftype.def(
+    rectype.rec(list.wrap(subtype.sub(final.final, eps, comptype.func-sym(
+    list.wrap(i32 i32 i32), list.wrap(i32))))), 0), eps, eps, eps, eps, 0, eps,
+    eps, rec.exportinst(name.wrap(char.wrap(102) char.wrap(105) char.wrap(98)),
+    externaddr.func(0))), func.func(uN.wrap(0), local.local(i32), instr.block(
+    blocktype.result(eps), instr.loop(blocktype.result(eps), instr.local-get(
+    uN.wrap(0)) instr.testop(i32, testop.eqz) instr.br-if(uN.wrap(1))
+    instr.local-get(uN.wrap(1)) instr.local-get(uN.wrap(2)) instr.binop(i32,
+    binop.add) instr.local-set(uN.wrap(3)) instr.local-get(uN.wrap(2))
+    instr.local-set(uN.wrap(1)) instr.local-get(uN.wrap(3)) instr.local-set(
+    uN.wrap(2)) instr.local-get(uN.wrap(0)) const(i32, uN.wrap(1)) instr.binop(
+    i32, binop.sub) instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0))))
+    instr.local-get(uN.wrap(1)))), eps, eps, eps, eps, eps), rec.frame(eps,
+    rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps))), const(i32,
+    uN.wrap(5)) const(i32, uN.wrap(0)) const(i32, uN.wrap(1))
+    ref.ref-func-addr(0) instr.call-ref(deftype.def(rectype.rec(list.wrap(
+    subtype.sub(final.final, eps, comptype.func-sym(list.wrap(i32 i32 i32),
+    list.wrap(i32))))), 0)))), 'execute}, {finished(state.sym(rec.store(eps,
+    eps, eps, eps, rec.funcinst(deftype.def(rectype.rec(list.wrap(subtype.sub(
+    final.final, eps, comptype.func-sym(list.wrap(i32 i32 i32), list.wrap(
+    i32))))), 0), rec.moduleinst(deftype.def(rectype.rec(list.wrap(subtype.sub(
+    final.final, eps, comptype.func-sym(list.wrap(i32 i32 i32), list.wrap(
+    i32))))), 0), eps, eps, eps, eps, 0, eps, eps, rec.exportinst(name.wrap(
+    char.wrap(102) char.wrap(105) char.wrap(98)), externaddr.func(0))),
+    func.func(uN.wrap(0), local.local(i32), instr.block(blocktype.result(eps),
+    instr.loop(blocktype.result(eps), instr.local-get(uN.wrap(0)) instr.testop(
+    i32, testop.eqz) instr.br-if(uN.wrap(1)) instr.local-get(uN.wrap(1))
+    instr.local-get(uN.wrap(2)) instr.binop(i32, binop.add) instr.local-set(
+    uN.wrap(3)) instr.local-get(uN.wrap(2)) instr.local-set(uN.wrap(1))
+    instr.local-get(uN.wrap(3)) instr.local-set(uN.wrap(2)) instr.local-get(
+    uN.wrap(0)) const(i32, uN.wrap(1)) instr.binop(i32, binop.sub)
+    instr.local-set(uN.wrap(0)) instr.br(uN.wrap(0)))) instr.local-get(uN.wrap(
+    1)))), eps, eps, eps, eps, eps), rec.frame(eps, rec.moduleinst(eps, eps,
+    eps, eps, eps, eps, eps, eps, eps))), const(i32, uN.wrap(5))), deadlock})
+Bye.

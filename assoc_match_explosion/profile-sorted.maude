@@ -1,0 +1,10 @@
+load fib-sorted-module.maude
+
+set profile on .
+
+search [1, 100000] in WASM2MAUDE-MODELCHECK :
+  boot =>* finished(S, const(i32, uN.wrap(6))) .
+
+show profile .
+
+quit
