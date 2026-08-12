@@ -145,10 +145,8 @@ fi
 require_rule step-read-return-call-ref-frame-addr
 return_call_ref=$(grep -A 1 -F 'crl [step-read-return-call-ref-frame-addr]' "$output")
 for guard in \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
-  'typecheckSeq(PATTERN2:SpectecTerminals, syn.val)' \
-  'typecheckSeq(PATTERN2:SpectecTerminals, syn.instr)'
+  'typecheckSeq(VAL_PRIME_STAR:SpectecTerminals, syn.val)' \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)'
 do
   if ! printf '%s\n' "$return_call_ref" | grep -Fq "$guard"; then
     echo "return_call_ref lost direct identity guard: $guard" >&2
@@ -161,15 +159,15 @@ if printf '%s\n' "$return_call_ref" | grep -Fq 'helper.subtype-'; then
 fi
 
 context_conditions=$(grep -A 1 -F 'crl [step-ctxt-instrs]' "$output")
-for guard in \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)'
-do
-  if ! printf '%s\n' "$context_conditions" | grep -Fq "$guard"; then
-    echo "step-ctxt-instrs lost identity guard: $guard" >&2
-    exit 1
-  fi
-done
+guard='typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)'
+if ! printf '%s\n' "$context_conditions" | grep -Fq "$guard"; then
+  echo "step-ctxt-instrs lost identity guard: $guard" >&2
+  exit 1
+fi
+if printf '%s\n' "$context_conditions" | grep -Fq 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)'; then
+  echo 'step-ctxt-instrs retained target membership implied by val <: instr' >&2
+  exit 1
+fi
 if printf '%s\n' "$context_conditions" \
     | grep -Eq 'helper\.context-|helper\.subtype-|syn\.state\)'; then
   echo 'step-ctxt-instrs retained a scanner, subtype helper, or redundant state check' >&2

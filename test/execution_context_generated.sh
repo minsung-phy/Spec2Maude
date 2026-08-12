@@ -33,32 +33,35 @@ do
 done
 
 printf '%s\n' "$statement" | grep -Fq \
-  'PATTERN1:SpectecTerminals (INSTR_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
+  'VAL_STAR:SpectecTerminals (INSTR_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
 printf '%s\n' "$statement" | grep -Fq \
-  'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
+  'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
 
-source_guard='typecheckSeq(PATTERN1:SpectecTerminals, syn.val)'
-target_guard='typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)'
-progress='_or_(_=/=_(PATTERN1:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))'
+source_guard='typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)'
+progress='_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))'
 recursive='rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals)'
 result_guard='typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)'
 
-for required in "$source_guard" "$target_guard" "$progress" "$recursive" "$result_guard"
+for required in "$source_guard" "$progress" "$recursive" "$result_guard"
 do
   printf '%s\n' "$condition" | grep -Fq "$required"
 done
 
 printf '%s\n' "$condition" | awk \
   -v progress="$progress" -v recursive="$recursive" \
-  -v source_guard="$source_guard" -v target_guard="$target_guard" '
+  -v source_guard="$source_guard" '
     {
       m = index($0, source_guard)
-      t = index($0, target_guard)
       p = index($0, progress)
       r = index($0, recursive)
     }
-    END { exit !(p > 0 && m > p && t > m && r > t) }
+    END { exit !(p > 0 && m > p && r > m) }
   '
+
+if printf '%s\n' "$condition" | grep -Fq 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)'; then
+  echo 'Step/ctxt-instrs retained target membership implied by val <: instr' >&2
+  exit 1
+fi
 
 if grep -Eq 'helper\.context-|Context(Split|Stack|MaybeFocus)' "$output"; then
   echo 'source-free context scanner survived generic context lowering' >&2

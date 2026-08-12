@@ -70,9 +70,9 @@ check_context_sequence_eliminated () {
   require_contains "$statement" "$raw" "$label did not reuse its raw certified pattern"
   require_not_contains "$statement" 'helper.iter-map' "$label retained its direct reinjection map"
   require_not_contains "$condition" 'helper.subtype-' "$label retained an identity projection"
-  require_contains "$condition" '_or_(_=/=_(PATTERN1:SpectecTerminals, eps)' "$label lost its source progress condition"
-  require_contains "$condition" 'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' "$label lost its source category guard"
-  require_contains "$condition" 'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' "$label lost its target category guard"
+  require_contains "$condition" '_or_(_=/=_(VAL_STAR:SpectecTerminals, eps)' "$label lost its source progress condition"
+  require_contains "$condition" 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' "$label lost its source category guard"
+  require_not_contains "$condition" 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)' "$label retained target membership implied by val <: instr"
   require_not_contains "$condition" 'helper.context-' "$label retained a source-free context scanner"
   sequence_rule_count=$((sequence_rule_count + 1))
 }
@@ -80,7 +80,7 @@ check_context_sequence_eliminated () {
 check_length_guard () {
   label=$1
   condition=$(condition_line "$label")
-  require_contains "$condition" 'len(PATTERN' "$label lost its source length guard"
+  require_contains "$condition" 'len(VAL' "$label lost its source length guard"
 }
 
 check_direct_eliminated () {
@@ -92,7 +92,6 @@ check_direct_eliminated () {
   require_not_contains "$statement" 'helper.subtype-inject' "$label retained its direct scalar reinjection"
   require_not_contains "$condition" 'helper.subtype-' "$label retained an identity projection"
   require_contains "$condition" 'syn.val' "$label lost its source category guard"
-  require_contains "$condition" 'syn.instr' "$label lost its target category guard"
   direct_rule_count=$((direct_rule_count + 1))
 }
 
@@ -117,22 +116,22 @@ check_null_scalar_eliminated () {
   require_contains "$condition" '_=/=_(VAL:SpectecTerminal, ref.ref-null-addr)' "$label stopped comparing the genuine source value"
 }
 
-check_sequence_eliminated step-pure-label-vals '=> PATTERN1:SpectecTerminals'
-check_sequence_eliminated step-pure-br-label-zero '=> PATTERN2:SpectecTerminals INSTR_PRIME_STAR:SpectecTerminals'
-check_sequence_eliminated step-pure-br-label-succ '=> PATTERN1:SpectecTerminals instr.br'
-check_sequence_eliminated step-pure-br-handler '=> PATTERN1:SpectecTerminals instr.br'
-check_sequence_eliminated step-pure-frame-vals '=> PATTERN1:SpectecTerminals'
-check_sequence_eliminated step-pure-return-frame '=> PATTERN2:SpectecTerminals'
-check_sequence_eliminated step-pure-return-label '=> PATTERN1:SpectecTerminals instr.return'
-check_sequence_eliminated step-pure-return-handler '=> PATTERN1:SpectecTerminals instr.return'
-check_sequence_eliminated step-pure-handler-vals '=> PATTERN1:SpectecTerminals'
-check_sequence_eliminated step-read-block 'eps, PATTERN1:SpectecTerminals INSTR_STAR:SpectecTerminals'
-check_sequence_eliminated step-read-loop 'PATTERN1:SpectecTerminals INSTR_STAR:SpectecTerminals'
-check_sequence_eliminated step-read-return-call-ref-label '=> PATTERN1:SpectecTerminals instr.return-call-ref'
-check_sequence_eliminated step-read-return-call-ref-handler '=> PATTERN1:SpectecTerminals instr.return-call-ref'
-check_sequence_eliminated step-read-return-call-ref-frame-addr '=> PATTERN2:SpectecTerminals (ref.ref-func-addr'
-check_sequence_eliminated step-read-try-table 'eps, PATTERN1:SpectecTerminals INSTR_STAR:SpectecTerminals'
-check_context_sequence_eliminated step-ctxt-instrs 'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
+check_sequence_eliminated step-pure-label-vals '=> VAL_STAR:SpectecTerminals'
+check_sequence_eliminated step-pure-br-label-zero '=> VAL_STAR:SpectecTerminals INSTR_PRIME_STAR:SpectecTerminals'
+check_sequence_eliminated step-pure-br-label-succ '=> VAL_STAR:SpectecTerminals instr.br'
+check_sequence_eliminated step-pure-br-handler '=> VAL_STAR:SpectecTerminals instr.br'
+check_sequence_eliminated step-pure-frame-vals '=> VAL_STAR:SpectecTerminals'
+check_sequence_eliminated step-pure-return-frame '=> VAL_STAR:SpectecTerminals'
+check_sequence_eliminated step-pure-return-label '=> VAL_STAR:SpectecTerminals instr.return'
+check_sequence_eliminated step-pure-return-handler '=> VAL_STAR:SpectecTerminals instr.return'
+check_sequence_eliminated step-pure-handler-vals '=> VAL_STAR:SpectecTerminals'
+check_sequence_eliminated step-read-block 'eps, VAL_STAR:SpectecTerminals INSTR_STAR:SpectecTerminals'
+check_sequence_eliminated step-read-loop 'VAL_STAR:SpectecTerminals INSTR_STAR:SpectecTerminals'
+check_sequence_eliminated step-read-return-call-ref-label '=> VAL_STAR:SpectecTerminals instr.return-call-ref'
+check_sequence_eliminated step-read-return-call-ref-handler '=> VAL_STAR:SpectecTerminals instr.return-call-ref'
+check_sequence_eliminated step-read-return-call-ref-frame-addr '=> VAL_STAR:SpectecTerminals (ref.ref-func-addr'
+check_sequence_eliminated step-read-try-table 'eps, VAL_STAR:SpectecTerminals INSTR_STAR:SpectecTerminals'
+check_context_sequence_eliminated step-ctxt-instrs 'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
 
 # Pointwise projection preserves cardinality on its exact domain.  The raw
 # target is reused while every source ListN guard remains present.
@@ -198,17 +197,17 @@ fi
 eval_statement=$(statement_line eval-expr-rule-1)
 eval_condition=$(condition_line eval-expr-rule-1)
 require_contains "$eval_statement" '[eval-expr-rule-1]' 'Eval_expr generated rule is missing'
-require_contains "$eval_statement" 'seq(PATTERN1:SpectecTerminals)' 'Eval_expr stopped returning direct source values'
-require_contains "$eval_condition" 'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' 'Eval_expr lost its source membership guard'
+require_contains "$eval_statement" 'seq(VAL_STAR:SpectecTerminals)' 'Eval_expr stopped returning direct source values'
+require_contains "$eval_condition" 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' 'Eval_expr lost its source membership guard'
 
 frame_condition=$(condition_line step-read-call-ref-func)
-require_contains "$frame_condition" 'rec.frame(helper.iter-map.step-read.2(PATTERN1:SpectecTerminals)' 'frame locals stopped consuming genuine source values'
+require_contains "$frame_condition" 'rec.frame(helper.iter-map.step-read.2(VAL_STAR:SpectecTerminals)' 'frame locals stopped consuming genuine source values'
 
 struct_condition=$(condition_line step-struct-new)
-require_contains "$struct_condition" 'helper.iter-zip.step(PATTERN1:SpectecTerminals' 'struct allocation stopped consuming genuine source values'
+require_contains "$struct_condition" 'helper.iter-zip.step(VAL_STAR:SpectecTerminals' 'struct allocation stopped consuming genuine source values'
 
 array_condition=$(condition_line step-array-new-fixed)
-require_contains "$array_condition" 'helper.iter-map.step(PATTERN1:SpectecTerminals' 'array allocation stopped consuming genuine source values'
+require_contains "$array_condition" 'helper.iter-map.step(VAL_STAR:SpectecTerminals' 'array allocation stopped consuming genuine source values'
 
 # Repetition still uses its genuine source value directly after identity
 # certification; only the independent count helper remains.
@@ -216,4 +215,4 @@ array_repeat_statement=$(statement_line step-pure-array-new)
 array_repeat_condition=$(condition_line step-pure-array-new)
 require_contains "$array_repeat_statement" 'helper.iter-count' 'scalar round-trip provenance leaked into a ListN repetition'
 require_contains "$array_repeat_condition" 'typecheck(VAL:SpectecTerminal, syn.val)' 'ListN repetition lost its source guard'
-require_contains "$array_repeat_condition" 'typecheck(VAL:SpectecTerminal, syn.instr)' 'ListN repetition lost its target guard'
+require_not_contains "$array_repeat_condition" 'typecheck(VAL:SpectecTerminal, syn.instr)' 'ListN repetition retained target membership implied by val <: instr'
