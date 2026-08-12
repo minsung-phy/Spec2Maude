@@ -1,0 +1,5 @@
+load fib-baseline-module.maude
+
+rew [100000] in WASM2MAUDE-MODELCHECK : boot .
+
+quit
