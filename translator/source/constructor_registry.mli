@@ -93,12 +93,7 @@ val register : t -> entry -> unit
 val register_checked : t -> entry -> registration
 val uniform_payload_schema : t -> entry -> bool
 val equivalent : t -> entry -> entry -> bool
-val resolve :
-  il_env:Il.Env.t ->
-  source_index:Analysis.Source_index.t ->
-  t ->
-  Il.Ast.script ->
-  unit
+val resolve : t -> unit
 val canonical_owner : t -> entry -> entry option
 val declaration_owner : t -> entry -> entry option
 val constructor_declaration : entry -> Maude_ir.op_decl

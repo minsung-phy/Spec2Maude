@@ -100,7 +100,7 @@ let require_runtime_shape () =
      "command.uninstantiable(ID,M,IMPORTS),CMDS))=>script.wrong-assertion(ID)iflinkImports(S,ENV,IMPORTS)=link.error.";
      "command.uninstantiable(ID,M,IMPORTS),CMDS))=>script.uninstantiable(ID,ENV,CMDS,C)iflink.ok(EXPORTS):=linkImports(S,ENV,IMPORTS)/\\def.instantiate(S,M,EXPORTS)=>C.";
      "script.uninstantiable(ID,ENV,CMDS,C)=>script.uninstantiable(ID,ENV,CMDS,C2)ifrel.step(C)=>C2.";
-     "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),instr.trap))=>script.ready(S,ENV,CMDS).";
+     "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),trap))=>script.ready(S,ENV,CMDS).";
      "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),ref.ref-exn-addr(A)instr.throw-ref))=>script.ready(S,ENV,CMDS).";
      "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),eps))=>script.wrong-assertion(ID)."];
   let start = find_from text "  rl [assert-uninstantiable-static" 0 in

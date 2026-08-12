@@ -226,15 +226,14 @@ let equivalence_domain = function
   | Guarded_constructor reason -> Constructor_equivalence.Guarded_constructor reason
 
 let equivalence_case source =
-  Constructor_equivalence.source_case
-    ~payload_typ:source.payload_typ
-    ~case_binds:source.case_binds
-    ~case_prems:source.case_prems
-    ~instance_binds:source.instance_binds
-    ~instance_args:source.instance_args
-    ~static_args_key:source.static_args_key
-    ~construction_domain:(equivalence_domain source.construction_domain)
-    ~origin:source.origin
+  { Constructor_equivalence.payload_typ = source.payload_typ
+  ; case_binds = source.case_binds
+  ; case_prems = source.case_prems
+  ; instance_binds = source.instance_binds
+  ; instance_args = source.instance_args
+  ; static_args_key = source.static_args_key
+  ; construction_domain = equivalence_domain source.construction_domain
+  }
 
 let proof_entry entry =
   { Constructor_equivalence.source_category = entry.source_category
@@ -250,24 +249,6 @@ let proof_entry entry =
   }
 
 let proof_entries t = List.map proof_entry t.entries
-
-let proof_cases t =
-  t.source_cases
-  |> List.map (fun case ->
-    { Constructor_equivalence.case_category = case.case_category
-    ; case_static_key = case.case_static_key
-    ; case_origin = case.case_origin
-    })
-
-let proof_inclusions t =
-  t.inclusions
-  |> List.map (fun inclusion ->
-    { Constructor_equivalence.parent_category = inclusion.parent_category
-    ; parent_static_args_key = inclusion.parent_static_args_key
-    ; child_category = inclusion.child_category
-    ; child_static_args_key = inclusion.child_static_args_key
-    ; covered_origins = inclusion.covered_origins
-    })
 
 let canonical_owner t entry =
   match t.equivalences with
@@ -542,17 +523,11 @@ let resolve_arity_surfaces t =
         { entry with constructor_op; projection_ops });
     t.surfaces_resolved <- true)
 
-let resolve ~il_env ~source_index t script =
+let resolve t =
   if Option.is_some t.equivalences || t.surfaces_resolved then
     invalid_arg "Constructor_registry.resolve: registry is already resolved";
   t.equivalences <-
-    Some
-      (Constructor_equivalence.analyze
-         ~il_env ~source_index
-         ~entries:(proof_entries t)
-         ~cases:(proof_cases t)
-         ~inclusions:(proof_inclusions t)
-         script);
+    Some (Constructor_equivalence.analyze ~entries:(proof_entries t));
   apply_equivalent_surfaces t;
   resolve_arity_surfaces t
 
@@ -1219,11 +1194,11 @@ let diagnostics ~profile t =
              ~profile
              ~reason:
                (Printf.sprintf
-                  "distinct certified constructor-equivalence classes claim the same unqualified target `%s`/%d: %s"
+                  "distinct structural constructor classes claim the same unqualified target `%s`/%d: %s"
                   owner.constructor_op owner.arity
                   (entries |> List.map class_summary |> String.concat "; "))
              ~suggestion:
-               "Keep the unqualified mixop surface unique by name, arity, typed signature, and certified equivalence class; do not merge unrelated source constructors"
+               "Keep the unqualified mixop surface unique by name, arity, typed signature, and structural representation class; do not merge unrelated source constructors"
              ()))
   in
   let declaration_collision_diagnostics =

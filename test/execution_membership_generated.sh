@@ -85,9 +85,12 @@ require_before_pattern \
   'TypD-instr/.*/VariantT/subtype/.* / category-inclusion' \
   'syn.instr checks an inherited value category before its own constructors'
 
-grep -Fq \
-  'rl [step-pure-unreachable] : rel.step-pure(instr.unreachable) => instr.trap .' \
-  "$output"
+require_rule step-pure-unreachable
+if ! grep -A 1 -F 'crl [step-pure-unreachable]' "$output" \
+    | grep -Fq 'rel.step-pure(instr.unreachable) => trap'; then
+  echo 'unreachable did not reduce to the shared TRAP constructor' >&2
+  exit 1
+fi
 grep -Fq \
   'rl [step-pure-nop] : rel.step-pure(instr.nop) => eps .' \
   "$output"

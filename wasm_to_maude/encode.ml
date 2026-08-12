@@ -121,7 +121,7 @@ and heaptype source at = function
   | Types.NoExnHT -> atom "absheaptype.noexn"
   | Types.ExternHT -> atom "absheaptype.extern"
   | Types.NoExternHT -> atom "absheaptype.noextern"
-  | Types.BotHT -> atom "absheaptype.bot"
+  | Types.BotHT -> atom "bot"
   | Types.UseHT use -> typeuse source at use
 
 and reftype source at (nul, heap) =
@@ -131,7 +131,7 @@ and valtype source at = function
   | Types.NumT t -> numtype t
   | Types.VecT t -> vectype t
   | Types.RefT t -> reftype source at t
-  | Types.BotT -> atom "valtype.bot"
+  | Types.BotT -> atom "bot"
 
 and storagetype source at = function
   | Types.ValStorageT t -> valtype source at t
@@ -820,7 +820,7 @@ let type_ source ({Source.it; at} : Ast.type_) =
 
 let tag source ({Source.it = Ast.Tag typ; at} : Ast.tag) =
   let Types.TagT use = typ in
-  app "tag.tag" [typeuse source at use]
+  app "tag" [typeuse source at use]
 
 let global source ({Source.it = Ast.Global (typ, init); at} : Ast.global) =
   app "global.global" [globaltype source at typ; expr source init.it]

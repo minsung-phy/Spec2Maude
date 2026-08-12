@@ -12,11 +12,7 @@ let exp_arg exp = ExpA exp $ region
 let origin name = Origin.synthetic ~ast_constructor:"NamingRegression" name
 
 let resolve registry =
-  let script = [] in
-  Constructor_registry.resolve
-    ~il_env:Il.Env.empty
-    ~source_index:(Analysis.Source_index.of_script script)
-    registry script
+  Constructor_registry.resolve registry
 
 let atom text =
   Xl.Atom.Atom text $$ region % Xl.Atom.info "naming-regression"

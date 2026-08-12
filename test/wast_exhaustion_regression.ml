@@ -68,7 +68,7 @@ let require_runtime_shape () =
      "=>script.exhaustion-check(ID,REQUIRED,ENV,CMDS,S2,config.sym(state.sym(S2,F2),INSTRS))ifrel.step(config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),BODY))=>config.sym(state.sym(S2,F2),INSTRS).";
      "script.exhaustion-check(ID,REQUIRED,ENV,CMDS,S,config.sym(C2,INSTRS))=>script.ready(S,ENV,CMDS)if_>_(activeFrameDepth(INSTRS),REQUIRED)=true.";
      "script.exhaustion-check(ID,REQUIRED,ENV,CMDS,S,C)=>script.exhaustion(ID,REQUIRED,ENV,CMDS,C)ifconfig.sym(C2,INSTRS):=C/\\_<=_(activeFrameDepth(INSTRS),REQUIRED)=true.";
-     "instr.trap))=>script.wrong-assertion(ID).";
+     "trap))=>script.wrong-assertion(ID).";
      "ref.ref-exn-addr(A)instr.throw-ref))=>script.wrong-assertion(ID).";
      "ifruntimeResults(ACTUAL)=true."];
   if contains text "call stack exhausted" then
