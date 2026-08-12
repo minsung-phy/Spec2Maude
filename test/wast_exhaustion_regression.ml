@@ -62,8 +62,8 @@ let require_runtime_shape () =
      "activeFrameDepth(instr.frame-sym-sym(N,C,BODY)REST)=_+_(1,activeFrameDepth(BODY)).";
      "activeFrameDepth(instr.label-sym-sym(N,INSTRS,BODY)REST)=activeFrameDepth(BODY).";
      "activeFrameDepth(instr.handler-sym-sym(N,CATCHES,BODY)REST)=activeFrameDepth(BODY).";
-     "activeFrameDepth(instr.const(NT,VALUE)REST)=activeFrameDepth(REST)iftypecheck(NT,syn.numtype)/\\typecheck(VALUE,syn.num(NT)).";
-     "activeFrameDepth(instr.vconst(vectype.v128,C)REST)=activeFrameDepth(REST).";
+     "activeFrameDepth(const(NT,VALUE)REST)=activeFrameDepth(REST)iftypecheck(NT,syn.numtype)/\\typecheck(VALUE,syn.num(NT)).";
+     "activeFrameDepth(vconst(vectype.v128,C)REST)=activeFrameDepth(REST).";
      "activeFrameDepth(CREST)=activeFrameDepth(REST)iftypecheck(C,syn.ref).";
      "=>script.exhaustion-check(ID,REQUIRED,ENV,CMDS,S2,config.sym(state.sym(S2,F2),INSTRS))ifrel.step(config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),BODY))=>config.sym(state.sym(S2,F2),INSTRS).";
      "script.exhaustion-check(ID,REQUIRED,ENV,CMDS,S,config.sym(C2,INSTRS))=>script.ready(S,ENV,CMDS)if_>_(activeFrameDepth(INSTRS),REQUIRED)=true.";

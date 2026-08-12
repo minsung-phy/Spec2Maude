@@ -124,21 +124,60 @@ let register_numeric_wrapper
       in
       [ destructor ]
   in
-  ignore
-    (Typd_registry.register_constructor
-       ctx origin
-       ~construction_domain:
-         Constructor_registry.Certified_representation_constructor
-       ?static_args_key
-       ~source_category
-       ~mixop:(Option.value mixop ~default:alias_projection_mixop)
-       ~arity:1
-       ~constructor_op:constructor
-       ~projection_ops
-       ~payload_witnesses:[ target ]
-       ~payload_sorts:[ payload_sort ]
-       ());
-  constructor, projection_ops
+  let registration =
+    Typd_registry.register_constructor
+      ctx origin
+      ~construction_domain:
+        Constructor_registry.Certified_representation_constructor
+      ?static_args_key
+      ~source_category
+      ~mixop:(Option.value mixop ~default:alias_projection_mixop)
+      ~arity:1
+      ~constructor_op:constructor
+      ~projection_ops
+      ~payload_witnesses:[ target ]
+      ~payload_sorts:[ payload_sort ]
+      ()
+  in
+  constructor, projection_ops, registration
+
+let numeric_wrapper_registry_diagnostic
+    ctx origin source_category = function
+  | Constructor_registry.Schema_mismatch (_expected, differences) ->
+    Some
+      (unsupported
+         ~ctx ~origin
+         ~constructor:"VariantT/numeric-wrapper/resolved-registry"
+         ~reason:
+           ("numeric wrapper lowering drifted from its preloaded exact schema in: "
+            ^ String.concat ", " differences)
+         ~suggestion:
+           "Preload the exact numeric wrapper payload sort and witness before constructor surface resolution"
+         ~source_echo:source_category
+         ())
+  | Constructor_registry.Rejected_after_resolution ->
+    Some
+      (unsupported
+         ~ctx ~origin
+         ~constructor:"VariantT/numeric-wrapper/resolved-registry"
+         ~reason:
+           "a genuinely new numeric wrapper owner was rejected after constructor surface resolution"
+         ~suggestion:
+           "Preload this exact numeric wrapper owner before constructor surface resolution"
+         ~source_echo:source_category
+         ())
+  | Constructor_registry.Registered
+  | Constructor_registry.Already_registered -> None
+
+let numeric_wrapper_lookup_diagnostic ctx origin source_category reason =
+  unsupported
+    ~ctx ~origin
+    ~constructor:"VariantT/numeric-wrapper/resolved-registry"
+    ~reason
+    ~suggestion:
+      "Preload one exact numeric wrapper owner before constructor surface resolution"
+    ~source_echo:source_category
+    ()
 
 let numeric_wrapper_statements
     env ctx ?mixop origin static_args_key source_category target payload_sort =
@@ -150,48 +189,85 @@ let numeric_wrapper_statements
   let variable_term, _names =
     Local_name.fresh_qualified names Local_name.Value (sr payload_sort)
   in
-  let constructor, projection_ops =
+  let _constructor, _projection_ops, registration =
     register_numeric_wrapper
       ctx ?mixop origin static_args_key source_category target payload_sort
   in
-  let wrapper = app constructor [ variable_term ] in
-  let base =
-    [ gen origin
-        (op constructor [ sr payload_sort ] spectec_terminal
-           ~kind:Partial ~attrs:[ Ctor ])
-    ; gen origin (mb wrapper spectec_terminal)
-    ; gen origin
-        (ceq
-           (Typecheck_term.typecheck wrapper target)
-           (Const "true")
-           [ MembershipCond (wrapper, spectec_terminal)
-           ; BoolCond (Typecheck_term.typecheck variable_term target)
-           ])
-    ]
-  in
-  let destructor =
-    projection_ops
-    |> List.map (fun destructor ->
-      [ gen origin (op destructor [ sr spectec_terminal ] payload_sort ~kind:Partial)
+  match numeric_wrapper_registry_diagnostic ctx origin source_category registration with
+  | Some diagnostic -> with_diagnostics [ diagnostic ]
+  | None ->
+    let registry = Context.constructors ctx in
+    let mixop = Option.value mixop ~default:alias_projection_mixop in
+    match
+      Constructor_registry.lookup_at_origin
+        registry ~source_category ~static_args_key ~mixop ~arity:1 ~origin
+    with
+    | Constructor_registry.Missing ->
+      with_diagnostics
+        [ numeric_wrapper_lookup_diagnostic
+            ctx origin source_category
+            "resolved numeric wrapper lookup found no exact source owner; wrapper statements were suppressed"
+        ]
+    | Constructor_registry.Ambiguous entries ->
+      with_diagnostics
+        [ numeric_wrapper_lookup_diagnostic
+            ctx origin source_category
+            (Printf.sprintf
+               "resolved numeric wrapper lookup found %d exact source-owner candidates; wrapper statements were suppressed"
+               (List.length entries))
+        ]
+    | Constructor_registry.Found entry ->
+    let constructor = entry.constructor_op in
+    let wrapper = app constructor [ variable_term ] in
+    let owned declaration =
+      if Constructor_registry.owns_op_declaration registry entry declaration then
+        [ gen origin
+            (op
+               ~kind:declaration.kind
+               ~attrs:declaration.attrs
+               declaration.name declaration.args declaration.result)
+        ]
+      else
+        []
+    in
+    let base =
+      owned (Constructor_registry.constructor_declaration entry)
+      @ [ gen origin (mb wrapper spectec_terminal)
       ; gen origin
           (ceq
-            (app destructor [ wrapper ])
-            variable_term
-            [ MembershipCond (wrapper, spectec_terminal) ])
-      ])
-    |> List.concat
-  in
-  base @ destructor
+             (Typecheck_term.typecheck wrapper target)
+             (Const "true")
+             [ MembershipCond (wrapper, spectec_terminal)
+             ; BoolCond (Typecheck_term.typecheck variable_term target)
+             ])
+      ]
+    in
+    let destructor =
+      Constructor_registry.projection_declarations entry
+      |> List.map (fun declaration ->
+        owned declaration
+        @ [ gen origin
+            (ceq
+              (app declaration.name [ wrapper ])
+              variable_term
+              [ MembershipCond (wrapper, spectec_terminal) ])
+        ])
+      |> List.concat
+    in
+    { statements = base @ destructor; diagnostics = [] }
 
 let translate_numeric_literal_case
     env ctx origin static_args_key source_category target mixop payload_sort literal_terms =
+  let wrapper =
+    numeric_wrapper_statements
+      env ctx ~mixop origin static_args_key source_category target payload_sort
+  in
   { statements =
       (literal_terms
        |> List.map (fun literal ->
          gen origin (eq (Typecheck_term.typecheck literal target) (Const "true"))))
-      @ numeric_wrapper_statements
-          env ctx ~mixop origin static_args_key source_category target payload_sort
-  ; diagnostics = []
+      @ wrapper.statements
+  ; diagnostics = wrapper.diagnostics
   }
 
 let translate_numeric_predicate_case
@@ -217,11 +293,14 @@ let translate_numeric_predicate_case
         | Const "true" -> []
         | _ -> [ BoolCond predicate_term ])
     in
+    let wrapper =
+      numeric_wrapper_statements
+        env ctx ~mixop origin static_args_key source_category target payload_sort
+    in
     { statements =
         [ gen origin (ceq (Typecheck_term.typecheck variable_term target) (Const "true") conditions) ]
-        @ numeric_wrapper_statements
-            env ctx ~mixop origin static_args_key source_category target payload_sort
-    ; diagnostics = lowered.diagnostics
+        @ wrapper.statements
+    ; diagnostics = lowered.diagnostics @ wrapper.diagnostics
     }
   | None ->
     let fallback =

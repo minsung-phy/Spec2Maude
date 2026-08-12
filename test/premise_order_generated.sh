@@ -87,9 +87,25 @@ require_statement_before () {
 
 step=$(condition_line 'crl [step-ctxt-instrs]')
 require_before "$step" \
-  'VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals)' \
+  '(_or_(_=/=_(PATTERN1:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'ctxt-instrs source-category guard no longer follows its progress guard'
+require_before "$step" \
+  '(_or_(_=/=_(PATTERN1:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
-  'ctxt-instrs value-prefix projection no longer precedes its self-recursive rewrite'
+  'ctxt-instrs progress guard no longer precedes its self-recursive rewrite'
+require_before "$step" \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
+  'ctxt-instrs self-recursive rewrite crossed its ready source-category guard'
+require_before "$step" \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
+  'ctxt-instrs target-category guard no longer follows its source-category guard'
+require_before "$step" \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
+  'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
+  'ctxt-instrs self-recursive rewrite crossed its ready target-category guard'
 if printf '%s\n' "$step" | grep -Eq 'helper\.context-'
 then
   echo 'ctxt-instrs retained a source-free context scanner' >&2
@@ -115,7 +131,7 @@ allocmodule=$(condition_line 'ceq def.allocmodule(S:SpectecTerminal')
 forward='FA_STAR:SpectecTerminals := helper.iter-count.allocmodule(len(FUNC_STAR:SpectecTerminals), 0, S:SpectecTerminal)'
 provisional='XI_STAR:SpectecTerminals := def.allocexports(rec.moduleinst(eps, AA_I_STAR:SpectecTerminals AA_STAR:SpectecTerminals, GA_I_STAR:SpectecTerminals GA_STAR:SpectecTerminals, MA_I_STAR:SpectecTerminals MA_STAR:SpectecTerminals, TA_I_STAR:SpectecTerminals TA_STAR:SpectecTerminals, FA_I_STAR:SpectecTerminals FA_STAR:SpectecTerminals, eps, eps, eps), EXPORT_STAR:SpectecTerminals)'
 moduleinst='MODULEINST:SpectecTerminal := rec.moduleinst(DT_STAR:SpectecTerminals, AA_I_STAR:SpectecTerminals AA_STAR:SpectecTerminals, GA_I_STAR:SpectecTerminals GA_STAR:SpectecTerminals, MA_I_STAR:SpectecTerminals MA_STAR:SpectecTerminals, TA_I_STAR:SpectecTerminals TA_STAR:SpectecTerminals, FA_I_STAR:SpectecTerminals FA_STAR:SpectecTerminals, DA_STAR:SpectecTerminals, EA_STAR:SpectecTerminals, XI_STAR:SpectecTerminals)'
-allocfuncs='tuple(S_7:SpectecTerminal seq(FA_STAR:SpectecTerminals)) := def.allocfuncs(S_6:SpectecTerminal, helper.iter-map.allocmodule.13(X_STAR:SpectecTerminals, DT_STAR:SpectecTerminals), helper.iter-zip.allocmodule.6(EXPR_F_STAR:SpectecTerminals, LOCAL_STAR_STAR:SpectecTerminals, X_STAR:SpectecTerminals), helper.iter-count.allocmodule.3(len(FUNC_STAR:SpectecTerminals), MODULEINST:SpectecTerminal))'
+allocfuncs='tuple(S_7:SpectecTerminal seq(FA_STAR:SpectecTerminals)) := def.allocfuncs(S_6:SpectecTerminal, helper.iter-map.allocmodule.8(X_STAR:SpectecTerminals, DT_STAR:SpectecTerminals), helper.iter-zip.allocmodule.6(EXPR_F_STAR:SpectecTerminals, LOCAL_STAR_STAR:SpectecTerminals, X_STAR:SpectecTerminals), helper.iter-count.allocmodule.3(len(FUNC_STAR:SpectecTerminals), MODULEINST:SpectecTerminal))'
 require_contains "$allocmodule" "$forward" \
   'allocmodule no longer computes the exact source-derived forward function addresses'
 require_contains "$allocmodule" "$provisional" \
@@ -178,8 +194,14 @@ if printf '%s\n' "$step_context_rule" | grep -Fq 'helper.iter-map'; then
   exit 1
 fi
 require_contains "$step_context" \
-  'VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals)' \
-  'Step/ctxt-instrs lost its source val* projection'
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'Step/ctxt-instrs lost its source val* membership guard'
+require_contains "$step_context" \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
+  'Step/ctxt-instrs lost its target instr* membership guard'
+require_not_contains "$step_context" \
+  'helper.subtype-' \
+  'Step/ctxt-instrs retained an identity subtype helper'
 if printf '%s\n' "$step_context" | grep -Eq 'syn\.state\)'; then
   echo 'Step/ctxt-instrs retained an input-state check implied by config membership' >&2
   exit 1
@@ -212,9 +234,12 @@ eval_expr=$(condition_line 'crl [eval-expr-rule-1]')
 require_contains "$eval_expr" \
   'typecheck(config.sym(Z_PRIME:SpectecTerminal, PATTERN1:SpectecTerminals), syn.config)' \
   'Eval_expr lost its whole Steps output config guard'
+require_contains "$eval_expr" \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'Eval_expr lost the source-category guard for its identity SubE pattern'
 if printf '%s\n' "$eval_expr" \
-    | grep -Eq 'syn\.state\)|typecheckSeq\('; then
-  echo 'Eval_expr retained payload checks implied by its whole config guard' >&2
+    | grep -Eq 'syn\.state\)'; then
+  echo 'Eval_expr retained a state check implied by its whole config guard' >&2
   exit 1
 fi
 
@@ -297,7 +322,7 @@ if printf '%s\n' "$memory_fill_in_bounds" | grep -Fq 'typecheck(Z:SpectecTermina
   echo 'memory.fill enabledness repeated an input-state check already enforced by config membership' >&2
   exit 1
 fi
-if printf '%s\n' "$memory_fill_in_bounds" | grep -Fq 'typecheckSeq(((instr.const'; then
+if printf '%s\n' "$memory_fill_in_bounds" | grep -Fq 'typecheckSeq(((const'; then
   echo 'memory.fill enabledness repeated an instruction check already enforced by config membership' >&2
   exit 1
 fi
@@ -320,18 +345,24 @@ if printf '%s\n' "$memory_fill" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.sta
   echo 'memory.fill successor repeated a state guard already established by its enabledness helper' >&2
   exit 1
 fi
-if printf '%s\n' "$memory_fill" | grep -Fq 'typecheckSeq(((instr.const'; then
+if printf '%s\n' "$memory_fill" | grep -Fq 'typecheckSeq(((const'; then
   echo 'memory.fill successor repeated an instruction guard already established by its enabledness helper' >&2
   exit 1
 fi
 for retained in \
-  'VAL:SpectecTerminal := helper.subtype-project.step-pure' \
-  'typecheck(I:SpectecTerminal, syn.num(helper.subtype-inject.num(AT:SpectecTerminal)))' \
-  'typecheck(uN.wrap(N:Nat), syn.num(helper.subtype-inject.num(AT:SpectecTerminal)))'
+  'typecheck(AT:SpectecTerminal, syn.addrtype)' \
+  'typecheck(AT:SpectecTerminal, syn.numtype)' \
+  'typecheck(I:SpectecTerminal, syn.num(AT:SpectecTerminal))' \
+  'typecheck(VAL:SpectecTerminal, syn.val)' \
+  'typecheck(VAL:SpectecTerminal, syn.instr)' \
+  'typecheck(uN.wrap(N:Nat), syn.num(AT:SpectecTerminal))'
 do
   require_contains "$memory_fill" "$retained" \
-    'memory.fill successor lost a binding or dependent guard that cannot be factored across the helper witness'
+    'memory.fill successor lost a source or target guard required by direct subtype identity'
 done
+require_not_contains "$memory_fill" \
+  'helper.subtype-' \
+  'memory.fill successor retained an identity subtype helper'
 require_not_contains "$memory_fill" \
   'typecheck(N:Nat, syn.nat)' \
   'memory.fill successor repeated an immutable LHS guard established by its enabledness helper'
@@ -346,14 +377,19 @@ if printf '%s\n' "$memory_fill_zero" | grep -Fq 'typecheck(Z:SpectecTerminal, sy
   exit 1
 fi
 for retained in \
-  'AT:SpectecTerminal :=' \
-  'VAL:SpectecTerminal :=' \
-  'typecheck(I:SpectecTerminal' \
-  'typecheck(uN.wrap(N:Nat)'
+  'typecheck(AT:SpectecTerminal, syn.addrtype)' \
+  'typecheck(AT:SpectecTerminal, syn.numtype)' \
+  'typecheck(I:SpectecTerminal, syn.num(AT:SpectecTerminal))' \
+  'typecheck(VAL:SpectecTerminal, syn.val)' \
+  'typecheck(VAL:SpectecTerminal, syn.instr)' \
+  'typecheck(uN.wrap(N:Nat), syn.num(AT:SpectecTerminal))'
 do
   require_contains "$memory_fill_zero" "$retained" \
-    'memory.fill zero rule lost a binding or dependent guard that cannot be factored across the helper witness'
+    'memory.fill zero rule lost a source or target guard required by direct subtype identity'
 done
+require_not_contains "$memory_fill_zero" \
+  'helper.subtype-' \
+  'memory.fill zero rule retained an identity subtype helper'
 require_not_contains "$memory_fill_zero" \
   'typecheck(N:Nat, syn.nat)' \
   'memory.fill zero rule repeated an immutable LHS guard established by its enabledness helper'
@@ -401,18 +437,23 @@ done
 
 store_pack=$(condition_line 'crl [step-store-pack-val]')
 require_contains "$store_pack" \
-  'typecheck(storeop.wrap(sz.wrap(N:Nat)), syn.storeop(helper.subtype-inject.num(INN:SpectecTerminal)))' \
+  'typecheck(storeop.wrap(sz.wrap(N:Nat)), syn.storeop(INN:SpectecTerminal))' \
   'store-pack lost its source constructor typecheck'
+require_contains "$store_pack" \
+  '(isOpt(storeop.wrap(sz.wrap(N:Nat)))) = true' \
+  'store-pack lost its optional-shape check'
 require_not_contains "$store_pack" \
-  'typecheckSeq(storeop.wrap(sz.wrap(N:Nat)), syn.storeop(helper.subtype-inject.num(INN:SpectecTerminal)))' \
-  'store-pack retained a singleton sequence check implied by the preceding constructor typecheck'
+  'typecheckSeq(storeop.wrap(sz.wrap(N:Nat)), syn.storeop(INN:SpectecTerminal))' \
+  'store-pack retained a singleton sequence check implied by the constructor typecheck'
 require_not_contains "$store_pack" \
   'typecheck(I:SpectecTerminal, syn.num(PATTERN1:SpectecTerminal))' \
   'store-pack retained a typecheck already established through the projection round-trip'
 
 for retained in \
   'indexDefined(def.funcinst(Z:SpectecTerminal), A:Nat)' \
-  'N:Nat := len(VAL_STAR:SpectecTerminals)' \
+  'N:Nat := len(PATTERN1:SpectecTerminals)' \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
   'FI:SpectecTerminal := index(def.funcinst(Z:SpectecTerminal), A:Nat)' \
   'RESULT1:SpectecTerminal := rel.expand(value('\''TYPE, FI:SpectecTerminal))' \
   'comptype.func-sym(list.wrap(T_1_STAR:SpectecTerminals), list.wrap(T_2_STAR:SpectecTerminals)) := RESULT1:SpectecTerminal' \

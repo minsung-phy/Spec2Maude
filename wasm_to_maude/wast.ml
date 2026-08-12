@@ -148,7 +148,7 @@ let typecheck_suite ?(details = false) ~semantics path =
                      let case =
                        { index = audit.encoded + 1;
                          source;
-                         term = Emit.term m;
+                         term = Maude_term.to_string (Encode.module_ m);
                          checks = if details then Encode.module_checks m else [] }
                      in
                      case :: cases, {audit with encoded = audit.encoded + 1}

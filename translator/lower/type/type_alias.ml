@@ -50,6 +50,7 @@ let translate_alias env ctx origin key_env static_args_key source_category targe
     with_diagnostics (carrier_diagnostics @ witness_diagnostics)
 
 let translate_category_union
+    ?covered_origins
     env ctx origin key_env static_args_key source_category target child_typ =
   let carrier_opt, carrier_diagnostics =
     typd_carrier ctx origin "VariantT/category-union" child_typ
@@ -65,6 +66,7 @@ let translate_category_union
       ~reason:"VariantT/category-union"
       ~key_env
       ?parent_static_args_key:static_args_key
+      ?covered_origins
       ~parent_category:source_category
       child_typ;
     let variable_type =

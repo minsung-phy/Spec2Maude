@@ -53,9 +53,11 @@ check_sequence_eliminated () {
   raw=$2
   statement=$(statement_line "$label")
   condition=$(condition_line "$label")
+  require_contains "$statement" "[$label]" "$label generated rule is missing"
   require_contains "$statement" "$raw" "$label did not reuse its raw certified pattern"
   require_not_contains "$statement" 'helper.iter-map' "$label retained its direct reinjection map"
-  require_contains "$condition" ':= helper.subtype-project-seq.' "$label lost its exact image-domain guard"
+  require_not_contains "$condition" 'helper.subtype-' "$label retained an identity projection"
+  require_contains "$condition" 'syn.val' "$label lost its source category guard"
   sequence_rule_count=$((sequence_rule_count + 1))
 }
 
@@ -64,10 +66,13 @@ check_context_sequence_eliminated () {
   raw=$2
   statement=$(statement_line "$label")
   condition=$(condition_line "$label")
+  require_contains "$statement" "[$label]" "$label generated rule is missing"
   require_contains "$statement" "$raw" "$label did not reuse its raw certified pattern"
   require_not_contains "$statement" 'helper.iter-map' "$label retained its direct reinjection map"
-  require_contains "$condition" ':= helper.subtype-project-seq.' "$label lost its exact image-domain guard"
-  require_contains "$condition" '_or_(_=/=_(VAL_STAR:SpectecTerminals, eps)' "$label lost its source progress condition"
+  require_not_contains "$condition" 'helper.subtype-' "$label retained an identity projection"
+  require_contains "$condition" '_or_(_=/=_(PATTERN1:SpectecTerminals, eps)' "$label lost its source progress condition"
+  require_contains "$condition" 'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' "$label lost its source category guard"
+  require_contains "$condition" 'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' "$label lost its target category guard"
   require_not_contains "$condition" 'helper.context-' "$label retained a source-free context scanner"
   sequence_rule_count=$((sequence_rule_count + 1))
 }
@@ -75,7 +80,7 @@ check_context_sequence_eliminated () {
 check_length_guard () {
   label=$1
   condition=$(condition_line "$label")
-  require_contains "$condition" 'len(VAL_STAR:SpectecTerminals)' "$label lost its source length guard"
+  require_contains "$condition" 'len(PATTERN' "$label lost its source length guard"
 }
 
 check_direct_eliminated () {
@@ -83,11 +88,21 @@ check_direct_eliminated () {
   shift
   statement=$(statement_line "$label")
   condition=$(condition_line "$label")
+  require_contains "$statement" "[$label]" "$label generated rule is missing"
   require_not_contains "$statement" 'helper.subtype-inject' "$label retained its direct scalar reinjection"
-  for evidence in "$@"
-  do
-    require_contains "$condition" "$evidence" "$label lost its exact scalar image-domain guard"
-  done
+  require_not_contains "$condition" 'helper.subtype-' "$label retained an identity projection"
+  require_contains "$condition" 'syn.val' "$label lost its source category guard"
+  require_contains "$condition" 'syn.instr' "$label lost its target category guard"
+  direct_rule_count=$((direct_rule_count + 1))
+}
+
+check_identity_direct () {
+  label=$1
+  statement=$(statement_line "$label")
+  condition=$(condition_line "$label")
+  require_contains "$statement" "[$label]" "$label generated rule is missing"
+  require_not_contains "$statement" 'helper.subtype-inject' "$label retained an identity injection"
+  require_not_contains "$condition" 'helper.subtype-project.num' "$label retained an identity projection"
   direct_rule_count=$((direct_rule_count + 1))
 }
 
@@ -95,12 +110,11 @@ check_null_scalar_eliminated () {
   label=$1
   raw=$2
   check_direct_eliminated \
-    "$label" \
-    'helper.subtype-project.step-pure(PATTERN1:SpectecTerminal)'
+    "$label"
   statement=$(statement_line "$label")
   condition=$(condition_line "$label")
   require_contains "$statement" "$raw" "$label did not reuse its raw certified pattern"
-  require_contains "$condition" '_=/=_(VAL:SpectecTerminal, ref.ref-null-addr)' "$label stopped comparing the genuine projected source value"
+  require_contains "$condition" '_=/=_(VAL:SpectecTerminal, ref.ref-null-addr)' "$label stopped comparing the genuine source value"
 }
 
 check_sequence_eliminated step-pure-label-vals '=> PATTERN1:SpectecTerminals'
@@ -134,76 +148,32 @@ do
   check_length_guard "$label"
 done
 
-check_direct_eliminated \
-  step-pure-select-true \
-  'helper.subtype-project.step-pure(PATTERN1:SpectecTerminal)'
-check_direct_eliminated \
-  step-pure-select-false \
-  'helper.subtype-project.step-pure(PATTERN2:SpectecTerminal)'
+check_direct_eliminated step-pure-select-true
+check_direct_eliminated step-pure-select-false
 check_null_scalar_eliminated \
   step-pure-br-on-null-addr \
-  '=> PATTERN1:SpectecTerminal'
+  '=> VAL:SpectecTerminal'
 check_null_scalar_eliminated \
   step-pure-br-on-non-null-addr \
-  '=> PATTERN1:SpectecTerminal instr.br'
-check_direct_eliminated \
-  step-pure-local-tee \
-  'helper.subtype-project.step-pure(PATTERN1:SpectecTerminal)'
+  '=> VAL:SpectecTerminal instr.br'
+check_direct_eliminated step-pure-local-tee
 
-check_direct_eliminated \
-  step-read-table-fill-succ \
-  'helper.subtype-project.step-pure(PATTERN2:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN3:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-table-copy-le \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN2:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN3:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-table-copy-gt \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN2:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN3:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-table-init-succ \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-load-pack-val \
-  'helper.subtype-project.num(PATTERN2:SpectecTerminal)'
+check_direct_eliminated step-read-table-fill-succ
+check_identity_direct step-read-table-copy-le
+check_identity_direct step-read-table-copy-gt
+check_identity_direct step-read-table-init-succ
+check_identity_direct step-read-load-pack-val
 
-check_direct_eliminated \
-  step-read-memory-fill-succ \
-  'helper.subtype-project.step-pure(PATTERN2:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN3:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-memory-copy-le \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN2:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN3:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-memory-copy-gt \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN2:SpectecTerminal)' \
-  'helper.subtype-project.num(PATTERN3:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-memory-init-succ \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)'
-check_direct_eliminated \
-  step-read-array-fill-succ \
-  'helper.subtype-project.step-pure(PATTERN1:SpectecTerminal)'
+check_direct_eliminated step-read-memory-fill-succ
+check_identity_direct step-read-memory-copy-le
+check_identity_direct step-read-memory-copy-gt
+check_identity_direct step-read-memory-init-succ
+check_direct_eliminated step-read-array-fill-succ
 
-check_direct_eliminated \
-  step-table-grow-succeed \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)'
-check_direct_eliminated \
-  step-table-grow-fail \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)'
-check_direct_eliminated \
-  step-memory-grow-succeed \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)'
-check_direct_eliminated \
-  step-memory-grow-fail \
-  'helper.subtype-project.num(PATTERN1:SpectecTerminal)'
+check_identity_direct step-table-grow-succeed
+check_identity_direct step-table-grow-fail
+check_identity_direct step-memory-grow-succeed
+check_identity_direct step-memory-grow-fail
 
 if [ "$sequence_rule_count" -ne 16 ]; then
   echo "expected 16 audited sequence rules, found $sequence_rule_count" >&2
@@ -218,55 +188,32 @@ if [ $((sequence_rule_count + direct_rule_count)) -ne 35 ]; then
   exit 1
 fi
 
-# The remaining RHS injections consume genuine source values obtained from
-# state, rather than reinjecting a source-pattern projection.  Count rule
-# labels, not the number of helper calls within each rule.
-rhs_injection_labels=$(awk '
-  /^  crl \[/ && /=>/ && /helper\.subtype-inject/ {
-    label=$0
-    sub(/^.*\[/, "", label)
-    sub(/\].*$/, "", label)
-    print label
-  }
-' "$output")
-rhs_injection_rule_count=$(printf '%s\n' "$rhs_injection_labels" | awk 'NF { count++ } END { print count + 0 }')
-if [ "$rhs_injection_rule_count" -ne 6 ]; then
-  echo "expected 6 genuine-source RHS injection rules, found $rhs_injection_rule_count" >&2
+if grep -Fq 'helper.subtype-' "$output"; then
+  echo 'certified generated subtype identities retained helper materialization' >&2
   exit 1
 fi
-for label in \
-  step-read-local-get \
-  step-read-global-get \
-  step-read-table-size \
-  step-read-memory-size \
-  step-read-struct-get-struct \
-  step-read-array-get-array
-do
-  if ! printf '%s\n' "$rhs_injection_labels" | grep -Fxq "$label"; then
-    echo "$label genuine-source RHS injection unexpectedly disappeared" >&2
-    exit 1
-  fi
-done
 
 # These consumers require a genuine source value sequence, not its target
 # instruction representation.
 eval_statement=$(statement_line eval-expr-rule-1)
 eval_condition=$(condition_line eval-expr-rule-1)
-require_contains "$eval_statement" 'seq(VAL_STAR:SpectecTerminals)' 'Eval_expr stopped returning projected source values'
-require_contains "$eval_condition" 'VAL_STAR:SpectecTerminals := helper.subtype-project-seq.' 'Eval_expr lost its source projection'
+require_contains "$eval_statement" '[eval-expr-rule-1]' 'Eval_expr generated rule is missing'
+require_contains "$eval_statement" 'seq(PATTERN1:SpectecTerminals)' 'Eval_expr stopped returning direct source values'
+require_contains "$eval_condition" 'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' 'Eval_expr lost its source membership guard'
 
 frame_condition=$(condition_line step-read-call-ref-func)
-require_contains "$frame_condition" 'rec.frame(helper.iter-map.step-read' 'frame locals stopped consuming genuine source values'
+require_contains "$frame_condition" 'rec.frame(helper.iter-map.step-read.2(PATTERN1:SpectecTerminals)' 'frame locals stopped consuming genuine source values'
 
 struct_condition=$(condition_line step-struct-new)
-require_contains "$struct_condition" 'helper.iter-zip.step(VAL_STAR:SpectecTerminals' 'struct allocation stopped consuming genuine source values'
+require_contains "$struct_condition" 'helper.iter-zip.step(PATTERN1:SpectecTerminals' 'struct allocation stopped consuming genuine source values'
 
 array_condition=$(condition_line step-array-new-fixed)
-require_contains "$array_condition" 'helper.iter-map.step(VAL_STAR:SpectecTerminals' 'array allocation stopped consuming genuine source values'
+require_contains "$array_condition" 'helper.iter-map.step(PATTERN1:SpectecTerminals' 'array allocation stopped consuming genuine source values'
 
-# A scalar projection may not escape into an enclosing repetition: this case
-# repeats the genuine source value and therefore keeps its source-driven helper.
+# Repetition still uses its genuine source value directly after identity
+# certification; only the independent count helper remains.
 array_repeat_statement=$(statement_line step-pure-array-new)
 array_repeat_condition=$(condition_line step-pure-array-new)
 require_contains "$array_repeat_statement" 'helper.iter-count' 'scalar round-trip provenance leaked into a ListN repetition'
-require_contains "$array_repeat_condition" 'VAL:SpectecTerminal := helper.subtype-project.' 'ListN repetition lost its genuine source projection'
+require_contains "$array_repeat_condition" 'typecheck(VAL:SpectecTerminal, syn.val)' 'ListN repetition lost its source guard'
+require_contains "$array_repeat_condition" 'typecheck(VAL:SpectecTerminal, syn.instr)' 'ListN repetition lost its target guard'

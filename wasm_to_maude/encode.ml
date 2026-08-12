@@ -32,10 +32,10 @@ let lane_shape = function
 let shape = function
   | I8x16 -> app "shape.x" [atom "packtype.i8"; app "dim.wrap" [nat 16]]
   | I16x8 -> app "shape.x" [atom "packtype.i16"; app "dim.wrap" [nat 8]]
-  | I32x4 -> app "shape.x" [atom "numtype.i32"; app "dim.wrap" [nat 4]]
-  | I64x2 -> app "shape.x" [atom "numtype.i64"; app "dim.wrap" [nat 2]]
-  | F32x4 -> app "shape.x" [atom "numtype.f32"; app "dim.wrap" [nat 4]]
-  | F64x2 -> app "shape.x" [atom "numtype.f64"; app "dim.wrap" [nat 2]]
+  | I32x4 -> app "shape.x" [atom "i32"; app "dim.wrap" [nat 4]]
+  | I64x2 -> app "shape.x" [atom "i64"; app "dim.wrap" [nat 2]]
+  | F32x4 -> app "shape.x" [atom "f32"; app "dim.wrap" [nat 4]]
+  | F64x2 -> app "shape.x" [atom "f64"; app "dim.wrap" [nat 2]]
 
 let result_shape value = shape (lane_shape value)
 
@@ -71,22 +71,22 @@ let v128 constructor value =
   let bits = app "uN.wrap" [atom (v128_nat value)] in
   app constructor [atom "vectype.v128"; bits]
 
-let vec_value value = v128 "vec.vconst" value
-let vec_instr value = v128 "instr.vconst" value
+let vec_value value = v128 "vconst" value
+let vec_instr value = v128 "vconst" value
 
 let rec expr source xs = seq (List.map (fun x -> instr source x) xs)
 
 and expr_item source xs = app "seq" [expr source xs]
 
 and numtype = function
-  | Types.I32T -> atom "numtype.i32"
-  | Types.I64T -> atom "numtype.i64"
-  | Types.F32T -> atom "numtype.f32"
-  | Types.F64T -> atom "numtype.f64"
+  | Types.I32T -> atom "i32"
+  | Types.I64T -> atom "i64"
+  | Types.F32T -> atom "f32"
+  | Types.F64T -> atom "f64"
 
 and addrtype = function
-  | Types.I32AT -> atom "addrtype.i32"
-  | Types.I64AT -> atom "addrtype.i64"
+  | Types.I32AT -> atom "i32"
+  | Types.I64AT -> atom "i64"
 
 and vectype Types.V128T = atom "vectype.v128"
 
@@ -103,8 +103,8 @@ and final = function
   | Types.Final -> atom "final.final"
 
 and typeuse source at = function
-  | Types.Idx x -> app "typeuse.idx" [u32 x]
-  | Types.Rec i -> app "typeuse.rec" [i32_nat i]
+  | Types.Idx x -> app "idx" [u32 x]
+  | Types.Rec i -> app "rec" [i32_nat i]
   | Types.Def _ ->
       unsupported source at "semantic deftype found in a source type use"
 
@@ -622,7 +622,7 @@ and blocktype source at = function
   | Ast.ValBlockType (Some t) ->
       app "blocktype.result" [valtype source at t]
 
-and typeidx x = app "typeuse.idx" [idx x]
+and typeidx x = app "idx" [idx x]
 
 and catch {Source.it; _} = match it with
   | Ast.Catch (tag, label) -> app "catch.catch" [idx tag; idx label]
@@ -752,7 +752,7 @@ and instr source ({Source.it; at} : Ast.instr) =
   | Ast.ExternConvert Ast.Externalize -> atom "instr.extern-convert-any"
   | Ast.Const n ->
       let typ, value = const n.it in
-      app "instr.const" [typ; value]
+      app "const" [typ; value]
   | Ast.Test op ->
       let typ, op = testop op in
       app "instr.testop" [typ; op]
@@ -802,11 +802,11 @@ let name chars =
 
 let num_value value =
   let typ, value = const value in
-  app "num.const" [typ; value]
+  app "const" [typ; value]
 
 let num_instr value =
   let typ, value = const value in
-  app "instr.const" [typ; value]
+  app "const" [typ; value]
 
 let num_payload value = snd (const value)
 

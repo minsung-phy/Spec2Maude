@@ -13,6 +13,7 @@ val translate_alias :
   Type_result.result
 
 val translate_category_union :
+  ?covered_origins:Origin.t list ->
   Type_static_env.static_env ->
   Context.t ->
   Origin.t ->

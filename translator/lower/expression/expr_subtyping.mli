@@ -13,6 +13,7 @@ type callbacks =
       Origin.t ->
       typ ->
       Maude_ir.term option * Diagnostics.t list
+  ; carrier_sort : Context.t -> typ -> Maude_ir.sort option
   }
 
 val lower :

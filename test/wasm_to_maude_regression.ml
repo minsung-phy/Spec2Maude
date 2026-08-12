@@ -334,7 +334,32 @@ let require_quoted_malformed_region path =
              && region.left.column <= quote_at.left.column)
       then failwith "quoted syntax region did not retain its payload offset"
 
-let () =
+let require_canonical_public_surfaces () =
+  let render = Maude_term.to_string in
+  let scalar =
+    [ Encode.num_value (Wasm.Value.I32 1l)
+    ; Encode.num_instr (Wasm.Value.F64 (Wasm.F64.of_float 0.))
+    ]
+    |> List.map render
+  in
+  let vector =
+    Wasm.V128.of_strings (Wasm.V128.I32x4 ()) ["0"; "1"; "2"; "3"]
+  in
+  let terms =
+    scalar @ [ render (Encode.vec_value vector); render (Encode.vec_instr vector) ]
+  in
+  if not (List.for_all (fun term -> contains term "const(") scalar) then
+    failwith "scalar encoder did not emit the shared public const surface";
+  if not (List.for_all (fun term -> contains term "vconst(") (List.tl (List.tl terms))) then
+    failwith "vector encoder did not emit the shared public vconst surface";
+  List.iter
+    (fun qualified ->
+      if List.exists (fun term -> contains term qualified) terms then
+        failwith ("encoder leaked qualified constructor " ^ qualified))
+    [ "num.const"; "instr.const"; "vec.vconst"; "instr.vconst" ]
+
+let run () =
+  require_canonical_public_surfaces ();
   require_modelcheck_fragments ();
   require_fragments "add.wat" scalar_source
     [ "module.module"; "func.func"; "instr.local-get"; "instr.binop";
@@ -344,11 +369,18 @@ let () =
       "ishape.wrap"; "vextbinop.dot-s"; "instr.vcvtop";
       "vcvtop.trunc-sat" ];
   require_fragments "call-and-convert.wat" call_and_convert_source
-    [ "instr.call-indirect"; "typeuse.idx"; "instr.cvtop";
-      "numtype.i32"; "numtype.i64"; "cvtop.wrap" ];
+    [ "instr.call-indirect"; "idx"; "instr.cvtop";
+      "i32"; "i64"; "cvtop.wrap" ];
   require_wast_fragments ~checked:2 ~runtime:2 "wast_quoted_modules.wast"
     [ "command.module(1,"; "command.module(2,";
-      "action.invoke(1,"; "action.invoke(2," ];
+      "action.invoke(1,"; "action.invoke(2,";
+      "VALUES:=ARGS";
+      "typecheckSeq(VALUES,syn.val)";
+      "typecheckSeq(ARGS,syn.instr)";
+      "ACTUAL:=value('VALUE,index(value('GLOBALS,S),A))";
+      "typecheck(ACTUAL,syn.val)";
+      "typecheck(ACTUAL,syn.instr)" ];
+  require_wast_absent "wast_quoted_modules.wast" [ "helper.subtype-" ];
   require_checked "wast_quoted_invalid.wast" 1;
   require_checked "wast_quoted_malformed.wast" 1;
   require_quoted_malformed_region "wast_quoted_malformed.wast";
@@ -376,7 +408,7 @@ let () =
       "hostArguments(VALUES,TYPES)=true" ];
   require_wast_fragments ~checked:1 ~runtime:1
     "wast_spectest_global_i32_value.wast"
-    [ "rec.globalinst(globaltype.wrap(eps,numtype.i32),num.const(numtype.i32,uN.wrap(666)))" ];
+    [ "rec.globalinst(globaltype.wrap(eps,i32),const(i32,uN.wrap(666)))" ];
   require_wast_unsupported "wast_spectest_unknown_export_unsupported.wast"
     "has no export";
   require_wast_unsupported "wast_spectest_wrong_type_unsupported.wast"
@@ -395,16 +427,16 @@ let () =
     [Wasm.Value.I32 1l; Wasm.Value.I64 2L] "wrong type";
   require_checked "wast_assert_unlinkable_unsupported.wast" 1;
   require_wast_fragments ~checked:6 ~runtime:7 "wast_vectors.wast"
-    [ "vec.vconst(vectype.v128,uN.wrap(";
-      "instr.vconst(vectype.v128,uN.wrap(";
-      "eqruntimeResults(instr.vconst(vectype.v128,C)ACTUAL)=" ];
+    [ "vconst(vectype.v128,uN.wrap(";
+      "eqruntimeResults(vconst(vectype.v128,C)ACTUAL)=" ];
+  require_wast_absent "wast_vectors.wast" [ "vec.vconst("; "instr.vconst(" ];
   require_vector_plan "wast_vectors.wast";
   require_wast_fragments ~checked:11 ~runtime:11 "wast_result_patterns.wast"
     [ "sortsScriptActionImportRequirementImportRefImportRefsLinkResultCommandCommandsInstanceEnvScriptStateResultPatternResultPatternsResultAlternativesLanePatternLanePatternsMatchVerdict.";
       "oppatterns.cons:ResultPatternResultPatterns->ResultPatterns[ctor].";
       "opmatch.value:SpectecTerminalResultPattern->MatchVerdict.";
-      "result.nan-canonical(numtype.f32)";
-      "result.nan-arithmetic(numtype.f64)";
+      "result.nan-canonical(f32)";
+      "result.nan-arithmetic(f64)";
       "_>=_(ADDR,4194304)=true";
       "result.ref-type(absheaptype.func)";
       "result.ref-type(absheaptype.extern)";
@@ -413,12 +445,16 @@ let () =
   require_result_pattern_plan "wast_result_patterns.wast";
   require_wast_fragments ~checked:9 ~runtime:9 "wast_vector_nan_lanes.wast"
     [ "ResultAlternativesLanePatternLanePatternsMatchVerdict";
-      "result.vec-lanes(shape.x(numtype.f32,dim.wrap(4))";
-      "result.vec-lanes(shape.x(numtype.f64,dim.wrap(2))";
+      "result.vec-lanes(shape.x(f32,dim.wrap(4))";
+      "result.vec-lanes(shape.x(f64,dim.wrap(2))";
       "lane.exact(fN.neg(fNmag.subnorm(0)))";
       "ifLANES:=builtin.lanes(shape.x(LT,DIM),VALUE)";
       "match.vec-lanes(NT,VALUELANES,lanes.cons(LPAT,LPATS))";
       "eqmatch.lane(NT,VALUE,LPAT)=match.no[owise]." ];
   require_wast_absent "wast_vector_nan_lanes.wast"
-    [ "lane.exact(instr.const" ];
+    [ "lane.exact(const" ];
   require_vector_nan_plan "wast_vector_nan_lanes.wast"
+
+let () =
+  try run () with
+  | Ingress_error.Error error -> failwith (Ingress_error.to_string error)

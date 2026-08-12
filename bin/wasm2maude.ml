@@ -38,7 +38,10 @@ let input_options args =
 let module_command args =
   let input, output, semantics, term_only = input_options args in
   let m = Frontend.load input in
-  let text = if term_only then Emit.term m ^ "\n" else Emit.typecheck ~semantics m in
+  let text =
+    if term_only then Emit.term m ^ "\n"
+    else Emit.typecheck ~semantics m
+  in
   write output text
 
 let instantiate_command args =

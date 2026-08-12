@@ -212,6 +212,12 @@ let translate
       ~profile:(Context.profile_name ctx)
       (Context.constructors ctx)
   in
+  let constructor_surface_diagnostics =
+    Constructor_registry.module_surface_diagnostics
+      ~profile:(Context.profile_name ctx)
+      (Context.constructors ctx)
+      statements
+  in
   let function_graph_diagnostics =
     Analysis.Function_graph.diagnostics
       ~profile:(Context.profile_name ctx)
@@ -223,7 +229,7 @@ let translate
     @ builtin_representation_diagnostics @ translated.diagnostics
     @ helper_diagnostics @ builtin_usage_diagnostics
     @ reachability_diagnostics @ constructor_registry_diagnostics
-    @ registry_diagnostics
+    @ constructor_surface_diagnostics @ registry_diagnostics
     |> Diagnostics.dedup
   in
   { module_; diagnostics; source_index; maude_registry; builtin_backend
@@ -256,15 +262,18 @@ let emit_partial result =
       "--- PARTIAL/INCOMPLETE VERIFICATION OUTPUT: fatal diagnostics remain; this module is not a complete translation."
     result
 
+let render_builtins ?output_load result =
+  Builtin_backend.render ?output_load result.builtin_backend
+
 let emit_builtins ?output_load result =
   require_nonfatal "emit_builtins" result;
-  Builtin_backend.render ?output_load result.builtin_backend
+  render_builtins ?output_load result
 
 let emit_partial_builtins ?output_load result =
   let marker =
     "--- PARTIAL/INCOMPLETE VERIFICATION BUILTINS: the loaded generated module has fatal translation diagnostics.\n"
   in
-  marker ^ Builtin_backend.render ?output_load result.builtin_backend
+  marker ^ render_builtins ?output_load result
 
 let emit_builtin_report result =
   Builtin_report.render_markdown

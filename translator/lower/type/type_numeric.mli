@@ -18,7 +18,7 @@ val register_numeric_wrapper :
   string ->
   Maude_ir.term ->
   Maude_ir.sort ->
-  string * string list
+  string * string list * Constructor_registry.registration
 
 val translate_numeric_literal_case :
   Type_static_env.static_env ->

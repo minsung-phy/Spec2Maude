@@ -1,14 +1,14 @@
 type t =
-  | Atom of string
+  | Const of string
   | App of string * t list
   | Seq of t list
 
-let atom s = Atom s
+let atom s = Const s
 let app f xs = App (f, xs)
 let seq xs = Seq xs
 
 let rec pp fmt = function
-  | Atom s -> Format.pp_print_string fmt s
+  | Const s -> Format.pp_print_string fmt s
   | Seq [] -> Format.pp_print_string fmt "eps"
   | Seq xs ->
       Format.pp_open_hovbox fmt 0;

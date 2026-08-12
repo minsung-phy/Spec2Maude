@@ -115,7 +115,7 @@ then
 fi
 
 if ! grep -A 1 -F 'crl [step-pure-select-true]' "$output" \
-    | grep -Fq 'typecheck(C:SpectecTerminal, syn.num(numtype.i32))'
+    | grep -Fq 'typecheck(C:SpectecTerminal, syn.num(i32))'
 then
   echo 'select lost its dependent constant payload check' >&2
   exit 1
@@ -142,22 +142,37 @@ then
   exit 1
 fi
 
-if ! grep -A 1 -F 'crl [step-read-return-call-ref-frame-addr]' "$output" \
-    | grep -Fq 'VAL_PRIME_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure'
-then
-  echo 'return_call_ref lost its value-prefix witness projection' >&2
+require_rule step-read-return-call-ref-frame-addr
+return_call_ref=$(grep -A 1 -F 'crl [step-read-return-call-ref-frame-addr]' "$output")
+for guard in \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
+  'typecheckSeq(PATTERN2:SpectecTerminals, syn.val)' \
+  'typecheckSeq(PATTERN2:SpectecTerminals, syn.instr)'
+do
+  if ! printf '%s\n' "$return_call_ref" | grep -Fq "$guard"; then
+    echo "return_call_ref lost direct identity guard: $guard" >&2
+    exit 1
+  fi
+done
+if printf '%s\n' "$return_call_ref" | grep -Fq 'helper.subtype-'; then
+  echo 'return_call_ref retained an identity subtype helper' >&2
   exit 1
 fi
 
 context_conditions=$(grep -A 1 -F 'crl [step-ctxt-instrs]' "$output")
-if ! printf '%s\n' "$context_conditions" \
-    | grep -Fq 'VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals)'; then
-  echo 'step-ctxt-instrs lost its source val* projection' >&2
-  exit 1
-fi
+for guard in \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)'
+do
+  if ! printf '%s\n' "$context_conditions" | grep -Fq "$guard"; then
+    echo "step-ctxt-instrs lost identity guard: $guard" >&2
+    exit 1
+  fi
+done
 if printf '%s\n' "$context_conditions" \
-    | grep -Eq 'helper\.context-|syn\.state\)'; then
-  echo 'step-ctxt-instrs retained a synthetic scanner or redundant state check' >&2
+    | grep -Eq 'helper\.context-|helper\.subtype-|syn\.state\)'; then
+  echo 'step-ctxt-instrs retained a scanner, subtype helper, or redundant state check' >&2
   exit 1
 fi
 

@@ -5,10 +5,10 @@ let list terms = T.app "list.wrap" [seq terms]
 let u64 value = T.app "uN.wrap" [T.atom (Int64.to_string value)]
 
 let host_valtype = function
-  | Wasm.Types.NumT Wasm.Types.I32T -> T.atom "numtype.i32"
-  | Wasm.Types.NumT Wasm.Types.I64T -> T.atom "numtype.i64"
-  | Wasm.Types.NumT Wasm.Types.F32T -> T.atom "numtype.f32"
-  | Wasm.Types.NumT Wasm.Types.F64T -> T.atom "numtype.f64"
+  | Wasm.Types.NumT Wasm.Types.I32T -> T.atom "i32"
+  | Wasm.Types.NumT Wasm.Types.I64T -> T.atom "i64"
+  | Wasm.Types.NumT Wasm.Types.F32T -> T.atom "f32"
+  | Wasm.Types.NumT Wasm.Types.F64T -> T.atom "f64"
   | Wasm.Types.VecT _ | Wasm.Types.RefT _ | Wasm.Types.BotT ->
       invalid_arg "Wast_host_encode.host_valtype"
 
@@ -32,8 +32,8 @@ let limits {Wasm.Types.min; max} =
     [u64 min; (match max with None -> seq [] | Some value -> u64 value)]
 
 let addrtype = function
-  | Wasm.Types.I32AT -> T.atom "addrtype.i32"
-  | Wasm.Types.I64AT -> T.atom "addrtype.i64"
+  | Wasm.Types.I32AT -> T.atom "i32"
+  | Wasm.Types.I64AT -> T.atom "i64"
 
 let globaltype = function
   | Wasm.Types.GlobalT (Wasm.Types.Cons, typ) ->

@@ -156,6 +156,11 @@ fi
 test -f "$output"
 test -f "$builtins"
 test -f "$report"
+test "$(sed -n '1p' "$builtins")" = '--- Spec2Maude builtin backend interface.'
+if grep -Fq -- '--- Spec2Maude representation-' "$builtins"; then
+  echo 'builtins contains constructor-ingress metadata' >&2
+  exit 1
+fi
 
 if ! (cd /tmp && maude -no-banner "$(basename "$builtins")" \
       "$smoke_fixture") >"$smoke_log" 2>&1
@@ -256,6 +261,15 @@ grep -q '^result SpectecTerminal: config.sym' "$instantiate_log"
 "$wasm_exe" run "$root/wat_examples/fib-wrapper.wat" \
   --invoke fib --arg i32:5 --arg i32:0 --arg i32:1 \
   --semantics "$builtins" -o "$run_harness"
+grep -Fq 'const(i32, uN.wrap(5))' "$run_harness"
+grep -Fq 'externaddr.func(ADDR)' "$run_harness"
+for harness in "$wasm_harness" "$instantiate_harness" "$run_harness"
+do
+  if grep -Eq 'num\.const|instr\.(const|vconst)|vec\.vconst|numtype\.(i32|i64|f32|f64)|addrtype\.(i32|i64)|Fnn\.(f32|f64)|type(use|var)\.(idx|rec)' "$harness"; then
+    echo "wasm serializer emitted an obsolete representation in $harness" >&2
+    exit 1
+  fi
+done
 if ! maude -no-banner "$run_harness" >"$run_log" 2>&1; then
   cat "$run_log" >&2
   exit 1
@@ -265,7 +279,7 @@ if grep -E 'Warning:|Advisory:|Error:' "$run_log" >/dev/null; then
   exit 1
 fi
 tr '\n' ' ' <"$run_log" | grep -Eq \
-  'result RunState: exec\(config\.sym\(.*instr\.const\([[:space:]]*numtype\.i32,[[:space:]]*uN\.wrap\([[:space:]]*5\)\)\)\)'
+  'result RunState: exec\(config\.sym\(.*const\([[:space:]]*i32,[[:space:]]*uN\.wrap\([[:space:]]*5\)\)\)\)'
 
 run_example() {
   name=$1
@@ -285,7 +299,7 @@ run_example() {
     exit 1
   fi
   tr '\n' ' ' <"$example_log" | grep -Eq \
-    "result RunState: exec\\(config\\.sym\\(.*instr\\.const\\([[:space:]]*numtype\\.i32,[[:space:]]*uN\\.wrap\\([[:space:]]*$expected\\)\\)\\)\\)"
+    "result RunState: exec\\(config\\.sym\\(.*const\\([[:space:]]*i32,[[:space:]]*uN\\.wrap\\([[:space:]]*$expected\\)\\)\\)\\)"
 }
 
 run_example data-load "$root/wat_examples/data-load.wat" 42
