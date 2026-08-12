@@ -57,6 +57,22 @@ let source_mixop mixop =
 
 let source_mixop_projection_label = source_mixop
 
+let is_reserved_operator_name name =
+  let keywords =
+    [ "addr"; "advisory"; "assoc"; "attr"; "cmb"; "comm"; "config"
+    ; "ctor"; "else"; "endfm"; "endm"; "endmod"; "endomod"
+    ; "eq"; "fmod"; "frozen"; "if"; "in"; "including"; "iter"; "label"
+    ; "left"; "metadata"; "mb"; "memo"; "mod"; "msg"; "nonexec"
+    ; "object"; "omod"; "op"; "ops"; "owise"; "prec"; "pr"; "protecting"
+    ; "rl"; "right"; "sort"; "sorts"; "strat"; "subsort"; "subsorts"
+    ; "to"; "var"; "vars"; "view"
+    ; "true"; "false"
+    ]
+  in
+  List.mem name keywords
+  || (name <> ""
+      && String.for_all (function '0' .. '9' -> true | _ -> false) name)
+
 let category_witness id =
   "syn." ^ category_slug id
 

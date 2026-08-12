@@ -11,6 +11,13 @@ let exp_param text = ExpP (id text, nat_typ) $ region
 let exp_arg exp = ExpA exp $ region
 let origin name = Origin.synthetic ~ast_constructor:"NamingRegression" name
 
+let resolve registry =
+  let script = [] in
+  Constructor_registry.resolve
+    ~il_env:Il.Env.empty
+    ~source_index:(Analysis.Source_index.of_script script)
+    registry script
+
 let atom text =
   Xl.Atom.Atom text $$ region % Xl.Atom.info "naming-regression"
 
@@ -613,6 +620,7 @@ let constructor_entry
   ; payload_typs = List.init arity (fun _ -> nat_typ)
   ; payload_witnesses = witnesses
   ; payload_sorts = sorts
+  ; source_case = None
   ; origin
   ; enclosing = []
   ; status = Constructor_registry.Emitted
@@ -666,7 +674,7 @@ let test_constructor_surface_resolution () =
        ~origin:(origin "unary") ~mixop:unary_mixop ~arity:1
        ~witnesses:[ Const "unrelated-rendered-witness" ]
        ~sorts:[ sort "SpectecTerminal" ] ());
-  Constructor_registry.resolve_surfaces registry;
+  resolve registry;
   let entry arity =
     Constructor_registry.entries registry
     |> List.find (fun entry -> entry.Constructor_registry.arity = arity)
@@ -690,7 +698,7 @@ let test_constructor_lossy_collision () =
     (constructor_entry
        ~origin:(origin "apostrophe-owner") ~mixop:(mixop "SAME'TOKEN")
        ~arity:0 ~witnesses:[] ~sorts:[] ());
-  Constructor_registry.resolve_surfaces registry;
+  resolve registry;
   if
     not
       (Constructor_registry.diagnostics ~profile:"naming-regression" registry
@@ -712,7 +720,7 @@ let test_constructor_static_key_sharing () =
   in
   Constructor_registry.register registry (entry "left" "static-left");
   Constructor_registry.register registry (entry "right" "static-right");
-  Constructor_registry.resolve_surfaces registry;
+  resolve registry;
   let entries = Constructor_registry.entries registry in
   if List.length entries <> 2 then
     failwith "static-contextual source entries were merged in the registry";
@@ -732,10 +740,11 @@ let test_constructor_registry_sealing () =
       ~arity:0 ~witnesses:[] ~sorts:[] ()
   in
   Constructor_registry.register registry first;
-  Constructor_registry.resolve_surfaces registry;
+  resolve registry;
   (match Constructor_registry.register_checked registry first with
   | Constructor_registry.Already_registered -> ()
   | Constructor_registry.Registered
+  | Constructor_registry.Schema_mismatch _
   | Constructor_registry.Rejected_after_resolution ->
     failwith "exact post-resolution registration was not accepted");
   let late =
@@ -747,6 +756,7 @@ let test_constructor_registry_sealing () =
   (match Constructor_registry.register_checked registry late with
   | Constructor_registry.Rejected_after_resolution -> ()
   | Constructor_registry.Registered
+  | Constructor_registry.Schema_mismatch _
   | Constructor_registry.Already_registered ->
     failwith "new post-resolution registration was not rejected");
   if List.length (Constructor_registry.entries registry) <> 1 then

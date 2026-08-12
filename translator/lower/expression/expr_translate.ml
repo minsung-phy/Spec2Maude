@@ -312,7 +312,8 @@ let rec lower_type_witness_impl ~lower_value ctx env origin constructor typ =
     ; witness_guards = []
     ; witness_diagnostics = []
     }
-  | IterT (inner, (List | Opt)) when not (Type_shape.typ_is_iter inner) ->
+  | IterT (inner, (List | List1 | ListN _ | Opt))
+    when not (Type_shape.typ_is_iter inner) ->
     lower_type_witness_impl ~lower_value ctx env origin constructor inner
   | IterT ({ it = IterT (inner, (List | Opt)); _ }, (List | Opt))
     when not (Type_shape.typ_is_iter inner) ->
@@ -847,7 +848,10 @@ and lower_numeric_conversion ctx env origin exp inner source_typ target_typ =
 
 and lower_numeric_subtyping ctx env origin exp inner source_typ target_typ =
   Expr_subtyping.lower
-    { Expr_subtyping.lower_value = lower_value; witness_of_typ }
+    { Expr_subtyping.lower_value = lower_value
+    ; witness_of_typ
+    ; carrier_sort = carrier_sort_of_typ_in
+    }
     ctx env origin exp inner source_typ target_typ
 
 and lower_bool_value ctx env origin exp =

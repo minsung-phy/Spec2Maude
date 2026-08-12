@@ -5,6 +5,7 @@ val source_id : Il.Ast.id -> string
 val category_slug : Il.Ast.id -> string
 val primitive_witness : string -> string
 val source_mixop : Il.Ast.mixop -> string
+val is_reserved_operator_name : string -> bool
 val category_witness : Il.Ast.id -> string
 val constructor_op : Il.Ast.mixop -> string
 val constructor_op_in_category :

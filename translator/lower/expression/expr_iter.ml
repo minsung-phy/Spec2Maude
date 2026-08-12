@@ -214,6 +214,22 @@ let direct_subtype_roundtrip ctx env exp iter generator_id source_exp body =
     | _ -> None)
   | _ -> None
 
+let direct_subtype_identity ctx exp iter generator_id source_exp body =
+  match source_exp.note.it, body.it, exp.note.it with
+  | IterT (source_element_typ, source_iter),
+    SubE ({ it = VarE body_id; _ }, source_typ, target_typ),
+    IterT (target_element_typ, target_iter)
+    when body_id.it = generator_id.it
+         && Il.Eq.eq_iter source_iter iter
+         && pointwise_result_iter source_iter target_iter
+         && Il.Eq.eq_typ source_typ source_element_typ
+         && Il.Eq.eq_typ target_typ target_element_typ ->
+    (match subtype_plan ctx source_typ target_typ with
+    | Ok Subtype_plan.Identity ->
+      Some (SubE (source_exp, source_exp.note, exp.note) $$ exp.at % exp.note)
+    | Ok (Subtype_plan.Injection _) | Error _ -> None)
+  | _ -> None
+
 let rec lower_iter
     ?(output_representation = Sequence_representation.Ordinary)
     callbacks ctx env origin exp body (iter, generators) =
@@ -235,6 +251,12 @@ let rec lower_iter
     unsupported_exp ctx origin "Expr/IterE/canonical-runs" exp
       "canonical run output is currently proved only for count-only ListN iteration"
   | Sequence_representation.Ordinary, iter, generators, body_it ->
+    let identity =
+      match iter, generators, body_it with
+      | (List | ListN _), [ generator_id, source_exp ], SubE _ ->
+        direct_subtype_identity ctx exp iter generator_id source_exp body
+      | _ -> None
+    in
     let roundtrip =
       match iter, generators, body_it with
       | (List | ListN _), [ generator_id, source_exp ], SubE _ ->
@@ -242,13 +264,14 @@ let rec lower_iter
           ctx env exp iter generator_id source_exp body
       | _ -> None
     in
-    (match roundtrip with
-    | Some reuse ->
+    (match identity, roundtrip with
+    | Some identity, _ -> callbacks.lower_value ctx env origin identity
+    | None, Some reuse ->
       { term = Some reuse.Pattern_subtyping.target
       ; guards = [ reuse.required_guard ]
       ; diagnostics = []
       }
-    | None ->
+    | None, None ->
       let env = Expr_env.forget_subtype_roundtrips env in
       match iter, generators, body_it with
       | List, [ generator_id, source_exp ], VarE body_id

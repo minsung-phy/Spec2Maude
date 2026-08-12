@@ -8,6 +8,7 @@ let register_constructor
     ?(payload_typs = [])
     ?(payload_witnesses = [])
     ?(payload_sorts = [])
+    ?source_case
     ?static_args_key
     ~source_category
     ~mixop
@@ -32,6 +33,7 @@ let register_constructor
     ; payload_typs
     ; payload_witnesses
     ; payload_sorts
+    ; source_case
     ; origin
     ; enclosing = Context.enclosing_path ctx
     ; status
@@ -48,11 +50,13 @@ let register_inclusion
     ~reason
     ~key_env
     ?parent_static_args_key
+    ?covered_origins
     ~parent_category
     child_typ =
   match category_ref_of_typ key_env child_typ with
   | None -> ()
   | Some (child_category, child_static_args_key) ->
+    let covered_origins = Option.value covered_origins ~default:[ origin ] in
     Constructor_registry.register_inclusion
       (Context.constructors ctx)
       { Constructor_registry.parent_category
@@ -60,5 +64,6 @@ let register_inclusion
       ; child_category
       ; child_static_args_key
       ; origin
+      ; covered_origins
       ; reason
       }

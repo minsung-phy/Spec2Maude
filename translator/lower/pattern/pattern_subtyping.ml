@@ -124,6 +124,65 @@ let dedup_guards guards =
   in
   loop [] [] guards
 
+let rec replace_term source target term =
+  if term = source then target
+  else match term with
+       | App (op, args) -> App (op, List.map (replace_term source target) args)
+       | Var _ | Const _ | Qid _ -> term
+
+let replace_condition source target = function
+  | EqCond (left, right) ->
+    EqCond (replace_term source target left, replace_term source target right)
+  | MatchCond (left, right) ->
+    MatchCond (replace_term source target left, replace_term source target right)
+  | MembershipCond (term, sort) ->
+    MembershipCond (replace_term source target term, sort)
+  | BoolCond term -> BoolCond (replace_term source target term)
+
+let identity_subject names source_exp source_result source_term sort =
+  match source_exp.it, source_term with
+  | VarE id, Var _
+    when List.exists
+           (fun introduced -> introduced.id = id.it)
+           source_result.introduced_bindings ->
+    let target, names = Local_name.fresh_typed names Local_name.Pattern sort in
+    let introduced_bindings =
+      source_result.introduced_bindings
+      |> List.map (fun introduced ->
+        if introduced.id = id.it && introduced.binding.term = source_term then
+          { introduced with
+            binding = { introduced.binding with term = target }
+          }
+        else introduced)
+    in
+    target,
+    { source_result with
+      guards = List.map (replace_condition source_term target) source_result.guards
+    ; introduced_bindings
+    },
+    names
+  | _ -> source_term, source_result, names
+
+let identity_sequence_subject names source_exp source_result source_term =
+  match source_exp.it, source_term with
+  | VarE id, Var _ when id.it <> "_" ->
+    let sort = sort "SpectecTerminals" in
+    let target, names = Local_name.fresh_typed names Local_name.Pattern sort in
+    let introduced = introduce id.it { term = target; sort; typ = source_exp.note } in
+    let introduced_bindings =
+      introduced
+      :: List.filter
+           (fun previous -> previous.id <> id.it)
+           source_result.introduced_bindings
+    in
+    target,
+    { source_result with
+      guards = List.map (replace_condition source_term target) source_result.guards
+    ; introduced_bindings
+    },
+    names
+  | _ -> source_term, source_result, names
+
 (** A projection is partial exactly outside the certified injection image.
     A successful match therefore proves both source and target categories. *)
 let without_typechecks guards =
@@ -281,6 +340,11 @@ let lower_direct names ctx callbacks origin exp inner source_typ target_typ =
           @ [ subtype_diagnostic ctx origin "Pattern/SubE/injection" exp error ]
       }
   | Some source_term, Ok Subtype_plan.Identity ->
+    let source_term, inner_result, names =
+      match callbacks.carrier_sort_of_typ target_typ with
+      | Some sort -> identity_subject names inner inner_result source_term sort
+      | None -> source_term, inner_result, names
+    in
     let source_guards, source_diagnostics =
       callbacks.guard_for_typ
         origin ~constructor:"Pattern/SubE/source" exp source_term source_typ
@@ -293,7 +357,8 @@ let lower_direct names ctx callbacks origin exp inner source_typ target_typ =
     | Some source_guards, Some target_guards ->
       return names
         { inner_result with
-          guards = dedup_guards (inner_result.guards @ source_guards @ target_guards)
+          term = Some source_term
+        ; guards = dedup_guards (inner_result.guards @ source_guards @ target_guards)
         ; diagnostics =
             inner_result.diagnostics @ source_diagnostics @ target_diagnostics
         }
@@ -382,6 +447,9 @@ let lower_iterated
     ~source_typ ~target_typ ~iter =
   match subtype_plan ctx source_typ target_typ with
   | Ok Subtype_plan.Identity ->
+    let source_term, source_result, names =
+      identity_sequence_subject names source_exp source_result source_term
+    in
     let source_guards, source_diagnostics =
       callbacks.guard_for_typ
         origin ~constructor:"Pattern/IterE/coercion"
@@ -395,7 +463,8 @@ let lower_iterated
     (match source_guards, target_guards with
     | Some source_guards, Some target_guards ->
       return names { source_result with
-        guards =
+        term = Some source_term
+      ; guards =
           dedup_guards
             (source_result.guards @ source_guards @ target_guards)
       ; diagnostics =

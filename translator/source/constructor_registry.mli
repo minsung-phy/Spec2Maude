@@ -13,6 +13,23 @@ type construction_domain =
       }
   | Guarded_constructor of string
 
+val same_construction_domain : construction_domain -> construction_domain -> bool
+
+type case_schema
+
+val case_schema :
+  payload_typ:Il.Ast.typ ->
+  case_binds:Il.Ast.quant list ->
+  case_prems:Il.Ast.prem list ->
+  instance_binds:Il.Ast.quant list ->
+  instance_args:Il.Ast.arg list ->
+  static_args_key:string option ->
+  construction_domain:construction_domain ->
+  origin:Origin.t ->
+  case_schema
+
+val same_case_schema : case_schema -> case_schema -> bool
+
 type payload_label =
   | Source_category of string
   | Primitive_type of string
@@ -30,6 +47,7 @@ type entry =
   ; payload_typs : Il.Ast.typ list
   ; payload_witnesses : Maude_ir.term list
   ; payload_sorts : Maude_ir.sort list
+  ; source_case : case_schema option
   ; origin : Origin.t
   ; enclosing : string list
   ; status : status
@@ -52,6 +70,7 @@ type inclusion =
   ; child_category : string
   ; child_static_args_key : string option
   ; origin : Origin.t
+  ; covered_origins : Origin.t list
   ; reason : string
   }
 
@@ -64,6 +83,7 @@ type t
 type registration =
   | Registered
   | Already_registered
+  | Schema_mismatch of entry * string list
   | Rejected_after_resolution
 
 val create : unit -> t
@@ -72,7 +92,20 @@ val replace : target:t -> source:t -> unit
 val register : t -> entry -> unit
 val register_checked : t -> entry -> registration
 val uniform_payload_schema : t -> entry -> bool
-val resolve_surfaces : t -> unit
+val equivalent : t -> entry -> entry -> bool
+val resolve :
+  il_env:Il.Env.t ->
+  source_index:Analysis.Source_index.t ->
+  t ->
+  Il.Ast.script ->
+  unit
+val canonical_owner : t -> entry -> entry option
+val declaration_owner : t -> entry -> entry option
+val constructor_declaration : entry -> Maude_ir.op_decl
+val projection_declarations : entry -> Maude_ir.op_decl list
+val owns_op_declaration : t -> entry -> Maude_ir.op_decl -> bool
+val module_surface_diagnostics :
+  profile:string -> t -> Maude_ir.generated list -> Diagnostics.t list
 val register_inclusion : t -> inclusion -> unit
 val note_source_case :
   t ->

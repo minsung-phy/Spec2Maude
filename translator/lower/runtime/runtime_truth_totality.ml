@@ -761,13 +761,8 @@ let same_length_domain
   && left.arity = right.arity
   && left.constructor_op = right.constructor_op
   && left.projection_ops = right.projection_ops
-  && match left.construction_domain, right.construction_domain with
-     | Constructor_registry.Length_guarded_representation_constructor left,
-       Constructor_registry.Length_guarded_representation_constructor right ->
-       left.payload_index = right.payload_index
-       && Il.Eq.eq_exp left.closed_bound right.closed_bound
-       && left.guard_origin = right.guard_origin
-     | _ -> false
+  && Constructor_registry.same_construction_domain
+       left.construction_domain right.construction_domain
 
 let add_length_domain token entry facts =
   if

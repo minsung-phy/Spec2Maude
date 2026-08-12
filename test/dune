@@ -1,6 +1,13 @@
+(copy_files ../builtins.maude)
+
 (test
  (name semantic_false_green)
  (modules semantic_false_green)
+ (libraries translator il util xl))
+
+(test
+ (name constructor_equivalence_regression)
+ (modules constructor_equivalence_regression)
  (libraries translator il util xl))
 
 (test
@@ -73,7 +80,8 @@
   wast_spectest_unknown_export_unsupported.wast
   wast_spectest_wrong_type_unsupported.wast
   wast_vector_nan_lanes.wast
-  wast_vectors.wast)
+  wast_vectors.wast
+  builtins.maude)
  (libraries wasm_to_maude))
 
 (rule
@@ -123,7 +131,8 @@
   wast_live_import_max_unsupported.wast
   wast_live_import_addr_unsupported.wast
   wast_live_import_ref_unsupported.wast
-  wast_register_imports.wast)
+  wast_register_imports.wast
+  builtins.maude)
  (libraries wasm_to_maude))
 
 (test
@@ -137,7 +146,8 @@
   wast_assert_unlinkable_start_trap.wast
   wast_assert_unlinkable_invalid.wast
   wast_import_missing_export_unsupported.wast
-  wast_import_mismatch_unsupported.wast)
+  wast_import_mismatch_unsupported.wast
+  builtins.maude)
  (libraries wasm_to_maude))
 
 (test
@@ -148,7 +158,8 @@
   wast_assert_uninstantiable_normal.wast
   wast_assert_uninstantiable_static.wast
   wast_assert_uninstantiable_live_link_error.wast
-  wast_assert_uninstantiable_memory.wast)
+  wast_assert_uninstantiable_memory.wast
+  builtins.maude)
  (libraries wasm_to_maude))
 
 (test
@@ -160,7 +171,8 @@
   wast_assert_exception_multiple_results.wast
   wast_assert_exception_trap.wast
   wast_assert_exception_caught.wast
-  wast_assert_exception_get.wast)
+  wast_assert_exception_get.wast
+  builtins.maude)
  (libraries wasm_to_maude))
 
 (test
@@ -172,7 +184,8 @@
   wast_assert_exhaustion_vector_prefix.wast
   wast_assert_exhaustion_store_continuation.wast
   wast_assert_exhaustion_zero.wast
-  wast_assert_exhaustion_get.wast)
+  wast_assert_exhaustion_get.wast
+  builtins.maude)
  (libraries wasm_to_maude))
 
 (rule

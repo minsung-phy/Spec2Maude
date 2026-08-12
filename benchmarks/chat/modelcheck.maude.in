@@ -60,11 +60,11 @@ mod SPEC2MAUDE-CHAT is
   eq memberValue(member.on) = uN.wrap(1) .
   eq memberValue(member.off) = uN.wrap(0) .
   eq chatArgs(M) =
-    num.const(numtype.i32, memberValue(M))
-    num.const(numtype.i32, uN.wrap(1))
-    num.const(numtype.i32, uN.wrap(1))
-    num.const(numtype.i32, uN.wrap(0))
-    num.const(numtype.i32, uN.wrap(1)) .
+    const(i32, memberValue(M))
+    const(i32, uN.wrap(1))
+    const(i32, uN.wrap(1))
+    const(i32, uN.wrap(0))
+    const(i32, uN.wrap(1)) .
 
   eq findFunc(
     rec.exportinst(NAME, externaddr.func(ADDR)) EXPORTS, NAME) = ADDR .
@@ -98,7 +98,7 @@ mod SPEC2MAUDE-CHAT is
     executing(P, M, NET, S, MI, V, C)
     => observed(P, M, NET, S2, MI, V, VALUE)
     if rel.steps(C) =>
-      config.sym(S2, instr.const(numtype.i32, VALUE)) .
+      config.sym(S2, const(i32, VALUE)) .
 
   rl [reject] :
     observed(P, M, NET, S, MI, V, uN.wrap(0))

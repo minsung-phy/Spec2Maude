@@ -42,8 +42,8 @@ run_state wast_assert_exhaustion_loop 1 50 'script.exhaustion(1, 1,'
 run_state wast_assert_exhaustion_tail 1 50 'script.exhaustion(1, 1,'
 
 observer_harness="$prefix-wast_assert_exhaustion_num_prefix-1.maude"
-grep -Fq 'activeFrameDepth(instr.const(NT, VALUE) REST)' "$observer_harness"
-grep -Fq 'instr.vconst(vectype.v128, C) REST) = activeFrameDepth(REST)' \
+grep -Fq 'activeFrameDepth(const(NT, VALUE) REST)' "$observer_harness"
+grep -Fq 'vconst(vectype.v128, C) REST) = activeFrameDepth(REST)' \
   "$observer_harness"
 grep -Fq 'if typecheck(C, syn.ref) .' "$observer_harness"
 if grep -Fq 'if typecheck(C, syn.val) .' "$observer_harness"; then

@@ -418,19 +418,43 @@ let normalize_rule_conditions
               | EqCondition _ -> false)
         | None -> false)
   in
+  let ready_domain_guard bound conditions =
+    List.exists
+      (fun condition ->
+        match normalize_rule_ready bound condition with
+        | Some _ -> true
+        | None -> false)
+      conditions
+  in
+  let ready_rewrite bound = function
+    | RewriteCond _ as condition -> Option.is_some (normalize_rule_ready bound condition)
+    | EqCondition _ -> false
+  in
+  let rec has_progress_exception bound = function
+    | [] -> false
+    | condition :: rest when self_recursive condition && ready_rewrite bound condition ->
+      Option.is_some (take_progress_guard bound [] rest)
+    | _ :: rest -> has_progress_exception bound rest
+  in
   let rec take_source_decision bound skipped selected = function
     | [] -> None
     | condition :: rest when List.mem condition source_decisions ->
       (match normalize_rule_ready bound condition with
-      | Some (next_bound, conditions) when self_recursive condition ->
+      | Some _ when self_recursive condition ->
         (match take_progress_guard bound [] rest with
         | Some (guard, guard_conditions, rest) ->
           Some
             ( guard
-            , next_bound
-            , List.rev_append selected (guard_conditions @ conditions)
-            , List.rev_append skipped rest )
+            , bound
+            , List.rev_append selected guard_conditions
+            , List.rev_append skipped (condition :: rest) )
         | None -> None)
+      | Some _
+        when ready_domain_guard bound skipped
+             && (match condition with
+                 | RewriteCond _ -> true
+                 | EqCondition _ -> false) ->
+        None
       | Some (next_bound, conditions)
         when next_bound = bound
              || (match condition with
@@ -442,6 +466,11 @@ let normalize_rule_conditions
           , List.rev_append selected conditions
           , List.rev_append skipped rest )
       | Some _ | None -> None)
+    | condition :: rest
+      when Option.is_some (normalize_rule_ready bound condition)
+           && List.exists (ready_rewrite bound) rest
+           && not (has_progress_exception bound rest) ->
+      None
     | condition :: rest when List.mem condition domain_guards ->
       (match normalize_rule_ready bound condition with
       | Some (next_bound, _) when next_bound <> bound
@@ -457,11 +486,11 @@ let normalize_rule_conditions
   (* Scheduling is stable: choose the least source-ready condition, considering
      later conditions only while an earlier one has unbound inputs.  The sole
      progress exception is a structurally total primitive Bool guard before a
-     ready self-recursive rewrite.  A source-total decision may also cross the
-     generated domain guards explicitly supplied by its lowering site.  A
-     source rewrite premise may bind its result while crossing those guards;
-     its inputs must still be bound before it moves.  This is a narrow
-     validated-ingress optimization, not arbitrary premise reordering. *)
+     ready self-recursive rewrite.  Moving that guard does not move the rewrite
+     with it.  A rewrite never crosses an earlier ready condition, independent
+     of whether that condition also appears in a role list.
+     This is a narrow validated-ingress optimization, not arbitrary premise
+     reordering. *)
   let take_ready bound pending =
     match take_source_decision bound [] [] pending with
     | Some ready -> Some ready

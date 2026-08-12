@@ -940,40 +940,40 @@ mod WASM-BUILTINS is
   op builtin.lane-to-bits : SpectecTerminal SpectecTerminal -> Nat .
   op builtin.lanes-aux : SpectecTerminal Nat Nat Nat -> SpectecTerminals .
   op builtin.inv-lanes-aux : SpectecTerminal Nat SpectecTerminals Nat Nat -> Nat .
-  eq builtin.lane-width(numtype.i32) = 32 .
-  eq builtin.lane-width(numtype.i64) = 64 .
-  eq builtin.lane-width(numtype.f32) = 32 .
-  eq builtin.lane-width(numtype.f64) = 64 .
+  eq builtin.lane-width(i32) = 32 .
+  eq builtin.lane-width(i64) = 64 .
+  eq builtin.lane-width(f32) = 32 .
+  eq builtin.lane-width(f64) = 64 .
   eq builtin.lane-width(packtype.i8) = 8 .
   eq builtin.lane-width(packtype.i16) = 16 .
   eq builtin.vec-raw(uN.wrap(LN_RAW)) = LN_RAW .
-  ceq builtin.lane-from-bits(numtype.i32, LN_RAW) = uN.wrap(LN_RAW)
+  ceq builtin.lane-from-bits(i32, LN_RAW) = uN.wrap(LN_RAW)
     if _<_(LN_RAW, _^_(2, 32)) .
-  ceq builtin.lane-from-bits(numtype.i64, LN_RAW) = uN.wrap(LN_RAW)
+  ceq builtin.lane-from-bits(i64, LN_RAW) = uN.wrap(LN_RAW)
     if _<_(LN_RAW, _^_(2, 64)) .
   ceq builtin.lane-from-bits(packtype.i8, LN_RAW) = uN.wrap(LN_RAW)
     if _<_(LN_RAW, _^_(2, 8)) .
   ceq builtin.lane-from-bits(packtype.i16, LN_RAW) = uN.wrap(LN_RAW)
     if _<_(LN_RAW, _^_(2, 16)) .
-  ceq builtin.lane-from-bits(numtype.f32, LN_RAW) = builtin.float-from-bits(32, LN_RAW)
+  ceq builtin.lane-from-bits(f32, LN_RAW) = builtin.float-from-bits(32, LN_RAW)
     if _<_(LN_RAW, _^_(2, 32)) .
-  ceq builtin.lane-from-bits(numtype.f64, LN_RAW) = builtin.float-from-bits(64, LN_RAW)
+  ceq builtin.lane-from-bits(f64, LN_RAW) = builtin.float-from-bits(64, LN_RAW)
     if _<_(LN_RAW, _^_(2, 64)) .
-  ceq builtin.lane-to-bits(numtype.i32, uN.wrap(LN_RAW)) = LN_RAW
+  ceq builtin.lane-to-bits(i32, uN.wrap(LN_RAW)) = LN_RAW
     if _<_(LN_RAW, _^_(2, 32)) .
-  ceq builtin.lane-to-bits(numtype.i64, uN.wrap(LN_RAW)) = LN_RAW
+  ceq builtin.lane-to-bits(i64, uN.wrap(LN_RAW)) = LN_RAW
     if _<_(LN_RAW, _^_(2, 64)) .
   ceq builtin.lane-to-bits(packtype.i8, uN.wrap(LN_RAW)) = LN_RAW
     if _<_(LN_RAW, _^_(2, 8)) .
   ceq builtin.lane-to-bits(packtype.i16, uN.wrap(LN_RAW)) = LN_RAW
     if _<_(LN_RAW, _^_(2, 16)) .
-  ceq builtin.lane-to-bits(numtype.f32, fN.pos(LN_MAG)) = builtin.float-to-bits(32, fN.pos(LN_MAG))
+  ceq builtin.lane-to-bits(f32, fN.pos(LN_MAG)) = builtin.float-to-bits(32, fN.pos(LN_MAG))
     if (builtin.fnmag-valid(32, LN_MAG)) = true .
-  ceq builtin.lane-to-bits(numtype.f32, fN.neg(LN_MAG)) = builtin.float-to-bits(32, fN.neg(LN_MAG))
+  ceq builtin.lane-to-bits(f32, fN.neg(LN_MAG)) = builtin.float-to-bits(32, fN.neg(LN_MAG))
     if (builtin.fnmag-valid(32, LN_MAG)) = true .
-  ceq builtin.lane-to-bits(numtype.f64, fN.pos(LN_MAG)) = builtin.float-to-bits(64, fN.pos(LN_MAG))
+  ceq builtin.lane-to-bits(f64, fN.pos(LN_MAG)) = builtin.float-to-bits(64, fN.pos(LN_MAG))
     if (builtin.fnmag-valid(64, LN_MAG)) = true .
-  ceq builtin.lane-to-bits(numtype.f64, fN.neg(LN_MAG)) = builtin.float-to-bits(64, fN.neg(LN_MAG))
+  ceq builtin.lane-to-bits(f64, fN.neg(LN_MAG)) = builtin.float-to-bits(64, fN.neg(LN_MAG))
     if (builtin.fnmag-valid(64, LN_MAG)) = true .
   eq builtin.lanes-aux(LN_LT, LN_W, 0, LN_RAW) = eps .
   ceq builtin.lanes-aux(LN_LT, LN_W, LN_COUNT, LN_RAW) =
@@ -1034,24 +1034,24 @@ mod WASM-BUILTINS is
        /\ typecheckSeq(FB_BYTES, syn.byte)
        /\ FB_RAW := builtin.inv-ibytes-aux(FB_BYTES, 1, 0) .
 
-  eq builtin.nbytes(numtype.i32, NB_PAYLOAD) = builtin.nbytes-int(32, NB_PAYLOAD) .
-  eq builtin.nbytes(numtype.i64, NB_PAYLOAD) = builtin.nbytes-int(64, NB_PAYLOAD) .
-  eq builtin.nbytes(numtype.f32, NB_PAYLOAD) = builtin.nbytes-float(32, NB_PAYLOAD) .
-  eq builtin.nbytes(numtype.f64, NB_PAYLOAD) = builtin.nbytes-float(64, NB_PAYLOAD) .
+  eq builtin.nbytes(i32, NB_PAYLOAD) = builtin.nbytes-int(32, NB_PAYLOAD) .
+  eq builtin.nbytes(i64, NB_PAYLOAD) = builtin.nbytes-int(64, NB_PAYLOAD) .
+  eq builtin.nbytes(f32, NB_PAYLOAD) = builtin.nbytes-float(32, NB_PAYLOAD) .
+  eq builtin.nbytes(f64, NB_PAYLOAD) = builtin.nbytes-float(64, NB_PAYLOAD) .
 
-  eq builtin.inv-nbytes(numtype.i32, NB_BYTES) = builtin.inv-nbytes-int(32, NB_BYTES) .
-  eq builtin.inv-nbytes(numtype.i64, NB_BYTES) = builtin.inv-nbytes-int(64, NB_BYTES) .
-  eq builtin.inv-nbytes(numtype.f32, NB_BYTES) = builtin.inv-nbytes-float(32, NB_BYTES) .
-  eq builtin.inv-nbytes(numtype.f64, NB_BYTES) = builtin.inv-nbytes-float(64, NB_BYTES) .
+  eq builtin.inv-nbytes(i32, NB_BYTES) = builtin.inv-nbytes-int(32, NB_BYTES) .
+  eq builtin.inv-nbytes(i64, NB_BYTES) = builtin.inv-nbytes-int(64, NB_BYTES) .
+  eq builtin.inv-nbytes(f32, NB_BYTES) = builtin.inv-nbytes-float(32, NB_BYTES) .
+  eq builtin.inv-nbytes(f64, NB_BYTES) = builtin.inv-nbytes-float(64, NB_BYTES) .
 
-  eq builtin.reinterpret(numtype.i32, numtype.f32, NB_PAYLOAD) =
-      builtin.inv-nbytes(numtype.f32, builtin.nbytes(numtype.i32, NB_PAYLOAD)) .
-  eq builtin.reinterpret(numtype.f32, numtype.i32, NB_PAYLOAD) =
-      builtin.inv-nbytes(numtype.i32, builtin.nbytes(numtype.f32, NB_PAYLOAD)) .
-  eq builtin.reinterpret(numtype.i64, numtype.f64, NB_PAYLOAD) =
-      builtin.inv-nbytes(numtype.f64, builtin.nbytes(numtype.i64, NB_PAYLOAD)) .
-  eq builtin.reinterpret(numtype.f64, numtype.i64, NB_PAYLOAD) =
-      builtin.inv-nbytes(numtype.i64, builtin.nbytes(numtype.f64, NB_PAYLOAD)) .
+  eq builtin.reinterpret(i32, f32, NB_PAYLOAD) =
+      builtin.inv-nbytes(f32, builtin.nbytes(i32, NB_PAYLOAD)) .
+  eq builtin.reinterpret(f32, i32, NB_PAYLOAD) =
+      builtin.inv-nbytes(i32, builtin.nbytes(f32, NB_PAYLOAD)) .
+  eq builtin.reinterpret(i64, f64, NB_PAYLOAD) =
+      builtin.inv-nbytes(f64, builtin.nbytes(i64, NB_PAYLOAD)) .
+  eq builtin.reinterpret(f64, i64, NB_PAYLOAD) =
+      builtin.inv-nbytes(i64, builtin.nbytes(f64, NB_PAYLOAD)) .
 
   ceq builtin.vbytes(vectype.v128, uN.wrap(BY_I)) =
       builtin.ibytes-aux(_quo_(def.vsize(vectype.v128), 8), BY_I)
@@ -1062,32 +1062,32 @@ mod WASM-BUILTINS is
        /\ typecheckSeq(BY_BYTES, syn.byte)
        /\ BY_RESULT := builtin.inv-ibytes-aux(BY_BYTES, 1, 0) .
 
-  eq builtin.zbytes(numtype.i32, ZB_PAYLOAD) = builtin.nbytes(numtype.i32, ZB_PAYLOAD) .
-  eq builtin.zbytes(numtype.i64, ZB_PAYLOAD) = builtin.nbytes(numtype.i64, ZB_PAYLOAD) .
-  eq builtin.zbytes(numtype.f32, ZB_PAYLOAD) = builtin.nbytes(numtype.f32, ZB_PAYLOAD) .
-  eq builtin.zbytes(numtype.f64, ZB_PAYLOAD) = builtin.nbytes(numtype.f64, ZB_PAYLOAD) .
+  eq builtin.zbytes(i32, ZB_PAYLOAD) = builtin.nbytes(i32, ZB_PAYLOAD) .
+  eq builtin.zbytes(i64, ZB_PAYLOAD) = builtin.nbytes(i64, ZB_PAYLOAD) .
+  eq builtin.zbytes(f32, ZB_PAYLOAD) = builtin.nbytes(f32, ZB_PAYLOAD) .
+  eq builtin.zbytes(f64, ZB_PAYLOAD) = builtin.nbytes(f64, ZB_PAYLOAD) .
   eq builtin.zbytes(vectype.v128, ZB_PAYLOAD) = builtin.vbytes(vectype.v128, ZB_PAYLOAD) .
   eq builtin.zbytes(packtype.i8, ZB_PAYLOAD) = builtin.zbytes-pack(8, ZB_PAYLOAD) .
   eq builtin.zbytes(packtype.i16, ZB_PAYLOAD) = builtin.zbytes-pack(16, ZB_PAYLOAD) .
 
-  eq builtin.cbytes(numtype.i32, ZB_PAYLOAD) = builtin.nbytes(numtype.i32, ZB_PAYLOAD) .
-  eq builtin.cbytes(numtype.i64, ZB_PAYLOAD) = builtin.nbytes(numtype.i64, ZB_PAYLOAD) .
-  eq builtin.cbytes(numtype.f32, ZB_PAYLOAD) = builtin.nbytes(numtype.f32, ZB_PAYLOAD) .
-  eq builtin.cbytes(numtype.f64, ZB_PAYLOAD) = builtin.nbytes(numtype.f64, ZB_PAYLOAD) .
+  eq builtin.cbytes(i32, ZB_PAYLOAD) = builtin.nbytes(i32, ZB_PAYLOAD) .
+  eq builtin.cbytes(i64, ZB_PAYLOAD) = builtin.nbytes(i64, ZB_PAYLOAD) .
+  eq builtin.cbytes(f32, ZB_PAYLOAD) = builtin.nbytes(f32, ZB_PAYLOAD) .
+  eq builtin.cbytes(f64, ZB_PAYLOAD) = builtin.nbytes(f64, ZB_PAYLOAD) .
   eq builtin.cbytes(vectype.v128, ZB_PAYLOAD) = builtin.vbytes(vectype.v128, ZB_PAYLOAD) .
 
-  eq builtin.inv-zbytes(numtype.i32, ZB_BYTES) = builtin.inv-nbytes(numtype.i32, ZB_BYTES) .
-  eq builtin.inv-zbytes(numtype.i64, ZB_BYTES) = builtin.inv-nbytes(numtype.i64, ZB_BYTES) .
-  eq builtin.inv-zbytes(numtype.f32, ZB_BYTES) = builtin.inv-nbytes(numtype.f32, ZB_BYTES) .
-  eq builtin.inv-zbytes(numtype.f64, ZB_BYTES) = builtin.inv-nbytes(numtype.f64, ZB_BYTES) .
+  eq builtin.inv-zbytes(i32, ZB_BYTES) = builtin.inv-nbytes(i32, ZB_BYTES) .
+  eq builtin.inv-zbytes(i64, ZB_BYTES) = builtin.inv-nbytes(i64, ZB_BYTES) .
+  eq builtin.inv-zbytes(f32, ZB_BYTES) = builtin.inv-nbytes(f32, ZB_BYTES) .
+  eq builtin.inv-zbytes(f64, ZB_BYTES) = builtin.inv-nbytes(f64, ZB_BYTES) .
   eq builtin.inv-zbytes(vectype.v128, ZB_BYTES) = builtin.inv-vbytes(vectype.v128, ZB_BYTES) .
   eq builtin.inv-zbytes(packtype.i8, ZB_BYTES) = builtin.inv-zbytes-pack(8, ZB_BYTES) .
   eq builtin.inv-zbytes(packtype.i16, ZB_BYTES) = builtin.inv-zbytes-pack(16, ZB_BYTES) .
 
-  eq builtin.inv-cbytes(numtype.i32, ZB_BYTES) = builtin.inv-nbytes(numtype.i32, ZB_BYTES) .
-  eq builtin.inv-cbytes(numtype.i64, ZB_BYTES) = builtin.inv-nbytes(numtype.i64, ZB_BYTES) .
-  eq builtin.inv-cbytes(numtype.f32, ZB_BYTES) = builtin.inv-nbytes(numtype.f32, ZB_BYTES) .
-  eq builtin.inv-cbytes(numtype.f64, ZB_BYTES) = builtin.inv-nbytes(numtype.f64, ZB_BYTES) .
+  eq builtin.inv-cbytes(i32, ZB_BYTES) = builtin.inv-nbytes(i32, ZB_BYTES) .
+  eq builtin.inv-cbytes(i64, ZB_BYTES) = builtin.inv-nbytes(i64, ZB_BYTES) .
+  eq builtin.inv-cbytes(f32, ZB_BYTES) = builtin.inv-nbytes(f32, ZB_BYTES) .
+  eq builtin.inv-cbytes(f64, ZB_BYTES) = builtin.inv-nbytes(f64, ZB_BYTES) .
   eq builtin.inv-cbytes(vectype.v128, ZB_BYTES) = builtin.inv-vbytes(vectype.v128, ZB_BYTES) .
 
   ceq builtin.lanes(shape.x(LN_LT, dim.wrap(LN_COUNT)), LN_PAYLOAD) =

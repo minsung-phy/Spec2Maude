@@ -7,6 +7,7 @@ val register_constructor :
   ?payload_typs:Il.Ast.typ list ->
   ?payload_witnesses:Maude_ir.term list ->
   ?payload_sorts:Maude_ir.sort list ->
+  ?source_case:Constructor_registry.case_schema ->
   ?static_args_key:string ->
   source_category:string ->
   mixop:Il.Ast.mixop ->
@@ -22,6 +23,7 @@ val register_inclusion :
   reason:string ->
   key_env:Static_key.env ->
   ?parent_static_args_key:string ->
+  ?covered_origins:Origin.t list ->
   parent_category:string ->
   Il.Ast.typ ->
   unit

@@ -37,24 +37,27 @@ printf '%s\n' "$statement" | grep -Fq \
 printf '%s\n' "$statement" | grep -Fq \
   'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
 
-projection='VAL_STAR:SpectecTerminals := helper.subtype-project-seq.step-pure(PATTERN1:SpectecTerminals)'
-progress='_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))'
+source_guard='typecheckSeq(PATTERN1:SpectecTerminals, syn.val)'
+target_guard='typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)'
+progress='_or_(_=/=_(PATTERN1:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))'
 recursive='rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals)'
 result_guard='typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)'
 
-for required in "$projection" "$progress" "$recursive" "$result_guard"
+for required in "$source_guard" "$target_guard" "$progress" "$recursive" "$result_guard"
 do
   printf '%s\n' "$condition" | grep -Fq "$required"
 done
 
 printf '%s\n' "$condition" | awk \
-  -v projection="$projection" -v progress="$progress" -v recursive="$recursive" '
+  -v progress="$progress" -v recursive="$recursive" \
+  -v source_guard="$source_guard" -v target_guard="$target_guard" '
     {
-      m = index($0, projection)
+      m = index($0, source_guard)
+      t = index($0, target_guard)
       p = index($0, progress)
       r = index($0, recursive)
     }
-    END { exit !(m > 0 && p > m && r > p) }
+    END { exit !(p > 0 && m > p && t > m && r > t) }
   '
 
 if grep -Eq 'helper\.context-|Context(Split|Stack|MaybeFocus)' "$output"; then
@@ -65,18 +68,28 @@ if printf '%s\n' "$statement" | grep -Fq 'helper.iter-map'; then
   echo 'Step/ctxt-instrs failed to reuse its raw instruction prefix' >&2
   exit 1
 fi
-if grep -Eq 'ceq typecheck\(instr\.(v)?const.*syn\.val\)' "$output"; then
-  echo 'instruction constructors were globally admitted as source values' >&2
+if printf '%s\n%s\n' "$statement" "$condition" | grep -Fq 'helper.subtype-'; then
+  echo 'Step/ctxt-instrs retained an identity subtype helper' >&2
   exit 1
 fi
 
 printf '%s\n' \
   'select SPEC2MAUDE-GENERATED .' \
-  'red typecheck(num.const(numtype.i32, uN.wrap(1)), syn.val) .' \
-  'red typecheck(instr.const(numtype.i32, uN.wrap(1)), syn.val) .' \
-  'red typecheck(rec.frame(seq(num.const(numtype.i32, uN.wrap(1))), rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps)), syn.frame) .' \
-  'red typecheck(rec.frame(seq(instr.const(numtype.i32, uN.wrap(1))), rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps)), syn.frame) .' \
-  'search [1] rel.step(config.sym(state.sym(rec.store(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps), rec.frame(eps, rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps))), instr.const(numtype.i32, uN.wrap(7)) instr.const(numtype.i32, uN.wrap(1)) instr.const(numtype.i32, uN.wrap(2)) instr.binop(numtype.i32, binop.add))) =>1 config.sym(state.sym(rec.store(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps), rec.frame(eps, rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps))), instr.const(numtype.i32, uN.wrap(7)) instr.const(numtype.i32, uN.wrap(3))) .' \
+  'red typecheck(const(i32, uN.wrap(1)), syn.val) .' \
+  'red typecheck(instr.binop(i32, binop.add), syn.val) .' \
+  'red typecheck(rec.frame(seq(const(i32, uN.wrap(1))), rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps)), syn.frame) .' \
+  'red typecheck(rec.frame(seq(instr.binop(i32, binop.add)), rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps)), syn.frame) .' \
+  'red def.isize(f32) .' \
+  'red def.fsize(i32) .' \
+  'red def.jsize(f32) .' \
+  'red def.jsizenn(f32) .' \
+  'red def.subst-typevar(i32, eps, eps) .' \
+  'red def.isize(i32) .' \
+  'red def.fsize(f32) .' \
+  'red def.jsize(i32) .' \
+  'red def.jsizenn(i32) .' \
+  'red def.subst-typevar(rec(0), eps, eps) .' \
+  'search [1] rel.step(config.sym(state.sym(rec.store(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps), rec.frame(eps, rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps))), const(i32, uN.wrap(7)) const(i32, uN.wrap(1)) const(i32, uN.wrap(2)) instr.binop(i32, binop.add))) =>1 config.sym(state.sym(rec.store(eps, eps, eps, eps, eps, eps, eps, eps, eps, eps), rec.frame(eps, rec.moduleinst(eps, eps, eps, eps, eps, eps, eps, eps, eps))), const(i32, uN.wrap(7)) const(i32, uN.wrap(3))) .' \
   'quit' \
   | maude -no-banner "$output" >"$maude_log" 2>&1
 
@@ -86,4 +99,15 @@ if grep -Eq 'Warning:|Advisory:|Error:' "$maude_log"; then
 fi
 test "$(grep -c 'result Bool: true' "$maude_log")" -eq 2
 test "$(grep -c 'result Bool: false' "$maude_log")" -eq 2
+for irreduced in \
+  'result Nat: def.isize(f32)' \
+  'result Nat: def.fsize(i32)' \
+  'result Nat: def.jsize(f32)' \
+  'result Nat: def.jsizenn(f32)' \
+  'def.subst-typevar(i32, eps, eps)'
+do
+  grep -Fq "$irreduced" "$maude_log"
+done
+test "$(grep -c 'result NzNat: 32' "$maude_log")" -eq 4
+grep -Fq 'result SpectecTerminal: rec(0)' "$maude_log"
 test "$(grep -c 'Solution 1' "$maude_log")" -eq 1

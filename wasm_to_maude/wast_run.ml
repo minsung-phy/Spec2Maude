@@ -11,10 +11,12 @@ let emit ~semantics ~steps ~call_depth source =
   let host = Wast_plan.host plan in
   let host_store = Wast_host_encode.store host |> Maude_term.to_string in
   let host_instances =
-    Wast_host_encode.instances host.providers |> Maude_term.to_string
+    Wast_host_encode.instances host.providers
+    |> Maude_term.to_string
   in
   let host_functions =
-    Wast_host_encode.function_addresses host.funcs |> Maude_term.to_string
+    Wast_host_encode.function_addresses host.funcs
+    |> Maude_term.to_string
   in
   let text =
     Wast_harness.render ~semantics ~steps ~commands ~host_store ~host_instances

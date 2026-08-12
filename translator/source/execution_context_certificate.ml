@@ -16,7 +16,6 @@ type t =
   ; output_focus_source : string
   ; value_source_typ : typ
   ; value_target_typ : typ
-  ; strictly_smaller_focus : bool
   }
 
 type list_segment =
@@ -44,7 +43,6 @@ let suffix_source certificate = certificate.suffix_source
 let output_focus_source certificate = certificate.output_focus_source
 let value_source_typ certificate = certificate.value_source_typ
 let value_target_typ certificate = certificate.value_target_typ
-let strictly_smaller_focus certificate = certificate.strictly_smaller_focus
 
 let same_id left right = left.it = right.it
 
@@ -70,33 +68,6 @@ let subtype_segment exp =
     when same_id item binder ->
       Some { segment; source_typ; target_typ }
   | Some _ | None -> None
-
-let empty_sequence exp =
-  match exp.it with
-  | ListE [] -> true
-  | _ -> false
-
-let source_sequence source exp =
-  match exp.it with
-  | VarE id -> same_id source id
-  | _ ->
-    (match plain_segment exp with
-    | Some segment -> same_id source segment.source
-    | None -> false)
-
-let nonempty source exp =
-  match exp.it with
-  | CmpE (`NeOp, _, left, right) ->
-    (source_sequence source left && empty_sequence right)
-    || (empty_sequence left && source_sequence source right)
-  | _ -> false
-
-let strict_progress prefix suffix prem =
-  match prem.it with
-  | IfPr { it = BinE (`OrOp, `BoolT, left, right); _ } ->
-    (nonempty prefix left && nonempty suffix right)
-    || (nonempty suffix left && nonempty prefix right)
-  | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> false
 
 let cat_segments exp =
   let rec collect acc exp =
@@ -172,10 +143,6 @@ let certify relation_id rule =
           ; output_focus_source = output_focus.source.it
           ; value_source_typ = prefix.source_typ
           ; value_target_typ = prefix.target_typ
-          ; strictly_smaller_focus =
-              List.exists
-                (strict_progress prefix.segment.source suffix.source)
-                prems
           }
       | [] | _ :: _ :: _ -> None)
     | None -> None)

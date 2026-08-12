@@ -134,7 +134,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  eq emptyStore = %s .\n\
        \  eq hostFunctionAddresses = %s .\n\n\
        \  eq hostArguments(eps, eps) = true .\n\
-       \  eq hostArguments(num.const(NT, VALUE) VALUES, NT TYPES) =\n\
+       \  eq hostArguments(const(NT, VALUE) VALUES, NT TYPES) =\n\
        \    hostArguments(VALUES, TYPES) .\n\
        \  eq hostArguments(VALUES, TYPES) = false [owise] .\n\n\
        \  eq findInstance(instances.cons(ID, MI, ENV), ID) = MI .\n\
@@ -210,11 +210,11 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \      findGlobal(EXPORTS, NAME)\n\
        \    if OTHER =/= NAME .\n\n\
        \  eq runtimeResults(eps) = true .\n\
-       \  ceq runtimeResults(instr.const(NT, VALUE) ACTUAL) =\n\
+       \  ceq runtimeResults(const(NT, VALUE) ACTUAL) =\n\
        \      runtimeResults(ACTUAL)\n\
        \    if typecheck(NT, syn.numtype)\n\
        \       /\\ typecheck(VALUE, syn.num(NT)) .\n\n\
-       \  eq runtimeResults(instr.vconst(vectype.v128, C) ACTUAL) =\n\
+       \  eq runtimeResults(vconst(vectype.v128, C) ACTUAL) =\n\
        \    runtimeResults(ACTUAL) .\n\n\
        \  ceq runtimeResults(C ACTUAL) = runtimeResults(ACTUAL)\n\
        \    if typecheck(C, syn.ref) .\n\n\
@@ -228,12 +228,12 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  eq activeFrameDepth(\n\
        \    instr.handler-sym-sym(N, CATCHES, BODY) REST) =\n\
        \      activeFrameDepth(BODY) .\n\
-       \  ceq activeFrameDepth(instr.const(NT, VALUE) REST) =\n\
+       \  ceq activeFrameDepth(const(NT, VALUE) REST) =\n\
        \      activeFrameDepth(REST)\n\
        \    if typecheck(NT, syn.numtype)\n\
        \       /\\ typecheck(VALUE, syn.num(NT)) .\n\
        \  eq activeFrameDepth(\n\
-       \    instr.vconst(vectype.v128, C) REST) = activeFrameDepth(REST) .\n\
+       \    vconst(vectype.v128, C) REST) = activeFrameDepth(REST) .\n\
        \  ceq activeFrameDepth(C REST) = activeFrameDepth(REST)\n\
        \    if typecheck(C, syn.ref) .\n\
        \  eq activeFrameDepth(INSTRS) = 0 [owise] .\n\n\
@@ -253,31 +253,31 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  eq match.value(VALUE, result.either(ALTERNATIVES)) =\n\
        \    match.any(VALUE, ALTERNATIVES) .\n\n\
        \  ceq match.value(\n\
-       \    instr.vconst(vectype.v128, VALUE),\n\
+       \    vconst(vectype.v128, VALUE),\n\
        \    result.vec-lanes(shape.x(LT, DIM), LPATS)) =\n\
        \      match.vec-lanes(LT, LANES, LPATS)\n\
        \    if LANES := builtin.lanes(shape.x(LT, DIM), VALUE) .\n\n\
        \  eq match.lane(NT, VALUE, lane.exact(VALUE)) = match.yes .\n\
-       \  eq match.lane(numtype.f32,\n\
+       \  eq match.lane(f32,\n\
        \    fN.pos(fNmag.nan(4194304)), lane.nan-canonical) = match.yes .\n\
-       \  eq match.lane(numtype.f32,\n\
+       \  eq match.lane(f32,\n\
        \    fN.neg(fNmag.nan(4194304)), lane.nan-canonical) = match.yes .\n\
-       \  eq match.lane(numtype.f64,\n\
+       \  eq match.lane(f64,\n\
        \    fN.pos(fNmag.nan(2251799813685248)), lane.nan-canonical) =\n\
        \      match.yes .\n\
-       \  eq match.lane(numtype.f64,\n\
+       \  eq match.lane(f64,\n\
        \    fN.neg(fNmag.nan(2251799813685248)), lane.nan-canonical) =\n\
        \      match.yes .\n\
-       \  ceq match.lane(numtype.f32,\n\
+       \  ceq match.lane(f32,\n\
        \    fN.pos(fNmag.nan(ADDR)), lane.nan-arithmetic) = match.yes\n\
        \    if _>=_(ADDR, 4194304) = true .\n\
-       \  ceq match.lane(numtype.f32,\n\
+       \  ceq match.lane(f32,\n\
        \    fN.neg(fNmag.nan(ADDR)), lane.nan-arithmetic) = match.yes\n\
        \    if _>=_(ADDR, 4194304) = true .\n\
-       \  ceq match.lane(numtype.f64,\n\
+       \  ceq match.lane(f64,\n\
        \    fN.pos(fNmag.nan(ADDR)), lane.nan-arithmetic) = match.yes\n\
        \    if _>=_(ADDR, 2251799813685248) = true .\n\
-       \  ceq match.lane(numtype.f64,\n\
+       \  ceq match.lane(f64,\n\
        \    fN.neg(fNmag.nan(ADDR)), lane.nan-arithmetic) = match.yes\n\
        \    if _>=_(ADDR, 2251799813685248) = true .\n\
        \  eq match.lane(NT, VALUE, LPAT) = match.no [owise] .\n\n\
@@ -287,32 +287,32 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \      match.vec-lanes(NT, LANES, LPATS)) .\n\
        \  eq match.vec-lanes(NT, LANES, LPATS) = match.no [owise] .\n\n\
        \  eq match.value(\n\
-       \    instr.const(numtype.f32, fN.pos(fNmag.nan(4194304))),\n\
-       \    result.nan-canonical(numtype.f32)) = match.yes .\n\
+       \    const(f32, fN.pos(fNmag.nan(4194304))),\n\
+       \    result.nan-canonical(f32)) = match.yes .\n\
        \  eq match.value(\n\
-       \    instr.const(numtype.f32, fN.neg(fNmag.nan(4194304))),\n\
-       \    result.nan-canonical(numtype.f32)) = match.yes .\n\
+       \    const(f32, fN.neg(fNmag.nan(4194304))),\n\
+       \    result.nan-canonical(f32)) = match.yes .\n\
        \  eq match.value(\n\
-       \    instr.const(numtype.f64, fN.pos(fNmag.nan(2251799813685248))),\n\
-       \    result.nan-canonical(numtype.f64)) = match.yes .\n\
+       \    const(f64, fN.pos(fNmag.nan(2251799813685248))),\n\
+       \    result.nan-canonical(f64)) = match.yes .\n\
        \  eq match.value(\n\
-       \    instr.const(numtype.f64, fN.neg(fNmag.nan(2251799813685248))),\n\
-       \    result.nan-canonical(numtype.f64)) = match.yes .\n\
+       \    const(f64, fN.neg(fNmag.nan(2251799813685248))),\n\
+       \    result.nan-canonical(f64)) = match.yes .\n\
        \  ceq match.value(\n\
-       \    instr.const(numtype.f32, fN.pos(fNmag.nan(ADDR))),\n\
-       \    result.nan-arithmetic(numtype.f32)) = match.yes\n\
+       \    const(f32, fN.pos(fNmag.nan(ADDR))),\n\
+       \    result.nan-arithmetic(f32)) = match.yes\n\
        \    if _>=_(ADDR, 4194304) = true .\n\
        \  ceq match.value(\n\
-       \    instr.const(numtype.f32, fN.neg(fNmag.nan(ADDR))),\n\
-       \    result.nan-arithmetic(numtype.f32)) = match.yes\n\
+       \    const(f32, fN.neg(fNmag.nan(ADDR))),\n\
+       \    result.nan-arithmetic(f32)) = match.yes\n\
        \    if _>=_(ADDR, 4194304) = true .\n\
        \  ceq match.value(\n\
-       \    instr.const(numtype.f64, fN.pos(fNmag.nan(ADDR))),\n\
-       \    result.nan-arithmetic(numtype.f64)) = match.yes\n\
+       \    const(f64, fN.pos(fNmag.nan(ADDR))),\n\
+       \    result.nan-arithmetic(f64)) = match.yes\n\
        \    if _>=_(ADDR, 2251799813685248) = true .\n\
        \  ceq match.value(\n\
-       \    instr.const(numtype.f64, fN.neg(fNmag.nan(ADDR))),\n\
-       \    result.nan-arithmetic(numtype.f64)) = match.yes\n\
+       \    const(f64, fN.neg(fNmag.nan(ADDR))),\n\
+       \    result.nan-arithmetic(f64)) = match.yes\n\
        \    if _>=_(ADDR, 2251799813685248) = true .\n\n\
        \  eq match.value(ref.ref-null-addr,\n\
        \    result.ref-type(absheaptype.any)) = match.yes .\n\
@@ -376,8 +376,9 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    rel.step-read(config.sym(state.sym(S, CURRENT),\n\
        \      ARGS (ref.ref-func-addr(A) instr.call-ref(C)))) => eps\n\
        \    if contains(A, hostFunctionAddresses) = true\n\
-       \       /\\ VALUES := helper.subtype-project-seq.step-pure(ARGS)\n\
+       \       /\\ VALUES := ARGS\n\
        \       /\\ (typecheckSeq(VALUES, syn.val)) = true\n\
+       \       /\\ (typecheckSeq(ARGS, syn.instr)) = true\n\
        \       /\\ N := len(VALUES)\n\
        \       /\\ XA := index(value('FUNCS, S), A)\n\
        \       /\\ value('CODE, XA) = hostfunc.sym\n\
@@ -462,8 +463,9 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    => script.ready(S, ENV, CMDS)\n\
        \    if A := findGlobal(value('EXPORTS,\n\
        \         findInstance(ENV, TARGET)), NAME)\n\
-       \       /\\ ACTUAL := helper.subtype-inject.step-pure(\n\
-       \         value('VALUE, index(value('GLOBALS, S), A)))\n\
+       \       /\\ ACTUAL := value('VALUE, index(value('GLOBALS, S), A))\n\
+       \       /\\ typecheck(ACTUAL, syn.val)\n\
+       \       /\\ typecheck(ACTUAL, syn.instr)\n\
        \       /\\ match.values(ACTUAL, EXPECTED) = match.yes .\n\
        \  crl [get-wrong-result] :\n\
        \    script.ready(S, ENV,\n\
@@ -472,8 +474,9 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    => script.wrong-result(ID, ACTUAL, EXPECTED)\n\
        \    if A := findGlobal(value('EXPORTS,\n\
        \         findInstance(ENV, TARGET)), NAME)\n\
-       \       /\\ ACTUAL := helper.subtype-inject.step-pure(\n\
-       \         value('VALUE, index(value('GLOBALS, S), A)))\n\
+       \       /\\ ACTUAL := value('VALUE, index(value('GLOBALS, S), A))\n\
+       \       /\\ typecheck(ACTUAL, syn.val)\n\
+       \       /\\ typecheck(ACTUAL, syn.instr)\n\
        \       /\\ match.values(ACTUAL, EXPECTED) = match.no .\n\
        \  crl [return-step] : script.return(ID, ENV, EXPECTED, CMDS, C)\n\
        \    => script.return(ID, ENV, EXPECTED, CMDS, C2)\n\
@@ -550,8 +553,9 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    => script.ready(S, ENV, CMDS)\n\
        \    if A := findGlobal(value('EXPORTS,\n\
        \         findInstance(ENV, TARGET)), NAME)\n\
-       \       /\\ ACTUAL := helper.subtype-inject.step-pure(\n\
-       \         value('VALUE, index(value('GLOBALS, S), A))) .\n\n\
+       \       /\\ ACTUAL := value('VALUE, index(value('GLOBALS, S), A))\n\
+       \       /\\ typecheck(ACTUAL, syn.val)\n\
+       \       /\\ typecheck(ACTUAL, syn.instr) .\n\n\
        \  rl [call-exhaustion] :\n\
        \    script.ready(S, ENV,\n\
        \      commands.cons(command.exhaustion(ID, REQUIRED,\n\

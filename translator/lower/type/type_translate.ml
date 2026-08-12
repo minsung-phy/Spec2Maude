@@ -500,8 +500,10 @@ let translate_alias
 module Variant = struct
 
 let translate_category_union
+    ?covered_origins
     env ctx origin key_env static_args_key source_category target child_typ =
   Type_alias.translate_category_union
+    ?covered_origins
     env ctx origin key_env static_args_key source_category target child_typ
 
 let expr_env_with_components env components =
@@ -750,6 +752,19 @@ type constructor_case_lowering =
   ; construction_domain : Constructor_registry.construction_domain
   }
 
+type constructor_case_source =
+  { instance_binds : quant list
+  ; instance_args : arg list
+  ; payload_typ : typ
+  ; case_binds : quant list
+  ; case_prems : prem list
+  }
+
+type registered_constructor_case =
+  { lowering : constructor_case_lowering
+  ; entry : Constructor_registry.entry
+  }
+
 let length_guarded_representation origin source_components prems =
   match source_components, prems with
   | [ payload, _ ], [ ({ it = IfPr condition; _ } as prem) ] ->
@@ -869,13 +884,17 @@ let describe_constructor_case
       @ condition_diagnostics
     in
     let guarded_constructor () =
+      let reasons =
+        [ instance_guards <> [], "instance guards"
+        ; hidden_binds <> [], "hidden bindings"
+        ; dependent_guards <> [], "dependent guards"
+        ; prem_conditions <> [], "premise conditions"
+        ]
+        |> List.filter_map (fun (present, reason) ->
+             if present then Some reason else None)
+      in
       Constructor_registry.Guarded_constructor
-        (Printf.sprintf
-           "source constructor retains instance guards=%d, hidden binds=%d, dependent guards=%d, premise conditions=%d"
-           (List.length instance_guards)
-           (List.length hidden_binds)
-           (List.length dependent_guards)
-           (List.length prem_conditions))
+        ("source constructor retains " ^ String.concat ", " reasons)
     in
     Some
       { constructor_name
@@ -907,7 +926,7 @@ let describe_constructor_case
     lowering_diagnostics
 
 let register_constructor_case
-    ctx origin static_args_key source_category mixop lowering =
+    ctx origin static_args_key source_category mixop source lowering =
   let registry_status =
     if List.exists Diagnostics.is_fatal lowering.diagnostics then
       Constructor_registry.Unsupported
@@ -936,6 +955,16 @@ let register_constructor_case
     ~payload_typs:(List.map (fun component -> component.typ) lowering.components)
     ~payload_witnesses:(List.map (fun component -> component.witness) lowering.components)
     ~payload_sorts:(List.map (fun component -> component.sort) lowering.components)
+    ~source_case:
+      (Constructor_registry.case_schema
+         ~payload_typ:source.payload_typ
+         ~case_binds:source.case_binds
+         ~case_prems:source.case_prems
+         ~instance_binds:source.instance_binds
+         ~instance_args:source.instance_args
+         ~static_args_key
+         ~construction_domain:lowering.construction_domain
+         ~origin)
     ()
 
 let lower_constructor_case_for_registry
@@ -948,8 +977,7 @@ let lower_constructor_case_for_registry
     source_category
     target
     mixop
-    binds
-    prems
+    source
     source_components
   =
   match
@@ -962,15 +990,15 @@ let lower_constructor_case_for_registry
       source_category
       target
       mixop
-      binds
-      prems
+      source.case_binds
+      source.case_prems
       source_components
   with
   | None, diagnostics -> None, diagnostics
   | Some lowering, diagnostics ->
     let registration =
       register_constructor_case
-        ctx origin static_args_key source_category mixop lowering
+        ctx origin static_args_key source_category mixop source lowering
     in
     let registry_diagnostic reason =
       unsupported
@@ -983,6 +1011,13 @@ let lower_constructor_case_for_registry
         ()
     in
     (match registration with
+    | Constructor_registry.Schema_mismatch (_expected, differences) ->
+      None,
+      diagnostics
+      @ [ registry_diagnostic
+            ("actual constructor lowering drifted from its preloaded exact schema in: "
+             ^ String.concat ", " differences)
+        ]
     | Constructor_registry.Rejected_after_resolution ->
       None,
       diagnostics
@@ -1002,10 +1037,13 @@ let lower_constructor_case_for_registry
      with
     | Found entry ->
       Some
-        { lowering with
-          constructor_name = entry.constructor_op
-        ; projection_ops = entry.projection_ops
-      },
+        { lowering =
+            { lowering with
+              constructor_name = entry.constructor_op
+            ; projection_ops = entry.projection_ops
+            }
+        ; entry
+        },
       diagnostics
     | Missing ->
       None,
@@ -1032,8 +1070,7 @@ let translate_constructor_case
     source_category
     target
     mixop
-    binds
-    prems
+    source
     components
   =
   match
@@ -1047,43 +1084,68 @@ let translate_constructor_case
       source_category
       target
       mixop
-      binds
-      prems
+      source
       components
   with
   | None, diagnostics -> with_diagnostics diagnostics
-  | Some lowering, lowering_diagnostics ->
+  | Some registered, lowering_diagnostics ->
+    let lowering = registered.lowering in
     let components = lowering.components in
-    let args = List.map (fun component -> sr component.sort) components in
     let arg_terms = List.map (fun component -> Var component.variable) components in
     let constructor = app lowering.constructor_name arg_terms in
-    let op_kind = if components = [] then Total else Partial in
-    let op_decl =
-      gen origin
-        (op lowering.constructor_name args spectec_terminal ~kind:op_kind ~attrs:[ Ctor ])
-    in
-    let membership =
-      match components with
-      | [] -> []
-      | _ -> [ gen origin (cmb constructor spectec_terminal lowering.membership_guards) ]
-    in
-    let destructors =
-      List.combine lowering.projection_ops components
-      |> List.map (fun (destructor, component) ->
-        [ gen origin (op destructor [ sr spectec_terminal ] component.sort ~kind:Partial)
-        ; gen origin
-            (ceq
-               (app destructor [ constructor ])
-               (Var component.variable)
-               [ MembershipCond (constructor, spectec_terminal) ])
-        ])
-      |> List.concat
+    let representation_statements =
+      match
+        Constructor_registry.declaration_owner
+          (Context.constructors ctx) registered.entry
+      with
+      | None -> []
+      | Some canonical ->
+        let representation_origin = canonical.origin in
+        let registry = Context.constructors ctx in
+        let owned declaration =
+          if
+            Constructor_registry.owns_op_declaration
+              registry registered.entry declaration
+          then
+            [ gen representation_origin
+                (op
+                   ~kind:declaration.kind
+                   ~attrs:declaration.attrs
+                   declaration.name declaration.args declaration.result)
+            ]
+          else []
+        in
+        let constructor_declaration =
+          Constructor_registry.constructor_declaration registered.entry
+        in
+        let membership =
+          match components with
+          | [] -> []
+          | _ ->
+            [ gen representation_origin
+                (cmb constructor spectec_terminal lowering.membership_guards)
+            ]
+        in
+        let destructors =
+          List.combine
+            (Constructor_registry.projection_declarations registered.entry)
+            components
+          |> List.concat_map (fun (declaration, component) ->
+            owned declaration
+            @ [ gen representation_origin
+                (ceq
+                   (app declaration.name [ constructor ])
+                   (Var component.variable)
+                   [ MembershipCond (constructor, spectec_terminal) ])
+            ])
+        in
+        owned constructor_declaration @ membership @ destructors
     in
     if
       List.exists Diagnostics.is_fatal
         (lowering.diagnostics)
     then
-      { statements = [ op_decl ] @ membership @ destructors
+      { statements = representation_statements
       ; diagnostics = lowering_diagnostics
       }
     else
@@ -1102,13 +1164,14 @@ let translate_constructor_case
              typecheck_conditions)
       in
       { statements =
-          [ op_decl ] @ membership @ destructors
-          @ [ typecheck_statement ]
+          representation_statements @ [ typecheck_statement ]
       ; diagnostics = lowering_diagnostics
       }
 
 let translate_typcase
     ~instance_guards
+    ~instance_binds
+    ~instance_args
     env
     ctx
     parent_origin
@@ -1130,6 +1193,11 @@ let translate_typcase
   in
   let owner = "VariantT/typcase" in
   let components = Type_shape.typ_components typ in
+  let source =
+    { instance_binds; instance_args
+    ; payload_typ = typ; case_binds = binds; case_prems = prems
+    }
+  in
   let record_like_single_constructor =
     record_like_single_constructor_case ~case_count mixop components
   in
@@ -1180,8 +1248,7 @@ let translate_typcase
                source_category
                target
                mixop
-               binds
-               prems
+               source
                components)
             (with_diagnostics diagnostics)
       else
@@ -1229,8 +1296,7 @@ let translate_typcase
          source_category
          target
          mixop
-         binds
-         prems
+         source
          components)
       (with_diagnostics diagnostics)
 
@@ -1242,6 +1308,17 @@ let inherited_union_origin parent_origin index typcase =
     "typcase"
     typ.at
     (source_echo_typcase typcase)
+
+let inherited_covered_origins parent_origin group =
+  group
+  |> List.map (fun inherited ->
+    let _mixop, (typ, _binds, _prems), _hints = inherited.inherited_typcase in
+    child_origin
+      parent_origin
+      (Printf.sprintf "VariantT[%d]" (inherited.inherited_index + 1))
+      "typcase"
+      typ.at
+      (source_echo_typcase inherited.inherited_typcase))
 
 let inherited_union_block
     env ctx parent_origin key_env static_args_key source_category target group =
@@ -1255,7 +1332,9 @@ let inherited_union_block
         first.inherited_typcase
     in
     let child_typ = VarT (first.inherited_child_id, []) $ first.inherited_child_id.at in
+    let covered_origins = inherited_covered_origins parent_origin group in
     translate_category_union
+      ~covered_origins
       env
       ctx
       origin
@@ -1289,6 +1368,8 @@ let is_native_category_union = function
 
 let translate_variant
     ~instance_guards
+    ~instance_binds
+    ~instance_args
     env ctx origin key_env static_args_key target id target_region cases =
   let source_category = Naming.source_owner id.it in
   let inherited_groups =
@@ -1340,6 +1421,8 @@ let translate_variant
         else
           translate_typcase
             ~instance_guards
+            ~instance_binds
+            ~instance_args
             env
             ctx
             origin
@@ -1439,11 +1522,30 @@ let preload_inherited_union_registry
         first.inherited_typcase
     in
     let child_typ = VarT (first.inherited_child_id, []) $ first.inherited_child_id.at in
-    preload_category_union_registry
-      env ctx origin key_env static_args_key source_category child_typ
+    let covered_origins = inherited_covered_origins parent_origin group in
+    let carrier_opt, _ =
+      typd_carrier ctx origin "VariantT/category-union" child_typ
+    in
+    let witness_opt, _ =
+      Typd_witness.of_typ
+        env ctx origin ~constructor:"VariantT/category-union" child_typ
+    in
+    (match carrier_opt, witness_opt with
+    | Some _, Some _ ->
+      Typd_registry.register_inclusion
+        ctx origin
+        ~reason:"VariantT/category-union"
+        ~key_env
+        ?parent_static_args_key:static_args_key
+        ~covered_origins
+        ~parent_category:source_category
+        child_typ
+    | _ -> ())
 
 let preload_typcase_registry
     ~instance_guards
+    ~instance_binds
+    ~instance_args
     env
     ctx
     parent_origin
@@ -1465,6 +1567,11 @@ let preload_typcase_registry
   in
   let owner = "VariantT/typcase" in
   let components = Type_shape.typ_components typ in
+  let source =
+    { instance_binds; instance_args
+    ; payload_typ = typ; case_binds = binds; case_prems = prems
+    }
+  in
   let record_like_single_constructor =
     record_like_single_constructor_case ~case_count mixop components
   in
@@ -1512,8 +1619,7 @@ let preload_typcase_registry
                  source_category
                  target
                  mixop
-                 binds
-                 prems
+                 source
                  components)
         else
           let bind_diags = unsupported_binds ctx origin owner binds in
@@ -1543,12 +1649,13 @@ let preload_typcase_registry
            source_category
            target
            mixop
-           binds
-           prems
+           source
            components)
 
 let preload_variant_registry
     ~instance_guards
+    ~instance_binds
+    ~instance_args
     env ctx origin key_env static_args_key target id target_region cases =
   let source_category = Naming.source_owner id.it in
   cases
@@ -1584,6 +1691,8 @@ let preload_variant_registry
     if not (List.mem index skip_indices) then
         preload_typcase_registry
           ~instance_guards
+          ~instance_binds
+          ~instance_args
           env
         ctx
         origin
@@ -1939,7 +2048,8 @@ let preload_alias_inclusion
 
 
 let preload_deftyp_registry
-    ~instance_guards env ctx origin key_env static_args_key target id deftyp =
+    ~instance_binds ~instance_args ~instance_guards
+    env ctx origin key_env static_args_key target id deftyp =
   let source_category = Naming.source_owner id.it in
   match deftyp.it with
   | AliasT typ ->
@@ -1948,11 +2058,14 @@ let preload_deftyp_registry
   | VariantT cases ->
     Variant.preload_variant_registry
       ~instance_guards
+      ~instance_binds
+      ~instance_args
       env ctx origin key_env static_args_key target id deftyp.at cases
   | StructT _fields -> ()
 
 let translate_deftyp
-    ~instance_guards env ctx origin key_env static_args_key target id deftyp =
+    ~instance_binds ~instance_args ~instance_guards
+    env ctx origin key_env static_args_key target id deftyp =
   let source_category = Naming.source_owner id.it in
   match deftyp.it with
   | AliasT typ ->
@@ -1961,6 +2074,8 @@ let translate_deftyp
   | VariantT cases ->
     Variant.translate_variant
       ~instance_guards
+      ~instance_binds
+      ~instance_args
       env ctx origin key_env static_args_key target id deftyp.at cases
   | StructT fields -> Struct.translate_struct env ctx origin target id fields
 
@@ -2037,6 +2152,8 @@ type ready =
   ; ready_env : Type_static_env.static_env
   ; ready_target : term
   ; ready_guards : eq_condition list
+  ; ready_instance_binds : quant list
+  ; ready_instance_args : arg list
   ; ready_key_env : Static_key.env
   ; ready_static_args_key : string option
   ; ready_deftyp : deftyp
@@ -2111,6 +2228,8 @@ let prepare env ctx typ_origin witness_name param_terms id params index inst =
         ; ready_env = inst_env
         ; ready_target = target
         ; ready_guards = arg_guards @ bind_guards
+        ; ready_instance_binds = binds
+        ; ready_instance_args = args
         ; ready_key_env = key_env
         ; ready_static_args_key = static_args_key
         ; ready_deftyp = deftyp
@@ -2149,6 +2268,8 @@ let translate_prepared_inst ctx id prepared =
     let translated =
       translate_deftyp
         ~instance_guards:ready.Inst_prepare.ready_guards
+        ~instance_binds:ready.Inst_prepare.ready_instance_binds
+        ~instance_args:ready.Inst_prepare.ready_instance_args
         ready.Inst_prepare.ready_env
         ctx
         ready.Inst_prepare.ready_origin
@@ -2196,6 +2317,8 @@ let preload_inst_registry ctx origin id setup index inst =
     when ready.Inst_prepare.ready_preload_state = Inst_prepare.Preloadable ->
     preload_deftyp_registry
       ~instance_guards:ready.Inst_prepare.ready_guards
+      ~instance_binds:ready.Inst_prepare.ready_instance_binds
+      ~instance_args:ready.Inst_prepare.ready_instance_args
       ready.Inst_prepare.ready_env
       ctx
       ready.Inst_prepare.ready_origin

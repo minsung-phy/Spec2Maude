@@ -26,7 +26,8 @@ let invocation m export args =
   let () = check_arguments m export args in
   let export = Encode.name export |> Maude_term.to_string in
   let args =
-    args |> List.map Encode.num_value |> Maude_term.seq |> Maude_term.to_string
+    args |> List.map Encode.num_value |> Maude_term.seq
+    |> Maude_term.to_string
   in
   term m, export, args
 
@@ -102,8 +103,12 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps m =
     let result_type =
       Encode.result_numtype expected_type |> Maude_term.to_string
     in
-    let expected = Encode.num_instr expected |> Maude_term.to_string in
-    let rejected = Encode.num_instr rejected |> Maude_term.to_string in
+    let expected =
+      Encode.num_instr expected |> Maude_term.to_string
+    in
+    let rejected =
+      Encode.num_instr rejected |> Maude_term.to_string
+    in
     Printf.sprintf
       "load %s\nload model-checker.maude\n\nmod WASM2MAUDE-MODELCHECK is\n\
        \  protecting WASM-BUILTINS .\n\
@@ -149,8 +154,8 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps m =
        \    => exec(def.invoke(\n\
        \      S, findFunc(value('EXPORTS, MI), inputName), inputArgs)) .\n\
        \  crl [execute] : exec(C) =>\n\
-       \      finished(S, instr.const(%s, VALUE))\n\
-       \    if rel.steps(C) => config.sym(S, instr.const(%s, VALUE)) .\n\n\
+       \      finished(S, const(%s, VALUE))\n\
+       \    if rel.steps(C) => config.sym(S, const(%s, VALUE)) .\n\n\
        \  eq finished(S, RESULT) |= returned(RESULT) = true .\n\
        \  eq ST |= P = false [owise] .\n\
        endm\n\n\

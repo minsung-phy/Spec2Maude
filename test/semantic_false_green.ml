@@ -1924,6 +1924,7 @@ let constructor_entry case_origin constructor_op status =
   ; payload_typs = []
   ; payload_witnesses = []
   ; payload_sorts = []
+  ; source_case = None
   ; origin = case_origin
   ; enclosing = []
   ; status
@@ -2020,6 +2021,7 @@ let unary_case_entry
   ; payload_typs = []
   ; payload_witnesses = [ Const "renamed-payload-witness" ]
   ; payload_sorts = [ payload_sort ]
+  ; source_case = None
   ; origin = origin (category ^ "-case")
   ; enclosing = []
   ; status = Constructor_registry.Emitted
@@ -2134,6 +2136,7 @@ let length_guarded_entry category =
   ; payload_typs = []
   ; payload_witnesses = [ Const "renamed-sequence-witness" ]
   ; payload_sorts = [ sort "SpectecTerminals" ]
+  ; source_case = None
   ; origin = origin (category ^ "-length-guard")
   ; enclosing = []
   ; status = Constructor_registry.Emitted
@@ -2557,6 +2560,16 @@ let test_source_decision_schedule () =
       [ domain_guard; decision ]
     <> [ domain_guard; decision ]
   then failwith "uncertified source decision was reordered";
+  let rewrite =
+    RewriteCond (App ("observe", [ Var "INPUT" ]), Var "RESULT")
+  in
+  if
+    normalize
+      ~source_decisions:[ rewrite ]
+      ~domain_guards:[ domain_guard ]
+      [ domain_guard; rewrite ]
+    <> [ domain_guard; rewrite ]
+  then failwith "source rewrite crossed a ready domain guard";
   let barrier = RewriteCond (App ("observe", [ Var "INPUT" ]), Var "RESULT") in
   if
     normalize
@@ -2574,7 +2587,19 @@ let test_source_decision_schedule () =
       ~domain_guards:[ domain_guard ]
       [ domain_guard; binding_decision ]
     <> [ domain_guard; binding_decision ]
-  then failwith "binding source condition was treated as a decision"
+  then failwith "binding source condition was treated as a decision";
+  let recursive = RewriteCond (lhs, Var "RESULT") in
+  let progress =
+    EqCondition
+      (BoolCond (App ("_=/=_", [ Var "INPUT"; Const "eps" ])))
+  in
+  if
+    normalize
+      ~source_decisions:[ recursive; progress ]
+      ~domain_guards:[ domain_guard ]
+      [ domain_guard; recursive; progress ]
+    <> [ progress; domain_guard; recursive ]
+  then failwith "certified recursive progress guard was not scheduled"
 
 let test_zip_binding_traversal () =
   let source : Helper_request.iter_zip_source =
@@ -4138,6 +4163,7 @@ let test_context_stage_isolates_constructor_registry () =
     ; child_category = "renamed-child"
     ; child_static_args_key = None
     ; origin = origin "constructor-stage"
+    ; covered_origins = [ origin "constructor-stage" ]
     ; reason = "transaction regression"
     };
   if Constructor_registry.inclusions (Context.constructors ctx) <> [] then
@@ -4184,6 +4210,7 @@ let test_context_stage_isolates_constructor_registry () =
     ; payload_typs = []
     ; payload_witnesses = [ Var "X" ]
     ; payload_sorts = [ sort "Nat" ]
+    ; source_case = None
     ; origin = origin "staged-pattern"
     ; enclosing = [ "staged-category" ]
     ; status = Constructor_registry.Emitted
@@ -4862,6 +4889,7 @@ let test_structural_match_pattern_certificate () =
     ; payload_typs = []
     ; payload_witnesses = [ Var "X" ]
     ; payload_sorts = [ sort "Nat" ]
+    ; source_case = None
     ; origin = origin "pattern-certificate"
     ; enclosing = [ "renamed-category" ]
     ; status = Constructor_registry.Emitted
