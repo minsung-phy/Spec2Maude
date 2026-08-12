@@ -437,7 +437,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    if rel.step(C) => C2 .\n\
        \  rl [assert-uninstantiable-trap] :\n\
        \    script.uninstantiable(ID, ENV, CMDS,\n\
-       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), instr.trap))\n\
+       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), trap))\n\
        \    => script.ready(S, ENV, CMDS) .\n\
        \  rl [assert-uninstantiable-exception] :\n\
        \    script.uninstantiable(ID, ENV, CMDS,\n\
@@ -505,7 +505,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    if rel.step(C) => C2 .\n\
        \  rl [trap-done] :\n\
        \    script.trap(ID, ENV, CMDS,\n\
-       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), instr.trap))\n\
+       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), trap))\n\
        \    => script.ready(S, ENV, CMDS) .\n\n\
        \  rl [call-exception] :\n\
        \    script.ready(S, ENV,\n\
@@ -524,7 +524,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    => script.ready(S, ENV, CMDS) .\n\
        \  rl [exception-trap] :\n\
        \    script.exception(ID, ENV, CMDS,\n\
-       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), instr.trap))\n\
+       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), trap))\n\
        \    => script.wrong-assertion(ID) .\n\
        \  crl [exception-normal] :\n\
        \    script.exception(ID, ENV, CMDS,\n\
@@ -583,7 +583,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \       /\\ _<=_(activeFrameDepth(INSTRS), REQUIRED) = true .\n\
        \  rl [exhaustion-trap] :\n\
        \    script.exhaustion(ID, REQUIRED, ENV, CMDS,\n\
-       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), instr.trap))\n\
+       \      config.sym(state.sym(S, rec.frame(LOCALS, CURRENT)), trap))\n\
        \    => script.wrong-assertion(ID) .\n\
        \  rl [exhaustion-exception] :\n\
        \    script.exhaustion(ID, REQUIRED, ENV, CMDS,\n\

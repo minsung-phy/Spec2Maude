@@ -8,18 +8,15 @@ type construction_domain =
       }
   | Guarded_constructor of string
 
-type source_case
-
-val source_case :
-  payload_typ:Il.Ast.typ ->
-  case_binds:Il.Ast.quant list ->
-  case_prems:Il.Ast.prem list ->
-  instance_binds:Il.Ast.quant list ->
-  instance_args:Il.Ast.arg list ->
-  static_args_key:string option ->
-  construction_domain:construction_domain ->
-  origin:Origin.t ->
-  source_case
+type source_case =
+  { payload_typ : Il.Ast.typ
+  ; case_binds : Il.Ast.quant list
+  ; case_prems : Il.Ast.prem list
+  ; instance_binds : Il.Ast.quant list
+  ; instance_args : Il.Ast.arg list
+  ; static_args_key : string option
+  ; construction_domain : construction_domain
+  }
 
 type entry =
   { source_category : string
@@ -34,31 +31,9 @@ type entry =
   ; emitted : bool
   }
 
-type category_case =
-  { case_category : string
-  ; case_static_key : string option
-  ; case_origin : Origin.t
-  }
-
-type inclusion =
-  { parent_category : string
-  ; parent_static_args_key : string option
-  ; child_category : string
-  ; child_static_args_key : string option
-  ; covered_origins : Origin.t list
-  }
-
 type t
 
-val analyze :
-  il_env:Il.Env.t ->
-  source_index:Analysis.Source_index.t ->
-  entries:entry list ->
-  cases:category_case list ->
-  inclusions:inclusion list ->
-  Il.Ast.script ->
-  t
-
+val analyze : entries:entry list -> t
 val canonical_entry : t -> entry -> entry option
 val equivalent : t -> entry -> entry -> bool
 val shared : t -> entry -> bool

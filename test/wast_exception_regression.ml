@@ -70,7 +70,7 @@ let require_runtime_shape () =
      "command.exception(ID,action.invoke(TARGET,NAME,ARGS)),CMDS))=>script.exception(ID,ENV,CMDS,def.invoke(S,findFunc(value('EXPORTS,findInstance(ENV,TARGET)),NAME),ARGS)).";
      "script.exception(ID,ENV,CMDS,C)=>script.exception(ID,ENV,CMDS,C2)ifrel.step(C)=>C2.";
      "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),ref.ref-exn-addr(A)instr.throw-ref))=>script.ready(S,ENV,CMDS).";
-     "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),instr.trap))=>script.wrong-assertion(ID).";
+     "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),trap))=>script.wrong-assertion(ID).";
      "config.sym(state.sym(S,rec.frame(LOCALS,CURRENT)),ACTUAL))=>script.wrong-assertion(ID)ifruntimeResults(ACTUAL)=true."];
   let start = find_from text "  rl [call-exception]" 0 in
   let stop = find_from text "  rl [call-action]" start in

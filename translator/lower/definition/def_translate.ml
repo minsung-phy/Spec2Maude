@@ -134,10 +134,7 @@ let preload_typd_registry ctx script =
 let translate_script ctx script =
   preload_typd_registry ctx script;
   let constructors = Context.constructors ctx in
-  Constructor_registry.resolve
-    ~il_env:(Context.il_env ctx)
-    ~source_index:(Context.source_index ctx)
-    constructors script;
+  Constructor_registry.resolve constructors;
   List.mapi
     (fun index def ->
       translate_def ctx [ Printf.sprintf "script[%d]" index ] (index + 1) def)

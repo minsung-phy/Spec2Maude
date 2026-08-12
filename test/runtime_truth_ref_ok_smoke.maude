@@ -74,13 +74,13 @@ red 'heaptype-sub-negative-end .
 red 'ref-ok-overlap-prove-begin .
 rew [100000] helper.truth-prove-ref-ok.step-read(
   smoke-store, ref.ref-null-addr,
-  reftype.ref(null.null, absheaptype.bot), eps) .
+  reftype.ref(null.null, bot), eps) .
 red 'ref-ok-overlap-prove-end .
 
 red 'ref-ok-overlap-refute-begin .
 rew [100000] helper.truth-refute-ref-ok.step-read(
   smoke-store, ref.ref-null-addr,
-  reftype.ref(null.null, absheaptype.bot), eps) .
+  reftype.ref(null.null, bot), eps) .
 red 'ref-ok-overlap-refute-end .
 
 quit

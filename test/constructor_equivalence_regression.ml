@@ -138,13 +138,13 @@ let test_transitive_identity_sharing_and_membership () =
   let shared_name = Naming.constructor_op common in
   if shared.constructor_op <> middle_case.constructor_op
      || shared.constructor_op <> target_case.constructor_op
-  then failwith "transitive certified class did not share one representation";
+  then failwith "structurally identical cases did not share one representation";
   if shared.constructor_op <> shared_name then
-    failwith "certified class did not use its unqualified mixop surface";
+    failwith "shared class did not use its unqualified mixop surface";
   if shared.projection_ops <> [ Naming.projection_op shared_name 0 ] then
     failwith "shared projection was not derived from the common surface";
   if op_count output.statements shared.constructor_op <> 1 then
-    failwith "certified class did not emit exactly one constructor operator";
+    failwith "shared class did not emit exactly one constructor operator";
   require_unique_op_declarations output.statements;
   List.iter
     (fun category ->
@@ -157,7 +157,7 @@ let test_transitive_identity_sharing_and_membership () =
   if not (has_typecheck output.statements target target_only.constructor_op) then
     failwith "target-only constructor lost target membership";
   if Helper.subtype_injections (Context.helpers ctx) <> [] then
-    failwith "certified identity materialized a subtype helper";
+    failwith "identity representation materialized a subtype helper";
   let source_typ = category_typ source in
   let target_typ = category_typ target in
   let pattern = sube source_typ target_typ in
@@ -181,21 +181,21 @@ let test_transitive_identity_sharing_and_membership () =
   then failwith "identity pattern lost its source binding"
 
 let test_canonical_choice_is_declaration_order_independent () =
-  let common, _, source, _, target, script =
+  let common, _, source, _, _, script =
     identity_script [ "cascade"; "asteroid"; "brooklet" ]
   in
   let _, ctx, output = translate script in
   let canonical = (entry ctx source common).constructor_op in
   let expected = Naming.constructor_op common in
   if canonical <> expected then
-    failwith "directed subtype chain did not choose its common mixop surface";
+    failwith "structural class did not choose its common mixop surface";
   let owner =
     Constructor_registry.canonical_owner
       (Context.constructors ctx) (entry ctx source common)
     |> Option.get
   in
-  if owner.source_category <> target then
-    failwith "synthetic surface replaced canonical source ownership";
+  if owner.source_category <> source then
+    failwith "declaration order changed the least canonical source owner";
   if op_count output.statements canonical <> 1 then
     failwith "declaration order changed canonical representation emission";
   let _, original_ctx, _ =
@@ -250,7 +250,7 @@ let test_cycle_choice_is_deterministic () =
         failwith "cyclic subtype class changed its surface or total least owner")
     [ [ "cedar"; "birch" ]; [ "birch"; "cedar" ] ]
 
-let test_same_spelling_without_sube_stays_distinct () =
+let test_same_constructor_without_sube_shares_representation () =
   let shared_spelling = mixop "SAME-SPELLING" in
   let _, ctx, output =
     translate
@@ -260,18 +260,19 @@ let test_same_spelling_without_sube_stays_distinct () =
   in
   let cairn = entry ctx "cairn" shared_spelling in
   let delta = entry ctx "delta" shared_spelling in
-  if cairn.constructor_op = delta.constructor_op then
-    failwith "unrelated same-spelled constructors were shared";
-  if cairn.constructor_op
-       <> Naming.constructor_op_in_category "cairn" shared_spelling
-     || delta.constructor_op
-        <> Naming.constructor_op_in_category "delta" shared_spelling
-  then failwith "unrelated constructors lost their category-qualified surfaces";
-  if op_count output.statements cairn.constructor_op <> 1
-     || op_count output.statements delta.constructor_op <> 1
-  then failwith "unrelated constructors did not emit independently"
+  if cairn.constructor_op <> delta.constructor_op then
+    failwith "one SpecTec constructor was split by its syntax category";
+  if cairn.constructor_op <> Naming.constructor_op shared_spelling then
+    failwith "shared constructor did not use its source mixop surface";
+  if op_count output.statements cairn.constructor_op <> 1 then
+    failwith "shared constructor did not emit exactly one operator";
+  List.iter
+    (fun category ->
+      if not (has_typecheck output.statements category cairn.constructor_op) then
+        failwith ("shared constructor lost typecheck for " ^ category))
+    [ "cairn"; "delta" ]
 
-let test_grammar_attribute_sube_certifies_sharing () =
+let test_grammar_attribute_sube_does_not_affect_sharing () =
   let shared = mixop "GRAMMAR-ATTRIBUTE" in
   let source = "grammar_source" in
   let target = "grammar_target" in
@@ -291,7 +292,7 @@ let test_grammar_attribute_sube_certifies_sharing () =
   in
   if (entry ctx source shared).constructor_op
      <> (entry ctx target shared).constructor_op
-  then failwith "AttrG-only SubE was not collected from its GramD production symbol"
+  then failwith "grammar-contained SubE changed structural constructor sharing"
 
 let test_inherited_open_variant_path_is_closed () =
   let child_region = region_of_file "synthetic-child.spectec" in
@@ -334,7 +335,7 @@ let test_inherited_open_variant_path_is_closed () =
   if has_typecheck output.statements child parent_only.constructor_op then
     failwith "open parent-only constructor leaked into child membership"
 
-let test_guard_mismatch_keeps_nonidentity_helper () =
+let test_guard_mismatch_keeps_representations_distinct () =
   let guarded = mixop "GUARDED-FLOWER" in
   let false_prem = IfPr (BoolE false $$ region % bool_typ) $ region in
   let source = "ember" in
@@ -351,31 +352,35 @@ let test_guard_mismatch_keeps_nonidentity_helper () =
   let source_case = entry ctx source guarded in
   let target_case = entry ctx target guarded in
   if source_case.constructor_op = target_case.constructor_op then
-    failwith "guard-mismatched cases were shared";
+    failwith "constructors with different source premises were merged";
   if op_count output.statements source_case.constructor_op <> 1
      || op_count output.statements target_case.constructor_op <> 1
-  then failwith "guard-mismatched cases did not emit independently";
+  then failwith "guard-mismatched constructors did not emit independently";
   match Helper.subtype_injections (Context.helpers ctx) with
   | [ _ ] -> ()
-  | [] -> failwith "genuine nonidentity SubE lost its helper"
-  | _ -> failwith "genuine nonidentity SubE requested multiple helpers"
+  | [] -> failwith "nonidentity guarded SubE lost its helper"
+  | _ -> failwith "nonidentity guarded SubE requested multiple helpers"
 
-let test_bound_case_stays_distinct () =
+let test_bound_case_shares_representation () =
   let bounded = mixop "BOUND-FLOWER" in
   let bind = ExpP (id "limit", nat_typ) $ region in
   let source = "larch" in
   let target = "maple" in
   let source_typ = category_typ source in
   let target_typ = category_typ target in
-  let _, ctx, _ =
+  let _, ctx, output =
     translate ~allow_fatal:true
       [ variant source [ typcase ~binds:[ bind ] nat_typ bounded ]
       ; variant target [ typcase ~binds:[ bind ] nat_typ bounded ]
       ; coercion "bound_retag" source_typ target_typ (sube source_typ target_typ)
       ]
   in
-  if (entry ctx source bounded).constructor_op = (entry ctx target bounded).constructor_op
-  then failwith "bound constructor cases were shared without a closed-domain proof"
+  let source_case = entry ctx source bounded in
+  let target_case = entry ctx target bounded in
+  if source_case.constructor_op <> target_case.constructor_op then
+    failwith "case binds split one runtime constructor";
+  if op_count output.statements source_case.constructor_op <> 1 then
+    failwith "bound shared constructor did not emit exactly once"
 
 let test_payload_mismatch_stays_distinct () =
   let leaf = mixop "LEAF" in
@@ -397,12 +402,12 @@ let test_payload_mismatch_stays_distinct () =
   let source_case = entry ctx "harbor" wrapped in
   let target_case = entry ctx "island" wrapped in
   if source_case.constructor_op = target_case.constructor_op then
-    failwith "payload-mismatched cases were shared";
+    failwith "constructors with different payload types were merged";
   if op_count output.statements source_case.constructor_op <> 1
      || op_count output.statements target_case.constructor_op <> 1
-  then failwith "payload-mismatched cases did not emit independently"
+  then failwith "payload-mismatched constructors did not emit independently"
 
-let test_static_specialization_stays_distinct () =
+let test_static_specialization_shares_runtime_representation () =
   let specialized = mixop "SPECIAL" in
   let argument = ExpA (nat 1) $ region in
   let source = VarT (id "jetty", [ argument ]) $ region in
@@ -416,11 +421,10 @@ let test_static_specialization_stays_distinct () =
   in
   let source_case = entry ctx "jetty" specialized in
   let target_case = entry ctx "knoll" specialized in
-  if source_case.constructor_op = target_case.constructor_op then
-    failwith "static constructor cases were shared without an exact certificate";
-  if op_count output.statements source_case.constructor_op <> 1
-     || op_count output.statements target_case.constructor_op <> 1
-  then failwith "static constructor cases did not emit independently"
+  if source_case.constructor_op <> target_case.constructor_op then
+    failwith "static syntax instances split one runtime constructor";
+  if op_count output.statements source_case.constructor_op <> 1 then
+    failwith "static shared constructor did not emit exactly once"
 
 let test_construction_domain_equality () =
   let guarded reason = Constructor_registry.Guarded_constructor reason in
@@ -476,7 +480,7 @@ let test_preload_schema_drift_is_rejected () =
   | Constructor_registry.Rejected_after_resolution ->
     failwith "actual lowering schema drift was accepted"
 
-let test_unqualified_shared_target_collision_is_rejected () =
+let test_shared_surface_merges_exact_signature_and_rejects_incompatible () =
   let shared = mixop "TARGET-COLLISION" in
   let pair left right typ =
     let left_typ = category_typ left in
@@ -495,19 +499,18 @@ let test_unqualified_shared_target_collision_is_rejected () =
     Driver.translate
       (pair "spruce" "tundra" nat_typ @ pair "upland" "valley" int_typ)
   in
-  List.iter
-    (fun (kind, result) ->
-      if
-        not
-          (List.exists
-             (fun diagnostic ->
-               diagnostic.Diagnostics.constructor
-               = "ConstructorRegistry/shared-surface-collision")
-             result.Driver.diagnostics)
-      then failwith (kind ^ " unqualified shared target collision was accepted");
-      if not (Driver.has_fatal_diagnostics result) then
-        failwith (kind ^ " unqualified shared target collision was not fatal"))
-    [ "exact-signature" , exact; "incompatible-signature", incompatible ]
+  if Driver.has_fatal_diagnostics exact then
+    failwith "equal constructor signatures did not form one representation";
+  if
+    not
+      (List.exists
+         (fun diagnostic ->
+           diagnostic.Diagnostics.constructor
+           = "ConstructorRegistry/shared-surface-collision")
+         incompatible.Driver.diagnostics)
+  then failwith "incompatible shared constructor signatures were accepted";
+  if not (Driver.has_fatal_diagnostics incompatible) then
+    failwith "incompatible shared constructor signatures were not fatal"
 
 let test_final_module_shared_surface_collisions_are_rejected () =
   let shared = mixop "FINAL-SURFACE" in
@@ -658,8 +661,7 @@ let test_numeric_wrapper_schema_mismatch_suppresses_emission () =
   | Constructor_registry.Schema_mismatch _
   | Constructor_registry.Rejected_after_resolution ->
     failwith "synthetic numeric wrapper preload did not register exactly once");
-  Constructor_registry.resolve
-    ~il_env:(Context.il_env ctx) ~source_index registry script;
+  Constructor_registry.resolve registry;
   let lowered =
     Type_translate.translate_typd ctx origin category_id [] insts
   in
@@ -730,10 +732,7 @@ let test_resolved_registry_rejects_late_source_facts () =
   Constructor_registry.note_source_case registry
     ~source_category:"resolved_parent" ~static_args_key:None covered;
   Constructor_registry.register_inclusion registry inclusion;
-  Constructor_registry.resolve
-    ~il_env:Il.Env.empty
-    ~source_index:(Analysis.Source_index.of_script [])
-    registry [];
+  Constructor_registry.resolve registry;
   Constructor_registry.note_source_case registry
     ~source_category:"resolved_parent" ~static_args_key:None covered;
   Constructor_registry.register_inclusion registry inclusion;
@@ -906,16 +905,16 @@ let () =
   test_canonical_choice_is_declaration_order_independent ();
   test_diamond_sink_choice_is_deterministic ();
   test_cycle_choice_is_deterministic ();
-  test_same_spelling_without_sube_stays_distinct ();
-  test_grammar_attribute_sube_certifies_sharing ();
+  test_same_constructor_without_sube_shares_representation ();
+  test_grammar_attribute_sube_does_not_affect_sharing ();
   test_inherited_open_variant_path_is_closed ();
-  test_guard_mismatch_keeps_nonidentity_helper ();
-  test_bound_case_stays_distinct ();
+  test_guard_mismatch_keeps_representations_distinct ();
+  test_bound_case_shares_representation ();
   test_payload_mismatch_stays_distinct ();
-  test_static_specialization_stays_distinct ();
+  test_static_specialization_shares_runtime_representation ();
   test_construction_domain_equality ();
   test_preload_schema_drift_is_rejected ();
-  test_unqualified_shared_target_collision_is_rejected ();
+  test_shared_surface_merges_exact_signature_and_rejects_incompatible ();
   test_final_module_shared_surface_collisions_are_rejected ();
   test_numeric_wrapper_schema_mismatch_suppresses_emission ();
   test_parameterized_nullary_declaration_has_one_owner ();
