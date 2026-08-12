@@ -145,42 +145,29 @@ let identity_subject names source_exp source_result source_term sort =
     when List.exists
            (fun introduced -> introduced.id = id.it)
            source_result.introduced_bindings ->
-    let target, names = Local_name.fresh_typed names Local_name.Pattern sort in
-    let introduced_bindings =
+    let introduced =
       source_result.introduced_bindings
-      |> List.map (fun introduced ->
-        if introduced.id = id.it && introduced.binding.term = source_term then
-          { introduced with
-            binding = { introduced.binding with term = target }
-          }
-        else introduced)
+      |> List.find (fun introduced -> introduced.id = id.it)
     in
-    target,
-    { source_result with
-      guards = List.map (replace_condition source_term target) source_result.guards
-    ; introduced_bindings
-    },
-    names
-  | _ -> source_term, source_result, names
-
-let identity_sequence_subject names source_exp source_result source_term =
-  match source_exp.it, source_term with
-  | VarE id, Var _ when id.it <> "_" ->
-    let sort = sort "SpectecTerminals" in
-    let target, names = Local_name.fresh_typed names Local_name.Pattern sort in
-    let introduced = introduce id.it { term = target; sort; typ = source_exp.note } in
-    let introduced_bindings =
-      introduced
-      :: List.filter
-           (fun previous -> previous.id <> id.it)
-           source_result.introduced_bindings
-    in
-    target,
-    { source_result with
-      guards = List.map (replace_condition source_term target) source_result.guards
-    ; introduced_bindings
-    },
-    names
+    if introduced.binding.sort = sort then
+      source_term, source_result, names
+    else
+      let target, names = Local_name.fresh_typed names Local_name.Pattern sort in
+      let introduced_bindings =
+        source_result.introduced_bindings
+        |> List.map (fun introduced ->
+          if introduced.id = id.it && introduced.binding.term = source_term then
+            { introduced with
+              binding = { introduced.binding with term = target }
+            }
+          else introduced)
+      in
+      target,
+      { source_result with
+        guards = List.map (replace_condition source_term target) source_result.guards
+      ; introduced_bindings
+      },
+      names
   | _ -> source_term, source_result, names
 
 (** A projection is partial exactly outside the certified injection image.
@@ -349,25 +336,21 @@ let lower_direct names ctx callbacks origin exp inner source_typ target_typ =
       callbacks.guard_for_typ
         origin ~constructor:"Pattern/SubE/source" exp source_term source_typ
     in
-    let target_guards, target_diagnostics =
-      callbacks.guard_for_typ
-        origin ~constructor:"Pattern/SubE" exp source_term target_typ
-    in
-    (match source_guards, target_guards with
-    | Some source_guards, Some target_guards ->
+    (match source_guards with
+    | Some source_guards ->
       return names
         { inner_result with
           term = Some source_term
-        ; guards = dedup_guards (inner_result.guards @ source_guards @ target_guards)
+        ; guards = dedup_guards (inner_result.guards @ source_guards)
         ; diagnostics =
-            inner_result.diagnostics @ source_diagnostics @ target_diagnostics
+            inner_result.diagnostics @ source_diagnostics
         }
-    | _ ->
+    | None ->
       return names
         { inner_result with
           term = None
         ; diagnostics =
-            inner_result.diagnostics @ source_diagnostics @ target_diagnostics
+            inner_result.diagnostics @ source_diagnostics
         })
   | Some source_term, Ok (Subtype_plan.Injection injection) ->
     (match callbacks.carrier_sort_of_typ target_typ with
@@ -447,34 +430,26 @@ let lower_iterated
     ~source_typ ~target_typ ~iter =
   match subtype_plan ctx source_typ target_typ with
   | Ok Subtype_plan.Identity ->
-    let source_term, source_result, names =
-      identity_sequence_subject names source_exp source_result source_term
-    in
     let source_guards, source_diagnostics =
       callbacks.guard_for_typ
         origin ~constructor:"Pattern/IterE/coercion"
         exp source_term (sequence_typ source_typ)
     in
-    let target_guards, target_diagnostics =
-      callbacks.guard_for_typ
-        origin ~constructor:"Pattern/IterE/coercion"
-        exp source_term (sequence_typ target_typ)
-    in
-    (match source_guards, target_guards with
-    | Some source_guards, Some target_guards ->
+    (match source_guards with
+    | Some source_guards ->
       return names { source_result with
         term = Some source_term
       ; guards =
           dedup_guards
-            (source_result.guards @ source_guards @ target_guards)
+            (source_result.guards @ source_guards)
       ; diagnostics =
-          source_result.diagnostics @ source_diagnostics @ target_diagnostics
+          source_result.diagnostics @ source_diagnostics
       }
-    | _ ->
+    | None ->
       return names { source_result with
         term = None
       ; diagnostics =
-          source_result.diagnostics @ source_diagnostics @ target_diagnostics
+          source_result.diagnostics @ source_diagnostics
       })
   | Ok (Subtype_plan.Injection injection) ->
     let target_term, names =

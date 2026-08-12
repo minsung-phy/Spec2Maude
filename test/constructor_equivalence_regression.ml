@@ -167,12 +167,12 @@ let test_transitive_identity_sharing_and_membership () =
       (Origin.synthetic ~ast_constructor:"SubE" "shared-pattern") pattern
   in
   let witnesses = guard_witnesses lowered.pattern_guards in
-  List.iter
-    (fun category ->
-      let witness = Naming.category_witness (id category) in
-      if not (List.mem witness witnesses) then
-        failwith ("identity pattern lost guard " ^ witness))
-    [ source; target ];
+  let source_witness = Naming.category_witness (id source) in
+  let target_witness = Naming.category_witness (id target) in
+  if not (List.mem source_witness witnesses) then
+    failwith ("identity pattern lost guard " ^ source_witness);
+  if List.mem target_witness witnesses then
+    failwith ("identity pattern retained implied guard " ^ target_witness);
   if
     not
       (List.exists

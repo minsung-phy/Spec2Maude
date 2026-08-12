@@ -87,25 +87,20 @@ require_statement_before () {
 
 step=$(condition_line 'crl [step-ctxt-instrs]')
 require_before "$step" \
-  '(_or_(_=/=_(PATTERN1:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  '(_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' \
   'ctxt-instrs source-category guard no longer follows its progress guard'
 require_before "$step" \
-  '(_or_(_=/=_(PATTERN1:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
+  '(_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))) = true' \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
   'ctxt-instrs progress guard no longer precedes its self-recursive rewrite'
 require_before "$step" \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
   'ctxt-instrs self-recursive rewrite crossed its ready source-category guard'
-require_before "$step" \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
-  'ctxt-instrs target-category guard no longer follows its source-category guard'
-require_before "$step" \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
-  'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) =>' \
-  'ctxt-instrs self-recursive rewrite crossed its ready target-category guard'
+require_not_contains "$step" \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)' \
+  'ctxt-instrs retained target membership implied by val <: instr'
 if printf '%s\n' "$step" | grep -Eq 'helper\.context-'
 then
   echo 'ctxt-instrs retained a source-free context scanner' >&2
@@ -181,7 +176,7 @@ require_before "$step_context" \
   'Step/ctxt-instrs no longer retains its whole recursive rewrite-result config guard'
 step_context_rule=$(matching_line 'crl [step-ctxt-instrs]')
 require_contains "$step_context_rule" \
-  'PATTERN1:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
+  'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
   'Step/ctxt-instrs no longer preserves its source value prefix'
 if printf '%s\n' "$step_context" \
     | grep -Eq 'helper\.context-'
@@ -194,11 +189,11 @@ if printf '%s\n' "$step_context_rule" | grep -Fq 'helper.iter-map'; then
   exit 1
 fi
 require_contains "$step_context" \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' \
   'Step/ctxt-instrs lost its source val* membership guard'
-require_contains "$step_context" \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
-  'Step/ctxt-instrs lost its target instr* membership guard'
+require_not_contains "$step_context" \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)' \
+  'Step/ctxt-instrs retained target membership implied by val <: instr'
 require_not_contains "$step_context" \
   'helper.subtype-' \
   'Step/ctxt-instrs retained an identity subtype helper'
@@ -232,10 +227,10 @@ fi
 
 eval_expr=$(condition_line 'crl [eval-expr-rule-1]')
 require_contains "$eval_expr" \
-  'typecheck(config.sym(Z_PRIME:SpectecTerminal, PATTERN1:SpectecTerminals), syn.config)' \
+  'typecheck(config.sym(Z_PRIME:SpectecTerminal, VAL_STAR:SpectecTerminals), syn.config)' \
   'Eval_expr lost its whole Steps output config guard'
 require_contains "$eval_expr" \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' \
   'Eval_expr lost the source-category guard for its identity SubE pattern'
 if printf '%s\n' "$eval_expr" \
     | grep -Eq 'syn\.state\)'; then
@@ -354,12 +349,14 @@ for retained in \
   'typecheck(AT:SpectecTerminal, syn.numtype)' \
   'typecheck(I:SpectecTerminal, syn.num(AT:SpectecTerminal))' \
   'typecheck(VAL:SpectecTerminal, syn.val)' \
-  'typecheck(VAL:SpectecTerminal, syn.instr)' \
   'typecheck(uN.wrap(N:Nat), syn.num(AT:SpectecTerminal))'
 do
   require_contains "$memory_fill" "$retained" \
-    'memory.fill successor lost a source or target guard required by direct subtype identity'
+    'memory.fill successor lost a source guard required by direct subtype identity'
 done
+require_not_contains "$memory_fill" \
+  'typecheck(VAL:SpectecTerminal, syn.instr)' \
+  'memory.fill successor retained target membership implied by val <: instr'
 require_not_contains "$memory_fill" \
   'helper.subtype-' \
   'memory.fill successor retained an identity subtype helper'
@@ -381,12 +378,14 @@ for retained in \
   'typecheck(AT:SpectecTerminal, syn.numtype)' \
   'typecheck(I:SpectecTerminal, syn.num(AT:SpectecTerminal))' \
   'typecheck(VAL:SpectecTerminal, syn.val)' \
-  'typecheck(VAL:SpectecTerminal, syn.instr)' \
   'typecheck(uN.wrap(N:Nat), syn.num(AT:SpectecTerminal))'
 do
   require_contains "$memory_fill_zero" "$retained" \
-    'memory.fill zero rule lost a source or target guard required by direct subtype identity'
+    'memory.fill zero rule lost a source guard required by direct subtype identity'
 done
+require_not_contains "$memory_fill_zero" \
+  'typecheck(VAL:SpectecTerminal, syn.instr)' \
+  'memory.fill zero rule retained target membership implied by val <: instr'
 require_not_contains "$memory_fill_zero" \
   'helper.subtype-' \
   'memory.fill zero rule retained an identity subtype helper'
@@ -451,21 +450,23 @@ require_not_contains "$store_pack" \
 
 for retained in \
   'indexDefined(def.funcinst(Z:SpectecTerminal), A:Nat)' \
-  'N:Nat := len(PATTERN1:SpectecTerminals)' \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.val)' \
-  'typecheckSeq(PATTERN1:SpectecTerminals, syn.instr)' \
+  'N:Nat := len(VAL_STAR:SpectecTerminals)' \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' \
   'FI:SpectecTerminal := index(def.funcinst(Z:SpectecTerminal), A:Nat)' \
   'RESULT1:SpectecTerminal := rel.expand(value('\''TYPE, FI:SpectecTerminal))' \
   'comptype.func-sym(list.wrap(T_1_STAR:SpectecTerminals), list.wrap(T_2_STAR:SpectecTerminals)) := RESULT1:SpectecTerminal' \
   'N:Nat = len(T_1_STAR:SpectecTerminals)' \
   'M:Nat := len(T_2_STAR:SpectecTerminals)' \
-  'func.func(X:SpectecTerminal, PATTERN2:SpectecTerminals, INSTR_STAR:SpectecTerminals) := value('\''CODE, FI:SpectecTerminal)' \
-  'tuple(seq(T_STAR:SpectecTerminals)) := helper.pattern-zip.step-read(PATTERN2:SpectecTerminals)' \
+  'func.func(X:SpectecTerminal, PATTERN1:SpectecTerminals, INSTR_STAR:SpectecTerminals) := value('\''CODE, FI:SpectecTerminal)' \
+  'tuple(seq(T_STAR:SpectecTerminals)) := helper.pattern-zip.step-read(PATTERN1:SpectecTerminals)' \
   'F:SpectecTerminal := rec.frame('
 do
   require_contains "$call_ref" "$retained" \
     'call_ref lost a source/dependent condition while removing payload validation'
 done
+require_not_contains "$call_ref" \
+  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)' \
+  'call_ref retained target membership implied by val <: instr'
 
 step_block=$(condition_line 'crl [step-read-block]')
 require_contains "$step_block" \

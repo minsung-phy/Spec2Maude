@@ -109,7 +109,7 @@ let lower_atomic callbacks ctx env origin exp inner source_typ target_typ =
         callbacks ctx env origin exp target_typ inner_result term)
   | Some inner_term, Ok Subtype_plan.Identity ->
     lower_with_type_guards
-      callbacks ctx env origin exp [ source_typ; target_typ ] inner_result inner_term
+      callbacks ctx env origin exp [ source_typ ] inner_result inner_term
   | Some _, Error error ->
     { term = None
     ; guards = inner_result.guards
@@ -163,7 +163,7 @@ let lower_iter callbacks ctx env origin exp inner source_typ target_typ iter =
     (match inner_result.term with
     | Some term ->
       lower_with_type_guards
-        callbacks ctx env origin exp [ inner.note; exp.note ] inner_result term
+        callbacks ctx env origin exp [ inner.note ] inner_result term
     | None -> inner_result)
   | Ok (Subtype_plan.Injection _) | Error _ ->
     let binder = fresh_iter_binder inner source_typ target_typ in
