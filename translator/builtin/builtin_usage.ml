@@ -278,12 +278,6 @@ let diagnostic profile entry =
       , "generated Maude calls declaration-only operator '"
         ^ entry.generated_op_stem ^ "', but no defining equation was emitted"
       , "Implement its source clauses or provide an explicit backend contract" )
-    | Obligation, Active, Equational_view ->
-      ( Diagnostics.Obligation
-      , "Backend/equational-view-active"
-      , "generated DecD equations call equational-view operator '"
-        ^ entry.generated_op_stem ^ "', but the view has no defining equations"
-      , "Implement the annotated relation view under an explicit backend contract or keep its consumers non-equational" )
     | Obligation, Active, Relation_surface ->
       ( Diagnostics.Obligation
       , "Backend/relation-surface-active"

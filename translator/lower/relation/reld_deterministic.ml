@@ -11,8 +11,7 @@ let rec premise_has_execution_dependency ctx prem =
     (match Analysis.Function_graph.find_relation (Context.function_graph ctx) rel_id.it with
     | Some relation ->
       (match (Relation_shape.of_relation relation).Relation_shape.decision with
-      | Relation_shape.Execution _ ->
-        not (Analysis.Function_graph.relation_has_maude_equational_view relation)
+      | Relation_shape.Execution _ -> true
       | Relation_shape.Static_validation _
       | Relation_shape.Runtime_predicate _
       | Relation_shape.Deterministic_candidate _

@@ -69,18 +69,7 @@ let translate ctx origin id params mixop result_typ rules =
   | Relation_shape.Deterministic_candidate shape ->
     Reld_deterministic.translate ctx origin id relation_kind mixop shape rules
   | Relation_shape.Execution shape ->
-    let contract_diagnostics =
-      Reld_equational_contract.validate ctx origin id shape rules
-    in
-    if List.exists Diagnostics.is_fatal contract_diagnostics then
-      { statements = []; diagnostics = contract_diagnostics }
-    else
-      let translated =
-        Reld_execution.translate ctx origin id relation_kind mixop shape rules
-      in
-      { translated with
-        diagnostics = contract_diagnostics @ translated.diagnostics
-      }
+    Reld_execution.translate ctx origin id relation_kind mixop shape rules
   | Relation_shape.Unknown reason ->
     one_diagnostic
       (unsupported

@@ -73,6 +73,7 @@ val diagnostics : profile:string -> t -> Diagnostics.t list
 val definitions : t -> definition list
 val find_definition : t -> string -> definition option
 val definition_is_partial : t -> string -> bool
+val definition_has_maude_rule : t -> string -> bool
 val definition_is_rewrite_backed : t -> string -> bool
 val plain_identity : string -> definition_identity
 val identity_of_specialization : specialization -> definition_identity

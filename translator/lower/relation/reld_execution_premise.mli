@@ -1,6 +1,5 @@
 val translate_premises_named :
   Local_name.t ->
-  ?require_equational_contract:bool ->
   Context.t ->
   Expr_env.t ->
   ?bound_conditions:Maude_ir.eq_condition list ->

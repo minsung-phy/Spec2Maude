@@ -31,7 +31,6 @@ let activity_to_string = function
 let requirement_source_to_string = function
   | Hint_builtin -> "hint(builtin)"
   | Declaration_only -> "declaration-only DecD"
-  | Equational_view -> "relation equational view"
   | Relation_surface -> "declaration-only RelD"
 
 let count predicate entries =

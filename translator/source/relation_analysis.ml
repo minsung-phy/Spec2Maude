@@ -11,7 +11,6 @@ type relation =
   ; result : typ
   ; rule_count : int
   ; hints : string list
-  ; maude_equational_view : bool
   ; external_validation_shape : bool
   }
 
@@ -108,8 +107,6 @@ let collect_relation_refs_from_rule rule =
     prems
     |> List.fold_left collect_relation_refs_from_prem []
     |> List.rev
-
-let maude_equational_view_hint = "maude_equational_view"
 
 let relation_hint_table entries =
   let table = Hashtbl.create 127 in
@@ -218,7 +215,6 @@ let build index =
         ; result
         ; rule_count = List.length rules
         ; hints
-        ; maude_equational_view = List.mem maude_equational_view_hint hints
         ; external_validation_shape = validation_marker_result index result
         }
       in
@@ -258,9 +254,6 @@ let rule_hints t ~relation_id ~rule_id =
   Hashtbl.find_opt
     t.rule_hints_by_id
     (rule_hint_key ~relation_id ~rule_id)
-
-let relation_has_maude_equational_view relation =
-  relation.maude_equational_view
 
 let runtime_seed_reason (relation : relation) =
   match relation.kind with

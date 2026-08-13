@@ -6,7 +6,6 @@ type activity = Active | Dormant
 type requirement_source =
   | Hint_builtin
   | Declaration_only
-  | Equational_view
   | Relation_surface
 
 type dec_signature =

@@ -206,7 +206,6 @@ let prem_origin parent prem =
 
 let translate_execution_premise
     names
-    ~require_equational_contract
     ctx
     env
     ~bound_vars
@@ -255,17 +254,8 @@ let translate_execution_premise
       let relation_shape = Relation_shape.of_relation relation in
       (match relation_shape.Relation_shape.decision with
       | Relation_shape.Execution _ ->
-        if require_equational_contract
-           && not (Analysis.Function_graph.relation_has_maude_equational_view relation)
-        then
-          ( unsupported_rule_prem
-            ctx env ~bound_vars ~lhs_bound_vars origin prem
-            "Premise/RulePr/execution/unannotated-rewrite-dependency"
-            "rewrite-backed DecD premise calls an execution relation without hint(maude_equational_view); no right-uniqueness contract permits this functional dependency"
-          , names )
-        else
-          lower_execution_rule_premise
-            names ctx env ~bound_vars ~lhs_bound_vars origin prem rel_id exp
+        lower_execution_rule_premise
+          names ctx env ~bound_vars ~lhs_bound_vars origin prem rel_id exp
       | Relation_shape.Deterministic_candidate _ ->
         Premise_translate.translate_premise_named
           names
@@ -380,7 +370,6 @@ let translate_execution_premise
 
 let translate_premises_named
     names
-    ?(require_equational_contract = false)
     ctx env ?(bound_conditions = []) ?(head_facts = [])
     ?(escape_source_ids = []) ~bound_terms origin prems =
   let incoming_names = names in
@@ -426,7 +415,6 @@ let translate_premises_named
       let result, candidate_names =
         translate_execution_premise
           names
-          ~require_equational_contract
           staged
           acc.Premise_result.env_after
           ~bound_vars:acc.Premise_result.bound_vars_after

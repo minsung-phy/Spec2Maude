@@ -116,6 +116,24 @@ let translate ctx origin hintdef =
               "partial metadata does not resolve to a structurally indexed DecD declaration"
             ~suggestion:
               "Attach hint(partial) to a declared DecD before lowering its operator"
+              ()
+        | "maude_rule" when
+            Analysis.Function_graph.definition_has_maude_rule
+              (Context.function_graph ctx) target_id.it ->
+          skipped
+            ~ctx ~origin ~constructor
+            ~reason:
+              "maude_rule metadata is consumed by the DecD declaration, whose clauses are emitted as frozen Maude rewrite rules"
+            ~suggestion:
+              "Keep the hint in provenance; the generated DecD operator and clauses carry its lowering policy"
+            ()
+        | "maude_rule" ->
+          unsupported
+            ~ctx ~origin ~constructor
+            ~reason:
+              "maude_rule metadata does not resolve to a structurally indexed DecD declaration"
+            ~suggestion:
+              "Attach hint(maude_rule) to a declared DecD that must preserve rewrite premises"
             ()
         | "inverse" ->
           (match
