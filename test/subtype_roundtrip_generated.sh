@@ -71,8 +71,8 @@ check_context_sequence_eliminated () {
   require_not_contains "$statement" 'helper.iter-map' "$label retained its direct reinjection map"
   require_not_contains "$condition" 'helper.subtype-' "$label retained an identity projection"
   require_contains "$condition" '_or_(_=/=_(VAL_STAR:SpectecTerminals, eps)' "$label lost its source progress condition"
-  require_contains "$condition" 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' "$label lost its source category guard"
-  require_not_contains "$condition" 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)' "$label retained target membership implied by val <: instr"
+  require_contains "$condition" 'typecheck(VAL_STAR:SpectecTerminals, syn.val)' "$label lost its source category guard"
+  require_not_contains "$condition" 'typecheck(VAL_STAR:SpectecTerminals, syn.instr)' "$label retained target membership implied by val <: instr"
   require_not_contains "$condition" 'helper.context-' "$label retained a source-free context scanner"
   sequence_rule_count=$((sequence_rule_count + 1))
 }
@@ -198,7 +198,7 @@ eval_statement=$(statement_line eval-expr-rule-1)
 eval_condition=$(condition_line eval-expr-rule-1)
 require_contains "$eval_statement" '[eval-expr-rule-1]' 'Eval_expr generated rule is missing'
 require_contains "$eval_statement" 'seq(VAL_STAR:SpectecTerminals)' 'Eval_expr stopped returning direct source values'
-require_contains "$eval_condition" 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)' 'Eval_expr lost its source membership guard'
+require_contains "$eval_condition" 'typecheck(VAL_STAR:SpectecTerminals, syn.val)' 'Eval_expr lost its source membership guard'
 
 frame_condition=$(condition_line step-read-call-ref-func)
 require_contains "$frame_condition" 'rec.frame(helper.iter-map.step-read.2(VAL_STAR:SpectecTerminals)' 'frame locals stopped consuming genuine source values'

@@ -7,11 +7,11 @@ let carries_sequence ctx typ =
   | Ok sort -> Carrier_sort.is_sequence_sort sort
   | Error _ -> false
 
-let for_typ ctx typ sort value witness =
+let for_typ ctx typ _ value witness =
   match typ.it with
   | IterT (inner, Opt) when not (Type_shape.typ_is_iter inner) ->
     [ BoolCond (App ("isOpt", [ value ]))
-    ; BoolCond (Typecheck_term.typecheck_seq value witness)
+    ; BoolCond (Typecheck_term.typecheck value witness)
     ]
   | IterT ({ it = IterT (inner, Opt); _ }, List)
     when not (Type_shape.typ_is_iter inner) ->
@@ -26,4 +26,4 @@ let for_typ ctx typ sort value witness =
     [ BoolCond (Typecheck_term.typecheck_nested_seq value witness) ]
   | IterT (inner, Opt) when carries_sequence ctx inner ->
     [ BoolCond (Typecheck_term.typecheck_seq_opt value witness) ]
-  | _ -> [ BoolCond (Typecheck_term.typecheck_for_sort sort value witness) ]
+  | _ -> [ BoolCond (Typecheck_term.typecheck value witness) ]

@@ -6,7 +6,7 @@ type t =
    an emitted Maude operator whose equations are total at this exact arity. *)
 let classify ~name ~arity =
   match name, arity with
-  | ( "typecheck" | "typecheckSeq" | "typecheckOptSeq"
+  | ( "typecheck" | "typecheckOptSeq"
     | "typecheckSeqOpt" | "typecheckNestedSeq" ), 2 ->
     Some Observer
   | ("isOpt" | "allOpt" | "len" | "ratIsInt" | "not_"), 1 ->

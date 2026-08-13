@@ -398,9 +398,9 @@ and lower_category_membership_equality callbacks ctx env origin value_exp catego
     let sort_opt = Carrier_sort.for_expression value_exp.note in
     Some
       (match value_result.term, sort_opt with
-      | Some value_term, Some value_sort ->
+      | Some value_term, Some _ ->
         { value_result with
-          term = Some (Typecheck_term.typecheck_for_sort value_sort value_term witness)
+          term = Some (Typecheck_term.typecheck value_term witness)
         }
       | _ -> value_result)
 

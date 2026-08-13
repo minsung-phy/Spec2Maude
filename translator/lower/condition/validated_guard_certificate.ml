@@ -29,28 +29,10 @@ let carrier_fact ctx (binding : Expr_env.binding) =
          (* The source alias and the Maude carrier normalize to the same
             primitive numeric sort, whose prelude typecheck is total. *)
          BoolCond
-           (Typecheck_term.typecheck_for_sort
-              sort binding.term
+           (Typecheck_term.typecheck
+              binding.term
               (Const (Naming.primitive_witness witness))))
   | Some _ | None -> None
-
-let source_constructor_term ctx = function
-  | App (constructor_op, args) ->
-    Option.is_some
-      (Typcase_constructor.ingress_certificate
-         ctx ~constructor_op ~arity:(List.length args))
-  | Const constructor_op ->
-    Option.is_some
-      (Typcase_constructor.ingress_certificate
-         ctx ~constructor_op ~arity:0)
-  | Var _ | Qid _ -> false
-
-let singleton_term ctx env term =
-  source_constructor_term ctx term
-  || Expr_env.bindings env
-     |> List.exists (fun (binding : Expr_env.binding) ->
-          binding.term = term
-          && String.equal (sort_name binding.sort) "SpectecTerminal")
 
 let projection_pairs ctx =
   Helper.subtype_injections (Context.helpers ctx)
@@ -106,16 +88,6 @@ let condition_known substitutions condition facts =
     (fun fact -> normalize_condition substitutions fact = condition)
     facts
 
-let singleton_sequence_fact ctx env facts established substitutions = function
-  | BoolCond (App ("typecheckSeq", [ subject; witness ]))
-    when singleton_term ctx env subject ->
-    let required =
-      BoolCond (Typecheck_term.typecheck subject witness)
-    in
-    condition_known substitutions required facts
-    || condition_known substitutions required established
-  | EqCond _ | MatchCond _ | MembershipCond _ | BoolCond _ -> false
-
 let discharge ctx env ~lhs_terms conditions =
   let facts =
     List.concat_map (ingress_facts ctx) lhs_terms
@@ -136,8 +108,6 @@ let discharge ctx env ~lhs_terms conditions =
         | BoolCond term when Typecheck_term.is_typecheck term ->
           condition_known substitutions condition facts
           || condition_known substitutions condition established
-          || singleton_sequence_fact
-               ctx env facts established substitutions condition
         | EqCond _ | MatchCond _ | MembershipCond _ | BoolCond _ -> false
       in
       let established =

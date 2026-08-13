@@ -2797,7 +2797,7 @@ let test_head_guard_refutation () =
   let sequence_guard =
     BoolCond
       (App
-         ("typecheckSeq",
+         ("typecheck",
           [ App ("_ _", [ Var "HEAD"; Var "TAIL" ]); Const "syn.item" ]))
   in
   (match Runtime_truth_head_guard_refutation.complement
@@ -2805,7 +2805,7 @@ let test_head_guard_refutation () =
   | Complete [ [ EqCond (term, Const "false") ] ]
     when term =
          App
-           ("typecheckSeq",
+           ("typecheck",
             [ App ("_ _", [ Var "HEAD"; Var "TAIL" ]); Const "syn.item" ]) ->
     ()
   | _ -> failwith "total sequence typecheck guard was treated as partial");
@@ -2856,7 +2856,7 @@ let test_prelude_true_condition_discharge () =
   let tautologies =
     [ BoolCond (App ("isOpt", [ Const "eps" ]))
     ; BoolCond
-        (App ("typecheckSeq", [ Const "eps"; Const "syn.null" ]))
+        (App ("typecheck", [ Const "eps"; Const "syn.null" ]))
     ; BoolCond (App ("allLen", [ Const "eps"; Var "X" ]))
     ]
   in

@@ -58,9 +58,9 @@ let lower_with_type_guards
       | _ -> callbacks.carrier_sort ctx typ
     in
     match witness, carrier with
-    | Some witness, Some sort
+    | Some witness, Some _
       when not (List.exists Diagnostics.is_fatal witness_diagnostics) ->
-      let guard = BoolCond (Typecheck_term.typecheck_for_sort sort term witness) in
+      let guard = BoolCond (Typecheck_term.typecheck term witness) in
       let guards = if List.mem guard guards then guards else guard :: guards in
       guards, List.rev_append witness_diagnostics diagnostics, failed
     | _ ->

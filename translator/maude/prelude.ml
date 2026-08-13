@@ -92,8 +92,6 @@ let declarations =
     ; op "contains" [ sr "SpectecTerminal"; sr "SpectecTerminals" ] (s "Bool")
     ; op "isTrue" [ sr "SpectecTerminal" ] (s "Bool") ~kind:Partial
     ; op "typecheck" [ kr "SpectecTerminal"; sr "SpectecType" ] (s "Bool")
-    ; op "typecheckSeq" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
-    ; op "typecheckSeq" [ sr "SpectecTerminals"; sr "SpectecTypes" ] (s "Bool")
     ; op "typecheckOptSeq" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
     ; op "typecheckSeqOpt" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
     ; op "typecheckNestedSeq" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
@@ -276,57 +274,52 @@ let typecheck_equations =
     ; eq (T.typecheck (app "rat" [ Var "R" ]) (Const (witness "rat"))) (Const "true")
     ; eq (T.typecheck (app "float" [ Var "F" ]) (Const (witness "real"))) (Const "true")
     ; eq (T.typecheck (app "text" [ Var "S" ]) (Const (witness "text"))) (Const "true")
-    ; eq (T.typecheck_seq (Const "eps") (Var "T")) (Const "true")
+    ; eq (T.typecheck (Const "eps") (Var "T")) (Const "true")
     ; ceq
-        (T.typecheck_seq
+        (T.typecheck
            (app "repeatSeq" [ Var "N"; Var "X" ])
            (Var "T"))
         (T.typecheck (Var "X") (Var "T"))
         [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ]) ]
     ; ceq
-        (T.typecheck_seq
+        (T.typecheck
            (app "_ _"
               [ app "repeatSeq" [ Var "N"; Var "X" ]
               ; Var "XS"
               ])
            (Var "T"))
-        (app "_and_"
-           [ T.typecheck (Var "X") (Var "T")
-           ; T.typecheck_seq (Var "XS") (Var "T")
-           ])
+        (T.typecheck (Var "XS") (Var "T"))
         [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ])
         ; BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ])
+        ; BoolCond (T.typecheck (Var "X") (Var "T"))
         ]
     ; ceq
-        (T.typecheck_seq (run (Var "N") (Var "X")) (Var "T"))
+        (T.typecheck (run (Var "N") (Var "X")) (Var "T"))
         (T.typecheck (Var "X") (Var "T"))
         [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ]) ]
     ; ceq
-        (T.typecheck_seq
+        (T.typecheck
            (seq (run (Var "N") (Var "X")) (Var "XS"))
            (Var "T"))
-        (app "_and_"
-           [ T.typecheck (Var "X") (Var "T")
-           ; T.typecheck_seq (Var "XS") (Var "T")
-           ])
+        (T.typecheck (Var "XS") (Var "T"))
         [ BoolCond (app "_=/=_" [ Var "N"; Const "0" ])
         ; BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ])
+        ; BoolCond (T.typecheck (Var "X") (Var "T"))
         ]
-    ; eq ~attrs:[ Owise ]
-        (T.typecheck_seq (Var "X") (Var "T"))
-        (T.typecheck (Var "X") (Var "T"))
-    ; ceq ~attrs:[ Owise ]
-        (T.typecheck_seq (app "_ _" [ Var "X"; Var "XS" ]) (Var "T"))
-        (app "_and_" [ T.typecheck (Var "X") (Var "T"); T.typecheck_seq (Var "XS") (Var "T") ])
-        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
+    ; ceq
+        (T.typecheck (app "_ _" [ Var "X"; Var "XS" ]) (Var "T"))
+        (T.typecheck (Var "XS") (Var "T"))
+        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ])
+        ; BoolCond (T.typecheck (Var "X") (Var "T"))
+        ]
     ; eq (T.typecheck_opt_seq (Const "eps") (Var "T")) (Const "true")
     ; eq
         (T.typecheck_opt_seq (app "seq" [ Var "YS" ]) (Var "T"))
-        (app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck_seq (Var "YS") (Var "T") ])
+        (app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck (Var "YS") (Var "T") ])
     ; ceq
         (T.typecheck_opt_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
         (app "_and_"
-           [ app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck_seq (Var "YS") (Var "T") ]
+           [ app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck (Var "YS") (Var "T") ]
            ; T.typecheck_opt_seq (Var "XS") (Var "T")
            ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
@@ -334,15 +327,15 @@ let typecheck_equations =
     ; eq (T.typecheck_seq_opt (Const "eps") (Var "T")) (Const "true")
     ; eq
         (T.typecheck_seq_opt (app "seq" [ Var "YS" ]) (Var "T"))
-        (T.typecheck_seq (Var "YS") (Var "T"))
+        (T.typecheck (Var "YS") (Var "T"))
     ; eq (T.typecheck_seq_opt (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
     ; eq (T.typecheck_nested_seq (Const "eps") (Var "T")) (Const "true")
     ; eq
         (T.typecheck_nested_seq (app "seq" [ Var "YS" ]) (Var "T"))
-        (T.typecheck_seq (Var "YS") (Var "T"))
+        (T.typecheck (Var "YS") (Var "T"))
     ; ceq
         (T.typecheck_nested_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
-        (app "_and_" [ T.typecheck_seq (Var "YS") (Var "T"); T.typecheck_nested_seq (Var "XS") (Var "T") ])
+        (app "_and_" [ T.typecheck (Var "YS") (Var "T"); T.typecheck_nested_seq (Var "XS") (Var "T") ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
     ; eq (T.typecheck_nested_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
   ]

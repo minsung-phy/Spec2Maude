@@ -377,8 +377,8 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \      ARGS (ref.ref-func-addr(A) instr.call-ref(C)))) => eps\n\
        \    if contains(A, hostFunctionAddresses) = true\n\
        \       /\\ VALUES := ARGS\n\
-       \       /\\ (typecheckSeq(VALUES, syn.val)) = true\n\
-       \       /\\ (typecheckSeq(ARGS, syn.instr)) = true\n\
+       \       /\\ (typecheck(VALUES, syn.val)) = true\n\
+       \       /\\ (typecheck(ARGS, syn.instr)) = true\n\
        \       /\\ N := len(VALUES)\n\
        \       /\\ XA := index(value('FUNCS, S), A)\n\
        \       /\\ value('CODE, XA) = hostfunc.sym\n\
