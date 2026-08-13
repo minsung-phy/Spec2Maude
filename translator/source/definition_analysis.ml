@@ -87,6 +87,7 @@ type t =
   { definitions : definition list
   ; definitions_by_id : (string, definition) Hashtbl.t
   ; bodies_by_id : (string, def_body) Hashtbl.t
+  ; maude_rule_definitions : (string, unit) Hashtbl.t
   ; definition_identity_edges : (string, definition_identity list) Hashtbl.t
   ; rewrite_backed_identities : (string, unit) Hashtbl.t
   ; specializations_by_id : (string, specialization list) Hashtbl.t
@@ -513,18 +514,6 @@ let raw_definition_refs_of_body body =
     []
   |> List.rev
 
-let rec premise_uses_annotated_execution t prem =
-  match prem.it with
-  | RulePr (id, _, _, _) ->
-    (match Relation_analysis.find_relation t.relation_analysis id.it with
-    | Some relation ->
-      relation.maude_equational_view
-      && (relation.kind = Relation_graph.Execution
-          || relation.kind = Relation_graph.Execution_star)
-    | None -> false)
-  | IterPr (prem, _) | NegPr prem -> premise_uses_annotated_execution t prem
-  | IfPr _ | LetPr _ | ElsePr -> false
-
 let source_ids exp =
   Il.Free.(free_exp exp).varid
   |> Il.Free.Set.to_seq
@@ -588,13 +577,8 @@ let clause_uses_binding_membership clause =
     in
     needs
 
-let body_needs_rewrite t body =
-  List.exists (fun clause ->
-    match clause.it with
-    | DefD (_, _, _, prems) ->
-      clause_uses_binding_membership clause
-      || List.exists (premise_uses_annotated_execution t) prems)
-    body.body_clauses
+let body_needs_rewrite body =
+  List.exists clause_uses_binding_membership body.body_clauses
 
 let specialization_for_identity t identity =
   specializations_for t identity.def_id
@@ -643,7 +627,10 @@ let compute_rewrite_backed_definitions t =
     |> List.iter (fun identity ->
       Hashtbl.replace t.definition_identity_edges
         (identity_key identity) (identity_edges t body identity);
-      if body_needs_rewrite t body then
+      let explicitly_rewrite_backed =
+        Hashtbl.mem t.maude_rule_definitions body.body_id.it
+      in
+      if explicitly_rewrite_backed || body_needs_rewrite body then
         Hashtbl.replace t.rewrite_backed_identities (identity_key identity) ()))
     t.bodies_by_id;
   let changed = ref true in
@@ -857,6 +844,7 @@ let validate_inverse_metadata t entries =
 let build index =
   let definitions_by_id = Hashtbl.create 127 in
   let bodies_by_id = Hashtbl.create 127 in
+  let maude_rule_definitions = Hashtbl.create 31 in
   let definition_identity_edges = Hashtbl.create 127 in
   let rewrite_backed_identities = Hashtbl.create 31 in
   let specializations_by_id = Hashtbl.create 127 in
@@ -880,6 +868,8 @@ let build index =
       in
       definitions := definition :: !definitions;
       add_once definitions_by_id id.it definition;
+      if dec_has_hint dec_hints_by_id id.it "maude_rule" then
+        Hashtbl.replace maude_rule_definitions id.it ();
       add_once
         bodies_by_id
         id.it
@@ -900,6 +890,7 @@ let build index =
   { definitions = List.rev !definitions
   ; definitions_by_id
   ; bodies_by_id
+  ; maude_rule_definitions
   ; definition_identity_edges
   ; rewrite_backed_identities
   ; specializations_by_id
@@ -939,6 +930,9 @@ let definition_is_partial t id =
   match find_definition t id with
   | Some definition -> definition.partial
   | None -> false
+
+let definition_has_maude_rule t id =
+  Hashtbl.mem t.maude_rule_definitions id
 
 let definition_is_rewrite_backed t id =
   Hashtbl.mem t.rewrite_backed_identities (identity_key (plain_identity id))

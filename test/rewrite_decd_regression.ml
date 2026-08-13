@@ -14,13 +14,13 @@ let execution_mixop =
   let marker = Xl.Atom.SqArrow $$ region % Xl.Atom.info "rewrite-regression" in
   Xl.Mixop.Infix (Xl.Mixop.Arg (), marker, Xl.Mixop.Arg ())
 
-let annotation relation_id =
+let maude_rule_hint definition_id =
   let hint =
-    { hintid = id "maude_equational_view"
+    { hintid = id "maude_rule"
     ; hintexp = El.Ast.BoolE true $ region
     }
   in
-  HintD (RelH (id relation_id, [ hint ]) $ region) $ region
+  HintD (DecH (id definition_id, [ hint ]) $ region) $ region
 
 let relation_typ output_typ =
   TupT [ id "input", nat_typ; id "output", output_typ ] $ region
@@ -102,7 +102,10 @@ let direct_fixture ?(annotated = true) () =
       [ exp_param "x" nat_typ ] seq_typ
       [ clause [ exp_param "x" nat_typ; exp_param "ys" seq_typ ] [ x ] ys [ premise ] ]
   in
-  relation_def :: (if annotated then [ annotation relation_name ] else []) @ [ def ]
+  let definitions =
+    if annotated then [ maude_rule_hint "renamed_walk"; def ] else [ def ]
+  in
+  relation_def :: definitions
 
 let test_ordinary_relation_and_rewrite_wrapper () =
   let result = Driver.translate (direct_fixture ()) in
@@ -168,7 +171,7 @@ let graph_fixture () =
       [ clause [ exp_param "x" nat_typ ] [ x ] a_call [] ]
   in
   [ relation relation_name nat_typ [ rule "identity" x x ]
-  ; annotation relation_name
+  ; maude_rule_hint "renamed_b"
   ; RecD [ a; b ] $ region
   ; caller
   ]
@@ -176,6 +179,12 @@ let graph_fixture () =
 let test_scc_and_transitive_callers () =
   let index = Analysis.Source_index.of_script (graph_fixture ()) in
   let graph = Analysis.Function_graph.build index in
+  if not (Analysis.Function_graph.definition_has_maude_rule graph "renamed_b") then
+    failwith "annotated definition lost its maude_rule metadata";
+  [ "renamed_a"; "renamed_caller" ]
+  |> List.iter (fun name ->
+    if Analysis.Function_graph.definition_has_maude_rule graph name then
+      failwith ("transitive rewrite dependency became source metadata: " ^ name));
   [ "renamed_a"; "renamed_b"; "renamed_caller" ]
   |> List.iter (fun name ->
     if not (Analysis.Function_graph.definition_is_rewrite_backed graph name) then
@@ -215,74 +224,39 @@ let test_condition_order_and_binding () =
   if not ordered then
     failwith "rewrite conditions were not ordered with RHS patterns binding later variables"
 
-let test_malformed_singleton_output () =
-  let malformed =
-    RuleD (id "malformed", [], execution_mixop, nat 0, []) $ region
-  in
-  let script =
-    [ relation "renamed_malformed" nat_typ [ malformed ]
-    ; annotation "renamed_malformed"
-    ]
-  in
-  let result = Driver.translate script in
-  if not (has_fatal result) then
-    failwith "malformed annotated input/output bundle was accepted"
-
-let test_obvious_nondeterminism () =
-  let first =
+let test_execution_nondeterminism_is_preserved () =
+  let relation_name = "renamed_choice" in
+  let definition_name = "renamed_choose" in
+  let input = var "choice_input" in
+  let output = var "choice_output" in
+  let transition name result =
     RuleD
-      (id "first", [], execution_mixop,
-       TupE [ nat 0; nat 1 ] $$ region % relation_typ nat_typ, [])
+      (id name, [], execution_mixop,
+       TupE [ nat 0; nat result ] $$ region % relation_typ nat_typ, [])
     $ region
   in
-  let second =
-    RuleD
-      (id "second", [], execution_mixop,
-       TupE [ nat 0; nat 2 ] $$ region % relation_typ nat_typ, [])
-    $ region
+  let premise = rule_prem relation_name input output nat_typ in
+  let consumer =
+    definition definition_name [ exp_param "choice_input" nat_typ ] nat_typ
+      [ clause
+          [ exp_param "choice_input" nat_typ
+          ; exp_param "choice_output" nat_typ
+          ]
+          [ input ] output [ premise ]
+      ]
   in
   let result =
     Driver.translate
-      [ relation "renamed_nondeterministic" nat_typ [ first; second ]
-      ; annotation "renamed_nondeterministic"
+      [ relation relation_name nat_typ
+          [ transition "choose-left" 1; transition "choose-right" 2 ]
+      ; maude_rule_hint definition_name
+      ; consumer
       ]
   in
-  if not (has_fatal result) then
-    failwith "obviously incompatible unconditional outputs were accepted"
-
-let overlap_result first_input first_output second_input second_output =
-  let first =
-    RuleD
-      (id "first-overlap", [], execution_mixop,
-       TupE [ first_input; first_output ] $$ region % relation_typ nat_typ, [])
-    $ region
-  in
-  let second =
-    RuleD
-      (id "second-overlap", [], execution_mixop,
-       TupE [ second_input; second_output ] $$ region % relation_typ nat_typ, [])
-    $ region
-  in
-  Driver.translate
-    [ relation "renamed_overlap" nat_typ [ first; second ]
-    ; annotation "renamed_overlap"
-    ]
-
-let test_structural_input_overlap () =
-  let result = overlap_result (var "left") (nat 1) (nat 0) (nat 2) in
-  if not (has_fatal result) then
-    failwith "variable-vs-literal input overlap was accepted";
-  let tag = Xl.Atom.Atom "RENAMED" $$ region % Xl.Atom.info "overlap" in
-  let constructor = Xl.Mixop.Seq [ Xl.Mixop.Atom tag; Xl.Mixop.Arg () ] in
-  let constructor_typ = VarT (id "renamed_constructor_category", []) $ region in
-  let wrapped = CaseE (constructor, nat 0) $$ region % constructor_typ in
-  let result = overlap_result (var "left") (nat 1) wrapped (nat 2) in
-  if not (has_fatal result) then
-    failwith "variable-vs-constructor input overlap was accepted"
-
-let test_alpha_equivalent_outputs () =
-  let result = overlap_result (var "left") (var "left") (var "right") (var "right") in
-  require_no_fatal "alpha-equivalent unconditional outputs conflicted" result
+  require_no_fatal "nondeterministic execution dependency did not translate" result;
+  let relation_rules = statements_for (Naming.relation_op (id relation_name)) result in
+  if List.length relation_rules <> 2 then
+    failwith "execution relation lost a source rewrite branch"
 
 let provenance_context () =
   let index = Analysis.Source_index.of_script (graph_fixture ()) in
@@ -461,10 +435,7 @@ let () =
   test_unannotated_stays_unsupported ();
   test_scc_and_transitive_callers ();
   test_condition_order_and_binding ();
-  test_malformed_singleton_output ();
-  test_obvious_nondeterminism ();
-  test_structural_input_overlap ();
-  test_alpha_equivalent_outputs ();
+  test_execution_nondeterminism_is_preserved ();
   test_missing_rewrite_provenance ();
   test_ambiguous_rewrite_provenance ();
   test_binding_membership_call_promotes_and_searches ();

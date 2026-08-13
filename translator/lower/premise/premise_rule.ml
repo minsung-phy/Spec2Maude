@@ -146,17 +146,11 @@ let lower
               "deterministic relation premise lowering expected a RulePr AST node"
           , names ))
       | Relation_shape.Execution _ ->
-        let annotation =
-          if Analysis.Function_graph.relation_has_maude_equational_view relation
-          then
-            "the annotation requires promotion of the enclosing DecD to a rewrite wrapper"
-          else
-            "no hint(maude_equational_view) right-uniqueness contract permits that promotion"
-        in
         ( unsupported_prem ctx env ~bound_vars origin
             "Premise/RulePr/execution" prem
             ("execution relation premise cannot be emitted inside eq/ceq/cmb conditions; structural relation classification is "
-           ^ relation_shape.Relation_shape.marker_text ^ "; " ^ annotation)
+           ^ relation_shape.Relation_shape.marker_text
+           ^ "; attach hint(maude_rule) to an enclosing DecD that must preserve this premise as an ordered rewrite condition")
         , names )
       | Relation_shape.Unknown reason ->
         ( unsupported_prem ctx env ~bound_vars origin

@@ -97,7 +97,6 @@ module Function_graph : sig
     ; result : Il.Ast.typ
     ; rule_count : int
     ; hints : string list
-    ; maude_equational_view : bool
     ; external_validation_shape : bool
     }
 
@@ -196,6 +195,7 @@ module Function_graph : sig
   val definitions : t -> definition list
   val find_definition : t -> string -> definition option
   val definition_is_partial : t -> string -> bool
+  val definition_has_maude_rule : t -> string -> bool
   val definition_is_rewrite_backed : t -> string -> bool
   val plain_identity : string -> definition_identity
   val identity_of_specialization : specialization -> definition_identity
@@ -206,7 +206,6 @@ module Function_graph : sig
   val find_relation : t -> string -> relation option
   val rule_hints :
     t -> relation_id:string -> rule_id:string -> rule_hint option
-  val relation_has_maude_equational_view : relation -> bool
   val relation_runtime_demand_reason : t -> string -> string option
   val relation_is_runtime_demanded : t -> string -> bool
   val runtime_predicate_search_plan : t -> string -> runtime_predicate_search_plan

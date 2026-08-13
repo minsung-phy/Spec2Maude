@@ -13737,13 +13737,13 @@ mod SPEC2MAUDE-GENERATED is
   crl [steps-trans] : rel.steps(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME_PRIME:SpectecTerminal, INSTR_PRIME_PRIME_STAR:SpectecTerminals)
     if rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config) /\ rel.steps(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals)) => config.sym(Z_PRIME_PRIME:SpectecTerminal, INSTR_PRIME_PRIME_STAR:SpectecTerminals) /\ typecheck(config.sym(Z_PRIME_PRIME:SpectecTerminal, INSTR_PRIME_PRIME_STAR:SpectecTerminals), syn.config) .
 
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:1105.1-1105.136 / script[1240]/1241-RelD-eval-expr / RelD
+  --- origin: wasm-3.0/4.3-execution.instructions.spectec:1105.1-1105.108 / script[1240]/1241-RelD-eval-expr / RelD
   sort RelConfEvalExpr .
 
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:1105.1-1105.136 / script[1240]/1241-RelD-eval-expr / RelD
+  --- origin: wasm-3.0/4.3-execution.instructions.spectec:1105.1-1105.108 / script[1240]/1241-RelD-eval-expr / RelD
   subsort SpectecTerminal < RelConfEvalExpr .
 
-  --- origin: wasm-3.0/4.3-execution.instructions.spectec:1105.1-1105.136 / script[1240]/1241-RelD-eval-expr / RelD
+  --- origin: wasm-3.0/4.3-execution.instructions.spectec:1105.1-1105.108 / script[1240]/1241-RelD-eval-expr / RelD
   op rel.eval-expr : SpectecTerminal SpectecTerminals -> RelConfEvalExpr [frozen (1 2)] .
 
   --- origin: wasm-3.0/4.3-execution.instructions.spectec:1107.1-1109.37 / script[1240]/1241-RelD-eval-expr/RuleD[1] / RuleD
@@ -13941,13 +13941,13 @@ mod SPEC2MAUDE-GENERATED is
   ceq def.runelem(X:SpectecTerminal, elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.active(Y:SpectecTerminal, INSTR_STAR:SpectecTerminals))) = INSTR_STAR:SpectecTerminals (((const(i32, uN.wrap(0)) const(i32, uN.wrap(N:Nat))) instr.table-init(Y:SpectecTerminal, X:SpectecTerminal)) instr.elem-drop(X:SpectecTerminal))
     if N:Nat := len(E_STAR:SpectecTerminals) /\ typecheck(elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.active(Y:SpectecTerminal, INSTR_STAR:SpectecTerminals)), syn.elem) /\ typecheck(uN.wrap(0), syn.num(i32)) /\ typecheck(const(i32, uN.wrap(0)), syn.instr) /\ typecheck(i32, syn.numtype) /\ typecheck(uN.wrap(N:Nat), syn.num(i32)) /\ typecheck(const(i32, uN.wrap(N:Nat)), syn.instr) .
 
-  --- origin: wasm-3.0/4.4-execution.modules.spectec:160.1-160.92 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs / DecD
+  --- origin: wasm-3.0/4.4-execution.modules.spectec:160.1-160.109 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs / DecD
   sort DecConfEvalexprs .
 
-  --- origin: wasm-3.0/4.4-execution.modules.spectec:160.1-160.92 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs / DecD
+  --- origin: wasm-3.0/4.4-execution.modules.spectec:160.1-160.109 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs / DecD
   subsort SpectecTerminal < DecConfEvalexprs .
 
-  --- origin: wasm-3.0/4.4-execution.modules.spectec:160.1-160.92 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs / DecD
+  --- origin: wasm-3.0/4.4-execution.modules.spectec:160.1-160.109 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs / DecD
   op def.evalexprs : SpectecTerminal SpectecTerminals -> DecConfEvalexprs [frozen (1 2)] .
 
   --- origin: wasm-3.0/4.4-execution.modules.spectec:161.1-161.34 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs/DefD[1] / DefD
@@ -13973,13 +13973,13 @@ mod SPEC2MAUDE-GENERATED is
   crl [evalexprss-clause-2] : def.evalexprss(Z:SpectecTerminal, seq(EXPR_STAR:SpectecTerminals) EXPR_PRIME_STAR_STAR:SpectecTerminals) => tuple(Z_PRIME_PRIME:SpectecTerminal seq(seq(REF_STAR:SpectecTerminals) REF_PRIME_STAR_STAR:SpectecTerminals))
     if def.evalexprs(Z:SpectecTerminal, EXPR_STAR:SpectecTerminals) => RESULT3:SpectecTerminal /\ RESULT3:SpectecTerminal => RESULT1:SpectecTerminal /\ tuple(Z_PRIME:SpectecTerminal seq(REF_STAR:SpectecTerminals)) := RESULT1:SpectecTerminal /\ def.evalexprss(Z_PRIME:SpectecTerminal, EXPR_PRIME_STAR_STAR:SpectecTerminals) => RESULT4:SpectecTerminal /\ RESULT4:SpectecTerminal => RESULT2:SpectecTerminal /\ tuple(Z_PRIME_PRIME:SpectecTerminal seq(REF_PRIME_STAR_STAR:SpectecTerminals)) := RESULT2:SpectecTerminal .
 
-  --- origin: wasm-3.0/4.4-execution.modules.spectec:174.1-174.111 / script[1276]/1277-RecD/RecD[0]/0001-DecD-evalglobals / DecD
+  --- origin: wasm-3.0/4.4-execution.modules.spectec:174.1-174.128 / script[1276]/1277-RecD/RecD[0]/0001-DecD-evalglobals / DecD
   sort DecConfEvalglobals .
 
-  --- origin: wasm-3.0/4.4-execution.modules.spectec:174.1-174.111 / script[1276]/1277-RecD/RecD[0]/0001-DecD-evalglobals / DecD
+  --- origin: wasm-3.0/4.4-execution.modules.spectec:174.1-174.128 / script[1276]/1277-RecD/RecD[0]/0001-DecD-evalglobals / DecD
   subsort SpectecTerminal < DecConfEvalglobals .
 
-  --- origin: wasm-3.0/4.4-execution.modules.spectec:174.1-174.111 / script[1276]/1277-RecD/RecD[0]/0001-DecD-evalglobals / DecD
+  --- origin: wasm-3.0/4.4-execution.modules.spectec:174.1-174.128 / script[1276]/1277-RecD/RecD[0]/0001-DecD-evalglobals / DecD
   op def.evalglobals : SpectecTerminal SpectecTerminals SpectecTerminals -> DecConfEvalglobals [frozen (1 2 3)] .
 
   --- origin: wasm-3.0/4.4-execution.modules.spectec:175.1-175.41 / script[1276]/1277-RecD/RecD[0]/0001-DecD-evalglobals/DefD[1] / DefD

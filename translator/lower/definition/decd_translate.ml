@@ -782,7 +782,6 @@ let translate_rewrite_decd_clause ctx dec_origin op_name id params index clause 
     let premise_translation, names =
       Reld_execution_premise.translate_premises_named
         names
-        ~require_equational_contract:true
         ctx
         env
         ~bound_conditions:lhs_guards

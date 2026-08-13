@@ -59,7 +59,6 @@ module Function_graph = struct
     ; result : Il.Ast.typ
     ; rule_count : int
     ; hints : string list
-    ; maude_equational_view : bool
     ; external_validation_shape : bool
     }
 
@@ -160,6 +159,7 @@ module Function_graph = struct
   let definitions = Definition_analysis.definitions
   let find_definition = Definition_analysis.find_definition
   let definition_is_partial = Definition_analysis.definition_is_partial
+  let definition_has_maude_rule = Definition_analysis.definition_has_maude_rule
   let definition_is_rewrite_backed = Definition_analysis.definition_is_rewrite_backed
   let plain_identity = Definition_analysis.plain_identity
   let identity_of_specialization = Definition_analysis.identity_of_specialization
@@ -178,9 +178,6 @@ module Function_graph = struct
 
   let rule_hints t ~relation_id ~rule_id =
     Relation_analysis.rule_hints (relation_analysis t) ~relation_id ~rule_id
-
-  let relation_has_maude_equational_view =
-    Relation_analysis.relation_has_maude_equational_view
 
   let relation_runtime_demand_reason t id =
     Relation_analysis.relation_runtime_demand_reason (relation_analysis t) id
@@ -230,7 +227,7 @@ module Hint_policy = struct
   let classify_hint_name = function
     | "desc" | "show" | "name" | "macro" | "tabular" ->
       Presentation
-    | "maude_equational_view" | "partial" | "inverse" ->
+    | "maude_rule" | "partial" | "inverse" ->
       Translator_annotation
     | "builtin" ->
       Semantic_obligation

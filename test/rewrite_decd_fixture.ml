@@ -32,13 +32,13 @@ let transition name state expr next value =
      [])
   $ region
 
-let annotation relation_id =
+let maude_rule_hint definition_id =
   let hint =
-    { hintid = id "maude_equational_view"
+    { hintid = id "maude_rule"
     ; hintexp = El.Ast.BoolE true $ region
     }
   in
-  HintD (RelH (id relation_id, [ hint ]) $ region) $ region
+  HintD (DecH (id definition_id, [ hint ]) $ region) $ region
 
 let relation_id = id "renamed_eval"
 let definition_id = id "renamed_sequence"
@@ -103,7 +103,7 @@ let script =
        ; transition "second" 1 20 2 200
        ])
     $ region
-  ; annotation relation_id.it
+  ; maude_rule_hint definition_id.it
   ; DecD
       (definition_id,
        [ exp_param "state" nat_typ; exp_param "exprs" seq_typ ],

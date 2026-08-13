@@ -51,7 +51,6 @@
   reld_deterministic
   reld_enabledness
   reld_enabledness_constructor_group
-  reld_equational_contract
   reld_execution
   reld_execution_premise
   reld_match_complement_certificate
