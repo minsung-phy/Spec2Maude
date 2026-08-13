@@ -58,15 +58,8 @@ let literal_num_value ctx origin exp n =
   | `RatT | `RealT -> with_diagnostics [ numeric_literal_diagnostic ctx origin exp ]
 
 let checks_value value = function
-  | BoolCond
-      (App
-        ( ( "typecheck"
-          | "typecheckOptSeq"
-          | "typecheckSeqOpt"
-          | "typecheckNestedSeq" )
-        , checked :: _ )) ->
-    checked = value
-  | EqCond _ | MatchCond _ | MembershipCond _ | BoolCond _ -> false
+  | BoolCond term -> Typecheck_term.subject term = Some value
+  | EqCond _ | MatchCond _ | MembershipCond _ -> false
 
 let trust_builtin_argument (result : result) =
   match result.term with

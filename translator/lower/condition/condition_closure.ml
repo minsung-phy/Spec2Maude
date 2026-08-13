@@ -22,13 +22,11 @@ let prelude_true = function
   | Const "true" -> true
   | App ("isOpt", [ Const "eps" ])
   | App ("allOpt", [ Const "eps" ])
+  | App ("allSeq", [ Const "eps" ])
   | App ("allLen", [ Const "eps"; _ ])
+  | App ("typecheck", [ Const "eps"; _ ])
   | App
-      ( ( "typecheck"
-        | "typecheckOptSeq"
-        | "typecheckSeqOpt"
-        | "typecheckNestedSeq" )
-      , [ Const "eps"; _ ] ) ->
+      ("typecheck", [ App ("flattenNested", [ Const "eps" ]); _ ]) ->
     true
   | Var _ | Const _ | Qid _ | App _ -> false
 
