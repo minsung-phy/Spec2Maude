@@ -293,6 +293,11 @@
  (libraries translator il util xl))
 
 (executable
+ (name nested_typecheck_fixture)
+ (modules nested_typecheck_fixture)
+ (libraries translator il util xl))
+
+(executable
  (name sequence_splice_fixture)
  (modules sequence_splice_fixture)
  (libraries translator il util xl))
@@ -341,6 +346,13 @@
  (action
   (run sh %{dep:optional_composition_reductions.sh}
     %{exe:optional_composition_fixture.exe})))
+
+(rule
+ (alias runtest)
+ (deps nested_typecheck_reductions.sh)
+ (action
+  (run sh %{dep:nested_typecheck_reductions.sh}
+    %{exe:nested_typecheck_fixture.exe})))
 
 (rule
  (alias runtest)

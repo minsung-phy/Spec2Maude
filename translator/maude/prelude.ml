@@ -89,12 +89,12 @@ let declarations =
     ; op "composeOpt" [ sr "SpectecTerminals"; sr "SpectecTerminals" ]
         spectec_terminals ~kind:Partial
     ; op "allOpt" [ sr "SpectecTerminals" ] (s "Bool")
+    ; op "allSeq" [ sr "SpectecTerminals" ] (s "Bool")
+    ; op "flattenNested" [ sr "SpectecTerminals" ] spectec_terminals
+        ~kind:Partial
     ; op "contains" [ sr "SpectecTerminal"; sr "SpectecTerminals" ] (s "Bool")
     ; op "isTrue" [ sr "SpectecTerminal" ] (s "Bool") ~kind:Partial
     ; op "typecheck" [ kr "SpectecTerminal"; sr "SpectecType" ] (s "Bool")
-    ; op "typecheckOptSeq" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
-    ; op "typecheckSeqOpt" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
-    ; op "typecheckNestedSeq" [ sr "SpectecTerminals"; sr "SpectecType" ] (s "Bool")
     ; sort_decl record_item
     ; sort_decl record_items
     ; subsort record_item record_items
@@ -257,6 +257,23 @@ let core_equations =
         (app "allOpt" [ app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ] ])
         (app "_and_" [ app "isOpt" [ Var "YS" ]; app "allOpt" [ Var "XS" ] ])
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
+    ; eq (app "allOpt" [ Var "XS" ]) (Const "false") ~attrs:[ Owise ]
+    ; eq (app "allSeq" [ Const "eps" ]) (Const "true")
+    ; eq (app "allSeq" [ app "seq" [ Var "YS" ] ]) (Const "true")
+    ; ceq
+        (app "allSeq" [ app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ] ])
+        (app "allSeq" [ Var "XS" ])
+        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
+    ; eq (app "allSeq" [ Var "XS" ]) (Const "false") ~attrs:[ Owise ]
+    ; eq (app "flattenNested" [ Const "eps" ]) (Const "eps")
+    ; eq
+        (app "flattenNested" [ app "seq" [ Var "YS" ] ])
+        (Var "YS")
+    ; ceq
+        (app "flattenNested"
+           [ app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ] ])
+        (app "_ _" [ Var "YS"; app "flattenNested" [ Var "XS" ] ])
+        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
     ; eq (app "contains" [ Var "X"; Const "eps" ]) (Const "false")
     ; eq (app "contains" [ Var "X"; Var "Y" ]) (app "_==_" [ Var "X"; Var "Y" ])
     ; ceq
@@ -312,32 +329,6 @@ let typecheck_equations =
         [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ])
         ; BoolCond (T.typecheck (Var "X") (Var "T"))
         ]
-    ; eq (T.typecheck_opt_seq (Const "eps") (Var "T")) (Const "true")
-    ; eq
-        (T.typecheck_opt_seq (app "seq" [ Var "YS" ]) (Var "T"))
-        (app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck (Var "YS") (Var "T") ])
-    ; ceq
-        (T.typecheck_opt_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
-        (app "_and_"
-           [ app "_and_" [ app "isOpt" [ Var "YS" ]; T.typecheck (Var "YS") (Var "T") ]
-           ; T.typecheck_opt_seq (Var "XS") (Var "T")
-           ])
-        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
-    ; eq (T.typecheck_opt_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
-    ; eq (T.typecheck_seq_opt (Const "eps") (Var "T")) (Const "true")
-    ; eq
-        (T.typecheck_seq_opt (app "seq" [ Var "YS" ]) (Var "T"))
-        (T.typecheck (Var "YS") (Var "T"))
-    ; eq (T.typecheck_seq_opt (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
-    ; eq (T.typecheck_nested_seq (Const "eps") (Var "T")) (Const "true")
-    ; eq
-        (T.typecheck_nested_seq (app "seq" [ Var "YS" ]) (Var "T"))
-        (T.typecheck (Var "YS") (Var "T"))
-    ; ceq
-        (T.typecheck_nested_seq (app "_ _" [ app "seq" [ Var "YS" ]; Var "XS" ]) (Var "T"))
-        (app "_and_" [ T.typecheck (Var "YS") (Var "T"); T.typecheck_nested_seq (Var "XS") (Var "T") ])
-        [ BoolCond (app "_=/=_" [ Var "XS"; Const "eps" ]) ]
-    ; eq (T.typecheck_nested_seq (Var "XS") (Var "T")) (Const "false") ~attrs:[ Owise ]
   ]
 
 let data_equations =

@@ -124,6 +124,12 @@ mod SPEC2MAUDE-GENERATED is
   op allOpt : SpectecTerminals -> Bool .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  op allSeq : SpectecTerminals -> Bool .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  op flattenNested : SpectecTerminals ~> SpectecTerminals .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   op contains : SpectecTerminal SpectecTerminals -> Bool .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
@@ -131,15 +137,6 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   op typecheck : [SpectecTerminal] SpectecType -> Bool .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  op typecheckOptSeq : SpectecTerminals SpectecType -> Bool .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  op typecheckSeqOpt : SpectecTerminals SpectecType -> Bool .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  op typecheckNestedSeq : SpectecTerminals SpectecType -> Bool .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   sort RecordItem .
@@ -409,6 +406,32 @@ mod SPEC2MAUDE-GENERATED is
     if _=/=_(XS, eps) .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  eq allOpt(XS) = false [owise] .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  eq allSeq(eps) = true .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  eq allSeq(seq(YS)) = true .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  ceq allSeq(seq(YS) XS) = allSeq(XS)
+    if _=/=_(XS, eps) .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  eq allSeq(XS) = false [owise] .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  eq flattenNested(eps) = eps .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  eq flattenNested(seq(YS)) = YS .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
+  ceq flattenNested(seq(YS) XS) = YS flattenNested(XS)
+    if _=/=_(XS, eps) .
+
+  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   eq contains(X, eps) = false .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
@@ -464,41 +487,6 @@ mod SPEC2MAUDE-GENERATED is
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   ceq typecheck(X XS, T) = typecheck(XS, T)
     if _=/=_(XS, eps) /\ typecheck(X, T) .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckOptSeq(eps, T) = true .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckOptSeq(seq(YS), T) = _and_(isOpt(YS), typecheck(YS, T)) .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  ceq typecheckOptSeq(seq(YS) XS, T) = _and_(_and_(isOpt(YS), typecheck(YS, T)), typecheckOptSeq(XS, T))
-    if _=/=_(XS, eps) .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckOptSeq(XS, T) = false [owise] .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckSeqOpt(eps, T) = true .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckSeqOpt(seq(YS), T) = typecheck(YS, T) .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckSeqOpt(XS, T) = false [owise] .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckNestedSeq(eps, T) = true .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckNestedSeq(seq(YS), T) = typecheck(YS, T) .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  ceq typecheckNestedSeq(seq(YS) XS, T) = _and_(typecheck(YS, T), typecheckNestedSeq(XS, T))
-    if _=/=_(XS, eps) .
-
-  --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
-  eq typecheckNestedSeq(XS, T) = false [owise] .
 
   --- origin: <Spec2Maude minimal runtime prelude> / prelude / Prelude
   eq value(FQ, { RI }) = value(FQ, RI) .
@@ -822,7 +810,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:16.1-16.64 / script[17]/0018-RecD/RecD[0]/0001-DecD-concat/DefD[2] / DefD
   ceq def.concat(TYP_X:SpectecType, seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals) = W_STAR:SpectecTerminals def.concat(TYP_X:SpectecType, W_PRIME_STAR_STAR:SpectecTerminals)
-    if (typecheckNestedSeq(seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals, TYP_X:SpectecType)) = true .
+    if (allSeq(seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals), TYP_X:SpectecType) .
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:18.1-18.89 / script[19]/0020-RecD/RecD[0]/0001-DecD-concatn / DecD
   op def.concatn : SpectecType SpectecTerminals Nat -> SpectecTerminals .
@@ -832,7 +820,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:20.1-20.73 / script[19]/0020-RecD/RecD[0]/0001-DecD-concatn/DefD[2] / DefD
   ceq def.concatn(TYP_X:SpectecType, seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals, N:Nat) = W_STAR:SpectecTerminals def.concatn(TYP_X:SpectecType, W_PRIME_STAR_STAR:SpectecTerminals, N:Nat)
-    if (typecheckNestedSeq(seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals, TYP_X:SpectecType)) = true /\ N:Nat = len(W_STAR:SpectecTerminals) /\ allLen(W_PRIME_STAR_STAR:SpectecTerminals, N:Nat) = true .
+    if (allSeq(seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(seq(W_STAR:SpectecTerminals) W_PRIME_STAR_STAR:SpectecTerminals), TYP_X:SpectecType) /\ N:Nat = len(W_STAR:SpectecTerminals) /\ allLen(W_PRIME_STAR_STAR:SpectecTerminals, N:Nat) = true .
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:22.1-22.58 / script[21]/0022-DecD-concatopt / DecD
   op def.concatopt : SpectecType SpectecTerminals -> SpectecTerminals .
@@ -842,7 +830,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:24.1-24.67 / script[21]/0022-DecD-concatopt/DefD[2] / DefD
   ceq def.concatopt(TYP_X:SpectecType, seq(W_OPT:SpectecTerminals) W_PRIME_OPT_STAR:SpectecTerminals) = W_OPT:SpectecTerminals def.concat(TYP_X:SpectecType, W_PRIME_OPT_STAR:SpectecTerminals)
-    if (typecheckOptSeq(seq(W_OPT:SpectecTerminals) W_PRIME_OPT_STAR:SpectecTerminals, TYP_X:SpectecType)) = true /\ isOpt(W_OPT:SpectecTerminals) = true /\ allOpt(W_PRIME_OPT_STAR:SpectecTerminals) = true .
+    if (allOpt(seq(W_OPT:SpectecTerminals) W_PRIME_OPT_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(seq(W_OPT:SpectecTerminals) W_PRIME_OPT_STAR:SpectecTerminals), TYP_X:SpectecType) /\ isOpt(W_OPT:SpectecTerminals) = true /\ allOpt(W_PRIME_OPT_STAR:SpectecTerminals) = true .
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:26.1-26.39 / script[23]/0024-DecD-inv-concat / DecD
   op builtin.inv-concat : SpectecType SpectecTerminals ~> SpectecTerminals .
@@ -895,18 +883,18 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:58.1-58.90 / script[32]/0033-RecD/RecD[0]/0001-DecD-setproduct2/DefD[2] / DefD
   ceq def.setproduct2(TYP_X:SpectecType, W_1:SpectecTerminal, seq(W_PRIME_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals) = seq(W_1:SpectecTerminal W_PRIME_STAR:SpectecTerminals) def.setproduct2(TYP_X:SpectecType, W_1:SpectecTerminal, W_STAR_STAR:SpectecTerminals)
-    if typecheck(W_1:SpectecTerminal, TYP_X:SpectecType) /\ (typecheckNestedSeq(seq(W_PRIME_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals, TYP_X:SpectecType)) = true .
+    if typecheck(W_1:SpectecTerminal, TYP_X:SpectecType) /\ (allSeq(seq(W_PRIME_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(seq(W_PRIME_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals), TYP_X:SpectecType) .
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:50.1-50.47 / script[33]/0034-RecD/RecD[0]/0001-DecD-setproduct1 / DecD
   op def.setproduct1 : SpectecType SpectecTerminals SpectecTerminals -> SpectecTerminals .
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:55.1-55.46 / script[33]/0034-RecD/RecD[0]/0001-DecD-setproduct1/DefD[1] / DefD
   ceq def.setproduct1(TYP_X:SpectecType, eps, W_STAR_STAR:SpectecTerminals) = eps
-    if (typecheckNestedSeq(W_STAR_STAR:SpectecTerminals, TYP_X:SpectecType)) = true .
+    if (allSeq(W_STAR_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(W_STAR_STAR:SpectecTerminals), TYP_X:SpectecType) .
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:56.1-56.107 / script[33]/0034-RecD/RecD[0]/0001-DecD-setproduct1/DefD[2] / DefD
   ceq def.setproduct1(TYP_X:SpectecType, W_1:SpectecTerminal W_PRIME_STAR:SpectecTerminals, W_STAR_STAR:SpectecTerminals) = def.setproduct2(TYP_X:SpectecType, W_1:SpectecTerminal, W_STAR_STAR:SpectecTerminals) def.setproduct1(TYP_X:SpectecType, W_PRIME_STAR:SpectecTerminals, W_STAR_STAR:SpectecTerminals)
-    if typecheck(W_1:SpectecTerminal W_PRIME_STAR:SpectecTerminals, TYP_X:SpectecType) /\ (typecheckNestedSeq(W_STAR_STAR:SpectecTerminals, TYP_X:SpectecType)) = true .
+    if typecheck(W_1:SpectecTerminal W_PRIME_STAR:SpectecTerminals, TYP_X:SpectecType) /\ (allSeq(W_STAR_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(W_STAR_STAR:SpectecTerminals), TYP_X:SpectecType) .
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:49.1-49.84 / script[34]/0035-RecD/RecD[0]/0001-DecD-setproduct / DecD
   op def.setproduct : SpectecType SpectecTerminals -> SpectecTerminals .
@@ -916,7 +904,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/0.3-aux.seq.spectec:54.1-54.90 / script[34]/0035-RecD/RecD[0]/0001-DecD-setproduct/DefD[2] / DefD
   ceq def.setproduct(TYP_X:SpectecType, seq(W_1_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals) = def.setproduct1(TYP_X:SpectecType, W_1_STAR:SpectecTerminals, def.setproduct(TYP_X:SpectecType, W_STAR_STAR:SpectecTerminals))
-    if (typecheckNestedSeq(seq(W_1_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals, TYP_X:SpectecType)) = true .
+    if (allSeq(seq(W_1_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(seq(W_1_STAR:SpectecTerminals) W_STAR_STAR:SpectecTerminals), TYP_X:SpectecType) .
 
   --- origin: wasm-3.0/1.0-syntax.profiles.spectec:5.1-5.29 / script[36]/0037-DecD-nd / DecD
   op builtin.nd : -> SpectecTerminal .
@@ -5706,7 +5694,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:127.1-128.40 / script[473]/0474-TypD-frame/InstD[1] / InstD
   cmb rec.frame(COMPONENT1:SpectecTerminals, MODULEINST:SpectecTerminal) : SpectecTerminal
-    if (typecheckOptSeq(COMPONENT1:SpectecTerminals, syn.val)) = true /\ typecheck(MODULEINST:SpectecTerminal, syn.moduleinst) .
+    if (allOpt(COMPONENT1:SpectecTerminals)) = true /\ typecheck(flattenNested(COMPONENT1:SpectecTerminals), syn.val) /\ typecheck(MODULEINST:SpectecTerminal, syn.moduleinst) .
 
   --- origin: wasm-3.0/4.0-execution.configurations.spectec:127.1-128.40 / script[473]/0474-TypD-frame/InstD[1] / InstD
   ceq typecheck(rec.frame(COMPONENT1:SpectecTerminals, MODULEINST:SpectecTerminal), syn.frame) = true
@@ -5757,7 +5745,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:222.5-222.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[4] / typcase
   cmb instr.select(VALTYPE_STAR_OPT:SpectecTerminals) : SpectecTerminal
-    if (typecheckSeqOpt(VALTYPE_STAR_OPT:SpectecTerminals, syn.valtype)) = true .
+    if (isOpt(VALTYPE_STAR_OPT:SpectecTerminals)) = true /\ (allSeq(VALTYPE_STAR_OPT:SpectecTerminals)) = true /\ typecheck(flattenNested(VALTYPE_STAR_OPT:SpectecTerminals), syn.valtype) .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:222.5-222.23 / script[474]/0475-RecD/RecD[0]/0001-TypD-instr/InstD[1]/VariantT[4] / typcase
   op proj.instr.select.0 : SpectecTerminal ~> SpectecTerminals .
@@ -8217,7 +8205,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:438.1-438.86 / script[506]/0507-RecD/RecD[0]/0001-DecD-free-instr/DefD[4] / DefD
   ceq def.free-instr(instr.select(VALTYPE_STAR_OPT:SpectecTerminals)) = def.free-opt(helper.iter-map.free-instr.2(VALTYPE_STAR_OPT:SpectecTerminals))
-    if typecheck(instr.select(VALTYPE_STAR_OPT:SpectecTerminals), syn.instr) /\ isOpt(VALTYPE_STAR_OPT:SpectecTerminals) = true .
+    if (isOpt(VALTYPE_STAR_OPT:SpectecTerminals)) = true /\ (allSeq(VALTYPE_STAR_OPT:SpectecTerminals)) = true /\ typecheck(instr.select(VALTYPE_STAR_OPT:SpectecTerminals), syn.instr) /\ isOpt(VALTYPE_STAR_OPT:SpectecTerminals) = true .
 
   --- origin: wasm-3.0/1.3-syntax.instructions.spectec:440.1-440.92 / script[506]/0507-RecD/RecD[0]/0001-DecD-free-instr/DefD[5] / DefD
   ceq def.free-instr(instr.block(BLOCKTYPE:SpectecTerminal, INSTR_STAR:SpectecTerminals)) = compose.rec.free(def.free-blocktype(BLOCKTYPE:SpectecTerminal), def.free-block(INSTR_STAR:SpectecTerminals))
@@ -8904,7 +8892,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/1.4-syntax.modules.spectec:35.3-35.30 / script[528]/0529-TypD-elem/InstD[1]/VariantT[1] / typcase
   cmb elem.elem(REFTYPE:SpectecTerminal, EXPR_STAR:SpectecTerminals, ELEMMODE:SpectecTerminal) : SpectecTerminal
-    if typecheck(REFTYPE:SpectecTerminal, syn.reftype) /\ (typecheckNestedSeq(EXPR_STAR:SpectecTerminals, syn.expr)) = true /\ typecheck(ELEMMODE:SpectecTerminal, syn.elemmode) .
+    if typecheck(REFTYPE:SpectecTerminal, syn.reftype) /\ (allSeq(EXPR_STAR:SpectecTerminals)) = true /\ typecheck(flattenNested(EXPR_STAR:SpectecTerminals), syn.expr) /\ typecheck(ELEMMODE:SpectecTerminal, syn.elemmode) .
 
   --- origin: wasm-3.0/1.4-syntax.modules.spectec:35.3-35.30 / script[528]/0529-TypD-elem/InstD[1]/VariantT[1] / typcase
   op proj.elem.elem.0 : SpectecTerminal ~> SpectecTerminal .
@@ -9193,7 +9181,7 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/1.4-syntax.modules.spectec:110.1-112.27 / script[548]/0549-DecD-free-elem/DefD[1] / DefD
   ceq def.free-elem(elem.elem(REFTYPE:SpectecTerminal, EXPR_STAR:SpectecTerminals, ELEMMODE:SpectecTerminal)) = compose.rec.free(compose.rec.free(def.free-reftype(REFTYPE:SpectecTerminal), def.free-list(helper.iter-map.free-elem(EXPR_STAR:SpectecTerminals))), def.free-elemmode(ELEMMODE:SpectecTerminal))
-    if typecheck(elem.elem(REFTYPE:SpectecTerminal, EXPR_STAR:SpectecTerminals, ELEMMODE:SpectecTerminal), syn.elem) .
+    if (allSeq(EXPR_STAR:SpectecTerminals)) = true /\ typecheck(elem.elem(REFTYPE:SpectecTerminal, EXPR_STAR:SpectecTerminals, ELEMMODE:SpectecTerminal), syn.elem) .
 
   --- origin: wasm-3.0/1.4-syntax.modules.spectec:84.1-84.30 / script[549]/0550-DecD-free-start / DecD
   op def.free-start : SpectecTerminal -> SpectecTerminal .
@@ -13919,15 +13907,15 @@ mod SPEC2MAUDE-GENERATED is
 
   --- origin: wasm-3.0/4.4-execution.modules.spectec:154.1-154.46 / script[1271]/1272-DecD-runelem/DefD[1] / DefD
   ceq def.runelem(X:SpectecTerminal, elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, passive)) = eps
-    if N:Nat := len(E_STAR:SpectecTerminals) /\ typecheck(elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, passive), syn.elem) .
+    if N:Nat := len(E_STAR:SpectecTerminals) /\ (allSeq(E_STAR:SpectecTerminals)) = true /\ typecheck(elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, passive), syn.elem) .
 
   --- origin: wasm-3.0/4.4-execution.modules.spectec:155.1-155.56 / script[1271]/1272-DecD-runelem/DefD[2] / DefD
   ceq def.runelem(X:SpectecTerminal, elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.declare)) = instr.elem-drop(X:SpectecTerminal)
-    if N:Nat := len(E_STAR:SpectecTerminals) /\ typecheck(elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.declare), syn.elem) .
+    if N:Nat := len(E_STAR:SpectecTerminals) /\ (allSeq(E_STAR:SpectecTerminals)) = true /\ typecheck(elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.declare), syn.elem) .
 
   --- origin: wasm-3.0/4.4-execution.modules.spectec:156.1-157.68 / script[1271]/1272-DecD-runelem/DefD[3] / DefD
   ceq def.runelem(X:SpectecTerminal, elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.active(Y:SpectecTerminal, INSTR_STAR:SpectecTerminals))) = INSTR_STAR:SpectecTerminals (((const(i32, uN.wrap(0)) const(i32, uN.wrap(N:Nat))) instr.table-init(Y:SpectecTerminal, X:SpectecTerminal)) instr.elem-drop(X:SpectecTerminal))
-    if N:Nat := len(E_STAR:SpectecTerminals) /\ typecheck(elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.active(Y:SpectecTerminal, INSTR_STAR:SpectecTerminals)), syn.elem) /\ typecheck(uN.wrap(0), syn.num(i32)) /\ typecheck(const(i32, uN.wrap(0)), syn.instr) /\ typecheck(i32, syn.numtype) /\ typecheck(uN.wrap(N:Nat), syn.num(i32)) /\ typecheck(const(i32, uN.wrap(N:Nat)), syn.instr) .
+    if N:Nat := len(E_STAR:SpectecTerminals) /\ (allSeq(E_STAR:SpectecTerminals)) = true /\ typecheck(elem.elem(RT:SpectecTerminal, E_STAR:SpectecTerminals, elemmode.active(Y:SpectecTerminal, INSTR_STAR:SpectecTerminals)), syn.elem) /\ typecheck(uN.wrap(0), syn.num(i32)) /\ typecheck(const(i32, uN.wrap(0)), syn.instr) /\ typecheck(i32, syn.numtype) /\ typecheck(uN.wrap(N:Nat), syn.num(i32)) /\ typecheck(const(i32, uN.wrap(N:Nat)), syn.instr) .
 
   --- origin: wasm-3.0/4.4-execution.modules.spectec:160.1-160.109 / script[1272]/1273-RecD/RecD[0]/0001-DecD-evalexprs / DecD
   sort DecConfEvalexprs .
