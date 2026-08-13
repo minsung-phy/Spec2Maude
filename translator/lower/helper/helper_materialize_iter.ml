@@ -733,8 +733,16 @@ let materialize_iter_premise_zip_rule entry (prem : Request.iter_premise_zip_rul
 let materialize_iter_pattern_zip entry (pattern : Request.iter_pattern_zip) =
   let name = entry.Helper_registry.name in
   let origin = entry.request.Request.origin in
+  let capture_sorts =
+    pattern.captures
+    |> List.map (fun capture -> sort_ref capture.Request.sort)
+  in
+  let formal_captures =
+    pattern.captures
+    |> List.map (fun capture -> Var capture.Request.formal_var)
+  in
   let helper_on subject =
-    app name [ subject ]
+    app name (subject :: formal_captures)
   in
   let tuple_of_sources sources =
     let wrapped = List.map (fun source -> app "seq" [ source ]) sources in
@@ -763,7 +771,7 @@ let materialize_iter_pattern_zip entry (pattern : Request.iter_pattern_zip) =
   let initial_bound =
     term_vars pattern.subject_item_term
     @ term_vars subject_tail
-    @ List.concat_map term_vars source_heads
+    @ List.map (fun capture -> capture.Request.formal_var) pattern.captures
   in
   let body_conditions =
     match
@@ -781,14 +789,17 @@ let materialize_iter_pattern_zip entry (pattern : Request.iter_pattern_zip) =
   let statement node = generated name origin node in
   [ statement
       (op name
-         [ sort_ref spectec_terminals ]
+         (sort_ref spectec_terminals :: capture_sorts)
          spectec_terminal)
   ]
   @ variable_declarations statement
       ((pattern.subject_tail_var, sort_ref spectec_terminals)
        :: (pattern.sources
            |> List.map (fun (source : Request.iter_pattern_zip_source) ->
-             source.source_tail_var, sort_ref spectec_terminals)))
+             source.source_tail_var, sort_ref spectec_terminals))
+       @ (pattern.captures
+          |> List.map (fun capture ->
+            capture.Request.formal_var, sort_ref capture.Request.sort)))
   @ [ statement
         (ceq
            (helper_on (Const "eps"))

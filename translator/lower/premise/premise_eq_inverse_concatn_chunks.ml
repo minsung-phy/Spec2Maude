@@ -154,13 +154,16 @@ let collect_concatn_call_shape ctx env origin ~omitted_param_index params args =
   loop 0 None [] [] [] [] params args
 
 let target names env ~bound_vars source_exp =
-  match unbound_direct_var env ~bound_vars source_exp with
-  | None -> None
-  | Some id ->
+  match
+    unbound_direct_var env ~bound_vars source_exp,
+    Premise_shape.zip_source_descriptor source_exp.note
+  with
+  | None, _ | _, None -> None
+  | Some id, Some (item_shape, _element_typ) ->
     (match typed_var_for_exp names id source_exp with
     | Some (_term, binding)
       when sort_name binding.Expr_env.sort = "SpectecTerminals" ->
-      Some (id.it, binding)
+      Some (id.it, binding, item_shape)
     | Some _ | None ->
       (match source_exp.note.it with
       | IterT (_, ListN _) ->
@@ -168,16 +171,12 @@ let target names env ~bound_vars source_exp =
         let term =
           Local_name.source_qualified names id.it (sort_ref sort)
         in
-        Some (id.it, { Expr_env.term; sort; typ = source_exp.note })
+        Some (id.it, { Expr_env.term; sort; typ = source_exp.note }, item_shape)
       | _ -> None))
 
 type bytes_arg =
   | Bytes_target
   | Bytes_capture of Request.capture
-
-let bytes_arg_formal target_head_var = function
-  | Bytes_target -> Var target_head_var
-  | Bytes_capture capture -> Var capture.Request.formal_var
 
 let lower_bytes_args
     ctx env origin names generator_id ~omitted_param_index params args =
@@ -273,10 +272,10 @@ let lower_bytes_args
 
 let chunks_shape runtime_exp =
   match runtime_exp.it with
-  | IterE (body, (ListN (count_exp, None), [ generator_id, source_exp ])) ->
+  | IterE (body, ((ListN (count_exp, None) as iter), [ generator_id, source_exp ])) ->
     (match body.it with
     | CallE (bytes_id, bytes_args) ->
-      Some (bytes_id, bytes_args, count_exp, generator_id, source_exp)
+      Some (body, iter, bytes_id, bytes_args, count_exp, generator_id, source_exp)
     | _ -> None)
   | _ -> None
 
@@ -286,7 +285,7 @@ let has_unbound_chunks_source env ~bound_vars args =
     match arg.it with
     | ExpA exp ->
       (match chunks_shape exp with
-      | Some (_, _, _, _, source_exp) ->
+      | Some (_, _, _, _, _, _, source_exp) ->
         Option.is_some (unbound_direct_var env ~bound_vars source_exp)
       | None -> false)
     | TypA _ | DefA _ | GramA _ -> false)
@@ -363,11 +362,19 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                       "Keep broader outer inverse signatures Unsupported until their structural role is documented"
                   ]
             }
-        | Some (bytes_id, bytes_args, count_exp, generator_id, source_exp), [ _ ] ->
+        | Some
+            ( body_exp
+            , iter
+            , bytes_id
+            , bytes_args
+            , count_exp
+            , generator_id
+            , source_exp )
+          , [ _ ] ->
           let bytes_target = call_target_id ctx bytes_id in
           (match target names env ~bound_vars source_exp with
           | None -> None
-          | Some (target_source_id, target_binding) ->
+          | Some (target_source_id, target_binding, source_item_shape) ->
             (match
                Analysis.Function_graph.find_definition graph bytes_target.it,
                Analysis.Function_graph.definition_inverse_status graph bytes_target.it
@@ -493,14 +500,6 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                         | Bytes_target -> None
                         | Bytes_capture capture -> Some capture)
                     in
-                    let capture_terms =
-                      List.map
-                        (fun capture -> capture.Request.call_term)
-                        captures
-                    in
-                    let bytes_call_formals =
-                      List.map (bytes_arg_formal target_head_var) arg_roles
-                    in
                     let target_stream_var, helper_names =
                       Local_name.fresh_qualified_name
                         helper_names Local_name.Stream
@@ -622,98 +621,70 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                                 ]
                           }
                       | Some _ ->
-                        let helper_request =
-                          { Request.kind =
-                              Request.Decode_chunks
-                                { source = source_echo_exp exp
-                                ; target_source_id
-                                ; bytes_op =
-                                    Context.definition_op ctx bytes_target
-                                ; inverse_op =
-                                    Context.definition_op ctx
-                                      { bytes_id with
-                                        it = inner_inverse.inverse_id
-                                      }
-                                ; captures
-                                ; bytes_call_formals
-                                ; inverse_call_formals
-                                ; target_head_var
-                                ; target_stream_var
-                                ; chunks_tail_var
-                                ; chunk_var
-                                }
-                          ; reason =
-                              "structural decode of chunks returned by the declared outer inverse"
-                          ; origin
-                          }
-                        in
-                        let helper_name =
-                          Helper.request (Context.helpers ctx) helper_request
-                        in
                         let outer_chunks, _ =
                           Local_name.fresh_qualified names Local_name.Chunk
                             (sort_ref (sort "SpectecTerminals"))
                         in
-                        let decode_pattern =
+                        let element_inverse_call =
                           app
-                            (Helper_materialize_inverse.decode_chunks_result_op
-                               helper_name)
-                            [ target_binding.term ]
+                            (Context.definition_op ctx
+                               { bytes_id with
+                                 it = inner_inverse.inverse_id
+                               })
+                            inverse_call_formals
+                        in
+                        let source : Premise_inverse_pattern.source =
+                          { generator_id
+                          ; source_exp
+                          ; binding = target_binding
+                          ; item_shape = source_item_shape
+                          ; head_term = Var target_head_var
+                          ; tail_var = target_stream_var
+                          }
+                        in
+                        let pattern_match =
+                          Premise_inverse_pattern.match_condition
+                            ctx
+                            origin
+                            ~pattern_exp:shape.omitted_exp
+                            ~body_exp
+                            ~iter
+                            ~subject_item:(app "seq" [ Var chunk_var ])
+                            ~subject_tail_var:chunks_tail_var
+                            ~sources:[ source ]
+                            ~captures
+                            ~body_conditions:
+                              [ MatchCond
+                                  (Var target_head_var, element_inverse_call)
+                              ]
+                            ~subject:outer_chunks
                         in
                         Context.record_definition_call ctx outer_inverse_call
                           (Analysis.Function_graph.plain_identity
                              outer_inverse.inverse_id);
+                        Context.record_definition_call ctx element_inverse_call
+                          (Analysis.Function_graph.plain_identity
+                             inner_inverse.inverse_id);
                         let env_after =
                           Expr_env.add env target_source_id target_binding
                         in
-                        let original_result =
-                          lower_with_source_carrier
-                            ctx env_after origin call_exp
+                        let conditions =
+                          prefix_conditions
+                          @ [ MatchCond (outer_chunks, outer_inverse_call)
+                            ; EqCond
+                                (app "len" [ outer_chunks ], count_term)
+                            ; pattern_match
+                            ]
                         in
-                        (match original_result.term with
-                        | None ->
-                          Some
-                            { (empty_with_env ~bound_vars env_after) with
-                              diagnostics =
-                                shape.diagnostics @ arg_diagnostics
-                                @ known_result.diagnostics
-                                @ count_result.diagnostics
-                                @ original_result.diagnostics
-                            }
-                        | Some original_term ->
-                          let decode_subject =
-                            app
-                              (Helper_materialize_inverse.decode_chunks_op
-                                 helper_name)
-                              (capture_terms @ [ outer_chunks ])
-                          in
-                          let conditions =
-                            prefix_conditions
-                            @ [ MatchCond (outer_chunks, outer_inverse_call)
-                              ; EqCond
-                                  (app "len" [ outer_chunks ], count_term)
-                              ; MatchCond (decode_pattern, decode_subject)
-                              ]
-                            @ original_result.guards
-                            @ [ EqCond (original_term, known_term) ]
-                          in
-                          let pattern_certificate =
-                            Condition_pattern_certificate.generated
-                              [ Helper_materialize_inverse.decode_chunks_result_constructor
-                                  helper_name origin
-                              ]
-                          in
-                          Some
-                            (with_conditions
-                               ~pattern_certificate
-                               ctx
-                               env_after
-                               bound_vars
-                               conditions
-                               (shape.diagnostics @ arg_diagnostics
-                                @ known_result.diagnostics
-                                @ count_result.diagnostics
-                                @ original_result.diagnostics)))))))
+                        Some
+                          (with_conditions
+                             ctx
+                             env_after
+                             bound_vars
+                             conditions
+                             (shape.diagnostics @ arg_diagnostics
+                              @ known_result.diagnostics
+                              @ count_result.diagnostics))))))
             | _ ->
               Some
                 { (empty_with_env ~bound_vars env) with

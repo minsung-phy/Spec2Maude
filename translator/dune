@@ -38,6 +38,7 @@
   premise_eq_optional_map_inverse
   premise_eq_value_binding
   premise_if
+  premise_inverse_pattern
   premise_iter_binding_map
   premise_iter_opt
   premise_rule

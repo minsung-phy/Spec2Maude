@@ -18,7 +18,7 @@ dune exec ./bin/spec2maude.exe -- translate \
     >"$translate_log" 2>&1
 
 grep -q '\[spec2maude\] diagnostics:.*fatal=0 unsupported=0.*obligations=0 prelude_gaps=0' "$translate_log"
-grep -q 'inverse metadata is unavailable: inverse target `inv_ibits_` does not structurally swap' "$translate_log"
+grep -q 'inverse metadata is unavailable: inverse target `inv_ibits_` does not structurally omit exactly one forward runtime parameter' "$translate_log"
 grep -q -- '- implemented: 87' "$report"
 grep -q -- '- active obligations: 0' "$report"
 

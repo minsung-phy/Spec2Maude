@@ -256,6 +256,7 @@ type iter_pattern_zip =
   ; subject_item_term : term
   ; subject_tail_var : string
   ; sources : iter_pattern_zip_source list
+  ; captures : capture list
   ; body_eq_conditions : eq_condition list
   }
 
@@ -267,24 +268,6 @@ type optional_map_inverse =
   ; captures : capture list
   ; lowered_body : term
   ; body_eq_conditions : eq_condition list
-  }
-
-type decode_chunks =
-  { source : string
-  ; target_source_id : string
-  ; bytes_op : string
-  ; inverse_op : string
-  ; captures : capture list
-  ; bytes_call_formals : term list
-  ; inverse_call_formals : term list
-  ; target_head_var : string
-  ; target_stream_var : string
-  ; chunks_tail_var : string
-  ; chunk_var : string
-  }
-
-type unzip2 =
-  { source : string
   }
 
 type request_kind =
@@ -302,8 +285,6 @@ type request_kind =
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_premise_zip_rule of iter_premise_zip_rule
   | Iter_pattern_zip of iter_pattern_zip
-  | Unzip2 of unzip2
-  | Decode_chunks of decode_chunks
   | Optional_map_inverse of optional_map_inverse
   | Subtype_injection of Subtype_injection.t
   | Runtime_predicate_search of Runtime_search_helper.request
@@ -316,18 +297,6 @@ type request =
   { kind : request_kind
   ; reason : string
   ; origin : Origin.t
-  }
-
-let unzip2 ~source =
-  { source }
-
-let unzip2_source request =
-  request.source
-
-let unzip2_request ~origin ~source ~reason =
-  { kind = Unzip2 (unzip2 ~source)
-  ; reason
-  ; origin
   }
 
 let subtype_injection_request ~origin injection =
