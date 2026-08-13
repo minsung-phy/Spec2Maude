@@ -156,9 +156,9 @@ let lower_category_membership_eq_premise ctx env ~bound_vars origin value_exp ca
     let sort_opt = Expr_translate.carrier_sort_of_typ value_exp.note in
     Some
       (match value_result.term, sort_opt with
-      | Some value_term, Some value_sort ->
+      | Some value_term, Some _ ->
         let condition =
-          BoolCond (Typecheck_term.typecheck_for_sort value_sort value_term witness)
+          BoolCond (Typecheck_term.typecheck value_term witness)
         in
         with_conditions ctx
           env

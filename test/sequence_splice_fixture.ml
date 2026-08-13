@@ -62,7 +62,11 @@ let () =
   print_endline "red index(splice(repeatSeq(2048, 0), 1024, 1, 9), 1023) == 0 .";
   print_endline "red index(splice(repeatSeq(2048, 0), 1024, 1, 9), 1024) == 9 .";
   print_endline "red index(splice(repeatSeq(2048, 0), 1024, 1, 9), 1025) == 0 .";
-  print_endline "red typecheckSeq(repeatSeq(2048, 7), syn.nat) .";
+  print_endline "red typecheck(repeatSeq(2048, 7), syn.nat) .";
+  print_endline "red typecheck(7, syn.nat) .";
+  print_endline "red typecheck(7 8, syn.nat) .";
+  print_endline "red typecheck(eps, syn.nat) .";
+  print_endline "red typecheck(bool(true) 8, syn.nat) == false .";
   print_endline "red index(repeatSeq(2048, 7), 2047) == 7 .";
   print_endline "red len(take(1024, repeatSeq(2048, 7))) == 1024 .";
   print_endline "red len(drop(1024, repeatSeq(2048, 7))) == 1024 .";
@@ -87,7 +91,7 @@ let () =
     "red index(spliceRun(spliceRun(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9), 1) == 9 .";
   print_endline
     "red index(spliceRun(spliceRun(repeatSeq(2048, 0), 0, 1, 9), 1, 1, 9), 2) == 0 .";
-  print_endline "red typecheckSeq(runSeq(2048, 7), syn.nat) .";
+  print_endline "red typecheck(runSeq(2048, 7), syn.nat) .";
   print_endline "red slice(runSeq(2048, 7), 1024, 2) == 7 7 .";
   print_endline
     "red takeRun(1024, runSeq(2048, 7)) == runSeq(1024, 7) .";

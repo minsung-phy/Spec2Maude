@@ -139,7 +139,7 @@ then
 fi
 
 if grep -A 1 -F 'crl [step-read-return-call-ref-frame-addr]' "$output" \
-    | grep -Fq 'typecheckSeq((((PATTERN1'
+    | grep -Fq 'typecheck((((PATTERN1'
 then
   echo 'return_call_ref repeated a frame-body check already enforced by constructor membership' >&2
   exit 1
@@ -148,8 +148,8 @@ fi
 require_rule step-read-return-call-ref-frame-addr
 return_call_ref=$(grep -A 1 -F 'crl [step-read-return-call-ref-frame-addr]' "$output")
 for guard in \
-  'typecheckSeq(VAL_PRIME_STAR:SpectecTerminals, syn.val)' \
-  'typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)'
+  'typecheck(VAL_PRIME_STAR:SpectecTerminals, syn.val)' \
+  'typecheck(VAL_STAR:SpectecTerminals, syn.val)'
 do
   if ! printf '%s\n' "$return_call_ref" | grep -Fq "$guard"; then
     echo "return_call_ref lost direct identity guard: $guard" >&2
@@ -162,12 +162,12 @@ if printf '%s\n' "$return_call_ref" | grep -Fq 'helper.subtype-'; then
 fi
 
 context_conditions=$(grep -A 1 -F 'crl [step-ctxt-instrs]' "$output")
-guard='typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)'
+guard='typecheck(VAL_STAR:SpectecTerminals, syn.val)'
 if ! printf '%s\n' "$context_conditions" | grep -Fq "$guard"; then
   echo "step-ctxt-instrs lost identity guard: $guard" >&2
   exit 1
 fi
-if printf '%s\n' "$context_conditions" | grep -Fq 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)'; then
+if printf '%s\n' "$context_conditions" | grep -Fq 'typecheck(VAL_STAR:SpectecTerminals, syn.instr)'; then
   echo 'step-ctxt-instrs retained target membership implied by val <: instr' >&2
   exit 1
 fi
@@ -184,7 +184,7 @@ for label in step-ctxt-label step-ctxt-handler; do
     exit 1
   fi
   if printf '%s\n' "$conditions" \
-      | grep -Eq 'syn\.state\)|typecheckSeq\('; then
+      | grep -Eq 'syn\.(state|instr)\)'; then
     echo "$label retained a payload check implied by its whole config guard" >&2
     exit 1
   fi
@@ -196,7 +196,7 @@ if ! printf '%s\n' "$frame_conditions" | grep -Fq ', syn.config)'; then
   exit 1
 fi
 if printf '%s\n' "$frame_conditions" \
-    | grep -Eq 'syn\.(store|frame|state)\)|typecheckSeq\('; then
+    | grep -Eq 'syn\.(store|frame|state|instr)\)'; then
   echo 'step-ctxt-frame retained a nested payload check implied by its whole config guard' >&2
   exit 1
 fi

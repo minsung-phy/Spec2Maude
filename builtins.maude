@@ -905,12 +905,12 @@ mod WASM-BUILTINS is
   ceq builtin.inv-nbytes-int(NB_N, NB_BYTES) = uN.wrap(NB_RAW)
     if _rem_(NB_N, 8) = 0
        /\ len(NB_BYTES) = _quo_(NB_N, 8)
-       /\ typecheckSeq(NB_BYTES, syn.byte)
+       /\ typecheck(NB_BYTES, syn.byte)
        /\ NB_RAW := builtin.inv-ibytes-aux(NB_BYTES, 1, 0) .
   ceq builtin.inv-nbytes-float(NB_N, NB_BYTES) = builtin.float-from-bits(NB_N, NB_RAW)
     if _rem_(NB_N, 8) = 0
        /\ len(NB_BYTES) = _quo_(NB_N, 8)
-       /\ typecheckSeq(NB_BYTES, syn.byte)
+       /\ typecheck(NB_BYTES, syn.byte)
        /\ NB_RAW := builtin.inv-ibytes-aux(NB_BYTES, 1, 0) .
 
   --- Implemented builtin family: composite storage/const bytes.
@@ -924,7 +924,7 @@ mod WASM-BUILTINS is
   ceq builtin.inv-zbytes-pack(ZB_N, ZB_BYTES) = uN.wrap(ZB_RAW)
     if _rem_(ZB_N, 8) = 0
        /\ len(ZB_BYTES) = _quo_(ZB_N, 8)
-       /\ typecheckSeq(ZB_BYTES, syn.byte)
+       /\ typecheck(ZB_BYTES, syn.byte)
        /\ ZB_RAW := builtin.inv-ibytes-aux(ZB_BYTES, 1, 0) .
 
   --- Implemented builtin family: vector lane splitting/reassembly.
@@ -992,7 +992,7 @@ mod WASM-BUILTINS is
 
   ceq builtin.inv-ibits(BI_N, BI_BITS) = uN.wrap(BI_RESULT)
     if len(BI_BITS) = BI_N
-       /\ typecheckSeq(BI_BITS, syn.bit)
+       /\ typecheck(BI_BITS, syn.bit)
        /\ BI_RESULT := builtin.inv-ibits-aux(BI_BITS, 0) .
 
   ceq builtin.fbits(FB_N, fN.pos(FB_MAG)) =
@@ -1006,7 +1006,7 @@ mod WASM-BUILTINS is
 
   ceq builtin.inv-fbits(FB_N, FB_BITS) = builtin.float-from-bits(FB_N, FB_RAW)
     if len(FB_BITS) = FB_N
-       /\ typecheckSeq(FB_BITS, syn.bit)
+       /\ typecheck(FB_BITS, syn.bit)
        /\ FB_RAW := builtin.inv-ibits-aux(FB_BITS, 0) .
 
   ceq builtin.ibytes(BY_N, uN.wrap(BY_I)) = builtin.ibytes-aux(_quo_(BY_N, 8), BY_I)
@@ -1016,7 +1016,7 @@ mod WASM-BUILTINS is
   ceq builtin.inv-ibytes(BY_N, BY_BYTES) = uN.wrap(BY_RESULT)
     if _rem_(BY_N, 8) = 0
        /\ len(BY_BYTES) = _quo_(BY_N, 8)
-       /\ typecheckSeq(BY_BYTES, syn.byte)
+       /\ typecheck(BY_BYTES, syn.byte)
        /\ BY_RESULT := builtin.inv-ibytes-aux(BY_BYTES, 1, 0) .
 
   ceq builtin.fbytes(FB_N, fN.pos(FB_MAG)) = builtin.ibytes-aux(_quo_(FB_N, 8), FB_RAW)
@@ -1031,7 +1031,7 @@ mod WASM-BUILTINS is
   ceq builtin.inv-fbytes(FB_N, FB_BYTES) = builtin.float-from-bits(FB_N, FB_RAW)
     if _rem_(FB_N, 8) = 0
        /\ len(FB_BYTES) = _quo_(FB_N, 8)
-       /\ typecheckSeq(FB_BYTES, syn.byte)
+       /\ typecheck(FB_BYTES, syn.byte)
        /\ FB_RAW := builtin.inv-ibytes-aux(FB_BYTES, 1, 0) .
 
   eq builtin.nbytes(i32, NB_PAYLOAD) = builtin.nbytes-int(32, NB_PAYLOAD) .
@@ -1059,7 +1059,7 @@ mod WASM-BUILTINS is
 
   ceq builtin.inv-vbytes(vectype.v128, BY_BYTES) = uN.wrap(BY_RESULT)
     if len(BY_BYTES) = _quo_(def.vsize(vectype.v128), 8)
-       /\ typecheckSeq(BY_BYTES, syn.byte)
+       /\ typecheck(BY_BYTES, syn.byte)
        /\ BY_RESULT := builtin.inv-ibytes-aux(BY_BYTES, 1, 0) .
 
   eq builtin.zbytes(i32, ZB_PAYLOAD) = builtin.nbytes(i32, ZB_PAYLOAD) .
@@ -1589,13 +1589,13 @@ mod WASM-BUILTINS is
   ceq def.utf8(char.wrap(UTF_C) UTF_REST) =
       byte.wrap(UTF_C) def.utf8(UTF_REST)
     if _<_(UTF_C, 128)
-       /\ (typecheckSeq(UTF_REST, syn.char)) = true .
+       /\ (typecheck(UTF_REST, syn.char)) = true .
   ceq def.utf8(char.wrap(UTF_C) UTF_REST) =
       byte.wrap(_+_(192, _quo_(UTF_C, 64)))
       byte.wrap(_+_(128, _rem_(UTF_C, 64)))
       def.utf8(UTF_REST)
     if _>=_(UTF_C, 128) /\ _<_(UTF_C, 2048)
-       /\ (typecheckSeq(UTF_REST, syn.char)) = true .
+       /\ (typecheck(UTF_REST, syn.char)) = true .
   ceq def.utf8(char.wrap(UTF_C) UTF_REST) =
       byte.wrap(_+_(224, _quo_(UTF_C, 4096)))
       byte.wrap(_+_(128, _rem_(_quo_(UTF_C, 64), 64)))
@@ -1603,7 +1603,7 @@ mod WASM-BUILTINS is
       def.utf8(UTF_REST)
     if _or_(_and_(_>=_(UTF_C, 2048), _<_(UTF_C, 55296)),
              _and_(_>=_(UTF_C, 57344), _<_(UTF_C, 65536)))
-       /\ (typecheckSeq(UTF_REST, syn.char)) = true .
+       /\ (typecheck(UTF_REST, syn.char)) = true .
   ceq def.utf8(char.wrap(UTF_C) UTF_REST) =
       byte.wrap(_+_(240, _quo_(UTF_C, 262144)))
       byte.wrap(_+_(128, _rem_(_quo_(UTF_C, 4096), 64)))
@@ -1611,7 +1611,7 @@ mod WASM-BUILTINS is
       byte.wrap(_+_(128, _rem_(UTF_C, 64)))
       def.utf8(UTF_REST)
     if _>=_(UTF_C, 65536) /\ _<_(UTF_C, 1114112)
-       /\ (typecheckSeq(UTF_REST, syn.char)) = true .
+       /\ (typecheck(UTF_REST, syn.char)) = true .
 
   --- Backend semantics: official-spectec-deterministic.
   --- Source: spectec/src/backend-interpreter/numerics.ml.

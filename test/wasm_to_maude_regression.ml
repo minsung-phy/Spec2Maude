@@ -375,8 +375,8 @@ let run () =
     [ "command.module(1,"; "command.module(2,";
       "action.invoke(1,"; "action.invoke(2,";
       "VALUES:=ARGS";
-      "typecheckSeq(VALUES,syn.val)";
-      "typecheckSeq(ARGS,syn.instr)";
+      "typecheck(VALUES,syn.val)";
+      "typecheck(ARGS,syn.instr)";
       "ACTUAL:=value('VALUE,index(value('GLOBALS,S),A))";
       "typecheck(ACTUAL,syn.val)";
       "typecheck(ACTUAL,syn.instr)" ];

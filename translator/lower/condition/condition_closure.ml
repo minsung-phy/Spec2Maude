@@ -24,7 +24,7 @@ let prelude_true = function
   | App ("allOpt", [ Const "eps" ])
   | App ("allLen", [ Const "eps"; _ ])
   | App
-      ( ( "typecheckSeq"
+      ( ( "typecheck"
         | "typecheckOptSeq"
         | "typecheckSeqOpt"
         | "typecheckNestedSeq" )

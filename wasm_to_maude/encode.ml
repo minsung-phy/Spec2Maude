@@ -899,8 +899,8 @@ type check = {label : string; term : T.t}
 let check label term typ =
   {label; term = app "typecheck" [term; atom typ]}
 
-let check_seq label term typ =
-  {label; term = app "typecheckSeq" [term; atom typ]}
+let check_sequence label term typ =
+  {label; term = app "typecheck" [term; atom typ]}
 
 let rec instr_checks source path instruction =
   let here = check path (instr source instruction) "syn.instr" in
@@ -924,7 +924,7 @@ and body_checks source path body =
 let func_checks source i ({Source.it = Ast.Func (_, _, body); _} as f) =
   let path = Printf.sprintf "func.%d" (i + 1) in
   check path (func source f) "syn.func"
-  :: check_seq (path ^ ".body") (expr source body) "syn.expr"
+  :: check_sequence (path ^ ".body") (expr source body) "syn.expr"
   :: body_checks source (path ^ ".instr") body
 
 let module_checks ({Frontend.source; ast; _} as m : Frontend.module_) =
@@ -944,7 +944,7 @@ let module_checks ({Frontend.source; ast; _} as m : Frontend.module_) =
     list_check "elems" (elem source) m'.elems "syn.elem";
     {label = "start.option";
      term = app "isOpt" [option start m'.start]};
-    check_seq "start" (option start m'.start) "syn.start";
+    check_sequence "start" (option start m'.start) "syn.start";
     list_check "exports" export m'.exports "syn.export" ]
   @ (m'.funcs |> List.mapi (func_checks source) |> List.concat)
 

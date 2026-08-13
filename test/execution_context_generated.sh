@@ -37,7 +37,7 @@ printf '%s\n' "$statement" | grep -Fq \
 printf '%s\n' "$statement" | grep -Fq \
   'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)'
 
-source_guard='typecheckSeq(VAL_STAR:SpectecTerminals, syn.val)'
+source_guard='typecheck(VAL_STAR:SpectecTerminals, syn.val)'
 progress='_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))'
 recursive='rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals)'
 result_guard='typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)'
@@ -58,7 +58,7 @@ printf '%s\n' "$condition" | awk \
     END { exit !(p > 0 && m > p && r > m) }
   '
 
-if printf '%s\n' "$condition" | grep -Fq 'typecheckSeq(VAL_STAR:SpectecTerminals, syn.instr)'; then
+if printf '%s\n' "$condition" | grep -Fq 'typecheck(VAL_STAR:SpectecTerminals, syn.instr)'; then
   echo 'Step/ctxt-instrs retained target membership implied by val <: instr' >&2
   exit 1
 fi

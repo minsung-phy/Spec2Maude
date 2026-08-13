@@ -61,7 +61,6 @@ let checks_value value = function
   | BoolCond
       (App
         ( ( "typecheck"
-          | "typecheckSeq"
           | "typecheckOptSeq"
           | "typecheckSeqOpt"
           | "typecheckNestedSeq" )

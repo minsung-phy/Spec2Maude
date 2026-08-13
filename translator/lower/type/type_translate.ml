@@ -659,8 +659,7 @@ let lower_hidden_bind_premise ctx visible_expr_env expr_env origin hidden rhs_ex
     in
     ( [ MatchCond (Var hidden.hidden_variable, rhs_term)
       ; BoolCond
-          (Typecheck_term.typecheck_for_sort
-             hidden.hidden_sort
+          (Typecheck_term.typecheck
              (Var hidden.hidden_variable)
              hidden.hidden_witness)
       ]

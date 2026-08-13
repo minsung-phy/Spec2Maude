@@ -41,8 +41,8 @@ let translate_alias env ctx origin key_env static_args_key source_category targe
     { statements =
         [ gen origin
             (eq
-               (Typecheck_term.typecheck_for_sort carrier term target)
-               (Typecheck_term.typecheck_for_sort carrier term witness))
+               (Typecheck_term.typecheck term target)
+               (Typecheck_term.typecheck term witness))
         ]
     ; diagnostics = carrier_diagnostics @ witness_diagnostics
     }
@@ -79,7 +79,7 @@ let translate_category_union
     { statements =
         [ gen origin
             (ceq
-               (Typecheck_term.typecheck_for_sort carrier term target)
+               (Typecheck_term.typecheck term target)
                (Const "true")
                union_guards)
         ]
@@ -109,7 +109,7 @@ let translate_subtype_membership env ctx origin target child_typ =
     { statements =
         [ gen origin
             (ceq
-               (Typecheck_term.typecheck_for_sort carrier term target)
+               (Typecheck_term.typecheck term target)
                (Const "true")
                guards)
         ]
