@@ -234,6 +234,7 @@ let iter_pattern_zip_request
     ~subject_item_term
     ~subject_tail_var
     ~sources
+    ~captures
     ~body_eq_conditions
     ~reason
     ~origin
@@ -244,6 +245,7 @@ let iter_pattern_zip_request
         ; subject_item_term
         ; subject_tail_var
         ; sources
+        ; captures
         ; body_eq_conditions
         }
   ; reason
@@ -1267,6 +1269,7 @@ and lower_constructor_zip_iter_pattern
           ~subject_item_term:body_term
           ~subject_tail_var
           ~sources:helper_sources
+          ~captures:[]
           ~body_eq_conditions:body_result.guards
           ~reason:"source-preserving iterated constructor pattern helper"
           ~origin

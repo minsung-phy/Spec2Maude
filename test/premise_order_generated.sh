@@ -241,54 +241,50 @@ fi
 pair_inverse=$(condition_line 'ceq def.ivadd-pairwise(')
 require_contains "$pair_inverse" 'builtin.inv-concat(' \
   'fixed pair reconstruction lost its declared outer inverse'
-require_contains "$pair_inverse" 'helper.unzip2.ivadd-pairwise(' \
-  'fixed pair reconstruction lost its structural unzip'
-require_contains "$pair_inverse" 'def.concat(' \
-  'fixed pair reconstruction lost its whole forward recheck'
+require_contains "$pair_inverse" 'helper.pattern-zip.ivadd-pairwise(' \
+  'fixed pair reconstruction lost its common IterE pattern binding'
 require_before "$pair_inverse" 'builtin.inv-concat(' \
-  'helper.unzip2.ivadd-pairwise(' \
+  'helper.pattern-zip.ivadd-pairwise(' \
   'fixed pair reconstruction no longer calls the outer inverse first'
-require_before "$pair_inverse" 'helper.unzip2.ivadd-pairwise(' 'def.concat(' \
-  'fixed pair reconstruction no longer rechecks the forward call after unzip'
+require_not_contains "$pair_inverse" 'def.concat(' \
+  'fixed pair reconstruction reintroduced a forward-call recheck after the declared inverse'
 
-unzip2=$(matching_line 'ceq helper.unzip2.ivadd-pairwise(')
-require_contains "$unzip2" \
-  'seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) STREAM1:SpectecTerminals' \
-  'unzip2 no longer consumes exact two-element chunks'
+pair_pattern=$(matching_line 'ceq helper.pattern-zip.ivadd-pairwise(')
+require_contains "$pair_pattern" \
+  'seq(HEAD1:SpectecTerminal HEAD2:SpectecTerminal) TAIL1:SpectecTerminals' \
+  'common IterE binder no longer matches the source two-element body pattern'
 for forbidden in 'builtin.inv-concat' 'slice(' 'drop('
 do
-  require_not_contains "$unzip2" "$forbidden" \
-    'unzip2 regained inverse or partition ownership'
+  require_not_contains "$pair_pattern" "$forbidden" \
+    'common IterE binder gained inverse or partition ownership'
 done
 
 concatn_inverse=$(condition_line 'crl [step-read-array-new-data-num]')
 require_contains "$concatn_inverse" 'builtin.inv-concatn(' \
   'fixed concatn reconstruction lost its declared outer inverse'
-require_contains "$concatn_inverse" 'helper.decode-chunks.step-read(' \
-  'fixed concatn reconstruction lost its structural decoder'
-require_contains "$concatn_inverse" 'def.concatn(' \
-  'fixed concatn reconstruction lost its whole forward recheck'
+require_contains "$concatn_inverse" 'helper.pattern-zip.step-read.4(' \
+  'fixed concatn reconstruction lost its common IterE pattern binding'
 require_before "$concatn_inverse" 'builtin.inv-concatn(' \
   'len(CHUNK1:SpectecTerminals) = N:Nat' \
   'fixed concatn reconstruction no longer checks the inverse chunk count'
 require_before "$concatn_inverse" 'len(CHUNK1:SpectecTerminals) = N:Nat' \
-  'helper.decode-chunks.step-read(' \
-  'fixed concatn reconstruction decodes before validating the chunk count'
-require_before "$concatn_inverse" 'helper.decode-chunks.step-read(' 'def.concatn(' \
-  'fixed concatn reconstruction no longer rechecks the whole forward call'
+  'helper.pattern-zip.step-read.4(' \
+  'fixed concatn reconstruction binds chunks before validating their count'
+require_not_contains "$concatn_inverse" 'def.concatn(' \
+  'fixed concatn reconstruction reintroduced a forward-call recheck after the declared inverse'
 
-decode_chunks=$(condition_line 'ceq helper.decode-chunks.step-read(')
-require_contains "$decode_chunks" 'builtin.inv-zbytes(' \
-  'chunk decoder lost its declared element inverse'
-require_contains "$decode_chunks" 'builtin.zbytes(' \
-  'chunk decoder lost its element forward recheck'
+chunk_pattern=$(condition_line 'ceq helper.pattern-zip.step-read.4(')
+require_contains "$chunk_pattern" 'builtin.inv-zbytes(' \
+  'common IterE binder lost its declared body inverse'
+require_not_contains "$chunk_pattern" 'builtin.zbytes(' \
+  'common IterE binder reintroduced a body forward-call recheck'
 for forbidden in 'builtin.inv-concatn' 'slice(' 'drop('
 do
-  require_not_contains "$decode_chunks" "$forbidden" \
-    'chunk decoder regained outer inverse or partition ownership'
+  require_not_contains "$chunk_pattern" "$forbidden" \
+    'common IterE binder gained outer inverse or partition ownership'
 done
-if grep -Eq 'helper\.(inverse-pair|inverse-chunks)' "$output"; then
-  echo 'obsolete partition-owning inverse helper survived' >&2
+if grep -Eq 'helper\.(inverse-pair|inverse-chunks|unzip2|decode-chunks)' "$output"; then
+  echo 'obsolete inverse-specific pattern helper survived' >&2
   exit 1
 fi
 

@@ -219,12 +219,6 @@ let inverse_known_terms args =
     | { arg = Inverse_known term; _ } -> Some term
     | { arg = Inverse_target _; _ } -> None)
 
-let inverse_original_terms args =
-  args
-  |> List.map (function
-    | { arg = Inverse_known term; _ } -> term
-    | { arg = Inverse_target (_id, binding); _ } -> binding.Expr_env.term)
-
 let inverse_target_admissible
     (inverse_definition : Analysis.Function_graph.definition)
     target_binding =
@@ -375,15 +369,8 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                   let inverse_call =
                     app (Context.definition_op ctx inverse_id_phrase) inverse_terms
                   in
-                  let original_call =
-                    app
-                      (Context.definition_op ctx target_id)
-                      (inverse_original_terms arg_items)
-                  in
                   Context.record_definition_call ctx inverse_call
                     (Analysis.Function_graph.plain_identity inverse.inverse_id);
-                  Context.record_definition_call ctx original_call
-                    (Analysis.Function_graph.plain_identity target_id.it);
                   let prefix_conditions = arg_guards @ known_result.guards in
                   let prefix_bound =
                     conditions_bound_vars bound_vars prefix_conditions
@@ -406,9 +393,7 @@ let lower names ctx env ~bound_vars origin exp call_exp known_exp =
                   else
                     let conditions =
                       prefix_conditions
-                      @ [ MatchCond (target_binding.term, inverse_call)
-                        ; EqCond (original_call, known_term)
-                        ]
+                      @ [ MatchCond (target_binding.term, inverse_call) ]
                     in
                     let env_after =
                       Expr_env.add env target_id_text target_binding

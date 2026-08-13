@@ -256,6 +256,7 @@ type iter_pattern_zip =
   ; subject_item_term : term
   ; subject_tail_var : string
   ; sources : iter_pattern_zip_source list
+  ; captures : capture list
   ; body_eq_conditions : eq_condition list
   }
 
@@ -268,24 +269,6 @@ type optional_map_inverse =
   ; lowered_body : term
   ; body_eq_conditions : eq_condition list
   }
-
-type decode_chunks =
-  { source : string
-  ; target_source_id : string
-  ; bytes_op : string
-  ; inverse_op : string
-  ; captures : capture list
-  ; bytes_call_formals : term list
-  ; inverse_call_formals : term list
-  ; target_head_var : string
-  ; target_stream_var : string
-  ; chunks_tail_var : string
-  ; chunk_var : string
-  }
-
-(* Structural helpers consume only values already reconstructed by a declared
-   inverse.  They never partition the original flat result. *)
-type unzip2
 
 type request_kind =
   | Membership_witness of Membership_witness_helper.request
@@ -302,8 +285,6 @@ type request_kind =
   | Iter_premise_zip_bool of iter_premise_zip_bool
   | Iter_premise_zip_rule of iter_premise_zip_rule
   | Iter_pattern_zip of iter_pattern_zip
-  | Unzip2 of unzip2
-  | Decode_chunks of decode_chunks
   | Optional_map_inverse of optional_map_inverse
   | Subtype_injection of Subtype_injection.t
   | Runtime_predicate_search of Runtime_search_helper.request
@@ -317,18 +298,6 @@ type request =
   ; reason : string
   ; origin : Origin.t
   }
-
-val unzip2 :
-  source:string ->
-  unzip2
-
-val unzip2_source : unzip2 -> string
-
-val unzip2_request :
-  origin:Origin.t ->
-  source:string ->
-  reason:string ->
-  request
 
 val subtype_injection_request :
   origin:Origin.t ->
