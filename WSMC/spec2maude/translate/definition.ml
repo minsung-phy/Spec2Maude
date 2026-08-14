@@ -10,4 +10,3 @@ let rec translate def =
   | RecD defs -> List.concat_map translate defs
 
 let translate_script script = List.concat_map translate script
-
