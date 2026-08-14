@@ -1,0 +1,129 @@
+fmod DSL-TERM is
+  sort SpectecTerminal .
+  sort SpectecType .
+endfm
+
+fmod DSL-PRETYPE is
+  protecting DSL-TERM .
+  protecting BOOL .
+  protecting NAT .
+  protecting INT .
+  protecting RAT .
+  protecting FLOAT .
+  protecting STRING .
+
+  sorts SpectecTerminals SpectecTypes .
+
+  subsorts Nat Int < SpectecTerminal .
+  subsort SpectecTerminal < SpectecTerminals .
+  subsort SpectecType < SpectecTypes .
+
+  ops bool nat int rat real text : -> SpectecType [ctor] .
+
+  op bool : Bool -> SpectecTerminal [ctor] .
+  op rat : Rat -> SpectecTerminal [ctor] .
+  op float : Float -> SpectecTerminal [ctor] .
+  op text : String -> SpectecTerminal [ctor] .
+
+  op eps : -> SpectecTerminals [ctor] .
+  op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals
+    [ctor assoc id: eps] .
+
+  op typecheck : [SpectecTerminal] SpectecType -> Bool .
+
+  var B : Bool .
+  var N : Nat .
+  var I : Int .
+  var R : Rat .
+  var F : Float .
+  var S : String .
+  var K : [SpectecTerminal] .
+  var T : SpectecTerminal .
+  var TS : SpectecTerminals .
+  var TYPE : SpectecType .
+
+  eq typecheck(bool(B), bool) = true .
+  eq typecheck(N, nat) = true .
+  eq typecheck(I, int) = true .
+  eq typecheck(rat(R), rat) = true .
+  eq typecheck(float(F), real) = true .
+  eq typecheck(text(S), text) = true .
+
+  eq typecheck(eps, TYPE) = true .
+  ceq typecheck(T TS, TYPE) = typecheck(TS, TYPE)
+    if TS =/= eps /\ typecheck(T, TYPE) .
+  eq typecheck(K, TYPE) = false [owise] .
+
+  op len : SpectecTerminals -> Nat .
+
+  eq len(eps) = 0 .
+  eq len(T) = 1 .
+  ceq len(T TS) = 1 + len(TS)
+    if TS =/= eps .
+
+  op indexDefined : SpectecTerminals Nat -> Bool .
+  op index : SpectecTerminals Nat ~> SpectecTerminal .
+
+  eq indexDefined(TS, N) = N < len(TS) .
+  eq index(T TS, 0) = T .
+  ceq index(T TS, s(N)) = index(TS, N)
+    if TS =/= eps .
+
+  op _[_<-_] : SpectecTerminals Nat SpectecTerminal -> SpectecTerminals
+    [prec 50] .
+
+  var NEW : SpectecTerminal .
+
+  eq eps[N <- NEW] = eps .
+  eq (T TS)[0 <- NEW] = NEW TS .
+  eq (T TS)[s(N) <- NEW] = T (TS[N <- NEW]) .
+endfm
+
+fmod DSL-RECORD is
+  protecting DSL-PRETYPE .
+  protecting QID .
+
+  sorts RecordItem RecordItems .
+  subsort RecordItem < RecordItems .
+
+  op EMPTY : -> RecordItems [ctor] .
+  op _;_ : RecordItems RecordItems -> RecordItems
+    [ctor assoc id: EMPTY] .
+  op item : Qid SpectecTerminals -> RecordItem [ctor] .
+  op {_} : RecordItems -> SpectecTerminal [ctor] .
+
+  op value : Qid SpectecTerminal -> SpectecTerminal .
+  op value : Qid RecordItems -> SpectecTerminals .
+
+  op _++_ : RecordItems RecordItems -> SpectecTerminal .
+  op _[._<-_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal .
+  op _[._=++_] : SpectecTerminal Qid SpectecTerminals -> SpectecTerminal .
+  op setItem : RecordItems Qid SpectecTerminals -> RecordItems .
+
+  vars FIELD OTHER : Qid .
+  vars ITEMS ITEMS2 : RecordItems .
+  vars VALUE NEW-VALUE : SpectecTerminals .
+  var RECORD : SpectecTerminal .
+
+  eq value(FIELD, {ITEMS}) = value(FIELD, ITEMS) .
+  eq value(FIELD, EMPTY) = eps .
+  eq value(FIELD, item(FIELD, VALUE) ; ITEMS) = VALUE .
+  ceq value(FIELD, item(OTHER, VALUE) ; ITEMS) = value(FIELD, ITEMS)
+    if FIELD =/= OTHER .
+
+  eq ITEMS ++ ITEMS2 = {ITEMS ; ITEMS2} .
+
+  eq {ITEMS}[. FIELD <- NEW-VALUE]
+    = {setItem(ITEMS, FIELD, NEW-VALUE)} .
+
+  eq setItem(EMPTY, FIELD, NEW-VALUE)
+    = item(FIELD, NEW-VALUE) .
+  eq setItem(item(FIELD, VALUE) ; ITEMS, FIELD, NEW-VALUE)
+    = item(FIELD, NEW-VALUE) ; ITEMS .
+  ceq setItem(item(OTHER, VALUE) ; ITEMS, FIELD, NEW-VALUE)
+    = item(OTHER, VALUE) ; setItem(ITEMS, FIELD, NEW-VALUE)
+    if FIELD =/= OTHER .
+
+  eq RECORD[. FIELD =++ NEW-VALUE]
+    = RECORD[. FIELD <- value(FIELD, RECORD) NEW-VALUE] .
+endfm
