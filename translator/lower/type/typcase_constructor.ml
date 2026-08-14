@@ -107,6 +107,13 @@ let certifies_ground resolution ~constructor_op arg_exps =
       arg_exps certificate.payload_typs
   | Some _ | None -> false
 
+let certifies_nullary_total resolution ~constructor_op =
+  let entry = resolution.registry_entry in
+  entry.status = Constructor_registry.Emitted
+  && entry.arity = 0
+  && String.equal entry.constructor_op constructor_op
+  && entry.construction_domain = Constructor_registry.Total_constructor
+
 let certifies_payloads certificate ~typs ~sorts ~witnesses =
   List.length certificate.payload_typs = List.length typs
   && List.for_all2 Il.Eq.eq_typ certificate.payload_typs typs

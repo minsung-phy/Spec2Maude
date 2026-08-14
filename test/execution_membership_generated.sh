@@ -85,10 +85,20 @@ require_before_pattern \
   'TypD-instr/.*/VariantT/subtype/.* / category-inclusion' \
   'syn.instr checks an inherited value category before its own constructors'
 
-require_rule step-pure-unreachable
-if ! grep -A 1 -F 'crl [step-pure-unreachable]' "$output" \
-    | grep -Fq 'rel.step-pure(instr.unreachable) => trap'; then
+if ! grep -Fq \
+    'rl [step-pure-unreachable] : rel.step-pure(instr.unreachable) => trap .' \
+    "$output"; then
   echo 'unreachable did not reduce to the shared TRAP constructor' >&2
+  exit 1
+fi
+if grep -A 1 -F 'rl [step-pure-unreachable]' "$output" \
+    | grep -Fq 'typecheck(trap, syn.instr)'; then
+  echo 'unreachable repeated the result type of the total nullary TRAP constructor' >&2
+  exit 1
+fi
+if ! grep -A 1 -F 'crl [step-pure-trap-instrs]' "$output" \
+    | grep -Fq 'typecheck(trap, syn.instr)'; then
+  echo 'trap context lost the source category check on its LHS pattern' >&2
   exit 1
 fi
 grep -Fq \
@@ -179,8 +189,8 @@ fi
 
 for label in step-ctxt-label step-ctxt-handler; do
   conditions=$(grep -A 1 -F "crl [$label]" "$output")
-  if ! printf '%s\n' "$conditions" | grep -Fq ', syn.config)'; then
-    echo "$label lost its whole rewrite-result config guard" >&2
+  if printf '%s\n' "$conditions" | grep -Fq ', syn.config)'; then
+    echo "$label repeated its certified rewrite-result config typecheck" >&2
     exit 1
   fi
   if printf '%s\n' "$conditions" \
@@ -191,8 +201,8 @@ for label in step-ctxt-label step-ctxt-handler; do
 done
 
 frame_conditions=$(grep -A 1 -F 'crl [step-ctxt-frame]' "$output")
-if ! printf '%s\n' "$frame_conditions" | grep -Fq ', syn.config)'; then
-  echo 'step-ctxt-frame lost its whole rewrite-result config guard' >&2
+if printf '%s\n' "$frame_conditions" | grep -Fq ', syn.config)'; then
+  echo 'step-ctxt-frame repeated its certified rewrite-result config typecheck' >&2
   exit 1
 fi
 if printf '%s\n' "$frame_conditions" \

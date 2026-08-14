@@ -1,7 +1,10 @@
 type t
 type value
 
-val deterministic_output :
+(** Certifies the output pattern of a resolved source relation.  Complete
+    artifact emission guarantees that every rule of that relation was
+    generated; this certificate only checks the elaborated result type. *)
+val relation_output :
   output_typ:Il.Ast.typ -> pattern:Il.Ast.exp -> t option
 
 val lower_equality_value :

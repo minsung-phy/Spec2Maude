@@ -120,6 +120,10 @@ let lower_case_impl
                      ~arity ->
               category_guards.witness_guards
             | Some _ | None
+              when Typcase_constructor.certifies_nullary_total
+                     resolution ~constructor_op:constructor ->
+              category_guards.witness_guards
+            | Some _ | None
               when Typcase_constructor.certifies_ground
                      resolution ~constructor_op:constructor arg_exps ->
               (* Exact elaborated payload notes plus no free source variables
