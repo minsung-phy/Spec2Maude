@@ -170,10 +170,12 @@ if printf '%s\n' "$step_read" | grep -Fq 'typecheck(Z:SpectecTerminal, syn.state
 fi
 
 step_context=$(condition_line 'crl [step-ctxt-instrs]')
-require_before "$step_context" \
+require_contains "$step_context" \
   'rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals))' \
+  'Step/ctxt-instrs lost its source recursive Step premise'
+require_not_contains "$step_context" \
   'typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)' \
-  'Step/ctxt-instrs no longer retains its whole recursive rewrite-result config guard'
+  'Step/ctxt-instrs repeated the certified recursive Step result typecheck'
 step_context_rule=$(matching_line 'crl [step-ctxt-instrs]')
 require_contains "$step_context_rule" \
   'VAL_STAR:SpectecTerminals (INSTR_PRIME_STAR:SpectecTerminals INSTR_1_STAR:SpectecTerminals)' \
@@ -203,9 +205,9 @@ if printf '%s\n' "$step_context" | grep -Eq 'syn\.state\)'; then
 fi
 
 step_frame=$(condition_line 'crl [step-ctxt-frame]')
-require_contains "$step_frame" \
+require_not_contains "$step_frame" \
   'typecheck(config.sym(state.sym(S_PRIME:SpectecTerminal, F_PRIME_PRIME:SpectecTerminal), INSTR_PRIME_STAR:SpectecTerminals), syn.config)' \
-  'Step/ctxt-frame lost its whole recursive rewrite-result config guard'
+  'Step/ctxt-frame repeated the certified recursive Step result typecheck'
 if printf '%s\n' "$step_frame" \
     | grep -Eq 'syn\.(store|frame|state|instr)\)'; then
   echo 'Step/ctxt-frame retained a nested payload check implied by its whole config guard' >&2
@@ -213,12 +215,12 @@ if printf '%s\n' "$step_frame" \
 fi
 
 steps_trans=$(condition_line 'crl [steps-trans]')
-require_contains "$steps_trans" \
+require_not_contains "$steps_trans" \
   'typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)' \
-  'Steps/trans lost its first whole rewrite-result config guard'
-require_contains "$steps_trans" \
+  'Steps/trans repeated its first certified rewrite-result config typecheck'
+require_not_contains "$steps_trans" \
   'typecheck(config.sym(Z_PRIME_PRIME:SpectecTerminal, INSTR_PRIME_PRIME_STAR:SpectecTerminals), syn.config)' \
-  'Steps/trans lost its transitive whole rewrite-result config guard'
+  'Steps/trans repeated its transitive certified rewrite-result config typecheck'
 if printf '%s\n' "$steps_trans" \
     | grep -Eq 'syn\.(state|instr)\)'; then
   echo 'Steps/trans retained payload checks implied by its whole config guards' >&2
@@ -226,9 +228,9 @@ if printf '%s\n' "$steps_trans" \
 fi
 
 eval_expr=$(condition_line 'crl [eval-expr-rule-1]')
-require_contains "$eval_expr" \
+require_not_contains "$eval_expr" \
   'typecheck(config.sym(Z_PRIME:SpectecTerminal, VAL_STAR:SpectecTerminals), syn.config)' \
-  'Eval_expr lost its whole Steps output config guard'
+  'Eval_expr repeated its certified Steps output config typecheck'
 require_contains "$eval_expr" \
   'typecheck(VAL_STAR:SpectecTerminals, syn.val)' \
   'Eval_expr lost the source-category guard for its identity SubE pattern'

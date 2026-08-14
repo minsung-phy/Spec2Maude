@@ -40,12 +40,15 @@ printf '%s\n' "$statement" | grep -Fq \
 source_guard='typecheck(VAL_STAR:SpectecTerminals, syn.val)'
 progress='_or_(_=/=_(VAL_STAR:SpectecTerminals, eps), _=/=_(INSTR_1_STAR:SpectecTerminals, eps))'
 recursive='rel.step(config.sym(Z:SpectecTerminal, INSTR_STAR:SpectecTerminals)) => config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals)'
-result_guard='typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)'
-
-for required in "$source_guard" "$progress" "$recursive" "$result_guard"
+for required in "$source_guard" "$progress" "$recursive"
 do
   printf '%s\n' "$condition" | grep -Fq "$required"
 done
+
+if printf '%s\n' "$condition" | grep -Fq 'typecheck(config.sym(Z_PRIME:SpectecTerminal, INSTR_PRIME_STAR:SpectecTerminals), syn.config)'; then
+  echo 'Step/ctxt-instrs repeated the certified recursive Step result typecheck' >&2
+  exit 1
+fi
 
 printf '%s\n' "$condition" | awk \
   -v progress="$progress" -v recursive="$recursive" \

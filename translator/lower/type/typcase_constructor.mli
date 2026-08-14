@@ -45,5 +45,10 @@ val certifies_ground :
   Il.Ast.exp list ->
   bool
 
+(** An exact source category may certify a total nullary constructor even
+    when the same target operator is shared by another category. *)
+val certifies_nullary_total :
+  resolution -> constructor_op:string -> bool
+
 val resolve_emitted :
   Context.t -> Il.Ast.typ -> Il.Ast.mixop -> arity:int -> lookup

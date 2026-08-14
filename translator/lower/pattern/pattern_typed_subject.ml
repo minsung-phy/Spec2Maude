@@ -1,5 +1,5 @@
 type producer =
-  | Deterministic_output
+  | Relation_output
   | Equality_value of Maude_ir.term * Maude_ir.eq_condition list
 
 type t =
@@ -15,9 +15,9 @@ type value =
 let result_has_fatal (result : Expr_result.result) =
   List.exists Diagnostics.is_fatal result.diagnostics
 
-let deterministic_output ~output_typ ~(pattern : Il.Ast.exp) =
+let relation_output ~output_typ ~(pattern : Il.Ast.exp) =
   if Il.Eq.eq_typ output_typ pattern.note then
-    Some { typ = output_typ; producer = Deterministic_output }
+    Some { typ = output_typ; producer = Relation_output }
   else
     None
 
@@ -49,7 +49,9 @@ let matches_result certificate (value : Expr_result.result) =
   match certificate.producer, value.term with
   | Equality_value (term, guards), Some value_term ->
     term = value_term && guards = value.guards && not (result_has_fatal value)
-  | Equality_value _, None | Deterministic_output, _ -> false
+  | Equality_value _, None
+  | Relation_output, _ ->
+    false
 
 let lower_pattern_named certificate names ctx env origin (pattern : Il.Ast.exp) =
   if Il.Eq.eq_typ certificate.typ pattern.note then

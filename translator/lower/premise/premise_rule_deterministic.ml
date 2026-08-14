@@ -192,7 +192,7 @@ let lower names ctx env ~bound_vars ~factor_head_domain origin prem rel_id exp
       in
       let output_pattern, names =
         match
-          Pattern_typed_subject.deterministic_output
+          Pattern_typed_subject.relation_output
             ~output_typ:shape.Relation_shape.output.typ
             ~pattern:output_exp
         with

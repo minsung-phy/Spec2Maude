@@ -130,8 +130,29 @@ let lower_execution_rule_premise
             output_typs
         in
         let (output_pattern_opt, output_guards, introduced, output_diags), names =
-          lower_rewrite_output_components_named
-            names ctx env origin output_exps
+          match output_typs, output_exps with
+          | [ output_typ ], [ output_exp ] ->
+            let result, names =
+              match
+                Pattern_typed_subject.relation_output
+                  ~output_typ ~pattern:output_exp
+              with
+              | Some certificate ->
+                Pattern_typed_subject.lower_pattern_named
+                  certificate names ctx env origin output_exp
+              | None ->
+                Expr_translate.lower_rewrite_output_pattern_named
+                  names ctx env origin output_exp
+            in
+            ( Option.map (fun term -> [ term ]) result.pattern_term
+            , result.pattern_guards
+            , result.introduced_bindings
+            , result.pattern_diagnostics
+            ),
+            names
+          | _ ->
+            lower_rewrite_output_components_named
+              names ctx env origin output_exps
         in
         (match input_terms_opt, output_pattern_opt, output_sorts_opt with
         | Some input_terms, Some output_patterns, Some output_sorts
