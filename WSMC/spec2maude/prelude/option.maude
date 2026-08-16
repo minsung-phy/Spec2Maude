@@ -1,0 +1,17 @@
+fmod DSL-OPTION is
+  protecting DSL-PRETYPE .
+  protecting QID .
+
+  op _? : [SpectecTerminal] -> SpectecTerminal [ctor] .
+  op _! : SpectecTerminal ~> SpectecTerminals .
+
+  var K : [SpectecTerminal] .
+  var TYPE : SpectecType .
+
+  eq (K ?)! = K .
+  eq typecheck(K ?, TYPE) = typecheck(K, TYPE) .
+
+  --- TypD emits one matching equation for every source constructor.
+
+  op _!_ : SpectecTerminal Qid ~> SpectecTerminals .
+endfm

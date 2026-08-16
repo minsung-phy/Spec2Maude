@@ -16,7 +16,7 @@ let indent text =
 (* Terms *)
 
 let emit_variable (variable : variable) =
-  variable.name ^ " : " ^ variable.sort
+  variable.name ^ ":" ^ variable.sort
 
 let rec emit_term = function
   | Var variable ->

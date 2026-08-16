@@ -1,0 +1,111 @@
+fmod DSL-SEQUENCE is
+  protecting DSL-OPTION .
+
+  op [_] : SpectecTerminals -> SpectecTerminals [prec 50] .
+  eq [TS] = TS .
+
+  op len : SpectecTerminals -> Nat .
+  op |_| : SpectecTerminals -> Nat .
+
+  vars N I : Nat .
+  var K : [SpectecTerminal] .
+  var T : SpectecTerminal .
+  vars TS WTS : SpectecTerminals .
+
+  eq len(eps) = 0 .
+  eq len(T) = 1 .
+  ceq len(T TS) = 1 + len(TS)
+    if TS =/= eps .
+  eq | TS | = len(TS) .
+
+  op _<-_ : [SpectecTerminal] SpectecTerminals -> Bool .
+
+  eq K <- eps = false .
+  eq T <- (T TS) = true .
+  ceq K <- (T TS) = K <- TS
+    if K =/= T .
+
+  op _++_ : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  eq TS ++ WTS = TS WTS .
+
+  op indexDefined : SpectecTerminals Nat -> Bool .
+  op index : SpectecTerminals Nat ~> SpectecTerminal .
+
+  eq indexDefined(TS, N) = N < len(TS) .
+  eq index(T TS, 0) = T .
+  ceq index(T TS, s(N)) = index(TS, N)
+    if TS =/= eps .
+
+  op _[_] : SpectecTerminals Nat ~> SpectecTerminal
+    [prec 10 gather (E e)] .
+  ceq TS[N] = index(TS, N)
+    if indexDefined(TS, N) .
+
+  op take : SpectecTerminals Nat -> SpectecTerminals .
+  op drop : SpectecTerminals Nat -> SpectecTerminals .
+  op slice : SpectecTerminals Nat Nat -> SpectecTerminals .
+
+  eq take(TS, 0) = eps .
+  eq take(eps, N) = eps .
+  eq take(T TS, s(N)) = T take(TS, N) .
+
+  eq drop(TS, 0) = TS .
+  eq drop(eps, N) = eps .
+  eq drop(T TS, s(N)) = drop(TS, N) .
+
+  eq slice(TS, N, I) = take(drop(TS, N), I) .
+
+  op _[_:_] : SpectecTerminals Nat Nat -> SpectecTerminals
+    [prec 10 gather (E e e)] .
+  eq TS[N : I] = slice(TS, N, I) .
+
+  op setAt : SpectecTerminals Nat [SpectecTerminal] -> SpectecTerminals .
+  op _[_=_] : SpectecTerminals Nat [SpectecTerminal] -> SpectecTerminals
+    [prec 10 gather (E e e)] .
+
+  var NEW-K : [SpectecTerminal] .
+  var NEW-TS : SpectecTerminals .
+
+  eq setAt(eps, N, NEW-K) = eps .
+  eq setAt(T TS, 0, NEW-K) = NEW-K TS .
+  eq setAt(T TS, s(N), NEW-K) = T setAt(TS, N, NEW-K) .
+  eq TS[N = NEW-K] = setAt(TS, N, NEW-K) .
+
+  op splice : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals .
+  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals
+    [prec 10 gather (E e e e)] .
+
+  eq splice(TS, N, I, NEW-TS)
+    = take(TS, N) NEW-TS drop(TS, N + I) .
+  eq TS[N : I = NEW-TS] = splice(TS, N, I, NEW-TS) .
+
+  op _[_=++_] : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals
+    [prec 10 gather (E e e)] .
+  op _[_:_=++_] : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals
+    [prec 10 gather (E e e e)] .
+
+  ceq TS[N =++ NEW-TS]
+    = setAt(TS, N, index(TS, N) ++ NEW-TS)
+    if indexDefined(TS, N) .
+  eq TS[N : I =++ NEW-TS]
+    = splice(TS, N, I, slice(TS, N, I) ++ NEW-TS) .
+
+  op lift : SpectecTerminals -> SpectecTerminals .
+  eq lift(eps) = eps .
+  eq lift(K ?) = K .
+
+  op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
+  op _^_ : SpectecTerminals Nat -> SpectecTerminals [ditto] .
+
+  eq repeatSeq(0, WTS) = eps .
+  eq repeatSeq(s(N), WTS) = WTS repeatSeq(N, WTS) .
+  eq WTS ^ N = repeatSeq(N, WTS) .
+
+  --- The concrete numeric equations for these source coercions belong to
+  --- builtins.maude.
+
+  op _:_<:>_ : SpectecTerminals SpectecType SpectecType
+    ~> SpectecTerminals .
+  op _:_<:_ : SpectecTerminals SpectecType SpectecType
+    ~> SpectecTerminals .
+endfm
