@@ -1,10 +1,3 @@
-type iter =
-  | Opt                          (* `?` *)
-  | List                         (* `*` *)
-  | List1                        (* `+` *)
-  | ListN of exp * id option     (* `^` exp *)
-
-
 open Il.Ast
 open Maude_il
 
