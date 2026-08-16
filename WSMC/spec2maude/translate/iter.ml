@@ -31,77 +31,18 @@ let translate_conditions translate_count value element_type iter =
       [check; EqCond (length value, translate_count count)]
 
 
-(* Generated helper names *)
-
-let sanitize name =
-  name
-  |> String.to_seq
-  |> Seq.map (function
-       | ('a'..'z' | 'A'..'Z' | '0'..'9' | '-') as char -> char
-       | _ -> '-')
-  |> String.of_seq
-
-let helper_name body =
-  match body.it with
-  | CallE (id, _) ->
-      "map-" ^ sanitize id.it
-  | _ ->
-      let pos = body.at.left in
-      let file = Filename.basename pos.file |> sanitize in
-      if file = "" then
-        Printf.sprintf "map-exp-%d-%d" pos.line pos.column
-      else
-        Printf.sprintf "map-%s-%d-%d" file pos.line pos.column
-
-
 (* Bound and captured variables *)
 
-let index_id = function
-  | ListN (_, Some id) -> [id]
-  | Opt | List | List1 | ListN (_, None) -> []
+let translate_captures translate_sort captures =
+  captures
+  |> List.map (fun (id, typ) ->
+       { name = String.uppercase_ascii id.it
+       ; sort = translate_sort typ
+       })
 
-let bound_ids iter generators =
-  index_id iter @ List.map fst generators
-
-let rec remove_id name = function
-  | [] -> []
-  | id :: ids when id = name -> ids
-  | id :: ids -> id :: remove_id name ids
-
-let capture_variables translate_sort body iter generators =
-  let bound = ref (List.map (fun id -> id.it) (bound_ids iter generators)) in
-  let captures : variable list ref = ref [] in
-  let add id typ =
-    if not (List.mem id.it !bound)
-       && not
-            (List.exists
-               (fun (variable : variable) ->
-                 variable.name = String.uppercase_ascii id.it)
-               !captures)
-    then
-      captures :=
-        { name = String.uppercase_ascii id.it
-        ; sort = translate_sort typ
-        }
-        :: !captures
-  in
-  let module Visitor = Il.Iter.Make (struct
-    include Il.Iter.Skip
-
-    let visit_exp exp =
-      match exp.it with
-      | VarE id -> add id exp.note
-      | _ -> ()
-
-    let scope_enter id _typ =
-      bound := id.it :: !bound
-
-    let scope_exit id () =
-      bound := remove_id id.it !bound
-  end)
-  in
-  Visitor.exp body;
-  List.rev !captures
+let capture_variables translate_sort body iterexp =
+  Prescan.capture_variables body iterexp
+  |> translate_captures translate_sort
 
 let term_of_variable (variable : variable) =
   Var variable
@@ -110,7 +51,7 @@ let terms_of_variables variables =
   List.map term_of_variable variables
 
 let capture_terms translate_sort body iter generators =
-  capture_variables translate_sort body iter generators
+  capture_variables translate_sort body (iter, generators)
   |> terms_of_variables
 
 
@@ -136,11 +77,12 @@ let translate_term translate_exp translate_sort body (iter, generators) =
   | ListN _, _ ->
       let captures = capture_terms translate_sort body iter generators in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
-      app (helper_name body) (captures @ controls translate_exp iter @ sources)
+      app (Prescan.iteration_name body)
+        (captures @ controls translate_exp iter @ sources)
   | (Opt | List | List1), _ :: _ ->
       let captures = capture_terms translate_sort body iter generators in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
-      app (helper_name body) (captures @ sources)
+      app (Prescan.iteration_name body) (captures @ sources)
 
 
 (* Generated helper declarations and equations *)
@@ -168,9 +110,6 @@ let tail_variable (id, _) =
   ; sort = "SpectecTerminals"
   }
 
-let declare (variable : variable) =
-  VarDecl ([variable.name], variable.sort)
-
 let helper_domain captures count index generators =
   List.map (fun (variable : variable) -> variable.sort) captures
   @ List.map
@@ -185,19 +124,6 @@ let helper_arrow iter generators =
   match iter, generators with
   | List, [_] -> Total
   | (Opt | List | List1 | ListN _), _ -> Partial
-
-let helper_variables iter captures count index heads tails =
-  List.map declare captures
-  @ List.map declare (Option.to_list count)
-  @ List.map declare (Option.to_list index)
-  @ (List.map2
-       (fun head tail ->
-         declare head
-         :: (match iter with
-             | Opt -> []
-             | List | List1 | ListN _ -> [declare tail]))
-       heads tails
-     |> List.concat)
 
 let empty_arguments captures count index generators =
   terms_of_variables captures
@@ -231,15 +157,20 @@ let next_arguments captures count index tails =
      | Some index -> [app "s" [term_of_variable index]])
   @ terms_of_variables tails
 
-let translate_statements translate_exp translate_sort body (iter, generators) =
+let translate_statements translate_exp translate_sort
+    (iteration : Prescan.iteration) =
+  let name = iteration.Prescan.name in
+  let body = iteration.Prescan.body in
+  let iter, generators = iteration.Prescan.iterexp in
   match iter, generators with
   | ListN (_, None), [] ->
       []
   | (Opt | List | List1), [] ->
       invalid_arg "IterE with Opt, List, or List1 requires a generator"
   | (Opt | List | List1 | ListN _), _ ->
-      let name = helper_name body in
-      let captures = capture_variables translate_sort body iter generators in
+      let captures =
+        translate_captures translate_sort iteration.Prescan.captures
+      in
       let count = count_variable iter in
       let index = index_variable iter in
       let heads = List.map (head_variable translate_sort) generators in
@@ -253,9 +184,6 @@ let translate_statements translate_exp translate_sort body (iter, generators) =
           ; arrow = helper_arrow iter generators
           ; attrs = []
           }
-      in
-      let variables =
-        helper_variables iter captures count index heads tails
       in
       let body_term =
         translate_exp body |> as_sequence_element body.note
@@ -321,8 +249,7 @@ let translate_statements translate_exp translate_sort body (iter, generators) =
               , []
               )
           in
-          declaration :: tail_declaration :: variables
-          @ [first; tail_base; tail_step]
+          [declaration; tail_declaration; first; tail_base; tail_step]
       | Opt | List | ListN _ ->
           let base =
             Eq
@@ -331,24 +258,41 @@ let translate_statements translate_exp translate_sort body (iter, generators) =
               , []
               )
           in
-          declaration :: variables @ [base; step]
+          [declaration; base; step]
 
 
-(* Nested IterE collection *)
+(* Whole-script helper materialization *)
 
-let collect_statements translate_exp translate_sort exp =
-  let groups = ref [] in
-  let module Visitor = Il.Iter.Make (struct
-    include Il.Iter.Skip
+let helper_key = function
+  | OpDecl declaration :: _ ->
+      declaration.name, declaration.domain, declaration.codomain
+  | [] ->
+      invalid_arg "an iteration helper cannot be empty"
+  | _ ->
+      invalid_arg "an iteration helper must start with an operator declaration"
 
-    let visit_exp exp =
-      match exp.it with
-      | IterE (body, iterexp) ->
-          groups :=
-            translate_statements translate_exp translate_sort body iterexp
-            :: !groups
-      | _ -> ()
-  end)
+let translate_all translate_exp translate_sort index =
+  let add groups iteration =
+    let statements =
+      translate_statements translate_exp translate_sort iteration
+    in
+    match statements with
+    | [] ->
+        groups
+    | _ ->
+        let key = helper_key statements in
+        begin match List.assoc_opt key groups with
+        | None ->
+            (key, statements) :: groups
+        | Some previous when previous = statements ->
+            groups
+        | Some _ ->
+            invalid_arg
+              ("conflicting iteration helpers named "
+               ^ iteration.Prescan.name)
+        end
   in
-  Visitor.exp exp;
-  !groups |> List.rev |> List.concat
+  Prescan.iterations index
+  |> List.fold_left add []
+  |> List.rev
+  |> List.concat_map snd

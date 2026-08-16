@@ -357,13 +357,4 @@ and translate_extension base path extension =
       translate_update base parent extended_parent
 
 
-type translation =
-  { term : term
-  ; statements : statement list
-  }
-
-let translate exp =
-  { term = translate_term exp
-  ; statements =
-      Iter.collect_statements translate_term Typ.translate_sort exp
-  }
+let translate = translate_term
