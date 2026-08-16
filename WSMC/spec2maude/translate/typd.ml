@@ -8,7 +8,7 @@ let translate_components typ =
 let translate_target id params args = 
   let terms =
     match args with
-    | [] -> params |> List.map Param.translate_term
+    | [] -> Param.translate_terms params
     | _ -> args |> List.map Term.translate_arg
   in App (id.it, terms)
 
@@ -141,15 +141,8 @@ let translate_variant id params quants args cases =
   cases |> List.concat_map (translate_typcase id target instance_conditions)
 
 (* TypD *)
-let translate_param_sort param =
-  match param.it with
-  | ExpP (_, typ) -> Term.translate_sort typ
-  | TypP _ -> "SpectecType"
-  | DefP _ -> invalid_arg "DefP must be specialized by prescan"
-  | GramP _ -> invalid_arg "GramP is not supported"
-
 let translate_type_decl id params =
-  let domain = params |> List.map translate_param_sort in
+  let domain = Param.translate_sorts params in
   OpDecl { name = id.it ; domain ; codomain = "SpectecType" ; arrow = Total ; attrs = [] }
 
 let translate_deftyp id params quants args deftyp = 
