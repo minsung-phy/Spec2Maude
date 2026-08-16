@@ -14,6 +14,6 @@ let translate_script script =
   let index = Prescan.scan script in
   let definitions = List.concat_map translate script in
   let iterations =
-    Iter.translate_all Exp.translate Typ.translate_sort index
+    Iter.translate_all Term.translate_exp Term.translate_sort index
   in
   definitions @ iterations
