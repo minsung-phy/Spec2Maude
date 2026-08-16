@@ -1,6 +1,9 @@
 open Il.Ast
 open Maude_il
 
+let translate_components typ =
+  Typ.translate_components Exp.translate_term typ
+
 (* AliasT *)
 let translate_target id params args = 
   let terms =
@@ -26,7 +29,7 @@ let join_struct_items = function
   | item :: items -> List.fold_left (fun left right -> App ("_;_", [left; right])) item items
 
 let translate_struct_field (atom, (typ, quants, prems), _hints) =
-  match Typ.translate_components typ with
+  match translate_components typ with
   | [(value, _, type_conditions)] ->
       let field = Const ("'" ^ Il.Print.string_of_atom atom) in
       let item = App ("item", [field; value]) in
@@ -87,7 +90,7 @@ let translate_union target case_conditions typ _hints =
 
 let translate_constructor _id target case_conditions mixop typ _hints =
   let constructor_name = Il.Print.string_of_mixop mixop in
-  let components = Typ.translate_components typ in
+  let components = translate_components typ in
   let values = components |> List.map (fun (value, _, _) -> value) in
   let domain = components |> List.map (fun (_, sort, _) -> sort) in
   let component_conditions = components |> List.concat_map (fun (_, _, conditions) -> conditions) in
@@ -110,7 +113,7 @@ let translate_constructor _id target case_conditions mixop typ _hints =
   [declaration] @ membership @ [typecheck_statement]
 
 let translate_numeric_case target case_conditions typ _quants prems _hints =
-  match typ.it, prems, Typ.translate_components typ with
+  match typ.it, prems, translate_components typ with
   | TupT [(_, payload_typ)], [{it = IfPr _; _}], [(value, _, _)] ->
       begin match payload_typ.it with
       | NumT (`NatT | `IntT) -> 
