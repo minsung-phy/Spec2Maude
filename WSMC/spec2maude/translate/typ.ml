@@ -23,15 +23,20 @@ let rec translate_sort typ =
   | TextT
   | TupT _ -> "SpectecTerminal"
 
+let translate_conditions translate_count value typ =
+  match typ.it with
+  | IterT (element_typ, iter) -> 
+      Iter.translate_conditions translate_count value (translate_term element_typ) iter
+  | _ -> [BoolCond (App ("typecheck", [value; translate_term typ]))]
+
 (* constructor 인자 하나 *)
-let make_component name typ =
+let make_component translate_count name typ =
   let sort = translate_sort typ in
   let value = Var {name; sort} in
-  let condition = BoolCond (App ("typecheck", [value; translate_term typ])) in
-  value, sort, [condition]
+  let condition = translate_conditions translate_count value typ in value, sort, conditions
 
 (* TupT 또는 타입 하나를 constructor 인자로 분해 *)
-let translate_components typ =
+let translate_components translate_count typ =
   match typ.it with
   | TupT fields -> 
       fields |> List.mapi (fun index (id, typ) ->
@@ -40,8 +45,6 @@ let translate_components typ =
                                 "VALUE" ^ string_of_int (index + 1)
                               else
                                 String.uppercase_ascii id.it
-                            in
-                            make_component name typ)
+                            in make_component translate_count name typ)
 
-  | _ ->
-      [make_component "VALUE" typ]
+  | _ -> [make_component translate_count "VALUE" typ]
