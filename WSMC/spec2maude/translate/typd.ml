@@ -2,20 +2,20 @@ open Il.Ast
 open Maude_il
 
 let translate_components typ =
-  Typ.translate_components Exp.translate_term typ
+  Term.translate_components typ
 
 (* AliasT *)
 let translate_target id params args = 
   let terms =
     match args with
     | [] -> params |> List.map Param.translate_term
-    | _ -> args |> List.map Arg.translate_term 
+    | _ -> args |> List.map Term.translate_arg
   in App (id.it, terms)
 
 let translate_alias id params quants args typ = 
-  let value = Var { name = "VALUE" ; sort = Typ.translate_sort typ} in
+  let value = Var { name = "VALUE" ; sort = Term.translate_sort typ} in
   let target = translate_target id params args in
-  let source = Typ.translate_term typ in
+  let source = Term.translate_typ typ in
   let left = App ("typecheck", [value; target]) in
   let right = App ("typecheck", [value; source]) in
   let conditions = Param.translate_eq_conditions quants in
@@ -81,8 +81,8 @@ let translate_struct id params quants args fields =
 let is_hole_only mixop = Xl.Mixop.flatten mixop |> List.for_all (( = ) [])
 
 let translate_union target case_conditions typ _hints =
-  let value = Var { name = "VALUE" ; sort = Typ.translate_sort typ } in
-  let source = Typ.translate_term typ in
+  let value = Var { name = "VALUE" ; sort = Term.translate_sort typ } in
+  let source = Term.translate_typ typ in
   let left = App ("typecheck", [value; target]) in
   let source_condition = BoolCond (App ("typecheck", [value; source])) in
   let conditions = case_conditions @ [source_condition] in
@@ -143,7 +143,7 @@ let translate_variant id params quants args cases =
 (* TypD *)
 let translate_param_sort param =
   match param.it with
-  | ExpP (_, typ) -> Typ.translate_sort typ
+  | ExpP (_, typ) -> Term.translate_sort typ
   | TypP _ -> "SpectecType"
   | DefP _ -> invalid_arg "DefP must be specialized by prescan"
   | GramP _ -> invalid_arg "GramP is not supported"
