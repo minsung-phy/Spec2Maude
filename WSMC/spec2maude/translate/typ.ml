@@ -33,7 +33,7 @@ let translate_conditions translate_count value typ =
 let make_component translate_count name typ =
   let sort = translate_sort typ in
   let value = Var {name; sort} in
-  let condition = translate_conditions translate_count value typ in value, sort, conditions
+  let conditions = translate_conditions translate_count value typ in value, sort, conditions
 
 (* TupT 또는 타입 하나를 constructor 인자로 분해 *)
 let translate_components translate_count typ =
