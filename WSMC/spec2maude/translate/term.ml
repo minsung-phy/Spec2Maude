@@ -50,7 +50,7 @@ let qid_of_atom atom =
   qid (Il.Print.string_of_atom atom)
 
 let qid_of_mixop mixop =
-  qid (Il.Print.string_of_mixop mixop)
+  qid (Mixop.name mixop)
 
 let source_name id =
   Prescan.sanitize id.it
@@ -212,7 +212,7 @@ and translate_exp exp =
           | TupE exps -> List.map translate_exp exps
           | _ -> [translate_exp payload]
         in
-        app (Il.Print.string_of_mixop mixop) args
+        app (Mixop.name mixop) args
 
   | UncaseE (case, mixop) ->
       app "_!_" [translate_exp case; qid_of_mixop mixop]

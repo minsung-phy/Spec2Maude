@@ -108,7 +108,7 @@ let translate_union target case_conditions typ _hints =
   [Ceq (left, Const "true", conditions, [])]
 
 let translate_constructor _id target case_conditions mixop typ _hints =
-  let constructor_name = Il.Print.string_of_mixop mixop in
+  let constructor_name = Mixop.name mixop in
   let components = translate_components typ in
   let values = components |> List.map (fun (value, _, _) -> value) in
   let domain = components |> List.map (fun (_, sort, _) -> sort) in
