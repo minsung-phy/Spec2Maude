@@ -436,6 +436,8 @@ and translate_extension base path extension =
 
 let translate_typ_conditions value typ =
   match typ.it with
+  | NumT (`NatT | `IntT) ->
+      []
   | IterT (element_typ, iter) ->
       Iter.translate_conditions
         translate_exp value (translate_typ element_typ) iter
