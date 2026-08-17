@@ -18,6 +18,51 @@ let indent text =
 let emit_variable (variable : variable) =
   variable.name ^ ":" ^ variable.sort
 
+let mixfix_holes name =
+  let rec count escaped index holes =
+    if index = String.length name then holes
+    else
+      match name.[index] with
+      | '`' -> count (not escaped) (index + 1) holes
+      | '_' when not escaped -> count false (index + 1) (holes + 1)
+      | _ -> count false (index + 1) holes
+  in
+  count false 0 0
+
+let is_identifier_char = function
+  | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-' -> true
+  | _ -> false
+
+let is_mixfix name args =
+  mixfix_holes name = List.length args
+  && (name = "if_then_else_fi"
+      || name = "_implies_"
+      || String.exists (Fun.negate is_identifier_char) name)
+
+let emit_mixfix emit_term name args =
+  let buffer = Buffer.create (String.length name + 32) in
+  let emit_argument term =
+    match term with
+    | App (name, args) when is_mixfix name args ->
+        "(" ^ emit_term term ^ ")"
+    | Var _ | Const _ | App _ -> emit_term term
+  in
+  let rec emit escaped index = function
+    | args when index = String.length name ->
+        if args <> [] then invalid_arg "mixfix operator arity mismatch"
+    | arg :: args when name.[index] = '_' && not escaped ->
+        Buffer.add_char buffer ' ';
+        Buffer.add_string buffer (emit_argument arg);
+        Buffer.add_char buffer ' ';
+        emit false (index + 1) args
+    | args ->
+        let char = name.[index] in
+        if char <> '`' then Buffer.add_char buffer char;
+        emit (char = '`' && not escaped) (index + 1) args
+  in
+  emit false 0 args;
+  Buffer.contents buffer |> String.trim
+
 let rec emit_term = function
   | Var variable ->
       emit_variable variable
@@ -32,6 +77,9 @@ let rec emit_term = function
 
   | App (name, []) ->
       name
+
+  | App (name, args) when is_mixfix name args ->
+      emit_mixfix emit_term name args
 
   | App (name, args) ->
       let args =
@@ -114,7 +162,7 @@ let emit_eq_condition = function
       emit_term term ^ " : " ^ sort
 
   | BoolCond term ->
-      "(" ^ emit_term term ^ ") = true"
+      emit_term term
 
 let emit_rule_condition = function
   | EqCondition condition ->

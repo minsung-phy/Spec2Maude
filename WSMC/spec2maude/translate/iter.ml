@@ -41,7 +41,7 @@ let translate_captures translate_sort captures =
        })
 
 let capture_variables translate_sort body iterexp =
-  Prescan.capture_variables body iterexp
+  Prescan.capture_exp_variables body iterexp
   |> translate_captures translate_sort
 
 let term_of_variable (variable : variable) =
@@ -101,7 +101,7 @@ let head_variable translate_sort (id, source) =
   let sort =
     match source.note.it with
     | IterT (typ, _) -> translate_sort typ
-    | _ -> invalid_arg "IterE generator must have an iteration type"
+    | _ -> invalid_arg "iteration generator must have an iteration type"
   in
   {name = String.uppercase_ascii id.it; sort}
 
@@ -293,6 +293,260 @@ let translate_all translate_exp translate_sort index =
         end
   in
   Prescan.iterations index
+  |> List.fold_left add []
+  |> List.rev
+  |> List.concat_map snd
+
+
+(* Premise iteration *)
+
+let mixop_has atoms mixop =
+  Xl.Mixop.flatten mixop
+  |> List.exists (List.exists (fun atom -> List.mem atom.it atoms))
+
+let direct_rule_components mixop exp =
+  match Xl.Mixop.arity mixop, exp.it with
+  | 0, TupE [] -> Some []
+  | 1, VarE id -> Some [id.it]
+  | arity, TupE exps when List.length exps = arity ->
+      let rec names = function
+        | [] -> Some []
+        | {it = VarE id; _} :: exps ->
+            Option.map (fun names -> id.it :: names) (names exps)
+        | _ -> None
+      in
+      names exps
+  | _ -> None
+
+let has_scalar_generator generators =
+  List.exists
+    (fun (_, source) ->
+      match source.note.it with
+      | IterT (element, _) ->
+          begin match element.it with IterT _ -> false | _ -> true end
+      | _ -> false)
+    generators
+
+let source_named_premise iteration =
+  let body = iteration.Prescan.body in
+  let iter, generators = iteration.Prescan.iterexp in
+  let non_indexed =
+    match iter with
+    | Opt | List | List1 | ListN (_, None) -> true
+    | ListN (_, Some _) -> false
+  in
+  match body.it with
+  | RulePr (_, [], mixop, exp)
+    when non_indexed
+         && has_scalar_generator generators
+         && mixop_has Xl.Atom.[Turnstile; TurnstileSub; Sub] mixop ->
+      let expected =
+        List.map (fun (id, _) -> id.it) iteration.Prescan.captures
+        @ List.map (fun (id, _) -> id.it) generators
+      in
+      direct_rule_components mixop exp = Some expected
+  | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> false
+
+let premise_helper_name iteration =
+  match iteration.Prescan.body.it with
+  | RulePr (id, _, _, _) when source_named_premise iteration ->
+      Prescan.sanitize id.it
+  | _ -> iteration.Prescan.name
+
+let premise_helper_iter iteration =
+  match iteration.Prescan.iterexp with
+  | (Opt | List | List1 | ListN (_, None)), _
+    when source_named_premise iteration -> List
+  | iter, _ -> iter
+
+let premise_helper_call translate_exp translate_sort iteration =
+  let iter, generators = iteration.Prescan.iterexp in
+  let captures =
+    translate_captures translate_sort iteration.Prescan.captures
+    |> terms_of_variables
+  in
+  let sources = List.map (fun (_, source) -> translate_exp source) generators in
+  let sources =
+    match iter with
+    | Opt when source_named_premise iteration ->
+        List.map (fun source -> app "lift" [source]) sources
+    | Opt | List | List1 | ListN _ -> sources
+  in
+  app (premise_helper_name iteration)
+    (captures
+     @ (if source_named_premise iteration then []
+        else controls translate_exp iter)
+     @ sources)
+
+let translate_premise index translate_exp translate_sort
+    premise =
+  match Prescan.premise_iteration index premise with
+  | Some iteration ->
+      let call = premise_helper_call translate_exp translate_sort iteration in
+      let cardinality =
+        match iteration.Prescan.iterexp with
+        | List1, (_, source) :: _ when source_named_premise iteration ->
+            [EqCondition
+               (BoolCond
+                  (app "_<_" [Const "0"; length (translate_exp source)]))]
+        | ListN (count, None), (_, source) :: _
+          when source_named_premise iteration ->
+            [EqCondition
+               (EqCond (length (translate_exp source), translate_exp count))]
+        | _ -> []
+      in
+      EqCondition (BoolCond call) :: cardinality
+  | None -> invalid_arg "IterPr is missing from the prescan index"
+
+
+(* Generated premise helpers *)
+
+let equation left right conditions =
+  match conditions with
+  | [] -> Eq (left, right, [])
+  | _ -> Ceq (left, right, conditions, [])
+
+let premise_local_names iteration =
+  let iter, generators = iteration.Prescan.iterexp in
+  let indexes =
+    match iter with
+    | ListN (_, Some id) -> [id.it]
+    | Opt | List | List1 | ListN (_, None) -> []
+  in
+  List.map (fun (id, _) -> id.it) iteration.Prescan.captures
+  @ indexes
+  @ List.map (fun (id, _) -> id.it) generators
+
+let premise_conditions translate_body iteration =
+  let conditions, otherwise =
+    translate_body (premise_local_names iteration) iteration.Prescan.body
+  in
+  if otherwise then invalid_arg "IterPr body cannot contain ElsePr";
+  List.map
+    (function
+      | EqCondition condition -> condition
+      | RewriteCond _ ->
+          invalid_arg "an IterPr helper cannot contain a rewrite condition")
+    conditions
+
+let premise_helper_declaration name domain =
+  OpDecl
+    { name
+    ; domain
+    ; codomain = "Bool"
+    ; arrow = Partial
+    ; attrs = []
+    }
+
+let premise_helper_arguments captures count index sources =
+  terms_of_variables captures
+  @ Option.to_list count
+  @ Option.to_list index
+  @ sources
+
+let canonical_variables prefix variables =
+  List.mapi
+    (fun index (variable : variable) ->
+      {variable with name = prefix ^ string_of_int (index + 1)})
+    variables
+
+let translate_premise_statements translate_body translate_sort
+    (iteration : Prescan.premise_iteration) =
+  let name = premise_helper_name iteration in
+  let _, generators = iteration.Prescan.iterexp in
+  let iter = premise_helper_iter iteration in
+  let captures =
+    translate_captures translate_sort iteration.Prescan.captures
+  in
+  let count = count_variable iter in
+  let index = index_variable iter in
+  let heads = List.map (head_variable translate_sort) generators in
+  let tails = List.map tail_variable generators in
+  let captures, heads, tails =
+    if source_named_premise iteration then
+      canonical_variables "CAPTURE" captures,
+      canonical_variables "ITEM" heads,
+      canonical_variables "TAIL" tails
+    else
+      captures, heads, tails
+  in
+  let domain = helper_domain captures count index generators in
+  let call name args = app name args in
+  let arguments count index sources =
+    premise_helper_arguments captures count index sources
+  in
+  let conditions =
+    if source_named_premise iteration then
+      [BoolCond
+         (app name
+            (terms_of_variables captures @ terms_of_variables heads))]
+    else
+      premise_conditions translate_body iteration
+  in
+  let declaration = premise_helper_declaration name domain in
+  let empty_sources = List.map (fun _ -> Const "eps") generators in
+  let base count index =
+    Eq (call name (arguments count index empty_sources), Const "true", [])
+  in
+  let source_patterns iter = source_arguments iter heads tails in
+  let step name iter count index next_count next_index next_name =
+    let left = call name (arguments count index (source_patterns iter)) in
+    let right = call next_name (arguments next_count next_index
+                                  (terms_of_variables tails)) in
+    equation left right conditions
+  in
+  match iter, generators with
+  | (Opt | List | List1), [] ->
+      invalid_arg "IterPr with Opt, List, or List1 requires a generator"
+  | Opt, _ ->
+      let single =
+        equation
+          (call name (arguments None None (source_patterns Opt)))
+          (Const "true") conditions
+      in
+      [declaration; base None None; single]
+  | List, _ ->
+      let step = step name List None None None None name in
+      [declaration; base None None; step]
+  | List1, _ ->
+      let tail_name = name ^ "-tail" in
+      let tail_declaration = premise_helper_declaration tail_name domain in
+      let first = step name List None None None None tail_name in
+      let tail_step = step tail_name List None None None None tail_name in
+      let tail_base =
+        Eq (call tail_name (arguments None None empty_sources), Const "true", [])
+      in
+      [declaration; tail_declaration; first; tail_base; tail_step]
+  | ListN _, _ ->
+      let count = Option.get count in
+      let next_index =
+        match Option.map term_of_variable index with
+        | None -> None
+        | Some term -> Some (app "s" [term])
+      in
+      let step =
+        step name List
+          (Some (app "s" [term_of_variable count]))
+          (Option.map term_of_variable index)
+          (Some (term_of_variable count)) next_index name
+      in
+      [declaration; base (Some (Const "0"))
+         (Option.map term_of_variable index); step]
+
+let translate_premise_all translate_body translate_sort index =
+  let add groups iteration =
+    let statements =
+      translate_premise_statements translate_body translate_sort iteration
+    in
+    let key = helper_key statements in
+    match List.assoc_opt key groups with
+    | None -> (key, statements) :: groups
+    | Some previous when previous = statements -> groups
+    | Some _ ->
+        let name, _, _ = key in
+        invalid_arg ("conflicting IterPr overload named " ^ name)
+  in
+  Prescan.premise_iterations index
   |> List.fold_left add []
   |> List.rev
   |> List.concat_map snd
