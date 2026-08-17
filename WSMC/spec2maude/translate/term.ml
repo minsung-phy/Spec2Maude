@@ -53,7 +53,7 @@ let qid_of_mixop mixop =
   qid (Il.Print.string_of_mixop mixop)
 
 let source_name id =
-  id.it
+  Prescan.sanitize id.it
 
 
 (* Primitive operators *)
@@ -132,7 +132,7 @@ let is_hole_only mixop =
 let rec translate_typ typ =
   match typ.it with
   | VarT (id, args) ->
-      app id.it (List.map translate_arg args)
+      app (source_name id) (List.map translate_arg args)
   | BoolT ->
       Const "bool"
   | NumT numtyp ->
@@ -151,7 +151,7 @@ and translate_arg arg =
   | TypA typ ->
       translate_typ typ
   | DefA id ->
-      Const id.it
+      Const (source_name id)
   | GramA _ ->
       invalid_arg "GramA is not translated"
 
@@ -307,6 +307,35 @@ and translate_exp exp =
         ; translate_typ source
         ; translate_typ target
         ]
+
+
+and translate_bool exp =
+  match exp.it with
+  | BoolE value ->
+      Const (string_of_bool value)
+
+  | UnE (`NotOp, _, inner) ->
+      app "~_" [translate_bool inner]
+
+  | BinE (`ImplOp, `BoolT, left, right) ->
+      app "_implies_" [translate_bool left; translate_bool right]
+
+  | BinE ((`AndOp | `OrOp | `EquivOp) as op,
+          `BoolT, left, right) ->
+      app (translate_binop op `BoolT)
+        [translate_bool left; translate_bool right]
+
+  | CmpE (op, _, left, right) ->
+      app (translate_cmpop op)
+        [ translate_exp left |> unwrap left.note
+        ; translate_exp right |> unwrap right.note
+        ]
+
+  | MemE (element, collection) ->
+      app "_<-_" [translate_exp element; translate_exp collection]
+
+  | _ ->
+      translate_exp exp |> unwrap exp.note
 
 
 and translate_select base path =
