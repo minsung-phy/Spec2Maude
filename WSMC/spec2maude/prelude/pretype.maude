@@ -1,6 +1,7 @@
 fmod DSL-TERM is
   sort SpectecTerminal .
   sort SpectecType .
+  sort SpectecDef .
 endfm
 
 fmod DSL-PRETYPE is
