@@ -33,16 +33,13 @@ let translate_conditions translate_count value element_type iter =
 
 (* Bound and captured variables *)
 
-let translate_captures translate_sort captures =
+let translate_captures index captures =
   captures
-  |> List.map (fun (id, typ) ->
-       { name = String.uppercase_ascii id.it
-       ; sort = translate_sort typ
-       })
+  |> List.map (fun (id, typ) -> Prescan.source_variable index id typ)
 
-let capture_variables translate_sort body iterexp =
+let capture_variables index body iterexp =
   Prescan.capture_exp_variables body iterexp
-  |> translate_captures translate_sort
+  |> translate_captures index
 
 let term_of_variable (variable : variable) =
   Var variable
@@ -50,8 +47,8 @@ let term_of_variable (variable : variable) =
 let terms_of_variables variables =
   List.map term_of_variable variables
 
-let capture_terms translate_sort body iter generators =
-  capture_variables translate_sort body (iter, generators)
+let capture_terms index body iter generators =
+  capture_variables index body (iter, generators)
   |> terms_of_variables
 
 
@@ -65,7 +62,7 @@ let controls translate_exp = function
   | ListN (count, Some _) ->
       [translate_exp count; Const "0"]
 
-let translate_term translate_exp translate_sort body (iter, generators) =
+let translate_term index translate_exp body (iter, generators) =
   match iter, generators with
   | ListN (count, None), [] ->
       app "_^_"
@@ -75,12 +72,12 @@ let translate_term translate_exp translate_sort body (iter, generators) =
   | (Opt | List | List1), [] ->
       invalid_arg "IterE with Opt, List, or List1 requires a generator"
   | ListN _, _ ->
-      let captures = capture_terms translate_sort body iter generators in
+      let captures = capture_terms index body iter generators in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
       app (Prescan.iteration_name body)
         (captures @ controls translate_exp iter @ sources)
   | (Opt | List | List1), _ :: _ ->
-      let captures = capture_terms translate_sort body iter generators in
+      let captures = capture_terms index body iter generators in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
       app (Prescan.iteration_name body) (captures @ sources)
 
@@ -88,26 +85,26 @@ let translate_term translate_exp translate_sort body (iter, generators) =
 (* Generated helper declarations and equations *)
 
 let count_variable = function
-  | ListN _ -> Some {name = "ITER-COUNT"; sort = "Nat"}
+  | ListN _ ->
+      Some {name = "ITER-COUNT"; sort = "Nat"; source = false}
   | Opt | List | List1 -> None
 
-let index_variable = function
+let index_variable index = function
   | ListN (_, Some id) ->
-      Some {name = String.uppercase_ascii id.it; sort = "Nat"}
+      let typ = NumT `NatT $ id.at in
+      Some (Prescan.source_variable index id typ)
   | Opt | List | List1 | ListN (_, None) ->
       None
 
-let head_variable translate_sort (id, source) =
-  let sort =
-    match source.note.it with
-    | IterT (typ, _) -> translate_sort typ
-    | _ -> invalid_arg "iteration generator must have an iteration type"
-  in
-  {name = String.uppercase_ascii id.it; sort}
+let head_variable index (id, source) =
+  match source.note.it with
+  | IterT (typ, _) -> Prescan.source_variable index id typ
+  | _ -> invalid_arg "iteration generator must have an iteration type"
 
 let tail_variable (id, _) =
   { name = String.uppercase_ascii id.it ^ "S"
   ; sort = "SpectecTerminals"
+  ; source = false
   }
 
 let helper_domain captures count index generators =
@@ -157,7 +154,7 @@ let next_arguments captures count index tails =
      | Some index -> [app "s" [term_of_variable index]])
   @ terms_of_variables tails
 
-let translate_statements translate_exp translate_sort
+let translate_statements index translate_exp
     (iteration : Prescan.iteration) =
   let name = iteration.Prescan.name in
   let body = iteration.Prescan.body in
@@ -169,17 +166,17 @@ let translate_statements translate_exp translate_sort
       invalid_arg "IterE with Opt, List, or List1 requires a generator"
   | (Opt | List | List1 | ListN _), _ ->
       let captures =
-        translate_captures translate_sort iteration.Prescan.captures
+        translate_captures index iteration.Prescan.captures
       in
       let count = count_variable iter in
-      let index = index_variable iter in
-      let heads = List.map (head_variable translate_sort) generators in
+      let iter_index = index_variable index iter in
+      let heads = List.map (head_variable index) generators in
       let tails = List.map tail_variable generators in
       let call args = app name args in
       let declaration =
         OpDecl
           { name
-          ; domain = helper_domain captures count index generators
+          ; domain = helper_domain captures count iter_index generators
           ; codomain = "SpectecTerminals"
           ; arrow = helper_arrow iter generators
           ; attrs = []
@@ -195,12 +192,13 @@ let translate_statements translate_exp translate_sort
         | List | List1 | ListN _ ->
             app "_ _"
               [ body_term
-              ; call (next_arguments captures count index tails)
+              ; call (next_arguments captures count iter_index tails)
               ]
       in
       let step =
         Eq
-          ( call (step_arguments iter captures count index heads tails)
+          ( call
+              (step_arguments iter captures count iter_index heads tails)
           , step_result
           , []
           )
@@ -212,7 +210,7 @@ let translate_statements translate_exp translate_sort
           let tail_declaration =
             OpDecl
               { name = tail_name
-              ; domain = helper_domain captures count index generators
+              ; domain = helper_domain captures count iter_index generators
               ; codomain = "SpectecTerminals"
               ; arrow = helper_arrow List generators
               ; attrs = []
@@ -253,7 +251,7 @@ let translate_statements translate_exp translate_sort
       | Opt | List | ListN _ ->
           let base =
             Eq
-              ( call (empty_arguments captures count index generators)
+              ( call (empty_arguments captures count iter_index generators)
               , Const "eps"
               , []
               )
@@ -271,10 +269,10 @@ let helper_key = function
   | _ ->
       invalid_arg "an iteration helper must start with an operator declaration"
 
-let translate_all translate_exp translate_sort index =
+let translate_all translate_exp index =
   let add groups iteration =
     let statements =
-      translate_statements translate_exp translate_sort iteration
+      translate_statements index translate_exp iteration
     in
     match statements with
     | [] ->
@@ -347,10 +345,10 @@ let source_named_premise iteration =
       direct_rule_components mixop exp = Some expected
   | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> false
 
-let premise_helper_name iteration =
+let premise_helper_name index iteration =
   match iteration.Prescan.body.it with
   | RulePr (id, _, _, _) when source_named_premise iteration ->
-      Prescan.sanitize id.it
+      Prescan.rel_name index id
   | _ -> iteration.Prescan.name
 
 let premise_helper_iter iteration =
@@ -359,10 +357,10 @@ let premise_helper_iter iteration =
     when source_named_premise iteration -> List
   | iter, _ -> iter
 
-let premise_helper_call translate_exp translate_sort iteration =
+let premise_helper_call index translate_exp iteration =
   let iter, generators = iteration.Prescan.iterexp in
   let captures =
-    translate_captures translate_sort iteration.Prescan.captures
+    translate_captures index iteration.Prescan.captures
     |> terms_of_variables
   in
   let sources = List.map (fun (_, source) -> translate_exp source) generators in
@@ -372,17 +370,18 @@ let premise_helper_call translate_exp translate_sort iteration =
         List.map (fun source -> app "lift" [source]) sources
     | Opt | List | List1 | ListN _ -> sources
   in
-  app (premise_helper_name iteration)
+  app (premise_helper_name index iteration)
     (captures
      @ (if source_named_premise iteration then []
         else controls translate_exp iter)
      @ sources)
 
-let translate_premise index translate_exp translate_sort
-    premise =
+let translate_premise index translate_exp premise =
   match Prescan.premise_iteration index premise with
   | Some iteration ->
-      let call = premise_helper_call translate_exp translate_sort iteration in
+      let call =
+        premise_helper_call index translate_exp iteration
+      in
       let cardinality =
         match iteration.Prescan.iterexp with
         | List1, (_, source) :: _ when source_named_premise iteration ->
@@ -447,20 +446,23 @@ let premise_helper_arguments captures count index sources =
 let canonical_variables prefix variables =
   List.mapi
     (fun index (variable : variable) ->
-      {variable with name = prefix ^ string_of_int (index + 1)})
+      { variable with
+        name = prefix ^ string_of_int (index + 1)
+      ; source = false
+      })
     variables
 
-let translate_premise_statements translate_body translate_sort
+let translate_premise_statements index translate_body
     (iteration : Prescan.premise_iteration) =
-  let name = premise_helper_name iteration in
+  let name = premise_helper_name index iteration in
   let _, generators = iteration.Prescan.iterexp in
   let iter = premise_helper_iter iteration in
   let captures =
-    translate_captures translate_sort iteration.Prescan.captures
+    translate_captures index iteration.Prescan.captures
   in
   let count = count_variable iter in
-  let index = index_variable iter in
-  let heads = List.map (head_variable translate_sort) generators in
+  let iter_index = index_variable index iter in
+  let heads = List.map (head_variable index) generators in
   let tails = List.map tail_variable generators in
   let captures, heads, tails =
     if source_named_premise iteration then
@@ -470,7 +472,7 @@ let translate_premise_statements translate_body translate_sort
     else
       captures, heads, tails
   in
-  let domain = helper_domain captures count index generators in
+  let domain = helper_domain captures count iter_index generators in
   let call name args = app name args in
   let arguments count index sources =
     premise_helper_arguments captures count index sources
@@ -520,23 +522,23 @@ let translate_premise_statements translate_body translate_sort
   | ListN _, _ ->
       let count = Option.get count in
       let next_index =
-        match Option.map term_of_variable index with
+        match Option.map term_of_variable iter_index with
         | None -> None
         | Some term -> Some (app "s" [term])
       in
       let step =
         step name List
           (Some (app "s" [term_of_variable count]))
-          (Option.map term_of_variable index)
+          (Option.map term_of_variable iter_index)
           (Some (term_of_variable count)) next_index name
       in
       [declaration; base (Some (Const "0"))
-         (Option.map term_of_variable index); step]
+         (Option.map term_of_variable iter_index); step]
 
-let translate_premise_all translate_body translate_sort index =
+let translate_premise_all translate_body index =
   let add groups iteration =
     let statements =
-      translate_premise_statements translate_body translate_sort iteration
+      translate_premise_statements index translate_body iteration
     in
     let key = helper_key statements in
     match List.assoc_opt key groups with

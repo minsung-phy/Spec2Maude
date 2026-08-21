@@ -16,16 +16,8 @@ let app name args = App (name, args)
 
 (* Sorts *)
 
-let translate_sort typ =
-  match typ.it with
-  | NumT `NatT -> "Nat"
-  | NumT `IntT -> "Int"
-  | IterT _ -> "SpectecTerminals"
-  | VarT _
-  | BoolT
-  | NumT (`RatT | `RealT)
-  | TextT
-  | TupT _ -> "SpectecTerminal"
+let translate_sort index typ =
+  Prescan.sort_of_typ index typ
 
 let translate_number num =
   let text = Xl.Num.to_string num in
@@ -49,11 +41,8 @@ let qid text =
 let qid_of_atom atom =
   qid (Il.Print.string_of_atom atom)
 
-let qid_of_mixop mixop =
-  qid (Mixop.name mixop)
-
-let source_name id =
-  Prescan.sanitize id.it
+let qid_of_mixop index mixop =
+  qid (Prescan.mixop_name index mixop)
 
 
 (* Primitive operators *)
@@ -129,10 +118,10 @@ let is_hole_only mixop =
 
 (* Recursive translation *)
 
-let rec translate_typ typ =
+let rec translate_typ index typ =
   match typ.it with
   | VarT (id, args) ->
-      app (source_name id) (List.map translate_arg args)
+      app (Prescan.typ_name index id) (List.map (translate_arg index) args)
   | BoolT ->
       Const "bool"
   | NumT numtyp ->
@@ -142,26 +131,23 @@ let rec translate_typ typ =
   | TupT _ ->
       invalid_arg "TupT must be translated by translate_components"
   | IterT (typ, _) ->
-      translate_typ typ
+      translate_typ index typ
 
-and translate_arg arg =
+and translate_arg index arg =
   match arg.it with
   | ExpA exp ->
-      translate_exp exp
+      translate_exp index exp
   | TypA typ ->
-      translate_typ typ
+      translate_typ index typ
   | DefA id ->
-      Const (source_name id)
+      Const (Prescan.def_name index id)
   | GramA _ ->
       invalid_arg "GramA is not translated"
 
-and translate_exp exp =
+and translate_exp index exp =
   match exp.it with
   | VarE id ->
-      Var
-        { name = String.uppercase_ascii id.it
-        ; sort = translate_sort exp.note
-        }
+      Var (Prescan.source_variable index id exp.note)
 
   | BoolE value ->
       app "bool" [Const (string_of_bool value)]
@@ -173,294 +159,299 @@ and translate_exp exp =
       translate_text value
 
   | UnE (`PlusOp, _, inner) ->
-      translate_exp inner
+      translate_exp index inner
 
   | UnE (op, _, inner) ->
-      let operand = translate_exp inner |> unwrap inner.note in
+      let operand = translate_exp index inner |> unwrap inner.note in
       app (translate_unop op) [operand]
       |> wrap exp.note
 
   | BinE (op, optyp, left, right) ->
-      let left = translate_exp left |> unwrap left.note in
-      let right = translate_exp right |> unwrap right.note in
+      let left = translate_exp index left |> unwrap left.note in
+      let right = translate_exp index right |> unwrap right.note in
       app (translate_binop op optyp) [left; right]
       |> wrap exp.note
 
   | CmpE (op, _, left, right) ->
-      let left = translate_exp left |> unwrap left.note in
-      let right = translate_exp right |> unwrap right.note in
+      let left = translate_exp index left |> unwrap left.note in
+      let right = translate_exp index right |> unwrap right.note in
       app (translate_cmpop op) [left; right]
       |> wrap exp.note
 
   | TupE exps ->
       exps
       |> List.map (fun exp ->
-           translate_exp exp |> as_sequence_element exp.note)
+           translate_exp index exp |> as_sequence_element exp.note)
       |> sequence
       |> fun terms -> app "tuple" [terms]
 
-  | ProjE (tuple, index) ->
-      app "_._" [translate_exp tuple; Const (string_of_int index)]
+  | ProjE (tuple, field_index) ->
+      app "_._"
+        [translate_exp index tuple; Const (string_of_int field_index)]
       |> from_sequence_element exp.note
 
   | CaseE (mixop, payload) ->
       if is_hole_only mixop then
-        translate_exp payload
+        translate_exp index payload
       else
         let args =
           match payload.it with
-          | TupE exps -> List.map translate_exp exps
-          | _ -> [translate_exp payload]
+          | TupE exps -> List.map (translate_exp index) exps
+          | _ -> [translate_exp index payload]
         in
-        app (Mixop.name mixop) args
+        app (Prescan.mixop_name index mixop) args
 
   | UncaseE (case, mixop) ->
-      app "_!_" [translate_exp case; qid_of_mixop mixop]
+      app "_!_" [translate_exp index case; qid_of_mixop index mixop]
       |> from_sequence_element exp.note
 
   | OptE None ->
       Const "eps"
 
   | OptE (Some inner) ->
-      app "_?" [translate_exp inner |> as_sequence_element inner.note]
+      app "_?" [translate_exp index inner |> as_sequence_element inner.note]
 
   | TheE option ->
-      app "_!" [translate_exp option]
+      app "_!" [translate_exp index option]
       |> from_sequence_element exp.note
 
   | StrE fields ->
       fields
       |> List.map (fun (atom, field) ->
-           app "item" [qid_of_atom atom; translate_exp field])
+           app "item" [qid_of_atom atom; translate_exp index field])
       |> record_items
       |> fun items -> app "{_}" [items]
 
   | DotE (record, atom) ->
-      app "_._" [translate_exp record; qid_of_atom atom]
+      app "_._" [translate_exp index record; qid_of_atom atom]
 
   | CompE (left, right) ->
-      app "_++_" [translate_exp left; translate_exp right]
+      app "_++_" [translate_exp index left; translate_exp index right]
 
   | ListE exps ->
       exps
       |> List.map (fun exp ->
-           translate_exp exp |> as_sequence_element exp.note)
+           translate_exp index exp |> as_sequence_element exp.note)
       |> sequence
       |> fun terms -> app "`[_`]" [terms]
 
   | LiftE inner ->
-      app "lift" [translate_exp inner]
+      app "lift" [translate_exp index inner]
 
   | MemE (element, collection) ->
-      app "_<-_" [translate_exp element; translate_exp collection]
+      app "_<-_" [translate_exp index element; translate_exp index collection]
       |> wrap exp.note
 
   | LenE sequence ->
-      app "|_|" [translate_exp sequence]
+      app "|_|" [translate_exp index sequence]
 
   | CatE (left, right) ->
-      app "_++_" [translate_exp left; translate_exp right]
+      app "_++_" [translate_exp index left; translate_exp index right]
 
-  | IdxE (sequence, index) ->
-      app "_`[_`]" [translate_exp sequence; translate_exp index]
+  | IdxE (sequence, element_index) ->
+      app "_`[_`]"
+        [translate_exp index sequence; translate_exp index element_index]
       |> from_sequence_element exp.note
 
-  | SliceE (sequence, index, length) ->
+  | SliceE (sequence, start, length) ->
       app "_`[_:_`]"
-        [ translate_exp sequence
-        ; translate_exp index
-        ; translate_exp length
+        [ translate_exp index sequence
+        ; translate_exp index start
+        ; translate_exp index length
         ]
 
   | UpdE (base, path, replacement) ->
       translate_update
-        (translate_exp base) path (translate_exp replacement)
+        index (translate_exp index base) path (translate_exp index replacement)
 
   | ExtE (base, path, extension) ->
       translate_extension
-        (translate_exp base) path (translate_exp extension)
+        index (translate_exp index base) path (translate_exp index extension)
 
   | IfE (condition, then_exp, else_exp) ->
       app "if_then_else_fi"
-        [ translate_exp condition |> unwrap condition.note
-        ; translate_exp then_exp
-        ; translate_exp else_exp
+        [ translate_exp index condition |> unwrap condition.note
+        ; translate_exp index then_exp
+        ; translate_exp index else_exp
         ]
 
   | CallE (id, args) ->
-      app (source_name id) (List.map translate_arg args)
+      app (Prescan.def_name index id) (List.map (translate_arg index) args)
 
   | IterE (body, (iter, generators)) ->
       Iter.translate_term
-        translate_exp translate_sort body (iter, generators)
+        index (translate_exp index) body (iter, generators)
 
   | CvtE (inner, source, target) ->
       app "_:_<:>_"
-        [ translate_exp inner
+        [ translate_exp index inner
         ; Const (Xl.Num.string_of_typ source)
         ; Const (Xl.Num.string_of_typ target)
         ]
 
   | SubE (inner, source, target) ->
       app "_:_<:_"
-        [ translate_exp inner
-        ; translate_typ source
-        ; translate_typ target
+        [ translate_exp index inner
+        ; translate_typ index source
+        ; translate_typ index target
         ]
 
 
-and translate_bool exp =
+and translate_bool index exp =
   match exp.it with
   | BoolE value ->
       Const (string_of_bool value)
 
   | UnE (`NotOp, _, inner) ->
-      app "~_" [translate_bool inner]
+      app "~_" [translate_bool index inner]
 
   | BinE (`ImplOp, `BoolT, left, right) ->
-      app "_implies_" [translate_bool left; translate_bool right]
+      app "_implies_" [translate_bool index left; translate_bool index right]
 
   | BinE ((`AndOp | `OrOp | `EquivOp) as op,
           `BoolT, left, right) ->
       app (translate_binop op `BoolT)
-        [translate_bool left; translate_bool right]
+        [translate_bool index left; translate_bool index right]
 
   | CmpE (op, _, left, right) ->
       app (translate_cmpop op)
-        [ translate_exp left |> unwrap left.note
-        ; translate_exp right |> unwrap right.note
+        [ translate_exp index left |> unwrap left.note
+        ; translate_exp index right |> unwrap right.note
         ]
 
   | MemE (element, collection) ->
-      app "_<-_" [translate_exp element; translate_exp collection]
+      app "_<-_"
+        [translate_exp index element; translate_exp index collection]
 
   | _ ->
-      translate_exp exp |> unwrap exp.note
+      translate_exp index exp |> unwrap exp.note
 
 
-and translate_select base path =
+and translate_select index base path =
   match path.it with
   | RootP ->
       base
 
-  | IdxP (parent, index) ->
+  | IdxP (parent, element_index) ->
       app "_`[_`]"
-        [ translate_select base parent
-        ; translate_exp index
+        [ translate_select index base parent
+        ; translate_exp index element_index
         ]
       |> from_sequence_element path.note
 
-  | SliceP (parent, index, length) ->
+  | SliceP (parent, start, length) ->
       app "_`[_:_`]"
-        [ translate_select base parent
-        ; translate_exp index
-        ; translate_exp length
+        [ translate_select index base parent
+        ; translate_exp index start
+        ; translate_exp index length
         ]
 
   | DotP (parent, atom) ->
       app "_._"
-        [ translate_select base parent
+        [ translate_select index base parent
         ; qid_of_atom atom
         ]
 
 
-and translate_update base path replacement =
+and translate_update index base path replacement =
   match path.it with
   | RootP ->
       replacement
 
-  | IdxP (parent, index) ->
-      let parent_value = translate_select base parent in
+  | IdxP (parent, element_index) ->
+      let parent_value = translate_select index base parent in
       let updated_parent =
         app "_`[_=_`]"
-          [parent_value; translate_exp index; replacement]
+          [parent_value; translate_exp index element_index; replacement]
       in
-      translate_update base parent updated_parent
+      translate_update index base parent updated_parent
 
-  | SliceP (parent, index, length) ->
-      let parent_value = translate_select base parent in
+  | SliceP (parent, start, length) ->
+      let parent_value = translate_select index base parent in
       let updated_parent =
         app "_`[_:_=_`]"
           [ parent_value
-          ; translate_exp index
-          ; translate_exp length
+          ; translate_exp index start
+          ; translate_exp index length
           ; replacement
           ]
       in
-      translate_update base parent updated_parent
+      translate_update index base parent updated_parent
 
   | DotP (parent, atom) ->
-      let parent_value = translate_select base parent in
+      let parent_value = translate_select index base parent in
       let updated_parent =
         app "_`[._=_`]"
           [parent_value; qid_of_atom atom; replacement]
       in
-      translate_update base parent updated_parent
+      translate_update index base parent updated_parent
 
 
-and translate_extension base path extension =
+and translate_extension index base path extension =
   match path.it with
   | RootP ->
       app "_++_" [base; extension]
 
-  | IdxP (parent, index) ->
-      let parent_value = translate_select base parent in
+  | IdxP (parent, element_index) ->
+      let parent_value = translate_select index base parent in
       let extended_parent =
         app "_`[_=++_`]"
-          [parent_value; translate_exp index; extension]
+          [parent_value; translate_exp index element_index; extension]
       in
-      translate_update base parent extended_parent
+      translate_update index base parent extended_parent
 
-  | SliceP (parent, index, length) ->
-      let parent_value = translate_select base parent in
+  | SliceP (parent, start, length) ->
+      let parent_value = translate_select index base parent in
       let extended_parent =
         app "_`[_:_=++_`]"
           [ parent_value
-          ; translate_exp index
-          ; translate_exp length
+          ; translate_exp index start
+          ; translate_exp index length
           ; extension
           ]
       in
-      translate_update base parent extended_parent
+      translate_update index base parent extended_parent
 
   | DotP (parent, atom) ->
-      let parent_value = translate_select base parent in
+      let parent_value = translate_select index base parent in
       let extended_parent =
         app "_`[._=++_`]"
           [parent_value; qid_of_atom atom; extension]
       in
-      translate_update base parent extended_parent
+      translate_update index base parent extended_parent
 
 
 (* Constructor components *)
 
-let translate_typ_conditions value typ =
-  match typ.it with
-  | NumT (`NatT | `IntT) ->
+let translate_typ_conditions index value typ =
+  match translate_sort index typ, typ.it with
+  | ("Nat" | "Int"), _ ->
       []
-  | IterT (element_typ, iter) ->
+  | _, IterT (element_typ, iter) ->
       Iter.translate_conditions
-        translate_exp value (translate_typ element_typ) iter
-  | _ ->
-      [BoolCond (app "typecheck" [value; translate_typ typ])]
+        (translate_exp index) value (translate_typ index element_typ) iter
+  | _, _ ->
+      [BoolCond (app "typecheck" [value; translate_typ index typ])]
 
-let make_component name typ =
-  let sort = translate_sort typ in
-  let value = Var {name; sort} in
-  let conditions = translate_typ_conditions value typ in
+let make_component index field_index id typ =
+  let sort = translate_sort index typ in
+  let variable =
+    if id.it = "_" then
+      {name = "VALUE" ^ string_of_int (field_index + 1); sort; source = false}
+    else
+      Prescan.source_variable index id typ
+  in
+  let value = Var variable in
+  let conditions = translate_typ_conditions index value typ in
   value, sort, conditions
 
-let component_name index id =
-  if id.it = "_" then
-    "VALUE" ^ string_of_int (index + 1)
-  else
-    String.uppercase_ascii id.it
-
-let translate_components typ =
+let translate_components index typ =
   match typ.it with
   | TupT fields ->
       fields
-      |> List.mapi (fun index (id, typ) ->
-           make_component (component_name index id) typ)
+      |> List.mapi (fun field_index (id, typ) ->
+           make_component index field_index id typ)
   | _ ->
-      [make_component "VALUE" typ]
+      let sort = translate_sort index typ in
+      let value = Var {name = "VALUE"; sort; source = false} in
+      [value, sort, translate_typ_conditions index value typ]
