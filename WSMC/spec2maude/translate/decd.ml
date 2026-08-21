@@ -4,16 +4,7 @@ open Maude_il
 
 
 let has_hint index id name =
-  Prescan.hints index
-  |> List.exists (fun hintdef ->
-       match hintdef.it with
-       | DecH (target, hints) ->
-           target.it = id.it
-           && List.exists
-                (fun (hint : hint) -> hint.hintid.it = name)
-                hints
-       | _ ->
-           false)
+  Prescan.has_dec_hint index id name
 
 
 (* DecD declaration *)
@@ -87,5 +78,8 @@ let translate_clause index id clause =
 
 (* Complete DecD *)
 let translate index id params result_typ clauses =
-  translate_decl index id params result_typ
-  :: List.map (translate_clause index id) clauses
+  if has_hint index id "builtin" then
+    [translate_decl index id params result_typ]
+  else
+    translate_decl index id params result_typ
+    :: List.map (translate_clause index id) clauses
