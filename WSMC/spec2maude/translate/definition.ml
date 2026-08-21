@@ -13,7 +13,10 @@ let rec translate index def =
 
 let translate_script script =
   let index = Prescan.scan script in
-  let definitions = List.concat_map (translate index) script in
+  let definitions =
+    List.concat_map (translate index) script
+    @ Param.translate_applications index
+  in
   let iterations =
     Iter.translate_all (Term.translate_exp index) index
   in

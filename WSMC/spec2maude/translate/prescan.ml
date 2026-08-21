@@ -24,6 +24,18 @@ type premise_iteration =
   ; captures : capture list
   }
 
+type definition_parameter =
+  { id : id
+  ; params : param list
+  ; result : typ
+  }
+
+type definition_application =
+  { target : id
+  ; params : param list
+  ; result : typ
+  }
+
 type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
@@ -34,6 +46,11 @@ type t =
   ; type_definitions : (string * inst list) list
   ; variables : ((string * sort) * name) list
   ; anonymous_variables : (id * sort * name) list
+  ; definition_parameters : definition_parameter list
+  ; definition_arguments : (arg * definition_parameter) list
+  ; definition_calls : (exp * definition_parameter) list
+  ; definition_values : id list
+  ; definition_applications : definition_application list
   }
 
 
@@ -46,6 +63,11 @@ let sanitize name =
        | ('a'..'z' | 'A'..'Z' | '0'..'9' | '-') as char -> char
        | _ -> '-')
   |> String.of_seq
+
+let builtin_name name =
+  name
+  |> sanitize
+  |> String.lowercase_ascii
 
 let primitive_sort typ =
   match typ.it with
@@ -197,6 +219,29 @@ let capture_premise_variables body iterexp =
   capture_variables Il.Free.(free_prem body).varid (PremiseBody body) iterexp
 
 
+let rec collect_hints hints = function
+  | [] -> hints
+  | def :: defs ->
+      begin match def.it with
+      | HintD hintdef -> collect_hints (hintdef :: hints) defs
+      | RecD nested ->
+          collect_hints (collect_hints hints nested) defs
+      | TypD _ | RelD _ | DecD _ | GramD _ ->
+          collect_hints hints defs
+      end
+
+let has_dec_hint_in hints target_name name =
+  List.exists
+    (fun hintdef ->
+      match hintdef.it with
+      | DecH (target, values) ->
+          target.it = target_name
+          && List.exists (fun hint -> hint.hintid.it = name) values
+      | TypH _ | RelH _ | GramH _ | RuleH _ ->
+          false)
+    hints
+
+
 let scan script =
   let rec collect_type_definitions definitions = function
     | [] -> definitions
@@ -212,10 +257,24 @@ let scan script =
         end
   in
   let type_definitions = collect_type_definitions [] script |> List.rev in
+  let hints = collect_hints [] script |> List.rev in
+  let rec collect_definitions definitions = function
+    | [] -> definitions
+    | def :: defs ->
+        begin match def.it with
+        | DecD (id, params, result, _) ->
+            collect_definitions ((id.it, params, result) :: definitions) defs
+        | RecD nested ->
+            collect_definitions
+              (collect_definitions definitions nested) defs
+        | TypD _ | RelD _ | GramD _ | HintD _ ->
+            collect_definitions definitions defs
+        end
+  in
+  let definitions = collect_definitions [] script |> List.rev in
   let iterations = ref [] in
   let premise_iterations = ref [] in
   let premise_count = ref 0 in
-  let hints = ref [] in
   let names = ref [] in
   let used_names = ref StringSet.empty in
 
@@ -243,18 +302,28 @@ let scan script =
     match def.it with
     | TypD (id, _, _) -> add_id_name TypName id
     | RelD (id, _, _, _, _) -> add_id_name RelName id
-    | DecD (id, _, _, _) -> add_id_name DefName id
+    | DecD (id, _, _, _) ->
+        let candidate =
+          if has_dec_hint_in hints id.it "builtin" then builtin_name id.it
+          else sanitize id.it
+        in
+        ignore (add_name DefName id.it candidate)
     | GramD _ -> ()
-    | HintD hintdef ->
-        begin match hintdef.it with
-        | TypH _ | RelH _ | DecH _ | RuleH _ ->
-            hints := hintdef :: !hints
-        | GramH _ -> ()
-        end
+    | HintD _ -> ()
     | RecD _ -> ()
   in
+  List.iter
+    (fun (source, _, _) ->
+      if has_dec_hint_in hints source "builtin" then
+        ignore (add_name DefName source (builtin_name source)))
+    definitions;
 
   let observed_variables = ref [] in
+  let definition_parameters = ref [] in
+  let definition_arguments = ref [] in
+  let definition_calls = ref [] in
+  let definition_values = ref [] in
+  let definition_applications = ref [] in
   let sort_of_typ typ = representation_sort type_definitions [] typ in
 
   let add_variable id typ =
@@ -271,12 +340,114 @@ let scan script =
       then observed_variables := (id, sort, false) :: !observed_variables
     end
   in
-  let add_param param =
+  let add_definition_variable id =
+    if not
+      (List.exists
+        (fun (id', sort, _) -> id'.it = id.it && sort = "SpectecDef")
+        !observed_variables)
+    then observed_variables := (id, "SpectecDef", false) :: !observed_variables
+  in
+  let rec add_param param =
     match param.it with
     | ExpP (id, typ) -> add_variable id typ
-    | TypP _ | DefP _ | GramP _ -> ()
+    | DefP (id, params, result) ->
+        definition_parameters := {id; params; result} :: !definition_parameters;
+        add_definition_variable id;
+        add_params params
+    | TypP _ | GramP _ -> ()
+
+  and add_params params =
+    List.iter add_param params
   in
-  let add_params params = List.iter add_param params in
+
+  let find_definition_parameter parameters id =
+    List.find_opt (fun parameter -> parameter.id.it = id.it) parameters
+  in
+  let local_definition_parameters params =
+    List.filter_map
+      (fun param ->
+        match param.it with
+        | DefP (id, params, result) -> Some {id; params; result}
+        | ExpP _ | TypP _ | GramP _ -> None)
+      params
+  in
+  let add_definition_value id =
+    if not (List.exists (fun value -> value.it = id.it) !definition_values)
+    then definition_values := id :: !definition_values
+  in
+  let add_definition_application target params result =
+    definition_applications :=
+      {target; params; result} :: !definition_applications
+  in
+  let inspect_bound_argument bound arg =
+    match arg.it with
+    | DefA id ->
+        begin match find_definition_parameter bound id with
+        | Some parameter ->
+            definition_arguments := (arg, parameter) :: !definition_arguments
+        | None ->
+            add_definition_value id
+        end
+    | ExpA _ | TypA _ | GramA _ -> ()
+  in
+  let rec inspect_arguments bound formals actuals =
+    match formals, actuals with
+    | formal :: formals, actual :: actuals ->
+        begin match formal.it, actual.it with
+        | DefP (_, params, result), DefA target
+          when find_definition_parameter bound target = None ->
+            add_definition_value target;
+            add_definition_application target params result
+        | _ -> ()
+        end;
+        inspect_arguments bound formals actuals
+    | _, _ -> ()
+  in
+  let scan_clause outer_params clause =
+    let quants, head_args =
+      match clause.it with DefD (quants, args, _, _) -> quants, args
+    in
+    let bound =
+      local_definition_parameters quants
+      @ local_definition_parameters outer_params
+    in
+    List.iter (inspect_bound_argument bound) head_args;
+    let module DefinitionVisitor = Il.Iter.Make (struct
+      include Il.Iter.Skip
+
+      let visit_exp exp =
+        match exp.it with
+        | CallE (id, args) ->
+            List.iter (inspect_bound_argument bound) args;
+            begin match find_definition_parameter bound id with
+            | Some parameter ->
+                definition_calls := (exp, parameter) :: !definition_calls
+            | None ->
+                begin match
+                  List.find_opt
+                    (fun (name, _, _) -> name = id.it)
+                    definitions
+                with
+                | Some (_, params, _) -> inspect_arguments bound params args
+                | None -> ()
+                end
+            end
+        | _ -> ()
+
+      let visit_typ typ =
+        match typ.it with
+        | VarT (_, args) -> List.iter (inspect_bound_argument bound) args
+        | BoolT | NumT _ | TextT | TupT _ | IterT _ -> ()
+
+      let visit_prem prem =
+        match prem.it with
+        | RulePr (_, args, _, _) ->
+            List.iter (inspect_bound_argument bound) args
+        | IfPr _ | ElsePr | IterPr _ | LetPr _ | NegPr _ -> ()
+    end)
+    in
+    DefinitionVisitor.clause clause
+  in
   let add_deftyp_quants deftyp =
     match deftyp.it with
     | AliasT _ -> ()
@@ -306,7 +477,10 @@ let scan script =
         add_params params;
         List.iter
           (fun clause ->
-            match clause.it with DefD (quants, _, _, _) -> add_params quants)
+            match clause.it with
+            | DefD (quants, _, _, _) ->
+                add_params quants;
+                scan_clause params clause)
           clauses
     | GramD _ | RecD _ | HintD _ -> ()
   in
@@ -394,11 +568,16 @@ let scan script =
   in
   { iterations = List.rev !iterations
   ; premise_iterations = List.rev !premise_iterations
-  ; hints = List.rev !hints
+  ; hints
   ; names = List.rev !names
   ; type_definitions
   ; variables
   ; anonymous_variables
+  ; definition_parameters = List.rev !definition_parameters
+  ; definition_arguments = List.rev !definition_arguments
+  ; definition_calls = List.rev !definition_calls
+  ; definition_values = List.rev !definition_values
+  ; definition_applications = List.rev !definition_applications
   }
 
 
@@ -422,6 +601,26 @@ let typ_name index id = local_name index TypName id
 let rel_name index id = name index RelName id.it
 let def_name index id = local_name index DefName id
 let mixop_name index mixop = name index MixopName (Mixop.name mixop)
+
+let has_dec_hint index id name =
+  has_dec_hint_in index.hints id.it name
+
+let definition_variable index parameter =
+  match List.assoc_opt (parameter.id.it, "SpectecDef") index.variables with
+  | Some name -> {name; sort = "SpectecDef"; source = true}
+  | None -> invalid_arg ("unregistered definition variable " ^ parameter.id.it)
+
+let definition_argument index arg =
+  List.find_opt (fun (arg', _) -> arg == arg') index.definition_arguments
+  |> Option.map snd
+
+let definition_call index exp =
+  List.find_opt (fun (exp', _) -> exp == exp') index.definition_calls
+  |> Option.map snd
+
+let definition_parameters index = index.definition_parameters
+let definition_values index = index.definition_values
+let definition_applications index = index.definition_applications
 
 let source_variable index id typ =
   let sort = sort_of_typ index typ in

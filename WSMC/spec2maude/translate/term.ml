@@ -140,7 +140,10 @@ and translate_arg index arg =
   | TypA typ ->
       translate_typ index typ
   | DefA id ->
-      Const (Prescan.def_name index id)
+      begin match Prescan.definition_argument index arg with
+      | Some parameter -> Var (Prescan.definition_variable index parameter)
+      | None -> Const (Prescan.def_name index id)
+      end
   | GramA _ ->
       invalid_arg "GramA is not translated"
 
@@ -276,7 +279,14 @@ and translate_exp index exp =
         ]
 
   | CallE (id, args) ->
-      app (Prescan.def_name index id) (List.map (translate_arg index) args)
+      begin match Prescan.definition_call index exp with
+      | Some parameter ->
+          app "apply"
+            (Var (Prescan.definition_variable index parameter)
+             :: List.map (translate_arg index) args)
+      | None ->
+          app (Prescan.def_name index id) (List.map (translate_arg index) args)
+      end
 
   | IterE (body, (iter, generators)) ->
       Iter.translate_term
