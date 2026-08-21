@@ -16,7 +16,8 @@ let indent text =
 (* Terms *)
 
 let emit_variable (variable : variable) =
-  variable.name ^ ":" ^ variable.sort
+  if variable.source then variable.name
+  else variable.name ^ ":" ^ variable.sort
 
 let mixfix_holes name =
   let rec count escaped index holes =

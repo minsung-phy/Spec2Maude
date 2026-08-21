@@ -15,14 +15,14 @@ let translate_script script =
   let index = Prescan.scan script in
   let definitions = List.concat_map (translate index) script in
   let iterations =
-    Iter.translate_all Term.translate_exp Term.translate_sort index
+    Iter.translate_all (Term.translate_exp index) index
   in
   let premise_iterations =
     let translate_body bound body =
       let result = Prem.translate_all index ~bound [body] in
       result.conditions, result.otherwise
     in
-    Iter.translate_premise_all translate_body Term.translate_sort index
+    Iter.translate_premise_all translate_body index
   in
   let declarations, definitions =
     List.partition (function Maude_il.OpDecl _ -> true | _ -> false) definitions
@@ -36,4 +36,5 @@ let translate_script script =
       premise_iterations
   in
   declarations @ iteration_declarations @ premise_declarations
+  @ Prescan.variable_declarations index
   @ definitions @ iterations @ premise_iterations

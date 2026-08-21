@@ -1,5 +1,6 @@
 open Util.Source
 open Il.Ast
+open Maude_il
 
 
 type capture = id * typ
@@ -23,12 +24,20 @@ type premise_iteration =
   ; captures : capture list
   }
 
+type name_kind = TypName | RelName | DefName | MixopName
+
 type t =
   { iterations : iteration list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
+  ; names : (name_kind * string * name) list
+  ; type_definitions : (string * inst list) list
+  ; variables : ((string * sort) * name) list
+  ; anonymous_variables : (id * sort * name) list
   }
 
+
+module StringSet = Set.Make (String)
 
 let sanitize name =
   name
@@ -37,6 +46,94 @@ let sanitize name =
        | ('a'..'z' | 'A'..'Z' | '0'..'9' | '-') as char -> char
        | _ -> '-')
   |> String.of_seq
+
+let primitive_sort typ =
+  match typ.it with
+  | NumT `NatT -> "Nat"
+  | NumT `IntT -> "Int"
+  | IterT _ -> "SpectecTerminals"
+  | VarT _
+  | BoolT
+  | NumT (`RatT | `RealT)
+  | TextT
+  | TupT _ -> "SpectecTerminal"
+
+let common_sort = function
+  | sort :: sorts when List.for_all (( = ) sort) sorts -> sort
+  | [] | _ -> "SpectecTerminal"
+
+let rec representation_sort definitions seen typ =
+  match typ.it with
+  | VarT (id, _) when not (List.mem id.it seen) ->
+      begin match List.assoc_opt id.it definitions with
+      | None -> "SpectecTerminal"
+      | Some insts ->
+          insts
+          |> List.map (instance_sort definitions (id.it :: seen))
+          |> common_sort
+      end
+  | VarT _ -> "SpectecTerminal"
+  | _ -> primitive_sort typ
+
+and instance_sort definitions seen inst =
+  match inst.it with
+  | InstD (_, _, {it = AliasT typ; _}) ->
+      representation_sort definitions seen typ
+  | InstD (_, _, {it = StructT _; _}) ->
+      "SpectecTerminal"
+  | InstD (_, _, {it = VariantT cases; _}) ->
+      cases |> List.map (case_sort definitions seen) |> common_sort
+
+and case_sort definitions seen (mixop, (typ, _, _), _) =
+  if Xl.Mixop.flatten mixop |> List.for_all (( = ) []) then
+    match typ.it with
+    | TupT [(_, payload)] -> representation_sort definitions seen payload
+    | _ -> "SpectecTerminal"
+  else
+    "SpectecTerminal"
+
+let sort_of_typ index typ =
+  representation_sort index.type_definitions [] typ
+
+let reserved_names =
+  StringSet.of_list
+    [ "true"; "false"; "none"; "min"; "max"; "s"; "sd"
+    ; "eps"; "bool"; "rat"; "float"; "text"; "seq"; "unseq"
+    ; "tuple"; "item"; "value"; "typecheck"; "isTrue"; "len"
+    ; "index"; "slice"; "lift"; "repeatSeq"
+    ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
+    ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "_/\\_"; "_\\/_"
+    ]
+
+let fresh used suffix candidate =
+  let rec choose index =
+    let name =
+      if index = 1 then candidate
+      else candidate ^ suffix index
+    in
+    if StringSet.mem name !used then choose (index + 1)
+    else name
+  in
+  let name = choose 1 in
+  used := StringSet.add name !used;
+  name
+
+let fresh_name used candidate =
+  let candidate =
+    if StringSet.mem candidate reserved_names then "spectec-" ^ candidate
+    else candidate
+  in
+  fresh used (fun index -> "-" ^ string_of_int index) candidate
+
+let fresh_variable_name used candidate =
+  fresh used string_of_int candidate
+
+let variable_base name =
+  let name = sanitize name |> String.uppercase_ascii in
+  let name = if name = "" then "VAR" else name in
+  match name.[0] with
+  | 'A'..'Z' -> name
+  | _ -> "V-" ^ name
 
 let iteration_name body =
   match body.it with
@@ -64,21 +161,13 @@ let rec remove_id name = function
   | id :: ids -> id :: remove_id name ids
 
 let capture_variables free body iterexp =
-  let bound =
-    ref (List.map (fun id -> id.it) (bound_ids iterexp))
-  in
+  let bound = ref (List.map (fun id -> id.it) (bound_ids iterexp)) in
   let captures = ref [] in
   let add id typ =
-    let name = String.uppercase_ascii id.it in
     if Il.Free.Set.mem id.it free
        && not (List.mem id.it !bound)
-       && not
-            (List.exists
-               (fun (captured, _) ->
-                 String.uppercase_ascii captured.it = name)
-               !captures)
-    then
-      captures := (id, typ) :: !captures
+       && not (List.exists (fun (captured, _) -> captured.it = id.it) !captures)
+    then captures := (id, typ) :: !captures
   in
   let module Visitor = Il.Iter.Make (struct
     include Il.Iter.Skip
@@ -109,10 +198,119 @@ let capture_premise_variables body iterexp =
 
 
 let scan script =
+  let rec collect_type_definitions definitions = function
+    | [] -> definitions
+    | def :: defs ->
+        begin match def.it with
+        | TypD (id, _, insts) ->
+            collect_type_definitions ((id.it, insts) :: definitions) defs
+        | RecD nested ->
+            collect_type_definitions
+              (collect_type_definitions definitions nested) defs
+        | RelD _ | DecD _ | GramD _ | HintD _ ->
+            collect_type_definitions definitions defs
+        end
+  in
+  let type_definitions = collect_type_definitions [] script |> List.rev in
   let iterations = ref [] in
   let premise_iterations = ref [] in
   let premise_count = ref 0 in
   let hints = ref [] in
+  let names = ref [] in
+  let used_names = ref StringSet.empty in
+
+  let add_name kind source candidate =
+    match
+      List.find_opt
+        (fun (kind', source', _) -> kind = kind' && source = source')
+        !names
+    with
+    | Some (_, _, name) -> name
+    | None ->
+        let name = fresh_name used_names candidate in
+        names := (kind, source, name) :: !names;
+        name
+  in
+  let add_id_name kind id =
+    ignore (add_name kind id.it (sanitize id.it))
+  in
+  let add_mixop_name mixop =
+    if not (Xl.Mixop.flatten mixop |> List.for_all (( = ) [])) then
+      let source = Mixop.name mixop in
+      ignore (add_name MixopName source source)
+  in
+  let add_def_name def =
+    match def.it with
+    | TypD (id, _, _) -> add_id_name TypName id
+    | RelD (id, _, _, _, _) -> add_id_name RelName id
+    | DecD (id, _, _, _) -> add_id_name DefName id
+    | GramD _ -> ()
+    | HintD hintdef ->
+        begin match hintdef.it with
+        | TypH _ | RelH _ | DecH _ | RuleH _ ->
+            hints := hintdef :: !hints
+        | GramH _ -> ()
+        end
+    | RecD _ -> ()
+  in
+
+  let observed_variables = ref [] in
+  let sort_of_typ typ = representation_sort type_definitions [] typ in
+
+  let add_variable id typ =
+    let sort = sort_of_typ typ in
+    if id.it = "_" then begin
+      if not (List.exists (fun (id', _, _) -> id == id') !observed_variables)
+      then observed_variables := (id, sort, true) :: !observed_variables
+    end else begin
+      if not
+           (List.exists
+              (fun (id', sort', anonymous) ->
+                not anonymous && id'.it = id.it && sort' = sort)
+              !observed_variables)
+      then observed_variables := (id, sort, false) :: !observed_variables
+    end
+  in
+  let add_param param =
+    match param.it with
+    | ExpP (id, typ) -> add_variable id typ
+    | TypP _ | DefP _ | GramP _ -> ()
+  in
+  let add_params params = List.iter add_param params in
+  let add_deftyp_quants deftyp =
+    match deftyp.it with
+    | AliasT _ -> ()
+    | StructT fields ->
+        List.iter (fun (_, (_, quants, _), _) -> add_params quants) fields
+    | VariantT cases ->
+        List.iter (fun (_, (_, quants, _), _) -> add_params quants) cases
+  in
+  let add_def_variables def =
+    match def.it with
+    | TypD (_, params, insts) ->
+        add_params params;
+        List.iter
+          (fun inst ->
+            match inst.it with
+            | InstD (quants, _, deftyp) ->
+                add_params quants;
+                add_deftyp_quants deftyp)
+          insts
+    | RelD (_, params, _, _, rules) ->
+        add_params params;
+        List.iter
+          (fun rule ->
+            match rule.it with RuleD (_, quants, _, _, _) -> add_params quants)
+          rules
+    | DecD (_, params, _, clauses) ->
+        add_params params;
+        List.iter
+          (fun clause ->
+            match clause.it with DefD (quants, _, _, _) -> add_params quants)
+          clauses
+    | GramD _ | RecD _ | HintD _ -> ()
+  in
+
   let add_iteration body iterexp =
     iterations :=
       { name = iteration_name body
@@ -133,41 +331,126 @@ let scan script =
       }
       :: !premise_iterations
   in
-  let module Visitor = Il.Iter.Make (struct
+
+  let module VariableVisitor = Il.Iter.Make (struct
     include Il.Iter.Skip
+
+    let visit_mixop = add_mixop_name
+
+    let visit_def def =
+      add_def_name def;
+      add_def_variables def
 
     let visit_exp exp =
       match exp.it with
+      | VarE id -> add_variable id exp.note
       | IterE (body, iterexp) -> add_iteration body iterexp
       | _ -> ()
 
     let visit_prem premise =
       match premise.it with
-      | IterPr (body, iterexp) -> add_premise_iteration premise body iterexp
-      | _ -> ()
+      | LetPr (quants, _, _) -> add_params quants
+      | IterPr (body, iterexp) ->
+          add_premise_iteration premise body iterexp
+      | RulePr _ | IfPr _ | ElsePr | NegPr _ -> ()
+
+    let scope_enter id typ =
+      add_variable id typ
+
+    let scope_exit _id () = ()
   end)
   in
-  let rec scan_def def =
-    match def.it with
-    | TypD _ | RelD _ | DecD _ ->
-        Visitor.def def
-    | RecD defs ->
-        List.iter scan_def defs
-    | HintD hintdef ->
-        begin match hintdef.it with
-        | TypH _ | RelH _ | DecH _ | RuleH _ ->
-            hints := hintdef :: !hints
-        | GramH _ ->
-            ()
-        end
-    | GramD _ ->
-        ()
+  VariableVisitor.list VariableVisitor.def script;
+
+  let observed_variables = List.rev !observed_variables in
+  let named, anonymous =
+    List.partition (fun (_, _, anonymous) -> not anonymous)
+      observed_variables
   in
-  List.iter scan_def script;
+  let exact, renamed =
+    List.partition
+      (fun (id, _, _) -> id.it = variable_base id.it)
+      named
+  in
+  let used_variable_names =
+    ref StringSet.empty
+  in
+  let variables =
+    exact @ renamed
+    |> List.map (fun (id, sort, _) ->
+         let target_name =
+           fresh_variable_name used_variable_names (variable_base id.it)
+         in
+         (id.it, sort), target_name)
+  in
+  let anonymous_variables =
+    anonymous
+    |> List.mapi (fun index (id, sort, _) ->
+         let target_name =
+           fresh_variable_name used_variable_names
+             ("PARAM" ^ string_of_int (index + 1))
+         in
+         id, sort, target_name)
+  in
   { iterations = List.rev !iterations
   ; premise_iterations = List.rev !premise_iterations
   ; hints = List.rev !hints
+  ; names = List.rev !names
+  ; type_definitions
+  ; variables
+  ; anonymous_variables
   }
+
+
+let find_name index kind source =
+  List.find_opt
+    (fun (kind', source', _) -> kind = kind' && source = source')
+    index.names
+  |> Option.map (fun (_, _, name) -> name)
+
+let name index kind source =
+  match find_name index kind source with
+  | Some name -> name
+  | None -> invalid_arg ("unregistered source name " ^ source)
+
+let local_name index kind id =
+  match find_name index kind id.it with
+  | Some name -> name
+  | None -> sanitize id.it
+
+let typ_name index id = local_name index TypName id
+let rel_name index id = name index RelName id.it
+let def_name index id = local_name index DefName id
+let mixop_name index mixop = name index MixopName (Mixop.name mixop)
+
+let source_variable index id typ =
+  let sort = sort_of_typ index typ in
+  let target_name =
+    if id.it = "_" then
+      List.find_opt (fun (id', _, _) -> id == id') index.anonymous_variables
+      |> Option.map (fun (_, _, name) -> name)
+    else
+      List.assoc_opt (id.it, sort) index.variables
+  in
+  match target_name with
+  | Some name -> {name; sort; source = true}
+  | None ->
+      invalid_arg ("unregistered source variable " ^ id.it)
+
+let variable_declarations index =
+  let rec add (name, sort) groups =
+    match groups with
+    | [] -> [sort, [name]]
+    | (sort', names) :: groups when sort = sort' ->
+        (sort, name :: names) :: groups
+    | group :: groups -> group :: add (name, sort) groups
+  in
+  let variables =
+    List.map (fun ((_, sort), name) -> name, sort) index.variables
+    @ List.map (fun (_, sort, name) -> name, sort) index.anonymous_variables
+  in
+  List.fold_left (fun groups variable -> add variable groups) [] variables
+  |> List.map (fun (sort, names) -> VarDecl (List.rev names, sort))
 
 let iterations index = index.iterations
 let premise_iterations index = index.premise_iterations

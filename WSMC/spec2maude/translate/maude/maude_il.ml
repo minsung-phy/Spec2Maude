@@ -10,6 +10,7 @@ type label = string
 type variable =
   { name : name
   ; sort : sort
+  ; source : bool
   }
 
 type term =

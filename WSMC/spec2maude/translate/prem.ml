@@ -79,35 +79,36 @@ let split_execution mixop exps =
   | _ ->
       invalid_arg "execution RulePr has multiple execution markers"
 
-let relation_call id args exps =
+let relation_call index id args exps =
   App
-    ( Term.source_name id
-    , List.map Term.translate_arg args @ List.map Term.translate_exp exps
+    ( Prescan.rel_name index id
+    , List.map (Term.translate_arg index) args
+      @ List.map (Term.translate_exp index) exps
     )
 
-let tuple = function
+let tuple index = function
   | [] -> Const "eps"
-  | [exp] -> Term.translate_exp exp
+  | [exp] -> Term.translate_exp index exp
   | exps ->
       exps
       |> List.map (fun exp ->
-           Term.translate_exp exp |> Term.as_sequence_element exp.note)
+           Term.translate_exp index exp |> Term.as_sequence_element exp.note)
       |> Term.sequence
       |> fun terms -> App ("tuple", [terms])
 
-let translate_rulepr bound id args mixop exp =
+let translate_rulepr index bound id args mixop exp =
   let exps = components mixop exp in
   match relation_kind mixop with
   | Predicate ->
       if not (known_args bound args && known bound exp) then
         invalid_arg "predicate RulePr contains an unbound variable";
-      make bound [EqCondition (BoolCond (relation_call id args exps))]
+      make bound [EqCondition (BoolCond (relation_call index id args exps))]
   | Deterministic ->
       begin match List.rev exps with
       | output :: inputs_rev ->
           let inputs = List.rev inputs_rev in
-          let call = relation_call id args inputs in
-          let output_term = Term.translate_exp output in
+          let call = relation_call index id args inputs in
+          let output_term = Term.translate_exp index output in
           if not (known_args bound args && List.for_all (known bound) inputs) then
             invalid_arg "deterministic RulePr has an unbound input";
           if known bound output then
@@ -126,14 +127,15 @@ let translate_rulepr bound id args mixop exp =
       if not (List.for_all is_pattern outputs) then
         invalid_arg "execution RulePr output is not a pattern";
       make (List.fold_left bind bound outputs)
-        [RewriteCond (relation_call id args inputs, tuple outputs)]
+        [RewriteCond
+           (relation_call index id args inputs, tuple index outputs)]
 
-let translate_ifpr bound exp =
+let translate_ifpr index bound exp =
   if not (known bound exp) then
     invalid_arg "IfPr contains an unbound variable";
-  make bound [EqCondition (BoolCond (Term.translate_bool exp))]
+  make bound [EqCondition (BoolCond (Term.translate_bool index exp))]
 
-let translate_letpr bound quants left right =
+let translate_letpr index bound quants left right =
   if not (known bound right) then invalid_arg "LetPr right side is unbound";
   if not (is_pattern left) then invalid_arg "LetPr left side is not a pattern";
   let names =
@@ -143,20 +145,22 @@ let translate_letpr bound quants left right =
       quants
   in
   let conditions =
-    EqCondition (MatchCond (Term.translate_exp left, Term.translate_exp right))
+    EqCondition
+      (MatchCond
+         (Term.translate_exp index left, Term.translate_exp index right))
     :: List.map (fun condition -> EqCondition condition)
-         (Param.translate_eq_conditions quants)
+         (Param.translate_eq_conditions index quants)
   in
   make (bind (bind_names bound names) left) conditions
 
 let translate index bound prem =
   match prem.it with
   | RulePr (id, args, mixop, exp) ->
-      translate_rulepr bound id args mixop exp
+      translate_rulepr index bound id args mixop exp
   | IfPr exp ->
-      translate_ifpr bound exp
+      translate_ifpr index bound exp
   | LetPr (quants, left, right) ->
-      translate_letpr bound quants left right
+      translate_letpr index bound quants left right
   | ElsePr ->
       {conditions = []; bound; otherwise = true}
   | IterPr (_, (iter, generators)) ->
@@ -168,7 +172,7 @@ let translate index bound prem =
       | Opt | List | List1 | ListN _ -> ()
       end;
       make bound
-        (Iter.translate_premise index Term.translate_exp Term.translate_sort prem)
+        (Iter.translate_premise index (Term.translate_exp index) prem)
   | NegPr _ ->
       invalid_arg "NegPr requires a total source-derived complement"
 

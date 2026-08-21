@@ -19,9 +19,9 @@ let has_hint index id name =
 (* DecD declaration *)
 let translate_decl index id params result_typ =
   OpDecl
-    { name = Term.source_name id
-    ; domain = Param.translate_sorts params
-    ; codomain = Term.translate_sort result_typ
+    { name = Prescan.def_name index id
+    ; domain = Param.translate_sorts index params
+    ; codomain = Term.translate_sort index result_typ
     ; arrow =
         if has_hint index id "partial" then Partial
         else Total
@@ -51,13 +51,13 @@ let translate_clause index id clause =
   | DefD (quants, args, rhs, prems) ->
       let left =
         App
-          ( Term.source_name id
-          , List.map Term.translate_arg args
+          ( Prescan.def_name index id
+          , List.map (Term.translate_arg index) args
           )
       in
 
       let right =
-        Term.translate_exp rhs
+        Term.translate_exp index rhs
       in
 
       let premises =
@@ -69,7 +69,7 @@ let translate_clause index id clause =
 
       let conditions =
         List.map eq_condition premises.conditions
-        @ Param.translate_eq_conditions quants
+        @ Param.translate_eq_conditions index quants
       in
 
       let attrs =
