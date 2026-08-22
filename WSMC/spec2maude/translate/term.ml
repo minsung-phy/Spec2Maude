@@ -184,6 +184,10 @@ and translate_exp index exp =
       |> sequence
       |> fun terms -> app "tuple" [terms]
 
+  | ProjE ({it = UncaseE (case, mixop); _}, 0)
+    when Mixop.is_hole_only mixop && Xl.Mixop.arity mixop = 1 ->
+      translate_exp index case
+
   | ProjE (tuple, field_index) ->
       app "_._"
         [translate_exp index tuple; Const (string_of_int field_index)]
