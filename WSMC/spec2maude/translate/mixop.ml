@@ -18,12 +18,15 @@ let rec translate = function
   | Xl.Mixop.Seq mixops ->
       String.concat "" (List.map translate mixops)
 
+let is_hole_only mixop =
+  Xl.Mixop.flatten mixop |> List.for_all (( = ) [])
+
 let name mixop =
   match mixop with
   | Xl.Mixop.Seq (Xl.Mixop.Atom atom :: args)
     when args <> [] && List.for_all is_arg args ->
       atom_name atom
-  | _ when Xl.Mixop.flatten mixop |> List.for_all (( = ) []) ->
+  | _ when is_hole_only mixop ->
       invalid_arg "a hole-only mixop has no constructor name"
   | _ ->
       translate mixop

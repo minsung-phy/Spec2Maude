@@ -107,7 +107,7 @@ and instance_sort definitions seen inst =
       cases |> List.map (case_sort definitions seen) |> common_sort
 
 and case_sort definitions seen (mixop, (typ, _, _), _) =
-  if Xl.Mixop.flatten mixop |> List.for_all (( = ) []) then
+  if Mixop.is_hole_only mixop then
     match typ.it with
     | TupT [(_, payload)] -> representation_sort definitions seen payload
     | _ -> "SpectecTerminal"
@@ -121,22 +121,21 @@ let rec parameter_sort definitions param =
   match param.it with
   | ExpP (_, typ) -> representation_sort definitions [] typ
   | TypP _ -> "SpectecType"
-  | DefP (_, params, result) -> definition_sort_with definitions params result
+  | DefP (_, params, result) ->
+      let sort, _, _ = definition_signature_with definitions params result in
+      sort
   | GramP _ -> invalid_arg "GramP is not supported"
 
-and definition_sort_with definitions params result =
+and definition_signature_with definitions params result =
   let domain = List.map (parameter_sort definitions) params in
   let codomain = representation_sort definitions [] result in
-  "SpectecDef-"
-  ^ (match domain with [] -> "Unit" | _ -> String.concat "-" domain)
-  ^ "-to-" ^ codomain
-
-let definition_sort index params result =
-  definition_sort_with index.type_definitions params result
+  let args =
+    match domain with [] -> "Unit" | _ -> String.concat "-" domain
+  in
+  "SpectecDef-" ^ args ^ "-to-" ^ codomain, domain, codomain
 
 let definition_signature index params result =
-  List.map (parameter_sort index.type_definitions) params,
-  representation_sort index.type_definitions [] result
+  definition_signature_with index.type_definitions params result
 
 let reserved_names =
   StringSet.of_list
@@ -317,7 +316,7 @@ let scan script =
     ignore (add_name kind id.it (sanitize id.it))
   in
   let add_mixop_name mixop =
-    if not (Xl.Mixop.flatten mixop |> List.for_all (( = ) [])) then
+    if not (Mixop.is_hole_only mixop) then
       let source = Mixop.key mixop in
       ignore (add_name MixopName source (Mixop.name mixop))
   in
@@ -365,16 +364,15 @@ let scan script =
   let add_variable id typ =
     add_variable_with_sort id (sort_of_typ typ)
   in
-  let add_definition_variable id params result =
-    add_variable_with_sort id
-      (definition_sort_with type_definitions params result)
-  in
   let rec add_param param =
     match param.it with
     | ExpP (id, typ) -> add_variable id typ
     | DefP (id, params, result) ->
         definition_parameters := {id; params; result} :: !definition_parameters;
-        add_definition_variable id params result;
+        let sort, _, _ =
+          definition_signature_with type_definitions params result
+        in
+        add_variable_with_sort id sort;
         add_params params
     | TypP id -> add_variable_with_sort id "SpectecType"
     | GramP _ -> ()
@@ -404,8 +402,8 @@ let scan script =
     | [] -> invalid_arg ("unknown definition value " ^ id.it)
     | value :: values ->
         let signature' value =
-          List.map (parameter_sort type_definitions) value.params,
-          representation_sort type_definitions [] value.result
+          definition_signature_with
+            type_definitions value.params value.result
         in
         if List.for_all (fun candidate -> signature' candidate = signature' value) values
         then value
@@ -422,14 +420,9 @@ let scan script =
   in
   let add_definition_application target params result =
     let value = add_definition_value target in
-    let expected =
-      List.map (parameter_sort type_definitions) params,
-      representation_sort type_definitions [] result
-    in
-    let actual =
-      List.map (parameter_sort type_definitions) value.params,
-      representation_sort type_definitions [] value.result
-    in
+    let signature = definition_signature_with type_definitions in
+    let expected = signature params result in
+    let actual = signature value.params value.result in
     if expected <> actual then
       invalid_arg ("definition argument signature mismatch for " ^ target.it);
     definition_applications := value :: !definition_applications
@@ -660,7 +653,9 @@ let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
 
 let definition_variable index (parameter : definition_parameter) =
-  let sort = definition_sort index parameter.params parameter.result in
+  let sort, _, _ =
+    definition_signature index parameter.params parameter.result
+  in
   match List.assoc_opt (parameter.id.it, sort) index.variables with
   | Some name -> Maude_il.source_variable name sort
   | None -> invalid_arg ("unregistered definition variable " ^ parameter.id.it)

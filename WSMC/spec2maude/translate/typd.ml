@@ -2,8 +2,9 @@ open Util.Source
 open Il.Ast
 open Maude_il
 
-let translate_components index typ =
-  Term.translate_components index typ
+let equation left right = function
+  | [] -> Eq (left, right, [])
+  | conditions -> Ceq (left, right, conditions, [])
 
 let parameter_names params =
   List.filter_map
@@ -36,17 +37,17 @@ let translate_alias index id params quants args typ =
   let left = App ("typecheck", [value; target]) in
   let right = App ("typecheck", [value; source]) in
   let conditions = Param.translate_eq_conditions index quants in
-  match conditions with
-  | [] -> [Eq (left, right, [])]
-  | _ -> [Ceq (left, right, conditions, [])]
+  [equation left right conditions]
 
 (* StructT *)
 let join_struct_items = function
   | [] -> Const "EMPTY"
-  | item :: items -> List.fold_left (fun left right -> App ("_;_", [left; right])) item items
+  | item :: items ->
+      List.fold_left
+        (fun left right -> App ("_;_", [left; right])) item items
 
 let translate_struct_field index bound (atom, (typ, quants, prems), _hints) =
-  match translate_components index typ with
+  match Term.translate_components index typ with
   | [(value, _, type_conditions)] ->
       let field = Const ("'" ^ Il.Print.string_of_atom atom) in
       let item = App ("item", [field; value]) in
@@ -86,24 +87,11 @@ let translate_struct index id params quants args fields =
   let left =
     App ("typecheck", [record; target])
   in
-
-  match conditions with
-  | [] ->
-      [Eq (left, Const "true", [])]
-
-  | _ ->
-      [Ceq
-        ( left
-        , Const "true"
-        , conditions
-        , []
-        )]
+  [equation left (Const "true") conditions]
 
 (* VariantT *)
-let is_hole_only mixop = Xl.Mixop.flatten mixop |> List.for_all (( = ) [])
-
 let transparent_payload index typ =
-  let components = translate_components index typ in
+  let components = Term.translate_components index typ in
   let values = List.map (fun (value, _, _) -> value) components in
   let value =
     match typ.it, values with
@@ -123,21 +111,20 @@ let transparent_payload index typ =
   in
   value, conditions
 
-let translate_union index target case_conditions typ _hints =
+let translate_union index target case_conditions typ =
   let value, component_conditions = transparent_payload index typ in
   let left = App ("typecheck", [value; target]) in
   let conditions = case_conditions @ component_conditions in
-  match conditions with
-  | [] -> [Eq (left, Const "true", [])]
-  | _ ->
-  [Ceq (left, Const "true", conditions, [])]
+  [equation left (Const "true") conditions]
 
-let translate_constructor index _id target case_conditions mixop typ _hints =
+let translate_constructor index target case_conditions mixop typ =
   let constructor_name = Prescan.mixop_name index mixop in
-  let components = translate_components index typ in
+  let components = Term.translate_components index typ in
   let values = components |> List.map (fun (value, _, _) -> value) in
   let domain = components |> List.map (fun (_, sort, _) -> sort) in
-  let component_conditions = components |> List.concat_map (fun (_, _, conditions) -> conditions) in
+  let component_conditions =
+    components |> List.concat_map (fun (_, _, conditions) -> conditions)
+  in
   let constructor = App (constructor_name, values) in
   let declaration =
     OpDecl
@@ -150,30 +137,25 @@ let translate_constructor index _id target case_conditions mixop typ _hints =
   in
   let typecheck_conditions = case_conditions @ component_conditions in
   let left = App ("typecheck", [constructor; target]) in
-  let typecheck_statement =
-    match typecheck_conditions with
-    | [] -> Eq (left, Const "true", [])
-    | _ -> Ceq (left, Const "true", typecheck_conditions, [])
-  in
-  [declaration; typecheck_statement]
+  [declaration; equation left (Const "true") typecheck_conditions]
 
-let translate_typcase index id target instance_conditions bound
-    (mixop, (typ, quants, prems), hints) =
+let translate_typcase index target instance_conditions bound
+    (mixop, (typ, quants, prems), _hints) =
   let bound = bound @ parameter_names quants @ payload_names typ in
   let case_conditions =
     instance_conditions @ Param.translate_eq_conditions index quants
     @ Prem.translate_eq_conditions index ~bound prems
   in
-  if is_hole_only mixop then
-    translate_union index target case_conditions typ hints
-  else translate_constructor index id target case_conditions mixop typ hints
+  if Mixop.is_hole_only mixop then
+    translate_union index target case_conditions typ
+  else translate_constructor index target case_conditions mixop typ
 
 let translate_variant index id params quants args cases =
   let target = translate_target index id params args in
   let instance_conditions = Param.translate_eq_conditions index quants in
   let bound = parameter_names params @ parameter_names quants in
   cases
-  |> List.concat_map (translate_typcase index id target instance_conditions bound)
+  |> List.concat_map (translate_typcase index target instance_conditions bound)
 
 (* TypD *)
 let translate_type_decl index id params =
