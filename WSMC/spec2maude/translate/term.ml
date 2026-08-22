@@ -195,7 +195,10 @@ and translate_exp index exp =
 
   | CaseE (mixop, payload) ->
       if is_hole_only mixop then
-        translate_exp index payload
+        begin match payload.it with
+        | TupE [single] -> translate_exp index single
+        | _ -> translate_exp index payload
+        end
       else
         let args =
           match payload.it with
@@ -205,8 +208,11 @@ and translate_exp index exp =
         app (Prescan.mixop_name index mixop) args
 
   | UncaseE (case, mixop) ->
-      app "_!_" [translate_exp index case; qid_of_mixop index mixop]
-      |> from_sequence_element exp.note
+      if is_hole_only mixop then
+        translate_exp index case
+      else
+        app "_!_" [translate_exp index case; qid_of_mixop index mixop]
+        |> from_sequence_element exp.note
 
   | OptE None ->
       Const "eps"
@@ -443,11 +449,14 @@ let translate_typ_conditions index value typ =
   | _, _ ->
       [BoolCond (app "typecheck" [value; translate_typ index typ])]
 
-let make_component index field_index id typ =
+let make_component index field_index repeated id typ =
   let sort = translate_sort index typ in
   let variable =
     if id.it = "_" then
-      {name = "VALUE" ^ string_of_int (field_index + 1); sort; source = false}
+      generated_variable ("VALUE" ^ string_of_int (field_index + 1)) sort
+    else if repeated then
+      let source = Prescan.source_variable index id typ in
+      generated_variable source.name sort
     else
       Prescan.source_variable index id typ
   in
@@ -458,10 +467,18 @@ let make_component index field_index id typ =
 let translate_components index typ =
   match typ.it with
   | TupT fields ->
-      fields
-      |> List.mapi (fun field_index (id, typ) ->
-           make_component index field_index id typ)
+      let rec translate_fields seen field_index = function
+        | [] -> []
+        | (id, typ) :: fields ->
+            let repeated = id.it <> "_" && List.mem id.it seen in
+            let component =
+              make_component index field_index repeated id typ
+            in
+            let seen = if id.it = "_" then seen else id.it :: seen in
+            component :: translate_fields seen (field_index + 1) fields
+      in
+      translate_fields [] 0 fields
   | _ ->
       let sort = translate_sort index typ in
-      let value = Var {name = "VALUE"; sort; source = false} in
+      let value = Var (generated_variable "VALUE" sort) in
       [value, sort, translate_typ_conditions index value typ]

@@ -27,3 +27,6 @@ let name mixop =
       invalid_arg "a hole-only mixop has no constructor name"
   | _ ->
       translate mixop
+
+let key mixop =
+  name mixop ^ "/" ^ string_of_int (Xl.Mixop.arity mixop)

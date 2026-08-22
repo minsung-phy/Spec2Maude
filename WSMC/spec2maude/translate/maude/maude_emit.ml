@@ -16,8 +16,7 @@ let indent text =
 (* Terms *)
 
 let emit_variable (variable : variable) =
-  if variable.source then variable.name
-  else variable.name ^ ":" ^ variable.sort
+  variable.name
 
 let mixfix_holes name =
   let rec count escaped index holes =
@@ -175,7 +174,7 @@ let emit_rule_condition = function
 let emit_conditions emit_condition conditions =
   conditions
   |> List.map emit_condition
-  |> join "\n    /\ "
+  |> join "\n    /\\ "
 
 
 (* Equation attributes *)

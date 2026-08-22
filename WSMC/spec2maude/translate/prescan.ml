@@ -49,7 +49,7 @@ type t =
   ; definition_parameters : definition_parameter list
   ; definition_arguments : (arg * definition_parameter) list
   ; definition_calls : (exp * definition_parameter) list
-  ; definition_values : id list
+  ; definition_values : definition_application list
   ; definition_applications : definition_application list
   }
 
@@ -117,6 +117,27 @@ and case_sort definitions seen (mixop, (typ, _, _), _) =
 let sort_of_typ index typ =
   representation_sort index.type_definitions [] typ
 
+let rec parameter_sort definitions param =
+  match param.it with
+  | ExpP (_, typ) -> representation_sort definitions [] typ
+  | TypP _ -> "SpectecType"
+  | DefP (_, params, result) -> definition_sort_with definitions params result
+  | GramP _ -> invalid_arg "GramP is not supported"
+
+and definition_sort_with definitions params result =
+  let domain = List.map (parameter_sort definitions) params in
+  let codomain = representation_sort definitions [] result in
+  "SpectecDef-"
+  ^ (match domain with [] -> "Unit" | _ -> String.concat "-" domain)
+  ^ "-to-" ^ codomain
+
+let definition_sort index params result =
+  definition_sort_with index.type_definitions params result
+
+let definition_signature index params result =
+  List.map (parameter_sort index.type_definitions) params,
+  representation_sort index.type_definitions [] result
+
 let reserved_names =
   StringSet.of_list
     [ "true"; "false"; "none"; "min"; "max"; "s"; "sd"
@@ -142,7 +163,9 @@ let fresh used suffix candidate =
 
 let fresh_name used candidate =
   let candidate =
-    if StringSet.mem candidate reserved_names then "spectec-" ^ candidate
+    if StringSet.mem candidate reserved_names
+       || StringSet.mem candidate !used
+    then "spectec-" ^ candidate
     else candidate
   in
   fresh used (fun index -> "-" ^ string_of_int index) candidate
@@ -295,8 +318,8 @@ let scan script =
   in
   let add_mixop_name mixop =
     if not (Xl.Mixop.flatten mixop |> List.for_all (( = ) [])) then
-      let source = Mixop.name mixop in
-      ignore (add_name MixopName source source)
+      let source = Mixop.key mixop in
+      ignore (add_name MixopName source (Mixop.name mixop))
   in
   let add_def_name def =
     match def.it with
@@ -326,8 +349,7 @@ let scan script =
   let definition_applications = ref [] in
   let sort_of_typ typ = representation_sort type_definitions [] typ in
 
-  let add_variable id typ =
-    let sort = sort_of_typ typ in
+  let add_variable_with_sort id sort =
     if id.it = "_" then begin
       if not (List.exists (fun (id', _, _) -> id == id') !observed_variables)
       then observed_variables := (id, sort, true) :: !observed_variables
@@ -340,21 +362,22 @@ let scan script =
       then observed_variables := (id, sort, false) :: !observed_variables
     end
   in
-  let add_definition_variable id =
-    if not
-      (List.exists
-        (fun (id', sort, _) -> id'.it = id.it && sort = "SpectecDef")
-        !observed_variables)
-    then observed_variables := (id, "SpectecDef", false) :: !observed_variables
+  let add_variable id typ =
+    add_variable_with_sort id (sort_of_typ typ)
+  in
+  let add_definition_variable id params result =
+    add_variable_with_sort id
+      (definition_sort_with type_definitions params result)
   in
   let rec add_param param =
     match param.it with
     | ExpP (id, typ) -> add_variable id typ
     | DefP (id, params, result) ->
         definition_parameters := {id; params; result} :: !definition_parameters;
-        add_definition_variable id;
+        add_definition_variable id params result;
         add_params params
-    | TypP _ | GramP _ -> ()
+    | TypP id -> add_variable_with_sort id "SpectecType"
+    | GramP _ -> ()
 
   and add_params params =
     List.iter add_param params
@@ -371,13 +394,45 @@ let scan script =
         | ExpP _ | TypP _ | GramP _ -> None)
       params
   in
+  let target_definition id =
+    match
+      List.filter_map
+        (fun (name, params, result) ->
+          if name = id.it then Some {target = id; params; result} else None)
+        definitions
+    with
+    | [] -> invalid_arg ("unknown definition value " ^ id.it)
+    | value :: values ->
+        let signature' value =
+          List.map (parameter_sort type_definitions) value.params,
+          representation_sort type_definitions [] value.result
+        in
+        if List.for_all (fun candidate -> signature' candidate = signature' value) values
+        then value
+        else invalid_arg ("conflicting signatures for definition " ^ id.it)
+  in
   let add_definition_value id =
-    if not (List.exists (fun value -> value.it = id.it) !definition_values)
-    then definition_values := id :: !definition_values
+    let value = target_definition id in
+    if not
+         (List.exists
+            (fun candidate -> candidate.target.it = id.it)
+            !definition_values)
+    then definition_values := value :: !definition_values;
+    value
   in
   let add_definition_application target params result =
-    definition_applications :=
-      {target; params; result} :: !definition_applications
+    let value = add_definition_value target in
+    let expected =
+      List.map (parameter_sort type_definitions) params,
+      representation_sort type_definitions [] result
+    in
+    let actual =
+      List.map (parameter_sort type_definitions) value.params,
+      representation_sort type_definitions [] value.result
+    in
+    if expected <> actual then
+      invalid_arg ("definition argument signature mismatch for " ^ target.it);
+    definition_applications := value :: !definition_applications
   in
   let inspect_bound_argument bound arg =
     match arg.it with
@@ -386,7 +441,7 @@ let scan script =
         | Some parameter ->
             definition_arguments := (arg, parameter) :: !definition_arguments
         | None ->
-            add_definition_value id
+            ignore (add_definition_value id)
         end
     | ExpA _ | TypA _ | GramA _ -> ()
   in
@@ -396,7 +451,6 @@ let scan script =
         begin match formal.it, actual.it with
         | DefP (_, params, result), DefA target
           when find_definition_parameter bound target = None ->
-            add_definition_value target;
             add_definition_application target params result
         | _ -> ()
         end;
@@ -600,14 +654,15 @@ let local_name index kind id =
 let typ_name index id = local_name index TypName id
 let rel_name index id = name index RelName id.it
 let def_name index id = local_name index DefName id
-let mixop_name index mixop = name index MixopName (Mixop.name mixop)
+let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
 
-let definition_variable index parameter =
-  match List.assoc_opt (parameter.id.it, "SpectecDef") index.variables with
-  | Some name -> {name; sort = "SpectecDef"; source = true}
+let definition_variable index (parameter : definition_parameter) =
+  let sort = definition_sort index parameter.params parameter.result in
+  match List.assoc_opt (parameter.id.it, sort) index.variables with
+  | Some name -> Maude_il.source_variable name sort
   | None -> invalid_arg ("unregistered definition variable " ^ parameter.id.it)
 
 let definition_argument index arg =
@@ -622,8 +677,7 @@ let definition_parameters index = index.definition_parameters
 let definition_values index = index.definition_values
 let definition_applications index = index.definition_applications
 
-let source_variable index id typ =
-  let sort = sort_of_typ index typ in
+let source_variable_with_sort index id sort =
   let target_name =
     if id.it = "_" then
       List.find_opt (fun (id', _, _) -> id == id') index.anonymous_variables
@@ -632,9 +686,12 @@ let source_variable index id typ =
       List.assoc_opt (id.it, sort) index.variables
   in
   match target_name with
-  | Some name -> {name; sort; source = true}
+  | Some name -> Maude_il.source_variable name sort
   | None ->
       invalid_arg ("unregistered source variable " ^ id.it)
+
+let source_variable index id typ =
+  source_variable_with_sort index id (sort_of_typ index typ)
 
 let variable_declarations index =
   let rec add (name, sort) groups =

@@ -1,5 +1,104 @@
 open Util.Source
 open Il.Ast
+open Maude_il
+
+module StringSet = Set.Make (String)
+
+let normalize_variables source_declarations statements =
+  let source_sorts = Hashtbl.create 64 in
+  let declared = Hashtbl.create 64 in
+  let declaration_order = ref [] in
+  let source_names = ref StringSet.empty in
+  let add_declared name sort =
+    match Hashtbl.find_opt declared name with
+    | None ->
+        Hashtbl.add declared name sort;
+        declaration_order := (name, sort) :: !declaration_order
+    | Some sort' when sort = sort' -> ()
+    | Some _ -> invalid_arg ("variable " ^ name ^ " has conflicting sorts")
+  in
+  List.iter
+    (function
+      | VarDecl (names, sort) ->
+          List.iter
+            (fun name ->
+              source_names := StringSet.add name !source_names;
+              match Hashtbl.find_opt source_sorts name with
+              | None -> Hashtbl.add source_sorts name sort
+              | Some sort' when sort = sort' -> ()
+              | Some _ ->
+                  invalid_arg ("source variable " ^ name ^ " has conflicting sorts"))
+            names
+      | _ -> invalid_arg "expected a variable declaration")
+    source_declarations;
+
+  let fresh_generated local_used (variable : variable) =
+    let rec choose index =
+      let name =
+        if index = 1 then variable.name
+        else variable.name ^ string_of_int index
+      in
+      if StringSet.mem name !source_names || StringSet.mem name !local_used then
+        choose (index + 1)
+      else
+        match Hashtbl.find_opt declared name with
+        | Some sort when sort <> variable.sort -> choose (index + 1)
+        | Some _ -> name
+        | None -> add_declared name variable.sort; name
+    in
+    choose 1
+  in
+
+  let normalize_statement statement =
+    let generated = ref [] in
+    let local_used = ref StringSet.empty in
+    let normalize_variable (variable : variable) =
+      match variable.origin with
+      | Source ->
+          begin match Hashtbl.find_opt source_sorts variable.name with
+          | Some sort when sort = variable.sort ->
+              add_declared variable.name variable.sort;
+              local_used := StringSet.add variable.name !local_used;
+              variable
+          | Some _ ->
+              invalid_arg ("source variable " ^ variable.name ^ " changed sort")
+          | None ->
+              invalid_arg ("undeclared source variable " ^ variable.name)
+          end
+      | Generated _ ->
+          begin match
+            List.find_opt
+              (fun (original, _) -> same_variable original variable)
+              !generated
+          with
+          | Some (_, normalized) -> normalized
+          | None ->
+              let name = fresh_generated local_used variable in
+              local_used := StringSet.add name !local_used;
+              let normalized = {variable with name} in
+              generated := (variable, normalized) :: !generated;
+              normalized
+          end
+    in
+    match statement with
+    | VarDecl _ -> invalid_arg "variable declarations are rebuilt after lowering"
+    | statement -> map_statement_variables normalize_variable statement
+  in
+  let statements = List.map normalize_statement statements in
+  let groups = Hashtbl.create 16 in
+  let sort_order = ref [] in
+  List.iter
+    (fun (name, sort) ->
+      if not (Hashtbl.mem groups sort) then sort_order := sort :: !sort_order;
+      let names = Option.value (Hashtbl.find_opt groups sort) ~default:[] in
+      Hashtbl.replace groups sort (name :: names))
+    (List.rev !declaration_order);
+  let declarations =
+    List.rev !sort_order
+    |> List.map (fun sort ->
+         VarDecl (List.rev (Hashtbl.find groups sort), sort))
+  in
+  declarations, statements
 
 let rec translate index def =
   match def.it with
@@ -13,7 +112,7 @@ let rec translate index def =
 
 let translate_script script =
   let index = Prescan.scan script in
-  let definitions =
+  let translated_definitions =
     List.concat_map (translate index) script
     @ Param.translate_applications index
   in
@@ -27,17 +126,21 @@ let translate_script script =
     in
     Iter.translate_premise_all translate_body index
   in
-  let declarations, definitions =
-    List.partition (function Maude_il.OpDecl _ -> true | _ -> false) definitions
+  let statements =
+    translated_definitions @ iterations @ premise_iterations
   in
-  let iteration_declarations, iterations =
-    List.partition (function Maude_il.OpDecl _ -> true | _ -> false) iterations
+  let variable_declarations, statements =
+    normalize_variables
+      (Prescan.variable_declarations index)
+      statements
   in
-  let premise_declarations, premise_iterations =
+  let sort_declarations, statements =
     List.partition
-      (function Maude_il.OpDecl _ -> true | _ -> false)
-      premise_iterations
+      (function SortDecl _ | SubsortDecl _ -> true | _ -> false)
+      statements
   in
-  declarations @ iteration_declarations @ premise_declarations
-  @ Prescan.variable_declarations index
-  @ definitions @ iterations @ premise_iterations
+  let operator_declarations, definitions =
+    List.partition (function OpDecl _ -> true | _ -> false) statements
+  in
+  sort_declarations @ operator_declarations
+  @ variable_declarations @ definitions

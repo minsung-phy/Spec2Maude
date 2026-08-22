@@ -7,7 +7,7 @@ let translate_sort index param =
   match param.it with
   | ExpP (_, typ) -> Term.translate_sort index typ
   | TypP _ -> "SpectecType"
-  | DefP _ -> "SpectecDef"
+  | DefP (_, params, result) -> Prescan.definition_sort index params result
   | GramP _ -> invalid_arg "GramP is not supported"
 
 
@@ -17,11 +17,7 @@ let translate_term index param =
       Var (Prescan.source_variable index id typ)
 
   | TypP id ->
-      Var
-        { name = String.uppercase_ascii id.it
-        ; sort = translate_sort index param
-        ; source = false
-        }
+      Var (Prescan.source_variable_with_sort index id "SpectecType")
 
   | DefP (id, params, result) ->
       Var
@@ -67,7 +63,10 @@ let unique_by key values =
   collect [] [] values
 
 let apply_signature index params result =
-  translate_sorts index params, Term.translate_sort index result
+  Prescan.definition_signature index params result
+
+let apply_sort index params result =
+  Prescan.definition_sort index params result
 
 let apply_declaration index (parameter : Prescan.definition_parameter) =
   let domain, codomain =
@@ -75,24 +74,29 @@ let apply_declaration index (parameter : Prescan.definition_parameter) =
   in
   OpDecl
     { name = "apply"
-    ; domain = "SpectecDef" :: domain
+    ; domain = apply_sort index parameter.params parameter.result :: domain
     ; codomain
     ; arrow = Total
     ; attrs = []
     }
 
-let definition_value index id =
+let definition_value index (value : Prescan.definition_application) =
   OpDecl
-    { name = Prescan.def_name index id
+    { name = Prescan.def_name index value.target
     ; domain = []
-    ; codomain = "SpectecDef"
+    ; codomain = apply_sort index value.params value.result
     ; arrow = Total
     ; attrs = []
     }
 
 let application_equation index
     (application : Prescan.definition_application) =
-  let variables = translate_terms index application.Prescan.params in
+  let variables =
+    application.Prescan.params
+    |> translate_sorts index
+    |> List.mapi (fun i sort ->
+         Var (generated_variable ("APPLY-ARG" ^ string_of_int (i + 1)) sort))
+  in
   let target = Prescan.def_name index application.target in
   Eq
     ( App ("apply", Const target :: variables)
@@ -112,6 +116,24 @@ let translate_applications index =
          Prescan.def_name index application.Prescan.target,
          apply_signature index application.params application.result)
   in
-  List.map (definition_value index) (Prescan.definition_values index)
-  @ List.map (apply_declaration index) parameters
+  let values = Prescan.definition_values index in
+  let signatures =
+    parameters
+    @ List.map
+        (fun (value : Prescan.definition_application) ->
+          ({ id = value.target
+           ; params = value.params
+           ; result = value.result
+           } : Prescan.definition_parameter))
+        values
+    |> unique_by (fun (parameter : Prescan.definition_parameter) ->
+         apply_sort index parameter.params parameter.result)
+  in
+  List.concat_map
+    (fun (parameter : Prescan.definition_parameter) ->
+      let sort = apply_sort index parameter.params parameter.result in
+      [SortDecl sort; SubsortDecl (sort, "SpectecDef")])
+    signatures
+  @ List.map (definition_value index) values
+  @ List.map (apply_declaration index) signatures
   @ List.map (application_equation index) applications
