@@ -73,9 +73,17 @@ let rec translate_pattern index exp =
                @ Term.translate_typ_conditions index pattern.term source
            })
 
+  | IterE (body, iterexp) ->
+      Iter.translate_identity_pattern
+        (fun exp ->
+          translate_pattern index exp
+          |> Option.map (fun pattern -> pattern.term, pattern.guards))
+        body iterexp
+      |> Option.map (fun (term, guards) -> {term; guards})
+
   | UnE _ | BinE _ | CmpE _ | ProjE _ | UncaseE _ | TheE _ | DotE _
   | CompE _ | LiftE _ | MemE _ | LenE _ | CatE _ | IdxE _ | SliceE _
-  | UpdE _ | ExtE _ | IfE _ | CallE _ | IterE _ | CvtE _ ->
+  | UpdE _ | ExtE _ | IfE _ | CallE _ | CvtE _ ->
       None
 
 and translate_patterns index = function
@@ -146,6 +154,10 @@ and translate_field_patterns index = function
       | None, _ | _, None -> None
       end
 
+let translate_pattern_parts index exp =
+  translate_pattern index exp
+  |> Option.map (fun pattern -> pattern.term, pattern.guards)
+
 let rule_guards pattern =
   List.map (fun guard -> EqCondition guard) pattern.guards
 
@@ -158,6 +170,19 @@ let rec bind_pattern index bound exp subject error =
         else App (Prescan.mixop_name index mixop, [subject])
       in
       bind_pattern index bound inner represented error
+  | IterE (body, iterexp) ->
+      begin match
+        Iter.translate_pattern index
+          (translate_pattern_parts index)
+          (Term.translate_exp index)
+          (known bound)
+          (fun name -> Il.Free.Set.mem name bound)
+          body iterexp subject
+      with
+      | Some conditions ->
+          make (bind bound exp) (List.map (fun c -> EqCondition c) conditions)
+      | None -> invalid_arg error
+      end
   | _ ->
       begin match translate_pattern index exp with
       | Some pattern ->
@@ -382,6 +407,16 @@ let translate index bound prem =
   | ElsePr ->
       {conditions = []; bound; otherwise = true}
   | IterPr (_, (iter, generators)) ->
+      let iteration =
+        match Prescan.premise_iteration index prem with
+        | Some iteration -> iteration
+        | None -> invalid_arg "IterPr is missing from the prescan index"
+      in
+      if not
+           (List.for_all
+              (fun (id, _) -> Il.Free.Set.mem id.it bound)
+              iteration.Prescan.captures)
+      then invalid_arg "IterPr has an unbound capture";
       if not (List.for_all (fun (_, source) -> known bound source) generators) then
         invalid_arg "IterPr has an unbound generator source";
       begin match iter with

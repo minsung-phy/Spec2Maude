@@ -11,6 +11,9 @@ type iteration_body =
 
 type iteration =
   { name : string
+  ; tail_name : string
+  ; projector_name : string
+  ; projector_tail_name : string
   ; body : exp
   ; iterexp : iterexp
   ; captures : capture list
@@ -18,6 +21,7 @@ type iteration =
 
 type premise_iteration =
   { name : string
+  ; tail_name : string
   ; premise : prem
   ; body : prem
   ; iterexp : iterexp
@@ -49,6 +53,7 @@ type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
   { iterations : iteration list
+  ; projector_bodies : exp list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
   ; names : (name_kind * string * name) list
@@ -189,17 +194,16 @@ let variable_base name =
   | 'A'..'Z' -> name
   | _ -> "V-" ^ name
 
-let iteration_name body =
-  match body.it with
-  | CallE (id, _) ->
-      "map-" ^ sanitize id.it
-  | _ ->
-      let pos = body.at.left in
-      let file = Filename.basename pos.file |> sanitize in
-      if file = "" then
-        Printf.sprintf "map-exp-%d-%d" pos.line pos.column
-      else
-        Printf.sprintf "map-%s-%d-%d" file pos.line pos.column
+let iteration_base_name (body : exp) =
+  let left = body.at.left in
+  let right = body.at.right in
+  let file = Filename.basename left.file |> sanitize in
+  if file = "" then
+    Printf.sprintf "map-exp-%d-%d-%d-%d"
+      left.line left.column right.line right.column
+  else
+    Printf.sprintf "map-%s-%d-%d-%d-%d"
+      file left.line left.column right.line right.column
 
 
 let index_ids = function
@@ -421,6 +425,7 @@ let scan script =
               validate_inverse definitions source inverse))
   in
   let iterations = ref [] in
+  let projector_bodies = ref [] in
   let premise_iterations = ref [] in
   let premise_count = ref 0 in
   let names = ref [] in
@@ -660,7 +665,10 @@ let scan script =
 
   let add_iteration body iterexp =
     iterations :=
-      { name = iteration_name body
+      { name = iteration_base_name body
+      ; tail_name = ""
+      ; projector_name = ""
+      ; projector_tail_name = ""
       ; body
       ; iterexp
       ; captures = capture_exp_variables body iterexp
@@ -671,6 +679,7 @@ let scan script =
     incr premise_count;
     premise_iterations :=
       { name = "iterpr-" ^ string_of_int !premise_count
+      ; tail_name = ""
       ; premise
       ; body
       ; iterexp
@@ -695,6 +704,18 @@ let scan script =
       | _ -> ()
 
     let visit_prem premise =
+      let module ProjectorVisitor = Il.Iter.Make (struct
+        include Il.Iter.Skip
+
+        let visit_exp exp =
+          match exp.it with
+          | IterE (body, _) ->
+              if not (List.exists (( == ) body) !projector_bodies) then
+                projector_bodies := body :: !projector_bodies
+          | _ -> ()
+      end)
+      in
+      ProjectorVisitor.prem premise;
       match premise.it with
       | LetPr (quants, _, _) -> add_params quants
       | IterPr (body, iterexp) ->
@@ -739,8 +760,30 @@ let scan script =
          in
          id, sort, target_name)
   in
-  { iterations = List.rev !iterations
-  ; premise_iterations = List.rev !premise_iterations
+  let iterations =
+    List.rev !iterations
+    |> List.map (fun (iteration : iteration) ->
+         let name = fresh_name used_names iteration.name in
+         { iteration with
+           name
+         ; tail_name = fresh_name used_names (name ^ "-tail")
+         ; projector_name = fresh_name used_names ("project-" ^ name)
+         ; projector_tail_name =
+             fresh_name used_names ("project-" ^ name ^ "-tail")
+         })
+  in
+  let premise_iterations =
+    List.rev !premise_iterations
+    |> List.map (fun (iteration : premise_iteration) ->
+         let name = fresh_name used_names iteration.name in
+         { iteration with
+           name
+         ; tail_name = fresh_name used_names (name ^ "-tail")
+         })
+  in
+  { iterations
+  ; projector_bodies = List.rev !projector_bodies
+  ; premise_iterations
   ; hints
   ; names = List.rev !names
   ; type_definitions
@@ -837,6 +880,23 @@ let variable_declarations index =
   |> List.map (fun (sort, names) -> VarDecl (List.rev names, sort))
 
 let iterations index = index.iterations
+let iteration index body =
+  List.find_opt
+    (fun (iteration : iteration) -> iteration.body == body)
+    index.iterations
+
+let iteration_name index body =
+  match iteration index body with
+  | Some iteration -> iteration.name
+  | None -> invalid_arg "IterE is missing from the prescan index"
+
+let projector_name index body =
+  match iteration index body with
+  | Some iteration -> iteration.projector_name
+  | None -> invalid_arg "IterE is missing from the prescan index"
+
+let projector_requested index body =
+  List.exists (( == ) body) index.projector_bodies
 let premise_iterations index = index.premise_iterations
 
 let premise_iteration index premise =
