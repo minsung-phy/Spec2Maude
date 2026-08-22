@@ -57,6 +57,7 @@ type t =
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
   ; names : (name_kind * string * name) list
+  ; rewrite_sorts : (string * sort) list
   ; type_definitions : (string * inst list) list
   ; variables : ((string * sort) * name) list
   ; anonymous_variables : (id * sort * name) list
@@ -781,11 +782,30 @@ let scan script =
          ; tail_name = fresh_name used_names (name ^ "-tail")
          })
   in
+  let rewrite_sorts =
+    definitions
+    |> List.filter_map (fun (source, _, _) ->
+         if has_dec_hint_in hints source "maude_rule" then
+           let name =
+             match
+               List.find_opt
+                 (fun (kind, source', _) ->
+                   kind = DefName && source' = source)
+                 !names
+             with
+             | Some (_, _, name) -> name
+             | None -> invalid_arg ("unregistered source name " ^ source)
+           in
+           Some (source, fresh_name used_names (name ^ "-Config"))
+         else
+           None)
+  in
   { iterations
   ; projector_bodies = List.rev !projector_bodies
   ; premise_iterations
   ; hints
   ; names = List.rev !names
+  ; rewrite_sorts
   ; type_definitions
   ; variables
   ; anonymous_variables
@@ -821,6 +841,11 @@ let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
+
+let rewrite_sort index id =
+  match List.assoc_opt id.it index.rewrite_sorts with
+  | Some sort -> sort
+  | None -> invalid_arg ("definition is not annotated maude_rule: " ^ id.it)
 
 let definition_variable index (parameter : definition_parameter) =
   let sort, _, _ =
