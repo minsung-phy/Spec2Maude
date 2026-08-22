@@ -5,6 +5,11 @@ open Maude_il
 
 let app name args = App (name, args)
 
+let rec sequence = function
+  | [] -> Const "eps"
+  | [term] -> term
+  | term :: terms -> app "_ _" [term; sequence terms]
+
 let as_sequence_element typ term =
   match typ.it with
   | IterT _ -> app "seq" [term]
@@ -74,12 +79,12 @@ let translate_term index translate_exp body (iter, generators) =
   | ListN _, _ ->
       let captures = capture_terms index body iter generators in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
-      app (Prescan.iteration_name body)
+      app (Prescan.iteration_name index body)
         (captures @ controls translate_exp iter @ sources)
   | (Opt | List | List1), _ :: _ ->
       let captures = capture_terms index body iter generators in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
-      app (Prescan.iteration_name body) (captures @ sources)
+      app (Prescan.iteration_name index body) (captures @ sources)
 
 
 (* Generated helper declarations and equations *)
@@ -115,34 +120,40 @@ let helper_domain captures count index generators =
       (Option.to_list index)
   @ List.map (fun _ -> "SpectecTerminals") generators
 
-let helper_arrow iter generators =
-  match iter, generators with
-  | List, [_] -> Total
-  | (Opt | List | List1 | ListN _), _ -> Partial
-
 let empty_arguments captures count index generators =
   terms_of_variables captures
   @ (match count with None -> [] | Some _ -> [Const "0"])
   @ terms_of_variables (Option.to_list index)
   @ List.map (fun _ -> Const "eps") generators
 
-let source_arguments iter heads tails =
+let generator_element (_, source) =
+  match source.note.it with
+  | IterT (element, _) -> element
+  | _ -> invalid_arg "iteration generator must have an iteration type"
+
+let source_head generator head =
+  term_of_variable head
+  |> as_sequence_element (generator_element generator)
+
+let source_arguments iter generators heads tails =
   match iter with
   | Opt ->
-      List.map (fun head -> app "_?" [term_of_variable head]) heads
+      List.map2
+        (fun generator head -> app "_?" [source_head generator head])
+        generators heads
   | List | List1 | ListN _ ->
       List.map2
-        (fun head tail ->
-          app "_ _" [term_of_variable head; term_of_variable tail])
-        heads tails
+        (fun (generator, head) tail ->
+          app "_ _" [source_head generator head; term_of_variable tail])
+        (List.combine generators heads) tails
 
-let step_arguments iter captures count index heads tails =
+let step_arguments iter captures count index generators heads tails =
   terms_of_variables captures
   @ (match count with
      | None -> []
      | Some count -> [app "s" [term_of_variable count]])
   @ terms_of_variables (Option.to_list index)
-  @ source_arguments iter heads tails
+  @ source_arguments iter generators heads tails
 
 let next_arguments captures count index tails =
   terms_of_variables captures
@@ -152,16 +163,314 @@ let next_arguments captures count index tails =
      | Some index -> [app "s" [term_of_variable index]])
   @ terms_of_variables tails
 
-let translate_statements index translate_exp
+let rec identity_body_id exp =
+  match exp.it with
+  | VarE id -> Some id
+  | IterE (inner, (List, [(binder, source)])) ->
+      begin match identity_body_id inner, source.it with
+      | Some inner_id, VarE source_id when inner_id.it = binder.it ->
+          Some source_id
+      | _ -> None
+      end
+  | _ -> None
+
+let identity_source body generators =
+  match identity_body_id body, generators with
+  | Some body_id, [(generator_id, source)]
+    when body_id.it = generator_id.it -> Some source
+  | _ -> None
+
+let translate_identity_pattern translate_pattern body (iter, generators) =
+  match identity_source body generators with
+  | None -> None
+  | Some source ->
+      begin match translate_pattern source with
+      | None -> None
+      | Some (term, guards) ->
+          let cardinality =
+            match iter with
+            | Opt ->
+                Some [BoolCond (app "_<=_" [length term; Const "1"])]
+            | List -> Some []
+            | List1 ->
+                Some [BoolCond (app "_<_" [Const "0"; length term])]
+            | ListN (count, _) ->
+                begin match translate_pattern count with
+                | Some (count, count_guards) ->
+                    Some (MatchCond (count, length term) :: count_guards)
+                | None -> None
+                end
+          in
+          Option.map (fun cardinality -> term, guards @ cardinality)
+            cardinality
+      end
+
+let projector_supported translate_pattern body generators =
+  generators <> []
+  && identity_source body generators = None
+  && Option.is_some (translate_pattern body)
+  && List.for_all
+       (fun (id, _) -> Il.Free.Set.mem id.it Il.Free.(free_exp body).varid)
+       generators
+
+let projector_domain captures count index =
+  List.map (fun (variable : variable) -> variable.sort) captures
+  @ List.map
+      (fun (variable : variable) -> variable.sort)
+      (Option.to_list count)
+  @ List.map
+      (fun (variable : variable) -> variable.sort)
+      (Option.to_list index)
+  @ ["SpectecTerminals"]
+
+let column_term generators columns =
+  match generators, columns with
+  | [_], [column] -> column
+  | _, _ ->
+      List.map2
+        (fun (_, source) column -> as_sequence_element source.note column)
+        generators columns
+      |> sequence
+      |> fun columns -> app "tuple" [columns]
+
+let projector_arguments captures count index subject =
+  terms_of_variables captures
+  @ Option.to_list count
+  @ Option.to_list index
+  @ [subject]
+
+let translate_projector_statements index translate_pattern
+    (iteration : Prescan.iteration) =
+  let body = iteration.Prescan.body in
+  let iter, generators = iteration.Prescan.iterexp in
+  if not (Prescan.projector_requested index body
+          && projector_supported translate_pattern body generators)
+  then [] else
+    let name = iteration.Prescan.projector_name in
+    let captures = translate_captures index iteration.Prescan.captures in
+    let count = count_variable iter in
+    let iter_index = index_variable index iter in
+    let heads = List.map (head_variable index) generators in
+    let tails =
+      generators
+      |> List.mapi (fun position _ ->
+           generated_variable
+             ("PROJECT-COLUMN-" ^ string_of_int (position + 1))
+             "SpectecTerminals")
+    in
+    let subject_tail =
+      generated_variable "PROJECT-REST" "SpectecTerminals"
+    in
+    let declaration name iter =
+      OpDecl
+        { name
+        ; domain = projector_domain captures (count_variable iter)
+                     (index_variable index iter)
+        ; codomain =
+            if List.length generators = 1
+            then "SpectecTerminals" else "SpectecTerminal"
+        ; arrow = Partial
+        ; attrs = []
+        }
+    in
+    let call name count index subject =
+      app name (projector_arguments captures count index subject)
+    in
+    let empty = column_term generators (List.map (fun _ -> Const "eps") generators) in
+    let columns = column_term generators (terms_of_variables tails) in
+    let next_columns =
+      List.map2
+        (fun (generator, head) tail ->
+          app "_ _" [source_head generator head; term_of_variable tail])
+        (List.combine generators heads) tails
+      |> column_term generators
+    in
+    let body_pattern, body_guards =
+      match translate_pattern body with
+      | Some pattern -> pattern
+      | None -> invalid_arg "structural IterE body is not a Maude pattern"
+    in
+    let element = as_sequence_element body.note body_pattern in
+    let subject =
+      app "_ _" [element; term_of_variable subject_tail]
+    in
+    let recursive name count index next_count next_index =
+      Ceq
+        ( call name count index subject
+        , next_columns
+        , body_guards
+          @ [MatchCond
+               ( columns
+               , call name next_count next_index
+                   (term_of_variable subject_tail)
+               )]
+        , []
+        )
+    in
+    match iter with
+    | Opt ->
+        [ declaration name Opt
+        ; Eq (call name None None (Const "eps"), empty, [])
+        ; let left = call name None None (app "_?" [element]) in
+          let right =
+            column_term generators
+              (List.map2
+                 (fun generator head ->
+                   app "_?" [source_head generator head])
+                 generators heads)
+          in
+          if body_guards = [] then Eq (left, right, [])
+          else Ceq (left, right, body_guards, [])
+        ]
+    | List ->
+        [ declaration name List
+        ; Eq (call name None None (Const "eps"), empty, [])
+        ; recursive name None None None None
+        ]
+    | List1 ->
+        let tail_name = iteration.Prescan.projector_tail_name in
+        let first =
+          Ceq
+            ( call name None None subject
+            , next_columns
+            , body_guards
+              @ [MatchCond
+                   ( columns
+                   , call tail_name None None (term_of_variable subject_tail)
+                   )]
+            , []
+            )
+        in
+        [ declaration name List
+        ; declaration tail_name List
+        ; first
+        ; Eq (call tail_name None None (Const "eps"), empty, [])
+        ; recursive tail_name None None None None
+        ]
+    | ListN _ ->
+        let count = Option.get count in
+        let current_index = Option.map term_of_variable iter_index in
+        let next_index =
+          Option.map (fun index -> app "s" [index]) current_index
+        in
+        [ declaration name iter
+        ; Eq
+            ( call name (Some (Const "0")) current_index (Const "eps")
+            , empty, [])
+        ; recursive name
+            (Some (app "s" [term_of_variable count])) current_index
+            (Some (term_of_variable count)) next_index
+        ]
+
+let rec translate_source_patterns translate_pattern = function
+  | [] -> Some ([], [])
+  | (_, source) :: generators ->
+      begin match
+        translate_pattern source,
+        translate_source_patterns translate_pattern generators
+      with
+      | Some (term, guards), Some (terms, remaining_guards) ->
+          Some (term :: terms, guards @ remaining_guards)
+      | None, _ | _, None -> None
+      end
+
+let pattern_count translate_pattern translate_exp known subject = function
+  | ListN (count, _) when known count ->
+      Some (translate_exp count, [])
+  | ListN (({it = VarE _; _} as count), _) ->
+      translate_pattern count
+      |> Option.map (fun (pattern, guards) ->
+           length subject,
+           MatchCond (pattern, length subject) :: guards)
+  | ListN _ -> None
+  | Opt | List | List1 -> Some (Const "0", [])
+
+let identity_cardinality translate_exp known subject = function
+  | Opt ->
+      [BoolCond (app "_<=_" [length subject; Const "1"])]
+  | List -> []
+  | List1 ->
+      [BoolCond (app "_<_" [Const "0"; length subject])]
+  | ListN (count, _) when known count ->
+      [EqCond (length subject, translate_exp count)]
+  | ListN _ -> []
+
+let translate_pattern index translate_source_pattern translate_exp known is_bound
+    body ((iter, generators) as iterexp) subject =
+  let captures = Prescan.capture_exp_variables body iterexp in
+  let count_variables =
+    match iter with
+    | ListN (count, _) when not (known count) ->
+        Il.Free.(free_exp count).varid
+    | Opt | List | List1 | ListN _ -> Il.Free.Set.empty
+  in
+  let captures_ready () =
+    List.for_all
+      (fun (id, _) ->
+        is_bound id.it || Il.Free.Set.mem id.it count_variables)
+      captures
+  in
+  match
+    translate_source_patterns translate_source_pattern generators
+  with
+  | None -> None
+  | Some (source_patterns, source_guards) ->
+      begin match identity_source body generators, source_patterns with
+      | Some _, [source_pattern] ->
+          begin match pattern_count translate_source_pattern translate_exp
+                        known subject iter with
+          | None -> None
+          | Some (_, count_conditions) ->
+              if not (captures_ready ()) then
+                invalid_arg "IterE pattern has an unbound capture";
+              Some
+                ( count_conditions
+                  @ (MatchCond (source_pattern, subject) :: source_guards)
+                  @ identity_cardinality translate_exp known subject iter)
+          end
+      | None, _ when
+          projector_supported translate_source_pattern body generators ->
+          begin match pattern_count translate_source_pattern translate_exp
+                        known subject iter with
+          | None -> None
+          | Some (count, count_conditions) ->
+              if not (captures_ready ()) then
+                invalid_arg "IterE pattern has an unbound capture";
+              let captures = capture_terms index body iter generators in
+              let controls =
+                match iter with
+                | Opt | List | List1 -> []
+                | ListN (_, None) -> [count]
+                | ListN (_, Some _) -> [count; Const "0"]
+              in
+              let projected =
+        app (Prescan.projector_name index body)
+          (captures @ controls @ [subject])
+              in
+              let forward =
+                translate_term index translate_exp body (iter, generators)
+              in
+              Some
+                ( count_conditions
+                  @ (MatchCond
+                       (column_term generators source_patterns, projected)
+                     :: source_guards)
+                  @ [EqCond (forward, subject)])
+          end
+      | Some _, _ | None, _ -> None
+      end
+
+let translate_statements index translate_pattern translate_exp
     (iteration : Prescan.iteration) =
   let name = iteration.Prescan.name in
   let body = iteration.Prescan.body in
   let iter, generators = iteration.Prescan.iterexp in
-  match iter, generators with
-  | ListN (_, None), [] ->
+  let forward =
+    match iter, generators with
+    | (Opt | ListN (_, None)), [] ->
       []
-  | (Opt | List | List1), [] ->
-      invalid_arg "IterE with Opt, List, or List1 requires a generator"
+    | (List | List1), [] ->
+      invalid_arg "IterE with List or List1 requires a generator"
   | (Opt | List | List1 | ListN _), _ ->
       let captures =
         translate_captures index iteration.Prescan.captures
@@ -176,7 +485,7 @@ let translate_statements index translate_exp
           { name
           ; domain = helper_domain captures count iter_index generators
           ; codomain = "SpectecTerminals"
-          ; arrow = helper_arrow iter generators
+          ; arrow = Partial
           ; attrs = []
           }
       in
@@ -196,27 +505,28 @@ let translate_statements index translate_exp
       let step =
         Eq
           ( call
-              (step_arguments iter captures count iter_index heads tails)
+              (step_arguments iter captures count iter_index generators heads tails)
           , step_result
           , []
           )
       in
       match iter with
       | List1 ->
-          let tail_name = name ^ "-tail" in
+          let tail_name = iteration.Prescan.tail_name in
           let tail_call args = app tail_name args in
           let tail_declaration =
             OpDecl
               { name = tail_name
               ; domain = helper_domain captures count iter_index generators
               ; codomain = "SpectecTerminals"
-              ; arrow = helper_arrow List generators
+              ; arrow = Partial
               ; attrs = []
               }
           in
           let first =
             Eq
-              ( call (step_arguments List captures None None heads tails)
+              ( call
+                  (step_arguments List captures None None generators heads tails)
               , app "_ _"
                   [ body_term
                   ; tail_call (terms_of_variables (captures @ tails))
@@ -237,7 +547,7 @@ let translate_statements index translate_exp
             Eq
               ( tail_call
                   (terms_of_variables captures
-                   @ source_arguments List heads tails)
+                   @ source_arguments List generators heads tails)
               , app "_ _"
                   [ body_term
                   ; tail_call (terms_of_variables (captures @ tails))
@@ -255,6 +565,8 @@ let translate_statements index translate_exp
               )
           in
           [declaration; base; step]
+  in
+  forward @ translate_projector_statements index translate_pattern iteration
 
 
 (* Whole-script helper materialization *)
@@ -267,10 +579,10 @@ let helper_key = function
   | _ ->
       invalid_arg "an iteration helper must start with an operator declaration"
 
-let translate_all translate_exp index =
+let translate_all translate_pattern translate_exp index =
   let add groups iteration =
     let statements =
-      translate_statements index translate_exp iteration
+      translate_statements index translate_pattern translate_exp iteration
     in
     match statements with
     | [] ->
@@ -296,64 +608,7 @@ let translate_all translate_exp index =
 
 (* Premise iteration *)
 
-let mixop_has atoms mixop =
-  Xl.Mixop.flatten mixop
-  |> List.exists (List.exists (fun atom -> List.mem atom.it atoms))
-
-let direct_rule_components mixop exp =
-  match Xl.Mixop.arity mixop, exp.it with
-  | 0, TupE [] -> Some []
-  | 1, VarE id -> Some [id.it]
-  | arity, TupE exps when List.length exps = arity ->
-      let rec names = function
-        | [] -> Some []
-        | {it = VarE id; _} :: exps ->
-            Option.map (fun names -> id.it :: names) (names exps)
-        | _ -> None
-      in
-      names exps
-  | _ -> None
-
-let has_scalar_generator generators =
-  List.exists
-    (fun (_, source) ->
-      match source.note.it with
-      | IterT (element, _) ->
-          begin match element.it with IterT _ -> false | _ -> true end
-      | _ -> false)
-    generators
-
-let source_named_premise iteration =
-  let body = iteration.Prescan.body in
-  let iter, generators = iteration.Prescan.iterexp in
-  let non_indexed =
-    match iter with
-    | Opt | List | List1 | ListN (_, None) -> true
-    | ListN (_, Some _) -> false
-  in
-  match body.it with
-  | RulePr (_, [], mixop, exp)
-    when non_indexed
-         && has_scalar_generator generators
-         && mixop_has Xl.Atom.[Turnstile; TurnstileSub; Sub] mixop ->
-      let expected =
-        List.map (fun (id, _) -> id.it) iteration.Prescan.captures
-        @ List.map (fun (id, _) -> id.it) generators
-      in
-      direct_rule_components mixop exp = Some expected
-  | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> false
-
-let premise_helper_name index iteration =
-  match iteration.Prescan.body.it with
-  | RulePr (id, _, _, _) when source_named_premise iteration ->
-      Prescan.rel_name index id
-  | _ -> iteration.Prescan.name
-
-let premise_helper_iter iteration =
-  match iteration.Prescan.iterexp with
-  | (Opt | List | List1 | ListN (_, None)), _
-    when source_named_premise iteration -> List
-  | iter, _ -> iter
+let premise_helper_name iteration = iteration.Prescan.name
 
 let premise_helper_call index translate_exp iteration =
   let iter, generators = iteration.Prescan.iterexp in
@@ -362,17 +617,8 @@ let premise_helper_call index translate_exp iteration =
     |> terms_of_variables
   in
   let sources = List.map (fun (_, source) -> translate_exp source) generators in
-  let sources =
-    match iter with
-    | Opt when source_named_premise iteration ->
-        List.map (fun source -> app "lift" [source]) sources
-    | Opt | List | List1 | ListN _ -> sources
-  in
-  app (premise_helper_name index iteration)
-    (captures
-     @ (if source_named_premise iteration then []
-        else controls translate_exp iter)
-     @ sources)
+  app (premise_helper_name iteration)
+    (captures @ controls translate_exp iter @ sources)
 
 let translate_premise index translate_exp premise =
   match Prescan.premise_iteration index premise with
@@ -380,19 +626,7 @@ let translate_premise index translate_exp premise =
       let call =
         premise_helper_call index translate_exp iteration
       in
-      let cardinality =
-        match iteration.Prescan.iterexp with
-        | List1, (_, source) :: _ when source_named_premise iteration ->
-            [EqCondition
-               (BoolCond
-                  (app "_<_" [Const "0"; length (translate_exp source)]))]
-        | ListN (count, None), (_, source) :: _
-          when source_named_premise iteration ->
-            [EqCondition
-               (EqCond (length (translate_exp source), translate_exp count))]
-        | _ -> []
-      in
-      EqCondition (BoolCond call) :: cardinality
+      [EqCondition (BoolCond call)]
   | None -> invalid_arg "IterPr is missing from the prescan index"
 
 
@@ -441,18 +675,11 @@ let premise_helper_arguments captures count index sources =
   @ Option.to_list index
   @ sources
 
-let canonical_variables prefix variables =
-  List.mapi
-    (fun index (variable : variable) ->
-      generated_variable
-        (prefix ^ string_of_int (index + 1)) variable.sort)
-    variables
-
 let translate_premise_statements index translate_body
     (iteration : Prescan.premise_iteration) =
-  let name = premise_helper_name index iteration in
+  let name = premise_helper_name iteration in
   let _, generators = iteration.Prescan.iterexp in
-  let iter = premise_helper_iter iteration in
+  let iter, _ = iteration.Prescan.iterexp in
   let captures =
     translate_captures index iteration.Prescan.captures
   in
@@ -460,33 +687,18 @@ let translate_premise_statements index translate_body
   let iter_index = index_variable index iter in
   let heads = List.map (head_variable index) generators in
   let tails = List.map tail_variable generators in
-  let captures, heads, tails =
-    if source_named_premise iteration then
-      canonical_variables "CAPTURE" captures,
-      canonical_variables "ITEM" heads,
-      canonical_variables "TAIL" tails
-    else
-      captures, heads, tails
-  in
   let domain = helper_domain captures count iter_index generators in
   let call name args = app name args in
   let arguments count index sources =
     premise_helper_arguments captures count index sources
   in
-  let conditions =
-    if source_named_premise iteration then
-      [BoolCond
-         (app name
-            (terms_of_variables captures @ terms_of_variables heads))]
-    else
-      premise_conditions translate_body iteration
-  in
+  let conditions = premise_conditions translate_body iteration in
   let declaration = premise_helper_declaration name domain in
   let empty_sources = List.map (fun _ -> Const "eps") generators in
   let base count index =
     Eq (call name (arguments count index empty_sources), Const "true", [])
   in
-  let source_patterns iter = source_arguments iter heads tails in
+  let source_patterns iter = source_arguments iter generators heads tails in
   let step name iter count index next_count next_index next_name =
     let left = call name (arguments count index (source_patterns iter)) in
     let right = call next_name (arguments next_count next_index
@@ -507,7 +719,7 @@ let translate_premise_statements index translate_body
       let step = step name List None None None None name in
       [declaration; base None None; step]
   | List1, _ ->
-      let tail_name = name ^ "-tail" in
+      let tail_name = iteration.Prescan.tail_name in
       let tail_declaration = premise_helper_declaration tail_name domain in
       let first = step name List None None None None tail_name in
       let tail_step = step tail_name List None None None None tail_name in

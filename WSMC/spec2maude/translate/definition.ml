@@ -113,7 +113,9 @@ let translate_script script =
     @ Param.translate_applications index
   in
   let iterations =
-    Iter.translate_all (Term.translate_exp index) index
+    Iter.translate_all
+      (Prem.translate_pattern_parts index)
+      (Term.translate_exp index) index
   in
   let premise_iterations =
     let translate_body bound body =

@@ -72,7 +72,11 @@ let rec emit_term = function
 
   | App ("_ _", terms) ->
       terms
-      |> List.map emit_term
+      |> List.map (fun term ->
+           match term with
+           | App (name, args) when is_mixfix name args ->
+               "(" ^ emit_term term ^ ")"
+           | Var _ | Const _ | App _ -> emit_term term)
       |> join " "
 
   | App (name, []) ->
