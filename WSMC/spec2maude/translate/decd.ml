@@ -117,7 +117,8 @@ let translate_rule_clause index id clause =
           )
       in
       let premises =
-        Prem.translate_all index ~bound:(head_bound args) prems
+        Prem.translate_all index ~bound:(head_bound args)
+          ~allow_binding_membership:true prems
       in
       if premises.otherwise then
         invalid_arg "ElsePr is not supported in a maude_rule DecD";
