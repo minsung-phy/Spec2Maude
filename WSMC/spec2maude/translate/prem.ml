@@ -23,6 +23,42 @@ let bind_names bound names =
 
 let make bound conditions = {conditions; bound; otherwise = false}
 
+let is_rewrite_call index exp =
+  match exp.it with
+  | CallE (id, _) ->
+      Prescan.definition_call index exp = None
+      && Prescan.has_dec_hint index id "maude_rule"
+  | _ -> false
+
+let has_rewrite_call index exp =
+  let found = ref false in
+  let module Visitor = Il.Iter.Make (struct
+    include Il.Iter.Skip
+
+    let visit_exp exp =
+      if is_rewrite_call index exp then found := true
+  end)
+  in
+  Visitor.exp exp;
+  !found
+
+let arg_has_rewrite_call index arg =
+  match arg.it with
+  | ExpA exp -> has_rewrite_call index exp
+  | TypA _ | DefA _ | GramA _ -> false
+
+let prem_has_rewrite_call index prem =
+  let found = ref false in
+  let module Visitor = Il.Iter.Make (struct
+    include Il.Iter.Skip
+
+    let visit_exp exp =
+      if is_rewrite_call index exp then found := true
+  end)
+  in
+  Visitor.prem prem;
+  !found
+
 type attempt =
   | Ready of result
   | Waiting
@@ -356,8 +392,37 @@ let translate_inverse index bound equality id args result =
           invalid_arg "inverse argument position does not match the call"
       end
 
+let translate_rewrite_call index bound call result =
+  if not (known bound call) then Waiting
+  else
+    let call = Term.translate_exp index call in
+    if known bound result then
+      Ready
+        (make bound
+           [RewriteCond (call, Term.translate_exp index result)])
+    else
+      match translate_pattern index result with
+      | Some pattern ->
+          Ready
+            (make (bind bound result)
+               (RewriteCond (call, pattern.term) :: rule_guards pattern))
+      | None ->
+          invalid_arg "rewrite-backed call result is not a pattern"
+
 let rec translate_ifpr index bound exp =
   match exp.it with
+  | CmpE (`EqOp, _, ({it = CallE _; _} as call), result)
+    when is_rewrite_call index call ->
+      translate_rewrite_call index bound call result
+
+  | CmpE (`EqOp, _, result, ({it = CallE _; _} as call))
+    when is_rewrite_call index call ->
+      translate_rewrite_call index bound call result
+
+  | _ when has_rewrite_call index exp ->
+      invalid_arg
+        "rewrite-backed call must be a top-level equality premise"
+
   | BinE (`AndOp, `BoolT, left, right) when not (known bound exp) ->
       begin match translate_ifpr index bound left with
       | Waiting -> Waiting
@@ -462,12 +527,25 @@ let rec translate_prems index result skipped = function
       | IfPr exp ->
           begin match translate_ifpr index result.bound exp with
           | Ready next ->
+              if skipped <> []
+                 && List.exists
+                      (function RewriteCond _ -> true | EqCondition _ -> false)
+                      next.conditions
+              then
+                invalid_arg
+                  "a premise dependency crosses a rewrite premise";
               translate_prems index (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
-              translate_prems index result (prem :: skipped) prems
+              if has_rewrite_call index exp then
+                invalid_arg "rewrite premise has an unbound input"
+              else
+                translate_prems index result (prem :: skipped) prems
           end
       | LetPr (quants, left, right) ->
+          if has_rewrite_call index left || has_rewrite_call index right then
+            invalid_arg
+              "rewrite-backed call must be an IfPr equality premise";
           begin match translate_letpr index result.bound quants left right with
           | Ready next ->
               translate_prems index (append result next) []
@@ -476,6 +554,9 @@ let rec translate_prems index result skipped = function
               translate_prems index result (prem :: skipped) prems
           end
       | RulePr _ | ElsePr | IterPr _ | NegPr _ ->
+          if prem_has_rewrite_call index prem then
+            invalid_arg
+              "rewrite-backed call must be an IfPr equality premise";
           if skipped <> [] then
             invalid_arg "a premise dependency crosses an effectful premise";
           let next = translate_barrier index result.bound prem in
