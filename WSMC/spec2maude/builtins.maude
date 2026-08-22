@@ -169,14 +169,14 @@ mod WASM-BUILTINS is
   vars FS_MAG FS_MAG2 : SpectecTerminal .
   op fnmag-valid : Nat SpectecTerminal -> Bool .
   ceq fnmag-valid(FS_N, NORM(FS_M, FS_E)) = true
-    if _and_(_<_(FS_M, _^_(2, M-2(FS_N))),
+    if _and_(_<_(FS_M, _^_(2, spectec-M(FS_N))),
             _and_(_<=_(_+_(2, - _^_(2, _-_(E(FS_N), 1))), FS_E),
                   _<=_(FS_E, _-_(_^_(2, _-_(E(FS_N), 1)), 1)))) = true .
   ceq fnmag-valid(FS_N, SUBNORM(FS_M)) = true
-    if _<_(FS_M, _^_(2, M-2(FS_N))) .
+    if _<_(FS_M, _^_(2, spectec-M(FS_N))) .
   eq fnmag-valid(FS_N, INF) = true .
   ceq fnmag-valid(FS_N, NAN(FS_M)) = true
-    if _and_(_<=_(1, FS_M), _<_(FS_M, _^_(2, M-2(FS_N)))) = true .
+    if _and_(_<=_(1, FS_M), _<_(FS_M, _^_(2, spectec-M(FS_N)))) = true .
 
   --- Implemented builtin family: exact finite floating-point rational model.
   vars FI_M FI_N FI_FRAC FI_RESULT : Nat .
@@ -269,10 +269,10 @@ mod WASM-BUILTINS is
   ceq scale-rat(FI_R, FI_E) = FI_R / pow2-rat(abs(FI_E))
     if _<_(FI_E, 0) .
   ceq fmag-rat(FI_N, NORM(FI_FRAC, FI_E)) =
-      scale-rat(_/_( _+_(_^_(2, M-2(FI_N)), FI_FRAC), pow2-rat(M-2(FI_N))), FI_E)
+      scale-rat(_/_( _+_(_^_(2, spectec-M(FI_N)), FI_FRAC), pow2-rat(spectec-M(FI_N))), FI_E)
     if (fnmag-valid(FI_N, NORM(FI_FRAC, FI_E))) = true .
   ceq fmag-rat(FI_N, SUBNORM(FI_FRAC)) =
-      scale-rat(_/_(FI_FRAC, pow2-rat(M-2(FI_N))), _+_(2, - _^_(2, _-_(E(FI_N), 1))))
+      scale-rat(_/_(FI_FRAC, pow2-rat(spectec-M(FI_N))), _+_(2, - _^_(2, _-_(E(FI_N), 1))))
     if (fnmag-valid(FI_N, SUBNORM(FI_FRAC))) = true .
   ceq float-rat(FI_N, POS(FI_MAG)) = fmag-rat(FI_N, FI_MAG)
     if (fnmag-valid(FI_N, FI_MAG)) = true .
@@ -352,19 +352,19 @@ mod WASM-BUILTINS is
     if (float-finite(FC_N, FC_F1)) = true .
   ceq float-lt-bit(FC_N, FC_F1, NEG(INF)) = 0
     if (float-finite(FC_N, FC_F1)) = true .
-  eq float-default-nan(FC_N) = POS(NAN(_^_(2, _-_(M-2(FC_N), 1)))) .
+  eq float-default-nan(FC_N) = POS(NAN(_^_(2, _-_(spectec-M(FC_N), 1)))) .
   ceq float-canonical-nan(FC_N, POS(NAN(FC_M))) = POS(NAN(FC_M))
     if (fnmag-valid(FC_N, NAN(FC_M))) = true
-       /\ _>=_(FC_M, _^_(2, _-_(M-2(FC_N), 1))) .
-  ceq float-canonical-nan(FC_N, POS(NAN(FC_M))) = POS(NAN(_+_(FC_M, _^_(2, _-_(M-2(FC_N), 1)))))
+       /\ _>=_(FC_M, _^_(2, _-_(spectec-M(FC_N), 1))) .
+  ceq float-canonical-nan(FC_N, POS(NAN(FC_M))) = POS(NAN(_+_(FC_M, _^_(2, _-_(spectec-M(FC_N), 1)))))
     if (fnmag-valid(FC_N, NAN(FC_M))) = true
-       /\ _<_(FC_M, _^_(2, _-_(M-2(FC_N), 1))) .
+       /\ _<_(FC_M, _^_(2, _-_(spectec-M(FC_N), 1))) .
   ceq float-canonical-nan(FC_N, NEG(NAN(FC_M))) = NEG(NAN(FC_M))
     if (fnmag-valid(FC_N, NAN(FC_M))) = true
-       /\ _>=_(FC_M, _^_(2, _-_(M-2(FC_N), 1))) .
-  ceq float-canonical-nan(FC_N, NEG(NAN(FC_M))) = NEG(NAN(_+_(FC_M, _^_(2, _-_(M-2(FC_N), 1)))))
+       /\ _>=_(FC_M, _^_(2, _-_(spectec-M(FC_N), 1))) .
+  ceq float-canonical-nan(FC_N, NEG(NAN(FC_M))) = NEG(NAN(_+_(FC_M, _^_(2, _-_(spectec-M(FC_N), 1)))))
     if (fnmag-valid(FC_N, NAN(FC_M))) = true
-       /\ _<_(FC_M, _^_(2, _-_(M-2(FC_N), 1))) .
+       /\ _<_(FC_M, _^_(2, _-_(spectec-M(FC_N), 1))) .
   ceq float-binary-nan(FC_N, POS(NAN(FC_M)), FC_F2) =
       float-canonical-nan(FC_N, POS(NAN(FC_M)))
     if (fnmag-valid(FC_N, NAN(FC_M))) = true .
@@ -498,36 +498,36 @@ mod WASM-BUILTINS is
   ceq round-rat-subnormal(FD_N, FD_R) = SUBNORM(0)
     if _>_(FD_R, 0)
        /\ FD_EMIN := _+_(2, - _^_(2, _-_(E(FD_N), 1)))
-       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_EMIN, M-2(FD_N))))
+       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_EMIN, spectec-M(FD_N))))
        /\ FD_Q = 0 .
   ceq round-rat-subnormal(FD_N, FD_R) = SUBNORM(FD_Q)
     if _>_(FD_R, 0)
        /\ FD_EMIN := _+_(2, - _^_(2, _-_(E(FD_N), 1)))
-       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_EMIN, M-2(FD_N))))
+       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_EMIN, spectec-M(FD_N))))
        /\ _>_(FD_Q, 0)
-       /\ _<_(FD_Q, _^_(2, M-2(FD_N))) .
+       /\ _<_(FD_Q, _^_(2, spectec-M(FD_N))) .
   ceq round-rat-subnormal(FD_N, FD_R) = NORM(0, FD_EMIN)
     if _>_(FD_R, 0)
        /\ FD_EMIN := _+_(2, - _^_(2, _-_(E(FD_N), 1)))
-       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_EMIN, M-2(FD_N))))
-       /\ FD_Q = _^_(2, M-2(FD_N)) .
-  ceq round-rat-normal(FD_N, FD_R, FD_E) = NORM(_-_(FD_Q, _^_(2, M-2(FD_N))), FD_E)
+       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_EMIN, spectec-M(FD_N))))
+       /\ FD_Q = _^_(2, spectec-M(FD_N)) .
+  ceq round-rat-normal(FD_N, FD_R, FD_E) = NORM(_-_(FD_Q, _^_(2, spectec-M(FD_N))), FD_E)
     if _>_(FD_R, 0)
-       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_E, M-2(FD_N))))
-       /\ _<_(FD_Q, _^_(2, _+_(M-2(FD_N), 1)))
-       /\ (fnmag-valid(FD_N, NORM(_-_(FD_Q, _^_(2, M-2(FD_N))), FD_E))) = true .
+       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_E, spectec-M(FD_N))))
+       /\ _<_(FD_Q, _^_(2, _+_(spectec-M(FD_N), 1)))
+       /\ (fnmag-valid(FD_N, NORM(_-_(FD_Q, _^_(2, spectec-M(FD_N))), FD_E))) = true .
   ceq round-rat-normal(FD_N, FD_R, FD_E) = NORM(0, _+_(FD_E, 1))
     if _>_(FD_R, 0)
        /\ FD_EMAX := _-_(_^_(2, _-_(E(FD_N), 1)), 1)
-       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_E, M-2(FD_N))))
-       /\ FD_Q = _^_(2, _+_(M-2(FD_N), 1))
+       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_E, spectec-M(FD_N))))
+       /\ FD_Q = _^_(2, _+_(spectec-M(FD_N), 1))
        /\ _<_(FD_E, FD_EMAX)
        /\ (fnmag-valid(FD_N, NORM(0, _+_(FD_E, 1)))) = true .
   ceq round-rat-normal(FD_N, FD_R, FD_E) = INF
     if _>_(FD_R, 0)
        /\ FD_EMAX := _-_(_^_(2, _-_(E(FD_N), 1)), 1)
-       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_E, M-2(FD_N))))
-       /\ FD_Q = _^_(2, _+_(M-2(FD_N), 1))
+       /\ FD_Q := nearest-rat-int(FD_R / scale-rat(1, _-_(FD_E, spectec-M(FD_N))))
+       /\ FD_Q = _^_(2, _+_(spectec-M(FD_N), 1))
        /\ FD_E = FD_EMAX .
   eq round-rat-to-fmag(FD_N, 0) = SUBNORM(0) .
   ceq round-rat-to-fmag(FD_N, FD_R) = round-rat-subnormal(FD_N, FD_R)
@@ -583,36 +583,36 @@ mod WASM-BUILTINS is
   ceq sqrt-rat-subnormal(SQ_N, SQ_R) = SUBNORM(0)
     if _>_(SQ_R, 0)
        /\ SQ_EMIN := _+_(2, - _^_(2, _-_(E(SQ_N), 1)))
-       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(M-2(SQ_N), SQ_EMIN))), _^_(2, M-2(SQ_N)))
+       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(spectec-M(SQ_N), SQ_EMIN))), _^_(2, spectec-M(SQ_N)))
        /\ SQ_Q = 0 .
   ceq sqrt-rat-subnormal(SQ_N, SQ_R) = SUBNORM(SQ_Q)
     if _>_(SQ_R, 0)
        /\ SQ_EMIN := _+_(2, - _^_(2, _-_(E(SQ_N), 1)))
-       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(M-2(SQ_N), SQ_EMIN))), _^_(2, M-2(SQ_N)))
+       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(spectec-M(SQ_N), SQ_EMIN))), _^_(2, spectec-M(SQ_N)))
        /\ _>_(SQ_Q, 0)
-       /\ _<_(SQ_Q, _^_(2, M-2(SQ_N))) .
+       /\ _<_(SQ_Q, _^_(2, spectec-M(SQ_N))) .
   ceq sqrt-rat-subnormal(SQ_N, SQ_R) = NORM(0, SQ_EMIN)
     if _>_(SQ_R, 0)
        /\ SQ_EMIN := _+_(2, - _^_(2, _-_(E(SQ_N), 1)))
-       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(M-2(SQ_N), SQ_EMIN))), _^_(2, M-2(SQ_N)))
-       /\ SQ_Q = _^_(2, M-2(SQ_N)) .
-  ceq sqrt-rat-normal(SQ_N, SQ_R, SQ_E) = NORM(_-_(SQ_Q, _^_(2, M-2(SQ_N))), SQ_E)
+       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(spectec-M(SQ_N), SQ_EMIN))), _^_(2, spectec-M(SQ_N)))
+       /\ SQ_Q = _^_(2, spectec-M(SQ_N)) .
+  ceq sqrt-rat-normal(SQ_N, SQ_R, SQ_E) = NORM(_-_(SQ_Q, _^_(2, spectec-M(SQ_N))), SQ_E)
     if _>_(SQ_R, 0)
-       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(M-2(SQ_N), SQ_E))), _^_(2, _+_(M-2(SQ_N), 1)))
-       /\ _<_(SQ_Q, _^_(2, _+_(M-2(SQ_N), 1)))
-       /\ (fnmag-valid(SQ_N, NORM(_-_(SQ_Q, _^_(2, M-2(SQ_N))), SQ_E))) = true .
+       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(spectec-M(SQ_N), SQ_E))), _^_(2, _+_(spectec-M(SQ_N), 1)))
+       /\ _<_(SQ_Q, _^_(2, _+_(spectec-M(SQ_N), 1)))
+       /\ (fnmag-valid(SQ_N, NORM(_-_(SQ_Q, _^_(2, spectec-M(SQ_N))), SQ_E))) = true .
   ceq sqrt-rat-normal(SQ_N, SQ_R, SQ_E) = NORM(0, _+_(SQ_E, 1))
     if _>_(SQ_R, 0)
        /\ SQ_EMAX := _-_(_^_(2, _-_(E(SQ_N), 1)), 1)
-       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(M-2(SQ_N), SQ_E))), _^_(2, _+_(M-2(SQ_N), 1)))
-       /\ SQ_Q = _^_(2, _+_(M-2(SQ_N), 1))
+       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(spectec-M(SQ_N), SQ_E))), _^_(2, _+_(spectec-M(SQ_N), 1)))
+       /\ SQ_Q = _^_(2, _+_(spectec-M(SQ_N), 1))
        /\ _<_(SQ_E, SQ_EMAX)
        /\ (fnmag-valid(SQ_N, NORM(0, _+_(SQ_E, 1)))) = true .
   ceq sqrt-rat-normal(SQ_N, SQ_R, SQ_E) = INF
     if _>_(SQ_R, 0)
        /\ SQ_EMAX := _-_(_^_(2, _-_(E(SQ_N), 1)), 1)
-       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(M-2(SQ_N), SQ_E))), _^_(2, _+_(M-2(SQ_N), 1)))
-       /\ SQ_Q = _^_(2, _+_(M-2(SQ_N), 1))
+       /\ SQ_Q := nearest-sqrt-rat-int(scale-rat(SQ_R, _*_(2, _-_(spectec-M(SQ_N), SQ_E))), _^_(2, _+_(spectec-M(SQ_N), 1)))
+       /\ SQ_Q = _^_(2, _+_(spectec-M(SQ_N), 1))
        /\ SQ_E = SQ_EMAX .
   eq sqrt-rat-to-fmag(SQ_N, 0) = SUBNORM(0) .
   ceq sqrt-rat-to-fmag(SQ_N, SQ_R) = sqrt-rat-subnormal(SQ_N, SQ_R)
@@ -635,20 +635,20 @@ mod WASM-BUILTINS is
   ceq sqrt-fmag(SQ_N, FI_MAG) = sqrt-rat-to-fmag(SQ_N, fmag-rat(SQ_N, FI_MAG))
     if (float-finite(SQ_N, POS(FI_MAG))) = true .
   eq promote-f32-normal-frac(FP_M) =
-      _*_(FP_M, _^_(2, _-_(M-2(64), M-2(32)))) .
+      _*_(FP_M, _^_(2, _-_(spectec-M(64), spectec-M(32)))) .
   ceq promote-f32-subnorm-frac(FP_M) =
-      _-_(_*_(FP_M, _^_(2, _-_(M-2(64), floor-log2(FP_M)))), _^_(2, M-2(64)))
+      _-_(_*_(FP_M, _^_(2, _-_(spectec-M(64), floor-log2(FP_M)))), _^_(2, spectec-M(64)))
     if _>_(FP_M, 0) .
   ceq promote-f32-subnorm-exp(FP_M) =
-      _+_(floor-log2(FP_M), _+_(_+_(2, - _^_(2, _-_(E(32), 1))), - M-2(32)))
+      _+_(floor-log2(FP_M), _+_(_+_(2, - _^_(2, _-_(E(32), 1))), - spectec-M(32)))
     if _>_(FP_M, 0) .
   eq promote-f32-nan-shift(FP_M) =
-      _*_(FP_M, _^_(2, _-_(M-2(64), M-2(32)))) .
+      _*_(FP_M, _^_(2, _-_(spectec-M(64), spectec-M(32)))) .
   ceq promote-f32-nan-payload(FP_M) = promote-f32-nan-shift(FP_M)
-    if _>=_(promote-f32-nan-shift(FP_M), _^_(2, _-_(M-2(64), 1))) .
+    if _>=_(promote-f32-nan-shift(FP_M), _^_(2, _-_(spectec-M(64), 1))) .
   ceq promote-f32-nan-payload(FP_M) =
-      _+_(promote-f32-nan-shift(FP_M), _^_(2, _-_(M-2(64), 1)))
-    if _<_(promote-f32-nan-shift(FP_M), _^_(2, _-_(M-2(64), 1))) .
+      _+_(promote-f32-nan-shift(FP_M), _^_(2, _-_(spectec-M(64), 1)))
+    if _<_(promote-f32-nan-shift(FP_M), _^_(2, _-_(spectec-M(64), 1))) .
   ceq promote-f32(POS(NORM(FP_M, FP_E))) =
       POS(NORM(promote-f32-normal-frac(FP_M), FP_E))
     if (fnmag-valid(32, NORM(FP_M, FP_E))) = true .
@@ -674,12 +674,12 @@ mod WASM-BUILTINS is
       NEG(NAN(promote-f32-nan-payload(FP_M)))
     if (fnmag-valid(32, NAN(FP_M))) = true .
   eq demote-f64-nan-shift(FP_M) =
-      _quo_(FP_M, _^_(2, _-_(M-2(64), M-2(32)))) .
+      _quo_(FP_M, _^_(2, _-_(spectec-M(64), spectec-M(32)))) .
   ceq demote-f64-nan-payload(FP_M) = demote-f64-nan-shift(FP_M)
-    if _>=_(demote-f64-nan-shift(FP_M), _^_(2, _-_(M-2(32), 1))) .
+    if _>=_(demote-f64-nan-shift(FP_M), _^_(2, _-_(spectec-M(32), 1))) .
   ceq demote-f64-nan-payload(FP_M) =
-      _+_(demote-f64-nan-shift(FP_M), _^_(2, _-_(M-2(32), 1)))
-    if _<_(demote-f64-nan-shift(FP_M), _^_(2, _-_(M-2(32), 1))) .
+      _+_(demote-f64-nan-shift(FP_M), _^_(2, _-_(spectec-M(32), 1)))
+    if _<_(demote-f64-nan-shift(FP_M), _^_(2, _-_(spectec-M(32), 1))) .
   ceq demote-f64(POS(FI_MAG)) =
       POS(round-rat-to-fmag(32, fmag-rat(64, FI_MAG)))
     if (float-finite(64, POS(FI_MAG))) = true .
@@ -698,31 +698,31 @@ mod WASM-BUILTINS is
   ceq nat-fmag-exact(FR_N, FR_I) = true
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _<=_(FR_E, M-2(FR_N)) .
+       /\ _<=_(FR_E, spectec-M(FR_N)) .
   ceq nat-fmag-exact(FR_N, FR_I) = true
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
-       /\ _rem_(FR_I, _^_(2, _-_(FR_E, M-2(FR_N)))) = 0 .
+       /\ _>_(FR_E, spectec-M(FR_N))
+       /\ _rem_(FR_I, _^_(2, _-_(FR_E, spectec-M(FR_N)))) = 0 .
   eq nat-to-fmag(FR_N, 0) = SUBNORM(0) .
   ceq nat-to-fmag(FR_N, FR_I) = NORM(FR_FRAC, FR_E)
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _<=_(FR_E, M-2(FR_N))
-       /\ FR_FRAC := _*_( _-_(FR_I, _^_(2, FR_E)), _^_(2, _-_(M-2(FR_N), FR_E)))
+       /\ _<=_(FR_E, spectec-M(FR_N))
+       /\ FR_FRAC := _*_( _-_(FR_I, _^_(2, FR_E)), _^_(2, _-_(spectec-M(FR_N), FR_E)))
        /\ (fnmag-valid(FR_N, NORM(FR_FRAC, FR_E))) = true .
   ceq nat-to-fmag(FR_N, FR_I) = NORM(FR_FRAC, FR_E)
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
-       /\ _rem_(FR_I, _^_(2, _-_(FR_E, M-2(FR_N)))) = 0
-       /\ FR_FRAC := _-_(_quo_(FR_I, _^_(2, _-_(FR_E, M-2(FR_N)))), _^_(2, M-2(FR_N)))
+       /\ _>_(FR_E, spectec-M(FR_N))
+       /\ _rem_(FR_I, _^_(2, _-_(FR_E, spectec-M(FR_N)))) = 0
+       /\ FR_FRAC := _-_(_quo_(FR_I, _^_(2, _-_(FR_E, spectec-M(FR_N)))), _^_(2, spectec-M(FR_N)))
        /\ (fnmag-valid(FR_N, NORM(FR_FRAC, FR_E))) = true .
   ceq round-nat-significand(FR_N, FR_I) = FR_Q
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
-       /\ FR_SHIFT := _-_(FR_E, M-2(FR_N))
+       /\ _>_(FR_E, spectec-M(FR_N))
+       /\ FR_SHIFT := _-_(FR_E, spectec-M(FR_N))
        /\ FR_SCALE := _^_(2, FR_SHIFT)
        /\ FR_Q := _quo_(FR_I, FR_SCALE)
        /\ FR_REM := _rem_(FR_I, FR_SCALE)
@@ -731,8 +731,8 @@ mod WASM-BUILTINS is
   ceq round-nat-significand(FR_N, FR_I) = _+_(FR_Q, 1)
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
-       /\ FR_SHIFT := _-_(FR_E, M-2(FR_N))
+       /\ _>_(FR_E, spectec-M(FR_N))
+       /\ FR_SHIFT := _-_(FR_E, spectec-M(FR_N))
        /\ FR_SCALE := _^_(2, FR_SHIFT)
        /\ FR_Q := _quo_(FR_I, FR_SCALE)
        /\ FR_REM := _rem_(FR_I, FR_SCALE)
@@ -741,8 +741,8 @@ mod WASM-BUILTINS is
   ceq round-nat-significand(FR_N, FR_I) = FR_Q
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
-       /\ FR_SHIFT := _-_(FR_E, M-2(FR_N))
+       /\ _>_(FR_E, spectec-M(FR_N))
+       /\ FR_SHIFT := _-_(FR_E, spectec-M(FR_N))
        /\ FR_SCALE := _^_(2, FR_SHIFT)
        /\ FR_Q := _quo_(FR_I, FR_SCALE)
        /\ FR_REM := _rem_(FR_I, FR_SCALE)
@@ -752,8 +752,8 @@ mod WASM-BUILTINS is
   ceq round-nat-significand(FR_N, FR_I) = _+_(FR_Q, 1)
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
-       /\ FR_SHIFT := _-_(FR_E, M-2(FR_N))
+       /\ _>_(FR_E, spectec-M(FR_N))
+       /\ FR_SHIFT := _-_(FR_E, spectec-M(FR_N))
        /\ FR_SCALE := _^_(2, FR_SHIFT)
        /\ FR_Q := _quo_(FR_I, FR_SCALE)
        /\ FR_REM := _rem_(FR_I, FR_SCALE)
@@ -764,20 +764,20 @@ mod WASM-BUILTINS is
   ceq rounded-nat-to-fmag(FR_N, FR_I) = nat-to-fmag(FR_N, FR_I)
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _<=_(FR_E, M-2(FR_N)) .
-  ceq rounded-nat-to-fmag(FR_N, FR_I) = NORM(_-_(FR_SIG, _^_(2, M-2(FR_N))), FR_E)
+       /\ _<=_(FR_E, spectec-M(FR_N)) .
+  ceq rounded-nat-to-fmag(FR_N, FR_I) = NORM(_-_(FR_SIG, _^_(2, spectec-M(FR_N))), FR_E)
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
+       /\ _>_(FR_E, spectec-M(FR_N))
        /\ FR_SIG := round-nat-significand(FR_N, FR_I)
-       /\ _<_(FR_SIG, _^_(2, _+_(M-2(FR_N), 1)))
-       /\ (fnmag-valid(FR_N, NORM(_-_(FR_SIG, _^_(2, M-2(FR_N))), FR_E))) = true .
+       /\ _<_(FR_SIG, _^_(2, _+_(spectec-M(FR_N), 1)))
+       /\ (fnmag-valid(FR_N, NORM(_-_(FR_SIG, _^_(2, spectec-M(FR_N))), FR_E))) = true .
   ceq rounded-nat-to-fmag(FR_N, FR_I) = NORM(0, _+_(FR_E, 1))
     if _>_(FR_I, 0)
        /\ FR_E := floor-log2(FR_I)
-       /\ _>_(FR_E, M-2(FR_N))
+       /\ _>_(FR_E, spectec-M(FR_N))
        /\ FR_SIG := round-nat-significand(FR_N, FR_I)
-       /\ FR_SIG = _^_(2, _+_(M-2(FR_N), 1))
+       /\ FR_SIG = _^_(2, _+_(spectec-M(FR_N), 1))
        /\ (fnmag-valid(FR_N, NORM(0, _+_(FR_E, 1)))) = true .
   ceq int-to-float-like(FR_N, FR_X, FR_SOURCE) = POS(nat-to-fmag(FR_N, abs(FR_X)))
     if _>_(FR_X, 0)
@@ -830,9 +830,9 @@ mod WASM-BUILTINS is
   ceq float-sign-field(FB_N, FB_I) = _quo_(_rem_(FB_I, _^_(2, FB_N)), _^_(2, _-_(FB_N, 1)))
     if _>_(FB_N, 0) .
   eq float-exp-field(FB_N, FB_I) =
-      _rem_(_quo_(_rem_(FB_I, _^_(2, FB_N)), _^_(2, M-2(FB_N))), _^_(2, E(FB_N))) .
+      _rem_(_quo_(_rem_(FB_I, _^_(2, FB_N)), _^_(2, spectec-M(FB_N))), _^_(2, E(FB_N))) .
   eq float-frac-field(FB_N, FB_I) =
-      _rem_(_rem_(FB_I, _^_(2, FB_N)), _^_(2, M-2(FB_N))) .
+      _rem_(_rem_(FB_I, _^_(2, FB_N)), _^_(2, spectec-M(FB_N))) .
   ceq float-mag-from-bits(FB_N, FB_I) = SUBNORM(FB_FRAC)
     if _<_(FB_I, _^_(2, FB_N))
        /\ FB_EXP := float-exp-field(FB_N, FB_I)
@@ -863,14 +863,14 @@ mod WASM-BUILTINS is
     if _<_(FB_I, _^_(2, FB_N))
        /\ float-sign-field(FB_N, FB_I) = 1 .
   ceq float-mag-to-bits(FB_N, SUBNORM(FB_M)) = FB_M
-    if _<_(FB_M, _^_(2, M-2(FB_N))) .
+    if _<_(FB_M, _^_(2, spectec-M(FB_N))) .
   eq float-mag-to-bits(FB_N, INF) =
-      _*_(float-max-exp-field(FB_N), _^_(2, M-2(FB_N))) .
+      _*_(float-max-exp-field(FB_N), _^_(2, spectec-M(FB_N))) .
   ceq float-mag-to-bits(FB_N, NAN(FB_M)) =
-      _+_(_*_(float-max-exp-field(FB_N), _^_(2, M-2(FB_N))), FB_M)
-    if _and_(_<=_(1, FB_M), _<_(FB_M, _^_(2, M-2(FB_N)))) = true .
+      _+_(_*_(float-max-exp-field(FB_N), _^_(2, spectec-M(FB_N))), FB_M)
+    if _and_(_<=_(1, FB_M), _<_(FB_M, _^_(2, spectec-M(FB_N)))) = true .
   ceq float-mag-to-bits(FB_N, NORM(FB_M, FB_EINT)) =
-      _+_(_*_(_+_(FB_EINT, float-bias(FB_N)), _^_(2, M-2(FB_N))), FB_M)
+      _+_(_*_(_+_(FB_EINT, float-bias(FB_N)), _^_(2, spectec-M(FB_N))), FB_M)
     if (fnmag-valid(FB_N, NORM(FB_M, FB_EINT))) = true .
   ceq float-to-bits(FB_N, POS(FB_MAG)) = FB_MAGBITS
     if (fnmag-valid(FB_N, FB_MAG)) = true
