@@ -86,7 +86,7 @@ let translate_term index translate_exp body (iter, generators) =
 
 let count_variable = function
   | ListN _ ->
-      Some {name = "ITER-COUNT"; sort = "Nat"; source = false}
+      Some (generated_variable "ITER-COUNT" "Nat")
   | Opt | List | List1 -> None
 
 let index_variable index = function
@@ -102,10 +102,8 @@ let head_variable index (id, source) =
   | _ -> invalid_arg "iteration generator must have an iteration type"
 
 let tail_variable (id, _) =
-  { name = String.uppercase_ascii id.it ^ "S"
-  ; sort = "SpectecTerminals"
-  ; source = false
-  }
+  generated_variable
+    (String.uppercase_ascii id.it ^ "S") "SpectecTerminals"
 
 let helper_domain captures count index generators =
   List.map (fun (variable : variable) -> variable.sort) captures
@@ -446,10 +444,8 @@ let premise_helper_arguments captures count index sources =
 let canonical_variables prefix variables =
   List.mapi
     (fun index (variable : variable) ->
-      { variable with
-        name = prefix ^ string_of_int (index + 1)
-      ; source = false
-      })
+      generated_variable
+        (prefix ^ string_of_int (index + 1)) variable.sort)
     variables
 
 let translate_premise_statements index translate_body
