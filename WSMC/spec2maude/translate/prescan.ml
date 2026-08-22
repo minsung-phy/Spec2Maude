@@ -36,6 +36,11 @@ type definition_application =
   ; result : typ
   }
 
+type inverse_contract =
+  { inverse_target : id
+  ; missing : int
+  }
+
 type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
@@ -51,6 +56,7 @@ type t =
   ; definition_calls : (exp * definition_parameter) list
   ; definition_values : definition_application list
   ; definition_applications : definition_application list
+  ; inverses : (string * inverse_contract) list
   }
 
 
@@ -263,6 +269,113 @@ let has_dec_hint_in hints target_name name =
           false)
     hints
 
+let inverse_hint hints source =
+  let targets =
+    hints
+    |> List.concat_map (fun hintdef ->
+         match hintdef.it with
+         | DecH (id, hints) when id.it = source ->
+             hints
+             |> List.filter (fun hint -> hint.hintid.it = "inverse")
+             |> List.map (fun hint ->
+                  match hint.hintexp.it with
+                  | El.Ast.CallE (target, []) -> Ok target
+                  | _ -> Error "inverse hint must name a definition")
+         | TypH _ | RelH _ | DecH _ | GramH _ | RuleH _ ->
+             [])
+  in
+  match targets with
+  | [] -> None
+  | Error reason :: _ -> Some (Error reason)
+  | Ok target :: targets ->
+      if List.for_all
+           (function Ok other -> other.it = target.it | Error _ -> false)
+           targets
+      then Some (Ok target)
+      else Some (Error "definition has conflicting inverse hints")
+
+let rec equal_parameter compare_names left right =
+  let equal_id left right =
+    not compare_names || left.it = right.it
+  in
+  match left.it, right.it with
+  | ExpP (left_id, left_typ), ExpP (right_id, right_typ) ->
+      equal_id left_id right_id && Il.Eq.eq_typ left_typ right_typ
+  | TypP left_id, TypP right_id -> equal_id left_id right_id
+  | DefP (left_id, left_params, left_result),
+    DefP (right_id, right_params, right_result) ->
+      equal_id left_id right_id
+      && List.length left_params = List.length right_params
+      && List.for_all2
+           (equal_parameter compare_names) left_params right_params
+      && Il.Eq.eq_typ left_result right_result
+  | GramP _, GramP _ -> false
+  | (ExpP _ | TypP _ | DefP _ | GramP _), _ -> false
+
+let compatible_parameter = equal_parameter false
+let same_parameter = equal_parameter true
+
+(* A definition inverse receives the preserved parameters in source order,
+   followed by the original result, and returns the omitted parameter. *)
+let remove_at index items =
+  items
+  |> List.mapi (fun position item -> position, item)
+  |> List.filter_map (fun (position, item) ->
+       if position = index then None else Some item)
+
+let validate_inverse definitions source = function
+  | Error reason -> invalid_arg reason
+  | Ok target ->
+      let find name =
+        List.find_opt (fun (id, _, _) -> id = name) definitions
+      in
+      match find source, find target.it with
+      | None, _ -> invalid_arg "inverse source is not a definition"
+      | _, None -> invalid_arg "inverse target is not a definition"
+      | Some (_, source_params, source_result),
+        Some (_, target_params, target_result) ->
+          begin match List.rev target_params with
+          | {it = ExpP (_, result); _} :: target_known_rev
+            when Il.Eq.eq_typ source_result result ->
+              let target_known = List.rev target_known_rev in
+              let candidates =
+                source_params
+                |> List.mapi (fun missing param -> missing, param)
+                |> List.filter_map (fun (missing, param) ->
+                     match param.it with
+                     | ExpP (_, missing_result)
+                       when Il.Eq.eq_typ missing_result target_result ->
+                         let source_known = remove_at missing source_params in
+                         if List.length source_known = List.length target_known
+                            && List.for_all2
+                                 compatible_parameter source_known target_known
+                         then Some missing else None
+                     | ExpP _ | TypP _ | DefP _ | GramP _ -> None)
+              in
+              let candidates =
+                match candidates with
+                | [_] -> candidates
+                | _ ->
+                    List.filter
+                      (fun missing ->
+                        List.for_all2 same_parameter
+                          (remove_at missing source_params) target_known)
+                      candidates
+              in
+              begin match candidates with
+              | [missing] -> {inverse_target = target; missing}
+              | [] ->
+                  invalid_arg
+                    "inverse signature does not identify a missing argument"
+              | _ ->
+                  invalid_arg
+                    "inverse signature identifies multiple missing arguments"
+              end
+          | _ ->
+              invalid_arg
+                "inverse must take the forward result as its last argument"
+          end
+
 
 let scan script =
   let rec collect_type_definitions definitions = function
@@ -294,6 +407,14 @@ let scan script =
         end
   in
   let definitions = collect_definitions [] script |> List.rev in
+  let inverses =
+    definitions
+    |> List.filter_map (fun (source, _, _) ->
+         inverse_hint hints source
+         |> Option.map (fun inverse ->
+              source,
+              validate_inverse definitions source inverse))
+  in
   let iterations = ref [] in
   let premise_iterations = ref [] in
   let premise_count = ref 0 in
@@ -625,6 +746,7 @@ let scan script =
   ; definition_calls = List.rev !definition_calls
   ; definition_values = List.rev !definition_values
   ; definition_applications = List.rev !definition_applications
+  ; inverses
   }
 
 
@@ -671,6 +793,9 @@ let definition_call index exp =
 let definition_parameters index = index.definition_parameters
 let definition_values index = index.definition_values
 let definition_applications index = index.definition_applications
+
+let inverse index id =
+  List.assoc_opt id.it index.inverses
 
 let source_variable_with_sort index id sort =
   let target_name =
