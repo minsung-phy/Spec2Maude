@@ -112,10 +112,6 @@ let from_sequence_element typ term =
   | IterT _ -> app "unseq" [term]
   | _ -> term
 
-let is_hole_only mixop =
-  Xl.Mixop.flatten mixop |> List.for_all (( = ) [])
-
-
 (* Recursive translation *)
 
 let rec translate_typ index typ =
@@ -194,7 +190,7 @@ and translate_exp index exp =
       |> from_sequence_element exp.note
 
   | CaseE (mixop, payload) ->
-      if is_hole_only mixop then
+      if Mixop.is_hole_only mixop then
         begin match payload.it with
         | TupE [single] -> translate_exp index single
         | _ -> translate_exp index payload
@@ -208,7 +204,7 @@ and translate_exp index exp =
         app (Prescan.mixop_name index mixop) args
 
   | UncaseE (case, mixop) ->
-      if is_hole_only mixop then
+      if Mixop.is_hole_only mixop then
         translate_exp index case
       else
         app "_!_" [translate_exp index case; qid_of_mixop index mixop]

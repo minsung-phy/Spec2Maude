@@ -50,7 +50,7 @@ let normalize_variables source_declarations statements =
   in
 
   let normalize_statement statement =
-    let generated = ref [] in
+    let generated = Hashtbl.create 16 in
     let local_used = ref StringSet.empty in
     let normalize_variable (variable : variable) =
       match variable.origin with
@@ -65,18 +65,14 @@ let normalize_variables source_declarations statements =
           | None ->
               invalid_arg ("undeclared source variable " ^ variable.name)
           end
-      | Generated _ ->
-          begin match
-            List.find_opt
-              (fun (original, _) -> same_variable original variable)
-              !generated
-          with
-          | Some (_, normalized) -> normalized
+      | Generated id ->
+          begin match Hashtbl.find_opt generated id with
+          | Some normalized -> normalized
           | None ->
               let name = fresh_generated local_used variable in
               local_used := StringSet.add name !local_used;
               let normalized = {variable with name} in
-              generated := (variable, normalized) :: !generated;
+              Hashtbl.add generated id normalized;
               normalized
           end
     in
