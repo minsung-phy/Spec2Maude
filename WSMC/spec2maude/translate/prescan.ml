@@ -41,6 +41,10 @@ type inverse_contract =
   ; missing : int
   }
 
+type inverse =
+  | ValidInverse of inverse_contract
+  | InvalidInverse of string
+
 type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
@@ -56,7 +60,7 @@ type t =
   ; definition_calls : (exp * definition_parameter) list
   ; definition_values : definition_application list
   ; definition_applications : definition_application list
-  ; inverses : (string * inverse_contract) list
+  ; inverses : (string * inverse) list
   }
 
 
@@ -324,14 +328,14 @@ let remove_at index items =
        if position = index then None else Some item)
 
 let validate_inverse definitions source = function
-  | Error reason -> invalid_arg reason
+  | Error reason -> InvalidInverse reason
   | Ok target ->
       let find name =
         List.find_opt (fun (id, _, _) -> id = name) definitions
       in
       match find source, find target.it with
-      | None, _ -> invalid_arg "inverse source is not a definition"
-      | _, None -> invalid_arg "inverse target is not a definition"
+      | None, _ -> InvalidInverse "inverse source is not a definition"
+      | _, None -> InvalidInverse "inverse target is not a definition"
       | Some (_, source_params, source_result),
         Some (_, target_params, target_result) ->
           begin match List.rev target_params with
@@ -363,16 +367,17 @@ let validate_inverse definitions source = function
                       candidates
               in
               begin match candidates with
-              | [missing] -> {inverse_target = target; missing}
+              | [missing] ->
+                  ValidInverse {inverse_target = target; missing}
               | [] ->
-                  invalid_arg
+                  InvalidInverse
                     "inverse signature does not identify a missing argument"
               | _ ->
-                  invalid_arg
+                  InvalidInverse
                     "inverse signature identifies multiple missing arguments"
               end
           | _ ->
-              invalid_arg
+              InvalidInverse
                 "inverse must take the forward result as its last argument"
           end
 
@@ -795,7 +800,10 @@ let definition_values index = index.definition_values
 let definition_applications index = index.definition_applications
 
 let inverse index id =
-  List.assoc_opt id.it index.inverses
+  match List.assoc_opt id.it index.inverses with
+  | None -> None
+  | Some (ValidInverse contract) -> Some contract
+  | Some (InvalidInverse reason) -> invalid_arg reason
 
 let source_variable_with_sort index id sort =
   let target_name =
