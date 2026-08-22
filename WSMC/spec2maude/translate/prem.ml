@@ -23,6 +23,10 @@ let bind_names bound names =
 
 let make bound conditions = {conditions; bound; otherwise = false}
 
+type attempt =
+  | Ready of result
+  | Waiting
+
 type pattern =
   { term : term
   ; guards : eq_condition list
@@ -312,7 +316,7 @@ let translate_rulepr index bound id args mixop exp =
 
 let translate_inverse index bound equality id args result =
   match Prescan.inverse index id with
-  | None -> invalid_arg "IfPr requires a declared inverse"
+  | None -> Waiting
   | Some inverse ->
       let known_arg arg =
         Il.Free.Set.subset Il.Free.(free_arg arg).varid bound
@@ -323,36 +327,48 @@ let translate_inverse index bound equality id args result =
         |> List.partition (fun (position, _) -> position = inverse.missing)
       in
       begin match selected with
-      | [_, ({it = ExpA pattern; _} as missing)]
-        when not (known_arg missing)
-          && List.for_all (fun (_, arg) -> known_arg arg) remaining ->
-          let inverse_call =
-            App
-              ( Prescan.def_name index inverse.inverse_target
-              , List.map
-                  (fun (_, arg) -> Term.translate_arg index arg)
-                  remaining
-                @ [Term.translate_exp index result]
-              )
-          in
-          let binding =
-            bind_pattern index bound pattern inverse_call
-              "inverse result is not a pattern"
-          in
-          make binding.bound
-            (binding.conditions
-             @ [EqCondition (BoolCond (Term.translate_bool index equality))])
+      | [_, ({it = ExpA pattern; _} as missing)] ->
+          if not (known_arg missing)
+             && List.for_all (fun (_, arg) -> known_arg arg) remaining
+          then
+            let inverse_call =
+              App
+                ( Prescan.def_name index inverse.inverse_target
+                , List.map
+                    (fun (_, arg) -> Term.translate_arg index arg)
+                    remaining
+                  @ [Term.translate_exp index result]
+                )
+            in
+            let binding =
+              bind_pattern index bound pattern inverse_call
+                "inverse result is not a pattern"
+            in
+            Ready
+              (make binding.bound
+                 (binding.conditions
+                  @ [EqCondition (BoolCond (Term.translate_bool index equality))]))
+          else
+            Waiting
+      | [_] ->
+          invalid_arg "inverse missing argument is not an expression"
       | _ ->
-          invalid_arg
-            "inverse requires exactly its declared argument to be unbound"
+          invalid_arg "inverse argument position does not match the call"
       end
 
 let rec translate_ifpr index bound exp =
   match exp.it with
   | BinE (`AndOp, `BoolT, left, right) when not (known bound exp) ->
-      let left = translate_ifpr index bound left in
-      let right = translate_ifpr index left.bound right in
-      make right.bound (left.conditions @ right.conditions)
+      begin match translate_ifpr index bound left with
+      | Waiting -> Waiting
+      | Ready left ->
+          begin match translate_ifpr index left.bound right with
+          | Waiting -> Waiting
+          | Ready right ->
+              Ready
+                (make right.bound (left.conditions @ right.conditions))
+          end
+      end
 
   | CmpE (`EqOp, _, ({it = CallE (id, args); _} as call), result)
     when not (known bound call) && known bound result ->
@@ -364,46 +380,46 @@ let rec translate_ifpr index bound exp =
 
   | CmpE (`EqOp, _, pattern, subject)
     when not (known bound pattern) && known bound subject ->
-      bind_pattern index bound pattern (Term.translate_exp index subject)
-        "IfPr left side is not a pattern"
+      Ready
+        (bind_pattern index bound pattern (Term.translate_exp index subject)
+           "IfPr left side is not a pattern")
 
   | CmpE (`EqOp, _, subject, pattern)
     when known bound subject && not (known bound pattern) ->
-      bind_pattern index bound pattern (Term.translate_exp index subject)
-        "IfPr right side is not a pattern"
+      Ready
+        (bind_pattern index bound pattern (Term.translate_exp index subject)
+           "IfPr right side is not a pattern")
 
   | _ ->
-      if not (known bound exp) then
-        invalid_arg "IfPr contains an unbound variable";
-      make bound [EqCondition (BoolCond (Term.translate_bool index exp))]
+      if known bound exp then
+        Ready (make bound [EqCondition (BoolCond (Term.translate_bool index exp))])
+      else
+        Waiting
 
 let translate_letpr index bound quants left right =
-  if not (known bound right) then invalid_arg "LetPr right side is unbound";
-  let result =
-    bind_pattern index bound left (Term.translate_exp index right)
-      "LetPr left side is not a pattern"
-  in
-  let names =
-    List.filter_map
-      (fun quant ->
-        match quant.it with ExpP (id, _) -> Some id.it | _ -> None)
-      quants
-  in
-  let conditions =
-    result.conditions
-    @ List.map (fun condition -> EqCondition condition)
-         (Param.translate_eq_conditions index quants)
-  in
-  make (bind_names result.bound names) conditions
+  if not (known bound right) then Waiting
+  else
+    let result =
+      bind_pattern index bound left (Term.translate_exp index right)
+        "LetPr left side is not a pattern"
+    in
+    let names =
+      List.filter_map
+        (fun quant ->
+          match quant.it with ExpP (id, _) -> Some id.it | _ -> None)
+        quants
+    in
+    let conditions =
+      result.conditions
+      @ List.map (fun condition -> EqCondition condition)
+           (Param.translate_eq_conditions index quants)
+    in
+    Ready (make (bind_names result.bound names) conditions)
 
-let translate index bound prem =
+let translate_barrier index bound prem =
   match prem.it with
   | RulePr (id, args, mixop, exp) ->
       translate_rulepr index bound id args mixop exp
-  | IfPr exp ->
-      translate_ifpr index bound exp
-  | LetPr (quants, left, right) ->
-      translate_letpr index bound quants left right
   | ElsePr ->
       {conditions = []; bound; otherwise = true}
   | IterPr (_, (iter, generators)) ->
@@ -428,21 +444,47 @@ let translate index bound prem =
         (Iter.translate_premise index (Term.translate_exp index) prem)
   | NegPr _ ->
       invalid_arg "NegPr requires a total source-derived complement"
+  | IfPr _ | LetPr _ ->
+      invalid_arg "internal error: pure premise reached a barrier"
 
-let rec translate_prems index result = function
-  | [] -> result
+let append result next =
+  { conditions = result.conditions @ next.conditions
+  ; bound = next.bound
+  ; otherwise = result.otherwise || next.otherwise
+  }
+
+let rec translate_prems index result skipped = function
+  | [] when skipped = [] -> result
+  | [] ->
+      invalid_arg "pure premises have unresolved variable dependencies"
   | prem :: prems ->
-      let next = translate index result.bound prem in
-      translate_prems index
-        { conditions = result.conditions @ next.conditions
-        ; bound = next.bound
-        ; otherwise = result.otherwise || next.otherwise
-        }
-        prems
+      begin match prem.it with
+      | IfPr exp ->
+          begin match translate_ifpr index result.bound exp with
+          | Ready next ->
+              translate_prems index (append result next) []
+                (List.rev_append skipped prems)
+          | Waiting ->
+              translate_prems index result (prem :: skipped) prems
+          end
+      | LetPr (quants, left, right) ->
+          begin match translate_letpr index result.bound quants left right with
+          | Ready next ->
+              translate_prems index (append result next) []
+                (List.rev_append skipped prems)
+          | Waiting ->
+              translate_prems index result (prem :: skipped) prems
+          end
+      | RulePr _ | ElsePr | IterPr _ | NegPr _ ->
+          if skipped <> [] then
+            invalid_arg "a premise dependency crosses an effectful premise";
+          let next = translate_barrier index result.bound prem in
+          translate_prems index (append result next) [] prems
+      end
 
 let translate_all index ?(bound = []) prems =
   let bound = bind_names Il.Free.Set.empty bound in
-  translate_prems index {conditions = []; bound; otherwise = false} prems
+  translate_prems index {conditions = []; bound; otherwise = false} [] prems
 
 let translate_eq_conditions index ?bound prems =
   let result = translate_all index ?bound prems in
