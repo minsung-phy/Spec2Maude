@@ -211,6 +211,24 @@ let rule_guards pattern =
 
 let rec bind_pattern index bound exp subject error =
   match exp.it with
+  | CvtE (inner, source, target) ->
+      begin match target, source with
+      | (`NatT | `IntT | `RatT), (`NatT | `IntT | `RatT)
+      | `RealT, `RealT ->
+          let converted =
+            App
+              ( "_:_<:>_"
+              , [ subject
+                ; Const (Xl.Num.string_of_typ target)
+                ; Const (Xl.Num.string_of_typ source)
+                ]
+              )
+          in
+          bind_pattern index bound inner converted error
+      | _ ->
+          invalid_arg
+            "CvtE pattern requires an exact backend numeric conversion"
+      end
   | ProjE ({it = UncaseE (inner, mixop); _}, 0)
     when Xl.Mixop.arity mixop = 1 ->
       let represented =

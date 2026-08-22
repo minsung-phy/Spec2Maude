@@ -9,6 +9,26 @@ mod WASM-BUILTINS is
   inc SPEC2MAUDE-GENERATED .
 
 
+  --- Exact SpecTec numeric coercions.
+  var CV_N : Nat .
+  var CV_I : Int .
+  var CV_R : Rat .
+  var CV_F : Float .
+  eq (CV_N : nat <:> nat) = CV_N .
+  eq (CV_N : nat <:> int) = CV_N .
+  eq (CV_N : nat <:> rat) = rat(CV_N) .
+  ceq (CV_I : int <:> nat) = abs(CV_I)
+    if CV_I >= 0 .
+  eq (CV_I : int <:> int) = CV_I .
+  eq (CV_I : int <:> rat) = rat(CV_I) .
+  ceq (rat(CV_R) : rat <:> nat) = abs(floor(CV_R))
+    if CV_R == floor(CV_R) /\ CV_R >= 0 .
+  ceq (rat(CV_R) : rat <:> int) = floor(CV_R)
+    if CV_R == floor(CV_R) .
+  eq (rat(CV_R) : rat <:> rat) = rat(CV_R) .
+  eq (float(CV_F) : real <:> real) = float(CV_F) .
+
+
   --- Implemented builtin family: integer bits, MSB first.
   vars BI_N BI_I BI_ACC BI_BIT BI_RESULT : Nat .
   var BI_BITS : SpectecTerminals .
