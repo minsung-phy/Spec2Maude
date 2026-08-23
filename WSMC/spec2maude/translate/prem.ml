@@ -8,11 +8,6 @@ type result =
   ; otherwise : bool
   }
 
-type relation_shape =
-  | Predicate of exp list
-  | Deterministic of exp list * exp list
-  | Execution of exp list * exp list
-
 let variables exp = Il.Free.(free_exp exp).varid
 let known bound exp = Il.Free.Set.subset (variables exp) bound
 let bind bound exp = Il.Free.Set.union bound (variables exp)
@@ -87,6 +82,16 @@ let rec translate_pattern index exp =
   | ListE exps ->
       translate_list_pattern index exps
 
+  | CatE (left, right) ->
+      begin match translate_pattern index left, translate_pattern index right with
+      | Some left, Some right ->
+          Some
+            { term = Term.sequence [left.term; right.term]
+            ; guards = left.guards @ right.guards
+            }
+      | None, _ | _, None -> None
+      end
+
   | CaseE (mixop, payload) ->
       translate_case_pattern index mixop payload
 
@@ -122,7 +127,7 @@ let rec translate_pattern index exp =
       |> Option.map (fun (term, guards) -> {term; guards})
 
   | UnE _ | BinE _ | CmpE _ | ProjE _ | UncaseE _ | TheE _ | DotE _
-  | CompE _ | LiftE _ | MemE _ | LenE _ | CatE _ | IdxE _ | SliceE _
+  | CompE _ | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _
   | UpdE _ | ExtE _ | IfE _ | CallE _ | CvtE _ ->
       None
 
@@ -201,8 +206,62 @@ let translate_pattern_parts index exp =
 let rule_guards pattern =
   List.map (fun guard -> EqCondition guard) pattern.guards
 
+type inverse_plan =
+  { missing_pattern : exp
+  ; inverse_target : id
+  ; remaining_args : arg list
+  }
+
+let inverse_plan index bound id args =
+  match Prescan.inverse index id with
+  | None -> None
+  | Some inverse ->
+      let known_arg arg =
+        Il.Free.Set.subset Il.Free.(free_arg arg).varid bound
+      in
+      let selected, remaining =
+        args
+        |> List.mapi (fun position arg -> position, arg)
+        |> List.partition (fun (position, _) -> position = inverse.missing)
+      in
+      begin match selected with
+      | [_, {it = ExpA pattern; _}] ->
+          if not (known bound pattern)
+             && List.for_all (fun (_, arg) -> known_arg arg) remaining
+          then
+            Some
+              { missing_pattern = pattern
+              ; inverse_target = inverse.inverse_target
+              ; remaining_args = List.map snd remaining
+              }
+          else None
+      | [_] ->
+          invalid_arg "inverse missing argument is not an expression"
+      | _ ->
+          invalid_arg "inverse argument position does not match the call"
+      end
+
+let inverse_call index plan subject =
+  App
+    ( Prescan.def_name index plan.inverse_target
+    , List.map (Term.translate_arg index) plan.remaining_args @ [subject]
+    )
+
+let can_bind_computed_pattern index bound exp =
+  match exp.it with
+  | CallE (id, args) -> Option.is_some (inverse_plan index bound id args)
+  | _ -> false
+
+let direct_numeric_variable index bound exp =
+  match exp.it, Prescan.sort_of_typ index exp.note with
+  | VarE _, ("Nat" | "Int") -> not (known bound exp)
+  | _ -> false
+
 let rec bind_pattern index bound exp subject error =
   match exp.it with
+  | _ when known bound exp ->
+      make bound
+        [EqCondition (MatchCond (Term.translate_exp index exp, subject))]
   | CvtE (inner, source, target) ->
       begin match target, source with
       | (`NatT | `IntT | `RatT), (`NatT | `IntT | `RatT)
@@ -228,6 +287,44 @@ let rec bind_pattern index bound exp subject error =
         else App (Prescan.mixop_name index mixop, [subject])
       in
       bind_pattern index bound inner represented error
+  | BinE (`MulOp, (`NatT | `IntT), left, right) ->
+      let target, factor =
+        if direct_numeric_variable index bound left && known bound right then
+          left, right
+        else if
+          known bound left && direct_numeric_variable index bound right
+        then
+          right, left
+        else
+          invalid_arg (error ^ ": " ^ Il.Print.string_of_exp exp)
+      in
+      let factor_term = Term.translate_exp index factor in
+      let result =
+        bind_pattern index bound target
+          (App ("_quo_", [subject; factor_term])) error
+      in
+      { result with
+        conditions =
+          EqCondition
+            (BoolCond (App ("_=/=_", [factor_term; Const "0"])))
+          :: result.conditions
+          @ [EqCondition (EqCond (Term.translate_exp index exp, subject))]
+      }
+  | CallE (id, args) ->
+      begin match inverse_plan index bound id args with
+      | Some plan ->
+          let result =
+            bind_pattern index bound plan.missing_pattern
+              (inverse_call index plan subject) error
+          in
+          { result with
+            conditions =
+              result.conditions
+              @ [EqCondition
+                   (EqCond (Term.translate_exp index exp, subject))]
+          }
+      | None -> bind_structural_pattern index bound exp subject error
+      end
   | IterE (body, iterexp) ->
       begin match
         Iter.translate_pattern index
@@ -235,6 +332,7 @@ let rec bind_pattern index bound exp subject error =
           (Term.translate_exp index)
           (known bound)
           (fun name -> Il.Free.Set.mem name bound)
+          (can_bind_computed_pattern index)
           body iterexp subject
       with
       | Some conditions ->
@@ -247,8 +345,112 @@ let rec bind_pattern index bound exp subject error =
           make (bind bound exp)
             (EqCondition (MatchCond (pattern.term, subject))
              :: rule_guards pattern)
-      | None -> invalid_arg error
+      | None -> bind_structural_pattern index bound exp subject error
       end
+
+and bind_structural_pattern index bound exp subject error =
+  match exp.it with
+  | TupE exps ->
+      let subjects = pattern_subjects index "TUPLE-PART" exps in
+      let represented =
+        List.map2
+          (fun exp subject -> Term.as_sequence_element exp.note subject)
+          exps subjects
+        |> Term.sequence
+        |> fun terms -> App ("tuple", [terms])
+      in
+      bind_pattern_parts index bound exps subjects
+        [EqCondition (MatchCond (represented, subject))] error
+  | ListE exps ->
+      let subjects = pattern_subjects index "LIST-PART" exps in
+      let represented =
+        List.map2
+          (fun exp subject -> Term.as_sequence_element exp.note subject)
+          exps subjects
+        |> Term.sequence
+      in
+      bind_pattern_parts index bound exps subjects
+        [EqCondition (MatchCond (represented, subject))] error
+  | CatE (left, right) ->
+      let exps = [left; right] in
+      let subjects = pattern_subjects index "CONCAT-PART" exps in
+      bind_pattern_parts index bound exps subjects
+        [EqCondition (MatchCond (Term.sequence subjects, subject))] error
+  | CaseE (mixop, payload) ->
+      bind_case_pattern index bound mixop payload subject error
+  | OptE (Some inner) ->
+      let inner_subject = pattern_subject index "OPTION-PART" inner in
+      let represented =
+        App ("_?", [Term.as_sequence_element inner.note inner_subject])
+      in
+      bind_pattern_parts index bound [inner] [inner_subject]
+        [EqCondition (MatchCond (represented, subject))] error
+  | StrE fields ->
+      let exps = List.map snd fields in
+      let subjects = pattern_subjects index "FIELD-PART" exps in
+      let represented =
+        List.map2
+          (fun (atom, _) value ->
+            App ("item", [Term.qid_of_atom atom; value]))
+          fields subjects
+        |> Term.record_items
+        |> fun items -> App ("{_}", [items])
+      in
+      bind_pattern_parts index bound exps subjects
+        [EqCondition (MatchCond (represented, subject))] error
+  | SubE (inner, source, _) ->
+      let result = bind_pattern index bound inner subject error in
+      { result with
+        conditions =
+          result.conditions
+          @ List.map (fun c -> EqCondition c)
+              (Term.translate_typ_conditions index subject source)
+      }
+  | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
+  | ProjE _ | UncaseE _ | OptE None | TheE _ | DotE _ | CompE _
+  | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _ | UpdE _ | ExtE _
+  | IfE _ | CallE _ | IterE _ | CvtE _ ->
+      invalid_arg (error ^ ": " ^ Il.Print.string_of_exp exp)
+
+and pattern_subject index prefix exp =
+  Var (generated_variable prefix (Term.translate_sort index exp.note))
+
+and pattern_subjects index prefix exps =
+  List.mapi
+    (fun position exp ->
+      pattern_subject index (prefix ^ string_of_int (position + 1)) exp)
+    exps
+
+and bind_pattern_parts index bound exps subjects conditions error =
+  let parts = List.combine exps subjects in
+  let direct, structural =
+    List.partition
+      (fun (exp, _) -> Option.is_some (translate_pattern index exp))
+      parts
+  in
+  List.fold_left
+    (fun result (exp, subject) ->
+      let next = bind_pattern index result.bound exp subject error in
+      { next with conditions = result.conditions @ next.conditions })
+    (make bound conditions) (direct @ structural)
+
+and bind_case_pattern index bound mixop payload subject error =
+  if Mixop.is_hole_only mixop then
+    match payload.it with
+    | TupE [single] -> bind_pattern index bound single subject error
+    | _ -> bind_pattern index bound payload subject error
+  else
+    let exps = match payload.it with TupE exps -> exps | _ -> [payload] in
+    let subjects = pattern_subjects index "CASE-PART" exps in
+    let represented = App (Prescan.mixop_name index mixop, subjects) in
+    bind_pattern_parts index bound exps subjects
+      [EqCondition (MatchCond (represented, subject))] error
+
+let output_subjects index outputs =
+  pattern_subjects index "REL-OUTPUT" outputs
+
+let bind_outputs index bound outputs subjects conditions error =
+  bind_pattern_parts index bound outputs subjects conditions error
 
 let components mixop exp =
   match Xl.Mixop.arity mixop, exp.it with
@@ -264,48 +466,6 @@ let split count items =
     | [] -> invalid_arg "malformed execution RulePr"
   in
   aux count [] items
-
-let marker_position markers mixop =
-  let positions =
-    Xl.Mixop.flatten mixop
-    |> List.mapi (fun index atoms ->
-         atoms
-         |> List.filter_map (fun atom ->
-              if List.mem atom.it markers then
-                Some (index + if Xl.Atom.is_sub atom then 1 else 0)
-              else None))
-    |> List.concat
-  in
-  match positions with
-  | [] -> None
-  | [position] -> Some position
-  | _ -> invalid_arg "RulePr relation has multiple direction markers"
-
-let relation_shape mixop exps =
-  let execution =
-    Xl.Atom.[SqArrow; SqArrowSub; SqArrowStar; SqArrowStarSub]
-  in
-  match marker_position execution mixop with
-  | Some position when position > 0 && position < List.length exps ->
-      let inputs, outputs = split position exps in
-      Execution (inputs, outputs)
-  | Some _ ->
-      invalid_arg "execution RulePr marker requires input and output components"
-  | None ->
-      begin match marker_position Xl.Atom.[Approx; ApproxSub] mixop with
-      | Some position when position < List.length exps ->
-          let inputs, outputs = split position exps in
-          Deterministic (inputs, outputs)
-      | Some _ ->
-          invalid_arg "deterministic RulePr marker requires an output component"
-      | None ->
-          begin match marker_position Xl.Atom.[Colon; ColonSub] mixop with
-          | Some position when position < List.length exps ->
-              let inputs, outputs = split position exps in
-              Deterministic (inputs, outputs)
-          | Some _ | None -> Predicate exps
-          end
-      end
 
 let relation_call index id args exps =
   App
@@ -327,14 +487,22 @@ let tuple exps terms =
 
 let translate_rulepr index bound id args mixop exp =
   let exps = components mixop exp in
-  match relation_shape mixop exps with
-  | Predicate inputs ->
+  let policy =
+    match Prescan.relation_policy index id with
+    | Ok policy -> policy
+    | Error reason ->
+        invalid_arg
+          ("RulePr target " ^ id.it ^ " is unsupported: " ^ reason)
+  in
+  match policy with
+  | Prescan.Predicate | Prescan.Builtin ->
       if not (known_args bound args && known bound exp) then
         invalid_arg "predicate RulePr contains an unbound variable";
-      make bound [EqCondition (BoolCond (relation_call index id args inputs))]
-  | Deterministic (inputs, outputs) ->
+      make bound [EqCondition (BoolCond (relation_call index id args exps))]
+  | Prescan.Equation {input_count} ->
+      let inputs, outputs = split input_count exps in
       if not (known_args bound args && List.for_all (known bound) inputs) then
-        invalid_arg "deterministic RulePr has an unbound input";
+        invalid_arg "equation RulePr has an unbound input";
       let call = relation_call index id args inputs in
       if List.for_all (known bound) outputs then
         make bound
@@ -351,9 +519,13 @@ let translate_rulepr index bound id args mixop exp =
                  (MatchCond (tuple outputs (pattern_terms patterns), call))
                :: List.concat_map rule_guards patterns)
         | None ->
-            invalid_arg "deterministic RulePr output is not a pattern"
+            let subjects = output_subjects index outputs in
+            bind_outputs index bound outputs subjects
+              [EqCondition (MatchCond (tuple outputs subjects, call))]
+              "equation RulePr output is not a structural pattern"
         end
-  | Execution (inputs, outputs) ->
+  | Prescan.Execution {input_count; _} ->
+      let inputs, outputs = split input_count exps in
       if not (known_args bound args && List.for_all (known bound) inputs) then
         invalid_arg "execution RulePr has an unbound input";
       begin match translate_patterns index outputs with
@@ -365,50 +537,30 @@ let translate_rulepr index bound id args mixop exp =
                )
              :: List.concat_map rule_guards patterns)
       | None ->
-          invalid_arg "execution RulePr output is not a pattern"
+          let subjects = output_subjects index outputs in
+          let binding =
+            bind_outputs index bound outputs subjects []
+              "execution RulePr output is not a structural pattern"
+          in
+          make binding.bound
+            (RewriteCond
+               (relation_call index id args inputs, tuple outputs subjects)
+             :: binding.conditions)
       end
 
 let translate_inverse index bound equality id args result =
-  match Prescan.inverse index id with
+  match inverse_plan index bound id args with
   | None -> Waiting
-  | Some inverse ->
-      let known_arg arg =
-        Il.Free.Set.subset Il.Free.(free_arg arg).varid bound
+  | Some plan ->
+      let binding =
+        bind_pattern index bound plan.missing_pattern
+          (inverse_call index plan (Term.translate_exp index result))
+          "inverse result is not a pattern"
       in
-      let selected, remaining =
-        args
-        |> List.mapi (fun position arg -> position, arg)
-        |> List.partition (fun (position, _) -> position = inverse.missing)
-      in
-      begin match selected with
-      | [_, ({it = ExpA pattern; _} as missing)] ->
-          if not (known_arg missing)
-             && List.for_all (fun (_, arg) -> known_arg arg) remaining
-          then
-            let inverse_call =
-              App
-                ( Prescan.def_name index inverse.inverse_target
-                , List.map
-                    (fun (_, arg) -> Term.translate_arg index arg)
-                    remaining
-                  @ [Term.translate_exp index result]
-                )
-            in
-            let binding =
-              bind_pattern index bound pattern inverse_call
-                "inverse result is not a pattern"
-            in
-            Ready
-              (make binding.bound
-                 (binding.conditions
-                  @ [EqCondition (BoolCond (Term.translate_bool index equality))]))
-          else
-            Waiting
-      | [_] ->
-          invalid_arg "inverse missing argument is not an expression"
-      | _ ->
-          invalid_arg "inverse argument position does not match the call"
-      end
+      Ready
+        (make binding.bound
+           (binding.conditions
+            @ [EqCondition (BoolCond (Term.translate_bool index equality))]))
 
 let translate_rewrite_call index bound call result =
   if not (known bound call) then Waiting
@@ -427,7 +579,24 @@ let translate_rewrite_call index bound call result =
       | None ->
           invalid_arg "rewrite-backed call result is not a pattern"
 
-let rec translate_ifpr index bound exp =
+let translate_binding_membership index bound element collection =
+  match collection.note.it, translate_pattern index element with
+  | IterT _, Some pattern ->
+      let prefix = Var (generated_variable "MEMBER-PREFIX" "SpectecTerminals") in
+      let suffix = Var (generated_variable "MEMBER-SUFFIX" "SpectecTerminals") in
+      let selected = Term.as_sequence_element element.note pattern.term in
+      let sequence = Term.sequence [prefix; selected; suffix] in
+      Ready
+        (make (bind bound element)
+           (EqCondition
+              (MatchCond (sequence, Term.translate_exp index collection))
+            :: rule_guards pattern))
+  | IterT _, None ->
+      invalid_arg "binding membership element is not a pattern"
+  | _ ->
+      invalid_arg "binding membership requires an iterated collection"
+
+let rec translate_ifpr index bind_membership bound exp =
   match exp.it with
   | CmpE (`EqOp, _, ({it = CallE _; _} as call), result)
     when is_rewrite_call index call ->
@@ -441,18 +610,34 @@ let rec translate_ifpr index bound exp =
       invalid_arg
         "rewrite-backed call must be a top-level equality premise"
 
-  | MemE (element, collection) when not (known bound element) ->
+  | MemE (_, collection) when not (known bound collection) ->
+      Waiting
+
+  | MemE (element, collection)
+    when bind_membership && not (known bound element) ->
+      translate_binding_membership index bound element collection
+
+  | MemE (element, _) when not (known bound element) ->
       invalid_arg
         "binding membership must be a final definition choice"
 
-  | MemE (_, collection) when not (known bound collection) ->
-      invalid_arg "membership collection is unbound"
-
   | BinE (`AndOp, `BoolT, left, right) when not (known bound exp) ->
-      begin match translate_ifpr index bound left with
-      | Waiting -> Waiting
+      begin match translate_ifpr index bind_membership bound left with
+      | Waiting ->
+          begin match translate_ifpr index bind_membership bound right with
+          | Waiting -> Waiting
+          | Ready right ->
+              begin match
+                translate_ifpr index bind_membership right.bound left
+              with
+              | Waiting -> Waiting
+              | Ready left ->
+                  Ready
+                    (make left.bound (right.conditions @ left.conditions))
+              end
+          end
       | Ready left ->
-          begin match translate_ifpr index left.bound right with
+          begin match translate_ifpr index bind_membership left.bound right with
           | Waiting -> Waiting
           | Ready right ->
               Ready
@@ -506,7 +691,7 @@ let translate_letpr index bound quants left right =
     in
     Ready (make (bind_names result.bound names) conditions)
 
-let translate_barrier index bound prem =
+let translate_barrier index request_output bound prem =
   match prem.it with
   | RulePr (id, args, mixop, exp) ->
       translate_rulepr index bound id args mixop exp
@@ -523,15 +708,36 @@ let translate_barrier index bound prem =
               (fun (id, _) -> Il.Free.Set.mem id.it bound)
               iteration.Prescan.captures)
       then invalid_arg "IterPr has an unbound capture";
-      if not (List.for_all (fun (_, source) -> known bound source) generators) then
-        invalid_arg "IterPr has an unbound generator source";
       begin match iter with
       | ListN (count, _) when not (known bound count) ->
           invalid_arg "IterPr has an unbound iteration count"
       | Opt | List | List1 | ListN _ -> ()
       end;
-      make bound
-        (Iter.translate_premise index (Term.translate_exp index) prem)
+      let unknown =
+        generators
+        |> List.mapi (fun position (_, source) -> position, source)
+        |> List.filter (fun (_, source) -> not (known bound source))
+      in
+      begin match unknown with
+      | [] ->
+          make bound
+            (Iter.translate_premise index (Term.translate_exp index) prem)
+      | [position, source]
+        when Iter.premise_output_possible iteration position ->
+          begin match request_output with
+          | Some request -> request iteration position
+          | None ->
+              invalid_arg "IterPr output requires relation helper collection"
+          end;
+          bind_pattern index bound source
+            (Iter.premise_output_call index (Term.translate_exp index)
+               iteration position)
+            "IterPr output source is not a structural pattern"
+      | [_] ->
+          invalid_arg "IterPr body does not determine its unbound source"
+      | _ ->
+          invalid_arg "IterPr has multiple unbound generator sources"
+      end
   | NegPr _ ->
       invalid_arg "NegPr requires a total source-derived complement"
   | IfPr _ | LetPr _ ->
@@ -543,14 +749,16 @@ let append result next =
   ; otherwise = result.otherwise || next.otherwise
   }
 
-let rec translate_prems index result skipped = function
+let rec translate_prems index bind_membership request_output result skipped = function
   | [] when skipped = [] -> result
   | [] ->
       invalid_arg "pure premises have unresolved variable dependencies"
   | prem :: prems ->
       begin match prem.it with
       | IfPr exp ->
-          begin match translate_ifpr index result.bound exp with
+          begin match
+            translate_ifpr index bind_membership result.bound exp
+          with
           | Ready next ->
               if skipped <> []
                  && List.exists
@@ -559,13 +767,15 @@ let rec translate_prems index result skipped = function
               then
                 invalid_arg
                   "a premise dependency crosses a rewrite premise";
-              translate_prems index (append result next) []
+              translate_prems index bind_membership request_output
+                (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
               if has_rewrite_call index exp then
                 invalid_arg "rewrite premise has an unbound input"
               else
-                translate_prems index result (prem :: skipped) prems
+                translate_prems index bind_membership request_output result
+                  (prem :: skipped) prems
           end
       | LetPr (quants, left, right) ->
           if has_rewrite_call index left || has_rewrite_call index right then
@@ -573,10 +783,12 @@ let rec translate_prems index result skipped = function
               "rewrite-backed call must be an IfPr equality premise";
           begin match translate_letpr index result.bound quants left right with
           | Ready next ->
-              translate_prems index (append result next) []
+              translate_prems index bind_membership request_output
+                (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
-              translate_prems index result (prem :: skipped) prems
+              translate_prems index bind_membership request_output result
+                (prem :: skipped) prems
           end
       | RulePr _ | ElsePr | IterPr _ | NegPr _ ->
           if prem_has_rewrite_call index prem then
@@ -584,13 +796,18 @@ let rec translate_prems index result skipped = function
               "rewrite-backed call must be an IfPr equality premise";
           if skipped <> [] then
             invalid_arg "a premise dependency crosses an effectful premise";
-          let next = translate_barrier index result.bound prem in
-          translate_prems index (append result next) [] prems
+          let next =
+            translate_barrier index request_output result.bound prem
+          in
+          translate_prems index bind_membership request_output
+            (append result next) [] prems
       end
 
-let translate_all index ?(bound = []) prems =
+let translate_all index ?(bound = []) ?(bind_membership = false)
+    ?request_output prems =
   let bound = bind_names Il.Free.Set.empty bound in
-  translate_prems index {conditions = []; bound; otherwise = false} [] prems
+  translate_prems index bind_membership request_output
+    {conditions = []; bound; otherwise = false} [] prems
 
 let translate_eq_conditions index ?bound prems =
   let result = translate_all index ?bound prems in

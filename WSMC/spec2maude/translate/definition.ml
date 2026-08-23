@@ -96,33 +96,54 @@ let normalize_variables source_declarations statements =
   in
   declarations, statements
 
-let rec translate index def =
+let rec translate ?request_output index def =
   match def.it with
   | TypD (id, params, insts) -> Typd.translate index id params insts
   | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
   | RelD (id, params, mixop, typ, rules) ->
-      Reld.translate index id params mixop typ rules
+      Reld.translate ?request_output index id params mixop typ rules
   | GramD _ -> []
   | HintD _ -> []
-  | RecD defs -> List.concat_map (translate index) defs
+  | RecD defs -> List.concat_map (translate ?request_output index) defs
 
 let translate_script script =
   let index = Prescan.scan script in
+  let output_requests = ref [] in
+  let request_output iteration position =
+    let request = iteration.Prescan.name, position in
+    if not (List.mem request !output_requests) then
+      output_requests := request :: !output_requests
+  in
   let translated_definitions =
-    List.concat_map (translate index) script
+    List.concat_map (translate ~request_output index) script
     @ Param.translate_applications index
   in
   let iterations =
+    let bind_body bound body subject =
+      let result =
+        Prem.bind_pattern index bound body subject
+          "computed IterE body is not invertible"
+      in
+      result.conditions, result.bound
+    in
     Iter.translate_all
       (Prem.translate_pattern_parts index)
+      (Prem.can_bind_computed_pattern index)
+      bind_body
       (Term.translate_exp index) index
   in
   let premise_iterations =
-    let translate_body bound body =
-      let result = Prem.translate_all index ~bound [body] in
-      result.conditions, result.otherwise
+    let translate_body allow_membership iteration bound body =
+      let bind_membership =
+        allow_membership
+        && Prescan.premise_iteration_binds_membership index iteration
+      in
+      let result =
+        Prem.translate_all index ~bound ~bind_membership [body]
+      in
+      result.conditions, result.otherwise, result.bound
     in
-    Iter.translate_premise_all translate_body index
+    Iter.translate_premise_all translate_body index !output_requests
   in
   let statements =
     translated_definitions @ iterations @ premise_iterations

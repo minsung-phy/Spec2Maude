@@ -6,7 +6,6 @@ open Maude_il
 let has_hint index id name =
   Prescan.has_dec_hint index id name
 
-
 (* DecD declaration *)
 let translate_decl index id params result_typ =
   OpDecl
@@ -226,18 +225,21 @@ let translate_rule_clause index id clause =
 
 (* Complete DecD *)
 let translate index id params result_typ clauses =
-  if has_hint index id "builtin" then
-    [translate_decl index id params result_typ]
-  else if Prescan.has_membership_choice index id then
-    if has_hint index id "maude_rule" then
-      invalid_arg
-        "membership choice conflicts with hint(maude_rule)"
-    else
-      translate_request_header index id params result_typ
-      @ List.concat_map (translate_clause index id result_typ) clauses
-  else if has_hint index id "maude_rule" then
-    translate_request_header index id params result_typ
-    @ List.map (translate_rule_clause index id) clauses
+  let builtin = has_hint index id "builtin" in
+  let choice = Prescan.has_membership_choice index id in
+  let rule = has_hint index id "maude_rule" in
+  if not builtin && choice && rule then
+    invalid_arg "membership choice conflicts with hint(maude_rule)";
+  let header =
+    if builtin then [translate_decl index id params result_typ]
+    else if choice || rule then translate_request_header index id params result_typ
+    else [translate_decl index id params result_typ]
+  in
+  if builtin || not (Prescan.definition_body_supported index id) then
+    header
+  else if choice then
+    header @ List.concat_map (translate_clause index id result_typ) clauses
+  else if rule then
+    header @ List.map (translate_rule_clause index id) clauses
   else
-    translate_decl index id params result_typ
-    :: List.map (translate_equation_clause index id) clauses
+    header @ List.map (translate_equation_clause index id) clauses
