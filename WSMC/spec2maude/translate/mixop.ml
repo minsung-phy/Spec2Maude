@@ -1,3 +1,5 @@
+open Util.Source
+
 let atom_name atom =
   Xl.Atom.to_string atom
   |> String.map (function '_' -> '-' | char -> char)
@@ -33,3 +35,13 @@ let name mixop =
 
 let key mixop =
   name mixop ^ "/" ^ string_of_int (Xl.Mixop.arity mixop)
+
+let marker_positions markers mixop =
+  Xl.Mixop.flatten mixop
+  |> List.mapi (fun index atoms ->
+       atoms
+       |> List.filter_map (fun atom ->
+            if List.mem atom.it markers then
+              Some (index + if Xl.Atom.is_sub atom then 1 else 0)
+            else None))
+  |> List.concat

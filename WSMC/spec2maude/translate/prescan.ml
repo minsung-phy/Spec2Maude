@@ -49,6 +49,15 @@ type inverse =
   | ValidInverse of inverse_contract
   | InvalidInverse of string
 
+type relation_policy =
+  | Execution of
+      { request_sort : sort
+      ; input_count : int
+      }
+  | Equation of {input_count : int}
+  | Predicate
+  | Builtin
+
 type membership_choice =
   { definition : string
   ; clause : clause
@@ -66,6 +75,8 @@ type t =
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
   ; names : (name_kind * string * name) list
+  ; relation_policies : (string * relation_policy) list
+  ; unsupported_relations : (string * string) list
   ; rewrite_sorts : (string * sort) list
   ; membership_choices : membership_choice list
   ; type_definitions : (string * inst list) list
@@ -288,6 +299,54 @@ let has_dec_hint_in hints target_name name =
           false)
     hints
 
+let relation_hint_names hints target_name =
+  let values =
+    hints
+    |> List.concat_map (fun hintdef ->
+         match hintdef.it with
+         | RelH (target, values) when target.it = target_name -> values
+         | TypH _ | RelH _ | DecH _ | GramH _ | RuleH _ -> [])
+  in
+  values
+  |> List.fold_left
+       (fun names hint ->
+         match names, hint.hintid.it with
+         | Error _ as error, _ -> error
+         | Ok names, ("maude_eq" | "maude_predicate" | "builtin" as name) ->
+             begin match hint.hintexp.it with
+             | El.Ast.SeqE [] -> Ok (name :: names)
+             | _ -> Error (name ^ " must be a flag hint")
+             end
+         | Ok names, _ -> Ok names)
+       (Ok [])
+  |> Result.map (List.sort_uniq String.compare)
+
+let classify_relation hints source mixop request_sort =
+  let markers = Mixop.marker_positions in
+  let arity = Xl.Mixop.arity mixop in
+  let plain = markers Xl.Atom.[SqArrow; SqArrowStar] mixop in
+  let execution =
+    markers Xl.Atom.[SqArrow; SqArrowSub; SqArrowStar; SqArrowStarSub] mixop
+  in
+  let plain_equation = markers Xl.Atom.[Approx] mixop in
+  let equation = markers Xl.Atom.[Approx; ApproxSub] mixop in
+  match execution, plain, equation, plain_equation,
+        relation_hint_names hints source with
+  | _, _, _, _, Error reason -> Error reason
+  | [input_count], [plain_count], [], [], Ok []
+    when input_count = plain_count && input_count > 0 && input_count < arity ->
+      Ok (Execution {request_sort = request_sort (); input_count})
+  | [], [], [input_count], [plain_count], Ok ["maude_eq"]
+    when input_count = plain_count && input_count > 0 && input_count < arity ->
+      Ok (Equation {input_count})
+  | [], [], _, _, Ok ["maude_eq"] ->
+      Error "maude_eq requires exactly one plain ~~ marker"
+  | [], [], [], [], Ok ["maude_predicate"] -> Ok Predicate
+  | [], [], [], [], Ok ["builtin"] -> Ok Builtin
+  | [], [], _, _, Ok [] ->
+      Error "non-execution relation requires an explicit backend hint"
+  | _ -> Error "relation has unsupported or conflicting backend markers"
+
 let inverse_hint hints source =
   let targets =
     hints
@@ -468,6 +527,19 @@ let scan script =
         end
   in
   let definitions = collect_definitions [] script |> List.rev in
+  let rec collect_relations relations = function
+    | [] -> relations
+    | def :: defs ->
+        begin match def.it with
+        | RelD (id, _, mixop, _, _) ->
+            collect_relations ((id.it, mixop) :: relations) defs
+        | RecD nested ->
+            collect_relations (collect_relations relations nested) defs
+        | TypD _ | DecD _ | GramD _ | HintD _ ->
+            collect_relations relations defs
+        end
+  in
+  let relations = collect_relations [] script |> List.rev in
   let membership_choices = collect_membership_choices script in
   let inverses =
     definitions
@@ -872,11 +944,25 @@ let scan script =
          else
            None)
   in
+  let relation_policies, unsupported_relations =
+    List.fold_right
+      (fun (source, mixop) (policies, unsupported) ->
+        let request_sort () =
+          let name = registered_name RelName source in
+          fresh_name used_names (name ^ "-Request")
+        in
+        match classify_relation hints source mixop request_sort with
+        | Ok policy -> (source, policy) :: policies, unsupported
+        | Error reason -> policies, (source, reason) :: unsupported)
+      relations ([], [])
+  in
   { iterations
   ; projector_bodies = List.rev !projector_bodies
   ; premise_iterations
   ; hints
   ; names = List.rev !names
+  ; relation_policies
+  ; unsupported_relations
   ; rewrite_sorts
   ; membership_choices
   ; type_definitions
@@ -914,6 +1000,17 @@ let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
+
+let relation_policy index id =
+  match List.assoc_opt id.it index.relation_policies with
+  | Some policy -> Ok policy
+  | None ->
+      begin match List.assoc_opt id.it index.unsupported_relations with
+      | Some reason -> Error reason
+      | None -> invalid_arg ("unregistered relation " ^ id.it)
+      end
+
+let relation_policies index = index.relation_policies
 
 let membership_choice index clause =
   List.find_opt (fun choice -> choice.clause == clause) index.membership_choices
