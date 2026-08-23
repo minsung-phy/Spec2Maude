@@ -20,10 +20,10 @@ rule Nondefaultable: |- t NONDEFAULTABLE -- if $default_(t) = eps
 
 ;; Values
 
-relation Num_ok: store |- num : numtype  hint(macro "%num")
-relation Vec_ok: store |- vec : vectype  hint(macro "%vec")
-relation Ref_ok: store |- ref : reftype  hint(macro "%ref")
-relation Val_ok: store |- val : valtype  hint(macro "%val")
+relation Num_ok: store |- num : numtype  hint(macro "%num") hint(maude_predicate)
+relation Vec_ok: store |- vec : vectype  hint(macro "%vec") hint(maude_predicate)
+relation Ref_ok: store |- ref : reftype  hint(macro "%ref") hint(builtin)
+relation Val_ok: store |- val : valtype  hint(macro "%val") hint(maude_predicate)
 
 rule Num_ok:
   s |- CONST nt c : nt

@@ -70,7 +70,7 @@ rule Instrtype_ok:
 
 ;; Type expansion
 
-relation Expand: deftype ~~ comptype hint(macro "%expanddt") hint(tabular)
+relation Expand: deftype ~~ comptype hint(macro "%expanddt") hint(tabular) hint(maude_eq)
   hint(prose "The :ref:`expansion <aux-expand-deftype>` of %1 is %2")  ;; TODO(3, ?): avoid hardcoding reST
 relation Expand_use: typeuse ~~_context comptype  hint(macro "%expandyy") hint(tabular)
   hint(prose "The :ref:`expansion <aux-expand-typeuse>` of %2 is %3")  ;; TODO(3, ?): avoid hardcoding reST
