@@ -180,7 +180,7 @@ def $vrelop_(shape, vrelop_(shape), vec_(V128), vec_(V128)) : vec_(V128)
 
 def $lcvtop__(shape_1, shape_2, vcvtop__(shape_1, shape_2), lane_($lanetype(shape_1))) : lane_($lanetype(shape_2))*
     hint(show %3#$__(%1,%2)^(%4)#((%5)))
-def $vcvtop__(shape_1, shape_2, vcvtop__(shape_1, shape_2), vec_(V128)) : vec_(V128) hint(maude_rule)
+def $vcvtop__(shape_1, shape_2, vcvtop__(shape_1, shape_2), vec_(V128)) : vec_(V128)
     hint(show %3#$__(%1,%2)^(%4)#((%5)))
 
 def $vshiftop_(ishape, vshiftop_(ishape), vec_(V128), u32) : vec_(V128)
@@ -199,7 +199,7 @@ def $vextunop__(ishape_1, ishape_2, vextunop__(ishape_1, ishape_2), vec_(V128)) 
     hint(show %3#$__(%1,%2,%4))
 def $vextbinop__(ishape_1, ishape_2, vextbinop__(ishape_1, ishape_2), vec_(V128), vec_(V128)) : vec_(V128)
     hint(show %3#$__(%1,%2,%4,%5))
-def $vextternop__(ishape_1, ishape_2, vextternop__(ishape_1, ishape_2), vec_(V128), vec_(V128), vec_(V128)) : vec_(V128) hint(maude_rule)
+def $vextternop__(ishape_1, ishape_2, vextternop__(ishape_1, ishape_2), vec_(V128), vec_(V128), vec_(V128)) : vec_(V128)
     hint(show %3#$__(%1,%2,%4,%5,%6))
 
 
