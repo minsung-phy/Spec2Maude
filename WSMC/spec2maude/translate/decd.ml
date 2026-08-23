@@ -24,7 +24,7 @@ let frozen_all count =
   | [] -> []
   | positions -> [Frozen positions]
 
-let translate_rule_header index id params result_typ =
+let translate_request_header index id params result_typ =
   let result_sort = Term.translate_sort index result_typ in
   let request_sort = Prescan.rewrite_sort index id in
   [ SortDecl request_sort
@@ -37,6 +37,17 @@ let translate_rule_header index id params result_typ =
       ; attrs = frozen_all (List.length params)
       }
   ]
+
+let head index id args =
+  App
+    ( Prescan.def_name index id
+    , List.map (Term.translate_arg index) args
+    )
+
+let equation left right conditions attrs =
+  match conditions with
+  | [] -> Eq (left, right, attrs)
+  | _ -> Ceq (left, right, conditions, attrs)
 
 
 (* Variables matched by the left-hand arguments are already bound. *)
@@ -60,19 +71,14 @@ let clause_has_rewrite_call index args rhs prems =
   || List.exists (Prem.prem_has_rewrite_call index) prems
 
 
-(* DefD clause *)
-let translate_clause index id clause =
+(* Ordinary DefD clause *)
+let translate_equation_clause index id clause =
   match clause.it with
   | DefD (quants, args, rhs, prems) ->
       if clause_has_rewrite_call index args rhs prems then
         invalid_arg
           "DecD calls a maude_rule definition without hint(maude_rule)";
-      let left =
-        App
-          ( Prescan.def_name index id
-          , List.map (Term.translate_arg index) args
-          )
-      in
+      let left = head index id args in
 
       let right =
         Term.translate_exp index rhs
@@ -95,12 +101,102 @@ let translate_clause index id clause =
         else []
       in
 
-      match conditions with
-      | [] ->
-          Eq (left, right, attrs)
+      equation left right conditions attrs
 
+let choice_helper index id result_typ
+    (choice : Prescan.membership_choice) rhs =
+  match choice.element.it with
+  | VarE _ ->
+      let helper argument = App (choice.helper_name, [argument]) in
+      let result_sort = Term.translate_sort index result_typ in
+      let request_sort = Prescan.rewrite_sort index id in
+      let rest = generated_variable "CHOICE-REST" "SpectecTerminals" in
+      let head = generated_variable "CHOICE-HEAD" "SpectecTerminal" in
+      let result = generated_variable "CHOICE-RESULT" result_sort in
+      let selected = Term.translate_exp index choice.element in
+      let selected_head =
+        Term.as_sequence_element choice.element.note selected
+      in
+      [ OpDecl
+          { name = choice.helper_name
+          ; domain = ["SpectecTerminals"]
+          ; codomain = request_sort
+          ; arrow = Total
+          ; attrs = [Frozen [1]]
+          }
+      ; Rl
+          ( None
+          , helper (Term.sequence [selected_head; Var rest])
+          , Term.translate_exp index rhs
+          )
+      ; Crl
+          ( None
+          , helper (Term.sequence [Var head; Var rest])
+          , Var result
+          , [RewriteCond (helper (Var rest), Var result)]
+          )
+      ]
+  | _ ->
+      invalid_arg "membership choice element must be a variable"
+
+let choice_public_quants element quants =
+  match element.it with
+  | VarE selected ->
+      let selected_quants, public_quants =
+        List.partition
+          (fun quant ->
+            match quant.it with
+            | ExpP (id, _) -> id.it = selected.it
+            | TypP _ | DefP _ | GramP _ -> false)
+          quants
+      in
+      begin match selected_quants with
+      | [_] -> public_quants
+      | [] ->
+          invalid_arg "membership choice variable has no ExpP quantifier"
       | _ ->
-          Ceq (left, right, conditions, attrs)
+          invalid_arg "membership choice variable has multiple ExpP quantifiers"
+      end
+  | _ ->
+      invalid_arg "membership choice element must be a variable"
+
+let translate_choice_clause index id result_typ
+    (choice : Prescan.membership_choice) clause =
+  match clause.it with
+  | DefD (quants, args, rhs, _) ->
+      if clause_has_rewrite_call index args rhs choice.prefix then
+        invalid_arg
+          "membership choice prefix cannot call a rewrite definition";
+      let premises =
+        Prem.translate_all index ~bound:(head_bound args) choice.prefix
+      in
+      if premises.otherwise then
+        invalid_arg "membership choice cannot follow ElsePr";
+      if Prem.known premises.bound choice.element then
+        invalid_arg "membership choice element is already bound";
+      if not (Prem.known premises.bound choice.collection) then
+        invalid_arg "membership choice collection is unbound";
+      let left = head index id args in
+      let right =
+        App
+          ( choice.helper_name
+          , [Term.translate_exp index choice.collection]
+          )
+      in
+      let conditions =
+        List.map eq_condition premises.conditions
+        @ Param.translate_eq_conditions index
+            (choice_public_quants choice.element quants)
+      in
+      equation left right conditions []
+      :: choice_helper index id result_typ choice rhs
+
+let translate_clause index id result_typ clause =
+  match Prescan.membership_choice index clause with
+  | Some choice ->
+      translate_choice_clause index id result_typ choice clause
+  | None ->
+      [translate_equation_clause index id clause]
 
 let translate_rule_clause index id clause =
   match clause.it with
@@ -110,15 +206,9 @@ let translate_rule_clause index id clause =
       then
         invalid_arg
           "maude_rule calls are only supported as premise equalities";
-      let left =
-        App
-          ( Prescan.def_name index id
-          , List.map (Term.translate_arg index) args
-          )
-      in
+      let left = head index id args in
       let premises =
-        Prem.translate_all index ~bound:(head_bound args)
-          ~allow_binding_membership:true prems
+        Prem.translate_all index ~bound:(head_bound args) prems
       in
       if premises.otherwise then
         invalid_arg "ElsePr is not supported in a maude_rule DecD";
@@ -138,9 +228,16 @@ let translate_rule_clause index id clause =
 let translate index id params result_typ clauses =
   if has_hint index id "builtin" then
     [translate_decl index id params result_typ]
+  else if Prescan.has_membership_choice index id then
+    if has_hint index id "maude_rule" then
+      invalid_arg
+        "membership choice conflicts with hint(maude_rule)"
+    else
+      translate_request_header index id params result_typ
+      @ List.concat_map (translate_clause index id result_typ) clauses
   else if has_hint index id "maude_rule" then
-    translate_rule_header index id params result_typ
+    translate_request_header index id params result_typ
     @ List.map (translate_rule_clause index id) clauses
   else
     translate_decl index id params result_typ
-    :: List.map (translate_clause index id) clauses
+    :: List.map (translate_equation_clause index id) clauses

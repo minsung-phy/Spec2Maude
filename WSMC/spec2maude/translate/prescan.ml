@@ -49,6 +49,15 @@ type inverse =
   | ValidInverse of inverse_contract
   | InvalidInverse of string
 
+type membership_choice =
+  { definition : string
+  ; clause : clause
+  ; helper_name : name
+  ; prefix : prem list
+  ; element : exp
+  ; collection : exp
+  }
+
 type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
@@ -58,6 +67,7 @@ type t =
   ; hints : hintdef list
   ; names : (name_kind * string * name) list
   ; rewrite_sorts : (string * sort) list
+  ; membership_choices : membership_choice list
   ; type_definitions : (string * inst list) list
   ; variables : ((string * sort) * name) list
   ; anonymous_variables : (id * sort * name) list
@@ -386,6 +396,47 @@ let validate_inverse definitions source = function
                 "inverse must take the forward result as its last argument"
           end
 
+let membership_choice_shape definition clause =
+  match clause.it with
+  | DefD (_, args, rhs, prems) ->
+      begin match List.rev prems with
+      | {it = IfPr ({it = MemE (({it = VarE _; _} as element), collection); _}); _}
+        :: prefix_rev
+        when Il.Eq.eq_exp rhs element ->
+          let prefix = List.rev prefix_rev in
+          let head = Frontend.Det.det_list Frontend.Det.det_arg args in
+          let preceding =
+            Frontend.Det.det_list Frontend.Det.det_prem prefix
+          in
+          let bound = Il.Free.Set.union head.varid preceding.varid in
+          let known exp =
+            Il.Free.Set.subset Il.Free.(free_exp exp).varid bound
+          in
+          if not (known element) && known collection then
+            Some
+              { definition
+              ; clause
+              ; helper_name = ""
+              ; prefix
+              ; element
+              ; collection
+              }
+          else None
+      | _ -> None
+      end
+
+let rec collect_membership_choices = function
+  | [] -> []
+  | def :: defs ->
+      let choices =
+        match def.it with
+        | DecD (id, _, _, clauses) ->
+            List.filter_map (membership_choice_shape id.it) clauses
+        | RecD nested -> collect_membership_choices nested
+        | TypD _ | RelD _ | GramD _ | HintD _ -> []
+      in
+      choices @ collect_membership_choices defs
+
 
 let scan script =
   let rec collect_type_definitions definitions = function
@@ -417,6 +468,7 @@ let scan script =
         end
   in
   let definitions = collect_definitions [] script |> List.rev in
+  let membership_choices = collect_membership_choices script in
   let inverses =
     definitions
     |> List.filter_map (fun (source, _, _) ->
@@ -443,6 +495,15 @@ let scan script =
         let name = fresh_name used_names candidate in
         names := (kind, source, name) :: !names;
         name
+  in
+  let registered_name kind source =
+    match
+      List.find_opt
+        (fun (kind', source', _) -> kind = kind' && source = source')
+        !names
+    with
+    | Some (_, _, name) -> name
+    | None -> invalid_arg ("unregistered source name " ^ source)
   in
   let add_id_name kind id =
     ignore (add_name kind id.it (sanitize id.it))
@@ -782,21 +843,32 @@ let scan script =
          ; tail_name = fresh_name used_names (name ^ "-tail")
          })
   in
+  let membership_choices =
+    membership_choices
+    |> List.map (fun choice ->
+         let definition_name =
+           registered_name DefName choice.definition
+         in
+         let position = choice.clause.at.left in
+         let candidate =
+           Printf.sprintf "%s-choice-%d-%d"
+             definition_name position.line position.column
+         in
+         {choice with helper_name = fresh_name used_names candidate})
+  in
+  let choice_definitions =
+    membership_choices
+    |> List.map (fun choice -> choice.definition)
+    |> StringSet.of_list
+  in
   let rewrite_sorts =
     definitions
     |> List.filter_map (fun (source, _, _) ->
-         if has_dec_hint_in hints source "maude_rule" then
-           let name =
-             match
-               List.find_opt
-                 (fun (kind, source', _) ->
-                   kind = DefName && source' = source)
-                 !names
-             with
-             | Some (_, _, name) -> name
-             | None -> invalid_arg ("unregistered source name " ^ source)
-           in
-           Some (source, fresh_name used_names (name ^ "-Config"))
+         let is_choice = StringSet.mem source choice_definitions in
+         if has_dec_hint_in hints source "maude_rule" || is_choice then
+           let name = registered_name DefName source in
+           let suffix = if is_choice then "-Request" else "-Config" in
+           Some (source, fresh_name used_names (name ^ suffix))
          else
            None)
   in
@@ -806,6 +878,7 @@ let scan script =
   ; hints
   ; names = List.rev !names
   ; rewrite_sorts
+  ; membership_choices
   ; type_definitions
   ; variables
   ; anonymous_variables
@@ -842,10 +915,21 @@ let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
 
+let membership_choice index clause =
+  List.find_opt (fun choice -> choice.clause == clause) index.membership_choices
+
+let has_membership_choice index id =
+  List.exists
+    (fun choice -> choice.definition = id.it)
+    index.membership_choices
+
+let definition_requires_rewrite index id =
+  has_dec_hint index id "maude_rule" || has_membership_choice index id
+
 let rewrite_sort index id =
   match List.assoc_opt id.it index.rewrite_sorts with
   | Some sort -> sort
-  | None -> invalid_arg ("definition is not annotated maude_rule: " ^ id.it)
+  | None -> invalid_arg ("definition does not produce rewrite requests: " ^ id.it)
 
 let definition_variable index (parameter : definition_parameter) =
   let sort, _, _ =
