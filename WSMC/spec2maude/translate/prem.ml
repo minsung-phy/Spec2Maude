@@ -27,7 +27,7 @@ let is_rewrite_call index exp =
   match exp.it with
   | CallE (id, _) ->
       Prescan.definition_call index exp = None
-      && Prescan.has_dec_hint index id "maude_rule"
+      && Prescan.definition_requires_rewrite index id
   | _ -> false
 
 let has_rewrite_call index exp =
@@ -58,14 +58,6 @@ let prem_has_rewrite_call index prem =
   in
   Visitor.prem prem;
   !found
-
-let rec has_binding_membership bound exp =
-  match exp.it with
-  | MemE (element, _) -> not (known bound element)
-  | BinE (`AndOp, `BoolT, left, right) ->
-      has_binding_membership bound left
-      || has_binding_membership bound right
-  | _ -> false
 
 type attempt =
   | Ready of result
@@ -435,28 +427,7 @@ let translate_rewrite_call index bound call result =
       | None ->
           invalid_arg "rewrite-backed call result is not a pattern"
 
-let translate_membership index bound element collection =
-  match translate_pattern index element with
-  | None ->
-      invalid_arg "binding membership element is not a pattern"
-  | Some pattern ->
-      let prefix =
-        Var (generated_variable "PREFIX" "SpectecTerminals")
-      in
-      let suffix =
-        Var (generated_variable "SUFFIX" "SpectecTerminals")
-      in
-      let element_term =
-        Term.as_sequence_element element.note pattern.term
-      in
-      let split = Term.sequence [prefix; element_term; suffix] in
-      Ready
-        (make (bind bound element)
-           (EqCondition
-              (MatchCond (split, Term.translate_exp index collection))
-            :: rule_guards pattern))
-
-let rec translate_ifpr index allow_binding_membership bound exp =
+let rec translate_ifpr index bound exp =
   match exp.it with
   | CmpE (`EqOp, _, ({it = CallE _; _} as call), result)
     when is_rewrite_call index call ->
@@ -471,24 +442,17 @@ let rec translate_ifpr index allow_binding_membership bound exp =
         "rewrite-backed call must be a top-level equality premise"
 
   | MemE (element, collection) when not (known bound element) ->
-      if not allow_binding_membership then
-        invalid_arg "binding membership requires hint(maude_rule)";
-      if not (known bound collection) then
-        invalid_arg "binding membership collection is unbound";
-      translate_membership index bound element collection
+      invalid_arg
+        "binding membership must be a final definition choice"
 
   | MemE (_, collection) when not (known bound collection) ->
       invalid_arg "membership collection is unbound"
 
   | BinE (`AndOp, `BoolT, left, right) when not (known bound exp) ->
-      begin match
-        translate_ifpr index allow_binding_membership bound left
-      with
+      begin match translate_ifpr index bound left with
       | Waiting -> Waiting
       | Ready left ->
-          begin match
-            translate_ifpr index allow_binding_membership left.bound right
-          with
+          begin match translate_ifpr index left.bound right with
           | Waiting -> Waiting
           | Ready right ->
               Ready
@@ -579,16 +543,14 @@ let append result next =
   ; otherwise = result.otherwise || next.otherwise
   }
 
-let rec translate_prems index allow_binding_membership result skipped = function
+let rec translate_prems index result skipped = function
   | [] when skipped = [] -> result
   | [] ->
       invalid_arg "pure premises have unresolved variable dependencies"
   | prem :: prems ->
       begin match prem.it with
       | IfPr exp ->
-          begin match
-            translate_ifpr index allow_binding_membership result.bound exp
-          with
+          begin match translate_ifpr index result.bound exp with
           | Ready next ->
               if skipped <> []
                  && List.exists
@@ -597,20 +559,13 @@ let rec translate_prems index allow_binding_membership result skipped = function
               then
                 invalid_arg
                   "a premise dependency crosses a rewrite premise";
-              if skipped <> []
-                 && has_binding_membership result.bound exp
-              then
-                invalid_arg
-                  "a premise dependency crosses a binding membership";
-              translate_prems index allow_binding_membership
-                (append result next) []
+              translate_prems index (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
               if has_rewrite_call index exp then
                 invalid_arg "rewrite premise has an unbound input"
               else
-                translate_prems index allow_binding_membership
-                  result (prem :: skipped) prems
+                translate_prems index result (prem :: skipped) prems
           end
       | LetPr (quants, left, right) ->
           if has_rewrite_call index left || has_rewrite_call index right then
@@ -618,12 +573,10 @@ let rec translate_prems index allow_binding_membership result skipped = function
               "rewrite-backed call must be an IfPr equality premise";
           begin match translate_letpr index result.bound quants left right with
           | Ready next ->
-              translate_prems index allow_binding_membership
-                (append result next) []
+              translate_prems index (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
-              translate_prems index allow_binding_membership
-                result (prem :: skipped) prems
+              translate_prems index result (prem :: skipped) prems
           end
       | RulePr _ | ElsePr | IterPr _ | NegPr _ ->
           if prem_has_rewrite_call index prem then
@@ -632,14 +585,12 @@ let rec translate_prems index allow_binding_membership result skipped = function
           if skipped <> [] then
             invalid_arg "a premise dependency crosses an effectful premise";
           let next = translate_barrier index result.bound prem in
-          translate_prems index allow_binding_membership
-            (append result next) [] prems
+          translate_prems index (append result next) [] prems
       end
 
-let translate_all index ?(bound = []) ?(allow_binding_membership = false) prems =
+let translate_all index ?(bound = []) prems =
   let bound = bind_names Il.Free.Set.empty bound in
-  translate_prems index allow_binding_membership
-    {conditions = []; bound; otherwise = false} [] prems
+  translate_prems index {conditions = []; bound; otherwise = false} [] prems
 
 let translate_eq_conditions index ?bound prems =
   let result = translate_all index ?bound prems in
