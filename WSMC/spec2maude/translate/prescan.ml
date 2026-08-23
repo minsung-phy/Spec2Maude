@@ -5,6 +5,11 @@ open Maude_il
 
 type capture = id * typ
 
+type iteration_owner =
+  | RelationOwner of string
+  | DefinitionOwner of string
+  | OtherOwner
+
 type iteration_body =
   | ExpBody of exp
   | PremiseBody of prem
@@ -14,6 +19,7 @@ type iteration =
   ; tail_name : string
   ; projector_name : string
   ; projector_tail_name : string
+  ; owner : iteration_owner
   ; body : exp
   ; iterexp : iterexp
   ; captures : capture list
@@ -22,6 +28,8 @@ type iteration =
 type premise_iteration =
   { name : string
   ; tail_name : string
+  ; output_names : (name * name) list
+  ; owner : iteration_owner
   ; premise : prem
   ; body : prem
   ; iterexp : iterexp
@@ -70,13 +78,15 @@ type membership_choice =
 type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
-  { iterations : iteration list
+  { type_env : Il.Env.t
+  ; iterations : iteration list
   ; projector_bodies : exp list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
   ; names : (name_kind * string * name) list
   ; relation_policies : (string * relation_policy) list
   ; unsupported_relations : (string * string) list
+  ; definition_bodies : (string * bool) list
   ; rewrite_sorts : (string * sort) list
   ; membership_choices : membership_choice list
   ; type_definitions : (string * inst list) list
@@ -121,58 +131,61 @@ let common_sort = function
   | sort :: sorts when List.for_all (( = ) sort) sorts -> sort
   | [] | _ -> "SpectecTerminal"
 
-let rec representation_sort definitions seen typ =
+let rec representation_sort env definitions seen typ =
+  let typ = Il.Eval.reduce_typ env typ in
   match typ.it with
   | VarT (id, _) when not (List.mem id.it seen) ->
       begin match List.assoc_opt id.it definitions with
       | None -> "SpectecTerminal"
       | Some insts ->
           insts
-          |> List.map (instance_sort definitions (id.it :: seen))
+          |> List.map (instance_sort env definitions (id.it :: seen))
           |> common_sort
       end
   | VarT _ -> "SpectecTerminal"
   | _ -> primitive_sort typ
 
-and instance_sort definitions seen inst =
+and instance_sort env definitions seen inst =
   match inst.it with
   | InstD (_, _, {it = AliasT typ; _}) ->
-      representation_sort definitions seen typ
+      representation_sort env definitions seen typ
   | InstD (_, _, {it = StructT _; _}) ->
       "SpectecTerminal"
   | InstD (_, _, {it = VariantT cases; _}) ->
-      cases |> List.map (case_sort definitions seen) |> common_sort
+      cases |> List.map (case_sort env definitions seen) |> common_sort
 
-and case_sort definitions seen (mixop, (typ, _, _), _) =
+and case_sort env definitions seen (mixop, (typ, _, _), _) =
   if Mixop.is_hole_only mixop then
     match typ.it with
-    | TupT [(_, payload)] -> representation_sort definitions seen payload
+    | TupT [(_, payload)] -> representation_sort env definitions seen payload
     | _ -> "SpectecTerminal"
   else
     "SpectecTerminal"
 
 let sort_of_typ index typ =
-  representation_sort index.type_definitions [] typ
+  representation_sort index.type_env index.type_definitions [] typ
 
-let rec parameter_sort definitions param =
+let rec parameter_sort env definitions param =
   match param.it with
-  | ExpP (_, typ) -> representation_sort definitions [] typ
+  | ExpP (_, typ) -> representation_sort env definitions [] typ
   | TypP _ -> "SpectecType"
   | DefP (_, params, result) ->
-      let sort, _, _ = definition_signature_with definitions params result in
+      let sort, _, _ =
+        definition_signature_with env definitions params result
+      in
       sort
   | GramP _ -> invalid_arg "GramP is not supported"
 
-and definition_signature_with definitions params result =
-  let domain = List.map (parameter_sort definitions) params in
-  let codomain = representation_sort definitions [] result in
+and definition_signature_with env definitions params result =
+  let domain = List.map (parameter_sort env definitions) params in
+  let codomain = representation_sort env definitions [] result in
   let args =
     match domain with [] -> "Unit" | _ -> String.concat "-" domain
   in
   "SpectecDef-" ^ args ^ "-to-" ^ codomain, domain, codomain
 
 let definition_signature index params result =
-  definition_signature_with index.type_definitions params result
+  definition_signature_with index.type_env index.type_definitions params result
 
 let reserved_names =
   StringSet.of_list
@@ -498,6 +511,7 @@ let rec collect_membership_choices = function
 
 
 let scan script =
+  let type_env = Il.Env.env_of_script script in
   let rec collect_type_definitions definitions = function
     | [] -> definitions
     | def :: defs ->
@@ -556,6 +570,19 @@ let scan script =
   let names = ref [] in
   let used_names = ref StringSet.empty in
 
+  let module ProjectorVisitor = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_exp exp =
+      match exp.it with
+      | IterE (body, _) ->
+          if not (List.exists (( == ) body) !projector_bodies) then
+            projector_bodies := body :: !projector_bodies
+      | _ -> ()
+  end)
+  in
+  let request_exp_projectors = ProjectorVisitor.exp in
+  let request_prem_projectors = ProjectorVisitor.prem in
+
   let add_name kind source candidate =
     match
       List.find_opt
@@ -611,7 +638,9 @@ let scan script =
   let definition_calls = ref [] in
   let definition_values = ref [] in
   let definition_applications = ref [] in
-  let sort_of_typ typ = representation_sort type_definitions [] typ in
+  let sort_of_typ typ =
+    representation_sort type_env type_definitions [] typ
+  in
 
   let add_variable_with_sort id sort =
     if id.it = "_" then begin
@@ -635,7 +664,7 @@ let scan script =
     | DefP (id, params, result) ->
         definition_parameters := {id; params; result} :: !definition_parameters;
         let sort, _, _ =
-          definition_signature_with type_definitions params result
+          definition_signature_with type_env type_definitions params result
         in
         add_variable_with_sort id sort;
         add_params params
@@ -668,7 +697,7 @@ let scan script =
     | value :: values ->
         let signature' value =
           definition_signature_with
-            type_definitions value.params value.result
+            type_env type_definitions value.params value.result
         in
         if List.for_all (fun candidate -> signature' candidate = signature' value) values
         then value
@@ -685,7 +714,7 @@ let scan script =
   in
   let add_definition_application target params result =
     let value = add_definition_value target in
-    let signature = definition_signature_with type_definitions in
+    let signature = definition_signature_with type_env type_definitions in
     let expected = signature params result in
     let actual = signature value.params value.result in
     if expected <> actual then
@@ -783,7 +812,10 @@ let scan script =
         add_params params;
         List.iter
           (fun rule ->
-            match rule.it with RuleD (_, quants, _, _, _) -> add_params quants)
+            match rule.it with
+            | RuleD (_, quants, _, exp, _) ->
+                add_params quants;
+                request_exp_projectors exp)
           rules
     | DecD (_, params, _, clauses) ->
         add_params params;
@@ -797,23 +829,26 @@ let scan script =
     | GramD _ | RecD _ | HintD _ -> ()
   in
 
-  let add_iteration body iterexp =
+  let add_iteration owner body iterexp =
     iterations :=
       { name = iteration_base_name body
       ; tail_name = ""
       ; projector_name = ""
       ; projector_tail_name = ""
+      ; owner
       ; body
       ; iterexp
       ; captures = capture_exp_variables body iterexp
       }
       :: !iterations
   in
-  let add_premise_iteration premise body iterexp =
+  let add_premise_iteration owner premise body iterexp =
     incr premise_count;
     premise_iterations :=
       { name = "iterpr-" ^ string_of_int !premise_count
       ; tail_name = ""
+      ; output_names = []
+      ; owner
       ; premise
       ; body
       ; iterexp
@@ -822,38 +857,34 @@ let scan script =
       :: !premise_iterations
   in
 
+  let current_owner = ref OtherOwner in
   let module VariableVisitor = Il.Iter.Make (struct
     include Il.Iter.Skip
 
     let visit_mixop = add_mixop_name
 
     let visit_def def =
+      current_owner :=
+        begin match def.it with
+        | RelD (id, _, _, _, _) -> RelationOwner id.it
+        | DecD (id, _, _, _) -> DefinitionOwner id.it
+        | TypD _ | GramD _ | HintD _ | RecD _ -> OtherOwner
+        end;
       add_def_name def;
       add_def_variables def
 
     let visit_exp exp =
       match exp.it with
       | VarE id -> add_variable id exp.note
-      | IterE (body, iterexp) -> add_iteration body iterexp
+      | IterE (body, iterexp) -> add_iteration !current_owner body iterexp
       | _ -> ()
 
     let visit_prem premise =
-      let module ProjectorVisitor = Il.Iter.Make (struct
-        include Il.Iter.Skip
-
-        let visit_exp exp =
-          match exp.it with
-          | IterE (body, _) ->
-              if not (List.exists (( == ) body) !projector_bodies) then
-                projector_bodies := body :: !projector_bodies
-          | _ -> ()
-      end)
-      in
-      ProjectorVisitor.prem premise;
+      request_prem_projectors premise;
       match premise.it with
       | LetPr (quants, _, _) -> add_params quants
       | IterPr (body, iterexp) ->
-          add_premise_iteration premise body iterexp
+          add_premise_iteration !current_owner premise body iterexp
       | RulePr _ | IfPr _ | ElsePr | NegPr _ -> ()
 
     let scope_enter id typ =
@@ -875,7 +906,7 @@ let scan script =
       named
   in
   let used_variable_names =
-    ref StringSet.empty
+    ref !used_names
   in
   let variables =
     exact @ renamed
@@ -910,9 +941,21 @@ let scan script =
     List.rev !premise_iterations
     |> List.map (fun (iteration : premise_iteration) ->
          let name = fresh_name used_names iteration.name in
+         let _, generators = iteration.iterexp in
+         let output_names =
+           List.mapi
+             (fun position _ ->
+               let output =
+                 fresh_name used_names
+                   (name ^ "-output-" ^ string_of_int (position + 1))
+               in
+               output, fresh_name used_names (output ^ "-tail"))
+             generators
+         in
          { iteration with
            name
          ; tail_name = fresh_name used_names (name ^ "-tail")
+         ; output_names
          })
   in
   let membership_choices =
@@ -956,13 +999,79 @@ let scan script =
         | Error reason -> policies, (source, reason) :: unsupported)
       relations ([], [])
   in
-  { iterations
+  let unsupported_relation_names =
+    List.map fst unsupported_relations |> StringSet.of_list
+  in
+  let unsupported_definition_names =
+    let names = ref StringSet.empty in
+    let rec visit_def def =
+      match def.it with
+      | DecD (id, _, _, clauses) ->
+          if List.exists
+               (fun clause ->
+                 let unsupported = ref false in
+                 let module Visitor = Il.Iter.Make (struct
+                   include Il.Iter.Skip
+                   let visit_prem prem =
+                     match prem.it with
+                     | RulePr (target, _, _, _)
+                       when StringSet.mem
+                              target.it unsupported_relation_names ->
+                         unsupported := true
+                     | RulePr _ | IfPr _ | LetPr _ | ElsePr
+                     | IterPr _ | NegPr _ -> ()
+                 end)
+                 in
+                 Visitor.clause clause;
+                 !unsupported)
+               clauses
+          then names := StringSet.add id.it !names
+      | RecD defs -> List.iter visit_def defs
+      | TypD _ | RelD _ | GramD _ | HintD _ -> ()
+    in
+    List.iter visit_def script;
+    !names
+  in
+  let definition_bodies =
+    definitions
+    |> List.map (fun (source, _, _) ->
+         source,
+         not (has_dec_hint_in hints source "builtin")
+         && not (StringSet.mem source unsupported_definition_names))
+    |> List.sort_uniq compare
+  in
+  let relation_supported source =
+    match List.assoc_opt source relation_policies with
+    | Some Builtin | None -> false
+    | Some (Execution _ | Equation _ | Predicate) -> true
+  in
+  let definition_supported source =
+    Option.value (List.assoc_opt source definition_bodies) ~default:false
+  in
+  let owner_supported = function
+    | RelationOwner source -> relation_supported source
+    | DefinitionOwner source -> definition_supported source
+    | OtherOwner -> true
+  in
+  let premise_iterations =
+    premise_iterations
+    |> List.filter (fun (iteration : premise_iteration) ->
+         owner_supported iteration.owner)
+  in
+  let iterations =
+    iterations
+    |> List.filter (fun (iteration : iteration) ->
+         owner_supported iteration.owner)
+  in
+  { type_env
+  ; iterations
   ; projector_bodies = List.rev !projector_bodies
   ; premise_iterations
   ; hints
   ; names = List.rev !names
   ; relation_policies
   ; unsupported_relations
+  ; definition_bodies
   ; rewrite_sorts
   ; membership_choices
   ; type_definitions
@@ -1010,7 +1119,20 @@ let relation_policy index id =
       | None -> invalid_arg ("unregistered relation " ^ id.it)
       end
 
-let relation_policies index = index.relation_policies
+let definition_body_supported index id =
+  match List.assoc_opt id.it index.definition_bodies with
+  | Some supported -> supported
+  | None -> invalid_arg ("unregistered definition " ^ id.it)
+
+let premise_iteration_binds_membership index
+    (iteration : premise_iteration) =
+  match iteration.owner with
+  | RelationOwner source ->
+      begin match List.assoc_opt source index.relation_policies with
+      | Some (Execution _) -> true
+      | Some (Equation _ | Predicate | Builtin) | None -> false
+      end
+  | DefinitionOwner _ | OtherOwner -> false
 
 let membership_choice index clause =
   List.find_opt (fun choice -> choice.clause == clause) index.membership_choices
