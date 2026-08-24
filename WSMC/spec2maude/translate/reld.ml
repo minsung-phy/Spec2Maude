@@ -64,11 +64,18 @@ let eq_conditions conditions =
           invalid_arg "an equation relation cannot use a rewrite condition")
     conditions
 
-let translate_rule ?request_output index id params policy rule =
+type rule_body =
+  { input_terms : term list
+  ; head_conditions : rule_condition list
+  ; left : term
+  ; right : term
+  ; conditions : rule_condition list
+  ; otherwise : bool
+  }
+
+let lower_rule_body ?request_output index id params policy rule =
   match rule.it with
   | RuleD (_, quants, mixop, exp, prems) ->
-      if has_else prems then
-        invalid_arg "ElsePr in a relation rule requires source complement lowering";
       let exps = Prem.components mixop exp in
       let inputs, outputs =
         match policy with
@@ -79,6 +86,8 @@ let translate_rule ?request_output index id params policy rule =
       let input_terms, head_conditions, bound =
         translate_inputs index params inputs
       in
+      if not (List.for_all (Prem.known bound) inputs) then
+        invalid_arg "relation rule has an unbound input";
       let left =
         App
           ( Prescan.rel_name index id
@@ -100,30 +109,235 @@ let translate_rule ?request_output index id params policy rule =
             (fun condition -> EqCondition condition)
             (Param.translate_eq_conditions index quants)
       in
-      match policy with
-      | Prescan.Execution _ ->
-          let right =
-            Prem.tuple outputs (List.map (Term.translate_exp index) outputs)
-          in
-          begin match conditions with
-          | [] -> Rl (None, left, right)
-          | _ -> Crl (None, left, right, conditions)
+      { input_terms
+      ; head_conditions
+      ; left
+      ; right = Prem.tuple outputs (List.map (Term.translate_exp index) outputs)
+      ; conditions
+      ; otherwise = premises.otherwise
+      }
+
+let translate_rule ?request_output index id params policy rule =
+  let body = lower_rule_body ?request_output index id params policy rule in
+  if body.otherwise then
+    invalid_arg "ElsePr in a relation rule requires source complement lowering";
+  match policy with
+  | Prescan.Execution _ ->
+      invalid_arg "execution relations require source-order lowering"
+  | Prescan.Equation _ ->
+      begin match eq_conditions body.conditions with
+      | [] -> Eq (body.left, body.right, [])
+      | conditions -> Ceq (body.left, body.right, conditions, [])
+      end
+  | Prescan.Predicate ->
+      begin match eq_conditions body.conditions with
+      | [] -> Eq (body.left, Const "true", [])
+      | conditions -> Ceq (body.left, Const "true", conditions, [])
+      end
+  | Prescan.Builtin ->
+      invalid_arg "builtin relation rules are supplied by builtins.maude"
+
+type execution_rule =
+  { ordinal : int
+  ; inputs : term list
+  ; input_shapes : term list
+  ; left : term
+  ; right : term
+  ; conditions : rule_condition list
+  ; predecessors : int list
+  }
+
+let input_shapes conditions inputs =
+  let binding variable =
+    List.find_map
+      (function
+        | EqCondition (MatchCond (pattern, Var subject))
+          when same_variable variable subject -> Some pattern
+        | EqCondition _ | RewriteCond _ -> None)
+      conditions
+  in
+  let rec expand seen = function
+    | Var variable as term ->
+        if List.exists (same_variable variable) seen then term
+        else
+          begin match binding variable with
+          | Some pattern -> expand (variable :: seen) pattern
+          | None -> term
           end
-      | Prescan.Equation _ ->
-          let right =
-            Prem.tuple outputs (List.map (Term.translate_exp index) outputs)
-          in
-          begin match eq_conditions conditions with
-          | [] -> Eq (left, right, [])
-          | conditions -> Ceq (left, right, conditions, [])
-          end
-      | Prescan.Predicate ->
-          begin match eq_conditions conditions with
-          | [] -> Eq (left, Const "true", [])
-          | conditions -> Ceq (left, Const "true", conditions, [])
-          end
-      | Prescan.Builtin ->
-          invalid_arg "builtin relation rules are supplied by builtins.maude"
+    | Const _ as term -> term
+    | App (name, args) -> App (name, List.map (expand seen) args)
+  in
+  List.map (expand []) inputs
+
+let rec may_overlap left right =
+  match left, right with
+  | Var _, _ | _, Var _ -> true
+  | Const left, Const right -> left = right
+  | App (left, left_args), App (right, right_args) ->
+      left = right
+      && List.length left_args = List.length right_args
+      && List.for_all2 may_overlap left_args right_args
+  | Const _, App _ | App _, Const _ -> false
+
+let inputs_may_overlap left right =
+  List.length left = List.length right
+  && List.for_all2 may_overlap left right
+
+let helper_call index id params ordinal inputs =
+  App
+    ( Prescan.relation_enabled_helper index id ordinal
+    , Param.translate_terms index params @ inputs
+    )
+
+let complement_conditions index id params inputs predecessors =
+  List.map
+    (fun predecessor ->
+      EqCondition
+        (EqCond
+           ( helper_call index id params predecessor.ordinal inputs
+           , Const "false"
+           )))
+    predecessors
+
+let rec explicit_bool_conditions = function
+  | EqCondition (BoolCond (App ("_/\\_", [left; right]))) ->
+      explicit_bool_conditions (EqCondition (BoolCond left))
+      @ explicit_bool_conditions (EqCondition (BoolCond right))
+  | EqCondition (BoolCond term) ->
+      [EqCondition (EqCond (term, Const "true"))]
+  | (EqCondition (EqCond _ | MatchCond _ | MembershipCond _)
+    | RewriteCond _) as condition -> [condition]
+
+let lower_execution_rule ?request_output index id params policy
+    previous ordinal rule =
+  let prems =
+    match rule.it with RuleD (_, _, _, _, prems) -> prems
+  in
+  begin match prems with
+  | {it = ElsePr; _} :: prems when not (has_else prems) -> ()
+  | _ when has_else prems ->
+      invalid_arg "execution relation requires exactly one leading ElsePr"
+  | _ -> ()
+  end;
+  let body = lower_rule_body ?request_output index id params policy rule in
+  let input_shapes = input_shapes body.head_conditions body.input_terms in
+  let predecessors =
+    if body.otherwise then
+      List.filter
+        (fun predecessor ->
+          inputs_may_overlap input_shapes predecessor.input_shapes)
+        previous
+    else []
+  in
+  if body.otherwise && predecessors = [] then
+    invalid_arg "otherwise execution rule has no matching predecessor";
+  { ordinal
+  ; inputs = body.input_terms
+  ; input_shapes
+  ; left = body.left
+  ; right = body.right
+  ; conditions =
+      complement_conditions index id params body.input_terms predecessors
+      @ (if body.otherwise then
+           List.concat_map explicit_bool_conditions body.conditions
+         else body.conditions)
+  ; predecessors = List.map (fun rule -> rule.ordinal) predecessors
+  }
+
+let execution_statement rule =
+  match rule.conditions with
+  | [] -> Rl (None, rule.left, rule.right)
+  | conditions -> Crl (None, rule.left, rule.right, conditions)
+
+let helper_conditions id rule =
+  rule.conditions
+  |> List.concat_map explicit_bool_conditions
+  |> List.map
+       (function
+         | EqCondition condition -> condition
+         | RewriteCond _ ->
+             invalid_arg
+               (Printf.sprintf
+                  "otherwise predecessor in relation %s rule %d uses a rewrite condition"
+                  id.it (rule.ordinal + 1)))
+
+let helper_statements index id params input_sorts rule =
+  let name = Prescan.relation_enabled_helper index id rule.ordinal in
+  let parameter_sorts = Param.translate_sorts index params in
+  let domain = parameter_sorts @ input_sorts in
+  let declaration =
+    OpDecl
+      { name
+      ; domain
+      ; codomain = "Bool"
+      ; arrow = Total
+      ; attrs = frozen_all (List.length domain)
+      }
+  in
+  let helper_inputs =
+    List.mapi
+      (fun position sort ->
+        Var
+          (generated_variable
+             ("ENABLED-INPUT" ^ string_of_int (position + 1)) sort))
+      input_sorts
+  in
+  let left =
+    App (name, Param.translate_terms index params @ helper_inputs)
+  in
+  let conditions =
+    List.map2
+      (fun pattern subject -> MatchCond (pattern, subject))
+      rule.inputs helper_inputs
+    @ helper_conditions id rule
+  in
+  let enabled =
+    match conditions with
+    | [] -> Eq (left, Const "true", [])
+    | conditions -> Ceq (left, Const "true", conditions, [])
+  in
+  [ declaration
+  ; enabled
+  ; Eq (left, Const "false", [Owise])
+  ]
+
+let translate_execution ?request_output index id params typ policy rules =
+  let input_count =
+    match policy with
+    | Prescan.Execution {input_count; _} -> input_count
+    | Prescan.Equation _ | Prescan.Predicate | Prescan.Builtin ->
+        invalid_arg "expected an execution relation policy"
+  in
+  let lowered =
+    rules
+    |> List.mapi (fun ordinal rule -> ordinal, rule)
+    |> List.fold_left
+         (fun previous (ordinal, rule) ->
+           let lowered =
+             lower_execution_rule ?request_output index id params policy
+               (List.rev previous) ordinal rule
+           in
+           lowered :: previous)
+         []
+    |> List.rev
+  in
+  let referenced =
+    lowered
+    |> List.concat_map (fun rule -> rule.predecessors)
+    |> List.sort_uniq compare
+  in
+  let input_sorts =
+    component_types typ
+    |> Prem.split input_count
+    |> fst
+    |> List.map (Term.translate_sort index)
+  in
+  let helpers =
+    lowered
+    |> List.filter (fun rule -> List.mem rule.ordinal referenced)
+    |> List.concat_map (helper_statements index id params input_sorts)
+  in
+  helpers @ List.map execution_statement lowered
 
 let translate_decl index id params typ policy =
   let types = component_types typ in
@@ -178,7 +392,11 @@ let translate ?request_output index id params _mixop typ rules =
       let declarations = translate_decl index id params typ policy in
       match policy with
       | Prescan.Builtin -> declarations
-      | Prescan.Execution _ | Prescan.Equation _ | Prescan.Predicate ->
+      | Prescan.Execution _ ->
+          declarations
+          @ translate_execution ?request_output index id params typ
+              policy rules
+      | Prescan.Equation _ | Prescan.Predicate ->
           declarations
           @ List.map
               (translate_rule ?request_output index id params policy)
