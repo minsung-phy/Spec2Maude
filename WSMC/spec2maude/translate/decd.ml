@@ -37,23 +37,15 @@ let translate_request_header index id params result_typ =
       }
   ]
 
-let head index id args =
-  App
-    ( Prescan.def_name index id
-    , List.map (Term.translate_arg index) args
-    )
-
 let equation left right conditions attrs =
   match conditions with
   | [] -> Eq (left, right, attrs)
   | _ -> Ceq (left, right, conditions, attrs)
 
 
-(* Variables matched by the left-hand arguments are already bound. *)
+(* Variables determined by the head are bound by its term or conditions. *)
 let head_bound args =
-  let det = Frontend.Det.det_list Frontend.Det.det_arg args in
-  Il.Free.Set.elements det.varid
-
+  Frontend.Det.(det_list det_arg args).varid
 
 (* DecD equations cannot contain Maude rewrite conditions. *)
 let eq_condition = function
@@ -63,6 +55,60 @@ let eq_condition = function
   | RewriteCond _ ->
       invalid_arg
         "DecD with a rewrite premise requires source-directed rule lowering"
+
+type clause_head =
+  { term : term
+  ; conditions : eq_condition list
+  ; bound : Il.Free.Set.t
+  }
+
+let has_iteration exp =
+  let found = ref false in
+  let module Visitor = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_exp exp =
+      match exp.it with IterE _ -> found := true | _ -> ()
+  end)
+  in
+  Visitor.exp exp;
+  !found
+
+let translate_head index id args =
+  let step (terms, conditions, bound) (position, arg) =
+    match arg.it with
+    | ExpA exp when has_iteration exp ->
+        begin match Prem.translate_pattern_parts index exp with
+        | Some (pattern, guards) ->
+            let subject =
+              Var
+                (generated_variable
+                   ("DEF-ARG" ^ string_of_int (position + 1))
+                   (Term.translate_sort index exp.note))
+            in
+            subject :: terms,
+            conditions @ (MatchCond (pattern, subject) :: guards),
+            Prem.bind bound exp
+        | None ->
+            Term.translate_exp index exp :: terms,
+            conditions,
+            Prem.bind bound exp
+        end
+    | ExpA exp ->
+        Term.translate_exp index exp :: terms, conditions, Prem.bind bound exp
+    | TypA _ | DefA _ | GramA _ ->
+        Term.translate_arg index arg :: terms, conditions, bound
+  in
+  let terms, conditions, bound =
+    List.mapi (fun position arg -> position, arg) args
+    |> List.fold_left step ([], [], Il.Free.Set.empty)
+  in
+  let expected = head_bound args in
+  if not (Il.Free.Set.subset expected bound) then
+    invalid_arg "definition head does not bind every deterministic variable";
+  { term = App (Prescan.def_name index id, List.rev terms)
+  ; conditions
+  ; bound
+  }
 
 let clause_has_rewrite_call index args rhs prems =
   List.exists (Prem.arg_has_rewrite_call index) args
@@ -77,7 +123,7 @@ let translate_equation_clause index id clause =
       if clause_has_rewrite_call index args rhs prems then
         invalid_arg
           "DecD calls a maude_rule definition without hint(maude_rule)";
-      let left = head index id args in
+      let head = translate_head index id args in
 
       let right =
         Term.translate_exp index rhs
@@ -86,12 +132,13 @@ let translate_equation_clause index id clause =
       let premises =
         Prem.translate_all
           index
-          ~bound:(head_bound args)
+          ~bound:(Il.Free.Set.elements head.bound)
           prems
       in
 
       let conditions =
-        List.map eq_condition premises.conditions
+        head.conditions
+        @ List.map eq_condition premises.conditions
         @ Param.translate_eq_conditions index quants
       in
 
@@ -100,7 +147,7 @@ let translate_equation_clause index id clause =
         else []
       in
 
-      equation left right conditions attrs
+      equation head.term right conditions attrs
 
 let choice_helper index id result_typ
     (choice : Prescan.membership_choice) rhs =
@@ -166,8 +213,10 @@ let translate_choice_clause index id result_typ
       if clause_has_rewrite_call index args rhs choice.prefix then
         invalid_arg
           "membership choice prefix cannot call a rewrite definition";
+      let head = translate_head index id args in
       let premises =
-        Prem.translate_all index ~bound:(head_bound args) choice.prefix
+        Prem.translate_all index
+          ~bound:(Il.Free.Set.elements head.bound) choice.prefix
       in
       if premises.otherwise then
         invalid_arg "membership choice cannot follow ElsePr";
@@ -175,7 +224,6 @@ let translate_choice_clause index id result_typ
         invalid_arg "membership choice element is already bound";
       if not (Prem.known premises.bound choice.collection) then
         invalid_arg "membership choice collection is unbound";
-      let left = head index id args in
       let right =
         App
           ( choice.helper_name
@@ -183,11 +231,12 @@ let translate_choice_clause index id result_typ
           )
       in
       let conditions =
-        List.map eq_condition premises.conditions
+        head.conditions
+        @ List.map eq_condition premises.conditions
         @ Param.translate_eq_conditions index
             (choice_public_quants choice.element quants)
       in
-      equation left right conditions []
+      equation head.term right conditions []
       :: choice_helper index id result_typ choice rhs
 
 let translate_clause index id result_typ clause =
@@ -205,22 +254,24 @@ let translate_rule_clause index id clause =
       then
         invalid_arg
           "maude_rule calls are only supported as premise equalities";
-      let left = head index id args in
+      let head = translate_head index id args in
       let premises =
-        Prem.translate_all index ~bound:(head_bound args) prems
+        Prem.translate_all index
+          ~bound:(Il.Free.Set.elements head.bound) prems
       in
       if premises.otherwise then
         invalid_arg "ElsePr is not supported in a maude_rule DecD";
       let conditions =
-        premises.conditions
+        List.map (fun condition -> EqCondition condition) head.conditions
+        @ premises.conditions
         @ List.map
             (fun condition -> EqCondition condition)
             (Param.translate_eq_conditions index quants)
       in
       let right = Term.translate_exp index rhs in
       match conditions with
-      | [] -> Rl (None, left, right)
-      | _ -> Crl (None, left, right, conditions)
+      | [] -> Rl (None, head.term, right)
+      | _ -> Crl (None, head.term, right, conditions)
 
 
 (* Complete DecD *)

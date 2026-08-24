@@ -1225,6 +1225,13 @@ let source_variable_with_sort index id sort =
 let source_variable index id typ =
   source_variable_with_sort index id (sort_of_typ index typ)
 
+let type_parameter index id =
+  List.assoc_opt (id.it, "SpectecType") index.variables
+  |> Option.map (fun name -> Maude_il.source_variable name "SpectecType")
+
+let same_representation index source target =
+  sort_of_typ index source = sort_of_typ index target
+
 let variable_declarations index =
   let rec add (name, sort) groups =
     match groups with
