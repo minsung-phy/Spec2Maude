@@ -4,9 +4,10 @@
 --- Backend semantics: official-spectec-deterministic.
 --- Contract: deterministic choices from spectec/src/backend-interpreter/numerics.ml at revision d34a973e70ab127476b5d8591c6f558be289b929.
 load output
+load relation-backends
 
 mod WASM-BUILTINS is
-  inc SPEC2MAUDE-GENERATED .
+  inc SPEC2MAUDE-RELATION-BACKENDS .
 
 
   --- Exact SpecTec numeric coercions.
@@ -1673,123 +1674,5 @@ mod WASM-BUILTINS is
   eq frelaxed-madd-(BDR_N, BDR_F1, BDR_F2, BDR_F3) = fadd-(BDR_N, fmul-(BDR_N, BDR_F1, BDR_F2), BDR_F3) .
   eq frelaxed-nmadd-(BDR_N, BDR_F1, BDR_F2, BDR_F3) = fadd-(BDR_N, fmul-(BDR_N, fneg-(BDR_N, BDR_F1), BDR_F2), BDR_F3) .
   eq relaxed-trunc--(BDR_M, BDR_N, BDR_SX, BDR_F1) = trunc-sat--(BDR_M, BDR_N, BDR_SX, BDR_F1) .
-
-  --- Ref_ok is not an official SpecTec builtin.  The source relation is
-  --- routed here by hint(builtin) because its witness-searching subtype rules
-  --- are not suitable for direct functional lowering.  This backend gives the
-  --- relation its ground, total Boolean meaning for valid runtime values.
-  vars RO_S RO_REF RO_RT RO_ACTUAL RO_H1 RO_H2 : SpectecTerminal .
-  vars RO_RECTYPE RO_DEFTYPE RO_COMPTYPE RO_SUPER RO_CLOSED : SpectecTerminal .
-  vars RO_SUBTYPES RO_FINAL RO_FIELDS RO_T1S RO_T2S : SpectecTerminals .
-  var RO_A RO_I : Nat .
-  vars RO_STORE RO_INSTANCE : Record .
-
-  op ref-ok-actual-type : SpectecTerminal SpectecTerminal ~> SpectecTerminal .
-  op ref-ok-reftype-sub : SpectecTerminal SpectecTerminal -> Bool .
-  op ref-ok-heaptype-sub : SpectecTerminal SpectecTerminal -> Bool .
-  op ref-ok-valid-heaptype : SpectecTerminal -> Bool .
-  op ref-ok-close-super : SpectecTerminals SpectecTerminal ~> SpectecTerminal .
-  op ref-ok-deftype-step : SpectecTerminals SpectecTerminal SpectecTerminal -> Bool .
-
-  eq ref-ok-actual-type(RO_STORE, REF.NULL-ADDR) = REF(NULL ?, BOT) .
-  eq ref-ok-actual-type(RO_STORE, REF.I31-NUM(RO_I)) = REF(eps, I31) .
-  ceq ref-ok-actual-type(RO_STORE, REF.STRUCT-ADDR(RO_A)) =
-      REF(eps, RO_DEFTYPE)
-    if indexDefined(RO_STORE . 'STRUCTS, RO_A)
-       /\ RO_INSTANCE := (RO_STORE . 'STRUCTS) [ RO_A ]
-       /\ RO_DEFTYPE := RO_INSTANCE . 'TYPE .
-  ceq ref-ok-actual-type(RO_STORE, REF.ARRAY-ADDR(RO_A)) =
-      REF(eps, RO_DEFTYPE)
-    if indexDefined(RO_STORE . 'ARRAYS, RO_A)
-       /\ RO_INSTANCE := (RO_STORE . 'ARRAYS) [ RO_A ]
-       /\ RO_DEFTYPE := RO_INSTANCE . 'TYPE .
-  ceq ref-ok-actual-type(RO_STORE, REF.FUNC-ADDR(RO_A)) =
-      REF(eps, RO_DEFTYPE)
-    if indexDefined(RO_STORE . 'FUNCS, RO_A)
-       /\ RO_INSTANCE := (RO_STORE . 'FUNCS) [ RO_A ]
-       /\ RO_DEFTYPE := RO_INSTANCE . 'TYPE .
-  ceq ref-ok-actual-type(RO_STORE, REF.EXN-ADDR(RO_A)) = REF(eps, EXN)
-    if indexDefined(RO_STORE . 'EXNS, RO_A) .
-  eq ref-ok-actual-type(RO_STORE, REF.HOST-ADDR(RO_A)) = REF(eps, ANY) .
-  ceq ref-ok-actual-type(RO_STORE, REF.EXTERN(RO_REF)) = REF(eps, EXTERN)
-    if RO_REF =/= REF.NULL-ADDR
-       /\ Ref-ok(RO_STORE, RO_REF, REF(eps, ANY)) .
-
-  ceq Ref-ok(RO_S, RO_REF, RO_RT) =
-      ref-ok-reftype-sub(RO_ACTUAL, RO_RT)
-    if RO_ACTUAL := ref-ok-actual-type(RO_S, RO_REF) .
-  eq Ref-ok(RO_S, RO_REF, RO_RT) = false [owise] .
-
-  eq ref-ok-reftype-sub(REF(eps, RO_H1), REF(eps, RO_H2)) =
-      ref-ok-heaptype-sub(RO_H1, RO_H2) .
-  eq ref-ok-reftype-sub(REF(eps, RO_H1), REF(NULL ?, RO_H2)) =
-      ref-ok-heaptype-sub(RO_H1, RO_H2) .
-  eq ref-ok-reftype-sub(REF(NULL ?, RO_H1), REF(NULL ?, RO_H2)) =
-      ref-ok-heaptype-sub(RO_H1, RO_H2) .
-  eq ref-ok-reftype-sub(RO_H1, RO_H2) = false [owise] .
-
-  eq ref-ok-valid-heaptype(ANY) = true .
-  eq ref-ok-valid-heaptype(EQ) = true .
-  eq ref-ok-valid-heaptype(I31) = true .
-  eq ref-ok-valid-heaptype(STRUCT) = true .
-  eq ref-ok-valid-heaptype(ARRAY) = true .
-  eq ref-ok-valid-heaptype(NONE) = true .
-  eq ref-ok-valid-heaptype(spectec-FUNC) = true .
-  eq ref-ok-valid-heaptype(NOFUNC) = true .
-  eq ref-ok-valid-heaptype(EXN) = true .
-  eq ref-ok-valid-heaptype(NOEXN) = true .
-  eq ref-ok-valid-heaptype(EXTERN) = true .
-  eq ref-ok-valid-heaptype(NOEXTERN) = true .
-  eq ref-ok-valid-heaptype(BOT) = true .
-  ceq ref-ok-valid-heaptype(-DEF(REC(RO_SUBTYPES), RO_I)) = true
-    if indexDefined(RO_SUBTYPES, RO_I) .
-  eq ref-ok-valid-heaptype(RO_H1) = false [owise] .
-
-  ceq ref-ok-heaptype-sub(RO_H1, RO_H1) = true
-    if ref-ok-valid-heaptype(RO_H1) .
-  eq ref-ok-heaptype-sub(BOT, RO_H2) = ref-ok-valid-heaptype(RO_H2) .
-  eq ref-ok-heaptype-sub(EQ, ANY) = true .
-  eq ref-ok-heaptype-sub(I31, EQ) = true .
-  eq ref-ok-heaptype-sub(I31, ANY) = true .
-  eq ref-ok-heaptype-sub(STRUCT, EQ) = true .
-  eq ref-ok-heaptype-sub(STRUCT, ANY) = true .
-  eq ref-ok-heaptype-sub(ARRAY, EQ) = true .
-  eq ref-ok-heaptype-sub(ARRAY, ANY) = true .
-  ceq ref-ok-heaptype-sub(-DEF(REC(RO_SUBTYPES), RO_I), RO_H2) =
-      ref-ok-deftype-step(RO_SUBTYPES, RO_H2, RO_SUBTYPES [ RO_I ])
-    if indexDefined(RO_SUBTYPES, RO_I)
-       /\ (-DEF(REC(RO_SUBTYPES), RO_I)) =/= RO_H2 .
-  eq ref-ok-heaptype-sub(RO_H1, RO_H2) = false [owise] .
-
-  eq ref-ok-close-super(RO_SUBTYPES, REC(RO_I)) =
-      -DEF(REC(RO_SUBTYPES), RO_I) .
-  eq ref-ok-close-super(RO_SUBTYPES, -DEF(RO_RECTYPE, RO_I)) =
-      -DEF(RO_RECTYPE, RO_I) .
-
-  eq ref-ok-deftype-step(RO_SUBTYPES, RO_H2,
-      SUB(RO_FINAL, eps, spectec-STRUCT(RO_FIELDS))) =
-      ref-ok-heaptype-sub(STRUCT, RO_H2) .
-  eq ref-ok-deftype-step(RO_SUBTYPES, RO_H2,
-      SUB(RO_FINAL, eps, spectec-ARRAY(RO_COMPTYPE))) =
-      ref-ok-heaptype-sub(ARRAY, RO_H2) .
-  eq ref-ok-deftype-step(RO_SUBTYPES, RO_H2,
-      SUB(RO_FINAL, eps, FUNC RO_T1S -> RO_T2S)) =
-      ref-ok-heaptype-sub(spectec-FUNC, RO_H2) .
-  ceq ref-ok-deftype-step(RO_SUBTYPES, RO_H2,
-      SUB(RO_FINAL, RO_SUPER, spectec-STRUCT(RO_FIELDS))) =
-      ref-ok-heaptype-sub(STRUCT, RO_H2)
-      or ref-ok-heaptype-sub(RO_CLOSED, RO_H2)
-    if RO_CLOSED := ref-ok-close-super(RO_SUBTYPES, RO_SUPER) .
-  ceq ref-ok-deftype-step(RO_SUBTYPES, RO_H2,
-      SUB(RO_FINAL, RO_SUPER, spectec-ARRAY(RO_COMPTYPE))) =
-      ref-ok-heaptype-sub(ARRAY, RO_H2)
-      or ref-ok-heaptype-sub(RO_CLOSED, RO_H2)
-    if RO_CLOSED := ref-ok-close-super(RO_SUBTYPES, RO_SUPER) .
-  ceq ref-ok-deftype-step(RO_SUBTYPES, RO_H2,
-      SUB(RO_FINAL, RO_SUPER, FUNC RO_T1S -> RO_T2S)) =
-      ref-ok-heaptype-sub(spectec-FUNC, RO_H2)
-      or ref-ok-heaptype-sub(RO_CLOSED, RO_H2)
-    if RO_CLOSED := ref-ok-close-super(RO_SUBTYPES, RO_SUPER) .
-  eq ref-ok-deftype-step(RO_SUBTYPES, RO_H2, RO_COMPTYPE) = false [owise] .
 
 endm

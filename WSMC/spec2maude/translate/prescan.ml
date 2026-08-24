@@ -66,7 +66,8 @@ type relation_policy =
       }
   | Equation of {input_count : int}
   | Predicate
-  | Builtin
+  | BackendCheck
+  | BackendCompute of {input_count : int}
 
 type membership_choice =
   { definition : string
@@ -348,10 +349,16 @@ let relation_hint_names hints target_name =
        (fun names hint ->
          match names, hint.hintid.it with
          | Error _ as error, _ -> error
-         | Ok names, ("maude_eq" | "maude_predicate" | "builtin" as name) ->
+         | Ok names, ("maude_eq" | "maude_predicate" as name) ->
              begin match hint.hintexp.it with
              | El.Ast.SeqE [] -> Ok (name :: names)
              | _ -> Error (name ^ " must be a flag hint")
+             end
+         | Ok names, "maude_backend" ->
+             begin match hint.hintexp.it with
+             | El.Ast.TextE "check" -> Ok ("backend-check" :: names)
+             | El.Ast.TextE "compute" -> Ok ("backend-compute" :: names)
+             | _ -> Error "maude_backend must be \"check\" or \"compute\""
              end
          | Ok names, _ -> Ok names)
        (Ok [])
@@ -366,20 +373,28 @@ let classify_relation hints source mixop request_sort =
   in
   let plain_equation = markers Xl.Atom.[Approx] mixop in
   let equation = markers Xl.Atom.[Approx; ApproxSub] mixop in
+  let plain_function = markers Xl.Atom.[Colon] mixop in
+  let functions = markers Xl.Atom.[Colon; ColonSub] mixop in
   match execution, plain, equation, plain_equation,
+        functions, plain_function,
         relation_hint_names hints source with
-  | _, _, _, _, Error reason -> Error reason
-  | [input_count], [plain_count], [], [], Ok []
+  | _, _, _, _, _, _, Error reason -> Error reason
+  | [input_count], [plain_count], [], [], _, _, Ok []
     when input_count = plain_count && input_count > 0 && input_count < arity ->
       Ok (Execution {request_sort = request_sort (); input_count})
-  | [], [], [input_count], [plain_count], Ok ["maude_eq"]
+  | [], [], [input_count], [plain_count], _, _, Ok ["maude_eq"]
     when input_count = plain_count && input_count > 0 && input_count < arity ->
       Ok (Equation {input_count})
-  | [], [], _, _, Ok ["maude_eq"] ->
+  | [], [], _, _, _, _, Ok ["maude_eq"] ->
       Error "maude_eq requires exactly one plain ~~ marker"
-  | [], [], [], [], Ok ["maude_predicate"] -> Ok Predicate
-  | [], [], [], [], Ok ["builtin"] -> Ok Builtin
-  | [], [], _, _, Ok [] ->
+  | [], [], _, _, _, _, Ok ["maude_predicate"] -> Ok Predicate
+  | [], [], _, _, _, _, Ok ["backend-check"] -> Ok BackendCheck
+  | [], [], _, _, [input_count], [plain_count], Ok ["backend-compute"]
+    when input_count = plain_count && input_count > 0 && input_count < arity ->
+      Ok (BackendCompute {input_count})
+  | [], [], _, _, _, _, Ok ["backend-compute"] ->
+      Error "maude_backend \"compute\" requires exactly one plain : marker"
+  | [], [], _, _, _, _, Ok [] ->
       Error "non-execution relation requires an explicit backend hint"
   | _ -> Error "relation has unsupported or conflicting backend markers"
 
@@ -1037,7 +1052,8 @@ let scan script =
                   (id.it, ordinal), fresh_name used_names candidate)
                 rules
               |> List.rev_append acc
-          | Some (Equation _ | Predicate | Builtin) | None -> acc
+          | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
+          | None -> acc
           end
       | RecD defs -> List.fold_left collect acc defs
       | TypD _ | DecD _ | GramD _ | HintD _ -> acc
@@ -1087,7 +1103,7 @@ let scan script =
   in
   let relation_supported source =
     match List.assoc_opt source relation_policies with
-    | Some Builtin | None -> false
+    | Some (BackendCheck | BackendCompute _) | None -> false
     | Some (Execution _ | Equation _ | Predicate) -> true
   in
   let definition_supported source =
@@ -1185,7 +1201,8 @@ let premise_iteration_binds_membership index
   | RelationOwner source ->
       begin match List.assoc_opt source index.relation_policies with
       | Some (Execution _) -> true
-      | Some (Equation _ | Predicate | Builtin) | None -> false
+      | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
+      | None -> false
       end
   | DefinitionOwner _ | OtherOwner -> false
 

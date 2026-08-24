@@ -495,11 +495,12 @@ let translate_rulepr index bound id args mixop exp =
           ("RulePr target " ^ id.it ^ " is unsupported: " ^ reason)
   in
   match policy with
-  | Prescan.Predicate | Prescan.Builtin ->
+  | Prescan.Predicate | Prescan.BackendCheck ->
       if not (known_args bound args && known bound exp) then
         invalid_arg "predicate RulePr contains an unbound variable";
       make bound [EqCondition (BoolCond (relation_call index id args exps))]
-  | Prescan.Equation {input_count} ->
+  | Prescan.Equation {input_count}
+  | Prescan.BackendCompute {input_count} ->
       let inputs, outputs = split input_count exps in
       if not (known_args bound args && List.for_all (known bound) inputs) then
         invalid_arg "equation RulePr has an unbound input";

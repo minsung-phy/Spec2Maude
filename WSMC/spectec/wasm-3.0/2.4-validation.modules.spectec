@@ -131,7 +131,7 @@ rule Externidx_ok/func:
 
 ;; Modules
 
-relation Module_ok: |- module : moduletype            hint(name "T-module")  hint(macro "%module")
+relation Module_ok: |- module : moduletype            hint(name "T-module")  hint(macro "%module") hint(maude_backend "compute")
 relation Types_ok: context |- type* : deftype*        hint(name "T-types")   hint(macro "%types")
 relation Globals_ok: context |- global* : globaltype* hint(name "T-globals") hint(macro "%globals")
 
