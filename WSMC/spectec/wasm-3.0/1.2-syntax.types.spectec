@@ -176,15 +176,15 @@ var tu : typeuse
 
 ;; Computed types
 
-def $IN(N) : Inn  hint(show I#%) hint(macro "INX") hint(partial)
+def $IN(N) : Inn  hint(show I#%) hint(macro "INX") hint(maude_kind)
 def $IN(32) = I32
 def $IN(64) = I64
 
-def $FN(N) : Fnn  hint(show F#%) hint(macro "FNX") hint(partial)
+def $FN(N) : Fnn  hint(show F#%) hint(macro "FNX") hint(maude_kind)
 def $FN(32) = F32
 def $FN(64) = F64
 
-def $JN(N) : Jnn  hint(show I#%) hint(macro "INX") hint(partial)
+def $JN(N) : Jnn  hint(show I#%) hint(macro "INX") hint(maude_kind)
 def $JN(8) = I8
 def $JN(16) = I16
 def $JN(32) = I32
@@ -197,7 +197,7 @@ def $size(numtype) : nat       hint(show |%|)
 def $vsize(vectype) : nat      hint(show |%|)
 def $psize(packtype) : nat     hint(show |%|)
 def $lsize(lanetype) : nat     hint(show |%|)
-def $zsize(storagetype) : nat  hint(show |%|) hint(partial)
+def $zsize(storagetype) : nat  hint(show |%|) hint(maude_kind)
 def $isize(Inn) : nat          hint(show |%|) hint(inverse $inv_isize)
 def $jsize(Jnn) : nat          hint(show |%|) hint(inverse $inv_jsize)
 def $fsize(Fnn) : nat          hint(show |%|) hint(inverse $inv_fsize)
@@ -223,9 +223,9 @@ def $isize(Inn) = $size(Inn)
 def $fsize(Fnn) = $size(Fnn)
 def $jsize(Jnn) = $lsize(Jnn)
 
-def $inv_isize(nat) : Inn hint(partial)
-def $inv_jsize(nat) : Jnn hint(partial)
-def $inv_fsize(nat) : Fnn hint(partial)
+def $inv_isize(nat) : Inn hint(maude_kind)
+def $inv_jsize(nat) : Jnn hint(maude_kind)
+def $inv_fsize(nat) : Fnn hint(maude_kind)
 
 def $inv_isize(32) = I32
 def $inv_isize(64) = I64
@@ -259,7 +259,7 @@ def $lsizenn2(lt) = $lsize(lt)
 def $jsizenn(Jnn) : nat   hint(show N) hint(macro none) hint(inverse $inv_jsizenn) ;; HACK!
 def $jsizenn(Jnn) = $lsize(Jnn)
 
-def $inv_jsizenn(nat) : Jnn hint(partial)
+def $inv_jsizenn(nat) : Jnn hint(maude_kind)
 def $inv_jsizenn(n) = $inv_jsize(n)
 
 
@@ -273,14 +273,14 @@ def $unpack(storagetype) : valtype
 def $unpack(valtype) = valtype
 def $unpack(packtype) = I32
 
-def $nunpack(storagetype) : numtype  hint(show $unpack(%)) hint(partial)
+def $nunpack(storagetype) : numtype  hint(show $unpack(%)) hint(maude_kind)
 def $nunpack(numtype) = numtype
 def $nunpack(packtype) = I32
 
-def $vunpack(storagetype) : vectype  hint(show $unpack(%)) hint(partial)
+def $vunpack(storagetype) : vectype  hint(show $unpack(%)) hint(maude_kind)
 def $vunpack(vectype) = vectype
 
-def $cunpack(storagetype) : consttype hint(show $unpack(%)) hint(partial)
+def $cunpack(storagetype) : consttype hint(show $unpack(%)) hint(maude_kind)
 def $cunpack(consttype) = consttype
 def $cunpack(packtype) = I32
 def $cunpack(lanetype) = $lunpack(lanetype)  ;; HACK
@@ -297,7 +297,7 @@ def $diffrt((REF null_1? ht_1), (REF NULL ht_2)) = (REF ht_1)
 def $diffrt((REF null_1? ht_1), (REF ht_2)) = (REF null_1? ht_1)
 
 ;; TODO(3, rossberg): Could this be inferable as a narrowing coercion?
-def $as_deftype(typeuse) : deftype  hint(show %) hint(partial)
+def $as_deftype(typeuse) : deftype  hint(show %) hint(maude_kind)
 def $as_deftype(dt) = dt
 
 
@@ -334,7 +334,7 @@ def $funcsxt(externtype xt*) = $funcsxt(xt*)  -- otherwise
 
 ;; Substitution
 
-def $subst_typevar(typevar, typevar*, typeuse*) : typeuse             hint(show %#`[%:=%]) hint(macro "%subst") hint(partial)
+def $subst_typevar(typevar, typevar*, typeuse*) : typeuse             hint(show %#`[%:=%]) hint(macro "%subst") hint(maude_kind)
 def $subst_typeuse(typeuse, typevar*, typeuse*) : typeuse             hint(show %#`[%:=%]) hint(macro "%subst")
 
 def $subst_addrtype(addrtype, typevar*, typeuse*) : addrtype          hint(show %#`[%:=%]) hint(macro "%subst")
@@ -398,7 +398,7 @@ def $subst_comptype((FUNC t_1* -> t_2*), tv*, tu*) = FUNC $subst_valtype(t_1, tv
 def $subst_subtype((SUB final? tu'* ct), tv*, tu*) =
   SUB final? $subst_typeuse(tu', tv*, tu*)* $subst_comptype(ct, tv*, tu*)
 
-def $minus_recs(typevar*, typeuse*) : (typevar*, typeuse*) hint(partial)
+def $minus_recs(typevar*, typeuse*) : (typevar*, typeuse*) hint(maude_kind)
 def $minus_recs(eps, eps) = (eps, eps)
 def $minus_recs((REC n) tv*, tu_1 tu*) = $minus_recs(tv*, tu*)
 def $minus_recs((_IDX x) tv*, tu_1 tu*) = ((_IDX x) tv'*, tu_1 tu'*)

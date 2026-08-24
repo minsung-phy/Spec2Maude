@@ -175,8 +175,8 @@ def $Ki = 1024
 
 ;; Packed fields
 
-def $packfield_(storagetype, val) : fieldval         hint(show $pack_(%,%)) hint(macro "packfield") hint(partial)
-def $unpackfield_(storagetype, sx?, fieldval) : val  hint(show $unpack_(%)^(%)#((%))) hint(macro "unpackfield") hint(partial)
+def $packfield_(storagetype, val) : fieldval         hint(show $pack_(%,%)) hint(macro "packfield") hint(maude_kind)
+def $unpackfield_(storagetype, sx?, fieldval) : val  hint(show $unpack_(%)^(%)#((%))) hint(macro "unpackfield") hint(maude_kind)
 
 def $packfield_(valtype, val) = val
 def $packfield_(packtype, CONST I32 i) = PACK packtype $wrap__(32, $psize(packtype), i)
@@ -313,8 +313,8 @@ def $add_exninst(z, exn*) = $sof(z)[.EXNS =++ exn*]; $fof(z)
 
 ;; Growing
 
-def $growtable(tableinst, nat, ref) : tableinst hint(partial)
-def $growmem(meminst, nat) : meminst            hint(partial)
+def $growtable(tableinst, nat, ref) : tableinst hint(maude_kind)
+def $growmem(meminst, nat) : meminst            hint(maude_kind)
 
 def $growtable(tableinst, n, r) = tableinst'
   -- if tableinst = { TYPE (at `[i .. j?] rt), REFS r'* }

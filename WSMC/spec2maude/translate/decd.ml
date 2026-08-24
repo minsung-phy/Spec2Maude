@@ -13,7 +13,7 @@ let translate_decl index id params result_typ =
     ; domain = Param.translate_sorts index params
     ; codomain = Term.translate_sort index result_typ
     ; arrow =
-        if has_hint index id "partial" then Partial
+        if has_hint index id "maude_kind" then Partial
         else Total
     ; attrs = []
     }
@@ -32,7 +32,7 @@ let translate_request_header index id params result_typ =
       { name = Prescan.def_name index id
       ; domain = Param.translate_sorts index params
       ; codomain = request_sort
-      ; arrow = if has_hint index id "partial" then Partial else Total
+      ; arrow = if has_hint index id "maude_kind" then Partial else Total
       ; attrs = frozen_all (List.length params)
       }
   ]
