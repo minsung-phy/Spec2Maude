@@ -81,7 +81,10 @@ let lower_rule_body ?request_output index id params policy rule =
         match policy with
         | Prescan.Execution {input_count; _}
         | Prescan.Equation {input_count} -> Prem.split input_count exps
-        | Prescan.Predicate | Prescan.Builtin -> exps, []
+        | Prescan.Predicate | Prescan.BackendCheck ->
+            exps, []
+        | Prescan.BackendCompute {input_count} ->
+            Prem.split input_count exps
       in
       let input_terms, head_conditions, bound =
         translate_inputs index params inputs
@@ -134,8 +137,8 @@ let translate_rule ?request_output index id params policy rule =
       | [] -> Eq (body.left, Const "true", [])
       | conditions -> Ceq (body.left, Const "true", conditions, [])
       end
-  | Prescan.Builtin ->
-      invalid_arg "builtin relation rules are supplied by builtins.maude"
+  | Prescan.BackendCheck | Prescan.BackendCompute _ ->
+      invalid_arg "manual relation rules are supplied by a Maude backend"
 
 type execution_rule =
   { ordinal : int
@@ -305,7 +308,8 @@ let translate_execution ?request_output index id params typ policy rules =
   let input_count =
     match policy with
     | Prescan.Execution {input_count; _} -> input_count
-    | Prescan.Equation _ | Prescan.Predicate | Prescan.Builtin ->
+    | Prescan.Equation _ | Prescan.Predicate | Prescan.BackendCheck
+    | Prescan.BackendCompute _ ->
         invalid_arg "expected an execution relation policy"
   in
   let lowered =
@@ -375,12 +379,22 @@ let translate_decl index id params typ policy =
           ; attrs = []
           }
       ]
-  | Prescan.Builtin ->
+  | Prescan.BackendCheck ->
       [ OpDecl
           { name = Prescan.rel_name index id
           ; domain = parameter_sorts @ List.map (Term.translate_sort index) types
           ; codomain = "Bool"
           ; arrow = Total
+          ; attrs = []
+          }
+      ]
+  | Prescan.BackendCompute {input_count} ->
+      let inputs, outputs = Prem.split input_count types in
+      [ OpDecl
+          { name = Prescan.rel_name index id
+          ; domain = parameter_sorts @ List.map (Term.translate_sort index) inputs
+          ; codomain = output_sort index outputs
+          ; arrow = Partial
           ; attrs = []
           }
       ]
@@ -391,7 +405,7 @@ let translate ?request_output index id params _mixop typ rules =
   | Ok policy ->
       let declarations = translate_decl index id params typ policy in
       match policy with
-      | Prescan.Builtin -> declarations
+      | Prescan.BackendCheck | Prescan.BackendCompute _ -> declarations
       | Prescan.Execution _ ->
           declarations
           @ translate_execution ?request_output index id params typ

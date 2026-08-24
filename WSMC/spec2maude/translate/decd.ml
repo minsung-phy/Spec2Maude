@@ -94,7 +94,14 @@ let translate_head index id args =
             Prem.bind bound exp
         end
     | ExpA exp ->
-        Term.translate_exp index exp :: terms, conditions, Prem.bind bound exp
+        begin match Prem.translate_pattern_parts index exp with
+        | Some (pattern, guards) ->
+            pattern :: terms, conditions @ guards, Prem.bind bound exp
+        | None ->
+            Term.translate_exp index exp :: terms,
+            conditions,
+            Prem.bind bound exp
+        end
     | TypA _ | DefA _ | GramA _ ->
         Term.translate_arg index arg :: terms, conditions, bound
   in

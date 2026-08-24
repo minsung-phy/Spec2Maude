@@ -22,7 +22,7 @@ rule Nondefaultable: |- t NONDEFAULTABLE -- if $default_(t) = eps
 
 relation Num_ok: store |- num : numtype  hint(macro "%num") hint(maude_predicate)
 relation Vec_ok: store |- vec : vectype  hint(macro "%vec") hint(maude_predicate)
-relation Ref_ok: store |- ref : reftype  hint(macro "%ref") hint(builtin)
+relation Ref_ok: store |- ref : reftype  hint(macro "%ref") hint(maude_backend "check")
 relation Val_ok: store |- val : valtype  hint(macro "%val") hint(maude_predicate)
 
 rule Num_ok:
@@ -101,7 +101,7 @@ rule Fieldval_ok/packval:
 
 ;; External addresses
 
-relation Externaddr_ok: store |- externaddr : externtype  hint(macro "%externaddr")
+relation Externaddr_ok: store |- externaddr : externtype  hint(macro "%externaddr") hint(maude_backend "check")
 
 rule Externaddr_ok/tag:
   s |- TAG a : TAG taginst.TYPE
