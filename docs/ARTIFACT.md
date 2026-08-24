@@ -45,7 +45,7 @@ dune runtest test --force
 Expected output includes:
 
 ```text
-translated 21 SpecTec files into 774646 Maude bytes
+translated 21 SpecTec files into 585165 Maude bytes
 Bye.
 ```
 
@@ -75,7 +75,7 @@ Expected result: `cmp` exits with status 0.
 The expected SHA-256 of the generated file is:
 
 ```text
-b58da3fa3dc9ba8bd1c1451f2938f9623fc0d364cdfdb48551887085ba92e29b
+1d2afca0a72722e0edfd8ba48419688229873cc819aeae195743efe0b37deae5
 ```
 
 On systems with `sha256sum`:
