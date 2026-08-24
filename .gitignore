@@ -17,21 +17,8 @@ __pycache__/
 .merlin
 
 # 4. 기타 파일 제외
-artifacts/
-benchmarks/
-!benchmarks/
-benchmarks/*
-!benchmarks/fibonacci/
-!benchmarks/fibonacci/**
-!benchmarks/chat/
-!benchmarks/chat/**
-!benchmarks/subtyping/
-!benchmarks/subtyping/**
-!benchmarks/builtins/
-!benchmarks/builtins/**
 reference/
 .codex/
 .agents/
-docs/
 AGENTS.md
 legacy/

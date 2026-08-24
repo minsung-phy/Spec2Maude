@@ -30,7 +30,7 @@ let input_options args =
     | _ -> usage ()
   in
   let input, output, semantics, term_only =
-    options None None "builtins.maude" false args
+    options None None "translator/backend/semantics.maude" false args
   in
   let input = match input with Some path -> path | None -> usage () in
   input, output, resolve semantics, term_only
@@ -85,7 +85,7 @@ let run_command args =
     | _ -> usage ()
   in
   let input, output, semantics, export, args, steps =
-    options None None "builtins.maude" None [] 100000 args
+    options None None "translator/backend/semantics.maude" None [] 100000 args
   in
   let semantics = resolve semantics in
   let input = match input with Some path -> path | None -> usage () in
@@ -128,7 +128,7 @@ let modelcheck_command args =
     | _ -> usage ()
   in
   let input, output, semantics, export, args, expected, rejected, steps =
-    options None None "builtins.maude" None [] None None 100000 args
+    options None None "translator/backend/semantics.maude" None [] None None 100000 args
   in
   let input = match input with Some path -> path | None -> usage () in
   let export = match export with Some name -> name | None -> usage () in
@@ -163,7 +163,7 @@ let wast_run args =
     | _ -> usage ()
   in
   let input, output, semantics, steps, call_depth =
-    options None None "builtins.maude" 1000000 256 args
+    options None None "translator/backend/semantics.maude" 1000000 256 args
   in
   let semantics = resolve semantics in
   let input = match input with Some path -> path | None -> usage () in
@@ -212,7 +212,7 @@ let suite_run args =
     | _ -> usage ()
   in
   let input, output, semantics, maude, timeout, steps, call_depth, log_dir =
-    options None None "builtins.maude" "maude" 60. 1000000 256 None args
+    options None None "translator/backend/semantics.maude" "maude" 60. 1000000 256 None args
   in
   let input = match input with Some path -> path | None -> usage () in
   let progress ~completed ~total ~source ~status ~seconds =

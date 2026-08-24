@@ -1,1 +1,1 @@
-(data_only_dirs benchmarks docs legacy reference wasm-3.0 wat_examples)
+(data_only_dirs benchmarks docs legacy reference)
