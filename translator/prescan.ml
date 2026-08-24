@@ -235,15 +235,20 @@ let variable_base name =
   | _ -> "V-" ^ name
 
 let iteration_base_name (body : exp) =
-  let left = body.at.left in
-  let right = body.at.right in
-  let file = Filename.basename left.file |> sanitize in
-  if file = "" then
-    Printf.sprintf "map-exp-%d-%d-%d-%d"
-      left.line left.column right.line right.column
-  else
-    Printf.sprintf "map-%s-%d-%d-%d-%d"
-      file left.line left.column right.line right.column
+  let compact name =
+    name
+    |> sanitize
+    |> String.split_on_char '-'
+    |> List.filter (fun part -> part <> "")
+    |> String.concat "-"
+  in
+  match body.it with
+  | CallE (id, _) ->
+      begin match compact id.it with
+      | "" -> "map-exp"
+      | name -> "map-" ^ name
+      end
+  | _ -> "map-exp"
 
 
 let index_ids = function
@@ -967,7 +972,11 @@ let scan script =
   let iterations =
     List.rev !iterations
     |> List.map (fun (iteration : iteration) ->
-         let name = fresh_name used_names iteration.name in
+         let name =
+           fresh used_names
+             (fun index -> "-" ^ string_of_int index)
+             iteration.name
+         in
          { iteration with
            name
          ; tail_name = fresh_name used_names (name ^ "-tail")
