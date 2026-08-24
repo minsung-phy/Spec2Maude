@@ -117,7 +117,12 @@ let from_sequence_element typ term =
 let rec translate_typ index typ =
   match typ.it with
   | VarT (id, args) ->
-      app (Prescan.typ_name index id) (List.map (translate_arg index) args)
+      begin match Prescan.type_parameter index id, args with
+      | Some variable, [] -> Var variable
+      | Some _, _ -> invalid_arg "TypP type variable cannot have arguments"
+      | None, _ ->
+          app (Prescan.typ_name index id) (List.map (translate_arg index) args)
+      end
   | BoolT ->
       Const "bool"
   | NumT numtyp ->
@@ -306,11 +311,10 @@ and translate_exp index exp =
         ]
 
   | SubE (inner, source, target) ->
-      app "_:_<:_"
-        [ translate_exp index inner
-        ; translate_typ index source
-        ; translate_typ index target
-        ]
+      if Prescan.same_representation index source target then
+        translate_exp index inner
+      else
+        invalid_arg "SubE changes the Maude representation sort"
 
 
 and translate_bool index exp =
