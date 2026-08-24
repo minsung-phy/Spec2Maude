@@ -198,7 +198,8 @@ let reserved_names =
     ; "tuple"; "item"; "value"; "typecheck"; "isTrue"; "len"
     ; "index"; "slice"; "lift"; "repeatSeq"
     ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
-    ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "_/\\_"; "_\\/_"
+    ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "not_"; "_and_"
+    ; "_or_"; "_implies_"; "_rem_"
     ]
 
 let fresh used suffix candidate =

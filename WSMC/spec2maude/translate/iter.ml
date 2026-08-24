@@ -77,9 +77,9 @@ let controls translate_exp = function
 let translate_term index translate_exp body (iter, generators) =
   match iter, generators with
   | ListN (count, None), [] ->
-      app "_^_"
-        [ translate_exp body |> as_sequence_element body.note
-        ; translate_exp count
+      app "repeatSeq"
+        [ translate_exp count
+        ; translate_exp body |> as_sequence_element body.note
         ]
   | (Opt | List | List1), [] ->
       invalid_arg "IterE with Opt, List, or List1 requires a generator"

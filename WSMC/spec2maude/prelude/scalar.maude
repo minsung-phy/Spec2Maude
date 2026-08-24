@@ -7,7 +7,7 @@ fmod DSL-SCALAR is
   op ratValue : SpectecTerminal ~> Rat .
   op floatValue : SpectecTerminal ~> Float .
 
-  vars B C : Bool .
+  var B : Bool .
   var R : Rat .
   var F : Float .
 
@@ -15,30 +15,4 @@ fmod DSL-SCALAR is
   eq ratValue(rat(R)) = R .
   eq floatValue(float(F)) = F .
 
-  --- Source boolean operators.
-
-  op ~_ : Bool -> Bool .
-  op _/\_ : Bool Bool -> Bool .
-  op _\/_ : Bool Bool -> Bool .
-  op _=>_ : Bool Bool -> Bool .
-  op _<=>_ : Bool Bool -> Bool .
-
-  eq ~ B = not B .
-  eq B /\ C = B and C .
-  eq B \/ C = B or C .
-  eq B => C = B implies C .
-  eq B <=> C = B == C .
-
-  --- Source remainder notation delegates to Maude's primitive remainder.
-
-  op _\_ : Nat Nat ~> Nat .
-  op int-rem : Int Int ~> Int .
-
-  var N : Nat .
-  var M : NzNat .
-  var I : Int .
-  var J : NzInt .
-
-  eq N \ M = N rem M .
-  eq int-rem(I, J) = I rem J .
 endfm

@@ -95,17 +95,13 @@ fmod DSL-SEQUENCE is
   eq lift(K ?) = K .
 
   op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
-  op _^_ : SpectecTerminals Nat -> SpectecTerminals [ditto] .
 
   eq repeatSeq(0, WTS) = eps .
   eq repeatSeq(s(N), WTS) = WTS repeatSeq(N, WTS) .
-  eq WTS ^ N = repeatSeq(N, WTS) .
 
   --- The concrete numeric equations for these source coercions belong to
   --- builtins.maude.
 
   op _:_<:>_ : SpectecTerminals SpectecType SpectecType
-    ~> SpectecTerminals .
-  op _:_<:_ : SpectecTerminals SpectecType SpectecType
     ~> SpectecTerminals .
 endfm
