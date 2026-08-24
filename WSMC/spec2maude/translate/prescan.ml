@@ -85,6 +85,7 @@ type t =
   ; hints : hintdef list
   ; names : (name_kind * string * name) list
   ; relation_policies : (string * relation_policy) list
+  ; relation_enabled_helpers : ((string * int) * name) list
   ; unsupported_relations : (string * string) list
   ; definition_bodies : (string * bool) list
   ; rewrite_sorts : (string * sort) list
@@ -999,6 +1000,28 @@ let scan script =
         | Error reason -> policies, (source, reason) :: unsupported)
       relations ([], [])
   in
+  let relation_enabled_helpers =
+    let rec collect acc def =
+      match def.it with
+      | RelD (id, _, _, _, rules) ->
+          begin match List.assoc_opt id.it relation_policies with
+          | Some (Execution _) ->
+              let relation = registered_name RelName id.it in
+              List.mapi
+                (fun ordinal _ ->
+                  let candidate =
+                    Printf.sprintf "%s-enabled-%d" relation (ordinal + 1)
+                  in
+                  (id.it, ordinal), fresh_name used_names candidate)
+                rules
+              |> List.rev_append acc
+          | Some (Equation _ | Predicate | Builtin) | None -> acc
+          end
+      | RecD defs -> List.fold_left collect acc defs
+      | TypD _ | DecD _ | GramD _ | HintD _ -> acc
+    in
+    List.fold_left collect [] script |> List.rev
+  in
   let unsupported_relation_names =
     List.map fst unsupported_relations |> StringSet.of_list
   in
@@ -1070,6 +1093,7 @@ let scan script =
   ; hints
   ; names = List.rev !names
   ; relation_policies
+  ; relation_enabled_helpers
   ; unsupported_relations
   ; definition_bodies
   ; rewrite_sorts
@@ -1118,6 +1142,15 @@ let relation_policy index id =
       | Some reason -> Error reason
       | None -> invalid_arg ("unregistered relation " ^ id.it)
       end
+
+let relation_enabled_helper index id ordinal =
+  match List.assoc_opt (id.it, ordinal) index.relation_enabled_helpers with
+  | Some name -> name
+  | None ->
+      invalid_arg
+        (Printf.sprintf
+           "unregistered enabledness helper for relation %s rule %d"
+           id.it (ordinal + 1))
 
 let definition_body_supported index id =
   match List.assoc_opt id.it index.definition_bodies with
