@@ -4,6 +4,25 @@ open Maude_il
 
 module StringSet = Set.Make (String)
 
+let deduplicate values =
+  let step (seen, result) value =
+    if List.mem value seen then seen, result
+    else value :: seen, value :: result
+  in
+  List.fold_left step ([], []) values
+  |> fun (_, result) -> List.rev result
+
+let deduplicate_conditions = function
+  | Cmb (term, sort, conditions) ->
+      Cmb (term, sort, deduplicate conditions)
+  | Ceq (left, right, conditions, attrs) ->
+      Ceq (left, right, deduplicate conditions, attrs)
+  | Crl (label, left, right, conditions) ->
+      Crl (label, left, right, deduplicate conditions)
+  | (SortDecl _ | SubsortDecl _ | VarDecl _ | OpDecl _
+    | Mb _ | Eq _ | Rl _) as statement ->
+      statement
+
 let normalize_variables source_declarations statements =
   let source_sorts = Hashtbl.create 64 in
   let declared = Hashtbl.create 64 in
@@ -80,7 +99,10 @@ let normalize_variables source_declarations statements =
     | VarDecl _ -> invalid_arg "variable declarations are rebuilt after lowering"
     | statement -> map_statement_variables normalize_variable statement
   in
-  let statements = List.map normalize_statement statements in
+  let statements =
+    List.map normalize_statement statements
+    |> List.map deduplicate_conditions
+  in
   let groups = Hashtbl.create 16 in
   let sort_order = ref [] in
   List.iter
