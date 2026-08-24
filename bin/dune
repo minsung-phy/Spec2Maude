@@ -1,7 +1,7 @@
 (executable
  (name spec2maude)
  (modules spec2maude)
- (libraries frontend translator util))
+ (libraries frontend util spec2maude_translate))
 
 (executable
  (name wasm2maude)

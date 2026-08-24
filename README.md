@@ -1,131 +1,115 @@
 # Spec2Maude
 
-Spec2Maude translates WebAssembly SpecTec into Maude.
+Spec2Maude is a research prototype for deriving executable
+[Maude](https://maude.cs.illinois.edu/) semantics from
+[SpecTec](https://github.com/Wasm-DSL/spectec) language definitions. Its primary
+case study is the WebAssembly 3.0 specification.
 
-The project is a research artifact for deriving rewriting-logic semantics from
-structured language specifications.  The current input is the WebAssembly 3.0
-SpecTec source under `wasm-3.0/`; the output is a Maude module that can be
-loaded, rewritten, searched, and eventually model checked.
+The project investigates whether a structured language specification can be
+translated into rewriting logic by a small, auditable recursive definition
+over the SpecTec intermediate language, instead of by a collection of
+language-specific translation passes.
 
-The intended pipeline is:
+## Research Motivation
+
+SpecTec gives mechanized structure to language syntax, auxiliary definitions,
+relations, inference rules, and premises. Maude provides executable rewriting
+logic with equations, rewrite rules, matching, search, and model checking.
+
+Connecting the two makes a SpecTec specification usable as an executable Maude
+semantics. The central challenge is to preserve the source structure while
+making every non-direct translation decision visible and reviewable.
+
+## Approach
+
+Spec2Maude parses and elaborates SpecTec with the SpecTec frontend, then
+recursively translates the resulting IL abstract syntax tree into a small
+Maude intermediate representation.
+
+The translation follows four principles:
+
+1. **Source directed.** Translation decisions are driven by SpecTec IL
+   constructors and source annotations, not by WebAssembly instruction or rule
+   names.
+2. **Structure preserving.** Syntax definitions, deterministic definitions,
+   relations, rules, premises, patterns, and iterations retain their source
+   structure whenever Maude provides a direct representation.
+3. **Explicit at non-direct boundaries.** Source annotations identify
+   definitions or relations that require a particular Maude interpretation.
+   Hand-written backend semantics remain separate from generated semantics.
+4. **Auditable failure.** A construct outside the supported translation
+   boundary is rejected explicitly rather than assigned a guessed meaning.
+
+## Translation Pipeline
 
 ```text
-wasm-3.0/*.spectec
-  -> SpecTec parser / elaborator
-  -> SpecTec IL
-  -> Spec2Maude
-  -> output.maude
-  -> Maude
+WebAssembly SpecTec source
+        |
+        v
+SpecTec parser and elaborator
+        |
+        v
+SpecTec IL AST
+        |
+        v
+Recursive Spec2Maude translation
+        |
+        v
+Generated Maude module
+        |
+        +---- hand-written SpecTec support
+        +---- relation backends
+        +---- builtin semantics
+        |
+        v
+Executable WebAssembly semantics in Maude
 ```
 
-For WebAssembly programs, the generated semantics are meant to be used with a
-separately generated initial Maude configuration:
+A separate WebAssembly frontend translates validated WebAssembly modules and
+test scripts into initial Maude terms. This separates the derivation of the
+language semantics from the construction of concrete program configurations.
+
+## Repository Organization
 
 ```text
-.wat / .wasm
-  -> WebAssembly parser / validator
-  -> initial Maude configuration
-  -> output.maude
-  -> rewrite / search / model checking
+bin/                         command-line frontends
+spectec/                     pinned SpecTec IL and WebAssembly 3.0 sources
+translator/                  recursive SpecTec IL-to-Maude translation
+translator/maude/            Maude intermediate language and renderer
+translator/generated/        generated Maude semantics
+translator/backend/spectec-support/
+                             hand-written SpecTec representation support
+translator/backend/relation-backends.maude
+                             explicitly selected relation implementations
+translator/backend/builtins.maude
+                             hand-written primitive semantics
+translator/backend/semantics.maude
+                             complete Maude loading order
+wasm2maude/                  WebAssembly-to-Maude configuration frontend
+vendor/wasm/                 vendored WebAssembly reference implementation
+test/                        translation and Maude loading smoke tests
+benchmarks/wasm-spec/        pinned official WebAssembly core test suite
 ```
 
-## Repository Layout
+## Reproducibility and Provenance
 
-```text
-bin/           command-line entry point
-translator/    SpecTec-to-Maude translator
-wasm_to_maude/ WebAssembly-to-Maude initial configuration frontend
-builtins.maude hand-written builtin backend semantics
-builtins.contract builtin backend ABI metadata
-wasm-3.0/      WebAssembly 3.0 SpecTec source
-wat_examples/  small local WebAssembly examples
-legacy/        previous implementation attempts, kept only for reference
-```
+Third-party sources are stored as pinned subsets:
 
-`output.maude` and any copy requested with `--builtins` are generated artifacts.
+- `spectec/REVISION` records the SpecTec upstream commit and the local
+  annotation boundary.
+- `benchmarks/wasm-spec/REVISION` records the WebAssembly specification
+  commit used for the official core test suite.
 
-## Build
+Their upstream licenses are included alongside the corresponding sources.
+Previous translator designs are retained under `legacy/` for historical
+reference and are not part of the active translation pipeline.
 
-Requirements:
+## Documentation
 
-- OCaml / opam
-- Dune
-- Maude
+- [Installation](docs/INSTALL.md)
+- [Artifact evaluation and testing](docs/ARTIFACT.md)
 
-Build the translator:
+## License
 
-```sh
-dune build
-```
-
-## Translate
-
-Generate Maude from the default WebAssembly SpecTec source:
-
-```sh
-dune exec ./bin/spec2maude.exe -- translate \
-  -o output.maude \
-  --builtins output-builtins.maude
-```
-
-If no input files are provided, Spec2Maude reads `wasm-3.0/*.spectec` in lexical
-order.  Explicit files can also be passed:
-
-```sh
-dune exec ./bin/spec2maude.exe -- translate \
-  -o output.maude \
-  wasm-3.0/1.1-syntax.values.spectec
-```
-
-## Check
-
-Translate and instantiate a validated WebAssembly module with the generated
-semantics:
-
-```sh
-dune exec ./bin/wasm2maude.exe -- module wat_examples/fib-wrapper.wat
-dune exec ./bin/wasm2maude.exe -- instantiate wat_examples/fib-wrapper.wat
-```
-
-The first command checks the encoded module against `syn.module`. The second
-rewrites the official SpecTec `instantiate` definition; modules with imports
-require an explicit host-address mapping and are rejected for now.
-
-Audit the module payloads in a local checkout of the official WebAssembly test
-suite with:
-
-```sh
-dune exec ./bin/wasm2maude.exe -- suite-audit \
-  benchmarks/external/webassembly-spec/test/core
-```
-
-This audit covers WAT and binary module decoding, validation, and Maude term
-encoding. Execution of WAST commands such as `invoke` and `assert_return` is a
-separate runner stage.
-
-Execute each WAST script independently in Maude and write a tab-separated report:
-
-```sh
-dune exec ./bin/wasm2maude.exe -- suite-run \
-  benchmarks/external/webassembly-spec/test/core \
-  --timeout 60 \
-  --log-dir /tmp/spec2maude-suite-logs \
-  -o /tmp/spec2maude-suite.tsv
-```
-
-The report distinguishes passing scripts, wrong results, unsupported inputs,
-frontend failures, Maude errors, timeouts, and stuck executions.  The command exits
-nonzero unless every selected script passes.
-
-Load the generated modules in Maude:
-
-```sh
-maude -no-banner output.maude
-maude -no-banner output-builtins.maude
-```
-
-Run the OCaml test suite:
-
-```sh
-dune runtest
-```
+Spec2Maude is distributed under the GNU General Public License v3.0. Vendored
+third-party components retain their respective upstream licenses.
