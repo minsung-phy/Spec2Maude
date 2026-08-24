@@ -56,6 +56,35 @@ let has_else prems =
   Visitor.list Visitor.prem prems;
   !found
 
+let add_variable variables variable =
+  if List.exists (same_variable variable) variables then variables
+  else variable :: variables
+
+let rec term_variables variables = function
+  | Var variable -> add_variable variables variable
+  | Const _ -> variables
+  | App (_, args) -> List.fold_left term_variables variables args
+
+let variables_bound bound term =
+  term_variables [] term
+  |> List.for_all (fun variable -> List.exists (same_variable variable) bound)
+
+let normalize_conditions left conditions =
+  let step (bound, normalized) condition =
+    match condition with
+    | EqCondition (MatchCond (pattern, subject))
+      when variables_bound bound pattern ->
+        bound, EqCondition (EqCond (pattern, subject)) :: normalized
+    | EqCondition (MatchCond (pattern, _)) ->
+        term_variables bound pattern, condition :: normalized
+    | RewriteCond (_, pattern) ->
+        term_variables bound pattern, condition :: normalized
+    | EqCondition (EqCond _ | MembershipCond _ | BoolCond _) ->
+        bound, condition :: normalized
+  in
+  List.fold_left step (term_variables [] left, []) conditions
+  |> fun (_, normalized) -> List.rev normalized
+
 let eq_conditions conditions =
   List.map
     (function
@@ -111,6 +140,7 @@ let lower_rule_body ?request_output index id params policy rule =
         @ List.map
             (fun condition -> EqCondition condition)
             (Param.translate_eq_conditions index quants)
+        |> normalize_conditions left
       in
       { input_terms
       ; head_conditions

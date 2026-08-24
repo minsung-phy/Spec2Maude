@@ -41,10 +41,6 @@ let qid text =
 let qid_of_atom atom =
   qid (Il.Print.string_of_atom atom)
 
-let qid_of_mixop index mixop =
-  qid (Prescan.mixop_name index mixop)
-
-
 (* Primitive operators *)
 
 let translate_unop = function
@@ -215,8 +211,7 @@ and translate_exp index exp =
       if Mixop.is_hole_only mixop then
         translate_exp index case
       else
-        app "_!_" [translate_exp index case; qid_of_mixop index mixop]
-        |> from_sequence_element exp.note
+        invalid_arg "named UncaseE is not supported"
 
   | OptE None ->
       Const "eps"

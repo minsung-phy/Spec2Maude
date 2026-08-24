@@ -261,7 +261,7 @@ let rec bind_pattern index bound exp subject error =
   match exp.it with
   | _ when known bound exp ->
       make bound
-        [EqCondition (MatchCond (Term.translate_exp index exp, subject))]
+        [EqCondition (EqCond (Term.translate_exp index exp, subject))]
   | CvtE (inner, source, target) ->
       begin match target, source with
       | (`NatT | `IntT | `RatT), (`NatT | `IntT | `RatT)
