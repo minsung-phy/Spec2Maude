@@ -53,16 +53,16 @@ let translate_eq_conditions index params =
 
 
 let unique_by key values =
-  let rec collect seen result = function
-    | [] -> List.rev result
-    | value :: values ->
-        let value_key = key value in
-        if List.mem value_key seen then
-          collect seen result values
-        else
-          collect (value_key :: seen) (value :: result) values
+  let seen = Hashtbl.create 16 in
+  let keep value =
+    let value_key = key value in
+    if Hashtbl.mem seen value_key then false
+    else begin
+      Hashtbl.add seen value_key ();
+      true
+    end
   in
-  collect [] [] values
+  List.filter keep values
 
 let apply_declaration index (parameter : Prescan.definition_parameter) =
   let sort, domain, codomain =

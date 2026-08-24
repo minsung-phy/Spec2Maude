@@ -3,11 +3,6 @@ open Il.Ast
 open Maude_il
 
 
-let frozen_all count =
-  match List.init count (( + ) 1) with
-  | [] -> []
-  | positions -> [Frozen positions]
-
 let component_types typ =
   match typ.it with
   | TupT fields -> List.map snd fields

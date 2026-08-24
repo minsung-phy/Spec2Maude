@@ -5,12 +5,15 @@ open Maude_il
 module StringSet = Set.Make (String)
 
 let deduplicate values =
-  let step (seen, result) value =
-    if List.mem value seen then seen, result
-    else value :: seen, value :: result
+  let seen = Hashtbl.create 32 in
+  let keep value =
+    if Hashtbl.mem seen value then false
+    else begin
+      Hashtbl.add seen value ();
+      true
+    end
   in
-  List.fold_left step ([], []) values
-  |> fun (_, result) -> List.rev result
+  List.filter keep values
 
 let deduplicate_conditions = function
   | Cmb (term, sort, conditions) ->
