@@ -6,11 +6,11 @@ let equation left right = function
   | [] -> Eq (left, right, [])
   | conditions -> Ceq (left, right, conditions, [])
 
-let parameter_names params =
-  List.filter_map
-    (fun (param : param) ->
-      match param.it with ExpP (id, _) -> Some id.it | _ -> None)
-    params
+let target_names params args =
+  if args = [] then
+    Il.Free.(bound_params params).varid |> Il.Free.Set.elements
+  else
+    Frontend.Det.(det_list det_arg args).varid |> Il.Free.Set.elements
 
 let payload_names (typ : typ) =
   match typ.it with
@@ -51,10 +51,10 @@ let translate_struct_field index bound (atom, (typ, quants, prems), _hints) =
   | [(value, _, type_conditions)] ->
       let field = Const ("'" ^ Il.Print.string_of_atom atom) in
       let item = App ("item", [field; value]) in
-      let bound = bound @ parameter_names quants @ payload_names typ in
+      let bound = bound @ payload_names typ in
       let conditions =
-        type_conditions @ Param.translate_eq_conditions index quants
-        @ Prem.translate_eq_conditions index ~bound prems in
+        type_conditions @ Prem.translate_eq_conditions index ~bound prems
+        @ Param.translate_eq_conditions index quants in
       (item, conditions)
   | _ -> invalid_arg "a StructT field must contain exactly one value"
 
@@ -67,7 +67,7 @@ let translate_struct index id params quants args fields =
     fields
     |> List.map
          (translate_struct_field index
-            (parameter_names params @ parameter_names quants))
+            (target_names params args))
   in
 
   let record =
@@ -141,10 +141,10 @@ let translate_constructor index target case_conditions mixop typ =
 
 let translate_typcase index target instance_conditions bound
     (mixop, (typ, quants, prems), _hints) =
-  let bound = bound @ parameter_names quants @ payload_names typ in
+  let bound = bound @ payload_names typ in
   let case_conditions =
-    instance_conditions @ Param.translate_eq_conditions index quants
-    @ Prem.translate_eq_conditions index ~bound prems
+    Prem.translate_eq_conditions index ~bound prems
+    @ Param.translate_eq_conditions index quants @ instance_conditions
   in
   if Mixop.is_hole_only mixop then
     translate_union index target case_conditions typ
@@ -153,7 +153,7 @@ let translate_typcase index target instance_conditions bound
 let translate_variant index id params quants args cases =
   let target = translate_target index id params args in
   let instance_conditions = Param.translate_eq_conditions index quants in
-  let bound = parameter_names params @ parameter_names quants in
+  let bound = target_names params args in
   cases
   |> List.concat_map (translate_typcase index target instance_conditions bound)
 

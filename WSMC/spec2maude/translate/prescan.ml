@@ -3,7 +3,15 @@ open Il.Ast
 open Maude_il
 
 
-type capture = id * typ
+type definition_parameter =
+  { id : id
+  ; params : param list
+  ; result : typ
+  }
+
+type capture =
+  | VariableCapture of id * typ
+  | DefinitionCapture of definition_parameter
 
 type iteration_owner =
   | RelationOwner of string
@@ -34,12 +42,6 @@ type premise_iteration =
   ; body : prem
   ; iterexp : iterexp
   ; captures : capture list
-  }
-
-type definition_parameter =
-  { id : id
-  ; params : param list
-  ; result : typ
   }
 
 type definition_application =
@@ -254,21 +256,39 @@ let rec remove_id name = function
   | id :: ids when id = name -> ids
   | id :: ids -> id :: remove_id name ids
 
-let capture_variables free body iterexp =
+let capture_id = function
+  | VariableCapture (id, _) -> id
+  | DefinitionCapture parameter -> parameter.id
+
+let capture_variables definition_calls free body iterexp =
   let bound = ref (List.map (fun id -> id.it) (bound_ids iterexp)) in
   let captures = ref [] in
-  let add id typ =
-    if Il.Free.Set.mem id.it free
+  let captured id =
+    List.exists (fun capture -> (capture_id capture).it = id.it) !captures
+  in
+  let add_variable id typ =
+    if Il.Free.Set.mem id.it free.Il.Free.varid
        && not (List.mem id.it !bound)
-       && not (List.exists (fun (captured, _) -> captured.it = id.it) !captures)
-    then captures := (id, typ) :: !captures
+       && not (captured id)
+    then captures := VariableCapture (id, typ) :: !captures
+  in
+  let add_definition exp =
+    match
+      List.find_opt (fun (call, _) -> call == exp) definition_calls
+    with
+    | Some (_, parameter)
+      when Il.Free.Set.mem parameter.id.it free.Il.Free.defid
+           && not (captured parameter.id) ->
+        captures := DefinitionCapture parameter :: !captures
+    | Some _ | None -> ()
   in
   let module Visitor = Il.Iter.Make (struct
     include Il.Iter.Skip
 
     let visit_exp exp =
       match exp.it with
-      | VarE id -> add id exp.note
+      | VarE id -> add_variable id exp.note
+      | CallE _ -> add_definition exp
       | _ -> ()
 
     let scope_enter id _typ =
@@ -284,11 +304,13 @@ let capture_variables free body iterexp =
   end;
   List.rev !captures
 
-let capture_exp_variables body iterexp =
-  capture_variables Il.Free.(free_exp body).varid (ExpBody body) iterexp
+let capture_exp_variables definition_calls body iterexp =
+  capture_variables definition_calls Il.Free.(free_exp body)
+    (ExpBody body) iterexp
 
-let capture_premise_variables body iterexp =
-  capture_variables Il.Free.(free_prem body).varid (PremiseBody body) iterexp
+let capture_premise_variables definition_calls body iterexp =
+  capture_variables definition_calls Il.Free.(free_prem body)
+    (PremiseBody body) iterexp
 
 
 let rec collect_hints hints = function
@@ -839,7 +861,7 @@ let scan script =
       ; owner
       ; body
       ; iterexp
-      ; captures = capture_exp_variables body iterexp
+      ; captures = capture_exp_variables !definition_calls body iterexp
       }
       :: !iterations
   in
@@ -853,7 +875,7 @@ let scan script =
       ; premise
       ; body
       ; iterexp
-      ; captures = capture_premise_variables body iterexp
+      ; captures = capture_premise_variables !definition_calls body iterexp
       }
       :: !premise_iterations
   in
