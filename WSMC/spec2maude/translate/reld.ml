@@ -202,15 +202,6 @@ let complement_conditions index id params inputs predecessors =
            )))
     predecessors
 
-let rec explicit_bool_conditions = function
-  | EqCondition (BoolCond (App ("_/\\_", [left; right]))) ->
-      explicit_bool_conditions (EqCondition (BoolCond left))
-      @ explicit_bool_conditions (EqCondition (BoolCond right))
-  | EqCondition (BoolCond term) ->
-      [EqCondition (EqCond (term, Const "true"))]
-  | (EqCondition (EqCond _ | MatchCond _ | MembershipCond _)
-    | RewriteCond _) as condition -> [condition]
-
 let lower_execution_rule ?request_output index id params policy
     previous ordinal rule =
   let prems =
@@ -241,9 +232,7 @@ let lower_execution_rule ?request_output index id params policy
   ; right = body.right
   ; conditions =
       complement_conditions index id params body.input_terms predecessors
-      @ (if body.otherwise then
-           List.concat_map explicit_bool_conditions body.conditions
-         else body.conditions)
+      @ body.conditions
   ; predecessors = List.map (fun rule -> rule.ordinal) predecessors
   }
 
@@ -254,7 +243,6 @@ let execution_statement rule =
 
 let helper_conditions id rule =
   rule.conditions
-  |> List.concat_map explicit_bool_conditions
   |> List.map
        (function
          | EqCondition condition -> condition

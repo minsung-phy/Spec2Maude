@@ -13,11 +13,10 @@ fmod DSL-PRETYPE is
   protecting FLOAT .
   protecting STRING .
 
-  sorts SpectecTerminals SpectecTypes .
+  sort SpectecTerminals .
 
   subsorts Nat Int < SpectecTerminal .
   subsort SpectecTerminal < SpectecTerminals .
-  subsort SpectecType < SpectecTypes .
 
   ops bool nat int rat real text : -> SpectecType [ctor] .
 

@@ -48,22 +48,21 @@ let qid_of_mixop index mixop =
 (* Primitive operators *)
 
 let translate_unop = function
-  | `NotOp -> "~_"
+  | `NotOp -> "not_"
   | `PlusOp -> "+_"
   | `MinusOp -> "-_"
 
 let translate_binop op optyp =
   match op, optyp with
-  | `AndOp, `BoolT -> "_/\\_"
-  | `OrOp, `BoolT -> "_\\/_"
-  | `ImplOp, `BoolT -> "_=>_"
-  | `EquivOp, `BoolT -> "_<=>_"
+  | `AndOp, `BoolT -> "_and_"
+  | `OrOp, `BoolT -> "_or_"
+  | `ImplOp, `BoolT -> "_implies_"
+  | `EquivOp, `BoolT -> "_==_"
   | `AddOp, #Xl.Num.typ -> "_+_"
   | `SubOp, #Xl.Num.typ -> "_-_"
   | `MulOp, #Xl.Num.typ -> "_*_"
   | `DivOp, #Xl.Num.typ -> "_/_"
-  | `ModOp, `NatT -> "_\\_"
-  | `ModOp, `IntT -> "int-rem"
+  | `ModOp, (`NatT | `IntT) -> "_rem_"
   | `PowOp, #Xl.Num.typ -> "_^_"
   | _ -> invalid_arg "malformed BinE operator annotation"
 
@@ -323,7 +322,7 @@ and translate_bool index exp =
       Const (string_of_bool value)
 
   | UnE (`NotOp, _, inner) ->
-      app "~_" [translate_bool index inner]
+      app "not_" [translate_bool index inner]
 
   | BinE (`ImplOp, `BoolT, left, right) ->
       app "_implies_" [translate_bool index left; translate_bool index right]
