@@ -40,11 +40,19 @@ let translate_conditions translate_count value element_type iter =
 
 let translate_captures index captures =
   captures
-  |> List.map (fun (id, typ) -> Prescan.source_variable index id typ)
+  |> List.map (function
+       | Prescan.VariableCapture (id, typ) ->
+           Prescan.source_variable index id typ
+       | Prescan.DefinitionCapture parameter ->
+           Prescan.definition_variable index parameter)
 
-let capture_variables index body iterexp =
-  Prescan.capture_exp_variables body iterexp
-  |> translate_captures index
+let captures index body =
+  match Prescan.iteration index body with
+  | Some iteration -> iteration.Prescan.captures
+  | None -> invalid_arg "IterE is missing from the prescan index"
+
+let capture_variables index body =
+  captures index body |> translate_captures index
 
 let term_of_variable (variable : variable) =
   Var variable
@@ -52,9 +60,8 @@ let term_of_variable (variable : variable) =
 let terms_of_variables variables =
   List.map term_of_variable variables
 
-let capture_terms index body iter generators =
-  capture_variables index body (iter, generators)
-  |> terms_of_variables
+let capture_terms index body =
+  capture_variables index body |> terms_of_variables
 
 
 (* IterE terms *)
@@ -77,12 +84,12 @@ let translate_term index translate_exp body (iter, generators) =
   | (Opt | List | List1), [] ->
       invalid_arg "IterE with Opt, List, or List1 requires a generator"
   | ListN _, _ ->
-      let captures = capture_terms index body iter generators in
+      let captures = capture_terms index body in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
       app (Prescan.iteration_name index body)
         (captures @ controls translate_exp iter @ sources)
   | (Opt | List | List1), _ :: _ ->
-      let captures = capture_terms index body iter generators in
+      let captures = capture_terms index body in
       let sources = List.map (fun (_, source) -> translate_exp source) generators in
       app (Prescan.iteration_name index body) (captures @ sources)
 
@@ -208,7 +215,9 @@ let translate_identity_pattern translate_pattern body (iter, generators) =
 let projector_local_bound captures iter =
   let bound =
     List.fold_left
-      (fun bound (id, _) -> Il.Free.Set.add id.it bound)
+      (fun bound -> function
+        | Prescan.VariableCapture (id, _) -> Il.Free.Set.add id.it bound
+        | Prescan.DefinitionCapture _ -> bound)
       Il.Free.Set.empty captures
   in
   let bound =
@@ -436,8 +445,8 @@ let identity_cardinality translate_exp known subject = function
   | ListN _ -> []
 
 let translate_pattern index translate_source_pattern translate_exp known is_bound
-    can_bind_body body ((iter, generators) as iterexp) subject =
-  let captures = Prescan.capture_exp_variables body iterexp in
+    can_bind_body body (iter, generators) subject =
+  let captures = captures index body in
   let count_variables =
     match iter with
     | ListN (count, _) when not (known count) ->
@@ -446,8 +455,10 @@ let translate_pattern index translate_source_pattern translate_exp known is_boun
   in
   let captures_ready () =
     List.for_all
-      (fun (id, _) ->
-        is_bound id.it || Il.Free.Set.mem id.it count_variables)
+      (function
+        | Prescan.VariableCapture (id, _) ->
+            is_bound id.it || Il.Free.Set.mem id.it count_variables
+        | Prescan.DefinitionCapture _ -> true)
       captures
   in
   match
@@ -478,7 +489,7 @@ let translate_pattern index translate_source_pattern translate_exp known is_boun
           | Some (count, count_conditions) ->
               if not (captures_ready ()) then
                 invalid_arg "IterE pattern has an unbound capture";
-              let captures = capture_terms index body iter generators in
+              let captures = capture_terms index body in
               let controls =
                 match iter with
                 | Opt | List | List1 -> []
@@ -719,7 +730,11 @@ let premise_local_names ?without iteration =
     | ListN (_, Some id) -> [id.it]
     | Opt | List | List1 | ListN (_, None) -> []
   in
-  List.map (fun (id, _) -> id.it) iteration.Prescan.captures
+  List.filter_map
+    (function
+      | Prescan.VariableCapture (id, _) -> Some id.it
+      | Prescan.DefinitionCapture _ -> None)
+    iteration.Prescan.captures
   @ indexes
   @ List.filter_map
       (fun (position, (id, _)) ->

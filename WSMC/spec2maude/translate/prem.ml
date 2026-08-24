@@ -705,7 +705,10 @@ let translate_barrier index request_output bound prem =
       in
       if not
            (List.for_all
-              (fun (id, _) -> Il.Free.Set.mem id.it bound)
+              (function
+                | Prescan.VariableCapture (id, _) ->
+                    Il.Free.Set.mem id.it bound
+                | Prescan.DefinitionCapture _ -> true)
               iteration.Prescan.captures)
       then invalid_arg "IterPr has an unbound capture";
       begin match iter with
