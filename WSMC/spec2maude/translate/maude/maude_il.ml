@@ -59,6 +59,11 @@ type op_decl =
   ; attrs : op_attr list
   }
 
+let frozen_all count =
+  match List.init count (( + ) 1) with
+  | [] -> []
+  | positions -> [Frozen positions]
+
 
 (* Conditions for equations and memberships *)
 
@@ -178,13 +183,3 @@ type modul =
   ; imports : import list
   ; statements : statement list
   }
-
-
-(* Translation result *)
-
-type t = statement list
-
-let empty = []
-
-let concat results =
-  List.concat results

@@ -18,11 +18,6 @@ let translate_decl index id params result_typ =
     ; attrs = []
     }
 
-let frozen_all count =
-  match List.init count (( + ) 1) with
-  | [] -> []
-  | positions -> [Frozen positions]
-
 let translate_request_header index id params result_typ =
   let result_sort = Term.translate_sort index result_typ in
   let request_sort = Prescan.rewrite_sort index id in
