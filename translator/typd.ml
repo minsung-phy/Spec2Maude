@@ -29,15 +29,19 @@ let translate_target index id params args =
   in App (Prescan.typ_name index id, terms)
 
 let translate_alias index id params quants args typ =
-  let value =
-    Var (generated_variable "VALUE" (Term.translate_sort index typ))
-  in
+  let sort = Term.translate_sort index typ in
+  let value = Var (generated_variable "VALUE" sort) in
   let target = translate_target index id params args in
   let source = Term.translate_typ index typ in
   let left = App ("typecheck", [value; target]) in
   let right = App ("typecheck", [value; source]) in
   let conditions = Param.translate_eq_conditions index quants in
-  [equation left right conditions]
+  let direct = equation left right conditions in
+  if sort = "SpectecTerminals" then
+    let boxed = App ("typecheck", [App ("seq", [value]); target]) in
+    [equation boxed right conditions; direct]
+  else
+    [direct]
 
 (* StructT *)
 let join_struct_items = function
@@ -98,7 +102,7 @@ let transparent_payload index typ =
     | TupT [_], [value] -> value
     | TupT fields, values ->
         List.map2
-          (fun (_, typ) value -> Term.as_sequence_element typ value)
+          (fun (_, typ) value -> Term.as_sequence_element index typ value)
           fields values
         |> Term.sequence
         |> fun values -> App ("tuple", [values])

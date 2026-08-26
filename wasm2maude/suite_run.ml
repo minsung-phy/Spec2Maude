@@ -123,8 +123,13 @@ let execute ~maude ~timeout harness output =
   Fun.protect
     ~finally:(fun () -> Unix.close fd)
     (fun () ->
-      let argv = [|maude; "-no-banner"; harness|] in
-      let pid = Unix.create_process maude argv Unix.stdin fd fd in
+      let shell = "/bin/sh" in
+      let argv =
+        [|shell; "-c";
+          "ulimit -s unlimited 2>/dev/null || ulimit -s 65520 2>/dev/null || true; exec \"$@\"";
+          "spec2maude-maude"; maude; "-no-banner"; harness|]
+      in
+      let pid = Unix.create_process shell argv Unix.stdin fd fd in
       wait pid (Unix.gettimeofday () +. timeout))
 
 let ensure_directory path =

@@ -1,6 +1,6 @@
 open Wasm
 
-module T = Maude_term
+module T = Spectec_term
 
 let atom = T.atom
 let app = T.app
@@ -17,7 +17,10 @@ let u32 n = app "uN.wrap" [i32_nat n]
 let u64 n = app "uN.wrap" [i64_nat n]
 let idx x = u32 x.Source.it
 let list f xs = app "list.wrap" [seq (List.map f xs)]
-let option f = function None -> seq [] | Some x -> f x
+let present term = app "_?" [term]
+let option f = function
+  | None -> seq []
+  | Some x -> present (f x)
 
 type lane_shape = I8x16 | I16x8 | I32x4 | I64x2 | F32x4 | F64x2
 
@@ -92,15 +95,15 @@ and vectype Types.V128T = atom "vectype.v128"
 
 and null = function
   | Types.NoNull -> seq []
-  | Types.Null -> atom "null.null"
+  | Types.Null -> present (atom "null.null")
 
 and mut = function
   | Types.Cons -> seq []
-  | Types.Var -> atom "mut.mut"
+  | Types.Var -> present (atom "mut.mut")
 
 and final = function
   | Types.NoFinal -> seq []
-  | Types.Final -> atom "final.final"
+  | Types.Final -> present (atom "final.final")
 
 and typeuse source at = function
   | Types.Idx x -> app "idx" [u32 x]
@@ -158,7 +161,7 @@ and rectype source at (Types.RecT subs) =
 
 and limits {Types.min; max} =
   app "limits.sym-sym-sym"
-    [u64 min; (match max with None -> seq [] | Some n -> u64 n)]
+    [u64 min; option u64 max]
 
 and globaltype source at (Types.GlobalT (m, t)) =
   app "globaltype.wrap" [mut m; valtype source at t]
@@ -222,18 +225,20 @@ and vector_dot_add_input_shape source at = function
   | I32x4 -> shape I8x16
   | _ -> unsupported source at "vector dot-add operation has no valid input shape"
 
-and vloadop = function
-  | None -> seq []
-  | Some (_, Pack.ExtLane (pack, sign)) ->
-      let size, lanes =
-        match pack with
-        | Pack.Pack8x8 -> packsize Pack.Pack8, 8
-        | Pack.Pack16x4 -> packsize Pack.Pack16, 4
-        | Pack.Pack32x2 -> packsize Pack.Pack32, 2
-      in
-      app "vloadop.shape-x-sym" [size; nat lanes; sx sign]
-  | Some (size, Pack.ExtSplat) -> app "vloadop.splat" [packsize size]
-  | Some (size, Pack.ExtZero) -> app "vloadop.zero" [packsize size]
+and vloadop op =
+  let encode = function
+    | _, Pack.ExtLane (pack, sign) ->
+        let size, lanes =
+          match pack with
+          | Pack.Pack8x8 -> packsize Pack.Pack8, 8
+          | Pack.Pack16x4 -> packsize Pack.Pack16, 4
+          | Pack.Pack32x2 -> packsize Pack.Pack32, 2
+        in
+        app "vloadop.shape-x-sym" [size; nat lanes; sx sign]
+    | size, Pack.ExtSplat -> app "vloadop.splat" [packsize size]
+    | size, Pack.ExtZero -> app "vloadop.zero" [packsize size]
+  in
+  option encode op
 
 and int_vunop (op : Ast.V128Op.iunop) = match op with
   | Ast.V128Op.Abs -> atom "vunop.abs"
@@ -393,15 +398,18 @@ and vector_convert source at op =
   | V128.I32x4 (Ast.V128Op.TruncSatF32x4 sign) ->
       convert (shape F32x4) (app "vcvtop.trunc-sat" [sx sign; seq []])
   | V128.I32x4 (Ast.V128Op.TruncSatZeroF64x2 sign) ->
-      convert (shape F64x2) (app "vcvtop.trunc-sat" [sx sign; atom "zero.zero"])
+      convert (shape F64x2)
+        (app "vcvtop.trunc-sat" [sx sign; present (atom "zero.zero")])
   | V128.I32x4 (Ast.V128Op.RelaxedTruncF32x4 sign) ->
       convert (shape F32x4) (app "vcvtop.relaxed-trunc" [sx sign; seq []])
   | V128.I32x4 (Ast.V128Op.RelaxedTruncZeroF64x2 sign) ->
-      convert (shape F64x2) (app "vcvtop.relaxed-trunc" [sx sign; atom "zero.zero"])
+      convert (shape F64x2)
+        (app "vcvtop.relaxed-trunc" [sx sign; present (atom "zero.zero")])
   | V128.F32x4 (Ast.V128Op.ConvertI32x4 sign) ->
       convert (shape I32x4) (app "vcvtop.convert" [seq []; sx sign])
   | V128.F64x2 (Ast.V128Op.ConvertI32x4 sign) ->
-      convert (shape I32x4) (app "vcvtop.convert" [atom "half.low"; sx sign])
+      convert (shape I32x4)
+        (app "vcvtop.convert" [present (atom "half.low"); sx sign])
   | V128.F32x4 Ast.V128Op.DemoteZeroF64x2 ->
       convert (shape F64x2) (app "vcvtop.demote" [atom "zero.zero"])
   | V128.F64x2 Ast.V128Op.PromoteLowF32x4 ->
@@ -441,7 +449,7 @@ and vector_extract op =
   match op with
   | V128.I8x16 (Ast.V128Op.Extract (lane, sign))
   | V128.I16x8 (Ast.V128Op.Extract (lane, sign)) ->
-      app "instr.vextract-lane" [sh; sx sign; laneidx lane]
+      app "instr.vextract-lane" [sh; present (sx sign); laneidx lane]
   | V128.I32x4 (Ast.V128Op.Extract (lane, ()))
   | V128.I64x2 (Ast.V128Op.Extract (lane, ()))
   | V128.F32x4 (Ast.V128Op.Extract (lane, ()))
@@ -617,10 +625,9 @@ and const = function
   | Value.F64 n -> (numtype Types.F64T, f64 n)
 
 and blocktype source at = function
-  | Ast.VarBlockType x -> app "blocktype.idx" [idx x]
-  | Ast.ValBlockType None -> app "blocktype.result" [seq []]
-  | Ast.ValBlockType (Some t) ->
-      app "blocktype.result" [valtype source at t]
+  | Ast.VarBlockType x -> app "idx" [idx x]
+  | Ast.ValBlockType result ->
+      app "blocktype.result" [option (valtype source at) result]
 
 and typeidx x = app "idx" [idx x]
 
@@ -636,9 +643,13 @@ and instr source ({Source.it; at} : Ast.instr) =
   | Ast.Unreachable -> atom "instr.unreachable"
   | Ast.Nop -> atom "instr.nop"
   | Ast.Drop -> atom "instr.drop"
-  | Ast.Select None -> app "instr.select" [seq []]
-  | Ast.Select (Some ts) ->
-      app "instr.select" [app "seq" [seq (List.map (valtype source at) ts)]]
+  | Ast.Select types ->
+      let types =
+        option
+          (fun ts -> app "seq" [seq (List.map (valtype source at) ts)])
+          types
+      in
+      app "instr.select" [types]
   | Ast.Block (bt, body) ->
       app "instr.block" [blocktype source at bt; seq (List.map (instr source) body)]
   | Ast.Loop (bt, body) ->
@@ -798,7 +809,7 @@ and instr source ({Source.it; at} : Ast.instr) =
   | Ast.VecReplace (Value.V128 op) -> vector_replace op
 
 let name chars =
-  app "name.wrap" [seq (List.map (fun c -> app "char.wrap" [nat c]) chars)]
+  seq (List.map nat chars)
 
 let num_value value =
   let typ, value = const value in
@@ -838,14 +849,14 @@ let func source ({Source.it = Ast.Func (typ, locals, body); _} : Ast.func) =
   app "func.func" [idx typ; seq (List.map (local source) locals); expr source body]
 
 let mode source = function
-  | {Source.it = Ast.Passive; _} -> atom "datamode.passive"
+  | {Source.it = Ast.Passive; _} -> atom "passive"
   | {Source.it = Ast.Active (x, init); _} ->
       app "datamode.active" [idx x; expr source init.it]
   | {Source.it = Ast.Declarative; at} ->
       unsupported source at "declarative mode is valid only for element segments"
 
 let elem_mode source = function
-  | {Source.it = Ast.Passive; _} -> atom "elemmode.passive"
+  | {Source.it = Ast.Passive; _} -> atom "passive"
   | {Source.it = Ast.Declarative; _} -> atom "elemmode.declare"
   | {Source.it = Ast.Active (x, init); _} ->
       app "elemmode.active" [idx x; expr source init.it]
@@ -891,7 +902,7 @@ let module_ ({Frontend.source; ast; _} : Frontend.module_) =
       list (func source) m.funcs;
       list (data source) m.datas;
       list (elem source) m.elems;
-      (match m.start with None -> seq [] | Some s -> start s);
+      option start m.start;
       list export m.exports ]
 
 type check = {label : string; term : T.t}

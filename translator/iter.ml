@@ -10,10 +10,10 @@ let rec sequence = function
   | [term] -> term
   | term :: terms -> app "_ _" [term; sequence terms]
 
-let as_sequence_element typ term =
-  match typ.it with
-  | IterT _ -> app "seq" [term]
-  | _ -> term
+let as_sequence_element index typ term =
+  if Prescan.sort_of_typ index typ = "SpectecTerminals"
+  then app "seq" [term]
+  else term
 
 
 (* Type iteration *)
@@ -79,7 +79,7 @@ let translate_term index translate_exp body (iter, generators) =
   | ListN (count, None), [] ->
       app "repeatSeq"
         [ translate_exp count
-        ; translate_exp body |> as_sequence_element body.note
+        ; translate_exp body |> as_sequence_element index body.note
         ]
   | (Opt | List | List1), [] ->
       invalid_arg "IterE with Opt, List, or List1 requires a generator"
@@ -138,29 +138,30 @@ let generator_element (_, source) =
   | IterT (element, _) -> element
   | _ -> invalid_arg "iteration generator must have an iteration type"
 
-let source_head generator head =
+let source_head index generator head =
   term_of_variable head
-  |> as_sequence_element (generator_element generator)
+  |> as_sequence_element index (generator_element generator)
 
-let source_arguments iter generators heads tails =
+let source_arguments index iter generators heads tails =
   match iter with
   | Opt ->
       List.map2
-        (fun generator head -> app "_?" [source_head generator head])
+        (fun generator head -> app "_?" [source_head index generator head])
         generators heads
   | List | List1 | ListN _ ->
       List.map2
         (fun (generator, head) tail ->
-          app "_ _" [source_head generator head; term_of_variable tail])
+          app "_ _"
+            [source_head index generator head; term_of_variable tail])
         (List.combine generators heads) tails
 
-let step_arguments iter captures count index generators heads tails =
+let step_arguments source_index iter captures count index generators heads tails =
   terms_of_variables captures
   @ (match count with
      | None -> []
      | Some count -> [app "s" [term_of_variable count]])
   @ terms_of_variables (Option.to_list index)
-  @ source_arguments iter generators heads tails
+  @ source_arguments source_index iter generators heads tails
 
 let next_arguments captures count index tails =
   terms_of_variables captures
@@ -248,12 +249,13 @@ let projector_domain captures count index =
       (Option.to_list index)
   @ ["SpectecTerminals"]
 
-let column_term generators columns =
+let column_term index generators columns =
   match generators, columns with
   | [_], [column] -> column
   | _, _ ->
       List.map2
-        (fun (_, source) column -> as_sequence_element source.note column)
+        (fun (_, source) column ->
+          as_sequence_element index source.note column)
         generators columns
       |> sequence
       |> fun columns -> app "tuple" [columns]
@@ -303,14 +305,17 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     let call name count index subject =
       app name (projector_arguments captures count index subject)
     in
-    let empty = column_term generators (List.map (fun _ -> Const "eps") generators) in
-    let columns = column_term generators (terms_of_variables tails) in
+    let empty =
+      column_term index generators (List.map (fun _ -> Const "eps") generators)
+    in
+    let columns = column_term index generators (terms_of_variables tails) in
     let next_columns =
       List.map2
         (fun (generator, head) tail ->
-          app "_ _" [source_head generator head; term_of_variable tail])
+          app "_ _"
+            [source_head index generator head; term_of_variable tail])
         (List.combine generators heads) tails
-      |> column_term generators
+      |> column_term index generators
     in
     let body_pattern, body_guards =
       match translate_pattern body with
@@ -339,7 +344,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
           in
           term_of_variable value, guards
     in
-    let element = as_sequence_element body.note body_pattern in
+    let element = as_sequence_element index body.note body_pattern in
     let subject =
       app "_ _" [element; term_of_variable subject_tail]
     in
@@ -362,10 +367,10 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
         ; Eq (call name None None (Const "eps"), empty, [])
         ; let left = call name None None (app "_?" [element]) in
           let right =
-            column_term generators
+            column_term index generators
               (List.map2
                  (fun generator head ->
-                   app "_?" [source_head generator head])
+                   app "_?" [source_head index generator head])
                  generators heads)
           in
           if body_guards = [] then Eq (left, right, [])
@@ -506,7 +511,7 @@ let translate_pattern index translate_source_pattern translate_exp known is_boun
               Some
                 ( count_conditions
                   @ (MatchCond
-                       (column_term generators source_patterns, projected)
+                       (column_term index generators source_patterns, projected)
                      :: source_guards)
                   @ [EqCond (forward, subject)])
           end
@@ -543,7 +548,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
           }
       in
       let body_term =
-        translate_exp body |> as_sequence_element body.note
+        translate_exp body |> as_sequence_element index body.note
       in
       let step_result =
         match iter with
@@ -558,7 +563,8 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
       let step =
         Eq
           ( call
-              (step_arguments iter captures count iter_index generators heads tails)
+              (step_arguments index iter captures count iter_index generators
+                 heads tails)
           , step_result
           , []
           )
@@ -579,7 +585,8 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
           let first =
             Eq
               ( call
-                  (step_arguments List captures None None generators heads tails)
+                  (step_arguments index List captures None None generators heads
+                     tails)
               , app "_ _"
                   [ body_term
                   ; tail_call (terms_of_variables (captures @ tails))
@@ -600,7 +607,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
             Eq
               ( tail_call
                   (terms_of_variables captures
-                   @ source_arguments List generators heads tails)
+                   @ source_arguments index List generators heads tails)
               , app "_ _"
                   [ body_term
                   ; tail_call (terms_of_variables (captures @ tails))
@@ -817,12 +824,14 @@ let translate_premise_statements index translate_body
   let base count index =
     Eq (call name (arguments count index empty_sources), empty_result, [])
   in
-  let source_patterns iter = source_arguments iter generators heads tails in
+  let source_patterns iter =
+    source_arguments index iter generators heads tails
+  in
   let extend result =
     match output with
     | None -> result
     | Some (generator, head) ->
-        app "_ _" [source_head generator head; result]
+        app "_ _" [source_head index generator head; result]
   in
   let step name iter count index next_count next_index next_name =
     let left = call name (arguments count index (source_patterns iter)) in
@@ -838,7 +847,7 @@ let translate_premise_statements index translate_body
         match output with
         | None -> Const "true"
         | Some (generator, head) ->
-            app "_?" [source_head generator head]
+            app "_?" [source_head index generator head]
       in
       let single =
         equation

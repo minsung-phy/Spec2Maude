@@ -97,15 +97,15 @@ let rec record_items = function
   | [item] -> item
   | item :: items -> app "_;_" [item; record_items items]
 
-let as_sequence_element typ term =
-  match typ.it with
-  | IterT _ -> app "seq" [term]
-  | _ -> term
+let as_sequence_element index typ term =
+  if Prescan.sort_of_typ index typ = "SpectecTerminals"
+  then app "seq" [term]
+  else term
 
-let from_sequence_element typ term =
-  match typ.it with
-  | IterT _ -> app "unseq" [term]
-  | _ -> term
+let from_sequence_element index typ term =
+  if Prescan.sort_of_typ index typ = "SpectecTerminals"
+  then app "unseq" [term]
+  else term
 
 (* Recursive translation *)
 
@@ -142,6 +142,20 @@ and translate_arg index arg =
       end
   | GramA _ ->
       invalid_arg "GramA is not translated"
+
+and translate_check_typ index typ =
+  match typ.it with
+  | IterT (element, Opt) ->
+      app "iterOpt" [translate_check_typ index element]
+  | IterT (element, List) ->
+      app "iterList" [translate_check_typ index element]
+  | IterT (element, List1) ->
+      app "iterList1" [translate_check_typ index element]
+  | IterT (element, ListN (count, _)) ->
+      app "iterListN"
+        [translate_check_typ index element; translate_exp index count]
+  | VarT _ | BoolT | NumT _ | TextT | TupT _ ->
+      translate_typ index typ
 
 and translate_exp index exp =
   match exp.it with
@@ -180,7 +194,7 @@ and translate_exp index exp =
   | TupE exps ->
       exps
       |> List.map (fun exp ->
-           translate_exp index exp |> as_sequence_element exp.note)
+           translate_exp index exp |> as_sequence_element index exp.note)
       |> sequence
       |> fun terms -> app "tuple" [terms]
 
@@ -191,7 +205,7 @@ and translate_exp index exp =
   | ProjE (tuple, field_index) ->
       app "_._"
         [translate_exp index tuple; Const (string_of_int field_index)]
-      |> from_sequence_element exp.note
+      |> from_sequence_element index exp.note
 
   | CaseE (mixop, payload) ->
       if Mixop.is_hole_only mixop then
@@ -217,11 +231,12 @@ and translate_exp index exp =
       Const "eps"
 
   | OptE (Some inner) ->
-      app "_?" [translate_exp index inner |> as_sequence_element inner.note]
+      app "_?"
+        [translate_exp index inner |> as_sequence_element index inner.note]
 
   | TheE option ->
       app "_!" [translate_exp index option]
-      |> from_sequence_element exp.note
+      |> from_sequence_element index exp.note
 
   | StrE fields ->
       fields
@@ -234,12 +249,17 @@ and translate_exp index exp =
       app "_._" [translate_exp index record; qid_of_atom atom]
 
   | CompE (left, right) ->
-      app "_++_" [translate_exp index left; translate_exp index right]
+      let operator =
+        match Prescan.composition_kind index exp.note with
+        | Prescan.SequenceComposition -> "_++_"
+        | Prescan.RecordComposition -> "recordConcat"
+      in
+      app operator [translate_exp index left; translate_exp index right]
 
   | ListE exps ->
       exps
       |> List.map (fun exp ->
-           translate_exp index exp |> as_sequence_element exp.note)
+           translate_exp index exp |> as_sequence_element index exp.note)
       |> sequence
       |> fun terms -> app "`[_`]" [terms]
 
@@ -259,7 +279,7 @@ and translate_exp index exp =
   | IdxE (sequence, element_index) ->
       app "_`[_`]"
         [translate_exp index sequence; translate_exp index element_index]
-      |> from_sequence_element exp.note
+      |> from_sequence_element index exp.note
 
   | SliceE (sequence, start, length) ->
       app "_`[_:_`]"
@@ -351,7 +371,7 @@ and translate_select index base path =
         [ translate_select index base parent
         ; translate_exp index element_index
         ]
-      |> from_sequence_element path.note
+      |> from_sequence_element index path.note
 
   | SliceP (parent, start, length) ->
       app "_`[_:_`]"
@@ -443,7 +463,7 @@ let translate_typ_conditions index value typ =
       []
   | _, IterT (element_typ, iter) ->
       Iter.translate_conditions
-        (translate_exp index) value (translate_typ index element_typ) iter
+        (translate_exp index) value (translate_check_typ index element_typ) iter
   | _, _ ->
       [BoolCond (app "typecheck" [value; translate_typ index typ])]
 
