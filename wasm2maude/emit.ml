@@ -59,12 +59,12 @@ let run ~semantics ~export ~args ~steps m =
        \  op init : SpectecTerminal -> RunState [ctor frozen (1)] .\n\
        \  op exec : SpectecTerminal -> RunState [ctor frozen (1)] .\n\n\
        \  op inputModule : -> SpectecTerminal .\n\
-       \  op inputName : -> SpectecTerminal .\n\
+       \  op inputName : -> SpectecTerminals .\n\
        \  op inputArgs : -> SpectecTerminals .\n\
        \  op emptyStore : -> SpectecTerminal .\n\
-       \  op findFunc : SpectecTerminals SpectecTerminal ~> SpectecTerminal .\n\n\
-       \  vars C C2 S MI NAME OTHER ADDR XA : SpectecTerminal .\n\
-       \  vars LOCALS EXPORTS : SpectecTerminals .\n\n\
+       \  op findFunc : SpectecTerminals SpectecTerminals ~> SpectecTerminal .\n\n\
+       \  vars C C2 S MI ADDR XA : SpectecTerminal .\n\
+       \  vars NAME OTHER LOCALS EXPORTS : SpectecTerminals .\n\n\
        \  eq inputModule = %s .\n\
        \  eq inputName = %s .\n\
        \  eq inputArgs = %s .\n\
@@ -121,15 +121,15 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps m =
        \  op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .\n\
        \  op finished : SpectecTerminal SpectecTerminal -> ModelState [ctor] .\n\n\
        \  op inputModule : -> SpectecTerminal .\n\
-       \  op inputName : -> SpectecTerminal .\n\
+       \  op inputName : -> SpectecTerminals .\n\
        \  op inputArgs : -> SpectecTerminals .\n\
        \  op emptyStore : -> SpectecTerminal .\n\
        \  op expected : -> SpectecTerminal .\n\
        \  op rejected : -> SpectecTerminal .\n\
-       \  op findFunc : SpectecTerminals SpectecTerminal ~> SpectecTerminal .\n\
+       \  op findFunc : SpectecTerminals SpectecTerminals ~> SpectecTerminal .\n\
        \  op returned : SpectecTerminals -> Prop [ctor] .\n\n\
-       \  vars C S MI NAME OTHER ADDR XA VALUE RESULT : SpectecTerminal .\n\
-       \  vars LOCALS EXPORTS : SpectecTerminals .\n\
+       \  vars C S MI ADDR XA VALUE RESULT : SpectecTerminal .\n\
+       \  vars NAME OTHER LOCALS EXPORTS : SpectecTerminals .\n\
        \  var ST : ModelState .\n\
        \  var P : Prop .\n\n\
        \  eq inputModule = %s .\n\

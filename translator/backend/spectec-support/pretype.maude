@@ -19,6 +19,8 @@ fmod DSL-PRETYPE is
   subsort SpectecTerminal < SpectecTerminals .
 
   ops bool nat int rat real text : -> SpectecType [ctor] .
+  ops iterOpt iterList iterList1 : SpectecType -> SpectecType [ctor] .
+  op iterListN : SpectecType Nat -> SpectecType [ctor] .
 
   op bool : Bool -> SpectecTerminal [ctor] .
   op rat : Rat -> SpectecTerminal [ctor] .

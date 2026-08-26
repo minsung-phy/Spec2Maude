@@ -169,6 +169,50 @@ and case_sort env definitions seen (mixop, (typ, _, _), _) =
 let sort_of_typ index typ =
   representation_sort index.type_env index.type_definitions [] typ
 
+type composition_kind = SequenceComposition | RecordComposition
+
+let rec composition_kind_of_typ env definitions seen typ =
+  let typ = Il.Eval.reduce_typ env typ in
+  match typ.it with
+  | IterT _ -> SequenceComposition
+  | VarT (id, _) when not (List.mem id.it seen) ->
+      begin match List.assoc_opt id.it definitions with
+      | Some insts ->
+          let kinds =
+            List.map
+              (composition_kind_of_inst env definitions (id.it :: seen)) insts
+          in
+          begin match kinds with
+          | kind :: rest when List.for_all (( = ) kind) rest -> kind
+          | [] | _ -> invalid_arg "ambiguous CompE representation"
+          end
+      | None -> invalid_arg "unresolved CompE type"
+      end
+  | VarT _ -> invalid_arg "recursive CompE type"
+  | BoolT | NumT _ | TextT | TupT _ ->
+      invalid_arg "non-composable CompE type"
+
+and composition_kind_of_inst env definitions seen inst =
+  match inst.it with
+  | InstD (_, _, {it = AliasT typ; _}) ->
+      composition_kind_of_typ env definitions seen typ
+  | InstD (_, _, {it = StructT fields; _}) ->
+      if
+        List.for_all
+          (fun (_, (typ, _, _), _) ->
+            representation_sort env definitions seen typ =
+              "SpectecTerminals")
+          fields
+      then RecordComposition
+      else
+        invalid_arg
+          "record CompE with non-sequence fields is unsupported"
+  | InstD (_, _, {it = VariantT _; _}) ->
+      invalid_arg "variant CompE type"
+
+let composition_kind index typ =
+  composition_kind_of_typ index.type_env index.type_definitions [] typ
+
 let rec parameter_sort env definitions param =
   match param.it with
   | ExpP (_, typ) -> representation_sort env definitions [] typ

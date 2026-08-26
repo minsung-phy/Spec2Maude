@@ -17,10 +17,12 @@ fmod DSL-RECORD is
 
   op _._ : Record Qid -> SpectecTerminals .
   op _++_ : Record Record -> Record .
+  op recordConcat : SpectecTerminal SpectecTerminal ~> SpectecTerminal .
   op _[._=_] : Record Qid SpectecTerminals -> Record .
   op _[._=++_] : Record Qid SpectecTerminals -> Record .
 
   op composeItems : RecordItems RecordItems -> RecordItems .
+  op appendItems : RecordItems RecordItems -> RecordItems .
   op composeValues : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op setItem : RecordItems Qid SpectecTerminals -> RecordItems .
 
@@ -38,6 +40,13 @@ fmod DSL-RECORD is
   eq RECORD . FIELD = value(FIELD, RECORD) .
 
   eq {ITEMS} ++ {ITEMS2} = {composeItems(ITEMS, ITEMS2)} .
+  eq recordConcat({ITEMS}, {ITEMS2}) = {appendItems(ITEMS, ITEMS2)} .
+
+  eq appendItems(EMPTY, EMPTY) = EMPTY .
+  eq appendItems(item(FIELD, VALUE) ; ITEMS,
+                 item(FIELD, NEW-VALUE) ; ITEMS2)
+    = item(FIELD, VALUE NEW-VALUE)
+      ; appendItems(ITEMS, ITEMS2) .
 
   eq composeItems(EMPTY, EMPTY) = EMPTY .
   eq composeItems(item(FIELD, VALUE) ; ITEMS,

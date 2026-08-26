@@ -101,7 +101,7 @@ let rec translate_pattern index exp =
            { pattern with
              term =
                App
-                 ("_?", [Term.as_sequence_element inner.note pattern.term])
+                 ("_?", [Term.as_sequence_element index inner.note pattern.term])
            })
 
   | StrE fields ->
@@ -145,7 +145,7 @@ and translate_sequence_pattern index name exps =
        let terms =
          List.map2
            (fun exp pattern ->
-             Term.as_sequence_element exp.note pattern.term)
+             Term.as_sequence_element index exp.note pattern.term)
            exps patterns
        in
        { term = App (name, [Term.sequence terms])
@@ -158,7 +158,7 @@ and translate_list_pattern index exps =
        let terms =
          List.map2
            (fun exp pattern ->
-             Term.as_sequence_element exp.note pattern.term)
+             Term.as_sequence_element index exp.note pattern.term)
            exps patterns
        in
        {term = Term.sequence terms; guards = pattern_guards patterns})
@@ -354,7 +354,7 @@ and bind_structural_pattern index bound exp subject error =
       let subjects = pattern_subjects index "TUPLE-PART" exps in
       let represented =
         List.map2
-          (fun exp subject -> Term.as_sequence_element exp.note subject)
+          (fun exp subject -> Term.as_sequence_element index exp.note subject)
           exps subjects
         |> Term.sequence
         |> fun terms -> App ("tuple", [terms])
@@ -365,7 +365,7 @@ and bind_structural_pattern index bound exp subject error =
       let subjects = pattern_subjects index "LIST-PART" exps in
       let represented =
         List.map2
-          (fun exp subject -> Term.as_sequence_element exp.note subject)
+          (fun exp subject -> Term.as_sequence_element index exp.note subject)
           exps subjects
         |> Term.sequence
       in
@@ -381,7 +381,7 @@ and bind_structural_pattern index bound exp subject error =
   | OptE (Some inner) ->
       let inner_subject = pattern_subject index "OPTION-PART" inner in
       let represented =
-        App ("_?", [Term.as_sequence_element inner.note inner_subject])
+        App ("_?", [Term.as_sequence_element index inner.note inner_subject])
       in
       bind_pattern_parts index bound [inner] [inner_subject]
         [EqCondition (MatchCond (represented, subject))] error
@@ -474,13 +474,13 @@ let relation_call index id args exps =
       @ List.map (Term.translate_exp index) exps
     )
 
-let tuple exps terms =
+let tuple index exps terms =
   match exps, terms with
   | [], [] -> Const "eps"
   | [_], [term] -> term
   | _, _ ->
       List.map2
-        (fun exp term -> Term.as_sequence_element exp.note term)
+        (fun exp term -> Term.as_sequence_element index exp.note term)
         exps terms
       |> Term.sequence
       |> fun terms -> App ("tuple", [terms])
@@ -509,7 +509,8 @@ let translate_rulepr index bound id args mixop exp =
         make bound
           [EqCondition
              (EqCond
-                ( tuple outputs (List.map (Term.translate_exp index) outputs)
+                ( tuple index outputs
+                    (List.map (Term.translate_exp index) outputs)
                 , call
                 ))]
       else
@@ -517,12 +518,14 @@ let translate_rulepr index bound id args mixop exp =
         | Some patterns ->
             make (List.fold_left bind bound outputs)
               (EqCondition
-                 (MatchCond (tuple outputs (pattern_terms patterns), call))
+                 (MatchCond
+                    (tuple index outputs (pattern_terms patterns), call))
                :: List.concat_map rule_guards patterns)
         | None ->
             let subjects = output_subjects index outputs in
             bind_outputs index bound outputs subjects
-              [EqCondition (MatchCond (tuple outputs subjects, call))]
+              [EqCondition
+                 (MatchCond (tuple index outputs subjects, call))]
               "equation RulePr output is not a structural pattern"
         end
   | Prescan.Execution {input_count; _} ->
@@ -534,7 +537,7 @@ let translate_rulepr index bound id args mixop exp =
           make (List.fold_left bind bound outputs)
             (RewriteCond
                ( relation_call index id args inputs
-               , tuple outputs (pattern_terms patterns)
+               , tuple index outputs (pattern_terms patterns)
                )
              :: List.concat_map rule_guards patterns)
       | None ->
@@ -545,7 +548,8 @@ let translate_rulepr index bound id args mixop exp =
           in
           make binding.bound
             (RewriteCond
-               (relation_call index id args inputs, tuple outputs subjects)
+               (relation_call index id args inputs,
+                tuple index outputs subjects)
              :: binding.conditions)
       end
 
@@ -585,7 +589,9 @@ let translate_binding_membership index bound element collection =
   | IterT _, Some pattern ->
       let prefix = Var (generated_variable "MEMBER-PREFIX" "SpectecTerminals") in
       let suffix = Var (generated_variable "MEMBER-SUFFIX" "SpectecTerminals") in
-      let selected = Term.as_sequence_element element.note pattern.term in
+      let selected =
+        Term.as_sequence_element index element.note pattern.term
+      in
       let sequence = Term.sequence [prefix; selected; suffix] in
       Ready
         (make (bind bound element)

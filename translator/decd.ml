@@ -163,7 +163,7 @@ let choice_helper index id result_typ
       let result = generated_variable "CHOICE-RESULT" result_sort in
       let selected = Term.translate_exp index choice.element in
       let selected_head =
-        Term.as_sequence_element choice.element.note selected
+        Term.as_sequence_element index choice.element.note selected
       in
       [ OpDecl
           { name = choice.helper_name

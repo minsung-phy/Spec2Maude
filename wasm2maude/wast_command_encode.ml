@@ -1,4 +1,5 @@
 module T = Maude_term
+module S = Spectec_term
 
 let invoke_term (instance, name, args) =
   T.app "action.invoke"
@@ -28,12 +29,12 @@ let imports_term imports =
     imports (T.atom "imports.nil")
 
 let reference_term = function
-  | Wasm.Value.NullRef -> T.atom "ref.ref-null-addr"
+  | Wasm.Value.NullRef -> S.atom "ref.ref-null-addr"
   | Wasm.Script.HostRef address ->
-      T.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]
+      S.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]
   | Wasm.Extern.ExternRef (Wasm.Script.HostRef address) ->
-      T.app "ref.ref-extern"
-        [T.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]]
+      S.app "ref.ref-extern"
+        [S.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]]
   | _ -> invalid_arg "Wast_command_encode.reference_term"
 
 let lane_patterns_term exact lanes =

@@ -64,21 +64,59 @@ let variables_bound bound term =
   term_variables [] term
   |> List.for_all (fun variable -> List.exists (same_variable variable) bound)
 
-let normalize_conditions left conditions =
-  let step (bound, normalized) condition =
-    match condition with
-    | EqCondition (MatchCond (pattern, subject))
-      when variables_bound bound pattern ->
-        bound, EqCondition (EqCond (pattern, subject)) :: normalized
-    | EqCondition (MatchCond (pattern, _)) ->
-        term_variables bound pattern, condition :: normalized
-    | RewriteCond (_, pattern) ->
-        term_variables bound pattern, condition :: normalized
-    | EqCondition (EqCond _ | MembershipCond _ | BoolCond _) ->
-        bound, condition :: normalized
+let condition_ready bound = function
+  | EqCondition (EqCond (left, right)) ->
+      variables_bound bound left && variables_bound bound right
+  | EqCondition (MatchCond (_, subject)) ->
+      variables_bound bound subject
+  | EqCondition (MembershipCond (term, _))
+  | EqCondition (BoolCond term) ->
+      variables_bound bound term
+  | RewriteCond (call, _) ->
+      variables_bound bound call
+
+let take_ready select bound conditions =
+  let rec take prefix = function
+    | [] -> None
+    | condition :: rest when select condition && condition_ready bound condition ->
+        Some (condition, List.rev_append prefix rest)
+    | condition :: rest -> take (condition :: prefix) rest
   in
-  List.fold_left step (term_variables [] left, []) conditions
-  |> fun (_, normalized) -> List.rev normalized
+  take [] conditions
+
+let normalize_conditions left conditions =
+  let rec normalize bound normalized pending =
+    match pending with
+    | [] -> List.rev normalized
+    | _ ->
+        let selected =
+          match
+            take_ready
+              (function EqCondition _ -> true | RewriteCond _ -> false)
+              bound pending
+          with
+          | Some selected -> Some selected
+          | None -> take_ready (fun _ -> true) bound pending
+        in
+        begin match selected with
+        | None -> invalid_arg "rule conditions have unresolved dependencies"
+        | Some (condition, pending) ->
+            begin match condition with
+            | EqCondition (MatchCond (pattern, subject))
+              when variables_bound bound pattern ->
+                normalize bound
+                  (EqCondition (EqCond (pattern, subject)) :: normalized)
+                  pending
+            | EqCondition (MatchCond (pattern, _))
+            | RewriteCond (_, pattern) ->
+                normalize (term_variables bound pattern)
+                  (condition :: normalized) pending
+            | EqCondition (EqCond _ | MembershipCond _ | BoolCond _) ->
+                normalize bound (condition :: normalized) pending
+            end
+        end
+  in
+  normalize (term_variables [] left) [] conditions
 
 let eq_conditions conditions =
   List.map
@@ -140,7 +178,9 @@ let lower_rule_body ?request_output index id params policy rule =
       { input_terms
       ; head_conditions
       ; left
-      ; right = Prem.tuple outputs (List.map (Term.translate_exp index) outputs)
+      ; right =
+          Prem.tuple index outputs
+            (List.map (Term.translate_exp index) outputs)
       ; conditions
       ; otherwise = premises.otherwise
       }

@@ -106,19 +106,16 @@ let add_shared host export =
   let binding address = {export; address} in
   match Wast_host.kind export with
   | Wast_host.Memory _ ->
-      {host with memories = binding (List.length host.memories) :: host.memories}
+      let binding = binding (List.length host.memories) in
+      binding, {host with memories = binding :: host.memories}
   | Wast_host.Table _ ->
-      {host with tables = binding (List.length host.tables) :: host.tables}
-  | Wast_host.Function _ | Wast_host.Global _ -> host
+      let binding = binding (List.length host.tables) in
+      binding, {host with tables = binding :: host.tables}
+  | Wast_host.Function _ | Wast_host.Global _ ->
+      invalid_arg "Wast_plan.add_shared"
 
 let empty_host =
-  let host = {providers = []; globals = []; memories = []; tables = []; funcs = []} in
-  Wast_host.exports
-  |> List.filter (fun export ->
-       match Wast_host.lifetime export with
-       | Wast_host.Shared _ -> true
-       | Wast_host.Fresh -> false)
-  |> List.fold_left add_shared host
+  {providers = []; globals = []; memories = []; tables = []; funcs = []}
 
 let empty instances = {
   modules = Names.empty;
@@ -386,13 +383,17 @@ let bind_module source env var module_ =
 
 let shared_binding host key =
   let bindings = host.memories @ host.tables in
-  List.find
+  List.find_opt
     (fun binding -> Wast_host.lifetime binding.export = Wast_host.Shared key)
     bindings
 
 let allocate_host host export =
   match Wast_host.lifetime export, Wast_host.kind export with
-  | Wast_host.Shared key, _ -> shared_binding host key, host
+  | Wast_host.Shared key, _ ->
+      begin match shared_binding host key with
+      | Some binding -> binding, host
+      | None -> add_shared host export
+      end
   | Wast_host.Fresh, Wast_host.Function _ ->
       let binding = {export; address = List.length host.funcs} in
       binding, {host with funcs = binding :: host.funcs}

@@ -18,14 +18,24 @@ let rec pp fmt = function
           pp fmt x)
         xs;
       Format.pp_close_box fmt ()
+  | App ("[_.._]", [lower; upper]) ->
+      Format.fprintf fmt "[@[%a@ ..@ %a@]]" pp lower pp upper
+  | App ("{_}", [items]) ->
+      Format.fprintf fmt "{@[%a@]}" pp items
+  | App ("_;_", [left; right]) ->
+      Format.fprintf fmt "(@[%a@ ;@ %a@])" pp left pp right
   | App (f, []) -> Format.pp_print_string fmt f
   | App (f, xs) ->
       Format.fprintf fmt "@[%s(@;<0 2>" f;
       List.iteri
         (fun i x ->
           if i > 0 then Format.fprintf fmt ",@ ";
-          pp fmt x)
+          pp_argument fmt x)
         xs;
       Format.fprintf fmt ")@]"
+
+and pp_argument fmt = function
+  | Seq (_ :: _ :: _ as xs) -> Format.fprintf fmt "(@[%a@])" pp (Seq xs)
+  | term -> pp fmt term
 
 let to_string t = Format.asprintf "%a" pp t

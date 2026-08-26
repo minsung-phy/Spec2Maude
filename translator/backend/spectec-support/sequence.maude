@@ -11,12 +11,21 @@ fmod DSL-SEQUENCE is
   var K : [SpectecTerminal] .
   var T : SpectecTerminal .
   vars TS WTS : SpectecTerminals .
+  var TYPE : SpectecType .
 
   eq len(eps) = 0 .
   eq len(T) = 1 .
   ceq len(T TS) = 1 + len(TS)
     if TS =/= eps .
   eq | TS | = len(TS) .
+
+  eq typecheck(seq(TS), iterOpt(TYPE)) =
+    typecheck(TS, TYPE) and len(TS) <= 1 .
+  eq typecheck(seq(TS), iterList(TYPE)) = typecheck(TS, TYPE) .
+  eq typecheck(seq(TS), iterList1(TYPE)) =
+    typecheck(TS, TYPE) and 0 < len(TS) .
+  eq typecheck(seq(TS), iterListN(TYPE, N)) =
+    typecheck(TS, TYPE) and len(TS) == N .
 
   op _<-_ : [SpectecTerminal] SpectecTerminals -> Bool .
 
