@@ -12,7 +12,8 @@ type case = {
   source : string;
   status : status;
   seconds : float;
-  checked : int;
+  commands : int;
+  checked_assertions : int;
   runtime_assertions : int;
   detail : string;
 }
@@ -146,12 +147,14 @@ let log_path dir index source =
 
 let run_case ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir index source =
   let started = Unix.gettimeofday () in
-  let checked = ref 0 in
+  let commands = ref 0 in
+  let checked_assertions = ref 0 in
   let runtime_assertions = ref 0 in
   let status, detail =
     try
       let harness, emitted = Wast_run.emit ~semantics ~steps ~call_depth source in
-      checked := Wast_run.checked emitted;
+      commands := Wast_run.commands emitted;
+      checked_assertions := Wast_run.checked_assertions emitted;
       runtime_assertions := Wast_run.runtime_assertions emitted;
       let harness_file = Filename.temp_file "spec2maude-wast-" ".maude" in
       let output_file = Filename.temp_file "spec2maude-wast-" ".log" in
@@ -184,7 +187,8 @@ let run_case ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir index source
   { source;
     status;
     seconds = Unix.gettimeofday () -. started;
-    checked = !checked;
+    commands = !commands;
+    checked_assertions = !checked_assertions;
     runtime_assertions = !runtime_assertions;
     detail }
 
@@ -213,13 +217,13 @@ let clean_field text =
 let to_tsv report =
   let buffer = Buffer.create 4096 in
   Buffer.add_string buffer
-    "status\tseconds\tcommands\truntime_assertions\tsource\tdetail\n";
+    "status\tseconds\tcommands\tchecked_assertions\truntime_assertions\tsource\tdetail\n";
   List.iter
     (fun case ->
       Buffer.add_string buffer
-        (Printf.sprintf "%s\t%.3f\t%d\t%d\t%s\t%s\n"
-           (status_name case.status) case.seconds case.checked
-           case.runtime_assertions (clean_field case.source)
+        (Printf.sprintf "%s\t%.3f\t%d\t%d\t%d\t%s\t%s\n"
+           (status_name case.status) case.seconds case.commands
+           case.checked_assertions case.runtime_assertions (clean_field case.source)
            (clean_field case.detail)))
     report;
   Buffer.contents buffer

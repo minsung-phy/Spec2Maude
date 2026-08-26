@@ -73,7 +73,12 @@ type command =
   | Exhaustion of int * exhaustion_plan
   | Do of int * action
 
-type t = {commands : command list; host : host; checked : int}
+type t = {
+  commands : command list;
+  host : host;
+  source_commands : int;
+  checked_assertions : int;
+}
 
 type instance = {id : int; module_ : Frontend.module_}
 type provider = Instance of instance | Host
@@ -570,6 +575,7 @@ let load source =
         | Script.Assertion _ | Script.Meta _ -> count)
       0 script
   in
+  let source_commands = List.length script in
   let finish host =
     {providers = List.rev host.providers;
      globals = List.rev host.globals;
@@ -578,7 +584,11 @@ let load source =
      funcs = List.rev host.funcs}
   in
   let rec collect env checked commands = function
-    | [] -> {commands = List.rev commands; host = finish env.host; checked}
+    | [] ->
+        { commands = List.rev commands;
+          host = finish env.host;
+          source_commands;
+          checked_assertions = checked }
     | command :: rest ->
         (match command.Source.it with
          | Script.Module (var, def) ->
@@ -657,12 +667,13 @@ let load source =
 
 let commands plan = plan.commands
 let host (plan : t) = plan.host
-let checked plan = plan.checked
+let source_commands plan = plan.source_commands
+let checked_assertions plan = plan.checked_assertions
 
 let runtime_assertions plan =
   List.fold_left
     (fun count -> function
-      | Instantiate _ -> count
+      | Instantiate _ | Do _ -> count
       | Unlinkable _ | Uninstantiable _ | Return _ | Trap _
-      | Exception _ | Exhaustion _ | Do _ -> count + 1)
+      | Exception _ | Exhaustion _ -> count + 1)
     0 plan.commands

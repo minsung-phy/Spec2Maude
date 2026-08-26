@@ -74,5 +74,6 @@ type t
 val load : string -> t
 val commands : t -> command list
 val host : t -> host
-val checked : t -> int
+val source_commands : t -> int
+val checked_assertions : t -> int
 val runtime_assertions : t -> int

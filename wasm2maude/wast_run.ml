@@ -1,4 +1,8 @@
-type report = {checked : int; runtime_assertions : int}
+type report = {
+  commands : int;
+  checked_assertions : int;
+  runtime_assertions : int;
+}
 
 let emit ~semantics ~steps ~call_depth source =
   if call_depth < 0 then invalid_arg "Wast_run.emit: negative call depth";
@@ -22,9 +26,11 @@ let emit ~semantics ~steps ~call_depth source =
     Wast_harness.render ~semantics ~steps ~commands ~host_store ~host_instances
       ~host_functions
   in
-  let checked = Wast_plan.checked plan in
+  let commands = Wast_plan.source_commands plan in
+  let checked_assertions = Wast_plan.checked_assertions plan in
   let runtime_assertions = Wast_plan.runtime_assertions plan in
-  text, {checked; runtime_assertions}
+  text, {commands; checked_assertions; runtime_assertions}
 
-let checked report = report.checked
+let commands report = report.commands
+let checked_assertions report = report.checked_assertions
 let runtime_assertions report = report.runtime_assertions

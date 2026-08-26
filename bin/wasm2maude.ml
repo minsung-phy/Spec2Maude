@@ -169,8 +169,10 @@ let wast_run args =
   let input = match input with Some path -> path | None -> usage () in
   let text, report = Wast_run.emit ~semantics ~steps ~call_depth input in
   write output text;
-  Printf.eprintf "[wasm2maude] checked=%d runtime=%d\n"
-    (Wast_run.checked report) (Wast_run.runtime_assertions report)
+  Printf.eprintf
+    "[wasm2maude] commands=%d checked-assertions=%d runtime-assertions=%d\n"
+    (Wast_run.commands report) (Wast_run.checked_assertions report)
+    (Wast_run.runtime_assertions report)
 
 let suite_run args =
   let positive_float value =
