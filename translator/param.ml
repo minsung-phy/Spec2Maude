@@ -37,12 +37,14 @@ let translate_terms index params =
   List.map (translate_term index) params
 
 
-let translate_eq_conditions index params =
+let translate_eq_conditions ?(proven = Il.Free.Set.empty) index params =
   params
   |> List.concat_map (fun param ->
        match param.it with
-       | ExpP (_, typ) ->
+       | ExpP (id, typ) when not (Il.Free.Set.mem id.it proven) ->
            Term.translate_typ_conditions index (translate_term index param) typ
+
+       | ExpP _ -> []
 
        | TypP _
        | DefP _ ->

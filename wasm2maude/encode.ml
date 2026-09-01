@@ -821,6 +821,15 @@ let num_instr value =
 
 let num_payload value = snd (const value)
 
+let reference_value = function
+  | Value.NullRef -> atom "ref.ref-null-addr"
+  | Script.HostRef address ->
+      app "ref.ref-host-addr" [atom (Int32.to_string address)]
+  | Extern.ExternRef (Script.HostRef address) ->
+      app "ref.ref-extern"
+        [app "ref.ref-host-addr" [atom (Int32.to_string address)]]
+  | _ -> invalid_arg "Encode.reference_value"
+
 let result_heaptype typ =
   heaptype "WAST result pattern" Source.no_region typ
 

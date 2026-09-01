@@ -60,10 +60,10 @@ maude
 The banner should report `Maude 3.5.1`. Enter `quit` to exit.
 
 Alternatively, set `MAUDE` to the executable path when running the supplied
-Maude smoke test:
+SpecTec-to-Maude test:
 
 ```sh
-MAUDE=/absolute/path/to/maude test/maude_load.sh "$(pwd)"
+MAUDE=/absolute/path/to/maude test/spectec_to_maude.sh
 ```
 
 ## Build
@@ -119,5 +119,5 @@ the input file reaches end of file.
 
 ## Next step
 
-See [ARTIFACT.md](ARTIFACT.md) for the reviewer-oriented smoke test,
-reproducibility checks, and official WebAssembly test-suite commands.
+See [ARTIFACT.md](ARTIFACT.md) for the reviewer-oriented translation test and
+official WebAssembly test-suite commands.

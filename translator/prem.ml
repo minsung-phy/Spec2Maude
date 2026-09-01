@@ -120,9 +120,11 @@ let rec translate_pattern index exp =
 
   | IterE (body, iterexp) ->
       Iter.translate_identity_pattern
+        index
         (fun exp ->
           translate_pattern index exp
           |> Option.map (fun pattern -> pattern.term, pattern.guards))
+        (Term.translate_typ_conditions index)
         body iterexp
       |> Option.map (fun (term, guards) -> {term; guards})
 
@@ -330,6 +332,7 @@ let rec bind_pattern index bound exp subject error =
         Iter.translate_pattern index
           (translate_pattern_parts index)
           (Term.translate_exp index)
+          (Term.translate_typ_conditions index)
           (known bound)
           (fun name -> Il.Free.Set.mem name bound)
           (can_bind_computed_pattern index)

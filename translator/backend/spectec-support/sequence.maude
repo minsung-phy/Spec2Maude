@@ -7,7 +7,19 @@ fmod DSL-SEQUENCE is
   op len : SpectecTerminals -> Nat .
   op |_| : SpectecTerminals -> Nat .
 
+  --- Large runs of one natural-number terminal stay compact.  This prevents
+  --- byte-sized repetitions from consuming the Maude call stack while all
+  --- other repetitions retain the ordinary sequence representation.
+
+  op repeatSeqRunThreshold : -> Nat .
+  eq repeatSeqRunThreshold = 1024 .
+
+  op runSeq : NzNat Nat -> SpectecTerminals [ctor] .
+  op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
+
   vars N I : Nat .
+  var RUN-COUNT : NzNat .
+  vars NAT-VALUE RUN-VALUE : Nat .
   var K : [SpectecTerminal] .
   var T : SpectecTerminal .
   vars TS WTS : SpectecTerminals .
@@ -17,7 +29,17 @@ fmod DSL-SEQUENCE is
   eq len(T) = 1 .
   ceq len(T TS) = 1 + len(TS)
     if TS =/= eps .
+  eq len(runSeq(RUN-COUNT, RUN-VALUE)) = RUN-COUNT .
+  ceq len(runSeq(RUN-COUNT, RUN-VALUE) TS)
+    = RUN-COUNT + len(TS)
+    if TS =/= eps .
   eq | TS | = len(TS) .
+
+  eq typecheck(runSeq(RUN-COUNT, RUN-VALUE), TYPE) =
+    typecheck(RUN-VALUE, TYPE) .
+  ceq typecheck(runSeq(RUN-COUNT, RUN-VALUE) TS, TYPE) =
+    typecheck(TS, TYPE)
+    if TS =/= eps /\ typecheck(RUN-VALUE, TYPE) .
 
   eq typecheck(seq(TS), iterOpt(TYPE)) =
     typecheck(TS, TYPE) and len(TS) <= 1 .
@@ -33,6 +55,9 @@ fmod DSL-SEQUENCE is
   eq T <- (T TS) = true .
   ceq K <- (T TS) = K <- TS
     if K =/= T .
+  eq NAT-VALUE <- (runSeq(RUN-COUNT, NAT-VALUE) TS) = true .
+  ceq K <- (runSeq(RUN-COUNT, RUN-VALUE) TS) = K <- TS
+    if K =/= RUN-VALUE .
 
   op _++_ : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   eq TS ++ WTS = TS WTS .
@@ -44,6 +69,11 @@ fmod DSL-SEQUENCE is
   eq index(T TS, 0) = T .
   ceq index(T TS, s(N)) = index(TS, N)
     if TS =/= eps .
+  ceq index((runSeq(RUN-COUNT, RUN-VALUE) TS), I) = RUN-VALUE
+    if _<_(I, RUN-COUNT) .
+  ceq index((runSeq(RUN-COUNT, RUN-VALUE) TS), I) =
+    index(TS, _-_(I, RUN-COUNT))
+    if _<=_(RUN-COUNT, I) /\ TS =/= eps .
 
   op _[_] : SpectecTerminals Nat ~> SpectecTerminal
     [prec 10 gather (E e)] .
@@ -57,10 +87,23 @@ fmod DSL-SEQUENCE is
   eq take(TS, 0) = eps .
   eq take(eps, N) = eps .
   eq take(T TS, s(N)) = T take(TS, N) .
+  ceq take((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
+    repeatSeq(s(N), RUN-VALUE)
+    if _<_(s(N), RUN-COUNT) .
+  ceq take((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
+    (runSeq(RUN-COUNT, RUN-VALUE)
+     take(TS, _-_(s(N), RUN-COUNT)))
+    if _<=_(RUN-COUNT, s(N)) .
 
   eq drop(TS, 0) = TS .
   eq drop(eps, N) = eps .
   eq drop(T TS, s(N)) = drop(TS, N) .
+  ceq drop((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
+    (repeatSeq(_-_(RUN-COUNT, s(N)), RUN-VALUE) TS)
+    if _<_(s(N), RUN-COUNT) .
+  ceq drop((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
+    drop(TS, _-_(s(N), RUN-COUNT))
+    if _<=_(RUN-COUNT, s(N)) .
 
   eq slice(TS, N, I) = take(drop(TS, N), I) .
 
@@ -78,6 +121,16 @@ fmod DSL-SEQUENCE is
   eq setAt(eps, N, NEW-K) = eps .
   eq setAt(T TS, 0, NEW-K) = NEW-K TS .
   eq setAt(T TS, s(N), NEW-K) = T setAt(TS, N, NEW-K) .
+  ceq setAt((runSeq(RUN-COUNT, RUN-VALUE) TS), I, NEW-K) =
+    (repeatSeq(I, RUN-VALUE)
+     NEW-K
+     repeatSeq(_-_(RUN-COUNT, _+_(I, 1)), RUN-VALUE)
+     TS)
+    if _<_(I, RUN-COUNT) .
+  ceq setAt((runSeq(RUN-COUNT, RUN-VALUE) TS), I, NEW-K) =
+    (runSeq(RUN-COUNT, RUN-VALUE)
+     setAt(TS, _-_(I, RUN-COUNT), NEW-K))
+    if _<=_(RUN-COUNT, I) .
   eq TS[N = NEW-K] = setAt(TS, N, NEW-K) .
 
   op splice : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals .
@@ -103,10 +156,11 @@ fmod DSL-SEQUENCE is
   eq lift(eps) = eps .
   eq lift(K ?) = K .
 
-  op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
-
   eq repeatSeq(0, WTS) = eps .
-  eq repeatSeq(s(N), WTS) = WTS repeatSeq(N, WTS) .
+  eq repeatSeq(s(N), eps) = eps .
+  ceq repeatSeq(s(N), NAT-VALUE) = runSeq(s(N), NAT-VALUE)
+    if repeatSeqRunThreshold <= s(N) .
+  eq repeatSeq(s(N), WTS) = WTS repeatSeq(N, WTS) [owise] .
 
   --- The concrete numeric equations for these source coercions belong to
   --- builtins.maude.
