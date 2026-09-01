@@ -66,6 +66,79 @@ let capture_terms index body =
 
 (* IterE terms *)
 
+let source_iteration source =
+  match source.note.it with
+  | IterT (_, iter) -> Some iter
+  | _ -> None
+
+let rec identity_body_id index exp =
+  match exp.it with
+  | VarE id -> Some id
+  | CaseE (mixop, payload) when Mixop.is_hole_only mixop ->
+      begin match payload.it with
+      | TupE [single] -> identity_body_id index single
+      | _ -> identity_body_id index payload
+      end
+  | UncaseE (inner, mixop) when Mixop.is_hole_only mixop ->
+      identity_body_id index inner
+  | ProjE ({it = UncaseE (inner, mixop); _}, 0)
+    when Mixop.is_hole_only mixop && Xl.Mixop.arity mixop = 1 ->
+      identity_body_id index inner
+  | SubE (inner, source, target)
+    when Prescan.same_representation index source target ->
+      identity_body_id index inner
+  | IterE (inner, (iter, [(binder, source)])) ->
+      begin match identity_body_id index inner, source.it,
+                  source_iteration source with
+      | Some inner_id, VarE source_id, Some source_iter
+        when inner_id.it = binder.it && Il.Eq.eq_iter iter source_iter ->
+          Some source_id
+      | _ -> None
+      end
+  | _ -> None
+
+let rec identity_requirements index exp =
+  match exp.it with
+  | SubE (inner, source, target)
+    when Prescan.same_representation index source target ->
+      source :: identity_requirements index inner
+  | CaseE (mixop, payload) when Mixop.is_hole_only mixop ->
+      begin match payload.it with
+      | TupE [single] -> identity_requirements index single
+      | _ -> identity_requirements index payload
+      end
+  | UncaseE (inner, mixop) when Mixop.is_hole_only mixop ->
+      identity_requirements index inner
+  | ProjE ({it = UncaseE (inner, mixop); _}, 0)
+    when Mixop.is_hole_only mixop && Xl.Mixop.arity mixop = 1 ->
+      identity_requirements index inner
+  | IterE (inner, (iter, [_])) ->
+      identity_requirements index inner
+      |> List.map (fun typ -> IterT (typ, iter) $ typ.at)
+  | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
+  | TupE _ | ProjE _ | CaseE _ | UncaseE _ | OptE _ | TheE _ | StrE _
+  | DotE _ | CompE _ | ListE _ | LiftE _ | MemE _ | LenE _ | CatE _
+  | IdxE _ | SliceE _ | UpdE _ | ExtE _ | IfE _ | CallE _ | IterE _
+  | CvtE _ | SubE _ ->
+      []
+
+let identity_source index body (iter, generators) =
+  match identity_body_id index body, generators with
+  | Some body_id, [(generator_id, source)] ->
+      begin match source_iteration source with
+      | Some source_iter
+        when body_id.it = generator_id.it
+             && Il.Eq.eq_iter iter source_iter ->
+          Some source
+      | _ -> None
+      end
+  | _ -> None
+
+let identity_requirement_guards index translate_conditions subject iter body =
+  identity_requirements index body
+  |> List.concat_map (fun typ ->
+       translate_conditions subject (IterT (typ, iter) $ typ.at))
+
 let controls translate_exp = function
   | Opt | List | List1 ->
       []
@@ -75,23 +148,30 @@ let controls translate_exp = function
       [translate_exp count; Const "0"]
 
 let translate_term index translate_exp body (iter, generators) =
-  match iter, generators with
-  | ListN (count, None), [] ->
-      app "repeatSeq"
-        [ translate_exp count
-        ; translate_exp body |> as_sequence_element index body.note
-        ]
-  | (Opt | List | List1), [] ->
-      invalid_arg "IterE with Opt, List, or List1 requires a generator"
-  | ListN _, _ ->
-      let captures = capture_terms index body in
-      let sources = List.map (fun (_, source) -> translate_exp source) generators in
-      app (Prescan.iteration_name index body)
-        (captures @ controls translate_exp iter @ sources)
-  | (Opt | List | List1), _ :: _ ->
-      let captures = capture_terms index body in
-      let sources = List.map (fun (_, source) -> translate_exp source) generators in
-      app (Prescan.iteration_name index body) (captures @ sources)
+  match identity_source index body (iter, generators) with
+  | Some source -> translate_exp source
+  | None ->
+      match iter, generators with
+      | ListN (count, None), [] ->
+          app "repeatSeq"
+            [ translate_exp count
+            ; translate_exp body |> as_sequence_element index body.note
+            ]
+      | (Opt | List | List1), [] ->
+          invalid_arg "IterE with Opt, List, or List1 requires a generator"
+      | ListN _, _ ->
+          let captures = capture_terms index body in
+          let sources =
+            List.map (fun (_, source) -> translate_exp source) generators
+          in
+          app (Prescan.iteration_name index body)
+            (captures @ controls translate_exp iter @ sources)
+      | (Opt | List | List1), _ :: _ ->
+          let captures = capture_terms index body in
+          let sources =
+            List.map (fun (_, source) -> translate_exp source) generators
+          in
+          app (Prescan.iteration_name index body) (captures @ sources)
 
 
 (* Generated helper declarations and equations *)
@@ -171,30 +251,17 @@ let next_arguments captures count index tails =
      | Some index -> [app "s" [term_of_variable index]])
   @ terms_of_variables tails
 
-let rec identity_body_id exp =
-  match exp.it with
-  | VarE id -> Some id
-  | IterE (inner, (List, [(binder, source)])) ->
-      begin match identity_body_id inner, source.it with
-      | Some inner_id, VarE source_id when inner_id.it = binder.it ->
-          Some source_id
-      | _ -> None
-      end
-  | _ -> None
-
-let identity_source body generators =
-  match identity_body_id body, generators with
-  | Some body_id, [(generator_id, source)]
-    when body_id.it = generator_id.it -> Some source
-  | _ -> None
-
-let translate_identity_pattern translate_pattern body (iter, generators) =
-  match identity_source body generators with
+let translate_identity_pattern index translate_pattern translate_conditions
+    body (iter, generators) =
+  match identity_source index body (iter, generators) with
   | None -> None
   | Some source ->
       begin match translate_pattern source with
       | None -> None
       | Some (term, guards) ->
+          let requirement_guards =
+            identity_requirement_guards index translate_conditions term iter body
+          in
           let cardinality =
             match iter with
             | Opt ->
@@ -209,7 +276,9 @@ let translate_identity_pattern translate_pattern body (iter, generators) =
                 | None -> None
                 end
           in
-          Option.map (fun cardinality -> term, guards @ cardinality)
+          Option.map
+            (fun cardinality ->
+              term, guards @ requirement_guards @ cardinality)
             cardinality
       end
 
@@ -231,9 +300,10 @@ let projector_local_bound captures iter =
   | ListN (_, Some id) -> Il.Free.Set.add id.it bound
   | Opt | List | List1 | ListN (_, None) -> bound
 
-let projector_supported translate_pattern can_bind_body bound body generators =
+let projector_supported index translate_pattern can_bind_body bound body iterexp =
+  let _, generators = iterexp in
   generators <> []
-  && identity_source body generators = None
+  && identity_source index body iterexp = None
   && (Option.is_some (translate_pattern body) || can_bind_body bound body)
   && List.for_all
        (fun (id, _) -> Il.Free.Set.mem id.it Il.Free.(free_exp body).varid)
@@ -272,8 +342,8 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
   let iter, generators = iteration.Prescan.iterexp in
   let local_bound = projector_local_bound iteration.Prescan.captures iter in
   if not (Prescan.projector_requested index body
-          && projector_supported translate_pattern can_bind_body
-               local_bound body generators)
+          && projector_supported index translate_pattern can_bind_body
+               local_bound body (iter, generators))
   then [] else
     let name = iteration.Prescan.projector_name in
     let captures = translate_captures index iteration.Prescan.captures in
@@ -449,8 +519,9 @@ let identity_cardinality translate_exp known subject = function
       [EqCond (length subject, translate_exp count)]
   | ListN _ -> []
 
-let translate_pattern index translate_source_pattern translate_exp known is_bound
-    can_bind_body body (iter, generators) subject =
+let translate_pattern index translate_source_pattern translate_exp
+    translate_conditions known is_bound can_bind_body body (iter, generators)
+    subject =
   let captures = captures index body in
   let count_variables =
     match iter with
@@ -471,7 +542,9 @@ let translate_pattern index translate_source_pattern translate_exp known is_boun
   with
   | None -> None
   | Some (source_patterns, source_guards) ->
-      begin match identity_source body generators, source_patterns with
+      begin match
+        identity_source index body (iter, generators), source_patterns
+      with
       | Some _, [source_pattern] ->
           begin match pattern_count translate_source_pattern translate_exp
                         known subject iter with
@@ -482,12 +555,14 @@ let translate_pattern index translate_source_pattern translate_exp known is_boun
               Some
                 ( count_conditions
                   @ (MatchCond (source_pattern, subject) :: source_guards)
+                  @ identity_requirement_guards index translate_conditions
+                      subject iter body
                   @ identity_cardinality translate_exp known subject iter)
           end
       | None, _ when
-          projector_supported translate_source_pattern can_bind_body
+          projector_supported index translate_source_pattern can_bind_body
             (projector_local_bound captures iter)
-            body generators ->
+            body (iter, generators) ->
           begin match pattern_count translate_source_pattern translate_exp
                         known subject iter with
           | None -> None
@@ -523,112 +598,115 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
   let name = iteration.Prescan.name in
   let body = iteration.Prescan.body in
   let iter, generators = iteration.Prescan.iterexp in
-  let forward =
-    match iter, generators with
-    | (Opt | ListN (_, None)), [] ->
-      []
-    | (List | List1), [] ->
-      invalid_arg "IterE with List or List1 requires a generator"
-  | (Opt | List | List1 | ListN _), _ ->
-      let captures =
-        translate_captures index iteration.Prescan.captures
+  match identity_source index body (iter, generators) with
+  | Some _ -> []
+  | None ->
+      let forward =
+        match iter, generators with
+        | (Opt | ListN (_, None)), [] ->
+            []
+        | (List | List1), [] ->
+            invalid_arg "IterE with List or List1 requires a generator"
+        | (Opt | List | List1 | ListN _), _ ->
+            let captures =
+              translate_captures index iteration.Prescan.captures
+            in
+            let count = count_variable iter in
+            let iter_index = index_variable index iter in
+            let heads = List.map (head_variable index) generators in
+            let tails = List.map tail_variable generators in
+            let call args = app name args in
+            let declaration =
+              OpDecl
+                { name
+                ; domain = helper_domain captures count iter_index generators
+                ; codomain = "SpectecTerminals"
+                ; arrow = Partial
+                ; attrs = []
+                }
+            in
+            let body_term =
+              translate_exp body |> as_sequence_element index body.note
+            in
+            let step_result =
+              match iter with
+              | Opt ->
+                  app "_?" [body_term]
+              | List | List1 | ListN _ ->
+                  app "_ _"
+                    [ body_term
+                    ; call (next_arguments captures count iter_index tails)
+                    ]
+            in
+            let step =
+              Eq
+                ( call
+                    (step_arguments index iter captures count iter_index generators
+                       heads tails)
+                , step_result
+                , []
+                )
+            in
+            match iter with
+            | List1 ->
+                let tail_name = iteration.Prescan.tail_name in
+                let tail_call args = app tail_name args in
+                let tail_declaration =
+                  OpDecl
+                    { name = tail_name
+                    ; domain = helper_domain captures count iter_index generators
+                    ; codomain = "SpectecTerminals"
+                    ; arrow = Partial
+                    ; attrs = []
+                    }
+                in
+                let first =
+                  Eq
+                    ( call
+                        (step_arguments index List captures None None generators
+                           heads tails)
+                    , app "_ _"
+                        [ body_term
+                        ; tail_call (terms_of_variables (captures @ tails))
+                        ]
+                    , []
+                    )
+                in
+                let tail_base =
+                  Eq
+                    ( tail_call
+                        (terms_of_variables captures
+                         @ List.map (fun _ -> Const "eps") generators)
+                    , Const "eps"
+                    , []
+                    )
+                in
+                let tail_step =
+                  Eq
+                    ( tail_call
+                        (terms_of_variables captures
+                         @ source_arguments index List generators heads tails)
+                    , app "_ _"
+                        [ body_term
+                        ; tail_call (terms_of_variables (captures @ tails))
+                        ]
+                    , []
+                    )
+                in
+                [declaration; tail_declaration; first; tail_base; tail_step]
+            | Opt | List | ListN _ ->
+                let base =
+                  Eq
+                    ( call (empty_arguments captures count iter_index generators)
+                    , Const "eps"
+                    , []
+                    )
+                in
+                [declaration; base; step]
       in
-      let count = count_variable iter in
-      let iter_index = index_variable index iter in
-      let heads = List.map (head_variable index) generators in
-      let tails = List.map tail_variable generators in
-      let call args = app name args in
-      let declaration =
-        OpDecl
-          { name
-          ; domain = helper_domain captures count iter_index generators
-          ; codomain = "SpectecTerminals"
-          ; arrow = Partial
-          ; attrs = []
-          }
-      in
-      let body_term =
-        translate_exp body |> as_sequence_element index body.note
-      in
-      let step_result =
-        match iter with
-        | Opt ->
-            app "_?" [body_term]
-        | List | List1 | ListN _ ->
-            app "_ _"
-              [ body_term
-              ; call (next_arguments captures count iter_index tails)
-              ]
-      in
-      let step =
-        Eq
-          ( call
-              (step_arguments index iter captures count iter_index generators
-                 heads tails)
-          , step_result
-          , []
-          )
-      in
-      match iter with
-      | List1 ->
-          let tail_name = iteration.Prescan.tail_name in
-          let tail_call args = app tail_name args in
-          let tail_declaration =
-            OpDecl
-              { name = tail_name
-              ; domain = helper_domain captures count iter_index generators
-              ; codomain = "SpectecTerminals"
-              ; arrow = Partial
-              ; attrs = []
-              }
-          in
-          let first =
-            Eq
-              ( call
-                  (step_arguments index List captures None None generators heads
-                     tails)
-              , app "_ _"
-                  [ body_term
-                  ; tail_call (terms_of_variables (captures @ tails))
-                  ]
-              , []
-              )
-          in
-          let tail_base =
-            Eq
-              ( tail_call
-                  (terms_of_variables captures
-                   @ List.map (fun _ -> Const "eps") generators)
-              , Const "eps"
-              , []
-              )
-          in
-          let tail_step =
-            Eq
-              ( tail_call
-                  (terms_of_variables captures
-                   @ source_arguments index List generators heads tails)
-              , app "_ _"
-                  [ body_term
-                  ; tail_call (terms_of_variables (captures @ tails))
-                  ]
-              , []
-              )
-          in
-          [declaration; tail_declaration; first; tail_base; tail_step]
-      | Opt | List | ListN _ ->
-          let base =
-            Eq
-              ( call (empty_arguments captures count iter_index generators)
-              , Const "eps"
-              , []
-              )
-          in
-          [declaration; base; step]
-  in
-  forward
-  @ translate_projector_statements index translate_pattern can_bind_body
-      bind_body iteration
+      forward
+      @ translate_projector_statements index translate_pattern can_bind_body
+          bind_body iteration
 
 
 (* Whole-script helper materialization *)

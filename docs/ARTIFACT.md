@@ -26,7 +26,7 @@ The SpecTec copy contains only the listed library subset, WebAssembly
 specification chapters 0--4, and Spec2Maude-specific source annotations. The
 benchmark copy contains only the official `test/core` suite.
 
-## Five-minute smoke test
+## Reviewer smoke test
 
 ### 1. Build all OCaml targets
 
@@ -36,67 +36,43 @@ dune build
 
 Expected result: exit status 0 and no compiler error.
 
-### 2. Run the translation smoke test
+### 2. Test the complete SpecTec-to-Maude translation
 
 ```sh
-dune runtest test --force
+test/spectec_to_maude.sh
 ```
 
-Expected output includes:
+If Maude is not on `PATH`, provide its absolute path:
+
+```sh
+MAUDE=/absolute/path/to/maude test/spectec_to_maude.sh
+```
+
+The test performs one complete pipeline:
+
+- confirms that the pinned source contains exactly 21 `.spectec` files;
+- parses and elaborates all 21 files through `bin/spec2maude.exe`;
+- generates a fresh temporary Maude module;
+- checks that it is byte-for-byte identical to
+  `translator/generated/output.maude`;
+- loads that fresh module together with all hand-written backends in Maude;
+- rejects every Maude warning, advisory, or error.
+
+Expected final output:
 
 ```text
-translated 21 SpecTec files into 585165 Maude bytes
-Bye.
+spectec_to_maude: PASS (21 files)
 ```
 
-The OCaml test parses and elaborates all 21 SpecTec files, recursively
-translates the IL AST, and checks the generated module and support import. The
-shell test loads the complete semantics in Maude and fails if Maude emits a
-warning, advisory, or error.
-
-The Maude test is skipped when `maude` is unavailable. For artifact
-evaluation, first confirm:
+### 3. Regenerate the versioned semantics manually
 
 ```sh
-command -v maude
+dune exec bin/spec2maude.exe --
 ```
 
-### 3. Regenerate and compare the semantics
-
-```sh
-tmp_output="$(mktemp)"
-dune exec bin/spec2maude.exe -- -o "$tmp_output"
-cmp translator/generated/output.maude "$tmp_output"
-rm -f "$tmp_output"
-```
-
-Expected result: `cmp` exits with status 0.
-
-The expected SHA-256 of the generated file is:
-
-```text
-1d2afca0a72722e0edfd8ba48419688229873cc819aeae195743efe0b37deae5
-```
-
-On systems with `sha256sum`:
-
-```sh
-sha256sum translator/generated/output.maude
-```
-
-On macOS:
-
-```sh
-shasum -a 256 translator/generated/output.maude
-```
-
-### 4. Load Maude independently
-
-```sh
-test/maude_load.sh "$(pwd)"
-```
-
-Expected result: exit status 0, `Bye.`, and no warning or advisory.
+This reads `spectec/wasm-3.0/*.spectec` in lexical order and writes
+`translator/generated/output.maude`. The preceding test uses a temporary file
+and does not modify the repository.
 
 ## Command-line frontends
 
@@ -142,22 +118,29 @@ encoded: 2510
 ### Run the suite
 
 ```sh
-mkdir -p /tmp/spec2maude-suite-logs
-dune exec bin/wasm2maude.exe -- suite-run \
-  benchmarks/wasm-spec/test/core \
-  --semantics translator/backend/semantics.maude \
-  --maude maude \
-  --timeout 60 \
-  --steps 1000000 \
-  --call-depth 256 \
-  --log-dir /tmp/spec2maude-suite-logs \
-  -o /tmp/spec2maude-suite.tsv
+test/wasm_core_suite.sh
 ```
 
-The TSV report contains:
+If Maude is not on `PATH`, or a fixed result directory is desired:
+
+```sh
+MAUDE=/absolute/path/to/maude \
+RESULT_DIR=/tmp/spec2maude-wasm-core \
+test/wasm_core_suite.sh
+```
+
+The script verifies that the suite contains exactly 258 distinct `.wast`
+files. It first runs all files with a 300-second wall-clock timeout and then
+reruns only `TIMEOUT` files with a 3600-second timeout. It uses a rewrite
+budget of `1000000000000` to make the runner's required bounded `rew` argument
+non-limiting in practice, and uses call depth 256.
+
+The result directory contains the first-stage report and logs, every retry's
+command/report/log, and the merged `final.tsv` and `summary.tsv`. `final.tsv`
+contains:
 
 ```text
-status  seconds  commands  runtime_assertions  source  detail
+status  seconds  commands  checked_assertions  runtime_assertions  source  detail
 ```
 
 Each file is classified as one of:
@@ -171,18 +154,16 @@ Each file is classified as one of:
 - `STEP_LIMIT`;
 - `STUCK`.
 
-The command exits with status 0 only when every selected script is classified
-as `PASS`. Per-file Maude logs are written to the requested log directory.
+The script exits with status 0 only when all 258 scripts are classified as
+`PASS`. Otherwise it exits nonzero after preserving the complete reports and
+logs; a nonzero exit therefore does not mean that the experiment artifacts
+were lost.
 
 ## Interpreting failures
 
 - A build error is an OCaml dependency or compilation failure.
-- A translation-smoke failure means parsing, elaboration, translation, or the
-  generated module boundary changed.
-- A Maude-load failure means the generated and hand-written modules do not
-  compose without diagnostics.
-- A checksum mismatch means the generated semantics is not byte-for-byte
-  reproducible from the pinned inputs.
+- A SpecTec-to-Maude test failure means parsing, elaboration, translation,
+  reproducibility, or complete Maude loading failed.
 - A suite status other than `PASS` is preserved in the TSV report and must
   not be silently counted as success.
 

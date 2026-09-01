@@ -1461,14 +1461,14 @@ mod WASM-BUILTINS is
           bit-and(bit-not(float-nan-bit(FC_N, FC_F2)),
             bit-not(float-lt-bit(FC_N, FC_F1, FC_F2))))) .
 
-  ceq trunc--(FI_M, FI_N, U, FI_F) = (int-to-iN(FI_N, FI_X))
+  ceq trunc--(FI_M, FI_N, U, FI_F) = (int-to-iN(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
        /\ FI_X := trunc-rat-int(FI_R)
        /\ _>=_(FI_X, 0)
        /\ _<_(FI_X, _^_(2, FI_N)) .
-  ceq trunc--(FI_M, FI_N, S, FI_F) = (int-to-iN(FI_N, FI_X))
+  ceq trunc--(FI_M, FI_N, S, FI_F) = (int-to-iN(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
@@ -1512,29 +1512,29 @@ mod WASM-BUILTINS is
        /\ FI_X := trunc-rat-int(FI_R)
        /\ _>_(FI_X, _-_( _^_(2, _-_(FI_N, 1)), 1)) .
 
-  ceq trunc-sat--(FI_M, FI_N, U, FI_F) = (saturate-u-int(FI_N, FI_X))
+  ceq trunc-sat--(FI_M, FI_N, U, FI_F) = (saturate-u-int(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
        /\ FI_X := trunc-rat-int(FI_R) .
-  ceq trunc-sat--(FI_M, FI_N, S, FI_F) = (saturate-s-int(FI_N, FI_X))
+  ceq trunc-sat--(FI_M, FI_N, S, FI_F) = (saturate-s-int(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
        /\ FI_X := trunc-rat-int(FI_R) .
-  eq trunc-sat--(FI_M, FI_N, U, POS(INF)) = (_-_(_^_(2, FI_N), 1)) .
-  eq trunc-sat--(FI_M, FI_N, U, NEG(INF)) = (0) .
-  ceq trunc-sat--(FI_M, FI_N, U, POS(NAN(FI_FRAC))) = (0)
+  eq trunc-sat--(FI_M, FI_N, U, POS(INF)) = (_-_(_^_(2, FI_N), 1)) ? .
+  eq trunc-sat--(FI_M, FI_N, U, NEG(INF)) = (0) ? .
+  ceq trunc-sat--(FI_M, FI_N, U, POS(NAN(FI_FRAC))) = (0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
-  ceq trunc-sat--(FI_M, FI_N, U, NEG(NAN(FI_FRAC))) = (0)
+  ceq trunc-sat--(FI_M, FI_N, U, NEG(NAN(FI_FRAC))) = (0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
-  ceq trunc-sat--(FI_M, FI_N, S, POS(INF)) = (_-_(_^_(2, _-_(FI_N, 1)), 1))
+  ceq trunc-sat--(FI_M, FI_N, S, POS(INF)) = (_-_(_^_(2, _-_(FI_N, 1)), 1)) ?
     if _>_(FI_N, 0) .
-  ceq trunc-sat--(FI_M, FI_N, S, NEG(INF)) = (int-to-iN(FI_N, - _^_(2, _-_(FI_N, 1))))
+  ceq trunc-sat--(FI_M, FI_N, S, NEG(INF)) = (int-to-iN(FI_N, - _^_(2, _-_(FI_N, 1)))) ?
     if _>_(FI_N, 0) .
-  ceq trunc-sat--(FI_M, FI_N, S, POS(NAN(FI_FRAC))) = (0)
+  ceq trunc-sat--(FI_M, FI_N, S, POS(NAN(FI_FRAC))) = (0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
-  ceq trunc-sat--(FI_M, FI_N, S, NEG(NAN(FI_FRAC))) = (0)
+  ceq trunc-sat--(FI_M, FI_N, S, NEG(NAN(FI_FRAC))) = (0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
 
   ceq convert--(FI_M, FI_N, U, (FI_RESULT)) =
@@ -1651,7 +1651,7 @@ mod WASM-BUILTINS is
   eq fixed-chunks(BDI_N, eps) = eps .
   ceq fixed-chunks(BDI_N, BDI_XS) =
       seq(take-exact(BDI_N, BDI_XS))
-      fixed-chunks(BDI_N, drop(BDI_N, BDI_XS))
+      fixed-chunks(BDI_N, drop(BDI_XS, BDI_N))
     if _>=_(len(BDI_XS), BDI_N) .
   ceq inv-concatn-(BDI_T, BDI_N, BDI_XS) = fixed-chunks(BDI_N, BDI_XS)
     if _==_(_rem_(len(BDI_XS), BDI_N), 0) .

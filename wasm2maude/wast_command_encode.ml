@@ -1,5 +1,4 @@
 module T = Maude_term
-module S = Spectec_term
 
 let invoke_term (instance, name, args) =
   T.app "action.invoke"
@@ -28,15 +27,6 @@ let imports_term imports =
     (fun import rest -> T.app "imports.cons" [import_term import; rest])
     imports (T.atom "imports.nil")
 
-let reference_term = function
-  | Wasm.Value.NullRef -> S.atom "ref.ref-null-addr"
-  | Wasm.Script.HostRef address ->
-      S.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]
-  | Wasm.Extern.ExternRef (Wasm.Script.HostRef address) ->
-      S.app "ref.ref-extern"
-        [S.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]]
-  | _ -> invalid_arg "Wast_command_encode.reference_term"
-
 let lane_patterns_term exact lanes =
   List.fold_right
     (fun lane rest ->
@@ -58,7 +48,7 @@ let rec result_pattern_term = function
       T.app "result.exact-vec" [Encode.vec_instr value]
   | Wast_plan.VecLanes pattern -> vector_pattern_term pattern
   | Wast_plan.ExactRef reference ->
-      T.app "result.exact-ref" [reference_term reference]
+      T.app "result.exact-ref" [Encode.reference_value reference]
   | Wast_plan.RefType heaptype ->
       T.app "result.ref-type" [Encode.result_heaptype heaptype]
   | Wast_plan.NullRef heaptype ->

@@ -394,6 +394,9 @@ and translate_update index base path replacement =
 
   | IdxP (parent, element_index) ->
       let parent_value = translate_select index base parent in
+      let replacement =
+        as_sequence_element index path.note replacement
+      in
       let updated_parent =
         app "_`[_=_`]"
           [parent_value; translate_exp index element_index; replacement]

@@ -910,8 +910,14 @@ let scan script =
         List.iter
           (fun clause ->
             match clause.it with
-            | DefD (quants, _, _, _) ->
+            | DefD (quants, args, _, _) ->
                 add_params quants;
+                List.iter
+                  (fun arg ->
+                    match arg.it with
+                    | ExpA exp -> request_exp_projectors exp
+                    | TypA _ | DefA _ | GramA _ -> ())
+                  args;
                 scan_clause params clause)
           clauses
     | GramD _ | RecD _ | HintD _ -> ()
@@ -1324,6 +1330,21 @@ let type_parameter index id =
 
 let same_representation index source target =
   sort_of_typ index source = sort_of_typ index target
+
+let alias_type index typ =
+  match typ.it with
+  | VarT (id, _) ->
+      begin match List.assoc_opt id.it index.type_definitions with
+      | Some insts ->
+          List.exists
+            (fun inst ->
+              match inst.it with
+              | InstD (_, _, {it = AliasT _; _}) -> true
+              | InstD (_, _, {it = StructT _ | VariantT _; _}) -> false)
+            insts
+      | None -> false
+      end
+  | BoolT | NumT _ | TextT | TupT _ | IterT _ -> false
 
 let variable_declarations index =
   let rec add (name, sort) groups =

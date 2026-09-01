@@ -1,5 +1,9 @@
 # `maude_sort`와 Prelude 리스트 적용 계획
 
+> **Status:** future design plan; this is not the current artifact workflow or
+> a description of behavior already implemented. For current installation and
+> testing commands, see `INSTALL.md` and `ARTIFACT.md`.
+
 ## 0. 문서 목적
 
 이 문서는 현재 Spec2Maude 변환기를 다음 구조로 바꾸기 위한 작업 지침이다.

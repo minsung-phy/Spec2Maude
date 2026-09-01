@@ -160,18 +160,18 @@ let literal source literal =
   match literal.Source.it with
   | Script.ValLit (Wasm.Value.Num value) -> Encode.num_value value
   | Script.ValLit (Wasm.Value.Ref Wasm.Value.NullRef)
-  | Script.NullLit _ -> T.atom "ref.ref-null-addr"
-  | Script.ValLit (Wasm.Value.Ref (Script.HostRef address)) ->
-      T.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]
-  | Script.ValLit
-      (Wasm.Value.Ref (Wasm.Extern.ExternRef (Script.HostRef address))) ->
-      T.app "ref.ref-extern"
-        [T.app "ref.ref-host-addr" [T.atom (Int32.to_string address)]]
+  | Script.NullLit _ -> Encode.reference_value Wasm.Value.NullRef
+  | Script.ValLit (Wasm.Value.Ref reference) ->
+      begin match reference with
+      | Script.HostRef _
+      | Wasm.Extern.ExternRef (Script.HostRef _) ->
+          Encode.reference_value reference
+      | _ ->
+          unsupported source literal.at
+            "this reference WAST argument is not supported"
+      end
   | Script.ValLit (Wasm.Value.Vec (Wasm.Value.V128 value)) ->
       Encode.vec_value value
-  | Script.ValLit (Wasm.Value.Ref _) ->
-      unsupported source literal.at
-        "this reference WAST argument is not supported"
 
 let i32_lane source at = function
   | Script.NumPat {Source.it = Wasm.Value.I32 value; _} -> value

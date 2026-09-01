@@ -168,11 +168,13 @@ let lower_rule_body ?request_output index id params policy rule =
       in
       if not (List.for_all (Prem.known premises.bound) outputs) then
         invalid_arg "relation output contains an unbound variable";
+      (* Reachable relation calls establish direct inputs and premise results. *)
+      let proven = premises.bound in
       let conditions =
         head_conditions @ premises.conditions
         @ List.map
             (fun condition -> EqCondition condition)
-            (Param.translate_eq_conditions index quants)
+            (Param.translate_eq_conditions ~proven index quants)
         |> normalize_conditions left
       in
       { input_terms

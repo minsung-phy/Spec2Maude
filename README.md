@@ -87,7 +87,7 @@ translator/backend/semantics.maude
                              complete Maude loading order
 wasm2maude/                  WebAssembly-to-Maude configuration frontend
 vendor/wasm/                 vendored WebAssembly reference implementation
-test/                        translation and Maude loading smoke tests
+test/                        SpecTec translation and WebAssembly suite tests
 benchmarks/wasm-spec/        pinned official WebAssembly core test suite
 ```
 
