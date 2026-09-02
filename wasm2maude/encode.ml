@@ -916,11 +916,11 @@ let module_ ({Frontend.source; ast; _} : Frontend.module_) =
 
 type check = {label : string; term : T.t}
 
-let check label term typ =
-  {label; term = app "typecheck" [term; atom typ]}
+let typecheck label term typ =
+  {label; term = app "typecheck" [term; typ]}
 
-let check_sequence label term typ =
-  {label; term = app "typecheck" [term; atom typ]}
+let check label term typ = typecheck label term (atom typ)
+let check_sequence = check
 
 let rec instr_checks source path instruction =
   let here = check path (instr source instruction) "syn.instr" in
@@ -950,7 +950,7 @@ let func_checks source i ({Source.it = Ast.Func (_, _, body); _} as f) =
 let module_checks ({Frontend.source; ast; _} as m : Frontend.module_) =
   let m' = ast.Source.it in
   let list_check label encode xs typ =
-    check label (list encode xs) ("syn.list(" ^ typ ^ ")")
+    typecheck label (list encode xs) (app "list" [atom typ])
   in
   [ check "module" (module_ m) "syn.module";
     list_check "types" (type_ source) m'.Ast.types "syn.type";
@@ -962,8 +962,6 @@ let module_checks ({Frontend.source; ast; _} as m : Frontend.module_) =
     list_check "funcs" (func source) m'.funcs "syn.func";
     list_check "datas" (data source) m'.datas "syn.data";
     list_check "elems" (elem source) m'.elems "syn.elem";
-    {label = "start.option";
-     term = app "isOpt" [option start m'.start]};
     check_sequence "start" (option start m'.start) "syn.start";
     list_check "exports" export m'.exports "syn.export" ]
   @ (m'.funcs |> List.mapi (func_checks source) |> List.concat)
