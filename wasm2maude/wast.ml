@@ -200,8 +200,9 @@ let typecheck_suite ?(details = false) ~semantics path =
         case.checks;
       Buffer.add_string buffer
         (Printf.sprintf
-           "red in WASM-BUILTINS : typecheck(\n%s,\nsyn.module) .\n\n"
-           case.term))
+           "red in WASM-BUILTINS : typecheck(\n%s,\n%s) .\n\n"
+           case.term
+           (Spectec_term.atom "syn.module" |> Maude_term.to_string)))
     cases;
   Buffer.contents buffer, audit
 
