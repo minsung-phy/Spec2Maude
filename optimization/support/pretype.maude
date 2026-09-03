@@ -1,0 +1,71 @@
+fmod DSL-TERM is
+  sort SpectecTerminal .
+  sort SpectecType .
+  sort SpectecDef .
+endfm
+
+view SPECTEC-TERMINAL-VIEW from TRIV to DSL-TERM is
+  sort Elt to SpectecTerminal .
+endv
+
+fmod DSL-PRETYPE is
+  protecting DSL-TERM .
+  protecting BOOL .
+  protecting NAT .
+  protecting INT .
+  protecting RAT .
+  protecting FLOAT .
+  protecting STRING .
+
+  protecting LIST{SPECTEC-TERMINAL-VIEW} * (
+    sort List{SPECTEC-TERMINAL-VIEW} to SpectecTerminals,
+    sort NeList{SPECTEC-TERMINAL-VIEW} to NeSpectecTerminals,
+    op nil to eps,
+    op append to _++_,
+    op occurs to _<-_,
+    op size to len,
+    op $size to genericSizeAux
+  ) .
+
+  subsorts Nat Int < SpectecTerminal .
+
+  ops bool nat int rat real text : -> SpectecType [ctor] .
+  ops iterOpt iterList iterList1 : SpectecType -> SpectecType [ctor] .
+  op iterListN : SpectecType Nat -> SpectecType [ctor] .
+
+  op bool : Bool -> SpectecTerminal [ctor] .
+  op rat : Rat -> SpectecTerminal [ctor] .
+  op float : Float -> SpectecTerminal [ctor] .
+  op text : String -> SpectecTerminal [ctor] .
+
+  --- A nested sequence is one element of an outer sequence.
+
+  op seq : SpectecTerminals -> SpectecTerminal [ctor] .
+  op unseq : SpectecTerminal ~> SpectecTerminals .
+  eq unseq(seq(TS)) = TS .
+
+  op typecheck : [SpectecTerminal] SpectecType -> Bool .
+
+  var B : Bool .
+  var N : Nat .
+  var I : Int .
+  var R : Rat .
+  var F : Float .
+  var S : String .
+  var K : [SpectecTerminal] .
+  var T : SpectecTerminal .
+  var TS : SpectecTerminals .
+  var TYPE : SpectecType .
+
+  eq typecheck(bool(B), bool) = true .
+  eq typecheck(N, nat) = true .
+  eq typecheck(I, int) = true .
+  eq typecheck(rat(R), rat) = true .
+  eq typecheck(float(F), real) = true .
+  eq typecheck(text(S), text) = true .
+
+  eq typecheck(eps, TYPE) = true .
+  ceq typecheck(T TS, TYPE) = typecheck(TS, TYPE)
+    if TS =/= eps /\ typecheck(T, TYPE) .
+  eq typecheck(K, TYPE) = false [owise] .
+endfm

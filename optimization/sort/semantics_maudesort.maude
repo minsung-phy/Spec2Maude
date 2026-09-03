@@ -1,0 +1,4 @@
+load ../../translator/backend/spectec-support/support.maude
+load output_maudesort.maude
+load ../../translator/backend/relation-backends.maude
+load ../../translator/backend/builtins.maude

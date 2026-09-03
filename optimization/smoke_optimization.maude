@@ -1,0 +1,41 @@
+load semantics_optimization.maude
+
+mod SPEC2MAUDE-OPTIMIZATION-SMOKE is
+  protecting WASM-BUILTINS .
+
+  vars PREFIX : ValList .
+  vars FOCUS SUFFIX : InstrList .
+  vars C2 : SpectecTerminal .
+endm
+
+--- A Val pattern embedded in InstrList must match a ground Wasm value.
+rew [1] in SPEC2MAUDE-OPTIMIZATION-SMOKE :
+  Step-pure(instrConcat(CONST(I64, 0), DROP)) .
+
+--- An inverse projector must recover the value from an InstrList.
+red in SPEC2MAUDE-OPTIMIZATION-SMOKE :
+  project-map-exp-971(instrConcat(CONST(I64, 0), instrNil)) .
+
+--- Enumerate the expected context split.
+search [1] in SPEC2MAUDE-OPTIMIZATION-SMOKE :
+  find-focus(CONST(I64, 99) ;
+    instrConcat(CONST(I64, 0),
+    instrConcat(CONST(I64, 1),
+    instrConcat(CONST(I64, 2),
+    instrConcat(BINOP(I64, ADD), NOP)))))
+  =>* focusTarget(PREFIX, CONST(I64, 99), FOCUS, SUFFIX)
+  such that PREFIX == valList(CONST(I64, 0))
+    /\ FOCUS == instrConcat(CONST(I64, 1),
+                  instrConcat(CONST(I64, 2), BINOP(I64, ADD)))
+    /\ SUFFIX == instrList(NOP) .
+
+--- The complete public Step remains one atomic transition.
+search [1] in SPEC2MAUDE-OPTIMIZATION-SMOKE :
+  Step(CONST(I64, 99) ;
+    instrConcat(CONST(I64, 0),
+    instrConcat(CONST(I64, 1),
+    instrConcat(CONST(I64, 2),
+    instrConcat(BINOP(I64, ADD), NOP)))))
+  =>1 C2 .
+
+quit

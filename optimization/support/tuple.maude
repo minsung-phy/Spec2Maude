@@ -1,0 +1,14 @@
+fmod DSL-TUPLE is
+  protecting DSL-SEQUENCE .
+
+  sort Tuple .
+  subsort Tuple < SpectecTerminal .
+
+  op tuple : SpectecTerminals -> Tuple [ctor] .
+  op _._ : Tuple Nat ~> SpectecTerminal .
+
+  var TS : SpectecTerminals .
+  var N : Nat .
+
+  eq tuple(TS) . N = index(TS, N) .
+endfm
