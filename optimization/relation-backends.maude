@@ -1,0 +1,400 @@
+--- Hand-written backends for relations selected by hint(maude_backend ...).
+--- These are not official SpecTec builtins.  They are kept outside
+--- builtins.maude because they implement complete source relations that are
+--- deliberately not lowered from RuleD: witness-searching ground checks use
+--- "check", while deterministic result production uses "compute".
+
+mod SPEC2MAUDE-RELATION-BACKENDS is
+  inc SPEC2MAUDE-GENERATED .
+
+
+  --- Shared ground subtype kernel.
+  vars RB_H1 RB_H2 RB_RECTYPE RB_DEFTYPE RB_COMPTYPE : SpectecTerminal .
+  vars RB_SUPER RB_CLOSED : SpectecTerminal .
+  vars RB_SUBTYPES RB_FIELDS RB_T1S RB_T2S RB_FINAL : SpectecTerminals .
+  var RB_I : Nat .
+
+  op backend-reftype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-heaptype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-valid-heaptype : SpectecTerminal -> Bool .
+  op backend-close-super : SpectecTerminals SpectecTerminal ~> SpectecTerminal .
+  op backend-deftype-step : SpectecTerminals SpectecTerminal SpectecTerminal -> Bool .
+
+  eq backend-reftype-sub(REF(eps, RB_H1), REF(eps, RB_H2)) =
+      backend-heaptype-sub(RB_H1, RB_H2) .
+  eq backend-reftype-sub(REF(eps, RB_H1), REF(NULL ?, RB_H2)) =
+      backend-heaptype-sub(RB_H1, RB_H2) .
+  eq backend-reftype-sub(REF(NULL ?, RB_H1), REF(NULL ?, RB_H2)) =
+      backend-heaptype-sub(RB_H1, RB_H2) .
+  eq backend-reftype-sub(RB_H1, RB_H2) = false [owise] .
+
+  eq backend-valid-heaptype(ANY) = true .
+  eq backend-valid-heaptype(EQ) = true .
+  eq backend-valid-heaptype(I31) = true .
+  eq backend-valid-heaptype(STRUCT) = true .
+  eq backend-valid-heaptype(ARRAY) = true .
+  eq backend-valid-heaptype(NONE) = true .
+  eq backend-valid-heaptype(spectec-FUNC) = true .
+  eq backend-valid-heaptype(NOFUNC) = true .
+  eq backend-valid-heaptype(EXN) = true .
+  eq backend-valid-heaptype(NOEXN) = true .
+  eq backend-valid-heaptype(EXTERN) = true .
+  eq backend-valid-heaptype(NOEXTERN) = true .
+  eq backend-valid-heaptype(BOT) = true .
+  ceq backend-valid-heaptype(-DEF(REC(RB_SUBTYPES), RB_I)) = true
+    if indexDefined(RB_SUBTYPES, RB_I) .
+  eq backend-valid-heaptype(RB_H1) = false [owise] .
+
+  ceq backend-heaptype-sub(RB_H1, RB_H1) = true
+    if backend-valid-heaptype(RB_H1) .
+  eq backend-heaptype-sub(BOT, RB_H2) = backend-valid-heaptype(RB_H2) .
+  eq backend-heaptype-sub(EQ, ANY) = true .
+  eq backend-heaptype-sub(I31, EQ) = true .
+  eq backend-heaptype-sub(I31, ANY) = true .
+  eq backend-heaptype-sub(STRUCT, EQ) = true .
+  eq backend-heaptype-sub(STRUCT, ANY) = true .
+  eq backend-heaptype-sub(ARRAY, EQ) = true .
+  eq backend-heaptype-sub(ARRAY, ANY) = true .
+  ceq backend-heaptype-sub(-DEF(REC(RB_SUBTYPES), RB_I), RB_H2) =
+      backend-deftype-step(RB_SUBTYPES, RB_H2, RB_SUBTYPES [ RB_I ])
+    if indexDefined(RB_SUBTYPES, RB_I)
+       /\ (-DEF(REC(RB_SUBTYPES), RB_I)) =/= RB_H2 .
+  eq backend-heaptype-sub(RB_H1, RB_H2) = false [owise] .
+
+  eq backend-close-super(RB_SUBTYPES, REC(RB_I)) =
+      -DEF(REC(RB_SUBTYPES), RB_I) .
+  eq backend-close-super(RB_SUBTYPES, -DEF(RB_RECTYPE, RB_I)) =
+      -DEF(RB_RECTYPE, RB_I) .
+
+  eq backend-deftype-step(RB_SUBTYPES, RB_H2,
+      SUB(RB_FINAL, eps, spectec-STRUCT(RB_FIELDS))) =
+      backend-heaptype-sub(STRUCT, RB_H2) .
+  eq backend-deftype-step(RB_SUBTYPES, RB_H2,
+      SUB(RB_FINAL, eps, spectec-ARRAY(RB_COMPTYPE))) =
+      backend-heaptype-sub(ARRAY, RB_H2) .
+  eq backend-deftype-step(RB_SUBTYPES, RB_H2,
+      SUB(RB_FINAL, eps, FUNC RB_T1S -> RB_T2S)) =
+      backend-heaptype-sub(spectec-FUNC, RB_H2) .
+  ceq backend-deftype-step(RB_SUBTYPES, RB_H2,
+      SUB(RB_FINAL, RB_SUPER, spectec-STRUCT(RB_FIELDS))) =
+      backend-heaptype-sub(STRUCT, RB_H2)
+      or backend-heaptype-sub(RB_CLOSED, RB_H2)
+    if RB_CLOSED := backend-close-super(RB_SUBTYPES, RB_SUPER) .
+  ceq backend-deftype-step(RB_SUBTYPES, RB_H2,
+      SUB(RB_FINAL, RB_SUPER, spectec-ARRAY(RB_COMPTYPE))) =
+      backend-heaptype-sub(ARRAY, RB_H2)
+      or backend-heaptype-sub(RB_CLOSED, RB_H2)
+    if RB_CLOSED := backend-close-super(RB_SUBTYPES, RB_SUPER) .
+  ceq backend-deftype-step(RB_SUBTYPES, RB_H2,
+      SUB(RB_FINAL, RB_SUPER, FUNC RB_T1S -> RB_T2S)) =
+      backend-heaptype-sub(spectec-FUNC, RB_H2)
+      or backend-heaptype-sub(RB_CLOSED, RB_H2)
+    if RB_CLOSED := backend-close-super(RB_SUBTYPES, RB_SUPER) .
+  eq backend-deftype-step(RB_SUBTYPES, RB_H2, RB_COMPTYPE) = false [owise] .
+
+
+  --- Ref_ok ground predicate.
+  vars RO_S RO_REF RO_RT RO_ACTUAL RO_DEFTYPE : SpectecTerminal .
+  var RO_A RO_I : Nat .
+  vars RO_STORE RO_INSTANCE : Record .
+
+  op ref-ok-actual-type : SpectecTerminal SpectecTerminal ~> SpectecTerminal .
+
+  eq ref-ok-actual-type(RO_STORE, REF.NULL-ADDR) = REF(NULL ?, BOT) .
+  eq ref-ok-actual-type(RO_STORE, REF.I31-NUM(RO_I)) = REF(eps, I31) .
+  ceq ref-ok-actual-type(RO_STORE, REF.STRUCT-ADDR(RO_A)) =
+      REF(eps, RO_DEFTYPE)
+    if indexDefined(RO_STORE . 'STRUCTS, RO_A)
+       /\ RO_INSTANCE := (RO_STORE . 'STRUCTS) [ RO_A ]
+       /\ RO_DEFTYPE := RO_INSTANCE . 'TYPE .
+  ceq ref-ok-actual-type(RO_STORE, REF.ARRAY-ADDR(RO_A)) =
+      REF(eps, RO_DEFTYPE)
+    if indexDefined(RO_STORE . 'ARRAYS, RO_A)
+       /\ RO_INSTANCE := (RO_STORE . 'ARRAYS) [ RO_A ]
+       /\ RO_DEFTYPE := RO_INSTANCE . 'TYPE .
+  ceq ref-ok-actual-type(RO_STORE, REF.FUNC-ADDR(RO_A)) =
+      REF(eps, RO_DEFTYPE)
+    if indexDefined(RO_STORE . 'FUNCS, RO_A)
+       /\ RO_INSTANCE := (RO_STORE . 'FUNCS) [ RO_A ]
+       /\ RO_DEFTYPE := RO_INSTANCE . 'TYPE .
+  ceq ref-ok-actual-type(RO_STORE, REF.EXN-ADDR(RO_A)) = REF(eps, EXN)
+    if indexDefined(RO_STORE . 'EXNS, RO_A) .
+  eq ref-ok-actual-type(RO_STORE, REF.HOST-ADDR(RO_A)) = REF(eps, ANY) .
+  ceq ref-ok-actual-type(RO_STORE, REF.EXTERN(RO_REF)) = REF(eps, EXTERN)
+    if RO_REF =/= REF.NULL-ADDR
+       /\ Ref-ok(RO_STORE, RO_REF, REF(eps, ANY)) .
+
+  ceq Ref-ok(RO_S, RO_REF, RO_RT) =
+      backend-reftype-sub(RO_ACTUAL, RO_RT)
+    if RO_ACTUAL := ref-ok-actual-type(RO_S, RO_REF) .
+  eq Ref-ok(RO_S, RO_REF, RO_RT) = false [owise] .
+
+
+  --- Externaddr_ok ground predicate.
+  vars EA_S EA_ADDR EA_EXPECTED EA_ACTUAL EA_TYPE : SpectecTerminal .
+  vars EA_X1 EA_X2 EA_AT EA_L1 EA_L2 EA_R1 EA_R2 : SpectecTerminal .
+  vars EA_M1 EA_M2 : SpectecTerminals .
+  var EA_A EA_N1 EA_N2 EA_MAX1 EA_MAX2 : Nat .
+  vars EA_STORE EA_INSTANCE : Record .
+
+  op externaddr-ok-actual-type : SpectecTerminal SpectecTerminal ~> SpectecTerminal .
+  op backend-externtype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-tagtype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-globaltype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-memtype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-tabletype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-valtype-sub : SpectecTerminal SpectecTerminal -> Bool .
+  op backend-limits-sub : SpectecTerminal SpectecTerminal -> Bool .
+
+  ceq externaddr-ok-actual-type(EA_STORE, TAG(EA_A)) = TAG(EA_TYPE)
+    if indexDefined(EA_STORE . 'TAGS, EA_A)
+       /\ EA_INSTANCE := (EA_STORE . 'TAGS) [ EA_A ]
+       /\ EA_TYPE := EA_INSTANCE . 'TYPE .
+  ceq externaddr-ok-actual-type(EA_STORE, GLOBAL(EA_A)) = GLOBAL(EA_TYPE)
+    if indexDefined(EA_STORE . 'GLOBALS, EA_A)
+       /\ EA_INSTANCE := (EA_STORE . 'GLOBALS) [ EA_A ]
+       /\ EA_TYPE := EA_INSTANCE . 'TYPE .
+  ceq externaddr-ok-actual-type(EA_STORE, MEM(EA_A)) = MEM(EA_TYPE)
+    if indexDefined(EA_STORE . 'MEMS, EA_A)
+       /\ EA_INSTANCE := (EA_STORE . 'MEMS) [ EA_A ]
+       /\ EA_TYPE := EA_INSTANCE . 'TYPE .
+  ceq externaddr-ok-actual-type(EA_STORE, TABLE(EA_A)) = TABLE(EA_TYPE)
+    if indexDefined(EA_STORE . 'TABLES, EA_A)
+       /\ EA_INSTANCE := (EA_STORE . 'TABLES) [ EA_A ]
+       /\ EA_TYPE := EA_INSTANCE . 'TYPE .
+  ceq externaddr-ok-actual-type(EA_STORE, FUNC(EA_A)) = FUNC(EA_TYPE)
+    if indexDefined(EA_STORE . 'FUNCS, EA_A)
+       /\ EA_INSTANCE := (EA_STORE . 'FUNCS) [ EA_A ]
+       /\ EA_TYPE := EA_INSTANCE . 'TYPE .
+
+  ceq Externaddr-ok(EA_S, EA_ADDR, EA_EXPECTED) =
+      backend-externtype-sub(EA_ACTUAL, EA_EXPECTED)
+    if EA_ACTUAL := externaddr-ok-actual-type(EA_S, EA_ADDR) .
+  eq Externaddr-ok(EA_S, EA_ADDR, EA_EXPECTED) = false [owise] .
+
+  eq backend-externtype-sub(TAG(EA_X1), TAG(EA_X2)) =
+      backend-tagtype-sub(EA_X1, EA_X2) .
+  eq backend-externtype-sub(GLOBAL(EA_X1), GLOBAL(EA_X2)) =
+      backend-globaltype-sub(EA_X1, EA_X2) .
+  eq backend-externtype-sub(MEM(EA_X1), MEM(EA_X2)) =
+      backend-memtype-sub(EA_X1, EA_X2) .
+  eq backend-externtype-sub(TABLE(EA_X1), TABLE(EA_X2)) =
+      backend-tabletype-sub(EA_X1, EA_X2) .
+  eq backend-externtype-sub(FUNC(EA_X1), FUNC(EA_X2)) =
+      backend-heaptype-sub(EA_X1, EA_X2) .
+  eq backend-externtype-sub(EA_X1, EA_X2) = false [owise] .
+
+  eq backend-tagtype-sub(EA_X1, EA_X2) =
+      backend-heaptype-sub(EA_X1, EA_X2)
+      and backend-heaptype-sub(EA_X2, EA_X1) .
+
+  eq backend-globaltype-sub(
+      tuple(seq(eps) EA_X1), tuple(seq(eps) EA_X2)) =
+      backend-valtype-sub(EA_X1, EA_X2) .
+  eq backend-globaltype-sub(
+      tuple(seq(MUT) EA_X1), tuple(seq(MUT) EA_X2)) =
+      backend-valtype-sub(EA_X1, EA_X2)
+      and backend-valtype-sub(EA_X2, EA_X1) .
+  ceq backend-globaltype-sub(EA_X1, EA_X1) = true
+    if typecheck(EA_X1, globaltype) .
+  eq backend-globaltype-sub(EA_X1, EA_X2) = false [owise] .
+
+  ceq backend-valtype-sub(EA_X1, EA_X1) = true
+    if typecheck(EA_X1, valtype) .
+  eq backend-valtype-sub(REF(EA_M1, EA_X1), REF(EA_M2, EA_X2)) =
+      backend-reftype-sub(REF(EA_M1, EA_X1), REF(EA_M2, EA_X2)) .
+  eq backend-valtype-sub(EA_X1, EA_X2) = false [owise] .
+
+  ceq backend-limits-sub([ EA_N1 .. EA_MAX1 ? ], [ EA_N2 .. EA_MAX2 ? ]) = true
+    if EA_N1 >= EA_N2 = true /\ EA_MAX1 <= EA_MAX2 = true .
+  ceq backend-limits-sub([ EA_N1 .. EA_MAX1 ? ], [ EA_N2 .. eps ]) = true
+    if EA_N1 >= EA_N2 .
+  ceq backend-limits-sub([ EA_N1 .. eps ], [ EA_N2 .. eps ]) = true
+    if EA_N1 >= EA_N2 .
+  eq backend-limits-sub(EA_X1, EA_X2) = false [owise] .
+
+  eq backend-memtype-sub(__PAGE(EA_AT, EA_L1), __PAGE(EA_AT, EA_L2)) =
+      backend-limits-sub(EA_L1, EA_L2) .
+  eq backend-memtype-sub(EA_X1, EA_X2) = false [owise] .
+
+  eq backend-tabletype-sub(tuple(EA_AT EA_L1 EA_R1),
+      tuple(EA_AT EA_L2 EA_R2)) =
+      backend-limits-sub(EA_L1, EA_L2)
+      and backend-reftype-sub(EA_R1, EA_R2)
+      and backend-reftype-sub(EA_R2, EA_R1) .
+  eq backend-tabletype-sub(EA_X1, EA_X2) = false [owise] .
+
+
+  --- Module_ok deterministic result for modules already accepted by the
+  --- official validator.  It computes the full closed import/export type.
+  vars MO_TYPES MO_IMPORTS MO_TAGS MO_GLOBALS MO_MEMS MO_TABLES MO_FUNCS : SpectecTerminals .
+  vars MO_DATAS MO_ELEMS MO_START MO_EXPORTS MO_REST : SpectecTerminals .
+  vars MO_DTS MO_IMPORT_TYPES MO_EXPORT_TYPES : SpectecTerminals .
+  vars MO_TAG_TYPES MO_GLOBAL_TYPES MO_MEM_TYPES MO_TABLE_TYPES MO_FUNC_TYPES : SpectecTerminals .
+  vars MO_NAME1 MO_NAME2 MO_LOCALS : SpectecTerminals .
+  var MO_EXPR : InstrList .
+  vars MO_XT MO_JT MO_GT MO_MT MO_TT : SpectecTerminal .
+  var MO_X MO_I : Nat .
+
+  op module-ok-import-types : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op module-ok-tag-types : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op module-ok-global-types : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op module-ok-mem-types : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op module-ok-table-types : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op module-ok-func-types : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op module-ok-export-types :
+      SpectecTerminals SpectecTerminals SpectecTerminals
+      SpectecTerminals SpectecTerminals SpectecTerminals
+      ~> SpectecTerminals .
+
+  eq module-ok-import-types(MO_DTS, eps) = eps .
+  eq module-ok-import-types(MO_DTS,
+      IMPORT(MO_NAME1, MO_NAME2, MO_XT)) =
+      subst-all-externtype(MO_XT, MO_DTS) .
+  eq module-ok-import-types(MO_DTS,
+      IMPORT(MO_NAME1, MO_NAME2, MO_XT) MO_REST) =
+      subst-all-externtype(MO_XT, MO_DTS)
+      module-ok-import-types(MO_DTS, MO_REST) .
+
+  eq module-ok-tag-types(MO_DTS, eps) = eps .
+  eq module-ok-tag-types(MO_DTS, TAG(MO_JT)) =
+      subst-all-tagtype(MO_JT, MO_DTS) .
+  eq module-ok-tag-types(MO_DTS, TAG(MO_JT) MO_REST) =
+      subst-all-tagtype(MO_JT, MO_DTS)
+      module-ok-tag-types(MO_DTS, MO_REST) .
+
+  eq module-ok-global-types(MO_DTS, eps) = eps .
+  eq module-ok-global-types(MO_DTS,
+      spectec-GLOBAL(MO_GT, MO_EXPR)) =
+      subst-all-globaltype(MO_GT, MO_DTS) .
+  eq module-ok-global-types(MO_DTS,
+      spectec-GLOBAL(MO_GT, MO_EXPR) MO_REST) =
+      subst-all-globaltype(MO_GT, MO_DTS)
+      module-ok-global-types(MO_DTS, MO_REST) .
+
+  eq module-ok-mem-types(MO_DTS, eps) = eps .
+  eq module-ok-mem-types(MO_DTS, MEMORY(MO_MT)) =
+      subst-all-memtype(MO_MT, MO_DTS) .
+  eq module-ok-mem-types(MO_DTS, MEMORY(MO_MT) MO_REST) =
+      subst-all-memtype(MO_MT, MO_DTS)
+      module-ok-mem-types(MO_DTS, MO_REST) .
+
+  eq module-ok-table-types(MO_DTS, eps) = eps .
+  eq module-ok-table-types(MO_DTS,
+      spectec-TABLE(MO_TT, MO_EXPR)) =
+      subst-all-tabletype(MO_TT, MO_DTS) .
+  eq module-ok-table-types(MO_DTS,
+      spectec-TABLE(MO_TT, MO_EXPR) MO_REST) =
+      subst-all-tabletype(MO_TT, MO_DTS)
+      module-ok-table-types(MO_DTS, MO_REST) .
+
+  eq module-ok-func-types(MO_DTS, eps) = eps .
+  ceq module-ok-func-types(MO_DTS,
+      spectec-FUNC-2(MO_X, MO_LOCALS, MO_EXPR)) =
+      MO_DTS [ MO_X ]
+    if indexDefined(MO_DTS, MO_X) .
+  ceq module-ok-func-types(MO_DTS,
+      spectec-FUNC-2(MO_X, MO_LOCALS, MO_EXPR) MO_REST) =
+      (MO_DTS [ MO_X ]) module-ok-func-types(MO_DTS, MO_REST)
+    if indexDefined(MO_DTS, MO_X) .
+
+  eq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES, eps) = eps .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, TAG(MO_I))) =
+      TAG(MO_TAG_TYPES [ MO_I ])
+    if indexDefined(MO_TAG_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, GLOBAL(MO_I))) =
+      GLOBAL(MO_GLOBAL_TYPES [ MO_I ])
+    if indexDefined(MO_GLOBAL_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, MEM(MO_I))) =
+      MEM(MO_MEM_TYPES [ MO_I ])
+    if indexDefined(MO_MEM_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, TABLE(MO_I))) =
+      TABLE(MO_TABLE_TYPES [ MO_I ])
+    if indexDefined(MO_TABLE_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, FUNC(MO_I))) =
+      FUNC(MO_FUNC_TYPES [ MO_I ])
+    if indexDefined(MO_FUNC_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, TAG(MO_I)) MO_REST) =
+      TAG(MO_TAG_TYPES [ MO_I ])
+      module-ok-export-types(
+        MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+        MO_TABLE_TYPES, MO_FUNC_TYPES, MO_REST)
+    if indexDefined(MO_TAG_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, GLOBAL(MO_I)) MO_REST) =
+      GLOBAL(MO_GLOBAL_TYPES [ MO_I ])
+      module-ok-export-types(
+        MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+        MO_TABLE_TYPES, MO_FUNC_TYPES, MO_REST)
+    if indexDefined(MO_GLOBAL_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, MEM(MO_I)) MO_REST) =
+      MEM(MO_MEM_TYPES [ MO_I ])
+      module-ok-export-types(
+        MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+        MO_TABLE_TYPES, MO_FUNC_TYPES, MO_REST)
+    if indexDefined(MO_MEM_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, TABLE(MO_I)) MO_REST) =
+      TABLE(MO_TABLE_TYPES [ MO_I ])
+      module-ok-export-types(
+        MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+        MO_TABLE_TYPES, MO_FUNC_TYPES, MO_REST)
+    if indexDefined(MO_TABLE_TYPES, MO_I) .
+  ceq module-ok-export-types(
+      MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+      MO_TABLE_TYPES, MO_FUNC_TYPES,
+      EXPORT(MO_NAME1, FUNC(MO_I)) MO_REST) =
+      FUNC(MO_FUNC_TYPES [ MO_I ])
+      module-ok-export-types(
+        MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+        MO_TABLE_TYPES, MO_FUNC_TYPES, MO_REST)
+    if indexDefined(MO_FUNC_TYPES, MO_I) .
+
+  ceq Module-ok(MODULE(
+      MO_TYPES, MO_IMPORTS, MO_TAGS, MO_GLOBALS, MO_MEMS, MO_TABLES,
+      MO_FUNCS, MO_DATAS, MO_ELEMS, MO_START, MO_EXPORTS)) =
+      MO_IMPORT_TYPES -> MO_EXPORT_TYPES
+    if MO_DTS := alloctypes(MO_TYPES)
+       /\ MO_IMPORT_TYPES := module-ok-import-types(MO_DTS, MO_IMPORTS)
+       /\ MO_TAG_TYPES := tagsxt(MO_IMPORT_TYPES)
+           ++ module-ok-tag-types(MO_DTS, MO_TAGS)
+       /\ MO_GLOBAL_TYPES := globalsxt(MO_IMPORT_TYPES)
+           ++ module-ok-global-types(MO_DTS, MO_GLOBALS)
+       /\ MO_MEM_TYPES := memsxt(MO_IMPORT_TYPES)
+           ++ module-ok-mem-types(MO_DTS, MO_MEMS)
+       /\ MO_TABLE_TYPES := tablesxt(MO_IMPORT_TYPES)
+           ++ module-ok-table-types(MO_DTS, MO_TABLES)
+       /\ MO_FUNC_TYPES := funcsxt(MO_IMPORT_TYPES)
+           ++ module-ok-func-types(MO_DTS, MO_FUNCS)
+       /\ MO_EXPORT_TYPES := module-ok-export-types(
+            MO_TAG_TYPES, MO_GLOBAL_TYPES, MO_MEM_TYPES,
+            MO_TABLE_TYPES, MO_FUNC_TYPES, MO_EXPORTS) .
+
+endm
