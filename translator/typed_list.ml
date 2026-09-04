@@ -40,13 +40,12 @@ let import metadata sort =
          ; rename "size" sequence.size
          ; rename "$size" (sort ^ "SizeAux")
          ]
+         @ (if sequence.concat = "_ _" then []
+            else [rename "__" sequence.concat])
        ))
 
 let imports metadata =
-  match Sort_metadata.typed_list_roots metadata with
-  | [] -> []
-  | [sort] -> [import metadata sort]
-  | _ -> invalid_arg "typed-list sorts must have one common maximal sort"
+  Sort_metadata.typed_list_roots metadata |> List.map (import metadata)
 
 let op ?(arrow = Total) ?(attrs = []) name domain codomain =
   OpDecl {name; domain; codomain; arrow; attrs}
@@ -84,14 +83,15 @@ let lower_list metadata sort =
   let reverse_name = root ^ "Reverse" in
   let reverse_aux = root ^ "ReverseAux" in
   let size_aux = root ^ "SizeAux" in
+  let concat_name = if sequence.concat = "_ _" then "__" else sequence.concat in
   [ SortDecl nonempty
   ; SortDecl list
   ; SubsortDecl (sort, nonempty)
   ; SubsortDecl (nonempty, list)
   ; op ~attrs:[Ctor] sequence.empty [] list
-  ; op ~attrs:[Ctor; Ditto] "__" [list; list] list
-  ; op ~attrs:[Ctor; Ditto] "__" [nonempty; list] nonempty
-  ; op ~attrs:[Ctor; Ditto] "__" [list; nonempty] nonempty
+  ; op ~attrs:[Ctor; Ditto] concat_name [list; list] list
+  ; op ~attrs:[Ctor; Ditto] concat_name [nonempty; list] nonempty
+  ; op ~attrs:[Ctor; Ditto] concat_name [list; nonempty] nonempty
   ; op sequence.append [list; list] list
   ; op sequence.append [nonempty; list] nonempty
   ; op sequence.append [list; nonempty] nonempty

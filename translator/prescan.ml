@@ -1188,6 +1188,52 @@ let scan script =
     |> List.filter (fun (iteration : iteration) ->
          owner_supported iteration.owner)
   in
+  (* Renamed list families cannot silently pass through an erased X* API:
+   * its equations still match the generic eps/__ constructors. *)
+  if Sort_metadata.separate_list_families sort_metadata then begin
+    let rec check id actual formal =
+      let owner = Sort_metadata.typed_list_owner sort_metadata in
+      match owner actual, owner formal with
+      | Some _, None | None, Some _ ->
+          Util.Error.error id.at "translation"
+            ("Unsupported: call $" ^ id.it
+             ^ " crosses renamed typed-list and generic representations ("
+             ^ Il.Print.string_of_typ actual ^ " / "
+             ^ Il.Print.string_of_typ formal
+             ^ "); list conversion is not implemented")
+      | _ ->
+          begin match actual.it, formal.it with
+          | IterT (actual, _), IterT (formal, _) -> check id actual formal
+          | TupT actuals, TupT formals
+            when List.length actuals = List.length formals ->
+              List.iter2 (fun (_, a) (_, f) -> check id a f) actuals formals
+          | _ -> ()
+          end
+    in
+    let module Visitor = Il.Iter.Make (struct
+      include Il.Iter.Skip
+      let visit_exp exp =
+        match exp.it with
+        | CallE (id, args) ->
+            let params, result =
+              match List.find_opt
+                (fun (call, _) -> call == exp) !definition_calls with
+              | Some (_, parameter) -> parameter.params, parameter.result
+              | None ->
+                  let params, result, _ = Il.Env.find_def type_env id in
+                  params, result
+            in
+            List.iter2
+              (fun param arg ->
+                match param.it, arg.it with
+                | ExpP (_, typ), ExpA arg -> check id arg.note typ
+                | _ -> ())
+              params args;
+            check id exp.note result
+        | _ -> ()
+    end) in
+    List.iter Visitor.def script
+  end;
   { type_env
   ; sort_metadata
   ; iterations

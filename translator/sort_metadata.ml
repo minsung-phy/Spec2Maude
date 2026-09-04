@@ -316,6 +316,30 @@ and sort_of_inst metadata seen inst =
            else constructor_result_sort metadata mixop)
       |> common_sort
 
+(* Shared list constructors require a chain: sibling lists would give their
+ * common empty constructor two incomparable least sorts. Independent chains
+ * are instantiated separately. *)
+let validate_list_families hints lists edges =
+  let below source target = is_subsort edges [] source target in
+  List.iter
+    (fun source ->
+      List.iter
+        (fun target ->
+          let connected =
+            List.exists
+              (fun sort ->
+                (below source sort && below target sort)
+                || (below sort source && below sort target))
+              lists
+          in
+          if connected && not (below source target || below target source) then
+            let hint = List.hd (hint_values "maude_sort" (List.assoc source hints)) in
+            Util.Error.error hint.hintid.at "translation"
+              ("Unsupported: typed-list family branches between " ^ source
+               ^ " and " ^ target ^ "; shared list constructors require a chain"))
+        lists)
+    lists
+
 let scan script =
   let definitions = type_definitions script in
   let hints = type_hints script in
@@ -325,6 +349,7 @@ let scan script =
   let annotated = order_sorts edges annotated in
   let proper = proper_sorts_of annotated edges in
   let lists = typed_list_sorts_of script annotated edges in
+  validate_list_families hints lists edges;
   let owners = constructor_owners_of definitions annotated in
   { type_env = Il.Env.env_of_script script
   ; type_definitions = definitions
@@ -348,7 +373,18 @@ let typed_parents metadata sort =
        else None)
 
 let typed_parent metadata sort =
-  match typed_parents metadata sort with
+  let parents = typed_parents metadata sort in
+  (* Ignore redundant transitive edges from explicit subsort hints. *)
+  let immediate =
+    List.filter
+      (fun parent ->
+        not (List.exists
+          (fun other -> other <> parent && is_subsort metadata.edges [] other parent)
+          parents))
+      parents
+    |> List.sort_uniq String.compare
+  in
+  match immediate with
   | [] -> None
   | [parent] -> Some parent
   | _ -> invalid_arg "typed-list subsort has multiple immediate supersorts"
@@ -366,6 +402,9 @@ let typed_list_root metadata sort =
 let typed_list_roots metadata =
   metadata.lists
   |> List.filter (fun sort -> Option.is_none (typed_parent metadata sort))
+
+let separate_list_families metadata =
+  List.length (typed_list_roots metadata) > 1
 
 let typed_list_subsort_edges metadata =
   metadata.edges
@@ -393,9 +432,12 @@ let rec typed_list_owner metadata typ =
 let typed_sequence_representation metadata owner =
   let title = String.capitalize_ascii owner in
   let root = typed_list_root metadata owner in
+  let separate = separate_list_families metadata in
+  (* Keep the existing generic representation for a single family. Different
+   * roots must not overload one empty constant with incomparable sorts. *)
   { sort = title ^ "List"
-  ; empty = "eps"
-  ; concat = "_ _"
+  ; empty = if separate then root ^ "Nil" else "eps"
+  ; concat = if separate then root ^ "Concat" else "_ _"
   ; append = root ^ "Append"
   ; occurs = root ^ "Occurs"
   ; size = root ^ "Size"
