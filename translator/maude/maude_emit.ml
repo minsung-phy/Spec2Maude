@@ -9,7 +9,7 @@ let join separator strings =
 let indent text =
   text
   |> String.split_on_char '\n'
-  |> List.map (fun line -> "  " ^ line)
+  |> List.map (fun line -> if line = "" then "" else "  " ^ line)
   |> join "\n"
 
 
@@ -110,8 +110,14 @@ let emit_op_attr = function
   | Comm ->
       "comm"
 
+  | Ditto ->
+      "ditto"
+
   | Id term ->
       "id: " ^ emit_term term
+
+  | Prec precedence ->
+      "prec " ^ string_of_int precedence
 
   | Frozen positions ->
       let positions =
@@ -282,17 +288,43 @@ let rec emit_statement = function
       ^ " ."
 
 
-(* Imports *)
+(* Module expressions and imports *)
+
+let emit_renaming = function
+  | SortRenaming (source, target) ->
+      "sort " ^ source ^ " to " ^ target
+
+  | OpRenaming (source, target) ->
+      "op " ^ source ^ " to " ^ target
+
+let rec emit_module_expr = function
+  | ModuleName name ->
+      name
+
+  | ModuleInstantiation (name, arguments) ->
+      name ^ "{" ^ join ", " arguments ^ "}"
+
+  | ModuleRenaming (module_expr, []) ->
+      emit_module_expr module_expr
+
+  | ModuleRenaming (module_expr, renamings) ->
+      let renamings =
+        renamings
+        |> List.map emit_renaming
+        |> join ",\n"
+        |> indent
+      in
+      emit_module_expr module_expr ^ " * (\n" ^ renamings ^ "\n)"
 
 let emit_import = function
-  | Protecting name ->
-      "protecting " ^ name ^ " ."
+  | Protecting module_expr ->
+      "protecting " ^ emit_module_expr module_expr ^ " ."
 
-  | Including name ->
-      "including " ^ name ^ " ."
+  | Including module_expr ->
+      "including " ^ emit_module_expr module_expr ^ " ."
 
-  | Extending name ->
-      "extending " ^ name ^ " ."
+  | Extending module_expr ->
+      "extending " ^ emit_module_expr module_expr ^ " ."
 
 
 (* Statement lists *)
@@ -336,3 +368,39 @@ let emit_module (modul : modul) =
     opening ^ " " ^ modul.name ^ " is\n"
     ^ body ^ "\n"
     ^ closing
+
+
+(* Views and top-level units *)
+
+let emit_view_mapping = function
+  | SortMapping (source, target) ->
+      "sort " ^ source ^ " to " ^ target ^ " ."
+
+  | OpMapping (source, target) ->
+      "op " ^ source ^ " to " ^ target ^ " ."
+
+let emit_view (view : view) =
+  let mappings =
+    view.mappings
+    |> List.map emit_view_mapping
+    |> join "\n"
+    |> indent
+  in
+  let opening =
+    "view " ^ view.name
+    ^ " from " ^ emit_module_expr view.source
+    ^ " to " ^ emit_module_expr view.target
+    ^ " is"
+  in
+  if mappings = "" then opening ^ "\nendv"
+  else opening ^ "\n" ^ mappings ^ "\nendv"
+
+let emit_top_level = function
+  | Module modul -> emit_module modul
+  | View view -> emit_view view
+  | Load path -> "load " ^ path
+
+let emit_top_levels top_levels =
+  top_levels
+  |> List.map emit_top_level
+  |> join "\n\n"

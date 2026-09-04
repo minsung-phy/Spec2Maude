@@ -4,7 +4,7 @@ fmod DSL-TERM is
   sort SpectecDef .
 endfm
 
-fmod DSL-PRETYPE is
+fmod DSL-PRETYPE-BASE is
   protecting DSL-TERM .
   protecting BOOL .
   protecting NAT .
@@ -13,10 +13,7 @@ fmod DSL-PRETYPE is
   protecting FLOAT .
   protecting STRING .
 
-  sort SpectecTerminals .
-
   subsorts Nat Int < SpectecTerminal .
-  subsort SpectecTerminal < SpectecTerminals .
 
   ops bool nat int rat real text : -> SpectecType [ctor] .
   ops iterOpt iterList iterList1 : SpectecType -> SpectecType [ctor] .
@@ -27,16 +24,6 @@ fmod DSL-PRETYPE is
   op float : Float -> SpectecTerminal [ctor] .
   op text : String -> SpectecTerminal [ctor] .
 
-  op eps : -> SpectecTerminals [ctor] .
-  op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals
-    [ctor assoc id: eps] .
-
-  --- A nested sequence is one element of an outer sequence.
-
-  op seq : SpectecTerminals -> SpectecTerminal [ctor] .
-  op unseq : SpectecTerminal ~> SpectecTerminals .
-  eq unseq(seq(TS)) = TS .
-
   op typecheck : [SpectecTerminal] SpectecType -> Bool .
 
   var B : Bool .
@@ -45,11 +32,6 @@ fmod DSL-PRETYPE is
   var R : Rat .
   var F : Float .
   var S : String .
-  var K : [SpectecTerminal] .
-  var T : SpectecTerminal .
-  var TS : SpectecTerminals .
-  var TYPE : SpectecType .
-
   eq typecheck(bool(B), bool) = true .
   eq typecheck(N, nat) = true .
   eq typecheck(I, int) = true .
@@ -57,8 +39,4 @@ fmod DSL-PRETYPE is
   eq typecheck(float(F), real) = true .
   eq typecheck(text(S), text) = true .
 
-  eq typecheck(eps, TYPE) = true .
-  ceq typecheck(T TS, TYPE) = typecheck(TS, TYPE)
-    if TS =/= eps /\ typecheck(T, TYPE) .
-  eq typecheck(K, TYPE) = false [owise] .
 endfm

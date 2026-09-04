@@ -375,8 +375,14 @@ let choice_helper index id result_typ
       let helper argument = App (choice.helper_name, [argument]) in
       let result_sort = Term.translate_sort index result_typ in
       let request_sort = Prescan.rewrite_sort index id in
-      let rest = generated_variable "CHOICE-REST" "SpectecTerminals" in
-      let head = generated_variable "CHOICE-HEAD" "SpectecTerminal" in
+      let representation =
+        Prescan.sequence_representation index choice.collection.note
+      in
+      let rest = generated_variable "CHOICE-REST" representation.sort in
+      let head =
+        generated_variable "CHOICE-HEAD"
+          (Term.translate_sort index choice.element.note)
+      in
       let result = generated_variable "CHOICE-RESULT" result_sort in
       let selected = Term.translate_exp index choice.element in
       let selected_head =
@@ -384,19 +390,23 @@ let choice_helper index id result_typ
       in
       [ OpDecl
           { name = choice.helper_name
-          ; domain = ["SpectecTerminals"]
+          ; domain = [representation.sort]
           ; codomain = request_sort
           ; arrow = Total
           ; attrs = [Frozen [1]]
           }
       ; Rl
           ( None
-          , helper (Term.sequence [selected_head; Var rest])
+          , helper
+              (Term.sequence_of_typ index choice.collection.note
+                 [selected_head; Var rest])
           , Term.translate_exp index rhs
           )
       ; Crl
           ( None
-          , helper (Term.sequence [Var head; Var rest])
+          , helper
+              (Term.sequence_of_typ index choice.collection.note
+                 [Var head; Var rest])
           , Var result
           , [RewriteCond (helper (Var rest), Var result)]
           )

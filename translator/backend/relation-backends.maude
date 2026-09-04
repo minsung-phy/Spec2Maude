@@ -231,7 +231,8 @@ mod SPEC2MAUDE-RELATION-BACKENDS is
   vars MO_DATAS MO_ELEMS MO_START MO_EXPORTS MO_REST : SpectecTerminals .
   vars MO_DTS MO_IMPORT_TYPES MO_EXPORT_TYPES : SpectecTerminals .
   vars MO_TAG_TYPES MO_GLOBAL_TYPES MO_MEM_TYPES MO_TABLE_TYPES MO_FUNC_TYPES : SpectecTerminals .
-  vars MO_NAME1 MO_NAME2 MO_LOCALS MO_EXPR : SpectecTerminals .
+  vars MO_NAME1 MO_NAME2 MO_LOCALS : SpectecTerminals .
+  var MO_EXPR : InstrList .
   vars MO_XT MO_JT MO_GT MO_MT MO_TT : SpectecTerminal .
   var MO_X MO_I : Nat .
 
