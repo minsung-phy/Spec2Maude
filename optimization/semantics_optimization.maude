@@ -1,4 +1,0 @@
-load support/support.maude
-load output_optimization.maude
-load relation-backends.maude
-load builtins.maude

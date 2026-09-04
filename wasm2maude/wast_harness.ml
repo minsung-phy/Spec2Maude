@@ -8,7 +8,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    InstanceEnv ScriptState ResultPattern ResultPatterns\n\
        \    ResultAlternatives LanePattern LanePatterns MatchVerdict .\n\
        \  subsort Command < Commands .\n\
-       \  op action.invoke : Nat SpectecTerminals SpectecTerminals\n\
+       \  op action.invoke : Nat SpectecTerminals ValList\n\
        \    -> ScriptAction [ctor] .\n\
        \  op action.get : Nat SpectecTerminals -> ScriptAction [ctor] .\n\
        \  op commands.nil : -> Commands [ctor] .\n\
@@ -58,7 +58,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op match.or : MatchVerdict MatchVerdict -> MatchVerdict .\n\
        \  op match.value : SpectecTerminal ResultPattern\n\
        \    -> MatchVerdict .\n\
-       \  op match.values : SpectecTerminals ResultPatterns\n\
+       \  op match.values : ValList ResultPatterns\n\
        \    -> MatchVerdict .\n\
        \  op match.any : SpectecTerminal ResultAlternatives\n\
        \    -> MatchVerdict .\n\n\
@@ -102,7 +102,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    -> ScriptState [ctor frozen (4)] .\n\
        \  op script.uninstantiable : Nat InstanceEnv Commands SpectecTerminal\n\
        \    -> ScriptState [ctor frozen (4)] .\n\
-       \  op script.wrong-result : Nat SpectecTerminals ResultPatterns\n\
+       \  op script.wrong-result : Nat ValList ResultPatterns\n\
        \    -> ScriptState [ctor] .\n\
        \  op script.wrong-assertion : Nat -> ScriptState [ctor] .\n\
        \  op script.link-error : Nat -> ScriptState [ctor] .\n\
@@ -110,16 +110,17 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op inputCommands : -> Commands .\n\
        \  op emptyStore : -> SpectecTerminal .\n\
        \  op hostFunctionAddresses : -> SpectecTerminals .\n\
-       \  op hostArguments : SpectecTerminals SpectecTerminals -> Bool .\n\
+       \  op hostArguments : ValList SpectecTerminals -> Bool .\n\
        \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
        \  op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
-       \  op runtimeResults : SpectecTerminals -> Bool .\n\n\
-       \  op activeFrameDepth : SpectecTerminals -> Nat .\n\n\
+       \  op runtimeResults : ValList -> Bool .\n\n\
+       \  op activeFrameDepth : InstrList -> Nat .\n\n\
        \  vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .\n\
        \  vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .\n\
-       \  vars WSHNAME WSHOTHER WSHLOCALS WSHEXPORTS WSHARGS WSHACTUAL : SpectecTerminals .\n\
-       \  vars WSHLANES WSHVALUES WSHTYPES WSHMAX WSHBODY WSHINSTRS : SpectecTerminals .\n\
-       \  vars WSHREST WSHCATCHES : SpectecTerminals .\n\
+       \  vars WSHNAME WSHOTHER WSHLOCALS WSHEXPORTS : SpectecTerminals .\n\
+       \  vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .\n\
+       \  vars WSHARGS WSHACTUAL WSHVALUES : ValList .\n\
+       \  vars WSHBODY WSHINSTRS WSHREST : InstrList .\n\
        \  var WSHCMDS : Commands .\n\
        \  vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .\n\
        \  var WSHREQUIREMENT : ImportRequirement .\n\

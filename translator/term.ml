@@ -93,10 +93,10 @@ let rec sequence = function
   | term :: terms -> app "_ _" [term; sequence terms]
 
 let rec sequence_with representation = function
-  | [] -> Const representation.Sort_metadata.empty
+  | [] -> Const representation.Hintd.empty
   | [term] -> term
   | term :: terms ->
-      app representation.Sort_metadata.concat
+      app representation.Hintd.concat
         [term; sequence_with representation terms]
 
 let sequence_of_typ index typ terms =
@@ -120,7 +120,7 @@ let rec record_items = function
 
 let as_sequence_element index typ term =
   match
-    Sort_metadata.sequence_element_wrappers
+    Hintd.sequence_element_wrappers
       (Prescan.sort_metadata index) typ
   with
   | Some (box, _) -> app box [term]
@@ -128,7 +128,7 @@ let as_sequence_element index typ term =
 
 let from_sequence_element index typ term =
   match
-    Sort_metadata.sequence_element_wrappers
+    Hintd.sequence_element_wrappers
       (Prescan.sort_metadata index) typ
   with
   | Some (_, unbox) -> app unbox [term]

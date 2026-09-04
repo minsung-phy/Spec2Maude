@@ -82,7 +82,8 @@ type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
   { type_env : Il.Env.t
-  ; sort_metadata : Sort_metadata.t
+  ; sort_metadata : Hintd.t
+  ; contexts : Hintd.context list
   ; iterations : iteration list
   ; projector_bodies : exp list
   ; premise_iterations : premise_iteration list
@@ -168,10 +169,10 @@ and case_sort env definitions seen (mixop, (typ, _, _), _) =
     "SpectecTerminal"
 
 let sort_of_typ index typ =
-  Sort_metadata.sort_of_typ index.sort_metadata typ
+  Hintd.sort_of_typ index.sort_metadata typ
 
 let sequence_representation index typ =
-  Sort_metadata.sequence_representation index.sort_metadata typ
+  Hintd.sequence_representation index.sort_metadata typ
 
 type composition_kind = SequenceComposition | RecordComposition
 
@@ -219,7 +220,7 @@ let composition_kind index typ =
 
 let rec parameter_sort metadata param =
   match param.it with
-  | ExpP (_, typ) -> Sort_metadata.sort_of_typ metadata typ
+  | ExpP (_, typ) -> Hintd.sort_of_typ metadata typ
   | TypP _ -> "SpectecType"
   | DefP (_, params, result) ->
       let sort, _, _ =
@@ -230,7 +231,7 @@ let rec parameter_sort metadata param =
 
 and definition_signature_with metadata params result =
   let domain = List.map (parameter_sort metadata) params in
-  let codomain = Sort_metadata.sort_of_typ metadata result in
+  let codomain = Hintd.sort_of_typ metadata result in
   let args =
     match domain with [] -> "Unit" | _ -> String.concat "-" domain
   in
@@ -604,7 +605,7 @@ let rec collect_membership_choices = function
 
 let scan script =
   let type_env = Il.Env.env_of_script script in
-  let sort_metadata = Sort_metadata.scan script in
+  let sort_metadata = Hintd.scan_sorts script in
   let rec collect_type_definitions definitions = function
     | [] -> definitions
     | def :: defs ->
@@ -732,7 +733,7 @@ let scan script =
   let definition_values = ref [] in
   let definition_applications = ref [] in
   let sort_of_typ typ =
-    Sort_metadata.sort_of_typ sort_metadata typ
+    Hintd.sort_of_typ sort_metadata typ
   in
 
   let add_variable_with_sort id sort =
@@ -1101,6 +1102,14 @@ let scan script =
         | Error reason -> policies, (source, reason) :: unsupported)
       relations ([], [])
   in
+  let contexts =
+    Hintd.scan_contexts sort_metadata
+      (fun source ->
+        match List.assoc_opt source relation_policies with
+        | Some (Execution {input_count; _}) -> Some input_count
+        | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
+        | None -> None)
+  in
   let relation_enabled_helpers =
     let rec collect acc def =
       match def.it with
@@ -1190,9 +1199,9 @@ let scan script =
   in
   (* Renamed list families cannot silently pass through an erased X* API:
    * its equations still match the generic eps/__ constructors. *)
-  if Sort_metadata.separate_list_families sort_metadata then begin
+  if Hintd.separate_list_families sort_metadata then begin
     let rec check id actual formal =
-      let owner = Sort_metadata.typed_list_owner sort_metadata in
+      let owner = Hintd.typed_list_owner sort_metadata in
       match owner actual, owner formal with
       | Some _, None | None, Some _ ->
           Util.Error.error id.at "translation"
@@ -1236,6 +1245,7 @@ let scan script =
   end;
   { type_env
   ; sort_metadata
+  ; contexts
   ; iterations
   ; projector_bodies = List.rev !projector_bodies
   ; premise_iterations
@@ -1380,7 +1390,7 @@ let type_parameter index id =
   |> Option.map (fun name -> Maude_il.source_variable name "SpectecType")
 
 let same_representation index source target =
-  Sort_metadata.representation_inclusion index.sort_metadata source target
+  Hintd.representation_inclusion index.sort_metadata source target
 
 let alias_type index typ =
   match typ.it with
@@ -1439,3 +1449,10 @@ let premise_iteration index premise =
 
 let hints index = index.hints
 let sort_metadata index = index.sort_metadata
+let contexts index = index.contexts
+
+let is_context_rule index relation rule =
+  List.exists
+    (fun (context : Hintd.context) ->
+      context.source.id.it = relation.it && context.rule == rule)
+    index.contexts
