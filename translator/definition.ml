@@ -60,14 +60,14 @@ let normalize_constructor_declarations statements =
 
 let sort_metadata_declarations metadata =
   let annotated =
-    Sort_metadata.annotated_sorts metadata |> List.map (fun sort -> SortDecl sort)
+    Hintd.annotated_sorts metadata |> List.map (fun sort -> SortDecl sort)
   in
   let proper =
-    Sort_metadata.proper_sorts metadata
+    Hintd.proper_sorts metadata
     |> List.map (fun (proper, _) -> SortDecl proper)
   in
   let edges =
-    Sort_metadata.subsort_edges metadata @ Sort_metadata.proper_sorts metadata
+    Hintd.subsort_edges metadata @ Hintd.proper_sorts metadata
     |> List.map (fun (subsort, supersort) -> SubsortDecl (subsort, supersort))
   in
   annotated @ proper @ edges
@@ -180,7 +180,9 @@ let rec translate ?request_output index def =
   | TypD (id, params, insts) -> Typd.translate index id params insts
   | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
   | RelD (id, params, mixop, typ, rules) ->
-      Reld.translate ?request_output index id params mixop typ rules
+      Reld.translate ?request_output
+        ~include_rule:(fun rule -> not (Prescan.is_context_rule index id rule))
+        index id params mixop typ rules
   | GramD _ -> []
   | HintD _ -> []
   | RecD defs -> List.concat_map (translate ?request_output index) defs
@@ -213,6 +215,7 @@ let translate_script script =
     if not (List.mem request !output_requests) then
       output_requests := request :: !output_requests
   in
+  let context_rules = Reld.translate_contexts ~request_output index in
   let translated_definitions =
     List.concat_map (translate ~request_output index) script
     @ Param.translate_applications index
@@ -244,18 +247,18 @@ let translate_script script =
     in
     Iter.translate_premise_all translate_body index !output_requests
   in
-  let typed_list_support = Typed_list.statements sort_metadata in
+  let typed_list_support = Typd.list_statements sort_metadata in
   let list_statements =
     normalize_module ~constructors:false [] typed_list_support
   in
   let generated_statements =
-    Typed_list.generated_statements sort_metadata
-    @ translated_definitions @ iterations @ premise_iterations
+    Typd.list_generated_statements sort_metadata
+    @ context_rules @ translated_definitions @ iterations @ premise_iterations
     |> normalize_module (Prescan.variable_declarations index)
   in
   { sort_statements = sort_metadata_declarations sort_metadata
-  ; list_views = Typed_list.views sort_metadata
-  ; list_imports = Typed_list.imports sort_metadata
+  ; list_views = Typd.list_views sort_metadata
+  ; list_imports = Typd.list_imports sort_metadata
   ; list_statements
   ; generated_statements
   }

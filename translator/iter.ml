@@ -11,7 +11,7 @@ let rec sequence = function
   | term :: terms -> app "_ _" [term; sequence terms]
 
 let rec sequence_with representation = function
-  | [] -> Const representation.Sort_metadata.empty
+  | [] -> Const representation.Hintd.empty
   | [term] -> term
   | term :: terms ->
       app representation.concat [term; sequence_with representation terms]
@@ -28,7 +28,7 @@ let iterated_typ body iter =
 
 let as_sequence_element index typ term =
   match
-    Sort_metadata.sequence_element_wrappers
+    Hintd.sequence_element_wrappers
       (Prescan.sort_metadata index) typ
   with
   | Some (box, _) -> app box [term]
