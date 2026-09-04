@@ -1,4 +1,3 @@
-load pretype.maude
 load scalar.maude
 load option.maude
 load sequence.maude

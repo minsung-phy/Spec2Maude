@@ -80,13 +80,13 @@ let rec translate_pattern index exp =
       translate_sequence_pattern index "tuple" exps
 
   | ListE exps ->
-      translate_list_pattern index exps
+      translate_list_pattern index exp.note exps
 
   | CatE (left, right) ->
       begin match translate_pattern index left, translate_pattern index right with
       | Some left, Some right ->
           Some
-            { term = Term.sequence [left.term; right.term]
+            { term = Term.sequence_of_typ index exp.note [left.term; right.term]
             ; guards = left.guards @ right.guards
             }
       | None, _ | _, None -> None
@@ -154,7 +154,7 @@ and translate_sequence_pattern index name exps =
        ; guards = pattern_guards patterns
        })
 
-and translate_list_pattern index exps =
+and translate_list_pattern index typ exps =
   translate_patterns index exps
   |> Option.map (fun patterns ->
        let terms =
@@ -163,7 +163,9 @@ and translate_list_pattern index exps =
              Term.as_sequence_element index exp.note pattern.term)
            exps patterns
        in
-       {term = Term.sequence terms; guards = pattern_guards patterns})
+       { term = Term.sequence_of_typ index typ terms
+       ; guards = pattern_guards patterns
+       })
 
 and translate_case_pattern index mixop payload =
   if Mixop.is_hole_only mixop then
@@ -370,7 +372,7 @@ and bind_structural_pattern index bound exp subject error =
         List.map2
           (fun exp subject -> Term.as_sequence_element index exp.note subject)
           exps subjects
-        |> Term.sequence
+        |> Term.sequence_of_typ index exp.note
       in
       bind_pattern_parts index bound exps subjects
         [EqCondition (MatchCond (represented, subject))] error
@@ -378,7 +380,10 @@ and bind_structural_pattern index bound exp subject error =
       let exps = [left; right] in
       let subjects = pattern_subjects index "CONCAT-PART" exps in
       bind_pattern_parts index bound exps subjects
-        [EqCondition (MatchCond (Term.sequence subjects, subject))] error
+        [ EqCondition
+            (MatchCond
+               (Term.sequence_of_typ index exp.note subjects, subject))
+        ] error
   | CaseE (mixop, payload) ->
       bind_case_pattern index bound mixop payload subject error
   | OptE (Some inner) ->
@@ -590,12 +595,19 @@ let translate_rewrite_call index bound call result =
 let translate_binding_membership index bound element collection =
   match collection.note.it, translate_pattern index element with
   | IterT _, Some pattern ->
-      let prefix = Var (generated_variable "MEMBER-PREFIX" "SpectecTerminals") in
-      let suffix = Var (generated_variable "MEMBER-SUFFIX" "SpectecTerminals") in
+      let representation = Prescan.sequence_representation index collection.note in
+      let prefix =
+        Var (generated_variable "MEMBER-PREFIX" representation.sort)
+      in
+      let suffix =
+        Var (generated_variable "MEMBER-SUFFIX" representation.sort)
+      in
       let selected =
         Term.as_sequence_element index element.note pattern.term
       in
-      let sequence = Term.sequence [prefix; selected; suffix] in
+      let sequence =
+        Term.sequence_of_typ index collection.note [prefix; selected; suffix]
+      in
       Ready
         (make (bind bound element)
            (EqCondition

@@ -82,6 +82,7 @@ type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
   { type_env : Il.Env.t
+  ; sort_metadata : Sort_metadata.t
   ; iterations : iteration list
   ; projector_bodies : exp list
   ; premise_iterations : premise_iteration list
@@ -167,7 +168,10 @@ and case_sort env definitions seen (mixop, (typ, _, _), _) =
     "SpectecTerminal"
 
 let sort_of_typ index typ =
-  representation_sort index.type_env index.type_definitions [] typ
+  Sort_metadata.sort_of_typ index.sort_metadata typ
+
+let sequence_representation index typ =
+  Sort_metadata.sequence_representation index.sort_metadata typ
 
 type composition_kind = SequenceComposition | RecordComposition
 
@@ -213,27 +217,27 @@ and composition_kind_of_inst env definitions seen inst =
 let composition_kind index typ =
   composition_kind_of_typ index.type_env index.type_definitions [] typ
 
-let rec parameter_sort env definitions param =
+let rec parameter_sort metadata param =
   match param.it with
-  | ExpP (_, typ) -> representation_sort env definitions [] typ
+  | ExpP (_, typ) -> Sort_metadata.sort_of_typ metadata typ
   | TypP _ -> "SpectecType"
   | DefP (_, params, result) ->
       let sort, _, _ =
-        definition_signature_with env definitions params result
+        definition_signature_with metadata params result
       in
       sort
   | GramP _ -> invalid_arg "GramP is not supported"
 
-and definition_signature_with env definitions params result =
-  let domain = List.map (parameter_sort env definitions) params in
-  let codomain = representation_sort env definitions [] result in
+and definition_signature_with metadata params result =
+  let domain = List.map (parameter_sort metadata) params in
+  let codomain = Sort_metadata.sort_of_typ metadata result in
   let args =
     match domain with [] -> "Unit" | _ -> String.concat "-" domain
   in
   "SpectecDef-" ^ args ^ "-to-" ^ codomain, domain, codomain
 
 let definition_signature index params result =
-  definition_signature_with index.type_env index.type_definitions params result
+  definition_signature_with index.sort_metadata params result
 
 let reserved_names =
   StringSet.of_list
@@ -600,6 +604,7 @@ let rec collect_membership_choices = function
 
 let scan script =
   let type_env = Il.Env.env_of_script script in
+  let sort_metadata = Sort_metadata.scan script in
   let rec collect_type_definitions definitions = function
     | [] -> definitions
     | def :: defs ->
@@ -727,7 +732,7 @@ let scan script =
   let definition_values = ref [] in
   let definition_applications = ref [] in
   let sort_of_typ typ =
-    representation_sort type_env type_definitions [] typ
+    Sort_metadata.sort_of_typ sort_metadata typ
   in
 
   let add_variable_with_sort id sort =
@@ -752,7 +757,7 @@ let scan script =
     | DefP (id, params, result) ->
         definition_parameters := {id; params; result} :: !definition_parameters;
         let sort, _, _ =
-          definition_signature_with type_env type_definitions params result
+          definition_signature_with sort_metadata params result
         in
         add_variable_with_sort id sort;
         add_params params
@@ -784,8 +789,7 @@ let scan script =
     | [] -> invalid_arg ("unknown definition value " ^ id.it)
     | value :: values ->
         let signature' value =
-          definition_signature_with
-            type_env type_definitions value.params value.result
+          definition_signature_with sort_metadata value.params value.result
         in
         if List.for_all (fun candidate -> signature' candidate = signature' value) values
         then value
@@ -802,7 +806,7 @@ let scan script =
   in
   let add_definition_application target params result =
     let value = add_definition_value target in
-    let signature = definition_signature_with type_env type_definitions in
+    let signature = definition_signature_with sort_metadata in
     let expected = signature params result in
     let actual = signature value.params value.result in
     if expected <> actual then
@@ -1185,6 +1189,7 @@ let scan script =
          owner_supported iteration.owner)
   in
   { type_env
+  ; sort_metadata
   ; iterations
   ; projector_bodies = List.rev !projector_bodies
   ; premise_iterations
@@ -1329,7 +1334,7 @@ let type_parameter index id =
   |> Option.map (fun name -> Maude_il.source_variable name "SpectecType")
 
 let same_representation index source target =
-  sort_of_typ index source = sort_of_typ index target
+  Sort_metadata.representation_inclusion index.sort_metadata source target
 
 let alias_type index typ =
   match typ.it with
@@ -1387,3 +1392,4 @@ let premise_iteration index premise =
     index.premise_iterations
 
 let hints index = index.hints
+let sort_metadata index = index.sort_metadata

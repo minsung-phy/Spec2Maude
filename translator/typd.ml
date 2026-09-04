@@ -123,6 +123,10 @@ let translate_union index target case_conditions typ =
 
 let translate_constructor index target case_conditions mixop typ =
   let constructor_name = Prescan.mixop_name index mixop in
+  let constructor_sort =
+    Sort_metadata.constructor_result_sort
+      (Prescan.sort_metadata index) mixop
+  in
   let components = Term.translate_components index typ in
   let values = components |> List.map (fun (value, _, _) -> value) in
   let domain = components |> List.map (fun (_, sort, _) -> sort) in
@@ -134,7 +138,7 @@ let translate_constructor index target case_conditions mixop typ =
     OpDecl
       { name = constructor_name
       ; domain
-      ; codomain = "SpectecTerminal"
+      ; codomain = constructor_sort
       ; arrow = Total
       ; attrs = [Ctor]
       }

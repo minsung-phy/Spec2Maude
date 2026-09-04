@@ -92,20 +92,47 @@ let rec sequence = function
   | [term] -> term
   | term :: terms -> app "_ _" [term; sequence terms]
 
+let rec sequence_with representation = function
+  | [] -> Const representation.Sort_metadata.empty
+  | [term] -> term
+  | term :: terms ->
+      app representation.Sort_metadata.concat
+        [term; sequence_with representation terms]
+
+let sequence_of_typ index typ terms =
+  sequence_with (Prescan.sequence_representation index typ) terms
+
+let sequence_operator index typ field =
+  let representation = Prescan.sequence_representation index typ in
+  field representation
+
+let unsupported_typed_sequence index operation typ =
+  let representation = Prescan.sequence_representation index typ in
+  if representation.typed then
+    invalid_arg
+      (operation ^ " is unsupported for typed list sort "
+       ^ representation.sort)
+
 let rec record_items = function
   | [] -> Const "EMPTY"
   | [item] -> item
   | item :: items -> app "_;_" [item; record_items items]
 
 let as_sequence_element index typ term =
-  if Prescan.sort_of_typ index typ = "SpectecTerminals"
-  then app "seq" [term]
-  else term
+  match
+    Sort_metadata.sequence_element_wrappers
+      (Prescan.sort_metadata index) typ
+  with
+  | Some (box, _) -> app box [term]
+  | None -> term
 
 let from_sequence_element index typ term =
-  if Prescan.sort_of_typ index typ = "SpectecTerminals"
-  then app "unseq" [term]
-  else term
+  match
+    Sort_metadata.sequence_element_wrappers
+      (Prescan.sort_metadata index) typ
+  with
+  | Some (_, unbox) -> app unbox [term]
+  | None -> term
 
 (* Recursive translation *)
 
@@ -251,37 +278,55 @@ and translate_exp index exp =
   | CompE (left, right) ->
       let operator =
         match Prescan.composition_kind index exp.note with
-        | Prescan.SequenceComposition -> "_++_"
+        | Prescan.SequenceComposition ->
+            sequence_operator index exp.note (fun sequence -> sequence.append)
         | Prescan.RecordComposition -> "recordConcat"
       in
       app operator [translate_exp index left; translate_exp index right]
 
   | ListE exps ->
-      exps
-      |> List.map (fun exp ->
-           translate_exp index exp |> as_sequence_element index exp.note)
-      |> sequence
-      |> fun terms -> app "`[_`]" [terms]
+      let terms =
+        exps
+        |> List.map (fun exp ->
+             translate_exp index exp |> as_sequence_element index exp.note)
+        |> sequence_of_typ index exp.note
+      in
+      let representation = Prescan.sequence_representation index exp.note in
+      if representation.typed then terms else app "`[_`]" [terms]
 
   | LiftE inner ->
-      app "lift" [translate_exp index inner]
+      let operator =
+        sequence_operator index exp.note (fun sequence -> sequence.lift)
+      in
+      app operator [translate_exp index inner]
 
   | MemE (element, collection) ->
-      app "_<-_" [translate_exp index element; translate_exp index collection]
+      let operator =
+        sequence_operator index collection.note (fun sequence -> sequence.occurs)
+      in
+      app operator [translate_exp index element; translate_exp index collection]
       |> wrap exp.note
 
-  | LenE sequence ->
-      app "|_|" [translate_exp index sequence]
+  | LenE collection ->
+      let operator =
+        sequence_operator index collection.note (fun sequence -> sequence.size)
+      in
+      app operator [translate_exp index collection]
 
   | CatE (left, right) ->
-      app "_++_" [translate_exp index left; translate_exp index right]
+      let operator =
+        sequence_operator index exp.note (fun sequence -> sequence.append)
+      in
+      app operator [translate_exp index left; translate_exp index right]
 
   | IdxE (sequence, element_index) ->
+      unsupported_typed_sequence index "IdxE" sequence.note;
       app "_`[_`]"
         [translate_exp index sequence; translate_exp index element_index]
       |> from_sequence_element index exp.note
 
   | SliceE (sequence, start, length) ->
+      unsupported_typed_sequence index "SliceE" sequence.note;
       app "_`[_:_`]"
         [ translate_exp index sequence
         ; translate_exp index start
@@ -328,7 +373,10 @@ and translate_exp index exp =
       if Prescan.same_representation index source target then
         translate_exp index inner
       else
-        invalid_arg "SubE changes the Maude representation sort"
+        invalid_arg
+          ("SubE changes the Maude representation sort: "
+           ^ Il.Print.string_of_typ source ^ " -> "
+           ^ Il.Print.string_of_typ target)
 
 
 and translate_bool index exp =
@@ -354,7 +402,10 @@ and translate_bool index exp =
         ]
 
   | MemE (element, collection) ->
-      app "_<-_"
+      let operator =
+        sequence_operator index collection.note (fun sequence -> sequence.occurs)
+      in
+      app operator
         [translate_exp index element; translate_exp index collection]
 
   | _ ->
@@ -367,6 +418,7 @@ and translate_select index base path =
       base
 
   | IdxP (parent, element_index) ->
+      unsupported_typed_sequence index "IdxP" parent.note;
       app "_`[_`]"
         [ translate_select index base parent
         ; translate_exp index element_index
@@ -374,6 +426,7 @@ and translate_select index base path =
       |> from_sequence_element index path.note
 
   | SliceP (parent, start, length) ->
+      unsupported_typed_sequence index "SliceP" parent.note;
       app "_`[_:_`]"
         [ translate_select index base parent
         ; translate_exp index start
@@ -393,6 +446,7 @@ and translate_update index base path replacement =
       replacement
 
   | IdxP (parent, element_index) ->
+      unsupported_typed_sequence index "UpdE/IdxP" parent.note;
       let parent_value = translate_select index base parent in
       let replacement =
         as_sequence_element index path.note replacement
@@ -404,6 +458,7 @@ and translate_update index base path replacement =
       translate_update index base parent updated_parent
 
   | SliceP (parent, start, length) ->
+      unsupported_typed_sequence index "UpdE/SliceP" parent.note;
       let parent_value = translate_select index base parent in
       let updated_parent =
         app "_`[_:_=_`]"
@@ -427,9 +482,13 @@ and translate_update index base path replacement =
 and translate_extension index base path extension =
   match path.it with
   | RootP ->
-      app "_++_" [base; extension]
+      let operator =
+        sequence_operator index path.note (fun sequence -> sequence.append)
+      in
+      app operator [base; extension]
 
   | IdxP (parent, element_index) ->
+      unsupported_typed_sequence index "ExtE/IdxP" parent.note;
       let parent_value = translate_select index base parent in
       let extended_parent =
         app "_`[_=++_`]"
@@ -438,6 +497,7 @@ and translate_extension index base path extension =
       translate_update index base parent extended_parent
 
   | SliceP (parent, start, length) ->
+      unsupported_typed_sequence index "ExtE/SliceP" parent.note;
       let parent_value = translate_select index base parent in
       let extended_parent =
         app "_`[_:_=++_`]"
@@ -465,8 +525,18 @@ let translate_typ_conditions index value typ =
   | ("Nat" | "Int"), _ ->
       []
   | _, IterT (element_typ, iter) ->
-      Iter.translate_conditions
-        (translate_exp index) value (translate_check_typ index element_typ) iter
+      let representation = Prescan.sequence_representation index typ in
+      if representation.typed then
+        let length = app representation.size [value] in
+        begin match iter with
+        | Opt | List -> []
+        | List1 -> [BoolCond (app "_<_" [Const "0"; length])]
+        | ListN (count, _) ->
+            [EqCond (length, translate_exp index count)]
+        end
+      else
+        Iter.translate_conditions
+          (translate_exp index) value (translate_check_typ index element_typ) iter
   | _, _ ->
       [BoolCond (app "typecheck" [value; translate_typ index typ])]
 
