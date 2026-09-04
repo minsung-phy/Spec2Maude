@@ -213,7 +213,7 @@ var bt : blocktype
 
 ;; Instructions
 
-syntax instr hint(desc "instruction")
+syntax instr hint(desc "instruction") hint(maude_sort)
 
 syntax instr/parametric hint(desc "parametric instruction") =
   | NOP

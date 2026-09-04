@@ -42,7 +42,7 @@ syntax ref hint(desc "reference value") hint(macro "reff") =
   | REF.HOST_ADDR hostaddr               hint(show REF.HOST %%)   hint(macro "%ADDR")
   | REF.EXTERN ref
 
-syntax val hint(desc "value") =
+syntax val hint(desc "value") hint(maude_sort) hint(maude_subsort "instr") =
   | num | vec | ref
 
 syntax result hint(desc "result") =

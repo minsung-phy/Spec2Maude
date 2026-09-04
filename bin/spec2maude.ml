@@ -21,15 +21,47 @@ let load_script files =
   |> Frontend.Elab.elab
   |> fst
 
+let module_name name = Maude_il.ModuleName name
+
 let emit_script script =
-  let modul : Maude_il.modul =
-    { name = "SPEC2MAUDE-GENERATED"
-    ; kind = System
-    ; imports = [Protecting "SPECTEC-SUPPORT"]
-    ; statements = Definition.translate_script script
-    }
+  let translation = Definition.translate_script script in
+  let sorts : Maude_il.top_level =
+    Module
+      { name = "SPEC2MAUDE-SORTS"
+      ; kind = Functional
+      ; imports = [Protecting (module_name "DSL-TERM")]
+      ; statements = translation.sort_statements
+      }
   in
-  Maude_emit.emit_module modul ^ "\n"
+  let generated : Maude_il.top_level =
+    Module
+      { name = "SPEC2MAUDE-GENERATED"
+      ; kind = System
+      ; imports =
+          [ Maude_il.Protecting (module_name "SPECTEC-SUPPORT")
+          ; Maude_il.Protecting (module_name "SPEC2MAUDE-SORTS")
+          ]
+      ; statements = translation.generated_statements
+      }
+  in
+  let pretype : Maude_il.top_level =
+    Module
+      { name = "DSL-PRETYPE"
+      ; kind = Maude_il.Functional
+      ; imports =
+          [ Maude_il.Protecting (module_name "DSL-PRETYPE-BASE")
+          ; Maude_il.Protecting (module_name "SPEC2MAUDE-SORTS")
+          ]
+          @ translation.list_imports
+      ; statements = translation.list_statements
+      }
+  in
+  Maude_emit.emit_top_levels
+    (sorts :: translation.list_views
+     @ [ pretype
+       ; Maude_il.Load "../backend/spectec-support/support.maude"
+       ; generated
+       ]) ^ "\n"
 
 let write_file path contents =
   let channel = open_out_bin path in
