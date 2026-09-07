@@ -5590,6 +5590,8 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(TRAP, instr) = true .
 
+  eq typecheck(seq(VALUE15), expr) = typecheck(VALUE15, instr) .
+
   eq typecheck(VALUE15, expr) = typecheck(VALUE15, instr) .
 
   eq memarg0 = { (item('ALIGN, 0) ; item('OFFSET, 0)) } .

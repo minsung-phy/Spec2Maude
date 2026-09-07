@@ -111,6 +111,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op emptyStore : -> SpectecTerminal .\n\
        \  op hostFunctionAddresses : -> SpectecTerminals .\n\
        \  op hostArguments : ValList SpectecTerminals -> Bool .\n\
+       \  op hostCallable : SpectecTerminal Nat ValList -> Bool .\n\
        \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
        \  op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
        \  op runtimeResults : ValList -> Bool .\n\n\
@@ -119,7 +120,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .\n\
        \  vars WSHNAME WSHOTHER WSHLOCALS WSHEXPORTS : SpectecTerminals .\n\
        \  vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .\n\
-       \  vars WSHARGS WSHACTUAL WSHVALUES : ValList .\n\
+       \  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : ValList .\n\
        \  vars WSHBODY WSHINSTRS WSHREST : InstrList .\n\
        \  var WSHCMDS : Commands .\n\
        \  vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .\n\
@@ -341,19 +342,26 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    alternatives.cons(WSHPATTERN, WSHALTERNATIVES)) =\n\
        \      match.or(match.value(WSHVALUE, WSHPATTERN),\n\
        \        match.any(WSHVALUE, WSHALTERNATIVES)) .\n\n\
-       \  crl [host-call] :\n\
-       \    Step-read((WSHS ; WSHCURRENT) ;\n\
-       \      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => eps\n\
+       \  ceq hostCallable(WSHS, WSHA, WSHARGS) = true\n\
        \    if WSHA <- hostFunctionAddresses = true\n\
-       \       /\\ WSHVALUES := WSHARGS\n\
-       \       /\\ typecheck(WSHVALUES, val) = true\n\
+       \       /\\ typecheck(WSHARGS, val) = true\n\
        \       /\\ typecheck(WSHARGS, instr) = true\n\
-       \       /\\ WSHN := len(WSHVALUES)\n\
        \       /\\ WSHXA := index(value('FUNCS, WSHS), WSHA)\n\
        \       /\\ value('CODE, WSHXA) = ...\n\
        \       /\\ FUNC WSHTYPES -> eps := Expand(value('TYPE, WSHXA))\n\
-       \       /\\ WSHN = len(WSHTYPES)\n\
-       \       /\\ hostArguments(WSHVALUES, WSHTYPES) = true .\n\n\
+       \       /\\ len(WSHARGS) = len(WSHTYPES)\n\
+       \       /\\ hostArguments(WSHARGS, WSHTYPES) = true .\n\
+       \  eq hostCallable(WSHS, WSHA, WSHARGS) = false [owise] .\n\n\
+       \  crl [host-call] :\n\
+       \    Step-read((WSHS ; WSHCURRENT) ;\n\
+       \      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => eps\n\
+       \    if hostCallable(WSHS, WSHA, WSHARGS) = true .\n\n\
+       \  crl [focus-host-call] :\n\
+       \    identifyFocus(WSHS ; WSHCURRENT,\n\
+       \      WSHPREFIX (WSHARGS REF.FUNC-ADDR(WSHA)), CALL-REF(WSHC), WSHREST)\n\
+       \    => { WSHPREFIX | ((WSHS ; WSHCURRENT) ;\n\
+       \      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) | WSHREST }\n\
+       \    if hostCallable(WSHS, WSHA, WSHARGS) = true .\n\n\
        \  rl [start] : script.start =>\n\
        \    script.ready(emptyStore, %s, inputCommands) .\n\
        \  crl [module-start] :\n\
