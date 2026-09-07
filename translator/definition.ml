@@ -62,15 +62,15 @@ let sort_metadata_declarations metadata =
   let annotated =
     Hintd.annotated_sorts metadata |> List.map (fun sort -> SortDecl sort)
   in
-  let proper =
-    Hintd.proper_sorts metadata
-    |> List.map (fun (proper, _) -> SortDecl proper)
+  let proper = Hintd.proper_sorts metadata in
+  let proper_declarations =
+    List.map (fun (sort, _) -> SortDecl sort) proper
   in
   let edges =
-    Hintd.subsort_edges metadata @ Hintd.proper_sorts metadata
+    Hintd.subsort_edges metadata @ proper
     |> List.map (fun (subsort, supersort) -> SubsortDecl (subsort, supersort))
   in
-  annotated @ proper @ edges
+  annotated @ proper_declarations @ edges
 
 type script_translation =
   { sort_statements : statement list

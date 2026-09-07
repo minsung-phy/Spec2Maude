@@ -31,7 +31,7 @@ type t =
   ; origins : (maude_sort * region) list
   ; annotated : maude_sort list
   ; edges : (maude_sort * maude_sort) list
-  ; proper : (maude_sort * maude_sort) list
+  ; proper : (maude_sort * maude_sort * maude_sort) list
   ; owners : (constructor * maude_sort list) list
   ; lists : maude_sort list
   }
@@ -191,17 +191,28 @@ let order_sorts origins edges sorts =
 
 let constructor_equal = Il.Eq.eq_mixop
 
-let proper_sort sort = String.capitalize_ascii sort ^ "Proper"
-
-let proper_sorts_of annotated edges =
-  annotated
-  |> List.filter (fun supersort ->
-       List.exists
-         (fun subsort ->
-           subsort <> supersort
-           && is_subsort edges [] subsort supersort)
-         annotated)
-  |> List.map (fun sort -> proper_sort sort, sort)
+let proper_sorts_of hints annotated =
+  hints
+  |> List.concat_map (fun (source, values) ->
+       hint_values "maude_proper" values
+       |> List.map (fun hint ->
+            let value, proper =
+              match hint.hintexp.it with
+              | El.Ast.TextE text ->
+                  begin match
+                    String.split_on_char ' ' text |> List.filter ((<>) "")
+                  with
+                  | [value; proper] -> value, proper
+                  | _ -> unsupported_sort hint.hintid.at
+                      "maude_proper expects a value type and proper sort"
+                  end
+              | _ -> unsupported_sort hint.hintid.at
+                  "maude_proper expects a string"
+            in
+            if not (List.mem source annotated && List.mem value annotated) then
+              unsupported_sort hint.hintid.at
+                "maude_proper types require maude_sort";
+            proper, source, value))
 
 let rec constructors_of_name definitions seen name =
   if List.mem name seen then []
@@ -303,21 +314,28 @@ let constructor_result_sort metadata constructor =
     in
     unsupported_sort at reason
   in
-  match
-    owners
-    |> List.filter (fun candidate ->
-         List.for_all
-           (fun owner -> is_subsort metadata.edges [] candidate owner)
-           owners)
-  with
-  | [owner] ->
-      begin match List.find_opt (fun (_, sort) -> sort = owner) metadata.proper with
-      | Some (proper, _) -> proper
-      | None -> owner
+  let partitions =
+    metadata.proper
+    |> List.filter (fun (_, parent, value) ->
+         List.mem parent owners && not (List.mem value owners))
+  in
+  match partitions with
+  | [(proper, _, _)] -> proper
+  | _ :: _ :: _ -> fail "constructor belongs to more than one proper partition"
+  | [] ->
+      let most_specific =
+        owners
+        |> List.filter (fun candidate ->
+             List.for_all
+               (fun owner -> is_subsort metadata.edges [] candidate owner)
+               owners)
+      in
+      begin match most_specific with
+      | [owner] -> owner
+      | [] when owners = [] -> "SpectecTerminal"
+      | [] -> fail "constructor has incomparable annotated owners"
+      | _ -> fail "constructor has ambiguous annotated owners"
       end
-  | [] when owners = [] -> "SpectecTerminal"
-  | [] -> fail "constructor has incomparable annotated owners"
-  | _ -> fail "constructor has ambiguous annotated owners"
 
 let rec sort_of_typ_seen metadata seen typ =
   match typ.it with
@@ -398,7 +416,7 @@ let scan_sorts script =
   let edges = subsort_edges_of hints annotated in
   validate_edges origins edges;
   let annotated = order_sorts origins edges annotated in
-  let proper = proper_sorts_of annotated edges in
+  let proper = proper_sorts_of hints annotated in
   let lists = typed_list_sorts_of source.list_uses annotated edges in
   validate_list_families hints lists edges;
   let owners = constructor_owners_of definitions annotated in
@@ -416,7 +434,8 @@ let scan_sorts script =
 
 let annotated_sorts metadata = metadata.annotated
 let subsort_edges metadata = metadata.edges
-let proper_sorts metadata = metadata.proper
+let proper_sorts metadata =
+  List.map (fun (proper, parent, _) -> proper, parent) metadata.proper
 let typed_list_sorts metadata = metadata.lists
 
 let typed_parents metadata sort =
@@ -579,19 +598,6 @@ let unique at absent ambiguous = function
 let context_hint values =
   values |> List.filter (fun hint -> hint.hintid.it = "maude_context")
 
-let target_names hint =
-  match hint.hintexp.it with
-  | El.Ast.TextE text ->
-      begin match
-        text |> String.split_on_char ' ' |> List.filter ((<>) "")
-      with
-      | [focus; postfix] when focus <> postfix -> focus, postfix
-      | _ -> unsupported hint.hintid.at
-          "hint must contain two distinct repeated-variable names"
-      end
-  | _ -> unsupported hint.hintid.at
-      "hint argument must be a string"
-
 let find_relation relations id at =
   relations
   |> List.filter (fun relation -> relation.id.it = id.it)
@@ -637,12 +643,6 @@ let quant_type quants name at =
        | ExpP _ | TypP _ | DefP _ | GramP _ -> None)
   |> unique at ("names an unknown variable `" ^ name ^ "`")
        ("names an ambiguous variable `" ^ name ^ "`")
-
-let rec preceding target next = function
-  | prefix :: focus :: postfix :: _
-    when focus = target && postfix = next -> Some prefix
-  | _ :: names -> preceding target next names
-  | [] -> None
 
 let rec source_name exp =
   match exp.it with
@@ -846,12 +846,7 @@ let execution_premises execution_input_count premises =
            Some (id, mixop, head, premise)
        | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> None)
 
-let shares_variable left right =
-  let left = (Il.Free.free_exp left).varid in
-  let right = (Il.Free.free_exp right).varid in
-  not (Il.Free.Set.is_empty (Il.Free.Set.inter left right))
-
-let focus_patterns metadata execution_input_count relations context owner =
+let focus_patterns (metadata : t) execution_input_count relations context owner =
   let rec visit seen bridges relation_id =
     if List.mem relation_id.it seen then
       unsupported relation_id.at "execution-relation bridge contains a cycle";
@@ -861,8 +856,11 @@ let focus_patterns metadata execution_input_count relations context owner =
     |> List.concat_map (fun (ordinal, rule) ->
          let RuleD (id, _, mixop, head, premises) = rule.it in
          let is_context_rule =
-           relation.id.it = context.source.id.it
-           && id.it = (rule_id context.rule).it
+           List.exists
+             (fun (relation_id, rule_id, hints, _) ->
+               relation_id.it = relation.id.it && rule_id.it = id.it
+               && context_hint hints <> [])
+             metadata.context_hints
          in
          let execution = execution_premises execution_input_count premises in
          if is_context_rule then []
@@ -899,22 +897,11 @@ let focus_patterns metadata execution_input_count relations context owner =
                 }]
            | None ->
                begin match execution with
-               | [(target_id, premise_mixop, premise_head, premise)]
+               | [(target_id, _, _, premise)]
                  when target_id.it <> relation.id.it ->
                    if List.length premises <> 1 then
                      unsupported rule.at
                        "execution-relation bridge has additional premises";
-                   let target = find_relation relations target_id premise.at in
-                   let target_inputs =
-                     relation_inputs execution_input_count target
-                       premise_mixop premise_head premise.at
-                   in
-                   let target_subject =
-                     sequence_subject metadata owner target_inputs premise.at
-                   in
-                   if not (shares_variable subject target_subject) then
-                     unsupported premise.at
-                       "bridge does not pass the focused repeated field";
                    let bridge =
                      { source = relation
                      ; ordinal
@@ -932,14 +919,14 @@ let focus_patterns metadata execution_input_count relations context owner =
   in
   visit [] [] context.inner_relation
 
-let validate metadata execution_input_count relations
+let extract_context metadata execution_input_count relations
     (relation_id, rule_id, values, hintdef) =
   match context_hint values with
   | [] -> None
   | _ :: _ :: _ -> unsupported hintdef.at
       "rule has more than one maude_context hint"
   | [hint] ->
-      let focus_name, postfix_name = target_names hint in
+      require_flags "maude_context" [hint];
       let relation = find_relation relations relation_id hintdef.at in
       let input_count =
         match execution_input_count relation.id.it with
@@ -952,52 +939,45 @@ let validate metadata execution_input_count relations
       let inputs, _ =
         take rule.at input_count [] (components relation.mixop head)
       in
-      let focus, focus_typ = quant_type quants focus_name hint.hintid.at in
-      let postfix, postfix_typ = quant_type quants postfix_name hint.hintid.at in
-      let focus_owner =
-        match typed_list_owner metadata focus_typ,
-          typed_list_owner metadata postfix_typ with
-        | Some focus_owner, Some postfix_owner when focus_owner = postfix_owner ->
-            focus_owner
-        | _ -> unsupported hint.hintid.at
-            "requires a repeated annotated prefix followed by two repeated fields of one annotated supersort"
+      let inner_relation, inner_mixop, inner_head =
+        match execution_premises execution_input_count premises with
+        | [(inner, mixop, head, _)] -> inner, mixop, head
+        | _ -> unsupported rule.at
+            "rule must have exactly one internal execution premise"
       in
-      let subject = sequence_subject metadata focus_owner inputs rule.at in
-      let prefix_name =
-        match
-          subject |> sequence_parts |> List.filter_map source_name
-          |> preceding focus_name postfix_name
-        with
-        | Some name -> name
-        | None -> unsupported hint.hintid.at
-            "targets must follow one repeated prefix in the input configuration"
+      let inner = find_relation relations inner_relation rule.at in
+      let inner_inputs =
+        relation_inputs execution_input_count inner inner_mixop inner_head rule.at
+      in
+      (* The internal request identifies the hole. Names are read from the
+         matching source bindings, not repeated in the annotation. *)
+      let inner_focus owner focus =
+        List.exists
+          (fun input ->
+            sequence_subjects metadata owner input
+            |> List.exists (fun exp -> source_name exp = Some focus))
+          inner_inputs
+      in
+      let candidates owner =
+        inputs
+        |> List.concat_map (sequence_subjects metadata owner)
+        |> List.filter_map (fun subject ->
+             match List.map source_name (sequence_parts subject) with
+             | [Some prefix; Some focus; Some postfix]
+               when inner_focus owner focus ->
+                 Some (subject, owner, prefix, focus, postfix)
+             | _ -> None)
+      in
+      let subject, focus_owner, prefix_name, focus_name, postfix_name =
+        metadata.annotated
+        |> List.concat_map candidates
+        |> unique rule.at "cannot extract a prefix/hole/postfix context"
+             "has ambiguous prefix/hole/postfix contexts"
       in
       let prefix, prefix_typ = quant_type quants prefix_name hint.hintid.at in
-      begin match typed_list_owner metadata prefix_typ with
-      | Some prefix_owner when prefix_owner <> focus_owner
-          && is_subsort (subsort_edges metadata) [] prefix_owner focus_owner -> ()
-      | _ -> unsupported hint.hintid.at
-          "requires a repeated annotated prefix followed by two repeated fields of one annotated supersort"
-      end;
+      let focus, focus_typ = quant_type quants focus_name hint.hintid.at in
+      let postfix, postfix_typ = quant_type quants postfix_name hint.hintid.at in
       let frame = sequence_frame subject inputs rule.at in
-      let inner_relation =
-        match execution_premises execution_input_count premises with
-        | [(inner, _, _, _)] -> inner
-        | [] -> unsupported rule.at
-            "rule must have exactly one internal execution premise"
-        | _ -> unsupported rule.at
-            "rule has more than one internal execution premise"
-      in
-      if not
-           (List.exists
-              (fun premise ->
-                match premise.it with
-                | IfPr condition ->
-                    nonempty_context prefix.it postfix.it condition
-                | RulePr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> false)
-              premises)
-      then unsupported rule.at
-          "rule must require a nonempty prefix or postfix";
       Some
         ({ source = relation
          ; ordinal
@@ -1017,7 +997,7 @@ let validate metadata execution_input_count relations
 let scan_contexts metadata execution_input_count =
   metadata.context_hints
   |> List.filter_map
-       (validate metadata execution_input_count metadata.relations)
+       (extract_context metadata execution_input_count metadata.relations)
   |> List.map (fun (context, owner) ->
        let patterns =
          focus_patterns metadata execution_input_count metadata.relations

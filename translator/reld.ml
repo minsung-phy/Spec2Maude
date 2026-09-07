@@ -624,30 +624,193 @@ module Context_rules = struct
     | Some rule -> rule
     | None -> unsupported at "focus pattern has an invalid source-rule ordinal"
 
-  let shaped_relation_call index (pattern : Hintd.focus_pattern) lowered =
+  (* A candidate needs operand boundaries, not the result of executing them.
+     Slice source premises before lowering; the ordinary RuleD is untouched. *)
+  let cardinalities exps =
+    let names = ref Il.Free.Set.empty in
+    let module Visitor = Il.Iter.Make (struct
+      include Il.Iter.Skip
+      let visit_exp exp =
+        match exp.it with
+        | IterE (_, (ListN (count, _), _)) ->
+            names := Il.Free.Set.union !names (Prem.variables count)
+        | _ -> ()
+    end)
+    in
+    Visitor.list Visitor.exp exps;
+    !names
+
+  let rec focus_output index needed exp =
+    let recurse = focus_output index needed in
+    let it =
+      match exp.it with
+      | IterE (body, ((ListN ({it = VarE count; _}, None), _) as iteration))
+        when not (Il.Free.Set.mem count.it needed)
+          && Iter.identity_requirements index body = [] ->
+          begin match Iter.identity_source index body iteration with
+          | Some source -> source.it
+          | None -> exp.it
+          end
+      | CaseE (op, payload) -> CaseE (op, recurse payload)
+      | TupE fields -> TupE (List.map recurse fields)
+      | ListE fields -> ListE (List.map recurse fields)
+      | CatE (left, right) -> CatE (recurse left, recurse right)
+      | _ -> exp.it
+    in
+    {exp with it}
+
+  let project_focus_premise index needed premise =
+    match premise.it with
+    | RulePr (id, args, mixop, head) ->
+        begin match Prescan.relation_policy index id with
+        | Ok (Prescan.Execution {input_count; _} | Prescan.Equation {input_count}
+             | Prescan.BackendCompute {input_count}) ->
+            let inputs, outputs =
+              Prem.split input_count (Prem.components mixop head)
+            in
+            let parts = inputs @ List.map (focus_output index needed) outputs in
+            let head =
+              match head.it with
+              | TupE _ -> {head with it = TupE parts}
+              | _ -> List.hd parts
+            in
+            {premise with it = RulePr (id, args, mixop, head)}
+        | _ -> premise
+        end
+    | _ -> premise
+
+  type focus_dependency =
+    { premise : prem
+    ; writes : Il.Free.Set.t
+    ; reads : Il.Free.Set.t
+    ; retain : bool
+    }
+
+  let focus_premises index initial needed deferred prems =
+    let module S = Il.Free.Set in
+    let free premise = Il.Free.(free_prem premise).varid in
+    let boundary_variable exp =
+      match exp.it with
+      | VarE id when S.mem id.it needed -> S.singleton id.it
+      | _ -> S.empty
+    in
+    let is_deferred id =
+      match deferred with
+      | Some target -> target.it = id.it
+      | None -> false
+    in
+    let binding bound pattern subject =
+      let writes = Prem.variables pattern in
+      let reads = S.union (Prem.variables subject) (S.inter bound writes) in
+      writes, reads, false
+    in
+    let describe bound premise =
+      let writes, reads, retain =
+        match premise.it with
+        | RulePr (id, args, mixop, head) ->
+            let parts = Prem.components mixop head in
+            begin match Prescan.relation_policy index id with
+            | Ok (Prescan.Execution _) when is_deferred id ->
+                S.empty, S.empty, false
+            | Ok (Prescan.Execution {input_count; _}
+                 | Prescan.Equation {input_count}
+                 | Prescan.BackendCompute {input_count}) ->
+                let inputs, outputs = Prem.split input_count parts in
+                let writes = List.fold_left Prem.bind S.empty outputs in
+                let reads =
+                  List.fold_left Prem.bind Il.Free.(free_args args).varid inputs
+                in
+                writes, S.union reads (S.inter bound writes), false
+            | Ok (Prescan.Predicate | Prescan.BackendCheck) ->
+                S.empty, free premise, true
+            | Error reason -> unsupported premise.at reason
+            end
+        | LetPr (quants, left, right) ->
+            let writes, reads, _ = binding bound left right in
+            let reads = S.union Il.Free.(free_quants quants).varid reads in
+            if Prem.known bound right then writes, reads, false
+            else S.empty, S.union reads (free premise), true
+        | IfPr {it = CmpE (`EqOp, _, left, right); _} ->
+            let boundary =
+              if Prem.known bound left && Prem.known bound right then
+                S.inter needed (free premise)
+              else
+                S.union (boundary_variable left) (boundary_variable right)
+            in
+            if not (S.is_empty boundary) then boundary, free premise, true
+            else if Prem.known bound right then binding bound left right
+            else if Prem.known bound left then binding bound right left
+            else S.empty, free premise, true
+        | ElsePr -> S.empty, S.empty, false
+        | IfPr exp ->
+            (* Cardinality guards constrain the boundary. Other ordinary
+               guards belong to execution; opaque/iterated premises stay. *)
+            S.inter needed (Prem.variables exp), Prem.variables exp, false
+        | IterPr _ | NegPr _ -> S.empty, free premise, true
+      in
+      {premise; writes; reads; retain}
+    in
+    let _, dependencies =
+      List.fold_left
+        (fun (bound, dependencies) premise ->
+          let dependency = describe bound premise in
+          S.union bound dependency.writes, dependency :: dependencies)
+        (initial, []) prems
+    in
+    let required needed dependency =
+      dependency.retain || not (S.is_empty (S.inter needed dependency.writes))
+    in
+    let rec close needed =
+      let next =
+        List.fold_left
+          (fun names dependency ->
+            if required names dependency then S.union names dependency.reads
+            else names)
+          needed dependencies
+      in
+      if S.equal next needed then needed else close next
+    in
+    let needed = close needed in
+    List.rev dependencies
+    |> List.filter_map (fun dependency ->
+         if required needed dependency then
+           Some (project_focus_premise index needed dependency.premise)
+         else None)
+
+  let shaped_relation_call index request_output (pattern : Hintd.focus_pattern) =
+    let RuleD (_, _, mixop, head, prems) = pattern.rule.it in
+    let policy = execution_policy index pattern.source.id in
+    let inputs =
+      match policy with
+      | Prescan.Execution {input_count; _} ->
+          fst (Prem.split input_count (Prem.components mixop head))
+      | _ -> unsupported pattern.rule.at
+          "focus source must be an execution relation"
+    in
+    let terms, guards, bound =
+      translate_inputs index pattern.source.params inputs
+    in
+    let needed = cardinalities (pattern.operands @ pattern.trailing) in
+    let prems =
+      focus_premises index bound needed pattern.deferred_execution prems
+    in
+    let premises =
+      Prem.translate_all index ~bound:(Il.Free.Set.elements bound)
+        ~bind_membership:true ~request_output prems
+    in
+    let conditions = guards @ premises.conditions in
+    let shapes = input_shapes conditions terms in
     let bindings =
       List.map2
-        (fun input shape ->
-          match input with
-          | Var variable when not (equal_term input shape) -> Some (variable, shape)
-          | Var _ | Const _ | App _ -> None)
-        lowered.inputs lowered.input_shapes
+        (fun term shape ->
+          match term with
+          | Var variable when not (equal_term term shape) -> Some (variable, shape)
+          | _ -> None)
+        terms shapes
       |> List.filter_map Fun.id
     in
-    let call = relation_call index pattern.source lowered.input_shapes in
-    let conditions =
-      List.map (substitute_condition bindings) lowered.conditions
-    in
-    let conditions =
-      match pattern.deferred_execution with
-      | None -> conditions
-      | Some relation ->
-          (* Heating selects the wrapper; its ordinary execution rule discharges
-             the recursive premise after the wrapper becomes the focus. *)
-          let target = Prescan.rel_name index relation in
-          delegated_condition pattern.rule.at target conditions |> snd
-    in
-    call, conditions
+    relation_call index pattern.source shapes,
+    List.map (substitute_condition bindings) conditions
 
   let lift_bridge cache request_output index (call, conditions)
       (bridge : Hintd.bridge) =
@@ -670,11 +833,7 @@ module Context_rules = struct
     )
 
   let outer_call cache request_output index (pattern : Hintd.focus_pattern) =
-    let lowered =
-      lowered_rule cache request_output index pattern.Hintd.source
-        pattern.ordinal pattern.rule.at
-    in
-    let call, conditions = shaped_relation_call index pattern lowered in
+    let call, conditions = shaped_relation_call index request_output pattern in
     List.fold_left
       (lift_bridge cache request_output index)
       (call, conditions)
@@ -749,27 +908,35 @@ module Context_rules = struct
     | Prescan.BackendCompute _ -> unsupported context.rule.at
         "context relation has no execution-request sort"
 
+  let helper index (context : Hintd.context) name =
+    match Prescan.contexts index with
+    | [_] -> name
+    | _ -> name ^ "-" ^ Prescan.rel_name index context.source.id
+        ^ "-" ^ Prescan.sanitize (rule_id context.rule).it
+
   let declarations index (context : Hintd.context) =
+    let name = helper index context in
     let prefix_sort = Term.translate_sort index context.Hintd.prefix_typ in
     let postfix_sort = Term.translate_sort index context.postfix_typ in
     let state_sort = Term.translate_sort index context.frame.state_typ in
     let config_sort = Term.translate_sort index context.frame.config_typ in
     let proper_sort = context.Hintd.proper_sort in
     let request_sort = request_sort index context in
-    [ SortDecl "FocusSearch"
-    ; SortDecl "FocusTarget"
-    ; SortDecl "Hole"
-    ; SubsortDecl ("FocusTarget", "FocusSearch")
-    ; op ~arrow:Partial ~attrs:(frozen_all 4) "identifyFocus"
-        [state_sort; prefix_sort; proper_sort; postfix_sort] "FocusSearch"
-    ; op ~attrs:[Ctor] "{_|_|_}"
-        [prefix_sort; config_sort; postfix_sort] "FocusTarget"
-    ; op ~attrs:[Ctor] "hole" [prefix_sort; postfix_sort] "Hole"
-    ; op ~attrs:[Frozen [2]] "_~>_" [request_sort; "Hole"] request_sort
+    [ SortDecl (name "FocusSearch")
+    ; SortDecl (name "FocusTarget")
+    ; SortDecl (name "Hole")
+    ; SubsortDecl (name "FocusTarget", name "FocusSearch")
+    ; op ~arrow:Partial ~attrs:(frozen_all 4) (name "identifyFocus")
+        [state_sort; prefix_sort; proper_sort; postfix_sort] (name "FocusSearch")
+    ; op ~attrs:[Ctor] (name "{_|_|_}")
+        [prefix_sort; config_sort; postfix_sort] (name "FocusTarget")
+    ; op ~attrs:[Ctor] (name "hole") [prefix_sort; postfix_sort] (name "Hole")
+    ; op ~attrs:[Frozen [2]] (name "_~>_") [request_sort; name "Hole"] request_sort
     ]
 
   let translate_pattern cache request_output index (context : Hintd.context)
       (pattern : Hintd.focus_pattern) =
+    let name = helper index context in
     let call, conditions = outer_call cache request_output index pattern in
     let config = relation_input index context call in
     let state, focus, rebuild =
@@ -784,19 +951,36 @@ module Context_rules = struct
     let rest =
       Term.sequence_of_typ index context.postfix_typ (trailing @ [postfix])
     in
-    let left = App ("identifyFocus", [state; stack; trigger; rest]) in
-    let right = App ("{_|_|_}", [prefix; rebuild focus; postfix]) in
-    let conditions = normalize_conditions left conditions in
-    let label = Some (focus_label index pattern) in
+    let left = App (name "identifyFocus", [state; stack; trigger; rest]) in
+    let right = App (name "{_|_|_}", [prefix; rebuild focus; postfix]) in
+    let conditions =
+      try normalize_conditions left conditions with
+      | Invalid_argument reason ->
+          unsupported pattern.rule.at
+            ("focus of " ^ (rule_id pattern.rule).it ^ ": " ^ reason)
+    in
+    let label = Some (name (focus_label index pattern)) in
     match conditions with
     | [] -> Rl (label, left, right)
     | _ -> Crl (label, left, right, conditions)
 
   let context_transitions request_output index (context : Hintd.context) =
+    let name = helper index context in
     let policy = execution_policy index context.source.id in
+    let RuleD (id, quants, mixop, head, prems) = context.rule.it in
+    let is_nonempty premise =
+      match premise.it with
+      | IfPr exp -> Hintd.nonempty_context context.prefix.it context.postfix.it exp
+      | _ -> false
+    in
+    let nonempty = List.exists is_nonempty prems in
+    let rule =
+      let prems = List.filter (fun premise -> not (is_nonempty premise)) prems in
+      {context.rule with it = RuleD (id, quants, mixop, head, prems)}
+    in
     let lowered =
       lower_execution_rule ~request_output index context.source.id
-        context.source.params policy [] context.ordinal context.rule
+        context.source.params policy [] context.ordinal rule
     in
     let inner_name = Prescan.rel_name index context.inner_relation in
     let (inner_call, inner_result), remaining =
@@ -821,10 +1005,10 @@ module Context_rules = struct
     in
     let input = rebuild sequence in
     let heat_left = relation_call index context.source [input] in
-    let target = App ("{_|_|_}", [prefix; rebuild focus; postfix]) in
+    let target = App (name "{_|_|_}", [prefix; rebuild focus; postfix]) in
     let identify =
       RewriteCond
-        (App ("identifyFocus", [state; stack; trigger; rest]), target)
+        (App (name "identifyFocus", [state; stack; trigger; rest]), target)
     in
     let bindings =
       [ Prescan.source_variable index context.prefix context.prefix_typ, prefix
@@ -832,51 +1016,91 @@ module Context_rules = struct
       ; Prescan.source_variable index context.postfix context.postfix_typ, postfix
       ]
     in
+    let different left right =
+      EqCondition (BoolCond (App ("_=/=_", [left; right])))
+    in
+    let guards =
+      if nonempty then
+        let whole =
+          Term.sequence_of_typ index context.focus_typ [prefix; focus; postfix]
+        in
+        [different sequence trigger; identify; different focus whole]
+      else [identify]
+    in
     let conditions =
-      identify :: List.map (substitute_condition bindings) remaining
+      guards @ List.map (substitute_condition bindings) remaining
       |> normalize_conditions heat_left
     in
+    let hole = App (name "hole", [prefix; postfix]) in
     let heat_right =
-      App
-        ( "_~>_"
-        , [ substitute bindings inner_call
-          ; App ("hole", [prefix; postfix])
-          ]
-        )
+      App (name "_~>_", [substitute bindings inner_call; hole])
     in
     let label =
-      Some
-        ("heating-"
-         ^ ((rule_id context.rule).it |> Prescan.sanitize))
+      Some (name ("heating-" ^ Prescan.sanitize (rule_id context.rule).it))
     in
     let heating = Crl (label, heat_left, heat_right, conditions) in
-    let cooling =
-      Eq
-        ( App
-            ( "_~>_"
-            , [ substitute bindings inner_result
-              ; App ("hole", [prefix; postfix])
-              ]
-            )
-        , substitute bindings lowered.right
-        , []
-        )
+    let cool_left =
+      App (name "_~>_", [substitute bindings inner_result; hole])
     in
+    let result = substitute bindings lowered.right in
+    let _, output, rebuild =
+      split_config index context.frame result context.rule.at
+    in
+    let representation =
+      Prescan.sequence_representation index context.focus_typ
+    in
+    let rec concatenate = function
+      | App (operator, terms) when operator = representation.append ->
+          Term.sequence_of_typ index context.focus_typ (List.map concatenate terms)
+      | term -> term
+    in
+    let cooling = Eq (cool_left, rebuild (concatenate output), []) in
     [heating; cooling]
+
+  let unique_candidates candidates =
+    let key statement =
+      let names = ref [] in
+      let rename variable =
+        let existing =
+          List.find_opt (fun (original, _) -> same_variable original variable) !names
+        in
+        match existing with
+        | Some (_, canonical) -> canonical
+        | None ->
+            let canonical =
+              source_variable (string_of_int (List.length !names)) variable.sort
+            in
+            names := (variable, canonical) :: !names;
+            canonical
+      in
+      let statement =
+        match statement with
+        | Rl (_, left, right) -> Rl (None, left, right)
+        | Crl (_, left, right, conditions) -> Crl (None, left, right, conditions)
+        | _ -> invalid_arg "expected a focus candidate"
+      in
+      map_statement_variables rename statement
+    in
+    let _, kept =
+      List.fold_left
+        (fun (seen, kept) candidate ->
+          let canonical = key candidate in
+          if List.mem canonical seen then seen, kept
+          else canonical :: seen, candidate :: kept)
+        ([], []) candidates
+    in
+    List.rev kept
 
   let translate ?request_output index =
     let request_output = Option.value request_output ~default:(fun _ _ -> ()) in
-    match Prescan.contexts index with
-    | [] -> []
-    | [context] ->
-        let cache = Hashtbl.create 4 in
-        declarations index context
-        @ List.map
-            (translate_pattern cache request_output index context)
-            context.Hintd.patterns
-        @ context_transitions request_output index context
-    | context :: _ -> unsupported context.Hintd.rule.at
-        "multiple maude_context rules are not yet supported"
+    let cache = Hashtbl.create 4 in
+    Prescan.contexts index
+    |> List.concat_map (fun context ->
+         declarations index context
+         @ (context.Hintd.patterns
+            |> List.map (translate_pattern cache request_output index context)
+            |> unique_candidates)
+         @ context_transitions request_output index context)
 
 end
 
