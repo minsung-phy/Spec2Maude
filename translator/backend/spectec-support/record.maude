@@ -34,8 +34,7 @@ fmod DSL-RECORD is
   eq value(FIELD, {ITEMS}) = value(FIELD, ITEMS) .
   eq value(FIELD, EMPTY) = eps .
   eq value(FIELD, item(FIELD, VALUE) ; ITEMS) = VALUE .
-  ceq value(FIELD, item(OTHER, VALUE) ; ITEMS) = value(FIELD, ITEMS)
-    if FIELD =/= OTHER .
+  eq value(FIELD, item(OTHER, VALUE) ; ITEMS) = value(FIELD, ITEMS) [owise] .
 
   eq RECORD . FIELD = value(FIELD, RECORD) .
 
