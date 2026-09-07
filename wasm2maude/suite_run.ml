@@ -130,8 +130,12 @@ let execute ~maude ~timeout harness output =
           "ulimit -s unlimited 2>/dev/null || ulimit -s 65520 2>/dev/null || true; exec \"$@\"";
           "spec2maude-maude"; maude; "-no-banner"; harness|]
       in
-      let pid = Unix.create_process shell argv Unix.stdin fd fd in
-      wait pid (Unix.gettimeofday () +. timeout))
+      let input = Unix.openfile "/dev/null" [Unix.O_RDONLY] 0 in
+      Fun.protect
+        ~finally:(fun () -> Unix.close input)
+        (fun () ->
+          let pid = Unix.create_process shell argv input fd fd in
+          wait pid (Unix.gettimeofday () +. timeout)))
 
 let ensure_directory path =
   if Sys.file_exists path then begin

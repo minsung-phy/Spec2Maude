@@ -37,11 +37,11 @@ let translate_alias index id params quants args typ =
   let right = App ("typecheck", [value; source]) in
   let conditions = Param.translate_eq_conditions index quants in
   let direct = equation left right conditions in
-  if sort = "SpectecTerminals" then
-    let boxed = App ("typecheck", [App ("seq", [value]); target]) in
-    [equation boxed right conditions; direct]
-  else
-    [direct]
+  match Hintd.sequence_element_wrappers (Prescan.sort_metadata index) typ with
+  | None -> [direct]
+  | Some (box, _) ->
+      let boxed = App ("typecheck", [App (box, [value]); target]) in
+      [equation boxed right conditions; direct]
 
 (* StructT *)
 let join_struct_items = function
@@ -359,6 +359,26 @@ module Lists = struct
     ; eq (app sequence.lift [app "_?" [term element]]) (term element)
     ]
 
+  let sequence_checks element rest typ empty concat =
+    let check value = app "typecheck" [value; typ] in
+    [ eq (check (Const empty)) (Const "true")
+    ; Ceq
+        ( check (app concat [element; rest])
+        , check rest
+        , [ BoolCond (app "_=/=_" [rest; Const empty])
+          ; BoolCond (check element)
+          ]
+        , [])
+    ]
+
+  let typed_sequence_checks metadata sort =
+    let sequence = Hintd.typed_sequence_representation metadata sort in
+    let element = var "SEQUENCE-ELEMENT" sort in
+    let rest = var "SEQUENCE-REST" sequence.sort in
+    let typ = var "TYPECHECK-TYPE" "SpectecType" in
+    sequence_checks (term element) (term rest) (term typ)
+      sequence.empty sequence.concat
+
   let generic_sequence =
     let element = var "SEQUENCE-ELEMENT" "SpectecTerminal" in
     let rest = var "SEQUENCE-REST" "SpectecTerminals" in
@@ -374,16 +394,9 @@ module Lists = struct
     ; op ~attrs:[Ctor] "seq" ["SpectecTerminals"] "SpectecTerminal"
     ; op ~arrow:Partial "unseq" ["SpectecTerminal"] "SpectecTerminals"
     ; eq (app "unseq" [app "seq" [term rest]]) (term rest)
-    ; eq (check (Const "eps")) (Const "true")
-    ; Ceq
-        ( check (app "_ _" [term element; term rest])
-        , check (term rest)
-        , [ BoolCond (app "_=/=_" [term rest; Const "eps"])
-          ; BoolCond (check (term element))
-          ]
-        , [])
-    ; Eq (check (term value), Const "false", [Owise])
     ]
+    @ sequence_checks (term element) (term rest) (term typ) "eps" "_ _"
+    @ [Eq (check (term value), Const "false", [Owise])]
 
   let statements metadata =
     let sorts = Hintd.typed_list_sorts metadata in
@@ -397,8 +410,13 @@ module Lists = struct
       roots
       |> List.map (fun sort -> SubsortDecl (list_sort sort, "SpectecTerminals"))
     in
+    let checks =
+      if Hintd.separate_list_families metadata then
+        List.concat_map (typed_sequence_checks metadata) roots
+      else []
+    in
     generic_sequence @ list_edges metadata @ generic_edges @ lower
-    @ List.concat_map (repeat metadata) sorts
+    @ checks @ List.concat_map (repeat metadata) sorts
 
   let generated_statements metadata =
     Hintd.typed_list_sorts metadata

@@ -57,6 +57,18 @@ if [[ "$file_count" != 258 ]]; then
 fi
 
 mkdir -p "$results/stage-300/logs" "$results/stage-3600"
+if git -C "$root" rev-parse HEAD >"$results/revision.txt" 2>/dev/null; then
+  git -C "$root" diff -- translator wasm2maude bin test >"$results/source.patch"
+else
+  echo 'unavailable (source archive)' >"$results/revision.txt"
+fi
+cp "$root/spectec/REVISION" "$results/spectec-revision.txt"
+cp "$root/benchmarks/wasm-spec/REVISION" "$results/suite-revision.txt"
+if command -v sha256sum >/dev/null 2>&1; then
+  sha256sum "$root/translator/generated/output.maude" >"$results/semantics.sha256"
+else
+  shasum -a 256 "$root/translator/generated/output.maude" >"$results/semantics.sha256"
+fi
 printf '%s\n' \
   "suite=$suite" \
   "semantics=$semantics" \
@@ -97,7 +109,7 @@ run_suite() {
   (
     cd "$root"
     "${command[@]}"
-  ) >"$stdout" 2>"$stderr" || true
+  ) </dev/null >"$stdout" 2>"$stderr" || true
   if [[ ! -s "$report" ]]; then
     echo "wasm_core_suite: runner did not produce $report" >&2
     exit 1
@@ -127,8 +139,27 @@ while IFS=$'\t' read -r status _seconds _commands _checked _runtime source _deta
   run_suite "$source" "$long_timeout" \
     "$retry_dir/report.tsv" "$retry_dir/logs" \
     "$retry_dir/stdout" "$retry_dir/stderr" "$retry_dir/command.txt"
+  if ! awk -F '\t' -v source="$source" '
+    NR > 1 { count++; if ($6 != source) wrong = 1 }
+    END { exit (count != 1 || wrong) }
+  ' "$retry_dir/report.tsv"; then
+    echo "wasm_core_suite: retry must report exactly one row for $source" >&2
+    exit 1
+  fi
   tail -n +2 "$retry_dir/report.tsv" >>"$retries"
 done < <(tail -n +2 "$stage300/report.tsv")
+
+if ! awk -F '\t' '
+  NR == FNR { if (FNR > 1 && $1 == "TIMEOUT") expected[$6] = 1; next }
+  FNR > 1 { if (!($6 in expected) || seen[$6]++) wrong = 1 }
+  END {
+    for (source in expected) if (!(source in seen)) wrong = 1
+    exit (wrong != 0)
+  }
+' "$stage300/report.tsv" "$retries"; then
+  echo "wasm_core_suite: retry sources do not match the initial TIMEOUT sources" >&2
+  exit 1
+fi
 
 awk -F '\t' '
   NR == FNR {
