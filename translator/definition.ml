@@ -15,13 +15,35 @@ let deduplicate values =
   in
   List.filter keep values
 
+let simplify_conditions equation conditions =
+  let matches = ref [] in
+  let keep condition =
+    match equation condition with
+    | Some (MatchCond (pattern, subject)) ->
+        matches := (pattern, subject) :: !matches;
+        true
+    | Some (EqCond (left, right)) ->
+        (* A preceding successful match already establishes this equality. *)
+        not (List.exists
+          (fun (pattern, subject) ->
+            (left = pattern && right = subject)
+            || (left = subject && right = pattern))
+          !matches)
+    | Some (MembershipCond _ | BoolCond _) | None -> true
+  in
+  List.filter keep (deduplicate conditions)
+
 let deduplicate_conditions = function
   | Cmb (term, sort, conditions) ->
-      Cmb (term, sort, deduplicate conditions)
+      Cmb (term, sort, simplify_conditions Option.some conditions)
   | Ceq (left, right, conditions, attrs) ->
-      Ceq (left, right, deduplicate conditions, attrs)
+      Ceq (left, right, simplify_conditions Option.some conditions, attrs)
   | Crl (label, left, right, conditions) ->
-      Crl (label, left, right, deduplicate conditions)
+      let equation = function
+        | EqCondition condition -> Some condition
+        | RewriteCond _ -> None
+      in
+      Crl (label, left, right, simplify_conditions equation conditions)
   | (SortDecl _ | SubsortDecl _ | VarDecl _ | OpDecl _
     | Mb _ | Eq _ | Rl _) as statement ->
       statement
