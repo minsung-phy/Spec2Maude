@@ -1046,15 +1046,7 @@ module Context_rules = struct
     let _, output, rebuild =
       split_config index context.frame result context.rule.at
     in
-    let representation =
-      Prescan.sequence_representation index context.focus_typ
-    in
-    let rec concatenate = function
-      | App (operator, terms) when operator = representation.append ->
-          Term.sequence_of_typ index context.focus_typ (List.map concatenate terms)
-      | term -> term
-    in
-    let cooling = Eq (cool_left, rebuild (concatenate output), []) in
+    let cooling = Eq (cool_left, rebuild output, []) in
     [heating; cooling]
 
   let unique_candidates candidates =

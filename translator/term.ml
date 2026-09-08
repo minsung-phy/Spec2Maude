@@ -279,20 +279,16 @@ and translate_exp index exp =
       let operator =
         match Prescan.composition_kind index exp.note with
         | Prescan.SequenceComposition ->
-            sequence_operator index exp.note (fun sequence -> sequence.append)
+            sequence_operator index exp.note (fun sequence -> sequence.concat)
         | Prescan.RecordComposition -> "recordConcat"
       in
       app operator [translate_exp index left; translate_exp index right]
 
   | ListE exps ->
-      let terms =
-        exps
-        |> List.map (fun exp ->
-             translate_exp index exp |> as_sequence_element index exp.note)
-        |> sequence_of_typ index exp.note
-      in
-      let representation = Prescan.sequence_representation index exp.note in
-      if representation.typed then terms else app "`[_`]" [terms]
+      exps
+      |> List.map (fun exp ->
+           translate_exp index exp |> as_sequence_element index exp.note)
+      |> sequence_of_typ index exp.note
 
   | LiftE inner ->
       let operator =
@@ -315,7 +311,7 @@ and translate_exp index exp =
 
   | CatE (left, right) ->
       let operator =
-        sequence_operator index exp.note (fun sequence -> sequence.append)
+        sequence_operator index exp.note (fun sequence -> sequence.concat)
       in
       app operator [translate_exp index left; translate_exp index right]
 
@@ -483,7 +479,7 @@ and translate_extension index base path extension =
   match path.it with
   | RootP ->
       let operator =
-        sequence_operator index path.note (fun sequence -> sequence.append)
+        sequence_operator index path.note (fun sequence -> sequence.concat)
       in
       app operator [base; extension]
 
