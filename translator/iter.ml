@@ -552,7 +552,7 @@ let pattern_count index typ translate_pattern translate_exp known subject = func
       translate_pattern count
       |> Option.map (fun (pattern, guards) ->
            let size = length_of_typ index typ subject in
-           size, MatchCond (pattern, size) :: guards)
+           pattern, MatchCond (pattern, size) :: guards)
   | ListN _ -> None
   | Opt | List | List1 -> Some (Const "0", [])
 
@@ -602,13 +602,18 @@ let translate_pattern index translate_source_pattern translate_exp
           | Some (_, count_conditions) ->
               if not (captures_ready ()) then
                 invalid_arg "IterE pattern has an unbound capture";
+              let value =
+                match source_pattern with
+                | Var _ -> source_pattern
+                | Const _ | App _ -> subject
+              in
               Some
                 ( count_conditions
                   @ (MatchCond (source_pattern, subject) :: source_guards)
                   @ identity_requirement_guards index translate_conditions
-                      subject iter body
+                      value iter body
                   @ identity_cardinality index source.note translate_exp known
-                      subject iter)
+                      value iter)
           end
       | None, _ when
           projector_supported index translate_source_pattern can_bind_body
@@ -628,18 +633,16 @@ let translate_pattern index translate_source_pattern translate_exp
                 | ListN (_, Some _) -> [count; Const "0"]
               in
               let projected =
-        app (Prescan.projector_name index body)
-          (captures @ controls @ [subject])
+                app (Prescan.projector_name index body)
+                  (captures @ controls @ [subject])
               in
-              let forward =
-                translate_term index translate_exp body (iter, generators)
-              in
+              (* The projector checks each body; matching its columns retains
+               * the generator constraints without rebuilding the subject. *)
               Some
                 ( count_conditions
                   @ (MatchCond
                        (column_term index generators source_patterns, projected)
-                     :: source_guards)
-                  @ [EqCond (forward, subject)])
+                     :: source_guards))
           end
       | Some _, _ | None, _ -> None
       end
