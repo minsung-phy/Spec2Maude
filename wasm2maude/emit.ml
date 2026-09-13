@@ -181,7 +181,15 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
     Printf.sprintf
       "load %s\nload model-checker.maude\n\nmod WASM2MAUDE-MODELCHECK is\n\
        \  protecting WASM-BUILTINS .\n\
-       \  including MODEL-CHECKER .\n\n\
+       \  including MODEL-CHECKER * (\n\
+       \    op _xor_ : Nat Nat -> Nat to integerXor,\n\
+       \    op _+_ : String String -> String to stringConcat,\n\
+       \    op _<_ : String String -> Bool to stringLess,\n\
+       \    op _<=_ : String String -> Bool to stringLessEqual,\n\
+       \    op _>_ : String String -> Bool to stringGreater,\n\
+       \    op _>=_ : String String -> Bool to stringGreaterEqual,\n\
+       \    op char : Nat -> Char to nativeChar\n\
+       \  ) .\n\n\
        \  sort ModelState .\n\
        \  subsort ModelState < State .\n\
        \  op boot : -> ModelState [ctor] .\n\

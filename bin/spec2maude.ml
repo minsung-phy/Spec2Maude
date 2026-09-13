@@ -24,7 +24,7 @@ let load_script files =
 let module_name name = Maude_il.ModuleName name
 
 let emit_script script =
-  let translation = Definition.translate_script script in
+  let translation = Def.translate_script script in
   let sorts : Maude_il.top_level =
     Module
       { name = "SPEC2MAUDE-SORTS"

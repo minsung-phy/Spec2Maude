@@ -23,8 +23,9 @@ WebAssembly suite:   fc209c5ed8afc4dfeb9252024d217da3376c7a6f
 ```
 
 The SpecTec copy contains only the listed library subset, WebAssembly
-specification chapters 0--4, and Spec2Maude-specific source annotations. The
-benchmark copy contains only the official `test/core` suite.
+specification chapters 0--4, and Spec2Maude-specific hint annotations.
+Function bodies and rules remain those of the pinned upstream source.
+The benchmark copy contains only the official `test/core` suite.
 
 ## Reviewer smoke test
 
@@ -158,6 +159,27 @@ The script exits with status 0 only when all 258 scripts are classified as
 `PASS`. Otherwise it exits nonzero after preserving the complete reports and
 logs; a nonzero exit therefore does not mean that the experiment artifacts
 were lost.
+
+## Model-checking claims
+
+The `modelcheck` command generates an initialization/invocation wrapper around
+the translated `Step` relation. It currently observes returned numeric values.
+`<> returned(expected)` is universal eventual return, while
+`[] ~ returned(rejected)` excludes only that particular returned value; it is
+not a trap-freedom or termination claim. `search` checks existence separately.
+
+`--steps N` bounds the generated preliminary rewrite and search commands. It
+does **not** bound the following `modelCheck` calls. Record a separate process
+timeout and distinguish it from a completed model-checking result. Maude
+totalizes deadlocks for LTL; inspect the trace to distinguish a source trap,
+program divergence, and an unexpected stuck configuration.
+
+The current backend uses the documented Wasm DET profile. The current
+`modelcheck` CLI rejects imported modules because it does not supply the
+host-address mapping needed to initialize them.
+See the [execution contract](SEMANTIC_DECISIONS.md) and
+[hint contracts](HINT_CONTRACTS.md) for the supported scope and assumptions.
+A completed target check is not by itself a proof of source-level preservation.
 
 ## Interpreting failures
 
