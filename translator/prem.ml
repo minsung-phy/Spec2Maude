@@ -109,7 +109,8 @@ let rec translate_pattern index exp =
       |> Option.map (fun (items, guards) ->
            {term = App ("{_}", [Term.record_items items]); guards})
 
-  | SubE (inner, source, _) ->
+  | SubE (inner, source, target)
+    when Prescan.same_representation index source target ->
       translate_pattern index inner
       |> Option.map (fun pattern ->
            { pattern with
@@ -130,7 +131,7 @@ let rec translate_pattern index exp =
 
   | UnE _ | BinE _ | CmpE _ | ProjE _ | UncaseE _ | TheE _ | DotE _
   | CompE _ | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _
-  | UpdE _ | ExtE _ | IfE _ | CallE _ | CvtE _ ->
+  | UpdE _ | ExtE _ | IfE _ | CallE _ | CvtE _ | SubE _ ->
       None
 
 and translate_patterns index = function
@@ -246,6 +247,7 @@ let inverse_plan index bound id args =
       end
 
 let inverse_call index plan subject =
+  Prescan.require_definition_body index "hint(inverse) target" plan.inverse_target;
   App
     ( Prescan.def_name index plan.inverse_target
     , List.map (Term.translate_arg index) plan.remaining_args @ [subject]
@@ -406,13 +408,17 @@ and bind_structural_pattern index bound exp subject error =
       in
       bind_pattern_parts index bound exps subjects
         [EqCondition (MatchCond (represented, subject))] error
-  | SubE (inner, source, _) ->
+  | SubE (inner, source, target) ->
+      if not (Prescan.same_representation index source target) then
+        invalid_arg "SubE pattern requires a representation conversion outside the Wasm scope";
       let result = bind_pattern index bound inner subject error in
       { result with
         conditions =
           result.conditions
           @ List.map (fun c -> EqCondition c)
-              (Term.translate_typ_conditions index subject source)
+              (Term.translate_typ_conditions index
+                 (Term.translate_exp index inner) source)
+          @ [EqCondition (EqCond (Term.translate_exp index exp, subject))]
       }
   | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
   | ProjE _ | UncaseE _ | OptE None | TheE _ | DotE _ | CompE _
@@ -730,7 +736,7 @@ let translate_barrier index request_output bound prem =
               (function
                 | Prescan.VariableCapture (id, _) ->
                     Il.Free.Set.mem id.it bound
-                | Prescan.DefinitionCapture _ -> true)
+                | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> true)
               iteration.Prescan.captures)
       then invalid_arg "IterPr has an unbound capture";
       begin match iter with

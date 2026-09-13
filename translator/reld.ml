@@ -51,19 +51,6 @@ let has_else prems =
   Visitor.list Visitor.prem prems;
   !found
 
-let add_variable variables variable =
-  if List.exists (same_variable variable) variables then variables
-  else variable :: variables
-
-let rec term_variables variables = function
-  | Var variable -> add_variable variables variable
-  | Const _ -> variables
-  | App (_, args) -> List.fold_left term_variables variables args
-
-let variables_bound bound term =
-  term_variables [] term
-  |> List.for_all (fun variable -> List.exists (same_variable variable) bound)
-
 let condition_ready bound = function
   | EqCondition (EqCond (left, right)) ->
       variables_bound bound left && variables_bound bound right
@@ -239,19 +226,47 @@ let input_shapes conditions inputs =
   in
   List.map (expand []) inputs
 
-let rec may_overlap left right =
+let rec may_overlap sequences left right =
+  let is_sequence name = List.mem_assoc name sequences in
+  let rec parts = function
+    | App (name, args) when is_sequence name -> List.concat_map parts args
+    | Const name when List.exists (fun (_, empty) -> name = empty) sequences -> []
+    | term -> [term]
+  in
+  let rec fixed_prefix left right =
+    match left, right with
+    | [], _ | _, [] | Var _ :: _, _ | _, Var _ :: _ -> true
+    | left :: lefts, right :: rights ->
+        may_overlap sequences left right && fixed_prefix lefts rights
+  in
   match left, right with
   | Var _, _ | _, Var _ -> true
+  (* A sequence pattern can match across argument boundaries, including the
+   * empty sequence. Only compare fixed prefixes/suffixes up to a variable. *)
+  | _ when List.exists
+      (function App (name, _) -> is_sequence name | Const _ | Var _ -> false)
+      [left; right] ->
+      let lefts, rights = parts left, parts right in
+      fixed_prefix lefts rights
+      && fixed_prefix (List.rev lefts) (List.rev rights)
   | Const left, Const right -> left = right
   | App (left, left_args), App (right, right_args) ->
       left = right
       && List.length left_args = List.length right_args
-      && List.for_all2 may_overlap left_args right_args
+      && List.for_all2 (may_overlap sequences) left_args right_args
   | Const _, App _ | App _, Const _ -> false
 
-let inputs_may_overlap left right =
+let inputs_may_overlap index left right =
+  let metadata = index.Prescan.sort_metadata in
+  let sequences =
+    ("_ _", "eps") :: List.map
+      (fun owner ->
+        let representation = Hintd.typed_sequence_representation metadata owner in
+        representation.concat, representation.empty)
+      (Hintd.typed_list_sorts metadata)
+  in
   List.length left = List.length right
-  && List.for_all2 may_overlap left right
+  && List.for_all2 (may_overlap sequences) left right
 
 let helper_call index id params ordinal inputs =
   App
@@ -286,7 +301,7 @@ let lower_execution_rule ?request_output index id params policy
     if body.otherwise then
       List.filter
         (fun predecessor ->
-          inputs_may_overlap input_shapes predecessor.input_shapes)
+          inputs_may_overlap index input_shapes predecessor.input_shapes)
         previous
     else []
   in
@@ -348,6 +363,9 @@ let helper_statements index id params input_sorts rule =
       (fun pattern subject -> MatchCond (pattern, subject))
       rule.inputs helper_inputs
     @ helper_conditions id rule
+    |> List.map (fun condition -> EqCondition condition)
+    |> normalize_conditions left
+    |> eq_conditions
   in
   let enabled =
     match conditions with
@@ -818,11 +836,44 @@ module Context_rules = struct
       lowered_rule cache request_output index bridge.Hintd.source
         bridge.ordinal bridge.rule.at
     in
-    let outer, bridge_conditions = freshen lowered.left lowered.conditions in
     let target =
       match call_name call with
       | Some target -> target
       | None -> unsupported bridge.rule.at "delegated relation is not a call"
+    in
+    let (_, result), bridge_conditions =
+      delegated_condition bridge.premise.at target lowered.conditions
+    in
+    (* Focus unifies the source input shape, while the equality guards retain
+       the checks performed when that input is constructed. *)
+    let delegated, input_guards =
+      match bridge.premise.it with
+      | RulePr (id, args, mixop, head) ->
+          let input_count =
+            match execution_policy index id with
+            | Prescan.Execution {input_count; _} -> input_count
+            | _ -> assert false
+          in
+          let inputs, _ = Prem.split input_count (Prem.components mixop head) in
+          let patterns, guards =
+            inputs |> List.map (fun input ->
+              match Prem.translate_pattern_parts index input with
+              | Some (pattern, guards) ->
+                  let expression = Term.translate_exp index input in
+                  let checks =
+                    if equal_term expression pattern then guards
+                    else guards @ [EqCond (expression, pattern)]
+                  in pattern, List.map (fun guard -> EqCondition guard) checks
+              | None -> unsupported input.at "bridge input has no structural pattern")
+            |> List.split
+          in
+          App (target, List.map (Term.translate_arg index) args @ patterns),
+          List.concat guards
+      | _ -> unsupported bridge.premise.at "bridge premise is not a relation"
+    in
+    let outer, bridge_conditions =
+      freshen lowered.left
+        (RewriteCond (delegated, result) :: input_guards @ bridge_conditions)
     in
     let (delegated, _), bridge_conditions =
       delegated_condition bridge.premise.at target bridge_conditions
@@ -1043,10 +1094,7 @@ module Context_rules = struct
       App (name "_~>_", [substitute bindings inner_result; hole])
     in
     let result = substitute bindings lowered.right in
-    let _, output, rebuild =
-      split_config index context.frame result context.rule.at
-    in
-    let cooling = Eq (cool_left, rebuild output, []) in
+    let cooling = Eq (cool_left, result, []) in
     [heating; cooling]
 
   let unique_candidates candidates =
