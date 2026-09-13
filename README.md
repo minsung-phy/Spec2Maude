@@ -2,8 +2,8 @@
 
 Spec2Maude is a research prototype for deriving executable
 [Maude](https://maude.cs.illinois.edu/) semantics from
-[SpecTec](https://github.com/Wasm-DSL/spectec) language definitions. Its primary
-case study is the WebAssembly 3.0 specification.
+[SpecTec](https://github.com/Wasm-DSL/spectec) language definitions. Its supported
+input is the pinned WebAssembly 3.0 specification in `spectec/wasm-3.0`.
 
 The project investigates whether a structured language specification can be
 translated into rewriting logic by a small, auditable recursive definition
@@ -108,6 +108,8 @@ reference and are not part of the active translation pipeline.
 
 - [Installation](docs/INSTALL.md)
 - [Artifact evaluation and testing](docs/ARTIFACT.md)
+- [Source hints and handwritten implementations](docs/HINT_CONTRACTS.md)
+- [Execution contract and current limits](docs/SEMANTIC_DECISIONS.md)
 
 ## License
 
