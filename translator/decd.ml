@@ -12,9 +12,7 @@ let translate_decl index id params result_typ =
     { name = Prescan.def_name index id
     ; domain = Param.translate_sorts index params
     ; codomain = Term.translate_sort index result_typ
-    ; arrow =
-        if has_hint index id "maude_kind" then Partial
-        else Total
+    ; arrow = if has_hint index id "maude_kind" then Partial else Total
     ; attrs = []
     }
 
@@ -93,19 +91,6 @@ let translate_head index id args =
   ; conditions
   ; bound
   }
-
-let add_variable variables variable =
-  if List.exists (same_variable variable) variables then variables
-  else variable :: variables
-
-let rec term_variables variables = function
-  | Var variable -> add_variable variables variable
-  | Const _ -> variables
-  | App (_, args) -> List.fold_left term_variables variables args
-
-let variables_bound bound term =
-  term_variables [] term
-  |> List.for_all (fun variable -> List.exists (same_variable variable) bound)
 
 let condition_ready bound = function
   | EqCond (left, right) ->

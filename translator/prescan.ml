@@ -12,6 +12,7 @@ type definition_parameter =
 type capture =
   | VariableCapture of id * typ
   | DefinitionCapture of definition_parameter
+  | TypeCapture of id
 
 type iteration_owner =
   | RelationOwner of string
@@ -27,6 +28,8 @@ type iteration =
   ; tail_name : string
   ; projector_name : string
   ; projector_tail_name : string
+  ; mutable forward_requested : bool
+  ; mutable projector_requested : bool
   ; owner : iteration_owner
   ; body : exp
   ; iterexp : iterexp
@@ -37,6 +40,7 @@ type premise_iteration =
   { name : string
   ; tail_name : string
   ; output_names : (name * name) list
+  ; mutable check_requested : bool
   ; owner : iteration_owner
   ; premise : prem
   ; body : prem
@@ -85,7 +89,6 @@ type t =
   ; sort_metadata : Hintd.t
   ; contexts : Hintd.context list
   ; iterations : iteration list
-  ; projector_bodies : exp list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
   ; names : (name_kind * string * name) list
@@ -99,6 +102,7 @@ type t =
   ; variables : ((string * sort) * name) list
   ; anonymous_variables : (id * sort * name) list
   ; definition_parameters : definition_parameter list
+  ; type_parameters : id list
   ; definition_arguments : (arg * definition_parameter) list
   ; definition_calls : (exp * definition_parameter) list
   ; definition_values : definition_application list
@@ -122,101 +126,21 @@ let builtin_name name =
   |> sanitize
   |> String.lowercase_ascii
 
-let primitive_sort typ =
-  match typ.it with
-  | NumT `NatT -> "Nat"
-  | NumT `IntT -> "Int"
-  | IterT _ -> "SpectecTerminals"
-  | VarT _
-  | BoolT
-  | NumT (`RatT | `RealT)
-  | TextT
-  | TupT _ -> "SpectecTerminal"
-
-let common_sort = function
-  | sort :: sorts when List.for_all (( = ) sort) sorts -> sort
-  | [] | _ -> "SpectecTerminal"
-
-let rec representation_sort env definitions seen typ =
-  let typ = Il.Eval.reduce_typ env typ in
-  match typ.it with
-  | VarT (id, _) when not (List.mem id.it seen) ->
-      begin match List.assoc_opt id.it definitions with
-      | None -> "SpectecTerminal"
-      | Some insts ->
-          insts
-          |> List.map (instance_sort env definitions (id.it :: seen))
-          |> common_sort
-      end
-  | VarT _ -> "SpectecTerminal"
-  | _ -> primitive_sort typ
-
-and instance_sort env definitions seen inst =
-  match inst.it with
-  | InstD (_, _, {it = AliasT typ; _}) ->
-      representation_sort env definitions seen typ
-  | InstD (_, _, {it = StructT _; _}) ->
-      "SpectecTerminal"
-  | InstD (_, _, {it = VariantT cases; _}) ->
-      cases |> List.map (case_sort env definitions seen) |> common_sort
-
-and case_sort env definitions seen (mixop, (typ, _, _), _) =
-  if Mixop.is_hole_only mixop then
-    match typ.it with
-    | TupT [(_, payload)] -> representation_sort env definitions seen payload
-    | _ -> "SpectecTerminal"
-  else
-    "SpectecTerminal"
-
 let sort_of_typ index typ =
   Hintd.sort_of_typ index.sort_metadata typ
 
 let sequence_representation index typ =
   Hintd.sequence_representation index.sort_metadata typ
 
-type composition_kind = SequenceComposition | RecordComposition
-
-let rec composition_kind_of_typ env definitions seen typ =
-  let typ = Il.Eval.reduce_typ env typ in
-  match typ.it with
-  | IterT _ -> SequenceComposition
-  | VarT (id, _) when not (List.mem id.it seen) ->
-      begin match List.assoc_opt id.it definitions with
-      | Some insts ->
-          let kinds =
-            List.map
-              (composition_kind_of_inst env definitions (id.it :: seen)) insts
-          in
-          begin match kinds with
-          | kind :: rest when List.for_all (( = ) kind) rest -> kind
-          | [] | _ -> invalid_arg "ambiguous CompE representation"
-          end
-      | None -> invalid_arg "unresolved CompE type"
+(* Record composition uses the equation emitted for its monomorphic TypD. *)
+let record_composition_available index typ =
+  match (Il.Eval.reduce_typ index.type_env typ).it with
+  | VarT (id, []) ->
+      begin match Il.Env.find_typ index.type_env id with
+      | [], [{it = InstD ([], [], {it = StructT _; _}); _}] -> true
+      | _ -> false
       end
-  | VarT _ -> invalid_arg "recursive CompE type"
-  | BoolT | NumT _ | TextT | TupT _ ->
-      invalid_arg "non-composable CompE type"
-
-and composition_kind_of_inst env definitions seen inst =
-  match inst.it with
-  | InstD (_, _, {it = AliasT typ; _}) ->
-      composition_kind_of_typ env definitions seen typ
-  | InstD (_, _, {it = StructT fields; _}) ->
-      if
-        List.for_all
-          (fun (_, (typ, _, _), _) ->
-            representation_sort env definitions seen typ =
-              "SpectecTerminals")
-          fields
-      then RecordComposition
-      else
-        invalid_arg
-          "record CompE with non-sequence fields is unsupported"
-  | InstD (_, _, {it = VariantT _; _}) ->
-      invalid_arg "variant CompE type"
-
-let composition_kind index typ =
-  composition_kind_of_typ index.type_env index.type_definitions [] typ
+  | _ -> false
 
 let rec parameter_sort metadata param =
   match param.it with
@@ -243,12 +167,84 @@ let definition_signature index params result =
 let reserved_names =
   StringSet.of_list
     [ "true"; "false"; "none"; "min"; "max"; "s"; "sd"
+    (* Native Float operations retain their hooks under import renaming. *)
+    ; "nativeFloatNeg"; "nativeFloatAdd"; "nativeFloatSub"
+    ; "nativeFloatMul"; "nativeFloatDiv"; "nativeFloatPow"
+    ; "nativeToFloat"; "nativeToRat"; "nativeParseFloat"; "nativeParseRat"
+    ; "nativeFloatString"; "nativeRatString"; "decFloat"
+    ; "integerXor"; "floatRem"; "floatAbs"; "floatFloor"
+    ; "floatCeiling"; "floatMin"; "floatMax"; "floatLess"
+    ; "floatLessEqual"; "floatGreater"; "floatGreaterEqual"
+    ; "sqrt"; "exp"; "log"; "sin"; "cos"; "tan"
+    ; "asin"; "acos"; "atan"; "pi"; "_xor_"
     ; "eps"; "bool"; "rat"; "float"; "text"; "seq"; "unseq"
-    ; "tuple"; "item"; "value"; "typecheck"; "isTrue"; "len"
+    ; "tuple"; "item"; "value"; "typecheck"; "len"
     ; "index"; "slice"; "lift"; "repeatSeq"
     ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
     ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "not_"; "_and_"
     ; "_or_"; "_implies_"; "_rem_"
+    (* Native numeric operators whose domains overlap unwrapped Nat/Int. *)
+    ; "abs"; "ceiling"; "floor"; "gcd"; "lcm"; "modExp"
+    (* Native string operators now share the source value kind. *)
+    ; "stringConcat"; "stringLess"; "stringLessEqual"
+    ; "stringGreater"; "stringGreaterEqual"; "nativeChar"
+    ; "ascii"; "length"; "substr"; "find"; "rfind"
+    ; "upperCase"; "lowerCase"; "notFound"
+    (* spectec-support/pretype.maude *)
+    ; "nat"; "int"; "real"
+    ; "iterOpt"; "iterList"; "iterList1"
+    ; "iterListN"
+    (* spectec-support/sequence.maude *)
+    ; "indexDefined"; "seqCursor"; "lenAux"; "takeAux"; "dropAux"
+    ; "take"; "drop"; "setAt"
+    ; "splice"
+    (* spectec-support/record.maude *)
+    ; "EMPTY"; "recordConcat"; "optionConcat"
+    ; "setItem"
+    (* builtins.maude *)
+    ; "ibits-aux"; "inv-ibits-aux"; "ibytes-aux"
+    ; "inv-ibytes-aux"; "sign-extend-nat"; "iclz-bits"
+    ; "ictz-bits"; "ipopcnt-bits"; "inot-bits"
+    ; "irev-bits"; "iand-bits"; "iandnot-bits"
+    ; "ior-bits"; "ixor-bits"; "shift-count"
+    ; "signed-nat"; "floor-div-pow2-int"; "sat-s-int"
+    ; "wrap-s-int"; "fnmag-valid"
+    ; "scale-rat"; "fmag-rat"; "float-rat"
+    ; "float-finite"; "trunc-rat-int"; "nearest-rat-int"
+    ; "floor-log2"
+    ; "floor-log2-rat"; "nat-fmag-exact"; "nat-to-fmag"
+    ; "round-nat-significand"; "rounded-nat-to-fmag"; "round-rat-subnormal"
+    ; "round-rat-normal"; "round-rat-to-fmag"; "floor-half-int"
+    ; "floor-sqrt-rat-range"; "nearest-sqrt-rat-int"; "sqrt-rat-subnormal"
+    ; "sqrt-rat-normal"; "sqrt-rat-to-fmag"; "sqrt-fmag"
+    ; "int-to-float-like"; "int-to-iN"; "saturate-u-int"
+    ; "saturate-s-int"; "bit-not"; "bit-and"
+    ; "bit-or"; "bit-xor"; "float-nan-bit"
+    ; "float-sign-bit"; "float-eq-bit"; "float-lt-bit"
+    ; "float-default-nan"; "float-canonical-nan"; "float-binary-nan"
+    ; "float-neg"; "rat-to-float-nearest"; "rat-to-float-nearest-signed-zero"
+    ; "float-signed-zero"; "float-signed-inf"; "float-add-result"
+    ; "float-min-equal"; "float-max-equal"; "float-min"
+    ; "float-max"; "float-pmin"; "float-pmax"
+    ; "promote-f32-normal-frac"; "promote-f32-subnorm-frac"; "promote-f32-subnorm-exp"
+    ; "promote-f32"
+    ; "demote-f64"
+    ; "float-bias"; "float-max-exp-field"; "float-exp-field"
+    ; "float-frac-field"; "float-sign-field"; "float-mag-from-bits"
+    ; "float-from-bits"; "float-mag-to-bits"; "float-to-bits"
+    ; "nbytes-int"; "nbytes-float"; "inv-nbytes-int"
+    ; "inv-nbytes-float"; "zbytes-pack"; "inv-zbytes-pack"
+    ; "lane-width"; "vec-raw"; "lane-from-bits"
+    ; "lane-to-bits"; "lanes-aux"; "inv-lanes-aux"
+    ; "pair-chunks"; "take-exact"; "fixed-chunks"
+    (* relation-backends.maude *)
+    ; "backend-reftype-sub"; "backend-heaptype-sub"; "backend-valid-heaptype"
+    ; "backend-close-super"; "backend-deftype-step"; "ref-ok-actual-type"
+    ; "externaddr-ok-actual-type"; "backend-externtype-sub"; "backend-tagtype-sub"
+    ; "backend-globaltype-sub"; "backend-memtype-sub"; "backend-tabletype-sub"
+    ; "backend-valtype-sub"; "backend-limits-sub"; "module-ok-import-types"
+    ; "module-ok-tag-types"; "module-ok-global-types"; "module-ok-mem-types"
+    ; "module-ok-table-types"; "module-ok-func-types"; "module-ok-export-types"
     ]
 
 let fresh used suffix candidate =
@@ -312,39 +308,95 @@ let rec remove_id name = function
   | id :: ids when id = name -> ids
   | id :: ids -> id :: remove_id name ids
 
-let capture_id = function
-  | VariableCapture (id, _) -> id
-  | DefinitionCapture parameter -> parameter.id
+(* Expression notes may retain ListN, which Il.Iter.typ excludes from
+ * declaration types. Visit their actual shape without rewriting the AST. *)
+let rec visit_noted_type visit visit_exp typ =
+  visit typ;
+  match typ.it with
+  | VarT (_, args) ->
+      List.iter
+        (fun arg ->
+          match arg.it with
+          | TypA typ -> visit_noted_type visit visit_exp typ
+          | ExpA exp -> visit_exp exp
+          | DefA _ | GramA _ -> ())
+        args
+  | TupT fields ->
+      List.iter (fun (_, typ) -> visit_noted_type visit visit_exp typ) fields
+  | IterT (typ, iter) ->
+      visit_noted_type visit visit_exp typ;
+      (match iter with ListN (count, _) -> visit_exp count | _ -> ())
+  | BoolT | NumT _ | TextT -> ()
 
-let capture_variables definition_calls free body iterexp =
+let capture_variables definition_calls definition_arguments type_parameters free body iterexp =
+  let free = ref free in
   let bound = ref (List.map (fun id -> id.it) (bound_ids iterexp)) in
   let captures = ref [] in
-  let captured id =
-    List.exists (fun capture -> (capture_id capture).it = id.it) !captures
-  in
   let add_variable id typ =
-    if Il.Free.Set.mem id.it free.Il.Free.varid
+    if Il.Free.Set.mem id.it (!free).Il.Free.varid
        && not (List.mem id.it !bound)
-       && not (captured id)
+       && not (List.exists (function
+            | VariableCapture (other, _) -> other.it = id.it
+            | DefinitionCapture _ | TypeCapture _ -> false) !captures)
     then captures := VariableCapture (id, typ) :: !captures
   in
-  let add_definition exp =
-    match
-      List.find_opt (fun (call, _) -> call == exp) definition_calls
-    with
-    | Some (_, parameter)
-      when Il.Free.Set.mem parameter.id.it free.Il.Free.defid
-           && not (captured parameter.id) ->
+  let add_definition = function
+    | Some parameter
+      when Il.Free.Set.mem parameter.id.it (!free).Il.Free.defid
+           && not (List.exists (function
+                | DefinitionCapture other -> other.id.it = parameter.id.it
+                | VariableCapture _ | TypeCapture _ -> false) !captures) ->
         captures := DefinitionCapture parameter :: !captures
     | Some _ | None -> ()
+  in
+  let add_arguments args =
+    List.iter
+      (fun arg ->
+        List.find_opt (fun (actual, _) -> actual == arg) definition_arguments
+        |> Option.map snd
+        |> add_definition)
+      args
+  in
+  let add_type typ =
+    match typ.it with
+    | VarT (id, []) when List.exists (( == ) id) type_parameters ->
+        if not (List.exists (function
+          | TypeCapture other -> other.it = id.it
+          | VariableCapture _ | DefinitionCapture _ -> false) !captures)
+        then captures := TypeCapture id :: !captures
+    | VarT (_, args) -> add_arguments args
+    | _ -> ()
+  in
+  let add_exp exp =
+    match exp.it with
+    | VarE id -> add_variable id exp.note
+    | CallE (_, args) ->
+        add_definition
+          (List.find_opt (fun (call, _) -> call == exp) definition_calls
+           |> Option.map snd);
+        add_arguments args
+    | _ -> ()
+  in
+  let module Types = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_typ = add_type
+    let visit_exp = add_exp
+  end) in
+  let add_note typ =
+    free := Il.Free.(!free ++ free_typ typ);
+    visit_noted_type add_type Types.exp typ
   in
   let module Visitor = Il.Iter.Make (struct
     include Il.Iter.Skip
 
     let visit_exp exp =
-      match exp.it with
-      | VarE id -> add_variable id exp.note
-      | CallE _ -> add_definition exp
+      add_note exp.note;
+      add_exp exp
+    let visit_typ = add_type
+    let visit_path path = add_note path.note
+    let visit_prem prem =
+      match prem.it with
+      | RulePr (_, args, _, _) -> add_arguments args
       | _ -> ()
 
     let scope_enter id _typ =
@@ -360,12 +412,12 @@ let capture_variables definition_calls free body iterexp =
   end;
   List.rev !captures
 
-let capture_exp_variables definition_calls body iterexp =
-  capture_variables definition_calls Il.Free.(free_exp body)
+let capture_exp_variables definition_calls definition_arguments type_parameters body iterexp =
+  capture_variables definition_calls definition_arguments type_parameters Il.Free.(free_exp body)
     (ExpBody body) iterexp
 
-let capture_premise_variables definition_calls body iterexp =
-  capture_variables definition_calls Il.Free.(free_prem body)
+let capture_premise_variables definition_calls definition_arguments type_parameters body iterexp =
+  capture_variables definition_calls definition_arguments type_parameters Il.Free.(free_prem body)
     (PremiseBody body) iterexp
 
 
@@ -381,15 +433,24 @@ let rec collect_hints hints = function
       end
 
 let has_dec_hint_in hints target_name name =
-  List.exists
-    (fun hintdef ->
+  List.fold_left
+    (fun found hintdef ->
       match hintdef.it with
-      | DecH (target, values) ->
-          target.it = target_name
-          && List.exists (fun hint -> hint.hintid.it = name) values
-      | TypH _ | RelH _ | GramH _ | RuleH _ ->
-          false)
-    hints
+      | DecH (target, values) when target.it = target_name ->
+          List.fold_left
+               (fun found hint ->
+                 begin match hint.hintid.it, hint.hintexp.it with
+                 | ("builtin" | "maude_kind" | "maude_rule"), El.Ast.SeqE [] -> ()
+                 | ("builtin" | "maude_kind" | "maude_rule" as flag), _ ->
+                     Util.Error.error hint.hintid.at "translation"
+                       ("Unsupported DecD $" ^ target_name ^ ": "
+                        ^ flag ^ " must be a flag hint")
+                 | _ -> ()
+                 end;
+                 found || hint.hintid.it = name)
+               found values
+      | TypH _ | RelH _ | DecH _ | GramH _ | RuleH _ -> found)
+    false hints
 
 let relation_hint_names hints target_name =
   let values =
@@ -606,48 +667,25 @@ let rec collect_membership_choices = function
 let scan script =
   let type_env = Il.Env.env_of_script script in
   let sort_metadata = Hintd.scan_sorts script in
-  let rec collect_type_definitions definitions = function
-    | [] -> definitions
-    | def :: defs ->
-        begin match def.it with
-        | TypD (id, _, insts) ->
-            collect_type_definitions ((id.it, insts) :: definitions) defs
-        | RecD nested ->
-            collect_type_definitions
-              (collect_type_definitions definitions nested) defs
-        | RelD _ | DecD _ | GramD _ | HintD _ ->
-            collect_type_definitions definitions defs
-        end
+  let rec collect declarations def =
+    let types, definitions, relations = declarations in
+    match def.it with
+    | TypD (id, _, insts) ->
+        (id.it, insts) :: types, definitions, relations
+    | DecD (id, params, result, _) ->
+        types, (id.it, params, result) :: definitions, relations
+    | RelD (id, _, mixop, _, _) ->
+        types, definitions, (id.it, mixop) :: relations
+    | RecD defs -> List.fold_left collect declarations defs
+    | GramD _ | HintD _ -> declarations
   in
-  let type_definitions = collect_type_definitions [] script |> List.rev in
+  let types, definitions, relations =
+    List.fold_left collect ([], [], []) script
+  in
+  let type_definitions = List.rev types in
+  let definitions = List.rev definitions in
+  let relations = List.rev relations in
   let hints = collect_hints [] script |> List.rev in
-  let rec collect_definitions definitions = function
-    | [] -> definitions
-    | def :: defs ->
-        begin match def.it with
-        | DecD (id, params, result, _) ->
-            collect_definitions ((id.it, params, result) :: definitions) defs
-        | RecD nested ->
-            collect_definitions
-              (collect_definitions definitions nested) defs
-        | TypD _ | RelD _ | GramD _ | HintD _ ->
-            collect_definitions definitions defs
-        end
-  in
-  let definitions = collect_definitions [] script |> List.rev in
-  let rec collect_relations relations = function
-    | [] -> relations
-    | def :: defs ->
-        begin match def.it with
-        | RelD (id, _, mixop, _, _) ->
-            collect_relations ((id.it, mixop) :: relations) defs
-        | RecD nested ->
-            collect_relations (collect_relations relations nested) defs
-        | TypD _ | DecD _ | GramD _ | HintD _ ->
-            collect_relations relations defs
-        end
-  in
-  let relations = collect_relations [] script |> List.rev in
   let membership_choices = collect_membership_choices script in
   let inverses =
     definitions
@@ -658,24 +696,10 @@ let scan script =
               validate_inverse definitions source inverse))
   in
   let iterations = ref [] in
-  let projector_bodies = ref [] in
   let premise_iterations = ref [] in
   let premise_count = ref 0 in
   let names = ref [] in
-  let used_names = ref StringSet.empty in
-
-  let module ProjectorVisitor = Il.Iter.Make (struct
-    include Il.Iter.Skip
-    let visit_exp exp =
-      match exp.it with
-      | IterE (body, _) ->
-          if not (List.exists (( == ) body) !projector_bodies) then
-            projector_bodies := body :: !projector_bodies
-      | _ -> ()
-  end)
-  in
-  let request_exp_projectors = ProjectorVisitor.exp in
-  let request_prem_projectors = ProjectorVisitor.prem in
+  let used_names = ref reserved_names in
 
   let add_name kind source candidate =
     match
@@ -728,6 +752,7 @@ let scan script =
 
   let observed_variables = ref [] in
   let definition_parameters = ref [] in
+  let type_parameters = ref [] in
   let definition_arguments = ref [] in
   let definition_calls = ref [] in
   let definition_values = ref [] in
@@ -737,17 +762,13 @@ let scan script =
   in
 
   let add_variable_with_sort id sort =
-    if id.it = "_" then begin
-      if not (List.exists (fun (id', _, _) -> id == id') !observed_variables)
-      then observed_variables := (id, sort, true) :: !observed_variables
-    end else begin
-      if not
-           (List.exists
-              (fun (id', sort', anonymous) ->
-                not anonymous && id'.it = id.it && sort' = sort)
-              !observed_variables)
-      then observed_variables := (id, sort, false) :: !observed_variables
-    end
+    let anonymous = id.it = "_" in
+    let matches (other, other_sort, other_anonymous) =
+      if anonymous then id == other
+      else not other_anonymous && other.it = id.it && other_sort = sort
+    in
+    if not (List.exists matches !observed_variables) then
+      observed_variables := (id, sort, anonymous) :: !observed_variables
   in
   let add_variable id typ =
     add_variable_with_sort id (sort_of_typ typ)
@@ -762,7 +783,9 @@ let scan script =
         in
         add_variable_with_sort id sort;
         add_params params
-    | TypP id -> add_variable_with_sort id "SpectecType"
+    | TypP id ->
+        type_parameters := id :: !type_parameters;
+        add_variable_with_sort id "SpectecType"
     | GramP _ -> ()
 
   and add_params params =
@@ -837,41 +860,67 @@ let scan script =
         inspect_arguments bound formals actuals
     | _, _ -> ()
   in
-  let scan_clause outer_params clause =
+  let scan_scope outer_params scope =
     let quants, head_args =
-      match clause.it with DefD (quants, args, _, _) -> quants, args
+      match scope with
+      | `Clause {it = DefD (quants, args, _, _); _} -> quants, args
+      | `Rule {it = RuleD (_, quants, _, _, _); _} -> quants, []
+      | `Instance {it = InstD (quants, args, _); _} -> quants, args
+      | `Field (_, (_, quants, _), _) | `Case (_, (_, quants, _), _) -> quants, []
+    in
+    let bound_types =
+      List.filter_map
+        (fun param -> match param.it with TypP id -> Some id.it | _ -> None)
+        (quants @ outer_params)
+    in
+    let mark_type typ =
+      match typ.it with
+      | VarT (id, []) when List.mem id.it bound_types ->
+          if not (List.exists (( == ) id) !type_parameters)
+          then type_parameters := id :: !type_parameters
+      | _ -> ()
     in
     let bound =
       local_definition_parameters quants
       @ local_definition_parameters outer_params
     in
+    let inspect_type typ =
+      mark_type typ;
+      match typ.it with
+      | VarT (_, args) -> List.iter (inspect_bound_argument bound) args
+      | _ -> ()
+    in
+    let inspect_exp exp =
+      match exp.it with
+      | CallE (id, args) ->
+          List.iter (inspect_bound_argument bound) args;
+          begin match find_definition_parameter bound id with
+          | Some parameter ->
+              definition_calls := (exp, parameter) :: !definition_calls
+          | None ->
+              begin match
+                List.find_opt (fun (name, _, _) -> name = id.it) definitions
+              with
+              | Some (_, params, _) -> inspect_arguments bound params args
+              | None -> ()
+              end
+          end
+      | _ -> ()
+    in
+    let module Types = Il.Iter.Make (struct
+      include Il.Iter.Skip
+      let visit_typ = inspect_type
+      let visit_exp = inspect_exp
+    end) in
     List.iter (inspect_bound_argument bound) head_args;
     let module DefinitionVisitor = Il.Iter.Make (struct
       include Il.Iter.Skip
 
       let visit_exp exp =
-        match exp.it with
-        | CallE (id, args) ->
-            List.iter (inspect_bound_argument bound) args;
-            begin match find_definition_parameter bound id with
-            | Some parameter ->
-                definition_calls := (exp, parameter) :: !definition_calls
-            | None ->
-                begin match
-                  List.find_opt
-                    (fun (name, _, _) -> name = id.it)
-                    definitions
-                with
-                | Some (_, params, _) -> inspect_arguments bound params args
-                | None -> ()
-                end
-            end
-        | _ -> ()
-
-      let visit_typ typ =
-        match typ.it with
-        | VarT (_, args) -> List.iter (inspect_bound_argument bound) args
-        | BoolT | NumT _ | TextT | TupT _ | IterT _ -> ()
+        visit_noted_type inspect_type Types.exp exp.note;
+        inspect_exp exp
+      let visit_typ = inspect_type
+      let visit_path path = visit_noted_type inspect_type Types.exp path.note
 
       let visit_prem prem =
         match prem.it with
@@ -880,15 +929,29 @@ let scan script =
         | IfPr _ | ElsePr | IterPr _ | LetPr _ | NegPr _ -> ()
     end)
     in
-    DefinitionVisitor.clause clause
+    begin match scope with
+    | `Clause clause -> DefinitionVisitor.clause clause
+    | `Rule rule -> DefinitionVisitor.rule rule
+    | `Instance inst -> DefinitionVisitor.inst inst
+    | `Field field -> DefinitionVisitor.typfield field
+    | `Case case -> DefinitionVisitor.typcase case
+    end
   in
-  let add_deftyp_quants deftyp =
+  let add_deftyp_quants params deftyp =
     match deftyp.it with
     | AliasT _ -> ()
     | StructT fields ->
-        List.iter (fun (_, (_, quants, _), _) -> add_params quants) fields
+        List.iter
+          (fun ((_, (_, quants, _), _) as field) ->
+            add_params quants;
+            scan_scope params (`Field field))
+          fields
     | VariantT cases ->
-        List.iter (fun (_, (_, quants, _), _) -> add_params quants) cases
+        List.iter
+          (fun ((_, (_, quants, _), _) as case) ->
+            add_params quants;
+            scan_scope params (`Case case))
+          cases
   in
   let add_def_variables def =
     match def.it with
@@ -899,31 +962,26 @@ let scan script =
             match inst.it with
             | InstD (quants, _, deftyp) ->
                 add_params quants;
-                add_deftyp_quants deftyp)
+                scan_scope params (`Instance inst);
+                add_deftyp_quants (quants @ params) deftyp)
           insts
     | RelD (_, params, _, _, rules) ->
         add_params params;
         List.iter
           (fun rule ->
             match rule.it with
-            | RuleD (_, quants, _, exp, _) ->
+            | RuleD (_, quants, _, _, _) ->
                 add_params quants;
-                request_exp_projectors exp)
+                scan_scope params (`Rule rule))
           rules
     | DecD (_, params, _, clauses) ->
         add_params params;
         List.iter
           (fun clause ->
             match clause.it with
-            | DefD (quants, args, _, _) ->
+            | DefD (quants, _, _, _) ->
                 add_params quants;
-                List.iter
-                  (fun arg ->
-                    match arg.it with
-                    | ExpA exp -> request_exp_projectors exp
-                    | TypA _ | DefA _ | GramA _ -> ())
-                  args;
-                scan_clause params clause)
+                scan_scope params (`Clause clause))
           clauses
     | GramD _ | RecD _ | HintD _ -> ()
   in
@@ -934,10 +992,13 @@ let scan script =
       ; tail_name = ""
       ; projector_name = ""
       ; projector_tail_name = ""
+      ; forward_requested = false
+      ; projector_requested = false
       ; owner
       ; body
       ; iterexp
-      ; captures = capture_exp_variables !definition_calls body iterexp
+      ; captures = capture_exp_variables !definition_calls !definition_arguments
+          !type_parameters body iterexp
       }
       :: !iterations
   in
@@ -947,11 +1008,13 @@ let scan script =
       { name = "iterpr-" ^ string_of_int !premise_count
       ; tail_name = ""
       ; output_names = []
+      ; check_requested = false
       ; owner
       ; premise
       ; body
       ; iterexp
-      ; captures = capture_premise_variables !definition_calls body iterexp
+      ; captures = capture_premise_variables !definition_calls !definition_arguments
+          !type_parameters body iterexp
       }
       :: !premise_iterations
   in
@@ -961,7 +1024,6 @@ let scan script =
     include Il.Iter.Skip
 
     let visit_mixop = add_mixop_name
-
     let visit_def def =
       current_owner :=
         begin match def.it with
@@ -979,7 +1041,6 @@ let scan script =
       | _ -> ()
 
     let visit_prem premise =
-      request_prem_projectors premise;
       match premise.it with
       | LetPr (quants, _, _) -> add_params quants
       | IterPr (body, iterexp) ->
@@ -993,6 +1054,19 @@ let scan script =
   end)
   in
   VariableVisitor.list VariableVisitor.def script;
+  (* Il.Iter's scope hook receives the collection type. The helper's head
+   * needs its element type, even if the binder never occurs in the body. *)
+  let add_generators (_, generators) =
+    List.iter (fun (id, source) ->
+      match source.note.it with
+      | IterT (element, _) -> add_variable id element
+      | _ -> invalid_arg "iteration generator does not have an iteration type")
+      generators
+  in
+  List.iter (fun (iteration : iteration) -> add_generators iteration.iterexp)
+    (List.rev !iterations);
+  List.iter (fun (iteration : premise_iteration) -> add_generators iteration.iterexp)
+    (List.rev !premise_iterations);
 
   let observed_variables = List.rev !observed_variables in
   let named, anonymous =
@@ -1247,7 +1321,6 @@ let scan script =
   ; sort_metadata
   ; contexts
   ; iterations
-  ; projector_bodies = List.rev !projector_bodies
   ; premise_iterations
   ; hints
   ; names = List.rev !names
@@ -1261,6 +1334,7 @@ let scan script =
   ; variables
   ; anonymous_variables
   ; definition_parameters = List.rev !definition_parameters
+  ; type_parameters = !type_parameters
   ; definition_arguments = List.rev !definition_arguments
   ; definition_calls = List.rev !definition_calls
   ; definition_values = List.rev !definition_values
@@ -1315,6 +1389,13 @@ let definition_body_supported index id =
   match List.assoc_opt id.it index.definition_bodies with
   | Some supported -> supported
   | None -> invalid_arg ("unregistered definition " ^ id.it)
+
+let require_definition_body index use id =
+  if not (definition_body_supported index id || has_dec_hint index id "builtin")
+  then invalid_arg
+    (use ^ " $" ^ id.it ^ " at " ^ string_of_region id.at
+     ^ " requires a body containing an unsupported RulePr;"
+     ^ " its relation needs an explicit supported lowering")
 
 let premise_iteration_binds_membership index
     (iteration : premise_iteration) =
@@ -1386,8 +1467,9 @@ let source_variable index id typ =
   source_variable_with_sort index id (sort_of_typ index typ)
 
 let type_parameter index id =
-  List.assoc_opt (id.it, "SpectecType") index.variables
-  |> Option.map (fun name -> Maude_il.source_variable name "SpectecType")
+  if List.exists (( == ) id) index.type_parameters then
+    Some (source_variable_with_sort index id "SpectecType")
+  else None
 
 let same_representation index source target =
   Hintd.representation_inclusion index.sort_metadata source target
@@ -1430,16 +1512,14 @@ let iteration index body =
 
 let iteration_name index body =
   match iteration index body with
-  | Some iteration -> iteration.name
+  | Some iteration -> iteration.forward_requested <- true; iteration.name
   | None -> invalid_arg "IterE is missing from the prescan index"
 
 let projector_name index body =
   match iteration index body with
-  | Some iteration -> iteration.projector_name
+  | Some iteration -> iteration.projector_requested <- true; iteration.projector_name
   | None -> invalid_arg "IterE is missing from the prescan index"
 
-let projector_requested index body =
-  List.exists (( == ) body) index.projector_bodies
 let premise_iterations index = index.premise_iterations
 
 let premise_iteration index premise =

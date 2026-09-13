@@ -67,7 +67,9 @@ let translate_captures index captures =
        | Prescan.VariableCapture (id, typ) ->
            Prescan.source_variable index id typ
        | Prescan.DefinitionCapture parameter ->
-           Prescan.definition_variable index parameter)
+           Prescan.definition_variable index parameter
+       | Prescan.TypeCapture id ->
+           Prescan.source_variable_with_sort index id "SpectecType")
 
 let captures index body =
   match Prescan.iteration index body with
@@ -114,7 +116,8 @@ let rec identity_body_id index exp =
       begin match identity_body_id index inner, source.it,
                   source_iteration source with
       | Some inner_id, VarE source_id, Some source_iter
-        when inner_id.it = binder.it && Il.Eq.eq_iter iter source_iter ->
+        when inner_id.it = binder.it && Il.Eq.eq_iter iter source_iter
+             && Prescan.same_representation index source.note exp.note ->
           Some source_id
       | _ -> None
       end
@@ -151,7 +154,9 @@ let identity_source index body (iter, generators) =
       begin match source_iteration source with
       | Some source_iter
         when body_id.it = generator_id.it
-             && Il.Eq.eq_iter iter source_iter ->
+             && Il.Eq.eq_iter iter source_iter
+             && Prescan.same_representation index source.note
+                  (iterated_typ body iter) ->
           Some source
       | _ -> None
       end
@@ -318,7 +323,7 @@ let projector_local_bound captures iter =
     List.fold_left
       (fun bound -> function
         | Prescan.VariableCapture (id, _) -> Il.Free.Set.add id.it bound
-        | Prescan.DefinitionCapture _ -> bound)
+        | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> bound)
       Il.Free.Set.empty captures
   in
   let bound =
@@ -372,7 +377,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
   let body = iteration.Prescan.body in
   let iter, generators = iteration.Prescan.iterexp in
   let local_bound = projector_local_bound iteration.Prescan.captures iter in
-  if not (Prescan.projector_requested index body
+  if not (iteration.Prescan.projector_requested
           && projector_supported index translate_pattern can_bind_body
                local_bound body (iter, generators))
   then [] else
@@ -584,7 +589,7 @@ let translate_pattern index translate_source_pattern translate_exp
       (function
         | Prescan.VariableCapture (id, _) ->
             is_bound id.it || Il.Free.Set.mem id.it count_variables
-        | Prescan.DefinitionCapture _ -> true)
+        | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> true)
       captures
   in
   match
@@ -656,6 +661,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
   | Some _ -> []
   | None ->
       let forward =
+        if not iteration.Prescan.forward_requested then [] else
         match iter, generators with
         | (Opt | ListN (_, None)), [] ->
             []
@@ -784,7 +790,11 @@ let helper_key = function
       invalid_arg "an iteration helper must start with an operator declaration"
 
 let translate_all translate_pattern can_bind_body bind_body translate_exp index =
+  let emitted = ref [] in
   let add groups iteration =
+    emitted :=
+      (iteration, iteration.Prescan.forward_requested,
+       iteration.Prescan.projector_requested) :: !emitted;
     let statements =
       translate_statements index translate_pattern can_bind_body bind_body
         translate_exp iteration
@@ -805,10 +815,21 @@ let translate_all translate_pattern can_bind_body bind_body translate_exp index 
                ^ iteration.Prescan.name)
         end
   in
-  Prescan.iterations index
-  |> List.fold_left add []
-  |> List.rev
-  |> List.concat_map snd
+  (* Shared AST bodies can receive another direction request from a later
+     parent. Revisit only if a request arrived after its body was emitted. *)
+  let rec generate () =
+    emitted := [];
+    let groups = List.fold_left add [] (Prescan.iterations index) in
+    let changed =
+      List.exists
+        (fun (iteration, forward, projector) ->
+          forward <> iteration.Prescan.forward_requested
+          || projector <> iteration.Prescan.projector_requested)
+        !emitted
+    in
+    if changed then generate () else List.concat_map snd (List.rev groups)
+  in
+  generate ()
 
 
 (* Premise iteration *)
@@ -822,10 +843,7 @@ let premise_output_tail_name iteration position =
   snd (List.nth iteration.Prescan.output_names position)
 
 let remove_at position items =
-  items
-  |> List.mapi (fun index item -> index, item)
-  |> List.filter_map (fun (index, item) ->
-       if index = position then None else Some item)
+  List.filteri (fun index _ -> index <> position) items
 
 let premise_output_possible iteration position =
   let iter, generators = iteration.Prescan.iterexp in
@@ -833,6 +851,7 @@ let premise_output_possible iteration position =
   && match iter with ListN _ -> true | _ -> List.length generators > 1
 
 let premise_helper_call index translate_exp iteration =
+  iteration.Prescan.check_requested <- true;
   let iter, generators = iteration.Prescan.iterexp in
   let captures =
     translate_captures index iteration.Prescan.captures
@@ -882,7 +901,7 @@ let premise_local_names ?without iteration =
   List.filter_map
     (function
       | Prescan.VariableCapture (id, _) -> Some id.it
-      | Prescan.DefinitionCapture _ -> None)
+      | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> None)
     iteration.Prescan.captures
   @ indexes
   @ List.filter_map
@@ -983,8 +1002,9 @@ let translate_premise_statements index translate_body
   in
   let step name iter count index next_count next_index next_name =
     let left = call name (arguments count index (source_patterns iter)) in
-    let right = call next_name (arguments next_count next_index
-                                  (terms_of_variables tails)) in
+    let right =
+      call next_name (arguments next_count next_index (terms_of_variables tails))
+    in
     equation left (extend right) conditions
   in
   match iter, generators with
@@ -1020,9 +1040,7 @@ let translate_premise_statements index translate_body
   | ListN _, _ ->
       let count = Option.get count in
       let next_index =
-        match Option.map term_of_variable iter_index with
-        | None -> None
-        | Some term -> Some (app "s" [term])
+        Option.map (fun variable -> app "s" [term_of_variable variable]) iter_index
       in
       let step =
         step name List
@@ -1034,7 +1052,9 @@ let translate_premise_statements index translate_body
          (Option.map term_of_variable iter_index); step]
 
 let translate_premise_all translate_body index outputs =
+  let emitted = ref [] in
   let add groups iteration =
+    emitted := (iteration, iteration.Prescan.check_requested) :: !emitted;
     let output_positions =
       outputs
       |> List.filter_map (fun (requested_name, position) ->
@@ -1043,8 +1063,10 @@ let translate_premise_all translate_body index outputs =
       |> List.sort_uniq compare
     in
     let statements =
-      translate_premise_statements index translate_body iteration Check
-      :: List.map
+      (if iteration.Prescan.check_requested
+       then [translate_premise_statements index translate_body iteration Check]
+       else [])
+      @ List.map
            (fun position ->
              translate_premise_statements index translate_body iteration
                (Collect position))
@@ -1061,7 +1083,15 @@ let translate_premise_all translate_body index outputs =
             invalid_arg ("conflicting IterPr overload named " ^ name))
       groups statements
   in
-  Prescan.premise_iterations index
-  |> List.fold_left add []
-  |> List.rev
-  |> List.concat_map snd
+  let rec generate () =
+    emitted := [];
+    let groups = List.fold_left add [] (Prescan.premise_iterations index) in
+    let changed =
+      List.exists
+        (fun (iteration, checked) ->
+          checked <> iteration.Prescan.check_requested)
+        !emitted
+    in
+    if changed then generate () else List.concat_map snd (List.rev groups)
+  in
+  generate ()

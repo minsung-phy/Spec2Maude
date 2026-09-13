@@ -6,40 +6,25 @@ fmod DSL-SEQUENCE is
 
   op len : SpectecTerminals -> Nat .
   op |_| : SpectecTerminals -> Nat .
-
-  --- Large runs of one natural-number terminal stay compact.  This prevents
-  --- byte-sized repetitions from consuming the Maude call stack while all
-  --- other repetitions retain the ordinary sequence representation.
-
-  op repeatSeqRunThreshold : -> Nat .
-  eq repeatSeqRunThreshold = 1024 .
-
-  op runSeq : NzNat Nat -> SpectecTerminals [ctor] .
+  --- A traversal marker avoids repeatedly copying canonical AU array tails.
+  --- It is not an element and is removed before returning a source sequence.
+  op seqCursor : -> SpectecTerminals [ctor] .
   op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
 
   vars N I : Nat .
-  var RUN-COUNT : NzNat .
-  vars NAT-VALUE RUN-VALUE : Nat .
   var K : [SpectecTerminal] .
-  var T : SpectecTerminal .
+  vars T U : SpectecTerminal .
   vars TS WTS : SpectecTerminals .
   var TYPE : SpectecType .
 
+  op lenAux : SpectecTerminals Nat -> Nat .
   eq len(eps) = 0 .
   eq len(T) = 1 .
-  ceq len(T TS) = 1 + len(TS)
+  ceq len(T TS) = lenAux(seqCursor TS, 1)
     if TS =/= eps .
-  eq len(runSeq(RUN-COUNT, RUN-VALUE)) = RUN-COUNT .
-  ceq len(runSeq(RUN-COUNT, RUN-VALUE) TS)
-    = RUN-COUNT + len(TS)
-    if TS =/= eps .
+  eq lenAux(seqCursor, N) = N .
+  eq lenAux(seqCursor T TS, N) = lenAux(seqCursor TS, N + 1) .
   eq | TS | = len(TS) .
-
-  eq typecheck(runSeq(RUN-COUNT, RUN-VALUE), TYPE) =
-    typecheck(RUN-VALUE, TYPE) .
-  ceq typecheck(runSeq(RUN-COUNT, RUN-VALUE) TS, TYPE) =
-    typecheck(TS, TYPE)
-    if TS =/= eps /\ typecheck(RUN-VALUE, TYPE) .
 
   eq typecheck(seq(TS), iterOpt(TYPE)) =
     typecheck(TS, TYPE) and len(TS) <= 1 .
@@ -49,122 +34,83 @@ fmod DSL-SEQUENCE is
   eq typecheck(seq(TS), iterListN(TYPE, N)) =
     typecheck(TS, TYPE) and len(TS) == N .
 
-  op _<-_ : [SpectecTerminal] SpectecTerminals -> Bool .
-
-  eq K <- eps = false .
+  --- IL MEM compares a value with a list of values; failed operands remain kinds.
+  op _<-_ : SpectecTerminal SpectecTerminals ~> Bool .
+  eq T <- eps = false .
   eq T <- (T TS) = true .
-  ceq K <- (T TS) = K <- TS
-    if K =/= T .
-  eq NAT-VALUE <- (runSeq(RUN-COUNT, NAT-VALUE) TS) = true .
-  ceq K <- (runSeq(RUN-COUNT, RUN-VALUE) TS) = K <- TS
-    if K =/= RUN-VALUE .
+  ceq T <- (U TS) = T <- TS
+    if T =/= U .
 
   op _++_ : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   eq TS ++ WTS = TS WTS .
 
   op indexDefined : SpectecTerminals Nat -> Bool .
   op index : SpectecTerminals Nat ~> SpectecTerminal .
-
   eq indexDefined(TS, N) = N < len(TS) .
   eq index(T TS, 0) = T .
-  ceq index(T TS, s(N)) = index(TS, N)
-    if TS =/= eps .
-  ceq index((runSeq(RUN-COUNT, RUN-VALUE) TS), I) = RUN-VALUE
-    if _<_(I, RUN-COUNT) .
-  ceq index((runSeq(RUN-COUNT, RUN-VALUE) TS), I) =
-    index(TS, _-_(I, RUN-COUNT))
-    if _<=_(RUN-COUNT, I) /\ TS =/= eps .
+  eq index(T TS, s(N)) = index(TS, N) .
 
   op _[_] : SpectecTerminals Nat ~> SpectecTerminal
     [prec 10 gather (E e)] .
-  ceq TS[N] = index(TS, N)
-    if indexDefined(TS, N) .
+  eq TS[N] = index(TS, N) .
 
   op take : SpectecTerminals Nat -> SpectecTerminals .
   op drop : SpectecTerminals Nat -> SpectecTerminals .
-  op slice : SpectecTerminals Nat Nat -> SpectecTerminals .
+  op slice : SpectecTerminals Nat Nat ~> SpectecTerminals .
 
-  eq take(TS, 0) = eps .
-  eq take(eps, N) = eps .
-  eq take(T TS, s(N)) = T take(TS, N) .
-  ceq take((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
-    repeatSeq(s(N), RUN-VALUE)
-    if _<_(s(N), RUN-COUNT) .
-  ceq take((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
-    (runSeq(RUN-COUNT, RUN-VALUE)
-     take(TS, _-_(s(N), RUN-COUNT)))
-    if _<=_(RUN-COUNT, s(N)) .
+  op dropAux : SpectecTerminals Nat -> SpectecTerminals .
+  --- Both cursors retain a deque during traversal, avoiding repeated suffix
+  --- scans and deep recursion while constructing the same ordinary sequence.
+  op takeAux : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals .
+  var PREFIX : SpectecTerminals .
+  eq take(TS, N) = takeAux(seqCursor TS, N, seqCursor) .
+  eq takeAux(seqCursor TS, 0, seqCursor PREFIX) = PREFIX .
+  eq takeAux(seqCursor, N, seqCursor PREFIX) = PREFIX .
+  eq takeAux(seqCursor T TS, s(N), seqCursor PREFIX) =
+      takeAux(seqCursor TS, N, seqCursor PREFIX T) .
 
   eq drop(TS, 0) = TS .
   eq drop(eps, N) = eps .
-  eq drop(T TS, s(N)) = drop(TS, N) .
-  ceq drop((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
-    (repeatSeq(_-_(RUN-COUNT, s(N)), RUN-VALUE) TS)
-    if _<_(s(N), RUN-COUNT) .
-  ceq drop((runSeq(RUN-COUNT, RUN-VALUE) TS), s(N)) =
-    drop(TS, _-_(s(N), RUN-COUNT))
-    if _<=_(RUN-COUNT, s(N)) .
+  eq drop(T TS, s(N)) = dropAux(seqCursor TS, N) .
+  eq dropAux(seqCursor TS, 0) = TS .
+  eq dropAux(seqCursor, N) = eps .
+  eq dropAux(seqCursor T TS, s(N)) = dropAux(seqCursor TS, N) .
 
-  eq slice(TS, N, I) = take(drop(TS, N), I) .
-
-  op _[_:_] : SpectecTerminals Nat Nat -> SpectecTerminals
+  --- An out-of-bounds slice has no normal sequence result, including length 0.
+  ceq slice(TS, N, I) = take(drop(TS, N), I)
+    if N + I <= len(TS) .
+  op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals
     [prec 10 gather (E e e)] .
   eq TS[N : I] = slice(TS, N, I) .
 
-  op setAt : SpectecTerminals Nat [SpectecTerminal] -> SpectecTerminals .
-  op _[_=_] : SpectecTerminals Nat [SpectecTerminal] -> SpectecTerminals
+  op setAt : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals .
+  op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals
     [prec 10 gather (E e e)] .
-
   var NEW-K : [SpectecTerminal] .
   var NEW-TS : SpectecTerminals .
 
-  eq setAt(eps, N, NEW-K) = eps .
-  eq setAt(T TS, 0, NEW-K) = NEW-K TS .
-  eq setAt(T TS, s(N), NEW-K) = T setAt(TS, N, NEW-K) .
-  ceq setAt((runSeq(RUN-COUNT, RUN-VALUE) TS), I, NEW-K) =
-    (repeatSeq(I, RUN-VALUE)
-     NEW-K
-     repeatSeq(_-_(RUN-COUNT, _+_(I, 1)), RUN-VALUE)
-     TS)
-    if _<_(I, RUN-COUNT) .
-  ceq setAt((runSeq(RUN-COUNT, RUN-VALUE) TS), I, NEW-K) =
-    (runSeq(RUN-COUNT, RUN-VALUE)
-     setAt(TS, _-_(I, RUN-COUNT), NEW-K))
-    if _<=_(RUN-COUNT, I) .
+  ceq setAt(TS, N, NEW-K) = take(TS, N) NEW-K drop(TS, N + 1)
+    if indexDefined(TS, N) .
   eq TS[N = NEW-K] = setAt(TS, N, NEW-K) .
 
-  op splice : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals .
-  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals
+  op splice : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals .
+  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals
     [prec 10 gather (E e e e)] .
-
-  eq splice(TS, N, I, NEW-TS)
-    = take(TS, N) NEW-TS drop(TS, N + I) .
+  ceq splice(TS, N, I, NEW-TS)
+    = take(TS, N) NEW-TS drop(TS, N + I)
+    if N + I <= len(TS) .
   eq TS[N : I = NEW-TS] = splice(TS, N, I, NEW-TS) .
-
-  op _[_=++_] : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals
-    [prec 10 gather (E e e)] .
-  op _[_:_=++_] : SpectecTerminals Nat Nat SpectecTerminals -> SpectecTerminals
-    [prec 10 gather (E e e e)] .
-
-  ceq TS[N =++ NEW-TS]
-    = setAt(TS, N, index(TS, N) ++ NEW-TS)
-    if indexDefined(TS, N) .
-  eq TS[N : I =++ NEW-TS]
-    = splice(TS, N, I, slice(TS, N, I) ++ NEW-TS) .
 
   op lift : SpectecTerminals -> SpectecTerminals .
   eq lift(eps) = eps .
   eq lift(K ?) = K .
 
+  --- Double the ordinary sequence, rather than introduce a compressed value.
+  --- The recursive count halves, so large repetitions do not need linear depth.
   eq repeatSeq(0, WTS) = eps .
-  eq repeatSeq(s(N), eps) = eps .
-  ceq repeatSeq(s(N), NAT-VALUE) = runSeq(s(N), NAT-VALUE)
-    if repeatSeqRunThreshold <= s(N) .
-  eq repeatSeq(s(N), WTS) = WTS repeatSeq(N, WTS) [owise] .
+  eq repeatSeq(1, WTS) = WTS .
+  ceq repeatSeq(N, WTS)
+    = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS)
+    if 1 < N .
 
-  --- The concrete numeric equations for these source coercions belong to
-  --- builtins.maude.
-
-  op _:_<:>_ : SpectecTerminals SpectecType SpectecType
-    ~> SpectecTerminals .
 endfm

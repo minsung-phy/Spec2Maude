@@ -55,6 +55,16 @@ mod SPEC2MAUDE-RELATION-BACKENDS is
   eq backend-heaptype-sub(STRUCT, ANY) = true .
   eq backend-heaptype-sub(ARRAY, EQ) = true .
   eq backend-heaptype-sub(ARRAY, ANY) = true .
+  --- Heaptype_sub/none, /nofunc, /noexn, /noextern: a family bottom
+  --- is below exactly that family's non-BOT heap types, including defined types.
+  ceq backend-heaptype-sub(NONE, RB_H2) = backend-heaptype-sub(RB_H2, ANY)
+    if RB_H2 =/= BOT .
+  ceq backend-heaptype-sub(NOFUNC, RB_H2) = backend-heaptype-sub(RB_H2, spectec-FUNC)
+    if RB_H2 =/= BOT .
+  ceq backend-heaptype-sub(NOEXN, RB_H2) = backend-heaptype-sub(RB_H2, EXN)
+    if RB_H2 =/= BOT .
+  ceq backend-heaptype-sub(NOEXTERN, RB_H2) = backend-heaptype-sub(RB_H2, EXTERN)
+    if RB_H2 =/= BOT .
   ceq backend-heaptype-sub(-DEF(REC(RB_SUBTYPES), RB_I), RB_H2) =
       backend-deftype-step(RB_SUBTYPES, RB_H2, RB_SUBTYPES [ RB_I ])
     if indexDefined(RB_SUBTYPES, RB_I)

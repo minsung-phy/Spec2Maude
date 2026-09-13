@@ -297,6 +297,10 @@ let emit_renaming = function
   | OpRenaming (source, target) ->
       "op " ^ source ^ " to " ^ target
 
+  | TypedOpRenaming (source, domain, codomain, target) ->
+      "op " ^ source ^ " : " ^ String.concat " " domain
+      ^ " -> " ^ codomain ^ " to " ^ target
+
 let rec emit_module_expr = function
   | ModuleName name ->
       name

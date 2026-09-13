@@ -1,6 +1,15 @@
 fmod DSL-RECORD is
   protecting DSL-SEQUENCE .
-  protecting QID .
+  --- Match the STRING renaming in DSL-PRETYPE-BASE.
+  protecting QID * (
+    op _xor_ : Nat Nat -> Nat to integerXor,
+    op _+_ : String String -> String to stringConcat,
+    op _<_ : String String -> Bool to stringLess,
+    op _<=_ : String String -> Bool to stringLessEqual,
+    op _>_ : String String -> Bool to stringGreater,
+    op _>=_ : String String -> Bool to stringGreaterEqual,
+    op char : Nat -> Char to nativeChar
+  ) .
 
   sorts Record RecordItem RecordItems .
   subsort Record < SpectecTerminal .
@@ -11,23 +20,18 @@ fmod DSL-RECORD is
     [ctor assoc id: EMPTY] .
   op item : Qid SpectecTerminals -> RecordItem [ctor] .
   op {_} : RecordItems -> Record [ctor] .
-
   op value : Qid Record -> SpectecTerminals .
   op value : Qid RecordItems -> SpectecTerminals .
 
   op _._ : Record Qid -> SpectecTerminals .
-  op _++_ : Record Record -> Record .
-  op recordConcat : SpectecTerminal SpectecTerminal ~> SpectecTerminal .
+  --- TypD emits field-type-directed CAT-str equations for this operation.
+  op recordConcat : Record Record SpectecType ~> Record .
   op _[._=_] : Record Qid SpectecTerminals -> Record .
-  op _[._=++_] : Record Qid SpectecTerminals -> Record .
 
-  op composeItems : RecordItems RecordItems -> RecordItems .
-  op appendItems : RecordItems RecordItems -> RecordItems .
-  op composeValues : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   op setItem : RecordItems Qid SpectecTerminals -> RecordItems .
 
   vars FIELD OTHER : Qid .
-  vars ITEMS ITEMS2 : RecordItems .
+  var ITEMS : RecordItems .
   vars VALUE NEW-VALUE : SpectecTerminals .
   var RECORD : Record .
 
@@ -38,24 +42,6 @@ fmod DSL-RECORD is
 
   eq {ITEMS} . FIELD = value(FIELD, ITEMS) .
   eq RECORD . FIELD = value(FIELD, RECORD) [owise] .
-
-  eq {ITEMS} ++ {ITEMS2} = {composeItems(ITEMS, ITEMS2)} .
-  eq recordConcat({ITEMS}, {ITEMS2}) = {appendItems(ITEMS, ITEMS2)} .
-
-  eq appendItems(EMPTY, EMPTY) = EMPTY .
-  eq appendItems(item(FIELD, VALUE) ; ITEMS,
-                 item(FIELD, NEW-VALUE) ; ITEMS2)
-    = item(FIELD, VALUE NEW-VALUE)
-      ; appendItems(ITEMS, ITEMS2) .
-
-  eq composeItems(EMPTY, EMPTY) = EMPTY .
-  eq composeItems(item(FIELD, VALUE) ; ITEMS,
-                  item(FIELD, NEW-VALUE) ; ITEMS2)
-    = item(FIELD, composeValues(VALUE, NEW-VALUE))
-      ; composeItems(ITEMS, ITEMS2) .
-
-  eq composeValues({ITEMS}, {ITEMS2}) = {composeItems(ITEMS, ITEMS2)} .
-  eq composeValues(VALUE, NEW-VALUE) = VALUE ++ NEW-VALUE [owise] .
 
   eq {ITEMS}[. FIELD = NEW-VALUE]
     = {setItem(ITEMS, FIELD, NEW-VALUE)} .
@@ -68,6 +54,4 @@ fmod DSL-RECORD is
     = item(OTHER, VALUE) ; setItem(ITEMS, FIELD, NEW-VALUE)
     if FIELD =/= OTHER .
 
-  eq RECORD[. FIELD =++ NEW-VALUE]
-    = RECORD[. FIELD = value(FIELD, RECORD) ++ NEW-VALUE] .
 endfm

@@ -6,23 +6,46 @@ endfm
 
 fmod DSL-PRETYPE-BASE is
   protecting DSL-TERM .
-  protecting BOOL .
-  protecting NAT .
-  protecting INT .
-  protecting RAT .
-  protecting FLOAT .
-  protecting STRING .
+  --- CONVERSION includes RAT, FLOAT, STRING and their BOOL/NAT/INT imports.
+  --- Typed renaming separates native operations in the common source value kind.
+  protecting CONVERSION * (
+    op -_ : Float -> Float to nativeFloatNeg,
+    op _+_ : Float Float -> Float to nativeFloatAdd,
+    op _-_ : Float Float -> Float to nativeFloatSub,
+    op _*_ : Float Float -> Float to nativeFloatMul,
+    op _/_ : Float Float -> Float to nativeFloatDiv,
+    op _rem_ : Float Float -> Float to floatRem,
+    op _^_ : Float Float -> Float to nativeFloatPow,
+    op abs : Float -> Float to floatAbs,
+    op floor : Float -> Float to floatFloor,
+    op ceiling : Float -> Float to floatCeiling,
+    op min : Float Float -> Float to floatMin,
+    op max : Float Float -> Float to floatMax,
+    op _<_ : Float Float -> Bool to floatLess,
+    op _<=_ : Float Float -> Bool to floatLessEqual,
+    op _>_ : Float Float -> Bool to floatGreater,
+    op _>=_ : Float Float -> Bool to floatGreaterEqual,
+    op _xor_ : Nat Nat -> Nat to integerXor,
+    op _+_ : String String -> String to stringConcat,
+    op _<_ : String String -> Bool to stringLess,
+    op _<=_ : String String -> Bool to stringLessEqual,
+    op _>_ : String String -> Bool to stringGreater,
+    op _>=_ : String String -> Bool to stringGreaterEqual,
+    op char : Nat -> Char to nativeChar,
+    op float : Rat -> Float to nativeToFloat,
+    op rat : FiniteFloat -> Rat to nativeToRat,
+    op float : String -> Float to nativeParseFloat,
+    op rat : String NzNat -> Rat to nativeParseRat,
+    op string : Float -> String to nativeFloatString,
+    op string : Rat NzNat -> String to nativeRatString
+  ) .
 
-  subsorts Nat Int < SpectecTerminal .
+  subsorts Bool Rat Float String < SpectecTerminal .
 
   ops bool nat int rat real text : -> SpectecType [ctor] .
   ops iterOpt iterList iterList1 : SpectecType -> SpectecType [ctor] .
   op iterListN : SpectecType Nat -> SpectecType [ctor] .
 
-  op bool : Bool -> SpectecTerminal [ctor] .
-  op rat : Rat -> SpectecTerminal [ctor] .
-  op float : Float -> SpectecTerminal [ctor] .
-  op text : String -> SpectecTerminal [ctor] .
 
   op typecheck : [SpectecTerminal] SpectecType -> Bool .
 
@@ -32,11 +55,29 @@ fmod DSL-PRETYPE-BASE is
   var R : Rat .
   var F : Float .
   var S : String .
-  eq typecheck(bool(B), bool) = true .
+  eq typecheck(B, bool) = true .
   eq typecheck(N, nat) = true .
   eq typecheck(I, int) = true .
-  eq typecheck(rat(R), rat) = true .
-  eq typecheck(float(F), real) = true .
-  eq typecheck(text(S), text) = true .
+  eq typecheck(R, rat) = true .
+  eq typecheck(F, real) = true .
+  eq typecheck(S, text) = true .
 
+  --- CvtE is a scalar IL operation, independent of Wasm builtin hints.
+  op _:_<:>_ : SpectecTerminal SpectecType SpectecType
+    ~> SpectecTerminal .
+
+  --- Exact coercions used by the pinned Wasm IL.
+  var CV_N : Nat .
+  var CV_I : Int .
+  var CV_R : Rat .
+  eq (CV_N : nat <:> nat) = CV_N .
+  eq (CV_N : nat <:> int) = CV_N .
+  eq (CV_N : nat <:> rat) = CV_N .
+  ceq (CV_I : int <:> nat) = abs(CV_I) if CV_I >= 0 .
+  eq (CV_I : int <:> int) = CV_I .
+  eq (CV_I : int <:> rat) = CV_I .
+  ceq (CV_R : rat <:> nat) = abs(floor(CV_R))
+    if CV_R == floor(CV_R) /\ CV_R >= 0 .
+  ceq (CV_R : rat <:> int) = floor(CV_R) if CV_R == floor(CV_R) .
+  eq (CV_R : rat <:> rat) = CV_R .
 endfm

@@ -44,11 +44,7 @@ let translate_eq_conditions ?(proven = Il.Free.Set.empty) index params =
        | ExpP (id, typ) when not (Il.Free.Set.mem id.it proven) ->
            Term.translate_typ_conditions index (translate_term index param) typ
 
-       | ExpP _ -> []
-
-       | TypP _
-       | DefP _ ->
-           []
+       | ExpP _ | TypP _ | DefP _ -> []
 
        | GramP _ ->
            invalid_arg "GramP is not supported")

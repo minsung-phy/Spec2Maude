@@ -1,4 +1,4 @@
-(* Maude International Language *)
+(* Maude intermediate language *)
 
 type name = string
 type sort = string
@@ -110,6 +110,17 @@ type statement =
 
 (* Variable traversal *)
 
+let rec term_variables variables = function
+  | Var variable ->
+      if List.exists (same_variable variable) variables then variables
+      else variable :: variables
+  | Const _ -> variables
+  | App (_, args) -> List.fold_left term_variables variables args
+
+let variables_bound bound term =
+  term_variables [] term
+  |> List.for_all (fun variable -> List.exists (same_variable variable) bound)
+
 let rec map_term_variables map = function
   | Var variable -> Var (map variable)
   | Const _ as term -> term
@@ -173,6 +184,7 @@ let map_statement_variables map = function
 type renaming =
   | SortRenaming of sort * sort
   | OpRenaming of name * name
+  | TypedOpRenaming of name * sort list * sort * name
 
 type module_expr =
   | ModuleName of name

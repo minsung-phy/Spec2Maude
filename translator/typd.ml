@@ -20,18 +20,56 @@ let payload_names (typ : typ) =
            if id.it = "_" then None else Some id.it)
   | _ -> []
 
-(* AliasT *)
+(* InstD arguments bind patterns in the generated type equations. *)
 let translate_target index id params args =
-  let terms =
-    match args with
-    | [] -> Param.translate_terms index params
-    | _ -> args |> List.map (Term.translate_arg index)
-  in App (Prescan.typ_name index id, terms)
+  let step (terms, conditions, bound) (position, arg) =
+    match arg.it with
+    | ExpA exp ->
+        begin match Prem.translate_pattern_parts index exp with
+        | Some (term, guards) ->
+            term :: terms, conditions @ guards, Prem.bind bound exp
+        | None ->
+            let subject =
+              Var
+                (generated_variable
+                   ("TYPE-ARG" ^ string_of_int (position + 1))
+                   (Term.translate_sort index exp.note))
+            in
+            let binding =
+              Prem.bind_pattern index bound exp subject
+                "type instance argument is not a structural pattern"
+            in
+            let guards =
+              List.map
+                (function
+                  | EqCondition condition -> condition
+                  | RewriteCond _ ->
+                      invalid_arg "type instance pattern requires rewriting")
+                binding.conditions
+            in
+            subject :: terms, conditions @ guards, binding.bound
+        end
+    | TypA _ | DefA _ | GramA _ ->
+        Term.translate_arg index arg :: terms, conditions, bound
+  in
+  if args = [] then
+    App (Prescan.typ_name index id, Param.translate_terms index params), [],
+    target_names params args
+  else
+    let terms, guards, bound =
+      List.mapi (fun i arg -> i, arg) args
+      |> List.fold_left step ([], [], Il.Free.Set.empty)
+    in
+    let expected = Frontend.Det.(det_list det_arg args).varid in
+    if not (Il.Free.Set.subset expected bound) then
+      invalid_arg "type instance pattern does not bind every deterministic variable";
+    App (Prescan.typ_name index id, List.rev terms), guards,
+    Il.Free.Set.elements bound
 
-let translate_alias index id params quants args typ =
+(* AliasT *)
+let translate_alias index target quants typ =
   let sort = Term.translate_sort index typ in
   let value = Var (generated_variable "VALUE" sort) in
-  let target = translate_target index id params args in
   let source = Term.translate_typ index typ in
   let left = App ("typecheck", [value; target]) in
   let right = App ("typecheck", [value; source]) in
@@ -58,42 +96,57 @@ let translate_struct_field index bound (atom, (typ, quants, prems), _hints) =
       let bound = bound @ payload_names typ in
       let conditions =
         type_conditions @ Prem.translate_eq_conditions index ~bound prems
-        @ Param.translate_eq_conditions index quants in
-      (item, conditions)
+        @ Param.translate_eq_conditions index quants
+      in
+      item, conditions
   | _ -> invalid_arg "a StructT field must contain exactly one value"
 
-let translate_struct index id params quants args fields =
-  let target =
-    translate_target index id params args
-  in
+let rec composable index seen typ =
+  not (List.exists (Il.Eq.eq_typ typ) seen)
+  && match (Il.Eval.reduce_typdef index.Prescan.type_env typ).it with
+     | AliasT {it = IterT _; _} -> true
+     | StructT fields ->
+         List.for_all
+           (fun (_, (field_typ, _, _), _) ->
+             composable index (typ :: seen) field_typ)
+           fields
+     | AliasT _ | VariantT _ -> false
 
-  let translated_fields =
+let translate_struct_composition index target fields =
+  if not (List.for_all (fun (_, (typ, _, _), _) -> composable index [] typ) fields)
+  then [] else
+  let left = Var (generated_variable "LEFT" "Record") in
+  let right = Var (generated_variable "RIGHT" "Record") in
+  let result =
     fields
-    |> List.map
-         (translate_struct_field index
-            (target_names params args))
-  in
-
-  let record =
-    translated_fields
-    |> List.map fst
+    |> List.map (fun (atom, (typ, _, _), _) ->
+         let field = Term.qid_of_atom atom in
+         let value =
+           Term.translate_composition index typ
+             (App ("_._", [left; field])) (App ("_._", [right; field]))
+         in
+         App ("item", [field; value]))
     |> join_struct_items
     |> fun items -> App ("{_}", [items])
   in
+  [equation (App ("recordConcat", [left; right; target])) result []]
 
+let translate_struct index target bound quants fields =
+  let translated_fields =
+    List.map (translate_struct_field index bound) fields
+  in
+  let items = List.map fst translated_fields in
+  let instance_conditions = Param.translate_eq_conditions index quants in
   let conditions =
-    Param.translate_eq_conditions index quants
-    @
-    (translated_fields
-     |> List.concat_map snd)
+    instance_conditions
+    @ List.concat_map snd translated_fields
   in
-
-  let left =
-    App ("typecheck", [record; target])
-  in
+  let record = App ("{_}", [join_struct_items items]) in
+  let left = App ("typecheck", [record; target]) in
   [equation left (Const "true") conditions]
+  @ translate_struct_composition index target fields
 
-(* VariantT *)
+(* VariantT declarations provide constructors and explicit type predicates. *)
 let transparent_payload index typ =
   let components = Term.translate_components index typ in
   let values = List.map (fun (value, _, _) -> value) components in
@@ -118,8 +171,7 @@ let transparent_payload index typ =
 let translate_union index target case_conditions typ =
   let value, component_conditions = transparent_payload index typ in
   let left = App ("typecheck", [value; target]) in
-  let conditions = case_conditions @ component_conditions in
-  [equation left (Const "true") conditions]
+  [equation left (Const "true") (case_conditions @ component_conditions)]
 
 let translate_constructor index target case_conditions mixop typ =
   let constructor_name = Prescan.mixop_name index mixop in
@@ -145,7 +197,9 @@ let translate_constructor index target case_conditions mixop typ =
   in
   let typecheck_conditions = case_conditions @ component_conditions in
   let left = App ("typecheck", [constructor; target]) in
-  [declaration; equation left (Const "true") typecheck_conditions]
+  [ declaration
+  ; equation left (Const "true") typecheck_conditions
+  ]
 
 let translate_typcase index target instance_conditions bound
     (mixop, (typ, quants, prems), _hints) =
@@ -158,10 +212,8 @@ let translate_typcase index target instance_conditions bound
     translate_union index target case_conditions typ
   else translate_constructor index target case_conditions mixop typ
 
-let translate_variant index id params quants args cases =
-  let target = translate_target index id params args in
+let translate_variant index target bound quants cases =
   let instance_conditions = Param.translate_eq_conditions index quants in
-  let bound = target_names params args in
   cases
   |> List.concat_map (translate_typcase index target instance_conditions bound)
 
@@ -176,24 +228,38 @@ let translate_type_decl index id params =
     ; attrs = []
     }
 
-let translate_deftyp index id params quants args deftyp =
+let guard_statements conditions statements =
+  let guard = function
+    | Eq (left, right, attrs) -> Ceq (left, right, conditions, attrs)
+    | Ceq (left, right, guards, attrs) ->
+        Ceq (left, right, conditions @ guards, attrs)
+    | Mb (term, sort) -> Cmb (term, sort, conditions)
+    | Cmb (term, sort, guards) -> Cmb (term, sort, conditions @ guards)
+    | statement -> statement
+  in
+  if conditions = [] then statements else List.map guard statements
+
+let translate_deftyp index target bound quants deftyp =
   match deftyp.it with
-  | AliasT typ -> translate_alias index id params quants args typ
-  | StructT fields -> translate_struct index id params quants args fields
-  | VariantT cases -> translate_variant index id params quants args cases
+  | AliasT typ -> translate_alias index target quants typ
+  | StructT fields -> translate_struct index target bound quants fields
+  | VariantT cases -> translate_variant index target bound quants cases
 
 let translate_inst index id params inst =
   match inst.it with
   | InstD (quants, args, deftyp) ->
-      translate_deftyp index id params quants args deftyp
+      let target, guards, bound = translate_target index id params args in
+      translate_deftyp index target bound quants deftyp
+      |> guard_statements guards
 
 let translate index id params insts =
-  let type_decl = translate_type_decl index id params in
-  let definitions = insts |> List.concat_map (translate_inst index id params) in
-  type_decl :: definitions
+  let definitions =
+    List.concat_map (translate_inst index id params) insts
+  in
+  translate_type_decl index id params :: definitions
 
-(* Typed-list support belongs to TypD lowering: Hintd decides which syntax
- * sorts need lists, and this private emitter materializes their Maude units. *)
+(* Typed-list support belongs to TypD lowering; its representations are selected
+ * by the source's maude_sort hints. *)
 module Lists = struct
   let title sort = String.capitalize_ascii sort
   let list_sort sort = title sort ^ "List"
@@ -223,6 +289,7 @@ module Lists = struct
                ("List{" ^ view_name sort ^ "}", list_sort sort)
            ; SortRenaming
                ("NeList{" ^ view_name sort ^ "}", nonempty_sort sort)
+           ; TypedOpRenaming ("_xor_", ["Nat"; "Nat"], "Nat", "integerXor")
            ; rename "nil" sequence.empty
            ; rename "append" sequence.append
            ; rename "head" (sort ^ "Head")
@@ -359,28 +426,31 @@ module Lists = struct
     ; eq (app sequence.lift [app "_?" [term element]]) (term element)
     ]
 
-  let sequence_checks element rest typ empty concat =
+  let sequence_checks element next rest typ empty concat =
     let check value = app "typecheck" [value; typ] in
+    let tail, guards = match next with
+      | Some next -> app concat [next; rest], []
+      | None -> rest, [BoolCond (app "_=/=_" [rest; Const empty])] in
     [ eq (check (Const empty)) (Const "true")
     ; Ceq
-        ( check (app concat [element; rest])
-        , check rest
-        , [ BoolCond (app "_=/=_" [rest; Const empty])
-          ; BoolCond (check element)
-          ]
+        ( check (app concat [element; tail])
+        , check tail
+        , guards @ [BoolCond (check element)]
         , [])
     ]
 
   let typed_sequence_checks metadata sort =
     let sequence = Hintd.typed_sequence_representation metadata sort in
     let element = var "SEQUENCE-ELEMENT" sort in
+    let next = var "SEQUENCE-NEXT" sort in
     let rest = var "SEQUENCE-REST" sequence.sort in
     let typ = var "TYPECHECK-TYPE" "SpectecType" in
-    sequence_checks (term element) (term rest) (term typ)
+    sequence_checks (term element) (Some (term next)) (term rest) (term typ)
       sequence.empty sequence.concat
 
-  let generic_sequence =
+  let generic_sequence metadata =
     let element = var "SEQUENCE-ELEMENT" "SpectecTerminal" in
+    let next = var "SEQUENCE-NEXT" "SpectecTerminal" in
     let rest = var "SEQUENCE-REST" "SpectecTerminals" in
     let value = var "TYPECHECK-VALUE" "[SpectecTerminal]" in
     let typ = var "TYPECHECK-TYPE" "SpectecType" in
@@ -395,7 +465,11 @@ module Lists = struct
     ; op ~arrow:Partial "unseq" ["SpectecTerminal"] "SpectecTerminals"
     ; eq (app "unseq" [app "seq" [term rest]]) (term rest)
     ]
-    @ sequence_checks (term element) (term rest) (term typ) "eps" "_ _"
+    (* Distinct hinted concat families can occur as an opaque generic suffix.
+       Keep the existing guard there; shared AU lists expose their next element. *)
+    @ sequence_checks (term element)
+        (if Hintd.separate_list_families metadata then None else Some (term next))
+        (term rest) (term typ) "eps" "_ _"
     @ [Eq (check (term value), Const "false", [Owise])]
 
   let statements metadata =
@@ -415,7 +489,7 @@ module Lists = struct
         List.concat_map (typed_sequence_checks metadata) roots
       else []
     in
-    generic_sequence @ list_edges metadata @ generic_edges @ lower
+    generic_sequence metadata @ list_edges metadata @ generic_edges @ lower
     @ checks @ List.concat_map (repeat metadata) sorts
 
   let generated_statements metadata =

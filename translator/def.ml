@@ -49,36 +49,29 @@ let deduplicate_conditions = function
       statement
 
 let normalize_constructor_declarations statements =
-  let same_head (left : op_decl) (right : op_decl) =
-    left.name = right.name && left.domain = right.domain
-  in
-  let rec add declarations = function
-    | [] -> List.rev declarations
-    | OpDecl declaration :: statements
-      when List.mem Ctor declaration.attrs ->
+  let declarations = Hashtbl.create 64 in
+  let keep = function
+    | OpDecl declaration ->
+        let key = declaration.name, declaration.domain in
         begin match
-          List.find_opt
-            (function
-              | OpDecl previous -> same_head previous declaration
-              | _ -> false)
-            declarations
+          Hashtbl.find_opt declarations key
         with
-        | None -> add (OpDecl declaration :: declarations) statements
-        | Some (OpDecl previous)
-          when previous.codomain = declaration.codomain
+        | Some previous when List.mem Ctor declaration.attrs ->
+            if previous.codomain = declaration.codomain
                && previous.arrow = declaration.arrow
-               && previous.attrs = declaration.attrs ->
-            add declarations statements
-        | Some (OpDecl previous) ->
-            invalid_arg
-              (Printf.sprintf
-                 "unsupported constructor signature for %s: %s and %s"
-                 declaration.name previous.codomain declaration.codomain)
-        | Some _ -> assert false
+               && previous.attrs = declaration.attrs then false
+            else
+              invalid_arg
+                (Printf.sprintf
+                   "unsupported constructor signature for %s: %s and %s"
+                   declaration.name previous.codomain declaration.codomain)
+        | None | Some _ ->
+            Hashtbl.replace declarations key declaration;
+            true
         end
-    | statement :: statements -> add (statement :: declarations) statements
+    | _ -> true
   in
-  add [] statements
+  List.filter keep statements
 
 let sort_metadata_declarations metadata =
   let annotated =
@@ -130,13 +123,21 @@ let normalize_variables source_declarations statements =
       | _ -> invalid_arg "expected a variable declaration")
     source_declarations;
 
+  let operator_names =
+    List.fold_left
+      (fun names -> function
+        | OpDecl declaration -> StringSet.add declaration.name names
+        | _ -> names)
+      StringSet.empty statements
+  in
   let fresh_generated local_used (variable : variable) =
     let rec choose index =
       let name =
         if index = 1 then variable.name
         else variable.name ^ string_of_int index
       in
-      if StringSet.mem name !source_names || StringSet.mem name !local_used then
+      if StringSet.mem name operator_names
+         || StringSet.mem name !source_names || StringSet.mem name !local_used then
         choose (index + 1)
       else
         match Hashtbl.find_opt declared name with
@@ -198,16 +199,27 @@ let normalize_variables source_declarations statements =
   declarations, statements
 
 let rec translate ?request_output index def =
-  match def.it with
-  | TypD (id, params, insts) -> Typd.translate index id params insts
-  | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
-  | RelD (id, params, mixop, typ, rules) ->
-      Reld.translate ?request_output
-        ~include_rule:(fun rule -> not (Prescan.is_context_rule index id rule))
-        index id params mixop typ rules
-  | GramD _ -> []
-  | HintD _ -> []
-  | RecD defs -> List.concat_map (translate ?request_output index) defs
+  try
+    match def.it with
+    | TypD (id, params, insts) -> Typd.translate index id params insts
+    | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
+    | RelD (id, params, mixop, typ, rules) ->
+        Reld.translate ?request_output
+          ~include_rule:(fun rule -> not (Prescan.is_context_rule index id rule))
+          index id params mixop typ rules
+    | GramD _ | HintD _ -> []
+    | RecD defs -> List.concat_map (translate ?request_output index) defs
+  with Invalid_argument reason ->
+    let owner =
+      match def.it with
+      | TypD (id, _, _) -> "TypD " ^ id.it
+      | DecD (id, _, _, _) -> "DecD $" ^ id.it
+      | RelD (id, _, _, _, _) -> "RelD " ^ id.it
+      | GramD (id, _, _, _) -> "GramD " ^ id.it
+      | RecD _ -> "RecD"
+      | HintD _ -> "HintD"
+    in
+    Util.Error.error def.at "translation" ("Unsupported " ^ owner ^ ": " ^ reason)
 
 let normalize_module ?(constructors = true) source_declarations statements =
   let variable_declarations, statements =
@@ -242,20 +254,6 @@ let translate_script script =
     List.concat_map (translate ~request_output index) script
     @ Param.translate_applications index
   in
-  let iterations =
-    let bind_body bound body subject =
-      let result =
-        Prem.bind_pattern index bound body subject
-          "computed IterE body is not invertible"
-      in
-      result.conditions, result.bound
-    in
-    Iter.translate_all
-      (Prem.translate_pattern_parts index)
-      (Prem.can_bind_computed_pattern index)
-      bind_body
-      (Term.translate_exp index) index
-  in
   let premise_iterations =
     let translate_body allow_membership iteration bound body =
       let bind_membership =
@@ -275,7 +273,25 @@ let translate_script script =
   in
   let generated_statements =
     Typd.list_generated_statements sort_metadata
-    @ context_rules @ translated_definitions @ iterations @ premise_iterations
+    @ context_rules @ translated_definitions
+  in
+  let iterations =
+    let bind_body bound body subject =
+      let result =
+        Prem.bind_pattern index bound body subject
+          "computed IterE body is not invertible"
+      in
+      result.conditions, result.bound
+    in
+    Iter.translate_all
+      (Prem.translate_pattern_parts index)
+      (Prem.can_bind_computed_pattern index)
+      bind_body
+      (Term.translate_exp index) index
+  in
+  let generated_statements =
+    generated_statements
+    @ iterations @ premise_iterations
     |> normalize_module (Prescan.variable_declarations index)
   in
   { sort_statements = sort_metadata_declarations sort_metadata

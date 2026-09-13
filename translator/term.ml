@@ -19,21 +19,26 @@ let app name args = App (name, args)
 let translate_sort index typ =
   Prescan.sort_of_typ index typ
 
-let translate_number num =
-  let text = Xl.Num.to_string num in
-  let text =
-    if String.length text > 0 && text.[0] = '+' then
-      String.sub text 1 (String.length text - 1)
-    else
-      text
-  in
-  match num with
-  | `Nat _ | `Int _ -> Const text
-  | `Rat _ -> app "rat" [Const text]
-  | `Real _ -> app "float" [Const text]
+let translate_number = function
+  | `Nat n | `Int n -> Const (Z.to_string n)
+  | `Rat q when Q.is_real q -> Const (Q.to_string q)
+  | `Rat _ -> invalid_arg "nonfinite IL Rat literal is outside the Wasm scope"
+  | `Real _ -> invalid_arg "IL Real literal is outside the Wasm scope"
 
 let translate_text text =
-  app "text" [Const ("\"" ^ String.escaped text ^ "\"")]
+  let buffer = Buffer.create (String.length text + 2) in
+  Buffer.add_char buffer '"';
+  String.iter
+    (function
+      | ('"' | '\\') as c ->
+          Buffer.add_char buffer '\\'; Buffer.add_char buffer c
+      | ' '..'~' as c -> Buffer.add_char buffer c
+      | c ->
+          (* Maude string escapes use three octal digits, not OCaml decimal. *)
+          Buffer.add_string buffer (Printf.sprintf "\\%03o" (Char.code c)))
+    text;
+  Buffer.add_char buffer '"';
+  Const (Buffer.contents buffer)
 
 let qid text =
   Const ("'" ^ text)
@@ -43,13 +48,17 @@ let qid_of_atom atom =
 
 (* Primitive operators *)
 
-let translate_unop = function
-  | `NotOp -> "not_"
-  | `PlusOp -> "+_"
-  | `MinusOp -> "-_"
+let translate_unop (op : unop) (optyp : optyp) =
+  match op, optyp with
+  | _, `RealT -> invalid_arg "IL Real operation is outside the Wasm scope"
+  | `NotOp, _ -> "not_"
+  | `PlusOp, _ -> "+_"
+  | `MinusOp, _ -> "-_"
 
 let translate_binop op optyp =
   match op, optyp with
+  | _, `RealT -> invalid_arg "IL Real operation is outside the Wasm scope"
+  | `PowOp, `RatT -> invalid_arg "IL Rat power is outside the Wasm scope"
   | `AndOp, `BoolT -> "_and_"
   | `OrOp, `BoolT -> "_or_"
   | `ImplOp, `BoolT -> "_implies_"
@@ -62,45 +71,20 @@ let translate_binop op optyp =
   | `PowOp, #Xl.Num.typ -> "_^_"
   | _ -> invalid_arg "malformed BinE operator annotation"
 
-let translate_cmpop = function
-  | `EqOp -> "_==_"
-  | `NeOp -> "_=/=_"
-  | `LtOp -> "_<_"
-  | `GtOp -> "_>_"
-  | `LeOp -> "_<=_"
-  | `GeOp -> "_>=_"
-
-let unwrap typ term =
-  match typ.it with
-  | BoolT -> app "isTrue" [term]
-  | NumT `RatT -> app "ratValue" [term]
-  | NumT `RealT -> app "floatValue" [term]
-  | VarT _ | NumT (`NatT | `IntT) | TextT | TupT _ | IterT _ -> term
-
-let wrap typ term =
-  match typ.it with
-  | BoolT -> app "bool" [term]
-  | NumT `RatT -> app "rat" [term]
-  | NumT `RealT -> app "float" [term]
-  | VarT _ | NumT (`NatT | `IntT) | TextT | TupT _ | IterT _ -> term
-
+let translate_comparison (op : cmpop) (optyp : optyp) left right =
+  match op, optyp with
+  | _, `RealT -> invalid_arg "IL Real comparison is outside the Wasm scope"
+  | `EqOp, _ -> app "_==_" [left; right]
+  | `NeOp, _ -> app "_=/=_" [left; right]
+  | `LtOp, _ -> app "_<_" [left; right]
+  | `GtOp, _ -> app "_>_" [left; right]
+  | `LeOp, _ -> app "_<=_" [left; right]
+  | `GeOp, _ -> app "_>=_" [left; right]
 
 (* Sequences, tuples, and records *)
 
-let rec sequence = function
-  | [] -> Const "eps"
-  | [term] -> term
-  | term :: terms -> app "_ _" [term; sequence terms]
-
-let rec sequence_with representation = function
-  | [] -> Const representation.Hintd.empty
-  | [term] -> term
-  | term :: terms ->
-      app representation.Hintd.concat
-        [term; sequence_with representation terms]
-
-let sequence_of_typ index typ terms =
-  sequence_with (Prescan.sequence_representation index typ) terms
+let sequence = Iter.sequence
+let sequence_of_typ = Iter.sequence_of_typ
 
 let sequence_operator index typ field =
   let representation = Prescan.sequence_representation index typ in
@@ -118,19 +102,10 @@ let rec record_items = function
   | [item] -> item
   | item :: items -> app "_;_" [item; record_items items]
 
-let as_sequence_element index typ term =
-  match
-    Hintd.sequence_element_wrappers
-      (Prescan.sort_metadata index) typ
-  with
-  | Some (box, _) -> app box [term]
-  | None -> term
+let as_sequence_element = Iter.as_sequence_element
 
 let from_sequence_element index typ term =
-  match
-    Hintd.sequence_element_wrappers
-      (Prescan.sort_metadata index) typ
-  with
+  match Hintd.sequence_element_wrappers (Prescan.sort_metadata index) typ with
   | Some (_, unbox) -> app unbox [term]
   | None -> term
 
@@ -161,17 +136,23 @@ and translate_arg index arg =
   | ExpA exp ->
       translate_exp index exp
   | TypA typ ->
-      translate_typ index typ
+      translate_check_typ index typ
   | DefA id ->
       begin match Prescan.definition_argument index arg with
       | Some parameter -> Var (Prescan.definition_variable index parameter)
-      | None -> Const (Prescan.def_name index id)
+      | None ->
+          Prescan.require_definition_body index "DefA" id;
+          Const (Prescan.def_name index id)
       end
   | GramA _ ->
       invalid_arg "GramA is not translated"
 
 and translate_check_typ index typ =
   match typ.it with
+  | VarT (id, _) when Prescan.type_parameter index id = None ->
+      let expanded = Il.Eval.reduce_typ index.Prescan.type_env typ in
+      if Il.Eq.eq_typ expanded typ then translate_typ index typ
+      else translate_check_typ index expanded
   | IterT (element, Opt) ->
       app "iterOpt" [translate_check_typ index element]
   | IterT (element, List) ->
@@ -190,7 +171,7 @@ and translate_exp index exp =
       Var (Prescan.source_variable index id exp.note)
 
   | BoolE value ->
-      app "bool" [Const (string_of_bool value)]
+      Const (string_of_bool value)
 
   | NumE value ->
       translate_number value
@@ -201,22 +182,19 @@ and translate_exp index exp =
   | UnE (`PlusOp, _, inner) ->
       translate_exp index inner
 
-  | UnE (op, _, inner) ->
-      let operand = translate_exp index inner |> unwrap inner.note in
-      app (translate_unop op) [operand]
-      |> wrap exp.note
+  | UnE (op, optyp, inner) ->
+      let operand = translate_exp index inner in
+      app (translate_unop op optyp) [operand]
 
   | BinE (op, optyp, left, right) ->
-      let left = translate_exp index left |> unwrap left.note in
-      let right = translate_exp index right |> unwrap right.note in
+      let left = translate_exp index left in
+      let right = translate_exp index right in
       app (translate_binop op optyp) [left; right]
-      |> wrap exp.note
 
-  | CmpE (op, _, left, right) ->
-      let left = translate_exp index left |> unwrap left.note in
-      let right = translate_exp index right |> unwrap right.note in
-      app (translate_cmpop op) [left; right]
-      |> wrap exp.note
+  | CmpE (op, optyp, left, right) ->
+      let left = translate_exp index left in
+      let right = translate_exp index right in
+      translate_comparison op optyp left right
 
   | TupE exps ->
       exps
@@ -235,6 +213,7 @@ and translate_exp index exp =
       |> from_sequence_element index exp.note
 
   | CaseE (mixop, payload) ->
+      (* Type premises are invariants, not guards on value construction. *)
       if Mixop.is_hole_only mixop then
         begin match payload.it with
         | TupE [single] -> translate_exp index single
@@ -276,13 +255,8 @@ and translate_exp index exp =
       app "_._" [translate_exp index record; qid_of_atom atom]
 
   | CompE (left, right) ->
-      let operator =
-        match Prescan.composition_kind index exp.note with
-        | Prescan.SequenceComposition ->
-            sequence_operator index exp.note (fun sequence -> sequence.concat)
-        | Prescan.RecordComposition -> "recordConcat"
-      in
-      app operator [translate_exp index left; translate_exp index right]
+      translate_composition index exp.note
+        (translate_exp index left) (translate_exp index right)
 
   | ListE exps ->
       exps
@@ -300,8 +274,10 @@ and translate_exp index exp =
       let operator =
         sequence_operator index collection.note (fun sequence -> sequence.occurs)
       in
-      app operator [translate_exp index element; translate_exp index collection]
-      |> wrap exp.note
+      app operator
+        [ translate_exp index element |> as_sequence_element index element.note
+        ; translate_exp index collection
+        ]
 
   | LenE collection ->
       let operator =
@@ -339,7 +315,7 @@ and translate_exp index exp =
 
   | IfE (condition, then_exp, else_exp) ->
       app "if_then_else_fi"
-        [ translate_exp index condition |> unwrap condition.note
+        [ translate_exp index condition
         ; translate_exp index then_exp
         ; translate_exp index else_exp
         ]
@@ -351,12 +327,16 @@ and translate_exp index exp =
             (Var (Prescan.definition_variable index parameter)
              :: List.map (translate_arg index) args)
       | None ->
+          Prescan.require_definition_body index "CallE" id;
           app (Prescan.def_name index id) (List.map (translate_arg index) args)
       end
 
   | IterE (body, (iter, generators)) ->
       Iter.translate_term
         index (translate_exp index) body (iter, generators)
+
+  | CvtE (_, `RealT, _) | CvtE (_, _, `RealT) ->
+      invalid_arg "IL Real conversion is outside the Wasm scope"
 
   | CvtE (inner, source, target) ->
       app "_:_<:>_"
@@ -370,43 +350,9 @@ and translate_exp index exp =
         translate_exp index inner
       else
         invalid_arg
-          ("SubE changes the Maude representation sort: "
-           ^ Il.Print.string_of_typ source ^ " -> "
-           ^ Il.Print.string_of_typ target)
-
-
-and translate_bool index exp =
-  match exp.it with
-  | BoolE value ->
-      Const (string_of_bool value)
-
-  | UnE (`NotOp, _, inner) ->
-      app "not_" [translate_bool index inner]
-
-  | BinE (`ImplOp, `BoolT, left, right) ->
-      app "_implies_" [translate_bool index left; translate_bool index right]
-
-  | BinE ((`AndOp | `OrOp | `EquivOp) as op,
-          `BoolT, left, right) ->
-      app (translate_binop op `BoolT)
-        [translate_bool index left; translate_bool index right]
-
-  | CmpE (op, _, left, right) ->
-      app (translate_cmpop op)
-        [ translate_exp index left |> unwrap left.note
-        ; translate_exp index right |> unwrap right.note
-        ]
-
-  | MemE (element, collection) ->
-      let operator =
-        sequence_operator index collection.note (fun sequence -> sequence.occurs)
-      in
-      app operator
-        [translate_exp index element; translate_exp index collection]
-
-  | _ ->
-      translate_exp index exp |> unwrap exp.note
-
+          ("Unsupported SubE representation: " ^ Il.Print.string_of_typ source
+           ^ " -> " ^ Il.Print.string_of_typ target
+           ^ " at " ^ string_of_region source.at)
 
 and translate_select index base path =
   match path.it with
@@ -469,57 +415,78 @@ and translate_update index base path replacement =
   | DotP (parent, atom) ->
       let parent_value = translate_select index base parent in
       let updated_parent =
-        app "_`[._=_`]"
-          [parent_value; qid_of_atom atom; replacement]
+        app "_`[._=_`]" [parent_value; qid_of_atom atom; replacement]
       in
       translate_update index base parent updated_parent
 
 
 and translate_extension index base path extension =
-  match path.it with
-  | RootP ->
+  (* EXT e p e' = UPD e p (CAT (ACC e p) e').  The existing path
+   * translation unboxes the selected value and reboxes it on update. *)
+  let operator =
+    sequence_operator index path.note (fun sequence -> sequence.concat)
+  in
+  let extended = app operator [translate_select index base path; extension] in
+  translate_update index base path extended
+
+and translate_composition index typ left right =
+  (* Expand declarations and type arguments only; do not evaluate the operands. *)
+  match (Il.Eval.reduce_typdef index.Prescan.type_env typ).it with
+  | AliasT {it = IterT (_, Opt); _} ->
+      app "optionConcat" [left; right]
+  | AliasT {it = IterT (_, (List | List1 | ListN _)); _} ->
       let operator =
-        sequence_operator index path.note (fun sequence -> sequence.concat)
+        sequence_operator index typ (fun sequence -> sequence.concat)
       in
-      app operator [base; extension]
-
-  | IdxP (parent, element_index) ->
-      unsupported_typed_sequence index "ExtE/IdxP" parent.note;
-      let parent_value = translate_select index base parent in
-      let extended_parent =
-        app "_`[_=++_`]"
-          [parent_value; translate_exp index element_index; extension]
-      in
-      translate_update index base parent extended_parent
-
-  | SliceP (parent, start, length) ->
-      unsupported_typed_sequence index "ExtE/SliceP" parent.note;
-      let parent_value = translate_select index base parent in
-      let extended_parent =
-        app "_`[_:_=++_`]"
-          [ parent_value
-          ; translate_exp index start
-          ; translate_exp index length
-          ; extension
-          ]
-      in
-      translate_update index base parent extended_parent
-
-  | DotP (parent, atom) ->
-      let parent_value = translate_select index base parent in
-      let extended_parent =
-        app "_`[._=++_`]"
-          [parent_value; qid_of_atom atom; extension]
-      in
-      translate_update index base parent extended_parent
+      app operator [left; right]
+  | StructT _ ->
+      if not (Prescan.record_composition_available index typ) then
+        invalid_arg
+          ("Unsupported CompE for " ^ Il.Print.string_of_typ typ
+           ^ " at " ^ string_of_region typ.at
+           ^ ": record composition requires a monomorphic StructT declaration");
+      app "recordConcat" [left; right; translate_typ index typ]
+  | AliasT _ | VariantT _ ->
+      invalid_arg ("non-composable CompE type: " ^ Il.Print.string_of_typ typ)
 
 
 (* Constructor components *)
 
-let translate_typ_conditions index value typ =
+let translate_bool = translate_exp
+
+let rec translate_typ_conditions index value typ =
   match translate_sort index typ, typ.it with
-  | ("Nat" | "Int"), _ ->
+  | _, NumT (`NatT | `IntT) ->
       []
+  | _, TupT fields ->
+      let rec check bindings position = function
+        | [] -> [], []
+        | (id, typ) :: fields ->
+            let variable =
+              generated_variable
+                ("TUPLE-CHECK" ^ string_of_int position) (translate_sort index typ)
+            in
+            let component = Var variable in
+            let substitute variable =
+              match
+                List.find_opt (fun (source, _) -> same_variable source variable) bindings
+              with
+              | Some (_, target) -> target
+              | None -> variable
+            in
+            let conditions =
+              translate_typ_conditions index component typ
+              |> List.map (map_eq_condition_variables substitute)
+            in
+            let bindings =
+              if id.it = "_" then bindings
+              else (Prescan.source_variable index id typ, variable) :: bindings
+            in
+            let values, rest = check bindings (position + 1) fields in
+            as_sequence_element index typ component :: values, conditions @ rest
+      in
+      let values, conditions = check [] 1 fields in
+      MatchCond (app "tuple" [sequence values], value) :: conditions
   | _, IterT (element_typ, iter) ->
       let representation = Prescan.sequence_representation index typ in
       if representation.typed then
@@ -536,7 +503,7 @@ let translate_typ_conditions index value typ =
   | _, _ ->
       [BoolCond (app "typecheck" [value; translate_typ index typ])]
 
-let make_component index field_index repeated id typ =
+and make_component index field_index repeated id typ =
   let sort = translate_sort index typ in
   let variable =
     if id.it = "_" then
@@ -551,7 +518,7 @@ let make_component index field_index repeated id typ =
   let conditions = translate_typ_conditions index value typ in
   value, sort, conditions
 
-let translate_components index typ =
+and translate_components index typ =
   match typ.it with
   | TupT fields ->
       let rec translate_fields seen field_index = function
