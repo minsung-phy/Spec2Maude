@@ -4,7 +4,8 @@ fmod DSL-SEQUENCE is
   op [_] : SpectecTerminals -> SpectecTerminals [prec 50] .
   eq [TS] = TS .
 
-  op len : SpectecTerminals -> Nat .
+  --- Cache canonical lists, without changing their representation or length.
+  op len : SpectecTerminals -> Nat [memo] .
   op |_| : SpectecTerminals -> Nat .
   --- A traversal marker avoids repeatedly copying canonical AU array tails.
   --- It is not an element and is removed before returning a source sequence.
@@ -96,9 +97,16 @@ fmod DSL-SEQUENCE is
   op splice : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals .
   op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals
     [prec 10 gather (E e e e)] .
+  op spliceAux : SpectecTerminals Nat Nat SpectecTerminals SpectecTerminals
+    ~> SpectecTerminals .
   ceq splice(TS, N, I, NEW-TS)
-    = take(TS, N) NEW-TS drop(TS, N + I)
+    = spliceAux(seqCursor TS, N, I, NEW-TS, seqCursor)
     if N + I <= len(TS) .
+  --- Retain the prefix while advancing to the replacement position once.
+  eq spliceAux(seqCursor TS, 0, I, NEW-TS, seqCursor PREFIX)
+    = PREFIX NEW-TS drop(TS, I) .
+  eq spliceAux(seqCursor T TS, s(N), I, NEW-TS, seqCursor PREFIX)
+    = spliceAux(seqCursor TS, N, I, NEW-TS, seqCursor PREFIX T) .
   eq TS[N : I = NEW-TS] = splice(TS, N, I, NEW-TS) .
 
   op lift : SpectecTerminals -> SpectecTerminals .
