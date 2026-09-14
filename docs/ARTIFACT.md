@@ -98,6 +98,19 @@ The pinned suite contains 258 `.wast` files, including the `bulk-memory`,
 `exceptions`, `gc`, `memory64`, `multi-memory`, `relaxed-simd`, and
 `simd` sub-suites.
 
+The sequence backend memoizes `len` on canonical lists. The WAST harness emits
+`set clear memo on .` to clear memo tables before each top-level rewriting
+command. The suite runner also starts a separate Maude process for every file,
+so cached lists do not accumulate across files. A WAST assertion is not a
+top-level Maude command: the cache can still grow throughout one file's run.
+There is no fixed cache size limit. Long runs that create many distinct large
+lists can require substantially more memory.
+
+For manual runs in a reused Maude session, use `set clear memo on .` before
+the command, or `do clear memo .` in the relevant module to discard prior
+entries (Maude manual, section 4.4.8). Record this setting when comparing
+rewrite counts or timings; a warm cache changes the measured work.
+
 ### Audit frontend coverage
 
 ```sh

@@ -568,6 +568,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  rl [done] :\n\
        \    script.ready(WSHS, WSHENV, commands.nil) => script.done .\n\
        endm\n\n\
+       set clear memo on .\n\
        rew [%d] in WASM2MAUDE-WAST : script.start .\n\
        continue 1 .\n"
       semantics commands host_store host_functions host_instances steps

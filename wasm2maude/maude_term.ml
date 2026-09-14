@@ -11,13 +11,23 @@ let rec pp fmt = function
   | Const s -> Format.pp_print_string fmt s
   | Seq [] -> Format.pp_print_string fmt "eps"
   | Seq xs ->
-      Format.pp_open_hovbox fmt 0;
-      List.iteri
-        (fun i x ->
-          if i > 0 then Format.pp_print_space fmt ();
-          pp fmt x)
-        xs;
-      Format.pp_close_box fmt ()
+      let items = Array.of_list xs in
+      (* Bound flat associative parses; grouping preserves order and elements. *)
+      let rec range fmt (start, length) =
+        if length <= 8 then begin
+          Format.pp_open_hovbox fmt 0;
+          for i = start to start + length - 1 do
+            if i > start then Format.pp_print_space fmt ();
+            pp fmt items.(i)
+          done;
+          Format.pp_close_box fmt ()
+        end else begin
+          let left = length / 2 in
+          Format.fprintf fmt "(@[%a@])@ (@[%a@])"
+            range (start, left) range (start + left, length - left)
+        end
+      in
+      range fmt (0, Array.length items)
   | App ("[_.._]", [lower; upper]) ->
       Format.fprintf fmt "[@[%a@ ..@ %a@]]" pp lower pp upper
   | App ("{_}", [items]) ->

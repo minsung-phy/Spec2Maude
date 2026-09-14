@@ -62,6 +62,28 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
 현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
 
+## 목록 계산과 출력의 비용
+
+`LenE`, `UpdE/SliceP`의 번역과 일반 목록의 `eps`, `__`, `seq(...)` 표현은
+유지한다. `len`은 Maude의 `[memo]`로 canonical 목록에 대한 계산 결과를
+재사용한다. 동일한 길이라도 내용이 다른 목록은 별도 캐시 항목이다.
+prelude `LIST`의 `size`도 원소를 순회하는 equational 정의이므로, 그 연산으로
+이름만 바꾸는 것으로 반복 순회가 없어지지는 않는다. 기존 hint 기반
+`InstrList`의 prelude 연산 선택은 유지한다.
+
+`splice(S, n, i, U)`는 기존의 `n + i <= len(S)` 조건을 유지하며 앞부분을
+한 번 순회한다. `S = P R`, `len(P) = n`이면 보조 계산의 결과는 `P U drop(R, i)`로,
+기존 `take(S, n) U drop(S, n + i)`와 같다. `seq(...)`는 이동 중에도 하나의
+원소다. 이 대응은 유한한 ground canonical IL 목록의 결과와 정의역에 관한
+것이며, 미평가 보조 term의 문법적 동일성이나 전체 translator의 보존 증명은 아니다.
+source Step 및 LABEL·FRAME 문맥 규칙은 바꾸지 않는다.
+
+WAST 출력기는 긴 `Seq`를 균형 괄호로 묶어 Maude의 평탄한 associative
+구문 분석 비용을 줄인다. 각 말단 그룹은 최대 8개 원소이며 `__`의 결합법칙만
+사용한다. 원소 순서, `App`의 인자 경계, 목록 원소를 구분하는 boxing은 유지한다.
+
+캐시의 수명과 실험 조건은 [ARTIFACT.md](ARTIFACT.md)의 실행 안내를 따른다.
+
 [language]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md
 [type-premises]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md#premises
 [formal]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/semantics/il/README.md
