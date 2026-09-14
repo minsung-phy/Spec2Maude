@@ -16,19 +16,23 @@ let deduplicate values =
   List.filter keep values
 
 let simplify_conditions equation conditions =
-  let matches = ref [] in
+  let equalities = ref [] in
   let keep condition =
     match equation condition with
     | Some (MatchCond (pattern, subject)) ->
-        matches := (pattern, subject) :: !matches;
+        equalities := (pattern, subject) :: !equalities;
         true
     | Some (EqCond (left, right)) ->
-        (* A preceding successful match already establishes this equality. *)
-        not (List.exists
-          (fun (pattern, subject) ->
-            (left = pattern && right = subject)
-            || (left = subject && right = pattern))
-          !matches)
+        (* A preceding successful match or equality establishes either order. *)
+        let redundant =
+          List.exists
+            (fun (first, second) ->
+              (left = first && right = second)
+              || (left = second && right = first))
+            !equalities
+        in
+        if not redundant then equalities := (left, right) :: !equalities;
+        not redundant
     | Some (MembershipCond _ | BoolCond _) | None -> true
   in
   List.filter keep (deduplicate conditions)

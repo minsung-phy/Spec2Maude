@@ -644,7 +644,7 @@ module Context_rules = struct
 
   (* A candidate needs operand boundaries, not the result of executing them.
      Slice source premises before lowering; the ordinary RuleD is untouched. *)
-  let cardinalities exps =
+  let boundary_variables index exps =
     let names = ref Il.Free.Set.empty in
     let module Visitor = Il.Iter.Make (struct
       include Il.Iter.Skip
@@ -656,6 +656,22 @@ module Context_rules = struct
     end)
     in
     Visitor.list Visitor.exp exps;
+    (* Unbounded sequence slots can change the focus extent without a ListN
+       count. Keep their source guards, but not scalar operand branch tests. *)
+    List.iter
+      (fun exp ->
+        let source =
+          match exp.it, exp.note.it with
+          | IterE (body, ((List, _) as iteration)), _ ->
+              Iter.identity_source index body iteration
+          | VarE _, IterT (_, List) -> Some exp
+          | _ -> None
+        in
+        match source with
+        | Some {it = VarE id; _} ->
+            names := Il.Free.Set.add id.it !names
+        | _ -> ())
+      exps;
     !names
 
   let rec focus_output index needed exp =
@@ -761,7 +777,7 @@ module Context_rules = struct
             else S.empty, free premise, true
         | ElsePr -> S.empty, S.empty, false
         | IfPr exp ->
-            (* Cardinality guards constrain the boundary. Other ordinary
+            (* Sequence and cardinality guards constrain the boundary. Other
                guards belong to execution; opaque/iterated premises stay. *)
             S.inter needed (Prem.variables exp), Prem.variables exp, false
         | IterPr _ | NegPr _ -> S.empty, free premise, true
@@ -808,7 +824,7 @@ module Context_rules = struct
     let terms, guards, bound =
       translate_inputs index pattern.source.params inputs
     in
-    let needed = cardinalities (pattern.operands @ pattern.trailing) in
+    let needed = boundary_variables index (pattern.operands @ pattern.trailing) in
     let prems =
       focus_premises index bound needed pattern.deferred_execution prems
     in
