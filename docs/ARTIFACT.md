@@ -111,6 +111,15 @@ the command, or `do clear memo .` in the relevant module to discard prior
 entries (Maude manual, section 4.4.8). Record this setting when comparing
 rewrite counts or timings; a warm cache changes the measured work.
 
+The ordinary sequence helpers consume up to 32 elements per equation, with
+single-element fallbacks for short tails. This changes internal equation counts,
+not the emitted IL operations or the source `Step` rules.
+
+The WAST harness defines its command list in groups of at most 64 commands.
+Each group refers to the next definition; unfolding them produces the original
+ordered list. This limits the size of each equation compiled by Maude without
+splitting the execution into separate runs or clearing the cache per assertion.
+
 ### Audit frontend coverage
 
 ```sh

@@ -1,5 +1,13 @@
 let render ~semantics ~steps ~commands ~host_store ~host_instances
     ~host_functions =
+    let commands =
+      List.map
+        (fun (name, body) ->
+          Printf.sprintf "  op %s : -> Commands .\n  eq %s = %s .\n"
+            name name (Maude_term.to_string body))
+        commands
+      |> String.concat ""
+    in
     Printf.sprintf
       "load %s\n\nmod WASM2MAUDE-WAST is\n\
        \  including WASM-BUILTINS .\n\n\
@@ -107,7 +115,6 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op script.wrong-assertion : Nat -> ScriptState [ctor] .\n\
        \  op script.link-error : Nat -> ScriptState [ctor] .\n\
        \  op script.done : -> ScriptState [ctor] .\n\n\
-       \  op inputCommands : -> Commands .\n\
        \  op emptyStore : -> SpectecTerminal .\n\
        \  op hostFunctionAddresses : -> SpectecTerminals .\n\
        \  op hostArguments : ValList SpectecTerminals -> Bool .\n\
@@ -133,7 +140,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  var WSHLPAT : LanePattern .\n\
        \  var WSHLPATS : LanePatterns .\n\
        \  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM : Nat .\n\n\
-       \  eq inputCommands = %s .\n\
+       %s\
        \  eq emptyStore = %s .\n\
        \  eq hostFunctionAddresses = %s .\n\n\
        \  eq hostArguments(eps, eps) = true .\n\

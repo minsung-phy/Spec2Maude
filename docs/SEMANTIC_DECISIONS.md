@@ -78,9 +78,25 @@ prelude `LIST`의 `size`도 원소를 순회하는 equational 정의이므로, �
 것이며, 미평가 보조 term의 문법적 동일성이나 전체 translator의 보존 증명은 아니다.
 source Step 및 LABEL·FRAME 문맥 규칙은 바꾸지 않는다.
 
+일반 목록의 `lenAux`, `takeAux`, `dropAux`, `spliceAux`는 32개 원소를
+처리하는 식과 `[owise]` 단일 원소 식을 사용한다. 32개 식은 기존 식을
+32회 적용한 결과로 전개되며, 짧은 목록과 작은 count는 단일 원소 식으로
+처리한다. 원소 순서, boxing, `slice`/`splice`의 범위 조건은 유지한다.
+이는 기존 IL 목록 연산의 backend 구현 변경이며 `LenE`, `SliceE`,
+`UpdE/SliceP`의 재귀 번역, typed list의 별도 연산, source rule은 변경하지
+않는다. 내부 equation trace의 일대일 대응이나 자유 목록 변수를 포함한
+symbolic matching/narrowing의 동등성까지 주장하지 않는다.
+
 WAST 출력기는 긴 `Seq`를 균형 괄호로 묶어 Maude의 평탄한 associative
 구문 분석 비용을 줄인다. 각 말단 그룹은 최대 8개 원소이며 `__`의 결합법칙만
 사용한다. 원소 순서, `App`의 인자 경계, 목록 원소를 구분하는 boxing은 유지한다.
+
+WAST command 목록은 AST에서 최대 64개씩 나누어 `inputCommands`와
+`script.commands-N`의 비순환 정의로 출력한다. 각 원래 command의 인코딩과
+순서는 유지하고 마지막 tail만 `commands.nil`이다. 빈 입력도
+`inputCommands = commands.nil`로 출력한다. 모든 정의를 펼친 정상형은
+기존의 단일 `commands.cons` 목록과 같다. 이 정의들은 WAST driver에만
+추가하며 SpecTec 실행 규칙이나 일반 Wasm run/modelcheck 출력은 바꾸지 않는다.
 
 캐시의 수명과 실험 조건은 [ARTIFACT.md](ARTIFACT.md)의 실행 안내를 따른다.
 
