@@ -10,7 +10,6 @@ let emit ~semantics ~steps ~call_depth source =
   let commands =
     Wast_plan.commands plan
     |> Wast_command_encode.commands ~call_depth
-    |> Maude_term.to_string
   in
   let host = Wast_plan.host plan in
   let host_store = Wast_host_encode.store host |> Maude_term.to_string in

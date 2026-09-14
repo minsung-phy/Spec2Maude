@@ -119,7 +119,35 @@ let command_term ~call_depth = function
         [T.atom (string_of_int index); action_term action]
 
 let commands ~call_depth commands =
-  List.fold_right
-    (fun command rest ->
-      T.app "commands.cons" [command_term ~call_depth command; rest])
-    commands (T.atom "commands.nil")
+  let name = function
+    | 0 -> "inputCommands"
+    | index -> "script.commands-" ^ string_of_int index
+  in
+  let rec split count commands =
+    match count, commands with
+    | 0, _ | _, [] -> [], commands
+    | _, command :: rest ->
+        let group, remaining = split (count - 1) rest in
+        command_term ~call_depth command :: group, remaining
+  in
+  let rec definitions index commands =
+    let group, remaining = split 64 commands in
+    let tail =
+      match remaining with
+      | [] -> T.atom "commands.nil"
+      | _ -> T.atom (name (index + 1))
+    in
+    let body =
+      List.fold_right
+        (fun command rest -> T.app "commands.cons" [command; rest])
+        group tail
+    in
+    let rest =
+      match remaining with
+      | [] -> []
+      | _ -> definitions (index + 1) remaining
+    in
+    (name index, body) :: rest
+  in
+  (* Acyclic definitions unfold to the same ordered command list. *)
+  definitions 0 commands
