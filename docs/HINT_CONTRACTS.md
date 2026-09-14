@@ -10,7 +10,7 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 | `maude_sort` | source 타입에 별도 Maude sort와 목록 표현을 부여한다. 없는 경우 일반 `SpectecTerminals` 표현을 사용한다. |
 | `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
 | `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
-| `maude_context` | source context rule을 focus/heat/cool로 번역한다. frame·prefix·hole·postfix를 원문에서 추출하며 실제 premise를 유지한다. |
+| `maude_context` | source context rule을 focus/heat/cool로 번역한다. frame·prefix·hole·postfix를 원문에서 추출한다. 일반 실행 premise를 유지하며, 목록 경계를 제한하는 원문 조건은 focus에도 보존한다. |
 | `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
 | `inverse $g` | 빠진 인자를 선언된 역함수 g로 구하고 pattern과 forward 결과를 재확인한다. 인자 순서·signature를 검사한다. |

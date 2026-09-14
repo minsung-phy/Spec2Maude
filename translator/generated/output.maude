@@ -2711,8 +2711,7 @@ mod SPEC2MAUDE-GENERATED is
   rl [focus-Step-pure-label-vals] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR- } VAL-, POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR- } VAL-)) | POSTFIX } .
 
   crl [focus-Step-pure-br-label-zero] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } (((VAL-- VAL-) BR(L)) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } (((VAL-- VAL-) BR(L)) INSTR-))) | POSTFIX }
-    if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-) .
+    if instrSize(VAL-) = N3 .
 
   rl [focus-Step-pure-br-label-succ] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-))) | POSTFIX } .
 
@@ -2733,12 +2732,10 @@ mod SPEC2MAUDE-GENERATED is
   rl [focus-Step-pure-return-call-indirect] : identifyFocus(BRIDGE-Z, PREFIX, RETURN-CALL-INDIRECT(X4, YY2), POSTFIX) => { PREFIX | (BRIDGE-Z ; RETURN-CALL-INDIRECT(X4, YY2)) | POSTFIX } .
 
   crl [focus-Step-pure-frame-vals] : identifyFocus(BRIDGE-Z, PREFIX, FRAME- N3 { F } VAL-, POSTFIX) => { PREFIX | (BRIDGE-Z ; (FRAME- N3 { F } VAL-)) | POSTFIX }
-    if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-) .
+    if instrSize(VAL-) = N3 .
 
   crl [focus-Step-pure-return-frame] : identifyFocus(BRIDGE-Z, PREFIX, FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-))) | POSTFIX }
-    if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-) .
+    if instrSize(VAL-) = N3 .
 
   rl [focus-Step-pure-return-label] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-))) | POSTFIX } .
 
@@ -2746,7 +2743,8 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-pure-handler-vals] : identifyFocus(BRIDGE-Z, PREFIX, HANDLER- N3 { CATCH- } VAL-, POSTFIX) => { PREFIX | (BRIDGE-Z ; (HANDLER- N3 { CATCH- } VAL-)) | POSTFIX } .
 
-  rl [focus-Step-pure-trap-instrs] : identifyFocus(BRIDGE-Z, PREFIX VAL-, TRAP, INSTR- POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL- (TRAP INSTR-))) | POSTFIX } .
+  crl [focus-Step-pure-trap-instrs] : identifyFocus(BRIDGE-Z, PREFIX VAL-, TRAP, INSTR- POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL- (TRAP INSTR-))) | POSTFIX }
+    if _or_(VAL- =/= eps, INSTR- =/= eps) .
 
   rl [focus-Step-pure-trap-label] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } TRAP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } TRAP)) | POSTFIX } .
 
@@ -2900,7 +2898,8 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-read-throw-ref-null] : identifyFocus(Z, PREFIX (REF.NULL-ADDR), THROW-REF, POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) THROW-REF)) | POSTFIX } .
 
-  rl [focus-Step-read-throw-ref-instrs] : identifyFocus(Z, PREFIX (VAL- REF.EXN-ADDR(A)), THROW-REF, INSTR- POSTFIX) => { PREFIX | (Z ; (VAL- (REF.EXN-ADDR(A) (THROW-REF INSTR-)))) | POSTFIX } .
+  crl [focus-Step-read-throw-ref-instrs] : identifyFocus(Z, PREFIX (VAL- REF.EXN-ADDR(A)), THROW-REF, INSTR- POSTFIX) => { PREFIX | (Z ; (VAL- (REF.EXN-ADDR(A) (THROW-REF INSTR-)))) | POSTFIX }
+    if _or_(VAL- =/= eps, INSTR- =/= eps) .
 
   rl [focus-Step-read-throw-ref-label] : identifyFocus(Z, PREFIX, LABEL- N3 { INSTR-- } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (LABEL- N3 { INSTR-- } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
 
@@ -3112,7 +3111,6 @@ mod SPEC2MAUDE-GENERATED is
 
   crl [focus-Step-array-new-fixed] : identifyFocus(Z, PREFIX VAL-, ARRAY.NEW-FIXED(X4, N3), POSTFIX) => { PREFIX | (Z ; (VAL- ARRAY.NEW-FIXED(X4, N3))) | POSTFIX }
     if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-)
       /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ A := len(spectec-arrayinst(Z))
@@ -7121,7 +7119,6 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-pure(LABEL- N3 { INSTR-- } (((VAL-- VAL-) BR(L)) INSTR-)) => VAL- INSTR--
     if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-)
       /\ L == 0 .
 
   crl Step-pure(LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-)) => VAL- BR(_-_(L : nat <:> int, 1 : nat <:> int) : int <:> nat)
@@ -7162,12 +7159,10 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-pure(RETURN-CALL-INDIRECT(X4, YY2)) => TABLE.GET(X4) (REF.CAST(REF(NULL ?, YY2)) RETURN-CALL-REF(YY2)) .
 
   crl Step-pure(FRAME- N3 { F } VAL-) => VAL-
-    if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-) .
+    if instrSize(VAL-) = N3 .
 
   crl Step-pure(FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-)) => VAL-
-    if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-) .
+    if instrSize(VAL-) = N3 .
 
   rl Step-pure(LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-)) => VAL- RETURN .
 
@@ -8289,7 +8284,6 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step(Z ; (VAL- ARRAY.NEW-FIXED(X4, N3))) => add-arrayinst(Z, AI2) ; REF.ARRAY-ADDR(A)
     if instrSize(VAL-) = N3
-      /\ N3 = instrSize(VAL-)
       /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ A := len(spectec-arrayinst(Z))
