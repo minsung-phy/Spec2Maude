@@ -62,43 +62,23 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
 현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
 
-## 목록 계산과 출력의 비용
+## baseline2의 목록 계산과 출력
 
-`LenE`, `UpdE/SliceP`의 번역과 일반 목록의 `eps`, `__`, `seq(...)` 표현은
-유지한다. `len`은 Maude의 `[memo]`로 canonical 목록에 대한 계산 결과를
-재사용한다. 동일한 길이라도 내용이 다른 목록은 별도 캐시 항목이다.
-prelude `LIST`의 `size`도 원소를 순회하는 equational 정의이므로, 그 연산으로
-이름만 바꾸는 것으로 반복 순회가 없어지지는 않는다. 기존 hint 기반
-`InstrList`의 prelude 연산 선택은 유지한다.
+`baseline2`는 현재 오류 수정을 유지하면서 source의 `maude_sort`,
+`maude_subsort`, `maude_proper`, `maude_context` 적용을 제거한다.
+일반 목록은 `SpectecTerminals`, `eps`, `__`, `seq(...)`를 사용하고,
+context rule은 원문의 premise와 경계 조건을 포함하는 일반 relation으로 번역한다.
+번역기의 선택적 hint 지원 코드는 유지하지만 이 입력에서는 활성화하지 않는다.
 
-`splice(S, n, i, U)`는 기존의 `n + i <= len(S)` 조건을 유지하며 앞부분을
-한 번 순회한다. `S = P R`, `len(P) = n`이면 보조 계산의 결과는 `P U drop(R, i)`로,
-기존 `take(S, n) U drop(S, n + i)`와 같다. `seq(...)`는 이동 중에도 하나의
-원소다. 이 대응은 유한한 ground canonical IL 목록의 결과와 정의역에 관한
-것이며, 미평가 보조 term의 문법적 동일성이나 전체 translator의 보존 증명은 아니다.
-source Step 및 LABEL·FRAME 문맥 규칙은 바꾸지 않는다.
+`len`, `take`, `drop`, `repeatSeq`는 단일 원소/횟수 재귀다. `splice`는
+`take(S, n) U drop(S, n + i)`이며 `n + i <= len(S)` 조건을 유지한다.
+캐시, cursor, 32개 단위 순회, 압축된 반복 목록은 사용하지 않는다.
+범위 밖 slice/update의 부분성과 nested `seq(...)` boxing은 유지한다.
 
-일반 목록의 `lenAux`, `takeAux`, `dropAux`, `spliceAux`는 32개 원소를
-처리하는 식과 `[owise]` 단일 원소 식을 사용한다. 32개 식은 기존 식을
-32회 적용한 결과로 전개되며, 짧은 목록과 작은 count는 단일 원소 식으로
-처리한다. 원소 순서, boxing, `slice`/`splice`의 범위 조건은 유지한다.
-이는 기존 IL 목록 연산의 backend 구현 변경이며 `LenE`, `SliceE`,
-`UpdE/SliceP`의 재귀 번역, typed list의 별도 연산, source rule은 변경하지
-않는다. 내부 equation trace의 일대일 대응이나 자유 목록 변수를 포함한
-symbolic matching/narrowing의 동등성까지 주장하지 않는다.
-
-WAST 출력기는 긴 `Seq`를 균형 괄호로 묶어 Maude의 평탄한 associative
-구문 분석 비용을 줄인다. 각 말단 그룹은 최대 8개 원소이며 `__`의 결합법칙만
-사용한다. 원소 순서, `App`의 인자 경계, 목록 원소를 구분하는 boxing은 유지한다.
-
-WAST command 목록은 AST에서 최대 64개씩 나누어 `inputCommands`와
-`script.commands-N`의 비순환 정의로 출력한다. 각 원래 command의 인코딩과
-순서는 유지하고 마지막 tail만 `commands.nil`이다. 빈 입력도
-`inputCommands = commands.nil`로 출력한다. 모든 정의를 펼친 정상형은
-기존의 단일 `commands.cons` 목록과 같다. 이 정의들은 WAST driver에만
-추가하며 SpecTec 실행 규칙이나 일반 Wasm run/modelcheck 출력은 바꾸지 않는다.
-
-캐시의 수명과 실험 조건은 [ARTIFACT.md](ARTIFACT.md)의 실행 안내를 따른다.
+출력기의 균형 괄호와 64개 단위 WAST command 정의는 main과 동일하게 유지한다.
+이는 파일 출력/파서 비용을 맞추기 위한 비교 조건이다. 제거 및 유지 항목은
+[BASELINE.md](BASELINE.md)에 기록한다. 전체 suite 통과나 의미 보존 증명을
+주장하지 않으며, 선택한 작은 회귀 입력과 Maude 로드를 검사한다.
 
 [language]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md
 [type-premises]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md#premises

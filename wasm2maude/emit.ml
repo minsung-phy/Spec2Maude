@@ -137,7 +137,7 @@ let run ~semantics ~export ~args ~steps:limit m =
        \  op exec : SpectecTerminal -> RunState [ctor frozen (1)] .\n\n\
        \  op inputModule : -> SpectecTerminal .\n\
        \  op inputName : -> SpectecTerminals .\n\
-       \  op inputArgs : -> ValList .\n\
+       \  op inputArgs : -> SpectecTerminals .\n\
        \  op emptyStore : -> SpectecTerminal .\n\
        \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
        \  vars C C2 Z XA : SpectecTerminal .\n\
@@ -196,18 +196,18 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
        \  op init : SpectecTerminal -> ModelState [ctor frozen (1)] .\n\
        \  op ready : SpectecTerminal -> ModelState [ctor] .\n\
        \  op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .\n\
-       \  op finished : ValList -> ModelState [ctor] .\n\n\
+       \  op finished : SpectecTerminals -> ModelState [ctor] .\n\n\
        \  op inputModule : -> SpectecTerminal .\n\
        \  op inputName : -> SpectecTerminals .\n\
-       \  op inputArgs : -> ValList .\n\
+       \  op inputArgs : -> SpectecTerminals .\n\
        \  op emptyStore : -> SpectecTerminal .\n\
-       \  op expected : -> ValList .\n\
-       \  op rejected : -> ValList .\n\
+       \  op expected : -> SpectecTerminals .\n\
+       \  op rejected : -> SpectecTerminals .\n\
        \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\
-       \  op returned : ValList -> Prop [ctor] .\n\n\
+       \  op returned : SpectecTerminals -> Prop [ctor] .\n\n\
        \  vars C C2 Z XA : SpectecTerminal .\n\
        \  vars NAME OTHER EXPORTS : SpectecTerminals .\n\
-       \  var RESULT : ValList .\n\
+       \  var RESULT : SpectecTerminals .\n\
        \  var ADDR : Nat .\n\
        \  var ST : ModelState .\n\
        \  var P : Prop .\n\n\
@@ -230,7 +230,8 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
        \  crl [execute-step] : exec(C) => exec(C2)\n\
        \    if %s => C2 .\n\
        \  crl [finished] : exec(C) => finished(RESULT)\n\
-       \    if (Z ; RESULT) := C .\n\n\
+       \    if (Z ; RESULT) := C\n\
+       \       /\\ typecheck(RESULT, val) = true .\n\n\
        \  eq finished(RESULT) |= returned(RESULT) = true .\n\
        \  eq ST |= P = false [owise] .\n\
        endm\n\n\

@@ -4,32 +4,20 @@ fmod DSL-SEQUENCE is
   op [_] : SpectecTerminals -> SpectecTerminals [prec 50] .
   eq [TS] = TS .
 
-  --- Cache canonical lists, without changing their representation or length.
-  op len : SpectecTerminals -> Nat [memo] .
+  op len : SpectecTerminals -> Nat .
   op |_| : SpectecTerminals -> Nat .
-  --- A traversal marker avoids repeatedly copying canonical AU array tails.
-  --- It is not an element and is removed before returning a source sequence.
-  op seqCursor : -> SpectecTerminals [ctor] .
   op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
 
   vars N I : Nat .
   var K : [SpectecTerminal] .
   vars T U : SpectecTerminal .
-  vars T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32 : SpectecTerminal .
   vars TS WTS : SpectecTerminals .
   var TYPE : SpectecType .
 
-  op lenAux : SpectecTerminals Nat -> Nat .
   eq len(eps) = 0 .
   eq len(T) = 1 .
-  ceq len(T TS) = lenAux(seqCursor TS, 1)
+  ceq len(T TS) = 1 + len(TS)
     if TS =/= eps .
-  eq lenAux(seqCursor, N) = N .
-  --- Each block equation is 32 applications of the single-element equation.
-  --- Keep the ordinary sequence representation and finish short tails below.
-  eq lenAux(seqCursor T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32 TS, N)
-    = lenAux(seqCursor TS, N + 32) .
-  eq lenAux(seqCursor T TS, N) = lenAux(seqCursor TS, N + 1) [owise] .
   eq | TS | = len(TS) .
 
   eq typecheck(seq(TS), iterOpt(TYPE)) =
@@ -64,27 +52,12 @@ fmod DSL-SEQUENCE is
   op drop : SpectecTerminals Nat -> SpectecTerminals .
   op slice : SpectecTerminals Nat Nat ~> SpectecTerminals .
 
-  op dropAux : SpectecTerminals Nat -> SpectecTerminals .
-  --- Both cursors retain a deque during traversal, avoiding repeated suffix
-  --- scans and deep recursion while constructing the same ordinary sequence.
-  op takeAux : SpectecTerminals Nat SpectecTerminals -> SpectecTerminals .
-  var PREFIX : SpectecTerminals .
-  eq take(TS, N) = takeAux(seqCursor TS, N, seqCursor) .
-  eq takeAux(seqCursor TS, 0, seqCursor PREFIX) = PREFIX .
-  eq takeAux(seqCursor, N, seqCursor PREFIX) = PREFIX .
-  eq takeAux(seqCursor T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32 TS, s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(N)))))))))))))))))))))))))))))))), seqCursor PREFIX)
-    = takeAux(seqCursor TS, N, seqCursor PREFIX T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32) .
-  eq takeAux(seqCursor T TS, s(N), seqCursor PREFIX) =
-      takeAux(seqCursor TS, N, seqCursor PREFIX T) [owise] .
-
+  eq take(TS, 0) = eps .
+  eq take(eps, N) = eps .
+  eq take(T TS, s(N)) = T take(TS, N) .
   eq drop(TS, 0) = TS .
   eq drop(eps, N) = eps .
-  eq drop(T TS, s(N)) = dropAux(seqCursor TS, N) .
-  eq dropAux(seqCursor TS, 0) = TS .
-  eq dropAux(seqCursor, N) = eps .
-  eq dropAux(seqCursor T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32 TS, s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(N)))))))))))))))))))))))))))))))))
-    = dropAux(seqCursor TS, N) .
-  eq dropAux(seqCursor T TS, s(N)) = dropAux(seqCursor TS, N) [owise] .
+  eq drop(T TS, s(N)) = drop(TS, N) .
 
   --- An out-of-bounds slice has no normal sequence result, including length 0.
   ceq slice(TS, N, I) = take(drop(TS, N), I)
@@ -106,30 +79,17 @@ fmod DSL-SEQUENCE is
   op splice : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals .
   op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals
     [prec 10 gather (E e e e)] .
-  op spliceAux : SpectecTerminals Nat Nat SpectecTerminals SpectecTerminals
-    ~> SpectecTerminals .
   ceq splice(TS, N, I, NEW-TS)
-    = spliceAux(seqCursor TS, N, I, NEW-TS, seqCursor)
+    = take(TS, N) NEW-TS drop(TS, N + I)
     if N + I <= len(TS) .
-  --- Retain the prefix while advancing to the replacement position once.
-  eq spliceAux(seqCursor TS, 0, I, NEW-TS, seqCursor PREFIX)
-    = PREFIX NEW-TS drop(TS, I) .
-  eq spliceAux(seqCursor T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32 TS, s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(s(N)))))))))))))))))))))))))))))))), I, NEW-TS, seqCursor PREFIX)
-    = spliceAux(seqCursor TS, N, I, NEW-TS, seqCursor PREFIX T1 T2 T3 T4 T5 T6 T7 T8 T9 T10 T11 T12 T13 T14 T15 T16 T17 T18 T19 T20 T21 T22 T23 T24 T25 T26 T27 T28 T29 T30 T31 T32) .
-  eq spliceAux(seqCursor T TS, s(N), I, NEW-TS, seqCursor PREFIX)
-    = spliceAux(seqCursor TS, N, I, NEW-TS, seqCursor PREFIX T) [owise] .
   eq TS[N : I = NEW-TS] = splice(TS, N, I, NEW-TS) .
 
   op lift : SpectecTerminals -> SpectecTerminals .
   eq lift(eps) = eps .
   eq lift(K ?) = K .
 
-  --- Double the ordinary sequence, rather than introduce a compressed value.
-  --- The recursive count halves, so large repetitions do not need linear depth.
   eq repeatSeq(0, WTS) = eps .
-  eq repeatSeq(1, WTS) = WTS .
-  ceq repeatSeq(N, WTS)
-    = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS)
-    if 1 < N .
+  eq repeatSeq(s(N), eps) = eps .
+  eq repeatSeq(s(N), WTS) = WTS repeatSeq(N, WTS) [owise] .
 
 endfm

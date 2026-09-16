@@ -16,7 +16,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    InstanceEnv ScriptState ResultPattern ResultPatterns\n\
        \    ResultAlternatives LanePattern LanePatterns MatchVerdict .\n\
        \  subsort Command < Commands .\n\
-       \  op action.invoke : Nat SpectecTerminals ValList\n\
+       \  op action.invoke : Nat SpectecTerminals SpectecTerminals\n\
        \    -> ScriptAction [ctor] .\n\
        \  op action.get : Nat SpectecTerminals -> ScriptAction [ctor] .\n\
        \  op commands.nil : -> Commands [ctor] .\n\
@@ -66,7 +66,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op match.or : MatchVerdict MatchVerdict -> MatchVerdict .\n\
        \  op match.value : SpectecTerminal ResultPattern\n\
        \    -> MatchVerdict .\n\
-       \  op match.values : ValList ResultPatterns\n\
+       \  op match.values : SpectecTerminals ResultPatterns\n\
        \    -> MatchVerdict .\n\
        \  op match.any : SpectecTerminal ResultAlternatives\n\
        \    -> MatchVerdict .\n\n\
@@ -110,25 +110,25 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    -> ScriptState [ctor frozen (4)] .\n\
        \  op script.uninstantiable : Nat InstanceEnv Commands SpectecTerminal\n\
        \    -> ScriptState [ctor frozen (4)] .\n\
-       \  op script.wrong-result : Nat ValList ResultPatterns\n\
+       \  op script.wrong-result : Nat SpectecTerminals ResultPatterns\n\
        \    -> ScriptState [ctor] .\n\
        \  op script.wrong-assertion : Nat -> ScriptState [ctor] .\n\
        \  op script.link-error : Nat -> ScriptState [ctor] .\n\
        \  op script.done : -> ScriptState [ctor] .\n\n\
        \  op emptyStore : -> SpectecTerminal .\n\
        \  op hostFunctionAddresses : -> SpectecTerminals .\n\
-       \  op hostArguments : ValList SpectecTerminals -> Bool .\n\
-       \  op hostCallable : SpectecTerminal Nat ValList -> Bool .\n\
+       \  op hostArguments : SpectecTerminals SpectecTerminals -> Bool .\n\
+       \  op hostCallable : SpectecTerminal Nat SpectecTerminals -> Bool .\n\
        \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
        \  op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
-       \  op runtimeResults : ValList -> Bool .\n\n\
-       \  op activeFrameDepth : InstrList -> Nat .\n\n\
+       \  op runtimeResults : SpectecTerminals -> Bool .\n\n\
+       \  op activeFrameDepth : SpectecTerminals -> Nat .\n\n\
        \  vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .\n\
        \  vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .\n\
        \  vars WSHNAME WSHOTHER WSHLOCALS WSHEXPORTS : SpectecTerminals .\n\
        \  vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .\n\
-       \  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : ValList .\n\
-       \  vars WSHBODY WSHINSTRS WSHREST : InstrList .\n\
+       \  vars WSHARGS WSHACTUAL WSHVALUES : SpectecTerminals .\n\
+       \  vars WSHBODY WSHINSTRS WSHREST : SpectecTerminals .\n\
        \  var WSHCMDS : Commands .\n\
        \  vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .\n\
        \  var WSHREQUIREMENT : ImportRequirement .\n\
@@ -363,12 +363,6 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    Step-read((WSHS ; WSHCURRENT) ;\n\
        \      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => eps\n\
        \    if hostCallable(WSHS, WSHA, WSHARGS) = true .\n\n\
-       \  crl [focus-host-call] :\n\
-       \    identifyFocus(WSHS ; WSHCURRENT,\n\
-       \      WSHPREFIX (WSHARGS REF.FUNC-ADDR(WSHA)), CALL-REF(WSHC), WSHREST)\n\
-       \    => { WSHPREFIX | ((WSHS ; WSHCURRENT) ;\n\
-       \      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) | WSHREST }\n\
-       \    if hostCallable(WSHS, WSHA, WSHARGS) = true .\n\n\
        \  rl [start] : script.start =>\n\
        \    script.ready(emptyStore, %s, inputCommands) .\n\
        \  crl [module-start] :\n\
@@ -575,7 +569,6 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  rl [done] :\n\
        \    script.ready(WSHS, WSHENV, commands.nil) => script.done .\n\
        endm\n\n\
-       set clear memo on .\n\
        rew [%d] in WASM2MAUDE-WAST : script.start .\n\
        continue 1 .\n"
       semantics commands host_store host_functions host_instances steps

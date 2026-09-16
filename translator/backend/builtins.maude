@@ -201,13 +201,16 @@ mod WASM-BUILTINS is
   vars FI_F FI_MAG : SpectecTerminal .
   vars FC_F1 FC_F2 FC_MAG FC_MAG2 : SpectecTerminal .
   vars FR_SOURCE FR_MAG : SpectecTerminal .
+  op pow2-rat : Nat -> Rat .
   op scale-rat : Rat Int -> Rat .
   op fmag-rat : Nat SpectecTerminal -> Rat .
   op float-rat : Nat SpectecTerminal -> Rat .
   op float-finite : Nat SpectecTerminal -> Bool .
   op trunc-rat-int : Rat -> Int .
   op nearest-rat-int : Rat -> Int .
+  op floor-log2-aux : Nat Nat -> Nat .
   op floor-log2 : Nat -> Nat .
+  op floor-log2-rat-aux : Rat Int -> Int .
   op floor-log2-rat : Rat -> Int .
   op nat-fmag-exact : Nat Nat -> Bool .
   op nat-to-fmag : Nat Nat -> SpectecTerminal .
@@ -255,15 +258,18 @@ mod WASM-BUILTINS is
   op promote-f32-subnorm-exp : Nat -> Int .
   op promote-f32 : SpectecTerminal -> SpectecTerminal .
   op demote-f64 : SpectecTerminal -> SpectecTerminal .
-  ceq scale-rat(FI_R, FI_E) = _*_(FI_R, _^_(2, abs(FI_E)))
+  eq pow2-rat(0) = 1 .
+  ceq pow2-rat(FI_N) = _*_(2, pow2-rat(_-_(FI_N, 1)))
+    if _>_(FI_N, 0) .
+  ceq scale-rat(FI_R, FI_E) = _*_(FI_R, pow2-rat(abs(FI_E)))
     if _>=_(FI_E, 0) .
-  ceq scale-rat(FI_R, FI_E) = FI_R / _^_(2, abs(FI_E))
+  ceq scale-rat(FI_R, FI_E) = FI_R / pow2-rat(abs(FI_E))
     if _<_(FI_E, 0) .
   ceq fmag-rat(FI_N, NORM(FI_FRAC, FI_E)) =
-      scale-rat(_/_( _+_(_^_(2, spectec-M(FI_N)), FI_FRAC), _^_(2, spectec-M(FI_N))), FI_E)
+      scale-rat(_/_( _+_(_^_(2, spectec-M(FI_N)), FI_FRAC), pow2-rat(spectec-M(FI_N))), FI_E)
     if (fnmag-valid(FI_N, NORM(FI_FRAC, FI_E))) = true .
   ceq fmag-rat(FI_N, SUBNORM(FI_FRAC)) =
-      scale-rat(_/_(FI_FRAC, _^_(2, spectec-M(FI_N))), _+_(2, - _^_(2, _-_(E(FI_N), 1))))
+      scale-rat(_/_(FI_FRAC, pow2-rat(spectec-M(FI_N))), _+_(2, - _^_(2, _-_(E(FI_N), 1))))
     if (fnmag-valid(FI_N, SUBNORM(FI_FRAC))) = true .
   ceq float-rat(FI_N, POS(FI_MAG)) = fmag-rat(FI_N, FI_MAG)
     if (fnmag-valid(FI_N, FI_MAG)) = true .
@@ -460,17 +466,25 @@ mod WASM-BUILTINS is
        /\ FR_CEIL := ceiling(FR_R)
        /\ _==_( _-_(FR_CEIL, FR_R), _-_(FR_R, FR_FLOOR))
        /\ _>_(_rem_(abs(FR_CEIL), 2), 0) .
-  --- Exact binary digit count; no floating-point logarithm or linear search.
-  ceq floor-log2(FR_I) = _-_(length(nativeRatString(FR_I, 2)), 1)
+  ceq floor-log2-aux(FR_I, FR_E) = FR_E
+    if _<=_(_^_(2, FR_E), FR_I)
+       /\ _<_(FR_I, _^_(2, _+_(FR_E, 1))) .
+  ceq floor-log2-aux(FR_I, FR_E) = floor-log2-aux(FR_I, _+_(FR_E, 1))
+    if _>=_(FR_I, _^_(2, _+_(FR_E, 1))) .
+  ceq floor-log2(FR_I) = floor-log2-aux(FR_I, 0)
     if _>_(FR_I, 0) .
-  ceq floor-log2-rat(FR_I) = floor-log2(FR_I)
-    if _>_(FR_I, 0) .
-  --- For p/q, the difference of digit counts is exact or one too large.
-  ceq floor-log2-rat(_/_(FR_I, FD_Q)) =
-      if _<_(_/_(FR_I, FD_Q), scale-rat(1, FD_E))
-      then _-_(FD_E, 1) else FD_E fi
-    if _>_(FR_I, 0) /\ _>_(FD_Q, 0)
-       /\ FD_E := _-_(floor-log2(FR_I), floor-log2(FD_Q)) .
+  ceq floor-log2-rat-aux(FD_R, FD_E) = FD_E
+    if _>_(FD_R, 0)
+       /\ _<=_(scale-rat(1, FD_E), FD_R)
+       /\ _<_(FD_R, scale-rat(1, _+_(FD_E, 1))) .
+  ceq floor-log2-rat-aux(FD_R, FD_E) = floor-log2-rat-aux(FD_R, _-_(FD_E, 1))
+    if _>_(FD_R, 0)
+       /\ _<_(FD_R, scale-rat(1, FD_E)) .
+  ceq floor-log2-rat-aux(FD_R, FD_E) = floor-log2-rat-aux(FD_R, _+_(FD_E, 1))
+    if _>_(FD_R, 0)
+       /\ _>=_(FD_R, scale-rat(1, _+_(FD_E, 1))) .
+  ceq floor-log2-rat(FD_R) = floor-log2-rat-aux(FD_R, 0)
+    if _>_(FD_R, 0) .
   ceq round-rat-subnormal(FD_N, FD_R) = SUBNORM(0)
     if _>_(FD_R, 0)
        /\ FD_EMIN := _+_(2, - _^_(2, _-_(E(FD_N), 1)))
@@ -1535,34 +1549,34 @@ mod WASM-BUILTINS is
 
   --- Implemented declaration-only builtin: canonical UTF-8 encoding of char*.
   var UTF_C : Nat .
-  vars UTF_REST UTF_TAIL : SpectecTerminals .
+  var UTF_REST : SpectecTerminals .
   eq utf8(eps) = eps .
   ceq utf8(UTF_C UTF_REST) =
-      UTF_C UTF_TAIL
+      UTF_C utf8(UTF_REST)
     if _<_(UTF_C, 128)
-       /\ UTF_TAIL := utf8(UTF_REST) .
+       /\ (typecheck(UTF_REST, char)) = true .
   ceq utf8(UTF_C UTF_REST) =
       (_+_(192, _quo_(UTF_C, 64)))
       (_+_(128, _rem_(UTF_C, 64)))
-      UTF_TAIL
+      utf8(UTF_REST)
     if _>=_(UTF_C, 128) /\ _<_(UTF_C, 2048)
-       /\ UTF_TAIL := utf8(UTF_REST) .
+       /\ (typecheck(UTF_REST, char)) = true .
   ceq utf8(UTF_C UTF_REST) =
       (_+_(224, _quo_(UTF_C, 4096)))
       (_+_(128, _rem_(_quo_(UTF_C, 64), 64)))
       (_+_(128, _rem_(UTF_C, 64)))
-      UTF_TAIL
+      utf8(UTF_REST)
     if _or_(_and_(_>=_(UTF_C, 2048), _<_(UTF_C, 55296)),
              _and_(_>=_(UTF_C, 57344), _<_(UTF_C, 65536)))
-       /\ UTF_TAIL := utf8(UTF_REST) .
+       /\ (typecheck(UTF_REST, char)) = true .
   ceq utf8(UTF_C UTF_REST) =
       (_+_(240, _quo_(UTF_C, 262144)))
       (_+_(128, _rem_(_quo_(UTF_C, 4096), 64)))
       (_+_(128, _rem_(_quo_(UTF_C, 64), 64)))
       (_+_(128, _rem_(UTF_C, 64)))
-      UTF_TAIL
+      utf8(UTF_REST)
     if _>=_(UTF_C, 65536) /\ _<_(UTF_C, 1114112)
-       /\ UTF_TAIL := utf8(UTF_REST) .
+       /\ (typecheck(UTF_REST, char)) = true .
 
   --- WebAssembly DET: fixed relaxed choices.
   --- Profile and source revision are recorded at the module header.
