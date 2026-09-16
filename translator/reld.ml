@@ -13,11 +13,49 @@ let output_sort index = function
   | _ :: _ :: _ -> "SpectecTerminal"
   | [] -> invalid_arg "relation policy has no output component"
 
+(* Keep constructors around computed fields. A function call is checked only
+ * after its arguments and its result field are bound by the input pattern. *)
+let translate_input_pattern index exp =
+  match Prem.translate_pattern index exp with
+  | Some pattern -> Some pattern
+  | None ->
+      let deferred = ref [] in
+      let computed exp =
+        if Prem.has_rewrite_call index exp then None
+        else
+          let subject =
+            Var
+              (generated_variable "INPUT-FIELD"
+                 (Term.translate_sort index exp.note))
+          in
+          deferred := (exp, subject) :: !deferred;
+          Some (Prem.pattern subject)
+      in
+      match Prem.translate_pattern ~computed index exp with
+      | None -> None
+      | Some pattern ->
+          let bound = term_variables [] pattern.term in
+          let equalities =
+            List.rev !deferred
+            |> List.map (fun (exp, subject) -> Term.translate_exp index exp, subject)
+          in
+          if List.for_all
+              (fun (value, subject) ->
+                variables_bound bound value && variables_bound bound subject)
+              equalities then
+            Some
+              { pattern with
+                guards = pattern.guards
+                  @ List.map (fun (value, subject) -> EqCond (value, subject))
+                      equalities
+              }
+          else None
+
 let translate_inputs index params inputs =
   let bound = Il.Free.(bound_params params).varid in
   let step (terms, conditions, bound) (position, exp) =
-    match Prem.translate_pattern_parts index exp with
-    | Some (term, guards) ->
+    match translate_input_pattern index exp with
+    | Some {term; guards} ->
         ( term :: terms
         , conditions @ List.map (fun guard -> EqCondition guard) guards
         , Prem.bind bound exp
