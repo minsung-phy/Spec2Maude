@@ -3,14 +3,13 @@
 대상은 [고정 Wasm 원문](../spectec/REVISION)과 그 원문에 붙은 hint다.
 hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 계산을 추가하는 허가가 아니다.
 
+`baseline2`는 `maude_sort`, `maude_subsort`, `maude_proper`, `maude_context`의
+구현을 제거했으며, 해당 hint를 명시적으로 거부한다. 일반 목록과 relation만 생성한다.
+
 ## 번역 인터페이스
 
 | Hint | 역할과 적용 조건 |
 | --- | --- |
-| `maude_sort` | source 타입에 별도 Maude sort와 목록 표현을 부여한다. 없는 경우 일반 `SpectecTerminals` 표현을 사용한다. |
-| `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
-| `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
-| `maude_context` | source context rule을 focus/heat/cool로 번역한다. frame·prefix·hole·postfix를 원문에서 추출한다. 일반 실행 premise를 유지하며, 목록 경계를 제한하는 원문 조건은 focus에도 보존한다. |
 | `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
 | `inverse $g` | 빠진 인자를 선언된 역함수 g로 구하고 pattern과 forward 결과를 재확인한다. 인자 순서·signature를 검사한다. |
@@ -39,7 +38,7 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 ## 숫자 builtin과 profile
 
 Wasm f32/f64·bits·bytes·rounding은 원문 `hint(builtin)` 구현의 책임이다.
-IL의 미사용 Real 확장을 제거하는 것과 Wasm 부동소수점 지원을 제거하는 것은 다르다.
+IL Real의 exact rational-backed 표현과 Wasm 부동소수점 표현은 서로 별개다.
 숫자 builtin은 해당 revision의 Wasm numeric 정의와 비교한다.
 
 현재 profile은 `ND=false`, relaxed 선택 0인 Wasm DET이다. 산술 NaN 생성과
@@ -48,5 +47,5 @@ memory/table grow의 자원 실패 선택은 남는다. DET의 결과를 full pr
 NaN·relaxed 선택에 대한 결과로 일반화하지 않는다.
 
 `otherwise`는 source의 앞선 적용 가능한 규칙이 없다는 조건을 보존해야 한다.
-context의 내부 상태는 source 상태와 구분한다. 검색 결과 일치는 임의 LTL 속성의
+baseline2에는 focus/heat/cool 내부 상태가 없다. 검색 결과 일치는 임의 LTL 속성의
 보존 증명이 아니며, 현재 경계는 [실행 계약](SEMANTIC_DECISIONS.md)에 기록한다.

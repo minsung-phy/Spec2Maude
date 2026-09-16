@@ -4,7 +4,7 @@ fmod DSL-TERM is
   sort SpectecDef .
 endfm
 
-fmod DSL-PRETYPE-BASE is
+fmod DSL-PRETYPE is
   protecting DSL-TERM .
   --- CONVERSION includes RAT, FLOAT, STRING and their BOOL/NAT/INT imports.
   --- Typed renaming separates native operations in the common source value kind.
@@ -53,13 +53,11 @@ fmod DSL-PRETYPE-BASE is
   var N : Nat .
   var I : Int .
   var R : Rat .
-  var F : Float .
   var S : String .
   eq typecheck(B, bool) = true .
   eq typecheck(N, nat) = true .
   eq typecheck(I, int) = true .
   eq typecheck(R, rat) = true .
-  eq typecheck(F, real) = true .
   eq typecheck(S, text) = true .
 
   --- CvtE is a scalar IL operation, independent of Wasm builtin hints.
@@ -80,4 +78,60 @@ fmod DSL-PRETYPE-BASE is
     if CV_R == floor(CV_R) /\ CV_R >= 0 .
   ceq (CV_R : rat <:> int) = floor(CV_R) if CV_R == floor(CV_R) .
   eq (CV_R : rat <:> rat) = CV_R .
+  --- IL POW-RAT permits integral exponents, including negative ones.
+  op ratPow : Rat Int ~> Rat .
+  ceq ratPow(CV_R, CV_I) = CV_R ^ abs(CV_I) if CV_I >= 0 .
+  ceq ratPow(CV_R, CV_I) = 1 / (CV_R ^ abs(CV_I))
+    if CV_I < 0 /\ CV_R =/= 0 .
+
+  --- Finite IL Real literals and integer powers form an exact rational fragment.
+  --- Keep the Real tag; Float arithmetic would introduce source-absent rounding.
+  sort RealValue .
+  subsort RealValue < SpectecTerminal .
+  op realValue : Rat -> RealValue [ctor] .
+  ops realPlus realNeg : RealValue -> RealValue .
+  ops realAdd realSub realMul : RealValue RealValue -> RealValue .
+  op realDiv : RealValue RealValue ~> RealValue .
+  op realPow : RealValue Int ~> RealValue .
+  ops realLess realGreater realLessEqual realGreaterEqual :
+    RealValue RealValue -> Bool .
+  vars RA RB : Rat .
+  eq typecheck(realValue(RA), real) = true .
+  eq realPlus(realValue(RA)) = realValue(RA) .
+  eq realNeg(realValue(RA)) = realValue(- RA) .
+  eq realAdd(realValue(RA), realValue(RB)) = realValue(RA + RB) .
+  eq realSub(realValue(RA), realValue(RB)) = realValue(_-_(RA, RB)) .
+  eq realMul(realValue(RA), realValue(RB)) = realValue(RA * RB) .
+  ceq realDiv(realValue(RA), realValue(RB)) = realValue(RA / RB)
+    if RB =/= 0 .
+  eq realPow(realValue(RA), CV_I) = realValue(ratPow(RA, CV_I)) .
+  eq realLess(realValue(RA), realValue(RB)) = RA < RB .
+  eq realGreater(realValue(RA), realValue(RB)) = RA > RB .
+  eq realLessEqual(realValue(RA), realValue(RB)) = RA <= RB .
+  eq realGreaterEqual(realValue(RA), realValue(RB)) = RA >= RB .
+  eq (CV_N : nat <:> real) = realValue(CV_N) .
+  eq (CV_I : int <:> real) = realValue(CV_I) .
+  eq (CV_R : rat <:> real) = realValue(CV_R) .
+  eq (realValue(RA) : real <:> real) = realValue(RA) .
+  eq (realValue(RA) : real <:> rat) = RA .
+  ceq (realValue(RA) : real <:> int) = floor(RA) if RA == floor(RA) .
+  ceq (realValue(RA) : real <:> nat) = abs(floor(RA))
+    if RA == floor(RA) /\ RA >= 0 .
+
+  sort SpectecTerminals .
+  subsort SpectecTerminal < SpectecTerminals .
+  op eps : -> SpectecTerminals [ctor] .
+  op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals
+    [ctor assoc id: eps prec 25] .
+  op seq : SpectecTerminals -> SpectecTerminal [ctor] .
+  op unseq : SpectecTerminal ~> SpectecTerminals .
+  var TS : SpectecTerminals .
+  vars T U : SpectecTerminal .
+  var K : [SpectecTerminal] .
+  var TYPE : SpectecType .
+  eq unseq(seq(TS)) = TS .
+  eq typecheck(eps, TYPE) = true .
+  ceq typecheck(T (U TS), TYPE) = typecheck(U TS, TYPE)
+    if typecheck(T, TYPE) .
+  eq typecheck(K, TYPE) = false [owise] .
 endfm

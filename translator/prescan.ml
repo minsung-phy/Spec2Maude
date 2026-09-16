@@ -28,8 +28,6 @@ type iteration =
   ; tail_name : string
   ; projector_name : string
   ; projector_tail_name : string
-  ; mutable forward_requested : bool
-  ; mutable projector_requested : bool
   ; owner : iteration_owner
   ; body : exp
   ; iterexp : iterexp
@@ -40,7 +38,6 @@ type premise_iteration =
   { name : string
   ; tail_name : string
   ; output_names : (name * name) list
-  ; mutable check_requested : bool
   ; owner : iteration_owner
   ; premise : prem
   ; body : prem
@@ -86,8 +83,7 @@ type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
   { type_env : Il.Env.t
-  ; sort_metadata : Hintd.t
-  ; contexts : Hintd.context list
+  ; projector_bodies : exp list
   ; iterations : iteration list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
@@ -126,14 +122,46 @@ let builtin_name name =
   |> sanitize
   |> String.lowercase_ascii
 
+(* The carrier follows the source type; every list uses the same AU sequence. *)
+let rec representation_sort env definitions seen typ =
+  let typ = Il.Eval.reduce_typ env typ in
+  match typ.it with
+  | NumT `NatT -> "Nat"
+  | NumT `IntT -> "Int"
+  | IterT _ -> "SpectecTerminals"
+  | VarT (id, _) when not (List.mem id.it seen) ->
+      let common = function
+        | sort :: sorts when List.for_all (( = ) sort) sorts -> sort
+        | _ -> "SpectecTerminal"
+      in
+      begin match List.assoc_opt id.it definitions with
+      | None -> "SpectecTerminal"
+      | Some insts ->
+          let sort = representation_sort env definitions (id.it :: seen) in
+          List.map
+            (fun inst -> match inst.it with
+              | InstD (_, _, {it = AliasT typ; _}) -> sort typ
+              | InstD (_, _, {it = StructT _; _}) -> "SpectecTerminal"
+              | InstD (_, _, {it = VariantT cases; _}) ->
+                  List.map
+                    (fun (mixop, (typ, _, _), _) ->
+                      if Mixop.is_hole_only mixop then
+                        match typ.it with
+                        | TupT [(_, payload)] -> sort payload
+                        | _ -> "SpectecTerminal"
+                      else "SpectecTerminal")
+                    cases |> common)
+            insts |> common
+      end
+  | VarT _ | BoolT | NumT (`RatT | `RealT) | TextT | TupT _ ->
+      "SpectecTerminal"
+
 let sort_of_typ index typ =
-  Hintd.sort_of_typ index.sort_metadata typ
+  representation_sort index.type_env index.type_definitions [] typ
 
-let sequence_representation index typ =
-  Hintd.sequence_representation index.sort_metadata typ
-
-(* Record composition uses the equation emitted for its monomorphic TypD. *)
-let record_composition_available index typ =
+(* An unparameterized record has one declaration-level composition equation.
+ * Applied record types are expanded structurally at their actual CompE type. *)
+let monomorphic_record index typ =
   match (Il.Eval.reduce_typ index.type_env typ).it with
   | VarT (id, []) ->
       begin match Il.Env.find_typ index.type_env id with
@@ -142,31 +170,34 @@ let record_composition_available index typ =
       end
   | _ -> false
 
-let rec parameter_sort metadata param =
+let rec parameter_sort sort_of_typ param =
   match param.it with
-  | ExpP (_, typ) -> Hintd.sort_of_typ metadata typ
+  | ExpP (_, typ) -> sort_of_typ typ
   | TypP _ -> "SpectecType"
   | DefP (_, params, result) ->
       let sort, _, _ =
-        definition_signature_with metadata params result
+        definition_signature_with sort_of_typ params result
       in
       sort
   | GramP _ -> invalid_arg "GramP is not supported"
 
-and definition_signature_with metadata params result =
-  let domain = List.map (parameter_sort metadata) params in
-  let codomain = Hintd.sort_of_typ metadata result in
+and definition_signature_with sort_of_typ params result =
+  let domain = List.map (parameter_sort sort_of_typ) params in
+  let codomain = sort_of_typ result in
   let args =
     match domain with [] -> "Unit" | _ -> String.concat "-" domain
   in
   "SpectecDef-" ^ args ^ "-to-" ^ codomain, domain, codomain
 
 let definition_signature index params result =
-  definition_signature_with index.sort_metadata params result
+  definition_signature_with (sort_of_typ index) params result
 
 let reserved_names =
   StringSet.of_list
-    [ "true"; "false"; "none"; "min"; "max"; "s"; "sd"
+    [ "true"; "false"; "none"; "min"; "max"; "s"; "sd"; "ratPow"
+    ; "realValue"; "realPlus"; "realNeg"; "realAdd"; "realSub"
+    ; "realMul"; "realDiv"; "realPow"; "realLess"; "realGreater"
+    ; "realLessEqual"; "realGreaterEqual"
     (* Native Float operations retain their hooks under import renaming. *)
     ; "nativeFloatNeg"; "nativeFloatAdd"; "nativeFloatSub"
     ; "nativeFloatMul"; "nativeFloatDiv"; "nativeFloatPow"
@@ -666,7 +697,6 @@ let rec collect_membership_choices = function
 
 let scan script =
   let type_env = Il.Env.env_of_script script in
-  let sort_metadata = Hintd.scan_sorts script in
   let rec collect declarations def =
     let types, definitions, relations = declarations in
     match def.it with
@@ -686,6 +716,19 @@ let scan script =
   let definitions = List.rev definitions in
   let relations = List.rev relations in
   let hints = collect_hints [] script |> List.rev in
+  List.iter
+    (fun hintdef ->
+      let values = match hintdef.it with
+        | TypH (_, values) | RelH (_, values) | DecH (_, values)
+        | GramH (_, values) | RuleH (_, _, values) -> values
+      in
+      List.iter (fun hint ->
+        if List.mem hint.hintid.it
+            ["maude_sort"; "maude_subsort"; "maude_proper"; "maude_context"] then
+          Util.Error.error hint.hintid.at "translation"
+            ("Unsupported hint(" ^ hint.hintid.it
+             ^ "): optimization is not part of baseline2")) values)
+    hints;
   let membership_choices = collect_membership_choices script in
   let inverses =
     definitions
@@ -695,6 +738,32 @@ let scan script =
               source,
               validate_inverse definitions source inverse))
   in
+  let projector_bodies = ref [] in
+  let module Projectors = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_exp exp = match exp.it with
+      | IterE (body, _) ->
+          if not (List.exists (( == ) body) !projector_bodies) then
+            projector_bodies := body :: !projector_bodies
+      | _ -> ()
+  end) in
+  let module Patterns = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_def def = match def.it with
+      | RelD (_, _, _, _, rules) ->
+          List.iter (fun rule ->
+            let RuleD (_, _, _, head, _) = rule.it in Projectors.exp head) rules
+      | DecD (_, _, _, clauses) ->
+          List.iter (fun clause ->
+            let DefD (_, args, _, _) = clause.it in
+            List.iter Projectors.arg args) clauses
+      | TypD (_, _, insts) ->
+          List.iter (fun inst ->
+            let InstD (_, args, _) = inst.it in List.iter Projectors.arg args) insts
+      | GramD _ | RecD _ | HintD _ -> ()
+    let visit_prem prem = Projectors.prem prem
+  end) in
+  List.iter Patterns.def script;
   let iterations = ref [] in
   let premise_iterations = ref [] in
   let premise_count = ref 0 in
@@ -758,7 +827,7 @@ let scan script =
   let definition_values = ref [] in
   let definition_applications = ref [] in
   let sort_of_typ typ =
-    Hintd.sort_of_typ sort_metadata typ
+    representation_sort type_env type_definitions [] typ
   in
 
   let add_variable_with_sort id sort =
@@ -779,7 +848,7 @@ let scan script =
     | DefP (id, params, result) ->
         definition_parameters := {id; params; result} :: !definition_parameters;
         let sort, _, _ =
-          definition_signature_with sort_metadata params result
+          definition_signature_with sort_of_typ params result
         in
         add_variable_with_sort id sort;
         add_params params
@@ -813,7 +882,7 @@ let scan script =
     | [] -> invalid_arg ("unknown definition value " ^ id.it)
     | value :: values ->
         let signature' value =
-          definition_signature_with sort_metadata value.params value.result
+          definition_signature_with sort_of_typ value.params value.result
         in
         if List.for_all (fun candidate -> signature' candidate = signature' value) values
         then value
@@ -830,7 +899,7 @@ let scan script =
   in
   let add_definition_application target params result =
     let value = add_definition_value target in
-    let signature = definition_signature_with sort_metadata in
+    let signature = definition_signature_with sort_of_typ in
     let expected = signature params result in
     let actual = signature value.params value.result in
     if expected <> actual then
@@ -992,8 +1061,6 @@ let scan script =
       ; tail_name = ""
       ; projector_name = ""
       ; projector_tail_name = ""
-      ; forward_requested = false
-      ; projector_requested = false
       ; owner
       ; body
       ; iterexp
@@ -1008,7 +1075,6 @@ let scan script =
       { name = "iterpr-" ^ string_of_int !premise_count
       ; tail_name = ""
       ; output_names = []
-      ; check_requested = false
       ; owner
       ; premise
       ; body
@@ -1176,14 +1242,6 @@ let scan script =
         | Error reason -> policies, (source, reason) :: unsupported)
       relations ([], [])
   in
-  let contexts =
-    Hintd.scan_contexts sort_metadata
-      (fun source ->
-        match List.assoc_opt source relation_policies with
-        | Some (Execution {input_count; _}) -> Some input_count
-        | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
-        | None -> None)
-  in
   let relation_enabled_helpers =
     let rec collect acc def =
       match def.it with
@@ -1271,55 +1329,8 @@ let scan script =
     |> List.filter (fun (iteration : iteration) ->
          owner_supported iteration.owner)
   in
-  (* Renamed list families cannot silently pass through an erased X* API:
-   * its equations still match the generic eps/__ constructors. *)
-  if Hintd.separate_list_families sort_metadata then begin
-    let rec check id actual formal =
-      let owner = Hintd.typed_list_owner sort_metadata in
-      match owner actual, owner formal with
-      | Some _, None | None, Some _ ->
-          Util.Error.error id.at "translation"
-            ("Unsupported: call $" ^ id.it
-             ^ " crosses renamed typed-list and generic representations ("
-             ^ Il.Print.string_of_typ actual ^ " / "
-             ^ Il.Print.string_of_typ formal
-             ^ "); list conversion is not implemented")
-      | _ ->
-          begin match actual.it, formal.it with
-          | IterT (actual, _), IterT (formal, _) -> check id actual formal
-          | TupT actuals, TupT formals
-            when List.length actuals = List.length formals ->
-              List.iter2 (fun (_, a) (_, f) -> check id a f) actuals formals
-          | _ -> ()
-          end
-    in
-    let module Visitor = Il.Iter.Make (struct
-      include Il.Iter.Skip
-      let visit_exp exp =
-        match exp.it with
-        | CallE (id, args) ->
-            let params, result =
-              match List.find_opt
-                (fun (call, _) -> call == exp) !definition_calls with
-              | Some (_, parameter) -> parameter.params, parameter.result
-              | None ->
-                  let params, result, _ = Il.Env.find_def type_env id in
-                  params, result
-            in
-            List.iter2
-              (fun param arg ->
-                match param.it, arg.it with
-                | ExpP (_, typ), ExpA arg -> check id arg.note typ
-                | _ -> ())
-              params args;
-            check id exp.note result
-        | _ -> ()
-    end) in
-    List.iter Visitor.def script
-  end;
   { type_env
-  ; sort_metadata
-  ; contexts
+  ; projector_bodies = !projector_bodies
   ; iterations
   ; premise_iterations
   ; hints
@@ -1472,7 +1483,7 @@ let type_parameter index id =
   else None
 
 let same_representation index source target =
-  Hintd.representation_inclusion index.sort_metadata source target
+  sort_of_typ index source = sort_of_typ index target
 
 let alias_type index typ =
   match typ.it with
@@ -1512,12 +1523,12 @@ let iteration index body =
 
 let iteration_name index body =
   match iteration index body with
-  | Some iteration -> iteration.forward_requested <- true; iteration.name
+  | Some iteration -> iteration.name
   | None -> invalid_arg "IterE is missing from the prescan index"
 
 let projector_name index body =
   match iteration index body with
-  | Some iteration -> iteration.projector_requested <- true; iteration.projector_name
+  | Some iteration -> iteration.projector_name
   | None -> invalid_arg "IterE is missing from the prescan index"
 
 let premise_iterations index = index.premise_iterations
@@ -1528,11 +1539,6 @@ let premise_iteration index premise =
     index.premise_iterations
 
 let hints index = index.hints
-let sort_metadata index = index.sort_metadata
-let contexts index = index.contexts
 
-let is_context_rule index relation rule =
-  List.exists
-    (fun (context : Hintd.context) ->
-      context.source.id.it = relation.it && context.rule == rule)
-    index.contexts
+let projector_needed index body =
+  List.exists (( == ) body) index.projector_bodies

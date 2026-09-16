@@ -4,54 +4,6 @@ open Maude_il
 
 module StringSet = Set.Make (String)
 
-let deduplicate values =
-  let seen = Hashtbl.create 32 in
-  let keep value =
-    if Hashtbl.mem seen value then false
-    else begin
-      Hashtbl.add seen value ();
-      true
-    end
-  in
-  List.filter keep values
-
-let simplify_conditions equation conditions =
-  let equalities = ref [] in
-  let keep condition =
-    match equation condition with
-    | Some (MatchCond (pattern, subject)) ->
-        equalities := (pattern, subject) :: !equalities;
-        true
-    | Some (EqCond (left, right)) ->
-        (* A preceding successful match or equality establishes either order. *)
-        let redundant =
-          List.exists
-            (fun (first, second) ->
-              (left = first && right = second)
-              || (left = second && right = first))
-            !equalities
-        in
-        if not redundant then equalities := (left, right) :: !equalities;
-        not redundant
-    | Some (MembershipCond _ | BoolCond _) | None -> true
-  in
-  List.filter keep (deduplicate conditions)
-
-let deduplicate_conditions = function
-  | Cmb (term, sort, conditions) ->
-      Cmb (term, sort, simplify_conditions Option.some conditions)
-  | Ceq (left, right, conditions, attrs) ->
-      Ceq (left, right, simplify_conditions Option.some conditions, attrs)
-  | Crl (label, left, right, conditions) ->
-      let equation = function
-        | EqCondition condition -> Some condition
-        | RewriteCond _ -> None
-      in
-      Crl (label, left, right, simplify_conditions equation conditions)
-  | (SortDecl _ | SubsortDecl _ | VarDecl _ | OpDecl _
-    | Mb _ | Eq _ | Rl _) as statement ->
-      statement
-
 let normalize_constructor_declarations statements =
   let declarations = Hashtbl.create 64 in
   let keep = function
@@ -76,28 +28,6 @@ let normalize_constructor_declarations statements =
     | _ -> true
   in
   List.filter keep statements
-
-let sort_metadata_declarations metadata =
-  let annotated =
-    Hintd.annotated_sorts metadata |> List.map (fun sort -> SortDecl sort)
-  in
-  let proper = Hintd.proper_sorts metadata in
-  let proper_declarations =
-    List.map (fun (sort, _) -> SortDecl sort) proper
-  in
-  let edges =
-    Hintd.subsort_edges metadata @ proper
-    |> List.map (fun (subsort, supersort) -> SubsortDecl (subsort, supersort))
-  in
-  annotated @ proper_declarations @ edges
-
-type script_translation =
-  { sort_statements : statement list
-  ; list_views : top_level list
-  ; list_imports : import list
-  ; list_statements : statement list
-  ; generated_statements : statement list
-  }
 
 let normalize_variables source_declarations statements =
   let source_sorts = Hashtbl.create 64 in
@@ -185,7 +115,6 @@ let normalize_variables source_declarations statements =
   in
   let statements =
     List.map normalize_statement statements
-    |> List.map deduplicate_conditions
   in
   let groups = Hashtbl.create 16 in
   let sort_order = ref [] in
@@ -209,7 +138,6 @@ let rec translate ?request_output index def =
     | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
     | RelD (id, params, mixop, typ, rules) ->
         Reld.translate ?request_output
-          ~include_rule:(fun rule -> not (Prescan.is_context_rule index id rule))
           index id params mixop typ rules
     | GramD _ | HintD _ -> []
     | RecD defs -> List.concat_map (translate ?request_output index) defs
@@ -246,14 +174,12 @@ let normalize_module ?(constructors = true) source_declarations statements =
 
 let translate_script script =
   let index = Prescan.scan script in
-  let sort_metadata = Prescan.sort_metadata index in
   let output_requests = ref [] in
   let request_output iteration position =
     let request = iteration.Prescan.name, position in
     if not (List.mem request !output_requests) then
       output_requests := request :: !output_requests
   in
-  let context_rules = Reld.translate_contexts ~request_output index in
   let translated_definitions =
     List.concat_map (translate ~request_output index) script
     @ Param.translate_applications index
@@ -271,14 +197,6 @@ let translate_script script =
     in
     Iter.translate_premise_all translate_body index !output_requests
   in
-  let typed_list_support = Typd.list_statements sort_metadata in
-  let list_statements =
-    normalize_module ~constructors:false [] typed_list_support
-  in
-  let generated_statements =
-    Typd.list_generated_statements sort_metadata
-    @ context_rules @ translated_definitions
-  in
   let iterations =
     let bind_body bound body subject =
       let result =
@@ -294,13 +212,8 @@ let translate_script script =
       (Term.translate_exp index) index
   in
   let generated_statements =
-    generated_statements
+    translated_definitions
     @ iterations @ premise_iterations
     |> normalize_module (Prescan.variable_declarations index)
   in
-  { sort_statements = sort_metadata_declarations sort_metadata
-  ; list_views = Typd.list_views sort_metadata
-  ; list_imports = Typd.list_imports sort_metadata
-  ; list_statements
-  ; generated_statements
-  }
+  generated_statements

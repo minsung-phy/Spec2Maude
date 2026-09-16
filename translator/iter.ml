@@ -10,38 +10,22 @@ let rec sequence = function
   | [term] -> term
   | term :: terms -> app "_ _" [term; sequence terms]
 
-let rec sequence_with representation = function
-  | [] -> Const representation.Hintd.empty
-  | [term] -> term
-  | term :: terms ->
-      app representation.concat [term; sequence_with representation terms]
-
-let sequence_of_typ index typ terms =
-  sequence_with (Prescan.sequence_representation index typ) terms
-
-let empty_of_typ index typ =
-  let representation = Prescan.sequence_representation index typ in
-  Const representation.empty
+let sequence_of_typ _index _typ terms = sequence terms
+let empty_of_typ _index _typ = Const "eps"
 
 let iterated_typ body iter =
   IterT (body.note, iter) $ body.note.at
 
 let as_sequence_element index typ term =
-  match
-    Hintd.sequence_element_wrappers
-      (Prescan.sort_metadata index) typ
-  with
-  | Some (box, _) -> app box [term]
-  | None -> term
+  if Prescan.sort_of_typ index typ = "SpectecTerminals" then app "seq" [term]
+  else term
 
 
 (* Type iteration *)
 
 let length value = app "len" [value]
 
-let length_of_typ index typ value =
-  let representation = Prescan.sequence_representation index typ in
-  app representation.size [value]
+let length_of_typ _index _typ value = length value
 
 let typecheck value element_type =
   BoolCond (app "typecheck" [value; element_type])
@@ -181,9 +165,7 @@ let translate_term index translate_exp body (iter, generators) =
   | None ->
       match iter, generators with
       | ListN (count, None), [] ->
-          let typ = iterated_typ body iter in
-          let representation = Prescan.sequence_representation index typ in
-          app representation.repeat
+          app "repeatSeq"
             [ translate_exp count
             ; translate_exp body |> as_sequence_element index body.note
             ]
@@ -377,7 +359,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
   let body = iteration.Prescan.body in
   let iter, generators = iteration.Prescan.iterexp in
   let local_bound = projector_local_bound iteration.Prescan.captures iter in
-  if not (iteration.Prescan.projector_requested
+  if not (Prescan.projector_needed index body
           && projector_supported index translate_pattern can_bind_body
                local_bound body (iter, generators))
   then [] else
@@ -385,10 +367,6 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     let captures = translate_captures index iteration.Prescan.captures in
     let count = count_variable iter in
     let iter_index = index_variable index iter in
-    let result_typ = iterated_typ body iter in
-    let result_representation =
-      Prescan.sequence_representation index result_typ
-    in
     let heads = List.map (head_variable index) generators in
     let tails =
       generators
@@ -398,14 +376,14 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
              (Prescan.sort_of_typ index source.note))
     in
     let subject_tail =
-      generated_variable "PROJECT-REST" result_representation.sort
+      generated_variable "PROJECT-REST" "SpectecTerminals"
     in
     let declaration name iter =
       OpDecl
         { name
         ; domain =
             projector_domain captures (count_variable iter)
-              (index_variable index iter) result_representation.sort
+              (index_variable index iter) "SpectecTerminals"
         ; codomain =
             if List.length generators = 1
             then
@@ -464,7 +442,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     in
     let element = as_sequence_element index body.note body_pattern in
     let subject =
-      app result_representation.concat
+      app "_ _"
         [element; term_of_variable subject_tail]
     in
     let recursive name count index next_count next_index =
@@ -483,7 +461,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     match iter with
     | Opt ->
         [ declaration name Opt
-        ; Eq (call name None None (Const result_representation.empty), empty, [])
+        ; Eq (call name None None (Const "eps"), empty, [])
         ; let left = call name None None (app "_?" [element]) in
           let right =
             column_term index generators
@@ -497,7 +475,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
         ]
     | List ->
         [ declaration name List
-        ; Eq (call name None None (Const result_representation.empty), empty, [])
+        ; Eq (call name None None (Const "eps"), empty, [])
         ; recursive name None None None None
         ]
     | List1 ->
@@ -518,7 +496,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
         ; declaration tail_name List
         ; first
         ; Eq
-            ( call tail_name None None (Const result_representation.empty)
+            ( call tail_name None None (Const "eps")
             , empty, [])
         ; recursive tail_name None None None None
         ]
@@ -531,7 +509,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
         [ declaration name iter
         ; Eq
             ( call name (Some (Const "0")) current_index
-                (Const result_representation.empty)
+                (Const "eps")
             , empty, [])
         ; recursive name
             (Some (app "s" [term_of_variable count])) current_index
@@ -641,13 +619,15 @@ let translate_pattern index translate_source_pattern translate_exp
                 app (Prescan.projector_name index body)
                   (captures @ controls @ [subject])
               in
-              (* The projector checks each body; matching its columns retains
-               * the generator constraints without rebuilding the subject. *)
+              let forward =
+                translate_term index translate_exp body (iter, generators)
+              in
               Some
                 ( count_conditions
                   @ (MatchCond
                        (column_term index generators source_patterns, projected)
-                     :: source_guards))
+                     :: source_guards)
+                  @ [EqCond (forward, subject)])
           end
       | Some _, _ | None, _ -> None
       end
@@ -661,7 +641,6 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
   | Some _ -> []
   | None ->
       let forward =
-        if not iteration.Prescan.forward_requested then [] else
         match iter, generators with
         | (Opt | ListN (_, None)), [] ->
             []
@@ -675,17 +654,13 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
             let iter_index = index_variable index iter in
             let heads = List.map (head_variable index) generators in
             let tails = List.map (tail_variable index) generators in
-            let result_typ = iterated_typ body iter in
-            let result_representation =
-              Prescan.sequence_representation index result_typ
-            in
             let call args = app name args in
             let declaration =
               OpDecl
                 { name
                 ; domain =
                     helper_domain index captures count iter_index generators
-                ; codomain = result_representation.sort
+                ; codomain = "SpectecTerminals"
                 ; arrow = Partial
                 ; attrs = []
                 }
@@ -698,7 +673,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
               | Opt ->
                   app "_?" [body_term]
               | List | List1 | ListN _ ->
-                  app result_representation.concat
+                  app "_ _"
                     [ body_term
                     ; call (next_arguments captures count iter_index tails)
                     ]
@@ -721,7 +696,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     { name = tail_name
                     ; domain =
                         helper_domain index captures count iter_index generators
-                    ; codomain = result_representation.sort
+                    ; codomain = "SpectecTerminals"
                     ; arrow = Partial
                     ; attrs = []
                     }
@@ -731,7 +706,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     ( call
                         (step_arguments index List captures None None generators
                            heads tails)
-                    , app result_representation.concat
+                    , app "_ _"
                         [ body_term
                         ; tail_call (terms_of_variables (captures @ tails))
                         ]
@@ -745,7 +720,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                          @ List.map
                              (fun (_, source) -> empty_of_typ index source.note)
                              generators)
-                    , Const result_representation.empty
+                    , Const "eps"
                     , []
                     )
                 in
@@ -754,7 +729,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     ( tail_call
                         (terms_of_variables captures
                          @ source_arguments index List generators heads tails)
-                    , app result_representation.concat
+                    , app "_ _"
                         [ body_term
                         ; tail_call (terms_of_variables (captures @ tails))
                         ]
@@ -768,7 +743,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     ( call
                         (empty_arguments index captures count iter_index
                            generators)
-                    , Const result_representation.empty
+                    , Const "eps"
                     , []
                     )
                 in
@@ -790,11 +765,7 @@ let helper_key = function
       invalid_arg "an iteration helper must start with an operator declaration"
 
 let translate_all translate_pattern can_bind_body bind_body translate_exp index =
-  let emitted = ref [] in
   let add groups iteration =
-    emitted :=
-      (iteration, iteration.Prescan.forward_requested,
-       iteration.Prescan.projector_requested) :: !emitted;
     let statements =
       translate_statements index translate_pattern can_bind_body bind_body
         translate_exp iteration
@@ -815,24 +786,8 @@ let translate_all translate_pattern can_bind_body bind_body translate_exp index 
                ^ iteration.Prescan.name)
         end
   in
-  (* Shared AST bodies can receive another direction request from a later
-     parent. Revisit only if a request arrived after its body was emitted. *)
-  let rec generate () =
-    emitted := [];
-    let groups = List.fold_left add [] (Prescan.iterations index) in
-    let changed =
-      List.exists
-        (fun (iteration, forward, projector) ->
-          forward <> iteration.Prescan.forward_requested
-          || projector <> iteration.Prescan.projector_requested)
-        !emitted
-    in
-    if changed then generate () else List.concat_map snd (List.rev groups)
-  in
-  generate ()
-
-
-(* Premise iteration *)
+  List.fold_left add [] (Prescan.iterations index)
+  |> List.rev |> List.concat_map snd
 
 let premise_helper_name iteration = iteration.Prescan.name
 
@@ -851,7 +806,6 @@ let premise_output_possible iteration position =
   && match iter with ListN _ -> true | _ -> List.length generators > 1
 
 let premise_helper_call index translate_exp iteration =
-  iteration.Prescan.check_requested <- true;
   let iter, generators = iteration.Prescan.iterexp in
   let captures =
     translate_captures index iteration.Prescan.captures
@@ -1052,9 +1006,7 @@ let translate_premise_statements index translate_body
          (Option.map term_of_variable iter_index); step]
 
 let translate_premise_all translate_body index outputs =
-  let emitted = ref [] in
   let add groups iteration =
-    emitted := (iteration, iteration.Prescan.check_requested) :: !emitted;
     let output_positions =
       outputs
       |> List.filter_map (fun (requested_name, position) ->
@@ -1063,9 +1015,7 @@ let translate_premise_all translate_body index outputs =
       |> List.sort_uniq compare
     in
     let statements =
-      (if iteration.Prescan.check_requested
-       then [translate_premise_statements index translate_body iteration Check]
-       else [])
+      [translate_premise_statements index translate_body iteration Check]
       @ List.map
            (fun position ->
              translate_premise_statements index translate_body iteration
@@ -1083,15 +1033,5 @@ let translate_premise_all translate_body index outputs =
             invalid_arg ("conflicting IterPr overload named " ^ name))
       groups statements
   in
-  let rec generate () =
-    emitted := [];
-    let groups = List.fold_left add [] (Prescan.premise_iterations index) in
-    let changed =
-      List.exists
-        (fun (iteration, checked) ->
-          checked <> iteration.Prescan.check_requested)
-        !emitted
-    in
-    if changed then generate () else List.concat_map snd (List.rev groups)
-  in
-  generate ()
+  List.fold_left add [] (Prescan.premise_iterations index)
+  |> List.rev |> List.concat_map snd

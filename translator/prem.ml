@@ -417,7 +417,7 @@ and bind_structural_pattern index bound exp subject error =
         [EqCondition (MatchCond (represented, subject))] error
   | SubE (inner, source, target) ->
       if not (Prescan.same_representation index source target) then
-        invalid_arg "SubE pattern requires a representation conversion outside the Wasm scope";
+        invalid_arg "SubE pattern requires a representation conversion not supported by baseline";
       let result = bind_pattern index bound inner subject error in
       { result with
         conditions =
@@ -608,12 +608,11 @@ let translate_rewrite_call index bound call result =
 let translate_binding_membership index bound element collection =
   match collection.note.it, translate_pattern index element with
   | IterT _, Some pattern ->
-      let representation = Prescan.sequence_representation index collection.note in
       let prefix =
-        Var (generated_variable "MEMBER-PREFIX" representation.sort)
+        Var (generated_variable "MEMBER-PREFIX" "SpectecTerminals")
       in
       let suffix =
-        Var (generated_variable "MEMBER-SUFFIX" representation.sort)
+        Var (generated_variable "MEMBER-SUFFIX" "SpectecTerminals")
       in
       let selected =
         Term.as_sequence_element index element.note pattern.term

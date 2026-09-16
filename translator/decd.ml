@@ -360,10 +360,7 @@ let choice_helper index id result_typ
       let helper argument = App (choice.helper_name, [argument]) in
       let result_sort = Term.translate_sort index result_typ in
       let request_sort = Prescan.rewrite_sort index id in
-      let representation =
-        Prescan.sequence_representation index choice.collection.note
-      in
-      let rest = generated_variable "CHOICE-REST" representation.sort in
+      let rest = generated_variable "CHOICE-REST" "SpectecTerminals" in
       let head =
         generated_variable "CHOICE-HEAD"
           (Term.translate_sort index choice.element.note)
@@ -375,7 +372,7 @@ let choice_helper index id result_typ
       in
       [ OpDecl
           { name = choice.helper_name
-          ; domain = [representation.sort]
+          ; domain = ["SpectecTerminals"]
           ; codomain = request_sort
           ; arrow = Total
           ; attrs = [Frozen [1]]

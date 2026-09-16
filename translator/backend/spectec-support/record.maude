@@ -1,6 +1,6 @@
 fmod DSL-RECORD is
   protecting DSL-SEQUENCE .
-  --- Match the STRING renaming in DSL-PRETYPE-BASE.
+  --- Match the STRING renaming in DSL-PRETYPE.
   protecting QID * (
     op _xor_ : Nat Nat -> Nat to integerXor,
     op _+_ : String String -> String to stringConcat,
@@ -24,7 +24,6 @@ fmod DSL-RECORD is
   op value : Qid RecordItems -> SpectecTerminals .
 
   op _._ : Record Qid -> SpectecTerminals .
-  --- TypD emits field-type-directed CAT-str equations for this operation.
   op recordConcat : Record Record SpectecType ~> Record .
   op _[._=_] : Record Qid SpectecTerminals -> Record .
 

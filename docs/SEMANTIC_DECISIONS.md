@@ -1,9 +1,9 @@
 # 실행 계약과 현재 한계
 
-입력은 [고정 revision](../spectec/REVISION)의 `wasm-3.0/*.spectec` 21개다.
-원문의 선언·함수 본문·규칙은 수정하지 않고, 명시적인 번역 hint만 허용한다.
-해당 입력의 IL AST를 이름 하드코딩 없이 재귀 번역한다. 임의 SpecTec 명세를
-지원하기 위한 기능 확장은 현재 범위에 포함하지 않는다.
+주된 검증 입력은 [고정 revision](../spectec/REVISION)의
+`wasm-3.0/*.spectec` 21개다. 명시적인 번역 hint 이외의 원문 계산은 바꾸지 않는다.
+실제 IL AST를 이름 하드코딩 없이 재귀 번역한다. 동일한 지원 IL과 hint 계약을
+쓰는 다른 명세에도 같은 번역을 적용한다. unsupported 입력은 명시적으로 거부한다.
 
 ## AST와 참조 문서
 
@@ -33,23 +33,27 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
 
 ## 지원 범위
 
-- 일반 목록은 `SpectecTerminals`, `eps`, `__`이고, 목록 원소로 쓰이는 목록은
-  `seq(...)`로 구분한다. 별도 목록 sort는 `maude_sort` hint로만 선택한다.
-- Wasm IL에서 사용하는 Nat·Int·유한 Rat 계산과 변환은 유지한다.
-  Wasm f32/f64는 원문의 `POS/NEG`, `NORM/SUBNORM/INF/NAN` 자료와 builtin으로 처리한다.
-- Wasm에서 사용하지 않는 IL Real 특수값·변환·산술, 특수 Rat 산술, Rat/Real 지수
-  확장은 철회했다. 이 숫자 입력은 현재 명시적으로 거부한다. 기준 커밋의 일부
-  직접 출력 분기도 제한되었으나, 당시 backend의 계산 지원까지 완전했다는 뜻은 아니다.
-- 기준 커밋에 있던 `IfE`의 직접 Maude `if` 번역과 root `UpdE`의 replacement 반환은
-  유지한다. 현재 Wasm에서 사용하지 않는다는 이유만으로 기존 분기를 삭제하지 않는다.
-- 다형 record 구체 인스턴스 생성과 표현을 바꾸는 중첩 SubE adapter 생성은 철회했다.
-  record 합성은 무인자 StructT 선언의 필드 타입을 따라 번역한다. 고정 Wasm IL에
-  record 폭 변환과 tuple record 필드가 없으므로 타입 검사는 선언 순서의 전체 record를
-  직접 매칭한다. 임의 record의 필드 순서 변경·추가를 허용하는 일반 검사는 생성하지 않는다.
-  Wasm의 실제 SubE는 기존 표현을 유지한다. 기준 커밋처럼 각 `SubE`에서
-  `same_representation`을 확인한다. 중첩 변환용 별도 전체 스캔은 유지하지 않는다.
-- 작은 외부 예제는 회귀 원인을 설명하는 자료일 수 있으나, 그 예제를 지원하는 것이
-  Wasm translator의 완료 조건은 아니다. 과거 일반화 실험과 철회한 기대값은 외부 기록에 둔다.
+- 일반 목록은 `SpectecTerminals`, `eps`, `__`이며 목록 원소로 쓰이는 목록은
+  `seq(...)`로 구분한다. typed-list/context 최적화 hint와 구현은 없다.
+- Nat·Int·유한 Rat 계산과 변환을 지원한다. Rat 정수 지수는 음수도 처리하며,
+  0의 음수 지수는 부분 연산으로 남는다.
+- Real은 유한 literal의 정확한 유리수 값, 숫자 변환, 사칙연산, 비교, 정수 지수의
+  닫힌 범위에서 `realValue(Rat)`로 표현한다. 실제 IL validator의 Real power는
+  Int 지수를 요구한다. 임의 무리수·초월함수·NaN/Inf를 지원한다는 뜻이 아니다.
+  Real에서 Int/Nat 변환은 정수성·부호 조건을 검사한다. Real을 포함한 변환을
+  역방향 binding pattern으로 푸는 기능은 기존 baseline처럼 Unsupported이다.
+- Wasm f32/f64는 원문의 `POS/NEG`, `NORM/SUBNORM/INF/NAN`과 builtin으로 처리한다.
+- `IfE`는 직접 Maude `if`로, root `UpdE`는 replacement로 번역한다.
+- record 합성은 필드의 적용된 타입을 따라 목록/option/record 합성을 수행한다.
+  무인자 StructT에는 선언별 방정식을, 타입 인자가 있는 StructT에는 actual argument를
+  치환한 필드의 재귀 번역을 사용한다. 별도 specialization pass는 없다.
+  tuple을 record로 추측하여 펼치지 않는다. typecheck는 선언 순서의 전체 record를
+  매칭하며 임의 필드 재배치·추가를 허용하는 일반 검사가 아니다.
+- `SubE`는 기존 표현을 유지할 수 있는 경우를 처리한다. 표현 변경이 필요한
+  pattern을 조용히 통과시키지 않는다. 임의 중첩 adapter 생성은 하지 않는다.
+- source premise의 순서와 중복을 보존한다. iteration projector는 source body의
+  forward 결과도 재확인한다. `otherwise`는 associative/identity 목록의 빈 overlap도
+  고려한다. 이전 rule이 적용 가능하면 fallback이 실행되지 않아야 한다.
 
 ## 검증과 모델체킹의 경계
 
@@ -57,7 +61,7 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
 [HINT_CONTRACTS.md](HINT_CONTRACTS.md)에 둔다. PASS, STUCK, TIMEOUT을 구분한다.
 official suite 통과만으로 모든 프로그램의 의미 동등성이 증명되는 것은 아니다.
 
-모델체커의 초기화·실행 wrapper와 focus/heat/cool 상태를 source의 한 step과
+모델체커의 초기화·실행 wrapper를 source의 한 step과
 동일시하지 않는다. 특정 속성을 source로 옮겨 주장하려면 상태 대응, 관측 지점,
 내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
 현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
@@ -68,7 +72,7 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 `maude_subsort`, `maude_proper`, `maude_context` 적용을 제거한다.
 일반 목록은 `SpectecTerminals`, `eps`, `__`, `seq(...)`를 사용하고,
 context rule은 원문의 premise와 경계 조건을 포함하는 일반 relation으로 번역한다.
-번역기의 선택적 hint 지원 코드는 유지하지만 이 입력에서는 활성화하지 않는다.
+번역기의 해당 hint 지원 코드도 제거했으며, 새 입력의 해당 hint는 거부한다.
 
 `len`, `take`, `drop`, `repeatSeq`는 단일 원소/횟수 재귀다. `splice`는
 `take(S, n) U drop(S, n + i)`이며 `n + i <= len(S)` 조건을 유지한다.

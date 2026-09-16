@@ -2,8 +2,11 @@
 
 Spec2Maude is a research prototype for deriving executable
 [Maude](https://maude.cs.illinois.edu/) semantics from
-[SpecTec](https://github.com/Wasm-DSL/spectec) language definitions. Its supported
-input is the pinned WebAssembly 3.0 specification in `spectec/wasm-3.0`.
+[SpecTec](https://github.com/Wasm-DSL/spectec) language definitions. The pinned WebAssembly 3.0 specification in
+`spectec/wasm-3.0` is the primary case study.
+
+This branch restores the direct, unoptimized translation baseline while retaining
+correctness fixes. See [the baseline contract](docs/BASELINE.md) for its scope and checks.
 
 The project investigates whether a structured language specification can be
 translated into rewriting logic by a small, auditable recursive definition

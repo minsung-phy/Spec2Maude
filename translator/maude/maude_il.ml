@@ -48,9 +48,7 @@ type op_attr =
   | Ctor
   | Assoc
   | Comm
-  | Ditto
   | Id of term
-  | Prec of int
   | Frozen of int list
 
 type op_decl =
@@ -148,7 +146,7 @@ let map_statement_variables map = function
         List.map
           (function
             | Id term -> Id (map_term_variables map term)
-            | (Ctor | Assoc | Comm | Ditto | Prec _ | Frozen _) as attr -> attr)
+            | (Ctor | Assoc | Comm | Frozen _) as attr -> attr)
           declaration.attrs
       in
       OpDecl {declaration with attrs}
@@ -179,25 +177,11 @@ let map_statement_variables map = function
         )
 
 
-(* Maude module expressions *)
-
-type renaming =
-  | SortRenaming of sort * sort
-  | OpRenaming of name * name
-  | TypedOpRenaming of name * sort list * sort * name
-
-type module_expr =
-  | ModuleName of name
-  | ModuleInstantiation of name * name list
-  | ModuleRenaming of module_expr * renaming list
-
-
-(* Maude modules and views *)
-
+(* Maude modules *)
 type import =
-  | Protecting of module_expr
-  | Including of module_expr
-  | Extending of module_expr
+  | Protecting of name
+  | Including of name
+  | Extending of name
 
 type module_kind =
   | Functional
@@ -209,19 +193,3 @@ type modul =
   ; imports : import list
   ; statements : statement list
   }
-
-type view_mapping =
-  | SortMapping of sort * sort
-  | OpMapping of name * name
-
-type view =
-  { name : name
-  ; source : module_expr
-  ; target : module_expr
-  ; mappings : view_mapping list
-  }
-
-type top_level =
-  | Module of modul
-  | View of view
-  | Load of string

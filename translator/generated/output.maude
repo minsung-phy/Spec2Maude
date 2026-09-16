@@ -1,46 +1,5 @@
-fmod SPEC2MAUDE-SORTS is
-  protecting DSL-TERM .
-endfm
-
-fmod DSL-PRETYPE is
-  protecting DSL-PRETYPE-BASE .
-  protecting SPEC2MAUDE-SORTS .
-
-  sort SpectecTerminals .
-
-  subsort SpectecTerminal < SpectecTerminals .
-
-  op eps : -> SpectecTerminals [ctor] .
-
-  op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [ctor assoc id: eps prec 25] .
-
-  op seq : SpectecTerminals -> SpectecTerminal [ctor] .
-
-  op unseq : SpectecTerminal ~> SpectecTerminals .
-
-  var SEQUENCE-REST : SpectecTerminals .
-
-  var TYPECHECK-TYPE : SpectecType .
-
-  vars SEQUENCE-ELEMENT SEQUENCE-NEXT : SpectecTerminal .
-
-  var TYPECHECK-VALUE : [SpectecTerminal] .
-
-  eq unseq(seq(SEQUENCE-REST)) = SEQUENCE-REST .
-
-  eq typecheck(eps, TYPECHECK-TYPE) = true .
-
-  ceq typecheck(SEQUENCE-ELEMENT (SEQUENCE-NEXT SEQUENCE-REST), TYPECHECK-TYPE) = typecheck(SEQUENCE-NEXT SEQUENCE-REST, TYPECHECK-TYPE)
-    if typecheck(SEQUENCE-ELEMENT, TYPECHECK-TYPE) .
-
-  eq typecheck(TYPECHECK-VALUE, TYPECHECK-TYPE) = false [owise] .
-endfm
-
-load ../backend/spectec-support/support.maude
-
 mod SPEC2MAUDE-GENERATED is
   protecting SPECTEC-SUPPORT .
-  protecting SPEC2MAUDE-SORTS .
 
   sort spectec-vcvtop---Request .
 
@@ -2402,15 +2361,23 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-exp-1014 : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
+  op map-exp-1040 : SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1040 : SpectecTerminals ~> SpectecTerminals .
 
   op map-exp-1042 : Nat SpectecTerminals ~> SpectecTerminals .
+
+  op project-map-exp-1042 : Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-default : SpectecTerminals ~> SpectecTerminals .
 
   op map-extend-7 : SpectecTerminal Nat Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
+  op map-exp-1084 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1084 : SpectecTerminals ~> SpectecTerminal .
+
+  op map-exp-1090 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1090 : SpectecTerminals ~> SpectecTerminal .
 
@@ -2420,9 +2387,13 @@ mod SPEC2MAUDE-GENERATED is
 
   op project-map-zbytes : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
+  op map-exp-1157 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1157 : Nat SpectecTerminals ~> SpectecTerminal .
 
   op map-packfield : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
+  op map-exp-1160 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1160 : SpectecTerminals ~> SpectecTerminal .
 
@@ -2430,17 +2401,31 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-allocexport : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
+  op map-exp-1261 : SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1261 : SpectecTerminals ~> SpectecTerminals .
+
+  op map-exp-1263 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1263 : SpectecTerminals ~> SpectecTerminal .
 
+  op map-exp-1265 : SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1265 : SpectecTerminals ~> SpectecTerminals .
+
+  op map-exp-1267 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1267 : SpectecTerminals ~> SpectecTerminal .
 
+  op map-exp-1269 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1269 : SpectecTerminals ~> SpectecTerminal .
 
+  op map-exp-1272 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1272 : SpectecTerminals ~> SpectecTerminal .
+
+  op map-exp-1275 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1275 : SpectecTerminals ~> SpectecTerminal .
 
@@ -2460,13 +2445,25 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-exp-1314 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
+  op project-map-exp-1314 : SpectecTerminals ~> SpectecTerminal .
+
+  op map-exp-1393 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1393 : SpectecTerminals ~> SpectecTerminal .
+
+  op map-exp-1395 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1395 : SpectecTerminals ~> SpectecTerminal .
 
+  op map-exp-1397 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1397 : SpectecTerminals ~> SpectecTerminal .
 
+  op map-exp-1400 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
   op project-map-exp-1400 : SpectecTerminals ~> SpectecTerminal .
+
+  op map-exp-1403 : SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1403 : SpectecTerminals ~> SpectecTerminals .
 
@@ -2478,11 +2475,17 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-exp-1430 : SpectecTerminals ~> SpectecTerminals .
 
+  op project-map-exp-1430 : SpectecTerminals ~> SpectecTerminals .
+
   op iterpr-34 : Nat SpectecTerminals ~> Bool .
 
   op iterpr-35 : Nat SpectecTerminals ~> Bool .
 
+  op iterpr-36 : Nat SpectecTerminal Nat SpectecTerminal Nat SpectecTerminal Nat Nat SpectecTerminals ~> Bool .
+
   op iterpr-36-output-1 : Nat SpectecTerminal Nat SpectecTerminal Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
+
+  op iterpr-37 : SpectecTerminals SpectecTerminals ~> Bool .
 
   op iterpr-37-output-1 : SpectecTerminals ~> SpectecTerminals .
 
@@ -2492,7 +2495,7 @@ mod SPEC2MAUDE-GENERATED is
 
   vars VALUE I J N3 N2 M3 FUNCIDX GLOBALIDX TABLEIDX MEMIDX TAGIDX X4 TYPEIDX ELEMIDX DATAIDX LOCALIDX LABELIDX U64 SZ DIM M2 M-1 M-2 VALUE14 TAGADDR GLOBALADDR MEMADDR TABLEADDR FUNCADDR U31 STRUCTADDR ARRAYADDR EXNADDR HOSTADDR VALUE23 TABLEIDX2 LANEIDX MEMIDX2 FIELDIDX U32 TYPEIDX2 C3 LABELIDX-3 VECLIT TYPEIDX-1 TYPEIDX-2 TABLEIDX-1 TABLEIDX-2 MEMIDX-1 MEMIDX-2 X-1 I-1 I-2 V-1 V-2 V-3 V C-12 CHOICE-RESULT CHOICE-HEAD K3 C-23 C-5 C--3 C-32 A I-3 L L-2 X-23 Y A-1 A-2 CASE-PART1 K2 JA GA MA TA FA DA EA APPLY-ARG1 APPLY-ARG22 APPLY-ARG3 APPLY-ARG4 ITER-COUNT J-13 J-23 I-F I-D I-E : Nat .
 
-  vars N-- W- W--- W-4 W---2 W-- W--3 W-1- X- CHAR- XX- VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 VALUE10 VALUE11 VALUE12 VALUE13 FREE-- NULL- MUT- RESULTTYPE RESULTTYPE2 FINAL- TYPEUSE- U64- EXTERNTYPE- EXTERNTYPE-3 NULL-1- XT- TV-- TU-- TV-3 TU-3 FT- T-1- T-2- ST- XT-1- XT-2- DT- SUBTYPE- VALTYPE- FIELDTYPE- RESULTTYPE-1 RESULTTYPE-2 EXTERNTYPE-1- EXTERNTYPE-2- HALF- ZERO- VALTYPE-2 VALTYPE-- INSTR- INSTR-5 LABELIDX- VALUE24 SX- LANEIDX- CATCH- LABELIDX-- INSTR-1- INSTR-2- LOADOP- STOREOP- VLOADOP- EXPR BYTE- LOCAL- EXPR- NAME NAME2 VALUE32 START- NAME-1 NAME-2 TYPE- TAG- GLOBAL- MEM- TABLE- FUNC- DATA- ELEM- IMPORT- EXPORT- LOCALIDX- VALUE15 VALUE16 VALUE17 X-2 LCT- DT-- C-2 C-1- C-- C-2- C-3- I- C-4 CHOICE-REST C--1- C--2- J-1- J-2- I-1- I-2- VAL- XA- B- R- SI- AI- EXN- J- R-- ENABLED-INPUT1 T-- VAL-- INSTR-- L- MEMBER-PREFIX MEMBER-SUFFIX T-5 CATCH-- CASE-PART2 CASE-PART3 T- J-3 CASE-PART12 MUT-- ZT- REF- INSTR-0- INSTR--- TYPE-- DEFTYPE-- DEFTYPE- TAGTYPE-- JA-- GLOBALTYPE-- GA-- MEMTYPE-- MA-- TABLETYPE-- REF-- TA-- FUNCCODE-- MODULEINST-- FA-- OK-- B--- DA-- RT-- REF--- EA-- TAGTYPE-4 EXPR-G- GLOBALTYPE-4 MEMTYPE-4 EXPR-T- TABLETYPE-4 EXPR-F- LOCAL-- BYTE-- DATAMODE- ELEMMODE- ELEMTYPE- EXPR-E-- EXTERNADDR- AA-I- GA-I- MA-I- TA-I- FA-I- FA-3 AA- VAL-G- GA-3 MA-3 REF-T- TA-3 DA-3 REF-E-- EA-3 XI- E- EXPR-- EXPR--- GT-- XT-I- XT-E- REFTYPE- X-5 INSTR-D- INSTR-E- INSTR-S- APPLY-ARG23 APPLY-ARG33 W--2 W'?S FTS T_1S T_2S TU'S STS XT_1S XT_2S SUBTYPES VALTYPES FIELDTYPES TYPEUSES EXTERNTYPE_1S EXTERNTYPE_2S LABELIDXS CATCHS INSTRS LOCALS EXPRS TYPES TAGS GLOBALS MEMS TABLES FUNCS DATAS ELEMS IMPORTS EXPORTS C_1S C*S C_2S C_3S IS J_1S J_2S PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1S I_2S VALS TS JS CS PROJECT-ELEMENT ZTS EXPR-G EXPR-T PROJECT-COLUMN-3 EXPR-F EXPR-E- TAGTYPES GLOBALTYPES MEMTYPES TABLETYPES ELEMTYPES XS EXPR_FS LOCAL*S EXTERNADDRS XT_IS : SpectecTerminals .
+  vars N-- W- W--- W-4 W---2 W-- W--3 W-1- X- CHAR- XX- VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 VALUE10 VALUE11 VALUE12 VALUE13 FREE-- NULL- MUT- RESULTTYPE RESULTTYPE2 FINAL- TYPEUSE- U64- EXTERNTYPE- EXTERNTYPE-3 NULL-1- XT- TV-- TU-- TV-3 TU-3 FT- T-1- T-2- ST- XT-1- XT-2- DT- SUBTYPE- VALTYPE- FIELDTYPE- RESULTTYPE-1 RESULTTYPE-2 EXTERNTYPE-1- EXTERNTYPE-2- HALF- ZERO- VALTYPE-2 VALTYPE-- INSTR- INSTR-5 LABELIDX- VALUE24 SX- LANEIDX- CATCH- LABELIDX-- INSTR-1- INSTR-2- LOADOP- STOREOP- VLOADOP- EXPR BYTE- LOCAL- EXPR- NAME NAME2 VALUE32 START- NAME-1 NAME-2 TYPE- TAG- GLOBAL- MEM- TABLE- FUNC- DATA- ELEM- IMPORT- EXPORT- LOCALIDX- VALUE15 VALUE16 VALUE17 X-2 LCT- DT-- C-2 C-1- C-- C-2- C-3- I- C-4 CHOICE-REST C--1- C--2- J-1- J-2- I-1- I-2- VAL- XA- B- R- SI- AI- EXN- J- R-- ENABLED-INPUT1 T-- VAL-- INSTR-- L- MEMBER-PREFIX MEMBER-SUFFIX T-5 CATCH-- CASE-PART2 CASE-PART3 T- J-3 CASE-PART12 MUT-- ZT- REF- INSTR-0- INSTR--- TYPE-- DEFTYPE-- DEFTYPE- TAGTYPE-- JA-- GLOBALTYPE-- GA-- MEMTYPE-- MA-- TABLETYPE-- REF-- TA-- FUNCCODE-- MODULEINST-- FA-- OK-- B--- DA-- RT-- REF--- EA-- TAGTYPE-4 EXPR-G- GLOBALTYPE-4 MEMTYPE-4 EXPR-T- TABLETYPE-4 EXPR-F- LOCAL-- BYTE-- DATAMODE- ELEMMODE- ELEMTYPE- EXPR-E-- EXTERNADDR- AA-I- GA-I- MA-I- TA-I- FA-I- FA-3 AA- VAL-G- GA-3 MA-3 REF-T- TA-3 DA-3 REF-E-- EA-3 XI- E- EXPR-- EXPR--- GT-- XT-I- XT-E- REFTYPE- X-5 INSTR-D- INSTR-E- INSTR-S- APPLY-ARG23 APPLY-ARG33 W--2 W'?S FTS T_1S T_2S TU'S STS XT_1S XT_2S SUBTYPES VALTYPES FIELDTYPES TYPEUSES EXTERNTYPE_1S EXTERNTYPE_2S LABELIDXS CATCHS INSTRS LOCALS EXPRS TYPES TAGS GLOBALS MEMS TABLES FUNCS DATAS ELEMS IMPORTS EXPORTS C_1S C*S C_2S C_3S IS J_1S J_2S PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1S I_2S TS VALS JS MUT?S ZTS CS PROJECT-ELEMENT TAGTYPES EXPR-G EXPR_GS GLOBALTYPES MEMTYPES EXPR-T EXPR_TS TABLETYPES EXPR-F EXPR_FS LOCAL*S XS PROJECT-COLUMN-3 BYTE*S DATAMODES EXPR-E- ELEMMODES ELEMTYPES EXPR_E*S REFTYPES EXTERNADDRS XT_IS : SpectecTerminals .
 
   var X : SpectecType .
 
@@ -2578,6 +2581,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq concatopt-(X, seq(W-4) W---2) = lift(W-4) concat-(X, map-exp-21(X, W---2))
     if len(W-4) <= 1
       /\ typecheck(W-4, X)
+      /\ len(W-4) <= 1
       /\ typecheck(W---2, iterOpt(X)) .
 
   eq disjoint-(X, eps) = true .
@@ -3187,19 +3191,24 @@ mod SPEC2MAUDE-GENERATED is
   eq psize(I16) = 16 .
 
   ceq lsize(NUMTYPE) = size(NUMTYPE)
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq lsize(PACKTYPE) = psize(PACKTYPE)
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq zsize(NUMTYPE) = size(NUMTYPE)
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq zsize(VECTYPE) = vsize(VECTYPE)
-    if typecheck(VECTYPE, vectype) .
+    if typecheck(VECTYPE, vectype)
+      /\ typecheck(VECTYPE, vectype) .
 
   ceq zsize(PACKTYPE) = psize(PACKTYPE)
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   eq isize(INN) = size(INN) .
 
@@ -3243,34 +3252,43 @@ mod SPEC2MAUDE-GENERATED is
   eq inv-jsizenn(N3) = inv-jsize(N3) .
 
   ceq lunpack(NUMTYPE) = NUMTYPE
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq lunpack(PACKTYPE) = I32
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq unpack(VALTYPE) = VALTYPE
-    if typecheck(VALTYPE, valtype) .
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALTYPE, valtype) .
 
   ceq unpack(PACKTYPE) = I32
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq nunpack(NUMTYPE) = NUMTYPE
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq nunpack(PACKTYPE) = I32
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq vunpack(VECTYPE) = VECTYPE
     if typecheck(VECTYPE, vectype) .
 
   ceq cunpack(CONSTTYPE) = CONSTTYPE
-    if typecheck(CONSTTYPE, consttype) .
+    if typecheck(CONSTTYPE, consttype)
+      /\ typecheck(CONSTTYPE, consttype) .
 
   ceq cunpack(PACKTYPE) = I32
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq cunpack(LANETYPE) = lunpack(LANETYPE)
-    if typecheck(LANETYPE, lanetype) .
+    if typecheck(LANETYPE, lanetype)
+      /\ typecheck(LANETYPE, lanetype) .
 
   ceq minat(AT-1, AT-2) = AT-1
     if size(AT-1) <= size(AT-2) .
@@ -3317,7 +3335,8 @@ mod SPEC2MAUDE-GENERATED is
   eq funcsxt(eps) = eps .
 
   ceq funcsxt(FUNC(DT) XT-) = DT funcsxt(XT-)
-    if typecheck(DT, deftype) .
+    if typecheck(DT, deftype)
+      /\ typecheck(DT, deftype) .
 
   eq funcsxt(EXTERNTYPE XT-) = funcsxt(XT-) [owise] .
 
@@ -3344,16 +3363,20 @@ mod SPEC2MAUDE-GENERATED is
   eq subst-vectype(VT, TV-3, TU-3) = VT .
 
   ceq subst-typeuse(TV-2, TV-3, TU-3) = subst-typevar(TV-2, TV-3, TU-3)
-    if typecheck(TV-2, typevar) .
+    if typecheck(TV-2, typevar)
+      /\ typecheck(TV-2, typevar) .
 
   ceq subst-typeuse(DT, TV-3, TU-3) = subst-deftype(DT, TV-3, TU-3)
-    if typecheck(DT, deftype) .
+    if typecheck(DT, deftype)
+      /\ typecheck(DT, deftype) .
 
   ceq subst-heaptype(TV-2, TV-3, TU-3) = subst-typevar(TV-2, TV-3, TU-3)
-    if typecheck(TV-2, typevar) .
+    if typecheck(TV-2, typevar)
+      /\ typecheck(TV-2, typevar) .
 
   ceq subst-heaptype(DT, TV-3, TU-3) = subst-deftype(DT, TV-3, TU-3)
-    if typecheck(DT, deftype) .
+    if typecheck(DT, deftype)
+      /\ typecheck(DT, deftype) .
 
   ceq subst-heaptype(HT, TV-3, TU-3) = HT
     if typecheck(HT, heaptype) [owise] .
@@ -3362,21 +3385,26 @@ mod SPEC2MAUDE-GENERATED is
     if len(NULL-) <= 1 .
 
   ceq subst-valtype(NT, TV-3, TU-3) = subst-numtype(NT, TV-3, TU-3)
-    if typecheck(NT, numtype) .
+    if typecheck(NT, numtype)
+      /\ typecheck(NT, numtype) .
 
   ceq subst-valtype(VT, TV-3, TU-3) = subst-vectype(VT, TV-3, TU-3)
-    if typecheck(VT, vectype) .
+    if typecheck(VT, vectype)
+      /\ typecheck(VT, vectype) .
 
   ceq subst-valtype(RT, TV-3, TU-3) = subst-reftype(RT, TV-3, TU-3)
-    if typecheck(RT, reftype) .
+    if typecheck(RT, reftype)
+      /\ typecheck(RT, reftype) .
 
   eq subst-valtype(BOT, TV-3, TU-3) = BOT .
 
   ceq subst-storagetype(T, TV-3, TU-3) = subst-valtype(T, TV-3, TU-3)
-    if typecheck(T, valtype) .
+    if typecheck(T, valtype)
+      /\ typecheck(T, valtype) .
 
   ceq subst-storagetype(PT, TV-3, TU-3) = subst-packtype(PT, TV-3, TU-3)
-    if typecheck(PT, packtype) .
+    if typecheck(PT, packtype)
+      /\ typecheck(PT, packtype) .
 
   ceq subst-fieldtype(tuple(seq(MUT-) ZT), TV-3, TU-3) = tuple(seq(MUT-) subst-storagetype(ZT, TV-3, TU-3))
     if len(MUT-) <= 1 .
@@ -3471,18 +3499,22 @@ mod SPEC2MAUDE-GENERATED is
   eq free-packtype(PACKTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
 
   ceq free-lanetype(NUMTYPE) = free-numtype(NUMTYPE)
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq free-lanetype(PACKTYPE) = free-packtype(PACKTYPE)
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   eq free-vectype(VECTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
 
   ceq free-consttype(NUMTYPE) = free-numtype(NUMTYPE)
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq free-consttype(VECTYPE) = free-vectype(VECTYPE)
-    if typecheck(VECTYPE, vectype) .
+    if typecheck(VECTYPE, vectype)
+      /\ typecheck(VECTYPE, vectype) .
 
   eq free-absheaptype(ABSHEAPTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
 
@@ -3491,38 +3523,47 @@ mod SPEC2MAUDE-GENERATED is
   eq free-typevar(REC(N3)) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
 
   ceq free-heaptype(ABSHEAPTYPE) = free-absheaptype(ABSHEAPTYPE)
-    if typecheck(ABSHEAPTYPE, absheaptype) .
+    if typecheck(ABSHEAPTYPE, absheaptype)
+      /\ typecheck(ABSHEAPTYPE, absheaptype) .
 
   ceq free-heaptype(TYPEUSE) = free-typeuse(TYPEUSE)
-    if typecheck(TYPEUSE, typeuse) .
+    if typecheck(TYPEUSE, typeuse)
+      /\ typecheck(TYPEUSE, typeuse) .
 
   ceq free-reftype(REF(NULL-, HEAPTYPE)) = free-heaptype(HEAPTYPE)
     if len(NULL-) <= 1 .
 
   ceq free-typeuse(TYPEVAR) = free-typevar(TYPEVAR)
-    if typecheck(TYPEVAR, typevar) .
+    if typecheck(TYPEVAR, typevar)
+      /\ typecheck(TYPEVAR, typevar) .
 
   ceq free-typeuse(DEFTYPE) = free-deftype(DEFTYPE)
-    if typecheck(DEFTYPE, deftype) .
+    if typecheck(DEFTYPE, deftype)
+      /\ typecheck(DEFTYPE, deftype) .
 
   ceq free-valtype(NUMTYPE) = free-numtype(NUMTYPE)
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq free-valtype(VECTYPE) = free-vectype(VECTYPE)
-    if typecheck(VECTYPE, vectype) .
+    if typecheck(VECTYPE, vectype)
+      /\ typecheck(VECTYPE, vectype) .
 
   ceq free-valtype(REFTYPE) = free-reftype(REFTYPE)
-    if typecheck(REFTYPE, reftype) .
+    if typecheck(REFTYPE, reftype)
+      /\ typecheck(REFTYPE, reftype) .
 
   eq free-valtype(BOT) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
 
   eq free-resulttype(VALTYPE-) = free-list(map-free-valtype(VALTYPE-)) .
 
   ceq free-storagetype(VALTYPE) = free-valtype(VALTYPE)
-    if typecheck(VALTYPE, valtype) .
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALTYPE, valtype) .
 
   ceq free-storagetype(PACKTYPE) = free-packtype(PACKTYPE)
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq free-fieldtype(tuple(seq(MUT-) STORAGETYPE)) = free-storagetype(STORAGETYPE)
     if len(MUT-) <= 1 .
@@ -3571,31 +3612,38 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(INN, Inn) .
 
   ceq typecheck(VALUE3, num-(FNN)) = typecheck(VALUE3, fN(sizenn(FNN)))
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(VALUE, pack-(PNN)) = typecheck(VALUE, iN(psizenn(PNN)))
     if typecheck(PNN, Pnn) .
 
   ceq typecheck(VALUE3, lane-(NUMTYPE)) = typecheck(VALUE3, num-(NUMTYPE))
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq typecheck(VALUE, lane-(PACKTYPE)) = typecheck(VALUE, pack-(PACKTYPE))
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq typecheck(VALUE, lane-(JNN)) = typecheck(VALUE, iN(lsize(JNN)))
-    if typecheck(JNN, Jnn) .
+    if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn) .
 
   ceq typecheck(VALUE, vec-(VNN)) = typecheck(VALUE, vN(vsize(VNN)))
     if typecheck(VNN, Vnn) .
 
   ceq typecheck(VALUE3, lit-(NUMTYPE)) = typecheck(VALUE3, num-(NUMTYPE))
-    if typecheck(NUMTYPE, numtype) .
+    if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype) .
 
   ceq typecheck(VALUE, lit-(VECTYPE)) = typecheck(VALUE, vec-(VECTYPE))
-    if typecheck(VECTYPE, vectype) .
+    if typecheck(VECTYPE, vectype)
+      /\ typecheck(VECTYPE, vectype) .
 
   ceq typecheck(VALUE, lit-(PACKTYPE)) = typecheck(VALUE, pack-(PACKTYPE))
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq typecheck(I, sz) = true
     if _or_(_or_(_or_(I == 8, I == 16), I == 32), I == 64) .
@@ -3623,25 +3671,32 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(SZ, sz) .
 
   ceq typecheck(ABS, unop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-NEG, unop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(SQRT, unop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(CEIL, unop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(FLOOR, unop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(TRUNC, unop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(NEAREST, unop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(ADD, binop-(INN)) = true
     if typecheck(INN, addrtype)
@@ -3695,25 +3750,32 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(INN, Inn) .
 
   ceq typecheck(ADD, binop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-SUB, binop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(MUL, binop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-DIV, binop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(MIN, binop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(MAX, binop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(COPYSIGN, binop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(EQZ, testop-(INN)) = true
     if typecheck(INN, addrtype)
@@ -3748,22 +3810,28 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(SX, sx) .
 
   ceq typecheck(EQ, relop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(NE, relop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-LT, relop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-GT, relop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-LE, relop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-GE, relop-(FNN)) = true
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq typecheck(EXTEND(SX), cvtop--(INN-1, INN-2)) = true
     if typecheck(INN-1, addrtype)
@@ -3784,23 +3852,27 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(INN-1, addrtype)
       /\ typecheck(FNN-2, Fnn)
       /\ typecheck(INN-1, Inn)
+      /\ typecheck(FNN-2, Fnn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(REINTERPRET, cvtop--(INN-1, FNN-2)) = true
     if typecheck(INN-1, addrtype)
       /\ typecheck(FNN-2, Fnn)
       /\ sizenn1(INN-1) == sizenn2(FNN-2)
-      /\ typecheck(INN-1, Inn) .
+      /\ typecheck(INN-1, Inn)
+      /\ typecheck(FNN-2, Fnn) .
 
   ceq typecheck(spectec-TRUNC(SX), cvtop--(FNN-1, INN-2)) = true
     if typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, addrtype)
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(TRUNC-SAT(SX), cvtop--(FNN-1, INN-2)) = true
     if typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, addrtype)
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, Inn)
       /\ typecheck(SX, sx) .
 
@@ -3808,17 +3880,22 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, addrtype)
       /\ sizenn1(FNN-1) == sizenn2(INN-2)
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, Inn) .
 
   ceq typecheck(PROMOTE, cvtop--(FNN-1, FNN-2)) = true
     if typecheck(FNN-1, Fnn)
       /\ typecheck(FNN-2, Fnn)
-      /\ sizenn1(FNN-1) < sizenn2(FNN-2) .
+      /\ sizenn1(FNN-1) < sizenn2(FNN-2)
+      /\ typecheck(FNN-1, Fnn)
+      /\ typecheck(FNN-2, Fnn) .
 
   ceq typecheck(DEMOTE, cvtop--(FNN-1, FNN-2)) = true
     if typecheck(FNN-1, Fnn)
       /\ typecheck(FNN-2, Fnn)
-      /\ sizenn1(FNN-1) > sizenn2(FNN-2) .
+      /\ sizenn1(FNN-1) > sizenn2(FNN-2)
+      /\ typecheck(FNN-1, Fnn)
+      /\ typecheck(FNN-2, Fnn) .
 
   ceq typecheck(I, dim) = true
     if _or_(_or_(_or_(_or_(I == 1, I == 2), I == 4), I == 8), I == 16) .
@@ -3836,6 +3913,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(SHAPE, ishape) = true
     if JNN := spectec-lanetype(SHAPE)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(JNN, Jnn)
       /\ typecheck(SHAPE, shape) .
 
@@ -3865,215 +3943,263 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(ABS, vunop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-NEG, vunop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(POPCNT, vunop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) == 8
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(ABS, vunop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-NEG, vunop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(SQRT, vunop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(CEIL, vunop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(FLOOR, vunop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(TRUNC, vunop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(NEAREST, vunop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(ADD, vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-SUB, vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(ADD-SAT(SX), vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 16
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(SUB-SAT(SX), vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 16
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(MUL, vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) >= 16
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(AVGRU, vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 16
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(Q15MULR-SATS, vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) == 16
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(RELAXED-Q15MULRS, vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) == 16
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-MIN(SX), vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 32
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(spectec-MAX(SX), vbinop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 32
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(ADD, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-SUB, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(MUL, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-DIV, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(MIN, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(MAX, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(PMIN, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(PMAX, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(RELAXED-MIN, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(RELAXED-MAX, vbinop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(RELAXED-LANESELECT, vternop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(RELAXED-MADD, vternop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(RELAXED-NMADD, vternop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(ALL-TRUE, vtestop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(EQ, vrelop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(NE, vrelop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(LT(SX), vrelop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(GT(SX), vrelop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(LE(SX), vrelop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(GE(SX), vrelop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(EQ, vrelop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(NE, vrelop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-LT, vrelop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-GT, vrelop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-LE, vrelop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(spectec-GE, vrelop-(_X_(FNN, M2))) = true
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(SHL, vshiftop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq typecheck(SHR(SX), vshiftop-(_X_(JNN, M2))) = true
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M)
       /\ typecheck(SX, sx) .
 
@@ -4087,7 +4213,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN-1, Jnn)
       /\ typecheck(JNN-2, Jnn)
       /\ _and_(16 <= (2 * lsizenn1(JNN-1)), _and_((2 * lsizenn1(JNN-1)) == lsizenn2(JNN-2), lsizenn2(JNN-2) <= 32))
+      /\ typecheck(JNN-1, Jnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M)
       /\ typecheck(SX, sx) .
 
@@ -4095,7 +4223,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN-1, Jnn)
       /\ typecheck(JNN-2, Jnn)
       /\ _and_((2 * lsizenn1(JNN-1)) == lsizenn2(JNN-2), lsizenn2(JNN-2) >= 16)
+      /\ typecheck(JNN-1, Jnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M)
       /\ typecheck(HALF, half)
       /\ typecheck(SX, sx) .
@@ -4104,28 +4234,36 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN-1, Jnn)
       /\ typecheck(JNN-2, Jnn)
       /\ _and_((2 * lsizenn1(JNN-1)) == lsizenn2(JNN-2), lsizenn2(JNN-2) == 32)
+      /\ typecheck(JNN-1, Jnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M) .
 
   ceq typecheck(RELAXED-DOTS, vextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2))) = true
     if typecheck(JNN-1, Jnn)
       /\ typecheck(JNN-2, Jnn)
       /\ _and_((2 * lsizenn1(JNN-1)) == lsizenn2(JNN-2), lsizenn2(JNN-2) == 16)
+      /\ typecheck(JNN-1, Jnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M) .
 
   ceq typecheck(RELAXED-DOT-ADDS, vextternop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2))) = true
     if typecheck(JNN-1, Jnn)
       /\ typecheck(JNN-2, Jnn)
       /\ _and_((4 * lsizenn1(JNN-1)) == lsizenn2(JNN-2), lsizenn2(JNN-2) == 32)
+      /\ typecheck(JNN-1, Jnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M) .
 
   ceq typecheck(spectec-EXTEND(HALF, SX), vcvtop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2))) = true
     if typecheck(JNN-1, Jnn)
       /\ typecheck(JNN-2, Jnn)
       /\ lsizenn2(JNN-2) == (2 * lsizenn1(JNN-1))
+      /\ typecheck(JNN-1, Jnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M)
       /\ typecheck(HALF, half)
       /\ typecheck(SX, sx) .
@@ -4134,7 +4272,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN-1, Jnn)
       /\ typecheck(FNN-2, Fnn)
       /\ _or_(_and_(_and_(sizenn2(FNN-2) == lsizenn1(JNN-1), lsizenn1(JNN-1) == 32), HALF- == eps), _and_(sizenn2(FNN-2) == (2 * lsizenn1(JNN-1)), HALF- == (LOW ?)))
+      /\ typecheck(JNN-1, Jnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(FNN-2, Fnn)
       /\ typecheck(M-2, M)
       /\ typecheck(HALF-, half)
       /\ len(HALF-) <= 1
@@ -4144,7 +4284,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN-1, Fnn)
       /\ typecheck(JNN-2, Jnn)
       /\ _or_(_and_(_and_(sizenn1(FNN-1) == lsizenn2(JNN-2), lsizenn2(JNN-2) == 32), ZERO- == eps), _and_(sizenn1(FNN-1) == (2 * lsizenn2(JNN-2)), ZERO- == (ZERO ?)))
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M)
       /\ typecheck(SX, sx)
       /\ typecheck(ZERO-, zero)
@@ -4154,7 +4296,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN-1, Fnn)
       /\ typecheck(JNN-2, Jnn)
       /\ _or_(_and_(_and_(sizenn1(FNN-1) == lsizenn2(JNN-2), lsizenn2(JNN-2) == 32), ZERO- == eps), _and_(sizenn1(FNN-1) == (2 * lsizenn2(JNN-2)), ZERO- == (ZERO ?)))
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(JNN-2, Jnn)
       /\ typecheck(M-2, M)
       /\ typecheck(SX, sx)
       /\ typecheck(ZERO-, zero)
@@ -4164,7 +4308,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN-1, Fnn)
       /\ typecheck(FNN-2, Fnn)
       /\ sizenn1(FNN-1) == (2 * sizenn2(FNN-2))
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(FNN-2, Fnn)
       /\ typecheck(M-2, M)
       /\ typecheck(ZERO3, zero) .
 
@@ -4172,7 +4318,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN-1, Fnn)
       /\ typecheck(FNN-2, Fnn)
       /\ (2 * sizenn1(FNN-1)) == sizenn2(FNN-2)
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(M-1, M)
+      /\ typecheck(FNN-2, Fnn)
       /\ typecheck(M-2, M) .
 
   ceq typecheck({ (item('ALIGN, VALUE) ; item('OFFSET, VALUE14)) }, memarg) = true
@@ -4782,10 +4930,12 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq const(NUMTYPE, C2) = CONST(NUMTYPE, C2)
     if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype)
       /\ typecheck(C2, lit-(NUMTYPE)) .
 
   ceq const(VECTYPE, C3) = VCONST(VECTYPE, C3)
     if typecheck(VECTYPE, vectype)
+      /\ typecheck(VECTYPE, vectype)
       /\ typecheck(C3, lit-(VECTYPE)) .
 
   eq free-shape(_X_(LANETYPE, DIM)) = free-lanetype(LANETYPE) .
@@ -5217,7 +5367,8 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(TYPEUSE, typeuse) [owise] .
 
   ceq unrollht-(C, DEFTYPE) = unrolldt(DEFTYPE)
-    if typecheck(DEFTYPE, deftype) .
+    if typecheck(DEFTYPE, deftype)
+      /\ typecheck(DEFTYPE, deftype) .
 
   ceq unrollht-(C, -IDX(TYPEIDX)) = unrolldt((C . 'TYPES) [ TYPEIDX ])
     if typecheck(TYPEIDX, typeidx) .
@@ -5233,7 +5384,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(INN, Inn) .
 
   ceq default-(FNN) = CONST(FNN, fzero(size(FNN))) ?
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   ceq default-(VNN) = VCONST(VNN, 0) ?
     if typecheck(VNN, vectype)
@@ -5288,16 +5440,20 @@ mod SPEC2MAUDE-GENERATED is
     if _and_(-_((2 ^ (_-_(N2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) <= I2, I2 < (0 : nat <:> int)) .
 
   ceq spectec-sx(CONSTTYPE) = eps
-    if typecheck(CONSTTYPE, consttype) .
+    if typecheck(CONSTTYPE, consttype)
+      /\ typecheck(CONSTTYPE, consttype) .
 
   ceq spectec-sx(PACKTYPE) = S ?
-    if typecheck(PACKTYPE, packtype) .
+    if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype) .
 
   ceq spectec-zero(JNN) = 0
-    if typecheck(JNN, Jnn) .
+    if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn) .
 
   ceq spectec-zero(FNN) = fzero(size(FNN))
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn) .
 
   eq spectec-bool(false) = 0 .
 
@@ -5418,34 +5574,42 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq lpacknum-(NUMTYPE, C2) = C2
     if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype)
       /\ typecheck(C2, num-(lunpack(NUMTYPE))) .
 
   ceq lpacknum-(PACKTYPE, C3) = wrap--(size(lunpack(PACKTYPE)), psize(PACKTYPE), C3)
     if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype)
       /\ typecheck(C3, num-(lunpack(PACKTYPE))) .
 
   ceq cpacknum-(CONSTTYPE, C2) = C2
     if typecheck(CONSTTYPE, consttype)
+      /\ typecheck(CONSTTYPE, consttype)
       /\ typecheck(C2, lit-(cunpack(CONSTTYPE))) .
 
   ceq cpacknum-(PACKTYPE, C3) = wrap--(size(lunpack(PACKTYPE)), psize(PACKTYPE), C3)
     if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype)
       /\ typecheck(C3, lit-(cunpack(PACKTYPE))) .
 
   ceq lunpacknum-(NUMTYPE, C2) = C2
     if typecheck(NUMTYPE, numtype)
+      /\ typecheck(NUMTYPE, numtype)
       /\ typecheck(C2, lane-(NUMTYPE)) .
 
   ceq lunpacknum-(PACKTYPE, C3) = extend--(psize(PACKTYPE), size(lunpack(PACKTYPE)), U, C3)
     if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype)
       /\ typecheck(C3, lane-(PACKTYPE)) .
 
   ceq cunpacknum-(CONSTTYPE, C2) = C2
     if typecheck(CONSTTYPE, consttype)
+      /\ typecheck(CONSTTYPE, consttype)
       /\ typecheck(C2, lit-(CONSTTYPE)) .
 
   ceq cunpacknum-(PACKTYPE, C3) = extend--(psize(PACKTYPE), size(lunpack(PACKTYPE)), U, C3)
     if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype)
       /\ typecheck(C3, lit-(PACKTYPE)) .
 
   ceq spectec-unop-(INN, CLZ, I) = iclz-(sizenn(INN), I)
@@ -5528,16 +5692,19 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-binop-(FNN, ADD, F-1, F-2) = fadd-(sizenn(FNN), F-1, F-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(F-1, num-(FNN))
       /\ typecheck(F-2, num-(FNN)) .
 
   ceq spectec-binop-(FNN, spectec-SUB, F-1, F-2) = fsub-(sizenn(FNN), F-1, F-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(F-1, num-(FNN))
       /\ typecheck(F-2, num-(FNN)) .
 
   ceq spectec-binop-(FNN, MUL, F-1, F-2) = fmul-(sizenn(FNN), F-1, F-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(F-1, num-(FNN))
       /\ typecheck(F-2, num-(FNN)) .
 
@@ -5582,11 +5749,13 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-relop-(FNN, EQ, F-1, F-2) = feq-(sizenn(FNN), F-1, F-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(F-1, num-(FNN))
       /\ typecheck(F-2, num-(FNN)) .
 
   ceq spectec-relop-(FNN, NE, F-1, F-2) = fne-(sizenn(FNN), F-1, F-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(F-1, num-(FNN))
       /\ typecheck(F-2, num-(FNN)) .
 
@@ -5635,12 +5804,14 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(FNN-2, Fnn)
       /\ size(INN-1) == size(FNN-2)
       /\ typecheck(INN-1, Inn)
+      /\ typecheck(FNN-2, Fnn)
       /\ typecheck(I-1, num-(INN-1)) .
 
   ceq spectec-cvtop--(FNN-1, INN-2, REINTERPRET, F-1) = reinterpret--(FNN-1, INN-2, F-1)
     if typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, addrtype)
       /\ size(FNN-1) == size(INN-2)
+      /\ typecheck(FNN-1, Fnn)
       /\ typecheck(INN-2, Inn)
       /\ typecheck(F-1, num-(FNN-1)) .
 
@@ -5830,10 +6001,12 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-vunop-(_X_(FNN, M2), ABS, V) = fvunop-(_X_(FNN, M2), fabs-, V)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vunop-(_X_(FNN, M2), spectec-NEG, V) = fvunop-(_X_(FNN, M2), fneg-, V)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vunop-(_X_(FNN, M2), SQRT, V) = fvunop-(_X_(FNN, M2), fsqrt-, V)
@@ -5853,10 +6026,12 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-vunop-(_X_(JNN, M2), ABS, V) = ivunop-(_X_(JNN, M2), iabs-, V)
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vunop-(_X_(JNN, M2), spectec-NEG, V) = ivunop-(_X_(JNN, M2), ineg-, V)
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vunop-(_X_(JNN, M2), POPCNT, V) = ivunop-(_X_(JNN, M2), ipopcnt-, V)
@@ -5864,14 +6039,17 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-vbinop-(_X_(JNN, M2), ADD, V-1, V-2) = ivbinop-(_X_(JNN, M2), iadd-, V-1, V-2)
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vbinop-(_X_(JNN, M2), spectec-SUB, V-1, V-2) = ivbinop-(_X_(JNN, M2), isub-, V-1, V-2)
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vbinop-(_X_(JNN, M2), MUL, V-1, V-2) = ivbinop-(_X_(JNN, M2), imul-, V-1, V-2)
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vbinop-(_X_(JNN, M2), ADD-SAT(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), iadd-sat-, SX, V-1, V-2)
@@ -5897,14 +6075,17 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-vbinop-(_X_(FNN, M2), ADD, V-1, V-2) = fvbinop-(_X_(FNN, M2), fadd-, V-1, V-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vbinop-(_X_(FNN, M2), spectec-SUB, V-1, V-2) = fvbinop-(_X_(FNN, M2), fsub-, V-1, V-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vbinop-(_X_(FNN, M2), MUL, V-1, V-2) = fvbinop-(_X_(FNN, M2), fmul-, V-1, V-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vbinop-(_X_(FNN, M2), spectec-DIV, V-1, V-2) = fvbinop-(_X_(FNN, M2), fdiv-, V-1, V-2)
@@ -5939,10 +6120,12 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-vrelop-(_X_(JNN, M2), EQ, V-1, V-2) = ivrelop-(_X_(JNN, M2), ieq-, V-1, V-2)
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vrelop-(_X_(JNN, M2), NE, V-1, V-2) = ivrelop-(_X_(JNN, M2), ine-, V-1, V-2)
     if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Jnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vrelop-(_X_(JNN, M2), LT(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), ilt-, SX, V-1, V-2)
@@ -5959,10 +6142,12 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-vrelop-(_X_(FNN, M2), EQ, V-1, V-2) = fvrelop-(_X_(FNN, M2), feq-, V-1, V-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vrelop-(_X_(FNN, M2), NE, V-1, V-2) = fvrelop-(_X_(FNN, M2), fne-, V-1, V-2)
     if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Fnn)
       /\ typecheck(M2, M) .
 
   ceq spectec-vrelop-(_X_(FNN, M2), spectec-LT, V-1, V-2) = fvrelop-(_X_(FNN, M2), flt-, V-1, V-2)
@@ -6082,6 +6267,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq ivadd-pairwise-(N2, I-) = map-iadd(N2, J-1-, J-2-)
     if tuple(seq(J-1-) seq(J-2-)) := project-map-exp-890(inv-concat-(nat, I-))
+      /\ map-exp-890(J-1-, J-2-) = inv-concat-(nat, I-)
       /\ concat-(nat, map-exp-890(J-1-, J-2-)) == I- .
 
   ceq ivextunop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), F-12, SX, V-1) = inv-lanes-(_X_(JNN-2, M-2), C-2)
@@ -6097,10 +6283,12 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq ivdot-(N2, I-1-, I-2-) = map-iadd-2(N2, J-1-, J-2-)
     if tuple(seq(J-1-) seq(J-2-)) := project-map-exp-899(N2, inv-concat-(uN(N2), map-imul(N2, I-1-, I-2-)))
+      /\ map-exp-899(N2, J-1-, J-2-) = inv-concat-(uN(N2), map-imul(N2, I-1-, I-2-))
       /\ concat-(uN(N2), map-exp-899(N2, J-1-, J-2-)) == map-imul(N2, I-1-, I-2-) .
 
   ceq ivdot-sat-(N2, I-1-, I-2-) = map-iadd-sat(N2, J-1-, J-2-)
     if tuple(seq(J-1-) seq(J-2-)) := project-map-exp-902(N2, inv-concat-(uN(N2), map-imul-2(N2, I-1-, I-2-)))
+      /\ map-exp-902(N2, J-1-, J-2-) = inv-concat-(uN(N2), map-imul-2(N2, I-1-, I-2-))
       /\ concat-(uN(N2), map-exp-902(N2, J-1-, J-2-)) == map-imul-2(N2, I-1-, I-2-) .
 
   ceq ivextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), F-13, SX-1, SX-2, I, K3, V-1, V-2) = inv-lanes-(_X_(JNN-2, M-2), C-2)
@@ -6271,10 +6459,12 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq packfield-(VALTYPE, VAL) = VAL
     if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALTYPE, valtype)
       /\ typecheck(VAL, val) .
 
   ceq packfield-(PACKTYPE, CONST(I32, I)) = PACK(PACKTYPE, wrap--(32, psize(PACKTYPE), I))
     if typecheck(PACKTYPE, packtype)
+      /\ typecheck(PACKTYPE, packtype)
       /\ typecheck(I, num-(I32)) .
 
   ceq unpackfield-(VALTYPE, eps, VAL) = VAL
@@ -6532,6 +6722,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VAL--, val)
       /\ typecheck(VAL-, val)
       /\ len(VAL-) = N3
+      /\ N3 = len(VAL-)
       /\ L == 0 .
 
   crl Step-pure(LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-)) => VAL- BR(_-_(L : nat <:> int, 1 : nat <:> int) : int <:> nat)
@@ -6575,12 +6766,14 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-pure(FRAME- N3 { F } VAL-) => VAL-
     if typecheck(VAL-, val)
-      /\ len(VAL-) = N3 .
+      /\ len(VAL-) = N3
+      /\ N3 = len(VAL-) .
 
   crl Step-pure(FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-)) => VAL-
     if typecheck(VAL--, val)
       /\ typecheck(VAL-, val)
-      /\ len(VAL-) = N3 .
+      /\ len(VAL-) = N3
+      /\ N3 = len(VAL-) .
 
   crl Step-pure(LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-)) => VAL- RETURN
     if typecheck(VAL-, val) .
@@ -6834,6 +7027,7 @@ mod SPEC2MAUDE-GENERATED is
     if Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4)))) := ENABLED-INPUT12
       /\ typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ (I + N3) > len(spectec-table(Z, X4) . 'REFS) .
 
   eq Step-read-enabled-31(ENABLED-INPUT12) = false [owise] .
@@ -6844,6 +7038,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-enabled-31(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) = false
       /\ typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ N3 == 0 .
 
   eq Step-read-enabled-32(ENABLED-INPUT12) = false [owise] .
@@ -6900,6 +7095,7 @@ mod SPEC2MAUDE-GENERATED is
     if Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4)))) := ENABLED-INPUT12
       /\ typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ (I + N3) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   eq Step-read-enabled-56(ENABLED-INPUT12) = false [owise] .
@@ -6910,6 +7106,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-enabled-56(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) = false
       /\ typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ N3 == 0 .
 
   eq Step-read-enabled-57(ENABLED-INPUT12) = false [owise] .
@@ -7074,6 +7271,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (VAL- BLOCK(BT, INSTR-))) => LABEL- N3 { eps } (VAL- INSTR-)
     if typecheck(VAL-, val)
       /\ M3 := len(VAL-)
+      /\ len(VAL-) = M3
       /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
       /\ M3 = len(T-1-)
       /\ N3 := len(T-2-) .
@@ -7081,6 +7279,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (VAL- LOOP(BT, INSTR-))) => LABEL- M3 { LOOP(BT, INSTR-) } (VAL- INSTR-)
     if typecheck(VAL-, val)
       /\ M3 := len(VAL-)
+      /\ len(VAL-) = M3
       /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
       /\ M3 = len(T-1-)
       /\ N3 := len(T-2-) .
@@ -7109,6 +7308,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (VAL- (REF.FUNC-ADDR(A) CALL-REF(YY2)))) => FRAME- M3 { F } (LABEL- M3 { eps } INSTR-)
     if typecheck(VAL-, val)
       /\ N3 := len(VAL-)
+      /\ len(VAL-) = N3
       /\ FI := spectec-funcinst(Z) [ A ]
       /\ FUNC T-1- -> T-2- := Expand(FI . 'TYPE)
       /\ N3 = len(T-1-)
@@ -7117,6 +7317,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ X4 := CASE-PART1
       /\ INSTR- := CASE-PART3
       /\ T- := project-map-exp-1040(CASE-PART2)
+      /\ map-exp-1040(T-) = CASE-PART2
       /\ F := { (item('LOCALS, map-exp-1042(N3, VAL-) map-default(T-)) ; item('MODULE, FI . 'MODULE)) } .
 
   crl Step-read(Z ; RETURN-CALL(X4)) => REF.FUNC-ADDR(A) RETURN-CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE)
@@ -7135,6 +7336,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VAL--, val)
       /\ typecheck(VAL-, val)
       /\ N3 := len(VAL-)
+      /\ len(VAL-) = N3
       /\ FUNC T-1- -> T-2- := Expand((spectec-funcinst(Z) [ A ]) . 'TYPE)
       /\ N3 = len(T-1-)
       /\ M3 := len(T-2-) .
@@ -7175,6 +7377,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (VAL- TRY-TABLE(BT, CATCH-, INSTR-))) => HANDLER- N3 { CATCH- } (LABEL- N3 { eps } (VAL- INSTR-))
     if typecheck(VAL-, val)
       /\ M3 := len(VAL-)
+      /\ len(VAL-) = M3
       /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
       /\ M3 = len(T-1-)
       /\ N3 := len(T-2-) .
@@ -7200,6 +7403,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) => TRAP
     if typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ (I + N3) > len(spectec-table(Z, X4) . 'REFS) .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) => eps
@@ -7207,6 +7411,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-enabled-31(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) = false
       /\ typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) => CONST(AT, I) (VAL (TABLE.SET(X4) (CONST(AT, I + 1) (VAL (CONST(AT, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) TABLE.FILL(X4))))))
@@ -7214,7 +7419,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-enabled-31(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) = false
       /\ Step-read-enabled-32(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) = false
       /\ typecheck(AT, addrtype)
-      /\ typecheck(VAL, val) .
+      /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype) .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X-1, X-23))))) => TRAP
     if typecheck(AT-1, addrtype)
@@ -7349,6 +7555,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) => TRAP
     if typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ (I + N3) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) => eps
@@ -7356,6 +7563,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-enabled-56(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) = false
       /\ typecheck(AT, addrtype)
       /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype)
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) => CONST(AT, I) (VAL (STORE(I32, 8 ?, X4, memarg0) (CONST(AT, I + 1) (VAL (CONST(AT, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) MEMORY.FILL(X4))))))
@@ -7363,7 +7571,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-enabled-56(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) = false
       /\ Step-read-enabled-57(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) = false
       /\ typecheck(AT, addrtype)
-      /\ typecheck(VAL, val) .
+      /\ typecheck(VAL, val)
+      /\ typecheck(AT, addrtype) .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) => TRAP
     if typecheck(AT-1, addrtype)
@@ -7439,6 +7648,7 @@ mod SPEC2MAUDE-GENERATED is
     if REL-OUTPUT1 := Expand(spectec-type(Z, X4))
       /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
       /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1084(CASE-PART12)
+      /\ map-exp-1084(MUT--, ZT-) = CASE-PART12
       /\ VAL- := iterpr-37-output-1(ZT-) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX-, X4, I))) => TRAP
@@ -7448,7 +7658,8 @@ mod SPEC2MAUDE-GENERATED is
     if len(SX-) <= 1
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
       /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1090(CASE-PART12) .
+      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1090(CASE-PART12)
+      /\ map-exp-1090(MUT--, ZT-) = CASE-PART12 .
 
   crl Step-read(Z ; (CONST(I32, N3) ARRAY.NEW-DEFAULT(X4))) => repeatSeq(N3, VAL) ARRAY.NEW-FIXED(X4, N3)
     if spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
@@ -7471,6 +7682,7 @@ mod SPEC2MAUDE-GENERATED is
     if spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ C-2 := project-map-zbytes(ZT, N3, inv-concatn-(byte, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, (spectec-data(Z, Y) . 'BYTES) [ I : ((((N3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]))
+      /\ map-zbytes(ZT, N3, C-2) = inv-concatn-(byte, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, (spectec-data(Z, Y) . 'BYTES) [ I : ((((N3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ concatn-(byte, map-zbytes(ZT, N3, C-2), ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) == ((spectec-data(Z, Y) . 'BYTES) [ I : ((((N3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, I) ARRAY.GET(SX-, X4)))) => TRAP
@@ -7618,6 +7830,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step(Z ; (VAL- THROW(X4))) => add-exninst(Z, EXN3) ; (REF.EXN-ADDR(A) THROW-REF)
     if typecheck(VAL-, val)
       /\ N3 := len(VAL-)
+      /\ len(VAL-) = N3
       /\ FUNC T- -> eps := Expand(as-deftype(spectec-tag(Z, X4) . 'TYPE))
       /\ N3 = len(T-)
       /\ A := len(spectec-exninst(Z))
@@ -7661,10 +7874,12 @@ mod SPEC2MAUDE-GENERATED is
   crl Step(Z ; (CONST(AT, I) (CONST(INN, C3) STORE(INN, N3 ?, X4, AO)))) => Z ; TRAP
     if typecheck(AT, addrtype)
       /\ typecheck(INN, addrtype)
+      /\ typecheck(INN, addrtype)
       /\ ((I + (AO . 'OFFSET)) + (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, I) (CONST(INN, C3) STORE(INN, N3 ?, X4, AO)))) => with-mem(Z, X4, I + (AO . 'OFFSET), ((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B-) ; eps
     if typecheck(AT, addrtype)
+      /\ typecheck(INN, addrtype)
       /\ typecheck(INN, addrtype)
       /\ B- := ibytes-(N3, wrap--(size(INN), N3, C3)) .
 
@@ -7699,9 +7914,11 @@ mod SPEC2MAUDE-GENERATED is
   crl Step(Z ; (VAL- STRUCT.NEW(X4))) => add-structinst(Z, SI2) ; REF.STRUCT-ADDR(A)
     if typecheck(VAL-, val)
       /\ N3 := len(VAL-)
+      /\ len(VAL-) = N3
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
       /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
       /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1157(N3, CASE-PART12)
+      /\ map-exp-1157(N3, MUT--, ZT-) = CASE-PART12
       /\ A := len(spectec-structinst(Z))
       /\ SI2 := { (item('TYPE, spectec-type(Z, X4)) ; item('FIELDS, map-packfield(N3, VAL-, ZT-))) } .
 
@@ -7712,11 +7929,13 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VAL, val)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
       /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1160(CASE-PART12) .
+      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1160(CASE-PART12)
+      /\ map-exp-1160(MUT--, ZT-) = CASE-PART12 .
 
   crl Step(Z ; (VAL- ARRAY.NEW-FIXED(X4, N3))) => add-arrayinst(Z, AI2) ; REF.ARRAY-ADDR(A)
     if typecheck(VAL-, val)
       /\ len(VAL-) = N3
+      /\ N3 = len(VAL-)
       /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ A := len(spectec-arrayinst(Z))
@@ -7837,12 +8056,19 @@ mod SPEC2MAUDE-GENERATED is
     if MODULE(TYPE-, IMPORT-, TAG-, GLOBAL-, MEM-, TABLE-, FUNC-, DATA-, ELEM-, START-, EXPORT-) := MODULE2
       /\ len(START-) <= 1
       /\ TAGTYPE-4 := project-map-exp-1261(TAG-)
+      /\ map-exp-1261(TAGTYPE-4) = TAG-
       /\ tuple(seq(EXPR-G-) seq(GLOBALTYPE-4)) := project-map-exp-1263(GLOBAL-)
+      /\ map-exp-1263(EXPR-G-, GLOBALTYPE-4) = GLOBAL-
       /\ MEMTYPE-4 := project-map-exp-1265(MEM-)
+      /\ map-exp-1265(MEMTYPE-4) = MEM-
       /\ tuple(seq(EXPR-T-) seq(TABLETYPE-4)) := project-map-exp-1267(TABLE-)
+      /\ map-exp-1267(EXPR-T-, TABLETYPE-4) = TABLE-
       /\ tuple(seq(EXPR-F-) (seq(LOCAL--) seq(X-2))) := project-map-exp-1269(FUNC-)
+      /\ map-exp-1269(EXPR-F-, LOCAL--, X-2) = FUNC-
       /\ tuple(seq(BYTE--) seq(DATAMODE-)) := project-map-exp-1272(DATA-)
+      /\ map-exp-1272(BYTE--, DATAMODE-) = DATA-
       /\ tuple(seq(ELEMMODE-) (seq(ELEMTYPE-) seq(EXPR-E--))) := project-map-exp-1275(ELEM-)
+      /\ map-exp-1275(ELEMMODE-, ELEMTYPE-, EXPR-E--) = ELEM-
       /\ AA-I- := tagsxa(EXTERNADDR-)
       /\ GA-I- := globalsxa(EXTERNADDR-)
       /\ MA-I- := memsxa(EXTERNADDR-)
@@ -7906,10 +8132,15 @@ mod SPEC2MAUDE-GENERATED is
       /\ MODULE(TYPE-, IMPORT-, TAG-, GLOBAL-, MEM-, TABLE-, FUNC-, DATA-, ELEM-, START-, EXPORT-) := MODULE2
       /\ len(START-) <= 1
       /\ tuple(seq(EXPR-G-) seq(GLOBALTYPE-4)) := project-map-exp-1393(GLOBAL-)
+      /\ map-exp-1393(EXPR-G-, GLOBALTYPE-4) = GLOBAL-
       /\ tuple(seq(EXPR-T-) seq(TABLETYPE-4)) := project-map-exp-1395(TABLE-)
+      /\ map-exp-1395(EXPR-T-, TABLETYPE-4) = TABLE-
       /\ tuple(seq(BYTE--) seq(DATAMODE-)) := project-map-exp-1397(DATA-)
+      /\ map-exp-1397(BYTE--, DATAMODE-) = DATA-
       /\ tuple(seq(ELEMMODE-) (seq(EXPR-E--) seq(REFTYPE-))) := project-map-exp-1400(ELEM-)
+      /\ map-exp-1400(ELEMMODE-, EXPR-E--, REFTYPE-) = ELEM-
       /\ X-5 := project-map-exp-1403(START-)
+      /\ map-exp-1403(X-5) = START-
       /\ MODULEINST-0 := { (item('TYPES, alloctypes(TYPE-)) ; (item('TAGS, eps) ; (item('GLOBALS, globalsxa(EXTERNADDR-)) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, funcsxa(EXTERNADDR-) map-exp-1407(S2, len(FUNC-), 0)) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; item('EXPORTS, eps))))))))) }
       /\ Z := S2 ; ({ (item('LOCALS, eps) ; item('MODULE, MODULEINST-0)) })
       /\ evalglobals(Z, GLOBALTYPE-4, EXPR-G-) => tuple(Z- seq(VAL-G-))
@@ -8423,6 +8654,10 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-exp-1014(JNN, I IS) = inez-(jsizenn(JNN), I) map-exp-1014(JNN, IS) .
 
+  eq map-exp-1040(eps) = eps .
+
+  eq map-exp-1040(T TS) = LOCAL(T) map-exp-1040(TS) .
+
   eq project-map-exp-1040(eps) = eps .
 
   ceq project-map-exp-1040(LOCAL(T) PROJECT-REST) = T PROJECT-COLUMN-1
@@ -8432,6 +8667,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-exp-1042(s(ITER-COUNT), VAL VALS) = seq(VAL ?) map-exp-1042(ITER-COUNT, VALS) .
 
+  eq project-map-exp-1042(0, eps) = eps .
+
+  ceq project-map-exp-1042(s(ITER-COUNT), seq(VAL ?) PROJECT-REST) = VAL PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := project-map-exp-1042(ITER-COUNT, PROJECT-REST) .
+
   eq map-default(eps) = eps .
 
   eq map-default(T TS) = seq(default-(T)) map-default(TS) .
@@ -8440,11 +8680,19 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-extend-7(JNN, K2, M2, SX, s(ITER-COUNT), J JS) = extend--(M2, jsizenn(JNN), SX, J) map-extend-7(JNN, K2, M2, SX, ITER-COUNT, JS) .
 
+  eq map-exp-1084(eps, eps) = eps .
+
+  eq map-exp-1084(seq(MUT-) MUT?S, ZT ZTS) = tuple(seq(MUT-) ZT) map-exp-1084(MUT?S, ZTS) .
+
   eq project-map-exp-1084(eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1084(tuple(seq(MUT-) ZT) PROJECT-REST) = tuple(seq(seq(MUT-) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
     if len(MUT-) <= 1
       /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1084(PROJECT-REST) .
+
+  eq map-exp-1090(eps, eps) = eps .
+
+  eq map-exp-1090(seq(MUT-) MUT?S, ZT ZTS) = tuple(seq(MUT-) ZT) map-exp-1090(MUT?S, ZTS) .
 
   eq project-map-exp-1090(eps) = tuple(seq(eps) seq(eps)) .
 
@@ -8467,6 +8715,10 @@ mod SPEC2MAUDE-GENERATED is
       /\ zbytes-(ZT, C2) = PROJECT-ELEMENT
       /\ PROJECT-COLUMN-1 := project-map-zbytes(ZT, ITER-COUNT, PROJECT-REST) .
 
+  eq map-exp-1157(0, eps, eps) = eps .
+
+  eq map-exp-1157(s(ITER-COUNT), seq(MUT-) MUT?S, ZT ZTS) = tuple(seq(MUT-) ZT) map-exp-1157(ITER-COUNT, MUT?S, ZTS) .
+
   eq project-map-exp-1157(0, eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1157(s(ITER-COUNT), tuple(seq(MUT-) ZT) PROJECT-REST) = tuple(seq(seq(MUT-) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
@@ -8476,6 +8728,10 @@ mod SPEC2MAUDE-GENERATED is
   eq map-packfield(0, eps, eps) = eps .
 
   eq map-packfield(s(ITER-COUNT), VAL VALS, ZT ZTS) = packfield-(ZT, VAL) map-packfield(ITER-COUNT, VALS, ZTS) .
+
+  eq map-exp-1160(eps, eps) = eps .
+
+  eq map-exp-1160(seq(MUT-) MUT?S, ZT ZTS) = tuple(seq(MUT-) ZT) map-exp-1160(MUT?S, ZTS) .
 
   eq project-map-exp-1160(eps) = tuple(seq(eps) seq(eps)) .
 
@@ -8491,35 +8747,63 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-allocexport(MODULEINST, EXPORT2 EXPORTS) = allocexport(MODULEINST, EXPORT2) map-allocexport(MODULEINST, EXPORTS) .
 
+  eq map-exp-1261(eps) = eps .
+
+  eq map-exp-1261(TAGTYPE TAGTYPES) = TAG(TAGTYPE) map-exp-1261(TAGTYPES) .
+
   eq project-map-exp-1261(eps) = eps .
 
   ceq project-map-exp-1261(TAG(TAGTYPE) PROJECT-REST) = TAGTYPE PROJECT-COLUMN-1
     if PROJECT-COLUMN-1 := project-map-exp-1261(PROJECT-REST) .
+
+  eq map-exp-1263(eps, eps) = eps .
+
+  eq map-exp-1263(seq(EXPR-G) EXPR_GS, GLOBALTYPE GLOBALTYPES) = spectec-GLOBAL(GLOBALTYPE, EXPR-G) map-exp-1263(EXPR_GS, GLOBALTYPES) .
 
   eq project-map-exp-1263(eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1263(spectec-GLOBAL(GLOBALTYPE, EXPR-G) PROJECT-REST) = tuple(seq(seq(EXPR-G) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1263(PROJECT-REST) .
 
+  eq map-exp-1265(eps) = eps .
+
+  eq map-exp-1265(MEMTYPE MEMTYPES) = MEMORY(MEMTYPE) map-exp-1265(MEMTYPES) .
+
   eq project-map-exp-1265(eps) = eps .
 
   ceq project-map-exp-1265(MEMORY(MEMTYPE) PROJECT-REST) = MEMTYPE PROJECT-COLUMN-1
     if PROJECT-COLUMN-1 := project-map-exp-1265(PROJECT-REST) .
+
+  eq map-exp-1267(eps, eps) = eps .
+
+  eq map-exp-1267(seq(EXPR-T) EXPR_TS, TABLETYPE TABLETYPES) = spectec-TABLE(TABLETYPE, EXPR-T) map-exp-1267(EXPR_TS, TABLETYPES) .
 
   eq project-map-exp-1267(eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1267(spectec-TABLE(TABLETYPE, EXPR-T) PROJECT-REST) = tuple(seq(seq(EXPR-T) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1267(PROJECT-REST) .
 
+  eq map-exp-1269(eps, eps, eps) = eps .
+
+  eq map-exp-1269(seq(EXPR-F) EXPR_FS, seq(LOCAL-) LOCAL*S, X4 XS) = spectec-FUNC-2(X4, LOCAL-, EXPR-F) map-exp-1269(EXPR_FS, LOCAL*S, XS) .
+
   eq project-map-exp-1269(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
   ceq project-map-exp-1269(spectec-FUNC-2(X4, LOCAL-, EXPR-F) PROJECT-REST) = tuple(seq(seq(EXPR-F) PROJECT-COLUMN-1) (seq(seq(LOCAL-) PROJECT-COLUMN-2) seq(X4 PROJECT-COLUMN-3)))
     if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1269(PROJECT-REST) .
 
+  eq map-exp-1272(eps, eps) = eps .
+
+  eq map-exp-1272(seq(BYTE-) BYTE*S, DATAMODE DATAMODES) = DATA(BYTE-, DATAMODE) map-exp-1272(BYTE*S, DATAMODES) .
+
   eq project-map-exp-1272(eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1272(DATA(BYTE-, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE-) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1272(PROJECT-REST) .
+
+  eq map-exp-1275(eps, eps, eps) = eps .
+
+  eq map-exp-1275(ELEMMODE ELEMMODES, ELEMTYPE ELEMTYPES, seq(EXPR-E-) EXPR_E*S) = ELEM(ELEMTYPE, EXPR-E-, ELEMMODE) map-exp-1275(ELEMMODES, ELEMTYPES, EXPR_E*S) .
 
   eq project-map-exp-1275(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
@@ -8558,25 +8842,50 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-exp-1314(seq(EXPR-F) EXPR_FS, seq(LOCAL-) LOCAL*S, X4 XS) = spectec-FUNC-2(X4, LOCAL-, EXPR-F) map-exp-1314(EXPR_FS, LOCAL*S, XS) .
 
+  eq project-map-exp-1314(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
+
+  ceq project-map-exp-1314(spectec-FUNC-2(X4, LOCAL-, EXPR-F) PROJECT-REST) = tuple(seq(seq(EXPR-F) PROJECT-COLUMN-1) (seq(seq(LOCAL-) PROJECT-COLUMN-2) seq(X4 PROJECT-COLUMN-3)))
+    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1314(PROJECT-REST) .
+
+  eq map-exp-1393(eps, eps) = eps .
+
+  eq map-exp-1393(seq(EXPR-G) EXPR_GS, GLOBALTYPE GLOBALTYPES) = spectec-GLOBAL(GLOBALTYPE, EXPR-G) map-exp-1393(EXPR_GS, GLOBALTYPES) .
+
   eq project-map-exp-1393(eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1393(spectec-GLOBAL(GLOBALTYPE, EXPR-G) PROJECT-REST) = tuple(seq(seq(EXPR-G) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1393(PROJECT-REST) .
+
+  eq map-exp-1395(eps, eps) = eps .
+
+  eq map-exp-1395(seq(EXPR-T) EXPR_TS, TABLETYPE TABLETYPES) = spectec-TABLE(TABLETYPE, EXPR-T) map-exp-1395(EXPR_TS, TABLETYPES) .
 
   eq project-map-exp-1395(eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1395(spectec-TABLE(TABLETYPE, EXPR-T) PROJECT-REST) = tuple(seq(seq(EXPR-T) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1395(PROJECT-REST) .
 
+  eq map-exp-1397(eps, eps) = eps .
+
+  eq map-exp-1397(seq(BYTE-) BYTE*S, DATAMODE DATAMODES) = DATA(BYTE-, DATAMODE) map-exp-1397(BYTE*S, DATAMODES) .
+
   eq project-map-exp-1397(eps) = tuple(seq(eps) seq(eps)) .
 
   ceq project-map-exp-1397(DATA(BYTE-, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE-) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1397(PROJECT-REST) .
 
+  eq map-exp-1400(eps, eps, eps) = eps .
+
+  eq map-exp-1400(ELEMMODE ELEMMODES, seq(EXPR-E-) EXPR_E*S, REFTYPE REFTYPES) = ELEM(REFTYPE, EXPR-E-, ELEMMODE) map-exp-1400(ELEMMODES, EXPR_E*S, REFTYPES) .
+
   eq project-map-exp-1400(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
   ceq project-map-exp-1400(ELEM(REFTYPE, EXPR-E-, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(seq(EXPR-E-) PROJECT-COLUMN-2) seq(REFTYPE PROJECT-COLUMN-3)))
     if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1400(PROJECT-REST) .
+
+  eq map-exp-1403(eps) = eps .
+
+  eq map-exp-1403(X4 ?) = START(X4) ? .
 
   eq project-map-exp-1403(eps) = eps .
 
@@ -8598,6 +8907,10 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-exp-1430(X4 ?) = CALL(X4) ? .
 
+  eq project-map-exp-1430(eps) = eps .
+
+  eq project-map-exp-1430(CALL(X4) ?) = X4 ? .
+
   eq iterpr-34(I-3, eps) = true .
 
   ceq iterpr-34(I-3, J ?) = true
@@ -8608,11 +8921,21 @@ mod SPEC2MAUDE-GENERATED is
   ceq iterpr-35(I-3, J ?) = true
     if I-3 <= J .
 
+  eq iterpr-36(M2, Z, X4, AT, I, AO, 0, K3, eps) = true .
+
+  ceq iterpr-36(M2, Z, X4, AT, I, AO, s(ITER-COUNT), K3, J JS) = iterpr-36(M2, Z, X4, AT, I, AO, ITER-COUNT, s(K3), JS)
+    if ibytes-(M2, J) == ((spectec-mem(Z, X4) . 'BYTES) [ ((I + (AO . 'OFFSET)) + ((((K3 * M2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+
   eq iterpr-36-output-1(M2, Z, X4, AT, I, AO, 0, K3) = eps .
 
   ceq iterpr-36-output-1(M2, Z, X4, AT, I, AO, s(ITER-COUNT), K3) = J iterpr-36-output-1(M2, Z, X4, AT, I, AO, ITER-COUNT, s(K3))
     if J := inv-ibytes-(M2, (spectec-mem(Z, X4) . 'BYTES) [ ((I + (AO . 'OFFSET)) + ((((K3 * M2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(M2, J) == ((spectec-mem(Z, X4) . 'BYTES) [ ((I + (AO . 'OFFSET)) + ((((K3 * M2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+
+  eq iterpr-37(eps, eps) = true .
+
+  ceq iterpr-37(VAL VALS, ZT ZTS) = iterpr-37(VALS, ZTS)
+    if default-(unpack(ZT)) == (VAL ?) .
 
   eq iterpr-37-output-1(eps) = eps .
 

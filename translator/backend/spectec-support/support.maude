@@ -1,3 +1,4 @@
+load pretype.maude
 load option.maude
 load sequence.maude
 load tuple.maude

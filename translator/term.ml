@@ -22,8 +22,10 @@ let translate_sort index typ =
 let translate_number = function
   | `Nat n | `Int n -> Const (Z.to_string n)
   | `Rat q when Q.is_real q -> Const (Q.to_string q)
-  | `Rat _ -> invalid_arg "nonfinite IL Rat literal is outside the Wasm scope"
-  | `Real _ -> invalid_arg "IL Real literal is outside the Wasm scope"
+  | `Rat _ -> invalid_arg "nonfinite Rat has no matching finite-rational IL value"
+  | `Real value when Float.is_finite value ->
+      app "realValue" [Const (Q.to_string (Q.of_float value))]
+  | `Real _ -> invalid_arg "NumE Real: infinity/NaN has no formal Real value"
 
 let translate_text text =
   let buffer = Buffer.create (String.length text + 2) in
@@ -50,15 +52,20 @@ let qid_of_atom atom =
 
 let translate_unop (op : unop) (optyp : optyp) =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real operation is outside the Wasm scope"
+  | `PlusOp, `RealT -> "realPlus"
+  | `MinusOp, `RealT -> "realNeg"
   | `NotOp, _ -> "not_"
   | `PlusOp, _ -> "+_"
   | `MinusOp, _ -> "-_"
 
 let translate_binop op optyp =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real operation is outside the Wasm scope"
-  | `PowOp, `RatT -> invalid_arg "IL Rat power is outside the Wasm scope"
+  | `AddOp, `RealT -> "realAdd"
+  | `SubOp, `RealT -> "realSub"
+  | `MulOp, `RealT -> "realMul"
+  | `DivOp, `RealT -> "realDiv"
+  | `PowOp, `RealT -> "realPow"
+  | `PowOp, `RatT -> "ratPow"
   | `AndOp, `BoolT -> "_and_"
   | `OrOp, `BoolT -> "_or_"
   | `ImplOp, `BoolT -> "_implies_"
@@ -73,7 +80,10 @@ let translate_binop op optyp =
 
 let translate_comparison (op : cmpop) (optyp : optyp) left right =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real comparison is outside the Wasm scope"
+  | `LtOp, `RealT -> app "realLess" [left; right]
+  | `GtOp, `RealT -> app "realGreater" [left; right]
+  | `LeOp, `RealT -> app "realLessEqual" [left; right]
+  | `GeOp, `RealT -> app "realGreaterEqual" [left; right]
   | `EqOp, _ -> app "_==_" [left; right]
   | `NeOp, _ -> app "_=/=_" [left; right]
   | `LtOp, _ -> app "_<_" [left; right]
@@ -86,17 +96,6 @@ let translate_comparison (op : cmpop) (optyp : optyp) left right =
 let sequence = Iter.sequence
 let sequence_of_typ = Iter.sequence_of_typ
 
-let sequence_operator index typ field =
-  let representation = Prescan.sequence_representation index typ in
-  field representation
-
-let unsupported_typed_sequence index operation typ =
-  let representation = Prescan.sequence_representation index typ in
-  if representation.typed then
-    invalid_arg
-      (operation ^ " is unsupported for typed list sort "
-       ^ representation.sort)
-
 let rec record_items = function
   | [] -> Const "EMPTY"
   | [item] -> item
@@ -105,9 +104,8 @@ let rec record_items = function
 let as_sequence_element = Iter.as_sequence_element
 
 let from_sequence_element index typ term =
-  match Hintd.sequence_element_wrappers (Prescan.sort_metadata index) typ with
-  | Some (_, unbox) -> app unbox [term]
-  | None -> term
+  if translate_sort index typ = "SpectecTerminals" then app "unseq" [term]
+  else term
 
 (* Recursive translation *)
 
@@ -265,40 +263,26 @@ and translate_exp index exp =
       |> sequence_of_typ index exp.note
 
   | LiftE inner ->
-      let operator =
-        sequence_operator index exp.note (fun sequence -> sequence.lift)
-      in
-      app operator [translate_exp index inner]
+      app "lift" [translate_exp index inner]
 
   | MemE (element, collection) ->
-      let operator =
-        sequence_operator index collection.note (fun sequence -> sequence.occurs)
-      in
-      app operator
+      app "_<-_"
         [ translate_exp index element |> as_sequence_element index element.note
         ; translate_exp index collection
         ]
 
   | LenE collection ->
-      let operator =
-        sequence_operator index collection.note (fun sequence -> sequence.size)
-      in
-      app operator [translate_exp index collection]
+      app "len" [translate_exp index collection]
 
   | CatE (left, right) ->
-      let operator =
-        sequence_operator index exp.note (fun sequence -> sequence.concat)
-      in
-      app operator [translate_exp index left; translate_exp index right]
+      app "_ _" [translate_exp index left; translate_exp index right]
 
   | IdxE (sequence, element_index) ->
-      unsupported_typed_sequence index "IdxE" sequence.note;
       app "_`[_`]"
         [translate_exp index sequence; translate_exp index element_index]
       |> from_sequence_element index exp.note
 
   | SliceE (sequence, start, length) ->
-      unsupported_typed_sequence index "SliceE" sequence.note;
       app "_`[_:_`]"
         [ translate_exp index sequence
         ; translate_exp index start
@@ -335,9 +319,6 @@ and translate_exp index exp =
       Iter.translate_term
         index (translate_exp index) body (iter, generators)
 
-  | CvtE (_, `RealT, _) | CvtE (_, _, `RealT) ->
-      invalid_arg "IL Real conversion is outside the Wasm scope"
-
   | CvtE (inner, source, target) ->
       app "_:_<:>_"
         [ translate_exp index inner
@@ -360,7 +341,6 @@ and translate_select index base path =
       base
 
   | IdxP (parent, element_index) ->
-      unsupported_typed_sequence index "IdxP" parent.note;
       app "_`[_`]"
         [ translate_select index base parent
         ; translate_exp index element_index
@@ -368,7 +348,6 @@ and translate_select index base path =
       |> from_sequence_element index path.note
 
   | SliceP (parent, start, length) ->
-      unsupported_typed_sequence index "SliceP" parent.note;
       app "_`[_:_`]"
         [ translate_select index base parent
         ; translate_exp index start
@@ -388,7 +367,6 @@ and translate_update index base path replacement =
       replacement
 
   | IdxP (parent, element_index) ->
-      unsupported_typed_sequence index "UpdE/IdxP" parent.note;
       let parent_value = translate_select index base parent in
       let replacement =
         as_sequence_element index path.note replacement
@@ -400,7 +378,6 @@ and translate_update index base path replacement =
       translate_update index base parent updated_parent
 
   | SliceP (parent, start, length) ->
-      unsupported_typed_sequence index "UpdE/SliceP" parent.note;
       let parent_value = translate_select index base parent in
       let updated_parent =
         app "_`[_:_=_`]"
@@ -423,10 +400,7 @@ and translate_update index base path replacement =
 and translate_extension index base path extension =
   (* EXT e p e' = UPD e p (CAT (ACC e p) e').  The existing path
    * translation unboxes the selected value and reboxes it on update. *)
-  let operator =
-    sequence_operator index path.note (fun sequence -> sequence.concat)
-  in
-  let extended = app operator [translate_select index base path; extension] in
+  let extended = app "_ _" [translate_select index base path; extension] in
   translate_update index base path extended
 
 and translate_composition index typ left right =
@@ -435,17 +409,20 @@ and translate_composition index typ left right =
   | AliasT {it = IterT (_, Opt); _} ->
       app "optionConcat" [left; right]
   | AliasT {it = IterT (_, (List | List1 | ListN _)); _} ->
-      let operator =
-        sequence_operator index typ (fun sequence -> sequence.concat)
-      in
-      app operator [left; right]
-  | StructT _ ->
-      if not (Prescan.record_composition_available index typ) then
-        invalid_arg
-          ("Unsupported CompE for " ^ Il.Print.string_of_typ typ
-           ^ " at " ^ string_of_region typ.at
-           ^ ": record composition requires a monomorphic StructT declaration");
+      app "_ _" [left; right]
+  | StructT _ when Prescan.monomorphic_record index typ ->
       app "recordConcat" [left; right; translate_typ index typ]
+  | StructT fields ->
+      fields
+      |> List.map (fun (atom, (field_typ, _, _), _) ->
+           let field = qid_of_atom atom in
+           let value =
+             translate_composition index field_typ
+               (app "_._" [left; field]) (app "_._" [right; field])
+           in
+           app "item" [field; value])
+      |> record_items
+      |> fun fields -> app "{_}" [fields]
   | AliasT _ | VariantT _ ->
       invalid_arg ("non-composable CompE type: " ^ Il.Print.string_of_typ typ)
 
@@ -488,16 +465,6 @@ let rec translate_typ_conditions index value typ =
       let values, conditions = check [] 1 fields in
       MatchCond (app "tuple" [sequence values], value) :: conditions
   | _, IterT (element_typ, iter) ->
-      let representation = Prescan.sequence_representation index typ in
-      if representation.typed then
-        let length = app representation.size [value] in
-        begin match iter with
-        | Opt | List -> []
-        | List1 -> [BoolCond (app "_<_" [Const "0"; length])]
-        | ListN (count, _) ->
-            [EqCond (length, translate_exp index count)]
-        end
-      else
         Iter.translate_conditions
           (translate_exp index) value (translate_check_typ index element_typ) iter
   | _, _ ->
