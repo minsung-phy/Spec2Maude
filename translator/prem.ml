@@ -71,19 +71,22 @@ let pattern_terms patterns =
 let pattern_guards patterns =
   List.concat_map (fun pattern -> pattern.guards) patterns
 
-let rec translate_pattern index exp =
+let rec translate_pattern ?(computed = fun _ -> None) index exp =
   match exp.it with
   | VarE _ | BoolE _ | NumE _ | TextE _ | OptE None ->
       Some (pattern (Term.translate_exp index exp))
 
   | TupE exps ->
-      translate_sequence_pattern index "tuple" exps
+      translate_sequence_pattern ~computed index "tuple" exps
 
   | ListE exps ->
-      translate_list_pattern index exp.note exps
+      translate_list_pattern ~computed index exp.note exps
 
   | CatE (left, right) ->
-      begin match translate_pattern index left, translate_pattern index right with
+      begin match
+        translate_pattern ~computed index left,
+        translate_pattern ~computed index right
+      with
       | Some left, Some right ->
           Some
             { term = Term.sequence_of_typ index exp.note [left.term; right.term]
@@ -93,10 +96,10 @@ let rec translate_pattern index exp =
       end
 
   | CaseE (mixop, payload) ->
-      translate_case_pattern index mixop payload
+      translate_case_pattern ~computed index mixop payload
 
   | OptE (Some inner) ->
-      translate_pattern index inner
+      translate_pattern ~computed index inner
       |> Option.map (fun pattern ->
            { pattern with
              term =
@@ -105,13 +108,13 @@ let rec translate_pattern index exp =
            })
 
   | StrE fields ->
-      translate_field_patterns index fields
+      translate_field_patterns ~computed index fields
       |> Option.map (fun (items, guards) ->
            {term = App ("{_}", [Term.record_items items]); guards})
 
   | SubE (inner, source, target)
     when Prescan.same_representation index source target ->
-      translate_pattern index inner
+      translate_pattern ~computed index inner
       |> Option.map (fun pattern ->
            { pattern with
              guards =
@@ -123,27 +126,31 @@ let rec translate_pattern index exp =
       Iter.translate_identity_pattern
         index
         (fun exp ->
-          translate_pattern index exp
+          translate_pattern ~computed index exp
           |> Option.map (fun pattern -> pattern.term, pattern.guards))
         (Term.translate_typ_conditions index)
         body iterexp
       |> Option.map (fun (term, guards) -> {term; guards})
 
+  | CallE _ -> computed exp
+
   | UnE _ | BinE _ | CmpE _ | ProjE _ | UncaseE _ | TheE _ | DotE _
   | CompE _ | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _
-  | UpdE _ | ExtE _ | IfE _ | CallE _ | CvtE _ | SubE _ ->
+  | UpdE _ | ExtE _ | IfE _ | CvtE _ | SubE _ ->
       None
 
-and translate_patterns index = function
+and translate_patterns ?(computed = fun _ -> None) index = function
   | [] -> Some []
   | exp :: exps ->
-      begin match translate_pattern index exp, translate_patterns index exps with
+      begin match
+        translate_pattern ~computed index exp, translate_patterns ~computed index exps
+      with
       | Some pattern, Some patterns -> Some (pattern :: patterns)
       | None, _ | _, None -> None
       end
 
-and translate_sequence_pattern index name exps =
-  translate_patterns index exps
+and translate_sequence_pattern ?(computed = fun _ -> None) index name exps =
+  translate_patterns ~computed index exps
   |> Option.map (fun patterns ->
        let terms =
          List.map2
@@ -155,8 +162,8 @@ and translate_sequence_pattern index name exps =
        ; guards = pattern_guards patterns
        })
 
-and translate_list_pattern index typ exps =
-  translate_patterns index exps
+and translate_list_pattern ?(computed = fun _ -> None) index typ exps =
+  translate_patterns ~computed index exps
   |> Option.map (fun patterns ->
        let terms =
          List.map2
@@ -168,33 +175,33 @@ and translate_list_pattern index typ exps =
        ; guards = pattern_guards patterns
        })
 
-and translate_case_pattern index mixop payload =
+and translate_case_pattern ?(computed = fun _ -> None) index mixop payload =
   if Mixop.is_hole_only mixop then
     match payload.it with
-    | TupE [single] -> translate_pattern index single
-    | _ -> translate_pattern index payload
+    | TupE [single] -> translate_pattern ~computed index single
+    | _ -> translate_pattern ~computed index payload
   else
     match payload.it with
     | TupE exps ->
-        translate_patterns index exps
+        translate_patterns ~computed index exps
         |> Option.map (fun patterns ->
              { term =
                  App (Prescan.mixop_name index mixop, pattern_terms patterns)
              ; guards = pattern_guards patterns
              })
     | _ ->
-        translate_pattern index payload
+        translate_pattern ~computed index payload
         |> Option.map (fun pattern ->
              { pattern with
                term = App (Prescan.mixop_name index mixop, [pattern.term])
              })
 
-and translate_field_patterns index = function
+and translate_field_patterns ?(computed = fun _ -> None) index = function
   | [] -> Some ([], [])
   | (atom, exp) :: fields ->
       begin match
-        translate_pattern index exp,
-        translate_field_patterns index fields
+        translate_pattern ~computed index exp,
+        translate_field_patterns ~computed index fields
       with
       | Some pattern, Some (items, guards) ->
           Some
