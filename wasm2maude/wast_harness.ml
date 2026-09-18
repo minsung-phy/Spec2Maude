@@ -41,8 +41,9 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op patterns.cons : ResultPattern ResultPatterns\n\
        \    -> ResultPatterns [ctor] .\n\
        \  op alternatives.nil : -> ResultAlternatives [ctor] .\n\
-       \  op alternatives.cons : ResultPattern ResultAlternatives\n\
-       \    -> ResultAlternatives [ctor] .\n\
+       \  subsort ResultPattern < ResultAlternatives .\n\
+       \  op alternatives.cons : ResultAlternatives ResultAlternatives\n\
+       \    -> ResultAlternatives [ctor assoc id: alternatives.nil] .\n\
        \  op result.exact-num : SpectecTerminal -> ResultPattern [ctor] .\n\
        \  op result.exact-vec : SpectecTerminal -> ResultPattern [ctor] .\n\
        \  op result.vec-lanes : SpectecTerminal LanePatterns\n\
@@ -63,7 +64,6 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op match.yes : -> MatchVerdict [ctor] .\n\
        \  op match.no : -> MatchVerdict [ctor] .\n\
        \  op match.and : MatchVerdict MatchVerdict -> MatchVerdict .\n\
-       \  op match.or : MatchVerdict MatchVerdict -> MatchVerdict .\n\
        \  op match.value : SpectecTerminal ResultPattern\n\
        \    -> MatchVerdict .\n\
        \  op match.values : ValList ResultPatterns\n\
@@ -81,9 +81,12 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op command.exhaustion : Nat Nat ScriptAction -> Command [ctor] .\n\
        \  op command.do : Nat ScriptAction -> Command [ctor] .\n\n\
        \  op instances.nil : -> InstanceEnv [ctor] .\n\
-       \  op instances.cons : Nat SpectecTerminal InstanceEnv\n\
-       \    -> InstanceEnv [ctor] .\n\
+       \  op instances.entry : Nat SpectecTerminal -> InstanceEnv [ctor] .\n\
+       \  op instances.concat : InstanceEnv InstanceEnv -> InstanceEnv\n\
+       \    [ctor assoc id: instances.nil] .\n\
+       \  op hasInstance : InstanceEnv Nat -> Bool .\n\
        \  op findInstance : InstanceEnv Nat ~> SpectecTerminal .\n\n\
+       \  op hasExport : SpectecTerminals SpectecTerminals -> Bool .\n\
        \  op findExport : SpectecTerminals SpectecTerminals\n\
        \    ~> SpectecTerminal .\n\
        \  op checkImport : SpectecTerminal SpectecTerminal ImportRequirement\n\
@@ -125,7 +128,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  op activeFrameDepth : InstrList -> Nat .\n\n\
        \  vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .\n\
        \  vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .\n\
-       \  vars WSHNAME WSHOTHER WSHLOCALS WSHEXPORTS : SpectecTerminals .\n\
+       \  vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .\n\
        \  vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .\n\
        \  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : ValList .\n\
        \  vars WSHBODY WSHINSTRS WSHREST : InstrList .\n\
@@ -133,10 +136,10 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .\n\
        \  var WSHREQUIREMENT : ImportRequirement .\n\
        \  var WSHLINK : LinkResult .\n\
-       \  var WSHENV : InstanceEnv .\n\
+       \  vars WSHENV WSHENVPREFIX WSHENVSUFFIX : InstanceEnv .\n\
        \  var WSHPATTERN : ResultPattern .\n\
        \  vars WSHEXPECTED WSHPATTERNS : ResultPatterns .\n\
-       \  var WSHALTERNATIVES : ResultAlternatives .\n\
+       \  vars WSHALTERNATIVES WSHALTPREFIX WSHALTSUFFIX : ResultAlternatives .\n\
        \  var WSHLPAT : LanePattern .\n\
        \  var WSHLPATS : LanePatterns .\n\
        \  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM : Nat .\n\n\
@@ -147,17 +150,20 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  eq hostArguments(CONST(WSHNT, WSHVALUE) WSHVALUES,\n\
        \    WSHNT WSHTYPES) = hostArguments(WSHVALUES, WSHTYPES) .\n\
        \  eq hostArguments(WSHVALUES, WSHTYPES) = false [owise] .\n\n\
-       \  eq findInstance(instances.cons(WSHID, WSHMI, WSHENV), WSHID) = WSHMI .\n\
-       \  ceq findInstance(instances.cons(WSHID, WSHMI, WSHENV), WSHTARGET) =\n\
-       \      findInstance(WSHENV, WSHTARGET)\n\
-       \    if WSHID =/= WSHTARGET .\n\n\
-       \  ceq findExport(WSHHEAD WSHEXPORTS, WSHNAME) = WSHXA\n\
+       \  eq hasInstance(instances.concat(WSHENVPREFIX,\n\
+       \    instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = true .\n\
+       \  eq hasInstance(WSHENV, WSHID) = false [owise] .\n\
+       \  ceq findInstance(instances.concat(WSHENVPREFIX,\n\
+       \    instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = WSHMI\n\
+       \    if not hasInstance(WSHENVPREFIX, WSHID) .\n\
+       \  \n\
+       \  ceq hasExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = true\n\
+       \    if WSHNAME = value('NAME, WSHHEAD) .\n\
+       \  eq hasExport(WSHEXPORTS, WSHNAME) = false [owise] .\n\
+       \  ceq findExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = WSHXA\n\
        \    if WSHNAME = value('NAME, WSHHEAD)\n\
+       \       /\\ not hasExport(WSHEXPORTPREFIX, WSHNAME)\n\
        \       /\\ WSHXA := value('ADDR, WSHHEAD) .\n\
-       \  ceq findExport(WSHHEAD WSHEXPORTS, WSHNAME) =\n\
-       \      findExport(WSHEXPORTS, WSHNAME)\n\
-       \    if WSHOTHER := value('NAME, WSHHEAD)\n\
-       \       /\\ WSHOTHER =/= WSHNAME .\n\n\
        \  eq link.append(link.error, WSHLINK) = link.error .\n\
        \  eq link.append(link.ok(WSHXA), link.error) = link.error .\n\
        \  eq link.append(link.ok(WSHXA), link.ok(WSHEXPORTS)) =\n\
@@ -219,30 +225,20 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \    runtimeResults(WSHACTUAL) .\n\n\
        \  ceq runtimeResults(WSHC WSHACTUAL) = runtimeResults(WSHACTUAL)\n\
        \    if typecheck(WSHC, ref) .\n\n\
-       \  eq activeFrameDepth(eps) = 0 .\n\
-       \  eq activeFrameDepth((FRAME- WSHN { WSHC } WSHBODY) WSHREST) =\n\
-       \    1 + activeFrameDepth(WSHBODY) .\n\
-       \  eq activeFrameDepth((LABEL- WSHN { WSHINSTRS } WSHBODY) WSHREST) =\n\
-       \    activeFrameDepth(WSHBODY) .\n\
-       \  eq activeFrameDepth((HANDLER- WSHN { WSHCATCHES } WSHBODY) WSHREST) =\n\
-       \    activeFrameDepth(WSHBODY) .\n\
-       \  ceq activeFrameDepth(CONST(WSHNT, WSHVALUE) WSHREST) =\n\
-       \      activeFrameDepth(WSHREST)\n\
-       \    if typecheck(WSHNT, numtype)\n\
-       \       /\\ typecheck(WSHVALUE, num-(WSHNT)) .\n\
-       \  eq activeFrameDepth(VCONST(V128, WSHC) WSHREST) =\n\
-       \    activeFrameDepth(WSHREST) .\n\
-       \  ceq activeFrameDepth(WSHC WSHREST) = activeFrameDepth(WSHREST)\n\
-       \    if typecheck(WSHC, ref) .\n\
-       \  eq activeFrameDepth(WSHINSTRS) = 0 [owise] .\n\n\
+       \  ceq activeFrameDepth(WSHPREFIX ((FRAME- WSHN { WSHC } WSHBODY) WSHREST)) =\n\
+       \    1 + activeFrameDepth(WSHBODY)\n\
+       \    if runtimeResults(WSHPREFIX) .\n\
+       \  ceq activeFrameDepth(WSHPREFIX ((LABEL- WSHN { WSHINSTRS } WSHBODY) WSHREST)) =\n\
+       \    activeFrameDepth(WSHBODY)\n\
+       \    if runtimeResults(WSHPREFIX) .\n\
+       \  ceq activeFrameDepth(WSHPREFIX ((HANDLER- WSHN { WSHCATCHES } WSHBODY) WSHREST)) =\n\
+       \    activeFrameDepth(WSHBODY)\n\
+       \    if runtimeResults(WSHPREFIX) .\n\
+       \  eq activeFrameDepth(WSHINSTRS) = 0 [owise] .\n\
        \  eq match.and(match.yes, match.yes) = match.yes .\n\
        \  eq match.and(match.yes, match.no) = match.no .\n\
        \  eq match.and(match.no, match.yes) = match.no .\n\
        \  eq match.and(match.no, match.no) = match.no .\n\
-       \  eq match.or(match.yes, match.yes) = match.yes .\n\
-       \  eq match.or(match.yes, match.no) = match.yes .\n\
-       \  eq match.or(match.no, match.yes) = match.yes .\n\
-       \  eq match.or(match.no, match.no) = match.no .\n\n\
        \  eq match.value(WSHVALUE, result.exact-num(WSHVALUE)) = match.yes .\n\
        \  eq match.value(WSHVALUE, result.exact-vec(WSHVALUE)) = match.yes .\n\
        \  eq match.value(WSHVALUE, result.exact-ref(WSHVALUE)) = match.yes .\n\
@@ -344,11 +340,10 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \      match.and(match.value(WSHVALUE, WSHPATTERN),\n\
        \        match.values(WSHACTUAL, WSHPATTERNS)) .\n\
        \  eq match.values(WSHACTUAL, WSHEXPECTED) = match.no [owise] .\n\n\
-       \  eq match.any(WSHVALUE, alternatives.nil) = match.no .\n\
-       \  eq match.any(WSHVALUE,\n\
-       \    alternatives.cons(WSHPATTERN, WSHALTERNATIVES)) =\n\
-       \      match.or(match.value(WSHVALUE, WSHPATTERN),\n\
-       \        match.any(WSHVALUE, WSHALTERNATIVES)) .\n\n\
+       \  ceq match.any(WSHVALUE, alternatives.cons(WSHALTPREFIX,\n\
+       \    alternatives.cons(WSHPATTERN, WSHALTSUFFIX))) = match.yes\n\
+       \    if match.value(WSHVALUE, WSHPATTERN) = match.yes .\n\
+       \  eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .\n\
        \  ceq hostCallable(WSHS, WSHA, WSHARGS) = true\n\
        \    if WSHA <- hostFunctionAddresses = true\n\
        \       /\\ typecheck(WSHARGS, val) = true\n\
@@ -385,7 +380,7 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  rl [module-done] :\n\
        \    script.module(WSHID, WSHENV, WSHCMDS,\n\
        \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHMI)) }) ; eps)\n\
-       \    => script.ready(WSHS, instances.cons(WSHID, WSHMI, WSHENV), WSHCMDS) .\n\n\
+       \    => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .\n\n\
        \  crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, WSHC)\n\
        \    => script.module(WSHID, WSHENV, WSHCMDS, WSHC2)\n\
        \    if Step(WSHC) => WSHC2 .\n\n\
@@ -575,7 +570,6 @@ let render ~semantics ~steps ~commands ~host_store ~host_instances
        \  rl [done] :\n\
        \    script.ready(WSHS, WSHENV, commands.nil) => script.done .\n\
        endm\n\n\
-       set clear memo on .\n\
        rew [%d] in WASM2MAUDE-WAST : script.start .\n\
        continue 1 .\n"
       semantics commands host_store host_functions host_instances steps

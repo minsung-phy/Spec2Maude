@@ -14,7 +14,6 @@ let export_instance name address =
   T.app "rec.exportinst" [name; address]
 
 let function_address address = T.app "externaddr.func" [address]
-let export_sequence export rest = T.seq [export; rest]
 let find_function exports name = T.app "findFunc" [exports; name]
 
 let instantiate_term store module_ imports =
@@ -88,17 +87,17 @@ let runtime_terms () =
   let z = variable "Z" in
   let exports = variable "EXPORTS" in
   let name = variable "NAME" in
-  let other = variable "OTHER" in
+  let prefix = variable "EXPORT-PREFIX" in
   let address = variable "ADDR" in
   let other_address = variable "XA" in
   let function_export =
     export_instance name (function_address address)
-    |> fun export -> export_sequence export exports
+    |> fun export -> T.seq [prefix; export; exports]
     |> render
   in
   let other_export =
-    export_instance other other_address
-    |> fun export -> export_sequence export exports
+    export_instance name other_address
+    |> fun export -> T.seq [prefix; export; exports]
     |> render
   in
   let instantiate =
@@ -139,17 +138,19 @@ let run ~semantics ~export ~args ~steps:limit m =
        \  op inputName : -> SpectecTerminals .\n\
        \  op inputArgs : -> ValList .\n\
        \  op emptyStore : -> SpectecTerminal .\n\
-       \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
+       \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\
+       \  op hasExport : SpectecTerminals SpectecTerminals -> Bool .\n\n\
        \  vars C C2 Z XA : SpectecTerminal .\n\
-       \  vars NAME OTHER EXPORTS : SpectecTerminals .\n\
+       \  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .\n\
        \  var ADDR : Nat .\n\n\
        \  eq inputModule = %s .\n\
        \  eq inputName = %s .\n\
        \  eq inputArgs = %s .\n\
        \  eq emptyStore = %s .\n\n\
-       \  eq findFunc(%s, NAME) = ADDR .\n\
-       \  ceq findFunc(%s, NAME) = findFunc(EXPORTS, NAME)\n\
-       \    if OTHER =/= NAME .\n\n\
+       \  ceq findFunc(%s, NAME) = ADDR\n\
+       \    if not hasExport(EXPORT-PREFIX, NAME) .\n\
+       \  eq hasExport(%s, NAME) = true .\n\
+       \  eq hasExport(EXPORTS, NAME) = false [owise] .\n\n\
        \  crl [instantiate] : boot => init(C)\n\
        \    if %s => C .\n\
        \  crl [init-step] : init(C) => init(C2)\n\
@@ -204,9 +205,10 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
        \  op expected : -> ValList .\n\
        \  op rejected : -> ValList .\n\
        \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\
+       \  op hasExport : SpectecTerminals SpectecTerminals -> Bool .\n\
        \  op returned : ValList -> Prop [ctor] .\n\n\
        \  vars C C2 Z XA : SpectecTerminal .\n\
-       \  vars NAME OTHER EXPORTS : SpectecTerminals .\n\
+       \  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .\n\
        \  var RESULT : ValList .\n\
        \  var ADDR : Nat .\n\
        \  var ST : ModelState .\n\
@@ -217,9 +219,10 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
        \  eq expected = %s .\n\
        \  eq rejected = %s .\n\
        \  eq emptyStore = %s .\n\n\
-       \  eq findFunc(%s, NAME) = ADDR .\n\
-       \  ceq findFunc(%s, NAME) = findFunc(EXPORTS, NAME)\n\
-       \    if OTHER =/= NAME .\n\n\
+       \  ceq findFunc(%s, NAME) = ADDR\n\
+       \    if not hasExport(EXPORT-PREFIX, NAME) .\n\
+       \  eq hasExport(%s, NAME) = true .\n\
+       \  eq hasExport(EXPORTS, NAME) = false [owise] .\n\n\
        \  crl [instantiate] : boot => init(C)\n\
        \    if %s => C .\n\
        \  crl [init-step] : init(C) => init(C2)\n\

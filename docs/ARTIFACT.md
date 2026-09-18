@@ -98,27 +98,42 @@ The pinned suite contains 258 `.wast` files, including the `bulk-memory`,
 `exceptions`, `gc`, `memory64`, `multi-memory`, `relaxed-simd`, and
 `simd` sub-suites.
 
-The sequence backend memoizes `len` on canonical lists. The WAST harness emits
-`set clear memo on .` to clear memo tables before each top-level rewriting
-command. The suite runner also starts a separate Maude process for every file,
-so cached lists do not accumulate across files. A WAST assertion is not a
-top-level Maude command: the cache can still grow throughout one file's run.
-There is no fixed cache size limit. Long runs that create many distinct large
-lists can require substantially more memory.
+The sequence backend uses associative matching for membership, indexing,
+slicing, and updates. It has no cursor, unrolled 32-element equations, or
+`len` memo table. Length uses a counting equation; repetition uses finite
+quotient/remainder decomposition. Typed list operations reuse Maude's native
+LIST equations. These backend changes do not change IL expression/premise
+translation or source Step rules.
 
-For manual runs in a reused Maude session, use `set clear memo on .` before
-the command, or `do clear memo .` in the relevant module to discard prior
-entries (Maude manual, section 4.4.8). Record this setting when comparing
-rewrite counts or timings; a warm cache changes the measured work.
+Run focused source-value and boundary regressions after translation:
 
-The ordinary sequence helpers consume up to 32 elements per equation, with
-single-element fallbacks for short tails. This changes internal equation counts,
-not the emitted IL operations or the source `Step` rules.
+```sh
+python3 test/backend_matching.py \
+  --semantics "$PWD/translator/backend/semantics.maude" \
+  --output-dir /tmp/spec2maude-backend-checks
+```
+
+The checks cover values, partial-operation bounds, boxing, record ordering,
+native typed-list result sorts, and bit operations. They are finite execution
+checks, not a full-suite result or a symbolic-narrowing preservation proof.
+
+Verify the generated run/modelcheck/WAST drivers and their lookup helpers:
+
+```sh
+python3 test/wasm2maude_matching.py \
+  --semantics "$PWD/translator/backend/semantics.maude" \
+  --output-dir /tmp/spec2maude-driver-checks
+```
+
+This executes Wasm programs and checks imports, registry rebinding, result
+alternatives, traps, exhaustion, duplicate names/IDs, missing lookups, and active
+frame depth. The model-checking fixture checks two true properties and an
+expected counterexample; it is not a whole-translator preservation proof.
 
 The WAST harness defines its command list in groups of at most 64 commands.
 Each group refers to the next definition; unfolding them produces the original
 ordered list. This limits the size of each equation compiled by Maude without
-splitting the execution into separate runs or clearing the cache per assertion.
+splitting the execution into separate runs or restarting execution per assertion.
 
 ### Audit frontend coverage
 

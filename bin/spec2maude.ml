@@ -44,9 +44,9 @@ let emit_script script =
       ; statements = translation.generated_statements
       }
   in
-  let pretype : Maude_il.top_level =
+  let typed_lists : Maude_il.top_level =
     Module
-      { name = "DSL-PRETYPE"
+      { name = "DSL-TYPED-LISTS"
       ; kind = Maude_il.Functional
       ; imports =
           [ Maude_il.Protecting (module_name "DSL-PRETYPE-BASE")
@@ -56,9 +56,20 @@ let emit_script script =
       ; statements = translation.list_statements
       }
   in
+  let pretype : Maude_il.top_level =
+    Module
+      { name = "DSL-PRETYPE"
+      ; kind = Maude_il.Functional
+      ; imports =
+          [Maude_il.Protecting (module_name translation.list_support_module)]
+      ; statements = translation.list_subsorts
+      }
+  in
   Maude_emit.emit_top_levels
     (sorts :: translation.list_views
-     @ [ pretype
+     @ [ typed_lists
+       ; Maude_il.Load "../backend/spectec-support/list.maude"
+       ; pretype
        ; Maude_il.Load "../backend/spectec-support/support.maude"
        ; generated
        ]) ^ "\n"

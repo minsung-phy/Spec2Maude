@@ -309,6 +309,11 @@ module Lists = struct
   let imports metadata =
     Hintd.typed_list_roots metadata |> List.map (import metadata)
 
+  let support_module metadata =
+    if Hintd.separate_list_families metadata then
+      "DSL-PRETYPE-SEPARATE-LISTS"
+    else "DSL-PRETYPE-LISTS"
+
   let op ?(arrow = Total) ?(attrs = []) name domain codomain =
     OpDecl {name; domain; codomain; arrow; attrs}
 
@@ -331,22 +336,9 @@ module Lists = struct
     let sequence = Hintd.typed_sequence_representation metadata sort in
     let list = sequence.sort in
     let nonempty = nonempty_sort sort in
-    let element = var "LIST-ELEMENT" sort in
-    let other = var "LIST-OTHER" sort in
-    let left = var "LIST-LEFT" list in
-    let rest = var "LIST-REST" list in
-    let count = var "LIST-COUNT" "Nat" in
-    let concat left right = app sequence.concat [left; right] in
-    let append left right = app sequence.append [left; right] in
     let root = Hintd.typed_list_root metadata sort in
-    let head = root ^ "Head" in
-    let tail = root ^ "Tail" in
-    let last = root ^ "Last" in
-    let front = root ^ "Front" in
-    let reverse_name = root ^ "Reverse" in
-    let reverse_aux = root ^ "ReverseAux" in
-    let size_aux = root ^ "SizeAux" in
     let concat_name = if sequence.concat = "_ _" then "__" else sequence.concat in
+    (* Native LIST equations apply to these narrower overloads as well. *)
     [ SortDecl nonempty
     ; SortDecl list
     ; SubsortDecl (sort, nonempty)
@@ -358,53 +350,17 @@ module Lists = struct
     ; op sequence.append [list; list] list
     ; op sequence.append [nonempty; list] nonempty
     ; op sequence.append [list; nonempty] nonempty
-    ; eq (append (term left) (term rest)) (concat (term left) (term rest))
-    ; op head [nonempty] sort
-    ; eq (app head [concat (term element) (term rest)]) (term element)
-    ; op tail [nonempty] list
-    ; eq (app tail [concat (term element) (term rest)]) (term rest)
-    ; op last [nonempty] sort
-    ; eq (app last [concat (term left) (term element)]) (term element)
-    ; op front [nonempty] list
-    ; eq (app front [concat (term left) (term element)]) (term left)
+    ; op (root ^ "Head") [nonempty] sort
+    ; op (root ^ "Tail") [nonempty] list
+    ; op (root ^ "Last") [nonempty] sort
+    ; op (root ^ "Front") [nonempty] list
     ; op sequence.occurs [sort; list] "Bool"
-    ; eq (app sequence.occurs [term element; Const sequence.empty])
-        (Const "false")
-    ; eq
-        ( app sequence.occurs
-            [term element; concat (term other) (term rest)]
-        )
-        (app "if_then_else_fi"
-            [ app "_==_" [term element; term other]
-            ; Const "true"
-            ; app sequence.occurs [term element; term rest]
-            ]
-        )
-    ; op reverse_name [list] list
-    ; op reverse_name [nonempty] nonempty
-    ; eq (app reverse_name [term rest])
-        (app reverse_aux [term rest; Const sequence.empty])
-    ; op reverse_aux [list; list] list
-    ; eq (app reverse_aux [Const sequence.empty; term left]) (term left)
-    ; eq
-        ( app reverse_aux
-            [concat (term element) (term rest); term left]
-        )
-        (app reverse_aux
-            [term rest; concat (term element) (term left)]
-        )
+    ; op (root ^ "Reverse") [list] list
+    ; op (root ^ "Reverse") [nonempty] nonempty
+    ; op (root ^ "ReverseAux") [list; list] list
     ; op sequence.size [list] "Nat"
     ; op sequence.size [nonempty] "NzNat"
-    ; eq (app sequence.size [term rest])
-        (app size_aux [term rest; Const "0"])
-    ; op size_aux [list; "Nat"] "Nat"
-    ; eq (app size_aux [Const sequence.empty; term count]) (term count)
-    ; eq
-        ( app size_aux [concat (term element) (term rest); term count]
-        )
-        (app size_aux
-            [term rest; app "_+_" [term count; Const "1"]]
-        )
+    ; op (root ^ "SizeAux") [list; "Nat"] "Nat"
     ]
 
   let repeat metadata sort =
@@ -448,30 +404,6 @@ module Lists = struct
     sequence_checks (term element) (Some (term next)) (term rest) (term typ)
       sequence.empty sequence.concat
 
-  let generic_sequence metadata =
-    let element = var "SEQUENCE-ELEMENT" "SpectecTerminal" in
-    let next = var "SEQUENCE-NEXT" "SpectecTerminal" in
-    let rest = var "SEQUENCE-REST" "SpectecTerminals" in
-    let value = var "TYPECHECK-VALUE" "[SpectecTerminal]" in
-    let typ = var "TYPECHECK-TYPE" "SpectecType" in
-    let check value = app "typecheck" [value; term typ] in
-    [ SortDecl "SpectecTerminals"
-    ; SubsortDecl ("SpectecTerminal", "SpectecTerminals")
-    ; op ~attrs:[Ctor] "eps" [] "SpectecTerminals"
-    ; op
-        ~attrs:[Ctor; Assoc; Id (Const "eps"); Prec 25]
-        "__" ["SpectecTerminals"; "SpectecTerminals"] "SpectecTerminals"
-    ; op ~attrs:[Ctor] "seq" ["SpectecTerminals"] "SpectecTerminal"
-    ; op ~arrow:Partial "unseq" ["SpectecTerminal"] "SpectecTerminals"
-    ; eq (app "unseq" [app "seq" [term rest]]) (term rest)
-    ]
-    (* Distinct hinted concat families can occur as an opaque generic suffix.
-       Keep the existing guard there; shared AU lists expose their next element. *)
-    @ sequence_checks (term element)
-        (if Hintd.separate_list_families metadata then None else Some (term next))
-        (term rest) (term typ) "eps" "_ _"
-    @ [Eq (check (term value), Const "false", [Owise])]
-
   let statements metadata =
     let sorts = Hintd.typed_list_sorts metadata in
     let roots = Hintd.typed_list_roots metadata in
@@ -480,17 +412,17 @@ module Lists = struct
       |> List.filter (fun sort -> not (List.mem sort roots))
       |> List.concat_map (lower_list metadata)
     in
-    let generic_edges =
-      roots
-      |> List.map (fun sort -> SubsortDecl (list_sort sort, "SpectecTerminals"))
-    in
     let checks =
       if Hintd.separate_list_families metadata then
         List.concat_map (typed_sequence_checks metadata) roots
       else []
     in
-    generic_sequence metadata @ list_edges metadata @ generic_edges @ lower
+    list_edges metadata @ lower
     @ checks @ List.concat_map (repeat metadata) sorts
+
+  let generic_edges metadata =
+    Hintd.typed_list_roots metadata
+    |> List.map (fun sort -> SubsortDecl (list_sort sort, "SpectecTerminals"))
 
   let generated_statements metadata =
     Hintd.typed_list_sorts metadata
@@ -500,5 +432,7 @@ end
 
 let list_views = Lists.views
 let list_imports = Lists.imports
+let list_support_module = Lists.support_module
+let list_subsorts = Lists.generic_edges
 let list_statements = Lists.statements
 let list_generated_statements = Lists.generated_statements

@@ -195,18 +195,15 @@ let reserved_names =
     ; "iterOpt"; "iterList"; "iterList1"
     ; "iterListN"
     (* spectec-support/sequence.maude *)
-    ; "indexDefined"; "seqCursor"; "lenAux"; "takeAux"; "dropAux"
-    ; "take"; "drop"; "setAt"
-    ; "splice"
+    ; "indexDefined"; "setAt"
+    ; "splice"; "lenAux"
     (* spectec-support/record.maude *)
     ; "EMPTY"; "recordConcat"; "optionConcat"
-    ; "setItem"
+    ; "setItem"; "hasField"
     (* builtins.maude *)
     ; "ibits-aux"; "inv-ibits-aux"; "ibytes-aux"
-    ; "inv-ibytes-aux"; "sign-extend-nat"; "iclz-bits"
-    ; "ictz-bits"; "ipopcnt-bits"; "inot-bits"
-    ; "irev-bits"; "iand-bits"; "iandnot-bits"
-    ; "ior-bits"; "ixor-bits"; "shift-count"
+    ; "inv-ibytes-aux"; "sign-extend-nat"; "ipopcnt-bits"; "ipopcnt-bits-aux"
+    ; "irev-bits"; "irev-bits-aux"; "shift-count"
     ; "signed-nat"; "floor-div-pow2-int"; "sat-s-int"
     ; "wrap-s-int"; "fnmag-valid"
     ; "scale-rat"; "fmag-rat"; "float-rat"
@@ -236,7 +233,7 @@ let reserved_names =
     ; "inv-nbytes-float"; "zbytes-pack"; "inv-zbytes-pack"
     ; "lane-width"; "vec-raw"; "lane-from-bits"
     ; "lane-to-bits"; "lanes-aux"; "inv-lanes-aux"
-    ; "pair-chunks"; "take-exact"; "fixed-chunks"
+    ; "pair-chunks"; "fixed-chunks"
     (* relation-backends.maude *)
     ; "backend-reftype-sub"; "backend-heaptype-sub"; "backend-valid-heaptype"
     ; "backend-close-super"; "backend-deftype-step"; "ref-ok-actual-type"

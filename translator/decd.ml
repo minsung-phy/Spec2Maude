@@ -353,22 +353,17 @@ let translate_equation_clause index prepared =
 
       equation head.term right conditions attrs
 
-let choice_helper index id result_typ
+let choice_helper index id
     (choice : Prescan.membership_choice) rhs =
   match choice.element.it with
   | VarE _ ->
       let helper argument = App (choice.helper_name, [argument]) in
-      let result_sort = Term.translate_sort index result_typ in
       let request_sort = Prescan.rewrite_sort index id in
       let representation =
         Prescan.sequence_representation index choice.collection.note
       in
       let rest = generated_variable "CHOICE-REST" representation.sort in
-      let head =
-        generated_variable "CHOICE-HEAD"
-          (Term.translate_sort index choice.element.note)
-      in
-      let result = generated_variable "CHOICE-RESULT" result_sort in
+      let prefix = generated_variable "CHOICE-PREFIX" representation.sort in
       let selected = Term.translate_exp index choice.element in
       let selected_head =
         Term.as_sequence_element index choice.element.note selected
@@ -384,16 +379,8 @@ let choice_helper index id result_typ
           ( None
           , helper
               (Term.sequence_of_typ index choice.collection.note
-                 [selected_head; Var rest])
+                 [Var prefix; selected_head; Var rest])
           , Term.translate_exp index rhs
-          )
-      ; Crl
-          ( None
-          , helper
-              (Term.sequence_of_typ index choice.collection.note
-                 [Var head; Var rest])
-          , Var result
-          , [RewriteCond (helper (Var rest), Var result)]
           )
       ]
   | _ ->
@@ -420,7 +407,7 @@ let choice_public_quants element quants =
   | _ ->
       invalid_arg "membership choice element must be a variable"
 
-let translate_choice_clause index id result_typ
+let translate_choice_clause index id
     (choice : Prescan.membership_choice) prepared =
   match prepared.clause.it with
   | DefD (quants, args, rhs, _) ->
@@ -453,12 +440,12 @@ let translate_choice_clause index id result_typ
         |> schedule_conditions head.term
       in
       equation head.term right conditions []
-      :: choice_helper index id result_typ choice rhs
+      :: choice_helper index id choice rhs
 
-let translate_clause index id result_typ prepared =
+let translate_clause index id prepared =
   match Prescan.membership_choice index prepared.clause with
   | Some choice ->
-      translate_choice_clause index id result_typ choice prepared
+      translate_choice_clause index id choice prepared
   | None ->
       [translate_equation_clause index prepared]
 
@@ -508,7 +495,7 @@ let translate index id params result_typ clauses =
   else
     let clauses = prepare_clauses index id params clauses in
     if choice then
-      header @ List.concat_map (translate_clause index id result_typ) clauses
+      header @ List.concat_map (translate_clause index id) clauses
     else if rule then
       header @ List.map (translate_rule_clause index) clauses
     else
