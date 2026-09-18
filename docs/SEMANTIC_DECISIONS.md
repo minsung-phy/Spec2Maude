@@ -62,30 +62,75 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
 현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
 
-## 목록 계산과 출력의 비용
+## 공통 backend와 목록 계산
 
-`LenE`, `UpdE/SliceP`의 번역과 일반 목록의 `eps`, `__`, `seq(...)` 표현은
-유지한다. `len`은 Maude의 `[memo]`로 canonical 목록에 대한 계산 결과를
-재사용한다. 동일한 길이라도 내용이 다른 목록은 별도 캐시 항목이다.
-prelude `LIST`의 `size`도 원소를 순회하는 equational 정의이므로, 그 연산으로
-이름만 바꾸는 것으로 반복 순회가 없어지지는 않는다. 기존 hint 기반
-`InstrList`의 prelude 연산 선택은 유지한다.
+고정 `SpectecTerminals`, `eps`, `__`, `seq`, `unseq` 및 공통 목록
+`typecheck` 정의는 `translator/backend/spectec-support/list.maude`에 둔다.
+생성되는 `DSL-TYPED-LISTS`는 source hint별 native LIST instantiation과
+좁은 타입 선언을 제공하고, `DSL-PRETYPE`은 backend 모듈을 import하고
+source별 subsort 연결만 추가한다. 공통 정의를 source마다 생성하지 않는다.
 
-`splice(S, n, i, U)`는 기존의 `n + i <= len(S)` 조건을 유지하며 앞부분을
-한 번 순회한다. `S = P R`, `len(P) = n`이면 보조 계산의 결과는 `P U drop(R, i)`로,
-기존 `take(S, n) U drop(S, n + i)`와 같다. `seq(...)`는 이동 중에도 하나의
-원소다. 이 대응은 유한한 ground canonical IL 목록의 결과와 정의역에 관한
-것이며, 미평가 보조 term의 문법적 동일성이나 전체 translator의 보존 증명은 아니다.
-source Step 및 LABEL·FRAME 문맥 규칙은 바꾸지 않는다.
+`LenE`, `SliceE`, `UpdE` 및 premise/iteration의 IL 번역은 유지한다.
+일반 목록의 membership은 `PREFIX T SUFFIX` 매칭과 `[owise]`로 구현한다.
+index/setAt은 해당 원소 앞 prefix의 길이를 검사한다. slice/splice는
+`S = PREFIX REST`, `REST = MIDDLE SUFFIX`를 순서대로 매칭하고
+`len(PREFIX) = N`, `len(MIDDLE) = I`를 검사한다. 따라서 정의역은
+`N + I <= len(S)`이고, 빈 slice도 끝 위치까지 허용한다. `seq(...)`는
+하나의 원소다. `take`, `drop`, cursor, 32원소 전개식, len memo는 제거했다.
 
-일반 목록의 `lenAux`, `takeAux`, `dropAux`, `spliceAux`는 32개 원소를
-처리하는 식과 `[owise]` 단일 원소 식을 사용한다. 32개 식은 기존 식을
-32회 적용한 결과로 전개되며, 짧은 목록과 작은 count는 단일 원소 식으로
-처리한다. 원소 순서, boxing, `slice`/`splice`의 범위 조건은 유지한다.
-이는 기존 IL 목록 연산의 backend 구현 변경이며 `LenE`, `SliceE`,
-`UpdE/SliceP`의 재귀 번역, typed list의 별도 연산, source rule은 변경하지
-않는다. 내부 equation trace의 일대일 대응이나 자유 목록 변수를 포함한
-symbolic matching/narrowing의 동등성까지 주장하지 않는다.
+길이를 세는 `lenAux(S, n)`은 `n + |S|`를 계산하는 equation이며,
+Maude prelude LIST의 `$size`와 같은 accumulator 형태다. 반복 목록 생성은
+`N = 2 * (N quo 2) + (N rem 2)`를 사용하는 equation을 유지한다.
+이 둘은 조회 알고리즘이 아니라 필요한 개수 계산/값 생성이다. 단순히
+중첩 호출로 바꾸면 65536원소에서 stack overflow가 발생하므로 재귀를
+무조건 제거하거나 한 원소씩 중첩시키지 않는다. typed list의 연산은
+중복 equation 없이 native LIST 정의를 사용하고 좁은 overload는 유지한다.
+
+record 조회/갱신은 field를 매칭하고 prefix에 동일 field가 없다는 조건으로
+첫 항목을 선택한다. 없는 field의 조회는 eps, 갱신은 끝에 추가한다.
+비결정적 membership choice helper는 prefix/선택 원소/suffix 매칭 rule로
+가능한 원소를 선택한다. source의 선택 의미, boxing과 frozen 인자를 유지한다.
+비트별 논리 연산은 폭/operand 조건을 유지한 native Nat 연산을 사용한다.
+CLZ/CTZ와 고정 크기 chunk는 매칭으로 구현하며, 실제 인코딩/누산/반전 등
+결과를 구성하는 재귀 계산은 남긴다.
+
+`ipopcnt-bits-aux(B, c)`는 `c + B 안의 1의 개수`,
+`irev-bits-aux(B, A)`는 `reverse(B) A`를 계산한다. 각 equation은
+이 대응을 유지하며 남은 비트 목록을 줄인다. 공개 unary helper는 각각
+0/eps로 시작한다. 이는 prelude LIST의 `$size`/`$reverse`와 같은 방식이며,
+비트마다 덧셈/연결을 중첩하는 구현에서 발생한 stack overflow를 피한다.
+새 backend helper 이름도 prescan의 예약 이름에 포함한다.
+
+이 대응은 유한 ground canonical source 값의 결과와 정의역에 관한 것이다.
+`[owise]` membership/record는 unknown symbolic tail에서 이전의 미평가 term과
+다른 결과를 낼 수 있으므로 자유 목록 변수의 narrowing 동등성을 주장하지 않는다.
+source rule, IL 반복 의미, 전체 model-checking graph 보존 증명으로 확대하지 않는다.
+
+## Wasm driver의 조회와 결과 검사
+
+run/modelcheck의 `findFunc`, WAST의 `findExport`는 export 앞/뒤를 매칭한다.
+prefix에 같은 이름이 없다는 조건은 첫 export를 선택하는 기존 의미를 유지한다.
+특히 먼저 나온 동일 이름의 global을 건너뛰어 뒤의 function을 선택하지 않는다.
+없는 export와 잘못된 address kind에는 정상 조회 결과를 추가하지 않는다.
+
+WAST instance 환경은 `instances.entry`와 associative `instances.concat`으로
+표현한다. identity는 `instances.nil`이며 `comm`은 붙이지 않는다.
+`cons(k,v,rest)`와 `entry(k,v) concat encode(rest)`를 대응시키면 기존 순서와
+삽입 위치를 보존한다. `findInstance`도 prefix 조건으로 첫 동일 ID를 선택한다.
+host-provider와 module-done의 환경 생성은 같은 표현을 사용한다.
+
+`match.any`는 associative alternatives에서 성공하는 pattern 하나를 찾는다.
+지원하는 canonical result/pattern에서 기존의 Boolean OR와 같은 존재 조건이며,
+성공하는 pattern이 없을 때만 `match.no [owise]`가 적용된다.
+`activeFrameDepth`는 `runtimeResults`로 확인한 값 prefix를 건너뛴 뒤 활성
+FRAME/LABEL/HANDLER의 body로만 내려간다. 뒤쪽 sibling의 FRAME은 세지 않는다.
+`runtimeResults`, 인자/결과의 위치별 비교, import 목록 구성은 모든 원소를
+검사하거나 결과를 구성하는 연산이므로 필요한 구조적 재귀를 유지한다.
+
+근거는 [Maude 3.5.1 manual](../reference/manual/Maude3.5.1-manual.pdf)의
+§4.3(조건과 matching), §4.4(연산자 속성), §4.9(membership/owise 예제),
+§8.3(native NAT), §8.14.1(LIST), 그리고 설치된 3.5.1 prelude의 LIST/NAT
+정의다. native MAP으로 치환하지 않는 이유는 중복 key의 의미를 바꾸기 때문이다.
 
 WAST 출력기는 긴 `Seq`를 균형 괄호로 묶어 Maude의 평탄한 associative
 구문 분석 비용을 줄인다. 각 말단 그룹은 최대 8개 원소이며 `__`의 결합법칙만

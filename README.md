@@ -69,6 +69,13 @@ A separate WebAssembly frontend translates validated WebAssembly modules and
 test scripts into initial Maude terms. This separates the derivation of the
 language semantics from the construction of concrete program configurations.
 
+Fixed value/type support lives in `backend/spectec-support/pretype.maude`, and
+fixed list declarations and checks live in `backend/spectec-support/list.maude`
+(both under `translator/`). The translator emits source-derived typed lists
+first, then loads the common list extension, and finally connects the hinted
+list sorts to the common sequence sort. This order keeps the native Maude
+`LIST` overloads and the common list operators in one extension chain.
+
 ## Repository Organization
 
 ```text

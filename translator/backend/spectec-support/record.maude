@@ -29,16 +29,20 @@ fmod DSL-RECORD is
   op _[._=_] : Record Qid SpectecTerminals -> Record .
 
   op setItem : RecordItems Qid SpectecTerminals -> RecordItems .
+  op hasField : RecordItems Qid -> Bool .
 
-  vars FIELD OTHER : Qid .
-  var ITEMS : RecordItems .
+  var FIELD : Qid .
+  vars ITEMS PREFIX SUFFIX : RecordItems .
   vars VALUE NEW-VALUE : SpectecTerminals .
   var RECORD : Record .
 
   eq value(FIELD, {ITEMS}) = value(FIELD, ITEMS) .
-  eq value(FIELD, EMPTY) = eps .
-  eq value(FIELD, item(FIELD, VALUE) ; ITEMS) = VALUE .
-  eq value(FIELD, item(OTHER, VALUE) ; ITEMS) = value(FIELD, ITEMS) [owise] .
+  eq hasField(PREFIX ; item(FIELD, VALUE) ; SUFFIX, FIELD) = true .
+  eq hasField(ITEMS, FIELD) = false [owise] .
+  --- Preserve first occurrence selection even for duplicate backend fields.
+  ceq value(FIELD, PREFIX ; item(FIELD, VALUE) ; SUFFIX) = VALUE
+    if not hasField(PREFIX, FIELD) .
+  eq value(FIELD, ITEMS) = eps [owise] .
 
   eq {ITEMS} . FIELD = value(FIELD, ITEMS) .
   eq RECORD . FIELD = value(FIELD, RECORD) [owise] .
@@ -46,12 +50,10 @@ fmod DSL-RECORD is
   eq {ITEMS}[. FIELD = NEW-VALUE]
     = {setItem(ITEMS, FIELD, NEW-VALUE)} .
 
-  eq setItem(EMPTY, FIELD, NEW-VALUE)
-    = item(FIELD, NEW-VALUE) .
-  eq setItem(item(FIELD, VALUE) ; ITEMS, FIELD, NEW-VALUE)
-    = item(FIELD, NEW-VALUE) ; ITEMS .
-  ceq setItem(item(OTHER, VALUE) ; ITEMS, FIELD, NEW-VALUE)
-    = item(OTHER, VALUE) ; setItem(ITEMS, FIELD, NEW-VALUE)
-    if FIELD =/= OTHER .
+  ceq setItem(PREFIX ; item(FIELD, VALUE) ; SUFFIX, FIELD, NEW-VALUE)
+    = PREFIX ; item(FIELD, NEW-VALUE) ; SUFFIX
+    if not hasField(PREFIX, FIELD) .
+  eq setItem(ITEMS, FIELD, NEW-VALUE)
+    = ITEMS ; item(FIELD, NEW-VALUE) [owise] .
 
 endfm

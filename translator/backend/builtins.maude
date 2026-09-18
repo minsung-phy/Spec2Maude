@@ -55,57 +55,27 @@ mod WASM-BUILTINS is
        /\ _<_(BE_I, _^_(2, BE_M))
        /\ _>=_(BE_I, _^_(2, _-_(BE_M, 1))) .
 
-  --- Implemented builtin family: integer bit-count operations.
+  --- Counting/reversing produces a result for every bit; it is not a lookup.
   vars BC_N BC_I BC_ACC : Nat .
-  var BC_BITS : SpectecTerminals .
-  op iclz-bits : SpectecTerminals Nat -> Nat .
-  op ictz-bits : SpectecTerminals Nat -> Nat .
-  op ipopcnt-bits : SpectecTerminals Nat -> Nat .
-  eq iclz-bits(eps, BC_ACC) = BC_ACC .
-  eq iclz-bits(1 BC_BITS, BC_ACC) = BC_ACC .
-  eq iclz-bits(0 BC_BITS, BC_ACC) = iclz-bits(BC_BITS, _+_(BC_ACC, 1)) .
-  eq ictz-bits(eps, BC_ACC) = BC_ACC .
-  eq ictz-bits(0 BC_BITS, BC_ACC) = ictz-bits(BC_BITS, _+_(BC_ACC, 1)) .
-  eq ictz-bits(1 BC_BITS, BC_ACC) = ictz-bits(BC_BITS, 0) .
-  eq ipopcnt-bits(eps, BC_ACC) = BC_ACC .
-  eq ipopcnt-bits(0 BC_BITS, BC_ACC) = ipopcnt-bits(BC_BITS, BC_ACC) .
-  eq ipopcnt-bits(1 BC_BITS, BC_ACC) = ipopcnt-bits(BC_BITS, _+_(BC_ACC, 1)) .
+  vars BC_BITS BC_PREFIX BC_SUFFIX : SpectecTerminals .
+  op ipopcnt-bits : SpectecTerminals -> Nat .
+  --- Like prelude LIST's size, keep the aggregate in an argument rather than
+  --- leave one pending addition per bit on the evaluator stack.
+  op ipopcnt-bits-aux : SpectecTerminals Nat -> Nat .
+  eq ipopcnt-bits(BC_BITS) = ipopcnt-bits-aux(BC_BITS, 0) .
+  eq ipopcnt-bits-aux(eps, BC_ACC) = BC_ACC .
+  eq ipopcnt-bits-aux(0 BC_BITS, BC_ACC) = ipopcnt-bits-aux(BC_BITS, BC_ACC) .
+  eq ipopcnt-bits-aux(1 BC_BITS, BC_ACC) = ipopcnt-bits-aux(BC_BITS, BC_ACC + 1) .
 
-  --- Implemented builtin family: integer bitwise operations.
   vars BT_N BT_I BT_J BT_K : Nat .
-  vars BT_BITS BT_BITS1 BT_BITS2 : SpectecTerminals .
-  op inot-bits : SpectecTerminals -> SpectecTerminals .
-  op irev-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  op iand-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  op iandnot-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  op ior-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  op ixor-bits : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  eq inot-bits(eps) = eps .
-  eq inot-bits(0 BT_BITS) = 1 inot-bits(BT_BITS) .
-  eq inot-bits(1 BT_BITS) = 0 inot-bits(BT_BITS) .
-  eq irev-bits(eps, BT_BITS2) = BT_BITS2 .
-  eq irev-bits(0 BT_BITS1, BT_BITS2) = irev-bits(BT_BITS1, 0 BT_BITS2) .
-  eq irev-bits(1 BT_BITS1, BT_BITS2) = irev-bits(BT_BITS1, 1 BT_BITS2) .
-  eq iand-bits(eps, eps) = eps .
-  eq iand-bits(0 BT_BITS1, 0 BT_BITS2) = 0 iand-bits(BT_BITS1, BT_BITS2) .
-  eq iand-bits(0 BT_BITS1, 1 BT_BITS2) = 0 iand-bits(BT_BITS1, BT_BITS2) .
-  eq iand-bits(1 BT_BITS1, 0 BT_BITS2) = 0 iand-bits(BT_BITS1, BT_BITS2) .
-  eq iand-bits(1 BT_BITS1, 1 BT_BITS2) = 1 iand-bits(BT_BITS1, BT_BITS2) .
-  eq iandnot-bits(eps, eps) = eps .
-  eq iandnot-bits(0 BT_BITS1, 0 BT_BITS2) = 0 iandnot-bits(BT_BITS1, BT_BITS2) .
-  eq iandnot-bits(0 BT_BITS1, 1 BT_BITS2) = 0 iandnot-bits(BT_BITS1, BT_BITS2) .
-  eq iandnot-bits(1 BT_BITS1, 0 BT_BITS2) = 1 iandnot-bits(BT_BITS1, BT_BITS2) .
-  eq iandnot-bits(1 BT_BITS1, 1 BT_BITS2) = 0 iandnot-bits(BT_BITS1, BT_BITS2) .
-  eq ior-bits(eps, eps) = eps .
-  eq ior-bits(0 BT_BITS1, 0 BT_BITS2) = 0 ior-bits(BT_BITS1, BT_BITS2) .
-  eq ior-bits(0 BT_BITS1, 1 BT_BITS2) = 1 ior-bits(BT_BITS1, BT_BITS2) .
-  eq ior-bits(1 BT_BITS1, 0 BT_BITS2) = 1 ior-bits(BT_BITS1, BT_BITS2) .
-  eq ior-bits(1 BT_BITS1, 1 BT_BITS2) = 1 ior-bits(BT_BITS1, BT_BITS2) .
-  eq ixor-bits(eps, eps) = eps .
-  eq ixor-bits(0 BT_BITS1, 0 BT_BITS2) = 0 ixor-bits(BT_BITS1, BT_BITS2) .
-  eq ixor-bits(0 BT_BITS1, 1 BT_BITS2) = 1 ixor-bits(BT_BITS1, BT_BITS2) .
-  eq ixor-bits(1 BT_BITS1, 0 BT_BITS2) = 1 ixor-bits(BT_BITS1, BT_BITS2) .
-  eq ixor-bits(1 BT_BITS1, 1 BT_BITS2) = 0 ixor-bits(BT_BITS1, BT_BITS2) .
+  vars BT_BITS BT_ACC : SpectecTerminals .
+  op irev-bits : SpectecTerminals -> SpectecTerminals .
+  --- The prelude LIST reverse uses the same tail-recursive construction.
+  op irev-bits-aux : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  eq irev-bits(BT_BITS) = irev-bits-aux(BT_BITS, eps) .
+  eq irev-bits-aux(eps, BT_ACC) = BT_ACC .
+  eq irev-bits-aux(0 BT_BITS, BT_ACC) = irev-bits-aux(BT_BITS, 0 BT_ACC) .
+  eq irev-bits-aux(1 BT_BITS, BT_ACC) = irev-bits-aux(BT_BITS, 1 BT_ACC) .
 
   --- Implemented builtin family: integer shift/rotate operations.
   var SH_N : NzNat .
@@ -1067,52 +1037,52 @@ mod WASM-BUILTINS is
        /\ _<_(BE_M, BE_N)
        /\ _<_(BE_I, _^_(2, BE_M)) .
 
-  ceq iclz-(BC_N, (BC_I)) = (iclz-bits(ibits-aux(BC_N, BC_I), 0))
+  ceq iclz-(BC_N, 0) = BC_N if BC_N > 0 .
+  ceq iclz-(BC_N, BC_I) = len(BC_PREFIX)
+    if BC_N > 0 /\ BC_I < 2 ^ BC_N
+       /\ BC_PREFIX 1 BC_SUFFIX := ibits-aux(BC_N, BC_I)
+       /\ BC_PREFIX == repeatSeq(len(BC_PREFIX), 0) .
+
+  ceq ictz-(BC_N, 0) = BC_N if BC_N > 0 .
+  ceq ictz-(BC_N, BC_I) = len(BC_SUFFIX)
+    if BC_N > 0 /\ BC_I < 2 ^ BC_N
+       /\ BC_PREFIX 1 BC_SUFFIX := ibits-aux(BC_N, BC_I)
+       /\ BC_SUFFIX == repeatSeq(len(BC_SUFFIX), 0) .
+
+  ceq ipopcnt-(BC_N, (BC_I)) = (ipopcnt-bits(ibits-aux(BC_N, BC_I)))
     if _>_(BC_N, 0)
        /\ _<_(BC_I, _^_(2, BC_N)) .
 
-  ceq ictz-(BC_N, (BC_I)) = (ictz-bits(ibits-aux(BC_N, BC_I), 0))
-    if _>_(BC_N, 0)
-       /\ _<_(BC_I, _^_(2, BC_N)) .
-
-  ceq ipopcnt-(BC_N, (BC_I)) = (ipopcnt-bits(ibits-aux(BC_N, BC_I), 0))
-    if _>_(BC_N, 0)
-       /\ _<_(BC_I, _^_(2, BC_N)) .
-
-  ceq inot-(BT_N, (BT_I)) = (inv-ibits-aux(inot-bits(ibits-aux(BT_N, BT_I)), 0))
+  ceq inot-(BT_N, (BT_I)) = (_-_(_-_(2 ^ BT_N, 1), BT_I))
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N)) .
 
-  ceq irev-(BT_N, (BT_I)) = (inv-ibits-aux(irev-bits(ibits-aux(BT_N, BT_I), eps), 0))
+  ceq irev-(BT_N, (BT_I)) = (inv-ibits-aux(irev-bits(ibits-aux(BT_N, BT_I)), 0))
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N)) .
 
-  ceq iand-(BT_N, (BT_I), (BT_J)) = (inv-ibits-aux(iand-bits(ibits-aux(BT_N, BT_I), ibits-aux(BT_N, BT_J)), 0))
+  ceq iand-(BT_N, (BT_I), (BT_J)) = (_&_(BT_I, BT_J))
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N))
        /\ _<_(BT_J, _^_(2, BT_N)) .
 
-  ceq iandnot-(BT_N, (BT_I), (BT_J)) = (inv-ibits-aux(iandnot-bits(ibits-aux(BT_N, BT_I), ibits-aux(BT_N, BT_J)), 0))
+  ceq iandnot-(BT_N, (BT_I), (BT_J)) = (_&_(BT_I, _-_( _-_(2 ^ BT_N, 1), BT_J)))
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N))
        /\ _<_(BT_J, _^_(2, BT_N)) .
 
-  ceq ior-(BT_N, (BT_I), (BT_J)) = (inv-ibits-aux(ior-bits(ibits-aux(BT_N, BT_I), ibits-aux(BT_N, BT_J)), 0))
+  ceq ior-(BT_N, (BT_I), (BT_J)) = (_|_(BT_I, BT_J))
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N))
        /\ _<_(BT_J, _^_(2, BT_N)) .
 
-  ceq ixor-(BT_N, (BT_I), (BT_J)) = (inv-ibits-aux(ixor-bits(ibits-aux(BT_N, BT_I), ibits-aux(BT_N, BT_J)), 0))
+  ceq ixor-(BT_N, (BT_I), (BT_J)) = (integerXor(BT_I, BT_J))
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N))
        /\ _<_(BT_J, _^_(2, BT_N)) .
 
   ceq ibitselect-(BT_N, (BT_I), (BT_J), (BT_K)) =
-      (inv-ibits-aux(
-        ior-bits(
-          iand-bits(ibits-aux(BT_N, BT_I), ibits-aux(BT_N, BT_K)),
-          iand-bits(ibits-aux(BT_N, BT_J), inot-bits(ibits-aux(BT_N, BT_K)))),
-        0))
+      _|_(_&_(BT_I, BT_K), _&_(BT_J, _-_( _-_(2 ^ BT_N, 1), BT_K)))
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N))
        /\ _<_(BT_J, _^_(2, BT_N))
@@ -1585,17 +1555,11 @@ mod WASM-BUILTINS is
   ceq inv-concat-(BDI_T, BDI_XS) = pair-chunks(BDI_XS)
     if _==_(_rem_(len(BDI_XS), 2), 0) .
   var BDI_N : NzNat .
-  var BDI_K : Nat .
-  op take-exact : Nat SpectecTerminals ~> SpectecTerminals .
   op fixed-chunks : NzNat SpectecTerminals ~> SpectecTerminals .
-  eq take-exact(0, BDI_XS) = eps .
-  eq take-exact(s BDI_K, BDI_X BDI_REST) =
-      BDI_X take-exact(BDI_K, BDI_REST) .
   eq fixed-chunks(BDI_N, eps) = eps .
-  ceq fixed-chunks(BDI_N, BDI_XS) =
-      seq(take-exact(BDI_N, BDI_XS))
-      fixed-chunks(BDI_N, drop(BDI_XS, BDI_N))
-    if _>=_(len(BDI_XS), BDI_N) .
+  ceq fixed-chunks(BDI_N, BDI_XS BDI_REST) =
+      seq(BDI_XS) fixed-chunks(BDI_N, BDI_REST)
+    if len(BDI_XS) == BDI_N .
   ceq inv-concatn-(BDI_T, BDI_N, BDI_XS) = fixed-chunks(BDI_N, BDI_XS)
     if _==_(_rem_(len(BDI_XS), BDI_N), 0) .
   eq nd = false .

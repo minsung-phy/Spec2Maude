@@ -102,7 +102,8 @@ let instances providers =
   List.fold_right
     (fun provider rest ->
       let id, instance = host_provider_term provider in
-      T.app "instances.cons" [T.atom (string_of_int id); instance; rest])
+      T.app "instances.concat"
+        [T.app "instances.entry" [T.atom (string_of_int id); instance]; rest])
     providers (T.atom "instances.nil")
 
 let store (host : Wast_plan.host) =
