@@ -1,0 +1,105 @@
+mod SERVER-BUGGY-WASM is
+  protecting WASM-BUILTINS .
+
+  sort ServerRunState .
+
+  op serverCall   : ValList -> ServerRunState [ctor] .
+  op serverInit   : SpectecTerminal ValList -> ServerRunState [ctor frozen (1)] .
+  op serverExec   : SpectecTerminal -> ServerRunState [ctor frozen (1)] .
+  op serverResult : ValList -> ServerRunState [ctor] .
+
+  op serverModule : -> SpectecTerminal .
+  op serverName : -> SpectecTerminals .
+  op serverEmptyStore : -> SpectecTerminal .
+  op serverFindFunc : SpectecTerminals SpectecTerminals ~> Nat .
+
+  vars C C2 Z XA : SpectecTerminal .
+  vars NAME OTHER EXPORTS : SpectecTerminals .
+  vars ARGS RESULT : ValList .
+  var ADDR : Nat .
+
+
+  --- 실제 server-buggy.wasm
+  eq serverModule =
+    MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I32, I32)))), eps, eps, eps,
+    eps, eps,
+    spectec-FUNC-2(
+      0, eps,
+      (LOCAL.GET(0) CONST(I32, 1) BINOP(I32, ADD))),
+    eps, eps, eps,
+    EXPORT(
+      ((115 101 114 118 101) (114 95 115 116 101 112)),
+      FUNC(0))) .
+
+
+  eq serverName =
+    (115 101 114 118 101)
+    (114 95 115 116 101 112) .
+
+
+  eq serverEmptyStore =
+    {(item('TAGS, eps) ;
+      (item('GLOBALS, eps) ;
+       (item('MEMS, eps) ;
+        (item('TABLES, eps) ;
+         (item('FUNCS, eps) ;
+          (item('DATAS, eps) ;
+           (item('ELEMS, eps) ;
+            (item('STRUCTS, eps) ;
+             (item('ARRAYS, eps) ;
+              item('EXNS, eps))))))))))} .
+
+
+  eq serverFindFunc(
+       {(item('NAME, NAME) ; item('ADDR, FUNC(ADDR)))} EXPORTS,
+       NAME)
+    = ADDR .
+
+  ceq serverFindFunc(
+        {(item('NAME, OTHER) ; item('ADDR, XA))} EXPORTS,
+        NAME)
+    = serverFindFunc(EXPORTS, NAME)
+    if OTHER =/= NAME .
+
+
+  crl [server-instantiate] :
+    serverCall(ARGS)
+    =>
+    serverInit(C, ARGS)
+    if instantiate(serverEmptyStore, serverModule, eps) => C .
+
+
+  crl [server-init-step] :
+    serverInit(C, ARGS)
+    =>
+    serverInit(C2, ARGS)
+    if Step(C) => C2 .
+
+
+  crl [server-invoke] :
+    serverInit(C, ARGS)
+    =>
+    serverExec(
+      invoke(
+        spectec-store(Z),
+        serverFindFunc(
+          value('EXPORTS, spectec-moduleinst(Z)),
+          serverName),
+        ARGS))
+    if (Z ; eps) := C .
+
+
+  crl [server-step] :
+    serverExec(C)
+    =>
+    serverExec(C2)
+    if Step(C) => C2 .
+
+
+  crl [server-finished] :
+    serverExec(C)
+    =>
+    serverResult(RESULT)
+    if (Z ; RESULT) := C .
+
+endm

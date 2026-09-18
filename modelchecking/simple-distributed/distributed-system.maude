@@ -1,0 +1,129 @@
+load ../../translator/backend/semantics.maude
+load client.maude
+load server-buggy.maude
+load model-checker.maude
+
+mod DISTRIBUTED-SYSTEM is
+    protecting CLIENT-WASM .
+    protecting SERVER-BUGGY-WASM .
+
+    including MODEL-CHECKER * (
+        op _xor_ : Nat Nat -> Nat to integerXor,
+        op _+_ : String String -> String to stringConcat,
+        op _<_ : String String -> Bool to stringLess,
+        op _<=_ : String String -> Bool to stringLessEqual,
+        op _>_ : String String -> Bool to stringGreater,
+        op _>=_ : String String -> Bool to stringGreaterEqual,
+        op char : Nat -> Char to nativeChar
+    ) .
+
+    sort Message .
+    ops none req ack : -> Message [ctor] .
+
+    sort SystemState .
+    subsort SystemState < State .
+    op <_,_,_> : Nat Nat Message -> SystemState [ctor] .
+
+    op initial : -> SystemState .
+    eq initial = < 0, 0, none > .
+
+    vars C C2 N N2 : Nat .
+
+    op doubleProcessed : -> Prop [ctor] .
+    ops waiting done : -> Prop [ctor] .
+    
+    var M : Message .
+    var S : SystemState .
+    var P : Prop .
+
+    eq < C, 2, M > |= doubleProcessed = true .
+    eq < 1, N, M > |= waiting = true .
+    eq < 2, N, M > |= done = true .
+    eq S |= P = false [owise] .
+
+    --- START
+    --- client_step(0, 0)을 실제 Wasm으로 실행
+    crl [start] :
+        < 0, N, none >
+        =>
+        < C2, N, req >
+        if clientCall(CONST(I32, 0) CONST(I32, 0)) => clientResult(CONST(I32, C2)) .
+    
+    --- Request가 Server에 전달
+    --- server_step(N)을 실제 Wasm으로 실행
+    --- crl [deliver-request] :
+    ---    < C, N, req >
+    ---    =>
+    ---    < C, N2, ack >
+    ---    if serverCall(CONST(I32, N)) => serverResult(CONST(I32, N2)) .
+    --- 
+    --- 첫 번째 처리: server_step(0)
+    crl [deliver-request-0] :
+        < C, 0, req >
+        =>
+        < C, N2, ack >
+        if serverCall(CONST(I32, 0)) => serverResult(CONST(I32, N2)) .
+
+    --- 두 번째 처리: server_step(1)
+    crl [deliver-request-1] :
+        < C, 1, req >
+        =>
+        < C, N2, ack >
+        if serverCall(CONST(I32, 1)) => serverResult(CONST(I32, N2)) .
+
+    --- 2 means "processed at least twice"
+    crl [deliver-request-2plus] :
+        < C, 2, req >
+        =>
+        < C, 2, ack >
+        if serverCall(CONST(I32, 2)) => serverResult(CONST(I32, 3)) .
+
+    --- Request 유실
+    rl [drop-request] :
+        < 1, N, req >
+        =>
+        < 1, N, none > .
+
+    --- ACK 정상 전달
+    --- client_step(1, 1)을 실제 Wasm으로 실행
+    crl [deliver-ack] :
+        < 1, N, ack >
+        =>
+        < C2, N, none >
+        if clientCall(CONST(I32, 1) CONST(I32, 1)) => clientResult(CONST(I32, C2)) .
+
+    --- ACK 유실
+    rl [drop-ack] :
+        < 1, N, ack >
+        =>
+        < 1, N, none > .
+
+    --- TIMEOUT
+    --- client_step(1, 2)을 실제 Wasm으로 실행
+    crl [timeout] :
+        < 1, N, none >
+        =>
+        < C2, N, req >
+        if clientCall(CONST(I32, 1) CONST(I32, 2)) => clientResult(CONST(I32, C2)) .
+    
+    --- for fairness
+    ops reqReady ackReady : -> Prop [ctor] .
+    eq < 1, N, req > |= reqReady = true .
+    eq < 1, N, ack > |= ackReady = true .
+
+    ops deliverReq deliverAck : -> Formula .
+    eq deliverReq = reqReady /\ O ackReady .
+    eq deliverAck = ackReady /\ O done .
+endm
+
+--- Reachability
+search [1] in DISTRIBUTED-SYSTEM : initial =>* < C:Nat, 2, M:Message > .
+
+--- Safety
+red in DISTRIBUTED-SYSTEM : modelCheck(initial, [] ~ doubleProcessed) .
+
+--- Liveness
+red in DISTRIBUTED-SYSTEM : modelCheck(initial, [] (waiting -> <> done)) . --- client가 기다리는 상태가 되면, 언젠가는 반드시 DONE이 되어야 한다
+
+--- faieness
+red in DISTRIBUTED-SYSTEM : modelCheck(initial, (([]<> reqReady) -> []<> deliverReq) /\ (([]<> ackReady) -> []<> deliverAck) -> [] (waiting -> <> done)) .
