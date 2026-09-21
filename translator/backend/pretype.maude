@@ -78,8 +78,7 @@ fmod SPECTEC-PRETYPE is
   eq typecheck(S, text) = true .
 
   --- CvtE is a scalar IL operation, independent of Wasm builtin hints.
-  op _:_<:>_ : SpectecTerminal SpectecType SpectecType
-    ~> SpectecTerminal .
+  op _:_<:>_ : SpectecTerminal SpectecType SpectecType ~> SpectecTerminal .
 
   --- Exact coercions used by the pinned Wasm IL.
   var CV_N : Nat .
@@ -167,13 +166,11 @@ fmod SPECTEC-PRETYPE is
   --- The matched prefix and segment enforce bounds, including empty slices.
   ceq slice(PREFIX REST, N, COUNT) = MIDDLE
     if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
-  op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals
-    [prec 10 gather (E e e)] .
+  op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals [prec 10 gather (E e e)] .
   eq TS[N : COUNT] = slice(TS, N, COUNT) .
 
   op setAt : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals .
-  op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals
-    [prec 10 gather (E e e)] .
+  op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals [prec 10 gather (E e e)] .
   var NEW-K : [SpectecTerminal] .
   var NEW-TS : SpectecTerminals .
 
@@ -182,8 +179,7 @@ fmod SPECTEC-PRETYPE is
   eq TS[N = NEW-K] = setAt(TS, N, NEW-K) .
 
   op splice : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals .
-  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals
-    [prec 10 gather (E e e e)] .
+  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals [prec 10 gather (E e e e)] .
   ceq splice(PREFIX REST, N, COUNT, NEW-TS) = PREFIX NEW-TS SUFFIX
     if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
   eq TS[N : COUNT = NEW-TS] = splice(TS, N, COUNT, NEW-TS) .
@@ -214,8 +210,7 @@ fmod SPECTEC-PRETYPE is
   subsort RecordItem < RecordItems .
 
   op EMPTY : -> RecordItems [ctor] .
-  op _;_ : RecordItems RecordItems -> RecordItems
-    [ctor assoc id: EMPTY] .
+  op _;_ : RecordItems RecordItems -> RecordItems [ctor assoc id: EMPTY] .
   op item : Qid SpectecTerminals -> RecordItem [ctor] .
   op {_} : RecordItems -> Record [ctor] .
   op value : Qid Record -> SpectecTerminals .
