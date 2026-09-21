@@ -65,9 +65,11 @@ fi
 cp "$root/spectec/REVISION" "$results/spectec-revision.txt"
 cp "$root/benchmarks/wasm-spec/REVISION" "$results/suite-revision.txt"
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$root/translator/generated/output.maude" >"$results/semantics.sha256"
+  sha256sum "$root/translator/generated/types.maude" \
+    "$root/translator/generated/output.maude" >"$results/semantics.sha256"
 else
-  shasum -a 256 "$root/translator/generated/output.maude" >"$results/semantics.sha256"
+  shasum -a 256 "$root/translator/generated/types.maude" \
+    "$root/translator/generated/output.maude" >"$results/semantics.sha256"
 fi
 printf '%s\n' \
   "suite=$suite" \

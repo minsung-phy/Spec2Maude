@@ -1,4 +1,4 @@
-load spectec-support/pretype.maude
+load pretype.maude
 load ../generated/output.maude
 load relation-backends.maude
 load builtins.maude

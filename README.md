@@ -69,12 +69,14 @@ A separate WebAssembly frontend translates validated WebAssembly modules and
 test scripts into initial Maude terms. This separates the derivation of the
 language semantics from the construction of concrete program configurations.
 
-Fixed value/type support lives in `backend/spectec-support/pretype.maude`, and
-fixed list declarations and checks live in `backend/spectec-support/list.maude`
-(both under `translator/`). The translator emits source-derived typed lists
-first, then loads the common list extension, and finally connects the hinted
-list sorts to the common sequence sort. This order keeps the native Maude
-`LIST` overloads and the common list operators in one extension chain.
+Fixed representations, type checks, and common operations live in
+`translator/backend/pretype.maude`, whose main module is `SPECTEC-PRETYPE`.
+The same file first declares the base sorts in `SPECTEC-TERM`, then loads
+source-derived typed lists from `translator/generated/types.maude` before
+declaring the common list overloads. `translator/generated/output.maude`
+connects the hinted list sorts to the common sequence sort and defines the
+translated semantics. This order keeps the native Maude `LIST` overloads and
+the common list operators in one extension chain.
 
 ## Repository Organization
 
@@ -83,8 +85,8 @@ bin/                         command-line frontends
 spectec/                     pinned SpecTec IL and WebAssembly 3.0 sources
 translator/                  recursive SpecTec IL-to-Maude translation
 translator/maude/            Maude intermediate language and renderer
-translator/generated/        generated Maude semantics
-translator/backend/spectec-support/
+translator/generated/        generated type declarations and Maude semantics
+translator/backend/pretype.maude
                              hand-written SpecTec representation support
 translator/backend/relation-backends.maude
                              explicitly selected relation implementations

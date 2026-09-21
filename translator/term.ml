@@ -22,8 +22,8 @@ let translate_sort index typ =
 let translate_number = function
   | `Nat n | `Int n -> Const (Z.to_string n)
   | `Rat q when Q.is_real q -> Const (Q.to_string q)
-  | `Rat _ -> invalid_arg "nonfinite IL Rat literal is outside the Wasm scope"
-  | `Real _ -> invalid_arg "IL Real literal is outside the Wasm scope"
+  | `Rat _ -> invalid_arg "nonfinite IL Rat literal is not implemented"
+  | `Real _ -> invalid_arg "IL Real literal is not implemented"
 
 let translate_text text =
   let buffer = Buffer.create (String.length text + 2) in
@@ -50,15 +50,15 @@ let qid_of_atom atom =
 
 let translate_unop (op : unop) (optyp : optyp) =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real operation is outside the Wasm scope"
+  | _, `RealT -> invalid_arg "IL Real operation is not implemented"
   | `NotOp, _ -> "not_"
   | `PlusOp, _ -> "+_"
   | `MinusOp, _ -> "-_"
 
 let translate_binop op optyp =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real operation is outside the Wasm scope"
-  | `PowOp, `RatT -> invalid_arg "IL Rat power is outside the Wasm scope"
+  | _, `RealT -> invalid_arg "IL Real operation is not implemented"
+  | `PowOp, `RatT -> invalid_arg "IL Rat power is not implemented"
   | `AndOp, `BoolT -> "_and_"
   | `OrOp, `BoolT -> "_or_"
   | `ImplOp, `BoolT -> "_implies_"
@@ -73,7 +73,7 @@ let translate_binop op optyp =
 
 let translate_comparison (op : cmpop) (optyp : optyp) left right =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real comparison is outside the Wasm scope"
+  | _, `RealT -> invalid_arg "IL Real comparison is not implemented"
   | `EqOp, _ -> app "_==_" [left; right]
   | `NeOp, _ -> app "_=/=_" [left; right]
   | `LtOp, _ -> app "_<_" [left; right]
@@ -157,11 +157,10 @@ and translate_check_typ index typ =
       app "iterOpt" [translate_check_typ index element]
   | IterT (element, List) ->
       app "iterList" [translate_check_typ index element]
-  | IterT (element, List1) ->
-      app "iterList1" [translate_check_typ index element]
-  | IterT (element, ListN (count, _)) ->
-      app "iterListN"
-        [translate_check_typ index element; translate_exp index count]
+  | IterT (_, List1) ->
+      invalid_arg "IterT List1 as a type value is not supported"
+  | IterT (_, ListN _) ->
+      invalid_arg "IterT ListN as a type value is not supported"
   | VarT _ | BoolT | NumT _ | TextT | TupT _ ->
       translate_typ index typ
 
@@ -240,9 +239,8 @@ and translate_exp index exp =
       app "_?"
         [translate_exp index inner |> as_sequence_element index inner.note]
 
-  | TheE option ->
-      app "_!" [translate_exp index option]
-      |> from_sequence_element index exp.note
+  | TheE _ ->
+      invalid_arg "TheE option extraction is not supported"
 
   | StrE fields ->
       fields
@@ -336,7 +334,7 @@ and translate_exp index exp =
         index (translate_exp index) body (iter, generators)
 
   | CvtE (_, `RealT, _) | CvtE (_, _, `RealT) ->
-      invalid_arg "IL Real conversion is outside the Wasm scope"
+      invalid_arg "IL Real conversion is not implemented"
 
   | CvtE (inner, source, target) ->
       app "_:_<:>_"

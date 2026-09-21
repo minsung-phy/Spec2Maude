@@ -3,7 +3,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 source_dir="$root/spectec/wasm-3.0"
-expected="$root/translator/generated/output.maude"
+expected_dir="$root/translator/generated"
 maude_bin=${MAUDE:-maude}
 work=$(mktemp -d "${TMPDIR:-/tmp}/spec2maude-translation.XXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -23,13 +23,15 @@ output="$work/translator/generated/output.maude"
 )
 
 grep -Fq 'mod SPEC2MAUDE-GENERATED is' "$output"
-grep -Fq 'protecting SPECTEC-SUPPORT .' "$output"
+grep -Fq 'protecting SPECTEC-PRETYPE .' "$output"
 
-if ! cmp -s "$expected" "$output"; then
-  echo "spectec_to_maude: generated output differs from $expected" >&2
-  echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe --" >&2
-  exit 1
-fi
+for name in types.maude output.maude; do
+  if ! cmp -s "$expected_dir/$name" "$work/translator/generated/$name"; then
+    echo "spectec_to_maude: generated output differs from $expected_dir/$name" >&2
+    echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe --" >&2
+    exit 1
+  fi
+done
 
 if ! command -v "$maude_bin" >/dev/null 2>&1; then
   echo "spectec_to_maude: Maude executable not found: $maude_bin" >&2
@@ -40,7 +42,7 @@ fi
 cp "$root/translator/backend/semantics.maude" "$work/translator/backend/"
 cp "$root/translator/backend/relation-backends.maude" "$work/translator/backend/"
 cp "$root/translator/backend/builtins.maude" "$work/translator/backend/"
-cp -R "$root/translator/backend/spectec-support" "$work/translator/backend/"
+cp "$root/translator/backend/pretype.maude" "$work/translator/backend/"
 
 log="$work/maude.log"
 (

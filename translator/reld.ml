@@ -534,12 +534,12 @@ let translate ?request_output ?include_rule index id params _mixop typ rules =
               (translate_rule ?request_output index id params policy)
               rules
 
-(* maude_context is a RuleD lowering mode. Hintd supplies the validated
+(* k_heatcool is a RuleD lowering mode. Hintd supplies the validated
  * relation shape; this private module constructs identify-focus, heating,
  * and cooling statements. *)
 module Context_rules = struct
   let unsupported at reason =
-    Util.Error.error at "translation" ("Unsupported: maude_context " ^ reason)
+    Util.Error.error at "translation" ("Unsupported: k_heatcool " ^ reason)
 
   let op ?(arrow = Total) ?(attrs = []) name domain codomain =
     OpDecl {name; domain; codomain; arrow; attrs}

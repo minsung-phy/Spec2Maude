@@ -417,7 +417,7 @@ and bind_structural_pattern index bound exp subject error =
         [EqCondition (MatchCond (represented, subject))] error
   | SubE (inner, source, target) ->
       if not (Prescan.same_representation index source target) then
-        invalid_arg "SubE pattern requires a representation conversion outside the Wasm scope";
+        invalid_arg "SubE pattern representation conversion is not implemented";
       let result = bind_pattern index bound inner subject error in
       { result with
         conditions =

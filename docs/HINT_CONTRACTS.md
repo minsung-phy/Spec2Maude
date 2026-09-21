@@ -7,10 +7,10 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 
 | Hint | 역할과 적용 조건 |
 | --- | --- |
-| `maude_sort` | source 타입에 별도 Maude sort와 목록 표현을 부여한다. 없는 경우 일반 `SpectecTerminals` 표현을 사용한다. |
+| `maude_sort` | source 타입에 별도 Maude sort와 목록 표현을 부여한다. 목록으로 사용하는 sort들은 하나의 subsort chain이어야 한다. 없는 경우 일반 `SpectecTerminals` 표현을 사용한다. |
 | `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
 | `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
-| `maude_context` | source context rule을 focus/heat/cool로 번역한다. frame·prefix·hole·postfix를 원문에서 추출한다. 일반 실행 premise를 유지하며, 목록 경계를 제한하는 원문 조건은 focus에도 보존한다. |
+| `k_heatcool` | source context rule을 focus/heat/cool로 번역한다. frame·prefix·hole·postfix를 원문에서 추출한다. 일반 실행 premise를 유지하며, 목록 경계를 제한하는 원문 조건은 focus에도 보존한다. |
 | `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
 | `inverse $g` | 빠진 인자를 선언된 역함수 g로 구하고 pattern과 forward 결과를 재확인한다. 인자 순서·signature를 검사한다. |
@@ -39,7 +39,9 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 ## 숫자 builtin과 profile
 
 Wasm f32/f64·bits·bytes·rounding은 원문 `hint(builtin)` 구현의 책임이다.
-IL의 미사용 Real 확장을 제거하는 것과 Wasm 부동소수점 지원을 제거하는 것은 다르다.
+IL Real 연산의 번역 지원과 Wasm 부동소수점 builtin 지원은 구분한다.
+현재 Wasm 입력에 없는 IL Real 연산은 지원하지 않는다. 이것이 Wasm f32/f64
+builtin 지원을 제거한다는 뜻은 아니다.
 숫자 builtin은 해당 revision의 Wasm numeric 정의와 비교한다.
 
 현재 profile은 `ND=false`, relaxed 선택 0인 Wasm DET이다. 산술 NaN 생성과
@@ -50,3 +52,10 @@ NaN·relaxed 선택에 대한 결과로 일반화하지 않는다.
 `otherwise`는 source의 앞선 적용 가능한 규칙이 없다는 조건을 보존해야 한다.
 context의 내부 상태는 source 상태와 구분한다. 검색 결과 일치는 임의 LTL 속성의
 보존 증명이 아니며, 현재 경계는 [실행 계약](SEMANTIC_DECISIONS.md)에 기록한다.
+
+## k_heatcool 이름과 확장 범위
+
+기존 `maude_context`의 현재 이름은 `k_heatcool`이다. 인자 없는 `hint(k_heatcool)`로 사용한다.
+현재 구현 범위는 기존과 동일한 prefix/hole/postfix context이며, 실제 적용 source는 `Step/ctxt-instrs` 하나다.
+다른 7개 relation rule의 적용안과 현재 출력은 [8개 rule 비교](K_HEATCOOL_RULES.md)에 기록한다.
+이 확장안은 아직 구현되지 않았으며, 해당 source에 hint를 추가하는 것만으로 지원되지 않는다.

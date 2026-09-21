@@ -8,7 +8,6 @@ type sequence_representation =
   { sort : maude_sort
   ; empty : string
   ; concat : string
-  ; append : string
   ; occurs : string
   ; size : string
   ; repeat : string
@@ -373,26 +372,18 @@ and sort_of_inst metadata seen inst =
            else constructor_result_sort metadata mixop)
       |> common_sort
 
-(* Shared list constructors require a chain: sibling lists would give their
- * common empty constructor two incomparable least sorts. Independent chains
- * are instantiated separately. *)
+(* Shared list constructors require a chain: incomparable lists would give
+ * their common empty constructor two incomparable least sorts. *)
 let validate_list_families hints lists edges =
   let below source target = is_subsort edges [] source target in
   List.iter
     (fun source ->
       List.iter
         (fun target ->
-          let connected =
-            List.exists
-              (fun sort ->
-                (below source sort && below target sort)
-                || (below sort source && below sort target))
-              lists
-          in
-          if connected && not (below source target || below target source) then
+          if not (below source target || below target source) then
             let hint = List.hd (hint_values "maude_sort" (List.assoc source hints)) in
             Util.Error.error hint.hintid.at "translation"
-              ("Unsupported: typed-list family branches between " ^ source
+              ("Unsupported: independent or branching typed lists " ^ source
                ^ " and " ^ target ^ "; shared list constructors require a chain"))
         lists)
     lists
@@ -478,9 +469,6 @@ let typed_list_roots metadata =
   metadata.lists
   |> List.filter (fun sort -> Option.is_none (typed_parent metadata sort))
 
-let separate_list_families metadata =
-  List.length (typed_list_roots metadata) > 1
-
 let sort_of_typ metadata typ =
   let reduced = Il.Eval.reduce_typ metadata.type_env typ in
   match typ.it with
@@ -501,13 +489,9 @@ let rec typed_list_owner metadata typ =
 let typed_sequence_representation metadata owner =
   let title = String.capitalize_ascii owner in
   let root = typed_list_root metadata owner in
-  let separate = separate_list_families metadata in
-  (* Keep the existing generic representation for a single family. Different
-   * roots must not overload one empty constant with incomparable sorts. *)
   { sort = title ^ "List"
-  ; empty = if separate then root ^ "Nil" else "eps"
-  ; concat = if separate then root ^ "Concat" else "_ _"
-  ; append = root ^ "Append"
+  ; empty = "eps"
+  ; concat = "_ _"
   ; occurs = root ^ "Occurs"
   ; size = root ^ "Size"
   ; repeat = owner ^ "Repeat"
@@ -522,7 +506,6 @@ let sequence_representation metadata typ =
       { sort = "SpectecTerminals"
       ; empty = "eps"
       ; concat = "_ _"
-      ; append = "_++_"
       ; occurs = "_<-_"
       ; size = "len"
       ; repeat = "repeatSeq"
@@ -588,7 +571,7 @@ type context =
   }
 
 let unsupported at reason =
-  Util.Error.error at "translation" ("Unsupported: maude_context " ^ reason)
+  Util.Error.error at "translation" ("Unsupported: k_heatcool " ^ reason)
 
 let unique at absent ambiguous = function
   | [value] -> value
@@ -596,7 +579,7 @@ let unique at absent ambiguous = function
   | _ -> unsupported at ambiguous
 
 let context_hint values =
-  values |> List.filter (fun hint -> hint.hintid.it = "maude_context")
+  values |> List.filter (fun hint -> hint.hintid.it = "k_heatcool")
 
 let find_relation relations id at =
   relations
@@ -924,9 +907,9 @@ let extract_context metadata execution_input_count relations
   match context_hint values with
   | [] -> None
   | _ :: _ :: _ -> unsupported hintdef.at
-      "rule has more than one maude_context hint"
+      "rule has more than one k_heatcool hint"
   | [hint] ->
-      require_flags "maude_context" [hint];
+      require_flags "k_heatcool" [hint];
       let relation = find_relation relations relation_id hintdef.at in
       let input_count =
         match execution_input_count relation.id.it with

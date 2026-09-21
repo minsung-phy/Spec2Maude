@@ -29,7 +29,7 @@ let emit_script script =
     Module
       { name = "SPEC2MAUDE-SORTS"
       ; kind = Functional
-      ; imports = [Protecting (module_name "DSL-TERM")]
+      ; imports = [Protecting (module_name "SPECTEC-TERM")]
       ; statements = translation.sort_statements
       }
   in
@@ -38,41 +38,27 @@ let emit_script script =
       { name = "SPEC2MAUDE-GENERATED"
       ; kind = System
       ; imports =
-          [ Maude_il.Protecting (module_name "SPECTEC-SUPPORT")
-          ; Maude_il.Protecting (module_name "SPEC2MAUDE-SORTS")
-          ]
-      ; statements = translation.generated_statements
+          [Maude_il.Protecting (module_name "SPECTEC-PRETYPE")]
+      ; statements = translation.list_subsorts @ translation.generated_statements
       }
   in
   let typed_lists : Maude_il.top_level =
     Module
-      { name = "DSL-TYPED-LISTS"
+      { name = "SPEC2MAUDE-TYPES"
       ; kind = Maude_il.Functional
       ; imports =
-          [ Maude_il.Protecting (module_name "DSL-PRETYPE-BASE")
-          ; Maude_il.Protecting (module_name "SPEC2MAUDE-SORTS")
-          ]
+          [Maude_il.Protecting (module_name "SPEC2MAUDE-SORTS")]
           @ translation.list_imports
       ; statements = translation.list_statements
       }
   in
-  let pretype : Maude_il.top_level =
-    Module
-      { name = "DSL-PRETYPE"
-      ; kind = Maude_il.Functional
-      ; imports =
-          [Maude_il.Protecting (module_name translation.list_support_module)]
-      ; statements = translation.list_subsorts
-      }
+  (* Native typed lists precede the backend's common list overloads; the
+     source-derived subsort connections follow them in the generated module. *)
+  let types =
+    Maude_emit.emit_top_levels
+      (sorts :: translation.list_views @ [typed_lists]) ^ "\n"
   in
-  Maude_emit.emit_top_levels
-    (sorts :: translation.list_views
-     @ [ typed_lists
-       ; Maude_il.Load "../backend/spectec-support/list.maude"
-       ; pretype
-       ; Maude_il.Load "../backend/spectec-support/support.maude"
-       ; generated
-       ]) ^ "\n"
+  types, Maude_emit.emit_top_levels [generated] ^ "\n"
 
 let write_file path contents =
   let channel = open_out_bin path in
@@ -84,8 +70,8 @@ let () =
   let output = ref default_output in
   let files = ref [] in
   let options =
-    [ "-o", Arg.Set_string output, "FILE write generated Maude to FILE"
-    ; "--output", Arg.Set_string output, "FILE write generated Maude to FILE"
+    [ "-o", Arg.Set_string output, "FILE write generated Maude and sibling types.maude"
+    ; "--output", Arg.Set_string output, "FILE write generated Maude and sibling types.maude"
     ]
   in
   let usage = "usage: spec2maude [-o FILE] [SPECTEC ...]" in
@@ -96,9 +82,14 @@ let () =
       | [] -> sorted_spectec_files default_source_dir
       | files -> files
     in
-    files |> load_script |> emit_script |> write_file !output;
-    Printf.eprintf "[spec2maude] wrote %s from %d SpecTec files\n"
-      !output (List.length files)
+    let types_output = Filename.concat (Filename.dirname !output) "types.maude" in
+    if Filename.basename !output = "types.maude" then
+      die "types.maude is reserved for generated type declarations";
+    let types, generated = files |> load_script |> emit_script in
+    write_file types_output types;
+    write_file !output generated;
+    Printf.eprintf "[spec2maude] wrote %s and %s from %d SpecTec files\n"
+      types_output !output (List.length files)
   with
   | Util.Error.Error (region, message) ->
       Util.Error.print_error region message;

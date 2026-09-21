@@ -90,6 +90,7 @@ The command reads the 21 `spectec/wasm-3.0/*.spectec` files in lexical order
 and writes:
 
 ```text
+translator/generated/types.maude
 translator/generated/output.maude
 ```
 
@@ -98,6 +99,9 @@ An alternative output path can be selected with `-o`:
 ```sh
 dune exec bin/spec2maude.exe -- -o /tmp/spec2maude-output.maude
 ```
+
+This also writes `/tmp/types.maude`. Keep both generated files together;
+`types.maude` is reserved for the generated type declarations.
 
 ## Load the complete Maude semantics
 

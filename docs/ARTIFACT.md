@@ -53,10 +53,10 @@ The test performs one complete pipeline:
 
 - confirms that the pinned source contains exactly 21 `.spectec` files;
 - parses and elaborates all 21 files through `bin/spec2maude.exe`;
-- generates a fresh temporary Maude module;
-- checks that it is byte-for-byte identical to
-  `translator/generated/output.maude`;
-- loads that fresh module together with all hand-written backends in Maude;
+- generates fresh temporary `types.maude` and `output.maude` files;
+- checks that both are byte-for-byte identical to their counterparts in
+  `translator/generated/`;
+- loads those files together with all hand-written backends in Maude;
 - rejects every Maude warning, advisory, or error.
 
 Expected final output:
@@ -72,8 +72,10 @@ dune exec bin/spec2maude.exe --
 ```
 
 This reads `spectec/wasm-3.0/*.spectec` in lexical order and writes
-`translator/generated/output.maude`. The preceding test uses a temporary file
-and does not modify the repository.
+`translator/generated/types.maude` and `translator/generated/output.maude`.
+With `-o FILE`, the type declarations are written to `types.maude` beside
+`FILE`; that name is reserved for the type declarations. The preceding test
+uses a temporary directory and does not modify the repository.
 
 ## Command-line frontends
 
@@ -97,43 +99,6 @@ subcommand was selected.
 The pinned suite contains 258 `.wast` files, including the `bulk-memory`,
 `exceptions`, `gc`, `memory64`, `multi-memory`, `relaxed-simd`, and
 `simd` sub-suites.
-
-The sequence backend uses associative matching for membership, indexing,
-slicing, and updates. It has no cursor, unrolled 32-element equations, or
-`len` memo table. Length uses a counting equation; repetition uses finite
-quotient/remainder decomposition. Typed list operations reuse Maude's native
-LIST equations. These backend changes do not change IL expression/premise
-translation or source Step rules.
-
-Run focused source-value and boundary regressions after translation:
-
-```sh
-python3 test/backend_matching.py \
-  --semantics "$PWD/translator/backend/semantics.maude" \
-  --output-dir /tmp/spec2maude-backend-checks
-```
-
-The checks cover values, partial-operation bounds, boxing, record ordering,
-native typed-list result sorts, and bit operations. They are finite execution
-checks, not a full-suite result or a symbolic-narrowing preservation proof.
-
-Verify the generated run/modelcheck/WAST drivers and their lookup helpers:
-
-```sh
-python3 test/wasm2maude_matching.py \
-  --semantics "$PWD/translator/backend/semantics.maude" \
-  --output-dir /tmp/spec2maude-driver-checks
-```
-
-This executes Wasm programs and checks imports, registry rebinding, result
-alternatives, traps, exhaustion, duplicate names/IDs, missing lookups, and active
-frame depth. The model-checking fixture checks two true properties and an
-expected counterexample; it is not a whole-translator preservation proof.
-
-The WAST harness defines its command list in groups of at most 64 commands.
-Each group refers to the next definition; unfolding them produces the original
-ordered list. This limits the size of each equation compiled by Maude without
-splitting the execution into separate runs or restarting execution per assertion.
 
 ### Audit frontend coverage
 

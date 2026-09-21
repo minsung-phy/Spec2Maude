@@ -22,7 +22,8 @@ show profile .
 
 - `mayPure`, `mayRead`로 검색을 걸러내는 기존 guard 계획은 채택하지 않는다.
 - `Step/ctxt-instrs`에서 사용한 heating/cooling 방식을 기준으로 한다.
-- 같은 방식으로 `hint(maude_context)`를 부여하고 `identifyPure`, `identifyRead`를 사용한다.
+- 같은 방식으로 `hint(k_heatcool)`를 부여하고 `identifyPure`, `identifyRead`를 사용한다.
+- 2026-09-21 사용자 지시에 따라 기존 hint 이름 `maude_context`를 `k_heatcool`로 변경했다.
 - 이 이름들은 미팅에서 정한 설계 방향이다. 구체적인 생성 규칙과 hint 계약은 실제 IL/source를 따라 구현한다.
 
 ## 3. 적용 범위는 premise에 ~>가 있는 모든 source rule

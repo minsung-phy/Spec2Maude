@@ -1,0 +1,256 @@
+fmod SPECTEC-TERM is
+  sort SpectecTerminal .
+  sort SpectecTerminals .
+  subsort SpectecTerminal < SpectecTerminals .
+  sort SpectecType .
+  sort SpectecDef .
+endfm
+
+--- Native typed lists must precede the common eps and __ overloads.
+load ../generated/types.maude
+
+fmod SPECTEC-PRETYPE is
+  protecting SPEC2MAUDE-TYPES .
+  --- CONVERSION includes RAT, FLOAT, STRING and their BOOL/NAT/INT imports.
+  --- Typed renaming separates native operations in the common source value kind.
+  protecting CONVERSION * (
+    op -_ : Float -> Float to nativeFloatNeg,
+    op _+_ : Float Float -> Float to nativeFloatAdd,
+    op _-_ : Float Float -> Float to nativeFloatSub,
+    op _*_ : Float Float -> Float to nativeFloatMul,
+    op _/_ : Float Float -> Float to nativeFloatDiv,
+    op _rem_ : Float Float -> Float to floatRem,
+    op _^_ : Float Float -> Float to nativeFloatPow,
+    op abs : Float -> Float to floatAbs,
+    op floor : Float -> Float to floatFloor,
+    op ceiling : Float -> Float to floatCeiling,
+    op min : Float Float -> Float to floatMin,
+    op max : Float Float -> Float to floatMax,
+    op _<_ : Float Float -> Bool to floatLess,
+    op _<=_ : Float Float -> Bool to floatLessEqual,
+    op _>_ : Float Float -> Bool to floatGreater,
+    op _>=_ : Float Float -> Bool to floatGreaterEqual,
+    op _xor_ : Nat Nat -> Nat to integerXor,
+    op _+_ : String String -> String to stringConcat,
+    op _<_ : String String -> Bool to stringLess,
+    op _<=_ : String String -> Bool to stringLessEqual,
+    op _>_ : String String -> Bool to stringGreater,
+    op _>=_ : String String -> Bool to stringGreaterEqual,
+    op char : Nat -> Char to nativeChar,
+    op float : Rat -> Float to nativeToFloat,
+    op rat : FiniteFloat -> Rat to nativeToRat,
+    op float : String -> Float to nativeParseFloat,
+    op rat : String NzNat -> Rat to nativeParseRat,
+    op string : Float -> String to nativeFloatString,
+    op string : Rat NzNat -> String to nativeRatString
+  ) .
+
+  --- Match the STRING renaming in CONVERSION.
+  protecting QID * (
+    op _xor_ : Nat Nat -> Nat to integerXor,
+    op _+_ : String String -> String to stringConcat,
+    op _<_ : String String -> Bool to stringLess,
+    op _<=_ : String String -> Bool to stringLessEqual,
+    op _>_ : String String -> Bool to stringGreater,
+    op _>=_ : String String -> Bool to stringGreaterEqual,
+    op char : Nat -> Char to nativeChar
+  ) .
+
+  --- Primitive types and conversions
+  subsorts Bool Rat Float String < SpectecTerminal .
+
+  ops bool nat int rat real text : -> SpectecType [ctor] .
+  ops iterOpt iterList : SpectecType -> SpectecType [ctor] .
+
+  op typecheck : SpectecTerminals SpectecType -> Bool .
+
+  var B : Bool .
+  var N : Nat .
+  var I : Int .
+  var R : Rat .
+  var F : Float .
+  var S : String .
+  eq typecheck(B, bool) = true .
+  eq typecheck(N, nat) = true .
+  eq typecheck(I, int) = true .
+  eq typecheck(R, rat) = true .
+  eq typecheck(F, real) = true .
+  eq typecheck(S, text) = true .
+
+  --- CvtE is a scalar IL operation, independent of Wasm builtin hints.
+  op _:_<:>_ : SpectecTerminal SpectecType SpectecType
+    ~> SpectecTerminal .
+
+  --- Exact coercions used by the pinned Wasm IL.
+  var CV_N : Nat .
+  var CV_I : Int .
+  var CV_R : Rat .
+  eq (CV_N : nat <:> nat) = CV_N .
+  eq (CV_N : nat <:> int) = CV_N .
+  eq (CV_N : nat <:> rat) = CV_N .
+  ceq (CV_I : int <:> nat) = abs(CV_I) if CV_I >= 0 .
+  eq (CV_I : int <:> int) = CV_I .
+  eq (CV_I : int <:> rat) = CV_I .
+  ceq (CV_R : rat <:> nat) = abs(floor(CV_R))
+    if CV_R == floor(CV_R) /\ CV_R >= 0 .
+  ceq (CV_R : rat <:> int) = floor(CV_R) if CV_R == floor(CV_R) .
+  eq (CV_R : rat <:> rat) = CV_R .
+
+  --- List
+  op eps : -> SpectecTerminals [ctor] .
+  op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [ctor assoc id: eps prec 25] .
+  op seq : SpectecTerminals -> SpectecTerminal [ctor] .
+  op unseq : SpectecTerminal ~> SpectecTerminals .
+
+  vars T U : SpectecTerminal .
+  vars TS VALUE : SpectecTerminals .
+  var TYPE : SpectecType .
+
+  eq unseq(seq(TS)) = TS .
+  eq typecheck(eps, TYPE) = true .
+  --- Two elements exclude the singleton match T eps without a condition.
+  ceq typecheck(T U TS, TYPE) = typecheck(U TS, TYPE)
+    if typecheck(T, TYPE) .
+  eq typecheck(VALUE, TYPE) = false [owise] .
+
+  --- Option
+  op _? : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  --- CAT-opt is partial: two present options have no concatenation rule.
+  op optionConcat : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
+  var K : [SpectecTerminal] .
+
+  eq optionConcat(eps, eps) = eps .
+  eq optionConcat(K ?, eps) = K ? .
+  eq optionConcat(eps, K ?) = K ? .
+
+  eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
+
+  --- Sequence
+  op len : SpectecTerminals -> Nat .
+  op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
+
+  var COUNT : Nat .
+  vars WTS PREFIX MIDDLE SUFFIX REST : SpectecTerminals .
+
+  --- Counting, like prelude LIST's size, needs to visit each element.
+  --- Keep the sum in an argument so page-sized lists do not exhaust the stack.
+  op lenAux : SpectecTerminals Nat -> Nat .
+  eq len(TS) = lenAux(TS, 0) .
+  eq lenAux(eps, N) = N .
+  eq lenAux(T TS, N) = lenAux(TS, N + 1) .
+
+  eq typecheck(seq(TS), iterOpt(TYPE)) =
+    typecheck(TS, TYPE) and len(TS) <= 1 .
+  eq typecheck(seq(TS), iterList(TYPE)) = typecheck(TS, TYPE) .
+
+  --- Match an occurrence among source values; failed operands remain kinds.
+  op _<-_ : SpectecTerminal SpectecTerminals ~> Bool .
+  eq T <- (PREFIX T SUFFIX) = true .
+  eq T <- TS = false [owise] .
+
+  op _++_ : SpectecTerminals SpectecTerminals -> SpectecTerminals .
+  eq TS ++ WTS = TS WTS .
+
+  op indexDefined : SpectecTerminals Nat -> Bool .
+  op index : SpectecTerminals Nat ~> SpectecTerminal .
+  eq indexDefined(TS, N) = N < len(TS) .
+  ceq index(PREFIX T SUFFIX, N) = T
+    if len(PREFIX) == N .
+
+  op _[_] : SpectecTerminals Nat ~> SpectecTerminal
+    [prec 10 gather (E e)] .
+  eq TS[N] = index(TS, N) .
+
+  op slice : SpectecTerminals Nat Nat ~> SpectecTerminals .
+  --- The matched prefix and segment enforce bounds, including empty slices.
+  ceq slice(PREFIX REST, N, COUNT) = MIDDLE
+    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
+  op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals
+    [prec 10 gather (E e e)] .
+  eq TS[N : COUNT] = slice(TS, N, COUNT) .
+
+  op setAt : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals .
+  op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals
+    [prec 10 gather (E e e)] .
+  var NEW-K : [SpectecTerminal] .
+  var NEW-TS : SpectecTerminals .
+
+  ceq setAt(PREFIX T SUFFIX, N, NEW-K) = PREFIX NEW-K SUFFIX
+    if len(PREFIX) == N .
+  eq TS[N = NEW-K] = setAt(TS, N, NEW-K) .
+
+  op splice : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals .
+  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals
+    [prec 10 gather (E e e e)] .
+  ceq splice(PREFIX REST, N, COUNT, NEW-TS) = PREFIX NEW-TS SUFFIX
+    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
+  eq TS[N : COUNT = NEW-TS] = splice(TS, N, COUNT, NEW-TS) .
+
+  op lift : SpectecTerminals -> SpectecTerminals .
+  eq lift(eps) = eps .
+  eq lift(K ?) = K .
+
+  eq repeatSeq(0, WTS) = eps .
+  eq repeatSeq(1, WTS) = WTS .
+  --- Build finite repetitions without one pending call per element.
+  ceq repeatSeq(N, WTS)
+    = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS)
+    if N > 1 .
+
+  --- Tuple
+  sort Tuple .
+  subsort Tuple < SpectecTerminal .
+
+  op tuple : SpectecTerminals -> Tuple [ctor] .
+  op _._ : Tuple Nat ~> SpectecTerminal .
+
+  eq tuple(TS) . N = index(TS, N) .
+
+  --- Record
+  sorts Record RecordItem RecordItems .
+  subsort Record < SpectecTerminal .
+  subsort RecordItem < RecordItems .
+
+  op EMPTY : -> RecordItems [ctor] .
+  op _;_ : RecordItems RecordItems -> RecordItems
+    [ctor assoc id: EMPTY] .
+  op item : Qid SpectecTerminals -> RecordItem [ctor] .
+  op {_} : RecordItems -> Record [ctor] .
+  op value : Qid Record -> SpectecTerminals .
+  op value : Qid RecordItems -> SpectecTerminals .
+
+  op _._ : Record Qid -> SpectecTerminals .
+  --- TypD emits field-type-directed CAT-str equations for this operation.
+  op recordConcat : Record Record SpectecType ~> Record .
+  op _[._=_] : Record Qid SpectecTerminals -> Record .
+
+  op setItem : RecordItems Qid SpectecTerminals -> RecordItems .
+  op hasField : RecordItems Qid -> Bool .
+
+  var FIELD : Qid .
+  vars ITEMS RECORD-PREFIX RECORD-SUFFIX : RecordItems .
+  var NEW-VALUE : SpectecTerminals .
+  var RECORD : Record .
+
+  eq value(FIELD, {ITEMS}) = value(FIELD, ITEMS) .
+  eq hasField(RECORD-PREFIX ; item(FIELD, VALUE) ; RECORD-SUFFIX, FIELD) = true .
+  eq hasField(ITEMS, FIELD) = false [owise] .
+  --- Preserve first occurrence selection even for duplicate backend fields.
+  ceq value(FIELD, RECORD-PREFIX ; item(FIELD, VALUE) ; RECORD-SUFFIX) = VALUE
+    if not hasField(RECORD-PREFIX, FIELD) .
+  eq value(FIELD, ITEMS) = eps [owise] .
+
+  eq {ITEMS} . FIELD = value(FIELD, ITEMS) .
+  eq RECORD . FIELD = value(FIELD, RECORD) [owise] .
+
+  eq {ITEMS}[. FIELD = NEW-VALUE]
+    = {setItem(ITEMS, FIELD, NEW-VALUE)} .
+
+  ceq setItem(RECORD-PREFIX ; item(FIELD, VALUE) ; RECORD-SUFFIX, FIELD, NEW-VALUE)
+    = RECORD-PREFIX ; item(FIELD, NEW-VALUE) ; RECORD-SUFFIX
+    if not hasField(RECORD-PREFIX, FIELD) .
+  eq setItem(ITEMS, FIELD, NEW-VALUE)
+    = ITEMS ; item(FIELD, NEW-VALUE) [owise] .
+endfm

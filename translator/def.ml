@@ -95,7 +95,6 @@ type script_translation =
   { sort_statements : statement list
   ; list_views : top_level list
   ; list_imports : import list
-  ; list_support_module : string
   ; list_subsorts : statement list
   ; list_statements : statement list
   ; generated_statements : statement list
@@ -303,7 +302,6 @@ let translate_script script =
   { sort_statements = sort_metadata_declarations sort_metadata
   ; list_views = Typd.list_views sort_metadata
   ; list_imports = Typd.list_imports sort_metadata
-  ; list_support_module = Typd.list_support_module sort_metadata
   ; list_subsorts = Typd.list_subsorts sort_metadata
   ; list_statements
   ; generated_statements
