@@ -2,7 +2,7 @@ open Wasm_to_maude
 
 let usage () =
   Printf.eprintf
-    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--steps N]\n  wasm2maude wast-run FILE [-o FILE] [--semantics FILE] [--steps N] [--call-depth N]\n  wasm2maude suite-run PATH [-o REPORT] [--semantics FILE] [--maude FILE] [--timeout SEC] [--steps N] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
+    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [-o FILE] [--semantics FILE] [--steps N] [--call-depth N]\n  wasm2maude suite-run PATH [-o REPORT] [--semantics FILE] [--maude FILE] [--timeout SEC] [--steps N] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
   exit 2
 
 let write output text =
@@ -18,6 +18,13 @@ let resolve path =
   if Filename.is_relative path then Filename.concat (Sys.getcwd ()) path
   else path
 
+let default_semantics = "translator/backend/semantics.maude"
+
+let nonnegative value =
+  match int_of_string_opt value with
+  | Some value when value >= 0 -> value
+  | Some _ | None -> usage ()
+
 let input_options args =
   let rec options input output semantics term_only = function
     | [] -> (input, output, semantics, term_only)
@@ -30,7 +37,7 @@ let input_options args =
     | _ -> usage ()
   in
   let input, output, semantics, term_only =
-    options None None "translator/backend/semantics.maude" false args
+    options None None default_semantics false args
   in
   let input = match input with Some path -> path | None -> usage () in
   input, output, resolve semantics, term_only
@@ -67,87 +74,74 @@ let parse_arg text =
     | _ -> usage ()
   with Failure _ -> usage ()
 
-let run_command args =
-  let rec options input output semantics export args steps = function
-    | [] -> input, output, semantics, export, List.rev args, steps
-    | "-o" :: path :: rest ->
-        options input (Some path) semantics export args steps rest
-    | "--semantics" :: path :: rest ->
-        options input output path export args steps rest
-    | "--invoke" :: name :: rest ->
-        options input output semantics (Some name) args steps rest
-    | "--arg" :: value :: rest ->
-        options input output semantics export (parse_arg value :: args) steps rest
-    | "--steps" :: value :: rest ->
-        options input output semantics export args (int_of_string value) rest
-    | arg :: rest when input = None ->
-        options (Some arg) output semantics export args steps rest
-    | _ -> usage ()
-  in
-  let input, output, semantics, export, args, steps =
-    options None None "translator/backend/semantics.maude" None [] 100000 args
-  in
-  let semantics = resolve semantics in
-  let input = match input with Some path -> path | None -> usage () in
-  let export = match export with Some name -> name | None -> usage () in
-  let m = Frontend.load input in
-  let export =
-    try Wasm.Utf8.decode export with Wasm.Utf8.Utf8 -> usage ()
-  in
-  write output (Emit.run ~semantics ~export ~args ~steps m)
+type execution_mode = Run | Modelcheck | Harness
 
-let modelcheck_command args =
-  let rec options input output semantics export arguments expected rejected steps =
-    function
-    | [] ->
-        input, output, semantics, export, List.rev arguments, expected, rejected,
-        steps
-    | "-o" :: path :: rest ->
-        options input (Some path) semantics export arguments expected rejected
-          steps rest
-    | "--semantics" :: path :: rest ->
-        options input output path export arguments expected rejected steps rest
-    | "--invoke" :: name :: rest ->
-        options input output semantics (Some name) arguments expected rejected
-          steps rest
-    | "--arg" :: value :: rest ->
-        options input output semantics export (parse_arg value :: arguments)
-          expected rejected steps rest
-    | "--expect" :: value :: rest ->
-        options input output semantics export arguments (Some (parse_arg value))
-          rejected steps rest
-    | "--reject" :: value :: rest ->
-        options input output semantics export arguments expected
-          (Some (parse_arg value)) steps rest
-    | "--steps" :: value :: rest ->
-        options input output semantics export arguments expected rejected
-          (int_of_string value) rest
-    | arg :: rest when input = None ->
-        options (Some arg) output semantics export arguments expected rejected
-          steps rest
+type execution_options = {
+  input : string option;
+  output : string option;
+  semantics : string;
+  export : string option;
+  arguments : Wasm.Value.num list;
+  expected : Wasm.Value.num option;
+  rejected : Wasm.Value.num option;
+  steps : int;
+  module_name : string option;
+  prefix : string option;
+}
+
+let execution_command mode args =
+  let rec options opts = function
+    | [] -> opts
+    | "-o" :: path :: rest -> options {opts with output = Some path} rest
+    | "--semantics" :: path :: rest when mode <> Harness ->
+        options {opts with semantics = path} rest
+    | "--invoke" :: name :: rest -> options {opts with export = Some name} rest
+    | "--arg" :: value :: rest when mode <> Harness ->
+        options {opts with arguments = parse_arg value :: opts.arguments} rest
+    | "--steps" :: value :: rest when mode <> Harness ->
+        let steps = nonnegative value in
+        options {opts with steps} rest
+    | "--expect" :: value :: rest when mode = Modelcheck ->
+        options {opts with expected = Some (parse_arg value)} rest
+    | "--reject" :: value :: rest when mode = Modelcheck ->
+        options {opts with rejected = Some (parse_arg value)} rest
+    | "--module-name" :: name :: rest when mode = Harness ->
+        options {opts with module_name = Some name} rest
+    | "--prefix" :: name :: rest when mode = Harness ->
+        options {opts with prefix = Some name} rest
+    | arg :: rest when opts.input = None && not (String.starts_with ~prefix:"-" arg) ->
+        options {opts with input = Some arg} rest
     | _ -> usage ()
   in
-  let input, output, semantics, export, args, expected, rejected, steps =
-    options None None "translator/backend/semantics.maude" None [] None None 100000 args
+  let opts = options
+    {input = None; output = None; semantics = default_semantics;
+     export = None; arguments = []; expected = None; rejected = None;
+     steps = 100000; module_name = None; prefix = None} args
   in
-  let input = match input with Some path -> path | None -> usage () in
-  let export = match export with Some name -> name | None -> usage () in
-  let expected = match expected with Some value -> value | None -> usage () in
-  let rejected = match rejected with Some value -> value | None -> usage () in
+  let required = function Some value -> value | None -> usage () in
+  let input = required opts.input in
   let export =
-    try Wasm.Utf8.decode export with Wasm.Utf8.Utf8 -> usage ()
+    try Wasm.Utf8.decode (required opts.export) with Wasm.Utf8.Utf8 -> usage ()
   in
+  let semantics = resolve opts.semantics in
+  let args = List.rev opts.arguments in
+  let steps = opts.steps in
   let m = Frontend.load input in
-  write output
-    (Emit.modelcheck ~semantics:(resolve semantics) ~export ~args ~expected
-       ~rejected ~steps m)
+  let text =
+    match mode with
+    | Run -> Emit.run ~semantics ~export ~args ~steps m
+    | Modelcheck ->
+        let expected = required opts.expected in
+        let rejected = required opts.rejected in
+        Emit.modelcheck ~semantics ~export ~args ~expected ~rejected ~steps m
+    | Harness ->
+        let module_name = required opts.module_name in
+        let prefix = required opts.prefix in
+        Emit.harness ~module_name ~prefix ~export m
+  in
+  write opts.output text
 
 let wast_run args =
-  let nonnegative value =
-    match int_of_string_opt value with
-    | Some value when value >= 0 -> value
-    | Some _ | None -> usage ()
-  in
   let rec options input output semantics steps call_depth = function
     | [] -> input, output, semantics, steps, call_depth
     | "-o" :: path :: rest ->
@@ -163,7 +157,7 @@ let wast_run args =
     | _ -> usage ()
   in
   let input, output, semantics, steps, call_depth =
-    options None None "translator/backend/semantics.maude" 1000000 256 args
+    options None None default_semantics 1000000 256 args
   in
   let semantics = resolve semantics in
   let input = match input with Some path -> path | None -> usage () in
@@ -178,11 +172,6 @@ let suite_run args =
   let positive_float value =
     match float_of_string_opt value with
     | Some value when value > 0. -> value
-    | Some _ | None -> usage ()
-  in
-  let nonnegative value =
-    match int_of_string_opt value with
-    | Some value when value >= 0 -> value
     | Some _ | None -> usage ()
   in
   let rec options input output semantics maude timeout steps call_depth log_dir =
@@ -214,7 +203,7 @@ let suite_run args =
     | _ -> usage ()
   in
   let input, output, semantics, maude, timeout, steps, call_depth, log_dir =
-    options None None "translator/backend/semantics.maude" "maude" 60. 1000000 256 None args
+    options None None default_semantics "maude" 60. 1000000 256 None args
   in
   let input = match input with Some path -> path | None -> usage () in
   let progress ~completed ~total ~source ~status ~seconds =
@@ -271,8 +260,9 @@ let suite_typecheck ?(details = false) args =
 let main = function
   | "module" :: args -> module_command args
   | "instantiate" :: args -> instantiate_command args
-  | "run" :: args -> run_command args
-  | "modelcheck" :: args -> modelcheck_command args
+  | "run" :: args -> execution_command Run args
+  | "modelcheck" :: args -> execution_command Modelcheck args
+  | "harness" :: args -> execution_command Harness args
   | "wast-run" :: args -> wast_run args
   | "suite-run" :: args -> suite_run args
   | ["wast-summary"; path] -> wast_summary path

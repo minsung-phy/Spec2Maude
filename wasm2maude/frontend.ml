@@ -4,6 +4,7 @@ type module_ = {
   source : string;
   ast : Ast.module_;
   custom : Custom.section list;
+  module_type : Types.moduletype Lazy.t;
 }
 
 type invocation_error =
@@ -16,7 +17,8 @@ type invocation_error =
 let validate source (ast, custom) =
   try
     ignore (Valid.check_module_with_custom (ast, custom));
-    {source; ast; custom}
+    (* Reuse the same source-derived type on repeated WAST actions. *)
+    {source; ast; custom; module_type = lazy (Ast.moduletype_of ast)}
   with
   | Valid.Invalid (at, message) ->
       Ingress_error.raise ~region:at Ingress_error.Invalid source message
@@ -80,7 +82,7 @@ let load path =
 let import_count m = List.length m.ast.Source.it.Ast.imports
 
 let export_type m name =
-  let Types.ModuleT (_, exports) = Ast.moduletype_of m.ast in
+  let Types.ModuleT (_, exports) = Lazy.force m.module_type in
   List.find_map
     (function
       | Types.ExportT (export_name, actual) when export_name = name ->

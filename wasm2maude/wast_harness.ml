@@ -1,575 +1,616 @@
 let render ~semantics ~steps ~commands ~host_store ~host_instances
     ~host_functions =
-    let commands =
-      List.map
-        (fun (name, body) ->
-          Printf.sprintf "  op %s : -> Commands .\n  eq %s = %s .\n"
-            name name (Maude_term.to_string body))
-        commands
-      |> String.concat ""
-    in
+    let buffer = Buffer.create 4096 in
+    List.iter
+      (fun (name, body) ->
+        Printf.bprintf buffer "  op %s : -> Commands .\n  eq %s = %s .\n"
+          name name (Maude_term.to_string body))
+      commands;
+    let commands = Buffer.contents buffer in
     Printf.sprintf
-      "load %s\n\nmod WASM2MAUDE-WAST is\n\
-       \  including WASM-BUILTINS .\n\n\
-       \  sorts ScriptAction ImportRequirement ImportRef ImportRefs LinkResult\n\
-       \    Command Commands\n\
-       \    InstanceEnv ScriptState ResultPattern ResultPatterns\n\
-       \    ResultAlternatives LanePattern LanePatterns MatchVerdict .\n\
-       \  subsort Command < Commands .\n\
-       \  op action.invoke : Nat SpectecTerminals ValList\n\
-       \    -> ScriptAction [ctor] .\n\
-       \  op action.get : Nat SpectecTerminals -> ScriptAction [ctor] .\n\
-       \  op commands.nil : -> Commands [ctor] .\n\
-       \  op commands.cons : Command Commands -> Commands [ctor] .\n\
-       \  op import.ready : -> ImportRequirement [ctor] .\n\
-       \  op import.current-memory-min : Nat -> ImportRequirement [ctor] .\n\
-       \  op import.current-table-min : Nat -> ImportRequirement [ctor] .\n\
-       \  op import.ref : Nat SpectecTerminals ImportRequirement\n\
-       \    -> ImportRef [ctor] .\n\
-       \  op imports.nil : -> ImportRefs [ctor] .\n\
-       \  op imports.cons : ImportRef ImportRefs -> ImportRefs [ctor] .\n\
-       \  op link.ok : SpectecTerminals -> LinkResult [ctor] .\n\
-       \  op link.error : -> LinkResult [ctor] .\n\
-       \  op link.append : LinkResult LinkResult -> LinkResult .\n\
-       \  op command.module : Nat SpectecTerminal ImportRefs\n\
-       \    -> Command [ctor] .\n\
-       \  op command.unlinkable : Nat ImportRefs -> Command [ctor] .\n\
-       \  op command.uninstantiable-static : Nat -> Command [ctor] .\n\
-       \  op command.uninstantiable : Nat SpectecTerminal ImportRefs\n\
-       \    -> Command [ctor] .\n\
-       \  op patterns.nil : -> ResultPatterns [ctor] .\n\
-       \  op patterns.cons : ResultPattern ResultPatterns\n\
-       \    -> ResultPatterns [ctor] .\n\
-       \  op alternatives.nil : -> ResultAlternatives [ctor] .\n\
-       \  subsort ResultPattern < ResultAlternatives .\n\
-       \  op alternatives.cons : ResultAlternatives ResultAlternatives\n\
-       \    -> ResultAlternatives [ctor assoc id: alternatives.nil] .\n\
-       \  op result.exact-num : SpectecTerminal -> ResultPattern [ctor] .\n\
-       \  op result.exact-vec : SpectecTerminal -> ResultPattern [ctor] .\n\
-       \  op result.vec-lanes : SpectecTerminal LanePatterns\n\
-       \    -> ResultPattern [ctor] .\n\
-       \  op result.exact-ref : SpectecTerminal -> ResultPattern [ctor] .\n\
-       \  op result.ref-type : SpectecTerminal -> ResultPattern [ctor] .\n\
-       \  op result.null-ref : SpectecTerminal -> ResultPattern [ctor] .\n\
-       \  op result.either : ResultAlternatives -> ResultPattern [ctor] .\n\
-       \  op result.nan-canonical : SpectecTerminal\n\
-       \    -> ResultPattern [ctor] .\n\
-       \  op result.nan-arithmetic : SpectecTerminal\n\
-       \    -> ResultPattern [ctor] .\n\
-       \  op lane.exact : SpectecTerminal -> LanePattern [ctor] .\n\
-       \  op lane.nan-canonical : -> LanePattern [ctor] .\n\
-       \  op lane.nan-arithmetic : -> LanePattern [ctor] .\n\
-       \  op lanes.nil : -> LanePatterns [ctor] .\n\
-       \  op lanes.cons : LanePattern LanePatterns -> LanePatterns [ctor] .\n\
-       \  op match.yes : -> MatchVerdict [ctor] .\n\
-       \  op match.no : -> MatchVerdict [ctor] .\n\
-       \  op match.and : MatchVerdict MatchVerdict -> MatchVerdict .\n\
-       \  op match.value : SpectecTerminal ResultPattern\n\
-       \    -> MatchVerdict .\n\
-       \  op match.values : ValList ResultPatterns\n\
-       \    -> MatchVerdict .\n\
-       \  op match.any : SpectecTerminal ResultAlternatives\n\
-       \    -> MatchVerdict .\n\n\
-       \  op match.lane : SpectecTerminal SpectecTerminal LanePattern\n\
-       \    -> MatchVerdict .\n\
-       \  op match.vec-lanes : SpectecTerminal SpectecTerminals LanePatterns\n\
-       \    -> MatchVerdict .\n\n\
-       \  op command.return : Nat ScriptAction ResultPatterns\n\
-       \    -> Command [ctor] .\n\
-       \  op command.trap : Nat ScriptAction -> Command [ctor] .\n\
-       \  op command.exception : Nat ScriptAction -> Command [ctor] .\n\
-       \  op command.exhaustion : Nat Nat ScriptAction -> Command [ctor] .\n\
-       \  op command.do : Nat ScriptAction -> Command [ctor] .\n\n\
-       \  op instances.nil : -> InstanceEnv [ctor] .\n\
-       \  op instances.entry : Nat SpectecTerminal -> InstanceEnv [ctor] .\n\
-       \  op instances.concat : InstanceEnv InstanceEnv -> InstanceEnv\n\
-       \    [ctor assoc id: instances.nil] .\n\
-       \  op hasInstance : InstanceEnv Nat -> Bool .\n\
-       \  op findInstance : InstanceEnv Nat ~> SpectecTerminal .\n\n\
-       \  op hasExport : SpectecTerminals SpectecTerminals -> Bool .\n\
-       \  op findExport : SpectecTerminals SpectecTerminals\n\
-       \    ~> SpectecTerminal .\n\
-       \  op checkImport : SpectecTerminal SpectecTerminal ImportRequirement\n\
-       \    -> LinkResult .\n\
-       \  op linkImports : SpectecTerminal InstanceEnv ImportRefs\n\
-       \    -> LinkResult .\n\n\
-       \  op script.start : -> ScriptState [ctor] .\n\
-       \  op script.ready : SpectecTerminal InstanceEnv Commands\n\
-       \    -> ScriptState [ctor] .\n\
-       \  op script.module : Nat InstanceEnv Commands SpectecTerminal\n\
-       \    -> ScriptState [ctor frozen (4)] .\n\
-       \  op script.return : Nat InstanceEnv ResultPatterns Commands\n\
-       \    SpectecTerminal -> ScriptState [ctor frozen (5)] .\n\
-       \  op script.trap : Nat InstanceEnv Commands SpectecTerminal\n\
-       \    -> ScriptState [ctor frozen (4)] .\n\
-       \  op script.exception : Nat InstanceEnv Commands SpectecTerminal\n\
-       \    -> ScriptState [ctor frozen (4)] .\n\
-       \  op script.exhaustion : Nat Nat InstanceEnv Commands SpectecTerminal\n\
-       \    -> ScriptState [ctor frozen (5)] .\n\
-       \  op script.exhaustion-check : Nat Nat InstanceEnv Commands\n\
-       \    SpectecTerminal SpectecTerminal\n\
-       \    -> ScriptState [ctor frozen (5 6)] .\n\
-       \  op script.action : Nat InstanceEnv Commands SpectecTerminal\n\
-       \    -> ScriptState [ctor frozen (4)] .\n\
-       \  op script.uninstantiable : Nat InstanceEnv Commands SpectecTerminal\n\
-       \    -> ScriptState [ctor frozen (4)] .\n\
-       \  op script.wrong-result : Nat ValList ResultPatterns\n\
-       \    -> ScriptState [ctor] .\n\
-       \  op script.wrong-assertion : Nat -> ScriptState [ctor] .\n\
-       \  op script.link-error : Nat -> ScriptState [ctor] .\n\
-       \  op script.done : -> ScriptState [ctor] .\n\n\
-       \  op emptyStore : -> SpectecTerminal .\n\
-       \  op hostFunctionAddresses : -> SpectecTerminals .\n\
-       \  op hostArguments : ValList SpectecTerminals -> Bool .\n\
-       \  op hostCallable : SpectecTerminal Nat ValList -> Bool .\n\
-       \  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
-       \  op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .\n\n\
-       \  op runtimeResults : ValList -> Bool .\n\n\
-       \  op activeFrameDepth : InstrList -> Nat .\n\n\
-       \  vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .\n\
-       \  vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .\n\
-       \  vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .\n\
-       \  vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .\n\
-       \  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : ValList .\n\
-       \  vars WSHBODY WSHINSTRS WSHREST : InstrList .\n\
-       \  var WSHCMDS : Commands .\n\
-       \  vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .\n\
-       \  var WSHREQUIREMENT : ImportRequirement .\n\
-       \  var WSHLINK : LinkResult .\n\
-       \  vars WSHENV WSHENVPREFIX WSHENVSUFFIX : InstanceEnv .\n\
-       \  var WSHPATTERN : ResultPattern .\n\
-       \  vars WSHEXPECTED WSHPATTERNS : ResultPatterns .\n\
-       \  vars WSHALTERNATIVES WSHALTPREFIX WSHALTSUFFIX : ResultAlternatives .\n\
-       \  var WSHLPAT : LanePattern .\n\
-       \  var WSHLPATS : LanePatterns .\n\
-       \  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM : Nat .\n\n\
-       %s\
-       \  eq emptyStore = %s .\n\
-       \  eq hostFunctionAddresses = %s .\n\n\
-       \  eq hostArguments(eps, eps) = true .\n\
-       \  eq hostArguments(CONST(WSHNT, WSHVALUE) WSHVALUES,\n\
-       \    WSHNT WSHTYPES) = hostArguments(WSHVALUES, WSHTYPES) .\n\
-       \  eq hostArguments(WSHVALUES, WSHTYPES) = false [owise] .\n\n\
-       \  eq hasInstance(instances.concat(WSHENVPREFIX,\n\
-       \    instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = true .\n\
-       \  eq hasInstance(WSHENV, WSHID) = false [owise] .\n\
-       \  ceq findInstance(instances.concat(WSHENVPREFIX,\n\
-       \    instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = WSHMI\n\
-       \    if not hasInstance(WSHENVPREFIX, WSHID) .\n\
-       \  \n\
-       \  ceq hasExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = true\n\
-       \    if WSHNAME = value('NAME, WSHHEAD) .\n\
-       \  eq hasExport(WSHEXPORTS, WSHNAME) = false [owise] .\n\
-       \  ceq findExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = WSHXA\n\
-       \    if WSHNAME = value('NAME, WSHHEAD)\n\
-       \       /\\ not hasExport(WSHEXPORTPREFIX, WSHNAME)\n\
-       \       /\\ WSHXA := value('ADDR, WSHHEAD) .\n\
-       \  eq link.append(link.error, WSHLINK) = link.error .\n\
-       \  eq link.append(link.ok(WSHXA), link.error) = link.error .\n\
-       \  eq link.append(link.ok(WSHXA), link.ok(WSHEXPORTS)) =\n\
-       \    link.ok(WSHXA WSHEXPORTS) .\n\n\
-       \  eq checkImport(WSHS, WSHXA, import.ready) = link.ok(WSHXA) .\n\
-       \  ceq checkImport(WSHS, MEM(WSHA),\n\
-       \    import.current-memory-min(WSHREQUIRED)) = link.ok(MEM(WSHA))\n\
-       \    if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=\n\
-       \         value('TYPE, index(value('MEMS, WSHS), WSHA))\n\
-       \       /\\ WSHMIN >= WSHREQUIRED = true .\n\
-       \  ceq checkImport(WSHS, MEM(WSHA),\n\
-       \    import.current-memory-min(WSHREQUIRED)) = link.error\n\
-       \    if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=\n\
-       \         value('TYPE, index(value('MEMS, WSHS), WSHA))\n\
-       \       /\\ WSHMIN < WSHREQUIRED = true .\n\
-       \  eq checkImport(WSHS, TAG(WSHA),\n\
-       \    import.current-memory-min(WSHREQUIRED)) = link.error .\n\
-       \  eq checkImport(WSHS, GLOBAL(WSHA),\n\
-       \    import.current-memory-min(WSHREQUIRED)) = link.error .\n\
-       \  eq checkImport(WSHS, TABLE(WSHA),\n\
-       \    import.current-memory-min(WSHREQUIRED)) = link.error .\n\
-       \  eq checkImport(WSHS, FUNC(WSHA),\n\
-       \    import.current-memory-min(WSHREQUIRED)) = link.error .\n\n\
-       \  ceq checkImport(WSHS, TABLE(WSHA),\n\
-       \    import.current-table-min(WSHREQUIRED)) = link.ok(TABLE(WSHA))\n\
-       \    if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=\n\
-       \         value('TYPE, index(value('TABLES, WSHS), WSHA))\n\
-       \       /\\ WSHMIN >= WSHREQUIRED = true .\n\
-       \  ceq checkImport(WSHS, TABLE(WSHA),\n\
-       \    import.current-table-min(WSHREQUIRED)) = link.error\n\
-       \    if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=\n\
-       \         value('TYPE, index(value('TABLES, WSHS), WSHA))\n\
-       \       /\\ WSHMIN < WSHREQUIRED = true .\n\
-       \  eq checkImport(WSHS, TAG(WSHA),\n\
-       \    import.current-table-min(WSHREQUIRED)) = link.error .\n\
-       \  eq checkImport(WSHS, GLOBAL(WSHA),\n\
-       \    import.current-table-min(WSHREQUIRED)) = link.error .\n\
-       \  eq checkImport(WSHS, MEM(WSHA),\n\
-       \    import.current-table-min(WSHREQUIRED)) = link.error .\n\
-       \  eq checkImport(WSHS, FUNC(WSHA),\n\
-       \    import.current-table-min(WSHREQUIRED)) = link.error .\n\n\
-       \  eq linkImports(WSHS, WSHENV, imports.nil) = link.ok(eps) .\n\
-       \  eq linkImports(WSHS, WSHENV, imports.cons(\n\
-       \    import.ref(WSHTARGET, WSHNAME, WSHREQUIREMENT), WSHIMPORTS2)) =\n\
-       \      link.append(\n\
-       \        checkImport(WSHS, findExport(value('EXPORTS,\n\
-       \          findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHREQUIREMENT),\n\
-       \        linkImports(WSHS, WSHENV, WSHIMPORTS2)) .\n\n\
-       \  ceq findFunc(WSHEXPORTS, WSHNAME) = WSHADDR\n\
-       \    if FUNC(WSHADDR) := findExport(WSHEXPORTS, WSHNAME) .\n\
-       \  ceq findGlobal(WSHEXPORTS, WSHNAME) = WSHA\n\
-       \    if GLOBAL(WSHA) := findExport(WSHEXPORTS, WSHNAME) .\n\n\
-       \  eq runtimeResults(eps) = true .\n\
-       \  ceq runtimeResults(CONST(WSHNT, WSHVALUE) WSHACTUAL) =\n\
-       \      runtimeResults(WSHACTUAL)\n\
-       \    if typecheck(WSHNT, numtype)\n\
-       \       /\\ typecheck(WSHVALUE, num-(WSHNT)) .\n\n\
-       \  eq runtimeResults(VCONST(V128, WSHC) WSHACTUAL) =\n\
-       \    runtimeResults(WSHACTUAL) .\n\n\
-       \  ceq runtimeResults(WSHC WSHACTUAL) = runtimeResults(WSHACTUAL)\n\
-       \    if typecheck(WSHC, ref) .\n\n\
-       \  ceq activeFrameDepth(WSHPREFIX ((FRAME- WSHN { WSHC } WSHBODY) WSHREST)) =\n\
-       \    1 + activeFrameDepth(WSHBODY)\n\
-       \    if runtimeResults(WSHPREFIX) .\n\
-       \  ceq activeFrameDepth(WSHPREFIX ((LABEL- WSHN { WSHINSTRS } WSHBODY) WSHREST)) =\n\
-       \    activeFrameDepth(WSHBODY)\n\
-       \    if runtimeResults(WSHPREFIX) .\n\
-       \  ceq activeFrameDepth(WSHPREFIX ((HANDLER- WSHN { WSHCATCHES } WSHBODY) WSHREST)) =\n\
-       \    activeFrameDepth(WSHBODY)\n\
-       \    if runtimeResults(WSHPREFIX) .\n\
-       \  eq activeFrameDepth(WSHINSTRS) = 0 [owise] .\n\
-       \  eq match.and(match.yes, match.yes) = match.yes .\n\
-       \  eq match.and(match.yes, match.no) = match.no .\n\
-       \  eq match.and(match.no, match.yes) = match.no .\n\
-       \  eq match.and(match.no, match.no) = match.no .\n\
-       \  eq match.value(WSHVALUE, result.exact-num(WSHVALUE)) = match.yes .\n\
-       \  eq match.value(WSHVALUE, result.exact-vec(WSHVALUE)) = match.yes .\n\
-       \  eq match.value(WSHVALUE, result.exact-ref(WSHVALUE)) = match.yes .\n\
-       \  eq match.value(REF.NULL-ADDR, result.null-ref(WSHNT)) =\n\
-       \    match.yes .\n\
-       \  eq match.value(WSHVALUE, result.either(WSHALTERNATIVES)) =\n\
-       \    match.any(WSHVALUE, WSHALTERNATIVES) .\n\n\
-       \  ceq match.value(\n\
-       \    VCONST(V128, WSHVALUE),\n\
-       \    result.vec-lanes(WSHLT X WSHDIM, WSHLPATS)) =\n\
-       \      match.vec-lanes(WSHLT, WSHLANES, WSHLPATS)\n\
-       \    if WSHLANES := lanes-(WSHLT X WSHDIM, WSHVALUE) .\n\n\
-       \  eq match.lane(WSHNT, WSHVALUE, lane.exact(WSHVALUE)) = match.yes .\n\
-       \  eq match.lane(F32,\n\
-       \    POS(NAN(4194304)), lane.nan-canonical) = match.yes .\n\
-       \  eq match.lane(F32,\n\
-       \    NEG(NAN(4194304)), lane.nan-canonical) = match.yes .\n\
-       \  eq match.lane(F64,\n\
-       \    POS(NAN(2251799813685248)), lane.nan-canonical) =\n\
-       \      match.yes .\n\
-       \  eq match.lane(F64,\n\
-       \    NEG(NAN(2251799813685248)), lane.nan-canonical) =\n\
-       \      match.yes .\n\
-       \  ceq match.lane(F32,\n\
-       \    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes\n\
-       \    if _>=_(WSHADDR, 4194304) = true .\n\
-       \  ceq match.lane(F32,\n\
-       \    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes\n\
-       \    if _>=_(WSHADDR, 4194304) = true .\n\
-       \  ceq match.lane(F64,\n\
-       \    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes\n\
-       \    if _>=_(WSHADDR, 2251799813685248) = true .\n\
-       \  ceq match.lane(F64,\n\
-       \    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes\n\
-       \    if _>=_(WSHADDR, 2251799813685248) = true .\n\
-       \  eq match.lane(WSHNT, WSHVALUE, WSHLPAT) = match.no [owise] .\n\n\
-       \  eq match.vec-lanes(WSHNT, eps, lanes.nil) = match.yes .\n\
-       \  eq match.vec-lanes(WSHNT, WSHVALUE WSHLANES,\n\
-       \    lanes.cons(WSHLPAT, WSHLPATS)) =\n\
-       \    match.and(match.lane(WSHNT, WSHVALUE, WSHLPAT),\n\
-       \      match.vec-lanes(WSHNT, WSHLANES, WSHLPATS)) .\n\
-       \  eq match.vec-lanes(WSHNT, WSHLANES, WSHLPATS) =\n\
-       \    match.no [owise] .\n\n\
-       \  eq match.value(\n\
-       \    CONST(F32, POS(NAN(4194304))),\n\
-       \    result.nan-canonical(F32)) = match.yes .\n\
-       \  eq match.value(\n\
-       \    CONST(F32, NEG(NAN(4194304))),\n\
-       \    result.nan-canonical(F32)) = match.yes .\n\
-       \  eq match.value(\n\
-       \    CONST(F64, POS(NAN(2251799813685248))),\n\
-       \    result.nan-canonical(F64)) = match.yes .\n\
-       \  eq match.value(\n\
-       \    CONST(F64, NEG(NAN(2251799813685248))),\n\
-       \    result.nan-canonical(F64)) = match.yes .\n\
-       \  ceq match.value(\n\
-       \    CONST(F32, POS(NAN(WSHADDR))),\n\
-       \    result.nan-arithmetic(F32)) = match.yes\n\
-       \    if _>=_(WSHADDR, 4194304) = true .\n\
-       \  ceq match.value(\n\
-       \    CONST(F32, NEG(NAN(WSHADDR))),\n\
-       \    result.nan-arithmetic(F32)) = match.yes\n\
-       \    if _>=_(WSHADDR, 4194304) = true .\n\
-       \  ceq match.value(\n\
-       \    CONST(F64, POS(NAN(WSHADDR))),\n\
-       \    result.nan-arithmetic(F64)) = match.yes\n\
-       \    if _>=_(WSHADDR, 2251799813685248) = true .\n\
-       \  ceq match.value(\n\
-       \    CONST(F64, NEG(NAN(WSHADDR))),\n\
-       \    result.nan-arithmetic(F64)) = match.yes\n\
-       \    if _>=_(WSHADDR, 2251799813685248) = true .\n\n\
-       \  eq match.value(REF.NULL-ADDR, result.ref-type(ANY)) = match.yes .\n\
-       \  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(ANY)) = match.yes .\n\
-       \  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .\n\
-       \  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .\n\
-       \  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .\n\
-       \  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .\n\
-       \  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(ANY)) = match.yes .\n\
-       \  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(EQ)) = match.yes .\n\
-       \  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .\n\
-       \  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .\n\
-       \  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(I31)) = match.yes .\n\
-       \  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(STRUCT)) = match.yes .\n\
-       \  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ARRAY)) = match.yes .\n\
-       \  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(spectec-FUNC)) = match.yes .\n\
-       \  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXN)) = match.yes .\n\
-       \  eq match.value(REF.NULL-ADDR, result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(EXTERN)) = match.yes .\n\
-       \  eq match.value(WSHVALUE, WSHPATTERN) = match.no [owise] .\n\n\
-       \  eq match.values(eps, patterns.nil) = match.yes .\n\
-       \  eq match.values(WSHVALUE WSHACTUAL,\n\
-       \    patterns.cons(WSHPATTERN, WSHPATTERNS)) =\n\
-       \      match.and(match.value(WSHVALUE, WSHPATTERN),\n\
-       \        match.values(WSHACTUAL, WSHPATTERNS)) .\n\
-       \  eq match.values(WSHACTUAL, WSHEXPECTED) = match.no [owise] .\n\n\
-       \  ceq match.any(WSHVALUE, alternatives.cons(WSHALTPREFIX,\n\
-       \    alternatives.cons(WSHPATTERN, WSHALTSUFFIX))) = match.yes\n\
-       \    if match.value(WSHVALUE, WSHPATTERN) = match.yes .\n\
-       \  eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .\n\
-       \  ceq hostCallable(WSHS, WSHA, WSHARGS) = true\n\
-       \    if WSHA <- hostFunctionAddresses = true\n\
-       \       /\\ typecheck(WSHARGS, val) = true\n\
-       \       /\\ typecheck(WSHARGS, instr) = true\n\
-       \       /\\ WSHXA := index(value('FUNCS, WSHS), WSHA)\n\
-       \       /\\ value('CODE, WSHXA) = ...\n\
-       \       /\\ FUNC WSHTYPES -> eps := Expand(value('TYPE, WSHXA))\n\
-       \       /\\ len(WSHARGS) = len(WSHTYPES)\n\
-       \       /\\ hostArguments(WSHARGS, WSHTYPES) = true .\n\
-       \  eq hostCallable(WSHS, WSHA, WSHARGS) = false [owise] .\n\n\
-       \  crl [host-call] :\n\
-       \    Step-read((WSHS ; WSHCURRENT) ;\n\
-       \      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => eps\n\
-       \    if hostCallable(WSHS, WSHA, WSHARGS) = true .\n\n\
-       \  crl [focus-host-call] :\n\
-       \    identifyFocus(WSHS ; WSHCURRENT,\n\
-       \      WSHPREFIX (WSHARGS REF.FUNC-ADDR(WSHA)), CALL-REF(WSHC), WSHREST)\n\
-       \    => { WSHPREFIX | ((WSHS ; WSHCURRENT) ;\n\
-       \      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) | WSHREST }\n\
-       \    if hostCallable(WSHS, WSHA, WSHARGS) = true .\n\n\
-       \  rl [start] : script.start =>\n\
-       \    script.ready(emptyStore, %s, inputCommands) .\n\
-       \  crl [module-start] :\n\
-       \    script.ready(WSHS, WSHENV,\n\
-       \      commands.cons(command.module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))\n\
-       \    => script.module(WSHID, WSHENV, WSHCMDS, WSHC)\n\
-       \    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)\n\
-       \       /\\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .\n\
-       \  crl [module-link-error] :\n\
-       \    script.ready(WSHS, WSHENV,\n\
-       \      commands.cons(command.module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))\n\
-       \    => script.link-error(WSHID)\n\
-       \    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .\n\
-       \  rl [module-done] :\n\
-       \    script.module(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHMI)) }) ; eps)\n\
-       \    => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .\n\n\
-       \  crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, WSHC)\n\
-       \    => script.module(WSHID, WSHENV, WSHCMDS, WSHC2)\n\
-       \    if Step(WSHC) => WSHC2 .\n\n\
-       \  crl [assert-unlinkable] :\n\
-       \    script.ready(WSHS, WSHENV,\n\
-       \      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS)\n\
-       \    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .\n\
-       \  crl [assert-unlinkable-wrong] :\n\
-       \    script.ready(WSHS, WSHENV,\n\
-       \      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))\n\
-       \    => script.wrong-assertion(WSHID)\n\
-       \    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS) .\n\n\
-       \  rl [assert-uninstantiable-static-link-error] :\n\
-       \    script.ready(WSHS, WSHENV,\n\
-       \      commands.cons(command.uninstantiable-static(WSHID), WSHCMDS))\n\
-       \    => script.wrong-assertion(WSHID) .\n\
-       \  crl [assert-uninstantiable-link-error] :\n\
-       \    script.ready(WSHS, WSHENV,\n\
-       \      commands.cons(command.uninstantiable(WSHID, WSHM, WSHIMPORTS), WSHCMDS))\n\
-       \    => script.wrong-assertion(WSHID)\n\
-       \    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .\n\
-       \  crl [assert-uninstantiable-start] :\n\
-       \    script.ready(WSHS, WSHENV,\n\
-       \      commands.cons(command.uninstantiable(WSHID, WSHM, WSHIMPORTS), WSHCMDS))\n\
-       \    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHC)\n\
-       \    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)\n\
-       \       /\\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .\n\
-       \  rl [assert-uninstantiable-trap] :\n\
-       \    script.uninstantiable(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS) .\n\
-       \  rl [assert-uninstantiable-exception] :\n\
-       \    script.uninstantiable(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;\n\
-       \        (REF.EXN-ADDR(WSHA) THROW-REF))\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS) .\n\
-       \  rl [assert-uninstantiable-normal] :\n\
-       \    script.uninstantiable(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; eps)\n\
-       \    => script.wrong-assertion(WSHID) .\n\
-       \  crl [assert-uninstantiable-step] :\n\
-       \    script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHC)\n\
-       \    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHC2)\n\
-       \    if Step(WSHC) => WSHC2 .\n\n\
-       \  rl [call-return] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(\n\
-       \      command.return(WSHID, action.invoke(WSHTARGET, WSHNAME, WSHARGS),\n\
-       \        WSHEXPECTED), WSHCMDS))\n\
-       \    => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,\n\
-       \      invoke(WSHS, findFunc(value('EXPORTS,\n\
-       \        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .\n\
-       \  crl [get-return] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(command.return(WSHID,\n\
-       \      action.get(WSHTARGET, WSHNAME), WSHEXPECTED), WSHCMDS))\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS)\n\
-       \    if WSHA := findGlobal(value('EXPORTS,\n\
-       \         findInstance(WSHENV, WSHTARGET)), WSHNAME)\n\
-       \       /\\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))\n\
-       \       /\\ typecheck(WSHACTUAL, val)\n\
-       \       /\\ typecheck(WSHACTUAL, instr)\n\
-       \       /\\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .\n\
-       \  crl [get-wrong-result] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(command.return(WSHID,\n\
-       \      action.get(WSHTARGET, WSHNAME), WSHEXPECTED), WSHCMDS))\n\
-       \    => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)\n\
-       \    if WSHA := findGlobal(value('EXPORTS,\n\
-       \         findInstance(WSHENV, WSHTARGET)), WSHNAME)\n\
-       \       /\\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))\n\
-       \       /\\ typecheck(WSHACTUAL, val)\n\
-       \       /\\ typecheck(WSHACTUAL, instr)\n\
-       \       /\\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .\n\
-       \  crl [return-done] :\n\
-       \    script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS)\n\
-       \    if runtimeResults(WSHACTUAL) = true\n\
-       \       /\\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .\n\
-       \  crl [return-wrong-result] :\n\
-       \    script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)\n\
-       \    => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)\n\
-       \    if runtimeResults(WSHACTUAL) = true\n\
-       \       /\\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .\n\
-       \  crl [return-step] :\n\
-       \    script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHC)\n\
-       \    => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHC2)\n\
-       \    if Step(WSHC) => WSHC2 .\n\n\
-       \  rl [call-trap] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(command.trap(WSHID,\n\
-       \      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))\n\
-       \    => script.trap(WSHID, WSHENV, WSHCMDS,\n\
-       \      invoke(WSHS, findFunc(value('EXPORTS,\n\
-       \        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .\n\
-       \  rl [trap-done] :\n\
-       \    script.trap(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS) .\n\
-       \  crl [trap-step] : script.trap(WSHID, WSHENV, WSHCMDS, WSHC)\n\
-       \    => script.trap(WSHID, WSHENV, WSHCMDS, WSHC2)\n\
-       \    if Step(WSHC) => WSHC2 .\n\n\
-       \  rl [call-exception] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,\n\
-       \      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))\n\
-       \    => script.exception(WSHID, WSHENV, WSHCMDS,\n\
-       \      invoke(WSHS, findFunc(value('EXPORTS,\n\
-       \        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .\n\
-       \  rl [exception-done] :\n\
-       \    script.exception(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;\n\
-       \        (REF.EXN-ADDR(WSHA) THROW-REF))\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS) .\n\
-       \  rl [exception-trap] :\n\
-       \    script.exception(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)\n\
-       \    => script.wrong-assertion(WSHID) .\n\
-       \  crl [exception-normal] :\n\
-       \    script.exception(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)\n\
-       \    => script.wrong-assertion(WSHID)\n\
-       \    if runtimeResults(WSHACTUAL) = true .\n\
-       \  crl [exception-step] : script.exception(WSHID, WSHENV, WSHCMDS, WSHC)\n\
-       \    => script.exception(WSHID, WSHENV, WSHCMDS, WSHC2)\n\
-       \    if Step(WSHC) => WSHC2 .\n\n\
-       \  rl [call-action] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,\n\
-       \      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))\n\
-       \    => script.action(WSHID, WSHENV, WSHCMDS,\n\
-       \      invoke(WSHS, findFunc(value('EXPORTS,\n\
-       \        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .\n\
-       \  crl [action-done] :\n\
-       \    script.action(WSHID, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS)\n\
-       \    if runtimeResults(WSHACTUAL) = true .\n\
-       \  crl [action-step] : script.action(WSHID, WSHENV, WSHCMDS, WSHC)\n\
-       \    => script.action(WSHID, WSHENV, WSHCMDS, WSHC2)\n\
-       \    if Step(WSHC) => WSHC2 .\n\
-       \  crl [get-action] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,\n\
-       \      action.get(WSHTARGET, WSHNAME)), WSHCMDS))\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS)\n\
-       \    if WSHA := findGlobal(value('EXPORTS,\n\
-       \         findInstance(WSHENV, WSHTARGET)), WSHNAME)\n\
-       \       /\\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))\n\
-       \       /\\ typecheck(WSHACTUAL, val)\n\
-       \       /\\ typecheck(WSHACTUAL, instr) .\n\n\
-       \  rl [call-exhaustion] :\n\
-       \    script.ready(WSHS, WSHENV, commands.cons(command.exhaustion(WSHID,\n\
-       \      WSHREQUIRED, action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))\n\
-       \    => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,\n\
-       \      invoke(WSHS, findFunc(value('EXPORTS,\n\
-       \        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .\n\
-       \  rl [exhaustion-trap] :\n\
-       \    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)\n\
-       \    => script.wrong-assertion(WSHID) .\n\
-       \  rl [exhaustion-exception] :\n\
-       \    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;\n\
-       \        (REF.EXN-ADDR(WSHA) THROW-REF))\n\
-       \    => script.wrong-assertion(WSHID) .\n\
-       \  crl [exhaustion-normal] :\n\
-       \    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)\n\
-       \    => script.wrong-assertion(WSHID)\n\
-       \    if runtimeResults(WSHACTUAL) = true .\n\
-       \  crl [exhaustion-step] :\n\
-       \    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,\n\
-       \      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHBODY)\n\
-       \    => script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,\n\
-       \      WSHS2, (WSHS2 ; WSHF2) ; WSHINSTRS)\n\
-       \    if Step((WSHS ;\n\
-       \         { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHBODY)\n\
-       \         => (WSHS2 ; WSHF2) ; WSHINSTRS .\n\
-       \  crl [exhaustion-done] :\n\
-       \    script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,\n\
-       \      WSHC2 ; WSHINSTRS)\n\
-       \    => script.ready(WSHS, WSHENV, WSHCMDS)\n\
-       \    if activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .\n\
-       \  crl [exhaustion-continue] :\n\
-       \    script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS, WSHC)\n\
-       \    => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHC)\n\
-       \    if WSHC2 ; WSHINSTRS := WSHC\n\
-       \       /\\ activeFrameDepth(WSHINSTRS) <= WSHREQUIRED = true .\n\
-       \n\
-       \  rl [done] :\n\
-       \    script.ready(WSHS, WSHENV, commands.nil) => script.done .\n\
-       endm\n\n\
-       rew [%d] in WASM2MAUDE-WAST : script.start .\n\
-       continue 1 .\n"
+      ({|load %s
+
+mod WASM2MAUDE-WAST is
+  including WASM-BUILTINS .
+
+  sorts ScriptAction ImportRequirement ImportRef ImportRefs LinkResult
+    Command Commands
+    InstanceEnv ScriptState ResultPattern ResultPatterns
+    ResultAlternatives LanePattern LanePatterns MatchVerdict .
+  subsort Command < Commands .
+  op action.invoke : Nat SpectecTerminals ValList
+    -> ScriptAction [ctor] .
+  op action.get : Nat SpectecTerminals -> ScriptAction [ctor] .
+  op commands.nil : -> Commands [ctor] .
+  op commands.cons : Command Commands -> Commands [ctor] .
+  op import.ready : -> ImportRequirement [ctor] .
+  op import.current-memory-min : Nat -> ImportRequirement [ctor] .
+  op import.current-table-min : Nat -> ImportRequirement [ctor] .
+  op import.ref : Nat SpectecTerminals ImportRequirement
+    -> ImportRef [ctor] .
+  op imports.nil : -> ImportRefs [ctor] .
+  op imports.cons : ImportRef ImportRefs -> ImportRefs [ctor] .
+  op link.ok : SpectecTerminals -> LinkResult [ctor] .
+  op link.error : -> LinkResult [ctor] .
+  op link.append : LinkResult LinkResult -> LinkResult .
+  op command.module : Nat SpectecTerminal ImportRefs
+    -> Command [ctor] .
+  op command.unlinkable : Nat ImportRefs -> Command [ctor] .
+  op command.uninstantiable-static : Nat -> Command [ctor] .
+  op command.uninstantiable : Nat SpectecTerminal ImportRefs
+    -> Command [ctor] .
+  op patterns.nil : -> ResultPatterns [ctor] .
+  op patterns.cons : ResultPattern ResultPatterns
+    -> ResultPatterns [ctor] .
+  op alternatives.nil : -> ResultAlternatives [ctor] .
+  subsort ResultPattern < ResultAlternatives .
+  op alternatives.cons : ResultAlternatives ResultAlternatives
+    -> ResultAlternatives [ctor assoc id: alternatives.nil] .
+  op result.exact-num : SpectecTerminal -> ResultPattern [ctor] .
+  op result.exact-vec : SpectecTerminal -> ResultPattern [ctor] .
+  op result.vec-lanes : SpectecTerminal LanePatterns
+    -> ResultPattern [ctor] .
+  op result.exact-ref : SpectecTerminal -> ResultPattern [ctor] .
+  op result.ref-type : SpectecTerminal -> ResultPattern [ctor] .
+  op result.null-ref : SpectecTerminal -> ResultPattern [ctor] .
+  op result.either : ResultAlternatives -> ResultPattern [ctor] .
+  op result.nan-canonical : SpectecTerminal
+    -> ResultPattern [ctor] .
+  op result.nan-arithmetic : SpectecTerminal
+    -> ResultPattern [ctor] .
+  op lane.exact : SpectecTerminal -> LanePattern [ctor] .
+  op lane.nan-canonical : -> LanePattern [ctor] .
+  op lane.nan-arithmetic : -> LanePattern [ctor] .
+  op lanes.nil : -> LanePatterns [ctor] .
+  op lanes.cons : LanePattern LanePatterns -> LanePatterns [ctor] .
+  op match.yes : -> MatchVerdict [ctor] .
+  op match.no : -> MatchVerdict [ctor] .
+  op match.and : MatchVerdict MatchVerdict -> MatchVerdict .
+  op match.value : SpectecTerminal ResultPattern
+    -> MatchVerdict .
+  op match.values : ValList ResultPatterns
+    -> MatchVerdict .
+  op match.any : SpectecTerminal ResultAlternatives
+    -> MatchVerdict .
+
+  op match.lane : SpectecTerminal SpectecTerminal LanePattern
+    -> MatchVerdict .
+  op match.vec-lanes : SpectecTerminal SpectecTerminals LanePatterns
+    -> MatchVerdict .
+
+  op command.return : Nat ScriptAction ResultPatterns
+    -> Command [ctor] .
+  op command.trap : Nat ScriptAction -> Command [ctor] .
+  op command.exception : Nat ScriptAction -> Command [ctor] .
+  op command.exhaustion : Nat Nat ScriptAction -> Command [ctor] .
+  op command.do : Nat ScriptAction -> Command [ctor] .
+
+  op instances.nil : -> InstanceEnv [ctor] .
+  op instances.entry : Nat SpectecTerminal -> InstanceEnv [ctor] .
+  op instances.concat : InstanceEnv InstanceEnv -> InstanceEnv
+    [ctor assoc id: instances.nil] .
+  op hasInstance : InstanceEnv Nat -> Bool .
+  op findInstance : InstanceEnv Nat ~> SpectecTerminal .
+
+  op hasExport : SpectecTerminals SpectecTerminals -> Bool .
+  op findExport : SpectecTerminals SpectecTerminals
+    ~> SpectecTerminal .
+  op checkImport : SpectecTerminal SpectecTerminal ImportRequirement
+    -> LinkResult .
+  op linkImports : SpectecTerminal InstanceEnv ImportRefs
+    -> LinkResult .
+
+  op script.start : -> ScriptState [ctor] .
+  op script.ready : SpectecTerminal InstanceEnv Commands
+    -> ScriptState [ctor] .
+  op script.module : Nat InstanceEnv Commands SpectecTerminal
+    -> ScriptState [ctor frozen (4)] .
+  op script.return : Nat InstanceEnv ResultPatterns Commands
+    SpectecTerminal -> ScriptState [ctor frozen (5)] .
+  op script.trap : Nat InstanceEnv Commands SpectecTerminal
+    -> ScriptState [ctor frozen (4)] .
+  op script.exception : Nat InstanceEnv Commands SpectecTerminal
+    -> ScriptState [ctor frozen (4)] .
+  op script.exhaustion : Nat Nat InstanceEnv Commands SpectecTerminal
+    -> ScriptState [ctor frozen (5)] .
+  op script.exhaustion-check : Nat Nat InstanceEnv Commands
+    SpectecTerminal SpectecTerminal
+    -> ScriptState [ctor frozen (5 6)] .
+  op script.action : Nat InstanceEnv Commands SpectecTerminal
+    -> ScriptState [ctor frozen (4)] .
+  op script.uninstantiable : Nat InstanceEnv Commands SpectecTerminal
+    -> ScriptState [ctor frozen (4)] .
+  op script.wrong-result : Nat ValList ResultPatterns
+    -> ScriptState [ctor] .
+  op script.wrong-assertion : Nat -> ScriptState [ctor] .
+  op script.link-error : Nat -> ScriptState [ctor] .
+  op script.done : -> ScriptState [ctor] .
+
+  op emptyStore : -> SpectecTerminal .
+  op hostFunctionAddresses : -> SpectecTerminals .
+  op hostArguments : ValList SpectecTerminals -> Bool .
+  op hostCallable : SpectecTerminal Nat ValList -> Bool .
+  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
+
+  op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .
+
+  op runtimeResults : ValList -> Bool .
+
+  op activeFrameDepth : InstrList -> Nat .
+
+  vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
+  vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .
+  vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .
+  vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .
+  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : ValList .
+  vars WSHBODY WSHINSTRS WSHREST : InstrList .
+  var WSHCMDS : Commands .
+  vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .
+  var WSHREQUIREMENT : ImportRequirement .
+  var WSHLINK : LinkResult .
+  vars WSHENV WSHENVPREFIX WSHENVSUFFIX : InstanceEnv .
+  var WSHPATTERN : ResultPattern .
+  vars WSHEXPECTED WSHPATTERNS : ResultPatterns .
+  vars WSHALTERNATIVES WSHALTPREFIX WSHALTSUFFIX : ResultAlternatives .
+  var WSHLPAT : LanePattern .
+  var WSHLPATS : LanePatterns .
+  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM : Nat .
+
+%s  eq emptyStore = %s .
+  eq hostFunctionAddresses = %s .
+
+  eq hostArguments(eps, eps) = true .
+  eq hostArguments(CONST(WSHNT, WSHVALUE) WSHVALUES,
+    WSHNT WSHTYPES) = hostArguments(WSHVALUES, WSHTYPES) .
+  eq hostArguments(WSHVALUES, WSHTYPES) = false [owise] .
+
+  eq hasInstance(instances.concat(WSHENVPREFIX,
+    instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = true .
+  eq hasInstance(WSHENV, WSHID) = false [owise] .
+  ceq findInstance(instances.concat(WSHENVPREFIX,
+    instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = WSHMI
+    if not hasInstance(WSHENVPREFIX, WSHID) .
+|} ^^ "  \n" ^^ {|  ceq hasExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = true
+    if WSHNAME = value('NAME, WSHHEAD) .
+  eq hasExport(WSHEXPORTS, WSHNAME) = false [owise] .
+  ceq findExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = WSHXA
+    if WSHNAME = value('NAME, WSHHEAD)
+       /\ not hasExport(WSHEXPORTPREFIX, WSHNAME)
+       /\ WSHXA := value('ADDR, WSHHEAD) .
+  eq link.append(link.error, WSHLINK) = link.error .
+  eq link.append(link.ok(WSHXA), link.error) = link.error .
+  eq link.append(link.ok(WSHXA), link.ok(WSHEXPORTS)) =
+    link.ok(WSHXA WSHEXPORTS) .
+
+  eq checkImport(WSHS, WSHXA, import.ready) = link.ok(WSHXA) .
+  ceq checkImport(WSHS, MEM(WSHA),
+    import.current-memory-min(WSHREQUIRED)) = link.ok(MEM(WSHA))
+    if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
+         value('TYPE, index(value('MEMS, WSHS), WSHA))
+       /\ WSHMIN >= WSHREQUIRED = true .
+  ceq checkImport(WSHS, MEM(WSHA),
+    import.current-memory-min(WSHREQUIRED)) = link.error
+    if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
+         value('TYPE, index(value('MEMS, WSHS), WSHA))
+       /\ WSHMIN < WSHREQUIRED = true .
+  eq checkImport(WSHS, TAG(WSHA),
+    import.current-memory-min(WSHREQUIRED)) = link.error .
+  eq checkImport(WSHS, GLOBAL(WSHA),
+    import.current-memory-min(WSHREQUIRED)) = link.error .
+  eq checkImport(WSHS, TABLE(WSHA),
+    import.current-memory-min(WSHREQUIRED)) = link.error .
+  eq checkImport(WSHS, FUNC(WSHA),
+    import.current-memory-min(WSHREQUIRED)) = link.error .
+
+  ceq checkImport(WSHS, TABLE(WSHA),
+    import.current-table-min(WSHREQUIRED)) = link.ok(TABLE(WSHA))
+    if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
+         value('TYPE, index(value('TABLES, WSHS), WSHA))
+       /\ WSHMIN >= WSHREQUIRED = true .
+  ceq checkImport(WSHS, TABLE(WSHA),
+    import.current-table-min(WSHREQUIRED)) = link.error
+    if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
+         value('TYPE, index(value('TABLES, WSHS), WSHA))
+       /\ WSHMIN < WSHREQUIRED = true .
+  eq checkImport(WSHS, TAG(WSHA),
+    import.current-table-min(WSHREQUIRED)) = link.error .
+  eq checkImport(WSHS, GLOBAL(WSHA),
+    import.current-table-min(WSHREQUIRED)) = link.error .
+  eq checkImport(WSHS, MEM(WSHA),
+    import.current-table-min(WSHREQUIRED)) = link.error .
+  eq checkImport(WSHS, FUNC(WSHA),
+    import.current-table-min(WSHREQUIRED)) = link.error .
+
+  eq linkImports(WSHS, WSHENV, imports.nil) = link.ok(eps) .
+  eq linkImports(WSHS, WSHENV, imports.cons(
+    import.ref(WSHTARGET, WSHNAME, WSHREQUIREMENT), WSHIMPORTS2)) =
+      link.append(
+        checkImport(WSHS, findExport(value('EXPORTS,
+          findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHREQUIREMENT),
+        linkImports(WSHS, WSHENV, WSHIMPORTS2)) .
+
+  ceq findFunc(WSHEXPORTS, WSHNAME) = WSHADDR
+    if FUNC(WSHADDR) := findExport(WSHEXPORTS, WSHNAME) .
+  ceq findGlobal(WSHEXPORTS, WSHNAME) = WSHA
+    if GLOBAL(WSHA) := findExport(WSHEXPORTS, WSHNAME) .
+
+  eq runtimeResults(eps) = true .
+  ceq runtimeResults(CONST(WSHNT, WSHVALUE) WSHACTUAL) =
+      runtimeResults(WSHACTUAL)
+    if typecheck(WSHNT, numtype)
+       /\ typecheck(WSHVALUE, num-(WSHNT)) .
+
+  eq runtimeResults(VCONST(V128, WSHC) WSHACTUAL) =
+    runtimeResults(WSHACTUAL) .
+
+  ceq runtimeResults(WSHC WSHACTUAL) = runtimeResults(WSHACTUAL)
+    if typecheck(WSHC, ref) .
+
+  ceq activeFrameDepth(WSHPREFIX ((FRAME- WSHN { WSHC } WSHBODY) WSHREST)) =
+    1 + activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  ceq activeFrameDepth(WSHPREFIX ((LABEL- WSHN { WSHINSTRS } WSHBODY) WSHREST)) =
+    activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  ceq activeFrameDepth(WSHPREFIX ((HANDLER- WSHN { WSHCATCHES } WSHBODY) WSHREST)) =
+    activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  eq activeFrameDepth(WSHINSTRS) = 0 [owise] .
+  eq match.and(match.yes, match.yes) = match.yes .
+  eq match.and(match.yes, match.no) = match.no .
+  eq match.and(match.no, match.yes) = match.no .
+  eq match.and(match.no, match.no) = match.no .
+  eq match.value(WSHVALUE, result.exact-num(WSHVALUE)) = match.yes .
+  eq match.value(WSHVALUE, result.exact-vec(WSHVALUE)) = match.yes .
+  eq match.value(WSHVALUE, result.exact-ref(WSHVALUE)) = match.yes .
+  eq match.value(REF.NULL-ADDR, result.null-ref(WSHNT)) =
+    match.yes .
+  eq match.value(WSHVALUE, result.either(WSHALTERNATIVES)) =
+    match.any(WSHVALUE, WSHALTERNATIVES) .
+
+  ceq match.value(
+    VCONST(V128, WSHVALUE),
+    result.vec-lanes(WSHLT X WSHDIM, WSHLPATS)) =
+      match.vec-lanes(WSHLT, WSHLANES, WSHLPATS)
+    if WSHLANES := lanes-(WSHLT X WSHDIM, WSHVALUE) .
+
+  eq match.lane(WSHNT, WSHVALUE, lane.exact(WSHVALUE)) = match.yes .
+  eq match.lane(F32,
+    POS(NAN(4194304)), lane.nan-canonical) = match.yes .
+  eq match.lane(F32,
+    NEG(NAN(4194304)), lane.nan-canonical) = match.yes .
+  eq match.lane(F64,
+    POS(NAN(2251799813685248)), lane.nan-canonical) =
+      match.yes .
+  eq match.lane(F64,
+    NEG(NAN(2251799813685248)), lane.nan-canonical) =
+      match.yes .
+  ceq match.lane(F32,
+    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 4194304) = true .
+  ceq match.lane(F32,
+    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 4194304) = true .
+  ceq match.lane(F64,
+    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 2251799813685248) = true .
+  ceq match.lane(F64,
+    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 2251799813685248) = true .
+  eq match.lane(WSHNT, WSHVALUE, WSHLPAT) = match.no [owise] .
+
+  eq match.vec-lanes(WSHNT, eps, lanes.nil) = match.yes .
+  eq match.vec-lanes(WSHNT, WSHVALUE WSHLANES,
+    lanes.cons(WSHLPAT, WSHLPATS)) =
+    match.and(match.lane(WSHNT, WSHVALUE, WSHLPAT),
+      match.vec-lanes(WSHNT, WSHLANES, WSHLPATS)) .
+  eq match.vec-lanes(WSHNT, WSHLANES, WSHLPATS) =
+    match.no [owise] .
+
+  eq match.value(
+    CONST(F32, POS(NAN(4194304))),
+    result.nan-canonical(F32)) = match.yes .
+  eq match.value(
+    CONST(F32, NEG(NAN(4194304))),
+    result.nan-canonical(F32)) = match.yes .
+  eq match.value(
+    CONST(F64, POS(NAN(2251799813685248))),
+    result.nan-canonical(F64)) = match.yes .
+  eq match.value(
+    CONST(F64, NEG(NAN(2251799813685248))),
+    result.nan-canonical(F64)) = match.yes .
+  ceq match.value(
+    CONST(F32, POS(NAN(WSHADDR))),
+    result.nan-arithmetic(F32)) = match.yes
+    if _>=_(WSHADDR, 4194304) = true .
+  ceq match.value(
+    CONST(F32, NEG(NAN(WSHADDR))),
+    result.nan-arithmetic(F32)) = match.yes
+    if _>=_(WSHADDR, 4194304) = true .
+  ceq match.value(
+    CONST(F64, POS(NAN(WSHADDR))),
+    result.nan-arithmetic(F64)) = match.yes
+    if _>=_(WSHADDR, 2251799813685248) = true .
+  ceq match.value(
+    CONST(F64, NEG(NAN(WSHADDR))),
+    result.nan-arithmetic(F64)) = match.yes
+    if _>=_(WSHADDR, 2251799813685248) = true .
+
+  eq match.value(REF.NULL-ADDR, result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(EQ)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(I31)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(STRUCT)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ARRAY)) = match.yes .
+  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(spectec-FUNC)) = match.yes .
+  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXN)) = match.yes .
+  eq match.value(REF.NULL-ADDR, result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(WSHVALUE, WSHPATTERN) = match.no [owise] .
+
+  eq match.values(eps, patterns.nil) = match.yes .
+  eq match.values(WSHVALUE WSHACTUAL,
+    patterns.cons(WSHPATTERN, WSHPATTERNS)) =
+      match.and(match.value(WSHVALUE, WSHPATTERN),
+        match.values(WSHACTUAL, WSHPATTERNS)) .
+  eq match.values(WSHACTUAL, WSHEXPECTED) = match.no [owise] .
+
+  ceq match.any(WSHVALUE, alternatives.cons(WSHALTPREFIX,
+    alternatives.cons(WSHPATTERN, WSHALTSUFFIX))) = match.yes
+    if match.value(WSHVALUE, WSHPATTERN) = match.yes .
+  eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .
+  ceq hostCallable(WSHS, WSHA, WSHARGS) = true
+    if WSHA <- hostFunctionAddresses = true
+       /\ typecheck(WSHARGS, val) = true
+       /\ typecheck(WSHARGS, instr) = true
+       /\ WSHXA := index(value('FUNCS, WSHS), WSHA)
+       /\ value('CODE, WSHXA) = ...
+       /\ FUNC WSHTYPES -> eps := Expand(value('TYPE, WSHXA))
+       /\ len(WSHARGS) = len(WSHTYPES)
+       /\ hostArguments(WSHARGS, WSHTYPES) = true .
+  eq hostCallable(WSHS, WSHA, WSHARGS) = false [owise] .
+
+  crl [host-call] :
+    Step-read((WSHS ; WSHCURRENT) ;
+      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => eps
+    if hostCallable(WSHS, WSHA, WSHARGS) = true .
+
+  crl [focus-host-call] :
+    identifyFocus(WSHS ; WSHCURRENT,
+      WSHPREFIX (WSHARGS REF.FUNC-ADDR(WSHA)), CALL-REF(WSHC), WSHREST)
+    => { WSHPREFIX | ((WSHS ; WSHCURRENT) ;
+      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) | WSHREST }
+    if hostCallable(WSHS, WSHA, WSHARGS) = true .
+
+  rl [start] : script.start =>
+    script.ready(emptyStore, %s, inputCommands) .
+  crl [module-start] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
+    => script.module(WSHID, WSHENV, WSHCMDS, WSHC)
+    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)
+       /\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .
+  crl [module-link-error] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
+    => script.link-error(WSHID)
+    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
+  rl [module-done] :
+    script.module(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHMI)) }) ; eps)
+    => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .
+
+  crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, WSHC)
+    => script.module(WSHID, WSHENV, WSHCMDS, WSHC2)
+    if Step(WSHC) => WSHC2 .
+
+  crl [assert-unlinkable] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
+  crl [assert-unlinkable-wrong] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))
+    => script.wrong-assertion(WSHID)
+    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS) .
+
+  rl [assert-uninstantiable-static-link-error] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.uninstantiable-static(WSHID), WSHCMDS))
+    => script.wrong-assertion(WSHID) .
+  crl [assert-uninstantiable-link-error] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.uninstantiable(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
+    => script.wrong-assertion(WSHID)
+    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
+  crl [assert-uninstantiable-start] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.uninstantiable(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
+    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHC)
+    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)
+       /\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .
+  rl [assert-uninstantiable-trap] :
+    script.uninstantiable(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+    => script.ready(WSHS, WSHENV, WSHCMDS) .
+  rl [assert-uninstantiable-exception] :
+    script.uninstantiable(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF))
+    => script.ready(WSHS, WSHENV, WSHCMDS) .
+  rl [assert-uninstantiable-normal] :
+    script.uninstantiable(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; eps)
+    => script.wrong-assertion(WSHID) .
+  crl [assert-uninstantiable-step] :
+    script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHC)
+    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHC2)
+    if Step(WSHC) => WSHC2 .
+
+  rl [call-return] :
+    script.ready(WSHS, WSHENV, commands.cons(
+      command.return(WSHID, action.invoke(WSHTARGET, WSHNAME, WSHARGS),
+        WSHEXPECTED), WSHCMDS))
+    => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
+      invoke(WSHS, findFunc(value('EXPORTS,
+        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+  crl [get-return] :
+    script.ready(WSHS, WSHENV, commands.cons(command.return(WSHID,
+      action.get(WSHTARGET, WSHNAME), WSHEXPECTED), WSHCMDS))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if WSHA := findGlobal(value('EXPORTS,
+         findInstance(WSHENV, WSHTARGET)), WSHNAME)
+       /\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))
+       /\ typecheck(WSHACTUAL, val)
+       /\ typecheck(WSHACTUAL, instr)
+       /\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .
+  crl [get-wrong-result] :
+    script.ready(WSHS, WSHENV, commands.cons(command.return(WSHID,
+      action.get(WSHTARGET, WSHNAME), WSHEXPECTED), WSHCMDS))
+    => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)
+    if WSHA := findGlobal(value('EXPORTS,
+         findInstance(WSHENV, WSHTARGET)), WSHNAME)
+       /\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))
+       /\ typecheck(WSHACTUAL, val)
+       /\ typecheck(WSHACTUAL, instr)
+       /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
+  crl [return-done] :
+    script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if runtimeResults(WSHACTUAL) = true
+       /\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .
+  crl [return-wrong-result] :
+    script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+    => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)
+    if runtimeResults(WSHACTUAL) = true
+       /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
+  crl [return-step] :
+    script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHC)
+    => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHC2)
+    if Step(WSHC) => WSHC2 .
+
+  rl [call-trap] :
+    script.ready(WSHS, WSHENV, commands.cons(command.trap(WSHID,
+      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
+    => script.trap(WSHID, WSHENV, WSHCMDS,
+      invoke(WSHS, findFunc(value('EXPORTS,
+        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+  rl [trap-done] :
+    script.trap(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+    => script.ready(WSHS, WSHENV, WSHCMDS) .
+  crl [trap-step] : script.trap(WSHID, WSHENV, WSHCMDS, WSHC)
+    => script.trap(WSHID, WSHENV, WSHCMDS, WSHC2)
+    if Step(WSHC) => WSHC2 .
+
+  rl [call-exception] :
+    script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,
+      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
+    => script.exception(WSHID, WSHENV, WSHCMDS,
+      invoke(WSHS, findFunc(value('EXPORTS,
+        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+  rl [exception-done] :
+    script.exception(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF))
+    => script.ready(WSHS, WSHENV, WSHCMDS) .
+  rl [exception-trap] :
+    script.exception(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+    => script.wrong-assertion(WSHID) .
+  crl [exception-normal] :
+    script.exception(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+    => script.wrong-assertion(WSHID)
+    if runtimeResults(WSHACTUAL) = true .
+  crl [exception-step] : script.exception(WSHID, WSHENV, WSHCMDS, WSHC)
+    => script.exception(WSHID, WSHENV, WSHCMDS, WSHC2)
+    if Step(WSHC) => WSHC2 .
+
+  rl [call-action] :
+    script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
+      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
+    => script.action(WSHID, WSHENV, WSHCMDS,
+      invoke(WSHS, findFunc(value('EXPORTS,
+        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+  crl [action-done] :
+    script.action(WSHID, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if runtimeResults(WSHACTUAL) = true .
+  crl [action-step] : script.action(WSHID, WSHENV, WSHCMDS, WSHC)
+    => script.action(WSHID, WSHENV, WSHCMDS, WSHC2)
+    if Step(WSHC) => WSHC2 .
+  crl [get-action] :
+    script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
+      action.get(WSHTARGET, WSHNAME)), WSHCMDS))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if WSHA := findGlobal(value('EXPORTS,
+         findInstance(WSHENV, WSHTARGET)), WSHNAME)
+       /\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))
+       /\ typecheck(WSHACTUAL, val)
+       /\ typecheck(WSHACTUAL, instr) .
+
+  rl [call-exhaustion] :
+    script.ready(WSHS, WSHENV, commands.cons(command.exhaustion(WSHID,
+      WSHREQUIRED, action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
+    => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
+      invoke(WSHS, findFunc(value('EXPORTS,
+        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+  rl [exhaustion-trap] :
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+    => script.wrong-assertion(WSHID) .
+  rl [exhaustion-exception] :
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF))
+    => script.wrong-assertion(WSHID) .
+  crl [exhaustion-normal] :
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+    => script.wrong-assertion(WSHID)
+    if runtimeResults(WSHACTUAL) = true .
+  crl [exhaustion-step] :
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
+      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHBODY)
+    => script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
+      WSHS2, (WSHS2 ; WSHF2) ; WSHINSTRS)
+    if Step((WSHS ;
+         { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHBODY)
+         => (WSHS2 ; WSHF2) ; WSHINSTRS .
+  crl [exhaustion-done] :
+    script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,
+      WSHC2 ; WSHINSTRS)
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
+  crl [exhaustion-continue] :
+    script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS, WSHC)
+    => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHC)
+    if WSHC2 ; WSHINSTRS := WSHC
+       /\ activeFrameDepth(WSHINSTRS) <= WSHREQUIRED = true .
+
+  rl [done] :
+    script.ready(WSHS, WSHENV, commands.nil) => script.done .
+endm
+
+rew [%d] in WASM2MAUDE-WAST : script.start .
+continue 1 .
+|})
       semantics commands host_store host_functions host_instances steps

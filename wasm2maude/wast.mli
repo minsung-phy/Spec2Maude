@@ -2,6 +2,7 @@ type summary
 type suite
 type audit
 
+val parse : string -> Wasm.Script.script
 val load : string -> summary
 val sources : string -> string list
 val load_suite : string -> suite

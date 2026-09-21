@@ -387,10 +387,10 @@ let bind_module source env var module_ =
   {env with modules; latest_module = Some module_}
 
 let shared_binding host key =
-  let bindings = host.memories @ host.tables in
-  List.find_opt
-    (fun binding -> Wast_host.lifetime binding.export = Wast_host.Shared key)
-    bindings
+  let matches binding = Wast_host.lifetime binding.export = Wast_host.Shared key in
+  match List.find_opt matches host.memories with
+  | Some _ as binding -> binding
+  | None -> List.find_opt matches host.tables
 
 let allocate_host host export =
   match Wast_host.lifetime export, Wast_host.kind export with
@@ -560,12 +560,7 @@ let push env command commands =
   command :: commands, {env with next_command = env.next_command + 1}
 
 let load source =
-  let script =
-    try Wasm.Parse.Script.parse_file source with
-    | Wasm.Parse.Syntax (at, message) | Wasm.Custom.Syntax (at, message) ->
-        Ingress_error.raise ~region:at Ingress_error.Syntax source message
-    | Sys_error message -> Ingress_error.raise Ingress_error.Io source message
-  in
+  let script = Wast.parse source in
   let instances =
     List.fold_left
       (fun count command ->

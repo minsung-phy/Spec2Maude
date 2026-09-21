@@ -94,6 +94,54 @@ dune exec bin/wasm2maude.exe --
 The second command prints its command summary and exits nonzero because no
 subcommand was selected.
 
+### Reusable Wasm calls in a composed model
+
+`module` encodes a `.wat`/`.wasm` module (`--term-only` emits just the term).
+`instantiate` emits an instantiation request. `run` adds initialization and a
+fixed invocation; `modelcheck` also adds returned-value propositions and queries.
+These load `translator/backend/semantics.maude`, which loads the generated
+`translator/generated/output.maude` and backend support. `.wast` scripts use
+`wast-run` for their modules, actions, and assertions.
+
+Use `harness` when another Maude model must supply arguments and consume results:
+
+```sh
+dune exec bin/wasm2maude.exe -- harness \
+  modelchecking/simple-distributed/client.wasm --invoke client_step \
+  --module-name CLIENT-WASM --prefix client \
+  -o modelchecking/simple-distributed/client.maude
+dune exec bin/wasm2maude.exe -- harness \
+  modelchecking/simple-distributed/server-buggy.wasm --invoke server_step \
+  --module-name SERVER-BUGGY-WASM --prefix server \
+  -o modelchecking/simple-distributed/server-buggy.maude
+maude modelchecking/simple-distributed/distributed-system.maude
+```
+
+The generated modules expose `clientCall(ARGS) =>* clientResult(RESULT)` and
+`serverCall(ARGS) =>* serverResult(RESULT)`. All generated operators, state sorts,
+and rule labels use the requested prefix. Choose distinct module names and
+prefixes when composing modules. Names start with a letter and contain only
+letters, digits, or hyphens. The enclosing file loads `semantics.maude` once,
+then the harness files; harness files contain no `load`, execution, or LTL queries.
+
+Each call **creates a fresh instance**, finishes initialization (including any
+start function), then invokes the chosen export through the generated `Step`
+relation. The caller must supply arguments matching the export signature.
+Only a returned value list reaches `Result`; a trap or divergence is not a
+successful result. Host imports are currently rejected. Store changes do not
+persist between calls. For a stateful application, model the persistent store
+and invocation lifecycle explicitly.
+
+The distributed example treats each successful Wasm call as one protocol action
+by using it in a rewrite condition. Its functions terminate and carry protocol
+state through numeric arguments. This does not expose instruction-level
+interleavings or model arbitrary trapping/diverging calls. Network behavior,
+fairness assumptions, and propositions remain in `distributed-system.maude`.
+Its `2+` counter saturation is not an exact abstraction of wrapping i32
+arithmetic; the short duplicate-processing counterexample occurs before
+saturation. Fairness-conditioned liveness is a conditional claim about this
+finite protocol model.
+
 ## Official WebAssembly core suite
 
 The pinned suite contains 258 `.wast` files, including the `bulk-memory`,

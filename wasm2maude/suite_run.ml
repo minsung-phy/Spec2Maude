@@ -37,29 +37,33 @@ let status_name = function
 let contains text pattern =
   let text_len = String.length text in
   let pattern_len = String.length pattern in
+  let rec matches start i =
+    i = pattern_len
+    || (text.[start + i] = pattern.[i] && matches start (i + 1))
+  in
   let rec search i =
     i + pattern_len <= text_len
-    && (String.sub text i pattern_len = pattern || search (i + 1))
+    && (matches i 0 || search (i + 1))
   in
   pattern_len = 0 || search 0
 
-let find_line pattern text =
-  String.split_on_char '\n' text
-  |> List.find_opt (fun line -> contains line pattern)
+let find_line pattern lines =
+  List.find_opt (fun line -> contains line pattern) lines
   |> Option.value ~default:""
   |> String.trim
 
-let result_lines text =
-  String.split_on_char '\n' text
-  |> List.filter (fun line -> contains line "result ")
+let bounded_result lines =
+  let previous, last =
+    List.fold_left
+      (fun ((_, last) as results) line ->
+        if contains line "result " then last, Some line else results)
+      (None, None) lines
+  in
+  match previous, last with
+  | Some result, _ | None, Some result -> String.trim result
+  | None, None -> "no Maude result"
 
-let bounded_result text =
-  match List.rev (result_lines text) with
-  | _probe :: result :: _ -> String.trim result
-  | result :: _ -> String.trim result
-  | [] -> "no Maude result"
-
-let last_rewrite_count text =
+let last_rewrite_count lines =
   let parse line =
     String.split_on_char ' ' (String.trim line)
     |> List.filter (fun field -> field <> "")
@@ -67,20 +71,21 @@ let last_rewrite_count text =
     | "rewrites:" :: count :: _ -> int_of_string_opt count
     | _ -> None
   in
-  String.split_on_char '\n' text |> List.filter_map parse |> List.rev
-  |> function count :: _ -> count | [] -> 0
+  List.fold_left
+    (fun last line -> Option.value (parse line) ~default:last) 0 lines
 
 let classify process output =
-  if contains output "Warning:" then Maude_error, find_line "Warning:" output
-  else if contains output "Error:" then Maude_error, find_line "Error:" output
+  let lines = String.split_on_char '\n' output in
+  if contains output "Warning:" then Maude_error, find_line "Warning:" lines
+  else if contains output "Error:" then Maude_error, find_line "Error:" lines
   else
     match process with
     | Timed_out -> Timeout, "Maude exceeded the per-file timeout"
     | Exited (Unix.WEXITED 0) ->
-        let result = bounded_result output in
+        let result = bounded_result lines in
         if contains result "script.wrong-" then Wrong_result, result
         else if contains result "script.done" then Pass, ""
-        else if last_rewrite_count output > 0 then
+        else if last_rewrite_count lines > 0 then
           Step_limit,
           "bounded rewrite budget exhausted while execution could still step"
         else Stuck, result

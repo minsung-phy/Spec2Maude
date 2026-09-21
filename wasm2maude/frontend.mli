@@ -1,7 +1,8 @@
-type module_ = {
+type module_ = private {
   source : string;
   ast : Wasm.Ast.module_;
   custom : Wasm.Custom.section list;
+  module_type : Wasm.Types.moduletype Lazy.t;
 }
 
 type invocation_error =
@@ -17,6 +18,8 @@ val text : name:string -> string -> module_
 val binary : name:string -> string -> module_
 val import_count : module_ -> int
 val export_type : module_ -> Wasm.Ast.name -> Wasm.Types.externtype option
+val function_parameters :
+  module_ -> Wasm.Ast.name -> (Wasm.Types.valtype list, invocation_error) result
 val validate_invocation :
   module_ ->
   Wasm.Ast.name ->

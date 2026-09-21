@@ -1,6 +1,12 @@
 val term : Frontend.module_ -> string
 val typecheck : semantics:string -> Frontend.module_ -> string
 val instantiate : semantics:string -> Frontend.module_ -> string
+val harness :
+  module_name:string ->
+  prefix:string ->
+  export:Wasm.Ast.name ->
+  Frontend.module_ ->
+  string
 val run :
   semantics:string ->
   export:Wasm.Ast.name ->

@@ -83,28 +83,56 @@ wasm-validate server-buggy.wasm
 ## 5. wasm2maude로 Maude 실행 파일 생성 후 output.maude 위에서 실제 실행
 ```
 dune exec bin/wasm2maude.exe -- run \
-  modelchecking/distributed/client.wasm \
+  modelchecking/simple-distributed/client.wasm \
   --invoke client_step \
   --arg i32:1 \
   --arg i32:2 \
   --steps 1000 \
-  -o modelchecking/distributed/client-timeout.maude
+  -o modelchecking/simple-distributed/client-timeout.maude
 
-maude modelchecking/distributed/client-timeout.maude
+maude modelchecking/simple-distributed/client-timeout.maude
 ```
 
 ```
 dune exec bin/wasm2maude.exe -- run \
-  modelchecking/distributed/server-buggy.wasm \
+  modelchecking/simple-distributed/server-buggy.wasm \
   --invoke server_step \
   --arg i32:0 \
   --steps 1000 \
-  -o modelchecking/distributed/server-0.maude
+  -o modelchecking/simple-distributed/server-0.maude
 
-maude modelchecking/distributed/server-0.maude
+maude modelchecking/simple-distributed/server-0.maude
 ```
 
 ## 6. Client + Server + Network를 하나의 분산 시스템으로 구성
+
+`run`은 고정 인자로 한 번 실행하는 파일을 만든다. 분산 모델에서 인자를
+전달하고 반환값을 받으려면 `harness`로 두 모듈을 생성한다.
+저장소 루트에서 실행하며, 생성 파일을 수동 수정할 필요가 없다.
+
+```sh
+dune exec bin/wasm2maude.exe -- harness \
+  modelchecking/simple-distributed/client.wasm --invoke client_step \
+  --module-name CLIENT-WASM --prefix client \
+  -o modelchecking/simple-distributed/client.maude
+dune exec bin/wasm2maude.exe -- harness \
+  modelchecking/simple-distributed/server-buggy.wasm --invoke server_step \
+  --module-name SERVER-BUGGY-WASM --prefix server \
+  -o modelchecking/simple-distributed/server-buggy.maude
+maude modelchecking/simple-distributed/distributed-system.maude
+```
+
+`distributed-system.maude`가 의미론을 먼저 로드하고 두 모듈을 불러온다.
+`clientCall(ARGS)`에서 `clientResult(RESULT)`까지, 그리고
+`serverCall(ARGS)`에서 `serverResult(RESULT)`까지의 실행을 프로토콜 규칙이 사용한다.
+각 호출은 새 인스턴스를 생성한다. 현재 두 함수는 상태를 숫자 인자로 주고받으므로
+이 계약에 맞지만, 메모리·전역변수를 호출 사이에 보존하는 프로그램에는 별도 모델이 필요하다.
+
+호출 전체는 프로토콜 전이 하나의 조건으로 실행되어 Wasm 내부 단계가 네트워크와
+교차하지 않는다. 또한 서버의 `2+` 포화는 i32 overflow까지 보존하는 정확한 축약은
+아니다. 짧은 중복 처리 반례는 포화 전에 발생한다. Fairness가 붙은 liveness는
+해당 전달 공정성을 가정한 유한 프로토콜 모델의 결과다.
+
 앞 단계까지는 client.wasm과 server-buggy.wasm을 각각 따로 실행했음
 
 이제 두 프로그램을 Network를 통해 연결하여 하나의 시스템으로 구성하자 !

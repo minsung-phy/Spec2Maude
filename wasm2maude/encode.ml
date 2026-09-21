@@ -75,43 +75,39 @@ let v128 constructor value =
   app constructor [atom "vectype.v128"; bits]
 
 let vec_value value = v128 "vconst" value
-let vec_instr value = v128 "vconst" value
+let vec_instr = vec_value
 
-let rec expr source xs = seq (List.map (fun x -> instr source x) xs)
-
-and expr_item source xs = app "seq" [expr source xs]
-
-and numtype = function
+let numtype = function
   | Types.I32T -> atom "i32"
   | Types.I64T -> atom "i64"
   | Types.F32T -> atom "f32"
   | Types.F64T -> atom "f64"
 
-and addrtype = function
+let addrtype = function
   | Types.I32AT -> atom "i32"
   | Types.I64AT -> atom "i64"
 
-and vectype Types.V128T = atom "vectype.v128"
+let vectype Types.V128T = atom "vectype.v128"
 
-and null = function
+let null = function
   | Types.NoNull -> seq []
   | Types.Null -> present (atom "null.null")
 
-and mut = function
+let mut = function
   | Types.Cons -> seq []
   | Types.Var -> present (atom "mut.mut")
 
-and final = function
+let final = function
   | Types.NoFinal -> seq []
   | Types.Final -> present (atom "final.final")
 
-and typeuse source at = function
+let typeuse source at = function
   | Types.Idx x -> app "idx" [u32 x]
   | Types.Rec i -> app "rec" [i32_nat i]
   | Types.Def _ ->
       unsupported source at "semantic deftype found in a source type use"
 
-and heaptype source at = function
+let heaptype source at = function
   | Types.AnyHT -> atom "absheaptype.any"
   | Types.NoneHT -> atom "absheaptype.none"
   | Types.EqHT -> atom "absheaptype.eq"
@@ -127,24 +123,24 @@ and heaptype source at = function
   | Types.BotHT -> atom "bot"
   | Types.UseHT use -> typeuse source at use
 
-and reftype source at (nul, heap) =
+let reftype source at (nul, heap) =
   app "reftype.ref" [null nul; heaptype source at heap]
 
-and valtype source at = function
+let valtype source at = function
   | Types.NumT t -> numtype t
   | Types.VecT t -> vectype t
   | Types.RefT t -> reftype source at t
   | Types.BotT -> atom "bot"
 
-and storagetype source at = function
+let storagetype source at = function
   | Types.ValStorageT t -> valtype source at t
   | Types.PackStorageT Types.I8T -> atom "packtype.i8"
   | Types.PackStorageT Types.I16T -> atom "packtype.i16"
 
-and fieldtype source at (Types.FieldT (m, t)) =
+let fieldtype source at (Types.FieldT (m, t)) =
   app "fieldtype.wrap" [mut m; storagetype source at t]
 
-and comptype source at = function
+let comptype source at = function
   | Types.StructT fields ->
       app "comptype.struct" [list (fieldtype source at) fields]
   | Types.ArrayT field -> app "comptype.array" [fieldtype source at field]
@@ -152,27 +148,27 @@ and comptype source at = function
       app "comptype.func-sym"
         [list (valtype source at) args; list (valtype source at) results]
 
-and subtype source at (Types.SubT (fin, supers, comp)) =
+let subtype source at (Types.SubT (fin, supers, comp)) =
   app "subtype.sub"
     [final fin; seq (List.map (typeuse source at) supers); comptype source at comp]
 
-and rectype source at (Types.RecT subs) =
+let rectype source at (Types.RecT subs) =
   app "rectype.rec" [list (subtype source at) subs]
 
-and limits {Types.min; max} =
+let limits {Types.min; max} =
   app "limits.sym-sym-sym"
     [u64 min; option u64 max]
 
-and globaltype source at (Types.GlobalT (m, t)) =
+let globaltype source at (Types.GlobalT (m, t)) =
   app "globaltype.wrap" [mut m; valtype source at t]
 
-and memtype (Types.MemoryT (addr, lim)) =
+let memtype (Types.MemoryT (addr, lim)) =
   app "memtype.page" [addrtype addr; limits lim]
 
-and tabletype source at (Types.TableT (addr, lim, ref)) =
+let tabletype source at (Types.TableT (addr, lim, ref)) =
   app "tabletype.wrap" [addrtype addr; limits lim; reftype source at ref]
 
-and externtype source at = function
+let externtype source at = function
   | Types.ExternTagT (Types.TagT use) ->
       app "externtype.tag" [typeuse source at use]
   | Types.ExternGlobalT t -> app "externtype.global" [globaltype source at t]
@@ -180,52 +176,52 @@ and externtype source at = function
   | Types.ExternTableT t -> app "externtype.table" [tabletype source at t]
   | Types.ExternFuncT use -> app "externtype.func" [typeuse source at use]
 
-and sx = function
+let sx = function
   | Pack.U -> atom "sx.u"
   | Pack.S -> atom "sx.s"
 
-and packsize = function
+let packsize = function
   | Pack.Pack8 -> app "sz.wrap" [nat 8]
   | Pack.Pack16 -> app "sz.wrap" [nat 16]
   | Pack.Pack32 -> app "sz.wrap" [nat 32]
   | Pack.Pack64 -> app "sz.wrap" [nat 64]
 
-and memarg align offset =
+let memarg align offset =
   app "rec.memarg"
     [app "uN.wrap" [nat align]; app "uN.wrap" [i64_nat offset]]
 
-and loadop {Ast.ty; pack; _} =
+let loadop {Ast.ty; pack; _} =
   let packed = option (fun (size, sign) -> app "loadop.sym" [packsize size; sx sign]) pack in
   numtype ty, packed
 
-and storeop {Ast.ty; pack; _} =
+let storeop {Ast.ty; pack; _} =
   numtype ty, option (fun size -> app "storeop.wrap" [packsize size]) pack
 
-and half = function
+let half = function
   | Ast.V128Op.Low -> atom "half.low"
   | Ast.V128Op.High -> atom "half.high"
 
-and vector_input_shape source at = function
+let vector_input_shape source at = function
   | I16x8 -> shape I8x16
   | I32x4 -> shape I16x8
   | I64x2 -> shape I32x4
   | _ -> unsupported source at "vector widening operation has no valid input shape"
 
-and vector_narrow_input_shape source at = function
+let vector_narrow_input_shape source at = function
   | I8x16 -> shape I16x8
   | I16x8 -> shape I32x4
   | _ -> unsupported source at "vector narrowing operation has no valid input shape"
 
-and vector_dot_input_shape source at = function
+let vector_dot_input_shape source at = function
   | I16x8 -> shape I8x16
   | I32x4 -> shape I16x8
   | _ -> unsupported source at "vector dot operation has no valid input shape"
 
-and vector_dot_add_input_shape source at = function
+let vector_dot_add_input_shape source at = function
   | I32x4 -> shape I8x16
   | _ -> unsupported source at "vector dot-add operation has no valid input shape"
 
-and vloadop op =
+let vloadop op =
   let encode = function
     | _, Pack.ExtLane (pack, sign) ->
         let size, lanes =
@@ -240,12 +236,12 @@ and vloadop op =
   in
   option encode op
 
-and int_vunop (op : Ast.V128Op.iunop) = match op with
+let int_vunop (op : Ast.V128Op.iunop) = match op with
   | Ast.V128Op.Abs -> atom "vunop.abs"
   | Ast.V128Op.Neg -> atom "vunop.neg"
   | Ast.V128Op.Popcnt -> atom "vunop.popcnt"
 
-and float_vunop (op : Ast.V128Op.funop) = match op with
+let float_vunop (op : Ast.V128Op.funop) = match op with
   | Ast.V128Op.Abs -> atom "vunop.abs"
   | Ast.V128Op.Neg -> atom "vunop.neg"
   | Ast.V128Op.Sqrt -> atom "vunop.sqrt"
@@ -254,7 +250,7 @@ and float_vunop (op : Ast.V128Op.funop) = match op with
   | Ast.V128Op.Trunc -> atom "vunop.trunc"
   | Ast.V128Op.Nearest -> atom "vunop.nearest"
 
-and int_vbinop source at (op : Ast.V128Op.ibinop) = match op with
+let int_vbinop source at (op : Ast.V128Op.ibinop) = match op with
   | Ast.V128Op.Add -> atom "vbinop.add"
   | Ast.V128Op.Sub -> atom "vbinop.sub"
   | Ast.V128Op.Mul -> atom "vbinop.mul"
@@ -270,7 +266,7 @@ and int_vbinop source at (op : Ast.V128Op.ibinop) = match op with
     | Ast.V128Op.RelaxedDot) ->
       unsupported source at "vector binary operation has an invalid lane shape"
 
-and float_vbinop (op : Ast.V128Op.fbinop) = match op with
+let float_vbinop (op : Ast.V128Op.fbinop) = match op with
   | Ast.V128Op.Add -> atom "vbinop.add"
   | Ast.V128Op.Sub -> atom "vbinop.sub"
   | Ast.V128Op.Mul -> atom "vbinop.mul"
@@ -282,7 +278,7 @@ and float_vbinop (op : Ast.V128Op.fbinop) = match op with
   | Ast.V128Op.RelaxedMin -> atom "vbinop.relaxed-min"
   | Ast.V128Op.RelaxedMax -> atom "vbinop.relaxed-max"
 
-and int_vrelop (op : Ast.V128Op.irelop) = match op with
+let int_vrelop (op : Ast.V128Op.irelop) = match op with
   | Ast.V128Op.Eq -> atom "vrelop.eq"
   | Ast.V128Op.Ne -> atom "vrelop.ne"
   | Ast.V128Op.Lt sign -> app "vrelop.lt-sx" [sx sign]
@@ -290,7 +286,7 @@ and int_vrelop (op : Ast.V128Op.irelop) = match op with
   | Ast.V128Op.Le sign -> app "vrelop.le-sx" [sx sign]
   | Ast.V128Op.Ge sign -> app "vrelop.ge-sx" [sx sign]
 
-and float_vrelop (op : Ast.V128Op.frelop) = match op with
+let float_vrelop (op : Ast.V128Op.frelop) = match op with
   | Ast.V128Op.Eq -> atom "vrelop.eq"
   | Ast.V128Op.Ne -> atom "vrelop.ne"
   | Ast.V128Op.Lt -> atom "vrelop.lt"
@@ -298,14 +294,14 @@ and float_vrelop (op : Ast.V128Op.frelop) = match op with
   | Ast.V128Op.Le -> atom "vrelop.le"
   | Ast.V128Op.Ge -> atom "vrelop.ge"
 
-and vector_unop op =
+let vector_unop op =
   let sh = shape (lane_shape op) in
   match op with
   | V128.I8x16 x | V128.I16x8 x | V128.I32x4 x | V128.I64x2 x ->
       app "instr.vunop" [sh; int_vunop x]
   | V128.F32x4 x | V128.F64x2 x -> app "instr.vunop" [sh; float_vunop x]
 
-and vector_test (op : Ast.V128Op.testop) =
+let vector_test (op : Ast.V128Op.testop) =
   let sh = shape (lane_shape op) in
   match op with
   | V128.I8x16 Ast.V128Op.AllTrue
@@ -315,14 +311,14 @@ and vector_test (op : Ast.V128Op.testop) =
       app "instr.vtestop" [sh; atom "vtestop.all-true"]
   | _ -> .
 
-and vector_relop op =
+let vector_relop op =
   let sh = shape (lane_shape op) in
   match op with
   | V128.I8x16 x | V128.I16x8 x | V128.I32x4 x | V128.I64x2 x ->
       app "instr.vrelop" [sh; int_vrelop x]
   | V128.F32x4 x | V128.F64x2 x -> app "instr.vrelop" [sh; float_vrelop x]
 
-and vector_binop source at op =
+let vector_binop source at op =
   let lane = lane_shape op in
   let sh = shape lane in
   match op with
@@ -356,7 +352,7 @@ and vector_binop source at op =
       app "instr.vbinop" [sh; int_vbinop source at x]
   | V128.F32x4 x | V128.F64x2 x -> app "instr.vbinop" [sh; float_vbinop x]
 
-and vector_ternop source at op =
+let vector_ternop source at op =
   let lane = lane_shape op in
   let sh = shape lane in
   match op with
@@ -381,7 +377,7 @@ and vector_ternop source at op =
   | V128.I64x2 Ast.V128Op.RelaxedDotAddS ->
       unsupported source at "vector dot-add operation has an invalid result shape"
 
-and vector_convert source at op =
+let vector_convert source at op =
   let lane = lane_shape op in
   let result = shape lane in
   let convert input operator = app "instr.vcvtop" [result; input; operator] in
@@ -417,7 +413,7 @@ and vector_convert source at op =
   | _ ->
       unsupported source at "vector conversion has an invalid source/result shape"
 
-and vector_shift (op : Ast.V128Op.shiftop) =
+let vector_shift (op : Ast.V128Op.shiftop) =
   match op with
   | V128.I8x16 Ast.V128Op.Shl | V128.I16x8 Ast.V128Op.Shl
   | V128.I32x4 Ast.V128Op.Shl | V128.I64x2 Ast.V128Op.Shl ->
@@ -430,21 +426,21 @@ and vector_shift (op : Ast.V128Op.shiftop) =
         [ishape (lane_shape op); app "vshiftop.shr" [sx sign]]
   | _ -> .
 
-and vector_bitmask (op : Ast.V128Op.bitmaskop) =
+let vector_bitmask (op : Ast.V128Op.bitmaskop) =
   match op with
   | V128.I8x16 Ast.V128Op.Bitmask | V128.I16x8 Ast.V128Op.Bitmask
   | V128.I32x4 Ast.V128Op.Bitmask | V128.I64x2 Ast.V128Op.Bitmask ->
       app "instr.vbitmask" [ishape (lane_shape op)]
   | _ -> .
 
-and vector_splat op =
+let vector_splat op =
   match op with
   | V128.I8x16 Ast.V128Op.Splat | V128.I16x8 Ast.V128Op.Splat
   | V128.I32x4 Ast.V128Op.Splat | V128.I64x2 Ast.V128Op.Splat
   | V128.F32x4 Ast.V128Op.Splat | V128.F64x2 Ast.V128Op.Splat ->
       app "instr.vsplat" [shape (lane_shape op)]
 
-and vector_extract op =
+let vector_extract op =
   let sh = shape (lane_shape op) in
   match op with
   | V128.I8x16 (Ast.V128Op.Extract (lane, sign))
@@ -456,7 +452,7 @@ and vector_extract op =
   | V128.F64x2 (Ast.V128Op.Extract (lane, ())) ->
       app "instr.vextract-lane" [sh; seq []; laneidx lane]
 
-and vector_replace op =
+let vector_replace op =
   match op with
   | V128.I8x16 (Ast.V128Op.Replace lane)
   | V128.I16x8 (Ast.V128Op.Replace lane)
@@ -466,13 +462,13 @@ and vector_replace op =
   | V128.F64x2 (Ast.V128Op.Replace lane) ->
       app "instr.vreplace-lane" [shape (lane_shape op); laneidx lane]
 
-and int_unop = function
+let int_unop = function
   | Ast.IntOp.Clz -> atom "unop.clz"
   | Ast.IntOp.Ctz -> atom "unop.ctz"
   | Ast.IntOp.Popcnt -> atom "unop.popcnt"
   | Ast.IntOp.ExtendS size -> app "unop.extend" [packsize size]
 
-and float_unop = function
+let float_unop = function
   | Ast.FloatOp.Abs -> atom "unop.abs"
   | Ast.FloatOp.Neg -> atom "unop.neg"
   | Ast.FloatOp.Sqrt -> atom "unop.sqrt"
@@ -481,13 +477,13 @@ and float_unop = function
   | Ast.FloatOp.Trunc -> atom "unop.trunc"
   | Ast.FloatOp.Nearest -> atom "unop.nearest"
 
-and unop = function
+let unop = function
   | Value.I32 op -> (numtype Types.I32T, int_unop op)
   | Value.I64 op -> (numtype Types.I64T, int_unop op)
   | Value.F32 op -> (numtype Types.F32T, float_unop op)
   | Value.F64 op -> (numtype Types.F64T, float_unop op)
 
-and int_binop = function
+let int_binop = function
   | Ast.IntOp.Add -> atom "binop.add"
   | Ast.IntOp.Sub -> atom "binop.sub"
   | Ast.IntOp.Mul -> atom "binop.mul"
@@ -501,7 +497,7 @@ and int_binop = function
   | Ast.IntOp.Rotl -> atom "binop.rotl"
   | Ast.IntOp.Rotr -> atom "binop.rotr"
 
-and float_binop = function
+let float_binop = function
   | Ast.FloatOp.Add -> atom "binop.add"
   | Ast.FloatOp.Sub -> atom "binop.sub"
   | Ast.FloatOp.Mul -> atom "binop.mul"
@@ -510,21 +506,19 @@ and float_binop = function
   | Ast.FloatOp.Max -> atom "binop.max"
   | Ast.FloatOp.CopySign -> atom "binop.copysign"
 
-and binop = function
+let binop = function
   | Value.I32 op -> (numtype Types.I32T, int_binop op)
   | Value.I64 op -> (numtype Types.I64T, int_binop op)
   | Value.F32 op -> (numtype Types.F32T, float_binop op)
   | Value.F64 op -> (numtype Types.F64T, float_binop op)
 
-and testop = function
+let testop (op : Ast.testop) = match op with
   | Value.I32 Ast.IntOp.Eqz -> (numtype Types.I32T, atom "testop.eqz")
   | Value.I64 Ast.IntOp.Eqz -> (numtype Types.I64T, atom "testop.eqz")
-  | Value.F32 op -> float_testop op
-  | Value.F64 op -> float_testop op
+  | Value.F32 _ -> .
+  | Value.F64 _ -> .
 
-and float_testop (op : Ast.FloatOp.testop) = match op with _ -> .
-
-and int_relop = function
+let int_relop = function
   | Ast.IntOp.Eq -> atom "relop.eq"
   | Ast.IntOp.Ne -> atom "relop.ne"
   | Ast.IntOp.Lt sign -> app "relop.lt-sx" [sx sign]
@@ -532,7 +526,7 @@ and int_relop = function
   | Ast.IntOp.Le sign -> app "relop.le-sx" [sx sign]
   | Ast.IntOp.Ge sign -> app "relop.ge-sx" [sx sign]
 
-and float_relop = function
+let float_relop = function
   | Ast.FloatOp.Eq -> atom "relop.eq"
   | Ast.FloatOp.Ne -> atom "relop.ne"
   | Ast.FloatOp.Lt -> atom "relop.lt"
@@ -540,13 +534,13 @@ and float_relop = function
   | Ast.FloatOp.Le -> atom "relop.le"
   | Ast.FloatOp.Ge -> atom "relop.ge"
 
-and relop = function
+let relop = function
   | Value.I32 op -> (numtype Types.I32T, int_relop op)
   | Value.I64 op -> (numtype Types.I64T, int_relop op)
   | Value.F32 op -> (numtype Types.F32T, float_relop op)
   | Value.F64 op -> (numtype Types.F64T, float_relop op)
 
-and cvtop_op = function
+let cvtop_op = function
   | Ast.IntOp.ExtendI32 sign -> app "cvtop.extend" [sx sign]
   | Ast.IntOp.WrapI64 -> atom "cvtop.wrap"
   | Ast.IntOp.TruncF32 sign | Ast.IntOp.TruncF64 sign ->
@@ -555,28 +549,28 @@ and cvtop_op = function
       app "cvtop.trunc-sat" [sx sign]
   | Ast.IntOp.ReinterpretFloat -> atom "cvtop.reinterpret"
 
-and float_cvtop_op = function
+let float_cvtop_op = function
   | Ast.FloatOp.ConvertI32 sign | Ast.FloatOp.ConvertI64 sign ->
       app "cvtop.convert" [sx sign]
   | Ast.FloatOp.PromoteF32 -> atom "cvtop.promote"
   | Ast.FloatOp.DemoteF64 -> atom "cvtop.demote"
   | Ast.FloatOp.ReinterpretInt -> atom "cvtop.reinterpret"
 
-and int_cvtop_source reinterpret_source = function
+let int_cvtop_source reinterpret_source = function
   | Ast.IntOp.ExtendI32 _ -> numtype Types.I32T
   | Ast.IntOp.WrapI64 -> numtype Types.I64T
   | Ast.IntOp.TruncF32 _ | Ast.IntOp.TruncSatF32 _ -> numtype Types.F32T
   | Ast.IntOp.TruncF64 _ | Ast.IntOp.TruncSatF64 _ -> numtype Types.F64T
   | Ast.IntOp.ReinterpretFloat -> numtype reinterpret_source
 
-and float_cvtop_source reinterpret_source = function
+let float_cvtop_source reinterpret_source = function
   | Ast.FloatOp.ConvertI32 _ -> numtype Types.I32T
   | Ast.FloatOp.ConvertI64 _ -> numtype Types.I64T
   | Ast.FloatOp.PromoteF32 -> numtype Types.F32T
   | Ast.FloatOp.DemoteF64 -> numtype Types.F64T
   | Ast.FloatOp.ReinterpretInt -> numtype reinterpret_source
 
-and cvtop = function
+let cvtop = function
   | Value.I32 op ->
       let target = Types.I32T in
       (numtype target, int_cvtop_source Types.F32T op, cvtop_op op)
@@ -590,7 +584,7 @@ and cvtop = function
       let target = Types.F64T in
       (numtype target, float_cvtop_source Types.I64T op, float_cvtop_op op)
 
-and float_term ~negative ~exponent ~fraction ~max_exponent ~bias =
+let float_term ~negative ~exponent ~fraction ~max_exponent ~bias =
   let mag =
     if exponent = 0 then app "fNmag.subnorm" [atom (Int64.to_string fraction)]
     else if exponent = max_exponent then
@@ -602,7 +596,7 @@ and float_term ~negative ~exponent ~fraction ~max_exponent ~bias =
   in
   app (if negative then "fN.neg" else "fN.pos") [mag]
 
-and f32 n =
+let f32 n =
   let bits = Int64.logand (Int64.of_int32 (F32.to_bits n)) 0xffff_ffffL in
   float_term
     ~negative:(Int64.shift_right_logical bits 31 = 1L)
@@ -610,7 +604,7 @@ and f32 n =
     ~fraction:(Int64.logand bits 0x7f_ffffL)
     ~max_exponent:0xff ~bias:127
 
-and f64 n =
+let f64 n =
   let bits = F64.to_bits n in
   float_term
     ~negative:(Int64.shift_right_logical bits 63 = 1L)
@@ -618,24 +612,26 @@ and f64 n =
     ~fraction:(Int64.logand bits 0x000f_ffff_ffff_ffffL)
     ~max_exponent:0x7ff ~bias:1023
 
-and const = function
+let const = function
   | Value.I32 n -> (numtype Types.I32T, app "uN.wrap" [i32_nat n])
   | Value.I64 n -> (numtype Types.I64T, app "uN.wrap" [i64_nat n])
   | Value.F32 n -> (numtype Types.F32T, f32 n)
   | Value.F64 n -> (numtype Types.F64T, f64 n)
 
-and blocktype source at = function
+let blocktype source at = function
   | Ast.VarBlockType x -> app "idx" [idx x]
   | Ast.ValBlockType result ->
       app "blocktype.result" [option (valtype source at) result]
 
-and typeidx x = app "idx" [idx x]
+let typeidx x = app "idx" [idx x]
 
-and catch {Source.it; _} = match it with
+let catch {Source.it; _} = match it with
   | Ast.Catch (tag, label) -> app "catch.catch" [idx tag; idx label]
   | Ast.CatchRef (tag, label) -> app "catch.catch-ref" [idx tag; idx label]
   | Ast.CatchAll label -> app "catch.catch-all" [idx label]
   | Ast.CatchAllRef label -> app "catch.catch-all-ref" [idx label]
+
+let rec expr source xs = seq (List.map (instr source) xs)
 
 and instr source ({Source.it; at} : Ast.instr) =
   let unary name x = app name [idx x] in
@@ -651,14 +647,14 @@ and instr source ({Source.it; at} : Ast.instr) =
       in
       app "instr.select" [types]
   | Ast.Block (bt, body) ->
-      app "instr.block" [blocktype source at bt; seq (List.map (instr source) body)]
+      app "instr.block" [blocktype source at bt; expr source body]
   | Ast.Loop (bt, body) ->
-      app "instr.loop" [blocktype source at bt; seq (List.map (instr source) body)]
+      app "instr.loop" [blocktype source at bt; expr source body]
   | Ast.If (bt, yes, no) ->
       app "instr.if-else"
         [ blocktype source at bt;
-          seq (List.map (instr source) yes);
-          seq (List.map (instr source) no) ]
+          expr source yes;
+          expr source no ]
   | Ast.Br x -> unary "instr.br" x
   | Ast.BrIf x -> unary "instr.br-if" x
   | Ast.BrTable (xs, x) ->
@@ -808,6 +804,8 @@ and instr source ({Source.it; at} : Ast.instr) =
   | Ast.VecExtract (Value.V128 op) -> vector_extract op
   | Ast.VecReplace (Value.V128 op) -> vector_replace op
 
+let expr_item source xs = app "seq" [expr source xs]
+
 let name chars =
   seq (List.map nat chars)
 
@@ -815,9 +813,7 @@ let num_value value =
   let typ, value = const value in
   app "const" [typ; value]
 
-let num_instr value =
-  let typ, value = const value in
-  app "const" [typ; value]
+let num_instr = num_value
 
 let num_payload value = snd (const value)
 
@@ -920,7 +916,6 @@ let typecheck label term typ =
   {label; term = app "typecheck" [term; typ]}
 
 let check label term typ = typecheck label term (atom typ)
-let check_sequence = check
 
 let rec instr_checks source path instruction =
   let here = check path (instr source instruction) "syn.instr" in
@@ -944,7 +939,7 @@ and body_checks source path body =
 let func_checks source i ({Source.it = Ast.Func (_, _, body); _} as f) =
   let path = Printf.sprintf "func.%d" (i + 1) in
   check path (func source f) "syn.func"
-  :: check_sequence (path ^ ".body") (expr source body) "syn.expr"
+  :: check (path ^ ".body") (expr source body) "syn.expr"
   :: body_checks source (path ^ ".instr") body
 
 let module_checks ({Frontend.source; ast; _} as m : Frontend.module_) =
@@ -962,7 +957,7 @@ let module_checks ({Frontend.source; ast; _} as m : Frontend.module_) =
     list_check "funcs" (func source) m'.funcs "syn.func";
     list_check "datas" (data source) m'.datas "syn.data";
     list_check "elems" (elem source) m'.elems "syn.elem";
-    check_sequence "start" (option start m'.start) "syn.start";
+    check "start" (option start m'.start) "syn.start";
     list_check "exports" export m'.exports "syn.export" ]
   @ (m'.funcs |> List.mapi (func_checks source) |> List.concat)
 
