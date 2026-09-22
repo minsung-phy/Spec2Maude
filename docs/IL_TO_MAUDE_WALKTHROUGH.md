@@ -406,7 +406,7 @@ TypD ("memarg", [], [InstD ([], [], StructT [
 **Maude 원문 발췌:**
 
 ```maude
-ceq typecheck({ (item('ALIGN, VALUE) ; item('OFFSET, VALUE14)) }, memarg) = true
+ceq typecheck({ (field('ALIGN, VALUE) ; field('OFFSET, VALUE14)) }, memarg) = true
   if typecheck(VALUE, u32)
     /\ typecheck(VALUE14, u64) .
 ```
@@ -782,7 +782,7 @@ C [. 'LOCALS = ((C . 'LOCALS) [ X1 = LCT1 ]) ]
 
 | SpecTec 조각 | IL AST | Maude 변환 도식 |
 | --- | --- | --- |
-| `{ALIGN a, OFFSET o}` | `StrE [(ALIGN,a);(OFFSET,o)]` | `{ item('ALIGN,A) ; item('OFFSET,O) }` |
+| `{ALIGN a, OFFSET o}` | `StrE [(ALIGN,a);(OFFSET,o)]` | `{ field('ALIGN,A) ; field('OFFSET,O) }` |
 | `s.MEMS` | `DotE(s,MEMS)` | `S . 'MEMS` |
 | 두 context의 합성 | `CompE(c1,c2)` | `recordConcat(C1,C2,context)` |
 | 목록/option 합성 | `CompE(l,r)`와 타입 정보 | 목록 concat / `optionConcat` |

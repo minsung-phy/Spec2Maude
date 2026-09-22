@@ -179,7 +179,7 @@ let reserved_names =
     ; "sqrt"; "exp"; "log"; "sin"; "cos"; "tan"
     ; "asin"; "acos"; "atan"; "pi"; "_xor_"
     ; "eps"; "bool"; "rat"; "float"; "text"; "seq"; "unseq"
-    ; "tuple"; "item"; "value"; "typecheck"; "len"
+    ; "tuple"; "field"; "typecheck"; "len"
     ; "lift"; "repeatSeq"
     ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
     ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "not_"; "_and_"
@@ -196,7 +196,7 @@ let reserved_names =
     ; "iterOpt"; "iterList"
     ; "indexDefined"; "lenAux"
     ; "EMPTY"; "recordConcat"; "optionConcat"
-    ; "setItem"; "hasField"
+    ; "hasField"
     (* builtins.maude *)
     ; "ibits-aux"; "inv-ibits-aux"; "ibytes-aux"
     ; "inv-ibytes-aux"; "sign-extend-nat"; "ipopcnt-bits"; "ipopcnt-bits-aux"

@@ -109,8 +109,8 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
 
   | StrE fields ->
       translate_field_patterns ~computed index fields
-      |> Option.map (fun (items, guards) ->
-           {term = App ("{_}", [Term.record_items items]); guards})
+      |> Option.map (fun (fields, guards) ->
+           {term = App ("{_}", [Term.record_fields fields]); guards})
 
   | SubE (inner, source, target)
     when Prescan.same_representation index source target ->
@@ -203,9 +203,9 @@ and translate_field_patterns ?(computed = fun _ -> None) index = function
         translate_pattern ~computed index exp,
         translate_field_patterns ~computed index fields
       with
-      | Some pattern, Some (items, guards) ->
+      | Some pattern, Some (fields, guards) ->
           Some
-            ( App ("item", [Term.qid_of_atom atom; pattern.term]) :: items
+            ( App ("field", [Term.qid_of_atom atom; pattern.term]) :: fields
             , pattern.guards @ guards
             )
       | None, _ | _, None -> None
@@ -408,10 +408,10 @@ and bind_structural_pattern index bound exp subject error =
       let represented =
         List.map2
           (fun (atom, _) value ->
-            App ("item", [Term.qid_of_atom atom; value]))
+            App ("field", [Term.qid_of_atom atom; value]))
           fields subjects
-        |> Term.record_items
-        |> fun items -> App ("{_}", [items])
+        |> Term.record_fields
+        |> fun fields -> App ("{_}", [fields])
       in
       bind_pattern_parts index bound exps subjects
         [EqCondition (MatchCond (represented, subject))] error

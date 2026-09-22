@@ -39,18 +39,18 @@ mod WASM2MAUDE-MODELCHECK-RUNTIME is
   var P : Prop .
 
   eq emptyStore = {
-    item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ;
-    item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ;
-    item('ELEMS, eps) ; item('STRUCTS, eps) ; item('ARRAYS, eps) ;
-    item('EXNS, eps)
+    field('TAGS, eps) ; field('GLOBALS, eps) ; field('MEMS, eps) ;
+    field('TABLES, eps) ; field('FUNCS, eps) ; field('DATAS, eps) ;
+    field('ELEMS, eps) ; field('STRUCTS, eps) ; field('ARRAYS, eps) ;
+    field('EXNS, eps)
   } .
 
   ceq findFunc(
-    EXPORT-PREFIX {item('NAME, NAME) ; item('ADDR, FUNC(ADDR))} EXPORTS,
+    EXPORT-PREFIX {field('NAME, NAME) ; field('ADDR, FUNC(ADDR))} EXPORTS,
     NAME) = ADDR
     if not hasExport(EXPORT-PREFIX, NAME) .
   eq hasExport(
-    EXPORT-PREFIX {item('NAME, NAME) ; item('ADDR, XA)} EXPORTS,
+    EXPORT-PREFIX {field('NAME, NAME) ; field('ADDR, XA)} EXPORTS,
     NAME) = true .
   eq hasExport(EXPORTS, NAME) = false [owise] .
 
@@ -61,7 +61,7 @@ mod WASM2MAUDE-MODELCHECK-RUNTIME is
   crl [initialize] : init(C) => ready(Z)
     if (Z ; eps) := C .
   rl [invoke] : ready(Z) => exec(invoke(spectec-store(Z),
-      findFunc(value('EXPORTS, spectec-moduleinst(Z)), inputName), inputArgs)) .
+      findFunc((spectec-moduleinst(Z) . 'EXPORTS), inputName), inputArgs)) .
   crl [execute-step] : exec(C) => exec(C2)
     if Step(C) => C2 .
   crl [finished] : exec(C) => finished(RESULT)

@@ -97,10 +97,10 @@ let unsupported_typed_sequence index operation typ =
       (operation ^ " is unsupported for typed list sort "
        ^ representation.sort)
 
-let rec record_items = function
+let rec record_fields = function
   | [] -> Const "EMPTY"
-  | [item] -> item
-  | item :: items -> app "_;_" [item; record_items items]
+  | [field] -> field
+  | field :: fields -> app "_;_" [field; record_fields fields]
 
 let as_sequence_element = Iter.as_sequence_element
 
@@ -245,9 +245,9 @@ and translate_exp index exp =
   | StrE fields ->
       fields
       |> List.map (fun (atom, field) ->
-           app "item" [qid_of_atom atom; translate_exp index field])
-      |> record_items
-      |> fun items -> app "{_}" [items]
+           app "field" [qid_of_atom atom; translate_exp index field])
+      |> record_fields
+      |> fun fields -> app "{_}" [fields]
 
   | DotE (record, atom) ->
       app "_._" [translate_exp index record; qid_of_atom atom]

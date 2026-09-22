@@ -2998,7 +2998,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ A := len(spectec-arrayinst(Z))
-      /\ AI2 := { (item('TYPE, spectec-type(Z, X4)) ; item('FIELDS, map-packfield-2(ZT, N3, VAL-))) } .
+      /\ AI2 := { (field('TYPE, spectec-type(Z, X4)) ; field('FIELDS, map-packfield-2(ZT, N3, VAL-))) } .
 
   crl [focus-Step-array-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) VAL)), ARRAY.SET(X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL ARRAY.SET(X4))))) | POSTFIX }
     if typecheck(VAL, val) .
@@ -3578,7 +3578,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq tagsxx(EXTERNIDX XX-) = tagsxx(XX-) [owise] .
 
-  ceq typecheck({ (((((((((item('TYPES, VALUE4) ; item('FUNCS, VALUE5)) ; item('GLOBALS, VALUE6)) ; item('TABLES, VALUE7)) ; item('MEMS, VALUE8)) ; item('ELEMS, VALUE9)) ; item('DATAS, VALUE10)) ; item('LOCALS, VALUE11)) ; item('LABELS, VALUE12)) ; item('TAGS, VALUE13)) }, free) = true
+  ceq typecheck({ (((((((((field('TYPES, VALUE4) ; field('FUNCS, VALUE5)) ; field('GLOBALS, VALUE6)) ; field('TABLES, VALUE7)) ; field('MEMS, VALUE8)) ; field('ELEMS, VALUE9)) ; field('DATAS, VALUE10)) ; field('LOCALS, VALUE11)) ; field('LABELS, VALUE12)) ; field('TAGS, VALUE13)) }, free) = true
     if typecheck(VALUE4, uN(32))
       /\ typecheck(VALUE5, uN(32))
       /\ typecheck(VALUE6, uN(32))
@@ -3590,35 +3590,35 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE12, uN(32))
       /\ typecheck(VALUE13, uN(32)) .
 
-  eq recordConcat(LEFT, RIGHT, free) = { (((((((((item('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; item('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; item('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; item('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; item('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; item('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; item('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; item('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; item('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; item('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) } .
+  eq recordConcat(LEFT, RIGHT, free) = { (((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; field('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) } .
 
-  eq free-opt(eps) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-opt(eps) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-opt(FREE ?) = FREE .
 
-  eq free-list(eps) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-list(eps) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-list(FREE FREE--) = recordConcat(FREE, free-list(FREE--), free) .
 
-  eq free-typeidx(TYPEIDX) = { (item('TYPES, TYPEIDX) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-typeidx(TYPEIDX) = { (field('TYPES, TYPEIDX) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-funcidx(FUNCIDX) = { (item('TYPES, eps) ; (item('FUNCS, FUNCIDX) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-funcidx(FUNCIDX) = { (field('TYPES, eps) ; (field('FUNCS, FUNCIDX) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-globalidx(GLOBALIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, GLOBALIDX) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-globalidx(GLOBALIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, GLOBALIDX) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-tableidx(TABLEIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, TABLEIDX) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-tableidx(TABLEIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, TABLEIDX) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-memidx(MEMIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, MEMIDX) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-memidx(MEMIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, MEMIDX) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-elemidx(ELEMIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, ELEMIDX) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-elemidx(ELEMIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, ELEMIDX) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-dataidx(DATAIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, DATAIDX) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-dataidx(DATAIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, DATAIDX) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-localidx(LOCALIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, LOCALIDX) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-localidx(LOCALIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, LOCALIDX) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-labelidx(LABELIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, LABELIDX) ; item('TAGS, eps)))))))))) } .
+  eq free-labelidx(LABELIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, LABELIDX) ; field('TAGS, eps)))))))))) } .
 
-  eq free-tagidx(TAGIDX) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, TAGIDX)))))))))) } .
+  eq free-tagidx(TAGIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, TAGIDX)))))))))) } .
 
   eq free-externidx(FUNC(FUNCIDX)) = free-funcidx(FUNCIDX) .
 
@@ -4235,11 +4235,11 @@ mod SPEC2MAUDE-GENERATED is
   ceq unrolldt(-DEF(RECTYPE, I)) = SUBTYPE- [ I ]
     if REC(SUBTYPE-) := unrollrt(RECTYPE) .
 
-  eq free-addrtype(ADDRTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-addrtype(ADDRTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-numtype(NUMTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-numtype(NUMTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-packtype(PACKTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-packtype(PACKTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   ceq free-lanetype(NUMTYPE) = free-numtype(NUMTYPE)
     if typecheck(NUMTYPE, numtype) .
@@ -4247,7 +4247,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq free-lanetype(PACKTYPE) = free-packtype(PACKTYPE)
     if typecheck(PACKTYPE, packtype) .
 
-  eq free-vectype(VECTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-vectype(VECTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   ceq free-consttype(NUMTYPE) = free-numtype(NUMTYPE)
     if typecheck(NUMTYPE, numtype) .
@@ -4255,11 +4255,11 @@ mod SPEC2MAUDE-GENERATED is
   ceq free-consttype(VECTYPE) = free-vectype(VECTYPE)
     if typecheck(VECTYPE, vectype) .
 
-  eq free-absheaptype(ABSHEAPTYPE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-absheaptype(ABSHEAPTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-typevar(-IDX(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
-  eq free-typevar(REC(N3)) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-typevar(REC(N3)) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   ceq free-heaptype(ABSHEAPTYPE) = free-absheaptype(ABSHEAPTYPE)
     if typecheck(ABSHEAPTYPE, absheaptype) .
@@ -4285,7 +4285,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq free-valtype(REFTYPE) = free-reftype(REFTYPE)
     if typecheck(REFTYPE, reftype) .
 
-  eq free-valtype(BOT) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-valtype(BOT) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-resulttype(VALTYPE-) = free-list(map-free-valtype(VALTYPE-)) .
 
@@ -4321,7 +4321,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-tabletype(tuple(ADDRTYPE (LIMITS REFTYPE))) = recordConcat(free-addrtype(ADDRTYPE), free-reftype(REFTYPE), free) .
 
-  eq free-datatype(OK) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-datatype(OK) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-elemtype(REFTYPE) = free-reftype(REFTYPE) .
 
@@ -4946,7 +4946,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(M-1, M)
       /\ typecheck(M-2, M) .
 
-  ceq typecheck({ (item('ALIGN, VALUE) ; item('OFFSET, VALUE14)) }, memarg) = true
+  ceq typecheck({ (field('ALIGN, VALUE) ; field('OFFSET, VALUE14)) }, memarg) = true
     if typecheck(VALUE, u32)
       /\ typecheck(VALUE14, u64) .
 
@@ -5035,11 +5035,11 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck(FUNC(FUNCADDR), externaddr) = true
     if typecheck(FUNCADDR, funcaddr) .
 
-  ceq typecheck({ (item('NAME, VALUE4) ; item('ADDR, VALUE3)) }, exportinst) = true
+  ceq typecheck({ (field('NAME, VALUE4) ; field('ADDR, VALUE3)) }, exportinst) = true
     if typecheck(VALUE4, name)
       /\ typecheck(VALUE3, externaddr) .
 
-  ceq typecheck({ ((((((((item('TYPES, VALUE4) ; item('TAGS, VALUE5)) ; item('GLOBALS, VALUE6)) ; item('MEMS, VALUE7)) ; item('TABLES, VALUE8)) ; item('FUNCS, VALUE9)) ; item('DATAS, VALUE10)) ; item('ELEMS, VALUE11)) ; item('EXPORTS, VALUE12)) }, moduleinst) = true
+  ceq typecheck({ ((((((((field('TYPES, VALUE4) ; field('TAGS, VALUE5)) ; field('GLOBALS, VALUE6)) ; field('MEMS, VALUE7)) ; field('TABLES, VALUE8)) ; field('FUNCS, VALUE9)) ; field('DATAS, VALUE10)) ; field('ELEMS, VALUE11)) ; field('EXPORTS, VALUE12)) }, moduleinst) = true
     if typecheck(VALUE4, deftype)
       /\ typecheck(VALUE5, nat)
       /\ typecheck(VALUE6, nat)
@@ -5050,7 +5050,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE11, nat)
       /\ typecheck(VALUE12, exportinst) .
 
-  eq recordConcat(LEFT, RIGHT, moduleinst) = { ((((((((item('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; item('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; item('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; item('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; item('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; item('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; item('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; item('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; item('EXPORTS, (LEFT . 'EXPORTS) (RIGHT . 'EXPORTS))) } .
+  eq recordConcat(LEFT, RIGHT, moduleinst) = { ((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('EXPORTS, (LEFT . 'EXPORTS) (RIGHT . 'EXPORTS))) } .
 
   eq typecheck(VALUE, hostaddr) = typecheck(VALUE, addr) .
 
@@ -5110,11 +5110,11 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck(REF.EXTERN(REF2), val) = true
     if typecheck(REF2, ref) .
 
-  ceq typecheck({ (item('LOCALS, VALUE4) ; item('MODULE, VALUE3)) }, frame) = true
+  ceq typecheck({ (field('LOCALS, VALUE4) ; field('MODULE, VALUE3)) }, frame) = true
     if typecheck(VALUE4, iterOpt(val))
       /\ typecheck(VALUE3, moduleinst) .
 
-  eq recordConcat(LEFT, RIGHT, frame) = { (item('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS)) ; item('MODULE, recordConcat(LEFT . 'MODULE, RIGHT . 'MODULE, moduleinst))) } .
+  eq recordConcat(LEFT, RIGHT, frame) = { (field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS)) ; field('MODULE, recordConcat(LEFT . 'MODULE, RIGHT . 'MODULE, moduleinst))) } .
 
   eq typecheck(NOP, instr) = true .
 
@@ -5540,7 +5540,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(VALUE15, expr) = typecheck(VALUE15, instr) .
 
-  eq memarg0 = { (item('ALIGN, 0) ; item('OFFSET, 0)) } .
+  eq memarg0 = { (field('ALIGN, 0) ; field('OFFSET, 0)) } .
 
   ceq const(NUMTYPE, C2) = CONST(NUMTYPE, C2)
     if typecheck(NUMTYPE, numtype)
@@ -5574,11 +5574,11 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(LABELIDX, labelidx)
       /\ typecheck(LABELIDX--, uN(32)) .
 
-  eq free-instr(NOP) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(NOP) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-instr(UNREACHABLE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(UNREACHABLE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-instr(DROP) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(DROP) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   ceq free-instr(SELECT(VALTYPE--)) = free-opt(map-free-list(VALTYPE--))
     if len(VALTYPE--) <= 1 .
@@ -5609,7 +5609,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(CALL-INDIRECT(TABLEIDX, TYPEUSE)) = recordConcat(free-tableidx(TABLEIDX), free-typeuse(TYPEUSE), free) .
 
-  eq free-instr(RETURN) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(RETURN) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-instr(RETURN-CALL(FUNCIDX)) = free-funcidx(FUNCIDX) .
 
@@ -5619,7 +5619,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(THROW(TAGIDX)) = free-tagidx(TAGIDX) .
 
-  eq free-instr(THROW-REF) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(THROW-REF) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-instr(TRY-TABLE(BLOCKTYPE, CATCH-, INSTR-)) = recordConcat(recordConcat(free-blocktype(BLOCKTYPE), free-list(map-free-catch(CATCH-)), free), free-list(map-free-instr(INSTR-)), free) .
 
@@ -5682,11 +5682,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(REF.NULL(HEAPTYPE)) = free-heaptype(HEAPTYPE) .
 
-  eq free-instr(REF.IS-NULL) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(REF.IS-NULL) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-instr(REF.AS-NON-NULL) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(REF.AS-NON-NULL) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-instr(REF.EQ) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(REF.EQ) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-instr(REF.TEST(REFTYPE)) = free-reftype(REFTYPE) .
 
@@ -5694,9 +5694,9 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(REF.FUNC(FUNCIDX)) = free-funcidx(FUNCIDX) .
 
-  eq free-instr(REF.I31) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(REF.I31) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-instr(I31.GET(SX)) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(I31.GET(SX)) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-instr(STRUCT.NEW(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
@@ -5722,7 +5722,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(ARRAY.SET(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
-  eq free-instr(ARRAY.LEN) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(ARRAY.LEN) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-instr(ARRAY.FILL(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
@@ -5732,9 +5732,9 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(ARRAY.INIT-ELEM(TYPEIDX, ELEMIDX)) = recordConcat(free-typeidx(TYPEIDX), free-elemidx(ELEMIDX), free) .
 
-  eq free-instr(EXTERN.CONVERT-ANY) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(EXTERN.CONVERT-ANY) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-instr(ANY.CONVERT-EXTERN) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-instr(ANY.CONVERT-EXTERN) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-instr(LOCAL.GET(LOCALIDX)) = free-localidx(LOCALIDX) .
 
@@ -5884,15 +5884,15 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-datamode(ACTIVE(MEMIDX, EXPR)) = recordConcat(free-memidx(MEMIDX), free-expr(EXPR), free) .
 
-  eq free-datamode(PASSIVE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-datamode(PASSIVE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-data(DATA(BYTE-, DATAMODE)) = free-datamode(DATAMODE) .
 
   eq free-elemmode(ACTIVE(TABLEIDX, EXPR)) = recordConcat(free-tableidx(TABLEIDX), free-expr(EXPR), free) .
 
-  eq free-elemmode(PASSIVE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-elemmode(PASSIVE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-elemmode(DECLARE) = { (item('TYPES, eps) ; (item('FUNCS, eps) ; (item('GLOBALS, eps) ; (item('TABLES, eps) ; (item('MEMS, eps) ; (item('ELEMS, eps) ; (item('DATAS, eps) ; (item('LOCALS, eps) ; (item('LABELS, eps) ; item('TAGS, eps)))))))))) } .
+  eq free-elemmode(DECLARE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
   eq free-elem(ELEM(REFTYPE, EXPR-, ELEMMODE)) = recordConcat(recordConcat(free-reftype(REFTYPE), free-list(map-free-expr(EXPR-)), free), free-elemmode(ELEMMODE), free) .
 
@@ -5922,7 +5922,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(LOCALIDX-, uN(32))
       /\ typecheck(RESULTTYPE2, resulttype) .
 
-  ceq typecheck({ ((((((((((((item('TYPES, VALUE4) ; item('TAGS, VALUE5)) ; item('GLOBALS, VALUE6)) ; item('MEMS, VALUE7)) ; item('TABLES, VALUE8)) ; item('FUNCS, VALUE9)) ; item('DATAS, VALUE10)) ; item('ELEMS, VALUE11)) ; item('LOCALS, VALUE12)) ; item('LABELS, VALUE13)) ; item('RETURN, VALUE16)) ; item('REFS, VALUE17)) ; item('RECS, VALUE18)) }, context) = true
+  ceq typecheck({ ((((((((((((field('TYPES, VALUE4) ; field('TAGS, VALUE5)) ; field('GLOBALS, VALUE6)) ; field('MEMS, VALUE7)) ; field('TABLES, VALUE8)) ; field('FUNCS, VALUE9)) ; field('DATAS, VALUE10)) ; field('ELEMS, VALUE11)) ; field('LOCALS, VALUE12)) ; field('LABELS, VALUE13)) ; field('RETURN, VALUE16)) ; field('REFS, VALUE17)) ; field('RECS, VALUE18)) }, context) = true
     if typecheck(VALUE4, deftype)
       /\ typecheck(VALUE5, typeuse)
       /\ typecheck(VALUE6, globaltype)
@@ -5938,7 +5938,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE17, uN(32))
       /\ typecheck(VALUE18, subtype) .
 
-  eq recordConcat(LEFT, RIGHT, context) = { ((((((((((((item('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; item('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; item('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; item('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; item('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; item('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; item('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; item('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; item('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; item('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; item('RETURN, optionConcat(LEFT . 'RETURN, RIGHT . 'RETURN))) ; item('REFS, (LEFT . 'REFS) (RIGHT . 'REFS))) ; item('RECS, (LEFT . 'RECS) (RIGHT . 'RECS))) } .
+  eq recordConcat(LEFT, RIGHT, context) = { ((((((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; field('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; field('RETURN, optionConcat(LEFT . 'RETURN, RIGHT . 'RETURN))) ; field('REFS, (LEFT . 'REFS) (RIGHT . 'REFS))) ; field('RECS, (LEFT . 'RECS) (RIGHT . 'RECS))) } .
 
   eq with-locals(C, eps, eps) = C .
 
@@ -6914,32 +6914,32 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(..., funccode) = true .
 
-  ceq typecheck({ item('TYPE, VALUE3) }, taginst) = true
+  ceq typecheck({ field('TYPE, VALUE3) }, taginst) = true
     if typecheck(VALUE3, tagtype) .
 
-  ceq typecheck({ (item('TYPE, VALUE3) ; item('VALUE, VALUE19)) }, globalinst) = true
+  ceq typecheck({ (field('TYPE, VALUE3) ; field('VALUE, VALUE19)) }, globalinst) = true
     if typecheck(VALUE3, globaltype)
       /\ typecheck(VALUE19, val) .
 
-  ceq typecheck({ (item('TYPE, VALUE3) ; item('BYTES, VALUE4)) }, meminst) = true
+  ceq typecheck({ (field('TYPE, VALUE3) ; field('BYTES, VALUE4)) }, meminst) = true
     if typecheck(VALUE3, memtype)
       /\ typecheck(VALUE4, byte) .
 
-  ceq typecheck({ (item('TYPE, VALUE3) ; item('REFS, VALUE4)) }, tableinst) = true
+  ceq typecheck({ (field('TYPE, VALUE3) ; field('REFS, VALUE4)) }, tableinst) = true
     if typecheck(VALUE3, tabletype)
       /\ typecheck(VALUE4, ref) .
 
-  ceq typecheck({ ((item('TYPE, VALUE3) ; item('MODULE, VALUE20)) ; item('CODE, VALUE21)) }, funcinst) = true
+  ceq typecheck({ ((field('TYPE, VALUE3) ; field('MODULE, VALUE20)) ; field('CODE, VALUE21)) }, funcinst) = true
     if typecheck(VALUE3, deftype)
       /\ typecheck(VALUE20, moduleinst)
       /\ typecheck(VALUE21, funccode) .
 
-  ceq typecheck({ item('BYTES, VALUE4) }, datainst) = true
+  ceq typecheck({ field('BYTES, VALUE4) }, datainst) = true
     if typecheck(VALUE4, byte) .
 
-  eq recordConcat(LEFT, RIGHT, datainst) = { item('BYTES, (LEFT . 'BYTES) (RIGHT . 'BYTES)) } .
+  eq recordConcat(LEFT, RIGHT, datainst) = { field('BYTES, (LEFT . 'BYTES) (RIGHT . 'BYTES)) } .
 
-  ceq typecheck({ (item('TYPE, VALUE3) ; item('REFS, VALUE4)) }, eleminst) = true
+  ceq typecheck({ (field('TYPE, VALUE3) ; field('REFS, VALUE4)) }, eleminst) = true
     if typecheck(VALUE3, elemtype)
       /\ typecheck(VALUE4, ref) .
 
@@ -6982,18 +6982,18 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(PACKTYPE, packtype)
       /\ typecheck(VALUE23, iN(psizenn(PACKTYPE))) .
 
-  ceq typecheck({ (item('TYPE, VALUE3) ; item('FIELDS, VALUE4)) }, structinst) = true
+  ceq typecheck({ (field('TYPE, VALUE3) ; field('FIELDS, VALUE4)) }, structinst) = true
     if typecheck(VALUE3, deftype)
       /\ typecheck(VALUE4, fieldval) .
 
-  ceq typecheck({ (item('TYPE, VALUE3) ; item('FIELDS, VALUE4)) }, arrayinst) = true
+  ceq typecheck({ (field('TYPE, VALUE3) ; field('FIELDS, VALUE4)) }, arrayinst) = true
     if typecheck(VALUE3, deftype)
       /\ typecheck(VALUE4, fieldval) .
 
-  ceq typecheck({ (item('TAG, VALUE) ; item('FIELDS, VALUE25)) }, exninst) = true
+  ceq typecheck({ (field('TAG, VALUE) ; field('FIELDS, VALUE25)) }, exninst) = true
     if typecheck(VALUE, tagaddr) .
 
-  ceq typecheck({ (((((((((item('TAGS, VALUE4) ; item('GLOBALS, VALUE5)) ; item('MEMS, VALUE6)) ; item('TABLES, VALUE7)) ; item('FUNCS, VALUE8)) ; item('DATAS, VALUE9)) ; item('ELEMS, VALUE10)) ; item('STRUCTS, VALUE11)) ; item('ARRAYS, VALUE12)) ; item('EXNS, VALUE13)) }, store) = true
+  ceq typecheck({ (((((((((field('TAGS, VALUE4) ; field('GLOBALS, VALUE5)) ; field('MEMS, VALUE6)) ; field('TABLES, VALUE7)) ; field('FUNCS, VALUE8)) ; field('DATAS, VALUE9)) ; field('ELEMS, VALUE10)) ; field('STRUCTS, VALUE11)) ; field('ARRAYS, VALUE12)) ; field('EXNS, VALUE13)) }, store) = true
     if typecheck(VALUE4, taginst)
       /\ typecheck(VALUE5, globalinst)
       /\ typecheck(VALUE6, meminst)
@@ -7005,7 +7005,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE12, arrayinst)
       /\ typecheck(VALUE13, exninst) .
 
-  eq recordConcat(LEFT, RIGHT, store) = { (((((((((item('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS)) ; item('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; item('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; item('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; item('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; item('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; item('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; item('STRUCTS, (LEFT . 'STRUCTS) (RIGHT . 'STRUCTS))) ; item('ARRAYS, (LEFT . 'ARRAYS) (RIGHT . 'ARRAYS))) ; item('EXNS, (LEFT . 'EXNS) (RIGHT . 'EXNS))) } .
+  eq recordConcat(LEFT, RIGHT, store) = { (((((((((field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS)) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('STRUCTS, (LEFT . 'STRUCTS) (RIGHT . 'STRUCTS))) ; field('ARRAYS, (LEFT . 'ARRAYS) (RIGHT . 'ARRAYS))) ; field('EXNS, (LEFT . 'EXNS) (RIGHT . 'EXNS))) } .
 
   ceq typecheck(STORE2 ; FRAME, state) = true
     if typecheck(STORE2, store)
@@ -7143,20 +7143,20 @@ mod SPEC2MAUDE-GENERATED is
   eq add-exninst(Z, EXN-) = (sof(Z) [. 'EXNS = ((sof(Z) . 'EXNS) EXN-) ]) ; fof(Z) .
 
   ceq growtable(TABLEINST, N3, R) = TABLEINST-
-    if { (item('TYPE, tuple(AT (([ I .. J- ]) RT))) ; item('REFS, R--)) } := TABLEINST
+    if { (field('TYPE, tuple(AT (([ I .. J- ]) RT))) ; field('REFS, R--)) } := TABLEINST
       /\ len(J-) <= 1
       /\ I-3 := len(R--) + N3
       /\ iterpr-34(I-3, J-)
       /\ (I-3 : nat <:> int) <= _-_((2 ^ size(AT)) : nat <:> int, 1 : nat <:> int)
-      /\ TABLEINST- := { (item('TYPE, tuple(AT (([ I-3 .. J- ]) RT))) ; item('REFS, R-- repeatSeq(N3, R))) } .
+      /\ TABLEINST- := { (field('TYPE, tuple(AT (([ I-3 .. J- ]) RT))) ; field('REFS, R-- repeatSeq(N3, R))) } .
 
   ceq growmem(MEMINST, N3) = MEMINST-
-    if { (item('TYPE, __PAGE(AT, [ I .. J- ])) ; item('BYTES, B-)) } := MEMINST
+    if { (field('TYPE, __PAGE(AT, [ I .. J- ])) ; field('BYTES, B-)) } := MEMINST
       /\ len(J-) <= 1
       /\ I-3 := (((len(B-) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) + (N3 : nat <:> rat)) : rat <:> nat
       /\ iterpr-35(I-3, J-)
       /\ I-3 <= (2 ^ (_-_(size(AT) : nat <:> int, 16 : nat <:> int) : int <:> nat))
-      /\ MEMINST- := { (item('TYPE, __PAGE(AT, [ I-3 .. J- ])) ; item('BYTES, B- repeatSeq(N3 * (64 * Ki), 0))) } .
+      /\ MEMINST- := { (field('TYPE, __PAGE(AT, [ I-3 .. J- ])) ; field('BYTES, B- repeatSeq(N3 * (64 * Ki), 0))) } .
 
   eq Num-ok(S2, CONST(NT, C2), NT) = true .
 
@@ -7846,7 +7846,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ X4 := CASE-PART12
       /\ INSTR- := CASE-PART3
       /\ T- := project-map-exp-1040(CASE-PART2)
-      /\ F := { (item('LOCALS, map-exp-1042(N3, VAL-) map-default(T-)) ; item('MODULE, FI . 'MODULE)) } .
+      /\ F := { (field('LOCALS, map-exp-1042(N3, VAL-) map-default(T-)) ; field('MODULE, FI . 'MODULE)) } .
 
   crl Step-read(Z ; RETURN-CALL(X4)) => REF.FUNC-ADDR(A) RETURN-CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE)
     if A := (spectec-moduleinst(Z) . 'FUNCS) [ X4 ] .
@@ -8322,7 +8322,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ FUNC T- -> eps := Expand(as-deftype(spectec-tag(Z, X4) . 'TYPE))
       /\ N3 = len(T-)
       /\ A := len(spectec-exninst(Z))
-      /\ EXN3 := { (item('TAG, spectec-tagaddr(Z) [ X4 ]) ; item('FIELDS, VAL-)) } .
+      /\ EXN3 := { (field('TAG, spectec-tagaddr(Z) [ X4 ]) ; field('FIELDS, VAL-)) } .
 
   crl Step(Z ; (VAL LOCAL.SET(X4))) => with-local(Z, X4, VAL) ; eps
     if typecheck(VAL, val) .
@@ -8403,7 +8403,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
       /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1157(N3, CASE-PART1)
       /\ A := len(spectec-structinst(Z))
-      /\ SI2 := { (item('TYPE, spectec-type(Z, X4)) ; item('FIELDS, map-packfield(N3, VAL-, ZT-))) } .
+      /\ SI2 := { (field('TYPE, spectec-type(Z, X4)) ; field('FIELDS, map-packfield(N3, VAL-, ZT-))) } .
 
   crl Step(Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X4, I)))) => Z ; TRAP
     if typecheck(VAL, val) .
@@ -8419,7 +8419,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ A := len(spectec-arrayinst(Z))
-      /\ AI2 := { (item('TYPE, spectec-type(Z, X4)) ; item('FIELDS, map-packfield-2(ZT, N3, VAL-))) } .
+      /\ AI2 := { (field('TYPE, spectec-type(Z, X4)) ; field('FIELDS, map-packfield-2(ZT, N3, VAL-))) } .
 
   crl Step(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL ARRAY.SET(X4))))) => Z ; TRAP
     if typecheck(VAL, val) .
@@ -8443,8 +8443,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ X4 := len(DEFTYPE--)
       /\ DEFTYPE- := subst-all-deftypes(rolldt(X4, RECTYPE), DEFTYPE--) .
 
-  ceq alloctag(S2, TAGTYPE) = tuple(recordConcat(S2, { (item('TAGS, TAGINST) ; (item('GLOBALS, eps) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, eps) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps)))))))))) }, store) len(S2 . 'TAGS))
-    if TAGINST := { item('TYPE, TAGTYPE) } .
+  ceq alloctag(S2, TAGTYPE) = tuple(recordConcat(S2, { (field('TAGS, TAGINST) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'TAGS))
+    if TAGINST := { field('TYPE, TAGTYPE) } .
 
   eq alloctags(S2, eps) = tuple(S2 seq(eps)) .
 
@@ -8454,8 +8454,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S-1 JA) := alloctag(S2, TAGTYPE)
       /\ tuple(S-2 seq(JA--)) := alloctags(S-1, TAGTYPE--) .
 
-  ceq allocglobal(S2, GLOBALTYPE, VAL) = tuple(recordConcat(S2, { (item('TAGS, eps) ; (item('GLOBALS, GLOBALINST) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, eps) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps)))))))))) }, store) len(S2 . 'GLOBALS))
-    if GLOBALINST := { (item('TYPE, GLOBALTYPE) ; item('VALUE, VAL)) } .
+  ceq allocglobal(S2, GLOBALTYPE, VAL) = tuple(recordConcat(S2, { (field('TAGS, eps) ; (field('GLOBALS, GLOBALINST) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'GLOBALS))
+    if GLOBALINST := { (field('TYPE, GLOBALTYPE) ; field('VALUE, VAL)) } .
 
   eq allocglobals(S2, eps, eps) = tuple(S2 seq(eps)) .
 
@@ -8463,9 +8463,9 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S-1 GA) := allocglobal(S2, GLOBALTYPE, VAL)
       /\ tuple(S-2 seq(GA--)) := allocglobals(S-1, GLOBALTYPE--, VAL--) .
 
-  ceq allocmem(S2, __PAGE(AT, [ I .. J- ])) = tuple(recordConcat(S2, { (item('TAGS, eps) ; (item('GLOBALS, eps) ; (item('MEMS, MEMINST) ; (item('TABLES, eps) ; (item('FUNCS, eps) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps)))))))))) }, store) len(S2 . 'MEMS))
+  ceq allocmem(S2, __PAGE(AT, [ I .. J- ])) = tuple(recordConcat(S2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, MEMINST) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'MEMS))
     if len(J-) <= 1
-      /\ MEMINST := { (item('TYPE, __PAGE(AT, [ I .. J- ])) ; item('BYTES, repeatSeq(I * (64 * Ki), 0))) } .
+      /\ MEMINST := { (field('TYPE, __PAGE(AT, [ I .. J- ])) ; field('BYTES, repeatSeq(I * (64 * Ki), 0))) } .
 
   eq allocmems(S2, eps) = tuple(S2 seq(eps)) .
 
@@ -8473,9 +8473,9 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S-1 MA) := allocmem(S2, MEMTYPE)
       /\ tuple(S-2 seq(MA--)) := allocmems(S-1, MEMTYPE--) .
 
-  ceq alloctable(S2, tuple(AT (([ I .. J- ]) RT)), REF2) = tuple(recordConcat(S2, { (item('TAGS, eps) ; (item('GLOBALS, eps) ; (item('MEMS, eps) ; (item('TABLES, TABLEINST) ; (item('FUNCS, eps) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps)))))))))) }, store) len(S2 . 'TABLES))
+  ceq alloctable(S2, tuple(AT (([ I .. J- ]) RT)), REF2) = tuple(recordConcat(S2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, TABLEINST) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'TABLES))
     if len(J-) <= 1
-      /\ TABLEINST := { (item('TYPE, tuple(AT (([ I .. J- ]) RT))) ; item('REFS, repeatSeq(I, REF2))) } .
+      /\ TABLEINST := { (field('TYPE, tuple(AT (([ I .. J- ]) RT))) ; field('REFS, repeatSeq(I, REF2))) } .
 
   eq alloctables(S2, eps, eps) = tuple(S2 seq(eps)) .
 
@@ -8483,8 +8483,8 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S-1 TA) := alloctable(S2, TABLETYPE, REF2)
       /\ tuple(S-2 seq(TA--)) := alloctables(S-1, TABLETYPE--, REF--) .
 
-  ceq allocfunc(S2, DEFTYPE, FUNCCODE, MODULEINST) = tuple(recordConcat(S2, { (item('TAGS, eps) ; (item('GLOBALS, eps) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, FUNCINST) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps)))))))))) }, store) len(S2 . 'FUNCS))
-    if FUNCINST := { (item('TYPE, DEFTYPE) ; (item('MODULE, MODULEINST) ; item('CODE, FUNCCODE))) } .
+  ceq allocfunc(S2, DEFTYPE, FUNCCODE, MODULEINST) = tuple(recordConcat(S2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, FUNCINST) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'FUNCS))
+    if FUNCINST := { (field('TYPE, DEFTYPE) ; (field('MODULE, MODULEINST) ; field('CODE, FUNCCODE))) } .
 
   eq allocfuncs(S2, eps, eps, eps) = tuple(S2 seq(eps)) .
 
@@ -8492,8 +8492,8 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S-1 FA) := allocfunc(S2, DT, FUNCCODE, MODULEINST)
       /\ tuple(S-2 seq(FA--)) := allocfuncs(S-1, DT--, FUNCCODE--, MODULEINST--) .
 
-  ceq allocdata(S2, OK, BYTE-) = tuple(recordConcat(S2, { (item('TAGS, eps) ; (item('GLOBALS, eps) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, eps) ; (item('DATAS, DATAINST) ; (item('ELEMS, eps) ; (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps)))))))))) }, store) len(S2 . 'DATAS))
-    if DATAINST := { item('BYTES, BYTE-) } .
+  ceq allocdata(S2, OK, BYTE-) = tuple(recordConcat(S2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, DATAINST) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'DATAS))
+    if DATAINST := { field('BYTES, BYTE-) } .
 
   eq allocdatas(S2, eps, eps) = tuple(S2 seq(eps)) .
 
@@ -8501,8 +8501,8 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S-1 DA) := allocdata(S2, OK3, B-)
       /\ tuple(S-2 seq(DA--)) := allocdatas(S-1, OK--, B---) .
 
-  ceq allocelem(S2, ELEMTYPE, REF-) = tuple(recordConcat(S2, { (item('TAGS, eps) ; (item('GLOBALS, eps) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, eps) ; (item('DATAS, eps) ; (item('ELEMS, ELEMINST) ; (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps)))))))))) }, store) len(S2 . 'ELEMS))
-    if ELEMINST := { (item('TYPE, ELEMTYPE) ; item('REFS, REF-)) } .
+  ceq allocelem(S2, ELEMTYPE, REF-) = tuple(recordConcat(S2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, ELEMINST) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'ELEMS))
+    if ELEMINST := { (field('TYPE, ELEMTYPE) ; field('REFS, REF-)) } .
 
   eq allocelems(S2, eps, eps) = tuple(S2 seq(eps)) .
 
@@ -8512,15 +8512,15 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S-1 EA) := allocelem(S2, RT, REF-)
       /\ tuple(S-2 seq(EA--)) := allocelems(S-1, RT--, REF---) .
 
-  eq allocexport(MODULEINST, EXPORT(NAME, TAG(X4))) = { (item('NAME, NAME) ; item('ADDR, TAG((MODULEINST . 'TAGS) [ X4 ]))) } .
+  eq allocexport(MODULEINST, EXPORT(NAME, TAG(X4))) = { (field('NAME, NAME) ; field('ADDR, TAG((MODULEINST . 'TAGS) [ X4 ]))) } .
 
-  eq allocexport(MODULEINST, EXPORT(NAME, GLOBAL(X4))) = { (item('NAME, NAME) ; item('ADDR, GLOBAL((MODULEINST . 'GLOBALS) [ X4 ]))) } .
+  eq allocexport(MODULEINST, EXPORT(NAME, GLOBAL(X4))) = { (field('NAME, NAME) ; field('ADDR, GLOBAL((MODULEINST . 'GLOBALS) [ X4 ]))) } .
 
-  eq allocexport(MODULEINST, EXPORT(NAME, MEM(X4))) = { (item('NAME, NAME) ; item('ADDR, MEM((MODULEINST . 'MEMS) [ X4 ]))) } .
+  eq allocexport(MODULEINST, EXPORT(NAME, MEM(X4))) = { (field('NAME, NAME) ; field('ADDR, MEM((MODULEINST . 'MEMS) [ X4 ]))) } .
 
-  eq allocexport(MODULEINST, EXPORT(NAME, TABLE(X4))) = { (item('NAME, NAME) ; item('ADDR, TABLE((MODULEINST . 'TABLES) [ X4 ]))) } .
+  eq allocexport(MODULEINST, EXPORT(NAME, TABLE(X4))) = { (field('NAME, NAME) ; field('ADDR, TABLE((MODULEINST . 'TABLES) [ X4 ]))) } .
 
-  eq allocexport(MODULEINST, EXPORT(NAME, FUNC(X4))) = { (item('NAME, NAME) ; item('ADDR, FUNC((MODULEINST . 'FUNCS) [ X4 ]))) } .
+  eq allocexport(MODULEINST, EXPORT(NAME, FUNC(X4))) = { (field('NAME, NAME) ; field('ADDR, FUNC((MODULEINST . 'FUNCS) [ X4 ]))) } .
 
   eq allocexports(MODULEINST, EXPORT-) = map-allocexport(MODULEINST, EXPORT-) .
 
@@ -8547,8 +8547,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S-4 seq(TA-3)) := alloctables(S-3, map-subst-all-tabletype(DT-, TABLETYPE-4), REF-T-)
       /\ tuple(S-5 seq(DA-3)) := allocdatas(S-4, repeatSeq(len(DATA-), OK), BYTE--)
       /\ tuple(S-6 seq(EA-3)) := allocelems(S-5, map-subst-all-reftype(DT-, ELEMTYPE-), REF-E--)
-      /\ XI- := allocexports({ (item('TYPES, eps) ; (item('TAGS, AA-I- AA-) ; (item('GLOBALS, GA-I- GA-3) ; (item('MEMS, MA-I- MA-3) ; (item('TABLES, TA-I- TA-3) ; (item('FUNCS, FA-I- FA-3) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; item('EXPORTS, eps))))))))) }, EXPORT-)
-      /\ MODULEINST := { (item('TYPES, DT-) ; (item('TAGS, AA-I- AA-) ; (item('GLOBALS, GA-I- GA-3) ; (item('MEMS, MA-I- MA-3) ; (item('TABLES, TA-I- TA-3) ; (item('FUNCS, FA-I- FA-3) ; (item('DATAS, DA-3) ; (item('ELEMS, EA-3) ; item('EXPORTS, XI-))))))))) }
+      /\ XI- := allocexports({ (field('TYPES, eps) ; (field('TAGS, AA-I- AA-) ; (field('GLOBALS, GA-I- GA-3) ; (field('MEMS, MA-I- MA-3) ; (field('TABLES, TA-I- TA-3) ; (field('FUNCS, FA-I- FA-3) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }, EXPORT-)
+      /\ MODULEINST := { (field('TYPES, DT-) ; (field('TAGS, AA-I- AA-) ; (field('GLOBALS, GA-I- GA-3) ; (field('MEMS, MA-I- MA-3) ; (field('TABLES, TA-I- TA-3) ; (field('FUNCS, FA-I- FA-3) ; (field('DATAS, DA-3) ; (field('ELEMS, EA-3) ; field('EXPORTS, XI-))))))))) }
       /\ tuple(S-7 seq(FA-3)) := allocfuncs(S-6, map-exp-1312(DT-, X-2), map-exp-1314(EXPR-F-, LOCAL--, X-2), repeatSeq(len(FUNC-), MODULEINST)) .
 
   ceq rundata-(X4, DATA(B-, PASSIVE)) = eps
@@ -8591,7 +8591,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(EXPR, expr)
       /\ typecheck(EXPR--, iterList(instr)) .
 
-  crl instantiate(S2, MODULE2, EXTERNADDR-) => (S---- ; ({ (item('LOCALS, eps) ; item('MODULE, MODULEINST)) })) ; (INSTR-E- (INSTR-D- instrLift(INSTR-S-)))
+  crl instantiate(S2, MODULE2, EXTERNADDR-) => (S---- ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST)) })) ; (INSTR-E- (INSTR-D- instrLift(INSTR-S-)))
     if XT-I- -> XT-E- := Module-ok(MODULE2)
       /\ iterpr-38(S2, EXTERNADDR-, XT-I-)
       /\ MODULE(TYPE-, IMPORT-, TAG-, GLOBAL-, MEM-, TABLE-, FUNC-, DATA-, ELEM-, START-, EXPORT-) := MODULE2
@@ -8601,8 +8601,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(seq(BYTE--) seq(DATAMODE-)) := project-map-exp-1397(DATA-)
       /\ tuple(seq(ELEMMODE-) (seq(EXPR-E--) seq(REFTYPE-))) := project-map-exp-1400(ELEM-)
       /\ X-5 := project-map-exp-1403(START-)
-      /\ MODULEINST-0 := { (item('TYPES, alloctypes(TYPE-)) ; (item('TAGS, eps) ; (item('GLOBALS, globalsxa(EXTERNADDR-)) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, funcsxa(EXTERNADDR-) map-exp-1407(S2, len(FUNC-), 0)) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; item('EXPORTS, eps))))))))) }
-      /\ Z := S2 ; ({ (item('LOCALS, eps) ; item('MODULE, MODULEINST-0)) })
+      /\ MODULEINST-0 := { (field('TYPES, alloctypes(TYPE-)) ; (field('TAGS, eps) ; (field('GLOBALS, globalsxa(EXTERNADDR-)) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, funcsxa(EXTERNADDR-) map-exp-1407(S2, len(FUNC-), 0)) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }
+      /\ Z := S2 ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST-0)) })
       /\ evalglobals(Z, GLOBALTYPE-4, EXPR-G-) => tuple(Z- seq(VAL-G-))
       /\ evalexprs(Z-, EXPR-T-) => tuple(Z-- seq(REF-T-))
       /\ evalexprss(Z--, EXPR-E--) => tuple(Z--- seq(REF-E--))
@@ -8613,7 +8613,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ INSTR-S- := map-exp-1430(X-5)
       /\ len(INSTR-S-) <= 1 .
 
-  ceq invoke(S2, FUNCADDR, VAL-) = (S2 ; ({ (item('LOCALS, eps) ; item('MODULE, { (item('TYPES, eps) ; (item('TAGS, eps) ; (item('GLOBALS, eps) ; (item('MEMS, eps) ; (item('TABLES, eps) ; (item('FUNCS, eps) ; (item('DATAS, eps) ; (item('ELEMS, eps) ; item('EXPORTS, eps))))))))) })) })) ; (VAL- (REF.FUNC-ADDR(FUNCADDR) CALL-REF(((S2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)))
+  ceq invoke(S2, FUNCADDR, VAL-) = (S2 ; ({ (field('LOCALS, eps) ; field('MODULE, { (field('TYPES, eps) ; (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) })) })) ; (VAL- (REF.FUNC-ADDR(FUNCADDR) CALL-REF(((S2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)))
     if FUNC T-1- -> T-2- := Expand(((S2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)
       /\ iterpr-39(S2, T-1-, VAL-) .
 

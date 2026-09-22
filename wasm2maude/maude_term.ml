@@ -35,6 +35,8 @@ let rec pp fmt = function
       Format.fprintf fmt "{@[%a@]}" pp items
   | App ("_;_", [left; right]) ->
       Format.fprintf fmt "(@[%a@ ;@ %a@])" pp left pp right
+  | App ("_._", [record; field]) ->
+      Format.fprintf fmt "(@[%a@ .@ %a@])" pp record pp field
   | App (f, []) -> Format.pp_print_string fmt f
   | App (f, xs) ->
       Format.fprintf fmt "@[%s(@;<0 2>" f;

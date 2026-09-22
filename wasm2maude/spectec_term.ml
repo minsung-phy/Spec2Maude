@@ -184,7 +184,7 @@ let source_name = function
   | "ref.ref-host-addr" -> "REF.HOST-ADDR"
   | "ref.ref-extern" -> "REF.EXTERN"
   | "hostfunc.sym" -> "..."
-  | "typecheck" | "isOpt" | "seq" | "_?" as name -> name
+  | "typecheck" | "isOpt" | "seq" | "_?" | "_._" as name -> name
   | name when String.starts_with ~prefix:"instances." name -> name
   | name when String.starts_with ~prefix:"syn." name -> remove_syn name
   | name when String.contains name '.' ->
@@ -193,17 +193,17 @@ let source_name = function
 
 let atom name = raw_atom (source_name name)
 
-let item field value = raw_app "item" [raw_atom ("'" ^ field); value]
+let field name value = raw_app "field" [raw_atom ("'" ^ name); value]
 
-let rec items = function
+let rec fields = function
   | [] -> raw_atom "EMPTY"
   | [entry] -> entry
-  | entry :: rest -> raw_app "_;_" [entry; items rest]
+  | entry :: rest -> raw_app "_;_" [entry; fields rest]
 
-let record fields =
-  fields
-  |> List.map (fun (name, value) -> item name value)
-  |> items
+let record named_fields =
+  named_fields
+  |> List.map (fun (name, value) -> field name value)
+  |> fields
   |> fun fields -> raw_app "{_}" [fields]
 
 let app name arguments =

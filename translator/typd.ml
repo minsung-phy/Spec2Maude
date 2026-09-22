@@ -82,23 +82,23 @@ let translate_alias index target quants typ =
       [equation boxed right conditions; direct]
 
 (* StructT *)
-let join_struct_items = function
+let join_struct_fields = function
   | [] -> Const "EMPTY"
-  | item :: items ->
+  | field :: fields ->
       List.fold_left
-        (fun left right -> App ("_;_", [left; right])) item items
+        (fun left right -> App ("_;_", [left; right])) field fields
 
 let translate_struct_field index bound (atom, (typ, quants, prems), _hints) =
   match Term.translate_components index typ with
   | [(value, _, type_conditions)] ->
-      let field = Const ("'" ^ Il.Print.string_of_atom atom) in
-      let item = App ("item", [field; value]) in
+      let field_name = Const ("'" ^ Il.Print.string_of_atom atom) in
+      let field = App ("field", [field_name; value]) in
       let bound = bound @ payload_names typ in
       let conditions =
         type_conditions @ Prem.translate_eq_conditions index ~bound prems
         @ Param.translate_eq_conditions index quants
       in
-      item, conditions
+      field, conditions
   | _ -> invalid_arg "a StructT field must contain exactly one value"
 
 let rec composable index seen typ =
@@ -125,9 +125,9 @@ let translate_struct_composition index target fields =
            Term.translate_composition index typ
              (App ("_._", [left; field])) (App ("_._", [right; field]))
          in
-         App ("item", [field; value]))
-    |> join_struct_items
-    |> fun items -> App ("{_}", [items])
+         App ("field", [field; value]))
+    |> join_struct_fields
+    |> fun fields -> App ("{_}", [fields])
   in
   [equation (App ("recordConcat", [left; right; target])) result []]
 
@@ -135,13 +135,13 @@ let translate_struct index target bound quants fields =
   let translated_fields =
     List.map (translate_struct_field index bound) fields
   in
-  let items = List.map fst translated_fields in
+  let record_fields = List.map fst translated_fields in
   let instance_conditions = Param.translate_eq_conditions index quants in
   let conditions =
     instance_conditions
     @ List.concat_map snd translated_fields
   in
-  let record = App ("{_}", [join_struct_items items]) in
+  let record = App ("{_}", [join_struct_fields record_fields]) in
   let left = App ("typecheck", [record; target]) in
   [equation left (Const "true") conditions]
   @ translate_struct_composition index target fields

@@ -125,7 +125,7 @@ let runtime_terms name =
   let module_ = T.app "spectec-moduleinst" [z] in
   let address =
     T.app (name "findFunc")
-      [T.app "value" [variable "'EXPORTS"; module_];
+      [T.app "_._" [module_; variable "'EXPORTS"];
        variable (name "inputName")]
   in
   let invocation = invoke store address (variable "ARGS") |> render in

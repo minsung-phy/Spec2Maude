@@ -36,18 +36,18 @@ eps, eps, eps,
 EXPORT(((99 108 105 101 110) (116 95 115 116 101 112)), FUNC(0))) .
   eq clientInputName = (99 108 105 101 110)
 (116 95 115 116 101 112) .
-  eq clientEmptyStore = {(item('TAGS, eps) ;
-  (item('GLOBALS, eps) ;
-   (item('MEMS, eps) ;
-    (item('TABLES, eps) ;
-     (item('FUNCS, eps) ;
-      (item('DATAS, eps) ;
-       (item('ELEMS, eps) ;
-        (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps))))))))))} .
+  eq clientEmptyStore = {(field('TAGS, eps) ;
+  (field('GLOBALS, eps) ;
+   (field('MEMS, eps) ;
+    (field('TABLES, eps) ;
+     (field('FUNCS, eps) ;
+      (field('DATAS, eps) ;
+       (field('ELEMS, eps) ;
+        (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps))))))))))} .
 
-  ceq clientFindFunc(EXPORT-PREFIX {(item('NAME, NAME) ; item('ADDR, FUNC(ADDR)))} EXPORTS, NAME) = ADDR
+  ceq clientFindFunc(EXPORT-PREFIX {(field('NAME, NAME) ; field('ADDR, FUNC(ADDR)))} EXPORTS, NAME) = ADDR
     if not clientHasExport(EXPORT-PREFIX, NAME) .
-  eq clientHasExport(EXPORT-PREFIX {(item('NAME, NAME) ; item('ADDR, XA))} EXPORTS, NAME) = true .
+  eq clientHasExport(EXPORT-PREFIX {(field('NAME, NAME) ; field('ADDR, XA))} EXPORTS, NAME) = true .
   eq clientHasExport(EXPORTS, NAME) = false [owise] .
 
   crl [clientInstantiate] : clientCall(ARGS) => clientInit(C, ARGS)
@@ -55,8 +55,7 @@ EXPORT(((99 108 105 101 110) (116 95 115 116 101 112)), FUNC(0))) .
   crl [clientInit-step] : clientInit(C, ARGS) => clientInit(C2, ARGS)
     if Step(C) => C2 .
   crl [clientInvoke] : clientInit(C, ARGS) => clientExec(invoke(spectec-store(Z),
-clientFindFunc(value('EXPORTS, spectec-moduleinst(Z)), clientInputName),
-ARGS))
+clientFindFunc((spectec-moduleinst(Z) . 'EXPORTS), clientInputName), ARGS))
     if (Z ; eps) := C .
   crl [clientStep] : clientExec(C) => clientExec(C2)
     if Step(C) => C2 .

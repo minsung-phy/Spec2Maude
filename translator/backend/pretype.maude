@@ -127,9 +127,8 @@ fmod SPECTEC-PRETYPE is
   eq typecheck(seq(TS), iterList(TYPE)) = typecheck(TS, TYPE) .
   eq typecheck(VALUE, TYPE) = false [owise] .
 
-  --- 리스트 포함 검사
-  --- 리스트에서 같은 값을 패턴 매칭으로 찾음. 정상적인 값에 대해서만 포함 여부를 계산함.
-  op _<-_ : SpectecTerminal SpectecTerminals ~> Bool .
+  --- 리스트 포함 검사 (리스트에서 같은 값을 패턴 매칭으로 찾음)
+  op _<-_ : SpectecTerminal SpectecTerminals -> Bool .
   eq T <- (PREFIX T SUFFIX) = true .
   eq T <- TS = false [owise] .
 
@@ -149,7 +148,7 @@ fmod SPECTEC-PRETYPE is
   op indexDefined : SpectecTerminals Nat -> Bool .
   op _[_] : SpectecTerminals Nat ~> SpectecTerminal [prec 10 gather (E e)] .
 
-  eq indexDefined(TS, N) = N < len(TS) .
+  eq indexDefined(TS, N) = N < len(TS) . --- 주어진 인덱스가 리스트 범위 안에 존재하는가를 검사
   ceq (PREFIX T SUFFIX)[N] = T
     if len(PREFIX) == N .
 
@@ -162,7 +161,7 @@ fmod SPECTEC-PRETYPE is
 
   --- 리스트 원소 갱신
   op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals [prec 10 gather (E e e)] .
-  var NEW-K : [SpectecTerminal] .
+  var NEW-K : SpectecTerminal .
 
   ceq (PREFIX T SUFFIX)[N = NEW-K] = PREFIX NEW-K SUFFIX
     if len(PREFIX) == N .
@@ -176,9 +175,10 @@ fmod SPECTEC-PRETYPE is
 
   --- Option
   op _? : SpectecTerminal -> SpectecTerminal [ctor] .
-  var K : [SpectecTerminal] .
+  var K : SpectecTerminal .
   
-  --- Option 결합: 양쪽 모두 값이 있는 경우는 정의하지 않는다.
+  --- Option 결합: 두 option을 이어 붙이되, 결과가 원소 0개 또는 1개인 경우만 정의
+  --- 양쪽 모두 값이 있으면 결과가 2개가 되므로 정의하지 않음
   op optionConcat : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   eq optionConcat(eps, eps) = eps .
@@ -187,11 +187,14 @@ fmod SPECTEC-PRETYPE is
 
   --- Option 타입 검사
   eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
-  eq typecheck(seq(TS), iterOpt(TYPE)) =
-    typecheck(TS, TYPE) and len(TS) <= 1 .
+  eq typecheck(seq(TS), iterOpt(TYPE)) = typecheck(TS, TYPE) and len(TS) <= 1 .
+      --- SpecTec에 (val?)*처럼 option을 원소로 갖는 리스트가 있음
+      --- translator는 각 내부 option을 seq(eps) 또는 seq(K ?)로 포장함
+      --- 포장하지 않으면 eps가 리스트 결합 연산의 identity이므로 eps K ?가 K ?로 단순화되어 None 원소가 사라지기 때문
+      --- 그 원소의 타입 TYPE?를 Maude에서 iterOpt(TYPE)으로 나타냄
 
-  --- Option을 목록으로 변환
-  op lift : SpectecTerminals -> SpectecTerminals .
+  --- Option을 리스트로 변환 (Option 값을 일반 리스트와 이어 붙여야 하는 경우에 사용)
+  op lift : SpectecTerminals ~> SpectecTerminals .
   eq lift(eps) = eps .
   eq lift(K ?) = K .
 
@@ -205,47 +208,32 @@ fmod SPECTEC-PRETYPE is
   eq tuple(TS) . N = TS[N] .
 
   --- Record
-  sorts Record RecordItem RecordItems .
+  sorts Record RecordField RecordFields .
   subsort Record < SpectecTerminal .
-  subsort RecordItem < RecordItems .
+  subsort RecordField < RecordFields .
 
-  op EMPTY : -> RecordItems [ctor] .
-  op _;_ : RecordItems RecordItems -> RecordItems [ctor assoc id: EMPTY] .
-  op item : Qid SpectecTerminals -> RecordItem [ctor] .
-  op {_} : RecordItems -> Record [ctor] .
-  op value : Qid Record -> SpectecTerminals .
-  op value : Qid RecordItems -> SpectecTerminals .
+  op EMPTY : -> RecordFields [ctor] .
+  op _;_ : RecordFields RecordFields -> RecordFields [ctor assoc id: EMPTY] .
+  op field : Qid SpectecTerminals -> RecordField [ctor] .
+  op {_} : RecordFields -> Record [ctor] .
+  op _._ : Record Qid -> SpectecTerminals . --- 필드 조회 (DotE)
+  op recordConcat : Record Record SpectecType ~> Record . --- 레코드 결합 (CompE) / Record 타입마다 결합 방법이 달라서 eq는 자동 생성됨
+  op _[._=_] : Record Qid SpectecTerminals -> Record . --- 필드 갱신 (UpdE + DotP)
 
-  op _._ : Record Qid -> SpectecTerminals .
-  --- TypD emits field-type-directed CAT-str equations for this operation.
-  op recordConcat : Record Record SpectecType ~> Record .
-  op _[._=_] : Record Qid SpectecTerminals -> Record .
-
-  op setItem : RecordItems Qid SpectecTerminals -> RecordItems .
-  op hasField : RecordItems Qid -> Bool .
+  op hasField : RecordFields Qid -> Bool . --- 첫 일치 필드를 찾기 위한 보조 연산 (IL에는 없음)
 
   var FIELD : Qid .
-  vars ITEMS RECORD-PREFIX RECORD-SUFFIX : RecordItems .
+  vars FIELDS RECORD-PREFIX RECORD-SUFFIX : RecordFields .
   var NEW-VALUE : SpectecTerminals .
-  var RECORD : Record .
 
-  eq value(FIELD, {ITEMS}) = value(FIELD, ITEMS) .
-  eq hasField(RECORD-PREFIX ; item(FIELD, VALUE) ; RECORD-SUFFIX, FIELD) = true .
-  eq hasField(ITEMS, FIELD) = false [owise] .
-  --- Preserve first occurrence selection even for duplicate backend fields.
-  ceq value(FIELD, RECORD-PREFIX ; item(FIELD, VALUE) ; RECORD-SUFFIX) = VALUE
+  eq hasField(RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX, FIELD) = true .
+  eq hasField(FIELDS, FIELD) = false [owise] .
+  ceq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX} . FIELD = VALUE --- 첫 번째 필드만 선택
     if not hasField(RECORD-PREFIX, FIELD) .
-  eq value(FIELD, ITEMS) = eps [owise] .
+  eq {FIELDS} . FIELD = eps [owise] .
 
-  eq {ITEMS} . FIELD = value(FIELD, ITEMS) .
-  eq RECORD . FIELD = value(FIELD, RECORD) [owise] .
-
-  eq {ITEMS}[. FIELD = NEW-VALUE]
-    = {setItem(ITEMS, FIELD, NEW-VALUE)} .
-
-  ceq setItem(RECORD-PREFIX ; item(FIELD, VALUE) ; RECORD-SUFFIX, FIELD, NEW-VALUE)
-    = RECORD-PREFIX ; item(FIELD, NEW-VALUE) ; RECORD-SUFFIX
+  ceq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX}[. FIELD = NEW-VALUE]
+    = {RECORD-PREFIX ; field(FIELD, NEW-VALUE) ; RECORD-SUFFIX}
     if not hasField(RECORD-PREFIX, FIELD) .
-  eq setItem(ITEMS, FIELD, NEW-VALUE)
-    = ITEMS ; item(FIELD, NEW-VALUE) [owise] .
+  eq {FIELDS}[. FIELD = NEW-VALUE] = {FIELDS ; field(FIELD, NEW-VALUE)} [owise] . --- 없으면 레코드 끝에 추가
 endfm

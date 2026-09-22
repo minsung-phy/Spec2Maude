@@ -160,12 +160,12 @@ mod WASM2MAUDE-WAST-RUNTIME is
     if not hasInstance(WSHENVPREFIX, WSHID) .
 
   ceq hasExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = true
-    if WSHNAME = value('NAME, WSHHEAD) .
+    if WSHNAME = (WSHHEAD . 'NAME) .
   eq hasExport(WSHEXPORTS, WSHNAME) = false [owise] .
   ceq findExport(WSHEXPORTPREFIX WSHHEAD WSHEXPORTS, WSHNAME) = WSHXA
-    if WSHNAME = value('NAME, WSHHEAD)
+    if WSHNAME = (WSHHEAD . 'NAME)
        /\ not hasExport(WSHEXPORTPREFIX, WSHNAME)
-       /\ WSHXA := value('ADDR, WSHHEAD) .
+       /\ WSHXA := (WSHHEAD . 'ADDR) .
   eq link.append(link.error, WSHLINK) = link.error .
   eq link.append(link.ok(WSHXA), link.error) = link.error .
   eq link.append(link.ok(WSHXA), link.ok(WSHEXPORTS)) =
@@ -175,12 +175,12 @@ mod WASM2MAUDE-WAST-RUNTIME is
   ceq checkImport(WSHS, MEM(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.ok(MEM(WSHA))
     if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         value('TYPE, value('MEMS, WSHS)[WSHA])
+         ((WSHS . 'MEMS)[WSHA] . 'TYPE)
        /\ WSHMIN >= WSHREQUIRED = true .
   ceq checkImport(WSHS, MEM(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.error
     if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         value('TYPE, value('MEMS, WSHS)[WSHA])
+         ((WSHS . 'MEMS)[WSHA] . 'TYPE)
        /\ WSHMIN < WSHREQUIRED = true .
   eq checkImport(WSHS, TAG(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.error .
@@ -194,12 +194,12 @@ mod WASM2MAUDE-WAST-RUNTIME is
   ceq checkImport(WSHS, TABLE(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.ok(TABLE(WSHA))
     if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
-         value('TYPE, value('TABLES, WSHS)[WSHA])
+         ((WSHS . 'TABLES)[WSHA] . 'TYPE)
        /\ WSHMIN >= WSHREQUIRED = true .
   ceq checkImport(WSHS, TABLE(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.error
     if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
-         value('TYPE, value('TABLES, WSHS)[WSHA])
+         ((WSHS . 'TABLES)[WSHA] . 'TYPE)
        /\ WSHMIN < WSHREQUIRED = true .
   eq checkImport(WSHS, TAG(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.error .
@@ -214,8 +214,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
   eq linkImports(WSHS, WSHENV, imports.cons(
     import.ref(WSHTARGET, WSHNAME, WSHREQUIREMENT), WSHIMPORTS2)) =
       link.append(
-        checkImport(WSHS, findExport(value('EXPORTS,
-          findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHREQUIREMENT),
+        checkImport(WSHS, findExport((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHREQUIREMENT),
         linkImports(WSHS, WSHENV, WSHIMPORTS2)) .
 
   ceq findFunc(WSHEXPORTS, WSHNAME) = WSHADDR
@@ -365,9 +364,9 @@ mod WASM2MAUDE-WAST-RUNTIME is
     if WSHA <- hostFunctionAddresses = true
        /\ typecheck(WSHARGS, val) = true
        /\ typecheck(WSHARGS, instr) = true
-       /\ WSHXA := value('FUNCS, WSHS)[WSHA]
-       /\ value('CODE, WSHXA) = ...
-       /\ FUNC WSHTYPES -> eps := Expand(value('TYPE, WSHXA))
+       /\ WSHXA := (WSHS . 'FUNCS)[WSHA]
+       /\ (WSHXA . 'CODE) = ...
+       /\ FUNC WSHTYPES -> eps := Expand((WSHXA . 'TYPE))
        /\ len(WSHARGS) = len(WSHTYPES)
        /\ hostArguments(WSHARGS, WSHTYPES) = true .
   eq hostCallable(WSHS, WSHA, WSHARGS) = false [owise] .
@@ -398,7 +397,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
     if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
   rl [module-done] :
     script.module(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHMI)) }) ; eps)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; eps)
     => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .
 
   crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, WSHC)
@@ -433,16 +432,16 @@ mod WASM2MAUDE-WAST-RUNTIME is
        /\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .
   rl [assert-uninstantiable-trap] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP)
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [assert-uninstantiable-exception] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
         (REF.EXN-ADDR(WSHA) THROW-REF))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [assert-uninstantiable-normal] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; eps)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; eps)
     => script.wrong-assertion(WSHID) .
   crl [assert-uninstantiable-step] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHC)
@@ -454,15 +453,13 @@ mod WASM2MAUDE-WAST-RUNTIME is
       command.return(WSHID, action.invoke(WSHTARGET, WSHNAME, WSHARGS),
         WSHEXPECTED), WSHCMDS))
     => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      invoke(WSHS, findFunc(value('EXPORTS,
-        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+      invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS)) .
   crl [get-return] :
     script.ready(WSHS, WSHENV, commands.cons(command.return(WSHID,
       action.get(WSHTARGET, WSHNAME), WSHEXPECTED), WSHCMDS))
     => script.ready(WSHS, WSHENV, WSHCMDS)
-    if WSHA := findGlobal(value('EXPORTS,
-         findInstance(WSHENV, WSHTARGET)), WSHNAME)
-       /\ WSHACTUAL := value('VALUE, value('GLOBALS, WSHS)[WSHA])
+    if WSHA := findGlobal((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME)
+       /\ WSHACTUAL := ((WSHS . 'GLOBALS)[WSHA] . 'VALUE)
        /\ typecheck(WSHACTUAL, val)
        /\ typecheck(WSHACTUAL, instr)
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .
@@ -470,21 +467,20 @@ mod WASM2MAUDE-WAST-RUNTIME is
     script.ready(WSHS, WSHENV, commands.cons(command.return(WSHID,
       action.get(WSHTARGET, WSHNAME), WSHEXPECTED), WSHCMDS))
     => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)
-    if WSHA := findGlobal(value('EXPORTS,
-         findInstance(WSHENV, WSHTARGET)), WSHNAME)
-       /\ WSHACTUAL := value('VALUE, value('GLOBALS, WSHS)[WSHA])
+    if WSHA := findGlobal((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME)
+       /\ WSHACTUAL := ((WSHS . 'GLOBALS)[WSHA] . 'VALUE)
        /\ typecheck(WSHACTUAL, val)
        /\ typecheck(WSHACTUAL, instr)
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
   crl [return-done] :
     script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if runtimeResults(WSHACTUAL) = true
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .
   crl [return-wrong-result] :
     script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
     => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)
     if runtimeResults(WSHACTUAL) = true
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
@@ -497,11 +493,10 @@ mod WASM2MAUDE-WAST-RUNTIME is
     script.ready(WSHS, WSHENV, commands.cons(command.trap(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.trap(WSHID, WSHENV, WSHCMDS,
-      invoke(WSHS, findFunc(value('EXPORTS,
-        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+      invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS)) .
   rl [trap-done] :
     script.trap(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP)
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   crl [trap-step] : script.trap(WSHID, WSHENV, WSHCMDS, WSHC)
     => script.trap(WSHID, WSHENV, WSHCMDS, WSHC2)
@@ -511,20 +506,19 @@ mod WASM2MAUDE-WAST-RUNTIME is
     script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.exception(WSHID, WSHENV, WSHCMDS,
-      invoke(WSHS, findFunc(value('EXPORTS,
-        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+      invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS)) .
   rl [exception-done] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
         (REF.EXN-ADDR(WSHA) THROW-REF))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [exception-trap] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP)
     => script.wrong-assertion(WSHID) .
   crl [exception-normal] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
   crl [exception-step] : script.exception(WSHID, WSHENV, WSHCMDS, WSHC)
@@ -535,11 +529,10 @@ mod WASM2MAUDE-WAST-RUNTIME is
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.action(WSHID, WSHENV, WSHCMDS,
-      invoke(WSHS, findFunc(value('EXPORTS,
-        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+      invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS)) .
   crl [action-done] :
     script.action(WSHID, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if runtimeResults(WSHACTUAL) = true .
   crl [action-step] : script.action(WSHID, WSHENV, WSHCMDS, WSHC)
@@ -549,9 +542,8 @@ mod WASM2MAUDE-WAST-RUNTIME is
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
       action.get(WSHTARGET, WSHNAME)), WSHCMDS))
     => script.ready(WSHS, WSHENV, WSHCMDS)
-    if WSHA := findGlobal(value('EXPORTS,
-         findInstance(WSHENV, WSHTARGET)), WSHNAME)
-       /\ WSHACTUAL := value('VALUE, value('GLOBALS, WSHS)[WSHA])
+    if WSHA := findGlobal((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME)
+       /\ WSHACTUAL := ((WSHS . 'GLOBALS)[WSHA] . 'VALUE)
        /\ typecheck(WSHACTUAL, val)
        /\ typecheck(WSHACTUAL, instr) .
 
@@ -559,29 +551,28 @@ mod WASM2MAUDE-WAST-RUNTIME is
     script.ready(WSHS, WSHENV, commands.cons(command.exhaustion(WSHID,
       WSHREQUIRED, action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      invoke(WSHS, findFunc(value('EXPORTS,
-        findInstance(WSHENV, WSHTARGET)), WSHNAME), WSHARGS)) .
+      invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS)) .
   rl [exhaustion-trap] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; TRAP)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP)
     => script.wrong-assertion(WSHID) .
   rl [exhaustion-exception] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ;
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
         (REF.EXN-ADDR(WSHA) THROW-REF))
     => script.wrong-assertion(WSHID) .
   crl [exhaustion-normal] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL)
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
   crl [exhaustion-step] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      (WSHS ; { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHBODY)
+      (WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHBODY)
     => script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
       WSHS2, (WSHS2 ; WSHF2) ; WSHINSTRS)
     if Step((WSHS ;
-         { (item('LOCALS, WSHLOCALS) ; item('MODULE, WSHCURRENT)) }) ; WSHBODY)
+         { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHBODY)
          => (WSHS2 ; WSHF2) ; WSHINSTRS .
   crl [exhaustion-done] :
     script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,

@@ -26,18 +26,18 @@ spectec-FUNC-2(0, eps, (LOCAL.GET(0) CONST(I32, 1) BINOP(I32, ADD))), eps,
 eps, eps, EXPORT(((115 101 114 118 101) (114 95 115 116 101 112)), FUNC(0))) .
   eq serverInputName = (115 101 114 118 101)
 (114 95 115 116 101 112) .
-  eq serverEmptyStore = {(item('TAGS, eps) ;
-  (item('GLOBALS, eps) ;
-   (item('MEMS, eps) ;
-    (item('TABLES, eps) ;
-     (item('FUNCS, eps) ;
-      (item('DATAS, eps) ;
-       (item('ELEMS, eps) ;
-        (item('STRUCTS, eps) ; (item('ARRAYS, eps) ; item('EXNS, eps))))))))))} .
+  eq serverEmptyStore = {(field('TAGS, eps) ;
+  (field('GLOBALS, eps) ;
+   (field('MEMS, eps) ;
+    (field('TABLES, eps) ;
+     (field('FUNCS, eps) ;
+      (field('DATAS, eps) ;
+       (field('ELEMS, eps) ;
+        (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps))))))))))} .
 
-  ceq serverFindFunc(EXPORT-PREFIX {(item('NAME, NAME) ; item('ADDR, FUNC(ADDR)))} EXPORTS, NAME) = ADDR
+  ceq serverFindFunc(EXPORT-PREFIX {(field('NAME, NAME) ; field('ADDR, FUNC(ADDR)))} EXPORTS, NAME) = ADDR
     if not serverHasExport(EXPORT-PREFIX, NAME) .
-  eq serverHasExport(EXPORT-PREFIX {(item('NAME, NAME) ; item('ADDR, XA))} EXPORTS, NAME) = true .
+  eq serverHasExport(EXPORT-PREFIX {(field('NAME, NAME) ; field('ADDR, XA))} EXPORTS, NAME) = true .
   eq serverHasExport(EXPORTS, NAME) = false [owise] .
 
   crl [serverInstantiate] : serverCall(ARGS) => serverInit(C, ARGS)
@@ -45,8 +45,7 @@ eps, eps, EXPORT(((115 101 114 118 101) (114 95 115 116 101 112)), FUNC(0))) .
   crl [serverInit-step] : serverInit(C, ARGS) => serverInit(C2, ARGS)
     if Step(C) => C2 .
   crl [serverInvoke] : serverInit(C, ARGS) => serverExec(invoke(spectec-store(Z),
-serverFindFunc(value('EXPORTS, spectec-moduleinst(Z)), serverInputName),
-ARGS))
+serverFindFunc((spectec-moduleinst(Z) . 'EXPORTS), serverInputName), ARGS))
     if (Z ; eps) := C .
   crl [serverStep] : serverExec(C) => serverExec(C2)
     if Step(C) => C2 .
