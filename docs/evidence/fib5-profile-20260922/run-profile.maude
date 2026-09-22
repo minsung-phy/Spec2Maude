@@ -1,0 +1,26 @@
+load ../../../translator/backend/semantics.maude
+load ../../../wasm2maude/modelcheck-runtime.maude
+
+mod WASM2MAUDE-MODELCHECK is
+  including WASM2MAUDE-MODELCHECK-RUNTIME .
+  var RESULT : ValList .
+
+  eq inputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I64, I64)))), eps, eps, eps,
+eps, eps,
+spectec-FUNC-2(0, eps,
+(LOCAL.GET(0) CONST(I64, 1) RELOP(I64, LE(U))
+ IF__ELSE_(-RESULT(_?(I64)), CONST(I64, 1),
+ ((LOCAL.GET(0) CONST(I64, 2) BINOP(I64, spectec-SUB) CALL(0))
+  (LOCAL.GET(0) CONST(I64, 1) BINOP(I64, spectec-SUB) CALL(0) BINOP(I64, ADD)))))),
+eps, eps, eps, EXPORT((102 105 98), FUNC(0))) .
+  eq inputName = 102 105 98 .
+  eq inputArgs = CONST(I64, 5) .
+  eq expected = CONST(I64, 8) .
+  eq rejected = CONST(I64, 6) .
+endm
+
+set profile on .
+set show breakdown on .
+rew [1000000] in WASM2MAUDE-MODELCHECK : boot .
+show profile .
+quit

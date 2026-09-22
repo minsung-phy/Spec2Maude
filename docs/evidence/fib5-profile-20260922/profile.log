@@ -1,0 +1,878 @@
+==========================================
+search [1, 1000000] in WASM2MAUDE-MODELCHECK : boot =>* finished(CONST(I64, 6)) .
+
+No solution.
+states: 174  rewrites: 17100 in 29ms cpu (30ms real) (580113 rewrites/second)
+mb applications: 0  equational rewrites: 14010  rule rewrites: 3090  variant narrowing steps: 0  narrowing steps: 0
+op _+_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 518 (3.02924%)
+
+op _rem_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 42 (0.245614%)
+
+op _^_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 127 (0.74269%)
+
+op _<_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 2 (0.0116959%)
+
+op _<=_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 286 (1.67251%)
+
+op _>=_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 198 (1.15789%)
+
+op _-_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 113 (0.660819%)
+
+op _==_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 259 (1.51462%)
+
+op _=/=_ : [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] -> [SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+built-in eq rewrites: 2531 (14.8012%)
+
+eq inputModule = MODULE(TYPE(REC(SUB(FINAL ?, eps, FUNC I64 -> I64))), eps, eps, eps, eps, eps, spectec-FUNC-2(0, eps, LOCAL.GET(0) CONST(I64, 1) RELOP(I64, LE(U)) (IF -RESULT(I64 ?) CONST(I64, 1) ELSE (LOCAL.GET(0) CONST(I64, 2) BINOP(I64, spectec-SUB) CALL(0)) LOCAL.GET(0) CONST(I64, 1) BINOP(I64, spectec-SUB) CALL(0) BINOP(I64, ADD))), eps, eps, eps, EXPORT(102 105 98, FUNC(0))) .
+rewrites: 1 (0.00584795%)
+
+eq inputName = 102 105 98 .
+rewrites: 1 (0.00584795%)
+
+eq inputArgs = CONST(I64, 5) .
+rewrites: 1 (0.00584795%)
+
+eq true and A:Bool = A:Bool .
+rewrites: 85 (0.497076%)
+
+eq false xor A:Bool = A:Bool .
+rewrites: 304 (1.77778%)
+
+eq not A:Bool = true xor A:Bool .
+rewrites: 304 (1.77778%)
+
+eq instrSize(L:InstrList) = instrSizeAux(L:InstrList, 0) .
+rewrites: 124 (0.725146%)
+
+eq instrSizeAux(eps, C:Nat) = C:Nat .
+rewrites: 124 (0.725146%)
+
+eq instrSizeAux(E:instr L:InstrList, C:Nat) = instrSizeAux(L:InstrList, C:Nat + 1) .
+rewrites: 87 (0.508772%)
+
+eq typecheck(N:Nat, nat) = true .
+rewrites: 170 (0.994152%)
+
+eq CV_N:Nat : nat <:> int = CV_N:Nat .
+rewrites: 254 (1.48538%)
+
+ceq CV_I:Int : int <:> nat = CV_I:Int if CV_I:Int >= 0 = true .
+lhs matches: 113	rewrites: 113 (0.660819%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		113		0		113		0
+
+eq unseq(seq(TS:SpectecTerminals)) = TS:SpectecTerminals .
+rewrites: 29 (0.169591%)
+
+eq len(TS:SpectecTerminals) = lenAux(TS:SpectecTerminals, 0) .
+rewrites: 637 (3.72515%)
+
+eq lenAux(eps, N:Nat) = N:Nat .
+rewrites: 637 (3.72515%)
+
+eq lenAux(T:SpectecTerminal TS:SpectecTerminals, N:Nat) = lenAux(TS:SpectecTerminals, N:Nat + 1) .
+rewrites: 384 (2.24561%)
+
+eq TS:SpectecTerminals ++ WTS:SpectecTerminals = TS:SpectecTerminals WTS:SpectecTerminals .
+rewrites: 5 (0.0292398%)
+
+eq repeatSeq(0, WTS:SpectecTerminals) = eps .
+rewrites: 1 (0.00584795%)
+
+eq repeatSeq(1, WTS:SpectecTerminals) = WTS:SpectecTerminals .
+rewrites: 1 (0.00584795%)
+
+eq indexDefined(TS:SpectecTerminals, N:Nat) = N:Nat < len(TS:SpectecTerminals) .
+rewrites: 2 (0.0116959%)
+
+ceq (PREFIX:SpectecTerminals T:SpectecTerminal SUFFIX:SpectecTerminals)[N:Nat] = T:SpectecTerminal if len(PREFIX:SpectecTerminals) == N:Nat = true .
+lhs matches: 223	rewrites: 223 (1.30409%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		223		0		223		0
+
+eq lift(K:[SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] ?) = K:[SpectecTerminals,Step-pure-Request,Step-read-Request,FindResult,spectec-vcvtop---Request,spectec-vextternop---Request,Step-Request,Steps-Request,Eval-expr-Request,evalexprs-Config,evalexprss-Config,evalglobals-Config,instantiate-Config,ModelCheckResult] .
+rewrites: 15 (0.0877193%)
+
+eq value(FIELD:Qid, {ITEMS:RecordItems}) = value(FIELD:Qid, ITEMS:RecordItems) .
+rewrites: 1 (0.00584795%)
+
+eq hasField(ITEMS:RecordItems, FIELD:Qid) = false [owise] .
+rewrites: 303 (1.77193%)
+
+ceq value(FIELD:Qid, RECORD-PREFIX:RecordItems ; item(FIELD:Qid, VALUE:SpectecTerminals) ; RECORD-SUFFIX:RecordItems) = VALUE:SpectecTerminals if not hasField(RECORD-PREFIX:RecordItems, FIELD:Qid) = true .
+lhs matches: 303	rewrites: 303 (1.77193%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		303		0		303		0
+
+eq {ITEMS:RecordItems} . FIELD:Qid = value(FIELD:Qid, ITEMS:RecordItems) .
+rewrites: 302 (1.76608%)
+
+eq instrLift(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq (Z-:SpectecTerminal ; INSTR--:InstrList) ~> hole(PREFIX:ValList, POSTFIX:InstrList) = Z-:SpectecTerminal ; PREFIX:ValList INSTR--:InstrList POSTFIX:InstrList .
+rewrites: 437 (2.55556%)
+
+eq INSTR--:InstrList ~> hole-Step-pure-1(Z:SpectecTerminal) = Z:SpectecTerminal ; INSTR--:InstrList .
+rewrites: 96 (0.561404%)
+
+eq INSTR--:InstrList ~> hole-Step-read-1(Z:SpectecTerminal) = Z:SpectecTerminal ; INSTR--:InstrList .
+rewrites: 73 (0.426901%)
+
+eq (Z-:SpectecTerminal ; INSTR--:InstrList) ~> hole-Step-ctxt-label-1(INSTR-0-:InstrList, N3:Nat) = Z-:SpectecTerminal ; LABEL- N3:Nat{INSTR-0-:InstrList}INSTR--:InstrList .
+rewrites: 903 (5.2807%)
+
+eq ((S-:SpectecTerminal ; F--:SpectecTerminal) ; INSTR--:InstrList) ~> hole-Step-ctxt-frame-1(N3:Nat, F:SpectecTerminal) = (S-:SpectecTerminal ; F:SpectecTerminal) ; FRAME- N3:Nat{F--:SpectecTerminal}INSTR--:InstrList .
+rewrites: 504 (2.94737%)
+
+eq typecheck(VALUE:Nat, N) = typecheck(VALUE:Nat, nat) .
+rewrites: 170 (0.994152%)
+
+eq concat-(X:SpectecType, eps) = eps .
+rewrites: 2 (0.0116959%)
+
+ceq typecheck(I:Nat, uN(N2:Nat)) = true if I:Nat <= ((2 ^ N2:Nat : nat <:> int) - (1 : nat <:> int) : int <:> nat) and I:Nat >= 0 = true /\ typecheck(N2:Nat, N) = true .
+lhs matches: 85	rewrites: 85 (0.497076%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		85		0		85		0
+2		85		0		85		0
+
+ceq typecheck(VALUE:Nat, iN(N2:Nat)) = typecheck(VALUE:Nat, uN(N2:Nat)) if typecheck(N2:Nat, N) = true .
+lhs matches: 85	rewrites: 85 (0.497076%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		85		0		85		0
+
+eq typecheck(I64, addrtype) = true .
+rewrites: 269 (1.5731%)
+
+eq typecheck(I64, numtype) = true .
+rewrites: 176 (1.02924%)
+
+eq typecheck(VALUE3:SpectecTerminal, Inn) = typecheck(VALUE3:SpectecTerminal, addrtype) .
+rewrites: 127 (0.74269%)
+
+eq size(I64) = 64 .
+rewrites: 142 (0.830409%)
+
+eq sizenn(NT:SpectecTerminal) = size(NT:SpectecTerminal) .
+rewrites: 142 (0.830409%)
+
+eq tagsxt(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq globalsxt(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq memsxt(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq tablesxt(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq funcsxt(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq minus-recs(eps, eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 3 (0.0175439%)
+
+eq subst-numtype(NT:SpectecTerminal, TV-3:SpectecTerminals, TU-3:SpectecTerminals) = NT:SpectecTerminal .
+rewrites: 174 (1.01754%)
+
+ceq subst-valtype(NT:SpectecTerminal, TV-3:SpectecTerminals, TU-3:SpectecTerminals) = subst-numtype(NT:SpectecTerminal, TV-3:SpectecTerminals, TU-3:SpectecTerminals) if typecheck(NT:SpectecTerminal, numtype) = true .
+lhs matches: 174	rewrites: 174 (1.01754%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		174		0		174		0
+
+eq subst-comptype(FUNC T-1-:SpectecTerminals -> T-2-:SpectecTerminals, TV-3:SpectecTerminals, TU-3:SpectecTerminals) = FUNC map-subst-valtype(TV-3:SpectecTerminals, TU-3:SpectecTerminals, T-1-:SpectecTerminals) -> map-subst-valtype-2(TV-3:SpectecTerminals, TU-3:SpectecTerminals, T-2-:SpectecTerminals) .
+rewrites: 87 (0.508772%)
+
+ceq subst-subtype(SUB(FINAL-:SpectecTerminals, TU--:SpectecTerminals, CT:SpectecTerminal), TV-3:SpectecTerminals, TU-3:SpectecTerminals) = SUB(FINAL-:SpectecTerminals, map-subst-typeuse(TV-3:SpectecTerminals, TU-3:SpectecTerminals, TU--:SpectecTerminals), subst-comptype(CT:SpectecTerminal, TV-3:SpectecTerminals, TU-3:SpectecTerminals)) if len(FINAL-:SpectecTerminals) <= 1 = true .
+lhs matches: 87	rewrites: 87 (0.508772%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		87		0		87		0
+
+ceq subst-rectype(REC(ST-:SpectecTerminals), TV-3:SpectecTerminals, TU-3:SpectecTerminals) = REC(map-subst-subtype(TV--:SpectecTerminals, TU--:SpectecTerminals, ST-:SpectecTerminals)) if tuple(seq(TV--:SpectecTerminals) seq(TU--:SpectecTerminals)) := minus-recs(TV-3:SpectecTerminals, TU-3:SpectecTerminals) .
+lhs matches: 3	rewrites: 3 (0.0175439%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3		0		3		0
+
+eq subst-deftype(-DEF(QT:SpectecTerminal, I:Nat), TV-3:SpectecTerminals, TU-3:SpectecTerminals) = -DEF(subst-rectype(QT:SpectecTerminal, TV-3:SpectecTerminals, TU-3:SpectecTerminals), I:Nat) .
+rewrites: 3 (0.0175439%)
+
+ceq subst-all-deftype(DT:SpectecTerminal, TU-3:SpectecTerminals) = subst-deftype(DT:SpectecTerminal, map-exp-272(N3:Nat, 0), TU-3:SpectecTerminals) if N3:Nat := len(TU-3:SpectecTerminals) .
+lhs matches: 3	rewrites: 3 (0.0175439%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3		0		3		0
+
+eq subst-all-deftypes(eps, TU-3:SpectecTerminals) = eps .
+rewrites: 3 (0.0175439%)
+
+eq subst-all-deftypes(DT-1:SpectecTerminal DT-:SpectecTerminals, TU-3:SpectecTerminals) = subst-all-deftype(DT-1:SpectecTerminal, TU-3:SpectecTerminals) subst-all-deftypes(DT-:SpectecTerminals, TU-3:SpectecTerminals) .
+rewrites: 3 (0.0175439%)
+
+ceq rollrt(X4:Nat, RECTYPE:SpectecTerminal) = REC(map-subst-subtype-2(X4:Nat, N3:Nat, N3:Nat, SUBTYPE-:SpectecTerminals)) if REC(SUBTYPE-:SpectecTerminals) := RECTYPE:SpectecTerminal /\ N3:Nat := len(SUBTYPE-:SpectecTerminals) .
+lhs matches: 3	rewrites: 3 (0.0175439%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3		0		3		0
+2		3		0		3		0
+
+ceq unrollrt(RECTYPE:SpectecTerminal) = REC(map-subst-subtype-3(N3:Nat, RECTYPE:SpectecTerminal, N3:Nat, SUBTYPE-:SpectecTerminals)) if REC(SUBTYPE-:SpectecTerminals) := RECTYPE:SpectecTerminal /\ N3:Nat := len(SUBTYPE-:SpectecTerminals) .
+lhs matches: 81	rewrites: 81 (0.473684%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		81		0		81		0
+2		81		0		81		0
+
+ceq rolldt(X4:Nat, RECTYPE:SpectecTerminal) = map-exp-304(N3:Nat, SUBTYPE-:SpectecTerminals, N3:Nat, 0) if REC(SUBTYPE-:SpectecTerminals) := rollrt(X4:Nat, RECTYPE:SpectecTerminal) /\ N3:Nat := len(SUBTYPE-:SpectecTerminals) .
+lhs matches: 3	rewrites: 3 (0.0175439%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3		0		3		0
+2		3		0		3		0
+
+ceq unrolldt(-DEF(RECTYPE:SpectecTerminal, I:Nat)) = SUBTYPE-:SpectecTerminals[I:Nat] if REC(SUBTYPE-:SpectecTerminals) := unrollrt(RECTYPE:SpectecTerminal) .
+lhs matches: 81	rewrites: 81 (0.473684%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		81		0		81		0
+
+ceq typecheck(VALUE:Nat, num-(INN:SpectecTerminal)) = typecheck(VALUE:Nat, iN(sizenn(INN:SpectecTerminal))) if typecheck(INN:SpectecTerminal, addrtype) = true /\ typecheck(INN:SpectecTerminal, Inn) = true .
+lhs matches: 85	rewrites: 85 (0.497076%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		85		0		85		0
+2		85		0		85		0
+
+ceq Expand(DEFTYPE:SpectecTerminal) = COMPTYPE:SpectecTerminal if SUB(FINAL-:SpectecTerminals, TYPEUSE-:SpectecTerminals, COMPTYPE:SpectecTerminal) := unrolldt(DEFTYPE:SpectecTerminal) /\ len(FINAL-:SpectecTerminals) <= 1 = true .
+lhs matches: 81	rewrites: 81 (0.473684%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		81		0		81		0
+2		81		0		81		0
+
+eq spectec-bool(false) = 0 .
+rewrites: 7 (0.0409357%)
+
+eq spectec-bool(true) = 1 .
+rewrites: 8 (0.0467836%)
+
+eq iadd-(N2:Nat, I-1:Nat, I-2:Nat) = (I-1:Nat + I-2:Nat) rem 2 ^ N2:Nat .
+rewrites: 14 (0.0818713%)
+
+eq isub-(N2:Nat, I-1:Nat, I-2:Nat) = ((I-1:Nat + 2 ^ N2:Nat : nat <:> int) - (I-2:Nat : nat <:> int)) rem (2 ^ N2:Nat : nat <:> int) : int <:> nat .
+rewrites: 28 (0.163743%)
+
+eq ile-(N2:Nat, U, I-1:Nat, I-2:Nat) = spectec-bool(I-1:Nat <= I-2:Nat) .
+rewrites: 15 (0.0877193%)
+
+ceq spectec-binop-(INN:SpectecTerminal, ADD, I-1:Nat, I-2:Nat) = iadd-(sizenn(INN:SpectecTerminal), I-1:Nat, I-2:Nat) if typecheck(INN:SpectecTerminal, addrtype) = true /\ typecheck(INN:SpectecTerminal, Inn) = true /\ typecheck(I-1:Nat, num-(INN:SpectecTerminal)) = true /\ typecheck(I-2:Nat, num-(INN:SpectecTerminal)) = true .
+lhs matches: 14	rewrites: 14 (0.0818713%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		14		0		14		0
+2		14		0		14		0
+3		14		0		14		0
+4		14		0		14		0
+
+ceq spectec-binop-(INN:SpectecTerminal, spectec-SUB, I-1:Nat, I-2:Nat) = isub-(sizenn(INN:SpectecTerminal), I-1:Nat, I-2:Nat) if typecheck(INN:SpectecTerminal, addrtype) = true /\ typecheck(INN:SpectecTerminal, Inn) = true /\ typecheck(I-1:Nat, num-(INN:SpectecTerminal)) = true /\ typecheck(I-2:Nat, num-(INN:SpectecTerminal)) = true .
+lhs matches: 28	rewrites: 28 (0.163743%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		28		0		28		0
+2		28		0		28		0
+3		28		0		28		0
+4		28		0		28		0
+
+ceq spectec-relop-(INN:SpectecTerminal, LE(SX:SpectecTerminal), I-1:Nat, I-2:Nat) = ile-(sizenn(INN:SpectecTerminal), SX:SpectecTerminal, I-1:Nat, I-2:Nat) if typecheck(INN:SpectecTerminal, addrtype) = true .
+lhs matches: 15	rewrites: 15 (0.0877193%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		0		15		0
+
+ceq typecheck(CONST(NUMTYPE:SpectecTerminal, VALUE22:SpectecTerminal), num) = true if typecheck(NUMTYPE:SpectecTerminal, numtype) = true /\ typecheck(VALUE22:SpectecTerminal, num-(NUMTYPE:SpectecTerminal)) = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+eq recordConcat(LEFT:Record, RIGHT:Record, store) = {((((((((item('TAGS, (LEFT:Record . 'TAGS) (RIGHT:Record . 'TAGS)) ; item('GLOBALS, (LEFT:Record . 'GLOBALS) (RIGHT:Record . 'GLOBALS))) ; item('MEMS, (LEFT:Record . 'MEMS) (RIGHT:Record . 'MEMS))) ; item('TABLES, (LEFT:Record . 'TABLES) (RIGHT:Record . 'TABLES))) ; item('FUNCS, (LEFT:Record . 'FUNCS) (RIGHT:Record . 'FUNCS))) ; item('DATAS, (LEFT:Record . 'DATAS) (RIGHT:Record . 'DATAS))) ; item('ELEMS, (LEFT:Record . 'ELEMS) (RIGHT:Record . 'ELEMS))) ; item('STRUCTS, (LEFT:Record . 'STRUCTS) (RIGHT:Record . 'STRUCTS))) ; item('ARRAYS, (LEFT:Record . 'ARRAYS) (RIGHT:Record . 'ARRAYS))) ; item('EXNS, (LEFT:Record . 'EXNS) (RIGHT:Record . 'EXNS))} .
+rewrites: 1 (0.00584795%)
+
+eq tagsxa(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq globalsxa(eps) = eps .
+rewrites: 2 (0.0116959%)
+
+eq memsxa(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq tablesxa(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq funcsxa(eps) = eps .
+rewrites: 2 (0.0116959%)
+
+eq spectec-store(S2:SpectecTerminal ; F:SpectecTerminal) = S2:SpectecTerminal .
+rewrites: 1 (0.00584795%)
+
+eq spectec-frame(S2:SpectecTerminal ; F:SpectecTerminal) = F:SpectecTerminal .
+rewrites: 29 (0.169591%)
+
+eq spectec-moduleinst(S2:SpectecTerminal ; F:SpectecTerminal) = F:SpectecTerminal . 'MODULE .
+rewrites: 15 (0.0877193%)
+
+eq spectec-funcinst(S2:SpectecTerminal ; F:SpectecTerminal) = S2:SpectecTerminal . 'FUNCS .
+rewrites: 94 (0.549708%)
+
+eq fof(Z:SpectecTerminal) = spectec-frame(Z:SpectecTerminal) .
+rewrites: 29 (0.169591%)
+
+eq spectec-local(Z:SpectecTerminal, X4:Nat) = unseq((fof(Z:SpectecTerminal) . 'LOCALS)[X4:Nat]) .
+rewrites: 29 (0.169591%)
+
+eq Num-ok(S2:SpectecTerminal, CONST(NT:SpectecTerminal, C2:SpectecTerminal), NT:SpectecTerminal) = true .
+rewrites: 1 (0.00584795%)
+
+ceq Val-ok(S2:SpectecTerminal, NUM:val, NT:SpectecTerminal) = true if typecheck(NUM:val, num) = true /\ typecheck(NT:SpectecTerminal, numtype) = true /\ Num-ok(S2:SpectecTerminal, NUM:val, NT:SpectecTerminal) = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+
+ceq blocktype-(Z:SpectecTerminal, -RESULT(T-5:SpectecTerminals)) = eps ->- eps lift(T-5:SpectecTerminals) if len(T-5:SpectecTerminals) <= 1 = true .
+lhs matches: 15	rewrites: 15 (0.0877193%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		0		15		0
+
+eq alloctypes(eps) = eps .
+rewrites: 3 (0.0175439%)
+
+ceq alloctypes(TYPE--:SpectecTerminals TYPE2:SpectecTerminal) = DEFTYPE--:SpectecTerminals DEFTYPE-:SpectecTerminals if DEFTYPE--:SpectecTerminals := alloctypes(TYPE--:SpectecTerminals) /\ TYPE(RECTYPE:SpectecTerminal) := TYPE2:SpectecTerminal /\ X4:Nat := len(DEFTYPE--:SpectecTerminals) /\ DEFTYPE-:SpectecTerminals := subst-all-deftypes(rolldt(X4:Nat, RECTYPE:SpectecTerminal), DEFTYPE--:SpectecTerminals) .
+lhs matches: 3	rewrites: 3 (0.0175439%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		3		0		3		0
+2		3		0		3		0
+3		3		0		3		0
+4		3		0		3		0
+
+eq alloctags(S2:SpectecTerminal, eps) = tuple(S2:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq allocglobals(S2:SpectecTerminal, eps, eps) = tuple(S2:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq allocmems(S2:SpectecTerminal, eps) = tuple(S2:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq alloctables(S2:SpectecTerminal, eps, eps) = tuple(S2:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+ceq allocfunc(S2:SpectecTerminal, DEFTYPE:SpectecTerminal, FUNCCODE:SpectecTerminal, MODULEINST:SpectecTerminal) = tuple(recordConcat(S2:SpectecTerminal, {item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, FUNCINST:SpectecTerminal) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('STRUCTS, eps) ; item('ARRAYS, eps) ; item('EXNS, eps)}, store) len(S2:SpectecTerminal . 'FUNCS)) if FUNCINST:SpectecTerminal := {item('TYPE, DEFTYPE:SpectecTerminal) ; item('MODULE, MODULEINST:SpectecTerminal) ; item('CODE, FUNCCODE:SpectecTerminal)} .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq allocfuncs(S2:SpectecTerminal, eps, eps, eps) = tuple(S2:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+ceq allocfuncs(S2:SpectecTerminal, DT:SpectecTerminal DT--:SpectecTerminals, FUNCCODE:SpectecTerminal FUNCCODE--:SpectecTerminals, MODULEINST:SpectecTerminal MODULEINST--:SpectecTerminals) = tuple(S-2:SpectecTerminal seq(FA:Nat FA--:SpectecTerminals)) if tuple(S-1:SpectecTerminal FA:Nat) := allocfunc(S2:SpectecTerminal, DT:SpectecTerminal, FUNCCODE:SpectecTerminal, MODULEINST:SpectecTerminal) /\ tuple(S-2:SpectecTerminal seq(FA--:SpectecTerminals)) := allocfuncs(S-1:SpectecTerminal, DT--:SpectecTerminals, FUNCCODE--:SpectecTerminals, MODULEINST--:SpectecTerminals) .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+eq allocdatas(S2:SpectecTerminal, eps, eps) = tuple(S2:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq allocelems(S2:SpectecTerminal, eps, eps) = tuple(S2:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq allocexport(MODULEINST:SpectecTerminal, EXPORT(NAME:SpectecTerminals, FUNC(X4:Nat))) = {item('NAME, NAME:SpectecTerminals) ; item('ADDR, FUNC((MODULEINST:SpectecTerminal . 'FUNCS)[X4:Nat]))} .
+rewrites: 1 (0.00584795%)
+
+eq allocexports(MODULEINST:SpectecTerminal, EXPORT-:SpectecTerminals) = map-allocexport(MODULEINST:SpectecTerminal, EXPORT-:SpectecTerminals) .
+rewrites: 1 (0.00584795%)
+
+ceq allocmodule(S2:SpectecTerminal, MODULE2:SpectecTerminal, EXTERNADDR-:SpectecTerminals, VAL-G-:ValList, REF-T-:SpectecTerminals, REF-E--:SpectecTerminals) = tuple(S-7:SpectecTerminal MODULEINST:SpectecTerminal) if MODULE(TYPE-:SpectecTerminals, IMPORT-:SpectecTerminals, TAG-:SpectecTerminals, GLOBAL-:SpectecTerminals, MEM-:SpectecTerminals, TABLE-:SpectecTerminals, FUNC-:SpectecTerminals, DATA-:SpectecTerminals, ELEM-:SpectecTerminals, START-:SpectecTerminals, EXPORT-:SpectecTerminals) := MODULE2:SpectecTerminal /\ len(START-:SpectecTerminals) <= 1 = true /\ TAGTYPE-4:SpectecTerminals := project-map-exp-1261(TAG-:SpectecTerminals) /\ tuple(seq(EXPR-G-:SpectecTerminals) seq(GLOBALTYPE-4:SpectecTerminals)) := project-map-exp-1263(GLOBAL-:SpectecTerminals) /\ MEMTYPE-4:SpectecTerminals := project-map-exp-1265(MEM-:SpectecTerminals) /\ tuple(seq(EXPR-T-:SpectecTerminals) seq(TABLETYPE-4:SpectecTerminals)) := project-map-exp-1267(TABLE-:SpectecTerminals) /\ tuple(seq(EXPR-F-:SpectecTerminals) seq(LOCAL--:SpectecTerminals) seq(X-2:SpectecTerminals)) := project-map-exp-1269(FUNC-:SpectecTerminals) /\ tuple(seq(BYTE--:SpectecTerminals) seq(DATAMODE-:SpectecTerminals)) := project-map-exp-1272(DATA-:SpectecTerminals) /\ tuple(seq(ELEMMODE-:SpectecTerminals) seq(ELEMTYPE-:SpectecTerminals) seq(EXPR-E--:SpectecTerminals)) := project-map-exp-1275(ELEM-:SpectecTerminals) /\ AA-I-:SpectecTerminals := tagsxa(EXTERNADDR-:SpectecTerminals) /\ GA-I-:SpectecTerminals := globalsxa(EXTERNADDR-:SpectecTerminals) /\ MA-I-:SpectecTerminals := memsxa(EXTERNADDR-:SpectecTerminals) /\ TA-I-:SpectecTerminals := tablesxa(EXTERNADDR-:SpectecTerminals) /\ FA-I-:SpectecTerminals := funcsxa(EXTERNADDR-:SpectecTerminals) /\ DT-:SpectecTerminals := alloctypes(TYPE-:SpectecTerminals) /\ FA-3:SpectecTerminals := map-exp-1290(S2:SpectecTerminal, len(FUNC-:SpectecTerminals), 0) /\ tuple(S-1:SpectecTerminal seq(AA-:SpectecTerminals)) := alloctags(S2:SpectecTerminal, map-subst-all-tagtype(DT-:SpectecTerminals, TAGTYPE-4:SpectecTerminals)) /\ tuple(S-2:SpectecTerminal seq(GA-3:SpectecTerminals)) := allocglobals(S-1:SpectecTerminal, map-subst-all-globaltype(DT-:SpectecTerminals, GLOBALTYPE-4:SpectecTerminals), VAL-G-:ValList) /\ tuple(S-3:SpectecTerminal seq(MA-3:SpectecTerminals)) := allocmems(S-2:SpectecTerminal, map-subst-all-memtype(DT-:SpectecTerminals, MEMTYPE-4:SpectecTerminals)) /\ tuple(S-4:SpectecTerminal seq(TA-3:SpectecTerminals)) := alloctables(S-3:SpectecTerminal, map-subst-all-tabletype(DT-:SpectecTerminals, TABLETYPE-4:SpectecTerminals), REF-T-:SpectecTerminals) /\ tuple(S-5:SpectecTerminal seq(DA-3:SpectecTerminals)) := allocdatas(S-4:SpectecTerminal, repeatSeq(len(DATA-:SpectecTerminals), OK), BYTE--:SpectecTerminals) /\ tuple(S-6:SpectecTerminal seq(EA-3:SpectecTerminals)) := allocelems(S-5:SpectecTerminal, map-subst-all-reftype(DT-:SpectecTerminals, ELEMTYPE-:SpectecTerminals), REF-E--:SpectecTerminals) /\ XI-:SpectecTerminals := allocexports({item('TYPES, eps) ; item('TAGS, AA-I-:SpectecTerminals AA-:SpectecTerminals) ; item('GLOBALS, GA-I-:SpectecTerminals GA-3:SpectecTerminals) ; item('MEMS, MA-I-:SpectecTerminals MA-3:SpectecTerminals) ; item('TABLES, TA-I-:SpectecTerminals TA-3:SpectecTerminals) ; item('FUNCS, FA-I-:SpectecTerminals FA-3:SpectecTerminals) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)}, EXPORT-:SpectecTerminals) /\ MODULEINST:SpectecTerminal := {item('TYPES, DT-:SpectecTerminals) ; item('TAGS, AA-I-:SpectecTerminals AA-:SpectecTerminals) ; item('GLOBALS, GA-I-:SpectecTerminals GA-3:SpectecTerminals) ; item('MEMS, MA-I-:SpectecTerminals MA-3:SpectecTerminals) ; item('TABLES, TA-I-:SpectecTerminals TA-3:SpectecTerminals) ; item('FUNCS, FA-I-:SpectecTerminals FA-3:SpectecTerminals) ; item('DATAS, DA-3:SpectecTerminals) ; item('ELEMS, EA-3:SpectecTerminals) ; item('EXPORTS, XI-:SpectecTerminals)} /\ tuple(S-7:SpectecTerminal seq(FA-3:SpectecTerminals)) := allocfuncs(S-6:SpectecTerminal, map-exp-1312(DT-:SpectecTerminals, X-2:SpectecTerminals), map-exp-1314(EXPR-F-:SpectecTerminals, LOCAL--:SpectecTerminals, X-2:SpectecTerminals), repeatSeq(len(FUNC-:SpectecTerminals), MODULEINST:SpectecTerminal)) .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+4		1		0		1		0
+5		1		0		1		0
+6		1		0		1		0
+7		1		0		1		0
+8		1		0		1		0
+9		1		0		1		0
+10		1		0		1		0
+11		1		0		1		0
+12		1		0		1		0
+13		1		0		1		0
+14		1		0		1		0
+15		1		0		1		0
+16		1		0		1		0
+17		1		0		1		0
+18		1		0		1		0
+19		1		0		1		0
+20		1		0		1		0
+21		1		0		1		0
+22		1		0		1		0
+23		1		0		1		0
+24		1		0		1		0
+25		1		0		1		0
+
+ceq invoke(S2:SpectecTerminal, FUNCADDR:Nat, VAL-:ValList) = (S2:SpectecTerminal ; {item('LOCALS, eps) ; item('MODULE, {item('TYPES, eps) ; item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)})}) ; VAL-:ValList REF.FUNC-ADDR(FUNCADDR:Nat) CALL-REF((S2:SpectecTerminal . 'FUNCS)[FUNCADDR:Nat] . 'TYPE) if FUNC T-1-:SpectecTerminals -> T-2-:SpectecTerminals := Expand((S2:SpectecTerminal . 'FUNCS)[FUNCADDR:Nat] . 'TYPE) /\ iterpr-39(S2:SpectecTerminal, T-1-:SpectecTerminals, VAL-:ValList) = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+
+eq map-subst-valtype(TV-3:SpectecTerminals, TU-3:SpectecTerminals, eps) = eps .
+rewrites: 87 (0.508772%)
+
+eq map-subst-valtype(TV-3:SpectecTerminals, TU-3:SpectecTerminals, T-12:SpectecTerminal T_1S:SpectecTerminals) = subst-valtype(T-12:SpectecTerminal, TV-3:SpectecTerminals, TU-3:SpectecTerminals) map-subst-valtype(TV-3:SpectecTerminals, TU-3:SpectecTerminals, T_1S:SpectecTerminals) .
+rewrites: 87 (0.508772%)
+
+eq map-subst-valtype-2(TV-3:SpectecTerminals, TU-3:SpectecTerminals, eps) = eps .
+rewrites: 87 (0.508772%)
+
+eq map-subst-valtype-2(TV-3:SpectecTerminals, TU-3:SpectecTerminals, T-22:SpectecTerminal T_2S:SpectecTerminals) = subst-valtype(T-22:SpectecTerminal, TV-3:SpectecTerminals, TU-3:SpectecTerminals) map-subst-valtype-2(TV-3:SpectecTerminals, TU-3:SpectecTerminals, T_2S:SpectecTerminals) .
+rewrites: 87 (0.508772%)
+
+eq map-subst-typeuse(TV-3:SpectecTerminals, TU-3:SpectecTerminals, eps) = eps .
+rewrites: 87 (0.508772%)
+
+eq map-subst-subtype(TV--:SpectecTerminals, TU--:SpectecTerminals, eps) = eps .
+rewrites: 3 (0.0175439%)
+
+eq map-subst-subtype(TV--:SpectecTerminals, TU--:SpectecTerminals, ST2:SpectecTerminal STS:SpectecTerminals) = subst-subtype(ST2:SpectecTerminal, TV--:SpectecTerminals, TU--:SpectecTerminals) map-subst-subtype(TV--:SpectecTerminals, TU--:SpectecTerminals, STS:SpectecTerminals) .
+rewrites: 3 (0.0175439%)
+
+eq map-exp-272(0, I:Nat) = eps .
+rewrites: 3 (0.0175439%)
+
+eq map-subst-subtype-2(X4:Nat, N3:Nat, 0, eps) = eps .
+rewrites: 3 (0.0175439%)
+
+eq map-subst-subtype-2(X4:Nat, N3:Nat, s ITER-COUNT:Nat, SUBTYPE:SpectecTerminal SUBTYPES:SpectecTerminals) = subst-subtype(SUBTYPE:SpectecTerminal, map-exp-298(X4:Nat, N3:Nat, 0), map-exp-299(N3:Nat, 0)) map-subst-subtype-2(X4:Nat, N3:Nat, ITER-COUNT:Nat, SUBTYPES:SpectecTerminals) .
+rewrites: 3 (0.0175439%)
+
+eq map-exp-298(X4:Nat, 0, I:Nat) = eps .
+rewrites: 3 (0.0175439%)
+
+eq map-exp-298(X4:Nat, s ITER-COUNT:Nat, I:Nat) = -IDX(I:Nat + X4:Nat) map-exp-298(X4:Nat, ITER-COUNT:Nat, s I:Nat) .
+rewrites: 3 (0.0175439%)
+
+eq map-exp-299(0, I:Nat) = eps .
+rewrites: 3 (0.0175439%)
+
+eq map-exp-299(s ITER-COUNT:Nat, I:Nat) = REC(I:Nat) map-exp-299(ITER-COUNT:Nat, s I:Nat) .
+rewrites: 3 (0.0175439%)
+
+eq map-subst-subtype-3(N3:Nat, RECTYPE:SpectecTerminal, 0, eps) = eps .
+rewrites: 81 (0.473684%)
+
+eq map-subst-subtype-3(N3:Nat, RECTYPE:SpectecTerminal, s ITER-COUNT:Nat, SUBTYPE:SpectecTerminal SUBTYPES:SpectecTerminals) = subst-subtype(SUBTYPE:SpectecTerminal, map-exp-301(N3:Nat, 0), map-exp-302(RECTYPE:SpectecTerminal, N3:Nat, 0)) map-subst-subtype-3(N3:Nat, RECTYPE:SpectecTerminal, ITER-COUNT:Nat, SUBTYPES:SpectecTerminals) .
+rewrites: 81 (0.473684%)
+
+eq map-exp-301(0, I:Nat) = eps .
+rewrites: 81 (0.473684%)
+
+eq map-exp-301(s ITER-COUNT:Nat, I:Nat) = REC(I:Nat) map-exp-301(ITER-COUNT:Nat, s I:Nat) .
+rewrites: 81 (0.473684%)
+
+eq map-exp-302(RECTYPE:SpectecTerminal, 0, I:Nat) = eps .
+rewrites: 81 (0.473684%)
+
+eq map-exp-302(RECTYPE:SpectecTerminal, s ITER-COUNT:Nat, I:Nat) = -DEF(RECTYPE:SpectecTerminal, I:Nat) map-exp-302(RECTYPE:SpectecTerminal, ITER-COUNT:Nat, s I:Nat) .
+rewrites: 81 (0.473684%)
+
+eq map-exp-304(N3:Nat, SUBTYPE-:SpectecTerminals, 0, I:Nat) = eps .
+rewrites: 3 (0.0175439%)
+
+eq map-exp-304(N3:Nat, SUBTYPE-:SpectecTerminals, s ITER-COUNT:Nat, I:Nat) = -DEF(REC(SUBTYPE-:SpectecTerminals), I:Nat) map-exp-304(N3:Nat, SUBTYPE-:SpectecTerminals, ITER-COUNT:Nat, s I:Nat) .
+rewrites: 3 (0.0175439%)
+
+eq project-map-exp-1040(eps) = eps .
+rewrites: 15 (0.0877193%)
+
+eq map-exp-1042(0, eps) = eps .
+rewrites: 15 (0.0877193%)
+
+eq map-exp-1042(s ITER-COUNT:Nat, VAL:val VALS:ValList) = seq(VAL:val ?) map-exp-1042(ITER-COUNT:Nat, VALS:ValList) .
+rewrites: 15 (0.0877193%)
+
+eq map-default(eps) = eps .
+rewrites: 15 (0.0877193%)
+
+eq map-allocexport(MODULEINST:SpectecTerminal, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-allocexport(MODULEINST:SpectecTerminal, EXPORT2:SpectecTerminal EXPORTS:SpectecTerminals) = allocexport(MODULEINST:SpectecTerminal, EXPORT2:SpectecTerminal) map-allocexport(MODULEINST:SpectecTerminal, EXPORTS:SpectecTerminals) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1261(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1263(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1265(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1267(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1269(eps) = tuple(seq(eps) seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+ceq project-map-exp-1269(spectec-FUNC-2(X4:Nat, LOCAL-:SpectecTerminals, EXPR-F2:InstrList) PROJECT-REST:SpectecTerminals) = tuple(seq(seq(EXPR-F2:InstrList) PROJECT-COLUMN-1:SpectecTerminals) seq(seq(LOCAL-:SpectecTerminals) PROJECT-COLUMN-2:SpectecTerminals) seq(X4:Nat PROJECT-COLUMN-3:SpectecTerminals)) if tuple(seq(PROJECT-COLUMN-1:SpectecTerminals) seq(PROJECT-COLUMN-2:SpectecTerminals) seq(PROJECT-COLUMN-3:SpectecTerminals)) := project-map-exp-1269(PROJECT-REST:SpectecTerminals) .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq project-map-exp-1272(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1275(eps) = tuple(seq(eps) seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1290(S2:SpectecTerminal, 0, I-F:Nat) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1290(S2:SpectecTerminal, s ITER-COUNT:Nat, I-F:Nat) = (I-F:Nat + len(S2:SpectecTerminal . 'FUNCS)) map-exp-1290(S2:SpectecTerminal, ITER-COUNT:Nat, s I-F:Nat) .
+rewrites: 1 (0.00584795%)
+
+eq map-subst-all-tagtype(DT-:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-subst-all-globaltype(DT-:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-subst-all-memtype(DT-:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-subst-all-tabletype(DT-:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-subst-all-reftype(DT-:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1312(DT-:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1312(DT-:SpectecTerminals, X4:Nat XS:SpectecTerminals) = DT-:SpectecTerminals[X4:Nat] map-exp-1312(DT-:SpectecTerminals, XS:SpectecTerminals) .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1314(eps, eps, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1314(seq(EXPR-F2:InstrList) EXPR_FS:SpectecTerminals, seq(LOCAL-:SpectecTerminals) LOCAL*S:SpectecTerminals, X4:Nat XS:SpectecTerminals) = spectec-FUNC-2(X4:Nat, LOCAL-:SpectecTerminals, EXPR-F2:InstrList) map-exp-1314(EXPR_FS:SpectecTerminals, LOCAL*S:SpectecTerminals, XS:SpectecTerminals) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1393(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1395(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1397(eps) = tuple(seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1400(eps) = tuple(seq(eps) seq(eps) seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+eq project-map-exp-1403(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1407(S2:SpectecTerminal, 0, I-F:Nat) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1407(S2:SpectecTerminal, s ITER-COUNT:Nat, I-F:Nat) = (I-F:Nat + len(S2:SpectecTerminal . 'FUNCS)) map-exp-1407(S2:SpectecTerminal, ITER-COUNT:Nat, s I-F:Nat) .
+rewrites: 1 (0.00584795%)
+
+eq map-rundata(DATA-:SpectecTerminals, 0, I-D:Nat) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-runelem(ELEM-:SpectecTerminals, 0, I-E:Nat) = eps .
+rewrites: 1 (0.00584795%)
+
+eq map-exp-1430(eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq iterpr-38(S2:SpectecTerminal, eps, eps) = true .
+rewrites: 1 (0.00584795%)
+
+eq iterpr-39(S2:SpectecTerminal, eps, eps) = true .
+rewrites: 1 (0.00584795%)
+
+ceq iterpr-39(S2:SpectecTerminal, T-12:SpectecTerminal T_1S:SpectecTerminals, VAL:val VALS:ValList) = iterpr-39(S2:SpectecTerminal, T_1S:SpectecTerminals, VALS:ValList) if Val-ok(S2:SpectecTerminal, VAL:val, T-12:SpectecTerminal) = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq module-ok-import-types(MO_DTS:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq module-ok-tag-types(MO_DTS:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq module-ok-global-types(MO_DTS:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq module-ok-mem-types(MO_DTS:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq module-ok-table-types(MO_DTS:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+eq module-ok-func-types(MO_DTS:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+ceq module-ok-func-types(MO_DTS:SpectecTerminals, spectec-FUNC-2(MO_X:Nat, MO_LOCALS:SpectecTerminals, MO_EXPR:InstrList) MO_REST:SpectecTerminals) = MO_DTS:SpectecTerminals[MO_X:Nat] module-ok-func-types(MO_DTS:SpectecTerminals, MO_REST:SpectecTerminals) if indexDefined(MO_DTS:SpectecTerminals, MO_X:Nat) = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq module-ok-export-types(MO_TAG_TYPES:SpectecTerminals, MO_GLOBAL_TYPES:SpectecTerminals, MO_MEM_TYPES:SpectecTerminals, MO_TABLE_TYPES:SpectecTerminals, MO_FUNC_TYPES:SpectecTerminals, eps) = eps .
+rewrites: 1 (0.00584795%)
+
+ceq module-ok-export-types(MO_TAG_TYPES:SpectecTerminals, MO_GLOBAL_TYPES:SpectecTerminals, MO_MEM_TYPES:SpectecTerminals, MO_TABLE_TYPES:SpectecTerminals, MO_FUNC_TYPES:SpectecTerminals, EXPORT(MO_NAME1:SpectecTerminals, FUNC(MO_I:Nat)) MO_REST:SpectecTerminals) = FUNC(MO_FUNC_TYPES:SpectecTerminals[MO_I:Nat]) module-ok-export-types(MO_TAG_TYPES:SpectecTerminals, MO_GLOBAL_TYPES:SpectecTerminals, MO_MEM_TYPES:SpectecTerminals, MO_TABLE_TYPES:SpectecTerminals, MO_FUNC_TYPES:SpectecTerminals, MO_REST:SpectecTerminals) if indexDefined(MO_FUNC_TYPES:SpectecTerminals, MO_I:Nat) = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+ceq Module-ok(MODULE(MO_TYPES:SpectecTerminals, MO_IMPORTS:SpectecTerminals, MO_TAGS:SpectecTerminals, MO_GLOBALS:SpectecTerminals, MO_MEMS:SpectecTerminals, MO_TABLES:SpectecTerminals, MO_FUNCS:SpectecTerminals, MO_DATAS:SpectecTerminals, MO_ELEMS:SpectecTerminals, MO_START:SpectecTerminals, MO_EXPORTS:SpectecTerminals)) = MO_IMPORT_TYPES:SpectecTerminals -> MO_EXPORT_TYPES:SpectecTerminals if MO_DTS:SpectecTerminals := alloctypes(MO_TYPES:SpectecTerminals) /\ MO_IMPORT_TYPES:SpectecTerminals := module-ok-import-types(MO_DTS:SpectecTerminals, MO_IMPORTS:SpectecTerminals) /\ MO_TAG_TYPES:SpectecTerminals := tagsxt(MO_IMPORT_TYPES:SpectecTerminals) ++ module-ok-tag-types(MO_DTS:SpectecTerminals, MO_TAGS:SpectecTerminals) /\ MO_GLOBAL_TYPES:SpectecTerminals := globalsxt(MO_IMPORT_TYPES:SpectecTerminals) ++ module-ok-global-types(MO_DTS:SpectecTerminals, MO_GLOBALS:SpectecTerminals) /\ MO_MEM_TYPES:SpectecTerminals := memsxt(MO_IMPORT_TYPES:SpectecTerminals) ++ module-ok-mem-types(MO_DTS:SpectecTerminals, MO_MEMS:SpectecTerminals) /\ MO_TABLE_TYPES:SpectecTerminals := tablesxt(MO_IMPORT_TYPES:SpectecTerminals) ++ module-ok-table-types(MO_DTS:SpectecTerminals, MO_TABLES:SpectecTerminals) /\ MO_FUNC_TYPES:SpectecTerminals := funcsxt(MO_IMPORT_TYPES:SpectecTerminals) ++ module-ok-func-types(MO_DTS:SpectecTerminals, MO_FUNCS:SpectecTerminals) /\ MO_EXPORT_TYPES:SpectecTerminals := module-ok-export-types(MO_TAG_TYPES:SpectecTerminals, MO_GLOBAL_TYPES:SpectecTerminals, MO_MEM_TYPES:SpectecTerminals, MO_TABLE_TYPES:SpectecTerminals, MO_FUNC_TYPES:SpectecTerminals, MO_EXPORTS:SpectecTerminals) .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+2		1		0		1		0
+3		1		0		1		0
+4		1		0		1		0
+5		1		0		1		0
+6		1		0		1		0
+7		1		0		1		0
+8		1		0		1		0
+
+eq emptyStore = {item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('STRUCTS, eps) ; item('ARRAYS, eps) ; item('EXNS, eps)} .
+rewrites: 1 (0.00584795%)
+
+ceq findFunc(EXPORT-PREFIX:SpectecTerminals {item('NAME, NAME:SpectecTerminals) ; item('ADDR, FUNC(ADDR:Nat))} EXPORTS:SpectecTerminals, NAME:SpectecTerminals) = ADDR:Nat if not hasExport(EXPORT-PREFIX:SpectecTerminals, NAME:SpectecTerminals) = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		1		0
+
+eq hasExport(EXPORTS:SpectecTerminals, NAME:SpectecTerminals) = false [owise] .
+rewrites: 1 (0.00584795%)
+
+rl [focus-Step-pure-if-true] : identifyFocus(BRIDGE-Z:SpectecTerminal, PREFIX:ValList CONST(I32, C3:Nat), IF BT:SpectecTerminal INSTR-1-:InstrList ELSE INSTR-2-:InstrList, POSTFIX:InstrList) => {PREFIX:ValList | BRIDGE-Z:SpectecTerminal ; CONST(I32, C3:Nat) (IF BT:SpectecTerminal INSTR-1-:InstrList ELSE INSTR-2-:InstrList) | POSTFIX:InstrList} .
+rewrites: 15 (0.0877193%)
+
+crl [focus-Step-pure-frame-vals] : identifyFocus(BRIDGE-Z:SpectecTerminal, PREFIX:ValList, FRAME- N3:Nat{F:SpectecTerminal}VAL-:ValList, POSTFIX:InstrList) => {PREFIX:ValList | BRIDGE-Z:SpectecTerminal ; FRAME- N3:Nat{F:SpectecTerminal}VAL-:ValList | POSTFIX:InstrList} if instrSize(VAL-:ValList) = N3:Nat .
+lhs matches: 14	rewrites: 14 (0.0818713%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		14		14		14		14
+
+rl [focus-Step-pure-binop-val] : identifyFocus(BRIDGE-Z:SpectecTerminal, PREFIX:ValList CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal), BINOP(NT:SpectecTerminal, BINOP2:SpectecTerminal), POSTFIX:InstrList) => {PREFIX:ValList | BRIDGE-Z:SpectecTerminal ; CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal) BINOP(NT:SpectecTerminal, BINOP2:SpectecTerminal) | POSTFIX:InstrList} .
+rewrites: 35 (0.204678%)
+
+rl [focus-Step-pure-relop] : identifyFocus(BRIDGE-Z:SpectecTerminal, PREFIX:ValList CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal), RELOP(NT:SpectecTerminal, RELOP2:SpectecTerminal), POSTFIX:InstrList) => {PREFIX:ValList | BRIDGE-Z:SpectecTerminal ; CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal) RELOP(NT:SpectecTerminal, RELOP2:SpectecTerminal) | POSTFIX:InstrList} .
+rewrites: 30 (0.175439%)
+
+rl [focus-Step-read-call] : identifyFocus(Z:SpectecTerminal, PREFIX:ValList, CALL(X4:Nat), POSTFIX:InstrList) => {PREFIX:ValList | Z:SpectecTerminal ; CALL(X4:Nat) | POSTFIX:InstrList} .
+rewrites: 14 (0.0818713%)
+
+crl [focus-Step-read-call-ref-func] : identifyFocus(Z:SpectecTerminal, PREFIX:ValList VAL-:ValList REF.FUNC-ADDR(A:Nat), CALL-REF(YY2:SpectecTerminal), POSTFIX:InstrList) => {PREFIX:ValList | Z:SpectecTerminal ; VAL-:ValList REF.FUNC-ADDR(A:Nat) CALL-REF(YY2:SpectecTerminal) | POSTFIX:InstrList} if N3:Nat := instrSize(VAL-:ValList) /\ FI:SpectecTerminal := spectec-funcinst(Z:SpectecTerminal)[A:Nat] /\ FUNC T-1-:SpectecTerminals -> T-2-:SpectecTerminals := Expand(FI:SpectecTerminal . 'TYPE) /\ N3:Nat = len(T-1-:SpectecTerminals) .
+lhs matches: 65	rewrites: 29 (0.169591%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		65		65		65		65
+2		65		65		65		65
+3		65		65		65		65
+4		65		29		29		65
+
+rl [focus-Step-read-local-get] : identifyFocus(Z:SpectecTerminal, PREFIX:ValList, LOCAL.GET(X4:Nat), POSTFIX:InstrList) => {PREFIX:ValList | Z:SpectecTerminal ; LOCAL.GET(X4:Nat) | POSTFIX:InstrList} .
+rewrites: 29 (0.169591%)
+
+rl [focus-Step-ctxt-frame] : identifyFocus(S2:SpectecTerminal ; F:SpectecTerminal, PREFIX:ValList, FRAME- N3:Nat{F-14:SpectecTerminal}INSTR-:InstrList, POSTFIX:InstrList) => {PREFIX:ValList | (S2:SpectecTerminal ; F:SpectecTerminal) ; FRAME- N3:Nat{F-14:SpectecTerminal}INSTR-:InstrList | POSTFIX:InstrList} .
+rewrites: 351 (2.05263%)
+
+crl [heating-ctxt-instrs] : Step(Z:SpectecTerminal ; STACK:ValList OP:InstrProper REST:InstrList) => Step(Z:SpectecTerminal ; FOCUS:InstrList) ~> hole(PREFIX:ValList, POSTFIX:InstrList) if STACK:ValList OP:InstrProper REST:InstrList =/= OP:InstrProper = true /\ identifyFocus(Z:SpectecTerminal, STACK:ValList, OP:InstrProper, REST:InstrList) => {PREFIX:ValList | Z:SpectecTerminal ; FOCUS:InstrList | POSTFIX:InstrList} /\ FOCUS:InstrList =/= PREFIX:ValList FOCUS:InstrList POSTFIX:InstrList = true .
+lhs matches: 2013	rewrites: 437 (2.55556%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2013		503		503		2013
+2		503		503		503		503
+3		503		437		437		503
+
+rl [identifyPure-6] : identifyPure(CONST(I32, C3:Nat) (IF BT:SpectecTerminal INSTR-1-:InstrList ELSE INSTR-2-:InstrList)) => identified-Step-pure .
+rewrites: 15 (0.0877193%)
+
+rl [identifyPure-8] : identifyPure(LABEL- N3:Nat{INSTR-:InstrList}VAL-:ValList) => identified-Step-pure .
+rewrites: 30 (0.175439%)
+
+rl [identifyPure-22] : identifyPure(FRAME- N3:Nat{F:SpectecTerminal}VAL-:ValList) => identified-Step-pure .
+rewrites: 15 (0.0877193%)
+
+rl [identifyPure-49] : identifyPure(CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal) BINOP(NT:SpectecTerminal, BINOP2:SpectecTerminal)) => identified-Step-pure .
+rewrites: 21 (0.122807%)
+
+rl [identifyPure-52] : identifyPure(CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal) RELOP(NT:SpectecTerminal, RELOP2:SpectecTerminal)) => identified-Step-pure .
+rewrites: 15 (0.0877193%)
+
+crl [heating-Step-pure] : Step(Z:SpectecTerminal ; INSTR-:InstrList) => Step-pure(INSTR-:InstrList) ~> hole-Step-pure-1(Z:SpectecTerminal) if identifyPure(INSTR-:InstrList) => identified-Step-pure .
+lhs matches: 2060	rewrites: 96 (0.561404%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2060		96		96		2060
+
+rl [identifyRead-1] : identifyRead(Z:SpectecTerminal ; VAL-:ValList BLOCK(BT:SpectecTerminal, INSTR-:InstrList)) => identified-Step-read .
+rewrites: 15 (0.0877193%)
+
+rl [identifyRead-7] : identifyRead(Z:SpectecTerminal ; CALL(X4:Nat)) => identified-Step-read .
+rewrites: 14 (0.0818713%)
+
+rl [identifyRead-9] : identifyRead(Z:SpectecTerminal ; VAL-:ValList REF.FUNC-ADDR(A:Nat) CALL-REF(YY2:SpectecTerminal)) => identified-Step-read .
+rewrites: 15 (0.0877193%)
+
+rl [identifyRead-26] : identifyRead(Z:SpectecTerminal ; LOCAL.GET(X4:Nat)) => identified-Step-read .
+rewrites: 29 (0.169591%)
+
+crl [heating-Step-read] : Step(Z:SpectecTerminal ; INSTR-:InstrList) => Step-read(Z:SpectecTerminal ; INSTR-:InstrList) ~> hole-Step-read-1(Z:SpectecTerminal) if identifyRead(Z:SpectecTerminal ; INSTR-:InstrList) => identified-Step-read .
+lhs matches: 2060	rewrites: 73 (0.426901%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		2060		73		73		2060
+
+rl [heating-Step-ctxt-label] : Step(Z:SpectecTerminal ; LABEL- N3:Nat{INSTR-0-:InstrList}INSTR-:InstrList) => Step(Z:SpectecTerminal ; INSTR-:InstrList) ~> hole-Step-ctxt-label-1(INSTR-0-:InstrList, N3:Nat) .
+rewrites: 933 (5.45614%)
+
+rl [heating-Step-ctxt-frame] : Step((S2:SpectecTerminal ; F:SpectecTerminal) ; FRAME- N3:Nat{F-14:SpectecTerminal}INSTR-:InstrList) => Step((S2:SpectecTerminal ; F-14:SpectecTerminal) ; INSTR-:InstrList) ~> hole-Step-ctxt-frame-1(N3:Nat, F:SpectecTerminal) .
+rewrites: 519 (3.03509%)
+
+crl Step-pure(CONST(I32, C3:Nat) (IF BT:SpectecTerminal INSTR-1-:InstrList ELSE INSTR-2-:InstrList)) => BLOCK(BT:SpectecTerminal, INSTR-1-:InstrList) if C3:Nat =/= 0 = true .
+lhs matches: 15	rewrites: 8 (0.0467836%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		8		8		15
+
+crl Step-pure(CONST(I32, C3:Nat) (IF BT:SpectecTerminal INSTR-1-:InstrList ELSE INSTR-2-:InstrList)) => BLOCK(BT:SpectecTerminal, INSTR-2-:InstrList) if C3:Nat == 0 = true .
+lhs matches: 15	rewrites: 7 (0.0409357%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		7		7		15
+
+rl Step-pure(LABEL- N3:Nat{INSTR-:InstrList}VAL-:ValList) => VAL-:ValList .
+rewrites: 30 (0.175439%)
+
+crl Step-pure(FRAME- N3:Nat{F:SpectecTerminal}VAL-:ValList) => VAL-:ValList if instrSize(VAL-:ValList) = N3:Nat .
+lhs matches: 15	rewrites: 15 (0.0877193%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		15		15		15
+
+crl Step-pure(CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal) BINOP(NT:SpectecTerminal, BINOP2:SpectecTerminal)) => CONST(NT:SpectecTerminal, C2:SpectecTerminal) if MEMBER-PREFIX:SpectecTerminals C2:SpectecTerminal MEMBER-SUFFIX:SpectecTerminals := spectec-binop-(NT:SpectecTerminal, BINOP2:SpectecTerminal, C-13:SpectecTerminal, C-24:SpectecTerminal) .
+lhs matches: 21	rewrites: 21 (0.122807%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		21		21		21		21
+
+crl Step-pure(CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal) BINOP(NT:SpectecTerminal, BINOP2:SpectecTerminal)) => TRAP if spectec-binop-(NT:SpectecTerminal, BINOP2:SpectecTerminal, C-13:SpectecTerminal, C-24:SpectecTerminal) == eps = true .
+lhs matches: 21	rewrites: 0 (0%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		21		0		0		21
+
+crl Step-pure(CONST(NT:SpectecTerminal, C-13:SpectecTerminal) CONST(NT:SpectecTerminal, C-24:SpectecTerminal) RELOP(NT:SpectecTerminal, RELOP2:SpectecTerminal)) => CONST(I32, C3:Nat) if C3:Nat := spectec-relop-(NT:SpectecTerminal, RELOP2:SpectecTerminal, C-13:SpectecTerminal, C-24:SpectecTerminal) .
+lhs matches: 15	rewrites: 15 (0.0877193%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		15		15		15
+
+crl Step-read(Z:SpectecTerminal ; VAL-:ValList BLOCK(BT:SpectecTerminal, INSTR-:InstrList)) => LABEL- N3:Nat{eps}VAL-:ValList INSTR-:InstrList if M3:Nat := instrSize(VAL-:ValList) /\ T-1-:SpectecTerminals ->- eps T-2-:SpectecTerminals := blocktype-(Z:SpectecTerminal, BT:SpectecTerminal) /\ M3:Nat = len(T-1-:SpectecTerminals) /\ N3:Nat := len(T-2-:SpectecTerminals) .
+lhs matches: 15	rewrites: 15 (0.0877193%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		15		15		15
+2		15		15		15		15
+3		15		15		15		15
+4		15		15		15		15
+
+crl Step-read(Z:SpectecTerminal ; CALL(X4:Nat)) => REF.FUNC-ADDR(A:Nat) CALL-REF(spectec-funcinst(Z:SpectecTerminal)[A:Nat] . 'TYPE) if A:Nat := (spectec-moduleinst(Z:SpectecTerminal) . 'FUNCS)[X4:Nat] .
+lhs matches: 14	rewrites: 14 (0.0818713%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		14		14		14		14
+
+crl Step-read(Z:SpectecTerminal ; VAL-:ValList REF.FUNC-ADDR(A:Nat) CALL-REF(YY2:SpectecTerminal)) => FRAME- M3:Nat{F:SpectecTerminal}LABEL- M3:Nat{eps}INSTR-:InstrList if N3:Nat := instrSize(VAL-:ValList) /\ FI:SpectecTerminal := spectec-funcinst(Z:SpectecTerminal)[A:Nat] /\ FUNC T-1-:SpectecTerminals -> T-2-:SpectecTerminals := Expand(FI:SpectecTerminal . 'TYPE) /\ N3:Nat = len(T-1-:SpectecTerminals) /\ M3:Nat := len(T-2-:SpectecTerminals) /\ spectec-FUNC-2(CASE-PART12:Nat, CASE-PART2:SpectecTerminals, CASE-PART3:InstrList) := FI:SpectecTerminal . 'CODE /\ X4:Nat := CASE-PART12:Nat /\ INSTR-:InstrList := CASE-PART3:InstrList /\ T-:SpectecTerminals := project-map-exp-1040(CASE-PART2:SpectecTerminals) /\ F:SpectecTerminal := {item('LOCALS, map-exp-1042(N3:Nat, VAL-:ValList) map-default(T-:SpectecTerminals)) ; item('MODULE, FI:SpectecTerminal . 'MODULE)} .
+lhs matches: 15	rewrites: 15 (0.0877193%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		15		15		15		15
+2		15		15		15		15
+3		15		15		15		15
+4		15		15		15		15
+5		15		15		15		15
+6		15		15		15		15
+7		15		15		15		15
+8		15		15		15		15
+9		15		15		15		15
+10		15		15		15		15
+
+crl Step-read(Z:SpectecTerminal ; LOCAL.GET(X4:Nat)) => VAL:val if VAL:val ? := spectec-local(Z:SpectecTerminal, X4:Nat) .
+lhs matches: 29	rewrites: 29 (0.169591%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		29		29		29		29
+
+rl evalexprs(Z:SpectecTerminal, eps) => tuple(Z:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+rl evalexprss(Z:SpectecTerminal, eps) => tuple(Z:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+rl evalglobals(Z:SpectecTerminal, eps, eps) => tuple(Z:SpectecTerminal seq(eps)) .
+rewrites: 1 (0.00584795%)
+
+crl instantiate(S2:SpectecTerminal, MODULE2:SpectecTerminal, EXTERNADDR-:SpectecTerminals) => (S----:SpectecTerminal ; {item('LOCALS, eps) ; item('MODULE, MODULEINST:SpectecTerminal)}) ; INSTR-E-:InstrList INSTR-D-:InstrList instrLift(INSTR-S-:SpectecTerminals) if XT-I-:SpectecTerminals -> XT-E-:SpectecTerminals := Module-ok(MODULE2:SpectecTerminal) /\ iterpr-38(S2:SpectecTerminal, EXTERNADDR-:SpectecTerminals, XT-I-:SpectecTerminals) = true /\ MODULE(TYPE-:SpectecTerminals, IMPORT-:SpectecTerminals, TAG-:SpectecTerminals, GLOBAL-:SpectecTerminals, MEM-:SpectecTerminals, TABLE-:SpectecTerminals, FUNC-:SpectecTerminals, DATA-:SpectecTerminals, ELEM-:SpectecTerminals, START-:SpectecTerminals, EXPORT-:SpectecTerminals) := MODULE2:SpectecTerminal /\ len(START-:SpectecTerminals) <= 1 = true /\ tuple(seq(EXPR-G-:SpectecTerminals) seq(GLOBALTYPE-4:SpectecTerminals)) := project-map-exp-1393(GLOBAL-:SpectecTerminals) /\ tuple(seq(EXPR-T-:SpectecTerminals) seq(TABLETYPE-4:SpectecTerminals)) := project-map-exp-1395(TABLE-:SpectecTerminals) /\ tuple(seq(BYTE--:SpectecTerminals) seq(DATAMODE-:SpectecTerminals)) := project-map-exp-1397(DATA-:SpectecTerminals) /\ tuple(seq(ELEMMODE-:SpectecTerminals) seq(EXPR-E--:SpectecTerminals) seq(REFTYPE-:SpectecTerminals)) := project-map-exp-1400(ELEM-:SpectecTerminals) /\ X-5:SpectecTerminals := project-map-exp-1403(START-:SpectecTerminals) /\ MODULEINST-0:SpectecTerminal := {item('TYPES, alloctypes(TYPE-:SpectecTerminals)) ; item('TAGS, eps) ; item('GLOBALS, globalsxa(EXTERNADDR-:SpectecTerminals)) ; item('MEMS, eps) ; item('TABLES, eps) ; item('FUNCS, funcsxa(EXTERNADDR-:SpectecTerminals) map-exp-1407(S2:SpectecTerminal, len(FUNC-:SpectecTerminals), 0)) ; item('DATAS, eps) ; item('ELEMS, eps) ; item('EXPORTS, eps)} /\ Z:SpectecTerminal := S2:SpectecTerminal ; {item('LOCALS, eps) ; item('MODULE, MODULEINST-0:SpectecTerminal)} /\ evalglobals(Z:SpectecTerminal, GLOBALTYPE-4:SpectecTerminals, EXPR-G-:SpectecTerminals) => tuple(Z-:SpectecTerminal seq(VAL-G-:ValList)) /\ evalexprs(Z-:SpectecTerminal, EXPR-T-:SpectecTerminals) => tuple(Z--:SpectecTerminal seq(REF-T-:SpectecTerminals)) /\ evalexprss(Z--:SpectecTerminal, EXPR-E--:SpectecTerminals) => tuple(Z---:SpectecTerminal seq(REF-E--:SpectecTerminals)) /\ S---:SpectecTerminal ; F:SpectecTerminal := Z---:SpectecTerminal /\ tuple(S----:SpectecTerminal MODULEINST:SpectecTerminal) := allocmodule(S---:SpectecTerminal, MODULE2:SpectecTerminal, EXTERNADDR-:SpectecTerminals, VAL-G-:ValList, REF-T-:SpectecTerminals, REF-E--:SpectecTerminals) /\ INSTR-D-:InstrList := concat-(instr, map-rundata(DATA-:SpectecTerminals, len(DATA-:SpectecTerminals), 0)) /\ INSTR-E-:InstrList := concat-(instr, map-runelem(ELEM-:SpectecTerminals, len(ELEM-:SpectecTerminals), 0)) /\ INSTR-S-:SpectecTerminals := map-exp-1430(X-5:SpectecTerminals) /\ len(INSTR-S-:SpectecTerminals) <= 1 = true .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+2		1		1		1		1
+3		1		1		1		1
+4		1		1		1		1
+5		1		1		1		1
+6		1		1		1		1
+7		1		1		1		1
+8		1		1		1		1
+9		1		1		1		1
+10		1		1		1		1
+11		1		1		1		1
+12		1		1		1		1
+13		1		1		1		1
+14		1		1		1		1
+15		1		1		1		1
+16		1		1		1		1
+17		1		1		1		1
+18		1		1		1		1
+19		1		1		1		1
+20		1		1		1		1
+
+crl [instantiate] : boot => init(C:SpectecTerminal) if instantiate(emptyStore, inputModule, eps) => C:SpectecTerminal .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+
+crl [init-step] : init(C:SpectecTerminal) => init(C2:SpectecTerminal) if Step(C:SpectecTerminal) => C2:SpectecTerminal .
+lhs matches: 1	rewrites: 0 (0%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		0		0		1
+
+crl [initialize] : init(C:SpectecTerminal) => ready(Z:SpectecTerminal) if Z:SpectecTerminal ; eps := C:SpectecTerminal .
+lhs matches: 1	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		1		1		1		1
+
+rl [invoke] : ready(Z:SpectecTerminal) => exec(invoke(spectec-store(Z:SpectecTerminal), findFunc(value('EXPORTS, spectec-moduleinst(Z:SpectecTerminal)), inputName), inputArgs)) .
+rewrites: 1 (0.00584795%)
+
+crl [execute-step] : exec(C:SpectecTerminal) => exec(C2:SpectecTerminal) if Step(C:SpectecTerminal) => C2:SpectecTerminal .
+lhs matches: 170	rewrites: 169 (0.988304%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		170		169		169		170
+
+crl [finished] : exec(C:SpectecTerminal) => finished(RESULT) if Z:SpectecTerminal ; RESULT := C:SpectecTerminal .
+lhs matches: 170	rewrites: 1 (0.00584795%)
+Fragment	Initial tries	Resolve tries	Successes	Failures
+1		170		1		1		170
+
+Bye.

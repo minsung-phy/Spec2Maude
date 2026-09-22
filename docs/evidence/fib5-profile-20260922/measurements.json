@@ -1,0 +1,113 @@
+{
+  "date": "2026-09-22",
+  "revision": "3c35fafddcbdb811f2cd69c20bee33577bb4a726",
+  "working_tree_before_analysis": "clean",
+  "spec_revision": "acc6e834ff403c82554d081237f327346190ad96",
+  "maude": "3.5.1, built Jul 16 2025 12:00:00, macOS arm64",
+  "maude_executable": "/Users/minsung/Dev/tools/Maude-3.5.1-macos-arm64/maude",
+  "dune": "3.23.1",
+  "ocamlc": "5.1.0",
+  "process_timeout_seconds": 60,
+  "fresh_translation_matches_checked_in": true,
+  "command": "search [1, 1000000] in WASM2MAUDE-MODELCHECK : boot =>* finished(CONST(I64, 6)) .",
+  "search": {
+    "result": "No solution",
+    "states": 174,
+    "arcs": 173,
+    "equational_rewrites": 14010,
+    "rule_rewrites": 3090,
+    "total_rewrites": 17100
+  },
+  "run": {
+    "result": "finished(CONST(I64, 8))",
+    "equational_rewrites": 12805,
+    "rule_rewrites": 3090,
+    "total_rewrites": 15895
+  },
+  "nonprofile_fresh_process_runs": [
+    {
+      "states": 174,
+      "rewrites": 17100,
+      "cpu_ms": 29,
+      "real_ms": 31
+    },
+    {
+      "states": 174,
+      "rewrites": 17100,
+      "cpu_ms": 28,
+      "real_ms": 29
+    },
+    {
+      "states": 174,
+      "rewrites": 17100,
+      "cpu_ms": 30,
+      "real_ms": 30
+    },
+    {
+      "states": 174,
+      "rewrites": 17100,
+      "cpu_ms": 28,
+      "real_ms": 30
+    },
+    {
+      "states": 174,
+      "rewrites": 17100,
+      "cpu_ms": 30,
+      "real_ms": 30
+    }
+  ],
+  "probe_rewrites": {
+    "focus_call_ref_first_solution": 64,
+    "focus_call_ref_exhausted": 125,
+    "binop_add_exhausted": 106,
+    "binop_sub_exhausted": 118,
+    "add_value": 52,
+    "sub_value": 58,
+    "funcinst_lookup_plus_expand": 55,
+    "native_iadd": 4,
+    "typecheck_I64_Inn": 2
+  },
+  "sha256": {
+    "spectec/REVISION": "fc86d359b76743f56c98b1d266a7a23dcc5031aafa283e3d3f92cdd729d60f01",
+    "reference/manual/Maude3.5.1-manual.pdf": "6d75a48a43cfd011934039804e6cd03232f0cc04cd2cc10cb0cf0c99c2927779",
+    "translator/backend/pretype.maude": "1999a08abc75c25cf921c77a3405e10668ae23691a49d1542dc99a8696a9106d",
+    "translator/backend/semantics.maude": "a71dbdc01f89089708a939edb98df1f50f255f192b2fca5744a392a66c20d7ed",
+    "translator/backend/builtins.maude": "2e5a42d415990040ea98409e7acb1135365c6faa08beecb3599e486f836ff91b",
+    "translator/backend/relation-backends.maude": "a357cbcfbdf96a2d29717bf81800dff09c10f7223a74ccf21abf40af12836841",
+    "translator/generated/types.maude": "d6d9305d74aff3c2bdeb80bb5a6f43107180fbe117e58acfc5acabfba0020bc8",
+    "translator/generated/output.maude": "e23d399d94383f43a4ac4fef1302b1af0bfa6fa82ab224d9fc2149af01d2a8b5",
+    "wasm2maude/modelcheck-runtime.maude": "9bae234e6755fdc081795993914dd9204cc208d68d0d8662468c8b9ca62d043c",
+    "translator/reld.ml": "557054ab3f8ab72c269901106d2bcd4161f3368603e43775085ff7ecd3339169",
+    "translator/decd.ml": "fcf1087991e478439e6373ddfcd8942b1eb9d12d02761d056f2ef2c52c6a0482",
+    "translator/param.ml": "1d024ee2ef5ba06549bec6edfc6e4a3df0b9e2066a097cdc4012b79e0e6c821c",
+    "translator/typd.ml": "ee9ea888a9f9f9dd75382d9fd4e64c2fa009eb86ab5d19fce7e37aeb510ef656",
+    "spectec/wasm-3.0/4.4-execution.modules.spectec": "a56d907c02e71d034e3720ede09a2a74113592be7581c78170d8f441c33cf406",
+    "spectec/wasm-3.0/3.1-numerics.scalar.spectec": "46ca5f36e086f9dddc63722e989233fd80992c5177dc519d33b95fd6b7e7487a",
+    "spectec/wasm-3.0/0.3-aux.seq.spectec": "99feab7a545a608050486d5e092a62d88c04db93a489c7d4330322ed21a401a0",
+    "spectec/wasm-3.0/2.3-validation.instructions.spectec": "a3bd388de6b76294a33b84cdda4aebbcfb2836cb7cecc18832263c31ba998303",
+    "spectec/wasm-3.0/1.0-syntax.profiles.spectec": "a8750e15a3c0e6888bc77ca28e88a67cb9737191392a4614d9afef89eb81fd01",
+    "spectec/wasm-3.0/2.0-validation.contexts.spectec": "e586b73425dd4097b5fe31c6b89fa006f80a65205b15c944a16c896f2d5295d1",
+    "spectec/wasm-3.0/2.4-validation.modules.spectec": "3730a0bed840c1f7a23e749513f3b022bedeb058ee81d752f8b06129433e04df",
+    "spectec/wasm-3.0/0.2-aux.num.spectec": "c8f397455513296d5056d58bd12f56c642bb5cd3d3e42d3cb05c3dfc46feb6ce",
+    "spectec/wasm-3.0/2.2-validation.subtyping.spectec": "7dfbd51d4c9ac7c460a1e70e33c38d0f68323913048155d6f912152a01ac1c26",
+    "spectec/wasm-3.0/3.0-numerics.relaxed.spectec": "70ccae258bfeb82a346ed7663c04458c34b7838bd46b2c4b81ba6ad4dcf4a398",
+    "spectec/wasm-3.0/3.2-numerics.vector.spectec": "22432ec847365aecc64a07f8464e9b7ba903679d6d773d0eb4a2f88baa450db8",
+    "spectec/wasm-3.0/4.1-execution.values.spectec": "8b35fa6009ed2957e70fa182e4dbb2d4758b8121251c3f9086f9a5a447cfdb08",
+    "spectec/wasm-3.0/1.1-syntax.values.spectec": "6315cead188cc2322bc8c4df92382c3cd60c8c05626f734b73fff2637afe0a23",
+    "spectec/wasm-3.0/4.0-execution.configurations.spectec": "7c705531cbf1192b8db3176dcbdfa09a995cfc6ceb4d7f455bc67a4770191d76",
+    "spectec/wasm-3.0/1.2-syntax.types.spectec": "e286ea223ed711290d9abace8b5f10d9c663173d7a2fac5934741eed1d8a0655",
+    "spectec/wasm-3.0/0.1-aux.vars.spectec": "7971512df868c9e5673e96e381686ca0a230fb92a2563b580b6c3a3f32e56594",
+    "spectec/wasm-3.0/1.3-syntax.instructions.spectec": "48b2bd109d9dc8b8ae67a24176e6b149957e3aa0caadc20b796428f037ce3a89",
+    "spectec/wasm-3.0/4.3-execution.instructions.spectec": "7cdbde069fd7ba94f7da51d65887ce03b60394989a7aa1d24a62304a46c4e9c6",
+    "spectec/wasm-3.0/2.1-validation.types.spectec": "9393a4120e5881951b3af7edc86dd0aa63a6a723f015f804a117297f41d26b9a",
+    "spectec/wasm-3.0/1.4-syntax.modules.spectec": "04245713d59b2e4189eef8ca54fe49349130472371bfa68d8efd9e0f6205ba44",
+    "spectec/wasm-3.0/4.2-execution.types.spectec": "f15612d3ce0d3b5845948d304d357c1ef45045efc8f83e72df1b7cd509491d6d",
+    "docs/evidence/fib5-profile-20260922/fib.wat": "c4dc4fcb4945fae69f396eeac00ea7530b4bf5b75555976d174579cae76cfcd4",
+    "docs/evidence/fib5-profile-20260922/profile.maude": "4081e307f80e7780385e74d2297fa17edd7ab7fb023fecc9bba552e4dfc6a805",
+    "docs/evidence/fib5-profile-20260922/run-profile.maude": "e390a3370152bd16478bfb70da0833d893b52ea25e7e4c47f2b633e3f779ac4b",
+    "docs/evidence/fib5-profile-20260922/profile.log": "207794b8763925598c64cf0c7e0762620afc87bcdef3235e22bc269990a95627",
+    "docs/evidence/fib5-profile-20260922/run-profile.log": "a35791260eff77cec2cf09c2c68fe21c29fd4990fe655af53ca50a338cd8ee14",
+    "maude_executable": "266eed04679fde6029a18e5e2b1828223d4a7169ac55503aa15d67e126792fbf",
+    "docs/evidence/fib5-profile-20260922/supplementary.zip": "65edb41418a9fb7d2d378aa46e597f72ff7e61d8809e15dd74709f5a379e6a77"
+  }
+}
