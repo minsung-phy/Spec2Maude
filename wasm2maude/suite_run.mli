@@ -2,6 +2,7 @@ type status
 type report
 
 val run :
+  ?runtime:string ->
   semantics:string ->
   maude:string ->
   timeout:float ->

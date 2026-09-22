@@ -52,6 +52,8 @@ let find_line pattern lines =
   |> Option.value ~default:""
   |> String.trim
 
+(* Wast_harness emits [rew [steps]] followed by [continue 1]. The penultimate
+   result belongs to the requested bound; the final result is only a probe. *)
 let bounded_result lines =
   let previous, last =
     List.fold_left
@@ -63,6 +65,8 @@ let bounded_result lines =
   | Some result, _ | None, Some result -> String.trim result
   | None, None -> "no Maude result"
 
+(* A positive rewrite count in the final probe distinguishes STEP_LIMIT from
+   STUCK. Do not use the probe's result to turn a bounded run into PASS. *)
 let last_rewrite_count lines =
   let parse line =
     String.split_on_char ' ' (String.trim line)
@@ -111,15 +115,26 @@ let read_file path =
 let remove_file path =
   try Sys.remove path with Sys_error _ -> ()
 
+let rec waitpid flags pid =
+  try Unix.waitpid flags pid with
+  | Unix.Unix_error (Unix.EINTR, _, _) -> waitpid flags pid
+
+let terminate pid =
+  try
+    match waitpid [Unix.WNOHANG] pid with
+    | 0, _ ->
+        (try Unix.kill pid Sys.sigkill with
+         | Unix.Unix_error (Unix.ESRCH, _, _) -> ());
+        ignore (waitpid [] pid)
+    | _ -> ()
+  with Unix.Unix_error (Unix.ECHILD, _, _) -> ()
+
 let rec wait pid deadline =
-  match Unix.waitpid [Unix.WNOHANG] pid with
+  match waitpid [Unix.WNOHANG] pid with
   | 0, _ when Unix.gettimeofday () < deadline ->
       Unix.sleepf 0.05;
       wait pid deadline
-  | 0, _ ->
-      Unix.kill pid Sys.sigkill;
-      ignore (Unix.waitpid [] pid);
-      Timed_out
+  | 0, _ -> Timed_out
   | _, status -> Exited status
 
 let execute ~maude ~timeout harness output =
@@ -140,7 +155,13 @@ let execute ~maude ~timeout harness output =
         ~finally:(fun () -> Unix.close input)
         (fun () ->
           let pid = Unix.create_process shell argv input fd fd in
-          wait pid (Unix.gettimeofday () +. timeout)))
+          let reaped = ref false in
+          Fun.protect
+            ~finally:(fun () -> if not !reaped then terminate pid)
+            (fun () ->
+              let result = wait pid (Unix.gettimeofday () +. timeout) in
+              (match result with Exited _ -> reaped := true | Timed_out -> ());
+              result)))
 
 let ensure_directory path =
   if Sys.file_exists path then begin
@@ -154,14 +175,14 @@ let log_path dir index source =
   let name = Filename.basename source in
   Filename.concat dir (Printf.sprintf "%04d-%s.log" index name)
 
-let run_case ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir index source =
+let run_case ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir index source =
   let started = Unix.gettimeofday () in
   let commands = ref 0 in
   let checked_assertions = ref 0 in
   let runtime_assertions = ref 0 in
   let status, detail =
     try
-      let harness, emitted = Wast_run.emit ~semantics ~steps ~call_depth source in
+      let harness, emitted = Wast_run.emit ?runtime ~semantics ~steps ~call_depth source in
       commands := Wast_run.commands emitted;
       checked_assertions := Wast_run.checked_assertions emitted;
       runtime_assertions := Wast_run.runtime_assertions emitted;
@@ -201,7 +222,7 @@ let run_case ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir index source
     runtime_assertions = !runtime_assertions;
     detail }
 
-let run ~semantics ~maude ~timeout ~steps ~call_depth ?progress ?log_dir path =
+let run ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ?progress ?log_dir path =
   if timeout <= 0. then invalid_arg "Suite_run.run: non-positive timeout";
   Option.iter ensure_directory log_dir;
   let sources = Wast.sources path in
@@ -210,7 +231,7 @@ let run ~semantics ~maude ~timeout ~steps ~call_depth ?progress ?log_dir path =
   |> List.mapi
        (fun index source ->
          let case =
-           run_case ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir
+           run_case ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir
              (index + 1) source
          in
          Option.iter

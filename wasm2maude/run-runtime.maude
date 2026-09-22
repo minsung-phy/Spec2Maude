@@ -1,0 +1,47 @@
+--- Fixed run rules; the generated module supplies the input data.
+
+mod WASM2MAUDE-RUN-RUNTIME is
+  protecting WASM-BUILTINS .
+
+  sort RunState .
+  op boot : -> RunState [ctor] .
+  op init : SpectecTerminal -> RunState [ctor frozen (1)] .
+  op exec : SpectecTerminal -> RunState [ctor frozen (1)] .
+
+  op inputModule : -> SpectecTerminal .
+  op inputName : -> SpectecTerminals .
+  op inputArgs : -> ValList .
+  op emptyStore : -> SpectecTerminal .
+  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
+  op hasExport : SpectecTerminals SpectecTerminals -> Bool .
+
+  vars C C2 Z XA : SpectecTerminal .
+  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
+  var ADDR : Nat .
+
+  eq emptyStore = {
+    item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ;
+    item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ;
+    item('ELEMS, eps) ; item('STRUCTS, eps) ; item('ARRAYS, eps) ;
+    item('EXNS, eps)
+  } .
+
+  ceq findFunc(
+    EXPORT-PREFIX {item('NAME, NAME) ; item('ADDR, FUNC(ADDR))} EXPORTS,
+    NAME) = ADDR
+    if not hasExport(EXPORT-PREFIX, NAME) .
+  eq hasExport(
+    EXPORT-PREFIX {item('NAME, NAME) ; item('ADDR, XA)} EXPORTS,
+    NAME) = true .
+  eq hasExport(EXPORTS, NAME) = false [owise] .
+
+  crl [instantiate] : boot => init(C)
+    if instantiate(emptyStore, inputModule, eps) => C .
+  crl [init-step] : init(C) => init(C2)
+    if Step(C) => C2 .
+  crl [invoke] : init(C) => exec(invoke(spectec-store(Z),
+      findFunc(value('EXPORTS, spectec-moduleinst(Z)), inputName), inputArgs))
+    if (Z ; eps) := C .
+  crl [step] : exec(C) => exec(C2)
+    if Step(C) => C2 .
+endm

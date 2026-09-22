@@ -208,10 +208,6 @@ let record fields =
 
 let app name arguments =
   match name, arguments with
-  | ( "uN.wrap" | "dim.wrap" | "sz.wrap" | "byte.wrap" | "char.wrap"
-    | "name.wrap" | "list.wrap" | "bshape.wrap" | "ishape.wrap"
-    | "storeop.wrap" ), [value] ->
-      value
   | ("fieldtype.wrap" | "globaltype.wrap"), [modifier; value_type] ->
       raw_app "tuple" [seq [raw_app "seq" [modifier]; value_type]]
   | "tabletype.wrap", [addr; limits; reftype] ->
@@ -244,8 +240,4 @@ let app name arguments =
         ; "FUNCS", funcs; "DATAS", datas; "ELEMS", elems; "STRUCTS", structs
         ; "ARRAYS", arrays; "EXNS", exns
         ]
-  | "helper.iter-count.allocmem", [count; _minimum] ->
-      raw_app "repeatSeq" [count; raw_atom "0"]
-  | "helper.iter-count.alloctable", [count; _minimum; reference] ->
-      raw_app "repeatSeq" [count; reference]
   | _ -> raw_app (source_name name) arguments

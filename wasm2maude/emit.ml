@@ -97,7 +97,7 @@ rew [1] in WASM2MAUDE-INPUT :
 |}
       semantics request
 
-let runtime_terms ?(name = Fun.id) ?(arguments = "inputArgs") () =
+let runtime_terms name =
   let c = variable "C" in
   let z = variable "Z" in
   let exports = variable "EXPORTS" in
@@ -128,7 +128,7 @@ let runtime_terms ?(name = Fun.id) ?(arguments = "inputArgs") () =
       [T.app "value" [variable "'EXPORTS"; module_];
        variable (name "inputName")]
   in
-  let invocation = invoke store address (variable arguments) |> render in
+  let invocation = invoke store address (variable "ARGS") |> render in
   { function_export;
     other_export;
     instantiate;
@@ -166,7 +166,7 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
        Ingress_error.raise Ingress_error.Unsupported m.source
          "harness invocation requires a function export with a resolved type");
   let name suffix = prefix ^ String.capitalize_ascii suffix in
-  let runtime = runtime_terms ~name ~arguments:"ARGS" () in
+  let runtime = runtime_terms name in
   let buffer = Buffer.create 4096 in
   let emit fmt = Printf.bprintf buffer fmt in
   let state = name "RunState" in
@@ -204,58 +204,35 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
     (name "finished") (name "exec") (name "result");
   Buffer.contents buffer
 
-let run ~semantics ~export ~args ~steps:limit m =
+let runtime_path path =
+  if Filename.is_relative path then Filename.concat (Sys.getcwd ()) path
+  else path
+
+let run ?(runtime = "wasm2maude/run-runtime.maude")
+    ~semantics ~export ~args ~steps:limit m =
   if Frontend.import_count m <> 0 then
     Ingress_error.raise Ingress_error.Unsupported m.source
       "running a module with imports needs an explicit host-address mapping"
   else
     let input, export, args = invocation m export args in
-    let runtime = runtime_terms () in
     Printf.sprintf
       {|load %s
+load %s
 
 mod WASM2MAUDE-RUN is
-  protecting WASM-BUILTINS .
-
-  sort RunState .
-  op boot : -> RunState [ctor] .
-  op init : SpectecTerminal -> RunState [ctor frozen (1)] .
-  op exec : SpectecTerminal -> RunState [ctor frozen (1)] .
-
-  op inputModule : -> SpectecTerminal .
-  op inputName : -> SpectecTerminals .
-  op inputArgs : -> ValList .
-  op emptyStore : -> SpectecTerminal .
-  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
-  op hasExport : SpectecTerminals SpectecTerminals -> Bool .
-
-  vars C C2 Z XA : SpectecTerminal .
-  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
-  var ADDR : Nat .
+  including WASM2MAUDE-RUN-RUNTIME .
 
   eq inputModule = %s .
   eq inputName = %s .
   eq inputArgs = %s .
-  eq emptyStore = %s .
-
-%s
-  crl [instantiate] : boot => init(C)
-    if %s => C .
-  crl [init-step] : init(C) => init(C2)
-    if %s => C2 .
-  crl [invoke] : init(C) => exec(%s)
-    if %s := C .
-  crl [step] : exec(C) => exec(C2)
-    if %s => C2 .
 endm
 
 rew [%d] in WASM2MAUDE-RUN : boot .
 |}
-      semantics input export args (render empty_store) (export_lookup Fun.id runtime)
-      runtime.instantiate runtime.step runtime.invocation
-      runtime.initialized runtime.step limit
+      semantics (runtime_path runtime) input export args limit
 
-let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
+let modelcheck ?(runtime = "wasm2maude/modelcheck-runtime.maude")
+    ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
   if Frontend.import_count m <> 0 then
     Ingress_error.raise Ingress_error.Unsupported m.source
       "model checking a module with imports needs an explicit host-address mapping"
@@ -268,70 +245,19 @@ let modelcheck ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
         "expected and rejected model-checking results must have the same type";
     let expected = Encode.num_instr expected |> render in
     let rejected = Encode.num_instr rejected |> render in
-    let runtime = runtime_terms () in
     Printf.sprintf
       {|load %s
-load model-checker.maude
+load %s
 
 mod WASM2MAUDE-MODELCHECK is
-  protecting WASM-BUILTINS .
-  including MODEL-CHECKER * (
-    op _xor_ : Nat Nat -> Nat to integerXor,
-    op _+_ : String String -> String to stringConcat,
-    op _<_ : String String -> Bool to stringLess,
-    op _<=_ : String String -> Bool to stringLessEqual,
-    op _>_ : String String -> Bool to stringGreater,
-    op _>=_ : String String -> Bool to stringGreaterEqual,
-    op char : Nat -> Char to nativeChar
-  ) .
-
-  sort ModelState .
-  subsort ModelState < State .
-  op boot : -> ModelState [ctor] .
-  op init : SpectecTerminal -> ModelState [ctor frozen (1)] .
-  op ready : SpectecTerminal -> ModelState [ctor] .
-  op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .
-  op finished : ValList -> ModelState [ctor] .
-
-  op inputModule : -> SpectecTerminal .
-  op inputName : -> SpectecTerminals .
-  op inputArgs : -> ValList .
-  op emptyStore : -> SpectecTerminal .
-  op expected : -> ValList .
-  op rejected : -> ValList .
-  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
-  op hasExport : SpectecTerminals SpectecTerminals -> Bool .
-  op returned : ValList -> Prop [ctor] .
-
-  vars C C2 Z XA : SpectecTerminal .
-  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
+  including WASM2MAUDE-MODELCHECK-RUNTIME .
   var RESULT : ValList .
-  var ADDR : Nat .
-  var ST : ModelState .
-  var P : Prop .
 
   eq inputModule = %s .
   eq inputName = %s .
   eq inputArgs = %s .
   eq expected = %s .
   eq rejected = %s .
-  eq emptyStore = %s .
-
-%s
-  crl [instantiate] : boot => init(C)
-    if %s => C .
-  crl [init-step] : init(C) => init(C2)
-    if %s => C2 .
-  crl [initialize] : init(C) => ready(Z)
-    if %s := C .
-  rl [invoke] : ready(Z) => exec(%s) .
-  crl [execute-step] : exec(C) => exec(C2)
-    if %s => C2 .
-  crl [finished] : exec(C) => finished(RESULT)
-    if (Z ; RESULT) := C .
-
-  eq finished(RESULT) |= returned(RESULT) = true .
-  eq ST |= P = false [owise] .
 endm
 
 rew [%d] in WASM2MAUDE-MODELCHECK : boot .
@@ -351,7 +277,5 @@ red in WASM2MAUDE-MODELCHECK :
 red in WASM2MAUDE-MODELCHECK :
   modelCheck(boot, <> returned(rejected)) .
 |}
-      semantics input export args expected rejected (render empty_store)
-      (export_lookup Fun.id runtime) runtime.instantiate
-      runtime.step runtime.initialized runtime.invocation runtime.step limit
-      limit limit
+      semantics (runtime_path runtime) input export args expected rejected
+      limit limit limit

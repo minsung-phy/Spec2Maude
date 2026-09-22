@@ -8,6 +8,7 @@ val harness :
   Frontend.module_ ->
   string
 val run :
+  ?runtime:string ->
   semantics:string ->
   export:Wasm.Ast.name ->
   args:Wasm.Value.num list ->
@@ -16,6 +17,7 @@ val run :
   string
 
 val modelcheck :
+  ?runtime:string ->
   semantics:string ->
   export:Wasm.Ast.name ->
   args:Wasm.Value.num list ->

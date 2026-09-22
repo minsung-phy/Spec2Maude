@@ -1,5 +1,6 @@
 val render :
   semantics:string ->
+  runtime:string ->
   steps:int ->
   commands:(string * Maude_term.t) list ->
   host_store:string ->

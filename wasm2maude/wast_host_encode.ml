@@ -1,8 +1,7 @@
 module T = Spectec_term
 
 let seq terms = T.seq terms
-let list terms = T.app "list.wrap" [seq terms]
-let u64 value = T.app "uN.wrap" [T.atom (Int64.to_string value)]
+let u64 value = T.atom (Int64.to_string value)
 let present term = T.app "_?" [term]
 let option f = function None -> seq [] | Some value -> present (f value)
 
@@ -21,14 +20,14 @@ let host_deftype = function
             (Wasm.Types.Final, [], Wasm.Types.FuncT (args, results))], 0l) ->
       let comp =
         T.app "comptype.func-sym"
-          [list (List.map host_valtype args);
-           list (List.map host_valtype results)]
+          [seq (List.map host_valtype args);
+           seq (List.map host_valtype results)]
       in
       let subtype =
         T.app "subtype.sub" [present (T.atom "final.final"); seq []; comp]
       in
       T.app "deftype.def"
-        [T.app "rectype.rec" [list [subtype]]; T.atom "0"]
+        [T.app "rectype.rec" [seq [subtype]]; T.atom "0"]
   | _ -> invalid_arg "Wast_host_encode.host_deftype"
 
 let limits {Wasm.Types.min; max} =
@@ -71,13 +70,11 @@ let host_resource_term {Wast_plan.export; _} =
       let bytes = Int64.mul lim.min 65536L in
       T.app "rec.meminst"
         [memtype typ;
-         T.app "helper.iter-count.allocmem" [T.atom (Int64.to_string bytes); u64 lim.min]]
+         T.app "repeatSeq" [u64 bytes; T.atom "0"]]
   | Wast_host.Table (Wasm.Types.TableT (_, lim, _) as typ) ->
       T.app "rec.tableinst"
         [tabletype typ;
-         T.app "helper.iter-count.alloctable"
-           [T.atom (Int64.to_string lim.min); u64 lim.min;
-            T.atom "ref.ref-null-addr"]]
+         T.app "repeatSeq" [u64 lim.min; T.atom "ref.ref-null-addr"]]
 
 let host_extern_term {Wast_plan.export; address} =
   let address = T.atom (string_of_int address) in

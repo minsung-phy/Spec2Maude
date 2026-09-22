@@ -13,10 +13,10 @@ let nat n = atom (string_of_int n)
 let decimal text = String.concat "" (String.split_on_char '_' text)
 let i32_nat n = atom (decimal (I32.to_string_u n))
 let i64_nat n = atom (decimal (I64.to_string_u n))
-let u32 n = app "uN.wrap" [i32_nat n]
-let u64 n = app "uN.wrap" [i64_nat n]
+let u32 = i32_nat
+let u64 = i64_nat
 let idx x = u32 x.Source.it
-let list f xs = app "list.wrap" [seq (List.map f xs)]
+let list f xs = seq (List.map f xs)
 let present term = app "_?" [term]
 let option f = function
   | None -> seq []
@@ -33,19 +33,16 @@ let lane_shape = function
   | V128.F64x2 _ -> F64x2
 
 let shape = function
-  | I8x16 -> app "shape.x" [atom "packtype.i8"; app "dim.wrap" [nat 16]]
-  | I16x8 -> app "shape.x" [atom "packtype.i16"; app "dim.wrap" [nat 8]]
-  | I32x4 -> app "shape.x" [atom "i32"; app "dim.wrap" [nat 4]]
-  | I64x2 -> app "shape.x" [atom "i64"; app "dim.wrap" [nat 2]]
-  | F32x4 -> app "shape.x" [atom "f32"; app "dim.wrap" [nat 4]]
-  | F64x2 -> app "shape.x" [atom "f64"; app "dim.wrap" [nat 2]]
+  | I8x16 -> app "shape.x" [atom "packtype.i8"; nat 16]
+  | I16x8 -> app "shape.x" [atom "packtype.i16"; nat 8]
+  | I32x4 -> app "shape.x" [atom "i32"; nat 4]
+  | I64x2 -> app "shape.x" [atom "i64"; nat 2]
+  | F32x4 -> app "shape.x" [atom "f32"; nat 4]
+  | F64x2 -> app "shape.x" [atom "f64"; nat 2]
 
 let result_shape value = shape (lane_shape value)
 
-let ishape lane = app "ishape.wrap" [shape lane]
-let bshape lane = app "bshape.wrap" [shape lane]
-
-let laneidx i = app "uN.wrap" [nat (I8.to_int_u i)]
+let laneidx i = nat (I8.to_int_u i)
 
 let decimal_mul_add digits factor add =
   let digit n = Char.chr (Char.code '0' + n) in
@@ -71,7 +68,7 @@ let v128_nat value =
   loop (String.length bytes - 1) "0"
 
 let v128 constructor value =
-  let bits = app "uN.wrap" [atom (v128_nat value)] in
+  let bits = atom (v128_nat value) in
   app constructor [atom "vectype.v128"; bits]
 
 let vec_value value = v128 "vconst" value
@@ -181,21 +178,20 @@ let sx = function
   | Pack.S -> atom "sx.s"
 
 let packsize = function
-  | Pack.Pack8 -> app "sz.wrap" [nat 8]
-  | Pack.Pack16 -> app "sz.wrap" [nat 16]
-  | Pack.Pack32 -> app "sz.wrap" [nat 32]
-  | Pack.Pack64 -> app "sz.wrap" [nat 64]
+  | Pack.Pack8 -> nat 8
+  | Pack.Pack16 -> nat 16
+  | Pack.Pack32 -> nat 32
+  | Pack.Pack64 -> nat 64
 
 let memarg align offset =
-  app "rec.memarg"
-    [app "uN.wrap" [nat align]; app "uN.wrap" [i64_nat offset]]
+  app "rec.memarg" [nat align; i64_nat offset]
 
 let loadop {Ast.ty; pack; _} =
   let packed = option (fun (size, sign) -> app "loadop.sym" [packsize size; sx sign]) pack in
   numtype ty, packed
 
 let storeop {Ast.ty; pack; _} =
-  numtype ty, option (fun size -> app "storeop.wrap" [packsize size]) pack
+  numtype ty, option packsize pack
 
 let half = function
   | Ast.V128Op.Low -> atom "half.low"
@@ -323,30 +319,28 @@ let vector_binop source at op =
   let sh = shape lane in
   match op with
   | V128.I8x16 Ast.V128Op.Swizzle ->
-      app "instr.vswizzlop" [bshape lane; atom "vswizzlop.swizzle"]
+      app "instr.vswizzlop" [sh; atom "vswizzlop.swizzle"]
   | V128.I8x16 Ast.V128Op.RelaxedSwizzle ->
-      app "instr.vswizzlop" [bshape lane; atom "vswizzlop.relaxed-swizzle"]
+      app "instr.vswizzlop" [sh; atom "vswizzlop.relaxed-swizzle"]
   | V128.I8x16 (Ast.V128Op.Shuffle lanes) ->
-      app "instr.vshuffle" [bshape lane; seq (List.map laneidx lanes)]
+      app "instr.vshuffle" [sh; seq (List.map laneidx lanes)]
   | (V128.I8x16 (Ast.V128Op.Narrow sign)
     | V128.I16x8 (Ast.V128Op.Narrow sign)) ->
       app "instr.vnarrow"
-        [ishape lane;
-         app "ishape.wrap" [vector_narrow_input_shape source at lane];
-         sx sign]
+        [sh; vector_narrow_input_shape source at lane; sx sign]
   | (V128.I16x8 (Ast.V128Op.ExtMul (part, sign))
     | V128.I32x4 (Ast.V128Op.ExtMul (part, sign))
     | V128.I64x2 (Ast.V128Op.ExtMul (part, sign))) ->
       app "instr.vextbinop"
-        [ishape lane; app "ishape.wrap" [vector_input_shape source at lane];
+        [sh; vector_input_shape source at lane;
          app "vextbinop.extmul" [half part; sx sign]]
   | V128.I16x8 Ast.V128Op.RelaxedDot ->
       app "instr.vextbinop"
-        [ishape lane; app "ishape.wrap" [vector_dot_input_shape source at lane];
+        [sh; vector_dot_input_shape source at lane;
          atom "vextbinop.relaxed-dot-s"]
   | V128.I32x4 Ast.V128Op.DotS ->
       app "instr.vextbinop"
-        [ishape lane; app "ishape.wrap" [vector_dot_input_shape source at lane];
+        [sh; vector_dot_input_shape source at lane;
          atom "vextbinop.dot-s"]
   | V128.I8x16 x | V128.I16x8 x | V128.I32x4 x | V128.I64x2 x ->
       app "instr.vbinop" [sh; int_vbinop source at x]
@@ -358,8 +352,7 @@ let vector_ternop source at op =
   match op with
   | V128.I32x4 Ast.V128Op.RelaxedDotAddS ->
       app "instr.vextternop"
-        [ishape lane;
-         app "ishape.wrap" [vector_dot_add_input_shape source at lane];
+        [sh; vector_dot_add_input_shape source at lane;
          atom "vextternop.relaxed-dot-add-s"]
   | (V128.I8x16 Ast.V128Op.RelaxedLaneselect
     | V128.I16x8 Ast.V128Op.RelaxedLaneselect
@@ -385,7 +378,7 @@ let vector_convert source at op =
   | (V128.I16x8 (Ast.V128Op.ExtAddPairwise sign)
     | V128.I32x4 (Ast.V128Op.ExtAddPairwise sign)) ->
       app "instr.vextunop"
-        [ishape lane; app "ishape.wrap" [vector_input_shape source at lane];
+        [result; vector_input_shape source at lane;
          app "vextunop.extadd-pairwise" [sx sign]]
   | (V128.I16x8 (Ast.V128Op.Extend (part, sign))
     | V128.I32x4 (Ast.V128Op.Extend (part, sign))
@@ -417,20 +410,20 @@ let vector_shift (op : Ast.V128Op.shiftop) =
   match op with
   | V128.I8x16 Ast.V128Op.Shl | V128.I16x8 Ast.V128Op.Shl
   | V128.I32x4 Ast.V128Op.Shl | V128.I64x2 Ast.V128Op.Shl ->
-      app "instr.vshiftop" [ishape (lane_shape op); atom "vshiftop.shl"]
+      app "instr.vshiftop" [shape (lane_shape op); atom "vshiftop.shl"]
   | V128.I8x16 (Ast.V128Op.Shr sign)
   | V128.I16x8 (Ast.V128Op.Shr sign)
   | V128.I32x4 (Ast.V128Op.Shr sign)
   | V128.I64x2 (Ast.V128Op.Shr sign) ->
       app "instr.vshiftop"
-        [ishape (lane_shape op); app "vshiftop.shr" [sx sign]]
+        [shape (lane_shape op); app "vshiftop.shr" [sx sign]]
   | _ -> .
 
 let vector_bitmask (op : Ast.V128Op.bitmaskop) =
   match op with
   | V128.I8x16 Ast.V128Op.Bitmask | V128.I16x8 Ast.V128Op.Bitmask
   | V128.I32x4 Ast.V128Op.Bitmask | V128.I64x2 Ast.V128Op.Bitmask ->
-      app "instr.vbitmask" [ishape (lane_shape op)]
+      app "instr.vbitmask" [shape (lane_shape op)]
   | _ -> .
 
 let vector_splat op =
@@ -613,8 +606,8 @@ let f64 n =
     ~max_exponent:0x7ff ~bias:1023
 
 let const = function
-  | Value.I32 n -> (numtype Types.I32T, app "uN.wrap" [i32_nat n])
-  | Value.I64 n -> (numtype Types.I64T, app "uN.wrap" [i64_nat n])
+  | Value.I32 n -> (numtype Types.I32T, i32_nat n)
+  | Value.I64 n -> (numtype Types.I64T, i64_nat n)
   | Value.F32 n -> (numtype Types.F32T, f32 n)
   | Value.F64 n -> (numtype Types.F64T, f64 n)
 
@@ -733,15 +726,15 @@ and instr source ({Source.it; at} : Ast.instr) =
   | Ast.StructNew (typ, Ast.Implicit) -> unary "instr.struct-new-default" typ
   | Ast.StructGet (typ, field, sign) ->
       app "instr.struct-get"
-        [option sx sign; idx typ; app "uN.wrap" [i32_nat field]]
+        [option sx sign; idx typ; i32_nat field]
   | Ast.StructSet (typ, field) ->
       app "instr.struct-set"
-        [idx typ; app "uN.wrap" [i32_nat field]]
+        [idx typ; i32_nat field]
   | Ast.ArrayNew (typ, Ast.Explicit) -> unary "instr.array-new" typ
   | Ast.ArrayNew (typ, Ast.Implicit) -> unary "instr.array-new-default" typ
   | Ast.ArrayNewFixed (typ, count) ->
       app "instr.array-new-fixed"
-        [idx typ; app "uN.wrap" [i32_nat count]]
+        [idx typ; i32_nat count]
   | Ast.ArrayNewData (typ, data) ->
       app "instr.array-new-data" [idx typ; idx data]
   | Ast.ArrayNewElem (typ, elem) ->
@@ -870,7 +863,7 @@ let data source ({Source.it = Ast.Data (bytes, m); _} : Ast.data) =
   let bytes =
     String.to_seq bytes
     |> List.of_seq
-    |> List.map (fun c -> app "byte.wrap" [nat (Char.code c)])
+    |> List.map (fun c -> nat (Char.code c))
   in
   app "data.data" [seq bytes; mode source m]
 

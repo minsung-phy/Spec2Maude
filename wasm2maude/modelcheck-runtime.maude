@@ -1,0 +1,72 @@
+--- Fixed modelcheck rules; the generated module supplies the input data.
+load model-checker.maude
+
+mod WASM2MAUDE-MODELCHECK-RUNTIME is
+  protecting WASM-BUILTINS .
+  including MODEL-CHECKER * (
+    op _xor_ : Nat Nat -> Nat to integerXor,
+    op _+_ : String String -> String to stringConcat,
+    op _<_ : String String -> Bool to stringLess,
+    op _<=_ : String String -> Bool to stringLessEqual,
+    op _>_ : String String -> Bool to stringGreater,
+    op _>=_ : String String -> Bool to stringGreaterEqual,
+    op char : Nat -> Char to nativeChar
+  ) .
+
+  sort ModelState .
+  subsort ModelState < State .
+  op boot : -> ModelState [ctor] .
+  op init : SpectecTerminal -> ModelState [ctor frozen (1)] .
+  op ready : SpectecTerminal -> ModelState [ctor] .
+  op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .
+  op finished : ValList -> ModelState [ctor] .
+
+  op inputModule : -> SpectecTerminal .
+  op inputName : -> SpectecTerminals .
+  op inputArgs : -> ValList .
+  op emptyStore : -> SpectecTerminal .
+  op expected : -> ValList .
+  op rejected : -> ValList .
+  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
+  op hasExport : SpectecTerminals SpectecTerminals -> Bool .
+  op returned : ValList -> Prop [ctor] .
+
+  vars C C2 Z XA : SpectecTerminal .
+  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
+  var RESULT : ValList .
+  var ADDR : Nat .
+  var ST : ModelState .
+  var P : Prop .
+
+  eq emptyStore = {
+    item('TAGS, eps) ; item('GLOBALS, eps) ; item('MEMS, eps) ;
+    item('TABLES, eps) ; item('FUNCS, eps) ; item('DATAS, eps) ;
+    item('ELEMS, eps) ; item('STRUCTS, eps) ; item('ARRAYS, eps) ;
+    item('EXNS, eps)
+  } .
+
+  ceq findFunc(
+    EXPORT-PREFIX {item('NAME, NAME) ; item('ADDR, FUNC(ADDR))} EXPORTS,
+    NAME) = ADDR
+    if not hasExport(EXPORT-PREFIX, NAME) .
+  eq hasExport(
+    EXPORT-PREFIX {item('NAME, NAME) ; item('ADDR, XA)} EXPORTS,
+    NAME) = true .
+  eq hasExport(EXPORTS, NAME) = false [owise] .
+
+  crl [instantiate] : boot => init(C)
+    if instantiate(emptyStore, inputModule, eps) => C .
+  crl [init-step] : init(C) => init(C2)
+    if Step(C) => C2 .
+  crl [initialize] : init(C) => ready(Z)
+    if (Z ; eps) := C .
+  rl [invoke] : ready(Z) => exec(invoke(spectec-store(Z),
+      findFunc(value('EXPORTS, spectec-moduleinst(Z)), inputName), inputArgs)) .
+  crl [execute-step] : exec(C) => exec(C2)
+    if Step(C) => C2 .
+  crl [finished] : exec(C) => finished(RESULT)
+    if (Z ; RESULT) := C .
+
+  eq finished(RESULT) |= returned(RESULT) = true .
+  eq ST |= P = false [owise] .
+endm

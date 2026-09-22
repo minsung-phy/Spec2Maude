@@ -4,8 +4,13 @@ type report = {
   runtime_assertions : int;
 }
 
-let emit ~semantics ~steps ~call_depth source =
+let emit ?(runtime = "wasm2maude/wast-runtime.maude")
+    ~semantics ~steps ~call_depth source =
   if call_depth < 0 then invalid_arg "Wast_run.emit: negative call depth";
+  let runtime =
+    if Filename.is_relative runtime then Filename.concat (Sys.getcwd ()) runtime
+    else runtime
+  in
   let plan = Wast_plan.load source in
   let commands =
     Wast_plan.commands plan
@@ -22,7 +27,7 @@ let emit ~semantics ~steps ~call_depth source =
     |> Maude_term.to_string
   in
   let text =
-    Wast_harness.render ~semantics ~steps ~commands ~host_store ~host_instances
+    Wast_harness.render ~semantics ~runtime ~steps ~commands ~host_store ~host_instances
       ~host_functions
   in
   let commands = Wast_plan.source_commands plan in
