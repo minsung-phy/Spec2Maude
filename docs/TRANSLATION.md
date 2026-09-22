@@ -39,7 +39,7 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
 ## 현재 구현과 미지원 항목
 
 - 일반 목록은 `SpectecTerminals`, `eps`, `__`이고, 목록 원소로 쓰이는 목록은
-  `seq(...)`로 구분한다. 별도 목록 sort는 `maude_sort` hint로만 선택한다.
+  `seq(...)`로 구분한다. 이 baseline은 별도 목록 sort hint를 지원하지 않는다.
 - Wasm IL에서 사용하는 Nat·Int·유한 Rat 계산과 변환은 유지한다.
   Wasm f32/f64는 원문의 `POS/NEG`, `NORM/SUBNORM/INF/NAN` 자료와 builtin으로 처리한다.
 - 현재 입력에 없는 IL Real 값·변환·산술, 비유한 Rat 값과 일부 Rat 산술은
@@ -68,7 +68,7 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
 기록한다. PASS, STUCK, TIMEOUT을 구분한다.
 official suite 통과만으로 모든 프로그램의 의미 동등성이 증명되는 것은 아니다.
 
-모델체커의 초기화·실행 wrapper와 focus/heat/cool 상태를 source의 한 step과
+모델체커의 초기화·실행 wrapper를 source의 한 step과
 동일시하지 않는다. 특정 속성을 source로 옮겨 주장하려면 상태 대응, 관측 지점,
 내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
 현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
@@ -76,22 +76,14 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 ## 공통 backend와 목록 계산
 
 고정 sort, 타입 표현·검사, 목록·option·tuple·record의 공통 연산은
-`translator/backend/pretype.maude` 한 파일에 둔다. 이 파일은 먼저
-`SPECTEC-TERM`에서 기본 sort를 선언하고, `generated/types.maude`를 읽은 뒤
-`SPECTEC-PRETYPE`에서 공통 연산을 정의한다. `types.maude`의
-`SPEC2MAUDE-TYPES`는 source hint별 native LIST instantiation과 좁은 타입
-선언을 제공한다. `generated/output.maude`는 `SPECTEC-PRETYPE`을 import하고
-source별 목록 subsort 연결과 번역된 정의를 추가한다.
+`translator/backend/pretype.maude` 한 파일에 둔다. `SPECTEC-TERM`에서 기본
+sort를 선언하고 `generated/types.maude`를 읽은 뒤 `SPECTEC-PRETYPE`에서 공통
+연산을 정의한다. 이 baseline의 `SPEC2MAUDE-TYPES`는 기본 sort를 import하며
+별도 typed LIST instantiation은 생성하지 않는다. 목록에는 공통 `eps`, `__`,
+`seq(...)` 표현을 사용한다.
 
-이 순서는 native LIST 뒤에 공통 `eps`, `__` overload를 선언하여 두 연산을
-하나의 모듈 확장 관계로 연결한다. 공통 정의를 source마다 생성하지 않으며,
-파일 통합을 위해 IL 표현이나 equation의 계산 의미를 바꾸지 않는다.
-
-공유 목록 검사는 `T U TS` 패턴으로 원소가 두 개 이상일 때만 재귀한다.
-단일 원소를 조건에서 다시 검사하지 않으며, 별도의 빈 suffix 비교가 필요
-없다. 현재 Wasm의 `val < instr` 목록은 `eps`와 `__`를 공유한다.
-별도 연결 연산을 생성하는 경로는 제공하지 않으며, 목록 sort들이 하나의
-subsort chain을 이루지 않는 hint 조합은 `Unsupported`로 거부한다.
+공유 목록 검사는 main처럼 `T U TS` 패턴으로 원소가 두 개 이상일 때만 재귀한다.
+단일 원소 검사와 일반 목록 연산은 변경하지 않았다.
 
 `typecheck`는 `SpectecTerminals`에 속하는 값과 목록을 검사한다. 실패
 equation과 option 검사도 sort 변수로 정의한다. kind에만 속하는 미정의 항을
@@ -101,7 +93,7 @@ equation과 option 검사도 sort 변수로 정의한다. kind에만 속하는 �
 미정의 항의 처리 계약을 별도로 정해야 한다.
 
 `LenE`, `SliceE`, `UpdE` 및 premise/iteration의 IL 번역은 유지한다.
-`ListE`는 목록 연결을, `LenE`는 `len` 또는 typed 목록의 size를 직접 사용하므로
+`ListE`는 목록 연결을, `LenE`는 `len`을 직접 사용하므로
 별도의 `[TS]`, `|TS|` 표기 wrapper는 제공하지 않는다.
 일반 목록의 membership은 `PREFIX T SUFFIX` 매칭과 `[owise]`로 구현한다.
 index/setAt은 해당 원소 앞 prefix의 길이를 검사한다. slice/splice는
@@ -114,10 +106,8 @@ index/setAt은 해당 원소 앞 prefix의 길이를 검사한다. slice/splice�
 길이는 `lenAux(S, n) = n + |S|`인 accumulator로 계산하고,
 반복 목록은 `N = 2 * (N quo 2) + (N rem 2)`로 구성한다.
 이는 Maude prelude LIST의 size/reverse처럼 결과를 집계하거나 구성하는
-재귀 equation이다. typed list 연산은 native LIST 정의를 사용하고,
-생성 코드는 `eps`, `__` 및 목록 연산의 결과 sort를 좁히는 overload를 선언한다.
-size·occurs와 size accumulator는 native 선언이 이미 같은 `Nat`·`NzNat`·`Bool`
-결과 sort를 제공하므로 좁은 입력 sort에 대해 중복 선언하지 않는다.
+재귀 equation이다. 이들 일반 목록 연산은 main과 동일하다.
+별도 typed list 연산과 입력·결과 sort를 좁히는 overload는 생성하지 않는다.
 
 record 조회/갱신은 field를 매칭하고 prefix에 동일 field가 없다는 조건으로
 첫 항목을 선택한다. 없는 field의 조회는 eps, 갱신은 끝에 추가한다.
@@ -200,10 +190,6 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 
 | Hint | 역할과 적용 조건 |
 | --- | --- |
-| `maude_sort` | source 타입에 별도 Maude sort와 목록 표현을 부여한다. 목록으로 사용하는 sort들은 하나의 subsort chain이어야 한다. 없는 경우 일반 `SpectecTerminals` 표현을 사용한다. |
-| `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
-| `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
-| `k_heatcool` | 실행 RulePr를 heat/cool로 연결한다. source에서 hole의 저장 변수와 결과 복원을 추출하고 premise 순서를 유지한다. 목록 context는 기존 focus 식별 및 경계 조건을 보존한다. |
 | `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
 | `inverse $g` | 빠진 인자를 선언된 역함수 g로 구하고 pattern과 forward 결과를 재확인한다. 인자 순서·signature를 검사한다. |
@@ -246,233 +232,18 @@ NaN·relaxed 선택에 대한 결과로 일반화하지 않는다.
 context의 내부 상태는 source 상태와 구분한다. 검색 결과 일치는 임의 LTL 속성의
 보존 증명이 아니며, 현재 경계는 [검증과 모델체킹의 경계](#검증과-모델체킹의-경계)에 기록한다.
 
-### k_heatcool 적용 범위
-
-인자 없는 `hint(k_heatcool)`로 사용한다(이전 이름: `maude_context`).
-`Step/pure`, `Step/read`, `Step/ctxt-instrs`, `Step/ctxt-label`,
-`Step/ctxt-handler`, `Step/ctxt-frame`, `Steps/trans`, `Eval_expr`에 적용한다.
-실제 source와 생성 결과는 아래 [8개 rule의 변환 예시](#k_heatcool-8개-rule의-변환-예시)에 있다.
-
-hint는 실행 relation의 RuleD에 적용하며 직접적인 실행 RulePr가 하나 이상 필요하다.
-실행 premise마다 이전 binding 중 결과 패턴·남은 조건·결론에 필요한 변수만 hole에 저장한다.
-일반 조건과 출력 패턴 검사는 해당 실행의 앞뒤 순서를 유지한다.
-sequence-result relation으로 연결하는 단일 premise에서는 대상 입력 패턴으로 식별 helper를 생성한다.
-현재 source rule 이름으로 `identifyPure`와 `identifyRead`가 생성되며, 실제 premise 검사는 실행 요청이 담당한다.
-생성자·relation의 Wasm 이름으로 번역을 선택하지 않는다.
-
-hinted rule의 ElsePr·IterPr·NegPr와 rewrite-backed expression은 현재 Unsupported다.
-함수 정의 절에 대한 heat/cool 확장은 이번 범위에 포함하지 않는다.
-요청 sort와 반환 sort는 구분하고, hole 인자에는 `[frozen (2)]`를 부여해 rule rewriting을 막는다.
-raw 요청의 실패 가지는 남을 수 있으므로 source의 공개 완료 결과와 구분한다.
-유한 실행 결과 검사만으로 임의 search/LTL 의미 보존을 주장하지 않는다.
-
-## k_heatcool: 8개 rule의 변환 예시
-
-아래는 현재 source와 생성된 Maude 문장이다. 보조 선언과 식별 규칙 전체는 생략했다.
-
-### 번역 계약과 구조
-
-`RuleD`의 실제 실행 `RulePr`를 식별하고, 기존 `Prem` 번역 결과를 사용한다. 실행 조건을 만나면 요청과 hole을 생성하고 남은 조건을 재귀적으로 번역한다. hole에는 이미 binding된 변수 중 내부 결과 패턴·나머지 조건·최종 결론에서 필요한 것만 저장한다. 모든 조건을 처리하면 원래 결론으로 cooling한다. 일반 조건을 다음 실행 premise 앞뒤로 넘기지 않는다.
-
-기존 prefix/hole/postfix context는 `identifyFocus` 경로를 유지한다. 생성자 context·relation 연결은 `reld.ml`의 조건 목록 재귀 처리로 처리한다. 별도 evaluator나 범용 premise 프레임워크를 추가하지 않는다. LABEL, FRAME 등의 이름으로 분기하지 않으며, 식별 helper와 hole 이름은 source rule에서 생성한다.
-
-`identifyPure`·`identifyRead`는 대상 relation의 입력 패턴에서 생성한다. 각각 성공 후보를 나타내는 별도 token을 반환하고, 실제 premise 검사는 Step-pure/Step-read 실행이 담당한다. 식별 과정에서 가능한 source 입력을 버리지 않는다. 목록 일부 선택은 기존 `identifyFocus`의 역할이다.
-
-실행 요청과 반환 결과는 sort로 구분한다. cooling은 반환 결과 패턴에만 적용된다. `Eval_expr`는 `VAL- : ValList`가 이 역할을 하므로 별도 typecheck를 삽입하지 않는다. `_~>_`의 hole 인자는 `[frozen (2)]`로 rule rewriting을 막는다. equation 정규화까지 금지한다는 뜻은 아니다.
-
-실패한 내부 요청 또는 Eval_expr의 비-value 중간 결과는 내부 정지 상태로 남을 수 있다. 기존 공개 driver의 `Step(C) => C2:SpectecTerminal` 조건은 완료 결과만 관측한다. raw 요청의 search/LTL을 source 상태의 search/LTL과 동일시하지 않는다. 유한 입력과 제한된 탐색 깊이의 결과 검사만으로 전체 의미 보존을 주장하지 않는다.
-
-### 1. Step/pure
-
-#### SpecTec source
-
-```spectec
-rule Step/pure:
-  z; instr*  ~>  z; instr'*
-  -- Step_pure: instr* ~> instr'*
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-crl [heating-Step-pure] : Step(Z ; INSTR-) => Step-pure(INSTR-) ~> hole-Step-pure-1(Z)
-    if identifyPure(INSTR-) => identified-Step-pure .
-
-eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
-```
-
-`identifyPure(INSTR-) => identified-Step-pure`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
-
-### 2. Step/read
-
-#### SpecTec source
-
-```spectec
-rule Step/read:
-  z; instr*  ~>  z; instr'*
-  -- Step_read: z; instr* ~> instr'*
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-crl [heating-Step-read] : Step(Z ; INSTR-) => Step-read(Z ; INSTR-) ~> hole-Step-read-1(Z)
-    if identifyRead(Z ; INSTR-) => identified-Step-read .
-
-eq INSTR-- ~> hole-Step-read-1(Z) = Z ; INSTR-- .
-```
-
-`identifyRead(Z ; INSTR-) => identified-Step-read`로 입력 후보를 확인한다. 읽기 실행은 instruction 목록을 반환하므로 원래 상태 Z를 붙인다.
-
-### 3. Step/ctxt-instrs
-
-#### SpecTec source
-
-```spectec
-rule Step/ctxt-instrs:
-  z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
-  -- Step: z; instr* ~> z'; instr'*
-  -- if val* =/= eps \/ instr_1* =/= eps
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
-    if (STACK (OP REST)) =/= OP
-      /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
-      /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
-
-eq (Z- ; INSTR--) ~> hole(PREFIX, POSTFIX) = Z- ; (PREFIX (INSTR-- POSTFIX)) .
-```
-
-기존 focus 식별과 prefix/postfix 복원을 유지한다. source의 nonempty 조건도 기존 guard로 남는다.
-
-### 4. Step/ctxt-label
-
-#### SpecTec source
-
-```spectec
-rule Step/ctxt-label:
-  z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
-  -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N3 { INSTR-0- } INSTR-)) => Step(Z ; INSTR-) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) .
-
-eq (Z- ; INSTR--) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) = Z- ; (LABEL- N3 { INSTR-0- } INSTR--) .
-```
-
-N과 INSTR0를 저장한다. RESULT에 해당하는 INSTR--는 내부 한 Step 뒤의 instruction 목록으로, 최종 값 목록일 필요가 없다.
-
-### 5. Step/ctxt-handler
-
-#### SpecTec source
-
-```spectec
-rule Step/ctxt-handler:
-  z; (HANDLER_ n `{catch*} instr*) ~> z'; (HANDLER_ n `{catch*} instr'*)
-  -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N3 { CATCH- } INSTR-)) => Step(Z ; INSTR-) ~> hole-Step-ctxt-handler-1(CATCH-, N3) .
-
-eq (Z- ; INSTR--) ~> hole-Step-ctxt-handler-1(CATCH-, N3) = Z- ; (HANDLER- N3 { CATCH- } INSTR--) .
-```
-
-N과 catch 목록을 저장하고, 갱신된 상태 및 instruction 목록으로 HANDLER를 복원한다.
-
-### 6. Step/ctxt-frame
-
-#### SpecTec source
-
-```spectec
-rule Step/ctxt-frame:
-  s; f; (FRAME_ n `{f'} instr*)  ~>  s'; f; (FRAME_ n `{f''} instr'*)
-  -- Step: s; f'; instr* ~> s'; f''; instr'*
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-rl [heating-Step-ctxt-frame] : Step((S2 ; F) ; (FRAME- N3 { F-14 } INSTR-)) => Step((S2 ; F-14) ; INSTR-) ~> hole-Step-ctxt-frame-1(N3, F) .
-
-eq ((S- ; F--) ; INSTR--) ~> hole-Step-ctxt-frame-1(N3, F) = (S- ; F) ; (FRAME- N3 { F-- } INSTR--) .
-```
-
-바깥 frame F는 유지한다. store S-와 내부 frame F--는 실행 결과를 사용한다.
-
-### 7. Steps/trans
-
-#### SpecTec source
-
-```spectec
-rule Steps/trans:
-  z; instr*  ~>*  z''; instr''*
-  -- Step: z; instr*  ~>  z'; instr'*
-  -- Steps: z'; instr'*  ~>*  z''; instr''*
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-rl [heating-Steps-trans] : Steps(Z ; INSTR-) => Step(Z ; INSTR-) ~> hole-Steps-trans-1 .
-
-eq (Z- ; INSTR--) ~> hole-Steps-trans-1 = Steps(Z- ; INSTR--) ~> hole-Steps-trans-2 .
-
-eq (Z-- ; INSTR---) ~> hole-Steps-trans-2 = Z-- ; INSTR--- .
-
-rl Steps(Z ; INSTR-) => Z ; INSTR- .
-```
-
-첫 Step의 결과를 다음 Steps에 전달한다. Steps/refl은 0회 실행을 보존하는 rule로 유지한다. 두 번째 hole은 원래 결론을 반환한다.
-
-### 8. Eval_expr
-
-#### SpecTec source
-
-```spectec
-rule Eval_expr:
-  z; instr*  ~>*  z'; val*
-  -- Steps: z; instr*  ~>*  z'; val*
-  hint(k_heatcool)
-```
-
-#### 현재 heat/cool 출력 (실제 생성)
-
-```maude
-rl [heating-Eval-expr-1] : Eval-expr(Z, INSTR-) => Steps(Z ; INSTR-) ~> hole-Eval-expr-1-1 .
-
-eq (Z- ; VAL-) ~> hole-Eval-expr-1-1 = tuple(Z- seq(VAL-)) .
-```
-
-VAL-의 sort는 ValList다. NOP/TRAP 등의 비-value 목록과 실행 중 요청은 이 cooling 패턴에 매치하지 않는다. tuple 모양도 원래 출력과 같다.
-
-### 지원 범위와 검증
-
-직접적인 실행 RulePr, 실행 전후의 일반 조건과 binding, 여러 실행 premise 연결을 지원한다. hinted rule 안의 ElsePr·IterPr·NegPr 및 rewrite-backed expression은 현재 명시적인 Unsupported다. 지원하지 않는 구조를 평범한 rule로 조용히 되돌리지 않는다. 기존 목록 context의 지원 범위는 유지한다.
-
-`4.4-execution.modules.spectec`의 `$evalexprs`, `$evalglobals`는 함수 정의 절이므로 위 relation rule 8개에 포함하지 않았다. 이들은 기존 번역을 유지하며, 변경된 Eval_expr를 호출한다.
-
-번역과 Maude load 확인:
-
-```sh
-dune build
-dune exec bin/spec2maude.exe --
-test/spectec_to_maude.sh
-```
-
-위 명령은 source 번역, 생성 파일 비교와 Maude load를 확인한다. 실행 결과 검사나 전체 공식 suite, 성능 비교, 일반 search/LTL 의미 보존 증명을 대신하지 않는다. 실행 및 suite 검사 방법은 [ARTIFACT.md](ARTIFACT.md)에 둔다.
+### Baseline의 hint 제거 범위
+
+`k_heatcool`, `maude_sort`, `maude_subsort`, `maude_proper`와 이전 이름
+`maude_context`는 source 위치와 enclosing definition을 포함한 `Unsupported`로
+거부한다. source의 해당 annotation과 전용 lowering을 제거했으며, 실행
+`RulePr`는 기존 일반 relation 번역 경로의 rewrite condition으로 남는다.
+
+run/modelcheck/WAST와 reusable harness는 일반 목록 타입을 사용한다.
+modelcheck/harness는 `typecheck(RESULT, val)`로 완료 값을 검사하고, WAST는
+기존 `runtimeResults`와 일반 host-call을 유지한다. focus 전용 host-call은 없다.
+
+main의 일반 조건 정렬·조건 중복 제거, iteration의 demand 기반 helper 생성과
+projector 처리, backend 목록 연산은 그대로 유지한다. 이는 모든 최적화를 제거한
+번역이 아니라 지정된 hint 기능만 제거한 비교 기준이다. 범위와 검증은
+[BASELINE.md](BASELINE.md)에 기록한다.

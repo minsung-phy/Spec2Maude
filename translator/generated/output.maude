@@ -1,36 +1,6 @@
 mod SPEC2MAUDE-GENERATED is
   protecting SPECTEC-PRETYPE .
 
-  subsort InstrList < SpectecTerminals .
-
-  sort FocusSearch .
-
-  sort FocusTarget .
-
-  sort Hole .
-
-  subsort FocusTarget < FocusSearch .
-
-  sort Hole-Step-pure-1 .
-
-  sort Identify-Step-pure .
-
-  sort Hole-Step-read-1 .
-
-  sort Identify-Step-read .
-
-  sort Hole-Steps-trans-1 .
-
-  sort Hole-Steps-trans-2 .
-
-  sort Hole-Step-ctxt-label-1 .
-
-  sort Hole-Step-ctxt-handler-1 .
-
-  sort Hole-Step-ctxt-frame-1 .
-
-  sort Hole-Eval-expr-1-1 .
-
   sort spectec-vcvtop---Request .
 
   subsort Nat < spectec-vcvtop---Request .
@@ -41,11 +11,11 @@ mod SPEC2MAUDE-GENERATED is
 
   sort Step-pure-Request .
 
-  subsort InstrList < Step-pure-Request .
+  subsort SpectecTerminals < Step-pure-Request .
 
   sort Step-read-Request .
 
-  subsort InstrList < Step-read-Request .
+  subsort SpectecTerminals < Step-read-Request .
 
   sort Step-Request .
 
@@ -122,58 +92,6 @@ mod SPEC2MAUDE-GENERATED is
   sort SpectecDef-Nat-SpectecTerminals-SpectecTerminals-to-SpectecTerminals .
 
   subsort SpectecDef-Nat-SpectecTerminals-SpectecTerminals-to-SpectecTerminals < SpectecDef .
-
-  op valLift : SpectecTerminals ~> ValList .
-
-  op instrLift : SpectecTerminals ~> InstrList .
-
-  op identifyFocus : SpectecTerminal ValList InstrProper InstrList ~> FocusSearch [frozen (1 2 3 4)] .
-
-  op {_|_|_} : ValList SpectecTerminal InstrList -> FocusTarget [ctor] .
-
-  op hole : ValList InstrList -> Hole [ctor] .
-
-  op _~>_ : Step-Request Hole -> Step-Request [frozen (2)] .
-
-  op hole-Step-pure-1 : SpectecTerminal -> Hole-Step-pure-1 [ctor] .
-
-  op _~>_ : Step-pure-Request Hole-Step-pure-1 -> Step-Request [frozen (2)] .
-
-  op identifyPure : InstrList -> Identify-Step-pure [frozen (1)] .
-
-  op identified-Step-pure : -> Identify-Step-pure [ctor] .
-
-  op hole-Step-read-1 : SpectecTerminal -> Hole-Step-read-1 [ctor] .
-
-  op _~>_ : Step-read-Request Hole-Step-read-1 -> Step-Request [frozen (2)] .
-
-  op identifyRead : SpectecTerminal -> Identify-Step-read [frozen (1)] .
-
-  op identified-Step-read : -> Identify-Step-read [ctor] .
-
-  op hole-Steps-trans-1 : -> Hole-Steps-trans-1 [ctor] .
-
-  op _~>_ : Step-Request Hole-Steps-trans-1 -> Steps-Request [frozen (2)] .
-
-  op hole-Steps-trans-2 : -> Hole-Steps-trans-2 [ctor] .
-
-  op _~>_ : Steps-Request Hole-Steps-trans-2 -> Steps-Request [frozen (2)] .
-
-  op hole-Step-ctxt-label-1 : InstrList Nat -> Hole-Step-ctxt-label-1 [ctor] .
-
-  op _~>_ : Step-Request Hole-Step-ctxt-label-1 -> Step-Request [frozen (2)] .
-
-  op hole-Step-ctxt-handler-1 : SpectecTerminals Nat -> Hole-Step-ctxt-handler-1 [ctor] .
-
-  op _~>_ : Step-Request Hole-Step-ctxt-handler-1 -> Step-Request [frozen (2)] .
-
-  op hole-Step-ctxt-frame-1 : Nat SpectecTerminal -> Hole-Step-ctxt-frame-1 [ctor] .
-
-  op _~>_ : Step-Request Hole-Step-ctxt-frame-1 -> Step-Request [frozen (2)] .
-
-  op hole-Eval-expr-1-1 : -> Hole-Eval-expr-1-1 [ctor] .
-
-  op _~>_ : Steps-Request Hole-Eval-expr-1-1 -> Eval-expr-Request [frozen (2)] .
 
   op N : -> SpectecType .
 
@@ -1053,249 +971,249 @@ mod SPEC2MAUDE-GENERATED is
 
   op ref : -> SpectecType .
 
-  op REF.I31-NUM : Nat -> val [ctor] .
+  op REF.I31-NUM : Nat -> SpectecTerminal [ctor] .
 
-  op REF.NULL-ADDR : -> val [ctor] .
+  op REF.NULL-ADDR : -> SpectecTerminal [ctor] .
 
-  op REF.STRUCT-ADDR : Nat -> val [ctor] .
+  op REF.STRUCT-ADDR : Nat -> SpectecTerminal [ctor] .
 
-  op REF.ARRAY-ADDR : Nat -> val [ctor] .
+  op REF.ARRAY-ADDR : Nat -> SpectecTerminal [ctor] .
 
-  op REF.FUNC-ADDR : Nat -> val [ctor] .
+  op REF.FUNC-ADDR : Nat -> SpectecTerminal [ctor] .
 
-  op REF.EXN-ADDR : Nat -> val [ctor] .
+  op REF.EXN-ADDR : Nat -> SpectecTerminal [ctor] .
 
-  op REF.HOST-ADDR : Nat -> val [ctor] .
+  op REF.HOST-ADDR : Nat -> SpectecTerminal [ctor] .
 
-  op REF.EXTERN : val -> val [ctor] .
+  op REF.EXTERN : SpectecTerminal -> SpectecTerminal [ctor] .
 
   op val : -> SpectecType .
 
-  op CONST : SpectecTerminal SpectecTerminal -> val [ctor] .
+  op CONST : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VCONST : SpectecTerminal Nat -> val [ctor] .
+  op VCONST : SpectecTerminal Nat -> SpectecTerminal [ctor] .
 
   op frame : -> SpectecType .
 
   op instr : -> SpectecType .
 
-  op NOP : -> InstrProper [ctor] .
+  op NOP : -> SpectecTerminal [ctor] .
 
-  op UNREACHABLE : -> InstrProper [ctor] .
+  op UNREACHABLE : -> SpectecTerminal [ctor] .
 
-  op DROP : -> InstrProper [ctor] .
+  op DROP : -> SpectecTerminal [ctor] .
 
-  op SELECT : SpectecTerminals -> InstrProper [ctor] .
+  op SELECT : SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op BLOCK : SpectecTerminal InstrList -> InstrProper [ctor] .
+  op BLOCK : SpectecTerminal SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op LOOP : SpectecTerminal InstrList -> InstrProper [ctor] .
+  op LOOP : SpectecTerminal SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op IF__ELSE_ : SpectecTerminal InstrList InstrList -> InstrProper [ctor] .
+  op IF__ELSE_ : SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op BR : Nat -> InstrProper [ctor] .
+  op BR : Nat -> SpectecTerminal [ctor] .
 
-  op BR-IF : Nat -> InstrProper [ctor] .
+  op BR-IF : Nat -> SpectecTerminal [ctor] .
 
-  op BR-TABLE : SpectecTerminals Nat -> InstrProper [ctor] .
+  op BR-TABLE : SpectecTerminals Nat -> SpectecTerminal [ctor] .
 
-  op BR-ON-NULL : Nat -> InstrProper [ctor] .
+  op BR-ON-NULL : Nat -> SpectecTerminal [ctor] .
 
-  op BR-ON-NON-NULL : Nat -> InstrProper [ctor] .
+  op BR-ON-NON-NULL : Nat -> SpectecTerminal [ctor] .
 
-  op BR-ON-CAST : Nat SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op BR-ON-CAST : Nat SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op BR-ON-CAST-FAIL : Nat SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op BR-ON-CAST-FAIL : Nat SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op CALL : Nat -> InstrProper [ctor] .
+  op CALL : Nat -> SpectecTerminal [ctor] .
 
-  op CALL-REF : SpectecTerminal -> InstrProper [ctor] .
+  op CALL-REF : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op CALL-INDIRECT : Nat SpectecTerminal -> InstrProper [ctor] .
+  op CALL-INDIRECT : Nat SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op RETURN : -> InstrProper [ctor] .
+  op RETURN : -> SpectecTerminal [ctor] .
 
-  op RETURN-CALL : Nat -> InstrProper [ctor] .
+  op RETURN-CALL : Nat -> SpectecTerminal [ctor] .
 
-  op RETURN-CALL-REF : SpectecTerminal -> InstrProper [ctor] .
+  op RETURN-CALL-REF : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op RETURN-CALL-INDIRECT : Nat SpectecTerminal -> InstrProper [ctor] .
+  op RETURN-CALL-INDIRECT : Nat SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op THROW : Nat -> InstrProper [ctor] .
+  op THROW : Nat -> SpectecTerminal [ctor] .
 
-  op THROW-REF : -> InstrProper [ctor] .
+  op THROW-REF : -> SpectecTerminal [ctor] .
 
-  op TRY-TABLE : SpectecTerminal SpectecTerminals InstrList -> InstrProper [ctor] .
+  op TRY-TABLE : SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op LOCAL.GET : Nat -> InstrProper [ctor] .
+  op LOCAL.GET : Nat -> SpectecTerminal [ctor] .
 
-  op LOCAL.SET : Nat -> InstrProper [ctor] .
+  op LOCAL.SET : Nat -> SpectecTerminal [ctor] .
 
-  op LOCAL.TEE : Nat -> InstrProper [ctor] .
+  op LOCAL.TEE : Nat -> SpectecTerminal [ctor] .
 
-  op GLOBAL.GET : Nat -> InstrProper [ctor] .
+  op GLOBAL.GET : Nat -> SpectecTerminal [ctor] .
 
-  op GLOBAL.SET : Nat -> InstrProper [ctor] .
+  op GLOBAL.SET : Nat -> SpectecTerminal [ctor] .
 
-  op TABLE.GET : Nat -> InstrProper [ctor] .
+  op TABLE.GET : Nat -> SpectecTerminal [ctor] .
 
-  op TABLE.SET : Nat -> InstrProper [ctor] .
+  op TABLE.SET : Nat -> SpectecTerminal [ctor] .
 
-  op TABLE.SIZE : Nat -> InstrProper [ctor] .
+  op TABLE.SIZE : Nat -> SpectecTerminal [ctor] .
 
-  op TABLE.GROW : Nat -> InstrProper [ctor] .
+  op TABLE.GROW : Nat -> SpectecTerminal [ctor] .
 
-  op TABLE.FILL : Nat -> InstrProper [ctor] .
+  op TABLE.FILL : Nat -> SpectecTerminal [ctor] .
 
-  op TABLE.COPY : Nat Nat -> InstrProper [ctor] .
+  op TABLE.COPY : Nat Nat -> SpectecTerminal [ctor] .
 
-  op TABLE.INIT : Nat Nat -> InstrProper [ctor] .
+  op TABLE.INIT : Nat Nat -> SpectecTerminal [ctor] .
 
-  op ELEM.DROP : Nat -> InstrProper [ctor] .
+  op ELEM.DROP : Nat -> SpectecTerminal [ctor] .
 
-  op LOAD : SpectecTerminal SpectecTerminals Nat SpectecTerminal -> InstrProper [ctor] .
+  op LOAD : SpectecTerminal SpectecTerminals Nat SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op STORE : SpectecTerminal SpectecTerminals Nat SpectecTerminal -> InstrProper [ctor] .
+  op STORE : SpectecTerminal SpectecTerminals Nat SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VLOAD : SpectecTerminal SpectecTerminals Nat SpectecTerminal -> InstrProper [ctor] .
+  op VLOAD : SpectecTerminal SpectecTerminals Nat SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VLOAD-LANE : SpectecTerminal Nat Nat SpectecTerminal Nat -> InstrProper [ctor] .
+  op VLOAD-LANE : SpectecTerminal Nat Nat SpectecTerminal Nat -> SpectecTerminal [ctor] .
 
-  op VSTORE : SpectecTerminal Nat SpectecTerminal -> InstrProper [ctor] .
+  op VSTORE : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VSTORE-LANE : SpectecTerminal Nat Nat SpectecTerminal Nat -> InstrProper [ctor] .
+  op VSTORE-LANE : SpectecTerminal Nat Nat SpectecTerminal Nat -> SpectecTerminal [ctor] .
 
-  op MEMORY.SIZE : Nat -> InstrProper [ctor] .
+  op MEMORY.SIZE : Nat -> SpectecTerminal [ctor] .
 
-  op MEMORY.GROW : Nat -> InstrProper [ctor] .
+  op MEMORY.GROW : Nat -> SpectecTerminal [ctor] .
 
-  op MEMORY.FILL : Nat -> InstrProper [ctor] .
+  op MEMORY.FILL : Nat -> SpectecTerminal [ctor] .
 
-  op MEMORY.COPY : Nat Nat -> InstrProper [ctor] .
+  op MEMORY.COPY : Nat Nat -> SpectecTerminal [ctor] .
 
-  op MEMORY.INIT : Nat Nat -> InstrProper [ctor] .
+  op MEMORY.INIT : Nat Nat -> SpectecTerminal [ctor] .
 
-  op DATA.DROP : Nat -> InstrProper [ctor] .
+  op DATA.DROP : Nat -> SpectecTerminal [ctor] .
 
-  op REF.NULL : SpectecTerminal -> InstrProper [ctor] .
+  op REF.NULL : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op REF.IS-NULL : -> InstrProper [ctor] .
+  op REF.IS-NULL : -> SpectecTerminal [ctor] .
 
-  op REF.AS-NON-NULL : -> InstrProper [ctor] .
+  op REF.AS-NON-NULL : -> SpectecTerminal [ctor] .
 
-  op REF.EQ : -> InstrProper [ctor] .
+  op REF.EQ : -> SpectecTerminal [ctor] .
 
-  op REF.TEST : SpectecTerminal -> InstrProper [ctor] .
+  op REF.TEST : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op REF.CAST : SpectecTerminal -> InstrProper [ctor] .
+  op REF.CAST : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op REF.FUNC : Nat -> InstrProper [ctor] .
+  op REF.FUNC : Nat -> SpectecTerminal [ctor] .
 
-  op REF.I31 : -> InstrProper [ctor] .
+  op REF.I31 : -> SpectecTerminal [ctor] .
 
-  op I31.GET : SpectecTerminal -> InstrProper [ctor] .
+  op I31.GET : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op STRUCT.NEW : Nat -> InstrProper [ctor] .
+  op STRUCT.NEW : Nat -> SpectecTerminal [ctor] .
 
-  op STRUCT.NEW-DEFAULT : Nat -> InstrProper [ctor] .
+  op STRUCT.NEW-DEFAULT : Nat -> SpectecTerminal [ctor] .
 
-  op STRUCT.GET : SpectecTerminals Nat Nat -> InstrProper [ctor] .
+  op STRUCT.GET : SpectecTerminals Nat Nat -> SpectecTerminal [ctor] .
 
-  op STRUCT.SET : Nat Nat -> InstrProper [ctor] .
+  op STRUCT.SET : Nat Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.NEW : Nat -> InstrProper [ctor] .
+  op ARRAY.NEW : Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.NEW-DEFAULT : Nat -> InstrProper [ctor] .
+  op ARRAY.NEW-DEFAULT : Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.NEW-FIXED : Nat Nat -> InstrProper [ctor] .
+  op ARRAY.NEW-FIXED : Nat Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.NEW-DATA : Nat Nat -> InstrProper [ctor] .
+  op ARRAY.NEW-DATA : Nat Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.NEW-ELEM : Nat Nat -> InstrProper [ctor] .
+  op ARRAY.NEW-ELEM : Nat Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.GET : SpectecTerminals Nat -> InstrProper [ctor] .
+  op ARRAY.GET : SpectecTerminals Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.SET : Nat -> InstrProper [ctor] .
+  op ARRAY.SET : Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.LEN : -> InstrProper [ctor] .
+  op ARRAY.LEN : -> SpectecTerminal [ctor] .
 
-  op ARRAY.FILL : Nat -> InstrProper [ctor] .
+  op ARRAY.FILL : Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.COPY : Nat Nat -> InstrProper [ctor] .
+  op ARRAY.COPY : Nat Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.INIT-DATA : Nat Nat -> InstrProper [ctor] .
+  op ARRAY.INIT-DATA : Nat Nat -> SpectecTerminal [ctor] .
 
-  op ARRAY.INIT-ELEM : Nat Nat -> InstrProper [ctor] .
+  op ARRAY.INIT-ELEM : Nat Nat -> SpectecTerminal [ctor] .
 
-  op EXTERN.CONVERT-ANY : -> InstrProper [ctor] .
+  op EXTERN.CONVERT-ANY : -> SpectecTerminal [ctor] .
 
-  op ANY.CONVERT-EXTERN : -> InstrProper [ctor] .
+  op ANY.CONVERT-EXTERN : -> SpectecTerminal [ctor] .
 
-  op UNOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op UNOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op BINOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op BINOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op TESTOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op TESTOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op RELOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op RELOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op CVTOP : SpectecTerminal SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op CVTOP : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VVUNOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VVUNOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VVBINOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VVBINOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VVTERNOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VVTERNOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VVTESTOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VVTESTOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VUNOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VUNOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VBINOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VBINOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VTERNOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VTERNOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VTESTOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VTESTOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VRELOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VRELOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VSHIFTOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VSHIFTOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VBITMASK : SpectecTerminal -> InstrProper [ctor] .
+  op VBITMASK : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VSWIZZLOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VSWIZZLOP : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VSHUFFLE : SpectecTerminal SpectecTerminals -> InstrProper [ctor] .
+  op VSHUFFLE : SpectecTerminal SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op VEXTUNOP : SpectecTerminal SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VEXTUNOP : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VEXTBINOP : SpectecTerminal SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VEXTBINOP : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VEXTTERNOP : SpectecTerminal SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VEXTTERNOP : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VNARROW : SpectecTerminal SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VNARROW : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VCVTOP : SpectecTerminal SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+  op VCVTOP : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VSPLAT : SpectecTerminal -> InstrProper [ctor] .
+  op VSPLAT : SpectecTerminal -> SpectecTerminal [ctor] .
 
-  op VEXTRACT-LANE : SpectecTerminal SpectecTerminals Nat -> InstrProper [ctor] .
+  op VEXTRACT-LANE : SpectecTerminal SpectecTerminals Nat -> SpectecTerminal [ctor] .
 
-  op VREPLACE-LANE : SpectecTerminal Nat -> InstrProper [ctor] .
+  op VREPLACE-LANE : SpectecTerminal Nat -> SpectecTerminal [ctor] .
 
-  op LABEL-_{_}_ : Nat InstrList InstrList -> InstrProper [ctor] .
+  op LABEL-_{_}_ : Nat SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op FRAME-_{_}_ : Nat SpectecTerminal InstrList -> InstrProper [ctor] .
+  op FRAME-_{_}_ : Nat SpectecTerminal SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op HANDLER-_{_}_ : Nat SpectecTerminals InstrList -> InstrProper [ctor] .
+  op HANDLER-_{_}_ : Nat SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
 
-  op TRAP : -> InstrProper [ctor] .
+  op TRAP : -> SpectecTerminal [ctor] .
 
   op expr : -> SpectecType .
 
   op memarg0 : -> SpectecTerminal .
 
-  op const : SpectecTerminal SpectecTerminal -> instr .
+  op const : SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
   op free-shape : SpectecTerminal -> SpectecTerminal .
 
@@ -1305,15 +1223,15 @@ mod SPEC2MAUDE-GENERATED is
 
   op shift-labelidxs : SpectecTerminals -> SpectecTerminals .
 
-  op free-instr : instr -> SpectecTerminal .
+  op free-instr : SpectecTerminal -> SpectecTerminal .
 
-  op free-block : InstrList -> SpectecTerminal .
+  op free-block : SpectecTerminals -> SpectecTerminal .
 
-  op free-expr : InstrList -> SpectecTerminal .
+  op free-expr : SpectecTerminals -> SpectecTerminal .
 
   op elemmode : -> SpectecType .
 
-  op ACTIVE : Nat InstrList -> SpectecTerminal [ctor] .
+  op ACTIVE : Nat SpectecTerminals -> SpectecTerminal [ctor] .
 
   op PASSIVE : -> SpectecTerminal [ctor] .
 
@@ -1329,7 +1247,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op global : -> SpectecType .
 
-  op spectec-GLOBAL : SpectecTerminal InstrList -> SpectecTerminal [ctor] .
+  op spectec-GLOBAL : SpectecTerminal SpectecTerminals -> SpectecTerminal [ctor] .
 
   op mem : -> SpectecType .
 
@@ -1337,7 +1255,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op table : -> SpectecType .
 
-  op spectec-TABLE : SpectecTerminal InstrList -> SpectecTerminal [ctor] .
+  op spectec-TABLE : SpectecTerminal SpectecTerminals -> SpectecTerminal [ctor] .
 
   op data : -> SpectecType .
 
@@ -1349,7 +1267,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op func : -> SpectecType .
 
-  op spectec-FUNC-2 : Nat SpectecTerminals InstrList -> SpectecTerminal [ctor] .
+  op spectec-FUNC-2 : Nat SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
 
   op elem : -> SpectecType .
 
@@ -1805,7 +1723,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op result : -> SpectecType .
 
-  op -VALS : ValList -> SpectecTerminal [ctor] .
+  op -VALS : SpectecTerminals -> SpectecTerminal [ctor] .
 
   op (REF.EXN-ADDR_)THROW-REF : Nat -> SpectecTerminal [ctor] .
 
@@ -1849,13 +1767,13 @@ mod SPEC2MAUDE-GENERATED is
 
   op config : -> SpectecType .
 
-  op _;_ : SpectecTerminal InstrList -> SpectecTerminal [ctor] .
+  op _;_ : SpectecTerminal SpectecTerminals -> SpectecTerminal [ctor] .
 
   op Ki : -> Nat .
 
-  op packfield- : SpectecTerminal val ~> SpectecTerminal .
+  op packfield- : SpectecTerminal SpectecTerminal ~> SpectecTerminal .
 
-  op unpackfield- : SpectecTerminal SpectecTerminals SpectecTerminal ~> val .
+  op unpackfield- : SpectecTerminal SpectecTerminals SpectecTerminal ~> SpectecTerminal .
 
   op tagsxa : SpectecTerminals -> SpectecTerminals .
 
@@ -1917,11 +1835,11 @@ mod SPEC2MAUDE-GENERATED is
 
   op spectec-local : SpectecTerminal Nat -> SpectecTerminals .
 
-  op with-local : SpectecTerminal Nat val -> SpectecTerminal .
+  op with-local : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .
 
-  op with-global : SpectecTerminal Nat val -> SpectecTerminal .
+  op with-global : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .
 
-  op with-table : SpectecTerminal Nat Nat val -> SpectecTerminal .
+  op with-table : SpectecTerminal Nat Nat SpectecTerminal -> SpectecTerminal .
 
   op with-tableinst : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .
 
@@ -1943,17 +1861,17 @@ mod SPEC2MAUDE-GENERATED is
 
   op add-exninst : SpectecTerminal SpectecTerminals -> SpectecTerminal .
 
-  op growtable : SpectecTerminal Nat val ~> SpectecTerminal .
+  op growtable : SpectecTerminal Nat SpectecTerminal ~> SpectecTerminal .
 
   op growmem : SpectecTerminal Nat ~> SpectecTerminal .
 
-  op Num-ok : SpectecTerminal val SpectecTerminal ~> Bool .
+  op Num-ok : SpectecTerminal SpectecTerminal SpectecTerminal ~> Bool .
 
-  op Vec-ok : SpectecTerminal val SpectecTerminal ~> Bool .
+  op Vec-ok : SpectecTerminal SpectecTerminal SpectecTerminal ~> Bool .
 
-  op Ref-ok : SpectecTerminal val SpectecTerminal -> Bool .
+  op Ref-ok : SpectecTerminal SpectecTerminal SpectecTerminal -> Bool .
 
-  op Val-ok : SpectecTerminal val SpectecTerminal ~> Bool .
+  op Val-ok : SpectecTerminal SpectecTerminal SpectecTerminal ~> Bool .
 
   op Externaddr-ok : SpectecTerminal SpectecTerminal SpectecTerminal -> Bool .
 
@@ -1967,23 +1885,23 @@ mod SPEC2MAUDE-GENERATED is
 
   op inst-tabletype : SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
-  op Step-pure : InstrList -> Step-pure-Request [frozen (1)] .
+  op Step-pure : SpectecTerminals -> Step-pure-Request [frozen (1)] .
 
-  op Step-pure-enabled-16 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-16 : SpectecTerminals -> Bool [frozen (1)] .
 
-  op Step-pure-enabled-18 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-18 : SpectecTerminals -> Bool [frozen (1)] .
 
-  op Step-pure-enabled-27 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-27 : SpectecTerminals -> Bool [frozen (1)] .
 
-  op Step-pure-enabled-33 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-33 : SpectecTerminals -> Bool [frozen (1)] .
 
-  op Step-pure-enabled-35 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-35 : SpectecTerminals -> Bool [frozen (1)] .
 
-  op Step-pure-enabled-37 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-37 : SpectecTerminals -> Bool [frozen (1)] .
 
-  op Step-pure-enabled-38 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-38 : SpectecTerminals -> Bool [frozen (1)] .
 
-  op Step-pure-enabled-43 : InstrList -> Bool [frozen (1)] .
+  op Step-pure-enabled-43 : SpectecTerminals -> Bool [frozen (1)] .
 
   op blocktype- : SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
@@ -2067,7 +1985,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op Steps : SpectecTerminal -> Steps-Request [frozen (1)] .
 
-  op Eval-expr : SpectecTerminal InstrList -> Eval-expr-Request [frozen (1 2)] .
+  op Eval-expr : SpectecTerminal SpectecTerminals -> Eval-expr-Request [frozen (1 2)] .
 
   op alloctypes : SpectecTerminals -> SpectecTerminals .
 
@@ -2075,15 +1993,15 @@ mod SPEC2MAUDE-GENERATED is
 
   op alloctags : SpectecTerminal SpectecTerminals -> SpectecTerminal .
 
-  op allocglobal : SpectecTerminal SpectecTerminal val -> SpectecTerminal .
+  op allocglobal : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
-  op allocglobals : SpectecTerminal SpectecTerminals ValList -> SpectecTerminal .
+  op allocglobals : SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminal .
 
   op allocmem : SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
   op allocmems : SpectecTerminal SpectecTerminals -> SpectecTerminal .
 
-  op alloctable : SpectecTerminal SpectecTerminal val -> SpectecTerminal .
+  op alloctable : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
   op alloctables : SpectecTerminal SpectecTerminals SpectecTerminals -> SpectecTerminal .
 
@@ -2103,11 +2021,11 @@ mod SPEC2MAUDE-GENERATED is
 
   op allocexports : SpectecTerminal SpectecTerminals -> SpectecTerminals .
 
-  op allocmodule : SpectecTerminal SpectecTerminal SpectecTerminals ValList SpectecTerminals SpectecTerminals -> SpectecTerminal .
+  op allocmodule : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal .
 
-  op rundata- : Nat SpectecTerminal -> InstrList .
+  op rundata- : Nat SpectecTerminal -> SpectecTerminals .
 
-  op runelem- : Nat SpectecTerminal -> InstrList .
+  op runelem- : Nat SpectecTerminal -> SpectecTerminals .
 
   op evalexprs : SpectecTerminal SpectecTerminals -> evalexprs-Config [frozen (1 2)] .
 
@@ -2117,7 +2035,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op instantiate : SpectecTerminal SpectecTerminal SpectecTerminals -> instantiate-Config [frozen (1 2 3)] .
 
-  op invoke : SpectecTerminal Nat ValList -> SpectecTerminal .
+  op invoke : SpectecTerminal Nat SpectecTerminals -> SpectecTerminal .
 
   op fabs- : -> SpectecDef-Nat-SpectecTerminal-to-SpectecTerminals .
 
@@ -2319,11 +2237,11 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-free-catch : SpectecTerminals ~> SpectecTerminals .
 
-  op map-free-instr : InstrList ~> SpectecTerminals .
+  op map-free-instr : SpectecTerminals ~> SpectecTerminals .
 
-  op map-free-instr-2 : InstrList ~> SpectecTerminals .
+  op map-free-instr-2 : SpectecTerminals ~> SpectecTerminals .
 
-  op map-free-instr-3 : InstrList ~> SpectecTerminals .
+  op map-free-instr-3 : SpectecTerminals ~> SpectecTerminals .
 
   op map-free-local : SpectecTerminals ~> SpectecTerminals .
 
@@ -2445,7 +2363,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op project-map-exp-1040 : SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-1042 : Nat ValList ~> SpectecTerminals .
+  op map-exp-1042 : Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-default : SpectecTerminals ~> SpectecTerminals .
 
@@ -2455,9 +2373,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op project-map-exp-1090 : SpectecTerminals ~> SpectecTerminal .
 
-  op map-exp-1094 : Nat SpectecTerminals ~> InstrList .
-
-  op map-const : SpectecTerminal Nat SpectecTerminals ~> InstrList .
+  op map-const : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-zbytes : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
@@ -2465,11 +2381,11 @@ mod SPEC2MAUDE-GENERATED is
 
   op project-map-exp-1157 : Nat SpectecTerminals ~> SpectecTerminal .
 
-  op map-packfield : Nat ValList SpectecTerminals ~> SpectecTerminals .
+  op map-packfield : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op project-map-exp-1160 : SpectecTerminals ~> SpectecTerminal .
 
-  op map-packfield-2 : SpectecTerminal Nat ValList ~> SpectecTerminals .
+  op map-packfield-2 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-allocexport : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
@@ -2527,29 +2443,19 @@ mod SPEC2MAUDE-GENERATED is
 
   op iterpr-36-output-1 : Nat SpectecTerminal Nat SpectecTerminal Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
 
-  op iterpr-37-output-1 : SpectecTerminals ~> ValList .
+  op iterpr-37-output-1 : SpectecTerminals ~> SpectecTerminals .
 
   op iterpr-38 : SpectecTerminal SpectecTerminals SpectecTerminals ~> Bool .
 
-  op iterpr-39 : SpectecTerminal SpectecTerminals ValList ~> Bool .
+  op iterpr-39 : SpectecTerminal SpectecTerminals SpectecTerminals ~> Bool .
 
-  vars LIFT-ELEMENT VAL VAL-1 VAL-2 REF2 REF-1 REF-2 VALUE19 V2 R NUM VEC : val .
+  vars VALUE I J N3 N2 M3 FUNCIDX GLOBALIDX TABLEIDX MEMIDX TAGIDX X4 TYPEIDX ELEMIDX DATAIDX LOCALIDX LABELIDX U64 SZ DIM M2 M-1 M-2 VALUE14 TAGADDR GLOBALADDR MEMADDR TABLEADDR FUNCADDR U31 STRUCTADDR ARRAYADDR EXNADDR HOSTADDR VALUE23 TABLEIDX2 LANEIDX MEMIDX2 FIELDIDX U32 TYPEIDX2 C3 LABELIDX-3 VECLIT TYPEIDX-1 TYPEIDX-2 TABLEIDX-1 TABLEIDX-2 MEMIDX-1 MEMIDX-2 X-1 I-1 I-2 V-1 V-2 V-3 V C-12 K3 C-23 C-5 C--3 C-32 A I-3 L L-2 X-23 Y A-1 A-2 CASE-PART1 K2 JA GA MA TA FA DA EA APPLY-ARG1 APPLY-ARG22 APPLY-ARG3 APPLY-ARG4 ITER-COUNT J-13 J-23 I-F I-D I-E : Nat .
 
-  vars LIFT-ELEMENT2 INSTR : instr .
-
-  vars PREFIX VAL- VAL-- STACK VALUE25 VAL-G- VALS : ValList .
-
-  vars BRIDGE-Z BT YY2 F SX NT C-13 UNOP2 C-24 BINOP2 TESTOP2 RELOP2 NT-1 NT-2 CVTOP2 VVUNOP2 VVBINOP2 VVTERNOP2 SH VUNOP2 VBINOP2 VTERNOP2 JNN VRELOP2 VSHIFTOP2 SWIZZLOP INPUT-FIELD LNN PT SH-2 SH-1 VEXTUNOP2 VEXTBINOP2 VEXTTERNOP2 VCVTOP2 Z S2 RT-2 RT-1 FI CATCH2 AT AT-1 AT-2 AT- AO INN HT RT REL-OUTPUT1 F-14 C2 ZT AI2 Z- Z-- S- F-- W W-1 VALUE1 VALUE3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE FNN VT LT2 CONSTTYPE LANETYPE HT-1 HT-2 DT JT EXTERNTYPE GT2 MT TT TV TV-1 TU-1 TV-2 T FT CT QT TU-2 LIM XT2 MMT DT-1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN INN-1 INN-2 FNN-2 FNN-1 SHAPE JNN-1 JNN-2 HALF ZERO3 VALUE22 BLOCKTYPE REFTYPE3 MEMARG NUMTYPE-1 NUMTYPE-2 VVTESTOP2 ISHAPE BSHAPE ISHAPE-1 ISHAPE-2 SHAPE-1 SHAPE-2 FRAME REFTYPE-1 REFTYPE-2 NUMLIT VTESTOP2 VSWIZZLOP2 DATAMODE ELEMMODE MODULE2 INIT C LCT-1 DT-N X-13 X-24 X-3 X-4 F-1 F-2 LNN-1 LNN-2 SX-1 SX-2 VALUE20 VALUE21 STORE2 STATE EXTERNADDR TI MI FV TABLEINST TABLEINST- MEMINST MEMINST- MODULEINST ENABLED-INPUT12 ZT-2 EXN3 SI2 TYPE2 TAGINST S-1 S-2 GLOBALINST FUNCCODE FUNCINST DATAINST OK3 ELEMTYPE ELEMINST S-3 S-4 S-5 S-6 S-7 MODULEINST-0 Z--- S--- S---- APPLY-ARG2 APPLY-ARG32 APPLY-ARG42 T-12 T-22 ST2 XT-12 XT-22 SUBTYPE EXTERNTYPE-12 EXTERNTYPE-22 LOCAL2 TAG2 GLOBAL2 MEM2 TABLE2 FUNC2 DATA2 ELEM2 START2 IMPORT2 EXPORT2 C-33 XT-I2 : SpectecTerminal .
-
-  vars POSTFIX INSTR-1- INSTR-2- INSTR- INSTR-- INSTR-0- REST FOCUS INSTR--- INSTR-5 VALUE15 EXPR ENABLED-INPUT1 CASE-PART3 INSTR-D- INSTR-E- INSTRS EXPR-G2 EXPR-T2 EXPR-F2 : InstrList .
-
-  vars T-- CATCH- L- I- T-1- T-2- CATCH-- J-3 CASE-PART1 MUT-- ZT- SX- T- MUT- N-- W- W--- W-4 W---2 W-- W--3 W-1- X- CHAR- XX- VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 VALUE10 VALUE11 VALUE12 VALUE13 FREE-- NULL- RESULTTYPE RESULTTYPE2 FINAL- TYPEUSE- U64- EXTERNTYPE- EXTERNTYPE-3 NULL-1- XT- TV-- TU-- TV-3 TU-3 FT- ST- XT-1- XT-2- DT- SUBTYPE- VALTYPE- FIELDTYPE- RESULTTYPE-1 RESULTTYPE-2 EXTERNTYPE-1- EXTERNTYPE-2- HALF- ZERO- VALTYPE-2 VALTYPE-- LABELIDX- VALUE24 LANEIDX- LABELIDX-- LOADOP- STOREOP- VLOADOP- BYTE- LOCAL- EXPR- NAME NAME2 VALUE32 START- NAME-1 NAME-2 TYPE- TAG- GLOBAL- MEM- TABLE- FUNC- DATA- ELEM- IMPORT- EXPORT- LOCALIDX- VALUE16 VALUE17 VALUE18 X-2 LCT- DT-- C-2 C-1- C-- C-2- C-3- C-4 CHOICE-PREFIX CHOICE-REST C--1- C--2- J-1- J-2- I-1- I-2- XA- B- R- SI- AI- EXN- J- R-- MEMBER-PREFIX MEMBER-SUFFIX T-5 CASE-PART2 REF- TYPE-- DEFTYPE-- DEFTYPE- TAGTYPE-- JA-- GLOBALTYPE-- GA-- MEMTYPE-- MA-- TABLETYPE-- REF-- TA-- FUNCCODE-- MODULEINST-- FA-- OK-- B--- DA-- RT-- REF--- EA-- TAGTYPE-4 EXPR-G- GLOBALTYPE-4 MEMTYPE-4 EXPR-T- TABLETYPE-4 EXPR-F- LOCAL-- BYTE-- DATAMODE- ELEMMODE- ELEMTYPE- EXPR-E-- EXTERNADDR- AA-I- GA-I- MA-I- TA-I- FA-I- FA-3 AA- GA-3 MA-3 REF-T- TA-3 DA-3 REF-E-- EA-3 XI- E- EXPR-- EXPR--- GT-- XT-I- XT-E- REFTYPE- X-5 INSTR-S- APPLY-ARG23 APPLY-ARG33 W--2 W'?S FTS T_1S T_2S TU'S STS XT_1S XT_2S SUBTYPES VALTYPES FIELDTYPES TYPEUSES EXTERNTYPE_1S EXTERNTYPE_2S LABELIDXS CATCHS LOCALS EXPRS TYPES TAGS GLOBALS MEMS TABLES FUNCS DATAS ELEMS IMPORTS EXPORTS C_1S C*S C_2S C_3S IS J_1S J_2S PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1S I_2S TS JS REFS CS PROJECT-ELEMENT ZTS PROJECT-COLUMN-3 EXPR-E- TAGTYPES GLOBALTYPES MEMTYPES TABLETYPES ELEMTYPES XS EXPR_FS LOCAL*S EXTERNADDRS XT_IS : SpectecTerminals .
-
-  vars C3 N3 L I L-2 X4 C-12 C-23 C-32 M2 M3 A K3 I-1 I-2 X-1 X-23 J Y K2 N2 A-1 A-2 VALUE FUNCIDX GLOBALIDX TABLEIDX MEMIDX TAGIDX TYPEIDX ELEMIDX DATAIDX LOCALIDX LABELIDX U64 SZ DIM M-1 M-2 VALUE14 TAGADDR GLOBALADDR MEMADDR TABLEADDR FUNCADDR U31 STRUCTADDR ARRAYADDR EXNADDR HOSTADDR VALUE23 TABLEIDX2 LANEIDX MEMIDX2 FIELDIDX U32 TYPEIDX2 LABELIDX-3 VECLIT TYPEIDX-1 TYPEIDX-2 TABLEIDX-1 TABLEIDX-2 MEMIDX-1 MEMIDX-2 V-1 V-2 V-3 V C-5 C--3 I-3 CASE-PART12 JA GA MA TA FA DA EA APPLY-ARG1 APPLY-ARG22 APPLY-ARG3 APPLY-ARG4 ITER-COUNT J-13 J-23 I-F I-D I-E : Nat .
-
-  var OP : InstrProper .
+  vars N-- W- W--- W-4 W---2 W-- W--3 W-1- X- CHAR- XX- VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 VALUE10 VALUE11 VALUE12 VALUE13 FREE-- NULL- MUT- RESULTTYPE RESULTTYPE2 FINAL- TYPEUSE- U64- EXTERNTYPE- EXTERNTYPE-3 NULL-1- XT- TV-- TU-- TV-3 TU-3 FT- T-1- T-2- ST- XT-1- XT-2- DT- SUBTYPE- VALTYPE- FIELDTYPE- RESULTTYPE-1 RESULTTYPE-2 EXTERNTYPE-1- EXTERNTYPE-2- HALF- ZERO- VALTYPE-2 VALTYPE-- INSTR- INSTR-5 LABELIDX- VALUE24 SX- LANEIDX- CATCH- LABELIDX-- INSTR-1- INSTR-2- LOADOP- STOREOP- VLOADOP- EXPR BYTE- LOCAL- EXPR- NAME NAME2 VALUE32 START- NAME-1 NAME-2 TYPE- TAG- GLOBAL- MEM- TABLE- FUNC- DATA- ELEM- IMPORT- EXPORT- LOCALIDX- VALUE15 VALUE16 VALUE17 X-2 LCT- DT-- C-2 C-1- C-- C-2- C-3- I- C-4 CHOICE-PREFIX CHOICE-REST C--1- C--2- J-1- J-2- I-1- I-2- VAL- XA- B- R- SI- AI- EXN- J- R-- ENABLED-INPUT1 T-- VAL-- INSTR-- L- MEMBER-PREFIX MEMBER-SUFFIX T-5 CATCH-- CASE-PART2 CASE-PART3 T- J-3 CASE-PART12 MUT-- ZT- REF- INSTR-0- INSTR--- TYPE-- DEFTYPE-- DEFTYPE- TAGTYPE-- JA-- GLOBALTYPE-- GA-- MEMTYPE-- MA-- TABLETYPE-- REF-- TA-- FUNCCODE-- MODULEINST-- FA-- OK-- B--- DA-- RT-- REF--- EA-- TAGTYPE-4 EXPR-G- GLOBALTYPE-4 MEMTYPE-4 EXPR-T- TABLETYPE-4 EXPR-F- LOCAL-- BYTE-- DATAMODE- ELEMMODE- ELEMTYPE- EXPR-E-- EXTERNADDR- AA-I- GA-I- MA-I- TA-I- FA-I- FA-3 AA- VAL-G- GA-3 MA-3 REF-T- TA-3 DA-3 REF-E-- EA-3 XI- E- EXPR-- EXPR--- GT-- XT-I- XT-E- REFTYPE- X-5 INSTR-D- INSTR-E- INSTR-S- APPLY-ARG23 APPLY-ARG33 W--2 W'?S FTS T_1S T_2S TU'S STS XT_1S XT_2S SUBTYPES VALTYPES FIELDTYPES TYPEUSES EXTERNTYPE_1S EXTERNTYPE_2S LABELIDXS CATCHS INSTRS LOCALS EXPRS TYPES TAGS GLOBALS MEMS TABLES FUNCS DATAS ELEMS IMPORTS EXPORTS C_1S C*S C_2S C_3S IS J_1S J_2S PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1S I_2S VALS TS JS CS PROJECT-ELEMENT ZTS EXPR-G EXPR-T PROJECT-COLUMN-3 EXPR-F EXPR-E- TAGTYPES GLOBALTYPES MEMTYPES TABLETYPES ELEMTYPES XS EXPR_FS LOCAL*S EXTERNADDRS XT_IS : SpectecTerminals .
 
   var X : SpectecType .
+
+  vars W W-1 VALUE1 VALUE3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE INN JNN FNN NT VT PT LT2 CONSTTYPE LANETYPE AT-1 AT-2 HT-1 HT-2 DT JT EXTERNTYPE GT2 MT TT TV TV-1 TU-1 TV-2 HT RT T ZT FT CT QT AT TU-2 LIM XT2 MMT DT-1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN SX INN-1 INN-2 FNN-2 FNN-1 LNN SHAPE JNN-1 JNN-2 HALF ZERO3 REF2 VALUE22 BLOCKTYPE REFTYPE3 MEMARG NUMTYPE-1 NUMTYPE-2 VVUNOP2 VVBINOP2 VVTERNOP2 VVTESTOP2 ISHAPE BSHAPE ISHAPE-1 ISHAPE-2 SHAPE-1 SHAPE-2 FRAME C2 REFTYPE-1 REFTYPE-2 NUMLIT UNOP2 BINOP2 TESTOP2 RELOP2 CVTOP2 VUNOP2 VBINOP2 VTERNOP2 VTESTOP2 VRELOP2 VSHIFTOP2 VSWIZZLOP2 VEXTUNOP2 VEXTBINOP2 VEXTTERNOP2 VCVTOP2 DATAMODE ELEMMODE MODULE2 INIT C LCT-1 DT-N X-13 X-24 X-3 X-4 F F-1 F-2 C-13 LNN-1 LNN-2 SX-1 SX-2 VALUE18 VALUE19 STORE2 STATE VAL EXTERNADDR S2 Z V2 R TI MI FV TABLEINST TABLEINST- MEMINST MEMINST- NUM VEC MODULEINST REF-1 REF-2 VAL-1 VAL-2 BT YY2 C-24 NT-1 NT-2 SH SWIZZLOP INPUT-FIELD SH-1 SH-2 ENABLED-INPUT12 RT-1 RT-2 AT- ZT-2 FI CATCH2 AO REL-OUTPUT1 Z- S- F-- F-14 EXN3 SI2 AI2 Z-- TYPE2 TAGINST S-1 S-2 GLOBALINST FUNCCODE FUNCINST DATAINST OK3 ELEMTYPE ELEMINST S-3 S-4 S-5 S-6 S-7 MODULEINST-0 Z--- S--- S---- APPLY-ARG2 APPLY-ARG32 APPLY-ARG42 T-12 T-22 ST2 XT-12 XT-22 SUBTYPE EXTERNTYPE-12 EXTERNTYPE-22 INSTR LOCAL2 TAG2 GLOBAL2 MEM2 TABLE2 FUNC2 DATA2 ELEM2 START2 IMPORT2 EXPORT2 C-33 XT-I2 : SpectecTerminal .
 
   vars I2 VALUE2 EXP J-1 J-2 : Int .
 
@@ -2578,724 +2484,6 @@ mod SPEC2MAUDE-GENERATED is
   var F-12 : SpectecDef-Nat-SpectecTerminals-to-SpectecTerminals .
 
   var F-13 : SpectecDef-Nat-SpectecTerminals-SpectecTerminals-to-SpectecTerminals .
-
-  eq valLift(eps) = eps .
-
-  eq valLift(LIFT-ELEMENT ?) = LIFT-ELEMENT .
-
-  eq instrLift(eps) = eps .
-
-  eq instrLift(LIFT-ELEMENT2 ?) = LIFT-ELEMENT2 .
-
-  rl [focus-Step-pure-unreachable] : identifyFocus(BRIDGE-Z, PREFIX, UNREACHABLE, POSTFIX) => { PREFIX | (BRIDGE-Z ; UNREACHABLE) | POSTFIX } .
-
-  rl [focus-Step-pure-nop] : identifyFocus(BRIDGE-Z, PREFIX, NOP, POSTFIX) => { PREFIX | (BRIDGE-Z ; NOP) | POSTFIX } .
-
-  crl [focus-Step-pure-drop] : identifyFocus(BRIDGE-Z, PREFIX VAL, DROP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL DROP)) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-pure-select-true] : identifyFocus(BRIDGE-Z, PREFIX (VAL-1 (VAL-2 CONST(I32, C3))), SELECT(T--), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL-1 (VAL-2 (CONST(I32, C3) SELECT(T--))))) | POSTFIX }
-    if typecheck(VAL-1, val)
-      /\ typecheck(VAL-2, val)
-      /\ len(T--) <= 1 .
-
-  rl [focus-Step-pure-if-true] : identifyFocus(BRIDGE-Z, PREFIX CONST(I32, C3), IF__ELSE_(BT, INSTR-1-, INSTR-2-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(I32, C3) IF__ELSE_(BT, INSTR-1-, INSTR-2-))) | POSTFIX } .
-
-  rl [focus-Step-pure-label-vals] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR- } VAL-, POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR- } VAL-)) | POSTFIX } .
-
-  crl [focus-Step-pure-br-label-zero] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } (((VAL-- VAL-) BR(L)) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } (((VAL-- VAL-) BR(L)) INSTR-))) | POSTFIX }
-    if instrSize(VAL-) = N3 .
-
-  rl [focus-Step-pure-br-label-succ] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-))) | POSTFIX } .
-
-  rl [focus-Step-pure-br-handler] : identifyFocus(BRIDGE-Z, PREFIX, HANDLER- N3 { CATCH- } ((VAL- BR(L)) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (HANDLER- N3 { CATCH- } ((VAL- BR(L)) INSTR-))) | POSTFIX } .
-
-  rl [focus-Step-pure-br-if-true] : identifyFocus(BRIDGE-Z, PREFIX CONST(I32, C3), BR-IF(L), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(I32, C3) BR-IF(L))) | POSTFIX } .
-
-  rl [focus-Step-pure-br-table-lt] : identifyFocus(BRIDGE-Z, PREFIX CONST(I32, I), BR-TABLE(L-, L-2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(I32, I) BR-TABLE(L-, L-2))) | POSTFIX } .
-
-  crl [focus-Step-pure-br-on-null-null] : identifyFocus(BRIDGE-Z, PREFIX VAL, BR-ON-NULL(L), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL BR-ON-NULL(L))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-pure-br-on-non-null-null] : identifyFocus(BRIDGE-Z, PREFIX VAL, BR-ON-NON-NULL(L), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL BR-ON-NON-NULL(L))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  rl [focus-Step-pure-call-indirect] : identifyFocus(BRIDGE-Z, PREFIX, CALL-INDIRECT(X4, YY2), POSTFIX) => { PREFIX | (BRIDGE-Z ; CALL-INDIRECT(X4, YY2)) | POSTFIX } .
-
-  rl [focus-Step-pure-return-call-indirect] : identifyFocus(BRIDGE-Z, PREFIX, RETURN-CALL-INDIRECT(X4, YY2), POSTFIX) => { PREFIX | (BRIDGE-Z ; RETURN-CALL-INDIRECT(X4, YY2)) | POSTFIX } .
-
-  crl [focus-Step-pure-frame-vals] : identifyFocus(BRIDGE-Z, PREFIX, FRAME- N3 { F } VAL-, POSTFIX) => { PREFIX | (BRIDGE-Z ; (FRAME- N3 { F } VAL-)) | POSTFIX }
-    if instrSize(VAL-) = N3 .
-
-  crl [focus-Step-pure-return-frame] : identifyFocus(BRIDGE-Z, PREFIX, FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-))) | POSTFIX }
-    if instrSize(VAL-) = N3 .
-
-  rl [focus-Step-pure-return-label] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-))) | POSTFIX } .
-
-  rl [focus-Step-pure-return-handler] : identifyFocus(BRIDGE-Z, PREFIX, HANDLER- N3 { CATCH- } ((VAL- RETURN) INSTR-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (HANDLER- N3 { CATCH- } ((VAL- RETURN) INSTR-))) | POSTFIX } .
-
-  rl [focus-Step-pure-handler-vals] : identifyFocus(BRIDGE-Z, PREFIX, HANDLER- N3 { CATCH- } VAL-, POSTFIX) => { PREFIX | (BRIDGE-Z ; (HANDLER- N3 { CATCH- } VAL-)) | POSTFIX } .
-
-  crl [focus-Step-pure-trap-instrs] : identifyFocus(BRIDGE-Z, PREFIX VAL-, TRAP, INSTR- POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL- (TRAP INSTR-))) | POSTFIX }
-    if _or_(VAL- =/= eps, INSTR- =/= eps) .
-
-  rl [focus-Step-pure-trap-label] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N3 { INSTR-- } TRAP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N3 { INSTR-- } TRAP)) | POSTFIX } .
-
-  rl [focus-Step-pure-trap-handler] : identifyFocus(BRIDGE-Z, PREFIX, HANDLER- N3 { CATCH- } TRAP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (HANDLER- N3 { CATCH- } TRAP)) | POSTFIX } .
-
-  rl [focus-Step-pure-trap-frame] : identifyFocus(BRIDGE-Z, PREFIX, FRAME- N3 { F } TRAP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (FRAME- N3 { F } TRAP)) | POSTFIX } .
-
-  crl [focus-Step-pure-local-tee] : identifyFocus(BRIDGE-Z, PREFIX VAL, LOCAL.TEE(X4), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL LOCAL.TEE(X4))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  rl [focus-Step-pure-ref-i31] : identifyFocus(BRIDGE-Z, PREFIX CONST(I32, I), REF.I31, POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(I32, I) (REF.I31))) | POSTFIX } .
-
-  crl [focus-Step-pure-ref-is-null-true] : identifyFocus(BRIDGE-Z, PREFIX REF2, REF.IS-NULL, POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF2 (REF.IS-NULL))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  crl [focus-Step-pure-ref-as-non-null-null] : identifyFocus(BRIDGE-Z, PREFIX REF2, REF.AS-NON-NULL, POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF2 (REF.AS-NON-NULL))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  crl [focus-Step-pure-ref-eq-null] : identifyFocus(BRIDGE-Z, PREFIX (REF-1 REF-2), REF.EQ, POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF-1 (REF-2 (REF.EQ)))) | POSTFIX }
-    if typecheck(REF-1, ref)
-      /\ typecheck(REF-2, ref) .
-
-  rl [focus-Step-pure-i31-get-null] : identifyFocus(BRIDGE-Z, PREFIX (REF.NULL-ADDR), I31.GET(SX), POSTFIX) => { PREFIX | (BRIDGE-Z ; ((REF.NULL-ADDR) I31.GET(SX))) | POSTFIX } .
-
-  rl [focus-Step-pure-i31-get-num] : identifyFocus(BRIDGE-Z, PREFIX REF.I31-NUM(I), I31.GET(SX), POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF.I31-NUM(I) I31.GET(SX))) | POSTFIX } .
-
-  crl [focus-Step-pure-array-new] : identifyFocus(BRIDGE-Z, PREFIX (VAL CONST(I32, N3)), ARRAY.NEW(X4), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL (CONST(I32, N3) ARRAY.NEW(X4)))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-pure-extern-convert-any-null] : identifyFocus(BRIDGE-Z, PREFIX REF2, EXTERN.CONVERT-ANY, POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF2 (EXTERN.CONVERT-ANY))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  rl [focus-Step-pure-any-convert-extern-null] : identifyFocus(BRIDGE-Z, PREFIX (REF.NULL-ADDR), ANY.CONVERT-EXTERN, POSTFIX) => { PREFIX | (BRIDGE-Z ; ((REF.NULL-ADDR) (ANY.CONVERT-EXTERN))) | POSTFIX } .
-
-  rl [focus-Step-pure-any-convert-extern-addr] : identifyFocus(BRIDGE-Z, PREFIX REF.EXTERN(REF2), ANY.CONVERT-EXTERN, POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF.EXTERN(REF2) (ANY.CONVERT-EXTERN))) | POSTFIX } .
-
-  rl [focus-Step-pure-unop-val] : identifyFocus(BRIDGE-Z, PREFIX CONST(NT, C-13), UNOP(NT, UNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(NT, C-13) UNOP(NT, UNOP2))) | POSTFIX } .
-
-  rl [focus-Step-pure-binop-val] : identifyFocus(BRIDGE-Z, PREFIX (CONST(NT, C-13) CONST(NT, C-24)), BINOP(NT, BINOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(NT, C-13) (CONST(NT, C-24) BINOP(NT, BINOP2)))) | POSTFIX } .
-
-  rl [focus-Step-pure-testop] : identifyFocus(BRIDGE-Z, PREFIX CONST(NT, C-13), TESTOP(NT, TESTOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(NT, C-13) TESTOP(NT, TESTOP2))) | POSTFIX } .
-
-  rl [focus-Step-pure-relop] : identifyFocus(BRIDGE-Z, PREFIX (CONST(NT, C-13) CONST(NT, C-24)), RELOP(NT, RELOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(NT, C-13) (CONST(NT, C-24) RELOP(NT, RELOP2)))) | POSTFIX } .
-
-  rl [focus-Step-pure-cvtop-val] : identifyFocus(BRIDGE-Z, PREFIX CONST(NT-1, C-13), CVTOP(NT-2, NT-1, CVTOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(NT-1, C-13) CVTOP(NT-2, NT-1, CVTOP2))) | POSTFIX } .
-
-  rl [focus-Step-pure-vvunop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VVUNOP(V128, VVUNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VVUNOP(V128, VVUNOP2))) | POSTFIX } .
-
-  rl [focus-Step-pure-vvbinop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VVBINOP(V128, VVBINOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VVBINOP(V128, VVBINOP2)))) | POSTFIX } .
-
-  rl [focus-Step-pure-vvternop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) (VCONST(V128, C-23) VCONST(V128, C-32))), VVTERNOP(V128, VVTERNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) (VCONST(V128, C-32) VVTERNOP(V128, VVTERNOP2))))) | POSTFIX } .
-
-  rl [focus-Step-pure-vvtestop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VVTESTOP(V128, ANY-TRUE), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VVTESTOP(V128, ANY-TRUE))) | POSTFIX } .
-
-  rl [focus-Step-pure-vunop-val] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VUNOP(SH, VUNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VUNOP(SH, VUNOP2))) | POSTFIX } .
-
-  rl [focus-Step-pure-vbinop-val] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VBINOP(SH, VBINOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VBINOP(SH, VBINOP2)))) | POSTFIX } .
-
-  rl [focus-Step-pure-vternop-val] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) (VCONST(V128, C-23) VCONST(V128, C-32))), VTERNOP(SH, VTERNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) (VCONST(V128, C-32) VTERNOP(SH, VTERNOP2))))) | POSTFIX } .
-
-  crl [focus-Step-pure-vtestop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VTESTOP(_X_(JNN, M2), ALL-TRUE), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VTESTOP(_X_(JNN, M2), ALL-TRUE))) | POSTFIX }
-    if typecheck(JNN, Jnn) .
-
-  rl [focus-Step-pure-vrelop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VRELOP(SH, VRELOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VRELOP(SH, VRELOP2)))) | POSTFIX } .
-
-  rl [focus-Step-pure-vshiftop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) CONST(I32, I)), VSHIFTOP(SH, VSHIFTOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (CONST(I32, I) VSHIFTOP(SH, VSHIFTOP2)))) | POSTFIX } .
-
-  rl [focus-Step-pure-vbitmask] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VBITMASK(SH), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VBITMASK(SH))) | POSTFIX } .
-
-  rl [focus-Step-pure-vswizzlop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VSWIZZLOP(SH, SWIZZLOP), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VSWIZZLOP(SH, SWIZZLOP)))) | POSTFIX } .
-
-  rl [focus-Step-pure-vshuffle] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VSHUFFLE(SH, I-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VSHUFFLE(SH, I-)))) | POSTFIX } .
-
-  crl [focus-Step-pure-vsplat] : identifyFocus(BRIDGE-Z, PREFIX CONST(INPUT-FIELD, C-13), VSPLAT(_X_(LNN, M2)), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(INPUT-FIELD, C-13) VSPLAT(_X_(LNN, M2)))) | POSTFIX }
-    if lunpack(LNN) = INPUT-FIELD .
-
-  crl [focus-Step-pure-vextract-lane-num] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VEXTRACT-LANE(_X_(NT, M2), eps, I), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VEXTRACT-LANE(_X_(NT, M2), eps, I))) | POSTFIX }
-    if typecheck(NT, numtype) .
-
-  crl [focus-Step-pure-vextract-lane-pack] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VEXTRACT-LANE(_X_(PT, M2), SX ?, I), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VEXTRACT-LANE(_X_(PT, M2), SX ?, I))) | POSTFIX }
-    if typecheck(PT, packtype) .
-
-  crl [focus-Step-pure-vreplace-lane] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) CONST(INPUT-FIELD, C-24)), VREPLACE-LANE(_X_(LNN, M2), I), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (CONST(INPUT-FIELD, C-24) VREPLACE-LANE(_X_(LNN, M2), I)))) | POSTFIX }
-    if lunpack(LNN) = INPUT-FIELD .
-
-  rl [focus-Step-pure-vextunop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VEXTUNOP(SH-2, SH-1, VEXTUNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VEXTUNOP(SH-2, SH-1, VEXTUNOP2))) | POSTFIX } .
-
-  rl [focus-Step-pure-vextbinop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VEXTBINOP(SH-2, SH-1, VEXTBINOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VEXTBINOP(SH-2, SH-1, VEXTBINOP2)))) | POSTFIX } .
-
-  rl [focus-Step-pure-vextternop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) (VCONST(V128, C-23) VCONST(V128, C-32))), VEXTTERNOP(SH-2, SH-1, VEXTTERNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) (VCONST(V128, C-32) VEXTTERNOP(SH-2, SH-1, VEXTTERNOP2))))) | POSTFIX } .
-
-  rl [focus-Step-pure-vnarrow] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VNARROW(SH-2, SH-1, SX), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VNARROW(SH-2, SH-1, SX)))) | POSTFIX } .
-
-  rl [focus-Step-pure-vcvtop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VCVTOP(SH-2, SH-1, VCVTOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VCVTOP(SH-2, SH-1, VCVTOP2))) | POSTFIX } .
-
-  crl [focus-Step-read-block] : identifyFocus(Z, PREFIX VAL-, BLOCK(BT, INSTR-), POSTFIX) => { PREFIX | (Z ; (VAL- BLOCK(BT, INSTR-))) | POSTFIX }
-    if M3 := instrSize(VAL-)
-      /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
-      /\ M3 = len(T-1-)
-      /\ N3 := len(T-2-) .
-
-  crl [focus-Step-read-loop] : identifyFocus(Z, PREFIX VAL-, LOOP(BT, INSTR-), POSTFIX) => { PREFIX | (Z ; (VAL- LOOP(BT, INSTR-))) | POSTFIX }
-    if M3 := instrSize(VAL-)
-      /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
-      /\ M3 = len(T-1-)
-      /\ N3 := len(T-2-) .
-
-  crl [focus-Step-read-br-on-cast-succeed] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST(L, RT-1, RT-2))) | POSTFIX }
-    if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
-
-  crl [focus-Step-read-br-on-cast-fail] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST(L, RT-1, RT-2))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  crl [focus-Step-read-br-on-cast-fail-succeed] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST-FAIL(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST-FAIL(L, RT-1, RT-2))) | POSTFIX }
-    if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
-
-  crl [focus-Step-read-br-on-cast-fail-fail] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST-FAIL(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST-FAIL(L, RT-1, RT-2))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  rl [focus-Step-read-call] : identifyFocus(Z, PREFIX, CALL(X4), POSTFIX) => { PREFIX | (Z ; CALL(X4)) | POSTFIX } .
-
-  rl [focus-Step-read-call-ref-null] : identifyFocus(Z, PREFIX (REF.NULL-ADDR), CALL-REF(YY2), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) CALL-REF(YY2))) | POSTFIX } .
-
-  crl [focus-Step-read-call-ref-func] : identifyFocus(Z, PREFIX (VAL- REF.FUNC-ADDR(A)), CALL-REF(YY2), POSTFIX) => { PREFIX | (Z ; (VAL- (REF.FUNC-ADDR(A) CALL-REF(YY2)))) | POSTFIX }
-    if N3 := instrSize(VAL-)
-      /\ FI := spectec-funcinst(Z) [ A ]
-      /\ FUNC T-1- -> T-2- := Expand(FI . 'TYPE)
-      /\ N3 = len(T-1-) .
-
-  rl [focus-Step-read-return-call] : identifyFocus(Z, PREFIX, RETURN-CALL(X4), POSTFIX) => { PREFIX | (Z ; RETURN-CALL(X4)) | POSTFIX } .
-
-  rl [focus-Step-read-return-call-ref-label] : identifyFocus(Z, PREFIX, LABEL- K3 { INSTR-- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-), POSTFIX) => { PREFIX | (Z ; (LABEL- K3 { INSTR-- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) | POSTFIX } .
-
-  rl [focus-Step-read-return-call-ref-handler] : identifyFocus(Z, PREFIX, HANDLER- K3 { CATCH- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-), POSTFIX) => { PREFIX | (Z ; (HANDLER- K3 { CATCH- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) | POSTFIX } .
-
-  rl [focus-Step-read-return-call-ref-frame-null] : identifyFocus(Z, PREFIX, FRAME- K3 { F } (((VAL- (REF.NULL-ADDR)) RETURN-CALL-REF(YY2)) INSTR-), POSTFIX) => { PREFIX | (Z ; (FRAME- K3 { F } (((VAL- (REF.NULL-ADDR)) RETURN-CALL-REF(YY2)) INSTR-))) | POSTFIX } .
-
-  crl [focus-Step-read-return-call-ref-frame-addr] : identifyFocus(Z, PREFIX, FRAME- K3 { F } ((((VAL-- VAL-) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY2)) INSTR-), POSTFIX) => { PREFIX | (Z ; (FRAME- K3 { F } ((((VAL-- VAL-) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY2)) INSTR-))) | POSTFIX }
-    if N3 := instrSize(VAL-) .
-
-  rl [focus-Step-read-throw-ref-null] : identifyFocus(Z, PREFIX (REF.NULL-ADDR), THROW-REF, POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) THROW-REF)) | POSTFIX } .
-
-  crl [focus-Step-read-throw-ref-instrs] : identifyFocus(Z, PREFIX (VAL- REF.EXN-ADDR(A)), THROW-REF, INSTR- POSTFIX) => { PREFIX | (Z ; (VAL- (REF.EXN-ADDR(A) (THROW-REF INSTR-)))) | POSTFIX }
-    if _or_(VAL- =/= eps, INSTR- =/= eps) .
-
-  rl [focus-Step-read-throw-ref-label] : identifyFocus(Z, PREFIX, LABEL- N3 { INSTR-- } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (LABEL- N3 { INSTR-- } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  rl [focus-Step-read-throw-ref-frame] : identifyFocus(Z, PREFIX, FRAME- N3 { F } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (FRAME- N3 { F } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  rl [focus-Step-read-throw-ref-handler-empty] : identifyFocus(Z, PREFIX, HANDLER- N3 { eps } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N3 { eps } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  rl [focus-Step-read-throw-ref-handler-catch] : identifyFocus(Z, PREFIX, HANDLER- N3 { (CATCH(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N3 { (CATCH(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  rl [focus-Step-read-throw-ref-handler-catch-ref] : identifyFocus(Z, PREFIX, HANDLER- N3 { (CATCH-REF(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N3 { (CATCH-REF(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  rl [focus-Step-read-throw-ref-handler-catch-all] : identifyFocus(Z, PREFIX, HANDLER- N3 { (CATCH-ALL(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N3 { (CATCH-ALL(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  rl [focus-Step-read-throw-ref-handler-catch-all-ref] : identifyFocus(Z, PREFIX, HANDLER- N3 { (CATCH-ALL-REF(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N3 { (CATCH-ALL-REF(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  rl [focus-Step-read-throw-ref-handler-next] : identifyFocus(Z, PREFIX, HANDLER- N3 { (CATCH2 CATCH--) } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N3 { (CATCH2 CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
-
-  crl [focus-Step-read-try-table] : identifyFocus(Z, PREFIX VAL-, TRY-TABLE(BT, CATCH-, INSTR-), POSTFIX) => { PREFIX | (Z ; (VAL- TRY-TABLE(BT, CATCH-, INSTR-))) | POSTFIX }
-    if M3 := instrSize(VAL-)
-      /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
-      /\ M3 = len(T-1-)
-      /\ N3 := len(T-2-) .
-
-  rl [focus-Step-read-local-get] : identifyFocus(Z, PREFIX, LOCAL.GET(X4), POSTFIX) => { PREFIX | (Z ; LOCAL.GET(X4)) | POSTFIX } .
-
-  rl [focus-Step-read-global-get] : identifyFocus(Z, PREFIX, GLOBAL.GET(X4), POSTFIX) => { PREFIX | (Z ; GLOBAL.GET(X4)) | POSTFIX } .
-
-  crl [focus-Step-read-table-get-oob] : identifyFocus(Z, PREFIX CONST(AT, I), TABLE.GET(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) TABLE.GET(X4))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  rl [focus-Step-read-table-size] : identifyFocus(Z, PREFIX, TABLE.SIZE(X4), POSTFIX) => { PREFIX | (Z ; TABLE.SIZE(X4)) | POSTFIX } .
-
-  crl [focus-Step-read-table-fill-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (VAL CONST(AT, N3))), TABLE.FILL(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val) .
-
-  crl [focus-Step-read-table-copy-oob] : identifyFocus(Z, PREFIX (CONST(AT-1, I-1) (CONST(AT-2, I-2) CONST(AT-, N3))), TABLE.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X-1, X-23))))) | POSTFIX }
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype) .
-
-  crl [focus-Step-read-table-init-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (CONST(I32, J) CONST(I32, N3))), TABLE.INIT(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) TABLE.INIT(X4, Y))))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-read-load-num-oob] : identifyFocus(Z, PREFIX CONST(AT, I), LOAD(NT, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) LOAD(NT, eps, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-read-load-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, I), LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype) .
-
-  crl [focus-Step-read-vload-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, eps, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-read-vload-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-read-vload-pack-val] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ J-3 := iterpr-36-output-1(M2, Z, X4, AT, I, AO, K2, 0) .
-
-  crl [focus-Step-read-vload-splat-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SPLAT(N2) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SPLAT(N2) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-read-vload-zero-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, spectec-ZERO(N2) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, spectec-ZERO(N2) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-read-vload-lane-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C-12)), VLOAD-LANE(V128, N2, X4, AO, J), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C-12) VLOAD-LANE(V128, N2, X4, AO, J)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  rl [focus-Step-read-memory-size] : identifyFocus(Z, PREFIX, MEMORY.SIZE(X4), POSTFIX) => { PREFIX | (Z ; MEMORY.SIZE(X4)) | POSTFIX } .
-
-  crl [focus-Step-read-memory-fill-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (VAL CONST(AT, N3))), MEMORY.FILL(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val) .
-
-  crl [focus-Step-read-memory-copy-oob] : identifyFocus(Z, PREFIX (CONST(AT-1, I-1) (CONST(AT-2, I-2) CONST(AT-, N3))), MEMORY.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) | POSTFIX }
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype) .
-
-  crl [focus-Step-read-memory-init-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (CONST(I32, J) CONST(I32, N3))), MEMORY.INIT(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) MEMORY.INIT(X4, Y))))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  rl [focus-Step-read-ref-null] : identifyFocus(Z, PREFIX, REF.NULL(HT), POSTFIX) => { PREFIX | (Z ; REF.NULL(HT)) | POSTFIX } .
-
-  rl [focus-Step-read-ref-func] : identifyFocus(Z, PREFIX, REF.FUNC(X4), POSTFIX) => { PREFIX | (Z ; REF.FUNC(X4)) | POSTFIX } .
-
-  crl [focus-Step-read-ref-test-true] : identifyFocus(S2 ; F, PREFIX REF2, REF.TEST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.TEST(RT))) | POSTFIX }
-    if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
-
-  crl [focus-Step-read-ref-test-false] : identifyFocus(S2 ; F, PREFIX REF2, REF.TEST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.TEST(RT))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  crl [focus-Step-read-ref-cast-succeed] : identifyFocus(S2 ; F, PREFIX REF2, REF.CAST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.CAST(RT))) | POSTFIX }
-    if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
-
-  crl [focus-Step-read-ref-cast-fail] : identifyFocus(S2 ; F, PREFIX REF2, REF.CAST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.CAST(RT))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  crl [focus-Step-read-struct-new-default] : identifyFocus(Z, PREFIX, STRUCT.NEW-DEFAULT(X4), POSTFIX) => { PREFIX | (Z ; STRUCT.NEW-DEFAULT(X4)) | POSTFIX }
-    if REL-OUTPUT1 := Expand(spectec-type(Z, X4))
-      /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1084(CASE-PART1)
-      /\ VAL- := iterpr-37-output-1(ZT-) .
-
-  crl [focus-Step-read-struct-get-null] : identifyFocus(Z, PREFIX (REF.NULL-ADDR), STRUCT.GET(SX-, X4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) STRUCT.GET(SX-, X4, I))) | POSTFIX }
-    if len(SX-) <= 1 .
-
-  crl [focus-Step-read-struct-get-struct] : identifyFocus(Z, PREFIX REF.STRUCT-ADDR(A), STRUCT.GET(SX-, X4, I), POSTFIX) => { PREFIX | (Z ; (REF.STRUCT-ADDR(A) STRUCT.GET(SX-, X4, I))) | POSTFIX }
-    if len(SX-) <= 1 .
-
-  rl [focus-Step-read-array-new-default] : identifyFocus(Z, PREFIX CONST(I32, N3), ARRAY.NEW-DEFAULT(X4), POSTFIX) => { PREFIX | (Z ; (CONST(I32, N3) ARRAY.NEW-DEFAULT(X4))) | POSTFIX } .
-
-  rl [focus-Step-read-array-new-elem-oob] : identifyFocus(Z, PREFIX (CONST(I32, I) CONST(I32, N3)), ARRAY.NEW-ELEM(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(I32, I) (CONST(I32, N3) ARRAY.NEW-ELEM(X4, Y)))) | POSTFIX } .
-
-  rl [focus-Step-read-array-new-data-oob] : identifyFocus(Z, PREFIX (CONST(I32, I) CONST(I32, N3)), ARRAY.NEW-DATA(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(I32, I) (CONST(I32, N3) ARRAY.NEW-DATA(X4, Y)))) | POSTFIX } .
-
-  crl [focus-Step-read-array-get-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) CONST(I32, I)), ARRAY.GET(SX-, X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) ARRAY.GET(SX-, X4)))) | POSTFIX }
-    if len(SX-) <= 1 .
-
-  crl [focus-Step-read-array-get-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) CONST(I32, I)), ARRAY.GET(SX-, X4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) ARRAY.GET(SX-, X4)))) | POSTFIX }
-    if len(SX-) <= 1 .
-
-  rl [focus-Step-read-array-len-null] : identifyFocus(Z, PREFIX (REF.NULL-ADDR), ARRAY.LEN, POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (ARRAY.LEN))) | POSTFIX } .
-
-  rl [focus-Step-read-array-len-array] : identifyFocus(Z, PREFIX REF.ARRAY-ADDR(A), ARRAY.LEN, POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) | POSTFIX } .
-
-  crl [focus-Step-read-array-fill-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) (VAL CONST(I32, N3)))), ARRAY.FILL(X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-read-array-fill-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL CONST(I32, N3)))), ARRAY.FILL(X4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-read-array-copy-null1] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I-1) (REF2 (CONST(I32, I-2) CONST(I32, N3))))), ARRAY.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I-1) (REF2 (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  crl [focus-Step-read-array-copy-null2] : identifyFocus(Z, PREFIX (REF2 (CONST(I32, I-1) ((REF.NULL-ADDR) (CONST(I32, I-2) CONST(I32, N3))))), ARRAY.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (REF2 (CONST(I32, I-1) ((REF.NULL-ADDR) (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) | POSTFIX }
-    if typecheck(REF2, ref) .
-
-  rl [focus-Step-read-array-copy-oob1] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A-1) (CONST(I32, I-1) (REF.ARRAY-ADDR(A-2) (CONST(I32, I-2) CONST(I32, N3))))), ARRAY.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A-1) (CONST(I32, I-1) (REF.ARRAY-ADDR(A-2) (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) | POSTFIX } .
-
-  rl [focus-Step-read-array-init-elem-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) (CONST(I32, J) CONST(I32, N3)))), ARRAY.INIT-ELEM(X4, Y), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-ELEM(X4, Y)))))) | POSTFIX } .
-
-  rl [focus-Step-read-array-init-elem-oob1] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) CONST(I32, N3)))), ARRAY.INIT-ELEM(X4, Y), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-ELEM(X4, Y)))))) | POSTFIX } .
-
-  rl [focus-Step-read-array-init-data-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) (CONST(I32, J) CONST(I32, N3)))), ARRAY.INIT-DATA(X4, Y), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-DATA(X4, Y)))))) | POSTFIX } .
-
-  rl [focus-Step-read-array-init-data-oob1] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) CONST(I32, N3)))), ARRAY.INIT-DATA(X4, Y), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-DATA(X4, Y)))))) | POSTFIX } .
-
-  rl [focus-Step-ctxt-label] : identifyFocus(Z, PREFIX, LABEL- N3 { INSTR-0- } INSTR-, POSTFIX) => { PREFIX | (Z ; (LABEL- N3 { INSTR-0- } INSTR-)) | POSTFIX } .
-
-  rl [focus-Step-ctxt-handler] : identifyFocus(Z, PREFIX, HANDLER- N3 { CATCH- } INSTR-, POSTFIX) => { PREFIX | (Z ; (HANDLER- N3 { CATCH- } INSTR-)) | POSTFIX } .
-
-  rl [focus-Step-ctxt-frame] : identifyFocus(S2 ; F, PREFIX, FRAME- N3 { F-14 } INSTR-, POSTFIX) => { PREFIX | ((S2 ; F) ; (FRAME- N3 { F-14 } INSTR-)) | POSTFIX } .
-
-  crl [focus-Step-throw] : identifyFocus(Z, PREFIX VAL-, THROW(X4), POSTFIX) => { PREFIX | (Z ; (VAL- THROW(X4))) | POSTFIX }
-    if N3 := instrSize(VAL-)
-      /\ FUNC T- -> eps := Expand(as-deftype(spectec-tag(Z, X4) . 'TYPE))
-      /\ N3 = len(T-) .
-
-  crl [focus-Step-local-set] : identifyFocus(Z, PREFIX VAL, LOCAL.SET(X4), POSTFIX) => { PREFIX | (Z ; (VAL LOCAL.SET(X4))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-global-set] : identifyFocus(Z, PREFIX VAL, GLOBAL.SET(X4), POSTFIX) => { PREFIX | (Z ; (VAL GLOBAL.SET(X4))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-table-set-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) REF2), TABLE.SET(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (REF2 TABLE.SET(X4)))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(REF2, ref) .
-
-  crl [focus-Step-table-grow-succeed] : identifyFocus(Z, PREFIX (REF2 CONST(AT, N3)), TABLE.GROW(X4), POSTFIX) => { PREFIX | (Z ; (REF2 (CONST(AT, N3) TABLE.GROW(X4)))) | POSTFIX }
-    if typecheck(REF2, ref)
-      /\ typecheck(AT, addrtype) .
-
-  rl [focus-Step-elem-drop] : identifyFocus(Z, PREFIX, ELEM.DROP(X4), POSTFIX) => { PREFIX | (Z ; ELEM.DROP(X4)) | POSTFIX } .
-
-  crl [focus-Step-store-num-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) CONST(NT, C2)), STORE(NT, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(NT, C2) STORE(NT, eps, X4, AO)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-store-pack-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) CONST(INN, C3)), STORE(INN, N3 ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(INN, C3) STORE(INN, N3 ?, X4, AO)))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype) .
-
-  crl [focus-Step-vstore-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C3)), VSTORE(V128, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE(V128, X4, AO)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-vstore-lane-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C3)), VSTORE-LANE(V128, N2, X4, AO, J), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE-LANE(V128, N2, X4, AO, J)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  crl [focus-Step-memory-grow-succeed] : identifyFocus(Z, PREFIX CONST(AT, N3), MEMORY.GROW(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, N3) MEMORY.GROW(X4))) | POSTFIX }
-    if typecheck(AT, addrtype) .
-
-  rl [focus-Step-data-drop] : identifyFocus(Z, PREFIX, DATA.DROP(X4), POSTFIX) => { PREFIX | (Z ; DATA.DROP(X4)) | POSTFIX } .
-
-  crl [focus-Step-struct-new] : identifyFocus(Z, PREFIX VAL-, STRUCT.NEW(X4), POSTFIX) => { PREFIX | (Z ; (VAL- STRUCT.NEW(X4))) | POSTFIX }
-    if N3 := instrSize(VAL-)
-      /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
-      /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1157(N3, CASE-PART1) .
-
-  crl [focus-Step-struct-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) VAL), STRUCT.SET(X4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X4, I)))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-struct-set-struct] : identifyFocus(Z, PREFIX (REF.STRUCT-ADDR(A) VAL), STRUCT.SET(X4, I), POSTFIX) => { PREFIX | (Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X4, I)))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-array-new-fixed] : identifyFocus(Z, PREFIX VAL-, ARRAY.NEW-FIXED(X4, N3), POSTFIX) => { PREFIX | (Z ; (VAL- ARRAY.NEW-FIXED(X4, N3))) | POSTFIX }
-    if instrSize(VAL-) = N3
-      /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
-      /\ len(MUT-) <= 1
-      /\ A := len(spectec-arrayinst(Z))
-      /\ AI2 := { (item('TYPE, spectec-type(Z, X4)) ; item('FIELDS, map-packfield-2(ZT, N3, VAL-))) } .
-
-  crl [focus-Step-array-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) VAL)), ARRAY.SET(X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL ARRAY.SET(X4))))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [focus-Step-array-set-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) VAL)), ARRAY.SET(X4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL ARRAY.SET(X4))))) | POSTFIX }
-    if typecheck(VAL, val) .
-
-  crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
-    if (STACK (OP REST)) =/= OP
-      /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
-      /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
-
-  eq (Z- ; INSTR--) ~> hole(PREFIX, POSTFIX) = Z- ; (PREFIX (INSTR-- POSTFIX)) .
-
-  rl [identifyPure-1] : identifyPure(UNREACHABLE) => identified-Step-pure .
-
-  rl [identifyPure-2] : identifyPure(NOP) => identified-Step-pure .
-
-  rl [identifyPure-3] : identifyPure(VAL DROP) => identified-Step-pure .
-
-  rl [identifyPure-4] : identifyPure(VAL-1 (VAL-2 (CONST(I32, C3) SELECT(T--)))) => identified-Step-pure .
-
-  rl [identifyPure-6] : identifyPure(CONST(I32, C3) IF__ELSE_(BT, INSTR-1-, INSTR-2-)) => identified-Step-pure .
-
-  rl [identifyPure-8] : identifyPure(LABEL- N3 { INSTR- } VAL-) => identified-Step-pure .
-
-  rl [identifyPure-9] : identifyPure(LABEL- N3 { INSTR-- } (((VAL-- VAL-) BR(L)) INSTR-)) => identified-Step-pure .
-
-  rl [identifyPure-10] : identifyPure(LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-)) => identified-Step-pure .
-
-  rl [identifyPure-11] : identifyPure(HANDLER- N3 { CATCH- } ((VAL- BR(L)) INSTR-)) => identified-Step-pure .
-
-  rl [identifyPure-12] : identifyPure(CONST(I32, C3) BR-IF(L)) => identified-Step-pure .
-
-  rl [identifyPure-14] : identifyPure(CONST(I32, I) BR-TABLE(L-, L-2)) => identified-Step-pure .
-
-  rl [identifyPure-16] : identifyPure(VAL BR-ON-NULL(L)) => identified-Step-pure .
-
-  rl [identifyPure-18] : identifyPure(VAL BR-ON-NON-NULL(L)) => identified-Step-pure .
-
-  rl [identifyPure-20] : identifyPure(CALL-INDIRECT(X4, YY2)) => identified-Step-pure .
-
-  rl [identifyPure-21] : identifyPure(RETURN-CALL-INDIRECT(X4, YY2)) => identified-Step-pure .
-
-  rl [identifyPure-22] : identifyPure(FRAME- N3 { F } VAL-) => identified-Step-pure .
-
-  rl [identifyPure-23] : identifyPure(FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-)) => identified-Step-pure .
-
-  rl [identifyPure-24] : identifyPure(LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-)) => identified-Step-pure .
-
-  rl [identifyPure-25] : identifyPure(HANDLER- N3 { CATCH- } ((VAL- RETURN) INSTR-)) => identified-Step-pure .
-
-  rl [identifyPure-26] : identifyPure(HANDLER- N3 { CATCH- } VAL-) => identified-Step-pure .
-
-  rl [identifyPure-27] : identifyPure(VAL- (TRAP INSTR-)) => identified-Step-pure .
-
-  rl [identifyPure-28] : identifyPure(LABEL- N3 { INSTR-- } TRAP) => identified-Step-pure .
-
-  rl [identifyPure-29] : identifyPure(HANDLER- N3 { CATCH- } TRAP) => identified-Step-pure .
-
-  rl [identifyPure-30] : identifyPure(FRAME- N3 { F } TRAP) => identified-Step-pure .
-
-  rl [identifyPure-31] : identifyPure(VAL LOCAL.TEE(X4)) => identified-Step-pure .
-
-  rl [identifyPure-32] : identifyPure(CONST(I32, I) (REF.I31)) => identified-Step-pure .
-
-  rl [identifyPure-33] : identifyPure(REF2 (REF.IS-NULL)) => identified-Step-pure .
-
-  rl [identifyPure-35] : identifyPure(REF2 (REF.AS-NON-NULL)) => identified-Step-pure .
-
-  rl [identifyPure-37] : identifyPure(REF-1 (REF-2 (REF.EQ))) => identified-Step-pure .
-
-  rl [identifyPure-40] : identifyPure((REF.NULL-ADDR) I31.GET(SX)) => identified-Step-pure .
-
-  rl [identifyPure-41] : identifyPure(REF.I31-NUM(I) I31.GET(SX)) => identified-Step-pure .
-
-  rl [identifyPure-42] : identifyPure(VAL (CONST(I32, N3) ARRAY.NEW(X4))) => identified-Step-pure .
-
-  rl [identifyPure-43] : identifyPure(REF2 (EXTERN.CONVERT-ANY)) => identified-Step-pure .
-
-  rl [identifyPure-45] : identifyPure((REF.NULL-ADDR) (ANY.CONVERT-EXTERN)) => identified-Step-pure .
-
-  rl [identifyPure-46] : identifyPure(REF.EXTERN(REF2) (ANY.CONVERT-EXTERN)) => identified-Step-pure .
-
-  rl [identifyPure-47] : identifyPure(CONST(NT, C-13) UNOP(NT, UNOP2)) => identified-Step-pure .
-
-  rl [identifyPure-49] : identifyPure(CONST(NT, C-13) (CONST(NT, C-24) BINOP(NT, BINOP2))) => identified-Step-pure .
-
-  rl [identifyPure-51] : identifyPure(CONST(NT, C-13) TESTOP(NT, TESTOP2)) => identified-Step-pure .
-
-  rl [identifyPure-52] : identifyPure(CONST(NT, C-13) (CONST(NT, C-24) RELOP(NT, RELOP2))) => identified-Step-pure .
-
-  rl [identifyPure-53] : identifyPure(CONST(NT-1, C-13) CVTOP(NT-2, NT-1, CVTOP2)) => identified-Step-pure .
-
-  rl [identifyPure-55] : identifyPure(VCONST(V128, C-12) VVUNOP(V128, VVUNOP2)) => identified-Step-pure .
-
-  rl [identifyPure-56] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) VVBINOP(V128, VVBINOP2))) => identified-Step-pure .
-
-  rl [identifyPure-57] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) (VCONST(V128, C-32) VVTERNOP(V128, VVTERNOP2)))) => identified-Step-pure .
-
-  rl [identifyPure-58] : identifyPure(VCONST(V128, C-12) VVTESTOP(V128, ANY-TRUE)) => identified-Step-pure .
-
-  rl [identifyPure-59] : identifyPure(VCONST(V128, C-12) VUNOP(SH, VUNOP2)) => identified-Step-pure .
-
-  rl [identifyPure-61] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) VBINOP(SH, VBINOP2))) => identified-Step-pure .
-
-  rl [identifyPure-63] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) (VCONST(V128, C-32) VTERNOP(SH, VTERNOP2)))) => identified-Step-pure .
-
-  rl [identifyPure-65] : identifyPure(VCONST(V128, C-12) VTESTOP(_X_(JNN, M2), ALL-TRUE)) => identified-Step-pure .
-
-  rl [identifyPure-66] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) VRELOP(SH, VRELOP2))) => identified-Step-pure .
-
-  rl [identifyPure-67] : identifyPure(VCONST(V128, C-12) (CONST(I32, I) VSHIFTOP(SH, VSHIFTOP2))) => identified-Step-pure .
-
-  rl [identifyPure-68] : identifyPure(VCONST(V128, C-12) VBITMASK(SH)) => identified-Step-pure .
-
-  rl [identifyPure-69] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) VSWIZZLOP(SH, SWIZZLOP))) => identified-Step-pure .
-
-  rl [identifyPure-70] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) VSHUFFLE(SH, I-))) => identified-Step-pure .
-
-  rl [identifyPure-71] : identifyPure(CONST(INPUT-FIELD, C-13) VSPLAT(_X_(LNN, M2))) => identified-Step-pure .
-
-  rl [identifyPure-72] : identifyPure(VCONST(V128, C-12) VEXTRACT-LANE(_X_(NT, M2), eps, I)) => identified-Step-pure .
-
-  rl [identifyPure-73] : identifyPure(VCONST(V128, C-12) VEXTRACT-LANE(_X_(PT, M2), SX ?, I)) => identified-Step-pure .
-
-  rl [identifyPure-74] : identifyPure(VCONST(V128, C-12) (CONST(INPUT-FIELD, C-24) VREPLACE-LANE(_X_(LNN, M2), I))) => identified-Step-pure .
-
-  rl [identifyPure-75] : identifyPure(VCONST(V128, C-12) VEXTUNOP(SH-2, SH-1, VEXTUNOP2)) => identified-Step-pure .
-
-  rl [identifyPure-76] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) VEXTBINOP(SH-2, SH-1, VEXTBINOP2))) => identified-Step-pure .
-
-  rl [identifyPure-77] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) (VCONST(V128, C-32) VEXTTERNOP(SH-2, SH-1, VEXTTERNOP2)))) => identified-Step-pure .
-
-  rl [identifyPure-78] : identifyPure(VCONST(V128, C-12) (VCONST(V128, C-23) VNARROW(SH-2, SH-1, SX))) => identified-Step-pure .
-
-  rl [identifyPure-79] : identifyPure(VCONST(V128, C-12) VCVTOP(SH-2, SH-1, VCVTOP2)) => identified-Step-pure .
-
-  crl [heating-Step-pure] : Step(Z ; INSTR-) => Step-pure(INSTR-) ~> hole-Step-pure-1(Z)
-    if identifyPure(INSTR-) => identified-Step-pure .
-
-  eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
-
-  rl [identifyRead-1] : identifyRead(Z ; (VAL- BLOCK(BT, INSTR-))) => identified-Step-read .
-
-  rl [identifyRead-2] : identifyRead(Z ; (VAL- LOOP(BT, INSTR-))) => identified-Step-read .
-
-  rl [identifyRead-3] : identifyRead((S2 ; F) ; (REF2 BR-ON-CAST(L, RT-1, RT-2))) => identified-Step-read .
-
-  rl [identifyRead-5] : identifyRead((S2 ; F) ; (REF2 BR-ON-CAST-FAIL(L, RT-1, RT-2))) => identified-Step-read .
-
-  rl [identifyRead-7] : identifyRead(Z ; CALL(X4)) => identified-Step-read .
-
-  rl [identifyRead-8] : identifyRead(Z ; ((REF.NULL-ADDR) CALL-REF(YY2))) => identified-Step-read .
-
-  rl [identifyRead-9] : identifyRead(Z ; (VAL- (REF.FUNC-ADDR(A) CALL-REF(YY2)))) => identified-Step-read .
-
-  rl [identifyRead-10] : identifyRead(Z ; RETURN-CALL(X4)) => identified-Step-read .
-
-  rl [identifyRead-11] : identifyRead(Z ; (LABEL- K3 { INSTR-- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) => identified-Step-read .
-
-  rl [identifyRead-12] : identifyRead(Z ; (HANDLER- K3 { CATCH- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) => identified-Step-read .
-
-  rl [identifyRead-13] : identifyRead(Z ; (FRAME- K3 { F } (((VAL- (REF.NULL-ADDR)) RETURN-CALL-REF(YY2)) INSTR-))) => identified-Step-read .
-
-  rl [identifyRead-14] : identifyRead(Z ; (FRAME- K3 { F } ((((VAL-- VAL-) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY2)) INSTR-))) => identified-Step-read .
-
-  rl [identifyRead-15] : identifyRead(Z ; ((REF.NULL-ADDR) THROW-REF)) => identified-Step-read .
-
-  rl [identifyRead-16] : identifyRead(Z ; (VAL- (REF.EXN-ADDR(A) (THROW-REF INSTR-)))) => identified-Step-read .
-
-  rl [identifyRead-17] : identifyRead(Z ; (LABEL- N3 { INSTR-- } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-18] : identifyRead(Z ; (FRAME- N3 { F } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-19] : identifyRead(Z ; (HANDLER- N3 { eps } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-20] : identifyRead(Z ; (HANDLER- N3 { (CATCH(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-21] : identifyRead(Z ; (HANDLER- N3 { (CATCH-REF(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-22] : identifyRead(Z ; (HANDLER- N3 { (CATCH-ALL(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-23] : identifyRead(Z ; (HANDLER- N3 { (CATCH-ALL-REF(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-24] : identifyRead(Z ; (HANDLER- N3 { (CATCH2 CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
-
-  rl [identifyRead-25] : identifyRead(Z ; (VAL- TRY-TABLE(BT, CATCH-, INSTR-))) => identified-Step-read .
-
-  rl [identifyRead-26] : identifyRead(Z ; LOCAL.GET(X4)) => identified-Step-read .
-
-  rl [identifyRead-27] : identifyRead(Z ; GLOBAL.GET(X4)) => identified-Step-read .
-
-  rl [identifyRead-28] : identifyRead(Z ; (CONST(AT, I) TABLE.GET(X4))) => identified-Step-read .
-
-  rl [identifyRead-30] : identifyRead(Z ; TABLE.SIZE(X4)) => identified-Step-read .
-
-  rl [identifyRead-31] : identifyRead(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) => identified-Step-read .
-
-  rl [identifyRead-34] : identifyRead(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X-1, X-23))))) => identified-Step-read .
-
-  rl [identifyRead-38] : identifyRead(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) TABLE.INIT(X4, Y))))) => identified-Step-read .
-
-  rl [identifyRead-41] : identifyRead(Z ; (CONST(AT, I) LOAD(NT, eps, X4, AO))) => identified-Step-read .
-
-  rl [identifyRead-43] : identifyRead(Z ; (CONST(AT, I) LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO))) => identified-Step-read .
-
-  rl [identifyRead-45] : identifyRead(Z ; (CONST(AT, I) VLOAD(V128, eps, X4, AO))) => identified-Step-read .
-
-  rl [identifyRead-47] : identifyRead(Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) => identified-Step-read .
-
-  rl [identifyRead-49] : identifyRead(Z ; (CONST(AT, I) VLOAD(V128, SPLAT(N2) ?, X4, AO))) => identified-Step-read .
-
-  rl [identifyRead-51] : identifyRead(Z ; (CONST(AT, I) VLOAD(V128, spectec-ZERO(N2) ?, X4, AO))) => identified-Step-read .
-
-  rl [identifyRead-53] : identifyRead(Z ; (CONST(AT, I) (VCONST(V128, C-12) VLOAD-LANE(V128, N2, X4, AO, J)))) => identified-Step-read .
-
-  rl [identifyRead-55] : identifyRead(Z ; MEMORY.SIZE(X4)) => identified-Step-read .
-
-  rl [identifyRead-56] : identifyRead(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) => identified-Step-read .
-
-  rl [identifyRead-59] : identifyRead(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) => identified-Step-read .
-
-  rl [identifyRead-63] : identifyRead(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) MEMORY.INIT(X4, Y))))) => identified-Step-read .
-
-  rl [identifyRead-66] : identifyRead(Z ; REF.NULL(HT)) => identified-Step-read .
-
-  rl [identifyRead-67] : identifyRead(Z ; REF.FUNC(X4)) => identified-Step-read .
-
-  rl [identifyRead-68] : identifyRead((S2 ; F) ; (REF2 REF.TEST(RT))) => identified-Step-read .
-
-  rl [identifyRead-70] : identifyRead((S2 ; F) ; (REF2 REF.CAST(RT))) => identified-Step-read .
-
-  rl [identifyRead-72] : identifyRead(Z ; STRUCT.NEW-DEFAULT(X4)) => identified-Step-read .
-
-  rl [identifyRead-73] : identifyRead(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX-, X4, I))) => identified-Step-read .
-
-  rl [identifyRead-74] : identifyRead(Z ; (REF.STRUCT-ADDR(A) STRUCT.GET(SX-, X4, I))) => identified-Step-read .
-
-  rl [identifyRead-75] : identifyRead(Z ; (CONST(I32, N3) ARRAY.NEW-DEFAULT(X4))) => identified-Step-read .
-
-  rl [identifyRead-76] : identifyRead(Z ; (CONST(I32, I) (CONST(I32, N3) ARRAY.NEW-ELEM(X4, Y)))) => identified-Step-read .
-
-  rl [identifyRead-78] : identifyRead(Z ; (CONST(I32, I) (CONST(I32, N3) ARRAY.NEW-DATA(X4, Y)))) => identified-Step-read .
-
-  rl [identifyRead-80] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, I) ARRAY.GET(SX-, X4)))) => identified-Step-read .
-
-  rl [identifyRead-81] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) ARRAY.GET(SX-, X4)))) => identified-Step-read .
-
-  rl [identifyRead-83] : identifyRead(Z ; ((REF.NULL-ADDR) (ARRAY.LEN))) => identified-Step-read .
-
-  rl [identifyRead-84] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) => identified-Step-read .
-
-  rl [identifyRead-85] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) => identified-Step-read .
-
-  rl [identifyRead-86] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) => identified-Step-read .
-
-  rl [identifyRead-89] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, I-1) (REF2 (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) => identified-Step-read .
-
-  rl [identifyRead-90] : identifyRead(Z ; (REF2 (CONST(I32, I-1) ((REF.NULL-ADDR) (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) => identified-Step-read .
-
-  rl [identifyRead-91] : identifyRead(Z ; (REF.ARRAY-ADDR(A-1) (CONST(I32, I-1) (REF.ARRAY-ADDR(A-2) (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) => identified-Step-read .
-
-  rl [identifyRead-96] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-ELEM(X4, Y)))))) => identified-Step-read .
-
-  rl [identifyRead-97] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-ELEM(X4, Y)))))) => identified-Step-read .
-
-  rl [identifyRead-101] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-DATA(X4, Y)))))) => identified-Step-read .
-
-  rl [identifyRead-102] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-DATA(X4, Y)))))) => identified-Step-read .
-
-  crl [heating-Step-read] : Step(Z ; INSTR-) => Step-read(Z ; INSTR-) ~> hole-Step-read-1(Z)
-    if identifyRead(Z ; INSTR-) => identified-Step-read .
-
-  eq INSTR-- ~> hole-Step-read-1(Z) = Z ; INSTR-- .
-
-  rl [heating-Steps-trans] : Steps(Z ; INSTR-) => Step(Z ; INSTR-) ~> hole-Steps-trans-1 .
-
-  eq (Z- ; INSTR--) ~> hole-Steps-trans-1 = Steps(Z- ; INSTR--) ~> hole-Steps-trans-2 .
-
-  eq (Z-- ; INSTR---) ~> hole-Steps-trans-2 = Z-- ; INSTR--- .
-
-  rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N3 { INSTR-0- } INSTR-)) => Step(Z ; INSTR-) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) .
-
-  eq (Z- ; INSTR--) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) = Z- ; (LABEL- N3 { INSTR-0- } INSTR--) .
-
-  rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N3 { CATCH- } INSTR-)) => Step(Z ; INSTR-) ~> hole-Step-ctxt-handler-1(CATCH-, N3) .
-
-  eq (Z- ; INSTR--) ~> hole-Step-ctxt-handler-1(CATCH-, N3) = Z- ; (HANDLER- N3 { CATCH- } INSTR--) .
-
-  rl [heating-Step-ctxt-frame] : Step((S2 ; F) ; (FRAME- N3 { F-14 } INSTR-)) => Step((S2 ; F-14) ; INSTR-) ~> hole-Step-ctxt-frame-1(N3, F) .
-
-  eq ((S- ; F--) ; INSTR--) ~> hole-Step-ctxt-frame-1(N3, F) = (S- ; F) ; (FRAME- N3 { F-- } INSTR--) .
-
-  rl [heating-Eval-expr-1] : Eval-expr(Z, INSTR-) => Steps(Z ; INSTR-) ~> hole-Eval-expr-1-1 .
-
-  eq (Z- ; VAL-) ~> hole-Eval-expr-1-1 = tuple(Z- seq(VAL-)) .
 
   eq typecheck(VALUE, N) = typecheck(VALUE, nat) .
 
@@ -5127,13 +4315,17 @@ mod SPEC2MAUDE-GENERATED is
       /\ len(VALTYPE--) <= 1 .
 
   ceq typecheck(BLOCK(BLOCKTYPE, INSTR-), instr) = true
-    if typecheck(BLOCKTYPE, blocktype) .
+    if typecheck(BLOCKTYPE, blocktype)
+      /\ typecheck(INSTR-, instr) .
 
   ceq typecheck(LOOP(BLOCKTYPE, INSTR-), instr) = true
-    if typecheck(BLOCKTYPE, blocktype) .
+    if typecheck(BLOCKTYPE, blocktype)
+      /\ typecheck(INSTR-, instr) .
 
   ceq typecheck(IF__ELSE_(BLOCKTYPE, INSTR-, INSTR-5), instr) = true
-    if typecheck(BLOCKTYPE, blocktype) .
+    if typecheck(BLOCKTYPE, blocktype)
+      /\ typecheck(INSTR-, instr)
+      /\ typecheck(INSTR-5, instr) .
 
   ceq typecheck(BR(LABELIDX), instr) = true
     if typecheck(LABELIDX, labelidx) .
@@ -5190,7 +4382,8 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(TRY-TABLE(BLOCKTYPE, VALUE24, INSTR-), instr) = true
     if typecheck(BLOCKTYPE, blocktype)
-      /\ typecheck(VALUE24, list(catch)) .
+      /\ typecheck(VALUE24, list(catch))
+      /\ typecheck(INSTR-, instr) .
 
   ceq typecheck(LOCAL.GET(LOCALIDX), instr) = true
     if typecheck(LOCALIDX, localidx) .
@@ -5524,21 +4717,25 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(REF2, ref) .
 
   ceq typecheck(LABEL- N3 { INSTR- } INSTR-5, instr) = true
-    if typecheck(N3, n) .
+    if typecheck(N3, n)
+      /\ typecheck(INSTR-, instr)
+      /\ typecheck(INSTR-5, instr) .
 
   ceq typecheck(FRAME- N3 { FRAME } INSTR-, instr) = true
     if typecheck(N3, n)
-      /\ typecheck(FRAME, frame) .
+      /\ typecheck(FRAME, frame)
+      /\ typecheck(INSTR-, instr) .
 
   ceq typecheck(HANDLER- N3 { CATCH- } INSTR-, instr) = true
     if typecheck(N3, n)
-      /\ typecheck(CATCH-, catch) .
+      /\ typecheck(CATCH-, catch)
+      /\ typecheck(INSTR-, instr) .
 
   eq typecheck(TRAP, instr) = true .
 
-  eq typecheck(seq(VALUE15), expr) = typecheck(VALUE15, instr) .
+  eq typecheck(seq(VALUE4), expr) = typecheck(VALUE4, instr) .
 
-  eq typecheck(VALUE15, expr) = typecheck(VALUE15, instr) .
+  eq typecheck(VALUE4, expr) = typecheck(VALUE4, instr) .
 
   eq memarg0 = { (item('ALIGN, 0) ; item('OFFSET, 0)) } .
 
@@ -5922,7 +5119,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(LOCALIDX-, uN(32))
       /\ typecheck(RESULTTYPE2, resulttype) .
 
-  ceq typecheck({ ((((((((((((item('TYPES, VALUE4) ; item('TAGS, VALUE5)) ; item('GLOBALS, VALUE6)) ; item('MEMS, VALUE7)) ; item('TABLES, VALUE8)) ; item('FUNCS, VALUE9)) ; item('DATAS, VALUE10)) ; item('ELEMS, VALUE11)) ; item('LOCALS, VALUE12)) ; item('LABELS, VALUE13)) ; item('RETURN, VALUE16)) ; item('REFS, VALUE17)) ; item('RECS, VALUE18)) }, context) = true
+  ceq typecheck({ ((((((((((((item('TYPES, VALUE4) ; item('TAGS, VALUE5)) ; item('GLOBALS, VALUE6)) ; item('MEMS, VALUE7)) ; item('TABLES, VALUE8)) ; item('FUNCS, VALUE9)) ; item('DATAS, VALUE10)) ; item('ELEMS, VALUE11)) ; item('LOCALS, VALUE12)) ; item('LABELS, VALUE13)) ; item('RETURN, VALUE15)) ; item('REFS, VALUE16)) ; item('RECS, VALUE17)) }, context) = true
     if typecheck(VALUE4, deftype)
       /\ typecheck(VALUE5, typeuse)
       /\ typecheck(VALUE6, globaltype)
@@ -5933,10 +5130,10 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE11, reftype)
       /\ typecheck(VALUE12, localtype)
       /\ typecheck(VALUE13, list(valtype))
-      /\ typecheck(VALUE16, list(valtype))
-      /\ len(VALUE16) <= 1
-      /\ typecheck(VALUE17, uN(32))
-      /\ typecheck(VALUE18, subtype) .
+      /\ typecheck(VALUE15, list(valtype))
+      /\ len(VALUE15) <= 1
+      /\ typecheck(VALUE16, uN(32))
+      /\ typecheck(VALUE17, subtype) .
 
   eq recordConcat(LEFT, RIGHT, context) = { ((((((((((((item('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; item('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; item('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; item('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; item('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; item('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; item('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; item('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; item('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; item('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; item('RETURN, optionConcat(LEFT . 'RETURN, RIGHT . 'RETURN))) ; item('REFS, (LEFT . 'REFS) (RIGHT . 'REFS))) ; item('RECS, (LEFT . 'RECS) (RIGHT . 'RECS))) } .
 
@@ -6898,7 +6095,8 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VECTYPE, vectype)
       /\ typecheck(VALUE23, vec-(VECTYPE)) .
 
-  eq typecheck(-VALS(VAL-), result) = true .
+  ceq typecheck(-VALS(VAL-), result) = true
+    if typecheck(VAL-, val) .
 
   ceq typecheck((REF.EXN-ADDR EXNADDR )THROW-REF, result) = true
     if typecheck(EXNADDR, exnaddr) .
@@ -6917,9 +6115,9 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck({ item('TYPE, VALUE3) }, taginst) = true
     if typecheck(VALUE3, tagtype) .
 
-  ceq typecheck({ (item('TYPE, VALUE3) ; item('VALUE, VALUE19)) }, globalinst) = true
+  ceq typecheck({ (item('TYPE, VALUE3) ; item('VALUE, VALUE18)) }, globalinst) = true
     if typecheck(VALUE3, globaltype)
-      /\ typecheck(VALUE19, val) .
+      /\ typecheck(VALUE18, val) .
 
   ceq typecheck({ (item('TYPE, VALUE3) ; item('BYTES, VALUE4)) }, meminst) = true
     if typecheck(VALUE3, memtype)
@@ -6929,10 +6127,10 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VALUE3, tabletype)
       /\ typecheck(VALUE4, ref) .
 
-  ceq typecheck({ ((item('TYPE, VALUE3) ; item('MODULE, VALUE20)) ; item('CODE, VALUE21)) }, funcinst) = true
+  ceq typecheck({ ((item('TYPE, VALUE3) ; item('MODULE, VALUE18)) ; item('CODE, VALUE19)) }, funcinst) = true
     if typecheck(VALUE3, deftype)
-      /\ typecheck(VALUE20, moduleinst)
-      /\ typecheck(VALUE21, funccode) .
+      /\ typecheck(VALUE18, moduleinst)
+      /\ typecheck(VALUE19, funccode) .
 
   ceq typecheck({ item('BYTES, VALUE4) }, datainst) = true
     if typecheck(VALUE4, byte) .
@@ -6990,8 +6188,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VALUE3, deftype)
       /\ typecheck(VALUE4, fieldval) .
 
-  ceq typecheck({ (item('TAG, VALUE) ; item('FIELDS, VALUE25)) }, exninst) = true
-    if typecheck(VALUE, tagaddr) .
+  ceq typecheck({ (item('TAG, VALUE) ; item('FIELDS, VALUE4)) }, exninst) = true
+    if typecheck(VALUE, tagaddr)
+      /\ typecheck(VALUE4, val) .
 
   ceq typecheck({ (((((((((item('TAGS, VALUE4) ; item('GLOBALS, VALUE5)) ; item('MEMS, VALUE6)) ; item('TABLES, VALUE7)) ; item('FUNCS, VALUE8)) ; item('DATAS, VALUE9)) ; item('ELEMS, VALUE10)) ; item('STRUCTS, VALUE11)) ; item('ARRAYS, VALUE12)) ; item('EXNS, VALUE13)) }, store) = true
     if typecheck(VALUE4, taginst)
@@ -7012,7 +6211,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(FRAME, frame) .
 
   ceq typecheck(STATE ; INSTR-, config) = true
-    if typecheck(STATE, state) .
+    if typecheck(STATE, state)
+      /\ typecheck(INSTR-, instr) .
 
   eq Ki = 1024 .
 
@@ -7203,6 +6403,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq Step-pure-enabled-27(ENABLED-INPUT1) = true
     if VAL- (TRAP INSTR-) := ENABLED-INPUT1
+      /\ typecheck(VAL-, val)
       /\ _or_(VAL- =/= eps, INSTR- =/= eps) .
 
   eq Step-pure-enabled-27(ENABLED-INPUT1) = false [owise] .
@@ -7271,16 +6472,21 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-pure(CONST(I32, C3) IF__ELSE_(BT, INSTR-1-, INSTR-2-)) => BLOCK(BT, INSTR-2-)
     if C3 == 0 .
 
-  rl Step-pure(LABEL- N3 { INSTR- } VAL-) => VAL- .
+  crl Step-pure(LABEL- N3 { INSTR- } VAL-) => VAL-
+    if typecheck(VAL-, val) .
 
   crl Step-pure(LABEL- N3 { INSTR-- } (((VAL-- VAL-) BR(L)) INSTR-)) => VAL- INSTR--
-    if instrSize(VAL-) = N3
+    if typecheck(VAL--, val)
+      /\ typecheck(VAL-, val)
+      /\ len(VAL-) = N3
       /\ L == 0 .
 
   crl Step-pure(LABEL- N3 { INSTR-- } ((VAL- BR(L)) INSTR-)) => VAL- BR(_-_(L : nat <:> int, 1 : nat <:> int) : int <:> nat)
-    if L > 0 .
+    if typecheck(VAL-, val)
+      /\ L > 0 .
 
-  rl Step-pure(HANDLER- N3 { CATCH- } ((VAL- BR(L)) INSTR-)) => VAL- BR(L) .
+  crl Step-pure(HANDLER- N3 { CATCH- } ((VAL- BR(L)) INSTR-)) => VAL- BR(L)
+    if typecheck(VAL-, val) .
 
   crl Step-pure(CONST(I32, C3) BR-IF(L)) => BR(L)
     if C3 =/= 0 .
@@ -7315,19 +6521,26 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-pure(RETURN-CALL-INDIRECT(X4, YY2)) => TABLE.GET(X4) (REF.CAST(REF(NULL ?, YY2)) RETURN-CALL-REF(YY2)) .
 
   crl Step-pure(FRAME- N3 { F } VAL-) => VAL-
-    if instrSize(VAL-) = N3 .
+    if typecheck(VAL-, val)
+      /\ len(VAL-) = N3 .
 
   crl Step-pure(FRAME- N3 { F } (((VAL-- VAL-) RETURN) INSTR-)) => VAL-
-    if instrSize(VAL-) = N3 .
+    if typecheck(VAL--, val)
+      /\ typecheck(VAL-, val)
+      /\ len(VAL-) = N3 .
 
-  rl Step-pure(LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-)) => VAL- RETURN .
+  crl Step-pure(LABEL- N3 { INSTR-- } ((VAL- RETURN) INSTR-)) => VAL- RETURN
+    if typecheck(VAL-, val) .
 
-  rl Step-pure(HANDLER- N3 { CATCH- } ((VAL- RETURN) INSTR-)) => VAL- RETURN .
+  crl Step-pure(HANDLER- N3 { CATCH- } ((VAL- RETURN) INSTR-)) => VAL- RETURN
+    if typecheck(VAL-, val) .
 
-  rl Step-pure(HANDLER- N3 { CATCH- } VAL-) => VAL- .
+  crl Step-pure(HANDLER- N3 { CATCH- } VAL-) => VAL-
+    if typecheck(VAL-, val) .
 
   crl Step-pure(VAL- (TRAP INSTR-)) => TRAP
-    if _or_(VAL- =/= eps, INSTR- =/= eps) .
+    if typecheck(VAL-, val)
+      /\ _or_(VAL- =/= eps, INSTR- =/= eps) .
 
   rl Step-pure(LABEL- N3 { INSTR-- } TRAP) => TRAP .
 
@@ -7381,7 +6594,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl Step-pure(REF.I31-NUM(I) I31.GET(SX)) => CONST(I32, extend--(31, 32, SX, I)) .
 
-  crl Step-pure(VAL (CONST(I32, N3) ARRAY.NEW(X4))) => instrRepeat(N3, VAL) ARRAY.NEW-FIXED(X4, N3)
+  crl Step-pure(VAL (CONST(I32, N3) ARRAY.NEW(X4))) => repeatSeq(N3, VAL) ARRAY.NEW-FIXED(X4, N3)
     if typecheck(VAL, val) .
 
   crl Step-pure(REF2 (EXTERN.CONVERT-ANY)) => REF.NULL-ADDR
@@ -7523,12 +6736,14 @@ mod SPEC2MAUDE-GENERATED is
   eq Step-read-enabled-5(ENABLED-INPUT12) = false [owise] .
 
   ceq Step-read-enabled-12(ENABLED-INPUT12) = true
-    if Z ; (HANDLER- K3 { CATCH- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-)) := ENABLED-INPUT12 .
+    if Z ; (HANDLER- K3 { CATCH- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-)) := ENABLED-INPUT12
+      /\ typecheck(VAL-, val) .
 
   eq Step-read-enabled-12(ENABLED-INPUT12) = false [owise] .
 
   ceq Step-read-enabled-16(ENABLED-INPUT12) = true
     if Z ; (VAL- (REF.EXN-ADDR(A) (THROW-REF INSTR-))) := ENABLED-INPUT12
+      /\ typecheck(VAL-, val)
       /\ _or_(VAL- =/= eps, INSTR- =/= eps) .
 
   eq Step-read-enabled-16(ENABLED-INPUT12) = false [owise] .
@@ -7804,13 +7019,15 @@ mod SPEC2MAUDE-GENERATED is
   eq Step-read-enabled-104(ENABLED-INPUT12) = false [owise] .
 
   crl Step-read(Z ; (VAL- BLOCK(BT, INSTR-))) => LABEL- N3 { eps } (VAL- INSTR-)
-    if M3 := instrSize(VAL-)
+    if typecheck(VAL-, val)
+      /\ M3 := len(VAL-)
       /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
       /\ M3 = len(T-1-)
       /\ N3 := len(T-2-) .
 
   crl Step-read(Z ; (VAL- LOOP(BT, INSTR-))) => LABEL- M3 { LOOP(BT, INSTR-) } (VAL- INSTR-)
-    if M3 := instrSize(VAL-)
+    if typecheck(VAL-, val)
+      /\ M3 := len(VAL-)
       /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
       /\ M3 = len(T-1-)
       /\ N3 := len(T-2-) .
@@ -7837,13 +7054,14 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-read(Z ; ((REF.NULL-ADDR) CALL-REF(YY2))) => TRAP .
 
   crl Step-read(Z ; (VAL- (REF.FUNC-ADDR(A) CALL-REF(YY2)))) => FRAME- M3 { F } (LABEL- M3 { eps } INSTR-)
-    if N3 := instrSize(VAL-)
+    if typecheck(VAL-, val)
+      /\ N3 := len(VAL-)
       /\ FI := spectec-funcinst(Z) [ A ]
       /\ FUNC T-1- -> T-2- := Expand(FI . 'TYPE)
       /\ N3 = len(T-1-)
       /\ M3 := len(T-2-)
-      /\ spectec-FUNC-2(CASE-PART12, CASE-PART2, CASE-PART3) := FI . 'CODE
-      /\ X4 := CASE-PART12
+      /\ spectec-FUNC-2(CASE-PART1, CASE-PART2, CASE-PART3) := FI . 'CODE
+      /\ X4 := CASE-PART1
       /\ INSTR- := CASE-PART3
       /\ T- := project-map-exp-1040(CASE-PART2)
       /\ F := { (item('LOCALS, map-exp-1042(N3, VAL-) map-default(T-)) ; item('MODULE, FI . 'MODULE)) } .
@@ -7851,14 +7069,19 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; RETURN-CALL(X4)) => REF.FUNC-ADDR(A) RETURN-CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE)
     if A := (spectec-moduleinst(Z) . 'FUNCS) [ X4 ] .
 
-  rl Step-read(Z ; (LABEL- K3 { INSTR-- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) => VAL- RETURN-CALL-REF(YY2) .
+  crl Step-read(Z ; (LABEL- K3 { INSTR-- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) => VAL- RETURN-CALL-REF(YY2)
+    if typecheck(VAL-, val) .
 
-  rl Step-read(Z ; (HANDLER- K3 { CATCH- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) => VAL- RETURN-CALL-REF(YY2) .
+  crl Step-read(Z ; (HANDLER- K3 { CATCH- } ((VAL- RETURN-CALL-REF(YY2)) INSTR-))) => VAL- RETURN-CALL-REF(YY2)
+    if typecheck(VAL-, val) .
 
-  rl Step-read(Z ; (FRAME- K3 { F } (((VAL- (REF.NULL-ADDR)) RETURN-CALL-REF(YY2)) INSTR-))) => TRAP .
+  crl Step-read(Z ; (FRAME- K3 { F } (((VAL- (REF.NULL-ADDR)) RETURN-CALL-REF(YY2)) INSTR-))) => TRAP
+    if typecheck(VAL-, val) .
 
   crl Step-read(Z ; (FRAME- K3 { F } ((((VAL-- VAL-) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY2)) INSTR-))) => VAL- (REF.FUNC-ADDR(A) CALL-REF(YY2))
-    if N3 := instrSize(VAL-)
+    if typecheck(VAL--, val)
+      /\ typecheck(VAL-, val)
+      /\ N3 := len(VAL-)
       /\ FUNC T-1- -> T-2- := Expand((spectec-funcinst(Z) [ A ]) . 'TYPE)
       /\ N3 = len(T-1-)
       /\ M3 := len(T-2-) .
@@ -7866,7 +7089,8 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-read(Z ; ((REF.NULL-ADDR) THROW-REF)) => TRAP .
 
   crl Step-read(Z ; (VAL- (REF.EXN-ADDR(A) (THROW-REF INSTR-)))) => REF.EXN-ADDR(A) THROW-REF
-    if _or_(VAL- =/= eps, INSTR- =/= eps) .
+    if typecheck(VAL-, val)
+      /\ _or_(VAL- =/= eps, INSTR- =/= eps) .
 
   rl Step-read(Z ; (LABEL- N3 { INSTR-- } (REF.EXN-ADDR(A) THROW-REF))) => REF.EXN-ADDR(A) THROW-REF .
 
@@ -7896,7 +7120,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-enabled-23(Z ; (HANDLER- N3 { (CATCH2 CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) = false .
 
   crl Step-read(Z ; (VAL- TRY-TABLE(BT, CATCH-, INSTR-))) => HANDLER- N3 { CATCH- } (LABEL- N3 { eps } (VAL- INSTR-))
-    if M3 := instrSize(VAL-)
+    if typecheck(VAL-, val)
+      /\ M3 := len(VAL-)
       /\ T-1- ->- eps  T-2- := blocktype-(Z, BT)
       /\ M3 = len(T-1-)
       /\ N3 := len(T-2-) .
@@ -8159,8 +7384,8 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read(Z ; STRUCT.NEW-DEFAULT(X4)) => VAL- STRUCT.NEW(X4)
     if REL-OUTPUT1 := Expand(spectec-type(Z, X4))
-      /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1084(CASE-PART1)
+      /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
+      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1084(CASE-PART12)
       /\ VAL- := iterpr-37-output-1(ZT-) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX-, X4, I))) => TRAP
@@ -8169,10 +7394,10 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (REF.STRUCT-ADDR(A) STRUCT.GET(SX-, X4, I))) => unpackfield-(ZT- [ I ], SX-, ((spectec-structinst(Z) [ A ]) . 'FIELDS) [ I ])
     if len(SX-) <= 1
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
-      /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1090(CASE-PART1) .
+      /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
+      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1090(CASE-PART12) .
 
-  crl Step-read(Z ; (CONST(I32, N3) ARRAY.NEW-DEFAULT(X4))) => instrRepeat(N3, VAL) ARRAY.NEW-FIXED(X4, N3)
+  crl Step-read(Z ; (CONST(I32, N3) ARRAY.NEW-DEFAULT(X4))) => repeatSeq(N3, VAL) ARRAY.NEW-FIXED(X4, N3)
     if spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ VAL ? := default-(unpack(ZT)) .
@@ -8180,7 +7405,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (CONST(I32, I) (CONST(I32, N3) ARRAY.NEW-ELEM(X4, Y)))) => TRAP
     if (I + N3) > len(spectec-elem(Z, Y) . 'REFS) .
 
-  crl Step-read(Z ; (CONST(I32, I) (CONST(I32, N3) ARRAY.NEW-ELEM(X4, Y)))) => map-exp-1094(N3, REF-) ARRAY.NEW-FIXED(X4, N3)
+  crl Step-read(Z ; (CONST(I32, I) (CONST(I32, N3) ARRAY.NEW-ELEM(X4, Y)))) => REF- ARRAY.NEW-FIXED(X4, N3)
     if REF- := (spectec-elem(Z, Y) . 'REFS) [ I : N3 ]
       /\ len(REF-) = N3 .
 
@@ -8317,8 +7542,29 @@ mod SPEC2MAUDE-GENERATED is
       /\ C2 := inv-zbytes-(ZT, (spectec-data(Z, Y) . 'BYTES) [ J : (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ zbytes-(ZT, C2) == ((spectec-data(Z, Y) . 'BYTES) [ J : (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
+  crl Step(Z ; INSTR-) => Z ; INSTR--
+    if Step-pure(INSTR-) => INSTR-- .
+
+  crl Step(Z ; INSTR-) => Z ; INSTR--
+    if Step-read(Z ; INSTR-) => INSTR-- .
+
+  crl Step(Z ; (VAL- (INSTR- INSTR-1-))) => Z- ; (VAL- (INSTR-- INSTR-1-))
+    if typecheck(VAL-, val)
+      /\ _or_(VAL- =/= eps, INSTR-1- =/= eps)
+      /\ Step(Z ; INSTR-) => Z- ; INSTR-- .
+
+  crl Step(Z ; (LABEL- N3 { INSTR-0- } INSTR-)) => Z- ; (LABEL- N3 { INSTR-0- } INSTR--)
+    if Step(Z ; INSTR-) => Z- ; INSTR-- .
+
+  crl Step(Z ; (HANDLER- N3 { CATCH- } INSTR-)) => Z- ; (HANDLER- N3 { CATCH- } INSTR--)
+    if Step(Z ; INSTR-) => Z- ; INSTR-- .
+
+  crl Step((S2 ; F) ; (FRAME- N3 { F-14 } INSTR-)) => (S- ; F) ; (FRAME- N3 { F-- } INSTR--)
+    if Step((S2 ; F-14) ; INSTR-) => (S- ; F--) ; INSTR-- .
+
   crl Step(Z ; (VAL- THROW(X4))) => add-exninst(Z, EXN3) ; (REF.EXN-ADDR(A) THROW-REF)
-    if N3 := instrSize(VAL-)
+    if typecheck(VAL-, val)
+      /\ N3 := len(VAL-)
       /\ FUNC T- -> eps := Expand(as-deftype(spectec-tag(Z, X4) . 'TYPE))
       /\ N3 = len(T-)
       /\ A := len(spectec-exninst(Z))
@@ -8398,10 +7644,11 @@ mod SPEC2MAUDE-GENERATED is
   rl Step(Z ; DATA.DROP(X4)) => with-data(Z, X4, eps) ; eps .
 
   crl Step(Z ; (VAL- STRUCT.NEW(X4))) => add-structinst(Z, SI2) ; REF.STRUCT-ADDR(A)
-    if N3 := instrSize(VAL-)
+    if typecheck(VAL-, val)
+      /\ N3 := len(VAL-)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
-      /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1157(N3, CASE-PART1)
+      /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
+      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1157(N3, CASE-PART12)
       /\ A := len(spectec-structinst(Z))
       /\ SI2 := { (item('TYPE, spectec-type(Z, X4)) ; item('FIELDS, map-packfield(N3, VAL-, ZT-))) } .
 
@@ -8411,11 +7658,12 @@ mod SPEC2MAUDE-GENERATED is
   crl Step(Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X4, I)))) => with-struct(Z, A, I, packfield-(ZT- [ I ], VAL)) ; eps
     if typecheck(VAL, val)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
-      /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1160(CASE-PART1) .
+      /\ spectec-STRUCT(CASE-PART12) := REL-OUTPUT1
+      /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1160(CASE-PART12) .
 
   crl Step(Z ; (VAL- ARRAY.NEW-FIXED(X4, N3))) => add-arrayinst(Z, AI2) ; REF.ARRAY-ADDR(A)
-    if instrSize(VAL-) = N3
+    if typecheck(VAL-, val)
+      /\ len(VAL-) = N3
       /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ A := len(spectec-arrayinst(Z))
@@ -8434,6 +7682,14 @@ mod SPEC2MAUDE-GENERATED is
       /\ len(MUT-) <= 1 .
 
   rl Steps(Z ; INSTR-) => Z ; INSTR- .
+
+  crl Steps(Z ; INSTR-) => Z-- ; INSTR---
+    if Step(Z ; INSTR-) => Z- ; INSTR--
+      /\ Steps(Z- ; INSTR--) => Z-- ; INSTR--- .
+
+  crl Eval-expr(Z, INSTR-) => tuple(Z- seq(VAL-))
+    if Steps(Z ; INSTR-) => Z- ; VAL-
+      /\ typecheck(VAL-, val) .
 
   eq alloctypes(eps) = eps .
 
@@ -8591,7 +7847,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(EXPR, expr)
       /\ typecheck(EXPR--, iterList(instr)) .
 
-  crl instantiate(S2, MODULE2, EXTERNADDR-) => (S---- ; ({ (item('LOCALS, eps) ; item('MODULE, MODULEINST)) })) ; (INSTR-E- (INSTR-D- instrLift(INSTR-S-)))
+  crl instantiate(S2, MODULE2, EXTERNADDR-) => (S---- ; ({ (item('LOCALS, eps) ; item('MODULE, MODULEINST)) })) ; (INSTR-E- (INSTR-D- lift(INSTR-S-)))
     if XT-I- -> XT-E- := Module-ok(MODULE2)
       /\ iterpr-38(S2, EXTERNADDR-, XT-I-)
       /\ MODULE(TYPE-, IMPORT-, TAG-, GLOBAL-, MEM-, TABLE-, FUNC-, DATA-, ELEM-, START-, EXPORT-) := MODULE2
@@ -9143,10 +8399,6 @@ mod SPEC2MAUDE-GENERATED is
     if len(MUT-) <= 1
       /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1090(PROJECT-REST) .
 
-  eq map-exp-1094(0, eps) = eps .
-
-  eq map-exp-1094(s(ITER-COUNT), REF2 REFS) = REF2 map-exp-1094(ITER-COUNT, REFS) .
-
   eq map-const(ZT, 0, eps) = eps .
 
   eq map-const(ZT, s(ITER-COUNT), C2 CS) = const(cunpack(ZT), cunpacknum-(ZT, C2)) map-const(ZT, ITER-COUNT, CS) .
@@ -9193,7 +8445,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq project-map-exp-1263(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1263(spectec-GLOBAL(GLOBALTYPE, EXPR-G2) PROJECT-REST) = tuple(seq(seq(EXPR-G2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
+  ceq project-map-exp-1263(spectec-GLOBAL(GLOBALTYPE, EXPR-G) PROJECT-REST) = tuple(seq(seq(EXPR-G) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1263(PROJECT-REST) .
 
   eq project-map-exp-1265(eps) = eps .
@@ -9203,12 +8455,12 @@ mod SPEC2MAUDE-GENERATED is
 
   eq project-map-exp-1267(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1267(spectec-TABLE(TABLETYPE, EXPR-T2) PROJECT-REST) = tuple(seq(seq(EXPR-T2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
+  ceq project-map-exp-1267(spectec-TABLE(TABLETYPE, EXPR-T) PROJECT-REST) = tuple(seq(seq(EXPR-T) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1267(PROJECT-REST) .
 
   eq project-map-exp-1269(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
-  ceq project-map-exp-1269(spectec-FUNC-2(X4, LOCAL-, EXPR-F2) PROJECT-REST) = tuple(seq(seq(EXPR-F2) PROJECT-COLUMN-1) (seq(seq(LOCAL-) PROJECT-COLUMN-2) seq(X4 PROJECT-COLUMN-3)))
+  ceq project-map-exp-1269(spectec-FUNC-2(X4, LOCAL-, EXPR-F) PROJECT-REST) = tuple(seq(seq(EXPR-F) PROJECT-COLUMN-1) (seq(seq(LOCAL-) PROJECT-COLUMN-2) seq(X4 PROJECT-COLUMN-3)))
     if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1269(PROJECT-REST) .
 
   eq project-map-exp-1272(eps) = tuple(seq(eps) seq(eps)) .
@@ -9251,16 +8503,16 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-exp-1314(eps, eps, eps) = eps .
 
-  eq map-exp-1314(seq(EXPR-F2) EXPR_FS, seq(LOCAL-) LOCAL*S, X4 XS) = spectec-FUNC-2(X4, LOCAL-, EXPR-F2) map-exp-1314(EXPR_FS, LOCAL*S, XS) .
+  eq map-exp-1314(seq(EXPR-F) EXPR_FS, seq(LOCAL-) LOCAL*S, X4 XS) = spectec-FUNC-2(X4, LOCAL-, EXPR-F) map-exp-1314(EXPR_FS, LOCAL*S, XS) .
 
   eq project-map-exp-1393(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1393(spectec-GLOBAL(GLOBALTYPE, EXPR-G2) PROJECT-REST) = tuple(seq(seq(EXPR-G2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
+  ceq project-map-exp-1393(spectec-GLOBAL(GLOBALTYPE, EXPR-G) PROJECT-REST) = tuple(seq(seq(EXPR-G) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1393(PROJECT-REST) .
 
   eq project-map-exp-1395(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1395(spectec-TABLE(TABLETYPE, EXPR-T2) PROJECT-REST) = tuple(seq(seq(EXPR-T2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
+  ceq project-map-exp-1395(spectec-TABLE(TABLETYPE, EXPR-T) PROJECT-REST) = tuple(seq(seq(EXPR-T) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1395(PROJECT-REST) .
 
   eq project-map-exp-1397(eps) = tuple(seq(eps) seq(eps)) .

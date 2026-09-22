@@ -13,12 +13,10 @@ relation Steps: config ~>* config     hint(name "E") hint(macro "steptostar") hi
 rule Step/pure:
   z; instr*  ~>  z; instr'*
   -- Step_pure: instr* ~> instr'*
-  hint(k_heatcool)
 
 rule Step/read:
   z; instr*  ~>  z; instr'*
   -- Step_read: z; instr* ~> instr'*
-  hint(k_heatcool)
 
 rule Steps/refl:
   z; instr* ~>* z; instr*
@@ -27,7 +25,6 @@ rule Steps/trans:
   z; instr*  ~>*  z''; instr''*
   -- Step: z; instr*  ~>  z'; instr'*
   -- Steps: z'; instr'*  ~>*  z''; instr''*
-  hint(k_heatcool)
 
 
 ;; Context
@@ -36,22 +33,18 @@ rule Step/ctxt-instrs:
   z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
   -- Step: z; instr* ~> z'; instr'*
   -- if val* =/= eps \/ instr_1* =/= eps
-  hint(k_heatcool)
 
 rule Step/ctxt-label:
   z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
   -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
 
 rule Step/ctxt-handler:
   z; (HANDLER_ n `{catch*} instr*) ~> z'; (HANDLER_ n `{catch*} instr'*)
   -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
 
 rule Step/ctxt-frame:
   s; f; (FRAME_ n `{f'} instr*)  ~>  s'; f; (FRAME_ n `{f''} instr'*)
   -- Step: s; f'; instr* ~> s'; f''; instr'*
-  hint(k_heatcool)
 
 
 ;; Polymorphic instructions
@@ -1114,4 +1107,3 @@ relation Eval_expr: state; expr ~>* state; val*  hint(name "E-expr") hint(macro 
 rule Eval_expr:
   z; instr*  ~>*  z'; val*
   -- Steps: z; instr*  ~>*  z'; val*
-  hint(k_heatcool)

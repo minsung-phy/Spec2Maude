@@ -4,10 +4,10 @@ mod CLIENT-WASM is
   protecting WASM-BUILTINS .
 
   sort clientRunState .
-  op clientCall : ValList -> clientRunState [ctor] .
-  op clientInit : SpectecTerminal ValList -> clientRunState [ctor frozen (1)] .
+  op clientCall : SpectecTerminals -> clientRunState [ctor] .
+  op clientInit : SpectecTerminal SpectecTerminals -> clientRunState [ctor frozen (1)] .
   op clientExec : SpectecTerminal -> clientRunState [ctor frozen (1)] .
-  op clientResult : ValList -> clientRunState [ctor] .
+  op clientResult : SpectecTerminals -> clientRunState [ctor] .
 
   op clientInputModule : -> SpectecTerminal .
   op clientInputName : -> SpectecTerminals .
@@ -17,7 +17,7 @@ mod CLIENT-WASM is
 
   vars C C2 Z XA : SpectecTerminal .
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
-  vars ARGS RESULT : ValList .
+  vars ARGS RESULT : SpectecTerminals .
   var ADDR : Nat .
 
   eq clientInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_((I32 I32), I32)))), eps, eps,
@@ -61,5 +61,5 @@ ARGS))
   crl [clientStep] : clientExec(C) => clientExec(C2)
     if Step(C) => C2 .
   crl [clientFinished] : clientExec(C) => clientResult(RESULT)
-    if (Z ; RESULT) := C .
+    if (Z ; RESULT) := C /\ typecheck(RESULT, val) = true .
 endm

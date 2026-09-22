@@ -87,8 +87,6 @@ type name_kind = TypName | RelName | DefName | MixopName
 type t =
   { type_env : Il.Env.t
   ; sort_metadata : Hintd.t
-  ; contexts : Hintd.context list
-  ; heatcool : Hintd.heatcool list
   ; iterations : iteration list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
@@ -1170,14 +1168,6 @@ let scan script =
         | Error reason -> policies, (source, reason) :: unsupported)
       relations ([], [])
   in
-  let execution_input_count source =
-    match List.assoc_opt source relation_policies with
-    | Some (Execution {input_count; _}) -> Some input_count
-    | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
-    | None -> None
-  in
-  let heatcool = Hintd.scan_heatcool sort_metadata execution_input_count in
-  let contexts = Hintd.scan_contexts sort_metadata execution_input_count heatcool in
   let relation_enabled_helpers =
     let rec collect acc def =
       match def.it with
@@ -1267,8 +1257,6 @@ let scan script =
   in
   { type_env
   ; sort_metadata
-  ; contexts
-  ; heatcool
   ; iterations
   ; premise_iterations
   ; hints
@@ -1478,18 +1466,3 @@ let premise_iteration index premise =
 
 let hints index = index.hints
 let sort_metadata index = index.sort_metadata
-let contexts index = index.contexts
-
-let is_context_rule index relation rule =
-  List.exists
-    (fun (context : Hintd.context) ->
-      context.source.id.it = relation.it && context.rule == rule)
-    index.contexts
-
-let heatcool index = index.heatcool
-
-let is_heatcool_rule index relation rule =
-  List.exists
-    (fun (heated : Hintd.heatcool) ->
-      heated.source.id.it = relation.it && heated.rule == rule)
-    index.heatcool

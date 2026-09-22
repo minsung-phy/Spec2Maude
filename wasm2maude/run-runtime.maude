@@ -10,7 +10,7 @@ mod WASM2MAUDE-RUN-RUNTIME is
 
   op inputModule : -> SpectecTerminal .
   op inputName : -> SpectecTerminals .
-  op inputArgs : -> ValList .
+  op inputArgs : -> SpectecTerminals .
   op emptyStore : -> SpectecTerminal .
   op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
   op hasExport : SpectecTerminals SpectecTerminals -> Bool .

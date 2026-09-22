@@ -8,7 +8,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
     InstanceEnv ScriptState ResultPattern ResultPatterns
     ResultAlternatives LanePattern LanePatterns MatchVerdict .
   subsort Command < Commands .
-  op action.invoke : Nat SpectecTerminals ValList
+  op action.invoke : Nat SpectecTerminals SpectecTerminals
     -> ScriptAction [ctor] .
   op action.get : Nat SpectecTerminals -> ScriptAction [ctor] .
   op commands.nil : -> Commands [ctor] .
@@ -58,7 +58,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
   op match.and : MatchVerdict MatchVerdict -> MatchVerdict .
   op match.value : SpectecTerminal ResultPattern
     -> MatchVerdict .
-  op match.values : ValList ResultPatterns
+  op match.values : SpectecTerminals ResultPatterns
     -> MatchVerdict .
   op match.any : SpectecTerminal ResultAlternatives
     -> MatchVerdict .
@@ -110,7 +110,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
     -> ScriptState [ctor frozen (4)] .
   op script.uninstantiable : Nat InstanceEnv Commands SpectecTerminal
     -> ScriptState [ctor frozen (4)] .
-  op script.wrong-result : Nat ValList ResultPatterns
+  op script.wrong-result : Nat SpectecTerminals ResultPatterns
     -> ScriptState [ctor] .
   op script.wrong-assertion : Nat -> ScriptState [ctor] .
   op script.link-error : Nat -> ScriptState [ctor] .
@@ -119,22 +119,22 @@ mod WASM2MAUDE-WAST-RUNTIME is
   op initialState : -> ScriptState .
   op emptyStore : -> SpectecTerminal .
   op hostFunctionAddresses : -> SpectecTerminals .
-  op hostArguments : ValList SpectecTerminals -> Bool .
-  op hostCallable : SpectecTerminal Nat ValList -> Bool .
+  op hostArguments : SpectecTerminals SpectecTerminals -> Bool .
+  op hostCallable : SpectecTerminal Nat SpectecTerminals -> Bool .
   op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
 
   op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .
 
-  op runtimeResults : ValList -> Bool .
+  op runtimeResults : SpectecTerminals -> Bool .
 
-  op activeFrameDepth : InstrList -> Nat .
+  op activeFrameDepth : SpectecTerminals -> Nat .
 
   vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
   vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .
   vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .
   vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .
-  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : ValList .
-  vars WSHBODY WSHINSTRS WSHREST : InstrList .
+  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : SpectecTerminals .
+  vars WSHBODY WSHINSTRS WSHREST : SpectecTerminals .
   var WSHCMDS : Commands .
   vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .
   var WSHREQUIREMENT : ImportRequirement .
@@ -375,13 +375,6 @@ mod WASM2MAUDE-WAST-RUNTIME is
   crl [host-call] :
     Step-read((WSHS ; WSHCURRENT) ;
       (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => eps
-    if hostCallable(WSHS, WSHA, WSHARGS) = true .
-
-  crl [focus-host-call] :
-    identifyFocus(WSHS ; WSHCURRENT,
-      WSHPREFIX (WSHARGS REF.FUNC-ADDR(WSHA)), CALL-REF(WSHC), WSHREST)
-    => { WSHPREFIX | ((WSHS ; WSHCURRENT) ;
-      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) | WSHREST }
     if hostCallable(WSHS, WSHA, WSHARGS) = true .
 
   rl [start] : script.start => initialState .

@@ -77,28 +77,7 @@ let normalize_constructor_declarations statements =
   in
   List.filter keep statements
 
-let sort_metadata_declarations metadata =
-  let annotated =
-    Hintd.annotated_sorts metadata |> List.map (fun sort -> SortDecl sort)
-  in
-  let proper = Hintd.proper_sorts metadata in
-  let proper_declarations =
-    List.map (fun (sort, _) -> SortDecl sort) proper
-  in
-  let edges =
-    Hintd.subsort_edges metadata @ proper
-    |> List.map (fun (subsort, supersort) -> SubsortDecl (subsort, supersort))
-  in
-  annotated @ proper_declarations @ edges
-
-type script_translation =
-  { sort_statements : statement list
-  ; list_views : top_level list
-  ; list_imports : import list
-  ; list_subsorts : statement list
-  ; list_statements : statement list
-  ; generated_statements : statement list
-  }
+type script_translation = { generated_statements : statement list }
 
 let normalize_variables source_declarations statements =
   let source_sorts = Hashtbl.create 64 in
@@ -210,7 +189,6 @@ let rec translate ?request_output index def =
     | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
     | RelD (id, params, mixop, typ, rules) ->
         Reld.translate ?request_output
-          ~include_rule:(fun rule -> not (Prescan.is_heatcool_rule index id rule))
           index id params mixop typ rules
     | GramD _ | HintD _ -> []
     | RecD defs -> List.concat_map (translate ?request_output index) defs
@@ -247,14 +225,12 @@ let normalize_module ?(constructors = true) source_declarations statements =
 
 let translate_script script =
   let index = Prescan.scan script in
-  let sort_metadata = Prescan.sort_metadata index in
   let output_requests = ref [] in
   let request_output iteration position =
     let request = iteration.Prescan.name, position in
     if not (List.mem request !output_requests) then
       output_requests := request :: !output_requests
   in
-  let context_rules = Reld.translate_contexts ~request_output index in
   let translated_definitions =
     List.concat_map (translate ~request_output index) script
     @ Param.translate_applications index
@@ -272,14 +248,7 @@ let translate_script script =
     in
     Iter.translate_premise_all translate_body index !output_requests
   in
-  let typed_list_support = Typd.list_statements sort_metadata in
-  let list_statements =
-    normalize_module ~constructors:false [] typed_list_support
-  in
-  let generated_statements =
-    Typd.list_generated_statements sort_metadata
-    @ context_rules @ translated_definitions
-  in
+  let generated_statements = translated_definitions in
   let iterations =
     let bind_body bound body subject =
       let result =
@@ -299,10 +268,4 @@ let translate_script script =
     @ iterations @ premise_iterations
     |> normalize_module (Prescan.variable_declarations index)
   in
-  { sort_statements = sort_metadata_declarations sort_metadata
-  ; list_views = Typd.list_views sort_metadata
-  ; list_imports = Typd.list_imports sort_metadata
-  ; list_subsorts = Typd.list_subsorts sort_metadata
-  ; list_statements
-  ; generated_statements
-  }
+  { generated_statements }

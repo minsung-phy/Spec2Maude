@@ -90,13 +90,6 @@ let sequence_operator index typ field =
   let representation = Prescan.sequence_representation index typ in
   field representation
 
-let unsupported_typed_sequence index operation typ =
-  let representation = Prescan.sequence_representation index typ in
-  if representation.typed then
-    invalid_arg
-      (operation ^ " is unsupported for typed list sort "
-       ^ representation.sort)
-
 let rec record_items = function
   | [] -> Const "EMPTY"
   | [item] -> item
@@ -290,13 +283,11 @@ and translate_exp index exp =
       app operator [translate_exp index left; translate_exp index right]
 
   | IdxE (sequence, element_index) ->
-      unsupported_typed_sequence index "IdxE" sequence.note;
       app "_`[_`]"
         [translate_exp index sequence; translate_exp index element_index]
       |> from_sequence_element index exp.note
 
   | SliceE (sequence, start, length) ->
-      unsupported_typed_sequence index "SliceE" sequence.note;
       app "_`[_:_`]"
         [ translate_exp index sequence
         ; translate_exp index start
@@ -358,7 +349,6 @@ and translate_select index base path =
       base
 
   | IdxP (parent, element_index) ->
-      unsupported_typed_sequence index "IdxP" parent.note;
       app "_`[_`]"
         [ translate_select index base parent
         ; translate_exp index element_index
@@ -366,7 +356,6 @@ and translate_select index base path =
       |> from_sequence_element index path.note
 
   | SliceP (parent, start, length) ->
-      unsupported_typed_sequence index "SliceP" parent.note;
       app "_`[_:_`]"
         [ translate_select index base parent
         ; translate_exp index start
@@ -386,7 +375,6 @@ and translate_update index base path replacement =
       replacement
 
   | IdxP (parent, element_index) ->
-      unsupported_typed_sequence index "UpdE/IdxP" parent.note;
       let parent_value = translate_select index base parent in
       let replacement =
         as_sequence_element index path.note replacement
@@ -398,7 +386,6 @@ and translate_update index base path replacement =
       translate_update index base parent updated_parent
 
   | SliceP (parent, start, length) ->
-      unsupported_typed_sequence index "UpdE/SliceP" parent.note;
       let parent_value = translate_select index base parent in
       let updated_parent =
         app "_`[_:_=_`]"
@@ -486,18 +473,8 @@ let rec translate_typ_conditions index value typ =
       let values, conditions = check [] 1 fields in
       MatchCond (app "tuple" [sequence values], value) :: conditions
   | _, IterT (element_typ, iter) ->
-      let representation = Prescan.sequence_representation index typ in
-      if representation.typed then
-        let length = app representation.size [value] in
-        begin match iter with
-        | Opt | List -> []
-        | List1 -> [BoolCond (app "_<_" [Const "0"; length])]
-        | ListN (count, _) ->
-            [EqCond (length, translate_exp index count)]
-        end
-      else
-        Iter.translate_conditions
-          (translate_exp index) value (translate_check_typ index element_typ) iter
+      Iter.translate_conditions
+        (translate_exp index) value (translate_check_typ index element_typ) iter
   | _, _ ->
       [BoolCond (app "typecheck" [value; translate_typ index typ])]
 

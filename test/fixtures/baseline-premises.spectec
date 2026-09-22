@@ -1,0 +1,8 @@
+syntax num = nat
+relation Next: num ~> num
+rule Next/one:
+  1 ~> 2
+relation Twice: num ~> num
+rule Twice/one:
+  1 ~> 2
+  -- Next: 1 ~> 2

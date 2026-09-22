@@ -25,40 +25,26 @@ let module_name name = Maude_il.ModuleName name
 
 let emit_script script =
   let translation = Def.translate_script script in
-  let sorts : Maude_il.top_level =
-    Module
-      { name = "SPEC2MAUDE-SORTS"
-      ; kind = Functional
-      ; imports = [Protecting (module_name "SPECTEC-TERM")]
-      ; statements = translation.sort_statements
-      }
-  in
   let generated : Maude_il.top_level =
     Module
       { name = "SPEC2MAUDE-GENERATED"
       ; kind = System
       ; imports =
           [Maude_il.Protecting (module_name "SPECTEC-PRETYPE")]
-      ; statements = translation.list_subsorts @ translation.generated_statements
+      ; statements = translation.generated_statements
       }
   in
-  let typed_lists : Maude_il.top_level =
+  (* Keep the sibling type module as a stable backend loading boundary. *)
+  let types : Maude_il.top_level =
     Module
       { name = "SPEC2MAUDE-TYPES"
-      ; kind = Maude_il.Functional
-      ; imports =
-          [Maude_il.Protecting (module_name "SPEC2MAUDE-SORTS")]
-          @ translation.list_imports
-      ; statements = translation.list_statements
+      ; kind = Functional
+      ; imports = [Protecting (module_name "SPECTEC-TERM")]
+      ; statements = []
       }
   in
-  (* Native typed lists precede the backend's common list overloads; the
-     source-derived subsort connections follow them in the generated module. *)
-  let types =
-    Maude_emit.emit_top_levels
-      (sorts :: translation.list_views @ [typed_lists]) ^ "\n"
-  in
-  types, Maude_emit.emit_top_levels [generated] ^ "\n"
+  Maude_emit.emit_top_levels [types] ^ "\n",
+  Maude_emit.emit_top_levels [generated] ^ "\n"
 
 let write_file path contents =
   let channel = open_out_bin path in

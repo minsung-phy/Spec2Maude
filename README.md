@@ -36,10 +36,10 @@ The OCaml implementation is organized by AST family. Each translation follows
 the corresponding source construct, keeping the relationship between the
 specification and generated code visible in the implementation.
 
-Source `hint(...)` annotations describe translation choices such as Maude sort
-representations, builtin implementations, and heating/cooling for execution
-premises. Backend modules provide common representations, primitive operations,
-and explicitly selected relation implementations.
+This baseline removes heating/cooling and dedicated sort/proper hints from main.
+Other translation behavior and optimizations remain as in main. Source hints
+still select builtin, inverse, and explicit backend interfaces. See
+[baseline scope](docs/BASELINE.md) for the removed hints and runtime adjustments.
 
 ## Working with WebAssembly
 

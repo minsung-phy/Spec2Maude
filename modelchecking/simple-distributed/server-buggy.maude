@@ -4,10 +4,10 @@ mod SERVER-BUGGY-WASM is
   protecting WASM-BUILTINS .
 
   sort serverRunState .
-  op serverCall : ValList -> serverRunState [ctor] .
-  op serverInit : SpectecTerminal ValList -> serverRunState [ctor frozen (1)] .
+  op serverCall : SpectecTerminals -> serverRunState [ctor] .
+  op serverInit : SpectecTerminal SpectecTerminals -> serverRunState [ctor frozen (1)] .
   op serverExec : SpectecTerminal -> serverRunState [ctor frozen (1)] .
-  op serverResult : ValList -> serverRunState [ctor] .
+  op serverResult : SpectecTerminals -> serverRunState [ctor] .
 
   op serverInputModule : -> SpectecTerminal .
   op serverInputName : -> SpectecTerminals .
@@ -17,7 +17,7 @@ mod SERVER-BUGGY-WASM is
 
   vars C C2 Z XA : SpectecTerminal .
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
-  vars ARGS RESULT : ValList .
+  vars ARGS RESULT : SpectecTerminals .
   var ADDR : Nat .
 
   eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I32, I32)))), eps, eps, eps,
@@ -51,5 +51,5 @@ ARGS))
   crl [serverStep] : serverExec(C) => serverExec(C2)
     if Step(C) => C2 .
   crl [serverFinished] : serverExec(C) => serverResult(RESULT)
-    if (Z ; RESULT) := C .
+    if (Z ; RESULT) := C /\ typecheck(RESULT, val) = true .
 endm

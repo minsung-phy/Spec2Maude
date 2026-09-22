@@ -6,8 +6,7 @@ fmod SPECTEC-TERM is
   sort SpectecDef .
 endfm
 
---- Maude의 native typed list를 먼저 선언한 뒤, (hint(maude_sort) 때문) 
---- 공통 빈 리스트 eps와 리스트 연결 연산 __을 선언해야 함
+--- Generated type module precedes the common operations.
 load ../generated/types.maude
 
 fmod SPECTEC-PRETYPE is

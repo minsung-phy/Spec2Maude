@@ -19,21 +19,21 @@ mod WASM2MAUDE-MODELCHECK-RUNTIME is
   op init : SpectecTerminal -> ModelState [ctor frozen (1)] .
   op ready : SpectecTerminal -> ModelState [ctor] .
   op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .
-  op finished : ValList -> ModelState [ctor] .
+  op finished : SpectecTerminals -> ModelState [ctor] .
 
   op inputModule : -> SpectecTerminal .
   op inputName : -> SpectecTerminals .
-  op inputArgs : -> ValList .
+  op inputArgs : -> SpectecTerminals .
   op emptyStore : -> SpectecTerminal .
-  op expected : -> ValList .
-  op rejected : -> ValList .
+  op expected : -> SpectecTerminals .
+  op rejected : -> SpectecTerminals .
   op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
   op hasExport : SpectecTerminals SpectecTerminals -> Bool .
-  op returned : ValList -> Prop [ctor] .
+  op returned : SpectecTerminals -> Prop [ctor] .
 
   vars C C2 Z XA : SpectecTerminal .
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
-  var RESULT : ValList .
+  var RESULT : SpectecTerminals .
   var ADDR : Nat .
   var ST : ModelState .
   var P : Prop .
@@ -65,7 +65,7 @@ mod WASM2MAUDE-MODELCHECK-RUNTIME is
   crl [execute-step] : exec(C) => exec(C2)
     if Step(C) => C2 .
   crl [finished] : exec(C) => finished(RESULT)
-    if (Z ; RESULT) := C .
+    if (Z ; RESULT) := C /\ typecheck(RESULT, val) = true .
 
   eq finished(RESULT) |= returned(RESULT) = true .
   eq ST |= P = false [owise] .

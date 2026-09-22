@@ -174,12 +174,12 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   emit "--- Each call uses a fresh instance; the caller supplies well-typed arguments.\n";
   emit "mod %s is\n  protecting WASM-BUILTINS .\n\n" module_name;
   emit "  sort %s .\n" state;
-  emit "  op %s : ValList -> %s [ctor] .\n" (name "call") state;
-  emit "  op %s : SpectecTerminal ValList -> %s [ctor frozen (1)] .\n"
+  emit "  op %s : SpectecTerminals -> %s [ctor] .\n" (name "call") state;
+  emit "  op %s : SpectecTerminal SpectecTerminals -> %s [ctor frozen (1)] .\n"
     (name "init") state;
   emit "  op %s : SpectecTerminal -> %s [ctor frozen (1)] .\n"
     (name "exec") state;
-  emit "  op %s : ValList -> %s [ctor] .\n\n" (name "result") state;
+  emit "  op %s : SpectecTerminals -> %s [ctor] .\n\n" (name "result") state;
   emit "  op %s : -> SpectecTerminal .\n" (name "inputModule");
   emit "  op %s : -> SpectecTerminals .\n" (name "inputName");
   emit "  op %s : -> SpectecTerminal .\n" (name "emptyStore");
@@ -187,7 +187,7 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   emit "  op %s : SpectecTerminals SpectecTerminals -> Bool .\n\n" (name "hasExport");
   emit "  vars C C2 Z XA : SpectecTerminal .\n";
   emit "  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .\n";
-  emit "  vars ARGS RESULT : ValList .\n  var ADDR : Nat .\n\n";
+  emit "  vars ARGS RESULT : SpectecTerminals .\n  var ADDR : Nat .\n\n";
   emit "  eq %s = %s .\n" (name "inputModule") (term m);
   emit "  eq %s = %s .\n" (name "inputName") (render (Encode.name export));
   emit "  eq %s = %s .\n\n" (name "emptyStore") (render empty_store);
@@ -200,7 +200,7 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
     (name "invoke") (name "init") (name "exec") runtime.invocation runtime.initialized;
   emit "  crl [%s] : %s(C) => %s(C2)\n    if %s => C2 .\n"
     (name "step") (name "exec") (name "exec") runtime.step;
-  emit "  crl [%s] : %s(C) => %s(RESULT)\n    if (Z ; RESULT) := C .\nendm\n"
+  emit "  crl [%s] : %s(C) => %s(RESULT)\n    if (Z ; RESULT) := C /\\ typecheck(RESULT, val) = true .\nendm\n"
     (name "finished") (name "exec") (name "result");
   Buffer.contents buffer
 
@@ -251,7 +251,7 @@ load %s
 
 mod WASM2MAUDE-MODELCHECK is
   including WASM2MAUDE-MODELCHECK-RUNTIME .
-  var RESULT : ValList .
+  var RESULT : SpectecTerminals .
 
   eq inputModule = %s .
   eq inputName = %s .
