@@ -570,6 +570,12 @@ type context =
   ; patterns : focus_pattern list
   }
 
+type heatcool =
+  { source : relation
+  ; ordinal : int
+  ; rule : rule
+  }
+
 let unsupported at reason =
   Util.Error.error at "translation" ("Unsupported: k_heatcool " ^ reason)
 
@@ -829,7 +835,8 @@ let execution_premises execution_input_count premises =
            Some (id, mixop, head, premise)
        | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> None)
 
-let focus_patterns (metadata : t) execution_input_count relations context owner =
+let focus_patterns (metadata : t) execution_input_count relations contexts
+    (context : context) owner =
   let rec visit seen bridges relation_id =
     if List.mem relation_id.it seen then
       unsupported relation_id.at "execution-relation bridge contains a cycle";
@@ -837,13 +844,11 @@ let focus_patterns (metadata : t) execution_input_count relations context owner 
     relation.rules
     |> List.mapi (fun ordinal rule -> ordinal, rule)
     |> List.concat_map (fun (ordinal, rule) ->
-         let RuleD (id, _, mixop, head, premises) = rule.it in
+         let RuleD (_, _, mixop, head, premises) = rule.it in
          let is_context_rule =
            List.exists
-             (fun (relation_id, rule_id, hints, _) ->
-               relation_id.it = relation.id.it && rule_id.it = id.it
-               && context_hint hints <> [])
-             metadata.context_hints
+             (fun (candidate : context) -> candidate.rule == rule)
+             contexts
          in
          let execution = execution_premises execution_input_count premises in
          if is_context_rule then []
@@ -902,38 +907,45 @@ let focus_patterns (metadata : t) execution_input_count relations context owner 
   in
   visit [] [] context.inner_relation
 
-let extract_context metadata execution_input_count relations
-    (relation_id, rule_id, values, hintdef) =
-  match context_hint values with
-  | [] -> None
-  | _ :: _ :: _ -> unsupported hintdef.at
-      "rule has more than one k_heatcool hint"
-  | [hint] ->
-      require_flags "k_heatcool" [hint];
-      let relation = find_relation relations relation_id hintdef.at in
-      let input_count =
-        match execution_input_count relation.id.it with
-        | Some count -> count
-        | None -> unsupported hintdef.at
-            "is only supported on an execution relation"
-      in
-      let ordinal, rule = find_rule relation rule_id hintdef.at in
-      let RuleD (_, quants, _, head, premises) = rule.it in
-      let inputs, _ =
-        take rule.at input_count [] (components relation.mixop head)
-      in
-      let inner_relation, inner_mixop, inner_head =
-        match execution_premises execution_input_count premises with
-        | [(inner, mixop, head, _)] -> inner, mixop, head
-        | _ -> unsupported rule.at
-            "rule must have exactly one internal execution premise"
-      in
-      let inner = find_relation relations inner_relation rule.at in
+let scan_heatcool (metadata : t) execution_input_count =
+  metadata.context_hints
+  |> List.filter_map (fun (relation_id, rule_id, values, hintdef) ->
+       match context_hint values with
+       | [] -> None
+       | _ :: _ :: _ -> unsupported hintdef.at
+           "rule has more than one k_heatcool hint"
+       | [hint] ->
+           require_flags "k_heatcool" [hint];
+           let source = find_relation metadata.relations relation_id hintdef.at in
+           let ordinal, rule = find_rule source rule_id hintdef.at in
+           let fail reason =
+             unsupported rule.at
+               ("RuleD " ^ relation_id.it ^ "/" ^ rule_id.it ^ ": " ^ reason)
+           in
+           if Option.is_none (execution_input_count source.id.it) then
+             fail "hint requires an execution relation";
+           let RuleD (_, _, _, _, premises) = rule.it in
+           List.iter (fun premise -> match premise.it with
+             | RulePr _ | IfPr _ | LetPr _ -> ()
+             | ElsePr -> fail "ElsePr is not supported in a heated rule"
+             | IterPr _ -> fail "IterPr is not supported in a heated rule"
+             | NegPr _ -> fail "NegPr is not supported in a heated rule") premises;
+           if execution_premises execution_input_count premises = [] then
+             fail "hint requires a direct execution RulePr";
+           Some ({source; ordinal; rule} : heatcool))
+
+let extract_context (metadata : t) execution_input_count (heated : heatcool) =
+  let {source = relation; ordinal; rule} = heated in
+  let RuleD (_, quants, _, head, premises) = rule.it in
+  let inputs =
+    relation_inputs execution_input_count relation relation.mixop head rule.at
+  in
+  match execution_premises execution_input_count premises with
+  | [(inner_relation, inner_mixop, inner_head, _)] ->
+      let inner = find_relation metadata.relations inner_relation rule.at in
       let inner_inputs =
         relation_inputs execution_input_count inner inner_mixop inner_head rule.at
       in
-      (* The internal request identifies the hole. Names are read from the
-         matching source bindings, not repeated in the annotation. *)
       let inner_focus owner focus =
         List.exists
           (fun input ->
@@ -951,39 +963,31 @@ let extract_context metadata execution_input_count relations
                  Some (subject, owner, prefix, focus, postfix)
              | _ -> None)
       in
-      let subject, focus_owner, prefix_name, focus_name, postfix_name =
-        metadata.annotated
-        |> List.concat_map candidates
-        |> unique rule.at "cannot extract a prefix/hole/postfix context"
-             "has ambiguous prefix/hole/postfix contexts"
-      in
-      let prefix, prefix_typ = quant_type quants prefix_name hint.hintid.at in
-      let focus, focus_typ = quant_type quants focus_name hint.hintid.at in
-      let postfix, postfix_typ = quant_type quants postfix_name hint.hintid.at in
-      let frame = sequence_frame subject inputs rule.at in
-      Some
-        ({ source = relation
-         ; ordinal
-         ; rule
-         ; inner_relation
-         ; prefix
-         ; prefix_typ
-         ; focus
-         ; focus_typ
-         ; postfix
-         ; postfix_typ
-         ; proper_sort = focus_proper_sort metadata focus_owner hint.hintid.at
-         ; frame
-         ; patterns = []
-         }, focus_owner)
+      begin match metadata.annotated |> List.concat_map candidates with
+      | [] -> None
+      | [(subject, focus_owner, prefix_name, focus_name, postfix_name)] ->
+          let prefix, prefix_typ = quant_type quants prefix_name rule.at in
+          let focus, focus_typ = quant_type quants focus_name rule.at in
+          let postfix, postfix_typ = quant_type quants postfix_name rule.at in
+          let frame = sequence_frame subject inputs rule.at in
+          Some
+            ({ source = relation; ordinal; rule; inner_relation
+             ; prefix; prefix_typ; focus; focus_typ; postfix; postfix_typ
+             ; proper_sort = focus_proper_sort metadata focus_owner rule.at
+             ; frame; patterns = []
+             }, focus_owner)
+      | _ -> unsupported rule.at "has ambiguous prefix/hole/postfix contexts"
+      end
+  | _ -> None
 
-let scan_contexts metadata execution_input_count =
-  metadata.context_hints
-  |> List.filter_map
-       (extract_context metadata execution_input_count metadata.relations)
+let scan_contexts metadata execution_input_count heated =
+  let contexts =
+    List.filter_map (extract_context metadata execution_input_count) heated
+  in
+  contexts
   |> List.map (fun (context, owner) ->
        let patterns =
          focus_patterns metadata execution_input_count metadata.relations
-           context owner
+           (List.map fst contexts) context owner
        in
        {context with patterns})

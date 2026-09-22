@@ -210,7 +210,7 @@ let rec translate ?request_output index def =
     | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
     | RelD (id, params, mixop, typ, rules) ->
         Reld.translate ?request_output
-          ~include_rule:(fun rule -> not (Prescan.is_context_rule index id rule))
+          ~include_rule:(fun rule -> not (Prescan.is_heatcool_rule index id rule))
           index id params mixop typ rules
     | GramD _ | HintD _ -> []
     | RecD defs -> List.concat_map (translate ?request_output index) defs

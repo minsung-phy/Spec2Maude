@@ -160,7 +160,7 @@ type rule_body =
   ; otherwise : bool
   }
 
-let lower_rule_body ?request_output index id params policy rule =
+let lower_rule_body ?request_output ?(normalize = true) index id params policy rule =
   match rule.it with
   | RuleD (_, quants, mixop, exp, prems) ->
       let exps = Prem.components mixop exp in
@@ -200,7 +200,8 @@ let lower_rule_body ?request_output index id params policy rule =
         @ List.map
             (fun condition -> EqCondition condition)
             (Param.translate_eq_conditions ~proven index quants)
-        |> normalize_conditions left
+        |> (fun conditions ->
+             if normalize then normalize_conditions left conditions else conditions)
       in
       { input_terms
       ; head_conditions
@@ -1185,16 +1186,164 @@ module Context_rules = struct
     in
     List.rev kept
 
+  (* A RulePr suspends this rule. Its result pattern resumes the remaining
+     premises in source order; only live, already-bound variables enter a hole. *)
+  let heatcool_rule cache request_output index (heated : Hintd.heatcool) =
+    let source = heated.source in
+    let RuleD (id, _, _, _, prems) = heated.rule.it in
+    let fail reason =
+      unsupported heated.rule.at
+        ("RuleD " ^ source.id.it ^ "/" ^ id.it ^ ": " ^ reason)
+    in
+    let policy = execution_policy index source.id in
+    let outer_sort = match policy with
+      | Prescan.Execution {request_sort; _} -> request_sort
+      | _ -> assert false
+    in
+    let executions =
+      prems |> List.filter_map (fun prem -> match prem.it with
+        | RulePr (target, _, mixop, exp) ->
+            begin match Prescan.relation_policy index target with
+            | Ok (Prescan.Execution {request_sort; input_count}) ->
+                let _, outputs = Prem.split input_count (Prem.components mixop exp) in
+                Some (target, request_sort, outputs)
+            | _ -> None
+            end
+        | IfPr _ | LetPr _ ->
+            if Prem.prem_has_rewrite_call index prem then
+              fail "rewrite-backed expression requires a separate hint contract";
+            None
+        | ElsePr | IterPr _ | NegPr _ ->
+            fail "unsupported premise under k_heatcool")
+    in
+    let body =
+      lower_rule_body ~request_output ~normalize:false
+        index source.id source.params policy heated.rule
+    in
+    if body.otherwise then fail "ElsePr requires an explicit complement";
+    let suffix = Prescan.rel_name index source.id ^ "-"
+      ^ (if id.it = "" then string_of_int (heated.ordinal + 1)
+         else Prescan.sanitize id.it)
+    in
+    let vars_condition variables = function
+      | RewriteCond (left, right)
+      | EqCondition (EqCond (left, right) | MatchCond (left, right)) ->
+          term_variables (term_variables variables left) right
+      | EqCondition (MembershipCond (term, _) | BoolCond term) ->
+          term_variables variables term
+    in
+    let bound_condition variables = function
+      | RewriteCond (_, pattern) | EqCondition (MatchCond (pattern, _)) ->
+          term_variables variables pattern
+      | EqCondition _ -> variables
+    in
+    let rec before_execution equations = function
+      | EqCondition condition :: rest -> before_execution (condition :: equations) rest
+      | rest -> List.rev equations, rest
+    in
+    let equation left right conditions =
+      match conditions with
+      | [] -> Eq (left, right, [])
+      | _ -> Ceq (left, right, conditions, [])
+    in
+    (* Identify sequence-result relation bridges from their result type, never
+       from Wasm relation names. Use source rule names for the helper spelling. *)
+    let identify target outputs call =
+      match executions, outputs, call with
+      | [_], [{note = {it = IterT _; _}; _}], App (_, args)
+        when target.it <> source.id.it ->
+          let relation = Hintd.find_relation
+              (Prescan.sort_metadata index).relations target heated.rule.at in
+          let candidates = lower_relation cache request_output index relation in
+          let name = "identify" ^ String.capitalize_ascii (Prescan.sanitize id.it) in
+          let found = "identified-" ^ suffix in
+          let sort = "Identify-" ^ suffix in
+          let params, _, typ, _ =
+            Il.Env.find_rel (Prescan.sort_metadata index).type_env target
+          in
+          let count = match execution_policy index target with
+            | Prescan.Execution {input_count; _} -> input_count
+            | _ -> assert false
+          in
+          let input_types, _ = Prem.split count (component_types typ) in
+          let domain = Param.translate_sorts index params
+            @ List.map (Term.translate_sort index) input_types in
+          (* Input patterns identify candidates. The original target rule
+             checks its premises once, when the suspended request executes. *)
+          let rules = candidates |> List.map (fun (candidate : execution_rule) ->
+            match candidate.left with
+            | App (_, inputs) ->
+                Rl (Some (name ^ "-" ^ string_of_int (candidate.ordinal + 1)),
+                    App (name, inputs), Const found)
+            | _ -> assert false)
+            |> unique_candidates
+          in
+          [ SortDecl sort
+          ; op ~attrs:(frozen_all (List.length domain)) name domain sort
+          ; op ~attrs:[Ctor] found [] sort
+          ] @ rules,
+          [RewriteCond (App (name, args), Const found)]
+      | _ -> [], []
+    in
+    let rec resume initial stage left conditions remaining =
+      let guards, pending = before_execution [] conditions in
+      let bound = List.fold_left bound_condition (term_variables [] left)
+          (List.map (fun guard -> EqCondition guard) guards) in
+      match pending, remaining with
+      | [], [] ->
+          if initial then fail "hint has no execution condition";
+          if not (variables_bound bound body.right) then
+            fail "cooling has an unbound output";
+          [equation left body.right guards]
+      | RewriteCond (call, result) :: rest, (target, inner_sort, outputs) :: targets ->
+          if not (variables_bound bound call) then
+            fail "RulePr input is not bound before heating";
+          let needed = List.fold_left vars_condition
+              (term_variables (term_variables [] body.right) result) rest in
+          let captures = List.filter
+              (fun variable -> List.exists (same_variable variable) needed) bound in
+          let name = "hole-" ^ suffix ^ "-" ^ string_of_int stage in
+          let sort = "Hole-" ^ suffix ^ "-" ^ string_of_int stage in
+          let hole = App (name, List.map (fun variable -> Var variable) captures) in
+          let suspended = App ("_~>_", [call; hole]) in
+          let returned = App ("_~>_", [result; hole]) in
+          let identification, checks =
+            if initial then identify target outputs call else [], [] in
+          let conditions = List.map (fun guard -> EqCondition guard) guards @ checks in
+          let transition =
+            if initial then
+              let label = Some ("heating-" ^ suffix) in
+              match conditions with
+              | [] -> Rl (label, left, suspended)
+              | _ -> Crl (label, left, suspended, conditions)
+            else equation left suspended guards
+          in
+          [ SortDecl sort
+          ; op ~attrs:[Ctor] name (List.map (fun variable -> variable.sort) captures) sort
+          ; op ~attrs:[Frozen [2]] "_~>_" [inner_sort; sort] outer_sort
+          ] @ identification @ [transition]
+          @ resume false (stage + 1) returned rest targets
+      | _ -> fail "lowered execution conditions do not match direct RulePr premises"
+    in
+    resume true 1 body.left body.conditions executions
+
   let translate ?request_output index =
     let request_output = Option.value request_output ~default:(fun _ _ -> ()) in
     let cache = Hashtbl.create 4 in
-    Prescan.contexts index
+    let sequences = Prescan.contexts index
     |> List.concat_map (fun context ->
          declarations index context
          @ (context.Hintd.patterns
             |> List.map (translate_pattern cache request_output index context)
             |> unique_candidates)
          @ context_transitions request_output index context)
+    in
+    let nested = Prescan.heatcool index
+      |> List.filter (fun (heated : Hintd.heatcool) ->
+           not (Prescan.is_context_rule index heated.source.id heated.rule))
+      |> List.concat_map (heatcool_rule cache request_output index)
+    in
+    sequences @ nested
 
 end
 

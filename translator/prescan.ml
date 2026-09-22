@@ -88,6 +88,7 @@ type t =
   { type_env : Il.Env.t
   ; sort_metadata : Hintd.t
   ; contexts : Hintd.context list
+  ; heatcool : Hintd.heatcool list
   ; iterations : iteration list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
@@ -1169,14 +1170,14 @@ let scan script =
         | Error reason -> policies, (source, reason) :: unsupported)
       relations ([], [])
   in
-  let contexts =
-    Hintd.scan_contexts sort_metadata
-      (fun source ->
-        match List.assoc_opt source relation_policies with
-        | Some (Execution {input_count; _}) -> Some input_count
-        | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
-        | None -> None)
+  let execution_input_count source =
+    match List.assoc_opt source relation_policies with
+    | Some (Execution {input_count; _}) -> Some input_count
+    | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
+    | None -> None
   in
+  let heatcool = Hintd.scan_heatcool sort_metadata execution_input_count in
+  let contexts = Hintd.scan_contexts sort_metadata execution_input_count heatcool in
   let relation_enabled_helpers =
     let rec collect acc def =
       match def.it with
@@ -1267,6 +1268,7 @@ let scan script =
   { type_env
   ; sort_metadata
   ; contexts
+  ; heatcool
   ; iterations
   ; premise_iterations
   ; hints
@@ -1483,3 +1485,11 @@ let is_context_rule index relation rule =
     (fun (context : Hintd.context) ->
       context.source.id.it = relation.it && context.rule == rule)
     index.contexts
+
+let heatcool index = index.heatcool
+
+let is_heatcool_rule index relation rule =
+  List.exists
+    (fun (heated : Hintd.heatcool) ->
+      heated.source.id.it = relation.it && heated.rule == rule)
+    index.heatcool

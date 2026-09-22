@@ -4,7 +4,7 @@
 --- Backend profile: WebAssembly DET (ND = false, relaxed choice 0).
 --- Contract: spectec/REVISION acc6e834ff403c82554d081237f327346190ad96;
 --- source builtin signatures plus document/core/exec/numerics.rst and
---- document/core/appendix/profiles.rst at that revision. See docs/HINT_CONTRACTS.md.
+--- document/core/appendix/profiles.rst at that revision. See docs/TRANSLATION.md.
 
 mod WASM-BUILTINS is
   inc SPEC2MAUDE-RELATION-BACKENDS .
@@ -1543,7 +1543,7 @@ mod WASM-BUILTINS is
   vars BDR_F1 BDR_F2 BDR_F3 : SpectecTerminal .
 
   --- Fixed-width inverse contracts: pair groups / positive-width groups.
-  --- These are not inverses over all possible list partitions. See docs/HINT_CONTRACTS.md.
+  --- These are not inverses over all possible list partitions. See docs/TRANSLATION.md.
   var BDI_T : SpectecType .
   var BDI_X : SpectecTerminal .
   vars BDI_XS BDI_REST : SpectecTerminals .
