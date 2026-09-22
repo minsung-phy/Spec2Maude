@@ -1,5 +1,8 @@
 # 번역 의미, source hints와 지원 범위
 
+처음 코드를 읽는 연구자를 위한 패턴별 설명과 재귀 의사코드는
+[SpecTec IL → Maude 워크스루](IL_TO_MAUDE_WALKTHROUGH.md)에 있다.
+
 번역 대상은 [고정 revision](../spectec/REVISION)의 `wasm-3.0/*.spectec` 21개를
 elaboration해서 얻은 IL AST 전체다. 그 입력의 타입 선언·함수 본문·규칙·premise를
 이름 하드코딩 없이 재귀 번역한다. 특정 Wasm 프로그램이나 테스트에서 실행하지
