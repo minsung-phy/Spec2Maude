@@ -6,14 +6,13 @@ fmod SPECTEC-TERM is
   sort SpectecDef .
 endfm
 
---- Native typed lists must precede the common eps and __ overloads.
+--- Maude의 native typed list를 먼저 선언한 뒤, (hint(maude_sort) 때문) 
+--- 공통 빈 리스트 eps와 리스트 연결 연산 __을 선언해야 함
 load ../generated/types.maude
 
 fmod SPECTEC-PRETYPE is
-  protecting SPEC2MAUDE-TYPES .
-  --- CONVERSION includes RAT, FLOAT, STRING and their BOOL/NAT/INT imports.
-  --- Typed renaming separates native operations in the common source value kind.
-  protecting CONVERSION * (
+  protecting SPEC2MAUDE-TYPES . --- in ../generated/typed.maude
+  protecting CONVERSION * ( --- RAT, FLOAT, STRING, BOOL, NAT, INT
     op -_ : Float -> Float to nativeFloatNeg,
     op _+_ : Float Float -> Float to nativeFloatAdd,
     op _-_ : Float Float -> Float to nativeFloatSub,
@@ -45,8 +44,7 @@ fmod SPECTEC-PRETYPE is
     op string : Rat NzNat -> String to nativeRatString
   ) .
 
-  --- Match the STRING renaming in CONVERSION.
-  protecting QID * (
+  protecting QID * ( --- for RECORD
     op _xor_ : Nat Nat -> Nat to integerXor,
     op _+_ : String String -> String to stringConcat,
     op _<_ : String String -> Bool to stringLess,
@@ -56,7 +54,7 @@ fmod SPECTEC-PRETYPE is
     op char : Nat -> Char to nativeChar
   ) .
 
-  --- Primitive types and conversions
+  --- 기본 타입 (ast.ml line 28 & num.ml line 14)
   subsorts Bool Rat Float String < SpectecTerminal .
 
   ops bool nat int rat real text : -> SpectecType [ctor] .
@@ -77,22 +75,25 @@ fmod SPECTEC-PRETYPE is
   eq typecheck(F, real) = true .
   eq typecheck(S, text) = true .
 
-  --- CvtE is a scalar IL operation, independent of Wasm builtin hints.
+  --- 수치 타입 변환 CvtE
   op _:_<:>_ : SpectecTerminal SpectecType SpectecType ~> SpectecTerminal .
 
-  --- Exact coercions used by the pinned Wasm IL.
+  --- SpecTec의 수치 연산 모듈(lib/xl/num.ml)의 CvtE 규칙 그대로, 
+  --- 현재 wasm 3.0 SpecTec에서 사용하는 모든 수치 변환을 Maude로 구현                                            
   var CV_N : Nat .
   var CV_I : Int .
   var CV_R : Rat .
-  eq (CV_N : nat <:> nat) = CV_N .
-  eq (CV_N : nat <:> int) = CV_N .
-  eq (CV_N : nat <:> rat) = CV_N .
-  ceq (CV_I : int <:> nat) = abs(CV_I) if CV_I >= 0 .
-  eq (CV_I : int <:> int) = CV_I .
-  eq (CV_I : int <:> rat) = CV_I .
-  ceq (CV_R : rat <:> nat) = abs(floor(CV_R))
+  eq (CV_N : nat <:> nat) = CV_N . --- 같은 타입
+  eq (CV_N : nat <:> int) = CV_N . --- 자연수는 이미 정수에 포함되므로 그대로 반환
+  eq (CV_N : nat <:> rat) = CV_N . --- 자연수는 이미 유리수에 포함되므로 그대로 반환
+  ceq (CV_I : int <:> nat) = CV_I  
+    if CV_I >= 0 .
+  eq (CV_I : int <:> int) = CV_I . --- 같은 타입
+  eq (CV_I : int <:> rat) = CV_I . --- 정수는 이미 유리수에 포함되므로 그대로 반환
+  ceq (CV_R : rat <:> nat) = floor(CV_R)
     if CV_R == floor(CV_R) /\ CV_R >= 0 .
-  ceq (CV_R : rat <:> int) = floor(CV_R) if CV_R == floor(CV_R) .
+  ceq (CV_R : rat <:> int) = floor(CV_R) 
+    if CV_R == floor(CV_R) .
   eq (CV_R : rat <:> rat) = CV_R .
 
   --- List
@@ -104,96 +105,95 @@ fmod SPECTEC-PRETYPE is
   vars T U : SpectecTerminal .
   vars TS VALUE : SpectecTerminals .
   var TYPE : SpectecType .
-
-  eq unseq(seq(TS)) = TS .
-  eq typecheck(eps, TYPE) = true .
-  --- Two elements exclude the singleton match T eps without a condition.
-  ceq typecheck(T U TS, TYPE) = typecheck(U TS, TYPE)
-    if typecheck(T, TYPE) .
-  eq typecheck(VALUE, TYPE) = false [owise] .
-
-  --- Option
-  op _? : SpectecTerminal -> SpectecTerminal [ctor] .
-
-  --- CAT-opt is partial: two present options have no concatenation rule.
-  op optionConcat : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  var K : [SpectecTerminal] .
-
-  eq optionConcat(eps, eps) = eps .
-  eq optionConcat(K ?, eps) = K ? .
-  eq optionConcat(eps, K ?) = K ? .
-
-  eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
-
-  --- Sequence
-  op len : SpectecTerminals -> Nat .
-  op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
-
   var COUNT : Nat .
   vars WTS PREFIX MIDDLE SUFFIX REST : SpectecTerminals .
 
-  --- Counting, like prelude LIST's size, needs to visit each element.
-  --- Keep the sum in an argument so page-sized lists do not exhaust the stack.
+  eq unseq(seq(TS)) = TS .
+
+  --- 리스트 길이
+  op len : SpectecTerminals -> Nat .
+
+  --- 리스트 길이를 구하려면 각 원소를 한 번씩 확인해야 함
+  --- 큰 리스트에서도 재귀 호출이 많이 쌓이지 않도록 현재 길이를 인자로 전달
   op lenAux : SpectecTerminals Nat -> Nat .
   eq len(TS) = lenAux(TS, 0) .
   eq lenAux(eps, N) = N .
   eq lenAux(T TS, N) = lenAux(TS, N + 1) .
 
-  eq typecheck(seq(TS), iterOpt(TYPE)) =
-    typecheck(TS, TYPE) and len(TS) <= 1 .
+  --- 리스트 타입 검사
+  eq typecheck(eps, TYPE) = true .
+  ceq typecheck(T U TS, TYPE) = typecheck(U TS, TYPE) --- 두 원소 패턴을 사용하여 단일 원소가 T eps로 매칭되는 것을 방지
+    if typecheck(T, TYPE) .
   eq typecheck(seq(TS), iterList(TYPE)) = typecheck(TS, TYPE) .
+  eq typecheck(VALUE, TYPE) = false [owise] .
 
-  --- Match an occurrence among source values; failed operands remain kinds.
+  --- 리스트 포함 검사
+  --- 리스트에서 같은 값을 패턴 매칭으로 찾음. 정상적인 값에 대해서만 포함 여부를 계산함.
   op _<-_ : SpectecTerminal SpectecTerminals ~> Bool .
   eq T <- (PREFIX T SUFFIX) = true .
   eq T <- TS = false [owise] .
 
+  --- 리스트 연결
   op _++_ : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   eq TS ++ WTS = TS WTS .
 
-  op indexDefined : SpectecTerminals Nat -> Bool .
-  op index : SpectecTerminals Nat ~> SpectecTerminal .
-  eq indexDefined(TS, N) = N < len(TS) .
-  ceq index(PREFIX T SUFFIX, N) = T
-    if len(PREFIX) == N .
-
-  op _[_] : SpectecTerminals Nat ~> SpectecTerminal
-    [prec 10 gather (E e)] .
-  eq TS[N] = index(TS, N) .
-
-  op slice : SpectecTerminals Nat Nat ~> SpectecTerminals .
-  --- The matched prefix and segment enforce bounds, including empty slices.
-  ceq slice(PREFIX REST, N, COUNT) = MIDDLE
-    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
-  op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals [prec 10 gather (E e e)] .
-  eq TS[N : COUNT] = slice(TS, N, COUNT) .
-
-  op setAt : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals .
-  op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals [prec 10 gather (E e e)] .
-  var NEW-K : [SpectecTerminal] .
-  var NEW-TS : SpectecTerminals .
-
-  ceq setAt(PREFIX T SUFFIX, N, NEW-K) = PREFIX NEW-K SUFFIX
-    if len(PREFIX) == N .
-  eq TS[N = NEW-K] = setAt(TS, N, NEW-K) .
-
-  op splice : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals .
-  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals [prec 10 gather (E e e e)] .
-  ceq splice(PREFIX REST, N, COUNT, NEW-TS) = PREFIX NEW-TS SUFFIX
-    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
-  eq TS[N : COUNT = NEW-TS] = splice(TS, N, COUNT, NEW-TS) .
-
-  op lift : SpectecTerminals -> SpectecTerminals .
-  eq lift(eps) = eps .
-  eq lift(K ?) = K .
+  --- 리스트 반복
+  op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
 
   eq repeatSeq(0, WTS) = eps .
   eq repeatSeq(1, WTS) = WTS .
-  --- Build finite repetitions without one pending call per element.
-  ceq repeatSeq(N, WTS)
-    = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS)
+  ceq repeatSeq(N, WTS) = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS) --- 리스트를 두 배씩 늘려 적은 재귀 호출로 반복
     if N > 1 .
+
+  --- 리스트 인덱싱
+  op indexDefined : SpectecTerminals Nat -> Bool .
+  op _[_] : SpectecTerminals Nat ~> SpectecTerminal [prec 10 gather (E e)] .
+
+  eq indexDefined(TS, N) = N < len(TS) .
+  ceq (PREFIX T SUFFIX)[N] = T
+    if len(PREFIX) == N .
+
+  --- 리스트 구간 추출
+  op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals [prec 10 gather (E e e)] .
+  
+  --- 리스트를 앞부분, 추출할 구간, 뒷부분으로 나누어 범위를 검사 (길이가 0인 빈 구간도 추출할 수 있음)
+  ceq (PREFIX REST)[N : COUNT] = MIDDLE
+    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
+
+  --- 리스트 원소 갱신
+  op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals [prec 10 gather (E e e)] .
+  var NEW-K : [SpectecTerminal] .
+
+  ceq (PREFIX T SUFFIX)[N = NEW-K] = PREFIX NEW-K SUFFIX
+    if len(PREFIX) == N .
+  
+  --- 리스트 구간 갱신
+  op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals [prec 10 gather (E e e e)] .
+  var NEW-TS : SpectecTerminals .
+  
+  ceq (PREFIX REST)[N : COUNT = NEW-TS] = PREFIX NEW-TS SUFFIX
+    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
+
+  --- Option
+  op _? : SpectecTerminal -> SpectecTerminal [ctor] .
+  var K : [SpectecTerminal] .
+  
+  --- Option 결합: 양쪽 모두 값이 있는 경우는 정의하지 않는다.
+  op optionConcat : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
+  eq optionConcat(eps, eps) = eps .
+  eq optionConcat(K ?, eps) = K ? .
+  eq optionConcat(eps, K ?) = K ? .
+
+  --- Option 타입 검사
+  eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
+  eq typecheck(seq(TS), iterOpt(TYPE)) =
+    typecheck(TS, TYPE) and len(TS) <= 1 .
+
+  --- Option을 목록으로 변환
+  op lift : SpectecTerminals -> SpectecTerminals .
+  eq lift(eps) = eps .
+  eq lift(K ?) = K .
 
   --- Tuple
   sort Tuple .
@@ -202,7 +202,7 @@ fmod SPECTEC-PRETYPE is
   op tuple : SpectecTerminals -> Tuple [ctor] .
   op _._ : Tuple Nat ~> SpectecTerminal .
 
-  eq tuple(TS) . N = index(TS, N) .
+  eq tuple(TS) . N = TS[N] .
 
   --- Record
   sorts Record RecordItem RecordItems .

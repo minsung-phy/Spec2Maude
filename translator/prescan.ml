@@ -179,7 +179,7 @@ let reserved_names =
     ; "asin"; "acos"; "atan"; "pi"; "_xor_"
     ; "eps"; "bool"; "rat"; "float"; "text"; "seq"; "unseq"
     ; "tuple"; "item"; "value"; "typecheck"; "len"
-    ; "index"; "slice"; "lift"; "repeatSeq"
+    ; "lift"; "repeatSeq"
     ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
     ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "not_"; "_and_"
     ; "_or_"; "_implies_"; "_rem_"
@@ -193,8 +193,7 @@ let reserved_names =
     (* backend/pretype.maude: types, sequences, and records *)
     ; "nat"; "int"; "real"
     ; "iterOpt"; "iterList"
-    ; "indexDefined"; "setAt"
-    ; "splice"; "lenAux"
+    ; "indexDefined"; "lenAux"
     ; "EMPTY"; "recordConcat"; "optionConcat"
     ; "setItem"; "hasField"
     (* builtins.maude *)

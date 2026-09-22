@@ -186,12 +186,12 @@ mod WASM2MAUDE-WAST is
   ceq checkImport(WSHS, MEM(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.ok(MEM(WSHA))
     if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         value('TYPE, index(value('MEMS, WSHS), WSHA))
+         value('TYPE, value('MEMS, WSHS)[WSHA])
        /\ WSHMIN >= WSHREQUIRED = true .
   ceq checkImport(WSHS, MEM(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.error
     if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         value('TYPE, index(value('MEMS, WSHS), WSHA))
+         value('TYPE, value('MEMS, WSHS)[WSHA])
        /\ WSHMIN < WSHREQUIRED = true .
   eq checkImport(WSHS, TAG(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.error .
@@ -205,12 +205,12 @@ mod WASM2MAUDE-WAST is
   ceq checkImport(WSHS, TABLE(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.ok(TABLE(WSHA))
     if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
-         value('TYPE, index(value('TABLES, WSHS), WSHA))
+         value('TYPE, value('TABLES, WSHS)[WSHA])
        /\ WSHMIN >= WSHREQUIRED = true .
   ceq checkImport(WSHS, TABLE(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.error
     if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
-         value('TYPE, index(value('TABLES, WSHS), WSHA))
+         value('TYPE, value('TABLES, WSHS)[WSHA])
        /\ WSHMIN < WSHREQUIRED = true .
   eq checkImport(WSHS, TAG(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.error .
@@ -376,7 +376,7 @@ mod WASM2MAUDE-WAST is
     if WSHA <- hostFunctionAddresses = true
        /\ typecheck(WSHARGS, val) = true
        /\ typecheck(WSHARGS, instr) = true
-       /\ WSHXA := index(value('FUNCS, WSHS), WSHA)
+       /\ WSHXA := value('FUNCS, WSHS)[WSHA]
        /\ value('CODE, WSHXA) = ...
        /\ FUNC WSHTYPES -> eps := Expand(value('TYPE, WSHXA))
        /\ len(WSHARGS) = len(WSHTYPES)
@@ -474,7 +474,7 @@ mod WASM2MAUDE-WAST is
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if WSHA := findGlobal(value('EXPORTS,
          findInstance(WSHENV, WSHTARGET)), WSHNAME)
-       /\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))
+       /\ WSHACTUAL := value('VALUE, value('GLOBALS, WSHS)[WSHA])
        /\ typecheck(WSHACTUAL, val)
        /\ typecheck(WSHACTUAL, instr)
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .
@@ -484,7 +484,7 @@ mod WASM2MAUDE-WAST is
     => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)
     if WSHA := findGlobal(value('EXPORTS,
          findInstance(WSHENV, WSHTARGET)), WSHNAME)
-       /\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))
+       /\ WSHACTUAL := value('VALUE, value('GLOBALS, WSHS)[WSHA])
        /\ typecheck(WSHACTUAL, val)
        /\ typecheck(WSHACTUAL, instr)
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
@@ -563,7 +563,7 @@ mod WASM2MAUDE-WAST is
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if WSHA := findGlobal(value('EXPORTS,
          findInstance(WSHENV, WSHTARGET)), WSHNAME)
-       /\ WSHACTUAL := value('VALUE, index(value('GLOBALS, WSHS), WSHA))
+       /\ WSHACTUAL := value('VALUE, value('GLOBALS, WSHS)[WSHA])
        /\ typecheck(WSHACTUAL, val)
        /\ typecheck(WSHACTUAL, instr) .
 
