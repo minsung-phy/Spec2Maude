@@ -84,11 +84,6 @@ let translate_comparison (op : cmpop) (optyp : optyp) left right =
 (* Sequences, tuples, and records *)
 
 let sequence = Iter.sequence
-let sequence_of_typ = Iter.sequence_of_typ
-
-let sequence_operator index typ field =
-  let representation = Prescan.sequence_representation index typ in
-  field representation
 
 let rec record_items = function
   | [] -> Const "EMPTY"
@@ -98,9 +93,8 @@ let rec record_items = function
 let as_sequence_element = Iter.as_sequence_element
 
 let from_sequence_element index typ term =
-  match Hintd.sequence_element_wrappers (Prescan.sort_metadata index) typ with
-  | Some (_, unbox) -> app unbox [term]
-  | None -> term
+  if Prescan.sort_of_typ index typ = "SpectecTerminals"
+  then app "unseq" [term] else term
 
 (* Recursive translation *)
 
@@ -253,34 +247,22 @@ and translate_exp index exp =
       exps
       |> List.map (fun exp ->
            translate_exp index exp |> as_sequence_element index exp.note)
-      |> sequence_of_typ index exp.note
+      |> sequence
 
   | LiftE inner ->
-      let operator =
-        sequence_operator index exp.note (fun sequence -> sequence.lift)
-      in
-      app operator [translate_exp index inner]
+      app "lift" [translate_exp index inner]
 
   | MemE (element, collection) ->
-      let operator =
-        sequence_operator index collection.note (fun sequence -> sequence.occurs)
-      in
-      app operator
+      app "_<-_"
         [ translate_exp index element |> as_sequence_element index element.note
         ; translate_exp index collection
         ]
 
   | LenE collection ->
-      let operator =
-        sequence_operator index collection.note (fun sequence -> sequence.size)
-      in
-      app operator [translate_exp index collection]
+      app "len" [translate_exp index collection]
 
   | CatE (left, right) ->
-      let operator =
-        sequence_operator index exp.note (fun sequence -> sequence.concat)
-      in
-      app operator [translate_exp index left; translate_exp index right]
+      app "_ _" [translate_exp index left; translate_exp index right]
 
   | IdxE (sequence, element_index) ->
       app "_`[_`]"
@@ -408,10 +390,7 @@ and translate_update index base path replacement =
 and translate_extension index base path extension =
   (* EXT e p e' = UPD e p (CAT (ACC e p) e').  The existing path
    * translation unboxes the selected value and reboxes it on update. *)
-  let operator =
-    sequence_operator index path.note (fun sequence -> sequence.concat)
-  in
-  let extended = app operator [translate_select index base path; extension] in
+  let extended = app "_ _" [translate_select index base path; extension] in
   translate_update index base path extended
 
 and translate_composition index typ left right =
@@ -420,10 +399,7 @@ and translate_composition index typ left right =
   | AliasT {it = IterT (_, Opt); _} ->
       app "optionConcat" [left; right]
   | AliasT {it = IterT (_, (List | List1 | ListN _)); _} ->
-      let operator =
-        sequence_operator index typ (fun sequence -> sequence.concat)
-      in
-      app operator [left; right]
+      app "_ _" [left; right]
   | StructT _ ->
       if not (Prescan.record_composition_available index typ) then
         invalid_arg

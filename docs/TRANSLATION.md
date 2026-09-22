@@ -76,11 +76,9 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 ## 공통 backend와 목록 계산
 
 고정 sort, 타입 표현·검사, 목록·option·tuple·record의 공통 연산은
-`translator/backend/pretype.maude` 한 파일에 둔다. `SPECTEC-TERM`에서 기본
-sort를 선언하고 `generated/types.maude`를 읽은 뒤 `SPECTEC-PRETYPE`에서 공통
-연산을 정의한다. 이 baseline의 `SPEC2MAUDE-TYPES`는 기본 sort를 import하며
-별도 typed LIST instantiation은 생성하지 않는다. 목록에는 공통 `eps`, `__`,
-`seq(...)` 표현을 사용한다.
+`translator/backend/pretype.maude`의 `SPECTEC-PRETYPE` 한 모듈에 둔다.
+별도 타입 파일이나 typed LIST instantiation은 생성하지 않는다.
+목록에는 공통 `eps`, `__`, `seq(...)` 표현을 사용하며 일반 목록 연산을 직접 호출한다.
 
 공유 목록 검사는 main처럼 `T U TS` 패턴으로 원소가 두 개 이상일 때만 재귀한다.
 단일 원소 검사와 일반 목록 연산은 변경하지 않았다.

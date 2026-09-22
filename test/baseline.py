@@ -19,6 +19,7 @@ with tempfile.TemporaryDirectory(prefix='spec2maude-baseline-') as directory:
     output = work / 'output.maude'
     result = run([str(EXE), '-o', str(output), str(SOURCE)])
     assert result.returncode == 0, result.stderr
+    assert sorted(work.glob("*.maude")) == [output], list(work.iterdir())
     for hint in ['maude_sort', 'maude_subsort', 'maude_proper',
                  'k_heatcool', 'maude_context']:
         source = work / f'{hint}.spectec'

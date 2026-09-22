@@ -75,11 +75,10 @@ let translate_alias index target quants typ =
   let right = App ("typecheck", [value; source]) in
   let conditions = Param.translate_eq_conditions index quants in
   let direct = equation left right conditions in
-  match Hintd.sequence_element_wrappers (Prescan.sort_metadata index) typ with
-  | None -> [direct]
-  | Some (box, _) ->
-      let boxed = App ("typecheck", [App (box, [value]); target]) in
-      [equation boxed right conditions; direct]
+  if sort = "SpectecTerminals" then
+    let boxed = App ("typecheck", [App ("seq", [value]); target]) in
+    [equation boxed right conditions; direct]
+  else [direct]
 
 (* StructT *)
 let join_struct_items = function

@@ -1,16 +1,9 @@
-fmod SPECTEC-TERM is
+fmod SPECTEC-PRETYPE is
   sort SpectecTerminal .
   sort SpectecTerminals .
   subsort SpectecTerminal < SpectecTerminals .
   sort SpectecType .
   sort SpectecDef .
-endfm
-
---- Generated type module precedes the common operations.
-load ../generated/types.maude
-
-fmod SPECTEC-PRETYPE is
-  protecting SPEC2MAUDE-TYPES . --- in ../generated/typed.maude
   protecting CONVERSION * ( --- RAT, FLOAT, STRING, BOOL, NAT, INT
     op -_ : Float -> Float to nativeFloatNeg,
     op _+_ : Float Float -> Float to nativeFloatAdd,

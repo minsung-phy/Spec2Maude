@@ -21,30 +21,14 @@ let load_script files =
   |> Frontend.Elab.elab
   |> fst
 
-let module_name name = Maude_il.ModuleName name
-
 let emit_script script =
-  let translation = Def.translate_script script in
-  let generated : Maude_il.top_level =
-    Module
-      { name = "SPEC2MAUDE-GENERATED"
-      ; kind = System
-      ; imports =
-          [Maude_il.Protecting (module_name "SPECTEC-PRETYPE")]
-      ; statements = translation.generated_statements
-      }
-  in
-  (* Keep the sibling type module as a stable backend loading boundary. *)
-  let types : Maude_il.top_level =
-    Module
-      { name = "SPEC2MAUDE-TYPES"
-      ; kind = Functional
-      ; imports = [Protecting (module_name "SPECTEC-TERM")]
-      ; statements = []
-      }
-  in
-  Maude_emit.emit_top_levels [types] ^ "\n",
-  Maude_emit.emit_top_levels [generated] ^ "\n"
+  let statements = Def.translate_script script in
+  Maude_emit.emit_module
+    { name = "SPEC2MAUDE-GENERATED"
+    ; kind = System
+    ; imports = [Maude_il.Protecting "SPECTEC-PRETYPE"]
+    ; statements
+    } ^ "\n"
 
 let write_file path contents =
   let channel = open_out_bin path in
@@ -56,8 +40,8 @@ let () =
   let output = ref default_output in
   let files = ref [] in
   let options =
-    [ "-o", Arg.Set_string output, "FILE write generated Maude and sibling types.maude"
-    ; "--output", Arg.Set_string output, "FILE write generated Maude and sibling types.maude"
+    [ "-o", Arg.Set_string output, "FILE write generated Maude"
+    ; "--output", Arg.Set_string output, "FILE write generated Maude"
     ]
   in
   let usage = "usage: spec2maude [-o FILE] [SPECTEC ...]" in
@@ -68,14 +52,10 @@ let () =
       | [] -> sorted_spectec_files default_source_dir
       | files -> files
     in
-    let types_output = Filename.concat (Filename.dirname !output) "types.maude" in
-    if Filename.basename !output = "types.maude" then
-      die "types.maude is reserved for generated type declarations";
-    let types, generated = files |> load_script |> emit_script in
-    write_file types_output types;
+    let generated = files |> load_script |> emit_script in
     write_file !output generated;
-    Printf.eprintf "[spec2maude] wrote %s and %s from %d SpecTec files\n"
-      types_output !output (List.length files)
+    Printf.eprintf "[spec2maude] wrote %s from %d SpecTec files\n"
+      !output (List.length files)
   with
   | Util.Error.Error (region, message) ->
       Util.Error.print_error region message;

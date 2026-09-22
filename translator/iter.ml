@@ -10,38 +10,17 @@ let rec sequence = function
   | [term] -> term
   | term :: terms -> app "_ _" [term; sequence terms]
 
-let rec sequence_with representation = function
-  | [] -> Const representation.Hintd.empty
-  | [term] -> term
-  | term :: terms ->
-      app representation.concat [term; sequence_with representation terms]
-
-let sequence_of_typ index typ terms =
-  sequence_with (Prescan.sequence_representation index typ) terms
-
-let empty_of_typ index typ =
-  let representation = Prescan.sequence_representation index typ in
-  Const representation.empty
-
 let iterated_typ body iter =
   IterT (body.note, iter) $ body.note.at
 
 let as_sequence_element index typ term =
-  match
-    Hintd.sequence_element_wrappers
-      (Prescan.sort_metadata index) typ
-  with
-  | Some (box, _) -> app box [term]
-  | None -> term
+  if Prescan.sort_of_typ index typ = "SpectecTerminals"
+  then app "seq" [term] else term
 
 
 (* Type iteration *)
 
 let length value = app "len" [value]
-
-let length_of_typ index typ value =
-  let representation = Prescan.sequence_representation index typ in
-  app representation.size [value]
 
 let typecheck value element_type =
   BoolCond (app "typecheck" [value; element_type])
@@ -181,9 +160,7 @@ let translate_term index translate_exp body (iter, generators) =
   | None ->
       match iter, generators with
       | ListN (count, None), [] ->
-          let typ = iterated_typ body iter in
-          let representation = Prescan.sequence_representation index typ in
-          app representation.repeat
+          app "repeatSeq"
             [ translate_exp count
             ; translate_exp body |> as_sequence_element index body.note
             ]
@@ -239,12 +216,12 @@ let helper_domain source_index captures count index generators =
       (fun (_, source) -> Prescan.sort_of_typ source_index source.note)
       generators
 
-let empty_arguments source_index captures count index generators =
+let empty_arguments captures count index generators =
   terms_of_variables captures
   @ (match count with None -> [] | Some _ -> [Const "0"])
   @ terms_of_variables (Option.to_list index)
   @ List.map
-      (fun (_, source) -> empty_of_typ source_index source.note)
+      (fun _ -> Const "eps")
       generators
 
 let generator_element (_, source) =
@@ -265,8 +242,7 @@ let source_arguments index iter generators heads tails =
   | List | List1 | ListN _ ->
       List.map2
         (fun (generator, head) tail ->
-          let _, source = generator in
-          sequence_of_typ index source.note
+          sequence
             [source_head index generator head; term_of_variable tail])
         (List.combine generators heads) tails
 
@@ -294,7 +270,7 @@ let translate_identity_pattern index translate_pattern translate_conditions
       begin match translate_pattern source with
       | None -> None
       | Some (term, guards) ->
-          let cardinality_length = length_of_typ index source.note term in
+          let cardinality_length = length term in
           let requirement_guards =
             identity_requirement_guards index translate_conditions term iter body
           in
@@ -345,7 +321,7 @@ let projector_supported index translate_pattern can_bind_body bound body iterexp
        (fun (id, _) -> Il.Free.Set.mem id.it Il.Free.(free_exp body).varid)
        generators
 
-let projector_domain captures count index subject_sort =
+let projector_domain captures count index =
   List.map (fun (variable : variable) -> variable.sort) captures
   @ List.map
       (fun (variable : variable) -> variable.sort)
@@ -353,7 +329,7 @@ let projector_domain captures count index subject_sort =
   @ List.map
       (fun (variable : variable) -> variable.sort)
       (Option.to_list index)
-  @ [subject_sort]
+  @ ["SpectecTerminals"]
 
 let column_term index generators columns =
   match generators, columns with
@@ -385,10 +361,6 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     let captures = translate_captures index iteration.Prescan.captures in
     let count = count_variable iter in
     let iter_index = index_variable index iter in
-    let result_typ = iterated_typ body iter in
-    let result_representation =
-      Prescan.sequence_representation index result_typ
-    in
     let heads = List.map (head_variable index) generators in
     let tails =
       generators
@@ -398,14 +370,14 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
              (Prescan.sort_of_typ index source.note))
     in
     let subject_tail =
-      generated_variable "PROJECT-REST" result_representation.sort
+      generated_variable "PROJECT-REST" "SpectecTerminals"
     in
     let declaration name iter =
       OpDecl
         { name
         ; domain =
             projector_domain captures (count_variable iter)
-              (index_variable index iter) result_representation.sort
+              (index_variable index iter)
         ; codomain =
             if List.length generators = 1
             then
@@ -422,15 +394,14 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     let empty =
       column_term index generators
         (List.map
-           (fun (_, source) -> empty_of_typ index source.note)
+           (fun _ -> Const "eps")
            generators)
     in
     let columns = column_term index generators (terms_of_variables tails) in
     let next_columns =
       List.map2
         (fun (generator, head) tail ->
-          let _, source = generator in
-          sequence_of_typ index source.note
+          sequence
             [source_head index generator head; term_of_variable tail])
         (List.combine generators heads) tails
       |> column_term index generators
@@ -464,7 +435,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     in
     let element = as_sequence_element index body.note body_pattern in
     let subject =
-      app result_representation.concat
+      app "_ _"
         [element; term_of_variable subject_tail]
     in
     let recursive name count index next_count next_index =
@@ -483,7 +454,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
     match iter with
     | Opt ->
         [ declaration name Opt
-        ; Eq (call name None None (Const result_representation.empty), empty, [])
+        ; Eq (call name None None (Const "eps"), empty, [])
         ; let left = call name None None (app "_?" [element]) in
           let right =
             column_term index generators
@@ -497,7 +468,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
         ]
     | List ->
         [ declaration name List
-        ; Eq (call name None None (Const result_representation.empty), empty, [])
+        ; Eq (call name None None (Const "eps"), empty, [])
         ; recursive name None None None None
         ]
     | List1 ->
@@ -518,7 +489,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
         ; declaration tail_name List
         ; first
         ; Eq
-            ( call tail_name None None (Const result_representation.empty)
+            ( call tail_name None None (Const "eps")
             , empty, [])
         ; recursive tail_name None None None None
         ]
@@ -531,7 +502,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
         [ declaration name iter
         ; Eq
             ( call name (Some (Const "0")) current_index
-                (Const result_representation.empty)
+                (Const "eps")
             , empty, [])
         ; recursive name
             (Some (app "s" [term_of_variable count])) current_index
@@ -550,33 +521,32 @@ let rec translate_source_patterns translate_pattern = function
       | None, _ | _, None -> None
       end
 
-let pattern_count index typ translate_pattern translate_exp known subject = function
+let pattern_count translate_pattern translate_exp known subject = function
   | ListN (count, _) when known count ->
       Some (translate_exp count, [])
   | ListN (({it = VarE _; _} as count), _) ->
       translate_pattern count
       |> Option.map (fun (pattern, guards) ->
-           let size = length_of_typ index typ subject in
+           let size = length subject in
            pattern, MatchCond (pattern, size) :: guards)
   | ListN _ -> None
   | Opt | List | List1 -> Some (Const "0", [])
 
-let identity_cardinality index typ translate_exp known subject = function
+let identity_cardinality translate_exp known subject = function
   | Opt ->
       [BoolCond
-         (app "_<=_" [length_of_typ index typ subject; Const "1"])]
+         (app "_<=_" [length subject; Const "1"])]
   | List -> []
   | List1 ->
       [BoolCond
-         (app "_<_" [Const "0"; length_of_typ index typ subject])]
+         (app "_<_" [Const "0"; length subject])]
   | ListN (count, _) when known count ->
-      [EqCond (length_of_typ index typ subject, translate_exp count)]
+      [EqCond (length subject, translate_exp count)]
   | ListN _ -> []
 
 let translate_pattern index translate_source_pattern translate_exp
     translate_conditions known is_bound can_bind_body body (iter, generators)
     subject =
-  let result_typ = iterated_typ body iter in
   let captures = captures index body in
   let count_variables =
     match iter with
@@ -600,8 +570,8 @@ let translate_pattern index translate_source_pattern translate_exp
       begin match
         identity_source index body (iter, generators), source_patterns
       with
-      | Some source, [source_pattern] ->
-          begin match pattern_count index source.note translate_source_pattern
+      | Some _, [source_pattern] ->
+          begin match pattern_count translate_source_pattern
                         translate_exp known subject iter with
           | None -> None
           | Some (_, count_conditions) ->
@@ -617,14 +587,14 @@ let translate_pattern index translate_source_pattern translate_exp
                   @ (MatchCond (source_pattern, subject) :: source_guards)
                   @ identity_requirement_guards index translate_conditions
                       value iter body
-                  @ identity_cardinality index source.note translate_exp known
+                  @ identity_cardinality translate_exp known
                       value iter)
           end
       | None, _ when
           projector_supported index translate_source_pattern can_bind_body
             (projector_local_bound captures iter)
             body (iter, generators) ->
-          begin match pattern_count index result_typ translate_source_pattern
+          begin match pattern_count translate_source_pattern
                         translate_exp known subject iter with
           | None -> None
           | Some (count, count_conditions) ->
@@ -675,17 +645,13 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
             let iter_index = index_variable index iter in
             let heads = List.map (head_variable index) generators in
             let tails = List.map (tail_variable index) generators in
-            let result_typ = iterated_typ body iter in
-            let result_representation =
-              Prescan.sequence_representation index result_typ
-            in
             let call args = app name args in
             let declaration =
               OpDecl
                 { name
                 ; domain =
                     helper_domain index captures count iter_index generators
-                ; codomain = result_representation.sort
+                ; codomain = "SpectecTerminals"
                 ; arrow = Partial
                 ; attrs = []
                 }
@@ -698,7 +664,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
               | Opt ->
                   app "_?" [body_term]
               | List | List1 | ListN _ ->
-                  app result_representation.concat
+                  app "_ _"
                     [ body_term
                     ; call (next_arguments captures count iter_index tails)
                     ]
@@ -721,7 +687,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     { name = tail_name
                     ; domain =
                         helper_domain index captures count iter_index generators
-                    ; codomain = result_representation.sort
+                    ; codomain = "SpectecTerminals"
                     ; arrow = Partial
                     ; attrs = []
                     }
@@ -731,7 +697,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     ( call
                         (step_arguments index List captures None None generators
                            heads tails)
-                    , app result_representation.concat
+                    , app "_ _"
                         [ body_term
                         ; tail_call (terms_of_variables (captures @ tails))
                         ]
@@ -743,9 +709,9 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     ( tail_call
                         (terms_of_variables captures
                          @ List.map
-                             (fun (_, source) -> empty_of_typ index source.note)
+                             (fun _ -> Const "eps")
                              generators)
-                    , Const result_representation.empty
+                    , Const "eps"
                     , []
                     )
                 in
@@ -754,7 +720,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                     ( tail_call
                         (terms_of_variables captures
                          @ source_arguments index List generators heads tails)
-                    , app result_representation.concat
+                    , app "_ _"
                         [ body_term
                         ; tail_call (terms_of_variables (captures @ tails))
                         ]
@@ -766,9 +732,9 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
                 let base =
                   Eq
                     ( call
-                        (empty_arguments index captures count iter_index
+                        (empty_arguments captures count iter_index
                            generators)
-                    , Const result_representation.empty
+                    , Const "eps"
                     , []
                     )
                 in
@@ -980,12 +946,12 @@ let translate_premise_statements index translate_body
   end;
   let declaration = premise_helper_declaration name domain codomain in
   let empty_sources =
-    List.map (fun (_, source) -> empty_of_typ index source.note) generators
+    List.map (fun _ -> Const "eps") generators
   in
   let empty_result =
     match output with
     | None -> Const "true"
-    | Some ((_, source), _) -> empty_of_typ index source.note
+    | Some _ -> Const "eps"
   in
   let base count index =
     Eq (call name (arguments count index empty_sources), empty_result, [])
@@ -996,8 +962,8 @@ let translate_premise_statements index translate_body
   let extend result =
     match output with
     | None -> result
-    | Some ((_, source) as generator, head) ->
-        sequence_of_typ index source.note
+    | Some (generator, head) ->
+        sequence
           [source_head index generator head; result]
   in
   let step name iter count index next_count next_index next_name =

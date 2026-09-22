@@ -117,10 +117,10 @@ The test performs one complete pipeline:
 
 - confirms that the pinned source contains exactly 21 `.spectec` files;
 - parses and elaborates all 21 files through `bin/spec2maude.exe`;
-- generates fresh temporary `types.maude` and `output.maude` files;
-- checks that both are byte-for-byte identical to their counterparts in
+- generates a fresh temporary `output.maude` file;
+- checks that it is byte-for-byte identical to its counterpart in
   `translator/generated/`;
-- loads those files together with all hand-written backends in Maude;
+- loads that file together with all hand-written backends in Maude;
 - rejects every Maude warning, advisory, or error.
 
 Expected final output:
@@ -136,9 +136,8 @@ dune exec bin/spec2maude.exe --
 ```
 
 This reads `spectec/wasm-3.0/*.spectec` in lexical order and writes
-`translator/generated/types.maude` and `translator/generated/output.maude`.
-With `-o FILE`, the type declarations are written to `types.maude` beside
-`FILE`; that name is reserved for the type declarations. The preceding test
+`translator/generated/output.maude`.
+With `-o FILE`, the generated module is written to `FILE`. The preceding test
 uses a temporary directory and does not modify the repository.
 
 ### 4. Load the complete Maude semantics manually

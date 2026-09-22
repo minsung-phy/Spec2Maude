@@ -25,13 +25,11 @@ output="$work/translator/generated/output.maude"
 grep -Fq 'mod SPEC2MAUDE-GENERATED is' "$output"
 grep -Fq 'protecting SPECTEC-PRETYPE .' "$output"
 
-for name in types.maude output.maude; do
-  if ! cmp -s "$expected_dir/$name" "$work/translator/generated/$name"; then
-    echo "spectec_to_maude: generated output differs from $expected_dir/$name" >&2
-    echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe --" >&2
-    exit 1
-  fi
-done
+if ! cmp -s "$expected_dir/output.maude" "$output"; then
+  echo "spectec_to_maude: generated output differs from $expected_dir/output.maude" >&2
+  echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe --" >&2
+  exit 1
+fi
 
 if ! command -v "$maude_bin" >/dev/null 2>&1; then
   echo "spectec_to_maude: Maude executable not found: $maude_bin" >&2

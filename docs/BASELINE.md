@@ -22,7 +22,8 @@
 
 - 조건 중복 제거 및 일반 조건 정렬.
 - iteration helper의 demand 기반 생성, projector 처리 전체.
-  `translator/iter.ml`은 main과 byte-for-byte 동일하다.
+  목록 표현 선택 계층만 없애고 기존 일반 목록 연산을 직접 호출한다.
+  demand 기반 helper 생성과 projector의 동작은 유지한다.
 - `repeatSeq` doubling을 포함한 일반 backend 연산과 builtin 구현.
 - wasm2maude 인코딩, CLI 구조, 출력 분할과 나머지 정확성 수정.
 
@@ -55,3 +56,20 @@ modelcheck의 사전 rewrite/search bound는 1000이고 전체 process timeout�
 60초다. WAST는 steps 10000, call-depth 32, timeout 45초다.
 완료 판정은 search depth 1과 timeout 15초로 확인했다.
 전체 official Wasm suite와 distributed 모델 전체 탐색은 실행하지 않았다.
+
+## 제거 후 잔여 구조 정리
+
+빈 타입 모듈과 sidecar 생성·로드·예약 파일명 처리를 제거했다.
+CLI는 지정한 Maude 파일 하나만 생성한다. 사용처가 없어진 View,
+module instantiation/renaming, typed-list 전용 Ditto 출력과 다중 top-level
+조립 경로도 제거했다. 목록 표현 선택 record와 고정 타입 인자는 없애고
+일반 목록 연산을 직접 호출한다. alias에 필요한 `seq`/`unseq` 판정은 유지한다.
+
+정리 전후 21개 source의 `output.maude`와 별도 iteration 입력의 출력이 각각
+byte-for-byte 동일했다. 생성 완료 메시지는 sidecar 출력 제거에 맞춰 바뀌었다.
+build·번역 재현성·Maude load·hint 거부·단일 파일 생성 검사를 통과했고,
+run/modelcheck/harness, WAST 5개 assertion, 완료 판정 10개,
+iteration·nested-list 4개와 빈 명령열 검사를 통과했다.
+최종 정리의 로그와 비교 입력은 저장소 밖
+`/private/tmp/spec2maude-baseline-cleanup-evidence/`에 있다.
+이 확인은 전체 suite나 일반 의미 보존 증명을 대신하지 않는다.

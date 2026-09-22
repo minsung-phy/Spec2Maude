@@ -128,9 +128,6 @@ let builtin_name name =
 let sort_of_typ index typ =
   Hintd.sort_of_typ index.sort_metadata typ
 
-let sequence_representation index typ =
-  Hintd.sequence_representation index.sort_metadata typ
-
 (* Record composition uses the equation emitted for its monomorphic TypD. *)
 let record_composition_available index typ =
   match (Il.Eval.reduce_typ index.type_env typ).it with
@@ -1465,4 +1462,3 @@ let premise_iteration index premise =
     index.premise_iterations
 
 let hints index = index.hints
-let sort_metadata index = index.sort_metadata

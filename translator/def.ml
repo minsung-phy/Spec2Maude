@@ -77,8 +77,6 @@ let normalize_constructor_declarations statements =
   in
   List.filter keep statements
 
-type script_translation = { generated_statements : statement list }
-
 let normalize_variables source_declarations statements =
   let source_sorts = Hashtbl.create 64 in
   let declared = Hashtbl.create 64 in
@@ -204,7 +202,7 @@ let rec translate ?request_output index def =
     in
     Util.Error.error def.at "translation" ("Unsupported " ^ owner ^ ": " ^ reason)
 
-let normalize_module ?(constructors = true) source_declarations statements =
+let normalize_module source_declarations statements =
   let variable_declarations, statements =
     normalize_variables source_declarations statements
   in
@@ -217,8 +215,7 @@ let normalize_module ?(constructors = true) source_declarations statements =
     List.partition (function OpDecl _ -> true | _ -> false) statements
   in
   let operator_declarations =
-    if constructors then normalize_constructor_declarations operator_declarations
-    else operator_declarations
+    normalize_constructor_declarations operator_declarations
   in
   sort_declarations @ operator_declarations
   @ variable_declarations @ definitions
@@ -248,7 +245,6 @@ let translate_script script =
     in
     Iter.translate_premise_all translate_body index !output_requests
   in
-  let generated_statements = translated_definitions in
   let iterations =
     let bind_body bound body subject =
       let result =
@@ -263,9 +259,5 @@ let translate_script script =
       bind_body
       (Term.translate_exp index) index
   in
-  let generated_statements =
-    generated_statements
-    @ iterations @ premise_iterations
-    |> normalize_module (Prescan.variable_declarations index)
-  in
-  { generated_statements }
+  translated_definitions @ iterations @ premise_iterations
+  |> normalize_module (Prescan.variable_declarations index)

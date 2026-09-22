@@ -6,10 +6,6 @@ type t =
   ; type_definitions : (string * inst list) list
   }
 
-type sequence_representation =
-  { sort : string; empty : string; concat : string; occurs : string
-  ; size : string; repeat : string; lift : string }
-
 (* Removed translation contracts must not silently become documentation hints. *)
 let scan_sorts script =
   let definitions = ref [] in
@@ -82,13 +78,5 @@ and sort_of_inst metadata seen inst =
 let sort_of_typ metadata typ =
   sort_of_typ_seen metadata [] (Il.Eval.reduce_typ metadata.type_env typ)
 
-let sequence_representation _metadata _typ =
-  { sort = "SpectecTerminals"; empty = "eps"; concat = "_ _"
-  ; occurs = "_<-_"; size = "len"; repeat = "repeatSeq"; lift = "lift" }
-
 let representation_inclusion metadata source target =
   sort_of_typ metadata source = sort_of_typ metadata target
-
-let sequence_element_wrappers metadata typ =
-  if sort_of_typ metadata typ = "SpectecTerminals" then Some ("seq", "unseq")
-  else None
