@@ -42,7 +42,8 @@ fmod SPECTEC-PRETYPE is
     op rat : String NzNat -> Rat to nativeParseRat,
     op string : Float -> String to nativeFloatString,
     op string : Rat NzNat -> String to nativeRatString
-  ) .
+  ) . --- Maude prelude에서 Float/String 등의 동일 이름 연산(ex: _+_)이 충돌하는 것을 피하기 위해 renaming
+
 
   protecting QID * ( --- for RECORD
     op _xor_ : Nat Nat -> Nat to integerXor,
