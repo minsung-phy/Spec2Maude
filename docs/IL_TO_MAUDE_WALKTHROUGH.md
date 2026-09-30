@@ -9,7 +9,7 @@
 읽는 순서는 요청한 여섯 단계다.
 
 1. [Prescan 전체: hint를 포함한 사전 수집](#1-prescan-전체)
-2. [일반 변환: syntax, def, rule, type/argument, expression/path, premise, iteration](#2-일반-변환-방법론-hint-선택-분기는-4절)
+2. [실제 변환 로직과 예제: syntax, def, rule, expression, premise, iteration](#2-실제-변환-로직과-예제)
 3. [방법론으로 제시할 재귀 OCaml/의사코드](#3-방법론으로-제시할-재귀-코드)
 4. [Hint가 선택하는 특수 변환](#4-hint가-선택하는-특수-변환)
 5. [현재 한계와 수동 relation backend의 자동화 의견](#5-현재-한계와-relation-backend-자동화)
@@ -39,16 +39,18 @@
 예제의 규칙:
 
 - **SpecTec** 블록은 명시한 실제 파일의 발췌다. 설명과 무관한 문서용 hint와 줄바꿈은 생략·정리할 수 있다. `설명용 조각`이라고 표시한 경우에만 문법 패턴을 짧게 조합했다.
-- **IL AST** 블록은 실제 constructor에 맞춘 **읽기용 골격**이다. `phrase`의 `.at`, expression의 `.note`, 일부 quantifier·coercion은 생략한다. 실제 `mixop`은 문자열이 아니라 atom 목록들의 구조다. 아래의 `mixop("...")`는 읽기용 표기다.
+- **IL AST** 블록은 실제 constructor에 맞춘 **읽기용 골격**이다. `phrase`의 `.at`, expression의 `.note`, 일부 quantifier·coercion은 생략한다. 실제 `mixop`은 문자열이 아니라 `Arg/Atom/Brack/Infix/Seq`로 구성된 구조다. 아래의 `mixop("...")`는 읽기용 표기다.
 - `Q`, `ps`, `e`, `t`, `G`는 각각 quantifier 목록, premise 목록, expression, type, generator 목록의 메타변수다. `CaseE("I32", ...)`의 문자열도 실제로는 mixop이다.
-- **Maude 원문 발췌**는 현재 [output.maude](../translator/generated/output.maude)와 일치한다. **변환 도식**은 변수명·괄호·부가 guard를 단순화한 설명이며 그대로 실행하는 완전한 모듈이 아니다.
+- **Maude 원문 발췌**는 현재 [types.maude](../translator/generated/types.maude) 또는 [output.maude](../translator/generated/output.maude)와 일치한다. **변환 도식**은 변수명·괄호·부가 guard를 단순화한 설명이며 그대로 실행하는 완전한 모듈이 아니다.
 - `eq`는 식 계산, `ceq`는 조건부 식 계산, `rl`은 rewrite 전이, `crl`은 조건부 rewrite 전이다. `P := E`는 **계산한 E를 패턴 P에 매칭해 변수를 얻는 조건**이고, `E => P`는 **rewrite 결과를 P에 매칭하는 조건**이다.
 
 실제 OCaml에서 `exp.it`는 constructor, `exp.at`는 source 위치,
 `exp.note`는 elaboration이 붙인 타입이다. 위치를 생략한 설명용 AST와 달리
 실제 translator는 타입 정보를 sort·boxing·coercion 판단에 사용한다.
 
-작성 기준은 2026-09-22의 코드 `3c35fafddcbdb811f2cd69c20bee33577bb4a726`이다. 입력 SpecTec은 [REVISION](../spectec/REVISION)의 `acc6e834ff403c82554d081237f327346190ad96`이며 로컬 번역 hint가 추가되어 있다. 이 revision의 [Language.md][language], [formal IL README][formal-readme], [formal reduction][formal-reduction]을 함께 확인했다. 이들의 적용 경계는 5절에서 설명한다.
+최초 작성 기준은 2026-09-22의 코드 `3c35fafddcbdb811f2cd69c20bee33577bb4a726`이다. 입력 SpecTec은 [REVISION](../spectec/REVISION)의 `acc6e834ff403c82554d081237f327346190ad96`이며 로컬 번역 hint가 추가되어 있다. 이 revision의 [Language.md][language], [formal IL README][formal-readme], [formal reduction][formal-reduction]을 함께 확인했다. 이들의 적용 경계는 5절에서 설명한다.
+
+2절은 source 예제와 실제 변환 분기를 먼저 읽는 구역이다. 3절은 구현을 더 자세히 볼 때, 4절은 hint의 조건을 확인할 때 참고하면 된다. 2.1–2.3과 2.7의 구분 및 3.2–3.4의 코드 발췌는 2026-09-28의 working tree(HEAD `15d905fd34086c64aa856e4af39ca518841f5063`)에 맞췄다.
 
 # 1. Prescan 전체
 
@@ -110,7 +112,7 @@
 | 타입·함수·relation 선언 | `TypD`, `DecD`, `RelD`, 중첩 `RecD`를 순회 | `type_env`, `type_definitions`, 함수 signature, relation mixop |
 | 모든 top-level hint | `HintD`; `RecD` 안까지 `collect_hints`로 방문 | `hints`; 함수·relation policy 분류 |
 | 이름 | source id와 mixop, 예약된 backend 이름 | `names`; `typ_name`, `def_name`, `rel_name`, `mixop_name` |
-| source 변수 | expression의 `VarE`, parameter·quantifier, `LetPr`, iteration binder | `(source id, sort)`별 Maude 변수; anonymous `_`는 발생 위치별 구분 |
+| source 변수 | expression의 `VarE`, parameter·quantifier, `LetPr`, iteration binder | `(source id, sort)`별 Maude 변수; anonymous `_`는 AST의 id 객체별 구분 |
 | type parameter | `TypP`, scope 안의 대응 `VarT` | `type_parameters`; 타입을 상수 대신 Maude 변수로 번역 |
 | 함수 parameter | `DefP(id, params, result)`와 로컬 scope | `definition_parameters`, signature별 함수 값 sort |
 | 함수 값 인자 | `DefA`와 선언의 formal parameter 대응 | `definition_arguments`, `definition_values`, `definition_applications`; `apply` 생성 |
@@ -207,17 +209,48 @@ inverse : known-args, result       → missing-arg
 
 이 단계들은 계산한 값으로 원문을 대체하는 일반 최적화기가 아니다. **번역에 필요한 정보의 수집 → 각 AST case의 lowering → 출력 정리**로 설명하면 된다.
 
-# 2. 일반 변환 방법론: hint 선택 분기는 4절
+# 2. 실제 변환 로직과 예제
 
 ## 2.1 Syntax: `TypD → InstD → AliasT / StructT / VariantT`
 
-구현: [typd.ml](../translator/typd.ml).
+syntax 변환은 **타입 이름을 선언**한 뒤, **그 타입의 값을 어떻게 표현하고 검사할지** 정한다. 실제 코드의 공통 처리와 분기에 따라 S1–S5로 나눴다. 각 예는 **SpecTec → IL AST → Maude** 순서다.
 
-syntax 이름은 기본적으로 Maude sort가 아니라 **`SpectecType` 값을 만드는 연산자**가 된다. runtime 값은 constructor·tuple·record 등으로 표현하고, 그 값이 source 타입에 속하는지 `typecheck(value, type)`로 기술한다. 별도 sort를 선택하는 hint는 4.1절에서 다룬다.
+먼저 두 가지만 구별하자. **Maude sort**는 값을 담는 종류이고, **`SpectecType` 항**은 검사할 source 타입을 나타낸다. 예를 들어 숫자 `3`은 `Nat`에 들어가지만, `u32`의 범위를 만족하는지는 `typecheck(3, u32)`로 검사한다.
 
-### S1. `AliasT`: 이미 있는 타입에 이름을 붙이기
+IL 예시는 읽기용 골격이다. `Q`는 생략한 변수 선언 목록, `mixop("...")`는 case의 표기를 간단히 적은 것이다.
+
+### S1. 공통 처리: 타입 이름과 인자
 
 **SpecTec:** [1.1-syntax.values.spectec](../spectec/wasm-3.0/1.1-syntax.values.spectec).
+
+```spectec
+syntax iN(N) = uN(N)
+```
+
+**IL AST:**
+
+```ocaml
+TypD ("iN", [ExpP ("N", VarT ("N", []))], [
+  InstD (Q, [ExpA (VarE "N")],
+    AliasT (VarT ("uN", [ExpA (VarE "N")])))
+])
+```
+
+**Maude 원문 발췌 — 공통 처리에서 만드는 선언:**
+
+```maude
+op iN : Nat -> SpectecType .
+```
+
+`TypD`는 syntax 선언 전체이고, `InstD`는 그 안의 개별 정의다. 위 예는 숫자 인자 하나를 받으므로 `iN(32)`, `iN(64)`처럼 타입을 나타내는 항을 만든다. 인자 값마다 새 Maude sort를 만드는 것은 아니다.
+
+그다음 `InstD`의 인자로 검사 대상 `iN(N2)`를 정하고, 본문인 `AliasT`를 처리한다. 그 결과는 S2에서 이어서 본다.
+
+코드: [Typd.translate → translate_inst → translate_deftyp](../translator/typd.ml). 타입 선언은 `translate_type_decl`, 검사 대상 구성은 `translate_target`이 맡는다.
+
+### S2. `AliasT`: 기존 타입의 검사로 연결
+
+**SpecTec:** 같은 values 파일.
 
 ```spectec
 syntax u32 = uN(`32)
@@ -238,155 +271,20 @@ op u32 : -> SpectecType .
 eq typecheck(VALUE, u32) = typecheck(VALUE, uN(32)) .
 ```
 
-`u32`라는 runtime wrapper를 새로 씌우지 않는다. alias의 membership을 대상 타입의 membership에 연결한다. sequence boxing이 필요한 alias에는 boxed 값에 대한 검사식도 생성될 수 있다.
+`u32`에 속하는지는 `uN(32)`에 속하는지로 검사한다. 값에 `u32(...)`라는 새 포장을 씌우지는 않는다.
 
-### S2. Parameter가 있는 `AliasT`
-
-**SpecTec:** 같은 파일.
-
-```spectec
-syntax iN(N) = uN(N)
-```
-
-**IL AST:**
-
-```ocaml
-TypD ("iN", [ExpP ("N", VarT ("N", []))], [
-  InstD (Q_N, [ExpA (VarE "N")], AliasT (VarT ("uN", [ExpA (VarE "N")])) )
-])
-```
-
-**Maude 원문 발췌:**
+S1의 `iN(N) = uN(N)`도 같은 분기다. 인자의 타입 검사까지 필요해서 조건부 equation이 된다.
 
 ```maude
-op iN : Nat -> SpectecType .
 ceq typecheck(VALUE, iN(N2)) = typecheck(VALUE, uN(N2))
   if typecheck(N2, N) .
 ```
 
-parameter마다 Maude sort를 무한히 생성하지 않는다. `iN(32)`, `iN(64)`는 타입을 나타내는 **항**이다. `InstD`의 인자가 constructor나 계산 패턴이면 `translate_target`이 structural pattern 또는 매칭 조건으로 바꾼다.
+여기서 `N2`는 숫자 변수, `N`은 source 타입 이름이다. 조건이 없으면 `eq`, 있으면 `ceq`를 쓴다. 목록을 다른 값 안에 넣어 `seq(...)`로 감싼 경우에는 그 표현을 검사하는 alias equation도 추가할 수 있다.
 
-### S3. `VariantT`: 이름 있는 case, payload 없음
+코드: [Typd.translate_alias](../translator/typd.ml).
 
-**SpecTec:** [1.2-syntax.types.spectec](../spectec/wasm-3.0/1.2-syntax.types.spectec).
-
-```spectec
-syntax numtype = I32 | I64 | F32 | F64
-```
-
-**IL AST:**
-
-```ocaml
-TypD ("numtype", [], [InstD ([], [], VariantT [
-  (mixop("I32"), (TupT [], [], []), []);
-  (mixop("I64"), (TupT [], [], []), []);
-  (* F32, F64도 동일 *)
-])])
-```
-
-**Maude 원문 발췌:**
-
-```maude
-op numtype : -> SpectecType .
-op I32 : -> SpectecTerminal [ctor] .
-eq typecheck(I32, numtype) = true .
-eq typecheck(I64, numtype) = true .
-```
-
-`I32`는 SpecTec의 atom을 사용하는 syntax case이고, `CaseE`는 그 값을 구성하는 IL expression이다. `I32` 자체가 IL AST constructor인 것은 아니다.
-
-### S4. `VariantT`: 이름 있는 case, payload 있음
-
-**SpecTec:** 같은 파일.
-
-```spectec
-syntax reftype = REF null? heaptype
-```
-
-**IL AST:**
-
-```ocaml
-VariantT [
-  (mixop("REF % %"),
-   (TupT [("null?", IterT (VarT ("null", []), Opt));
-          ("heaptype", VarT ("heaptype", []))], Q, []), [])
-]
-```
-
-**Maude 변환 도식:**
-
-```maude
-op REF : SpectecTerminals SpectecTerminal -> SpectecTerminal [ctor] .
-ceq typecheck(REF(NULLS, HT), reftype) = true
-  if typecheck(NULLS, null) /\ len(NULLS) <= 1
-     /\ typecheck(HT, heaptype) .
-```
-
-case의 payload component마다 argument sort와 타입 조건을 만든다. `Opt`는 길이 1 이하라는 조건도 갖는다. type case에 자체 premise가 있으면 typecheck equation의 조건에 들어간다.
-
-**중요한 구분:** 이 조건을 `CaseE`로 값을 만들 때마다 자동 실행하지는 않는다. 값 생성은 constructor application이고, 여기서는 명시적인 타입 검사 연산을 정의한다. 현재 언어 계약과 formal의 차이는 5.6절에 있다.
-
-### S5. `VariantT`: hole-only case와 투명한 표현
-
-**SpecTec:** [1.1-syntax.values.spectec](../spectec/wasm-3.0/1.1-syntax.values.spectec).
-
-```spectec
-syntax list(syntax X) = X*  -- if |X*| < $(2^32)
-```
-
-**IL AST:** 실제 elaboration에서 `AliasT`가 아니라 premise를 가진 `VariantT`다.
-
-```ocaml
-VariantT [
-  (mixop("%"),
-   (TupT [("X*", IterT (VarT ("X", []), List))], Q,
-    [IfPr (CmpE (`LtOp, `NatT, LenE xs, pow_2_32))]), [])
-]
-```
-
-**Maude 원문 발췌:**
-
-```maude
-ceq typecheck(X-, list(X)) = true
-  if len(X-) < (2 ^ 32)
-    /\ typecheck(X-, X) .
-```
-
-hole 하나뿐인 case는 `list.wrap` 같은 runtime constructor를 추가하지 않는다. 내부 값이 곧 외부 값이다. `CaseE`에서도 같은 투명한 표현을 사용한다.
-
-hole가 여러 개인 예는 `syntax fieldtype = mut? storagetype`이다. 실제 IL은 두 component의 `TupT`를 가진 hole-only `VariantT`이고, 값은 `tuple(seq(MUTS) STORAGE)`로 표현한다. `seq`는 option/list 한 덩어리를 tuple의 한 component로 보존한다.
-
-### S6. 범위 표기와 union은 먼저 elaboration 결과를 확인한다
-
-**SpecTec:**
-
-```spectec
-syntax uN(N) = 0 | ... | $nat$(2^N-1)
-syntax consttype = numtype | vectype
-```
-
-**IL AST:** 현재 frontend를 실행해 확인한 모양은 다음과 같다.
-
-```ocaml
-(* uN: 숫자 payload와 범위 premise를 가진 투명 case *)
-VariantT [(mixop("%"), (TupT [("i", NumT `NatT)], Q,
-  [IfPr range_condition]), [])]
-
-(* consttype: frontend가 포함된 case들을 펼친다 *)
-VariantT [case_I32; case_I64; case_F32; case_F64; case_V128]
-```
-
-**Maude 변환 도식:**
-
-```maude
-ceq typecheck(I, uN(N)) = true if 0 <= I /\ I <= 2 ^ N - 1 /\ parameter_guards .
-eq typecheck(I32, consttype) = true .
-eq typecheck(V128, consttype) = true .
-```
-
-첫 식의 실제 출력에는 `CvtE`에 따른 Nat/Int 변환이 남아 있다. 이 도식은 범위의 의미만 단순화했다. translator에 “범위 syntax 전용 AST case”나 “Wasm numtype union 전용 분기”가 있는 것이 아니다.
-
-### S7. `StructT`: record 필드와 membership
+### S3. `StructT`: record 모양과 필드 검사
 
 **SpecTec:** [1.3-syntax.instructions.spectec](../spectec/wasm-3.0/1.3-syntax.instructions.spectec).
 
@@ -406,20 +304,108 @@ TypD ("memarg", [], [InstD ([], [], StructT [
 **Maude 원문 발췌:**
 
 ```maude
+op memarg : -> SpectecType .
 ceq typecheck({ (field('ALIGN, VALUE) ; field('OFFSET, VALUE14)) }, memarg) = true
   if typecheck(VALUE, u32)
     /\ typecheck(VALUE14, u64) .
 ```
 
-source 필드 이름은 Maude quoted identifier인 `'ALIGN`, `'OFFSET`으로 보존한다. 현재 검사는 선언된 순서의 전체 record 패턴을 매칭한다. field 순서를 임의 변경한 record의 일반 검사기가 아니다.
+`ALIGN`, `OFFSET` 순서의 record를 맞춰 보고, 각 필드 값을 검사한다. 임의 순서의 필드를 찾아 검사하는 방식은 아니다. record 표현에는 backend의 공통 `field`, `_;_`, `{_}`를 사용한다.
 
-필드가 모두 목록·option·합성 가능한 record이면 `recordConcat(left,right,type)` equation도 생성한다. source 예는 [validation context](../spectec/wasm-3.0/2.0-validation.contexts.spectec)의 `context`다. 각 목록 필드는 연결하고 option 필드는 `optionConcat`을 사용한다. `memarg`의 scalar 필드처럼 합성 불가능한 경우에는 이 equation을 만들지 않는다.
+추가로, 모든 필드가 목록·option·합성 가능한 record이면 두 record를 합치는 `recordConcat` equation도 만든다. [context](../spectec/wasm-3.0/2.0-validation.contexts.spectec)는 목록 필드를 연결하고 option 필드를 `optionConcat`으로 합친다. `memarg`는 숫자 필드라 이 equation을 만들지 않는다. record 합성의 호출은 현재 타입 인자 없는 단일 StructT 선언으로 제한된다.
+
+코드: [Typd.translate_struct / translate_struct_field / translate_struct_composition](../translator/typd.ml).
+
+### S4. `VariantT`의 named case: constructor와 검사 생성
+
+**SpecTec:** [1.2-syntax.types.spectec](../spectec/wasm-3.0/1.2-syntax.types.spectec).
+
+```spectec
+syntax reftype = REF null? heaptype
+```
+
+**IL AST — 본문 부분:**
+
+```ocaml
+VariantT [
+  (mixop("REF % %"),
+   (TupT [("null?", IterT (VarT ("null", []), Opt));
+          ("heaptype", VarT ("heaptype", []))], Q, []), [])
+]
+```
+
+**Maude 변환 도식 — 변수명을 단순화:**
+
+```maude
+op reftype : -> SpectecType .
+op REF : SpectecTerminals SpectecTerminal -> SpectecTerminal [ctor] .
+ceq typecheck(REF(NS, HT), reftype) = true
+  if typecheck(NS, null)
+    /\ len(NS) <= 1
+    /\ typecheck(HT, heaptype) .
+```
+
+두 가지를 만든다. `REF` 선언은 **값을 만드는 방법**, `typecheck` equation은 **그 값이 reftype인지 검사하는 방법**이다. `null?`는 비어 있거나 원소 하나인 option이므로 길이 조건도 붙는다. case에 별도 premise가 있으면 검사 조건에 포함한다.
+
+인자 sort는 각 payload 타입에서 정한다. constructor의 결과 sort는 source의 sort hint 정보가 정하며, 이 예에서는 `SpectecTerminal`이다. hint가 선택하는 좁은 sort는 4.1절에서 다룬다.
+
+payload가 없는 `I32`도 같은 분기다. `TupT []`를 받아 `op I32 : -> SpectecTerminal [ctor] .`와 `eq typecheck(I32, numtype) = true .`를 만든다.
+
+**값을 만들 때 이 typecheck를 자동 실행하지는 않는다.** 값 생성과 타입 검사 정의를 구별한다.
+
+코드: [Typd.translate_variant → translate_typcase → translate_constructor](../translator/typd.ml).
+
+### S5. `VariantT`의 hole-only case: 내부 값을 그대로 사용
+
+**SpecTec:** [1.1-syntax.values.spectec](../spectec/wasm-3.0/1.1-syntax.values.spectec).
+
+```spectec
+syntax list(syntax X) = X*  -- if |X*| < $(2^32)
+```
+
+**IL AST — 본문 부분:**
+
+```ocaml
+VariantT [
+  (mixop("%"),
+   (TupT [("X*", IterT (VarT ("X", []), List))], Q,
+    [IfPr (CmpE (`LtOp, `NatT, LenE xs, pow_2_32))]), [])
+]
+```
+
+**Maude 원문 발췌:**
+
+```maude
+op list : SpectecType -> SpectecType .
+ceq typecheck(X-, list(X)) = true
+  if len(X-) < (2 ^ 32)
+    /\ typecheck(X-, X) .
+```
+
+이 case에는 `REF` 같은 고정 atom이 없고 값이 들어갈 자리만 있다. 그래서 **새 값 constructor 없이 목록 자체를 사용**한다. `X`는 원소 타입, `X-`는 검사할 목록이다. 길이 제한은 source의 premise에서 온다.
+
+내부 값이 하나면 그대로 쓰고, 여러 개면 tuple로 묶는다. 예를 들어 `syntax fieldtype = mut? storagetype`은 `tuple(seq(MUTS) STORAGE)`로 표현한다. `seq`는 option 전체가 tuple의 한 칸을 차지하게 한다.
+
+코드: [Typd.translate_typcase → translate_union → transparent_payload](../translator/typd.ml).
+
+**source 표기와 IL 분기는 다를 수 있다.** `uN(N) = 0 | ... | 2^N-1` 같은 범위는 범위 조건을 가진 hole-only `VariantT`로 내려온다. `consttype = numtype | vectype` 같은 union은 포함된 named case들이 펼쳐져 내려온다. 범위·union 전용 변환 함수가 따로 있는 것은 아니다.
+
+타입 인자와 반복 타입의 자세한 구분은 2.4절, 전체 호출 구조는 3.2절에서 이어서 본다.
 
 ## 2.2 Definition: `DecD → DefD`
 
-구현: [decd.ml](../translator/decd.ml). 일반 함수는 operator 선언과 clause별 `eq`/`ceq`가 된다.
+`DecD`는 함수 선언 전체이고, `DefD`는 그 함수의 개별 clause다. 먼저 함수의 인자·결과 sort를 선언하고, 각 clause의 입력 패턴·결과·premise를 번역한다.
 
-### D1. 무조건 clause와 재귀 clause
+실제 [decd.ml](../translator/decd.ml)의 큰 분기는 다음과 같다. **재귀인지, 조건이 있는지**는 일반 equation 분기 안에서 처리한다.
+
+| 선택 조건 | 생성 결과 |
+| --- | --- |
+| 일반 함수 | `eq` / `ceq` |
+| 마지막 membership에서 반환값을 선택 | 후보 목록을 만드는 equation + 원소를 선택하는 rule |
+| `hint(maude_rule)` | `rl` / `crl` |
+| `hint(builtin)` | 선언만 생성; 본문은 backend |
+
+### D1. 일반 함수: 입력 패턴과 결과를 equation으로 연결
 
 **SpecTec:** [0.2-aux.num.spectec](../spectec/wasm-3.0/0.2-aux.num.spectec).
 
@@ -434,11 +420,10 @@ def $sum(n n'*) = $(n + $sum(n'*))
 ```ocaml
 DecD ("sum", [ExpP ("_", IterT (NumT `NatT, List))], NumT `NatT, [
   DefD ([], [ExpA (ListE [])], NumE (`Nat 0), []);
-  DefD (Q,
-    [ExpA (CatE (ListE [VarE "n"], tail_iteration))],
-    BinE (`AddOp, `NatT, VarE "n", CallE ("sum", [ExpA tail_iteration])), [])
+  DefD (Q, [ExpA (CatE (ListE [VarE "n"], tail))],
+    BinE (`AddOp, `NatT, VarE "n", CallE ("sum", [ExpA tail])), [])
 ])
-(* tail_iteration = IterE(VarE "n'", (List, [("n'", VarE "n'*")])) *)
+(* tail = IterE(VarE "n'", (List, [("n'", VarE "n'*")])) *)
 ```
 
 **Maude 원문 발췌:**
@@ -451,25 +436,22 @@ ceq sum(N3 N--) = N3 + sum(N--)
     /\ typecheck(N--, nat) .
 ```
 
-두 가지 재귀를 구별하자. translator의 OCaml 재귀는 AST의 RHS를 방문한다. 생성된 `sum(N--)` 재귀는 **source 함수 자신의 계산**을 보존한 것이다.
+head인 `sum(eps)`, `sum(N3 N--)`는 입력을 맞추는 패턴이다. 오른쪽은 결과 식이다. 필요한 검사 조건이 없으면 `eq`, 있으면 `ceq`가 된다. source에 premise가 없어도 입력의 타입 검사 때문에 `ceq`가 될 수 있다.
 
-### D2. Guard와 `otherwise`
+재귀 호출은 오른쪽의 `CallE("sum",...)`를 `sum(...)`으로 번역하면 된다. 재귀 함수 전용 clause 분기가 있는 것은 아니다.
 
-**SpecTec:** 같은 파일.
+**`otherwise`도 이 equation 분기 안에서 처리한다.** 같은 source 파일의 예를 보자.
 
 ```spectec
-def $min(nat, nat) : nat
 def $min(i, j) = i  -- if $(i <= j)
 def $min(i, j) = j  -- otherwise
 ```
 
-**IL AST:**
+**IL AST — 두 clause의 핵심:**
 
 ```ocaml
-DecD ("min", params, NumT `NatT, [
-  DefD (Q, [ExpA i; ExpA j], i, [IfPr (CmpE (`LeOp, `NatT, i, j))]);
-  DefD (Q, [ExpA i; ExpA j], j, [ElsePr])
-])
+DefD (Q, [ExpA i; ExpA j], i, [IfPr (CmpE (`LeOp, `NatT, i, j))])
+DefD (Q, [ExpA i; ExpA j], j, [ElsePr])
 ```
 
 **Maude 원문 발췌:**
@@ -479,39 +461,19 @@ ceq spectec-min(I, J) = I if I <= J .
 eq spectec-min(I, J) = J [owise] .
 ```
 
-`ElsePr`만 보고 premise translator가 `false` 조건을 내는 것은 아니다. `Prem`이 `otherwise=true`를 반환하고, enclosing `Decd`가 equation attribute `[owise]`로 바꾼다.
+`ElsePr`는 여기서 `[owise]`가 된다. 모든 clause에 source 순서 우선권을 붙이는 방식은 아니다.
 
-이 대응의 전제는 source의 clause coherence와 해당 입력 범위다. 일반 clause 모두에 source 순서 우선순위를 구현한 별도 dispatcher가 있는 것은 아니다. [Language의 함수 설명][language]도 겹치는 clause의 결과 일치를 요구하며 이를 자동 증명하지 않는다.
+코드: `translate_decl`이 선언을, `prepare_clauses`와 `translate_head`가 입력 패턴을, `translate_equation_clause`가 equation을 만든다. head에 계산이 있으면 별도 매칭·비교 조건이 필요할 수 있다. 그 처리는 2.6절에서 설명한다. 일반 equation에 rewrite 조건이 필요하면 거부한다.
 
-### D3. 계산이 들어간 head pattern
+### D2. Membership choice: 후보 목록에서 반환값 선택
 
-**SpecTec 설명용 패턴:**
-
-```text
-def $f(CONSTR $g(x), x) = rhs
-```
-
-**IL AST:** `DefD(Q, [ExpA(CaseE(...CallE("g",...))); ExpA x], rhs, ps)`.
-
-**Maude 변환 도식:**
-
-```maude
-ceq f(CONSTR(FIELD), X) = RHS if FIELD = g(X) /\ ... .
-```
-
-constructor 구조는 head에 남기고, 입력에서 얻은 `FIELD`와 계산값을 조건으로 비교한다. 반대로 `g`의 인자가 아직 미지이면 일반 함수 호출을 역으로 매칭할 수 없다. 지원하는 구조 패턴 또는 명시적인 inverse 계약이 필요하다. 실패하면 임의의 값을 선택하지 않고 거부한다.
-
-### D4. 마지막 membership에서 결과를 선택하는 clause
-
-이 경로는 **hint로 선택하지 않고 IL shape로 인식하는 일반 특수 패턴**이므로 여기 포함한다.
-
-**SpecTec 실제 예:** [3.2-numerics.vector.spectec](../spectec/wasm-3.0/3.2-numerics.vector.spectec), `$vcvtop__` clause의 끝.
+**SpecTec:** [3.2-numerics.vector.spectec](../spectec/wasm-3.0/3.2-numerics.vector.spectec)의 `$vcvtop__`. 중간 premise는 생략했다.
 
 ```spectec
+def $vcvtop__(Lnn_1 X M, Lnn_2 X M, vcvtop, v_1) = v
+  ;; 앞 premise에서 후보 목록을 계산
   -- if v <- $inv_lanes_(Lnn_2 X M, c*)*
 ```
-
-그 clause의 RHS는 `v`다. 앞 premise들에서 후보 목록은 정해지지만 `v`는 아직 정해지지 않는다.
 
 **IL AST 핵심:**
 
@@ -520,22 +482,98 @@ DefD (Q, args, VarE "v",
   prefix @ [IfPr (MemE (VarE "v", candidates))])
 ```
 
-**Maude 변환 도식과 실제 선택 rule:**
+**Maude 변환 도식 — 함수·helper 이름과 조건을 단순화:**
 
 ```maude
 ceq f(ARGS) = choice(CANDIDATES) if PREFIX_CONDITIONS .
+rl choice(PREFIX V REST) => V .
+```
+
+먼저 후보 목록을 계산하고, 그 안의 원소 하나를 rewrite rule로 선택한다. 목록을 `PREFIX V REST`로 나누어 맞추므로 첫 원소만 고정해서 고르지 않는다. 실제 선택 rule은 다음과 같다.
+
+```maude
 rl spectec-vcvtop---choice-291-0(CHOICE-PREFIX (V CHOICE-REST)) => V .
 ```
 
-Maude의 associative matching으로 가능한 위치의 값을 선택한다. `[frozen ...]` request와 별도 결과 sort 관계를 사용한다. 하나의 deterministic equation으로 첫 원소만 고르면 source의 가능한 결과를 잃는다.
+이 분기는 hint가 아니라 **마지막 premise의 IL 모양**으로 선택한다. 선택할 `v`가 아직 미지이고, 후보 목록은 알려져 있으며, 반환식이 바로 `v`여야 한다. 같은 함수의 다른 clause가 이 모양이 아니면 그 clause는 D1처럼 equation으로 번역한다.
 
-지원 조건은 좁다. 마지막 premise의 미지 원소가 단순 `VarE`이며 RHS와 같아야 한다. 임의의 existential constraint solver는 아니다. `maude_rule`과 이 choice 경로를 같은 함수에서 동시에 선택하면 거부한다.
+코드: `translate_clause → translate_choice_clause / choice_helper`. 이 함수를 호출하는 operator는 선택 요청을 담는 sort를 사용한다. `maude_rule`과 동시에 선택하면 거부한다.
+
+### D3. `maude_rule`: 함수 결과를 rewrite로 계산
+
+**SpecTec:** [4.4-execution.modules.spectec](../spectec/wasm-3.0/4.4-execution.modules.spectec). 두 clause 중 빈 입력 clause를 발췌했다.
+
+```spectec
+def $evalexprs(state, expr*) : (state, ref*) hint(maude_rule)
+def $evalexprs(z, eps) = (z, eps)
+```
+
+**IL AST 골격:**
+
+```ocaml
+DecD ("evalexprs", params, tuple_result, [
+  DefD (Q, [ExpA (VarE "z"); ExpA (ListE [])],
+    TupE [VarE "z"; ListE []], []);
+  (* 실행 premise가 있는 다음 clause는 생략 *)
+])
+HintD (DecH ("evalexprs", [flag "maude_rule"]))
+```
+
+**Maude 원문 발췌:**
+
+```maude
+sort evalexprs-Config .
+subsort SpectecTerminal < evalexprs-Config .
+op evalexprs : SpectecTerminal SpectecTerminals -> evalexprs-Config [frozen (1 2)] .
+rl evalexprs(Z, eps) => tuple(Z seq(eps)) .
+```
+
+`evalexprs(...)`라는 요청을 결과 tuple로 rewrite한다. 조건이 있으면 `crl`이 된다. 이 방식은 premise에서 다른 실행의 결과를 받아야 할 때 사용한다. 실제 재귀 clause와 rewrite 조건은 4.3절에 있다.
+
+코드: `translate_request_header`, `translate_rule_clause`. `maude_rule` 함수의 `otherwise`와 임의 식 안에 중첩된 rewrite 함수 호출은 현재 지원하지 않는다.
+
+### D4. `builtin`: 선언만 만들고 본문은 backend 사용
+
+**SpecTec:** [1.0-syntax.profiles.spectec](../spectec/wasm-3.0/1.0-syntax.profiles.spectec).
+
+```spectec
+def $ND : bool hint(builtin)
+```
+
+**IL AST 골격:**
+
+```ocaml
+DecD ("ND", [], BoolT, [])
+HintD (DecH ("ND", [flag "builtin"]))
+```
+
+**Maude — 생성한 선언과 backend의 구현을 구분:**
+
+```maude
+--- output.maude에서 생성
+op nd : -> SpectecTerminal .
+--- builtins.maude에 작성된 현재 DET profile의 구현
+eq nd = false .
+```
+
+translator는 선언만 만든다. 계산 equation은 [builtins.maude](../translator/backend/builtins.maude)에 있다.
+
+코드: `Decd.translate`의 `builtin` 분기. 이와 별개로 prescan이 본문을 지원하지 않는다고 표시한 함수도 현재 선언만 남긴다. 후자는 builtin 구현이 있다는 뜻이 아니며, 5.5절의 미지원 경계다.
 
 ## 2.3 Relation과 Rule: `RelD → RuleD`
 
-구현: [reld.ml](../translator/reld.ml). 이 절은 relation에 별도 backend hint가 없는 plain execution relation을 설명한다.
+`RelD`는 relation 선언 전체이고, `RuleD`는 그 안의 개별 규칙이다. [reld.ml](../translator/reld.ml)은 prescan이 정한 **relation policy**, 즉 번역 방식을 먼저 확인한다.
 
-### R1. 조건 없는 실행 규칙
+| source에서 선택한 방식 | 생성 결과 |
+| --- | --- |
+| 실행 관계 `~>` / `~>*` | 요청을 결과로 바꾸는 `rl` / `crl` |
+| `~~` + `maude_eq` | 입력에서 출력을 계산하는 `eq` / `ceq` |
+| `maude_predicate` | 관계가 성립하면 `true`가 되는 `eq` / `ceq` |
+| `maude_backend` | 선언만 생성; 본문은 backend |
+
+실행 규칙에 `k_heatcool`이 붙으면 별도 경로로 번역한다(R5). 조건 유무나 출력 개수는 위 분기 안에서 처리하므로 별도 relation 종류가 아니다.
+
+### R1. 실행 관계: 요청을 결과로 rewrite
 
 **SpecTec:** [4.3-execution.instructions.spectec](../spectec/wasm-3.0/4.3-execution.instructions.spectec).
 
@@ -564,13 +602,11 @@ op Step-pure : InstrList -> Step-pure-Request [frozen (1)] .
 rl Step-pure(NOP) => eps .
 ```
 
-`InstrList`라는 좁은 sort는 현재 source의 type hint 때문에 선택되어 있다. **rule lowering 자체**는 request를 결과로 rewrite하는 일반 방식이다. 결과를 request sort의 subsort로 두므로 입력 request와 반환값을 같은 rewrite kind 안에서 다룰 수 있다.
+왼쪽 입력은 `Step-pure(NOP)`라는 요청이 되고, 오른쪽 결과 `eps`로 rewrite된다. 요청과 결과를 같은 rewrite 안에서 다루기 위해 `InstrList`를 요청 sort 아래에 둔다. `InstrList` 자체는 source의 type hint가 선택한 목록 sort다.
 
-`Step_pure`의 relation 이름과 rule label `nop`은 서로 다른 정보다. 일반 생성 rule은 현재 label을 생략할 수 있다. source label이 항상 출력 label과 일대일로 남는다고 설명하지 않는다.
+**조건이 있는 규칙도 같은 경로**다.
 
-### R2. 조건 있는 규칙
-
-**SpecTec:**
+**SpecTec:** 같은 파일.
 
 ```spectec
 rule Step_pure/select-true:
@@ -586,8 +622,6 @@ RuleD ("select-true", Q, mixop("% ~> %"),
   [IfPr (CmpE (`NeOp, `NatT, unbox_c, NumE (`Nat 0)))])
 ```
 
-실제 IL의 `unbox_c`는 투명 case의 `UncaseE`와 `ProjE(...,0)`다. 번역 결과에서는 표현이 같으므로 `C3`로 남는다.
-
 **Maude 원문 발췌:**
 
 ```maude
@@ -598,29 +632,14 @@ crl Step-pure(VAL-1 (VAL-2 (CONST(I32, C3) SELECT(T--)))) => VAL-1
     /\ C3 =/= 0 .
 ```
 
-입력 패턴에서 변수를 얻고, premise와 필요한 pattern/type 조건을 만들고, RHS를 재귀 번역한다. `crl`의 모든 조건이 성립해야 전이가 가능하다.
+입력 패턴에서 값을 얻고, 필요한 타입 검사와 source premise를 조건으로 붙인다. 조건이 있으므로 `rl` 대신 `crl`이다. IL의 `unbox_c`는 투명 case에서 숫자를 꺼내는 식이며, Maude에서는 같은 숫자 변수 `C3`가 된다.
 
-### R3. 출력 component가 여러 개인 relation
+**`otherwise`는 앞 규칙이 적용되지 않는지 검사한다.** IL의 `ElsePr`를 만나면 앞선 규칙 중 입력이 겹칠 수 있는 규칙에 대해 `R-enabled-...` 검사를 만든다. source의 out-of-bounds trap 규칙 등에 사용한다. 아래는 이름과 조건을 단순화한 도식이다.
 
-**SpecTec 설명용 조각:** `relation R: a ~> b; c`.
-
-**IL AST:** `RelD(..., TupT[a_type; b_type; c_type], ...)`와 `RuleD(..., TupE[a;b;c], ps)`.
-
-**Maude 변환 도식:**
-
-```maude
-crl R(A) => tuple(B C) if CONDITIONS .
+```text
+SpecTec: -- otherwise
+IL AST:  RuleD(..., ElsePr :: remaining_prems)
 ```
-
-relation marker 앞의 component가 입력이고 뒤가 출력이다. 출력 하나면 그 항을 반환하고, 둘 이상이면 tuple로 묶는다. 실제 Wasm의 `config`가 `CaseE` 하나로 표현된 경우에는 그 내부 `state; instrs`를 relation-level 다중 출력과 혼동하지 않는다.
-
-### R4. 실행 relation의 `otherwise`
-
-**SpecTec 실제 패턴:** 같은 실행 파일의 out-of-bounds trap 등에는 앞 규칙 다음에 `-- otherwise`가 온다.
-
-**IL AST:** `RuleD(..., ElsePr :: remaining_prems)`.
-
-**Maude 변환 도식:**
 
 ```maude
 ceq R-enabled-k(INPUTS) = true if PREDECESSOR_CONDITIONS .
@@ -629,13 +648,138 @@ crl R(INPUTS) => FALLBACK
   if R-enabled-k(INPUTS) = false /\ REMAINING_CONDITIONS .
 ```
 
-`Reld`는 source상 앞선 규칙 중 입력 패턴이 겹칠 수 있는 후보를 모아, 그 후보가 모두 적용 불가능한 조건을 만든다. rewrite rule 자체에 `[owise]`를 붙이는 방식이 아니다.
+함수의 `[owise]`와 달리 **rewrite rule에 직접 `[owise]`를 붙이지 않는다.** 현재는 선두 `ElsePr` 하나만 지원하며, 앞 규칙의 적용 여부를 검사하는 데 rewrite가 필요하면 이 경로는 거부한다.
 
-현재 정확히 하나의 선두 `ElsePr` 형태를 요구한다. 선행 규칙의 enabled 조건에 rewrite condition이 필요한 경우에는 이 Boolean complement 경로로 처리하지 못한다. `otherwise`가 임의 관계의 부정을 자동 해결한다는 뜻이 아니다.
+코드: `translate_decl`이 요청 선언을, `lower_rule_body`가 입력·출력·조건을, `lower_execution_rules`와 `execution_statement`가 최종 규칙을 만든다. 출력 component가 여러 개면 tuple로 묶는다. source rule 이름이 항상 Maude label로 남는 것은 아니다.
 
-### R5. 실행 premise를 포함하는 RuleD
+### R2. `maude_eq`: 입력에서 출력을 equation으로 계산
 
-`RulePr` 자체의 일반 번역은 `R(input) => output-pattern`이라는 rewrite condition이다. 그러나 현재 Wasm source에서 실행 premise가 들어 있는 8개 규칙은 모두 `hint(k_heatcool)`로 **4.5절의 heat/cool lowering**을 선택한다. 이 현재 경로를 평범한 `crl ... if Step(...) => ...` 출력으로 잘못 소개하지 않는다.
+**SpecTec:** [2.1-validation.types.spectec](../spectec/wasm-3.0/2.1-validation.types.spectec).
+
+```spectec
+relation Expand: deftype ~~ comptype hint(maude_eq)
+rule Expand: deftype ~~ comptype
+  -- if $unrolldt(deftype) = SUB final? typeuse* comptype
+```
+
+**IL AST 골격:**
+
+```ocaml
+RelD ("Expand", [], mixop("% ~~ %"), relation_type, [
+  RuleD ("", Q, mixop("% ~~ %"), TupE [dt; ct],
+    [IfPr (CmpE (`EqOp, ty, CallE ("unrolldt", [ExpA dt]), sub_pattern))])
+])
+HintD (RelH ("Expand", [flag "maude_eq"]))
+```
+
+**Maude 원문 발췌:**
+
+```maude
+op Expand : SpectecTerminal ~> SpectecTerminal .
+ceq Expand(DEFTYPE) = COMPTYPE
+  if SUB(FINAL-, TYPEUSE-, COMPTYPE) := unrolldt(DEFTYPE)
+    /\ len(FINAL-) <= 1 .
+```
+
+`deftype`를 입력받아 `comptype`를 계산한다. `:=`는 계산 결과를 패턴에 맞춰 `COMPTYPE` 등의 값을 얻는 조건이다. 선언의 `~>`는 Maude의 partial operator 표시이고, 실행 rule의 `=>`와 다르다.
+
+코드: `translate_decl`, `translate_rule`의 `Equation` 분기. 이 equation 안에 rewrite 조건이 필요하면 거부한다.
+
+### R3. `maude_predicate`: 관계가 성립하면 true
+
+**SpecTec:** [4.1-execution.values.spectec](../spectec/wasm-3.0/4.1-execution.values.spectec).
+
+```spectec
+relation Num_ok: store |- num : numtype hint(maude_predicate)
+rule Num_ok:
+  s |- CONST nt c : nt
+```
+
+**IL AST 골격:**
+
+```ocaml
+RelD ("Num_ok", [], mixop("% |- % : %"), relation_type, [
+  RuleD ("", Q, mixop("% |- % : %"),
+    TupE [s; CaseE (mixop("CONST % %"), TupE [nt; c]); nt], [])
+])
+HintD (RelH ("Num_ok", [flag "maude_predicate"]))
+```
+
+**Maude 원문 발췌:**
+
+```maude
+op Num-ok : SpectecTerminal val SpectecTerminal ~> Bool .
+eq Num-ok(S2, CONST(NT, C2), NT) = true .
+```
+
+모든 component가 입력이다. 그 값들이 규칙을 만족하면 `true`가 된다. **만족하지 않는 모든 경우에 `false`를 돌려주는 식은 자동 생성하지 않는다.** 해당하는 equation이 없으면 계산되지 않은 항으로 남을 수 있다.
+
+코드: `translate_decl`, `translate_rule`의 `Predicate` 분기.
+
+### R4. `maude_backend`: 선언만 만들고 본문은 backend 사용
+
+**SpecTec:** [execution values](../spectec/wasm-3.0/4.1-execution.values.spectec), [validation modules](../spectec/wasm-3.0/2.4-validation.modules.spectec).
+
+```spectec
+relation Ref_ok: store |- ref : reftype hint(maude_backend "check")
+relation Module_ok: |- module : moduletype hint(maude_backend "compute")
+```
+
+**IL AST 골격:**
+
+```ocaml
+RelD ("Ref_ok", [], mixop("% |- % : %"), ref_relation_type, ref_rules)
+RelD ("Module_ok", [], mixop("|- % : %"), module_relation_type, module_rules)
+HintD (RelH ("Ref_ok", [text_hint "maude_backend" "check"]))
+HintD (RelH ("Module_ok", [text_hint "maude_backend" "compute"]))
+```
+
+**Maude 원문 발췌 — 선언만 자동 생성:**
+
+```maude
+op Ref-ok : SpectecTerminal val SpectecTerminal -> Bool .
+op Module-ok : SpectecTerminal ~> SpectecTerminal .
+```
+
+`check`는 주어진 값들의 관계를 Bool로 검사하고, `compute`는 입력에서 출력을 계산한다. 이 경로에서는 `RuleD` 본문을 번역하지 않는다. 실제 equations는 [relation-backends.maude](../translator/backend/relation-backends.maude)에 있다.
+
+코드: `Reld.translate`의 `BackendCheck / BackendCompute` 분기. source 규칙을 자동으로 전부 구현한 결과와 구별한다.
+
+### R5. `k_heatcool`: 내부 실행 후 바깥 계산으로 복귀
+
+이것은 relation 전체의 policy가 아니라 **개별 실행 RuleD가 선택하는 경로**다. 해당 규칙은 R1의 일반 출력에서 제외하고 별도로 생성한다.
+
+**SpecTec:** [4.3-execution.instructions.spectec](../spectec/wasm-3.0/4.3-execution.instructions.spectec).
+
+```spectec
+rule Step/pure:
+  z; instr* ~> z; instr'*
+  -- Step_pure: instr* ~> instr'*
+  hint(k_heatcool)
+```
+
+**IL AST 핵심:**
+
+```ocaml
+RuleD ("pure", Q, op_step, TupE [config(z,is); config(z,is')],
+  [RulePr ("Step_pure", [], op_pure, TupE [is;is'])])
+HintD (RuleH ("Step", "pure", [flag "k_heatcool"]))
+```
+
+**Maude 원문 발췌:**
+
+```maude
+crl [heating-Step-pure] : Step(Z ; INSTR-) =>
+  Step-pure(INSTR-) ~> hole-Step-pure-1(Z)
+  if identifyPure(INSTR-) => identified-Step-pure .
+eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
+```
+
+`Z`를 `hole-Step-pure-1`에 보관하고 내부 `Step-pure`를 실행한다. 결과가 나오면 보관한 `Z`와 다시 합친다. `identifyPure`는 실행 후보를 찾는 조건이며, 실제 내부 실행이 성공했는지 미리 증명하는 검사는 아니다.
+
+코드: `Def.translate_script → Reld.translate_contexts → Context_rules`. 목록 context와 여러 실행 premise를 처리하는 세부 분기는 4.5절에 있다.
+
+**지원 경계:** 위 policy로 분류되지 않은 relation은 현재 `Reld.translate`에서 생략된다. 그 relation을 premise에서 요구하면 오류가 날 수 있다. 이를 자동 번역 성공으로 세지 않는다(5.5절).
 
 ## 2.4 Type, parameter, argument: 세 가지를 구별하기
 
@@ -787,8 +931,8 @@ C [. 'LOCALS = ((C . 'LOCALS) [ X1 = LCT1 ]) ]
 | 두 context의 합성 | `CompE(c1,c2)` | `recordConcat(C1,C2,context)` |
 | 목록/option 합성 | `CompE(l,r)`와 타입 정보 | 목록 concat / `optionConcat` |
 | root 교체 | `UpdE(e,RootP,r)` | `E(r)` |
-| index 교체 | `UpdE(e,IdxP(p,i),r)` | 선택한 parent의 `setAt` 표기 후 parent를 재귀 갱신 |
-| slice 교체 | `UpdE(e,SliceP(p,i,n),r)` | parent의 `splice` 표기 후 parent를 재귀 갱신 |
+| index 교체 | `UpdE(e,IdxP(p,i),r)` | 선택한 parent에 `[I = NEW]`를 적용한 뒤 바깥 값을 재귀 갱신 |
+| slice 교체 | `UpdE(e,SliceP(p,i,n),r)` | parent에 `[START : COUNT = NEW]`를 적용한 뒤 바깥 값을 재귀 갱신 |
 | field 교체 | `UpdE(e,DotP(p,a),r)` | parent record의 field 갱신 후 바깥 재구성 |
 | `e[path =.. xs]` | `ExtE(e,p,xs)` | `update(e,p, concat(select(e,p),E(xs)))` |
 
@@ -871,7 +1015,7 @@ execution과 compute는 입력이 먼저 bound여야 한다. predicate와 backen
 
 | source | IL | 결과 |
 | --- | --- | --- |
-| `-- otherwise` | `ElsePr` | enclosing 함수·relation에 넘길 marker; D2/R4 참조 |
+| `-- otherwise` | `ElsePr` | enclosing 함수·relation에 넘길 marker; D1/R1 참조 |
 | `-- (R: x : y)*` | `IterPr(RulePr(...),(List,G))` | 반복 검사 또는 제한된 출력 수집 helper |
 | 부정 premise | `NegPr p` | total한 source-derived complement가 없으므로 거부 |
 
@@ -889,11 +1033,13 @@ execution과 compute는 입력이 먼저 bound여야 한다. predicate와 backen
 
 이는 실행 가능한 binding 순서를 구성하는 구현이다. 임의의 논리 premise 집합에 대한 완전한 탐색·해결 알고리즘이라고 주장하지 않는다.
 
-## 2.7 Iteration: expression, pattern, premise의 세 방향
+## 2.7 Iteration: 바로 번역하는 경우와 helper를 만드는 경우
 
-구현: [iter.ml](../translator/iter.ml).
+[iter.ml](../translator/iter.ml)은 반복을 세 방향으로 처리한다. **값을 만드는 expression**, **값에서 변수를 꺼내는 pattern**, **반복해서 검사하는 premise**다.
 
-### I1. 단순 변수 반복: 원본 목록을 그대로 사용
+expression의 실제 선택 순서는 **그대로 반환 → 같은 값 반복 → 일반 helper**다. `Opt/List/List1/ListN`은 그 안에서 반복 횟수와 종료 조건을 정한다.
+
+### I1. Identity: 원본 목록을 그대로 사용
 
 **SpecTec:** `$sum(n'*)`의 `n'*`.
 
@@ -907,7 +1053,33 @@ IterE (VarE "n'", (List, [("n'", VarE "n'*")]))
 
 identity 조건과 표현이 맞으면 `map-id`를 만들지 않는다. 길이·option 제약이 필요한 pattern 방향은 별도 조건을 유지한다.
 
-### I2. 일반 map과 zip
+코드: `translate_term`의 첫 번째 `identity_source` 분기.
+
+### I2. 고정된 값 반복: repeat 연산 사용
+
+**SpecTec:** [4.0-execution.configurations.spectec](../spectec/wasm-3.0/4.0-execution.configurations.spectec), `$growmem`에서 추가할 0 byte 목록을 만드는 부분.
+
+```spectec
+(0x00)^(n * $($(64 * $Ki)))
+```
+
+**IL AST 골격:** `zero_byte`는 0 byte를 나타내는 식, `count`는 위 반복 횟수 식이다.
+
+```ocaml
+IterE (zero_byte, (ListN (count, None), []))
+```
+
+**Maude 원문 발췌 — 생성된 식의 해당 부분:**
+
+```maude
+repeatSeq(N3 * (64 * Ki), 0)
+```
+
+매번 다른 원소를 읽거나 index를 사용하는 반복이 아니다. 같은 값을 정해진 횟수만큼 반복하므로 공통 `repeatSeq`를 사용한다. typed list에는 그 목록용 repeat 연산을 쓴다.
+
+코드: `translate_term`의 `ListN(count,None), []` 분기.
+
+### I3. 일반 반복: 원소별 계산 helper 생성
 
 **SpecTec:** 1.4절의 `$subst_fieldtype(ft,tv*,tu*)*`.
 
@@ -923,7 +1095,7 @@ eq map-subst-fieldtype(TV-3, TU-3, FT FTS) =
 
 generator가 여러 개면 각 목록의 head를 **같은 iteration 한 번에서 함께** 소비한다. Cartesian product가 아니다. base case도 모든 generator가 동시에 빈 형태이고, 길이가 다르면 정상 결과를 만들어 주지 않는다.
 
-### I3. `ListN`: 반복 횟수와 index
+코드: `translate_term`이 helper 호출을 만들고, `translate_statements`가 반복 equation을 만든다. 다음은 index가 있어 매회 다른 값을 만드는 경우다. 이것도 helper 생성 경로다.
 
 **SpecTec 실제 조각:** [1.2-syntax.types.spectec](../spectec/wasm-3.0/1.2-syntax.types.spectec), `$subst_all_valtype`의 `(_IDX i)^(i<n)`.
 
@@ -941,20 +1113,20 @@ eq make-indexes(0, I) = eps .
 eq make-indexes(s(N), I) = -IDX(I) make-indexes(N, s(I)) .
 ```
 
-실제 helper 이름은 source body와 prescan에서 결정한다. `N`을 하나씩 줄이고 index를 늘린다. index 없는 `ListN(count,None)`이며 generator도 없으면 새 map helper 대신 `repeatSeq(count, boxed-body)` 또는 typed repeat 연산으로 번역한다.
+실제 helper 이름은 source body와 prescan에서 정한다. 이 예는 남은 횟수를 줄이면서 index를 늘린다.
 
-### I4. `Opt`, `List1`
+helper의 종료·반복 모양은 다음과 같다. 아래 source 표기는 설명용 패턴이다.
 
-**source 패턴 → IL → Maude 도식:**
+| SpecTec 패턴 | IL의 반복 종류 | Maude helper의 동작 |
+| --- | --- | --- |
+| `f(x)?` | `Opt` | 빈 option은 `eps`; 있는 값은 계산 결과에 `?`를 붙임 |
+| `f(x)*` | `List` | 빈 목록 종료 + head를 계산하고 tail 재귀 |
+| `f(x)+` | `List1` | 첫 원소는 필요; 이후 tail은 빈 목록도 허용 |
+| `f(i)^(i<n)` | `ListN` | 횟수 0에서 종료; 횟수를 줄이고 index를 늘림 |
 
-- `f(x)?` → `IterE(body,(Opt,[(x,xs)]))` → 빈 option은 `eps`, 있는 option은 `E(body) ?`.
-- `f(x)+` → `IterE(body,(List1,G))` → 최초 helper에는 빈 base가 없고, 첫 원소 뒤의 tail helper에만 빈 base를 둔다.
-- `*` → `List` → 빈 base와 head/tail 재귀.
-- `^n` → `ListN` → 횟수 0의 base와 countdown 재귀, 필요하면 index.
+`Opt/List/List1`에 원소를 공급할 generator가 없으면 거부한다.
 
-`Opt`·`List`·`List1`에 generator가 없는 일반 `IterE`는 거부한다. source annotation에서 단순히 별표가 보인다고 항상 같은 lowering이 되는 것은 아니다.
-
-### I5. Iteration을 pattern으로 쓰기: projector
+### I4. Pattern: 만들어진 목록에서 변수 목록 복원
 
 **SpecTec 설명용 조각:** 함수 head의 `(x,y)*`.
 
@@ -962,13 +1134,18 @@ eq make-indexes(s(N), I) = -IDX(I) make-indexes(N, s(I)) .
 
 **Maude 변환 도식:**
 
-```text
-project([(x1,y1),(x2,y2)]) = ([x1,x2], [y1,y2])
+```maude
+--- 이름을 단순화한 두 scalar 열의 복원 예
+eq project(eps) = tuple(seq(eps) seq(eps)) .
+ceq project(tuple(X Y) REST) = tuple(seq(X XS) seq(Y YS))
+  if tuple(seq(XS) seq(YS)) := project(REST) .
 ```
+
+이는 helper의 핵심 구조를 보여 주는 도식이며 실제 생성 이름·추가 guard는 생략했다. 기존 목록을 그대로 꺼낼 수 있는 identity pattern은 이런 helper 없이 matching과 필요한 길이 검사로 처리한다.
 
 source 목록 하나에서 generator 열을 복원한다. `Prem.bind_pattern`과 `Iter.translate_pattern`이 projector를 요청하고 `translate_projector_statements`가 필요한 역방향 helper를 만든다. 임의 함수 body를 뒤집지는 않는다. 구조적으로 분해할 수 있거나 허용된 inverse binding으로 모든 generator가 결정되어야 한다.
 
-### I6. 반복 premise: check와 output collection
+### I5. Premise: 반복 검사 또는 결과 목록 수집
 
 **SpecTec 실제 패턴:** [2.4-validation.modules.spectec](../spectec/wasm-3.0/2.4-validation.modules.spectec)의 `(Import_ok: ... import : xt_I)*`.
 
@@ -981,10 +1158,14 @@ IterPr (RulePr ("Import_ok", [], op, body),
 
 **일반 구현의 Maude 변환 도식:**
 
-```text
-모든 generator bound → iterpr-check(CAPTURES, SOURCES) : Bool
-출력 generator 하나만 미지 → OUTPUT := iterpr-output(CAPTURES, KNOWN-SOURCES)
+```maude
+--- 모두 알려진 경우: 다음 Bool 조건이 true인지 검사
+iterpr-check(CAPTURES, SOURCES)
+--- 목록 하나를 구해야 하는 경우: 계산한 목록을 OUTPUT에 매칭
+OUTPUT := iterpr-output(CAPTURES, KNOWN-SOURCES)
 ```
+
+위는 helper 이름과 인자 목록을 단순화한 **조건 도식**이다.
 
 현재 output collection은 body가 그 하나의 출력을 결정하는 제한된 형태이며, enclosing relation이 helper 요청을 수집해야 한다. 여러 generator가 미지이거나 rewrite condition을 equation helper에 넣어야 하는 모양은 거부된다. `check` helper에는 무조건 `[owise] = false`를 붙이지 않는다.
 
@@ -1023,7 +1204,7 @@ translate_prems  : Env → Bound → Il.Ast.prem list → Conditions × Bound ×
 
 실제 `Def.translate_script`는 곧바로 `top_level list` 대신 조립용 `script_translation` record를 반환하고, `bin/spec2maude.ml`이 모듈로 감싼다. 위 첫 signature는 논문에서 전체 변환을 묶은 표기다.
 
-**아래 코드는 설명용 OCaml 의사코드다.** 실제 constructor와 분기 방향을 따르되 record 필드·진단·세부 helper 이름은 줄였다. 그대로 컴파일하는 대체 구현이 아니다. `declare_*`, `bind_*`, `checks`는 설명한 하위 변환을 지칭하며 새로운 의미를 임의로 계산하는 oracle이 아니다.
+3.2–3.4는 **현재 구현의 핵심 함수 발췌**다. 나머지는 설명용 OCaml 의사코드이며, 실제 constructor와 분기 방향을 따르되 세부 이름과 진단은 줄였다. `declare_*`, `bind_*`, `checks`는 앞에서 설명한 하위 변환을 간단히 부르는 이름이다. 코드 조각만으로 실행되는 별도 구현은 아니다.
 
 ## 3.1 전체 `def.ml`
 
@@ -1055,113 +1236,146 @@ let translate_script script =
 
 ## 3.2 `typd.ml`: 타입 선언의 재귀적 정의
 
+2.1절의 실제 진입점은 `Typd.translate`다. 아래는 현재 코드의 핵심 함수다.
+
 ```ocaml
-let rec translate_typd env id params insts =
-  declare_type_operator env id params ::
-  List.concat_map (translate_inst env id params) insts
+let translate_deftyp index target bound quants deftyp =
+  match deftyp.it with
+  | AliasT typ -> translate_alias index target quants typ
+  | StructT fields -> translate_struct index target bound quants fields
+  | VariantT cases -> translate_variant index target bound quants cases
 
-and translate_inst env id params inst =
+let translate_inst index id params inst =
   match inst.it with
-  | InstD (quants, args, body) ->
-      let target, guards, bound = translate_type_head env id params args in
-      add_guards guards (translate_deftyp env target bound quants body)
+  | InstD (quants, args, deftyp) ->
+      let target, guards, bound = translate_target index id params args in
+      translate_deftyp index target bound quants deftyp
+      |> guard_statements guards
 
-and translate_deftyp env target bound quants dt =
-  match dt.it with
-  | AliasT typ ->
-      let v = fresh_value (sort_of_typ env typ) in
-      equations_for_alias_and_boxed_alias env v target typ quants
-  | StructT fields ->
-      let items, conditions = translate_fields env bound fields in
-      [conditional_eq (typecheck (record items) target) true_term
-         (quant_checks env quants @ conditions)]
-      @ record_composition_if_supported env target fields
-  | VariantT cases ->
-      List.concat_map (translate_case env target bound quants) cases
-
-and translate_case env target bound quants (op, (typ, qs, ps), hints) =
-  let values, domains, type_conditions = translate_components env typ in
-  let conditions = translate_type_case_prems env bound ps
-                   @ quant_checks env (quants @ qs) @ type_conditions in
-  if hole_only op then
-    [conditional_eq (typecheck (transparent_payload typ values) target)
-       true_term conditions]
-  else
-    let name = constructor_name env op in
-    [declare_constructor name domains (constructor_sort env op);
-     conditional_eq (typecheck (App (name, values)) target)
-       true_term conditions]
+let translate index id params insts =
+  let definitions =
+    List.concat_map (translate_inst index id params) insts
+  in
+  translate_type_decl index id params :: definitions
 ```
 
-이 재귀의 근거는 `TypD` 안에 `InstD`가 있고 그 안에 `deftyp`이 있다는 입력의 나무 구조다.
+`VariantT`는 각 case에서 다음 분기를 사용한다.
+
+```ocaml
+let translate_typcase index target instance_conditions bound
+    (mixop, (typ, quants, prems), _hints) =
+  let bound = bound @ payload_names typ in
+  let case_conditions =
+    Prem.translate_eq_conditions index ~bound prems
+    @ Param.translate_eq_conditions index quants @ instance_conditions
+  in
+  if Mixop.is_hole_only mixop then
+    translate_union index target case_conditions typ
+  else translate_constructor index target case_conditions mixop typ
+```
+
+`translate_typd`는 다른 의사코드에서 쓰는 설명용 이름이고, 실제 함수명은 `translate`다. 위 함수들은 `let rec ... and ...` 묶음이 아니다. instance·field·case 목록을 내려가며 내부 타입·식·premise의 재귀 번역을 호출한다.
 
 ## 3.3 `decd.ml`: 함수와 clause
 
-```ocaml
-let translate_decd env id params result clauses =
-  let mode = definition_mode env id in
-  let header = declare_definition env mode id params result in
-  if mode = Builtin || not (body_supported env id) then header
-  else
-    let prepared = prepare_clause_heads env id params clauses in
-    header @ List.concat_map (translate_clause env mode) prepared
+2.2절의 네 경로를 고르는 실제 `Decd.translate`는 다음과 같다.
 
-let translate_clause env mode prepared =
-  let DefD (quants, args, rhs, prems) = prepared.clause.it in
-  let lhs, head_guards, initially_bound = prepared.head in
-  match mode with
-  | Ordinary ->
-      let p = translate_prems env initially_bound prems in
-      let conditions = schedule_equational_conditions lhs
-        (head_guards @ require_no_rewrite p.conditions
-         @ necessary_quant_checks env prepared p quants) in
-      let attrs = if p.otherwise then [Owise] else [] in
-      [eq_or_ceq lhs (translate_exp env rhs) conditions attrs]
-  | MembershipChoice -> translate_last_membership_choice env prepared
-  | Rule -> translate_rule_clause env prepared (* 4.3절 *)
-  | Builtin -> [] (* 본문은 builtins.maude *)
+```ocaml
+let translate index id params result_typ clauses =
+  let builtin = has_hint index id "builtin" in
+  let choice = Prescan.has_membership_choice index id in
+  let rule = has_hint index id "maude_rule" in
+  if not builtin && choice && rule then
+    invalid_arg "membership choice conflicts with hint(maude_rule)";
+  let header =
+    if builtin then [translate_decl index id params result_typ]
+    else if choice || rule then translate_request_header index id params result_typ
+    else [translate_decl index id params result_typ]
+  in
+  if builtin || not (Prescan.definition_body_supported index id) then
+    header
+  else
+    let clauses = prepare_clauses index id params clauses in
+    if choice then
+      header @ List.concat_map (translate_clause index id) clauses
+    else if rule then
+      header @ List.map (translate_rule_clause index) clauses
+    else
+      header @ List.map (translate_equation_clause index) clauses
 ```
 
-`eq_or_ceq`는 조건이 없으면 `Eq`, 있으면 `Ceq`를 고른다. ordinary equation 안에 `RewriteCond`가 들어가면 거부한다. 실제 `prepare_clauses`는 head overlap과 signature를 고려해 불필요한 quantifier 타입 검사를 줄이지만, source premise 자체를 지우는 근거로 사용하지 않는다.
+choice 함수 안에서도 모든 clause가 선택 rule이 되는 것은 아니다. 실제로는 clause마다 다시 나눈다.
+
+```ocaml
+let translate_clause index id prepared =
+  match Prescan.membership_choice index prepared.clause with
+  | Some choice ->
+      translate_choice_clause index id choice prepared
+  | None ->
+      [translate_equation_clause index prepared]
+```
+
+일반 equation clause의 내부 흐름은 다음과 같다.
+
+```text
+prepared.head의 입력 패턴
+  + Term.translate_exp로 번역한 RHS
+  + Prem.translate_all의 premise 조건
+  + 아직 필요한 quantifier 타입 검사
+  → schedule_conditions로 변수를 얻는 순서 정리
+  → equation: 조건이 없으면 Eq, 있으면 Ceq
+```
+
+`ElsePr`는 `[Owise]` 속성이 된다. 일반 equation에 rewrite 조건이 필요하면 거부한다. `prepare_clauses`는 입력 패턴과 signature를 바탕으로 이미 확보한 타입 정보를 기록하지만, 그것이 source premise를 삭제하는 근거는 아니다.
 
 ## 3.4 `reld.ml`: relation과 rule
 
+2.3절의 policy별 분기를 선택하는 실제 `Reld.translate`다.
+
 ```ocaml
-let translate_reld env id params op typ rules =
-  match relation_policy env id with
-  | Error reason -> []  (* 현재 구현: 5.5절의 한계 *)
+let translate ?request_output ?include_rule index id params _mixop typ rules =
+  match Prescan.relation_policy index id with
+  | Error _ -> []
   | Ok policy ->
-      let header = declare_relation env id params typ policy in
+      let declarations = translate_decl index id params typ policy in
       match policy with
-      | BackendCheck | BackendCompute _ -> header
-      | Execution _ ->
-          header @ lower_execution_rules_in_source_order env id policy
-                     (exclude_heatcool_rules env rules)
-      | Equation _ | Predicate ->
-          header @ List.map (translate_equational_rule env id policy) rules
-
-let lower_rule env id params policy rule =
-  let RuleD (label, quants, op, head, prems) = rule.it in
-  let components = split_mixop_components op head in
-  let inputs, outputs = partition_by_policy policy components in
-  let lhs_args, head_conditions, bound = bind_input_patterns env inputs in
-  let p = translate_prems env bound prems in
-  require_all_bound p.bound outputs;
-  { lhs = App (relation_name env id, parameter_terms params @ lhs_args);
-    rhs = pack_outputs (List.map (translate_exp env) outputs);
-    conditions = head_conditions @ p.conditions @ remaining_quant_checks;
-    otherwise = p.otherwise }
+      | Prescan.BackendCheck | Prescan.BackendCompute _ -> declarations
+      | Prescan.Execution _ ->
+          declarations
+          @ translate_execution ?request_output ?include_rule index id params typ
+              policy rules
+      | Prescan.Equation _ | Prescan.Predicate ->
+          declarations
+          @ List.map
+              (translate_rule ?request_output index id params policy)
+              rules
 ```
 
-이 body를 policy별로 감싼다.
+`lower_rule_body`는 입력 패턴, 출력 식, 조건을 만든다. execution 경로는 source 순서로 앞 규칙을 확인하며 `otherwise`를 처리한다. equation/predicate 경로는 다음처럼 구별한다.
 
 ```ocaml
-Execution → Rl / Crl (lhs, rhs, conditions)
-Equation  → Eq / Ceq (lhs, rhs, equation_conditions)
-Predicate → Eq / Ceq (lhs, Const "true", equation_conditions)
+let translate_rule ?request_output index id params policy rule =
+  let body = lower_rule_body ?request_output index id params policy rule in
+  if body.otherwise then
+    invalid_arg "ElsePr in a relation rule requires source complement lowering";
+  match policy with
+  | Prescan.Execution _ ->
+      invalid_arg "execution relations require source-order lowering"
+  | Prescan.Equation _ ->
+      begin match eq_conditions body.conditions with
+      | [] -> Eq (body.left, body.right, [])
+      | conditions -> Ceq (body.left, body.right, conditions, [])
+      end
+  | Prescan.Predicate ->
+      begin match eq_conditions body.conditions with
+      | [] -> Eq (body.left, Const "true", [])
+      | conditions -> Ceq (body.left, Const "true", conditions, [])
+      end
+  | Prescan.BackendCheck | Prescan.BackendCompute _ ->
+      invalid_arg "manual relation rules are supplied by a Maude backend"
 ```
 
-`otherwise`는 R4절의 선행 enabled complement를 먼저 붙여야 한다. heat/cool은 동일한 입력·premise 번역을 바탕으로 4.5절처럼 여러 단계로 나눈다.
+실행 rule은 `execution_statement`에서 조건 유무에 따라 `Rl/Crl`이 된다. `otherwise`의 선행 규칙 검사는 **R1의 실행 경로**에서 처리하며, equation/predicate의 `ElsePr`는 현재 거부한다. `k_heatcool` 규칙은 `Def.translate`가 일반 rule 목록에서 제외하고 별도 생성한다(4.5절).
 
 ## 3.5 `term.ml`: 식의 직접 재귀
 
@@ -1336,7 +1550,7 @@ map(CAPTURES, x1 xs1, ..., xk xsk)
   = box(E(body)) map(CAPTURES, xs1, ..., xsk)
 ```
 
-option·nonempty·counted iteration은 I4절의 base/step을 사용한다. pattern 방향은 projector를, premise 방향은 check/output helper를 생성한다. 이 세 방향은 하나의 `map` 호출로 뭉개지지 않는다.
+option·nonempty·counted helper는 I3절의 종료·반복 모양을 사용한다. pattern 방향은 projector를, premise 방향은 check/output helper를 생성한다. 이 세 방향은 하나의 `map` 호출로 뭉개지지 않는다.
 
 ## 3.9 논문의 주장과 증명 의무
 
@@ -1558,6 +1772,8 @@ match inverse_contract env f with
 
 구현은 [reld.ml](../translator/reld.ml)의 `Context_rules`다. 계약과 전체 8개 예제는 [TRANSLATION.md](TRANSLATION.md#k_heatcool-8개-rule의-변환-예시)에 있고, 여기서는 구조를 이해할 대표 예제를 설명한다.
 
+실제 큰 분기는 두 개다. H3–H5는 내부 실행을 차례로 연결하는 일반 `heatcool_rule` 경로이고, H6는 목록을 앞부분·실행할 부분·뒷부분으로 나누는 `context_transitions` 경로다. H3–H5의 실행 premise 개수나 중첩 모양마다 별도 translator가 있는 것은 아니다.
+
 source 규칙이 다른 실행 relation의 결과를 필요로 하면 내부 request를 실행하고, 저장한 context와 반환값을 조합해 외부 결과를 만든다. **hole은 다음 계산에 필요한 값을 저장하는 continuation**으로 읽으면 된다.
 
 ### H3. 실행 premise 하나: `Step/pure`
@@ -1765,7 +1981,7 @@ relation Module_ok: |- module : moduletype hint(maude_backend "compute")
 **Maude 변환 도식:**
 
 ```maude
-op Ref-ok : SpectecTerminal SpectecTerminal SpectecTerminal -> Bool .
+op Ref-ok : SpectecTerminal val SpectecTerminal -> Bool .
 op Module-ok : SpectecTerminal ~> SpectecTerminal .
 --- 이 relation들의 source RuleD 본문은 여기서 생성하지 않음
 ```
@@ -2157,12 +2373,14 @@ source의 `$sum` 재귀 clause를 다시 보자.
 | target AST와 출력 규칙은 무엇인가 | [maude_il.ml](../translator/maude/maude_il.ml), [maude_emit.ml](../translator/maude/maude_emit.ml) |
 | 생성한 전체 파일은 어디 있나 | [types.maude](../translator/generated/types.maude), [output.maude](../translator/generated/output.maude) |
 
-작성 중 다음을 확인했다.
+최초 작성 시(2026-09-22) 기록된 검증은 다음과 같다. 아래 실행 이력을 2026-09-28 문서 수정에서 새로 수행한 검사로 보지 않는다.
 
-- `test/spectec_to_maude.sh </dev/null`: **PASS (21 files)**. 현재 translator를 빌드·실행하여 새 생성물이 저장된 두 생성 파일과 일치하는지 검사하고, 수동 backend까지 포함해 Maude를 로드했다. Warning/Advisory 검사도 통과했다.
+- `test/spectec_to_maude.sh </dev/null`: **PASS (21 files)**. 당시 translator를 빌드·실행하여 새 생성물이 저장된 두 생성 파일과 일치하는지 검사하고, 수동 backend까지 포함해 Maude를 로드했다. Warning/Advisory 검사도 통과했다.
 - 같은 frontend로 대표 타입·함수·rule을 elaboration하고 `Il.Print`로 확인했다. 특히 `consttype`의 펼쳐진 case, `list`·`uN`의 transparent `VariantT`, `$sum`의 `CatE`/identity iteration을 대조했다. 문서의 constructor 표기는 그 결과와 소스를 바탕으로 재구성한 골격이다.
 - 수동 relation 경계는 별도 읽기 전용 검토를 받았다. L3의 잘못된 start 예제도 기존 생성물과 backend를 로드해 재현했다. 결과는 `eps -> eps`, 19 rewrites이며 명령·출력은 임시 기록의 `module-boundary.maude`, `module-boundary.log`에 있다.
 - 이번 변경은 문서다. 전체 WAST suite, 모든 AST/hint 조합, 임의 입력의 의미 동등성, model-checking 보존 증명은 수행하지 않았다.
+
+2026-09-28 수정은 현재 코드의 분기, source 예제, checked-in Maude 출력과 문서의 연결을 대조한 문서 변경이다. 문서 구조·링크·원문 발췌를 검사했으며, translator 재실행이나 Maude 실행 검증은 새로 수행하지 않았다.
 
 기본 재현 명령은 저장소 root에서 다음과 같다. 자세한 설치·실행법은 [ARTIFACT.md](ARTIFACT.md)에 있다.
 
