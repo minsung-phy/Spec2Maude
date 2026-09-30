@@ -259,12 +259,12 @@ reftype-sub:
 
 heaptype-sub:
   ```Spectec
-  relation Heaptype_sub: context |- heaptype <: heaptype hint(maude_sub-check)
+  relation Heaptype_sub: context |- heaptype <: heaptype hint(maude_check)
   
   rule Heaptype_sub/refl:
   C |- heaptype <: heaptype
   
-  rule Heaptype_sub/trans:
+  rule Heaptype_sub/trans: hint(maude_heaptypesubtrans)
   C |- heaptype_1 <: heaptype_2
   -- Heaptype_ok: C |- heaptype' : OK   
   -- Heaptype_sub: C |- heaptype_1 <: heaptype'
@@ -351,10 +351,38 @@ heaptype-sub:
 
   eq heaptype-sub(C, HEAPTYPE, HEAPTYPE) = true .
 
-  ceq heaptype-sub(C, H1, H2) = true --- 중간 타입 탐색 미구현 -> 구현 필요
-  if heaptype-sub(C, H1, H-)
-    /\ heaptype-sub(C, H-, H2) .
+  ceq heaptype-sub(C, H1, H2) = true
+    if MID := find-mid(C, H1, H2)
+    /\ heaptype-sub(C, H1, MID) = true
+    /\ heaptype-sub(C, MID, H2) = true .
 
+  --- find-mid 구현
+  sort FindMidResult .
+  op found-mid : SpectecTerminal -> FindMidResult [ctor] .
+  op no-mid : -> FindMidResult [ctor] .
+
+  op fm-pick : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals -> FindMidResult .
+
+  --- 후보가 없으면 실패
+  eq fm-pick(C, H1, H2, eps) = no-mid .
+
+  --- 첫 후보 MID가 두 조건을 만족하면 선택
+  ceq fm-pick(C, H1, H2, MID REST) = found-mid(MID)
+    if MID =/= H1
+    /\ MID =/= H2
+    /\ Heaptype-sub-proof(C, H1, MID, fm-empty) = true
+    /\ Heaptype-sub-proof(C, MID, H2, fm-empty) = true .
+
+  --- 만족하지 않으면 나머지 후보를 검사
+  eq fm-pick(C, H1, H2, MID REST) = fm-pick(C, H1, H2, REST) [owise] .
+
+  op find-mid : SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminal .
+
+  --- H1의 상위 타입 후보 중에서 MID를 찾음
+  ceq find-mid(C, H1, H2) = MID
+    if found-mid(MID) := fm-pick(C, H1, H2, Heaptype-sub-parents(C, H1)) .
+
+  --- heaptype-sub 이어서
   eq heaptype-sub(C, EQ, ANY) = true .
 
   eq heaptype-sub(C, I31, EQ) = true .
@@ -418,7 +446,7 @@ heaptype-sub:
 
 deftype-sub:
   ```Spectec
-  relation Deftype_sub: context |- deftype <: deftype hint(maude_sub-check)
+  relation Deftype_sub: context |- deftype <: deftype hint(maude_check)
 
   rule Deftype_sub/refl:
   C |- deftype_1 <: deftype_2
