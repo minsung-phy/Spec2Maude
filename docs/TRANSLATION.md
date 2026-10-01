@@ -246,6 +246,40 @@ memory/table grow의 자원 실패 선택은 남는다. DET의 결과를 full pr
 NaN·relaxed 선택에 대한 결과로 일반화하지 않는다.
 
 `otherwise`는 source의 앞선 적용 가능한 규칙이 없다는 조건을 보존해야 한다.
+실행 `RelD`의 `ElsePr`은 먼저 선행 입력 패턴의 변수를 현재 입력에 정렬하고,
+이미 알려진 순수 조건의 complement를 직접 출력한다. relation parameter는
+고정하며, 반복 sequence 변수의 여러 matching 가능성을 임의로 선택하지 않는다.
+`Prem.translate_rulepr`가 Bool 조건으로 번역한 relation 호출은 `P =/= true`로,
+이미 알려진 결과와의 equation 조건은 `left =/= right`로 직접 부정한다.
+현재 caller에서 보장하지 못하는 선행 타입 가드나 새 변수 binding, 입력 패턴의
+다른 matching 가능성이 남으면 기존 enabled helper를 사용한다. rewrite 조건은
+equational enabled helper로 번역할 수 없으며 기존 진단을 유지한다.
+
+입력의 겹침은 source `CaseE`·`TupE`·`ListE`·`CatE`·`IterE`와 선언된 타입의
+constructor를 재귀적으로 비교한다. 원소 타입에 없는 constructor를 필수로
+포함하는 sequence는 해당 입력과 겹치지 않는다. 닫힌 constructor 집합을
+확인하지 못하는 type parameter·재귀 alias는 보수적으로 검사 대상에 남긴다.
+규칙·명령 이름으로 분기하지 않는다.
+
+선행 `MatchCond`와 현재 fallback의 순수 binding이 같은 계산 결과를 같은
+구조로 분해하면 출력 변수도 정렬하여 재사용한다. associative spine에 sequence
+변수가 여러 개 있어 분해가 유일하지 않으면 이 재사용을 하지 않는다. 실행
+premise 뒤에서 얻는 값은 앞선 otherwise 검사로 가져오지 않는다. 앞선
+otherwise의 helper 실패 조건도 현재 binding으로 직접 검사할 수 있는 경우,
+그 caller 영역에서 이미 구한 동일한 direct 실패 조건으로 대체한다.
+
+현재 Wasm source의 실행 `ElsePr` 35개는 입력값으로 직접 검사하는 31개,
+fallback binding을 재사용하는 2개(`array.copy-gt`, `array.init_data-num`),
+helper를 사용하는 2개(`throw_ref-handler-next`, `array.init_data-zero`)로
+번역한다. 마지막 두 source 규칙이 참조하는 helper 함수는 catch 분기 4개와
+array 범위 검사 1개로 총 5개다. 이는 source rule 하나를 실행 rule 하나로
+유지하는 방법의 결과이며, 모든 규칙의 분할까지 고려한 helper 불가피성 주장은 아니다.
+
+값 equality는 `==`와 `=/=`로 반전한다. numeric 비교의 반전과 Bool De Morgan은
+total한 비교에만 적용한다. 부분 계산이 남을 수 있는 비교·논리식은 전체
+`P =/= true`로 표현하여, 미평가 조건에도 `false [owise]`를 반환하던 helper의
+적용 실패를 보존한다. helper의 자동 타입 검사는 모든 caller의 정렬된 입력에서
+같은 검사가 보장될 때만 제거하고, caller의 실행 rule에서 먼저 검사한다.
 context의 내부 상태는 source 상태와 구분한다. 검색 결과 일치는 임의 LTL 속성의
 보존 증명이 아니며, 현재 경계는 [검증과 모델체킹의 경계](#검증과-모델체킹의-경계)에 기록한다.
 

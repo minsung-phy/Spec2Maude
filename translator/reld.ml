@@ -152,8 +152,10 @@ let eq_conditions conditions =
     conditions
 
 type rule_body =
-  { input_terms : term list
+  { input_exps : exp list
+  ; input_terms : term list
   ; head_conditions : rule_condition list
+  ; guard_conditions : rule_condition list
   ; left : term
   ; right : term
   ; conditions : rule_condition list
@@ -195,16 +197,20 @@ let lower_rule_body ?request_output ?(normalize = true) index id params policy r
         invalid_arg "relation output contains an unbound variable";
       (* Reachable relation calls establish direct inputs and premise results. *)
       let proven = premises.bound in
+      let quant_conditions =
+        List.map (fun condition -> EqCondition condition)
+          (Param.translate_eq_conditions ~proven index quants)
+      in
+      let guard_conditions = head_conditions @ quant_conditions in
       let conditions =
-        head_conditions @ premises.conditions
-        @ List.map
-            (fun condition -> EqCondition condition)
-            (Param.translate_eq_conditions ~proven index quants)
+        head_conditions @ premises.conditions @ quant_conditions
         |> (fun conditions ->
              if normalize then normalize_conditions left conditions else conditions)
       in
-      { input_terms
+      { input_exps = inputs
+      ; input_terms
       ; head_conditions
+      ; guard_conditions
       ; left
       ; right =
           Prem.tuple index outputs
@@ -235,13 +241,121 @@ let translate_rule ?request_output index id params policy rule =
 
 type execution_rule =
   { ordinal : int
+  ; input_exps : exp list
   ; inputs : term list
   ; input_shapes : term list
   ; left : term
   ; right : term
   ; conditions : rule_condition list
+  ; guard_conditions : rule_condition list
   ; predecessors : int list
   }
+
+(* A typed sequence variable cannot absorb a constructor outside its source
+ * element type. Keep unknown/type-parameter cases conservative. *)
+let rec source_constructors index seen typ =
+  let collect types =
+    List.fold_left
+      (fun known typ ->
+        match known, source_constructors index seen typ with
+        | Some left, Some right -> Some (left @ right)
+        | _ -> None)
+      (Some []) types
+  in
+  match typ.it with
+  | VarT (id, [])
+    when not (List.mem id.it seen)
+      && not (List.exists (( == ) id) index.Prescan.type_parameters) ->
+      begin match List.assoc_opt id.it index.Prescan.type_definitions with
+      | None -> None
+      | Some insts ->
+          List.fold_left
+            (fun known inst ->
+              let constructors =
+                match inst.it with
+                | InstD (_, _, {it = AliasT typ; _}) ->
+                    source_constructors index (id.it :: seen) typ
+                | InstD (_, _, {it = StructT _; _}) -> Some []
+                | InstD (_, _, {it = VariantT cases; _}) ->
+                    List.fold_left
+                      (fun known (mixop, (typ, _, _), _) ->
+                        let constructors =
+                          if Mixop.is_hole_only mixop then
+                            source_constructors index (id.it :: seen) typ
+                          else Some [mixop]
+                        in
+                        match known, constructors with
+                        | Some left, Some right -> Some (left @ right)
+                        | _ -> None)
+                      (Some []) cases
+              in
+              match known, constructors with
+              | Some left, Some right -> Some (left @ right)
+              | _ -> None)
+            (Some []) insts
+      end
+  | VarT _ -> None
+  | IterT (typ, _) -> source_constructors index seen typ
+  | TupT fields -> collect (List.map snd fields)
+  | BoolT | NumT _ | TextT -> Some []
+
+let rec source_pattern exp =
+  match exp.it with
+  | SubE (inner, _, _) -> source_pattern inner
+  | CaseE (mixop, {it = TupE [inner]; _}) when Mixop.is_hole_only mixop ->
+      source_pattern inner
+  | CaseE (mixop, inner) when Mixop.is_hole_only mixop -> source_pattern inner
+  | _ -> exp
+
+let source_accepts index typ mixop =
+  match source_constructors index [] typ with
+  | None -> true
+  | Some constructors -> List.exists (Il.Eq.eq_mixop mixop) constructors
+
+let rec source_overlap index left right =
+  let left, right = source_pattern left, source_pattern right in
+  match left.it, right.it with
+  | CaseE (op, payload), CaseE (op', payload') ->
+      Il.Eq.eq_mixop op op' && source_overlap index payload payload'
+  | TupE lefts, TupE rights when List.length lefts = List.length rights ->
+      List.for_all2 (source_overlap index) lefts rights
+  | _ when (match left.note.it, right.note.it with
+             | IterT _, IterT _ -> true | _ -> false) ->
+      let lefts, rights = source_elements left, source_elements right in
+      let covered elements = function
+        | None, _ -> true
+        | Some exp, _ -> List.exists (source_element_overlap index (Some exp, exp.note)) elements
+      in
+      List.for_all (covered rights) lefts && List.for_all (covered lefts) rights
+  | VarE _, CaseE (mixop, _) -> source_accepts index left.note mixop
+  | CaseE (mixop, _), VarE _ -> source_accepts index right.note mixop
+  | _ -> true
+
+and source_elements exp =
+  let exp = source_pattern exp in
+  match exp.it with
+  | ListE exps -> List.map (fun exp -> Some exp, exp.note) exps
+  | CatE (left, right) -> source_elements left @ source_elements right
+  | OptE None -> []
+  | OptE (Some inner) -> [Some inner, inner.note]
+  | IterE (inner, _) -> [None, inner.note]
+  | _ ->
+      begin match exp.note.it with
+      | IterT (typ, _) -> [None, typ]
+      | _ -> [Some exp, exp.note]
+      end
+
+and source_element_overlap index (left, left_typ) (right, right_typ) =
+  match left, right with
+  | Some left, Some right -> source_overlap index left right
+  | Some exp, None | None, Some exp ->
+      let exp = source_pattern exp in
+      begin match exp.it with
+      | CaseE (mixop, _) ->
+          source_accepts index (if Option.is_none left then left_typ else right_typ) mixop
+      | _ -> true
+      end
+  | None, None -> true
 
 let input_shapes conditions inputs =
   let binding variable =
@@ -313,15 +427,246 @@ let helper_call index id params ordinal inputs =
     , Param.translate_terms index params @ inputs
     )
 
-let complement_conditions index id params inputs predecessors =
-  List.map
-    (fun predecessor ->
-      EqCondition
-        (EqCond
-           ( helper_call index id params predecessor.ordinal inputs
-           , Const "false"
-           )))
-    predecessors
+let rec same_term left right =
+  match left, right with
+  | Var left, Var right -> same_variable left right
+  | Const left, Const right -> left = right
+  | App (left, lefts), App (right, rights) ->
+      left = right && List.length lefts = List.length rights
+      && List.for_all2 same_term lefts rights
+  | _ -> false
+
+let same_condition left right =
+  match left, right with
+  | EqCondition (BoolCond left), EqCondition (BoolCond right) ->
+      same_term left right
+  | EqCondition (EqCond (left, right)), EqCondition (EqCond (left', right')) ->
+      same_term left left' && same_term right right'
+  | _ -> false
+
+(* Only identical structural positions are aligned. Do not choose an arbitrary
+ * associative split, or replace a narrower variable by a wider-sort subject. *)
+let align_inputs ?(sequences = false) ?(bindings = []) index params patterns subjects =
+  let sequence_sorts =
+    "SpectecTerminals"
+    :: List.map
+         (fun owner ->
+           (Hintd.typed_sequence_representation index.Prescan.sort_metadata owner).sort)
+         (Hintd.typed_list_sorts index.Prescan.sort_metadata)
+  in
+  let rec align bindings pattern subject =
+    match pattern, subject with
+    | Var variable, Var subject
+      when variable.sort = subject.sort
+           && (sequences || not (List.mem variable.sort sequence_sorts)) ->
+        begin match List.find_opt (fun (v, _) -> same_variable v variable) bindings with
+        | None -> Some ((variable, subject) :: bindings)
+        | Some (_, previous) when same_variable previous subject -> Some bindings
+        | Some _ -> None
+        end
+    | Const left, Const right when left = right -> Some bindings
+    | App (left, lefts), App (right, rights)
+      when left = right && List.length lefts = List.length rights ->
+        align_list bindings lefts rights
+    | _ -> None
+  and align_list bindings patterns subjects =
+    match patterns, subjects with
+    | [], [] -> Some bindings
+    | pattern :: patterns, subject :: subjects ->
+        begin match align bindings pattern subject with
+        | None -> None
+        | Some bindings -> align_list bindings patterns subjects
+        end
+    | _ -> None
+  in
+  let fixed =
+    Param.translate_terms index params
+    |> List.fold_left term_variables []
+    |> List.map (fun variable -> variable, variable)
+  in
+  align_list (fixed @ bindings) patterns subjects
+
+let aligned_condition bindings condition =
+  map_rule_condition_variables
+    (fun variable ->
+      match List.find_opt (fun (v, _) -> same_variable v variable) bindings with
+      | Some (_, replacement) -> replacement
+      | None -> variable)
+    condition
+
+let bool_combine name identity left right =
+  let absorbing = if identity = "true" then "false" else "true" in
+  if same_term left (Const identity) then right
+  else if same_term right (Const identity) then left
+  else if same_term left (Const absorbing) || same_term right (Const absorbing) then
+    Const absorbing
+  else if same_term left right then left
+  else App (name, [left; right])
+
+let rec total_number = function
+  | Var variable -> List.mem variable.sort ["Nat"; "Int"; "Rat"]
+  | Const number ->
+      let digits =
+        if String.length number > 0 && number.[0] = '-' then
+          String.sub number 1 (String.length number - 1)
+        else number
+      in
+      String.length digits > 0
+      && String.for_all (fun c -> c >= '0' && c <= '9') digits
+  | App (("_+_" | "_-_" | "_*_"), args) -> List.for_all total_number args
+  | _ -> false
+
+let rec total_comparison = function
+  | Const ("true" | "false") | App (("_==_" | "_=/=_"), _) -> true
+  | App (("_<_" | "_<=_" | "_>_" | "_>=_"), args) ->
+      List.for_all total_number args
+  | App (("_and_" | "_or_"), args) -> List.for_all total_comparison args
+  | App ("not_", [inner]) -> total_comparison inner
+  | _ -> false
+
+let rec negate_comparison = function
+  | Const "true" -> Const "false"
+  | Const "false" -> Const "true"
+  | App ("_==_", args) -> App ("_=/=_", args)
+  | App ("_=/=_", args) -> App ("_==_", args)
+  | App ("_and_", [left; right])
+    when total_comparison left && total_comparison right ->
+      bool_combine "_or_" "false" (negate_comparison left) (negate_comparison right)
+  | App ("_or_", [left; right])
+    when total_comparison left && total_comparison right ->
+      bool_combine "_and_" "true" (negate_comparison left) (negate_comparison right)
+  | App (("_<_" | "_<=_" | "_>_" | "_>=_" as op), args)
+    when List.for_all total_number args ->
+      let opposite =
+        match op with
+        | "_<_" -> "_>=_" | "_<=_" -> "_>_"
+        | "_>_" -> "_<=_" | _ -> "_<_"
+      in
+      App (opposite, args)
+  | App ("not_", [inner]) when total_comparison inner -> inner
+  | predicate ->
+      (* An unsuccessful condition includes a residual partial comparison.
+       * Bool not / numeric duals would leave that case stuck, unlike [owise]. *)
+      App ("_=/=_", [predicate; Const "true"])
+
+(* Identical matches can share their outputs only when the structural match
+ * has a unique decomposition. In particular, two sequence holes must retain
+ * existential enabledness instead of testing one arbitrary split. *)
+let unique_match_pattern index pattern =
+  let metadata = index.Prescan.sort_metadata in
+  let families =
+    ("_ _", "SpectecTerminals") :: ("_;_", "RecordFields")
+    :: List.map
+         (fun owner ->
+           let sequence = Hintd.typed_sequence_representation metadata owner in
+           sequence.concat, sequence.sort)
+         (Hintd.typed_list_sorts metadata)
+  in
+  let rec unique = function
+    | Var _ | Const _ -> true
+    | App (name, args) ->
+        let rec parts = function
+          | App (op, args) when op = name -> List.concat_map parts args
+          | term -> [term]
+        in
+        let holes =
+          match List.assoc_opt name families with
+          | None -> 0
+          | Some sort ->
+              List.concat_map parts args
+              |> List.filter
+                   (function Var variable -> variable.sort = sort | _ -> false)
+              |> List.length
+        in
+        holes <= 1 && List.for_all unique args
+  in
+  unique pattern
+
+let direct_complement ?(complements = []) index params available inputs predecessor =
+  match align_inputs index params predecessor.inputs inputs with
+  | None -> None
+  | Some bindings ->
+      (* A fallback's pure bindings may be used before its complement, but not
+       * bindings after an execution premise. *)
+      let rec pure_prefix = function
+        | EqCondition _ as condition :: rest -> condition :: pure_prefix rest
+        | RewriteCond _ :: _ | [] -> []
+      in
+      let available = pure_prefix available in
+      let aligned bindings condition =
+        let condition = aligned_condition bindings condition in
+        match List.find_opt (fun (helper, _) -> same_condition helper condition) complements with
+        | Some (_, direct) -> direct
+        | None -> condition
+      in
+      let implied bindings condition =
+        List.exists (same_condition (aligned bindings condition)) available
+      in
+      let bound =
+        List.fold_left term_variables [] (Param.translate_terms index params @ inputs)
+        |> fun bound -> List.fold_left
+             (fun bound -> function
+               | EqCondition (MatchCond (pattern, _)) -> term_variables bound pattern
+               | _ -> bound)
+             bound available
+      in
+      let rec negate bindings result = function
+        | [] ->
+            if List.for_all (implied bindings) predecessor.guard_conditions then Some result
+            else None
+        | EqCondition (MatchCond (pattern, subject)) :: conditions ->
+            let subject =
+              match aligned_condition bindings (EqCondition (MatchCond (pattern, subject))) with
+              | EqCondition (MatchCond (_, subject)) -> subject
+              | _ -> assert false
+            in
+            let shared =
+              if not (unique_match_pattern index pattern) then None else
+              List.find_map
+                (function
+                  | EqCondition (MatchCond (pattern', subject'))
+                    when same_term subject subject' && unique_match_pattern index pattern' ->
+                      align_inputs ~sequences:true ~bindings index params [pattern] [pattern']
+                  | _ -> None)
+                available
+            in
+            begin match shared with
+            | None -> None
+            | Some bindings -> negate bindings result conditions
+            end
+        | condition :: conditions when implied bindings condition ->
+            negate bindings result conditions
+        | EqCondition (BoolCond predicate) :: conditions ->
+            begin match aligned bindings (EqCondition (BoolCond predicate)) with
+            | EqCondition (BoolCond predicate) when variables_bound bound predicate ->
+                negate bindings (bool_combine "_or_" "false" result (negate_comparison predicate)) conditions
+            | _ -> None
+            end
+        | EqCondition (EqCond (left, right)) :: conditions ->
+            begin match aligned bindings (EqCondition (EqCond (left, right))) with
+            | EqCondition (EqCond (left, right))
+              when variables_bound bound left && variables_bound bound right ->
+                negate bindings (bool_combine "_or_" "false" result
+                          (App ("_=/=_", [left; right]))) conditions
+            | _ -> None
+            end
+        | _ -> None
+      in
+      negate bindings (Const "false") predecessor.conditions
+
+let complement_conditions index id params inputs available predecessors =
+  let step (conditions, helpers, complements) predecessor =
+    let helper = EqCondition (EqCond
+      (helper_call index id params predecessor.ordinal inputs, Const "false")) in
+    match direct_complement ~complements index params (available @ conditions) inputs predecessor with
+    | Some predicate ->
+        let direct = EqCondition (BoolCond predicate) in
+        conditions @ [direct], helpers, (helper, direct) :: complements
+    | None ->
+        conditions @ [helper], helpers @ [predecessor.ordinal], complements
+  in
+  let conditions, helpers, _ = List.fold_left step ([], [], []) predecessors in
+  conditions, helpers
 
 let lower_execution_rule ?request_output index id params policy
     previous ordinal rule =
@@ -340,25 +685,43 @@ let lower_execution_rule ?request_output index id params policy
     if body.otherwise then
       List.filter
         (fun predecessor ->
-          inputs_may_overlap index input_shapes predecessor.input_shapes)
+          List.for_all2 (source_overlap index) body.input_exps predecessor.input_exps
+          && inputs_may_overlap index input_shapes predecessor.input_shapes)
         previous
     else []
   in
-  if body.otherwise && predecessors = [] then
-    invalid_arg "otherwise execution rule has no matching predecessor";
+  if body.otherwise && previous = [] then
+    invalid_arg "otherwise execution rule has no predecessor";
+  let complements, helpers =
+    complement_conditions index id params body.input_terms body.conditions predecessors
+  in
   { ordinal
+  ; input_exps = body.input_exps
   ; inputs = body.input_terms
   ; input_shapes
   ; left = body.left
   ; right = body.right
-  ; conditions =
-      complement_conditions index id params body.input_terms predecessors
-      @ body.conditions
-  ; predecessors = List.map (fun rule -> rule.ordinal) predecessors
+  ; conditions = complements @ body.conditions
+  ; guard_conditions = body.guard_conditions
+  ; predecessors = helpers
   }
 
 let execution_statement rule =
-  match rule.conditions with
+  (* A helper may rely on the caller's domain. Check those automatic guards
+   * before invoking it, not merely somewhere in the same conjunction. *)
+  let guards =
+    List.filter
+      (function EqCondition (BoolCond (App ("typecheck", _))) -> true | _ -> false)
+      rule.guard_conditions
+  in
+  let conditions =
+    guards
+    @ List.filter
+        (fun condition -> not (List.exists (same_condition condition) guards))
+        rule.conditions
+    |> normalize_conditions rule.left
+  in
+  match conditions with
   | [] -> Rl (None, rule.left, rule.right)
   | conditions -> Crl (None, rule.left, rule.right, conditions)
 
@@ -373,7 +736,7 @@ let helper_conditions id rule =
                   "otherwise predecessor in relation %s rule %d uses a rewrite condition"
                   id.it (rule.ordinal + 1)))
 
-let helper_statements index id params input_sorts rule =
+let helper_statements index id params input_sorts callers rule =
   let name = Prescan.relation_enabled_helper index id rule.ordinal in
   let parameter_sorts = Param.translate_sorts index params in
   let domain = parameter_sorts @ input_sorts in
@@ -396,6 +759,28 @@ let helper_statements index id params input_sorts rule =
   in
   let left =
     App (name, Param.translate_terms index params @ helper_inputs)
+  in
+  let callers =
+    List.filter (fun caller -> List.mem rule.ordinal caller.predecessors) callers
+  in
+  let redundant_guard condition =
+    match condition with
+    | EqCondition (BoolCond (App ("typecheck", _)))
+      when List.exists (same_condition condition) rule.guard_conditions ->
+        callers <> []
+        && List.for_all
+             (fun caller ->
+               match align_inputs index params rule.inputs caller.inputs with
+               | None -> false
+               | Some bindings ->
+                   List.exists
+                     (same_condition (aligned_condition bindings condition))
+                     caller.conditions)
+             callers
+    | _ -> false
+  in
+  let rule =
+    {rule with conditions = List.filter (fun c -> not (redundant_guard c)) rule.conditions}
   in
   let conditions =
     List.map2
@@ -458,7 +843,7 @@ let translate_execution ?request_output ?include_rule
   let helpers =
     lowered
     |> List.filter (fun rule -> List.mem rule.ordinal referenced)
-    |> List.concat_map (helper_statements index id params input_sorts)
+    |> List.concat_map (helper_statements index id params input_sorts lowered)
   in
   helpers @ List.map execution_statement lowered
 
