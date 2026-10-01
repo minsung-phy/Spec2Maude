@@ -38,7 +38,7 @@ let emit_script script =
       { name = "SPEC2MAUDE-GENERATED"
       ; kind = System
       ; imports =
-          [Maude_il.Protecting (module_name "SPECTEC-PRETYPE")]
+          [Maude_il.Protecting (module_name "SPECTEC-SEMANTICS")]
       ; statements = translation.list_subsorts @ translation.generated_statements
       }
   in
