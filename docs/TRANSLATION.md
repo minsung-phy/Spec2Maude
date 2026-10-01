@@ -274,6 +274,9 @@ helper를 사용하는 2개(`throw_ref-handler-next`, `array.init_data-zero`)로
 번역한다. 마지막 두 source 규칙이 참조하는 helper 함수는 catch 분기 4개와
 array 범위 검사 1개로 총 5개다. 이는 source rule 하나를 실행 rule 하나로
 유지하는 방법의 결과이며, 모든 규칙의 분할까지 고려한 helper 불가피성 주장은 아니다.
+helper의 `true` equation은 선행 규칙의 입력 패턴을 왼쪽에 직접 사용하고,
+그 규칙의 나머지 조건을 검사한다. 일반 입력을 받는 `false [owise]` equation은
+입력 패턴이나 조건이 맞지 않은 경우를 처리한다.
 
 값 equality는 `==`와 `=/=`로 반전한다. numeric 비교의 반전과 Bool De Morgan은
 total한 비교에만 적용한다. 부분 계산이 남을 수 있는 비교·논리식은 전체

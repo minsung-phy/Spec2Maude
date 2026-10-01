@@ -7364,33 +7364,28 @@ mod SPEC2MAUDE-GENERATED is
   ceq blocktype-(Z, -RESULT(T-5)) = eps ->- eps  lift(T-5)
     if len(T-5) <= 1 .
 
-  ceq Step-read-enabled-20(ENABLED-INPUT1) = true
-    if Z ; (HANDLER- N3 { (CATCH(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF)) := ENABLED-INPUT1
-      /\ ((spectec-exninst(Z) [ A ]) . 'TAG) == (spectec-tagaddr(Z) [ X4 ])
+  ceq Step-read-enabled-20(Z ; (HANDLER- N3 { (CATCH(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) = true
+    if ((spectec-exninst(Z) [ A ]) . 'TAG) == (spectec-tagaddr(Z) [ X4 ])
       /\ VAL- := (spectec-exninst(Z) [ A ]) . 'FIELDS .
 
   eq Step-read-enabled-20(ENABLED-INPUT1) = false [owise] .
 
-  ceq Step-read-enabled-21(ENABLED-INPUT1) = true
-    if Z ; (HANDLER- N3 { (CATCH-REF(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF)) := ENABLED-INPUT1
-      /\ ((spectec-exninst(Z) [ A ]) . 'TAG) == (spectec-tagaddr(Z) [ X4 ])
+  ceq Step-read-enabled-21(Z ; (HANDLER- N3 { (CATCH-REF(X4, L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) = true
+    if ((spectec-exninst(Z) [ A ]) . 'TAG) == (spectec-tagaddr(Z) [ X4 ])
       /\ VAL- := (spectec-exninst(Z) [ A ]) . 'FIELDS .
 
   eq Step-read-enabled-21(ENABLED-INPUT1) = false [owise] .
 
-  ceq Step-read-enabled-22(ENABLED-INPUT1) = true
-    if Z ; (HANDLER- N3 { (CATCH-ALL(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF)) := ENABLED-INPUT1 .
+  eq Step-read-enabled-22(Z ; (HANDLER- N3 { (CATCH-ALL(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
   eq Step-read-enabled-22(ENABLED-INPUT1) = false [owise] .
 
-  ceq Step-read-enabled-23(ENABLED-INPUT1) = true
-    if Z ; (HANDLER- N3 { (CATCH-ALL-REF(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF)) := ENABLED-INPUT1 .
+  eq Step-read-enabled-23(Z ; (HANDLER- N3 { (CATCH-ALL-REF(L) CATCH--) } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
   eq Step-read-enabled-23(ENABLED-INPUT1) = false [owise] .
 
-  ceq Step-read-enabled-103(ENABLED-INPUT1) = true
-    if Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-DATA(X4, Y))))) := ENABLED-INPUT1
-      /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
+  ceq Step-read-enabled-103(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (CONST(I32, J) (CONST(I32, N3) ARRAY.INIT-DATA(X4, Y)))))) = true
+    if spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1
       /\ (J + ((((N3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-data(Z, Y) . 'BYTES) .
 

@@ -757,9 +757,10 @@ let helper_statements index id params input_sorts callers rule =
              ("ENABLED-INPUT" ^ string_of_int (position + 1)) sort))
       input_sorts
   in
-  let left =
+  let fallback =
     App (name, Param.translate_terms index params @ helper_inputs)
   in
+  let left = App (name, Param.translate_terms index params @ rule.inputs) in
   let callers =
     List.filter (fun caller -> List.mem rule.ordinal caller.predecessors) callers
   in
@@ -783,10 +784,7 @@ let helper_statements index id params input_sorts callers rule =
     {rule with conditions = List.filter (fun c -> not (redundant_guard c)) rule.conditions}
   in
   let conditions =
-    List.map2
-      (fun pattern subject -> MatchCond (pattern, subject))
-      rule.inputs helper_inputs
-    @ helper_conditions id rule
+    helper_conditions id rule
     |> List.map (fun condition -> EqCondition condition)
     |> normalize_conditions left
     |> eq_conditions
@@ -798,7 +796,7 @@ let helper_statements index id params input_sorts callers rule =
   in
   [ declaration
   ; enabled
-  ; Eq (left, Const "false", [Owise])
+  ; Eq (fallback, Const "false", [Owise])
   ]
 
 let lower_execution_rules ?request_output ?(include_rule = fun _ -> true)
