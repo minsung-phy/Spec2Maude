@@ -10,7 +10,7 @@ endfm
 --- 공통 빈 리스트 eps와 리스트 연결 연산 __을 선언해야 함
 load ../generated/types.maude
 
-fmod SPECTEC-PRETYPE is
+fmod SPECTEC-PRIMITIVES is
   protecting SPEC2MAUDE-TYPES . --- in ../generated/typed.maude
   protecting CONVERSION * ( --- RAT, FLOAT, STRING, BOOL, NAT, INT
     op -_ : Float -> Float to nativeFloatNeg,
@@ -56,7 +56,7 @@ fmod SPECTEC-PRETYPE is
   ) .
 
   --- 기본 타입 (ast.ml line 28 & num.ml line 14)
-  subsorts Bool Rat Float String < SpectecTerminal .
+  subsorts Bool Rat Float String < SpectecTerminal . 
 
   ops bool nat int rat real text : -> SpectecType [ctor] .
   ops iterOpt iterList : SpectecType -> SpectecType [ctor] .
@@ -75,6 +75,10 @@ fmod SPECTEC-PRETYPE is
   eq typecheck(R, rat) = true .
   eq typecheck(F, real) = true .
   eq typecheck(S, text) = true .
+endfm
+
+fmod SPECTEC-CONVERT is
+  protecting SPECTEC-PRIMITIVES .
 
   --- 수치 타입 변환 CvtE
   op _:_<:>_ : SpectecTerminal SpectecType SpectecType ~> SpectecTerminal .
@@ -96,8 +100,13 @@ fmod SPECTEC-PRETYPE is
   ceq (CV_R : rat <:> int) = floor(CV_R) 
     if CV_R == floor(CV_R) .
   eq (CV_R : rat <:> rat) = CV_R .
+endfm
+
+fmod SPECTEC-LIST is
+  protecting SPECTEC-PRIMITIVES .
 
   --- List
+  var N : Nat .
   op eps : -> SpectecTerminals [ctor] .
   op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [ctor assoc id: eps prec 25] .
   op seq : SpectecTerminals -> SpectecTerminal [ctor] .
@@ -141,9 +150,7 @@ fmod SPECTEC-PRETYPE is
   op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
 
   eq repeatSeq(0, WTS) = eps .
-  eq repeatSeq(1, WTS) = WTS .
-  ceq repeatSeq(N, WTS) = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS) --- 리스트를 두 배씩 늘려 적은 재귀 호출로 반복
-    if N > 1 .
+  eq repeatSeq(s N, WTS) = WTS repeatSeq(N, WTS) .
 
   --- 리스트 인덱싱
   op indexDefined : SpectecTerminals Nat -> Bool .
@@ -173,8 +180,15 @@ fmod SPECTEC-PRETYPE is
   
   ceq (PREFIX REST)[N : COUNT = NEW-TS] = PREFIX NEW-TS SUFFIX
     if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
+endfm
+
+fmod SPECTEC-OPTION is
+  protecting SPECTEC-LIST .
 
   --- Option
+  var T : SpectecTerminal .
+  var TS : SpectecTerminals .
+  var TYPE : SpectecType .
   op _? : SpectecTerminal -> SpectecTerminal [ctor] .
   var K : SpectecTerminal .
   
@@ -187,7 +201,7 @@ fmod SPECTEC-PRETYPE is
   eq optionConcat(eps, K ?) = K ? .
 
   --- Option 타입 검사
-  eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
+  eq typecheck(T ?, TYPE) = typecheck(T, TYPE) . --- output.maude 3272, 5034
   eq typecheck(seq(TS), iterOpt(TYPE)) = typecheck(TS, TYPE) and len(TS) <= 1 .
       --- SpecTec에 (val?)*처럼 option을 원소로 갖는 리스트가 있음
       --- translator는 각 내부 option을 seq(eps) 또는 seq(K ?)로 포장함
@@ -198,8 +212,14 @@ fmod SPECTEC-PRETYPE is
   op lift : SpectecTerminals ~> SpectecTerminals .
   eq lift(eps) = eps .
   eq lift(K ?) = K .
+endfm
+
+fmod SPECTEC-TUPLE is
+  protecting SPECTEC-LIST .
 
   --- Tuple
+  var TS : SpectecTerminals .
+  var N : Nat .
   sort Tuple .
   subsort Tuple < SpectecTerminal .
 
@@ -207,8 +227,13 @@ fmod SPECTEC-PRETYPE is
   op _._ : Tuple Nat ~> SpectecTerminal .
 
   eq tuple(TS) . N = TS[N] .
+endfm
+
+fmod SPECTEC-RECORD is
+  protecting SPECTEC-LIST .
 
   --- Record
+  var VALUE : SpectecTerminals .
   sorts Record RecordField RecordFields .
   subsort Record < SpectecTerminal .
   subsort RecordField < RecordFields .
@@ -237,4 +262,12 @@ fmod SPECTEC-PRETYPE is
     = {RECORD-PREFIX ; field(FIELD, NEW-VALUE) ; RECORD-SUFFIX}
     if not hasField(RECORD-PREFIX, FIELD) .
   eq {FIELDS}[. FIELD = NEW-VALUE] = {FIELDS ; field(FIELD, NEW-VALUE)} [owise] . --- 없으면 레코드 끝에 추가
+endfm
+
+fmod SPECTEC-SEMANTICS is
+  protecting SPECTEC-CONVERT .
+  protecting SPECTEC-LIST .
+  protecting SPECTEC-OPTION .
+  protecting SPECTEC-TUPLE .
+  protecting SPECTEC-RECORD .
 endfm

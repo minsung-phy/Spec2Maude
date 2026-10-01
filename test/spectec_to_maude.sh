@@ -23,7 +23,7 @@ output="$work/translator/generated/output.maude"
 )
 
 grep -Fq 'mod SPEC2MAUDE-GENERATED is' "$output"
-grep -Fq 'protecting SPECTEC-PRETYPE .' "$output"
+grep -Fq 'protecting SPECTEC-SEMANTICS .' "$output"
 
 for name in types.maude output.maude; do
   if ! cmp -s "$expected_dir/$name" "$work/translator/generated/$name"; then
@@ -42,7 +42,7 @@ fi
 cp "$root/translator/backend/semantics.maude" "$work/translator/backend/"
 cp "$root/translator/backend/relation-backends.maude" "$work/translator/backend/"
 cp "$root/translator/backend/builtins.maude" "$work/translator/backend/"
-cp "$root/translator/backend/pretype.maude" "$work/translator/backend/"
+cp "$root/translator/backend/spectec-semantics.maude" "$work/translator/backend/"
 
 log="$work/maude.log"
 (

@@ -1,5 +1,5 @@
 mod SPEC2MAUDE-GENERATED is
-  protecting SPECTEC-PRETYPE .
+  protecting SPECTEC-SEMANTICS .
 
   subsort InstrList < SpectecTerminals .
 
