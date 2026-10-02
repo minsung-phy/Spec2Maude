@@ -7,9 +7,7 @@ let translate_sort index param =
   match param.it with
   | ExpP (_, typ) -> Term.translate_sort index typ
   | TypP _ -> "SpectecType"
-  | DefP (_, params, result) ->
-      let sort, _, _ = Prescan.definition_signature index params result in
-      sort
+  | DefP _ -> invalid_arg "DefP must be removed by Def.specialize_script"
   | GramP _ -> invalid_arg "GramP is not supported"
 
 
@@ -21,10 +19,8 @@ let translate_term index param =
   | TypP id ->
       Var (Prescan.source_variable_with_sort index id "SpectecType")
 
-  | DefP (id, params, result) ->
-      Var
-        (Prescan.definition_variable index
-           ({id; params; result} : Prescan.definition_parameter))
+  | DefP _ ->
+      invalid_arg "DefP must be removed by Def.specialize_script"
 
   | GramP _ ->
       invalid_arg "GramP is not supported"
@@ -50,93 +46,25 @@ let translate_eq_conditions ?(proven = Il.Free.Set.empty) index params =
            invalid_arg "GramP is not supported")
 
 
-let unique_by key values =
-  let seen = Hashtbl.create 16 in
-  let keep value =
-    let value_key = key value in
-    if Hashtbl.mem seen value_key then false
-    else begin
-      Hashtbl.add seen value_key ();
-      true
-    end
-  in
-  List.filter keep values
+(* DefP positions, used to specialize def parameters away *)
 
-let apply_declaration index (parameter : Prescan.definition_parameter) =
-  let sort, domain, codomain =
-    Prescan.definition_signature
-      index parameter.Prescan.params parameter.result
-  in
-  OpDecl
-    { name = "apply"
-    ; domain = sort :: domain
-    ; codomain
-    ; arrow = Total
-    ; attrs = []
-    }
+let is_def param =
+  match param.it with
+  | DefP _ -> true
+  | ExpP _ | TypP _ | GramP _ -> false
 
-let definition_value index (value : Prescan.definition_application) =
-  let sort, _, _ =
-    Prescan.definition_signature index value.params value.result
-  in
-  OpDecl
-    { name = Prescan.def_name index value.target
-    ; domain = []
-    ; codomain = sort
-    ; arrow = Total
-    ; attrs = []
-    }
+let def_ids params =
+  List.filter_map
+    (fun param ->
+      match param.it with
+      | DefP (id, _, _) -> Some id.it
+      | ExpP _ | TypP _ | GramP _ -> None)
+    params
 
-let application_equation index
-    (application : Prescan.definition_application) =
-  let variables =
-    application.Prescan.params
-    |> translate_sorts index
-    |> List.mapi (fun i sort ->
-         Var (generated_variable ("APPLY-ARG" ^ string_of_int (i + 1)) sort))
-  in
-  let target = Prescan.def_name index application.target in
-  Eq
-    ( App ("apply", Const target :: variables)
-    , App (target, variables)
-    , []
-    )
-
-let translate_applications index =
-  let parameters =
-    Prescan.definition_parameters index
-    |> unique_by (fun (parameter : Prescan.definition_parameter) ->
-         Prescan.definition_signature
-           index parameter.Prescan.params parameter.result)
-  in
-  let applications =
-    Prescan.definition_applications index
-    |> unique_by (fun (application : Prescan.definition_application) ->
-         Prescan.def_name index application.Prescan.target,
-         Prescan.definition_signature
-           index application.params application.result)
-  in
-  let values = Prescan.definition_values index in
-  let signatures =
-    parameters
-    @ List.map
-        (fun (value : Prescan.definition_application) ->
-          ({ id = value.target
-           ; params = value.params
-           ; result = value.result
-           } : Prescan.definition_parameter))
-        values
-    |> unique_by (fun (parameter : Prescan.definition_parameter) ->
-         Prescan.definition_signature
-           index parameter.params parameter.result)
-  in
-  List.concat_map
-    (fun (parameter : Prescan.definition_parameter) ->
-      let sort, _, _ =
-        Prescan.definition_signature index parameter.params parameter.result
-      in
-      [SortDecl sort; SubsortDecl (sort, "SpectecDef")])
-    signatures
-  @ List.map (definition_value index) values
-  @ List.map (apply_declaration index) signatures
-  @ List.map (application_equation index) applications
+(* Splits items at the DefP positions of params. *)
+let split_def_positions params items =
+  List.fold_right2
+    (fun param item (kept, removed) ->
+      if is_def param then kept, item :: removed
+      else item :: kept, removed)
+    params items ([], [])

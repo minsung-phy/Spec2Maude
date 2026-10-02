@@ -66,8 +66,6 @@ let translate_captures index captures =
   |> List.map (function
        | Prescan.VariableCapture (id, typ) ->
            Prescan.source_variable index id typ
-       | Prescan.DefinitionCapture parameter ->
-           Prescan.definition_variable index parameter
        | Prescan.TypeCapture id ->
            Prescan.source_variable_with_sort index id "SpectecType")
 
@@ -323,7 +321,7 @@ let projector_local_bound captures iter =
     List.fold_left
       (fun bound -> function
         | Prescan.VariableCapture (id, _) -> Il.Free.Set.add id.it bound
-        | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> bound)
+        | Prescan.TypeCapture _ -> bound)
       Il.Free.Set.empty captures
   in
   let bound =
@@ -589,7 +587,7 @@ let translate_pattern index translate_source_pattern translate_exp
       (function
         | Prescan.VariableCapture (id, _) ->
             is_bound id.it || Il.Free.Set.mem id.it count_variables
-        | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> true)
+        | Prescan.TypeCapture _ -> true)
       captures
   in
   match
@@ -901,7 +899,7 @@ let premise_local_names ?without iteration =
   List.filter_map
     (function
       | Prescan.VariableCapture (id, _) -> Some id.it
-      | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> None)
+      | Prescan.TypeCapture _ -> None)
     iteration.Prescan.captures
   @ indexes
   @ List.filter_map

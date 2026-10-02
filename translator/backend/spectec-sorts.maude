@@ -3,5 +3,4 @@ fmod SPECTEC-SORTS is
   sort SpectecTerminals .
   subsort SpectecTerminal < SpectecTerminals .
   sort SpectecType .
-  sort SpectecDef .
 endfm

@@ -20,9 +20,7 @@ let make bound conditions = {conditions; bound; otherwise = false}
 
 let is_rewrite_call index exp =
   match exp.it with
-  | CallE (id, _) ->
-      Prescan.definition_call index exp = None
-      && Prescan.definition_requires_rewrite index id
+  | CallE (id, _) -> Prescan.definition_requires_rewrite index id
   | _ -> false
 
 let has_rewrite_call index exp =
@@ -743,7 +741,7 @@ let translate_barrier index request_output bound prem =
               (function
                 | Prescan.VariableCapture (id, _) ->
                     Il.Free.Set.mem id.it bound
-                | Prescan.DefinitionCapture _ | Prescan.TypeCapture _ -> true)
+                | Prescan.TypeCapture _ -> true)
               iteration.Prescan.captures)
       then invalid_arg "IterPr has an unbound capture";
       begin match iter with

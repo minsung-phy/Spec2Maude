@@ -381,3 +381,58 @@ let translate index id params result_typ clauses =
       header @ List.map translate_rule_clause clauses
     else
       header @ List.map translate_equation_clause clauses
+
+
+(* Def-parameter specialization: a copy of a DecD whose DefP parameters are
+ * fixed to declared definitions, following the source meaning
+ * $g_t(xs) = $g(xs) with f := t. *)
+
+type specialization =
+  { callee : id
+  ; targets : id list  (* one per DefP parameter, in parameter order *)
+  ; copy : id
+  }
+
+(* Def ids have no binders inside clauses, so renaming a def parameter is
+ * capture-free; Il.Subst would also refresh iteration binders. *)
+let renaming ids targets =
+  let rename id =
+    match List.assoc_opt id.it (List.combine ids targets) with
+    | Some target -> target
+    | None -> id
+  in
+  {Il.Walk.base_transformer with transform_def_id = rename}
+
+let specialize_clause id params targets clause =
+  let DefD (quants, args, exp, prems) = clause.it in
+  let args, def_args = Param.split_def_positions params args in
+  let ids =
+    List.map
+      (fun arg ->
+        match arg.it with
+        | DefA def_id -> def_id.it
+        | ExpA _ | TypA _ | GramA _ ->
+            Util.Error.error arg.at "translation"
+              ("Unsupported DefD argument in DecD $" ^ id.it
+               ^ ": a def parameter position expects a DefA argument"))
+      def_args
+  in
+  let quants =
+    List.filter
+      (fun quant ->
+        match quant.it with
+        | DefP (def_id, _, _) -> not (List.mem def_id.it ids)
+        | ExpP _ | TypP _ | GramP _ -> true)
+      quants
+  in
+  Il.Walk.transform_clause (renaming ids targets)
+    (DefD (quants, args, exp, prems) $ clause.at)
+
+let specialize specialization id params result_typ clauses =
+  let kept, def_params = Param.split_def_positions params params in
+  let rename = renaming (Param.def_ids def_params) specialization.targets in
+  DecD
+    ( specialization.copy
+    , List.map (Il.Walk.transform_param rename) kept
+    , Il.Walk.transform_typ rename result_typ
+    , List.map (specialize_clause id params specialization.targets) clauses )

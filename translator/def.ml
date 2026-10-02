@@ -203,6 +203,15 @@ let normalize_variables source_declarations statements =
   in
   declarations, statements
 
+let owner_of def =
+  match def.it with
+  | TypD (id, _, _) -> "TypD " ^ id.it
+  | DecD (id, _, _, _) -> "DecD $" ^ id.it
+  | RelD (id, _, _, _, _) -> "RelD " ^ id.it
+  | GramD (id, _, _, _) -> "GramD " ^ id.it
+  | RecD _ -> "RecD"
+  | HintD _ -> "HintD"
+
 let rec translate ?request_output index def =
   try
     match def.it with
@@ -215,16 +224,8 @@ let rec translate ?request_output index def =
     | GramD _ | HintD _ -> []
     | RecD defs -> List.concat_map (translate ?request_output index) defs
   with Invalid_argument reason ->
-    let owner =
-      match def.it with
-      | TypD (id, _, _) -> "TypD " ^ id.it
-      | DecD (id, _, _, _) -> "DecD $" ^ id.it
-      | RelD (id, _, _, _, _) -> "RelD " ^ id.it
-      | GramD (id, _, _, _) -> "GramD " ^ id.it
-      | RecD _ -> "RecD"
-      | HintD _ -> "HintD"
-    in
-    Util.Error.error def.at "translation" ("Unsupported " ^ owner ^ ": " ^ reason)
+    Util.Error.error def.at "translation"
+      ("Unsupported " ^ owner_of def ^ ": " ^ reason)
 
 let normalize_module ?(constructors = true) source_declarations statements =
   let variable_declarations, statements =
@@ -245,7 +246,223 @@ let normalize_module ?(constructors = true) source_declarations statements =
   sort_declarations @ operator_declarations
   @ variable_declarations @ definitions
 
+(* Def-parameter specialization runs before Prescan: every call of a DecD with
+ * DefP parameters is redirected to a Decd.specialize copy for its DefA
+ * targets, so translation never sees DefP or DefA. *)
+
+let unsupported at case owner reason =
+  Util.Error.error at "translation"
+    ("Unsupported " ^ case ^ " in " ^ owner ^ ": " ^ reason)
+
+let rec flatten def =
+  match def.it with
+  | RecD defs -> List.concat_map flatten defs
+  | TypD _ | RelD _ | DecD _ | GramD _ | HintD _ -> [def]
+
+(* Collection *)
+
+let collect declarations script =
+  let instances = ref [] in
+  let owner = ref "" in
+  let bound = ref [] in
+  let target arg =
+    match arg.it with
+    | DefA id when List.mem id.it !bound ->
+        unsupported arg.at "DefA" !owner
+          ("$" ^ id.it ^ " is a def parameter of the enclosing definition;"
+           ^ " passing a received function on is not specialized")
+    | DefA id when List.mem_assoc id.it declarations -> id
+    | DefA id ->
+        unsupported arg.at "DefA" !owner ("$" ^ id.it ^ " is not a declared DecD")
+    | ExpA _ | TypA _ | GramA _ ->
+        unsupported arg.at "CallE argument" !owner
+          "a def parameter position expects a DefA argument"
+  in
+  let inspect exp =
+    begin match exp.it with
+    | CallE (callee, args)
+      when List.mem callee.it !bound
+           && List.exists
+                (fun arg ->
+                  match arg.it with
+                  | DefA _ -> true
+                  | ExpA _ | TypA _ | GramA _ -> false)
+                args ->
+        unsupported exp.at "CallE" !owner
+          ("def parameter $" ^ callee.it ^ " receives a DefA argument;"
+           ^ " def parameters with def parameters are not specialized")
+    | CallE (callee, args) ->
+        begin match List.assoc_opt callee.it declarations with
+        | Some params when List.exists Param.is_def params ->
+            let _, def_args = Param.split_def_positions params args in
+            let targets = List.map target def_args in
+            let same instance =
+              instance.Decd.callee.it = callee.it
+              && List.map (fun id -> id.it) instance.Decd.targets
+                 = List.map (fun id -> id.it) targets
+            in
+            if not (List.exists same !instances) then
+              let name =
+                String.concat "" (callee.it :: List.map (fun id -> id.it) targets)
+              in
+              if List.mem_assoc name declarations
+                 || List.exists (fun instance -> instance.Decd.copy.it = name) !instances
+              then
+                unsupported exp.at "CallE" !owner
+                  ("specialized name $" ^ name ^ " is already used");
+              instances :=
+                {Decd.callee; targets; copy = name $ callee.at} :: !instances
+        | Some _ | None -> ()
+        end
+    | _ -> ()
+    end;
+    exp
+  in
+  (* The same traversal as replace_calls, so every rewritten call is collected. *)
+  let visit = {Il.Walk.base_transformer with transform_exp = inspect} in
+  List.iter
+    (fun def ->
+      owner := owner_of def;
+      match def.it with
+      | DecD (_, params, typ, clauses) ->
+          bound := Param.def_ids params;
+          List.iter (fun param -> ignore (Il.Walk.transform_param visit param)) params;
+          ignore (Il.Walk.transform_typ visit typ);
+          List.iter
+            (fun clause ->
+              let DefD (quants, _, _, _) = clause.it in
+              bound := Param.def_ids (params @ quants);
+              ignore (Il.Walk.transform_clause visit clause))
+            clauses;
+          bound := []
+      | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ ->
+          ignore (Il.Walk.transform_def visit def))
+    (List.concat_map flatten script);
+  List.rev !instances
+
+
+(* Calls *)
+
+let replace_calls declarations instances def =
+  let replace exp =
+    match exp.it with
+    | CallE (callee, args) ->
+        begin match List.assoc_opt callee.it declarations with
+        | Some params when List.exists Param.is_def params ->
+            let args, def_args = Param.split_def_positions params args in
+            let targets =
+              List.map
+                (fun arg ->
+                  match arg.it with
+                  | DefA id -> id.it
+                  | ExpA _ | TypA _ | GramA _ ->
+                      invalid_arg "collected call lost its DefA argument")
+                def_args
+            in
+            let instance =
+              List.find
+                (fun instance ->
+                  instance.Decd.callee.it = callee.it
+                  && List.map (fun id -> id.it) instance.Decd.targets = targets)
+                instances
+            in
+            {exp with it = CallE (instance.Decd.copy, args)}
+        | Some _ | None -> exp
+        end
+    | _ -> exp
+  in
+  Il.Walk.transform_def {Il.Walk.base_transformer with transform_exp = replace} def
+
+
+(* Remaining def arguments have no specialization. *)
+
+let check_remaining def =
+  let owner = owner_of def in
+  let reject_def_params params =
+    List.iter
+      (fun param ->
+        if Param.is_def param then
+          unsupported param.at "DefP" owner
+            "def parameters are specialized only for DecD")
+      params
+  in
+  begin match def.it with
+  | TypD (_, params, _) | RelD (_, params, _, _, _) | GramD (_, params, _, _) ->
+      reject_def_params params
+  | DecD _ | HintD _ | RecD _ -> ()
+  end;
+  let reject arg =
+    match arg.it with
+    | DefA id ->
+        unsupported arg.at "DefA" owner
+          ("$" ^ id.it ^ " is passed outside a DecD call")
+    | ExpA _ | TypA _ | GramA _ -> arg
+  in
+  ignore
+    (Il.Walk.transform_def
+       {Il.Walk.base_transformer with transform_arg = reject} def)
+
+(* Translator hints that describe the higher-order definition itself would
+ * not describe its copies. *)
+let check_hints higher_order script =
+  List.iter
+    (fun def ->
+      match def.it with
+      | HintD {it = DecH (id, hints); _} when List.mem id.it higher_order ->
+          List.iter
+            (fun hint ->
+              match hint.hintid.it with
+              | "builtin" | "maude_kind" | "maude_rule" | "inverse" ->
+                  unsupported hint.hintid.at "DecH" ("DecD $" ^ id.it)
+                    (hint.hintid.it ^ " hint on a definition with def parameters")
+              | _ -> ())
+            hints
+      | _ -> ())
+    (List.concat_map flatten script)
+
+
+let specialize_script script =
+  let declarations =
+    List.filter_map
+      (fun def ->
+        match def.it with
+        | DecD (id, params, _, _) -> Some (id.it, params)
+        | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ -> None)
+      (List.concat_map flatten script)
+  in
+  let higher_order =
+    List.filter_map
+      (fun (id, params) ->
+        if List.exists Param.is_def params then Some id else None)
+      declarations
+  in
+  check_hints higher_order script;
+  let instances = collect declarations script in
+  (* A copy is placed where its source definition was; a definition with def
+   * parameters and no call produces no copy. *)
+  let rec place def =
+    match def.it with
+    | DecD (id, _, _, _) when List.mem id.it higher_order ->
+        instances
+        |> List.filter (fun instance -> instance.Decd.callee.it = id.it)
+        |> List.map (fun specialization ->
+             match def.it with
+             | DecD (_, params, result_typ, clauses) ->
+                 Decd.specialize specialization id params result_typ clauses $ def.at
+             | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ -> assert false)
+    | RecD defs -> [{def with it = RecD (List.concat_map place defs)}]
+    | TypD _ | RelD _ | DecD _ | GramD _ | HintD _ -> [def]
+  in
+  let script =
+    script
+    |> List.concat_map place
+    |> List.map (replace_calls declarations instances)
+  in
+  List.iter check_remaining (List.concat_map flatten script);
+  script
+
 let translate_script script =
+  let script = specialize_script script in
   let index = Prescan.scan script in
   let sort_metadata = Prescan.sort_metadata index in
   let output_requests = ref [] in
@@ -257,7 +474,6 @@ let translate_script script =
   let context_rules = Reld.translate_contexts ~request_output index in
   let translated_definitions =
     List.concat_map (translate ~request_output index) script
-    @ Param.translate_applications index
   in
   let premise_iterations =
     let translate_body allow_membership iteration bound body =

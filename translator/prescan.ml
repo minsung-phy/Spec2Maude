@@ -3,15 +3,8 @@ open Il.Ast
 open Maude_il
 
 
-type definition_parameter =
-  { id : id
-  ; params : param list
-  ; result : typ
-  }
-
 type capture =
   | VariableCapture of id * typ
-  | DefinitionCapture of definition_parameter
   | TypeCapture of id
 
 type iteration_owner =
@@ -46,12 +39,6 @@ type premise_iteration =
   ; body : prem
   ; iterexp : iterexp
   ; captures : capture list
-  }
-
-type definition_application =
-  { target : id
-  ; params : param list
-  ; result : typ
   }
 
 type inverse_contract =
@@ -103,12 +90,7 @@ type t =
   ; type_definitions : (string * inst list) list
   ; variables : ((string * sort) * name) list
   ; anonymous_variables : (id * sort * name) list
-  ; definition_parameters : definition_parameter list
   ; type_parameters : id list
-  ; definition_arguments : (arg * definition_parameter) list
-  ; definition_calls : (exp * definition_parameter) list
-  ; definition_values : definition_application list
-  ; definition_applications : definition_application list
   ; inverses : (string * inverse) list
   }
 
@@ -143,28 +125,6 @@ let record_composition_available index typ =
       | _ -> false
       end
   | _ -> false
-
-let rec parameter_sort metadata param =
-  match param.it with
-  | ExpP (_, typ) -> Hintd.sort_of_typ metadata typ
-  | TypP _ -> "SpectecType"
-  | DefP (_, params, result) ->
-      let sort, _, _ =
-        definition_signature_with metadata params result
-      in
-      sort
-  | GramP _ -> invalid_arg "GramP is not supported"
-
-and definition_signature_with metadata params result =
-  let domain = List.map (parameter_sort metadata) params in
-  let codomain = Hintd.sort_of_typ metadata result in
-  let args =
-    match domain with [] -> "Unit" | _ -> String.concat "-" domain
-  in
-  "SpectecDef-" ^ args ^ "-to-" ^ codomain, domain, codomain
-
-let definition_signature index params result =
-  definition_signature_with index.sort_metadata params result
 
 let reserved_names =
   StringSet.of_list
@@ -323,7 +283,7 @@ let rec visit_noted_type visit visit_exp typ =
       (match iter with ListN (count, _) -> visit_exp count | _ -> ())
   | BoolT | NumT _ | TextT -> ()
 
-let capture_variables definition_calls definition_arguments type_parameters free body iterexp =
+let capture_variables type_parameters free body iterexp =
   let free = ref free in
   let bound = ref (List.map (fun id -> id.it) (bound_ids iterexp)) in
   let captures = ref [] in
@@ -332,44 +292,21 @@ let capture_variables definition_calls definition_arguments type_parameters free
        && not (List.mem id.it !bound)
        && not (List.exists (function
             | VariableCapture (other, _) -> other.it = id.it
-            | DefinitionCapture _ | TypeCapture _ -> false) !captures)
+            | TypeCapture _ -> false) !captures)
     then captures := VariableCapture (id, typ) :: !captures
-  in
-  let add_definition = function
-    | Some parameter
-      when Il.Free.Set.mem parameter.id.it (!free).Il.Free.defid
-           && not (List.exists (function
-                | DefinitionCapture other -> other.id.it = parameter.id.it
-                | VariableCapture _ | TypeCapture _ -> false) !captures) ->
-        captures := DefinitionCapture parameter :: !captures
-    | Some _ | None -> ()
-  in
-  let add_arguments args =
-    List.iter
-      (fun arg ->
-        List.find_opt (fun (actual, _) -> actual == arg) definition_arguments
-        |> Option.map snd
-        |> add_definition)
-      args
   in
   let add_type typ =
     match typ.it with
     | VarT (id, []) when List.exists (( == ) id) type_parameters ->
         if not (List.exists (function
           | TypeCapture other -> other.it = id.it
-          | VariableCapture _ | DefinitionCapture _ -> false) !captures)
+          | VariableCapture _ -> false) !captures)
         then captures := TypeCapture id :: !captures
-    | VarT (_, args) -> add_arguments args
     | _ -> ()
   in
   let add_exp exp =
     match exp.it with
     | VarE id -> add_variable id exp.note
-    | CallE (_, args) ->
-        add_definition
-          (List.find_opt (fun (call, _) -> call == exp) definition_calls
-           |> Option.map snd);
-        add_arguments args
     | _ -> ()
   in
   let module Types = Il.Iter.Make (struct
@@ -389,10 +326,6 @@ let capture_variables definition_calls definition_arguments type_parameters free
       add_exp exp
     let visit_typ = add_type
     let visit_path path = add_note path.note
-    let visit_prem prem =
-      match prem.it with
-      | RulePr (_, args, _, _) -> add_arguments args
-      | _ -> ()
 
     let scope_enter id _typ =
       bound := id.it :: !bound
@@ -407,12 +340,12 @@ let capture_variables definition_calls definition_arguments type_parameters free
   end;
   List.rev !captures
 
-let capture_exp_variables definition_calls definition_arguments type_parameters body iterexp =
-  capture_variables definition_calls definition_arguments type_parameters Il.Free.(free_exp body)
+let capture_exp_variables type_parameters body iterexp =
+  capture_variables type_parameters Il.Free.(free_exp body)
     (ExpBody body) iterexp
 
-let capture_premise_variables definition_calls definition_arguments type_parameters body iterexp =
-  capture_variables definition_calls definition_arguments type_parameters Il.Free.(free_prem body)
+let capture_premise_variables type_parameters body iterexp =
+  capture_variables type_parameters Il.Free.(free_prem body)
     (PremiseBody body) iterexp
 
 
@@ -746,12 +679,7 @@ let scan script =
     definitions;
 
   let observed_variables = ref [] in
-  let definition_parameters = ref [] in
   let type_parameters = ref [] in
-  let definition_arguments = ref [] in
-  let definition_calls = ref [] in
-  let definition_values = ref [] in
-  let definition_applications = ref [] in
   let sort_of_typ typ =
     Hintd.sort_of_typ sort_metadata typ
   in
@@ -771,13 +699,7 @@ let scan script =
   let rec add_param param =
     match param.it with
     | ExpP (id, typ) -> add_variable id typ
-    | DefP (id, params, result) ->
-        definition_parameters := {id; params; result} :: !definition_parameters;
-        let sort, _, _ =
-          definition_signature_with sort_metadata params result
-        in
-        add_variable_with_sort id sort;
-        add_params params
+    | DefP _ -> invalid_arg "DefP must be removed by Def.specialize_script"
     | TypP id ->
         type_parameters := id :: !type_parameters;
         add_variable_with_sort id "SpectecType"
@@ -787,81 +709,13 @@ let scan script =
     List.iter add_param params
   in
 
-  let find_definition_parameter parameters id =
-    List.find_opt (fun parameter -> parameter.id.it = id.it) parameters
-  in
-  let local_definition_parameters params =
-    List.filter_map
-      (fun param ->
-        match param.it with
-        | DefP (id, params, result) -> Some {id; params; result}
-        | ExpP _ | TypP _ | GramP _ -> None)
-      params
-  in
-  let target_definition id =
-    match
-      List.filter_map
-        (fun (name, params, result) ->
-          if name = id.it then Some {target = id; params; result} else None)
-        definitions
-    with
-    | [] -> invalid_arg ("unknown definition value " ^ id.it)
-    | value :: values ->
-        let signature' value =
-          definition_signature_with sort_metadata value.params value.result
-        in
-        if List.for_all (fun candidate -> signature' candidate = signature' value) values
-        then value
-        else invalid_arg ("conflicting signatures for definition " ^ id.it)
-  in
-  let add_definition_value id =
-    let value = target_definition id in
-    if not
-         (List.exists
-            (fun candidate -> candidate.target.it = id.it)
-            !definition_values)
-    then definition_values := value :: !definition_values;
-    value
-  in
-  let add_definition_application target params result =
-    let value = add_definition_value target in
-    let signature = definition_signature_with sort_metadata in
-    let expected = signature params result in
-    let actual = signature value.params value.result in
-    if expected <> actual then
-      invalid_arg ("definition argument signature mismatch for " ^ target.it);
-    definition_applications := value :: !definition_applications
-  in
-  let inspect_bound_argument bound arg =
-    match arg.it with
-    | DefA id ->
-        begin match find_definition_parameter bound id with
-        | Some parameter ->
-            definition_arguments := (arg, parameter) :: !definition_arguments
-        | None ->
-            ignore (add_definition_value id)
-        end
-    | ExpA _ | TypA _ | GramA _ -> ()
-  in
-  let rec inspect_arguments bound formals actuals =
-    match formals, actuals with
-    | formal :: formals, actual :: actuals ->
-        begin match formal.it, actual.it with
-        | DefP (_, params, result), DefA target
-          when find_definition_parameter bound target = None ->
-            add_definition_application target params result
-        | _ -> ()
-        end;
-        inspect_arguments bound formals actuals
-    | _, _ -> ()
-  in
   let scan_scope outer_params scope =
-    let quants, head_args =
+    let quants =
       match scope with
-      | `Clause {it = DefD (quants, args, _, _); _} -> quants, args
-      | `Rule {it = RuleD (_, quants, _, _, _); _} -> quants, []
-      | `Instance {it = InstD (quants, args, _); _} -> quants, args
-      | `Field (_, (_, quants, _), _) | `Case (_, (_, quants, _), _) -> quants, []
+      | `Clause {it = DefD (quants, _, _, _); _} -> quants
+      | `Rule {it = RuleD (_, quants, _, _, _); _} -> quants
+      | `Instance {it = InstD (quants, _, _); _} -> quants
+      | `Field (_, (_, quants, _), _) | `Case (_, (_, quants, _), _) -> quants
     in
     let bound_types =
       List.filter_map
@@ -875,61 +729,24 @@ let scan script =
           then type_parameters := id :: !type_parameters
       | _ -> ()
     in
-    let bound =
-      local_definition_parameters quants
-      @ local_definition_parameters outer_params
-    in
-    let inspect_type typ =
-      mark_type typ;
-      match typ.it with
-      | VarT (_, args) -> List.iter (inspect_bound_argument bound) args
-      | _ -> ()
-    in
-    let inspect_exp exp =
-      match exp.it with
-      | CallE (id, args) ->
-          List.iter (inspect_bound_argument bound) args;
-          begin match find_definition_parameter bound id with
-          | Some parameter ->
-              definition_calls := (exp, parameter) :: !definition_calls
-          | None ->
-              begin match
-                List.find_opt (fun (name, _, _) -> name = id.it) definitions
-              with
-              | Some (_, params, _) -> inspect_arguments bound params args
-              | None -> ()
-              end
-          end
-      | _ -> ()
-    in
     let module Types = Il.Iter.Make (struct
       include Il.Iter.Skip
-      let visit_typ = inspect_type
-      let visit_exp = inspect_exp
+      let visit_typ = mark_type
     end) in
-    List.iter (inspect_bound_argument bound) head_args;
-    let module DefinitionVisitor = Il.Iter.Make (struct
+    let module ScopeVisitor = Il.Iter.Make (struct
       include Il.Iter.Skip
 
-      let visit_exp exp =
-        visit_noted_type inspect_type Types.exp exp.note;
-        inspect_exp exp
-      let visit_typ = inspect_type
-      let visit_path path = visit_noted_type inspect_type Types.exp path.note
-
-      let visit_prem prem =
-        match prem.it with
-        | RulePr (_, args, _, _) ->
-            List.iter (inspect_bound_argument bound) args
-        | IfPr _ | ElsePr | IterPr _ | LetPr _ | NegPr _ -> ()
+      let visit_exp exp = visit_noted_type mark_type Types.exp exp.note
+      let visit_typ = mark_type
+      let visit_path path = visit_noted_type mark_type Types.exp path.note
     end)
     in
     begin match scope with
-    | `Clause clause -> DefinitionVisitor.clause clause
-    | `Rule rule -> DefinitionVisitor.rule rule
-    | `Instance inst -> DefinitionVisitor.inst inst
-    | `Field field -> DefinitionVisitor.typfield field
-    | `Case case -> DefinitionVisitor.typcase case
+    | `Clause clause -> ScopeVisitor.clause clause
+    | `Rule rule -> ScopeVisitor.rule rule
+    | `Instance inst -> ScopeVisitor.inst inst
+    | `Field field -> ScopeVisitor.typfield field
+    | `Case case -> ScopeVisitor.typcase case
     end
   in
   let add_deftyp_quants params deftyp =
@@ -992,7 +809,7 @@ let scan script =
       ; owner
       ; body
       ; iterexp
-      ; captures = capture_exp_variables !definition_calls !definition_arguments
+      ; captures = capture_exp_variables
           !type_parameters body iterexp
       }
       :: !iterations
@@ -1008,7 +825,7 @@ let scan script =
       ; premise
       ; body
       ; iterexp
-      ; captures = capture_premise_variables !definition_calls !definition_arguments
+      ; captures = capture_premise_variables
           !type_parameters body iterexp
       }
       :: !premise_iterations
@@ -1284,12 +1101,7 @@ let scan script =
   ; type_definitions
   ; variables
   ; anonymous_variables
-  ; definition_parameters = List.rev !definition_parameters
   ; type_parameters = !type_parameters
-  ; definition_arguments = List.rev !definition_arguments
-  ; definition_calls = List.rev !definition_calls
-  ; definition_values = List.rev !definition_values
-  ; definition_applications = List.rev !definition_applications
   ; inverses
   }
 
@@ -1374,26 +1186,6 @@ let rewrite_sort index id =
   match List.assoc_opt id.it index.rewrite_sorts with
   | Some sort -> sort
   | None -> invalid_arg ("definition does not produce rewrite requests: " ^ id.it)
-
-let definition_variable index (parameter : definition_parameter) =
-  let sort, _, _ =
-    definition_signature index parameter.params parameter.result
-  in
-  match List.assoc_opt (parameter.id.it, sort) index.variables with
-  | Some name -> Maude_il.source_variable name sort
-  | None -> invalid_arg ("unregistered definition variable " ^ parameter.id.it)
-
-let definition_argument index arg =
-  List.find_opt (fun (arg', _) -> arg == arg') index.definition_arguments
-  |> Option.map snd
-
-let definition_call index exp =
-  List.find_opt (fun (exp', _) -> exp == exp') index.definition_calls
-  |> Option.map snd
-
-let definition_parameters index = index.definition_parameters
-let definition_values index = index.definition_values
-let definition_applications index = index.definition_applications
 
 let inverse index id =
   match List.assoc_opt id.it index.inverses with

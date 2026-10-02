@@ -137,13 +137,8 @@ and translate_arg index arg =
       translate_exp index exp
   | TypA typ ->
       translate_check_typ index typ
-  | DefA id ->
-      begin match Prescan.definition_argument index arg with
-      | Some parameter -> Var (Prescan.definition_variable index parameter)
-      | None ->
-          Prescan.require_definition_body index "DefA" id;
-          Const (Prescan.def_name index id)
-      end
+  | DefA _ ->
+      invalid_arg "DefA must be removed by Def.specialize_script"
   | GramA _ ->
       invalid_arg "GramA is not translated"
 
@@ -319,15 +314,8 @@ and translate_exp index exp =
         ]
 
   | CallE (id, args) ->
-      begin match Prescan.definition_call index exp with
-      | Some parameter ->
-          app "apply"
-            (Var (Prescan.definition_variable index parameter)
-             :: List.map (translate_arg index) args)
-      | None ->
-          Prescan.require_definition_body index "CallE" id;
-          app (Prescan.def_name index id) (List.map (translate_arg index) args)
-      end
+      Prescan.require_definition_body index "CallE" id;
+      app (Prescan.def_name index id) (List.map (translate_arg index) args)
 
   | IterE (body, (iter, generators)) ->
       Iter.translate_term
@@ -565,8 +553,6 @@ let type_substitution params args =
           match param.it, arg.it with
           | ExpP (id, _), ExpA value -> Some (Il.Subst.add_varid subst id value)
           | TypP id, TypA typ -> Some (Il.Subst.add_typid subst id typ)
-          | DefP (id, _, _), DefA target ->
-              Some (Il.Subst.add_defid subst id target)
           | _ -> None))
       (Some Il.Subst.empty) params args
 
