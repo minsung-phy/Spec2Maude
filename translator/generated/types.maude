@@ -1,5 +1,5 @@
 fmod SPEC2MAUDE-SORTS is
-  protecting SPECTEC-TERM .
+  protecting SPECTEC-SORTS .
 
   sort val .
 

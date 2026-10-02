@@ -3,7 +3,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 suite="$root/benchmarks/wasm-spec/test/core"
-semantics="$root/translator/backend/semantics.maude"
+semantics="$root/translator/backend/main.maude"
 maude_bin=${MAUDE:-maude}
 short_timeout=${SHORT_TIMEOUT:-300}
 long_timeout=${LONG_TIMEOUT:-3600}

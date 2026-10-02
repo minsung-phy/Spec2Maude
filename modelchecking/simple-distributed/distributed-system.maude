@@ -1,4 +1,4 @@
-load ../../translator/backend/semantics.maude
+load ../../translator/backend/main.maude
 load client.maude
 load server-buggy.maude
 load model-checker.maude

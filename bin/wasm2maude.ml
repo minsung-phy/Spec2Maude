@@ -18,7 +18,7 @@ let resolve path =
   if Filename.is_relative path then Filename.concat (Sys.getcwd ()) path
   else path
 
-let default_semantics = "translator/backend/semantics.maude"
+let default_semantics = "translator/backend/main.maude"
 
 let nonnegative value =
   match int_of_string_opt value with

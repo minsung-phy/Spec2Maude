@@ -1,0 +1,7 @@
+fmod SPECTEC-SORTS is
+  sort SpectecTerminal .
+  sort SpectecTerminals .
+  subsort SpectecTerminal < SpectecTerminals .
+  sort SpectecType .
+  sort SpectecDef .
+endfm

@@ -29,7 +29,7 @@ let emit_script script =
     Module
       { name = "SPEC2MAUDE-SORTS"
       ; kind = Functional
-      ; imports = [Protecting (module_name "SPECTEC-TERM")]
+      ; imports = [Protecting (module_name "SPECTEC-SORTS")]
       ; statements = translation.sort_statements
       }
   in

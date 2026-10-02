@@ -191,7 +191,7 @@ let reserved_names =
     ; "stringGreater"; "stringGreaterEqual"; "nativeChar"
     ; "ascii"; "length"; "substr"; "find"; "rfind"
     ; "upperCase"; "lowerCase"; "notFound"
-    (* backend/spectec-semantics.maude: types, sequences, and records *)
+    (* backend/spectec-{builtin-types,semantics}.maude: types, sequences, records *)
     ; "nat"; "int"; "real"
     ; "iterOpt"; "iterList"
     ; "indexDefined"; "lenAux"
