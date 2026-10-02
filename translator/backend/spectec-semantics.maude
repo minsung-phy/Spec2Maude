@@ -129,7 +129,7 @@ fmod SPECTEC-OPTION is
   eq optionConcat(K ?, eps) = K ? .
   eq optionConcat(eps, K ?) = K ? .
 
-  --- Option 타입 검사 (4.0-execution.configurations.spectec의 syntax frame)
+  --- Option 타입 검사 (spectec/wasm-3.0/1.2-syntax.types.spectec:47 -> syntax reftype = REF null? heaptype를 maude로 변환시 typecheck(NULL-, null))
   eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
   eq typecheck(seq(TS), iterOpt(TYPE)) = typecheck(TS, TYPE) and len(TS) <= 1 .
       --- SpecTec에 (val?)*처럼 option을 원소로 갖는 리스트가 있음
