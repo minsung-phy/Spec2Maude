@@ -23,3 +23,6 @@ reference/
 AGENTS.md
 legacy/
 .serena/
+.claude/
+CLAUDE.md
+.mcp.json
