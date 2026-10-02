@@ -162,6 +162,7 @@ type prepared_clause =
   { clause : clause
   ; head : clause_head
   ; head_proven : Il.Free.Set.t
+  ; index : Prescan.t
   }
 
 let quantified_type quants id =
@@ -282,14 +283,15 @@ let prepare_clauses index id params clauses =
     List.map
       (fun clause ->
         let args = match clause.it with DefD (_, args, _, _) -> args in
-        clause, translate_head index id args)
+        let index = Term.with_parameter_types index params args in
+        clause, translate_head index id args, index)
       clauses
   in
   List.mapi
-    (fun position (clause, head) ->
+    (fun position (clause, head, index) ->
       let overlapping =
         List.mapi (fun other item -> other, item) prepared
-        |> List.filter_map (fun (other, (peer, peer_head)) ->
+        |> List.filter_map (fun (other, (peer, peer_head, _)) ->
              if position <> other && heads_may_overlap head.term peer_head.term
              then Some peer
              else None)
@@ -301,7 +303,7 @@ let prepare_clauses index id params clauses =
             (signature_proven params clause overlapping)
             (list_components_proven index params clause)
       in
-      {clause; head; head_proven})
+      {clause; head; head_proven; index})
     prepared
 
 let proven_variables prepared premises =
@@ -319,7 +321,8 @@ let clause_has_rewrite_call index args rhs prems =
 
 
 (* Ordinary DefD clause *)
-let translate_equation_clause index prepared =
+let translate_equation_clause prepared =
+  let index = prepared.index in
   match prepared.clause.it with
   | DefD (quants, args, rhs, prems) ->
       if clause_has_rewrite_call index args rhs prems then
@@ -407,8 +410,9 @@ let choice_public_quants element quants =
   | _ ->
       invalid_arg "membership choice element must be a variable"
 
-let translate_choice_clause index id
+let translate_choice_clause id
     (choice : Prescan.membership_choice) prepared =
+  let index = prepared.index in
   match prepared.clause.it with
   | DefD (quants, args, rhs, _) ->
       if clause_has_rewrite_call index args rhs choice.prefix then
@@ -445,11 +449,12 @@ let translate_choice_clause index id
 let translate_clause index id prepared =
   match Prescan.membership_choice index prepared.clause with
   | Some choice ->
-      translate_choice_clause index id choice prepared
+      translate_choice_clause id choice prepared
   | None ->
-      [translate_equation_clause index prepared]
+      [translate_equation_clause prepared]
 
-let translate_rule_clause index prepared =
+let translate_rule_clause prepared =
+  let index = prepared.index in
   match prepared.clause.it with
   | DefD (quants, args, rhs, prems) ->
       if List.exists (Prem.arg_has_rewrite_call index) args
@@ -497,6 +502,6 @@ let translate index id params result_typ clauses =
     if choice then
       header @ List.concat_map (translate_clause index id) clauses
     else if rule then
-      header @ List.map (translate_rule_clause index) clauses
+      header @ List.map translate_rule_clause clauses
     else
-      header @ List.map (translate_equation_clause index) clauses
+      header @ List.map translate_equation_clause clauses

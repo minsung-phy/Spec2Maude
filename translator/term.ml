@@ -534,3 +534,308 @@ and translate_components index typ =
       let sort = translate_sort index typ in
       let value = Var (generated_variable "VALUE" sort) in
       [value, sort, translate_typ_conditions index value typ]
+
+
+(* Decompose declared input types along their source patterns.
+   Only common memberships of all possible branches may omit a guard. *)
+let rec source_value exp = match exp.it with
+  | SubE (inner, _, _) -> source_value inner
+  | CaseE (Xl.Mixop.Arg (), payload) ->
+      let inner = match payload.it with TupE [inner] -> inner | _ -> payload in
+      source_value inner
+  | _ -> exp
+let same_source_value a b = Il.Eq.eq_exp (source_value a) (source_value b)
+let type_substitution params args =
+  if List.length params <> List.length args then None else
+  List.fold_left2 (fun result param arg ->
+    Option.bind result (fun subst ->
+      match param.it, arg.it with
+      | ExpP (id, _), ExpA value -> Some (Il.Subst.add_varid subst id value)
+      | TypP id, TypA typ -> Some (Il.Subst.add_typid subst id typ)
+      | DefP (id, _, _), DefA target -> Some (Il.Subst.add_defid subst id target)
+      | _ -> None)) (Some Il.Subst.empty) params args
+
+let fresh_type_instance inst =
+  let InstD (quants, args, body) = inst.it in
+  let subst = List.fold_left (fun subst quant -> match quant.it with
+    | ExpP (id, typ) ->
+        let fresh = Il.Fresh.refresh_varid id in
+        Il.Subst.add_varid subst id (VarE fresh $$ id.at % typ)
+    | TypP id -> Il.Subst.add_typid subst id (VarT (Il.Fresh.refresh_typid id, []) $ id.at)
+    | DefP _ | GramP _ -> subst) Il.Subst.empty quants in
+  let quants = List.map (fun quant -> match quant.it with
+    | ExpP (id, typ) ->
+        let value = Il.Subst.subst_exp subst (VarE id $$ id.at % typ) in
+        let id = match value.it with VarE id -> id | _ -> assert false in
+        ExpP (id, Il.Subst.subst_typ subst typ) $ quant.at
+    | _ -> quant) quants in
+  quants, Il.Subst.subst_args subst args, Il.Subst.subst_deftyp subst body
+
+(* Argument matching retains constraints from the original instance pattern.
+   A narrow note on the caller's pattern is never such a constraint. *)
+let rec match_type_pattern quants subst constraints pattern actual =
+  let actual = source_value actual in
+  match pattern.it, actual.it with
+  | SubE (inner, source, _), _ ->
+      match_type_pattern quants subst ((actual, source) :: constraints) inner actual
+  | VarE id, _ ->
+      let constraints = match List.find_opt (fun q -> match q.it with ExpP (x, _) -> x.it = id.it | _ -> false) quants with
+        | Some {it = ExpP (_, typ); _} -> (actual, typ) :: constraints
+        | _ -> constraints in
+      begin match Il.Subst.Map.find_opt id.it subst.Il.Subst.varid with
+      | Some previous when not (same_source_value previous actual) -> None
+      | _ -> Some (Il.Subst.add_varid subst id actual, constraints)
+      end
+  | CaseE (Xl.Mixop.Arg (), payload), _ ->
+      let inner = match payload.it with TupE [inner] -> inner | _ -> payload in
+      match_type_pattern quants subst constraints inner actual
+  | CaseE (op, payload), CaseE (op', payload') when Il.Eq.eq_mixop op op' ->
+      match_type_pattern quants subst constraints payload payload'
+  | TupE xs, TupE ys | ListE xs, ListE ys when List.length xs = List.length ys ->
+      List.fold_left2 (fun result x y -> Option.bind result (fun (s, cs) -> match_type_pattern quants s cs x y))
+        (Some (subst, constraints)) xs ys
+  | OptE (Some x), OptE (Some y) -> match_type_pattern quants subst constraints x y
+  | _, VarE _ -> Some (subst, constraints) (* unknown, not an impossible branch *)
+  | _ when Il.Eq.eq_exp pattern actual -> Some (subst, constraints)
+  | (CaseE _ | TupE _ | ListE _ | OptE _ | NumE _ | BoolE _ | TextE _),
+    (CaseE _ | TupE _ | ListE _ | OptE _ | NumE _ | BoolE _ | TextE _) -> None
+  | _ -> Some (subst, constraints) (* unknown argument shape remains possible *)
+
+let match_type_arguments quants patterns actuals =
+  if List.length patterns <> List.length actuals then None else
+  List.fold_left2 (fun result pattern actual -> Option.bind result (fun (subst, cs) ->
+    match pattern.it, actual.it with
+    | ExpA x, ExpA y -> match_type_pattern quants subst cs x y
+    | TypA {it = VarT (id, []); _}, TypA typ -> Some (Il.Subst.add_typid subst id typ, cs)
+    | _ when Il.Eq.eq_arg pattern actual -> Some (subst, cs)
+    | _ -> None)) (Some (Il.Subst.empty, [])) patterns actuals
+
+let type_instances index typ = match typ.it with
+  | VarT (id, args) ->
+      begin match Il.Env.find_opt_typ index.Prescan.type_env id with
+      | None -> []
+      | Some (params, insts) -> List.filter_map (fun inst ->
+          let quants, patterns, body = fresh_type_instance inst in
+          let matched = if patterns = [] then Option.map (fun s -> s, []) (type_substitution params args)
+            else match_type_arguments quants patterns args in
+          Option.map (fun (s, cs) ->
+            Il.Subst.subst_deftyp s body,
+            List.map (fun (v, t) -> v, Il.Subst.subst_typ s t) cs) matched) insts
+      end
+  | _ -> []
+
+let rec type_alias index seen typ =
+  if List.exists (Il.Eq.eq_typ typ) seen then typ else
+  match type_instances index typ with
+  | [({it = AliasT inner; _}, [])] -> type_alias index (typ :: seen) inner
+  | _ -> typ
+let rec identity_exp exp =
+  let it = match exp.it with
+    | SubE (inner, _, _) -> (identity_exp inner).it
+    | CallE (id, args) -> CallE (id, List.map identity_arg args)
+    | TupE xs -> TupE (List.map identity_exp xs)
+    | CaseE (Xl.Mixop.Arg (), _) -> (identity_exp (source_value exp)).it
+    | CaseE (op, body) -> CaseE (op, identity_exp body)
+    | _ -> exp.it in
+  {exp with it}
+and identity_arg arg = match arg.it with
+  | ExpA exp -> {arg with it = ExpA (identity_exp exp)}
+  | TypA typ -> {arg with it = TypA (identity_typ typ)}
+  | DefA _ | GramA _ -> arg
+and identity_typ typ =
+  let it = match typ.it with
+    | VarT (id, args) -> VarT (id, List.map identity_arg args)
+    | IterT (inner, iter) -> IterT (identity_typ inner, iter)
+    | TupT fields -> TupT (List.map (fun (id, typ) -> id, identity_typ typ) fields)
+    | _ -> typ.it in
+  {typ with it}
+let same_source_type index a b = Il.Eq.eq_typ
+  (identity_typ (type_alias index [] a)) (identity_typ (type_alias index [] b))
+let membership_type typ = match typ.it with IterT (inner, _) -> inner | _ -> typ
+let same_membership index source target =
+  let source = membership_type (type_alias index [] source) in
+  let target = membership_type (type_alias index [] target) in
+  same_source_type index source target
+
+(* A source declaration may promise a narrowing of a structural projection.
+   Only a complete, unconditional DefD projection is unfolded here. *)
+let source_projection index exp =
+  match (source_value exp).it with
+  | CallE (id, args) ->
+      begin match Il.Env.find_opt_def index.Prescan.type_env id with
+      | Some (_, _, clauses) ->
+          let results = List.map (fun clause ->
+            let DefD (quants, patterns, body, prems) = clause.it in
+            if prems <> [] then None else
+            match match_type_arguments quants patterns args, body.it with
+            | Some (subst, _), VarE field when Il.Subst.mem_varid subst field ->
+                Some (source_value (Il.Subst.subst_exp subst body))
+            | _ -> None) clauses in
+          begin match results with
+          | Some first :: rest when List.for_all (function Some next -> same_source_value first next | None -> false) rest -> first
+          | _ -> exp
+          end
+      | None -> exp
+      end
+  | _ -> exp
+
+let payload_substitution typ value =
+  match typ.it, value.it with
+  | TupT fields, TupE values when List.length fields = List.length values ->
+      List.fold_left2 (fun s (id, _) v -> Il.Subst.add_varid s id v) Il.Subst.empty fields values
+  | TupT [(id, _)], _ -> Il.Subst.add_varid Il.Subst.empty id value
+  | _ -> Il.Subst.empty
+let declaration_types index payload value prems =
+  let subst = payload_substitution payload value in
+  List.filter_map (fun prem ->
+    match (Il.Subst.subst_prem subst prem).it with
+    | IfPr {it = CmpE (`EqOp, _, left, {it = SubE (_, narrow, _); _}); _} ->
+        Some (source_value (source_projection index left), narrow)
+    | IfPr {it = CmpE (`EqOp, _, {it = SubE (_, narrow, _); _}, right); _} ->
+        Some (source_value (source_projection index right), narrow)
+    | _ -> None) prems
+
+(* Complete alternatives are inspected in source order. Unknown cases contribute
+   an empty implication, so they cannot make another branch look exclusive. *)
+let rec input_type_branches index facts seen value typ =
+  let value = source_value value in
+  if List.exists (fun (v, t) -> same_source_value v value && Il.Eq.eq_typ t typ) seen then [[]] else
+  let seen = (value, typ) :: seen in
+  let root = value, typ in
+  let add_root = List.map (fun fs -> root :: fs) in
+  let combine alternatives next =
+    List.concat_map (fun fs -> List.map (fun more -> fs @ more) next) alternatives in
+  match typ.it, value.it with
+  | IterT (_, _), CatE (a, b) ->
+      add_root (combine (input_type_branches index facts seen a typ) (input_type_branches index facts seen b typ))
+  | IterT (element, Opt), OptE (Some inner) -> add_root (input_type_branches index facts seen inner element)
+  | IterT (element, _), ListE xs ->
+      add_root (List.fold_left (fun acc x -> combine acc (input_type_branches index facts seen x element)) [[]] xs)
+  | IterT (element, _), IterE (body, (_, generators)) ->
+      let branches = input_type_branches index facts seen body element in
+      add_root (List.map (fun fs -> fs @ List.filter_map (fun (id, source) ->
+        match List.find_opt (fun f -> match (fst f).it with VarE x -> x.it = id.it | _ -> false) fs with
+        | Some f -> Some (source_value source, IterT (snd f, List) $ source.at)
+        | None -> None) generators) branches)
+  | TupT [(_, inner)], _ when (match value.it with TupE _ -> false | _ -> true) ->
+      add_root (input_type_branches index facts seen value inner)
+  | TupT fields, TupE xs when List.length fields = List.length xs ->
+      let rec fields_ subst acc fields xs = match fields, xs with
+        | [], [] -> acc
+        | (id, t) :: ts, x :: xs ->
+            let t = Il.Subst.subst_typ subst t in
+            fields_ (Il.Subst.add_varid subst id x) (combine acc (input_type_branches index facts seen x t)) ts xs
+        | _ -> [[]] in
+      add_root (fields_ Il.Subst.empty [[]] fields xs)
+  | VarT (_, []), VarE _ -> [[root]]
+  | VarT _, _ ->
+      let insts = type_instances index typ in
+      if insts = [] then [[root]] else
+      List.concat_map (fun (body, constraints) ->
+        let constraints_possible = List.for_all (fun (v, t) -> possible_input_type index facts seen v t) constraints in
+        if not constraints_possible then [] else
+        let branches = match body.it with
+          | AliasT inner -> input_type_branches index facts seen value inner
+          | StructT fields ->
+              begin match value.it with
+              | StrE values -> List.fold_left (fun acc (atom, (t, _, _), _) ->
+                  match List.find_opt (fun (a, _) -> Il.Eq.eq_atom a atom) values with
+                  | Some (_, v) -> combine acc (input_type_branches index facts seen v t)
+                  | None -> acc) [[]] fields
+              | _ -> [[]]
+              end
+          | VariantT cases -> List.concat_map (fun (op, (payload, _, prems), _) ->
+              if op = Xl.Mixop.Arg () then
+                List.map (fun fs -> declaration_types index payload value prems @ fs)
+                  (input_type_branches index facts seen value payload)
+              else
+              match value.it with
+              | CaseE (actual, inner) when Il.Eq.eq_mixop op actual -> input_type_branches index facts seen inner payload
+              | VarE _ when translate_sort index value.note <> "Nat" -> [[]]
+              | CaseE _ | NumE _ | BoolE _ | TextE _ | ListE _ | OptE _ | StrE _ | TupE _ -> []
+              | VarE _ -> []
+              | _ -> [[]]) cases in
+        List.map (fun fs -> root :: List.map (fun (v, t) -> source_value v, t) constraints @ fs) branches) insts
+  | NumT _, CaseE _ | BoolT, CaseE _ | TextT, CaseE _ -> []
+  | _, _ -> [[root]]
+and possible_input_type index facts seen value typ =
+  let known = List.filter (fun f -> same_source_value (fst f) value) facts in
+  let structural = input_type_branches index [] seen value typ <> [] in
+  structural && List.for_all (fun f ->
+    let literals t =
+      let rec collect seen t =
+        if List.exists (Il.Eq.eq_typ t) seen then None else
+        match type_instances index t with
+        | [(body, [])] -> begin match body.it with
+            | AliasT inner -> collect (t :: seen) inner
+            | VariantT cases ->
+                if List.for_all (fun (op, (t, _, prems), _) -> op <> Xl.Mixop.Arg () && prems = [] && t.it = TupT []) cases
+                then Some (List.map (fun (op, _, _) -> op) cases) else None
+            | _ -> None end
+        | _ -> None in collect [] t in
+    match literals (snd f), literals typ with
+    | Some xs, Some ys -> List.exists (fun x -> List.exists (Il.Eq.eq_mixop x) ys) xs
+    | _ -> true) known
+
+let add_input_type index known value typ =
+  match input_type_branches index !known [] value typ with
+  | [] -> ()
+  | first :: rest -> List.iter (fun (v, t) ->
+      let same (v', t') = same_source_value v v' && same_membership index t' t in
+      if List.for_all (List.exists same) rest
+         && not (List.exists (fun (v', t') -> same_source_value v v' && Il.Eq.eq_typ t' t) !known)
+      then known := (v, t) :: !known) first
+
+let refine_input_types index known =
+  List.iter (fun (value, typ) -> add_input_type index known value typ) !known
+
+let with_parameter_types index params args =
+  let known = ref [] in
+  let index = {index with Prescan.input_types = Some known} in
+  Option.iter (fun subst -> List.iter2 (fun param arg -> match param.it, arg.it with
+    | ExpP (_, typ), ExpA value -> add_input_type index known value (Il.Subst.subst_typ subst typ)
+    | _ -> ()) params args) (type_substitution params args);
+  refine_input_types index known;
+  index
+
+let with_relation_types index id params inputs =
+  let known = ref [] in
+  let index = {index with Prescan.input_types = Some known} in
+  begin match Il.Env.find_opt_rel index.Prescan.type_env id with
+  | None -> ()
+  | Some (_, _, schema, _) ->
+      List.iter (fun param -> match param.it with
+        | ExpP (id, typ) -> add_input_type index known (VarE id $$ id.at % typ) typ
+        | _ -> ()) params;
+      let fields = match schema.it with TupT fields -> fields | _ -> [("_" $ schema.at), schema] in
+      let rec fields_ subst fields inputs = match fields, inputs with
+        | (id, typ) :: fields, value :: inputs ->
+            add_input_type index known value (Il.Subst.subst_typ subst typ);
+            fields_ (Il.Subst.add_varid subst id value) fields inputs
+        | _ -> () in
+      fields_ Il.Subst.empty fields inputs;
+      refine_input_types index known
+  end;
+  index
+
+let translate_guard_conditions index value typ =
+  let conditions = translate_typ_conditions index value typ in
+  match index.Prescan.input_types with
+  | None -> conditions
+  | Some known ->
+      let matching = List.filter (fun (v, _) -> translate_exp index v = value) !known in
+      let native = match value, (type_alias index [] typ).it with
+        | Var v, NumT `NatT -> v.sort = "Nat"
+        | Var v, VarT (id, []) -> id.it = v.sort
+            && List.mem id.it (Hintd.annotated_sorts (Prescan.sort_metadata index))
+        | _ -> false in
+      let implied = native || List.exists (fun (_, t) -> same_membership index t typ) matching in
+      List.filter (function
+        | BoolCond (App ("typecheck", _)) when implied -> false
+        | BoolCond (App ("typecheck", _)) ->
+            begin match matching with
+            | (v, _) :: _ -> add_input_type index known v typ; refine_input_types index known
+            | [] -> ()
+            end;
+            true
+        | _ -> true) conditions

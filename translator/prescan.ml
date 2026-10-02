@@ -86,6 +86,7 @@ type name_kind = TypName | RelName | DefName | MixopName
 
 type t =
   { type_env : Il.Env.t
+  ; input_types : (exp * typ) list ref option
   ; sort_metadata : Hintd.t
   ; contexts : Hintd.context list
   ; heatcool : Hintd.heatcool list
@@ -1266,6 +1267,7 @@ let scan script =
          owner_supported iteration.owner)
   in
   { type_env
+  ; input_types = None
   ; sort_metadata
   ; contexts
   ; heatcool

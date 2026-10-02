@@ -119,7 +119,7 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
            { pattern with
              guards =
                pattern.guards
-               @ Term.translate_typ_conditions index pattern.term source
+               @ Term.translate_guard_conditions index pattern.term source
            })
 
   | IterE (body, iterexp) ->
@@ -128,7 +128,7 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
         (fun exp ->
           translate_pattern ~computed index exp
           |> Option.map (fun pattern -> pattern.term, pattern.guards))
-        (Term.translate_typ_conditions index)
+        (Term.translate_guard_conditions index)
         body iterexp
       |> Option.map (fun (term, guards) -> {term; guards})
 
@@ -343,7 +343,7 @@ let rec bind_pattern index bound exp subject error =
         Iter.translate_pattern index
           (translate_pattern_parts index)
           (Term.translate_exp index)
-          (Term.translate_typ_conditions index)
+          (Term.translate_guard_conditions index)
           (known bound)
           (fun name -> Il.Free.Set.mem name bound)
           (can_bind_computed_pattern index)
@@ -423,7 +423,7 @@ and bind_structural_pattern index bound exp subject error =
         conditions =
           result.conditions
           @ List.map (fun c -> EqCondition c)
-              (Term.translate_typ_conditions index
+              (Term.translate_guard_conditions index
                  (Term.translate_exp index inner) source)
           @ [EqCondition (EqCond (Term.translate_exp index exp, subject))]
       }

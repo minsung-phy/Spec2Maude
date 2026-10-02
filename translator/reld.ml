@@ -175,6 +175,7 @@ let lower_rule_body ?request_output ?(normalize = true) index id params policy r
         | Prescan.BackendCompute {input_count} ->
             Prem.split input_count exps
       in
+      let index = Term.with_relation_types index id params inputs in
       let input_terms, head_conditions, bound =
         translate_inputs index params inputs
       in
@@ -1243,6 +1244,8 @@ module Context_rules = struct
       | _ -> unsupported pattern.rule.at
           "focus source must be an execution relation"
     in
+    let index = Term.with_relation_types index
+      pattern.source.id pattern.source.params inputs in
     let terms, guards, bound =
       translate_inputs index pattern.source.params inputs
     in

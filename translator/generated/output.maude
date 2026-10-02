@@ -2511,13 +2511,10 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-pure-nop] : identifyFocus(BRIDGE-Z, PREFIX, NOP, POSTFIX) => { PREFIX | (BRIDGE-Z ; NOP) | POSTFIX } .
 
-  crl [focus-Step-pure-drop] : identifyFocus(BRIDGE-Z, PREFIX VAL, DROP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL DROP)) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-pure-drop] : identifyFocus(BRIDGE-Z, PREFIX VAL, DROP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL DROP)) | POSTFIX } .
 
   crl [focus-Step-pure-select-true] : identifyFocus(BRIDGE-Z, PREFIX (VAL-1 (VAL-2 CONST(I32, C3))), SELECT(T--), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL-1 (VAL-2 (CONST(I32, C3) SELECT(T--))))) | POSTFIX }
-    if typecheck(VAL-1, val)
-      /\ typecheck(VAL-2, val)
-      /\ len(T--) <= 1 .
+    if len(T--) <= 1 .
 
   rl [focus-Step-pure-if-true] : identifyFocus(BRIDGE-Z, PREFIX CONST(I32, C3), IF__ELSE_(BT, INSTR-1-, INSTR-2-), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(I32, C3) IF__ELSE_(BT, INSTR-1-, INSTR-2-))) | POSTFIX } .
 
@@ -2534,11 +2531,9 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-pure-br-table-lt] : identifyFocus(BRIDGE-Z, PREFIX CONST(I32, I), BR-TABLE(L-, L-2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(I32, I) BR-TABLE(L-, L-2))) | POSTFIX } .
 
-  crl [focus-Step-pure-br-on-null-null] : identifyFocus(BRIDGE-Z, PREFIX VAL, BR-ON-NULL(L), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL BR-ON-NULL(L))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-pure-br-on-null-null] : identifyFocus(BRIDGE-Z, PREFIX VAL, BR-ON-NULL(L), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL BR-ON-NULL(L))) | POSTFIX } .
 
-  crl [focus-Step-pure-br-on-non-null-null] : identifyFocus(BRIDGE-Z, PREFIX VAL, BR-ON-NON-NULL(L), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL BR-ON-NON-NULL(L))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-pure-br-on-non-null-null] : identifyFocus(BRIDGE-Z, PREFIX VAL, BR-ON-NON-NULL(L), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL BR-ON-NON-NULL(L))) | POSTFIX } .
 
   rl [focus-Step-pure-call-indirect] : identifyFocus(BRIDGE-Z, PREFIX, CALL-INDIRECT(X4, YY2), POSTFIX) => { PREFIX | (BRIDGE-Z ; CALL-INDIRECT(X4, YY2)) | POSTFIX } .
 
@@ -2565,8 +2560,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-pure-trap-frame] : identifyFocus(BRIDGE-Z, PREFIX, FRAME- N3 { F } TRAP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (FRAME- N3 { F } TRAP)) | POSTFIX } .
 
-  crl [focus-Step-pure-local-tee] : identifyFocus(BRIDGE-Z, PREFIX VAL, LOCAL.TEE(X4), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL LOCAL.TEE(X4))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-pure-local-tee] : identifyFocus(BRIDGE-Z, PREFIX VAL, LOCAL.TEE(X4), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL LOCAL.TEE(X4))) | POSTFIX } .
 
   rl [focus-Step-pure-ref-i31] : identifyFocus(BRIDGE-Z, PREFIX CONST(I32, I), REF.I31, POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(I32, I) (REF.I31))) | POSTFIX } .
 
@@ -2584,8 +2578,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-pure-i31-get-num] : identifyFocus(BRIDGE-Z, PREFIX REF.I31-NUM(I), I31.GET(SX), POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF.I31-NUM(I) I31.GET(SX))) | POSTFIX } .
 
-  crl [focus-Step-pure-array-new] : identifyFocus(BRIDGE-Z, PREFIX (VAL CONST(I32, N3)), ARRAY.NEW(X4), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL (CONST(I32, N3) ARRAY.NEW(X4)))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-pure-array-new] : identifyFocus(BRIDGE-Z, PREFIX (VAL CONST(I32, N3)), ARRAY.NEW(X4), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL (CONST(I32, N3) ARRAY.NEW(X4)))) | POSTFIX } .
 
   crl [focus-Step-pure-extern-convert-any-null] : identifyFocus(BRIDGE-Z, PREFIX REF2, EXTERN.CONVERT-ANY, POSTFIX) => { PREFIX | (BRIDGE-Z ; (REF2 (EXTERN.CONVERT-ANY))) | POSTFIX }
     if typecheck(REF2, ref) .
@@ -2618,8 +2611,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-pure-vternop-val] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) (VCONST(V128, C-23) VCONST(V128, C-32))), VTERNOP(SH, VTERNOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) (VCONST(V128, C-32) VTERNOP(SH, VTERNOP2))))) | POSTFIX } .
 
-  crl [focus-Step-pure-vtestop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VTESTOP(_X_(JNN, M2), ALL-TRUE), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VTESTOP(_X_(JNN, M2), ALL-TRUE))) | POSTFIX }
-    if typecheck(JNN, Jnn) .
+  rl [focus-Step-pure-vtestop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C-12), VTESTOP(_X_(JNN, M2), ALL-TRUE), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) VTESTOP(_X_(JNN, M2), ALL-TRUE))) | POSTFIX } .
 
   rl [focus-Step-pure-vrelop] : identifyFocus(BRIDGE-Z, PREFIX (VCONST(V128, C-12) VCONST(V128, C-23)), VRELOP(SH, VRELOP2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C-12) (VCONST(V128, C-23) VRELOP(SH, VRELOP2)))) | POSTFIX } .
 
@@ -2731,62 +2723,40 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-read-global-get] : identifyFocus(Z, PREFIX, GLOBAL.GET(X4), POSTFIX) => { PREFIX | (Z ; GLOBAL.GET(X4)) | POSTFIX } .
 
-  crl [focus-Step-read-table-get-oob] : identifyFocus(Z, PREFIX CONST(AT, I), TABLE.GET(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) TABLE.GET(X4))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-table-get-oob] : identifyFocus(Z, PREFIX CONST(AT, I), TABLE.GET(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) TABLE.GET(X4))) | POSTFIX } .
 
   rl [focus-Step-read-table-size] : identifyFocus(Z, PREFIX, TABLE.SIZE(X4), POSTFIX) => { PREFIX | (Z ; TABLE.SIZE(X4)) | POSTFIX } .
 
-  crl [focus-Step-read-table-fill-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (VAL CONST(AT, N3))), TABLE.FILL(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val) .
+  rl [focus-Step-read-table-fill-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (VAL CONST(AT, N3))), TABLE.FILL(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) | POSTFIX } .
 
-  crl [focus-Step-read-table-copy-oob] : identifyFocus(Z, PREFIX (CONST(AT-1, I-1) (CONST(AT-2, I-2) CONST(AT-, N3))), TABLE.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X-1, X-23))))) | POSTFIX }
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype) .
+  rl [focus-Step-read-table-copy-oob] : identifyFocus(Z, PREFIX (CONST(AT-1, I-1) (CONST(AT-2, I-2) CONST(AT-, N3))), TABLE.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X-1, X-23))))) | POSTFIX } .
 
-  crl [focus-Step-read-table-init-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (CONST(I32, J) CONST(I32, N3))), TABLE.INIT(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) TABLE.INIT(X4, Y))))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-table-init-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (CONST(I32, J) CONST(I32, N3))), TABLE.INIT(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) TABLE.INIT(X4, Y))))) | POSTFIX } .
 
-  crl [focus-Step-read-load-num-oob] : identifyFocus(Z, PREFIX CONST(AT, I), LOAD(NT, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) LOAD(NT, eps, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-load-num-oob] : identifyFocus(Z, PREFIX CONST(AT, I), LOAD(NT, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) LOAD(NT, eps, X4, AO))) | POSTFIX } .
 
-  crl [focus-Step-read-load-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, I), LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype) .
+  rl [focus-Step-read-load-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, I), LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO))) | POSTFIX } .
 
-  crl [focus-Step-read-vload-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, eps, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-vload-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, eps, X4, AO))) | POSTFIX } .
 
-  crl [focus-Step-read-vload-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-vload-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) | POSTFIX } .
 
   crl [focus-Step-read-vload-pack-val] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ J-3 := iterpr-36-output-1(M2, Z, X4, AT, I, AO, K2, 0) .
+    if J-3 := iterpr-36-output-1(M2, Z, X4, AT, I, AO, K2, 0) .
 
-  crl [focus-Step-read-vload-splat-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SPLAT(N2) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SPLAT(N2) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-vload-splat-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, SPLAT(N2) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, SPLAT(N2) ?, X4, AO))) | POSTFIX } .
 
-  crl [focus-Step-read-vload-zero-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, spectec-ZERO(N2) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, spectec-ZERO(N2) ?, X4, AO))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-vload-zero-oob] : identifyFocus(Z, PREFIX CONST(AT, I), VLOAD(V128, spectec-ZERO(N2) ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) VLOAD(V128, spectec-ZERO(N2) ?, X4, AO))) | POSTFIX } .
 
-  crl [focus-Step-read-vload-lane-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C-12)), VLOAD-LANE(V128, N2, X4, AO, J), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C-12) VLOAD-LANE(V128, N2, X4, AO, J)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-vload-lane-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C-12)), VLOAD-LANE(V128, N2, X4, AO, J), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C-12) VLOAD-LANE(V128, N2, X4, AO, J)))) | POSTFIX } .
 
   rl [focus-Step-read-memory-size] : identifyFocus(Z, PREFIX, MEMORY.SIZE(X4), POSTFIX) => { PREFIX | (Z ; MEMORY.SIZE(X4)) | POSTFIX } .
 
-  crl [focus-Step-read-memory-fill-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (VAL CONST(AT, N3))), MEMORY.FILL(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val) .
+  rl [focus-Step-read-memory-fill-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (VAL CONST(AT, N3))), MEMORY.FILL(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) | POSTFIX } .
 
-  crl [focus-Step-read-memory-copy-oob] : identifyFocus(Z, PREFIX (CONST(AT-1, I-1) (CONST(AT-2, I-2) CONST(AT-, N3))), MEMORY.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) | POSTFIX }
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype) .
+  rl [focus-Step-read-memory-copy-oob] : identifyFocus(Z, PREFIX (CONST(AT-1, I-1) (CONST(AT-2, I-2) CONST(AT-, N3))), MEMORY.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) | POSTFIX } .
 
-  crl [focus-Step-read-memory-init-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (CONST(I32, J) CONST(I32, N3))), MEMORY.INIT(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) MEMORY.INIT(X4, Y))))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-read-memory-init-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) (CONST(I32, J) CONST(I32, N3))), MEMORY.INIT(X4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) MEMORY.INIT(X4, Y))))) | POSTFIX } .
 
   rl [focus-Step-read-ref-null] : identifyFocus(Z, PREFIX, REF.NULL(HT), POSTFIX) => { PREFIX | (Z ; REF.NULL(HT)) | POSTFIX } .
 
@@ -2834,11 +2804,9 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-read-array-len-array] : identifyFocus(Z, PREFIX REF.ARRAY-ADDR(A), ARRAY.LEN, POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) | POSTFIX } .
 
-  crl [focus-Step-read-array-fill-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) (VAL CONST(I32, N3)))), ARRAY.FILL(X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-read-array-fill-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) (VAL CONST(I32, N3)))), ARRAY.FILL(X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) | POSTFIX } .
 
-  crl [focus-Step-read-array-fill-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL CONST(I32, N3)))), ARRAY.FILL(X4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-read-array-fill-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL CONST(I32, N3)))), ARRAY.FILL(X4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) | POSTFIX } .
 
   crl [focus-Step-read-array-copy-null1] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I-1) (REF2 (CONST(I32, I-2) CONST(I32, N3))))), ARRAY.COPY(X-1, X-23), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I-1) (REF2 (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) | POSTFIX }
     if typecheck(REF2, ref) .
@@ -2867,37 +2835,27 @@ mod SPEC2MAUDE-GENERATED is
       /\ FUNC T- -> eps := Expand(as-deftype(spectec-tag(Z, X4) . 'TYPE))
       /\ N3 = len(T-) .
 
-  crl [focus-Step-local-set] : identifyFocus(Z, PREFIX VAL, LOCAL.SET(X4), POSTFIX) => { PREFIX | (Z ; (VAL LOCAL.SET(X4))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-local-set] : identifyFocus(Z, PREFIX VAL, LOCAL.SET(X4), POSTFIX) => { PREFIX | (Z ; (VAL LOCAL.SET(X4))) | POSTFIX } .
 
-  crl [focus-Step-global-set] : identifyFocus(Z, PREFIX VAL, GLOBAL.SET(X4), POSTFIX) => { PREFIX | (Z ; (VAL GLOBAL.SET(X4))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-global-set] : identifyFocus(Z, PREFIX VAL, GLOBAL.SET(X4), POSTFIX) => { PREFIX | (Z ; (VAL GLOBAL.SET(X4))) | POSTFIX } .
 
   crl [focus-Step-table-set-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) REF2), TABLE.SET(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (REF2 TABLE.SET(X4)))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(REF2, ref) .
+    if typecheck(REF2, ref) .
 
   crl [focus-Step-table-grow-succeed] : identifyFocus(Z, PREFIX (REF2 CONST(AT, N3)), TABLE.GROW(X4), POSTFIX) => { PREFIX | (Z ; (REF2 (CONST(AT, N3) TABLE.GROW(X4)))) | POSTFIX }
-    if typecheck(REF2, ref)
-      /\ typecheck(AT, addrtype) .
+    if typecheck(REF2, ref) .
 
   rl [focus-Step-elem-drop] : identifyFocus(Z, PREFIX, ELEM.DROP(X4), POSTFIX) => { PREFIX | (Z ; ELEM.DROP(X4)) | POSTFIX } .
 
-  crl [focus-Step-store-num-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) CONST(NT, C2)), STORE(NT, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(NT, C2) STORE(NT, eps, X4, AO)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-store-num-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) CONST(NT, C2)), STORE(NT, eps, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(NT, C2) STORE(NT, eps, X4, AO)))) | POSTFIX } .
 
-  crl [focus-Step-store-pack-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) CONST(INN, C3)), STORE(INN, N3 ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(INN, C3) STORE(INN, N3 ?, X4, AO)))) | POSTFIX }
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype) .
+  rl [focus-Step-store-pack-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) CONST(INN, C3)), STORE(INN, N3 ?, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (CONST(INN, C3) STORE(INN, N3 ?, X4, AO)))) | POSTFIX } .
 
-  crl [focus-Step-vstore-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C3)), VSTORE(V128, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE(V128, X4, AO)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-vstore-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C3)), VSTORE(V128, X4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE(V128, X4, AO)))) | POSTFIX } .
 
-  crl [focus-Step-vstore-lane-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C3)), VSTORE-LANE(V128, N2, X4, AO, J), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE-LANE(V128, N2, X4, AO, J)))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-vstore-lane-oob] : identifyFocus(Z, PREFIX (CONST(AT, I) VCONST(V128, C3)), VSTORE-LANE(V128, N2, X4, AO, J), POSTFIX) => { PREFIX | (Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE-LANE(V128, N2, X4, AO, J)))) | POSTFIX } .
 
-  crl [focus-Step-memory-grow-succeed] : identifyFocus(Z, PREFIX CONST(AT, N3), MEMORY.GROW(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, N3) MEMORY.GROW(X4))) | POSTFIX }
-    if typecheck(AT, addrtype) .
+  rl [focus-Step-memory-grow-succeed] : identifyFocus(Z, PREFIX CONST(AT, N3), MEMORY.GROW(X4), POSTFIX) => { PREFIX | (Z ; (CONST(AT, N3) MEMORY.GROW(X4))) | POSTFIX } .
 
   rl [focus-Step-data-drop] : identifyFocus(Z, PREFIX, DATA.DROP(X4), POSTFIX) => { PREFIX | (Z ; DATA.DROP(X4)) | POSTFIX } .
 
@@ -2907,11 +2865,9 @@ mod SPEC2MAUDE-GENERATED is
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
       /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1157(N3, CASE-PART1) .
 
-  crl [focus-Step-struct-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) VAL), STRUCT.SET(X4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X4, I)))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-struct-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) VAL), STRUCT.SET(X4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X4, I)))) | POSTFIX } .
 
-  crl [focus-Step-struct-set-struct] : identifyFocus(Z, PREFIX (REF.STRUCT-ADDR(A) VAL), STRUCT.SET(X4, I), POSTFIX) => { PREFIX | (Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X4, I)))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-struct-set-struct] : identifyFocus(Z, PREFIX (REF.STRUCT-ADDR(A) VAL), STRUCT.SET(X4, I), POSTFIX) => { PREFIX | (Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X4, I)))) | POSTFIX } .
 
   crl [focus-Step-array-new-fixed] : identifyFocus(Z, PREFIX VAL-, ARRAY.NEW-FIXED(X4, N3), POSTFIX) => { PREFIX | (Z ; (VAL- ARRAY.NEW-FIXED(X4, N3))) | POSTFIX }
     if instrSize(VAL-) = N3
@@ -2920,11 +2876,9 @@ mod SPEC2MAUDE-GENERATED is
       /\ A := len(spectec-arrayinst(Z))
       /\ AI2 := { (field('TYPE, spectec-type(Z, X4)) ; field('FIELDS, map-packfield-2(ZT, N3, VAL-))) } .
 
-  crl [focus-Step-array-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) VAL)), ARRAY.SET(X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL ARRAY.SET(X4))))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-array-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, I) VAL)), ARRAY.SET(X4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL ARRAY.SET(X4))))) | POSTFIX } .
 
-  crl [focus-Step-array-set-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) VAL)), ARRAY.SET(X4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL ARRAY.SET(X4))))) | POSTFIX }
-    if typecheck(VAL, val) .
+  rl [focus-Step-array-set-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, I) VAL)), ARRAY.SET(X4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL ARRAY.SET(X4))))) | POSTFIX } .
 
   crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
     if (STACK (OP REST)) =/= OP
@@ -3234,87 +3188,56 @@ mod SPEC2MAUDE-GENERATED is
 
   eq sum(eps) = 0 .
 
-  ceq sum(N3 N--) = N3 + sum(N--)
-    if typecheck(N3, n)
-      /\ typecheck(N--, nat) .
+  eq sum(N3 N--) = N3 + sum(N--) .
 
   eq prod(eps) = 1 .
 
-  ceq prod(N3 N--) = N3 * prod(N--)
-    if typecheck(N3, n)
-      /\ typecheck(N--, nat) .
+  eq prod(N3 N--) = N3 * prod(N--) .
 
   eq opt-(X, eps) = eps .
 
-  ceq opt-(X, W) = W ?
-    if typecheck(W, X) .
+  eq opt-(X, W) = W ? .
 
   eq concat-(X, eps) = eps .
 
-  ceq concat-(X, seq(W-) W---) = W- concat-(X, W---)
-    if typecheck(W-, X)
-      /\ typecheck(W---, iterList(X)) .
+  eq concat-(X, seq(W-) W---) = W- concat-(X, W---) .
 
-  ceq concatn-(X, eps, N3) = eps
-    if typecheck(N3, n) .
+  eq concatn-(X, eps, N3) = eps .
 
   ceq concatn-(X, seq(W-) W---, N3) = W- concatn-(X, W---, N3)
-    if N3 = len(W-)
-      /\ typecheck(N3, n)
-      /\ typecheck(W-, X)
-      /\ typecheck(W---, iterList(X)) .
+    if N3 = len(W-) .
 
   eq concatopt-(X, eps) = eps .
 
   ceq concatopt-(X, seq(W-4) W---2) = lift(W-4) concat-(X, map-exp-21(X, W---2))
-    if len(W-4) <= 1
-      /\ typecheck(W-4, X)
-      /\ typecheck(W---2, iterOpt(X)) .
+    if len(W-4) <= 1 .
 
   eq disjoint-(X, eps) = true .
 
-  ceq disjoint-(X, W W--) = _and_(not_(W <- W--), disjoint-(X, W--))
-    if typecheck(W, X)
-      /\ typecheck(W--, X) .
+  eq disjoint-(X, W W--) = _and_(not_(W <- W--), disjoint-(X, W--)) .
 
   eq setminus1-(X, W, eps) = W .
 
   ceq setminus1-(X, W, W-1 W--) = eps
-    if W == W-1
-      /\ typecheck(W-1, X)
-      /\ typecheck(W--, X) .
+    if W == W-1 .
 
-  ceq setminus1-(X, W, W-1 W--) = setminus1-(X, W, W--)
-    if typecheck(W-1, X)
-      /\ typecheck(W--, X) [owise] .
+  eq setminus1-(X, W, W-1 W--) = setminus1-(X, W, W--) [owise] .
 
-  ceq setminus-(X, eps, W-) = eps
-    if typecheck(W-, X) .
+  eq setminus-(X, eps, W-) = eps .
 
-  ceq setminus-(X, W-1 W--, W-) = setminus1-(X, W-1, W-) setminus-(X, W--, W-)
-    if typecheck(W-1, X)
-      /\ typecheck(W--, X)
-      /\ typecheck(W-, X) .
+  eq setminus-(X, W-1 W--, W-) = setminus1-(X, W-1, W-) setminus-(X, W--, W-) .
 
   eq setproduct2-(X, W-1, eps) = eps .
 
-  ceq setproduct2-(X, W-1, seq(W--) W--3) = seq(W-1 W--) setproduct2-(X, W-1, W--3)
-    if typecheck(W--, X)
-      /\ typecheck(W--3, iterList(X)) .
+  eq setproduct2-(X, W-1, seq(W--) W--3) = seq(W-1 W--) setproduct2-(X, W-1, W--3) .
 
-  ceq setproduct1-(X, eps, W--3) = eps
-    if typecheck(W--3, iterList(X)) .
+  eq setproduct1-(X, eps, W--3) = eps .
 
-  ceq setproduct1-(X, W-1 W--, W--3) = setproduct2-(X, W-1, W--3) setproduct1-(X, W--, W--3)
-    if typecheck(W-1, X)
-      /\ typecheck(W--, X)
-      /\ typecheck(W--3, iterList(X)) .
+  eq setproduct1-(X, W-1 W--, W--3) = setproduct2-(X, W-1, W--3) setproduct1-(X, W--, W--3) .
 
   eq setproduct-(X, eps) = seq(eps) .
 
-  ceq setproduct-(X, seq(W-1-) W--3) = setproduct1-(X, W-1-, setproduct-(X, W--3))
-    if typecheck(W-1-, X)
-      /\ typecheck(W--3, iterList(X)) .
+  eq setproduct-(X, seq(W-1-) W--3) = setproduct1-(X, W-1-, setproduct-(X, W--3)) .
 
   ceq typecheck(I, bit) = true
     if _or_(I == 0, I == 1) .
@@ -3465,36 +3388,31 @@ mod SPEC2MAUDE-GENERATED is
 
   eq funcsxx(eps) = eps .
 
-  ceq funcsxx(FUNC(X4) XX-) = X4 funcsxx(XX-)
-    if typecheck(X4, idx) .
+  eq funcsxx(FUNC(X4) XX-) = X4 funcsxx(XX-) .
 
   eq funcsxx(EXTERNIDX XX-) = funcsxx(XX-) [owise] .
 
   eq globalsxx(eps) = eps .
 
-  ceq globalsxx(GLOBAL(X4) XX-) = X4 globalsxx(XX-)
-    if typecheck(X4, idx) .
+  eq globalsxx(GLOBAL(X4) XX-) = X4 globalsxx(XX-) .
 
   eq globalsxx(EXTERNIDX XX-) = globalsxx(XX-) [owise] .
 
   eq tablesxx(eps) = eps .
 
-  ceq tablesxx(TABLE(X4) XX-) = X4 tablesxx(XX-)
-    if typecheck(X4, idx) .
+  eq tablesxx(TABLE(X4) XX-) = X4 tablesxx(XX-) .
 
   eq tablesxx(EXTERNIDX XX-) = tablesxx(XX-) [owise] .
 
   eq memsxx(eps) = eps .
 
-  ceq memsxx(MEM(X4) XX-) = X4 memsxx(XX-)
-    if typecheck(X4, idx) .
+  eq memsxx(MEM(X4) XX-) = X4 memsxx(XX-) .
 
   eq memsxx(EXTERNIDX XX-) = memsxx(XX-) [owise] .
 
   eq tagsxx(eps) = eps .
 
-  ceq tagsxx(TAG(X4) XX-) = X4 tagsxx(XX-)
-    if typecheck(X4, idx) .
+  eq tagsxx(TAG(X4) XX-) = X4 tagsxx(XX-) .
 
   eq tagsxx(EXTERNIDX XX-) = tagsxx(XX-) [owise] .
 
@@ -3906,8 +3824,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq inv-jsize(16) = I16 .
 
-  ceq inv-jsize(N3) = inv-isize(N3)
-    if typecheck(N3, n) .
+  eq inv-jsize(N3) = inv-isize(N3) .
 
   eq inv-fsize(32) = F32 .
 
@@ -3979,29 +3896,25 @@ mod SPEC2MAUDE-GENERATED is
 
   eq tagsxt(eps) = eps .
 
-  ceq tagsxt(TAG(JT) XT-) = JT tagsxt(XT-)
-    if typecheck(JT, tagtype) .
+  eq tagsxt(TAG(JT) XT-) = JT tagsxt(XT-) .
 
   eq tagsxt(EXTERNTYPE XT-) = tagsxt(XT-) [owise] .
 
   eq globalsxt(eps) = eps .
 
-  ceq globalsxt(GLOBAL(GT2) XT-) = GT2 globalsxt(XT-)
-    if typecheck(GT2, globaltype) .
+  eq globalsxt(GLOBAL(GT2) XT-) = GT2 globalsxt(XT-) .
 
   eq globalsxt(EXTERNTYPE XT-) = globalsxt(XT-) [owise] .
 
   eq memsxt(eps) = eps .
 
-  ceq memsxt(MEM(MT) XT-) = MT memsxt(XT-)
-    if typecheck(MT, memtype) .
+  eq memsxt(MEM(MT) XT-) = MT memsxt(XT-) .
 
   eq memsxt(EXTERNTYPE XT-) = memsxt(XT-) [owise] .
 
   eq tablesxt(eps) = eps .
 
-  ceq tablesxt(TABLE(TT) XT-) = TT tablesxt(XT-)
-    if typecheck(TT, tabletype) .
+  eq tablesxt(TABLE(TT) XT-) = TT tablesxt(XT-) .
 
   eq tablesxt(EXTERNTYPE XT-) = tablesxt(XT-) [owise] .
 
@@ -4021,12 +3934,10 @@ mod SPEC2MAUDE-GENERATED is
 
   eq minus-recs(eps, eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq minus-recs(REC(N3) TV-3, TU-1 TU-3) = minus-recs(TV-3, TU-3)
-    if typecheck(N3, n) .
+  eq minus-recs(REC(N3) TV-3, TU-1 TU-3) = minus-recs(TV-3, TU-3) .
 
   ceq minus-recs(-IDX(X4) TV-3, TU-1 TU-3) = tuple(seq(-IDX(X4) TV--) seq(TU-1 TU--))
-    if typecheck(X4, idx)
-      /\ tuple(seq(TV--) seq(TU--)) := minus-recs(TV-3, TU-3) .
+    if tuple(seq(TV--) seq(TU--)) := minus-recs(TV-3, TU-3) .
 
   eq subst-packtype(PT, TV-3, TU-3) = PT .
 
@@ -4046,8 +3957,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq subst-heaptype(DT, TV-3, TU-3) = subst-deftype(DT, TV-3, TU-3)
     if typecheck(DT, deftype) .
 
-  ceq subst-heaptype(HT, TV-3, TU-3) = HT
-    if typecheck(HT, heaptype) [owise] .
+  eq subst-heaptype(HT, TV-3, TU-3) = HT [owise] .
 
   ceq subst-reftype(REF(NULL-, HT), TV-3, TU-3) = REF(NULL-, subst-heaptype(HT, TV-3, TU-3))
     if len(NULL-) <= 1 .
@@ -5463,12 +5373,10 @@ mod SPEC2MAUDE-GENERATED is
   eq memarg0 = { (field('ALIGN, 0) ; field('OFFSET, 0)) } .
 
   ceq const(NUMTYPE, C2) = CONST(NUMTYPE, C2)
-    if typecheck(NUMTYPE, numtype)
-      /\ typecheck(C2, lit-(NUMTYPE)) .
+    if typecheck(NUMTYPE, numtype) .
 
   ceq const(VECTYPE, C3) = VCONST(VECTYPE, C3)
-    if typecheck(VECTYPE, vectype)
-      /\ typecheck(C3, lit-(VECTYPE)) .
+    if typecheck(VECTYPE, vectype) .
 
   eq free-shape(_X_(LANETYPE, DIM)) = free-lanetype(LANETYPE) .
 
@@ -5487,12 +5395,9 @@ mod SPEC2MAUDE-GENERATED is
 
   eq shift-labelidxs(eps) = eps .
 
-  ceq shift-labelidxs(0 LABELIDX--) = shift-labelidxs(LABELIDX--)
-    if typecheck(LABELIDX--, uN(32)) .
+  eq shift-labelidxs(0 LABELIDX--) = shift-labelidxs(LABELIDX--) .
 
-  ceq shift-labelidxs(LABELIDX LABELIDX--) = (_-_(LABELIDX : nat <:> int, 1 : nat <:> int) : int <:> nat) shift-labelidxs(LABELIDX--)
-    if typecheck(LABELIDX, labelidx)
-      /\ typecheck(LABELIDX--, uN(32)) .
+  eq shift-labelidxs(LABELIDX LABELIDX--) = (_-_(LABELIDX : nat <:> int, 1 : nat <:> int) : int <:> nat) shift-labelidxs(LABELIDX--) .
 
   eq free-instr(NOP) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
@@ -5862,9 +5767,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq with-locals(C, eps, eps) = C .
 
-  ceq with-locals(C, X-1 X-2, LCT-1 LCT-) = with-locals(C [. 'LOCALS = ((C . 'LOCALS) [ X-1 = LCT-1 ]) ], X-2, LCT-)
-    if typecheck(X-1, idx)
-      /\ typecheck(X-2, uN(32)) .
+  eq with-locals(C, X-1 X-2, LCT-1 LCT-) = with-locals(C [. 'LOCALS = ((C . 'LOCALS) [ X-1 = LCT-1 ]) ], X-2, LCT-) .
 
   eq clos-deftypes(eps) = eps .
 
@@ -5892,40 +5795,32 @@ mod SPEC2MAUDE-GENERATED is
     if SUB(FINAL-, TYPEUSE-, COMPTYPE) := unrolldt(DEFTYPE)
       /\ len(FINAL-) <= 1 .
 
-  ceq before(REC(J), I) = J < I
-    if typecheck(J, n) .
+  eq before(REC(J), I) = J < I .
 
-  ceq before(TYPEUSE, I) = true
-    if typecheck(TYPEUSE, typeuse) [owise] .
+  eq before(TYPEUSE, I) = true [owise] .
 
   ceq unrollht-(C, DEFTYPE) = unrolldt(DEFTYPE)
     if typecheck(DEFTYPE, deftype) .
 
-  ceq unrollht-(C, -IDX(TYPEIDX)) = unrolldt((C . 'TYPES) [ TYPEIDX ])
-    if typecheck(TYPEIDX, typeidx) .
+  eq unrollht-(C, -IDX(TYPEIDX)) = unrolldt((C . 'TYPES) [ TYPEIDX ]) .
 
-  ceq unrollht-(C, REC(I)) = (C . 'RECS) [ I ]
-    if typecheck(I, n) .
+  eq unrollht-(C, REC(I)) = (C . 'RECS) [ I ] .
 
   ceq typecheck(spectec-OK(TYPEIDX), oktypeidx) = true
     if typecheck(TYPEIDX, typeidx) .
 
   ceq default-(INN) = CONST(INN, 0) ?
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, addrtype) .
 
   ceq default-(FNN) = CONST(FNN, fzero(size(FNN))) ?
     if typecheck(FNN, Fnn) .
 
   ceq default-(VNN) = VCONST(VNN, 0) ?
-    if typecheck(VNN, vectype)
-      /\ typecheck(VNN, Vnn) .
+    if typecheck(VNN, vectype) .
 
-  ceq default-(REF(NULL ?, HT)) = (REF.NULL-ADDR) ?
-    if typecheck(HT, heaptype) .
+  eq default-(REF(NULL ?, HT)) = (REF.NULL-ADDR) ? .
 
-  ceq default-(REF(eps, HT)) = eps
-    if typecheck(HT, heaptype) .
+  eq default-(REF(eps, HT)) = eps .
 
   eq is-packtype(ZT) = ZT =/= unpack(ZT) .
 
@@ -6020,28 +5915,23 @@ mod SPEC2MAUDE-GENERATED is
 
   eq idiv-(N2, U, I-1, 0) = eps .
 
-  ceq idiv-(N2, U, I-1, I-2) = (truncz((I-1 : nat <:> rat) / (I-2 : nat <:> rat)) : int <:> nat) ?
-    if typecheck(I-2, iN(N2)) .
+  eq idiv-(N2, U, I-1, I-2) = (truncz((I-1 : nat <:> rat) / (I-2 : nat <:> rat)) : int <:> nat) ? .
 
   eq idiv-(N2, S, I-1, 0) = eps .
 
   ceq idiv-(N2, S, I-1, I-2) = eps
-    if ((signed-(N2, I-1) : int <:> rat) / (signed-(N2, I-2) : int <:> rat)) == ((2 ^ (_-_(N2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> rat)
-      /\ typecheck(I-2, iN(N2)) .
+    if ((signed-(N2, I-1) : int <:> rat) / (signed-(N2, I-2) : int <:> rat)) == ((2 ^ (_-_(N2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> rat) .
 
-  ceq idiv-(N2, S, I-1, I-2) = inv-signed-(N2, truncz((signed-(N2, I-1) : int <:> rat) / (signed-(N2, I-2) : int <:> rat))) ?
-    if typecheck(I-2, iN(N2)) .
+  eq idiv-(N2, S, I-1, I-2) = inv-signed-(N2, truncz((signed-(N2, I-1) : int <:> rat) / (signed-(N2, I-2) : int <:> rat))) ? .
 
   eq irem-(N2, U, I-1, 0) = eps .
 
-  ceq irem-(N2, U, I-1, I-2) = (_-_(I-1 : nat <:> int, (I-2 * (truncz((I-1 : nat <:> rat) / (I-2 : nat <:> rat)) : int <:> nat)) : nat <:> int) : int <:> nat) ?
-    if typecheck(I-2, iN(N2)) .
+  eq irem-(N2, U, I-1, I-2) = (_-_(I-1 : nat <:> int, (I-2 * (truncz((I-1 : nat <:> rat) / (I-2 : nat <:> rat)) : int <:> nat)) : nat <:> int) : int <:> nat) ? .
 
   eq irem-(N2, S, I-1, 0) = eps .
 
   ceq irem-(N2, S, I-1, I-2) = inv-signed-(N2, _-_(J-1, J-2 * truncz((J-1 : int <:> rat) / (J-2 : int <:> rat)))) ?
-    if typecheck(I-2, iN(N2))
-      /\ J-1 := signed-(N2, I-1)
+    if J-1 := signed-(N2, I-1)
       /\ J-2 := signed-(N2, I-2) .
 
   ceq imin-(N2, U, I-1, I-2) = I-1
@@ -6099,308 +5989,187 @@ mod SPEC2MAUDE-GENERATED is
   eq ige-(N2, S, I-1, I-2) = spectec-bool(signed-(N2, I-1) >= signed-(N2, I-2)) .
 
   ceq lpacknum-(NUMTYPE, C2) = C2
-    if typecheck(NUMTYPE, numtype)
-      /\ typecheck(C2, num-(lunpack(NUMTYPE))) .
+    if typecheck(NUMTYPE, numtype) .
 
   ceq lpacknum-(PACKTYPE, C3) = wrap--(size(lunpack(PACKTYPE)), psize(PACKTYPE), C3)
-    if typecheck(PACKTYPE, packtype)
-      /\ typecheck(C3, num-(lunpack(PACKTYPE))) .
+    if typecheck(PACKTYPE, packtype) .
 
   ceq cpacknum-(CONSTTYPE, C2) = C2
-    if typecheck(CONSTTYPE, consttype)
-      /\ typecheck(C2, lit-(cunpack(CONSTTYPE))) .
+    if typecheck(CONSTTYPE, consttype) .
 
   ceq cpacknum-(PACKTYPE, C3) = wrap--(size(lunpack(PACKTYPE)), psize(PACKTYPE), C3)
-    if typecheck(PACKTYPE, packtype)
-      /\ typecheck(C3, lit-(cunpack(PACKTYPE))) .
+    if typecheck(PACKTYPE, packtype) .
 
   ceq lunpacknum-(NUMTYPE, C2) = C2
-    if typecheck(NUMTYPE, numtype)
-      /\ typecheck(C2, lane-(NUMTYPE)) .
+    if typecheck(NUMTYPE, numtype) .
 
   ceq lunpacknum-(PACKTYPE, C3) = extend--(psize(PACKTYPE), size(lunpack(PACKTYPE)), U, C3)
-    if typecheck(PACKTYPE, packtype)
-      /\ typecheck(C3, lane-(PACKTYPE)) .
+    if typecheck(PACKTYPE, packtype) .
 
   ceq cunpacknum-(CONSTTYPE, C2) = C2
-    if typecheck(CONSTTYPE, consttype)
-      /\ typecheck(C2, lit-(CONSTTYPE)) .
+    if typecheck(CONSTTYPE, consttype) .
 
   ceq cunpacknum-(PACKTYPE, C3) = extend--(psize(PACKTYPE), size(lunpack(PACKTYPE)), U, C3)
-    if typecheck(PACKTYPE, packtype)
-      /\ typecheck(C3, lit-(PACKTYPE)) .
+    if typecheck(PACKTYPE, packtype) .
 
-  ceq spectec-unop-(INN, CLZ, I) = iclz-(sizenn(INN), I)
-    if typecheck(INN, addrtype) .
+  eq spectec-unop-(INN, CLZ, I) = iclz-(sizenn(INN), I) .
 
-  ceq spectec-unop-(INN, CTZ, I) = ictz-(sizenn(INN), I)
-    if typecheck(INN, addrtype) .
+  eq spectec-unop-(INN, CTZ, I) = ictz-(sizenn(INN), I) .
 
-  ceq spectec-unop-(INN, POPCNT, I) = ipopcnt-(sizenn(INN), I)
-    if typecheck(INN, addrtype) .
+  eq spectec-unop-(INN, POPCNT, I) = ipopcnt-(sizenn(INN), I) .
 
-  ceq spectec-unop-(INN, EXTEND(M2), I) = iextend-(sizenn(INN), M2, S, I)
-    if typecheck(INN, addrtype) .
+  eq spectec-unop-(INN, EXTEND(M2), I) = iextend-(sizenn(INN), M2, S, I) .
 
-  ceq spectec-unop-(FNN, ABS, F) = fabs-(sizenn(FNN), F)
-    if typecheck(FNN, Fnn) .
+  eq spectec-unop-(FNN, ABS, F) = fabs-(sizenn(FNN), F) .
 
-  ceq spectec-unop-(FNN, spectec-NEG, F) = fneg-(sizenn(FNN), F)
-    if typecheck(FNN, Fnn) .
+  eq spectec-unop-(FNN, spectec-NEG, F) = fneg-(sizenn(FNN), F) .
 
-  ceq spectec-unop-(FNN, SQRT, F) = fsqrt-(sizenn(FNN), F)
-    if typecheck(FNN, Fnn) .
+  eq spectec-unop-(FNN, SQRT, F) = fsqrt-(sizenn(FNN), F) .
 
-  ceq spectec-unop-(FNN, CEIL, F) = fceil-(sizenn(FNN), F)
-    if typecheck(FNN, Fnn) .
+  eq spectec-unop-(FNN, CEIL, F) = fceil-(sizenn(FNN), F) .
 
-  ceq spectec-unop-(FNN, FLOOR, F) = ffloor-(sizenn(FNN), F)
-    if typecheck(FNN, Fnn) .
+  eq spectec-unop-(FNN, FLOOR, F) = ffloor-(sizenn(FNN), F) .
 
-  ceq spectec-unop-(FNN, TRUNC, F) = ftrunc-(sizenn(FNN), F)
-    if typecheck(FNN, Fnn) .
+  eq spectec-unop-(FNN, TRUNC, F) = ftrunc-(sizenn(FNN), F) .
 
-  ceq spectec-unop-(FNN, NEAREST, F) = fnearest-(sizenn(FNN), F)
-    if typecheck(FNN, Fnn) .
+  eq spectec-unop-(FNN, NEAREST, F) = fnearest-(sizenn(FNN), F) .
 
-  ceq spectec-binop-(INN, ADD, I-1, I-2) = iadd-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
-      /\ typecheck(I-1, num-(INN))
-      /\ typecheck(I-2, num-(INN)) .
+  eq spectec-binop-(INN, ADD, I-1, I-2) = iadd-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, spectec-SUB, I-1, I-2) = isub-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
-      /\ typecheck(I-1, num-(INN))
-      /\ typecheck(I-2, num-(INN)) .
+  eq spectec-binop-(INN, spectec-SUB, I-1, I-2) = isub-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, MUL, I-1, I-2) = imul-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
-      /\ typecheck(I-1, num-(INN))
-      /\ typecheck(I-2, num-(INN)) .
+  eq spectec-binop-(INN, MUL, I-1, I-2) = imul-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, DIV(SX), I-1, I-2) = lift(idiv-(sizenn(INN), SX, I-1, I-2))
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, DIV(SX), I-1, I-2) = lift(idiv-(sizenn(INN), SX, I-1, I-2)) .
 
-  ceq spectec-binop-(INN, REM(SX), I-1, I-2) = lift(irem-(sizenn(INN), SX, I-1, I-2))
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, REM(SX), I-1, I-2) = lift(irem-(sizenn(INN), SX, I-1, I-2)) .
 
-  ceq spectec-binop-(INN, AND, I-1, I-2) = iand-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, AND, I-1, I-2) = iand-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, OR, I-1, I-2) = ior-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, OR, I-1, I-2) = ior-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, XOR, I-1, I-2) = ixor-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, XOR, I-1, I-2) = ixor-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, SHL, I-1, I-2) = ishl-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, SHL, I-1, I-2) = ishl-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, SHR(SX), I-1, I-2) = ishr-(sizenn(INN), SX, I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, SHR(SX), I-1, I-2) = ishr-(sizenn(INN), SX, I-1, I-2) .
 
-  ceq spectec-binop-(INN, ROTL, I-1, I-2) = irotl-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, ROTL, I-1, I-2) = irotl-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-binop-(INN, ROTR, I-1, I-2) = irotr-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(INN, ROTR, I-1, I-2) = irotr-(sizenn(INN), I-1, I-2) .
 
   ceq spectec-binop-(FNN, ADD, F-1, F-2) = fadd-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(F-1, num-(FNN))
-      /\ typecheck(F-2, num-(FNN)) .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-binop-(FNN, spectec-SUB, F-1, F-2) = fsub-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(F-1, num-(FNN))
-      /\ typecheck(F-2, num-(FNN)) .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-binop-(FNN, MUL, F-1, F-2) = fmul-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(F-1, num-(FNN))
-      /\ typecheck(F-2, num-(FNN)) .
-
-  ceq spectec-binop-(FNN, spectec-DIV, F-1, F-2) = fdiv-(sizenn(FNN), F-1, F-2)
     if typecheck(FNN, Fnn) .
 
-  ceq spectec-binop-(FNN, MIN, F-1, F-2) = fmin-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-binop-(FNN, spectec-DIV, F-1, F-2) = fdiv-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-binop-(FNN, MAX, F-1, F-2) = fmax-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-binop-(FNN, MIN, F-1, F-2) = fmin-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-binop-(FNN, COPYSIGN, F-1, F-2) = fcopysign-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-binop-(FNN, MAX, F-1, F-2) = fmax-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-testop-(INN, EQZ, I) = ieqz-(sizenn(INN), I)
-    if typecheck(INN, addrtype) .
+  eq spectec-binop-(FNN, COPYSIGN, F-1, F-2) = fcopysign-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-relop-(INN, EQ, I-1, I-2) = ieq-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
-      /\ typecheck(I-1, num-(INN))
-      /\ typecheck(I-2, num-(INN)) .
+  eq spectec-testop-(INN, EQZ, I) = ieqz-(sizenn(INN), I) .
 
-  ceq spectec-relop-(INN, NE, I-1, I-2) = ine-(sizenn(INN), I-1, I-2)
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
-      /\ typecheck(I-1, num-(INN))
-      /\ typecheck(I-2, num-(INN)) .
+  eq spectec-relop-(INN, EQ, I-1, I-2) = ieq-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-relop-(INN, LT(SX), I-1, I-2) = ilt-(sizenn(INN), SX, I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-relop-(INN, NE, I-1, I-2) = ine-(sizenn(INN), I-1, I-2) .
 
-  ceq spectec-relop-(INN, GT(SX), I-1, I-2) = igt-(sizenn(INN), SX, I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-relop-(INN, LT(SX), I-1, I-2) = ilt-(sizenn(INN), SX, I-1, I-2) .
 
-  ceq spectec-relop-(INN, LE(SX), I-1, I-2) = ile-(sizenn(INN), SX, I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-relop-(INN, GT(SX), I-1, I-2) = igt-(sizenn(INN), SX, I-1, I-2) .
 
-  ceq spectec-relop-(INN, GE(SX), I-1, I-2) = ige-(sizenn(INN), SX, I-1, I-2)
-    if typecheck(INN, addrtype) .
+  eq spectec-relop-(INN, LE(SX), I-1, I-2) = ile-(sizenn(INN), SX, I-1, I-2) .
+
+  eq spectec-relop-(INN, GE(SX), I-1, I-2) = ige-(sizenn(INN), SX, I-1, I-2) .
 
   ceq spectec-relop-(FNN, EQ, F-1, F-2) = feq-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(F-1, num-(FNN))
-      /\ typecheck(F-2, num-(FNN)) .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-relop-(FNN, NE, F-1, F-2) = fne-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(F-1, num-(FNN))
-      /\ typecheck(F-2, num-(FNN)) .
-
-  ceq spectec-relop-(FNN, spectec-LT, F-1, F-2) = flt-(sizenn(FNN), F-1, F-2)
     if typecheck(FNN, Fnn) .
 
-  ceq spectec-relop-(FNN, spectec-GT, F-1, F-2) = fgt-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-relop-(FNN, spectec-LT, F-1, F-2) = flt-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-relop-(FNN, spectec-LE, F-1, F-2) = fle-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-relop-(FNN, spectec-GT, F-1, F-2) = fgt-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-relop-(FNN, spectec-GE, F-1, F-2) = fge-(sizenn(FNN), F-1, F-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-relop-(FNN, spectec-LE, F-1, F-2) = fle-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-cvtop--(INN-1, INN-2, EXTEND(SX), I-1) = extend--(sizenn1(INN-1), sizenn2(INN-2), SX, I-1)
-    if typecheck(INN-1, addrtype)
-      /\ typecheck(INN-2, addrtype) .
+  eq spectec-relop-(FNN, spectec-GE, F-1, F-2) = fge-(sizenn(FNN), F-1, F-2) .
 
-  ceq spectec-cvtop--(INN-1, INN-2, WRAP, I-1) = wrap--(sizenn1(INN-1), sizenn2(INN-2), I-1)
-    if typecheck(INN-1, addrtype)
-      /\ typecheck(INN-2, addrtype) .
+  eq spectec-cvtop--(INN-1, INN-2, EXTEND(SX), I-1) = extend--(sizenn1(INN-1), sizenn2(INN-2), SX, I-1) .
 
-  ceq spectec-cvtop--(FNN-1, INN-2, spectec-TRUNC(SX), F-1) = lift(trunc--(sizenn1(FNN-1), sizenn2(INN-2), SX, F-1))
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(INN-2, addrtype) .
+  eq spectec-cvtop--(INN-1, INN-2, WRAP, I-1) = wrap--(sizenn1(INN-1), sizenn2(INN-2), I-1) .
 
-  ceq spectec-cvtop--(FNN-1, INN-2, TRUNC-SAT(SX), F-1) = lift(trunc-sat--(sizenn1(FNN-1), sizenn2(INN-2), SX, F-1))
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(INN-2, addrtype) .
+  eq spectec-cvtop--(FNN-1, INN-2, spectec-TRUNC(SX), F-1) = lift(trunc--(sizenn1(FNN-1), sizenn2(INN-2), SX, F-1)) .
 
-  ceq spectec-cvtop--(INN-1, FNN-2, CONVERT(SX), I-1) = convert--(sizenn1(INN-1), sizenn2(FNN-2), SX, I-1)
-    if typecheck(INN-1, addrtype)
-      /\ typecheck(FNN-2, Fnn) .
+  eq spectec-cvtop--(FNN-1, INN-2, TRUNC-SAT(SX), F-1) = lift(trunc-sat--(sizenn1(FNN-1), sizenn2(INN-2), SX, F-1)) .
 
-  ceq spectec-cvtop--(FNN-1, FNN-2, PROMOTE, F-1) = promote--(sizenn1(FNN-1), sizenn2(FNN-2), F-1)
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn) .
+  eq spectec-cvtop--(INN-1, FNN-2, CONVERT(SX), I-1) = convert--(sizenn1(INN-1), sizenn2(FNN-2), SX, I-1) .
 
-  ceq spectec-cvtop--(FNN-1, FNN-2, DEMOTE, F-1) = demote--(sizenn1(FNN-1), sizenn2(FNN-2), F-1)
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn) .
+  eq spectec-cvtop--(FNN-1, FNN-2, PROMOTE, F-1) = promote--(sizenn1(FNN-1), sizenn2(FNN-2), F-1) .
+
+  eq spectec-cvtop--(FNN-1, FNN-2, DEMOTE, F-1) = demote--(sizenn1(FNN-1), sizenn2(FNN-2), F-1) .
 
   ceq spectec-cvtop--(INN-1, FNN-2, REINTERPRET, I-1) = reinterpret--(INN-1, FNN-2, I-1)
-    if typecheck(INN-1, addrtype)
-      /\ typecheck(FNN-2, Fnn)
-      /\ size(INN-1) == size(FNN-2)
-      /\ typecheck(INN-1, Inn)
-      /\ typecheck(I-1, num-(INN-1)) .
+    if size(INN-1) == size(FNN-2) .
 
   ceq spectec-cvtop--(FNN-1, INN-2, REINTERPRET, F-1) = reinterpret--(FNN-1, INN-2, F-1)
     if typecheck(FNN-1, Fnn)
-      /\ typecheck(INN-2, addrtype)
-      /\ size(FNN-1) == size(INN-2)
-      /\ typecheck(INN-2, Inn)
-      /\ typecheck(F-1, num-(FNN-1)) .
+      /\ size(FNN-1) == size(INN-2) .
 
-  ceq zeroop(_X_(JNN-1, M-1), _X_(JNN-2, M-2), spectec-EXTEND(HALF, SX)) = eps
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn) .
+  eq zeroop(_X_(JNN-1, M-1), _X_(JNN-2, M-2), spectec-EXTEND(HALF, SX)) = eps .
 
   ceq zeroop(_X_(JNN-1, M-1), _X_(FNN-2, M-2), spectec-CONVERT(HALF-, SX)) = eps
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(FNN-2, Fnn)
-      /\ len(HALF-) <= 1 .
+    if len(HALF-) <= 1 .
 
   ceq zeroop(_X_(FNN-1, M-1), _X_(JNN-2, M-2), spectec-TRUNC-SAT(SX, ZERO-)) = ZERO-
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(JNN-2, Jnn)
-      /\ len(ZERO-) <= 1 .
+    if len(ZERO-) <= 1 .
 
   ceq zeroop(_X_(FNN-1, M-1), _X_(JNN-2, M-2), RELAXED-TRUNC(SX, ZERO-)) = ZERO-
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(JNN-2, Jnn)
-      /\ len(ZERO-) <= 1 .
+    if len(ZERO-) <= 1 .
 
-  ceq zeroop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), spectec-DEMOTE(ZERO3)) = ZERO3 ?
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn) .
+  eq zeroop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), spectec-DEMOTE(ZERO3)) = ZERO3 ? .
 
-  ceq zeroop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), PROMOTELOW) = eps
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn) .
+  eq zeroop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), PROMOTELOW) = eps .
 
-  ceq halfop(_X_(JNN-1, M-1), _X_(JNN-2, M-2), spectec-EXTEND(HALF, SX)) = HALF ?
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn) .
+  eq halfop(_X_(JNN-1, M-1), _X_(JNN-2, M-2), spectec-EXTEND(HALF, SX)) = HALF ? .
 
   ceq halfop(_X_(JNN-1, M-1), _X_(FNN-2, M-2), spectec-CONVERT(HALF-, SX)) = HALF-
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(FNN-2, Fnn)
-      /\ len(HALF-) <= 1 .
+    if len(HALF-) <= 1 .
 
   ceq halfop(_X_(FNN-1, M-1), _X_(JNN-2, M-2), spectec-TRUNC-SAT(SX, ZERO-)) = eps
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(JNN-2, Jnn)
-      /\ len(ZERO-) <= 1 .
+    if len(ZERO-) <= 1 .
 
   ceq halfop(_X_(FNN-1, M-1), _X_(JNN-2, M-2), RELAXED-TRUNC(SX, ZERO-)) = eps
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(JNN-2, Jnn)
-      /\ len(ZERO-) <= 1 .
+    if len(ZERO-) <= 1 .
 
-  ceq halfop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), spectec-DEMOTE(ZERO3)) = eps
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn) .
+  eq halfop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), spectec-DEMOTE(ZERO3)) = eps .
 
-  ceq halfop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), PROMOTELOW) = LOW ?
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn) .
+  eq halfop(_X_(FNN-1, M-1), _X_(FNN-2, M-2), PROMOTELOW) = LOW ? .
 
   eq spectec-half(LOW, I, J) = I .
 
   eq spectec-half(HIGH, I, J) = J .
 
   ceq iswizzle-lane-(N2, C-2, I) = C-2 [ I ]
-    if I < len(C-2)
-      /\ typecheck(C-2, uN(N2)) .
+    if I < len(C-2) .
 
-  ceq iswizzle-lane-(N2, C-2, I) = 0
-    if typecheck(C-2, uN(N2)) [owise] .
+  eq iswizzle-lane-(N2, C-2, I) = 0 [owise] .
 
   ceq irelaxed-swizzle-lane-(N2, C-2, I) = C-2 [ I ]
-    if I < len(C-2)
-      /\ typecheck(C-2, uN(N2)) .
+    if I < len(C-2) .
 
   ceq irelaxed-swizzle-lane-(N2, C-2, I) = 0
-    if signed-(N2, I) < (0 : nat <:> int)
-      /\ typecheck(C-2, uN(N2)) .
+    if signed-(N2, I) < (0 : nat <:> int) .
 
-  ceq irelaxed-swizzle-lane-(N2, C-2, I) = spectec-relaxed2(r-swizzle, uN(N2), 0, C-2 [ _rem_(I, len(C-2)) ])
-    if typecheck(C-2, uN(N2)) [owise] .
+  eq irelaxed-swizzle-lane-(N2, C-2, I) = spectec-relaxed2(r-swizzle, uN(N2), 0, C-2 [ _rem_(I, len(C-2)) ]) [owise] .
 
   ceq ivunop-(_X_(JNN, M2), F-, V-1) = inv-lanes-(_X_(JNN, M2), C-2)
     if typecheck(JNN, Jnn)
@@ -6511,207 +6280,143 @@ mod SPEC2MAUDE-GENERATED is
   eq vvternop-(VNN, BITSELECT, V-1, V-2, V-3) = ibitselect-(vsizenn(VNN), V-1, V-2, V-3) .
 
   ceq spectec-vunop-(_X_(FNN, M2), ABS, V) = fvunop-(_X_(FNN, M2), fabs-, V)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(M2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-vunop-(_X_(FNN, M2), spectec-NEG, V) = fvunop-(_X_(FNN, M2), fneg-, V)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(M2, M) .
-
-  ceq spectec-vunop-(_X_(FNN, M2), SQRT, V) = fvunop-(_X_(FNN, M2), fsqrt-, V)
     if typecheck(FNN, Fnn) .
 
-  ceq spectec-vunop-(_X_(FNN, M2), CEIL, V) = fvunop-(_X_(FNN, M2), fceil-, V)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vunop-(_X_(FNN, M2), SQRT, V) = fvunop-(_X_(FNN, M2), fsqrt-, V) .
 
-  ceq spectec-vunop-(_X_(FNN, M2), FLOOR, V) = fvunop-(_X_(FNN, M2), ffloor-, V)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vunop-(_X_(FNN, M2), CEIL, V) = fvunop-(_X_(FNN, M2), fceil-, V) .
 
-  ceq spectec-vunop-(_X_(FNN, M2), TRUNC, V) = fvunop-(_X_(FNN, M2), ftrunc-, V)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vunop-(_X_(FNN, M2), FLOOR, V) = fvunop-(_X_(FNN, M2), ffloor-, V) .
 
-  ceq spectec-vunop-(_X_(FNN, M2), NEAREST, V) = fvunop-(_X_(FNN, M2), fnearest-, V)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vunop-(_X_(FNN, M2), TRUNC, V) = fvunop-(_X_(FNN, M2), ftrunc-, V) .
+
+  eq spectec-vunop-(_X_(FNN, M2), NEAREST, V) = fvunop-(_X_(FNN, M2), fnearest-, V) .
 
   ceq spectec-vunop-(_X_(JNN, M2), ABS, V) = ivunop-(_X_(JNN, M2), iabs-, V)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(M2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq spectec-vunop-(_X_(JNN, M2), spectec-NEG, V) = ivunop-(_X_(JNN, M2), ineg-, V)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(M2, M) .
-
-  ceq spectec-vunop-(_X_(JNN, M2), POPCNT, V) = ivunop-(_X_(JNN, M2), ipopcnt-, V)
     if typecheck(JNN, Jnn) .
+
+  eq spectec-vunop-(_X_(JNN, M2), POPCNT, V) = ivunop-(_X_(JNN, M2), ipopcnt-, V) .
 
   ceq spectec-vbinop-(_X_(JNN, M2), ADD, V-1, V-2) = ivbinop-(_X_(JNN, M2), iadd-, V-1, V-2)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(M2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq spectec-vbinop-(_X_(JNN, M2), spectec-SUB, V-1, V-2) = ivbinop-(_X_(JNN, M2), isub-, V-1, V-2)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(M2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq spectec-vbinop-(_X_(JNN, M2), MUL, V-1, V-2) = ivbinop-(_X_(JNN, M2), imul-, V-1, V-2)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(M2, M) .
-
-  ceq spectec-vbinop-(_X_(JNN, M2), ADD-SAT(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), iadd-sat-, SX, V-1, V-2)
     if typecheck(JNN, Jnn) .
 
-  ceq spectec-vbinop-(_X_(JNN, M2), SUB-SAT(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), isub-sat-, SX, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vbinop-(_X_(JNN, M2), ADD-SAT(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), iadd-sat-, SX, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(JNN, M2), spectec-MIN(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), imin-, SX, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vbinop-(_X_(JNN, M2), SUB-SAT(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), isub-sat-, SX, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(JNN, M2), spectec-MAX(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), imax-, SX, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vbinop-(_X_(JNN, M2), spectec-MIN(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), imin-, SX, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(JNN, M2), AVGRU, V-1, V-2) = ivbinopsx-(_X_(JNN, M2), iavgr-, U, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vbinop-(_X_(JNN, M2), spectec-MAX(SX), V-1, V-2) = ivbinopsx-(_X_(JNN, M2), imax-, SX, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(JNN, M2), Q15MULR-SATS, V-1, V-2) = ivbinopsx-(_X_(JNN, M2), iq15mulr-sat-, S, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vbinop-(_X_(JNN, M2), AVGRU, V-1, V-2) = ivbinopsx-(_X_(JNN, M2), iavgr-, U, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(JNN, M2), RELAXED-Q15MULRS, V-1, V-2) = ivbinopsxnd-(_X_(JNN, M2), irelaxed-q15mulr-, S, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vbinop-(_X_(JNN, M2), Q15MULR-SATS, V-1, V-2) = ivbinopsx-(_X_(JNN, M2), iq15mulr-sat-, S, V-1, V-2) .
+
+  eq spectec-vbinop-(_X_(JNN, M2), RELAXED-Q15MULRS, V-1, V-2) = ivbinopsxnd-(_X_(JNN, M2), irelaxed-q15mulr-, S, V-1, V-2) .
 
   ceq spectec-vbinop-(_X_(FNN, M2), ADD, V-1, V-2) = fvbinop-(_X_(FNN, M2), fadd-, V-1, V-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(M2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-vbinop-(_X_(FNN, M2), spectec-SUB, V-1, V-2) = fvbinop-(_X_(FNN, M2), fsub-, V-1, V-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(M2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-vbinop-(_X_(FNN, M2), MUL, V-1, V-2) = fvbinop-(_X_(FNN, M2), fmul-, V-1, V-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(M2, M) .
-
-  ceq spectec-vbinop-(_X_(FNN, M2), spectec-DIV, V-1, V-2) = fvbinop-(_X_(FNN, M2), fdiv-, V-1, V-2)
     if typecheck(FNN, Fnn) .
 
-  ceq spectec-vbinop-(_X_(FNN, M2), MIN, V-1, V-2) = fvbinop-(_X_(FNN, M2), fmin-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vbinop-(_X_(FNN, M2), spectec-DIV, V-1, V-2) = fvbinop-(_X_(FNN, M2), fdiv-, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(FNN, M2), MAX, V-1, V-2) = fvbinop-(_X_(FNN, M2), fmax-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vbinop-(_X_(FNN, M2), MIN, V-1, V-2) = fvbinop-(_X_(FNN, M2), fmin-, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(FNN, M2), PMIN, V-1, V-2) = fvbinop-(_X_(FNN, M2), fpmin-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vbinop-(_X_(FNN, M2), MAX, V-1, V-2) = fvbinop-(_X_(FNN, M2), fmax-, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(FNN, M2), PMAX, V-1, V-2) = fvbinop-(_X_(FNN, M2), fpmax-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vbinop-(_X_(FNN, M2), PMIN, V-1, V-2) = fvbinop-(_X_(FNN, M2), fpmin-, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(FNN, M2), RELAXED-MIN, V-1, V-2) = fvbinop-(_X_(FNN, M2), frelaxed-min-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vbinop-(_X_(FNN, M2), PMAX, V-1, V-2) = fvbinop-(_X_(FNN, M2), fpmax-, V-1, V-2) .
 
-  ceq spectec-vbinop-(_X_(FNN, M2), RELAXED-MAX, V-1, V-2) = fvbinop-(_X_(FNN, M2), frelaxed-max-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vbinop-(_X_(FNN, M2), RELAXED-MIN, V-1, V-2) = fvbinop-(_X_(FNN, M2), frelaxed-min-, V-1, V-2) .
 
-  ceq spectec-vternop-(_X_(JNN, M2), RELAXED-LANESELECT, V-1, V-2, V-3) = ivternopnd-(_X_(JNN, M2), irelaxed-laneselect-, V-1, V-2, V-3)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vbinop-(_X_(FNN, M2), RELAXED-MAX, V-1, V-2) = fvbinop-(_X_(FNN, M2), frelaxed-max-, V-1, V-2) .
 
-  ceq spectec-vternop-(_X_(FNN, M2), RELAXED-MADD, V-1, V-2, V-3) = fvternop-(_X_(FNN, M2), frelaxed-madd-, V-1, V-2, V-3)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vternop-(_X_(JNN, M2), RELAXED-LANESELECT, V-1, V-2, V-3) = ivternopnd-(_X_(JNN, M2), irelaxed-laneselect-, V-1, V-2, V-3) .
 
-  ceq spectec-vternop-(_X_(FNN, M2), RELAXED-NMADD, V-1, V-2, V-3) = fvternop-(_X_(FNN, M2), frelaxed-nmadd-, V-1, V-2, V-3)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vternop-(_X_(FNN, M2), RELAXED-MADD, V-1, V-2, V-3) = fvternop-(_X_(FNN, M2), frelaxed-madd-, V-1, V-2, V-3) .
+
+  eq spectec-vternop-(_X_(FNN, M2), RELAXED-NMADD, V-1, V-2, V-3) = fvternop-(_X_(FNN, M2), frelaxed-nmadd-, V-1, V-2, V-3) .
 
   ceq spectec-vrelop-(_X_(JNN, M2), EQ, V-1, V-2) = ivrelop-(_X_(JNN, M2), ieq-, V-1, V-2)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(M2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq spectec-vrelop-(_X_(JNN, M2), NE, V-1, V-2) = ivrelop-(_X_(JNN, M2), ine-, V-1, V-2)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(M2, M) .
-
-  ceq spectec-vrelop-(_X_(JNN, M2), LT(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), ilt-, SX, V-1, V-2)
     if typecheck(JNN, Jnn) .
 
-  ceq spectec-vrelop-(_X_(JNN, M2), GT(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), igt-, SX, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vrelop-(_X_(JNN, M2), LT(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), ilt-, SX, V-1, V-2) .
 
-  ceq spectec-vrelop-(_X_(JNN, M2), LE(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), ile-, SX, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vrelop-(_X_(JNN, M2), GT(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), igt-, SX, V-1, V-2) .
 
-  ceq spectec-vrelop-(_X_(JNN, M2), GE(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), ige-, SX, V-1, V-2)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vrelop-(_X_(JNN, M2), LE(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), ile-, SX, V-1, V-2) .
+
+  eq spectec-vrelop-(_X_(JNN, M2), GE(SX), V-1, V-2) = ivrelopsx-(_X_(JNN, M2), ige-, SX, V-1, V-2) .
 
   ceq spectec-vrelop-(_X_(FNN, M2), EQ, V-1, V-2) = fvrelop-(_X_(FNN, M2), feq-, V-1, V-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(M2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-vrelop-(_X_(FNN, M2), NE, V-1, V-2) = fvrelop-(_X_(FNN, M2), fne-, V-1, V-2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(M2, M) .
-
-  ceq spectec-vrelop-(_X_(FNN, M2), spectec-LT, V-1, V-2) = fvrelop-(_X_(FNN, M2), flt-, V-1, V-2)
     if typecheck(FNN, Fnn) .
 
-  ceq spectec-vrelop-(_X_(FNN, M2), spectec-GT, V-1, V-2) = fvrelop-(_X_(FNN, M2), fgt-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vrelop-(_X_(FNN, M2), spectec-LT, V-1, V-2) = fvrelop-(_X_(FNN, M2), flt-, V-1, V-2) .
 
-  ceq spectec-vrelop-(_X_(FNN, M2), spectec-LE, V-1, V-2) = fvrelop-(_X_(FNN, M2), fle-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vrelop-(_X_(FNN, M2), spectec-GT, V-1, V-2) = fvrelop-(_X_(FNN, M2), fgt-, V-1, V-2) .
 
-  ceq spectec-vrelop-(_X_(FNN, M2), spectec-GE, V-1, V-2) = fvrelop-(_X_(FNN, M2), fge-, V-1, V-2)
-    if typecheck(FNN, Fnn) .
+  eq spectec-vrelop-(_X_(FNN, M2), spectec-LE, V-1, V-2) = fvrelop-(_X_(FNN, M2), fle-, V-1, V-2) .
+
+  eq spectec-vrelop-(_X_(FNN, M2), spectec-GE, V-1, V-2) = fvrelop-(_X_(FNN, M2), fge-, V-1, V-2) .
 
   ceq lcvtop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), spectec-EXTEND(HALF, SX), C-12) = C3
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn)
-      /\ C3 := extend--(lsizenn1(JNN-1), lsizenn2(JNN-2), SX, C-12) .
+    if C3 := extend--(lsizenn1(JNN-1), lsizenn2(JNN-2), SX, C-12) .
 
   ceq lcvtop--(_X_(JNN-1, M-1), _X_(FNN-2, M-2), spectec-CONVERT(HALF-, SX), C-12) = C2
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(FNN-2, Fnn)
-      /\ len(HALF-) <= 1
+    if len(HALF-) <= 1
       /\ C2 := convert--(lsizenn1(JNN-1), lsizenn2(FNN-2), SX, C-12) .
 
   ceq lcvtop--(_X_(FNN-1, M-1), _X_(INN-2, M-2), spectec-TRUNC-SAT(SX, ZERO-), C-13) = lift(C-4)
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(INN-2, addrtype)
+    if typecheck(INN-2, addrtype)
       /\ len(ZERO-) <= 1
       /\ C-4 := trunc-sat--(lsizenn1(FNN-1), lsizenn2(INN-2), SX, C-13)
       /\ len(C-4) <= 1 .
 
   ceq lcvtop--(_X_(FNN-1, M-1), _X_(INN-2, M-2), RELAXED-TRUNC(SX, ZERO-), C-13) = lift(C-4)
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(INN-2, addrtype)
+    if typecheck(INN-2, addrtype)
       /\ len(ZERO-) <= 1
       /\ C-4 := relaxed-trunc--(lsizenn1(FNN-1), lsizenn2(INN-2), SX, C-13)
       /\ len(C-4) <= 1 .
 
   ceq lcvtop--(_X_(FNN-1, M-1), _X_(FNN-2, M-2), spectec-DEMOTE(ZERO), C-13) = C-2
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn)
-      /\ C-2 := demote--(lsizenn1(FNN-1), lsizenn2(FNN-2), C-13) .
+    if C-2 := demote--(lsizenn1(FNN-1), lsizenn2(FNN-2), C-13) .
 
   ceq lcvtop--(_X_(FNN-1, M-1), _X_(FNN-2, M-2), PROMOTELOW, C-13) = C-2
-    if typecheck(FNN-1, Fnn)
-      /\ typecheck(FNN-2, Fnn)
-      /\ C-2 := promote--(lsizenn1(FNN-1), lsizenn2(FNN-2), C-13) .
+    if C-2 := promote--(lsizenn1(FNN-1), lsizenn2(FNN-2), C-13) .
 
   ceq spectec-vcvtop--(_X_(LNN-1, M2), _X_(LNN-2, M2), VCVTOP2, V-1) = spectec-vcvtop---choice-291-0(map-inv-lanes-6(LNN-2, M2, C--))
     if _and_(halfop(_X_(LNN-1, M2), _X_(LNN-2, M2), VCVTOP2) == eps, zeroop(_X_(LNN-1, M2), _X_(LNN-2, M2), VCVTOP2) == eps)
-      /\ typecheck(LNN-1, Lnn)
-      /\ typecheck(M2, M)
-      /\ typecheck(LNN-2, Lnn)
-      /\ typecheck(VCVTOP2, vcvtop--(_X_(LNN-1, M2), _X_(LNN-2, M2)))
       /\ C-1- := lanes-(_X_(LNN-1, M2), V-1)
       /\ C-- := setproduct-(lane-(LNN-2), map-lcvtop(LNN-2, LNN-1, M2, VCVTOP2, C-1-)) .
 
   rl spectec-vcvtop---choice-291-0(CHOICE-PREFIX (V CHOICE-REST)) => V .
 
   ceq spectec-vcvtop--(_X_(LNN-1, M-1), _X_(LNN-2, M-2), VCVTOP2, V-1) = spectec-vcvtop---choice-296-0(map-inv-lanes-7(LNN-2, M-2, C--))
-    if typecheck(LNN-1, Lnn)
-      /\ typecheck(M-1, M)
-      /\ typecheck(LNN-2, Lnn)
-      /\ typecheck(M-2, M)
-      /\ typecheck(VCVTOP2, vcvtop--(_X_(LNN-1, M-1), _X_(LNN-2, M-2)))
-      /\ HALF ? := halfop(_X_(LNN-1, M-1), _X_(LNN-2, M-2), VCVTOP2)
+    if HALF ? := halfop(_X_(LNN-1, M-1), _X_(LNN-2, M-2), VCVTOP2)
       /\ C-1- := lanes-(_X_(LNN-1, M-1), V-1) [ spectec-half(HALF, 0, M-2) : M-2 ]
       /\ C-- := setproduct-(lane-(LNN-2), map-lcvtop-2(LNN-2, LNN-1, M-1, M-2, VCVTOP2, C-1-)) .
 
@@ -6719,24 +6424,16 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-vcvtop--(_X_(LNN-1, M-1), _X_(LNN-2, M-2), VCVTOP2, V-1) = spectec-vcvtop---choice-301-0(map-inv-lanes-8(LNN-2, M-2, C--))
     if zeroop(_X_(LNN-1, M-1), _X_(LNN-2, M-2), VCVTOP2) == (ZERO ?)
-      /\ typecheck(LNN-1, Lnn)
-      /\ typecheck(M-1, M)
-      /\ typecheck(LNN-2, Lnn)
-      /\ typecheck(M-2, M)
-      /\ typecheck(VCVTOP2, vcvtop--(_X_(LNN-1, M-1), _X_(LNN-2, M-2)))
       /\ C-1- := lanes-(_X_(LNN-1, M-1), V-1)
       /\ C-- := setproduct-(lane-(LNN-2), map-lcvtop-3(LNN-2, LNN-1, M-1, M-2, VCVTOP2, C-1-) repeatSeq(M-1, seq(spectec-zero(LNN-2)))) .
 
   rl spectec-vcvtop---choice-301-0(CHOICE-PREFIX (V CHOICE-REST)) => V .
 
-  ceq spectec-vshiftop-(_X_(JNN, M2), SHL, V, I) = ivshiftop-(_X_(JNN, M2), ishl-, V, I)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vshiftop-(_X_(JNN, M2), SHL, V, I) = ivshiftop-(_X_(JNN, M2), ishl-, V, I) .
 
-  ceq spectec-vshiftop-(_X_(JNN, M2), SHR(SX), V, I) = ivshiftopsx-(_X_(JNN, M2), ishr-, SX, V, I)
-    if typecheck(JNN, Jnn) .
+  eq spectec-vshiftop-(_X_(JNN, M2), SHR(SX), V, I) = ivshiftopsx-(_X_(JNN, M2), ishr-, SX, V, I) .
 
-  ceq vbitmaskop-(_X_(JNN, M2), V) = ivbitmaskop-(_X_(JNN, M2), V)
-    if typecheck(JNN, Jnn) .
+  eq vbitmaskop-(_X_(JNN, M2), V) = ivbitmaskop-(_X_(JNN, M2), V) .
 
   eq spectec-vswizzlop-(_X_(I8, M2), SWIZZLE, V-1, V-2) = ivswizzlop-(_X_(I8, M2), iswizzle-lane-, V-1, V-2) .
 
@@ -6764,9 +6461,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ C--1- := map-extend-4(JNN-2, JNN-1, SX, C-1-)
       /\ C-2 := apply(F-12, lsizenn2(JNN-2), C--1-) .
 
-  ceq spectec-vextunop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), EXTADD-PAIRWISE(SX), V-1) = ivextunop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivadd-pairwise-, SX, V-1)
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn) .
+  eq spectec-vextunop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), EXTADD-PAIRWISE(SX), V-1) = ivextunop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivadd-pairwise-, SX, V-1) .
 
   ceq ivdot-(N2, I-1-, I-2-) = map-iadd-2(N2, J-1-, J-2-)
     if tuple(seq(J-1-) seq(J-2-)) := project-map-exp-899(N2, inv-concat-(uN(N2), map-imul(N2, I-1-, I-2-)))
@@ -6787,22 +6482,14 @@ mod SPEC2MAUDE-GENERATED is
 
   eq ivmul-(N2, I-1-, I-2-) = map-imul-3(N2, I-1-, I-2-) .
 
-  ceq spectec-vextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), EXTMUL(HALF, SX), V-1, V-2) = ivextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivmul-, SX, SX, spectec-half(HALF, 0, M-2), M-2, V-1, V-2)
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn) .
+  eq spectec-vextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), EXTMUL(HALF, SX), V-1, V-2) = ivextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivmul-, SX, SX, spectec-half(HALF, 0, M-2), M-2, V-1, V-2) .
 
-  ceq spectec-vextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), DOTS, V-1, V-2) = ivextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivdot-, S, S, 0, M-1, V-1, V-2)
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn) .
+  eq spectec-vextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), DOTS, V-1, V-2) = ivextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivdot-, S, S, 0, M-1, V-1, V-2) .
 
-  ceq spectec-vextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), RELAXED-DOTS, V-1, V-2) = ivextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivdot-sat-, S, spectec-relaxed2(r-idot, sx, S, U), 0, M-1, V-1, V-2)
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn) .
+  eq spectec-vextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), RELAXED-DOTS, V-1, V-2) = ivextbinop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), ivdot-sat-, S, spectec-relaxed2(r-idot, sx, S, U), 0, M-1, V-1, V-2) .
 
   ceq spectec-vextternop--(_X_(JNN-1, M-1), _X_(JNN-2, M-2), RELAXED-DOT-ADDS, C-12, C-23, C-32) = spectec-vextternop---choice-398-0(spectec-vbinop-(_X_(JNN-2, M-2), ADD, C--3, C-32))
-    if typecheck(JNN-1, Jnn)
-      /\ typecheck(JNN-2, Jnn)
-      /\ JNN := inv-jsizenn(2 * lsizenn1(JNN-1))
+    if JNN := inv-jsizenn(2 * lsizenn1(JNN-1))
       /\ jsizenn(JNN) == (2 * lsizenn1(JNN-1))
       /\ M2 := 2 * M-2
       /\ C-5 := spectec-vextbinop--(_X_(JNN-1, M-1), _X_(JNN, M2), RELAXED-DOTS, C-12, C-23)
@@ -6937,52 +6624,43 @@ mod SPEC2MAUDE-GENERATED is
   eq Ki = 1024 .
 
   ceq packfield-(VALTYPE, VAL) = VAL
-    if typecheck(VALTYPE, valtype)
-      /\ typecheck(VAL, val) .
+    if typecheck(VALTYPE, valtype) .
 
   ceq packfield-(PACKTYPE, CONST(I32, I)) = PACK(PACKTYPE, wrap--(32, psize(PACKTYPE), I))
-    if typecheck(PACKTYPE, packtype)
-      /\ typecheck(I, num-(I32)) .
+    if typecheck(PACKTYPE, packtype) .
 
   ceq unpackfield-(VALTYPE, eps, VAL) = VAL
-    if typecheck(VALTYPE, valtype)
-      /\ typecheck(VAL, val) .
+    if typecheck(VALTYPE, valtype) .
 
-  ceq unpackfield-(PACKTYPE, SX ?, PACK(PACKTYPE, I)) = CONST(I32, extend--(psize(PACKTYPE), 32, SX, I))
-    if typecheck(PACKTYPE, packtype) .
+  eq unpackfield-(PACKTYPE, SX ?, PACK(PACKTYPE, I)) = CONST(I32, extend--(psize(PACKTYPE), 32, SX, I)) .
 
   eq tagsxa(eps) = eps .
 
-  ceq tagsxa(TAG(A) XA-) = A tagsxa(XA-)
-    if typecheck(A, addr) .
+  eq tagsxa(TAG(A) XA-) = A tagsxa(XA-) .
 
   eq tagsxa(EXTERNADDR XA-) = tagsxa(XA-) [owise] .
 
   eq globalsxa(eps) = eps .
 
-  ceq globalsxa(GLOBAL(A) XA-) = A globalsxa(XA-)
-    if typecheck(A, addr) .
+  eq globalsxa(GLOBAL(A) XA-) = A globalsxa(XA-) .
 
   eq globalsxa(EXTERNADDR XA-) = globalsxa(XA-) [owise] .
 
   eq memsxa(eps) = eps .
 
-  ceq memsxa(MEM(A) XA-) = A memsxa(XA-)
-    if typecheck(A, addr) .
+  eq memsxa(MEM(A) XA-) = A memsxa(XA-) .
 
   eq memsxa(EXTERNADDR XA-) = memsxa(XA-) [owise] .
 
   eq tablesxa(eps) = eps .
 
-  ceq tablesxa(TABLE(A) XA-) = A tablesxa(XA-)
-    if typecheck(A, addr) .
+  eq tablesxa(TABLE(A) XA-) = A tablesxa(XA-) .
 
   eq tablesxa(EXTERNADDR XA-) = tablesxa(XA-) [owise] .
 
   eq funcsxa(eps) = eps .
 
-  ceq funcsxa(FUNC(A) XA-) = A funcsxa(XA-)
-    if typecheck(A, addr) .
+  eq funcsxa(FUNC(A) XA-) = A funcsxa(XA-) .
 
   eq funcsxa(EXTERNADDR XA-) = funcsxa(XA-) [owise] .
 
@@ -7111,19 +6789,14 @@ mod SPEC2MAUDE-GENERATED is
 
   rl Step-pure(NOP) => eps .
 
-  crl Step-pure(VAL DROP) => eps
-    if typecheck(VAL, val) .
+  rl Step-pure(VAL DROP) => eps .
 
   crl Step-pure(VAL-1 (VAL-2 (CONST(I32, C3) SELECT(T--)))) => VAL-1
-    if typecheck(VAL-1, val)
-      /\ typecheck(VAL-2, val)
-      /\ len(T--) <= 1
+    if len(T--) <= 1
       /\ C3 =/= 0 .
 
   crl Step-pure(VAL-1 (VAL-2 (CONST(I32, C3) SELECT(T--)))) => VAL-2
-    if typecheck(VAL-1, val)
-      /\ typecheck(VAL-2, val)
-      /\ len(T--) <= 1
+    if len(T--) <= 1
       /\ C3 == 0 .
 
   crl Step-pure(CONST(I32, C3) IF__ELSE_(BT, INSTR-1-, INSTR-2-)) => BLOCK(BT, INSTR-1-)
@@ -7156,20 +6829,16 @@ mod SPEC2MAUDE-GENERATED is
     if I >= len(L-) .
 
   crl Step-pure(VAL BR-ON-NULL(L)) => BR(L)
-    if typecheck(VAL, val)
-      /\ VAL == (REF.NULL-ADDR) .
+    if VAL == (REF.NULL-ADDR) .
 
   crl Step-pure(VAL BR-ON-NULL(L)) => VAL
-    if typecheck(VAL, val)
-      /\ VAL =/= (REF.NULL-ADDR) .
+    if VAL =/= (REF.NULL-ADDR) .
 
   crl Step-pure(VAL BR-ON-NON-NULL(L)) => eps
-    if typecheck(VAL, val)
-      /\ VAL == (REF.NULL-ADDR) .
+    if VAL == (REF.NULL-ADDR) .
 
   crl Step-pure(VAL BR-ON-NON-NULL(L)) => VAL BR(L)
-    if typecheck(VAL, val)
-      /\ VAL =/= (REF.NULL-ADDR) .
+    if VAL =/= (REF.NULL-ADDR) .
 
   rl Step-pure(CALL-INDIRECT(X4, YY2)) => TABLE.GET(X4) (REF.CAST(REF(NULL ?, YY2)) CALL-REF(YY2)) .
 
@@ -7196,8 +6865,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl Step-pure(FRAME- N3 { F } TRAP) => TRAP .
 
-  crl Step-pure(VAL LOCAL.TEE(X4)) => VAL (VAL LOCAL.SET(X4))
-    if typecheck(VAL, val) .
+  rl Step-pure(VAL LOCAL.TEE(X4)) => VAL (VAL LOCAL.SET(X4)) .
 
   rl Step-pure(CONST(I32, I) (REF.I31)) => REF.I31-NUM(wrap--(32, 31, I)) .
 
@@ -7238,8 +6906,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl Step-pure(REF.I31-NUM(I) I31.GET(SX)) => CONST(I32, extend--(31, 32, SX, I)) .
 
-  crl Step-pure(VAL (CONST(I32, N3) ARRAY.NEW(X4))) => instrRepeat(N3, VAL) ARRAY.NEW-FIXED(X4, N3)
-    if typecheck(VAL, val) .
+  rl Step-pure(VAL (CONST(I32, N3) ARRAY.NEW(X4))) => instrRepeat(N3, VAL) ARRAY.NEW-FIXED(X4, N3) .
 
   crl Step-pure(REF2 (EXTERN.CONVERT-ANY)) => REF.NULL-ADDR
     if typecheck(REF2, ref)
@@ -7308,8 +6975,7 @@ mod SPEC2MAUDE-GENERATED is
     if spectec-vternop-(SH, VTERNOP2, C-12, C-23, C-32) == eps .
 
   crl Step-pure(VCONST(V128, C-12) VTESTOP(_X_(JNN, M2), ALL-TRUE)) => CONST(I32, C3)
-    if typecheck(JNN, Jnn)
-      /\ I- := lanes-(_X_(JNN, M2), C-12)
+    if I- := lanes-(_X_(JNN, M2), C-12)
       /\ C3 := prod(map-exp-1014(JNN, I-)) .
 
   crl Step-pure(VCONST(V128, C-12) (VCONST(V128, C-23) VRELOP(SH, VRELOP2))) => VCONST(V128, C3)
@@ -7493,124 +7159,89 @@ mod SPEC2MAUDE-GENERATED is
     if VAL := spectec-global(Z, X4) . 'VALUE .
 
   crl Step-read(Z ; (CONST(AT, I) TABLE.GET(X4))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ I >= len(spectec-table(Z, X4) . 'REFS) .
+    if I >= len(spectec-table(Z, X4) . 'REFS) .
 
   crl Step-read(Z ; (CONST(AT, I) TABLE.GET(X4))) => (spectec-table(Z, X4) . 'REFS) [ I ]
-    if typecheck(AT, addrtype)
-      /\ I < len(spectec-table(Z, X4) . 'REFS) .
+    if I < len(spectec-table(Z, X4) . 'REFS) .
 
   crl Step-read(Z ; TABLE.SIZE(X4)) => CONST(AT, N3)
     if N3 := len(spectec-table(Z, X4) . 'REFS)
       /\ tuple(AT (LIM RT)) := spectec-table(Z, X4) . 'TYPE .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val)
-      /\ (I + N3) > len(spectec-table(Z, X4) . 'REFS) .
+    if (I + N3) > len(spectec-table(Z, X4) . 'REFS) .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) => eps
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val)
-      /\ ((I + N3) > len(spectec-table(Z, X4) . 'REFS)) =/= true
+    if ((I + N3) > len(spectec-table(Z, X4) . 'REFS)) =/= true
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) TABLE.FILL(X4))))) => CONST(AT, I) (VAL (TABLE.SET(X4) (CONST(AT, I + 1) (VAL (CONST(AT, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) TABLE.FILL(X4))))))
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val)
-      /\ ((I + N3) > len(spectec-table(Z, X4) . 'REFS)) =/= true
+    if ((I + N3) > len(spectec-table(Z, X4) . 'REFS)) =/= true
       /\ N3 =/= 0 .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X-1, X-23))))) => TRAP
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-table(Z, X-1) . 'REFS), (I-2 + N3) > len(spectec-table(Z, X-23) . 'REFS)) .
+    if _or_((I-1 + N3) > len(spectec-table(Z, X-1) . 'REFS), (I-2 + N3) > len(spectec-table(Z, X-23) . 'REFS)) .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X4, Y))))) => eps
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-table(Z, X4) . 'REFS), (I-2 + N3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I-1 + N3) > len(spectec-table(Z, X4) . 'REFS), (I-2 + N3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X4, Y))))) => CONST(AT-1, I-1) (CONST(AT-2, I-2) (TABLE.GET(Y) (TABLE.SET(X4) (CONST(AT-1, I-1 + 1) (CONST(AT-2, I-2 + 1) (CONST(AT-, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) TABLE.COPY(X4, Y)))))))
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-table(Z, X4) . 'REFS), (I-2 + N3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I-1 + N3) > len(spectec-table(Z, X4) . 'REFS), (I-2 + N3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N3 =/= 0
       /\ I-1 <= I-2 .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) TABLE.COPY(X4, Y))))) => CONST(AT-1, _-_((I-1 + N3) : nat <:> int, 1 : nat <:> int) : int <:> nat) (CONST(AT-2, _-_((I-2 + N3) : nat <:> int, 1 : nat <:> int) : int <:> nat) (TABLE.GET(Y) (TABLE.SET(X4) (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) TABLE.COPY(X4, Y)))))))
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-table(Z, X4) . 'REFS), (I-2 + N3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I-1 + N3) > len(spectec-table(Z, X4) . 'REFS), (I-2 + N3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N3 =/= 0
       /\ I-1 > I-2 .
 
   crl Step-read(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) TABLE.INIT(X4, Y))))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ _or_((I + N3) > len(spectec-table(Z, X4) . 'REFS), (J + N3) > len(spectec-elem(Z, Y) . 'REFS)) .
+    if _or_((I + N3) > len(spectec-table(Z, X4) . 'REFS), (J + N3) > len(spectec-elem(Z, Y) . 'REFS)) .
 
   crl Step-read(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) TABLE.INIT(X4, Y))))) => eps
-    if typecheck(AT, addrtype)
-      /\ _or_((I + N3) > len(spectec-table(Z, X4) . 'REFS), (J + N3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if _or_((I + N3) > len(spectec-table(Z, X4) . 'REFS), (J + N3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) TABLE.INIT(X4, Y))))) => CONST(AT, I) (((spectec-elem(Z, Y) . 'REFS) [ J ]) (TABLE.SET(X4) (CONST(AT, I + 1) (CONST(I32, J + 1) (CONST(I32, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) TABLE.INIT(X4, Y))))))
-    if typecheck(AT, addrtype)
-      /\ _or_((I + N3) > len(spectec-table(Z, X4) . 'REFS), (J + N3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if _or_((I + N3) > len(spectec-table(Z, X4) . 'REFS), (J + N3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N3 =/= 0 .
 
   crl Step-read(Z ; (CONST(AT, I) LOAD(NT, eps, X4, AO))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) LOAD(NT, eps, X4, AO))) => CONST(NT, C2)
-    if typecheck(AT, addrtype)
-      /\ C2 := inv-nbytes-(NT, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if C2 := inv-nbytes-(NT, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ nbytes-(NT, C2) == ((spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; (CONST(AT, I) LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) LOAD(INN, spectec-_-_(N3, SX) ?, X4, AO))) => CONST(INN, extend--(N3, size(INN), SX, C3))
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype)
-      /\ C3 := inv-ibytes-(N3, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if C3 := inv-ibytes-(N3, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(N3, C3) == ((spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, eps, X4, AO))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, eps, X4, AO))) => VCONST(V128, C3)
-    if typecheck(AT, addrtype)
-      /\ C3 := inv-vbytes-(V128, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if C3 := inv-vbytes-(V128, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ vbytes-(V128, C3) == ((spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + ((((M2 * K2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + ((((M2 * K2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, SHAPE_X_-_(M2, K2, SX) ?, X4, AO))) => VCONST(V128, C3)
-    if typecheck(AT, addrtype)
-      /\ J-3 := iterpr-36-output-1(M2, Z, X4, AT, I, AO, K2, 0)
+    if J-3 := iterpr-36-output-1(M2, Z, X4, AT, I, AO, K2, 0)
       /\ JNN := inv-jsizenn(M2 * 2)
       /\ jsizenn(JNN) == (M2 * 2)
       /\ C3 := inv-lanes-(_X_(JNN, K2), map-extend-7(JNN, K2, M2, SX, K2, J-3)) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, SPLAT(N2) ?, X4, AO))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, SPLAT(N2) ?, X4, AO))) => VCONST(V128, C3)
-    if typecheck(AT, addrtype)
-      /\ J := inv-ibytes-(N2, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if J := inv-ibytes-(N2, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(N2, J) == ((spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ JNN := inv-jsize(N2)
       /\ N2 == jsize(JNN)
@@ -7618,22 +7249,18 @@ mod SPEC2MAUDE-GENERATED is
       /\ C3 := inv-lanes-(_X_(JNN, M2), repeatSeq(M2, J)) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, spectec-ZERO(N2) ?, X4, AO))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) VLOAD(V128, spectec-ZERO(N2) ?, X4, AO))) => VCONST(V128, C3)
-    if typecheck(AT, addrtype)
-      /\ J := inv-ibytes-(N2, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if J := inv-ibytes-(N2, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(N2, J) == ((spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ C3 := extend--(N2, 128, U, J) .
 
   crl Step-read(Z ; (CONST(AT, I) (VCONST(V128, C-12) VLOAD-LANE(V128, N2, X4, AO, J)))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) (VCONST(V128, C-12) VLOAD-LANE(V128, N2, X4, AO, J)))) => VCONST(V128, C3)
-    if typecheck(AT, addrtype)
-      /\ K3 := inv-ibytes-(N2, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if K3 := inv-ibytes-(N2, (spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(N2, K3) == ((spectec-mem(Z, X4) . 'BYTES) [ (I + (AO . 'OFFSET)) : (((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ JNN := inv-jsize(N2)
       /\ N2 == jsize(JNN)
@@ -7647,63 +7274,42 @@ mod SPEC2MAUDE-GENERATED is
       /\ __PAGE(AT, LIM) := spectec-mem(Z, X4) . 'TYPE .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val)
-      /\ (I + N3) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if (I + N3) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) => eps
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val)
-      /\ ((I + N3) > len(spectec-mem(Z, X4) . 'BYTES)) =/= true
+    if ((I + N3) > len(spectec-mem(Z, X4) . 'BYTES)) =/= true
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, I) (VAL (CONST(AT, N3) MEMORY.FILL(X4))))) => CONST(AT, I) (VAL (STORE(I32, 8 ?, X4, memarg0) (CONST(AT, I + 1) (VAL (CONST(AT, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) MEMORY.FILL(X4))))))
-    if typecheck(AT, addrtype)
-      /\ typecheck(VAL, val)
-      /\ ((I + N3) > len(spectec-mem(Z, X4) . 'BYTES)) =/= true
+    if ((I + N3) > len(spectec-mem(Z, X4) . 'BYTES)) =/= true
       /\ N3 =/= 0 .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) => TRAP
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) .
+    if _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) => eps
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) =/= true
+    if _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) =/= true
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) => CONST(AT-1, I-1) (CONST(AT-2, I-2) (LOAD(I32, spectec-_-_(8, U) ?, X-23, memarg0) (STORE(I32, 8 ?, X-1, memarg0) (CONST(AT-1, I-1 + 1) (CONST(AT-2, I-2 + 1) (CONST(AT-, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) MEMORY.COPY(X-1, X-23)))))))
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) =/= true
+    if _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) =/= true
       /\ N3 =/= 0
       /\ I-1 <= I-2 .
 
   crl Step-read(Z ; (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, N3) MEMORY.COPY(X-1, X-23))))) => CONST(AT-1, _-_((I-1 + N3) : nat <:> int, 1 : nat <:> int) : int <:> nat) (CONST(AT-2, _-_((I-2 + N3) : nat <:> int, 1 : nat <:> int) : int <:> nat) (LOAD(I32, spectec-_-_(8, U) ?, X-23, memarg0) (STORE(I32, 8 ?, X-1, memarg0) (CONST(AT-1, I-1) (CONST(AT-2, I-2) (CONST(AT-, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) MEMORY.COPY(X-1, X-23)))))))
-    if typecheck(AT-1, addrtype)
-      /\ typecheck(AT-2, addrtype)
-      /\ typecheck(AT-, addrtype)
-      /\ _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) =/= true
+    if _or_((I-1 + N3) > len(spectec-mem(Z, X-1) . 'BYTES), (I-2 + N3) > len(spectec-mem(Z, X-23) . 'BYTES)) =/= true
       /\ N3 =/= 0
       /\ I-1 > I-2 .
 
   crl Step-read(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) MEMORY.INIT(X4, Y))))) => TRAP
-    if typecheck(AT, addrtype)
-      /\ _or_((I + N3) > len(spectec-mem(Z, X4) . 'BYTES), (J + N3) > len(spectec-data(Z, Y) . 'BYTES)) .
+    if _or_((I + N3) > len(spectec-mem(Z, X4) . 'BYTES), (J + N3) > len(spectec-data(Z, Y) . 'BYTES)) .
 
   crl Step-read(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) MEMORY.INIT(X4, Y))))) => eps
-    if typecheck(AT, addrtype)
-      /\ _or_((I + N3) > len(spectec-mem(Z, X4) . 'BYTES), (J + N3) > len(spectec-data(Z, Y) . 'BYTES)) =/= true
+    if _or_((I + N3) > len(spectec-mem(Z, X4) . 'BYTES), (J + N3) > len(spectec-data(Z, Y) . 'BYTES)) =/= true
       /\ N3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, I) (CONST(I32, J) (CONST(I32, N3) MEMORY.INIT(X4, Y))))) => CONST(AT, I) (CONST(I32, (spectec-data(Z, Y) . 'BYTES) [ J ]) (STORE(I32, 8 ?, X4, memarg0) (CONST(AT, I + 1) (CONST(I32, J + 1) (CONST(I32, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) MEMORY.INIT(X4, Y))))))
-    if typecheck(AT, addrtype)
-      /\ _or_((I + N3) > len(spectec-mem(Z, X4) . 'BYTES), (J + N3) > len(spectec-data(Z, Y) . 'BYTES)) =/= true
+    if _or_((I + N3) > len(spectec-mem(Z, X4) . 'BYTES), (J + N3) > len(spectec-data(Z, Y) . 'BYTES)) =/= true
       /\ N3 =/= 0 .
 
   rl Step-read(Z ; REF.NULL(HT)) => REF.NULL-ADDR .
@@ -7780,21 +7386,17 @@ mod SPEC2MAUDE-GENERATED is
 
   rl Step-read(Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) => CONST(I32, len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) .
 
-  crl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) => TRAP
-    if typecheck(VAL, val) .
+  rl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) => TRAP .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) => TRAP
-    if typecheck(VAL, val)
-      /\ (I + N3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
+    if (I + N3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) => eps
-    if typecheck(VAL, val)
-      /\ ((I + N3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+    if ((I + N3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
       /\ N3 == 0 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (CONST(I32, N3) ARRAY.FILL(X4)))))) => REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL (ARRAY.SET(X4) (REF.ARRAY-ADDR(A) (CONST(I32, I + 1) (VAL (CONST(I32, _-_(N3 : nat <:> int, 1 : nat <:> int) : int <:> nat) ARRAY.FILL(X4))))))))
-    if typecheck(VAL, val)
-      /\ ((I + N3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+    if ((I + N3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
       /\ N3 =/= 0 .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, I-1) (REF2 (CONST(I32, I-2) (CONST(I32, N3) ARRAY.COPY(X-1, X-23))))))) => TRAP
@@ -7884,76 +7486,58 @@ mod SPEC2MAUDE-GENERATED is
       /\ A := len(spectec-exninst(Z))
       /\ EXN3 := { (field('TAG, spectec-tagaddr(Z) [ X4 ]) ; field('FIELDS, VAL-)) } .
 
-  crl Step(Z ; (VAL LOCAL.SET(X4))) => with-local(Z, X4, VAL) ; eps
-    if typecheck(VAL, val) .
+  rl Step(Z ; (VAL LOCAL.SET(X4))) => with-local(Z, X4, VAL) ; eps .
 
-  crl Step(Z ; (VAL GLOBAL.SET(X4))) => with-global(Z, X4, VAL) ; eps
-    if typecheck(VAL, val) .
+  rl Step(Z ; (VAL GLOBAL.SET(X4))) => with-global(Z, X4, VAL) ; eps .
 
   crl Step(Z ; (CONST(AT, I) (REF2 TABLE.SET(X4)))) => Z ; TRAP
-    if typecheck(AT, addrtype)
-      /\ typecheck(REF2, ref)
+    if typecheck(REF2, ref)
       /\ I >= len(spectec-table(Z, X4) . 'REFS) .
 
   crl Step(Z ; (CONST(AT, I) (REF2 TABLE.SET(X4)))) => with-table(Z, X4, I, REF2) ; eps
-    if typecheck(AT, addrtype)
-      /\ typecheck(REF2, ref)
+    if typecheck(REF2, ref)
       /\ I < len(spectec-table(Z, X4) . 'REFS) .
 
   crl Step(Z ; (REF2 (CONST(AT, N3) TABLE.GROW(X4)))) => with-tableinst(Z, X4, TI) ; CONST(AT, len(spectec-table(Z, X4) . 'REFS))
     if typecheck(REF2, ref)
-      /\ typecheck(AT, addrtype)
       /\ TI := growtable(spectec-table(Z, X4), N3, REF2) .
 
   crl Step(Z ; (REF2 (CONST(AT, N3) TABLE.GROW(X4)))) => Z ; CONST(AT, inv-signed-(size(AT), -_(1 : nat <:> int)))
-    if typecheck(REF2, ref)
-      /\ typecheck(AT, addrtype) .
+    if typecheck(REF2, ref) .
 
   rl Step(Z ; ELEM.DROP(X4)) => with-elem(Z, X4, eps) ; eps .
 
   crl Step(Z ; (CONST(AT, I) (CONST(NT, C2) STORE(NT, eps, X4, AO)))) => Z ; TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, I) (CONST(NT, C2) STORE(NT, eps, X4, AO)))) => with-mem(Z, X4, I + (AO . 'OFFSET), ((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B-) ; eps
-    if typecheck(AT, addrtype)
-      /\ B- := nbytes-(NT, C2) .
+    if B- := nbytes-(NT, C2) .
 
   crl Step(Z ; (CONST(AT, I) (CONST(INN, C3) STORE(INN, N3 ?, X4, AO)))) => Z ; TRAP
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, I) (CONST(INN, C3) STORE(INN, N3 ?, X4, AO)))) => with-mem(Z, X4, I + (AO . 'OFFSET), ((N3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B-) ; eps
-    if typecheck(AT, addrtype)
-      /\ typecheck(INN, addrtype)
-      /\ B- := ibytes-(N3, wrap--(size(INN), N3, C3)) .
+    if B- := ibytes-(N3, wrap--(size(INN), N3, C3)) .
 
   crl Step(Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE(V128, X4, AO)))) => Z ; TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE(V128, X4, AO)))) => with-mem(Z, X4, I + (AO . 'OFFSET), ((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B-) ; eps
-    if typecheck(AT, addrtype)
-      /\ B- := vbytes-(V128, C3) .
+    if B- := vbytes-(V128, C3) .
 
   crl Step(Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE-LANE(V128, N2, X4, AO, J)))) => Z ; TRAP
-    if typecheck(AT, addrtype)
-      /\ ((I + (AO . 'OFFSET)) + N2) > len(spectec-mem(Z, X4) . 'BYTES) .
+    if ((I + (AO . 'OFFSET)) + N2) > len(spectec-mem(Z, X4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, I) (VCONST(V128, C3) VSTORE-LANE(V128, N2, X4, AO, J)))) => with-mem(Z, X4, I + (AO . 'OFFSET), ((N2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B-) ; eps
-    if typecheck(AT, addrtype)
-      /\ JNN := inv-jsize(N2)
+    if JNN := inv-jsize(N2)
       /\ N2 == jsize(JNN)
       /\ M2 := ((128 : nat <:> rat) / (N2 : nat <:> rat)) : rat <:> nat
       /\ B- := ibytes-(N2, lanes-(_X_(JNN, M2), C3) [ J ]) .
 
   crl Step(Z ; (CONST(AT, N3) MEMORY.GROW(X4))) => with-meminst(Z, X4, MI) ; CONST(AT, ((len(spectec-mem(Z, X4) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat)
-    if typecheck(AT, addrtype)
-      /\ MI := growmem(spectec-mem(Z, X4), N3) .
+    if MI := growmem(spectec-mem(Z, X4), N3) .
 
-  crl Step(Z ; (CONST(AT, N3) MEMORY.GROW(X4))) => Z ; CONST(AT, inv-signed-(size(AT), -_(1 : nat <:> int)))
-    if typecheck(AT, addrtype) .
+  rl Step(Z ; (CONST(AT, N3) MEMORY.GROW(X4))) => Z ; CONST(AT, inv-signed-(size(AT), -_(1 : nat <:> int))) .
 
   rl Step(Z ; DATA.DROP(X4)) => with-data(Z, X4, eps) ; eps .
 
@@ -7965,12 +7549,10 @@ mod SPEC2MAUDE-GENERATED is
       /\ A := len(spectec-structinst(Z))
       /\ SI2 := { (field('TYPE, spectec-type(Z, X4)) ; field('FIELDS, map-packfield(N3, VAL-, ZT-))) } .
 
-  crl Step(Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X4, I)))) => Z ; TRAP
-    if typecheck(VAL, val) .
+  rl Step(Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X4, I)))) => Z ; TRAP .
 
   crl Step(Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X4, I)))) => with-struct(Z, A, I, packfield-(ZT- [ I ], VAL)) ; eps
-    if typecheck(VAL, val)
-      /\ REL-OUTPUT1 := Expand(spectec-type(Z, X4))
+    if REL-OUTPUT1 := Expand(spectec-type(Z, X4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
       /\ tuple(seq(MUT--) seq(ZT-)) := project-map-exp-1160(CASE-PART1) .
 
@@ -7981,16 +7563,13 @@ mod SPEC2MAUDE-GENERATED is
       /\ A := len(spectec-arrayinst(Z))
       /\ AI2 := { (field('TYPE, spectec-type(Z, X4)) ; field('FIELDS, map-packfield-2(ZT, N3, VAL-))) } .
 
-  crl Step(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL ARRAY.SET(X4))))) => Z ; TRAP
-    if typecheck(VAL, val) .
+  rl Step(Z ; ((REF.NULL-ADDR) (CONST(I32, I) (VAL ARRAY.SET(X4))))) => Z ; TRAP .
 
   crl Step(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL ARRAY.SET(X4))))) => Z ; TRAP
-    if typecheck(VAL, val)
-      /\ I >= len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
+    if I >= len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
 
   crl Step(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, I) (VAL ARRAY.SET(X4))))) => with-array(Z, A, I, packfield-(ZT, VAL)) ; eps
-    if typecheck(VAL, val)
-      /\ spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
+    if spectec-ARRAY(tuple(seq(MUT-) ZT)) := Expand(spectec-type(Z, X4))
       /\ len(MUT-) <= 1 .
 
   rl Steps(Z ; INSTR-) => Z ; INSTR- .
@@ -8009,9 +7588,7 @@ mod SPEC2MAUDE-GENERATED is
   eq alloctags(S2, eps) = tuple(S2 seq(eps)) .
 
   ceq alloctags(S2, TAGTYPE TAGTYPE--) = tuple(S-2 seq(JA JA--))
-    if typecheck(TAGTYPE, tagtype)
-      /\ typecheck(TAGTYPE--, typeuse)
-      /\ tuple(S-1 JA) := alloctag(S2, TAGTYPE)
+    if tuple(S-1 JA) := alloctag(S2, TAGTYPE)
       /\ tuple(S-2 seq(JA--)) := alloctags(S-1, TAGTYPE--) .
 
   ceq allocglobal(S2, GLOBALTYPE, VAL) = tuple(recordConcat(S2, { (field('TAGS, eps) ; (field('GLOBALS, GLOBALINST) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) len(S2 . 'GLOBALS))
@@ -8067,9 +7644,7 @@ mod SPEC2MAUDE-GENERATED is
   eq allocelems(S2, eps, eps) = tuple(S2 seq(eps)) .
 
   ceq allocelems(S2, RT RT--, seq(REF-) REF---) = tuple(S-2 seq(EA EA--))
-    if typecheck(RT, reftype)
-      /\ typecheck(RT--, reftype)
-      /\ tuple(S-1 EA) := allocelem(S2, RT, REF-)
+    if tuple(S-1 EA) := allocelem(S2, RT, REF-)
       /\ tuple(S-2 seq(EA--)) := allocelems(S-1, RT--, REF---) .
 
   eq allocexport(MODULEINST, EXPORT(NAME, TAG(X4))) = { (field('NAME, NAME) ; field('ADDR, TAG((MODULEINST . 'TAGS) [ X4 ]))) } .
@@ -8131,9 +7706,7 @@ mod SPEC2MAUDE-GENERATED is
   crl evalexprs(Z, seq(EXPR) EXPR--) => tuple(Z-- seq(REF2 REF--))
     if Eval-expr(Z, EXPR) => tuple(Z- seq(REF2))
       /\ typecheck(REF2, ref)
-      /\ evalexprs(Z-, EXPR--) => tuple(Z-- seq(REF--))
-      /\ typecheck(EXPR, expr)
-      /\ typecheck(EXPR--, iterList(instr)) .
+      /\ evalexprs(Z-, EXPR--) => tuple(Z-- seq(REF--)) .
 
   rl evalexprss(Z, eps) => tuple(Z seq(eps)) .
 
@@ -8147,9 +7720,7 @@ mod SPEC2MAUDE-GENERATED is
     if Eval-expr(Z, EXPR) => tuple(Z- seq(VAL))
       /\ S2 ; F := Z-
       /\ tuple(S- A) := allocglobal(S2, GT2, VAL)
-      /\ evalglobals(S- ; (F [. 'MODULE = ((F . 'MODULE) [. 'GLOBALS = (((F . 'MODULE) . 'GLOBALS) A) ]) ]), GT--, EXPR--) => tuple(Z-- seq(VAL--))
-      /\ typecheck(EXPR, expr)
-      /\ typecheck(EXPR--, iterList(instr)) .
+      /\ evalglobals(S- ; (F [. 'MODULE = ((F . 'MODULE) [. 'GLOBALS = (((F . 'MODULE) . 'GLOBALS) A) ]) ]), GT--, EXPR--) => tuple(Z-- seq(VAL--)) .
 
   crl instantiate(S2, MODULE2, EXTERNADDR-) => (S---- ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST)) })) ; (INSTR-E- (INSTR-D- instrLift(INSTR-S-)))
     if XT-I- -> XT-E- := Module-ok(MODULE2)
