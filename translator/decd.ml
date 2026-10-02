@@ -141,23 +141,6 @@ let schedule_conditions left conditions =
   in
   schedule (term_variables [] left) [] conditions
 
-let rec contains_sequence = function
-  | App ("_ _", _) -> true
-  | App (_, args) -> List.exists contains_sequence args
-  | Var _ | Const _ -> false
-
-let rec heads_may_overlap left right =
-  if contains_sequence left || contains_sequence right then true
-  else
-    match left, right with
-    | Var _, _ | _, Var _ -> true
-    | Const left, Const right -> left = right
-    | App (left, left_args), App (right, right_args) ->
-        left = right
-        && List.length left_args = List.length right_args
-        && List.for_all2 heads_may_overlap left_args right_args
-    | Const _, App _ | App _, Const _ -> false
-
 type prepared_clause =
   { clause : clause
   ; head : clause_head
@@ -165,150 +148,43 @@ type prepared_clause =
   ; index : Prescan.t
   }
 
-let quantified_type quants id =
-  match
-    List.filter_map
-      (fun quant ->
-        match quant.it with
-        | ExpP (quant_id, typ) when quant_id.it = id.it -> Some typ
-        | ExpP _ | TypP _ | DefP _ | GramP _ -> None)
-      quants
-  with
-  | [typ] -> Some typ
-  | [] | _ :: _ :: _ -> None
-
-let direct_formal_variable formal_typ position clause =
-  match clause.it with
-  | DefD (quants, args, _, _) ->
-      begin match List.nth_opt args position with
-      | Some {it = ExpA {it = VarE id; _}; _} ->
-          begin match quantified_type quants id with
-          | Some typ when Il.Eq.eq_typ typ formal_typ -> Some id
-          | Some _ | None -> None
-          end
-      | Some {it = ExpA _ | TypA _ | DefA _ | GramA _; _} | None -> None
-      end
-
-let signature_proven params current peers =
-  List.mapi
-    (fun position formal -> position, formal)
-    params
-  |> List.fold_left
-       (fun proven (position, formal) ->
-         match formal.it with
-         | ExpP (_, formal_typ) ->
-             begin match
-               direct_formal_variable formal_typ position current
-             with
-             | Some id when
-                 List.for_all
-                   (fun peer ->
-                     Option.is_some
-                       (direct_formal_variable formal_typ position peer))
-                   peers ->
-                 Il.Free.Set.add id.it proven
-             | Some _ | None -> proven
-             end
-         | TypP _ | DefP _ | GramP _ -> proven)
-       Il.Free.Set.empty
-
-let exact_variable quants expected exp =
-  match exp.it with
-  | VarE id ->
-      begin match quantified_type quants id with
-      | Some typ when Il.Eq.eq_typ typ expected ->
-          Il.Free.Set.singleton id.it
-      | Some _ | None -> Il.Free.Set.empty
-      end
-  | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _ | TupE _
-  | ProjE _ | CaseE _ | UncaseE _ | OptE _ | TheE _ | StrE _ | DotE _
-  | CompE _ | ListE _ | LiftE _ | MemE _ | LenE _ | CatE _ | IdxE _
-  | SliceE _ | UpdE _ | ExtE _ | IfE _ | CallE _ | IterE _ | CvtE _
-  | SubE _ ->
-      Il.Free.Set.empty
-
-let rec list_pattern_proven index quants expected exp =
-  match expected.it, exp.it with
-  | IterT (_, List), CatE (left, right) ->
-      Il.Free.Set.union
-        (list_pattern_proven index quants expected left)
-        (list_pattern_proven index quants expected right)
-  | IterT (element, List), ListE elements ->
-      List.fold_left
-        (fun proven element_pattern ->
-          Il.Free.Set.union proven
-            (list_pattern_proven index quants element element_pattern))
-        Il.Free.Set.empty elements
-  | IterT (_, List), IterE (body, iterexp) ->
-      begin match Iter.identity_source index body iterexp with
-      | Some ({it = VarE _; _} as source) ->
-          exact_variable quants expected source
-      | Some _ | None -> Il.Free.Set.empty
-      end
-  | _, VarE _ -> exact_variable quants expected exp
-  | IterT (_, (Opt | List1 | ListN _)), _
-  | (VarT _ | BoolT | NumT _ | TextT | TupT _ | IterT _), _ ->
-      Il.Free.Set.empty
-
-let list_components_proven index params clause =
-  let abstract_types =
-    List.fold_left
-      (fun types param ->
-        match param.it with
-        | TypP id -> Il.Free.Set.add id.it types
-        | ExpP _ | DefP _ | GramP _ -> types)
-      Il.Free.Set.empty params
+(* A head SubE pattern already guards its variable, so the quantifier check
+   of an equal membership repeats it. *)
+let guarded_quants index quants args =
+  let collector =
+    { (Il.Walk.base_collector [] ( @ )) with
+      collect_exp =
+        (fun exp ->
+          match exp.it with
+          | SubE ({it = VarE id; _}, typ, _) -> [id.it, typ], true
+          | _ -> [], true)
+    }
   in
-  match clause.it with
-  | DefD (quants, args, _, _) ->
-      List.mapi (fun position formal -> position, formal) params
-      |> List.fold_left
-           (fun proven (position, formal) ->
-             match formal.it, List.nth_opt args position with
-             | ExpP (_, ({it = IterT (element, List); _} as formal_typ)),
-               Some {it = ExpA actual; _} ->
-                 if
-                   not (Prescan.alias_type index element)
-                   && Il.Free.Set.disjoint abstract_types
-                        Il.Free.(free_typ element).typid
-                 then
-                   Il.Free.Set.union proven
-                     (list_pattern_proven index quants formal_typ actual)
-                 else proven
-             | (ExpP _ | TypP _ | DefP _ | GramP _), _ -> proven)
-           Il.Free.Set.empty
+  let guards = List.concat_map (Il.Walk.collect_arg collector) args in
+  List.fold_left
+    (fun proven quant ->
+      match quant.it with
+      | ExpP (id, typ)
+        when List.exists
+               (fun (x, t) -> x = id.it && Term.same_membership index t typ)
+               guards ->
+          Il.Free.Set.add id.it proven
+      | ExpP _ | TypP _ | DefP _ | GramP _ -> proven)
+    Il.Free.Set.empty quants
 
 let prepare_clauses index id params clauses =
-  let prepared =
-    List.map
-      (fun clause ->
-        let args = match clause.it with DefD (_, args, _, _) -> args in
-        let index = Term.with_parameter_types index params args in
-        clause, translate_head index id args, index)
-      clauses
-  in
-  List.mapi
-    (fun position (clause, head, index) ->
-      let overlapping =
-        List.mapi (fun other item -> other, item) prepared
-        |> List.filter_map (fun (other, (peer, peer_head, _)) ->
-             if position <> other && heads_may_overlap head.term peer_head.term
-             then Some peer
-             else None)
-      in
-      let head_proven =
-        if overlapping = [] then head.bound
-        else
-          Il.Free.Set.union
-            (signature_proven params clause overlapping)
-            (list_components_proven index params clause)
-      in
-      {clause; head; head_proven; index})
-    prepared
+  List.map
+    (fun clause ->
+      match clause.it with
+      | DefD (quants, args, _, _) ->
+          let index = Term.with_parameter_types index params args in
+          let head = translate_head index id args in
+          let head_proven = guarded_quants index quants args in
+          {clause; head; head_proven; index})
+    clauses
 
 let proven_variables prepared premises =
-  (* Valid ingress proves variables selected by a unique head or shared formal
-     signature; a successful premise proves the variables that it introduced. *)
+  (* A successful premise proves the variables that it introduced. *)
   let introduced =
     Il.Free.Set.diff premises.Prem.bound prepared.head.bound
   in

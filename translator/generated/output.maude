@@ -6118,10 +6118,12 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-cvtop--(FNN-1, FNN-2, DEMOTE, F-1) = demote--(sizenn1(FNN-1), sizenn2(FNN-2), F-1) .
 
   ceq spectec-cvtop--(INN-1, FNN-2, REINTERPRET, I-1) = reinterpret--(INN-1, FNN-2, I-1)
-    if size(INN-1) == size(FNN-2) .
+    if typecheck(FNN-2, Fnn)
+      /\ size(INN-1) == size(FNN-2) .
 
   ceq spectec-cvtop--(FNN-1, INN-2, REINTERPRET, F-1) = reinterpret--(FNN-1, INN-2, F-1)
     if typecheck(FNN-1, Fnn)
+      /\ typecheck(INN-2, addrtype)
       /\ size(FNN-1) == size(INN-2) .
 
   eq zeroop(_X_(JNN-1, M-1), _X_(JNN-2, M-2), spectec-EXTEND(HALF, SX)) = eps .
@@ -6433,7 +6435,8 @@ mod SPEC2MAUDE-GENERATED is
 
   eq spectec-vshiftop-(_X_(JNN, M2), SHR(SX), V, I) = ivshiftopsx-(_X_(JNN, M2), ishr-, SX, V, I) .
 
-  eq vbitmaskop-(_X_(JNN, M2), V) = ivbitmaskop-(_X_(JNN, M2), V) .
+  ceq vbitmaskop-(_X_(JNN, M2), V) = ivbitmaskop-(_X_(JNN, M2), V)
+    if typecheck(JNN, Jnn) .
 
   eq spectec-vswizzlop-(_X_(I8, M2), SWIZZLE, V-1, V-2) = ivswizzlop-(_X_(I8, M2), iswizzle-lane-, V-1, V-2) .
 
