@@ -383,7 +383,10 @@ module Lists = struct
 
   let generic_edges metadata =
     Hintd.typed_list_roots metadata
-    |> List.map (fun sort -> SubsortDecl (list_sort sort, "SpectecTerminals"))
+    |> List.concat_map (fun sort ->
+         [ SubsortDecl (list_sort sort, "SpectecTerminals")
+         ; SubsortDecl (nonempty_sort sort, "SpectecNeTerminals")
+         ])
 
   let generated_statements metadata =
     Hintd.typed_list_sorts metadata

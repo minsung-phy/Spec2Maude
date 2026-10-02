@@ -1,6 +1,5 @@
 fmod SPECTEC-SORTS is
-  sort SpectecTerminal .
-  sort SpectecTerminals .
-  subsort SpectecTerminal < SpectecTerminals .
+  sorts SpectecTerminal SpectecNeTerminals SpectecTerminals .
+  subsort SpectecTerminal < SpectecNeTerminals < SpectecTerminals .
   sort SpectecType .
 endfm

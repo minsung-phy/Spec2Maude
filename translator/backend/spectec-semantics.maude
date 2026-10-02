@@ -38,11 +38,14 @@ fmod SPECTEC-LIST is
   var N : Nat .
   op eps : -> SpectecTerminals [ctor] .
   op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [ctor assoc id: eps prec 25] .
+  op __ : SpectecNeTerminals SpectecTerminals -> SpectecNeTerminals [ctor ditto] .
+  op __ : SpectecTerminals SpectecNeTerminals -> SpectecNeTerminals [ctor ditto] .
   op seq : SpectecTerminals -> SpectecTerminal [ctor] .
   op unseq : SpectecTerminal ~> SpectecTerminals .
 
-  vars T U : SpectecTerminal .
+  var T : SpectecTerminal .
   vars TS VALUE : SpectecTerminals .
+  var NTS : SpectecNeTerminals .
   var TYPE : SpectecType .
   var COUNT : Nat .
   vars WTS PREFIX MIDDLE SUFFIX REST : SpectecTerminals .
@@ -61,7 +64,7 @@ fmod SPECTEC-LIST is
 
   --- 리스트 타입 검사
   eq typecheck(eps, TYPE) = true .
-  ceq typecheck(T U TS, TYPE) = typecheck(U TS, TYPE) --- 두 원소 패턴을 사용하여 단일 원소가 T eps로 매칭되는 것을 방지
+  ceq typecheck(T NTS, TYPE) = typecheck(NTS, TYPE) --- NTS는 비어 있지 않으므로 단일 원소는 T eps로 매칭되지 않음
     if typecheck(T, TYPE) .
   eq typecheck(seq(TS), iterList(TYPE)) = typecheck(TS, TYPE) .
   eq typecheck(VALUE, TYPE) = false [owise] .

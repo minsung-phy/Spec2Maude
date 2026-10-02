@@ -3,6 +3,8 @@ mod SPEC2MAUDE-GENERATED is
 
   subsort InstrList < SpectecTerminals .
 
+  subsort NeInstrList < SpectecNeTerminals .
+
   sort FocusSearch .
 
   sort FocusTarget .
