@@ -1,5 +1,17 @@
+(* Source hints that need whole-script analysis. Nothing here emits Maude
+ * code; the results are read through Prescan.
+ *
+ * Part 1: sorts. hint(maude_sort), hint(maude_subsort), and
+ *   hint(maude_proper) decide the Maude sort of each type, its subsorts, and
+ *   the representation of typed sequences.
+ * Part 2: hint(k_heatcool). The hinted rules are checked against the shapes
+ *   that Heatcool supports, and context rules get their focus patterns
+ *   (TRANSLATION_MAP.md, section 2). *)
+
 open Util.Source
 open Il.Ast
+
+(* Part 1: sorts *)
 
 type maude_sort = string
 type constructor = mixop
@@ -528,8 +540,10 @@ let sequence_element_wrappers metadata typ =
       Some ("seq", "unseq")
   | None -> None
 
-(* Rule-level hints are analyzed here as certificates for later RuleD
- * translation.  This module does not emit Maude code. *)
+(* Part 2: hint(k_heatcool)
+ *
+ * Rule-level hints are analyzed here as certificates for later RuleD
+ * translation. *)
 type frame =
   { mixop : mixop
   ; config_typ : typ

@@ -14,8 +14,8 @@ the paper, or to check how a constructor is handled.
   `hint(k_heatcool)`). Generated iteration helpers are in `iter_helpers.ml`,
   and the reordering of Maude conditions is in one section of
   `maude/maude_il.ml`.
-- Code locations are given as `file:function`. They describe the working tree
-  of 2026-10-03, which is commit `934a822` with uncommitted changes.
+- Code locations are given as `file:function`. They refer to commit
+  `66210bf`.
 - Cases that the translator rejects or omits are listed in section 8.
 
 ## Notation
@@ -187,7 +187,11 @@ that applies; `prem.ml:translate_ifpr` then translates that case.
 ### Expressions as patterns
 
 When an expression `p` has unbound variables, it is used as a pattern for a
-known value `u` (`prem.ml:bind_pattern`). Most expressions become a matching
+known value `u` (`prem.ml:bind_pattern`). An argument of a function clause
+head or a type instance is a pattern if it is one, and otherwise a fresh
+variable bound in this way (`prem.ml:bind_head_argument`). Relation inputs
+use the same scheme, and may also contain computed fields that are compared
+after matching (`reld.ml:translate_inputs`). Most expressions become a matching
 condition `⟦p⟧ := u` with the same constructors as `⟦p⟧`. Some arithmetic
 and conversion expressions cannot be matched, so the translator computes the
 unbound part from `u` instead:

@@ -202,6 +202,28 @@ let project_focus_premise index needed premise =
       end
   | _ -> premise
 
+(* Premise slicing for identifyFocus.
+
+   An identifyFocus rule only has to split the instruction sequence into
+   PREFIX | focus | POSTFIX. It is derived from a rule of an inner relation,
+   but keeps only the premises that decide this split:
+
+   - needed variables start as the boundary variables: the counts of ^n
+     iterations and the unbounded sequence slots of the focus
+     (boundary_variables);
+   - a premise is kept if it binds a needed variable, or if it must be kept
+     as a whole (a checked relation, a subsumption check, an IterPr or NegPr,
+     a LetPr whose right side is not yet known, or an equality on a boundary
+     variable); a kept premise makes its own inputs needed;
+   - this is repeated until no new variable becomes needed (close).
+
+   Dropped premises are the scalar guards that choose between inner rules
+   with the same focus. They are not lost: the focus is executed as a request
+   of the inner relation, whose rules check all their premises. This assumes
+   that a dropped premise never changes where the focus ends. The execution
+   premise named by the bridge (deferred) is always dropped, since it is the
+   step that the focus will take. *)
+
 type focus_dependency =
   { premise : prem
   ; writes : Il.Free.Set.t
@@ -640,6 +662,42 @@ let unique_candidates candidates =
   in
   List.rev kept
 
+(* The heating guard of a k_heatcool rule whose inner relation computes a
+ * sequence: one rl per rule of the inner relation, matching that rule's
+ * input pattern (TRANSLATION_MAP.md, section 2). Returns the statements and
+ * the heating condition. The helper is named after the source rule. *)
+let identify_statements cache index (heated : Hintd.heatcool) suffix target args =
+  let RuleD (id, _, _, _, _) = heated.rule.it in
+  let metadata = Prescan.sort_metadata index in
+  let relation = Hintd.find_relation metadata.relations target heated.rule.at in
+  let candidates = lower_relation cache index relation in
+  let name = "identify" ^ String.capitalize_ascii (Prescan.sanitize id.it) in
+  let found = "identified-" ^ suffix in
+  let sort = "Identify-" ^ suffix in
+  let params, _, typ, _ = Il.Env.find_rel metadata.type_env target in
+  let count = match execution_policy index target with
+    | Prescan.Execution {input_count; _} -> input_count
+    | _ -> assert false
+  in
+  let input_types, _ = Prem.split count (Reld.component_types typ) in
+  let domain = Param.translate_sorts index params
+    @ List.map (Term.translate_sort index) input_types in
+  (* Input patterns identify candidates. The original target rule checks its
+     premises once, when the suspended request executes. *)
+  let rules = candidates |> List.map (fun (candidate : Reld.execution_rule) ->
+    match candidate.left with
+    | App (_, inputs) ->
+        Rl (Some (name ^ "-" ^ string_of_int (candidate.ordinal + 1)),
+            App (name, inputs), Const found)
+    | _ -> assert false)
+    |> unique_candidates
+  in
+  [ SortDecl sort
+  ; op ~attrs:(frozen_all (List.length domain)) name domain sort
+  ; op ~attrs:[Ctor] found [] sort
+  ] @ rules,
+  [RewriteCond (App (name, args), Const found)]
+
 (* A RulePr suspends this rule. Its result pattern resumes the remaining
    premises in source order; only live, already-bound variables enter a hole. *)
 let heatcool_rule cache index (heated : Hintd.heatcool) =
@@ -701,42 +759,12 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
     | _ -> Ceq (left, right, conditions, [])
   in
   (* Identify sequence-result relation bridges from their result type, never
-     from Wasm relation names. Use source rule names for the helper spelling. *)
+     from Wasm relation names. *)
   let identify target outputs call =
     match executions, outputs, call with
     | [_], [{note = {it = IterT _; _}; _}], App (_, args)
       when target.it <> source.id.it ->
-        let relation = Hintd.find_relation
-            (Prescan.sort_metadata index).relations target heated.rule.at in
-        let candidates = lower_relation cache index relation in
-        let name = "identify" ^ String.capitalize_ascii (Prescan.sanitize id.it) in
-        let found = "identified-" ^ suffix in
-        let sort = "Identify-" ^ suffix in
-        let params, _, typ, _ =
-          Il.Env.find_rel (Prescan.sort_metadata index).type_env target
-        in
-        let count = match execution_policy index target with
-          | Prescan.Execution {input_count; _} -> input_count
-          | _ -> assert false
-        in
-        let input_types, _ = Prem.split count (Reld.component_types typ) in
-        let domain = Param.translate_sorts index params
-          @ List.map (Term.translate_sort index) input_types in
-        (* Input patterns identify candidates. The original target rule
-           checks its premises once, when the suspended request executes. *)
-        let rules = candidates |> List.map (fun (candidate : Reld.execution_rule) ->
-          match candidate.left with
-          | App (_, inputs) ->
-              Rl (Some (name ^ "-" ^ string_of_int (candidate.ordinal + 1)),
-                  App (name, inputs), Const found)
-          | _ -> assert false)
-          |> unique_candidates
-        in
-        [ SortDecl sort
-        ; op ~attrs:(frozen_all (List.length domain)) name domain sort
-        ; op ~attrs:[Ctor] found [] sort
-        ] @ rules,
-        [RewriteCond (App (name, args), Const found)]
+        identify_statements cache index heated suffix target args
     | _ -> [], []
   in
   let rec resume initial stage left conditions remaining =

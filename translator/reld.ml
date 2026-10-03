@@ -51,8 +51,11 @@ let translate_input_pattern index exp =
               }
           else None
 
-(* With defer, an input that is no pattern over the earlier inputs is
- * compared with its value after the premises have bound its variables. *)
+(* Relation inputs follow Prem.bind_head_argument, with two additions: an
+ * input may contain computed fields (translate_input_pattern), and with
+ * defer (checked relations), an input that is no pattern over the earlier
+ * inputs is compared with its value after the premises have bound its
+ * variables. *)
 let translate_inputs ~defer index params inputs =
   let bound = Il.Free.(bound_params params).varid in
   let step (terms, conditions, bound, deferred) (position, exp) =

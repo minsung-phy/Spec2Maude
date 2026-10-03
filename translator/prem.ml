@@ -480,6 +480,20 @@ and bind_case_pattern index bound mixop payload subject error =
     bind_pattern_parts index bound exps subjects
       [EqCondition (MatchCond (represented, subject))] error
 
+(* An argument of a function clause head or of a type instance: a Maude
+ * pattern if it is one, otherwise a fresh variable [name] to which the
+ * argument is bound by bind_pattern. Relation inputs use the same scheme
+ * with two additions (Reld.translate_inputs). *)
+let bind_head_argument index bound name error exp =
+  match translate_pattern index exp with
+  | Some pattern -> pattern.term, rule_guards pattern, bind bound exp
+  | None ->
+      let subject =
+        Var (generated_variable name (Term.translate_sort index exp.note))
+      in
+      let binding = bind_pattern index bound exp subject error in
+      subject, binding.conditions, binding.bound
+
 let output_subjects index outputs =
   pattern_subjects index "REL-OUTPUT" outputs
 

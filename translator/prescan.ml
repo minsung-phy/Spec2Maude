@@ -817,6 +817,11 @@ let collect_occurrences sort_metadata script =
     | GramD _ | RecD _ | HintD _ -> ()
   in
 
+  (* Captures are computed when an iteration is visited, from the type
+   * parameters collected so far. This is complete because Il.Iter calls
+   * visit_def before visiting the definition's contents, and visit_def
+   * (add_def_variables) registers every type parameter of the definition
+   * and of its rules, clauses, and instances. *)
   let add_iteration owner body iterexp =
     iterations :=
       { name = iteration_base_name body

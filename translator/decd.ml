@@ -61,25 +61,13 @@ let translate_head index id args =
     let sort = List.nth sorts position in
     match arg.it with
     | ExpA exp ->
-        begin match Prem.translate_pattern_parts index exp with
-        | Some (pattern, guards) ->
-            Term.to_parameter_sort index sort exp pattern :: terms,
-            conditions @ guards, Prem.bind bound exp
-        | None ->
-            let subject =
-              Var
-                (generated_variable
-                   ("DEF-ARG" ^ string_of_int (position + 1))
-                   (Term.translate_sort index exp.note))
-            in
-            let binding =
-              Prem.bind_pattern index bound exp subject
-                "definition head is not a structural pattern"
-            in
-            Term.to_parameter_sort index sort exp subject :: terms,
-            conditions @ List.map eq_condition binding.conditions,
-            binding.bound
-        end
+        let term, guards, bound =
+          Prem.bind_head_argument index bound
+            ("DEF-ARG" ^ string_of_int (position + 1))
+            "definition head is not a structural pattern" exp
+        in
+        Term.to_parameter_sort index sort exp term :: terms,
+        conditions @ List.map eq_condition guards, bound
     | TypA _ | DefA _ | GramA _ ->
         Term.translate_arg index arg :: terms, conditions, bound
   in

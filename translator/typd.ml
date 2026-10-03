@@ -25,30 +25,20 @@ let translate_target index id params args =
   let step (terms, conditions, bound) (position, arg) =
     match arg.it with
     | ExpA exp ->
-        begin match Prem.translate_pattern_parts index exp with
-        | Some (term, guards) ->
-            term :: terms, conditions @ guards, Prem.bind bound exp
-        | None ->
-            let subject =
-              Var
-                (generated_variable
-                   ("TYPE-ARG" ^ string_of_int (position + 1))
-                   (Term.translate_sort index exp.note))
-            in
-            let binding =
-              Prem.bind_pattern index bound exp subject
-                "type instance argument is not a structural pattern"
-            in
-            let guards =
-              List.map
-                (function
-                  | EqCondition condition -> condition
-                  | RewriteCond _ ->
-                      invalid_arg "type instance pattern requires rewriting")
-                binding.conditions
-            in
-            subject :: terms, conditions @ guards, binding.bound
-        end
+        let term, guards, bound =
+          Prem.bind_head_argument index bound
+            ("TYPE-ARG" ^ string_of_int (position + 1))
+            "type instance argument is not a structural pattern" exp
+        in
+        let guards =
+          List.map
+            (function
+              | EqCondition condition -> condition
+              | RewriteCond _ ->
+                  invalid_arg "type instance pattern requires rewriting")
+            guards
+        in
+        term :: terms, conditions @ guards, bound
     | TypA _ | DefA _ | GramA _ ->
         Term.translate_arg index arg :: terms, conditions, bound
   in
