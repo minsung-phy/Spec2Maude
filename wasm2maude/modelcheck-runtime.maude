@@ -12,6 +12,8 @@ mod WASM2MAUDE-MODELCHECK-RUNTIME is
   op ready : SpectecTerminal -> ModelState [ctor] .
   op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .
   op finished : ValList -> ModelState [ctor] .
+  --- $invoke is undefined unless the arguments satisfy Val_ok.
+  op invalid-invocation : -> ModelState [ctor] .
 
   op inputModule : -> SpectecTerminal .
   op inputName : -> SpectecTerminals .
@@ -21,9 +23,12 @@ mod WASM2MAUDE-MODELCHECK-RUNTIME is
   op rejected : -> ValList .
   op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
   op hasExport : SpectecTerminals SpectecTerminals -> Bool .
+  op invocation : SpectecTerminal -> SpectecTerminal .
+  op isConfig : SpectecTerminal -> Bool .
   op returned : ValList -> Prop [ctor] .
 
   vars C C2 Z XA : SpectecTerminal .
+  var IS : InstrList .
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
   var RESULT : ValList .
   var ADDR : Nat .
@@ -52,8 +57,15 @@ mod WASM2MAUDE-MODELCHECK-RUNTIME is
     if Step(C) => C2 .
   crl [initialize] : init(C) => ready(Z)
     if (Z ; eps) := C .
-  rl [invoke] : ready(Z) => exec(invoke(spectec-store(Z),
-      findFunc((spectec-moduleinst(Z) . 'EXPORTS), inputName), inputArgs)) .
+  eq invocation(Z) = invoke(spectec-store(Z),
+      findFunc((spectec-moduleinst(Z) . 'EXPORTS), inputName), inputArgs) .
+  eq isConfig(Z ; IS) = true .
+  eq isConfig(C) = false [owise] .
+
+  crl [invoke] : ready(Z) => exec(C2)
+    if C2 := invocation(Z) /\ isConfig(C2) .
+  crl [invalid-invocation] : ready(Z) => invalid-invocation
+    if not isConfig(invocation(Z)) .
   crl [execute-step] : exec(C) => exec(C2)
     if Step(C) => C2 .
   crl [finished] : exec(C) => finished(RESULT)

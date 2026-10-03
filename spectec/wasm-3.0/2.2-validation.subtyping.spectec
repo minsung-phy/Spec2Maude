@@ -6,8 +6,8 @@
 
 relation Numtype_sub: context |- numtype <: numtype    hint(name "S-num")  hint(macro "%numtypematch")
 relation Vectype_sub: context |- vectype <: vectype    hint(name "S-vec")  hint(macro "%vectypematch")
-relation Heaptype_sub: context |- heaptype <: heaptype hint(name "S-heap") hint(macro "%heaptypematch")
-relation Reftype_sub: context |- reftype <: reftype    hint(name "S-ref")  hint(macro "%reftypematch")
+relation Heaptype_sub: context |- heaptype <: heaptype hint(name "S-heap") hint(macro "%heaptypematch") hint(maude_check)
+relation Reftype_sub: context |- reftype <: reftype    hint(name "S-ref")  hint(macro "%reftypematch") hint(maude_check)
 relation Valtype_sub: context |- valtype <: valtype    hint(name "S-val")  hint(macro "%valtypematch")
 
 rule Numtype_sub:
@@ -25,6 +25,8 @@ rule Heaptype_sub/trans:
   -- Heaptype_ok: C |- heaptype' : OK
   -- Heaptype_sub: C |- heaptype_1 <: heaptype'
   -- Heaptype_sub: C |- heaptype' <: heaptype_2
+  hint(maude_trans "ANY" "EQ" "I31" "STRUCT" "ARRAY" "FUNC" "EXN" "EXTERN")
+  hint(maude_assume "Heaptype_ok")
 
 rule Heaptype_sub/eq-any:
   C |- EQ <: ANY

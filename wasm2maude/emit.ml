@@ -32,14 +32,11 @@ type runtime_terms = {
   invocation : string;
 }
 
-let check_arguments m export args =
-  let arguments =
-    List.map
-      (fun argument -> Wasm.Types.NumT (Wasm.Value.type_of_num argument))
-      args
-  in
-  match Frontend.validate_invocation m export arguments with
-  | Ok () -> ()
+(* Argument count and types are checked by the translated $invoke (Val_ok);
+ * the runtime reports an invocation it leaves undefined. *)
+let check_export m export =
+  match Frontend.function_parameters m export with
+  | Ok _ -> ()
   | Error error ->
       let message =
         match error with
@@ -48,15 +45,11 @@ let check_arguments m export args =
             "requested export is not a function"
         | Frontend.Unresolved_function_type ->
             "validated function export retained an unresolved type index"
-        | Frontend.Wrong_arity ->
-            "function invocation has the wrong number of arguments"
-        | Frontend.Wrong_argument_type _ ->
-            "function invocation argument has the wrong type"
       in
       Ingress_error.raise Ingress_error.Unsupported m.source message
 
 let invocation m export args =
-  check_arguments m export args;
+  check_export m export;
   let export = Encode.name export |> render in
   let args = args |> List.map Encode.num_value |> T.seq |> render in
   term m, export, args

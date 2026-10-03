@@ -11,8 +11,6 @@ type invocation_error =
   | Missing_export
   | Non_function_export
   | Unresolved_function_type
-  | Wrong_arity
-  | Wrong_argument_type of int
 
 let validate source (ast, custom) =
   try
@@ -97,20 +95,3 @@ let function_parameters m name =
   | Some (Types.ExternFuncT (Types.Idx _)) -> Error Unresolved_function_type
   | Some _ -> Error Non_function_export
   | None -> Error Missing_export
-
-let validate_invocation m name arguments =
-  match function_parameters m name with
-  | Error _ as error -> error
-  | Ok parameters when List.length arguments <> List.length parameters ->
-      Error Wrong_arity
-  | Ok parameters ->
-      let rec check index arguments parameters =
-        match arguments, parameters with
-        | [], [] -> Ok ()
-        | argument :: arguments, parameter :: parameters ->
-            if Match.match_valtype [] argument parameter then
-              check (index + 1) arguments parameters
-            else Error (Wrong_argument_type index)
-        | [], _ :: _ | _ :: _, [] -> Error Wrong_arity
-      in
-      check 0 arguments parameters

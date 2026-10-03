@@ -51,15 +51,17 @@ let translate_input_pattern index exp =
               }
           else None
 
-let translate_inputs index params inputs =
+(* With ~defer, an input that is no pattern over the earlier inputs is
+ * compared with its value after the premises have bound its variables. *)
+let translate_inputs ?(defer = false) index params inputs =
   let bound = Il.Free.(bound_params params).varid in
-  let step (terms, conditions, bound) (position, exp) =
+  let step (terms, conditions, bound, deferred) (position, exp) =
     match translate_input_pattern index exp with
     | Some {term; guards} ->
         ( term :: terms
         , conditions @ List.map (fun guard -> EqCondition guard) guards
         , Prem.bind bound exp
-        )
+        , deferred )
     | None ->
         let subject =
           Var
@@ -67,16 +69,19 @@ let translate_inputs index params inputs =
                ("REL-INPUT" ^ string_of_int (position + 1))
                (Term.translate_sort index exp.note))
         in
-        let binding =
+        match
           Prem.bind_pattern index bound exp subject
             "relation input is not a structural pattern"
-        in
-        subject :: terms, conditions @ binding.conditions, binding.bound
+        with
+        | binding ->
+            subject :: terms, conditions @ binding.conditions, binding.bound, deferred
+        | exception Invalid_argument _ when defer ->
+            subject :: terms, conditions, bound, (exp, subject) :: deferred
   in
   List.mapi (fun position exp -> position, exp) inputs
-  |> List.fold_left step ([], [], bound)
-  |> fun (terms, conditions, bound) ->
-       List.rev terms, conditions, bound
+  |> List.fold_left step ([], [], bound, [])
+  |> fun (terms, conditions, bound, deferred) ->
+       List.rev terms, conditions, bound, List.rev deferred
 
 let has_else prems =
   let found = ref false in
@@ -162,28 +167,29 @@ type rule_body =
   ; otherwise : bool
   }
 
-let lower_rule_body ?request_output ?(normalize = true) index id params policy rule =
+let lower_rule_body ?request_output ?(normalize = true) ?head index id params policy rule =
   match rule.it with
   | RuleD (_, quants, mixop, exp, prems) ->
       let exps = Prem.components mixop exp in
       let inputs, outputs =
         match policy with
         | Prescan.Execution {input_count; _}
-        | Prescan.Equation {input_count} -> Prem.split input_count exps
-        | Prescan.Predicate | Prescan.BackendCheck ->
-            exps, []
-        | Prescan.BackendCompute {input_count} ->
-            Prem.split input_count exps
+        | Prescan.Compute {input_count; _} -> Prem.split input_count exps
+        | Prescan.Check _ -> exps, []
       in
       let index = Term.with_relation_types index id params inputs in
-      let input_terms, head_conditions, bound =
-        translate_inputs index params inputs
+      let defer = match policy with Prescan.Check _ -> true | _ -> false in
+      let input_terms, head_conditions, bound, deferred =
+        translate_inputs ~defer index params inputs
       in
-      if not (List.for_all (Prem.known bound) inputs) then
+      let immediate =
+        List.filter (fun exp -> not (List.exists (fun (e, _) -> e == exp) deferred)) inputs
+      in
+      if not (List.for_all (Prem.known bound) immediate) then
         invalid_arg "relation rule has an unbound input";
       let left =
         App
-          ( Prescan.rel_name index id
+          ( Option.value head ~default:(Prescan.rel_name index id)
           , Param.translate_terms index params @ input_terms
           )
       in
@@ -196,6 +202,18 @@ let lower_rule_body ?request_output ?(normalize = true) index id params policy r
       in
       if not (List.for_all (Prem.known premises.bound) outputs) then
         invalid_arg "relation output contains an unbound variable";
+      let deferred_conditions =
+        List.concat_map
+          (fun (exp, subject) ->
+            let bound, choices =
+              Prem.bind_free_indices index premises.bound [] exp
+            in
+            if not (Prem.known bound exp) then
+              invalid_arg "relation input is not a structural pattern";
+            choices
+            @ [EqCondition (EqCond (Term.translate_exp index exp, subject))])
+          deferred
+      in
       (* Reachable relation calls establish direct inputs and premise results. *)
       let proven = premises.bound in
       let quant_conditions =
@@ -204,7 +222,8 @@ let lower_rule_body ?request_output ?(normalize = true) index id params policy r
       in
       let guard_conditions = head_conditions @ quant_conditions in
       let conditions =
-        head_conditions @ premises.conditions @ quant_conditions
+        head_conditions @ premises.conditions @ deferred_conditions
+        @ quant_conditions
         |> (fun conditions ->
              if normalize then normalize_conditions left conditions else conditions)
       in
@@ -220,25 +239,24 @@ let lower_rule_body ?request_output ?(normalize = true) index id params policy r
       ; otherwise = premises.otherwise
       }
 
-let translate_rule ?request_output index id params policy rule =
-  let body = lower_rule_body ?request_output index id params policy rule in
+let translate_rule ?request_output ?head index id params policy rule =
+  let body = lower_rule_body ?request_output ?head index id params policy rule in
   if body.otherwise then
     invalid_arg "ElsePr in a relation rule requires source complement lowering";
-  match policy with
-  | Prescan.Execution _ ->
-      invalid_arg "execution relations require source-order lowering"
-  | Prescan.Equation _ ->
-      begin match eq_conditions body.conditions with
-      | [] -> Eq (body.left, body.right, [])
-      | conditions -> Ceq (body.left, body.right, conditions, [])
-      end
-  | Prescan.Predicate ->
-      begin match eq_conditions body.conditions with
-      | [] -> Eq (body.left, Const "true", [])
-      | conditions -> Ceq (body.left, Const "true", conditions, [])
-      end
-  | Prescan.BackendCheck | Prescan.BackendCompute _ ->
-      invalid_arg "manual relation rules are supplied by a Maude backend"
+  let right =
+    match policy with
+    | Prescan.Execution _ ->
+        invalid_arg "execution relations require source-order lowering"
+    | Prescan.Compute _ -> body.right
+    | Prescan.Check _ -> Const "true"
+  in
+  match eq_conditions body.conditions with
+  | [] -> Eq (body.left, right, [])
+  | conditions -> Ceq (body.left, right, conditions, [])
+
+let rule_id rule =
+  match rule.it with RuleD (id, _, _, _, _) -> id.it
+
 
 type execution_rule =
   { ordinal : int
@@ -820,8 +838,7 @@ let translate_execution ?request_output ?include_rule
   let input_count =
     match policy with
     | Prescan.Execution {input_count; _} -> input_count
-    | Prescan.Equation _ | Prescan.Predicate | Prescan.BackendCheck
-    | Prescan.BackendCompute _ ->
+    | Prescan.Compute _ | Prescan.Check _ ->
         invalid_arg "expected an execution relation policy"
   in
   let lowered =
@@ -846,6 +863,96 @@ let translate_execution ?request_output ?include_rule
   in
   helpers @ List.map execution_statement lowered
 
+(* hint(maude_trans): Rel(.., h1, h2) holds by one step of another rule, or
+ * by one such step to a listed witness h' followed by Rel(.., h', h2). Any
+ * chain through listed witnesses regroups into this form, so only the first
+ * premise needs the step operator. h' =/= h1 excludes the reflexive step,
+ * which would repeat the query; h' =/= h2 excludes a reflexive tail. *)
+let translate_trans index id params (trans : Prescan.trans) rule =
+  match rule.it with
+  | RuleD (rule_id, quants, mixop, exp, prems) ->
+      let fail reason =
+        Util.Error.error rule.at "translation"
+          ("Unsupported: maude_trans " ^ id.it ^ "/" ^ rule_id.it ^ ": " ^ reason)
+      in
+      let conclusion = Prem.components mixop exp in
+      (* The one conclusion position a premise replaces by a fresh variable. *)
+      let replaced (args, comps) =
+        if List.length comps <> List.length conclusion then None
+        else
+          match
+            List.combine conclusion comps
+            |> List.mapi (fun position pair -> position, pair)
+            |> List.filter (fun (_, (left, right)) -> not (Il.Eq.eq_exp left right))
+          with
+          | [position, (_, ({it = VarE x; _} as middle))] ->
+              Some (args, comps, position, x.it, middle)
+          | _ -> None
+      in
+      let self prem =
+        match prem.it with
+        | RulePr (target, args, mixop, exp) when target.it = id.it ->
+            replaced (args, Prem.components mixop exp)
+        | _ -> None
+      in
+      let shape = "premises must be Rel(.., h1, h') and Rel(.., h', h2)" in
+      let (args1, comps1, i, x, middle), (args2, comps2, j, y, _) =
+        match List.map self prems with
+        | [Some first; Some second] -> first, second
+        | _ -> fail shape
+      in
+      if i = j || x <> y || Il.Free.Set.mem x Il.Free.(free_exp exp).varid then
+        fail shape;
+      let witness name =
+        let source = String.map (function '_' -> '-' | char -> char) name in
+        match
+          source_constructors index [] middle.note
+          |> Option.value ~default:[]
+          |> List.find_opt (fun mixop ->
+               Xl.Mixop.arity mixop = 0 && Mixop.name mixop = source)
+        with
+        | Some mixop -> Const (Prescan.mixop_name index mixop)
+        | None -> fail ("witness " ^ name ^ " is not a nullary constructor of "
+                        ^ Il.Print.string_of_typ middle.note)
+      in
+      let body =
+        lower_rule_body ~normalize:false index id params (Prescan.Check {trans = None})
+          {rule with it = RuleD (rule_id, quants, mixop, exp, [])}
+      in
+      let term = Term.translate_exp index in
+      let middle_term = term middle in
+      let call name args comps =
+        App (name, List.map (Term.translate_arg index) args @ List.map term comps)
+      in
+      let rest sort = Var (generated_variable "WITNESSES" sort) in
+      let conditions =
+        [ EqCondition
+            (MatchCond
+               ( Term.sequence
+                   [rest "SpectecTerminals"; middle_term; rest "SpectecTerminals"]
+               , Term.sequence (List.map witness trans.witnesses) ))
+        ; EqCondition (BoolCond (App ("_=/=_", [middle_term; term (List.nth conclusion j)])))
+        ; EqCondition (BoolCond (App ("_=/=_", [middle_term; term (List.nth conclusion i)])))
+        ; EqCondition (BoolCond (call trans.step args1 comps1))
+        ; EqCondition (BoolCond (call (Prescan.rel_name index id) args2 comps2))
+        ]
+      in
+      Ceq
+        ( body.left
+        , Const "true"
+        , eq_conditions
+            (normalize_conditions body.left (body.conditions @ conditions))
+        , [] )
+
+let check_decl index name parameter_sorts types =
+  OpDecl
+    { name
+    ; domain = parameter_sorts @ List.map (Term.translate_sort index) types
+    ; codomain = "Bool"
+    ; arrow = Partial
+    ; attrs = []
+    }
+
 let translate_decl index id params typ policy =
   let types = component_types typ in
   let parameter_sorts = Param.translate_sorts index params in
@@ -863,61 +970,73 @@ let translate_decl index id params typ policy =
           ; attrs = frozen_all (List.length params + List.length inputs)
           }
       ]
-  | Prescan.Equation {input_count} ->
+  | Prescan.Compute {input_count; subsume} ->
       let inputs, outputs = Prem.split input_count types in
-      [ OpDecl
-          { name = Prescan.rel_name index id
-          ; domain = parameter_sorts @ List.map (Term.translate_sort index) inputs
-          ; codomain = output_sort index outputs
-          ; arrow = Partial
-          ; attrs = []
-          }
-      ]
-  | Prescan.Predicate ->
-      [ OpDecl
-          { name = Prescan.rel_name index id
-          ; domain = parameter_sorts @ List.map (Term.translate_sort index) types
-          ; codomain = "Bool"
-          ; arrow = Partial
-          ; attrs = []
-          }
-      ]
-  | Prescan.BackendCheck ->
-      [ OpDecl
-          { name = Prescan.rel_name index id
-          ; domain = parameter_sorts @ List.map (Term.translate_sort index) types
-          ; codomain = "Bool"
-          ; arrow = Total
-          ; attrs = []
-          }
-      ]
-  | Prescan.BackendCompute {input_count} ->
-      let inputs, outputs = Prem.split input_count types in
-      [ OpDecl
-          { name = Prescan.rel_name index id
-          ; domain = parameter_sorts @ List.map (Term.translate_sort index) inputs
-          ; codomain = output_sort index outputs
-          ; arrow = Partial
-          ; attrs = []
-          }
-      ]
+      OpDecl
+        { name = Prescan.rel_name index id
+        ; domain = parameter_sorts @ List.map (Term.translate_sort index) inputs
+        ; codomain = output_sort index outputs
+        ; arrow = Partial
+        ; attrs = []
+        }
+      :: (match subsume with
+          | Some {check; _} -> [check_decl index check parameter_sorts types]
+          | None -> [])
+  | Prescan.Check {trans} ->
+      check_decl index (Prescan.rel_name index id) parameter_sorts types
+      :: (match trans with
+          | Some {step; _} -> [check_decl index step parameter_sorts types]
+          | None -> [])
+
+(* Rel(xs) = true if Rel-step(xs): the rules other than maude_trans. *)
+let step_bridge index id params typ step =
+  let variables =
+    Param.translate_terms index params
+    @ List.mapi
+        (fun position typ ->
+          Var
+            (generated_variable ("REL-ARG" ^ string_of_int (position + 1))
+               (Term.translate_sort index typ)))
+        (component_types typ)
+  in
+  Ceq
+    ( App (Prescan.rel_name index id, variables)
+    , Const "true"
+    , [BoolCond (App (step, variables))]
+    , [] )
 
 let translate ?request_output ?include_rule index id params _mixop typ rules =
   match Prescan.relation_policy index id with
   | Error _ -> []
   | Ok policy ->
       let declarations = translate_decl index id params typ policy in
+      let rule ?head policy r =
+        translate_rule ?request_output ?head index id params policy r
+      in
       match policy with
-      | Prescan.BackendCheck | Prescan.BackendCompute _ -> declarations
       | Prescan.Execution _ ->
           declarations
           @ translate_execution ?request_output ?include_rule index id params typ
               policy rules
-      | Prescan.Equation _ | Prescan.Predicate ->
+      | Prescan.Compute {subsume = Some {subsume_rule; check}; _} ->
           declarations
           @ List.map
-              (translate_rule ?request_output index id params policy)
+              (fun r ->
+                if rule_id r = subsume_rule then
+                  rule ~head:check (Prescan.Check {trans = None}) r
+                else rule policy r)
               rules
+      | Prescan.Check {trans = Some trans} ->
+          declarations
+          @ step_bridge index id params typ trans.step
+            :: List.map
+                 (fun r ->
+                   if rule_id r = trans.trans_rule then
+                     translate_trans index id params trans r
+                   else rule ~head:trans.step policy r)
+                 rules
+      | Prescan.Compute {subsume = None; _} | Prescan.Check {trans = None} ->
+          declarations @ List.map (rule policy) rules
 
 (* k_heatcool is a RuleD lowering mode. Hintd supplies the validated
  * relation shape; this private module constructs identify-focus, heating,
@@ -1032,8 +1151,7 @@ module Context_rules = struct
   let execution_policy index relation =
     match Prescan.relation_policy index relation with
     | Ok (Prescan.Execution _ as policy) -> policy
-    | Ok (Prescan.Equation _ | Prescan.Predicate | Prescan.BackendCheck
-         | Prescan.BackendCompute _)
+    | Ok (Prescan.Compute _ | Prescan.Check _)
     | Error _ -> unsupported relation.at
         "focus pattern refers to a non-execution relation"
 
@@ -1120,8 +1238,7 @@ module Context_rules = struct
     match premise.it with
     | RulePr (id, args, mixop, head) ->
         begin match Prescan.relation_policy index id with
-        | Ok (Prescan.Execution {input_count; _} | Prescan.Equation {input_count}
-             | Prescan.BackendCompute {input_count}) ->
+        | Ok (Prescan.Execution {input_count; _} | Prescan.Compute {input_count; _}) ->
             let inputs, outputs =
               Prem.split input_count (Prem.components mixop head)
             in
@@ -1169,16 +1286,19 @@ module Context_rules = struct
             begin match Prescan.relation_policy index id with
             | Ok (Prescan.Execution _) when is_deferred id ->
                 S.empty, S.empty, false
+            | Ok (Prescan.Compute {subsume = Some _; _})
+              when Prem.known_args bound args && Prem.known bound head ->
+                (* A known result is the subsumption check, as for Check. *)
+                S.empty, free premise, true
             | Ok (Prescan.Execution {input_count; _}
-                 | Prescan.Equation {input_count}
-                 | Prescan.BackendCompute {input_count}) ->
+                 | Prescan.Compute {input_count; _}) ->
                 let inputs, outputs = Prem.split input_count parts in
                 let writes = List.fold_left Prem.bind S.empty outputs in
                 let reads =
                   List.fold_left Prem.bind Il.Free.(free_args args).varid inputs
                 in
                 writes, S.union reads (S.inter bound writes), false
-            | Ok (Prescan.Predicate | Prescan.BackendCheck) ->
+            | Ok (Prescan.Check _) ->
                 S.empty, free premise, true
             | Error reason -> unsupported premise.at reason
             end
@@ -1246,7 +1366,7 @@ module Context_rules = struct
     in
     let index = Term.with_relation_types index
       pattern.source.id pattern.source.params inputs in
-    let terms, guards, bound =
+    let terms, guards, bound, _ =
       translate_inputs index pattern.source.params inputs
     in
     let needed = boundary_variables index (pattern.operands @ pattern.trailing) in
@@ -1396,8 +1516,7 @@ module Context_rules = struct
   let request_sort index (context : Hintd.context) =
     match execution_policy index context.source.id with
     | Prescan.Execution {request_sort; _} -> request_sort
-    | Prescan.Equation _ | Prescan.Predicate | Prescan.BackendCheck
-    | Prescan.BackendCompute _ -> unsupported context.rule.at
+    | Prescan.Compute _ | Prescan.Check _ -> unsupported context.rule.at
         "context relation has no execution-request sort"
 
   let helper index (context : Hintd.context) name =

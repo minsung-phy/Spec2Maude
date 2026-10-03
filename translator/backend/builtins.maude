@@ -7,7 +7,7 @@
 --- document/core/appendix/profiles.rst at that revision. See docs/TRANSLATION.md.
 
 mod WASM-BUILTINS is
-  inc SPEC2MAUDE-RELATION-BACKENDS .
+  inc SPEC2MAUDE-GENERATED .
 
 
   --- Implemented builtin family: integer bits, MSB first.

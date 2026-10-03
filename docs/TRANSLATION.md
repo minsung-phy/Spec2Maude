@@ -62,6 +62,12 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
   필드 순서 변경·추가를 허용하는 일반 검사는 생성하지 않는다.
   Wasm의 실제 SubE는 기존 표현을 유지한다. 기준 커밋처럼 각 `SubE`에서
   `same_representation`을 확인한다. 중첩 변환용 별도 전체 스캔은 유지하지 않는다.
+- relation 전제에서 어떤 입력에도 묶이지 않은 변수 i가 알려진 `xs[i]`의 인덱스로만
+  쓰이면, i는 xs의 유효한 위치를 고른다(`xs[i]`는 i < |xs|일 때만 정의된다):
+  `PREFIX E SUFFIX := xs /\ I := |PREFIX|`. 예: `Deftype_sub/super`의 `typeuse*[i]`.
+  `maude_check` rule의 결론 입력이 pattern이 아니면(예: `Heaptype_sub/rec-sub`의
+  `typeuse*[j]`), 전제가 변수를 묶은 뒤 그 값과 비교한다.
+  생성자가 없는 `e?{}` pattern은 eps 또는 e와 같다(예: `Reftype_sub/null`의 `NULL?`).
 - 함수 인자(`DefP`/`DefA`)는 번역 전에 함수별 정의로 specialization한다
   (`Def.specialize_script`, `Decd.specialize`). `$g(..., def $t, ...)` 호출마다
   `$g`의 복사본 `$gt`를 만들고 본문의 def 파라미터 이름을 `$t`로 바꾼다(source 의미
@@ -88,6 +94,40 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 동일시하지 않는다. 특정 속성을 source로 옮겨 주장하려면 상태 대응, 관측 지점,
 내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
 현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
+
+### import 범위 (결정, 2026-10-03)
+
+`run`, `modelcheck`, `instantiate`, `harness`는 import가 있는 모듈을 Unsupported로
+거부한다(`wasm2maude/emit.ml`). 결과 집계에서도 PASS가 아니라 Unsupported로 센다.
+`$instantiate`는 `maude_assume "Module_ok" "Externaddr_ok"`이다.
+
+- 이유: import가 있는 프로그램을 실행·모델체킹하려면 import를 제공하는 쪽이
+  필요하다. 예를 들어 `(import "env" "print" (func (param i32)))`의 몸체는 host에
+  있고 SpecTec 명세에는 없다. 필요한 일은 ① 제공자(다른 Wasm 모듈 또는 host 함수
+  모델)와 ② 제공된 것의 타입 검사(`Externaddr_ok`) 두 가지다. ①이 없으면 ②만
+  번역해도 실행할 수 없으므로, import 지원은 ①과 함께 하는 별도 작업이다.
+- import가 없으면 `$instantiate`의 두 전제를 생략해도 의미가 그대로다.
+  `Module_ok`가 내는 `xt_I*`가 비고 `externaddr*`도 `eps`이므로
+  `(Externaddr_ok: s |- externaddr : xt_I)*`는 빈 반복이다. 이 등가는
+  import가 없을 때만 성립하므로 wasm2maude의 거부가 그 전제 조건을 보장한다.
+  `Module_ok`의 타입 검사는 frontend validator가 보장한다고 가정한다.
+- 나중에 import를 지원할 때: 링크 단계에서 frontend(reference interpreter의
+  linker)가 import 타입을 검사하면, `Module_ok`와 같은 논리로 `Externaddr_ok`도
+  가정으로 둘 수 있다. 그러면 `Externtype_sub` 아래의 validation relation을
+  번역하지 않아도 된다. 이 경우에는 frontend 검사와 명세 relation이 같다는 가정을 기록한다.
+- wast harness는 이미 이 방식이다. 계획 단계에서 reference interpreter의
+  `Wasm.Match.match_externtype`이 import 타입을 검사하고(`wasm2maude/wast_plan.ml`),
+  memory/table의 현재 최소 크기 조건만 Maude의 `linkImports`가 실행 중에 검사한다
+  (`wasm2maude/wast-runtime.maude`). 따라서 wast의 import 모듈은 frontend linker가
+  `Externaddr_ok`와 같은 판정을 한다는 가정 아래 지원된다.
+
+### 호출 인자 검사
+
+`$invoke`의 `(Val_ok: s |- val : t_1)*`가 인자 개수와 타입을 검사한다. wasm2maude는
+export가 함수인지까지만 확인한다. `Val_ok`가 실패하면 `$invoke`는 정의되지 않으며,
+`run`/`modelcheck` runtime은 `invalid-invocation` 상태로 끝난다. 이 상태에서는
+아무 값도 반환되지 않으므로 `[]~ returned(rejected)` 같은 안전성 질의는 공허하게
+참이 된다. 먼저 `rewrite` 결과가 `invalid-invocation`이 아닌지 확인한다.
 
 ## 공통 backend와 목록 계산
 
@@ -253,10 +293,11 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
 | `inverse $g` | 빠진 인자를 선언된 역함수 g로 구하고 pattern과 forward 결과를 재확인한다. 인자 순서·signature를 검사한다. |
 | `builtin` | 함수 선언을 생성하고 `translator/backend/builtins.maude`의 handwritten 구현에 연결한다. |
-| `maude_eq` | 계산 가능한 `~~` relation의 입력·출력을 equation으로 대응시킨다. |
-| `maude_predicate` | 모든 인자가 알려진 relation을 Boolean predicate로 대응시킨다. |
-| `maude_backend "check"` | ground relation의 Bool 검사를 `relation-backends.maude`에 맡긴다. |
-| `maude_backend "compute"` | relation의 출력 계산을 `relation-backends.maude`에 맡긴다. |
+| `maude_compute` | relation을 하나의 plain `~~` 또는 `:` 뒤의 출력을 계산하는 partial 연산으로 번역한다. |
+| `maude_check` | relation을 모든 component를 받는 partial Bool 검사로 번역한다. 성립하면 `true`, 아니면 결과가 없다. |
+| `maude_subsume` (rule) | `maude_compute` relation의 이 rule은 검사 형태다. rule 이름으로 된 별도 Bool 연산(`Ref_ok/sub` → `Ref-ok-sub`)이 되고, 출력까지 알려진 호출은 이 연산을 부른다. 출력을 모르는 호출만 계산 연산을 부른다. |
+| `maude_trans "C" ...` (rule) | `maude_check` relation의 추이 rule `R(.., h1, h2) :- R(.., h1, x), R(.., x, h2)`이다. 중간 x는 나열한 nullary constructor 중에서 고르고, 첫 전제는 이 rule을 뺀 `-step` 연산을 쓴다. |
+| `maude_assume "R" ...` (rule/def) | 나열한 relation의 전제를 번역하지 않는다. 입력이 그 전제를 이미 만족한다는 가정이며, 아래 적용 범위에 근거를 기록한다. 나열한 relation이 전제에 없으면 거부한다. |
 
 `show`, `macro`, `desc`, `name`, `prose`, `tabular`는 문서 표현용이며 실행 방식을
 선택하지 않는다. hint의 형식 검사가 통과했다는 것과 handwritten 구현이 정확하다는
@@ -269,10 +310,27 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
   임의 길이 목록의 모든 분할을 찾는 역관계로 확장하지 않는다.
 - `$fbits_`의 `inverse` 대상은 `$inv_fbits_`다. 기존의 `$inv_ibits_` 표기는
   로컬 hint 수정으로 바로잡았다. 함수의 계산식은 변경하지 않는다.
-- `Module_ok` backend는 이미 검증된 모듈의 타입 계산 범위다.
-  validation relation은 실제 실행 rule의 premise에 요구될 때 연결한다.
-- `Ref_ok`, `Externaddr_ok`와 subtype의 handwritten 구현은 원문의 관계를 따른다.
-  정상적인 trap과 잘못된 import의 거부를 성공한 실행으로 바꾸지 않는다.
+- 타입 검사 relation은 실행 rule과 함수의 전제에 나타날 때만 hint를 붙인다.
+  `Expand`, `Ref_ok`는 `maude_compute`, `Val_ok`, `Num_ok`, `Vec_ok`,
+  `Reftype_sub`, `Heaptype_sub`, `Deftype_sub`는 `maude_check`다.
+  hint가 없는 validation relation(`Module_ok`, `Externaddr_ok` 등)은 번역하지 않고,
+  그것을 전제로 쓰는 정의는 지원하지 않는다.
+- `Ref_ok/sub`: `maude_subsume`, `maude_assume "Reftype_ok"`.
+  나머지 rule은 ref 생성자마다 하나씩 실제 타입을 계산한다(partial).
+  검사 `Ref-ok-sub(s, ref, rt)`는 그 타입이 `rt`의 subtype인지 본다.
+  `Reftype_sub`가 반사적이고 추이적이므로 `Ref_ok/sub`를 여러 번 중첩한 유도와 같다.
+  `Reftype_ok {} |- rt`는 `rt`가 검증된 모듈의 `$inst_reftype` 결과이거나
+  store instance의 타입이라 닫혀 있고 올바르다는 가정이다(증명하지 않음).
+  닫히지 않은 `_IDX` 타입이 들어오면 원문보다 더 받아들일 수 있다.
+- `Heaptype_sub/trans`: `maude_trans "ANY" "EQ" "I31" "STRUCT" "ARRAY" "FUNC" "EXN" "EXTERN"`,
+  `maude_assume "Heaptype_ok"`. 후보는 모두 `Heaptype_ok/abs`로 OK이므로
+  `Heaptype_ok` 생략은 근사가 아니다. bottom 타입(`NONE`, `NOFUNC`, `NOEXN`,
+  `NOEXTERN`, `BOT`)을 후보에 넣으면 `NOFUNC <: ANY` 같은 거짓 질의가
+  `NONE`/`NOFUNC` 사이를 순환한다. bottom을 거치는 사슬은 none/bot rule이 직접 다룬다.
+  deftype 중간값은 `Deftype_sub/super`의 재귀가 다룬다. 이 완전성은 C = {}와
+  닫힌 타입에 대한 귀납 논증(semantic review, 미증명)에 근거한다.
+  추상 heap type 169쌍 전부를 원문 정의로 계산한 값과 비교해 일치와 종료를 확인했다.
+- 실행 중 질의는 C = {}이므로 `_IDX`, `REC` rule은 번역되지만 적용되지 않는다.
 
 ### 숫자 builtin과 profile
 

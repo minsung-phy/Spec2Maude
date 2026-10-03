@@ -1397,6 +1397,14 @@ mod SPEC2MAUDE-GENERATED is
 
   op unrollht- : SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
+  op Deftype-sub : SpectecTerminal SpectecTerminal SpectecTerminal ~> Bool .
+
+  op Heaptype-sub : SpectecTerminal SpectecTerminal SpectecTerminal ~> Bool .
+
+  op Heaptype-sub-step : SpectecTerminal SpectecTerminal SpectecTerminal ~> Bool .
+
+  op Reftype-sub : SpectecTerminal SpectecTerminal SpectecTerminal ~> Bool .
+
   op oktypeidx : -> SpectecType .
 
   op default- : SpectecTerminal ~> SpectecTerminals .
@@ -1406,8 +1414,6 @@ mod SPEC2MAUDE-GENERATED is
   op nonfuncs : -> SpectecType .
 
   op funcidx-nonfuncs : SpectecTerminal -> SpectecTerminals .
-
-  op Module-ok : SpectecTerminal ~> SpectecTerminal .
 
   op relaxed2 : -> SpectecType .
 
@@ -1979,11 +1985,11 @@ mod SPEC2MAUDE-GENERATED is
 
   op Vec-ok : SpectecTerminal val SpectecTerminal ~> Bool .
 
-  op Ref-ok : SpectecTerminal val SpectecTerminal -> Bool .
+  op Ref-ok : SpectecTerminal val ~> SpectecTerminal .
+
+  op Ref-ok-sub : SpectecTerminal val SpectecTerminal ~> Bool .
 
   op Val-ok : SpectecTerminal val SpectecTerminal ~> Bool .
-
-  op Externaddr-ok : SpectecTerminal SpectecTerminal SpectecTerminal -> Bool .
 
   op inst-valtype : SpectecTerminal SpectecTerminal -> SpectecTerminal .
 
@@ -2431,23 +2437,23 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-exp-1480 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
+  op project-map-exp-1557 : SpectecTerminals ~> SpectecTerminal .
+
   op project-map-exp-1559 : SpectecTerminals ~> SpectecTerminal .
 
   op project-map-exp-1561 : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1563 : SpectecTerminals ~> SpectecTerminal .
+  op project-map-exp-1564 : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1566 : SpectecTerminals ~> SpectecTerminal .
+  op project-map-exp-1567 : SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1569 : SpectecTerminals ~> SpectecTerminals .
-
-  op map-exp-1573 : SpectecTerminal Nat Nat ~> SpectecTerminals .
+  op map-exp-1571 : SpectecTerminal Nat Nat ~> SpectecTerminals .
 
   op map-rundata : SpectecTerminals Nat Nat ~> SpectecTerminals .
 
   op map-runelem : SpectecTerminals Nat Nat ~> SpectecTerminals .
 
-  op map-exp-1596 : SpectecTerminals ~> SpectecTerminals .
+  op map-exp-1594 : SpectecTerminals ~> SpectecTerminals .
 
   op iterpr-34 : Nat SpectecTerminals ~> Bool .
 
@@ -2457,9 +2463,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op iterpr-37-output-1 : SpectecTerminals ~> ValList .
 
-  op iterpr-38 : SpectecTerminal SpectecTerminals SpectecTerminals ~> Bool .
-
-  op iterpr-39 : SpectecTerminal SpectecTerminals ValList ~> Bool .
+  op iterpr-38 : SpectecTerminal SpectecTerminals ValList ~> Bool .
 
   vars LIFT-ELEMENT VAL VAL-1 VAL-2 REF2 REF-1 REF-2 VALUE19 V2 R NUM VEC : val .
 
@@ -2467,11 +2471,11 @@ mod SPEC2MAUDE-GENERATED is
 
   vars PREFIX VAL- VAL-- STACK VALUE25 VAL-G- VALS : ValList .
 
-  vars BRIDGE-Z BT YY2 F SX NT C-13 UNOP2 C-24 BINOP2 TESTOP2 RELOP2 NT-1 NT-2 CVTOP2 VVUNOP2 VVBINOP2 VVTERNOP2 SH VUNOP2 VBINOP2 VTERNOP2 JNN VRELOP2 VSHIFTOP2 SWIZZLOP INPUT-FIELD LNN PT SH-2 SH-1 VEXTUNOP2 VEXTBINOP2 VEXTTERNOP2 VCVTOP2 Z S2 RT-2 RT-1 FI CATCH2 AT AT-1 AT-2 AT- AO INN HT RT REL-OUTPUT1 F- C2 ZT AI2 Z- Z-- S- F-- W W-1 VALUE1 VALUE3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE FNN VT LT2 CONSTTYPE LANETYPE HT-1 HT-2 DT JT EXTERNTYPE GT2 MT TT TV TV-1 TU-1 TV-2 T FT CT QT TU-2 LIM XT2 MMT DT-1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN INN-1 INN-2 FNN-2 FNN-1 SHAPE JNN-1 JNN-2 HALF ZERO3 VALUE22 BLOCKTYPE REFTYPE3 MEMARG NUMTYPE-1 NUMTYPE-2 VVTESTOP2 ISHAPE BSHAPE ISHAPE-1 ISHAPE-2 SHAPE-1 SHAPE-2 FRAME REFTYPE-1 REFTYPE-2 NUMLIT VTESTOP2 VSWIZZLOP2 DATAMODE ELEMMODE MODULE2 INIT C LCT-1 DT-N X-13 X-24 X-3 X-4 F-1 F-2 LNN-1 LNN-2 SX-1 SX-2 VALUE20 VALUE21 STORE2 STATE EXTERNADDR TI MI FV TABLEINST TABLEINST- MEMINST MEMINST- MODULEINST ENABLED-INPUT1 ZT-2 EXN3 SI2 TYPE2 TAGINST S-1 S-2 GLOBALINST FUNCCODE FUNCINST DATAINST OK3 ELEMTYPE ELEMINST S-3 S-4 S-5 S-6 S-7 MODULEINST-0 Z--- S--- S---- T-12 T-22 ST2 XT-12 XT-22 SUBTYPE EXTERNTYPE-12 EXTERNTYPE-22 LOCAL2 TAG2 GLOBAL2 MEM2 TABLE2 FUNC2 DATA2 ELEM2 START2 IMPORT2 EXPORT2 C-33 XT-I2 : SpectecTerminal .
+  vars BRIDGE-Z BT YY2 F SX NT C-13 UNOP2 C-24 BINOP2 TESTOP2 RELOP2 NT-1 NT-2 CVTOP2 VVUNOP2 VVBINOP2 VVTERNOP2 SH VUNOP2 VBINOP2 VTERNOP2 JNN VRELOP2 VSHIFTOP2 SWIZZLOP INPUT-FIELD LNN PT SH-2 SH-1 VEXTUNOP2 VEXTBINOP2 VEXTTERNOP2 VCVTOP2 Z S2 RT-2 RT-1 FI CATCH2 AT AT-1 AT-2 AT- AO INN HT RT REL-OUTPUT1 F- C2 ZT AI2 Z- Z-- S- F-- W W-1 VALUE1 VALUE3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE FNN VT LT2 CONSTTYPE LANETYPE HT-1 HT-2 DT JT EXTERNTYPE GT2 MT TT TV TV-1 TU-1 TV-2 T FT CT QT TU-2 LIM XT2 MMT DT-1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN INN-1 INN-2 FNN-2 FNN-1 SHAPE JNN-1 JNN-2 HALF ZERO3 VALUE22 BLOCKTYPE REFTYPE3 MEMARG NUMTYPE-1 NUMTYPE-2 VVTESTOP2 ISHAPE BSHAPE ISHAPE-1 ISHAPE-2 SHAPE-1 SHAPE-2 FRAME REFTYPE-1 REFTYPE-2 NUMLIT VTESTOP2 VSWIZZLOP2 DATAMODE ELEMMODE MODULE2 INIT C LCT-1 DT-N DEFTYPE-1 DEFTYPE-2 INDEX-ELEMENT REL-ARG1 REL-ARG2 REL-ARG3 HEAPTYPE- HEAPTYPE-1 HEAPTYPE-2 REL-INPUT3 REL-INPUT2 CASE-PART2 X-13 X-24 X-3 X-4 F-1 F-2 LNN-1 LNN-2 SX-1 SX-2 VALUE20 VALUE21 STORE2 STATE EXTERNADDR TI MI FV TABLEINST TABLEINST- MEMINST MEMINST- EXN3 RT- MODULEINST ENABLED-INPUT1 ZT-2 SI2 TYPE2 TAGINST S-1 S-2 GLOBALINST FUNCCODE FUNCINST DATAINST OK3 ELEMTYPE ELEMINST S-3 S-4 S-5 S-6 S-7 MODULEINST-0 Z--- S--- S---- T-12 T-22 ST2 XT-12 XT-22 SUBTYPE EXTERNTYPE-12 EXTERNTYPE-22 LOCAL2 TAG2 GLOBAL2 MEM2 TABLE2 FUNC2 DATA2 ELEM2 START2 IMPORT2 EXPORT2 C-33 : SpectecTerminal .
 
   vars POSTFIX INSTR-1- INSTR-2- INSTR- INSTR-- INSTR-0- REST FOCUS INSTR--- INSTR-5 VALUE15 EXPR CASE-PART3 INSTR-D- INSTR-E- INSTRS EXPR-G2 EXPR-T2 EXPR-F2 : InstrList .
 
-  vars T-- CATCH- L- I- T-1- T-2- CATCH-- J-3 CASE-PART1 MUT-- ZT- SX- T- MUT- N-- W- W--- W-4 W---2 W-- W--3 W-1- X- CHAR- XX- VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 VALUE10 VALUE11 VALUE12 VALUE13 FREE-- NULL- RESULTTYPE RESULTTYPE2 FINAL- TYPEUSE- U64- EXTERNTYPE- EXTERNTYPE-3 NULL-1- XT- TV-- TU-- TV-3 TU-3 FT- ST- XT-1- XT-2- DT- SUBTYPE- VALTYPE- FIELDTYPE- RESULTTYPE-1 RESULTTYPE-2 EXTERNTYPE-1- EXTERNTYPE-2- HALF- ZERO- VALTYPE-2 VALTYPE-- LABELIDX- VALUE24 LANEIDX- LABELIDX-- LOADOP- STOREOP- VLOADOP- BYTE- LOCAL- EXPR- NAME NAME2 VALUE32 START- NAME-1 NAME-2 TYPE- TAG- GLOBAL- MEM- TABLE- FUNC- DATA- ELEM- IMPORT- EXPORT- LOCALIDX- VALUE16 VALUE17 VALUE18 X-2 LCT- DT-- C-2 C-1- C-- C-2- C-3- C-4 CHOICE-PREFIX CHOICE-REST C--1- C--2- J-1- J-2- I-1- I-2- XA- B- R- SI- AI- EXN- J- R-- MEMBER-PREFIX MEMBER-SUFFIX T-5 CASE-PART2 REF- TYPE-- DEFTYPE-- DEFTYPE- TAGTYPE-- JA-- GLOBALTYPE-- GA-- MEMTYPE-- MA-- TABLETYPE-- REF-- TA-- FUNCCODE-- MODULEINST-- FA-- OK-- B--- DA-- RT-- REF--- EA-- TAGTYPE-4 EXPR-G- GLOBALTYPE-4 MEMTYPE-4 EXPR-T- TABLETYPE-4 EXPR-F- LOCAL-- BYTE-- DATAMODE- ELEMMODE- ELEMTYPE- EXPR-E-- EXTERNADDR- AA-I- GA-I- MA-I- TA-I- FA-I- FA-3 AA- GA-3 MA-3 REF-T- TA-3 DA-3 REF-E-- EA-3 XI- E- EXPR-- EXPR--- GT-- XT-I- XT-E- REFTYPE- X-5 INSTR-S- W--2 W'?S FTS T_1S T_2S TU'S STS XT_1S XT_2S SUBTYPES VALTYPES FIELDTYPES TYPEUSES EXTERNTYPE_1S EXTERNTYPE_2S LABELIDXS CATCHS LOCALS EXPRS TYPES TAGS GLOBALS MEMS TABLES FUNCS DATAS ELEMS IMPORTS EXPORTS C_1S C*S C_2S C_3S IS J_1S J_2S PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1S I_2S TS JS REFS CS PROJECT-ELEMENT ZTS PROJECT-COLUMN-3 EXPR-E- TAGTYPES GLOBALTYPES MEMTYPES TABLETYPES ELEMTYPES XS EXPR_FS LOCAL*S EXTERNADDRS XT_IS : SpectecTerminals .
+  vars T-- CATCH- L- I- T-1- T-2- CATCH-- J-3 CASE-PART1 MUT-- ZT- SX- T- MUT- N-- W- W--- W-4 W---2 W-- W--3 W-1- X- CHAR- XX- VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 VALUE10 VALUE11 VALUE12 VALUE13 FREE-- NULL- RESULTTYPE RESULTTYPE2 FINAL- TYPEUSE- U64- EXTERNTYPE- EXTERNTYPE-3 NULL-1- XT- TV-- TU-- TV-3 TU-3 FT- ST- XT-1- XT-2- DT- SUBTYPE- VALTYPE- FIELDTYPE- RESULTTYPE-1 RESULTTYPE-2 EXTERNTYPE-1- EXTERNTYPE-2- HALF- ZERO- VALTYPE-2 VALTYPE-- LABELIDX- VALUE24 LANEIDX- LABELIDX-- LOADOP- STOREOP- VLOADOP- BYTE- LOCAL- EXPR- NAME NAME2 VALUE32 START- NAME-1 NAME-2 TYPE- TAG- GLOBAL- MEM- TABLE- FUNC- DATA- ELEM- IMPORT- EXPORT- LOCALIDX- VALUE16 VALUE17 VALUE18 X-2 LCT- DT-- INDEX-PREFIX INDEX-SUFFIX WITNESSES WITNESSES2 C-2 C-1- C-- C-2- C-3- C-4 CHOICE-PREFIX CHOICE-REST C--1- C--2- J-1- J-2- I-1- I-2- XA- B- R- SI- AI- EXN- J- R-- MEMBER-PREFIX MEMBER-SUFFIX T-5 CASE-PART22 REF- TYPE-- DEFTYPE-- DEFTYPE- TAGTYPE-- JA-- GLOBALTYPE-- GA-- MEMTYPE-- MA-- TABLETYPE-- REF-- TA-- FUNCCODE-- MODULEINST-- FA-- OK-- B--- DA-- RT-- REF--- EA-- TAGTYPE-4 EXPR-G- GLOBALTYPE-4 MEMTYPE-4 EXPR-T- TABLETYPE-4 EXPR-F- LOCAL-- BYTE-- DATAMODE- ELEMMODE- ELEMTYPE- EXPR-E-- EXTERNADDR- AA-I- GA-I- MA-I- TA-I- FA-I- FA-3 AA- GA-3 MA-3 REF-T- TA-3 DA-3 REF-E-- EA-3 XI- E- EXPR-- EXPR--- GT-- REFTYPE- X-5 INSTR-S- W--2 W'?S FTS T_1S T_2S TU'S STS XT_1S XT_2S SUBTYPES VALTYPES FIELDTYPES TYPEUSES EXTERNTYPE_1S EXTERNTYPE_2S LABELIDXS CATCHS LOCALS EXPRS TYPES TAGS GLOBALS MEMS TABLES FUNCS DATAS ELEMS IMPORTS EXPORTS C_1S C*S C_2S C_3S IS J_1S J_2S PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1S I_2S TS JS REFS CS PROJECT-ELEMENT ZTS PROJECT-COLUMN-3 EXPR-E- TAGTYPES GLOBALTYPES MEMTYPES TABLETYPES ELEMTYPES XS EXPR_FS LOCAL*S : SpectecTerminals .
 
   vars C3 N3 L I L-2 X4 C-12 C-23 C-32 M2 M3 A K3 I-1 I-2 X-1 X-23 J Y K2 N2 A-1 A-2 VALUE FUNCIDX GLOBALIDX TABLEIDX MEMIDX TAGIDX TYPEIDX ELEMIDX DATAIDX LOCALIDX LABELIDX U64 SZ DIM M-1 M-2 VALUE14 TAGADDR GLOBALADDR MEMADDR TABLEADDR FUNCADDR U31 STRUCTADDR ARRAYADDR EXNADDR HOSTADDR VALUE23 TABLEIDX2 LANEIDX MEMIDX2 FIELDIDX U32 TYPEIDX2 LABELIDX-3 VECLIT TYPEIDX-1 TYPEIDX-2 TABLEIDX-1 TABLEIDX-2 MEMIDX-1 MEMIDX-2 V-1 V-2 V-3 V C-5 C--3 I-3 CASE-PART12 JA GA MA TA FA DA EA ITER-COUNT J-13 J-23 I-F I-D I-E : Nat .
 
@@ -2643,14 +2647,14 @@ mod SPEC2MAUDE-GENERATED is
 
   crl [focus-Step-read-br-on-cast-succeed] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST(L, RT-1, RT-2))) | POSTFIX }
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
 
   crl [focus-Step-read-br-on-cast-fail] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST(L, RT-1, RT-2))) | POSTFIX }
     if typecheck(REF2, ref) .
 
   crl [focus-Step-read-br-on-cast-fail-succeed] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST-FAIL(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST-FAIL(L, RT-1, RT-2))) | POSTFIX }
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
 
   crl [focus-Step-read-br-on-cast-fail-fail] : identifyFocus(S2 ; F, PREFIX REF2, BR-ON-CAST-FAIL(L, RT-1, RT-2), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 BR-ON-CAST-FAIL(L, RT-1, RT-2))) | POSTFIX }
     if typecheck(REF2, ref) .
@@ -2748,14 +2752,14 @@ mod SPEC2MAUDE-GENERATED is
 
   crl [focus-Step-read-ref-test-true] : identifyFocus(S2 ; F, PREFIX REF2, REF.TEST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.TEST(RT))) | POSTFIX }
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
 
   crl [focus-Step-read-ref-test-false] : identifyFocus(S2 ; F, PREFIX REF2, REF.TEST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.TEST(RT))) | POSTFIX }
     if typecheck(REF2, ref) .
 
   crl [focus-Step-read-ref-cast-succeed] : identifyFocus(S2 ; F, PREFIX REF2, REF.CAST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.CAST(RT))) | POSTFIX }
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
 
   crl [focus-Step-read-ref-cast-fail] : identifyFocus(S2 ; F, PREFIX REF2, REF.CAST(RT), POSTFIX) => { PREFIX | ((S2 ; F) ; (REF2 REF.CAST(RT))) | POSTFIX }
     if typecheck(REF2, ref) .
@@ -5790,6 +5794,106 @@ mod SPEC2MAUDE-GENERATED is
 
   eq unrollht-(C, REC(I)) = (C . 'RECS) [ I ] .
 
+  ceq Deftype-sub(C, DEFTYPE-1, DEFTYPE-2) = true
+    if clos-deftype(C, DEFTYPE-1) == clos-deftype(C, DEFTYPE-2) .
+
+  ceq Deftype-sub(C, DEFTYPE-1, DEFTYPE-2) = true
+    if SUB(FINAL-, TYPEUSE-, CT) := unrolldt(DEFTYPE-1)
+      /\ len(FINAL-) <= 1
+      /\ INDEX-PREFIX (INDEX-ELEMENT INDEX-SUFFIX) := TYPEUSE-
+      /\ I := len(INDEX-PREFIX)
+      /\ Heaptype-sub(C, TYPEUSE- [ I ], DEFTYPE-2) .
+
+  ceq Heaptype-sub(REL-ARG1, REL-ARG2, REL-ARG3) = true
+    if Heaptype-sub-step(REL-ARG1, REL-ARG2, REL-ARG3) .
+
+  eq Heaptype-sub-step(C, HEAPTYPE, HEAPTYPE) = true .
+
+  ceq Heaptype-sub(C, HEAPTYPE-1, HEAPTYPE-2) = true
+    if WITNESSES (HEAPTYPE- WITNESSES2) := ANY (EQ (I31 (STRUCT (ARRAY (spectec-FUNC (EXN EXTERN))))))
+      /\ typecheck(HEAPTYPE-, heaptype)
+      /\ HEAPTYPE- =/= HEAPTYPE-1
+      /\ HEAPTYPE- =/= HEAPTYPE-2
+      /\ Heaptype-sub-step(C, HEAPTYPE-1, HEAPTYPE-)
+      /\ Heaptype-sub(C, HEAPTYPE-, HEAPTYPE-2) .
+
+  eq Heaptype-sub-step(C, EQ, ANY) = true .
+
+  eq Heaptype-sub-step(C, I31, EQ) = true .
+
+  eq Heaptype-sub-step(C, STRUCT, EQ) = true .
+
+  eq Heaptype-sub-step(C, ARRAY, EQ) = true .
+
+  ceq Heaptype-sub-step(C, DEFTYPE, STRUCT) = true
+    if typecheck(DEFTYPE, deftype)
+      /\ spectec-STRUCT(FIELDTYPE-) := Expand(DEFTYPE) .
+
+  ceq Heaptype-sub-step(C, DEFTYPE, ARRAY) = true
+    if typecheck(DEFTYPE, deftype)
+      /\ spectec-ARRAY(FIELDTYPE) := Expand(DEFTYPE) .
+
+  ceq Heaptype-sub-step(C, DEFTYPE, spectec-FUNC) = true
+    if typecheck(DEFTYPE, deftype)
+      /\ FUNC T-1- -> T-2- := Expand(DEFTYPE) .
+
+  ceq Heaptype-sub-step(C, DEFTYPE-1, DEFTYPE-2) = true
+    if typecheck(DEFTYPE-1, deftype)
+      /\ typecheck(DEFTYPE-2, deftype)
+      /\ Deftype-sub(C, DEFTYPE-1, DEFTYPE-2) .
+
+  ceq Heaptype-sub-step(C, -IDX(TYPEIDX), HEAPTYPE) = true
+    if Heaptype-sub(C, (C . 'TYPES) [ TYPEIDX ], HEAPTYPE) .
+
+  ceq Heaptype-sub-step(C, HEAPTYPE, -IDX(TYPEIDX)) = true
+    if Heaptype-sub(C, HEAPTYPE, (C . 'TYPES) [ TYPEIDX ]) .
+
+  ceq Heaptype-sub-step(C, REC(I), STRUCT) = true
+    if SUB(FINAL-, eps, spectec-STRUCT(FIELDTYPE-)) := (C . 'RECS) [ I ]
+      /\ len(FINAL-) <= 1 .
+
+  ceq Heaptype-sub-step(C, REC(I), ARRAY) = true
+    if SUB(FINAL-, eps, spectec-ARRAY(FIELDTYPE)) := (C . 'RECS) [ I ]
+      /\ len(FINAL-) <= 1 .
+
+  ceq Heaptype-sub-step(C, REC(I), spectec-FUNC) = true
+    if SUB(FINAL-, eps, FUNC T-1- -> T-2-) := (C . 'RECS) [ I ]
+      /\ len(FINAL-) <= 1 .
+
+  ceq Heaptype-sub-step(C, REC(I), REL-INPUT3) = true
+    if SUB(FINAL-, TYPEUSE-, CT) := (C . 'RECS) [ I ]
+      /\ len(FINAL-) <= 1
+      /\ INDEX-PREFIX (INDEX-ELEMENT INDEX-SUFFIX) := TYPEUSE-
+      /\ J := len(INDEX-PREFIX)
+      /\ TYPEUSE- [ J ] = REL-INPUT3 .
+
+  ceq Heaptype-sub-step(C, NONE, HEAPTYPE) = true
+    if Heaptype-sub(C, HEAPTYPE, ANY)
+      /\ HEAPTYPE =/= BOT .
+
+  ceq Heaptype-sub-step(C, NOFUNC, HEAPTYPE) = true
+    if Heaptype-sub(C, HEAPTYPE, spectec-FUNC)
+      /\ HEAPTYPE =/= BOT .
+
+  ceq Heaptype-sub-step(C, NOEXN, HEAPTYPE) = true
+    if Heaptype-sub(C, HEAPTYPE, EXN)
+      /\ HEAPTYPE =/= BOT .
+
+  ceq Heaptype-sub-step(C, NOEXTERN, HEAPTYPE) = true
+    if Heaptype-sub(C, HEAPTYPE, EXTERN)
+      /\ HEAPTYPE =/= BOT .
+
+  eq Heaptype-sub-step(C, BOT, HEAPTYPE) = true .
+
+  ceq Reftype-sub(C, REF(eps, HT-1), REF(eps, HT-2)) = true
+    if Heaptype-sub(C, HT-1, HT-2) .
+
+  ceq Reftype-sub(C, REL-INPUT2, REF(NULL ?, HT-2)) = true
+    if REF(CASE-PART1, CASE-PART2) := REL-INPUT2
+      /\ HT-1 := CASE-PART2
+      /\ _or_(CASE-PART1 == eps, CASE-PART1 == (NULL ?))
+      /\ Heaptype-sub(C, HT-1, HT-2) .
+
   ceq typecheck(spectec-OK(TYPEIDX), oktypeidx) = true
     if typecheck(# TYPEIDX, typeidx) .
 
@@ -6978,6 +7082,32 @@ mod SPEC2MAUDE-GENERATED is
 
   eq Vec-ok(S2, VCONST(VT, C3), VT) = true .
 
+  eq Ref-ok(S2, REF.NULL-ADDR) = REF(NULL ?, BOT) .
+
+  eq Ref-ok(S2, REF.I31-NUM(I)) = REF(eps, I31) .
+
+  ceq Ref-ok(S2, REF.STRUCT-ADDR(A)) = REF(eps, DT)
+    if DT := ((S2 . 'STRUCTS) [ A ]) . 'TYPE .
+
+  ceq Ref-ok(S2, REF.ARRAY-ADDR(A)) = REF(eps, DT)
+    if DT := ((S2 . 'ARRAYS) [ A ]) . 'TYPE .
+
+  ceq Ref-ok(S2, REF.FUNC-ADDR(A)) = REF(eps, DT)
+    if DT := ((S2 . 'FUNCS) [ A ]) . 'TYPE .
+
+  ceq Ref-ok(S2, REF.EXN-ADDR(A)) = REF(eps, EXN)
+    if EXN3 := (S2 . 'EXNS) [ A ] .
+
+  eq Ref-ok(S2, REF.HOST-ADDR(A)) = REF(eps, ANY) .
+
+  ceq Ref-ok(S2, REF.EXTERN(REF2)) = REF(eps, EXTERN)
+    if Ref-ok-sub(S2, REF2, REF(eps, ANY))
+      /\ REF2 =/= (REF.NULL-ADDR) .
+
+  ceq Ref-ok-sub(S2, REF2, RT) = true
+    if RT- := Ref-ok(S2, REF2)
+      /\ Reftype-sub({ (field('TYPES, eps) ; (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; (field('RETURN, eps) ; (field('REFS, eps) ; field('RECS, eps))))))))))))) }, RT-, RT) .
+
   ceq Val-ok(S2, NUM, NT) = true
     if typecheck(NUM, num)
       /\ typecheck(NT, numtype)
@@ -6991,7 +7121,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq Val-ok(S2, REF2, RT) = true
     if typecheck(REF2, ref)
       /\ typecheck(RT, reftype)
-      /\ Ref-ok(S2, REF2, RT) .
+      /\ Ref-ok-sub(S2, REF2, RT) .
 
   eq inst-valtype(MODULEINST, T) = subst-all-valtype(T, MODULEINST . 'TYPES) .
 
@@ -7289,19 +7419,19 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read((S2 ; F) ; (REF2 BR-ON-CAST(L, RT-1, RT-2))) => REF2 BR(L)
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
 
   crl Step-read((S2 ; F) ; (REF2 BR-ON-CAST(L, RT-1, RT-2))) => REF2
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) =/= true .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) =/= true .
 
   crl Step-read((S2 ; F) ; (REF2 BR-ON-CAST-FAIL(L, RT-1, RT-2))) => REF2
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) .
 
   crl Step-read((S2 ; F) ; (REF2 BR-ON-CAST-FAIL(L, RT-1, RT-2))) => REF2 BR(L)
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) =/= true .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT-2)) =/= true .
 
   crl Step-read(Z ; CALL(X4)) => REF.FUNC-ADDR(A) CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE)
     if A := #rat((spectec-moduleinst(Z) . 'FUNCS) [ X4 ]) .
@@ -7314,10 +7444,10 @@ mod SPEC2MAUDE-GENERATED is
       /\ FUNC T-1- -> T-2- := Expand(FI . 'TYPE)
       /\ N3 = len(T-1-)
       /\ M3 := len(T-2-)
-      /\ spectec-FUNC-2(CASE-PART12, CASE-PART2, CASE-PART3) := FI . 'CODE
+      /\ spectec-FUNC-2(CASE-PART12, CASE-PART22, CASE-PART3) := FI . 'CODE
       /\ X4 := CASE-PART12
       /\ INSTR- := CASE-PART3
-      /\ T- := project-map-exp-1206(CASE-PART2)
+      /\ T- := project-map-exp-1206(CASE-PART22)
       /\ F := { (field('LOCALS, map-exp-1208(N3, VAL-) map-default(T-)) ; field('MODULE, FI . 'MODULE)) } .
 
   crl Step-read(Z ; RETURN-CALL(X4)) => REF.FUNC-ADDR(A) RETURN-CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE)
@@ -7536,19 +7666,19 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read((S2 ; F) ; (REF2 REF.TEST(RT))) => CONST(I32, # 1)
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
 
   crl Step-read((S2 ; F) ; (REF2 REF.TEST(RT))) => CONST(I32, # 0)
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) =/= true .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT)) =/= true .
 
   crl Step-read((S2 ; F) ; (REF2 REF.CAST(RT))) => REF2
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT)) .
 
   crl Step-read((S2 ; F) ; (REF2 REF.CAST(RT))) => TRAP
     if typecheck(REF2, ref)
-      /\ Ref-ok(S2, REF2, inst-reftype(F . 'MODULE, RT)) =/= true .
+      /\ Ref-ok-sub(S2, REF2, inst-reftype(F . 'MODULE, RT)) =/= true .
 
   crl Step-read(Z ; STRUCT.NEW-DEFAULT(X4)) => VAL- STRUCT.NEW(X4)
     if REL-OUTPUT1 := Expand(spectec-type(Z, X4))
@@ -7941,16 +8071,14 @@ mod SPEC2MAUDE-GENERATED is
       /\ evalglobals(S- ; (F [. 'MODULE = ((F . 'MODULE) [. 'GLOBALS = (((F . 'MODULE) . 'GLOBALS) (# A)) ]) ]), GT--, EXPR--) => tuple(Z-- seq(VAL--)) .
 
   crl instantiate(S2, MODULE2, EXTERNADDR-) => (S---- ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST)) })) ; (INSTR-E- (INSTR-D- instrLift(INSTR-S-)))
-    if XT-I- -> XT-E- := Module-ok(MODULE2)
-      /\ iterpr-38(S2, EXTERNADDR-, XT-I-)
-      /\ MODULE(TYPE-, IMPORT-, TAG-, GLOBAL-, MEM-, TABLE-, FUNC-, DATA-, ELEM-, START-, EXPORT-) := MODULE2
+    if MODULE(TYPE-, IMPORT-, TAG-, GLOBAL-, MEM-, TABLE-, FUNC-, DATA-, ELEM-, START-, EXPORT-) := MODULE2
       /\ len(START-) <= 1
-      /\ tuple(seq(EXPR-G-) seq(GLOBALTYPE-4)) := project-map-exp-1559(GLOBAL-)
-      /\ tuple(seq(EXPR-T-) seq(TABLETYPE-4)) := project-map-exp-1561(TABLE-)
-      /\ tuple(seq(BYTE--) seq(DATAMODE-)) := project-map-exp-1563(DATA-)
-      /\ tuple(seq(ELEMMODE-) (seq(EXPR-E--) seq(REFTYPE-))) := project-map-exp-1566(ELEM-)
-      /\ X-5 := project-map-exp-1569(START-)
-      /\ MODULEINST-0 := { (field('TYPES, alloctypes(TYPE-)) ; (field('TAGS, eps) ; (field('GLOBALS, globalsxa(EXTERNADDR-)) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, funcsxa(EXTERNADDR-) map-exp-1573(S2, len(FUNC-), 0)) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }
+      /\ tuple(seq(EXPR-G-) seq(GLOBALTYPE-4)) := project-map-exp-1557(GLOBAL-)
+      /\ tuple(seq(EXPR-T-) seq(TABLETYPE-4)) := project-map-exp-1559(TABLE-)
+      /\ tuple(seq(BYTE--) seq(DATAMODE-)) := project-map-exp-1561(DATA-)
+      /\ tuple(seq(ELEMMODE-) (seq(EXPR-E--) seq(REFTYPE-))) := project-map-exp-1564(ELEM-)
+      /\ X-5 := project-map-exp-1567(START-)
+      /\ MODULEINST-0 := { (field('TYPES, alloctypes(TYPE-)) ; (field('TAGS, eps) ; (field('GLOBALS, globalsxa(EXTERNADDR-)) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, funcsxa(EXTERNADDR-) map-exp-1571(S2, len(FUNC-), 0)) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }
       /\ Z := S2 ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST-0)) })
       /\ evalglobals(Z, GLOBALTYPE-4, EXPR-G-) => tuple(Z- seq(VAL-G-))
       /\ evalexprs(Z-, EXPR-T-) => tuple(Z-- seq(REF-T-))
@@ -7959,12 +8087,12 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S---- MODULEINST) := allocmodule(S---, MODULE2, EXTERNADDR-, VAL-G-, REF-T-, REF-E--)
       /\ INSTR-D- := concat-(instr, map-rundata(DATA-, len(DATA-), 0))
       /\ INSTR-E- := concat-(instr, map-runelem(ELEM-, len(ELEM-), 0))
-      /\ INSTR-S- := map-exp-1596(X-5)
+      /\ INSTR-S- := map-exp-1594(X-5)
       /\ len(INSTR-S-) <= 1 .
 
   ceq invoke(S2, FUNCADDR, VAL-) = (S2 ; ({ (field('LOCALS, eps) ; field('MODULE, { (field('TYPES, eps) ; (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) })) })) ; (VAL- (REF.FUNC-ADDR(FUNCADDR) CALL-REF(((S2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)))
     if FUNC T-1- -> T-2- := Expand(((S2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)
-      /\ iterpr-39(S2, T-1-, VAL-) .
+      /\ iterpr-38(S2, T-1-, VAL-) .
 
   eq map-exp-21(X, eps) = eps .
 
@@ -8716,33 +8844,33 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-exp-1480(seq(EXPR-F2) EXPR_FS, seq(LOCAL-) LOCAL*S, (# X4) XS) = spectec-FUNC-2(X4, LOCAL-, EXPR-F2) map-exp-1480(EXPR_FS, LOCAL*S, XS) .
 
+  eq project-map-exp-1557(eps) = tuple(seq(eps) seq(eps)) .
+
+  ceq project-map-exp-1557(spectec-GLOBAL(GLOBALTYPE, EXPR-G2) PROJECT-REST) = tuple(seq(seq(EXPR-G2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1557(PROJECT-REST) .
+
   eq project-map-exp-1559(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1559(spectec-GLOBAL(GLOBALTYPE, EXPR-G2) PROJECT-REST) = tuple(seq(seq(EXPR-G2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
+  ceq project-map-exp-1559(spectec-TABLE(TABLETYPE, EXPR-T2) PROJECT-REST) = tuple(seq(seq(EXPR-T2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1559(PROJECT-REST) .
 
   eq project-map-exp-1561(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1561(spectec-TABLE(TABLETYPE, EXPR-T2) PROJECT-REST) = tuple(seq(seq(EXPR-T2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
+  ceq project-map-exp-1561(DATA(BYTE-, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE-) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1561(PROJECT-REST) .
 
-  eq project-map-exp-1563(eps) = tuple(seq(eps) seq(eps)) .
+  eq project-map-exp-1564(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
-  ceq project-map-exp-1563(DATA(BYTE-, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE-) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1563(PROJECT-REST) .
+  ceq project-map-exp-1564(ELEM(REFTYPE, EXPR-E-, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(seq(EXPR-E-) PROJECT-COLUMN-2) seq(REFTYPE PROJECT-COLUMN-3)))
+    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1564(PROJECT-REST) .
 
-  eq project-map-exp-1566(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
+  eq project-map-exp-1567(eps) = eps .
 
-  ceq project-map-exp-1566(ELEM(REFTYPE, EXPR-E-, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(seq(EXPR-E-) PROJECT-COLUMN-2) seq(REFTYPE PROJECT-COLUMN-3)))
-    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1566(PROJECT-REST) .
+  eq project-map-exp-1567(START(X4) ?) = (# X4) ? .
 
-  eq project-map-exp-1569(eps) = eps .
+  eq map-exp-1571(S2, 0, I-F) = eps .
 
-  eq project-map-exp-1569(START(X4) ?) = (# X4) ? .
-
-  eq map-exp-1573(S2, 0, I-F) = eps .
-
-  eq map-exp-1573(S2, s(ITER-COUNT), I-F) = (# (len(S2 . 'FUNCS) + I-F)) map-exp-1573(S2, ITER-COUNT, s(I-F)) .
+  eq map-exp-1571(S2, s(ITER-COUNT), I-F) = (# (len(S2 . 'FUNCS) + I-F)) map-exp-1571(S2, ITER-COUNT, s(I-F)) .
 
   eq map-rundata(DATA-, 0, I-D) = eps .
 
@@ -8752,9 +8880,9 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-runelem(ELEM-, s(ITER-COUNT), I-E) = seq(runelem-(I-E, ELEM- [ I-E ])) map-runelem(ELEM-, ITER-COUNT, s(I-E)) .
 
-  eq map-exp-1596(eps) = eps .
+  eq map-exp-1594(eps) = eps .
 
-  eq map-exp-1596((# X4) ?) = CALL(X4) ? .
+  eq map-exp-1594((# X4) ?) = CALL(X4) ? .
 
   eq iterpr-34(I-3, eps) = true .
 
@@ -8779,11 +8907,6 @@ mod SPEC2MAUDE-GENERATED is
 
   eq iterpr-38(S2, eps, eps) = true .
 
-  ceq iterpr-38(S2, EXTERNADDR EXTERNADDRS, XT-I2 XT_IS) = iterpr-38(S2, EXTERNADDRS, XT_IS)
-    if Externaddr-ok(S2, EXTERNADDR, XT-I2) .
-
-  eq iterpr-39(S2, eps, eps) = true .
-
-  ceq iterpr-39(S2, T-12 T_1S, VAL VALS) = iterpr-39(S2, T_1S, VALS)
+  ceq iterpr-38(S2, T-12 T_1S, VAL VALS) = iterpr-38(S2, T_1S, VALS)
     if Val-ok(S2, VAL, T-12) .
 endm

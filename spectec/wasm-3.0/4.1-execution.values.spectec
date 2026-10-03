@@ -20,10 +20,10 @@ rule Nondefaultable: |- t NONDEFAULTABLE -- if $default_(t) = eps
 
 ;; Values
 
-relation Num_ok: store |- num : numtype  hint(macro "%num") hint(maude_predicate)
-relation Vec_ok: store |- vec : vectype  hint(macro "%vec") hint(maude_predicate)
-relation Ref_ok: store |- ref : reftype  hint(macro "%ref") hint(maude_backend "check")
-relation Val_ok: store |- val : valtype  hint(macro "%val") hint(maude_predicate)
+relation Num_ok: store |- num : numtype  hint(macro "%num") hint(maude_check)
+relation Vec_ok: store |- vec : vectype  hint(macro "%vec") hint(maude_check)
+relation Ref_ok: store |- ref : reftype  hint(macro "%ref") hint(maude_compute)
+relation Val_ok: store |- val : valtype  hint(macro "%val") hint(maude_check)
 
 rule Num_ok:
   s |- CONST nt c : nt
@@ -67,6 +67,8 @@ rule Ref_ok/sub:
   -- Ref_ok: s |- ref : rt'
   -- Reftype_ok: {} |- rt : OK
   -- Reftype_sub: {} |- rt' <: rt
+  hint(maude_subsume)
+  hint(maude_assume "Reftype_ok")
 
 
 rule Val_ok/num:
@@ -101,7 +103,7 @@ rule Fieldval_ok/packval:
 
 ;; External addresses
 
-relation Externaddr_ok: store |- externaddr : externtype  hint(macro "%externaddr") hint(maude_backend "check")
+relation Externaddr_ok: store |- externaddr : externtype  hint(macro "%externaddr")
 
 rule Externaddr_ok/tag:
   s |- TAG a : TAG taginst.TYPE

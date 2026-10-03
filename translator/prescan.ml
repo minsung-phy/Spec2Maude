@@ -55,10 +55,27 @@ type relation_policy =
       { request_sort : sort
       ; input_count : int
       }
-  | Equation of {input_count : int}
-  | Predicate
-  | BackendCheck
-  | BackendCompute of {input_count : int}
+  | Compute of
+      { input_count : int
+      ; subsume : subsume option
+      }
+  | Check of {trans : trans option}
+
+(* hint(maude_subsume) on a rule of a computed relation: the rule's conclusion
+ * is the relation's check form, an operator separate from the computation. *)
+and subsume =
+  { subsume_rule : string
+  ; check : name
+  }
+
+(* hint(maude_trans "C" ...) on a transitivity rule of a checked relation:
+ * the existential middle ranges over the listed nullary constructors and its
+ * first premise uses the relation without that rule (the step operator). *)
+and trans =
+  { trans_rule : string
+  ; step : name
+  ; witnesses : string list
+  }
 
 type membership_choice =
   { definition : string
@@ -184,14 +201,6 @@ let reserved_names =
     ; "lane-width"; "lane-from-bits"
     ; "lane-to-bits"; "lanes-aux"; "inv-lanes-aux"
     ; "pair-chunks"; "fixed-chunks"
-    (* relation-backends.maude *)
-    ; "backend-reftype-sub"; "backend-heaptype-sub"; "backend-valid-heaptype"
-    ; "backend-close-super"; "backend-deftype-step"; "ref-ok-actual-type"
-    ; "externaddr-ok-actual-type"; "backend-externtype-sub"; "backend-tagtype-sub"
-    ; "backend-globaltype-sub"; "backend-memtype-sub"; "backend-tabletype-sub"
-    ; "backend-valtype-sub"; "backend-limits-sub"; "module-ok-import-types"
-    ; "module-ok-tag-types"; "module-ok-global-types"; "module-ok-mem-types"
-    ; "module-ok-table-types"; "module-ok-func-types"; "module-ok-export-types"
     ]
 
 let fresh used suffix candidate =
@@ -385,54 +394,88 @@ let relation_hint_names hints target_name =
        (fun names hint ->
          match names, hint.hintid.it with
          | Error _ as error, _ -> error
-         | Ok names, ("maude_eq" | "maude_predicate" as name) ->
+         | Ok names, ("maude_compute" | "maude_check" as name) ->
              begin match hint.hintexp.it with
              | El.Ast.SeqE [] -> Ok (name :: names)
              | _ -> Error (name ^ " must be a flag hint")
-             end
-         | Ok names, "maude_backend" ->
-             begin match hint.hintexp.it with
-             | El.Ast.TextE "check" -> Ok ("backend-check" :: names)
-             | El.Ast.TextE "compute" -> Ok ("backend-compute" :: names)
-             | _ -> Error "maude_backend must be \"check\" or \"compute\""
              end
          | Ok names, _ -> Ok names)
        (Ok [])
   |> Result.map (List.sort_uniq String.compare)
 
-let classify_relation hints source mixop request_sort =
+let rule_hints hints relation name =
+  List.concat_map
+    (fun hintdef ->
+      match hintdef.it with
+      | RuleH (target, rule, values) when target.it = relation ->
+          values
+          |> List.filter (fun hint -> hint.hintid.it = name)
+          |> List.map (fun hint -> rule.it, hint)
+      | TypH _ | RelH _ | DecH _ | GramH _ | RuleH _ -> [])
+    hints
+
+let subsume_hint hints source derived =
+  match rule_hints hints source "maude_subsume" with
+  | [] -> Ok None
+  | [rule, {hintexp = {it = El.Ast.SeqE []; _}; _}] ->
+      Ok (Some {subsume_rule = rule; check = derived rule})
+  | [_] -> Error "maude_subsume must be a flag hint"
+  | _ -> Error "relation has more than one maude_subsume rule"
+
+let trans_hint hints source derived =
+  match rule_hints hints source "maude_trans" with
+  | [] -> Ok None
+  | [rule, hint] ->
+      let exps =
+        match hint.hintexp.it with
+        | El.Ast.SeqE exps -> exps
+        | _ -> [hint.hintexp]
+      in
+      let witnesses =
+        List.filter_map
+          (fun (exp : El.Ast.exp) ->
+            match exp.it with El.Ast.TextE name -> Some name | _ -> None)
+          exps
+      in
+      if witnesses = [] || List.length witnesses <> List.length exps then
+        Error "maude_trans expects constructor names as strings"
+      else Ok (Some {trans_rule = rule; step = derived "step"; witnesses})
+  | _ -> Error "relation has more than one maude_trans rule"
+
+let classify_relation hints source mixop request_sort derived =
   let markers = Mixop.marker_positions in
   let arity = Xl.Mixop.arity mixop in
   let plain = markers Xl.Atom.[SqArrow; SqArrowStar] mixop in
   let execution =
     markers Xl.Atom.[SqArrow; SqArrowSub; SqArrowStar; SqArrowStarSub] mixop
   in
-  let plain_equation = markers Xl.Atom.[Approx] mixop in
-  let equation = markers Xl.Atom.[Approx; ApproxSub] mixop in
-  let plain_function = markers Xl.Atom.[Colon] mixop in
-  let functions = markers Xl.Atom.[Colon; ColonSub] mixop in
-  match execution, plain, equation, plain_equation,
-        functions, plain_function,
-        relation_hint_names hints source with
+  (* A computed relation's outputs follow its one ~~ or : marker. *)
+  let output = markers Xl.Atom.[Approx; ApproxSub; Colon; ColonSub] mixop in
+  let plain_output = markers Xl.Atom.[Approx; Colon] mixop in
+  let subsume = subsume_hint hints source derived in
+  let trans = trans_hint hints source derived in
+  match execution, plain, output, plain_output,
+        relation_hint_names hints source, subsume, trans with
+  | _, _, _, _, Error reason, _, _
+  | _, _, _, _, _, Error reason, _
   | _, _, _, _, _, _, Error reason -> Error reason
-  | [input_count], [plain_count], [], [], _, _, Ok []
-    when input_count = plain_count && input_count > 0 && input_count < arity ->
+  | [input_count], [plain_count], _, _, Ok [], Ok None, Ok None
+    when input_count = plain_count && input_count > 0 && input_count < arity
+         && markers Xl.Atom.[Approx; ApproxSub] mixop = [] ->
       Ok (Execution {request_sort = request_sort (); input_count})
-  | [], [], [input_count], [plain_count], _, _, Ok ["maude_eq"]
+  | [], [], [input_count], [plain_count], Ok ["maude_compute"], Ok subsume, Ok None
     when input_count = plain_count && input_count > 0 && input_count < arity ->
-      Ok (Equation {input_count})
-  | [], [], _, _, _, _, Ok ["maude_eq"] ->
-      Error "maude_eq requires exactly one plain ~~ marker"
-  | [], [], _, _, _, _, Ok ["maude_predicate"] -> Ok Predicate
-  | [], [], _, _, _, _, Ok ["backend-check"] -> Ok BackendCheck
-  | [], [], _, _, [input_count], [plain_count], Ok ["backend-compute"]
-    when input_count = plain_count && input_count > 0 && input_count < arity ->
-      Ok (BackendCompute {input_count})
-  | [], [], _, _, _, _, Ok ["backend-compute"] ->
-      Error "maude_backend \"compute\" requires exactly one plain : marker"
-  | [], [], _, _, _, _, Ok [] ->
-      Error "non-execution relation requires an explicit backend hint"
-  | _ -> Error "relation has unsupported or conflicting backend markers"
+      Ok (Compute {input_count; subsume})
+  | [], [], _, _, Ok ["maude_compute"], _, Ok None ->
+      Error "maude_compute requires exactly one plain ~~ or : marker"
+  | [], [], _, _, Ok ["maude_check"], Ok None, Ok trans -> Ok (Check {trans})
+  | _, _, _, _, _, Ok (Some _), _ ->
+      Error "maude_subsume requires a maude_compute relation"
+  | _, _, _, _, _, _, Ok (Some _) ->
+      Error "maude_trans requires a maude_check relation"
+  | [], [], _, _, Ok [], _, _ ->
+      Error "non-execution relation requires hint(maude_compute) or hint(maude_check)"
+  | _ -> Error "relation has unsupported or conflicting markers or hints"
 
 let inverse_hint hints source =
   let targets =
@@ -975,7 +1018,10 @@ let scan script =
           let name = registered_name RelName source in
           fresh_name used_names (name ^ "-Request")
         in
-        match classify_relation hints source mixop request_sort with
+        let derived suffix =
+          fresh_name used_names (registered_name RelName source ^ "-" ^ suffix)
+        in
+        match classify_relation hints source mixop request_sort derived with
         | Ok policy -> (source, policy) :: policies, unsupported
         | Error reason -> policies, (source, reason) :: unsupported)
       relations ([], [])
@@ -983,7 +1029,7 @@ let scan script =
   let execution_input_count source =
     match List.assoc_opt source relation_policies with
     | Some (Execution {input_count; _}) -> Some input_count
-    | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
+    | Some (Compute _ | Check _)
     | None -> None
   in
   let heatcool = Hintd.scan_heatcool sort_metadata execution_input_count in
@@ -1003,7 +1049,7 @@ let scan script =
                   (id.it, ordinal), fresh_name used_names candidate)
                 rules
               |> List.rev_append acc
-          | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
+          | Some (Compute _ | Check _)
           | None -> acc
           end
       | RecD defs -> List.fold_left collect acc defs
@@ -1054,8 +1100,8 @@ let scan script =
   in
   let relation_supported source =
     match List.assoc_opt source relation_policies with
-    | Some (BackendCheck | BackendCompute _) | None -> false
-    | Some (Execution _ | Equation _ | Predicate) -> true
+    | Some (Execution _ | Compute _ | Check _) -> true
+    | None -> false
   in
   let definition_supported source =
     Option.value (List.assoc_opt source definition_bodies) ~default:false
@@ -1158,7 +1204,7 @@ let premise_iteration_binds_membership index
   | RelationOwner source ->
       begin match List.assoc_opt source index.relation_policies with
       | Some (Execution _) -> true
-      | Some (Equation _ | Predicate | BackendCheck | BackendCompute _)
+      | Some (Compute _ | Check _)
       | None -> false
       end
   | DefinitionOwner _ | OtherOwner -> false

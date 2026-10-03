@@ -461,8 +461,108 @@ let specialize_script script =
   List.iter check_remaining (List.concat_map flatten script);
   script
 
+(* hint(maude_assume "Rel" ...) on a rule or definition omits its premises on
+ * the named relations. Each premise is assumed to hold for every admitted
+ * input, e.g. a module that passed the frontend validator; the assumption is
+ * recorded with the hint in docs/TRANSLATION.md, not checked here. *)
+
+let assumed_relations owner hints =
+  hints
+  |> List.filter (fun hint -> hint.hintid.it = "maude_assume")
+  |> List.concat_map (fun hint ->
+       let name (exp : El.Ast.exp) =
+         match exp.it with
+         | El.Ast.TextE name -> name
+         | _ ->
+             unsupported hint.hintid.at "hint" owner
+               "maude_assume expects relation names as strings"
+       in
+       match hint.hintexp.it with
+       | El.Ast.SeqE exps -> List.map name exps
+       | _ -> [name hint.hintexp])
+
+let rec premise_relation prem =
+  match prem.it with
+  | RulePr (id, _, _, _) -> Some id.it
+  | IterPr (prem, _) -> premise_relation prem
+  | IfPr _ | LetPr _ | ElsePr | NegPr _ -> None
+
+let omit_assumed at owner names prems =
+  let assumed prem =
+    match premise_relation prem with
+    | Some id -> List.mem id names
+    | None -> false
+  in
+  List.iter
+    (fun name ->
+      if not (List.exists (fun prem -> premise_relation prem = Some name) prems)
+      then
+        unsupported at "hint" owner
+          ("maude_assume names " ^ name ^ ", which is not a premise here"))
+    names;
+  List.filter (fun prem -> not (assumed prem)) prems
+
+(* Variables that occurred only in omitted premises are no longer quantified. *)
+let used_quants free quants =
+  List.filter
+    (fun quant ->
+      match quant.it with
+      | ExpP (id, _) -> Il.Free.Set.mem id.it free.Il.Free.varid
+      | TypP _ | DefP _ | GramP _ -> true)
+    quants
+
+let assume_script script =
+  let hints = Prescan.collect_hints [] script in
+  let rule_hints relation rule =
+    List.concat_map
+      (fun hintdef ->
+        match hintdef.it with
+        | RuleH (r, id, values) when r.it = relation && id.it = rule -> values
+        | TypH _ | RelH _ | DecH _ | GramH _ | RuleH _ -> [])
+      hints
+  in
+  let dec_hints definition =
+    List.concat_map
+      (fun hintdef ->
+        match hintdef.it with
+        | DecH (id, values) when id.it = definition -> values
+        | TypH _ | RelH _ | DecH _ | GramH _ | RuleH _ -> [])
+      hints
+  in
+  let rule relation r =
+    let RuleD (id, quants, mixop, exp, prems) = r.it in
+    let owner = "RuleD " ^ relation ^ "/" ^ id.it in
+    match assumed_relations owner (rule_hints relation id.it) with
+    | [] -> r
+    | names ->
+        let prems = omit_assumed r.at owner names prems in
+        let free = Il.Free.(free_exp exp ++ free_prems prems) in
+        {r with it = RuleD (id, used_quants free quants, mixop, exp, prems)}
+  in
+  let clause owner names c =
+    let DefD (quants, args, exp, prems) = c.it in
+    let prems = omit_assumed c.at owner names prems in
+    let free = Il.Free.(free_args args ++ free_exp exp ++ free_prems prems) in
+    {c with it = DefD (used_quants free quants, args, exp, prems)}
+  in
+  let rec transform def =
+    match def.it with
+    | RelD (id, params, mixop, typ, rules) ->
+        {def with it = RelD (id, params, mixop, typ, List.map (rule id.it) rules)}
+    | DecD (id, params, typ, clauses) ->
+        let owner = "DecD $" ^ id.it in
+        begin match assumed_relations owner (dec_hints id.it) with
+        | [] -> def
+        | names ->
+            {def with it = DecD (id, params, typ, List.map (clause owner names) clauses)}
+        end
+    | RecD defs -> {def with it = RecD (List.map transform defs)}
+    | TypD _ | GramD _ | HintD _ -> def
+  in
+  List.map transform script
+
 let translate_script script =
-  let script = specialize_script script in
+  let script = specialize_script (assume_script script) in
   let index = Prescan.scan script in
   let sort_metadata = Prescan.sort_metadata index in
   let output_requests = ref [] in

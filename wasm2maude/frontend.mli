@@ -9,8 +9,6 @@ type invocation_error =
   | Missing_export
   | Non_function_export
   | Unresolved_function_type
-  | Wrong_arity
-  | Wrong_argument_type of int
 
 val load : string -> module_
 val of_definition : string -> Wasm.Script.definition -> module_
@@ -20,8 +18,3 @@ val import_count : module_ -> int
 val export_type : module_ -> Wasm.Ast.name -> Wasm.Types.externtype option
 val function_parameters :
   module_ -> Wasm.Ast.name -> (Wasm.Types.valtype list, invocation_error) result
-val validate_invocation :
-  module_ ->
-  Wasm.Ast.name ->
-  Wasm.Types.valtype list ->
-  (unit, invocation_error) result

@@ -278,6 +278,12 @@ let direct_numeric_variable index bound exp =
 
 let rec bind_pattern index bound exp subject error =
   match exp.it with
+  | IterE (body, (Opt, [])) when known bound body ->
+      (* Without a generator, e? matches either eps or e. *)
+      let present = Term.translate_exp index {exp with it = OptE (Some body)} in
+      let is term = App ("_==_", [subject; term]) in
+      make bound
+        [EqCondition (BoolCond (App ("_or_", [is (Const "eps"); is present])))]
   | _ when known bound exp ->
       make bound
         [EqCondition (EqCond (Term.translate_exp index exp, subject))]
@@ -513,7 +519,63 @@ let tuple index exps terms =
       |> Term.sequence
       |> fun terms -> App ("tuple", [terms])
 
-let translate_rulepr index bound id args mixop exp =
+(* A variable i bound by no input and used as the index of a known xs[i]
+ * ranges over the valid indices of xs, since xs[i] requires i < |xs|:
+ * PREFIX ELEMENT SUFFIX := xs /\ i := |PREFIX|. *)
+let bind_free_indices index bound args exp =
+  let indices = ref [] in
+  let module Visitor = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_exp exp =
+      match exp.it with
+      | IdxE (collection, ({it = VarE i; _} as position))
+        when not (Il.Free.Set.mem i.it bound)
+             && known bound collection
+             && not (List.exists (fun (j, _, _) -> j = i.it) !indices) ->
+          indices := (i.it, position, collection) :: !indices
+      | _ -> ()
+  end)
+  in
+  Visitor.args args;
+  Visitor.exp exp;
+  List.fold_left
+    (fun (bound, conditions) (i, position, collection) ->
+      match collection.note.it with
+      | IterT (element_typ, _) ->
+          let representation =
+            Prescan.sequence_representation index collection.note
+          in
+          let part name = Var (generated_variable name representation.sort) in
+          let prefix = part "INDEX-PREFIX" in
+          let element =
+            Var
+              (generated_variable "INDEX-ELEMENT"
+                 (Term.translate_sort index element_typ))
+            |> Term.as_sequence_element index element_typ
+          in
+          let sequence =
+            Term.sequence_of_typ index collection.note
+              [prefix; element; part "INDEX-SUFFIX"]
+          in
+          ( Il.Free.Set.add i bound
+          , conditions
+            @ [ EqCondition
+                  (MatchCond (sequence, Term.translate_exp index collection))
+              ; EqCondition
+                  (MatchCond
+                     ( Term.translate_exp index position
+                     , App (representation.size, [prefix]) )) ] )
+      | _ -> invalid_arg "indexed collection is not iterated")
+    (bound, []) (List.rev !indices)
+
+let rec translate_rulepr index bound id args mixop exp =
+  match bind_free_indices index bound args exp with
+  | _, [] -> translate_known_rulepr index bound id args mixop exp
+  | bound, choices ->
+      let result = translate_known_rulepr index bound id args mixop exp in
+      {result with conditions = choices @ result.conditions}
+
+and translate_known_rulepr index bound id args mixop exp =
   let exps = components mixop exp in
   let policy =
     match Prescan.relation_policy index id with
@@ -523,15 +585,27 @@ let translate_rulepr index bound id args mixop exp =
           ("RulePr target " ^ id.it ^ " is unsupported: " ^ reason)
   in
   match policy with
-  | Prescan.Predicate | Prescan.BackendCheck ->
+  | Prescan.Check _ ->
       if not (known_args bound args && known bound exp) then
-        invalid_arg "predicate RulePr contains an unbound variable";
+        invalid_arg
+          ("checked RulePr contains an unbound variable: " ^ id.it ^ ": "
+           ^ Il.Print.string_of_exp exp);
       make bound [EqCondition (BoolCond (relation_call index id args exps))]
-  | Prescan.Equation {input_count}
-  | Prescan.BackendCompute {input_count} ->
+  | Prescan.Compute {subsume = Some {check; _}; _}
+    when known_args bound args && known bound exp ->
+      (* A known result is checked by the subsumption rule, not by equality
+       * with the computed one. *)
+      make bound
+        [EqCondition
+           (BoolCond
+              (App
+                 ( check
+                 , List.map (Term.translate_arg index) args
+                   @ List.map (Term.translate_exp index) exps )))]
+  | Prescan.Compute {input_count; _} ->
       let inputs, outputs = split input_count exps in
       if not (known_args bound args && List.for_all (known bound) inputs) then
-        invalid_arg "equation RulePr has an unbound input";
+        invalid_arg "computed RulePr has an unbound input";
       let call = relation_call index id args inputs in
       if List.for_all (known bound) outputs then
         make bound

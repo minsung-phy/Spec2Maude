@@ -267,15 +267,10 @@ let result_heaptype source at = function
         "semantic heap type is not reachable in a source WAST result pattern"
   | heaptype -> heaptype
 
-let type_of_literal literal =
-  match literal.Source.it with
-  | Script.ValLit value -> Wasm.Value.type_of_value value
-  | Script.NullLit heaptype -> Wasm.Types.RefT (Wasm.Types.Null, heaptype)
-
-let check_invocation source at instance name args =
-  let arguments = List.map type_of_literal args in
-  match Frontend.validate_invocation instance.module_ name arguments with
-  | Ok () -> ()
+(* Argument count and types are checked by the translated $invoke (Val_ok). *)
+let check_invocation source at instance name =
+  match Frontend.function_parameters instance.module_ name with
+  | Ok _ -> ()
   | Error Frontend.Missing_export ->
       unsupported source at "action names an undefined export"
   | Error Frontend.Non_function_export ->
@@ -283,12 +278,6 @@ let check_invocation source at instance name args =
   | Error Frontend.Unresolved_function_type ->
       unsupported source at
         "validated function export retained an unresolved type index"
-  | Error Frontend.Wrong_arity ->
-      unsupported source at "function invocation has the wrong number of arguments"
-  | Error (Frontend.Wrong_argument_type index) ->
-      let literal = List.nth args index in
-      unsupported source literal.Source.at
-        "function invocation argument has the wrong type"
 
 let exact_ref source at = function
   | Wasm.Value.NullRef
@@ -339,7 +328,7 @@ let action source env action =
   in
   match action.Source.it with
   | Script.Invoke (_, name, args) ->
-      check_invocation source action.at instance name args;
+      check_invocation source action.at instance name;
       Invoke (instance.id, name, List.map (literal source) args)
   | Script.Get (_, name) -> Get (instance.id, name)
 

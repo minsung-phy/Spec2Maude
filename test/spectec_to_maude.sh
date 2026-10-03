@@ -40,7 +40,6 @@ if ! command -v "$maude_bin" >/dev/null 2>&1; then
 fi
 
 cp "$root/translator/backend/main.maude" "$work/translator/backend/"
-cp "$root/translator/backend/relation-backends.maude" "$work/translator/backend/"
 cp "$root/translator/backend/builtins.maude" "$work/translator/backend/"
 cp "$root/translator/backend/spectec-semantics.maude" "$work/translator/backend/"
 cp "$root/translator/backend/spectec-sorts.maude" "$work/translator/backend/"
