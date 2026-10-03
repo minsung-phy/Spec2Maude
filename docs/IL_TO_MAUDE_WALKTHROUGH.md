@@ -1189,7 +1189,7 @@ output.maude
   SPEC2MAUDE-GENERATED
 ```
 
-읽는 순서는 `SPECTEC-TERM → types.maude → SPECTEC-PRETYPE → output.maude → 수동 relation/builtin backend`다. 실제 loading entry는 [semantics.maude](../translator/backend/semantics.maude)다.
+읽는 순서는 `SPECTEC-SORTS → types.maude → SPECTEC-BUILTIN-TYPES → 기능별 공통 모듈 → SPECTEC-SEMANTICS → output.maude → 수동 relation/builtin backend`다. 공통 sort는 [spectec-sorts.maude](../translator/backend/spectec-sorts.maude), 기본 타입 표현은 [spectec-builtin-types.maude](../translator/backend/spectec-builtin-types.maude), 기능별 공통 모듈은 [spectec-semantics.maude](../translator/backend/spectec-semantics.maude)에 선언하고, 실제 loading entry는 [main.maude](../translator/backend/main.maude)다.
 
 # 3. 방법론으로 제시할 재귀 코드
 
@@ -2000,7 +2000,9 @@ match policy with
 
 | 파일 | 왜 존재하는가 | 자동화 관점 |
 | --- | --- | --- |
-| [pretype.maude](../translator/backend/pretype.maude) | 목록·option·tuple·record·타입 검사 등 target의 공통 표현과 연산 | `LenE` 등의 번역 결과가 호출하는 공통 target 정의. 모든 내용을 source별로 다시 생성해야 한다는 뜻은 아님 |
+| [spectec-sorts.maude](../translator/backend/spectec-sorts.maude) | 공통 sort(`SpectecTerminal(s)`, `SpectecType`, `SpectecDef`) 선언 | 모든 backend·생성 모듈이 공유하는 sort |
+| [spectec-builtin-types.maude](../translator/backend/spectec-builtin-types.maude) | SpecTec 기본 타입의 Maude 표현·검사 | IL 의미가 아닌 표현 선택이라 의미 모듈과 분리 |
+| [spectec-semantics.maude](../translator/backend/spectec-semantics.maude) | convert·list·option·tuple·record 모듈을 선언 | `LenE` 등의 번역 결과가 호출하는 공통 target 정의. 모든 내용을 source별로 다시 생성해야 한다는 뜻은 아님 |
 | [builtins.maude](../translator/backend/builtins.maude) | source `hint(builtin)`이 선택한 숫자·비트·profile 구현 | source가 명시한 builtin 계약을 구현·검증하는 경계 |
 | [relation-backends.maude](../translator/backend/relation-backends.maude) | 현재 자동 `RuleD` 번역을 대신하는 source-specific relation 구현 | 이 절에서 자동화 대상으로 논의하는 부분 |
 
@@ -2024,7 +2026,7 @@ match policy with
 2. `Reld.translate`가 operator 선언만 반환하고 해당 `RuleD` 목록을 번역하지 않는다.
 3. `Prescan`은 그 backend relation 소유의 iteration을 helper 생성 목록에서 제외한다.
 4. `Prem.translate_rulepr`는 호출 형태만 생성한다.
-5. `semantics.maude`가 수동 relation 파일을 로드하여 본문을 연결한다.
+5. `main.maude`가 수동 relation 파일을 로드하여 본문을 연결한다.
 
 ## 5.3 왜 단순 재귀 번역만으로 처리하기 어려운가
 

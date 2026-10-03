@@ -62,6 +62,19 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
   필드 순서 변경·추가를 허용하는 일반 검사는 생성하지 않는다.
   Wasm의 실제 SubE는 기존 표현을 유지한다. 기준 커밋처럼 각 `SubE`에서
   `same_representation`을 확인한다. 중첩 변환용 별도 전체 스캔은 유지하지 않는다.
+- 함수 인자(`DefP`/`DefA`)는 번역 전에 함수별 정의로 specialization한다
+  (`Def.specialize_script`, `Decd.specialize`). `$g(..., def $t, ...)` 호출마다
+  `$g`의 복사본 `$gt`를 만들고 본문의 def 파라미터 이름을 `$t`로 바꾼다(source 의미
+  `$g_t(xs) = $g(xs)`, f := t). 호출되지 않는 고차 정의는 출력하지 않는다.
+  받은 함수를 다시 넘기는 경우(같은 함수를 넘기는 재귀 포함), def 파라미터를 받는
+  def 파라미터, DecD 호출 밖의 `DefA`, TypD/RelD/GramD의 `DefP`, 고차 정의의
+  `builtin`/`maude_kind`/`maude_rule`/`inverse` hint, 복사본 이름 충돌은
+  `Unsupported`로 거부한다.
+- `#` 표현의 미지원 형태: 한 family 안에서 instance마다 같은 생성자의 인자가 native
+  여부가 다르면 거부한다. 고차 정의를 대상으로 하는 다른 def의 `hint(inverse ...)`는
+  검사하지 않는다. text 값의 연결은 목록 연결로 번역되며 현재 입력에는 없다.
+  wasm2maude 인코더는 `#` 위치를 Wasm 구조에 맞춰 직접 정하므로 semantics의
+  sort가 바뀌면 함께 고친다.
 - 현재 입력을 넘어서는 AST 형태와 hint 조합에는 미지원 분기가 남아 있다.
   Wasm 명세 번역과 실행 테스트의 통과를 임의 SpecTec 명세의 번역 지원으로 확대하지 않는다.
 
@@ -78,21 +91,50 @@ official suite 통과만으로 모든 프로그램의 의미 동등성이 증명
 
 ## 공통 backend와 목록 계산
 
-고정 sort, 타입 표현·검사, 목록·option·tuple·record의 공통 연산은
-`translator/backend/pretype.maude` 한 파일에 둔다. 이 파일은 먼저
-`SPECTEC-TERM`에서 기본 sort를 선언하고, `generated/types.maude`를 읽은 뒤
-`SPECTEC-PRETYPE`에서 공통 연산을 정의한다. `types.maude`의
+공통 backend의 진입점은 `translator/backend/spectec-semantics.maude`다.
+먼저 `spectec-sorts.maude`의 `SPECTEC-SORTS`에서 공통 sort를 선언하고,
+`generated/types.maude`를 읽은 뒤 `spectec-builtin-types.maude`의
+`SPECTEC-BUILTIN-TYPES`에서 SpecTec 기본 타입(`bool nat int rat real text`)의
+Maude 표현, 즉 native import·타입 태그·기본 검사를 선언한다. 이 표현은 IL
+연산의 의미가 아니라 표현 선택이므로 의미 모듈과 다른 파일에 둔다.
+
+기본 타입은 IMP처럼 생성자로 감싼다(`op #_ : Bool|Rat|Float|String ->
+SpectecTerminal [ctor]`). native sort를 `SpectecTerminal`의 subsort로 두지 않으므로
+prelude의 같은 이름 연산이 한 kind에서 충돌하지 않고 import renaming이 필요 없다.
+IL `nat`/`int` 값은 native `Nat`/`Int`, 그 밖의 값은 `SpectecTerminal`로 표현한다.
+번역기는 값의 sort와 자리가 기대하는 sort가 다를 때만 `#`를 넣거나 뺀다
+(`Iter.coerce`): native 값이 목록·option·tuple 원소, 생성자·def 인자, record 필드,
+`typecheck` 대상에 들어가면 `# V`, 꺼낼 때는 패턴이면 `# V` 매칭, 식 중간이면
+부분 함수 `#rat`/`#bool`/`#string`을 쓴다. 비교·논리 연산 결과는 native이므로
+값 자리에서 감싸고, 산술·비교 피연산자는 native로 꺼낸다. CvtE는 native `Rat`을
+받고 돌려준다. 생성자 인자 sort는 `CaseE`가 속한 variant 타입의 선언에서,
+def 호출 결과는 callee가 선언한 결과 sort에서 정한다.
+
+기능별 연산은 `spectec-semantics.maude` 파일 안의 다음 모듈에 둔다.
+
+| 모듈 | 내용 |
+|---|---|
+| `SPECTEC-CONVERT` | 수치 타입 변환 |
+| `SPECTEC-LIST` | 목록 표현·검사·연산 |
+| `SPECTEC-OPTION` | option 표현·검사·연산 |
+| `SPECTEC-TUPLE` | tuple 표현·projection |
+| `SPECTEC-RECORD` | record 표현·조회·갱신 |
+
+convert와 list는 builtin types를, option·tuple·record는 list를 import한다.
+마지막 `SPECTEC-SEMANTICS`가 다섯 모듈을 모은다. `types.maude`의
 `SPEC2MAUDE-TYPES`는 source hint별 native LIST instantiation과 좁은 타입
-선언을 제공한다. `generated/output.maude`는 `SPECTEC-PRETYPE`을 import하고
+선언을 제공한다. `generated/output.maude`는 `SPECTEC-SEMANTICS`를 import하고
 source별 목록 subsort 연결과 번역된 정의를 추가한다.
 
 이 순서는 native LIST 뒤에 공통 `eps`, `__` overload를 선언하여 두 연산을
 하나의 모듈 확장 관계로 연결한다. 공통 정의를 source마다 생성하지 않으며,
-파일 통합을 위해 IL 표현이나 equation의 계산 의미를 바꾸지 않는다.
+모듈 분리를 위해 IL 표현이나 기존 검사의 계산 의미를 바꾸지 않는다.
 
-공유 목록 검사는 `T U TS` 패턴으로 원소가 두 개 이상일 때만 재귀한다.
-단일 원소를 조건에서 다시 검사하지 않으며, 별도의 빈 suffix 비교가 필요
-없다. 현재 Wasm의 `val < instr` 목록은 `eps`와 `__`를 공유한다.
+비어 있지 않은 목록은 prelude `LIST`처럼 `SpectecNeTerminals` sort로 구분한다
+(`SpectecTerminal < SpectecNeTerminals < SpectecTerminals`). 공유 목록 검사는
+`typecheck(T NTS, TYPE)`로 원소가 두 개 이상일 때만 재귀하고, 빈 목록은 `t*`의
+올바른 값이므로 `typecheck(eps, TYPE) = true`를 유지한다. typed list root마다
+`NeXList < SpectecNeTerminals`를 함께 생성한다. 현재 Wasm의 `val < instr` 목록은 `eps`와 `__`를 공유한다.
 별도 연결 연산을 생성하는 경로는 제공하지 않으며, 목록 sort들이 하나의
 subsort chain을 이루지 않는 hint 조합은 `Unsupported`로 거부한다.
 
@@ -114,10 +156,10 @@ index/setAt은 해당 원소 앞 prefix의 길이를 검사한다. slice/splice�
 하나의 원소다. 길이와 위치 조건은 목록의 원소 수를 사용하며, 별도의 cursor나
 길이 memo table을 사용하지 않는다.
 
-길이는 `lenAux(S, n) = n + |S|`인 accumulator로 계산하고,
-반복 목록은 `N = 2 * (N quo 2) + (N rem 2)`로 구성한다.
-이는 Maude prelude LIST의 size/reverse처럼 결과를 집계하거나 구성하는
-재귀 equation이다. typed list 연산은 native LIST 정의를 사용하고,
+길이는 `lenAux(S, n) = n + |S|`인 accumulator로 계산한다.
+반복 목록은 `repeatSeq(0, S) = eps`,
+`repeatSeq(s N, S) = S repeatSeq(N, S)`의 직접 재귀 equation으로 구성한다.
+typed list 연산은 native LIST 정의를 사용하고,
 생성 코드는 `eps`, `__` 및 목록 연산의 결과 sort를 좁히는 overload를 선언한다.
 size·occurs와 size accumulator는 native 선언이 이미 같은 `Nat`·`NzNat`·`Bool`
 결과 sort를 제공하므로 좁은 입력 sort에 대해 중복 선언하지 않는다.

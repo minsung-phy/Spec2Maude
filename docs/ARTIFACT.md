@@ -143,9 +143,12 @@ uses a temporary directory and does not modify the repository.
 
 ### 4. Load the complete Maude semantics manually
 
-`translator/backend/semantics.maude` owns the complete loading order:
+`translator/backend/main.maude` owns the complete loading order:
 
-1. SpecTec representation support;
+1. `spectec-semantics.maude`, which loads `spectec-sorts.maude` (common sorts),
+   the generated `types.maude`, and `spectec-builtin-types.maude` (SpecTec
+   built-in type representation), then declares separate convert, list, option,
+   tuple, and record modules;
 2. generated semantics;
 3. hand-written relation backends;
 4. primitive builtin semantics.
@@ -153,7 +156,7 @@ uses a temporary directory and does not modify the repository.
 Load it from the repository root:
 
 ```sh
-maude -no-banner translator/backend/semantics.maude
+maude -no-banner translator/backend/main.maude
 ```
 
 A successful load produces no warning or advisory. Enter `quit` to exit.
@@ -180,7 +183,7 @@ subcommand was selected.
 `module` encodes a `.wat`/`.wasm` module (`--term-only` emits just the term).
 `instantiate` emits an instantiation request. `run` adds initialization and a
 fixed invocation; `modelcheck` also adds returned-value propositions and queries.
-These load `translator/backend/semantics.maude`, which loads the generated
+These load `translator/backend/main.maude`, which loads the generated
 `translator/generated/output.maude` and backend support. `.wast` scripts use
 `wast-run` for their modules, actions, and assertions.
 
@@ -216,7 +219,7 @@ The generated modules expose `clientCall(ARGS) =>* clientResult(RESULT)` and
 `serverCall(ARGS) =>* serverResult(RESULT)`. All generated operators, state sorts,
 and rule labels use the requested prefix. Choose distinct module names and
 prefixes when composing modules. Names start with a letter and contain only
-letters, digits, or hyphens. The enclosing file loads `semantics.maude` once,
+letters, digits, or hyphens. The enclosing file loads `main.maude` once,
 then the harness files; harness files contain no `load`, execution, or LTL queries.
 
 Each call **creates a fresh instance**, finishes initialization (including any
