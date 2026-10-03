@@ -104,10 +104,93 @@ let rec record_fields = function
 
 let as_sequence_element = Iter.as_sequence_element
 
+let to_sort = Iter.to_sort
+
+let to_terminal index typ term =
+  to_sort index ~sort:"SpectecTerminals" typ term
+
+let from_terminal index typ term =
+  Iter.coerce ~actual:"SpectecTerminals" ~expected:(translate_sort index typ) term
+
 let from_sequence_element index typ term =
   match Hintd.sequence_element_wrappers (Prescan.sort_metadata index) typ with
   | Some (_, unbox) -> app unbox [term]
+  | None -> from_terminal index typ term
+
+(* Argument sorts of a constructor, as declared by Typd.translate_constructor. *)
+let payload_sorts index typ =
+  match typ.it with
+  | TupT fields -> List.map (fun (_, typ) -> translate_sort index typ) fields
+  | _ -> [translate_sort index typ]
+
+(* The variant type of the CaseE selects among same-named constructors. *)
+let constructor_domain index typ mixop =
+  let key = Mixop.key mixop in
+  let owner =
+    match (Il.Eval.reduce_typ index.Prescan.type_env typ).it with
+    | VarT (id, _) -> id.it
+    | BoolT | NumT _ | TextT | TupT _ | IterT _ ->
+        invalid_arg ("constructor " ^ key ^ " has a non-variant type")
+  in
+  let domains =
+    List.assoc_opt owner index.Prescan.type_definitions
+    |> Option.value ~default:[]
+    |> List.concat_map (fun inst ->
+         match inst.it with
+         | InstD (_, _, {it = VariantT cases; _}) ->
+             List.filter_map
+               (fun (other, (typ, _, _), _) ->
+                 if not (Mixop.is_hole_only other) && Mixop.key other = key
+                 then Some (payload_sorts index typ)
+                 else None)
+               cases
+         | InstD (_, _, {it = AliasT _ | StructT _; _}) -> [])
+  in
+  match domains with
+  | [] -> invalid_arg ("constructor " ^ key ^ " is not declared by " ^ owner)
+  | domain :: others ->
+      let natives domain = List.map Iter.native_sort domain in
+      if List.exists (fun other -> natives other <> natives domain) others then
+        invalid_arg
+          ("constructor " ^ key ^ " has native and SpectecTerminal argument sorts");
+      domain
+
+(* Parameter and result sorts of a DecD, as declared by Decd.translate_decl. *)
+let definition_sorts index id =
+  let params, result, _ = Il.Env.find_def index.Prescan.type_env id in
+  ( List.map
+      (fun param ->
+        match param.it with
+        | ExpP (_, typ) -> Some (translate_sort index typ)
+        | TypP _ | DefP _ | GramP _ -> None)
+      params
+  , translate_sort index result )
+
+let to_parameter_sort index sort exp term =
+  match sort with
+  | Some sort -> to_sort index ~sort exp.note term
   | None -> term
+
+(* A primitive IL value (bool, rat, text) is a SpectecTerminal #_ V; nat and
+ * int values are already native.  Operators compute on native values. *)
+let of_native index typ term =
+  if Iter.native_sort (translate_sort index typ) then term
+  else app "#_" [term]
+
+let to_native index typ term =
+  let unbox name =
+    match term with
+    | App ("#_", [value]) -> value  (* #rat(# V) = V *)
+    | _ -> app name [term]
+  in
+  if Iter.native_sort (translate_sort index typ) then term
+  else
+    match (Il.Eval.reduce_typ index.Prescan.type_env typ).it with
+    | BoolT -> unbox "#bool"
+    | NumT _ -> unbox "#rat"
+    | TextT -> unbox "#string"
+    | VarT _ | TupT _ | IterT _ ->
+        invalid_arg ("native operand of type " ^ Il.Print.string_of_typ typ)
 
 (* Recursive translation *)
 
@@ -142,6 +225,11 @@ and translate_arg index arg =
   | GramA _ ->
       invalid_arg "GramA is not translated"
 
+and translate_call_arg index sort arg =
+  match arg.it with
+  | ExpA exp -> to_parameter_sort index sort exp (translate_exp index exp)
+  | TypA _ | DefA _ | GramA _ -> translate_arg index arg
+
 and translate_check_typ index typ =
   match typ.it with
   | VarT (id, _) when Prescan.type_parameter index id = None ->
@@ -160,35 +248,79 @@ and translate_check_typ index typ =
       translate_typ index typ
 
 and translate_exp index exp =
+  match native_exp index exp with
+  | Some term -> of_native index exp.note term
+  | None -> translate_value index exp
+
+(* Native Maude values computed by primitive IL operations. *)
+and native_exp index exp =
+  match exp.it with
+  | BoolE value ->
+      Some (Const (string_of_bool value))
+
+  | NumE value ->
+      Some (translate_number value)
+
+  | TextE value ->
+      Some (translate_text value)
+
+  | UnE (`PlusOp, _, inner) ->
+      Some (translate_native index inner)
+
+  | UnE (op, optyp, inner) ->
+      Some (app (translate_unop op optyp) [translate_native index inner])
+
+  | BinE (op, optyp, left, right) ->
+      Some
+        (app (translate_binop op optyp)
+           [translate_native index left; translate_native index right])
+
+  | CmpE ((`EqOp | `NeOp) as op, optyp, left, right) ->
+      (* Equality compares values of one IL type in their common representation. *)
+      Some
+        (translate_comparison op optyp
+           (translate_exp index left) (translate_exp index right))
+
+  | CmpE (op, optyp, left, right) ->
+      Some
+        (translate_comparison op optyp
+           (translate_native index left) (translate_native index right))
+
+  | MemE (element, collection) ->
+      let operator =
+        sequence_operator index collection.note (fun sequence -> sequence.occurs)
+      in
+      Some
+        (app operator
+           [ translate_exp index element |> as_sequence_element index element.note
+           ; translate_exp index collection
+           ])
+
+  | CvtE (_, `RealT, _) | CvtE (_, _, `RealT) ->
+      invalid_arg "IL Real conversion is not implemented"
+
+  | CvtE (inner, source, target) ->
+      Some
+        (app "_:_<:>_"
+           [ translate_native index inner
+           ; Const (Xl.Num.string_of_typ source)
+           ; Const (Xl.Num.string_of_typ target)
+           ])
+
+  | _ -> None
+
+and translate_native index exp =
+  match native_exp index exp with
+  | Some term -> term
+  | None -> to_native index exp.note (translate_value index exp)
+
+and translate_value index exp =
   match exp.it with
   | VarE id ->
       Var (Prescan.source_variable index id exp.note)
 
-  | BoolE value ->
-      Const (string_of_bool value)
-
-  | NumE value ->
-      translate_number value
-
-  | TextE value ->
-      translate_text value
-
-  | UnE (`PlusOp, _, inner) ->
-      translate_exp index inner
-
-  | UnE (op, optyp, inner) ->
-      let operand = translate_exp index inner in
-      app (translate_unop op optyp) [operand]
-
-  | BinE (op, optyp, left, right) ->
-      let left = translate_exp index left in
-      let right = translate_exp index right in
-      app (translate_binop op optyp) [left; right]
-
-  | CmpE (op, optyp, left, right) ->
-      let left = translate_exp index left in
-      let right = translate_exp index right in
-      translate_comparison op optyp left right
+  | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _ | MemE _ | CvtE _ ->
+      invalid_arg "primitive operation is translated by native_exp"
 
   | TupE exps ->
       exps
@@ -214,10 +346,15 @@ and translate_exp index exp =
         | _ -> translate_exp index payload
         end
       else
-        let args =
+        let exps =
           match payload.it with
-          | TupE exps -> List.map (translate_exp index) exps
-          | _ -> [translate_exp index payload]
+          | TupE exps -> exps
+          | _ -> [payload]
+        in
+        let args =
+          List.map2
+            (fun exp sort -> to_sort index ~sort exp.note (translate_exp index exp))
+            exps (constructor_domain index exp.note mixop)
         in
         app (Prescan.mixop_name index mixop) args
 
@@ -240,12 +377,14 @@ and translate_exp index exp =
   | StrE fields ->
       fields
       |> List.map (fun (atom, field) ->
-           app "field" [qid_of_atom atom; translate_exp index field])
+           app "field"
+             [qid_of_atom atom; to_terminal index field.note (translate_exp index field)])
       |> record_fields
       |> fun fields -> app "{_}" [fields]
 
   | DotE (record, atom) ->
       app "_._" [translate_exp index record; qid_of_atom atom]
+      |> from_terminal index exp.note
 
   | CompE (left, right) ->
       translate_composition index exp.note
@@ -262,15 +401,6 @@ and translate_exp index exp =
         sequence_operator index exp.note (fun sequence -> sequence.lift)
       in
       app operator [translate_exp index inner]
-
-  | MemE (element, collection) ->
-      let operator =
-        sequence_operator index collection.note (fun sequence -> sequence.occurs)
-      in
-      app operator
-        [ translate_exp index element |> as_sequence_element index element.note
-        ; translate_exp index collection
-        ]
 
   | LenE collection ->
       let operator =
@@ -308,28 +438,21 @@ and translate_exp index exp =
 
   | IfE (condition, then_exp, else_exp) ->
       app "if_then_else_fi"
-        [ translate_exp index condition
+        [ translate_native index condition
         ; translate_exp index then_exp
         ; translate_exp index else_exp
         ]
 
   | CallE (id, args) ->
       Prescan.require_definition_body index "CallE" id;
-      app (Prescan.def_name index id) (List.map (translate_arg index) args)
+      let sorts, result = definition_sorts index id in
+      app (Prescan.def_name index id)
+        (List.map2 (translate_call_arg index) sorts args)
+      |> Iter.coerce ~actual:result ~expected:(translate_sort index exp.note)
 
   | IterE (body, (iter, generators)) ->
       Iter.translate_term
         index (translate_exp index) body (iter, generators)
-
-  | CvtE (_, `RealT, _) | CvtE (_, _, `RealT) ->
-      invalid_arg "IL Real conversion is not implemented"
-
-  | CvtE (inner, source, target) ->
-      app "_:_<:>_"
-        [ translate_exp index inner
-        ; Const (Xl.Num.string_of_typ source)
-        ; Const (Xl.Num.string_of_typ target)
-        ]
 
   | SubE (inner, source, target) ->
       if Prescan.same_representation index source target then
@@ -366,6 +489,7 @@ and translate_select index base path =
         [ translate_select index base parent
         ; qid_of_atom atom
         ]
+      |> from_terminal index path.note
 
 
 and translate_update index base path replacement =
@@ -400,6 +524,7 @@ and translate_update index base path replacement =
 
   | DotP (parent, atom) ->
       let parent_value = translate_select index base parent in
+      let replacement = to_terminal index path.note replacement in
       let updated_parent =
         app "_`[._=_`]" [parent_value; qid_of_atom atom; replacement]
       in
@@ -438,7 +563,7 @@ and translate_composition index typ left right =
 
 (* Constructor components *)
 
-let translate_bool = translate_exp
+let translate_bool = translate_native
 
 let rec translate_typ_conditions index value typ =
   match translate_sort index typ, typ.it with
@@ -487,6 +612,7 @@ let rec translate_typ_conditions index value typ =
         Iter.translate_conditions
           (translate_exp index) value (translate_check_typ index element_typ) iter
   | _, _ ->
+      let value = to_sort index ~sort:"SpectecTerminals" typ value in
       [BoolCond (app "typecheck" [value; translate_typ index typ])]
 
 and make_component index field_index repeated id typ =

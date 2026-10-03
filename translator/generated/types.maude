@@ -23,7 +23,6 @@ fmod SPEC2MAUDE-TYPES is
   protecting LIST{INSTR-VIEW} * (
     sort List{INSTR-VIEW} to InstrList,
     sort NeList{INSTR-VIEW} to NeInstrList,
-    op _xor_ : Nat Nat -> Nat to integerXor,
     op nil to eps,
     op append to instrAppend,
     op head to instrHead,

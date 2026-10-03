@@ -215,9 +215,9 @@ mod SPEC2MAUDE-RELATION-BACKENDS is
       backend-reftype-sub(REF(EA_M1, EA_X1), REF(EA_M2, EA_X2)) .
   eq backend-valtype-sub(EA_X1, EA_X2) = false [owise] .
 
-  ceq backend-limits-sub([ EA_N1 .. EA_MAX1 ? ], [ EA_N2 .. EA_MAX2 ? ]) = true
+  ceq backend-limits-sub([ EA_N1 .. (# EA_MAX1) ? ], [ EA_N2 .. (# EA_MAX2) ? ]) = true
     if EA_N1 >= EA_N2 = true /\ EA_MAX1 <= EA_MAX2 = true .
-  ceq backend-limits-sub([ EA_N1 .. EA_MAX1 ? ], [ EA_N2 .. eps ]) = true
+  ceq backend-limits-sub([ EA_N1 .. (# EA_MAX1) ? ], [ EA_N2 .. eps ]) = true
     if EA_N1 >= EA_N2 .
   ceq backend-limits-sub([ EA_N1 .. eps ], [ EA_N2 .. eps ]) = true
     if EA_N1 >= EA_N2 .

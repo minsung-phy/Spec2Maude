@@ -69,7 +69,10 @@ let translate_target index id params args =
 (* AliasT *)
 let translate_alias index target quants typ =
   let sort = Term.translate_sort index typ in
-  let value = Var (generated_variable "VALUE" sort) in
+  let value =
+    Var (generated_variable "VALUE" sort)
+    |> Term.to_sort index ~sort:"SpectecTerminals" typ
+  in
   let source = Term.translate_typ index typ in
   let left = App ("typecheck", [value; target]) in
   let right = App ("typecheck", [value; source]) in
@@ -90,7 +93,8 @@ let join_struct_fields = function
 
 let translate_struct_field index bound (atom, (typ, quants, prems), _hints) =
   match Term.translate_components index typ with
-  | [(value, _, type_conditions)] ->
+  | [(value, sort, type_conditions)] ->
+      let value = Iter.coerce ~actual:sort ~expected:"SpectecTerminals" value in
       let field_name = Const ("'" ^ Il.Print.string_of_atom atom) in
       let field = App ("field", [field_name; value]) in
       let bound = bound @ payload_names typ in
@@ -170,6 +174,11 @@ let transparent_payload index typ =
 
 let translate_union index target case_conditions typ =
   let value, component_conditions = transparent_payload index typ in
+  let value =
+    match typ.it with
+    | TupT [(_, field_typ)] -> Term.to_terminal index field_typ value
+    | _ -> Term.to_terminal index typ value
+  in
   let left = App ("typecheck", [value; target]) in
   [equation left (Const "true") (case_conditions @ component_conditions)]
 
@@ -289,7 +298,6 @@ module Lists = struct
                ("List{" ^ view_name sort ^ "}", list_sort sort)
            ; SortRenaming
                ("NeList{" ^ view_name sort ^ "}", nonempty_sort sort)
-           ; TypedOpRenaming ("_xor_", ["Nat"; "Nat"], "Nat", "integerXor")
            ; rename "nil" sequence.empty
            ; rename "append" (sort ^ "Append")
            ; rename "head" (sort ^ "Head")

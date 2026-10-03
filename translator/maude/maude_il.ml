@@ -184,7 +184,6 @@ let map_statement_variables map = function
 type renaming =
   | SortRenaming of sort * sort
   | OpRenaming of name * name
-  | TypedOpRenaming of name * sort list * sort * name
 
 type module_expr =
   | ModuleName of name

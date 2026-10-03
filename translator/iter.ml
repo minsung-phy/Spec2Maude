@@ -26,13 +26,28 @@ let empty_of_typ index typ =
 let iterated_typ body iter =
   IterT (body.note, iter) $ body.note.at
 
+(* IL nat and int values are native Maude Nat and Int terms; every other
+ * value is a SpectecTerminal.  A native value enters a SpectecTerminal(s)
+ * position as #_ V and leaves it through #rat (spectec-builtin-types.maude). *)
+let native_sort sort = sort = "Nat" || sort = "Int"
+
+let coerce ~actual ~expected term =
+  match native_sort actual, native_sort expected, term with
+  | true, false, _ -> app "#_" [term]
+  | false, true, App ("#_", [value]) -> value  (* #rat(# V) = V *)
+  | false, true, _ -> app "#rat" [term]
+  | true, true, _ | false, false, _ -> term
+
+let to_sort index ~sort typ term =
+  coerce ~actual:(Prescan.sort_of_typ index typ) ~expected:sort term
+
 let as_sequence_element index typ term =
   match
     Hintd.sequence_element_wrappers
       (Prescan.sort_metadata index) typ
   with
   | Some (box, _) -> app box [term]
-  | None -> term
+  | None -> to_sort index ~sort:"SpectecTerminal" typ term
 
 
 (* Type iteration *)

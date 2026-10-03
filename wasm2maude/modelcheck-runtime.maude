@@ -3,15 +3,7 @@ load model-checker.maude
 
 mod WASM2MAUDE-MODELCHECK-RUNTIME is
   protecting WASM-BUILTINS .
-  including MODEL-CHECKER * (
-    op _xor_ : Nat Nat -> Nat to integerXor,
-    op _+_ : String String -> String to stringConcat,
-    op _<_ : String String -> Bool to stringLess,
-    op _<=_ : String String -> Bool to stringLessEqual,
-    op _>_ : String String -> Bool to stringGreater,
-    op _>=_ : String String -> Bool to stringGreaterEqual,
-    op char : Nat -> Char to nativeChar
-  ) .
+  including MODEL-CHECKER .
 
   sort ModelState .
   subsort ModelState < State .

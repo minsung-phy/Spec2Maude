@@ -10,7 +10,7 @@ fmod SPECTEC-CONVERT is
   protecting SPECTEC-BUILTIN-TYPES .
 
   --- 수치 타입 변환 CvtE
-  op _:_<:>_ : SpectecTerminal SpectecType SpectecType ~> SpectecTerminal .
+  op _:_<:>_ : Rat SpectecType SpectecType ~> Rat . --- native 값끼리 변환해 바로 산술에 사용
 
   --- SpecTec의 수치 연산 모듈(lib/xl/num.ml)의 CvtE 규칙 그대로, 
   --- 현재 wasm 3.0 SpecTec에서 사용하는 모든 수치 변환을 Maude로 구현                                            

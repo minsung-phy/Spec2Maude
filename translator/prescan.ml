@@ -129,17 +129,11 @@ let record_composition_available index typ =
 let reserved_names =
   StringSet.of_list
     [ "true"; "false"; "none"; "min"; "max"; "s"; "sd"
-    (* Native Float operations retain their hooks under import renaming. *)
-    ; "nativeFloatNeg"; "nativeFloatAdd"; "nativeFloatSub"
-    ; "nativeFloatMul"; "nativeFloatDiv"; "nativeFloatPow"
-    ; "nativeToFloat"; "nativeToRat"; "nativeParseFloat"; "nativeParseRat"
-    ; "nativeFloatString"; "nativeRatString"; "decFloat"
-    ; "integerXor"; "floatRem"; "floatAbs"; "floatFloor"
-    ; "floatCeiling"; "floatMin"; "floatMax"; "floatLess"
-    ; "floatLessEqual"; "floatGreater"; "floatGreaterEqual"
+    ; "decFloat"
     ; "sqrt"; "exp"; "log"; "sin"; "cos"; "tan"
     ; "asin"; "acos"; "atan"; "pi"; "_xor_"
     ; "eps"; "bool"; "rat"; "float"; "text"; "seq"; "unseq"
+    ; "#_"; "#bool"; "#rat"; "#float"; "#string"; "string"
     ; "tuple"; "field"; "typecheck"; "len"
     ; "lift"; "repeatSeq"
     ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
@@ -147,10 +141,8 @@ let reserved_names =
     ; "_or_"; "_implies_"; "_rem_"
     (* Native numeric operators whose domains overlap unwrapped Nat/Int. *)
     ; "abs"; "ceiling"; "floor"; "gcd"; "lcm"; "modExp"
-    (* Native string operators now share the source value kind. *)
-    ; "stringConcat"; "stringLess"; "stringLessEqual"
-    ; "stringGreater"; "stringGreaterEqual"; "nativeChar"
-    ; "ascii"; "length"; "substr"; "find"; "rfind"
+    (* Native string operators *)
+    ; "char"; "ascii"; "length"; "substr"; "find"; "rfind"
     ; "upperCase"; "lowerCase"; "notFound"
     (* backend/spectec-{builtin-types,semantics}.maude: types, sequences, records *)
     ; "nat"; "int"; "real"
@@ -189,7 +181,7 @@ let reserved_names =
     ; "float-from-bits"; "float-mag-to-bits"; "float-to-bits"
     ; "nbytes-int"; "nbytes-float"; "inv-nbytes-int"
     ; "inv-nbytes-float"; "zbytes-pack"; "inv-zbytes-pack"
-    ; "lane-width"; "vec-raw"; "lane-from-bits"
+    ; "lane-width"; "lane-from-bits"
     ; "lane-to-bits"; "lanes-aux"; "inv-lanes-aux"
     ; "pair-chunks"; "fixed-chunks"
     (* relation-backends.maude *)

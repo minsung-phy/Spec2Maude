@@ -15,6 +15,9 @@ let i32_nat n = atom (decimal (I32.to_string_u n))
 let i64_nat n = atom (decimal (I64.to_string_u n))
 let u32 = i32_nat
 let u64 = i64_nat
+(* A nat in a SpectecTerminal position is #_ V, as in the generated semantics
+ * (translator/backend/spectec-builtin-types.maude). *)
+let terminal term = app "#_" [term]
 let idx x = u32 x.Source.it
 let list f xs = seq (List.map f xs)
 let present term = app "_?" [term]
@@ -154,7 +157,7 @@ let rectype source at (Types.RecT subs) =
 
 let limits {Types.min; max} =
   app "limits.sym-sym-sym"
-    [u64 min; option u64 max]
+    [u64 min; option (fun max -> terminal (u64 max)) max]
 
 let globaltype source at (Types.GlobalT (m, t)) =
   app "globaltype.wrap" [mut m; valtype source at t]
@@ -184,14 +187,14 @@ let packsize = function
   | Pack.Pack64 -> nat 64
 
 let memarg align offset =
-  app "rec.memarg" [nat align; i64_nat offset]
+  app "rec.memarg" [terminal (nat align); terminal (i64_nat offset)]
 
 let loadop {Ast.ty; pack; _} =
   let packed = option (fun (size, sign) -> app "loadop.sym" [packsize size; sx sign]) pack in
   numtype ty, packed
 
 let storeop {Ast.ty; pack; _} =
-  numtype ty, option packsize pack
+  numtype ty, option (fun size -> terminal (packsize size)) pack
 
 let half = function
   | Ast.V128Op.Low -> atom "half.low"
@@ -323,7 +326,7 @@ let vector_binop source at op =
   | V128.I8x16 Ast.V128Op.RelaxedSwizzle ->
       app "instr.vswizzlop" [sh; atom "vswizzlop.relaxed-swizzle"]
   | V128.I8x16 (Ast.V128Op.Shuffle lanes) ->
-      app "instr.vshuffle" [sh; seq (List.map laneidx lanes)]
+      app "instr.vshuffle" [sh; seq (List.map (fun i -> terminal (laneidx i)) lanes)]
   | (V128.I8x16 (Ast.V128Op.Narrow sign)
     | V128.I16x8 (Ast.V128Op.Narrow sign)) ->
       app "instr.vnarrow"
@@ -606,8 +609,8 @@ let f64 n =
     ~max_exponent:0x7ff ~bias:1023
 
 let const = function
-  | Value.I32 n -> (numtype Types.I32T, i32_nat n)
-  | Value.I64 n -> (numtype Types.I64T, i64_nat n)
+  | Value.I32 n -> (numtype Types.I32T, terminal (i32_nat n))
+  | Value.I64 n -> (numtype Types.I64T, terminal (i64_nat n))
   | Value.F32 n -> (numtype Types.F32T, f32 n)
   | Value.F64 n -> (numtype Types.F64T, f64 n)
 
@@ -651,7 +654,7 @@ and instr source ({Source.it; at} : Ast.instr) =
   | Ast.Br x -> unary "instr.br" x
   | Ast.BrIf x -> unary "instr.br-if" x
   | Ast.BrTable (xs, x) ->
-      app "instr.br-table" [seq (List.map idx xs); idx x]
+      app "instr.br-table" [seq (List.map (fun x -> terminal (idx x)) xs); idx x]
   | Ast.BrOnNull x -> unary "instr.br-on-null" x
   | Ast.BrOnNonNull x -> unary "instr.br-on-non-null" x
   | Ast.BrOnCast (label, from, into) ->
@@ -800,7 +803,7 @@ and instr source ({Source.it; at} : Ast.instr) =
 let expr_item source xs = app "seq" [expr source xs]
 
 let name chars =
-  seq (List.map nat chars)
+  seq (List.map (fun c -> terminal (nat c)) chars)
 
 let num_value value =
   let typ, value = const value in
@@ -863,7 +866,7 @@ let data source ({Source.it = Ast.Data (bytes, m); _} : Ast.data) =
   let bytes =
     String.to_seq bytes
     |> List.of_seq
-    |> List.map (fun c -> nat (Char.code c))
+    |> List.map (fun c -> terminal (nat (Char.code c)))
   in
   app "data.data" [seq bytes; mode source m]
 

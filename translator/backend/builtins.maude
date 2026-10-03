@@ -17,12 +17,12 @@ mod WASM-BUILTINS is
   op inv-ibits-aux : SpectecTerminals Nat -> Nat .
   eq ibits-aux(0, BI_I) = eps .
   ceq ibits-aux(BI_N, BI_I) =
-      _rem_(_quo_(BI_I, _^_(2, _-_(BI_N, 1))), 2) ibits-aux(_-_(BI_N, 1), BI_I)
+      (# _rem_(_quo_(BI_I, _^_(2, _-_(BI_N, 1))), 2)) ibits-aux(_-_(BI_N, 1), BI_I)
     if _>_(BI_N, 0) .
   eq inv-ibits-aux(eps, BI_ACC) = BI_ACC .
-  ceq inv-ibits-aux(BI_BIT BI_BITS, BI_ACC) =
+  ceq inv-ibits-aux((# BI_BIT) BI_BITS, BI_ACC) =
       inv-ibits-aux(BI_BITS, _+_(_*_(BI_ACC, 2), BI_BIT))
-    if typecheck(BI_BIT, bit) .
+    if typecheck(# BI_BIT, bit) .
 
   --- Implemented builtin family: integer bytes, little endian.
   vars BY_N BY_I BY_COUNT BY_ACC BY_SCALE BY_BYTE BY_RESULT : Nat .
@@ -31,13 +31,13 @@ mod WASM-BUILTINS is
   op inv-ibytes-aux : SpectecTerminals Nat Nat -> Nat .
   eq ibytes-aux(0, BY_I) = eps .
   ceq ibytes-aux(BY_COUNT, BY_I) =
-      (_rem_(BY_I, 256))
+      (# _rem_(BY_I, 256))
       ibytes-aux(_-_(BY_COUNT, 1), _quo_(BY_I, 256))
     if _>_(BY_COUNT, 0) .
   eq inv-ibytes-aux(eps, BY_SCALE, BY_ACC) = BY_ACC .
-  ceq inv-ibytes-aux(BY_BYTE BY_BYTES, BY_SCALE, BY_ACC) =
+  ceq inv-ibytes-aux((# BY_BYTE) BY_BYTES, BY_SCALE, BY_ACC) =
       inv-ibytes-aux(BY_BYTES, _*_(BY_SCALE, 256), _+_(BY_ACC, _*_(BY_BYTE, BY_SCALE)))
-    if typecheck(BY_BYTE, byte) .
+    if typecheck(# BY_BYTE, byte) .
 
   --- Implemented builtin family: integer wrap--/extend-- conversions.
   vars BW_M BW_N BW_I : Nat .
@@ -64,8 +64,8 @@ mod WASM-BUILTINS is
   op ipopcnt-bits-aux : SpectecTerminals Nat -> Nat .
   eq ipopcnt-bits(BC_BITS) = ipopcnt-bits-aux(BC_BITS, 0) .
   eq ipopcnt-bits-aux(eps, BC_ACC) = BC_ACC .
-  eq ipopcnt-bits-aux(0 BC_BITS, BC_ACC) = ipopcnt-bits-aux(BC_BITS, BC_ACC) .
-  eq ipopcnt-bits-aux(1 BC_BITS, BC_ACC) = ipopcnt-bits-aux(BC_BITS, BC_ACC + 1) .
+  eq ipopcnt-bits-aux((# 0) BC_BITS, BC_ACC) = ipopcnt-bits-aux(BC_BITS, BC_ACC) .
+  eq ipopcnt-bits-aux((# 1) BC_BITS, BC_ACC) = ipopcnt-bits-aux(BC_BITS, BC_ACC + 1) .
 
   vars BT_N BT_I BT_J BT_K : Nat .
   vars BT_BITS BT_ACC : SpectecTerminals .
@@ -74,8 +74,8 @@ mod WASM-BUILTINS is
   op irev-bits-aux : SpectecTerminals SpectecTerminals -> SpectecTerminals .
   eq irev-bits(BT_BITS) = irev-bits-aux(BT_BITS, eps) .
   eq irev-bits-aux(eps, BT_ACC) = BT_ACC .
-  eq irev-bits-aux(0 BT_BITS, BT_ACC) = irev-bits-aux(BT_BITS, 0 BT_ACC) .
-  eq irev-bits-aux(1 BT_BITS, BT_ACC) = irev-bits-aux(BT_BITS, 1 BT_ACC) .
+  eq irev-bits-aux((# 0) BT_BITS, BT_ACC) = irev-bits-aux(BT_BITS, (# 0) BT_ACC) .
+  eq irev-bits-aux((# 1) BT_BITS, BT_ACC) = irev-bits-aux(BT_BITS, (# 1) BT_ACC) .
 
   --- Implemented builtin family: integer shift/rotate operations.
   var SH_N : NzNat .
@@ -275,7 +275,7 @@ mod WASM-BUILTINS is
     if float-nan-bit(FC_N, FC_F1) = 1 .
   ceq float-eq-bit(FC_N, FC_F1, FC_F2) = 0
     if float-nan-bit(FC_N, FC_F2) = 1 .
-  ceq float-eq-bit(FC_N, FC_F1, FC_F2) = spectec-bool(_==_(FC_R1, FC_R2))
+  ceq float-eq-bit(FC_N, FC_F1, FC_F2) = spectec-bool(# _==_(FC_R1, FC_R2))
     if (float-finite(FC_N, FC_F1)) = true
        /\ (float-finite(FC_N, FC_F2)) = true
        /\ FC_R1 := float-rat(FC_N, FC_F1)
@@ -296,7 +296,7 @@ mod WASM-BUILTINS is
     if float-nan-bit(FC_N, FC_F1) = 1 .
   ceq float-lt-bit(FC_N, FC_F1, FC_F2) = 0
     if float-nan-bit(FC_N, FC_F2) = 1 .
-  ceq float-lt-bit(FC_N, FC_F1, FC_F2) = spectec-bool(_<_(FC_R1, FC_R2))
+  ceq float-lt-bit(FC_N, FC_F1, FC_F2) = spectec-bool(# _<_(FC_R1, FC_R2))
     if (float-finite(FC_N, FC_F1)) = true
        /\ (float-finite(FC_N, FC_F2)) = true
        /\ FC_R1 := float-rat(FC_N, FC_F1)
@@ -431,7 +431,7 @@ mod WASM-BUILTINS is
        /\ _==_( _-_(FR_CEIL, FR_R), _-_(FR_R, FR_FLOOR))
        /\ _>_(_rem_(abs(FR_CEIL), 2), 0) .
   --- Exact binary digit count; no floating-point logarithm or linear search.
-  ceq floor-log2(FR_I) = _-_(length(nativeRatString(FR_I, 2)), 1)
+  ceq floor-log2(FR_I) = _-_(length(string(FR_I, 2)), 1)
     if _>_(FR_I, 0) .
   ceq floor-log2-rat(FR_I) = floor-log2(FR_I)
     if _>_(FR_I, 0) .
@@ -819,11 +819,11 @@ mod WASM-BUILTINS is
   op nbytes-float : Nat SpectecTerminal -> SpectecTerminals .
   op inv-nbytes-int : Nat SpectecTerminals -> SpectecTerminal .
   op inv-nbytes-float : Nat SpectecTerminals -> SpectecTerminal .
-  ceq nbytes-int(NB_N, (NB_I)) = ibytes-(NB_N, (NB_I))
+  ceq nbytes-int(NB_N, # NB_I) = ibytes-(NB_N, NB_I)
     if _<_(NB_I, _^_(2, NB_N)) .
   eq nbytes-float(NB_N, POS(FB_MAG)) = fbytes-(NB_N, POS(FB_MAG)) .
   eq nbytes-float(NB_N, NEG(FB_MAG)) = fbytes-(NB_N, NEG(FB_MAG)) .
-  ceq inv-nbytes-int(NB_N, NB_BYTES) = (NB_RAW)
+  ceq inv-nbytes-int(NB_N, NB_BYTES) = # NB_RAW
     if _rem_(NB_N, 8) = 0
        /\ len(NB_BYTES) = _quo_(NB_N, 8)
        /\ typecheck(NB_BYTES, byte)
@@ -840,9 +840,9 @@ mod WASM-BUILTINS is
   var ZB_BYTES : SpectecTerminals .
   op zbytes-pack : Nat SpectecTerminal -> SpectecTerminals .
   op inv-zbytes-pack : Nat SpectecTerminals -> SpectecTerminal .
-  ceq zbytes-pack(ZB_N, (ZB_RAW)) = ibytes-(ZB_N, (ZB_RAW))
+  ceq zbytes-pack(ZB_N, # ZB_RAW) = ibytes-(ZB_N, ZB_RAW)
     if _<_(ZB_RAW, _^_(2, ZB_N)) .
-  ceq inv-zbytes-pack(ZB_N, ZB_BYTES) = (ZB_RAW)
+  ceq inv-zbytes-pack(ZB_N, ZB_BYTES) = # ZB_RAW
     if _rem_(ZB_N, 8) = 0
        /\ len(ZB_BYTES) = _quo_(ZB_N, 8)
        /\ typecheck(ZB_BYTES, byte)
@@ -851,12 +851,10 @@ mod WASM-BUILTINS is
   --- Implemented builtin family: vector lane splitting/reassembly.
   vars LN_W LN_COUNT LN_RAW LN_SCALE LN_ACC : Nat .
   var LN_LT : SpectecTerminal .
-  var LN_PAYLOAD : SpectecTerminal .
   var LN_HEAD : SpectecTerminal .
   var LN_MAG : SpectecTerminal .
   vars LN_LANES LN_TAIL : SpectecTerminals .
   op lane-width : SpectecTerminal -> Nat .
-  op vec-raw : SpectecTerminal -> Nat .
   op lane-from-bits : SpectecTerminal Nat -> SpectecTerminal .
   op lane-to-bits : SpectecTerminal SpectecTerminal -> Nat .
   op lanes-aux : SpectecTerminal Nat Nat Nat -> SpectecTerminals .
@@ -867,26 +865,25 @@ mod WASM-BUILTINS is
   eq lane-width(F64) = 64 .
   eq lane-width(I8) = 8 .
   eq lane-width(I16) = 16 .
-  eq vec-raw(LN_RAW) = LN_RAW .
-  ceq lane-from-bits(I32, LN_RAW) = (LN_RAW)
+  ceq lane-from-bits(I32, LN_RAW) = # LN_RAW
     if _<_(LN_RAW, _^_(2, 32)) .
-  ceq lane-from-bits(I64, LN_RAW) = (LN_RAW)
+  ceq lane-from-bits(I64, LN_RAW) = # LN_RAW
     if _<_(LN_RAW, _^_(2, 64)) .
-  ceq lane-from-bits(I8, LN_RAW) = (LN_RAW)
+  ceq lane-from-bits(I8, LN_RAW) = # LN_RAW
     if _<_(LN_RAW, _^_(2, 8)) .
-  ceq lane-from-bits(I16, LN_RAW) = (LN_RAW)
+  ceq lane-from-bits(I16, LN_RAW) = # LN_RAW
     if _<_(LN_RAW, _^_(2, 16)) .
   ceq lane-from-bits(F32, LN_RAW) = float-from-bits(32, LN_RAW)
     if _<_(LN_RAW, _^_(2, 32)) .
   ceq lane-from-bits(F64, LN_RAW) = float-from-bits(64, LN_RAW)
     if _<_(LN_RAW, _^_(2, 64)) .
-  ceq lane-to-bits(I32, (LN_RAW)) = LN_RAW
+  ceq lane-to-bits(I32, # LN_RAW) = LN_RAW
     if _<_(LN_RAW, _^_(2, 32)) .
-  ceq lane-to-bits(I64, (LN_RAW)) = LN_RAW
+  ceq lane-to-bits(I64, # LN_RAW) = LN_RAW
     if _<_(LN_RAW, _^_(2, 64)) .
-  ceq lane-to-bits(I8, (LN_RAW)) = LN_RAW
+  ceq lane-to-bits(I8, # LN_RAW) = LN_RAW
     if _<_(LN_RAW, _^_(2, 8)) .
-  ceq lane-to-bits(I16, (LN_RAW)) = LN_RAW
+  ceq lane-to-bits(I16, # LN_RAW) = LN_RAW
     if _<_(LN_RAW, _^_(2, 16)) .
   ceq lane-to-bits(F32, POS(LN_MAG)) = float-to-bits(32, POS(LN_MAG))
     if (fnmag-valid(32, LN_MAG)) = true .
@@ -987,7 +984,7 @@ mod WASM-BUILTINS is
   eq zbytes-(I64, ZB_PAYLOAD) = nbytes-(I64, ZB_PAYLOAD) .
   eq zbytes-(F32, ZB_PAYLOAD) = nbytes-(F32, ZB_PAYLOAD) .
   eq zbytes-(F64, ZB_PAYLOAD) = nbytes-(F64, ZB_PAYLOAD) .
-  eq zbytes-(V128, ZB_PAYLOAD) = vbytes-(V128, ZB_PAYLOAD) .
+  eq zbytes-(V128, # ZB_RAW) = vbytes-(V128, ZB_RAW) .
   eq zbytes-(I8, ZB_PAYLOAD) = zbytes-pack(8, ZB_PAYLOAD) .
   eq zbytes-(I16, ZB_PAYLOAD) = zbytes-pack(16, ZB_PAYLOAD) .
 
@@ -995,13 +992,13 @@ mod WASM-BUILTINS is
   eq cbytes-(I64, ZB_PAYLOAD) = nbytes-(I64, ZB_PAYLOAD) .
   eq cbytes-(F32, ZB_PAYLOAD) = nbytes-(F32, ZB_PAYLOAD) .
   eq cbytes-(F64, ZB_PAYLOAD) = nbytes-(F64, ZB_PAYLOAD) .
-  eq cbytes-(V128, ZB_PAYLOAD) = vbytes-(V128, ZB_PAYLOAD) .
+  eq cbytes-(V128, # ZB_RAW) = vbytes-(V128, ZB_RAW) .
 
   eq inv-zbytes-(I32, ZB_BYTES) = inv-nbytes-(I32, ZB_BYTES) .
   eq inv-zbytes-(I64, ZB_BYTES) = inv-nbytes-(I64, ZB_BYTES) .
   eq inv-zbytes-(F32, ZB_BYTES) = inv-nbytes-(F32, ZB_BYTES) .
   eq inv-zbytes-(F64, ZB_BYTES) = inv-nbytes-(F64, ZB_BYTES) .
-  eq inv-zbytes-(V128, ZB_BYTES) = inv-vbytes-(V128, ZB_BYTES) .
+  eq inv-zbytes-(V128, ZB_BYTES) = # inv-vbytes-(V128, ZB_BYTES) .
   eq inv-zbytes-(I8, ZB_BYTES) = inv-zbytes-pack(8, ZB_BYTES) .
   eq inv-zbytes-(I16, ZB_BYTES) = inv-zbytes-pack(16, ZB_BYTES) .
 
@@ -1009,13 +1006,12 @@ mod WASM-BUILTINS is
   eq inv-cbytes-(I64, ZB_BYTES) = inv-nbytes-(I64, ZB_BYTES) .
   eq inv-cbytes-(F32, ZB_BYTES) = inv-nbytes-(F32, ZB_BYTES) .
   eq inv-cbytes-(F64, ZB_BYTES) = inv-nbytes-(F64, ZB_BYTES) .
-  eq inv-cbytes-(V128, ZB_BYTES) = inv-vbytes-(V128, ZB_BYTES) .
+  eq inv-cbytes-(V128, ZB_BYTES) = # inv-vbytes-(V128, ZB_BYTES) .
 
-  ceq lanes-(LN_LT X LN_COUNT, LN_PAYLOAD) =
+  ceq lanes-(LN_LT X LN_COUNT, LN_RAW) =
       lanes-aux(LN_LT, LN_W, LN_COUNT, LN_RAW)
     if LN_W := lane-width(LN_LT)
        /\ _*_(LN_W, LN_COUNT) = 128
-       /\ LN_RAW := vec-raw(LN_PAYLOAD)
        /\ _<_(LN_RAW, _^_(2, 128)) .
 
   ceq inv-lanes-(LN_LT X LN_COUNT, LN_LANES) =
@@ -1040,14 +1036,14 @@ mod WASM-BUILTINS is
   ceq iclz-(BC_N, 0) = BC_N if BC_N > 0 .
   ceq iclz-(BC_N, BC_I) = len(BC_PREFIX)
     if BC_N > 0 /\ BC_I < 2 ^ BC_N
-       /\ BC_PREFIX 1 BC_SUFFIX := ibits-aux(BC_N, BC_I)
-       /\ BC_PREFIX == repeatSeq(len(BC_PREFIX), 0) .
+       /\ BC_PREFIX (# 1) BC_SUFFIX := ibits-aux(BC_N, BC_I)
+       /\ BC_PREFIX == repeatSeq(len(BC_PREFIX), # 0) .
 
   ceq ictz-(BC_N, 0) = BC_N if BC_N > 0 .
   ceq ictz-(BC_N, BC_I) = len(BC_SUFFIX)
     if BC_N > 0 /\ BC_I < 2 ^ BC_N
-       /\ BC_PREFIX 1 BC_SUFFIX := ibits-aux(BC_N, BC_I)
-       /\ BC_SUFFIX == repeatSeq(len(BC_SUFFIX), 0) .
+       /\ BC_PREFIX (# 1) BC_SUFFIX := ibits-aux(BC_N, BC_I)
+       /\ BC_SUFFIX == repeatSeq(len(BC_SUFFIX), # 0) .
 
   ceq ipopcnt-(BC_N, (BC_I)) = (ipopcnt-bits(ibits-aux(BC_N, BC_I)))
     if _>_(BC_N, 0)
@@ -1076,7 +1072,7 @@ mod WASM-BUILTINS is
        /\ _<_(BT_I, _^_(2, BT_N))
        /\ _<_(BT_J, _^_(2, BT_N)) .
 
-  ceq ixor-(BT_N, (BT_I), (BT_J)) = (integerXor(BT_I, BT_J))
+  ceq ixor-(BT_N, (BT_I), (BT_J)) = (BT_I xor BT_J)
     if _>_(BT_N, 0)
        /\ _<_(BT_I, _^_(2, BT_N))
        /\ _<_(BT_J, _^_(2, BT_N)) .
@@ -1161,12 +1157,12 @@ mod WASM-BUILTINS is
        /\ _<_(Q15_I, _^_(2, Q15_N))
        /\ _<_(Q15_J, _^_(2, Q15_N)) .
 
-  ceq truncz(TZ_R) = floor(TZ_R)
+  ceq truncz(# TZ_R) = floor(TZ_R)
     if _>=_(TZ_R, 0) .
-  ceq truncz(TZ_R) = ceiling(TZ_R)
+  ceq truncz(# TZ_R) = ceiling(TZ_R)
     if _<_(TZ_R, 0) .
 
-  eq ceilz(TZ_R) = ceiling(TZ_R) .
+  eq ceilz(# TZ_R) = ceiling(TZ_R) .
 
   ceq fsqrt-(FI_N, POS(FI_MAG)) = POS(sqrt-fmag(FI_N, FI_MAG))
     if (float-finite(FI_N, POS(FI_MAG))) = true .
@@ -1374,14 +1370,14 @@ mod WASM-BUILTINS is
           bit-and(bit-not(float-nan-bit(FC_N, FC_F2)),
             bit-not(float-lt-bit(FC_N, FC_F1, FC_F2))))) .
 
-  ceq trunc--(FI_M, FI_N, U, FI_F) = (int-to-iN(FI_N, FI_X)) ?
+  ceq trunc--(FI_M, FI_N, U, FI_F) = (# int-to-iN(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
        /\ FI_X := trunc-rat-int(FI_R)
        /\ _>=_(FI_X, 0)
        /\ _<_(FI_X, _^_(2, FI_N)) .
-  ceq trunc--(FI_M, FI_N, S, FI_F) = (int-to-iN(FI_N, FI_X)) ?
+  ceq trunc--(FI_M, FI_N, S, FI_F) = (# int-to-iN(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
@@ -1425,29 +1421,29 @@ mod WASM-BUILTINS is
        /\ FI_X := trunc-rat-int(FI_R)
        /\ _>_(FI_X, _-_( _^_(2, _-_(FI_N, 1)), 1)) .
 
-  ceq trunc-sat--(FI_M, FI_N, U, FI_F) = (saturate-u-int(FI_N, FI_X)) ?
+  ceq trunc-sat--(FI_M, FI_N, U, FI_F) = (# saturate-u-int(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
        /\ FI_X := trunc-rat-int(FI_R) .
-  ceq trunc-sat--(FI_M, FI_N, S, FI_F) = (saturate-s-int(FI_N, FI_X)) ?
+  ceq trunc-sat--(FI_M, FI_N, S, FI_F) = (# saturate-s-int(FI_N, FI_X)) ?
     if _>_(FI_N, 0)
        /\ (float-finite(FI_M, FI_F)) = true
        /\ FI_R := float-rat(FI_M, FI_F)
        /\ FI_X := trunc-rat-int(FI_R) .
-  eq trunc-sat--(FI_M, FI_N, U, POS(INF)) = (_-_(_^_(2, FI_N), 1)) ? .
-  eq trunc-sat--(FI_M, FI_N, U, NEG(INF)) = (0) ? .
-  ceq trunc-sat--(FI_M, FI_N, U, POS(NAN(FI_FRAC))) = (0) ?
+  eq trunc-sat--(FI_M, FI_N, U, POS(INF)) = (# _-_(_^_(2, FI_N), 1)) ? .
+  eq trunc-sat--(FI_M, FI_N, U, NEG(INF)) = (# 0) ? .
+  ceq trunc-sat--(FI_M, FI_N, U, POS(NAN(FI_FRAC))) = (# 0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
-  ceq trunc-sat--(FI_M, FI_N, U, NEG(NAN(FI_FRAC))) = (0) ?
+  ceq trunc-sat--(FI_M, FI_N, U, NEG(NAN(FI_FRAC))) = (# 0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
-  ceq trunc-sat--(FI_M, FI_N, S, POS(INF)) = (_-_(_^_(2, _-_(FI_N, 1)), 1)) ?
+  ceq trunc-sat--(FI_M, FI_N, S, POS(INF)) = (# _-_(_^_(2, _-_(FI_N, 1)), 1)) ?
     if _>_(FI_N, 0) .
-  ceq trunc-sat--(FI_M, FI_N, S, NEG(INF)) = (int-to-iN(FI_N, - _^_(2, _-_(FI_N, 1)))) ?
+  ceq trunc-sat--(FI_M, FI_N, S, NEG(INF)) = (# int-to-iN(FI_N, - _^_(2, _-_(FI_N, 1)))) ?
     if _>_(FI_N, 0) .
-  ceq trunc-sat--(FI_M, FI_N, S, POS(NAN(FI_FRAC))) = (0) ?
+  ceq trunc-sat--(FI_M, FI_N, S, POS(NAN(FI_FRAC))) = (# 0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
-  ceq trunc-sat--(FI_M, FI_N, S, NEG(NAN(FI_FRAC))) = (0) ?
+  ceq trunc-sat--(FI_M, FI_N, S, NEG(NAN(FI_FRAC))) = (# 0) ?
     if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
 
   ceq convert--(FI_M, FI_N, U, (FI_RESULT)) =
@@ -1507,29 +1503,29 @@ mod WASM-BUILTINS is
   var UTF_C : Nat .
   vars UTF_REST UTF_TAIL : SpectecTerminals .
   eq utf8(eps) = eps .
-  ceq utf8(UTF_C UTF_REST) =
-      UTF_C UTF_TAIL
+  ceq utf8((# UTF_C) UTF_REST) =
+      (# UTF_C) UTF_TAIL
     if _<_(UTF_C, 128)
        /\ UTF_TAIL := utf8(UTF_REST) .
-  ceq utf8(UTF_C UTF_REST) =
-      (_+_(192, _quo_(UTF_C, 64)))
-      (_+_(128, _rem_(UTF_C, 64)))
+  ceq utf8((# UTF_C) UTF_REST) =
+      (# _+_(192, _quo_(UTF_C, 64)))
+      (# _+_(128, _rem_(UTF_C, 64)))
       UTF_TAIL
     if _>=_(UTF_C, 128) /\ _<_(UTF_C, 2048)
        /\ UTF_TAIL := utf8(UTF_REST) .
-  ceq utf8(UTF_C UTF_REST) =
-      (_+_(224, _quo_(UTF_C, 4096)))
-      (_+_(128, _rem_(_quo_(UTF_C, 64), 64)))
-      (_+_(128, _rem_(UTF_C, 64)))
+  ceq utf8((# UTF_C) UTF_REST) =
+      (# _+_(224, _quo_(UTF_C, 4096)))
+      (# _+_(128, _rem_(_quo_(UTF_C, 64), 64)))
+      (# _+_(128, _rem_(UTF_C, 64)))
       UTF_TAIL
     if _or_(_and_(_>=_(UTF_C, 2048), _<_(UTF_C, 55296)),
              _and_(_>=_(UTF_C, 57344), _<_(UTF_C, 65536)))
        /\ UTF_TAIL := utf8(UTF_REST) .
-  ceq utf8(UTF_C UTF_REST) =
-      (_+_(240, _quo_(UTF_C, 262144)))
-      (_+_(128, _rem_(_quo_(UTF_C, 4096), 64)))
-      (_+_(128, _rem_(_quo_(UTF_C, 64), 64)))
-      (_+_(128, _rem_(UTF_C, 64)))
+  ceq utf8((# UTF_C) UTF_REST) =
+      (# _+_(240, _quo_(UTF_C, 262144)))
+      (# _+_(128, _rem_(_quo_(UTF_C, 4096), 64)))
+      (# _+_(128, _rem_(_quo_(UTF_C, 64), 64)))
+      (# _+_(128, _rem_(UTF_C, 64)))
       UTF_TAIL
     if _>=_(UTF_C, 65536) /\ _<_(UTF_C, 1114112)
        /\ UTF_TAIL := utf8(UTF_REST) .
@@ -1562,7 +1558,7 @@ mod WASM-BUILTINS is
     if len(BDI_XS) == BDI_N .
   ceq inv-concatn-(BDI_T, BDI_N, BDI_XS) = fixed-chunks(BDI_N, BDI_XS)
     if _==_(_rem_(len(BDI_XS), BDI_N), 0) .
-  eq nd = false .
+  eq nd = # false .
   eq r-fmadd = (0) .
   eq r-fmin = (0) .
   eq r-fmax = (0) .
@@ -1572,8 +1568,8 @@ mod WASM-BUILTINS is
   eq r-trunc-s = (0) .
   eq r-swizzle = (0) .
   eq r-laneselect = (0) .
-  eq irelaxed-q15mulr-(BDR_N, BDR_SX, (BDR_I), (BDR_J)) = iq15mulr-sat-(BDR_N, BDR_SX, (BDR_I), (BDR_J)) .
-  eq irelaxed-laneselect-(BDR_N, (BDR_I), (BDR_J), (BDR_K)) = ibitselect-(BDR_N, (BDR_I), (BDR_J), (BDR_K)) .
+  eq irelaxed-q15mulr-(BDR_N, BDR_SX, (BDR_I), (BDR_J)) = # iq15mulr-sat-(BDR_N, BDR_SX, BDR_I, BDR_J) .
+  eq irelaxed-laneselect-(BDR_N, (BDR_I), (BDR_J), (BDR_K)) = # ibitselect-(BDR_N, BDR_I, BDR_J, BDR_K) .
   eq frelaxed-min-(BDR_N, BDR_F1, BDR_F2) = fmin-(BDR_N, BDR_F1, BDR_F2) .
   eq frelaxed-max-(BDR_N, BDR_F1, BDR_F2) = fmax-(BDR_N, BDR_F1, BDR_F2) .
   eq frelaxed-madd-(BDR_N, BDR_F1, BDR_F2, BDR_F3) = fadd-(BDR_N, fmul-(BDR_N, BDR_F1, BDR_F2), BDR_F3) .

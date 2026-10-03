@@ -56,12 +56,15 @@ type clause_head =
   }
 
 let translate_head index id args =
+  let sorts, _ = Term.definition_sorts index id in
   let step (terms, conditions, bound) (position, arg) =
+    let sort = List.nth sorts position in
     match arg.it with
     | ExpA exp ->
         begin match Prem.translate_pattern_parts index exp with
         | Some (pattern, guards) ->
-            pattern :: terms, conditions @ guards, Prem.bind bound exp
+            Term.to_parameter_sort index sort exp pattern :: terms,
+            conditions @ guards, Prem.bind bound exp
         | None ->
             let subject =
               Var
@@ -73,7 +76,7 @@ let translate_head index id args =
               Prem.bind_pattern index bound exp subject
                 "definition head is not a structural pattern"
             in
-            subject :: terms,
+            Term.to_parameter_sort index sort exp subject :: terms,
             conditions @ List.map eq_condition binding.conditions,
             binding.bound
         end
@@ -145,6 +148,7 @@ type prepared_clause =
   { clause : clause
   ; head : clause_head
   ; head_proven : Il.Free.Set.t
+  ; result_sort : sort
   ; index : Prescan.t
   }
 
@@ -180,7 +184,8 @@ let prepare_clauses index id params clauses =
           let index = Term.with_parameter_types index params args in
           let head = translate_head index id args in
           let head_proven = guarded_quants index quants args in
-          {clause; head; head_proven; index})
+          let _, result_sort = Term.definition_sorts index id in
+          {clause; head; head_proven; result_sort; index})
     clauses
 
 let proven_variables prepared premises =
@@ -196,6 +201,11 @@ let clause_has_rewrite_call index args rhs prems =
   || List.exists (Prem.prem_has_rewrite_call index) prems
 
 
+let translate_result prepared rhs =
+  let index = prepared.index in
+  Term.to_sort index ~sort:prepared.result_sort rhs.note
+    (Term.translate_exp index rhs)
+
 (* Ordinary DefD clause *)
 let translate_equation_clause prepared =
   let index = prepared.index in
@@ -206,9 +216,7 @@ let translate_equation_clause prepared =
           "DecD calls a maude_rule definition without hint(maude_rule)";
       let head = prepared.head in
 
-      let right =
-        Term.translate_exp index rhs
-      in
+      let right = translate_result prepared rhs in
 
       let premises =
         Prem.translate_all
@@ -353,7 +361,7 @@ let translate_rule_clause prepared =
             (Param.translate_eq_conditions
                ~proven:(proven_variables prepared premises) index quants)
       in
-      let right = Term.translate_exp index rhs in
+      let right = translate_result prepared rhs in
       match conditions with
       | [] -> Rl (None, head.term, right)
       | _ -> Crl (None, head.term, right, conditions)

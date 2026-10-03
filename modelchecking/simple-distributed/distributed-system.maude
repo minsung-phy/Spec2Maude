@@ -7,15 +7,7 @@ mod DISTRIBUTED-SYSTEM is
     protecting CLIENT-WASM .
     protecting SERVER-BUGGY-WASM .
 
-    including MODEL-CHECKER * (
-        op _xor_ : Nat Nat -> Nat to integerXor,
-        op _+_ : String String -> String to stringConcat,
-        op _<_ : String String -> Bool to stringLess,
-        op _<=_ : String String -> Bool to stringLessEqual,
-        op _>_ : String String -> Bool to stringGreater,
-        op _>=_ : String String -> Bool to stringGreaterEqual,
-        op char : Nat -> Char to nativeChar
-    ) .
+    including MODEL-CHECKER .
 
     sort Message .
     ops none req ack : -> Message [ctor] .
@@ -47,7 +39,7 @@ mod DISTRIBUTED-SYSTEM is
         < 0, N, none >
         =>
         < C2, N, req >
-        if clientCall(CONST(I32, 0) CONST(I32, 0)) => clientResult(CONST(I32, C2)) .
+        if clientCall(CONST(I32, # 0) CONST(I32, # 0)) => clientResult(CONST(I32, # C2)) .
     
     --- Request가 Server에 전달
     --- server_step(N)을 실제 Wasm으로 실행
@@ -55,28 +47,28 @@ mod DISTRIBUTED-SYSTEM is
     ---    < C, N, req >
     ---    =>
     ---    < C, N2, ack >
-    ---    if serverCall(CONST(I32, N)) => serverResult(CONST(I32, N2)) .
+    ---    if serverCall(CONST(I32, # N)) => serverResult(CONST(I32, # N2)) .
     --- 
     --- 첫 번째 처리: server_step(0)
     crl [deliver-request-0] :
         < C, 0, req >
         =>
         < C, N2, ack >
-        if serverCall(CONST(I32, 0)) => serverResult(CONST(I32, N2)) .
+        if serverCall(CONST(I32, # 0)) => serverResult(CONST(I32, # N2)) .
 
     --- 두 번째 처리: server_step(1)
     crl [deliver-request-1] :
         < C, 1, req >
         =>
         < C, N2, ack >
-        if serverCall(CONST(I32, 1)) => serverResult(CONST(I32, N2)) .
+        if serverCall(CONST(I32, # 1)) => serverResult(CONST(I32, # N2)) .
 
     --- 2 means "processed at least twice"
     crl [deliver-request-2plus] :
         < C, 2, req >
         =>
         < C, 2, ack >
-        if serverCall(CONST(I32, 2)) => serverResult(CONST(I32, 3)) .
+        if serverCall(CONST(I32, # 2)) => serverResult(CONST(I32, # 3)) .
 
     --- Request 유실
     rl [drop-request] :
@@ -90,7 +82,7 @@ mod DISTRIBUTED-SYSTEM is
         < 1, N, ack >
         =>
         < C2, N, none >
-        if clientCall(CONST(I32, 1) CONST(I32, 1)) => clientResult(CONST(I32, C2)) .
+        if clientCall(CONST(I32, # 1) CONST(I32, # 1)) => clientResult(CONST(I32, # C2)) .
 
     --- ACK 유실
     rl [drop-ack] :
@@ -104,7 +96,7 @@ mod DISTRIBUTED-SYSTEM is
         < 1, N, none >
         =>
         < C2, N, req >
-        if clientCall(CONST(I32, 1) CONST(I32, 2)) => clientResult(CONST(I32, C2)) .
+        if clientCall(CONST(I32, # 1) CONST(I32, # 2)) => clientResult(CONST(I32, # C2)) .
     
     --- for fairness
     ops reqReady ackReady : -> Prop [ctor] .

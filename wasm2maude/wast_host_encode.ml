@@ -32,7 +32,7 @@ let host_deftype = function
 
 let limits {Wasm.Types.min; max} =
   T.app "limits.sym-sym-sym"
-    [u64 min; option u64 max]
+    [u64 min; option (fun max -> T.app "#_" [u64 max]) max]
 
 let addrtype = function
   | Wasm.Types.I32AT -> T.atom "i32"
@@ -70,7 +70,7 @@ let host_resource_term {Wast_plan.export; _} =
       let bytes = Int64.mul lim.min 65536L in
       T.app "rec.meminst"
         [memtype typ;
-         T.app "repeatSeq" [u64 bytes; T.atom "0"]]
+         T.app "repeatSeq" [u64 bytes; T.app "#_" [T.atom "0"]]]
   | Wast_host.Table (Wasm.Types.TableT (_, lim, _) as typ) ->
       T.app "rec.tableinst"
         [tabletype typ;
@@ -114,5 +114,6 @@ let store (host : Wast_plan.host) =
 
 let function_addresses funcs =
   funcs
-  |> List.map (fun binding -> T.atom (string_of_int binding.Wast_plan.address))
+  |> List.map (fun binding ->
+       T.app "#_" [T.atom (string_of_int binding.Wast_plan.address)])
   |> T.seq

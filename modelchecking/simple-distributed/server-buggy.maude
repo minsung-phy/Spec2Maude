@@ -22,10 +22,14 @@ mod SERVER-BUGGY-WASM is
 
   eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I32, I32)))), eps, eps, eps,
 eps, eps,
-spectec-FUNC-2(0, eps, (LOCAL.GET(0) CONST(I32, 1) BINOP(I32, ADD))), eps,
-eps, eps, EXPORT(((115 101 114 118 101) (114 95 115 116 101 112)), FUNC(0))) .
-  eq serverInputName = (115 101 114 118 101)
-(114 95 115 116 101 112) .
+spectec-FUNC-2(0, eps, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))),
+eps, eps, eps,
+EXPORT(
+  ((#_(115) #_(101) #_(114) #_(118) #_(101))
+   (#_(114) #_(95) #_(115) #_(116) #_(101) #_(112))),
+FUNC(0))) .
+  eq serverInputName = (#_(115) #_(101) #_(114) #_(118) #_(101))
+(#_(114) #_(95) #_(115) #_(116) #_(101) #_(112)) .
   eq serverEmptyStore = {(field('TAGS, eps) ;
   (field('GLOBALS, eps) ;
    (field('MEMS, eps) ;

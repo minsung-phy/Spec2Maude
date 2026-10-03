@@ -145,7 +145,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
   vars WSHALTERNATIVES WSHALTPREFIX WSHALTSUFFIX : ResultAlternatives .
   var WSHLPAT : LanePattern .
   var WSHLPATS : LanePatterns .
-  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM : Nat .
+  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM WSHBITS : Nat .
 
   eq hostArguments(eps, eps) = true .
   eq hostArguments(CONST(WSHNT, WSHVALUE) WSHVALUES,
@@ -228,7 +228,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
     if typecheck(WSHNT, numtype)
        /\ typecheck(WSHVALUE, num-(WSHNT)) .
 
-  eq runtimeResults(VCONST(V128, WSHC) WSHACTUAL) =
+  eq runtimeResults(VCONST(V128, WSHBITS) WSHACTUAL) =
     runtimeResults(WSHACTUAL) .
 
   ceq runtimeResults(WSHC WSHACTUAL) = runtimeResults(WSHACTUAL)
@@ -257,10 +257,10 @@ mod WASM2MAUDE-WAST-RUNTIME is
     match.any(WSHVALUE, WSHALTERNATIVES) .
 
   ceq match.value(
-    VCONST(V128, WSHVALUE),
+    VCONST(V128, WSHBITS),
     result.vec-lanes(WSHLT X WSHDIM, WSHLPATS)) =
       match.vec-lanes(WSHLT, WSHLANES, WSHLPATS)
-    if WSHLANES := lanes-(WSHLT X WSHDIM, WSHVALUE) .
+    if WSHLANES := lanes-(WSHLT X WSHDIM, WSHBITS) .
 
   eq match.lane(WSHNT, WSHVALUE, lane.exact(WSHVALUE)) = match.yes .
   eq match.lane(F32,
@@ -325,22 +325,22 @@ mod WASM2MAUDE-WAST-RUNTIME is
     if _>=_(WSHADDR, 2251799813685248) = true .
 
   eq match.value(REF.NULL-ADDR, result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(ANY)) = match.yes .
   eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
   eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
   eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
   eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
   eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(EQ)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(EQ)) = match.yes .
   eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
   eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(I31)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(I31)) = match.yes .
   eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(STRUCT)) = match.yes .
   eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ARRAY)) = match.yes .
   eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(spectec-FUNC)) = match.yes .
   eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXN)) = match.yes .
   eq match.value(REF.NULL-ADDR, result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHVALUE), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(EXTERN)) = match.yes .
   eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
   eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
   eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
@@ -361,7 +361,7 @@ mod WASM2MAUDE-WAST-RUNTIME is
     if match.value(WSHVALUE, WSHPATTERN) = match.yes .
   eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .
   ceq hostCallable(WSHS, WSHA, WSHARGS) = true
-    if WSHA <- hostFunctionAddresses = true
+    if (# WSHA) <- hostFunctionAddresses = true
        /\ typecheck(WSHARGS, val) = true
        /\ typecheck(WSHARGS, instr) = true
        /\ WSHXA := (WSHS . 'FUNCS)[WSHA]

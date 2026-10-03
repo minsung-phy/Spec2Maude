@@ -94,7 +94,7 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
       end
 
   | CaseE (mixop, payload) ->
-      translate_case_pattern ~computed index mixop payload
+      translate_case_pattern ~computed index exp.note mixop payload
 
   | OptE (Some inner) ->
       translate_pattern ~computed index inner
@@ -173,26 +173,29 @@ and translate_list_pattern ?(computed = fun _ -> None) index typ exps =
        ; guards = pattern_guards patterns
        })
 
-and translate_case_pattern ?(computed = fun _ -> None) index mixop payload =
+and translate_case_pattern ?(computed = fun _ -> None) index typ mixop payload =
   if Mixop.is_hole_only mixop then
     match payload.it with
     | TupE [single] -> translate_pattern ~computed index single
     | _ -> translate_pattern ~computed index payload
   else
-    match payload.it with
-    | TupE exps ->
-        translate_patterns ~computed index exps
-        |> Option.map (fun patterns ->
-             { term =
-                 App (Prescan.mixop_name index mixop, pattern_terms patterns)
-             ; guards = pattern_guards patterns
-             })
-    | _ ->
-        translate_pattern ~computed index payload
-        |> Option.map (fun pattern ->
-             { pattern with
-               term = App (Prescan.mixop_name index mixop, [pattern.term])
-             })
+    let exps =
+      match payload.it with
+      | TupE exps -> exps
+      | _ -> [payload]
+    in
+    translate_patterns ~computed index exps
+    |> Option.map (fun patterns ->
+         let terms =
+           List.map2
+             (fun (exp, pattern) sort ->
+               Term.to_sort index ~sort exp.note pattern.term)
+             (List.combine exps patterns)
+             (Term.constructor_domain index typ mixop)
+         in
+         { term = App (Prescan.mixop_name index mixop, terms)
+         ; guards = pattern_guards patterns
+         })
 
 and translate_field_patterns ?(computed = fun _ -> None) index = function
   | [] -> Some ([], [])
@@ -203,7 +206,12 @@ and translate_field_patterns ?(computed = fun _ -> None) index = function
       with
       | Some pattern, Some (fields, guards) ->
           Some
-            ( App ("field", [Term.qid_of_atom atom; pattern.term]) :: fields
+            ( App
+                ( "field"
+                , [ Term.qid_of_atom atom
+                  ; Term.to_terminal index exp.note pattern.term
+                  ] )
+              :: fields
             , pattern.guards @ guards
             )
       | None, _ | _, None -> None
@@ -280,11 +288,12 @@ let rec bind_pattern index bound exp subject error =
           let converted =
             App
               ( "_:_<:>_"
-              , [ subject
+              , [ Term.to_native index exp.note subject
                 ; Const (Xl.Num.string_of_typ target)
                 ; Const (Xl.Num.string_of_typ source)
                 ]
               )
+            |> Term.of_native index inner.note
           in
           bind_pattern index bound inner converted error
       | _ ->

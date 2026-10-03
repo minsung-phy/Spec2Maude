@@ -23,19 +23,22 @@ mod CLIENT-WASM is
   eq clientInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_((I32 I32), I32)))), eps, eps,
 eps, eps, eps,
 spectec-FUNC-2(0, eps,
-(LOCAL.GET(0) CONST(I32, 0) RELOP(I32, EQ)
+(LOCAL.GET(0) CONST(I32, #_(0)) RELOP(I32, EQ)
  IF__ELSE_(-RESULT(_?(I32)),
- (LOCAL.GET(1) CONST(I32, 0) RELOP(I32, EQ)
-  IF__ELSE_(-RESULT(_?(I32)), CONST(I32, 1), CONST(I32, 0))),
- (LOCAL.GET(0) CONST(I32, 1) RELOP(I32, EQ)
+ (LOCAL.GET(1) CONST(I32, #_(0)) RELOP(I32, EQ)
+  IF__ELSE_(-RESULT(_?(I32)), CONST(I32, #_(1)), CONST(I32, #_(0)))),
+ (LOCAL.GET(0) CONST(I32, #_(1)) RELOP(I32, EQ)
   IF__ELSE_(-RESULT(_?(I32)),
-  (LOCAL.GET(1) CONST(I32, 1) RELOP(I32, EQ)
-   IF__ELSE_(-RESULT(_?(I32)), CONST(I32, 2), CONST(I32, 1))),
-  CONST(I32, 2)))))),
+  (LOCAL.GET(1) CONST(I32, #_(1)) RELOP(I32, EQ)
+   IF__ELSE_(-RESULT(_?(I32)), CONST(I32, #_(2)), CONST(I32, #_(1)))),
+  CONST(I32, #_(2))))))),
 eps, eps, eps,
-EXPORT(((99 108 105 101 110) (116 95 115 116 101 112)), FUNC(0))) .
-  eq clientInputName = (99 108 105 101 110)
-(116 95 115 116 101 112) .
+EXPORT(
+  ((#_(99) #_(108) #_(105) #_(101) #_(110))
+   (#_(116) #_(95) #_(115) #_(116) #_(101) #_(112))),
+FUNC(0))) .
+  eq clientInputName = (#_(99) #_(108) #_(105) #_(101) #_(110))
+(#_(116) #_(95) #_(115) #_(116) #_(101) #_(112)) .
   eq clientEmptyStore = {(field('TAGS, eps) ;
   (field('GLOBALS, eps) ;
    (field('MEMS, eps) ;
