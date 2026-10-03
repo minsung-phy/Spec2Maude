@@ -212,17 +212,15 @@ let owner_of def =
   | RecD _ -> "RecD"
   | HintD _ -> "HintD"
 
-let rec translate ?request_output index def =
+let rec translate index def =
   try
     match def.it with
     | TypD (id, params, insts) -> Typd.translate index id params insts
     | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
     | RelD (id, params, mixop, typ, rules) ->
-        Reld.translate ?request_output
-          ~include_rule:(fun rule -> not (Prescan.is_heatcool_rule index id rule))
-          index id params mixop typ rules
+        Reld.translate index id params mixop typ rules
     | GramD _ | HintD _ -> []
-    | RecD defs -> List.concat_map (translate ?request_output index) defs
+    | RecD defs -> List.concat_map (translate index) defs
   with Invalid_argument reason ->
     Util.Error.error def.at "translation"
       ("Unsupported " ^ owner_of def ^ ": " ^ reason)
@@ -253,11 +251,6 @@ let normalize_module ?(constructors = true) source_declarations statements =
 let unsupported at case owner reason =
   Util.Error.error at "translation"
     ("Unsupported " ^ case ^ " in " ^ owner ^ ": " ^ reason)
-
-let rec flatten def =
-  match def.it with
-  | RecD defs -> List.concat_map flatten defs
-  | TypD _ | RelD _ | DecD _ | GramD _ | HintD _ -> [def]
 
 (* Collection *)
 
@@ -337,7 +330,7 @@ let collect declarations script =
           bound := []
       | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ ->
           ignore (Il.Walk.transform_def visit def))
-    (List.concat_map flatten script);
+    (List.concat_map Prescan.flatten script);
   List.rev !instances
 
 
@@ -418,7 +411,7 @@ let check_hints higher_order script =
               | _ -> ())
             hints
       | _ -> ())
-    (List.concat_map flatten script)
+    (List.concat_map Prescan.flatten script)
 
 
 let specialize_script script =
@@ -428,7 +421,7 @@ let specialize_script script =
         match def.it with
         | DecD (id, params, _, _) -> Some (id.it, params)
         | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ -> None)
-      (List.concat_map flatten script)
+      (List.concat_map Prescan.flatten script)
   in
   let higher_order =
     List.filter_map
@@ -458,7 +451,7 @@ let specialize_script script =
     |> List.concat_map place
     |> List.map (replace_calls declarations instances)
   in
-  List.iter check_remaining (List.concat_map flatten script);
+  List.iter check_remaining (List.concat_map Prescan.flatten script);
   script
 
 (* hint(maude_assume "Rel" ...) on a rule or definition omits its premises on
@@ -512,7 +505,7 @@ let used_quants free quants =
     quants
 
 let assume_script script =
-  let hints = Prescan.collect_hints [] script in
+  let hints = Prescan.collect_hints script in
   let rule_hints relation rule =
     List.concat_map
       (fun hintdef ->
@@ -573,15 +566,9 @@ let translate_script script =
         (String.concat ", " (List.map fst relations))
   end;
   let sort_metadata = Prescan.sort_metadata index in
-  let output_requests = ref [] in
-  let request_output iteration position =
-    let request = iteration.Prescan.name, position in
-    if not (List.mem request !output_requests) then
-      output_requests := request :: !output_requests
-  in
-  let context_rules = Reld.translate_contexts ~request_output index in
+  let context_rules = Heatcool.translate index in
   let translated_definitions =
-    List.concat_map (translate ~request_output index) script
+    List.concat_map (translate index) script
   in
   let premise_iterations =
     let translate_body allow_membership iteration bound body =
@@ -590,11 +577,11 @@ let translate_script script =
         && Prescan.premise_iteration_binds_membership index iteration
       in
       let result =
-        Prem.translate_all index ~bound ~bind_membership [body]
+        Prem.translate_all index ~bound ~bind_membership ~collect_outputs:false [body]
       in
       result.conditions, result.otherwise, result.bound
     in
-    Iter.translate_premise_all translate_body index !output_requests
+    Iter.translate_premise_all translate_body index
   in
   let typed_list_support = Typd.list_statements sort_metadata in
   let list_statements =

@@ -592,17 +592,15 @@ let find_relation relations id at =
   |> List.filter (fun relation -> relation.id.it = id.it)
   |> unique at "refers to an unknown relation" "refers to an ambiguous relation"
 
-let find_rule (relation : relation) id at =
-  relation.rules
-  |> List.mapi (fun ordinal rule -> ordinal, rule)
-  |> List.filter (fun (_, rule) ->
-       let RuleD (rule_id, _, _, _, _) = rule.it in
-       rule_id.it = id.it)
-  |> unique at "refers to an unknown rule" "refers to an ambiguous rule"
-
 let rule_id rule =
   let RuleD (id, _, _, _, _) = rule.it in
   id
+
+let find_rule (relation : relation) id at =
+  relation.rules
+  |> List.mapi (fun ordinal rule -> ordinal, rule)
+  |> List.filter (fun (_, rule) -> (rule_id rule).it = id.it)
+  |> unique at "refers to an unknown rule" "refers to an ambiguous rule"
 
 let components mixop exp =
   match Xl.Mixop.arity mixop, exp.it with

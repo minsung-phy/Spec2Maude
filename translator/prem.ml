@@ -807,7 +807,7 @@ let translate_letpr index bound quants left right =
     in
     Ready (make (bind_names result.bound names) conditions)
 
-let translate_barrier index request_output bound prem =
+let translate_barrier index collect_outputs bound prem =
   match prem.it with
   | RulePr (id, args, mixop, exp) ->
       translate_rulepr index bound id args mixop exp
@@ -843,11 +843,9 @@ let translate_barrier index request_output bound prem =
             (Iter.translate_premise index (Term.translate_exp index) prem)
       | [position, source]
         when Iter.premise_output_possible iteration position ->
-          begin match request_output with
-          | Some request -> request iteration position
-          | None ->
-              invalid_arg "IterPr output requires relation helper collection"
-          end;
+          if not collect_outputs then
+            invalid_arg "IterPr output requires relation helper collection";
+          Prescan.request index iteration.Prescan.name (OutputHelper position);
           bind_pattern index bound source
             (Iter.premise_output_call index (Term.translate_exp index)
                iteration position)
@@ -868,7 +866,7 @@ let append result next =
   ; otherwise = result.otherwise || next.otherwise
   }
 
-let rec translate_prems index bind_membership request_output result skipped = function
+let rec translate_prems index bind_membership collect_outputs result skipped = function
   | [] when skipped = [] -> result
   | [] ->
       invalid_arg "pure premises have unresolved variable dependencies"
@@ -886,14 +884,14 @@ let rec translate_prems index bind_membership request_output result skipped = fu
               then
                 invalid_arg
                   "a premise dependency crosses a rewrite premise";
-              translate_prems index bind_membership request_output
+              translate_prems index bind_membership collect_outputs
                 (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
               if has_rewrite_call index exp then
                 invalid_arg "rewrite premise has an unbound input"
               else
-                translate_prems index bind_membership request_output result
+                translate_prems index bind_membership collect_outputs result
                   (prem :: skipped) prems
           end
       | LetPr (quants, left, right) ->
@@ -902,11 +900,11 @@ let rec translate_prems index bind_membership request_output result skipped = fu
               "rewrite-backed call must be an IfPr equality premise";
           begin match translate_letpr index result.bound quants left right with
           | Ready next ->
-              translate_prems index bind_membership request_output
+              translate_prems index bind_membership collect_outputs
                 (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
-              translate_prems index bind_membership request_output result
+              translate_prems index bind_membership collect_outputs result
                 (prem :: skipped) prems
           end
       | RulePr _ | ElsePr | IterPr _ | NegPr _ ->
@@ -916,20 +914,24 @@ let rec translate_prems index bind_membership request_output result skipped = fu
           if skipped <> [] then
             invalid_arg "a premise dependency crosses an effectful premise";
           let next =
-            translate_barrier index request_output result.bound prem
+            translate_barrier index collect_outputs result.bound prem
           in
-          translate_prems index bind_membership request_output
+          translate_prems index bind_membership collect_outputs
             (append result next) [] prems
       end
 
-let translate_all index ?(bound = []) ?(bind_membership = false)
-    ?request_output prems =
+(* With bind_membership, a premise x <- xs whose x is unbound matches any
+ * element of xs. With collect_outputs, an IterPr can compute one unbound
+ * generator source. Without them, such premises are rejected. *)
+let translate_all index ?(bound = []) ~bind_membership ~collect_outputs prems =
   let bound = bind_names Il.Free.Set.empty bound in
-  translate_prems index bind_membership request_output
+  translate_prems index bind_membership collect_outputs
     {conditions = []; bound; otherwise = false} [] prems
 
 let translate_eq_conditions index ?bound prems =
-  let result = translate_all index ?bound prems in
+  let result =
+    translate_all index ?bound ~bind_membership:false ~collect_outputs:false prems
+  in
   if result.otherwise then invalid_arg "ElsePr belongs to DecD or RelD";
   List.map
     (function

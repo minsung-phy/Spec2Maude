@@ -95,54 +95,19 @@ let translate_head index id args =
   ; bound
   }
 
-let condition_ready bound = function
-  | EqCond (left, right) ->
-      variables_bound bound left && variables_bound bound right
-  | MatchCond (_, subject) -> variables_bound bound subject
-  | MembershipCond (term, _) | BoolCond term -> variables_bound bound term
-
-let condition_binds bound = function
-  | MatchCond (pattern, _) -> not (variables_bound bound pattern)
-  | EqCond _ | MembershipCond _ | BoolCond _ -> false
-
-let take_ready select bound conditions =
-  let rec take prefix = function
-    | [] -> None
-    | condition :: rest
-      when select condition && condition_ready bound condition ->
-        Some (condition, List.rev_append prefix rest)
-    | condition :: rest -> take (condition :: prefix) rest
+(* Ready guards are checked before a condition that binds new variables, so
+ * a deferred result pattern is constructed only after its guards hold. *)
+let schedule_equation_conditions left conditions =
+  let binds bound = function
+    | EqCondition (MatchCond (pattern, _)) -> not (variables_bound bound pattern)
+    | EqCondition (EqCond _ | MembershipCond _ | BoolCond _) | RewriteCond _ -> false
   in
-  take [] conditions
-
-(* Check ready guards before constructing a deferred result pattern. *)
-let schedule_conditions left conditions =
-  let rec schedule bound ordered pending =
-    match pending with
-    | [] -> List.rev ordered
-    | _ ->
-        let selected =
-          match
-            take_ready
-              (fun condition -> not (condition_binds bound condition))
-              bound pending
-          with
-          | Some selected -> Some selected
-          | None -> take_ready (fun _ -> true) bound pending
-        in
-        begin match selected with
-        | None ->
-            invalid_arg "definition conditions have unresolved dependencies"
-        | Some (MatchCond (pattern, subject), pending)
-          when variables_bound bound pattern ->
-            schedule bound (EqCond (pattern, subject) :: ordered) pending
-        | Some ((MatchCond (pattern, _) as condition), pending) ->
-            schedule (term_variables bound pattern) (condition :: ordered) pending
-        | Some ((EqCond _ | MembershipCond _ | BoolCond _ as condition), pending) ->
-            schedule bound (condition :: ordered) pending
-        end
-  in
-  schedule (term_variables [] left) [] conditions
+  conditions
+  |> List.map (fun condition -> EqCondition condition)
+  |> schedule_conditions (fun bound condition -> not (binds bound condition)) left
+  |> List.map (function
+       | EqCondition condition -> condition
+       | RewriteCond _ -> invalid_arg "an equation cannot use a rewrite condition")
 
 type prepared_clause =
   { clause : clause
@@ -222,6 +187,7 @@ let translate_equation_clause prepared =
         Prem.translate_all
           index
           ~bound:(Il.Free.Set.elements head.bound)
+          ~bind_membership:false ~collect_outputs:false
           prems
       in
 
@@ -230,7 +196,7 @@ let translate_equation_clause prepared =
         @ List.map eq_condition premises.conditions
         @ Param.translate_eq_conditions
             ~proven:(proven_variables prepared premises) index quants
-        |> schedule_conditions head.term
+        |> schedule_equation_conditions head.term
       in
 
       let attrs =
@@ -305,7 +271,9 @@ let translate_choice_clause id
       let head = prepared.head in
       let premises =
         Prem.translate_all index
-          ~bound:(Il.Free.Set.elements head.bound) choice.prefix
+          ~bound:(Il.Free.Set.elements head.bound)
+          ~bind_membership:false ~collect_outputs:false
+          choice.prefix
       in
       if premises.otherwise then
         invalid_arg "membership choice cannot follow ElsePr";
@@ -325,7 +293,7 @@ let translate_choice_clause id
         @ Param.translate_eq_conditions index
             ~proven:(proven_variables prepared premises)
             (choice_public_quants choice.element quants)
-        |> schedule_conditions head.term
+        |> schedule_equation_conditions head.term
       in
       equation head.term right conditions []
       :: choice_helper index id choice rhs
@@ -349,7 +317,8 @@ let translate_rule_clause prepared =
       let head = prepared.head in
       let premises =
         Prem.translate_all index
-          ~bound:(Il.Free.Set.elements head.bound) prems
+          ~bound:(Il.Free.Set.elements head.bound)
+          ~bind_membership:false ~collect_outputs:false prems
       in
       if premises.otherwise then
         invalid_arg "ElsePr is not supported in a maude_rule DecD";

@@ -21,8 +21,6 @@ type iteration =
   ; tail_name : string
   ; projector_name : string
   ; projector_tail_name : string
-  ; mutable forward_requested : bool
-  ; mutable projector_requested : bool
   ; owner : iteration_owner
   ; body : exp
   ; iterexp : iterexp
@@ -33,7 +31,6 @@ type premise_iteration =
   { name : string
   ; tail_name : string
   ; output_names : (name * name) list
-  ; mutable check_requested : bool
   ; owner : iteration_owner
   ; premise : prem
   ; body : prem
@@ -88,6 +85,14 @@ type membership_choice =
 
 type name_kind = TypName | RelName | DefName | MixopName
 
+(* Iteration helpers are generated only when a translation case calls them.
+ * A case records each call in the request table of the index. *)
+type helper_request =
+  | ForwardHelper       (* IterE helper that computes the sequence *)
+  | ProjectorHelper     (* IterE helper that recovers a pattern's variables *)
+  | CheckHelper         (* IterPr helper that checks every element *)
+  | OutputHelper of int (* IterPr helper that computes one generator source *)
+
 type t =
   { type_env : Il.Env.t
   ; input_types : (exp * typ) list option
@@ -109,6 +114,7 @@ type t =
   ; anonymous_variables : (id * sort * name) list
   ; type_parameters : id list
   ; inverses : (string * inverse) list
+  ; requests : (name * helper_request, unit) Hashtbl.t
   }
 
 
@@ -350,16 +356,15 @@ let capture_premise_variables type_parameters body iterexp =
     (PremiseBody body) iterexp
 
 
-let rec collect_hints hints = function
-  | [] -> hints
-  | def :: defs ->
-      begin match def.it with
-      | HintD hintdef -> collect_hints (hintdef :: hints) defs
-      | RecD nested ->
-          collect_hints (collect_hints hints nested) defs
-      | TypD _ | RelD _ | DecD _ | GramD _ ->
-          collect_hints hints defs
-      end
+let rec flatten def =
+  match def.it with
+  | RecD defs -> List.concat_map flatten defs
+  | TypD _ | RelD _ | DecD _ | GramD _ | HintD _ -> [def]
+
+let collect_hints defs =
+  List.filter_map
+    (fun def -> match def.it with HintD hintdef -> Some hintdef | _ -> None)
+    (List.concat_map flatten defs)
 
 let has_dec_hint_in hints target_name name =
   List.fold_left
@@ -526,10 +531,7 @@ let same_parameter = equal_parameter true
 (* A definition inverse receives the preserved parameters in source order,
    followed by the original result, and returns the omitted parameter. *)
 let remove_at index items =
-  items
-  |> List.mapi (fun position item -> position, item)
-  |> List.filter_map (fun (position, item) ->
-       if position = index then None else Some item)
+  List.filteri (fun position _ -> position <> index) items
 
 let validate_inverse definitions source = function
   | Error reason -> InvalidInverse reason
@@ -614,105 +616,87 @@ let membership_choice_shape definition clause =
       | _ -> None
       end
 
-let rec collect_membership_choices = function
-  | [] -> []
-  | def :: defs ->
-      let choices =
-        match def.it with
-        | DecD (id, _, _, clauses) ->
-            List.filter_map (membership_choice_shape id.it) clauses
-        | RecD nested -> collect_membership_choices nested
-        | TypD _ | RelD _ | GramD _ | HintD _ -> []
-      in
-      choices @ collect_membership_choices defs
+let collect_membership_choices defs =
+  List.concat_map
+    (fun def ->
+      match def.it with
+      | DecD (id, _, _, clauses) ->
+          List.filter_map (membership_choice_shape id.it) clauses
+      | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ -> [])
+    defs
 
 
-let scan script =
-  let type_env = Il.Env.env_of_script script in
-  let sort_metadata = Hintd.scan_sorts script in
-  let rec collect declarations def =
-    let types, definitions, relations = declarations in
-    match def.it with
-    | TypD (id, _, insts) ->
-        (id.it, insts) :: types, definitions, relations
-    | DecD (id, params, result, _) ->
-        types, (id.it, params, result) :: definitions, relations
-    | RelD (id, _, mixop, _, _) ->
-        types, definitions, (id.it, mixop) :: relations
-    | RecD defs -> List.fold_left collect declarations defs
-    | GramD _ | HintD _ -> declarations
+(* Stage 1: Maude names for declarations and constructors. A name that is
+ * taken receives a numeric suffix, so names are chosen in a fixed order:
+ * builtin definitions, then declarations and constructors in source order. *)
+
+type registry =
+  { entries : (name_kind * string * name) list ref
+  ; used : StringSet.t ref
+  }
+
+let lookup entries kind source =
+  List.find_map
+    (fun (kind', source', name) ->
+      if kind = kind' && source = source' then Some name else None)
+    entries
+
+let register registry kind source candidate =
+  match lookup !(registry.entries) kind source with
+  | Some name -> name
+  | None ->
+      let name = fresh_name registry.used candidate in
+      registry.entries := (kind, source, name) :: !(registry.entries);
+      name
+
+let registered registry kind source =
+  match lookup !(registry.entries) kind source with
+  | Some name -> name
+  | None -> invalid_arg ("unregistered source name " ^ source)
+
+let register_names hints definitions script =
+  let registry = {entries = ref []; used = ref reserved_names} in
+  let builtin source = has_dec_hint_in hints source "builtin" in
+  let add kind source candidate = ignore (register registry kind source candidate) in
+  List.iter
+    (fun (source, _, _) ->
+      if builtin source then add DefName source (builtin_name source))
+    definitions;
+  let module Visitor = Il.Iter.Make (struct
+    include Il.Iter.Skip
+
+    let visit_mixop mixop =
+      if not (Mixop.is_hole_only mixop) then
+        add MixopName (Mixop.key mixop) (Mixop.name mixop)
+
+    let visit_def def =
+      match def.it with
+      | TypD (id, _, _) -> add TypName id.it (sanitize id.it)
+      | RelD (id, _, _, _, _) -> add RelName id.it (sanitize id.it)
+      | DecD (id, _, _, _) ->
+          add DefName id.it
+            (if builtin id.it then builtin_name id.it else sanitize id.it)
+      | GramD _ | HintD _ | RecD _ -> ()
+  end)
   in
-  let types, definitions, relations =
-    List.fold_left collect ([], [], []) script
-  in
-  let type_definitions = List.rev types in
-  let definitions = List.rev definitions in
-  let relations = List.rev relations in
-  let hints = collect_hints [] script |> List.rev in
-  let membership_choices = collect_membership_choices script in
-  let inverses =
-    definitions
-    |> List.filter_map (fun (source, _, _) ->
-         inverse_hint hints source
-         |> Option.map (fun inverse ->
-              source,
-              validate_inverse definitions source inverse))
-  in
+  Visitor.list Visitor.def script;
+  registry
+
+
+(* Stage 2: source variables, type parameters, and iterations, in source
+ * order. Iterations are named in stage 3. *)
+
+type occurrences =
+  { observed : (id * sort * bool) list
+  ; found_type_parameters : id list
+  ; found_iterations : iteration list
+  ; found_premise_iterations : premise_iteration list
+  }
+
+let collect_occurrences sort_metadata script =
   let iterations = ref [] in
   let premise_iterations = ref [] in
   let premise_count = ref 0 in
-  let names = ref [] in
-  let used_names = ref reserved_names in
-
-  let add_name kind source candidate =
-    match
-      List.find_opt
-        (fun (kind', source', _) -> kind = kind' && source = source')
-        !names
-    with
-    | Some (_, _, name) -> name
-    | None ->
-        let name = fresh_name used_names candidate in
-        names := (kind, source, name) :: !names;
-        name
-  in
-  let registered_name kind source =
-    match
-      List.find_opt
-        (fun (kind', source', _) -> kind = kind' && source = source')
-        !names
-    with
-    | Some (_, _, name) -> name
-    | None -> invalid_arg ("unregistered source name " ^ source)
-  in
-  let add_id_name kind id =
-    ignore (add_name kind id.it (sanitize id.it))
-  in
-  let add_mixop_name mixop =
-    if not (Mixop.is_hole_only mixop) then
-      let source = Mixop.key mixop in
-      ignore (add_name MixopName source (Mixop.name mixop))
-  in
-  let add_def_name def =
-    match def.it with
-    | TypD (id, _, _) -> add_id_name TypName id
-    | RelD (id, _, _, _, _) -> add_id_name RelName id
-    | DecD (id, _, _, _) ->
-        let candidate =
-          if has_dec_hint_in hints id.it "builtin" then builtin_name id.it
-          else sanitize id.it
-        in
-        ignore (add_name DefName id.it candidate)
-    | GramD _ -> ()
-    | HintD _ -> ()
-    | RecD _ -> ()
-  in
-  List.iter
-    (fun (source, _, _) ->
-      if has_dec_hint_in hints source "builtin" then
-        ignore (add_name DefName source (builtin_name source)))
-    definitions;
-
   let observed_variables = ref [] in
   let type_parameters = ref [] in
   let sort_of_typ typ =
@@ -839,8 +823,6 @@ let scan script =
       ; tail_name = ""
       ; projector_name = ""
       ; projector_tail_name = ""
-      ; forward_requested = false
-      ; projector_requested = false
       ; owner
       ; body
       ; iterexp
@@ -855,7 +837,6 @@ let scan script =
       { name = "iterpr-" ^ string_of_int !premise_count
       ; tail_name = ""
       ; output_names = []
-      ; check_requested = false
       ; owner
       ; premise
       ; body
@@ -870,7 +851,6 @@ let scan script =
   let module VariableVisitor = Il.Iter.Make (struct
     include Il.Iter.Skip
 
-    let visit_mixop = add_mixop_name
     let visit_def def =
       current_owner :=
         begin match def.it with
@@ -878,7 +858,6 @@ let scan script =
         | DecD (id, _, _, _) -> DefinitionOwner id.it
         | TypD _ | GramD _ | HintD _ | RecD _ -> OtherOwner
         end;
-      add_def_name def;
       add_def_variables def
 
     let visit_exp exp =
@@ -915,116 +894,224 @@ let scan script =
   List.iter (fun (iteration : premise_iteration) -> add_generators iteration.iterexp)
     (List.rev !premise_iterations);
 
-  let observed_variables = List.rev !observed_variables in
+  { observed = List.rev !observed_variables
+  ; found_type_parameters = !type_parameters
+  ; found_iterations = List.rev !iterations
+  ; found_premise_iterations = List.rev !premise_iterations
+  }
+
+
+(* Stage 3: Maude names for variables and generated helpers. *)
+
+(* Variable names may repeat declaration names; they are chosen from a copy
+ * of the names used so far. *)
+let name_variables used observed =
   let named, anonymous =
-    List.partition (fun (_, _, anonymous) -> not anonymous)
-      observed_variables
+    List.partition (fun (_, _, anonymous) -> not anonymous) observed
   in
   let exact, renamed =
-    List.partition
-      (fun (id, _, _) -> id.it = variable_base id.it)
-      named
+    List.partition (fun (id, _, _) -> id.it = variable_base id.it) named
   in
-  let used_variable_names =
-    ref !used_names
-  in
+  let used = ref used in
   let variables =
     exact @ renamed
     |> List.map (fun (id, sort, _) ->
-         let target_name =
-           fresh_variable_name used_variable_names (variable_base id.it)
-         in
-         (id.it, sort), target_name)
+         (id.it, sort), fresh_variable_name used (variable_base id.it))
   in
   let anonymous_variables =
     anonymous
     |> List.mapi (fun index (id, sort, _) ->
-         let target_name =
-           fresh_variable_name used_variable_names
-             ("PARAM" ^ string_of_int (index + 1))
-         in
-         id, sort, target_name)
+         id, sort,
+         fresh_variable_name used ("PARAM" ^ string_of_int (index + 1)))
   in
-  let iterations =
-    List.rev !iterations
-    |> List.map (fun (iteration : iteration) ->
-         let name =
-           fresh used_names
-             (fun index -> "-" ^ string_of_int index)
-             iteration.name
-         in
-         { iteration with
-           name
-         ; tail_name = fresh_name used_names (name ^ "-tail")
-         ; projector_name = fresh_name used_names ("project-" ^ name)
-         ; projector_tail_name =
-             fresh_name used_names ("project-" ^ name ^ "-tail")
-         })
-  in
-  let premise_iterations =
-    List.rev !premise_iterations
-    |> List.map (fun (iteration : premise_iteration) ->
-         let name = fresh_name used_names iteration.name in
-         let _, generators = iteration.iterexp in
-         let output_names =
-           List.mapi
-             (fun position _ ->
-               let output =
-                 fresh_name used_names
-                   (name ^ "-output-" ^ string_of_int (position + 1))
-               in
-               output, fresh_name used_names (output ^ "-tail"))
-             generators
-         in
-         { iteration with
-           name
-         ; tail_name = fresh_name used_names (name ^ "-tail")
-         ; output_names
-         })
-  in
-  let membership_choices =
-    membership_choices
-    |> List.map (fun choice ->
-         let definition_name =
-           registered_name DefName choice.definition
-         in
-         let position = choice.clause.at.left in
-         let candidate =
-           Printf.sprintf "%s-choice-%d-%d"
-             definition_name position.line position.column
-         in
-         {choice with helper_name = fresh_name used_names candidate})
-  in
+  variables, anonymous_variables
+
+let name_iterations used iterations =
+  iterations
+  |> List.map (fun (iteration : iteration) ->
+       let name =
+         fresh used (fun index -> "-" ^ string_of_int index) iteration.name
+       in
+       { iteration with
+         name
+       ; tail_name = fresh_name used (name ^ "-tail")
+       ; projector_name = fresh_name used ("project-" ^ name)
+       ; projector_tail_name = fresh_name used ("project-" ^ name ^ "-tail")
+       })
+
+let name_premise_iterations used premise_iterations =
+  premise_iterations
+  |> List.map (fun (iteration : premise_iteration) ->
+       let name = fresh_name used iteration.name in
+       let _, generators = iteration.iterexp in
+       let output_names =
+         List.mapi
+           (fun position _ ->
+             let output =
+               fresh_name used (name ^ "-output-" ^ string_of_int (position + 1))
+             in
+             output, fresh_name used (output ^ "-tail"))
+           generators
+       in
+       {iteration with name; tail_name = fresh_name used (name ^ "-tail"); output_names})
+
+let name_membership_choices registry choices =
+  choices
+  |> List.map (fun choice ->
+       let definition_name = registered registry DefName choice.definition in
+       let position = choice.clause.at.left in
+       let candidate =
+         Printf.sprintf "%s-choice-%d-%d"
+           definition_name position.line position.column
+       in
+       {choice with helper_name = fresh_name registry.used candidate})
+
+
+(* Generated Maude sorts for definitions evaluated by rewriting. *)
+let name_rewrite_sorts registry hints definitions membership_choices =
   let choice_definitions =
     membership_choices
     |> List.map (fun choice -> choice.definition)
     |> StringSet.of_list
   in
-  let rewrite_sorts =
+  definitions
+  |> List.filter_map (fun (source, _, _) ->
+       let is_choice = StringSet.mem source choice_definitions in
+       if has_dec_hint_in hints source "maude_rule" || is_choice then
+         let name = registered registry DefName source in
+         let suffix = if is_choice then "-Request" else "-Config" in
+         Some (source, fresh_name registry.used (name ^ suffix))
+       else
+         None)
+
+
+(* Stage 4: the kind of each relation (section 2 of TRANSLATION_MAP.md) and
+ * the names that kind requires. *)
+
+let classify_relations registry hints relations =
+  List.fold_right
+    (fun (source, mixop) (policies, unsupported) ->
+      let request_sort () =
+        let name = registered registry RelName source in
+        fresh_name registry.used (name ^ "-Request")
+      in
+      let derived suffix =
+        fresh_name registry.used (registered registry RelName source ^ "-" ^ suffix)
+      in
+      match classify_relation hints source mixop request_sort derived with
+      | Ok policy -> (source, policy) :: policies, unsupported
+      | Error reason -> policies, (source, reason) :: unsupported)
+    relations ([], [])
+
+(* One enabled-predicate name per rule of an execution relation, used when
+ * an ElsePr cannot state the negation of an earlier rule directly. *)
+let name_enabled_helpers registry relation_policies defs =
+  defs
+  |> List.concat_map (fun def ->
+       match def.it with
+       | RelD (id, _, _, _, rules) ->
+           begin match List.assoc_opt id.it relation_policies with
+           | Some (Execution _) ->
+               let relation = registered registry RelName id.it in
+               List.mapi
+                 (fun ordinal _ ->
+                   let candidate =
+                     Printf.sprintf "%s-enabled-%d" relation (ordinal + 1)
+                   in
+                   (id.it, ordinal), fresh_name registry.used candidate)
+                 rules
+           | Some (Compute _ | Check _)
+           | None -> []
+           end
+       | TypD _ | DecD _ | GramD _ | HintD _ | RecD _ -> [])
+
+
+(* Stage 5: a definition with a clause that uses an untranslated relation
+ * gets no body. *)
+let unsupported_definitions unsupported_relations defs =
+  let unsupported_relation_names =
+    List.map fst unsupported_relations |> StringSet.of_list
+  in
+  let uses_unsupported clause =
+    let unsupported = ref false in
+    let module Visitor = Il.Iter.Make (struct
+      include Il.Iter.Skip
+      let visit_prem prem =
+        match prem.it with
+        | RulePr (target, _, _, _)
+          when StringSet.mem target.it unsupported_relation_names ->
+            unsupported := true
+        | RulePr _ | IfPr _ | LetPr _ | ElsePr
+        | IterPr _ | NegPr _ -> ()
+    end)
+    in
+    Visitor.clause clause;
+    !unsupported
+  in
+  defs
+  |> List.filter_map (fun def ->
+       match def.it with
+       | DecD (id, _, _, clauses) when List.exists uses_unsupported clauses ->
+           Some id.it
+       | TypD _ | RelD _ | DecD _ | GramD _ | HintD _ | RecD _ -> None)
+  |> StringSet.of_list
+
+
+let scan script =
+  let type_env = Il.Env.env_of_script script in
+  let sort_metadata = Hintd.scan_sorts script in
+  let defs = List.concat_map flatten script in
+  let type_definitions =
+    List.filter_map
+      (fun def ->
+        match def.it with
+        | TypD (id, _, insts) -> Some (id.it, insts)
+        | RelD _ | DecD _ | GramD _ | HintD _ | RecD _ -> None)
+      defs
+  in
+  let definitions =
+    List.filter_map
+      (fun def ->
+        match def.it with
+        | DecD (id, params, result, _) -> Some (id.it, params, result)
+        | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ -> None)
+      defs
+  in
+  let relations =
+    List.filter_map
+      (fun def ->
+        match def.it with
+        | RelD (id, _, mixop, _, _) -> Some (id.it, mixop)
+        | TypD _ | DecD _ | GramD _ | HintD _ | RecD _ -> None)
+      defs
+  in
+  let hints = collect_hints script in
+  let membership_choices = collect_membership_choices defs in
+  let inverses =
     definitions
     |> List.filter_map (fun (source, _, _) ->
-         let is_choice = StringSet.mem source choice_definitions in
-         if has_dec_hint_in hints source "maude_rule" || is_choice then
-           let name = registered_name DefName source in
-           let suffix = if is_choice then "-Request" else "-Config" in
-           Some (source, fresh_name used_names (name ^ suffix))
-         else
-           None)
+         inverse_hint hints source
+         |> Option.map (fun inverse ->
+              source,
+              validate_inverse definitions source inverse))
+  in
+  let registry = register_names hints definitions script in
+  let occurrences = collect_occurrences sort_metadata script in
+  let variables, anonymous_variables =
+    name_variables !(registry.used) occurrences.observed
+  in
+  let iterations = name_iterations registry.used occurrences.found_iterations in
+  let premise_iterations =
+    name_premise_iterations registry.used occurrences.found_premise_iterations
+  in
+  let membership_choices =
+    name_membership_choices registry membership_choices
+  in
+  let rewrite_sorts =
+    name_rewrite_sorts registry hints definitions membership_choices
   in
   let relation_policies, unsupported_relations =
-    List.fold_right
-      (fun (source, mixop) (policies, unsupported) ->
-        let request_sort () =
-          let name = registered_name RelName source in
-          fresh_name used_names (name ^ "-Request")
-        in
-        let derived suffix =
-          fresh_name used_names (registered_name RelName source ^ "-" ^ suffix)
-        in
-        match classify_relation hints source mixop request_sort derived with
-        | Ok policy -> (source, policy) :: policies, unsupported
-        | Error reason -> policies, (source, reason) :: unsupported)
-      relations ([], [])
+    classify_relations registry hints relations
   in
   let execution_input_count source =
     match List.assoc_opt source relation_policies with
@@ -1035,60 +1122,10 @@ let scan script =
   let heatcool = Hintd.scan_heatcool sort_metadata execution_input_count in
   let contexts = Hintd.scan_contexts sort_metadata execution_input_count heatcool in
   let relation_enabled_helpers =
-    let rec collect acc def =
-      match def.it with
-      | RelD (id, _, _, _, rules) ->
-          begin match List.assoc_opt id.it relation_policies with
-          | Some (Execution _) ->
-              let relation = registered_name RelName id.it in
-              List.mapi
-                (fun ordinal _ ->
-                  let candidate =
-                    Printf.sprintf "%s-enabled-%d" relation (ordinal + 1)
-                  in
-                  (id.it, ordinal), fresh_name used_names candidate)
-                rules
-              |> List.rev_append acc
-          | Some (Compute _ | Check _)
-          | None -> acc
-          end
-      | RecD defs -> List.fold_left collect acc defs
-      | TypD _ | DecD _ | GramD _ | HintD _ -> acc
-    in
-    List.fold_left collect [] script |> List.rev
-  in
-  let unsupported_relation_names =
-    List.map fst unsupported_relations |> StringSet.of_list
+    name_enabled_helpers registry relation_policies defs
   in
   let unsupported_definition_names =
-    let names = ref StringSet.empty in
-    let rec visit_def def =
-      match def.it with
-      | DecD (id, _, _, clauses) ->
-          if List.exists
-               (fun clause ->
-                 let unsupported = ref false in
-                 let module Visitor = Il.Iter.Make (struct
-                   include Il.Iter.Skip
-                   let visit_prem prem =
-                     match prem.it with
-                     | RulePr (target, _, _, _)
-                       when StringSet.mem
-                              target.it unsupported_relation_names ->
-                         unsupported := true
-                     | RulePr _ | IfPr _ | LetPr _ | ElsePr
-                     | IterPr _ | NegPr _ -> ()
-                 end)
-                 in
-                 Visitor.clause clause;
-                 !unsupported)
-               clauses
-          then names := StringSet.add id.it !names
-      | RecD defs -> List.iter visit_def defs
-      | TypD _ | RelD _ | GramD _ | HintD _ -> ()
-    in
-    List.iter visit_def script;
-    !names
+    unsupported_definitions unsupported_relations defs
   in
   let definition_bodies =
     definitions
@@ -1129,7 +1166,7 @@ let scan script =
   ; iterations
   ; premise_iterations
   ; hints
-  ; names = List.rev !names
+  ; names = List.rev !(registry.entries)
   ; relation_policies
   ; relation_enabled_helpers
   ; unsupported_relations
@@ -1139,16 +1176,13 @@ let scan script =
   ; type_definitions
   ; variables
   ; anonymous_variables
-  ; type_parameters = !type_parameters
+  ; type_parameters = occurrences.found_type_parameters
   ; inverses
+  ; requests = Hashtbl.create 64
   }
 
 
-let find_name index kind source =
-  List.find_opt
-    (fun (kind', source', _) -> kind = kind' && source = source')
-    index.names
-  |> Option.map (fun (_, _, name) -> name)
+let find_name index kind source = lookup index.names kind source
 
 let name index kind source =
   match find_name index kind source with
@@ -1276,14 +1310,27 @@ let iteration index body =
     (fun (iteration : iteration) -> iteration.body == body)
     index.iterations
 
+let request index name kind = Hashtbl.replace index.requests (name, kind) ()
+let requested index name kind = Hashtbl.mem index.requests (name, kind)
+
+let requested_outputs index name =
+  Hashtbl.fold
+    (fun (name', kind) () positions ->
+      match kind with
+      | OutputHelper position when name' = name -> position :: positions
+      | OutputHelper _ | ForwardHelper | ProjectorHelper | CheckHelper -> positions)
+    index.requests []
+  |> List.sort_uniq compare
+
 let iteration_name index body =
   match iteration index body with
-  | Some iteration -> iteration.forward_requested <- true; iteration.name
+  | Some iteration -> request index iteration.name ForwardHelper; iteration.name
   | None -> invalid_arg "IterE is missing from the prescan index"
 
 let projector_name index body =
   match iteration index body with
-  | Some iteration -> iteration.projector_requested <- true; iteration.projector_name
+  | Some iteration ->
+      request index iteration.name ProjectorHelper; iteration.projector_name
   | None -> invalid_arg "IterE is missing from the prescan index"
 
 let premise_iterations index = index.premise_iterations

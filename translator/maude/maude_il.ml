@@ -179,6 +179,55 @@ let map_statement_variables map = function
         )
 
 
+(* Condition order *)
+
+(* Maude evaluates conditions from left to right, and a matching or rewrite
+ * condition binds the variables of its pattern. Place each condition after
+ * the conditions that bind its variables, otherwise keeping the given order.
+ * Among ready conditions, those selected by [prefer bound] come first. *)
+let condition_ready bound = function
+  | EqCondition (EqCond (left, right)) ->
+      variables_bound bound left && variables_bound bound right
+  | EqCondition (MatchCond (_, subject)) -> variables_bound bound subject
+  | EqCondition (MembershipCond (term, _) | BoolCond term) ->
+      variables_bound bound term
+  | RewriteCond (call, _) -> variables_bound bound call
+
+let schedule_conditions prefer left conditions =
+  let take select bound =
+    let rec take prefix = function
+      | [] -> None
+      | condition :: rest when select condition && condition_ready bound condition ->
+          Some (condition, List.rev_append prefix rest)
+      | condition :: rest -> take (condition :: prefix) rest
+    in
+    take []
+  in
+  let rec schedule bound ordered pending =
+    match pending with
+    | [] -> List.rev ordered
+    | _ ->
+        let selected =
+          match take (prefer bound) bound pending with
+          | Some selected -> Some selected
+          | None -> take (fun _ -> true) bound pending
+        in
+        begin match selected with
+        | None -> invalid_arg "conditions have unresolved dependencies"
+        | Some (EqCondition (MatchCond (pattern, subject)), pending)
+          when variables_bound bound pattern ->
+            schedule bound (EqCondition (EqCond (pattern, subject)) :: ordered) pending
+        | Some ((EqCondition (MatchCond (pattern, _)) | RewriteCond (_, pattern)
+                 as condition), pending) ->
+            schedule (term_variables bound pattern) (condition :: ordered) pending
+        | Some ((EqCondition (EqCond _ | MembershipCond _ | BoolCond _)
+                 as condition), pending) ->
+            schedule bound (condition :: ordered) pending
+        end
+  in
+  schedule (term_variables [] left) [] conditions
+
+
 (* Maude module expressions *)
 
 type renaming =

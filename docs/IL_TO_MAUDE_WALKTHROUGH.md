@@ -203,7 +203,7 @@ inverse : known-args, result       → missing-arg
 | --- | --- |
 | `Decd.prepare_clauses` | 함수 하나의 head들을 비교해 overlap·이미 확보된 타입 정보를 판단 |
 | `Reld.lower_execution_rules` | relation 규칙의 source 순서를 따라 `otherwise` 선행 후보를 구성 |
-| `Context_rules`의 capture 분석 | 실행 premise 뒤에 필요한 변수만 hole에 저장 |
+| `Heatcool`의 capture 분석 | 실행 premise 뒤에 필요한 변수만 hole에 저장 |
 | `Iter.translate_all`, `translate_premise_all` | 번역 중 요청된 helper 본문 생성 |
 | `Def.normalize_module` | 생성 변수 이름 정리, 선언·조건 중복 정리, 호환 constructor 선언 통합 |
 
@@ -777,7 +777,7 @@ eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
 
 `Z`를 `hole-Step-pure-1`에 보관하고 내부 `Step-pure`를 실행한다. 결과가 나오면 보관한 `Z`와 다시 합친다. `identifyPure`는 실행 후보를 찾는 조건이며, 실제 내부 실행이 성공했는지 미리 증명하는 검사는 아니다.
 
-코드: `Def.translate_script → Reld.translate_contexts → Context_rules`. 목록 context와 여러 실행 premise를 처리하는 세부 분기는 4.5절에 있다.
+코드: `Def.translate_script → Heatcool.translate`. 목록 context와 여러 실행 premise를 처리하는 세부 분기는 4.5절에 있다.
 
 **지원 경계:** 위 policy로 분류되지 않은 relation은 현재 `Reld.translate`에서 생략된다. 그 relation을 premise에서 요구하면 오류가 날 수 있다. 이를 자동 번역 성공으로 세지 않는다(5.5절).
 
@@ -1770,7 +1770,7 @@ match inverse_contract env f with
 
 ## 4.5 `k_heatcool`: 실행 premise를 continuation으로 변환
 
-구현은 [reld.ml](../translator/reld.ml)의 `Context_rules`다. 계약과 전체 8개 예제는 [TRANSLATION.md](TRANSLATION.md#k_heatcool-8개-rule의-변환-예시)에 있고, 여기서는 구조를 이해할 대표 예제를 설명한다.
+구현은 [heatcool.ml](../translator/heatcool.ml)이다. 계약과 전체 8개 예제는 [TRANSLATION.md](TRANSLATION.md#k_heatcool-8개-rule의-변환-예시)에 있고, 여기서는 구조를 이해할 대표 예제를 설명한다.
 
 실제 큰 분기는 두 개다. H3–H5는 내부 실행을 차례로 연결하는 일반 `heatcool_rule` 경로이고, H6는 목록을 앞부분·실행할 부분·뒷부분으로 나누는 `context_transitions` 경로다. H3–H5의 실행 premise 개수나 중첩 모양마다 별도 translator가 있는 것은 아니다.
 

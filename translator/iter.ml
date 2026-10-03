@@ -390,7 +390,7 @@ let translate_projector_statements index translate_pattern can_bind_body bind_bo
   let body = iteration.Prescan.body in
   let iter, generators = iteration.Prescan.iterexp in
   let local_bound = projector_local_bound iteration.Prescan.captures iter in
-  if not (iteration.Prescan.projector_requested
+  if not (Prescan.requested index iteration.Prescan.name ProjectorHelper
           && projector_supported index translate_pattern can_bind_body
                local_bound body (iter, generators))
   then [] else
@@ -674,7 +674,7 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
   | Some _ -> []
   | None ->
       let forward =
-        if not iteration.Prescan.forward_requested then [] else
+        if not (Prescan.requested index name ForwardHelper) then [] else
         match iter, generators with
         | (Opt | ListN (_, None)), [] ->
             []
@@ -794,6 +794,25 @@ let translate_statements index translate_pattern can_bind_body bind_body transla
 
 (* Whole-script helper materialization *)
 
+(* Generating a helper body can request another helper, including one that
+ * was already visited. Regenerate until no helper received a request after
+ * it was visited. [status] reads the requests of one helper. *)
+let generate_requested status add helpers =
+  let rec generate () =
+    let visited = ref [] in
+    let groups =
+      List.fold_left
+        (fun groups helper ->
+          visited := (helper, status helper) :: !visited;
+          add groups helper)
+        [] helpers
+    in
+    if List.exists (fun (helper, before) -> before <> status helper) !visited
+    then generate ()
+    else List.concat_map snd (List.rev groups)
+  in
+  generate ()
+
 let helper_key = function
   | OpDecl declaration :: _ ->
       declaration.name, declaration.domain, declaration.codomain
@@ -803,11 +822,7 @@ let helper_key = function
       invalid_arg "an iteration helper must start with an operator declaration"
 
 let translate_all translate_pattern can_bind_body bind_body translate_exp index =
-  let emitted = ref [] in
   let add groups iteration =
-    emitted :=
-      (iteration, iteration.Prescan.forward_requested,
-       iteration.Prescan.projector_requested) :: !emitted;
     let statements =
       translate_statements index translate_pattern can_bind_body bind_body
         translate_exp iteration
@@ -828,21 +843,11 @@ let translate_all translate_pattern can_bind_body bind_body translate_exp index 
                ^ iteration.Prescan.name)
         end
   in
-  (* Shared AST bodies can receive another direction request from a later
-     parent. Revisit only if a request arrived after its body was emitted. *)
-  let rec generate () =
-    emitted := [];
-    let groups = List.fold_left add [] (Prescan.iterations index) in
-    let changed =
-      List.exists
-        (fun (iteration, forward, projector) ->
-          forward <> iteration.Prescan.forward_requested
-          || projector <> iteration.Prescan.projector_requested)
-        !emitted
-    in
-    if changed then generate () else List.concat_map snd (List.rev groups)
+  let status (iteration : Prescan.iteration) =
+    Prescan.requested index iteration.name ForwardHelper,
+    Prescan.requested index iteration.name ProjectorHelper
   in
-  generate ()
+  generate_requested status add (Prescan.iterations index)
 
 
 (* Premise iteration *)
@@ -855,16 +860,13 @@ let premise_output_name iteration position =
 let premise_output_tail_name iteration position =
   snd (List.nth iteration.Prescan.output_names position)
 
-let remove_at position items =
-  List.filteri (fun index _ -> index <> position) items
-
 let premise_output_possible iteration position =
   let iter, generators = iteration.Prescan.iterexp in
   position >= 0 && position < List.length generators
   && match iter with ListN _ -> true | _ -> List.length generators > 1
 
 let premise_helper_call index translate_exp iteration =
-  iteration.Prescan.check_requested <- true;
+  Prescan.request index iteration.Prescan.name CheckHelper;
   let iter, generators = iteration.Prescan.iterexp in
   let captures =
     translate_captures index iteration.Prescan.captures
@@ -881,7 +883,7 @@ let premise_output_call index translate_exp iteration position =
     |> terms_of_variables
   in
   let sources =
-    generators |> remove_at position
+    generators |> Prescan.remove_at position
     |> List.map (fun (_, source) -> translate_exp source)
   in
   app (premise_output_name iteration position)
@@ -904,7 +906,7 @@ let equation left right conditions =
   | [] -> Eq (left, right, [])
   | _ -> Ceq (left, right, conditions, [])
 
-let premise_local_names ?without iteration =
+let premise_local_names without iteration =
   let iter, generators = iteration.Prescan.iterexp in
   let indexes =
     match iter with
@@ -922,10 +924,10 @@ let premise_local_names ?without iteration =
         if Some position = without then None else Some id.it)
       (List.mapi (fun position generator -> position, generator) generators)
 
-let premise_conditions translate_body ?without iteration =
+let premise_conditions translate_body without iteration =
   let conditions, otherwise, bound =
     translate_body (Option.is_none without) iteration
-      (premise_local_names ?without iteration) iteration.Prescan.body
+      (premise_local_names without iteration) iteration.Prescan.body
   in
   if otherwise then invalid_arg "IterPr body cannot contain ElsePr";
   ( List.map
@@ -967,7 +969,7 @@ let translate_premise_statements index translate_body
         let _, source = generator in
         premise_output_name iteration position,
         premise_output_tail_name iteration position,
-        remove_at position all_generators,
+        Prescan.remove_at position all_generators,
         Some (generator, head_variable index generator),
         Prescan.sort_of_typ index source.note, Some position
   in
@@ -984,7 +986,7 @@ let translate_premise_statements index translate_body
     premise_helper_arguments captures count index sources
   in
   let conditions, bound =
-    premise_conditions translate_body ?without iteration
+    premise_conditions translate_body without iteration
   in
   begin match output with
   | Some ((id, _), _) when not (Il.Free.Set.mem id.it bound) ->
@@ -1064,26 +1066,18 @@ let translate_premise_statements index translate_body
       [declaration; base (Some (Const "0"))
          (Option.map term_of_variable iter_index); step]
 
-let translate_premise_all translate_body index outputs =
-  let emitted = ref [] in
+let translate_premise_all translate_body index =
   let add groups iteration =
-    emitted := (iteration, iteration.Prescan.check_requested) :: !emitted;
-    let output_positions =
-      outputs
-      |> List.filter_map (fun (requested_name, position) ->
-           if requested_name = iteration.Prescan.name
-           then Some position else None)
-      |> List.sort_uniq compare
-    in
+    let name = iteration.Prescan.name in
     let statements =
-      (if iteration.Prescan.check_requested
+      (if Prescan.requested index name CheckHelper
        then [translate_premise_statements index translate_body iteration Check]
        else [])
       @ List.map
            (fun position ->
              translate_premise_statements index translate_body iteration
                (Collect position))
-           output_positions
+           (Prescan.requested_outputs index name)
     in
     List.fold_left
       (fun groups statements ->
@@ -1096,15 +1090,7 @@ let translate_premise_all translate_body index outputs =
             invalid_arg ("conflicting IterPr overload named " ^ name))
       groups statements
   in
-  let rec generate () =
-    emitted := [];
-    let groups = List.fold_left add [] (Prescan.premise_iterations index) in
-    let changed =
-      List.exists
-        (fun (iteration, checked) ->
-          checked <> iteration.Prescan.check_requested)
-        !emitted
-    in
-    if changed then generate () else List.concat_map snd (List.rev groups)
+  let status (iteration : Prescan.premise_iteration) =
+    Prescan.requested index iteration.name CheckHelper
   in
-  generate ()
+  generate_requested status add (Prescan.premise_iterations index)
