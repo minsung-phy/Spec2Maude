@@ -564,6 +564,14 @@ let assume_script script =
 let translate_script script =
   let script = specialize_script (assume_script script) in
   let index = Prescan.scan script in
+  (* Relations without a supported policy are omitted; a call to one is
+     rejected later, but an unreferenced one would vanish silently. *)
+  begin match index.Prescan.unsupported_relations with
+  | [] -> ()
+  | relations ->
+      Printf.eprintf "[spec2maude] warning: relations not translated: %s\n"
+        (String.concat ", " (List.map fst relations))
+  end;
   let sort_metadata = Prescan.sort_metadata index in
   let output_requests = ref [] in
   let request_output iteration position =
