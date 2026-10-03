@@ -9,10 +9,13 @@ the paper, or to check how a constructor is handled.
 - Translator: [`translator/`](../translator/). Each file is named after the IL
   syntactic category it translates (`typd.ml` for `TypD`, `decd.ml` for
   `DecD`, `reld.ml` for `RelD`, `prem.ml` for premises, `term.ml` for
-  expressions and types). A lowering selected by a hint rather than by an IL
-  constructor has its own file (`heatcool.ml` for `hint(k_heatcool)`).
+  expressions and types, `iter.ml` for iterations). A lowering selected by a
+  hint rather than by an IL constructor has its own file (`heatcool.ml` for
+  `hint(k_heatcool)`). Generated iteration helpers are in `iter_helpers.ml`,
+  and the reordering of Maude conditions is in one section of
+  `maude/maude_il.ml`.
 - Code locations are given as `file:function`. They describe the working tree
-  of 2026-10-03, which is commit `2f03724` with uncommitted changes.
+  of 2026-10-03, which is commit `934a822` with uncommitted changes.
 - Cases that the translator rejects or omits are listed in section 8.
 
 ## Notation
@@ -80,8 +83,9 @@ into inputs `ins` and outputs `outs`.
 | Check | `hint(maude_check)` | `op r̂ : S(e) ~> Bool .` | `ceq r̂(⟦e⟧) = true if ⟦prs⟧ .` | `reld.ml:translate_rule` |
 
 A relation that matches none of these kinds is not translated (section 8).
-The rules of an execution relation that have `hint(k_heatcool)` are
-translated by `heatcool.ml`, not by `reld.ml` (see below).
+For each relation, `def.ml:translate` calls `reld.ml:translate` for the
+rules without `hint(k_heatcool)` and then `heatcool.ml:translate_relation`
+for the rules with it (see below).
 
 ### `ElsePr` in execution relations
 
@@ -96,6 +100,12 @@ predicate `r̂-enabled-k` instead. That predicate is defined by the earlier
 rule's conditions and an `[owise]` equation that returns `false`
 (`reld.ml:helper_statements`).
 
+| Stage | What must hold for the translation to keep the meaning | Code |
+| --- | --- | --- |
+| 1. Skip earlier rules that cannot match | A rule is skipped only if its input patterns cannot match the same input. When the analysis is unsure, the rule is kept. | `reld.ml:source_overlap`, `reld.ml:inputs_may_overlap` |
+| 2. Negate the conditions of an earlier rule | The negation is exact. A comparison is negated by its dual only if it is total (numbers, `==`, `=/=`); any other condition `b` becomes `b =/= true`, which also holds when `b` is undefined. A matching condition is shared only if its pattern has a unique decomposition. | `reld.ml:direct_complement`, `reld.ml:negate_comparison`, `reld.ml:unique_match_pattern` |
+| 3. Fall back to `r̂-enabled-k` | `r̂-enabled-k(ins)` is `true` exactly when the earlier rule's conditions hold. An earlier rule with a rewrite condition cannot be used this way and is rejected. | `reld.ml:helper_statements` |
+
 Rules with `hint(k_heatcool)` are not counted as earlier rules. In the
 WebAssembly specification, no relation has both (`ElsePr` occurs only in
 `Step_pure` and `Step_read`; `k_heatcool` only in `Step`, `Steps`, and
@@ -106,8 +116,33 @@ WebAssembly specification, no relation has both (`ElsePr` occurs only in
 | Hint | Meaning | Code |
 | --- | --- | --- |
 | `hint(maude_subsume)` on a rule of a computed relation | The rule defines a separate check operator. A premise whose outputs are already known calls this check (section 3). | `reld.ml:translate` |
-| `hint(maude_trans "C" …)` on a transitivity rule of a checked relation | The middle value ranges over the listed constructors. | `reld.ml:translate_trans` |
-| `hint(k_heatcool)` on a rule with an execution premise | The rule is translated into heating and cooling rewrite rules that keep the order of its premises. | `heatcool.ml:translate` |
+| `hint(maude_trans "C" …)` on a transitivity rule of a checked relation | The other rules are emitted under a separate operator `r̂-step`, and `ceq r̂(xs) = true if r̂-step(xs)` links the two. The transitivity rule becomes `ceq r̂(x, z) = true if y` ranges over the listed constructors `∧ y =/= z ∧ y =/= x ∧ r̂-step(x, y) ∧ r̂(y, z)`. | `reld.ml:translate_trans`, `reld.ml:step_bridge` |
+| `hint(k_heatcool)` on a rule with an execution premise | See "Rules with `hint(k_heatcool)`" below. | `heatcool.ml:translate_relation` |
+
+### Rules with `hint(k_heatcool)`
+
+Such a rule `r̂(ins) => outs` has execution premises `inner(ins') => outs'`.
+It is translated so that the inner step is taken by rewriting, and the
+remaining premises are evaluated after it returns. The premises keep their
+source order.
+
+| Statement | Maude | Code |
+| --- | --- | --- |
+| Heating (first execution premise) | `crl [heating-r] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r-1(C) if ⟦earlier premises⟧ .` `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
+| Heating guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧) => identified-inner`, where `identifyInner` has one `rl` per rule of the inner relation, matching that rule's input pattern. Heating applies only to an input that some inner rule can match. | `heatcool.ml:heatcool_rule` |
+| Next execution premise | `eq ⟦outs'⟧ ~> hole-r-k(C) = inner2(⟦ins''⟧) ~> hole-r-(k+1)(C') .` | `heatcool.ml:heatcool_rule` |
+| Cooling (after the last execution premise) | `eq ⟦outs'⟧ ~> hole-r-n(C) = ⟦outs⟧ .`, with the remaining premises as conditions | `heatcool.ml:heatcool_rule` |
+
+A context rule (a rule whose execution premise steps a part of the
+instruction sequence, such as `Step/ctxt-instrs`) is translated differently.
+`identifyFocus` finds the instruction to step and splits the sequence into
+`PREFIX`, focus, and `POSTFIX`. It has one `rl [focus-…]` for each rule of
+the relations that can step a focus. Heating is
+`crl [heating-ctxt-…] : r̂(c) => r̂(focus) ~> hole(PREFIX, POSTFIX) if identifyFocus(…) => { PREFIX | focus | POSTFIX } …`,
+and cooling puts the result back between `PREFIX` and `POSTFIX`
+(`heatcool.ml:translate_pattern`, `heatcool.ml:context_transitions`). Which
+rules are context rules, and their focus patterns, is decided before
+translation (`hintd.ml:scan_contexts`, `hintd.ml:scan_heatcool`).
 
 ## 3. Premises
 
@@ -134,17 +169,17 @@ it is rejected if an earlier premise is still waiting. A call of a
 
 ### `IfPr e`
 
-`prem.ml:translate_ifpr` tries these cases in order and uses the first that
-applies.
+`prem.ml:classify_ifpr` tries these cases in order and returns the first
+that applies; `prem.ml:translate_ifpr` then translates that case.
 
 | Shape of `e` | Maude condition |
 | --- | --- |
 | `f(args) = e'` or `e' = f(args)`, `f` has `hint(maude_rule)` | `f̂(⟦args⟧) => ⟦e'⟧` (`e'` may be a pattern) |
 | a call of a `maude_rule` function anywhere else in `e` | rejected |
 | `x <- es`, `es` not yet bound | wait |
-| `x <- es`, `x` unbound, where choice is enabled (`bind_membership`: execution rules and their `IterPr` bodies) | `PREFIX ⟦x⟧ SUFFIX := ⟦es⟧`: any element can be chosen; rejected elsewhere |
+| `x <- es`, `x` unbound, where choice is enabled (`bind_membership`: execution rules, the check helpers of their `IterPr`s, and `k_heatcool` focus patterns) | `PREFIX ⟦x⟧ SUFFIX := ⟦es⟧`: any element can be chosen; rejected elsewhere |
 | `e1 ∧ e2`, not all variables bound | `⟦IfPr e1⟧` and `⟦IfPr e2⟧`, in the order in which their variables become bound |
-| `f(args) = e'`, one argument unbound, `e'` known, `f` has `hint(inverse g)` | the argument as a pattern for `ĝ(…, ⟦e'⟧)`, then `⟦e⟧` |
+| `f(args) = e'` or `e' = f(args)`, an argument unbound, `e'` known | if `f` has `hint(inverse g)`: the argument as a pattern for `ĝ(…, ⟦e'⟧)`, then `⟦e⟧`; otherwise wait |
 | `p = e'` or `e' = p`, `p` has unbound variables, `e'` known | `p` as a pattern for `⟦e'⟧` (below) |
 | all variables bound | `⟦e⟧` |
 | otherwise | wait |
@@ -223,7 +258,7 @@ other expressions are handled by `term.ml:translate_value`.
 | `TupT fields` | one component for each field | `term.ml:translate_components` |
 | `IterT t Opt` / `IterT t List`, as a type argument | `iterOpt(⟦t⟧)` / `iterList(⟦t⟧)` | `term.ml:translate_check_typ` |
 | `IterT t iter`, as a sort | the sort of the sequence or option of `t` | `term.ml:translate_sort` |
-| `ExpA e` / `TypA t` | `⟦e⟧` / `⟦t⟧` | `term.ml:translate_arg` |
+| `ExpA e` / `TypA t` | `⟦e⟧` / `⟦t⟧` after expanding type aliases | `term.ml:translate_arg`, `term.ml:translate_check_typ` |
 | `ExpP x t` / `TypP x` | variable of sort `S(t)` / of sort `SpectecType` | `param.ml` |
 | `DefP`, `DefA` | removed before translation: each call with a function argument uses a copy of the definition specialized to that function | `decd.ml:specialize` |
 
@@ -256,19 +291,21 @@ the iteration names an index variable.
 
 | Helper | Code |
 | --- | --- |
-| `IterE`: compute the sequence | `iter.ml:translate_statements` |
-| `IterE` used as a pattern: recover the sequence of each variable | `iter.ml:translate_projector_statements` |
-| `IterPr`: check every element, or compute one unbound generator sequence | `iter.ml:translate_premise_statements` |
+| `IterE`: compute the sequence | `iter_helpers.ml:translate_statements` |
+| `IterE` used as a pattern: recover the sequence of each variable | `iter_helpers.ml:translate_projector_statements` |
+| `IterPr`: check every element, or compute one unbound generator sequence | `iter_helpers.ml:translate_premise_statements` |
 
 A helper is generated only if a translated term or condition calls it. The
 call is recorded in a request table (`prescan.ml:request`) by the function
-that returns the helper's name (`prescan.ml:iteration_name`,
-`prescan.ml:projector_name`, `iter.ml:premise_helper_call`) or by
+that emits the call (`iter.ml:request_helper`,
+`iter.ml:premise_helper_call`) or by
 `prem.ml:translate_barrier` for an `IterPr` output. An `IterE` is identified
 by its AST node, so the name lookup compares nodes physically. After all
 definitions are translated, the requested helpers are generated
-(`iter.ml:generate_requested`). Because a helper body can call another
-helper, generation repeats until no new request appears. An `IterPr` that
+(`iter_helpers.ml:generate_requested`). Because a helper body can call another
+helper, generation repeats until no visited helper receives a new request.
+Requests for `IterPr` outputs come only from relation rules, which are all
+translated before generation starts. An `IterPr` that
 computes an unbound sequence is supported only in relation rules
 (`collect_outputs` in `prem.ml:translate_all`).
 
@@ -279,9 +316,10 @@ computes an unbound sequence is supported only in relation rules
 | Before translation | Remove the premises named by `hint(maude_assume)`, and the quantifiers whose variables occurred only in those premises | `def.ml:assume_script` |
 | Before translation | Remove `DefP`/`DefA` (section 5) | `def.ml:specialize_script` |
 | Before translation | Choose Maude names; collect variables, iterations, relation kinds, and hints | `prescan.ml:scan` |
-| Condition order | Place each condition after the conditions that bind its variables. Among ready conditions, relation rules take equational conditions before rewrite conditions, and function clauses take conditions that bind nothing before conditions that bind variables. Otherwise the order of the premises is kept. | `maude_il.ml:schedule_conditions`, `reld.ml:schedule_rule_conditions`, `decd.ml:schedule_equation_conditions` |
-| Condition order, execution rules | The `typecheck` guards of the rule's inputs come first | `reld.ml:execution_statement` |
-| After translation | Remove repeated conditions, including an equality that repeats an earlier match or equality in either order | `def.ml:simplify_conditions` |
+| Type guards | A variable of a quantifier or parameter gets a condition `typecheck(X, ⟦t⟧)`, unless its type is already established: by a premise that binds it from a relation call, or by the declared types of the rule's inputs. A guard of an earlier rule's `r̂-enabled-k` predicate is also dropped when every caller already checks it. This assumes that relation calls and inputs only produce values of their declared types. | `param.ml:translate_eq_conditions` (`proven`), `term.ml:with_relation_types`, `term.ml:translate_guard_conditions`, `reld.ml:helper_statements` |
+| Condition order | Place each condition after the conditions that bind its variables. Among ready conditions, relation rules take equational conditions before rewrite conditions, and function clauses take conditions that bind nothing before conditions that bind variables. Otherwise the order of the premises is kept. | `maude_il.ml:schedule_conditions`, `maude_il.ml:schedule_rule_conditions`, `maude_il.ml:schedule_equation_conditions` |
+| Condition order, execution rules | The `typecheck` guards of the rule's inputs come first | `maude_il.ml:schedule_execution_conditions` |
+| After translation | Remove repeated conditions, including an equality that repeats an earlier match or equality in either order | `maude_il.ml:simplify_conditions` |
 | After translation | Declare variables and put declarations first | `def.ml:normalize_module` |
 | Sequence support | List sorts and operations selected by `hint(maude_sort)` | `typd.ml:Lists` |
 
@@ -295,8 +333,10 @@ computes an unbound sequence is supported only in relation rules
 | `maude_assume` | `RuleD` and `DecD` | 7 |
 | `maude_sort`, `maude_subsort`, `maude_proper` | `TypD` | 7 |
 
-Other hints (for example, the documentation hints `name`, `macro`, and
-`tabular`) are ignored.
+Hints arrive as `HintD` definitions (`TypH`, `RelH`, `DecH`, `RuleH`) and
+are collected by `prescan.ml:collect_hints`. Other hints (for example, the
+documentation hints `name`, `macro`, and `tabular`, and every `GramH`) are
+ignored.
 
 ## 8. Cases that are rejected or omitted
 
@@ -315,6 +355,8 @@ definition and the reason. An omitted case produces no Maude output.
 | `IterT t +` and `IterT t ^n` as a type argument | rejected | `term.ml:translate_check_typ` |
 | `ElsePr` in a `maude_rule` function, or not as the first premise of an execution rule | rejected | `decd.ml:translate_rule_clause`, `reld.ml:lower_execution_rule` |
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
+| `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |
+| `ElsePr`, `IterPr`, or `NegPr` in a `k_heatcool` rule, and `k_heatcool` rules whose shape does not fit section 2 | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
 | An `ElsePr` execution rule whose earlier rule needs an `r̂-enabled-k` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
 | A call of a `maude_rule` function from a function without `maude_rule`, or in an argument or result of a `maude_rule` clause | rejected | `decd.ml:translate_equation_clause`, `decd.ml:translate_rule_clause` |
 | `ElsePr` or a `maude_rule` call in the premises before a membership choice | rejected | `decd.ml:translate_choice_clause` |

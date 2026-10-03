@@ -94,13 +94,6 @@ let has_else prems =
   Visitor.list Visitor.prem prems;
   !found
 
-(* Equational conditions are evaluated before rewrite conditions when both
- * are ready. *)
-let schedule_rule_conditions =
-  schedule_conditions (fun _ -> function
-    | EqCondition _ -> true
-    | RewriteCond _ -> false)
-
 let eq_conditions conditions =
   List.map
     (function
@@ -205,6 +198,22 @@ let translate_rule ~head index id params policy rule =
   | [] -> Eq (body.left, right, [])
   | conditions -> Ceq (body.left, right, conditions, [])
 
+
+(* Execution relations and ElsePr
+
+   A rule of an execution relation becomes a rewrite rule (crl). A rule
+   whose first premise is ElsePr applies only if no earlier rule of the
+   relation applies. This is stated directly in its conditions, in three
+   steps:
+
+   1. Earlier rules that cannot match the same input are skipped
+      (source_overlap on the source patterns, inputs_may_overlap on the
+      Maude patterns).
+   2. For each remaining earlier rule, the negation of its conditions is
+      added as a Boolean condition (direct_complement, negate_comparison).
+   3. If that negation cannot be written, the rule uses a generated
+      predicate r-enabled-k, defined by the earlier rule's conditions and an
+      [owise] equation that returns false (helper_statements). *)
 
 type execution_rule =
   { ordinal : int
@@ -678,20 +687,12 @@ let lower_execution_rule index id params policy
   }
 
 let execution_statement rule =
-  (* A helper may rely on the caller's domain. Check those automatic guards
-   * before invoking it, not merely somewhere in the same conjunction. *)
   let guards =
     List.filter
       (function EqCondition (BoolCond (App ("typecheck", _))) -> true | _ -> false)
       rule.guard_conditions
   in
-  let conditions =
-    guards
-    @ List.filter
-        (fun condition -> not (List.exists (same_condition condition) guards))
-        rule.conditions
-    |> schedule_rule_conditions rule.left
-  in
+  let conditions = schedule_execution_conditions guards rule.left rule.conditions in
   match conditions with
   | [] -> Rl (None, rule.left, rule.right)
   | conditions -> Crl (None, rule.left, rule.right, conditions)

@@ -181,7 +181,12 @@ let map_statement_variables map = function
 
 (* Condition order *)
 
-(* Maude evaluates conditions from left to right, and a matching or rewrite
+(* Premises are translated in source order (Prem). The functions below
+ * reorder the resulting Maude conditions: a condition moves after the
+ * conditions that bind its variables, and some ready conditions are
+ * preferred over others. The last ones drop repeated conditions.
+ *
+ * Maude evaluates conditions from left to right, and a matching or rewrite
  * condition binds the variables of its pattern. Place each condition after
  * the conditions that bind its variables, otherwise keeping the given order.
  * Among ready conditions, those selected by [prefer bound] come first. *)
@@ -226,6 +231,85 @@ let schedule_conditions prefer left conditions =
         end
   in
   schedule (term_variables [] left) [] conditions
+
+(* Relation rules: equational conditions are evaluated before rewrite
+ * conditions when both are ready. *)
+let schedule_rule_conditions =
+  schedule_conditions (fun _ -> function
+    | EqCondition _ -> true
+    | RewriteCond _ -> false)
+
+(* Function clauses: ready guards are checked before a condition that binds
+ * new variables, so a deferred result pattern is constructed only after its
+ * guards hold. *)
+let schedule_equation_conditions left conditions =
+  let binds bound = function
+    | EqCondition (MatchCond (pattern, _)) -> not (variables_bound bound pattern)
+    | EqCondition (EqCond _ | MembershipCond _ | BoolCond _) | RewriteCond _ -> false
+  in
+  conditions
+  |> List.map (fun condition -> EqCondition condition)
+  |> schedule_conditions (fun bound condition -> not (binds bound condition)) left
+  |> List.map (function
+       | EqCondition condition -> condition
+       | RewriteCond _ -> invalid_arg "an equation cannot use a rewrite condition")
+
+(* Execution rules: the type guards of the inputs come first, because a
+ * helper called by a later condition may rely on the input's type. *)
+let schedule_execution_conditions guards left conditions =
+  guards @ List.filter (fun condition -> not (List.mem condition guards)) conditions
+  |> schedule_rule_conditions left
+
+(* After variable names are fixed, a condition that repeats an earlier one is
+ * removed. An equality that repeats an earlier match or equality, in either
+ * order, is also removed: the earlier condition already established it. *)
+let deduplicate values =
+  let seen = Hashtbl.create 32 in
+  let keep value =
+    if Hashtbl.mem seen value then false
+    else begin
+      Hashtbl.add seen value ();
+      true
+    end
+  in
+  List.filter keep values
+
+let simplify_conditions equation conditions =
+  let equalities = ref [] in
+  let keep condition =
+    match equation condition with
+    | Some (MatchCond (pattern, subject)) ->
+        equalities := (pattern, subject) :: !equalities;
+        true
+    | Some (EqCond (left, right)) ->
+        (* A preceding successful match or equality establishes either order. *)
+        let redundant =
+          List.exists
+            (fun (first, second) ->
+              (left = first && right = second)
+              || (left = second && right = first))
+            !equalities
+        in
+        if not redundant then equalities := (left, right) :: !equalities;
+        not redundant
+    | Some (MembershipCond _ | BoolCond _) | None -> true
+  in
+  List.filter keep (deduplicate conditions)
+
+let deduplicate_conditions = function
+  | Cmb (term, sort, conditions) ->
+      Cmb (term, sort, simplify_conditions Option.some conditions)
+  | Ceq (left, right, conditions, attrs) ->
+      Ceq (left, right, simplify_conditions Option.some conditions, attrs)
+  | Crl (label, left, right, conditions) ->
+      let equation = function
+        | EqCondition condition -> Some condition
+        | RewriteCond _ -> None
+      in
+      Crl (label, left, right, simplify_conditions equation conditions)
+  | (SortDecl _ | SubsortDecl _ | VarDecl _ | OpDecl _
+    | Mb _ | Eq _ | Rl _) as statement ->
+      statement
 
 
 (* Maude module expressions *)

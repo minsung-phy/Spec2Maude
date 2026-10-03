@@ -4,54 +4,6 @@ open Maude_il
 
 module StringSet = Set.Make (String)
 
-let deduplicate values =
-  let seen = Hashtbl.create 32 in
-  let keep value =
-    if Hashtbl.mem seen value then false
-    else begin
-      Hashtbl.add seen value ();
-      true
-    end
-  in
-  List.filter keep values
-
-let simplify_conditions equation conditions =
-  let equalities = ref [] in
-  let keep condition =
-    match equation condition with
-    | Some (MatchCond (pattern, subject)) ->
-        equalities := (pattern, subject) :: !equalities;
-        true
-    | Some (EqCond (left, right)) ->
-        (* A preceding successful match or equality establishes either order. *)
-        let redundant =
-          List.exists
-            (fun (first, second) ->
-              (left = first && right = second)
-              || (left = second && right = first))
-            !equalities
-        in
-        if not redundant then equalities := (left, right) :: !equalities;
-        not redundant
-    | Some (MembershipCond _ | BoolCond _) | None -> true
-  in
-  List.filter keep (deduplicate conditions)
-
-let deduplicate_conditions = function
-  | Cmb (term, sort, conditions) ->
-      Cmb (term, sort, simplify_conditions Option.some conditions)
-  | Ceq (left, right, conditions, attrs) ->
-      Ceq (left, right, simplify_conditions Option.some conditions, attrs)
-  | Crl (label, left, right, conditions) ->
-      let equation = function
-        | EqCondition condition -> Some condition
-        | RewriteCond _ -> None
-      in
-      Crl (label, left, right, simplify_conditions equation conditions)
-  | (SortDecl _ | SubsortDecl _ | VarDecl _ | OpDecl _
-    | Mb _ | Eq _ | Rl _) as statement ->
-      statement
-
 let normalize_constructor_declarations statements =
   let declarations = Hashtbl.create 64 in
   let keep = function
@@ -218,7 +170,9 @@ let rec translate index def =
     | TypD (id, params, insts) -> Typd.translate index id params insts
     | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
     | RelD (id, params, mixop, typ, rules) ->
+        (* Rules with hint(k_heatcool) are left to Heatcool. *)
         Reld.translate index id params mixop typ rules
+        @ Heatcool.translate_relation index id
     | GramD _ | HintD _ -> []
     | RecD defs -> List.concat_map (translate index) defs
   with Invalid_argument reason ->
@@ -566,45 +520,19 @@ let translate_script script =
         (String.concat ", " (List.map fst relations))
   end;
   let sort_metadata = Prescan.sort_metadata index in
-  let context_rules = Heatcool.translate index in
   let translated_definitions =
     List.concat_map (translate index) script
   in
-  let premise_iterations =
-    let translate_body allow_membership iteration bound body =
-      let bind_membership =
-        allow_membership
-        && Prescan.premise_iteration_binds_membership index iteration
-      in
-      let result =
-        Prem.translate_all index ~bound ~bind_membership ~collect_outputs:false [body]
-      in
-      result.conditions, result.otherwise, result.bound
-    in
-    Iter.translate_premise_all translate_body index
-  in
+  let premise_iterations = Iter_helpers.translate_premise_all index in
   let typed_list_support = Typd.list_statements sort_metadata in
   let list_statements =
     normalize_module ~constructors:false [] typed_list_support
   in
   let generated_statements =
     Typd.list_generated_statements sort_metadata
-    @ context_rules @ translated_definitions
+    @ translated_definitions
   in
-  let iterations =
-    let bind_body bound body subject =
-      let result =
-        Prem.bind_pattern index bound body subject
-          "computed IterE body is not invertible"
-      in
-      result.conditions, result.bound
-    in
-    Iter.translate_all
-      (Prem.translate_pattern_parts index)
-      (Prem.can_bind_computed_pattern index)
-      bind_body
-      (Term.translate_exp index) index
-  in
+  let iterations = Iter_helpers.translate_all index in
   let generated_statements =
     generated_statements
     @ iterations @ premise_iterations

@@ -95,20 +95,6 @@ let translate_head index id args =
   ; bound
   }
 
-(* Ready guards are checked before a condition that binds new variables, so
- * a deferred result pattern is constructed only after its guards hold. *)
-let schedule_equation_conditions left conditions =
-  let binds bound = function
-    | EqCondition (MatchCond (pattern, _)) -> not (variables_bound bound pattern)
-    | EqCondition (EqCond _ | MembershipCond _ | BoolCond _) | RewriteCond _ -> false
-  in
-  conditions
-  |> List.map (fun condition -> EqCondition condition)
-  |> schedule_conditions (fun bound condition -> not (binds bound condition)) left
-  |> List.map (function
-       | EqCondition condition -> condition
-       | RewriteCond _ -> invalid_arg "an equation cannot use a rewrite condition")
-
 type prepared_clause =
   { clause : clause
   ; head : clause_head

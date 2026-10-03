@@ -777,7 +777,7 @@ eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
 
 `Z`를 `hole-Step-pure-1`에 보관하고 내부 `Step-pure`를 실행한다. 결과가 나오면 보관한 `Z`와 다시 합친다. `identifyPure`는 실행 후보를 찾는 조건이며, 실제 내부 실행이 성공했는지 미리 증명하는 검사는 아니다.
 
-코드: `Def.translate_script → Heatcool.translate`. 목록 context와 여러 실행 premise를 처리하는 세부 분기는 4.5절에 있다.
+코드: `Def.translate → Heatcool.translate_relation`. 목록 context와 여러 실행 premise를 처리하는 세부 분기는 4.5절에 있다.
 
 **지원 경계:** 위 policy로 분류되지 않은 relation은 현재 `Reld.translate`에서 생략된다. 그 relation을 premise에서 요구하면 오류가 날 수 있다. 이를 자동 번역 성공으로 세지 않는다(5.5절).
 
@@ -1375,7 +1375,7 @@ let translate_rule ?request_output index id params policy rule =
       invalid_arg "manual relation rules are supplied by a Maude backend"
 ```
 
-실행 rule은 `execution_statement`에서 조건 유무에 따라 `Rl/Crl`이 된다. `otherwise`의 선행 규칙 검사는 **R1의 실행 경로**에서 처리하며, equation/predicate의 `ElsePr`는 현재 거부한다. `k_heatcool` 규칙은 `Def.translate`가 일반 rule 목록에서 제외하고 별도 생성한다(4.5절).
+실행 rule은 `execution_statement`에서 조건 유무에 따라 `Rl/Crl`이 된다. `otherwise`의 선행 규칙 검사는 **R1의 실행 경로**에서 처리하며, equation/predicate의 `ElsePr`는 현재 거부한다. `k_heatcool` 규칙은 `Reld.translate`가 일반 rule 목록에서 제외하고, `Def.translate`가 같은 relation에 대해 `Heatcool.translate_relation`으로 생성한다(4.5절).
 
 ## 3.5 `term.ml`: 식의 직접 재귀
 

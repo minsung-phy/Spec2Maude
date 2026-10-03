@@ -514,7 +514,7 @@ let translate_pattern cache index (context : Hintd.context)
   let left = App (name "identifyFocus", [state; stack; trigger; rest]) in
   let right = App (name "{_|_|_}", [prefix; rebuild focus; postfix]) in
   let conditions =
-    try Reld.schedule_rule_conditions left conditions with
+    try schedule_rule_conditions left conditions with
     | Invalid_argument reason ->
         unsupported pattern.rule.at
           ("focus of " ^ (Hintd.rule_id pattern.rule).it ^ ": " ^ reason)
@@ -589,7 +589,7 @@ let context_transitions index (context : Hintd.context) =
   in
   let conditions =
     guards @ List.map (substitute_condition bindings) remaining
-    |> Reld.schedule_rule_conditions heat_left
+    |> schedule_rule_conditions heat_left
   in
   let hole = App (name "hole", [prefix; postfix]) in
   let heat_right =
@@ -781,9 +781,11 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
   in
   resume true 1 body.left body.conditions executions
 
-let translate index =
+(* The statements for the hint(k_heatcool) rules of one relation. *)
+let translate_relation index id =
   let cache = Hashtbl.create 4 in
   let sequences = Prescan.contexts index
+  |> List.filter (fun (context : Hintd.context) -> context.source.id.it = id.it)
   |> List.concat_map (fun context ->
        declarations index context
        @ (context.Hintd.patterns
@@ -793,7 +795,8 @@ let translate index =
   in
   let nested = Prescan.heatcool index
     |> List.filter (fun (heated : Hintd.heatcool) ->
-         not (Prescan.is_context_rule index heated.source.id heated.rule))
+         heated.source.id.it = id.it
+         && not (Prescan.is_context_rule index heated.source.id heated.rule))
     |> List.concat_map (heatcool_rule cache index)
   in
   sequences @ nested

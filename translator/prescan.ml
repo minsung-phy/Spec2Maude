@@ -1322,16 +1322,6 @@ let requested_outputs index name =
     index.requests []
   |> List.sort_uniq compare
 
-let iteration_name index body =
-  match iteration index body with
-  | Some iteration -> request index iteration.name ForwardHelper; iteration.name
-  | None -> invalid_arg "IterE is missing from the prescan index"
-
-let projector_name index body =
-  match iteration index body with
-  | Some iteration ->
-      request index iteration.name ProjectorHelper; iteration.projector_name
-  | None -> invalid_arg "IterE is missing from the prescan index"
 
 let premise_iterations index = index.premise_iterations
 

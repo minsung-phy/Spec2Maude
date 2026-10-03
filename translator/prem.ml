@@ -712,80 +712,88 @@ let translate_binding_membership index bound element collection =
   | _ ->
       invalid_arg "binding membership requires an iterated collection"
 
-let rec translate_ifpr index bind_membership bound exp =
+(* The shapes of an IfPr premise, in the order in which they are tried
+ * (TRANSLATION_MAP.md, section 3). Only the classification depends on this
+ * order; each shape is then translated on its own. *)
+type ifpr_shape =
+  | RewriteCall of exp * exp        (* f(args) = e with hint(maude_rule) f *)
+  | Choice of exp * exp             (* x <- es with x unbound *)
+  | Conjunction of exp * exp        (* e1 /\ e2 with unbound variables *)
+  | Inverse of id * arg list * exp  (* f(args) = e with an unbound argument *)
+  | Binding of exp * exp * string   (* p = e with p unbound and e known *)
+  | Check                           (* every variable is bound *)
+  | Wait                            (* a later premise must bind variables *)
+
+let classify_ifpr index bind_membership bound exp =
   match exp.it with
   | CmpE (`EqOp, _, ({it = CallE _; _} as call), result)
     when is_rewrite_call index call ->
-      translate_rewrite_call index bound call result
-
+      RewriteCall (call, result)
   | CmpE (`EqOp, _, result, ({it = CallE _; _} as call))
     when is_rewrite_call index call ->
-      translate_rewrite_call index bound call result
-
+      RewriteCall (call, result)
   | _ when has_rewrite_call index exp ->
-      invalid_arg
-        "rewrite-backed call must be a top-level equality premise"
-
+      invalid_arg "rewrite-backed call must be a top-level equality premise"
   | MemE (_, collection) when not (known bound collection) ->
-      Waiting
-
-  | MemE (element, collection)
-    when bind_membership && not (known bound element) ->
-      translate_binding_membership index bound element collection
-
-  | MemE (element, _) when not (known bound element) ->
-      invalid_arg
-        "binding membership must be a final definition choice"
-
+      Wait
+  | MemE (element, collection) when not (known bound element) ->
+      if bind_membership then Choice (element, collection)
+      else invalid_arg "binding membership must be a final definition choice"
   | BinE (`AndOp, `BoolT, left, right) when not (known bound exp) ->
-      begin match translate_ifpr index bind_membership bound left with
-      | Waiting ->
-          begin match translate_ifpr index bind_membership bound right with
-          | Waiting -> Waiting
-          | Ready right ->
-              begin match
-                translate_ifpr index bind_membership right.bound left
-              with
-              | Waiting -> Waiting
-              | Ready left ->
-                  Ready
-                    (make left.bound (right.conditions @ left.conditions))
-              end
-          end
-      | Ready left ->
-          begin match translate_ifpr index bind_membership left.bound right with
-          | Waiting -> Waiting
-          | Ready right ->
-              Ready
-                (make right.bound (left.conditions @ right.conditions))
-          end
-      end
-
+      Conjunction (left, right)
   | CmpE (`EqOp, _, ({it = CallE (id, args); _} as call), result)
     when not (known bound call) && known bound result ->
-      translate_inverse index bound exp id args result
-
+      Inverse (id, args, result)
   | CmpE (`EqOp, _, result, ({it = CallE (id, args); _} as call))
     when known bound result && not (known bound call) ->
-      translate_inverse index bound exp id args result
-
+      Inverse (id, args, result)
   | CmpE (`EqOp, _, pattern, subject)
     when not (known bound pattern) && known bound subject ->
-      Ready
-        (bind_pattern index bound pattern (Term.translate_exp index subject)
-           "IfPr left side is not a pattern")
-
+      Binding (pattern, subject, "IfPr left side is not a pattern")
   | CmpE (`EqOp, _, subject, pattern)
     when known bound subject && not (known bound pattern) ->
-      Ready
-        (bind_pattern index bound pattern (Term.translate_exp index subject)
-           "IfPr right side is not a pattern")
-
+      Binding (pattern, subject, "IfPr right side is not a pattern")
+  | _ when known bound exp ->
+      Check
   | _ ->
-      if known bound exp then
-        Ready (make bound [EqCondition (BoolCond (Term.translate_bool index exp))])
-      else
-        Waiting
+      Wait
+
+let rec translate_ifpr index bind_membership bound exp =
+  match classify_ifpr index bind_membership bound exp with
+  | RewriteCall (call, result) ->
+      translate_rewrite_call index bound call result
+  | Choice (element, collection) ->
+      translate_binding_membership index bound element collection
+  | Conjunction (left, right) ->
+      (* Translate first the side whose variables are bound already. *)
+      let translate bound exp = translate_ifpr index bind_membership bound exp in
+      begin match translate bound left with
+      | Ready first ->
+          begin match translate first.bound right with
+          | Ready second ->
+              Ready (make second.bound (first.conditions @ second.conditions))
+          | Waiting -> Waiting
+          end
+      | Waiting ->
+          begin match translate bound right with
+          | Ready first ->
+              begin match translate first.bound left with
+              | Ready second ->
+                  Ready (make second.bound (first.conditions @ second.conditions))
+              | Waiting -> Waiting
+              end
+          | Waiting -> Waiting
+          end
+      end
+  | Inverse (id, args, result) ->
+      translate_inverse index bound exp id args result
+  | Binding (pattern, subject, error) ->
+      Ready
+        (bind_pattern index bound pattern (Term.translate_exp index subject) error)
+  | Check ->
+      Ready (make bound [EqCondition (BoolCond (Term.translate_bool index exp))])
+  | Wait ->
+      Waiting
 
 let translate_letpr index bound quants left right =
   if not (known bound right) then Waiting
