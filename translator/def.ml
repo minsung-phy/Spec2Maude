@@ -91,7 +91,7 @@ let normalize_variables source_declarations statements =
     let rec choose index =
       let name =
         if index = 1 then variable.name
-        else variable.name ^ string_of_int index
+        else variable.name ^ "-" ^ string_of_int index
       in
       if StringSet.mem name operator_names
          || StringSet.mem name !source_names || StringSet.mem name !local_used then

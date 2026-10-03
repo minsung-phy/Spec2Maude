@@ -35,6 +35,15 @@ the paper, or to check how a constructor is handled.
 The Maude shapes below are schematic. They omit sort coercions, boxing of
 native values (`#_`), and the conditions generated from type annotations.
 
+A source variable keeps its SpecTec name in upper case, including `*`, `?`,
+`'`, and `_`: `instr*` is `INSTR*`, `instr'*` is `INSTR'*`, `t*?` is `T*?`,
+and `val_1` is `VAL_1` (`prescan.ml:variable_base`). Maude accepts these
+characters inside a variable token (Maude manual, Appendix B.2). When two
+variables would get the same name, because they differ only in case (`C`/`c`)
+or one source variable occurs with two Maude sorts, the later one gets a
+`-N` suffix: `C-2`, `C_1-2`. Generated variables follow the same suffix rule;
+the rest of a sequence after its head `x` is `X*-REST`.
+
 ## 1. Definitions
 
 The translation visits the definitions of the script in order
@@ -285,7 +294,7 @@ sequence:
 
 ```maude
 eq map-f(C, eps) = eps .
-eq map-f(C, X XS) = ⟦e⟧[x := X] map-f(C, XS) .
+eq map-f(C, X X*-REST) = ⟦e⟧[x := X] map-f(C, X*-REST) .
 ```
 
 `C` holds the variables that the body uses from outside the iteration. They

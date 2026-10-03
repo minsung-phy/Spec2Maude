@@ -83,6 +83,10 @@ fmod SPECTEC-LIST is
 
   eq repeatSeq(0, WTS) = eps .
   eq repeatSeq(s N, WTS) = WTS repeatSeq(N, WTS) .
+    --- repeatSeq 이전 버전
+    --- eq repeatSeq(0, WTS) = eps .
+    --- eq repeatSeq(1, WTS) = WTS .
+    --- ceq repeatSeq(N, WTS) = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS) if N > 1 .
 
   --- 리스트 인덱싱
   op indexDefined : SpectecTerminals Nat -> Bool .

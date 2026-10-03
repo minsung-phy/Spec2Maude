@@ -153,7 +153,7 @@ IterE (
 이 정보는 나중에 다음 인자 순서의 helper를 만드는 데 쓰인다.
 
 ```maude
-map-subst-fieldtype(TV-3, TU-3, FT-)
+map-subst-fieldtype(TV*, TU*, FT*)
 ```
 
 prescan은 helper 후보 이름을 마련한다. 실제 번역 중 `forward_requested`, `projector_requested`, premise의 `check_requested`, 출력 요청이 기록되고 **필요한 방향의 helper**가 후속 단계에서 생성된다. 모든 `IterE`마다 무조건 재귀 helper가 생기지는 않는다.
@@ -244,7 +244,7 @@ op iN : Nat -> SpectecType .
 
 `TypD`는 syntax 선언 전체이고, `InstD`는 그 안의 개별 정의다. 위 예는 숫자 인자 하나를 받으므로 `iN(32)`, `iN(64)`처럼 타입을 나타내는 항을 만든다. 인자 값마다 새 Maude sort를 만드는 것은 아니다.
 
-그다음 `InstD`의 인자로 검사 대상 `iN(N2)`를 정하고, 본문인 `AliasT`를 처리한다. 그 결과는 S2에서 이어서 본다.
+그다음 `InstD`의 인자로 검사 대상 `iN(N-2)`를 정하고, 본문인 `AliasT`를 처리한다. 그 결과는 S2에서 이어서 본다.
 
 코드: [Typd.translate → translate_inst → translate_deftyp](../translator/typd.ml). 타입 선언은 `translate_type_decl`, 검사 대상 구성은 `translate_target`이 맡는다.
 
@@ -276,11 +276,11 @@ eq typecheck(VALUE, u32) = typecheck(VALUE, uN(32)) .
 S1의 `iN(N) = uN(N)`도 같은 분기다. 인자의 타입 검사까지 필요해서 조건부 equation이 된다.
 
 ```maude
-ceq typecheck(VALUE, iN(N2)) = typecheck(VALUE, uN(N2))
-  if typecheck(N2, N) .
+ceq typecheck(VALUE, iN(N-2)) = typecheck(VALUE, uN(N-2))
+  if typecheck(N-2, N) .
 ```
 
-여기서 `N2`는 숫자 변수, `N`은 source 타입 이름이다. 조건이 없으면 `eq`, 있으면 `ceq`를 쓴다. 목록을 다른 값 안에 넣어 `seq(...)`로 감싼 경우에는 그 표현을 검사하는 alias equation도 추가할 수 있다.
+여기서 `N-2`는 숫자 변수, `N`은 source 타입 이름이다. 조건이 없으면 `eq`, 있으면 `ceq`를 쓴다. 목록을 다른 값 안에 넣어 `seq(...)`로 감싼 경우에는 그 표현을 검사하는 alias equation도 추가할 수 있다.
 
 코드: [Typd.translate_alias](../translator/typd.ml).
 
@@ -305,9 +305,9 @@ TypD ("memarg", [], [InstD ([], [], StructT [
 
 ```maude
 op memarg : -> SpectecType .
-ceq typecheck({ (field('ALIGN, VALUE) ; field('OFFSET, VALUE14)) }, memarg) = true
+ceq typecheck({ (field('ALIGN, VALUE) ; field('OFFSET, VALUE-14)) }, memarg) = true
   if typecheck(VALUE, u32)
-    /\ typecheck(VALUE14, u64) .
+    /\ typecheck(VALUE-14, u64) .
 ```
 
 `ALIGN`, `OFFSET` 순서의 record를 맞춰 보고, 각 필드 값을 검사한다. 임의 순서의 필드를 찾아 검사하는 방식은 아니다. record 표현에는 backend의 공통 `field`, `_;_`, `{_}`를 사용한다.
@@ -339,9 +339,9 @@ VariantT [
 ```maude
 op reftype : -> SpectecType .
 op REF : SpectecTerminals SpectecTerminal -> SpectecTerminal [ctor] .
-ceq typecheck(REF(NS, HT), reftype) = true
-  if typecheck(NS, null)
-    /\ len(NS) <= 1
+ceq typecheck(REF(NULL?, HT), reftype) = true
+  if typecheck(NULL?, null)
+    /\ len(NULL?) <= 1
     /\ typecheck(HT, heaptype) .
 ```
 
@@ -377,14 +377,14 @@ VariantT [
 
 ```maude
 op list : SpectecType -> SpectecType .
-ceq typecheck(X-, list(X)) = true
-  if len(X-) < (2 ^ 32)
-    /\ typecheck(X-, X) .
+ceq typecheck(X*, list(X)) = true
+  if len(X*) < (2 ^ 32)
+    /\ typecheck(X*, X) .
 ```
 
-이 case에는 `REF` 같은 고정 atom이 없고 값이 들어갈 자리만 있다. 그래서 **새 값 constructor 없이 목록 자체를 사용**한다. `X`는 원소 타입, `X-`는 검사할 목록이다. 길이 제한은 source의 premise에서 온다.
+이 case에는 `REF` 같은 고정 atom이 없고 값이 들어갈 자리만 있다. 그래서 **새 값 constructor 없이 목록 자체를 사용**한다. `X`는 원소 타입, `X*`는 검사할 목록이다. 길이 제한은 source의 premise에서 온다.
 
-내부 값이 하나면 그대로 쓰고, 여러 개면 tuple로 묶는다. 예를 들어 `syntax fieldtype = mut? storagetype`은 `tuple(seq(MUTS) STORAGE)`로 표현한다. `seq`는 option 전체가 tuple의 한 칸을 차지하게 한다.
+내부 값이 하나면 그대로 쓰고, 여러 개면 tuple로 묶는다. 예를 들어 `syntax fieldtype = mut? storagetype`은 `tuple(seq(MUT?) STORAGE)`로 표현한다. `seq`는 option 전체가 tuple의 한 칸을 차지하게 한다.
 
 코드: [Typd.translate_typcase → translate_union → transparent_payload](../translator/typd.ml).
 
@@ -431,12 +431,12 @@ DecD ("sum", [ExpP ("_", IterT (NumT `NatT, List))], NumT `NatT, [
 ```maude
 op sum : SpectecTerminals -> Nat .
 eq sum(eps) = 0 .
-ceq sum(N3 N--) = N3 + sum(N--)
-  if typecheck(N3, n)
-    /\ typecheck(N--, nat) .
+ceq sum(N-3 N'*) = N-3 + sum(N'*)
+  if typecheck(N-3, n)
+    /\ typecheck(N'*, nat) .
 ```
 
-head인 `sum(eps)`, `sum(N3 N--)`는 입력을 맞추는 패턴이다. 오른쪽은 결과 식이다. 필요한 검사 조건이 없으면 `eq`, 있으면 `ceq`가 된다. source에 premise가 없어도 입력의 타입 검사 때문에 `ceq`가 될 수 있다.
+head인 `sum(eps)`, `sum(N-3 N'*)`는 입력을 맞추는 패턴이다. 오른쪽은 결과 식이다. 필요한 검사 조건이 없으면 `eq`, 있으면 `ceq`가 된다. source에 premise가 없어도 입력의 타입 검사 때문에 `ceq`가 될 수 있다.
 
 재귀 호출은 오른쪽의 `CallE("sum",...)`를 `sum(...)`으로 번역하면 된다. 재귀 함수 전용 clause 분기가 있는 것은 아니다.
 
@@ -625,14 +625,14 @@ RuleD ("select-true", Q, mixop("% ~> %"),
 **Maude 원문 발췌:**
 
 ```maude
-crl Step-pure(VAL-1 (VAL-2 (CONST(I32, C3) SELECT(T--)))) => VAL-1
-  if typecheck(VAL-1, val)
-    /\ typecheck(VAL-2, val)
-    /\ len(T--) <= 1
-    /\ C3 =/= 0 .
+crl Step-pure(VAL_1 (VAL_2 (CONST(I32, C-3) SELECT(T*?)))) => VAL_1
+  if typecheck(VAL_1, val)
+    /\ typecheck(VAL_2, val)
+    /\ len(T*?) <= 1
+    /\ C-3 =/= 0 .
 ```
 
-입력 패턴에서 값을 얻고, 필요한 타입 검사와 source premise를 조건으로 붙인다. 조건이 있으므로 `rl` 대신 `crl`이다. IL의 `unbox_c`는 투명 case에서 숫자를 꺼내는 식이며, Maude에서는 같은 숫자 변수 `C3`가 된다.
+입력 패턴에서 값을 얻고, 필요한 타입 검사와 source premise를 조건으로 붙인다. 조건이 있으므로 `rl` 대신 `crl`이다. IL의 `unbox_c`는 투명 case에서 숫자를 꺼내는 식이며, Maude에서는 같은 숫자 변수 `C-3`가 된다.
 
 **`otherwise`는 앞 규칙이 적용되지 않는지 검사한다.** IL의 `ElsePr`를 만나면 앞선 규칙 중 입력이 겹칠 수 있는 규칙에 대해 `R-enabled-...` 검사를 만든다. source의 out-of-bounds trap 규칙 등에 사용한다. 아래는 이름과 조건을 단순화한 도식이다.
 
@@ -677,8 +677,8 @@ HintD (RelH ("Expand", [flag "maude_eq"]))
 ```maude
 op Expand : SpectecTerminal ~> SpectecTerminal .
 ceq Expand(DEFTYPE) = COMPTYPE
-  if SUB(FINAL-, TYPEUSE-, COMPTYPE) := unrolldt(DEFTYPE)
-    /\ len(FINAL-) <= 1 .
+  if SUB(FINAL?, TYPEUSE*, COMPTYPE) := unrolldt(DEFTYPE)
+    /\ len(FINAL?) <= 1 .
 ```
 
 `deftype`를 입력받아 `comptype`를 계산한다. `:=`는 계산 결과를 패턴에 맞춰 `COMPTYPE` 등의 값을 얻는 조건이다. 선언의 `~>`는 Maude의 partial operator 표시이고, 실행 rule의 `=>`와 다르다.
@@ -709,7 +709,7 @@ HintD (RelH ("Num_ok", [flag "maude_predicate"]))
 
 ```maude
 op Num-ok : SpectecTerminal val SpectecTerminal ~> Bool .
-eq Num-ok(S2, CONST(NT, C2), NT) = true .
+eq Num-ok(S-2, CONST(NT, C-2), NT) = true .
 ```
 
 모든 component가 입력이다. 그 값들이 규칙을 만족하면 `true`가 된다. **만족하지 않는 모든 경우에 `false`를 돌려주는 식은 자동 생성하지 않는다.** 해당하는 equation이 없으면 계산되지 않은 항으로 남을 수 있다.
@@ -769,10 +769,10 @@ HintD (RuleH ("Step", "pure", [flag "k_heatcool"]))
 **Maude 원문 발췌:**
 
 ```maude
-crl [heating-Step-pure] : Step(Z ; INSTR-) =>
-  Step-pure(INSTR-) ~> hole-Step-pure-1(Z)
-  if identifyPure(INSTR-) => identified-Step-pure .
-eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
+crl [heating-Step-pure] : Step(Z ; INSTR*) =>
+  Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
+  if identifyPure(INSTR*) => identified-Step-pure .
+eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
 ```
 
 `Z`를 `hole-Step-pure-1`에 보관하고 내부 `Step-pure`를 실행한다. 결과가 나오면 보관한 `Z`와 다시 합친다. `identifyPure`는 실행 후보를 찾는 조건이며, 실제 내부 실행이 성공했는지 미리 증명하는 검사는 아니다.
@@ -880,11 +880,11 @@ eq apply(concrete-function, ARGS) = concrete-function(ARGS) .
 | SpecTec source 조각 | IL AST | 일반 목록의 Maude 변환 도식 |
 | --- | --- | --- |
 | `eps` | `ListE []` | `eps` |
-| `n n'*` | `CatE(ListE[n], tail)` | `N NS` |
+| `n n'*` | `CatE(ListE[n], tail)` | `N N'*` |
 | 두 목록의 `++` | `CatE(xs,ys)` | `E(xs) E(ys)` |
 | `$disjoint_`의 `w <- w'*` | `MemE(w,ws)` | `E(w) <- E(ws)`; 원소가 목록이면 boxing |
 | `|xs|` | `LenE xs` | `len(E(xs))` |
-| `$relaxed2`의 `(X_1 X_2)[i]` | `IdxE(ListE[x1;x2],i)` | `(X1 X2) [ I ]` |
+| `$relaxed2`의 `(X_1 X_2)[i]` | `IdxE(ListE[x1;x2],i)` | `(X_1 X_2) [ I ]` |
 | `xs[i:n]` | `SliceE(xs,i,n)` | `XS [ I : N ]`; N은 끝 위치가 아니라 **길이** |
 | option을 list 위치에 쓰는 coercion | `LiftE option_exp` | `lift(E(option_exp))` |
 
@@ -919,7 +919,7 @@ UpdE (VarE "C",
 **Maude 변환 도식:**
 
 ```maude
-C [. 'LOCALS = ((C . 'LOCALS) [ X1 = LCT1 ]) ]
+C [. 'LOCALS = ((C . 'LOCALS) [ X_1 = LCT_1 ]) ]
 ```
 
 안쪽 목록을 바꾼 뒤, 바뀐 목록을 다시 바깥 record에 넣는다. 단순히 마지막 index만 출력하면 원래 record를 잃는다.
@@ -977,7 +977,7 @@ path constructor는 정확히 `RootP`, `IdxP`, `SliceP`, `DotP` 네 개다. 각�
 실제 [Expand source](../spectec/wasm-3.0/2.1-validation.types.spectec)는 `$unrolldt(deftype) = SUB final? typeuse* comptype`라는 equality를 쓴다. 아래처럼 **계산 결과에서 변수를 얻는** 조건이 된다.
 
 ```maude
-SUB(FINAL-, TYPEUSE-, COMPTYPE) := unrolldt(DEFTYPE)
+SUB(FINAL?, TYPEUSE*, COMPTYPE) := unrolldt(DEFTYPE)
 ```
 
 알 수 없는 인자를 가진 함수 호출을 거꾸로 풀어야 하는 경우에는 4.4절의 `inverse` 계약을 사용한다.
@@ -1049,7 +1049,7 @@ expression의 실제 선택 순서는 **그대로 반환 → 같은 값 반복 �
 IterE (VarE "n'", (List, [("n'", VarE "n'*")]))
 ```
 
-**Maude:** `N--`.
+**Maude:** `N'*`.
 
 identity 조건과 표현이 맞으면 `map-id`를 만들지 않는다. 길이·option 제약이 필요한 pattern 방향은 별도 조건을 유지한다.
 
@@ -1072,7 +1072,7 @@ IterE (zero_byte, (ListN (count, None), []))
 **Maude 원문 발췌 — 생성된 식의 해당 부분:**
 
 ```maude
-repeatSeq(N3 * (64 * Ki), 0)
+repeatSeq(N-3 * (64 * Ki), 0)
 ```
 
 매번 다른 원소를 읽거나 index를 사용하는 반복이 아니다. 같은 값을 정해진 횟수만큼 반복하므로 공통 `repeatSeq`를 사용한다. typed list에는 그 목록용 repeat 연산을 쓴다.
@@ -1088,9 +1088,9 @@ repeatSeq(N3 * (64 * Ki), 0)
 **Maude 원문 발췌:**
 
 ```maude
-eq map-subst-fieldtype(TV-3, TU-3, eps) = eps .
-eq map-subst-fieldtype(TV-3, TU-3, FT FTS) =
-  subst-fieldtype(FT, TV-3, TU-3) map-subst-fieldtype(TV-3, TU-3, FTS) .
+eq map-subst-fieldtype(TV*, TU*, eps) = eps .
+eq map-subst-fieldtype(TV*, TU*, FT FT*-REST) =
+  subst-fieldtype(FT, TV*, TU*) map-subst-fieldtype(TV*, TU*, FT*-REST) .
 ```
 
 generator가 여러 개면 각 목록의 head를 **같은 iteration 한 번에서 함께** 소비한다. Cartesian product가 아니다. base case도 모든 generator가 동시에 빈 형태이고, 길이가 다르면 정상 결과를 만들어 주지 않는다.
@@ -1713,12 +1713,12 @@ sort evalexprs-Config .
 subsort SpectecTerminal < evalexprs-Config .
 op evalexprs : SpectecTerminal SpectecTerminals -> evalexprs-Config [frozen (1 2)] .
 rl evalexprs(Z, eps) => tuple(Z seq(eps)) .
-crl evalexprs(Z, seq(EXPR) EXPR--) => tuple(Z-- seq(REF2 REF--))
-  if Eval-expr(Z, EXPR) => tuple(Z- seq(REF2))
-    /\ typecheck(REF2, ref)
-    /\ evalexprs(Z-, EXPR--) => tuple(Z-- seq(REF--))
+crl evalexprs(Z, seq(EXPR) EXPR'*) => tuple(Z'' seq(REF-2 REF'*))
+  if Eval-expr(Z, EXPR) => tuple(Z' seq(REF-2))
+    /\ typecheck(REF-2, ref)
+    /\ evalexprs(Z', EXPR'*) => tuple(Z'' seq(REF'*))
     /\ typecheck(EXPR, expr)
-    /\ typecheck(EXPR--, iterList(instr)) .
+    /\ typecheck(EXPR'*, iterList(instr)) .
 ```
 
 위 코드는 실제 생성물의 발췌다. `expr*`는 instruction의 평탄한 목록이 아니라 expression 목록이므로 각 `EXPR`을 `seq`로 묶는다.
@@ -1798,14 +1798,14 @@ HintD (RuleH ("Step", "pure", [flag "k_heatcool"]))
 **Maude 원문 발췌:**
 
 ```maude
-crl [heating-Step-pure] : Step(Z ; INSTR-) =>
-  Step-pure(INSTR-) ~> hole-Step-pure-1(Z)
-  if identifyPure(INSTR-) => identified-Step-pure .
+crl [heating-Step-pure] : Step(Z ; INSTR*) =>
+  Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
+  if identifyPure(INSTR*) => identified-Step-pure .
 
-eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
+eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
 ```
 
-`hole-Step-pure-1`은 나중에 필요한 `Z`를 저장한다. 내부 request가 `INSTR--`로 rewrite되면 cooling equation이 `Z ; INSTR--`를 만든다.
+`hole-Step-pure-1`은 나중에 필요한 `Z`를 저장한다. 내부 request가 `INSTR'*`로 rewrite되면 cooling equation이 `Z ; INSTR'*`를 만든다.
 
 `identifyPure`는 입력 pattern으로 후보를 식별하는 helper다. **모든 premise가 성립함을 미리 증명하는 predicate가 아니다.** 실제 premise는 `Step-pure` 실행에서 검사한다. `identifyRead`도 같은 역할이며, helper 이름은 source rule id에서 정한다.
 
@@ -1826,11 +1826,11 @@ rule Steps/trans:
 **Maude 원문 발췌:**
 
 ```maude
-rl [heating-Steps-trans] : Steps(Z ; INSTR-) =>
-  Step(Z ; INSTR-) ~> hole-Steps-trans-1 .
-eq (Z- ; INSTR--) ~> hole-Steps-trans-1 =
-  Steps(Z- ; INSTR--) ~> hole-Steps-trans-2 .
-eq (Z-- ; INSTR---) ~> hole-Steps-trans-2 = Z-- ; INSTR--- .
+rl [heating-Steps-trans] : Steps(Z ; INSTR*) =>
+  Step(Z ; INSTR*) ~> hole-Steps-trans-1 .
+eq (Z' ; INSTR'*) ~> hole-Steps-trans-1 =
+  Steps(Z' ; INSTR'*) ~> hole-Steps-trans-2 .
+eq (Z'' ; INSTR''*) ~> hole-Steps-trans-2 = Z'' ; INSTR''* .
 ```
 
 첫 번째 실행의 결과로 두 번째 request를 만든다. 두 premise의 binding과 순서가 continuation에 드러난다.
@@ -1851,13 +1851,13 @@ rule Step/ctxt-label:
 **Maude 원문 발췌:**
 
 ```maude
-rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N3 { INSTR-0- } INSTR-)) =>
-  Step(Z ; INSTR-) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) .
-eq (Z- ; INSTR--) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) =
-  Z- ; (LABEL- N3 { INSTR-0- } INSTR--) .
+rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) =>
+  Step(Z ; INSTR*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) .
+eq (Z' ; INSTR'*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) =
+  Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
 ```
 
-hole에는 `instr_0*`와 `n`을 저장한다. 갱신된 `Z-`와 `INSTR--`는 내부 실행에서 반환된다.
+hole에는 `instr_0*`와 `n`을 저장한다. 갱신된 `Z'`와 `INSTR'*`는 내부 실행에서 반환된다.
 
 ### H6. 목록 context: `Step/ctxt-instrs`
 
@@ -1889,7 +1889,7 @@ crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> ho
   if (STACK (OP REST)) =/= OP
     /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
     /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
-eq (Z- ; INSTR--) ~> hole(PREFIX, POSTFIX) = Z- ; (PREFIX (INSTR-- POSTFIX)) .
+eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 ```
 
 `identifyFocus`의 후보 rule은 source의 operand·trigger·trailing pattern과 필요한 조건에서 생성된다. 성공 결과 `{ PREFIX | (Z ; FOCUS) | POSTFIX }`를 얻고 내부 `Step`을 실행한 뒤 바깥 목록을 복원한다. `Step(P X S) → Step(X)`만 적으면 복원과 가능한 분해를 설명할 수 없다.
@@ -1942,8 +1942,8 @@ rule Expand: deftype ~~ comptype
 
 ```maude
 ceq Expand(DEFTYPE) = COMPTYPE
-  if SUB(FINAL-, TYPEUSE-, COMPTYPE) := unrolldt(DEFTYPE)
-    /\ len(FINAL-) <= 1 .
+  if SUB(FINAL?, TYPEUSE*, COMPTYPE) := unrolldt(DEFTYPE)
+    /\ len(FINAL?) <= 1 .
 ```
 
 `~~`의 왼쪽은 입력, 오른쪽은 출력이다. `RuleD` 본문까지 자동 생성한다. rewrite premise가 필요하면 equation 안에 넣을 수 없으므로 거부한다.
@@ -1962,7 +1962,7 @@ rule Num_ok: s |- CONST nt c : nt
 **Maude 원문 발췌:**
 
 ```maude
-eq Num-ok(S2, CONST(NT, C2), NT) = true .
+eq Num-ok(S-2, CONST(NT, C-2), NT) = true .
 ```
 
 이 경로는 일반적인 `false [owise]`를 생성하지 않는다. 성공 equation이 적용되지 않으면 검사식이 미계산으로 남을 수 있다. **positive predicate 번역**과 **전체 true/false 결정 절차**를 구별한다.
@@ -2202,7 +2202,7 @@ B. validation 자체의 자동화
 
 ```text
 SpecTec IL                    Maude IL                      문자열
-BinE(AddOp,...,n,CallE(...)) → App("_+_", [Var n; App(...)]) → N + sum(NS)
+BinE(AddOp,...,n,CallE(...)) → App("_+_", [Var n; App(...)]) → N-3 + sum(N'*)
 ```
 
 따라서 교수님의 “IL AST를 받아 Maude code를 반환하는 재귀 코드”는 다음 합성으로 설명할 수 있다.
@@ -2225,7 +2225,7 @@ type term =
 
 | Maude 의미 | Maude IL | 출력 예 |
 | --- | --- | --- |
-| 변수 | `Var {name="N3"; sort="Nat"; origin=Source}` | `N3` |
+| 변수 | `Var {name="N-3"; sort="Nat"; origin=Source}` | `N-3` |
 | literal·고정 토큰 | `Const "0"`, `Const "true"` | `0`, `true` |
 | 일반 호출 | `App("sum", [ns])` | `sum(NS)` |
 | constructor | `App("REF", [a;b])` | `REF(A,B)` |
@@ -2341,7 +2341,7 @@ source의 `$sum` 재귀 clause를 다시 보자.
    sum 이름, n/tail sort, identity IterE와 그 owner 등을 등록
 
 4. Decd
-   head → sum(N3 N--)
+   head → sum(N-3 N'*)
    RHS를 Term.translate_exp로 재귀 번역
    필요한 type 조건과 함께 Ceq 생성
 
@@ -2353,8 +2353,8 @@ source의 `$sum` 재귀 clause를 다시 보자.
        [])
 
 6. Maude_emit
-   ceq sum(N3 N--) = N3 + sum(N--)
-     if typecheck(N3, n) /\ typecheck(N--, nat) .
+   ceq sum(N-3 N'*) = N-3 + sum(N'*)
+     if typecheck(N-3, n) /\ typecheck(N'*, nat) .
 ```
 
 이 연결을 기준으로 다른 case도 읽으면 된다. **source의 어떤 구조가 IL에 남고, 어느 재귀 case에서 어떤 target 구조가 되며, 필요한 target 연산은 어디에 정의되어 있는가**를 한 번씩 확인한다.

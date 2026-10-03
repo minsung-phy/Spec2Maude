@@ -48,9 +48,10 @@ let head_variable index (id, source) =
   | IterT (typ, _) -> Prescan.source_variable index id typ
   | _ -> invalid_arg "iteration generator must have an iteration type"
 
+(* The rest of the sequence after the head element [id]. *)
 let tail_variable index (id, source) =
   generated_variable
-    (String.uppercase_ascii id.it ^ "S") (Prescan.sort_of_typ index source.note)
+    (Prescan.variable_base id.it ^ "*-REST") (Prescan.sort_of_typ index source.note)
 
 let helper_domain source_index captures count index generators =
   List.map (fun (variable : variable) -> variable.sort) captures

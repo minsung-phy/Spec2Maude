@@ -231,11 +231,22 @@ let fresh_name used candidate =
   in
   fresh used (fun index -> "-" ^ string_of_int index) candidate
 
+(* SpecTec subscripts use '_', so a "-N" suffix stays visibly distinct from
+ * them: a second t_1 becomes T_1-2, not T_12. *)
 let fresh_variable_name used candidate =
-  fresh used string_of_int candidate
+  fresh used (fun index -> "-" ^ string_of_int index) candidate
 
+(* A variable keeps SpecTec's iteration, prime, and subscript marks: a Maude
+ * variable is any whitespace-delimited token except ':' and the
+ * self-delimiting ( ) [ ] { } , (Maude manual, Appendix B.2). *)
 let variable_base name =
-  let name = sanitize name |> String.uppercase_ascii in
+  let name =
+    name
+    |> String.map (function
+         | ('a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '\'' | '*' | '?' | '+') as char -> char
+         | _ -> '-')
+    |> String.uppercase_ascii
+  in
   let name = if name = "" then "VAR" else name in
   match name.[0] with
   | 'A'..'Z' -> name

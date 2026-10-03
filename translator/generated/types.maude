@@ -84,13 +84,13 @@ fmod SPEC2MAUDE-TYPES is
 
   var REPEAT-COUNT : Nat .
 
-  var REPEAT-ELEMENT2 : instr .
+  var REPEAT-ELEMENT-2 : instr .
 
   eq valRepeat(0, REPEAT-ELEMENT) = eps .
 
   eq valRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT) = REPEAT-ELEMENT valRepeat(REPEAT-COUNT, REPEAT-ELEMENT) .
 
-  eq instrRepeat(0, REPEAT-ELEMENT2) = eps .
+  eq instrRepeat(0, REPEAT-ELEMENT-2) = eps .
 
-  eq instrRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT2) = REPEAT-ELEMENT2 instrRepeat(REPEAT-COUNT, REPEAT-ELEMENT2) .
+  eq instrRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT-2) = REPEAT-ELEMENT-2 instrRepeat(REPEAT-COUNT, REPEAT-ELEMENT-2) .
 endfm

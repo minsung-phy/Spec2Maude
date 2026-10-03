@@ -418,7 +418,7 @@ raw 요청의 실패 가지는 남을 수 있으므로 source의 공개 완료 �
 
 `identifyPure`·`identifyRead`는 대상 relation의 입력 패턴에서 생성한다. 각각 성공 후보를 나타내는 별도 token을 반환하고, 실제 premise 검사는 Step-pure/Step-read 실행이 담당한다. 식별 과정에서 가능한 source 입력을 버리지 않는다. 목록 일부 선택은 기존 `identifyFocus`의 역할이다.
 
-실행 요청과 반환 결과는 sort로 구분한다. cooling은 반환 결과 패턴에만 적용된다. `Eval_expr`는 `VAL- : ValList`가 이 역할을 하므로 별도 typecheck를 삽입하지 않는다. `_~>_`의 hole 인자는 `[frozen (2)]`로 rule rewriting을 막는다. equation 정규화까지 금지한다는 뜻은 아니다.
+실행 요청과 반환 결과는 sort로 구분한다. cooling은 반환 결과 패턴에만 적용된다. `Eval_expr`는 `VAL* : ValList`가 이 역할을 하므로 별도 typecheck를 삽입하지 않는다. `_~>_`의 hole 인자는 `[frozen (2)]`로 rule rewriting을 막는다. equation 정규화까지 금지한다는 뜻은 아니다.
 
 실패한 내부 요청 또는 Eval_expr의 비-value 중간 결과는 내부 정지 상태로 남을 수 있다. 기존 공개 driver의 `Step(C) => C2:SpectecTerminal` 조건은 완료 결과만 관측한다. raw 요청의 search/LTL을 source 상태의 search/LTL과 동일시하지 않는다. 유한 입력과 제한된 탐색 깊이의 결과 검사만으로 전체 의미 보존을 주장하지 않는다.
 
@@ -436,13 +436,13 @@ rule Step/pure:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-crl [heating-Step-pure] : Step(Z ; INSTR-) => Step-pure(INSTR-) ~> hole-Step-pure-1(Z)
-    if identifyPure(INSTR-) => identified-Step-pure .
+crl [heating-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
+    if identifyPure(INSTR*) => identified-Step-pure .
 
-eq INSTR-- ~> hole-Step-pure-1(Z) = Z ; INSTR-- .
+eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
 ```
 
-`identifyPure(INSTR-) => identified-Step-pure`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
+`identifyPure(INSTR*) => identified-Step-pure`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
 
 ### 2. Step/read
 
@@ -458,13 +458,13 @@ rule Step/read:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-crl [heating-Step-read] : Step(Z ; INSTR-) => Step-read(Z ; INSTR-) ~> hole-Step-read-1(Z)
-    if identifyRead(Z ; INSTR-) => identified-Step-read .
+crl [heating-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read-1(Z)
+    if identifyRead(Z ; INSTR*) => identified-Step-read .
 
-eq INSTR-- ~> hole-Step-read-1(Z) = Z ; INSTR-- .
+eq INSTR'* ~> hole-Step-read-1(Z) = Z ; INSTR'* .
 ```
 
-`identifyRead(Z ; INSTR-) => identified-Step-read`로 입력 후보를 확인한다. 읽기 실행은 instruction 목록을 반환하므로 원래 상태 Z를 붙인다.
+`identifyRead(Z ; INSTR*) => identified-Step-read`로 입력 후보를 확인한다. 읽기 실행은 instruction 목록을 반환하므로 원래 상태 Z를 붙인다.
 
 ### 3. Step/ctxt-instrs
 
@@ -486,7 +486,7 @@ crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> ho
       /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
       /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
 
-eq (Z- ; INSTR--) ~> hole(PREFIX, POSTFIX) = Z- ; (PREFIX (INSTR-- POSTFIX)) .
+eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 ```
 
 기존 focus 식별과 prefix/postfix 복원을 유지한다. source의 nonempty 조건도 기존 guard로 남는다.
@@ -505,12 +505,12 @@ rule Step/ctxt-label:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N3 { INSTR-0- } INSTR-)) => Step(Z ; INSTR-) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) .
+rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) .
 
-eq (Z- ; INSTR--) ~> hole-Step-ctxt-label-1(INSTR-0-, N3) = Z- ; (LABEL- N3 { INSTR-0- } INSTR--) .
+eq (Z' ; INSTR'*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
 ```
 
-N과 INSTR0를 저장한다. RESULT에 해당하는 INSTR--는 내부 한 Step 뒤의 instruction 목록으로, 최종 값 목록일 필요가 없다.
+N과 INSTR0를 저장한다. RESULT에 해당하는 INSTR'*는 내부 한 Step 뒤의 instruction 목록으로, 최종 값 목록일 필요가 없다.
 
 ### 5. Step/ctxt-handler
 
@@ -526,9 +526,9 @@ rule Step/ctxt-handler:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N3 { CATCH- } INSTR-)) => Step(Z ; INSTR-) ~> hole-Step-ctxt-handler-1(CATCH-, N3) .
+rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N-3 { CATCH* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-handler-1(CATCH*, N-3) .
 
-eq (Z- ; INSTR--) ~> hole-Step-ctxt-handler-1(CATCH-, N3) = Z- ; (HANDLER- N3 { CATCH- } INSTR--) .
+eq (Z' ; INSTR'*) ~> hole-Step-ctxt-handler-1(CATCH*, N-3) = Z' ; (HANDLER- N-3 { CATCH* } INSTR'*) .
 ```
 
 N과 catch 목록을 저장하고, 갱신된 상태 및 instruction 목록으로 HANDLER를 복원한다.
@@ -547,12 +547,12 @@ rule Step/ctxt-frame:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Step-ctxt-frame] : Step((S2 ; F) ; (FRAME- N3 { F-14 } INSTR-)) => Step((S2 ; F-14) ; INSTR-) ~> hole-Step-ctxt-frame-1(N3, F) .
+rl [heating-Step-ctxt-frame] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame-1(N-3, F) .
 
-eq ((S- ; F--) ; INSTR--) ~> hole-Step-ctxt-frame-1(N3, F) = (S- ; F) ; (FRAME- N3 { F-- } INSTR--) .
+eq ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame-1(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
 ```
 
-바깥 frame F는 유지한다. store S-와 내부 frame F--는 실행 결과를 사용한다.
+바깥 frame F는 유지한다. store S'와 내부 frame F''는 실행 결과를 사용한다.
 
 ### 7. Steps/trans
 
@@ -569,13 +569,13 @@ rule Steps/trans:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Steps-trans] : Steps(Z ; INSTR-) => Step(Z ; INSTR-) ~> hole-Steps-trans-1 .
+rl [heating-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-1 .
 
-eq (Z- ; INSTR--) ~> hole-Steps-trans-1 = Steps(Z- ; INSTR--) ~> hole-Steps-trans-2 .
+eq (Z' ; INSTR'*) ~> hole-Steps-trans-1 = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-2 .
 
-eq (Z-- ; INSTR---) ~> hole-Steps-trans-2 = Z-- ; INSTR--- .
+eq (Z'' ; INSTR''*) ~> hole-Steps-trans-2 = Z'' ; INSTR''* .
 
-rl Steps(Z ; INSTR-) => Z ; INSTR- .
+rl Steps(Z ; INSTR*) => Z ; INSTR* .
 ```
 
 첫 Step의 결과를 다음 Steps에 전달한다. Steps/refl은 0회 실행을 보존하는 rule로 유지한다. 두 번째 hole은 원래 결론을 반환한다.
@@ -594,12 +594,12 @@ rule Eval_expr:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Eval-expr-1] : Eval-expr(Z, INSTR-) => Steps(Z ; INSTR-) ~> hole-Eval-expr-1-1 .
+rl [heating-Eval-expr-1] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr-1-1 .
 
-eq (Z- ; VAL-) ~> hole-Eval-expr-1-1 = tuple(Z- seq(VAL-)) .
+eq (Z' ; VAL*) ~> hole-Eval-expr-1-1 = tuple(Z' seq(VAL*)) .
 ```
 
-VAL-의 sort는 ValList다. NOP/TRAP 등의 비-value 목록과 실행 중 요청은 이 cooling 패턴에 매치하지 않는다. tuple 모양도 원래 출력과 같다.
+VAL*의 sort는 ValList다. NOP/TRAP 등의 비-value 목록과 실행 중 요청은 이 cooling 패턴에 매치하지 않는다. tuple 모양도 원래 출력과 같다.
 
 ### 지원 범위와 검증
 
