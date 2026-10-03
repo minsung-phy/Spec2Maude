@@ -15,7 +15,7 @@ the paper, or to check how a constructor is handled.
   and the reordering of Maude conditions is in one section of
   `maude/maude_il.ml`.
 - Code locations are given as `file:function`. They refer to commit
-  `66210bf`.
+  `4c73c1f`.
 - Cases that the translator rejects or omits are listed in section 8.
 
 ## Notation
