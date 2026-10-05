@@ -248,6 +248,38 @@ let translate_inst index id params inst =
   match inst.it with
   | InstD (quants, args, deftyp) ->
       let target, guards, bound = translate_target index id params args in
+      (* An argument SubE pattern checks its variable against the coercion's
+         source type, which repeats the quantifier's own membership
+         (num_(Inn): addrtype and Inn). That check keeps its place but uses
+         the quantifier's type, as written in the source. *)
+      let proven = Decd.guarded_quants index quants args in
+      let proven_quants =
+        List.filter
+          (fun quant ->
+            match quant.it with
+            | ExpP (id, _) -> Il.Free.Set.mem id.it proven
+            | TypP _ | DefP _ | GramP _ -> false)
+          quants
+      in
+      let checked_quant = function
+        | BoolCond (App ("typecheck", [(Var v | App ("#_", [Var v])); _])) ->
+            List.find_opt
+              (fun quant ->
+                match quant.it with
+                | ExpP (id, typ) -> (Prescan.source_variable index id typ).name = v.name
+                | TypP _ | DefP _ | GramP _ -> false)
+              proven_quants
+        | _ -> None
+      in
+      let guards =
+        List.concat_map
+          (fun guard ->
+            match checked_quant guard with
+            | Some quant -> Param.translate_eq_conditions index [quant]
+            | None -> [guard])
+          guards
+      in
+      let quants = List.filter (fun quant -> not (List.memq quant proven_quants)) quants in
       translate_deftyp index target bound quants deftyp
       |> guard_statements guards
 

@@ -3473,8 +3473,7 @@ mod SPEC2MAUDE-GENERATED is
   eq free-moduletype(EXTERNTYPE_1* -> EXTERNTYPE_2*) = recordConcat(free-list(map-free-externtype(EXTERNTYPE_1*)), free-list(map-free-externtype-2(EXTERNTYPE_2*)), free) .
 
   ceq typecheck(# VALUE, num-(INN)) = typecheck(# VALUE, iN(sizenn(INN)))
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(VALUE-3, num-(FNN)) = typecheck(VALUE-3, fN(sizenn(FNN)))
     if typecheck(FNN, Fnn) .
@@ -3511,21 +3510,17 @@ mod SPEC2MAUDE-GENERATED is
   eq typecheck(S, sx) = true .
 
   ceq typecheck(CLZ, unop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(CTZ, unop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(POPCNT, unop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(EXTEND(SZ), unop-(INN)) = true
-    if typecheck(INN, addrtype)
+    if typecheck(INN, Inn)
       /\ SZ < sizenn(INN)
-      /\ typecheck(INN, Inn)
       /\ typecheck(# SZ, sz) .
 
   ceq typecheck(ABS, unop-(FNN)) = true
@@ -3550,55 +3545,43 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn) .
 
   ceq typecheck(ADD, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(spectec-SUB, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(MUL, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(DIV(SX), binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
+    if typecheck(INN, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(REM(SX), binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
+    if typecheck(INN, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(AND, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(OR, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(XOR, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(SHL, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(SHR(SX), binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
+    if typecheck(INN, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(ROTL, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(ROTR, binop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(ADD, binop-(FNN)) = true
     if typecheck(FNN, Fnn) .
@@ -3622,35 +3605,28 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn) .
 
   ceq typecheck(EQZ, testop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(EQ, relop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(NE, relop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn) .
+    if typecheck(INN, Inn) .
 
   ceq typecheck(LT(SX), relop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
+    if typecheck(INN, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(GT(SX), relop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
+    if typecheck(INN, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(LE(SX), relop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
+    if typecheck(INN, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(GE(SX), relop-(INN)) = true
-    if typecheck(INN, addrtype)
-      /\ typecheck(INN, Inn)
+    if typecheck(INN, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(EQ, relop-(FNN)) = true
@@ -3672,49 +3648,40 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn) .
 
   ceq typecheck(EXTEND(SX), cvtop--(INN_1, INN_2)) = true
-    if typecheck(INN_1, addrtype)
-      /\ typecheck(INN_2, addrtype)
-      /\ sizenn1(INN_1) < sizenn2(INN_2)
-      /\ typecheck(INN_1, Inn)
+    if typecheck(INN_1, Inn)
       /\ typecheck(INN_2, Inn)
+      /\ sizenn1(INN_1) < sizenn2(INN_2)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(WRAP, cvtop--(INN_1, INN_2)) = true
-    if typecheck(INN_1, addrtype)
-      /\ typecheck(INN_2, addrtype)
-      /\ sizenn1(INN_1) > sizenn2(INN_2)
-      /\ typecheck(INN_1, Inn)
-      /\ typecheck(INN_2, Inn) .
+    if typecheck(INN_1, Inn)
+      /\ typecheck(INN_2, Inn)
+      /\ sizenn1(INN_1) > sizenn2(INN_2) .
 
   ceq typecheck(CONVERT(SX), cvtop--(INN_1, FNN_2)) = true
-    if typecheck(INN_1, addrtype)
+    if typecheck(INN_1, Inn)
       /\ typecheck(FNN_2, Fnn)
-      /\ typecheck(INN_1, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(REINTERPRET, cvtop--(INN_1, FNN_2)) = true
-    if typecheck(INN_1, addrtype)
+    if typecheck(INN_1, Inn)
       /\ typecheck(FNN_2, Fnn)
-      /\ sizenn1(INN_1) == sizenn2(FNN_2)
-      /\ typecheck(INN_1, Inn) .
+      /\ sizenn1(INN_1) == sizenn2(FNN_2) .
 
   ceq typecheck(spectec-TRUNC(SX), cvtop--(FNN_1, INN_2)) = true
     if typecheck(FNN_1, Fnn)
-      /\ typecheck(INN_2, addrtype)
       /\ typecheck(INN_2, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(TRUNC-SAT(SX), cvtop--(FNN_1, INN_2)) = true
     if typecheck(FNN_1, Fnn)
-      /\ typecheck(INN_2, addrtype)
       /\ typecheck(INN_2, Inn)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(REINTERPRET, cvtop--(FNN_1, INN_2)) = true
     if typecheck(FNN_1, Fnn)
-      /\ typecheck(INN_2, addrtype)
-      /\ sizenn1(FNN_1) == sizenn2(INN_2)
-      /\ typecheck(INN_2, Inn) .
+      /\ typecheck(INN_2, Inn)
+      /\ sizenn1(FNN_1) == sizenn2(INN_2) .
 
   ceq typecheck(PROMOTE, cvtop--(FNN_1, FNN_2)) = true
     if typecheck(FNN_1, Fnn)
@@ -4014,16 +3981,14 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(# VALUE-14, u64) .
 
   ceq typecheck(spectec-_-_(SZ, SX), loadop-(INN)) = true
-    if typecheck(INN, addrtype)
+    if typecheck(INN, Inn)
       /\ SZ < sizenn(INN)
-      /\ typecheck(INN, Inn)
       /\ typecheck(# SZ, sz)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(# SZ, storeop-(INN)) = true
-    if typecheck(INN, addrtype)
+    if typecheck(INN, Inn)
       /\ SZ < sizenn(INN)
-      /\ typecheck(INN, Inn)
       /\ typecheck(# SZ, sz) .
 
   ceq typecheck(SHAPE_X_-_(SZ, M-2, SX), vloadop-(VECTYPE)) = true
