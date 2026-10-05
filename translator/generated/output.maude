@@ -2570,15 +2570,12 @@ mod SPEC2MAUDE-GENERATED is
     if _and_(I >= 0, I <= 255) .
 
   ceq typecheck(# I, uN(N-2)) = true
-    if _and_(I >= 0, I <= (_-_((2 ^ N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat))
-      /\ typecheck(# N-2, N) .
+    if _and_(I >= 0, I <= (_-_((2 ^ N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) .
 
   ceq typecheck(# I-2, sN(N-2)) = true
-    if _or_(_or_(_and_(I-2 >= -_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int), I-2 <= -_(1 : nat <:> int)), I-2 == (0 : nat <:> int)), _and_(I-2 >= (1 : nat <:> int), I-2 <= _-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int)))
-      /\ typecheck(# N-2, N) .
+    if _or_(_or_(_and_(I-2 >= -_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int), I-2 <= -_(1 : nat <:> int)), I-2 == (0 : nat <:> int)), _and_(I-2 >= (1 : nat <:> int), I-2 <= _-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int))) .
 
-  ceq typecheck(# VALUE, iN(N-2)) = typecheck(# VALUE, uN(N-2))
-    if typecheck(# N-2, N) .
+  eq typecheck(# VALUE, iN(N-2)) = typecheck(# VALUE, uN(N-2)) .
 
   eq typecheck(# VALUE, u8) = typecheck(# VALUE, uN(8)) .
 
@@ -2614,32 +2611,23 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(NORM(M-3, EXP), fNmag(N-2)) = true
     if _and_(M-3 < (2 ^ spectec-M(N-2)), _and_(_-_(2 : nat <:> int, (2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) <= EXP, EXP <= _-_((2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int)))
-      /\ typecheck(# N-2, N)
-      /\ typecheck(# M-3, m)
       /\ typecheck(# EXP, spectec-exp) .
 
   ceq typecheck(SUBNORM(M-3), fNmag(N-2)) = true
     if M-3 < (2 ^ spectec-M(N-2))
       /\ EXP := _-_(2 : nat <:> int, (2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int)
-      /\ typecheck(# EXP, spectec-exp)
-      /\ typecheck(# N-2, N)
-      /\ typecheck(# M-3, m) .
+      /\ typecheck(# EXP, spectec-exp) .
 
-  ceq typecheck(INF, fNmag(N-2)) = true
-    if typecheck(# N-2, N) .
+  eq typecheck(INF, fNmag(N-2)) = true .
 
   ceq typecheck(NAN(M-3), fNmag(N-2)) = true
-    if _and_(1 <= M-3, M-3 < (2 ^ spectec-M(N-2)))
-      /\ typecheck(# N-2, N)
-      /\ typecheck(# M-3, m) .
+    if _and_(1 <= M-3, M-3 < (2 ^ spectec-M(N-2))) .
 
   ceq typecheck(POS(VALUE1), fN(N-2)) = true
-    if typecheck(# N-2, N)
-      /\ typecheck(VALUE1, fNmag(N-2)) .
+    if typecheck(VALUE1, fNmag(N-2)) .
 
   ceq typecheck(NEG(VALUE1), fN(N-2)) = true
-    if typecheck(# N-2, N)
-      /\ typecheck(VALUE1, fNmag(N-2)) .
+    if typecheck(VALUE1, fNmag(N-2)) .
 
   eq typecheck(VALUE-3, f32) = typecheck(VALUE-3, fN(32)) .
 
@@ -2653,8 +2641,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq canon-(N-2) = 2 ^ (_-_(signif(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat) .
 
-  ceq typecheck(# VALUE, vN(N-2)) = typecheck(# VALUE, uN(N-2))
-    if typecheck(# N-2, N) .
+  eq typecheck(# VALUE, vN(N-2)) = typecheck(# VALUE, uN(N-2)) .
 
   eq typecheck(# VALUE, v128) = typecheck(# VALUE, vN(128)) .
 
@@ -2852,11 +2839,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(# TYPEIDX, typeidx) .
 
   ceq typecheck(-DEF(RECTYPE, N-3), typeuse) = true
-    if typecheck(RECTYPE, rectype)
-      /\ typecheck(# N-3, n) .
+    if typecheck(RECTYPE, rectype) .
 
-  ceq typecheck(REC(N-3), typeuse) = true
-    if typecheck(# N-3, n) .
+  eq typecheck(REC(N-3), typeuse) = true .
 
   eq typecheck(ANY, heaptype) = true .
 
@@ -2888,11 +2873,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(# TYPEIDX, typeidx) .
 
   ceq typecheck(-DEF(RECTYPE, N-3), heaptype) = true
-    if typecheck(RECTYPE, rectype)
-      /\ typecheck(# N-3, n) .
+    if typecheck(RECTYPE, rectype) .
 
-  ceq typecheck(REC(N-3), heaptype) = true
-    if typecheck(# N-3, n) .
+  eq typecheck(REC(N-3), heaptype) = true .
 
   eq typecheck(I32, valtype) = true .
 
@@ -2961,14 +2944,12 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VALUE1-2, list(subtype)) .
 
   ceq typecheck(-DEF(RECTYPE, N-3), deftype) = true
-    if typecheck(RECTYPE, rectype)
-      /\ typecheck(# N-3, n) .
+    if typecheck(RECTYPE, rectype) .
 
   ceq typecheck(-IDX(TYPEIDX), typevar) = true
     if typecheck(# TYPEIDX, typeidx) .
 
-  ceq typecheck(REC(N-3), typevar) = true
-    if typecheck(# N-3, n) .
+  eq typecheck(REC(N-3), typevar) = true .
 
   ceq typecheck(REF(NULL?, HEAPTYPE), reftype) = true
     if typecheck(NULL?, null)
@@ -3789,269 +3770,207 @@ mod SPEC2MAUDE-GENERATED is
   eq typecheck(ANY-TRUE, vvtestop) = true .
 
   ceq typecheck(ABS, vunop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(spectec-NEG, vunop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(POPCNT, vunop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
-      /\ lsizenn(JNN) == 8
-      /\ typecheck(# M-2, M) .
+      /\ lsizenn(JNN) == 8 .
 
   ceq typecheck(ABS, vunop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-NEG, vunop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(SQRT, vunop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(CEIL, vunop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(FLOOR, vunop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(TRUNC, vunop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(NEAREST, vunop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(ADD, vbinop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(spectec-SUB, vbinop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(ADD-SAT(SX), vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 16
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(SUB-SAT(SX), vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 16
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(MUL, vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
-      /\ lsizenn(JNN) >= 16
-      /\ typecheck(# M-2, M) .
+      /\ lsizenn(JNN) >= 16 .
 
   ceq typecheck(AVGRU, vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
-      /\ lsizenn(JNN) <= 16
-      /\ typecheck(# M-2, M) .
+      /\ lsizenn(JNN) <= 16 .
 
   ceq typecheck(Q15MULR-SATS, vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
-      /\ lsizenn(JNN) == 16
-      /\ typecheck(# M-2, M) .
+      /\ lsizenn(JNN) == 16 .
 
   ceq typecheck(RELAXED-Q15MULRS, vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
-      /\ lsizenn(JNN) == 16
-      /\ typecheck(# M-2, M) .
+      /\ lsizenn(JNN) == 16 .
 
   ceq typecheck(spectec-MIN(SX), vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 32
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(spectec-MAX(SX), vbinop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ lsizenn(JNN) <= 32
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(ADD, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-SUB, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(MUL, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-DIV, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(MIN, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(MAX, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(PMIN, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(PMAX, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(RELAXED-MIN, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(RELAXED-MAX, vbinop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(RELAXED-LANESELECT, vternop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(RELAXED-MADD, vternop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(RELAXED-NMADD, vternop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(ALL-TRUE, vtestop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(EQ, vrelop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(NE, vrelop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(LT(SX), vrelop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(GT(SX), vrelop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(LE(SX), vrelop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(GE(SX), vrelop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
       /\ _or_(lsizenn(JNN) =/= 64, SX == S)
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(EQ, vrelop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(NE, vrelop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-LT, vrelop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-GT, vrelop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-LE, vrelop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(spectec-GE, vrelop-(_X_(FNN, M-2))) = true
-    if typecheck(FNN, Fnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(FNN, Fnn) .
 
   ceq typecheck(SHL, vshiftop-(_X_(JNN, M-2))) = true
-    if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M) .
+    if typecheck(JNN, Jnn) .
 
   ceq typecheck(SHR(SX), vshiftop-(_X_(JNN, M-2))) = true
     if typecheck(JNN, Jnn)
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
-  ceq typecheck(SWIZZLE, vswizzlop-(_X_(I8, M-2))) = true
-    if typecheck(# M-2, M) .
+  eq typecheck(SWIZZLE, vswizzlop-(_X_(I8, M-2))) = true .
 
-  ceq typecheck(RELAXED-SWIZZLE, vswizzlop-(_X_(I8, M-2))) = true
-    if typecheck(# M-2, M) .
+  eq typecheck(RELAXED-SWIZZLE, vswizzlop-(_X_(I8, M-2))) = true .
 
   ceq typecheck(EXTADD-PAIRWISE(SX), vextunop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
       /\ _and_(16 <= (2 * lsizenn1(JNN_1)), _and_((2 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) <= 32))
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(EXTMUL(HALF, SX), vextbinop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
       /\ _and_((2 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) >= 16)
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M)
       /\ typecheck(HALF, half)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(DOTS, vextbinop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
-      /\ _and_((2 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32)
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M) .
+      /\ _and_((2 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32) .
 
   ceq typecheck(RELAXED-DOTS, vextbinop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
-      /\ _and_((2 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 16)
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M) .
+      /\ _and_((2 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 16) .
 
   ceq typecheck(RELAXED-DOT-ADDS, vextternop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
-      /\ _and_((4 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32)
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M) .
+      /\ _and_((4 * lsizenn1(JNN_1)) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32) .
 
   ceq typecheck(spectec-EXTEND(HALF, SX), vcvtop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
       /\ lsizenn2(JNN_2) == (2 * lsizenn1(JNN_1))
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M)
       /\ typecheck(HALF, half)
       /\ typecheck(SX, sx) .
 
@@ -4059,8 +3978,6 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN_1, Jnn)
       /\ typecheck(FNN_2, Fnn)
       /\ _or_(_and_(_and_(sizenn2(FNN_2) == lsizenn1(JNN_1), lsizenn1(JNN_1) == 32), HALF? == eps), _and_(sizenn2(FNN_2) == (2 * lsizenn1(JNN_1)), HALF? == (LOW ?)))
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M)
       /\ typecheck(HALF?, half)
       /\ len(HALF?) <= 1
       /\ typecheck(SX, sx) .
@@ -4069,8 +3986,6 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN_1, Fnn)
       /\ typecheck(JNN_2, Jnn)
       /\ _or_(_and_(_and_(sizenn1(FNN_1) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32), ZERO? == eps), _and_(sizenn1(FNN_1) == (2 * lsizenn2(JNN_2)), ZERO? == (ZERO ?)))
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M)
       /\ typecheck(SX, sx)
       /\ typecheck(ZERO?, zero)
       /\ len(ZERO?) <= 1 .
@@ -4079,8 +3994,6 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN_1, Fnn)
       /\ typecheck(JNN_2, Jnn)
       /\ _or_(_and_(_and_(sizenn1(FNN_1) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32), ZERO? == eps), _and_(sizenn1(FNN_1) == (2 * lsizenn2(JNN_2)), ZERO? == (ZERO ?)))
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M)
       /\ typecheck(SX, sx)
       /\ typecheck(ZERO?, zero)
       /\ len(ZERO?) <= 1 .
@@ -4089,16 +4002,12 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN_1, Fnn)
       /\ typecheck(FNN_2, Fnn)
       /\ sizenn1(FNN_1) == (2 * sizenn2(FNN_2))
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M)
       /\ typecheck(ZERO-3, zero) .
 
   ceq typecheck(PROMOTELOW, vcvtop--(_X_(FNN_1, M_1), _X_(FNN_2, M_2))) = true
     if typecheck(FNN_1, Fnn)
       /\ typecheck(FNN_2, Fnn)
-      /\ (2 * sizenn1(FNN_1)) == sizenn2(FNN_2)
-      /\ typecheck(# M_1, M)
-      /\ typecheck(# M_2, M) .
+      /\ (2 * sizenn1(FNN_1)) == sizenn2(FNN_2) .
 
   ceq typecheck({ (field('ALIGN, # VALUE) ; field('OFFSET, # VALUE-14)) }, memarg) = true
     if typecheck(# VALUE, u32)
@@ -4121,7 +4030,6 @@ mod SPEC2MAUDE-GENERATED is
     if (# ((SZ * M-2) : nat <:> rat)) == (# ((vsize(VECTYPE) : nat <:> rat) / (2 : nat <:> rat)))
       /\ typecheck(VECTYPE, vectype)
       /\ typecheck(# SZ, sz)
-      /\ typecheck(# M-2, M)
       /\ typecheck(SX, sx) .
 
   ceq typecheck(SPLAT(SZ), vloadop-(VECTYPE)) = true
@@ -4174,20 +4082,15 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(# VALUE, tagaddr) = typecheck(# VALUE, addr) .
 
-  ceq typecheck(TAG(TAGADDR), externaddr) = true
-    if typecheck(# TAGADDR, tagaddr) .
+  eq typecheck(TAG(TAGADDR), externaddr) = true .
 
-  ceq typecheck(GLOBAL(GLOBALADDR), externaddr) = true
-    if typecheck(# GLOBALADDR, globaladdr) .
+  eq typecheck(GLOBAL(GLOBALADDR), externaddr) = true .
 
-  ceq typecheck(MEM(MEMADDR), externaddr) = true
-    if typecheck(# MEMADDR, memaddr) .
+  eq typecheck(MEM(MEMADDR), externaddr) = true .
 
-  ceq typecheck(TABLE(TABLEADDR), externaddr) = true
-    if typecheck(# TABLEADDR, tableaddr) .
+  eq typecheck(TABLE(TABLEADDR), externaddr) = true .
 
-  ceq typecheck(FUNC(FUNCADDR), externaddr) = true
-    if typecheck(# FUNCADDR, funcaddr) .
+  eq typecheck(FUNC(FUNCADDR), externaddr) = true .
 
   ceq typecheck({ (field('NAME, VALUE-4) ; field('ADDR, VALUE-3)) }, exportinst) = true
     if typecheck(VALUE-4, name)
@@ -4215,20 +4118,15 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(REF.NULL-ADDR, ref) = true .
 
-  ceq typecheck(REF.STRUCT-ADDR(STRUCTADDR), ref) = true
-    if typecheck(# STRUCTADDR, structaddr) .
+  eq typecheck(REF.STRUCT-ADDR(STRUCTADDR), ref) = true .
 
-  ceq typecheck(REF.ARRAY-ADDR(ARRAYADDR), ref) = true
-    if typecheck(# ARRAYADDR, arrayaddr) .
+  eq typecheck(REF.ARRAY-ADDR(ARRAYADDR), ref) = true .
 
-  ceq typecheck(REF.FUNC-ADDR(FUNCADDR), ref) = true
-    if typecheck(# FUNCADDR, funcaddr) .
+  eq typecheck(REF.FUNC-ADDR(FUNCADDR), ref) = true .
 
-  ceq typecheck(REF.EXN-ADDR(EXNADDR), ref) = true
-    if typecheck(# EXNADDR, exnaddr) .
+  eq typecheck(REF.EXN-ADDR(EXNADDR), ref) = true .
 
-  ceq typecheck(REF.HOST-ADDR(HOSTADDR), ref) = true
-    if typecheck(# HOSTADDR, hostaddr) .
+  eq typecheck(REF.HOST-ADDR(HOSTADDR), ref) = true .
 
   ceq typecheck(REF.EXTERN(REF-2), ref) = true
     if typecheck(REF-2, ref) .
@@ -4246,20 +4144,15 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(REF.NULL-ADDR, val) = true .
 
-  ceq typecheck(REF.STRUCT-ADDR(STRUCTADDR), val) = true
-    if typecheck(# STRUCTADDR, structaddr) .
+  eq typecheck(REF.STRUCT-ADDR(STRUCTADDR), val) = true .
 
-  ceq typecheck(REF.ARRAY-ADDR(ARRAYADDR), val) = true
-    if typecheck(# ARRAYADDR, arrayaddr) .
+  eq typecheck(REF.ARRAY-ADDR(ARRAYADDR), val) = true .
 
-  ceq typecheck(REF.FUNC-ADDR(FUNCADDR), val) = true
-    if typecheck(# FUNCADDR, funcaddr) .
+  eq typecheck(REF.FUNC-ADDR(FUNCADDR), val) = true .
 
-  ceq typecheck(REF.EXN-ADDR(EXNADDR), val) = true
-    if typecheck(# EXNADDR, exnaddr) .
+  eq typecheck(REF.EXN-ADDR(EXNADDR), val) = true .
 
-  ceq typecheck(REF.HOST-ADDR(HOSTADDR), val) = true
-    if typecheck(# HOSTADDR, hostaddr) .
+  eq typecheck(REF.HOST-ADDR(HOSTADDR), val) = true .
 
   ceq typecheck(REF.EXTERN(REF-2), val) = true
     if typecheck(REF-2, ref) .
@@ -4659,34 +4552,26 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(REF.NULL-ADDR, instr) = true .
 
-  ceq typecheck(REF.STRUCT-ADDR(STRUCTADDR), instr) = true
-    if typecheck(# STRUCTADDR, structaddr) .
+  eq typecheck(REF.STRUCT-ADDR(STRUCTADDR), instr) = true .
 
-  ceq typecheck(REF.ARRAY-ADDR(ARRAYADDR), instr) = true
-    if typecheck(# ARRAYADDR, arrayaddr) .
+  eq typecheck(REF.ARRAY-ADDR(ARRAYADDR), instr) = true .
 
-  ceq typecheck(REF.FUNC-ADDR(FUNCADDR), instr) = true
-    if typecheck(# FUNCADDR, funcaddr) .
+  eq typecheck(REF.FUNC-ADDR(FUNCADDR), instr) = true .
 
-  ceq typecheck(REF.EXN-ADDR(EXNADDR), instr) = true
-    if typecheck(# EXNADDR, exnaddr) .
+  eq typecheck(REF.EXN-ADDR(EXNADDR), instr) = true .
 
-  ceq typecheck(REF.HOST-ADDR(HOSTADDR), instr) = true
-    if typecheck(# HOSTADDR, hostaddr) .
+  eq typecheck(REF.HOST-ADDR(HOSTADDR), instr) = true .
 
   ceq typecheck(REF.EXTERN(REF-2), instr) = true
     if typecheck(REF-2, ref) .
 
-  ceq typecheck(LABEL- N-3 { INSTR* } INSTR*-2, instr) = true
-    if typecheck(# N-3, n) .
+  eq typecheck(LABEL- N-3 { INSTR* } INSTR*-2, instr) = true .
 
   ceq typecheck(FRAME- N-3 { FRAME } INSTR*, instr) = true
-    if typecheck(# N-3, n)
-      /\ typecheck(FRAME, frame) .
+    if typecheck(FRAME, frame) .
 
   ceq typecheck(HANDLER- N-3 { CATCH* } INSTR*, instr) = true
-    if typecheck(# N-3, n)
-      /\ typecheck(CATCH*, catch) .
+    if typecheck(CATCH*, catch) .
 
   eq typecheck(TRAP, instr) = true .
 
@@ -6165,8 +6050,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(-VALS(VAL*), result) = true .
 
-  ceq typecheck((REF.EXN-ADDR EXNADDR )THROW-REF, result) = true
-    if typecheck(# EXNADDR, exnaddr) .
+  eq typecheck((REF.EXN-ADDR EXNADDR )THROW-REF, result) = true .
 
   eq typecheck(TRAP, result) = true .
 
@@ -6225,20 +6109,15 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(REF.NULL-ADDR, fieldval) = true .
 
-  ceq typecheck(REF.STRUCT-ADDR(STRUCTADDR), fieldval) = true
-    if typecheck(# STRUCTADDR, structaddr) .
+  eq typecheck(REF.STRUCT-ADDR(STRUCTADDR), fieldval) = true .
 
-  ceq typecheck(REF.ARRAY-ADDR(ARRAYADDR), fieldval) = true
-    if typecheck(# ARRAYADDR, arrayaddr) .
+  eq typecheck(REF.ARRAY-ADDR(ARRAYADDR), fieldval) = true .
 
-  ceq typecheck(REF.FUNC-ADDR(FUNCADDR), fieldval) = true
-    if typecheck(# FUNCADDR, funcaddr) .
+  eq typecheck(REF.FUNC-ADDR(FUNCADDR), fieldval) = true .
 
-  ceq typecheck(REF.EXN-ADDR(EXNADDR), fieldval) = true
-    if typecheck(# EXNADDR, exnaddr) .
+  eq typecheck(REF.EXN-ADDR(EXNADDR), fieldval) = true .
 
-  ceq typecheck(REF.HOST-ADDR(HOSTADDR), fieldval) = true
-    if typecheck(# HOSTADDR, hostaddr) .
+  eq typecheck(REF.HOST-ADDR(HOSTADDR), fieldval) = true .
 
   ceq typecheck(REF.EXTERN(REF-2), fieldval) = true
     if typecheck(REF-2, ref) .
@@ -6255,8 +6134,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(VALUE-3, deftype)
       /\ typecheck(VALUE-4, fieldval) .
 
-  ceq typecheck({ (field('TAG, # VALUE) ; field('FIELDS, VALUE-22)) }, exninst) = true
-    if typecheck(# VALUE, tagaddr) .
+  eq typecheck({ (field('TAG, # VALUE) ; field('FIELDS, VALUE-22)) }, exninst) = true .
 
   ceq typecheck({ (((((((((field('TAGS, VALUE-4) ; field('GLOBALS, VALUE-5)) ; field('MEMS, VALUE-6)) ; field('TABLES, VALUE-7)) ; field('FUNCS, VALUE-8)) ; field('DATAS, VALUE-9)) ; field('ELEMS, VALUE-10)) ; field('STRUCTS, VALUE-11)) ; field('ARRAYS, VALUE-12)) ; field('EXNS, VALUE-13)) }, store) = true
     if typecheck(VALUE-4, taginst)
