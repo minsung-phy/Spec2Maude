@@ -2728,16 +2728,16 @@ mod SPEC2MAUDE-GENERATED is
   eq tagsxx(EXTERNIDX XX*) = tagsxx(XX*) [owise] .
 
   ceq typecheck({ (((((((((field('TYPES, VALUE-4) ; field('FUNCS, VALUE-5)) ; field('GLOBALS, VALUE-6)) ; field('TABLES, VALUE-7)) ; field('MEMS, VALUE-8)) ; field('ELEMS, VALUE-9)) ; field('DATAS, VALUE-10)) ; field('LOCALS, VALUE-11)) ; field('LABELS, VALUE-12)) ; field('TAGS, VALUE-13)) }, free) = true
-    if typecheck(VALUE-4, uN(32))
-      /\ typecheck(VALUE-5, uN(32))
-      /\ typecheck(VALUE-6, uN(32))
-      /\ typecheck(VALUE-7, uN(32))
-      /\ typecheck(VALUE-8, uN(32))
-      /\ typecheck(VALUE-9, uN(32))
-      /\ typecheck(VALUE-10, uN(32))
-      /\ typecheck(VALUE-11, uN(32))
-      /\ typecheck(VALUE-12, uN(32))
-      /\ typecheck(VALUE-13, uN(32)) .
+    if typecheck(VALUE-4, typeidx)
+      /\ typecheck(VALUE-5, funcidx)
+      /\ typecheck(VALUE-6, globalidx)
+      /\ typecheck(VALUE-7, tableidx)
+      /\ typecheck(VALUE-8, memidx)
+      /\ typecheck(VALUE-9, elemidx)
+      /\ typecheck(VALUE-10, dataidx)
+      /\ typecheck(VALUE-11, localidx)
+      /\ typecheck(VALUE-12, labelidx)
+      /\ typecheck(VALUE-13, tagidx) .
 
   eq recordConcat(LEFT, RIGHT, free) = { (((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; field('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) } .
 
@@ -3028,7 +3028,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck([ U64 .. U64? ], limits) = true
     if typecheck(# U64, u64)
-      /\ typecheck(U64?, uN(64))
+      /\ typecheck(U64?, u64)
       /\ len(U64?) <= 1 .
 
   eq typecheck(VALUE-3, tagtype) = typecheck(VALUE-3, typeuse) .
@@ -4063,13 +4063,13 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck({ ((((((((field('TYPES, VALUE-4) ; field('TAGS, VALUE-5)) ; field('GLOBALS, VALUE-6)) ; field('MEMS, VALUE-7)) ; field('TABLES, VALUE-8)) ; field('FUNCS, VALUE-9)) ; field('DATAS, VALUE-10)) ; field('ELEMS, VALUE-11)) ; field('EXPORTS, VALUE-12)) }, moduleinst) = true
     if typecheck(VALUE-4, deftype)
-      /\ typecheck(VALUE-5, nat)
-      /\ typecheck(VALUE-6, nat)
-      /\ typecheck(VALUE-7, nat)
-      /\ typecheck(VALUE-8, nat)
-      /\ typecheck(VALUE-9, nat)
-      /\ typecheck(VALUE-10, nat)
-      /\ typecheck(VALUE-11, nat)
+      /\ typecheck(VALUE-5, tagaddr)
+      /\ typecheck(VALUE-6, globaladdr)
+      /\ typecheck(VALUE-7, memaddr)
+      /\ typecheck(VALUE-8, tableaddr)
+      /\ typecheck(VALUE-9, funcaddr)
+      /\ typecheck(VALUE-10, dataaddr)
+      /\ typecheck(VALUE-11, elemaddr)
       /\ typecheck(VALUE-12, exportinst) .
 
   eq recordConcat(LEFT, RIGHT, moduleinst) = { ((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('EXPORTS, (LEFT . 'EXPORTS) (RIGHT . 'EXPORTS))) } .
@@ -4154,7 +4154,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(# LABELIDX, labelidx) .
 
   ceq typecheck(BR-TABLE(LABELIDX*, LABELIDX), instr) = true
-    if typecheck(LABELIDX*, uN(32))
+    if typecheck(LABELIDX*, labelidx)
       /\ typecheck(# LABELIDX, labelidx) .
 
   ceq typecheck(BR-ON-NULL(LABELIDX), instr) = true
@@ -4470,7 +4470,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck(VSHUFFLE(BSHAPE, LANEIDX*), instr) = true
     if len(LANEIDX*) == spectec-dim(BSHAPE)
       /\ typecheck(BSHAPE, bshape)
-      /\ typecheck(LANEIDX*, uN(8)) .
+      /\ typecheck(LANEIDX*, laneidx) .
 
   ceq typecheck(VEXTUNOP(ISHAPE_1, ISHAPE_2, VALUE3), instr) = true
     if typecheck(ISHAPE_1, ishape)
@@ -4838,7 +4838,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(ELEM(REFTYPE, EXPR*, ELEMMODE), elem) = true
     if typecheck(REFTYPE, reftype)
-      /\ typecheck(EXPR*, iterList(instr))
+      /\ typecheck(EXPR*, expr)
       /\ typecheck(ELEMMODE, elemmode) .
 
   ceq typecheck(START(FUNCIDX), start) = true
@@ -4918,23 +4918,23 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(RESULTTYPE ->- LOCALIDX*  RESULTTYPE-2, instrtype) = true
     if typecheck(RESULTTYPE, resulttype)
-      /\ typecheck(LOCALIDX*, uN(32))
+      /\ typecheck(LOCALIDX*, localidx)
       /\ typecheck(RESULTTYPE-2, resulttype) .
 
   ceq typecheck({ ((((((((((((field('TYPES, VALUE-4) ; field('TAGS, VALUE-5)) ; field('GLOBALS, VALUE-6)) ; field('MEMS, VALUE-7)) ; field('TABLES, VALUE-8)) ; field('FUNCS, VALUE-9)) ; field('DATAS, VALUE-10)) ; field('ELEMS, VALUE-11)) ; field('LOCALS, VALUE-12)) ; field('LABELS, VALUE-13)) ; field('RETURN, VALUE-16)) ; field('REFS, VALUE-17)) ; field('RECS, VALUE-18)) }, context) = true
     if typecheck(VALUE-4, deftype)
-      /\ typecheck(VALUE-5, typeuse)
+      /\ typecheck(VALUE-5, tagtype)
       /\ typecheck(VALUE-6, globaltype)
       /\ typecheck(VALUE-7, memtype)
       /\ typecheck(VALUE-8, tabletype)
       /\ typecheck(VALUE-9, deftype)
       /\ typecheck(VALUE-10, datatype)
-      /\ typecheck(VALUE-11, reftype)
+      /\ typecheck(VALUE-11, elemtype)
       /\ typecheck(VALUE-12, localtype)
-      /\ typecheck(VALUE-13, list(valtype))
-      /\ typecheck(VALUE-16, list(valtype))
+      /\ typecheck(VALUE-13, resulttype)
+      /\ typecheck(VALUE-16, resulttype)
       /\ len(VALUE-16) <= 1
-      /\ typecheck(VALUE-17, uN(32))
+      /\ typecheck(VALUE-17, funcidx)
       /\ typecheck(VALUE-18, subtype) .
 
   eq recordConcat(LEFT, RIGHT, context) = { ((((((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; field('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; field('RETURN, optionConcat(LEFT . 'RETURN, RIGHT . 'RETURN))) ; field('REFS, (LEFT . 'REFS) (RIGHT . 'REFS))) ; field('RECS, (LEFT . 'RECS) (RIGHT . 'RECS))) } .
@@ -5445,7 +5445,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq irelaxed-swizzle-lane-(N-2, C*, I) = 0
     if signed-(N-2, I) < (0 : nat <:> int) .
 
-  eq irelaxed-swizzle-lane-(N-2, C*, I) = #rat(spectec-relaxed2(r-swizzle, uN(N-2), # 0, # #rat(C* [ _rem_(I, len(C*)) ]))) [owise] .
+  eq irelaxed-swizzle-lane-(N-2, C*, I) = #rat(spectec-relaxed2(r-swizzle, iN(N-2), # 0, # #rat(C* [ _rem_(I, len(C*)) ]))) [owise] .
 
   ceq ivunop-iabs-(_X_(JNN, M-2), V_1) = # inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -5465,37 +5465,37 @@ mod SPEC2MAUDE-GENERATED is
   ceq fvunop-fabs-(_X_(FNN, M-2), V_1) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
-      /\ C** := setproduct-(fN(size(FNN)), map-fabs(FNN, C_1*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fabs(FNN, C_1*)) .
 
   ceq fvunop-fneg-(_X_(FNN, M-2), V_1) = map-inv-lanes-2(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
-      /\ C** := setproduct-(fN(size(FNN)), map-fneg(FNN, C_1*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fneg(FNN, C_1*)) .
 
   ceq fvunop-fsqrt-(_X_(FNN, M-2), V_1) = map-inv-lanes-3(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
-      /\ C** := setproduct-(fN(size(FNN)), map-fsqrt(FNN, C_1*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fsqrt(FNN, C_1*)) .
 
   ceq fvunop-fceil-(_X_(FNN, M-2), V_1) = map-inv-lanes-4(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
-      /\ C** := setproduct-(fN(size(FNN)), map-fceil(FNN, C_1*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fceil(FNN, C_1*)) .
 
   ceq fvunop-ffloor-(_X_(FNN, M-2), V_1) = map-inv-lanes-5(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
-      /\ C** := setproduct-(fN(size(FNN)), map-ffloor(FNN, C_1*)) .
+      /\ C** := setproduct-(lane-(FNN), map-ffloor(FNN, C_1*)) .
 
   ceq fvunop-ftrunc-(_X_(FNN, M-2), V_1) = map-inv-lanes-6(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
-      /\ C** := setproduct-(fN(size(FNN)), map-ftrunc(FNN, C_1*)) .
+      /\ C** := setproduct-(lane-(FNN), map-ftrunc(FNN, C_1*)) .
 
   ceq fvunop-fnearest-(_X_(FNN, M-2), V_1) = map-inv-lanes-7(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
-      /\ C** := setproduct-(fN(size(FNN)), map-fnearest(FNN, C_1*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fnearest(FNN, C_1*)) .
 
   ceq ivbinop-iadd-(_X_(JNN, M-2), V_1, V_2) = # inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -5555,88 +5555,88 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C** := setproduct-(uN(lsize(JNN)), map-irelaxed-q15mulr(JNN, SX, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(JNN), map-irelaxed-q15mulr(JNN, SX, C_1*, C_2*)) .
 
   ceq fvbinop-fadd-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-9(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fadd(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fadd(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-fsub-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-10(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fsub(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fsub(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-fmul-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-11(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fmul(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fmul(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-fdiv-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-12(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fdiv(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fdiv(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-fmin-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-13(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fmin(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fmin(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-fmax-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-14(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fmax(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fmax(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-fpmin-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-15(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fpmin(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fpmin(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-fpmax-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-16(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-fpmax(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-fpmax(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-frelaxed-min-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-17(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-frelaxed-min(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-frelaxed-min(FNN, C_1*, C_2*)) .
 
   ceq fvbinop-frelaxed-max-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-18(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C** := setproduct-(fN(size(FNN)), map-frelaxed-max(FNN, C_1*, C_2*)) .
+      /\ C** := setproduct-(lane-(FNN), map-frelaxed-max(FNN, C_1*, C_2*)) .
 
   ceq ivternopnd-irelaxed-laneselect-(_X_(JNN, M-2), V_1, V_2, V_3) = map-inv-lanes-19(JNN, M-2, C**)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
       /\ C_3* := lanes-(_X_(JNN, M-2), V_3)
-      /\ C** := setproduct-(uN(lsize(JNN)), map-irelaxed-laneselect(JNN, C_1*, C_2*, C_3*)) .
+      /\ C** := setproduct-(lane-(JNN), map-irelaxed-laneselect(JNN, C_1*, C_2*, C_3*)) .
 
   ceq fvternop-frelaxed-madd-(_X_(FNN, M-2), V_1, V_2, V_3) = map-inv-lanes-20(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C_3* := lanes-(_X_(FNN, M-2), V_3)
-      /\ C** := setproduct-(fN(size(FNN)), map-frelaxed-madd(FNN, C_1*, C_2*, C_3*)) .
+      /\ C** := setproduct-(lane-(FNN), map-frelaxed-madd(FNN, C_1*, C_2*, C_3*)) .
 
   ceq fvternop-frelaxed-nmadd-(_X_(FNN, M-2), V_1, V_2, V_3) = map-inv-lanes-21(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C_3* := lanes-(_X_(FNN, M-2), V_3)
-      /\ C** := setproduct-(fN(size(FNN)), map-frelaxed-nmadd(FNN, C_1*, C_2*, C_3*)) .
+      /\ C** := setproduct-(lane-(FNN), map-frelaxed-nmadd(FNN, C_1*, C_2*, C_3*)) .
 
   ceq ivrelop-ieq-(_X_(JNN, M-2), V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -5941,8 +5941,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ V := inv-lanes-(_X_(JNN_2, M_2), C'_1* C'_2*) .
 
   ceq ivadd-pairwise-(N-2, I*) = map-iadd-2(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1040(inv-concat-(nat, I*))
-      /\ concat-(nat, map-exp-1040(J_1*, J_2*)) == I* .
+    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1040(inv-concat-(N, I*))
+      /\ concat-(N, map-exp-1040(J_1*, J_2*)) == I* .
 
   ceq ivextunop--ivadd-pairwise-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, V_1) = inv-lanes-(_X_(JNN_2, M_2), C*)
     if typecheck(JNN_1, Jnn)
@@ -5954,12 +5954,12 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-vextunop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), EXTADD-PAIRWISE(SX), V_1) = ivextunop--ivadd-pairwise-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, V_1) .
 
   ceq ivdot-(N-2, I_1*, I_2*) = map-iadd-3(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1049(N-2, inv-concat-(uN(N-2), map-imul-2(N-2, I_1*, I_2*)))
-      /\ concat-(uN(N-2), map-exp-1049(N-2, J_1*, J_2*)) == map-imul-2(N-2, I_1*, I_2*) .
+    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1049(N-2, inv-concat-(iN(N-2), map-imul-2(N-2, I_1*, I_2*)))
+      /\ concat-(iN(N-2), map-exp-1049(N-2, J_1*, J_2*)) == map-imul-2(N-2, I_1*, I_2*) .
 
   ceq ivdot-sat-(N-2, I_1*, I_2*) = map-iadd-sat-2(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1052(N-2, inv-concat-(uN(N-2), map-imul-3(N-2, I_1*, I_2*)))
-      /\ concat-(uN(N-2), map-exp-1052(N-2, J_1*, J_2*)) == map-imul-3(N-2, I_1*, I_2*) .
+    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1052(N-2, inv-concat-(iN(N-2), map-imul-3(N-2, I_1*, I_2*)))
+      /\ concat-(iN(N-2), map-exp-1052(N-2, J_1*, J_2*)) == map-imul-3(N-2, I_1*, I_2*) .
 
   ceq ivextbinop--ivmul-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX_1, SX_2, I, K-3, V_1, V_2) = inv-lanes-(_X_(JNN_2, M_2), C*)
     if typecheck(JNN_1, Jnn)

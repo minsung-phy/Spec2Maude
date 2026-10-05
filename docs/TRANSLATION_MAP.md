@@ -271,7 +271,7 @@ other expressions are handled by `term.ml:translate_value`.
 | `TupT fields` | one component for each field | `term.ml:translate_components` |
 | `IterT t Opt` / `IterT t List`, as a type argument | `iterOpt(⟦t⟧)` / `iterList(⟦t⟧)` | `term.ml:translate_check_typ` |
 | `IterT t iter`, as a sort | the sort of the sequence or option of `t` | `term.ml:translate_sort` |
-| `ExpA e` / `TypA t` | `⟦e⟧` / `⟦t⟧` after expanding type aliases | `term.ml:translate_arg`, `term.ml:translate_check_typ` |
+| `ExpA e` / `TypA t` | `⟦e⟧` / `⟦t⟧`, keeping the source type name (an alias such as `localidx` is not expanded; its `typecheck` equation resolves it) | `term.ml:translate_arg`, `term.ml:translate_check_typ` |
 | `ExpP x t` / `TypP x` | variable of sort `S(t)` / of sort `SpectecType` | `param.ml` |
 | `DefP`, `DefA` | removed before translation: each call with a function argument uses a copy of the definition specialized to that function | `decd.ml:specialize` |
 

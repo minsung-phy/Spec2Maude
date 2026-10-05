@@ -236,10 +236,6 @@ and translate_call_arg index sort arg =
 
 and translate_check_typ index typ =
   match typ.it with
-  | VarT (id, _) when Prescan.type_parameter index id = None ->
-      let expanded = Il.Eval.reduce_typ index.Prescan.type_env typ in
-      if Il.Eq.eq_typ expanded typ then translate_typ index typ
-      else translate_check_typ index expanded
   | IterT (element, Opt) ->
       app "iterOpt" [translate_check_typ index element]
   | IterT (element, List) ->
