@@ -273,14 +273,13 @@ eq typecheck(VALUE, u32) = typecheck(VALUE, uN(32)) .
 
 `u32`에 속하는지는 `uN(32)`에 속하는지로 검사한다. 값에 `u32(...)`라는 새 포장을 씌우지는 않는다.
 
-S1의 `iN(N) = uN(N)`도 같은 분기다. 인자의 타입 검사까지 필요해서 조건부 equation이 된다.
+S1의 `iN(N) = uN(N)`도 같은 분기다.
 
 ```maude
-ceq typecheck(VALUE, iN(N-2)) = typecheck(VALUE, uN(N-2))
-  if typecheck(N-2, N) .
+eq typecheck(# VALUE, iN(N-2)) = typecheck(# VALUE, uN(N-2)) .
 ```
 
-여기서 `N-2`는 숫자 변수, `N`은 source 타입 이름이다. 조건이 없으면 `eq`, 있으면 `ceq`를 쓴다. 목록을 다른 값 안에 넣어 `seq(...)`로 감싼 경우에는 그 표현을 검사하는 alias equation도 추가할 수 있다.
+여기서 `N-2`는 숫자 변수, `N`은 source 타입 이름이다. `N`은 `nat`의 별칭이고 `N-2`의 sort가 이미 `Nat`이므로 인자 검사 조건은 생기지 않는다. 조건이 없으면 `eq`, 있으면 `ceq`를 쓴다. 목록을 다른 값 안에 넣어 `seq(...)`로 감싼 경우에는 그 표현을 검사하는 alias equation도 추가할 수 있다.
 
 코드: [Typd.translate_alias](../translator/typd.ml).
 
