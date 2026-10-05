@@ -211,8 +211,12 @@ let rec translate_typ index typ =
       Const "text"
   | TupT _ ->
       invalid_arg "TupT must be translated by translate_components"
-  | IterT (typ, _) ->
+  | IterT (typ, List) ->
+      (* typecheck distributes over the elements of a sequence. *)
       translate_typ index typ
+  | IterT (_, (Opt | List1 | ListN _)) ->
+      (* The element type alone would drop the length condition. *)
+      invalid_arg "IterT ?, + or ^n as a type value is not supported"
 
 and translate_arg index arg =
   match arg.it with
