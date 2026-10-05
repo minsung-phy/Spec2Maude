@@ -2610,13 +2610,11 @@ mod SPEC2MAUDE-GENERATED is
   eq typecheck(# VALUE-2, spectec-exp) = typecheck(# VALUE-2, int) .
 
   ceq typecheck(NORM(M-3, EXP), fNmag(N-2)) = true
-    if _and_(M-3 < (2 ^ spectec-M(N-2)), _and_(_-_(2 : nat <:> int, (2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) <= EXP, EXP <= _-_((2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int)))
-      /\ typecheck(# EXP, spectec-exp) .
+    if _and_(M-3 < (2 ^ spectec-M(N-2)), _and_(_-_(2 : nat <:> int, (2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) <= EXP, EXP <= _-_((2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int))) .
 
   ceq typecheck(SUBNORM(M-3), fNmag(N-2)) = true
     if M-3 < (2 ^ spectec-M(N-2))
-      /\ EXP := _-_(2 : nat <:> int, (2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int)
-      /\ typecheck(# EXP, spectec-exp) .
+      /\ EXP := _-_(2 : nat <:> int, (2 ^ (_-_(E(N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) .
 
   eq typecheck(INF, fNmag(N-2)) = true .
 

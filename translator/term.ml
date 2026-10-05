@@ -569,11 +569,13 @@ let rec translate_typ_conditions index value typ =
   match translate_sort index typ, typ.it with
   | _, NumT (`NatT | `IntT) ->
       []
-  (* A Nat-sorted variable ranges exactly over the source nat values, so a
-     membership in an alias of nat (e.g. syntax N = nat) adds no condition. *)
-  | "Nat", VarT _
-    when (match value with Var v -> v.sort = "Nat" | _ -> false)
-         && (Il.Eval.reduce_typ index.Prescan.type_env typ).it = NumT `NatT ->
+  (* A Nat- or Int-sorted variable ranges exactly over the source nat or int
+     values, so a membership in an alias of nat or int (e.g. syntax N = nat,
+     syntax exp = int) adds no condition. *)
+  | ("Nat" | "Int" as sort), VarT _
+    when (match value with Var v -> v.sort = sort | _ -> false)
+         && (Il.Eval.reduce_typ index.Prescan.type_env typ).it
+            = NumT (if sort = "Nat" then `NatT else `IntT) ->
       []
   | _, TupT fields ->
       let rec check bindings position = function
