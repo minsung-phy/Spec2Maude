@@ -186,7 +186,6 @@ let reserved_names =
     ; "iterOpt"; "iterList"
     ; "indexDefined"; "lenAux"
     ; "EMPTY"; "recordConcat"; "optionConcat"
-    ; "hasField"
     (* builtins.maude *)
     ; "ibits-aux"; "inv-ibits-aux"; "ibytes-aux"
     ; "inv-ibytes-aux"; "sign-extend-nat"; "ipopcnt-bits"; "ipopcnt-bits-aux"

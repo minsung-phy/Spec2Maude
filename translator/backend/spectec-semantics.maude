@@ -182,21 +182,15 @@ fmod SPECTEC-RECORD is
   op recordConcat : Record Record SpectecType ~> Record . --- 레코드 결합 (CompE) / Record 타입마다 결합 방법이 달라서 eq는 자동 생성됨
   op _[._=_] : Record Qid SpectecTerminals -> Record . --- 필드 갱신 (UpdE + DotP)
 
-  op hasField : RecordFields Qid -> Bool . --- 첫 일치 필드를 찾기 위한 보조 연산 (IL에는 없음)
-
   var FIELD : Qid .
   vars FIELDS RECORD-PREFIX RECORD-SUFFIX : RecordFields .
   var NEW-VALUE : SpectecTerminals .
 
-  eq hasField(RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX, FIELD) = true .
-  eq hasField(FIELDS, FIELD) = false [owise] .
-  ceq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX} . FIELD = VALUE --- 첫 번째 필드만 선택
-    if not hasField(RECORD-PREFIX, FIELD) .
+  eq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX} . FIELD = VALUE .
   eq {FIELDS} . FIELD = eps [owise] .
 
-  ceq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX}[. FIELD = NEW-VALUE]
-    = {RECORD-PREFIX ; field(FIELD, NEW-VALUE) ; RECORD-SUFFIX}
-    if not hasField(RECORD-PREFIX, FIELD) .
+  eq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX}[. FIELD = NEW-VALUE]
+    = {RECORD-PREFIX ; field(FIELD, NEW-VALUE) ; RECORD-SUFFIX} .
   eq {FIELDS}[. FIELD = NEW-VALUE] = {FIELDS ; field(FIELD, NEW-VALUE)} [owise] . --- 없으면 레코드 끝에 추가
 endfm
 
