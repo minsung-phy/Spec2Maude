@@ -68,7 +68,7 @@ The translation visits the definitions of the script in order
 | --- | --- | --- | --- |
 | Ordinary | `op f̂ : S(params) -> S(t) .` | `ceq f̂(⟦args⟧) = ⟦e⟧ if ⟦prs⟧ .` If `prs` contains `ElsePr`, the equation gets `[owise]`. | `decd.ml:translate_equation_clause` |
 | `hint(maude_rule)` (the body needs rewriting) | `sort F-Config .` `subsort S(t) < F-Config .` `op f̂ : S(params) -> F-Config [frozen] .` | `crl f̂(⟦args⟧) => ⟦e⟧ if ⟦prs⟧ .` (`ElsePr` is rejected) | `decd.ml:translate_rule_clause` |
-| A clause ends with `x <- es` and returns `x` (membership choice) | `sort F-Request .` `subsort S(t) < F-Request .` `op f̂ : S(params) -> F-Request [frozen] .` | `ceq f̂(⟦args⟧) = f-choice(⟦es⟧) if ⟦other prs⟧ .` and `rl f-choice(PREFIX X SUFFIX) => X .` Any element of `es` can be returned. | `decd.ml:translate_choice_clause` |
+| A clause ends with `x <- es` and returns `x` (membership choice) | `sort F-Request .` `subsort S(t) < F-Request .` `op f̂ : S(params) -> F-Request [frozen] .` | `ceq f̂(⟦args⟧) = choose-f(⟦es⟧) if ⟦other prs⟧ .` and `rl choose-f(PREFIX X SUFFIX) => X .` Any element of `es` can be returned. | `decd.ml:translate_choice_clause` |
 | `hint(builtin)` | `op f̂ : S(params) -> S(t) .` | no equations; the body is written by hand in `translator/backend/builtins.maude` | `decd.ml:translate` |
 
 `hint(maude_kind)` makes the declaration partial (`~>` instead of `->`).
@@ -302,11 +302,13 @@ are found before translation (`prescan.ml:capture_variables`). For `^n`, the
 helper also takes the count `n`, and an index argument that starts at `0` if
 the iteration names an index variable.
 
-| Helper | Code |
-| --- | --- |
-| `IterE`: compute the sequence | `iter_helpers.ml:translate_statements` |
-| `IterE` used as a pattern: recover the sequence of each variable | `iter_helpers.ml:translate_projector_statements` |
-| `IterPr`: check every element, or compute one unbound generator sequence | `iter_helpers.ml:translate_premise_statements` |
+| Helper | Name | Code |
+| --- | --- | --- |
+| `IterE`: compute the sequence | `map-f` if the body calls `$f`, `map-C` if it is constructor `C`, else `map-` and the enclosing definition or relation | `iter_helpers.ml:translate_statements` |
+| `IterE` used as a pattern: recover the sequence of each variable | `unzip-C`, `unzip-` and the enclosing definition or relation otherwise | `iter_helpers.ml:translate_projector_statements` |
+| `IterPr`: check every element | `all-` and the enclosing definition or relation | `iter_helpers.ml:translate_premise_statements` |
+| `IterPr`: compute one unbound generator sequence | `bind-` and the enclosing relation | `iter_helpers.ml:translate_premise_statements` |
+| Membership choice (section 2) | `choose-f` | `decd.ml:choice_helper` |
 
 A helper is generated only if a translated term or condition calls it. The
 call is recorded in a request table (`prescan.ml:request`) by the function
@@ -321,6 +323,19 @@ Requests for `IterPr` outputs come only from relation rules, which are all
 translated before generation starts. An `IterPr` that
 computes an unbound sequence is supported only in relation rules
 (`collect_outputs` in `prem.ml:translate_all`).
+
+Each iteration first gets its own helper under a unique working name. After
+translation, helpers whose statements are equal up to variable names are
+shared: the later ones are dropped and their calls go to the first. Sharing a
+helper can make its callers equal, so this repeats until nothing changes.
+Each remaining helper then gets its name from the table above. If several
+different helpers would get the same `map-f`, `map-C`, or `unzip-C` name, each
+of them is named after its enclosing definition or relation instead (e.g.
+`map-ivrelop-ieq` and `map-ivrelop-ine`, both of which iterate `$extend__`). A
+name that is still taken gets the suffix `-2`, and so on
+(`def.ml:share_helpers`).
+A shared helper named after an enclosing definition keeps the name of its
+first occurrence.
 
 ## 7. Steps outside the recursive translation
 

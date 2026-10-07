@@ -126,57 +126,46 @@ let rec map_term_variables map = function
   | Const _ as term -> term
   | App (name, args) -> App (name, List.map (map_term_variables map) args)
 
-let map_eq_condition_variables map = function
-  | EqCond (left, right) ->
-      EqCond (map_term_variables map left, map_term_variables map right)
-  | MatchCond (left, right) ->
-      MatchCond (map_term_variables map left, map_term_variables map right)
-  | MembershipCond (term, sort) ->
-      MembershipCond (map_term_variables map term, sort)
-  | BoolCond term -> BoolCond (map_term_variables map term)
+(* Apply [f] to every top-level term of a condition or statement. *)
+let map_eq_condition_terms f = function
+  | EqCond (left, right) -> EqCond (f left, f right)
+  | MatchCond (left, right) -> MatchCond (f left, f right)
+  | MembershipCond (term, sort) -> MembershipCond (f term, sort)
+  | BoolCond term -> BoolCond (f term)
 
-let map_rule_condition_variables map = function
-  | EqCondition condition ->
-      EqCondition (map_eq_condition_variables map condition)
-  | RewriteCond (left, right) ->
-      RewriteCond (map_term_variables map left, map_term_variables map right)
+let map_rule_condition_terms f = function
+  | EqCondition condition -> EqCondition (map_eq_condition_terms f condition)
+  | RewriteCond (left, right) -> RewriteCond (f left, f right)
 
-let map_statement_variables map = function
+let map_statement_terms f = function
   | (SortDecl _ | SubsortDecl _ | VarDecl _) as statement -> statement
   | OpDecl declaration ->
       let attrs =
         List.map
           (function
-            | Id term -> Id (map_term_variables map term)
+            | Id term -> Id (f term)
             | (Ctor | Assoc | Comm | Ditto | Prec _ | Frozen _) as attr -> attr)
           declaration.attrs
       in
       OpDecl {declaration with attrs}
-  | Mb (term, sort) -> Mb (map_term_variables map term, sort)
+  | Mb (term, sort) -> Mb (f term, sort)
   | Cmb (term, sort, conditions) ->
-      Cmb
-        ( map_term_variables map term
-        , sort
-        , List.map (map_eq_condition_variables map) conditions
-        )
-  | Eq (left, right, attrs) ->
-      Eq (map_term_variables map left, map_term_variables map right, attrs)
+      Cmb (f term, sort, List.map (map_eq_condition_terms f) conditions)
+  | Eq (left, right, attrs) -> Eq (f left, f right, attrs)
   | Ceq (left, right, conditions, attrs) ->
-      Ceq
-        ( map_term_variables map left
-        , map_term_variables map right
-        , List.map (map_eq_condition_variables map) conditions
-        , attrs
-        )
-  | Rl (label, left, right) ->
-      Rl (label, map_term_variables map left, map_term_variables map right)
+      Ceq (f left, f right, List.map (map_eq_condition_terms f) conditions, attrs)
+  | Rl (label, left, right) -> Rl (label, f left, f right)
   | Crl (label, left, right, conditions) ->
-      Crl
-        ( label
-        , map_term_variables map left
-        , map_term_variables map right
-        , List.map (map_rule_condition_variables map) conditions
-        )
+      Crl (label, f left, f right, List.map (map_rule_condition_terms f) conditions)
+
+let map_eq_condition_variables map =
+  map_eq_condition_terms (map_term_variables map)
+
+let map_rule_condition_variables map =
+  map_rule_condition_terms (map_term_variables map)
+
+let map_statement_variables map =
+  map_statement_terms (map_term_variables map)
 
 
 (* Condition order *)

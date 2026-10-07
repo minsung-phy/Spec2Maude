@@ -85,6 +85,17 @@ type membership_choice =
 
 type name_kind = TypName | RelName | DefName | MixopName
 
+(* The Maude name of a generated helper. Helpers first get unique working
+ * names; after translation, helpers that are equal up to variable names
+ * are shared and each remaining helper is named from its base
+ * (Def.share_helpers, TRANSLATION_MAP.md section 6). The second name is
+ * used instead when several helpers have the same first name. *)
+type helper_name =
+  | Base of string * string  (* e.g. map-f or else map-r, all-r, choose-f *)
+  | Tail of name    (* the tail helper of the named helper: <its name>-tail *)
+
+module StringSet = Set.Make (String)
+
 (* Iteration helpers are generated only when a translation case calls them.
  * A case records each call in the request table of the index. *)
 type helper_request =
@@ -115,10 +126,11 @@ type t =
   ; type_parameters : id list
   ; inverses : (string * inverse) list
   ; requests : (name * helper_request, unit) Hashtbl.t
+  ; helper_names : (name * helper_name) list
+  ; reserved : StringSet.t  (* every non-helper name in use *)
   }
 
 
-module StringSet = Set.Make (String)
 
 let sanitize name =
   name
@@ -252,14 +264,57 @@ let variable_base name =
   | 'A'..'Z' -> name
   | _ -> "V-" ^ name
 
+let compact name =
+  name
+  |> sanitize
+  |> String.split_on_char '-'
+  |> List.filter (fun part -> part <> "")
+  |> String.concat "-"
+
+let owner_name = function
+  | RelationOwner source | DefinitionOwner source -> compact source
+  | OtherOwner -> "exp"
+
+(* What an IterE helper is named after: the called definition, the
+ * constructor, or else the enclosing definition or relation. *)
+let helper_subject owner (body : exp) =
+  match body.it with
+  | CallE (id, _) when compact id.it <> "" -> compact id.it
+  | CaseE (mixop, _) when not (Mixop.is_hole_only mixop)
+                          && compact (Mixop.name mixop) <> "" ->
+      compact (Mixop.name mixop)
+  | _ -> owner_name owner
+
+let helper_base prefix owner body =
+  Base (prefix ^ helper_subject owner body, prefix ^ owner_name owner)
+
+let helper_names iterations premise_iterations membership_choices =
+  List.concat_map
+    (fun (iteration : iteration) ->
+      let base prefix = helper_base prefix iteration.owner iteration.body in
+      [ iteration.name, base "map-"
+      ; iteration.tail_name, Tail iteration.name
+      ; iteration.projector_name, base "unzip-"
+      ; iteration.projector_tail_name, Tail iteration.projector_name
+      ])
+    iterations
+  @ List.concat_map
+      (fun (iteration : premise_iteration) ->
+        let owner = owner_name iteration.owner in
+        (iteration.name, Base ("all-" ^ owner, "all-" ^ owner))
+        :: (iteration.tail_name, Tail iteration.name)
+        :: List.concat_map
+             (fun (output, tail) ->
+               [output, Base ("bind-" ^ owner, "bind-" ^ owner); tail, Tail output])
+             iteration.output_names)
+      premise_iterations
+  @ List.map
+      (fun choice ->
+        let name = "choose-" ^ compact choice.definition in
+        choice.helper_name, Base (name, name))
+      membership_choices
+
 let iteration_base_name (body : exp) =
-  let compact name =
-    name
-    |> sanitize
-    |> String.split_on_char '-'
-    |> List.filter (fun part -> part <> "")
-    |> String.concat "-"
-  in
   match body.it with
   | CallE (id, _) ->
       begin match compact id.it with
@@ -1123,6 +1178,9 @@ let scan script =
   let membership_choices =
     name_membership_choices registry membership_choices
   in
+  let helper_names =
+    helper_names iterations premise_iterations membership_choices
+  in
   let rewrite_sorts =
     name_rewrite_sorts registry hints definitions membership_choices
   in
@@ -1174,6 +1232,10 @@ let scan script =
     |> List.filter (fun (iteration : iteration) ->
          owner_supported iteration.owner)
   in
+  let reserved =
+    StringSet.diff !(registry.used)
+      (StringSet.of_list (List.map fst helper_names))
+  in
   { type_env
   ; input_types = None
   ; sort_metadata
@@ -1195,6 +1257,8 @@ let scan script =
   ; type_parameters = occurrences.found_type_parameters
   ; inverses
   ; requests = Hashtbl.create 64
+  ; helper_names
+  ; reserved
   }
 
 
@@ -1325,6 +1389,18 @@ let iteration index body =
   List.find_opt
     (fun (iteration : iteration) -> iteration.body == body)
     index.iterations
+
+let helper_names index = index.helper_names
+
+(* The final name of a helper: its base, or with a "-N" suffix if that is
+ * already in use. A base that is a backend name gets the spectec- prefix. *)
+let fresh_helper_name index used candidate =
+  let candidate =
+    if StringSet.mem candidate reserved_names then "spectec-" ^ candidate
+    else candidate
+  in
+  used := StringSet.union index.reserved !used;
+  fresh used (fun index -> "-" ^ string_of_int index) candidate
 
 let request index name kind = Hashtbl.replace index.requests (name, kind) ()
 let requested index name kind = Hashtbl.mem index.requests (name, kind)

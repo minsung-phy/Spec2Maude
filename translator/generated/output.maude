@@ -1745,11 +1745,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op spectec-vcvtop-- : SpectecTerminal SpectecTerminal SpectecTerminal Nat -> spectec-vcvtop---Request [frozen (1 2 3 4)] .
 
-  op spectec-vcvtop---choice-291-0 : SpectecTerminals -> spectec-vcvtop---Request [frozen (1)] .
-
-  op spectec-vcvtop---choice-296-0 : SpectecTerminals -> spectec-vcvtop---Request [frozen (1)] .
-
-  op spectec-vcvtop---choice-301-0 : SpectecTerminals -> spectec-vcvtop---Request [frozen (1)] .
+  op choose-vcvtop : SpectecTerminals -> spectec-vcvtop---Request [frozen (1)] .
 
   op spectec-vshiftop- : SpectecTerminal SpectecTerminal Nat Nat -> Nat .
 
@@ -1783,7 +1779,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op spectec-vextternop-- : SpectecTerminal SpectecTerminal SpectecTerminal Nat Nat Nat -> spectec-vextternop---Request [frozen (1 2 3 4 5 6)] .
 
-  op spectec-vextternop---choice-398-0 : SpectecTerminals -> spectec-vextternop---Request [frozen (1)] .
+  op choose-vextternop : SpectecTerminals -> spectec-vextternop---Request [frozen (1)] .
 
   op num : -> SpectecType .
 
@@ -2073,55 +2069,33 @@ mod SPEC2MAUDE-GENERATED is
 
   op invoke : SpectecTerminal Nat ValList -> SpectecTerminal .
 
-  op map-exp-21 : SpectecType SpectecTerminals ~> SpectecTerminals .
+  op map-concatopt : SpectecType SpectecTerminals ~> SpectecTerminals .
 
   op map-subst-fieldtype : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-subst-valtype : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-subst-valtype-2 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
   op map-subst-typeuse : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-subst-subtype : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-subst-rectype : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-subst-externtype : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-subst-externtype-2 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-subst-all-valtype : Nat Nat ~> SpectecTerminals .
 
-  op map-exp-266 : Nat Nat ~> SpectecTerminals .
+  op map-rollrt : Nat Nat Nat SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-269 : Nat Nat ~> SpectecTerminals .
+  op map-rollrt-2 : Nat Nat Nat ~> SpectecTerminals .
 
-  op map-exp-272 : Nat Nat ~> SpectecTerminals .
+  op map-REC : Nat Nat ~> SpectecTerminals .
 
-  op map-exp-275 : Nat Nat ~> SpectecTerminals .
+  op map-unrollrt : Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-278 : Nat Nat ~> SpectecTerminals .
+  op map-unrollrt-2 : SpectecTerminal Nat Nat ~> SpectecTerminals .
 
-  op map-exp-281 : Nat Nat ~> SpectecTerminals .
+  op map-rolldt : Nat SpectecTerminals Nat Nat ~> SpectecTerminals .
 
-  op map-exp-284 : Nat Nat ~> SpectecTerminals .
-
-  op map-exp-287 : Nat Nat ~> SpectecTerminals .
-
-  op map-exp-290 : Nat Nat ~> SpectecTerminals .
-
-  op map-subst-subtype-2 : Nat Nat Nat SpectecTerminals ~> SpectecTerminals .
-
-  op map-exp-298 : Nat Nat Nat ~> SpectecTerminals .
-
-  op map-exp-299 : Nat Nat ~> SpectecTerminals .
-
-  op map-subst-subtype-3 : Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
-  op map-exp-301 : Nat Nat ~> SpectecTerminals .
-
-  op map-exp-302 : SpectecTerminal Nat Nat ~> SpectecTerminals .
-
-  op map-exp-304 : Nat SpectecTerminals Nat Nat ~> SpectecTerminals .
-
-  op map-free-valtype : SpectecTerminals ~> SpectecTerminals .
+  op map-free-resulttype : SpectecTerminals ~> SpectecTerminals .
 
   op map-free-fieldtype : SpectecTerminals ~> SpectecTerminals .
 
@@ -2131,23 +2105,15 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-free-externtype : SpectecTerminals ~> SpectecTerminals .
 
-  op map-free-externtype-2 : SpectecTerminals ~> SpectecTerminals .
-
-  op map-free-valtype-2 : SpectecTerminals ~> SpectecTerminals .
+  op map-free-blocktype : SpectecTerminals ~> SpectecTerminals .
 
   op map-free-list : SpectecTerminals ~> SpectecTerminals .
-
-  op map-free-valtype-3 : SpectecTerminals ~> SpectecTerminals .
 
   op map-free-labelidx : SpectecTerminals ~> SpectecTerminals .
 
   op map-free-catch : SpectecTerminals ~> SpectecTerminals .
 
   op map-free-instr : InstrList ~> SpectecTerminals .
-
-  op map-free-instr-2 : InstrList ~> SpectecTerminals .
-
-  op map-free-instr-3 : InstrList ~> SpectecTerminals .
 
   op map-free-local : SpectecTerminals ~> SpectecTerminals .
 
@@ -2175,8 +2141,6 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-free-export : SpectecTerminals ~> SpectecTerminals .
 
-  op map-free-func-2 : SpectecTerminals ~> SpectecTerminals .
-
   op map-iabs : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
   op map-ineg : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
@@ -2187,37 +2151,25 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-fabs : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-2 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-fneg : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-3 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-fsqrt : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-4 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-fceil : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-5 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-ffloor : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-6 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-ftrunc : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-7 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-fnearest : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-iadd : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivbinop-iadd : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-isub : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-imul : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivbinop-imul : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-iadd-sat : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivbinopsx-iadd-sat : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-isub-sat : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
@@ -2229,199 +2181,135 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-iq15mulr-sat : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-8 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-irelaxed-q15mulr : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-9 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-fadd : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-10 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-fsub : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-11 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-fmul : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-12 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-fdiv : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-13 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-fmin : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-14 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-fmax : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-15 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-fpmin : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-16 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-fpmax : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-17 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-frelaxed-min : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-18 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-frelaxed-max : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-19 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-irelaxed-laneselect : SpectecTerminal SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-20 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
   op map-frelaxed-madd : SpectecTerminal SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-21 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-frelaxed-nmadd : SpectecTerminal SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivrelop-ieq : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-2 : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivrelop-ine : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-3 : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivrelopsx-ilt : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-4 : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivrelopsx-igt : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-5 : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivrelopsx-ile : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-6 : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivrelopsx-ige : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-7 : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-fvrelop-feq : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-8 : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-fvrelop-fne : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-9 : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-fvrelop-flt : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-10 : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-fvrelop-fgt : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-11 : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-fvrelop-fle : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-12 : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-fvrelop-fge : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-ishl : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
   op map-ishr : SpectecTerminal SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-987 : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+  op map-ivbitmaskop : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
   op map-iswizzle-lane : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-irelaxed-swizzle-lane : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-1004 : SpectecTerminal Nat SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivshufflop : SpectecTerminal Nat SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-lcvtop : SpectecTerminal SpectecTerminal Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+  op map-vcvtop : SpectecTerminal SpectecTerminal Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-inv-lanes-22 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
-  op map-lcvtop-2 : SpectecTerminal SpectecTerminal Nat Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-23 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
-
-  op map-lcvtop-3 : SpectecTerminal SpectecTerminal Nat Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-inv-lanes-24 : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
+  op map-vcvtop-2 : SpectecTerminal SpectecTerminal Nat Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
   op map-narrow : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-narrow-2 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+  op map-ivadd-pairwise : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-iadd-2 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivadd-pairwise-2 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-1040 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op unzip-ivadd-pairwise : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1040 : SpectecTerminals ~> SpectecTerminal .
+  op map-ivextunop-ivadd-pairwise : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-13 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+  op map-ivdot : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-iadd-3 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op unzip-ivdot : Nat SpectecTerminals ~> SpectecTerminal .
 
-  op map-exp-1049 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivdot-2 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1049 : Nat SpectecTerminals ~> SpectecTerminal .
+  op map-ivdot-sat : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-imul-2 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-Step-pure : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-iadd-sat-2 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op unzip-LOCAL : SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-1052 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op project-map-exp-1052 : Nat SpectecTerminals ~> SpectecTerminal .
-
-  op map-imul-3 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-extend-14 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-extend-15 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-extend-16 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-extend-17 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-extend-18 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-extend-19 : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op map-imul-4 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
-
-  op map-exp-1180 : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
-
-  op project-map-exp-1206 : SpectecTerminals ~> SpectecTerminals .
-
-  op map-exp-1208 : Nat ValList ~> SpectecTerminals .
+  op map-Step-read : Nat ValList ~> SpectecTerminals .
 
   op map-default : SpectecTerminals ~> SpectecTerminals .
 
-  op map-extend-20 : SpectecTerminal Nat Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
+  op map-Step-read-2 : SpectecTerminal Nat Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1250 : SpectecTerminals ~> SpectecTerminal .
+  op unzip-Step-read : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1256 : SpectecTerminals ~> SpectecTerminal .
-
-  op map-exp-1260 : Nat SpectecTerminals ~> InstrList .
+  op map-Step-read-3 : Nat SpectecTerminals ~> InstrList .
 
   op map-const : SpectecTerminal Nat SpectecTerminals ~> InstrList .
 
   op map-zbytes : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-zbytes : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
+  op unzip-zbytes : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1323 : Nat SpectecTerminals ~> SpectecTerminal .
+  op unzip-Step : Nat SpectecTerminals ~> SpectecTerminal .
 
-  op map-packfield : Nat ValList SpectecTerminals ~> SpectecTerminals .
+  op map-Step : Nat ValList SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1326 : SpectecTerminals ~> SpectecTerminal .
-
-  op map-packfield-2 : SpectecTerminal Nat ValList ~> SpectecTerminals .
+  op map-Step-2 : SpectecTerminal Nat ValList ~> SpectecTerminals .
 
   op map-allocexport : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1427 : SpectecTerminals ~> SpectecTerminals .
+  op unzip-TAG : SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1429 : SpectecTerminals ~> SpectecTerminal .
+  op unzip-GLOBAL : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1431 : SpectecTerminals ~> SpectecTerminals .
+  op unzip-MEMORY : SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1433 : SpectecTerminals ~> SpectecTerminal .
+  op unzip-TABLE : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1435 : SpectecTerminals ~> SpectecTerminal .
+  op unzip-FUNC : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1438 : SpectecTerminals ~> SpectecTerminal .
+  op unzip-DATA : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1441 : SpectecTerminals ~> SpectecTerminal .
+  op unzip-allocmodule : SpectecTerminals ~> SpectecTerminal .
 
-  op map-exp-1456 : SpectecTerminal Nat Nat ~> SpectecTerminals .
+  op map-allocmodule : SpectecTerminal Nat Nat ~> SpectecTerminals .
 
   op map-subst-all-tagtype : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
@@ -2433,37 +2321,27 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-subst-all-reftype : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-1478 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-allocmodule-2 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-exp-1480 : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-FUNC : SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op project-map-exp-1557 : SpectecTerminals ~> SpectecTerminal .
+  op unzip-instantiate : SpectecTerminals ~> SpectecTerminal .
 
-  op project-map-exp-1559 : SpectecTerminals ~> SpectecTerminal .
-
-  op project-map-exp-1561 : SpectecTerminals ~> SpectecTerminal .
-
-  op project-map-exp-1564 : SpectecTerminals ~> SpectecTerminal .
-
-  op project-map-exp-1567 : SpectecTerminals ~> SpectecTerminals .
-
-  op map-exp-1571 : SpectecTerminal Nat Nat ~> SpectecTerminals .
+  op unzip-START : SpectecTerminals ~> SpectecTerminals .
 
   op map-rundata : SpectecTerminals Nat Nat ~> SpectecTerminals .
 
   op map-runelem : SpectecTerminals Nat Nat ~> SpectecTerminals .
 
-  op map-exp-1594 : SpectecTerminals ~> SpectecTerminals .
+  op map-CALL : SpectecTerminals ~> SpectecTerminals .
 
-  op iterpr-34 : Nat SpectecTerminals ~> Bool .
+  op all-growtable : Nat SpectecTerminals ~> Bool .
 
-  op iterpr-35 : Nat SpectecTerminals ~> Bool .
+  op bind-Step-read : Nat SpectecTerminal Nat SpectecTerminal Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
 
-  op iterpr-36-output-1 : Nat SpectecTerminal Nat SpectecTerminal Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
+  op bind-Step-read-2 : SpectecTerminals ~> ValList .
 
-  op iterpr-37-output-1 : SpectecTerminals ~> ValList .
-
-  op iterpr-38 : SpectecTerminal SpectecTerminals ValList ~> Bool .
+  op all-invoke : SpectecTerminal SpectecTerminals ValList ~> Bool .
 
   vars LIFT-ELEMENT REF-2 VALUE-19 VAL V-2 R NUM VEC VAL_1 VAL_2 REF_1 REF_2 : val .
 
@@ -2471,11 +2349,11 @@ mod SPEC2MAUDE-GENERATED is
 
   vars VALUE I J N-3 N-2 M-3 FUNCIDX GLOBALIDX TABLEIDX MEMIDX TAGIDX X-4 TYPEIDX ELEMIDX DATAIDX LOCALIDX LABELIDX U64 SZ DIM M-2 M_1 M_2 VALUE-14 TAGADDR GLOBALADDR MEMADDR TABLEADDR FUNCADDR U31 STRUCTADDR ARRAYADDR EXNADDR HOSTADDR VALUE2-2 TABLEIDX-2 LANEIDX MEMIDX-2 FIELDIDX U32 TYPEIDX-2 C-3 LABELIDX'-2 VECLIT TYPEIDX_1 TYPEIDX_2 TABLEIDX_1 TABLEIDX_2 MEMIDX_1 MEMIDX_2 X_1-2 VALUE1-3 I_1 I_2 V_1 V_2 V_3 V C_1-2 K-3 C_2-2 C'-2 C'' C_3-2 A I' L L' Y CASE-PART1-2 X_2-3 K-2 A_1 A_2 JA GA MA TA FA DA EA ITER-COUNT J_1-3 J_2-3 I_F I_D I_E : Nat .
 
-  vars N'* W* W'** W? W'?* W'* W** W_1* X* CHAR* XX* VALUE-4 VALUE-5 VALUE-6 VALUE-7 VALUE-8 VALUE-9 VALUE-10 VALUE-11 VALUE-12 VALUE-13 FREE'* NULL? MUT? VALUE1-2 RESULTTYPE RESULTTYPE-2 FINAL? TYPEUSE* U64? EXTERNTYPE* EXTERNTYPE*-2 NULL_1? XT* TV'* TU'* TV* TU* FT* T_1* T_2* ST* XT_1* XT_2* DT* SUBTYPE* VALTYPE* FIELDTYPE* RESULTTYPE_1 RESULTTYPE_2 EXTERNTYPE_1* EXTERNTYPE_2* HALF? ZERO? VALTYPE? VALTYPE*? LABELIDX* VALUE2-3 SX? LANEIDX* CATCH* LABELIDX'* LOADOP? STOREOP? VLOADOP? BYTE* LOCAL* EXPR* NAME NAME-2 VALUE3-2 VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 START? VALUE11 NAME_1 NAME_2 TYPE* TAG* GLOBAL* MEM* TABLE* FUNC* DATA* ELEM* IMPORT* EXPORT* LOCALIDX* VALUE-16 VALUE-17 VALUE-18 X*-2 LCT* DT'* INDEX-PREFIX INDEX-SUFFIX WITNESSES WITNESSES-2 CASE-PART1 C* C_1* C** C_2* C_3* I* C? CHOICE-PREFIX CHOICE-REST C'_1* C'_2* J_1* J_2* I_1* I_2* XA* B* R* SI* AI* EXN* J? R'* T*? L* MEMBER-PREFIX MEMBER-SUFFIX T? CATCH'* CASE-PART2-2 T* J* MUT?* ZT* REF* TYPE'* DEFTYPE'* DEFTYPE* TAGTYPE'* JA'* GLOBALTYPE'* GA'* MEMTYPE'* MA'* TABLETYPE'* REF'* TA'* FUNCCODE'* MODULEINST'* FA'* OK'* B'** DA'* RT'* REF'** EA'* TAGTYPE* EXPR_G* GLOBALTYPE* MEMTYPE* EXPR_T* TABLETYPE* EXPR_F* LOCAL** BYTE** DATAMODE* ELEMMODE* ELEMTYPE* EXPR_E** EXTERNADDR* AA_I* GA_I* MA_I* TA_I* FA_I* FA* AA* GA* MA* REF_T* TA* DA* REF_E** EA* XI* E* EXPR'* EXPR'** GT'* REFTYPE* X? INSTR_S? W'? W'?*-REST FT*-REST T_1*-REST T_2*-REST TU'*-REST ST*-REST XT_1*-REST XT_2*-REST SUBTYPE*-REST VALTYPE*-REST FIELDTYPE*-REST TYPEUSE*-REST EXTERNTYPE_1*-REST EXTERNTYPE_2*-REST LABELIDX*-REST CATCH*-REST LOCAL*-REST EXPR*-REST TYPE*-REST TAG*-REST GLOBAL*-REST MEM*-REST TABLE*-REST FUNC*-REST DATA*-REST ELEM*-REST IMPORT*-REST EXPORT*-REST C_1*-REST C**-REST C_2*-REST C_3*-REST I*-REST J_1*-REST J_2*-REST PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1*-REST I_2*-REST T*-REST J*-REST REF*-REST C*-REST PROJECT-ELEMENT ZT*-REST PROJECT-COLUMN-3 EXPR_E* TAGTYPE*-REST GLOBALTYPE*-REST MEMTYPE*-REST TABLETYPE*-REST ELEMTYPE*-REST X*-REST EXPR_F*-REST LOCAL**-REST : SpectecTerminals .
+  vars N'* W* W'** W? W'?* W'* W** W_1* X* CHAR* XX* VALUE-4 VALUE-5 VALUE-6 VALUE-7 VALUE-8 VALUE-9 VALUE-10 VALUE-11 VALUE-12 VALUE-13 FREE'* NULL? MUT? VALUE1-2 RESULTTYPE RESULTTYPE-2 FINAL? TYPEUSE* U64? EXTERNTYPE* EXTERNTYPE*-2 NULL_1? XT* TV'* TU'* TV* TU* FT* T_1* T_2* ST* XT_1* XT_2* DT* SUBTYPE* VALTYPE* FIELDTYPE* RESULTTYPE_1 RESULTTYPE_2 EXTERNTYPE_1* EXTERNTYPE_2* HALF? ZERO? VALTYPE? VALTYPE*? LABELIDX* VALUE2-3 SX? LANEIDX* CATCH* LABELIDX'* LOADOP? STOREOP? VLOADOP? BYTE* LOCAL* EXPR* NAME NAME-2 VALUE3-2 VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 START? VALUE11 NAME_1 NAME_2 TYPE* TAG* GLOBAL* MEM* TABLE* FUNC* DATA* ELEM* IMPORT* EXPORT* LOCALIDX* VALUE-16 VALUE-17 VALUE-18 X*-2 LCT* DT'* INDEX-PREFIX INDEX-SUFFIX WITNESSES WITNESSES-2 CASE-PART1 C* C_1* C** C_2* C_3* I* C? CHOICE-PREFIX CHOICE-REST C'_1* C'_2* J_1* J_2* I_1* I_2* XA* B* R* SI* AI* EXN* J? R'* T*? L* MEMBER-PREFIX MEMBER-SUFFIX T? CATCH'* CASE-PART2-2 T* J* MUT?* ZT* REF* TYPE'* DEFTYPE'* DEFTYPE* TAGTYPE'* JA'* GLOBALTYPE'* GA'* MEMTYPE'* MA'* TABLETYPE'* REF'* TA'* FUNCCODE'* MODULEINST'* FA'* OK'* B'** DA'* RT'* REF'** EA'* TAGTYPE* EXPR_G* GLOBALTYPE* MEMTYPE* EXPR_T* TABLETYPE* EXPR_F* LOCAL** BYTE** DATAMODE* ELEMMODE* ELEMTYPE* EXPR_E** EXTERNADDR* AA_I* GA_I* MA_I* TA_I* FA_I* FA* AA* GA* MA* REF_T* TA* DA* REF_E** EA* XI* E* EXPR'* EXPR'** GT'* REFTYPE* X? INSTR_S? W'? W'?*-REST FT*-REST T_1*-REST TU'*-REST ST*-REST XT_1*-REST SUBTYPE*-REST VALTYPE*-REST FIELDTYPE*-REST TYPEUSE*-REST EXTERNTYPE_1*-REST LABELIDX*-REST CATCH*-REST LOCAL*-REST EXPR*-REST TYPE*-REST TAG*-REST GLOBAL*-REST MEM*-REST TABLE*-REST FUNC*-REST DATA*-REST ELEM*-REST IMPORT*-REST EXPORT*-REST C_1*-REST C**-REST C_2*-REST C_3*-REST I*-REST J_1*-REST J_2*-REST PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1*-REST I_2*-REST T*-REST J*-REST REF*-REST C*-REST PROJECT-ELEMENT ZT*-REST PROJECT-COLUMN-3 EXPR_E* TAGTYPE*-REST GLOBALTYPE*-REST MEMTYPE*-REST TABLETYPE*-REST ELEMTYPE*-REST X*-REST EXPR_F*-REST LOCAL**-REST : SpectecTerminals .
 
   var X : SpectecType .
 
-  vars W W_1 VALUE1 VALUE-3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE INN JNN FNN NT VT PT LT-2 CONSTTYPE LANETYPE AT_1 AT_2 HT_1 HT_2 DT JT EXTERNTYPE GT-2 MT TT TV TV_1 TU_1 TV'-2 HT RT T ZT FT CT QT AT TU'-2 LIM XT-2 MMT DT_1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN SX INN_1 INN_2 FNN_2 FNN_1 LNN SHAPE JNN_1 JNN_2 HALF ZERO-3 VALUE2 BLOCKTYPE REFTYPE-3 MEMARG NUMTYPE_1 NUMTYPE_2 VALUE3 VVUNOP-2 VVBINOP-2 VVTERNOP-2 VVTESTOP-2 ISHAPE BSHAPE ISHAPE_1 ISHAPE_2 SHAPE_1 SHAPE_2 FRAME C-2 REFTYPE_1 REFTYPE_2 NUMLIT UNOP-2 BINOP-2 TESTOP-2 RELOP-2 CVTOP-2 VUNOP-2 VBINOP-2 VTERNOP-2 VTESTOP-2 VRELOP-2 VSHIFTOP-2 VSWIZZLOP-2 VEXTUNOP-2 VEXTBINOP-2 VEXTTERNOP-2 VCVTOP-2 DATAMODE ELEMMODE MODULE-2 INIT C LCT_1 DT_N DEFTYPE_1 DEFTYPE_2 INDEX-ELEMENT REL-ARG1 REL-ARG2 REL-ARG3 HEAPTYPE' HEAPTYPE_1 HEAPTYPE_2 REL-INPUT3 REL-INPUT2 CASE-PART2 X_1 X_2 X_3 X_4 F F_1 F_2 C_1-3 LNN_1 LNN_2 SX_1 SX_2 VALUE-20 VALUE-21 STORE-2 STATE EXTERNADDR S-2 Z TI MI FV TABLEINST TABLEINST' MEMINST MEMINST' EXN-3 RT' MODULEINST BT YY-2 C_2-3 NT_1 NT_2 SH SWIZZLOP INPUT-FIELD SH_1 SH_2 ENABLED-INPUT1 RT_2 RT_1 FI CATCH-2 AT' AO REL-OUTPUT1 ZT_2 SI-2 AI-2 BRIDGE-Z F' Z' S' F'' Z'' TYPE-2 TAGINST S_1 S_2 GLOBALINST FUNCCODE FUNCINST DATAINST OK-3 ELEMTYPE ELEMINST S_3 S_4 S_5 S_6 S_7 MODULEINST_0 Z''' S''' S'''' T_1-2 T_2-2 ST-2 XT_1-2 XT_2-2 SUBTYPE EXTERNTYPE_1-2 EXTERNTYPE_2-2 LOCAL-2 TAG-2 GLOBAL-2 MEM-2 TABLE-2 FUNC-2 DATA-2 ELEM-2 START-2 IMPORT-2 EXPORT-2 C_3-3 : SpectecTerminal .
+  vars W W_1 VALUE1 VALUE-3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE INN JNN FNN NT VT PT LT-2 CONSTTYPE LANETYPE AT_1 AT_2 HT_1 HT_2 DT JT EXTERNTYPE GT-2 MT TT TV TV_1 TU_1 TV'-2 HT RT T ZT FT CT QT AT TU'-2 LIM XT-2 MMT DT_1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN SX INN_1 INN_2 FNN_2 FNN_1 LNN SHAPE JNN_1 JNN_2 HALF ZERO-3 VALUE2 BLOCKTYPE REFTYPE-3 MEMARG NUMTYPE_1 NUMTYPE_2 VALUE3 VVUNOP-2 VVBINOP-2 VVTERNOP-2 VVTESTOP-2 ISHAPE BSHAPE ISHAPE_1 ISHAPE_2 SHAPE_1 SHAPE_2 FRAME C-2 REFTYPE_1 REFTYPE_2 NUMLIT UNOP-2 BINOP-2 TESTOP-2 RELOP-2 CVTOP-2 VUNOP-2 VBINOP-2 VTERNOP-2 VTESTOP-2 VRELOP-2 VSHIFTOP-2 VSWIZZLOP-2 VEXTUNOP-2 VEXTBINOP-2 VEXTTERNOP-2 VCVTOP-2 DATAMODE ELEMMODE MODULE-2 INIT C LCT_1 DT_N DEFTYPE_1 DEFTYPE_2 INDEX-ELEMENT REL-ARG1 REL-ARG2 REL-ARG3 HEAPTYPE' HEAPTYPE_1 HEAPTYPE_2 REL-INPUT3 REL-INPUT2 CASE-PART2 X_1 X_2 X_3 X_4 F F_1 F_2 C_1-3 LNN_1 LNN_2 SX_1 SX_2 VALUE-20 VALUE-21 STORE-2 STATE EXTERNADDR S-2 Z TI MI FV TABLEINST TABLEINST' MEMINST MEMINST' EXN-3 RT' MODULEINST BT YY-2 C_2-3 NT_1 NT_2 SH SWIZZLOP INPUT-FIELD SH_1 SH_2 ENABLED-INPUT1 RT_2 RT_1 FI CATCH-2 AT' AO REL-OUTPUT1 ZT_2 SI-2 AI-2 BRIDGE-Z F' Z' S' F'' Z'' TYPE-2 TAGINST S_1 S_2 GLOBALINST FUNCCODE FUNCINST DATAINST OK-3 ELEMTYPE ELEMINST S_3 S_4 S_5 S_6 S_7 MODULEINST_0 Z''' S''' S'''' T_1-2 ST-2 XT_1-2 SUBTYPE EXTERNTYPE_1-2 LOCAL-2 TAG-2 GLOBAL-2 MEM-2 TABLE-2 FUNC-2 DATA-2 ELEM-2 START-2 IMPORT-2 EXPORT-2 C_3-3 : SpectecTerminal .
 
   vars I-2 VALUE-2 EXP J_1 J_2 : Int .
 
@@ -2533,7 +2411,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq concatopt-(X, eps) = eps .
 
-  ceq concatopt-(X, seq(W?) W'?*) = lift(W?) concat-(X, map-exp-21(X, W'?*))
+  ceq concatopt-(X, seq(W?) W'?*) = lift(W?) concat-(X, map-concatopt(X, W'?*))
     if len(W?) <= 1 .
 
   eq disjoint-(X, eps) = # true .
@@ -3289,12 +3167,12 @@ mod SPEC2MAUDE-GENERATED is
 
   eq subst-comptype(spectec-ARRAY(FT), TV*, TU*) = spectec-ARRAY(subst-fieldtype(FT, TV*, TU*)) .
 
-  eq subst-comptype(FUNC T_1* -> T_2*, TV*, TU*) = FUNC map-subst-valtype(TV*, TU*, T_1*) -> map-subst-valtype-2(TV*, TU*, T_2*) .
+  eq subst-comptype(FUNC T_1* -> T_2*, TV*, TU*) = FUNC map-subst-valtype(TV*, TU*, T_1*) -> map-subst-valtype(TV*, TU*, T_2*) .
 
   ceq subst-subtype(SUB(FINAL?, TU'*, CT), TV*, TU*) = SUB(FINAL?, map-subst-typeuse(TV*, TU*, TU'*), subst-comptype(CT, TV*, TU*))
     if len(FINAL?) <= 1 .
 
-  ceq subst-rectype(REC(ST*), TV*, TU*) = REC(map-subst-subtype(TV'*, TU'*, ST*))
+  ceq subst-rectype(REC(ST*), TV*, TU*) = REC(map-subst-rectype(TV'*, TU'*, ST*))
     if tuple(seq(TV'*) seq(TU'*)) := minus-recs(TV*, TU*) .
 
   eq subst-deftype(-DEF(QT, I), TV*, TU*) = -DEF(subst-rectype(QT, TV*, TU*), I) .
@@ -3320,48 +3198,48 @@ mod SPEC2MAUDE-GENERATED is
 
   eq subst-externtype(FUNC(TU'-2), TV*, TU*) = FUNC(subst-typeuse(TU'-2, TV*, TU*)) .
 
-  eq subst-moduletype(XT_1* -> XT_2*, TV*, TU*) = map-subst-externtype(TV*, TU*, XT_1*) -> map-subst-externtype-2(TV*, TU*, XT_2*) .
+  eq subst-moduletype(XT_1* -> XT_2*, TV*, TU*) = map-subst-externtype(TV*, TU*, XT_1*) -> map-subst-externtype(TV*, TU*, XT_2*) .
 
-  ceq subst-all-valtype(T, TU*) = subst-valtype(T, map-exp-266(N-3, 0), TU*)
+  ceq subst-all-valtype(T, TU*) = subst-valtype(T, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-reftype(RT, TU*) = subst-reftype(RT, map-exp-269(N-3, 0), TU*)
+  ceq subst-all-reftype(RT, TU*) = subst-reftype(RT, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-deftype(DT, TU*) = subst-deftype(DT, map-exp-272(N-3, 0), TU*)
+  ceq subst-all-deftype(DT, TU*) = subst-deftype(DT, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-tagtype(JT, TU*) = subst-tagtype(JT, map-exp-275(N-3, 0), TU*)
+  ceq subst-all-tagtype(JT, TU*) = subst-tagtype(JT, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-globaltype(GT-2, TU*) = subst-globaltype(GT-2, map-exp-278(N-3, 0), TU*)
+  ceq subst-all-globaltype(GT-2, TU*) = subst-globaltype(GT-2, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-memtype(MT, TU*) = subst-memtype(MT, map-exp-281(N-3, 0), TU*)
+  ceq subst-all-memtype(MT, TU*) = subst-memtype(MT, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-tabletype(TT, TU*) = subst-tabletype(TT, map-exp-284(N-3, 0), TU*)
+  ceq subst-all-tabletype(TT, TU*) = subst-tabletype(TT, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-externtype(XT-2, TU*) = subst-externtype(XT-2, map-exp-287(N-3, 0), TU*)
+  ceq subst-all-externtype(XT-2, TU*) = subst-externtype(XT-2, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
-  ceq subst-all-moduletype(MMT, TU*) = subst-moduletype(MMT, map-exp-290(N-3, 0), TU*)
+  ceq subst-all-moduletype(MMT, TU*) = subst-moduletype(MMT, map-subst-all-valtype(N-3, 0), TU*)
     if N-3 := len(TU*) .
 
   eq subst-all-deftypes(eps, TU*) = eps .
 
   eq subst-all-deftypes(DT_1 DT*, TU*) = subst-all-deftype(DT_1, TU*) subst-all-deftypes(DT*, TU*) .
 
-  ceq rollrt(X-4, RECTYPE) = REC(map-subst-subtype-2(X-4, N-3, N-3, SUBTYPE*))
+  ceq rollrt(X-4, RECTYPE) = REC(map-rollrt(X-4, N-3, N-3, SUBTYPE*))
     if REC(SUBTYPE*) := RECTYPE
       /\ N-3 := len(SUBTYPE*) .
 
-  ceq unrollrt(RECTYPE) = REC(map-subst-subtype-3(N-3, RECTYPE, N-3, SUBTYPE*))
+  ceq unrollrt(RECTYPE) = REC(map-unrollrt(N-3, RECTYPE, N-3, SUBTYPE*))
     if REC(SUBTYPE*) := RECTYPE
       /\ N-3 := len(SUBTYPE*) .
 
-  ceq rolldt(X-4, RECTYPE) = map-exp-304(N-3, SUBTYPE*, N-3, 0)
+  ceq rolldt(X-4, RECTYPE) = map-rolldt(N-3, SUBTYPE*, N-3, 0)
     if REC(SUBTYPE*) := rollrt(X-4, RECTYPE)
       /\ N-3 := len(SUBTYPE*) .
 
@@ -3420,7 +3298,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-valtype(BOT) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
 
-  eq free-resulttype(VALTYPE*) = free-list(map-free-valtype(VALTYPE*)) .
+  eq free-resulttype(VALTYPE*) = free-list(map-free-resulttype(VALTYPE*)) .
 
   ceq free-storagetype(VALTYPE) = free-valtype(VALTYPE)
     if typecheck(VALTYPE, valtype) .
@@ -3468,7 +3346,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-externtype(FUNC(TYPEUSE)) = free-typeuse(TYPEUSE) .
 
-  eq free-moduletype(EXTERNTYPE_1* -> EXTERNTYPE_2*) = recordConcat(free-list(map-free-externtype(EXTERNTYPE_1*)), free-list(map-free-externtype-2(EXTERNTYPE_2*)), free) .
+  eq free-moduletype(EXTERNTYPE_1* -> EXTERNTYPE_2*) = recordConcat(free-list(map-free-externtype(EXTERNTYPE_1*)), free-list(map-free-externtype(EXTERNTYPE_2*)), free) .
 
   ceq typecheck(# VALUE, num-(INN)) = typecheck(# VALUE, iN(sizenn(INN)))
     if typecheck(INN, Inn) .
@@ -4552,7 +4430,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-shape(_X_(LANETYPE, DIM)) = free-lanetype(LANETYPE) .
 
-  ceq free-blocktype(-RESULT(VALTYPE?)) = free-opt(map-free-valtype-2(VALTYPE?))
+  ceq free-blocktype(-RESULT(VALTYPE?)) = free-opt(map-free-blocktype(VALTYPE?))
     if len(VALTYPE?) <= 1 .
 
   eq free-blocktype(-IDX(TYPEIDX)) = free-typeidx(TYPEIDX) .
@@ -4787,9 +4665,9 @@ mod SPEC2MAUDE-GENERATED is
   eq free-instr(DATA.DROP(DATAIDX)) = free-dataidx(DATAIDX) .
 
   ceq free-block(INSTR*) = FREE [. 'LABELS = shift-labelidxs(FREE . 'LABELS) ]
-    if FREE := free-list(map-free-instr-2(INSTR*)) .
+    if FREE := free-list(map-free-instr(INSTR*)) .
 
-  eq free-expr(INSTR*) = free-list(map-free-instr-3(INSTR*)) .
+  eq free-expr(INSTR*) = free-list(map-free-instr(INSTR*)) .
 
   ceq typecheck(ACTIVE(TABLEIDX, EXPR), elemmode) = true
     if typecheck(# TABLEIDX, tableidx)
@@ -4904,7 +4782,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq funcidx-module(MODULE-2) = free-module(MODULE-2) . 'FUNCS .
 
-  eq dataidx-funcs(FUNC*) = free-list(map-free-func-2(FUNC*)) . 'DATAS .
+  eq dataidx-funcs(FUNC*) = free-list(map-free-func(FUNC*)) . 'DATAS .
 
   eq typecheck(SET, init) = true .
 
@@ -5465,32 +5343,32 @@ mod SPEC2MAUDE-GENERATED is
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C** := setproduct-(lane-(FNN), map-fabs(FNN, C_1*)) .
 
-  ceq fvunop-fneg-(_X_(FNN, M-2), V_1) = map-inv-lanes-2(FNN, M-2, C**)
+  ceq fvunop-fneg-(_X_(FNN, M-2), V_1) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C** := setproduct-(lane-(FNN), map-fneg(FNN, C_1*)) .
 
-  ceq fvunop-fsqrt-(_X_(FNN, M-2), V_1) = map-inv-lanes-3(FNN, M-2, C**)
+  ceq fvunop-fsqrt-(_X_(FNN, M-2), V_1) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C** := setproduct-(lane-(FNN), map-fsqrt(FNN, C_1*)) .
 
-  ceq fvunop-fceil-(_X_(FNN, M-2), V_1) = map-inv-lanes-4(FNN, M-2, C**)
+  ceq fvunop-fceil-(_X_(FNN, M-2), V_1) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C** := setproduct-(lane-(FNN), map-fceil(FNN, C_1*)) .
 
-  ceq fvunop-ffloor-(_X_(FNN, M-2), V_1) = map-inv-lanes-5(FNN, M-2, C**)
+  ceq fvunop-ffloor-(_X_(FNN, M-2), V_1) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C** := setproduct-(lane-(FNN), map-ffloor(FNN, C_1*)) .
 
-  ceq fvunop-ftrunc-(_X_(FNN, M-2), V_1) = map-inv-lanes-6(FNN, M-2, C**)
+  ceq fvunop-ftrunc-(_X_(FNN, M-2), V_1) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C** := setproduct-(lane-(FNN), map-ftrunc(FNN, C_1*)) .
 
-  ceq fvunop-fnearest-(_X_(FNN, M-2), V_1) = map-inv-lanes-7(FNN, M-2, C**)
+  ceq fvunop-fnearest-(_X_(FNN, M-2), V_1) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C** := setproduct-(lane-(FNN), map-fnearest(FNN, C_1*)) .
@@ -5499,7 +5377,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-iadd(JNN, C_1*, C_2*) .
+      /\ C* := map-ivbinop-iadd(JNN, C_1*, C_2*) .
 
   ceq ivbinop-isub-(_X_(JNN, M-2), V_1, V_2) = # inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -5511,13 +5389,13 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-imul(JNN, C_1*, C_2*) .
+      /\ C* := map-ivbinop-imul(JNN, C_1*, C_2*) .
 
   ceq ivbinopsx-iadd-sat-(_X_(JNN, M-2), SX, V_1, V_2) = # inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-iadd-sat(JNN, SX, C_1*, C_2*) .
+      /\ C* := map-ivbinopsx-iadd-sat(JNN, SX, C_1*, C_2*) .
 
   ceq ivbinopsx-isub-sat-(_X_(JNN, M-2), SX, V_1, V_2) = # inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -5549,87 +5427,87 @@ mod SPEC2MAUDE-GENERATED is
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
       /\ C* := map-iq15mulr-sat(JNN, SX, C_1*, C_2*) .
 
-  ceq ivbinopsxnd-irelaxed-q15mulr-(_X_(JNN, M-2), SX, V_1, V_2) = map-inv-lanes-8(JNN, M-2, C**)
+  ceq ivbinopsxnd-irelaxed-q15mulr-(_X_(JNN, M-2), SX, V_1, V_2) = map-inv-lanes(JNN, M-2, C**)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
       /\ C** := setproduct-(lane-(JNN), map-irelaxed-q15mulr(JNN, SX, C_1*, C_2*)) .
 
-  ceq fvbinop-fadd-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-9(FNN, M-2, C**)
+  ceq fvbinop-fadd-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fadd(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-fsub-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-10(FNN, M-2, C**)
+  ceq fvbinop-fsub-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fsub(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-fmul-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-11(FNN, M-2, C**)
+  ceq fvbinop-fmul-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fmul(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-fdiv-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-12(FNN, M-2, C**)
+  ceq fvbinop-fdiv-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fdiv(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-fmin-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-13(FNN, M-2, C**)
+  ceq fvbinop-fmin-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fmin(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-fmax-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-14(FNN, M-2, C**)
+  ceq fvbinop-fmax-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fmax(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-fpmin-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-15(FNN, M-2, C**)
+  ceq fvbinop-fpmin-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fpmin(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-fpmax-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-16(FNN, M-2, C**)
+  ceq fvbinop-fpmax-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-fpmax(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-frelaxed-min-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-17(FNN, M-2, C**)
+  ceq fvbinop-frelaxed-min-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-frelaxed-min(FNN, C_1*, C_2*)) .
 
-  ceq fvbinop-frelaxed-max-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes-18(FNN, M-2, C**)
+  ceq fvbinop-frelaxed-max-(_X_(FNN, M-2), V_1, V_2) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C** := setproduct-(lane-(FNN), map-frelaxed-max(FNN, C_1*, C_2*)) .
 
-  ceq ivternopnd-irelaxed-laneselect-(_X_(JNN, M-2), V_1, V_2, V_3) = map-inv-lanes-19(JNN, M-2, C**)
+  ceq ivternopnd-irelaxed-laneselect-(_X_(JNN, M-2), V_1, V_2, V_3) = map-inv-lanes(JNN, M-2, C**)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
       /\ C_3* := lanes-(_X_(JNN, M-2), V_3)
       /\ C** := setproduct-(lane-(JNN), map-irelaxed-laneselect(JNN, C_1*, C_2*, C_3*)) .
 
-  ceq fvternop-frelaxed-madd-(_X_(FNN, M-2), V_1, V_2, V_3) = map-inv-lanes-20(FNN, M-2, C**)
+  ceq fvternop-frelaxed-madd-(_X_(FNN, M-2), V_1, V_2, V_3) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
       /\ C_3* := lanes-(_X_(FNN, M-2), V_3)
       /\ C** := setproduct-(lane-(FNN), map-frelaxed-madd(FNN, C_1*, C_2*, C_3*)) .
 
-  ceq fvternop-frelaxed-nmadd-(_X_(FNN, M-2), V_1, V_2, V_3) = map-inv-lanes-21(FNN, M-2, C**)
+  ceq fvternop-frelaxed-nmadd-(_X_(FNN, M-2), V_1, V_2, V_3) = map-inv-lanes(FNN, M-2, C**)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
@@ -5640,43 +5518,43 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-extend(JNN, C_1*, C_2*) .
+      /\ C* := map-ivrelop-ieq(JNN, C_1*, C_2*) .
 
   ceq ivrelop-ine-(_X_(JNN, M-2), V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-extend-2(JNN, C_1*, C_2*) .
+      /\ C* := map-ivrelop-ine(JNN, C_1*, C_2*) .
 
   ceq ivrelopsx-ilt-(_X_(JNN, M-2), SX, V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-extend-3(JNN, SX, C_1*, C_2*) .
+      /\ C* := map-ivrelopsx-ilt(JNN, SX, C_1*, C_2*) .
 
   ceq ivrelopsx-igt-(_X_(JNN, M-2), SX, V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-extend-4(JNN, SX, C_1*, C_2*) .
+      /\ C* := map-ivrelopsx-igt(JNN, SX, C_1*, C_2*) .
 
   ceq ivrelopsx-ile-(_X_(JNN, M-2), SX, V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-extend-5(JNN, SX, C_1*, C_2*) .
+      /\ C* := map-ivrelopsx-ile(JNN, SX, C_1*, C_2*) .
 
   ceq ivrelopsx-ige-(_X_(JNN, M-2), SX, V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-extend-6(JNN, SX, C_1*, C_2*) .
+      /\ C* := map-ivrelopsx-ige(JNN, SX, C_1*, C_2*) .
 
   ceq fvrelop-feq-(_X_(FNN, M-2), V_1, V_2) = inv-lanes-(_X_(INN, M-2), C*)
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C* := map-extend-7(FNN, C_1*, C_2*)
+      /\ C* := map-fvrelop-feq(FNN, C_1*, C_2*)
       /\ INN := inv-isize(fsize(FNN))
       /\ isize(INN) == fsize(FNN) .
 
@@ -5684,7 +5562,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C* := map-extend-8(FNN, C_1*, C_2*)
+      /\ C* := map-fvrelop-fne(FNN, C_1*, C_2*)
       /\ INN := inv-isize(fsize(FNN))
       /\ isize(INN) == fsize(FNN) .
 
@@ -5692,7 +5570,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C* := map-extend-9(FNN, C_1*, C_2*)
+      /\ C* := map-fvrelop-flt(FNN, C_1*, C_2*)
       /\ INN := inv-isize(fsize(FNN))
       /\ isize(INN) == fsize(FNN) .
 
@@ -5700,7 +5578,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C* := map-extend-10(FNN, C_1*, C_2*)
+      /\ C* := map-fvrelop-fgt(FNN, C_1*, C_2*)
       /\ INN := inv-isize(fsize(FNN))
       /\ isize(INN) == fsize(FNN) .
 
@@ -5708,7 +5586,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C* := map-extend-11(FNN, C_1*, C_2*)
+      /\ C* := map-fvrelop-fle(FNN, C_1*, C_2*)
       /\ INN := inv-isize(fsize(FNN))
       /\ isize(INN) == fsize(FNN) .
 
@@ -5716,7 +5594,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(FNN, Fnn)
       /\ C_1* := lanes-(_X_(FNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(FNN, M-2), V_2)
-      /\ C* := map-extend-12(FNN, C_1*, C_2*)
+      /\ C* := map-fvrelop-fge(FNN, C_1*, C_2*)
       /\ INN := inv-isize(fsize(FNN))
       /\ isize(INN) == fsize(FNN) .
 
@@ -5733,8 +5611,8 @@ mod SPEC2MAUDE-GENERATED is
   ceq ivbitmaskop-(_X_(JNN, M-2), V_1) = irev-(32, C-3)
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
-      /\ C-3 := inv-ibits-(32, map-exp-987(JNN, C_1*) repeatSeq(_-_(32 : nat <:> int, M-2 : nat <:> int) : int <:> nat, # 0))
-      /\ ibits-(32, C-3) == (map-exp-987(JNN, C_1*) repeatSeq(_-_(32 : nat <:> int, M-2 : nat <:> int) : int <:> nat, # 0)) .
+      /\ C-3 := inv-ibits-(32, map-ivbitmaskop(JNN, C_1*) repeatSeq(_-_(32 : nat <:> int, M-2 : nat <:> int) : int <:> nat, # 0))
+      /\ ibits-(32, C-3) == (map-ivbitmaskop(JNN, C_1*) repeatSeq(_-_(32 : nat <:> int, M-2 : nat <:> int) : int <:> nat, # 0)) .
 
   ceq ivswizzlop-iswizzle-lane-(_X_(JNN, M-2), V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -5752,7 +5630,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(JNN, Jnn)
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-exp-1004(JNN, M-2, C_1*, C_2*, I*) .
+      /\ C* := map-ivshufflop(JNN, M-2, C_1*, C_2*, I*) .
 
   eq vvunop-(VNN, NOT, V) = # inot-(vsizenn(VNN), V) .
 
@@ -5895,26 +5773,22 @@ mod SPEC2MAUDE-GENERATED is
   ceq lcvtop--(_X_(FNN_1, M_1), _X_(FNN_2, M_2), PROMOTELOW, C_1-3) = C*
     if C* := promote--(lsizenn1(FNN_1), lsizenn2(FNN_2), C_1-3) .
 
-  ceq spectec-vcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, V_1) = spectec-vcvtop---choice-291-0(map-inv-lanes-22(LNN_2, M-2, C**))
+  ceq spectec-vcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, V_1) = choose-vcvtop(map-inv-lanes(LNN_2, M-2, C**))
     if _and_(halfop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == eps, zeroop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == eps)
       /\ C_1* := lanes-(_X_(LNN_1, M-2), V_1)
-      /\ C** := setproduct-(lane-(LNN_2), map-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*)) .
+      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*)) .
 
-  rl spectec-vcvtop---choice-291-0(CHOICE-PREFIX ((# V) CHOICE-REST)) => V .
+  rl choose-vcvtop(CHOICE-PREFIX ((# V) CHOICE-REST)) => V .
 
-  ceq spectec-vcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, V_1) = spectec-vcvtop---choice-296-0(map-inv-lanes-23(LNN_2, M_2, C**))
+  ceq spectec-vcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, V_1) = choose-vcvtop(map-inv-lanes(LNN_2, M_2, C**))
     if HALF ? := halfop(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2)
       /\ C_1* := lanes-(_X_(LNN_1, M_1), V_1) [ spectec-half(HALF, 0, M_2) : M_2 ]
-      /\ C** := setproduct-(lane-(LNN_2), map-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*)) .
+      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*)) .
 
-  rl spectec-vcvtop---choice-296-0(CHOICE-PREFIX ((# V) CHOICE-REST)) => V .
-
-  ceq spectec-vcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, V_1) = spectec-vcvtop---choice-301-0(map-inv-lanes-24(LNN_2, M_2, C**))
+  ceq spectec-vcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, V_1) = choose-vcvtop(map-inv-lanes(LNN_2, M_2, C**))
     if zeroop(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2) == (ZERO ?)
       /\ C_1* := lanes-(_X_(LNN_1, M_1), V_1)
-      /\ C** := setproduct-(lane-(LNN_2), map-lcvtop-3(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*) repeatSeq(M_1, seq(spectec-zero(LNN_2)))) .
-
-  rl spectec-vcvtop---choice-301-0(CHOICE-PREFIX ((# V) CHOICE-REST)) => V .
+      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*) repeatSeq(M_1, seq(spectec-zero(LNN_2)))) .
 
   eq spectec-vshiftop-(_X_(JNN, M-2), SHL, V, I) = ivshiftop-ishl-(_X_(JNN, M-2), V, I) .
 
@@ -5935,37 +5809,37 @@ mod SPEC2MAUDE-GENERATED is
       /\ C_1* := lanes-(_X_(JNN_1, M_1), V_1)
       /\ C_2* := lanes-(_X_(JNN_1, M_1), V_2)
       /\ C'_1* := map-narrow(JNN_2, JNN_1, SX, C_1*)
-      /\ C'_2* := map-narrow-2(JNN_2, JNN_1, SX, C_2*)
+      /\ C'_2* := map-narrow(JNN_2, JNN_1, SX, C_2*)
       /\ V := inv-lanes-(_X_(JNN_2, M_2), C'_1* C'_2*) .
 
-  ceq ivadd-pairwise-(N-2, I*) = map-iadd-2(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1040(inv-concat-(N, I*))
-      /\ concat-(N, map-exp-1040(J_1*, J_2*)) == I* .
+  ceq ivadd-pairwise-(N-2, I*) = map-ivadd-pairwise(N-2, J_1*, J_2*)
+    if tuple(seq(J_1*) seq(J_2*)) := unzip-ivadd-pairwise(inv-concat-(N, I*))
+      /\ concat-(N, map-ivadd-pairwise-2(J_1*, J_2*)) == I* .
 
   ceq ivextunop--ivadd-pairwise-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, V_1) = inv-lanes-(_X_(JNN_2, M_2), C*)
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
       /\ C_1* := lanes-(_X_(JNN_1, M_1), V_1)
-      /\ C'_1* := map-extend-13(JNN_2, JNN_1, SX, C_1*)
+      /\ C'_1* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, C_1*)
       /\ C* := ivadd-pairwise-(lsizenn2(JNN_2), C'_1*) .
 
   eq spectec-vextunop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), EXTADD-PAIRWISE(SX), V_1) = ivextunop--ivadd-pairwise-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, V_1) .
 
-  ceq ivdot-(N-2, I_1*, I_2*) = map-iadd-3(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1049(N-2, inv-concat-(iN(N-2), map-imul-2(N-2, I_1*, I_2*)))
-      /\ concat-(iN(N-2), map-exp-1049(N-2, J_1*, J_2*)) == map-imul-2(N-2, I_1*, I_2*) .
+  ceq ivdot-(N-2, I_1*, I_2*) = map-ivadd-pairwise(N-2, J_1*, J_2*)
+    if tuple(seq(J_1*) seq(J_2*)) := unzip-ivdot(N-2, inv-concat-(iN(N-2), map-ivdot-2(N-2, I_1*, I_2*)))
+      /\ concat-(iN(N-2), map-ivdot(N-2, J_1*, J_2*)) == map-ivdot-2(N-2, I_1*, I_2*) .
 
-  ceq ivdot-sat-(N-2, I_1*, I_2*) = map-iadd-sat-2(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := project-map-exp-1052(N-2, inv-concat-(iN(N-2), map-imul-3(N-2, I_1*, I_2*)))
-      /\ concat-(iN(N-2), map-exp-1052(N-2, J_1*, J_2*)) == map-imul-3(N-2, I_1*, I_2*) .
+  ceq ivdot-sat-(N-2, I_1*, I_2*) = map-ivdot-sat(N-2, J_1*, J_2*)
+    if tuple(seq(J_1*) seq(J_2*)) := unzip-ivdot(N-2, inv-concat-(iN(N-2), map-ivdot-2(N-2, I_1*, I_2*)))
+      /\ concat-(iN(N-2), map-ivdot(N-2, J_1*, J_2*)) == map-ivdot-2(N-2, I_1*, I_2*) .
 
   ceq ivextbinop--ivmul-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX_1, SX_2, I, K-3, V_1, V_2) = inv-lanes-(_X_(JNN_2, M_2), C*)
     if typecheck(JNN_1, Jnn)
       /\ typecheck(JNN_2, Jnn)
       /\ C_1* := lanes-(_X_(JNN_1, M_1), V_1) [ I : K-3 ]
       /\ C_2* := lanes-(_X_(JNN_1, M_1), V_2) [ I : K-3 ]
-      /\ C'_1* := map-extend-14(JNN_2, JNN_1, SX_1, C_1*)
-      /\ C'_2* := map-extend-15(JNN_2, JNN_1, SX_2, C_2*)
+      /\ C'_1* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX_1, C_1*)
+      /\ C'_2* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX_2, C_2*)
       /\ C* := ivmul-(lsizenn2(JNN_2), C'_1*, C'_2*) .
 
   ceq ivextbinop--ivdot-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX_1, SX_2, I, K-3, V_1, V_2) = inv-lanes-(_X_(JNN_2, M_2), C*)
@@ -5973,8 +5847,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(JNN_2, Jnn)
       /\ C_1* := lanes-(_X_(JNN_1, M_1), V_1) [ I : K-3 ]
       /\ C_2* := lanes-(_X_(JNN_1, M_1), V_2) [ I : K-3 ]
-      /\ C'_1* := map-extend-16(JNN_2, JNN_1, SX_1, C_1*)
-      /\ C'_2* := map-extend-17(JNN_2, JNN_1, SX_2, C_2*)
+      /\ C'_1* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX_1, C_1*)
+      /\ C'_2* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX_2, C_2*)
       /\ C* := ivdot-(lsizenn2(JNN_2), C'_1*, C'_2*) .
 
   ceq ivextbinop--ivdot-sat-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX_1, SX_2, I, K-3, V_1, V_2) = inv-lanes-(_X_(JNN_2, M_2), C*)
@@ -5982,11 +5856,11 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(JNN_2, Jnn)
       /\ C_1* := lanes-(_X_(JNN_1, M_1), V_1) [ I : K-3 ]
       /\ C_2* := lanes-(_X_(JNN_1, M_1), V_2) [ I : K-3 ]
-      /\ C'_1* := map-extend-18(JNN_2, JNN_1, SX_1, C_1*)
-      /\ C'_2* := map-extend-19(JNN_2, JNN_1, SX_2, C_2*)
+      /\ C'_1* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX_1, C_1*)
+      /\ C'_2* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX_2, C_2*)
       /\ C* := ivdot-sat-(lsizenn2(JNN_2), C'_1*, C'_2*) .
 
-  eq ivmul-(N-2, I_1*, I_2*) = map-imul-4(N-2, I_1*, I_2*) .
+  eq ivmul-(N-2, I_1*, I_2*) = map-ivdot-2(N-2, I_1*, I_2*) .
 
   eq spectec-vextbinop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), EXTMUL(HALF, SX), V_1, V_2) = ivextbinop--ivmul-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, SX, spectec-half(HALF, 0, M_2), M_2, V_1, V_2) .
 
@@ -5994,14 +5868,14 @@ mod SPEC2MAUDE-GENERATED is
 
   eq spectec-vextbinop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), RELAXED-DOTS, V_1, V_2) = ivextbinop--ivdot-sat-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), S, spectec-relaxed2(r-idot, sx, S, U), 0, M_1, V_1, V_2) .
 
-  ceq spectec-vextternop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), RELAXED-DOT-ADDS, C_1-2, C_2-2, C_3-2) = spectec-vextternop---choice-398-0(spectec-vbinop-(_X_(JNN_2, M_2), ADD, C'', C_3-2))
+  ceq spectec-vextternop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), RELAXED-DOT-ADDS, C_1-2, C_2-2, C_3-2) = choose-vextternop(spectec-vbinop-(_X_(JNN_2, M_2), ADD, C'', C_3-2))
     if JNN := inv-jsizenn(2 * lsizenn1(JNN_1))
       /\ jsizenn(JNN) == (2 * lsizenn1(JNN_1))
       /\ M-2 := 2 * M_2
       /\ C'-2 := spectec-vextbinop--(_X_(JNN_1, M_1), _X_(JNN, M-2), RELAXED-DOTS, C_1-2, C_2-2)
       /\ C'' := spectec-vextunop--(_X_(JNN, M-2), _X_(JNN_2, M_2), EXTADD-PAIRWISE(S), C'-2) .
 
-  rl spectec-vextternop---choice-398-0(CHOICE-PREFIX ((# C-3) CHOICE-REST)) => C-3 .
+  rl choose-vextternop(CHOICE-PREFIX ((# C-3) CHOICE-REST)) => C-3 .
 
   ceq typecheck(CONST(NUMTYPE, VALUE2), num) = true
     if typecheck(NUMTYPE, numtype)
@@ -6243,7 +6117,7 @@ mod SPEC2MAUDE-GENERATED is
     if { (field('TYPE, tuple(AT (([ I .. J? ]) RT))) ; field('REFS, R'*)) } := TABLEINST
       /\ len(J?) <= 1
       /\ I' := len(R'*) + N-3
-      /\ iterpr-34(I', J?)
+      /\ all-growtable(I', J?)
       /\ (I' : nat <:> int) <= _-_((2 ^ size(AT)) : nat <:> int, 1 : nat <:> int)
       /\ TABLEINST' := { (field('TYPE, tuple(AT (([ I' .. J? ]) RT))) ; field('REFS, R'* repeatSeq(N-3, R))) } .
 
@@ -6251,7 +6125,7 @@ mod SPEC2MAUDE-GENERATED is
     if { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, B*)) } := MEMINST
       /\ len(J?) <= 1
       /\ I' := (((len(B*) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) + (N-3 : nat <:> rat)) : rat <:> nat
-      /\ iterpr-35(I', J?)
+      /\ all-growtable(I', J?)
       /\ I' <= (2 ^ (_-_(size(AT) : nat <:> int, 16 : nat <:> int) : int <:> nat))
       /\ MEMINST' := { (field('TYPE, __PAGE(AT, [ I' .. J? ])) ; field('BYTES, B* repeatSeq(N-3 * (64 * Ki), # 0))) } .
 
@@ -6501,7 +6375,7 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-pure(VCONST(V128, C_1-2) VTESTOP(_X_(JNN, M-2), ALL-TRUE)) => CONST(I32, # C-3)
     if I* := lanes-(_X_(JNN, M-2), C_1-2)
-      /\ C-3 := prod(map-exp-1180(JNN, I*)) .
+      /\ C-3 := prod(map-Step-pure(JNN, I*)) .
 
   crl Step-pure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VRELOP(SH, VRELOP-2))) => VCONST(V128, C-3)
     if C-3 := spectec-vrelop-(SH, VRELOP-2, C_1-2, C_2-2) .
@@ -6624,8 +6498,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ spectec-FUNC-2(CASE-PART1-2, CASE-PART2-2, CASE-PART3) := FI . 'CODE
       /\ X-4 := CASE-PART1-2
       /\ INSTR* := CASE-PART3
-      /\ T* := project-map-exp-1206(CASE-PART2-2)
-      /\ F := { (field('LOCALS, map-exp-1208(N-3, VAL*) map-default(T*)) ; field('MODULE, FI . 'MODULE)) } .
+      /\ T* := unzip-LOCAL(CASE-PART2-2)
+      /\ F := { (field('LOCALS, map-Step-read(N-3, VAL*) map-default(T*)) ; field('MODULE, FI . 'MODULE)) } .
 
   crl Step-read(Z ; RETURN-CALL(X-4)) => REF.FUNC-ADDR(A) RETURN-CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE)
     if A := #rat((spectec-moduleinst(Z) . 'FUNCS) [ X-4 ]) .
@@ -6757,10 +6631,10 @@ mod SPEC2MAUDE-GENERATED is
     if ((I + #rat(AO . 'OFFSET)) + ((((M-2 * K-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => VCONST(V128, C-3)
-    if J* := iterpr-36-output-1(M-2, Z, X-4, AT, I, AO, K-2, 0)
+    if J* := bind-Step-read(M-2, Z, X-4, AT, I, AO, K-2, 0)
       /\ JNN := inv-jsizenn(M-2 * 2)
       /\ jsizenn(JNN) == (M-2 * 2)
-      /\ C-3 := inv-lanes-(_X_(JNN, K-2), map-extend-20(JNN, K-2, M-2, SX, K-2, J*)) .
+      /\ C-3 := inv-lanes-(_X_(JNN, K-2), map-Step-read-2(JNN, K-2, M-2, SX, K-2, J*)) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => TRAP
     if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
@@ -6860,8 +6734,8 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; STRUCT.NEW-DEFAULT(X-4)) => VAL* STRUCT.NEW(X-4)
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := project-map-exp-1250(CASE-PART1)
-      /\ VAL* := iterpr-37-output-1(ZT*) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1)
+      /\ VAL* := bind-Step-read-2(ZT*) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX?, X-4, I))) => TRAP
     if len(SX?) <= 1 .
@@ -6870,7 +6744,7 @@ mod SPEC2MAUDE-GENERATED is
     if len(SX?) <= 1
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := project-map-exp-1256(CASE-PART1) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1) .
 
   crl Step-read(Z ; (CONST(I32, # N-3) ARRAY.NEW-DEFAULT(X-4))) => instrRepeat(N-3, VAL) ARRAY.NEW-FIXED(X-4, N-3)
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
@@ -6880,7 +6754,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => TRAP
     if (I + N-3) > len(spectec-elem(Z, Y) . 'REFS) .
 
-  crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => map-exp-1260(N-3, REF*) ARRAY.NEW-FIXED(X-4, N-3)
+  crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => map-Step-read-3(N-3, REF*) ARRAY.NEW-FIXED(X-4, N-3)
     if REF* := (spectec-elem(Z, Y) . 'REFS) [ I : N-3 ]
       /\ len(REF*) = N-3 .
 
@@ -6892,7 +6766,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-DATA(X-4, Y)))) => map-const(ZT, N-3, C*) ARRAY.NEW-FIXED(X-4, N-3)
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ len(MUT?) <= 1
-      /\ C* := project-map-zbytes(ZT, N-3, inv-concatn-(byte, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, (spectec-data(Z, Y) . 'BYTES) [ I : ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]))
+      /\ C* := unzip-zbytes(ZT, N-3, inv-concatn-(byte, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, (spectec-data(Z, Y) . 'BYTES) [ I : ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]))
       /\ concatn-(byte, map-zbytes(ZT, N-3, C*), ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) == ((spectec-data(Z, Y) . 'BYTES) [ I : ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => TRAP
@@ -7070,23 +6944,23 @@ mod SPEC2MAUDE-GENERATED is
     if N-3 := instrSize(VAL*)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := project-map-exp-1323(N-3, CASE-PART1)
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step(N-3, CASE-PART1)
       /\ A := len(spectec-structinst(Z))
-      /\ SI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-packfield(N-3, VAL*, ZT*))) } .
+      /\ SI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step(N-3, VAL*, ZT*))) } .
 
   rl Step(Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X-4, I)))) => Z ; TRAP .
 
   crl Step(Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X-4, I)))) => with-struct(Z, A, I, packfield-(ZT* [ I ], VAL)) ; eps
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := project-map-exp-1326(CASE-PART1) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1) .
 
   crl Step(Z ; (VAL* ARRAY.NEW-FIXED(X-4, N-3))) => add-arrayinst(Z, AI-2) ; REF.ARRAY-ADDR(A)
     if instrSize(VAL*) = N-3
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ len(MUT?) <= 1
       /\ A := len(spectec-arrayinst(Z))
-      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-packfield-2(ZT, N-3, VAL*))) } .
+      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-2(ZT, N-3, VAL*))) } .
 
   rl Step(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) => Z ; TRAP .
 
@@ -7332,7 +7206,7 @@ mod SPEC2MAUDE-GENERATED is
   rl [focus-Step-read-vload-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) | POSTFIX } .
 
   crl [focus-Step-read-vload-pack-val] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) | POSTFIX }
-    if J* := iterpr-36-output-1(M-2, Z, X-4, AT, I, AO, K-2, 0) .
+    if J* := bind-Step-read(M-2, Z, X-4, AT, I, AO, K-2, 0) .
 
   rl [focus-Step-read-vload-splat-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, SPLAT(N-2) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) | POSTFIX } .
 
@@ -7369,8 +7243,8 @@ mod SPEC2MAUDE-GENERATED is
   crl [focus-Step-read-struct-new-default] : identifyFocus(Z, PREFIX, STRUCT.NEW-DEFAULT(X-4), POSTFIX) => { PREFIX | (Z ; STRUCT.NEW-DEFAULT(X-4)) | POSTFIX }
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := project-map-exp-1250(CASE-PART1)
-      /\ VAL* := iterpr-37-output-1(ZT*) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1)
+      /\ VAL* := bind-Step-read-2(ZT*) .
 
   crl [focus-Step-read-struct-get-null] : identifyFocus(Z, PREFIX (REF.NULL-ADDR), STRUCT.GET(SX?, X-4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) STRUCT.GET(SX?, X-4, I))) | POSTFIX }
     if len(SX?) <= 1 .
@@ -7453,7 +7327,7 @@ mod SPEC2MAUDE-GENERATED is
     if N-3 := instrSize(VAL*)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := project-map-exp-1323(N-3, CASE-PART1) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step(N-3, CASE-PART1) .
 
   rl [focus-Step-struct-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) VAL), STRUCT.SET(X-4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X-4, I)))) | POSTFIX } .
 
@@ -7464,7 +7338,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ len(MUT?) <= 1
       /\ A := len(spectec-arrayinst(Z))
-      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-packfield-2(ZT, N-3, VAL*))) } .
+      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-2(ZT, N-3, VAL*))) } .
 
   rl [focus-Step-array-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, # I) VAL)), ARRAY.SET(X-4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | POSTFIX } .
 
@@ -7851,20 +7725,20 @@ mod SPEC2MAUDE-GENERATED is
   ceq allocmodule(S-2, MODULE-2, EXTERNADDR*, VAL_G*, REF_T*, REF_E**) = tuple(S_7 MODULEINST)
     if MODULE(TYPE*, IMPORT*, TAG*, GLOBAL*, MEM*, TABLE*, FUNC*, DATA*, ELEM*, START?, EXPORT*) := MODULE-2
       /\ len(START?) <= 1
-      /\ TAGTYPE* := project-map-exp-1427(TAG*)
-      /\ tuple(seq(EXPR_G*) seq(GLOBALTYPE*)) := project-map-exp-1429(GLOBAL*)
-      /\ MEMTYPE* := project-map-exp-1431(MEM*)
-      /\ tuple(seq(EXPR_T*) seq(TABLETYPE*)) := project-map-exp-1433(TABLE*)
-      /\ tuple(seq(EXPR_F*) (seq(LOCAL**) seq(X*-2))) := project-map-exp-1435(FUNC*)
-      /\ tuple(seq(BYTE**) seq(DATAMODE*)) := project-map-exp-1438(DATA*)
-      /\ tuple(seq(ELEMMODE*) (seq(ELEMTYPE*) seq(EXPR_E**))) := project-map-exp-1441(ELEM*)
+      /\ TAGTYPE* := unzip-TAG(TAG*)
+      /\ tuple(seq(EXPR_G*) seq(GLOBALTYPE*)) := unzip-GLOBAL(GLOBAL*)
+      /\ MEMTYPE* := unzip-MEMORY(MEM*)
+      /\ tuple(seq(EXPR_T*) seq(TABLETYPE*)) := unzip-TABLE(TABLE*)
+      /\ tuple(seq(EXPR_F*) (seq(LOCAL**) seq(X*-2))) := unzip-FUNC(FUNC*)
+      /\ tuple(seq(BYTE**) seq(DATAMODE*)) := unzip-DATA(DATA*)
+      /\ tuple(seq(ELEMMODE*) (seq(ELEMTYPE*) seq(EXPR_E**))) := unzip-allocmodule(ELEM*)
       /\ AA_I* := tagsxa(EXTERNADDR*)
       /\ GA_I* := globalsxa(EXTERNADDR*)
       /\ MA_I* := memsxa(EXTERNADDR*)
       /\ TA_I* := tablesxa(EXTERNADDR*)
       /\ FA_I* := funcsxa(EXTERNADDR*)
       /\ DT* := alloctypes(TYPE*)
-      /\ FA* := map-exp-1456(S-2, len(FUNC*), 0)
+      /\ FA* := map-allocmodule(S-2, len(FUNC*), 0)
       /\ tuple(S_1 seq(AA*)) := alloctags(S-2, map-subst-all-tagtype(DT*, TAGTYPE*))
       /\ tuple(S_2 seq(GA*)) := allocglobals(S_1, map-subst-all-globaltype(DT*, GLOBALTYPE*), VAL_G*)
       /\ tuple(S_3 seq(MA*)) := allocmems(S_2, map-subst-all-memtype(DT*, MEMTYPE*))
@@ -7873,7 +7747,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S_6 seq(EA*)) := allocelems(S_5, map-subst-all-reftype(DT*, ELEMTYPE*), REF_E**)
       /\ XI* := allocexports({ (field('TYPES, eps) ; (field('TAGS, AA_I* AA*) ; (field('GLOBALS, GA_I* GA*) ; (field('MEMS, MA_I* MA*) ; (field('TABLES, TA_I* TA*) ; (field('FUNCS, FA_I* FA*) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }, EXPORT*)
       /\ MODULEINST := { (field('TYPES, DT*) ; (field('TAGS, AA_I* AA*) ; (field('GLOBALS, GA_I* GA*) ; (field('MEMS, MA_I* MA*) ; (field('TABLES, TA_I* TA*) ; (field('FUNCS, FA_I* FA*) ; (field('DATAS, DA*) ; (field('ELEMS, EA*) ; field('EXPORTS, XI*))))))))) }
-      /\ tuple(S_7 seq(FA*)) := allocfuncs(S_6, map-exp-1478(DT*, X*-2), map-exp-1480(EXPR_F*, LOCAL**, X*-2), repeatSeq(len(FUNC*), MODULEINST)) .
+      /\ tuple(S_7 seq(FA*)) := allocfuncs(S_6, map-allocmodule-2(DT*, X*-2), map-FUNC(EXPR_F*, LOCAL**, X*-2), repeatSeq(len(FUNC*), MODULEINST)) .
 
   ceq rundata-(X-4, DATA(B*, PASSIVE)) = eps
     if N-3 := len(B*) .
@@ -7914,12 +7788,12 @@ mod SPEC2MAUDE-GENERATED is
   crl instantiate(S-2, MODULE-2, EXTERNADDR*) => (S'''' ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST)) })) ; (INSTR_E* (INSTR_D* instrLift(INSTR_S?)))
     if MODULE(TYPE*, IMPORT*, TAG*, GLOBAL*, MEM*, TABLE*, FUNC*, DATA*, ELEM*, START?, EXPORT*) := MODULE-2
       /\ len(START?) <= 1
-      /\ tuple(seq(EXPR_G*) seq(GLOBALTYPE*)) := project-map-exp-1557(GLOBAL*)
-      /\ tuple(seq(EXPR_T*) seq(TABLETYPE*)) := project-map-exp-1559(TABLE*)
-      /\ tuple(seq(BYTE**) seq(DATAMODE*)) := project-map-exp-1561(DATA*)
-      /\ tuple(seq(ELEMMODE*) (seq(EXPR_E**) seq(REFTYPE*))) := project-map-exp-1564(ELEM*)
-      /\ X? := project-map-exp-1567(START?)
-      /\ MODULEINST_0 := { (field('TYPES, alloctypes(TYPE*)) ; (field('TAGS, eps) ; (field('GLOBALS, globalsxa(EXTERNADDR*)) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, funcsxa(EXTERNADDR*) map-exp-1571(S-2, len(FUNC*), 0)) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }
+      /\ tuple(seq(EXPR_G*) seq(GLOBALTYPE*)) := unzip-GLOBAL(GLOBAL*)
+      /\ tuple(seq(EXPR_T*) seq(TABLETYPE*)) := unzip-TABLE(TABLE*)
+      /\ tuple(seq(BYTE**) seq(DATAMODE*)) := unzip-DATA(DATA*)
+      /\ tuple(seq(ELEMMODE*) (seq(EXPR_E**) seq(REFTYPE*))) := unzip-instantiate(ELEM*)
+      /\ X? := unzip-START(START?)
+      /\ MODULEINST_0 := { (field('TYPES, alloctypes(TYPE*)) ; (field('TAGS, eps) ; (field('GLOBALS, globalsxa(EXTERNADDR*)) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, funcsxa(EXTERNADDR*) map-allocmodule(S-2, len(FUNC*), 0)) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }
       /\ Z := S-2 ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST_0)) })
       /\ evalglobals(Z, GLOBALTYPE*, EXPR_G*) => tuple(Z' seq(VAL_G*))
       /\ evalexprs(Z', EXPR_T*) => tuple(Z'' seq(REF_T*))
@@ -7928,16 +7802,16 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S'''' MODULEINST) := allocmodule(S''', MODULE-2, EXTERNADDR*, VAL_G*, REF_T*, REF_E**)
       /\ INSTR_D* := concat-(instr, map-rundata(DATA*, len(DATA*), 0))
       /\ INSTR_E* := concat-(instr, map-runelem(ELEM*, len(ELEM*), 0))
-      /\ INSTR_S? := map-exp-1594(X?)
+      /\ INSTR_S? := map-CALL(X?)
       /\ len(INSTR_S?) <= 1 .
 
   ceq invoke(S-2, FUNCADDR, VAL*) = (S-2 ; ({ (field('LOCALS, eps) ; field('MODULE, { (field('TYPES, eps) ; (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) })) })) ; (VAL* (REF.FUNC-ADDR(FUNCADDR) CALL-REF(((S-2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)))
     if FUNC T_1* -> T_2* := Expand(((S-2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)
-      /\ iterpr-38(S-2, T_1*, VAL*) .
+      /\ all-invoke(S-2, T_1*, VAL*) .
 
-  eq map-exp-21(X, eps) = eps .
+  eq map-concatopt(X, eps) = eps .
 
-  eq map-exp-21(X, seq(W'?) W'?*-REST) = seq(lift(W'?)) map-exp-21(X, W'?*-REST) .
+  eq map-concatopt(X, seq(W'?) W'?*-REST) = seq(lift(W'?)) map-concatopt(X, W'?*-REST) .
 
   eq map-subst-fieldtype(TV*, TU*, eps) = eps .
 
@@ -7947,93 +7821,49 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-subst-valtype(TV*, TU*, T_1-2 T_1*-REST) = subst-valtype(T_1-2, TV*, TU*) map-subst-valtype(TV*, TU*, T_1*-REST) .
 
-  eq map-subst-valtype-2(TV*, TU*, eps) = eps .
-
-  eq map-subst-valtype-2(TV*, TU*, T_2-2 T_2*-REST) = subst-valtype(T_2-2, TV*, TU*) map-subst-valtype-2(TV*, TU*, T_2*-REST) .
-
   eq map-subst-typeuse(TV*, TU*, eps) = eps .
 
   eq map-subst-typeuse(TV*, TU*, TU'-2 TU'*-REST) = subst-typeuse(TU'-2, TV*, TU*) map-subst-typeuse(TV*, TU*, TU'*-REST) .
 
-  eq map-subst-subtype(TV'*, TU'*, eps) = eps .
+  eq map-subst-rectype(TV'*, TU'*, eps) = eps .
 
-  eq map-subst-subtype(TV'*, TU'*, ST-2 ST*-REST) = subst-subtype(ST-2, TV'*, TU'*) map-subst-subtype(TV'*, TU'*, ST*-REST) .
+  eq map-subst-rectype(TV'*, TU'*, ST-2 ST*-REST) = subst-subtype(ST-2, TV'*, TU'*) map-subst-rectype(TV'*, TU'*, ST*-REST) .
 
   eq map-subst-externtype(TV*, TU*, eps) = eps .
 
   eq map-subst-externtype(TV*, TU*, XT_1-2 XT_1*-REST) = subst-externtype(XT_1-2, TV*, TU*) map-subst-externtype(TV*, TU*, XT_1*-REST) .
 
-  eq map-subst-externtype-2(TV*, TU*, eps) = eps .
+  eq map-subst-all-valtype(0, I) = eps .
 
-  eq map-subst-externtype-2(TV*, TU*, XT_2-2 XT_2*-REST) = subst-externtype(XT_2-2, TV*, TU*) map-subst-externtype-2(TV*, TU*, XT_2*-REST) .
+  eq map-subst-all-valtype(s(ITER-COUNT), I) = -IDX(I) map-subst-all-valtype(ITER-COUNT, s(I)) .
 
-  eq map-exp-266(0, I) = eps .
+  eq map-rollrt(X-4, N-3, 0, eps) = eps .
 
-  eq map-exp-266(s(ITER-COUNT), I) = -IDX(I) map-exp-266(ITER-COUNT, s(I)) .
+  eq map-rollrt(X-4, N-3, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-rollrt-2(X-4, N-3, 0), map-REC(N-3, 0)) map-rollrt(X-4, N-3, ITER-COUNT, SUBTYPE*-REST) .
 
-  eq map-exp-269(0, I) = eps .
+  eq map-rollrt-2(X-4, 0, I) = eps .
 
-  eq map-exp-269(s(ITER-COUNT), I) = -IDX(I) map-exp-269(ITER-COUNT, s(I)) .
+  eq map-rollrt-2(X-4, s(ITER-COUNT), I) = -IDX(X-4 + I) map-rollrt-2(X-4, ITER-COUNT, s(I)) .
 
-  eq map-exp-272(0, I) = eps .
+  eq map-REC(0, I) = eps .
 
-  eq map-exp-272(s(ITER-COUNT), I) = -IDX(I) map-exp-272(ITER-COUNT, s(I)) .
+  eq map-REC(s(ITER-COUNT), I) = REC(I) map-REC(ITER-COUNT, s(I)) .
 
-  eq map-exp-275(0, I) = eps .
+  eq map-unrollrt(N-3, RECTYPE, 0, eps) = eps .
 
-  eq map-exp-275(s(ITER-COUNT), I) = -IDX(I) map-exp-275(ITER-COUNT, s(I)) .
+  eq map-unrollrt(N-3, RECTYPE, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-REC(N-3, 0), map-unrollrt-2(RECTYPE, N-3, 0)) map-unrollrt(N-3, RECTYPE, ITER-COUNT, SUBTYPE*-REST) .
 
-  eq map-exp-278(0, I) = eps .
+  eq map-unrollrt-2(RECTYPE, 0, I) = eps .
 
-  eq map-exp-278(s(ITER-COUNT), I) = -IDX(I) map-exp-278(ITER-COUNT, s(I)) .
+  eq map-unrollrt-2(RECTYPE, s(ITER-COUNT), I) = -DEF(RECTYPE, I) map-unrollrt-2(RECTYPE, ITER-COUNT, s(I)) .
 
-  eq map-exp-281(0, I) = eps .
+  eq map-rolldt(N-3, SUBTYPE*, 0, I) = eps .
 
-  eq map-exp-281(s(ITER-COUNT), I) = -IDX(I) map-exp-281(ITER-COUNT, s(I)) .
+  eq map-rolldt(N-3, SUBTYPE*, s(ITER-COUNT), I) = -DEF(REC(SUBTYPE*), I) map-rolldt(N-3, SUBTYPE*, ITER-COUNT, s(I)) .
 
-  eq map-exp-284(0, I) = eps .
+  eq map-free-resulttype(eps) = eps .
 
-  eq map-exp-284(s(ITER-COUNT), I) = -IDX(I) map-exp-284(ITER-COUNT, s(I)) .
-
-  eq map-exp-287(0, I) = eps .
-
-  eq map-exp-287(s(ITER-COUNT), I) = -IDX(I) map-exp-287(ITER-COUNT, s(I)) .
-
-  eq map-exp-290(0, I) = eps .
-
-  eq map-exp-290(s(ITER-COUNT), I) = -IDX(I) map-exp-290(ITER-COUNT, s(I)) .
-
-  eq map-subst-subtype-2(X-4, N-3, 0, eps) = eps .
-
-  eq map-subst-subtype-2(X-4, N-3, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-exp-298(X-4, N-3, 0), map-exp-299(N-3, 0)) map-subst-subtype-2(X-4, N-3, ITER-COUNT, SUBTYPE*-REST) .
-
-  eq map-exp-298(X-4, 0, I) = eps .
-
-  eq map-exp-298(X-4, s(ITER-COUNT), I) = -IDX(X-4 + I) map-exp-298(X-4, ITER-COUNT, s(I)) .
-
-  eq map-exp-299(0, I) = eps .
-
-  eq map-exp-299(s(ITER-COUNT), I) = REC(I) map-exp-299(ITER-COUNT, s(I)) .
-
-  eq map-subst-subtype-3(N-3, RECTYPE, 0, eps) = eps .
-
-  eq map-subst-subtype-3(N-3, RECTYPE, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-exp-301(N-3, 0), map-exp-302(RECTYPE, N-3, 0)) map-subst-subtype-3(N-3, RECTYPE, ITER-COUNT, SUBTYPE*-REST) .
-
-  eq map-exp-301(0, I) = eps .
-
-  eq map-exp-301(s(ITER-COUNT), I) = REC(I) map-exp-301(ITER-COUNT, s(I)) .
-
-  eq map-exp-302(RECTYPE, 0, I) = eps .
-
-  eq map-exp-302(RECTYPE, s(ITER-COUNT), I) = -DEF(RECTYPE, I) map-exp-302(RECTYPE, ITER-COUNT, s(I)) .
-
-  eq map-exp-304(N-3, SUBTYPE*, 0, I) = eps .
-
-  eq map-exp-304(N-3, SUBTYPE*, s(ITER-COUNT), I) = -DEF(REC(SUBTYPE*), I) map-exp-304(N-3, SUBTYPE*, ITER-COUNT, s(I)) .
-
-  eq map-free-valtype(eps) = eps .
-
-  eq map-free-valtype(VALTYPE VALTYPE*-REST) = free-valtype(VALTYPE) map-free-valtype(VALTYPE*-REST) .
+  eq map-free-resulttype(VALTYPE VALTYPE*-REST) = free-valtype(VALTYPE) map-free-resulttype(VALTYPE*-REST) .
 
   eq map-free-fieldtype(eps) = eps .
 
@@ -8051,21 +7881,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-free-externtype(EXTERNTYPE_1-2 EXTERNTYPE_1*-REST) = free-externtype(EXTERNTYPE_1-2) map-free-externtype(EXTERNTYPE_1*-REST) .
 
-  eq map-free-externtype-2(eps) = eps .
+  eq map-free-blocktype(eps) = eps .
 
-  eq map-free-externtype-2(EXTERNTYPE_2-2 EXTERNTYPE_2*-REST) = free-externtype(EXTERNTYPE_2-2) map-free-externtype-2(EXTERNTYPE_2*-REST) .
-
-  eq map-free-valtype-2(eps) = eps .
-
-  eq map-free-valtype-2(VALTYPE ?) = free-valtype(VALTYPE) ? .
+  eq map-free-blocktype(VALTYPE ?) = free-valtype(VALTYPE) ? .
 
   eq map-free-list(eps) = eps .
 
-  eq map-free-list(seq(VALTYPE*) ?) = free-list(map-free-valtype-3(VALTYPE*)) ? .
-
-  eq map-free-valtype-3(eps) = eps .
-
-  eq map-free-valtype-3(VALTYPE VALTYPE*-REST) = free-valtype(VALTYPE) map-free-valtype-3(VALTYPE*-REST) .
+  eq map-free-list(seq(VALTYPE*) ?) = free-list(map-free-resulttype(VALTYPE*)) ? .
 
   eq map-free-labelidx(eps) = eps .
 
@@ -8078,14 +7900,6 @@ mod SPEC2MAUDE-GENERATED is
   eq map-free-instr(eps) = eps .
 
   eq map-free-instr(INSTR INSTR*-REST) = free-instr(INSTR) map-free-instr(INSTR*-REST) .
-
-  eq map-free-instr-2(eps) = eps .
-
-  eq map-free-instr-2(INSTR INSTR*-REST) = free-instr(INSTR) map-free-instr-2(INSTR*-REST) .
-
-  eq map-free-instr-3(eps) = eps .
-
-  eq map-free-instr-3(INSTR INSTR*-REST) = free-instr(INSTR) map-free-instr-3(INSTR*-REST) .
 
   eq map-free-local(eps) = eps .
 
@@ -8139,10 +7953,6 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-free-export(EXPORT-2 EXPORT*-REST) = free-export(EXPORT-2) map-free-export(EXPORT*-REST) .
 
-  eq map-free-func-2(eps) = eps .
-
-  eq map-free-func-2(FUNC-2 FUNC*-REST) = free-func(FUNC-2) map-free-func-2(FUNC*-REST) .
-
   eq map-iabs(JNN, eps) = eps .
 
   eq map-iabs(JNN, (# C_1-2) C_1*-REST) = (# iabs-(lsizenn(JNN), C_1-2)) map-iabs(JNN, C_1*-REST) .
@@ -8163,69 +7973,45 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-fabs(FNN, C_1-3 C_1*-REST) = seq(fabs-(sizenn(FNN), C_1-3)) map-fabs(FNN, C_1*-REST) .
 
-  eq map-inv-lanes-2(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-2(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-2(FNN, M-2, C**-REST) .
-
   eq map-fneg(FNN, eps) = eps .
 
   eq map-fneg(FNN, C_1-3 C_1*-REST) = seq(fneg-(sizenn(FNN), C_1-3)) map-fneg(FNN, C_1*-REST) .
-
-  eq map-inv-lanes-3(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-3(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-3(FNN, M-2, C**-REST) .
 
   eq map-fsqrt(FNN, eps) = eps .
 
   eq map-fsqrt(FNN, C_1-3 C_1*-REST) = seq(fsqrt-(sizenn(FNN), C_1-3)) map-fsqrt(FNN, C_1*-REST) .
 
-  eq map-inv-lanes-4(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-4(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-4(FNN, M-2, C**-REST) .
-
   eq map-fceil(FNN, eps) = eps .
 
   eq map-fceil(FNN, C_1-3 C_1*-REST) = seq(fceil-(sizenn(FNN), C_1-3)) map-fceil(FNN, C_1*-REST) .
-
-  eq map-inv-lanes-5(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-5(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-5(FNN, M-2, C**-REST) .
 
   eq map-ffloor(FNN, eps) = eps .
 
   eq map-ffloor(FNN, C_1-3 C_1*-REST) = seq(ffloor-(sizenn(FNN), C_1-3)) map-ffloor(FNN, C_1*-REST) .
 
-  eq map-inv-lanes-6(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-6(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-6(FNN, M-2, C**-REST) .
-
   eq map-ftrunc(FNN, eps) = eps .
 
   eq map-ftrunc(FNN, C_1-3 C_1*-REST) = seq(ftrunc-(sizenn(FNN), C_1-3)) map-ftrunc(FNN, C_1*-REST) .
-
-  eq map-inv-lanes-7(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-7(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-7(FNN, M-2, C**-REST) .
 
   eq map-fnearest(FNN, eps) = eps .
 
   eq map-fnearest(FNN, C_1-3 C_1*-REST) = seq(fnearest-(sizenn(FNN), C_1-3)) map-fnearest(FNN, C_1*-REST) .
 
-  eq map-iadd(JNN, eps, eps) = eps .
+  eq map-ivbinop-iadd(JNN, eps, eps) = eps .
 
-  eq map-iadd(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iadd-(lsizenn(JNN), C_1-2, C_2-2)) map-iadd(JNN, C_1*-REST, C_2*-REST) .
+  eq map-ivbinop-iadd(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iadd-(lsizenn(JNN), C_1-2, C_2-2)) map-ivbinop-iadd(JNN, C_1*-REST, C_2*-REST) .
 
   eq map-isub(JNN, eps, eps) = eps .
 
   eq map-isub(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# isub-(lsizenn(JNN), C_1-2, C_2-2)) map-isub(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-imul(JNN, eps, eps) = eps .
+  eq map-ivbinop-imul(JNN, eps, eps) = eps .
 
-  eq map-imul(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# imul-(lsizenn(JNN), C_1-2, C_2-2)) map-imul(JNN, C_1*-REST, C_2*-REST) .
+  eq map-ivbinop-imul(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# imul-(lsizenn(JNN), C_1-2, C_2-2)) map-ivbinop-imul(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-iadd-sat(JNN, SX, eps, eps) = eps .
+  eq map-ivbinopsx-iadd-sat(JNN, SX, eps, eps) = eps .
 
-  eq map-iadd-sat(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iadd-sat-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-iadd-sat(JNN, SX, C_1*-REST, C_2*-REST) .
+  eq map-ivbinopsx-iadd-sat(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iadd-sat-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-ivbinopsx-iadd-sat(JNN, SX, C_1*-REST, C_2*-REST) .
 
   eq map-isub-sat(JNN, SX, eps, eps) = eps .
 
@@ -8247,165 +8033,109 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-iq15mulr-sat(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iq15mulr-sat-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-iq15mulr-sat(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-inv-lanes-8(JNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-8(JNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(JNN, M-2), C*)) map-inv-lanes-8(JNN, M-2, C**-REST) .
-
   eq map-irelaxed-q15mulr(JNN, SX, eps, eps) = eps .
 
   eq map-irelaxed-q15mulr(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = seq(irelaxed-q15mulr-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-irelaxed-q15mulr(JNN, SX, C_1*-REST, C_2*-REST) .
-
-  eq map-inv-lanes-9(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-9(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-9(FNN, M-2, C**-REST) .
 
   eq map-fadd(FNN, eps, eps) = eps .
 
   eq map-fadd(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fadd-(sizenn(FNN), C_1-3, C_2-3)) map-fadd(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-inv-lanes-10(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-10(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-10(FNN, M-2, C**-REST) .
-
   eq map-fsub(FNN, eps, eps) = eps .
 
   eq map-fsub(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fsub-(sizenn(FNN), C_1-3, C_2-3)) map-fsub(FNN, C_1*-REST, C_2*-REST) .
-
-  eq map-inv-lanes-11(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-11(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-11(FNN, M-2, C**-REST) .
 
   eq map-fmul(FNN, eps, eps) = eps .
 
   eq map-fmul(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fmul-(sizenn(FNN), C_1-3, C_2-3)) map-fmul(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-inv-lanes-12(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-12(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-12(FNN, M-2, C**-REST) .
-
   eq map-fdiv(FNN, eps, eps) = eps .
 
   eq map-fdiv(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fdiv-(sizenn(FNN), C_1-3, C_2-3)) map-fdiv(FNN, C_1*-REST, C_2*-REST) .
-
-  eq map-inv-lanes-13(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-13(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-13(FNN, M-2, C**-REST) .
 
   eq map-fmin(FNN, eps, eps) = eps .
 
   eq map-fmin(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fmin-(sizenn(FNN), C_1-3, C_2-3)) map-fmin(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-inv-lanes-14(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-14(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-14(FNN, M-2, C**-REST) .
-
   eq map-fmax(FNN, eps, eps) = eps .
 
   eq map-fmax(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fmax-(sizenn(FNN), C_1-3, C_2-3)) map-fmax(FNN, C_1*-REST, C_2*-REST) .
-
-  eq map-inv-lanes-15(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-15(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-15(FNN, M-2, C**-REST) .
 
   eq map-fpmin(FNN, eps, eps) = eps .
 
   eq map-fpmin(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fpmin-(sizenn(FNN), C_1-3, C_2-3)) map-fpmin(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-inv-lanes-16(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-16(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-16(FNN, M-2, C**-REST) .
-
   eq map-fpmax(FNN, eps, eps) = eps .
 
   eq map-fpmax(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fpmax-(sizenn(FNN), C_1-3, C_2-3)) map-fpmax(FNN, C_1*-REST, C_2*-REST) .
-
-  eq map-inv-lanes-17(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-17(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-17(FNN, M-2, C**-REST) .
 
   eq map-frelaxed-min(FNN, eps, eps) = eps .
 
   eq map-frelaxed-min(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(frelaxed-min-(sizenn(FNN), C_1-3, C_2-3)) map-frelaxed-min(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-inv-lanes-18(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-18(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-18(FNN, M-2, C**-REST) .
-
   eq map-frelaxed-max(FNN, eps, eps) = eps .
 
   eq map-frelaxed-max(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(frelaxed-max-(sizenn(FNN), C_1-3, C_2-3)) map-frelaxed-max(FNN, C_1*-REST, C_2*-REST) .
-
-  eq map-inv-lanes-19(JNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-19(JNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(JNN, M-2), C*)) map-inv-lanes-19(JNN, M-2, C**-REST) .
 
   eq map-irelaxed-laneselect(JNN, eps, eps, eps) = eps .
 
   eq map-irelaxed-laneselect(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST, (# C_3-2) C_3*-REST) = seq(irelaxed-laneselect-(lsizenn(JNN), C_1-2, C_2-2, C_3-2)) map-irelaxed-laneselect(JNN, C_1*-REST, C_2*-REST, C_3*-REST) .
 
-  eq map-inv-lanes-20(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-20(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-20(FNN, M-2, C**-REST) .
-
   eq map-frelaxed-madd(FNN, eps, eps, eps) = eps .
 
   eq map-frelaxed-madd(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST, C_3-3 C_3*-REST) = seq(frelaxed-madd-(sizenn(FNN), C_1-3, C_2-3, C_3-3)) map-frelaxed-madd(FNN, C_1*-REST, C_2*-REST, C_3*-REST) .
-
-  eq map-inv-lanes-21(FNN, M-2, eps) = eps .
-
-  eq map-inv-lanes-21(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes-21(FNN, M-2, C**-REST) .
 
   eq map-frelaxed-nmadd(FNN, eps, eps, eps) = eps .
 
   eq map-frelaxed-nmadd(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST, C_3-3 C_3*-REST) = seq(frelaxed-nmadd-(sizenn(FNN), C_1-3, C_2-3, C_3-3)) map-frelaxed-nmadd(FNN, C_1*-REST, C_2*-REST, C_3*-REST) .
 
-  eq map-extend(JNN, eps, eps) = eps .
+  eq map-ivrelop-ieq(JNN, eps, eps) = eps .
 
-  eq map-extend(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ieq-(lsizenn(JNN), C_1-2, C_2-2))) map-extend(JNN, C_1*-REST, C_2*-REST) .
+  eq map-ivrelop-ieq(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ieq-(lsizenn(JNN), C_1-2, C_2-2))) map-ivrelop-ieq(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-2(JNN, eps, eps) = eps .
+  eq map-ivrelop-ine(JNN, eps, eps) = eps .
 
-  eq map-extend-2(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ine-(lsizenn(JNN), C_1-2, C_2-2))) map-extend-2(JNN, C_1*-REST, C_2*-REST) .
+  eq map-ivrelop-ine(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ine-(lsizenn(JNN), C_1-2, C_2-2))) map-ivrelop-ine(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-3(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-ilt(JNN, SX, eps, eps) = eps .
 
-  eq map-extend-3(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ilt-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-extend-3(JNN, SX, C_1*-REST, C_2*-REST) .
+  eq map-ivrelopsx-ilt(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ilt-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-ilt(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-4(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-igt(JNN, SX, eps, eps) = eps .
 
-  eq map-extend-4(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, igt-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-extend-4(JNN, SX, C_1*-REST, C_2*-REST) .
+  eq map-ivrelopsx-igt(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, igt-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-igt(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-5(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-ile(JNN, SX, eps, eps) = eps .
 
-  eq map-extend-5(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ile-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-extend-5(JNN, SX, C_1*-REST, C_2*-REST) .
+  eq map-ivrelopsx-ile(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ile-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-ile(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-6(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-ige(JNN, SX, eps, eps) = eps .
 
-  eq map-extend-6(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ige-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-extend-6(JNN, SX, C_1*-REST, C_2*-REST) .
+  eq map-ivrelopsx-ige(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ige-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-ige(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-7(FNN, eps, eps) = eps .
+  eq map-fvrelop-feq(FNN, eps, eps) = eps .
 
-  eq map-extend-7(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, feq-(sizenn(FNN), C_1-3, C_2-3))) map-extend-7(FNN, C_1*-REST, C_2*-REST) .
+  eq map-fvrelop-feq(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, feq-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-feq(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-8(FNN, eps, eps) = eps .
+  eq map-fvrelop-fne(FNN, eps, eps) = eps .
 
-  eq map-extend-8(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fne-(sizenn(FNN), C_1-3, C_2-3))) map-extend-8(FNN, C_1*-REST, C_2*-REST) .
+  eq map-fvrelop-fne(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fne-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fne(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-9(FNN, eps, eps) = eps .
+  eq map-fvrelop-flt(FNN, eps, eps) = eps .
 
-  eq map-extend-9(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, flt-(sizenn(FNN), C_1-3, C_2-3))) map-extend-9(FNN, C_1*-REST, C_2*-REST) .
+  eq map-fvrelop-flt(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, flt-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-flt(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-10(FNN, eps, eps) = eps .
+  eq map-fvrelop-fgt(FNN, eps, eps) = eps .
 
-  eq map-extend-10(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fgt-(sizenn(FNN), C_1-3, C_2-3))) map-extend-10(FNN, C_1*-REST, C_2*-REST) .
+  eq map-fvrelop-fgt(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fgt-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fgt(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-11(FNN, eps, eps) = eps .
+  eq map-fvrelop-fle(FNN, eps, eps) = eps .
 
-  eq map-extend-11(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fle-(sizenn(FNN), C_1-3, C_2-3))) map-extend-11(FNN, C_1*-REST, C_2*-REST) .
+  eq map-fvrelop-fle(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fle-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fle(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-extend-12(FNN, eps, eps) = eps .
+  eq map-fvrelop-fge(FNN, eps, eps) = eps .
 
-  eq map-extend-12(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fge-(sizenn(FNN), C_1-3, C_2-3))) map-extend-12(FNN, C_1*-REST, C_2*-REST) .
+  eq map-fvrelop-fge(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fge-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fge(FNN, C_1*-REST, C_2*-REST) .
 
   eq map-ishl(JNN, I, eps) = eps .
 
@@ -8415,9 +8145,9 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-ishr(JNN, SX, I, (# C_1-2) C_1*-REST) = (# ishr-(lsizenn(JNN), SX, C_1-2, I)) map-ishr(JNN, SX, I, C_1*-REST) .
 
-  eq map-exp-987(JNN, eps) = eps .
+  eq map-ivbitmaskop(JNN, eps) = eps .
 
-  eq map-exp-987(JNN, (# C_1-2) C_1*-REST) = (# ilt-(lsizenn(JNN), S, C_1-2, 0)) map-exp-987(JNN, C_1*-REST) .
+  eq map-ivbitmaskop(JNN, (# C_1-2) C_1*-REST) = (# ilt-(lsizenn(JNN), S, C_1-2, 0)) map-ivbitmaskop(JNN, C_1*-REST) .
 
   eq map-iswizzle-lane(JNN, C_1*, eps) = eps .
 
@@ -8427,157 +8157,86 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-irelaxed-swizzle-lane(JNN, C_1*, (# C_2-2) C_2*-REST) = (# irelaxed-swizzle-lane-(lsizenn(JNN), C_1*, C_2-2)) map-irelaxed-swizzle-lane(JNN, C_1*, C_2*-REST) .
 
-  eq map-exp-1004(JNN, M-2, C_1*, C_2*, eps) = eps .
+  eq map-ivshufflop(JNN, M-2, C_1*, C_2*, eps) = eps .
 
-  eq map-exp-1004(JNN, M-2, C_1*, C_2*, (# I) I*-REST) = (# #rat((C_1* C_2*) [ I ])) map-exp-1004(JNN, M-2, C_1*, C_2*, I*-REST) .
+  eq map-ivshufflop(JNN, M-2, C_1*, C_2*, (# I) I*-REST) = (# #rat((C_1* C_2*) [ I ])) map-ivshufflop(JNN, M-2, C_1*, C_2*, I*-REST) .
 
-  eq map-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, eps) = eps .
+  eq map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, eps) = eps .
 
-  eq map-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, C_1-3)) map-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*-REST) .
+  eq map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, C_1-3)) map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*-REST) .
 
-  eq map-inv-lanes-22(LNN_2, M-2, eps) = eps .
+  eq map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, eps) = eps .
 
-  eq map-inv-lanes-22(LNN_2, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(LNN_2, M-2), C*)) map-inv-lanes-22(LNN_2, M-2, C**-REST) .
-
-  eq map-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, eps) = eps .
-
-  eq map-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, C_1-3)) map-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*-REST) .
-
-  eq map-inv-lanes-23(LNN_2, M_2, eps) = eps .
-
-  eq map-inv-lanes-23(LNN_2, M_2, seq(C*) C**-REST) = (# inv-lanes-(_X_(LNN_2, M_2), C*)) map-inv-lanes-23(LNN_2, M_2, C**-REST) .
-
-  eq map-lcvtop-3(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, eps) = eps .
-
-  eq map-lcvtop-3(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, C_1-3)) map-lcvtop-3(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*-REST) .
-
-  eq map-inv-lanes-24(LNN_2, M_2, eps) = eps .
-
-  eq map-inv-lanes-24(LNN_2, M_2, seq(C*) C**-REST) = (# inv-lanes-(_X_(LNN_2, M_2), C*)) map-inv-lanes-24(LNN_2, M_2, C**-REST) .
+  eq map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, C_1-3)) map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*-REST) .
 
   eq map-narrow(JNN_2, JNN_1, SX, eps) = eps .
 
   eq map-narrow(JNN_2, JNN_1, SX, (# C_1-2) C_1*-REST) = (# narrow--(lsize(JNN_1), lsize(JNN_2), SX, C_1-2)) map-narrow(JNN_2, JNN_1, SX, C_1*-REST) .
 
-  eq map-narrow-2(JNN_2, JNN_1, SX, eps) = eps .
+  eq map-ivadd-pairwise(N-2, eps, eps) = eps .
 
-  eq map-narrow-2(JNN_2, JNN_1, SX, (# C_2-2) C_2*-REST) = (# narrow--(lsize(JNN_1), lsize(JNN_2), SX, C_2-2)) map-narrow-2(JNN_2, JNN_1, SX, C_2*-REST) .
+  eq map-ivadd-pairwise(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-(N-2, J_1-3, J_2-3)) map-ivadd-pairwise(N-2, J_1*-REST, J_2*-REST) .
 
-  eq map-iadd-2(N-2, eps, eps) = eps .
+  eq map-ivadd-pairwise-2(eps, eps) = eps .
 
-  eq map-iadd-2(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-(N-2, J_1-3, J_2-3)) map-iadd-2(N-2, J_1*-REST, J_2*-REST) .
+  eq map-ivadd-pairwise-2((# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-ivadd-pairwise-2(J_1*-REST, J_2*-REST) .
 
-  eq map-exp-1040(eps, eps) = eps .
+  eq unzip-ivadd-pairwise(eps) = tuple(seq(eps) seq(eps)) .
 
-  eq map-exp-1040((# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-exp-1040(J_1*-REST, J_2*-REST) .
+  ceq unzip-ivadd-pairwise(seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-ivadd-pairwise(PROJECT-REST) .
 
-  eq project-map-exp-1040(eps) = tuple(seq(eps) seq(eps)) .
+  eq map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, eps) = eps .
 
-  ceq project-map-exp-1040(seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1040(PROJECT-REST) .
+  eq map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, (# C_1-2) C_1*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX, C_1-2)) map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, C_1*-REST) .
 
-  eq map-extend-13(JNN_2, JNN_1, SX, eps) = eps .
+  eq map-ivdot(N-2, eps, eps) = eps .
 
-  eq map-extend-13(JNN_2, JNN_1, SX, (# C_1-2) C_1*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX, C_1-2)) map-extend-13(JNN_2, JNN_1, SX, C_1*-REST) .
+  eq map-ivdot(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-ivdot(N-2, J_1*-REST, J_2*-REST) .
 
-  eq map-iadd-3(N-2, eps, eps) = eps .
+  eq unzip-ivdot(N-2, eps) = tuple(seq(eps) seq(eps)) .
 
-  eq map-iadd-3(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-(N-2, J_1-3, J_2-3)) map-iadd-3(N-2, J_1*-REST, J_2*-REST) .
+  ceq unzip-ivdot(N-2, seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-ivdot(N-2, PROJECT-REST) .
 
-  eq map-exp-1049(N-2, eps, eps) = eps .
+  eq map-ivdot-2(N-2, eps, eps) = eps .
 
-  eq map-exp-1049(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-exp-1049(N-2, J_1*-REST, J_2*-REST) .
+  eq map-ivdot-2(N-2, (# I_1) I_1*-REST, (# I_2) I_2*-REST) = (# imul-(N-2, I_1, I_2)) map-ivdot-2(N-2, I_1*-REST, I_2*-REST) .
 
-  eq project-map-exp-1049(N-2, eps) = tuple(seq(eps) seq(eps)) .
+  eq map-ivdot-sat(N-2, eps, eps) = eps .
 
-  ceq project-map-exp-1049(N-2, seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1049(N-2, PROJECT-REST) .
+  eq map-ivdot-sat(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-sat-(N-2, S, J_1-3, J_2-3)) map-ivdot-sat(N-2, J_1*-REST, J_2*-REST) .
 
-  eq map-imul-2(N-2, eps, eps) = eps .
+  eq map-Step-pure(JNN, eps) = eps .
 
-  eq map-imul-2(N-2, (# I_1) I_1*-REST, (# I_2) I_2*-REST) = (# imul-(N-2, I_1, I_2)) map-imul-2(N-2, I_1*-REST, I_2*-REST) .
+  eq map-Step-pure(JNN, (# I) I*-REST) = (# inez-(jsizenn(JNN), I)) map-Step-pure(JNN, I*-REST) .
 
-  eq map-iadd-sat-2(N-2, eps, eps) = eps .
+  eq unzip-LOCAL(eps) = eps .
 
-  eq map-iadd-sat-2(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-sat-(N-2, S, J_1-3, J_2-3)) map-iadd-sat-2(N-2, J_1*-REST, J_2*-REST) .
+  ceq unzip-LOCAL(LOCAL(T) PROJECT-REST) = T PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-LOCAL(PROJECT-REST) .
 
-  eq map-exp-1052(N-2, eps, eps) = eps .
+  eq map-Step-read(0, eps) = eps .
 
-  eq map-exp-1052(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-exp-1052(N-2, J_1*-REST, J_2*-REST) .
-
-  eq project-map-exp-1052(N-2, eps) = tuple(seq(eps) seq(eps)) .
-
-  ceq project-map-exp-1052(N-2, seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1052(N-2, PROJECT-REST) .
-
-  eq map-imul-3(N-2, eps, eps) = eps .
-
-  eq map-imul-3(N-2, (# I_1) I_1*-REST, (# I_2) I_2*-REST) = (# imul-(N-2, I_1, I_2)) map-imul-3(N-2, I_1*-REST, I_2*-REST) .
-
-  eq map-extend-14(JNN_2, JNN_1, SX_1, eps) = eps .
-
-  eq map-extend-14(JNN_2, JNN_1, SX_1, (# C_1-2) C_1*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX_1, C_1-2)) map-extend-14(JNN_2, JNN_1, SX_1, C_1*-REST) .
-
-  eq map-extend-15(JNN_2, JNN_1, SX_2, eps) = eps .
-
-  eq map-extend-15(JNN_2, JNN_1, SX_2, (# C_2-2) C_2*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX_2, C_2-2)) map-extend-15(JNN_2, JNN_1, SX_2, C_2*-REST) .
-
-  eq map-extend-16(JNN_2, JNN_1, SX_1, eps) = eps .
-
-  eq map-extend-16(JNN_2, JNN_1, SX_1, (# C_1-2) C_1*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX_1, C_1-2)) map-extend-16(JNN_2, JNN_1, SX_1, C_1*-REST) .
-
-  eq map-extend-17(JNN_2, JNN_1, SX_2, eps) = eps .
-
-  eq map-extend-17(JNN_2, JNN_1, SX_2, (# C_2-2) C_2*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX_2, C_2-2)) map-extend-17(JNN_2, JNN_1, SX_2, C_2*-REST) .
-
-  eq map-extend-18(JNN_2, JNN_1, SX_1, eps) = eps .
-
-  eq map-extend-18(JNN_2, JNN_1, SX_1, (# C_1-2) C_1*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX_1, C_1-2)) map-extend-18(JNN_2, JNN_1, SX_1, C_1*-REST) .
-
-  eq map-extend-19(JNN_2, JNN_1, SX_2, eps) = eps .
-
-  eq map-extend-19(JNN_2, JNN_1, SX_2, (# C_2-2) C_2*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX_2, C_2-2)) map-extend-19(JNN_2, JNN_1, SX_2, C_2*-REST) .
-
-  eq map-imul-4(N-2, eps, eps) = eps .
-
-  eq map-imul-4(N-2, (# I_1) I_1*-REST, (# I_2) I_2*-REST) = (# imul-(N-2, I_1, I_2)) map-imul-4(N-2, I_1*-REST, I_2*-REST) .
-
-  eq map-exp-1180(JNN, eps) = eps .
-
-  eq map-exp-1180(JNN, (# I) I*-REST) = (# inez-(jsizenn(JNN), I)) map-exp-1180(JNN, I*-REST) .
-
-  eq project-map-exp-1206(eps) = eps .
-
-  ceq project-map-exp-1206(LOCAL(T) PROJECT-REST) = T PROJECT-COLUMN-1
-    if PROJECT-COLUMN-1 := project-map-exp-1206(PROJECT-REST) .
-
-  eq map-exp-1208(0, eps) = eps .
-
-  eq map-exp-1208(s(ITER-COUNT), VAL VAL*-REST) = seq(VAL ?) map-exp-1208(ITER-COUNT, VAL*-REST) .
+  eq map-Step-read(s(ITER-COUNT), VAL VAL*-REST) = seq(VAL ?) map-Step-read(ITER-COUNT, VAL*-REST) .
 
   eq map-default(eps) = eps .
 
   eq map-default(T T*-REST) = seq(default-(T)) map-default(T*-REST) .
 
-  eq map-extend-20(JNN, K-2, M-2, SX, 0, eps) = eps .
+  eq map-Step-read-2(JNN, K-2, M-2, SX, 0, eps) = eps .
 
-  eq map-extend-20(JNN, K-2, M-2, SX, s(ITER-COUNT), (# J) J*-REST) = (# extend--(M-2, jsizenn(JNN), SX, J)) map-extend-20(JNN, K-2, M-2, SX, ITER-COUNT, J*-REST) .
+  eq map-Step-read-2(JNN, K-2, M-2, SX, s(ITER-COUNT), (# J) J*-REST) = (# extend--(M-2, jsizenn(JNN), SX, J)) map-Step-read-2(JNN, K-2, M-2, SX, ITER-COUNT, J*-REST) .
 
-  eq project-map-exp-1250(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-Step-read(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1250(tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
+  ceq unzip-Step-read(tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
     if len(MUT?) <= 1
-      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1250(PROJECT-REST) .
+      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step-read(PROJECT-REST) .
 
-  eq project-map-exp-1256(eps) = tuple(seq(eps) seq(eps)) .
+  eq map-Step-read-3(0, eps) = eps .
 
-  ceq project-map-exp-1256(tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
-    if len(MUT?) <= 1
-      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1256(PROJECT-REST) .
-
-  eq map-exp-1260(0, eps) = eps .
-
-  eq map-exp-1260(s(ITER-COUNT), REF-2 REF*-REST) = REF-2 map-exp-1260(ITER-COUNT, REF*-REST) .
+  eq map-Step-read-3(s(ITER-COUNT), REF-2 REF*-REST) = REF-2 map-Step-read-3(ITER-COUNT, REF*-REST) .
 
   eq map-const(ZT, 0, eps) = eps .
 
@@ -8587,75 +8246,69 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-zbytes(ZT, s(ITER-COUNT), C-2 C*-REST) = seq(zbytes-(ZT, C-2)) map-zbytes(ZT, ITER-COUNT, C*-REST) .
 
-  eq project-map-zbytes(ZT, 0, eps) = eps .
+  eq unzip-zbytes(ZT, 0, eps) = eps .
 
-  ceq project-map-zbytes(ZT, s(ITER-COUNT), seq(PROJECT-ELEMENT) PROJECT-REST) = C-2 PROJECT-COLUMN-1
+  ceq unzip-zbytes(ZT, s(ITER-COUNT), seq(PROJECT-ELEMENT) PROJECT-REST) = C-2 PROJECT-COLUMN-1
     if C-2 := inv-zbytes-(ZT, PROJECT-ELEMENT)
       /\ zbytes-(ZT, C-2) = PROJECT-ELEMENT
-      /\ PROJECT-COLUMN-1 := project-map-zbytes(ZT, ITER-COUNT, PROJECT-REST) .
+      /\ PROJECT-COLUMN-1 := unzip-zbytes(ZT, ITER-COUNT, PROJECT-REST) .
 
-  eq project-map-exp-1323(0, eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-Step(0, eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1323(s(ITER-COUNT), tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
+  ceq unzip-Step(s(ITER-COUNT), tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
     if len(MUT?) <= 1
-      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1323(ITER-COUNT, PROJECT-REST) .
+      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step(ITER-COUNT, PROJECT-REST) .
 
-  eq map-packfield(0, eps, eps) = eps .
+  eq map-Step(0, eps, eps) = eps .
 
-  eq map-packfield(s(ITER-COUNT), VAL VAL*-REST, ZT ZT*-REST) = packfield-(ZT, VAL) map-packfield(ITER-COUNT, VAL*-REST, ZT*-REST) .
+  eq map-Step(s(ITER-COUNT), VAL VAL*-REST, ZT ZT*-REST) = packfield-(ZT, VAL) map-Step(ITER-COUNT, VAL*-REST, ZT*-REST) .
 
-  eq project-map-exp-1326(eps) = tuple(seq(eps) seq(eps)) .
+  eq map-Step-2(ZT, 0, eps) = eps .
 
-  ceq project-map-exp-1326(tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
-    if len(MUT?) <= 1
-      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1326(PROJECT-REST) .
-
-  eq map-packfield-2(ZT, 0, eps) = eps .
-
-  eq map-packfield-2(ZT, s(ITER-COUNT), VAL VAL*-REST) = packfield-(ZT, VAL) map-packfield-2(ZT, ITER-COUNT, VAL*-REST) .
+  eq map-Step-2(ZT, s(ITER-COUNT), VAL VAL*-REST) = packfield-(ZT, VAL) map-Step-2(ZT, ITER-COUNT, VAL*-REST) .
 
   eq map-allocexport(MODULEINST, eps) = eps .
 
   eq map-allocexport(MODULEINST, EXPORT-2 EXPORT*-REST) = allocexport(MODULEINST, EXPORT-2) map-allocexport(MODULEINST, EXPORT*-REST) .
 
-  eq project-map-exp-1427(eps) = eps .
+  eq unzip-TAG(eps) = eps .
 
-  ceq project-map-exp-1427(TAG(TAGTYPE) PROJECT-REST) = TAGTYPE PROJECT-COLUMN-1
-    if PROJECT-COLUMN-1 := project-map-exp-1427(PROJECT-REST) .
+  ceq unzip-TAG(TAG(TAGTYPE) PROJECT-REST) = TAGTYPE PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-TAG(PROJECT-REST) .
 
-  eq project-map-exp-1429(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-GLOBAL(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1429(spectec-GLOBAL(GLOBALTYPE, EXPR_G-2) PROJECT-REST) = tuple(seq(seq(EXPR_G-2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1429(PROJECT-REST) .
+  ceq unzip-GLOBAL(spectec-GLOBAL(GLOBALTYPE, EXPR_G-2) PROJECT-REST) = tuple(seq(seq(EXPR_G-2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-GLOBAL(PROJECT-REST) .
 
-  eq project-map-exp-1431(eps) = eps .
+  eq unzip-MEMORY(eps) = eps .
 
-  ceq project-map-exp-1431(MEMORY(MEMTYPE) PROJECT-REST) = MEMTYPE PROJECT-COLUMN-1
-    if PROJECT-COLUMN-1 := project-map-exp-1431(PROJECT-REST) .
+  ceq unzip-MEMORY(MEMORY(MEMTYPE) PROJECT-REST) = MEMTYPE PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-MEMORY(PROJECT-REST) .
 
-  eq project-map-exp-1433(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-TABLE(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1433(spectec-TABLE(TABLETYPE, EXPR_T-2) PROJECT-REST) = tuple(seq(seq(EXPR_T-2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1433(PROJECT-REST) .
+  ceq unzip-TABLE(spectec-TABLE(TABLETYPE, EXPR_T-2) PROJECT-REST) = tuple(seq(seq(EXPR_T-2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-TABLE(PROJECT-REST) .
 
-  eq project-map-exp-1435(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
+  eq unzip-FUNC(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
-  ceq project-map-exp-1435(spectec-FUNC-2(X-4, LOCAL*, EXPR_F-2) PROJECT-REST) = tuple(seq(seq(EXPR_F-2) PROJECT-COLUMN-1) (seq(seq(LOCAL*) PROJECT-COLUMN-2) seq((# X-4) PROJECT-COLUMN-3)))
-    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1435(PROJECT-REST) .
+  ceq unzip-FUNC(spectec-FUNC-2(X-4, LOCAL*, EXPR_F-2) PROJECT-REST) = tuple(seq(seq(EXPR_F-2) PROJECT-COLUMN-1) (seq(seq(LOCAL*) PROJECT-COLUMN-2) seq((# X-4) PROJECT-COLUMN-3)))
+    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := unzip-FUNC(PROJECT-REST) .
 
-  eq project-map-exp-1438(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-DATA(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq project-map-exp-1438(DATA(BYTE*, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE*) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1438(PROJECT-REST) .
+  ceq unzip-DATA(DATA(BYTE*, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE*) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-DATA(PROJECT-REST) .
 
-  eq project-map-exp-1441(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
+  eq unzip-allocmodule(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
-  ceq project-map-exp-1441(ELEM(ELEMTYPE, EXPR_E*, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(ELEMTYPE PROJECT-COLUMN-2) seq(seq(EXPR_E*) PROJECT-COLUMN-3)))
-    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1441(PROJECT-REST) .
+  ceq unzip-allocmodule(ELEM(ELEMTYPE, EXPR_E*, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(ELEMTYPE PROJECT-COLUMN-2) seq(seq(EXPR_E*) PROJECT-COLUMN-3)))
+    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := unzip-allocmodule(PROJECT-REST) .
 
-  eq map-exp-1456(S-2, 0, I_F) = eps .
+  eq map-allocmodule(S-2, 0, I_F) = eps .
 
-  eq map-exp-1456(S-2, s(ITER-COUNT), I_F) = (# (len(S-2 . 'FUNCS) + I_F)) map-exp-1456(S-2, ITER-COUNT, s(I_F)) .
+  eq map-allocmodule(S-2, s(ITER-COUNT), I_F) = (# (len(S-2 . 'FUNCS) + I_F)) map-allocmodule(S-2, ITER-COUNT, s(I_F)) .
 
   eq map-subst-all-tagtype(DT*, eps) = eps .
 
@@ -8677,41 +8330,22 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-subst-all-reftype(DT*, ELEMTYPE ELEMTYPE*-REST) = subst-all-reftype(ELEMTYPE, DT*) map-subst-all-reftype(DT*, ELEMTYPE*-REST) .
 
-  eq map-exp-1478(DT*, eps) = eps .
+  eq map-allocmodule-2(DT*, eps) = eps .
 
-  eq map-exp-1478(DT*, (# X-4) X*-REST) = (DT* [ X-4 ]) map-exp-1478(DT*, X*-REST) .
+  eq map-allocmodule-2(DT*, (# X-4) X*-REST) = (DT* [ X-4 ]) map-allocmodule-2(DT*, X*-REST) .
 
-  eq map-exp-1480(eps, eps, eps) = eps .
+  eq map-FUNC(eps, eps, eps) = eps .
 
-  eq map-exp-1480(seq(EXPR_F-2) EXPR_F*-REST, seq(LOCAL*) LOCAL**-REST, (# X-4) X*-REST) = spectec-FUNC-2(X-4, LOCAL*, EXPR_F-2) map-exp-1480(EXPR_F*-REST, LOCAL**-REST, X*-REST) .
+  eq map-FUNC(seq(EXPR_F-2) EXPR_F*-REST, seq(LOCAL*) LOCAL**-REST, (# X-4) X*-REST) = spectec-FUNC-2(X-4, LOCAL*, EXPR_F-2) map-FUNC(EXPR_F*-REST, LOCAL**-REST, X*-REST) .
 
-  eq project-map-exp-1557(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-instantiate(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
-  ceq project-map-exp-1557(spectec-GLOBAL(GLOBALTYPE, EXPR_G-2) PROJECT-REST) = tuple(seq(seq(EXPR_G-2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1557(PROJECT-REST) .
+  ceq unzip-instantiate(ELEM(REFTYPE, EXPR_E*, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(seq(EXPR_E*) PROJECT-COLUMN-2) seq(REFTYPE PROJECT-COLUMN-3)))
+    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := unzip-instantiate(PROJECT-REST) .
 
-  eq project-map-exp-1559(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-START(eps) = eps .
 
-  ceq project-map-exp-1559(spectec-TABLE(TABLETYPE, EXPR_T-2) PROJECT-REST) = tuple(seq(seq(EXPR_T-2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1559(PROJECT-REST) .
-
-  eq project-map-exp-1561(eps) = tuple(seq(eps) seq(eps)) .
-
-  ceq project-map-exp-1561(DATA(BYTE*, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE*) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
-    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := project-map-exp-1561(PROJECT-REST) .
-
-  eq project-map-exp-1564(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
-
-  ceq project-map-exp-1564(ELEM(REFTYPE, EXPR_E*, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(seq(EXPR_E*) PROJECT-COLUMN-2) seq(REFTYPE PROJECT-COLUMN-3)))
-    if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := project-map-exp-1564(PROJECT-REST) .
-
-  eq project-map-exp-1567(eps) = eps .
-
-  eq project-map-exp-1567(START(X-4) ?) = (# X-4) ? .
-
-  eq map-exp-1571(S-2, 0, I_F) = eps .
-
-  eq map-exp-1571(S-2, s(ITER-COUNT), I_F) = (# (len(S-2 . 'FUNCS) + I_F)) map-exp-1571(S-2, ITER-COUNT, s(I_F)) .
+  eq unzip-START(START(X-4) ?) = (# X-4) ? .
 
   eq map-rundata(DATA*, 0, I_D) = eps .
 
@@ -8721,33 +8355,28 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-runelem(ELEM*, s(ITER-COUNT), I_E) = seq(runelem-(I_E, ELEM* [ I_E ])) map-runelem(ELEM*, ITER-COUNT, s(I_E)) .
 
-  eq map-exp-1594(eps) = eps .
+  eq map-CALL(eps) = eps .
 
-  eq map-exp-1594((# X-4) ?) = CALL(X-4) ? .
+  eq map-CALL((# X-4) ?) = CALL(X-4) ? .
 
-  eq iterpr-34(I', eps) = true .
+  eq all-growtable(I', eps) = true .
 
-  ceq iterpr-34(I', (# J) ?) = true
+  ceq all-growtable(I', (# J) ?) = true
     if I' <= J .
 
-  eq iterpr-35(I', eps) = true .
+  eq bind-Step-read(M-2, Z, X-4, AT, I, AO, 0, K-3) = eps .
 
-  ceq iterpr-35(I', (# J) ?) = true
-    if I' <= J .
-
-  eq iterpr-36-output-1(M-2, Z, X-4, AT, I, AO, 0, K-3) = eps .
-
-  ceq iterpr-36-output-1(M-2, Z, X-4, AT, I, AO, s(ITER-COUNT), K-3) = (# J) iterpr-36-output-1(M-2, Z, X-4, AT, I, AO, ITER-COUNT, s(K-3))
+  ceq bind-Step-read(M-2, Z, X-4, AT, I, AO, s(ITER-COUNT), K-3) = (# J) bind-Step-read(M-2, Z, X-4, AT, I, AO, ITER-COUNT, s(K-3))
     if J := inv-ibytes-(M-2, (spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(M-2, J) == ((spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
-  eq iterpr-37-output-1(eps) = eps .
+  eq bind-Step-read-2(eps) = eps .
 
-  ceq iterpr-37-output-1(ZT ZT*-REST) = VAL iterpr-37-output-1(ZT*-REST)
+  ceq bind-Step-read-2(ZT ZT*-REST) = VAL bind-Step-read-2(ZT*-REST)
     if VAL ? := default-(unpack(ZT)) .
 
-  eq iterpr-38(S-2, eps, eps) = true .
+  eq all-invoke(S-2, eps, eps) = true .
 
-  ceq iterpr-38(S-2, T_1-2 T_1*-REST, VAL VAL*-REST) = iterpr-38(S-2, T_1*-REST, VAL*-REST)
+  ceq all-invoke(S-2, T_1-2 T_1*-REST, VAL VAL*-REST) = all-invoke(S-2, T_1*-REST, VAL*-REST)
     if Val-ok(S-2, VAL, T_1-2) .
 endm

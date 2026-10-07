@@ -198,6 +198,133 @@ let normalize_module ?(constructors = true) source_declarations statements =
   sort_declarations @ operator_declarations
   @ variable_declarations @ definitions
 
+(* Generated helpers (TRANSLATION_MAP.md, section 6). Every IterE, IterPr,
+ * and membership choice gets its own helper, under a unique working name
+ * (Prescan). After translation, helpers whose statements are equal up to
+ * variable names are one helper: the later ones are dropped and their calls
+ * go to the first. Each remaining helper is then named from its base
+ * (Prescan.helper_name). *)
+
+let rec rename_term rename = function
+  | Var _ as term -> term
+  | Const name -> Const (rename name)
+  | App (name, args) -> App (rename name, List.map (rename_term rename) args)
+
+let rename_statement rename statement =
+  match map_statement_terms (rename_term rename) statement with
+  | OpDecl declaration -> OpDecl {declaration with name = rename declaration.name}
+  | statement -> statement
+
+(* The operator a statement declares or defines. *)
+let defined_name = function
+  | OpDecl declaration -> Some declaration.name
+  | Mb (App (name, _), _) | Cmb (App (name, _), _, _)
+  | Eq (App (name, _), _, _) | Ceq (App (name, _), _, _, _)
+  | Rl (_, App (name, _), _) | Crl (_, App (name, _), _, _) -> Some name
+  | SortDecl _ | SubsortDecl _ | VarDecl _
+  | Mb _ | Cmb _ | Eq _ | Ceq _ | Rl _ | Crl _ -> None
+
+(* A helper's statements with its own name blanked, calls resolved, and the
+ * variables of each statement numbered in order of occurrence. *)
+let canonical resolve name statements =
+  let variables statement =
+    let seen = ref [] in
+    map_statement_variables
+      (fun variable ->
+        match List.find_opt (fun (seen, _) -> same_variable variable seen) !seen with
+        | Some (_, numbered) -> numbered
+        | None ->
+            let numbered =
+              source_variable (string_of_int (List.length !seen)) variable.sort
+            in
+            seen := (variable, numbered) :: !seen;
+            numbered)
+      statement
+  in
+  List.map
+    (fun statement ->
+      rename_statement (fun called -> if called = name then "" else resolve called) statement
+      |> variables)
+    statements
+
+let share_helpers index statements =
+  let bases = Prescan.helper_names index in
+  let helpers =
+    List.filter_map
+      (function
+        | OpDecl declaration when List.mem_assoc declaration.name bases ->
+            Some declaration.name
+        | _ -> None)
+      statements
+  in
+  let defining name =
+    List.filter (fun statement -> defined_name statement = Some name) statements
+  in
+  let shared = Hashtbl.create 64 in
+  let rec resolve name =
+    match Hashtbl.find_opt shared name with
+    | Some first -> resolve first
+    | None -> name
+  in
+  (* Sharing a callee can make its callers equal, so repeat until stable. *)
+  let rec merge () =
+    let firsts = Hashtbl.create 64 in
+    let merged = ref false in
+    List.iter
+      (fun name ->
+        if not (Hashtbl.mem shared name) then
+          let key = canonical resolve name (defining name) in
+          match Hashtbl.find_opt firsts key with
+          | Some first ->
+              Hashtbl.replace shared name first;
+              merged := true
+          | None -> Hashtbl.add firsts key name)
+      helpers;
+    if !merged then merge ()
+  in
+  merge ();
+  let statements =
+    statements
+    |> List.filter (fun statement ->
+         match defined_name statement with
+         | Some name -> not (Hashtbl.mem shared name)
+         | None -> true)
+    |> List.map (rename_statement resolve)
+  in
+  let kept = List.filter (fun name -> not (Hashtbl.mem shared name)) helpers in
+  let first_names =
+    List.filter_map
+      (fun name ->
+        match List.assoc name bases with
+        | Prescan.Base (first, _) -> Some first
+        | Prescan.Tail _ -> None)
+      kept
+  in
+  let shared_first first =
+    List.length (List.filter (( = ) first) first_names) > 1
+  in
+  let used = ref Prescan.StringSet.empty in
+  let names = Hashtbl.create 64 in
+  let rec final name =
+    match Hashtbl.find_opt names name with
+    | Some final -> final
+    | None ->
+        let candidate =
+          match List.assoc name bases with
+          | Prescan.Base (first, second) ->
+              if shared_first first then second else first
+          | Prescan.Tail helper -> final (resolve helper) ^ "-tail"
+        in
+        let final = Prescan.fresh_helper_name index used candidate in
+        Hashtbl.add names name final;
+        final
+  in
+  List.iter (fun name -> ignore (final name)) kept;
+  List.map
+    (rename_statement (fun name ->
+       Option.value (Hashtbl.find_opt names name) ~default:name))
+    statements
+
 (* Def-parameter specialization runs before Prescan: every call of a DecD with
  * DefP parameters is redirected to a Decd.specialize copy for its DefA
  * targets, so translation never sees DefP or DefA. *)
@@ -536,6 +663,7 @@ let translate_script script =
   let generated_statements =
     generated_statements
     @ iterations @ premise_iterations
+    |> share_helpers index
     |> normalize_module (Prescan.variable_declarations index)
   in
   { sort_statements = sort_metadata_declarations sort_metadata
