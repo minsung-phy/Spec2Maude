@@ -2267,19 +2267,19 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-ivdot-sat : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-Step-pure : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+  op map-Step-pure-vtestop : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
   op unzip-LOCAL : SpectecTerminals ~> SpectecTerminals .
 
-  op map-Step-read : Nat ValList ~> SpectecTerminals .
+  op map-Step-read-call-ref-func : Nat ValList ~> SpectecTerminals .
 
   op map-default : SpectecTerminals ~> SpectecTerminals .
 
-  op map-Step-read-2 : SpectecTerminal Nat Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
+  op map-Step-read-vload-pack-val : SpectecTerminal Nat Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op unzip-Step-read : SpectecTerminals ~> SpectecTerminal .
+  op unzip-Step-read-struct-new-default : SpectecTerminals ~> SpectecTerminal .
 
-  op map-Step-read-3 : Nat SpectecTerminals ~> InstrList .
+  op map-Step-read-array-new-elem-alloc : Nat SpectecTerminals ~> InstrList .
 
   op map-const : SpectecTerminal Nat SpectecTerminals ~> InstrList .
 
@@ -2287,11 +2287,11 @@ mod SPEC2MAUDE-GENERATED is
 
   op unzip-zbytes : SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op unzip-Step : Nat SpectecTerminals ~> SpectecTerminal .
+  op unzip-Step-struct-new : Nat SpectecTerminals ~> SpectecTerminal .
 
-  op map-Step : Nat ValList SpectecTerminals ~> SpectecTerminals .
+  op map-Step-struct-new : Nat ValList SpectecTerminals ~> SpectecTerminals .
 
-  op map-Step-2 : SpectecTerminal Nat ValList ~> SpectecTerminals .
+  op map-Step-array-new-fixed : SpectecTerminal Nat ValList ~> SpectecTerminals .
 
   op map-allocexport : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
@@ -2337,9 +2337,9 @@ mod SPEC2MAUDE-GENERATED is
 
   op all-growtable : Nat SpectecTerminals ~> Bool .
 
-  op bind-Step-read : Nat SpectecTerminal Nat SpectecTerminal Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
+  op bind-Step-read-vload-pack-val : Nat SpectecTerminal Nat SpectecTerminal Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
 
-  op bind-Step-read-2 : SpectecTerminals ~> ValList .
+  op bind-Step-read-struct-new-default : SpectecTerminals ~> ValList .
 
   op all-invoke : SpectecTerminal SpectecTerminals ValList ~> Bool .
 
@@ -6375,7 +6375,7 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-pure(VCONST(V128, C_1-2) VTESTOP(_X_(JNN, M-2), ALL-TRUE)) => CONST(I32, # C-3)
     if I* := lanes-(_X_(JNN, M-2), C_1-2)
-      /\ C-3 := prod(map-Step-pure(JNN, I*)) .
+      /\ C-3 := prod(map-Step-pure-vtestop(JNN, I*)) .
 
   crl Step-pure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VRELOP(SH, VRELOP-2))) => VCONST(V128, C-3)
     if C-3 := spectec-vrelop-(SH, VRELOP-2, C_1-2, C_2-2) .
@@ -6499,7 +6499,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ X-4 := CASE-PART1-2
       /\ INSTR* := CASE-PART3
       /\ T* := unzip-LOCAL(CASE-PART2-2)
-      /\ F := { (field('LOCALS, map-Step-read(N-3, VAL*) map-default(T*)) ; field('MODULE, FI . 'MODULE)) } .
+      /\ F := { (field('LOCALS, map-Step-read-call-ref-func(N-3, VAL*) map-default(T*)) ; field('MODULE, FI . 'MODULE)) } .
 
   crl Step-read(Z ; RETURN-CALL(X-4)) => REF.FUNC-ADDR(A) RETURN-CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE)
     if A := #rat((spectec-moduleinst(Z) . 'FUNCS) [ X-4 ]) .
@@ -6631,10 +6631,10 @@ mod SPEC2MAUDE-GENERATED is
     if ((I + #rat(AO . 'OFFSET)) + ((((M-2 * K-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => VCONST(V128, C-3)
-    if J* := bind-Step-read(M-2, Z, X-4, AT, I, AO, K-2, 0)
+    if J* := bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, K-2, 0)
       /\ JNN := inv-jsizenn(M-2 * 2)
       /\ jsizenn(JNN) == (M-2 * 2)
-      /\ C-3 := inv-lanes-(_X_(JNN, K-2), map-Step-read-2(JNN, K-2, M-2, SX, K-2, J*)) .
+      /\ C-3 := inv-lanes-(_X_(JNN, K-2), map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, K-2, J*)) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => TRAP
     if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
@@ -6734,8 +6734,8 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; STRUCT.NEW-DEFAULT(X-4)) => VAL* STRUCT.NEW(X-4)
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1)
-      /\ VAL* := bind-Step-read-2(ZT*) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read-struct-new-default(CASE-PART1)
+      /\ VAL* := bind-Step-read-struct-new-default(ZT*) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX?, X-4, I))) => TRAP
     if len(SX?) <= 1 .
@@ -6744,7 +6744,7 @@ mod SPEC2MAUDE-GENERATED is
     if len(SX?) <= 1
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read-struct-new-default(CASE-PART1) .
 
   crl Step-read(Z ; (CONST(I32, # N-3) ARRAY.NEW-DEFAULT(X-4))) => instrRepeat(N-3, VAL) ARRAY.NEW-FIXED(X-4, N-3)
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
@@ -6754,7 +6754,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => TRAP
     if (I + N-3) > len(spectec-elem(Z, Y) . 'REFS) .
 
-  crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => map-Step-read-3(N-3, REF*) ARRAY.NEW-FIXED(X-4, N-3)
+  crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => map-Step-read-array-new-elem-alloc(N-3, REF*) ARRAY.NEW-FIXED(X-4, N-3)
     if REF* := (spectec-elem(Z, Y) . 'REFS) [ I : N-3 ]
       /\ len(REF*) = N-3 .
 
@@ -6944,23 +6944,23 @@ mod SPEC2MAUDE-GENERATED is
     if N-3 := instrSize(VAL*)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step(N-3, CASE-PART1)
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-struct-new(N-3, CASE-PART1)
       /\ A := len(spectec-structinst(Z))
-      /\ SI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step(N-3, VAL*, ZT*))) } .
+      /\ SI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-struct-new(N-3, VAL*, ZT*))) } .
 
   rl Step(Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X-4, I)))) => Z ; TRAP .
 
   crl Step(Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X-4, I)))) => with-struct(Z, A, I, packfield-(ZT* [ I ], VAL)) ; eps
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read-struct-new-default(CASE-PART1) .
 
   crl Step(Z ; (VAL* ARRAY.NEW-FIXED(X-4, N-3))) => add-arrayinst(Z, AI-2) ; REF.ARRAY-ADDR(A)
     if instrSize(VAL*) = N-3
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ len(MUT?) <= 1
       /\ A := len(spectec-arrayinst(Z))
-      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-2(ZT, N-3, VAL*))) } .
+      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-array-new-fixed(ZT, N-3, VAL*))) } .
 
   rl Step(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) => Z ; TRAP .
 
@@ -7206,7 +7206,7 @@ mod SPEC2MAUDE-GENERATED is
   rl [focus-Step-read-vload-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) | POSTFIX } .
 
   crl [focus-Step-read-vload-pack-val] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) | POSTFIX }
-    if J* := bind-Step-read(M-2, Z, X-4, AT, I, AO, K-2, 0) .
+    if J* := bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, K-2, 0) .
 
   rl [focus-Step-read-vload-splat-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, SPLAT(N-2) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) | POSTFIX } .
 
@@ -7243,8 +7243,8 @@ mod SPEC2MAUDE-GENERATED is
   crl [focus-Step-read-struct-new-default] : identifyFocus(Z, PREFIX, STRUCT.NEW-DEFAULT(X-4), POSTFIX) => { PREFIX | (Z ; STRUCT.NEW-DEFAULT(X-4)) | POSTFIX }
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read(CASE-PART1)
-      /\ VAL* := bind-Step-read-2(ZT*) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read-struct-new-default(CASE-PART1)
+      /\ VAL* := bind-Step-read-struct-new-default(ZT*) .
 
   crl [focus-Step-read-struct-get-null] : identifyFocus(Z, PREFIX (REF.NULL-ADDR), STRUCT.GET(SX?, X-4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) STRUCT.GET(SX?, X-4, I))) | POSTFIX }
     if len(SX?) <= 1 .
@@ -7327,7 +7327,7 @@ mod SPEC2MAUDE-GENERATED is
     if N-3 := instrSize(VAL*)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
-      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step(N-3, CASE-PART1) .
+      /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-struct-new(N-3, CASE-PART1) .
 
   rl [focus-Step-struct-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) VAL), STRUCT.SET(X-4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X-4, I)))) | POSTFIX } .
 
@@ -7338,7 +7338,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ len(MUT?) <= 1
       /\ A := len(spectec-arrayinst(Z))
-      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-2(ZT, N-3, VAL*))) } .
+      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-array-new-fixed(ZT, N-3, VAL*))) } .
 
   rl [focus-Step-array-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, # I) VAL)), ARRAY.SET(X-4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | POSTFIX } .
 
@@ -8207,36 +8207,36 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-ivdot-sat(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-sat-(N-2, S, J_1-3, J_2-3)) map-ivdot-sat(N-2, J_1*-REST, J_2*-REST) .
 
-  eq map-Step-pure(JNN, eps) = eps .
+  eq map-Step-pure-vtestop(JNN, eps) = eps .
 
-  eq map-Step-pure(JNN, (# I) I*-REST) = (# inez-(jsizenn(JNN), I)) map-Step-pure(JNN, I*-REST) .
+  eq map-Step-pure-vtestop(JNN, (# I) I*-REST) = (# inez-(jsizenn(JNN), I)) map-Step-pure-vtestop(JNN, I*-REST) .
 
   eq unzip-LOCAL(eps) = eps .
 
   ceq unzip-LOCAL(LOCAL(T) PROJECT-REST) = T PROJECT-COLUMN-1
     if PROJECT-COLUMN-1 := unzip-LOCAL(PROJECT-REST) .
 
-  eq map-Step-read(0, eps) = eps .
+  eq map-Step-read-call-ref-func(0, eps) = eps .
 
-  eq map-Step-read(s(ITER-COUNT), VAL VAL*-REST) = seq(VAL ?) map-Step-read(ITER-COUNT, VAL*-REST) .
+  eq map-Step-read-call-ref-func(s(ITER-COUNT), VAL VAL*-REST) = seq(VAL ?) map-Step-read-call-ref-func(ITER-COUNT, VAL*-REST) .
 
   eq map-default(eps) = eps .
 
   eq map-default(T T*-REST) = seq(default-(T)) map-default(T*-REST) .
 
-  eq map-Step-read-2(JNN, K-2, M-2, SX, 0, eps) = eps .
+  eq map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, 0, eps) = eps .
 
-  eq map-Step-read-2(JNN, K-2, M-2, SX, s(ITER-COUNT), (# J) J*-REST) = (# extend--(M-2, jsizenn(JNN), SX, J)) map-Step-read-2(JNN, K-2, M-2, SX, ITER-COUNT, J*-REST) .
+  eq map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, s(ITER-COUNT), (# J) J*-REST) = (# extend--(M-2, jsizenn(JNN), SX, J)) map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, ITER-COUNT, J*-REST) .
 
-  eq unzip-Step-read(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-Step-read-struct-new-default(eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq unzip-Step-read(tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
+  ceq unzip-Step-read-struct-new-default(tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
     if len(MUT?) <= 1
-      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step-read(PROJECT-REST) .
+      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step-read-struct-new-default(PROJECT-REST) .
 
-  eq map-Step-read-3(0, eps) = eps .
+  eq map-Step-read-array-new-elem-alloc(0, eps) = eps .
 
-  eq map-Step-read-3(s(ITER-COUNT), REF-2 REF*-REST) = REF-2 map-Step-read-3(ITER-COUNT, REF*-REST) .
+  eq map-Step-read-array-new-elem-alloc(s(ITER-COUNT), REF-2 REF*-REST) = REF-2 map-Step-read-array-new-elem-alloc(ITER-COUNT, REF*-REST) .
 
   eq map-const(ZT, 0, eps) = eps .
 
@@ -8253,19 +8253,19 @@ mod SPEC2MAUDE-GENERATED is
       /\ zbytes-(ZT, C-2) = PROJECT-ELEMENT
       /\ PROJECT-COLUMN-1 := unzip-zbytes(ZT, ITER-COUNT, PROJECT-REST) .
 
-  eq unzip-Step(0, eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-Step-struct-new(0, eps) = tuple(seq(eps) seq(eps)) .
 
-  ceq unzip-Step(s(ITER-COUNT), tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
+  ceq unzip-Step-struct-new(s(ITER-COUNT), tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
     if len(MUT?) <= 1
-      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step(ITER-COUNT, PROJECT-REST) .
+      /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step-struct-new(ITER-COUNT, PROJECT-REST) .
 
-  eq map-Step(0, eps, eps) = eps .
+  eq map-Step-struct-new(0, eps, eps) = eps .
 
-  eq map-Step(s(ITER-COUNT), VAL VAL*-REST, ZT ZT*-REST) = packfield-(ZT, VAL) map-Step(ITER-COUNT, VAL*-REST, ZT*-REST) .
+  eq map-Step-struct-new(s(ITER-COUNT), VAL VAL*-REST, ZT ZT*-REST) = packfield-(ZT, VAL) map-Step-struct-new(ITER-COUNT, VAL*-REST, ZT*-REST) .
 
-  eq map-Step-2(ZT, 0, eps) = eps .
+  eq map-Step-array-new-fixed(ZT, 0, eps) = eps .
 
-  eq map-Step-2(ZT, s(ITER-COUNT), VAL VAL*-REST) = packfield-(ZT, VAL) map-Step-2(ZT, ITER-COUNT, VAL*-REST) .
+  eq map-Step-array-new-fixed(ZT, s(ITER-COUNT), VAL VAL*-REST) = packfield-(ZT, VAL) map-Step-array-new-fixed(ZT, ITER-COUNT, VAL*-REST) .
 
   eq map-allocexport(MODULEINST, eps) = eps .
 
@@ -8364,15 +8364,15 @@ mod SPEC2MAUDE-GENERATED is
   ceq all-growtable(I', (# J) ?) = true
     if I' <= J .
 
-  eq bind-Step-read(M-2, Z, X-4, AT, I, AO, 0, K-3) = eps .
+  eq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, 0, K-3) = eps .
 
-  ceq bind-Step-read(M-2, Z, X-4, AT, I, AO, s(ITER-COUNT), K-3) = (# J) bind-Step-read(M-2, Z, X-4, AT, I, AO, ITER-COUNT, s(K-3))
+  ceq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, s(ITER-COUNT), K-3) = (# J) bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, ITER-COUNT, s(K-3))
     if J := inv-ibytes-(M-2, (spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(M-2, J) == ((spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
-  eq bind-Step-read-2(eps) = eps .
+  eq bind-Step-read-struct-new-default(eps) = eps .
 
-  ceq bind-Step-read-2(ZT ZT*-REST) = VAL bind-Step-read-2(ZT*-REST)
+  ceq bind-Step-read-struct-new-default(ZT ZT*-REST) = VAL bind-Step-read-struct-new-default(ZT*-REST)
     if VAL ? := default-(unpack(ZT)) .
 
   eq all-invoke(S-2, eps, eps) = true .

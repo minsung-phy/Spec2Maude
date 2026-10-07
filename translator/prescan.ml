@@ -22,6 +22,7 @@ type iteration =
   ; projector_name : string
   ; projector_tail_name : string
   ; owner : iteration_owner
+  ; place : string  (* the enclosing definition or rule, for helper names *)
   ; body : exp
   ; iterexp : iterexp
   ; captures : capture list
@@ -32,6 +33,7 @@ type premise_iteration =
   ; tail_name : string
   ; output_names : (name * name) list
   ; owner : iteration_owner
+  ; place : string
   ; premise : prem
   ; body : prem
   ; iterexp : iterexp
@@ -271,27 +273,23 @@ let compact name =
   |> List.filter (fun part -> part <> "")
   |> String.concat "-"
 
-let owner_name = function
-  | RelationOwner source | DefinitionOwner source -> compact source
-  | OtherOwner -> "exp"
-
 (* What an IterE helper is named after: the called definition, the
  * constructor, or else the enclosing definition or relation. *)
-let helper_subject owner (body : exp) =
+let helper_subject place (body : exp) =
   match body.it with
   | CallE (id, _) when compact id.it <> "" -> compact id.it
   | CaseE (mixop, _) when not (Mixop.is_hole_only mixop)
                           && compact (Mixop.name mixop) <> "" ->
       compact (Mixop.name mixop)
-  | _ -> owner_name owner
+  | _ -> place
 
-let helper_base prefix owner body =
-  Base (prefix ^ helper_subject owner body, prefix ^ owner_name owner)
+let helper_base prefix place body =
+  Base (prefix ^ helper_subject place body, prefix ^ place)
 
 let helper_names iterations premise_iterations membership_choices =
   List.concat_map
     (fun (iteration : iteration) ->
-      let base prefix = helper_base prefix iteration.owner iteration.body in
+      let base prefix = helper_base prefix iteration.place iteration.body in
       [ iteration.name, base "map-"
       ; iteration.tail_name, Tail iteration.name
       ; iteration.projector_name, base "unzip-"
@@ -300,7 +298,7 @@ let helper_names iterations premise_iterations membership_choices =
     iterations
   @ List.concat_map
       (fun (iteration : premise_iteration) ->
-        let owner = owner_name iteration.owner in
+        let owner = iteration.place in
         (iteration.name, Base ("all-" ^ owner, "all-" ^ owner))
         :: (iteration.tail_name, Tail iteration.name)
         :: List.concat_map
@@ -888,6 +886,7 @@ let collect_occurrences sort_metadata script =
    * visit_def before visiting the definition's contents, and visit_def
    * (add_def_variables) registers every type parameter of the definition
    * and of its rules, clauses, and instances. *)
+  let current_place = ref "exp" in
   let add_iteration owner body iterexp =
     iterations :=
       { name = iteration_base_name body
@@ -895,6 +894,7 @@ let collect_occurrences sort_metadata script =
       ; projector_name = ""
       ; projector_tail_name = ""
       ; owner
+      ; place = !current_place
       ; body
       ; iterexp
       ; captures = capture_exp_variables
@@ -909,6 +909,7 @@ let collect_occurrences sort_metadata script =
       ; tail_name = ""
       ; output_names = []
       ; owner
+      ; place = !current_place
       ; premise
       ; body
       ; iterexp
@@ -929,7 +930,19 @@ let collect_occurrences sort_metadata script =
         | DecD (id, _, _, _) -> DefinitionOwner id.it
         | TypD _ | GramD _ | HintD _ | RecD _ -> OtherOwner
         end;
+      current_place :=
+        begin match !current_owner with
+        | RelationOwner source | DefinitionOwner source -> compact source
+        | OtherOwner -> "exp"
+        end;
       add_def_variables def
+
+    (* A rule's helpers are named after the relation and the rule. *)
+    let visit_ruleid id =
+      match !current_owner with
+      | RelationOwner source when compact id.it <> "" ->
+          current_place := compact source ^ "-" ^ compact id.it
+      | RelationOwner _ | DefinitionOwner _ | OtherOwner -> ()
 
     let visit_exp exp =
       match exp.it with

@@ -304,10 +304,10 @@ the iteration names an index variable.
 
 | Helper | Name | Code |
 | --- | --- | --- |
-| `IterE`: compute the sequence | `map-f` if the body calls `$f`, `map-C` if it is constructor `C`, else `map-` and the enclosing definition or relation | `iter_helpers.ml:translate_statements` |
-| `IterE` used as a pattern: recover the sequence of each variable | `unzip-C`, `unzip-` and the enclosing definition or relation otherwise | `iter_helpers.ml:translate_projector_statements` |
-| `IterPr`: check every element | `all-` and the enclosing definition or relation | `iter_helpers.ml:translate_premise_statements` |
-| `IterPr`: compute one unbound generator sequence | `bind-` and the enclosing relation | `iter_helpers.ml:translate_premise_statements` |
+| `IterE`: compute the sequence | `map-f` if the body calls `$f`, `map-C` if it is constructor `C`, else `map-` and the enclosing definition or rule | `iter_helpers.ml:translate_statements` |
+| `IterE` used as a pattern: recover the sequence of each variable | `unzip-C`, `unzip-` and the enclosing definition or rule otherwise | `iter_helpers.ml:translate_projector_statements` |
+| `IterPr`: check every element | `all-` and the enclosing definition or rule | `iter_helpers.ml:translate_premise_statements` |
+| `IterPr`: compute one unbound generator sequence | `bind-` and the enclosing rule | `iter_helpers.ml:translate_premise_statements` |
 | Membership choice (section 2) | `choose-f` | `decd.ml:choice_helper` |
 
 A helper is generated only if a translated term or condition calls it. The
@@ -330,12 +330,13 @@ shared: the later ones are dropped and their calls go to the first. Sharing a
 helper can make its callers equal, so this repeats until nothing changes.
 Each remaining helper then gets its name from the table above. If several
 different helpers would get the same `map-f`, `map-C`, or `unzip-C` name, each
-of them is named after its enclosing definition or relation instead (e.g.
+of them is named after its enclosing definition or rule instead (e.g.
 `map-ivrelop-ieq` and `map-ivrelop-ine`, both of which iterate `$extend__`). A
 name that is still taken gets the suffix `-2`, and so on
 (`def.ml:share_helpers`).
-A shared helper named after an enclosing definition keeps the name of its
-first occurrence.
+A helper in a rule is named after the relation and the rule (e.g. `map-Step-read-vload-pack-val`).
+A shared helper named after an enclosing definition or rule keeps the name of
+its first occurrence.
 
 ## 7. Steps outside the recursive translation
 
