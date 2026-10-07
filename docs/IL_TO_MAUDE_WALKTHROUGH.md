@@ -123,7 +123,7 @@
 | membership choice | `DefD`의 마지막 premise가 미지 변수 `x <- xs`, RHS가 바로 `x` | `membership_choices`; 비결정적 선택 request/helper |
 | rewrite 함수 | `maude_rule` 또는 위 choice shape | `rewrite_sorts`; 일반 값 함수와 request 함수 구별 |
 | relation 정책 | mixop의 marker 위치와 relation hint | `Execution`, `Equation`, `Predicate`, `BackendCheck`, `BackendCompute` |
-| otherwise 후보 이름 | execution relation의 규칙 ordinal | `relation_enabled_helpers`; 필요할 때만 helper 본문 생성 |
+| otherwise 후보 이름 | execution relation의 규칙 이름(없으면 순번) | `relation_enabled_helpers`; 필요할 때만 helper 본문 생성 |
 | heat/cool | `k_heatcool` 규칙, relation 입출력 수 | `heatcool`, `contexts`; 1.6절 |
 | 본문 지원 여부 | builtin 여부, 미지원 relation을 premise에서 직접 참조하는 함수 | `definition_bodies`, `unsupported_relations`; 5.5절의 누락 경계 |
 
@@ -633,7 +633,7 @@ crl Step-pure(VAL_1 (VAL_2 (CONST(I32, C-3) SELECT(T*?)))) => VAL_1
 
 입력 패턴에서 값을 얻고, 필요한 타입 검사와 source premise를 조건으로 붙인다. 조건이 있으므로 `rl` 대신 `crl`이다. IL의 `unbox_c`는 투명 case에서 숫자를 꺼내는 식이며, Maude에서는 같은 숫자 변수 `C-3`가 된다.
 
-**`otherwise`는 앞 규칙이 적용되지 않는지 검사한다.** IL의 `ElsePr`를 만나면 앞선 규칙 중 입력이 겹칠 수 있는 규칙에 대해 `R-enabled-...` 검사를 만든다. source의 out-of-bounds trap 규칙 등에 사용한다. 아래는 이름과 조건을 단순화한 도식이다.
+**`otherwise`는 앞 규칙이 적용되지 않는지 검사한다.** IL의 `ElsePr`를 만나면 앞선 규칙 중 입력이 겹칠 수 있는 규칙에 대해 `R-r-enabled` 검사(앞 규칙 `R/r`의 이름을 붙인다)를 만든다. source의 out-of-bounds trap 규칙 등에 사용한다. 아래는 이름과 조건을 단순화한 도식이다.
 
 ```text
 SpecTec: -- otherwise
@@ -641,10 +641,10 @@ IL AST:  RuleD(..., ElsePr :: remaining_prems)
 ```
 
 ```maude
-ceq R-enabled-k(INPUTS) = true if PREDECESSOR_CONDITIONS .
-eq R-enabled-k(INPUTS) = false [owise] .
+ceq R-r-enabled(INPUTS) = true if PREDECESSOR_CONDITIONS .
+eq R-r-enabled(INPUTS) = false [owise] .
 crl R(INPUTS) => FALLBACK
-  if R-enabled-k(INPUTS) = false /\ REMAINING_CONDITIONS .
+  if R-r-enabled(INPUTS) = false /\ REMAINING_CONDITIONS .
 ```
 
 함수의 `[owise]`와 달리 **rewrite rule에 직접 `[owise]`를 붙이지 않는다.** 현재는 선두 `ElsePr` 하나만 지원하며, 앞 규칙의 적용 여부를 검사하는 데 rewrite가 필요하면 이 경로는 거부한다.

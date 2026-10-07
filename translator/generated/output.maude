@@ -1955,15 +1955,15 @@ mod SPEC2MAUDE-GENERATED is
 
   op Step-read : SpectecTerminal -> Step-read-Request [frozen (1)] .
 
-  op Step-read-enabled-20 : SpectecTerminal -> Bool [frozen (1)] .
+  op Step-read-throw-ref-handler-catch-enabled : SpectecTerminal -> Bool [frozen (1)] .
 
-  op Step-read-enabled-21 : SpectecTerminal -> Bool [frozen (1)] .
+  op Step-read-throw-ref-handler-catch-ref-enabled : SpectecTerminal -> Bool [frozen (1)] .
 
-  op Step-read-enabled-22 : SpectecTerminal -> Bool [frozen (1)] .
+  op Step-read-throw-ref-handler-catch-all-enabled : SpectecTerminal -> Bool [frozen (1)] .
 
-  op Step-read-enabled-23 : SpectecTerminal -> Bool [frozen (1)] .
+  op Step-read-throw-ref-handler-catch-all-ref-enabled : SpectecTerminal -> Bool [frozen (1)] .
 
-  op Step-read-enabled-103 : SpectecTerminal -> Bool [frozen (1)] .
+  op Step-read-array-init-data-oob2-enabled : SpectecTerminal -> Bool [frozen (1)] .
 
   op Step : SpectecTerminal -> Step-Request [frozen (1)] .
 
@@ -6429,32 +6429,32 @@ mod SPEC2MAUDE-GENERATED is
   ceq blocktype-(Z, -RESULT(T?)) = eps ->- eps  lift(T?)
     if len(T?) <= 1 .
 
-  ceq Step-read-enabled-20(Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true
+  ceq Step-read-throw-ref-handler-catch-enabled(Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true
     if #rat((spectec-exninst(Z) [ A ]) . 'TAG) == #rat(spectec-tagaddr(Z) [ X-4 ])
       /\ VAL* := (spectec-exninst(Z) [ A ]) . 'FIELDS .
 
-  eq Step-read-enabled-20(ENABLED-INPUT1) = false [owise] .
+  eq Step-read-throw-ref-handler-catch-enabled(ENABLED-INPUT1) = false [owise] .
 
-  ceq Step-read-enabled-21(Z ; (HANDLER- N-3 { (CATCH-REF(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true
+  ceq Step-read-throw-ref-handler-catch-ref-enabled(Z ; (HANDLER- N-3 { (CATCH-REF(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true
     if #rat((spectec-exninst(Z) [ A ]) . 'TAG) == #rat(spectec-tagaddr(Z) [ X-4 ])
       /\ VAL* := (spectec-exninst(Z) [ A ]) . 'FIELDS .
 
-  eq Step-read-enabled-21(ENABLED-INPUT1) = false [owise] .
+  eq Step-read-throw-ref-handler-catch-ref-enabled(ENABLED-INPUT1) = false [owise] .
 
-  eq Step-read-enabled-22(Z ; (HANDLER- N-3 { (CATCH-ALL(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true .
+  eq Step-read-throw-ref-handler-catch-all-enabled(Z ; (HANDLER- N-3 { (CATCH-ALL(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
-  eq Step-read-enabled-22(ENABLED-INPUT1) = false [owise] .
+  eq Step-read-throw-ref-handler-catch-all-enabled(ENABLED-INPUT1) = false [owise] .
 
-  eq Step-read-enabled-23(Z ; (HANDLER- N-3 { (CATCH-ALL-REF(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true .
+  eq Step-read-throw-ref-handler-catch-all-ref-enabled(Z ; (HANDLER- N-3 { (CATCH-ALL-REF(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
-  eq Step-read-enabled-23(ENABLED-INPUT1) = false [owise] .
+  eq Step-read-throw-ref-handler-catch-all-ref-enabled(ENABLED-INPUT1) = false [owise] .
 
-  ceq Step-read-enabled-103(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = true
+  ceq Step-read-array-init-data-oob2-enabled(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = true
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ len(MUT?) <= 1
       /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-data(Z, Y) . 'BYTES) .
 
-  eq Step-read-enabled-103(ENABLED-INPUT1) = false [owise] .
+  eq Step-read-array-init-data-oob2-enabled(ENABLED-INPUT1) = false [owise] .
 
   crl Step-read(Z ; (VAL* BLOCK(BT, INSTR*))) => LABEL- N-3 { eps } (VAL* INSTR*)
     if M-3 := instrSize(VAL*)
@@ -6540,10 +6540,10 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-read(Z ; (HANDLER- N-3 { (CATCH-ALL-REF(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => REF.EXN-ADDR(A) BR(L) .
 
   crl Step-read(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => HANDLER- N-3 { CATCH'* } (REF.EXN-ADDR(A) THROW-REF)
-    if Step-read-enabled-20(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
-      /\ Step-read-enabled-21(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
-      /\ Step-read-enabled-22(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
-      /\ Step-read-enabled-23(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false .
+    if Step-read-throw-ref-handler-catch-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
+      /\ Step-read-throw-ref-handler-catch-ref-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
+      /\ Step-read-throw-ref-handler-catch-all-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
+      /\ Step-read-throw-ref-handler-catch-all-ref-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false .
 
   crl Step-read(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) => HANDLER- N-3 { CATCH* } (LABEL- N-3 { eps } (VAL* INSTR*))
     if M-3 := instrSize(VAL*)
@@ -6866,7 +6866,7 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => eps
     if ((I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
-      /\ Step-read-enabled-103(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = false
+      /\ Step-read-array-init-data-oob2-enabled(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = false
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => REF.ARRAY-ADDR(A) (CONST(I32, # I) (const(cunpack(ZT), cunpacknum-(ZT, C-2)) (ARRAY.SET(X-4) (REF.ARRAY-ADDR(A) (CONST(I32, # (I + 1)) (CONST(I32, # (J + (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) ARRAY.INIT-DATA(X-4, Y))))))))

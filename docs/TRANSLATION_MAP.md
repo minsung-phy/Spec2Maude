@@ -105,7 +105,8 @@ adds the **negation of that rule's conditions** to the conditions of the
 `ElsePr` rule (`reld.ml:direct_complement`). If the negation cannot be
 written as a condition (for example, when the earlier rule matches a sequence
 pattern that can be split in more than one way), it uses a generated
-predicate `r̂-enabled-k` instead. That predicate is defined by the earlier
+predicate `r̂-r-enabled` instead, named after the earlier rule `R/r` (e.g.
+`Step-read-throw-ref-handler-catch-enabled`). That predicate is defined by the earlier
 rule's conditions and an `[owise]` equation that returns `false`
 (`reld.ml:helper_statements`).
 
@@ -113,7 +114,7 @@ rule's conditions and an `[owise]` equation that returns `false`
 | --- | --- | --- |
 | 1. Skip earlier rules that cannot match | A rule is skipped only if its input patterns cannot match the same input. When the analysis is unsure, the rule is kept. | `reld.ml:source_overlap`, `reld.ml:inputs_may_overlap` |
 | 2. Negate the conditions of an earlier rule | The negation is exact. A comparison is negated by its dual only if it is total (numbers, `==`, `=/=`); any other condition `b` becomes `b =/= true`, which also holds when `b` is undefined. A matching condition is shared only if its pattern has a unique decomposition. | `reld.ml:direct_complement`, `reld.ml:negate_comparison`, `reld.ml:unique_match_pattern` |
-| 3. Fall back to `r̂-enabled-k` | `r̂-enabled-k(ins)` is `true` exactly when the earlier rule's conditions hold. An earlier rule with a rewrite condition cannot be used this way and is rejected. | `reld.ml:helper_statements` |
+| 3. Fall back to `r̂-r-enabled` | `r̂-r-enabled(ins)` is `true` exactly when the earlier rule's conditions hold. An earlier rule with a rewrite condition cannot be used this way and is rejected. | `reld.ml:helper_statements` |
 
 Rules with `hint(k_heatcool)` are not counted as earlier rules. In the
 WebAssembly specification, no relation has both (`ElsePr` occurs only in
@@ -345,7 +346,7 @@ its first occurrence.
 | Before translation | Remove the premises named by `hint(maude_assume)`, and the quantifiers whose variables occurred only in those premises | `def.ml:assume_script` |
 | Before translation | Remove `DefP`/`DefA` (section 5) | `def.ml:specialize_script` |
 | Before translation | Choose Maude names; collect variables, iterations, relation kinds, and hints | `prescan.ml:scan` |
-| Type guards | A variable of a quantifier or parameter gets a condition `typecheck(X, ⟦t⟧)`, unless its type is already established: by a premise that binds it from a relation call, or by the declared types of the rule's inputs, or by an argument `SubE` pattern of a function head that already checks an equal membership. In a syntax instance such as `syntax num_(Inn)`, the `SubE` check of the alias-expanded type (`addrtype`) keeps its place but uses the quantifier's type (`Inn`), and the quantifier check is not repeated. In every context, including syntax membership equations, a variable of Maude sort `Nat` (`Int`) gets no guard for `nat` (`int`) or an alias of it (e.g. `syntax N = nat`, `syntax exp = int`): the sort already ranges exactly over those values. A guard of an earlier rule's `r̂-enabled-k` predicate is also dropped when every caller already checks it. This assumes that relation calls and inputs only produce values of their declared types. | `param.ml:translate_eq_conditions` (`proven`), `term.ml:translate_typ_conditions`, `term.ml:with_relation_types`, `term.ml:translate_guard_conditions`, `reld.ml:helper_statements` |
+| Type guards | A variable of a quantifier or parameter gets a condition `typecheck(X, ⟦t⟧)`, unless its type is already established: by a premise that binds it from a relation call, or by the declared types of the rule's inputs, or by an argument `SubE` pattern of a function head that already checks an equal membership. In a syntax instance such as `syntax num_(Inn)`, the `SubE` check of the alias-expanded type (`addrtype`) keeps its place but uses the quantifier's type (`Inn`), and the quantifier check is not repeated. In every context, including syntax membership equations, a variable of Maude sort `Nat` (`Int`) gets no guard for `nat` (`int`) or an alias of it (e.g. `syntax N = nat`, `syntax exp = int`): the sort already ranges exactly over those values. A guard of an earlier rule's `r̂-r-enabled` predicate is also dropped when every caller already checks it. This assumes that relation calls and inputs only produce values of their declared types. | `param.ml:translate_eq_conditions` (`proven`), `term.ml:translate_typ_conditions`, `term.ml:with_relation_types`, `term.ml:translate_guard_conditions`, `reld.ml:helper_statements` |
 | Condition order | Place each condition after the conditions that bind its variables. Among ready conditions, relation rules take equational conditions before rewrite conditions, and function clauses take conditions that bind nothing before conditions that bind variables. Otherwise the order of the premises is kept. | `maude_il.ml:schedule_conditions`, `maude_il.ml:schedule_rule_conditions`, `maude_il.ml:schedule_equation_conditions` |
 | Condition order, execution rules | The `typecheck` guards of the rule's inputs come first | `maude_il.ml:schedule_execution_conditions` |
 | After translation | Remove repeated conditions, including an equality that repeats an earlier match or equality in either order | `maude_il.ml:simplify_conditions` |
@@ -386,7 +387,7 @@ definition and the reason. An omitted case produces no Maude output.
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |
 | `ElsePr`, `IterPr`, or `NegPr` in a `k_heatcool` rule, and `k_heatcool` rules whose shape does not fit section 2 | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
-| An `ElsePr` execution rule whose earlier rule needs an `r̂-enabled-k` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
+| An `ElsePr` execution rule whose earlier rule needs an `r̂-r-enabled` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
 | A call of a `maude_rule` function from a function without `maude_rule`, or in an argument or result of a `maude_rule` clause | rejected | `decd.ml:translate_equation_clause`, `decd.ml:translate_rule_clause` |
 | `ElsePr` or a `maude_rule` call in the premises before a membership choice | rejected | `decd.ml:translate_choice_clause` |
 | `IterE` with `?`, `*`, or `+` and no generator | rejected | `iter.ml:translate_term` |

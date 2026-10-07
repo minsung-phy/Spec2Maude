@@ -1097,10 +1097,15 @@ let name_enabled_helpers registry relation_policies defs =
            begin match List.assoc_opt id.it relation_policies with
            | Some (Execution _) ->
                let relation = registered registry RelName id.it in
+               (* Named after the rule: R-r-enabled for rule R/r. *)
                List.mapi
-                 (fun ordinal _ ->
+                 (fun ordinal rule ->
+                   let RuleD (rule_id, _, _, _, _) = rule.it in
                    let candidate =
-                     Printf.sprintf "%s-enabled-%d" relation (ordinal + 1)
+                     if compact rule_id.it = "" then
+                       Printf.sprintf "%s-enabled-%d" relation (ordinal + 1)
+                     else
+                       Printf.sprintf "%s-%s-enabled" relation (compact rule_id.it)
                    in
                    (id.it, ordinal), fresh_name registry.used candidate)
                  rules
