@@ -158,7 +158,7 @@ let source_name = function
   | "mem.memory" -> "MEMORY"
   | "table.table" -> "spectec-TABLE"
   | "local.local" -> "LOCAL"
-  | "func.func" -> "spectec-FUNC-2"
+  | "func.func" -> "FUNC-func"
   | "data.data" -> "DATA"
   | "elem.elem" -> "ELEM"
   | "start.start" -> "START"

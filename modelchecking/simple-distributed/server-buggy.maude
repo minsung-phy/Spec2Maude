@@ -22,7 +22,7 @@ mod SERVER-BUGGY-WASM is
 
   eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I32, I32)))), eps, eps, eps,
 eps, eps,
-spectec-FUNC-2(0, eps, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))),
+FUNC-func(0, eps, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))),
 eps, eps, eps,
 EXPORT(
   ((#_(115) #_(101) #_(114) #_(118) #_(101))

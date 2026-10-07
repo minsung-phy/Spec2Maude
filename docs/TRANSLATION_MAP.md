@@ -26,7 +26,7 @@ the paper, or to check how a constructor is handled.
 | `⟦t⟧` | Maude term that names IL type `t` (`Term.translate_typ`) |
 | `⟦prs⟧` | Maude conditions for the premises `prs` (`Prem.translate_all`) |
 | `S(t)` | Maude sort for IL type `t` (`Term.translate_sort`) |
-| `x̂` | Maude name chosen for IL identifier `x` (fixed before translation) |
+| `x̂` | Maude name chosen for IL identifier `x` (fixed before translation). A name already in use gets the prefix `spectec-`; a constructor whose `spectec-` name is also in use is named after its syntax instead (e.g. `FUNC-func` for `FUNC` of `syntax func`) |
 | `b` | Boolean condition: the Maude condition `b = true` |
 | `u = v` | Equality condition |
 | `P := u` | Matching condition: match `u` against pattern `P` |
@@ -138,10 +138,10 @@ source order.
 
 | Statement | Maude | Code |
 | --- | --- | --- |
-| Heating (first execution premise) | `crl [heating-r] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r-1(C) if ⟦earlier premises⟧ .` `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
-| Heating guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧) => identified-inner`, where `identifyInner` has one `rl` per rule of the inner relation, matching that rule's input pattern. Heating applies only to an input that some inner rule can match. | `heatcool.ml:heatcool_rule` |
-| Next execution premise | `eq ⟦outs'⟧ ~> hole-r-k(C) = inner2(⟦ins''⟧) ~> hole-r-(k+1)(C') .` | `heatcool.ml:heatcool_rule` |
-| Cooling (after the last execution premise) | `eq ⟦outs'⟧ ~> hole-r-n(C) = ⟦outs⟧ .`, with the remaining premises as conditions | `heatcool.ml:heatcool_rule` |
+| Heating (first execution premise) | `crl [heating-r] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ .` `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
+| Heating guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧) => identified-inner`, where `identifyInner` has one `rl [identify-inner-r']` per rule `r'` of the inner relation, matching that rule's input pattern. Heating applies only to an input that some inner rule can match. | `heatcool.ml:identify_statements` |
+| Next execution premise | `eq ⟦outs'⟧ ~> hole-r-inner(C) = inner2(⟦ins''⟧) ~> hole-r-inner2(C') .` With several execution premises, each hole is named after the relation it waits for. | `heatcool.ml:heatcool_rule` |
+| Cooling (after the last execution premise) | `eq ⟦outs'⟧ ~> hole-r-inner2(C) = ⟦outs⟧ .`, with the remaining premises as conditions | `heatcool.ml:heatcool_rule` |
 
 A context rule (a rule whose execution premise steps a part of the
 instruction sequence, such as `Step/ctxt-instrs`) is translated differently.
@@ -332,8 +332,9 @@ helper can make its callers equal, so this repeats until nothing changes.
 Each remaining helper then gets its name from the table above. If several
 different helpers would get the same `map-f`, `map-C`, or `unzip-C` name, each
 of them is named after its enclosing definition or rule instead (e.g.
-`map-ivrelop-ieq` and `map-ivrelop-ine`, both of which iterate `$extend__`). A
-name that is still taken gets the suffix `-2`, and so on
+`map-ivrelop-ieq` and `map-ivrelop-ine`, both of which iterate `$extend__`),
+and if that is shared too, after both (e.g. `map-rollrt-subst-subtype` and
+`map-rollrt-IDX`). A name that is still taken gets the suffix `-2`, and so on
 (`def.ml:share_helpers`).
 A helper in a rule is named after the relation and the rule (e.g. `map-Step-read-vload-pack-val`).
 A shared helper named after an enclosing definition or rule keeps the name of

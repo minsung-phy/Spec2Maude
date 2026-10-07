@@ -684,11 +684,17 @@ let identify_statements cache index (heated : Hintd.heatcool) suffix target args
     @ List.map (Term.translate_sort index) input_types in
   (* Input patterns identify candidates. The original target rule checks its
      premises once, when the suspended request executes. *)
+  (* Each rl is labeled after its inner rule, like the focus rules. *)
+  let label (candidate : Reld.execution_rule) =
+    let rule_id = Hintd.rule_id (List.nth relation.Hintd.rules candidate.ordinal) in
+    "identify-" ^ Prescan.rel_name index target ^ "-"
+    ^ (if rule_id.it = "" then string_of_int (candidate.ordinal + 1)
+       else Prescan.sanitize rule_id.it)
+  in
   let rules = candidates |> List.map (fun (candidate : Reld.execution_rule) ->
     match candidate.left with
     | App (_, inputs) ->
-        Rl (Some (name ^ "-" ^ string_of_int (candidate.ordinal + 1)),
-            App (name, inputs), Const found)
+        Rl (Some (label candidate), App (name, inputs), Const found)
     | _ -> assert false)
     |> unique_candidates
   in
@@ -733,9 +739,12 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
       index source.id source.params policy heated.rule
   in
   if body.otherwise then fail "ElsePr requires an explicit complement";
-  let suffix = Prescan.rel_name index source.id ^ "-"
-    ^ (if id.it = "" then string_of_int (heated.ordinal + 1)
-       else Prescan.sanitize id.it)
+  (* An unnamed rule is numbered only if its relation has other rules. *)
+  let suffix =
+    Prescan.rel_name index source.id
+    ^ (if id.it <> "" then "-" ^ Prescan.sanitize id.it
+       else if List.length source.Hintd.rules = 1 then ""
+       else "-" ^ string_of_int (heated.ordinal + 1))
   in
   let vars_condition variables = function
     | RewriteCond (left, right)
@@ -784,8 +793,17 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
             (term_variables (term_variables [] body.right) result) rest in
         let captures = List.filter
             (fun variable -> List.exists (same_variable variable) needed) bound in
-        let name = "hole-" ^ suffix ^ "-" ^ string_of_int stage in
-        let sort = "Hole-" ^ suffix ^ "-" ^ string_of_int stage in
+        (* With several execution premises, a hole is named after the relation
+           of the premise it waits for, numbered only if that repeats. *)
+        let stage_suffix =
+          let same (other, _, _) = other.it = target.it in
+          match List.length executions, List.length (List.filter same executions) with
+          | 1, _ -> ""
+          | _, 1 -> "-" ^ Prescan.rel_name index target
+          | _ -> "-" ^ Prescan.rel_name index target ^ "-" ^ string_of_int stage
+        in
+        let name = "hole-" ^ suffix ^ stage_suffix in
+        let sort = "Hole-" ^ suffix ^ stage_suffix in
         let hole = App (name, List.map (fun variable -> Var variable) captures) in
         let suspended = App ("_~>_", [call; hole]) in
         let returned = App ("_~>_", [result; hole]) in

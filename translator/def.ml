@@ -292,17 +292,43 @@ let share_helpers index statements =
     |> List.map (rename_statement resolve)
   in
   let kept = List.filter (fun name -> not (Hashtbl.mem shared name)) helpers in
-  let first_names =
-    List.filter_map
+  (* Helpers that would get the same name move on to their next candidate,
+     until no two share one or their candidates run out. *)
+  let level = Hashtbl.create 64 in
+  let candidate name =
+    match List.assoc name bases with
+    | Prescan.Base candidates ->
+        let k = Option.value (Hashtbl.find_opt level name) ~default:0 in
+        Some (List.nth candidates (min k (List.length candidates - 1)))
+    | Prescan.Tail _ -> None
+  in
+  let rec separate () =
+    let moved = ref false in
+    List.iter
       (fun name ->
-        match List.assoc name bases with
-        | Prescan.Base (first, _) -> Some first
-        | Prescan.Tail _ -> None)
-      kept
+        match List.assoc name bases, candidate name with
+        | Prescan.Base candidates, Some current ->
+            let k = Option.value (Hashtbl.find_opt level name) ~default:0 in
+            let others =
+              List.filter (fun other -> other <> name && candidate other = Some current) kept
+            in
+            if others <> [] && k < List.length candidates - 1 then begin
+              List.iter
+                (fun other ->
+                  let k' = Option.value (Hashtbl.find_opt level other) ~default:0 in
+                  match List.assoc other bases with
+                  | Prescan.Base candidates' when k' < List.length candidates' - 1 ->
+                      Hashtbl.replace level other (k' + 1)
+                  | _ -> ())
+                others;
+              Hashtbl.replace level name (k + 1);
+              moved := true
+            end
+        | _ -> ())
+      kept;
+    if !moved then separate ()
   in
-  let shared_first first =
-    List.length (List.filter (( = ) first) first_names) > 1
-  in
+  separate ();
   let used = ref Prescan.StringSet.empty in
   let names = Hashtbl.create 64 in
   let rec final name =
@@ -311,8 +337,7 @@ let share_helpers index statements =
     | None ->
         let candidate =
           match List.assoc name bases with
-          | Prescan.Base (first, second) ->
-              if shared_first first then second else first
+          | Prescan.Base _ -> Option.get (candidate name)
           | Prescan.Tail helper -> final (resolve helper) ^ "-tail"
         in
         let final = Prescan.fresh_helper_name index used candidate in

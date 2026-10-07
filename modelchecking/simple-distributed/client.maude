@@ -22,7 +22,7 @@ mod CLIENT-WASM is
 
   eq clientInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_((I32 I32), I32)))), eps, eps,
 eps, eps, eps,
-spectec-FUNC-2(0, eps,
+FUNC-func(0, eps,
 (LOCAL.GET(0) CONST(I32, #_(0)) RELOP(I32, EQ)
  IF__ELSE_(-RESULT(_?(I32)),
  (LOCAL.GET(1) CONST(I32, #_(0)) RELOP(I32, EQ)

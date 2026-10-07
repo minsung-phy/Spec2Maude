@@ -90,10 +90,10 @@ type name_kind = TypName | RelName | DefName | MixopName
 (* The Maude name of a generated helper. Helpers first get unique working
  * names; after translation, helpers that are equal up to variable names
  * are shared and each remaining helper is named from its base
- * (Def.share_helpers, TRANSLATION_MAP.md section 6). The second name is
- * used instead when several helpers have the same first name. *)
+ * (Def.share_helpers, TRANSLATION_MAP.md section 6). The next candidate is
+ * used when several helpers have the same one. *)
 type helper_name =
-  | Base of string * string  (* e.g. map-f or else map-r, all-r, choose-f *)
+  | Base of string list  (* e.g. map-f, map-r, map-r-f; all-r; choose-f *)
   | Tail of name    (* the tail helper of the named helper: <its name>-tail *)
 
 module StringSet = Set.Make (String)
@@ -284,7 +284,9 @@ let helper_subject place (body : exp) =
   | _ -> place
 
 let helper_base prefix place body =
-  Base (prefix ^ helper_subject place body, prefix ^ place)
+  let subject = helper_subject place body in
+  if subject = place then Base [prefix ^ place]
+  else Base [prefix ^ subject; prefix ^ place; prefix ^ place ^ "-" ^ subject]
 
 let helper_names iterations premise_iterations membership_choices =
   List.concat_map
@@ -299,17 +301,17 @@ let helper_names iterations premise_iterations membership_choices =
   @ List.concat_map
       (fun (iteration : premise_iteration) ->
         let owner = iteration.place in
-        (iteration.name, Base ("all-" ^ owner, "all-" ^ owner))
+        (iteration.name, Base ["all-" ^ owner])
         :: (iteration.tail_name, Tail iteration.name)
         :: List.concat_map
              (fun (output, tail) ->
-               [output, Base ("bind-" ^ owner, "bind-" ^ owner); tail, Tail output])
+               [output, Base ["bind-" ^ owner]; tail, Tail output])
              iteration.output_names)
       premise_iterations
   @ List.map
       (fun choice ->
         let name = "choose-" ^ compact choice.definition in
-        choice.helper_name, Base (name, name))
+        choice.helper_name, Base [name])
       membership_choices
 
 let iteration_base_name (body : exp) =
@@ -726,14 +728,31 @@ let register_names hints definitions script =
     (fun (source, _, _) ->
       if builtin source then add DefName source (builtin_name source))
     definitions;
+  (* A constructor whose name and spectec- name are both taken is named
+     after its syntax (e.g. FUNC-func) instead of getting a number. *)
+  let current_typ = ref None in
+  let constructor_candidate name =
+    let taken name =
+      StringSet.mem name !(registry.used) || StringSet.mem name reserved_names
+    in
+    match taken name, taken ("spectec-" ^ name), !current_typ with
+    | true, true, Some typ -> name ^ "-" ^ sanitize typ
+    | _ -> name
+  in
   let module Visitor = Il.Iter.Make (struct
     include Il.Iter.Skip
 
     let visit_mixop mixop =
-      if not (Mixop.is_hole_only mixop) then
-        add MixopName (Mixop.key mixop) (Mixop.name mixop)
+      if not (Mixop.is_hole_only mixop)
+         && lookup !(registry.entries) MixopName (Mixop.key mixop) = None then
+        add MixopName (Mixop.key mixop) (constructor_candidate (Mixop.name mixop))
 
     let visit_def def =
+      current_typ :=
+        begin match def.it with
+        | TypD (id, _, _) -> Some id.it
+        | RelD _ | DecD _ | GramD _ | HintD _ | RecD _ -> None
+        end;
       match def.it with
       | TypD (id, _, _) -> add TypName id.it (sanitize id.it)
       | RelD (id, _, _, _, _) -> add RelName id.it (sanitize id.it)

@@ -33,33 +33,33 @@ mod SPEC2MAUDE-GENERATED is
 
   subsort FocusTarget < FocusSearch .
 
-  sort Hole-Step-pure-1 .
+  sort Hole-Step-pure .
 
   sort Identify-Step-pure .
 
-  sort Hole-Step-read-1 .
+  sort Hole-Step-read .
 
   sort Identify-Step-read .
 
-  sort Hole-Step-ctxt-label-1 .
+  sort Hole-Step-ctxt-label .
 
-  sort Hole-Step-ctxt-handler-1 .
+  sort Hole-Step-ctxt-handler .
 
-  sort Hole-Step-ctxt-frame-1 .
+  sort Hole-Step-ctxt-frame .
 
   sort Steps-Request .
 
   subsort SpectecTerminal < Steps-Request .
 
-  sort Hole-Steps-trans-1 .
+  sort Hole-Steps-trans-Step .
 
-  sort Hole-Steps-trans-2 .
+  sort Hole-Steps-trans-Steps .
 
   sort Eval-expr-Request .
 
   subsort SpectecTerminal < Eval-expr-Request .
 
-  sort Hole-Eval-expr-1-1 .
+  sort Hole-Eval-expr .
 
   sort evalexprs-Config .
 
@@ -1255,7 +1255,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op func : -> SpectecType .
 
-  op spectec-FUNC-2 : Nat SpectecTerminals InstrList -> SpectecTerminal [ctor] .
+  op FUNC-func : Nat SpectecTerminals InstrList -> SpectecTerminal [ctor] .
 
   op elem : -> SpectecType .
 
@@ -1975,49 +1975,49 @@ mod SPEC2MAUDE-GENERATED is
 
   op _~>_ : Step-Request Hole -> Step-Request [frozen (2)] .
 
-  op hole-Step-pure-1 : SpectecTerminal -> Hole-Step-pure-1 [ctor] .
+  op hole-Step-pure : SpectecTerminal -> Hole-Step-pure [ctor] .
 
-  op _~>_ : Step-pure-Request Hole-Step-pure-1 -> Step-Request [frozen (2)] .
+  op _~>_ : Step-pure-Request Hole-Step-pure -> Step-Request [frozen (2)] .
 
   op identifyPure : InstrList -> Identify-Step-pure [frozen (1)] .
 
   op identified-Step-pure : -> Identify-Step-pure [ctor] .
 
-  op hole-Step-read-1 : SpectecTerminal -> Hole-Step-read-1 [ctor] .
+  op hole-Step-read : SpectecTerminal -> Hole-Step-read [ctor] .
 
-  op _~>_ : Step-read-Request Hole-Step-read-1 -> Step-Request [frozen (2)] .
+  op _~>_ : Step-read-Request Hole-Step-read -> Step-Request [frozen (2)] .
 
   op identifyRead : SpectecTerminal -> Identify-Step-read [frozen (1)] .
 
   op identified-Step-read : -> Identify-Step-read [ctor] .
 
-  op hole-Step-ctxt-label-1 : InstrList Nat -> Hole-Step-ctxt-label-1 [ctor] .
+  op hole-Step-ctxt-label : InstrList Nat -> Hole-Step-ctxt-label [ctor] .
 
-  op _~>_ : Step-Request Hole-Step-ctxt-label-1 -> Step-Request [frozen (2)] .
+  op _~>_ : Step-Request Hole-Step-ctxt-label -> Step-Request [frozen (2)] .
 
-  op hole-Step-ctxt-handler-1 : SpectecTerminals Nat -> Hole-Step-ctxt-handler-1 [ctor] .
+  op hole-Step-ctxt-handler : SpectecTerminals Nat -> Hole-Step-ctxt-handler [ctor] .
 
-  op _~>_ : Step-Request Hole-Step-ctxt-handler-1 -> Step-Request [frozen (2)] .
+  op _~>_ : Step-Request Hole-Step-ctxt-handler -> Step-Request [frozen (2)] .
 
-  op hole-Step-ctxt-frame-1 : Nat SpectecTerminal -> Hole-Step-ctxt-frame-1 [ctor] .
+  op hole-Step-ctxt-frame : Nat SpectecTerminal -> Hole-Step-ctxt-frame [ctor] .
 
-  op _~>_ : Step-Request Hole-Step-ctxt-frame-1 -> Step-Request [frozen (2)] .
+  op _~>_ : Step-Request Hole-Step-ctxt-frame -> Step-Request [frozen (2)] .
 
   op Steps : SpectecTerminal -> Steps-Request [frozen (1)] .
 
-  op hole-Steps-trans-1 : -> Hole-Steps-trans-1 [ctor] .
+  op hole-Steps-trans-Step : -> Hole-Steps-trans-Step [ctor] .
 
-  op _~>_ : Step-Request Hole-Steps-trans-1 -> Steps-Request [frozen (2)] .
+  op _~>_ : Step-Request Hole-Steps-trans-Step -> Steps-Request [frozen (2)] .
 
-  op hole-Steps-trans-2 : -> Hole-Steps-trans-2 [ctor] .
+  op hole-Steps-trans-Steps : -> Hole-Steps-trans-Steps [ctor] .
 
-  op _~>_ : Steps-Request Hole-Steps-trans-2 -> Steps-Request [frozen (2)] .
+  op _~>_ : Steps-Request Hole-Steps-trans-Steps -> Steps-Request [frozen (2)] .
 
   op Eval-expr : SpectecTerminal InstrList -> Eval-expr-Request [frozen (1 2)] .
 
-  op hole-Eval-expr-1-1 : -> Hole-Eval-expr-1-1 [ctor] .
+  op hole-Eval-expr : -> Hole-Eval-expr [ctor] .
 
-  op _~>_ : Steps-Request Hole-Eval-expr-1-1 -> Eval-expr-Request [frozen (2)] .
+  op _~>_ : Steps-Request Hole-Eval-expr -> Eval-expr-Request [frozen (2)] .
 
   op alloctypes : SpectecTerminals -> SpectecTerminals .
 
@@ -2083,15 +2083,15 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-subst-all-valtype : Nat Nat ~> SpectecTerminals .
 
-  op map-rollrt : Nat Nat Nat SpectecTerminals ~> SpectecTerminals .
+  op map-rollrt-subst-subtype : Nat Nat Nat SpectecTerminals ~> SpectecTerminals .
 
-  op map-rollrt-2 : Nat Nat Nat ~> SpectecTerminals .
+  op map-rollrt-IDX : Nat Nat Nat ~> SpectecTerminals .
 
   op map-REC : Nat Nat ~> SpectecTerminals .
 
-  op map-unrollrt : Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
+  op map-unrollrt-subst-subtype : Nat SpectecTerminal Nat SpectecTerminals ~> SpectecTerminals .
 
-  op map-unrollrt-2 : SpectecTerminal Nat Nat ~> SpectecTerminals .
+  op map-unrollrt-DEF : SpectecTerminal Nat Nat ~> SpectecTerminals .
 
   op map-rolldt : Nat SpectecTerminals Nat Nat ~> SpectecTerminals .
 
@@ -2245,15 +2245,15 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-ivshufflop : SpectecTerminal Nat SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-vcvtop : SpectecTerminal SpectecTerminal Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+  op map-vcvtop-lcvtop : SpectecTerminal SpectecTerminal Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-vcvtop-2 : SpectecTerminal SpectecTerminal Nat Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+  op map-vcvtop-lcvtop-2 : SpectecTerminal SpectecTerminal Nat Nat SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
   op map-narrow : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-ivadd-pairwise : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivadd-pairwise-iadd : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-ivadd-pairwise-2 : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivadd-pairwise : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op unzip-ivadd-pairwise : SpectecTerminals ~> SpectecTerminal .
 
@@ -2263,7 +2263,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op unzip-ivdot : Nat SpectecTerminals ~> SpectecTerminal .
 
-  op map-ivdot-2 : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-ivdot-imul : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-ivdot-sat : Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
@@ -3231,11 +3231,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq subst-all-deftypes(DT_1 DT*, TU*) = subst-all-deftype(DT_1, TU*) subst-all-deftypes(DT*, TU*) .
 
-  ceq rollrt(X-4, RECTYPE) = REC(map-rollrt(X-4, N-3, N-3, SUBTYPE*))
+  ceq rollrt(X-4, RECTYPE) = REC(map-rollrt-subst-subtype(X-4, N-3, N-3, SUBTYPE*))
     if REC(SUBTYPE*) := RECTYPE
       /\ N-3 := len(SUBTYPE*) .
 
-  ceq unrollrt(RECTYPE) = REC(map-unrollrt(N-3, RECTYPE, N-3, SUBTYPE*))
+  ceq unrollrt(RECTYPE) = REC(map-unrollrt-subst-subtype(N-3, RECTYPE, N-3, SUBTYPE*))
     if REC(SUBTYPE*) := RECTYPE
       /\ N-3 := len(SUBTYPE*) .
 
@@ -4707,7 +4707,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck(LOCAL(VALTYPE), local) = true
     if typecheck(VALTYPE, valtype) .
 
-  ceq typecheck(spectec-FUNC-2(TYPEIDX, LOCAL*, EXPR), func) = true
+  ceq typecheck(FUNC-func(TYPEIDX, LOCAL*, EXPR), func) = true
     if typecheck(# TYPEIDX, typeidx)
       /\ typecheck(LOCAL*, local)
       /\ typecheck(EXPR, expr) .
@@ -4755,7 +4755,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-local(LOCAL(T)) = free-valtype(T) .
 
-  eq free-func(spectec-FUNC-2(TYPEIDX, LOCAL*, EXPR)) = recordConcat(recordConcat(free-typeidx(TYPEIDX), free-list(map-free-local(LOCAL*)), free), free-block(EXPR) [. 'LOCALS = eps ], free) .
+  eq free-func(FUNC-func(TYPEIDX, LOCAL*, EXPR)) = recordConcat(recordConcat(free-typeidx(TYPEIDX), free-list(map-free-local(LOCAL*)), free), free-block(EXPR) [. 'LOCALS = eps ], free) .
 
   eq free-datamode(ACTIVE(MEMIDX, EXPR)) = recordConcat(free-memidx(MEMIDX), free-expr(EXPR), free) .
 
@@ -5776,19 +5776,19 @@ mod SPEC2MAUDE-GENERATED is
   ceq spectec-vcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, V_1) = choose-vcvtop(map-inv-lanes(LNN_2, M-2, C**))
     if _and_(halfop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == eps, zeroop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == eps)
       /\ C_1* := lanes-(_X_(LNN_1, M-2), V_1)
-      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*)) .
+      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*)) .
 
   rl choose-vcvtop(CHOICE-PREFIX ((# V) CHOICE-REST)) => V .
 
   ceq spectec-vcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, V_1) = choose-vcvtop(map-inv-lanes(LNN_2, M_2, C**))
     if HALF ? := halfop(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2)
       /\ C_1* := lanes-(_X_(LNN_1, M_1), V_1) [ spectec-half(HALF, 0, M_2) : M_2 ]
-      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*)) .
+      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*)) .
 
   ceq spectec-vcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, V_1) = choose-vcvtop(map-inv-lanes(LNN_2, M_2, C**))
     if zeroop(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2) == (ZERO ?)
       /\ C_1* := lanes-(_X_(LNN_1, M_1), V_1)
-      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*) repeatSeq(M_1, seq(spectec-zero(LNN_2)))) .
+      /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*) repeatSeq(M_1, seq(spectec-zero(LNN_2)))) .
 
   eq spectec-vshiftop-(_X_(JNN, M-2), SHL, V, I) = ivshiftop-ishl-(_X_(JNN, M-2), V, I) .
 
@@ -5812,9 +5812,9 @@ mod SPEC2MAUDE-GENERATED is
       /\ C'_2* := map-narrow(JNN_2, JNN_1, SX, C_2*)
       /\ V := inv-lanes-(_X_(JNN_2, M_2), C'_1* C'_2*) .
 
-  ceq ivadd-pairwise-(N-2, I*) = map-ivadd-pairwise(N-2, J_1*, J_2*)
+  ceq ivadd-pairwise-(N-2, I*) = map-ivadd-pairwise-iadd(N-2, J_1*, J_2*)
     if tuple(seq(J_1*) seq(J_2*)) := unzip-ivadd-pairwise(inv-concat-(N, I*))
-      /\ concat-(N, map-ivadd-pairwise-2(J_1*, J_2*)) == I* .
+      /\ concat-(N, map-ivadd-pairwise(J_1*, J_2*)) == I* .
 
   ceq ivextunop--ivadd-pairwise-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, V_1) = inv-lanes-(_X_(JNN_2, M_2), C*)
     if typecheck(JNN_1, Jnn)
@@ -5825,13 +5825,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq spectec-vextunop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), EXTADD-PAIRWISE(SX), V_1) = ivextunop--ivadd-pairwise-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, V_1) .
 
-  ceq ivdot-(N-2, I_1*, I_2*) = map-ivadd-pairwise(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := unzip-ivdot(N-2, inv-concat-(iN(N-2), map-ivdot-2(N-2, I_1*, I_2*)))
-      /\ concat-(iN(N-2), map-ivdot(N-2, J_1*, J_2*)) == map-ivdot-2(N-2, I_1*, I_2*) .
+  ceq ivdot-(N-2, I_1*, I_2*) = map-ivadd-pairwise-iadd(N-2, J_1*, J_2*)
+    if tuple(seq(J_1*) seq(J_2*)) := unzip-ivdot(N-2, inv-concat-(iN(N-2), map-ivdot-imul(N-2, I_1*, I_2*)))
+      /\ concat-(iN(N-2), map-ivdot(N-2, J_1*, J_2*)) == map-ivdot-imul(N-2, I_1*, I_2*) .
 
   ceq ivdot-sat-(N-2, I_1*, I_2*) = map-ivdot-sat(N-2, J_1*, J_2*)
-    if tuple(seq(J_1*) seq(J_2*)) := unzip-ivdot(N-2, inv-concat-(iN(N-2), map-ivdot-2(N-2, I_1*, I_2*)))
-      /\ concat-(iN(N-2), map-ivdot(N-2, J_1*, J_2*)) == map-ivdot-2(N-2, I_1*, I_2*) .
+    if tuple(seq(J_1*) seq(J_2*)) := unzip-ivdot(N-2, inv-concat-(iN(N-2), map-ivdot-imul(N-2, I_1*, I_2*)))
+      /\ concat-(iN(N-2), map-ivdot(N-2, J_1*, J_2*)) == map-ivdot-imul(N-2, I_1*, I_2*) .
 
   ceq ivextbinop--ivmul-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX_1, SX_2, I, K-3, V_1, V_2) = inv-lanes-(_X_(JNN_2, M_2), C*)
     if typecheck(JNN_1, Jnn)
@@ -5860,7 +5860,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ C'_2* := map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX_2, C_2*)
       /\ C* := ivdot-sat-(lsizenn2(JNN_2), C'_1*, C'_2*) .
 
-  eq ivmul-(N-2, I_1*, I_2*) = map-ivdot-2(N-2, I_1*, I_2*) .
+  eq ivmul-(N-2, I_1*, I_2*) = map-ivdot-imul(N-2, I_1*, I_2*) .
 
   eq spectec-vextbinop--(_X_(JNN_1, M_1), _X_(JNN_2, M_2), EXTMUL(HALF, SX), V_1, V_2) = ivextbinop--ivmul-(_X_(JNN_1, M_1), _X_(JNN_2, M_2), SX, SX, spectec-half(HALF, 0, M_2), M_2, V_1, V_2) .
 
@@ -5893,7 +5893,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(..., hostfunc) = true .
 
-  ceq typecheck(spectec-FUNC-2(TYPEIDX, LOCAL*, EXPR), funccode) = true
+  ceq typecheck(FUNC-func(TYPEIDX, LOCAL*, EXPR), funccode) = true
     if typecheck(# TYPEIDX, typeidx)
       /\ typecheck(LOCAL*, local)
       /\ typecheck(EXPR, expr) .
@@ -6495,7 +6495,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ FUNC T_1* -> T_2* := Expand(FI . 'TYPE)
       /\ N-3 = len(T_1*)
       /\ M-3 := len(T_2*)
-      /\ spectec-FUNC-2(CASE-PART1-2, CASE-PART2-2, CASE-PART3) := FI . 'CODE
+      /\ FUNC-func(CASE-PART1-2, CASE-PART2-2, CASE-PART3) := FI . 'CODE
       /\ X-4 := CASE-PART1-2
       /\ INSTR* := CASE-PART3
       /\ T* := unzip-LOCAL(CASE-PART2-2)
@@ -7351,291 +7351,291 @@ mod SPEC2MAUDE-GENERATED is
 
   eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 
-  rl [identifyPure-1] : identifyPure(UNREACHABLE) => identified-Step-pure .
+  rl [identify-Step-pure-unreachable] : identifyPure(UNREACHABLE) => identified-Step-pure .
 
-  rl [identifyPure-2] : identifyPure(NOP) => identified-Step-pure .
+  rl [identify-Step-pure-nop] : identifyPure(NOP) => identified-Step-pure .
 
-  rl [identifyPure-3] : identifyPure(VAL DROP) => identified-Step-pure .
+  rl [identify-Step-pure-drop] : identifyPure(VAL DROP) => identified-Step-pure .
 
-  rl [identifyPure-4] : identifyPure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT(T*?)))) => identified-Step-pure .
+  rl [identify-Step-pure-select-true] : identifyPure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT(T*?)))) => identified-Step-pure .
 
-  rl [identifyPure-6] : identifyPure(CONST(I32, # C-3) IF__ELSE_(BT, INSTR_1*, INSTR_2*)) => identified-Step-pure .
+  rl [identify-Step-pure-if-true] : identifyPure(CONST(I32, # C-3) IF__ELSE_(BT, INSTR_1*, INSTR_2*)) => identified-Step-pure .
 
-  rl [identifyPure-8] : identifyPure(LABEL- N-3 { INSTR* } VAL*) => identified-Step-pure .
+  rl [identify-Step-pure-label-vals] : identifyPure(LABEL- N-3 { INSTR* } VAL*) => identified-Step-pure .
 
-  rl [identifyPure-9] : identifyPure(LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(L)) INSTR*)) => identified-Step-pure .
+  rl [identify-Step-pure-br-label-zero] : identifyPure(LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(L)) INSTR*)) => identified-Step-pure .
 
-  rl [identifyPure-10] : identifyPure(LABEL- N-3 { INSTR'* } ((VAL* BR(L)) INSTR*)) => identified-Step-pure .
+  rl [identify-Step-pure-br-label-succ] : identifyPure(LABEL- N-3 { INSTR'* } ((VAL* BR(L)) INSTR*)) => identified-Step-pure .
 
-  rl [identifyPure-11] : identifyPure(HANDLER- N-3 { CATCH* } ((VAL* BR(L)) INSTR*)) => identified-Step-pure .
+  rl [identify-Step-pure-br-handler] : identifyPure(HANDLER- N-3 { CATCH* } ((VAL* BR(L)) INSTR*)) => identified-Step-pure .
 
-  rl [identifyPure-12] : identifyPure(CONST(I32, # C-3) BR-IF(L)) => identified-Step-pure .
+  rl [identify-Step-pure-br-if-true] : identifyPure(CONST(I32, # C-3) BR-IF(L)) => identified-Step-pure .
 
-  rl [identifyPure-14] : identifyPure(CONST(I32, # I) BR-TABLE(L*, L')) => identified-Step-pure .
+  rl [identify-Step-pure-br-table-lt] : identifyPure(CONST(I32, # I) BR-TABLE(L*, L')) => identified-Step-pure .
 
-  rl [identifyPure-16] : identifyPure(VAL BR-ON-NULL(L)) => identified-Step-pure .
+  rl [identify-Step-pure-br-on-null-null] : identifyPure(VAL BR-ON-NULL(L)) => identified-Step-pure .
 
-  rl [identifyPure-18] : identifyPure(VAL BR-ON-NON-NULL(L)) => identified-Step-pure .
+  rl [identify-Step-pure-br-on-non-null-null] : identifyPure(VAL BR-ON-NON-NULL(L)) => identified-Step-pure .
 
-  rl [identifyPure-20] : identifyPure(CALL-INDIRECT(X-4, YY-2)) => identified-Step-pure .
+  rl [identify-Step-pure-call-indirect] : identifyPure(CALL-INDIRECT(X-4, YY-2)) => identified-Step-pure .
 
-  rl [identifyPure-21] : identifyPure(RETURN-CALL-INDIRECT(X-4, YY-2)) => identified-Step-pure .
+  rl [identify-Step-pure-return-call-indirect] : identifyPure(RETURN-CALL-INDIRECT(X-4, YY-2)) => identified-Step-pure .
 
-  rl [identifyPure-22] : identifyPure(FRAME- N-3 { F } VAL*) => identified-Step-pure .
+  rl [identify-Step-pure-frame-vals] : identifyPure(FRAME- N-3 { F } VAL*) => identified-Step-pure .
 
-  rl [identifyPure-23] : identifyPure(FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) => identified-Step-pure .
+  rl [identify-Step-pure-return-frame] : identifyPure(FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) => identified-Step-pure .
 
-  rl [identifyPure-24] : identifyPure(LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*)) => identified-Step-pure .
+  rl [identify-Step-pure-return-label] : identifyPure(LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*)) => identified-Step-pure .
 
-  rl [identifyPure-25] : identifyPure(HANDLER- N-3 { CATCH* } ((VAL* RETURN) INSTR*)) => identified-Step-pure .
+  rl [identify-Step-pure-return-handler] : identifyPure(HANDLER- N-3 { CATCH* } ((VAL* RETURN) INSTR*)) => identified-Step-pure .
 
-  rl [identifyPure-26] : identifyPure(HANDLER- N-3 { CATCH* } VAL*) => identified-Step-pure .
+  rl [identify-Step-pure-handler-vals] : identifyPure(HANDLER- N-3 { CATCH* } VAL*) => identified-Step-pure .
 
-  rl [identifyPure-27] : identifyPure(VAL* (TRAP INSTR*)) => identified-Step-pure .
+  rl [identify-Step-pure-trap-instrs] : identifyPure(VAL* (TRAP INSTR*)) => identified-Step-pure .
 
-  rl [identifyPure-28] : identifyPure(LABEL- N-3 { INSTR'* } TRAP) => identified-Step-pure .
+  rl [identify-Step-pure-trap-label] : identifyPure(LABEL- N-3 { INSTR'* } TRAP) => identified-Step-pure .
 
-  rl [identifyPure-29] : identifyPure(HANDLER- N-3 { CATCH* } TRAP) => identified-Step-pure .
+  rl [identify-Step-pure-trap-handler] : identifyPure(HANDLER- N-3 { CATCH* } TRAP) => identified-Step-pure .
 
-  rl [identifyPure-30] : identifyPure(FRAME- N-3 { F } TRAP) => identified-Step-pure .
+  rl [identify-Step-pure-trap-frame] : identifyPure(FRAME- N-3 { F } TRAP) => identified-Step-pure .
 
-  rl [identifyPure-31] : identifyPure(VAL LOCAL.TEE(X-4)) => identified-Step-pure .
+  rl [identify-Step-pure-local-tee] : identifyPure(VAL LOCAL.TEE(X-4)) => identified-Step-pure .
 
-  rl [identifyPure-32] : identifyPure(CONST(I32, # I) (REF.I31)) => identified-Step-pure .
+  rl [identify-Step-pure-ref-i31] : identifyPure(CONST(I32, # I) (REF.I31)) => identified-Step-pure .
 
-  rl [identifyPure-33] : identifyPure(REF-2 (REF.IS-NULL)) => identified-Step-pure .
+  rl [identify-Step-pure-ref-is-null-true] : identifyPure(REF-2 (REF.IS-NULL)) => identified-Step-pure .
 
-  rl [identifyPure-35] : identifyPure(REF-2 (REF.AS-NON-NULL)) => identified-Step-pure .
+  rl [identify-Step-pure-ref-as-non-null-null] : identifyPure(REF-2 (REF.AS-NON-NULL)) => identified-Step-pure .
 
-  rl [identifyPure-37] : identifyPure(REF_1 (REF_2 (REF.EQ))) => identified-Step-pure .
+  rl [identify-Step-pure-ref-eq-null] : identifyPure(REF_1 (REF_2 (REF.EQ))) => identified-Step-pure .
 
-  rl [identifyPure-40] : identifyPure((REF.NULL-ADDR) I31.GET(SX)) => identified-Step-pure .
+  rl [identify-Step-pure-i31-get-null] : identifyPure((REF.NULL-ADDR) I31.GET(SX)) => identified-Step-pure .
 
-  rl [identifyPure-41] : identifyPure(REF.I31-NUM(I) I31.GET(SX)) => identified-Step-pure .
+  rl [identify-Step-pure-i31-get-num] : identifyPure(REF.I31-NUM(I) I31.GET(SX)) => identified-Step-pure .
 
-  rl [identifyPure-42] : identifyPure(VAL (CONST(I32, # N-3) ARRAY.NEW(X-4))) => identified-Step-pure .
+  rl [identify-Step-pure-array-new] : identifyPure(VAL (CONST(I32, # N-3) ARRAY.NEW(X-4))) => identified-Step-pure .
 
-  rl [identifyPure-43] : identifyPure(REF-2 (EXTERN.CONVERT-ANY)) => identified-Step-pure .
+  rl [identify-Step-pure-extern-convert-any-null] : identifyPure(REF-2 (EXTERN.CONVERT-ANY)) => identified-Step-pure .
 
-  rl [identifyPure-45] : identifyPure((REF.NULL-ADDR) (ANY.CONVERT-EXTERN)) => identified-Step-pure .
+  rl [identify-Step-pure-any-convert-extern-null] : identifyPure((REF.NULL-ADDR) (ANY.CONVERT-EXTERN)) => identified-Step-pure .
 
-  rl [identifyPure-46] : identifyPure(REF.EXTERN(REF-2) (ANY.CONVERT-EXTERN)) => identified-Step-pure .
+  rl [identify-Step-pure-any-convert-extern-addr] : identifyPure(REF.EXTERN(REF-2) (ANY.CONVERT-EXTERN)) => identified-Step-pure .
 
-  rl [identifyPure-47] : identifyPure(CONST(NT, C_1-3) UNOP(NT, UNOP-2)) => identified-Step-pure .
+  rl [identify-Step-pure-unop-val] : identifyPure(CONST(NT, C_1-3) UNOP(NT, UNOP-2)) => identified-Step-pure .
 
-  rl [identifyPure-49] : identifyPure(CONST(NT, C_1-3) (CONST(NT, C_2-3) BINOP(NT, BINOP-2))) => identified-Step-pure .
+  rl [identify-Step-pure-binop-val] : identifyPure(CONST(NT, C_1-3) (CONST(NT, C_2-3) BINOP(NT, BINOP-2))) => identified-Step-pure .
 
-  rl [identifyPure-51] : identifyPure(CONST(NT, C_1-3) TESTOP(NT, TESTOP-2)) => identified-Step-pure .
+  rl [identify-Step-pure-testop] : identifyPure(CONST(NT, C_1-3) TESTOP(NT, TESTOP-2)) => identified-Step-pure .
 
-  rl [identifyPure-52] : identifyPure(CONST(NT, C_1-3) (CONST(NT, C_2-3) RELOP(NT, RELOP-2))) => identified-Step-pure .
+  rl [identify-Step-pure-relop] : identifyPure(CONST(NT, C_1-3) (CONST(NT, C_2-3) RELOP(NT, RELOP-2))) => identified-Step-pure .
 
-  rl [identifyPure-53] : identifyPure(CONST(NT_1, C_1-3) CVTOP(NT_2, NT_1, CVTOP-2)) => identified-Step-pure .
+  rl [identify-Step-pure-cvtop-val] : identifyPure(CONST(NT_1, C_1-3) CVTOP(NT_2, NT_1, CVTOP-2)) => identified-Step-pure .
 
-  rl [identifyPure-55] : identifyPure(VCONST(V128, C_1-2) VVUNOP(V128, VVUNOP-2)) => identified-Step-pure .
+  rl [identify-Step-pure-vvunop] : identifyPure(VCONST(V128, C_1-2) VVUNOP(V128, VVUNOP-2)) => identified-Step-pure .
 
-  rl [identifyPure-56] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VVBINOP(V128, VVBINOP-2))) => identified-Step-pure .
+  rl [identify-Step-pure-vvbinop] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VVBINOP(V128, VVBINOP-2))) => identified-Step-pure .
 
-  rl [identifyPure-57] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VVTERNOP(V128, VVTERNOP-2)))) => identified-Step-pure .
+  rl [identify-Step-pure-vvternop] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VVTERNOP(V128, VVTERNOP-2)))) => identified-Step-pure .
 
-  rl [identifyPure-58] : identifyPure(VCONST(V128, C_1-2) VVTESTOP(V128, ANY-TRUE)) => identified-Step-pure .
+  rl [identify-Step-pure-vvtestop] : identifyPure(VCONST(V128, C_1-2) VVTESTOP(V128, ANY-TRUE)) => identified-Step-pure .
 
-  rl [identifyPure-59] : identifyPure(VCONST(V128, C_1-2) VUNOP(SH, VUNOP-2)) => identified-Step-pure .
+  rl [identify-Step-pure-vunop-val] : identifyPure(VCONST(V128, C_1-2) VUNOP(SH, VUNOP-2)) => identified-Step-pure .
 
-  rl [identifyPure-61] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VBINOP(SH, VBINOP-2))) => identified-Step-pure .
+  rl [identify-Step-pure-vbinop-val] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VBINOP(SH, VBINOP-2))) => identified-Step-pure .
 
-  rl [identifyPure-63] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VTERNOP(SH, VTERNOP-2)))) => identified-Step-pure .
+  rl [identify-Step-pure-vternop-val] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VTERNOP(SH, VTERNOP-2)))) => identified-Step-pure .
 
-  rl [identifyPure-65] : identifyPure(VCONST(V128, C_1-2) VTESTOP(_X_(JNN, M-2), ALL-TRUE)) => identified-Step-pure .
+  rl [identify-Step-pure-vtestop] : identifyPure(VCONST(V128, C_1-2) VTESTOP(_X_(JNN, M-2), ALL-TRUE)) => identified-Step-pure .
 
-  rl [identifyPure-66] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VRELOP(SH, VRELOP-2))) => identified-Step-pure .
+  rl [identify-Step-pure-vrelop] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VRELOP(SH, VRELOP-2))) => identified-Step-pure .
 
-  rl [identifyPure-67] : identifyPure(VCONST(V128, C_1-2) (CONST(I32, # I) VSHIFTOP(SH, VSHIFTOP-2))) => identified-Step-pure .
+  rl [identify-Step-pure-vshiftop] : identifyPure(VCONST(V128, C_1-2) (CONST(I32, # I) VSHIFTOP(SH, VSHIFTOP-2))) => identified-Step-pure .
 
-  rl [identifyPure-68] : identifyPure(VCONST(V128, C_1-2) VBITMASK(SH)) => identified-Step-pure .
+  rl [identify-Step-pure-vbitmask] : identifyPure(VCONST(V128, C_1-2) VBITMASK(SH)) => identified-Step-pure .
 
-  rl [identifyPure-69] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VSWIZZLOP(SH, SWIZZLOP))) => identified-Step-pure .
+  rl [identify-Step-pure-vswizzlop] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VSWIZZLOP(SH, SWIZZLOP))) => identified-Step-pure .
 
-  rl [identifyPure-70] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VSHUFFLE(SH, I*))) => identified-Step-pure .
+  rl [identify-Step-pure-vshuffle] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VSHUFFLE(SH, I*))) => identified-Step-pure .
 
-  rl [identifyPure-71] : identifyPure(CONST(INPUT-FIELD, C_1-3) VSPLAT(_X_(LNN, M-2))) => identified-Step-pure .
+  rl [identify-Step-pure-vsplat] : identifyPure(CONST(INPUT-FIELD, C_1-3) VSPLAT(_X_(LNN, M-2))) => identified-Step-pure .
 
-  rl [identifyPure-72] : identifyPure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), eps, I)) => identified-Step-pure .
+  rl [identify-Step-pure-vextract-lane-num] : identifyPure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), eps, I)) => identified-Step-pure .
 
-  rl [identifyPure-73] : identifyPure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(PT, M-2), SX ?, I)) => identified-Step-pure .
+  rl [identify-Step-pure-vextract-lane-pack] : identifyPure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(PT, M-2), SX ?, I)) => identified-Step-pure .
 
-  rl [identifyPure-74] : identifyPure(VCONST(V128, C_1-2) (CONST(INPUT-FIELD, C_2-3) VREPLACE-LANE(_X_(LNN, M-2), I))) => identified-Step-pure .
+  rl [identify-Step-pure-vreplace-lane] : identifyPure(VCONST(V128, C_1-2) (CONST(INPUT-FIELD, C_2-3) VREPLACE-LANE(_X_(LNN, M-2), I))) => identified-Step-pure .
 
-  rl [identifyPure-75] : identifyPure(VCONST(V128, C_1-2) VEXTUNOP(SH_2, SH_1, VEXTUNOP-2)) => identified-Step-pure .
+  rl [identify-Step-pure-vextunop] : identifyPure(VCONST(V128, C_1-2) VEXTUNOP(SH_2, SH_1, VEXTUNOP-2)) => identified-Step-pure .
 
-  rl [identifyPure-76] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VEXTBINOP(SH_2, SH_1, VEXTBINOP-2))) => identified-Step-pure .
+  rl [identify-Step-pure-vextbinop] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VEXTBINOP(SH_2, SH_1, VEXTBINOP-2))) => identified-Step-pure .
 
-  rl [identifyPure-77] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VEXTTERNOP(SH_2, SH_1, VEXTTERNOP-2)))) => identified-Step-pure .
+  rl [identify-Step-pure-vextternop] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VEXTTERNOP(SH_2, SH_1, VEXTTERNOP-2)))) => identified-Step-pure .
 
-  rl [identifyPure-78] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VNARROW(SH_2, SH_1, SX))) => identified-Step-pure .
+  rl [identify-Step-pure-vnarrow] : identifyPure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VNARROW(SH_2, SH_1, SX))) => identified-Step-pure .
 
-  rl [identifyPure-79] : identifyPure(VCONST(V128, C_1-2) VCVTOP(SH_2, SH_1, VCVTOP-2)) => identified-Step-pure .
+  rl [identify-Step-pure-vcvtop] : identifyPure(VCONST(V128, C_1-2) VCVTOP(SH_2, SH_1, VCVTOP-2)) => identified-Step-pure .
 
-  crl [heating-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
+  crl [heating-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure(Z)
     if identifyPure(INSTR*) => identified-Step-pure .
 
-  eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
+  eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
 
-  rl [identifyRead-1] : identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) => identified-Step-read .
+  rl [identify-Step-read-block] : identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) => identified-Step-read .
 
-  rl [identifyRead-2] : identifyRead(Z ; (VAL* LOOP(BT, INSTR*))) => identified-Step-read .
+  rl [identify-Step-read-loop] : identifyRead(Z ; (VAL* LOOP(BT, INSTR*))) => identified-Step-read .
 
-  rl [identifyRead-3] : identifyRead((S-2 ; F) ; (REF-2 BR-ON-CAST(L, RT_1, RT_2))) => identified-Step-read .
+  rl [identify-Step-read-br-on-cast-succeed] : identifyRead((S-2 ; F) ; (REF-2 BR-ON-CAST(L, RT_1, RT_2))) => identified-Step-read .
 
-  rl [identifyRead-5] : identifyRead((S-2 ; F) ; (REF-2 BR-ON-CAST-FAIL(L, RT_1, RT_2))) => identified-Step-read .
+  rl [identify-Step-read-br-on-cast-fail-succeed] : identifyRead((S-2 ; F) ; (REF-2 BR-ON-CAST-FAIL(L, RT_1, RT_2))) => identified-Step-read .
 
-  rl [identifyRead-7] : identifyRead(Z ; CALL(X-4)) => identified-Step-read .
+  rl [identify-Step-read-call] : identifyRead(Z ; CALL(X-4)) => identified-Step-read .
 
-  rl [identifyRead-8] : identifyRead(Z ; ((REF.NULL-ADDR) CALL-REF(YY-2))) => identified-Step-read .
+  rl [identify-Step-read-call-ref-null] : identifyRead(Z ; ((REF.NULL-ADDR) CALL-REF(YY-2))) => identified-Step-read .
 
-  rl [identifyRead-9] : identifyRead(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) => identified-Step-read .
+  rl [identify-Step-read-call-ref-func] : identifyRead(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) => identified-Step-read .
 
-  rl [identifyRead-10] : identifyRead(Z ; RETURN-CALL(X-4)) => identified-Step-read .
+  rl [identify-Step-read-return-call] : identifyRead(Z ; RETURN-CALL(X-4)) => identified-Step-read .
 
-  rl [identifyRead-11] : identifyRead(Z ; (LABEL- K-3 { INSTR'* } ((VAL* RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
+  rl [identify-Step-read-return-call-ref-label] : identifyRead(Z ; (LABEL- K-3 { INSTR'* } ((VAL* RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
 
-  rl [identifyRead-12] : identifyRead(Z ; (HANDLER- K-3 { CATCH* } ((VAL* RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
+  rl [identify-Step-read-return-call-ref-handler] : identifyRead(Z ; (HANDLER- K-3 { CATCH* } ((VAL* RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
 
-  rl [identifyRead-13] : identifyRead(Z ; (FRAME- K-3 { F } (((VAL* (REF.NULL-ADDR)) RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
+  rl [identify-Step-read-return-call-ref-frame-null] : identifyRead(Z ; (FRAME- K-3 { F } (((VAL* (REF.NULL-ADDR)) RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
 
-  rl [identifyRead-14] : identifyRead(Z ; (FRAME- K-3 { F } ((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
+  rl [identify-Step-read-return-call-ref-frame-addr] : identifyRead(Z ; (FRAME- K-3 { F } ((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*))) => identified-Step-read .
 
-  rl [identifyRead-15] : identifyRead(Z ; ((REF.NULL-ADDR) THROW-REF)) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-null] : identifyRead(Z ; ((REF.NULL-ADDR) THROW-REF)) => identified-Step-read .
 
-  rl [identifyRead-16] : identifyRead(Z ; (VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*)))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-instrs] : identifyRead(Z ; (VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*)))) => identified-Step-read .
 
-  rl [identifyRead-17] : identifyRead(Z ; (LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-label] : identifyRead(Z ; (LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-18] : identifyRead(Z ; (FRAME- N-3 { F } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-frame] : identifyRead(Z ; (FRAME- N-3 { F } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-19] : identifyRead(Z ; (HANDLER- N-3 { eps } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-handler-empty] : identifyRead(Z ; (HANDLER- N-3 { eps } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-20] : identifyRead(Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-handler-catch] : identifyRead(Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-21] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-REF(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-handler-catch-ref] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-REF(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-22] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-ALL(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-handler-catch-all] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-ALL(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-23] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-ALL-REF(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-handler-catch-all-ref] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-ALL-REF(L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-24] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
+  rl [identify-Step-read-throw-ref-handler-next] : identifyRead(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => identified-Step-read .
 
-  rl [identifyRead-25] : identifyRead(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) => identified-Step-read .
+  rl [identify-Step-read-try-table] : identifyRead(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) => identified-Step-read .
 
-  rl [identifyRead-26] : identifyRead(Z ; LOCAL.GET(X-4)) => identified-Step-read .
+  rl [identify-Step-read-local-get] : identifyRead(Z ; LOCAL.GET(X-4)) => identified-Step-read .
 
-  rl [identifyRead-27] : identifyRead(Z ; GLOBAL.GET(X-4)) => identified-Step-read .
+  rl [identify-Step-read-global-get] : identifyRead(Z ; GLOBAL.GET(X-4)) => identified-Step-read .
 
-  rl [identifyRead-28] : identifyRead(Z ; (CONST(AT, # I) TABLE.GET(X-4))) => identified-Step-read .
+  rl [identify-Step-read-table-get-oob] : identifyRead(Z ; (CONST(AT, # I) TABLE.GET(X-4))) => identified-Step-read .
 
-  rl [identifyRead-30] : identifyRead(Z ; TABLE.SIZE(X-4)) => identified-Step-read .
+  rl [identify-Step-read-table-size] : identifyRead(Z ; TABLE.SIZE(X-4)) => identified-Step-read .
 
-  rl [identifyRead-31] : identifyRead(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => identified-Step-read .
+  rl [identify-Step-read-table-fill-oob] : identifyRead(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => identified-Step-read .
 
-  rl [identifyRead-34] : identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X_1-2, X_2-3))))) => identified-Step-read .
+  rl [identify-Step-read-table-copy-oob] : identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X_1-2, X_2-3))))) => identified-Step-read .
 
-  rl [identifyRead-38] : identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => identified-Step-read .
+  rl [identify-Step-read-table-init-oob] : identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => identified-Step-read .
 
-  rl [identifyRead-41] : identifyRead(Z ; (CONST(AT, # I) LOAD(NT, eps, X-4, AO))) => identified-Step-read .
+  rl [identify-Step-read-load-num-oob] : identifyRead(Z ; (CONST(AT, # I) LOAD(NT, eps, X-4, AO))) => identified-Step-read .
 
-  rl [identifyRead-43] : identifyRead(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) => identified-Step-read .
+  rl [identify-Step-read-load-pack-oob] : identifyRead(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) => identified-Step-read .
 
-  rl [identifyRead-45] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, eps, X-4, AO))) => identified-Step-read .
+  rl [identify-Step-read-vload-oob] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, eps, X-4, AO))) => identified-Step-read .
 
-  rl [identifyRead-47] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => identified-Step-read .
+  rl [identify-Step-read-vload-pack-oob] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => identified-Step-read .
 
-  rl [identifyRead-49] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => identified-Step-read .
+  rl [identify-Step-read-vload-splat-oob] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => identified-Step-read .
 
-  rl [identifyRead-51] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, spectec-ZERO(N-2) ?, X-4, AO))) => identified-Step-read .
+  rl [identify-Step-read-vload-zero-oob] : identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, spectec-ZERO(N-2) ?, X-4, AO))) => identified-Step-read .
 
-  rl [identifyRead-53] : identifyRead(Z ; (CONST(AT, # I) (VCONST(V128, C_1-2) VLOAD-LANE(V128, N-2, X-4, AO, J)))) => identified-Step-read .
+  rl [identify-Step-read-vload-lane-oob] : identifyRead(Z ; (CONST(AT, # I) (VCONST(V128, C_1-2) VLOAD-LANE(V128, N-2, X-4, AO, J)))) => identified-Step-read .
 
-  rl [identifyRead-55] : identifyRead(Z ; MEMORY.SIZE(X-4)) => identified-Step-read .
+  rl [identify-Step-read-memory-size] : identifyRead(Z ; MEMORY.SIZE(X-4)) => identified-Step-read .
 
-  rl [identifyRead-56] : identifyRead(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => identified-Step-read .
+  rl [identify-Step-read-memory-fill-oob] : identifyRead(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => identified-Step-read .
 
-  rl [identifyRead-59] : identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => identified-Step-read .
+  rl [identify-Step-read-memory-copy-oob] : identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => identified-Step-read .
 
-  rl [identifyRead-63] : identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => identified-Step-read .
+  rl [identify-Step-read-memory-init-oob] : identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => identified-Step-read .
 
-  rl [identifyRead-66] : identifyRead(Z ; REF.NULL(HT)) => identified-Step-read .
+  rl [identify-Step-read-ref-null] : identifyRead(Z ; REF.NULL(HT)) => identified-Step-read .
 
-  rl [identifyRead-67] : identifyRead(Z ; REF.FUNC(X-4)) => identified-Step-read .
+  rl [identify-Step-read-ref-func] : identifyRead(Z ; REF.FUNC(X-4)) => identified-Step-read .
 
-  rl [identifyRead-68] : identifyRead((S-2 ; F) ; (REF-2 REF.TEST(RT))) => identified-Step-read .
+  rl [identify-Step-read-ref-test-true] : identifyRead((S-2 ; F) ; (REF-2 REF.TEST(RT))) => identified-Step-read .
 
-  rl [identifyRead-70] : identifyRead((S-2 ; F) ; (REF-2 REF.CAST(RT))) => identified-Step-read .
+  rl [identify-Step-read-ref-cast-succeed] : identifyRead((S-2 ; F) ; (REF-2 REF.CAST(RT))) => identified-Step-read .
 
-  rl [identifyRead-72] : identifyRead(Z ; STRUCT.NEW-DEFAULT(X-4)) => identified-Step-read .
+  rl [identify-Step-read-struct-new-default] : identifyRead(Z ; STRUCT.NEW-DEFAULT(X-4)) => identified-Step-read .
 
-  rl [identifyRead-73] : identifyRead(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX?, X-4, I))) => identified-Step-read .
+  rl [identify-Step-read-struct-get-null] : identifyRead(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX?, X-4, I))) => identified-Step-read .
 
-  rl [identifyRead-74] : identifyRead(Z ; (REF.STRUCT-ADDR(A) STRUCT.GET(SX?, X-4, I))) => identified-Step-read .
+  rl [identify-Step-read-struct-get-struct] : identifyRead(Z ; (REF.STRUCT-ADDR(A) STRUCT.GET(SX?, X-4, I))) => identified-Step-read .
 
-  rl [identifyRead-75] : identifyRead(Z ; (CONST(I32, # N-3) ARRAY.NEW-DEFAULT(X-4))) => identified-Step-read .
+  rl [identify-Step-read-array-new-default] : identifyRead(Z ; (CONST(I32, # N-3) ARRAY.NEW-DEFAULT(X-4))) => identified-Step-read .
 
-  rl [identifyRead-76] : identifyRead(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => identified-Step-read .
+  rl [identify-Step-read-array-new-elem-oob] : identifyRead(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => identified-Step-read .
 
-  rl [identifyRead-78] : identifyRead(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-DATA(X-4, Y)))) => identified-Step-read .
+  rl [identify-Step-read-array-new-data-oob] : identifyRead(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-DATA(X-4, Y)))) => identified-Step-read .
 
-  rl [identifyRead-80] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => identified-Step-read .
+  rl [identify-Step-read-array-get-null] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => identified-Step-read .
 
-  rl [identifyRead-81] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => identified-Step-read .
+  rl [identify-Step-read-array-get-oob] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => identified-Step-read .
 
-  rl [identifyRead-83] : identifyRead(Z ; ((REF.NULL-ADDR) (ARRAY.LEN))) => identified-Step-read .
+  rl [identify-Step-read-array-len-null] : identifyRead(Z ; ((REF.NULL-ADDR) (ARRAY.LEN))) => identified-Step-read .
 
-  rl [identifyRead-84] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) => identified-Step-read .
+  rl [identify-Step-read-array-len-array] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) => identified-Step-read .
 
-  rl [identifyRead-85] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => identified-Step-read .
+  rl [identify-Step-read-array-fill-null] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => identified-Step-read .
 
-  rl [identifyRead-86] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => identified-Step-read .
+  rl [identify-Step-read-array-fill-oob] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => identified-Step-read .
 
-  rl [identifyRead-89] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I_1) (REF-2 (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => identified-Step-read .
+  rl [identify-Step-read-array-copy-null1] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I_1) (REF-2 (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => identified-Step-read .
 
-  rl [identifyRead-90] : identifyRead(Z ; (REF-2 (CONST(I32, # I_1) ((REF.NULL-ADDR) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => identified-Step-read .
+  rl [identify-Step-read-array-copy-null2] : identifyRead(Z ; (REF-2 (CONST(I32, # I_1) ((REF.NULL-ADDR) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => identified-Step-read .
 
-  rl [identifyRead-91] : identifyRead(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => identified-Step-read .
+  rl [identify-Step-read-array-copy-oob1] : identifyRead(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => identified-Step-read .
 
-  rl [identifyRead-96] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => identified-Step-read .
+  rl [identify-Step-read-array-init-elem-null] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => identified-Step-read .
 
-  rl [identifyRead-97] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => identified-Step-read .
+  rl [identify-Step-read-array-init-elem-oob1] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => identified-Step-read .
 
-  rl [identifyRead-101] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => identified-Step-read .
+  rl [identify-Step-read-array-init-data-null] : identifyRead(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => identified-Step-read .
 
-  rl [identifyRead-102] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => identified-Step-read .
+  rl [identify-Step-read-array-init-data-oob1] : identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => identified-Step-read .
 
-  crl [heating-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read-1(Z)
+  crl [heating-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read(Z)
     if identifyRead(Z ; INSTR*) => identified-Step-read .
 
-  eq INSTR'* ~> hole-Step-read-1(Z) = Z ; INSTR'* .
+  eq INSTR'* ~> hole-Step-read(Z) = Z ; INSTR'* .
 
-  rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) .
+  rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) .
 
-  eq (Z' ; INSTR'*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
+  eq (Z' ; INSTR'*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
 
-  rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N-3 { CATCH* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-handler-1(CATCH*, N-3) .
+  rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N-3 { CATCH* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-handler(CATCH*, N-3) .
 
-  eq (Z' ; INSTR'*) ~> hole-Step-ctxt-handler-1(CATCH*, N-3) = Z' ; (HANDLER- N-3 { CATCH* } INSTR'*) .
+  eq (Z' ; INSTR'*) ~> hole-Step-ctxt-handler(CATCH*, N-3) = Z' ; (HANDLER- N-3 { CATCH* } INSTR'*) .
 
-  rl [heating-Step-ctxt-frame] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame-1(N-3, F) .
+  rl [heating-Step-ctxt-frame] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame(N-3, F) .
 
-  eq ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame-1(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
+  eq ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
 
   rl Steps(Z ; INSTR*) => Z ; INSTR* .
 
-  rl [heating-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-1 .
+  rl [heating-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step .
 
-  eq (Z' ; INSTR'*) ~> hole-Steps-trans-1 = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-2 .
+  eq (Z' ; INSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-Steps .
 
-  eq (Z'' ; INSTR''*) ~> hole-Steps-trans-2 = Z'' ; INSTR''* .
+  eq (Z'' ; INSTR''*) ~> hole-Steps-trans-Steps = Z'' ; INSTR''* .
 
-  rl [heating-Eval-expr-1] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr-1-1 .
+  rl [heating-Eval-expr] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr .
 
-  eq (Z' ; VAL*) ~> hole-Eval-expr-1-1 = tuple(Z' seq(VAL*)) .
+  eq (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
 
   eq alloctypes(eps) = eps .
 
@@ -7837,25 +7837,25 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-subst-all-valtype(s(ITER-COUNT), I) = -IDX(I) map-subst-all-valtype(ITER-COUNT, s(I)) .
 
-  eq map-rollrt(X-4, N-3, 0, eps) = eps .
+  eq map-rollrt-subst-subtype(X-4, N-3, 0, eps) = eps .
 
-  eq map-rollrt(X-4, N-3, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-rollrt-2(X-4, N-3, 0), map-REC(N-3, 0)) map-rollrt(X-4, N-3, ITER-COUNT, SUBTYPE*-REST) .
+  eq map-rollrt-subst-subtype(X-4, N-3, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-rollrt-IDX(X-4, N-3, 0), map-REC(N-3, 0)) map-rollrt-subst-subtype(X-4, N-3, ITER-COUNT, SUBTYPE*-REST) .
 
-  eq map-rollrt-2(X-4, 0, I) = eps .
+  eq map-rollrt-IDX(X-4, 0, I) = eps .
 
-  eq map-rollrt-2(X-4, s(ITER-COUNT), I) = -IDX(X-4 + I) map-rollrt-2(X-4, ITER-COUNT, s(I)) .
+  eq map-rollrt-IDX(X-4, s(ITER-COUNT), I) = -IDX(X-4 + I) map-rollrt-IDX(X-4, ITER-COUNT, s(I)) .
 
   eq map-REC(0, I) = eps .
 
   eq map-REC(s(ITER-COUNT), I) = REC(I) map-REC(ITER-COUNT, s(I)) .
 
-  eq map-unrollrt(N-3, RECTYPE, 0, eps) = eps .
+  eq map-unrollrt-subst-subtype(N-3, RECTYPE, 0, eps) = eps .
 
-  eq map-unrollrt(N-3, RECTYPE, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-REC(N-3, 0), map-unrollrt-2(RECTYPE, N-3, 0)) map-unrollrt(N-3, RECTYPE, ITER-COUNT, SUBTYPE*-REST) .
+  eq map-unrollrt-subst-subtype(N-3, RECTYPE, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-REC(N-3, 0), map-unrollrt-DEF(RECTYPE, N-3, 0)) map-unrollrt-subst-subtype(N-3, RECTYPE, ITER-COUNT, SUBTYPE*-REST) .
 
-  eq map-unrollrt-2(RECTYPE, 0, I) = eps .
+  eq map-unrollrt-DEF(RECTYPE, 0, I) = eps .
 
-  eq map-unrollrt-2(RECTYPE, s(ITER-COUNT), I) = -DEF(RECTYPE, I) map-unrollrt-2(RECTYPE, ITER-COUNT, s(I)) .
+  eq map-unrollrt-DEF(RECTYPE, s(ITER-COUNT), I) = -DEF(RECTYPE, I) map-unrollrt-DEF(RECTYPE, ITER-COUNT, s(I)) .
 
   eq map-rolldt(N-3, SUBTYPE*, 0, I) = eps .
 
@@ -8161,25 +8161,25 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-ivshufflop(JNN, M-2, C_1*, C_2*, (# I) I*-REST) = (# #rat((C_1* C_2*) [ I ])) map-ivshufflop(JNN, M-2, C_1*, C_2*, I*-REST) .
 
-  eq map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, eps) = eps .
+  eq map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, eps) = eps .
 
-  eq map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, C_1-3)) map-vcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*-REST) .
+  eq map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, C_1-3)) map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*-REST) .
 
-  eq map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, eps) = eps .
+  eq map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, eps) = eps .
 
-  eq map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, C_1-3)) map-vcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*-REST) .
+  eq map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, C_1-3)) map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*-REST) .
 
   eq map-narrow(JNN_2, JNN_1, SX, eps) = eps .
 
   eq map-narrow(JNN_2, JNN_1, SX, (# C_1-2) C_1*-REST) = (# narrow--(lsize(JNN_1), lsize(JNN_2), SX, C_1-2)) map-narrow(JNN_2, JNN_1, SX, C_1*-REST) .
 
-  eq map-ivadd-pairwise(N-2, eps, eps) = eps .
+  eq map-ivadd-pairwise-iadd(N-2, eps, eps) = eps .
 
-  eq map-ivadd-pairwise(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-(N-2, J_1-3, J_2-3)) map-ivadd-pairwise(N-2, J_1*-REST, J_2*-REST) .
+  eq map-ivadd-pairwise-iadd(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-(N-2, J_1-3, J_2-3)) map-ivadd-pairwise-iadd(N-2, J_1*-REST, J_2*-REST) .
 
-  eq map-ivadd-pairwise-2(eps, eps) = eps .
+  eq map-ivadd-pairwise(eps, eps) = eps .
 
-  eq map-ivadd-pairwise-2((# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-ivadd-pairwise-2(J_1*-REST, J_2*-REST) .
+  eq map-ivadd-pairwise((# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-ivadd-pairwise(J_1*-REST, J_2*-REST) .
 
   eq unzip-ivadd-pairwise(eps) = tuple(seq(eps) seq(eps)) .
 
@@ -8199,9 +8199,9 @@ mod SPEC2MAUDE-GENERATED is
   ceq unzip-ivdot(N-2, seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-ivdot(N-2, PROJECT-REST) .
 
-  eq map-ivdot-2(N-2, eps, eps) = eps .
+  eq map-ivdot-imul(N-2, eps, eps) = eps .
 
-  eq map-ivdot-2(N-2, (# I_1) I_1*-REST, (# I_2) I_2*-REST) = (# imul-(N-2, I_1, I_2)) map-ivdot-2(N-2, I_1*-REST, I_2*-REST) .
+  eq map-ivdot-imul(N-2, (# I_1) I_1*-REST, (# I_2) I_2*-REST) = (# imul-(N-2, I_1, I_2)) map-ivdot-imul(N-2, I_1*-REST, I_2*-REST) .
 
   eq map-ivdot-sat(N-2, eps, eps) = eps .
 
@@ -8293,7 +8293,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq unzip-FUNC(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
-  ceq unzip-FUNC(spectec-FUNC-2(X-4, LOCAL*, EXPR_F-2) PROJECT-REST) = tuple(seq(seq(EXPR_F-2) PROJECT-COLUMN-1) (seq(seq(LOCAL*) PROJECT-COLUMN-2) seq((# X-4) PROJECT-COLUMN-3)))
+  ceq unzip-FUNC(FUNC-func(X-4, LOCAL*, EXPR_F-2) PROJECT-REST) = tuple(seq(seq(EXPR_F-2) PROJECT-COLUMN-1) (seq(seq(LOCAL*) PROJECT-COLUMN-2) seq((# X-4) PROJECT-COLUMN-3)))
     if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := unzip-FUNC(PROJECT-REST) .
 
   eq unzip-DATA(eps) = tuple(seq(eps) seq(eps)) .
@@ -8336,7 +8336,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-FUNC(eps, eps, eps) = eps .
 
-  eq map-FUNC(seq(EXPR_F-2) EXPR_F*-REST, seq(LOCAL*) LOCAL**-REST, (# X-4) X*-REST) = spectec-FUNC-2(X-4, LOCAL*, EXPR_F-2) map-FUNC(EXPR_F*-REST, LOCAL**-REST, X*-REST) .
+  eq map-FUNC(seq(EXPR_F-2) EXPR_F*-REST, seq(LOCAL*) LOCAL**-REST, (# X-4) X*-REST) = FUNC-func(X-4, LOCAL*, EXPR_F-2) map-FUNC(EXPR_F*-REST, LOCAL**-REST, X*-REST) .
 
   eq unzip-instantiate(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
 
