@@ -770,7 +770,7 @@ HintD (RuleH ("Step", "pure", [flag "k_heatcool"]))
 ```maude
 crl [heating-Step-pure] : Step(Z ; INSTR*) =>
   Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
-  if identifyPure(INSTR*) => identified-Step-pure .
+  if identifyPure(INSTR*) .
 eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
 ```
 
@@ -1799,7 +1799,7 @@ HintD (RuleH ("Step", "pure", [flag "k_heatcool"]))
 ```maude
 crl [heating-Step-pure] : Step(Z ; INSTR*) =>
   Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
-  if identifyPure(INSTR*) => identified-Step-pure .
+  if identifyPure(INSTR*) .
 
 eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
 ```

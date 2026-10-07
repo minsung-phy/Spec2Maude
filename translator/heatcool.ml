@@ -666,14 +666,12 @@ let unique_candidates candidates =
  * sequence: one rl per rule of the inner relation, matching that rule's
  * input pattern (TRANSLATION_MAP.md, section 2). Returns the statements and
  * the heating condition. The helper is named after the source rule. *)
-let identify_statements cache index (heated : Hintd.heatcool) suffix target args =
+let identify_statements cache index (heated : Hintd.heatcool) target args =
   let RuleD (id, _, _, _, _) = heated.rule.it in
   let metadata = Prescan.sort_metadata index in
   let relation = Hintd.find_relation metadata.relations target heated.rule.at in
   let candidates = lower_relation cache index relation in
   let name = "identify" ^ String.capitalize_ascii (Prescan.sanitize id.it) in
-  let found = "identified-" ^ suffix in
-  let sort = "Identify-" ^ suffix in
   let params, _, typ, _ = Il.Env.find_rel metadata.type_env target in
   let count = match execution_policy index target with
     | Prescan.Execution {input_count; _} -> input_count
@@ -691,18 +689,20 @@ let identify_statements cache index (heated : Hintd.heatcool) suffix target args
     ^ (if rule_id.it = "" then string_of_int (candidate.ordinal + 1)
        else Prescan.sanitize rule_id.it)
   in
-  let rules = candidates |> List.map (fun (candidate : Reld.execution_rule) ->
+  (* identifyI(ins) = true for an input that some inner rule matches; on
+     any other input it stays unreduced, so the heating condition fails. *)
+  let equations = candidates |> List.map (fun (candidate : Reld.execution_rule) ->
     match candidate.left with
     | App (_, inputs) ->
-        Rl (Some (label candidate), App (name, inputs), Const found)
+        Rl (Some (label candidate), App (name, inputs), Const "true")
     | _ -> assert false)
     |> unique_candidates
+    |> List.map (function
+         | Rl (_, left, right) -> Eq (left, right, [])
+         | _ -> assert false)
   in
-  [ SortDecl sort
-  ; op ~attrs:(frozen_all (List.length domain)) name domain sort
-  ; op ~attrs:[Ctor] found [] sort
-  ] @ rules,
-  [RewriteCond (App (name, args), Const found)]
+  op name domain "Bool" :: equations,
+  [EqCondition (BoolCond (App (name, args)))]
 
 (* A RulePr suspends this rule. Its result pattern resumes the remaining
    premises in source order; only live, already-bound variables enter a hole. *)
@@ -773,7 +773,7 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
     match executions, outputs, call with
     | [_], [{note = {it = IterT _; _}; _}], App (_, args)
       when target.it <> source.id.it ->
-        identify_statements cache index heated suffix target args
+        identify_statements cache index heated target args
     | _ -> [], []
   in
   let rec resume initial stage left conditions remaining =

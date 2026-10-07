@@ -416,7 +416,7 @@ raw 요청의 실패 가지는 남을 수 있으므로 source의 공개 완료 �
 
 기존 prefix/hole/postfix context는 `identifyFocus` 경로를 유지한다. 생성자 context·relation 연결은 `reld.ml`의 조건 목록 재귀 처리로 처리한다. 별도 evaluator나 범용 premise 프레임워크를 추가하지 않는다. LABEL, FRAME 등의 이름으로 분기하지 않으며, 식별 helper와 hole 이름은 source rule에서 생성한다.
 
-`identifyPure`·`identifyRead`는 대상 relation의 입력 패턴에서 생성한다. 각각 성공 후보를 나타내는 별도 token을 반환하고, 실제 premise 검사는 Step-pure/Step-read 실행이 담당한다. 식별 과정에서 가능한 source 입력을 버리지 않는다. 목록 일부 선택은 기존 `identifyFocus`의 역할이다.
+`identifyPure`·`identifyRead`는 대상 relation의 입력 패턴에서 생성한다. 각각 `Bool` 연산자이고 입력 패턴마다 `= true` equation을 가지며, 실제 premise 검사는 Step-pure/Step-read 실행이 담당한다. 식별 과정에서 가능한 source 입력을 버리지 않는다. 목록 일부 선택은 기존 `identifyFocus`의 역할이다.
 
 실행 요청과 반환 결과는 sort로 구분한다. cooling은 반환 결과 패턴에만 적용된다. `Eval_expr`는 `VAL* : ValList`가 이 역할을 하므로 별도 typecheck를 삽입하지 않는다. `_~>_`의 hole 인자는 `[frozen (2)]`로 rule rewriting을 막는다. equation 정규화까지 금지한다는 뜻은 아니다.
 
@@ -437,12 +437,12 @@ rule Step/pure:
 
 ```maude
 crl [heating-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
-    if identifyPure(INSTR*) => identified-Step-pure .
+    if identifyPure(INSTR*) .
 
 eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
 ```
 
-`identifyPure(INSTR*) => identified-Step-pure`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
+`identifyPure(INSTR*)`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
 
 ### 2. Step/read
 
@@ -459,12 +459,12 @@ rule Step/read:
 
 ```maude
 crl [heating-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read-1(Z)
-    if identifyRead(Z ; INSTR*) => identified-Step-read .
+    if identifyRead(Z ; INSTR*) .
 
 eq INSTR'* ~> hole-Step-read-1(Z) = Z ; INSTR'* .
 ```
 
-`identifyRead(Z ; INSTR*) => identified-Step-read`로 입력 후보를 확인한다. 읽기 실행은 instruction 목록을 반환하므로 원래 상태 Z를 붙인다.
+`identifyRead(Z ; INSTR*)`로 입력 후보를 확인한다. 읽기 실행은 instruction 목록을 반환하므로 원래 상태 Z를 붙인다.
 
 ### 3. Step/ctxt-instrs
 

@@ -139,7 +139,7 @@ source order.
 | Statement | Maude | Code |
 | --- | --- | --- |
 | Heating (first execution premise) | `crl [heating-r] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ .` `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
-| Heating guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧) => identified-inner`, where `identifyInner` has one `rl [identify-inner-r']` per rule `r'` of the inner relation, matching that rule's input pattern. Heating applies only to an input that some inner rule can match. | `heatcool.ml:identify_statements` |
+| Heating guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧)`, a `Bool` operator with one equation `eq identifyInner(⟦ins of r'⟧) = true` per rule `r'` of the inner relation. On an input that no inner rule matches it stays unreduced, so heating does not apply. | `heatcool.ml:identify_statements` |
 | Next execution premise | `eq ⟦outs'⟧ ~> hole-r-inner(C) = inner2(⟦ins''⟧) ~> hole-r-inner2(C') .` With several execution premises, each hole is named after the relation it waits for. | `heatcool.ml:heatcool_rule` |
 | Cooling (after the last execution premise) | `eq ⟦outs'⟧ ~> hole-r-inner2(C) = ⟦outs⟧ .`, with the remaining premises as conditions | `heatcool.ml:heatcool_rule` |
 
