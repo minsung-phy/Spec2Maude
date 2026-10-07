@@ -213,7 +213,7 @@ let run ?(runtime = "wasm2maude/run-runtime.maude")
 load %s
 
 mod WASM2MAUDE-RUN is
-  including WASM2MAUDE-RUN-RUNTIME .
+  including WASM-RUN-DRIVER .
 
   eq inputModule = %s .
   eq inputName = %s .
@@ -243,7 +243,7 @@ let modelcheck ?(runtime = "wasm2maude/modelcheck-runtime.maude")
 load %s
 
 mod WASM2MAUDE-MODELCHECK is
-  including WASM2MAUDE-MODELCHECK-RUNTIME .
+  including WASM-MODELCHECK-DRIVER .
   var RESULT : ValList .
 
   eq inputModule = %s .

@@ -1,6 +1,6 @@
 --- Fixed run rules; the generated module supplies the input data.
 
-mod WASM2MAUDE-RUN-RUNTIME is
+mod WASM-RUN-DRIVER is
   protecting WASM-BUILTINS .
 
   sort RunState .

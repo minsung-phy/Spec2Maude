@@ -1,7 +1,7 @@
 --- Fixed modelcheck rules; the generated module supplies the input data.
 load model-checker.maude
 
-mod WASM2MAUDE-MODELCHECK-RUNTIME is
+mod WASM-MODELCHECK-DRIVER is
   protecting WASM-BUILTINS .
   including MODEL-CHECKER .
 

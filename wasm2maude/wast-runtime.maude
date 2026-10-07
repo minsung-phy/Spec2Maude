@@ -1,6 +1,6 @@
 --- WAST command execution and assertion checking over the loaded Wasm semantics.
 --- The generated WASM2MAUDE-WAST module supplies the initial state and host data.
-mod WASM2MAUDE-WAST-RUNTIME is
+mod WASM-WAST-DRIVER is
   including WASM-BUILTINS .
 
   sorts ScriptAction ImportRequirement ImportRef ImportRefs LinkResult

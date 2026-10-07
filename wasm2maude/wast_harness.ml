@@ -15,7 +15,7 @@ let render ~semantics ~runtime ~steps ~commands ~host_store ~host_instances
 load %s
 
 mod WASM2MAUDE-WAST is
-  including WASM2MAUDE-WAST-RUNTIME .
+  including WASM-WAST-DRIVER .
 
 %s  eq emptyStore = %s .
   eq hostFunctionAddresses = %s .
