@@ -506,10 +506,17 @@ let focus_parts index (context : Hintd.context)
   | _ -> unsupported pattern.rule.at
       "lowered focus does not preserve the extracted source-pattern boundary"
 
+(* Generated statements are named <relation>-<rule> after their source rule.
+   An unnamed rule is numbered only if its relation has other rules. *)
+let rule_name index (relation : Hintd.relation) ordinal rule =
+  let id = Hintd.rule_id rule in
+  Prescan.rel_name index relation.id
+  ^ (if id.it <> "" then "-" ^ Prescan.sanitize id.it
+     else if List.length relation.rules = 1 then ""
+     else "-" ^ string_of_int (ordinal + 1))
+
 let focus_label index (pattern : Hintd.focus_pattern) =
-  let relation = Prescan.rel_name index pattern.Hintd.source.id in
-  let rule = (Hintd.rule_id pattern.rule).it |> Prescan.sanitize in
-  "focus-" ^ relation ^ "-" ^ rule
+  "focus-" ^ rule_name index pattern.source pattern.ordinal pattern.rule
 
 let request_sort index (context : Hintd.context) =
   match execution_policy index context.source.id with
@@ -674,10 +681,8 @@ let context_transitions index (context : Hintd.context) =
   let heat_right =
     App (name "_~>_", [substitute bindings inner_call; hole])
   in
-  (* Named like the other heating rules: heating-<relation>-<rule>. *)
   let label =
-    Some ("heating-" ^ Prescan.rel_name index context.source.id
-          ^ "-" ^ Prescan.sanitize (Hintd.rule_id context.rule).it)
+    Some ("heating-" ^ rule_name index context.source context.ordinal context.rule)
   in
   let heating = Crl (label, heat_left, heat_right, conditions) in
   let cool_left =
@@ -743,10 +748,8 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
      premises once, when the suspended request executes. *)
   (* Each rl is labeled after its inner rule, like the focus rules. *)
   let label (candidate : Reld.execution_rule) =
-    let rule_id = Hintd.rule_id (List.nth relation.Hintd.rules candidate.ordinal) in
-    "identify-" ^ Prescan.rel_name index target ^ "-"
-    ^ (if rule_id.it = "" then string_of_int (candidate.ordinal + 1)
-       else Prescan.sanitize rule_id.it)
+    "identify-" ^ rule_name index relation candidate.ordinal
+      (List.nth relation.Hintd.rules candidate.ordinal)
   in
   (* identifyI(ins) = true for an input that some inner rule matches; on
      any other input it stays unreduced, so the heating condition fails. *)
@@ -798,13 +801,7 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
       index source.id source.params policy heated.rule
   in
   if body.otherwise then fail "ElsePr requires an explicit complement";
-  (* An unnamed rule is numbered only if its relation has other rules. *)
-  let suffix =
-    Prescan.rel_name index source.id
-    ^ (if id.it <> "" then "-" ^ Prescan.sanitize id.it
-       else if List.length source.Hintd.rules = 1 then ""
-       else "-" ^ string_of_int (heated.ordinal + 1))
-  in
+  let suffix = rule_name index source heated.ordinal heated.rule in
   let bound_condition variables = function
     | RewriteCond (_, pattern) | EqCondition (MatchCond (pattern, _)) ->
         term_variables variables pattern
