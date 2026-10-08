@@ -211,16 +211,17 @@ let project_focus_premise index needed premise =
    - needed variables start as the boundary variables: the counts of ^n
      iterations and the unbounded sequence slots of the focus
      (boundary_variables);
-   - a premise is kept if it binds a needed variable, or if it must be kept
-     as a whole (a checked relation, a subsumption check, an IterPr or NegPr,
-     a LetPr whose right side is not yet known, or an equality on a boundary
-     variable); a kept premise makes its own inputs needed;
+   - a premise is kept if it binds a needed variable or is an equality on a
+     boundary variable; a kept premise makes its own inputs needed;
    - this is repeated until no new variable becomes needed (close).
+   Input guards of the source pattern are kept on the same terms
+   (boundary_guards).
 
-   Dropped premises are the scalar guards that choose between inner rules
-   with the same focus. They are not lost: the focus is executed as a request
-   of the inner relation, whose rules check all their premises. This assumes
-   that a dropped premise never changes where the focus ends. The execution
+   Dropped premises only choose between inner rules with the same focus.
+   They are not lost: the focus is executed as a request of the inner
+   relation, whose rules check all their premises. Dropping a premise can
+   only add candidate splits, and a split is used only if the inner relation
+   steps it, which Step/ctxt-instrs allows for any split. The execution
    premise named by the bridge (deferred) is always dropped, since it is the
    step that the focus will take. *)
 
@@ -249,18 +250,18 @@ let focus_premises index initial needed deferred prems =
     let reads = S.union (Prem.variables subject) (S.inter bound writes) in
     writes, reads, false
   in
+  let none = S.empty, S.empty, false in
   let describe bound premise =
     let writes, reads, retain =
       match premise.it with
       | RulePr (id, args, mixop, head) ->
           let parts = Prem.components mixop head in
           begin match Prescan.relation_policy index id with
-          | Ok (Prescan.Execution _) when is_deferred id ->
-              S.empty, S.empty, false
+          | Ok (Prescan.Execution _) when is_deferred id -> none
           | Ok (Prescan.Compute {subsume = Some _; _})
             when Prem.known_args bound args && Prem.known bound head ->
               (* A known result is the subsumption check, as for Check. *)
-              S.empty, free premise, true
+              none
           | Ok (Prescan.Execution {input_count; _}
                | Prescan.Compute {input_count; _}) ->
               let inputs, outputs = Prem.split input_count parts in
@@ -269,15 +270,12 @@ let focus_premises index initial needed deferred prems =
                 List.fold_left Prem.bind Il.Free.(free_args args).varid inputs
               in
               writes, S.union reads (S.inter bound writes), false
-          | Ok (Prescan.Check _) ->
-              S.empty, free premise, true
+          | Ok (Prescan.Check _) -> none
           | Error reason -> unsupported premise.at reason
           end
       | LetPr (quants, left, right) ->
           let writes, reads, _ = binding bound left right in
-          let reads = S.union Il.Free.(free_quants quants).varid reads in
-          if Prem.known bound right then writes, reads, false
-          else S.empty, S.union reads (free premise), true
+          writes, S.union Il.Free.(free_quants quants).varid reads, false
       | IfPr {it = CmpE (`EqOp, _, left, right); _} ->
           let boundary =
             if Prem.known bound left && Prem.known bound right then
@@ -288,13 +286,12 @@ let focus_premises index initial needed deferred prems =
           if not (S.is_empty boundary) then boundary, free premise, true
           else if Prem.known bound right then binding bound left right
           else if Prem.known bound left then binding bound right left
-          else S.empty, free premise, true
-      | ElsePr -> S.empty, S.empty, false
+          else none
+      | ElsePr | NegPr _ -> none
       | IfPr exp ->
-          (* Sequence and cardinality guards constrain the boundary. Other
-             guards belong to execution; opaque/iterated premises stay. *)
+          (* Sequence and cardinality guards constrain the boundary. *)
           S.inter needed (Prem.variables exp), Prem.variables exp, false
-      | IterPr _ | NegPr _ -> S.empty, free premise, true
+      | IterPr _ -> S.diff (free premise) bound, free premise, false
     in
     {premise; writes; reads; retain}
   in
@@ -319,11 +316,40 @@ let focus_premises index initial needed deferred prems =
     if S.equal next needed then needed else close next
   in
   let needed = close needed in
+  needed,
   List.rev dependencies
   |> List.filter_map (fun dependency ->
        if required needed dependency then
          Some (project_focus_premise index needed dependency.premise)
        else None)
+
+let condition_variables variables = function
+  | RewriteCond (left, right)
+  | EqCondition (EqCond (left, right) | MatchCond (left, right)) ->
+      term_variables (term_variables variables left) right
+  | EqCondition (MembershipCond (term, _) | BoolCond term) ->
+      term_variables variables term
+
+(* An input guard is kept if it mentions a needed source variable (the
+   length check of val^n) or a variable of a kept premise. Other guards
+   (e.g. a ref typecheck of a single operand) only choose an inner rule,
+   like a dropped premise. *)
+let boundary_guards index needed inputs premises guards =
+  let relevant = ref (List.fold_left condition_variables [] premises) in
+  let module Visitor = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_exp exp =
+      match exp.it with
+      | VarE id when Il.Free.Set.mem id.it needed ->
+          relevant := Prescan.source_variable index id exp.note :: !relevant
+      | _ -> ()
+  end)
+  in
+  Visitor.list Visitor.exp inputs;
+  let mentioned variable = List.exists (same_variable variable) !relevant in
+  List.filter
+    (fun guard -> List.exists mentioned (condition_variables [] guard))
+    guards
 
 let shaped_relation_call index (pattern : Hintd.focus_pattern) =
   let RuleD (_, _, mixop, head, prems) = pattern.rule.it in
@@ -341,13 +367,14 @@ let shaped_relation_call index (pattern : Hintd.focus_pattern) =
     Reld.translate_inputs ~defer:false index pattern.source.params inputs
   in
   let needed = boundary_variables index (pattern.operands @ pattern.trailing) in
-  let prems =
+  let needed, prems =
     focus_premises index bound needed pattern.deferred_execution prems
   in
   let premises =
     Prem.translate_all index ~bound:(Il.Free.Set.elements bound)
       ~bind_membership:true ~collect_outputs:true prems
   in
+  let guards = boundary_guards index needed inputs premises.conditions guards in
   let conditions = guards @ premises.conditions in
   let shapes = Reld.input_shapes conditions terms in
   let bindings =
@@ -516,6 +543,32 @@ let declarations index (context : Hintd.context) =
   ; op ~attrs:[Frozen [2]] (name "_~>_") [request_sort; name "Hole"] request_sort
   ]
 
+(* An operand of the prefix sequence sort (val* of val^n) can start anywhere
+   in the stack. Matched on the left side, every split is enumerated before
+   any condition runs, so a condition that fixes n (e.g. a type lookup) is
+   repeated per split. Such operands and those before them are matched by a
+   condition instead; scheduling places it after the conditions that do not
+   read them. *)
+let split_stack index (context : Hintd.context) prefix operands =
+  let sequence = Term.sequence_of_typ index context.prefix_typ in
+  let prefix_sort = Term.translate_sort index context.prefix_typ in
+  let rec split = function
+    | [] -> None
+    | operand :: rest ->
+        begin match split rest, operand with
+        | Some (leading, trailing), _ -> Some (operand :: leading, trailing)
+        | None, Var variable when variable.sort = prefix_sort ->
+            Some ([operand], rest)
+        | None, _ -> None
+        end
+  in
+  match split operands with
+  | None -> sequence (prefix :: operands), []
+  | Some (leading, trailing) ->
+      let stack = variable index "STACK" context.prefix_typ in
+      ( sequence (stack :: trailing)
+      , [EqCondition (MatchCond (sequence (prefix :: leading), stack))] )
+
 let translate_pattern cache index (context : Hintd.context)
     (pattern : Hintd.focus_pattern) =
   let name = helper index context in
@@ -527,8 +580,12 @@ let translate_pattern cache index (context : Hintd.context)
   let operands, trigger, trailing = focus_parts index context pattern focus in
   let prefix = variable index "PREFIX" context.prefix_typ in
   let postfix = variable index "POSTFIX" context.postfix_typ in
-  let stack =
-    Term.sequence_of_typ index context.prefix_typ (prefix :: operands)
+  let stack, conditions =
+    match conditions with
+    | [] -> Term.sequence_of_typ index context.prefix_typ (prefix :: operands), []
+    | _ ->
+        let stack, split = split_stack index context prefix operands in
+        stack, conditions @ split
   in
   let rest =
     Term.sequence_of_typ index context.postfix_typ (trailing @ [postfix])
@@ -746,13 +803,6 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
        else if List.length source.Hintd.rules = 1 then ""
        else "-" ^ string_of_int (heated.ordinal + 1))
   in
-  let vars_condition variables = function
-    | RewriteCond (left, right)
-    | EqCondition (EqCond (left, right) | MatchCond (left, right)) ->
-        term_variables (term_variables variables left) right
-    | EqCondition (MembershipCond (term, _) | BoolCond term) ->
-        term_variables variables term
-  in
   let bound_condition variables = function
     | RewriteCond (_, pattern) | EqCondition (MatchCond (pattern, _)) ->
         term_variables variables pattern
@@ -789,7 +839,7 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
     | RewriteCond (call, result) :: rest, (target, inner_sort, outputs) :: targets ->
         if not (variables_bound bound call) then
           fail "RulePr input is not bound before heating";
-        let needed = List.fold_left vars_condition
+        let needed = List.fold_left condition_variables
             (term_variables (term_variables [] body.right) result) rest in
         let captures = List.filter
             (fun variable -> List.exists (same_variable variable) needed) bound in
