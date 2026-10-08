@@ -7296,7 +7296,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-array-set-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, # I) VAL)), ARRAY.SET(X-4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | POSTFIX } .
 
-  crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
+  crl [heating-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
     if (STACK (OP REST)) =/= OP
       /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
       /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .

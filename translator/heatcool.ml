@@ -674,8 +674,10 @@ let context_transitions index (context : Hintd.context) =
   let heat_right =
     App (name "_~>_", [substitute bindings inner_call; hole])
   in
+  (* Named like the other heating rules: heating-<relation>-<rule>. *)
   let label =
-    Some (name ("heating-" ^ Prescan.sanitize (Hintd.rule_id context.rule).it))
+    Some ("heating-" ^ Prescan.rel_name index context.source.id
+          ^ "-" ^ Prescan.sanitize (Hintd.rule_id context.rule).it)
   in
   let heating = Crl (label, heat_left, heat_right, conditions) in
   let cool_left =

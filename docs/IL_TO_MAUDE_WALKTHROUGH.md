@@ -1884,7 +1884,7 @@ rule Step/ctxt-instrs:
 이 형태는 `Hintd.extract_context`가 식별하는 별도 경로다. 현재 실제 출력은 다음과 같다.
 
 ```maude
-crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
+crl [heating-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
   if (STACK (OP REST)) =/= OP
     /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
     /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .

@@ -481,7 +481,7 @@ rule Step/ctxt-instrs:
 #### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-crl [heating-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
+crl [heating-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
     if (STACK (OP REST)) =/= OP
       /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
       /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
