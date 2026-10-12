@@ -88,7 +88,7 @@
 | `TypD(id, params, insts)` | 타입별 `InstD` 목록 | alias 확장, constructor 소유 타입, sort 선택 |
 | `RelD(...)` | relation의 parameter, mixop, 규칙 목록 | heat/cool의 relation·규칙 조회 |
 | `HintD(TypH(id, hints))` | 타입 hint 목록 | `maude_sort`, `maude_subsort`, `maude_proper` |
-| `HintD(RuleH(rel, rule, hints))` | 규칙 hint와 원문 위치 | `k_heatcool` 대상 검증 |
+| `HintD(RuleH(rel, rule, hints))` | 규칙 hint와 원문 위치 | `rl_embedding`/`k_embedding` 대상 검증 |
 | `IterT(VarT(id,...), List/List1/ListN)` | 목록으로 쓰이는 source 타입 | typed list가 필요한 타입 판별 |
 
 `scan_sorts`는 위 정보를 다음 순서로 정리한다.
@@ -124,7 +124,7 @@
 | rewrite 함수 | `maude_rule` 또는 위 choice shape | `rewrite_sorts`; 일반 값 함수와 request 함수 구별 |
 | relation 정책 | mixop의 marker 위치와 relation hint | `Execution`, `Equation`, `Predicate`, `BackendCheck`, `BackendCompute` |
 | otherwise 후보 이름 | execution relation의 규칙 이름(없으면 순번) | `relation_enabled_helpers`; 필요할 때만 helper 본문 생성 |
-| heat/cool | `k_heatcool` 규칙, relation 입출력 수 | `heatcool`, `contexts`; 1.6절 |
+| heat/cool | `rl_embedding`/`k_embedding` 규칙, relation 입출력 수 | `heatcool`, `contexts`; 1.6절 |
 | 본문 지원 여부 | builtin 여부, 미지원 relation을 premise에서 직접 참조하는 함수 | `definition_bodies`, `unsupported_relations`; 5.5절의 누락 경계 |
 
 이름 정리의 실제 예는 `$min` → `spectec-min`이다. backend 예약 이름 `min`과 충돌하기 때문에 접두어가 생긴다. 밑줄·기호도 Maude에서 쓸 이름으로 정리한다. 따라서 논문에서 “source 이름을 그대로 복사한다”보다는 **source에서 결정한 이름을 충돌 없이 인코딩한다**고 쓰는 편이 정확하다.
@@ -186,7 +186,7 @@ inverse : known-args, result       → missing-arg
 
 `scan_heatcool`은 다음을 확인한다.
 
-- 인자 없는 `hint(k_heatcool)`가 규칙에 한 번 붙어 있다.
+- 인자 없는 `hint(rl_embedding)`가 규칙에 한 번 붙어 있다.
 - 대상 relation이 execution policy다.
 - 적어도 하나의 직접적인 execution `RulePr`가 있다.
 - hinted rule 안의 `ElsePr`, `IterPr`, `NegPr`는 현재 거부한다.
@@ -570,7 +570,7 @@ translator는 선언만 만든다. 계산 equation은 [builtins.maude](../transl
 | `maude_predicate` | 관계가 성립하면 `true`가 되는 `eq` / `ceq` |
 | `maude_backend` | 선언만 생성; 본문은 backend |
 
-실행 규칙에 `k_heatcool`이 붙으면 별도 경로로 번역한다(R5). 조건 유무나 출력 개수는 위 분기 안에서 처리하므로 별도 relation 종류가 아니다.
+실행 규칙에 `rl_embedding`/`k_embedding`이 붙으면 별도 경로로 번역한다(R5). 조건 유무나 출력 개수는 위 분기 안에서 처리하므로 별도 relation 종류가 아니다.
 
 ### R1. 실행 관계: 요청을 결과로 rewrite
 
@@ -744,7 +744,7 @@ op Module-ok : SpectecTerminal ~> SpectecTerminal .
 
 코드: `Reld.translate`의 `BackendCheck / BackendCompute` 분기. source 규칙을 자동으로 전부 구현한 결과와 구별한다.
 
-### R5. `k_heatcool`: 내부 실행 후 바깥 계산으로 복귀
+### R5. `rl_embedding`: 내부 실행 후 바깥 계산으로 복귀
 
 이것은 relation 전체의 policy가 아니라 **개별 실행 RuleD가 선택하는 경로**다. 해당 규칙은 R1의 일반 출력에서 제외하고 별도로 생성한다.
 
@@ -754,7 +754,7 @@ op Module-ok : SpectecTerminal ~> SpectecTerminal .
 rule Step/pure:
   z; instr* ~> z; instr'*
   -- Step_pure: instr* ~> instr'*
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
 **IL AST 핵심:**
@@ -762,19 +762,19 @@ rule Step/pure:
 ```ocaml
 RuleD ("pure", Q, op_step, TupE [config(z,is); config(z,is')],
   [RulePr ("Step_pure", [], op_pure, TupE [is;is'])])
-HintD (RuleH ("Step", "pure", [flag "k_heatcool"]))
+HintD (RuleH ("Step", "pure", [flag "rl_embedding"]))
 ```
 
 **Maude 원문 발췌:**
 
 ```maude
-crl [heating-Step-pure] : Step(Z ; INSTR*) =>
-  Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
+crl [split-Step-pure] : Step(Z ; INSTR*) =>
+  Step-pure(INSTR*) ~> hole-Step-pure(Z)
   if identifyPure(INSTR*) .
-eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
+eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
 ```
 
-`Z`를 `hole-Step-pure-1`에 보관하고 내부 `Step-pure`를 실행한다. 결과가 나오면 보관한 `Z`와 다시 합친다. `identifyPure`는 실행 후보를 찾는 조건이며, 실제 내부 실행이 성공했는지 미리 증명하는 검사는 아니다.
+`Z`를 `hole-Step-pure`에 보관하고 내부 `Step-pure`를 실행한다. 결과가 나오면 보관한 `Z`와 다시 합친다. `identifyPure`는 실행 후보를 찾는 조건이며, 실제 내부 실행이 성공했는지 미리 증명하는 검사는 아니다.
 
 코드: `Def.translate → Heatcool.translate_relation`. 목록 context와 여러 실행 premise를 처리하는 세부 분기는 4.5절에 있다.
 
@@ -1028,7 +1028,7 @@ execution과 compute는 입력이 먼저 bound여야 한다. predicate와 backen
 - 보류된 조건이 `RulePr`·`IterPr` 같은 barrier를 넘어가야 하면 거부한다.
 - rewrite가 필요한 호출은 입력이 이미 있어야 하며, 이를 임의로 순수 조건처럼 이동하지 않는다.
 - 일반 `Decd`/`Reld`에도 bound 의존성에 따른 최종 condition 정리가 있다.
-- `k_heatcool` 경로는 실행 premise 앞뒤의 조건을 단계별로 보존하도록 `normalize:false`로 body를 만들고 continuation을 나눈다.
+- `rl_embedding`/`k_embedding` 경로는 실행 premise 앞뒤의 조건을 단계별로 보존하도록 `normalize:false`로 body를 만들고 continuation을 나눈다.
 
 이는 실행 가능한 binding 순서를 구성하는 구현이다. 임의의 논리 premise 집합에 대한 완전한 탐색·해결 알고리즘이라고 주장하지 않는다.
 
@@ -1374,7 +1374,7 @@ let translate_rule ?request_output index id params policy rule =
       invalid_arg "manual relation rules are supplied by a Maude backend"
 ```
 
-실행 rule은 `execution_statement`에서 조건 유무에 따라 `Rl/Crl`이 된다. `otherwise`의 선행 규칙 검사는 **R1의 실행 경로**에서 처리하며, equation/predicate의 `ElsePr`는 현재 거부한다. `k_heatcool` 규칙은 `Reld.translate`가 일반 rule 목록에서 제외하고, `Def.translate`가 같은 relation에 대해 `Heatcool.translate_relation`으로 생성한다(4.5절).
+실행 rule은 `execution_statement`에서 조건 유무에 따라 `Rl/Crl`이 된다. `otherwise`의 선행 규칙 검사는 **R1의 실행 경로**에서 처리하며, equation/predicate의 `ElsePr`는 현재 거부한다. `rl_embedding`/`k_embedding` 규칙은 `Reld.translate`가 일반 rule 목록에서 제외하고, `Def.translate`가 같은 relation에 대해 `Heatcool.translate_relation`으로 생성한다(4.5절).
 
 ## 3.5 `term.ml`: 식의 직접 재귀
 
@@ -1767,9 +1767,9 @@ match inverse_contract env f with
 
 `inv_concat_`·`inv_concatn_`는 현재 vector/storage source에서 사용하는 폭에 대한 계약을 가진다. 임의 길이의 모든 분할을 열거하는 일반 역관계는 아니다. forward 재확인은 잘못된 후보를 제외하지만, **가능한 모든 후보를 빠짐없이 생성한다는 증명은 아니다.**
 
-## 4.5 `k_heatcool`: 실행 premise를 continuation으로 변환
+## 4.5 `rl_embedding`과 `k_embedding`: 실행 premise를 continuation으로 변환
 
-구현은 [heatcool.ml](../translator/heatcool.ml)이다. 계약과 전체 8개 예제는 [TRANSLATION.md](TRANSLATION.md#k_heatcool-8개-rule의-변환-예시)에 있고, 여기서는 구조를 이해할 대표 예제를 설명한다.
+구현은 [heatcool.ml](../translator/heatcool.ml)이다. 계약과 전체 8개 예제는 [TRANSLATION.md](TRANSLATION.md#rl_embedding과-k_embedding-8개-rule의-변환-예시)에 있고, 여기서는 구조를 이해할 대표 예제를 설명한다.
 
 실제 큰 분기는 두 개다. H3–H5는 내부 실행을 차례로 연결하는 일반 `heatcool_rule` 경로이고, H6는 목록을 앞부분·실행할 부분·뒷부분으로 나누는 `context_transitions` 경로다. H3–H5의 실행 premise 개수나 중첩 모양마다 별도 translator가 있는 것은 아니다.
 
@@ -1783,7 +1783,7 @@ source 규칙이 다른 실행 relation의 결과를 필요로 하면 내부 req
 rule Step/pure:
   z; instr* ~> z; instr'*
   -- Step_pure: instr* ~> instr'*
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
 **IL AST 핵심:**
@@ -1791,20 +1791,20 @@ rule Step/pure:
 ```ocaml
 RuleD ("pure", Q, op_step, TupE [config(z,is); config(z,is')],
   [RulePr ("Step_pure", [], op_pure, TupE [is;is'])])
-HintD (RuleH ("Step", "pure", [flag "k_heatcool"]))
+HintD (RuleH ("Step", "pure", [flag "rl_embedding"]))
 ```
 
 **Maude 원문 발췌:**
 
 ```maude
-crl [heating-Step-pure] : Step(Z ; INSTR*) =>
-  Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
+crl [split-Step-pure] : Step(Z ; INSTR*) =>
+  Step-pure(INSTR*) ~> hole-Step-pure(Z)
   if identifyPure(INSTR*) .
 
-eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
+eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
 ```
 
-`hole-Step-pure-1`은 나중에 필요한 `Z`를 저장한다. 내부 request가 `INSTR'*`로 rewrite되면 cooling equation이 `Z ; INSTR'*`를 만든다.
+`hole-Step-pure`은 나중에 필요한 `Z`를 저장한다. 내부 request가 `INSTR'*`로 rewrite되면 plug equation이 `Z ; INSTR'*`를 만든다.
 
 `identifyPure`는 입력 pattern으로 후보를 식별하는 helper다. **모든 premise가 성립함을 미리 증명하는 predicate가 아니다.** 실제 premise는 `Step-pure` 실행에서 검사한다. `identifyRead`도 같은 역할이며, helper 이름은 source rule id에서 정한다.
 
@@ -1817,7 +1817,7 @@ rule Steps/trans:
   z; instr* ~>* z''; instr''*
   -- Step: z; instr* ~> z'; instr'*
   -- Steps: z'; instr'* ~>* z''; instr''*
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
 **IL AST:** `RuleD(...,[RulePr(Step,...); RulePr(Steps,...)])`와 `RuleH`.
@@ -1825,7 +1825,7 @@ rule Steps/trans:
 **Maude 원문 발췌:**
 
 ```maude
-rl [heating-Steps-trans] : Steps(Z ; INSTR*) =>
+rl [split-Steps-trans] : Steps(Z ; INSTR*) =>
   Step(Z ; INSTR*) ~> hole-Steps-trans-1 .
 eq (Z' ; INSTR'*) ~> hole-Steps-trans-1 =
   Steps(Z' ; INSTR'*) ~> hole-Steps-trans-2 .
@@ -1842,21 +1842,26 @@ eq (Z'' ; INSTR''*) ~> hole-Steps-trans-2 = Z'' ; INSTR''* .
 rule Step/ctxt-label:
   z; (LABEL_ n `{instr_0*} instr*) ~> z'; (LABEL_ n `{instr_0*} instr'*)
   -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
+  hint(k_embedding)
 ```
 
 **IL AST:** 바깥 `CaseE(LABEL,...)`을 가진 `RuleD`와 body를 실행하는 `RulePr(Step,...)`.
 
-**Maude 원문 발췌:**
+**Maude 원문 발췌 (K embedding, heating/cooling equation):**
 
 ```maude
-rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) =>
-  Step(Z ; INSTR*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) .
-eq (Z' ; INSTR'*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) =
-  Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
+ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), K-4) =
+  kstate(Z ; INSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4)
+  if closed-Step-ctxt-label(INSTR*) = false .
+ceq kstate(Z' ; INSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4) =
+  kstate(Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*), K-4)
+  if closed-Step-ctxt-label(INSTR'*) = true .
 ```
 
-hole에는 `instr_0*`와 `n`을 저장한다. 갱신된 `Z'`와 `INSTR'*`는 내부 실행에서 반환된다.
+hole에는 `instr_0*`와 `n`을 저장한다. split/plug와 달리 hole은 driver 상태 `kstate(c, K)`의 `K`에
+남고, 안쪽이 값이나 closed body(br/return/trap 등, LABEL 자체를 소비하는 rule의 body)가 될 때만
+cooling한다. 앞뒤 명령을 떼어 두는 instrs heating, `closed-…` 목록, `cool-all`은
+[TRANSLATION.md](TRANSLATION.md#rl_embedding과-k_embedding-적용-범위)에 있다.
 
 ### H6. 목록 context: `Step/ctxt-instrs`
 
@@ -1867,7 +1872,7 @@ rule Step/ctxt-instrs:
   z; val* instr* instr_1* ~> z'; val* instr'* instr_1*
   -- Step: z; instr* ~> z'; instr'*
   -- if val* =/= eps \/ instr_1* =/= eps
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
 **IL AST:** 목록 concatenation을 포함한 head, 실행 `RulePr`, nonempty `IfPr`, `RuleH`.
@@ -1884,7 +1889,7 @@ rule Step/ctxt-instrs:
 이 형태는 `Hintd.extract_context`가 식별하는 별도 경로다. 현재 실제 출력은 다음과 같다.
 
 ```maude
-crl [heating-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
+crl [split-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
   if (STACK (OP REST)) =/= OP
     /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
     /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
@@ -1893,13 +1898,13 @@ eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 
 `identifyFocus`의 후보 rule은 source의 operand·trigger·trailing pattern과 필요한 조건에서 생성된다. 성공 결과 `{ PREFIX | (Z ; FOCUS) | POSTFIX }`를 얻고 내부 `Step`을 실행한 뒤 바깥 목록을 복원한다. `Step(P X S) → Step(X)`만 적으면 복원과 가능한 분해를 설명할 수 없다.
 
-### H7. 일반 heat/cool 의사코드와 지원 경계
+### H7. 일반 split/plug(rl_embedding) 의사코드와 지원 경계
 
 ```ocaml
 let rec resume stage left conditions execution_prems =
   let before, rest = take_conditions_before_next_rewrite conditions in
   match rest, execution_prems with
-  | [], [] -> emit_cooling_equation left final_result before
+  | [], [] -> emit_plug_equation left final_result before
   | RewriteCond (request, result_pattern) :: after, exec :: remaining ->
       let saved = bound_variables_needed_by
                     result_pattern after final_result in
@@ -1909,7 +1914,7 @@ let rec resume stage left conditions execution_prems =
   | _ -> unsupported "execution premise correspondence"
 ```
 
-실제 코드에서는 최초 suspension은 heating rule이고, 반환 뒤 다음 suspension이나 최종 반환은 equation이다. 실행 premise 앞의 조건은 heating 전에, 뒤의 조건은 결과를 받은 뒤 처리한다.
+실제 코드에서는 최초 suspension은 split rule이고, 반환 뒤 다음 suspension이나 최종 반환은 equation이다. 실행 premise 앞의 조건은 split 전에, 뒤의 조건은 결과를 받은 뒤 처리한다.
 
 | 현재 source의 8개 규칙 | 방식 |
 | --- | --- |
@@ -1921,7 +1926,7 @@ let rec resume stage left conditions execution_prems =
 
 continuation 연산의 두 번째 인자는 `[frozen (2)]`로 선언하여 저장한 context 안의 rule rewriting을 막는다. 반환 sort와 request sort도 구별한다. `frozen`은 모든 equational 계산까지 멈춘다는 뜻은 아니다.
 
-현재 `ElsePr`·`IterPr`·`NegPr`가 들어간 hinted rule, rewrite-backed expression은 거부한다. raw request 탐색에는 실패한 내부 가지와 source에 없는 행정 상태가 보일 수 있다. **heating rule 하나를 source Step 하나와 동일시하거나, 이 hint만으로 임의 LTL 속성의 보존을 주장하지 않는다.**
+현재 `ElsePr`·`IterPr`·`NegPr`가 들어간 hinted rule, rewrite-backed expression은 거부한다. raw request 탐색에는 실패한 내부 가지와 source에 없는 행정 상태가 보일 수 있다. **split rule 하나를 source Step 하나와 동일시하거나, 이 hint만으로 임의 LTL 속성의 보존을 주장하지 않는다.**
 
 ## 4.6 `maude_eq`, `maude_predicate`, `maude_backend`
 

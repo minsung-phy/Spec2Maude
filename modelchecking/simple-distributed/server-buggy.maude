@@ -5,8 +5,8 @@ mod SERVER-BUGGY-WASM is
 
   sort serverRunState .
   op serverCall : ValList -> serverRunState [ctor] .
-  op serverInit : SpectecTerminal ValList -> serverRunState [ctor frozen (1)] .
-  op serverExec : SpectecTerminal -> serverRunState [ctor frozen (1)] .
+  op serverInit : KState ValList -> serverRunState [ctor frozen (1)] .
+  op serverExec : KState -> serverRunState [ctor frozen (1)] .
   op serverResult : ValList -> serverRunState [ctor] .
 
   op serverInputModule : -> SpectecTerminal .
@@ -19,11 +19,12 @@ mod SERVER-BUGGY-WASM is
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
   vars ARGS RESULT : ValList .
   var ADDR : Nat .
+  var K : Holes .
 
   eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I32, I32)))), eps, eps, eps,
 eps, eps,
-FUNC-func(0, eps, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))),
-eps, eps, eps,
+FUNC-func(0, eps, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))), eps,
+eps, eps,
 EXPORT(
   ((#_(115) #_(101) #_(114) #_(118) #_(101))
    (#_(114) #_(95) #_(115) #_(116) #_(101) #_(112))),
@@ -44,15 +45,13 @@ FUNC(0))) .
   eq serverHasExport(EXPORT-PREFIX {(field('NAME, NAME) ; field('ADDR, XA))} EXPORTS, NAME) = true .
   eq serverHasExport(EXPORTS, NAME) = false [owise] .
 
-  crl [serverInstantiate] : serverCall(ARGS) => serverInit(C, ARGS)
+  crl [serverInstantiate] : serverCall(ARGS) => serverInit(kstate(C, none), ARGS)
     if instantiate(serverEmptyStore, serverInputModule, eps) => C .
-  crl [serverInit-step] : serverInit(C, ARGS) => serverInit(C2, ARGS)
+  crl [serverInit-step] : serverInit(kstate(C, K), ARGS) => serverInit(kstate(C2, K), ARGS)
     if Step(C) => C2 .
-  crl [serverInvoke] : serverInit(C, ARGS) => serverExec(invoke(spectec-store(Z),
-serverFindFunc((spectec-moduleinst(Z) . 'EXPORTS), serverInputName), ARGS))
-    if (Z ; eps) := C .
-  crl [serverStep] : serverExec(C) => serverExec(C2)
+  rl [serverInvoke] : serverInit(kstate((Z ; eps), none), ARGS) => serverExec(kstate(invoke(spectec-store(Z),
+serverFindFunc((spectec-moduleinst(Z) . 'EXPORTS), serverInputName), ARGS), none)) .
+  crl [serverStep] : serverExec(kstate(C, K)) => serverExec(kstate(C2, K))
     if Step(C) => C2 .
-  crl [serverFinished] : serverExec(C) => serverResult(RESULT)
-    if (Z ; RESULT) := C .
+  rl [serverFinished] : serverExec(kstate(Z ; RESULT, none)) => serverResult(RESULT) .
 endm

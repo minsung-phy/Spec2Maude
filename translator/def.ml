@@ -170,7 +170,7 @@ let rec translate index def =
     | TypD (id, params, insts) -> Typd.translate index id params insts
     | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
     | RelD (id, params, mixop, typ, rules) ->
-        (* Rules with hint(k_heatcool) are left to Heatcool. *)
+        (* Rules with hint(rl_embedding) are left to Heatcool. *)
         Reld.translate index id params mixop typ rules
         @ Heatcool.translate_relation index id
     | GramD _ | HintD _ -> []
