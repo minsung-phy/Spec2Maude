@@ -1022,7 +1022,8 @@ let scan_kembedding (metadata : t) execution_input_count =
            let RuleD (_, _, _, _, premises) = rule.it in
            begin match premises with
            | [{it = RulePr (target, _, _, _); _}] when target.it = relation_id.it -> ()
-           | _ -> fail "hint requires one premise, an execution premise of the same relation"
+           | _ ->
+               fail "hint requires one premise, an execution premise of the same relation"
            end;
            Some ({source; ordinal; rule} : heatcool))
 

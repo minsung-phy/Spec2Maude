@@ -172,7 +172,7 @@ gets no focus pattern.
 | Instrs heating | `ceq kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K) if _or_(PREFIX =/= eps, POSTFIX =/= eps) /\ closed-r(x) = false .` | `heatcool.ml:kembedding_rule` |
 | Heating | `ceq kstate(⟦C[x]⟧, K) = kstate(⟦x⟧, hole-r(C) K) if closed-r(x) = false .` | `heatcool.ml:kembedding_rule` |
 | Cooling | `ceq kstate(⟦x'⟧, hole-r(C) K) = kstate(⟦C'[x']⟧, K) if closed-r(x') = true .` | `heatcool.ml:kembedding_rule` |
-| Closed bodies | `eq closed-r(b) = true .` for each focus pattern of the sequence context whose trigger is `E`'s constructor, `b` its body; `eq closed-r(x) = false [owise] .` Assumed: no step of `R` applies to such a body alone. | `heatcool.ml:kembedding_rule` |
+| Closed bodies | `eq closed-r(b) = true .` for each focus pattern of the sequence context whose trigger is `E`'s constructor, `b` its body; `eq closed-r(x) = false [owise] .` Assumed: no step of `R` applies to such a body alone. | `heatcool.ml:closed_bodies` |
 | Instrs cooling | `eq kstate(z ; s, hole(PREFIX, POSTFIX) K) = kstate(z ; PREFIX s POSTFIX, K) [owise] .` | `heatcool.ml:kembedding_statements` |
 | Cool all | `cool-all(c, K)` cools every hole; it is the source configuration of `kstate(c, K)`. | `heatcool.ml:kembedding_statements` |
 
@@ -410,7 +410,7 @@ definition and the reason. An omitted case produces no Maude output.
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |
 | `ElsePr`, `IterPr`, or `NegPr` in an `rl_embedding` rule, and `rl_embedding` rules whose shape does not fit section 2 | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
-| A `k_embedding` rule with another premise, a premise of another relation, a context that changes when its inside steps, a conclusion input that is not one sequence element, no sequence context or nonempty condition in its relation, or no rule consuming its element; a rule with both hints | rejected | `hintd.ml:scan_kembedding`, `heatcool.ml:kembedding_rule`, `heatcool.ml:translate_relation` |
+| A `k_embedding` rule with another premise, a premise of another relation, a context that changes when its inside steps, a conclusion input that is not one sequence element, no sequence context or nonempty condition in its relation, or no rule consuming its element; a rule with both hints | rejected | `hintd.ml:scan_kembedding`, `heatcool.ml:kept_rule`, `heatcool.ml:kembedding_rule`, `heatcool.ml:kembedding_statements`, `heatcool.ml:translate_relation` |
 | An `ElsePr` execution rule whose earlier rule needs an `r̂-r-enabled` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
 | A call of a `maude_rule` function from a function without `maude_rule`, or in an argument or result of a `maude_rule` clause | rejected | `decd.ml:translate_equation_clause`, `decd.ml:translate_rule_clause` |
 | `ElsePr` or a `maude_rule` call in the premises before a membership choice | rejected | `decd.ml:translate_choice_clause` |
