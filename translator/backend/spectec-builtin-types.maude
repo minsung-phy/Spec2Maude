@@ -14,7 +14,6 @@ fmod SPECTEC-BUILTIN-TYPES is
   --- 매칭으로 꺼낼 수 없는 식 중간에서만 쓰는 부분 함수
   op #bool : SpectecTerminal ~> Bool .
   op #rat : SpectecTerminal ~> Rat .
-  op #float : SpectecTerminal ~> Float .
   op #string : SpectecTerminal ~> String .
 
   ops bool nat int rat real text : -> SpectecType [ctor] .
@@ -30,7 +29,6 @@ fmod SPECTEC-BUILTIN-TYPES is
   var S : String .
   eq #bool(# B) = B .
   eq #rat(# R) = R .
-  eq #float(# F) = F .
   eq #string(# S) = S .
 
   eq typecheck(# B, bool) = true .

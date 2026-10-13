@@ -66,10 +66,8 @@ fmod SPECTEC-LIST is
     --- ceq repeatSeq(N, WTS) = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS) if N > 1 .
 
   --- 리스트 인덱싱
-  op indexDefined : SpectecTerminals Nat -> Bool .
   op _[_] : SpectecTerminals Nat ~> SpectecTerminal [prec 10 gather (E e)] .
 
-  eq indexDefined(TS, N) = N < size(TS) . --- 주어진 인덱스가 리스트 범위 안에 존재하는가를 검사
   --- 앞 원소를 하나씩 넘기며 N번째 원소를 찾음
   eq (T TS)[0] = T .
   eq (T TS)[(s N)] = TS[N] .
