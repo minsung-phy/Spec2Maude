@@ -340,7 +340,7 @@ op reftype : -> SpectecType .
 op REF : SpectecTerminals SpectecTerminal -> SpectecTerminal [ctor] .
 ceq typecheck(REF(NULL?, HT), reftype) = true
   if typecheck(NULL?, null)
-    /\ len(NULL?) <= 1
+    /\ size(NULL?) <= 1
     /\ typecheck(HT, heaptype) .
 ```
 
@@ -377,7 +377,7 @@ VariantT [
 ```maude
 op list : SpectecType -> SpectecType .
 ceq typecheck(X*, list(X)) = true
-  if len(X*) < (2 ^ 32)
+  if size(X*) < (2 ^ 32)
     /\ typecheck(X*, X) .
 ```
 
@@ -429,13 +429,13 @@ DecD ("sum", [ExpP ("_", IterT (NumT `NatT, List))], NumT `NatT, [
 
 ```maude
 op sum : SpectecTerminals -> Nat .
-eq sum(eps) = 0 .
+eq sum(nil) = 0 .
 ceq sum(N-3 N'*) = N-3 + sum(N'*)
   if typecheck(N-3, n)
     /\ typecheck(N'*, nat) .
 ```
 
-head인 `sum(eps)`, `sum(N-3 N'*)`는 입력을 맞추는 패턴이다. 오른쪽은 결과 식이다. 필요한 검사 조건이 없으면 `eq`, 있으면 `ceq`가 된다. source에 premise가 없어도 입력의 타입 검사 때문에 `ceq`가 될 수 있다.
+head인 `sum(nil)`, `sum(N-3 N'*)`는 입력을 맞추는 패턴이다. 오른쪽은 결과 식이다. 필요한 검사 조건이 없으면 `eq`, 있으면 `ceq`가 된다. source에 premise가 없어도 입력의 타입 검사 때문에 `ceq`가 될 수 있다.
 
 재귀 호출은 오른쪽의 `CallE("sum",...)`를 `sum(...)`으로 번역하면 된다. 재귀 함수 전용 clause 분기가 있는 것은 아니다.
 
@@ -524,7 +524,7 @@ HintD (DecH ("evalexprs", [flag "maude_rule"]))
 sort evalexprs-Config .
 subsort SpectecTerminal < evalexprs-Config .
 op evalexprs : SpectecTerminal SpectecTerminals -> evalexprs-Config [frozen (1 2)] .
-rl evalexprs(Z, eps) => tuple(Z seq(eps)) .
+rl evalexprs(Z, nil) => tuple(Z seq(nil)) .
 ```
 
 `evalexprs(...)`라는 요청을 결과 tuple로 rewrite한다. 조건이 있으면 `crl`이 된다. 이 방식은 premise에서 다른 실행의 결과를 받아야 할 때 사용한다. 실제 재귀 clause와 rewrite 조건은 4.3절에 있다.
@@ -598,10 +598,10 @@ RelD ("Step_pure", [], mixop("% ~> %"),
 sort Step-pure-Request .
 subsort InstrList < Step-pure-Request .
 op Step-pure : InstrList -> Step-pure-Request [frozen (1)] .
-rl Step-pure(NOP) => eps .
+rl Step-pure(NOP) => nil .
 ```
 
-왼쪽 입력은 `Step-pure(NOP)`라는 요청이 되고, 오른쪽 결과 `eps`로 rewrite된다. 요청과 결과를 같은 rewrite 안에서 다루기 위해 `InstrList`를 요청 sort 아래에 둔다. `InstrList` 자체는 source의 type hint가 선택한 목록 sort다.
+왼쪽 입력은 `Step-pure(NOP)`라는 요청이 되고, 오른쪽 결과 `nil`로 rewrite된다. 요청과 결과를 같은 rewrite 안에서 다루기 위해 `InstrList`를 요청 sort 아래에 둔다. `InstrList` 자체는 source의 type hint가 선택한 목록 sort다.
 
 **조건이 있는 규칙도 같은 경로**다.
 
@@ -627,7 +627,7 @@ RuleD ("select-true", Q, mixop("% ~> %"),
 crl Step-pure(VAL_1 (VAL_2 (CONST(I32, C-3) SELECT(T*?)))) => VAL_1
   if typecheck(VAL_1, val)
     /\ typecheck(VAL_2, val)
-    /\ len(T*?) <= 1
+    /\ size(T*?) <= 1
     /\ C-3 =/= 0 .
 ```
 
@@ -677,7 +677,7 @@ HintD (RelH ("Expand", [flag "maude_eq"]))
 op Expand : SpectecTerminal ~> SpectecTerminal .
 ceq Expand(DEFTYPE) = COMPTYPE
   if SUB(FINAL?, TYPEUSE*, COMPTYPE) := unrolldt(DEFTYPE)
-    /\ len(FINAL?) <= 1 .
+    /\ size(FINAL?) <= 1 .
 ```
 
 `deftype`를 입력받아 `comptype`를 계산한다. `:=`는 계산 결과를 패턴에 맞춰 `COMPTYPE` 등의 값을 얻는 조건이다. 선언의 `~>`는 Maude의 partial operator 표시이고, 실행 rule의 `=>`와 다르다.
@@ -867,7 +867,7 @@ eq apply(concrete-function, ARGS) = concrete-function(ARGS) .
 | tuple component 사용 | `ProjE(e,k)` | `(E(e) . k)`를 결과 타입에 따라 unbox |
 | 투명 payload를 꺼내는 내부 식 | `UncaseE(e,hole-only)` | `E(e)` |
 | 위 투명 case의 단일 component | `ProjE(UncaseE(e,hole-only),0)` | `E(e)` |
-| 없는 option / 있는 option | `OptE None` / `OptE(Some e)` | `eps` / `box(E(e)) ?` |
+| 없는 option / 있는 option | `OptE None` / `OptE(Some e)` | `nil` / `box(E(e)) ?` |
 | option 추출 — 현재 지원 예 없음 | `TheE e` | 명시적 미지원 |
 
 이름 있는 `UncaseE`는 일반 expression 위치에서 미지원이다. 반면 constructor **pattern**은 `Prem`이 구조를 매칭할 수 있다. 식을 계산하는 방향과 이미 있는 값을 패턴으로 분해하는 방향은 같지 않다.
@@ -878,18 +878,18 @@ eq apply(concrete-function, ARGS) = concrete-function(ARGS) .
 
 | SpecTec source 조각 | IL AST | 일반 목록의 Maude 변환 도식 |
 | --- | --- | --- |
-| `eps` | `ListE []` | `eps` |
+| `eps` | `ListE []` | `nil` |
 | `n n'*` | `CatE(ListE[n], tail)` | `N N'*` |
 | 두 목록의 `++` | `CatE(xs,ys)` | `E(xs) E(ys)` |
-| `$disjoint_`의 `w <- w'*` | `MemE(w,ws)` | `E(w) <- E(ws)`; 원소가 목록이면 boxing |
-| `|xs|` | `LenE xs` | `len(E(xs))` |
+| `$disjoint_`의 `w <- w'*` | `MemE(w,ws)` | `occurs(E(w), E(ws))`; 원소가 목록이면 boxing |
+| `|xs|` | `LenE xs` | `size(E(xs))` |
 | `$relaxed2`의 `(X_1 X_2)[i]` | `IdxE(ListE[x1;x2],i)` | `(X_1 X_2) [ I ]` |
 | `xs[i:n]` | `SliceE(xs,i,n)` | `XS [ I : N ]`; N은 끝 위치가 아니라 **길이** |
 | option을 list 위치에 쓰는 coercion | `LiftE option_exp` | `lift(E(option_exp))` |
 
-정확한 연산 이름은 `Prescan.sequence_representation`에서 가져온다. typed list이면 예를 들어 `instrSize`·`instrOccurs`를 쓴다. 현재 typed list의 `IdxE`, `SliceE`와 해당 path는 미지원이다.
+정확한 연산 이름은 `Prescan.sequence_representation`에서 가져온다. typed list도 prelude의 `size`·`occurs`를 그대로 쓴다. 현재 typed list의 `IdxE`, `SliceE`와 해당 path는 미지원이다.
 
-일반 목록은 `[assoc id: eps]`인 `__`를 쓴다. 하지만 목록의 목록은 flatten하면 안 된다.
+일반 목록은 prelude LIST의 `[assoc id: nil]`인 `__`를 쓴다. 하지만 목록의 목록은 flatten하면 안 된다.
 
 ```text
 source의 목록 원소: [ [a,b], [c] ]
@@ -1087,7 +1087,7 @@ repeatSeq(N-3 * (64 * Ki), 0)
 **Maude 원문 발췌:**
 
 ```maude
-eq map-subst-fieldtype(TV*, TU*, eps) = eps .
+eq map-subst-fieldtype(TV*, TU*, nil) = nil .
 eq map-subst-fieldtype(TV*, TU*, FT FT*-REST) =
   subst-fieldtype(FT, TV*, TU*) map-subst-fieldtype(TV*, TU*, FT*-REST) .
 ```
@@ -1108,7 +1108,7 @@ IterE (CaseE (mixop("_IDX %"), TupE [VarE "i"]),
 **Maude 변환 도식:**
 
 ```maude
-eq make-indexes(0, I) = eps .
+eq make-indexes(0, I) = nil .
 eq make-indexes(s(N), I) = -IDX(I) make-indexes(N, s(I)) .
 ```
 
@@ -1118,7 +1118,7 @@ helper의 종료·반복 모양은 다음과 같다. 아래 source 표기는 설
 
 | SpecTec 패턴 | IL의 반복 종류 | Maude helper의 동작 |
 | --- | --- | --- |
-| `f(x)?` | `Opt` | 빈 option은 `eps`; 있는 값은 계산 결과에 `?`를 붙임 |
+| `f(x)?` | `Opt` | 빈 option은 `nil`; 있는 값은 계산 결과에 `?`를 붙임 |
 | `f(x)*` | `List` | 빈 목록 종료 + head를 계산하고 tail 재귀 |
 | `f(x)+` | `List1` | 첫 원소는 필요; 이후 tail은 빈 목록도 허용 |
 | `f(i)^(i<n)` | `ListN` | 횟수 0에서 종료; 횟수를 줄이고 index를 늘림 |
@@ -1135,7 +1135,7 @@ helper의 종료·반복 모양은 다음과 같다. 아래 source 표기는 설
 
 ```maude
 --- 이름을 단순화한 두 scalar 열의 복원 예
-eq project(eps) = tuple(seq(eps) seq(eps)) .
+eq project(nil) = tuple(seq(nil) seq(nil)) .
 ceq project(tuple(X Y) REST) = tuple(seq(X XS) seq(Y YS))
   if tuple(seq(XS) seq(YS)) := project(REST) .
 ```
@@ -1423,7 +1423,7 @@ let rec translate_exp env exp =
       else App (constructor_name env op, translate_payload_components env payload)
   | UncaseE (x, op) when hole_only op -> e x
   | UncaseE _ | TheE _ -> unsupported exp
-  | OptE None -> Const "eps"
+  | OptE None -> Const "nil"
   | OptE (Some x) -> App ("_?", [boxed_exp env x])
   | StrE fields -> record (List.map (translate_field env) fields)
   | DotE (x, a) -> App ("_._", [e x; qid a])
@@ -1544,7 +1544,7 @@ let translate_iteration env body (iter, generators) =
 helper 생성의 일반 `List` 경우는 다음 재귀 equation을 **AST로 구성**한다.
 
 ```text
-map(CAPTURES, eps, ..., eps) = eps
+map(CAPTURES, nil, ..., nil) = nil
 map(CAPTURES, x1 xs1, ..., xk xsk)
   = box(E(body)) map(CAPTURES, xs1, ..., xsk)
 ```
@@ -1611,21 +1611,21 @@ subsort InstrProper < instr .
 
 constructor 선언은 owner 정보를 이용해 좁은 codomain을 선택한다. value constructor와 proper instruction constructor를 이름 목록으로 하드코딩하지 않는다.
 
-목록은 현재 `instr`를 root로 native `LIST`를 한 번 instantiate하고, `val` 목록의 좁은 overload·subsort를 연결한다.
+목록은 prelude `LIST{SpectecTerminal}`(`spectec-sorts.maude`) 하나만 instantiate한다. `instr`, `val` 목록은 그 위에 subsort로 얹고 `nil`, `__`만 좁은 sort로 overload한다(PLC의 `PLC-EXP-LIST`와 같은 방식).
 
 ```maude
---- 원문의 일부; import renaming의 나머지는 생략
-protecting LIST{INSTR-VIEW} * (
-  sort List{INSTR-VIEW} to InstrList,
-  sort NeList{INSTR-VIEW} to NeInstrList,
-  op nil to eps,
-  op size to instrSize
-) .
+--- 원문의 일부; ValList의 overload와 repeat 연산은 생략
+subsort InstrList < SpectecTerminals .
+subsort NeInstrList < SpectecNeTerminals .
+subsort instr < NeInstrList .
+subsort NeInstrList < InstrList .
+op nil : -> InstrList [ctor] .
+op __ : InstrList InstrList -> InstrList [ctor ditto] .
 subsort ValList < InstrList .
 subsort NeValList < NeInstrList .
 ```
 
-위 import는 일부만 적은 도식이다. 완전한 renaming 목록은 실제 파일을 읽는다. 현재 구현은 서로 관계없는 여러 annotated list family를 일반 지원하지 않는다. 모든 목록 sort가 지원하는 chain을 이뤄야 한다.
+위 선언은 일부만 적은 도식이다. 전체는 실제 `types.maude`를 읽는다. 현재 구현은 서로 관계없는 여러 annotated list family를 일반 지원하지 않는다. 모든 목록 sort가 지원하는 chain을 이뤄야 한다.
 
 **재귀 코드에 추가되는 결정:**
 
@@ -1711,7 +1711,7 @@ HintD (DecH ("evalexprs", [flag "maude_rule"]))
 sort evalexprs-Config .
 subsort SpectecTerminal < evalexprs-Config .
 op evalexprs : SpectecTerminal SpectecTerminals -> evalexprs-Config [frozen (1 2)] .
-rl evalexprs(Z, eps) => tuple(Z seq(eps)) .
+rl evalexprs(Z, nil) => tuple(Z seq(nil)) .
 crl evalexprs(Z, seq(EXPR) EXPR'*) => tuple(Z'' seq(REF-2 REF'*))
   if Eval-expr(Z, EXPR) => tuple(Z' seq(REF-2))
     /\ typecheck(REF-2, ref)
@@ -1942,7 +1942,7 @@ rule Expand: deftype ~~ comptype
 ```maude
 ceq Expand(DEFTYPE) = COMPTYPE
   if SUB(FINAL?, TYPEUSE*, COMPTYPE) := unrolldt(DEFTYPE)
-    /\ len(FINAL?) <= 1 .
+    /\ size(FINAL?) <= 1 .
 ```
 
 `~~`의 왼쪽은 입력, 오른쪽은 출력이다. `RuleD` 본문까지 자동 생성한다. rewrite premise가 필요하면 equation 안에 넣을 수 없으므로 거부한다.
@@ -2132,11 +2132,11 @@ ceq Module-ok(MODULE(TYPES, IMPORTS, ..., START, EXPORTS)) =
 
 ```maude
 red in SPEC2MAUDE-RELATION-BACKENDS :
-  Module-ok(MODULE(eps, eps, eps, eps, eps, eps,
-                   eps, eps, eps, START(0) ?, eps)) .
+  Module-ok(MODULE(nil, nil, nil, nil, nil, nil,
+                   nil, nil, nil, START(0) ?, nil)) .
 ```
 
-현재 결과는 `eps -> eps`다. 그러나 함수가 하나도 없으므로 source의 `Start_ok`가 요구하는 0번 함수는 없다. 따라서 이것은 **전체 validation relation과의 동등성에 대한 반례**다. 이미 검증된 모듈만 받는 정상 ingress의 버그라고 곧바로 분류하지는 않는다.
+현재 결과는 `nil -> nil`다. 그러나 함수가 하나도 없으므로 source의 `Start_ok`가 요구하는 0번 함수는 없다. 따라서 이것은 **전체 validation relation과의 동등성에 대한 반례**다. 이미 검증된 모듈만 받는 정상 ingress의 버그라고 곧바로 분류하지는 않는다.
 
 ## 5.4 어떻게 자동화할 것인가: 미구현 제안
 

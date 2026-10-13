@@ -39,7 +39,7 @@ let emit_script script =
       ; kind = System
       ; imports =
           [Maude_il.Protecting (module_name "SPECTEC-SEMANTICS")]
-      ; statements = translation.list_subsorts @ translation.generated_statements
+      ; statements = translation.generated_statements
       }
   in
   let typed_lists : Maude_il.top_level =
@@ -48,15 +48,13 @@ let emit_script script =
       ; kind = Maude_il.Functional
       ; imports =
           [Maude_il.Protecting (module_name "SPEC2MAUDE-SORTS")]
-          @ translation.list_imports
       ; statements = translation.list_statements
       }
   in
-  (* Native typed lists precede the backend's common list overloads; the
-     source-derived subsort connections follow them in the generated module. *)
+  (* Typed lists are declared on the prelude LIST of SpectecTerminal,
+     which backend/spectec-sorts.maude imports before this file. *)
   let types =
-    Maude_emit.emit_top_levels
-      (sorts :: translation.list_views @ [typed_lists]) ^ "\n"
+    Maude_emit.emit_top_levels [sorts; typed_lists] ^ "\n"
   in
   types, Maude_emit.emit_top_levels [generated] ^ "\n"
 

@@ -20,24 +20,24 @@ mod SERVER-BUGGY-WASM is
   vars ARGS RESULT : ValList .
   var ADDR : Nat .
 
-  eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I32, I32)))), eps, eps, eps,
-eps, eps,
-FUNC-func(0, eps, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))),
-eps, eps, eps,
+  eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), nil, FUNC_->_(I32, I32)))), nil, nil, nil,
+nil, nil,
+FUNC-func(0, nil, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))), nil,
+nil, nil,
 EXPORT(
   ((#_(115) #_(101) #_(114) #_(118) #_(101))
    (#_(114) #_(95) #_(115) #_(116) #_(101) #_(112))),
 FUNC(0))) .
   eq serverInputName = (#_(115) #_(101) #_(114) #_(118) #_(101))
 (#_(114) #_(95) #_(115) #_(116) #_(101) #_(112)) .
-  eq serverEmptyStore = {(field('TAGS, eps) ;
-  (field('GLOBALS, eps) ;
-   (field('MEMS, eps) ;
-    (field('TABLES, eps) ;
-     (field('FUNCS, eps) ;
-      (field('DATAS, eps) ;
-       (field('ELEMS, eps) ;
-        (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps))))))))))} .
+  eq serverEmptyStore = {(field('TAGS, nil) ;
+  (field('GLOBALS, nil) ;
+   (field('MEMS, nil) ;
+    (field('TABLES, nil) ;
+     (field('FUNCS, nil) ;
+      (field('DATAS, nil) ;
+       (field('ELEMS, nil) ;
+        (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil))))))))))} .
 
   ceq serverFindFunc(EXPORT-PREFIX {(field('NAME, NAME) ; field('ADDR, FUNC(ADDR)))} EXPORTS, NAME) = ADDR
     if not serverHasExport(EXPORT-PREFIX, NAME) .
@@ -45,12 +45,12 @@ FUNC(0))) .
   eq serverHasExport(EXPORTS, NAME) = false [owise] .
 
   crl [serverInstantiate] : serverCall(ARGS) => serverInit(C, ARGS)
-    if instantiate(serverEmptyStore, serverInputModule, eps) => C .
+    if instantiate(serverEmptyStore, serverInputModule, nil) => C .
   crl [serverInit-step] : serverInit(C, ARGS) => serverInit(C2, ARGS)
     if Step(C) => C2 .
   crl [serverInvoke] : serverInit(C, ARGS) => serverExec(invoke(spectec-store(Z),
 serverFindFunc((spectec-moduleinst(Z) . 'EXPORTS), serverInputName), ARGS))
-    if (Z ; eps) := C .
+    if (Z ; nil) := C .
   crl [serverStep] : serverExec(C) => serverExec(C2)
     if Step(C) => C2 .
   crl [serverFinished] : serverExec(C) => serverResult(RESULT)

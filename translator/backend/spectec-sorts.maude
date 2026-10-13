@@ -1,5 +1,15 @@
+fmod SPECTEC-TERMINAL is
+  sort SpectecTerminal .
+endfm
+
+view SpectecTerminal from TRIV to SPECTEC-TERMINAL is
+  sort Elt to SpectecTerminal .
+endv
+
+--- 공통 리스트는 prelude LIST를 그대로 사용 (nil, __, size, occurs, append, ...)
 fmod SPECTEC-SORTS is
-  sorts SpectecTerminal SpectecNeTerminals SpectecTerminals .
-  subsort SpectecTerminal < SpectecNeTerminals < SpectecTerminals .
+  protecting LIST{SpectecTerminal} * (
+    sort List{SpectecTerminal} to SpectecTerminals,
+    sort NeList{SpectecTerminal} to SpectecNeTerminals) .
   sort SpectecType .
 endfm

@@ -1,7 +1,7 @@
 load spectec-sorts.maude
 
---- Maude의 native typed list를 먼저 선언한 뒤, (hint(maude_sort) 때문) 
---- 공통 빈 리스트 eps와 리스트 연결 연산 __을 선언해야 함
+--- 공통 리스트(prelude LIST)는 spectec-sorts.maude에서 가져오고,
+--- hint(maude_sort) 리스트는 types.maude에서 그 위에 subsort로 선언함
 load ../generated/types.maude
 
 load spectec-builtin-types.maude
@@ -34,12 +34,8 @@ endfm
 fmod SPECTEC-LIST is
   protecting SPECTEC-BUILTIN-TYPES .
 
-  --- List
+  --- List (nil, __, size, occurs, append는 prelude LIST, spectec-sorts.maude)
   var N : Nat .
-  op eps : -> SpectecTerminals [ctor] .
-  op __ : SpectecTerminals SpectecTerminals -> SpectecTerminals [ctor assoc id: eps prec 25] .
-  op __ : SpectecNeTerminals SpectecTerminals -> SpectecNeTerminals [ctor ditto] .
-  op __ : SpectecTerminals SpectecNeTerminals -> SpectecNeTerminals [ctor ditto] .
   op seq : SpectecTerminals -> SpectecTerminal [ctor] .
   op unseq : SpectecTerminal ~> SpectecTerminals .
 
@@ -52,39 +48,20 @@ fmod SPECTEC-LIST is
 
   eq unseq(seq(TS)) = TS .
 
-  --- 리스트 길이
-  op len : SpectecTerminals -> Nat .
-
-  --- 리스트 길이를 구하려면 각 원소를 한 번씩 확인해야 함
-  --- 큰 리스트에서도 재귀 호출이 많이 쌓이지 않도록 현재 길이를 인자로 전달
-  op lenAux : SpectecTerminals Nat -> Nat .
-  eq len(TS) = lenAux(TS, 0) .
-  eq lenAux(eps, N) = N .
-  eq lenAux(T TS, N) = lenAux(TS, N + 1) .
-
   --- 리스트 타입 검사
-  eq typecheck(eps, TYPE) = true .
-  ceq typecheck(T NTS, TYPE) = typecheck(NTS, TYPE) --- NTS는 비어 있지 않으므로 단일 원소는 T eps로 매칭되지 않음
+  eq typecheck(nil, TYPE) = true .
+  ceq typecheck(T NTS, TYPE) = typecheck(NTS, TYPE) --- NTS는 비어 있지 않으므로 단일 원소는 T nil로 매칭되지 않음
     if typecheck(T, TYPE) .
   eq typecheck(seq(TS), iterList(TYPE)) = typecheck(TS, TYPE) .
   eq typecheck(VALUE, TYPE) = false [owise] .
 
-  --- 리스트 포함 검사 (리스트에서 같은 값을 패턴 매칭으로 찾음)
-  op _<-_ : SpectecTerminal SpectecTerminals -> Bool .
-  eq T <- (PREFIX T SUFFIX) = true .
-  eq T <- TS = false [owise] .
-
-  --- 리스트 연결
-  op _++_ : SpectecTerminals SpectecTerminals -> SpectecTerminals .
-  eq TS ++ WTS = TS WTS .
-
   --- 리스트 반복
   op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
 
-  eq repeatSeq(0, WTS) = eps .
+  eq repeatSeq(0, WTS) = nil .
   eq repeatSeq(s N, WTS) = WTS repeatSeq(N, WTS) .
     --- repeatSeq 이전 버전
-    --- eq repeatSeq(0, WTS) = eps .
+    --- eq repeatSeq(0, WTS) = nil .
     --- eq repeatSeq(1, WTS) = WTS .
     --- ceq repeatSeq(N, WTS) = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS) if N > 1 .
 
@@ -92,30 +69,35 @@ fmod SPECTEC-LIST is
   op indexDefined : SpectecTerminals Nat -> Bool .
   op _[_] : SpectecTerminals Nat ~> SpectecTerminal [prec 10 gather (E e)] .
 
-  eq indexDefined(TS, N) = N < len(TS) . --- 주어진 인덱스가 리스트 범위 안에 존재하는가를 검사
-  ceq (PREFIX T SUFFIX)[N] = T
-    if len(PREFIX) == N .
+  eq indexDefined(TS, N) = N < size(TS) . --- 주어진 인덱스가 리스트 범위 안에 존재하는가를 검사
+  --- 앞 원소를 하나씩 넘기며 N번째 원소를 찾음
+  eq (T TS)[0] = T .
+  eq (T TS)[(s N)] = TS[N] .
 
   --- 리스트 구간 추출
   op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals [prec 10 gather (E e e)] .
   
-  --- 리스트를 앞부분, 추출할 구간, 뒷부분으로 나누어 범위를 검사 (길이가 0인 빈 구간도 추출할 수 있음)
-  ceq (PREFIX REST)[N : COUNT] = MIDDLE
-    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
+  --- 시작 위치까지 앞 원소를 넘긴 뒤, COUNT개를 하나씩 가져옴 (길이가 0인 빈 구간도 추출할 수 있음)
+  eq (T TS)[(s N) : COUNT] = TS[N : COUNT] .
+  eq TS[0 : 0] = nil .
+  eq (T TS)[0 : (s COUNT)] = T TS[0 : COUNT] .
 
   --- 리스트 원소 갱신
   op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals [prec 10 gather (E e e)] .
   var NEW-K : SpectecTerminal .
 
-  ceq (PREFIX T SUFFIX)[N = NEW-K] = PREFIX NEW-K SUFFIX
-    if len(PREFIX) == N .
+  --- 앞 원소를 남겨 두고 N번째 원소를 새 값으로 바꿈
+  eq (T TS)[0 = NEW-K] = NEW-K TS .
+  eq (T TS)[(s N) = NEW-K] = T TS[N = NEW-K] .
   
   --- 리스트 구간 갱신
   op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals [prec 10 gather (E e e e)] .
   var NEW-TS : SpectecTerminals .
   
-  ceq (PREFIX REST)[N : COUNT = NEW-TS] = PREFIX NEW-TS SUFFIX
-    if len(PREFIX) == N /\ MIDDLE SUFFIX := REST /\ len(MIDDLE) == COUNT .
+  --- 시작 위치까지 앞 원소를 남기고, COUNT개를 하나씩 버린 뒤 새 구간을 넣음
+  eq (T TS)[(s N) : COUNT = NEW-TS] = T TS[N : COUNT = NEW-TS] .
+  eq (T TS)[0 : (s COUNT) = NEW-TS] = TS[0 : COUNT = NEW-TS] .
+  eq TS[0 : 0 = NEW-TS] = NEW-TS TS .
 endfm
 
 fmod SPECTEC-OPTION is
@@ -132,21 +114,21 @@ fmod SPECTEC-OPTION is
   --- 양쪽 모두 값이 있으면 결과가 2개가 되므로 정의하지 않음
   op optionConcat : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  eq optionConcat(eps, eps) = eps .
-  eq optionConcat(K ?, eps) = K ? .
-  eq optionConcat(eps, K ?) = K ? .
+  eq optionConcat(nil, nil) = nil .
+  eq optionConcat(K ?, nil) = K ? .
+  eq optionConcat(nil, K ?) = K ? .
 
   --- Option 타입 검사 (spectec/wasm-3.0/1.2-syntax.types.spectec:47 -> syntax reftype = REF null? heaptype를 maude로 변환시 typecheck(NULL-, null))
   eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
-  eq typecheck(seq(TS), iterOpt(TYPE)) = typecheck(TS, TYPE) and len(TS) <= 1 .
+  eq typecheck(seq(TS), iterOpt(TYPE)) = typecheck(TS, TYPE) and size(TS) <= 1 .
       --- SpecTec에 (val?)*처럼 option을 원소로 갖는 리스트가 있음
-      --- translator는 각 내부 option을 seq(eps) 또는 seq(K ?)로 포장함
-      --- 포장하지 않으면 eps가 리스트 결합 연산의 identity이므로 eps K ?가 K ?로 단순화되어 None 원소가 사라지기 때문
+      --- translator는 각 내부 option을 seq(nil) 또는 seq(K ?)로 포장함
+      --- 포장하지 않으면 nil이 리스트 결합 연산의 identity이므로 nil K ?가 K ?로 단순화되어 None 원소가 사라지기 때문
       --- 그 원소의 타입 TYPE?를 Maude에서 iterOpt(TYPE)으로 나타냄
 
   --- Option을 리스트로 변환 (Option 값을 일반 리스트와 이어 붙여야 하는 경우에 사용)
   op lift : SpectecTerminals ~> SpectecTerminals .
-  eq lift(eps) = eps .
+  eq lift(nil) = nil .
   eq lift(K ?) = K .
 endfm
 
@@ -187,7 +169,7 @@ fmod SPECTEC-RECORD is
   var NEW-VALUE : SpectecTerminals .
 
   eq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX} . FIELD = VALUE .
-  eq {FIELDS} . FIELD = eps [owise] .
+  eq {FIELDS} . FIELD = nil [owise] .
 
   eq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX}[. FIELD = NEW-VALUE]
     = {RECORD-PREFIX ; field(FIELD, NEW-VALUE) ; RECORD-SUFFIX} .

@@ -479,7 +479,7 @@ let typed_list_root metadata sort =
 
 let typed_list_roots metadata =
   metadata.lists
-  |> List.filter (fun sort -> Option.is_none (typed_parent metadata sort))
+  |> List.filter (fun sort -> typed_list_root metadata sort = sort)
 
 let sort_of_typ metadata typ =
   let reduced = Il.Eval.reduce_typ metadata.type_env typ in
@@ -498,14 +498,13 @@ let rec typed_list_owner metadata typ =
       let reduced = Il.Eval.reduce_typ metadata.type_env typ in
       if Il.Eq.eq_typ typ reduced then None else typed_list_owner metadata reduced
 
-let typed_sequence_representation metadata owner =
+let typed_sequence_representation owner =
   let title = String.capitalize_ascii owner in
-  let root = typed_list_root metadata owner in
   { sort = title ^ "List"
-  ; empty = "eps"
+  ; empty = "nil"
   ; concat = "_ _"
-  ; occurs = root ^ "Occurs"
-  ; size = root ^ "Size"
+  ; occurs = "occurs"
+  ; size = "size"
   ; repeat = owner ^ "Repeat"
   ; lift = owner ^ "Lift"
   ; typed = true
@@ -513,13 +512,13 @@ let typed_sequence_representation metadata owner =
 
 let sequence_representation metadata typ =
   match typed_list_owner metadata typ with
-  | Some owner -> typed_sequence_representation metadata owner
+  | Some owner -> typed_sequence_representation owner
   | None ->
       { sort = "SpectecTerminals"
-      ; empty = "eps"
+      ; empty = "nil"
       ; concat = "_ _"
-      ; occurs = "_<-_"
-      ; size = "len"
+      ; occurs = "occurs"
+      ; size = "size"
       ; repeat = "repeatSeq"
       ; lift = "lift"
       ; typed = false

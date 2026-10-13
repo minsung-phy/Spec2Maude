@@ -1,10 +1,6 @@
 mod SPEC2MAUDE-GENERATED is
   protecting SPECTEC-SEMANTICS .
 
-  subsort InstrList < SpectecTerminals .
-
-  subsort NeInstrList < SpectecNeTerminals .
-
   sort spectec-vcvtop---Request .
 
   subsort Nat < spectec-vcvtop---Request .
@@ -461,7 +457,7 @@ mod SPEC2MAUDE-GENERATED is
 
   op JN : Nat ~> SpectecTerminal .
 
-  op size : SpectecTerminal -> Nat .
+  op spectec-size : SpectecTerminal -> Nat .
 
   op vsize : SpectecTerminal -> Nat .
 
@@ -2357,11 +2353,11 @@ mod SPEC2MAUDE-GENERATED is
 
   var OP : InstrProper .
 
-  eq valLift(eps) = eps .
+  eq valLift(nil) = nil .
 
   eq valLift(LIFT-ELEMENT ?) = LIFT-ELEMENT .
 
-  eq instrLift(eps) = eps .
+  eq instrLift(nil) = nil .
 
   eq instrLift(LIFT-ELEMENT-2 ?) = LIFT-ELEMENT-2 .
 
@@ -2380,56 +2376,56 @@ mod SPEC2MAUDE-GENERATED is
 
   eq spectec-min(I, J) = J [owise] .
 
-  eq sum(eps) = 0 .
+  eq sum(nil) = 0 .
 
   eq sum((# N-3) N'*) = N-3 + sum(N'*) .
 
-  eq prod(eps) = 1 .
+  eq prod(nil) = 1 .
 
   eq prod((# N-3) N'*) = N-3 * prod(N'*) .
 
-  eq opt-(X, eps) = eps .
+  eq opt-(X, nil) = nil .
 
   eq opt-(X, W) = W ? .
 
-  eq concat-(X, eps) = eps .
+  eq concat-(X, nil) = nil .
 
   eq concat-(X, seq(W*) W'**) = W* concat-(X, W'**) .
 
-  eq concatn-(X, eps, N-3) = eps .
+  eq concatn-(X, nil, N-3) = nil .
 
   ceq concatn-(X, seq(W*) W'**, N-3) = W* concatn-(X, W'**, N-3)
-    if N-3 = len(W*) .
+    if N-3 = size(W*) .
 
-  eq concatopt-(X, eps) = eps .
+  eq concatopt-(X, nil) = nil .
 
   ceq concatopt-(X, seq(W?) W'?*) = lift(W?) concat-(X, map-concatopt(X, W'?*))
-    if len(W?) <= 1 .
+    if size(W?) <= 1 .
 
-  eq disjoint-(X, eps) = # true .
+  eq disjoint-(X, nil) = # true .
 
-  eq disjoint-(X, W W'*) = # _and_(not_(W <- W'*), #bool(disjoint-(X, W'*))) .
+  eq disjoint-(X, W W'*) = # _and_(not_(occurs(W, W'*)), #bool(disjoint-(X, W'*))) .
 
-  eq setminus1-(X, W, eps) = W .
+  eq setminus1-(X, W, nil) = W .
 
-  ceq setminus1-(X, W, W_1 W'*) = eps
+  ceq setminus1-(X, W, W_1 W'*) = nil
     if W == W_1 .
 
   eq setminus1-(X, W, W_1 W'*) = setminus1-(X, W, W'*) [owise] .
 
-  eq setminus-(X, eps, W*) = eps .
+  eq setminus-(X, nil, W*) = nil .
 
   eq setminus-(X, W_1 W'*, W*) = setminus1-(X, W_1, W*) setminus-(X, W'*, W*) .
 
-  eq setproduct2-(X, W_1, eps) = eps .
+  eq setproduct2-(X, W_1, nil) = nil .
 
   eq setproduct2-(X, W_1, seq(W'*) W**) = seq(W_1 W'*) setproduct2-(X, W_1, W**) .
 
-  eq setproduct1-(X, eps, W**) = eps .
+  eq setproduct1-(X, nil, W**) = nil .
 
   eq setproduct1-(X, W_1 W'*, W**) = setproduct2-(X, W_1, W**) setproduct1-(X, W'*, W**) .
 
-  eq setproduct-(X, eps) = seq(eps) .
+  eq setproduct-(X, nil) = seq(nil) .
 
   eq setproduct-(X, seq(W_1*) W**) = setproduct1-(X, W_1*, setproduct-(X, W**)) .
 
@@ -2514,14 +2510,14 @@ mod SPEC2MAUDE-GENERATED is
   eq typecheck(# VALUE, v128) = typecheck(# VALUE, vN(128)) .
 
   ceq typecheck(X*, list(X)) = true
-    if len(X*) < (2 ^ 32)
+    if size(X*) < (2 ^ 32)
       /\ typecheck(X*, X) .
 
   ceq typecheck(# I, spectec-char) = true
     if _or_(_and_(I >= 0, I <= 55295), _and_(I >= 57344, I <= 1114111)) .
 
   ceq typecheck(CHAR*, name) = true
-    if len(utf8(CHAR*)) < (2 ^ 32)
+    if size(utf8(CHAR*)) < (2 ^ 32)
       /\ typecheck(CHAR*, spectec-char) .
 
   eq typecheck(# VALUE, idx) = typecheck(# VALUE, u32) .
@@ -2565,31 +2561,31 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck(TAG(TAGIDX), externidx) = true
     if typecheck(# TAGIDX, tagidx) .
 
-  eq funcsxx(eps) = eps .
+  eq funcsxx(nil) = nil .
 
   eq funcsxx(FUNC(X-4) XX*) = (# X-4) funcsxx(XX*) .
 
   eq funcsxx(EXTERNIDX XX*) = funcsxx(XX*) [owise] .
 
-  eq globalsxx(eps) = eps .
+  eq globalsxx(nil) = nil .
 
   eq globalsxx(GLOBAL(X-4) XX*) = (# X-4) globalsxx(XX*) .
 
   eq globalsxx(EXTERNIDX XX*) = globalsxx(XX*) [owise] .
 
-  eq tablesxx(eps) = eps .
+  eq tablesxx(nil) = nil .
 
   eq tablesxx(TABLE(X-4) XX*) = (# X-4) tablesxx(XX*) .
 
   eq tablesxx(EXTERNIDX XX*) = tablesxx(XX*) [owise] .
 
-  eq memsxx(eps) = eps .
+  eq memsxx(nil) = nil .
 
   eq memsxx(MEM(X-4) XX*) = (# X-4) memsxx(XX*) .
 
   eq memsxx(EXTERNIDX XX*) = memsxx(XX*) [owise] .
 
-  eq tagsxx(eps) = eps .
+  eq tagsxx(nil) = nil .
 
   eq tagsxx(TAG(X-4) XX*) = (# X-4) tagsxx(XX*) .
 
@@ -2609,33 +2605,33 @@ mod SPEC2MAUDE-GENERATED is
 
   eq recordConcat(LEFT, RIGHT, free) = { (((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; field('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) } .
 
-  eq free-opt(eps) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-opt(nil) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-opt(FREE ?) = FREE .
 
-  eq free-list(eps) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-list(nil) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-list(FREE FREE'*) = recordConcat(FREE, free-list(FREE'*), free) .
 
-  eq free-typeidx(TYPEIDX) = { (field('TYPES, # TYPEIDX) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-typeidx(TYPEIDX) = { (field('TYPES, # TYPEIDX) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-funcidx(FUNCIDX) = { (field('TYPES, eps) ; (field('FUNCS, # FUNCIDX) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-funcidx(FUNCIDX) = { (field('TYPES, nil) ; (field('FUNCS, # FUNCIDX) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-globalidx(GLOBALIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, # GLOBALIDX) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-globalidx(GLOBALIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, # GLOBALIDX) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-tableidx(TABLEIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, # TABLEIDX) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-tableidx(TABLEIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, # TABLEIDX) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-memidx(MEMIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, # MEMIDX) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-memidx(MEMIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, # MEMIDX) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-elemidx(ELEMIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, # ELEMIDX) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-elemidx(ELEMIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, # ELEMIDX) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-dataidx(DATAIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, # DATAIDX) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-dataidx(DATAIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, # DATAIDX) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-localidx(LOCALIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, # LOCALIDX) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-localidx(LOCALIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, # LOCALIDX) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-labelidx(LABELIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, # LABELIDX) ; field('TAGS, eps)))))))))) } .
+  eq free-labelidx(LABELIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, # LABELIDX) ; field('TAGS, nil)))))))))) } .
 
-  eq free-tagidx(TAGIDX) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, # TAGIDX)))))))))) } .
+  eq free-tagidx(TAGIDX) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, # TAGIDX)))))))))) } .
 
   eq free-externidx(FUNC(FUNCIDX)) = free-funcidx(FUNCIDX) .
 
@@ -2757,7 +2753,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(REF(NULL?, HEAPTYPE), valtype) = true
     if typecheck(NULL?, null)
-      /\ len(NULL?) <= 1
+      /\ size(NULL?) <= 1
       /\ typecheck(HEAPTYPE, heaptype) .
 
   eq typecheck(BOT, valtype) = true .
@@ -2774,7 +2770,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(REF(NULL?, HEAPTYPE), storagetype) = true
     if typecheck(NULL?, null)
-      /\ len(NULL?) <= 1
+      /\ size(NULL?) <= 1
       /\ typecheck(HEAPTYPE, heaptype) .
 
   eq typecheck(BOT, storagetype) = true .
@@ -2789,7 +2785,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(tuple(seq(MUT?) STORAGETYPE), fieldtype) = true
     if typecheck(MUT?, mut)
-      /\ len(MUT?) <= 1
+      /\ size(MUT?) <= 1
       /\ typecheck(STORAGETYPE, storagetype) .
 
   ceq typecheck(spectec-STRUCT(VALUE1-2), comptype) = true
@@ -2804,7 +2800,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(SUB(FINAL?, TYPEUSE*, COMPTYPE), subtype) = true
     if typecheck(FINAL?, final)
-      /\ len(FINAL?) <= 1
+      /\ size(FINAL?) <= 1
       /\ typecheck(TYPEUSE*, typeuse)
       /\ typecheck(COMPTYPE, comptype) .
 
@@ -2821,7 +2817,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(REF(NULL?, HEAPTYPE), reftype) = true
     if typecheck(NULL?, null)
-      /\ len(NULL?) <= 1
+      /\ size(NULL?) <= 1
       /\ typecheck(HEAPTYPE, heaptype) .
 
   eq typecheck(VALUE-3, Inn) = typecheck(VALUE-3, addrtype) .
@@ -2897,13 +2893,13 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck([ U64 .. U64? ], limits) = true
     if typecheck(# U64, u64)
       /\ typecheck(U64?, u64)
-      /\ len(U64?) <= 1 .
+      /\ size(U64?) <= 1 .
 
   eq typecheck(VALUE-3, tagtype) = typecheck(VALUE-3, typeuse) .
 
   ceq typecheck(tuple(seq(MUT?) VALTYPE), globaltype) = true
     if typecheck(MUT?, mut)
-      /\ len(MUT?) <= 1
+      /\ size(MUT?) <= 1
       /\ typecheck(VALTYPE, valtype) .
 
   ceq typecheck(__PAGE(ADDRTYPE, LIMITS), memtype) = true
@@ -2954,13 +2950,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq JN(64) = I64 .
 
-  eq size(I32) = 32 .
+  eq spectec-size(I32) = 32 .
 
-  eq size(I64) = 64 .
+  eq spectec-size(I64) = 64 .
 
-  eq size(F32) = 32 .
+  eq spectec-size(F32) = 32 .
 
-  eq size(F64) = 64 .
+  eq spectec-size(F64) = 64 .
 
   eq vsize(V128) = 128 .
 
@@ -2968,13 +2964,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq psize(I16) = 16 .
 
-  ceq lsize(NUMTYPE) = size(NUMTYPE)
+  ceq lsize(NUMTYPE) = spectec-size(NUMTYPE)
     if typecheck(NUMTYPE, numtype) .
 
   ceq lsize(PACKTYPE) = psize(PACKTYPE)
     if typecheck(PACKTYPE, packtype) .
 
-  ceq zsize(NUMTYPE) = size(NUMTYPE)
+  ceq zsize(NUMTYPE) = spectec-size(NUMTYPE)
     if typecheck(NUMTYPE, numtype) .
 
   ceq zsize(VECTYPE) = vsize(VECTYPE)
@@ -2983,11 +2979,11 @@ mod SPEC2MAUDE-GENERATED is
   ceq zsize(PACKTYPE) = psize(PACKTYPE)
     if typecheck(PACKTYPE, packtype) .
 
-  eq isize(INN) = size(INN) .
+  eq isize(INN) = spectec-size(INN) .
 
   eq jsize(JNN) = lsize(JNN) .
 
-  eq fsize(FNN) = size(FNN) .
+  eq fsize(FNN) = spectec-size(FNN) .
 
   eq inv-isize(32) = I32 .
 
@@ -3003,11 +2999,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq inv-fsize(64) = F64 .
 
-  eq sizenn(NT) = size(NT) .
+  eq sizenn(NT) = spectec-size(NT) .
 
-  eq sizenn1(NT) = size(NT) .
+  eq sizenn1(NT) = spectec-size(NT) .
 
-  eq sizenn2(NT) = size(NT) .
+  eq sizenn2(NT) = spectec-size(NT) .
 
   eq vsizenn(VT) = vsize(VT) .
 
@@ -3054,58 +3050,58 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(LANETYPE, lanetype) .
 
   ceq minat(AT_1, AT_2) = AT_1
-    if size(AT_1) <= size(AT_2) .
+    if spectec-size(AT_1) <= spectec-size(AT_2) .
 
   eq minat(AT_1, AT_2) = AT_2 [owise] .
 
-  ceq diffrt(REF(NULL_1?, HT_1), REF(NULL ?, HT_2)) = REF(eps, HT_1)
-    if len(NULL_1?) <= 1 .
+  ceq diffrt(REF(NULL_1?, HT_1), REF(NULL ?, HT_2)) = REF(nil, HT_1)
+    if size(NULL_1?) <= 1 .
 
-  ceq diffrt(REF(NULL_1?, HT_1), REF(eps, HT_2)) = REF(NULL_1?, HT_1)
-    if len(NULL_1?) <= 1 .
+  ceq diffrt(REF(NULL_1?, HT_1), REF(nil, HT_2)) = REF(NULL_1?, HT_1)
+    if size(NULL_1?) <= 1 .
 
   ceq as-deftype(DT) = DT
     if typecheck(DT, deftype) .
 
-  eq tagsxt(eps) = eps .
+  eq tagsxt(nil) = nil .
 
   eq tagsxt(TAG(JT) XT*) = JT tagsxt(XT*) .
 
   eq tagsxt(EXTERNTYPE XT*) = tagsxt(XT*) [owise] .
 
-  eq globalsxt(eps) = eps .
+  eq globalsxt(nil) = nil .
 
   eq globalsxt(GLOBAL(GT-2) XT*) = GT-2 globalsxt(XT*) .
 
   eq globalsxt(EXTERNTYPE XT*) = globalsxt(XT*) [owise] .
 
-  eq memsxt(eps) = eps .
+  eq memsxt(nil) = nil .
 
   eq memsxt(MEM(MT) XT*) = MT memsxt(XT*) .
 
   eq memsxt(EXTERNTYPE XT*) = memsxt(XT*) [owise] .
 
-  eq tablesxt(eps) = eps .
+  eq tablesxt(nil) = nil .
 
   eq tablesxt(TABLE(TT) XT*) = TT tablesxt(XT*) .
 
   eq tablesxt(EXTERNTYPE XT*) = tablesxt(XT*) [owise] .
 
-  eq funcsxt(eps) = eps .
+  eq funcsxt(nil) = nil .
 
   ceq funcsxt(FUNC(DT) XT*) = DT funcsxt(XT*)
     if typecheck(DT, deftype) .
 
   eq funcsxt(EXTERNTYPE XT*) = funcsxt(XT*) [owise] .
 
-  eq subst-typevar(TV, eps, eps) = TV .
+  eq subst-typevar(TV, nil, nil) = TV .
 
   ceq subst-typevar(TV, TV_1 TV'*, TU_1 TU'*) = TU_1
     if TV == TV_1 .
 
   eq subst-typevar(TV, TV_1 TV'*, TU_1 TU'*) = subst-typevar(TV, TV'*, TU'*) [owise] .
 
-  eq minus-recs(eps, eps) = tuple(seq(eps) seq(eps)) .
+  eq minus-recs(nil, nil) = tuple(seq(nil) seq(nil)) .
 
   eq minus-recs(REC(N-3) TV*, TU_1 TU*) = minus-recs(TV*, TU*) .
 
@@ -3133,7 +3129,7 @@ mod SPEC2MAUDE-GENERATED is
   eq subst-heaptype(HT, TV*, TU*) = HT [owise] .
 
   ceq subst-reftype(REF(NULL?, HT), TV*, TU*) = REF(NULL?, subst-heaptype(HT, TV*, TU*))
-    if len(NULL?) <= 1 .
+    if size(NULL?) <= 1 .
 
   ceq subst-valtype(NT, TV*, TU*) = subst-numtype(NT, TV*, TU*)
     if typecheck(NT, numtype) .
@@ -3153,7 +3149,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(PT, packtype) .
 
   ceq subst-fieldtype(tuple(seq(MUT?) ZT), TV*, TU*) = tuple(seq(MUT?) subst-storagetype(ZT, TV*, TU*))
-    if len(MUT?) <= 1 .
+    if size(MUT?) <= 1 .
 
   eq subst-comptype(spectec-STRUCT(FT*), TV*, TU*) = spectec-STRUCT(map-subst-fieldtype(TV*, TU*, FT*)) .
 
@@ -3162,7 +3158,7 @@ mod SPEC2MAUDE-GENERATED is
   eq subst-comptype(FUNC T_1* -> T_2*, TV*, TU*) = FUNC map-subst-valtype(TV*, TU*, T_1*) -> map-subst-valtype(TV*, TU*, T_2*) .
 
   ceq subst-subtype(SUB(FINAL?, TU'*, CT), TV*, TU*) = SUB(FINAL?, map-subst-typeuse(TV*, TU*, TU'*), subst-comptype(CT, TV*, TU*))
-    if len(FINAL?) <= 1 .
+    if size(FINAL?) <= 1 .
 
   ceq subst-rectype(REC(ST*), TV*, TU*) = REC(map-subst-rectype(TV'*, TU'*, ST*))
     if tuple(seq(TV'*) seq(TU'*)) := minus-recs(TV*, TU*) .
@@ -3174,7 +3170,7 @@ mod SPEC2MAUDE-GENERATED is
   eq subst-tagtype(TU'-2, TV*, TU*) = subst-typeuse(TU'-2, TV*, TU*) .
 
   ceq subst-globaltype(tuple(seq(MUT?) T), TV*, TU*) = tuple(seq(MUT?) subst-valtype(T, TV*, TU*))
-    if len(MUT?) <= 1 .
+    if size(MUT?) <= 1 .
 
   eq subst-memtype(__PAGE(AT, LIM), TV*, TU*) = __PAGE(AT, LIM) .
 
@@ -3193,56 +3189,56 @@ mod SPEC2MAUDE-GENERATED is
   eq subst-moduletype(XT_1* -> XT_2*, TV*, TU*) = map-subst-externtype(TV*, TU*, XT_1*) -> map-subst-externtype(TV*, TU*, XT_2*) .
 
   ceq subst-all-valtype(T, TU*) = subst-valtype(T, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-reftype(RT, TU*) = subst-reftype(RT, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-deftype(DT, TU*) = subst-deftype(DT, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-tagtype(JT, TU*) = subst-tagtype(JT, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-globaltype(GT-2, TU*) = subst-globaltype(GT-2, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-memtype(MT, TU*) = subst-memtype(MT, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-tabletype(TT, TU*) = subst-tabletype(TT, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-externtype(XT-2, TU*) = subst-externtype(XT-2, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
   ceq subst-all-moduletype(MMT, TU*) = subst-moduletype(MMT, map-subst-all-valtype(N-3, 0), TU*)
-    if N-3 := len(TU*) .
+    if N-3 := size(TU*) .
 
-  eq subst-all-deftypes(eps, TU*) = eps .
+  eq subst-all-deftypes(nil, TU*) = nil .
 
   eq subst-all-deftypes(DT_1 DT*, TU*) = subst-all-deftype(DT_1, TU*) subst-all-deftypes(DT*, TU*) .
 
   ceq rollrt(X-4, RECTYPE) = REC(map-rollrt-subst-subtype(X-4, N-3, N-3, SUBTYPE*))
     if REC(SUBTYPE*) := RECTYPE
-      /\ N-3 := len(SUBTYPE*) .
+      /\ N-3 := size(SUBTYPE*) .
 
   ceq unrollrt(RECTYPE) = REC(map-unrollrt-subst-subtype(N-3, RECTYPE, N-3, SUBTYPE*))
     if REC(SUBTYPE*) := RECTYPE
-      /\ N-3 := len(SUBTYPE*) .
+      /\ N-3 := size(SUBTYPE*) .
 
   ceq rolldt(X-4, RECTYPE) = map-rolldt(N-3, SUBTYPE*, N-3, 0)
     if REC(SUBTYPE*) := rollrt(X-4, RECTYPE)
-      /\ N-3 := len(SUBTYPE*) .
+      /\ N-3 := size(SUBTYPE*) .
 
   ceq unrolldt(-DEF(RECTYPE, I)) = SUBTYPE* [ I ]
     if REC(SUBTYPE*) := unrollrt(RECTYPE) .
 
-  eq free-addrtype(ADDRTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-addrtype(ADDRTYPE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-numtype(NUMTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-numtype(NUMTYPE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-packtype(PACKTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-packtype(PACKTYPE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   ceq free-lanetype(NUMTYPE) = free-numtype(NUMTYPE)
     if typecheck(NUMTYPE, numtype) .
@@ -3250,7 +3246,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq free-lanetype(PACKTYPE) = free-packtype(PACKTYPE)
     if typecheck(PACKTYPE, packtype) .
 
-  eq free-vectype(VECTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-vectype(VECTYPE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   ceq free-consttype(NUMTYPE) = free-numtype(NUMTYPE)
     if typecheck(NUMTYPE, numtype) .
@@ -3258,11 +3254,11 @@ mod SPEC2MAUDE-GENERATED is
   ceq free-consttype(VECTYPE) = free-vectype(VECTYPE)
     if typecheck(VECTYPE, vectype) .
 
-  eq free-absheaptype(ABSHEAPTYPE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-absheaptype(ABSHEAPTYPE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-typevar(-IDX(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
-  eq free-typevar(REC(N-3)) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-typevar(REC(N-3)) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   ceq free-heaptype(ABSHEAPTYPE) = free-absheaptype(ABSHEAPTYPE)
     if typecheck(ABSHEAPTYPE, absheaptype) .
@@ -3271,7 +3267,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(TYPEUSE, typeuse) .
 
   ceq free-reftype(REF(NULL?, HEAPTYPE)) = free-heaptype(HEAPTYPE)
-    if len(NULL?) <= 1 .
+    if size(NULL?) <= 1 .
 
   ceq free-typeuse(TYPEVAR) = free-typevar(TYPEVAR)
     if typecheck(TYPEVAR, typevar) .
@@ -3288,7 +3284,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq free-valtype(REFTYPE) = free-reftype(REFTYPE)
     if typecheck(REFTYPE, reftype) .
 
-  eq free-valtype(BOT) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-valtype(BOT) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-resulttype(VALTYPE*) = free-list(map-free-resulttype(VALTYPE*)) .
 
@@ -3299,7 +3295,7 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(PACKTYPE, packtype) .
 
   ceq free-fieldtype(tuple(seq(MUT?) STORAGETYPE)) = free-storagetype(STORAGETYPE)
-    if len(MUT?) <= 1 .
+    if size(MUT?) <= 1 .
 
   eq free-comptype(spectec-STRUCT(FIELDTYPE*)) = free-list(map-free-fieldtype(FIELDTYPE*)) .
 
@@ -3308,7 +3304,7 @@ mod SPEC2MAUDE-GENERATED is
   eq free-comptype(FUNC RESULTTYPE_1 -> RESULTTYPE_2) = recordConcat(free-resulttype(RESULTTYPE_1), free-resulttype(RESULTTYPE_2), free) .
 
   ceq free-subtype(SUB(FINAL?, TYPEUSE*, COMPTYPE)) = recordConcat(free-list(map-free-typeuse(TYPEUSE*)), free-comptype(COMPTYPE), free)
-    if len(FINAL?) <= 1 .
+    if size(FINAL?) <= 1 .
 
   eq free-rectype(REC(SUBTYPE*)) = free-list(map-free-subtype(SUBTYPE*)) .
 
@@ -3318,13 +3314,13 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(DEFTYPE, deftype) .
 
   ceq free-globaltype(tuple(seq(MUT?) VALTYPE)) = free-valtype(VALTYPE)
-    if len(MUT?) <= 1 .
+    if size(MUT?) <= 1 .
 
   eq free-memtype(__PAGE(ADDRTYPE, LIMITS)) = free-addrtype(ADDRTYPE) .
 
   eq free-tabletype(tuple(ADDRTYPE (LIMITS REFTYPE))) = recordConcat(free-addrtype(ADDRTYPE), free-reftype(REFTYPE), free) .
 
-  eq free-datatype(OK) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-datatype(OK) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-elemtype(REFTYPE) = free-reftype(REFTYPE) .
 
@@ -3812,26 +3808,26 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck(spectec-CONVERT(HALF?, SX), vcvtop--(_X_(JNN_1, M_1), _X_(FNN_2, M_2))) = true
     if typecheck(JNN_1, Jnn)
       /\ typecheck(FNN_2, Fnn)
-      /\ _or_(_and_(_and_(sizenn2(FNN_2) == lsizenn1(JNN_1), lsizenn1(JNN_1) == 32), HALF? == eps), _and_(sizenn2(FNN_2) == (2 * lsizenn1(JNN_1)), HALF? == (LOW ?)))
+      /\ _or_(_and_(_and_(sizenn2(FNN_2) == lsizenn1(JNN_1), lsizenn1(JNN_1) == 32), HALF? == nil), _and_(sizenn2(FNN_2) == (2 * lsizenn1(JNN_1)), HALF? == (LOW ?)))
       /\ typecheck(HALF?, half)
-      /\ len(HALF?) <= 1
+      /\ size(HALF?) <= 1
       /\ typecheck(SX, sx) .
 
   ceq typecheck(spectec-TRUNC-SAT(SX, ZERO?), vcvtop--(_X_(FNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(FNN_1, Fnn)
       /\ typecheck(JNN_2, Jnn)
-      /\ _or_(_and_(_and_(sizenn1(FNN_1) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32), ZERO? == eps), _and_(sizenn1(FNN_1) == (2 * lsizenn2(JNN_2)), ZERO? == (ZERO ?)))
+      /\ _or_(_and_(_and_(sizenn1(FNN_1) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32), ZERO? == nil), _and_(sizenn1(FNN_1) == (2 * lsizenn2(JNN_2)), ZERO? == (ZERO ?)))
       /\ typecheck(SX, sx)
       /\ typecheck(ZERO?, zero)
-      /\ len(ZERO?) <= 1 .
+      /\ size(ZERO?) <= 1 .
 
   ceq typecheck(RELAXED-TRUNC(SX, ZERO?), vcvtop--(_X_(FNN_1, M_1), _X_(JNN_2, M_2))) = true
     if typecheck(FNN_1, Fnn)
       /\ typecheck(JNN_2, Jnn)
-      /\ _or_(_and_(_and_(sizenn1(FNN_1) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32), ZERO? == eps), _and_(sizenn1(FNN_1) == (2 * lsizenn2(JNN_2)), ZERO? == (ZERO ?)))
+      /\ _or_(_and_(_and_(sizenn1(FNN_1) == lsizenn2(JNN_2), lsizenn2(JNN_2) == 32), ZERO? == nil), _and_(sizenn1(FNN_1) == (2 * lsizenn2(JNN_2)), ZERO? == (ZERO ?)))
       /\ typecheck(SX, sx)
       /\ typecheck(ZERO?, zero)
-      /\ len(ZERO?) <= 1 .
+      /\ size(ZERO?) <= 1 .
 
   ceq typecheck(spectec-DEMOTE(ZERO-3), vcvtop--(_X_(FNN_1, M_1), _X_(FNN_2, M_2))) = true
     if typecheck(FNN_1, Fnn)
@@ -3876,7 +3872,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(-RESULT(VALTYPE?), blocktype) = true
     if typecheck(VALTYPE?, valtype)
-      /\ len(VALTYPE?) <= 1 .
+      /\ size(VALTYPE?) <= 1 .
 
   ceq typecheck(-IDX(TYPEIDX), blocktype) = true
     if typecheck(# TYPEIDX, typeidx) .
@@ -4004,7 +4000,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(SELECT(VALTYPE*?), instr) = true
     if typecheck(VALTYPE*?, iterList(valtype))
-      /\ len(VALTYPE*?) <= 1 .
+      /\ size(VALTYPE*?) <= 1 .
 
   ceq typecheck(BLOCK(BLOCKTYPE, INSTR*), instr) = true
     if typecheck(BLOCKTYPE, blocktype) .
@@ -4116,21 +4112,21 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck(LOAD(NUMTYPE, VALUE2-3, MEMIDX, MEMARG), instr) = true
     if typecheck(NUMTYPE, numtype)
       /\ typecheck(VALUE2-3, loadop-(NUMTYPE))
-      /\ len(VALUE2-3) <= 1
+      /\ size(VALUE2-3) <= 1
       /\ typecheck(# MEMIDX, memidx)
       /\ typecheck(MEMARG, memarg) .
 
   ceq typecheck(STORE(NUMTYPE, VALUE2-3, MEMIDX, MEMARG), instr) = true
     if typecheck(NUMTYPE, numtype)
       /\ typecheck(VALUE2-3, storeop-(NUMTYPE))
-      /\ len(VALUE2-3) <= 1
+      /\ size(VALUE2-3) <= 1
       /\ typecheck(# MEMIDX, memidx)
       /\ typecheck(MEMARG, memarg) .
 
   ceq typecheck(VLOAD(VECTYPE, VALUE2-3, MEMIDX, MEMARG), instr) = true
     if typecheck(VECTYPE, vectype)
       /\ typecheck(VALUE2-3, vloadop-(VECTYPE))
-      /\ len(VALUE2-3) <= 1
+      /\ size(VALUE2-3) <= 1
       /\ typecheck(# MEMIDX, memidx)
       /\ typecheck(MEMARG, memarg) .
 
@@ -4204,7 +4200,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(STRUCT.GET(SX?, TYPEIDX, FIELDIDX), instr) = true
     if typecheck(SX?, sx)
-      /\ len(SX?) <= 1
+      /\ size(SX?) <= 1
       /\ typecheck(# TYPEIDX, typeidx)
       /\ typecheck(# FIELDIDX, fieldidx) .
 
@@ -4232,7 +4228,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq typecheck(ARRAY.GET(SX?, TYPEIDX), instr) = true
     if typecheck(SX?, sx)
-      /\ len(SX?) <= 1
+      /\ size(SX?) <= 1
       /\ typecheck(# TYPEIDX, typeidx) .
 
   ceq typecheck(ARRAY.SET(TYPEIDX), instr) = true
@@ -4336,7 +4332,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE2, vswizzlop-(BSHAPE)) .
 
   ceq typecheck(VSHUFFLE(BSHAPE, LANEIDX*), instr) = true
-    if len(LANEIDX*) == spectec-dim(BSHAPE)
+    if size(LANEIDX*) == spectec-dim(BSHAPE)
       /\ typecheck(BSHAPE, bshape)
       /\ typecheck(LANEIDX*, laneidx) .
 
@@ -4370,10 +4366,10 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(SHAPE, shape) .
 
   ceq typecheck(VEXTRACT-LANE(SHAPE, SX?, LANEIDX), instr) = true
-    if (SX? == eps) == (spectec-lanetype(SHAPE) <- (I32 (I64 (F32 F64))))
+    if (SX? == nil) == occurs(spectec-lanetype(SHAPE), I32 (I64 (F32 F64)))
       /\ typecheck(SHAPE, shape)
       /\ typecheck(SX?, sx)
-      /\ len(SX?) <= 1
+      /\ size(SX?) <= 1
       /\ typecheck(# LANEIDX, laneidx) .
 
   ceq typecheck(VREPLACE-LANE(SHAPE, LANEIDX), instr) = true
@@ -4423,7 +4419,7 @@ mod SPEC2MAUDE-GENERATED is
   eq free-shape(_X_(LANETYPE, DIM)) = free-lanetype(LANETYPE) .
 
   ceq free-blocktype(-RESULT(VALTYPE?)) = free-opt(map-free-blocktype(VALTYPE?))
-    if len(VALTYPE?) <= 1 .
+    if size(VALTYPE?) <= 1 .
 
   eq free-blocktype(-IDX(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
@@ -4435,20 +4431,20 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-catch(CATCH-ALL-REF(LABELIDX)) = free-labelidx(LABELIDX) .
 
-  eq shift-labelidxs(eps) = eps .
+  eq shift-labelidxs(nil) = nil .
 
   eq shift-labelidxs((# 0) LABELIDX'*) = shift-labelidxs(LABELIDX'*) .
 
   eq shift-labelidxs((# LABELIDX) LABELIDX'*) = (# (_-_(LABELIDX : nat <:> int, 1 : nat <:> int) : int <:> nat)) shift-labelidxs(LABELIDX'*) .
 
-  eq free-instr(NOP) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(NOP) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-instr(UNREACHABLE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(UNREACHABLE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-instr(DROP) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(DROP) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   ceq free-instr(SELECT(VALTYPE*?)) = free-opt(map-free-list(VALTYPE*?))
-    if len(VALTYPE*?) <= 1 .
+    if size(VALTYPE*?) <= 1 .
 
   eq free-instr(BLOCK(BLOCKTYPE, INSTR*)) = recordConcat(free-blocktype(BLOCKTYPE), free-block(INSTR*), free) .
 
@@ -4476,7 +4472,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(CALL-INDIRECT(TABLEIDX, TYPEUSE)) = recordConcat(free-tableidx(TABLEIDX), free-typeuse(TYPEUSE), free) .
 
-  eq free-instr(RETURN) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(RETURN) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-instr(RETURN-CALL(FUNCIDX)) = free-funcidx(FUNCIDX) .
 
@@ -4486,7 +4482,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(THROW(TAGIDX)) = free-tagidx(TAGIDX) .
 
-  eq free-instr(THROW-REF) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(THROW-REF) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-instr(TRY-TABLE(BLOCKTYPE, CATCH*, INSTR*)) = recordConcat(recordConcat(free-blocktype(BLOCKTYPE), free-list(map-free-catch(CATCH*)), free), free-list(map-free-instr(INSTR*)), free) .
 
@@ -4543,17 +4539,17 @@ mod SPEC2MAUDE-GENERATED is
   eq free-instr(VSPLAT(SHAPE)) = free-shape(SHAPE) .
 
   ceq free-instr(VEXTRACT-LANE(SHAPE, SX?, LANEIDX)) = free-shape(SHAPE)
-    if len(SX?) <= 1 .
+    if size(SX?) <= 1 .
 
   eq free-instr(VREPLACE-LANE(SHAPE, LANEIDX)) = free-shape(SHAPE) .
 
   eq free-instr(REF.NULL(HEAPTYPE)) = free-heaptype(HEAPTYPE) .
 
-  eq free-instr(REF.IS-NULL) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(REF.IS-NULL) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-instr(REF.AS-NON-NULL) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(REF.AS-NON-NULL) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-instr(REF.EQ) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(REF.EQ) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-instr(REF.TEST(REFTYPE)) = free-reftype(REFTYPE) .
 
@@ -4561,16 +4557,16 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(REF.FUNC(FUNCIDX)) = free-funcidx(FUNCIDX) .
 
-  eq free-instr(REF.I31) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(REF.I31) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-instr(I31.GET(SX)) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(I31.GET(SX)) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-instr(STRUCT.NEW(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
   eq free-instr(STRUCT.NEW-DEFAULT(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
   ceq free-instr(STRUCT.GET(SX?, TYPEIDX, U32)) = free-typeidx(TYPEIDX)
-    if len(SX?) <= 1 .
+    if size(SX?) <= 1 .
 
   eq free-instr(STRUCT.SET(TYPEIDX, U32)) = free-typeidx(TYPEIDX) .
 
@@ -4585,11 +4581,11 @@ mod SPEC2MAUDE-GENERATED is
   eq free-instr(ARRAY.NEW-ELEM(TYPEIDX, ELEMIDX)) = recordConcat(free-typeidx(TYPEIDX), free-elemidx(ELEMIDX), free) .
 
   ceq free-instr(ARRAY.GET(SX?, TYPEIDX)) = free-typeidx(TYPEIDX)
-    if len(SX?) <= 1 .
+    if size(SX?) <= 1 .
 
   eq free-instr(ARRAY.SET(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
-  eq free-instr(ARRAY.LEN) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(ARRAY.LEN) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-instr(ARRAY.FILL(TYPEIDX)) = free-typeidx(TYPEIDX) .
 
@@ -4599,9 +4595,9 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-instr(ARRAY.INIT-ELEM(TYPEIDX, ELEMIDX)) = recordConcat(free-typeidx(TYPEIDX), free-elemidx(ELEMIDX), free) .
 
-  eq free-instr(EXTERN.CONVERT-ANY) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(EXTERN.CONVERT-ANY) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-instr(ANY.CONVERT-EXTERN) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-instr(ANY.CONVERT-EXTERN) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-instr(LOCAL.GET(LOCALIDX)) = free-localidx(LOCALIDX) .
 
@@ -4630,13 +4626,13 @@ mod SPEC2MAUDE-GENERATED is
   eq free-instr(ELEM.DROP(ELEMIDX)) = free-elemidx(ELEMIDX) .
 
   ceq free-instr(LOAD(NUMTYPE, LOADOP?, MEMIDX, MEMARG)) = recordConcat(free-numtype(NUMTYPE), free-memidx(MEMIDX), free)
-    if len(LOADOP?) <= 1 .
+    if size(LOADOP?) <= 1 .
 
   ceq free-instr(STORE(NUMTYPE, STOREOP?, MEMIDX, MEMARG)) = recordConcat(free-numtype(NUMTYPE), free-memidx(MEMIDX), free)
-    if len(STOREOP?) <= 1 .
+    if size(STOREOP?) <= 1 .
 
   ceq free-instr(VLOAD(VECTYPE, VLOADOP?, MEMIDX, MEMARG)) = recordConcat(free-vectype(VECTYPE), free-memidx(MEMIDX), free)
-    if len(VLOADOP?) <= 1 .
+    if size(VLOADOP?) <= 1 .
 
   eq free-instr(VLOAD-LANE(VECTYPE, SZ, MEMIDX, MEMARG, LANEIDX)) = recordConcat(free-vectype(VECTYPE), free-memidx(MEMIDX), free) .
 
@@ -4732,7 +4728,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE8, list(data))
       /\ typecheck(VALUE9, list(elem))
       /\ typecheck(START?, start)
-      /\ len(START?) <= 1
+      /\ size(START?) <= 1
       /\ typecheck(VALUE11, list(export)) .
 
   eq free-type(TYPE(RECTYPE)) = free-rectype(RECTYPE) .
@@ -4747,19 +4743,19 @@ mod SPEC2MAUDE-GENERATED is
 
   eq free-local(LOCAL(T)) = free-valtype(T) .
 
-  eq free-func(FUNC-func(TYPEIDX, LOCAL*, EXPR)) = recordConcat(recordConcat(free-typeidx(TYPEIDX), free-list(map-free-local(LOCAL*)), free), free-block(EXPR) [. 'LOCALS = eps ], free) .
+  eq free-func(FUNC-func(TYPEIDX, LOCAL*, EXPR)) = recordConcat(recordConcat(free-typeidx(TYPEIDX), free-list(map-free-local(LOCAL*)), free), free-block(EXPR) [. 'LOCALS = nil ], free) .
 
   eq free-datamode(ACTIVE(MEMIDX, EXPR)) = recordConcat(free-memidx(MEMIDX), free-expr(EXPR), free) .
 
-  eq free-datamode(PASSIVE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-datamode(PASSIVE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-data(DATA(BYTE*, DATAMODE)) = free-datamode(DATAMODE) .
 
   eq free-elemmode(ACTIVE(TABLEIDX, EXPR)) = recordConcat(free-tableidx(TABLEIDX), free-expr(EXPR), free) .
 
-  eq free-elemmode(PASSIVE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-elemmode(PASSIVE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
-  eq free-elemmode(DECLARE) = { (field('TYPES, eps) ; (field('FUNCS, eps) ; (field('GLOBALS, eps) ; (field('TABLES, eps) ; (field('MEMS, eps) ; (field('ELEMS, eps) ; (field('DATAS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; field('TAGS, eps)))))))))) } .
+  eq free-elemmode(DECLARE) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
   eq free-elem(ELEM(REFTYPE, EXPR*, ELEMMODE)) = recordConcat(recordConcat(free-reftype(REFTYPE), free-list(map-free-expr(EXPR*)), free), free-elemmode(ELEMMODE), free) .
 
@@ -4770,7 +4766,7 @@ mod SPEC2MAUDE-GENERATED is
   eq free-export(EXPORT(NAME, EXTERNIDX)) = free-externidx(EXTERNIDX) .
 
   ceq free-module(MODULE(TYPE*, IMPORT*, TAG*, GLOBAL*, MEM*, TABLE*, FUNC*, DATA*, ELEM*, START?, EXPORT*)) = recordConcat(recordConcat(recordConcat(recordConcat(recordConcat(recordConcat(recordConcat(recordConcat(recordConcat(recordConcat(free-list(map-free-type(TYPE*)), free-list(map-free-tag(TAG*)), free), free-list(map-free-global(GLOBAL*)), free), free-list(map-free-mem(MEM*)), free), free-list(map-free-table(TABLE*)), free), free-list(map-free-func(FUNC*)), free), free-list(map-free-data(DATA*)), free), free-list(map-free-elem(ELEM*)), free), free-opt(map-free-start(START?)), free), free-list(map-free-import(IMPORT*)), free), free-list(map-free-export(EXPORT*)), free)
-    if len(START?) <= 1 .
+    if size(START?) <= 1 .
 
   eq funcidx-module(MODULE-2) = free-module(MODULE-2) . 'FUNCS .
 
@@ -4801,17 +4797,17 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE-12, localtype)
       /\ typecheck(VALUE-13, resulttype)
       /\ typecheck(VALUE-16, resulttype)
-      /\ len(VALUE-16) <= 1
+      /\ size(VALUE-16) <= 1
       /\ typecheck(VALUE-17, funcidx)
       /\ typecheck(VALUE-18, subtype) .
 
   eq recordConcat(LEFT, RIGHT, context) = { ((((((((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; field('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; field('RETURN, optionConcat(LEFT . 'RETURN, RIGHT . 'RETURN))) ; field('REFS, (LEFT . 'REFS) (RIGHT . 'REFS))) ; field('RECS, (LEFT . 'RECS) (RIGHT . 'RECS))) } .
 
-  eq with-locals(C, eps, eps) = C .
+  eq with-locals(C, nil, nil) = C .
 
   eq with-locals(C, (# X_1-2) X*-2, LCT_1 LCT*) = with-locals(C [. 'LOCALS = ((C . 'LOCALS) [ X_1-2 = LCT_1 ]) ], X*-2, LCT*) .
 
-  eq clos-deftypes(eps) = eps .
+  eq clos-deftypes(nil) = nil .
 
   ceq clos-deftypes(DT* DT_N) = DT'* subst-all-deftype(DT_N, DT'*)
     if DT'* := clos-deftypes(DT*) .
@@ -4835,7 +4831,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq Expand(DEFTYPE) = COMPTYPE
     if SUB(FINAL?, TYPEUSE*, COMPTYPE) := unrolldt(DEFTYPE)
-      /\ len(FINAL?) <= 1 .
+      /\ size(FINAL?) <= 1 .
 
   eq before(REC(J), I) = # (J < I) .
 
@@ -4853,9 +4849,9 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq Deftype-sub(C, DEFTYPE_1, DEFTYPE_2) = true
     if SUB(FINAL?, TYPEUSE*, CT) := unrolldt(DEFTYPE_1)
-      /\ len(FINAL?) <= 1
+      /\ size(FINAL?) <= 1
       /\ INDEX-PREFIX (INDEX-ELEMENT INDEX-SUFFIX) := TYPEUSE*
-      /\ I := len(INDEX-PREFIX)
+      /\ I := size(INDEX-PREFIX)
       /\ Heaptype-sub(C, TYPEUSE* [ I ], DEFTYPE_2) .
 
   ceq Heaptype-sub(REL-ARG1, REL-ARG2, REL-ARG3) = true
@@ -4903,22 +4899,22 @@ mod SPEC2MAUDE-GENERATED is
     if Heaptype-sub(C, HEAPTYPE, (C . 'TYPES) [ TYPEIDX ]) .
 
   ceq Heaptype-sub-step(C, REC(I), STRUCT) = true
-    if SUB(FINAL?, eps, spectec-STRUCT(FIELDTYPE*)) := (C . 'RECS) [ I ]
-      /\ len(FINAL?) <= 1 .
+    if SUB(FINAL?, nil, spectec-STRUCT(FIELDTYPE*)) := (C . 'RECS) [ I ]
+      /\ size(FINAL?) <= 1 .
 
   ceq Heaptype-sub-step(C, REC(I), ARRAY) = true
-    if SUB(FINAL?, eps, spectec-ARRAY(FIELDTYPE)) := (C . 'RECS) [ I ]
-      /\ len(FINAL?) <= 1 .
+    if SUB(FINAL?, nil, spectec-ARRAY(FIELDTYPE)) := (C . 'RECS) [ I ]
+      /\ size(FINAL?) <= 1 .
 
   ceq Heaptype-sub-step(C, REC(I), spectec-FUNC) = true
-    if SUB(FINAL?, eps, FUNC T_1* -> T_2*) := (C . 'RECS) [ I ]
-      /\ len(FINAL?) <= 1 .
+    if SUB(FINAL?, nil, FUNC T_1* -> T_2*) := (C . 'RECS) [ I ]
+      /\ size(FINAL?) <= 1 .
 
   ceq Heaptype-sub-step(C, REC(I), REL-INPUT3) = true
     if SUB(FINAL?, TYPEUSE*, CT) := (C . 'RECS) [ I ]
-      /\ len(FINAL?) <= 1
+      /\ size(FINAL?) <= 1
       /\ INDEX-PREFIX (INDEX-ELEMENT INDEX-SUFFIX) := TYPEUSE*
-      /\ J := len(INDEX-PREFIX)
+      /\ J := size(INDEX-PREFIX)
       /\ TYPEUSE* [ J ] = REL-INPUT3 .
 
   ceq Heaptype-sub-step(C, NONE, HEAPTYPE) = true
@@ -4939,13 +4935,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq Heaptype-sub-step(C, BOT, HEAPTYPE) = true .
 
-  ceq Reftype-sub(C, REF(eps, HT_1), REF(eps, HT_2)) = true
+  ceq Reftype-sub(C, REF(nil, HT_1), REF(nil, HT_2)) = true
     if Heaptype-sub(C, HT_1, HT_2) .
 
   ceq Reftype-sub(C, REL-INPUT2, REF(NULL ?, HT_2)) = true
     if REF(CASE-PART1, CASE-PART2) := REL-INPUT2
       /\ HT_1 := CASE-PART2
-      /\ _or_(CASE-PART1 == eps, CASE-PART1 == (NULL ?))
+      /\ _or_(CASE-PART1 == nil, CASE-PART1 == (NULL ?))
       /\ Heaptype-sub(C, HT_1, HT_2) .
 
   ceq typecheck(spectec-OK(TYPEIDX), oktypeidx) = true
@@ -4954,7 +4950,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq default-(INN) = CONST(INN, # 0) ?
     if typecheck(INN, addrtype) .
 
-  ceq default-(FNN) = CONST(FNN, fzero(size(FNN))) ?
+  ceq default-(FNN) = CONST(FNN, fzero(spectec-size(FNN))) ?
     if typecheck(FNN, Fnn) .
 
   ceq default-(VNN) = VCONST(VNN, 0) ?
@@ -4962,7 +4958,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq default-(REF(NULL ?, HT)) = (REF.NULL-ADDR) ? .
 
-  eq default-(REF(eps, HT)) = eps .
+  eq default-(REF(nil, HT)) = nil .
 
   eq is-packtype(ZT) = # (ZT =/= unpack(ZT)) .
 
@@ -4972,11 +4968,11 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(TABLE*, table)
       /\ typecheck(ELEM*, elem)
       /\ typecheck(START?, start)
-      /\ len(START?) <= 1
+      /\ size(START?) <= 1
       /\ typecheck(EXPORT*, export) .
 
-  ceq funcidx-nonfuncs(tuple(seq(GLOBAL*) (seq(MEM*) (seq(TABLE*) (seq(ELEM*) (seq(START?) seq(EXPORT*))))))) = funcidx-module(MODULE(eps, eps, eps, GLOBAL*, MEM*, TABLE*, eps, eps, ELEM*, START?, EXPORT*))
-    if len(START?) <= 1 .
+  ceq funcidx-nonfuncs(tuple(seq(GLOBAL*) (seq(MEM*) (seq(TABLE*) (seq(ELEM*) (seq(START?) seq(EXPORT*))))))) = funcidx-module(MODULE(nil, nil, nil, GLOBAL*, MEM*, TABLE*, nil, nil, ELEM*, START?, EXPORT*))
+    if size(START?) <= 1 .
 
   ceq typecheck(# I, relaxed2) = true
     if _or_(I == 0, I == 1) .
@@ -5006,7 +5002,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq inv-signed-(N-2, I-2) = (I-2 + ((2 ^ N-2) : nat <:> int)) : int <:> nat
     if _and_(-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) <= I-2, I-2 < (0 : nat <:> int)) .
 
-  ceq spectec-sx(CONSTTYPE) = eps
+  ceq spectec-sx(CONSTTYPE) = nil
     if typecheck(CONSTTYPE, consttype) .
 
   ceq spectec-sx(PACKTYPE) = S ?
@@ -5015,7 +5011,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq spectec-zero(JNN) = # 0
     if typecheck(JNN, Jnn) .
 
-  ceq spectec-zero(FNN) = fzero(size(FNN))
+  ceq spectec-zero(FNN) = fzero(spectec-size(FNN))
     if typecheck(FNN, Fnn) .
 
   eq spectec-bool(# false) = 0 .
@@ -5055,22 +5051,22 @@ mod SPEC2MAUDE-GENERATED is
 
   eq imul-(N-2, I_1, I_2) = _rem_(I_1 * I_2, 2 ^ N-2) .
 
-  eq idiv-(N-2, U, I_1, 0) = eps .
+  eq idiv-(N-2, U, I_1, 0) = nil .
 
   eq idiv-(N-2, U, I_1, I_2) = (# (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) ? .
 
-  eq idiv-(N-2, S, I_1, 0) = eps .
+  eq idiv-(N-2, S, I_1, 0) = nil .
 
-  ceq idiv-(N-2, S, I_1, I_2) = eps
+  ceq idiv-(N-2, S, I_1, I_2) = nil
     if (# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))) == (# ((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> rat)) .
 
   eq idiv-(N-2, S, I_1, I_2) = (# inv-signed-(N-2, truncz(# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))))) ? .
 
-  eq irem-(N-2, U, I_1, 0) = eps .
+  eq irem-(N-2, U, I_1, 0) = nil .
 
   eq irem-(N-2, U, I_1, I_2) = (# (_-_(I_1 : nat <:> int, (I_2 * (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) : nat <:> int) : int <:> nat)) ? .
 
-  eq irem-(N-2, S, I_1, 0) = eps .
+  eq irem-(N-2, S, I_1, 0) = nil .
 
   ceq irem-(N-2, S, I_1, I_2) = (# inv-signed-(N-2, _-_(J_1, J_2 * truncz(# ((J_1 : int <:> rat) / (J_2 : int <:> rat)))))) ?
     if J_1 := signed-(N-2, I_1)
@@ -5133,25 +5129,25 @@ mod SPEC2MAUDE-GENERATED is
   ceq lpacknum-(NUMTYPE, C-2) = C-2
     if typecheck(NUMTYPE, numtype) .
 
-  ceq lpacknum-(PACKTYPE, # C-3) = # wrap--(size(lunpack(PACKTYPE)), psize(PACKTYPE), C-3)
+  ceq lpacknum-(PACKTYPE, # C-3) = # wrap--(spectec-size(lunpack(PACKTYPE)), psize(PACKTYPE), C-3)
     if typecheck(PACKTYPE, packtype) .
 
   ceq cpacknum-(CONSTTYPE, C-2) = C-2
     if typecheck(CONSTTYPE, consttype) .
 
-  ceq cpacknum-(PACKTYPE, # C-3) = # wrap--(size(lunpack(PACKTYPE)), psize(PACKTYPE), C-3)
+  ceq cpacknum-(PACKTYPE, # C-3) = # wrap--(spectec-size(lunpack(PACKTYPE)), psize(PACKTYPE), C-3)
     if typecheck(PACKTYPE, packtype) .
 
   ceq lunpacknum-(NUMTYPE, C-2) = C-2
     if typecheck(NUMTYPE, numtype) .
 
-  ceq lunpacknum-(PACKTYPE, # C-3) = # extend--(psize(PACKTYPE), size(lunpack(PACKTYPE)), U, C-3)
+  ceq lunpacknum-(PACKTYPE, # C-3) = # extend--(psize(PACKTYPE), spectec-size(lunpack(PACKTYPE)), U, C-3)
     if typecheck(PACKTYPE, packtype) .
 
   ceq cunpacknum-(CONSTTYPE, C-2) = C-2
     if typecheck(CONSTTYPE, consttype) .
 
-  ceq cunpacknum-(PACKTYPE, # C-3) = # extend--(psize(PACKTYPE), size(lunpack(PACKTYPE)), U, C-3)
+  ceq cunpacknum-(PACKTYPE, # C-3) = # extend--(psize(PACKTYPE), spectec-size(lunpack(PACKTYPE)), U, C-3)
     if typecheck(PACKTYPE, packtype) .
 
   eq spectec-unop-(INN, CLZ, # I) = # iclz-(sizenn(INN), I) .
@@ -5261,40 +5257,40 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq spectec-cvtop--(INN_1, FNN_2, REINTERPRET, # I_1) = reinterpret--(INN_1, FNN_2, # I_1)
     if typecheck(FNN_2, Fnn)
-      /\ size(INN_1) == size(FNN_2) .
+      /\ spectec-size(INN_1) == spectec-size(FNN_2) .
 
   ceq spectec-cvtop--(FNN_1, INN_2, REINTERPRET, F_1) = # #rat(reinterpret--(FNN_1, INN_2, F_1))
     if typecheck(FNN_1, Fnn)
       /\ typecheck(INN_2, addrtype)
-      /\ size(FNN_1) == size(INN_2) .
+      /\ spectec-size(FNN_1) == spectec-size(INN_2) .
 
-  eq zeroop(_X_(JNN_1, M_1), _X_(JNN_2, M_2), spectec-EXTEND(HALF, SX)) = eps .
+  eq zeroop(_X_(JNN_1, M_1), _X_(JNN_2, M_2), spectec-EXTEND(HALF, SX)) = nil .
 
-  ceq zeroop(_X_(JNN_1, M_1), _X_(FNN_2, M_2), spectec-CONVERT(HALF?, SX)) = eps
-    if len(HALF?) <= 1 .
+  ceq zeroop(_X_(JNN_1, M_1), _X_(FNN_2, M_2), spectec-CONVERT(HALF?, SX)) = nil
+    if size(HALF?) <= 1 .
 
   ceq zeroop(_X_(FNN_1, M_1), _X_(JNN_2, M_2), spectec-TRUNC-SAT(SX, ZERO?)) = ZERO?
-    if len(ZERO?) <= 1 .
+    if size(ZERO?) <= 1 .
 
   ceq zeroop(_X_(FNN_1, M_1), _X_(JNN_2, M_2), RELAXED-TRUNC(SX, ZERO?)) = ZERO?
-    if len(ZERO?) <= 1 .
+    if size(ZERO?) <= 1 .
 
   eq zeroop(_X_(FNN_1, M_1), _X_(FNN_2, M_2), spectec-DEMOTE(ZERO-3)) = ZERO-3 ? .
 
-  eq zeroop(_X_(FNN_1, M_1), _X_(FNN_2, M_2), PROMOTELOW) = eps .
+  eq zeroop(_X_(FNN_1, M_1), _X_(FNN_2, M_2), PROMOTELOW) = nil .
 
   eq halfop(_X_(JNN_1, M_1), _X_(JNN_2, M_2), spectec-EXTEND(HALF, SX)) = HALF ? .
 
   ceq halfop(_X_(JNN_1, M_1), _X_(FNN_2, M_2), spectec-CONVERT(HALF?, SX)) = HALF?
-    if len(HALF?) <= 1 .
+    if size(HALF?) <= 1 .
 
-  ceq halfop(_X_(FNN_1, M_1), _X_(JNN_2, M_2), spectec-TRUNC-SAT(SX, ZERO?)) = eps
-    if len(ZERO?) <= 1 .
+  ceq halfop(_X_(FNN_1, M_1), _X_(JNN_2, M_2), spectec-TRUNC-SAT(SX, ZERO?)) = nil
+    if size(ZERO?) <= 1 .
 
-  ceq halfop(_X_(FNN_1, M_1), _X_(JNN_2, M_2), RELAXED-TRUNC(SX, ZERO?)) = eps
-    if len(ZERO?) <= 1 .
+  ceq halfop(_X_(FNN_1, M_1), _X_(JNN_2, M_2), RELAXED-TRUNC(SX, ZERO?)) = nil
+    if size(ZERO?) <= 1 .
 
-  eq halfop(_X_(FNN_1, M_1), _X_(FNN_2, M_2), spectec-DEMOTE(ZERO-3)) = eps .
+  eq halfop(_X_(FNN_1, M_1), _X_(FNN_2, M_2), spectec-DEMOTE(ZERO-3)) = nil .
 
   eq halfop(_X_(FNN_1, M_1), _X_(FNN_2, M_2), PROMOTELOW) = LOW ? .
 
@@ -5303,17 +5299,17 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-half(HIGH, I, J) = J .
 
   ceq iswizzle-lane-(N-2, C*, I) = #rat(C* [ I ])
-    if I < len(C*) .
+    if I < size(C*) .
 
   eq iswizzle-lane-(N-2, C*, I) = 0 [owise] .
 
   ceq irelaxed-swizzle-lane-(N-2, C*, I) = #rat(C* [ I ])
-    if I < len(C*) .
+    if I < size(C*) .
 
   ceq irelaxed-swizzle-lane-(N-2, C*, I) = 0
     if signed-(N-2, I) < (0 : nat <:> int) .
 
-  eq irelaxed-swizzle-lane-(N-2, C*, I) = #rat(spectec-relaxed2(r-swizzle, iN(N-2), # 0, # #rat(C* [ _rem_(I, len(C*)) ]))) [owise] .
+  eq irelaxed-swizzle-lane-(N-2, C*, I) = #rat(spectec-relaxed2(r-swizzle, iN(N-2), # 0, # #rat(C* [ _rem_(I, size(C*)) ]))) [owise] .
 
   ceq ivunop-iabs-(_X_(JNN, M-2), V_1) = # inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -5744,20 +5740,20 @@ mod SPEC2MAUDE-GENERATED is
     if C-3 := extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX, C_1-2) .
 
   ceq lcvtop--(_X_(JNN_1, M_1), _X_(FNN_2, M_2), spectec-CONVERT(HALF?, SX), # C_1-2) = C-2
-    if len(HALF?) <= 1
+    if size(HALF?) <= 1
       /\ C-2 := convert--(lsizenn1(JNN_1), lsizenn2(FNN_2), SX, C_1-2) .
 
   ceq lcvtop--(_X_(FNN_1, M_1), _X_(INN_2, M_2), spectec-TRUNC-SAT(SX, ZERO?), C_1-3) = lift(C?)
     if typecheck(INN_2, addrtype)
-      /\ len(ZERO?) <= 1
+      /\ size(ZERO?) <= 1
       /\ C? := trunc-sat--(lsizenn1(FNN_1), lsizenn2(INN_2), SX, C_1-3)
-      /\ len(C?) <= 1 .
+      /\ size(C?) <= 1 .
 
   ceq lcvtop--(_X_(FNN_1, M_1), _X_(INN_2, M_2), RELAXED-TRUNC(SX, ZERO?), C_1-3) = lift(C?)
     if typecheck(INN_2, addrtype)
-      /\ len(ZERO?) <= 1
+      /\ size(ZERO?) <= 1
       /\ C? := relaxed-trunc--(lsizenn1(FNN_1), lsizenn2(INN_2), SX, C_1-3)
-      /\ len(C?) <= 1 .
+      /\ size(C?) <= 1 .
 
   ceq lcvtop--(_X_(FNN_1, M_1), _X_(FNN_2, M_2), spectec-DEMOTE(ZERO), C_1-3) = C*
     if C* := demote--(lsizenn1(FNN_1), lsizenn2(FNN_2), C_1-3) .
@@ -5766,7 +5762,7 @@ mod SPEC2MAUDE-GENERATED is
     if C* := promote--(lsizenn1(FNN_1), lsizenn2(FNN_2), C_1-3) .
 
   ceq spectec-vcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, V_1) = choose-vcvtop(map-inv-lanes(LNN_2, M-2, C**))
-    if _and_(halfop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == eps, zeroop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == eps)
+    if _and_(halfop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == nil, zeroop(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2) == nil)
       /\ C_1* := lanes-(_X_(LNN_1, M-2), V_1)
       /\ C** := setproduct-(lane-(LNN_2), map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*)) .
 
@@ -5994,36 +5990,36 @@ mod SPEC2MAUDE-GENERATED is
   ceq packfield-(PACKTYPE, CONST(I32, # I)) = PACK(PACKTYPE, wrap--(32, psize(PACKTYPE), I))
     if typecheck(PACKTYPE, packtype) .
 
-  ceq unpackfield-(VALTYPE, eps, VAL) = VAL
+  ceq unpackfield-(VALTYPE, nil, VAL) = VAL
     if typecheck(VALTYPE, valtype) .
 
   eq unpackfield-(PACKTYPE, SX ?, PACK(PACKTYPE, I)) = CONST(I32, # extend--(psize(PACKTYPE), 32, SX, I)) .
 
-  eq tagsxa(eps) = eps .
+  eq tagsxa(nil) = nil .
 
   eq tagsxa(TAG(A) XA*) = (# A) tagsxa(XA*) .
 
   eq tagsxa(EXTERNADDR XA*) = tagsxa(XA*) [owise] .
 
-  eq globalsxa(eps) = eps .
+  eq globalsxa(nil) = nil .
 
   eq globalsxa(GLOBAL(A) XA*) = (# A) globalsxa(XA*) .
 
   eq globalsxa(EXTERNADDR XA*) = globalsxa(XA*) [owise] .
 
-  eq memsxa(eps) = eps .
+  eq memsxa(nil) = nil .
 
   eq memsxa(MEM(A) XA*) = (# A) memsxa(XA*) .
 
   eq memsxa(EXTERNADDR XA*) = memsxa(XA*) [owise] .
 
-  eq tablesxa(eps) = eps .
+  eq tablesxa(nil) = nil .
 
   eq tablesxa(TABLE(A) XA*) = (# A) tablesxa(XA*) .
 
   eq tablesxa(EXTERNADDR XA*) = tablesxa(XA*) [owise] .
 
-  eq funcsxa(eps) = eps .
+  eq funcsxa(nil) = nil .
 
   eq funcsxa(FUNC(A) XA*) = (# A) funcsxa(XA*) .
 
@@ -6107,18 +6103,18 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq growtable(TABLEINST, N-3, R) = TABLEINST'
     if { (field('TYPE, tuple(AT (([ I .. J? ]) RT))) ; field('REFS, R'*)) } := TABLEINST
-      /\ len(J?) <= 1
-      /\ I' := len(R'*) + N-3
+      /\ size(J?) <= 1
+      /\ I' := size(R'*) + N-3
       /\ all-growtable(I', J?)
-      /\ (I' : nat <:> int) <= _-_((2 ^ size(AT)) : nat <:> int, 1 : nat <:> int)
+      /\ (I' : nat <:> int) <= _-_((2 ^ spectec-size(AT)) : nat <:> int, 1 : nat <:> int)
       /\ TABLEINST' := { (field('TYPE, tuple(AT (([ I' .. J? ]) RT))) ; field('REFS, R'* repeatSeq(N-3, R))) } .
 
   ceq growmem(MEMINST, N-3) = MEMINST'
     if { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, B*)) } := MEMINST
-      /\ len(J?) <= 1
-      /\ I' := (((len(B*) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) + (N-3 : nat <:> rat)) : rat <:> nat
+      /\ size(J?) <= 1
+      /\ I' := (((size(B*) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) + (N-3 : nat <:> rat)) : rat <:> nat
       /\ all-growtable(I', J?)
-      /\ I' <= (2 ^ (_-_(size(AT) : nat <:> int, 16 : nat <:> int) : int <:> nat))
+      /\ I' <= (2 ^ (_-_(spectec-size(AT) : nat <:> int, 16 : nat <:> int) : int <:> nat))
       /\ MEMINST' := { (field('TYPE, __PAGE(AT, [ I' .. J? ])) ; field('BYTES, B* repeatSeq(N-3 * (64 * Ki), # 0))) } .
 
   eq Num-ok(S-2, CONST(NT, C-2), NT) = true .
@@ -6127,29 +6123,29 @@ mod SPEC2MAUDE-GENERATED is
 
   eq Ref-ok(S-2, REF.NULL-ADDR) = REF(NULL ?, BOT) .
 
-  eq Ref-ok(S-2, REF.I31-NUM(I)) = REF(eps, I31) .
+  eq Ref-ok(S-2, REF.I31-NUM(I)) = REF(nil, I31) .
 
-  ceq Ref-ok(S-2, REF.STRUCT-ADDR(A)) = REF(eps, DT)
+  ceq Ref-ok(S-2, REF.STRUCT-ADDR(A)) = REF(nil, DT)
     if DT := ((S-2 . 'STRUCTS) [ A ]) . 'TYPE .
 
-  ceq Ref-ok(S-2, REF.ARRAY-ADDR(A)) = REF(eps, DT)
+  ceq Ref-ok(S-2, REF.ARRAY-ADDR(A)) = REF(nil, DT)
     if DT := ((S-2 . 'ARRAYS) [ A ]) . 'TYPE .
 
-  ceq Ref-ok(S-2, REF.FUNC-ADDR(A)) = REF(eps, DT)
+  ceq Ref-ok(S-2, REF.FUNC-ADDR(A)) = REF(nil, DT)
     if DT := ((S-2 . 'FUNCS) [ A ]) . 'TYPE .
 
-  ceq Ref-ok(S-2, REF.EXN-ADDR(A)) = REF(eps, EXN)
+  ceq Ref-ok(S-2, REF.EXN-ADDR(A)) = REF(nil, EXN)
     if EXN-3 := (S-2 . 'EXNS) [ A ] .
 
-  eq Ref-ok(S-2, REF.HOST-ADDR(A)) = REF(eps, ANY) .
+  eq Ref-ok(S-2, REF.HOST-ADDR(A)) = REF(nil, ANY) .
 
-  ceq Ref-ok(S-2, REF.EXTERN(REF-2)) = REF(eps, EXTERN)
-    if Ref-ok-sub(S-2, REF-2, REF(eps, ANY))
+  ceq Ref-ok(S-2, REF.EXTERN(REF-2)) = REF(nil, EXTERN)
+    if Ref-ok-sub(S-2, REF-2, REF(nil, ANY))
       /\ REF-2 =/= (REF.NULL-ADDR) .
 
   ceq Ref-ok-sub(S-2, REF-2, RT) = true
     if RT' := Ref-ok(S-2, REF-2)
-      /\ Reftype-sub({ (field('TYPES, eps) ; (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('LOCALS, eps) ; (field('LABELS, eps) ; (field('RETURN, eps) ; (field('REFS, eps) ; field('RECS, eps))))))))))))) }, RT', RT) .
+      /\ Reftype-sub({ (field('TYPES, nil) ; (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; (field('RETURN, nil) ; (field('REFS, nil) ; field('RECS, nil))))))))))))) }, RT', RT) .
 
   ceq Val-ok(S-2, NUM, NT) = true
     if typecheck(NUM, num)
@@ -6178,16 +6174,16 @@ mod SPEC2MAUDE-GENERATED is
 
   rl Step-pure(UNREACHABLE) => TRAP .
 
-  rl Step-pure(NOP) => eps .
+  rl Step-pure(NOP) => nil .
 
-  rl Step-pure(VAL DROP) => eps .
+  rl Step-pure(VAL DROP) => nil .
 
   crl Step-pure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT(T*?)))) => VAL_1
-    if len(T*?) <= 1
+    if size(T*?) <= 1
       /\ C-3 =/= 0 .
 
   crl Step-pure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT(T*?)))) => VAL_2
-    if len(T*?) <= 1
+    if size(T*?) <= 1
       /\ C-3 == 0 .
 
   crl Step-pure(CONST(I32, # C-3) IF__ELSE_(BT, INSTR_1*, INSTR_2*)) => BLOCK(BT, INSTR_1*)
@@ -6199,7 +6195,7 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-pure(LABEL- N-3 { INSTR* } VAL*) => VAL* .
 
   crl Step-pure(LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(L)) INSTR*)) => VAL* INSTR'*
-    if instrSize(VAL*) = N-3
+    if size(VAL*) = N-3
       /\ L == 0 .
 
   crl Step-pure(LABEL- N-3 { INSTR'* } ((VAL* BR(L)) INSTR*)) => VAL* BR(_-_(L : nat <:> int, 1 : nat <:> int) : int <:> nat)
@@ -6210,14 +6206,14 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-pure(CONST(I32, # C-3) BR-IF(L)) => BR(L)
     if C-3 =/= 0 .
 
-  crl Step-pure(CONST(I32, # C-3) BR-IF(L)) => eps
+  crl Step-pure(CONST(I32, # C-3) BR-IF(L)) => nil
     if C-3 == 0 .
 
   crl Step-pure(CONST(I32, # I) BR-TABLE(L*, L')) => BR(#rat(L* [ I ]))
-    if I < len(L*) .
+    if I < size(L*) .
 
   crl Step-pure(CONST(I32, # I) BR-TABLE(L*, L')) => BR(L')
-    if I >= len(L*) .
+    if I >= size(L*) .
 
   crl Step-pure(VAL BR-ON-NULL(L)) => BR(L)
     if VAL == (REF.NULL-ADDR) .
@@ -6225,7 +6221,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-pure(VAL BR-ON-NULL(L)) => VAL
     if VAL =/= (REF.NULL-ADDR) .
 
-  crl Step-pure(VAL BR-ON-NON-NULL(L)) => eps
+  crl Step-pure(VAL BR-ON-NON-NULL(L)) => nil
     if VAL == (REF.NULL-ADDR) .
 
   crl Step-pure(VAL BR-ON-NON-NULL(L)) => VAL BR(L)
@@ -6236,10 +6232,10 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-pure(RETURN-CALL-INDIRECT(X-4, YY-2)) => TABLE.GET(X-4) (REF.CAST(REF(NULL ?, YY-2)) RETURN-CALL-REF(YY-2)) .
 
   crl Step-pure(FRAME- N-3 { F } VAL*) => VAL*
-    if instrSize(VAL*) = N-3 .
+    if size(VAL*) = N-3 .
 
   crl Step-pure(FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) => VAL*
-    if instrSize(VAL*) = N-3 .
+    if size(VAL*) = N-3 .
 
   rl Step-pure(LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*)) => VAL* RETURN .
 
@@ -6248,7 +6244,7 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-pure(HANDLER- N-3 { CATCH* } VAL*) => VAL* .
 
   crl Step-pure(VAL* (TRAP INSTR*)) => TRAP
-    if _or_(VAL* =/= eps, INSTR* =/= eps) .
+    if _or_(VAL* =/= nil, INSTR* =/= nil) .
 
   rl Step-pure(LABEL- N-3 { INSTR'* } TRAP) => TRAP .
 
@@ -6315,13 +6311,13 @@ mod SPEC2MAUDE-GENERATED is
     if MEMBER-PREFIX (C-2 MEMBER-SUFFIX) := spectec-unop-(NT, UNOP-2, C_1-3) .
 
   crl Step-pure(CONST(NT, C_1-3) UNOP(NT, UNOP-2)) => TRAP
-    if spectec-unop-(NT, UNOP-2, C_1-3) == eps .
+    if spectec-unop-(NT, UNOP-2, C_1-3) == nil .
 
   crl Step-pure(CONST(NT, C_1-3) (CONST(NT, C_2-3) BINOP(NT, BINOP-2))) => CONST(NT, C-2)
     if MEMBER-PREFIX (C-2 MEMBER-SUFFIX) := spectec-binop-(NT, BINOP-2, C_1-3, C_2-3) .
 
   crl Step-pure(CONST(NT, C_1-3) (CONST(NT, C_2-3) BINOP(NT, BINOP-2))) => TRAP
-    if spectec-binop-(NT, BINOP-2, C_1-3, C_2-3) == eps .
+    if spectec-binop-(NT, BINOP-2, C_1-3, C_2-3) == nil .
 
   crl Step-pure(CONST(NT, C_1-3) TESTOP(NT, TESTOP-2)) => CONST(I32, # C-3)
     if C-3 := spectec-testop-(NT, TESTOP-2, C_1-3) .
@@ -6333,7 +6329,7 @@ mod SPEC2MAUDE-GENERATED is
     if MEMBER-PREFIX (C-2 MEMBER-SUFFIX) := spectec-cvtop--(NT_1, NT_2, CVTOP-2, C_1-3) .
 
   crl Step-pure(CONST(NT_1, C_1-3) CVTOP(NT_2, NT_1, CVTOP-2)) => TRAP
-    if spectec-cvtop--(NT_1, NT_2, CVTOP-2, C_1-3) == eps .
+    if spectec-cvtop--(NT_1, NT_2, CVTOP-2, C_1-3) == nil .
 
   crl Step-pure(VCONST(V128, C_1-2) VVUNOP(V128, VVUNOP-2)) => VCONST(V128, C-3)
     if MEMBER-PREFIX ((# C-3) MEMBER-SUFFIX) := vvunop-(V128, VVUNOP-2, C_1-2) .
@@ -6351,19 +6347,19 @@ mod SPEC2MAUDE-GENERATED is
     if MEMBER-PREFIX ((# C-3) MEMBER-SUFFIX) := spectec-vunop-(SH, VUNOP-2, C_1-2) .
 
   crl Step-pure(VCONST(V128, C_1-2) VUNOP(SH, VUNOP-2)) => TRAP
-    if spectec-vunop-(SH, VUNOP-2, C_1-2) == eps .
+    if spectec-vunop-(SH, VUNOP-2, C_1-2) == nil .
 
   crl Step-pure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VBINOP(SH, VBINOP-2))) => VCONST(V128, C-3)
     if MEMBER-PREFIX ((# C-3) MEMBER-SUFFIX) := spectec-vbinop-(SH, VBINOP-2, C_1-2, C_2-2) .
 
   crl Step-pure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) VBINOP(SH, VBINOP-2))) => TRAP
-    if spectec-vbinop-(SH, VBINOP-2, C_1-2, C_2-2) == eps .
+    if spectec-vbinop-(SH, VBINOP-2, C_1-2, C_2-2) == nil .
 
   crl Step-pure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VTERNOP(SH, VTERNOP-2)))) => VCONST(V128, C-3)
     if MEMBER-PREFIX ((# C-3) MEMBER-SUFFIX) := spectec-vternop-(SH, VTERNOP-2, C_1-2, C_2-2, C_3-2) .
 
   crl Step-pure(VCONST(V128, C_1-2) (VCONST(V128, C_2-2) (VCONST(V128, C_3-2) VTERNOP(SH, VTERNOP-2)))) => TRAP
-    if spectec-vternop-(SH, VTERNOP-2, C_1-2, C_2-2, C_3-2) == eps .
+    if spectec-vternop-(SH, VTERNOP-2, C_1-2, C_2-2, C_3-2) == nil .
 
   crl Step-pure(VCONST(V128, C_1-2) VTESTOP(_X_(JNN, M-2), ALL-TRUE)) => CONST(I32, # C-3)
     if I* := lanes-(_X_(JNN, M-2), C_1-2)
@@ -6388,7 +6384,7 @@ mod SPEC2MAUDE-GENERATED is
     if lunpack(LNN) = INPUT-FIELD
       /\ C-3 := inv-lanes-(_X_(LNN, M-2), repeatSeq(M-2, lpacknum-(LNN, C_1-3))) .
 
-  crl Step-pure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), eps, I)) => CONST(NT, C_2-3)
+  crl Step-pure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), nil, I)) => CONST(NT, C_2-3)
     if typecheck(NT, numtype)
       /\ C_2-3 := lanes-(_X_(NT, M-2), C_1-2) [ I ] .
 
@@ -6415,11 +6411,11 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-pure(VCONST(V128, C_1-2) VCVTOP(SH_2, SH_1, VCVTOP-2)) => VCONST(V128, C-3)
     if spectec-vcvtop--(SH_1, SH_2, VCVTOP-2, C_1-2) => C-3 .
 
-  ceq blocktype-(Z, -IDX(X-4)) = T_1* ->- eps  T_2*
+  ceq blocktype-(Z, -IDX(X-4)) = T_1* ->- nil  T_2*
     if FUNC T_1* -> T_2* := Expand(spectec-type(Z, X-4)) .
 
-  ceq blocktype-(Z, -RESULT(T?)) = eps ->- eps  lift(T?)
-    if len(T?) <= 1 .
+  ceq blocktype-(Z, -RESULT(T?)) = nil ->- nil  lift(T?)
+    if size(T?) <= 1 .
 
   ceq Step-read-throw-ref-handler-catch-enabled(Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true
     if #rat((spectec-exninst(Z) [ A ]) . 'TAG) == #rat(spectec-tagaddr(Z) [ X-4 ])
@@ -6443,22 +6439,22 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq Step-read-array-init-data-oob2-enabled(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = true
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1
-      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-data(Z, Y) . 'BYTES) .
+      /\ size(MUT?) <= 1
+      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES) .
 
   eq Step-read-array-init-data-oob2-enabled(ENABLED-INPUT1) = false [owise] .
 
-  crl Step-read(Z ; (VAL* BLOCK(BT, INSTR*))) => LABEL- N-3 { eps } (VAL* INSTR*)
-    if M-3 := instrSize(VAL*)
-      /\ T_1* ->- eps  T_2* := blocktype-(Z, BT)
-      /\ M-3 = len(T_1*)
-      /\ N-3 := len(T_2*) .
+  crl Step-read(Z ; (VAL* BLOCK(BT, INSTR*))) => LABEL- N-3 { nil } (VAL* INSTR*)
+    if M-3 := size(VAL*)
+      /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 = size(T_1*)
+      /\ N-3 := size(T_2*) .
 
   crl Step-read(Z ; (VAL* LOOP(BT, INSTR*))) => LABEL- M-3 { LOOP(BT, INSTR*) } (VAL* INSTR*)
-    if M-3 := instrSize(VAL*)
-      /\ T_1* ->- eps  T_2* := blocktype-(Z, BT)
-      /\ M-3 = len(T_1*)
-      /\ N-3 := len(T_2*) .
+    if M-3 := size(VAL*)
+      /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 = size(T_1*)
+      /\ N-3 := size(T_2*) .
 
   crl Step-read((S-2 ; F) ; (REF-2 BR-ON-CAST(L, RT_1, RT_2))) => REF-2 BR(L)
     if typecheck(REF-2, ref)
@@ -6481,12 +6477,12 @@ mod SPEC2MAUDE-GENERATED is
 
   rl Step-read(Z ; ((REF.NULL-ADDR) CALL-REF(YY-2))) => TRAP .
 
-  crl Step-read(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) => FRAME- M-3 { F } (LABEL- M-3 { eps } INSTR*)
-    if N-3 := instrSize(VAL*)
+  crl Step-read(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) => FRAME- M-3 { F } (LABEL- M-3 { nil } INSTR*)
+    if N-3 := size(VAL*)
       /\ FI := spectec-funcinst(Z) [ A ]
       /\ FUNC T_1* -> T_2* := Expand(FI . 'TYPE)
-      /\ N-3 = len(T_1*)
-      /\ M-3 := len(T_2*)
+      /\ N-3 = size(T_1*)
+      /\ M-3 := size(T_2*)
       /\ FUNC-func(CASE-PART1-2, CASE-PART2-2, CASE-PART3) := FI . 'CODE
       /\ X-4 := CASE-PART1-2
       /\ INSTR* := CASE-PART3
@@ -6503,21 +6499,21 @@ mod SPEC2MAUDE-GENERATED is
   rl Step-read(Z ; (FRAME- K-3 { F } (((VAL* (REF.NULL-ADDR)) RETURN-CALL-REF(YY-2)) INSTR*))) => TRAP .
 
   crl Step-read(Z ; (FRAME- K-3 { F } ((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*))) => VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2))
-    if N-3 := instrSize(VAL*)
+    if N-3 := size(VAL*)
       /\ FUNC T_1* -> T_2* := Expand((spectec-funcinst(Z) [ A ]) . 'TYPE)
-      /\ N-3 = len(T_1*)
-      /\ M-3 := len(T_2*) .
+      /\ N-3 = size(T_1*)
+      /\ M-3 := size(T_2*) .
 
   rl Step-read(Z ; ((REF.NULL-ADDR) THROW-REF)) => TRAP .
 
   crl Step-read(Z ; (VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*)))) => REF.EXN-ADDR(A) THROW-REF
-    if _or_(VAL* =/= eps, INSTR* =/= eps) .
+    if _or_(VAL* =/= nil, INSTR* =/= nil) .
 
   rl Step-read(Z ; (LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF))) => REF.EXN-ADDR(A) THROW-REF .
 
   rl Step-read(Z ; (FRAME- N-3 { F } (REF.EXN-ADDR(A) THROW-REF))) => REF.EXN-ADDR(A) THROW-REF .
 
-  rl Step-read(Z ; (HANDLER- N-3 { eps } (REF.EXN-ADDR(A) THROW-REF))) => REF.EXN-ADDR(A) THROW-REF .
+  rl Step-read(Z ; (HANDLER- N-3 { nil } (REF.EXN-ADDR(A) THROW-REF))) => REF.EXN-ADDR(A) THROW-REF .
 
   crl Step-read(Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) => VAL* BR(L)
     if #rat((spectec-exninst(Z) [ A ]) . 'TAG) == #rat(spectec-tagaddr(Z) [ X-4 ])
@@ -6537,11 +6533,11 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-throw-ref-handler-catch-all-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
       /\ Step-read-throw-ref-handler-catch-all-ref-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false .
 
-  crl Step-read(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) => HANDLER- N-3 { CATCH* } (LABEL- N-3 { eps } (VAL* INSTR*))
-    if M-3 := instrSize(VAL*)
-      /\ T_1* ->- eps  T_2* := blocktype-(Z, BT)
-      /\ M-3 = len(T_1*)
-      /\ N-3 := len(T_2*) .
+  crl Step-read(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) => HANDLER- N-3 { CATCH* } (LABEL- N-3 { nil } (VAL* INSTR*))
+    if M-3 := size(VAL*)
+      /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 = size(T_1*)
+      /\ N-3 := size(T_2*) .
 
   crl Step-read(Z ; LOCAL.GET(X-4)) => VAL
     if VAL ? := spectec-local(Z, X-4) .
@@ -6550,77 +6546,77 @@ mod SPEC2MAUDE-GENERATED is
     if VAL := spectec-global(Z, X-4) . 'VALUE .
 
   crl Step-read(Z ; (CONST(AT, # I) TABLE.GET(X-4))) => TRAP
-    if I >= len(spectec-table(Z, X-4) . 'REFS) .
+    if I >= size(spectec-table(Z, X-4) . 'REFS) .
 
   crl Step-read(Z ; (CONST(AT, # I) TABLE.GET(X-4))) => (spectec-table(Z, X-4) . 'REFS) [ I ]
-    if I < len(spectec-table(Z, X-4) . 'REFS) .
+    if I < size(spectec-table(Z, X-4) . 'REFS) .
 
   crl Step-read(Z ; TABLE.SIZE(X-4)) => CONST(AT, # N-3)
-    if N-3 := len(spectec-table(Z, X-4) . 'REFS)
+    if N-3 := size(spectec-table(Z, X-4) . 'REFS)
       /\ tuple(AT (LIM RT)) := spectec-table(Z, X-4) . 'TYPE .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => TRAP
-    if (I + N-3) > len(spectec-table(Z, X-4) . 'REFS) .
+    if (I + N-3) > size(spectec-table(Z, X-4) . 'REFS) .
 
-  crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => eps
-    if ((I + N-3) > len(spectec-table(Z, X-4) . 'REFS)) =/= true
+  crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => nil
+    if ((I + N-3) > size(spectec-table(Z, X-4) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => CONST(AT, # I) (VAL (TABLE.SET(X-4) (CONST(AT, # (I + 1)) (VAL (CONST(AT, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.FILL(X-4))))))
-    if ((I + N-3) > len(spectec-table(Z, X-4) . 'REFS)) =/= true
+    if ((I + N-3) > size(spectec-table(Z, X-4) . 'REFS)) =/= true
       /\ N-3 =/= 0 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X_1-2, X_2-3))))) => TRAP
-    if _or_((I_1 + N-3) > len(spectec-table(Z, X_1-2) . 'REFS), (I_2 + N-3) > len(spectec-table(Z, X_2-3) . 'REFS)) .
+    if _or_((I_1 + N-3) > size(spectec-table(Z, X_1-2) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, X_2-3) . 'REFS)) .
 
-  crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) => eps
-    if _or_((I_1 + N-3) > len(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
+  crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) => nil
+    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) => CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (TABLE.GET(Y) (TABLE.SET(X-4) (CONST(AT_1, # (I_1 + 1)) (CONST(AT_2, # (I_2 + 1)) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.COPY(X-4, Y)))))))
-    if _or_((I_1 + N-3) > len(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ I_1 <= I_2 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) => CONST(AT_1, # (_-_((I_1 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (CONST(AT_2, # (_-_((I_2 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (TABLE.GET(Y) (TABLE.SET(X-4) (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.COPY(X-4, Y)))))))
-    if _or_((I_1 + N-3) > len(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > len(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ I_1 > I_2 .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => TRAP
-    if _or_((I + N-3) > len(spectec-table(Z, X-4) . 'REFS), (J + N-3) > len(spectec-elem(Z, Y) . 'REFS)) .
+    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) .
 
-  crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => eps
-    if _or_((I + N-3) > len(spectec-table(Z, X-4) . 'REFS), (J + N-3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
+  crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => nil
+    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => CONST(AT, # I) (((spectec-elem(Z, Y) . 'REFS) [ J ]) (TABLE.SET(X-4) (CONST(AT, # (I + 1)) (CONST(I32, # (J + 1)) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.INIT(X-4, Y))))))
-    if _or_((I + N-3) > len(spectec-table(Z, X-4) . 'REFS), (J + N-3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0 .
 
-  crl Step-read(Z ; (CONST(AT, # I) LOAD(NT, eps, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+  crl Step-read(Z ; (CONST(AT, # I) LOAD(NT, nil, X-4, AO))) => TRAP
+    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step-read(Z ; (CONST(AT, # I) LOAD(NT, eps, X-4, AO))) => CONST(NT, C-2)
-    if C-2 := inv-nbytes-(NT, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ nbytes-(NT, C-2) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+  crl Step-read(Z ; (CONST(AT, # I) LOAD(NT, nil, X-4, AO))) => CONST(NT, C-2)
+    if C-2 := inv-nbytes-(NT, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+      /\ nbytes-(NT, C-2) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step-read(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) => CONST(INN, # extend--(N-3, size(INN), SX, C-3))
+  crl Step-read(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) => CONST(INN, # extend--(N-3, spectec-size(INN), SX, C-3))
     if C-3 := inv-ibytes-(N-3, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(N-3, C-3) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
-  crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, eps, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+  crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, nil, X-4, AO))) => TRAP
+    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, eps, X-4, AO))) => VCONST(V128, C-3)
+  crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, nil, X-4, AO))) => VCONST(V128, C-3)
     if C-3 := inv-vbytes-(V128, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ vbytes-(V128, C-3) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + ((((M-2 * K-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + ((((M-2 * K-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => VCONST(V128, C-3)
     if J* := bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, K-2, 0)
@@ -6629,7 +6625,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ C-3 := inv-lanes-(_X_(JNN, K-2), map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, K-2, J*)) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => VCONST(V128, C-3)
     if J := inv-ibytes-(N-2, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
@@ -6640,7 +6636,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ C-3 := inv-lanes-(_X_(JNN, M-2), repeatSeq(M-2, # J)) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, spectec-ZERO(N-2) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, spectec-ZERO(N-2) ?, X-4, AO))) => VCONST(V128, C-3)
     if J := inv-ibytes-(N-2, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
@@ -6648,7 +6644,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ C-3 := extend--(N-2, 128, U, J) .
 
   crl Step-read(Z ; (CONST(AT, # I) (VCONST(V128, C_1-2) VLOAD-LANE(V128, N-2, X-4, AO, J)))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) (VCONST(V128, C_1-2) VLOAD-LANE(V128, N-2, X-4, AO, J)))) => VCONST(V128, C-3)
     if K-3 := inv-ibytes-(N-2, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
@@ -6660,47 +6656,47 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read(Z ; MEMORY.SIZE(X-4)) => CONST(AT, # N-3)
     if (64 * Ki) =/= 0
-      /\ N-3 := _quo_(len(spectec-mem(Z, X-4) . 'BYTES), 64 * Ki)
-      /\ N-3 * (64 * Ki) = len(spectec-mem(Z, X-4) . 'BYTES)
+      /\ N-3 := _quo_(size(spectec-mem(Z, X-4) . 'BYTES), 64 * Ki)
+      /\ N-3 * (64 * Ki) = size(spectec-mem(Z, X-4) . 'BYTES)
       /\ __PAGE(AT, LIM) := spectec-mem(Z, X-4) . 'TYPE .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => TRAP
-    if (I + N-3) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if (I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => eps
-    if ((I + N-3) > len(spectec-mem(Z, X-4) . 'BYTES)) =/= true
+  crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => nil
+    if ((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => CONST(AT, # I) (VAL (STORE(I32, (# 8) ?, X-4, memarg0) (CONST(AT, # (I + 1)) (VAL (CONST(AT, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.FILL(X-4))))))
-    if ((I + N-3) > len(spectec-mem(Z, X-4) . 'BYTES)) =/= true
+    if ((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES)) =/= true
       /\ N-3 =/= 0 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => TRAP
-    if _or_((I_1 + N-3) > len(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > len(spectec-mem(Z, X_2-3) . 'BYTES)) .
+    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) .
 
-  crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => eps
-    if _or_((I_1 + N-3) > len(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > len(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
+  crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => nil
+    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (LOAD(I32, spectec-_-_(8, U) ?, X_2-3, memarg0) (STORE(I32, (# 8) ?, X_1-2, memarg0) (CONST(AT_1, # (I_1 + 1)) (CONST(AT_2, # (I_2 + 1)) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.COPY(X_1-2, X_2-3)))))))
-    if _or_((I_1 + N-3) > len(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > len(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
+    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
       /\ N-3 =/= 0
       /\ I_1 <= I_2 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => CONST(AT_1, # (_-_((I_1 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (CONST(AT_2, # (_-_((I_2 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (LOAD(I32, spectec-_-_(8, U) ?, X_2-3, memarg0) (STORE(I32, (# 8) ?, X_1-2, memarg0) (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.COPY(X_1-2, X_2-3)))))))
-    if _or_((I_1 + N-3) > len(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > len(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
+    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
       /\ N-3 =/= 0
       /\ I_1 > I_2 .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => TRAP
-    if _or_((I + N-3) > len(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > len(spectec-data(Z, Y) . 'BYTES)) .
+    if _or_((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > size(spectec-data(Z, Y) . 'BYTES)) .
 
-  crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => eps
-    if _or_((I + N-3) > len(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > len(spectec-data(Z, Y) . 'BYTES)) =/= true
+  crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => nil
+    if _or_((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > size(spectec-data(Z, Y) . 'BYTES)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => CONST(AT, # I) (CONST(I32, # #rat((spectec-data(Z, Y) . 'BYTES) [ J ])) (STORE(I32, (# 8) ?, X-4, memarg0) (CONST(AT, # (I + 1)) (CONST(I32, # (J + 1)) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.INIT(X-4, Y))))))
-    if _or_((I + N-3) > len(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > len(spectec-data(Z, Y) . 'BYTES)) =/= true
+    if _or_((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > size(spectec-data(Z, Y) . 'BYTES)) =/= true
       /\ N-3 =/= 0 .
 
   rl Step-read(Z ; REF.NULL(HT)) => REF.NULL-ADDR .
@@ -6730,64 +6726,64 @@ mod SPEC2MAUDE-GENERATED is
       /\ VAL* := bind-Step-read-struct-new-default(ZT*) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) STRUCT.GET(SX?, X-4, I))) => TRAP
-    if len(SX?) <= 1 .
+    if size(SX?) <= 1 .
 
   crl Step-read(Z ; (REF.STRUCT-ADDR(A) STRUCT.GET(SX?, X-4, I))) => unpackfield-(ZT* [ I ], SX?, ((spectec-structinst(Z) [ A ]) . 'FIELDS) [ I ])
-    if len(SX?) <= 1
+    if size(SX?) <= 1
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
       /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read-struct-new-default(CASE-PART1) .
 
   crl Step-read(Z ; (CONST(I32, # N-3) ARRAY.NEW-DEFAULT(X-4))) => instrRepeat(N-3, VAL) ARRAY.NEW-FIXED(X-4, N-3)
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1
+      /\ size(MUT?) <= 1
       /\ VAL ? := default-(unpack(ZT)) .
 
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => TRAP
-    if (I + N-3) > len(spectec-elem(Z, Y) . 'REFS) .
+    if (I + N-3) > size(spectec-elem(Z, Y) . 'REFS) .
 
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-ELEM(X-4, Y)))) => map-Step-read-array-new-elem-alloc(N-3, REF*) ARRAY.NEW-FIXED(X-4, N-3)
     if REF* := (spectec-elem(Z, Y) . 'REFS) [ I : N-3 ]
-      /\ len(REF*) = N-3 .
+      /\ size(REF*) = N-3 .
 
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-DATA(X-4, Y)))) => TRAP
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1
-      /\ (I + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-data(Z, Y) . 'BYTES) .
+      /\ size(MUT?) <= 1
+      /\ (I + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-DATA(X-4, Y)))) => map-const(ZT, N-3, C*) ARRAY.NEW-FIXED(X-4, N-3)
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1
+      /\ size(MUT?) <= 1
       /\ C* := unzip-zbytes(ZT, N-3, inv-concatn-(byte, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, (spectec-data(Z, Y) . 'BYTES) [ I : ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]))
       /\ concatn-(byte, map-zbytes(ZT, N-3, C*), ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) == ((spectec-data(Z, Y) . 'BYTES) [ I : ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => TRAP
-    if len(SX?) <= 1 .
+    if size(SX?) <= 1 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => TRAP
-    if len(SX?) <= 1
-      /\ I >= len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
+    if size(SX?) <= 1
+      /\ I >= size((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => unpackfield-(ZT, SX?, ((spectec-arrayinst(Z) [ A ]) . 'FIELDS) [ I ])
-    if len(SX?) <= 1
+    if size(SX?) <= 1
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1 .
+      /\ size(MUT?) <= 1 .
 
   rl Step-read(Z ; ((REF.NULL-ADDR) (ARRAY.LEN))) => TRAP .
 
-  rl Step-read(Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) => CONST(I32, # len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) .
+  rl Step-read(Z ; (REF.ARRAY-ADDR(A) (ARRAY.LEN))) => CONST(I32, # size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) .
 
   rl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => TRAP .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => TRAP
-    if (I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
+    if (I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
 
-  crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => eps
-    if ((I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+  crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => nil
+    if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (CONST(I32, # N-3) ARRAY.FILL(X-4)))))) => REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (ARRAY.SET(X-4) (REF.ARRAY-ADDR(A) (CONST(I32, # (I + 1)) (VAL (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) ARRAY.FILL(X-4))))))))
-    if ((I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+    if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
       /\ N-3 =/= 0 .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, # I_1) (REF-2 (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => TRAP
@@ -6797,171 +6793,171 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(REF-2, ref) .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => TRAP
-    if (I_1 + N-3) > len((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS) .
+    if (I_1 + N-3) > size((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS) .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => TRAP
-    if (I_2 + N-3) > len((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS) .
+    if (I_2 + N-3) > size((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS) .
 
-  crl Step-read(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => eps
-    if ((I_1 + N-3) > len((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS)) =/= true
-      /\ ((I_2 + N-3) > len((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS)) =/= true
+  crl Step-read(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => nil
+    if ((I_1 + N-3) > size((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS)) =/= true
+      /\ ((I_2 + N-3) > size((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (ARRAY.GET(SX?, X_2-3) (ARRAY.SET(X_1-2) (REF.ARRAY-ADDR(A_1) (CONST(I32, # (I_1 + 1)) (REF.ARRAY-ADDR(A_2) (CONST(I32, # (I_2 + 1)) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) ARRAY.COPY(X_1-2, X_2-3)))))))))))
-    if ((I_1 + N-3) > len((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS)) =/= true
-      /\ ((I_2 + N-3) > len((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS)) =/= true
+    if ((I_1 + N-3) > size((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS)) =/= true
+      /\ ((I_2 + N-3) > size((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS)) =/= true
       /\ N-3 =/= 0
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT_2)) := Expand(spectec-type(Z, X_2-3))
-      /\ len(MUT?) <= 1
+      /\ size(MUT?) <= 1
       /\ I_1 <= I_2
       /\ SX? := spectec-sx(ZT_2)
-      /\ len(SX?) <= 1 .
+      /\ size(SX?) <= 1 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # N-3) ARRAY.COPY(X_1-2, X_2-3))))))) => REF.ARRAY-ADDR(A_1) (CONST(I32, # (_-_((I_1 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (REF.ARRAY-ADDR(A_2) (CONST(I32, # (_-_((I_2 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (ARRAY.GET(SX?, X_2-3) (ARRAY.SET(X_1-2) (REF.ARRAY-ADDR(A_1) (CONST(I32, # I_1) (REF.ARRAY-ADDR(A_2) (CONST(I32, # I_2) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) ARRAY.COPY(X_1-2, X_2-3)))))))))))
-    if ((I_1 + N-3) > len((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS)) =/= true
-      /\ ((I_2 + N-3) > len((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS)) =/= true
+    if ((I_1 + N-3) > size((spectec-arrayinst(Z) [ A_1 ]) . 'FIELDS)) =/= true
+      /\ ((I_2 + N-3) > size((spectec-arrayinst(Z) [ A_2 ]) . 'FIELDS)) =/= true
       /\ N-3 =/= 0
       /\ I_1 > I_2
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT_2)) := Expand(spectec-type(Z, X_2-3))
-      /\ len(MUT?) <= 1
+      /\ size(MUT?) <= 1
       /\ SX? := spectec-sx(ZT_2)
-      /\ len(SX?) <= 1 .
+      /\ size(SX?) <= 1 .
 
   rl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => TRAP .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => TRAP
-    if (I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
+    if (I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => TRAP
-    if (J + N-3) > len(spectec-elem(Z, Y) . 'REFS) .
+    if (J + N-3) > size(spectec-elem(Z, Y) . 'REFS) .
 
-  crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => eps
-    if ((I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
-      /\ ((J + N-3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
+  crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => nil
+    if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+      /\ ((J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-ELEM(X-4, Y)))))) => REF.ARRAY-ADDR(A) (CONST(I32, # I) (REF-2 (ARRAY.SET(X-4) (REF.ARRAY-ADDR(A) (CONST(I32, # (I + 1)) (CONST(I32, # (J + 1)) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) ARRAY.INIT-ELEM(X-4, Y))))))))
-    if ((I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
-      /\ ((J + N-3) > len(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+      /\ ((J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ REF-2 := (spectec-elem(Z, Y) . 'REFS) [ J ] .
 
   rl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => TRAP .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => TRAP
-    if (I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
+    if (I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => TRAP
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1
-      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-data(Z, Y) . 'BYTES) .
+      /\ size(MUT?) <= 1
+      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES) .
 
-  crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => eps
-    if ((I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+  crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => nil
+    if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
       /\ Step-read-array-init-data-oob2-enabled(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = false
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => REF.ARRAY-ADDR(A) (CONST(I32, # I) (const(cunpack(ZT), cunpacknum-(ZT, C-2)) (ARRAY.SET(X-4) (REF.ARRAY-ADDR(A) (CONST(I32, # (I + 1)) (CONST(I32, # (J + (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) ARRAY.INIT-DATA(X-4, Y))))))))
-    if ((I + N-3) > len((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
+    if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
       /\ N-3 =/= 0
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ ((J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-data(Z, Y) . 'BYTES)) =/= true
-      /\ len(MUT?) <= 1
+      /\ ((J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES)) =/= true
+      /\ size(MUT?) <= 1
       /\ C-2 := inv-zbytes-(ZT, (spectec-data(Z, Y) . 'BYTES) [ J : (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ zbytes-(ZT, C-2) == ((spectec-data(Z, Y) . 'BYTES) [ J : (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
   crl Step(Z ; (VAL* THROW(X-4))) => add-exninst(Z, EXN-3) ; (REF.EXN-ADDR(A) THROW-REF)
-    if N-3 := instrSize(VAL*)
-      /\ FUNC T* -> eps := Expand(as-deftype(spectec-tag(Z, X-4) . 'TYPE))
-      /\ N-3 = len(T*)
-      /\ A := len(spectec-exninst(Z))
+    if N-3 := size(VAL*)
+      /\ FUNC T* -> nil := Expand(as-deftype(spectec-tag(Z, X-4) . 'TYPE))
+      /\ N-3 = size(T*)
+      /\ A := size(spectec-exninst(Z))
       /\ EXN-3 := { (field('TAG, # #rat(spectec-tagaddr(Z) [ X-4 ])) ; field('FIELDS, VAL*)) } .
 
-  rl Step(Z ; (VAL LOCAL.SET(X-4))) => with-local(Z, X-4, VAL) ; eps .
+  rl Step(Z ; (VAL LOCAL.SET(X-4))) => with-local(Z, X-4, VAL) ; nil .
 
-  rl Step(Z ; (VAL GLOBAL.SET(X-4))) => with-global(Z, X-4, VAL) ; eps .
+  rl Step(Z ; (VAL GLOBAL.SET(X-4))) => with-global(Z, X-4, VAL) ; nil .
 
   crl Step(Z ; (CONST(AT, # I) (REF-2 TABLE.SET(X-4)))) => Z ; TRAP
     if typecheck(REF-2, ref)
-      /\ I >= len(spectec-table(Z, X-4) . 'REFS) .
+      /\ I >= size(spectec-table(Z, X-4) . 'REFS) .
 
-  crl Step(Z ; (CONST(AT, # I) (REF-2 TABLE.SET(X-4)))) => with-table(Z, X-4, I, REF-2) ; eps
+  crl Step(Z ; (CONST(AT, # I) (REF-2 TABLE.SET(X-4)))) => with-table(Z, X-4, I, REF-2) ; nil
     if typecheck(REF-2, ref)
-      /\ I < len(spectec-table(Z, X-4) . 'REFS) .
+      /\ I < size(spectec-table(Z, X-4) . 'REFS) .
 
-  crl Step(Z ; (REF-2 (CONST(AT, # N-3) TABLE.GROW(X-4)))) => with-tableinst(Z, X-4, TI) ; CONST(AT, # len(spectec-table(Z, X-4) . 'REFS))
+  crl Step(Z ; (REF-2 (CONST(AT, # N-3) TABLE.GROW(X-4)))) => with-tableinst(Z, X-4, TI) ; CONST(AT, # size(spectec-table(Z, X-4) . 'REFS))
     if typecheck(REF-2, ref)
       /\ TI := growtable(spectec-table(Z, X-4), N-3, REF-2) .
 
-  crl Step(Z ; (REF-2 (CONST(AT, # N-3) TABLE.GROW(X-4)))) => Z ; CONST(AT, # inv-signed-(size(AT), -_(1 : nat <:> int)))
+  crl Step(Z ; (REF-2 (CONST(AT, # N-3) TABLE.GROW(X-4)))) => Z ; CONST(AT, # inv-signed-(spectec-size(AT), -_(1 : nat <:> int)))
     if typecheck(REF-2, ref) .
 
-  rl Step(Z ; ELEM.DROP(X-4)) => with-elem(Z, X-4, eps) ; eps .
+  rl Step(Z ; ELEM.DROP(X-4)) => with-elem(Z, X-4, nil) ; nil .
 
-  crl Step(Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, eps, X-4, AO)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+  crl Step(Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, nil, X-4, AO)))) => Z ; TRAP
+    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step(Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, eps, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; eps
+  crl Step(Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, nil, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
     if B* := nbytes-(NT, C-2) .
 
   crl Step(Z ; (CONST(AT, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, X-4, AO)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step(Z ; (CONST(AT, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; eps
-    if B* := ibytes-(N-3, wrap--(size(INN), N-3, C-3)) .
+  crl Step(Z ; (CONST(AT, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
+    if B* := ibytes-(N-3, wrap--(spectec-size(INN), N-3, C-3)) .
 
   crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE(V128, X-4, AO)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE(V128, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; eps
+  crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE(V128, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
     if B* := vbytes-(V128, C-3) .
 
   crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE-LANE(V128, N-2, X-4, AO, J)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + N-2) > len(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + N-2) > size(spectec-mem(Z, X-4) . 'BYTES) .
 
-  crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE-LANE(V128, N-2, X-4, AO, J)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; eps
+  crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE-LANE(V128, N-2, X-4, AO, J)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
     if JNN := inv-jsize(N-2)
       /\ N-2 == jsize(JNN)
       /\ M-2 := ((128 : nat <:> rat) / (N-2 : nat <:> rat)) : rat <:> nat
       /\ B* := ibytes-(N-2, #rat(lanes-(_X_(JNN, M-2), C-3) [ J ])) .
 
-  crl Step(Z ; (CONST(AT, # N-3) MEMORY.GROW(X-4))) => with-meminst(Z, X-4, MI) ; CONST(AT, # (((len(spectec-mem(Z, X-4) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat))
+  crl Step(Z ; (CONST(AT, # N-3) MEMORY.GROW(X-4))) => with-meminst(Z, X-4, MI) ; CONST(AT, # (((size(spectec-mem(Z, X-4) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat))
     if MI := growmem(spectec-mem(Z, X-4), N-3) .
 
-  rl Step(Z ; (CONST(AT, # N-3) MEMORY.GROW(X-4))) => Z ; CONST(AT, # inv-signed-(size(AT), -_(1 : nat <:> int))) .
+  rl Step(Z ; (CONST(AT, # N-3) MEMORY.GROW(X-4))) => Z ; CONST(AT, # inv-signed-(spectec-size(AT), -_(1 : nat <:> int))) .
 
-  rl Step(Z ; DATA.DROP(X-4)) => with-data(Z, X-4, eps) ; eps .
+  rl Step(Z ; DATA.DROP(X-4)) => with-data(Z, X-4, nil) ; nil .
 
   crl Step(Z ; (VAL* STRUCT.NEW(X-4))) => add-structinst(Z, SI-2) ; REF.STRUCT-ADDR(A)
-    if N-3 := instrSize(VAL*)
+    if N-3 := size(VAL*)
       /\ REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
       /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-struct-new(N-3, CASE-PART1)
-      /\ A := len(spectec-structinst(Z))
+      /\ A := size(spectec-structinst(Z))
       /\ SI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-struct-new(N-3, VAL*, ZT*))) } .
 
   rl Step(Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X-4, I)))) => Z ; TRAP .
 
-  crl Step(Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X-4, I)))) => with-struct(Z, A, I, packfield-(ZT* [ I ], VAL)) ; eps
+  crl Step(Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X-4, I)))) => with-struct(Z, A, I, packfield-(ZT* [ I ], VAL)) ; nil
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
       /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-read-struct-new-default(CASE-PART1) .
 
   crl Step(Z ; (VAL* ARRAY.NEW-FIXED(X-4, N-3))) => add-arrayinst(Z, AI-2) ; REF.ARRAY-ADDR(A)
-    if instrSize(VAL*) = N-3
+    if size(VAL*) = N-3
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1
-      /\ A := len(spectec-arrayinst(Z))
+      /\ size(MUT?) <= 1
+      /\ A := size(spectec-arrayinst(Z))
       /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-array-new-fixed(ZT, N-3, VAL*))) } .
 
   rl Step(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) => Z ; TRAP .
 
   crl Step(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) => Z ; TRAP
-    if I >= len((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
+    if I >= size((spectec-arrayinst(Z) [ A ]) . 'FIELDS) .
 
-  crl Step(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) => with-array(Z, A, I, packfield-(ZT, VAL)) ; eps
+  crl Step(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) => with-array(Z, A, I, packfield-(ZT, VAL)) ; nil
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1 .
+      /\ size(MUT?) <= 1 .
 
   rl [focus-Step-pure-unreachable] : identifyFocus(BRIDGE-Z, PREFIX, UNREACHABLE, POSTFIX) => { PREFIX | (BRIDGE-Z ; UNREACHABLE) | POSTFIX } .
 
@@ -7005,7 +7001,7 @@ mod SPEC2MAUDE-GENERATED is
 
   crl [focus-Step-pure-trap-instrs] : identifyFocus(BRIDGE-Z, STACK, TRAP, INSTR* POSTFIX) => { PREFIX | (BRIDGE-Z ; (VAL* (TRAP INSTR*))) | POSTFIX }
     if PREFIX VAL* := STACK
-      /\ _or_(VAL* =/= eps, INSTR* =/= eps) .
+      /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
 
   rl [focus-Step-pure-trap-label] : identifyFocus(BRIDGE-Z, PREFIX, LABEL- N-3 { INSTR'* } TRAP, POSTFIX) => { PREFIX | (BRIDGE-Z ; (LABEL- N-3 { INSTR'* } TRAP)) | POSTFIX } .
 
@@ -7073,7 +7069,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-pure-vsplat] : identifyFocus(BRIDGE-Z, PREFIX CONST(INPUT-FIELD, C_1-3), VSPLAT(_X_(LNN, M-2)), POSTFIX) => { PREFIX | (BRIDGE-Z ; (CONST(INPUT-FIELD, C_1-3) VSPLAT(_X_(LNN, M-2)))) | POSTFIX } .
 
-  rl [focus-Step-pure-vextract-lane-num] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C_1-2), VEXTRACT-LANE(_X_(NT, M-2), eps, I), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), eps, I))) | POSTFIX } .
+  rl [focus-Step-pure-vextract-lane-num] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C_1-2), VEXTRACT-LANE(_X_(NT, M-2), nil, I), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), nil, I))) | POSTFIX } .
 
   rl [focus-Step-pure-vextract-lane-pack] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C_1-2), VEXTRACT-LANE(_X_(PT, M-2), SX ?, I), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(PT, M-2), SX ?, I))) | POSTFIX } .
 
@@ -7090,18 +7086,18 @@ mod SPEC2MAUDE-GENERATED is
   rl [focus-Step-pure-vcvtop] : identifyFocus(BRIDGE-Z, PREFIX VCONST(V128, C_1-2), VCVTOP(SH_2, SH_1, VCVTOP-2), POSTFIX) => { PREFIX | (BRIDGE-Z ; (VCONST(V128, C_1-2) VCVTOP(SH_2, SH_1, VCVTOP-2))) | POSTFIX } .
 
   crl [focus-Step-read-block] : identifyFocus(Z, STACK, BLOCK(BT, INSTR*), POSTFIX) => { PREFIX | (Z ; (VAL* BLOCK(BT, INSTR*))) | POSTFIX }
-    if T_1* ->- eps  T_2* := blocktype-(Z, BT)
-      /\ M-3 := len(T_1*)
-      /\ N-3 := len(T_2*)
+    if T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 := size(T_1*)
+      /\ N-3 := size(T_2*)
       /\ PREFIX VAL* := STACK
-      /\ instrSize(VAL*) = M-3 .
+      /\ size(VAL*) = M-3 .
 
   crl [focus-Step-read-loop] : identifyFocus(Z, STACK, LOOP(BT, INSTR*), POSTFIX) => { PREFIX | (Z ; (VAL* LOOP(BT, INSTR*))) | POSTFIX }
-    if T_1* ->- eps  T_2* := blocktype-(Z, BT)
-      /\ M-3 := len(T_1*)
-      /\ N-3 := len(T_2*)
+    if T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 := size(T_1*)
+      /\ N-3 := size(T_2*)
       /\ PREFIX VAL* := STACK
-      /\ instrSize(VAL*) = M-3 .
+      /\ size(VAL*) = M-3 .
 
   rl [focus-Step-read-br-on-cast-succeed] : identifyFocus(S-2 ; F, PREFIX REF-2, BR-ON-CAST(L, RT_1, RT_2), POSTFIX) => { PREFIX | ((S-2 ; F) ; (REF-2 BR-ON-CAST(L, RT_1, RT_2))) | POSTFIX } .
 
@@ -7114,9 +7110,9 @@ mod SPEC2MAUDE-GENERATED is
   crl [focus-Step-read-call-ref-func] : identifyFocus(Z, STACK REF.FUNC-ADDR(A), CALL-REF(YY-2), POSTFIX) => { PREFIX | (Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) | POSTFIX }
     if FI := spectec-funcinst(Z) [ A ]
       /\ FUNC T_1* -> T_2* := Expand(FI . 'TYPE)
-      /\ N-3 := len(T_1*)
+      /\ N-3 := size(T_1*)
       /\ PREFIX VAL* := STACK
-      /\ instrSize(VAL*) = N-3 .
+      /\ size(VAL*) = N-3 .
 
   rl [focus-Step-read-return-call] : identifyFocus(Z, PREFIX, RETURN-CALL(X-4), POSTFIX) => { PREFIX | (Z ; RETURN-CALL(X-4)) | POSTFIX } .
 
@@ -7132,13 +7128,13 @@ mod SPEC2MAUDE-GENERATED is
 
   crl [focus-Step-read-throw-ref-instrs] : identifyFocus(Z, STACK REF.EXN-ADDR(A), THROW-REF, INSTR* POSTFIX) => { PREFIX | (Z ; (VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*)))) | POSTFIX }
     if PREFIX VAL* := STACK
-      /\ _or_(VAL* =/= eps, INSTR* =/= eps) .
+      /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
 
   rl [focus-Step-read-throw-ref-label] : identifyFocus(Z, PREFIX, LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
 
   rl [focus-Step-read-throw-ref-frame] : identifyFocus(Z, PREFIX, FRAME- N-3 { F } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (FRAME- N-3 { F } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
 
-  rl [focus-Step-read-throw-ref-handler-empty] : identifyFocus(Z, PREFIX, HANDLER- N-3 { eps } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N-3 { eps } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
+  rl [focus-Step-read-throw-ref-handler-empty] : identifyFocus(Z, PREFIX, HANDLER- N-3 { nil } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N-3 { nil } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
 
   rl [focus-Step-read-throw-ref-handler-catch] : identifyFocus(Z, PREFIX, HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
 
@@ -7151,11 +7147,11 @@ mod SPEC2MAUDE-GENERATED is
   rl [focus-Step-read-throw-ref-handler-next] : identifyFocus(Z, PREFIX, HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) => { PREFIX | (Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
 
   crl [focus-Step-read-try-table] : identifyFocus(Z, STACK, TRY-TABLE(BT, CATCH*, INSTR*), POSTFIX) => { PREFIX | (Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) | POSTFIX }
-    if T_1* ->- eps  T_2* := blocktype-(Z, BT)
-      /\ M-3 := len(T_1*)
-      /\ N-3 := len(T_2*)
+    if T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 := size(T_1*)
+      /\ N-3 := size(T_2*)
       /\ PREFIX VAL* := STACK
-      /\ instrSize(VAL*) = M-3 .
+      /\ size(VAL*) = M-3 .
 
   rl [focus-Step-read-local-get] : identifyFocus(Z, PREFIX, LOCAL.GET(X-4), POSTFIX) => { PREFIX | (Z ; LOCAL.GET(X-4)) | POSTFIX } .
 
@@ -7171,11 +7167,11 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-read-table-init-oob] : identifyFocus(Z, PREFIX (CONST(AT, # I) (CONST(I32, # J) CONST(I32, # N-3))), TABLE.INIT(X-4, Y), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) | POSTFIX } .
 
-  rl [focus-Step-read-load-num-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), LOAD(NT, eps, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) LOAD(NT, eps, X-4, AO))) | POSTFIX } .
+  rl [focus-Step-read-load-num-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), LOAD(NT, nil, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) LOAD(NT, nil, X-4, AO))) | POSTFIX } .
 
   rl [focus-Step-read-load-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) | POSTFIX } .
 
-  rl [focus-Step-read-vload-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, eps, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, eps, X-4, AO))) | POSTFIX } .
+  rl [focus-Step-read-vload-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, nil, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, nil, X-4, AO))) | POSTFIX } .
 
   rl [focus-Step-read-vload-pack-oob] : identifyFocus(Z, PREFIX CONST(AT, # I), VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) | POSTFIX } .
 
@@ -7246,10 +7242,10 @@ mod SPEC2MAUDE-GENERATED is
   rl [focus-Step-ctxt-frame] : identifyFocus(S-2 ; F, PREFIX, FRAME- N-3 { F' } INSTR*, POSTFIX) => { PREFIX | ((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) | POSTFIX } .
 
   crl [focus-Step-throw] : identifyFocus(Z, STACK, THROW(X-4), POSTFIX) => { PREFIX | (Z ; (VAL* THROW(X-4))) | POSTFIX }
-    if FUNC T* -> eps := Expand(as-deftype(spectec-tag(Z, X-4) . 'TYPE))
-      /\ N-3 := len(T*)
+    if FUNC T* -> nil := Expand(as-deftype(spectec-tag(Z, X-4) . 'TYPE))
+      /\ N-3 := size(T*)
       /\ PREFIX VAL* := STACK
-      /\ instrSize(VAL*) = N-3 .
+      /\ size(VAL*) = N-3 .
 
   rl [focus-Step-local-set] : identifyFocus(Z, PREFIX VAL, LOCAL.SET(X-4), POSTFIX) => { PREFIX | (Z ; (VAL LOCAL.SET(X-4))) | POSTFIX } .
 
@@ -7261,7 +7257,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-elem-drop] : identifyFocus(Z, PREFIX, ELEM.DROP(X-4), POSTFIX) => { PREFIX | (Z ; ELEM.DROP(X-4)) | POSTFIX } .
 
-  rl [focus-Step-store-num-oob] : identifyFocus(Z, PREFIX (CONST(AT, # I) CONST(NT, C-2)), STORE(NT, eps, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, eps, X-4, AO)))) | POSTFIX } .
+  rl [focus-Step-store-num-oob] : identifyFocus(Z, PREFIX (CONST(AT, # I) CONST(NT, C-2)), STORE(NT, nil, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, nil, X-4, AO)))) | POSTFIX } .
 
   rl [focus-Step-store-pack-oob] : identifyFocus(Z, PREFIX (CONST(AT, # I) CONST(INN, # C-3)), STORE(INN, (# N-3) ?, X-4, AO), POSTFIX) => { PREFIX | (Z ; (CONST(AT, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, X-4, AO)))) | POSTFIX } .
 
@@ -7277,7 +7273,7 @@ mod SPEC2MAUDE-GENERATED is
     if REL-OUTPUT1 := Expand(spectec-type(Z, X-4))
       /\ spectec-STRUCT(CASE-PART1) := REL-OUTPUT1
       /\ PREFIX VAL* := STACK
-      /\ N-3 := instrSize(VAL*)
+      /\ N-3 := size(VAL*)
       /\ tuple(seq(MUT?*) seq(ZT*)) := unzip-Step-struct-new(N-3, CASE-PART1) .
 
   rl [focus-Step-struct-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) VAL), STRUCT.SET(X-4, I), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (VAL STRUCT.SET(X-4, I)))) | POSTFIX } .
@@ -7286,10 +7282,10 @@ mod SPEC2MAUDE-GENERATED is
 
   crl [focus-Step-array-new-fixed] : identifyFocus(Z, STACK, ARRAY.NEW-FIXED(X-4, N-3), POSTFIX) => { PREFIX | (Z ; (VAL* ARRAY.NEW-FIXED(X-4, N-3))) | POSTFIX }
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ len(MUT?) <= 1
-      /\ A := len(spectec-arrayinst(Z))
+      /\ size(MUT?) <= 1
+      /\ A := size(spectec-arrayinst(Z))
       /\ PREFIX VAL* := STACK
-      /\ instrSize(VAL*) = N-3
+      /\ size(VAL*) = N-3
       /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-array-new-fixed(ZT, N-3, VAL*))) } .
 
   rl [focus-Step-array-set-null] : identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, # I) VAL)), ARRAY.SET(X-4), POSTFIX) => { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | POSTFIX } .
@@ -7411,7 +7407,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyPure(CONST(INPUT-FIELD, C_1-3) VSPLAT(_X_(LNN, M-2))) = true .
 
-  eq identifyPure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), eps, I)) = true .
+  eq identifyPure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(NT, M-2), nil, I)) = true .
 
   eq identifyPure(VCONST(V128, C_1-2) VEXTRACT-LANE(_X_(PT, M-2), SX ?, I)) = true .
 
@@ -7464,7 +7460,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyRead(Z ; (FRAME- N-3 { F } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
-  eq identifyRead(Z ; (HANDLER- N-3 { eps } (REF.EXN-ADDR(A) THROW-REF))) = true .
+  eq identifyRead(Z ; (HANDLER- N-3 { nil } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
   eq identifyRead(Z ; (HANDLER- N-3 { (CATCH(X-4, L) CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
@@ -7492,11 +7488,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) = true .
 
-  eq identifyRead(Z ; (CONST(AT, # I) LOAD(NT, eps, X-4, AO))) = true .
+  eq identifyRead(Z ; (CONST(AT, # I) LOAD(NT, nil, X-4, AO))) = true .
 
   eq identifyRead(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) = true .
 
-  eq identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, eps, X-4, AO))) = true .
+  eq identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, nil, X-4, AO))) = true .
 
   eq identifyRead(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) = true .
 
@@ -7589,74 +7585,74 @@ mod SPEC2MAUDE-GENERATED is
 
   eq (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
 
-  eq alloctypes(eps) = eps .
+  eq alloctypes(nil) = nil .
 
   ceq alloctypes(TYPE'* TYPE-2) = DEFTYPE'* DEFTYPE*
     if DEFTYPE'* := alloctypes(TYPE'*)
       /\ TYPE(RECTYPE) := TYPE-2
-      /\ X-4 := len(DEFTYPE'*)
+      /\ X-4 := size(DEFTYPE'*)
       /\ DEFTYPE* := subst-all-deftypes(rolldt(X-4, RECTYPE), DEFTYPE'*) .
 
-  ceq alloctag(S-2, TAGTYPE) = tuple(recordConcat(S-2, { (field('TAGS, TAGINST) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) (# len(S-2 . 'TAGS)))
+  ceq alloctag(S-2, TAGTYPE) = tuple(recordConcat(S-2, { (field('TAGS, TAGINST) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'TAGS)))
     if TAGINST := { field('TYPE, TAGTYPE) } .
 
-  eq alloctags(S-2, eps) = tuple(S-2 seq(eps)) .
+  eq alloctags(S-2, nil) = tuple(S-2 seq(nil)) .
 
   ceq alloctags(S-2, TAGTYPE TAGTYPE'*) = tuple(S_2 seq((# JA) JA'*))
     if tuple(S_1 (# JA)) := alloctag(S-2, TAGTYPE)
       /\ tuple(S_2 seq(JA'*)) := alloctags(S_1, TAGTYPE'*) .
 
-  ceq allocglobal(S-2, GLOBALTYPE, VAL) = tuple(recordConcat(S-2, { (field('TAGS, eps) ; (field('GLOBALS, GLOBALINST) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) (# len(S-2 . 'GLOBALS)))
+  ceq allocglobal(S-2, GLOBALTYPE, VAL) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, GLOBALINST) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'GLOBALS)))
     if GLOBALINST := { (field('TYPE, GLOBALTYPE) ; field('VALUE, VAL)) } .
 
-  eq allocglobals(S-2, eps, eps) = tuple(S-2 seq(eps)) .
+  eq allocglobals(S-2, nil, nil) = tuple(S-2 seq(nil)) .
 
   ceq allocglobals(S-2, GLOBALTYPE GLOBALTYPE'*, VAL VAL'*) = tuple(S_2 seq((# GA) GA'*))
     if tuple(S_1 (# GA)) := allocglobal(S-2, GLOBALTYPE, VAL)
       /\ tuple(S_2 seq(GA'*)) := allocglobals(S_1, GLOBALTYPE'*, VAL'*) .
 
-  ceq allocmem(S-2, __PAGE(AT, [ I .. J? ])) = tuple(recordConcat(S-2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, MEMINST) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) (# len(S-2 . 'MEMS)))
-    if len(J?) <= 1
+  ceq allocmem(S-2, __PAGE(AT, [ I .. J? ])) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, MEMINST) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'MEMS)))
+    if size(J?) <= 1
       /\ MEMINST := { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, repeatSeq(I * (64 * Ki), # 0))) } .
 
-  eq allocmems(S-2, eps) = tuple(S-2 seq(eps)) .
+  eq allocmems(S-2, nil) = tuple(S-2 seq(nil)) .
 
   ceq allocmems(S-2, MEMTYPE MEMTYPE'*) = tuple(S_2 seq((# MA) MA'*))
     if tuple(S_1 (# MA)) := allocmem(S-2, MEMTYPE)
       /\ tuple(S_2 seq(MA'*)) := allocmems(S_1, MEMTYPE'*) .
 
-  ceq alloctable(S-2, tuple(AT (([ I .. J? ]) RT)), REF-2) = tuple(recordConcat(S-2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, TABLEINST) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) (# len(S-2 . 'TABLES)))
-    if len(J?) <= 1
+  ceq alloctable(S-2, tuple(AT (([ I .. J? ]) RT)), REF-2) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, TABLEINST) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'TABLES)))
+    if size(J?) <= 1
       /\ TABLEINST := { (field('TYPE, tuple(AT (([ I .. J? ]) RT))) ; field('REFS, repeatSeq(I, REF-2))) } .
 
-  eq alloctables(S-2, eps, eps) = tuple(S-2 seq(eps)) .
+  eq alloctables(S-2, nil, nil) = tuple(S-2 seq(nil)) .
 
   ceq alloctables(S-2, TABLETYPE TABLETYPE'*, REF-2 REF'*) = tuple(S_2 seq((# TA) TA'*))
     if tuple(S_1 (# TA)) := alloctable(S-2, TABLETYPE, REF-2)
       /\ tuple(S_2 seq(TA'*)) := alloctables(S_1, TABLETYPE'*, REF'*) .
 
-  ceq allocfunc(S-2, DEFTYPE, FUNCCODE, MODULEINST) = tuple(recordConcat(S-2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, FUNCINST) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) (# len(S-2 . 'FUNCS)))
+  ceq allocfunc(S-2, DEFTYPE, FUNCCODE, MODULEINST) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, FUNCINST) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'FUNCS)))
     if FUNCINST := { (field('TYPE, DEFTYPE) ; (field('MODULE, MODULEINST) ; field('CODE, FUNCCODE))) } .
 
-  eq allocfuncs(S-2, eps, eps, eps) = tuple(S-2 seq(eps)) .
+  eq allocfuncs(S-2, nil, nil, nil) = tuple(S-2 seq(nil)) .
 
   ceq allocfuncs(S-2, DT DT'*, FUNCCODE FUNCCODE'*, MODULEINST MODULEINST'*) = tuple(S_2 seq((# FA) FA'*))
     if tuple(S_1 (# FA)) := allocfunc(S-2, DT, FUNCCODE, MODULEINST)
       /\ tuple(S_2 seq(FA'*)) := allocfuncs(S_1, DT'*, FUNCCODE'*, MODULEINST'*) .
 
-  ceq allocdata(S-2, OK, BYTE*) = tuple(recordConcat(S-2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, DATAINST) ; (field('ELEMS, eps) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) (# len(S-2 . 'DATAS)))
+  ceq allocdata(S-2, OK, BYTE*) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, DATAINST) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'DATAS)))
     if DATAINST := { field('BYTES, BYTE*) } .
 
-  eq allocdatas(S-2, eps, eps) = tuple(S-2 seq(eps)) .
+  eq allocdatas(S-2, nil, nil) = tuple(S-2 seq(nil)) .
 
   ceq allocdatas(S-2, OK-3 OK'*, seq(B*) B'**) = tuple(S_2 seq((# DA) DA'*))
     if tuple(S_1 (# DA)) := allocdata(S-2, OK-3, B*)
       /\ tuple(S_2 seq(DA'*)) := allocdatas(S_1, OK'*, B'**) .
 
-  ceq allocelem(S-2, ELEMTYPE, REF*) = tuple(recordConcat(S-2, { (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, ELEMINST) ; (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps)))))))))) }, store) (# len(S-2 . 'ELEMS)))
+  ceq allocelem(S-2, ELEMTYPE, REF*) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, ELEMINST) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'ELEMS)))
     if ELEMINST := { (field('TYPE, ELEMTYPE) ; field('REFS, REF*)) } .
 
-  eq allocelems(S-2, eps, eps) = tuple(S-2 seq(eps)) .
+  eq allocelems(S-2, nil, nil) = tuple(S-2 seq(nil)) .
 
   ceq allocelems(S-2, RT RT'*, seq(REF*) REF'**) = tuple(S_2 seq((# EA) EA'*))
     if tuple(S_1 (# EA)) := allocelem(S-2, RT, REF*)
@@ -7676,7 +7672,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq allocmodule(S-2, MODULE-2, EXTERNADDR*, VAL_G*, REF_T*, REF_E**) = tuple(S_7 MODULEINST)
     if MODULE(TYPE*, IMPORT*, TAG*, GLOBAL*, MEM*, TABLE*, FUNC*, DATA*, ELEM*, START?, EXPORT*) := MODULE-2
-      /\ len(START?) <= 1
+      /\ size(START?) <= 1
       /\ TAGTYPE* := unzip-TAG(TAG*)
       /\ tuple(seq(EXPR_G*) seq(GLOBALTYPE*)) := unzip-GLOBAL(GLOBAL*)
       /\ MEMTYPE* := unzip-MEMORY(MEM*)
@@ -7690,46 +7686,46 @@ mod SPEC2MAUDE-GENERATED is
       /\ TA_I* := tablesxa(EXTERNADDR*)
       /\ FA_I* := funcsxa(EXTERNADDR*)
       /\ DT* := alloctypes(TYPE*)
-      /\ FA* := map-allocmodule(S-2, len(FUNC*), 0)
+      /\ FA* := map-allocmodule(S-2, size(FUNC*), 0)
       /\ tuple(S_1 seq(AA*)) := alloctags(S-2, map-subst-all-tagtype(DT*, TAGTYPE*))
       /\ tuple(S_2 seq(GA*)) := allocglobals(S_1, map-subst-all-globaltype(DT*, GLOBALTYPE*), VAL_G*)
       /\ tuple(S_3 seq(MA*)) := allocmems(S_2, map-subst-all-memtype(DT*, MEMTYPE*))
       /\ tuple(S_4 seq(TA*)) := alloctables(S_3, map-subst-all-tabletype(DT*, TABLETYPE*), REF_T*)
-      /\ tuple(S_5 seq(DA*)) := allocdatas(S_4, repeatSeq(len(DATA*), OK), BYTE**)
+      /\ tuple(S_5 seq(DA*)) := allocdatas(S_4, repeatSeq(size(DATA*), OK), BYTE**)
       /\ tuple(S_6 seq(EA*)) := allocelems(S_5, map-subst-all-reftype(DT*, ELEMTYPE*), REF_E**)
-      /\ XI* := allocexports({ (field('TYPES, eps) ; (field('TAGS, AA_I* AA*) ; (field('GLOBALS, GA_I* GA*) ; (field('MEMS, MA_I* MA*) ; (field('TABLES, TA_I* TA*) ; (field('FUNCS, FA_I* FA*) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }, EXPORT*)
+      /\ XI* := allocexports({ (field('TYPES, nil) ; (field('TAGS, AA_I* AA*) ; (field('GLOBALS, GA_I* GA*) ; (field('MEMS, MA_I* MA*) ; (field('TABLES, TA_I* TA*) ; (field('FUNCS, FA_I* FA*) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; field('EXPORTS, nil))))))))) }, EXPORT*)
       /\ MODULEINST := { (field('TYPES, DT*) ; (field('TAGS, AA_I* AA*) ; (field('GLOBALS, GA_I* GA*) ; (field('MEMS, MA_I* MA*) ; (field('TABLES, TA_I* TA*) ; (field('FUNCS, FA_I* FA*) ; (field('DATAS, DA*) ; (field('ELEMS, EA*) ; field('EXPORTS, XI*))))))))) }
-      /\ tuple(S_7 seq(FA*)) := allocfuncs(S_6, map-allocmodule-2(DT*, X*-2), map-FUNC(EXPR_F*, LOCAL**, X*-2), repeatSeq(len(FUNC*), MODULEINST)) .
+      /\ tuple(S_7 seq(FA*)) := allocfuncs(S_6, map-allocmodule-2(DT*, X*-2), map-FUNC(EXPR_F*, LOCAL**, X*-2), repeatSeq(size(FUNC*), MODULEINST)) .
 
-  ceq rundata-(X-4, DATA(B*, PASSIVE)) = eps
-    if N-3 := len(B*) .
+  ceq rundata-(X-4, DATA(B*, PASSIVE)) = nil
+    if N-3 := size(B*) .
 
   ceq rundata-(X-4, DATA(B*, ACTIVE(Y, INSTR*))) = INSTR* (CONST(I32, # 0) (CONST(I32, # N-3) (MEMORY.INIT(Y, X-4) DATA.DROP(X-4))))
-    if N-3 := len(B*) .
+    if N-3 := size(B*) .
 
-  ceq runelem-(X-4, ELEM(RT, E*, PASSIVE)) = eps
-    if N-3 := len(E*) .
+  ceq runelem-(X-4, ELEM(RT, E*, PASSIVE)) = nil
+    if N-3 := size(E*) .
 
   ceq runelem-(X-4, ELEM(RT, E*, DECLARE)) = ELEM.DROP(X-4)
-    if N-3 := len(E*) .
+    if N-3 := size(E*) .
 
   ceq runelem-(X-4, ELEM(RT, E*, ACTIVE(Y, INSTR*))) = INSTR* (CONST(I32, # 0) (CONST(I32, # N-3) (TABLE.INIT(Y, X-4) ELEM.DROP(X-4))))
-    if N-3 := len(E*) .
+    if N-3 := size(E*) .
 
-  rl evalexprs(Z, eps) => tuple(Z seq(eps)) .
+  rl evalexprs(Z, nil) => tuple(Z seq(nil)) .
 
   crl evalexprs(Z, seq(EXPR) EXPR'*) => tuple(Z'' seq(REF-2 REF'*))
     if Eval-expr(Z, EXPR) => tuple(Z' seq(REF-2))
       /\ typecheck(REF-2, ref)
       /\ evalexprs(Z', EXPR'*) => tuple(Z'' seq(REF'*)) .
 
-  rl evalexprss(Z, eps) => tuple(Z seq(eps)) .
+  rl evalexprss(Z, nil) => tuple(Z seq(nil)) .
 
   crl evalexprss(Z, seq(EXPR*) EXPR'**) => tuple(Z'' seq(seq(REF*) REF'**))
     if evalexprs(Z, EXPR*) => tuple(Z' seq(REF*))
       /\ evalexprss(Z', EXPR'**) => tuple(Z'' seq(REF'**)) .
 
-  rl evalglobals(Z, eps, eps) => tuple(Z seq(eps)) .
+  rl evalglobals(Z, nil, nil) => tuple(Z seq(nil)) .
 
   crl evalglobals(Z, GT-2 GT'*, seq(EXPR) EXPR'*) => tuple(Z'' seq(VAL VAL'*))
     if Eval-expr(Z, EXPR) => tuple(Z' seq(VAL))
@@ -7737,597 +7733,597 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S' (# A)) := allocglobal(S-2, GT-2, VAL)
       /\ evalglobals(S' ; (F [. 'MODULE = ((F . 'MODULE) [. 'GLOBALS = (((F . 'MODULE) . 'GLOBALS) (# A)) ]) ]), GT'*, EXPR'*) => tuple(Z'' seq(VAL'*)) .
 
-  crl instantiate(S-2, MODULE-2, EXTERNADDR*) => (S'''' ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST)) })) ; (INSTR_E* (INSTR_D* instrLift(INSTR_S?)))
+  crl instantiate(S-2, MODULE-2, EXTERNADDR*) => (S'''' ; ({ (field('LOCALS, nil) ; field('MODULE, MODULEINST)) })) ; (INSTR_E* (INSTR_D* instrLift(INSTR_S?)))
     if MODULE(TYPE*, IMPORT*, TAG*, GLOBAL*, MEM*, TABLE*, FUNC*, DATA*, ELEM*, START?, EXPORT*) := MODULE-2
-      /\ len(START?) <= 1
+      /\ size(START?) <= 1
       /\ tuple(seq(EXPR_G*) seq(GLOBALTYPE*)) := unzip-GLOBAL(GLOBAL*)
       /\ tuple(seq(EXPR_T*) seq(TABLETYPE*)) := unzip-TABLE(TABLE*)
       /\ tuple(seq(BYTE**) seq(DATAMODE*)) := unzip-DATA(DATA*)
       /\ tuple(seq(ELEMMODE*) (seq(EXPR_E**) seq(REFTYPE*))) := unzip-instantiate(ELEM*)
       /\ X? := unzip-START(START?)
-      /\ MODULEINST_0 := { (field('TYPES, alloctypes(TYPE*)) ; (field('TAGS, eps) ; (field('GLOBALS, globalsxa(EXTERNADDR*)) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, funcsxa(EXTERNADDR*) map-allocmodule(S-2, len(FUNC*), 0)) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) }
-      /\ Z := S-2 ; ({ (field('LOCALS, eps) ; field('MODULE, MODULEINST_0)) })
+      /\ MODULEINST_0 := { (field('TYPES, alloctypes(TYPE*)) ; (field('TAGS, nil) ; (field('GLOBALS, globalsxa(EXTERNADDR*)) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, funcsxa(EXTERNADDR*) map-allocmodule(S-2, size(FUNC*), 0)) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; field('EXPORTS, nil))))))))) }
+      /\ Z := S-2 ; ({ (field('LOCALS, nil) ; field('MODULE, MODULEINST_0)) })
       /\ evalglobals(Z, GLOBALTYPE*, EXPR_G*) => tuple(Z' seq(VAL_G*))
       /\ evalexprs(Z', EXPR_T*) => tuple(Z'' seq(REF_T*))
       /\ evalexprss(Z'', EXPR_E**) => tuple(Z''' seq(REF_E**))
       /\ S''' ; F := Z'''
       /\ tuple(S'''' MODULEINST) := allocmodule(S''', MODULE-2, EXTERNADDR*, VAL_G*, REF_T*, REF_E**)
-      /\ INSTR_D* := concat-(instr, map-rundata(DATA*, len(DATA*), 0))
-      /\ INSTR_E* := concat-(instr, map-runelem(ELEM*, len(ELEM*), 0))
+      /\ INSTR_D* := concat-(instr, map-rundata(DATA*, size(DATA*), 0))
+      /\ INSTR_E* := concat-(instr, map-runelem(ELEM*, size(ELEM*), 0))
       /\ INSTR_S? := map-CALL(X?)
-      /\ len(INSTR_S?) <= 1 .
+      /\ size(INSTR_S?) <= 1 .
 
-  ceq invoke(S-2, FUNCADDR, VAL*) = (S-2 ; ({ (field('LOCALS, eps) ; field('MODULE, { (field('TYPES, eps) ; (field('TAGS, eps) ; (field('GLOBALS, eps) ; (field('MEMS, eps) ; (field('TABLES, eps) ; (field('FUNCS, eps) ; (field('DATAS, eps) ; (field('ELEMS, eps) ; field('EXPORTS, eps))))))))) })) })) ; (VAL* (REF.FUNC-ADDR(FUNCADDR) CALL-REF(((S-2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)))
+  ceq invoke(S-2, FUNCADDR, VAL*) = (S-2 ; ({ (field('LOCALS, nil) ; field('MODULE, { (field('TYPES, nil) ; (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; field('EXPORTS, nil))))))))) })) })) ; (VAL* (REF.FUNC-ADDR(FUNCADDR) CALL-REF(((S-2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)))
     if FUNC T_1* -> T_2* := Expand(((S-2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)
       /\ all-invoke(S-2, T_1*, VAL*) .
 
-  eq map-concatopt(X, eps) = eps .
+  eq map-concatopt(X, nil) = nil .
 
   eq map-concatopt(X, seq(W'?) W'?*-REST) = seq(lift(W'?)) map-concatopt(X, W'?*-REST) .
 
-  eq map-subst-fieldtype(TV*, TU*, eps) = eps .
+  eq map-subst-fieldtype(TV*, TU*, nil) = nil .
 
   eq map-subst-fieldtype(TV*, TU*, FT FT*-REST) = subst-fieldtype(FT, TV*, TU*) map-subst-fieldtype(TV*, TU*, FT*-REST) .
 
-  eq map-subst-valtype(TV*, TU*, eps) = eps .
+  eq map-subst-valtype(TV*, TU*, nil) = nil .
 
   eq map-subst-valtype(TV*, TU*, T_1-2 T_1*-REST) = subst-valtype(T_1-2, TV*, TU*) map-subst-valtype(TV*, TU*, T_1*-REST) .
 
-  eq map-subst-typeuse(TV*, TU*, eps) = eps .
+  eq map-subst-typeuse(TV*, TU*, nil) = nil .
 
   eq map-subst-typeuse(TV*, TU*, TU'-2 TU'*-REST) = subst-typeuse(TU'-2, TV*, TU*) map-subst-typeuse(TV*, TU*, TU'*-REST) .
 
-  eq map-subst-rectype(TV'*, TU'*, eps) = eps .
+  eq map-subst-rectype(TV'*, TU'*, nil) = nil .
 
   eq map-subst-rectype(TV'*, TU'*, ST-2 ST*-REST) = subst-subtype(ST-2, TV'*, TU'*) map-subst-rectype(TV'*, TU'*, ST*-REST) .
 
-  eq map-subst-externtype(TV*, TU*, eps) = eps .
+  eq map-subst-externtype(TV*, TU*, nil) = nil .
 
   eq map-subst-externtype(TV*, TU*, XT_1-2 XT_1*-REST) = subst-externtype(XT_1-2, TV*, TU*) map-subst-externtype(TV*, TU*, XT_1*-REST) .
 
-  eq map-subst-all-valtype(0, I) = eps .
+  eq map-subst-all-valtype(0, I) = nil .
 
   eq map-subst-all-valtype(s(ITER-COUNT), I) = -IDX(I) map-subst-all-valtype(ITER-COUNT, s(I)) .
 
-  eq map-rollrt-subst-subtype(X-4, N-3, 0, eps) = eps .
+  eq map-rollrt-subst-subtype(X-4, N-3, 0, nil) = nil .
 
   eq map-rollrt-subst-subtype(X-4, N-3, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-rollrt-IDX(X-4, N-3, 0), map-REC(N-3, 0)) map-rollrt-subst-subtype(X-4, N-3, ITER-COUNT, SUBTYPE*-REST) .
 
-  eq map-rollrt-IDX(X-4, 0, I) = eps .
+  eq map-rollrt-IDX(X-4, 0, I) = nil .
 
   eq map-rollrt-IDX(X-4, s(ITER-COUNT), I) = -IDX(X-4 + I) map-rollrt-IDX(X-4, ITER-COUNT, s(I)) .
 
-  eq map-REC(0, I) = eps .
+  eq map-REC(0, I) = nil .
 
   eq map-REC(s(ITER-COUNT), I) = REC(I) map-REC(ITER-COUNT, s(I)) .
 
-  eq map-unrollrt-subst-subtype(N-3, RECTYPE, 0, eps) = eps .
+  eq map-unrollrt-subst-subtype(N-3, RECTYPE, 0, nil) = nil .
 
   eq map-unrollrt-subst-subtype(N-3, RECTYPE, s(ITER-COUNT), SUBTYPE SUBTYPE*-REST) = subst-subtype(SUBTYPE, map-REC(N-3, 0), map-unrollrt-DEF(RECTYPE, N-3, 0)) map-unrollrt-subst-subtype(N-3, RECTYPE, ITER-COUNT, SUBTYPE*-REST) .
 
-  eq map-unrollrt-DEF(RECTYPE, 0, I) = eps .
+  eq map-unrollrt-DEF(RECTYPE, 0, I) = nil .
 
   eq map-unrollrt-DEF(RECTYPE, s(ITER-COUNT), I) = -DEF(RECTYPE, I) map-unrollrt-DEF(RECTYPE, ITER-COUNT, s(I)) .
 
-  eq map-rolldt(N-3, SUBTYPE*, 0, I) = eps .
+  eq map-rolldt(N-3, SUBTYPE*, 0, I) = nil .
 
   eq map-rolldt(N-3, SUBTYPE*, s(ITER-COUNT), I) = -DEF(REC(SUBTYPE*), I) map-rolldt(N-3, SUBTYPE*, ITER-COUNT, s(I)) .
 
-  eq map-free-resulttype(eps) = eps .
+  eq map-free-resulttype(nil) = nil .
 
   eq map-free-resulttype(VALTYPE VALTYPE*-REST) = free-valtype(VALTYPE) map-free-resulttype(VALTYPE*-REST) .
 
-  eq map-free-fieldtype(eps) = eps .
+  eq map-free-fieldtype(nil) = nil .
 
   eq map-free-fieldtype(FIELDTYPE FIELDTYPE*-REST) = free-fieldtype(FIELDTYPE) map-free-fieldtype(FIELDTYPE*-REST) .
 
-  eq map-free-typeuse(eps) = eps .
+  eq map-free-typeuse(nil) = nil .
 
   eq map-free-typeuse(TYPEUSE TYPEUSE*-REST) = free-typeuse(TYPEUSE) map-free-typeuse(TYPEUSE*-REST) .
 
-  eq map-free-subtype(eps) = eps .
+  eq map-free-subtype(nil) = nil .
 
   eq map-free-subtype(SUBTYPE SUBTYPE*-REST) = free-subtype(SUBTYPE) map-free-subtype(SUBTYPE*-REST) .
 
-  eq map-free-externtype(eps) = eps .
+  eq map-free-externtype(nil) = nil .
 
   eq map-free-externtype(EXTERNTYPE_1-2 EXTERNTYPE_1*-REST) = free-externtype(EXTERNTYPE_1-2) map-free-externtype(EXTERNTYPE_1*-REST) .
 
-  eq map-free-blocktype(eps) = eps .
+  eq map-free-blocktype(nil) = nil .
 
   eq map-free-blocktype(VALTYPE ?) = free-valtype(VALTYPE) ? .
 
-  eq map-free-list(eps) = eps .
+  eq map-free-list(nil) = nil .
 
   eq map-free-list(seq(VALTYPE*) ?) = free-list(map-free-resulttype(VALTYPE*)) ? .
 
-  eq map-free-labelidx(eps) = eps .
+  eq map-free-labelidx(nil) = nil .
 
   eq map-free-labelidx((# LABELIDX) LABELIDX*-REST) = free-labelidx(LABELIDX) map-free-labelidx(LABELIDX*-REST) .
 
-  eq map-free-catch(eps) = eps .
+  eq map-free-catch(nil) = nil .
 
   eq map-free-catch(CATCH-2 CATCH*-REST) = free-catch(CATCH-2) map-free-catch(CATCH*-REST) .
 
-  eq map-free-instr(eps) = eps .
+  eq map-free-instr(nil) = nil .
 
   eq map-free-instr(INSTR INSTR*-REST) = free-instr(INSTR) map-free-instr(INSTR*-REST) .
 
-  eq map-free-local(eps) = eps .
+  eq map-free-local(nil) = nil .
 
   eq map-free-local(LOCAL-2 LOCAL*-REST) = free-local(LOCAL-2) map-free-local(LOCAL*-REST) .
 
-  eq map-free-expr(eps) = eps .
+  eq map-free-expr(nil) = nil .
 
   eq map-free-expr(seq(EXPR) EXPR*-REST) = free-expr(EXPR) map-free-expr(EXPR*-REST) .
 
-  eq map-free-type(eps) = eps .
+  eq map-free-type(nil) = nil .
 
   eq map-free-type(TYPE-2 TYPE*-REST) = free-type(TYPE-2) map-free-type(TYPE*-REST) .
 
-  eq map-free-tag(eps) = eps .
+  eq map-free-tag(nil) = nil .
 
   eq map-free-tag(TAG-2 TAG*-REST) = free-tag(TAG-2) map-free-tag(TAG*-REST) .
 
-  eq map-free-global(eps) = eps .
+  eq map-free-global(nil) = nil .
 
   eq map-free-global(GLOBAL-2 GLOBAL*-REST) = free-global(GLOBAL-2) map-free-global(GLOBAL*-REST) .
 
-  eq map-free-mem(eps) = eps .
+  eq map-free-mem(nil) = nil .
 
   eq map-free-mem(MEM-2 MEM*-REST) = free-mem(MEM-2) map-free-mem(MEM*-REST) .
 
-  eq map-free-table(eps) = eps .
+  eq map-free-table(nil) = nil .
 
   eq map-free-table(TABLE-2 TABLE*-REST) = free-table(TABLE-2) map-free-table(TABLE*-REST) .
 
-  eq map-free-func(eps) = eps .
+  eq map-free-func(nil) = nil .
 
   eq map-free-func(FUNC-2 FUNC*-REST) = free-func(FUNC-2) map-free-func(FUNC*-REST) .
 
-  eq map-free-data(eps) = eps .
+  eq map-free-data(nil) = nil .
 
   eq map-free-data(DATA-2 DATA*-REST) = free-data(DATA-2) map-free-data(DATA*-REST) .
 
-  eq map-free-elem(eps) = eps .
+  eq map-free-elem(nil) = nil .
 
   eq map-free-elem(ELEM-2 ELEM*-REST) = free-elem(ELEM-2) map-free-elem(ELEM*-REST) .
 
-  eq map-free-start(eps) = eps .
+  eq map-free-start(nil) = nil .
 
   eq map-free-start(START-2 ?) = free-start(START-2) ? .
 
-  eq map-free-import(eps) = eps .
+  eq map-free-import(nil) = nil .
 
   eq map-free-import(IMPORT-2 IMPORT*-REST) = free-import(IMPORT-2) map-free-import(IMPORT*-REST) .
 
-  eq map-free-export(eps) = eps .
+  eq map-free-export(nil) = nil .
 
   eq map-free-export(EXPORT-2 EXPORT*-REST) = free-export(EXPORT-2) map-free-export(EXPORT*-REST) .
 
-  eq map-iabs(JNN, eps) = eps .
+  eq map-iabs(JNN, nil) = nil .
 
   eq map-iabs(JNN, (# C_1-2) C_1*-REST) = (# iabs-(lsizenn(JNN), C_1-2)) map-iabs(JNN, C_1*-REST) .
 
-  eq map-ineg(JNN, eps) = eps .
+  eq map-ineg(JNN, nil) = nil .
 
   eq map-ineg(JNN, (# C_1-2) C_1*-REST) = (# ineg-(lsizenn(JNN), C_1-2)) map-ineg(JNN, C_1*-REST) .
 
-  eq map-ipopcnt(JNN, eps) = eps .
+  eq map-ipopcnt(JNN, nil) = nil .
 
   eq map-ipopcnt(JNN, (# C_1-2) C_1*-REST) = (# ipopcnt-(lsizenn(JNN), C_1-2)) map-ipopcnt(JNN, C_1*-REST) .
 
-  eq map-inv-lanes(FNN, M-2, eps) = eps .
+  eq map-inv-lanes(FNN, M-2, nil) = nil .
 
   eq map-inv-lanes(FNN, M-2, seq(C*) C**-REST) = (# inv-lanes-(_X_(FNN, M-2), C*)) map-inv-lanes(FNN, M-2, C**-REST) .
 
-  eq map-fabs(FNN, eps) = eps .
+  eq map-fabs(FNN, nil) = nil .
 
   eq map-fabs(FNN, C_1-3 C_1*-REST) = seq(fabs-(sizenn(FNN), C_1-3)) map-fabs(FNN, C_1*-REST) .
 
-  eq map-fneg(FNN, eps) = eps .
+  eq map-fneg(FNN, nil) = nil .
 
   eq map-fneg(FNN, C_1-3 C_1*-REST) = seq(fneg-(sizenn(FNN), C_1-3)) map-fneg(FNN, C_1*-REST) .
 
-  eq map-fsqrt(FNN, eps) = eps .
+  eq map-fsqrt(FNN, nil) = nil .
 
   eq map-fsqrt(FNN, C_1-3 C_1*-REST) = seq(fsqrt-(sizenn(FNN), C_1-3)) map-fsqrt(FNN, C_1*-REST) .
 
-  eq map-fceil(FNN, eps) = eps .
+  eq map-fceil(FNN, nil) = nil .
 
   eq map-fceil(FNN, C_1-3 C_1*-REST) = seq(fceil-(sizenn(FNN), C_1-3)) map-fceil(FNN, C_1*-REST) .
 
-  eq map-ffloor(FNN, eps) = eps .
+  eq map-ffloor(FNN, nil) = nil .
 
   eq map-ffloor(FNN, C_1-3 C_1*-REST) = seq(ffloor-(sizenn(FNN), C_1-3)) map-ffloor(FNN, C_1*-REST) .
 
-  eq map-ftrunc(FNN, eps) = eps .
+  eq map-ftrunc(FNN, nil) = nil .
 
   eq map-ftrunc(FNN, C_1-3 C_1*-REST) = seq(ftrunc-(sizenn(FNN), C_1-3)) map-ftrunc(FNN, C_1*-REST) .
 
-  eq map-fnearest(FNN, eps) = eps .
+  eq map-fnearest(FNN, nil) = nil .
 
   eq map-fnearest(FNN, C_1-3 C_1*-REST) = seq(fnearest-(sizenn(FNN), C_1-3)) map-fnearest(FNN, C_1*-REST) .
 
-  eq map-ivbinop-iadd(JNN, eps, eps) = eps .
+  eq map-ivbinop-iadd(JNN, nil, nil) = nil .
 
   eq map-ivbinop-iadd(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iadd-(lsizenn(JNN), C_1-2, C_2-2)) map-ivbinop-iadd(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-isub(JNN, eps, eps) = eps .
+  eq map-isub(JNN, nil, nil) = nil .
 
   eq map-isub(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# isub-(lsizenn(JNN), C_1-2, C_2-2)) map-isub(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-ivbinop-imul(JNN, eps, eps) = eps .
+  eq map-ivbinop-imul(JNN, nil, nil) = nil .
 
   eq map-ivbinop-imul(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# imul-(lsizenn(JNN), C_1-2, C_2-2)) map-ivbinop-imul(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-ivbinopsx-iadd-sat(JNN, SX, eps, eps) = eps .
+  eq map-ivbinopsx-iadd-sat(JNN, SX, nil, nil) = nil .
 
   eq map-ivbinopsx-iadd-sat(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iadd-sat-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-ivbinopsx-iadd-sat(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-isub-sat(JNN, SX, eps, eps) = eps .
+  eq map-isub-sat(JNN, SX, nil, nil) = nil .
 
   eq map-isub-sat(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# isub-sat-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-isub-sat(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-imin(JNN, SX, eps, eps) = eps .
+  eq map-imin(JNN, SX, nil, nil) = nil .
 
   eq map-imin(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# imin-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-imin(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-imax(JNN, SX, eps, eps) = eps .
+  eq map-imax(JNN, SX, nil, nil) = nil .
 
   eq map-imax(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# imax-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-imax(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-iavgr(JNN, SX, eps, eps) = eps .
+  eq map-iavgr(JNN, SX, nil, nil) = nil .
 
   eq map-iavgr(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iavgr-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-iavgr(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-iq15mulr-sat(JNN, SX, eps, eps) = eps .
+  eq map-iq15mulr-sat(JNN, SX, nil, nil) = nil .
 
   eq map-iq15mulr-sat(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# iq15mulr-sat-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-iq15mulr-sat(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-irelaxed-q15mulr(JNN, SX, eps, eps) = eps .
+  eq map-irelaxed-q15mulr(JNN, SX, nil, nil) = nil .
 
   eq map-irelaxed-q15mulr(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = seq(irelaxed-q15mulr-(lsizenn(JNN), SX, C_1-2, C_2-2)) map-irelaxed-q15mulr(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-fadd(FNN, eps, eps) = eps .
+  eq map-fadd(FNN, nil, nil) = nil .
 
   eq map-fadd(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fadd-(sizenn(FNN), C_1-3, C_2-3)) map-fadd(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fsub(FNN, eps, eps) = eps .
+  eq map-fsub(FNN, nil, nil) = nil .
 
   eq map-fsub(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fsub-(sizenn(FNN), C_1-3, C_2-3)) map-fsub(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fmul(FNN, eps, eps) = eps .
+  eq map-fmul(FNN, nil, nil) = nil .
 
   eq map-fmul(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fmul-(sizenn(FNN), C_1-3, C_2-3)) map-fmul(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fdiv(FNN, eps, eps) = eps .
+  eq map-fdiv(FNN, nil, nil) = nil .
 
   eq map-fdiv(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fdiv-(sizenn(FNN), C_1-3, C_2-3)) map-fdiv(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fmin(FNN, eps, eps) = eps .
+  eq map-fmin(FNN, nil, nil) = nil .
 
   eq map-fmin(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fmin-(sizenn(FNN), C_1-3, C_2-3)) map-fmin(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fmax(FNN, eps, eps) = eps .
+  eq map-fmax(FNN, nil, nil) = nil .
 
   eq map-fmax(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fmax-(sizenn(FNN), C_1-3, C_2-3)) map-fmax(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fpmin(FNN, eps, eps) = eps .
+  eq map-fpmin(FNN, nil, nil) = nil .
 
   eq map-fpmin(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fpmin-(sizenn(FNN), C_1-3, C_2-3)) map-fpmin(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fpmax(FNN, eps, eps) = eps .
+  eq map-fpmax(FNN, nil, nil) = nil .
 
   eq map-fpmax(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(fpmax-(sizenn(FNN), C_1-3, C_2-3)) map-fpmax(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-frelaxed-min(FNN, eps, eps) = eps .
+  eq map-frelaxed-min(FNN, nil, nil) = nil .
 
   eq map-frelaxed-min(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(frelaxed-min-(sizenn(FNN), C_1-3, C_2-3)) map-frelaxed-min(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-frelaxed-max(FNN, eps, eps) = eps .
+  eq map-frelaxed-max(FNN, nil, nil) = nil .
 
   eq map-frelaxed-max(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = seq(frelaxed-max-(sizenn(FNN), C_1-3, C_2-3)) map-frelaxed-max(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-irelaxed-laneselect(JNN, eps, eps, eps) = eps .
+  eq map-irelaxed-laneselect(JNN, nil, nil, nil) = nil .
 
   eq map-irelaxed-laneselect(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST, (# C_3-2) C_3*-REST) = seq(irelaxed-laneselect-(lsizenn(JNN), C_1-2, C_2-2, C_3-2)) map-irelaxed-laneselect(JNN, C_1*-REST, C_2*-REST, C_3*-REST) .
 
-  eq map-frelaxed-madd(FNN, eps, eps, eps) = eps .
+  eq map-frelaxed-madd(FNN, nil, nil, nil) = nil .
 
   eq map-frelaxed-madd(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST, C_3-3 C_3*-REST) = seq(frelaxed-madd-(sizenn(FNN), C_1-3, C_2-3, C_3-3)) map-frelaxed-madd(FNN, C_1*-REST, C_2*-REST, C_3*-REST) .
 
-  eq map-frelaxed-nmadd(FNN, eps, eps, eps) = eps .
+  eq map-frelaxed-nmadd(FNN, nil, nil, nil) = nil .
 
   eq map-frelaxed-nmadd(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST, C_3-3 C_3*-REST) = seq(frelaxed-nmadd-(sizenn(FNN), C_1-3, C_2-3, C_3-3)) map-frelaxed-nmadd(FNN, C_1*-REST, C_2*-REST, C_3*-REST) .
 
-  eq map-ivrelop-ieq(JNN, eps, eps) = eps .
+  eq map-ivrelop-ieq(JNN, nil, nil) = nil .
 
   eq map-ivrelop-ieq(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ieq-(lsizenn(JNN), C_1-2, C_2-2))) map-ivrelop-ieq(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-ivrelop-ine(JNN, eps, eps) = eps .
+  eq map-ivrelop-ine(JNN, nil, nil) = nil .
 
   eq map-ivrelop-ine(JNN, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ine-(lsizenn(JNN), C_1-2, C_2-2))) map-ivrelop-ine(JNN, C_1*-REST, C_2*-REST) .
 
-  eq map-ivrelopsx-ilt(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-ilt(JNN, SX, nil, nil) = nil .
 
   eq map-ivrelopsx-ilt(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ilt-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-ilt(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-ivrelopsx-igt(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-igt(JNN, SX, nil, nil) = nil .
 
   eq map-ivrelopsx-igt(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, igt-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-igt(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-ivrelopsx-ile(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-ile(JNN, SX, nil, nil) = nil .
 
   eq map-ivrelopsx-ile(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ile-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-ile(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-ivrelopsx-ige(JNN, SX, eps, eps) = eps .
+  eq map-ivrelopsx-ige(JNN, SX, nil, nil) = nil .
 
   eq map-ivrelopsx-ige(JNN, SX, (# C_1-2) C_1*-REST, (# C_2-2) C_2*-REST) = (# extend--(1, lsizenn(JNN), S, ige-(lsizenn(JNN), SX, C_1-2, C_2-2))) map-ivrelopsx-ige(JNN, SX, C_1*-REST, C_2*-REST) .
 
-  eq map-fvrelop-feq(FNN, eps, eps) = eps .
+  eq map-fvrelop-feq(FNN, nil, nil) = nil .
 
   eq map-fvrelop-feq(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, feq-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-feq(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fvrelop-fne(FNN, eps, eps) = eps .
+  eq map-fvrelop-fne(FNN, nil, nil) = nil .
 
   eq map-fvrelop-fne(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fne-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fne(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fvrelop-flt(FNN, eps, eps) = eps .
+  eq map-fvrelop-flt(FNN, nil, nil) = nil .
 
   eq map-fvrelop-flt(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, flt-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-flt(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fvrelop-fgt(FNN, eps, eps) = eps .
+  eq map-fvrelop-fgt(FNN, nil, nil) = nil .
 
   eq map-fvrelop-fgt(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fgt-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fgt(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fvrelop-fle(FNN, eps, eps) = eps .
+  eq map-fvrelop-fle(FNN, nil, nil) = nil .
 
   eq map-fvrelop-fle(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fle-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fle(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-fvrelop-fge(FNN, eps, eps) = eps .
+  eq map-fvrelop-fge(FNN, nil, nil) = nil .
 
   eq map-fvrelop-fge(FNN, C_1-3 C_1*-REST, C_2-3 C_2*-REST) = (# extend--(1, sizenn(FNN), S, fge-(sizenn(FNN), C_1-3, C_2-3))) map-fvrelop-fge(FNN, C_1*-REST, C_2*-REST) .
 
-  eq map-ishl(JNN, I, eps) = eps .
+  eq map-ishl(JNN, I, nil) = nil .
 
   eq map-ishl(JNN, I, (# C_1-2) C_1*-REST) = (# ishl-(lsizenn(JNN), C_1-2, I)) map-ishl(JNN, I, C_1*-REST) .
 
-  eq map-ishr(JNN, SX, I, eps) = eps .
+  eq map-ishr(JNN, SX, I, nil) = nil .
 
   eq map-ishr(JNN, SX, I, (# C_1-2) C_1*-REST) = (# ishr-(lsizenn(JNN), SX, C_1-2, I)) map-ishr(JNN, SX, I, C_1*-REST) .
 
-  eq map-ivbitmaskop(JNN, eps) = eps .
+  eq map-ivbitmaskop(JNN, nil) = nil .
 
   eq map-ivbitmaskop(JNN, (# C_1-2) C_1*-REST) = (# ilt-(lsizenn(JNN), S, C_1-2, 0)) map-ivbitmaskop(JNN, C_1*-REST) .
 
-  eq map-iswizzle-lane(JNN, C_1*, eps) = eps .
+  eq map-iswizzle-lane(JNN, C_1*, nil) = nil .
 
   eq map-iswizzle-lane(JNN, C_1*, (# C_2-2) C_2*-REST) = (# iswizzle-lane-(lsizenn(JNN), C_1*, C_2-2)) map-iswizzle-lane(JNN, C_1*, C_2*-REST) .
 
-  eq map-irelaxed-swizzle-lane(JNN, C_1*, eps) = eps .
+  eq map-irelaxed-swizzle-lane(JNN, C_1*, nil) = nil .
 
   eq map-irelaxed-swizzle-lane(JNN, C_1*, (# C_2-2) C_2*-REST) = (# irelaxed-swizzle-lane-(lsizenn(JNN), C_1*, C_2-2)) map-irelaxed-swizzle-lane(JNN, C_1*, C_2*-REST) .
 
-  eq map-ivshufflop(JNN, M-2, C_1*, C_2*, eps) = eps .
+  eq map-ivshufflop(JNN, M-2, C_1*, C_2*, nil) = nil .
 
   eq map-ivshufflop(JNN, M-2, C_1*, C_2*, (# I) I*-REST) = (# #rat((C_1* C_2*) [ I ])) map-ivshufflop(JNN, M-2, C_1*, C_2*, I*-REST) .
 
-  eq map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, eps) = eps .
+  eq map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, nil) = nil .
 
   eq map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M-2), _X_(LNN_2, M-2), VCVTOP-2, C_1-3)) map-vcvtop-lcvtop(LNN_2, LNN_1, M-2, VCVTOP-2, C_1*-REST) .
 
-  eq map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, eps) = eps .
+  eq map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, nil) = nil .
 
   eq map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1-3 C_1*-REST) = seq(lcvtop--(_X_(LNN_1, M_1), _X_(LNN_2, M_2), VCVTOP-2, C_1-3)) map-vcvtop-lcvtop-2(LNN_2, LNN_1, M_1, M_2, VCVTOP-2, C_1*-REST) .
 
-  eq map-narrow(JNN_2, JNN_1, SX, eps) = eps .
+  eq map-narrow(JNN_2, JNN_1, SX, nil) = nil .
 
   eq map-narrow(JNN_2, JNN_1, SX, (# C_1-2) C_1*-REST) = (# narrow--(lsize(JNN_1), lsize(JNN_2), SX, C_1-2)) map-narrow(JNN_2, JNN_1, SX, C_1*-REST) .
 
-  eq map-ivadd-pairwise-iadd(N-2, eps, eps) = eps .
+  eq map-ivadd-pairwise-iadd(N-2, nil, nil) = nil .
 
   eq map-ivadd-pairwise-iadd(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-(N-2, J_1-3, J_2-3)) map-ivadd-pairwise-iadd(N-2, J_1*-REST, J_2*-REST) .
 
-  eq map-ivadd-pairwise(eps, eps) = eps .
+  eq map-ivadd-pairwise(nil, nil) = nil .
 
   eq map-ivadd-pairwise((# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-ivadd-pairwise(J_1*-REST, J_2*-REST) .
 
-  eq unzip-ivadd-pairwise(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-ivadd-pairwise(nil) = tuple(seq(nil) seq(nil)) .
 
   ceq unzip-ivadd-pairwise(seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-ivadd-pairwise(PROJECT-REST) .
 
-  eq map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, eps) = eps .
+  eq map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, nil) = nil .
 
   eq map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, (# C_1-2) C_1*-REST) = (# extend--(lsizenn1(JNN_1), lsizenn2(JNN_2), SX, C_1-2)) map-ivextunop-ivadd-pairwise(JNN_2, JNN_1, SX, C_1*-REST) .
 
-  eq map-ivdot(N-2, eps, eps) = eps .
+  eq map-ivdot(N-2, nil, nil) = nil .
 
   eq map-ivdot(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = seq((# J_1-3) (# J_2-3)) map-ivdot(N-2, J_1*-REST, J_2*-REST) .
 
-  eq unzip-ivdot(N-2, eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-ivdot(N-2, nil) = tuple(seq(nil) seq(nil)) .
 
   ceq unzip-ivdot(N-2, seq((# J_1-3) (# J_2-3)) PROJECT-REST) = tuple(seq((# J_1-3) PROJECT-COLUMN-1) seq((# J_2-3) PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-ivdot(N-2, PROJECT-REST) .
 
-  eq map-ivdot-imul(N-2, eps, eps) = eps .
+  eq map-ivdot-imul(N-2, nil, nil) = nil .
 
   eq map-ivdot-imul(N-2, (# I_1) I_1*-REST, (# I_2) I_2*-REST) = (# imul-(N-2, I_1, I_2)) map-ivdot-imul(N-2, I_1*-REST, I_2*-REST) .
 
-  eq map-ivdot-sat(N-2, eps, eps) = eps .
+  eq map-ivdot-sat(N-2, nil, nil) = nil .
 
   eq map-ivdot-sat(N-2, (# J_1-3) J_1*-REST, (# J_2-3) J_2*-REST) = (# iadd-sat-(N-2, S, J_1-3, J_2-3)) map-ivdot-sat(N-2, J_1*-REST, J_2*-REST) .
 
-  eq map-Step-pure-vtestop(JNN, eps) = eps .
+  eq map-Step-pure-vtestop(JNN, nil) = nil .
 
   eq map-Step-pure-vtestop(JNN, (# I) I*-REST) = (# inez-(jsizenn(JNN), I)) map-Step-pure-vtestop(JNN, I*-REST) .
 
-  eq unzip-LOCAL(eps) = eps .
+  eq unzip-LOCAL(nil) = nil .
 
   ceq unzip-LOCAL(LOCAL(T) PROJECT-REST) = T PROJECT-COLUMN-1
     if PROJECT-COLUMN-1 := unzip-LOCAL(PROJECT-REST) .
 
-  eq map-Step-read-call-ref-func(0, eps) = eps .
+  eq map-Step-read-call-ref-func(0, nil) = nil .
 
   eq map-Step-read-call-ref-func(s(ITER-COUNT), VAL VAL*-REST) = seq(VAL ?) map-Step-read-call-ref-func(ITER-COUNT, VAL*-REST) .
 
-  eq map-default(eps) = eps .
+  eq map-default(nil) = nil .
 
   eq map-default(T T*-REST) = seq(default-(T)) map-default(T*-REST) .
 
-  eq map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, 0, eps) = eps .
+  eq map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, 0, nil) = nil .
 
   eq map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, s(ITER-COUNT), (# J) J*-REST) = (# extend--(M-2, jsizenn(JNN), SX, J)) map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, ITER-COUNT, J*-REST) .
 
-  eq unzip-Step-read-struct-new-default(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-Step-read-struct-new-default(nil) = tuple(seq(nil) seq(nil)) .
 
   ceq unzip-Step-read-struct-new-default(tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
-    if len(MUT?) <= 1
+    if size(MUT?) <= 1
       /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step-read-struct-new-default(PROJECT-REST) .
 
-  eq map-Step-read-array-new-elem-alloc(0, eps) = eps .
+  eq map-Step-read-array-new-elem-alloc(0, nil) = nil .
 
   eq map-Step-read-array-new-elem-alloc(s(ITER-COUNT), REF-2 REF*-REST) = REF-2 map-Step-read-array-new-elem-alloc(ITER-COUNT, REF*-REST) .
 
-  eq map-const(ZT, 0, eps) = eps .
+  eq map-const(ZT, 0, nil) = nil .
 
   eq map-const(ZT, s(ITER-COUNT), C-2 C*-REST) = const(cunpack(ZT), cunpacknum-(ZT, C-2)) map-const(ZT, ITER-COUNT, C*-REST) .
 
-  eq map-zbytes(ZT, 0, eps) = eps .
+  eq map-zbytes(ZT, 0, nil) = nil .
 
   eq map-zbytes(ZT, s(ITER-COUNT), C-2 C*-REST) = seq(zbytes-(ZT, C-2)) map-zbytes(ZT, ITER-COUNT, C*-REST) .
 
-  eq unzip-zbytes(ZT, 0, eps) = eps .
+  eq unzip-zbytes(ZT, 0, nil) = nil .
 
   ceq unzip-zbytes(ZT, s(ITER-COUNT), seq(PROJECT-ELEMENT) PROJECT-REST) = C-2 PROJECT-COLUMN-1
     if C-2 := inv-zbytes-(ZT, PROJECT-ELEMENT)
       /\ zbytes-(ZT, C-2) = PROJECT-ELEMENT
       /\ PROJECT-COLUMN-1 := unzip-zbytes(ZT, ITER-COUNT, PROJECT-REST) .
 
-  eq unzip-Step-struct-new(0, eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-Step-struct-new(0, nil) = tuple(seq(nil) seq(nil)) .
 
   ceq unzip-Step-struct-new(s(ITER-COUNT), tuple(seq(MUT?) ZT) PROJECT-REST) = tuple(seq(seq(MUT?) PROJECT-COLUMN-1) seq(ZT PROJECT-COLUMN-2))
-    if len(MUT?) <= 1
+    if size(MUT?) <= 1
       /\ tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-Step-struct-new(ITER-COUNT, PROJECT-REST) .
 
-  eq map-Step-struct-new(0, eps, eps) = eps .
+  eq map-Step-struct-new(0, nil, nil) = nil .
 
   eq map-Step-struct-new(s(ITER-COUNT), VAL VAL*-REST, ZT ZT*-REST) = packfield-(ZT, VAL) map-Step-struct-new(ITER-COUNT, VAL*-REST, ZT*-REST) .
 
-  eq map-Step-array-new-fixed(ZT, 0, eps) = eps .
+  eq map-Step-array-new-fixed(ZT, 0, nil) = nil .
 
   eq map-Step-array-new-fixed(ZT, s(ITER-COUNT), VAL VAL*-REST) = packfield-(ZT, VAL) map-Step-array-new-fixed(ZT, ITER-COUNT, VAL*-REST) .
 
-  eq map-allocexport(MODULEINST, eps) = eps .
+  eq map-allocexport(MODULEINST, nil) = nil .
 
   eq map-allocexport(MODULEINST, EXPORT-2 EXPORT*-REST) = allocexport(MODULEINST, EXPORT-2) map-allocexport(MODULEINST, EXPORT*-REST) .
 
-  eq unzip-TAG(eps) = eps .
+  eq unzip-TAG(nil) = nil .
 
   ceq unzip-TAG(TAG(TAGTYPE) PROJECT-REST) = TAGTYPE PROJECT-COLUMN-1
     if PROJECT-COLUMN-1 := unzip-TAG(PROJECT-REST) .
 
-  eq unzip-GLOBAL(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-GLOBAL(nil) = tuple(seq(nil) seq(nil)) .
 
   ceq unzip-GLOBAL(spectec-GLOBAL(GLOBALTYPE, EXPR_G-2) PROJECT-REST) = tuple(seq(seq(EXPR_G-2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-GLOBAL(PROJECT-REST) .
 
-  eq unzip-MEMORY(eps) = eps .
+  eq unzip-MEMORY(nil) = nil .
 
   ceq unzip-MEMORY(MEMORY(MEMTYPE) PROJECT-REST) = MEMTYPE PROJECT-COLUMN-1
     if PROJECT-COLUMN-1 := unzip-MEMORY(PROJECT-REST) .
 
-  eq unzip-TABLE(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-TABLE(nil) = tuple(seq(nil) seq(nil)) .
 
   ceq unzip-TABLE(spectec-TABLE(TABLETYPE, EXPR_T-2) PROJECT-REST) = tuple(seq(seq(EXPR_T-2) PROJECT-COLUMN-1) seq(TABLETYPE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-TABLE(PROJECT-REST) .
 
-  eq unzip-FUNC(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
+  eq unzip-FUNC(nil) = tuple(seq(nil) (seq(nil) seq(nil))) .
 
   ceq unzip-FUNC(FUNC-func(X-4, LOCAL*, EXPR_F-2) PROJECT-REST) = tuple(seq(seq(EXPR_F-2) PROJECT-COLUMN-1) (seq(seq(LOCAL*) PROJECT-COLUMN-2) seq((# X-4) PROJECT-COLUMN-3)))
     if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := unzip-FUNC(PROJECT-REST) .
 
-  eq unzip-DATA(eps) = tuple(seq(eps) seq(eps)) .
+  eq unzip-DATA(nil) = tuple(seq(nil) seq(nil)) .
 
   ceq unzip-DATA(DATA(BYTE*, DATAMODE) PROJECT-REST) = tuple(seq(seq(BYTE*) PROJECT-COLUMN-1) seq(DATAMODE PROJECT-COLUMN-2))
     if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-DATA(PROJECT-REST) .
 
-  eq unzip-allocmodule(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
+  eq unzip-allocmodule(nil) = tuple(seq(nil) (seq(nil) seq(nil))) .
 
   ceq unzip-allocmodule(ELEM(ELEMTYPE, EXPR_E*, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(ELEMTYPE PROJECT-COLUMN-2) seq(seq(EXPR_E*) PROJECT-COLUMN-3)))
     if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := unzip-allocmodule(PROJECT-REST) .
 
-  eq map-allocmodule(S-2, 0, I_F) = eps .
+  eq map-allocmodule(S-2, 0, I_F) = nil .
 
-  eq map-allocmodule(S-2, s(ITER-COUNT), I_F) = (# (len(S-2 . 'FUNCS) + I_F)) map-allocmodule(S-2, ITER-COUNT, s(I_F)) .
+  eq map-allocmodule(S-2, s(ITER-COUNT), I_F) = (# (size(S-2 . 'FUNCS) + I_F)) map-allocmodule(S-2, ITER-COUNT, s(I_F)) .
 
-  eq map-subst-all-tagtype(DT*, eps) = eps .
+  eq map-subst-all-tagtype(DT*, nil) = nil .
 
   eq map-subst-all-tagtype(DT*, TAGTYPE TAGTYPE*-REST) = subst-all-tagtype(TAGTYPE, DT*) map-subst-all-tagtype(DT*, TAGTYPE*-REST) .
 
-  eq map-subst-all-globaltype(DT*, eps) = eps .
+  eq map-subst-all-globaltype(DT*, nil) = nil .
 
   eq map-subst-all-globaltype(DT*, GLOBALTYPE GLOBALTYPE*-REST) = subst-all-globaltype(GLOBALTYPE, DT*) map-subst-all-globaltype(DT*, GLOBALTYPE*-REST) .
 
-  eq map-subst-all-memtype(DT*, eps) = eps .
+  eq map-subst-all-memtype(DT*, nil) = nil .
 
   eq map-subst-all-memtype(DT*, MEMTYPE MEMTYPE*-REST) = subst-all-memtype(MEMTYPE, DT*) map-subst-all-memtype(DT*, MEMTYPE*-REST) .
 
-  eq map-subst-all-tabletype(DT*, eps) = eps .
+  eq map-subst-all-tabletype(DT*, nil) = nil .
 
   eq map-subst-all-tabletype(DT*, TABLETYPE TABLETYPE*-REST) = subst-all-tabletype(TABLETYPE, DT*) map-subst-all-tabletype(DT*, TABLETYPE*-REST) .
 
-  eq map-subst-all-reftype(DT*, eps) = eps .
+  eq map-subst-all-reftype(DT*, nil) = nil .
 
   eq map-subst-all-reftype(DT*, ELEMTYPE ELEMTYPE*-REST) = subst-all-reftype(ELEMTYPE, DT*) map-subst-all-reftype(DT*, ELEMTYPE*-REST) .
 
-  eq map-allocmodule-2(DT*, eps) = eps .
+  eq map-allocmodule-2(DT*, nil) = nil .
 
   eq map-allocmodule-2(DT*, (# X-4) X*-REST) = (DT* [ X-4 ]) map-allocmodule-2(DT*, X*-REST) .
 
-  eq map-FUNC(eps, eps, eps) = eps .
+  eq map-FUNC(nil, nil, nil) = nil .
 
   eq map-FUNC(seq(EXPR_F-2) EXPR_F*-REST, seq(LOCAL*) LOCAL**-REST, (# X-4) X*-REST) = FUNC-func(X-4, LOCAL*, EXPR_F-2) map-FUNC(EXPR_F*-REST, LOCAL**-REST, X*-REST) .
 
-  eq unzip-instantiate(eps) = tuple(seq(eps) (seq(eps) seq(eps))) .
+  eq unzip-instantiate(nil) = tuple(seq(nil) (seq(nil) seq(nil))) .
 
   ceq unzip-instantiate(ELEM(REFTYPE, EXPR_E*, ELEMMODE) PROJECT-REST) = tuple(seq(ELEMMODE PROJECT-COLUMN-1) (seq(seq(EXPR_E*) PROJECT-COLUMN-2) seq(REFTYPE PROJECT-COLUMN-3)))
     if tuple(seq(PROJECT-COLUMN-1) (seq(PROJECT-COLUMN-2) seq(PROJECT-COLUMN-3))) := unzip-instantiate(PROJECT-REST) .
 
-  eq unzip-START(eps) = eps .
+  eq unzip-START(nil) = nil .
 
   eq unzip-START(START(X-4) ?) = (# X-4) ? .
 
-  eq map-rundata(DATA*, 0, I_D) = eps .
+  eq map-rundata(DATA*, 0, I_D) = nil .
 
   eq map-rundata(DATA*, s(ITER-COUNT), I_D) = seq(rundata-(I_D, DATA* [ I_D ])) map-rundata(DATA*, ITER-COUNT, s(I_D)) .
 
-  eq map-runelem(ELEM*, 0, I_E) = eps .
+  eq map-runelem(ELEM*, 0, I_E) = nil .
 
   eq map-runelem(ELEM*, s(ITER-COUNT), I_E) = seq(runelem-(I_E, ELEM* [ I_E ])) map-runelem(ELEM*, ITER-COUNT, s(I_E)) .
 
-  eq map-CALL(eps) = eps .
+  eq map-CALL(nil) = nil .
 
   eq map-CALL((# X-4) ?) = CALL(X-4) ? .
 
-  eq all-growtable(I', eps) = true .
+  eq all-growtable(I', nil) = true .
 
   ceq all-growtable(I', (# J) ?) = true
     if I' <= J .
 
-  eq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, 0, K-3) = eps .
+  eq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, 0, K-3) = nil .
 
   ceq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, s(ITER-COUNT), K-3) = (# J) bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, ITER-COUNT, s(K-3))
     if J := inv-ibytes-(M-2, (spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
       /\ ibytes-(M-2, J) == ((spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
 
-  eq bind-Step-read-struct-new-default(eps) = eps .
+  eq bind-Step-read-struct-new-default(nil) = nil .
 
   ceq bind-Step-read-struct-new-default(ZT ZT*-REST) = VAL bind-Step-read-struct-new-default(ZT*-REST)
     if VAL ? := default-(unpack(ZT)) .
 
-  eq all-invoke(S-2, eps, eps) = true .
+  eq all-invoke(S-2, nil, nil) = true .
 
   ceq all-invoke(S-2, T_1-2 T_1*-REST, VAL VAL*-REST) = all-invoke(S-2, T_1*-REST, VAL*-REST)
     if Val-ok(S-2, VAL, T_1-2) .
