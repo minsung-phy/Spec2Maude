@@ -391,9 +391,9 @@ let rec may_overlap sequences left right =
 let inputs_may_overlap index left right =
   let metadata = index.Prescan.sort_metadata in
   let sequences =
-    ("_ _", "eps") :: List.map
+    ("_ _", "nil") :: List.map
       (fun owner ->
-        let representation = Hintd.typed_sequence_representation metadata owner in
+        let representation = Hintd.typed_sequence_representation owner in
         representation.concat, representation.empty)
       (Hintd.typed_list_sorts metadata)
   in
@@ -430,7 +430,7 @@ let align_inputs ?(sequences = false) ?(bindings = []) index params patterns sub
     "SpectecTerminals"
     :: List.map
          (fun owner ->
-           (Hintd.typed_sequence_representation index.Prescan.sort_metadata owner).sort)
+           (Hintd.typed_sequence_representation owner).sort)
          (Hintd.typed_list_sorts index.Prescan.sort_metadata)
   in
   let rec align bindings pattern subject =
@@ -537,7 +537,7 @@ let unique_match_pattern index pattern =
     ("_ _", "SpectecTerminals") :: ("_;_", "RecordFields")
     :: List.map
          (fun owner ->
-           let sequence = Hintd.typed_sequence_representation metadata owner in
+           let sequence = Hintd.typed_sequence_representation owner in
            sequence.concat, sequence.sort)
          (Hintd.typed_list_sorts metadata)
   in

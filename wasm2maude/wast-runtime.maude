@@ -151,7 +151,7 @@ mod WASM-WAST-DRIVER is
   var WSHLPATS : LanePatterns .
   vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM WSHBITS : Nat .
 
-  eq hostArguments(eps, eps) = true .
+  eq hostArguments(nil, nil) = true .
   eq hostArguments(CONST(WSHNT, WSHVALUE) WSHVALUES,
     WSHNT WSHTYPES) = hostArguments(WSHVALUES, WSHTYPES) .
   eq hostArguments(WSHVALUES, WSHTYPES) = false [owise] .
@@ -214,7 +214,7 @@ mod WASM-WAST-DRIVER is
   eq checkImport(WSHS, FUNC(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.error .
 
-  eq linkImports(WSHS, WSHENV, imports.nil) = link.ok(eps) .
+  eq linkImports(WSHS, WSHENV, imports.nil) = link.ok(nil) .
   eq linkImports(WSHS, WSHENV, imports.cons(
     import.ref(WSHTARGET, WSHNAME, WSHREQUIREMENT), WSHIMPORTS2)) =
       link.append(
@@ -226,7 +226,7 @@ mod WASM-WAST-DRIVER is
   ceq findGlobal(WSHEXPORTS, WSHNAME) = WSHA
     if GLOBAL(WSHA) := findExport(WSHEXPORTS, WSHNAME) .
 
-  eq runtimeResults(eps) = true .
+  eq runtimeResults(nil) = true .
   ceq runtimeResults(CONST(WSHNT, WSHVALUE) WSHACTUAL) =
       runtimeResults(WSHACTUAL)
     if typecheck(WSHNT, numtype)
@@ -291,7 +291,7 @@ mod WASM-WAST-DRIVER is
     if _>=_(WSHADDR, 2251799813685248) = true .
   eq match.lane(WSHNT, WSHVALUE, WSHLPAT) = match.no [owise] .
 
-  eq match.vec-lanes(WSHNT, eps, lanes.nil) = match.yes .
+  eq match.vec-lanes(WSHNT, nil, lanes.nil) = match.yes .
   eq match.vec-lanes(WSHNT, WSHVALUE WSHLANES,
     lanes.cons(WSHLPAT, WSHLPATS)) =
     match.and(match.lane(WSHNT, WSHVALUE, WSHLPAT),
@@ -353,7 +353,7 @@ mod WASM-WAST-DRIVER is
   eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(EXTERN)) = match.yes .
   eq match.value(WSHVALUE, WSHPATTERN) = match.no [owise] .
 
-  eq match.values(eps, patterns.nil) = match.yes .
+  eq match.values(nil, patterns.nil) = match.yes .
   eq match.values(WSHVALUE WSHACTUAL,
     patterns.cons(WSHPATTERN, WSHPATTERNS)) =
       match.and(match.value(WSHVALUE, WSHPATTERN),
@@ -365,19 +365,19 @@ mod WASM-WAST-DRIVER is
     if match.value(WSHVALUE, WSHPATTERN) = match.yes .
   eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .
   ceq hostCallable(WSHS, WSHA, WSHARGS) = true
-    if (# WSHA) <- hostFunctionAddresses = true
+    if occurs(# WSHA, hostFunctionAddresses) = true
        /\ typecheck(WSHARGS, val) = true
        /\ typecheck(WSHARGS, instr) = true
        /\ WSHXA := (WSHS . 'FUNCS)[WSHA]
        /\ (WSHXA . 'CODE) = ...
-       /\ FUNC WSHTYPES -> eps := Expand((WSHXA . 'TYPE))
-       /\ len(WSHARGS) = len(WSHTYPES)
+       /\ FUNC WSHTYPES -> nil := Expand((WSHXA . 'TYPE))
+       /\ size(WSHARGS) = size(WSHTYPES)
        /\ hostArguments(WSHARGS, WSHTYPES) = true .
   eq hostCallable(WSHS, WSHA, WSHARGS) = false [owise] .
 
   crl [host-call] :
     Step-read((WSHS ; WSHCURRENT) ;
-      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => eps
+      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => nil
     if hostCallable(WSHS, WSHA, WSHARGS) = true .
 
   crl [focus-host-call] :
@@ -401,7 +401,7 @@ mod WASM-WAST-DRIVER is
     if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
   rl [module-done] :
     script.module(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; eps, none))
+      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; nil, none))
     => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .
 
   crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
@@ -445,7 +445,7 @@ mod WASM-WAST-DRIVER is
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [assert-uninstantiable-normal] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; eps, none))
+      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; nil, none))
     => script.wrong-assertion(WSHID) .
   crl [assert-uninstantiable-step] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS, kstate(WSHC, WSHK))

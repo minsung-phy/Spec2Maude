@@ -41,8 +41,8 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
 
 ## 현재 구현과 미지원 항목
 
-- 일반 목록은 `SpectecTerminals`, `eps`, `__`이고, 목록 원소로 쓰이는 목록은
-  `seq(...)`로 구분한다. 별도 목록 sort는 `maude_sort` hint로만 선택한다.
+- 일반 목록은 prelude `LIST{SpectecTerminal}`(sort `SpectecTerminals`, `nil`, `__`)이고,
+  목록 원소로 쓰이는 목록은 `seq(...)`로 구분한다. 별도 목록 sort는 `maude_sort` hint로만 선택한다.
 - Wasm IL에서 사용하는 Nat·Int·유한 Rat 계산과 변환은 유지한다.
   Wasm f32/f64는 원문의 `POS/NEG`, `NORM/SUBNORM/INF/NAN` 자료와 builtin으로 처리한다.
 - 현재 입력에 없는 IL Real 값·변환·산술, 비유한 Rat 값과 일부 Rat 산술은
@@ -161,20 +161,24 @@ def 호출 결과는 callee가 선언한 결과 sort에서 정한다.
 | `SPECTEC-RECORD` | record 표현·조회·갱신 |
 
 convert와 list는 builtin types를, option·tuple·record는 list를 import한다.
-마지막 `SPECTEC-SEMANTICS`가 다섯 모듈을 모은다. `types.maude`의
-`SPEC2MAUDE-TYPES`는 source hint별 native LIST instantiation과 좁은 타입
-선언을 제공한다. `generated/output.maude`는 `SPECTEC-SEMANTICS`를 import하고
-source별 목록 subsort 연결과 번역된 정의를 추가한다.
+마지막 `SPECTEC-SEMANTICS`가 다섯 모듈을 모은다. 공통 목록은
+`spectec-sorts.maude`가 prelude `LIST{SpectecTerminal}`을 sort 이름만 바꿔
+가져온 것이다(`nil`, `__`, `size`, `occurs`, `append`는 prelude 이름 그대로).
+`types.maude`의 `SPEC2MAUDE-TYPES`는 hint별 목록 sort를 이 목록 위에 subsort로
+얹고 `nil`, `__`만 좁은 sort로 overload한다(LIST를 다시 instantiate하지 않는다).
+`generated/output.maude`는 `SPECTEC-SEMANTICS`를 import하고 번역된 정의를
+추가한다.
 
-이 순서는 native LIST 뒤에 공통 `eps`, `__` overload를 선언하여 두 연산을
-하나의 모듈 확장 관계로 연결한다. 공통 정의를 source마다 생성하지 않으며,
-모듈 분리를 위해 IL 표현이나 기존 검사의 계산 의미를 바꾸지 않는다.
+LIST instance가 하나이므로 typed list의 `nil`, `__`, `size`, `occurs`는 모두 같은
+prelude 연산이고 warning·advisory 없이 load된다. prelude 연산 이름(`nil`,
+`size`, `occurs` 등)은 `Prescan.reserved_names`에 있어서, 같은 이름의 source
+정의는 `spectec-` 접두사를 받는다(예: Wasm `$size` → `spectec-size`).
 
 비어 있지 않은 목록은 prelude `LIST`처럼 `SpectecNeTerminals` sort로 구분한다
 (`SpectecTerminal < SpectecNeTerminals < SpectecTerminals`). 공유 목록 검사는
 `typecheck(T NTS, TYPE)`로 원소가 두 개 이상일 때만 재귀하고, 빈 목록은 `t*`의
-올바른 값이므로 `typecheck(eps, TYPE) = true`를 유지한다. typed list root마다
-`NeXList < SpectecNeTerminals`를 함께 생성한다. 현재 Wasm의 `val < instr` 목록은 `eps`와 `__`를 공유한다.
+올바른 값이므로 `typecheck(nil, TYPE) = true`를 유지한다. typed list root마다
+`NeXList < SpectecNeTerminals`를 함께 생성한다. 현재 Wasm의 `val < instr` 목록은 `nil`과 `__`를 공유한다.
 별도 연결 연산을 생성하는 경로는 제공하지 않으며, 목록 sort들이 하나의
 subsort chain을 이루지 않는 hint 조합은 `Unsupported`로 거부한다.
 
@@ -186,26 +190,24 @@ equation과 option 검사도 sort 변수로 정의한다. kind에만 속하는 �
 미정의 항의 처리 계약을 별도로 정해야 한다.
 
 `LenE`, `SliceE`, `UpdE` 및 premise/iteration의 IL 번역은 유지한다.
-`ListE`는 목록 연결을, `LenE`는 `len` 또는 typed 목록의 size를 직접 사용하므로
+`ListE`는 목록 연결을, `LenE`는 prelude `size`를 직접 사용하므로
 별도의 `[TS]`, `|TS|` 표기 wrapper는 제공하지 않는다.
-일반 목록의 membership은 `PREFIX T SUFFIX` 매칭과 `[owise]`로 구현한다.
-index/setAt은 해당 원소 앞 prefix의 길이를 검사한다. slice/splice는
-`S = PREFIX REST`, `REST = MIDDLE SUFFIX`를 순서대로 매칭하고
-`len(PREFIX) = N`, `len(MIDDLE) = I`를 검사한다. 따라서 정의역은
-`N + I <= len(S)`이고, 빈 slice도 끝 위치까지 허용한다. `seq(...)`는
-하나의 원소다. 길이와 위치 조건은 목록의 원소 수를 사용하며, 별도의 cursor나
-길이 memo table을 사용하지 않는다.
+membership(`MemE`)은 prelude `occurs`를 사용한다.
+index, slice, 원소 갱신, 구간 갱신은 prelude `occurs`처럼 앞 원소를 하나씩 떼는
+구조 재귀로 정의한다(`(T TS)[(s N)] = TS[N]`, `(T TS)[(s N) = K] = T TS[N = K]`).
+slice/splice는 시작 위치까지 넘긴 뒤 `COUNT`개를 가져오거나 버린다. 따라서
+정의역은 `N + COUNT <= size(S)`이고, 빈 slice도 끝 위치까지 허용한다. 범위 밖이면
+equation이 적용되지 않아 정의되지 않는다. `seq(...)`는 하나의 원소다.
+갱신과 slice의 가져오기 부분은 꼬리 재귀가 아니어서 위치(개수)에 비례하는 stack을
+쓴다(64MB stack에서 약 26만 칸까지 확인, 52만 칸에서 overflow).
 
-길이는 `lenAux(S, n) = n + |S|`인 accumulator로 계산한다.
-반복 목록은 `repeatSeq(0, S) = eps`,
+길이는 prelude `size`/`$size`(accumulator)로 계산한다.
+반복 목록은 `repeatSeq(0, S) = nil`,
 `repeatSeq(s N, S) = S repeatSeq(N, S)`의 직접 재귀 equation으로 구성한다.
-typed list 연산은 native LIST 정의를 사용하고,
-생성 코드는 `eps`, `__` 및 목록 연산의 결과 sort를 좁히는 overload를 선언한다.
-size·occurs와 size accumulator는 native 선언이 이미 같은 `Nat`·`NzNat`·`Bool`
-결과 sort를 제공하므로 좁은 입력 sort에 대해 중복 선언하지 않는다.
+typed list는 별도 연산을 선언하지 않고 prelude 연산을 그대로 사용한다.
 
 record 조회/갱신은 field를 매칭하고 prefix에 동일 field가 없다는 조건으로
-첫 항목을 선택한다. 없는 field의 조회는 eps, 갱신은 끝에 추가한다.
+첫 항목을 선택한다. 없는 field의 조회는 nil, 갱신은 끝에 추가한다.
 비결정적 membership choice helper는 prefix/선택 원소/suffix 매칭 rule로
 가능한 원소를 선택한다. source의 선택 의미, boxing과 frozen 인자를 유지한다.
 비트별 논리 연산은 폭/operand 조건을 유지한 native Nat 연산을 사용한다.
@@ -428,7 +430,7 @@ raw 요청의 실패 가지는 남을 수 있으므로 source의 공개 완료 �
 
 ```maude
 kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K)
-  if _or_(PREFIX =/= eps, POSTFIX =/= eps) /\ closed-R-r(x) = false .     --- instrs heating
+  if _or_(PREFIX =/= nil, POSTFIX =/= nil) /\ closed-R-r(x) = false .     --- instrs heating
 kstate(C[x], K) = kstate(x, hole-R-r(..) K)  if closed-R-r(x) = false .   --- heating
 kstate(x', hole-R-r(..) K) = kstate(C'[x'], K)  if closed-R-r(x') = true .  --- cooling
 kstate(z ; s, hole(PREFIX, POSTFIX) K) = kstate(z ; PREFIX s POSTFIX, K) [owise] .  --- instrs cooling
@@ -541,7 +543,7 @@ rule Step/ctxt-label:
 
 ```maude
 ceq kstate(Z ; (PREFIX ((LABEL- N-3 { INSTR_0* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), hole(PREFIX, POSTFIX) K-4)
-    if _or_(PREFIX =/= eps, POSTFIX =/= eps)
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
       /\ closed-Step-ctxt-label(INSTR*) = false .
 
 ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4)

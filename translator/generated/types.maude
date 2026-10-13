@@ -14,27 +14,12 @@ fmod SPEC2MAUDE-SORTS is
   subsort InstrProper < instr .
 endfm
 
-view INSTR-VIEW from TRIV to SPEC2MAUDE-SORTS is
-  sort Elt to instr .
-endv
-
 fmod SPEC2MAUDE-TYPES is
   protecting SPEC2MAUDE-SORTS .
-  protecting LIST{INSTR-VIEW} * (
-    sort List{INSTR-VIEW} to InstrList,
-    sort NeList{INSTR-VIEW} to NeInstrList,
-    op nil to eps,
-    op append to instrAppend,
-    op head to instrHead,
-    op tail to instrTail,
-    op last to instrLast,
-    op front to instrFront,
-    op occurs to instrOccurs,
-    op reverse to instrReverse,
-    op $reverse to instrReverseAux,
-    op size to instrSize,
-    op $size to instrSizeAux
-  ) .
+
+  subsort InstrList < SpectecTerminals .
+
+  subsort NeInstrList < SpectecNeTerminals .
 
   subsort NeValList < NeInstrList .
 
@@ -48,7 +33,15 @@ fmod SPEC2MAUDE-TYPES is
 
   subsort NeValList < ValList .
 
-  op eps : -> ValList [ctor] .
+  sort NeInstrList .
+
+  sort InstrList .
+
+  subsort instr < NeInstrList .
+
+  subsort NeInstrList < InstrList .
+
+  op nil : -> ValList [ctor] .
 
   op __ : ValList ValList -> ValList [ctor ditto] .
 
@@ -56,25 +49,13 @@ fmod SPEC2MAUDE-TYPES is
 
   op __ : ValList NeValList -> NeValList [ctor ditto] .
 
-  op instrAppend : ValList ValList -> ValList .
+  op nil : -> InstrList [ctor] .
 
-  op instrAppend : NeValList ValList -> NeValList .
+  op __ : InstrList InstrList -> InstrList [ctor ditto] .
 
-  op instrAppend : ValList NeValList -> NeValList .
+  op __ : NeInstrList InstrList -> NeInstrList [ctor ditto] .
 
-  op instrHead : NeValList -> val .
-
-  op instrTail : NeValList -> ValList .
-
-  op instrLast : NeValList -> val .
-
-  op instrFront : NeValList -> ValList .
-
-  op instrReverse : ValList -> ValList .
-
-  op instrReverse : NeValList -> NeValList .
-
-  op instrReverseAux : ValList ValList -> ValList .
+  op __ : InstrList NeInstrList -> NeInstrList [ctor ditto] .
 
   op valRepeat : Nat val -> ValList .
 
@@ -86,11 +67,11 @@ fmod SPEC2MAUDE-TYPES is
 
   var REPEAT-ELEMENT-2 : instr .
 
-  eq valRepeat(0, REPEAT-ELEMENT) = eps .
+  eq valRepeat(0, REPEAT-ELEMENT) = nil .
 
   eq valRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT) = REPEAT-ELEMENT valRepeat(REPEAT-COUNT, REPEAT-ELEMENT) .
 
-  eq instrRepeat(0, REPEAT-ELEMENT-2) = eps .
+  eq instrRepeat(0, REPEAT-ELEMENT-2) = nil .
 
   eq instrRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT-2) = REPEAT-ELEMENT-2 instrRepeat(REPEAT-COUNT, REPEAT-ELEMENT-2) .
 endfm

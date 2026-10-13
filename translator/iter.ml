@@ -10,7 +10,7 @@ open Maude_il
 let app name args = App (name, args)
 
 let rec sequence = function
-  | [] -> Const "eps"
+  | [] -> Const "nil"
   | [term] -> term
   | term :: terms -> app "_ _" [term; sequence terms]
 
@@ -56,7 +56,7 @@ let as_sequence_element index typ term =
 
 (* Type iteration *)
 
-let length value = app "len" [value]
+let length value = app "size" [value]
 
 let length_of_typ index typ value =
   let representation = Prescan.sequence_representation index typ in

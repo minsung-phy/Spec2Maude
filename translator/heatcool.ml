@@ -1036,7 +1036,7 @@ type kept_context =
   ; postfix : term
   ; sequence : term list -> term
   ; sequence_hole : term           (* hole(PREFIX, POSTFIX) of the sequence context *)
-  ; nonempty : eq_condition        (* its PREFIX =/= eps \/ POSTFIX =/= eps *)
+  ; nonempty : eq_condition        (* its PREFIX =/= nil \/ POSTFIX =/= nil *)
   }
 
 let kembedding_rule cache index context shared (kept : Hintd.heatcool) =

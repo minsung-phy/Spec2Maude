@@ -279,11 +279,11 @@ let direct_numeric_variable index bound exp =
 let rec bind_pattern index bound exp subject error =
   match exp.it with
   | IterE (body, (Opt, [])) when known bound body ->
-      (* Without a generator, e? matches either eps or e. *)
+      (* Without a generator, e? matches either nil or e. *)
       let present = Term.translate_exp index {exp with it = OptE (Some body)} in
       let is term = App ("_==_", [subject; term]) in
       make bound
-        [EqCondition (BoolCond (App ("_or_", [is (Const "eps"); is present])))]
+        [EqCondition (BoolCond (App ("_or_", [is (Const "nil"); is present])))]
   | _ when known bound exp ->
       make bound
         [EqCondition (EqCond (Term.translate_exp index exp, subject))]
@@ -524,7 +524,7 @@ let relation_call index id args exps =
 
 let tuple index exps terms =
   match exps, terms with
-  | [], [] -> Const "eps"
+  | [], [] -> Const "nil"
   | [_], [term] -> term
   | _, _ ->
       List.map2

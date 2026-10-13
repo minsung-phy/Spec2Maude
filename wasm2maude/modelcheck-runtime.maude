@@ -37,10 +37,10 @@ mod WASM-MODELCHECK-DRIVER is
   var P : Prop .
 
   eq emptyStore = {
-    field('TAGS, eps) ; field('GLOBALS, eps) ; field('MEMS, eps) ;
-    field('TABLES, eps) ; field('FUNCS, eps) ; field('DATAS, eps) ;
-    field('ELEMS, eps) ; field('STRUCTS, eps) ; field('ARRAYS, eps) ;
-    field('EXNS, eps)
+    field('TAGS, nil) ; field('GLOBALS, nil) ; field('MEMS, nil) ;
+    field('TABLES, nil) ; field('FUNCS, nil) ; field('DATAS, nil) ;
+    field('ELEMS, nil) ; field('STRUCTS, nil) ; field('ARRAYS, nil) ;
+    field('EXNS, nil)
   } .
 
   ceq findFunc(
@@ -53,10 +53,10 @@ mod WASM-MODELCHECK-DRIVER is
   eq hasExport(EXPORTS, NAME) = false [owise] .
 
   crl [instantiate] : boot => init(kstate(C, none))
-    if instantiate(emptyStore, inputModule, eps) => C .
+    if instantiate(emptyStore, inputModule, nil) => C .
   crl [init-step] : init(kstate(C, K)) => init(kstate(C2, K))
     if Step(C) => C2 .
-  rl [initialize] : init(kstate(Z ; eps, none)) => ready(Z) .
+  rl [initialize] : init(kstate(Z ; nil, none)) => ready(Z) .
   eq invocation(Z) = invoke(spectec-store(Z),
       findFunc((spectec-moduleinst(Z) . 'EXPORTS), inputName), inputArgs) .
   eq isConfig(Z ; IS) = true .

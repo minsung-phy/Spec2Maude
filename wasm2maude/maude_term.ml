@@ -9,7 +9,7 @@ let seq xs = Seq xs
 
 let rec pp fmt = function
   | Const s -> Format.pp_print_string fmt s
-  | Seq [] -> Format.pp_print_string fmt "eps"
+  | Seq [] -> Format.pp_print_string fmt "nil"
   | Seq [item] -> Format.fprintf fmt "@[%a@]" pp item
   | Seq xs ->
       let items = Array.of_list xs in

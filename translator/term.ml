@@ -365,7 +365,7 @@ and translate_value index exp =
         invalid_arg "named UncaseE is not supported"
 
   | OptE None ->
-      Const "eps"
+      Const "nil"
 
   | OptE (Some inner) ->
       app "_?"

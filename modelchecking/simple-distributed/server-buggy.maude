@@ -21,24 +21,24 @@ mod SERVER-BUGGY-WASM is
   var ADDR : Nat .
   var K : Holes .
 
-  eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), eps, FUNC_->_(I32, I32)))), eps, eps, eps,
-eps, eps,
-FUNC-func(0, eps, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))), eps,
-eps, eps,
+  eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), nil, FUNC_->_(I32, I32)))), nil, nil, nil,
+nil, nil,
+FUNC-func(0, nil, (LOCAL.GET(0) CONST(I32, #_(1)) BINOP(I32, ADD))), nil,
+nil, nil,
 EXPORT(
   ((#_(115) #_(101) #_(114) #_(118) #_(101))
    (#_(114) #_(95) #_(115) #_(116) #_(101) #_(112))),
 FUNC(0))) .
   eq serverInputName = (#_(115) #_(101) #_(114) #_(118) #_(101))
 (#_(114) #_(95) #_(115) #_(116) #_(101) #_(112)) .
-  eq serverEmptyStore = {(field('TAGS, eps) ;
-  (field('GLOBALS, eps) ;
-   (field('MEMS, eps) ;
-    (field('TABLES, eps) ;
-     (field('FUNCS, eps) ;
-      (field('DATAS, eps) ;
-       (field('ELEMS, eps) ;
-        (field('STRUCTS, eps) ; (field('ARRAYS, eps) ; field('EXNS, eps))))))))))} .
+  eq serverEmptyStore = {(field('TAGS, nil) ;
+  (field('GLOBALS, nil) ;
+   (field('MEMS, nil) ;
+    (field('TABLES, nil) ;
+     (field('FUNCS, nil) ;
+      (field('DATAS, nil) ;
+       (field('ELEMS, nil) ;
+        (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil))))))))))} .
 
   ceq serverFindFunc(EXPORT-PREFIX {(field('NAME, NAME) ; field('ADDR, FUNC(ADDR)))} EXPORTS, NAME) = ADDR
     if not serverHasExport(EXPORT-PREFIX, NAME) .
@@ -46,10 +46,10 @@ FUNC(0))) .
   eq serverHasExport(EXPORTS, NAME) = false [owise] .
 
   crl [serverInstantiate] : serverCall(ARGS) => serverInit(kstate(C, none), ARGS)
-    if instantiate(serverEmptyStore, serverInputModule, eps) => C .
+    if instantiate(serverEmptyStore, serverInputModule, nil) => C .
   crl [serverInit-step] : serverInit(kstate(C, K), ARGS) => serverInit(kstate(C2, K), ARGS)
     if Step(C) => C2 .
-  rl [serverInvoke] : serverInit(kstate((Z ; eps), none), ARGS) => serverExec(kstate(invoke(spectec-store(Z),
+  rl [serverInvoke] : serverInit(kstate((Z ; nil), none), ARGS) => serverExec(kstate(invoke(spectec-store(Z),
 serverFindFunc((spectec-moduleinst(Z) . 'EXPORTS), serverInputName), ARGS), none)) .
   crl [serverStep] : serverExec(kstate(C, K)) => serverExec(kstate(C2, K))
     if Step(C) => C2 .

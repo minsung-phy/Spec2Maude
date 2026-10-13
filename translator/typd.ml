@@ -295,47 +295,6 @@ module Lists = struct
   let title sort = String.capitalize_ascii sort
   let list_sort sort = title sort ^ "List"
   let nonempty_sort sort = "Ne" ^ list_sort sort
-  let view_name sort = String.uppercase_ascii sort ^ "-VIEW"
-
-  let module_name name = ModuleName name
-
-  let view sort =
-    View
-      { name = view_name sort
-      ; source = module_name "TRIV"
-      ; target = module_name "SPEC2MAUDE-SORTS"
-      ; mappings = [SortMapping ("Elt", sort)]
-      }
-
-  let views metadata =
-    Hintd.typed_list_roots metadata |> List.map view
-
-  let import metadata sort =
-    let sequence = Hintd.typed_sequence_representation metadata sort in
-    let rename source target = OpRenaming (source, target) in
-    Protecting
-      (ModuleRenaming
-         ( ModuleInstantiation ("LIST", [view_name sort])
-         , [ SortRenaming
-               ("List{" ^ view_name sort ^ "}", list_sort sort)
-           ; SortRenaming
-               ("NeList{" ^ view_name sort ^ "}", nonempty_sort sort)
-           ; rename "nil" sequence.empty
-           ; rename "append" (sort ^ "Append")
-           ; rename "head" (sort ^ "Head")
-           ; rename "tail" (sort ^ "Tail")
-           ; rename "last" (sort ^ "Last")
-           ; rename "front" (sort ^ "Front")
-           ; rename "occurs" sequence.occurs
-           ; rename "reverse" (sort ^ "Reverse")
-           ; rename "$reverse" (sort ^ "ReverseAux")
-           ; rename "size" sequence.size
-           ; rename "$size" (sort ^ "SizeAux")
-           ]
-         ))
-
-  let imports metadata =
-    Hintd.typed_list_roots metadata |> List.map (import metadata)
 
   let op ?(arrow = Total) ?(attrs = []) name domain codomain =
     OpDecl {name; domain; codomain; arrow; attrs}
@@ -344,6 +303,17 @@ module Lists = struct
   let eq left right = Eq (left, right, [])
   let var name sort = generated_variable name sort
   let term variable = Var variable
+
+  (* A typed list is a subsort of the prelude LIST of SpectecTerminal
+     (backend/spectec-sorts.maude), as narrower lists are in PLC's
+     PLC-EXP-LIST. Only nil and __ are overloaded, so the prelude
+     operations and their equations apply to every typed list. *)
+  let root_edges metadata =
+    Hintd.typed_list_roots metadata
+    |> List.concat_map (fun sort ->
+         [ SubsortDecl (list_sort sort, "SpectecTerminals")
+         ; SubsortDecl (nonempty_sort sort, "SpectecNeTerminals")
+         ])
 
   let list_edges metadata =
     let lists = Hintd.typed_list_sorts metadata in
@@ -355,12 +325,10 @@ module Lists = struct
          ; SubsortDecl (list_sort source, list_sort target)
          ])
 
-  let lower_list metadata sort =
-    let sequence = Hintd.typed_sequence_representation metadata sort in
+  let lower_list sort =
+    let sequence = Hintd.typed_sequence_representation sort in
     let list = sequence.sort in
     let nonempty = nonempty_sort sort in
-    let root = Hintd.typed_list_root metadata sort in
-    (* Preserve narrower result sorts; native equations apply to the overloads. *)
     [ SortDecl nonempty
     ; SortDecl list
     ; SubsortDecl (sort, nonempty)
@@ -369,20 +337,10 @@ module Lists = struct
     ; op ~attrs:[Ctor; Ditto] "__" [list; list] list
     ; op ~attrs:[Ctor; Ditto] "__" [nonempty; list] nonempty
     ; op ~attrs:[Ctor; Ditto] "__" [list; nonempty] nonempty
-    ; op (root ^ "Append") [list; list] list
-    ; op (root ^ "Append") [nonempty; list] nonempty
-    ; op (root ^ "Append") [list; nonempty] nonempty
-    ; op (root ^ "Head") [nonempty] sort
-    ; op (root ^ "Tail") [nonempty] list
-    ; op (root ^ "Last") [nonempty] sort
-    ; op (root ^ "Front") [nonempty] list
-    ; op (root ^ "Reverse") [list] list
-    ; op (root ^ "Reverse") [nonempty] nonempty
-    ; op (root ^ "ReverseAux") [list; list] list
     ]
 
-  let repeat metadata sort =
-    let sequence = Hintd.typed_sequence_representation metadata sort in
+  let repeat sort =
+    let sequence = Hintd.typed_sequence_representation sort in
     let count = var "REPEAT-COUNT" "Nat" in
     let element = var "REPEAT-ELEMENT" sort in
     let call count = app sequence.repeat [count; term element] in
@@ -392,40 +350,25 @@ module Lists = struct
         (app sequence.concat [term element; call (term count)])
     ]
 
-  let lift metadata sort =
-    let sequence = Hintd.typed_sequence_representation metadata sort in
+  let lift sort =
+    let sequence = Hintd.typed_sequence_representation sort in
     let element = var "LIFT-ELEMENT" sort in
     [ op ~arrow:Partial sequence.lift ["SpectecTerminals"] sequence.sort
-    ; eq (app sequence.lift [Const "eps"]) (Const sequence.empty)
+    ; eq (app sequence.lift [Const "nil"]) (Const sequence.empty)
     ; eq (app sequence.lift [app "_?" [term element]]) (term element)
     ]
 
   let statements metadata =
     let sorts = Hintd.typed_list_sorts metadata in
-    let roots = Hintd.typed_list_roots metadata in
-    let lower =
-      sorts
-      |> List.filter (fun sort -> not (List.mem sort roots))
-      |> List.concat_map (lower_list metadata)
-    in
-    list_edges metadata @ lower
-    @ List.concat_map (repeat metadata) sorts
-
-  let generic_edges metadata =
-    Hintd.typed_list_roots metadata
-    |> List.concat_map (fun sort ->
-         [ SubsortDecl (list_sort sort, "SpectecTerminals")
-         ; SubsortDecl (nonempty_sort sort, "SpectecNeTerminals")
-         ])
+    root_edges metadata @ list_edges metadata
+    @ List.concat_map lower_list sorts
+    @ List.concat_map repeat sorts
 
   let generated_statements metadata =
     Hintd.typed_list_sorts metadata
-    |> List.concat_map (lift metadata)
+    |> List.concat_map lift
 
 end
 
-let list_views = Lists.views
-let list_imports = Lists.imports
-let list_subsorts = Lists.generic_edges
 let list_statements = Lists.statements
 let list_generated_statements = Lists.generated_statements

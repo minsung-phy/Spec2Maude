@@ -169,7 +169,7 @@ gets no focus pattern.
 
 | Statement | Maude | Code |
 | --- | --- | --- |
-| Instrs heating | `ceq kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K) if _or_(PREFIX =/= eps, POSTFIX =/= eps) /\ closed-r(x) = false .` | `heatcool.ml:kembedding_rule` |
+| Instrs heating | `ceq kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K) if _or_(PREFIX =/= nil, POSTFIX =/= nil) /\ closed-r(x) = false .` | `heatcool.ml:kembedding_rule` |
 | Heating | `ceq kstate(⟦C[x]⟧, K) = kstate(⟦x⟧, hole-r(C) K) if closed-r(x) = false .` | `heatcool.ml:kembedding_rule` |
 | Cooling | `ceq kstate(⟦x'⟧, hole-r(C) K) = kstate(⟦C'[x']⟧, K) if closed-r(x') = true .` | `heatcool.ml:kembedding_rule` |
 | Closed bodies | `eq closed-r(b) = true .` for each focus pattern of the sequence context whose trigger is `E`'s constructor, `b` its body; `eq closed-r(x) = false [owise] .` Assumed: no step of `R` applies to such a body alone. | `heatcool.ml:closed_bodies` |
@@ -193,7 +193,7 @@ it is rejected if an earlier premise is still waiting. A call of a
 | `RulePr r args mixop e`, computed relation, outputs unknown | `⟦outs⟧ := r̂(⟦ins⟧)` | `prem.ml:translate_known_rulepr` |
 | `RulePr r args mixop e`, computed relation with a `maude_subsume` rule, outputs known | `check(⟦ins⟧, ⟦outs⟧)` | `prem.ml:translate_known_rulepr` |
 | `RulePr r args mixop e`, checked relation | `r̂(⟦e⟧)` | `prem.ml:translate_known_rulepr` |
-| `RulePr` that uses `xs[i]` with `xs` known and `i` unbound | first `PREFIX Y SUFFIX := ⟦xs⟧` and `I := len(PREFIX)`, so `i` ranges over the valid indices | `prem.ml:bind_free_indices` |
+| `RulePr` that uses `xs[i]` with `xs` known and `i` unbound | first `PREFIX Y SUFFIX := ⟦xs⟧` and `I := size(PREFIX)`, so `i` ranges over the valid indices | `prem.ml:bind_free_indices` |
 | `ElsePr` | marks the rule; see section 2 (relations) and section 1 (`[owise]` for functions) | `prem.ml:translate_barrier` |
 | `IterPr pr (iter, gens)`, all sources known | `helper(⟦captures⟧, ⟦sources⟧)`: a generated helper that checks `pr` for every element (section 6) | `prem.ml:translate_barrier`, `iter.ml:translate_premise` |
 | `IterPr pr (iter, gens)`, one source unbound, `iter` is `^n` or there are two or more generators | `⟦source⟧` as a pattern for a generated helper that computes it from the other sources (section 6) | `prem.ml:translate_barrier` |
@@ -231,7 +231,7 @@ unbound part from `u` instead:
 | Shape of `p` | Maude conditions |
 | --- | --- |
 | all variables bound | `⟦p⟧ = u` |
-| `e?` without a generator | `u == eps or u == ⟦e⟧ ?` |
+| `e?` without a generator | `u == nil or u == ⟦e⟧ ?` |
 | `e : t1 <:> t2` (numeric conversion) | `e` as a pattern for `u : t2 <:> t1` |
 | `(e!C).0`, `C` with one argument | `e` as a pattern for `Ĉ(u)`, or for `u` if `C` is hole-only |
 | `x * k` or `k * x` (natural or integer), `k` known | `k =/= 0`, `x` as a pattern for `u quo ⟦k⟧`, then `⟦p⟧ = u` |
@@ -257,14 +257,14 @@ other expressions are handled by `term.ml:translate_value`.
 | `CaseE C e`, named `C` | `Ĉ(⟦e1⟧, …, ⟦en⟧)` | `term.ml:translate_value` |
 | `CaseE C e`, hole-only `C` | `⟦e⟧` | `term.ml:translate_value` |
 | `UncaseE e C`, hole-only `C` | `⟦e⟧` | `term.ml:translate_value` |
-| `OptE None` / `OptE (Some e)` | `eps` / `⟦e⟧ ?` | `term.ml:translate_value` |
+| `OptE None` / `OptE (Some e)` | `nil` / `⟦e⟧ ?` | `term.ml:translate_value` |
 | `StrE fields` | `{ field('a1, ⟦e1⟧) ; … }` | `term.ml:translate_value` |
 | `DotE e a` | `⟦e⟧ . 'a` | `term.ml:translate_value` |
 | `CompE e1 e2` | `recordConcat`, `optionConcat`, or sequence concatenation, by type | `term.ml:translate_composition` |
 | `ListE es` | `⟦e1⟧ … ⟦en⟧` (sequence) | `term.ml:translate_value` |
 | `LiftE e` | sequence lift of `⟦e⟧` | `term.ml:translate_value` |
-| `MemE e es` | `⟦e⟧ <- ⟦es⟧` (membership test) | `term.ml:native_exp` |
-| `LenE e` | `len(⟦e⟧)` | `term.ml:translate_value` |
+| `MemE e es` | `occurs(⟦e⟧, ⟦es⟧)` (prelude membership test) | `term.ml:native_exp` |
+| `LenE e` | `size(⟦e⟧)` | `term.ml:translate_value` |
 | `CatE e1 e2` | `⟦e1⟧ ⟦e2⟧` (sequence concatenation) | `term.ml:translate_value` |
 | `IdxE e i` | `⟦e⟧[⟦i⟧]` | `term.ml:translate_value` |
 | `SliceE e i n` | `⟦e⟧[⟦i⟧ : ⟦n⟧]` | `term.ml:translate_value` |
@@ -316,7 +316,7 @@ function with one equation for the empty sequence and one for a non-empty
 sequence:
 
 ```maude
-eq map-f(C, eps) = eps .
+eq map-f(C, nil) = nil .
 eq map-f(C, X X*-REST) = ⟦e⟧[x := X] map-f(C, X*-REST) .
 ```
 
@@ -374,7 +374,7 @@ its first occurrence.
 | Condition order, execution rules | The `typecheck` guards of the rule's inputs come first | `maude_il.ml:schedule_execution_conditions` |
 | After translation | Remove repeated conditions, including an equality that repeats an earlier match or equality in either order | `maude_il.ml:simplify_conditions` |
 | After translation | Declare variables and put declarations first | `def.ml:normalize_module` |
-| Sequence support | List sorts and operations selected by `hint(maude_sort)` | `typd.ml:Lists` |
+| Sequence support | List sorts selected by `hint(maude_sort)`, subsorts of the prelude `LIST{SpectecTerminal}` with `nil`/`__` overloads | `typd.ml:Lists` |
 
 ### Hints read by the translator
 

@@ -170,9 +170,9 @@ let reserved_names =
     ; "decFloat"
     ; "sqrt"; "exp"; "log"; "sin"; "cos"; "tan"
     ; "asin"; "acos"; "atan"; "pi"; "_xor_"
-    ; "eps"; "bool"; "rat"; "float"; "text"; "seq"; "unseq"
+    ; "bool"; "rat"; "float"; "text"; "seq"; "unseq"
     ; "#_"; "#bool"; "#rat"; "#float"; "#string"; "string"
-    ; "tuple"; "field"; "typecheck"; "len"
+    ; "tuple"; "field"; "typecheck"
     ; "lift"; "repeatSeq"
     ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
     ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "not_"; "_and_"
@@ -185,8 +185,11 @@ let reserved_names =
     (* backend/spectec-{builtin-types,semantics}.maude: types, sequences, records *)
     ; "nat"; "int"; "real"
     ; "iterOpt"; "iterList"
-    ; "indexDefined"; "lenAux"
+    ; "indexDefined"
     ; "EMPTY"; "recordConcat"; "optionConcat"
+    (* prelude LIST, imported by backend/spectec-sorts.maude *)
+    ; "nil"; "append"; "head"; "tail"; "last"; "front"
+    ; "occurs"; "reverse"; "$reverse"; "size"; "$size"
     (* builtins.maude *)
     ; "ibits-aux"; "inv-ibits-aux"; "ibytes-aux"
     ; "inv-ibytes-aux"; "sign-extend-nat"; "ipopcnt-bits"; "ipopcnt-bits-aux"
