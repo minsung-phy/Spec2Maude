@@ -153,13 +153,13 @@ let sort_of_typ index typ =
 let sequence_representation index typ =
   Hintd.sequence_representation index.sort_metadata typ
 
-(* hint(maude_array): the field atom of a record of type typ. *)
+(* hint(maude_array): field atom of the record type typ is an array, and
+   the record type typ has an array field. *)
 let array_field index typ atom =
-  Hintd.array_field index.sort_metadata typ atom
+  Hintd.array_field index.sort_metadata.Hintd.arrays typ atom
 
-let array_record index id = List.mem_assoc id.it index.sort_metadata.Hintd.arrays
-
-let has_array_field index typ = Hintd.has_array_field index.sort_metadata typ
+let array_record index typ =
+  Hintd.array_record index.sort_metadata.Hintd.arrays typ
 
 (* Record composition uses the equation emitted for its monomorphic TypD.
    A record with a maude_array field has no such equation. *)
@@ -168,7 +168,7 @@ let record_composition_available index typ =
   | VarT (id, []) ->
       begin match Il.Env.find_typ index.type_env id with
       | [], [{it = InstD ([], [], {it = StructT _; _}); _}] ->
-          not (has_array_field index typ)
+          not (array_record index typ)
       | _ -> false
       end
   | _ -> false
@@ -195,7 +195,7 @@ let reserved_names =
     ; "nat"; "int"; "real"
     ; "iterOpt"; "iterList"
     ; "EMPTY"; "recordConcat"; "optionConcat"
-    ; "bytes"; "bytes-of"; "bsize"; "bread"; "bwrite"; "bgrow"
+    ; "sized-array"; "array-of"; "array-size"; "array-read"; "array-write"; "array-grow"
     (* prelude ARRAY, imported by backend/spectec-semantics.maude *)
     ; "empty"; "insert"; "$hasMapping"
     (* prelude LIST, imported by backend/spectec-sorts.maude *)

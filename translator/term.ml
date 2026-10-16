@@ -97,7 +97,7 @@ let unsupported_typed_sequence index operation typ =
       (operation ^ " is unsupported for typed list sort "
        ^ representation.sort)
 
-(* hint(maude_array): a record field stored as bytes(size, array). The
+(* hint(maude_array): a record field stored as sized-array(size, array). The
  * field is read only through |e.f|, e.f[i], and e.f[i : n], and written
  * through e[.f[i : n] = s] and e[.f = s] (TRANSLATION_MAP.md). *)
 let unsupported_array at reason =
@@ -427,7 +427,7 @@ and translate_value index exp =
 
   | LenE collection ->
       begin match array_field_value index collection with
-      | Some array -> app "bsize" [array]
+      | Some array -> app "array-size" [array]
       | None ->
           let operator =
             sequence_operator index collection.note (fun sequence -> sequence.size)
@@ -444,7 +444,7 @@ and translate_value index exp =
   | IdxE (sequence, element_index) ->
       begin match array_field_value index sequence with
       | Some array ->
-          app "bread" [array; translate_exp index element_index; Const "1"]
+          app "array-read" [array; translate_exp index element_index; Const "1"]
       | None ->
           unsupported_typed_sequence index "IdxE" sequence.note;
           app "_`[_`]"
@@ -455,7 +455,7 @@ and translate_value index exp =
   | SliceE (sequence, start, length) ->
       begin match array_field_value index sequence with
       | Some array ->
-          app "bread"
+          app "array-read"
             [array; translate_exp index start; translate_exp index length]
       | None ->
           unsupported_typed_sequence index "SliceE" sequence.note;
@@ -518,12 +518,12 @@ and translate_array_value index exp =
   match array_field_value index exp, exp.it with
   | Some array, _ -> array
   | None, IterE (body, (ListN (count, None), [])) when is_zero body ->
-      app "bytes" [translate_exp index count; Const "empty"]
+      app "sized-array" [translate_exp index count; Const "empty"]
   | None, CatE (left, {it = IterE (body, (ListN (count, None), [])); _})
     when is_zero body ->
-      app "bgrow" [translate_array_value index left; translate_exp index count]
+      app "array-grow" [translate_array_value index left; translate_exp index count]
   | None, _ ->
-      app "bytes-of" [translate_exp index exp]
+      app "array-of" [translate_exp index exp]
 
 (* A path that ends at a maude_array field. *)
 and array_path index path =
@@ -586,7 +586,7 @@ and translate_update index base path replacement =
   | SliceP ({it = DotP (record, atom); _} as parent, start, length)
     when Prescan.array_field index record.note atom ->
       let written =
-        app "bwrite"
+        app "array-write"
           [ translate_select index base parent
           ; translate_exp index start
           ; translate_exp index length
@@ -610,7 +610,7 @@ and translate_update index base path replacement =
 
   | DotP (parent, atom) when Prescan.array_field index parent.note atom ->
       translate_field_update index base parent atom
-        (app "bytes-of" [replacement])
+        (app "array-of" [replacement])
 
   | DotP (parent, atom) ->
       translate_field_update index base parent atom
@@ -644,7 +644,7 @@ and translate_composition index typ left right =
       in
       app operator [left; right]
   | StructT _ ->
-      if Prescan.has_array_field index typ then
+      if Prescan.array_record index typ then
         unsupported_array typ.at "a record with a maude_array field has no composition";
       if not (Prescan.record_composition_available index typ) then
         invalid_arg

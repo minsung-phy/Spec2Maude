@@ -662,7 +662,7 @@ let assume_script script =
    x*, which gets the array translation (|e.f| is the stored size, e.f 0^n
    grows the array); the binding premise is kept. *)
 let array_script script =
-  let metadata = Hintd.scan_sorts script in
+  let arrays = Hintd.scan_arrays script in
   let bound_variable exp =
     match exp.it with
     | VarE x -> Some x
@@ -675,7 +675,7 @@ let array_script script =
     | StrE fields ->
         fields
         |> List.filter_map (fun (atom, value) ->
-             if not (Hintd.array_field metadata pattern.note atom) then None
+             if not (Hintd.array_field arrays pattern.note atom) then None
              else
                bound_variable value
                |> Option.map (fun x -> x, DotE (record, atom) $$ (value.at, value.note)))

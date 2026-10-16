@@ -109,7 +109,7 @@ let rec composable index seen typ =
 (* No recordConcat for a record with a maude_array field: an array is not a
    sequence to concatenate, and CompE on such a record is Unsupported. *)
 let translate_struct_composition index id target fields =
-  if Prescan.array_record index id
+  if Prescan.array_record index (VarT (id, []) $ id.at)
      || not (List.for_all (fun (_, (typ, _, _), _) -> composable index [] typ) fields)
   then [] else
   let left = Var (generated_variable "LEFT" "Record") in

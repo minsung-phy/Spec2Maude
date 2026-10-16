@@ -69,7 +69,7 @@ let host_resource_term {Wast_plan.export; _} =
   | Wast_host.Memory (Wasm.Types.MemoryT (_, lim) as typ) ->
       let bytes = Int64.mul lim.min 65536L in
       (* meminst BYTES is a maude_array field: size and an empty array (all 0). *)
-      T.app "rec.meminst" [memtype typ; T.app "bytes" [u64 bytes; T.atom "empty"]]
+      T.app "rec.meminst" [memtype typ; T.app "sized-array" [u64 bytes; T.atom "empty"]]
   | Wast_host.Table (Wasm.Types.TableT (_, lim, _) as typ) ->
       T.app "rec.tableinst"
         [tabletype typ;

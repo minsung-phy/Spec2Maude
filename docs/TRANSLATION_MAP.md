@@ -266,20 +266,21 @@ other expressions are handled by `term.ml:translate_value`.
 
 ### Fields with `hint(maude_array)`
 
-`hint(maude_array "f")` on a record type stores the sequence field `f` as
-`bytes(size, A)`, where `A` is a prelude `ARRAY{Nat, Zero}` whose entries
+`hint(maude_array)` on a sequence field `f` of a record type (`{.., f t* hint(maude_array)}`) stores `f` as
+`sized-array(size, A)`, where `A` is a prelude `ARRAY{Nat, Zero}` whose entries
 equal to `# 0` are absent (`backend/spectec-semantics.maude`, `SPECTEC-ARRAY`).
 
 | IL | Maude | Code |
 | --- | --- | --- |
-| `LenE (DotE e f)` | `bsize(⟦e⟧ . 'f)` | `term.ml:translate_value` |
-| `IdxE (DotE e f) i` | `bread(⟦e⟧ . 'f, ⟦i⟧, 1)` | `term.ml:translate_value` |
-| `SliceE (DotE e f) i n` | `bread(⟦e⟧ . 'f, ⟦i⟧, ⟦n⟧)` | `term.ml:translate_value` |
-| `UpdE e (SliceP (DotP p f) i n) e'` | `p` updated with `[. 'f = bwrite(⟦p⟧ . 'f, ⟦i⟧, ⟦n⟧, ⟦e'⟧)]` | `term.ml:translate_update` |
-| `UpdE e (DotP p f) e'` | `p` updated with `[. 'f = bytes-of(⟦e'⟧)]` | `term.ml:translate_update` |
-| field `f` of `StrE`, value `0^n` | `bytes(⟦n⟧, empty)` | `term.ml:translate_array_value` |
-| field `f` of `StrE`, value `e 0^n` | `bgrow(⟦e⟧, ⟦n⟧)`, with `⟦e⟧` by this row set | `term.ml:translate_array_value` |
-| field `f` of `StrE`, other value `e` | `bytes-of(⟦e⟧)` (a sequence becomes an array; an array is kept) | `term.ml:translate_array_value` |
+| `LenE (DotE e f)` | `array-size(⟦e⟧ . 'f)` | `term.ml:translate_value` |
+| `IdxE (DotE e f) i` | `array-read(⟦e⟧ . 'f, ⟦i⟧, 1)` | `term.ml:translate_value` |
+| `SliceE (DotE e f) i n` | `array-read(⟦e⟧ . 'f, ⟦i⟧, ⟦n⟧)` | `term.ml:translate_value` |
+| `UpdE e (SliceP (DotP p f) i n) e'` | `p` updated with `[. 'f = array-write(⟦p⟧ . 'f, ⟦i⟧, ⟦n⟧, ⟦e'⟧)]` | `term.ml:translate_update` |
+| `UpdE e (DotP p f) e'` | `p` updated with `[. 'f = array-of(⟦e'⟧)]` | `term.ml:translate_update` |
+| field `f` of `StrE`, value `0^n` | `sized-array(⟦n⟧, empty)` | `term.ml:translate_array_value` |
+| field `f` of `StrE`, value `e 0^n` | `array-grow(⟦e⟧, ⟦n⟧)`, with `⟦e⟧` by this row set | `term.ml:translate_array_value` |
+| field `f` of `StrE`, value `e.f'` of another array field | the stored array of `e.f'` | `term.ml:translate_array_value` |
+| field `f` of `StrE`, other value `e` | `array-of(⟦e⟧)` (the sequence becomes an array) | `term.ml:translate_array_value` |
 | field `f` of a `StrE` pattern | the variable binds the stored array; its later uses are written as `e.f` before translation (section 7) | `prem.ml:translate_field_patterns`, `def.ml:array_script` |
 
 `0` is `NumE 0`, possibly under `SubE`, `CvtE`, or an argument case such as
@@ -385,12 +386,14 @@ its first occurrence.
 | `maude_compute`, `maude_check` | `RelD` | 2 |
 | `maude_subsume`, `maude_trans`, `k_heatcool` | `RuleD` | 2 |
 | `maude_assume` | `RuleD` and `DecD` | 7 |
-| `maude_sort`, `maude_subsort`, `maude_proper`, `maude_array` | `TypD` | 4, 7 |
+| `maude_sort`, `maude_subsort`, `maude_proper` | `TypD` | 7 |
+| `maude_array` | a field of `StructT` (the hint list of the field) | 4 |
 
 Hints arrive as `HintD` definitions (`TypH`, `RelH`, `DecH`, `RuleH`) and
-are collected by `prescan.ml:collect_hints`. Other hints (for example, the
-documentation hints `name`, `macro`, and `tabular`, and every `GramH`) are
-ignored.
+are collected by `prescan.ml:collect_hints`. A field hint (`maude_array`)
+stays in the hint list of its `StructT` field and is read by
+`hintd.ml:arrays_of`. Other hints (for example, the documentation hints
+`name`, `macro`, and `tabular`, and every `GramH`) are ignored.
 
 ## 8. Cases that are rejected or omitted
 
@@ -407,7 +410,7 @@ definition and the reason. An omitted case produces no Maude output.
 | `SubE` between types with different Maude representations | rejected | `term.ml:translate_value` |
 | `IdxE`, `SliceE`, and the paths `IdxP`, `SliceP` on a sequence with its own sort (`hint(maude_sort)`) | rejected | `term.ml:translate_value`, `term.ml:translate_select` |
 | `IterT t +` and `IterT t ^n` as a type argument | rejected | `term.ml:translate_check_typ` |
-| `hint(maude_array "f")` on a type that is not a monomorphic record with a sequence field `f` | rejected | `hintd.ml:array_field_of` |
+| `hint(maude_array)` on a field that is not a sequence, or of a record type with parameters; `hint(maude_array)` on a `syntax` declaration instead of a field | rejected | `hintd.ml:array_field_of`, `hintd.ml:arrays_of` |
 | A `maude_array` field read other than by `LenE`, `IdxE`, `SliceE`; written by `IdxP` or `ExtE`; selected inside; or `CompE` of its record | rejected | `term.ml:translate_value`, `term.ml:translate_select`, `term.ml:translate_update`, `term.ml:translate_extension`, `term.ml:translate_composition` |
 | `ElsePr` in a `maude_rule` function, or not as the first premise of an execution rule | rejected | `decd.ml:translate_rule_clause`, `reld.ml:lower_execution_rule` |
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
