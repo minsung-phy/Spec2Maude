@@ -174,10 +174,50 @@ fmod SPECTEC-RECORD is
   eq {FIELDS}[. FIELD = NEW-VALUE] = {FIELDS ; field(FIELD, NEW-VALUE)} [owise] . --- 없으면 레코드 끝에 추가
 endfm
 
+--- hint(maude_array "FIELD"): 레코드의 sequence 필드를 크기 + prelude ARRAY로 저장
+--- (기본값 # 0: 0인 칸은 저장하지 않음, prelude ARRAY의 insert와 _[_])
+view Zero from DEFAULT to SPECTEC-BUILTIN-TYPES is
+  sort Elt to SpectecTerminal .
+  op 0 to term # 0 .
+endv
+
+fmod SPECTEC-ARRAY is
+  protecting SPECTEC-LIST .
+  protecting ARRAY{Nat, Zero} * (sort Array{Nat, Zero} to ZeroArray, sort Entry{Nat, Zero} to ZeroEntry) .
+
+  op bytes : Nat ZeroArray -> SpectecTerminal [ctor] .                      --- 크기, 배열
+  op bytes-of : SpectecTerminals -> SpectecTerminal .                       --- 필드에 저장할 값 (sequence → 배열)
+  op bsize : SpectecTerminal ~> Nat .                                       --- |e.f|
+  op bread : SpectecTerminal Nat Nat ~> SpectecTerminals .                  --- e.f[I : C]
+  op bwrite : SpectecTerminal Nat Nat SpectecTerminals ~> SpectecTerminal . --- e[.f[I : C] = TS], |TS| = C
+  op bgrow : SpectecTerminal Nat ~> SpectecTerminal .                       --- f 0^K
+
+  vars S I C K : Nat .
+  var A : ZeroArray .
+  var T : SpectecTerminal .
+  var TS : SpectecTerminals .
+  var TYPE : SpectecType .
+
+  eq bytes-of(bytes(S, A)) = bytes(S, A) .  --- 필드 패턴으로 받은 값은 이미 배열
+  eq bytes-of(TS) = bwrite(bytes(size(TS), empty), 0, size(TS), TS) [owise] .
+
+  eq bsize(bytes(S, A)) = S .
+  ceq bread(bytes(S, A), I, 0) = nil if I <= S .
+  ceq bread(bytes(S, A), I, s C) = A[I] bread(bytes(S, A), s I, C) if I + s C <= S .
+  ceq bwrite(bytes(S, A), I, 0, nil) = bytes(S, A) if I <= S .
+  ceq bwrite(bytes(S, A), I, s C, T TS) = bwrite(bytes(S, insert(I, T, A)), s I, C, TS) if I + s C <= S .
+  eq bgrow(bytes(S, A), K) = bytes(S + K, A) .
+
+  --- 원소 타입 검사: 저장된 칸과 기본값 # 0만 확인
+  eq typecheck(bytes(S, empty), TYPE) = typecheck(# 0, TYPE) .
+  eq typecheck(bytes(S, (I |-> T ; A)), TYPE) = I < S and typecheck(T, TYPE) and typecheck(bytes(S, A), TYPE) .
+endfm
+
 fmod SPECTEC-SEMANTICS is
   protecting SPECTEC-CONVERT .
   protecting SPECTEC-LIST .
   protecting SPECTEC-OPTION .
   protecting SPECTEC-TUPLE .
   protecting SPECTEC-RECORD .
+  protecting SPECTEC-ARRAY .
 endfm

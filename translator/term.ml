@@ -97,6 +97,23 @@ let unsupported_typed_sequence index operation typ =
       (operation ^ " is unsupported for typed list sort "
        ^ representation.sort)
 
+(* hint(maude_array): a record field stored as bytes(size, array). The
+ * field is read only through |e.f|, e.f[i], and e.f[i : n], and written
+ * through e[.f[i : n] = s] and e[.f = s] (TRANSLATION_MAP.md). *)
+let unsupported_array at reason =
+  invalid_arg
+    ("Unsupported maude_array use at " ^ string_of_region at ^ ": " ^ reason)
+
+(* The array default: entries equal to 0 are not stored. A numeric syntax
+   type such as byte wraps its number in an argument case (%_byte(0)). *)
+let rec is_zero exp =
+  match exp.it with
+  | NumE (`Nat n | `Int n) -> Z.equal n Z.zero
+  | SubE (inner, _, _) | CvtE (inner, _, _) -> is_zero inner
+  | CaseE (Xl.Mixop.Arg (), {it = TupE [inner]; _}) -> is_zero inner
+  | CaseE (Xl.Mixop.Arg (), inner) -> is_zero inner
+  | _ -> false
+
 let rec record_fields = function
   | [] -> Const "EMPTY"
   | [field] -> field
@@ -377,12 +394,18 @@ and translate_value index exp =
   | StrE fields ->
       fields
       |> List.map (fun (atom, field) ->
-           app "field"
-             [qid_of_atom atom; to_terminal index field.note (translate_exp index field)])
+           let value =
+             if Prescan.array_field index exp.note atom then
+               translate_array_value index field
+             else to_terminal index field.note (translate_exp index field)
+           in
+           app "field" [qid_of_atom atom; value])
       |> record_fields
       |> fun fields -> app "{_}" [fields]
 
   | DotE (record, atom) ->
+      if Prescan.array_field index record.note atom then
+        unsupported_array exp.at "read it through |e.f|, e.f[i], or e.f[i : n]";
       app "_._" [translate_exp index record; qid_of_atom atom]
       |> from_terminal index exp.note
 
@@ -403,10 +426,14 @@ and translate_value index exp =
       app operator [translate_exp index inner]
 
   | LenE collection ->
-      let operator =
-        sequence_operator index collection.note (fun sequence -> sequence.size)
-      in
-      app operator [translate_exp index collection]
+      begin match array_field_value index collection with
+      | Some array -> app "bsize" [array]
+      | None ->
+          let operator =
+            sequence_operator index collection.note (fun sequence -> sequence.size)
+          in
+          app operator [translate_exp index collection]
+      end
 
   | CatE (left, right) ->
       let operator =
@@ -415,18 +442,29 @@ and translate_value index exp =
       app operator [translate_exp index left; translate_exp index right]
 
   | IdxE (sequence, element_index) ->
-      unsupported_typed_sequence index "IdxE" sequence.note;
-      app "_`[_`]"
-        [translate_exp index sequence; translate_exp index element_index]
+      begin match array_field_value index sequence with
+      | Some array ->
+          app "bread" [array; translate_exp index element_index; Const "1"]
+      | None ->
+          unsupported_typed_sequence index "IdxE" sequence.note;
+          app "_`[_`]"
+            [translate_exp index sequence; translate_exp index element_index]
+      end
       |> from_sequence_element index exp.note
 
   | SliceE (sequence, start, length) ->
-      unsupported_typed_sequence index "SliceE" sequence.note;
-      app "_`[_:_`]"
-        [ translate_exp index sequence
-        ; translate_exp index start
-        ; translate_exp index length
-        ]
+      begin match array_field_value index sequence with
+      | Some array ->
+          app "bread"
+            [array; translate_exp index start; translate_exp index length]
+      | None ->
+          unsupported_typed_sequence index "SliceE" sequence.note;
+          app "_`[_:_`]"
+            [ translate_exp index sequence
+            ; translate_exp index start
+            ; translate_exp index length
+            ]
+      end
 
   | UpdE (base, path, replacement) ->
       translate_update
@@ -463,10 +501,43 @@ and translate_value index exp =
            ^ " -> " ^ Il.Print.string_of_typ target
            ^ " at " ^ string_of_region source.at)
 
+(* The stored value of a maude_array field e.f, when exp is e.f or the
+ * identity iteration x*{x <- e.f}. *)
+and array_field_value index exp =
+  match exp.it with
+  | DotE (record, atom) when Prescan.array_field index record.note atom ->
+      Some (app "_._" [translate_exp index record; qid_of_atom atom])
+  | IterE (body, iterexp) ->
+      Option.bind (Iter.identity_source index body iterexp) (array_field_value index)
+  | _ -> None
+
+(* A source sequence stored into a maude_array field: another array field is
+ * copied, 0^n is the empty array of size n, s 0^n grows the array s, and any
+ * other sequence is converted. *)
+and translate_array_value index exp =
+  match array_field_value index exp, exp.it with
+  | Some array, _ -> array
+  | None, IterE (body, (ListN (count, None), [])) when is_zero body ->
+      app "bytes" [translate_exp index count; Const "empty"]
+  | None, CatE (left, {it = IterE (body, (ListN (count, None), [])); _})
+    when is_zero body ->
+      app "bgrow" [translate_array_value index left; translate_exp index count]
+  | None, _ ->
+      app "bytes-of" [translate_exp index exp]
+
+(* A path that ends at a maude_array field. *)
+and array_path index path =
+  match path.it with
+  | DotP (record, atom) -> Prescan.array_field index record.note atom
+  | RootP | IdxP _ | SliceP _ -> false
+
 and translate_select index base path =
   match path.it with
   | RootP ->
       base
+
+  | (IdxP (parent, _) | SliceP (parent, _, _)) when array_path index parent ->
+      unsupported_array path.at "select inside the field"
 
   | IdxP (parent, element_index) ->
       unsupported_typed_sequence index "IdxP" parent.note;
@@ -497,6 +568,9 @@ and translate_update index base path replacement =
   | RootP ->
       replacement
 
+  | IdxP (parent, _) when array_path index parent ->
+      unsupported_array path.at "write it through e[.f[i : n] = s]"
+
   | IdxP (parent, element_index) ->
       unsupported_typed_sequence index "UpdE/IdxP" parent.note;
       let parent_value = translate_select index base parent in
@@ -508,6 +582,18 @@ and translate_update index base path replacement =
           [parent_value; translate_exp index element_index; replacement]
       in
       translate_update index base parent updated_parent
+
+  | SliceP ({it = DotP (record, atom); _} as parent, start, length)
+    when Prescan.array_field index record.note atom ->
+      let written =
+        app "bwrite"
+          [ translate_select index base parent
+          ; translate_exp index start
+          ; translate_exp index length
+          ; replacement
+          ]
+      in
+      translate_field_update index base record atom written
 
   | SliceP (parent, start, length) ->
       unsupported_typed_sequence index "UpdE/SliceP" parent.note;
@@ -522,16 +608,23 @@ and translate_update index base path replacement =
       in
       translate_update index base parent updated_parent
 
+  | DotP (parent, atom) when Prescan.array_field index parent.note atom ->
+      translate_field_update index base parent atom
+        (app "bytes-of" [replacement])
+
   | DotP (parent, atom) ->
-      let parent_value = translate_select index base parent in
-      let replacement = to_terminal index path.note replacement in
-      let updated_parent =
-        app "_`[._=_`]" [parent_value; qid_of_atom atom; replacement]
-      in
-      translate_update index base parent updated_parent
+      translate_field_update index base parent atom
+        (to_terminal index path.note replacement)
+
+and translate_field_update index base record atom value =
+  let record_value = translate_select index base record in
+  translate_update index base record
+    (app "_`[._=_`]" [record_value; qid_of_atom atom; value])
 
 
 and translate_extension index base path extension =
+  if array_path index path then
+    unsupported_array path.at "extend it through e[.f = s]";
   (* EXT e p e' = UPD e p (CAT (ACC e p) e').  The existing path
    * translation unboxes the selected value and reboxes it on update. *)
   let operator =
@@ -551,6 +644,8 @@ and translate_composition index typ left right =
       in
       app operator [left; right]
   | StructT _ ->
+      if Prescan.has_array_field index typ then
+        unsupported_array typ.at "a record with a maude_array field has no composition";
       if not (Prescan.record_composition_available index typ) then
         invalid_arg
           ("Unsupported CompE for " ^ Il.Print.string_of_typ typ

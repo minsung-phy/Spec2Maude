@@ -148,7 +148,9 @@ uses a temporary directory and does not modify the repository.
 1. `spectec-semantics.maude`, which loads `spectec-sorts.maude` (common sorts),
    the generated `types.maude`, and `spectec-builtin-types.maude` (SpecTec
    built-in type representation), then declares separate convert, list, option,
-   tuple, and record modules;
+   tuple, record, and array modules (the array module stores the fields marked
+   with `hint(maude_array)`, such as memory bytes, as a size and a prelude
+   `ARRAY`);
 2. generated semantics;
 3. hand-written relation backends;
 4. primitive builtin semantics.

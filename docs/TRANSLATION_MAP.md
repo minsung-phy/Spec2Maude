@@ -54,7 +54,7 @@ The translation visits the definitions of the script in order
 | `TypD x params insts` | `op x̂ : S(params) -> SpectecType .` and the output for each `inst` | `typd.ml:translate` |
 | `InstD quants args deftyp` | output for `deftyp`, with type target `x̂(⟦args⟧)` and conditions from `quants` | `typd.ml:translate_inst` |
 | `AliasT t` | `eq typecheck(V, x̂(..)) = typecheck(V, ⟦t⟧) .` If `hint(maude_sort)` boxes the elements of `t`, a second equation for the boxed value. | `typd.ml:translate_alias` |
-| `StructT fields` | `ceq typecheck({ field('a1, V1) ; … }, x̂(..)) = true if typecheck(Vi, ⟦ti⟧) ∧ ⟦field premises⟧ .` If every field type can be composed, also an equation for `recordConcat`, used by `CompE`. | `typd.ml:translate_struct` |
+| `StructT fields` | `ceq typecheck({ field('a1, V1) ; … }, x̂(..)) = true if typecheck(Vi, ⟦ti⟧) ∧ ⟦field premises⟧ .` If every field type can be composed and no field has `hint(maude_array)`, also an equation for `recordConcat`, used by `CompE`. | `typd.ml:translate_struct` |
 | `VariantT cases`, named case `C` | `op Ĉ : S(t1) … S(tn) -> Sort [ctor] .` and `ceq typecheck(Ĉ(V1, …, Vn), x̂(..)) = true if … .` | `typd.ml:translate_constructor` |
 | `VariantT cases`, hole-only case | `ceq typecheck(V, x̂(..)) = true if typecheck(V, ⟦t⟧) ∧ … .` | `typd.ml:translate_union` |
 | `DecD f params t clauses` | Depends on the hints of `f` (table below) | `decd.ml:translate` |
@@ -238,6 +238,7 @@ other expressions are handled by `term.ml:translate_value`.
 | `OptE None` / `OptE (Some e)` | `nil` / `⟦e⟧ ?` | `term.ml:translate_value` |
 | `StrE fields` | `{ field('a1, ⟦e1⟧) ; … }` | `term.ml:translate_value` |
 | `DotE e a` | `⟦e⟧ . 'a` | `term.ml:translate_value` |
+| `StrE fields`, `DotE e a`, `LenE`, `IdxE`, `SliceE`, `UpdE` on a `maude_array` field | see "Fields with `hint(maude_array)`" below | `term.ml:translate_value`, `term.ml:translate_update` |
 | `CompE e1 e2` | `recordConcat`, `optionConcat`, or sequence concatenation, by type | `term.ml:translate_composition` |
 | `ListE es` | `⟦e1⟧ … ⟦en⟧` (sequence) | `term.ml:translate_value` |
 | `LiftE e` | sequence lift of `⟦e⟧` | `term.ml:translate_value` |
@@ -262,6 +263,27 @@ other expressions are handled by `term.ml:translate_value`.
 | `IdxP p i` | `⟦p⟧[⟦i⟧]` | `term.ml:translate_select` |
 | `SliceP p i n` | `⟦p⟧[⟦i⟧ : ⟦n⟧]` | `term.ml:translate_select` |
 | `DotP p a` | `⟦p⟧ . 'a` | `term.ml:translate_select` |
+
+### Fields with `hint(maude_array)`
+
+`hint(maude_array "f")` on a record type stores the sequence field `f` as
+`bytes(size, A)`, where `A` is a prelude `ARRAY{Nat, Zero}` whose entries
+equal to `# 0` are absent (`backend/spectec-semantics.maude`, `SPECTEC-ARRAY`).
+
+| IL | Maude | Code |
+| --- | --- | --- |
+| `LenE (DotE e f)` | `bsize(⟦e⟧ . 'f)` | `term.ml:translate_value` |
+| `IdxE (DotE e f) i` | `bread(⟦e⟧ . 'f, ⟦i⟧, 1)` | `term.ml:translate_value` |
+| `SliceE (DotE e f) i n` | `bread(⟦e⟧ . 'f, ⟦i⟧, ⟦n⟧)` | `term.ml:translate_value` |
+| `UpdE e (SliceP (DotP p f) i n) e'` | `p` updated with `[. 'f = bwrite(⟦p⟧ . 'f, ⟦i⟧, ⟦n⟧, ⟦e'⟧)]` | `term.ml:translate_update` |
+| `UpdE e (DotP p f) e'` | `p` updated with `[. 'f = bytes-of(⟦e'⟧)]` | `term.ml:translate_update` |
+| field `f` of `StrE`, value `0^n` | `bytes(⟦n⟧, empty)` | `term.ml:translate_array_value` |
+| field `f` of `StrE`, value `e 0^n` | `bgrow(⟦e⟧, ⟦n⟧)`, with `⟦e⟧` by this row set | `term.ml:translate_array_value` |
+| field `f` of `StrE`, other value `e` | `bytes-of(⟦e⟧)` (a sequence becomes an array; an array is kept) | `term.ml:translate_array_value` |
+| field `f` of a `StrE` pattern | the variable binds the stored array; its later uses are written as `e.f` before translation (section 7) | `prem.ml:translate_field_patterns`, `def.ml:array_script` |
+
+`0` is `NumE 0`, possibly under `SubE`, `CvtE`, or an argument case such as
+`%_byte(0)`. Every other use of the field is rejected (section 8).
 
 ## 5. Types, arguments, and parameters
 
@@ -346,6 +368,7 @@ its first occurrence.
 | --- | --- | --- |
 | Before translation | Remove the premises named by `hint(maude_assume)`, and the quantifiers whose variables occurred only in those premises | `def.ml:assume_script` |
 | Before translation | Remove `DefP`/`DefA` (section 5) | `def.ml:specialize_script` |
+| Before translation | After a premise `e = {.., f x*}` on a `hint(maude_array)` field `f`, write `e.f` for `x*` in the later premises and the result, so that `x*` gets the array translation (section 4). Only clauses and rules with such a premise are rewritten. | `def.ml:array_script` |
 | Before translation | Choose Maude names; collect variables, iterations, relation kinds, and hints | `prescan.ml:scan` |
 | Type guards | A variable of a quantifier or parameter gets a condition `typecheck(X, ⟦t⟧)`, unless its type is already established: by a premise that binds it from a relation call, or by the declared types of the rule's inputs, or by an argument `SubE` pattern of a function head that already checks an equal membership. In a syntax instance such as `syntax num_(Inn)`, the `SubE` check of the alias-expanded type (`addrtype`) keeps its place but uses the quantifier's type (`Inn`), and the quantifier check is not repeated. In every context, including syntax membership equations, a variable of Maude sort `Nat` (`Int`) gets no guard for `nat` (`int`) or an alias of it (e.g. `syntax N = nat`, `syntax exp = int`): the sort already ranges exactly over those values. A guard of an earlier rule's `r̂-r-enabled` predicate is also dropped when every caller already checks it. This assumes that relation calls and inputs only produce values of their declared types. | `param.ml:translate_eq_conditions` (`proven`), `term.ml:translate_typ_conditions`, `term.ml:with_relation_types`, `term.ml:translate_guard_conditions`, `reld.ml:helper_statements` |
 | Condition order | Place each condition after the conditions that bind its variables. Among ready conditions, relation rules take equational conditions before rewrite conditions, and function clauses take conditions that bind nothing before conditions that bind variables. Otherwise the order of the premises is kept. | `maude_il.ml:schedule_conditions`, `maude_il.ml:schedule_rule_conditions`, `maude_il.ml:schedule_equation_conditions` |
@@ -362,7 +385,7 @@ its first occurrence.
 | `maude_compute`, `maude_check` | `RelD` | 2 |
 | `maude_subsume`, `maude_trans`, `k_heatcool` | `RuleD` | 2 |
 | `maude_assume` | `RuleD` and `DecD` | 7 |
-| `maude_sort`, `maude_subsort`, `maude_proper` | `TypD` | 7 |
+| `maude_sort`, `maude_subsort`, `maude_proper`, `maude_array` | `TypD` | 4, 7 |
 
 Hints arrive as `HintD` definitions (`TypH`, `RelH`, `DecH`, `RuleH`) and
 are collected by `prescan.ml:collect_hints`. Other hints (for example, the
@@ -384,6 +407,8 @@ definition and the reason. An omitted case produces no Maude output.
 | `SubE` between types with different Maude representations | rejected | `term.ml:translate_value` |
 | `IdxE`, `SliceE`, and the paths `IdxP`, `SliceP` on a sequence with its own sort (`hint(maude_sort)`) | rejected | `term.ml:translate_value`, `term.ml:translate_select` |
 | `IterT t +` and `IterT t ^n` as a type argument | rejected | `term.ml:translate_check_typ` |
+| `hint(maude_array "f")` on a type that is not a monomorphic record with a sequence field `f` | rejected | `hintd.ml:array_field_of` |
+| A `maude_array` field read other than by `LenE`, `IdxE`, `SliceE`; written by `IdxP` or `ExtE`; selected inside; or `CompE` of its record | rejected | `term.ml:translate_value`, `term.ml:translate_select`, `term.ml:translate_update`, `term.ml:translate_extension`, `term.ml:translate_composition` |
 | `ElsePr` in a `maude_rule` function, or not as the first premise of an execution rule | rejected | `decd.ml:translate_rule_clause`, `reld.ml:lower_execution_rule` |
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |

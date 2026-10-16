@@ -63,7 +63,7 @@ syntax taginst hint(desc "tag instance") hint(macro "%" "HI%") =
 syntax globalinst hint(desc "global instance") hint(macro "%" "GI%") =
   { TYPE globaltype, VALUE val }
 
-syntax meminst hint(desc "memory instance") hint(macro "%" "MI%") =
+syntax meminst hint(desc "memory instance") hint(macro "%" "MI%") hint(maude_array "BYTES") =
   { TYPE memtype, BYTES byte* }
 
 syntax tableinst hint(desc "table instance") hint(macro "%" "TI%") =
@@ -72,7 +72,7 @@ syntax tableinst hint(desc "table instance") hint(macro "%" "TI%") =
 syntax funcinst hint(desc "function instance") hint(macro "%" "FI%") =
   { TYPE deftype, MODULE moduleinst, CODE funccode }
 
-syntax datainst hint(desc "data instance") hint(macro "%" "DI%") =
+syntax datainst hint(desc "data instance") hint(macro "%" "DI%") hint(maude_array "BYTES") =
   { BYTES byte* }
 
 syntax eleminst hint(desc "element instance") hint(macro "%" "EI%") =

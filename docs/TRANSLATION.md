@@ -156,9 +156,10 @@ def 호출 결과는 callee가 선언한 결과 sort에서 정한다.
 | `SPECTEC-OPTION` | option 표현·검사·연산 |
 | `SPECTEC-TUPLE` | tuple 표현·projection |
 | `SPECTEC-RECORD` | record 표현·조회·갱신 |
+| `SPECTEC-ARRAY` | `hint(maude_array)` 필드의 크기 + prelude `ARRAY` 표현·연산 |
 
-convert와 list는 builtin types를, option·tuple·record는 list를 import한다.
-마지막 `SPECTEC-SEMANTICS`가 다섯 모듈을 모은다. 공통 목록은
+convert와 list는 builtin types를, option·tuple·record·array는 list를 import한다.
+마지막 `SPECTEC-SEMANTICS`가 여섯 모듈을 모은다. 공통 목록은
 `spectec-sorts.maude`가 prelude `LIST{SpectecTerminal}`을 sort 이름만 바꿔
 가져온 것이다(`nil`, `__`, `size`, `occurs`, `append`는 prelude 이름 그대로).
 `types.maude`의 `SPEC2MAUDE-TYPES`는 hint별 목록 sort를 이 목록 위에 subsort로
@@ -205,6 +206,34 @@ typed list는 별도 연산을 선언하지 않고 prelude 연산을 그대로 �
 
 record 조회/갱신은 field를 매칭하고 prefix에 동일 field가 없다는 조건으로
 첫 항목을 선택한다. 없는 field의 조회는 nil, 갱신은 끝에 추가한다.
+
+`hint(maude_array "F")`가 붙은 record 타입의 sequence 필드 F는 목록이 아니라
+`bytes(크기, A)`로 저장한다. A는 prelude `ARRAY{Nat, Zero}`이고, view `Zero`가
+기본값을 `# 0`으로 정하므로 0인 칸은 저장하지 않는다(prelude `insert`가 0을
+지우고, `_[_]`가 없는 칸에 0을 돌려준다). 크기를 따로 두므로 길이 검사가 칸 수에
+비례하지 않는다. 연산은 `SPECTEC-ARRAY`에 있다.
+
+| source | Maude |
+|---|---|
+| `\|e.F\|` | `bsize(e . 'F)` |
+| `e.F[i]` | `bread(e . 'F, i, 1)` |
+| `e.F[i : n]` | `bread(e . 'F, i, n)` |
+| `e[.F[i : n] = s]` | `e[. 'F = bwrite(e . 'F, i, n, s)]` |
+| `e[.F = s]` | `e[. 'F = bytes-of(s)]` |
+| `{.., F 0^n}` | `bytes(n, empty)` |
+| `{.., F s 0^n}` | `bgrow(⟦s⟧, n)` |
+| `{.., F s}` | `bytes-of(s)` |
+
+`bread`, `bwrite`는 목록 slice/splice처럼 `i + n <= 크기`에서만 정의된다.
+`bytes-of`는 목록을 배열로 바꾸고, 이미 배열인 값은 그대로 둔다. 필드
+pattern(`-- if e = {.., F b*}`)은 배열 값을 그대로 묶고, 번역 전에
+(`def.ml:array_script`) 그 뒤의 전제와 결과에서 `b*`를 `e.F`로 바꿔 쓴다. 원문에서
+`b* = e.F`이므로 의미가 같고, `|b*|`와 `b* 0^n`이 위 표의 배열 번역을 받는다
+(Wasm `$growmem`).
+
+위 표 밖의 사용(필드 값 자체를 목록으로 읽기, 원소 하나 갱신, `++` 확장, 필드를
+가진 record의 `CompE`)은 `Unsupported`로 거부한다. 이 record 타입에는
+`recordConcat` equation을 생성하지 않는다.
 비결정적 membership choice helper는 prefix/선택 원소/suffix 매칭 rule로
 가능한 원소를 선택한다. source의 선택 의미, boxing과 frozen 인자를 유지한다.
 비트별 논리 연산은 폭/operand 조건을 유지한 native Nat 연산을 사용한다.
@@ -257,19 +286,9 @@ WAST command 목록은 AST에서 최대 64개씩 나누어 `inputCommands`와
 기존의 단일 `commands.cons` 목록과 같다. 이 정의들은 WAST driver에만
 추가하며 SpecTec 실행 규칙이나 일반 Wasm run/modelcheck 출력은 바꾸지 않는다.
 
-목록의 위치를 찾을 때 여러 분해 후보의 prefix 길이를 계산하므로,
-긴 메모리 목록에서 실행 비용이 클 수 있다. 현재 메모리 실행에는 이전 구현 대비
-큰 성능 regression이 알려져 있다. 결과의 정확성과 실행 비용은 별도로 검증한다.
-
-### 향후 아이디어: 메모리 트리
-
-추후 Maude profiling에서 메모리 조회·갱신이 심한 병목으로 확인되면,
-목록 대신 트리로 메모리를 표현하는 방법도 검토할 수 있다.
-이는 미구현 아이디어이며, 채택한 개발 계획이나 필수 후속 작업은 아니다.
-
-검토할 때는 주소별 값, 범위 검사, 갱신과 grow의 source 의미를 보존해야 한다.
-현재 목록 표현과의 대응을 설명하고 동일 입력·조건에서 비용을 측정한 뒤
-채택 여부를 판단한다. 트리라는 이유만으로 성능 개선을 전제하지 않는다.
+WAST host memory(spectest `memory`)는 `meminst`의 `BYTES`가 `maude_array`
+필드이므로 `bytes(크기, empty)`로 만든다(`wast_host_encode.ml`). 모듈의 메모리와
+data instance는 번역된 `allocmem`/`allocdata`가 만든다.
 
 [language]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md
 [type-premises]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md#premises
@@ -287,6 +306,7 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 | `maude_sort` | source 타입에 별도 Maude sort와 목록 표현을 부여한다. 목록으로 사용하는 sort들은 하나의 subsort chain이어야 한다. 없는 경우 일반 `SpectecTerminals` 표현을 사용한다. |
 | `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
 | `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
+| `maude_array "F"` | 단형 record 타입의 sequence 필드 F를 크기 + prelude `ARRAY`(기본값 0)로 저장한다. 필드 접근은 길이·원소·구간 읽기와 구간·전체 쓰기, 생성은 `0^n`·`s 0^n`·목록으로 제한한다. 다른 사용은 거부한다. 원소의 0은 저장하지 않으므로 원소 타입에 수 0이 있어야 한다. |
 | `k_heatcool` | 실행 RulePr를 heat/cool로 연결한다. source에서 hole의 저장 변수와 결과 복원을 추출하고 premise 순서를 유지한다. 목록 context는 기존 focus 식별 및 경계 조건을 보존한다. |
 | `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
@@ -330,6 +350,12 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
   닫힌 타입에 대한 귀납 논증(semantic review, 미증명)에 근거한다.
   추상 heap type 169쌍 전부를 원문 정의로 계산한 값과 비교해 일치와 종료를 확인했다.
 - 실행 중 질의는 C = {}이므로 `_IDX`, `REC` rule은 번역되지만 적용되지 않는다.
+- `meminst`, `datainst`: `maude_array "BYTES"`. 원문은 메모리(1 page = 65,536칸)와
+  data segment 바이트를 목록 `byte*`로 둔다. 목록에서는 범위 검사 `|$mem(z,x).BYTES|`가
+  매번 칸 수만큼 세고, 메모리 생성이 칸마다 원소를 만든다(Maude profile에서 확인).
+  원문의 사용은 길이, 원소·구간 읽기, 구간 쓰기(`$with_mem`), 전체 쓰기(`$with_data`),
+  `0^n` 생성(`allocmem`), 목록 생성(`allocdata`), 필드 pattern 후 `b* 0^n`(`growmem`)이며
+  모두 위 표의 형태다. byte의 0은 `%_byte(0)` 형태로 기본값과 대응한다.
 
 ### 숫자 builtin과 profile
 

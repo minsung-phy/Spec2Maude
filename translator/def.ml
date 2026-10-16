@@ -657,8 +657,82 @@ let assume_script script =
   in
   List.map transform script
 
+(* hint(maude_array): a premise e = {.., f x*} binds x* to the array stored in
+   e.f, so x* equals e.f. Later premises and the result use e.f in place of
+   x*, which gets the array translation (|e.f| is the stored size, e.f 0^n
+   grows the array); the binding premise is kept. *)
+let array_script script =
+  let metadata = Hintd.scan_sorts script in
+  let bound_variable exp =
+    match exp.it with
+    | VarE x -> Some x
+    | IterE ({it = VarE y; _}, (_, [(y', {it = VarE x; _})])) when y.it = y'.it ->
+        Some x
+    | _ -> None
+  in
+  let field_bindings record pattern =
+    match pattern.it with
+    | StrE fields ->
+        fields
+        |> List.filter_map (fun (atom, value) ->
+             if not (Hintd.array_field metadata pattern.note atom) then None
+             else
+               bound_variable value
+               |> Option.map (fun x -> x, DotE (record, atom) $$ (value.at, value.note)))
+    | _ -> []
+  in
+  let premise_bindings prem =
+    match prem.it with
+    | IfPr {it = CmpE (`EqOp, _, left, right); _} ->
+        field_bindings left right @ field_bindings right left
+    | LetPr (_, pattern, value) -> field_bindings value pattern
+    | _ -> []
+  in
+  (* Substitution renames iteration binders, so it is applied only after a
+     binding exists; other clauses stay unchanged. *)
+  let substitute exp prems =
+    let apply bindings f x =
+      if bindings = [] then x
+      else
+        let subst =
+          List.fold_left
+            (fun subst (x, field) -> Il.Subst.add_varid subst x field)
+            Il.Subst.empty bindings
+        in
+        f subst x
+    in
+    let bindings, prems =
+      List.fold_left
+        (fun (bindings, prems) prem ->
+          let prem = apply bindings Il.Subst.subst_prem prem in
+          bindings @ premise_bindings prem, prem :: prems)
+        ([], []) prems
+    in
+    apply bindings Il.Subst.subst_exp exp, List.rev prems
+  in
+  let clause c =
+    let DefD (quants, args, exp, prems) = c.it in
+    let exp, prems = substitute exp prems in
+    {c with it = DefD (quants, args, exp, prems)}
+  in
+  let rule r =
+    let RuleD (id, quants, mixop, exp, prems) = r.it in
+    let exp, prems = substitute exp prems in
+    {r with it = RuleD (id, quants, mixop, exp, prems)}
+  in
+  let rec transform def =
+    match def.it with
+    | DecD (id, params, typ, clauses) ->
+        {def with it = DecD (id, params, typ, List.map clause clauses)}
+    | RelD (id, params, mixop, typ, rules) ->
+        {def with it = RelD (id, params, mixop, typ, List.map rule rules)}
+    | RecD defs -> {def with it = RecD (List.map transform defs)}
+    | TypD _ | GramD _ | HintD _ -> def
+  in
+  List.map transform script
+
 let translate_script script =
-  let script = specialize_script (assume_script script) in
+  let script = array_script (specialize_script (assume_script script)) in
   let index = Prescan.scan script in
   (* Relations without a supported policy are omitted; a call to one is
      rejected later, but an unreferenced one would vanish silently. *)

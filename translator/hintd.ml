@@ -3,7 +3,8 @@
  *
  * Part 1: sorts. hint(maude_sort), hint(maude_subsort), and
  *   hint(maude_proper) decide the Maude sort of each type, its subsorts, and
- *   the representation of typed sequences.
+ *   the representation of typed sequences. hint(maude_array "FIELD") on a
+ *   record type stores that sequence field as a size and a prelude ARRAY.
  * Part 2: hint(k_heatcool). The hinted rules are checked against the shapes
  *   that Heatcool supports, and context rules get their focus patterns
  *   (TRANSLATION_MAP.md, section 2). *)
@@ -45,6 +46,7 @@ type t =
   ; proper : (maude_sort * maude_sort * maude_sort) list
   ; owners : (constructor * maude_sort list) list
   ; lists : maude_sort list
+  ; arrays : (string * string) list  (* record type, field *)
   }
 
 let unsupported_sort at reason =
@@ -142,6 +144,34 @@ let explicit_edges hints annotated =
               unsupported_sort hint.hintid.at
                 "maude_subsort target must have maude_sort";
             source, target))
+
+(* hint(maude_array "FIELD") names a sequence field of a monomorphic record
+   type. Its value is stored as bytes(size, array), where array entries equal
+   to 0 are absent (prelude ARRAY with default 0). *)
+let array_field_of definitions source hint =
+  let field =
+    match hint.hintexp.it with
+    | El.Ast.TextE field -> field
+    | _ -> unsupported_sort hint.hintid.at "maude_array must name a record field"
+  in
+  let is_sequence_field (atom, (typ, _, _), _) =
+    Il.Print.string_of_atom atom = field
+    && match typ.it with IterT (_, (List | List1 | ListN _)) -> true | _ -> false
+  in
+  match List.assoc_opt source definitions with
+  | Some [{it = InstD ([], [], {it = StructT fields; _}); _}]
+    when List.exists is_sequence_field fields ->
+      source, field
+  | _ ->
+      unsupported_sort hint.hintid.at
+        ("maude_array requires a monomorphic record type with sequence field "
+         ^ field)
+
+let array_fields_of definitions hints =
+  hints
+  |> List.concat_map (fun (source, values) ->
+       hint_values "maude_array" values
+       |> List.map (array_field_of definitions source))
 
 let sort_origin origins sort =
   Option.value (List.assoc_opt sort origins) ~default:no_region
@@ -433,9 +463,21 @@ let scan_sorts script =
   ; proper
   ; owners
   ; lists
+  ; arrays = array_fields_of definitions hints
   }
 
 let annotated_sorts metadata = metadata.annotated
+
+let array_field metadata typ atom =
+  match (Il.Eval.reduce_typ metadata.type_env typ).it with
+  | VarT (id, []) ->
+      List.mem (id.it, Il.Print.string_of_atom atom) metadata.arrays
+  | _ -> false
+
+let has_array_field metadata typ =
+  match (Il.Eval.reduce_typ metadata.type_env typ).it with
+  | VarT (id, []) -> List.mem_assoc id.it metadata.arrays
+  | _ -> false
 let subsort_edges metadata = metadata.edges
 let proper_sorts metadata =
   List.map (fun (proper, parent, _) -> proper, parent) metadata.proper

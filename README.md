@@ -37,9 +37,10 @@ the corresponding source construct, keeping the relationship between the
 specification and generated code visible in the implementation.
 
 Source `hint(...)` annotations describe translation choices such as Maude sort
-representations, builtin implementations, and heating/cooling for execution
-premises. Backend modules provide common representations, primitive operations,
-and explicitly selected relation implementations.
+representations, array-backed record fields (memory bytes), builtin
+implementations, and heating/cooling for execution premises. Backend modules
+provide common representations, primitive operations, and explicitly selected
+relation implementations.
 
 ## Working with WebAssembly
 

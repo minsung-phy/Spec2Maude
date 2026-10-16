@@ -106,8 +106,11 @@ let rec composable index seen typ =
            fields
      | AliasT _ | VariantT _ -> false
 
-let translate_struct_composition index target fields =
-  if not (List.for_all (fun (_, (typ, _, _), _) -> composable index [] typ) fields)
+(* No recordConcat for a record with a maude_array field: an array is not a
+   sequence to concatenate, and CompE on such a record is Unsupported. *)
+let translate_struct_composition index id target fields =
+  if Prescan.array_record index id
+     || not (List.for_all (fun (_, (typ, _, _), _) -> composable index [] typ) fields)
   then [] else
   let left = Var (generated_variable "LEFT" "Record") in
   let right = Var (generated_variable "RIGHT" "Record") in
@@ -125,7 +128,7 @@ let translate_struct_composition index target fields =
   in
   [equation (App ("recordConcat", [left; right; target])) result []]
 
-let translate_struct index target bound quants fields =
+let translate_struct index id target bound quants fields =
   let translated_fields =
     List.map (translate_struct_field index bound) fields
   in
@@ -138,7 +141,7 @@ let translate_struct index target bound quants fields =
   let record = App ("{_}", [join_struct_fields record_fields]) in
   let left = App ("typecheck", [record; target]) in
   [equation left (Const "true") conditions]
-  @ translate_struct_composition index target fields
+  @ translate_struct_composition index id target fields
 
 (* VariantT declarations provide constructors and explicit type predicates. *)
 let transparent_payload index typ =
@@ -238,10 +241,10 @@ let guard_statements conditions statements =
   in
   if conditions = [] then statements else List.map guard statements
 
-let translate_deftyp index target bound quants deftyp =
+let translate_deftyp index id target bound quants deftyp =
   match deftyp.it with
   | AliasT typ -> translate_alias index target quants typ
-  | StructT fields -> translate_struct index target bound quants fields
+  | StructT fields -> translate_struct index id target bound quants fields
   | VariantT cases -> translate_variant index target bound quants cases
 
 let translate_inst index id params inst =
@@ -280,7 +283,7 @@ let translate_inst index id params inst =
           guards
       in
       let quants = List.filter (fun quant -> not (List.memq quant proven_quants)) quants in
-      translate_deftyp index target bound quants deftyp
+      translate_deftyp index id target bound quants deftyp
       |> guard_statements guards
 
 let translate index id params insts =

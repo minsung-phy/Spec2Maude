@@ -5911,8 +5911,6 @@ mod SPEC2MAUDE-GENERATED is
   ceq typecheck({ field('BYTES, VALUE-4) }, datainst) = true
     if typecheck(VALUE-4, byte) .
 
-  eq recordConcat(LEFT, RIGHT, datainst) = { field('BYTES, (LEFT . 'BYTES) (RIGHT . 'BYTES)) } .
-
   ceq typecheck({ (field('TYPE, VALUE-3) ; field('REFS, VALUE-4)) }, eleminst) = true
     if typecheck(VALUE-3, elemtype)
       /\ typecheck(VALUE-4, ref) .
@@ -6083,13 +6081,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq with-tableinst(Z, X-4, TI) = (sof(Z) [. 'TABLES = ((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) = TI ]) ]) ; fof(Z) .
 
-  eq with-mem(Z, X-4, I, J, B*) = (sof(Z) [. 'MEMS = ((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) = (((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) ]) [. 'BYTES = ((((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) ]) . 'BYTES) [ I : J = B* ]) ]) ]) ]) ; fof(Z) .
+  eq with-mem(Z, X-4, I, J, B*) = (sof(Z) [. 'MEMS = ((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) = (((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) ]) [. 'BYTES = bwrite(((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) ]) . 'BYTES, I, J, B*) ]) ]) ]) ; fof(Z) .
 
   eq with-meminst(Z, X-4, MI) = (sof(Z) [. 'MEMS = ((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) = MI ]) ]) ; fof(Z) .
 
   eq with-elem(Z, X-4, R*) = (sof(Z) [. 'ELEMS = ((sof(Z) . 'ELEMS) [ #rat(((fof(Z) . 'MODULE) . 'ELEMS) [ X-4 ]) = (((sof(Z) . 'ELEMS) [ #rat(((fof(Z) . 'MODULE) . 'ELEMS) [ X-4 ]) ]) [. 'REFS = R* ]) ]) ]) ; fof(Z) .
 
-  eq with-data(Z, X-4, B*) = (sof(Z) [. 'DATAS = ((sof(Z) . 'DATAS) [ #rat(((fof(Z) . 'MODULE) . 'DATAS) [ X-4 ]) = (((sof(Z) . 'DATAS) [ #rat(((fof(Z) . 'MODULE) . 'DATAS) [ X-4 ]) ]) [. 'BYTES = B* ]) ]) ]) ; fof(Z) .
+  eq with-data(Z, X-4, B*) = (sof(Z) [. 'DATAS = ((sof(Z) . 'DATAS) [ #rat(((fof(Z) . 'MODULE) . 'DATAS) [ X-4 ]) = (((sof(Z) . 'DATAS) [ #rat(((fof(Z) . 'MODULE) . 'DATAS) [ X-4 ]) ]) [. 'BYTES = bytes-of(B*) ]) ]) ]) ; fof(Z) .
 
   eq with-struct(Z, A, I, FV) = (sof(Z) [. 'STRUCTS = ((sof(Z) . 'STRUCTS) [ A = (((sof(Z) . 'STRUCTS) [ A ]) [. 'FIELDS = ((((sof(Z) . 'STRUCTS) [ A ]) . 'FIELDS) [ I = FV ]) ]) ]) ]) ; fof(Z) .
 
@@ -6112,10 +6110,10 @@ mod SPEC2MAUDE-GENERATED is
   ceq growmem(MEMINST, N-3) = MEMINST'
     if { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, B*)) } := MEMINST
       /\ size(J?) <= 1
-      /\ I' := (((size(B*) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) + (N-3 : nat <:> rat)) : rat <:> nat
+      /\ I' := (((bsize(MEMINST . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) + (N-3 : nat <:> rat)) : rat <:> nat
       /\ all-growtable(I', J?)
       /\ I' <= (2 ^ (_-_(spectec-size(AT) : nat <:> int, 16 : nat <:> int) : int <:> nat))
-      /\ MEMINST' := { (field('TYPE, __PAGE(AT, [ I' .. J? ])) ; field('BYTES, B* repeatSeq(N-3 * (64 * Ki), # 0))) } .
+      /\ MEMINST' := { (field('TYPE, __PAGE(AT, [ I' .. J? ])) ; field('BYTES, bgrow(MEMINST . 'BYTES, N-3 * (64 * Ki)))) } .
 
   eq Num-ok(S-2, CONST(NT, C-2), NT) = true .
 
@@ -6440,7 +6438,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq Step-read-array-init-data-oob2-enabled(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = true
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ size(MUT?) <= 1
-      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES) .
+      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-data(Z, Y) . 'BYTES) .
 
   eq Step-read-array-init-data-oob2-enabled(ENABLED-INPUT1) = false [owise] .
 
@@ -6595,28 +6593,28 @@ mod SPEC2MAUDE-GENERATED is
       /\ N-3 =/= 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) LOAD(NT, nil, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) LOAD(NT, nil, X-4, AO))) => CONST(NT, C-2)
-    if C-2 := inv-nbytes-(NT, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ nbytes-(NT, C-2) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+    if C-2 := inv-nbytes-(NT, bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ nbytes-(NT, C-2) == bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) .
 
   crl Step-read(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, X-4, AO))) => CONST(INN, # extend--(N-3, spectec-size(INN), SX, C-3))
-    if C-3 := inv-ibytes-(N-3, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ ibytes-(N-3, C-3) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+    if C-3 := inv-ibytes-(N-3, bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ ibytes-(N-3, C-3) == bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, nil, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, nil, X-4, AO))) => VCONST(V128, C-3)
-    if C-3 := inv-vbytes-(V128, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ vbytes-(V128, C-3) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+    if C-3 := inv-vbytes-(V128, bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ vbytes-(V128, C-3) == bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + ((((M-2 * K-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + ((((M-2 * K-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SHAPE_X_-_(M-2, K-2, SX) ?, X-4, AO))) => VCONST(V128, C-3)
     if J* := bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, K-2, 0)
@@ -6625,30 +6623,30 @@ mod SPEC2MAUDE-GENERATED is
       /\ C-3 := inv-lanes-(_X_(JNN, K-2), map-Step-read-vload-pack-val(JNN, K-2, M-2, SX, K-2, J*)) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, SPLAT(N-2) ?, X-4, AO))) => VCONST(V128, C-3)
-    if J := inv-ibytes-(N-2, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ ibytes-(N-2, J) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if J := inv-ibytes-(N-2, bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ ibytes-(N-2, J) == bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)
       /\ JNN := inv-jsize(N-2)
       /\ N-2 == jsize(JNN)
       /\ M-2 := ((128 : nat <:> rat) / (N-2 : nat <:> rat)) : rat <:> nat
       /\ C-3 := inv-lanes-(_X_(JNN, M-2), repeatSeq(M-2, # J)) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, spectec-ZERO(N-2) ?, X-4, AO))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) VLOAD(V128, spectec-ZERO(N-2) ?, X-4, AO))) => VCONST(V128, C-3)
-    if J := inv-ibytes-(N-2, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ ibytes-(N-2, J) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if J := inv-ibytes-(N-2, bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ ibytes-(N-2, J) == bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)
       /\ C-3 := extend--(N-2, 128, U, J) .
 
   crl Step-read(Z ; (CONST(AT, # I) (VCONST(V128, C_1-2) VLOAD-LANE(V128, N-2, X-4, AO, J)))) => TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) (VCONST(V128, C_1-2) VLOAD-LANE(V128, N-2, X-4, AO, J)))) => VCONST(V128, C-3)
-    if K-3 := inv-ibytes-(N-2, (spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ ibytes-(N-2, K-3) == ((spectec-mem(Z, X-4) . 'BYTES) [ (I + #rat(AO . 'OFFSET)) : (((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
+    if K-3 := inv-ibytes-(N-2, bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ ibytes-(N-2, K-3) == bread(spectec-mem(Z, X-4) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)
       /\ JNN := inv-jsize(N-2)
       /\ N-2 == jsize(JNN)
       /\ M-2 := ((vsize(V128) : nat <:> rat) / (N-2 : nat <:> rat)) : rat <:> nat
@@ -6656,47 +6654,47 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read(Z ; MEMORY.SIZE(X-4)) => CONST(AT, # N-3)
     if (64 * Ki) =/= 0
-      /\ N-3 := _quo_(size(spectec-mem(Z, X-4) . 'BYTES), 64 * Ki)
-      /\ N-3 * (64 * Ki) = size(spectec-mem(Z, X-4) . 'BYTES)
+      /\ N-3 := _quo_(bsize(spectec-mem(Z, X-4) . 'BYTES), 64 * Ki)
+      /\ N-3 * (64 * Ki) = bsize(spectec-mem(Z, X-4) . 'BYTES)
       /\ __PAGE(AT, LIM) := spectec-mem(Z, X-4) . 'TYPE .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => TRAP
-    if (I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if (I + N-3) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => nil
-    if ((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES)) =/= true
+    if ((I + N-3) > bsize(spectec-mem(Z, X-4) . 'BYTES)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) MEMORY.FILL(X-4))))) => CONST(AT, # I) (VAL (STORE(I32, (# 8) ?, X-4, memarg0) (CONST(AT, # (I + 1)) (VAL (CONST(AT, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.FILL(X-4))))))
-    if ((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES)) =/= true
+    if ((I + N-3) > bsize(spectec-mem(Z, X-4) . 'BYTES)) =/= true
       /\ N-3 =/= 0 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => TRAP
-    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) .
+    if _or_((I_1 + N-3) > bsize(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > bsize(spectec-mem(Z, X_2-3) . 'BYTES)) .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => nil
-    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
+    if _or_((I_1 + N-3) > bsize(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > bsize(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (LOAD(I32, spectec-_-_(8, U) ?, X_2-3, memarg0) (STORE(I32, (# 8) ?, X_1-2, memarg0) (CONST(AT_1, # (I_1 + 1)) (CONST(AT_2, # (I_2 + 1)) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.COPY(X_1-2, X_2-3)))))))
-    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
+    if _or_((I_1 + N-3) > bsize(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > bsize(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
       /\ N-3 =/= 0
       /\ I_1 <= I_2 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) MEMORY.COPY(X_1-2, X_2-3))))) => CONST(AT_1, # (_-_((I_1 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (CONST(AT_2, # (_-_((I_2 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (LOAD(I32, spectec-_-_(8, U) ?, X_2-3, memarg0) (STORE(I32, (# 8) ?, X_1-2, memarg0) (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.COPY(X_1-2, X_2-3)))))))
-    if _or_((I_1 + N-3) > size(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > size(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
+    if _or_((I_1 + N-3) > bsize(spectec-mem(Z, X_1-2) . 'BYTES), (I_2 + N-3) > bsize(spectec-mem(Z, X_2-3) . 'BYTES)) =/= true
       /\ N-3 =/= 0
       /\ I_1 > I_2 .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => TRAP
-    if _or_((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > size(spectec-data(Z, Y) . 'BYTES)) .
+    if _or_((I + N-3) > bsize(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > bsize(spectec-data(Z, Y) . 'BYTES)) .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => nil
-    if _or_((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > size(spectec-data(Z, Y) . 'BYTES)) =/= true
+    if _or_((I + N-3) > bsize(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > bsize(spectec-data(Z, Y) . 'BYTES)) =/= true
       /\ N-3 == 0 .
 
-  crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => CONST(AT, # I) (CONST(I32, # #rat((spectec-data(Z, Y) . 'BYTES) [ J ])) (STORE(I32, (# 8) ?, X-4, memarg0) (CONST(AT, # (I + 1)) (CONST(I32, # (J + 1)) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.INIT(X-4, Y))))))
-    if _or_((I + N-3) > size(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > size(spectec-data(Z, Y) . 'BYTES)) =/= true
+  crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) MEMORY.INIT(X-4, Y))))) => CONST(AT, # I) (CONST(I32, # #rat(bread(spectec-data(Z, Y) . 'BYTES, J, 1))) (STORE(I32, (# 8) ?, X-4, memarg0) (CONST(AT, # (I + 1)) (CONST(I32, # (J + 1)) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) MEMORY.INIT(X-4, Y))))))
+    if _or_((I + N-3) > bsize(spectec-mem(Z, X-4) . 'BYTES), (J + N-3) > bsize(spectec-data(Z, Y) . 'BYTES)) =/= true
       /\ N-3 =/= 0 .
 
   rl Step-read(Z ; REF.NULL(HT)) => REF.NULL-ADDR .
@@ -6749,13 +6747,13 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-DATA(X-4, Y)))) => TRAP
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ size(MUT?) <= 1
-      /\ (I + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES) .
+      /\ (I + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-data(Z, Y) . 'BYTES) .
 
   crl Step-read(Z ; (CONST(I32, # I) (CONST(I32, # N-3) ARRAY.NEW-DATA(X-4, Y)))) => map-const(ZT, N-3, C*) ARRAY.NEW-FIXED(X-4, N-3)
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ size(MUT?) <= 1
-      /\ C* := unzip-zbytes(ZT, N-3, inv-concatn-(byte, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, (spectec-data(Z, Y) . 'BYTES) [ I : ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]))
-      /\ concatn-(byte, map-zbytes(ZT, N-3, C*), ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) == ((spectec-data(Z, Y) . 'BYTES) [ I : ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+      /\ C* := unzip-zbytes(ZT, N-3, inv-concatn-(byte, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, bread(spectec-data(Z, Y) . 'BYTES, I, (((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)))
+      /\ concatn-(byte, map-zbytes(ZT, N-3, C*), ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) == bread(spectec-data(Z, Y) . 'BYTES, I, (((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) .
 
   crl Step-read(Z ; ((REF.NULL-ADDR) (CONST(I32, # I) ARRAY.GET(SX?, X-4)))) => TRAP
     if size(SX?) <= 1 .
@@ -6850,7 +6848,7 @@ mod SPEC2MAUDE-GENERATED is
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => TRAP
     if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
       /\ size(MUT?) <= 1
-      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES) .
+      /\ (J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-data(Z, Y) . 'BYTES) .
 
   crl Step-read(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) => nil
     if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
@@ -6861,10 +6859,10 @@ mod SPEC2MAUDE-GENERATED is
     if ((I + N-3) > size((spectec-arrayinst(Z) [ A ]) . 'FIELDS)) =/= true
       /\ N-3 =/= 0
       /\ spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ ((J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-data(Z, Y) . 'BYTES)) =/= true
+      /\ ((J + ((((N-3 * zsize(ZT)) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-data(Z, Y) . 'BYTES)) =/= true
       /\ size(MUT?) <= 1
-      /\ C-2 := inv-zbytes-(ZT, (spectec-data(Z, Y) . 'BYTES) [ J : (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ zbytes-(ZT, C-2) == ((spectec-data(Z, Y) . 'BYTES) [ J : (((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+      /\ C-2 := inv-zbytes-(ZT, bread(spectec-data(Z, Y) . 'BYTES, J, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ zbytes-(ZT, C-2) == bread(spectec-data(Z, Y) . 'BYTES, J, ((zsize(ZT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) .
 
   crl Step(Z ; (VAL* THROW(X-4))) => add-exninst(Z, EXN-3) ; (REF.EXN-ADDR(A) THROW-REF)
     if N-3 := size(VAL*)
@@ -6895,25 +6893,25 @@ mod SPEC2MAUDE-GENERATED is
   rl Step(Z ; ELEM.DROP(X-4)) => with-elem(Z, X-4, nil) ; nil .
 
   crl Step(Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, nil, X-4, AO)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, # I) (CONST(NT, C-2) STORE(NT, nil, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((spectec-size(NT) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
     if B* := nbytes-(NT, C-2) .
 
   crl Step(Z ; (CONST(AT, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, X-4, AO)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
     if B* := ibytes-(N-3, wrap--(spectec-size(INN), N-3, C-3)) .
 
   crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE(V128, X-4, AO)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + (((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE(V128, X-4, AO)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((vsize(V128) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
     if B* := vbytes-(V128, C-3) .
 
   crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE-LANE(V128, N-2, X-4, AO, J)))) => Z ; TRAP
-    if ((I + #rat(AO . 'OFFSET)) + N-2) > size(spectec-mem(Z, X-4) . 'BYTES) .
+    if ((I + #rat(AO . 'OFFSET)) + N-2) > bsize(spectec-mem(Z, X-4) . 'BYTES) .
 
   crl Step(Z ; (CONST(AT, # I) (VCONST(V128, C-3) VSTORE-LANE(V128, N-2, X-4, AO, J)))) => with-mem(Z, X-4, I + #rat(AO . 'OFFSET), ((N-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat, B*) ; nil
     if JNN := inv-jsize(N-2)
@@ -6921,7 +6919,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ M-2 := ((128 : nat <:> rat) / (N-2 : nat <:> rat)) : rat <:> nat
       /\ B* := ibytes-(N-2, #rat(lanes-(_X_(JNN, M-2), C-3) [ J ])) .
 
-  crl Step(Z ; (CONST(AT, # N-3) MEMORY.GROW(X-4))) => with-meminst(Z, X-4, MI) ; CONST(AT, # (((size(spectec-mem(Z, X-4) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat))
+  crl Step(Z ; (CONST(AT, # N-3) MEMORY.GROW(X-4))) => with-meminst(Z, X-4, MI) ; CONST(AT, # (((bsize(spectec-mem(Z, X-4) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat))
     if MI := growmem(spectec-mem(Z, X-4), N-3) .
 
   rl Step(Z ; (CONST(AT, # N-3) MEMORY.GROW(X-4))) => Z ; CONST(AT, # inv-signed-(spectec-size(AT), -_(1 : nat <:> int))) .
@@ -7613,7 +7611,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq allocmem(S-2, __PAGE(AT, [ I .. J? ])) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, MEMINST) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'MEMS)))
     if size(J?) <= 1
-      /\ MEMINST := { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, repeatSeq(I * (64 * Ki), # 0))) } .
+      /\ MEMINST := { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, bytes(I * (64 * Ki), empty))) } .
 
   eq allocmems(S-2, nil) = tuple(S-2 seq(nil)) .
 
@@ -7641,7 +7639,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ tuple(S_2 seq(FA'*)) := allocfuncs(S_1, DT'*, FUNCCODE'*, MODULEINST'*) .
 
   ceq allocdata(S-2, OK, BYTE*) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, DATAINST) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'DATAS)))
-    if DATAINST := { field('BYTES, BYTE*) } .
+    if DATAINST := { field('BYTES, bytes-of(BYTE*)) } .
 
   eq allocdatas(S-2, nil, nil) = tuple(S-2 seq(nil)) .
 
@@ -8315,8 +8313,8 @@ mod SPEC2MAUDE-GENERATED is
   eq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, 0, K-3) = nil .
 
   ceq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, s(ITER-COUNT), K-3) = (# J) bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, ITER-COUNT, s(K-3))
-    if J := inv-ibytes-(M-2, (spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ])
-      /\ ibytes-(M-2, J) == ((spectec-mem(Z, X-4) . 'BYTES) [ ((I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat)) : (((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) ]) .
+    if J := inv-ibytes-(M-2, bread(spectec-mem(Z, X-4) . 'BYTES, (I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat), ((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat))
+      /\ ibytes-(M-2, J) == bread(spectec-mem(Z, X-4) . 'BYTES, (I + #rat(AO . 'OFFSET)) + ((((K-3 * M-2) : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat), ((M-2 : nat <:> rat) / (8 : nat <:> rat)) : rat <:> nat) .
 
   eq bind-Step-read-struct-new-default(nil) = nil .
 
