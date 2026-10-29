@@ -145,6 +145,107 @@ let translate_result prepared rhs =
   Term.to_sort index ~sort:prepared.result_sort rhs.note
     (Term.translate_exp index rhs)
 
+(* DefD clauses are a sequential pattern match (Bringing the WebAssembly
+   Standard up to Speed with SpecTec, 3): a clause applies only if no earlier
+   clause does. Equations are unordered, so a clause carries the complement of
+   each earlier clause that its head can match:
+     def $inv_jsize(8) = I8   def $inv_jsize(n) = $inv_isize(n)
+     ceq inv-jsize(N) = inv-isize(N) if N =/= 8 .
+   One head must be an instance of the other, the extra structure of an earlier
+   head ground; the earlier conditions must be negatable. Otherwise
+   Unsupported. *)
+let complement at (head, _, _) (earlier_head, earlier_conditions, _) =
+  let rec instance bindings pattern subject =
+    match pattern, subject with
+    | Var variable, _ ->
+        begin match List.find_opt (fun (v, _) -> same_variable v variable) bindings with
+        | Some (_, previous) when Reld.same_term previous subject -> Some bindings
+        | Some _ -> None
+        | None -> Some ((variable, subject) :: bindings)
+        end
+    | Const left, Const right when left = right -> Some bindings
+    | App (left, lefts), App (right, rights)
+      when left = right && List.length lefts = List.length rights ->
+        List.fold_left2
+          (fun bindings pattern subject ->
+            Option.bind bindings (fun bindings -> instance bindings pattern subject))
+          (Some bindings) lefts rights
+    | _ -> None
+  in
+  let unsupported reason =
+    Util.Error.error at "translation"
+      ("Unsupported: DefD clause order: " ^ reason)
+  in
+  (* The earlier variables in terms of this clause's input, and the
+     disequalities for the earlier head's extra ground structure. *)
+  let substitution, differences =
+    match instance [] head earlier_head, instance [] earlier_head head with
+    | Some bindings, _ ->
+        (* A variable repeated in the earlier head, f(X, X) against f(A, B),
+           requires A = B. *)
+        let rec repeated = function
+          | (variable, Var earlier) :: rest ->
+              List.filter_map
+                (function
+                  | other, Var earlier' when same_variable earlier earlier' ->
+                      Some (App ("_=/=_", [Var variable; Var other]))
+                  | _ -> None)
+                rest
+              @ repeated rest
+          | _ :: rest -> repeated rest
+          | [] -> []
+        in
+        let repeated = repeated bindings in
+        ( List.filter_map
+            (function variable, Var earlier -> Some (earlier, Var variable) | _ -> None)
+            bindings
+        , repeated
+          @ List.filter_map
+              (function
+                | _, Var _ -> None
+                | variable, subject when term_variables [] subject = [] ->
+                    Some (App ("_=/=_", [Var variable; subject]))
+                | _ -> unsupported "an earlier head has non-ground extra structure")
+              bindings )
+    | None, Some bindings -> bindings, []
+    | None, None -> unsupported "an earlier clause overlaps without being an instance"
+  in
+  let condition_variables variables = function
+    | EqCond (left, right) | MatchCond (left, right) ->
+        term_variables (term_variables variables left) right
+    | MembershipCond (term, _) | BoolCond term -> term_variables variables term
+  in
+  let known variable =
+    List.exists (fun (v, _) -> same_variable v variable) substitution
+  in
+  if not (List.for_all known
+            (List.fold_left condition_variables [] earlier_conditions)) then
+    unsupported "an earlier clause's conditions use variables outside its head";
+  let substitute term =
+    let rec go = function
+      | Var variable as term ->
+          begin match List.find_opt (fun (v, _) -> same_variable v variable) substitution with
+          | Some (_, replacement) -> replacement
+          | None -> term
+          end
+      | Const _ as term -> term
+      | App (name, args) -> App (name, List.map go args)
+    in
+    go term
+  in
+  let negated =
+    List.map
+      (function
+        | BoolCond predicate -> Reld.negate_comparison (substitute predicate)
+        | EqCond (left, right) -> App ("_=/=_", [substitute left; substitute right])
+        | MatchCond _ | MembershipCond _ ->
+            unsupported "an earlier clause binds in its conditions")
+      earlier_conditions
+  in
+  BoolCond
+    (List.fold_left (Reld.bool_combine "_or_" "false") (Const "false")
+       (differences @ negated))
+
 (* Ordinary DefD clause *)
 let translate_equation_clause prepared =
   let index = prepared.index in
@@ -310,6 +411,66 @@ let translate_rule_clause prepared =
       | _ -> Crl (None, head.term, right, conditions)
 
 
+(* Equation clauses in source order, each with the complements of the earlier
+   clauses that can match its input. An otherwise clause is [owise]. *)
+let ordered_clauses index clauses =
+  let parts = function
+    | Eq (left, _, attrs) -> left, [], attrs
+    | Ceq (left, _, conditions, attrs) -> left, conditions, attrs
+    | _ -> assert false
+  in
+  let arguments = function App (_, args) -> args | _ -> [] in
+  let source_arguments prepared =
+    match prepared.clause.it with DefD (_, args, _, _) -> args
+  in
+  (* As for ElsePr predecessors (Reld): the source patterns and the
+     translated heads may both overlap. Arguments of types with disjoint
+     constructors (Inn, Fnn) do not: the source types exclude such inputs. *)
+  let constructors exp =
+    Reld.source_constructors ~exact:true index [] (Reld.source_pattern exp).note
+  in
+  let typed_overlap exp earlier_exp =
+    match constructors exp, constructors earlier_exp with
+    | Some mixops, Some earlier_mixops ->
+        List.exists (fun mixop -> List.exists (Il.Eq.eq_mixop mixop) earlier_mixops) mixops
+    | _ -> true
+  in
+  let overlap (prepared, (head, _, _)) (earlier, (earlier_head, _, _)) =
+    List.for_all2
+      (fun arg earlier_arg ->
+        match arg.it, earlier_arg.it with
+        | ExpA exp, ExpA earlier_exp ->
+            Reld.source_overlap index exp earlier_exp && typed_overlap exp earlier_exp
+        | _ -> true)
+      (source_arguments prepared) (source_arguments earlier)
+    && Reld.inputs_may_overlap index (arguments head) (arguments earlier_head)
+  in
+  let step (earlier, statements) prepared =
+    let statement = translate_equation_clause prepared in
+    let (head, _, attrs) as current = parts statement in
+    let statement =
+      if List.mem Owise attrs then statement
+      else
+        match
+          earlier
+          |> List.filter (fun earlier -> overlap (prepared, current) earlier)
+          |> List.map (fun (_, parts) -> complement prepared.clause.at current parts)
+        with
+        | [] -> statement
+        | complements ->
+            let _, right, conditions, attrs =
+              match statement with
+              | Eq (left, right, attrs) -> left, right, [], attrs
+              | Ceq (left, right, conditions, attrs) -> left, right, conditions, attrs
+              | _ -> assert false
+            in
+            equation head right
+              (schedule_equation_conditions head (conditions @ complements)) attrs
+    in
+    earlier @ [prepared, current], statements @ [statement]
+  in
+  snd (List.fold_left step ([], []) clauses)
+
 (* Complete DecD *)
 let translate index id params result_typ clauses =
   let builtin = has_hint index id "builtin" in
@@ -331,7 +492,7 @@ let translate index id params result_typ clauses =
     else if rule then
       header @ List.map translate_rule_clause clauses
     else
-      header @ List.map translate_equation_clause clauses
+      header @ ordered_clauses index clauses
 
 
 (* Def-parameter specialization: a copy of a DecD whose DefP parameters are

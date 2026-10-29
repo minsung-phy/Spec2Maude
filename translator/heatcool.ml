@@ -324,12 +324,21 @@ let focus_premises index initial needed deferred prems =
     in
     {premise; writes; reads; retain}
   in
+  (* A conjunction is kept or dropped per conjunct (a = |s| /\ ai = {..^n}
+     only uses n), as Prem translates it. *)
+  let rec conjuncts premise =
+    match premise.it with
+    | IfPr {it = BinE (`AndOp, `BoolT, left, right); _} ->
+        conjuncts {premise with it = IfPr left}
+        @ conjuncts {premise with it = IfPr right}
+    | _ -> [premise]
+  in
   let _, dependencies =
     List.fold_left
       (fun (bound, dependencies) premise ->
         let dependency = describe bound premise in
         S.union bound dependency.writes, dependency :: dependencies)
-      (initial, []) prems
+      (initial, []) (List.concat_map conjuncts prems)
   in
   let required needed dependency =
     dependency.retain || not (S.is_empty (S.inter needed dependency.writes))
@@ -405,6 +414,22 @@ let shaped_relation_call index (pattern : Hintd.focus_pattern) =
   in
   let guards = boundary_guards index needed inputs premises.conditions guards in
   let conditions = guards @ premises.conditions in
+  (* A kept premise may also bind what the focus does not use (n of
+     t_1^m -> t_2^n); such a binding of a lone variable is dropped. *)
+  let rec live conditions =
+    let unused = function
+      | EqCondition (MatchCond (Var variable, _)) as condition ->
+          let others = List.filter (fun other -> other != condition) conditions in
+          let used = List.fold_left condition_variables
+              (List.fold_left term_variables [] terms) others in
+          not (List.exists (same_variable variable) used)
+      | _ -> false
+    in
+    match List.find_opt unused conditions with
+    | Some dead -> live (List.filter (fun condition -> condition != dead) conditions)
+    | None -> conditions
+  in
+  let conditions = live conditions in
   let shapes = Reld.input_shapes conditions terms in
   let bindings =
     List.map2
@@ -655,6 +680,21 @@ let translate_pattern cache index (context : Hintd.context)
   let label = Some (name (focus_label index pattern)) in
   heating context.source pattern.rule.at label left right conditions
 
+(* The variables of the sequence context val* instr* instr_1*, renamed
+   PREFIX, FOCUS, POSTFIX, and the bindings from the source variables. *)
+let context_variables index (context : Hintd.context) =
+  let generated name typ =
+    Var (generated_variable name (Term.translate_sort index typ))
+  in
+  let prefix = generated "PREFIX" context.prefix_typ in
+  let focus = generated "FOCUS" context.focus_typ in
+  let postfix = generated "POSTFIX" context.postfix_typ in
+  ( prefix, focus, postfix,
+    [ Prescan.source_variable index context.prefix context.prefix_typ, prefix
+    ; Prescan.source_variable index context.focus context.focus_typ, focus
+    ; Prescan.source_variable index context.postfix context.postfix_typ, postfix
+    ] )
+
 let context_transitions index (context : Hintd.context) =
   let name = helper index context in
   let policy = execution_policy index context.source.id in
@@ -682,12 +722,9 @@ let context_transitions index (context : Hintd.context) =
     split_config index context.frame config context.rule.at
   in
   let prefix_sort = Term.translate_sort index context.prefix_typ in
-  let focus_sort = Term.translate_sort index context.focus_typ in
   let postfix_sort = Term.translate_sort index context.postfix_typ in
   let generated name sort = Var (generated_variable name sort) in
-  let prefix = generated "PREFIX" prefix_sort in
-  let focus = generated "FOCUS" focus_sort in
-  let postfix = generated "POSTFIX" postfix_sort in
+  let prefix, focus, postfix, bindings = context_variables index context in
   let stack = generated "STACK" prefix_sort in
   let trigger = Var (generated_variable "OP" context.Hintd.proper_sort) in
   let rest = generated "REST" postfix_sort in
@@ -701,12 +738,6 @@ let context_transitions index (context : Hintd.context) =
   let identify =
     if heats_by_equation context.source then EqCondition (MatchCond (target, search))
     else RewriteCond (search, target)
-  in
-  let bindings =
-    [ Prescan.source_variable index context.prefix context.prefix_typ, prefix
-    ; Prescan.source_variable index context.focus context.focus_typ, focus
-    ; Prescan.source_variable index context.postfix context.postfix_typ, postfix
-    ]
   in
   let different left right =
     EqCondition (BoolCond (App ("_=/=_", [left; right])))
@@ -793,10 +824,6 @@ let is_absorbed index rule =
   | Some (context, pattern) -> absorbed context pattern
   | None -> false
 
-(* A lowered execution rule as left, right, and conditions. *)
-let rule_parts (rule : Reld.execution_rule) =
-  rule.left, rule.right, Reld.typecheck_guards rule @ rule.conditions
-
 (* The outer rule with its execution premise on the inner rule's relation
    replaced by the inner rule: the premise's call is unified with the inner
    left side and its result with the inner right side, and the inner
@@ -840,36 +867,27 @@ let inline at (outer_left, outer_right, outer_conditions)
 let absorbed_rules cache index (context : Hintd.context)
     (pattern : Hintd.focus_pattern) =
   let at = pattern.rule.at in
-  let lowered (source : Hintd.relation) ordinal at =
-    let rule = lowered_rule cache index source ordinal at in
+  let parts (rule : Reld.execution_rule) =
     if not rule.structural_right then
       unsupported at "absorbed rule has a computed result";
-    rule_parts rule
+    rule.left, rule.right, Reld.typecheck_guards rule @ rule.conditions
+  in
+  let lowered (source : Hintd.relation) ordinal =
+    parts (lowered_rule cache index source ordinal at)
   in
   let direct =
     List.fold_left
       (fun rule (bridge : Hintd.bridge) ->
-        inline at (lowered bridge.source bridge.ordinal bridge.rule.at) rule)
-      (lowered pattern.source pattern.ordinal at)
+        inline at (lowered bridge.source bridge.ordinal) rule)
+      (lowered pattern.source pattern.ordinal)
       (List.rev pattern.bridges)
   in
-  let policy = execution_policy index context.source.id in
   let context_rule =
-    let rule =
-      Reld.lower_execution_rule index context.source.id
-        context.source.params policy [] context.ordinal context.rule
+    let left, right, conditions =
+      parts (Reld.lower_execution_rule index context.source.id context.source.params
+               (execution_policy index context.source.id) [] context.ordinal context.rule)
     in
-    let generated name typ =
-      Var (generated_variable name (Term.translate_sort index typ))
-    in
-    let bindings =
-      [ Prescan.source_variable index context.prefix context.prefix_typ,
-        generated "PREFIX" context.prefix_typ
-      ; Prescan.source_variable index context.postfix context.postfix_typ,
-        generated "POSTFIX" context.postfix_typ
-      ]
-    in
-    let left, right, conditions = rule_parts rule in
+    let _, _, _, bindings = context_variables index context in
     ( substitute bindings left
     , substitute bindings right
     , List.map (substitute_condition bindings) conditions )
@@ -1362,7 +1380,7 @@ let translate_relation index id =
   |> List.filter (fun (context : Hintd.context) -> context.source.id.it = id.it)
   in
   let sequences = contexts |> List.concat_map (fun context ->
-       let absorbed, patterns =
+       let rules, patterns =
          List.partition (absorbed context) context.Hintd.patterns
        in
        declarations index context
@@ -1370,7 +1388,7 @@ let translate_relation index id =
           |> List.map (translate_pattern cache index context)
           |> unique_candidates)
        @ context_transitions index context
-       @ List.concat_map (absorbed_rules cache index context) absorbed
+       @ List.concat_map (absorbed_rules cache index context) rules
        @ (if kept = [] then [] else kembedding_statements cache index context kept))
   in
   if kept <> [] && List.length contexts <> 1 then

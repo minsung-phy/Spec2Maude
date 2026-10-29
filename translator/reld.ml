@@ -236,7 +236,12 @@ type execution_rule =
 
 (* A typed sequence variable cannot absorb a constructor outside its source
  * element type. Keep unknown/type-parameter cases conservative. *)
-let rec source_constructors index seen typ =
+(* The constructors of a source type, None if unknown. With ~exact, also None
+   if the type has values that are not constructors (numbers, structs,
+   sequences), so disjoint results mean disjoint types. *)
+let rec source_constructors ?(exact = false) index seen typ =
+  let source_constructors = source_constructors ~exact in
+  let other = if exact then None else Some [] in
   let collect types =
     List.fold_left
       (fun known typ ->
@@ -258,7 +263,7 @@ let rec source_constructors index seen typ =
                 match inst.it with
                 | InstD (_, _, {it = AliasT typ; _}) ->
                     source_constructors index (id.it :: seen) typ
-                | InstD (_, _, {it = StructT _; _}) -> Some []
+                | InstD (_, _, {it = StructT _; _}) -> other
                 | InstD (_, _, {it = VariantT cases; _}) ->
                     List.fold_left
                       (fun known (mixop, (typ, _, _), _) ->
@@ -278,9 +283,9 @@ let rec source_constructors index seen typ =
             (Some []) insts
       end
   | VarT _ -> None
-  | IterT (typ, _) -> source_constructors index seen typ
-  | TupT fields -> collect (List.map snd fields)
-  | BoolT | NumT _ | TextT -> Some []
+  | IterT (typ, _) -> if exact then None else source_constructors index seen typ
+  | TupT fields -> if exact then None else collect (List.map snd fields)
+  | BoolT | NumT _ | TextT -> other
 
 let rec source_pattern exp =
   match exp.it with

@@ -67,12 +67,21 @@ let translate_alias index target quants typ =
   let left = App ("typecheck", [value; target]) in
   let right = App ("typecheck", [value; source]) in
   let conditions = Param.translate_eq_conditions index quants in
-  let direct = equation left right conditions in
   match Hintd.sequence_element_wrappers (Prescan.sort_metadata index) typ with
-  | None -> [direct]
-  | Some (box, _) ->
+  | None -> [equation left right conditions]
+  | Some (box, unbox) ->
+      (* typecheck(v1 .. vn, t) checks each element (spectec-semantics.maude),
+         and a boxed seq(v) is one value of the alias. The direct equation is
+         then for one unboxed element only (unseq is defined on seq(..) only),
+         so the three never disagree on seq(v1) seq(v2). *)
       let boxed = App ("typecheck", [App (box, [value]); target]) in
-      [equation boxed right conditions; direct]
+      let element = Var (generated_variable "VALUE" "SpectecTerminal") in
+      let unboxed =
+        BoolCond (App ("_=/=_", [element; App (box, [App (unbox, [element])])]))
+      in
+      [ equation boxed right conditions
+      ; equation (App ("typecheck", [element; target]))
+          (App ("typecheck", [element; source])) (conditions @ [unboxed]) ]
 
 (* StructT *)
 let join_struct_fields = function

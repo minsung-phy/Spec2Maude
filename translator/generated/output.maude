@@ -2809,7 +2809,8 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(seq(VALUE-4), resulttype) = typecheck(VALUE-4, list(valtype)) .
 
-  eq typecheck(VALUE-4, resulttype) = typecheck(VALUE-4, list(valtype)) .
+  ceq typecheck(VALUE-3, resulttype) = typecheck(VALUE-3, list(valtype))
+    if VALUE-3 =/= seq(unseq(VALUE-3)) .
 
   ceq typecheck(tuple(seq(MUT?) STORAGETYPE), fieldtype) = true
     if typecheck(MUT?, mut)
@@ -3021,7 +3022,9 @@ mod SPEC2MAUDE-GENERATED is
 
   eq inv-jsize(16) = I16 .
 
-  eq inv-jsize(N-3) = inv-isize(N-3) .
+  ceq inv-jsize(N-3) = inv-isize(N-3)
+    if N-3 =/= 8
+      /\ N-3 =/= 16 .
 
   eq inv-fsize(32) = F32 .
 
@@ -3075,7 +3078,9 @@ mod SPEC2MAUDE-GENERATED is
     if typecheck(PACKTYPE, packtype) .
 
   ceq cunpack(LANETYPE) = lunpack(LANETYPE)
-    if typecheck(LANETYPE, lanetype) .
+    if typecheck(LANETYPE, lanetype)
+      /\ typecheck(LANETYPE, consttype) =/= true
+      /\ typecheck(LANETYPE, packtype) =/= true .
 
   ceq minat(AT_1, AT_2) = AT_1
     if spectec-size(AT_1) <= spectec-size(AT_2) .
@@ -4434,7 +4439,8 @@ mod SPEC2MAUDE-GENERATED is
 
   eq typecheck(seq(VALUE-15), expr) = typecheck(VALUE-15, instr) .
 
-  eq typecheck(VALUE-15, expr) = typecheck(VALUE-15, instr) .
+  ceq typecheck(VALUE-3, expr) = typecheck(VALUE-3, instr)
+    if VALUE-3 =/= seq(unseq(VALUE-3)) .
 
   eq memarg0 = { (field('ALIGN, # 0) ; field('OFFSET, # 0)) } .
 
@@ -4463,7 +4469,8 @@ mod SPEC2MAUDE-GENERATED is
 
   eq shift-labelidxs((# 0) LABELIDX'*) = shift-labelidxs(LABELIDX'*) .
 
-  eq shift-labelidxs((# LABELIDX) LABELIDX'*) = (# (_-_(LABELIDX : nat <:> int, 1 : nat <:> int) : int <:> nat)) shift-labelidxs(LABELIDX'*) .
+  ceq shift-labelidxs((# LABELIDX) LABELIDX'*) = (# (_-_(LABELIDX : nat <:> int, 1 : nat <:> int) : int <:> nat)) shift-labelidxs(LABELIDX'*)
+    if LABELIDX =/= 0 .
 
   eq free-instr(NOP) = { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; (field('ELEMS, nil) ; (field('DATAS, nil) ; (field('LOCALS, nil) ; (field('LABELS, nil) ; field('TAGS, nil)))))))))) } .
 
@@ -5022,13 +5029,15 @@ mod SPEC2MAUDE-GENERATED is
     if I < (2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) .
 
   ceq signed-(N-2, I) = _-_(I : nat <:> int, (2 ^ N-2) : nat <:> int)
-    if _and_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) <= I, I < (2 ^ N-2)) .
+    if _and_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) <= I, I < (2 ^ N-2))
+      /\ (I < (2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat))) =/= true .
 
   ceq inv-signed-(N-2, I-2) = I-2 : int <:> nat
     if _and_((0 : nat <:> int) <= I-2, I-2 < ((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int)) .
 
   ceq inv-signed-(N-2, I-2) = (I-2 + ((2 ^ N-2) : nat <:> int)) : int <:> nat
-    if _and_(-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) <= I-2, I-2 < (0 : nat <:> int)) .
+    if _and_(-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) <= I-2, I-2 < (0 : nat <:> int))
+      /\ _and_((0 : nat <:> int) <= I-2, I-2 < ((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int)) =/= true .
 
   ceq spectec-sx(CONSTTYPE) = nil
     if typecheck(CONSTTYPE, consttype) .
@@ -5050,7 +5059,8 @@ mod SPEC2MAUDE-GENERATED is
     if I-2 < (0 : nat <:> int) .
 
   ceq sat-u-(N-2, I-2) = _-_((2 ^ N-2) : nat <:> int, 1 : nat <:> int) : int <:> nat
-    if I-2 > _-_((2 ^ N-2) : nat <:> int, 1 : nat <:> int) .
+    if I-2 > _-_((2 ^ N-2) : nat <:> int, 1 : nat <:> int)
+      /\ (I-2 < (0 : nat <:> int)) =/= true .
 
   eq sat-u-(N-2, I-2) = I-2 : int <:> nat [owise] .
 
@@ -5058,7 +5068,8 @@ mod SPEC2MAUDE-GENERATED is
     if I-2 < -_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int) .
 
   ceq sat-s-(N-2, I-2) = _-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int)
-    if I-2 > _-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int) .
+    if I-2 > _-_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int, 1 : nat <:> int)
+      /\ (I-2 < -_((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> int)) =/= true .
 
   eq sat-s-(N-2, I-2) = I-2 [owise] .
 
@@ -5081,23 +5092,29 @@ mod SPEC2MAUDE-GENERATED is
 
   eq idiv-(N-2, U, I_1, 0) = nil .
 
-  eq idiv-(N-2, U, I_1, I_2) = (# (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) ? .
+  ceq idiv-(N-2, U, I_1, I_2) = (# (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) ?
+    if I_2 =/= 0 .
 
   eq idiv-(N-2, S, I_1, 0) = nil .
 
   ceq idiv-(N-2, S, I_1, I_2) = nil
-    if (# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))) == (# ((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> rat)) .
+    if (# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))) == (# ((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> rat))
+      /\ I_2 =/= 0 .
 
-  eq idiv-(N-2, S, I_1, I_2) = (# inv-signed-(N-2, truncz(# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))))) ? .
+  ceq idiv-(N-2, S, I_1, I_2) = (# inv-signed-(N-2, truncz(# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))))) ?
+    if I_2 =/= 0
+      /\ (# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))) =/= (# ((2 ^ (_-_(N-2 : nat <:> int, 1 : nat <:> int) : int <:> nat)) : nat <:> rat)) .
 
   eq irem-(N-2, U, I_1, 0) = nil .
 
-  eq irem-(N-2, U, I_1, I_2) = (# (_-_(I_1 : nat <:> int, (I_2 * (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) : nat <:> int) : int <:> nat)) ? .
+  ceq irem-(N-2, U, I_1, I_2) = (# (_-_(I_1 : nat <:> int, (I_2 * (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) : nat <:> int) : int <:> nat)) ?
+    if I_2 =/= 0 .
 
   eq irem-(N-2, S, I_1, 0) = nil .
 
   ceq irem-(N-2, S, I_1, I_2) = (# inv-signed-(N-2, _-_(J_1, J_2 * truncz(# ((J_1 : int <:> rat) / (J_2 : int <:> rat)))))) ?
-    if J_1 := signed-(N-2, I_1)
+    if I_2 =/= 0
+      /\ J_1 := signed-(N-2, I_1)
       /\ J_2 := signed-(N-2, I_2) .
 
   ceq imin-(N-2, U, I_1, I_2) = I_1
@@ -5335,7 +5352,8 @@ mod SPEC2MAUDE-GENERATED is
     if I < size(C*) .
 
   ceq irelaxed-swizzle-lane-(N-2, C*, I) = 0
-    if signed-(N-2, I) < (0 : nat <:> int) .
+    if signed-(N-2, I) < (0 : nat <:> int)
+      /\ (I < size(C*)) =/= true .
 
   eq irelaxed-swizzle-lane-(N-2, C*, I) = #rat(spectec-relaxed2(r-swizzle, iN(N-2), # 0, # #rat(C* [ _rem_(I, size(C*)) ]))) [owise] .
 
@@ -5677,10 +5695,12 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-vunop-(_X_(FNN, M-2), NEAREST, V) = fvunop-fnearest-(_X_(FNN, M-2), V) .
 
   ceq spectec-vunop-(_X_(JNN, M-2), ABS, V) = ivunop-iabs-(_X_(JNN, M-2), V)
-    if typecheck(JNN, Jnn) .
+    if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Fnn) =/= true .
 
   ceq spectec-vunop-(_X_(JNN, M-2), spectec-NEG, V) = ivunop-ineg-(_X_(JNN, M-2), V)
-    if typecheck(JNN, Jnn) .
+    if typecheck(JNN, Jnn)
+      /\ typecheck(JNN, Fnn) =/= true .
 
   eq spectec-vunop-(_X_(JNN, M-2), POPCNT, V) = ivunop-ipopcnt-(_X_(JNN, M-2), V) .
 
@@ -5708,13 +5728,16 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-vbinop-(_X_(JNN, M-2), RELAXED-Q15MULRS, V_1, V_2) = ivbinopsxnd-irelaxed-q15mulr-(_X_(JNN, M-2), S, V_1, V_2) .
 
   ceq spectec-vbinop-(_X_(FNN, M-2), ADD, V_1, V_2) = fvbinop-fadd-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Jnn) =/= true .
 
   ceq spectec-vbinop-(_X_(FNN, M-2), spectec-SUB, V_1, V_2) = fvbinop-fsub-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Jnn) =/= true .
 
   ceq spectec-vbinop-(_X_(FNN, M-2), MUL, V_1, V_2) = fvbinop-fmul-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Jnn) =/= true .
 
   eq spectec-vbinop-(_X_(FNN, M-2), spectec-DIV, V_1, V_2) = fvbinop-fdiv-(_X_(FNN, M-2), V_1, V_2) .
 
@@ -5751,10 +5774,12 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-vrelop-(_X_(JNN, M-2), GE(SX), V_1, V_2) = ivrelopsx-ige-(_X_(JNN, M-2), SX, V_1, V_2) .
 
   ceq spectec-vrelop-(_X_(FNN, M-2), EQ, V_1, V_2) = fvrelop-feq-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Jnn) =/= true .
 
   ceq spectec-vrelop-(_X_(FNN, M-2), NE, V_1, V_2) = fvrelop-fne-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn) .
+    if typecheck(FNN, Fnn)
+      /\ typecheck(FNN, Jnn) =/= true .
 
   eq spectec-vrelop-(_X_(FNN, M-2), spectec-LT, V_1, V_2) = fvrelop-flt-(_X_(FNN, M-2), V_1, V_2) .
 
@@ -7159,14 +7184,12 @@ mod SPEC2MAUDE-GENERATED is
   ceq identifyFocus(Z, STACK, BLOCK(BT, INSTR*), POSTFIX) = { PREFIX | (Z ; (VAL* BLOCK(BT, INSTR*))) | POSTFIX }
     if T_1* ->- nil  T_2* := blocktype-(Z, BT)
       /\ M-3 := size(T_1*)
-      /\ N-3 := size(T_2*)
       /\ PREFIX VAL* := STACK
       /\ size(VAL*) = M-3 .
 
   ceq identifyFocus(Z, STACK, LOOP(BT, INSTR*), POSTFIX) = { PREFIX | (Z ; (VAL* LOOP(BT, INSTR*))) | POSTFIX }
     if T_1* ->- nil  T_2* := blocktype-(Z, BT)
       /\ M-3 := size(T_1*)
-      /\ N-3 := size(T_2*)
       /\ PREFIX VAL* := STACK
       /\ size(VAL*) = M-3 .
 
@@ -7216,7 +7239,6 @@ mod SPEC2MAUDE-GENERATED is
   ceq identifyFocus(Z, STACK, TRY-TABLE(BT, CATCH*, INSTR*), POSTFIX) = { PREFIX | (Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) | POSTFIX }
     if T_1* ->- nil  T_2* := blocktype-(Z, BT)
       /\ M-3 := size(T_1*)
-      /\ N-3 := size(T_2*)
       /\ PREFIX VAL* := STACK
       /\ size(VAL*) = M-3 .
 
@@ -7342,12 +7364,8 @@ mod SPEC2MAUDE-GENERATED is
   eq identifyFocus(Z, PREFIX (REF.STRUCT-ADDR(A) VAL), STRUCT.SET(X-4, I), POSTFIX) = { PREFIX | (Z ; (REF.STRUCT-ADDR(A) (VAL STRUCT.SET(X-4, I)))) | POSTFIX } .
 
   ceq identifyFocus(Z, STACK, ARRAY.NEW-FIXED(X-4, N-3), POSTFIX) = { PREFIX | (Z ; (VAL* ARRAY.NEW-FIXED(X-4, N-3))) | POSTFIX }
-    if spectec-ARRAY(tuple(seq(MUT?) ZT)) := Expand(spectec-type(Z, X-4))
-      /\ size(MUT?) <= 1
-      /\ A := size(spectec-arrayinst(Z))
-      /\ PREFIX VAL* := STACK
-      /\ size(VAL*) = N-3
-      /\ AI-2 := { (field('TYPE, spectec-type(Z, X-4)) ; field('FIELDS, map-Step-array-new-fixed(ZT, N-3, VAL*))) } .
+    if PREFIX VAL* := STACK
+      /\ size(VAL*) = N-3 .
 
   eq identifyFocus(Z, PREFIX ((REF.NULL-ADDR) (CONST(I32, # I) VAL)), ARRAY.SET(X-4), POSTFIX) = { PREFIX | (Z ; ((REF.NULL-ADDR) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | POSTFIX } .
 
@@ -7687,14 +7705,12 @@ mod SPEC2MAUDE-GENERATED is
   ceq identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) = true
     if M-3 := size(VAL*)
       /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
-      /\ M-3 = size(T_1*)
-      /\ N-3 := size(T_2*) .
+      /\ M-3 = size(T_1*) .
 
   ceq identifyRead(Z ; (VAL* LOOP(BT, INSTR*))) = true
     if M-3 := size(VAL*)
       /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
-      /\ M-3 = size(T_1*)
-      /\ N-3 := size(T_2*) .
+      /\ M-3 = size(T_1*) .
 
   ceq identifyRead((S-2 ; F) ; (REF-2 BR-ON-CAST(L, RT_1, RT_2))) = true
     if typecheck(REF-2, ref)
@@ -7759,8 +7775,7 @@ mod SPEC2MAUDE-GENERATED is
   ceq identifyRead(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) = true
     if M-3 := size(VAL*)
       /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
-      /\ M-3 = size(T_1*)
-      /\ N-3 := size(T_2*) .
+      /\ M-3 = size(T_1*) .
 
   eq identifyRead(Z ; LOCAL.GET(X-4)) = true .
 
