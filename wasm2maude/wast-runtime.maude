@@ -93,9 +93,15 @@ mod WASM-WAST-DRIVER is
   op script.start : -> ScriptState [ctor] .
   op script.ready : SpectecTerminal InstanceEnv Commands
     -> ScriptState [ctor] .
-  --- kstate(C, K): C is the configuration around the next redex, K the holes
-  --- of hint(k_embedding) contexts taken off it; cool-all(C, K) is the whole
-  --- configuration. One step rewrite is one Step.
+  --- kstate(R, K): R is the Step request of the configuration around the next
+  --- redex, K the holes of hint(k_heatcool) contexts taken off it; one rule of
+  --- Step applied inside it is one step, and cool-all(unheat(R), K) is the whole
+  --- configuration. A script runs one deterministic execution like the
+  --- reference interpreter: each step is the nearest successor that a
+  --- breadth-first search finds, so rules are tried in declaration order
+  --- memory.grow-succeed, for example, is tried before memory.grow-fail.
+  --- The condition KS => KS2 holds in zero or more steps; KS2 =/= KS skips
+  --- zero steps. This driver is meant for rew, not for search.
   op script.module : Nat InstanceEnv Commands KState
     -> ScriptState [ctor frozen (4)] .
   op script.return : Nat InstanceEnv ResultPatterns Commands
@@ -133,7 +139,9 @@ mod WASM-WAST-DRIVER is
   op activeFrameDepth : InstrList -> Nat .
 
   vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
-  var WSHK : Holes .
+  vars WSHK WSHK2 : Holes .
+  vars WSHR WSHR2 : Step-Request .
+  vars WSHKS WSHKS2 : KState .
   vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .
   vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .
   vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .
@@ -380,10 +388,9 @@ mod WASM-WAST-DRIVER is
       (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => nil
     if hostCallable(WSHS, WSHA, WSHARGS) = true .
 
-  crl [focus-host-call] :
-    identifyFocus(WSHS ; WSHCURRENT,
+  ceq identifyFocus(WSHS ; WSHCURRENT,
       WSHPREFIX (WSHARGS REF.FUNC-ADDR(WSHA)), CALL-REF(WSHC), WSHREST)
-    => { WSHPREFIX | ((WSHS ; WSHCURRENT) ;
+    = { WSHPREFIX | ((WSHS ; WSHCURRENT) ;
       (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) | WSHREST }
     if hostCallable(WSHS, WSHA, WSHARGS) = true .
 
@@ -401,12 +408,13 @@ mod WASM-WAST-DRIVER is
     if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
   rl [module-done] :
     script.module(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; nil, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; nil), none))
     => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .
 
-  crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
-    => script.module(WSHID, WSHENV, WSHCMDS, kstate(WSHC2, WSHK))
-    if Step(WSHC) => WSHC2 .
+
+  crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, WSHKS)
+    => script.module(WSHID, WSHENV, WSHCMDS, WSHKS2)
+    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   crl [assert-unlinkable] :
     script.ready(WSHS, WSHENV,
@@ -436,21 +444,21 @@ mod WASM-WAST-DRIVER is
        /\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .
   rl [assert-uninstantiable-trap] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [assert-uninstantiable-exception] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF), none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [assert-uninstantiable-normal] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; nil, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; nil), none))
     => script.wrong-assertion(WSHID) .
-  crl [assert-uninstantiable-step] :
-    script.uninstantiable(WSHID, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
-    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, kstate(WSHC2, WSHK))
-    if Step(WSHC) => WSHC2 .
+
+  crl [assert-uninstantiable-step] : script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHKS)
+    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHKS2)
+    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   rl [call-return] :
     script.ready(WSHS, WSHENV, commands.cons(
@@ -478,20 +486,20 @@ mod WASM-WAST-DRIVER is
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
   crl [return-done] :
     script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if runtimeResults(WSHACTUAL) = true
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .
   crl [return-wrong-result] :
     script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)
     if runtimeResults(WSHACTUAL) = true
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
-  crl [return-step] :
-    script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, kstate(WSHC, WSHK))
-    => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, kstate(WSHC2, WSHK))
-    if Step(WSHC) => WSHC2 .
+
+  crl [return-step] : script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHKS)
+    => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHKS2)
+    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   rl [call-trap] :
     script.ready(WSHS, WSHENV, commands.cons(command.trap(WSHID,
@@ -500,11 +508,12 @@ mod WASM-WAST-DRIVER is
       kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
   rl [trap-done] :
     script.trap(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
-  crl [trap-step] : script.trap(WSHID, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
-    => script.trap(WSHID, WSHENV, WSHCMDS, kstate(WSHC2, WSHK))
-    if Step(WSHC) => WSHC2 .
+
+  crl [trap-step] : script.trap(WSHID, WSHENV, WSHCMDS, WSHKS)
+    => script.trap(WSHID, WSHENV, WSHCMDS, WSHKS2)
+    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   rl [call-exception] :
     script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,
@@ -513,21 +522,22 @@ mod WASM-WAST-DRIVER is
       kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
   rl [exception-done] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF), none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [exception-trap] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
     => script.wrong-assertion(WSHID) .
   crl [exception-normal] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
-  crl [exception-step] : script.exception(WSHID, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
-    => script.exception(WSHID, WSHENV, WSHCMDS, kstate(WSHC2, WSHK))
-    if Step(WSHC) => WSHC2 .
+
+  crl [exception-step] : script.exception(WSHID, WSHENV, WSHCMDS, WSHKS)
+    => script.exception(WSHID, WSHENV, WSHCMDS, WSHKS2)
+    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   rl [call-action] :
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
@@ -536,12 +546,13 @@ mod WASM-WAST-DRIVER is
       kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
   crl [action-done] :
     script.action(WSHID, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if runtimeResults(WSHACTUAL) = true .
-  crl [action-step] : script.action(WSHID, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
-    => script.action(WSHID, WSHENV, WSHCMDS, kstate(WSHC2, WSHK))
-    if Step(WSHC) => WSHC2 .
+  crl [action-step] : script.action(WSHID, WSHENV, WSHCMDS, WSHKS)
+    => script.action(WSHID, WSHENV, WSHCMDS, WSHKS2)
+    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
+
   crl [get-action] :
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
       action.get(WSHTARGET, WSHNAME)), WSHCMDS))
@@ -558,36 +569,37 @@ mod WASM-WAST-DRIVER is
       kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
   rl [exhaustion-trap] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
     => script.wrong-assertion(WSHID) .
   rl [exhaustion-exception] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF), none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
     => script.wrong-assertion(WSHID) .
   crl [exhaustion-normal] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL, none))
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
   crl [exhaustion-step] :
-    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
     => script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      WSHS2, kstate(WSHC2, WSHK))
-    if Step(WSHC) => WSHC2
-       /\ (WSHS2 ; WSHF2) ; WSHINSTRS := WSHC2 .
+      WSHS2, kstate(WSHR2, WSHK2))
+    if kstate(WSHR, WSHK) => kstate(WSHR2, WSHK2)
+       /\ kstate(WSHR2, WSHK2) =/= kstate(WSHR, WSHK)
+       /\ (WSHS2 ; WSHF2) ; WSHINSTRS := unheat(WSHR2) .
   --- The frame depth counts the frames of the whole configuration.
   crl [exhaustion-done] :
     script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,
-      kstate(WSHC, WSHK))
+      kstate(WSHR, WSHK))
     => script.ready(WSHS, WSHENV, WSHCMDS)
-    if WSHC2 ; WSHINSTRS := cool-all(WSHC, WSHK)
+    if WSHC2 ; WSHINSTRS := cool-all(unheat(WSHR), WSHK)
        /\ activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
   crl [exhaustion-continue] :
     script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,
-      kstate(WSHC, WSHK))
-    => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHC, WSHK))
-    if WSHC2 ; WSHINSTRS := cool-all(WSHC, WSHK)
+      kstate(WSHR, WSHK))
+    => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
+    if WSHC2 ; WSHINSTRS := cool-all(unheat(WSHR), WSHK)
        /\ activeFrameDepth(WSHINSTRS) <= WSHREQUIRED = true .
 
   rl [done] :

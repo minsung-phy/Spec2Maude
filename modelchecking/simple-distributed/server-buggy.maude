@@ -5,8 +5,8 @@ mod SERVER-BUGGY-WASM is
 
   sort serverRunState .
   op serverCall : ValList -> serverRunState [ctor] .
-  op serverInit : KState ValList -> serverRunState [ctor frozen (1)] .
-  op serverExec : KState -> serverRunState [ctor frozen (1)] .
+  op serverInit : KState ValList -> serverRunState [ctor] .
+  op serverExec : KState -> serverRunState [ctor] .
   op serverResult : ValList -> serverRunState [ctor] .
 
   op serverInputModule : -> SpectecTerminal .
@@ -15,11 +15,10 @@ mod SERVER-BUGGY-WASM is
   op serverFindFunc : SpectecTerminals SpectecTerminals ~> Nat .
   op serverHasExport : SpectecTerminals SpectecTerminals -> Bool .
 
-  vars C C2 Z XA : SpectecTerminal .
+  vars C Z XA : SpectecTerminal .
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
   vars ARGS RESULT : ValList .
   var ADDR : Nat .
-  var K : Holes .
 
   eq serverInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), nil, FUNC_->_(I32, I32)))), nil, nil, nil,
 nil, nil,
@@ -47,11 +46,7 @@ FUNC(0))) .
 
   crl [serverInstantiate] : serverCall(ARGS) => serverInit(kstate(C, none), ARGS)
     if instantiate(serverEmptyStore, serverInputModule, nil) => C .
-  crl [serverInit-step] : serverInit(kstate(C, K), ARGS) => serverInit(kstate(C2, K), ARGS)
-    if Step(C) => C2 .
-  rl [serverInvoke] : serverInit(kstate((Z ; nil), none), ARGS) => serverExec(kstate(invoke(spectec-store(Z),
+  rl [serverInvoke] : serverInit(kstate(Step((Z ; nil)), none), ARGS) => serverExec(kstate(invoke(spectec-store(Z),
 serverFindFunc((spectec-moduleinst(Z) . 'EXPORTS), serverInputName), ARGS), none)) .
-  crl [serverStep] : serverExec(kstate(C, K)) => serverExec(kstate(C2, K))
-    if Step(C) => C2 .
-  rl [serverFinished] : serverExec(kstate(Z ; RESULT, none)) => serverResult(RESULT) .
+  rl [serverFinished] : serverExec(kstate(Step((Z ; RESULT)), none)) => serverResult(RESULT) .
 endm

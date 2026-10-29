@@ -27,8 +27,8 @@ type runtime_terms = {
   function_export : string;
   other_export : string;
   instantiate : string;
-  step : string;
   initialized : string;
+  finished : string;
   invocation : string;
 }
 
@@ -91,7 +91,6 @@ rew [1] in WASM2MAUDE-INPUT :
       semantics request
 
 let runtime_terms name =
-  let c = variable "C" in
   let z = variable "Z" in
   let exports = variable "EXPORTS" in
   let export_name = variable "NAME" in
@@ -113,7 +112,8 @@ let runtime_terms name =
       (variable (name "inputModule")) empty
     |> render
   in
-  let initialized = pair z empty |> render in
+  let initialized = step (pair z empty) |> render in
+  let finished = step (pair z (variable "RESULT")) |> render in
   let store = T.app "spectec-store" [z] in
   let module_ = T.app "spectec-moduleinst" [z] in
   let address =
@@ -125,8 +125,8 @@ let runtime_terms name =
   { function_export;
     other_export;
     instantiate;
-    step = render (step c);
     initialized;
+    finished;
     invocation }
 
 let export_lookup name runtime =
@@ -168,9 +168,9 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   emit "mod %s is\n  protecting WASM-BUILTINS .\n\n" module_name;
   emit "  sort %s .\n" state;
   emit "  op %s : ValList -> %s [ctor] .\n" (name "call") state;
-  emit "  op %s : KState ValList -> %s [ctor frozen (1)] .\n"
+  emit "  op %s : KState ValList -> %s [ctor] .\n"
     (name "init") state;
-  emit "  op %s : KState -> %s [ctor frozen (1)] .\n"
+  emit "  op %s : KState -> %s [ctor] .\n"
     (name "exec") state;
   emit "  op %s : ValList -> %s [ctor] .\n\n" (name "result") state;
   emit "  op %s : -> SpectecTerminal .\n" (name "inputModule");
@@ -178,25 +178,22 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   emit "  op %s : -> SpectecTerminal .\n" (name "emptyStore");
   emit "  op %s : SpectecTerminals SpectecTerminals ~> Nat .\n" (name "findFunc");
   emit "  op %s : SpectecTerminals SpectecTerminals -> Bool .\n\n" (name "hasExport");
-  emit "  vars C C2 Z XA : SpectecTerminal .\n";
+  emit "  vars C Z XA : SpectecTerminal .\n";
   emit "  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .\n";
-  emit "  vars ARGS RESULT : ValList .\n  var ADDR : Nat .\n  var K : Holes .\n\n";
+  emit "  vars ARGS RESULT : ValList .\n  var ADDR : Nat .\n\n";
   emit "  eq %s = %s .\n" (name "inputModule") (term m);
   emit "  eq %s = %s .\n" (name "inputName") (render (Encode.name export));
   emit "  eq %s = %s .\n\n" (name "emptyStore") (render empty_store);
   emit "%s\n" (export_lookup name runtime);
   (* kstate(C, K): C is the configuration around the next redex, K the holes
-     of hint(k_embedding) contexts taken off it. One step rewrite is one Step. *)
+     of hint(k_heatcool) contexts taken off it. The generated equations make C a
+     Step request; one rule of Step, applied inside init or exec, is one step. *)
   emit "  crl [%s] : %s(ARGS) => %s(kstate(C, none), ARGS)\n    if %s => C .\n"
     (name "instantiate") (name "call") (name "init") runtime.instantiate;
-  emit "  crl [%s] : %s(kstate(C, K), ARGS) => %s(kstate(C2, K), ARGS)\n    if %s => C2 .\n"
-    (name "init-step") (name "init") (name "init") runtime.step;
   emit "  rl [%s] : %s(kstate(%s, none), ARGS) => %s(kstate(%s, none)) .\n"
     (name "invoke") (name "init") runtime.initialized (name "exec") runtime.invocation;
-  emit "  crl [%s] : %s(kstate(C, K)) => %s(kstate(C2, K))\n    if %s => C2 .\n"
-    (name "step") (name "exec") (name "exec") runtime.step;
-  emit "  rl [%s] : %s(kstate(Z ; RESULT, none)) => %s(RESULT) .\nendm\n"
-    (name "finished") (name "exec") (name "result");
+  emit "  rl [%s] : %s(kstate(%s, none)) => %s(RESULT) .\nendm\n"
+    (name "finished") (name "exec") runtime.finished (name "result");
   Buffer.contents buffer
 
 let runtime_path path =

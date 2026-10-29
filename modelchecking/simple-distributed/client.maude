@@ -5,8 +5,8 @@ mod CLIENT-WASM is
 
   sort clientRunState .
   op clientCall : ValList -> clientRunState [ctor] .
-  op clientInit : KState ValList -> clientRunState [ctor frozen (1)] .
-  op clientExec : KState -> clientRunState [ctor frozen (1)] .
+  op clientInit : KState ValList -> clientRunState [ctor] .
+  op clientExec : KState -> clientRunState [ctor] .
   op clientResult : ValList -> clientRunState [ctor] .
 
   op clientInputModule : -> SpectecTerminal .
@@ -15,11 +15,10 @@ mod CLIENT-WASM is
   op clientFindFunc : SpectecTerminals SpectecTerminals ~> Nat .
   op clientHasExport : SpectecTerminals SpectecTerminals -> Bool .
 
-  vars C C2 Z XA : SpectecTerminal .
+  vars C Z XA : SpectecTerminal .
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
   vars ARGS RESULT : ValList .
   var ADDR : Nat .
-  var K : Holes .
 
   eq clientInputModule = MODULE(TYPE(REC(SUB(_?(FINAL), nil, FUNC_->_((I32 I32), I32)))), nil, nil,
 nil, nil, nil,
@@ -56,11 +55,7 @@ FUNC(0))) .
 
   crl [clientInstantiate] : clientCall(ARGS) => clientInit(kstate(C, none), ARGS)
     if instantiate(clientEmptyStore, clientInputModule, nil) => C .
-  crl [clientInit-step] : clientInit(kstate(C, K), ARGS) => clientInit(kstate(C2, K), ARGS)
-    if Step(C) => C2 .
-  rl [clientInvoke] : clientInit(kstate((Z ; nil), none), ARGS) => clientExec(kstate(invoke(spectec-store(Z),
+  rl [clientInvoke] : clientInit(kstate(Step((Z ; nil)), none), ARGS) => clientExec(kstate(invoke(spectec-store(Z),
 clientFindFunc((spectec-moduleinst(Z) . 'EXPORTS), clientInputName), ARGS), none)) .
-  crl [clientStep] : clientExec(kstate(C, K)) => clientExec(kstate(C2, K))
-    if Step(C) => C2 .
-  rl [clientFinished] : clientExec(kstate(Z ; RESULT, none)) => clientResult(RESULT) .
+  rl [clientFinished] : clientExec(kstate(Step((Z ; RESULT)), none)) => clientResult(RESULT) .
 endm

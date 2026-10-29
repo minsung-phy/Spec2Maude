@@ -112,6 +112,7 @@ type rule_body =
   ; guard_conditions : rule_condition list
   ; left : term
   ; right : term
+  ; structural_right : bool
   ; conditions : rule_condition list
   ; otherwise : bool
   }
@@ -182,6 +183,8 @@ let lower_rule_body ~head index id params policy rule =
       ; right =
           Prem.tuple index outputs
             (List.map (Term.translate_exp index) outputs)
+      ; structural_right =
+          List.for_all (fun exp -> Option.is_some (Prem.translate_pattern index exp)) outputs
       ; conditions
       ; otherwise = premises.otherwise
       }
@@ -225,6 +228,7 @@ type execution_rule =
   ; input_shapes : term list
   ; left : term
   ; right : term
+  ; structural_right : bool
   ; conditions : rule_condition list
   ; guard_conditions : rule_condition list
   ; predecessors : int list
@@ -684,21 +688,31 @@ let lower_execution_rule index id params policy
   ; input_shapes
   ; left = body.left
   ; right = body.right
+  ; structural_right = body.structural_right
   ; conditions = complements @ conditions
   ; guard_conditions = body.guard_conditions
   ; predecessors = helpers
   }
 
-let execution_statement rule =
+(* A computed result is bound to a variable of the result sort, so the rule
+   applies only where it is defined: a step whose result is undefined (e.g. a
+   partial function outside its domain) is no step of the relation. *)
+let execution_statement result_sort rule =
   let guards =
     List.filter
       (function EqCondition (BoolCond (App ("typecheck", _))) -> true | _ -> false)
       rule.guard_conditions
   in
   let conditions = schedule_execution_conditions guards rule.left rule.conditions in
+  let right, conditions =
+    if rule.structural_right then rule.right, conditions
+    else
+      let result = Var (generated_variable "RESULT" result_sort) in
+      result, conditions @ [EqCondition (MatchCond (result, rule.right))]
+  in
   match conditions with
-  | [] -> Rl (None, rule.left, rule.right)
-  | conditions -> Crl (None, rule.left, rule.right, conditions)
+  | [] -> Rl (None, rule.left, right)
+  | conditions -> Crl (None, rule.left, right, conditions)
 
 let helper_conditions id rule =
   rule.conditions
@@ -817,7 +831,10 @@ let translate_execution ~include_rule
     |> List.filter (fun rule -> List.mem rule.ordinal referenced)
     |> List.concat_map (helper_statements index id params input_sorts lowered)
   in
-  helpers @ List.map execution_statement lowered
+  let result_sort =
+    output_sort index (snd (Prem.split input_count (component_types typ)))
+  in
+  helpers @ List.map (execution_statement result_sort) lowered
 
 (* hint(maude_trans): Rel(.., h1, h2) holds by one step of another rule, or
  * by one such step to a listed witness h' followed by Rel(.., h', h2). Any
@@ -971,7 +988,7 @@ let translate index id params _mixop typ rules =
       let rule head policy r =
         translate_rule ~head index id params policy r
       in
-      (* hint(rl_embedding) and hint(k_embedding) rules are translated by Heatcool. *)
+      (* hint(k_heatcool) rules are translated by Heatcool. *)
       let include_rule rule =
         not (Prescan.is_heatcool_rule index id rule
              || Prescan.is_kembedding_rule index id rule)

@@ -8,9 +8,9 @@ mod WASM-MODELCHECK-DRIVER is
   sort ModelState .
   subsort ModelState < State .
   op boot : -> ModelState [ctor] .
-  op init : KState -> ModelState [ctor frozen (1)] .
+  op init : KState -> ModelState [ctor] .
   op ready : SpectecTerminal -> ModelState [ctor] .
-  op exec : KState -> ModelState [ctor frozen (1)] .
+  op exec : KState -> ModelState [ctor] .
   op finished : ValList -> ModelState [ctor] .
   --- $invoke is undefined unless the arguments satisfy Val_ok.
   op invalid-invocation : -> ModelState [ctor] .
@@ -32,7 +32,6 @@ mod WASM-MODELCHECK-DRIVER is
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
   var RESULT : ValList .
   var ADDR : Nat .
-  var K : Holes .
   var ST : ModelState .
   var P : Prop .
 
@@ -54,9 +53,7 @@ mod WASM-MODELCHECK-DRIVER is
 
   crl [instantiate] : boot => init(kstate(C, none))
     if instantiate(emptyStore, inputModule, nil) => C .
-  crl [init-step] : init(kstate(C, K)) => init(kstate(C2, K))
-    if Step(C) => C2 .
-  rl [initialize] : init(kstate(Z ; nil, none)) => ready(Z) .
+  rl [initialize] : init(kstate(Step(Z ; nil), none)) => ready(Z) .
   eq invocation(Z) = invoke(spectec-store(Z),
       findFunc((spectec-moduleinst(Z) . 'EXPORTS), inputName), inputArgs) .
   eq isConfig(Z ; IS) = true .
@@ -66,9 +63,7 @@ mod WASM-MODELCHECK-DRIVER is
     if C2 := invocation(Z) /\ isConfig(C2) .
   crl [invalid-invocation] : ready(Z) => invalid-invocation
     if not isConfig(invocation(Z)) .
-  crl [execute-step] : exec(kstate(C, K)) => exec(kstate(C2, K))
-    if Step(C) => C2 .
-  rl [finished] : exec(kstate(Z ; RESULT, none)) => finished(RESULT) .
+  rl [finished] : exec(kstate(Step(Z ; RESULT), none)) => finished(RESULT) .
 
   eq finished(RESULT) |= returned(RESULT) = true .
   eq ST |= P = false [owise] .

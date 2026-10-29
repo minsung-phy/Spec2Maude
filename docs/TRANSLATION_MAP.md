@@ -11,7 +11,7 @@ the paper, or to check how a constructor is handled.
   `DecD`, `reld.ml` for `RelD`, `prem.ml` for premises, `term.ml` for
   expressions and types, `iter.ml` for iterations). A lowering selected by a
   hint rather than by an IL constructor has its own file (`heatcool.ml` for
-  `hint(rl_embedding)` and `hint(k_embedding)`). Generated iteration helpers are in `iter_helpers.ml`,
+  `hint(k_heatcool)`). Generated iteration helpers are in `iter_helpers.ml`,
   and the reordering of Maude conditions is in one section of
   `maude/maude_il.ml`.
 - Code locations are given as `file:function`. They refer to commit
@@ -87,13 +87,13 @@ into inputs `ins` and outputs `outs`.
 
 | Relation kind | How it is selected | Declaration | `RuleD` with premises `prs` | Code |
 | --- | --- | --- | --- | --- |
-| Execution | notation `~>` or `~>*` | `sort R-Request .` `subsort S(outs) < R-Request .` `op r̂ : S(ins) -> R-Request [frozen] .` | `crl r̂(⟦ins⟧) => ⟦outs⟧ if ⟦prs⟧ .` | `reld.ml:lower_execution_rule`, `reld.ml:execution_statement` |
+| Execution | notation `~>` or `~>*` | `sort R-Request .` `subsort S(outs) < R-Request .` `op r̂ : S(ins) -> R-Request [frozen] .` | `crl r̂(⟦ins⟧) => ⟦outs⟧ if ⟦prs⟧ .`; if `outs` is not a structural pattern, `crl r̂(⟦ins⟧) => RESULT if ⟦prs⟧ /\ RESULT := ⟦outs⟧ .` with `RESULT : S(outs)`, so the rule applies only where `outs` is defined | `reld.ml:lower_execution_rule`, `reld.ml:execution_statement` |
 | Compute | `hint(maude_compute)` | `op r̂ : S(ins) ~> S(outs) .` | `ceq r̂(⟦ins⟧) = ⟦outs⟧ if ⟦prs⟧ .` | `reld.ml:translate_rule` |
 | Check | `hint(maude_check)` | `op r̂ : S(e) ~> Bool .` | `ceq r̂(⟦e⟧) = true if ⟦prs⟧ .` | `reld.ml:translate_rule` |
 
 A relation that matches none of these kinds is not translated (section 8).
 For each relation, `def.ml:translate` calls `reld.ml:translate` for the
-rules without `hint(rl_embedding)` or `hint(k_embedding)` and then
+rules without `hint(k_heatcool)` and then
 `heatcool.ml:translate_relation` for the rules with them (see below).
 
 ### `ElsePr` in execution relations
@@ -116,9 +116,9 @@ rule's conditions and an `[owise]` equation that returns `false`
 | 2. Negate the conditions of an earlier rule | The negation is exact. A comparison is negated by its dual only if it is total (numbers, `==`, `=/=`); any other condition `b` becomes `b =/= true`, which also holds when `b` is undefined. A matching condition is shared only if its pattern has a unique decomposition. | `reld.ml:direct_complement`, `reld.ml:negate_comparison`, `reld.ml:unique_match_pattern` |
 | 3. Fall back to `r̂-r-enabled` | `r̂-r-enabled(ins)` is `true` exactly when the earlier rule's conditions hold. An earlier rule with a rewrite condition cannot be used this way and is rejected. | `reld.ml:helper_statements` |
 
-Rules with `hint(rl_embedding)` or `hint(k_embedding)` are not counted as
+Rules with `hint(k_heatcool)` are not counted as
 earlier rules. In the WebAssembly specification, no relation has both
-(`ElsePr` occurs only in `Step_pure` and `Step_read`; the two hints only in
+(`ElsePr` occurs only in `Step_pure` and `Step_read`; the hint only in
 `Step`, `Steps`, and `Eval_expr`).
 
 ### Rules selected by hints
@@ -127,13 +127,15 @@ earlier rules. In the WebAssembly specification, no relation has both
 | --- | --- | --- |
 | `hint(maude_subsume)` on a rule of a computed relation | The rule defines a separate check operator. A premise whose outputs are already known calls this check (section 3). | `reld.ml:translate` |
 | `hint(maude_trans "C" …)` on a transitivity rule of a checked relation | The other rules are emitted under a separate operator `r̂-step`, and `ceq r̂(xs) = true if r̂-step(xs)` links the two. The transitivity rule becomes `ceq r̂(x, z) = true if y` ranges over the listed constructors `∧ y =/= z ∧ y =/= x ∧ r̂-step(x, y) ∧ r̂(y, z)`. | `reld.ml:translate_trans`, `reld.ml:step_bridge` |
-| `hint(rl_embedding)` on a rule with an execution premise | See "Rules with `hint(rl_embedding)`" below. | `heatcool.ml:translate_relation` |
-| `hint(k_embedding)` on a context rule | See "Rules with `hint(k_embedding)`" below. | `heatcool.ml:kembedding_statements` |
+| `hint(k_heatcool)` on a rule with an execution premise | A context rule (its only premise steps the same relation) is translated as in "Context rules with `hint(k_heatcool)`"; any other rule as in "Split rules with `hint(k_heatcool)`" below. | `heatcool.ml:translate_relation`, `hintd.ml:is_kept_rule` |
 
-### Rules with `hint(rl_embedding)`
+### Split rules with `hint(k_heatcool)`
 
-The rewriting logic embedding of the K book (Section 5.4.5): split is a rule,
-plug is an equation.
+The rewriting logic embedding of the K book (Section 5.4.5). Plug is an
+equation. Split is an equation for a `~>` relation (it only takes the
+configuration apart; the inner relation's rule is the step) and a rule for a
+`~>*` relation (its reflexive and transitive rules both apply to one request)
+(`heatcool.ml:heating`, `heatcool.ml:heats_by_equation`).
 
 Such a rule `r̂(ins) => outs` has execution premises `inner(ins') => outs'`.
 It is translated so that the inner step is taken by rewriting, and the
@@ -142,27 +144,31 @@ source order.
 
 | Statement | Maude | Code |
 | --- | --- | --- |
-| Split (first execution premise) | `crl [split-r] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ .` `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
-| Split guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧)`, a `Bool` operator with one equation `eq identifyInner(⟦ins of r'⟧) = true` per rule `r'` of the inner relation. On an input that no inner rule matches it stays unreduced, so the split does not apply. | `heatcool.ml:identify_statements` |
+| Split (first execution premise) | `ceq r̂(⟦ins⟧) = inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ .` for `~>`, `crl [split-r] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ .` for `~>*`. `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
+| Split guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧)`, a `Bool` operator with one equation `eq identifyInner(⟦ins of r'⟧) = true` per rule `r'` of the inner relation, conditional on the equational premises of `r'` over its input variables only. On an input that no inner rule matches it stays unreduced, so the split does not apply. | `heatcool.ml:identify_statements` |
+| Unheat (`~>` split) | `eq unheat(inner(⟦ins'⟧) ~> hole-r(C)) = ⟦ins⟧ .`: the configuration that a split request stands for, for drivers that observe it between steps | `heatcool.ml:heatcool_rule` |
 | Next execution premise | `eq ⟦outs'⟧ ~> hole-r-inner(C) = inner2(⟦ins''⟧) ~> hole-r-inner2(C') .` With several execution premises, each hole is named after the relation it waits for. | `heatcool.ml:heatcool_rule` |
 | Plug (after the last execution premise) | `eq ⟦outs'⟧ ~> hole-r-inner2(C) = ⟦outs⟧ .`, with the remaining premises as conditions | `heatcool.ml:heatcool_rule` |
 
 A context rule (a rule whose execution premise steps a part of the
 instruction sequence, such as `Step/ctxt-instrs`) is translated differently.
 `identifyFocus` finds the instruction to step and splits the sequence into
-`PREFIX`, focus, and `POSTFIX`. It has one `rl [focus-…]` for each rule of
-the relations that can step a focus. The split is
-`crl [split-ctxt-…] : r̂(c) => r̂(focus) ~> hole(PREFIX, POSTFIX) if identifyFocus(…) => { PREFIX | focus | POSTFIX } …`,
-and the plug puts the result back between `PREFIX` and `POSTFIX`
+`PREFIX`, focus, and `POSTFIX`. For a `~>` relation it has one
+`eq identifyFocus(…) = { … }` (or `ceq`) for each rule of the relations that
+can step a focus, and the split is
+`ceq r̂(c) = r̂(focus) ~> hole(PREFIX, POSTFIX) if { PREFIX | focus | POSTFIX } := identifyFocus(…) …`
+(`rl`/`crl` with a rewrite condition for a `~>*` relation). The plug puts the
+result back between `PREFIX` and `POSTFIX`, and
+`eq unheat(R ~> hole(PREFIX, POSTFIX)) = unheat(R) ~> hole(PREFIX, POSTFIX) .`
 (`heatcool.ml:translate_pattern`, `heatcool.ml:context_transitions`). Which
 rules are context rules, and their focus patterns, is decided before
 translation (`hintd.ml:scan_contexts`, `hintd.ml:scan_heatcool`).
 
-### Rules with `hint(k_embedding)`
+### Context rules with `hint(k_heatcool)`
 
 The K embedding of the K book (Section 5.4.6) for a context rule
 `R: C[x] ~> C'[x']  -- R: x ~> x'` whose conclusion input is one element `E`
-of the sequence of the relation's `rl_embedding` sequence context
+of the sequence of the relation's split-rule sequence context
 (`hintd.ml:scan_kembedding`). The driver state `kstate(c, K)` keeps the
 configuration around the next redex and the holes taken off it. Such a rule
 gets no focus pattern.
@@ -174,7 +180,8 @@ gets no focus pattern.
 | Cooling | `ceq kstate(⟦x'⟧, hole-r(C) K) = kstate(⟦C'[x']⟧, K) if closed-r(x') = true .` | `heatcool.ml:kembedding_rule` |
 | Closed bodies | `eq closed-r(b) = true .` for each focus pattern of the sequence context whose trigger is `E`'s constructor, `b` its body; `eq closed-r(x) = false [owise] .` Assumed: no step of `R` applies to such a body alone. | `heatcool.ml:closed_bodies` |
 | Instrs cooling | `eq kstate(z ; s, hole(PREFIX, POSTFIX) K) = kstate(z ; PREFIX s POSTFIX, K) [owise] .` | `heatcool.ml:kembedding_statements` |
-| Cool all | `cool-all(c, K)` cools every hole; it is the source configuration of `kstate(c, K)`. | `heatcool.ml:kembedding_statements` |
+| Request | `ceq kstate(c, K) = kstate(r̂(c), K) if plug-first(K) = false [owise] .`: when no other equation applies and no sequence hole waits, the configuration becomes a request, which the split equations focus and one rule of the relation steps in place. `kstate`'s first argument is not frozen. | `heatcool.ml:kembedding_statements` |
+| Cool all | `cool-all(unheat(r), K)` cools every hole; it is the source configuration of `kstate(r, K)`. | `heatcool.ml:kembedding_statements` |
 
 ## 3. Premises
 
@@ -209,7 +216,7 @@ that applies; `prem.ml:translate_ifpr` then translates that case.
 | `f(args) = e'` or `e' = f(args)`, `f` has `hint(maude_rule)` | `f̂(⟦args⟧) => ⟦e'⟧` (`e'` may be a pattern) |
 | a call of a `maude_rule` function anywhere else in `e` | rejected |
 | `x <- es`, `es` not yet bound | wait |
-| `x <- es`, `x` unbound, where choice is enabled (`bind_membership`: execution rules, the check helpers of their `IterPr`s, and `rl_embedding` focus patterns) | `PREFIX ⟦x⟧ SUFFIX := ⟦es⟧`: any element can be chosen; rejected elsewhere |
+| `x <- es`, `x` unbound, where choice is enabled (`bind_membership`: execution rules, the check helpers of their `IterPr`s, and `k_heatcool` focus patterns) | `PREFIX ⟦x⟧ SUFFIX := ⟦es⟧`: any element can be chosen; rejected elsewhere |
 | `e1 ∧ e2`, not all variables bound | `⟦IfPr e1⟧` and `⟦IfPr e2⟧`, in the order in which their variables become bound |
 | `f(args) = e'` or `e' = f(args)`, an argument unbound, `e'` known | if `f` has `hint(inverse g)`: the argument as a pattern for `ĝ(…, ⟦e'⟧)`, then `⟦e⟧`; otherwise wait |
 | `p = e'` or `e' = p`, `p` has unbound variables, `e'` known | `p` as a pattern for `⟦e'⟧` (below) |
@@ -406,7 +413,7 @@ its first occurrence.
 | --- | --- | --- |
 | `builtin`, `maude_kind`, `maude_rule`, `inverse` | `DecD` | 1, 3 |
 | `maude_compute`, `maude_check` | `RelD` | 2 |
-| `maude_subsume`, `maude_trans`, `rl_embedding`, `k_embedding` | `RuleD` | 2 |
+| `maude_subsume`, `maude_trans`, `k_heatcool` | `RuleD` | 2 |
 | `maude_assume` | `RuleD` and `DecD` | 7 |
 | `maude_sort`, `maude_subsort`, `maude_proper` | `TypD` | 7 |
 | `maude_array` | a field of `StructT` (the hint list of the field) | 4 |
@@ -437,8 +444,8 @@ definition and the reason. An omitted case produces no Maude output.
 | `ElsePr` in a `maude_rule` function, or not as the first premise of an execution rule | rejected | `decd.ml:translate_rule_clause`, `reld.ml:lower_execution_rule` |
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |
-| `ElsePr`, `IterPr`, or `NegPr` in an `rl_embedding` rule, and `rl_embedding` rules whose shape does not fit section 2 | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
-| A `k_embedding` rule with another premise, a premise of another relation, a context that changes when its inside steps, a conclusion input that is not one sequence element, no sequence context or nonempty condition in its relation, or no rule consuming its element; a rule with both hints | rejected | `hintd.ml:scan_kembedding`, `heatcool.ml:kept_rule`, `heatcool.ml:kembedding_rule`, `heatcool.ml:kembedding_statements`, `heatcool.ml:translate_relation` |
+| `ElsePr`, `IterPr`, or `NegPr` in a `k_heatcool` split rule, split rules whose shape does not fit section 2, and a rewrite condition in a split equation | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
+| A `k_heatcool` context rule with a context that changes when its inside steps, a conclusion input that is not one sequence element, no sequence context or nonempty condition in its relation, or no rule consuming its element | rejected | `hintd.ml:scan_kembedding`, `heatcool.ml:kept_rule`, `heatcool.ml:kembedding_rule`, `heatcool.ml:kembedding_statements`, `heatcool.ml:translate_relation` |
 | An `ElsePr` execution rule whose earlier rule needs an `r̂-r-enabled` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
 | A call of a `maude_rule` function from a function without `maude_rule`, or in an argument or result of a `maude_rule` clause | rejected | `decd.ml:translate_equation_clause`, `decd.ml:translate_rule_clause` |
 | `ElsePr` or a `maude_rule` call in the premises before a membership choice | rejected | `decd.ml:translate_choice_clause` |

@@ -5,7 +5,7 @@
  *   hint(maude_proper) decide the Maude sort of each type, its subsorts, and
  *   the representation of typed sequences. hint(maude_array) on a record
  *   field stores that sequence field as a size and a prelude ARRAY.
- * Part 2: hint(rl_embedding). The hinted rules are checked against the shapes
+ * Part 2: hint(k_heatcool). The hinted rules are checked against the shapes
  *   that Heatcool supports, and context rules get their focus patterns
  *   (TRANSLATION_MAP.md, section 2). *)
 
@@ -609,7 +609,7 @@ let sequence_element_wrappers metadata typ =
       Some ("seq", "unseq")
   | None -> None
 
-(* Part 2: hint(rl_embedding)
+(* Part 2: hint(k_heatcool)
  *
  * Rule-level hints are analyzed here as certificates for later RuleD
  * translation. *)
@@ -660,7 +660,7 @@ type heatcool =
   }
 
 let unsupported at reason =
-  Util.Error.error at "translation" ("Unsupported: rl_embedding " ^ reason)
+  Util.Error.error at "translation" ("Unsupported: k_heatcool " ^ reason)
 
 let unique at absent ambiguous = function
   | [value] -> value
@@ -668,7 +668,15 @@ let unique at absent ambiguous = function
   | _ -> unsupported at ambiguous
 
 let context_hint values =
-  values |> List.filter (fun hint -> hint.hintid.it = "rl_embedding")
+  values |> List.filter (fun hint -> hint.hintid.it = "k_heatcool")
+
+(* A hint(k_heatcool) rule whose only premise steps the same relation, the
+   inside of its context (K embedding, TRANSLATION.md). *)
+let is_kept_rule relation_id rule =
+  let RuleD (_, _, _, _, premises) = rule.it in
+  match premises with
+  | [{it = RulePr (target, _, _, _); _}] -> target.it = relation_id.it
+  | _ -> false
 
 let find_relation relations id at =
   relations
@@ -995,11 +1003,12 @@ let scan_heatcool (metadata : t) execution_input_count =
        match context_hint values with
        | [] -> None
        | _ :: _ :: _ -> unsupported hintdef.at
-           "rule has more than one rl_embedding hint"
+           "rule has more than one k_heatcool hint"
        | [hint] ->
-           require_flags "rl_embedding" [hint];
+           require_flags "k_heatcool" [hint];
            let source = find_relation metadata.relations relation_id hintdef.at in
            let ordinal, rule = find_rule source rule_id hintdef.at in
+           if is_kept_rule relation_id rule then None else
            let fail reason =
              unsupported rule.at
                ("RuleD " ^ relation_id.it ^ "/" ^ rule_id.it ^ ": " ^ reason)
@@ -1062,39 +1071,23 @@ let extract_context (metadata : t) execution_input_count (heated : heatcool) =
       end
   | _ -> None
 
-(* hint(k_embedding): a context rule whose only premise steps the inside of
- * its context in the same relation. The context stays open between steps
- * (K embedding, TRANSLATION.md); its rule gets no focus pattern. *)
-let kembedding_hint values =
-  values |> List.filter (fun hint -> hint.hintid.it = "k_embedding")
-
+(* The hint(k_heatcool) context rules whose only premise steps the inside of
+ * their context in the same relation. The context stays open between steps
+ * (K embedding, TRANSLATION.md); such a rule gets no focus pattern. *)
 let scan_kembedding (metadata : t) execution_input_count =
   metadata.context_hints
   |> List.filter_map (fun (relation_id, rule_id, values, hintdef) ->
-       let fail at reason =
-         Util.Error.error at "translation" ("Unsupported: k_embedding " ^ reason)
-       in
-       match kembedding_hint values, context_hint values with
-       | [], _ -> None
-       | _ :: _ :: _, _ -> fail hintdef.at "rule has more than one k_embedding hint"
-       | [_], _ :: _ ->
-           fail hintdef.at "rule has both rl_embedding and k_embedding hints"
-       | [hint], [] ->
-           require_flags "k_embedding" [hint];
+       match context_hint values with
+       | [] -> None
+       | _ ->
            let source = find_relation metadata.relations relation_id hintdef.at in
            let ordinal, rule = find_rule source rule_id hintdef.at in
-           let fail reason =
-             fail rule.at ("RuleD " ^ relation_id.it ^ "/" ^ rule_id.it ^ ": " ^ reason)
-           in
-           if Option.is_none (execution_input_count source.id.it) then
-             fail "hint requires an execution relation";
-           let RuleD (_, _, _, _, premises) = rule.it in
-           begin match premises with
-           | [{it = RulePr (target, _, _, _); _}] when target.it = relation_id.it -> ()
-           | _ ->
-               fail "hint requires one premise, an execution premise of the same relation"
-           end;
-           Some ({source; ordinal; rule} : heatcool))
+           if not (is_kept_rule relation_id rule) then None
+           else if Option.is_none (execution_input_count source.id.it) then
+             unsupported rule.at
+               ("RuleD " ^ relation_id.it ^ "/" ^ rule_id.it
+                ^ ": hint requires an execution relation")
+           else Some ({source; ordinal; rule} : heatcool))
 
 let scan_contexts metadata execution_input_count heated kept =
   let contexts =
