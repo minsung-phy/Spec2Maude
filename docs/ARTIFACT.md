@@ -203,6 +203,18 @@ directory and emit an absolute `load` path. Use `--wast-runtime FILE` when
 running from another directory or relocating the runtime. This path is
 independent of `--semantics FILE`, which selects the translated Wasm semantics.
 
+The WAST runtime is a test runner, not part of the translated semantics:
+
+- It runs one deterministic execution per script, like the reference
+  interpreter. A script step is the first successor of the rewrite condition
+  `KS => KS2 /\ KS2 =/= KS`, found at one Step by `rew`; use it with `rew`, not
+  with `search` or model checking.
+- `spectest` print functions are an environment model: a call is one step that
+  consumes its arguments and leaves the store unchanged (`host-call`).
+- SpecTec has no call-stack limit. `assert_exhaustion` passes once the frame
+  depth exceeds `--call-depth` (default 256), so that PASS is relative to the
+  bound.
+
 Use `harness` when another Maude model must supply arguments and consume results:
 
 ```sh

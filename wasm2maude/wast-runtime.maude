@@ -101,7 +101,10 @@ mod WASM-WAST-DRIVER is
   --- breadth-first search finds, so rules are tried in declaration order
   --- memory.grow-succeed, for example, is tried before memory.grow-fail.
   --- The condition KS => KS2 holds in zero or more steps; KS2 =/= KS skips
-  --- zero steps. This driver is meant for rew, not for search.
+  --- zero steps. As a rewrite theory a script step therefore also relates KS
+  --- to states several Steps away; rew takes the first solution, which the
+  --- breadth-first search finds at one Step. This driver is meant for rew,
+  --- not for search or model checking.
   op script.module : Nat InstanceEnv Commands KState
     -> ScriptState [ctor frozen (4)] .
   op script.return : Nat InstanceEnv ResultPatterns Commands
@@ -383,15 +386,13 @@ mod WASM-WAST-DRIVER is
        /\ hostArguments(WSHARGS, WSHTYPES) = true .
   eq hostCallable(WSHS, WSHA, WSHARGS) = false [owise] .
 
+  --- Environment model, not SpecTec: a call of a spectest host function, the
+  --- print functions without results, is one Step_read step that consumes its
+  --- arguments and leaves the store unchanged. The split is the translated
+  --- identifyFocus of call_ref, whose arity is the function type's.
   crl [host-call] :
     Step-read((WSHS ; WSHCURRENT) ;
       (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => nil
-    if hostCallable(WSHS, WSHA, WSHARGS) = true .
-
-  ceq identifyFocus(WSHS ; WSHCURRENT,
-      WSHPREFIX (WSHARGS REF.FUNC-ADDR(WSHA)), CALL-REF(WSHC), WSHREST)
-    = { WSHPREFIX | ((WSHS ; WSHCURRENT) ;
-      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) | WSHREST }
     if hostCallable(WSHS, WSHA, WSHARGS) = true .
 
   rl [start] : script.start => initialState .
@@ -588,7 +589,9 @@ mod WASM-WAST-DRIVER is
     if kstate(WSHR, WSHK) => kstate(WSHR2, WSHK2)
        /\ kstate(WSHR2, WSHK2) =/= kstate(WSHR, WSHK)
        /\ (WSHS2 ; WSHF2) ; WSHINSTRS := unheat(WSHR2) .
-  --- The frame depth counts the frames of the whole configuration.
+  --- SpecTec has no call-stack limit: assert_exhaustion passes once the frame
+  --- depth of the whole configuration exceeds the bound (--call-depth), so a
+  --- PASS is relative to that bound.
   crl [exhaustion-done] :
     script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,
       kstate(WSHR, WSHK))
