@@ -168,9 +168,9 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   emit "mod %s is\n  protecting WASM-BUILTINS .\n\n" module_name;
   emit "  sort %s .\n" state;
   emit "  op %s : ValList -> %s [ctor] .\n" (name "call") state;
-  emit "  op %s : SpectecTerminal ValList -> %s [ctor frozen (1)] .\n"
+  emit "  op %s : KState ValList -> %s [ctor frozen (1)] .\n"
     (name "init") state;
-  emit "  op %s : SpectecTerminal -> %s [ctor frozen (1)] .\n"
+  emit "  op %s : KState -> %s [ctor frozen (1)] .\n"
     (name "exec") state;
   emit "  op %s : ValList -> %s [ctor] .\n\n" (name "result") state;
   emit "  op %s : -> SpectecTerminal .\n" (name "inputModule");
@@ -180,20 +180,22 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   emit "  op %s : SpectecTerminals SpectecTerminals -> Bool .\n\n" (name "hasExport");
   emit "  vars C C2 Z XA : SpectecTerminal .\n";
   emit "  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .\n";
-  emit "  vars ARGS RESULT : ValList .\n  var ADDR : Nat .\n\n";
+  emit "  vars ARGS RESULT : ValList .\n  var ADDR : Nat .\n  var K : Holes .\n\n";
   emit "  eq %s = %s .\n" (name "inputModule") (term m);
   emit "  eq %s = %s .\n" (name "inputName") (render (Encode.name export));
   emit "  eq %s = %s .\n\n" (name "emptyStore") (render empty_store);
   emit "%s\n" (export_lookup name runtime);
-  emit "  crl [%s] : %s(ARGS) => %s(C, ARGS)\n    if %s => C .\n"
+  (* kstate(C, K): C is the configuration around the next redex, K the holes
+     of hint(k_embedding) contexts taken off it. One step rewrite is one Step. *)
+  emit "  crl [%s] : %s(ARGS) => %s(kstate(C, none), ARGS)\n    if %s => C .\n"
     (name "instantiate") (name "call") (name "init") runtime.instantiate;
-  emit "  crl [%s] : %s(C, ARGS) => %s(C2, ARGS)\n    if %s => C2 .\n"
+  emit "  crl [%s] : %s(kstate(C, K), ARGS) => %s(kstate(C2, K), ARGS)\n    if %s => C2 .\n"
     (name "init-step") (name "init") (name "init") runtime.step;
-  emit "  crl [%s] : %s(C, ARGS) => %s(%s)\n    if %s := C .\n"
-    (name "invoke") (name "init") (name "exec") runtime.invocation runtime.initialized;
-  emit "  crl [%s] : %s(C) => %s(C2)\n    if %s => C2 .\n"
+  emit "  rl [%s] : %s(kstate(%s, none), ARGS) => %s(kstate(%s, none)) .\n"
+    (name "invoke") (name "init") runtime.initialized (name "exec") runtime.invocation;
+  emit "  crl [%s] : %s(kstate(C, K)) => %s(kstate(C2, K))\n    if %s => C2 .\n"
     (name "step") (name "exec") (name "exec") runtime.step;
-  emit "  crl [%s] : %s(C) => %s(RESULT)\n    if (Z ; RESULT) := C .\nendm\n"
+  emit "  rl [%s] : %s(kstate(Z ; RESULT, none)) => %s(RESULT) .\nendm\n"
     (name "finished") (name "exec") (name "result");
   Buffer.contents buffer
 

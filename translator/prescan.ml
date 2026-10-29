@@ -112,6 +112,7 @@ type t =
   ; sort_metadata : Hintd.t
   ; contexts : Hintd.context list
   ; heatcool : Hintd.heatcool list
+  ; kembedding : Hintd.heatcool list
   ; iterations : iteration list
   ; premise_iterations : premise_iteration list
   ; hints : hintdef list
@@ -1245,7 +1246,10 @@ let scan script =
     | None -> None
   in
   let heatcool = Hintd.scan_heatcool sort_metadata execution_input_count in
-  let contexts = Hintd.scan_contexts sort_metadata execution_input_count heatcool in
+  let kembedding = Hintd.scan_kembedding sort_metadata execution_input_count in
+  let contexts =
+    Hintd.scan_contexts sort_metadata execution_input_count heatcool kembedding
+  in
   let relation_enabled_helpers =
     name_enabled_helpers registry relation_policies defs
   in
@@ -1292,6 +1296,7 @@ let scan script =
   ; sort_metadata
   ; contexts
   ; heatcool
+  ; kembedding
   ; iterations
   ; premise_iterations
   ; hints
@@ -1490,3 +1495,11 @@ let is_heatcool_rule index relation rule =
     (fun (heated : Hintd.heatcool) ->
       heated.source.id.it = relation.it && heated.rule == rule)
     index.heatcool
+
+let kembedding index = index.kembedding
+
+let is_kembedding_rule index relation rule =
+  List.exists
+    (fun (kept : Hintd.heatcool) ->
+      kept.source.id.it = relation.it && kept.rule == rule)
+    index.kembedding

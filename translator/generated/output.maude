@@ -29,15 +29,27 @@ mod SPEC2MAUDE-GENERATED is
 
   subsort FocusTarget < FocusSearch .
 
-  sort Hole-Step-pure .
+  sort Holes .
 
-  sort Hole-Step-read .
+  sort KState .
+
+  subsort Hole < Holes .
 
   sort Hole-Step-ctxt-label .
 
+  subsort Hole-Step-ctxt-label < Holes .
+
   sort Hole-Step-ctxt-handler .
 
+  subsort Hole-Step-ctxt-handler < Holes .
+
   sort Hole-Step-ctxt-frame .
+
+  subsort Hole-Step-ctxt-frame < Holes .
+
+  sort Hole-Step-pure .
+
+  sort Hole-Step-read .
 
   sort Steps-Request .
 
@@ -1967,6 +1979,26 @@ mod SPEC2MAUDE-GENERATED is
 
   op _~>_ : Step-Request Hole -> Step-Request [frozen (2)] .
 
+  op none : -> Holes [ctor] .
+
+  op __ : Holes Holes -> Holes [ctor assoc id: none] .
+
+  op kstate : SpectecTerminal Holes -> KState [ctor frozen (1 2)] .
+
+  op cool-all : SpectecTerminal Holes -> SpectecTerminal .
+
+  op hole-Step-ctxt-label : InstrList Nat -> Hole-Step-ctxt-label [ctor] .
+
+  op closed-Step-ctxt-label : InstrList -> Bool .
+
+  op hole-Step-ctxt-handler : SpectecTerminals Nat -> Hole-Step-ctxt-handler [ctor] .
+
+  op closed-Step-ctxt-handler : InstrList -> Bool .
+
+  op hole-Step-ctxt-frame : Nat SpectecTerminal -> Hole-Step-ctxt-frame [ctor] .
+
+  op closed-Step-ctxt-frame : InstrList -> Bool .
+
   op hole-Step-pure : SpectecTerminal -> Hole-Step-pure [ctor] .
 
   op _~>_ : Step-pure-Request Hole-Step-pure -> Step-Request [frozen (2)] .
@@ -1978,18 +2010,6 @@ mod SPEC2MAUDE-GENERATED is
   op _~>_ : Step-read-Request Hole-Step-read -> Step-Request [frozen (2)] .
 
   op identifyRead : SpectecTerminal -> Bool .
-
-  op hole-Step-ctxt-label : InstrList Nat -> Hole-Step-ctxt-label [ctor] .
-
-  op _~>_ : Step-Request Hole-Step-ctxt-label -> Step-Request [frozen (2)] .
-
-  op hole-Step-ctxt-handler : SpectecTerminals Nat -> Hole-Step-ctxt-handler [ctor] .
-
-  op _~>_ : Step-Request Hole-Step-ctxt-handler -> Step-Request [frozen (2)] .
-
-  op hole-Step-ctxt-frame : Nat SpectecTerminal -> Hole-Step-ctxt-frame [ctor] .
-
-  op _~>_ : Step-Request Hole-Step-ctxt-frame -> Step-Request [frozen (2)] .
 
   op Steps : SpectecTerminal -> Steps-Request [frozen (1)] .
 
@@ -2341,17 +2361,19 @@ mod SPEC2MAUDE-GENERATED is
 
   var X : SpectecType .
 
-  vars W W_1 VALUE1 VALUE-3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE INN JNN FNN NT VT PT LT-2 CONSTTYPE LANETYPE AT_1 AT_2 HT_1 HT_2 DT JT EXTERNTYPE GT-2 MT TT TV TV_1 TU_1 TV'-2 HT RT T ZT FT CT QT AT TU'-2 LIM XT-2 MMT DT_1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN SX INN_1 INN_2 FNN_2 FNN_1 LNN SHAPE JNN_1 JNN_2 HALF ZERO-3 VALUE2 BLOCKTYPE REFTYPE-3 MEMARG NUMTYPE_1 NUMTYPE_2 VALUE3 VVUNOP-2 VVBINOP-2 VVTERNOP-2 VVTESTOP-2 ISHAPE BSHAPE ISHAPE_1 ISHAPE_2 SHAPE_1 SHAPE_2 FRAME C-2 REFTYPE_1 REFTYPE_2 NUMLIT UNOP-2 BINOP-2 TESTOP-2 RELOP-2 CVTOP-2 VUNOP-2 VBINOP-2 VTERNOP-2 VTESTOP-2 VRELOP-2 VSHIFTOP-2 VSWIZZLOP-2 VEXTUNOP-2 VEXTBINOP-2 VEXTTERNOP-2 VCVTOP-2 DATAMODE ELEMMODE MODULE-2 INIT C LCT_1 DT_N DEFTYPE_1 DEFTYPE_2 INDEX-ELEMENT REL-ARG1 REL-ARG2 REL-ARG3 HEAPTYPE' HEAPTYPE_1 HEAPTYPE_2 REL-INPUT3 REL-INPUT2 CASE-PART2 X_1 X_2 X_3 X_4 F F_1 F_2 C_1-3 LNN_1 LNN_2 SX_1 SX_2 VALUE-20 VALUE-21 STORE-2 STATE EXTERNADDR S-2 Z TI MI FV TABLEINST TABLEINST' MEMINST MEMINST' EXN-3 RT' MODULEINST BT YY-2 C_2-3 NT_1 NT_2 SH SWIZZLOP INPUT-FIELD SH_1 SH_2 ENABLED-INPUT1 RT_2 RT_1 FI CATCH-2 AT' AO REL-OUTPUT1 ZT_2 SI-2 AI-2 BRIDGE-Z F' Z' S' F'' Z'' TYPE-2 TAGINST S_1 S_2 GLOBALINST FUNCCODE FUNCINST DATAINST OK-3 ELEMTYPE ELEMINST S_3 S_4 S_5 S_6 S_7 MODULEINST_0 Z''' S''' S'''' T_1-2 ST-2 XT_1-2 SUBTYPE EXTERNTYPE_1-2 LOCAL-2 TAG-2 GLOBAL-2 MEM-2 TABLE-2 FUNC-2 DATA-2 ELEM-2 START-2 IMPORT-2 EXPORT-2 C_3-3 : SpectecTerminal .
+  vars W W_1 VALUE1 VALUE-3 EXTERNIDX FREE RECTYPE HEAPTYPE STORAGETYPE FIELDTYPE COMPTYPE VALTYPE ADDRTYPE LIMITS REFTYPE TAGTYPE GLOBALTYPE MEMTYPE TABLETYPE TYPEUSE NUMTYPE PACKTYPE VECTYPE INN JNN FNN NT VT PT LT-2 CONSTTYPE LANETYPE AT_1 AT_2 HT_1 HT_2 DT JT EXTERNTYPE GT-2 MT TT TV TV_1 TU_1 TV'-2 HT RT T ZT FT CT QT AT TU'-2 LIM XT-2 MMT DT_1 ABSHEAPTYPE TYPEVAR DEFTYPE PNN VNN SX INN_1 INN_2 FNN_2 FNN_1 LNN SHAPE JNN_1 JNN_2 HALF ZERO-3 VALUE2 BLOCKTYPE REFTYPE-3 MEMARG NUMTYPE_1 NUMTYPE_2 VALUE3 VVUNOP-2 VVBINOP-2 VVTERNOP-2 VVTESTOP-2 ISHAPE BSHAPE ISHAPE_1 ISHAPE_2 SHAPE_1 SHAPE_2 FRAME C-2 REFTYPE_1 REFTYPE_2 NUMLIT UNOP-2 BINOP-2 TESTOP-2 RELOP-2 CVTOP-2 VUNOP-2 VBINOP-2 VTERNOP-2 VTESTOP-2 VRELOP-2 VSHIFTOP-2 VSWIZZLOP-2 VEXTUNOP-2 VEXTBINOP-2 VEXTTERNOP-2 VCVTOP-2 DATAMODE ELEMMODE MODULE-2 INIT C LCT_1 DT_N DEFTYPE_1 DEFTYPE_2 INDEX-ELEMENT REL-ARG1 REL-ARG2 REL-ARG3 HEAPTYPE' HEAPTYPE_1 HEAPTYPE_2 REL-INPUT3 REL-INPUT2 CASE-PART2 X_1 X_2 X_3 X_4 F F_1 F_2 C_1-3 LNN_1 LNN_2 SX_1 SX_2 VALUE-20 VALUE-21 STORE-2 STATE EXTERNADDR S-2 Z TI MI FV TABLEINST TABLEINST' MEMINST MEMINST' EXN-3 RT' MODULEINST BT YY-2 C_2-3 NT_1 NT_2 SH SWIZZLOP INPUT-FIELD SH_1 SH_2 ENABLED-INPUT1 RT_2 RT_1 FI CATCH-2 AT' AO REL-OUTPUT1 ZT_2 SI-2 AI-2 BRIDGE-Z Z' C-5 Z-2 F' S' F'' Z'' TYPE-2 TAGINST S_1 S_2 GLOBALINST FUNCCODE FUNCINST DATAINST OK-3 ELEMTYPE ELEMINST S_3 S_4 S_5 S_6 S_7 MODULEINST_0 Z''' S''' S'''' T_1-2 ST-2 XT_1-2 SUBTYPE EXTERNTYPE_1-2 LOCAL-2 TAG-2 GLOBAL-2 MEM-2 TABLE-2 FUNC-2 DATA-2 ELEM-2 START-2 IMPORT-2 EXPORT-2 C_3-3 : SpectecTerminal .
 
   vars I-2 VALUE-2 EXP J_1 J_2 : Int .
 
   vars LEFT RIGHT : Record .
 
-  vars INSTR* INSTR*-2 VALUE-15 INSTR_1* INSTR_2* EXPR INSTR'* CASE-PART3 POSTFIX INSTR_0* REST FOCUS INSTR''* INSTR_D* INSTR_E* INSTR*-REST EXPR_G-2 EXPR_T-2 EXPR_F-2 : InstrList .
+  vars INSTR* INSTR*-2 VALUE-15 INSTR_1* INSTR_2* EXPR INSTR'* CASE-PART3 POSTFIX REST FOCUS INSTR-3 INSTR_0* INSTR''* INSTR_D* INSTR_E* INSTR*-REST EXPR_G-2 EXPR_T-2 EXPR_F-2 : InstrList .
 
   vars VAL* VALUE-22 VAL'* PREFIX STACK VAL_G* VAL*-REST : ValList .
 
   var OP : InstrProper .
+
+  var K-4 : Holes .
 
   eq valLift(nil) = nil .
 
@@ -7233,12 +7255,6 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-read-array-init-data-oob1] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) CONST(I32, # N-3)))), ARRAY.INIT-DATA(X-4, Y), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) | POSTFIX } .
 
-  rl [focus-Step-ctxt-label] : identifyFocus(Z, PREFIX, LABEL- N-3 { INSTR_0* } INSTR*, POSTFIX) => { PREFIX | (Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) | POSTFIX } .
-
-  rl [focus-Step-ctxt-handler] : identifyFocus(Z, PREFIX, HANDLER- N-3 { CATCH* } INSTR*, POSTFIX) => { PREFIX | (Z ; (HANDLER- N-3 { CATCH* } INSTR*)) | POSTFIX } .
-
-  rl [focus-Step-ctxt-frame] : identifyFocus(S-2 ; F, PREFIX, FRAME- N-3 { F' } INSTR*, POSTFIX) => { PREFIX | ((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) | POSTFIX } .
-
   crl [focus-Step-throw] : identifyFocus(Z, STACK, THROW(X-4), POSTFIX) => { PREFIX | (Z ; (VAL* THROW(X-4))) | POSTFIX }
     if FUNC T* -> nil := Expand(as-deftype(spectec-tag(Z, X-4) . 'TYPE))
       /\ N-3 := size(T*)
@@ -7290,12 +7306,98 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-Step-array-set-oob] : identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, # I) VAL)), ARRAY.SET(X-4), POSTFIX) => { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | POSTFIX } .
 
-  crl [heating-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
+  crl [split-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
     if (STACK (OP REST)) =/= OP
       /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
       /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
 
   eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
+
+  eq cool-all(C-5, none) = C-5 .
+
+  eq cool-all(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-4) = cool-all(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-4) .
+
+  ceq kstate(Z ; (PREFIX ((LABEL- N-3 { INSTR_0* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), hole(PREFIX, POSTFIX) K-4)
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ closed-Step-ctxt-label(INSTR*) = false .
+
+  ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4)
+    if closed-Step-ctxt-label(INSTR*) = false .
+
+  ceq kstate(Z' ; INSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4) = kstate(Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*), K-4)
+    if closed-Step-ctxt-label(INSTR'*) = true .
+
+  eq cool-all(Z' ; INSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4) = cool-all(Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*), K-4) .
+
+  eq closed-Step-ctxt-label(VAL*) = true .
+
+  eq closed-Step-ctxt-label(((VAL'* VAL*) BR(L)) INSTR*) = true .
+
+  eq closed-Step-ctxt-label((VAL* BR(L)) INSTR*) = true .
+
+  eq closed-Step-ctxt-label((VAL* RETURN) INSTR*) = true .
+
+  eq closed-Step-ctxt-label(TRAP) = true .
+
+  eq closed-Step-ctxt-label((VAL* RETURN-CALL-REF(YY-2)) INSTR*) = true .
+
+  eq closed-Step-ctxt-label(REF.EXN-ADDR(A) THROW-REF) = true .
+
+  eq closed-Step-ctxt-label(INSTR-3) = false [owise] .
+
+  ceq kstate(Z ; (PREFIX ((HANDLER- N-3 { CATCH* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (HANDLER- N-3 { CATCH* } INSTR*), hole(PREFIX, POSTFIX) K-4)
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ closed-Step-ctxt-handler(INSTR*) = false .
+
+  ceq kstate(Z ; (HANDLER- N-3 { CATCH* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-handler(CATCH*, N-3) K-4)
+    if closed-Step-ctxt-handler(INSTR*) = false .
+
+  ceq kstate(Z' ; INSTR'*, hole-Step-ctxt-handler(CATCH*, N-3) K-4) = kstate(Z' ; (HANDLER- N-3 { CATCH* } INSTR'*), K-4)
+    if closed-Step-ctxt-handler(INSTR'*) = true .
+
+  eq cool-all(Z' ; INSTR'*, hole-Step-ctxt-handler(CATCH*, N-3) K-4) = cool-all(Z' ; (HANDLER- N-3 { CATCH* } INSTR'*), K-4) .
+
+  eq closed-Step-ctxt-handler((VAL* BR(L)) INSTR*) = true .
+
+  eq closed-Step-ctxt-handler((VAL* RETURN) INSTR*) = true .
+
+  eq closed-Step-ctxt-handler(VAL*) = true .
+
+  eq closed-Step-ctxt-handler(TRAP) = true .
+
+  eq closed-Step-ctxt-handler((VAL* RETURN-CALL-REF(YY-2)) INSTR*) = true .
+
+  eq closed-Step-ctxt-handler(REF.EXN-ADDR(A) THROW-REF) = true .
+
+  eq closed-Step-ctxt-handler(INSTR-3) = false [owise] .
+
+  ceq kstate((S-2 ; F) ; (PREFIX ((FRAME- N-3 { F' } INSTR*) POSTFIX)), K-4) = kstate((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*), hole(PREFIX, POSTFIX) K-4)
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ closed-Step-ctxt-frame(INSTR*) = false .
+
+  ceq kstate((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*), K-4) = kstate((S-2 ; F') ; INSTR*, hole-Step-ctxt-frame(N-3, F) K-4)
+    if closed-Step-ctxt-frame(INSTR*) = false .
+
+  ceq kstate((S' ; F'') ; INSTR'*, hole-Step-ctxt-frame(N-3, F) K-4) = kstate((S' ; F) ; (FRAME- N-3 { F'' } INSTR'*), K-4)
+    if closed-Step-ctxt-frame(INSTR'*) = true .
+
+  eq cool-all((S' ; F'') ; INSTR'*, hole-Step-ctxt-frame(N-3, F) K-4) = cool-all((S' ; F) ; (FRAME- N-3 { F'' } INSTR'*), K-4) .
+
+  eq closed-Step-ctxt-frame(VAL*) = true .
+
+  eq closed-Step-ctxt-frame(((VAL'* VAL*) RETURN) INSTR*) = true .
+
+  eq closed-Step-ctxt-frame(TRAP) = true .
+
+  eq closed-Step-ctxt-frame(((VAL* (REF.NULL-ADDR)) RETURN-CALL-REF(YY-2)) INSTR*) = true .
+
+  eq closed-Step-ctxt-frame((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*) = true .
+
+  eq closed-Step-ctxt-frame(REF.EXN-ADDR(A) THROW-REF) = true .
+
+  eq closed-Step-ctxt-frame(INSTR-3) = false [owise] .
+
+  eq kstate(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-4) = kstate(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-4) [owise] .
 
   eq identifyPure(UNREACHABLE) = true .
 
@@ -7421,7 +7523,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyPure(VCONST(V128, C_1-2) VCVTOP(SH_2, SH_1, VCVTOP-2)) = true .
 
-  crl [heating-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure(Z)
+  crl [split-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure(Z)
     if identifyPure(INSTR*) .
 
   eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
@@ -7554,32 +7656,20 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyRead(Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (CONST(I32, # J) (CONST(I32, # N-3) ARRAY.INIT-DATA(X-4, Y)))))) = true .
 
-  crl [heating-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read(Z)
+  crl [split-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read(Z)
     if identifyRead(Z ; INSTR*) .
 
   eq INSTR'* ~> hole-Step-read(Z) = Z ; INSTR'* .
 
-  rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) .
-
-  eq (Z' ; INSTR'*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
-
-  rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N-3 { CATCH* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-handler(CATCH*, N-3) .
-
-  eq (Z' ; INSTR'*) ~> hole-Step-ctxt-handler(CATCH*, N-3) = Z' ; (HANDLER- N-3 { CATCH* } INSTR'*) .
-
-  rl [heating-Step-ctxt-frame] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame(N-3, F) .
-
-  eq ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
-
   rl Steps(Z ; INSTR*) => Z ; INSTR* .
 
-  rl [heating-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step .
+  rl [split-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step .
 
   eq (Z' ; INSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-Steps .
 
   eq (Z'' ; INSTR''*) ~> hole-Steps-trans-Steps = Z'' ; INSTR''* .
 
-  rl [heating-Eval-expr] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr .
+  rl [split-Eval-expr] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr .
 
   eq (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
 

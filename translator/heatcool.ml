@@ -1,13 +1,13 @@
-(* hint(k_heatcool): lowering of RuleD with execution premises.
+(* hint(rl_embedding): lowering of RuleD with execution premises.
  * Hintd supplies the validated relation shape; this module constructs the
- * identify-focus, heating, and cooling statements. *)
+ * identify-focus, split, and plug statements (rewriting logic embedding). *)
 
 open Util.Source
 open Il.Ast
 open Maude_il
 
 let unsupported at reason =
-  Util.Error.error at "translation" ("Unsupported: k_heatcool " ^ reason)
+  Util.Error.error at "translation" ("Unsupported: rl_embedding " ^ reason)
 
 let op ?(arrow = Total) ?(attrs = []) name domain codomain =
   OpDecl {name; domain; codomain; arrow; attrs}
@@ -576,15 +576,33 @@ let split_stack index (context : Hintd.context) prefix operands =
       ( sequence (stack :: trailing)
       , [EqCondition (MatchCond (sequence (prefix :: leading), stack))] )
 
-let translate_pattern cache index (context : Hintd.context)
-    (pattern : Hintd.focus_pattern) =
-  let name = helper index context in
+(* The focused input of a focus pattern: the state, the operands before its
+   trigger instruction, the trigger, and the instructions after it. *)
+type focused =
+  { conditions : rule_condition list
+  ; state : term
+  ; focus : term
+  ; rebuild : term -> term
+  ; operands : term list
+  ; trigger : term
+  ; trailing : term list
+  }
+
+let focused cache index (context : Hintd.context) (pattern : Hintd.focus_pattern) =
   let call, conditions = outer_call cache index pattern in
   let config = relation_input index context call in
   let state, focus, rebuild =
     split_config index context.Hintd.frame config pattern.rule.at
   in
   let operands, trigger, trailing = focus_parts index context pattern focus in
+  {conditions; state; focus; rebuild; operands; trigger; trailing}
+
+let translate_pattern cache index (context : Hintd.context)
+    (pattern : Hintd.focus_pattern) =
+  let name = helper index context in
+  let {conditions; state; focus; rebuild; operands; trigger; trailing} =
+    focused cache index context pattern
+  in
   let prefix = variable index "PREFIX" context.prefix_typ in
   let postfix = variable index "POSTFIX" context.postfix_typ in
   let stack, conditions =
@@ -650,7 +668,7 @@ let context_transitions index (context : Hintd.context) =
     Term.sequence_of_typ index context.focus_typ [stack; trigger; rest]
   in
   let input = rebuild sequence in
-  let heat_left = relation_call index context.source [input] in
+  let split_left = relation_call index context.source [input] in
   let target = App (name "{_|_|_}", [prefix; rebuild focus; postfix]) in
   let identify =
     RewriteCond
@@ -675,22 +693,22 @@ let context_transitions index (context : Hintd.context) =
   in
   let conditions =
     guards @ List.map (substitute_condition bindings) remaining
-    |> schedule_rule_conditions heat_left
+    |> schedule_rule_conditions split_left
   in
   let hole = App (name "hole", [prefix; postfix]) in
-  let heat_right =
+  let split_right =
     App (name "_~>_", [substitute bindings inner_call; hole])
   in
   let label =
-    Some ("heating-" ^ rule_name index context.source context.ordinal context.rule)
+    Some ("split-" ^ rule_name index context.source context.ordinal context.rule)
   in
-  let heating = Crl (label, heat_left, heat_right, conditions) in
-  let cool_left =
+  let split = Crl (label, split_left, split_right, conditions) in
+  let plug_left =
     App (name "_~>_", [substitute bindings inner_result; hole])
   in
   let result = substitute bindings lowered.right in
-  let cooling = Eq (cool_left, result, []) in
-  [heating; cooling]
+  let plug = Eq (plug_left, result, []) in
+  [split; plug]
 
 let unique_candidates candidates =
   let key statement =
@@ -712,7 +730,8 @@ let unique_candidates candidates =
       match statement with
       | Rl (_, left, right) -> Rl (None, left, right)
       | Crl (_, left, right, conditions) -> Crl (None, left, right, conditions)
-      | _ -> invalid_arg "expected a focus candidate"
+      | Eq _ as statement -> statement
+      | _ -> invalid_arg "expected a focus candidate or an equation"
     in
     map_statement_variables rename statement
   in
@@ -726,10 +745,10 @@ let unique_candidates candidates =
   in
   List.rev kept
 
-(* The heating guard of a k_heatcool rule whose inner relation computes a
+(* The split guard of an rl_embedding rule whose inner relation computes a
  * sequence: one rl per rule of the inner relation, matching that rule's
  * input pattern (TRANSLATION_MAP.md, section 2). Returns the statements and
- * the heating condition. The helper is named after the source rule. *)
+ * the split condition. The helper is named after the source rule. *)
 let identify_statements cache index (heated : Hintd.heatcool) target args =
   let RuleD (id, _, _, _, _) = heated.rule.it in
   let metadata = Prescan.sort_metadata index in
@@ -752,7 +771,7 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
       (List.nth relation.Hintd.rules candidate.ordinal)
   in
   (* identifyI(ins) = true for an input that some inner rule matches; on
-     any other input it stays unreduced, so the heating condition fails. *)
+     any other input it stays unreduced, so the split condition fails. *)
   let equations = candidates |> List.map (fun (candidate : Reld.execution_rule) ->
     match candidate.left with
     | App (_, inputs) ->
@@ -794,7 +813,7 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
             fail "rewrite-backed expression requires a separate hint contract";
           None
       | ElsePr | IterPr _ | NegPr _ ->
-          fail "unsupported premise under k_heatcool")
+          fail "unsupported premise under rl_embedding")
   in
   let body =
     Reld.lower_rule_body ~head:(Prescan.rel_name index source.id)
@@ -833,11 +852,11 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
     | [], [] ->
         if initial then fail "hint has no execution condition";
         if not (variables_bound bound body.right) then
-          fail "cooling has an unbound output";
+          fail "plug has an unbound output";
         [equation left body.right guards]
     | RewriteCond (call, result) :: rest, (target, inner_sort, outputs) :: targets ->
         if not (variables_bound bound call) then
-          fail "RulePr input is not bound before heating";
+          fail "RulePr input is not bound before split";
         let needed = List.fold_left condition_variables
             (term_variables (term_variables [] body.right) result) rest in
         let captures = List.filter
@@ -861,7 +880,7 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
         let conditions = List.map (fun guard -> EqCondition guard) guards @ checks in
         let transition =
           if initial then
-            let label = Some ("heating-" ^ suffix) in
+            let label = Some ("split-" ^ suffix) in
             match conditions with
             | [] -> Rl (label, left, suspended)
             | _ -> Crl (label, left, suspended, conditions)
@@ -876,18 +895,256 @@ let heatcool_rule cache index (heated : Hintd.heatcool) =
   in
   resume true 1 body.left body.conditions executions
 
-(* The statements for the hint(k_heatcool) rules of one relation. *)
+(* hint(k_embedding): the K embedding of a context rule (K book, 5.4.6).
+ * The driver state kstate(c, K) holds the configuration c around the next
+ * redex and the list K of holes taken off it. For a rule
+ *   R: C[x] ~> C'[x']  -- R: x ~> x'
+ * whose conclusion input is one element E of the sequence context's sequence:
+ *   kstate(C[x], K) = kstate(x, hole-R(..) K)                  if closed-R(x) = false
+ *   kstate(x', hole-R(..) K) = kstate(C'[x'], K)               if closed-R(x') = true
+ *   kstate(z; PREFIX E POSTFIX, K) = kstate(z; E, hole(PREFIX, POSTFIX) K)
+ *                                    if the nonempty condition of the sequence context
+ *                                    /\ closed-R(x) = false
+ *   kstate(z; s, hole(PREFIX, POSTFIX) K) = kstate(z; PREFIX s POSTFIX, K)  [owise]
+ * cool-all(c, K) cools every hole: the configuration of the source relation
+ * that kstate(c, K) stands for.
+ * closed-R holds for the bodies that a focus pattern of the sequence context
+ * matches inside E: rules that consume E itself. Assumed (TRANSLATION.md): no
+ * step of R applies to such a body alone, so keeping E closed loses no step. *)
+let kembedding_fail (kept : Hintd.heatcool) reason =
+  Util.Error.error kept.rule.at "translation"
+    ("Unsupported: k_embedding RuleD " ^ kept.source.id.it ^ "/"
+     ^ (Hintd.rule_id kept.rule).it ^ ": " ^ reason)
+
+let kstate config holes = App ("kstate", [config; holes])
+
+let cool_all config holes = App ("cool-all", [config; holes])
+
+let holes hole rest = App ("_ _", [hole; rest])
+
+let make_config index (frame : Hintd.frame) state sequence =
+  let components =
+    if frame.Hintd.sequence_position = 0 then [sequence; state]
+    else [state; sequence]
+  in
+  App (Prescan.mixop_name index frame.mixop, components)
+
+(* One-way matching: the bindings of pattern variables that make pattern equal
+   to subject, if any. *)
+let rec matches bindings pattern subject =
+  match pattern, subject with
+  | Var variable, _ ->
+      begin match
+        List.find_opt (fun (bound, _) -> same_variable variable bound) bindings
+      with
+      | Some (_, previous) when Reld.same_term previous subject -> Some bindings
+      | Some _ -> None
+      | None -> Some ((variable, subject) :: bindings)
+      end
+  | Const left, Const right when left = right -> Some bindings
+  | App (left, left_args), App (right, right_args)
+    when left = right && List.length left_args = List.length right_args ->
+      List.fold_left2
+        (fun bindings pattern subject ->
+          Option.bind bindings (fun bindings -> matches bindings pattern subject))
+        (Some bindings) left_args right_args
+  | _ -> None
+
+(* A k_embedding rule R/r: C[x] ~> C'[x']  -- R: x ~> x', lowered and checked. *)
+type kept_rule =
+  { suffix : string                (* R-r, after the source rule *)
+  ; input : term                   (* C[x], the conclusion input configuration *)
+  ; rebuild : term -> term         (* C[x] with another sequence *)
+  ; ctor : name                    (* E, the one element of that sequence *)
+  ; arguments : term list
+  ; position : int                 (* the argument of E that is x *)
+  ; inner : term                   (* the premise input configuration *)
+  ; body : variable                (* x *)
+  ; result : term                  (* the premise output configuration *)
+  ; result_body : variable         (* x' *)
+  ; output : term                  (* C'[x'], the conclusion output configuration *)
+  ; captures : variable list       (* the variables the hole keeps *)
+  }
+
+let kept_rule index (context : Hintd.context) (kept : Hintd.heatcool) =
+  let fail = kembedding_fail kept in
+  let source = kept.source in
+  let lowered =
+    Reld.lower_rule_body ~head:(Prescan.rel_name index source.id)
+      index source.id source.params (execution_policy index source.id) kept.rule
+  in
+  let call, result =
+    match lowered.conditions with
+    | [RewriteCond (call, result)] -> call, result
+    | _ -> fail "the premise does not lower to one rewrite condition"
+  in
+  let split config = split_config index context.Hintd.frame config kept.rule.at in
+  let sequence_variable config what =
+    match split config with
+    | _, Var variable, _ -> variable
+    | _ -> fail ("the " ^ what ^ " is not a sequence variable")
+  in
+  let input = relation_input index context lowered.left in
+  let inner = relation_input index context call in
+  let _, sequence, rebuild = split input in
+  let representation = Prescan.sequence_representation index context.focus_typ in
+  let ctor, arguments =
+    match flatten representation.concat sequence with
+    | [App (ctor, arguments)] -> ctor, arguments
+    | _ -> fail "the conclusion input is not one sequence element"
+  in
+  let body = sequence_variable inner "premise input" in
+  let position =
+    match
+      List.mapi (fun position argument -> position, argument) arguments
+      |> List.filter (fun (_, argument) -> Reld.same_term argument (Var body))
+    with
+    | [(position, _)] -> position
+    | _ -> fail "the stepped sequence is not one argument of the context element"
+  in
+  (* The context does not change while its inside steps: the premise input
+     put into the conclusion output gives back the conclusion input. *)
+  begin match matches [] result inner with
+  | Some bindings when Reld.same_term (substitute bindings lowered.right) input -> ()
+  | _ -> fail "the context changes when its inside steps"
+  end;
+  let needed = term_variables (term_variables [] lowered.right) result in
+  { suffix = rule_name index source kept.ordinal kept.rule
+  ; input; rebuild; ctor; arguments; position; inner; body; result
+  ; result_body = sequence_variable result "premise output"
+  ; output = lowered.right
+  ; captures =
+      term_variables [] lowered.left
+      |> List.filter (fun variable -> List.exists (same_variable variable) needed)
+  }
+
+(* The bodies x of E that a rule consuming E itself matches: those whose focus
+   pattern has E's constructor as its trigger. *)
+let closed_bodies cache index (context : Hintd.context) rule =
+  context.Hintd.patterns
+  |> List.filter_map (fun pattern ->
+       match (focused cache index context pattern).trigger with
+       | App (name, args)
+         when name = rule.ctor && List.length args = List.length rule.arguments ->
+           Some (List.nth args rule.position)
+       | _ -> None)
+
+(* What every k_embedding rule of one sequence context shares. *)
+type kept_context =
+  { holes_var : term               (* K *)
+  ; prefix : term
+  ; postfix : term
+  ; sequence : term list -> term
+  ; sequence_hole : term           (* hole(PREFIX, POSTFIX) of the sequence context *)
+  ; nonempty : eq_condition        (* its PREFIX =/= eps \/ POSTFIX =/= eps *)
+  }
+
+let kembedding_rule cache index context shared (kept : Hintd.heatcool) =
+  let rule = kept_rule index context kept in
+  let closed = "closed-" ^ rule.suffix in
+  let is_closed body value = EqCond (App (closed, [Var body]), Const value) in
+  let sort = "Hole-" ^ rule.suffix in
+  let hole =
+    holes (App ("hole-" ^ rule.suffix, List.map (fun v -> Var v) rule.captures))
+      shared.holes_var
+  in
+  let element = App (rule.ctor, rule.arguments) in
+  let surrounded =
+    rule.rebuild (shared.sequence [shared.prefix; element; shared.postfix])
+  in
+  let bodies =
+    match closed_bodies cache index context rule with
+    | [] -> kembedding_fail kept "no rule consumes the context element"
+    | bodies -> bodies
+  in
+  [ SortDecl sort
+  ; SubsortDecl (sort, "Holes")
+  ; op ~attrs:[Ctor] ("hole-" ^ rule.suffix)
+      (List.map (fun variable -> variable.sort) rule.captures) sort
+  ; op closed [rule.body.sort] "Bool"
+  ; Ceq (kstate surrounded shared.holes_var,
+         kstate rule.input (holes shared.sequence_hole shared.holes_var),
+         [shared.nonempty; is_closed rule.body "false"], [])
+  ; Ceq (kstate rule.input shared.holes_var, kstate rule.inner hole,
+         [is_closed rule.body "false"], [])
+  ; Ceq (kstate rule.result hole, kstate rule.output shared.holes_var,
+         [is_closed rule.result_body "true"], [])
+  ; Eq (cool_all rule.result hole, cool_all rule.output shared.holes_var, [])
+  ]
+  @ unique_candidates
+      (List.map (fun body -> Eq (App (closed, [body]), Const "true", [])) bodies)
+  @ [ Eq (App (closed, [Var (generated_variable "INSTR" rule.body.sort)]),
+          Const "false", [Owise]) ]
+
+(* The declarations, the cool-all and [owise] instrs-cooling equations of the
+   sequence context, and the equations of each k_embedding rule. *)
+let kembedding_statements cache index (context : Hintd.context) kept =
+  let nonempty premise =
+    match premise.it with
+    | IfPr exp -> Hintd.nonempty_context context.prefix.it context.postfix.it exp
+    | _ -> false
+  in
+  let RuleD (_, _, _, _, prems) = context.rule.it in
+  if not (List.exists nonempty prems) then
+    kembedding_fail (List.hd kept)
+      "the sequence context has no nonempty condition on its prefix and postfix";
+  let name = helper index context in
+  let empty typ = Const (Prescan.sequence_representation index typ).empty in
+  let prefix = variable index "PREFIX" context.prefix_typ in
+  let postfix = variable index "POSTFIX" context.postfix_typ in
+  let shared =
+    { holes_var = Var (generated_variable "K" "Holes")
+    ; prefix; postfix
+    ; sequence = Term.sequence_of_typ index context.focus_typ
+    ; sequence_hole = App (name "hole", [prefix; postfix])
+    ; nonempty =
+        BoolCond (App ("_or_",
+          [ App ("_=/=_", [prefix; empty context.prefix_typ])
+          ; App ("_=/=_", [postfix; empty context.postfix_typ]) ]))
+    }
+  in
+  let config_sort = Term.translate_sort index context.frame.config_typ in
+  let whole = Var (generated_variable "C" config_sort) in
+  let state = variable index "Z" context.frame.state_typ in
+  let config = make_config index context.frame state in
+  let inner = variable index "INSTR" context.focus_typ in
+  let around = holes shared.sequence_hole shared.holes_var in
+  let surrounded = config (shared.sequence [prefix; inner; postfix]) in
+  [ SortDecl "Holes"
+  ; SortDecl "KState"
+  ; SubsortDecl (name "Hole", "Holes")
+  ; op ~attrs:[Ctor] "none" [] "Holes"
+  ; op ~attrs:[Ctor; Assoc; Id (Const "none")] "__" ["Holes"; "Holes"] "Holes"
+  ; op ~attrs:[Ctor; Frozen [1; 2]] "kstate" [config_sort; "Holes"] "KState"
+  ; op "cool-all" [config_sort; "Holes"] config_sort
+  ; Eq (cool_all whole (Const "none"), whole, [])
+  ; Eq (cool_all (config inner) around, cool_all surrounded shared.holes_var, [])
+  ]
+  @ List.concat_map (kembedding_rule cache index context shared) kept
+  @ [Eq (kstate (config inner) around, kstate surrounded shared.holes_var, [Owise])]
+
+(* The statements for the hint(rl_embedding) and hint(k_embedding) rules of
+   one relation. *)
 let translate_relation index id =
   let cache = Hashtbl.create 4 in
-  let sequences = Prescan.contexts index
+  let kept =
+    Prescan.kembedding index
+    |> List.filter (fun (kept : Hintd.heatcool) -> kept.source.id.it = id.it)
+  in
+  let contexts = Prescan.contexts index
   |> List.filter (fun (context : Hintd.context) -> context.source.id.it = id.it)
-  |> List.concat_map (fun context ->
+  in
+  let sequences = contexts |> List.concat_map (fun context ->
        declarations index context
        @ (context.Hintd.patterns
           |> List.map (translate_pattern cache index context)
           |> unique_candidates)
-       @ context_transitions index context)
+       @ context_transitions index context
+       @ (if kept = [] then [] else kembedding_statements cache index context kept))
   in
+  if kept <> [] && List.length contexts <> 1 then
+    kembedding_fail (List.hd kept)
+      "the relation needs exactly one rl_embedding sequence context";
   let nested = Prescan.heatcool index
     |> List.filter (fun (heated : Hintd.heatcool) ->
          heated.source.id.it = id.it

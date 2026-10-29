@@ -87,7 +87,7 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
 기록한다. PASS, STUCK, TIMEOUT을 구분한다.
 official suite 통과만으로 모든 프로그램의 의미 동등성이 증명되는 것은 아니다.
 
-모델체커의 초기화·실행 wrapper와 focus/heat/cool 상태를 source의 한 step과
+모델체커의 초기화·실행 wrapper와 focus/split/plug 중간 상태를 source의 한 step과
 동일시하지 않는다. 특정 속성을 source로 옮겨 주장하려면 상태 대응, 관측 지점,
 내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
 현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
@@ -309,7 +309,8 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 | `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
 | `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
 | `maude_array` (record 필드) | 단형 record 타입의 이 sequence 필드를 크기 + prelude `ARRAY`(기본값 0)로 저장한다. 필드 접근은 길이·원소·구간 읽기와 구간·전체 쓰기, 생성은 `0^n`·`s 0^n`·목록으로 제한한다. 다른 사용은 거부한다. 원소의 0은 저장하지 않으므로 원소 타입에 수 0이 있어야 한다. |
-| `k_heatcool` | 실행 RulePr를 heat/cool로 연결한다. source에서 hole의 저장 변수와 결과 복원을 추출하고 premise 순서를 유지한다. 목록 context는 기존 focus 식별 및 경계 조건을 보존한다. |
+| `rl_embedding` | 실행 RulePr를 rewriting logic embedding(K book §5.4.5)의 split/plug로 연결한다. source에서 hole의 저장 변수와 결과 복원을 추출하고 premise 순서를 유지한다. 목록 context는 기존 focus 식별 및 경계 조건을 보존한다. |
+| `k_embedding` | context rule을 K embedding(K book §5.4.6)의 heating/cooling equation으로 번역한다. context는 step 사이에 열린 채로 남고, 실행 driver가 `kstate(c, K)`를 다룬다. 적용 조건과 가정은 아래 [적용 범위](#rl_embedding과-k_embedding-적용-범위)에 있다. |
 | `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
 | `inverse $g` | 빠진 인자를 선언된 역함수 g로 구하고 pattern과 forward 결과를 재확인한다. 인자 순서·signature를 검사한다. |
@@ -413,14 +414,21 @@ total한 비교에만 적용한다. 부분 계산이 남을 수 있는 비교·�
 context의 내부 상태는 source 상태와 구분한다. 검색 결과 일치는 임의 LTL 속성의
 보존 증명이 아니며, 현재 경계는 [검증과 모델체킹의 경계](#검증과-모델체킹의-경계)에 기록한다.
 
-### k_heatcool 적용 범위
+### rl_embedding과 k_embedding 적용 범위
 
-인자 없는 `hint(k_heatcool)`로 사용한다(이전 이름: `maude_context`).
-`Step/pure`, `Step/read`, `Step/ctxt-instrs`, `Step/ctxt-label`,
-`Step/ctxt-handler`, `Step/ctxt-frame`, `Steps/trans`, `Eval_expr`에 적용한다.
-실제 source와 생성 결과는 아래 [8개 rule의 변환 예시](#k_heatcool-8개-rule의-변환-예시)에 있다.
+두 hint 모두 인자 없이 사용한다(`rl_embedding`의 이전 이름: `k_heatcool`, `maude_context`).
+같은 rule에 둘을 함께 붙이면 Unsupported다.
 
-hint는 실행 relation의 RuleD에 적용하며 직접적인 실행 RulePr가 하나 이상 필요하다.
+- `hint(rl_embedding)`: `Step/pure`, `Step/read`, `Step/ctxt-instrs`, `Steps/trans`, `Eval_expr`.
+  rewriting logic embedding(K book §5.4.5)이다. split은 rule, plug는 equation이고,
+  한 Step이 끝날 때마다 plug해서 닫힌 configuration으로 돌아온다.
+- `hint(k_embedding)`: `Step/ctxt-label`, `Step/ctxt-handler`, `Step/ctxt-frame`.
+  K embedding(K book §5.4.6)이다. heating과 cooling이 모두 equation이고, context는 안쪽이
+  여러 step을 도는 동안 열린 채로 남는다.
+
+실제 source와 생성 결과는 아래 [8개 rule의 변환 예시](#rl_embedding과-k_embedding-8개-rule의-변환-예시)에 있다.
+
+`rl_embedding`은 실행 relation의 RuleD에 적용하며 직접적인 실행 RulePr가 하나 이상 필요하다.
 실행 premise마다 이전 binding 중 결과 패턴·남은 조건·결론에 필요한 변수만 hole에 저장한다.
 일반 조건과 출력 패턴 검사는 해당 실행의 앞뒤 순서를 유지한다.
 sequence-result relation으로 연결하는 단일 premise에서는 대상 입력 패턴으로 식별 helper를 생성한다.
@@ -428,87 +436,116 @@ sequence-result relation으로 연결하는 단일 premise에서는 대상 입�
 생성자·relation의 Wasm 이름으로 번역을 선택하지 않는다.
 
 hinted rule의 ElsePr·IterPr·NegPr와 rewrite-backed expression은 현재 Unsupported다.
-함수 정의 절에 대한 heat/cool 확장은 이번 범위에 포함하지 않는다.
+함수 정의 절에 대한 확장은 이번 범위에 포함하지 않는다.
 요청 sort와 반환 sort는 구분하고, hole 인자에는 `[frozen (2)]`를 부여해 rule rewriting을 막는다.
 raw 요청의 실패 가지는 남을 수 있으므로 source의 공개 완료 결과와 구분한다.
 유한 실행 결과 검사만으로 임의 search/LTL 의미 보존을 주장하지 않는다.
 
-## k_heatcool: 8개 rule의 변환 예시
+`k_embedding`의 적용 조건은 다음과 같다. 맞지 않으면 진단과 함께 Unsupported다.
+
+- premise가 하나뿐이고, 그것이 같은 relation의 실행 premise다(`R: C[x] ~> C'[x']  -- R: x ~> x'`).
+- context가 안쪽 step 동안 바뀌지 않는다: 결론 출력에 premise 입력을 다시 넣으면 결론 입력이 된다
+  (`C'[x]`가 `C[x]`). frame처럼 상태 일부를 안쪽과 바꾸는 것은 허용한다.
+- 결론 입력의 sequence가 context 원소 하나 `E`이고, premise는 `E`의 인자인 sequence 변수 `x`를 실행한다.
+- 같은 relation에 `rl_embedding` sequence context(`val* instr* instr_1*`)가 정확히 하나 있고,
+  그 rule에 `val* =/= eps \/ instr_1* =/= eps` 조건이 있다.
+- `E`를 소비하는 rule이 하나 이상 있다(아래 closed body).
+
+생성 결과(`R`의 rule 이름을 `R-r`이라 하면):
+
+```maude
+kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K)
+  if _or_(PREFIX =/= eps, POSTFIX =/= eps) /\ closed-R-r(x) = false .     --- instrs heating
+kstate(C[x], K) = kstate(x, hole-R-r(..) K)  if closed-R-r(x) = false .   --- heating
+kstate(x', hole-R-r(..) K) = kstate(C'[x'], K)  if closed-R-r(x') = true .  --- cooling
+kstate(z ; s, hole(PREFIX, POSTFIX) K) = kstate(z ; PREFIX s POSTFIX, K) [owise] .  --- instrs cooling
+cool-all(c, K)                                                               --- 모든 hole을 다시 붙인 configuration
+```
+
+closed body는 sequence context의 focus pattern 중 trigger가 `E`의 constructor인 것에서
+`x` 자리의 패턴이다. 즉 `E` 자체를 소비하는 rule(label-vals, br-label, return-frame 등)의
+body 모양이며, Wasm 이름이 아니라 source rule에서 뽑는다. instrs cooling은 heating 조건이
+맞지 않을 때만 적용되므로 `[owise]`다.
+
+**가정.** closed body에는 같은 relation의 Step이 단독으로 적용되지 않는다고 가정한다.
+이 가정이 깨지면 K embedding은 그 body를 열지 않으므로 안쪽 step 가지를 잃는다.
+번역기는 이 가정을 검사하지 않는다. Wasm 3.0에서는 rule.maude의 해당 rule들과 대조해 확인했다
+(br/return/return_call_ref에는 context 밖 rule이 없고, trap-instrs와 throw_ref-instrs는 앞뒤에 다른
+명령이 있을 때만 적용된다).
+
+**상태 대응.** `cool-all(c, K)`가 source configuration이다. driver의 rule 한 번은 source Step 한 번이고,
+heating/cooling은 equation이라 상태를 만들지 않는다(K book Theorem 13, step-for-step correspondence).
+fib(5), fib(10)과 br/return/trap/예외/tail-call 프로그램에서 step마다 `cool-all`한 상태가
+rewriting logic embedding과 같음을 확인했다. 이는 유한 입력에 대한 확인이며 증명이 아니다.
+
+`Steps`와 `Eval_expr`는 driver 없이 `Step`을 직접 부른다. `Step`에는 이제 `k_embedding` context로
+들어가는 rule이 없으므로, 이 경로는 LABEL_/HANDLER_/FRAME_가 없는 식에만 맞다. 이들이 평가하는
+상수식에는 그런 명령이 없다.
+
+## rl_embedding과 k_embedding: 8개 rule의 변환 예시
 
 아래는 현재 source와 생성된 Maude 문장이다. 보조 선언과 식별 규칙 전체는 생략했다.
 
 ### 번역 계약과 구조
 
-`RuleD`의 실제 실행 `RulePr`를 식별하고, 기존 `Prem` 번역 결과를 사용한다. 실행 조건을 만나면 요청과 hole을 생성하고 남은 조건을 재귀적으로 번역한다. hole에는 이미 binding된 변수 중 내부 결과 패턴·나머지 조건·최종 결론에서 필요한 것만 저장한다. 모든 조건을 처리하면 원래 결론으로 cooling한다. 일반 조건을 다음 실행 premise 앞뒤로 넘기지 않는다.
+`RuleD`의 실제 실행 `RulePr`를 식별하고, 기존 `Prem` 번역 결과를 사용한다. 실행 조건을 만나면 요청과 hole을 생성하고 남은 조건을 재귀적으로 번역한다. hole에는 이미 binding된 변수 중 내부 결과 패턴·나머지 조건·최종 결론에서 필요한 것만 저장한다. 모든 조건을 처리하면 원래 결론으로 plug한다. 일반 조건을 다음 실행 premise 앞뒤로 넘기지 않는다.
 
 기존 prefix/hole/postfix context는 `identifyFocus` 경로를 유지한다. 생성자 context·relation 연결은 `reld.ml`의 조건 목록 재귀 처리로 처리한다. 별도 evaluator나 범용 premise 프레임워크를 추가하지 않는다. LABEL, FRAME 등의 이름으로 분기하지 않으며, 식별 helper와 hole 이름은 source rule에서 생성한다.
 
 `identifyPure`·`identifyRead`는 대상 relation의 입력 패턴에서 생성한다. 각각 `Bool` 연산자이고 입력 패턴마다 `= true` equation을 가지며, 실제 premise 검사는 Step-pure/Step-read 실행이 담당한다. 식별 과정에서 가능한 source 입력을 버리지 않는다. 목록 일부 선택은 기존 `identifyFocus`의 역할이다.
 
-실행 요청과 반환 결과는 sort로 구분한다. cooling은 반환 결과 패턴에만 적용된다. `Eval_expr`는 `VAL* : ValList`가 이 역할을 하므로 별도 typecheck를 삽입하지 않는다. `_~>_`의 hole 인자는 `[frozen (2)]`로 rule rewriting을 막는다. equation 정규화까지 금지한다는 뜻은 아니다.
+실행 요청과 반환 결과는 sort로 구분한다. plug는 반환 결과 패턴에만 적용된다. `Eval_expr`는 `VAL* : ValList`가 이 역할을 하므로 별도 typecheck를 삽입하지 않는다. `_~>_`의 hole 인자는 `[frozen (2)]`로 rule rewriting을 막는다. equation 정규화까지 금지한다는 뜻은 아니다.
 
-실패한 내부 요청 또는 Eval_expr의 비-value 중간 결과는 내부 정지 상태로 남을 수 있다. 기존 공개 driver의 `Step(C) => C2:SpectecTerminal` 조건은 완료 결과만 관측한다. raw 요청의 search/LTL을 source 상태의 search/LTL과 동일시하지 않는다. 유한 입력과 제한된 탐색 깊이의 결과 검사만으로 전체 의미 보존을 주장하지 않는다.
+실패한 내부 요청 또는 Eval_expr의 비-value 중간 결과는 내부 정지 상태로 남을 수 있다. 공개 driver의 `Step(C) => C2` 조건은 완료 결과만 관측한다. raw 요청의 search/LTL을 source 상태의 search/LTL과 동일시하지 않는다. 유한 입력과 제한된 탐색 깊이의 결과 검사만으로 전체 의미 보존을 주장하지 않는다.
 
-### 1. Step/pure
-
-#### SpecTec source
+### 1. Step/pure (rl_embedding)
 
 ```spectec
 rule Step/pure:
   z; instr*  ~>  z; instr'*
   -- Step_pure: instr* ~> instr'*
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
-#### 현재 heat/cool 출력 (실제 생성)
-
 ```maude
-crl [heating-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure-1(Z)
+crl [split-Step-pure] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure(Z)
     if identifyPure(INSTR*) .
 
-eq INSTR'* ~> hole-Step-pure-1(Z) = Z ; INSTR'* .
+eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
 ```
 
 `identifyPure(INSTR*)`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
 
-### 2. Step/read
-
-#### SpecTec source
+### 2. Step/read (rl_embedding)
 
 ```spectec
 rule Step/read:
   z; instr*  ~>  z; instr'*
   -- Step_read: z; instr* ~> instr'*
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
-#### 현재 heat/cool 출력 (실제 생성)
-
 ```maude
-crl [heating-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read-1(Z)
+crl [split-Step-read] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read(Z)
     if identifyRead(Z ; INSTR*) .
 
-eq INSTR'* ~> hole-Step-read-1(Z) = Z ; INSTR'* .
+eq INSTR'* ~> hole-Step-read(Z) = Z ; INSTR'* .
 ```
 
 `identifyRead(Z ; INSTR*)`로 입력 후보를 확인한다. 읽기 실행은 instruction 목록을 반환하므로 원래 상태 Z를 붙인다.
 
-### 3. Step/ctxt-instrs
-
-#### SpecTec source
+### 3. Step/ctxt-instrs (rl_embedding)
 
 ```spectec
 rule Step/ctxt-instrs:
   z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
   -- Step: z; instr* ~> z'; instr'*
   -- if val* =/= eps \/ instr_1* =/= eps
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
-#### 현재 heat/cool 출력 (실제 생성)
-
 ```maude
-crl [heating-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
+crl [split-Step-ctxt-instrs] : Step(Z ; (STACK (OP REST))) => Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
     if (STACK (OP REST)) =/= OP
       /\ identifyFocus(Z, STACK, OP, REST) => { PREFIX | (Z ; FOCUS) | POSTFIX }
       /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
@@ -517,116 +554,131 @@ eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 ```
 
 기존 focus 식별과 prefix/postfix 복원을 유지한다. source의 nonempty 조건도 기존 guard로 남는다.
+매 step 자르는 자리가 바뀌므로(앞 명령의 결과가 다음 명령의 operand) 열어 두지 않는다.
+`k_embedding` rule(ctxt-label/handler/frame)에는 focus pattern을 만들지 않는다.
 
-### 4. Step/ctxt-label
-
-#### SpecTec source
+### 4. Step/ctxt-label (k_embedding)
 
 ```spectec
 rule Step/ctxt-label:
   z; (LABEL_ n `{instr_0*} instr*)  ~>  z'; (LABEL_ n `{instr_0*} instr'*)
   -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
+  hint(k_embedding)
 ```
-
-#### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Step-ctxt-label] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) .
+ceq kstate(Z ; (PREFIX ((LABEL- N-3 { INSTR_0* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), hole(PREFIX, POSTFIX) K-4)
+    if _or_(PREFIX =/= eps, POSTFIX =/= eps)
+      /\ closed-Step-ctxt-label(INSTR*) = false .
 
-eq (Z' ; INSTR'*) ~> hole-Step-ctxt-label-1(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
+ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4)
+    if closed-Step-ctxt-label(INSTR*) = false .
+
+ceq kstate(Z' ; INSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4) = kstate(Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*), K-4)
+    if closed-Step-ctxt-label(INSTR'*) = true .
+
+eq cool-all(Z' ; INSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4) = cool-all(Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*), K-4) .
+
+eq closed-Step-ctxt-label(VAL*) = true .
+eq closed-Step-ctxt-label(((VAL'* VAL*) BR(L)) INSTR*) = true .
+eq closed-Step-ctxt-label((VAL* BR(L)) INSTR*) = true .
+eq closed-Step-ctxt-label((VAL* RETURN) INSTR*) = true .
+eq closed-Step-ctxt-label(TRAP) = true .
+eq closed-Step-ctxt-label((VAL* RETURN-CALL-REF(YY-2)) INSTR*) = true .
+eq closed-Step-ctxt-label(REF.EXN-ADDR(A) THROW-REF) = true .
+eq closed-Step-ctxt-label(INSTR-3) = false [owise] .
 ```
 
-N과 INSTR0를 저장한다. RESULT에 해당하는 INSTR'*는 내부 한 Step 뒤의 instruction 목록으로, 최종 값 목록일 필요가 없다.
+closed body는 label-vals, br-label-zero, br-label-succ, return-label, trap-label,
+return_call_ref-label, throw_ref-label의 body다.
 
-### 5. Step/ctxt-handler
-
-#### SpecTec source
+### 5. Step/ctxt-handler (k_embedding)
 
 ```spectec
 rule Step/ctxt-handler:
   z; (HANDLER_ n `{catch*} instr*) ~> z'; (HANDLER_ n `{catch*} instr'*)
   -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
+  hint(k_embedding)
 ```
 
-#### 현재 heat/cool 출력 (실제 생성)
+ctxt-label과 같은 모양이다(hole `hole-Step-ctxt-handler(CATCH*, N-3)`). closed body는 br-handler,
+return-handler, handler-vals, trap-handler, return_call_ref-handler, throw_ref-handler-*의 body다.
 
-```maude
-rl [heating-Step-ctxt-handler] : Step(Z ; (HANDLER- N-3 { CATCH* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-handler-1(CATCH*, N-3) .
-
-eq (Z' ; INSTR'*) ~> hole-Step-ctxt-handler-1(CATCH*, N-3) = Z' ; (HANDLER- N-3 { CATCH* } INSTR'*) .
-```
-
-N과 catch 목록을 저장하고, 갱신된 상태 및 instruction 목록으로 HANDLER를 복원한다.
-
-### 6. Step/ctxt-frame
-
-#### SpecTec source
+### 6. Step/ctxt-frame (k_embedding)
 
 ```spectec
 rule Step/ctxt-frame:
   s; f; (FRAME_ n `{f'} instr*)  ~>  s'; f; (FRAME_ n `{f''} instr'*)
   -- Step: s; f'; instr* ~> s'; f''; instr'*
-  hint(k_heatcool)
+  hint(k_embedding)
 ```
-
-#### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Step-ctxt-frame] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame-1(N-3, F) .
+ceq kstate((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*), K-4) = kstate((S-2 ; F') ; INSTR*, hole-Step-ctxt-frame(N-3, F) K-4)
+    if closed-Step-ctxt-frame(INSTR*) = false .
 
-eq ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame-1(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
+ceq kstate((S' ; F'') ; INSTR'*, hole-Step-ctxt-frame(N-3, F) K-4) = kstate((S' ; F) ; (FRAME- N-3 { F'' } INSTR'*), K-4)
+    if closed-Step-ctxt-frame(INSTR'*) = true .
 ```
 
-바깥 frame F는 유지한다. store S'와 내부 frame F''는 실행 결과를 사용한다.
+heating에서 안쪽 frame F'로 바꾸고 바깥 frame F를 hole에 둔다. cooling에서 store S'와 안쪽
+frame F''는 실행 결과를 쓴다. instrs heating과 closed body(frame-vals, return-frame, trap-frame,
+return_call_ref-frame-null/addr, throw_ref-frame)는 ctxt-label과 같은 방식으로 생성된다.
 
-### 7. Steps/trans
+### 공통 선언과 instrs cooling (k_embedding)
 
-#### SpecTec source
+```maude
+op none : -> Holes [ctor] .
+op __ : Holes Holes -> Holes [ctor assoc id: none] .
+op kstate : SpectecTerminal Holes -> KState [ctor frozen (1 2)] .
+op cool-all : SpectecTerminal Holes -> SpectecTerminal .
+
+eq cool-all(C-5, none) = C-5 .
+eq cool-all(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-4) = cool-all(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-4) .
+eq kstate(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-4) = kstate(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-4) [owise] .
+```
+
+실행 driver(`wasm2maude/*-runtime.maude`, harness)는 `kstate(C, K)`의 안쪽 `C`에 `Step(C) => C2`를
+적용하고 `K`는 그대로 넘긴다. 시작은 `kstate(C, none)`, 끝은 `kstate(z ; vals, none)`이다.
+
+### 7. Steps/trans (rl_embedding)
 
 ```spectec
 rule Steps/trans:
   z; instr*  ~>*  z''; instr''*
   -- Step: z; instr*  ~>  z'; instr'*
   -- Steps: z'; instr'*  ~>*  z''; instr''*
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
 
-#### 현재 heat/cool 출력 (실제 생성)
-
 ```maude
-rl [heating-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-1 .
+rl [split-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step .
 
-eq (Z' ; INSTR'*) ~> hole-Steps-trans-1 = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-2 .
+eq (Z' ; INSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-Steps .
 
-eq (Z'' ; INSTR''*) ~> hole-Steps-trans-2 = Z'' ; INSTR''* .
+eq (Z'' ; INSTR''*) ~> hole-Steps-trans-Steps = Z'' ; INSTR''* .
 
 rl Steps(Z ; INSTR*) => Z ; INSTR* .
 ```
 
 첫 Step의 결과를 다음 Steps에 전달한다. Steps/refl은 0회 실행을 보존하는 rule로 유지한다. 두 번째 hole은 원래 결론을 반환한다.
 
-### 8. Eval_expr
-
-#### SpecTec source
+### 8. Eval_expr (rl_embedding)
 
 ```spectec
 rule Eval_expr:
   z; instr*  ~>*  z'; val*
   -- Steps: z; instr*  ~>*  z'; val*
-  hint(k_heatcool)
+  hint(rl_embedding)
 ```
-
-#### 현재 heat/cool 출력 (실제 생성)
 
 ```maude
-rl [heating-Eval-expr-1] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr-1-1 .
+rl [split-Eval-expr] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr .
 
-eq (Z' ; VAL*) ~> hole-Eval-expr-1-1 = tuple(Z' seq(VAL*)) .
+eq (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
 ```
 
-VAL*의 sort는 ValList다. NOP/TRAP 등의 비-value 목록과 실행 중 요청은 이 cooling 패턴에 매치하지 않는다. tuple 모양도 원래 출력과 같다.
+VAL*의 sort는 ValList다. NOP/TRAP 등의 비-value 목록과 실행 중 요청은 이 plug 패턴에 매치하지 않는다. tuple 모양도 원래 출력과 같다.
 
 ### 지원 범위와 검증
 

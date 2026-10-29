@@ -971,8 +971,11 @@ let translate index id params _mixop typ rules =
       let rule head policy r =
         translate_rule ~head index id params policy r
       in
-      (* hint(k_heatcool) rules are translated by Heatcool. *)
-      let include_rule rule = not (Prescan.is_heatcool_rule index id rule) in
+      (* hint(rl_embedding) and hint(k_embedding) rules are translated by Heatcool. *)
+      let include_rule rule =
+        not (Prescan.is_heatcool_rule index id rule
+             || Prescan.is_kembedding_rule index id rule)
+      in
       match policy with
       | Prescan.Execution _ ->
           declarations
