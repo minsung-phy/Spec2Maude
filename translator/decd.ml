@@ -154,7 +154,7 @@ let translate_result prepared rhs =
    One head must be an instance of the other, the extra structure of an earlier
    head ground; the earlier conditions must be negatable. Otherwise
    Unsupported. *)
-let complement at (head, _, _) (earlier_head, earlier_conditions, _) =
+let complement at (head, _, _, _) (earlier_head, _, earlier_conditions, _) =
   let rec instance bindings pattern subject =
     match pattern, subject with
     | Var variable, _ ->
@@ -246,8 +246,8 @@ let complement at (head, _, _) (earlier_head, earlier_conditions, _) =
     (List.fold_left (Reld.bool_combine "_or_" "false") (Const "false")
        (differences @ negated))
 
-(* Ordinary DefD clause *)
-let translate_equation_clause prepared =
+(* Ordinary DefD clause: head, result, conditions, attributes. *)
+let equation_clause prepared =
   let index = prepared.index in
   match prepared.clause.it with
   | DefD (quants, args, rhs, prems) ->
@@ -279,7 +279,11 @@ let translate_equation_clause prepared =
         else []
       in
 
-      equation head.term right conditions attrs
+      head.term, right, conditions, attrs
+
+let translate_equation_clause prepared =
+  let head, right, conditions, attrs = equation_clause prepared in
+  equation head right conditions attrs
 
 let choice_helper index id
     (choice : Prescan.membership_choice) rhs =
@@ -414,60 +418,35 @@ let translate_rule_clause prepared =
 (* Equation clauses in source order, each with the complements of the earlier
    clauses that can match its input. An otherwise clause is [owise]. *)
 let ordered_clauses index clauses =
-  let parts = function
-    | Eq (left, _, attrs) -> left, [], attrs
-    | Ceq (left, _, conditions, attrs) -> left, conditions, attrs
-    | _ -> assert false
-  in
   let arguments = function App (_, args) -> args | _ -> [] in
   let source_arguments prepared =
     match prepared.clause.it with DefD (_, args, _, _) -> args
   in
   (* As for ElsePr predecessors (Reld): the source patterns and the
-     translated heads may both overlap. Arguments of types with disjoint
-     constructors (Inn, Fnn) do not: the source types exclude such inputs. *)
-  let constructors exp =
-    Reld.source_constructors ~exact:true index [] (Reld.source_pattern exp).note
-  in
-  let typed_overlap exp earlier_exp =
-    match constructors exp, constructors earlier_exp with
-    | Some mixops, Some earlier_mixops ->
-        List.exists (fun mixop -> List.exists (Il.Eq.eq_mixop mixop) earlier_mixops) mixops
-    | _ -> true
-  in
-  let overlap (prepared, (head, _, _)) (earlier, (earlier_head, _, _)) =
+     translated heads may both overlap. *)
+  let overlap (prepared, (head, _, _, _)) (earlier, (earlier_head, _, _, _)) =
     List.for_all2
       (fun arg earlier_arg ->
         match arg.it, earlier_arg.it with
-        | ExpA exp, ExpA earlier_exp ->
-            Reld.source_overlap index exp earlier_exp && typed_overlap exp earlier_exp
+        | ExpA exp, ExpA earlier_exp -> Reld.source_overlap index exp earlier_exp
         | _ -> true)
       (source_arguments prepared) (source_arguments earlier)
     && Reld.inputs_may_overlap index (arguments head) (arguments earlier_head)
   in
   let step (earlier, statements) prepared =
-    let statement = translate_equation_clause prepared in
-    let (head, _, attrs) as current = parts statement in
-    let statement =
-      if List.mem Owise attrs then statement
+    let (head, right, conditions, attrs) as current = equation_clause prepared in
+    let complements =
+      if List.mem Owise attrs then []
       else
-        match
-          earlier
-          |> List.filter (fun earlier -> overlap (prepared, current) earlier)
-          |> List.map (fun (_, parts) -> complement prepared.clause.at current parts)
-        with
-        | [] -> statement
-        | complements ->
-            let _, right, conditions, attrs =
-              match statement with
-              | Eq (left, right, attrs) -> left, right, [], attrs
-              | Ceq (left, right, conditions, attrs) -> left, right, conditions, attrs
-              | _ -> assert false
-            in
-            equation head right
-              (schedule_equation_conditions head (conditions @ complements)) attrs
+        earlier
+        |> List.filter (fun earlier -> overlap (prepared, current) earlier)
+        |> List.map (fun (_, parts) -> complement prepared.clause.at current parts)
     in
-    earlier @ [prepared, current], statements @ [statement]
+    let conditions =
+      if complements = [] then conditions
+      else schedule_equation_conditions head (conditions @ complements)
+    in
+    earlier @ [prepared, current], statements @ [equation head right conditions attrs]
   in
   snd (List.fold_left step ([], []) clauses)
 

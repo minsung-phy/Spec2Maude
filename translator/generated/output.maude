@@ -5695,12 +5695,10 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-vunop-(_X_(FNN, M-2), NEAREST, V) = fvunop-fnearest-(_X_(FNN, M-2), V) .
 
   ceq spectec-vunop-(_X_(JNN, M-2), ABS, V) = ivunop-iabs-(_X_(JNN, M-2), V)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(JNN, Fnn) =/= true .
+    if typecheck(JNN, Jnn) .
 
   ceq spectec-vunop-(_X_(JNN, M-2), spectec-NEG, V) = ivunop-ineg-(_X_(JNN, M-2), V)
-    if typecheck(JNN, Jnn)
-      /\ typecheck(JNN, Fnn) =/= true .
+    if typecheck(JNN, Jnn) .
 
   eq spectec-vunop-(_X_(JNN, M-2), POPCNT, V) = ivunop-ipopcnt-(_X_(JNN, M-2), V) .
 
@@ -5728,16 +5726,13 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-vbinop-(_X_(JNN, M-2), RELAXED-Q15MULRS, V_1, V_2) = ivbinopsxnd-irelaxed-q15mulr-(_X_(JNN, M-2), S, V_1, V_2) .
 
   ceq spectec-vbinop-(_X_(FNN, M-2), ADD, V_1, V_2) = fvbinop-fadd-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(FNN, Jnn) =/= true .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-vbinop-(_X_(FNN, M-2), spectec-SUB, V_1, V_2) = fvbinop-fsub-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(FNN, Jnn) =/= true .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-vbinop-(_X_(FNN, M-2), MUL, V_1, V_2) = fvbinop-fmul-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(FNN, Jnn) =/= true .
+    if typecheck(FNN, Fnn) .
 
   eq spectec-vbinop-(_X_(FNN, M-2), spectec-DIV, V_1, V_2) = fvbinop-fdiv-(_X_(FNN, M-2), V_1, V_2) .
 
@@ -5774,12 +5769,10 @@ mod SPEC2MAUDE-GENERATED is
   eq spectec-vrelop-(_X_(JNN, M-2), GE(SX), V_1, V_2) = ivrelopsx-ige-(_X_(JNN, M-2), SX, V_1, V_2) .
 
   ceq spectec-vrelop-(_X_(FNN, M-2), EQ, V_1, V_2) = fvrelop-feq-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(FNN, Jnn) =/= true .
+    if typecheck(FNN, Fnn) .
 
   ceq spectec-vrelop-(_X_(FNN, M-2), NE, V_1, V_2) = fvrelop-fne-(_X_(FNN, M-2), V_1, V_2)
-    if typecheck(FNN, Fnn)
-      /\ typecheck(FNN, Jnn) =/= true .
+    if typecheck(FNN, Fnn) .
 
   eq spectec-vrelop-(_X_(FNN, M-2), spectec-LT, V_1, V_2) = fvrelop-flt-(_X_(FNN, M-2), V_1, V_2) .
 

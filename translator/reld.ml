@@ -317,6 +317,14 @@ let rec source_overlap index left right =
       List.for_all (covered rights) lefts && List.for_all (covered lefts) rights
   | VarE _, CaseE (mixop, _) -> source_accepts index left.note mixop
   | CaseE (mixop, _), VarE _ -> source_accepts index right.note mixop
+  | VarE _, VarE _ ->
+      (* Types with disjoint constructors (Inn, Fnn) have no common value. *)
+      begin match source_constructors ~exact:true index [] left.note,
+                  source_constructors ~exact:true index [] right.note with
+      | Some lefts, Some rights ->
+          List.exists (fun mixop -> List.exists (Il.Eq.eq_mixop mixop) rights) lefts
+      | _ -> true
+      end
   | _ -> true
 
 and source_elements exp =
