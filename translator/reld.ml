@@ -697,12 +697,13 @@ let lower_execution_rule index id params policy
 (* A computed result is bound to a variable of the result sort, so the rule
    applies only where it is defined: a step whose result is undefined (e.g. a
    partial function outside its domain) is no step of the relation. *)
+let typecheck_guards rule =
+  List.filter
+    (function EqCondition (BoolCond (App ("typecheck", _))) -> true | _ -> false)
+    rule.guard_conditions
+
 let execution_statement result_sort rule =
-  let guards =
-    List.filter
-      (function EqCondition (BoolCond (App ("typecheck", _))) -> true | _ -> false)
-      rule.guard_conditions
-  in
+  let guards = typecheck_guards rule in
   let conditions = schedule_execution_conditions guards rule.left rule.conditions in
   let right, conditions =
     if rule.structural_right then rule.right, conditions

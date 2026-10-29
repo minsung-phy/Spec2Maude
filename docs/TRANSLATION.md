@@ -449,13 +449,35 @@ hinted rule의 ElsePr·IterPr·NegPr와 rewrite-backed expression은 현재 Unsu
   `val* =/= eps \/ instr* =/= eps`)를 함께 검사한다. 어떤 rule도 실행할 수 없는 입력(끝에 남은
   `TRAP` 하나 등)은 split하지 않고 `Step(c)`로 남는다. 한 focus에 pure·read·Step rule이 함께 맞지
   않아야 한다. Wasm 3.0에서 세 쪽 rule의 trigger 명령이 겹치지 않음을 생성 패턴으로 확인했다(증명 아님).
-- `identifyFocus`와 split이 equation이면 갈래가 여러 개일 때 하나만 고른다(equation은 confluent하지
-  않다). Wasm 3.0에서 갈래가 여러 개인 것은 `val*`·`instr*`를 흡수하는 trap-instrs와 throw_ref-instrs뿐이다.
-  예: `c1 c2 TRAP NOP`의 source 다음 상태는 5개(`TRAP`, `c1 TRAP`, `TRAP NOP`, …)지만 생성 코드는
-  하나만 만든다. 또 `c1 (REF.EXN_ADDR a) THROW_REF NOP`에는 ctxt-instrs split과 read split이 함께
-  맞는다. 이 갈래들은 store를 바꾸지 않고 같은 `TRAP`·`REF.EXN_ADDR a THROW_REF`로 모이므로,
-  **중간 상태를 줄이는 축소**이지 step 단위 대응이 아니다. 관측 명제가 명령 목록 모양이나 X(next)를
-  보지 않으면 결과가 같다(stuttering). 근거: `WasmSuiteTest/spec2maude-results/20261029-focus-eq`.
+- 식별 helper는 `identifyFocus`와 같은 범위 결정 premise도 검사한다(`val^m`의 m을 정하는 block
+  타입 등). 없으면 `c1 c2 BLOCK`(값을 받지 않는 block)을 전체로 자르는 read split과 `BLOCK`만 자르는
+  focus split이 둘 다 맞아, 같은 항이 진행 가능한 상태와 멈춘 상태 둘과 같아진다.
+
+  ```maude
+  ceq identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) = true
+    if M-3 := size(VAL*) /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
+    /\ M-3 = size(T_1*) /\ N-3 := size(T_2*) .
+  ```
+- equation은 같음을 말하므로, 입력마다 자르는 방법이 하나여야 한다(confluence). focus pattern의
+  operand나 뒤쪽에 길이가 정해지지 않은 sequence(`val*`, 또는 rule의 다른 곳에 n이 없는 `val^n`)가
+  있으면 sequence context의 앞뒤와 겹쳐 자르는 방법이 여러 개이고, 각각 다른 source 다음 상태다.
+  예: trap-instrs(`val* TRAP instr* ~> TRAP`)로 `c1 c2 TRAP NOP`의 다음 상태는 5개
+  (`TRAP`, `TRAP NOP`, `c1 TRAP NOP`, `c1 TRAP`, `c1 c2 TRAP`)다. 이런 pattern은 focus·식별 equation을
+  만들지 않고, bridge를 거친 그 rule과 sequence context 안의 그 rule을 각각 rule 하나로 낸다
+  (`heatcool.ml:absorbed_rules`). rule은 매칭을 모두 쓰므로 다음 상태가 source와 같다.
+
+  ```maude
+  crl [Step-pure-trap-instrs] : Step(Z ; (VAL* (TRAP INSTR*))) => Z ; TRAP
+    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+  crl [Step-ctxt-instrs-trap-instrs] : Step(Z ; (PREFIX ((VAL* (TRAP INSTR*)) POSTFIX)))
+      => Z ; (PREFIX (TRAP POSTFIX))
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil) /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
+  ```
+
+  판단은 rule 모양으로만 하며, Wasm 3.0에서 해당되는 것은 trap-instrs와 throw_ref-instrs다.
+  `val^n`은 n이 rule의 다른 곳에도 나오면 길이가 정해진다고 본다(block의 블록 타입, struct.new의
+  필드 수 등; 번역기는 n이 그 값으로 정해지는지까지는 검사하지 않는다).
+  근거: `WasmSuiteTest/spec2maude-results/20261029-trap-rule`.
 - 모델체킹 상태의 configuration은 split된 요청을 담을 수 있다. configuration을 보는 명제는
   `cool-all(unheat(R), K)`로 읽어야 한다(현재 명제 `returned`는 `finished(...)`만 본다).
 - 실행 rule이 상태에 직접 적용되므로, 결과가 계산식인 실행 rule은 결과를 결과 sort 변수에 `:=`로

@@ -7074,10 +7074,6 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyFocus(BRIDGE-Z, PREFIX, HANDLER- N-3 { CATCH* } VAL*, POSTFIX) = { PREFIX | (BRIDGE-Z ; (HANDLER- N-3 { CATCH* } VAL*)) | POSTFIX } .
 
-  ceq identifyFocus(BRIDGE-Z, STACK, TRAP, INSTR* POSTFIX) = { PREFIX | (BRIDGE-Z ; (VAL* (TRAP INSTR*))) | POSTFIX }
-    if PREFIX VAL* := STACK
-      /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
-
   eq identifyFocus(BRIDGE-Z, PREFIX, LABEL- N-3 { INSTR'* } TRAP, POSTFIX) = { PREFIX | (BRIDGE-Z ; (LABEL- N-3 { INSTR'* } TRAP)) | POSTFIX } .
 
   eq identifyFocus(BRIDGE-Z, PREFIX, HANDLER- N-3 { CATCH* } TRAP, POSTFIX) = { PREFIX | (BRIDGE-Z ; (HANDLER- N-3 { CATCH* } TRAP)) | POSTFIX } .
@@ -7200,10 +7196,6 @@ mod SPEC2MAUDE-GENERATED is
   eq identifyFocus(Z, PREFIX, FRAME- K-3 { F } ((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*), POSTFIX) = { PREFIX | (Z ; (FRAME- K-3 { F } ((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*))) | POSTFIX } .
 
   eq identifyFocus(Z, PREFIX (REF.NULL-ADDR), THROW-REF, POSTFIX) = { PREFIX | (Z ; ((REF.NULL-ADDR) THROW-REF)) | POSTFIX } .
-
-  ceq identifyFocus(Z, STACK REF.EXN-ADDR(A), THROW-REF, INSTR* POSTFIX) = { PREFIX | (Z ; (VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*)))) | POSTFIX }
-    if PREFIX VAL* := STACK
-      /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
 
   eq identifyFocus(Z, PREFIX, LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF), POSTFIX) = { PREFIX | (Z ; (LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF))) | POSTFIX } .
 
@@ -7370,6 +7362,20 @@ mod SPEC2MAUDE-GENERATED is
 
   eq unheat(R-3 ~> hole(PREFIX, POSTFIX)) = unheat(R-3) ~> hole(PREFIX, POSTFIX) .
 
+  crl [Step-pure-trap-instrs] : Step(Z ; (VAL* (TRAP INSTR*))) => Z ; TRAP
+    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+
+  crl [Step-ctxt-instrs-trap-instrs] : Step(Z ; (PREFIX ((VAL* (TRAP INSTR*)) POSTFIX))) => Z ; (PREFIX (TRAP POSTFIX))
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
+
+  crl [Step-read-throw-ref-instrs] : Step(Z ; (VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*)))) => Z ; (REF.EXN-ADDR(A) THROW-REF)
+    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+
+  crl [Step-ctxt-instrs-throw-ref-instrs] : Step(Z ; (PREFIX ((VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*))) POSTFIX))) => Z ; (PREFIX ((REF.EXN-ADDR(A) THROW-REF) POSTFIX))
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
+
   eq cool-all(C-5, none) = C-5 .
 
   eq cool-all(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-4) = cool-all(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-4) .
@@ -7534,9 +7540,6 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyPure(HANDLER- N-3 { CATCH* } VAL*) = true .
 
-  ceq identifyPure(VAL* (TRAP INSTR*)) = true
-    if _or_(VAL* =/= nil, INSTR* =/= nil) .
-
   eq identifyPure(LABEL- N-3 { INSTR'* } TRAP) = true .
 
   eq identifyPure(HANDLER- N-3 { CATCH* } TRAP) = true .
@@ -7681,9 +7684,17 @@ mod SPEC2MAUDE-GENERATED is
 
   eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
 
-  eq identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) = true .
+  ceq identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) = true
+    if M-3 := size(VAL*)
+      /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 = size(T_1*)
+      /\ N-3 := size(T_2*) .
 
-  eq identifyRead(Z ; (VAL* LOOP(BT, INSTR*))) = true .
+  ceq identifyRead(Z ; (VAL* LOOP(BT, INSTR*))) = true
+    if M-3 := size(VAL*)
+      /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 = size(T_1*)
+      /\ N-3 := size(T_2*) .
 
   ceq identifyRead((S-2 ; F) ; (REF-2 BR-ON-CAST(L, RT_1, RT_2))) = true
     if typecheck(REF-2, ref)
@@ -7705,7 +7716,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq identifyRead(Z ; ((REF.NULL-ADDR) CALL-REF(YY-2))) = true .
 
-  eq identifyRead(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) = true .
+  ceq identifyRead(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) = true
+    if N-3 := size(VAL*)
+      /\ FI := spectec-funcinst(Z) [ A ]
+      /\ FUNC T_1* -> T_2* := Expand(FI . 'TYPE)
+      /\ N-3 = size(T_1*) .
 
   eq identifyRead(Z ; RETURN-CALL(X-4)) = true .
 
@@ -7718,9 +7733,6 @@ mod SPEC2MAUDE-GENERATED is
   eq identifyRead(Z ; (FRAME- K-3 { F } ((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*))) = true .
 
   eq identifyRead(Z ; ((REF.NULL-ADDR) THROW-REF)) = true .
-
-  ceq identifyRead(Z ; (VAL* (REF.EXN-ADDR(A) (THROW-REF INSTR*)))) = true
-    if _or_(VAL* =/= nil, INSTR* =/= nil) .
 
   eq identifyRead(Z ; (LABEL- N-3 { INSTR'* } (REF.EXN-ADDR(A) THROW-REF))) = true .
 
@@ -7744,7 +7756,11 @@ mod SPEC2MAUDE-GENERATED is
       /\ Step-read-throw-ref-handler-catch-all-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false
       /\ Step-read-throw-ref-handler-catch-all-ref-enabled(Z ; (HANDLER- N-3 { (CATCH-2 CATCH'*) } (REF.EXN-ADDR(A) THROW-REF))) = false .
 
-  eq identifyRead(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) = true .
+  ceq identifyRead(Z ; (VAL* TRY-TABLE(BT, CATCH*, INSTR*))) = true
+    if M-3 := size(VAL*)
+      /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
+      /\ M-3 = size(T_1*)
+      /\ N-3 := size(T_2*) .
 
   eq identifyRead(Z ; LOCAL.GET(X-4)) = true .
 

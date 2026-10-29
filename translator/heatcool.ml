@@ -64,19 +64,25 @@ let substitute_condition bindings = function
   | RewriteCond (left, right) ->
       RewriteCond (substitute bindings left, substitute bindings right)
 
-let freshen left conditions =
+(* Renames the selected variables to fresh BRIDGE- variables, the same
+   variable to the same one. *)
+let renaming selected =
   let variables = ref [] in
-  let fresh variable =
-    match
-      List.find_opt
-        (fun (source, _) -> same_variable variable source) !variables
-    with
-    | Some (_, target) -> target
-    | None ->
-        let target = generated_variable ("BRIDGE-" ^ variable.name) variable.sort in
-        variables := (variable, target) :: !variables;
-        target
-  in
+  fun variable ->
+    if not (selected variable) then variable
+    else
+      match
+        List.find_opt
+          (fun (source, _) -> same_variable variable source) !variables
+      with
+      | Some (_, target) -> target
+      | None ->
+          let target = generated_variable ("BRIDGE-" ^ variable.name) variable.sort in
+          variables := (variable, target) :: !variables;
+          target
+
+let freshen left conditions =
+  let fresh = renaming (fun _ -> true) in
   ( map_term_variables fresh left
   , List.map (map_rule_condition_variables fresh) conditions
   )
@@ -243,12 +249,10 @@ let project_focus_premise index needed premise =
    named by the bridge (deferred) is always dropped, since it is the step
    that the focus will take.
 
-   For a ~> relation identifyFocus and the splits are equations and commit to
-   one choice. Where a rule absorbs val* or instr* (trap-instrs,
-   throw_ref-instrs), one input has several source successors; the choice
-   keeps one of them, and all of them converge, without a store change, to
-   the same configuration. This is a reduction of intermediate states, not a
-   one-step correspondence (TRANSLATION.md, k_heatcool). *)
+   For a ~> relation identifyFocus and the splits are equations, so every
+   input must split in exactly one way. A pattern whose extent is not fixed
+   (unbounded_extent) splits in several ways and is a rule instead
+   (absorbed_rules). *)
 
 type focus_dependency =
   { premise : prem
@@ -743,6 +747,145 @@ let context_transitions index (context : Hintd.context) =
   in
   [split; plug] @ unheat
 
+(* The extent of a focus pattern is not fixed when an operand or trailing part
+   is a sequence whose length no other part of the rule determines (val*, or
+   val^n with n nowhere else). It overlaps the prefix or postfix of the
+   sequence context, so an input splits in several ways, each a different
+   source successor: by trap-instrs (val* TRAP instr* ~> TRAP), a b TRAP
+   steps to TRAP and to a TRAP. An equation would keep one of them. *)
+let unbounded_extent (pattern : Hintd.focus_pattern) =
+  let occurrences name =
+    let count = ref 0 in
+    let module Visitor = Il.Iter.Make (struct
+      include Il.Iter.Skip
+      let visit_exp exp =
+        match exp.it with
+        | VarE id when id.it = name -> incr count
+        | _ -> ()
+    end)
+    in
+    Visitor.rule pattern.rule;
+    !count
+  in
+  let unbounded exp =
+    let exp = Hintd.strip_subtype exp in
+    match exp.it, exp.note.it with
+    | IterE (_, ((Opt | List | List1), _)), _
+    | VarE _, IterT (_, (Opt | List | List1)) -> true
+    | IterE (_, (ListN (count, _), _)), _ ->
+        Il.Free.Set.exists (fun name -> occurrences name < 2) (Prem.variables count)
+    | _ -> false
+  in
+  List.exists unbounded (pattern.operands @ pattern.trailing)
+
+let absorbed (context : Hintd.context) pattern =
+  heats_by_equation context.source && unbounded_extent pattern
+
+(* The focus pattern of an inner relation's rule, with its context. *)
+let focus_pattern index rule =
+  Prescan.contexts index |> List.find_map (fun (context : Hintd.context) ->
+    context.patterns
+    |> List.find_opt (fun (pattern : Hintd.focus_pattern) -> pattern.rule == rule)
+    |> Option.map (fun pattern -> context, pattern))
+
+let is_absorbed index rule =
+  match focus_pattern index rule with
+  | Some (context, pattern) -> absorbed context pattern
+  | None -> false
+
+(* A lowered execution rule as left, right, and conditions. *)
+let rule_parts (rule : Reld.execution_rule) =
+  rule.left, rule.right, Reld.typecheck_guards rule @ rule.conditions
+
+(* The outer rule with its execution premise on the inner rule's relation
+   replaced by the inner rule: the premise's call is unified with the inner
+   left side and its result with the inner right side, and the inner
+   conditions take the premise's place. Outer variables that also occur in
+   the inner rule are renamed first. *)
+let inline at (outer_left, outer_right, outer_conditions)
+    (inner_left, inner_right, inner_conditions) =
+  let inner_variables =
+    List.fold_left condition_variables
+      (term_variables (term_variables [] inner_left) inner_right)
+      inner_conditions
+  in
+  let rename =
+    renaming (fun variable -> List.exists (same_variable variable) inner_variables)
+  in
+  let outer_left = map_term_variables rename outer_left in
+  let outer_right = map_term_variables rename outer_right in
+  let outer_conditions =
+    List.map (map_rule_condition_variables rename) outer_conditions
+  in
+  let target = call_name inner_left in
+  let rec split before = function
+    | RewriteCond (call, result) :: after when call_name call = target ->
+        List.rev before, call, result, after
+    | condition :: rest -> split (condition :: before) rest
+    | [] -> unsupported at "absorbed rule has no premise on the inner relation"
+  in
+  let before, call, result, after = split [] outer_conditions in
+  let bindings = unify at (unify at [] call inner_left) result inner_right in
+  ( substitute bindings outer_left
+  , substitute bindings outer_right
+  , List.map (substitute_condition bindings) (before @ inner_conditions @ after) )
+
+(* An absorbed pattern is one rule per source derivation: its rule through the
+   bridges (pure, read) to the context relation, and that inside the sequence
+   context. As rules, all splits are kept:
+     crl Step(Z ; VAL* TRAP INSTR* ) => Z ; TRAP if ... .
+     crl Step(Z ; PREFIX VAL* TRAP INSTR* POSTFIX) => Z ; PREFIX TRAP POSTFIX
+       if PREFIX =/= nil or POSTFIX =/= nil /\ ... .
+   Without a bridge the first is the source rule itself, translated as such. *)
+let absorbed_rules cache index (context : Hintd.context)
+    (pattern : Hintd.focus_pattern) =
+  let at = pattern.rule.at in
+  let lowered (source : Hintd.relation) ordinal at =
+    let rule = lowered_rule cache index source ordinal at in
+    if not rule.structural_right then
+      unsupported at "absorbed rule has a computed result";
+    rule_parts rule
+  in
+  let direct =
+    List.fold_left
+      (fun rule (bridge : Hintd.bridge) ->
+        inline at (lowered bridge.source bridge.ordinal bridge.rule.at) rule)
+      (lowered pattern.source pattern.ordinal at)
+      (List.rev pattern.bridges)
+  in
+  let policy = execution_policy index context.source.id in
+  let context_rule =
+    let rule =
+      Reld.lower_execution_rule index context.source.id
+        context.source.params policy [] context.ordinal context.rule
+    in
+    let generated name typ =
+      Var (generated_variable name (Term.translate_sort index typ))
+    in
+    let bindings =
+      [ Prescan.source_variable index context.prefix context.prefix_typ,
+        generated "PREFIX" context.prefix_typ
+      ; Prescan.source_variable index context.postfix context.postfix_typ,
+        generated "POSTFIX" context.postfix_typ
+      ]
+    in
+    let left, right, conditions = rule_parts rule in
+    ( substitute bindings left
+    , substitute bindings right
+    , List.map (substitute_condition bindings) conditions )
+  in
+  let statement label (left, right, conditions) =
+    match conditions with
+    | [] -> Rl (Some label, left, right)
+    | conditions ->
+        Crl (Some label, left, right, schedule_rule_conditions left conditions)
+  in
+  let inner = rule_name index pattern.source pattern.ordinal pattern.rule in
+  let outer = rule_name index context.source context.ordinal context.rule in
+  (if pattern.bridges = [] then [] else [statement inner direct])
+  @ [statement (outer ^ "-" ^ Prescan.sanitize (Hintd.rule_id pattern.rule).it)
+       (inline at context_rule direct)]
+
 let unique_candidates candidates =
   let key statement =
     let names = ref [] in
@@ -797,7 +940,7 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
   let domain = Param.translate_sorts index params
     @ List.map (Term.translate_sort index) input_types in
   (* Input patterns identify candidates. The original target rule checks its
-     premises once, when the suspended request executes. *)
+     other premises once, when the suspended request executes. *)
   (* Each rl is labeled after its inner rule, like the focus rules. *)
   let label (candidate : Reld.execution_rule) =
     "identify-" ^ rule_name index relation candidate.ordinal
@@ -817,12 +960,30 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
             (condition_variables [] condition)
       | RewriteCond _ -> false)
   in
+  (* An absorbed rule is a rule of its own (absorbed_rules), never split. *)
+  let candidates = candidates |> List.filter (fun (candidate : Reld.execution_rule) ->
+    not (is_absorbed index (List.nth relation.Hintd.rules candidate.ordinal)))
+  in
+  (* The split is an equation only if no other split applies to the same
+     input: the premises that fix the rule's extent (val^m by the block type)
+     are checked as in identifyFocus. Otherwise c1 c2 BLOCK, whose block takes
+     no value, is split here as a whole and by identifyFocus around BLOCK. *)
+  let boundary (candidate : Reld.execution_rule) =
+    match focus_pattern index (List.nth relation.Hintd.rules candidate.ordinal) with
+    | Some (_, pattern) -> snd (shaped_relation_call index pattern)
+    | None -> []
+  in
   let equations = candidates |> List.map (fun (candidate : Reld.execution_rule) ->
-    match candidate.left, input_guards candidate with
+    let guards = input_guards candidate in
+    let boundary = boundary candidate |> List.filter (fun condition ->
+      not (List.exists (Reld.same_condition condition) guards)) in
+    match candidate.left, guards @ boundary with
     | App (_, inputs), [] ->
         Rl (Some (label candidate), App (name, inputs), Const "true")
     | App (_, inputs), guards ->
-        Crl (Some (label candidate), App (name, inputs), Const "true", guards)
+        let left = App (name, inputs) in
+        Crl (Some (label candidate), left, Const "true",
+             schedule_rule_conditions left guards)
     | _ -> assert false)
     |> unique_candidates
     |> List.map (function
@@ -1201,11 +1362,15 @@ let translate_relation index id =
   |> List.filter (fun (context : Hintd.context) -> context.source.id.it = id.it)
   in
   let sequences = contexts |> List.concat_map (fun context ->
+       let absorbed, patterns =
+         List.partition (absorbed context) context.Hintd.patterns
+       in
        declarations index context
-       @ (context.Hintd.patterns
+       @ (patterns
           |> List.map (translate_pattern cache index context)
           |> unique_candidates)
        @ context_transitions index context
+       @ List.concat_map (absorbed_rules cache index context) absorbed
        @ (if kept = [] then [] else kembedding_statements cache index context kept))
   in
   if kept <> [] && List.length contexts <> 1 then
