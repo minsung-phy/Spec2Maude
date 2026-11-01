@@ -267,7 +267,6 @@ let order_sorts origins edges sorts =
   in
   order [] sorts
 
-let constructor_equal = Il.Eq.eq_mixop
 
 let proper_sorts_of hints annotated =
   hints
@@ -302,7 +301,7 @@ let rec constructors_of_name definitions seen name =
         |> List.concat_map (constructors_of_inst definitions (name :: seen))
         |> List.fold_left
              (fun constructors constructor ->
-               add_unique constructor_equal constructor constructors)
+               add_unique Il.Eq.eq_mixop constructor constructors)
              []
 
 and constructors_of_inst definitions seen inst =
@@ -334,7 +333,7 @@ let constructor_owners_of definitions annotated =
              let rec add = function
                | [] -> [constructor, [owner]]
                | (constructor', owners') :: entries
-                 when constructor_equal constructor constructor' ->
+                 when Il.Eq.eq_mixop constructor constructor' ->
                    (constructor', add_unique String.equal owner owners') :: entries
                | entry :: entries -> entry :: add entries
              in
@@ -380,7 +379,7 @@ let constructor_result_sort metadata constructor =
   let owners =
     metadata.owners
     |> List.find_opt (fun (constructor', _) ->
-         constructor_equal constructor constructor')
+         Il.Eq.eq_mixop constructor constructor')
     |> Option.map snd
     |> Option.value ~default:[]
   in
@@ -693,25 +692,18 @@ let find_rule (relation : relation) id at =
   |> List.filter (fun (_, rule) -> (rule_id rule).it = id.it)
   |> unique at "refers to an unknown rule" "refers to an ambiguous rule"
 
-let components mixop exp =
-  match Xl.Mixop.arity mixop, exp.it with
-  | 0, TupE [] -> []
-  | 1, _ -> [exp]
-  | arity, TupE exps when List.length exps = arity -> exps
-  | _ -> unsupported exp.at "rule head does not match its relation"
-
-let rec take at count taken = function
-  | rest when count = 0 -> List.rev taken, rest
-  | exp :: exps -> take at (count - 1) (exp :: taken) exps
-  | [] -> unsupported at "execution input arity exceeds its rule head"
-
 let relation_inputs execution_input_count relation mixop head at =
   let input_count =
     match execution_input_count relation.id.it with
     | Some count -> count
     | None -> unsupported at "refers to a non-execution relation"
   in
-  take at input_count [] (components mixop head) |> fst
+  match Mixop.components mixop head with
+  | None -> unsupported head.at "rule head does not match its relation"
+  | Some exps ->
+      match Mixop.split input_count exps with
+      | Some (inputs, _) -> inputs
+      | None -> unsupported at "execution input arity exceeds its rule head"
 
 let quant_type quants name at =
   quants

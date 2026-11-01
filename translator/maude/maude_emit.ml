@@ -107,17 +107,11 @@ let emit_op_attr = function
   | Assoc ->
       "assoc"
 
-  | Comm ->
-      "comm"
-
   | Ditto ->
       "ditto"
 
   | Id term ->
       "id: " ^ emit_term term
-
-  | Prec precedence ->
-      "prec " ^ string_of_int precedence
 
   | Frozen positions ->
       let positions =
@@ -167,9 +161,6 @@ let emit_eq_condition = function
 
   | MatchCond (pattern, subject) ->
       emit_term pattern ^ " := " ^ emit_term subject
-
-  | MembershipCond (term, sort) ->
-      emit_term term ^ " : " ^ sort
 
   | BoolCond term ->
       emit_term term
@@ -237,18 +228,6 @@ let rec emit_statement = function
   | OpDecl decl ->
       emit_op_decl decl
 
-  | Mb (term, sort) ->
-      "mb " ^ emit_term term ^ " : " ^ sort ^ " ."
-
-  | Cmb (term, sort, []) ->
-      emit_statement (Mb (term, sort))
-
-  | Cmb (term, sort, conditions) ->
-      "cmb " ^ emit_term term ^ " : " ^ sort
-      ^ "\n  if "
-      ^ emit_conditions emit_eq_condition conditions
-      ^ " ."
-
   | Eq (left, right, attrs) ->
       "eq " ^ emit_term left
       ^ " = " ^ emit_term right
@@ -290,41 +269,13 @@ let rec emit_statement = function
 
 (* Module expressions and imports *)
 
-let emit_renaming = function
-  | SortRenaming (source, target) ->
-      "sort " ^ source ^ " to " ^ target
-
-  | OpRenaming (source, target) ->
-      "op " ^ source ^ " to " ^ target
-
-let rec emit_module_expr = function
+let emit_module_expr = function
   | ModuleName name ->
       name
-
-  | ModuleInstantiation (name, arguments) ->
-      name ^ "{" ^ join ", " arguments ^ "}"
-
-  | ModuleRenaming (module_expr, []) ->
-      emit_module_expr module_expr
-
-  | ModuleRenaming (module_expr, renamings) ->
-      let renamings =
-        renamings
-        |> List.map emit_renaming
-        |> join ",\n"
-        |> indent
-      in
-      emit_module_expr module_expr ^ " * (\n" ^ renamings ^ "\n)"
 
 let emit_import = function
   | Protecting module_expr ->
       "protecting " ^ emit_module_expr module_expr ^ " ."
-
-  | Including module_expr ->
-      "including " ^ emit_module_expr module_expr ^ " ."
-
-  | Extending module_expr ->
-      "extending " ^ emit_module_expr module_expr ^ " ."
 
 
 (* Statement lists *)
@@ -370,35 +321,10 @@ let emit_module (modul : modul) =
     ^ closing
 
 
-(* Views and top-level units *)
-
-let emit_view_mapping = function
-  | SortMapping (source, target) ->
-      "sort " ^ source ^ " to " ^ target ^ " ."
-
-  | OpMapping (source, target) ->
-      "op " ^ source ^ " to " ^ target ^ " ."
-
-let emit_view (view : view) =
-  let mappings =
-    view.mappings
-    |> List.map emit_view_mapping
-    |> join "\n"
-    |> indent
-  in
-  let opening =
-    "view " ^ view.name
-    ^ " from " ^ emit_module_expr view.source
-    ^ " to " ^ emit_module_expr view.target
-    ^ " is"
-  in
-  if mappings = "" then opening ^ "\nendv"
-  else opening ^ "\n" ^ mappings ^ "\nendv"
+(* Top-level units *)
 
 let emit_top_level = function
   | Module modul -> emit_module modul
-  | View view -> emit_view view
-  | Load path -> "load " ^ path
 
 let emit_top_levels top_levels =
   top_levels

@@ -501,19 +501,14 @@ let bind_outputs index bound outputs subjects conditions error =
   bind_pattern_parts index bound outputs subjects conditions error
 
 let components mixop exp =
-  match Xl.Mixop.arity mixop, exp.it with
-  | 0, TupE [] -> []
-  | 1, _ -> [exp]
-  | arity, TupE exps when List.length exps = arity -> exps
-  | _ -> invalid_arg "RulePr expression does not match its mixop"
+  match Mixop.components mixop exp with
+  | Some exps -> exps
+  | None -> invalid_arg "RulePr expression does not match its mixop"
 
 let split count items =
-  let rec aux count left = function
-    | right when count = 0 -> List.rev left, right
-    | item :: items -> aux (count - 1) (item :: left) items
-    | [] -> invalid_arg "malformed execution RulePr"
-  in
-  aux count [] items
+  match Mixop.split count items with
+  | Some parts -> parts
+  | None -> invalid_arg "malformed execution RulePr"
 
 let relation_call index id args exps =
   App
@@ -681,7 +676,7 @@ let translate_inverse index bound equality id args result =
       Ready
         (make binding.bound
            (binding.conditions
-            @ [EqCondition (BoolCond (Term.translate_bool index equality))]))
+            @ [EqCondition (BoolCond (Term.translate_native index equality))]))
 
 let translate_rewrite_call index bound call result =
   if not (known bound call) then Waiting
@@ -805,7 +800,7 @@ let rec translate_ifpr index bind_membership bound exp =
       Ready
         (bind_pattern index bound pattern (Term.translate_exp index subject) error)
   | Check ->
-      Ready (make bound [EqCondition (BoolCond (Term.translate_bool index exp))])
+      Ready (make bound [EqCondition (BoolCond (Term.translate_native index exp))])
   | Wait ->
       Waiting
 

@@ -45,3 +45,19 @@ let marker_positions markers mixop =
               Some (index + if Xl.Atom.is_sub atom then 1 else 0)
             else None))
   |> List.concat
+
+(* The argument expressions of a relation or constructor head: one per hole. *)
+let components mixop (exp : Il.Ast.exp) =
+  match Xl.Mixop.arity mixop, exp.it with
+  | 0, Il.Ast.TupE [] -> Some []
+  | 1, _ -> Some [exp]
+  | arity, Il.Ast.TupE exps when List.length exps = arity -> Some exps
+  | _ -> None
+
+(* The first [count] items and the rest. *)
+let rec split count items =
+  match count, items with
+  | 0, items -> Some ([], items)
+  | count, item :: items ->
+      Option.map (fun (left, right) -> item :: left, right) (split (count - 1) items)
+  | _, [] -> None

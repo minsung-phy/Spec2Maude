@@ -2,10 +2,6 @@ open Util.Source
 open Il.Ast
 open Maude_il
 
-let equation left right = function
-  | [] -> Eq (left, right, [])
-  | conditions -> Ceq (left, right, conditions, [])
-
 let target_names params args =
   if args = [] then
     Il.Free.(bound_params params).varid |> Il.Free.Set.elements
@@ -244,8 +240,6 @@ let guard_statements conditions statements =
     | Eq (left, right, attrs) -> Ceq (left, right, conditions, attrs)
     | Ceq (left, right, guards, attrs) ->
         Ceq (left, right, conditions @ guards, attrs)
-    | Mb (term, sort) -> Cmb (term, sort, conditions)
-    | Cmb (term, sort, guards) -> Cmb (term, sort, conditions @ guards)
     | statement -> statement
   in
   if conditions = [] then statements else List.map guard statements
@@ -259,39 +253,41 @@ let translate_deftyp index id target bound quants deftyp =
 let translate_inst index id params inst =
   match inst.it with
   | InstD (quants, args, deftyp) ->
-      let target, guards, bound = translate_target index id params args in
       (* An argument SubE pattern checks its variable against the coercion's
          source type, which repeats the quantifier's own membership
          (num_(Inn): addrtype and Inn). That check keeps its place but uses
          the quantifier's type, as written in the source. *)
       let proven = Decd.guarded_quants index quants args in
-      let proven_quants =
+      let quant_typ id =
+        List.find_map
+          (fun quant ->
+            match quant.it with
+            | ExpP (id', typ) when id'.it = id.it -> Some typ
+            | ExpP _ | TypP _ | DefP _ | GramP _ -> None)
+          quants
+      in
+      let as_quantified =
+        { Il.Walk.base_transformer with
+          transform_exp = (fun exp ->
+            match exp.it with
+            | SubE ({it = VarE id; _} as var, _, target)
+              when Il.Free.Set.mem id.it proven ->
+                begin match quant_typ id with
+                | Some typ -> {exp with it = SubE (var, typ, target)}
+                | None -> exp
+                end
+            | _ -> exp) }
+      in
+      let args = List.map (Il.Walk.transform_arg as_quantified) args in
+      let target, guards, bound = translate_target index id params args in
+      let quants =
         List.filter
           (fun quant ->
             match quant.it with
-            | ExpP (id, _) -> Il.Free.Set.mem id.it proven
-            | TypP _ | DefP _ | GramP _ -> false)
+            | ExpP (id, _) -> not (Il.Free.Set.mem id.it proven)
+            | TypP _ | DefP _ | GramP _ -> true)
           quants
       in
-      let checked_quant = function
-        | BoolCond (App ("typecheck", [(Var v | App ("#_", [Var v])); _])) ->
-            List.find_opt
-              (fun quant ->
-                match quant.it with
-                | ExpP (id, typ) -> (Prescan.source_variable index id typ).name = v.name
-                | TypP _ | DefP _ | GramP _ -> false)
-              proven_quants
-        | _ -> None
-      in
-      let guards =
-        List.concat_map
-          (fun guard ->
-            match checked_quant guard with
-            | Some quant -> Param.translate_eq_conditions index [quant]
-            | None -> [guard])
-          guards
-      in
-      let quants = List.filter (fun quant -> not (List.memq quant proven_quants)) quants in
       translate_deftyp index id target bound quants deftyp
       |> guard_statements guards
 

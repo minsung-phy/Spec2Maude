@@ -215,11 +215,10 @@ let rename_statement rename statement =
 (* The operator a statement declares or defines. *)
 let defined_name = function
   | OpDecl declaration -> Some declaration.name
-  | Mb (App (name, _), _) | Cmb (App (name, _), _, _)
   | Eq (App (name, _), _, _) | Ceq (App (name, _), _, _, _)
   | Rl (_, App (name, _), _) | Crl (_, App (name, _), _, _) -> Some name
   | SortDecl _ | SubsortDecl _ | VarDecl _
-  | Mb _ | Cmb _ | Eq _ | Ceq _ | Rl _ | Crl _ -> None
+  | Eq _ | Ceq _ | Rl _ | Crl _ -> None
 
 (* A helper's statements with its own name blanked, calls resolved, and the
  * variables of each statement numbered in order of occurrence. *)
@@ -538,14 +537,11 @@ let specialize_script script =
    * parameters and no call produces no copy. *)
   let rec place def =
     match def.it with
-    | DecD (id, _, _, _) when List.mem id.it higher_order ->
+    | DecD (id, params, result_typ, clauses) when List.mem id.it higher_order ->
         instances
         |> List.filter (fun instance -> instance.Decd.callee.it = id.it)
         |> List.map (fun specialization ->
-             match def.it with
-             | DecD (_, params, result_typ, clauses) ->
-                 Decd.specialize specialization id params result_typ clauses $ def.at
-             | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ -> assert false)
+             Decd.specialize specialization id params result_typ clauses $ def.at)
     | RecD defs -> [{def with it = RecD (List.concat_map place defs)}]
     | TypD _ | RelD _ | DecD _ | GramD _ | HintD _ -> [def]
   in
@@ -736,12 +732,17 @@ let translate_script script =
   let index = Prescan.scan script in
   (* Relations without a supported policy are omitted; a call to one is
      rejected later, but an unreferenced one would vanish silently. *)
-  begin match index.Prescan.unsupported_relations with
-  | [] -> ()
-  | relations ->
-      Printf.eprintf "[spec2maude] warning: relations not translated: %s\n"
-        (String.concat ", " (List.map fst relations))
-  end;
+  (* One line per reason, listing its relations in source order. *)
+  let relations = index.Prescan.unsupported_relations in
+  List.sort_uniq compare (List.map snd relations)
+  |> List.iter (fun reason ->
+       let names =
+         List.filter_map
+           (fun (name, reason') -> if reason' = reason then Some name else None)
+           relations
+       in
+       Printf.eprintf "[spec2maude] warning: relations not translated (%s): %s\n"
+         reason (String.concat ", " names));
   let sort_metadata = Prescan.sort_metadata index in
   let translated_definitions =
     List.concat_map (translate index) script

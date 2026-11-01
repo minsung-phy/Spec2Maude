@@ -73,6 +73,18 @@ shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 �
   def 파라미터, DecD 호출 밖의 `DefA`, TypD/RelD/GramD의 `DefP`, 고차 정의의
   `builtin`/`maude_kind`/`maude_rule`/`inverse` hint, 복사본 이름 충돌은
   `Unsupported`로 거부한다.
+- 함수 절은 위에서부터 순서대로 매칭한다(SpecTec 논문, `eval.ml`의 `reduce_exp_call`).
+  Maude equation은 순서가 없으므로, 앞 절과 겹칠 수 있는 절에는 그 앞 절이 맞지 않는다는
+  조건을 붙인다(`decd.ml:complement`). 예: `ceq inv-jsize(N) = inv-isize(N) if N =/= 8
+  /\ N =/= 16`. 겹침은 source pattern과 번역된 head로 판단하고, 생성자가 겹치지 않는
+  타입(`Inn`, `Fnn`)은 겹치지 않는다. 두 head 중 하나가 다른 쪽의 instance가 아니거나,
+  앞 head의 추가 구조가 ground가 아니거나, 앞 절 조건이 변수를 묶으면 `Unsupported`.
+  자기 조건이 이미 함의하는 부정이 붙을 수 있다(`$signed_`): 중복이지만 틀리지 않는다.
+  `ElsePr` 절은 `[owise]`이고 마지막 절이어야 한다(검사하지 않음).
+- 목록 alias(`resulttype = valtype*`, `expr = instr*`)의 typecheck는 원소별이다. 포장된
+  `seq(v)`는 alias 값 하나이고, 직접 equation은 포장되지 않은 원소 하나에만 적용한다
+  (`V =/= seq(unseq(V))`). 여러 원소는 backend의 원소별 equation이 검사한다. 세 equation은
+  어떤 항에서도 결과가 갈리지 않는다.
 - `#` 표현의 미지원 형태: 한 family 안에서 instance마다 같은 생성자의 인자가 native
   여부가 다르면 거부한다. 고차 정의를 대상으로 하는 다른 def의 `hint(inverse ...)`는
   검사하지 않는다. text 값의 연결은 목록 연결로 번역되며 현재 입력에는 없다.

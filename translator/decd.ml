@@ -30,11 +30,6 @@ let translate_request_header index id params result_typ =
       }
   ]
 
-let equation left right conditions attrs =
-  match conditions with
-  | [] -> Eq (left, right, attrs)
-  | _ -> Ceq (left, right, conditions, attrs)
-
 
 (* Variables determined by the head are bound by its term or conditions. *)
 let head_bound args =
@@ -115,9 +110,16 @@ let guarded_quants index quants args =
       | ExpP _ | TypP _ | DefP _ | GramP _ -> proven)
     Il.Free.Set.empty quants
 
+(* A clause that cannot be translated is Unsupported at that clause. *)
+let located id clause f =
+  try f () with Invalid_argument reason ->
+    Util.Error.error clause.at "translation"
+      ("Unsupported DecD " ^ id.it ^ " clause: " ^ reason)
+
 let prepare_clauses index id params clauses =
   List.map
     (fun clause ->
+      located id clause @@ fun () ->
       match clause.it with
       | DefD (quants, args, _, _) ->
           let index = Term.with_parameter_types index params args in
@@ -155,23 +157,6 @@ let translate_result prepared rhs =
    head ground; the earlier conditions must be negatable. Otherwise
    Unsupported. *)
 let complement at (head, _, _, _) (earlier_head, _, earlier_conditions, _) =
-  let rec instance bindings pattern subject =
-    match pattern, subject with
-    | Var variable, _ ->
-        begin match List.find_opt (fun (v, _) -> same_variable v variable) bindings with
-        | Some (_, previous) when Reld.same_term previous subject -> Some bindings
-        | Some _ -> None
-        | None -> Some ((variable, subject) :: bindings)
-        end
-    | Const left, Const right when left = right -> Some bindings
-    | App (left, lefts), App (right, rights)
-      when left = right && List.length lefts = List.length rights ->
-        List.fold_left2
-          (fun bindings pattern subject ->
-            Option.bind bindings (fun bindings -> instance bindings pattern subject))
-          (Some bindings) lefts rights
-    | _ -> None
-  in
   let unsupported reason =
     Util.Error.error at "translation"
       ("Unsupported: DefD clause order: " ^ reason)
@@ -179,7 +164,7 @@ let complement at (head, _, _, _) (earlier_head, _, earlier_conditions, _) =
   (* The earlier variables in terms of this clause's input, and the
      disequalities for the earlier head's extra ground structure. *)
   let substitution, differences =
-    match instance [] head earlier_head, instance [] earlier_head head with
+    match match_term [] head earlier_head, match_term [] earlier_head head with
     | Some bindings, _ ->
         (* A variable repeated in the earlier head, f(X, X) against f(A, B),
            requires A = B. *)
@@ -210,21 +195,18 @@ let complement at (head, _, _, _) (earlier_head, _, earlier_conditions, _) =
     | None, Some bindings -> bindings, []
     | None, None -> unsupported "an earlier clause overlaps without being an instance"
   in
-  let condition_variables variables = function
-    | EqCond (left, right) | MatchCond (left, right) ->
-        term_variables (term_variables variables left) right
-    | MembershipCond (term, _) | BoolCond term -> term_variables variables term
-  in
   let known variable =
     List.exists (fun (v, _) -> same_variable v variable) substitution
   in
   if not (List.for_all known
-            (List.fold_left condition_variables [] earlier_conditions)) then
+            (List.fold_left eq_condition_variables [] earlier_conditions)) then
     unsupported "an earlier clause's conditions use variables outside its head";
   let substitute term =
     let rec go = function
       | Var variable as term ->
-          begin match List.find_opt (fun (v, _) -> same_variable v variable) substitution with
+          begin match
+            List.find_opt (fun (v, _) -> same_variable v variable) substitution
+          with
           | Some (_, replacement) -> replacement
           | None -> term
           end
@@ -238,7 +220,7 @@ let complement at (head, _, _, _) (earlier_head, _, earlier_conditions, _) =
       (function
         | BoolCond predicate -> Reld.negate_comparison (substitute predicate)
         | EqCond (left, right) -> App ("_=/=_", [substitute left; substitute right])
-        | MatchCond _ | MembershipCond _ ->
+        | MatchCond _ ->
             unsupported "an earlier clause binds in its conditions")
       earlier_conditions
   in
@@ -283,7 +265,7 @@ let equation_clause prepared =
 
 let translate_equation_clause prepared =
   let head, right, conditions, attrs = equation_clause prepared in
-  equation head right conditions attrs
+  equation ~attrs head right conditions
 
 let choice_helper index id
     (choice : Prescan.membership_choice) rhs =
@@ -374,7 +356,7 @@ let translate_choice_clause id
             (choice_public_quants choice.element quants)
         |> schedule_equation_conditions head.term
       in
-      equation head.term right conditions []
+      equation head.term right conditions
       :: choice_helper index id choice rhs
 
 let translate_clause index id prepared =
@@ -410,14 +392,12 @@ let translate_rule_clause prepared =
                ~proven:(proven_variables prepared premises) index quants)
       in
       let right = translate_result prepared rhs in
-      match conditions with
-      | [] -> Rl (None, head.term, right)
-      | _ -> Crl (None, head.term, right, conditions)
+      rule head.term right conditions
 
 
 (* Equation clauses in source order, each with the complements of the earlier
    clauses that can match its input. An otherwise clause is [owise]. *)
-let ordered_clauses index clauses =
+let ordered_clauses index id clauses =
   let arguments = function App (_, args) -> args | _ -> [] in
   let source_arguments prepared =
     match prepared.clause.it with DefD (_, args, _, _) -> args
@@ -434,7 +414,9 @@ let ordered_clauses index clauses =
     && Reld.inputs_may_overlap index (arguments head) (arguments earlier_head)
   in
   let step (earlier, statements) prepared =
-    let (head, right, conditions, attrs) as current = equation_clause prepared in
+    let (head, right, conditions, attrs) as current =
+      located id prepared.clause (fun () -> equation_clause prepared)
+    in
     let complements =
       if List.mem Owise attrs then []
       else
@@ -446,7 +428,7 @@ let ordered_clauses index clauses =
       if complements = [] then conditions
       else schedule_equation_conditions head (conditions @ complements)
     in
-    earlier @ [prepared, current], statements @ [equation head right conditions attrs]
+    earlier @ [prepared, current], statements @ [equation ~attrs head right conditions]
   in
   snd (List.fold_left step ([], []) clauses)
 
@@ -467,11 +449,13 @@ let translate index id params result_typ clauses =
   else
     let clauses = prepare_clauses index id params clauses in
     if choice then
-      header @ List.concat_map (translate_clause index id) clauses
+      header @ List.concat_map (fun prepared ->
+        located id prepared.clause (fun () -> translate_clause index id prepared)) clauses
     else if rule then
-      header @ List.map translate_rule_clause clauses
+      header @ List.map (fun prepared ->
+        located id prepared.clause (fun () -> translate_rule_clause prepared)) clauses
     else
-      header @ ordered_clauses index clauses
+      header @ ordered_clauses index id clauses
 
 
 (* Def-parameter specialization: a copy of a DecD whose DefP parameters are

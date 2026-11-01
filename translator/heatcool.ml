@@ -1,7 +1,8 @@
 (* hint(k_heatcool): lowering of RuleD with execution premises.
  * Hintd supplies the validated relation shape; this module constructs the
  * identify-focus, split, and plug statements (equations for a ~> relation,
- * rules for a ~>* relation) and the K embedding of context rules. *)
+ * rules for a ~>* relation), the rules of focus patterns that split in
+ * several ways (absorbed_rules), and the K embedding of context rules. *)
 
 open Util.Source
 open Il.Ast
@@ -36,10 +37,10 @@ let bind at bindings variable term =
   match
     List.find_opt (fun (bound, _) -> same_variable variable bound) bindings
   with
-  | Some (_, previous) when Reld.same_term (substitute bindings previous) term ->
+  | Some (_, previous) when same_term (substitute bindings previous) term ->
       bindings
   | Some _ -> unsupported at "bridge input patterns do not unify"
-  | None when Reld.same_term (Var variable) term -> bindings
+  | None when same_term (Var variable) term -> bindings
   | None when occurs variable term -> unsupported at "bridge unification is cyclic"
   | None -> (variable, term) :: bindings
 
@@ -52,17 +53,8 @@ let rec unify at bindings pattern subject =
       List.fold_left2 (unify at) bindings left_args right_args
   | _ -> unsupported at "bridge input does not match the delegated relation"
 
-let substitute_condition bindings = function
-  | EqCondition (EqCond (left, right)) ->
-      EqCondition (EqCond (substitute bindings left, substitute bindings right))
-  | EqCondition (MatchCond (left, right)) ->
-      EqCondition (MatchCond (substitute bindings left, substitute bindings right))
-  | EqCondition (MembershipCond (term, sort)) ->
-      EqCondition (MembershipCond (substitute bindings term, sort))
-  | EqCondition (BoolCond term) ->
-      EqCondition (BoolCond (substitute bindings term))
-  | RewriteCond (left, right) ->
-      RewriteCond (substitute bindings left, substitute bindings right)
+let substitute_condition bindings =
+  map_rule_condition_terms (substitute bindings)
 
 (* Renames the selected variables to fresh BRIDGE- variables, the same
    variable to the same one. *)
@@ -111,6 +103,14 @@ let execution_policy index relation =
   | Error _ -> unsupported relation.at
       "focus pattern refers to a non-execution relation"
 
+(* The request sort and input count of an execution relation. *)
+let execution_shape index relation =
+  match Prescan.relation_policy index relation with
+  | Ok (Prescan.Execution {request_sort; input_count}) -> request_sort, input_count
+  | Ok (Prescan.Compute _ | Prescan.Check _)
+  | Error _ -> unsupported relation.at
+      "focus pattern refers to a non-execution relation"
+
 let relation_call index (source : Hintd.relation) inputs =
   App
     ( Prescan.rel_name index source.id
@@ -130,11 +130,8 @@ let equational at conditions =
 
 (* A heating transition: an equation for a ~> relation, a rule otherwise. *)
 let heating (relation : Hintd.relation) at label left right conditions =
-  match heats_by_equation relation, conditions with
-  | true, [] -> Eq (left, right, [])
-  | true, _ -> Ceq (left, right, equational at conditions, [])
-  | false, [] -> Rl (label, left, right)
-  | false, _ -> Crl (label, left, right, conditions)
+  if heats_by_equation relation then equation left right (equational at conditions)
+  else rule ?label left right conditions
 
 let lower_relation cache index (source : Hintd.relation) =
   match Hashtbl.find_opt cache source.id.it with
@@ -361,13 +358,6 @@ let focus_premises index initial needed deferred prems =
          Some (project_focus_premise index needed dependency.premise)
        else None)
 
-let condition_variables variables = function
-  | RewriteCond (left, right)
-  | EqCondition (EqCond (left, right) | MatchCond (left, right)) ->
-      term_variables (term_variables variables left) right
-  | EqCondition (MembershipCond (term, _) | BoolCond term) ->
-      term_variables variables term
-
 (* An input guard is kept if it mentions a needed source variable (the
    length check of val^n) or a variable of a kept premise. Other guards
    (e.g. a ref typecheck of a single operand) only choose an inner rule,
@@ -435,7 +425,7 @@ let shaped_relation_call index (pattern : Hintd.focus_pattern) =
     List.map2
       (fun term shape ->
         match term with
-        | Var variable when not (Reld.same_term term shape) -> Some (variable, shape)
+        | Var variable when not (same_term term shape) -> Some (variable, shape)
         | _ -> None)
       terms shapes
     |> List.filter_map Fun.id
@@ -462,11 +452,7 @@ let lift_bridge cache index (call, conditions)
   let delegated, input_guards =
     match bridge.premise.it with
     | RulePr (id, args, mixop, head) ->
-        let input_count =
-          match execution_policy index id with
-          | Prescan.Execution {input_count; _} -> input_count
-          | _ -> assert false
-        in
+        let _, input_count = execution_shape index id in
         let inputs, _ = Prem.split input_count (Prem.components mixop head) in
         let patterns, guards =
           inputs |> List.map (fun input ->
@@ -474,7 +460,7 @@ let lift_bridge cache index (call, conditions)
             | Some (pattern, guards) ->
                 let expression = Term.translate_exp index input in
                 let checks =
-                  if Reld.same_term expression pattern then guards
+                  if same_term expression pattern then guards
                   else guards @ [EqCond (expression, pattern)]
                 in pattern, List.map (fun guard -> EqCondition guard) checks
             | None -> unsupported input.at "bridge input has no structural pattern")
@@ -503,19 +489,13 @@ let outer_call cache index (pattern : Hintd.focus_pattern) =
     (call, conditions)
     (List.rev pattern.bridges)
 
-let rec drop count values =
-  match count, values with
-  | 0, values -> values
-  | count, _ :: values -> drop (count - 1) values
-  | _, [] -> []
-
 let relation_input index (context : Hintd.context) call =
   let relation = Prescan.rel_name index context.Hintd.source.id in
   let parameter_count = List.length context.source.params in
   match call with
   | App (name, args) when name = relation ->
-      begin match drop parameter_count args with
-      | [input] -> input
+      begin match Mixop.split parameter_count args with
+      | Some (_, [input]) -> input
       | _ -> unsupported context.rule.at
           "identifyFocus currently requires one context-relation input"
       end
@@ -541,21 +521,13 @@ let rec flatten operator = function
   | App (name, args) when name = operator -> List.concat_map (flatten operator) args
   | term -> [term]
 
-let split_at at count values =
-  let rec split count prefix = function
-    | values when count = 0 -> List.rev prefix, values
-    | value :: values -> split (count - 1) (value :: prefix) values
-    | [] -> unsupported at "lowered focus has fewer terms than its source pattern"
-  in
-  split count [] values
-
 let focus_parts index (context : Hintd.context)
     (pattern : Hintd.focus_pattern) sequence =
   let representation = Prescan.sequence_representation index context.Hintd.focus_typ in
   let parts = flatten representation.concat sequence in
-  let operands, rest = split_at pattern.rule.at (List.length pattern.operands) parts in
-  match rest with
-  | trigger :: trailing when List.length trailing = List.length pattern.trailing ->
+  match Mixop.split (List.length pattern.operands) parts with
+  | Some (operands, trigger :: trailing)
+    when List.length trailing = List.length pattern.trailing ->
       operands, trigger, trailing
   | _ -> unsupported pattern.rule.at
       "lowered focus does not preserve the extracted source-pattern boundary"
@@ -573,10 +545,7 @@ let focus_label index (pattern : Hintd.focus_pattern) =
   "focus-" ^ rule_name index pattern.source pattern.ordinal pattern.rule
 
 let request_sort index (context : Hintd.context) =
-  match execution_policy index context.source.id with
-  | Prescan.Execution {request_sort; _} -> request_sort
-  | Prescan.Compute _ | Prescan.Check _ -> unsupported context.rule.at
-      "context relation has no execution-request sort"
+  fst (execution_shape index context.source.id)
 
 let helper index (context : Hintd.context) name =
   match Prescan.contexts index with
@@ -695,18 +664,19 @@ let context_variables index (context : Hintd.context) =
     ; Prescan.source_variable index context.postfix context.postfix_typ, postfix
     ] )
 
+(* The nonempty condition of the sequence context: val* =/= eps \/ instr_1* =/= eps. *)
+let is_nonempty (context : Hintd.context) premise =
+  match premise.it with
+  | IfPr exp -> Hintd.nonempty_context context.prefix.it context.postfix.it exp
+  | _ -> false
+
 let context_transitions index (context : Hintd.context) =
   let name = helper index context in
   let policy = execution_policy index context.source.id in
   let RuleD (id, quants, mixop, head, prems) = context.rule.it in
-  let is_nonempty premise =
-    match premise.it with
-    | IfPr exp -> Hintd.nonempty_context context.prefix.it context.postfix.it exp
-    | _ -> false
-  in
-  let nonempty = List.exists is_nonempty prems in
+  let nonempty = List.exists (is_nonempty context) prems in
   let rule =
-    let prems = List.filter (fun premise -> not (is_nonempty premise)) prems in
+    let prems = List.filter (fun premise -> not (is_nonempty context premise)) prems in
     {context.rule with it = RuleD (id, quants, mixop, head, prems)}
   in
   let lowered =
@@ -893,10 +863,7 @@ let absorbed_rules cache index (context : Hintd.context)
     , List.map (substitute_condition bindings) conditions )
   in
   let statement label (left, right, conditions) =
-    match conditions with
-    | [] -> Rl (Some label, left, right)
-    | conditions ->
-        Crl (Some label, left, right, schedule_rule_conditions left conditions)
+    rule ~label left right (schedule_rule_conditions left conditions)
   in
   let inner = rule_name index pattern.source pattern.ordinal pattern.rule in
   let outer = rule_name index context.source context.ordinal context.rule in
@@ -940,7 +907,7 @@ let unique_candidates candidates =
   List.rev kept
 
 (* The split guard of a k_heatcool rule whose inner relation computes a
- * sequence: one rl per rule of the inner relation, matching that rule's
+ * sequence: one equation per rule of the inner relation, matching that rule's
  * input pattern (TRANSLATION_MAP.md, section 2). Returns the statements and
  * the split condition. The helper is named after the source rule. *)
 let identify_statements cache index (heated : Hintd.heatcool) target args =
@@ -950,19 +917,14 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
   let candidates = lower_relation cache index relation in
   let name = "identify" ^ String.capitalize_ascii (Prescan.sanitize id.it) in
   let params, _, typ, _ = Il.Env.find_rel metadata.type_env target in
-  let count = match execution_policy index target with
-    | Prescan.Execution {input_count; _} -> input_count
-    | _ -> assert false
-  in
+  let _, count = execution_shape index target in
   let input_types, _ = Prem.split count (Reld.component_types typ) in
   let domain = Param.translate_sorts index params
     @ List.map (Term.translate_sort index) input_types in
   (* Input patterns identify candidates. The original target rule checks its
      other premises once, when the suspended request executes. *)
-  (* Each rl is labeled after its inner rule, like the focus rules. *)
-  let label (candidate : Reld.execution_rule) =
-    "identify-" ^ rule_name index relation candidate.ordinal
-      (List.nth relation.Hintd.rules candidate.ordinal)
+  let source_rule (candidate : Reld.execution_rule) =
+    List.nth relation.Hintd.rules candidate.ordinal
   in
   (* identifyI(ins) = true for an input that some inner rule matches and whose
      input guards hold: the equational premises over the input variables only
@@ -980,14 +942,14 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
   in
   (* An absorbed rule is a rule of its own (absorbed_rules), never split. *)
   let candidates = candidates |> List.filter (fun (candidate : Reld.execution_rule) ->
-    not (is_absorbed index (List.nth relation.Hintd.rules candidate.ordinal)))
+    not (is_absorbed index (source_rule candidate)))
   in
   (* The split is an equation only if no other split applies to the same
      input: the premises that fix the rule's extent (val^m by the block type)
      are checked as in identifyFocus. Otherwise c1 c2 BLOCK, whose block takes
      no value, is split here as a whole and by identifyFocus around BLOCK. *)
   let boundary (candidate : Reld.execution_rule) =
-    match focus_pattern index (List.nth relation.Hintd.rules candidate.ordinal) with
+    match focus_pattern index (source_rule candidate) with
     | Some (_, pattern) -> snd (shaped_relation_call index pattern)
     | None -> []
   in
@@ -996,19 +958,13 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
     let boundary = boundary candidate |> List.filter (fun condition ->
       not (List.exists (Reld.same_condition condition) guards)) in
     match candidate.left, guards @ boundary with
-    | App (_, inputs), [] ->
-        Rl (Some (label candidate), App (name, inputs), Const "true")
+    | App (_, inputs), [] -> Eq (App (name, inputs), Const "true", [])
     | App (_, inputs), guards ->
         let left = App (name, inputs) in
-        Crl (Some (label candidate), left, Const "true",
-             schedule_rule_conditions left guards)
+        Ceq (left, Const "true",
+             equational heated.rule.at (schedule_rule_conditions left guards), [])
     | _ -> assert false)
     |> unique_candidates
-    |> List.map (function
-         | Rl (_, left, right) -> Eq (left, right, [])
-         | Crl (_, left, right, guards) ->
-             Ceq (left, right, equational heated.rule.at guards, [])
-         | _ -> assert false)
   in
   op name domain "Bool" :: equations,
   [EqCondition (BoolCond (App (name, args)))]
@@ -1023,10 +979,7 @@ let heatcool_rule ~observed cache index (heated : Hintd.heatcool) =
       ("RuleD " ^ source.id.it ^ "/" ^ id.it ^ ": " ^ reason)
   in
   let policy = execution_policy index source.id in
-  let outer_sort = match policy with
-    | Prescan.Execution {request_sort; _} -> request_sort
-    | _ -> assert false
-  in
+  let outer_sort, _ = execution_shape index source.id in
   let executions =
     prems |> List.filter_map (fun prem -> match prem.it with
       | RulePr (target, _, mixop, exp) ->
@@ -1057,11 +1010,6 @@ let heatcool_rule ~observed cache index (heated : Hintd.heatcool) =
   let rec before_execution equations = function
     | EqCondition condition :: rest -> before_execution (condition :: equations) rest
     | rest -> List.rev equations, rest
-  in
-  let equation left right conditions =
-    match conditions with
-    | [] -> Eq (left, right, [])
-    | _ -> Ceq (left, right, conditions, [])
   in
   (* Identify sequence-result relation bridges from their result type, never
      from Wasm relation names. *)
@@ -1164,25 +1112,6 @@ let make_config index (frame : Hintd.frame) state sequence =
 
 (* One-way matching: the bindings of pattern variables that make pattern equal
    to subject, if any. *)
-let rec matches bindings pattern subject =
-  match pattern, subject with
-  | Var variable, _ ->
-      begin match
-        List.find_opt (fun (bound, _) -> same_variable variable bound) bindings
-      with
-      | Some (_, previous) when Reld.same_term previous subject -> Some bindings
-      | Some _ -> None
-      | None -> Some ((variable, subject) :: bindings)
-      end
-  | Const left, Const right when left = right -> Some bindings
-  | App (left, left_args), App (right, right_args)
-    when left = right && List.length left_args = List.length right_args ->
-      List.fold_left2
-        (fun bindings pattern subject ->
-          Option.bind bindings (fun bindings -> matches bindings pattern subject))
-        (Some bindings) left_args right_args
-  | _ -> None
-
 (* A kept rule R/r: C[x] ~> C'[x']  -- R: x ~> x', lowered and checked. *)
 type kept_rule =
   { suffix : string                (* R-r, after the source rule *)
@@ -1230,15 +1159,15 @@ let kept_rule index (context : Hintd.context) (kept : Hintd.heatcool) =
   let position =
     match
       List.mapi (fun position argument -> position, argument) arguments
-      |> List.filter (fun (_, argument) -> Reld.same_term argument (Var body))
+      |> List.filter (fun (_, argument) -> same_term argument (Var body))
     with
     | [(position, _)] -> position
     | _ -> fail "the stepped sequence is not one argument of the context element"
   in
   (* The context does not change while its inside steps: the premise input
      put into the conclusion output gives back the conclusion input. *)
-  begin match matches [] result inner with
-  | Some bindings when Reld.same_term (substitute bindings lowered.right) input -> ()
+  begin match match_term [] result inner with
+  | Some bindings when same_term (substitute bindings lowered.right) input -> ()
   | _ -> fail "the context changes when its inside steps"
   end;
   let needed = term_variables (term_variables [] lowered.right) result in
@@ -1312,13 +1241,8 @@ let kembedding_rule cache index context shared (kept : Hintd.heatcool) =
 (* The declarations, the cool-all and [owise] instrs-cooling equations of the
    sequence context, and the equations of each kept rule. *)
 let kembedding_statements cache index (context : Hintd.context) kept =
-  let nonempty premise =
-    match premise.it with
-    | IfPr exp -> Hintd.nonempty_context context.prefix.it context.postfix.it exp
-    | _ -> false
-  in
   let RuleD (_, _, _, _, prems) = context.rule.it in
-  if not (List.exists nonempty prems) then
+  if not (List.exists (is_nonempty context) prems) then
     kembedding_fail (List.hd kept)
       "the sequence context has no nonempty condition on its prefix and postfix";
   let name = helper index context in

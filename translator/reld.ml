@@ -200,9 +200,8 @@ let translate_rule ~head index id params policy rule =
     | Prescan.Compute _ -> body.right
     | Prescan.Check _ -> Const "true"
   in
-  match eq_conditions (schedule_rule_conditions body.left body.conditions) with
-  | [] -> Eq (body.left, right, [])
-  | conditions -> Ceq (body.left, right, conditions, [])
+  equation body.left right
+    (eq_conditions (schedule_rule_conditions body.left body.conditions))
 
 
 (* Execution relations and ElsePr
@@ -234,11 +233,11 @@ type execution_rule =
   ; predecessors : int list
   }
 
-(* A typed sequence variable cannot absorb a constructor outside its source
- * element type. Keep unknown/type-parameter cases conservative. *)
-(* The constructors of a source type, None if unknown. With ~exact, also None
-   if the type has values that are not constructors (numbers, structs,
-   sequences), so disjoint results mean disjoint types. *)
+(* The constructors of a source type, None if unknown (a type parameter): a
+ * typed sequence variable cannot absorb a constructor outside its element
+ * type. With ~exact, also None if the type has values that are not
+ * constructors (numbers, structs, sequences), so disjoint results mean
+ * disjoint types. *)
 let rec source_constructors ?(exact = false) index seen typ =
   let source_constructors = source_constructors ~exact in
   let other = if exact then None else Some [] in
@@ -405,14 +404,19 @@ let rec may_overlap sequences left right =
       && List.for_all2 (may_overlap sequences) left_args right_args
   | Const _, App _ | App _, Const _ -> false
 
+(* The sequence representations (concatenation, empty, sort): the untyped
+   SpectecTerminals and one per typed list sort. *)
+let sequence_families index =
+  ("_ _", "nil", "SpectecTerminals")
+  :: List.map
+       (fun owner ->
+         let sequence = Hintd.typed_sequence_representation owner in
+         sequence.concat, sequence.empty, sequence.sort)
+       (Hintd.typed_list_sorts index.Prescan.sort_metadata)
+
 let inputs_may_overlap index left right =
-  let metadata = index.Prescan.sort_metadata in
   let sequences =
-    ("_ _", "nil") :: List.map
-      (fun owner ->
-        let representation = Hintd.typed_sequence_representation owner in
-        representation.concat, representation.empty)
-      (Hintd.typed_list_sorts metadata)
+    List.map (fun (concat, empty, _) -> concat, empty) (sequence_families index)
   in
   List.length left = List.length right
   && List.for_all2 (may_overlap sequences) left right
@@ -422,15 +426,6 @@ let helper_call index id params ordinal inputs =
     ( Prescan.relation_enabled_helper index id ordinal
     , Param.translate_terms index params @ inputs
     )
-
-let rec same_term left right =
-  match left, right with
-  | Var left, Var right -> same_variable left right
-  | Const left, Const right -> left = right
-  | App (left, lefts), App (right, rights) ->
-      left = right && List.length lefts = List.length rights
-      && List.for_all2 same_term lefts rights
-  | _ -> false
 
 let same_condition left right =
   match left, right with
@@ -443,13 +438,7 @@ let same_condition left right =
 (* Only identical structural positions are aligned. Do not choose an arbitrary
  * associative split, or replace a narrower variable by a wider-sort subject. *)
 let align_inputs ?(sequences = false) ?(bindings = []) index params patterns subjects =
-  let sequence_sorts =
-    "SpectecTerminals"
-    :: List.map
-         (fun owner ->
-           (Hintd.typed_sequence_representation owner).sort)
-         (Hintd.typed_list_sorts index.Prescan.sort_metadata)
-  in
+  let sequence_sorts = List.map (fun (_, _, sort) -> sort) (sequence_families index) in
   let rec align bindings pattern subject =
     match pattern, subject with
     | Var variable, Var subject
@@ -549,14 +538,9 @@ let rec negate_comparison = function
  * has a unique decomposition. In particular, two sequence holes must retain
  * existential enabledness instead of testing one arbitrary split. *)
 let unique_match_pattern index pattern =
-  let metadata = index.Prescan.sort_metadata in
   let families =
-    ("_ _", "SpectecTerminals") :: ("_;_", "RecordFields")
-    :: List.map
-         (fun owner ->
-           let sequence = Hintd.typed_sequence_representation owner in
-           sequence.concat, sequence.sort)
-         (Hintd.typed_list_sorts metadata)
+    ("_;_", "RecordFields")
+    :: List.map (fun (concat, _, sort) -> concat, sort) (sequence_families index)
   in
   let rec unique = function
     | Var _ | Const _ -> true
@@ -707,14 +691,14 @@ let lower_execution_rule index id params policy
   ; predecessors = helpers
   }
 
-(* A computed result is bound to a variable of the result sort, so the rule
-   applies only where it is defined: a step whose result is undefined (e.g. a
-   partial function outside its domain) is no step of the relation. *)
 let typecheck_guards rule =
   List.filter
     (function EqCondition (BoolCond (App ("typecheck", _))) -> true | _ -> false)
     rule.guard_conditions
 
+(* A computed result is bound to a variable of the result sort, so the rule
+   applies only where it is defined: a step whose result is undefined (e.g. a
+   partial function outside its domain) is no step of the relation. *)
 let execution_statement result_sort rule =
   let guards = typecheck_guards rule in
   let conditions = schedule_execution_conditions guards rule.left rule.conditions in
@@ -724,9 +708,7 @@ let execution_statement result_sort rule =
       let result = Var (generated_variable "RESULT" result_sort) in
       result, conditions @ [EqCondition (MatchCond (result, rule.right))]
   in
-  match conditions with
-  | [] -> Rl (None, rule.left, right)
-  | conditions -> Crl (None, rule.left, right, conditions)
+  Maude_il.rule rule.left right conditions
 
 let helper_conditions id rule =
   rule.conditions
@@ -792,15 +774,19 @@ let helper_statements index id params input_sorts callers rule =
     |> schedule_rule_conditions left
     |> eq_conditions
   in
-  let enabled =
-    match conditions with
-    | [] -> Eq (left, Const "true", [])
-    | conditions -> Ceq (left, Const "true", conditions, [])
-  in
+  let enabled = equation left (Const "true") conditions in
   [ declaration
   ; enabled
   ; Eq (fallback, Const "false", [Owise])
   ]
+
+(* A rule that cannot be lowered is Unsupported at that rule. *)
+let located id rule f =
+  try f () with Invalid_argument reason ->
+    Util.Error.error rule.at "translation"
+      ("Unsupported RelD " ^ id.it
+       ^ (match (Hintd.rule_id rule).it with "" -> "" | rule_id -> "/" ^ rule_id)
+       ^ ": " ^ reason)
 
 let lower_execution_rules ~include_rule
     index id params policy rules =
@@ -810,8 +796,9 @@ let lower_execution_rules ~include_rule
   |> List.fold_left
        (fun previous (ordinal, rule) ->
          let lowered =
-           lower_execution_rule index id params policy
-             (List.rev previous) ordinal rule
+           located id rule (fun () ->
+             lower_execution_rule index id params policy
+               (List.rev previous) ordinal rule)
          in
          lowered :: previous)
        []
@@ -1000,7 +987,7 @@ let translate index id params _mixop typ rules =
       let declarations = translate_decl index id params typ policy in
       let name = Prescan.rel_name index id in
       let rule head policy r =
-        translate_rule ~head index id params policy r
+        located id r (fun () -> translate_rule ~head index id params policy r)
       in
       (* hint(k_heatcool) rules are translated by Heatcool. *)
       let include_rule rule =
@@ -1026,7 +1013,7 @@ let translate index id params _mixop typ rules =
             :: List.map
                  (fun r ->
                    if (Hintd.rule_id r).it = trans.trans_rule then
-                     translate_trans index id params trans r
+                     located id r (fun () -> translate_trans index id params trans r)
                    else rule trans.step policy r)
                  rules
       | Prescan.Compute {subsume = None; _} | Prescan.Check {trans = None} ->

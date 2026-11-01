@@ -238,11 +238,13 @@ let reserved_names =
     ; "pair-chunks"; "fixed-chunks"
     ]
 
-let fresh used suffix candidate =
+(* SpecTec subscripts use '_', so a "-N" suffix stays visibly distinct from
+ * them: a second t_1 becomes T_1-2, not T_12. *)
+let fresh used candidate =
   let rec choose index =
     let name =
       if index = 1 then candidate
-      else candidate ^ suffix index
+      else candidate ^ "-" ^ string_of_int index
     in
     if StringSet.mem name !used then choose (index + 1)
     else name
@@ -258,12 +260,7 @@ let fresh_name used candidate =
     then "spectec-" ^ candidate
     else candidate
   in
-  fresh used (fun index -> "-" ^ string_of_int index) candidate
-
-(* SpecTec subscripts use '_', so a "-N" suffix stays visibly distinct from
- * them: a second t_1 becomes T_1-2, not T_12. *)
-let fresh_variable_name used candidate =
-  fresh used (fun index -> "-" ^ string_of_int index) candidate
+  fresh used candidate
 
 (* A variable keeps SpecTec's iteration, prime, and subscript marks: a Maude
  * variable is any whitespace-delimited token except ':' and the
@@ -1034,13 +1031,13 @@ let name_variables used observed =
   let variables =
     exact @ renamed
     |> List.map (fun (id, sort, _) ->
-         (id.it, sort), fresh_variable_name used (variable_base id.it))
+         (id.it, sort), fresh used (variable_base id.it))
   in
   let anonymous_variables =
     anonymous
     |> List.mapi (fun index (id, sort, _) ->
          id, sort,
-         fresh_variable_name used ("PARAM" ^ string_of_int (index + 1)))
+         fresh used ("PARAM" ^ string_of_int (index + 1)))
   in
   variables, anonymous_variables
 
@@ -1048,7 +1045,7 @@ let name_iterations used iterations =
   iterations
   |> List.map (fun (iteration : iteration) ->
        let name =
-         fresh used (fun index -> "-" ^ string_of_int index) iteration.name
+         fresh used iteration.name
        in
        { iteration with
          name
@@ -1456,7 +1453,7 @@ let fresh_helper_name index used candidate =
     else candidate
   in
   used := StringSet.union index.reserved !used;
-  fresh used (fun index -> "-" ^ string_of_int index) candidate
+  fresh used candidate
 
 let request index name kind = Hashtbl.replace index.requests (name, kind) ()
 let requested index name kind = Hashtbl.mem index.requests (name, kind)

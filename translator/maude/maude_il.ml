@@ -47,10 +47,8 @@ type arrow =
 type op_attr =
   | Ctor
   | Assoc
-  | Comm
   | Ditto
   | Id of term
-  | Prec of int
   | Frozen of int list
 
 type op_decl =
@@ -67,12 +65,11 @@ let frozen_all count =
   | positions -> [Frozen positions]
 
 
-(* Conditions for equations and memberships *)
+(* Conditions for equations *)
 
 type eq_condition =
   | EqCond of term * term
   | MatchCond of term * term
-  | MembershipCond of term * sort
   | BoolCond of term
 
 
@@ -98,14 +95,21 @@ type statement =
 
   | OpDecl of op_decl
 
-  | Mb of term * sort
-  | Cmb of term * sort * eq_condition list
-
   | Eq of term * term * eq_attr list
   | Ceq of term * term * eq_condition list * eq_attr list
 
   | Rl of label option * term * term
   | Crl of label option * term * term * rule_condition list
+
+
+(* An equation or a rule, conditional if it has conditions. *)
+let equation ?(attrs = []) left right = function
+  | [] -> Eq (left, right, attrs)
+  | conditions -> Ceq (left, right, conditions, attrs)
+
+let rule ?label left right = function
+  | [] -> Rl (label, left, right)
+  | conditions -> Crl (label, left, right, conditions)
 
 
 (* Variable traversal *)
@@ -121,6 +125,45 @@ let variables_bound bound term =
   term_variables [] term
   |> List.for_all (fun variable -> List.exists (same_variable variable) bound)
 
+let eq_condition_variables variables = function
+  | EqCond (left, right) | MatchCond (left, right) ->
+      term_variables (term_variables variables left) right
+  | BoolCond term -> term_variables variables term
+
+let condition_variables variables = function
+  | EqCondition condition -> eq_condition_variables variables condition
+  | RewriteCond (left, right) -> term_variables (term_variables variables left) right
+
+let rec same_term left right =
+  match left, right with
+  | Var left, Var right -> same_variable left right
+  | Const left, Const right -> left = right
+  | App (left, lefts), App (right, rights) ->
+      left = right && List.length lefts = List.length rights
+      && List.for_all2 same_term lefts rights
+  | _ -> false
+
+(* Matching of [pattern] against [subject], extending [bindings]; a variable
+   seen twice must match the same term. *)
+let rec match_term bindings pattern subject =
+  match pattern, subject with
+  | Var variable, _ ->
+      begin match
+        List.find_opt (fun (bound, _) -> same_variable variable bound) bindings
+      with
+      | Some (_, previous) when same_term previous subject -> Some bindings
+      | Some _ -> None
+      | None -> Some ((variable, subject) :: bindings)
+      end
+  | Const left, Const right when left = right -> Some bindings
+  | App (left, lefts), App (right, rights)
+    when left = right && List.length lefts = List.length rights ->
+      List.fold_left2
+        (fun bindings pattern subject ->
+          Option.bind bindings (fun bindings -> match_term bindings pattern subject))
+        (Some bindings) lefts rights
+  | _ -> None
+
 let rec map_term_variables map = function
   | Var variable -> Var (map variable)
   | Const _ as term -> term
@@ -130,7 +173,6 @@ let rec map_term_variables map = function
 let map_eq_condition_terms f = function
   | EqCond (left, right) -> EqCond (f left, f right)
   | MatchCond (left, right) -> MatchCond (f left, f right)
-  | MembershipCond (term, sort) -> MembershipCond (f term, sort)
   | BoolCond term -> BoolCond (f term)
 
 let map_rule_condition_terms f = function
@@ -144,13 +186,10 @@ let map_statement_terms f = function
         List.map
           (function
             | Id term -> Id (f term)
-            | (Ctor | Assoc | Comm | Ditto | Prec _ | Frozen _) as attr -> attr)
+            | (Ctor | Assoc | Ditto | Frozen _) as attr -> attr)
           declaration.attrs
       in
       OpDecl {declaration with attrs}
-  | Mb (term, sort) -> Mb (f term, sort)
-  | Cmb (term, sort, conditions) ->
-      Cmb (f term, sort, List.map (map_eq_condition_terms f) conditions)
   | Eq (left, right, attrs) -> Eq (f left, f right, attrs)
   | Ceq (left, right, conditions, attrs) ->
       Ceq (f left, f right, List.map (map_eq_condition_terms f) conditions, attrs)
@@ -183,7 +222,7 @@ let condition_ready bound = function
   | EqCondition (EqCond (left, right)) ->
       variables_bound bound left && variables_bound bound right
   | EqCondition (MatchCond (_, subject)) -> variables_bound bound subject
-  | EqCondition (MembershipCond (term, _) | BoolCond term) ->
+  | EqCondition (BoolCond term) ->
       variables_bound bound term
   | RewriteCond (call, _) -> variables_bound bound call
 
@@ -214,7 +253,7 @@ let schedule_conditions prefer left conditions =
         | Some ((EqCondition (MatchCond (pattern, _)) | RewriteCond (_, pattern)
                  as condition), pending) ->
             schedule (term_variables bound pattern) (condition :: ordered) pending
-        | Some ((EqCondition (EqCond _ | MembershipCond _ | BoolCond _)
+        | Some ((EqCondition (EqCond _ | BoolCond _)
                  as condition), pending) ->
             schedule bound (condition :: ordered) pending
         end
@@ -234,7 +273,7 @@ let schedule_rule_conditions =
 let schedule_equation_conditions left conditions =
   let binds bound = function
     | EqCondition (MatchCond (pattern, _)) -> not (variables_bound bound pattern)
-    | EqCondition (EqCond _ | MembershipCond _ | BoolCond _) | RewriteCond _ -> false
+    | EqCondition (EqCond _ | BoolCond _) | RewriteCond _ -> false
   in
   conditions
   |> List.map (fun condition -> EqCondition condition)
@@ -281,13 +320,11 @@ let simplify_conditions equation conditions =
         in
         if not redundant then equalities := (left, right) :: !equalities;
         not redundant
-    | Some (MembershipCond _ | BoolCond _) | None -> true
+    | Some (BoolCond _) | None -> true
   in
   List.filter keep (deduplicate conditions)
 
 let deduplicate_conditions = function
-  | Cmb (term, sort, conditions) ->
-      Cmb (term, sort, simplify_conditions Option.some conditions)
   | Ceq (left, right, conditions, attrs) ->
       Ceq (left, right, simplify_conditions Option.some conditions, attrs)
   | Crl (label, left, right, conditions) ->
@@ -297,28 +334,20 @@ let deduplicate_conditions = function
       in
       Crl (label, left, right, simplify_conditions equation conditions)
   | (SortDecl _ | SubsortDecl _ | VarDecl _ | OpDecl _
-    | Mb _ | Eq _ | Rl _) as statement ->
+    | Eq _ | Rl _) as statement ->
       statement
 
 
 (* Maude module expressions *)
 
-type renaming =
-  | SortRenaming of sort * sort
-  | OpRenaming of name * name
-
 type module_expr =
   | ModuleName of name
-  | ModuleInstantiation of name * name list
-  | ModuleRenaming of module_expr * renaming list
 
 
-(* Maude modules and views *)
+(* Maude modules *)
 
 type import =
   | Protecting of module_expr
-  | Including of module_expr
-  | Extending of module_expr
 
 type module_kind =
   | Functional
@@ -331,18 +360,5 @@ type modul =
   ; statements : statement list
   }
 
-type view_mapping =
-  | SortMapping of sort * sort
-  | OpMapping of name * name
-
-type view =
-  { name : name
-  ; source : module_expr
-  ; target : module_expr
-  ; mappings : view_mapping list
-  }
-
 type top_level =
   | Module of modul
-  | View of view
-  | Load of string

@@ -65,17 +65,18 @@ let length_of_typ index typ value =
 let typecheck value element_type =
   BoolCond (app "typecheck" [value; element_type])
 
+(* The length condition of an iteration; ^n needs its count, given by the
+   caller. *)
+let length_conditions length = function
+  | Opt -> [BoolCond (app "_<=_" [length; Const "1"])]
+  | List | ListN _ -> []
+  | List1 -> [BoolCond (app "_<_" [Const "0"; length])]
+
 let translate_conditions translate_count value element_type iter =
-  let check = typecheck value element_type in
-  match iter with
-  | Opt ->
-      [check; BoolCond (app "_<=_" [length value; Const "1"])]
-  | List ->
-      [check]
-  | List1 ->
-      [check; BoolCond (app "_<_" [Const "0"; length value])]
-  | ListN (count, _) ->
-      [check; EqCond (length value, translate_count count)]
+  typecheck value element_type
+  :: match iter with
+     | ListN (count, _) -> [EqCond (length value, translate_count count)]
+     | Opt | List | List1 -> length_conditions (length value) iter
 
 
 (* Bound and captured variables *)
@@ -264,11 +265,7 @@ let translate_identity_pattern index translate_pattern translate_conditions
           in
           let cardinality =
             match iter with
-            | Opt ->
-                Some [BoolCond (app "_<=_" [cardinality_length; Const "1"])]
-            | List -> Some []
-            | List1 ->
-                Some [BoolCond (app "_<_" [Const "0"; cardinality_length])]
+            | Opt | List | List1 -> Some (length_conditions cardinality_length iter)
             | ListN (count, _) ->
                 begin match translate_pattern count with
                 | Some (count, count_guards) ->
@@ -344,16 +341,9 @@ let pattern_count index typ translate_pattern translate_exp known subject = func
   | Opt | List | List1 -> Some (Const "0", [])
 
 let identity_cardinality index typ translate_exp known subject = function
-  | Opt ->
-      [BoolCond
-         (app "_<=_" [length_of_typ index typ subject; Const "1"])]
-  | List -> []
-  | List1 ->
-      [BoolCond
-         (app "_<_" [Const "0"; length_of_typ index typ subject])]
   | ListN (count, _) when known count ->
       [EqCond (length_of_typ index typ subject, translate_exp count)]
-  | ListN _ -> []
+  | iter -> length_conditions (length_of_typ index typ subject) iter
 
 let translate_pattern index translate_source_pattern translate_exp
     translate_conditions known is_bound can_bind_body body (iter, generators)

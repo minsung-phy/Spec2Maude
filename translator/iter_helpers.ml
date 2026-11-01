@@ -53,14 +53,20 @@ let tail_variable index (id, source) =
   generated_variable
     (Prescan.variable_base id.it ^ "*-REST") (Prescan.sort_of_typ index source.note)
 
+(* A helper's leading arguments: the captures, then the count and the index of
+   an ^n iteration. *)
+let leading_sorts captures count index =
+  List.map (fun (variable : variable) -> variable.sort)
+    (captures @ Option.to_list count @ Option.to_list index)
+
+let leading_arguments captures count index rest =
+  Iter.terms_of_variables captures @ Option.to_list count @ Option.to_list index @ rest
+
+let partial_op name domain codomain =
+  OpDecl {name; domain; codomain; arrow = Partial; attrs = []}
+
 let helper_domain source_index captures count index generators =
-  List.map (fun (variable : variable) -> variable.sort) captures
-  @ List.map
-      (fun (variable : variable) -> variable.sort)
-      (Option.to_list count)
-  @ List.map
-      (fun (variable : variable) -> variable.sort)
-      (Option.to_list index)
+  leading_sorts captures count index
   @ List.map
       (fun (_, source) -> Prescan.sort_of_typ source_index source.note)
       generators
@@ -88,22 +94,6 @@ let next_arguments captures count index tails =
      | None -> []
      | Some index -> [Iter.app "s" [Iter.term_of_variable index]])
   @ Iter.terms_of_variables tails
-
-let projector_domain captures count index subject_sort =
-  List.map (fun (variable : variable) -> variable.sort) captures
-  @ List.map
-      (fun (variable : variable) -> variable.sort)
-      (Option.to_list count)
-  @ List.map
-      (fun (variable : variable) -> variable.sort)
-      (Option.to_list index)
-  @ [subject_sort]
-
-let projector_arguments captures count index subject =
-  Iter.terms_of_variables captures
-  @ Option.to_list count
-  @ Option.to_list index
-  @ [subject]
 
 let premise_output_tail_name iteration position =
   snd (List.nth iteration.Prescan.output_names position)
@@ -141,23 +131,16 @@ let translate_projector_statements index (iteration : Prescan.iteration) =
       generated_variable "PROJECT-REST" result_representation.sort
     in
     let declaration name iter =
-      OpDecl
-        { name
-        ; domain =
-            projector_domain captures (count_variable iter)
-              (index_variable index iter) result_representation.sort
-        ; codomain =
-            if List.length generators = 1
-            then
-              let _, source = List.hd generators in
-              Prescan.sort_of_typ index source.note
-            else "SpectecTerminal"
-        ; arrow = Partial
-        ; attrs = []
-        }
+      partial_op name
+        (leading_sorts captures (count_variable iter) (index_variable index iter)
+         @ [result_representation.sort])
+        (if List.length generators = 1 then
+           let _, source = List.hd generators in
+           Prescan.sort_of_typ index source.note
+         else "SpectecTerminal")
     in
     let call name count index subject =
-      Iter.app name (projector_arguments captures count index subject)
+      Iter.app name (leading_arguments captures count index [subject])
     in
     let empty =
       Iter.column_term index generators
@@ -306,14 +289,9 @@ let translate_statements index (iteration : Prescan.iteration) =
             in
             let call args = Iter.app name args in
             let declaration =
-              OpDecl
-                { name
-                ; domain =
-                    helper_domain index captures count iter_index generators
-                ; codomain = result_representation.sort
-                ; arrow = Partial
-                ; attrs = []
-                }
+              partial_op name
+                (helper_domain index captures count iter_index generators)
+                result_representation.sort
             in
             let body_term =
               Term.translate_exp index body |> Iter.as_sequence_element index body.note
@@ -342,14 +320,9 @@ let translate_statements index (iteration : Prescan.iteration) =
                 let tail_name = iteration.Prescan.tail_name in
                 let tail_call args = Iter.app tail_name args in
                 let tail_declaration =
-                  OpDecl
-                    { name = tail_name
-                    ; domain =
-                        helper_domain index captures count iter_index generators
-                    ; codomain = result_representation.sort
-                    ; arrow = Partial
-                    ; attrs = []
-                    }
+                  partial_op tail_name
+                    (helper_domain index captures count iter_index generators)
+                    result_representation.sort
                 in
                 let first =
                   Eq
@@ -432,10 +405,16 @@ let helper_key = function
   | _ ->
       invalid_arg "an iteration helper must start with an operator declaration"
 
+(* A helper that cannot be generated is Unsupported at its source iteration. *)
+let located at place f =
+  try f () with Invalid_argument reason ->
+    Util.Error.error at "translation" ("Unsupported iteration in " ^ place ^ ": " ^ reason)
+
 let translate_all index =
-  let add groups iteration =
+  let add groups (iteration : Prescan.iteration) =
     let statements =
-      translate_statements index iteration
+      located iteration.body.at iteration.place (fun () ->
+        translate_statements index iteration)
     in
     match statements with
     | [] ->
@@ -461,11 +440,6 @@ let translate_all index =
 
 
 (* Generated premise helpers *)
-
-let equation left right conditions =
-  match conditions with
-  | [] -> Eq (left, right, [])
-  | _ -> Ceq (left, right, conditions, [])
 
 let premise_local_names without iteration =
   let iter, generators = iteration.Prescan.iterexp in
@@ -500,21 +474,6 @@ let premise_conditions index without iteration =
   , bound
   )
 
-let premise_helper_declaration name domain codomain =
-  OpDecl
-    { name
-    ; domain
-    ; codomain
-    ; arrow = Partial
-    ; attrs = []
-    }
-
-let premise_helper_arguments captures count index sources =
-  Iter.terms_of_variables captures
-  @ Option.to_list count
-  @ Option.to_list index
-  @ sources
-
 type premise_mode = Check | Collect of int
 
 let translate_premise_statements index
@@ -544,7 +503,7 @@ let translate_premise_statements index
   let domain = helper_domain index captures count iter_index generators in
   let call name args = Iter.app name args in
   let arguments count index sources =
-    premise_helper_arguments captures count index sources
+    leading_arguments captures count index sources
   in
   let conditions, bound =
     premise_conditions index without iteration
@@ -554,7 +513,7 @@ let translate_premise_statements index
       invalid_arg "IterPr output helper body does not bind its output"
   | None | Some _ -> ()
   end;
-  let declaration = premise_helper_declaration name domain codomain in
+  let declaration = partial_op name domain codomain in
   let empty_sources =
     List.map (fun (_, source) -> Iter.empty_of_typ index source.note) generators
   in
@@ -604,7 +563,7 @@ let translate_premise_statements index
       [declaration; base None None; step]
   | List1, _ ->
       let tail_declaration =
-        premise_helper_declaration tail_name domain codomain
+        partial_op tail_name domain codomain
       in
       let first = step name List None None None None tail_name in
       let tail_step = step tail_name List None None None None tail_name in
@@ -628,17 +587,18 @@ let translate_premise_statements index
          (Option.map Iter.term_of_variable iter_index); step]
 
 let translate_premise_all index =
-  let add groups iteration =
-    let name = iteration.Prescan.name in
+  let add groups (iteration : Prescan.premise_iteration) =
+    let name = iteration.name in
     let statements =
-      (if Prescan.requested index name CheckHelper
-       then [translate_premise_statements index iteration Check]
-       else [])
-      @ List.map
-           (fun position ->
-             translate_premise_statements index iteration
-               (Collect position))
-           (Prescan.requested_outputs index name)
+      located iteration.premise.at iteration.place (fun () ->
+        (if Prescan.requested index name CheckHelper
+         then [translate_premise_statements index iteration Check]
+         else [])
+        @ List.map
+             (fun position ->
+               translate_premise_statements index iteration
+                 (Collect position))
+             (Prescan.requested_outputs index name))
     in
     List.fold_left
       (fun groups statements ->

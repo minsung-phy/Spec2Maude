@@ -229,7 +229,9 @@ let rec translate_typ index typ =
   | TupT _ ->
       invalid_arg "TupT must be translated by translate_components"
   | IterT (typ, List) ->
-      (* typecheck distributes over the elements of a sequence. *)
+      (* typecheck distributes over the elements of a sequence, so t* is its
+         element type here; as a type argument it is iterList(t)
+         (translate_check_typ). *)
       translate_typ index typ
   | IterT (_, (Opt | List1 | ListN _)) ->
       (* The element type alone would drop the length condition. *)
@@ -658,7 +660,6 @@ and translate_composition index typ left right =
 
 (* Constructor components *)
 
-let translate_bool = translate_native
 
 let rec translate_typ_conditions index value typ =
   match translate_sort index typ, typ.it with
@@ -1020,8 +1021,11 @@ let with_relation_types index id params inputs =
   in
   {index with Prescan.input_types = Some facts}
 
-(* An execution guard omits a membership that the input facts or the native
-   Maude sort of the value already establish. *)
+(* An execution guard omits a membership that the input facts or the Maude
+   sort of the value already establish. Nat and Int range exactly over nat and
+   int. The sort of a hint(maude_sort) type is the sort of its constructors,
+   which is wider (CONST(I32, c) has sort val for any c): omitting that guard
+   relies on reachable values being well typed, like the input facts. *)
 let translate_guard_conditions index value typ =
   let conditions = translate_typ_conditions index value typ in
   match index.Prescan.input_types with
