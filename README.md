@@ -39,8 +39,7 @@ specification and generated code visible in the implementation.
 Source `hint(...)` annotations describe translation choices such as Maude sort
 representations, array-backed record fields (memory bytes), builtin
 implementations, and heating/cooling for execution premises. Backend modules
-provide common representations, primitive operations, and explicitly selected
-relation implementations.
+provide common representations and primitive operations.
 
 ## Working with WebAssembly
 
@@ -60,7 +59,7 @@ properties in a composed model.
 | [`spectec/`](spectec/) | SpecTec frontend, IL definitions, and WebAssembly specification |
 | [`translator/`](translator/) | Recursive SpecTec IL-to-Maude translator |
 | [`translator/maude/`](translator/maude/) | Maude intermediate representation and renderer |
-| [`translator/backend/`](translator/backend/) | Common representations, builtins, and relation implementations |
+| [`translator/backend/`](translator/backend/) | Common representations and builtins |
 | [`translator/generated/`](translator/generated/) | Generated Maude declarations and semantics |
 | [`wasm2maude/`](wasm2maude/) | WebAssembly program encoding and execution drivers |
 | [`bin/`](bin/) | Command-line entry points |

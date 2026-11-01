@@ -928,7 +928,7 @@ let identify_statements cache index (heated : Hintd.heatcool) target args =
   in
   (* identifyI(ins) = true for an input that some inner rule matches and whose
      input guards hold: the equational premises over the input variables only
-     (e.g. val* =/= eps \/ instr* =/= eps). On any other input it stays
+     (e.g. c =/= 0 of if-true). On any other input it stays
      unreduced, so the split condition fails. The split is an equation for a
      ~> relation, so an input that no inner rule can step must stay unsplit. *)
   let input_guards (candidate : Reld.execution_rule) =

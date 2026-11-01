@@ -14,8 +14,7 @@ the paper, or to check how a constructor is handled.
   `hint(k_heatcool)`). Generated iteration helpers are in `iter_helpers.ml`,
   and the reordering of Maude conditions is in one section of
   `maude/maude_il.ml`.
-- Code locations are given as `file:function`. They refer to commit
-  `4c73c1f`.
+- Code locations are given as `file:function` in the current code.
 - Cases that the translator rejects or omits are listed in section 8.
 
 ## Notation
@@ -165,7 +164,7 @@ source order.
 | Statement | Maude | Code |
 | --- | --- | --- |
 | Split (first execution premise) | `ceq r̂(⟦ins⟧) = inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ .` for `~>`, `crl [split-r] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ .` for `~>*`. `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
-| Split guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧)`, a `Bool` operator with one equation `eq identifyInner(⟦ins of r'⟧) = true` per rule `r'` of the inner relation, conditional on the equational premises of `r'` over its input variables only. On an input that no inner rule matches it stays unreduced, so the split does not apply. | `heatcool.ml:identify_statements` |
+| Split guard, inner relation on an instruction sequence | an extra condition `identifyInner(⟦ins'⟧)`, a `Bool` operator with one equation `eq identifyInner(⟦ins of r'⟧) = true` per rule `r'` of the inner relation, conditional on the equational premises of `r'` over its input variables only and on the premises that fix how many values it takes (as in `identifyFocus`, e.g. `M = size(T_1*)` for `val^m (BLOCK bt instr*)`). A rule whose extent is not fixed (below) has none. On an input that no inner rule matches it stays unreduced, so the split does not apply. | `heatcool.ml:identify_statements` |
 | Unheat (`~>` split) | `eq unheat(inner(⟦ins'⟧) ~> hole-r(C)) = ⟦ins⟧ .`: the configuration that a split request stands for, for drivers that observe it between steps | `heatcool.ml:heatcool_rule` |
 | Next execution premise | `eq ⟦outs'⟧ ~> hole-r-inner(C) = inner2(⟦ins''⟧) ~> hole-r-inner2(C') .` With several execution premises, each hole is named after the relation it waits for. | `heatcool.ml:heatcool_rule` |
 | Plug (after the last execution premise) | `eq ⟦outs'⟧ ~> hole-r-inner2(C) = ⟦outs⟧ .`, with the remaining premises as conditions | `heatcool.ml:heatcool_rule` |
@@ -177,7 +176,14 @@ instruction sequence, such as `Step/ctxt-instrs`) is translated differently.
 `eq identifyFocus(…) = { … }` (or `ceq`) for each rule of the relations that
 can step a focus, and the split is
 `ceq r̂(c) = r̂(focus) ~> hole(PREFIX, POSTFIX) if { PREFIX | focus | POSTFIX } := identifyFocus(…) …`
-(`rl`/`crl` with a rewrite condition for a `~>*` relation). The plug puts the
+(`rl`/`crl` with a rewrite condition for a `~>*` relation). A rule whose
+operands or trailing instructions have no fixed length (`val* TRAP instr*` of
+trap-instrs; throw_ref-instrs) overlaps `PREFIX` and `POSTFIX`, so an input
+splits in several ways, each a different successor. It has no `identifyFocus`
+or identify equation; instead it is one rule through its bridges
+(`crl r̂(z ; val* TRAP instr*) => z ; TRAP …`) and one inside the context
+(`crl r̂(z ; PREFIX val* TRAP instr* POSTFIX) => z ; PREFIX TRAP POSTFIX …`),
+which keep all splits (`heatcool.ml:absorbed_rules`). The plug puts the
 result back between `PREFIX` and `POSTFIX`, and
 `eq unheat(R ~> hole(PREFIX, POSTFIX)) = unheat(R) ~> hole(PREFIX, POSTFIX) .`
 (`heatcool.ml:translate_pattern`, `heatcool.ml:context_transitions`). Which

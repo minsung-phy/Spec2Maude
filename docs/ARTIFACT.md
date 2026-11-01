@@ -152,8 +152,7 @@ uses a temporary directory and does not modify the repository.
    with `hint(maude_array)`, such as memory bytes, as a size and a prelude
    `ARRAY`);
 2. generated semantics;
-3. hand-written relation backends;
-4. primitive builtin semantics.
+3. primitive builtin semantics.
 
 Load it from the repository root:
 

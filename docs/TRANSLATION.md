@@ -457,9 +457,10 @@ hinted rule의 ElsePr·IterPr·NegPr와 rewrite-backed expression은 현재 Unsu
 
 **equation split의 조건과 근거.** equation은 한 번 고르면 되돌아가지 않으므로 다음을 지킨다.
 
-- 식별 helper는 대상 rule의 입력 패턴과, 입력 변수만 쓰는 equational premise(예: trap-instrs의
-  `val* =/= eps \/ instr* =/= eps`)를 함께 검사한다. 어떤 rule도 실행할 수 없는 입력(끝에 남은
-  `TRAP` 하나 등)은 split하지 않고 `Step(c)`로 남는다. 한 focus에 pure·read·Step rule이 함께 맞지
+- 식별 helper는 대상 rule의 입력 패턴과, 입력 변수만 쓰는 equational premise(예: if-true의
+  `c =/= 0`)를 함께 검사한다. 어떤 rule도 실행할 수 없는 입력(끝에 남은 `TRAP` 하나 등)은
+  split하지 않고 `Step(c)`로 남는다. 길이가 정해지지 않은 pattern의 rule(trap-instrs 등, 아래)은
+  식별 helper에 넣지 않는다. 한 focus에 pure·read·Step rule이 함께 맞지
   않아야 한다. Wasm 3.0에서 세 쪽 rule의 trigger 명령이 겹치지 않음을 생성 패턴으로 확인했다(증명 아님).
 - 식별 helper는 `identifyFocus`와 같은 범위 결정 premise도 검사한다(`val^m`의 m을 정하는 block
   타입 등). 없으면 `c1 c2 BLOCK`(값을 받지 않는 block)을 전체로 자르는 read split과 `BLOCK`만 자르는
@@ -468,7 +469,7 @@ hinted rule의 ElsePr·IterPr·NegPr와 rewrite-backed expression은 현재 Unsu
   ```maude
   ceq identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) = true
     if M-3 := size(VAL*) /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
-    /\ M-3 = size(T_1*) /\ N-3 := size(T_2*) .
+    /\ M-3 = size(T_1*) .
   ```
 - equation은 같음을 말하므로, 입력마다 자르는 방법이 하나여야 한다(confluence). focus pattern의
   operand나 뒤쪽에 길이가 정해지지 않은 sequence(`val*`, 또는 rule의 다른 곳에 n이 없는 `val^n`)가
@@ -571,8 +572,7 @@ ceq Step(Z ; INSTR*) = Step-pure(INSTR*) ~> hole-Step-pure(Z)
 eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
 eq unheat(Step-pure(INSTR*) ~> hole-Step-pure(Z)) = Z ; INSTR* .
 
-ceq identifyPure(VAL* (TRAP INSTR*)) = true
-    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+eq identifyPure(NOP) = true .
 ```
 
 `identifyPure(INSTR*)`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
@@ -616,7 +616,7 @@ eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 eq unheat(R-3 ~> hole(PREFIX, POSTFIX)) = unheat(R-3) ~> hole(PREFIX, POSTFIX) .
 ```
 
-`identifyFocus` 식도 equation이다(`eq identifyFocus(...) = { ... }`). source의 nonempty 조건은 guard로 남는다.
+`identifyFocus` 식도 equation이다(`eq`/`ceq identifyFocus(...) = { ... }`). source의 nonempty 조건은 guard로 남는다.
 매 step 자르는 자리가 바뀌므로(앞 명령의 결과가 다음 명령의 operand) 열어 두지 않는다.
 context rule(ctxt-label/handler/frame)에는 focus pattern을 만들지 않는다.
 
