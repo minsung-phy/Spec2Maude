@@ -2359,7 +2359,7 @@ mod SPEC2MAUDE-GENERATED is
 
   vars LIFT-ELEMENT-2 INSTR : instr .
 
-  vars VALUE I J N-3 N-2 M-3 FUNCIDX GLOBALIDX TABLEIDX MEMIDX TAGIDX X-4 TYPEIDX ELEMIDX DATAIDX LOCALIDX LABELIDX U64 SZ DIM M-2 M_1 M_2 VALUE-14 TAGADDR GLOBALADDR MEMADDR TABLEADDR FUNCADDR U31 STRUCTADDR ARRAYADDR EXNADDR HOSTADDR VALUE2-2 TABLEIDX-2 LANEIDX MEMIDX-2 FIELDIDX U32 TYPEIDX-2 C-3 LABELIDX'-2 VECLIT TYPEIDX_1 TYPEIDX_2 TABLEIDX_1 TABLEIDX_2 MEMIDX_1 MEMIDX_2 X_1-2 VALUE1-3 I_1 I_2 V_1 V_2 V_3 V C_1-2 K-3 C_2-2 C'-2 C'' C_3-2 A I' L L' Y CASE-PART1-2 X_2-3 K-2 A_1 A_2 JA GA MA TA FA DA EA ITER-COUNT J_1-3 J_2-3 I_F I_D I_E : Nat .
+  vars VALUE I J N-3 N-2 M-3 FUNCIDX GLOBALIDX TABLEIDX MEMIDX TAGIDX X-4 TYPEIDX ELEMIDX DATAIDX LOCALIDX LABELIDX U64 SZ DIM M-2 M_1 M_2 VALUE-14 TAGADDR GLOBALADDR MEMADDR TABLEADDR FUNCADDR U31 STRUCTADDR ARRAYADDR EXNADDR HOSTADDR VALUE2-2 TABLEIDX-2 LANEIDX MEMIDX-2 FIELDIDX U32 TYPEIDX-2 C-3 LABELIDX'-2 VECLIT TYPEIDX_1 TYPEIDX_2 TABLEIDX_1 TABLEIDX_2 MEMIDX_1 MEMIDX_2 X_1-2 VALUE1-3 I_1 I_2 V_1 V_2 V_3 V C_1-2 K-3 C_2-2 C'-2 C'' C_3-2 A I' L L' Y CASE-PART1-2 X_2-3 K-2 A_1 A_2 JA GA MA TA FA DA EA ITER-COUNT J_1-3 J_2-3 I_F I_D I_E J-2-3 : Nat .
 
   vars N'* W* W'** W? W'?* W'* W** W_1* X* CHAR* XX* VALUE-4 VALUE-5 VALUE-6 VALUE-7 VALUE-8 VALUE-9 VALUE-10 VALUE-11 VALUE-12 VALUE-13 FREE'* NULL? MUT? VALUE1-2 RESULTTYPE RESULTTYPE-2 FINAL? TYPEUSE* U64? EXTERNTYPE* EXTERNTYPE*-2 NULL_1? XT* TV'* TU'* TV* TU* FT* T_1* T_2* ST* XT_1* XT_2* DT* SUBTYPE* VALTYPE* FIELDTYPE* RESULTTYPE_1 RESULTTYPE_2 EXTERNTYPE_1* EXTERNTYPE_2* HALF? ZERO? VALTYPE? VALTYPE*? LABELIDX* VALUE2-3 SX? LANEIDX* CATCH* LABELIDX'* LOADOP? STOREOP? VLOADOP? BYTE* LOCAL* EXPR* NAME NAME-2 VALUE3-2 VALUE4 VALUE5 VALUE6 VALUE7 VALUE8 VALUE9 START? VALUE11 NAME_1 NAME_2 TYPE* TAG* GLOBAL* MEM* TABLE* FUNC* DATA* ELEM* IMPORT* EXPORT* LOCALIDX* VALUE-16 VALUE-17 VALUE-18 X*-2 LCT* DT'* INDEX-PREFIX INDEX-SUFFIX WITNESSES WITNESSES-2 CASE-PART1 C* C_1* C** C_2* C_3* I* C? CHOICE-PREFIX CHOICE-REST C'_1* C'_2* J_1* J_2* I_1* I_2* XA* B* R* SI* AI* EXN* J? R'* T*? L* MEMBER-PREFIX MEMBER-SUFFIX T? CATCH'* CASE-PART2-2 T* J* MUT?* ZT* REF* TYPE'* DEFTYPE'* DEFTYPE* TAGTYPE'* JA'* GLOBALTYPE'* GA'* MEMTYPE'* MA'* TABLETYPE'* REF'* TA'* FUNCCODE'* MODULEINST'* FA'* OK'* B'** DA'* RT'* REF'** EA'* TAGTYPE* EXPR_G* GLOBALTYPE* MEMTYPE* EXPR_T* TABLETYPE* EXPR_F* LOCAL** BYTE** DATAMODE* ELEMMODE* ELEMTYPE* EXPR_E** EXTERNADDR* AA_I* GA_I* MA_I* TA_I* FA_I* FA* AA* GA* MA* REF_T* TA* DA* REF_E** EA* XI* E* EXPR'* EXPR'** GT'* REFTYPE* X? INSTR_S? W'? W'?*-REST FT*-REST T_1*-REST TU'*-REST ST*-REST XT_1*-REST SUBTYPE*-REST VALTYPE*-REST FIELDTYPE*-REST TYPEUSE*-REST EXTERNTYPE_1*-REST LABELIDX*-REST CATCH*-REST LOCAL*-REST EXPR*-REST TYPE*-REST TAG*-REST GLOBAL*-REST MEM*-REST TABLE*-REST FUNC*-REST DATA*-REST ELEM*-REST IMPORT*-REST EXPORT*-REST C_1*-REST C**-REST C_2*-REST C_3*-REST I*-REST J_1*-REST J_2*-REST PROJECT-REST PROJECT-COLUMN-1 PROJECT-COLUMN-2 I_1*-REST I_2*-REST T*-REST J*-REST REF*-REST C*-REST PROJECT-ELEMENT ZT*-REST PROJECT-COLUMN-3 EXPR_E* TAGTYPE*-REST GLOBALTYPE*-REST MEMTYPE*-REST TABLETYPE*-REST ELEMTYPE*-REST X*-REST EXPR_F*-REST LOCAL**-REST : SpectecTerminals .
 
@@ -6017,7 +6017,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ typecheck(VALUE-12, arrayinst)
       /\ typecheck(VALUE-13, exninst) .
 
-  eq recordConcat(LEFT, RIGHT, store) = { (((((((((field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS)) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('STRUCTS, (LEFT . 'STRUCTS) (RIGHT . 'STRUCTS))) ; field('ARRAYS, (LEFT . 'ARRAYS) (RIGHT . 'ARRAYS))) ; field('EXNS, (LEFT . 'EXNS) (RIGHT . 'EXNS))) } .
+  eq recordConcat(LEFT, RIGHT, store) = { (((((((((field('TAGS, (LEFT . 'TAGS) (RIGHT . 'TAGS)) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('MEMS, map-concat(LEFT . 'MEMS, RIGHT . 'MEMS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('FUNCS, map-concat(LEFT . 'FUNCS, RIGHT . 'FUNCS))) ; field('DATAS, (LEFT . 'DATAS) (RIGHT . 'DATAS))) ; field('ELEMS, (LEFT . 'ELEMS) (RIGHT . 'ELEMS))) ; field('STRUCTS, (LEFT . 'STRUCTS) (RIGHT . 'STRUCTS))) ; field('ARRAYS, (LEFT . 'ARRAYS) (RIGHT . 'ARRAYS))) ; field('EXNS, (LEFT . 'EXNS) (RIGHT . 'EXNS))) } .
 
   ceq typecheck(STORE-2 ; FRAME, state) = true
     if typecheck(STORE-2, store)
@@ -6107,11 +6107,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq spectec-global(Z, X-4) = (sof(Z) . 'GLOBALS) [ #rat(((fof(Z) . 'MODULE) . 'GLOBALS) [ X-4 ]) ] .
 
-  eq spectec-mem(Z, X-4) = (sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) ] .
+  eq spectec-mem(Z, X-4) = map-read(sof(Z) . 'MEMS, #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ])) .
 
   eq spectec-table(Z, X-4) = (sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) ] .
 
-  eq spectec-func(Z, X-4) = (sof(Z) . 'FUNCS) [ #rat(((fof(Z) . 'MODULE) . 'FUNCS) [ X-4 ]) ] .
+  eq spectec-func(Z, X-4) = map-read(sof(Z) . 'FUNCS, #rat(((fof(Z) . 'MODULE) . 'FUNCS) [ X-4 ])) .
 
   eq spectec-data(Z, X-4) = (sof(Z) . 'DATAS) [ #rat(((fof(Z) . 'MODULE) . 'DATAS) [ X-4 ]) ] .
 
@@ -6123,13 +6123,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq with-global(Z, X-4, V-2) = (sof(Z) [. 'GLOBALS = ((sof(Z) . 'GLOBALS) [ #rat(((fof(Z) . 'MODULE) . 'GLOBALS) [ X-4 ]) = (((sof(Z) . 'GLOBALS) [ #rat(((fof(Z) . 'MODULE) . 'GLOBALS) [ X-4 ]) ]) [. 'VALUE = V-2 ]) ]) ]) ; fof(Z) .
 
-  eq with-table(Z, X-4, I, R) = (sof(Z) [. 'TABLES = ((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) = (((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) ]) [. 'REFS = ((((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) ]) . 'REFS) [ I = R ]) ]) ]) ]) ; fof(Z) .
+  eq with-table(Z, X-4, I, R) = (sof(Z) [. 'TABLES = ((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) = (((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) ]) [. 'REFS = map-write(((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) ]) . 'REFS, I, R) ]) ]) ]) ; fof(Z) .
 
   eq with-tableinst(Z, X-4, TI) = (sof(Z) [. 'TABLES = ((sof(Z) . 'TABLES) [ #rat(((fof(Z) . 'MODULE) . 'TABLES) [ X-4 ]) = TI ]) ]) ; fof(Z) .
 
-  eq with-mem(Z, X-4, I, J, B*) = (sof(Z) [. 'MEMS = ((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) = (((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) ]) [. 'BYTES = array-write(((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) ]) . 'BYTES, I, J, B*) ]) ]) ]) ; fof(Z) .
+  eq with-mem(Z, X-4, I, J, B*) = (sof(Z) [. 'MEMS = map-write(sof(Z) . 'MEMS, #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]), map-read(sof(Z) . 'MEMS, #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ])) [. 'BYTES = array-write(map-read(sof(Z) . 'MEMS, #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ])) . 'BYTES, I, J, B*) ]) ]) ; fof(Z) .
 
-  eq with-meminst(Z, X-4, MI) = (sof(Z) [. 'MEMS = ((sof(Z) . 'MEMS) [ #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]) = MI ]) ]) ; fof(Z) .
+  eq with-meminst(Z, X-4, MI) = (sof(Z) [. 'MEMS = map-write(sof(Z) . 'MEMS, #rat(((fof(Z) . 'MODULE) . 'MEMS) [ X-4 ]), MI) ]) ; fof(Z) .
 
   eq with-elem(Z, X-4, R*) = (sof(Z) [. 'ELEMS = ((sof(Z) . 'ELEMS) [ #rat(((fof(Z) . 'MODULE) . 'ELEMS) [ X-4 ]) = (((sof(Z) . 'ELEMS) [ #rat(((fof(Z) . 'MODULE) . 'ELEMS) [ X-4 ]) ]) [. 'REFS = R* ]) ]) ]) ; fof(Z) .
 
@@ -6148,10 +6148,10 @@ mod SPEC2MAUDE-GENERATED is
   ceq growtable(TABLEINST, N-3, R) = TABLEINST'
     if { (field('TYPE, tuple(AT (([ I .. J? ]) RT))) ; field('REFS, R'*)) } := TABLEINST
       /\ size(J?) <= 1
-      /\ I' := size(R'*) + N-3
+      /\ I' := map-size(TABLEINST . 'REFS) + N-3
       /\ all-growtable(I', J?)
       /\ (I' : nat <:> int) <= _-_((2 ^ spectec-size(AT)) : nat <:> int, 1 : nat <:> int)
-      /\ TABLEINST' := { (field('TYPE, tuple(AT (([ I' .. J? ]) RT))) ; field('REFS, R'* repeatSeq(N-3, R))) } .
+      /\ TABLEINST' := { (field('TYPE, tuple(AT (([ I' .. J? ]) RT))) ; field('REFS, map-append(TABLEINST . 'REFS, repeatSeq(N-3, R)))) } .
 
   ceq growmem(MEMINST, N-3) = MEMINST'
     if { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, B*)) } := MEMINST
@@ -6176,7 +6176,7 @@ mod SPEC2MAUDE-GENERATED is
     if DT := ((S-2 . 'ARRAYS) [ A ]) . 'TYPE .
 
   ceq Ref-ok(S-2, REF.FUNC-ADDR(A)) = REF(nil, DT)
-    if DT := ((S-2 . 'FUNCS) [ A ]) . 'TYPE .
+    if DT := map-read(S-2 . 'FUNCS, A) . 'TYPE .
 
   ceq Ref-ok(S-2, REF.EXN-ADDR(A)) = REF(nil, EXN)
     if EXN-3 := (S-2 . 'EXNS) [ A ] .
@@ -6523,13 +6523,13 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read(Z ; CALL(X-4)) => RESULT
     if A := #rat((spectec-moduleinst(Z) . 'FUNCS) [ X-4 ])
-      /\ RESULT := REF.FUNC-ADDR(A) CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE) .
+      /\ RESULT := REF.FUNC-ADDR(A) CALL-REF(map-read(spectec-funcinst(Z), A) . 'TYPE) .
 
   rl Step-read(Z ; ((REF.NULL-ADDR) CALL-REF(YY-2))) => TRAP .
 
   crl Step-read(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) => FRAME- M-3 { F } (LABEL- M-3 { nil } INSTR*)
     if N-3 := size(VAL*)
-      /\ FI := spectec-funcinst(Z) [ A ]
+      /\ FI := map-read(spectec-funcinst(Z), A)
       /\ FUNC T_1* -> T_2* := Expand(FI . 'TYPE)
       /\ N-3 = size(T_1*)
       /\ M-3 := size(T_2*)
@@ -6541,7 +6541,7 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read(Z ; RETURN-CALL(X-4)) => RESULT
     if A := #rat((spectec-moduleinst(Z) . 'FUNCS) [ X-4 ])
-      /\ RESULT := REF.FUNC-ADDR(A) RETURN-CALL-REF((spectec-funcinst(Z) [ A ]) . 'TYPE) .
+      /\ RESULT := REF.FUNC-ADDR(A) RETURN-CALL-REF(map-read(spectec-funcinst(Z), A) . 'TYPE) .
 
   rl Step-read(Z ; (LABEL- K-3 { INSTR'* } ((VAL* RETURN-CALL-REF(YY-2)) INSTR*))) => VAL* RETURN-CALL-REF(YY-2) .
 
@@ -6551,7 +6551,7 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step-read(Z ; (FRAME- K-3 { F } ((((VAL'* VAL*) REF.FUNC-ADDR(A)) RETURN-CALL-REF(YY-2)) INSTR*))) => VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2))
     if N-3 := size(VAL*)
-      /\ FUNC T_1* -> T_2* := Expand((spectec-funcinst(Z) [ A ]) . 'TYPE)
+      /\ FUNC T_1* -> T_2* := Expand(map-read(spectec-funcinst(Z), A) . 'TYPE)
       /\ N-3 = size(T_1*)
       /\ M-3 := size(T_2*) .
 
@@ -6597,56 +6597,56 @@ mod SPEC2MAUDE-GENERATED is
     if VAL := spectec-global(Z, X-4) . 'VALUE .
 
   crl Step-read(Z ; (CONST(AT, # I) TABLE.GET(X-4))) => TRAP
-    if I >= size(spectec-table(Z, X-4) . 'REFS) .
+    if I >= map-size(spectec-table(Z, X-4) . 'REFS) .
 
   crl Step-read(Z ; (CONST(AT, # I) TABLE.GET(X-4))) => RESULT
-    if I < size(spectec-table(Z, X-4) . 'REFS)
-      /\ RESULT := (spectec-table(Z, X-4) . 'REFS) [ I ] .
+    if I < map-size(spectec-table(Z, X-4) . 'REFS)
+      /\ RESULT := map-read(spectec-table(Z, X-4) . 'REFS, I) .
 
   crl Step-read(Z ; TABLE.SIZE(X-4)) => CONST(AT, # N-3)
-    if N-3 := size(spectec-table(Z, X-4) . 'REFS)
+    if N-3 := map-size(spectec-table(Z, X-4) . 'REFS)
       /\ tuple(AT (LIM RT)) := spectec-table(Z, X-4) . 'TYPE .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => TRAP
-    if (I + N-3) > size(spectec-table(Z, X-4) . 'REFS) .
+    if (I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS) .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => nil
-    if ((I + N-3) > size(spectec-table(Z, X-4) . 'REFS)) =/= true
+    if ((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) => RESULT
-    if ((I + N-3) > size(spectec-table(Z, X-4) . 'REFS)) =/= true
+    if ((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ RESULT := CONST(AT, # I) (VAL (TABLE.SET(X-4) (CONST(AT, # (I + 1)) (VAL (CONST(AT, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.FILL(X-4)))))) .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X_1-2, X_2-3))))) => TRAP
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X_1-2) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, X_2-3) . 'REFS)) .
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X_1-2) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, X_2-3) . 'REFS)) .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) => nil
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) => RESULT
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ I_1 <= I_2
       /\ RESULT := CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (TABLE.GET(Y) (TABLE.SET(X-4) (CONST(AT_1, # (I_1 + 1)) (CONST(AT_2, # (I_2 + 1)) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.COPY(X-4, Y))))))) .
 
   crl Step-read(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) => RESULT
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ I_1 > I_2
       /\ RESULT := CONST(AT_1, # (_-_((I_1 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (CONST(AT_2, # (_-_((I_2 + N-3) : nat <:> int, 1 : nat <:> int) : int <:> nat)) (TABLE.GET(Y) (TABLE.SET(X-4) (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.COPY(X-4, Y))))))) .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => TRAP
-    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) .
+    if _or_((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => nil
-    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if _or_((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   crl Step-read(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) => RESULT
-    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if _or_((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ RESULT := CONST(AT, # I) (((spectec-elem(Z, Y) . 'REFS) [ J ]) (TABLE.SET(X-4) (CONST(AT, # (I + 1)) (CONST(I32, # (J + 1)) (CONST(I32, # (_-_(N-3 : nat <:> int, 1 : nat <:> int) : int <:> nat)) TABLE.INIT(X-4, Y)))))) .
 
@@ -6955,17 +6955,17 @@ mod SPEC2MAUDE-GENERATED is
 
   crl Step(Z ; (CONST(AT, # I) (REF-2 TABLE.SET(X-4)))) => Z ; TRAP
     if typecheck(REF-2, ref)
-      /\ I >= size(spectec-table(Z, X-4) . 'REFS) .
+      /\ I >= map-size(spectec-table(Z, X-4) . 'REFS) .
 
   crl Step(Z ; (CONST(AT, # I) (REF-2 TABLE.SET(X-4)))) => RESULT-2
     if typecheck(REF-2, ref)
-      /\ I < size(spectec-table(Z, X-4) . 'REFS)
+      /\ I < map-size(spectec-table(Z, X-4) . 'REFS)
       /\ RESULT-2 := with-table(Z, X-4, I, REF-2) ; nil .
 
   crl Step(Z ; (REF-2 (CONST(AT, # N-3) TABLE.GROW(X-4)))) => RESULT-2
     if typecheck(REF-2, ref)
       /\ TI := growtable(spectec-table(Z, X-4), N-3, REF-2)
-      /\ RESULT-2 := with-tableinst(Z, X-4, TI) ; CONST(AT, # size(spectec-table(Z, X-4) . 'REFS)) .
+      /\ RESULT-2 := with-tableinst(Z, X-4, TI) ; CONST(AT, # map-size(spectec-table(Z, X-4) . 'REFS)) .
 
   crl Step(Z ; (REF-2 (CONST(AT, # N-3) TABLE.GROW(X-4)))) => RESULT-2
     if typecheck(REF-2, ref)
@@ -7195,7 +7195,7 @@ mod SPEC2MAUDE-GENERATED is
   eq identifyFocus(Z, PREFIX (REF.NULL-ADDR), CALL-REF(YY-2), POSTFIX) = { PREFIX | (Z ; ((REF.NULL-ADDR) CALL-REF(YY-2))) | POSTFIX } .
 
   ceq identifyFocus(Z, STACK REF.FUNC-ADDR(A), CALL-REF(YY-2), POSTFIX) = { PREFIX | (Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) | POSTFIX }
-    if FI := spectec-funcinst(Z) [ A ]
+    if FI := map-read(spectec-funcinst(Z), A)
       /\ FUNC T_1* -> T_2* := Expand(FI . 'TYPE)
       /\ N-3 := size(T_1*)
       /\ PREFIX VAL* := STACK
@@ -7727,7 +7727,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq identifyRead(Z ; (VAL* (REF.FUNC-ADDR(A) CALL-REF(YY-2)))) = true
     if N-3 := size(VAL*)
-      /\ FI := spectec-funcinst(Z) [ A ]
+      /\ FI := map-read(spectec-funcinst(Z), A)
       /\ FUNC T_1* -> T_2* := Expand(FI . 'TYPE)
       /\ N-3 = size(T_1*) .
 
@@ -7775,50 +7775,50 @@ mod SPEC2MAUDE-GENERATED is
   eq identifyRead(Z ; GLOBAL.GET(X-4)) = true .
 
   ceq identifyRead(Z ; (CONST(AT, # I) TABLE.GET(X-4))) = true
-    if I >= size(spectec-table(Z, X-4) . 'REFS) .
+    if I >= map-size(spectec-table(Z, X-4) . 'REFS) .
 
   ceq identifyRead(Z ; (CONST(AT, # I) TABLE.GET(X-4))) = true
-    if I < size(spectec-table(Z, X-4) . 'REFS) .
+    if I < map-size(spectec-table(Z, X-4) . 'REFS) .
 
   eq identifyRead(Z ; TABLE.SIZE(X-4)) = true .
 
   ceq identifyRead(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) = true
-    if (I + N-3) > size(spectec-table(Z, X-4) . 'REFS) .
+    if (I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS) .
 
   ceq identifyRead(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) = true
-    if ((I + N-3) > size(spectec-table(Z, X-4) . 'REFS)) =/= true
+    if ((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   ceq identifyRead(Z ; (CONST(AT, # I) (VAL (CONST(AT, # N-3) TABLE.FILL(X-4))))) = true
-    if ((I + N-3) > size(spectec-table(Z, X-4) . 'REFS)) =/= true
+    if ((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS)) =/= true
       /\ N-3 =/= 0 .
 
   ceq identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X_1-2, X_2-3))))) = true
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X_1-2) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, X_2-3) . 'REFS)) .
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X_1-2) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, X_2-3) . 'REFS)) .
 
   ceq identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) = true
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   ceq identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) = true
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ I_1 <= I_2 .
 
   ceq identifyRead(Z ; (CONST(AT_1, # I_1) (CONST(AT_2, # I_2) (CONST(AT', # N-3) TABLE.COPY(X-4, Y))))) = true
-    if _or_((I_1 + N-3) > size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > size(spectec-table(Z, Y) . 'REFS)) =/= true
+    if _or_((I_1 + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (I_2 + N-3) > map-size(spectec-table(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0
       /\ I_1 > I_2 .
 
   ceq identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) = true
-    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) .
+    if _or_((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) .
 
   ceq identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) = true
-    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if _or_((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 == 0 .
 
   ceq identifyRead(Z ; (CONST(AT, # I) (CONST(I32, # J) (CONST(I32, # N-3) TABLE.INIT(X-4, Y))))) = true
-    if _or_((I + N-3) > size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
+    if _or_((I + N-3) > map-size(spectec-table(Z, X-4) . 'REFS), (J + N-3) > size(spectec-elem(Z, Y) . 'REFS)) =/= true
       /\ N-3 =/= 0 .
 
   ceq identifyRead(Z ; (CONST(AT, # I) LOAD(NT, nil, X-4, AO))) = true
@@ -8052,7 +8052,7 @@ mod SPEC2MAUDE-GENERATED is
       /\ X-4 := size(DEFTYPE'*)
       /\ DEFTYPE* := subst-all-deftypes(rolldt(X-4, RECTYPE), DEFTYPE'*) .
 
-  ceq alloctag(S-2, TAGTYPE) = tuple(recordConcat(S-2, { (field('TAGS, TAGINST) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'TAGS)))
+  ceq alloctag(S-2, TAGTYPE) = tuple(recordConcat(S-2, { (field('TAGS, TAGINST) ; (field('GLOBALS, nil) ; (field('MEMS, map-of(nil)) ; (field('TABLES, nil) ; (field('FUNCS, map-of(nil)) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'TAGS)))
     if TAGINST := { field('TYPE, TAGTYPE) } .
 
   eq alloctags(S-2, nil) = tuple(S-2 seq(nil)) .
@@ -8061,7 +8061,7 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S_1 (# JA)) := alloctag(S-2, TAGTYPE)
       /\ tuple(S_2 seq(JA'*)) := alloctags(S_1, TAGTYPE'*) .
 
-  ceq allocglobal(S-2, GLOBALTYPE, VAL) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, GLOBALINST) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'GLOBALS)))
+  ceq allocglobal(S-2, GLOBALTYPE, VAL) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, GLOBALINST) ; (field('MEMS, map-of(nil)) ; (field('TABLES, nil) ; (field('FUNCS, map-of(nil)) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'GLOBALS)))
     if GLOBALINST := { (field('TYPE, GLOBALTYPE) ; field('VALUE, VAL)) } .
 
   eq allocglobals(S-2, nil, nil) = tuple(S-2 seq(nil)) .
@@ -8070,7 +8070,7 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S_1 (# GA)) := allocglobal(S-2, GLOBALTYPE, VAL)
       /\ tuple(S_2 seq(GA'*)) := allocglobals(S_1, GLOBALTYPE'*, VAL'*) .
 
-  ceq allocmem(S-2, __PAGE(AT, [ I .. J? ])) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, MEMINST) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'MEMS)))
+  ceq allocmem(S-2, __PAGE(AT, [ I .. J? ])) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, map-of(MEMINST)) ; (field('TABLES, nil) ; (field('FUNCS, map-of(nil)) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# map-size(S-2 . 'MEMS)))
     if size(J?) <= 1
       /\ MEMINST := { (field('TYPE, __PAGE(AT, [ I .. J? ])) ; field('BYTES, sized-array(I * (64 * Ki), empty))) } .
 
@@ -8080,9 +8080,9 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S_1 (# MA)) := allocmem(S-2, MEMTYPE)
       /\ tuple(S_2 seq(MA'*)) := allocmems(S_1, MEMTYPE'*) .
 
-  ceq alloctable(S-2, tuple(AT (([ I .. J? ]) RT)), REF-2) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, TABLEINST) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'TABLES)))
+  ceq alloctable(S-2, tuple(AT (([ I .. J? ]) RT)), REF-2) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, map-of(nil)) ; (field('TABLES, TABLEINST) ; (field('FUNCS, map-of(nil)) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'TABLES)))
     if size(J?) <= 1
-      /\ TABLEINST := { (field('TYPE, tuple(AT (([ I .. J? ]) RT))) ; field('REFS, repeatSeq(I, REF-2))) } .
+      /\ TABLEINST := { (field('TYPE, tuple(AT (([ I .. J? ]) RT))) ; field('REFS, map-of(repeatSeq(I, REF-2)))) } .
 
   eq alloctables(S-2, nil, nil) = tuple(S-2 seq(nil)) .
 
@@ -8090,7 +8090,7 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S_1 (# TA)) := alloctable(S-2, TABLETYPE, REF-2)
       /\ tuple(S_2 seq(TA'*)) := alloctables(S_1, TABLETYPE'*, REF'*) .
 
-  ceq allocfunc(S-2, DEFTYPE, FUNCCODE, MODULEINST) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, FUNCINST) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'FUNCS)))
+  ceq allocfunc(S-2, DEFTYPE, FUNCCODE, MODULEINST) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, map-of(nil)) ; (field('TABLES, nil) ; (field('FUNCS, map-of(FUNCINST)) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# map-size(S-2 . 'FUNCS)))
     if FUNCINST := { (field('TYPE, DEFTYPE) ; (field('MODULE, MODULEINST) ; field('CODE, FUNCCODE))) } .
 
   eq allocfuncs(S-2, nil, nil, nil) = tuple(S-2 seq(nil)) .
@@ -8099,7 +8099,7 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S_1 (# FA)) := allocfunc(S-2, DT, FUNCCODE, MODULEINST)
       /\ tuple(S_2 seq(FA'*)) := allocfuncs(S_1, DT'*, FUNCCODE'*, MODULEINST'*) .
 
-  ceq allocdata(S-2, OK, BYTE*) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, DATAINST) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'DATAS)))
+  ceq allocdata(S-2, OK, BYTE*) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, map-of(nil)) ; (field('TABLES, nil) ; (field('FUNCS, map-of(nil)) ; (field('DATAS, DATAINST) ; (field('ELEMS, nil) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'DATAS)))
     if DATAINST := { field('BYTES, array-of(BYTE*)) } .
 
   eq allocdatas(S-2, nil, nil) = tuple(S-2 seq(nil)) .
@@ -8108,7 +8108,7 @@ mod SPEC2MAUDE-GENERATED is
     if tuple(S_1 (# DA)) := allocdata(S-2, OK-3, B*)
       /\ tuple(S_2 seq(DA'*)) := allocdatas(S_1, OK'*, B'**) .
 
-  ceq allocelem(S-2, ELEMTYPE, REF*) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, ELEMINST) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'ELEMS)))
+  ceq allocelem(S-2, ELEMTYPE, REF*) = tuple(recordConcat(S-2, { (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, map-of(nil)) ; (field('TABLES, nil) ; (field('FUNCS, map-of(nil)) ; (field('DATAS, nil) ; (field('ELEMS, ELEMINST) ; (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil)))))))))) }, store) (# size(S-2 . 'ELEMS)))
     if ELEMINST := { (field('TYPE, ELEMTYPE) ; field('REFS, REF*)) } .
 
   eq allocelems(S-2, nil, nil) = tuple(S-2 seq(nil)) .
@@ -8212,8 +8212,8 @@ mod SPEC2MAUDE-GENERATED is
       /\ INSTR_S? := map-CALL(X?)
       /\ size(INSTR_S?) <= 1 .
 
-  ceq invoke(S-2, FUNCADDR, VAL*) = (S-2 ; ({ (field('LOCALS, nil) ; field('MODULE, { (field('TYPES, nil) ; (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; field('EXPORTS, nil))))))))) })) })) ; (VAL* (REF.FUNC-ADDR(FUNCADDR) CALL-REF(((S-2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)))
-    if FUNC T_1* -> T_2* := Expand(((S-2 . 'FUNCS) [ FUNCADDR ]) . 'TYPE)
+  ceq invoke(S-2, FUNCADDR, VAL*) = (S-2 ; ({ (field('LOCALS, nil) ; field('MODULE, { (field('TYPES, nil) ; (field('TAGS, nil) ; (field('GLOBALS, nil) ; (field('MEMS, nil) ; (field('TABLES, nil) ; (field('FUNCS, nil) ; (field('DATAS, nil) ; (field('ELEMS, nil) ; field('EXPORTS, nil))))))))) })) })) ; (VAL* (REF.FUNC-ADDR(FUNCADDR) CALL-REF(map-read(S-2 . 'FUNCS, FUNCADDR) . 'TYPE)))
+    if FUNC T_1* -> T_2* := Expand(map-read(S-2 . 'FUNCS, FUNCADDR) . 'TYPE)
       /\ all-invoke(S-2, T_1*, VAL*) .
 
   eq map-concatopt(X, nil) = nil .
@@ -8715,7 +8715,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-allocmodule(S-2, 0, I_F) = nil .
 
-  eq map-allocmodule(S-2, s(ITER-COUNT), I_F) = (# (size(S-2 . 'FUNCS) + I_F)) map-allocmodule(S-2, ITER-COUNT, s(I_F)) .
+  eq map-allocmodule(S-2, s(ITER-COUNT), I_F) = (# (map-size(S-2 . 'FUNCS) + I_F)) map-allocmodule(S-2, ITER-COUNT, s(I_F)) .
 
   eq map-subst-all-tagtype(DT*, nil) = nil .
 
@@ -8768,8 +8768,8 @@ mod SPEC2MAUDE-GENERATED is
 
   eq all-growtable(I', nil) = true .
 
-  ceq all-growtable(I', (# J) ?) = true
-    if I' <= J .
+  ceq all-growtable(I', (# J-2-3) ?) = true
+    if I' <= J-2-3 .
 
   eq bind-Step-read-vload-pack-val(M-2, Z, X-4, AT, I, AO, 0, K-3) = nil .
 

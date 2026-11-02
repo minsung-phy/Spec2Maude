@@ -212,6 +212,47 @@ fmod SPECTEC-ARRAY is
   eq typecheck(sized-array(S, (I |-> T ; A)), TYPE) = I < S and typecheck(T, TYPE) and typecheck(sized-array(S, A), TYPE) .
 endfm
 
+--- hint(maude_map) (record 필드): 그 sequence 필드를 크기 + prelude MAP으로 저장
+--- (모든 index 0 .. 크기-1에 항목이 있음; 없는 index의 조회는 prelude MAP의 undefined)
+view Terminal from TRIV to SPECTEC-BUILTIN-TYPES is
+  sort Elt to SpectecTerminal .
+endv
+
+fmod SPECTEC-MAP is
+  protecting SPECTEC-LIST .
+  protecting MAP{Nat, Terminal} * (sort Map{Nat, Terminal} to TerminalMap,
+    sort Entry{Nat, Terminal} to TerminalEntry, op _|->_ to _|=>_) .
+
+  op sized-map : Nat TerminalMap -> SpectecTerminal [ctor] .                   --- 크기, map
+  op map-of : SpectecTerminals -> SpectecTerminal .                            --- sequence → map
+  op map-size : SpectecTerminal ~> Nat .                                       --- |e.f|
+  op map-read : SpectecTerminal Nat ~> SpectecTerminal .                       --- e.f[I]
+  op map-write : SpectecTerminal Nat SpectecTerminal ~> SpectecTerminal .      --- e[.f[I] = T]
+  op map-append : SpectecTerminal SpectecTerminals ~> SpectecTerminal .        --- e.f TS
+  op map-concat : SpectecTerminal SpectecTerminal ~> SpectecTerminal .         --- record ++ 의 필드
+
+  vars S S' I : Nat .
+  vars M M' : TerminalMap .
+  var T : SpectecTerminal .
+  var TS : SpectecTerminals .
+  var TYPE : SpectecType .
+
+  eq map-of(TS) = map-append(sized-map(0, empty), TS) .
+
+  eq map-size(sized-map(S, M)) = S .
+  eq map-read(sized-map(S, M), I) = M[I] .
+  ceq map-write(sized-map(S, M), I, T) = sized-map(S, insert(I, T, M)) if I < S .
+  eq map-append(sized-map(S, M), nil) = sized-map(S, M) .
+  eq map-append(sized-map(S, M), T TS) = map-append(sized-map(s S, (M, S |=> T)), TS) .
+  eq map-concat(sized-map(S, M), sized-map(S', empty)) = sized-map(S + S', M) .
+  eq map-concat(sized-map(S, M), sized-map(S', (I |=> T, M')))
+    = map-concat(sized-map(S, (M, S + I |=> T)), sized-map(S', M')) .
+
+  --- 원소 타입 검사: 저장된 칸마다 확인
+  eq typecheck(sized-map(S, empty), TYPE) = true .
+  eq typecheck(sized-map(S, (I |=> T, M)), TYPE) = I < S and typecheck(T, TYPE) and typecheck(sized-map(S, M), TYPE) .
+endfm
+
 fmod SPECTEC-SEMANTICS is
   protecting SPECTEC-CONVERT .
   protecting SPECTEC-LIST .
@@ -219,4 +260,5 @@ fmod SPECTEC-SEMANTICS is
   protecting SPECTEC-TUPLE .
   protecting SPECTEC-RECORD .
   protecting SPECTEC-ARRAY .
+  protecting SPECTEC-MAP .
 endfm

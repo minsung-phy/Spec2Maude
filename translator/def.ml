@@ -507,7 +507,7 @@ let check_hints higher_order script =
           List.iter
             (fun hint ->
               match hint.hintid.it with
-              | "builtin" | "maude_kind" | "maude_rule" | "inverse" ->
+              | "builtin" | "maude_kind" | "maude_rule" | "maude_map" | "inverse" ->
                   unsupported hint.hintid.at "DecH" ("DecD $" ^ id.it)
                     (hint.hintid.it ^ " hint on a definition with def parameters")
               | _ -> ())
@@ -653,12 +653,12 @@ let assume_script script =
   in
   List.map transform script
 
-(* hint(maude_array): a premise e = {.., f x*} binds x* to the array stored in
-   e.f, so x* equals e.f. Later premises and the result use e.f in place of
-   x*, which gets the array translation (|e.f| is the stored size, e.f 0^n
-   grows the array); the binding premise is kept. *)
-let array_script script =
-  let arrays = Hintd.scan_arrays script in
+(* hint(maude_array), hint(maude_map): a premise e = {.., f x*} binds x* to
+   the array or map stored in e.f, so x* equals e.f. Later premises and the
+   result use e.f in place of x*, which gets the stored translation (|e.f| is
+   the stored size, e.f s grows it); the binding premise is kept. *)
+let stored_script script =
+  let stored = Hintd.scan_stored script in
   let bound_variable exp =
     match exp.it with
     | VarE x -> Some x
@@ -671,7 +671,7 @@ let array_script script =
     | StrE fields ->
         fields
         |> List.filter_map (fun (atom, value) ->
-             if not (Hintd.array_field arrays pattern.note atom) then None
+             if Hintd.stored_field stored pattern.note atom = None then None
              else
                bound_variable value
                |> Option.map (fun x -> x, DotE (record, atom) $$ (value.at, value.note)))
@@ -728,7 +728,7 @@ let array_script script =
   List.map transform script
 
 let translate_script script =
-  let script = array_script (specialize_script (assume_script script)) in
+  let script = stored_script (specialize_script (assume_script script)) in
   let index = Prescan.scan script in
   (* Relations without a supported policy are omitted; a call to one is
      rejected later, but an unreferenced one would vanish silently. *)

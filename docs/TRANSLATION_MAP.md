@@ -293,7 +293,7 @@ other expressions are handled by `term.ml:translate_value`.
 | `OptE None` / `OptE (Some e)` | `nil` / `⟦e⟧ ?` | `term.ml:translate_value` |
 | `StrE fields` | `{ field('a1, ⟦e1⟧) ; … }` | `term.ml:translate_value` |
 | `DotE e a` | `⟦e⟧ . 'a` | `term.ml:translate_value` |
-| `StrE fields`, `DotE e a`, `LenE`, `IdxE`, `SliceE`, `UpdE` on a `maude_array` field | see "Fields with `hint(maude_array)`" below | `term.ml:translate_value`, `term.ml:translate_update` |
+| `StrE fields`, `DotE e a`, `LenE`, `IdxE`, `SliceE`, `UpdE` on a `maude_array` or `maude_map` field | see "Fields with `hint(maude_array)`" and "Fields with `hint(maude_map)`" below | `term.ml:translate_value`, `term.ml:translate_update` |
 | `CompE e1 e2` | `recordConcat`, `optionConcat`, or sequence concatenation, by type | `term.ml:translate_composition` |
 | `ListE es` | `⟦e1⟧ … ⟦en⟧` (sequence) | `term.ml:translate_value` |
 | `LiftE e` | sequence lift of `⟦e⟧` | `term.ml:translate_value` |
@@ -332,14 +332,41 @@ equal to `# 0` are absent (`backend/spectec-semantics.maude`, `SPECTEC-ARRAY`).
 | `SliceE (DotE e f) i n` | `array-read(⟦e⟧ . 'f, ⟦i⟧, ⟦n⟧)` | `term.ml:translate_value` |
 | `UpdE e (SliceP (DotP p f) i n) e'` | `p` updated with `[. 'f = array-write(⟦p⟧ . 'f, ⟦i⟧, ⟦n⟧, ⟦e'⟧)]` | `term.ml:translate_update` |
 | `UpdE e (DotP p f) e'` | `p` updated with `[. 'f = array-of(⟦e'⟧)]` | `term.ml:translate_update` |
-| field `f` of `StrE`, value `0^n` | `sized-array(⟦n⟧, empty)` | `term.ml:translate_array_value` |
-| field `f` of `StrE`, value `e 0^n` | `array-grow(⟦e⟧, ⟦n⟧)`, with `⟦e⟧` by this row set | `term.ml:translate_array_value` |
-| field `f` of `StrE`, value `e.f'` of another array field | the stored array of `e.f'` | `term.ml:translate_array_value` |
-| field `f` of `StrE`, other value `e` | `array-of(⟦e⟧)` (the sequence becomes an array) | `term.ml:translate_array_value` |
-| field `f` of a `StrE` pattern | the variable binds the stored array; its later uses are written as `e.f` before translation (section 7) | `prem.ml:translate_field_patterns`, `def.ml:array_script` |
+| field `f` of `StrE`, value `0^n` | `sized-array(⟦n⟧, empty)` | `term.ml:translate_stored_value` |
+| field `f` of `StrE`, value `e 0^n` | `array-grow(⟦e⟧, ⟦n⟧)`, with `⟦e⟧` by this row set | `term.ml:translate_stored_value` |
+| field `f` of `StrE`, value `e.f'` of another array field | the stored array of `e.f'` | `term.ml:translate_stored_value` |
+| field `f` of `StrE`, other value `e` | `array-of(⟦e⟧)` (the sequence becomes an array) | `term.ml:translate_stored_value` |
+| field `f` of a `StrE` pattern | the variable binds the stored array; its later uses are written as `e.f` before translation (section 7) | `prem.ml:translate_field_patterns`, `def.ml:stored_script` |
 
 `0` is `NumE 0`, possibly under `SubE`, `CvtE`, or an argument case such as
 `%_byte(0)`. Every other use of the field is rejected (section 8).
+
+### Fields with `hint(maude_map)`
+
+`hint(maude_map)` on a sequence field `f` of a record type stores `f` as
+`sized-map(size, M)`, where `M` is a prelude `MAP{Nat, Terminal}` (entry
+operator renamed `_|=>_`) with an entry for every index `0 .. size-1`
+(`backend/spectec-semantics.maude`, `SPECTEC-MAP`). A missing index reads as
+the prelude `undefined`, which has no sort, so an out-of-range read gives no
+value, as in the source. `hint(maude_map)` on a `DecD` whose clauses return
+such a field (`def $funcinst(state) : funcinst*`) makes its calls map values.
+
+| IL | Maude | Code |
+| --- | --- | --- |
+| `LenE (DotE e f)`, `LenE (CallE g ..)` | `map-size(⟦e⟧ . 'f)`, `map-size(ĝ(..))` | `term.ml:translate_value`, `term.ml:stored_value` |
+| `IdxE (DotE e f) i`, `IdxE (CallE g ..) i` | `map-read(⟦e⟧ . 'f, ⟦i⟧)`, `map-read(ĝ(..), ⟦i⟧)` | `term.ml:translate_value`, `term.ml:stored_value` |
+| `UpdE e (IdxP (DotP p f) i) e'` | `p` updated with `[. 'f = map-write(⟦p⟧ . 'f, ⟦i⟧, ⟦e'⟧)]` | `term.ml:translate_update` |
+| path `IdxP (DotP p f) i` below an update (`s[.f[i].g = e']`) | selected by `map-read(⟦p⟧ . 'f, ⟦i⟧)`, written back by `map-write` | `term.ml:translate_select`, `term.ml:translate_update` |
+| `UpdE e (DotP p f) e'` | `p` updated with `[. 'f = map-of(⟦e'⟧)]` | `term.ml:translate_update` |
+| field `f` of `StrE`, value `e.f'` of another map field | the stored map of `e.f'` | `term.ml:translate_stored_value` |
+| field `f` of `StrE`, value `e s` with `e` a map field | `map-append(⟦e⟧, ⟦s⟧)` | `term.ml:translate_stored_value` |
+| field `f` of `StrE`, other value `e` | `map-of(⟦e⟧)` | `term.ml:translate_stored_value` |
+| `CompE` of the record (`s ++ {f x}`) | `recordConcat` with `map-concat(L . 'f, R . 'f)` for `f` | `typd.ml:translate_struct_composition` |
+| clause result of a `hint(maude_map)` `DecD` | the stored map of the returned field | `decd.ml:translate_result` |
+| field `f` of a `StrE` pattern | as for `maude_array` | `def.ml:stored_script` |
+
+Every other use of the field or of a call of the definition is rejected
+(section 8).
 
 ## 5. Types, arguments, and parameters
 
@@ -424,7 +451,7 @@ its first occurrence.
 | --- | --- | --- |
 | Before translation | Remove the premises named by `hint(maude_assume)`, and the quantifiers whose variables occurred only in those premises | `def.ml:assume_script` |
 | Before translation | Remove `DefP`/`DefA` (section 5) | `def.ml:specialize_script` |
-| Before translation | After a premise `e = {.., f x*}` on a `hint(maude_array)` field `f`, write `e.f` for `x*` in the later premises and the result, so that `x*` gets the array translation (section 4). Only clauses and rules with such a premise are rewritten. | `def.ml:array_script` |
+| Before translation | After a premise `e = {.., f x*}` on a `hint(maude_array)` or `hint(maude_map)` field `f`, write `e.f` for `x*` in the later premises and the result, so that `x*` gets the stored translation (section 4). Only clauses and rules with such a premise are rewritten. | `def.ml:stored_script` |
 | Before translation | Choose Maude names; collect variables, iterations, relation kinds, and hints | `prescan.ml:scan` |
 | Type guards | A variable of a quantifier or parameter gets a condition `typecheck(X, ⟦t⟧)`, unless its type is already established: by a premise that binds it from a relation call, or by the declared types of the rule's inputs, or by an argument `SubE` pattern of a function head that already checks an equal membership. In a syntax instance such as `syntax num_(Inn)`, the `SubE` check of the alias-expanded type (`addrtype`) keeps its place but uses the quantifier's type (`Inn`), and the quantifier check is not repeated; the type is replaced in the source
 pattern before translation. A variable whose Maude sort is the sort of its
@@ -442,16 +469,17 @@ relies on reachable values being well typed. In every context, including syntax 
 | Hint | Where | Section |
 | --- | --- | --- |
 | `builtin`, `maude_kind`, `maude_rule`, `inverse` | `DecD` | 1, 3 |
+| `maude_map` | `DecD` | 4 |
 | `maude_compute`, `maude_check` | `RelD` | 2 |
 | `maude_subsume`, `maude_trans`, `k_heatcool` | `RuleD` | 2 |
 | `maude_assume` | `RuleD` and `DecD` | 7 |
 | `maude_sort`, `maude_subsort`, `maude_proper` | `TypD` | 7 |
-| `maude_array` | a field of `StructT` (the hint list of the field) | 4 |
+| `maude_array`, `maude_map` | a field of `StructT` (the hint list of the field) | 4 |
 
 Hints arrive as `HintD` definitions (`TypH`, `RelH`, `DecH`, `RuleH`) and
-are collected by `prescan.ml:collect_hints`. A field hint (`maude_array`)
-stays in the hint list of its `StructT` field and is read by
-`hintd.ml:arrays_of`. Other hints (for example, the documentation hints
+are collected by `prescan.ml:collect_hints`. A field hint (`maude_array`,
+`maude_map`) stays in the hint list of its `StructT` field and is read by
+`hintd.ml:stored_of`. Other hints (for example, the documentation hints
 `name`, `macro`, and `tabular`, and every `GramH`) are ignored.
 
 ## 8. Cases that are rejected or omitted
@@ -469,8 +497,9 @@ the rule, clause, or iteration, naming the definition and the reason. An omitted
 | `SubE` between types with different Maude representations | rejected | `term.ml:translate_value` |
 | `IdxE`, `SliceE`, and the paths `IdxP`, `SliceP` on a sequence with its own sort (`hint(maude_sort)`) | rejected | `term.ml:translate_value`, `term.ml:translate_select` |
 | `IterT t +` and `IterT t ^n` as a type argument | rejected | `term.ml:translate_check_typ` |
-| `hint(maude_array)` on a field that is not a sequence, or of a record type with parameters; `hint(maude_array)` on a `syntax` declaration instead of a field | rejected | `hintd.ml:array_field_of`, `hintd.ml:arrays_of` |
+| `hint(maude_array)` or `hint(maude_map)` on a field that is not a sequence, or of a record type with parameters; both on one field; either on a `syntax` declaration instead of a field | rejected | `hintd.ml:stored_field_of`, `hintd.ml:stored_of` |
 | A `maude_array` field read other than by `LenE`, `IdxE`, `SliceE`; written by `IdxP` or `ExtE`; selected inside; or `CompE` of its record | rejected | `term.ml:translate_value`, `term.ml:translate_select`, `term.ml:translate_update`, `term.ml:translate_extension`, `term.ml:translate_composition` |
+| A `maude_map` field or `hint(maude_map)` call read other than by `LenE`, `IdxE`; written by `SliceP` or `ExtE`; selected inside by `SliceP`; a `hint(maude_map)` `DecD` clause that does not return a `maude_map` field | rejected | `term.ml:translate_value`, `term.ml:translate_select`, `term.ml:translate_update`, `term.ml:translate_extension`, `decd.ml:translate_result` |
 | `ElsePr` in a `maude_rule` function, or not as the first premise of an execution rule | rejected | `decd.ml:translate_rule_clause`, `reld.ml:lower_execution_rule` |
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |

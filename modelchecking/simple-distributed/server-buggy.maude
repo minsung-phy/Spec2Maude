@@ -32,9 +32,9 @@ FUNC(0))) .
 (#_(114) #_(95) #_(115) #_(116) #_(101) #_(112)) .
   eq serverEmptyStore = {(field('TAGS, nil) ;
   (field('GLOBALS, nil) ;
-   (field('MEMS, nil) ;
+   (field('MEMS, map-of(nil)) ;
     (field('TABLES, nil) ;
-     (field('FUNCS, nil) ;
+     (field('FUNCS, map-of(nil)) ;
       (field('DATAS, nil) ;
        (field('ELEMS, nil) ;
         (field('STRUCTS, nil) ; (field('ARRAYS, nil) ; field('EXNS, nil))))))))))} .

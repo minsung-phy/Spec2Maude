@@ -94,34 +94,29 @@ mod WASM-WAST-DRIVER is
   op script.ready : SpectecTerminal InstanceEnv Commands
     -> ScriptState [ctor] .
   --- kstate(R, K): R is the Step request of the configuration around the next
-  --- redex, K the holes of hint(k_heatcool) contexts taken off it; one rule of
-  --- Step applied inside it is one step, and cool-all(unheat(R), K) is the whole
-  --- configuration. A script runs one deterministic execution like the
-  --- reference interpreter: each step is the nearest successor that a
-  --- breadth-first search finds, so rules are tried in declaration order
-  --- memory.grow-succeed, for example, is tried before memory.grow-fail.
-  --- The condition KS => KS2 holds in zero or more steps; KS2 =/= KS skips
-  --- zero steps. As a rewrite theory a script step therefore also relates KS
-  --- to states several Steps away; rew takes the first solution, which the
-  --- breadth-first search finds at one Step. This driver is meant for rew,
-  --- not for search or model checking.
-  op script.module : Nat InstanceEnv Commands KState
-    -> ScriptState [ctor frozen (4)] .
-  op script.return : Nat InstanceEnv ResultPatterns Commands
-    KState -> ScriptState [ctor frozen (5)] .
-  op script.trap : Nat InstanceEnv Commands KState
-    -> ScriptState [ctor frozen (4)] .
-  op script.exception : Nat InstanceEnv Commands KState
-    -> ScriptState [ctor frozen (4)] .
+  --- redex, K the holes of hint(k_heatcool) contexts taken off it, and
+  --- cool-all(unheat(R), K) is the whole configuration. The KState argument
+  --- of a running command is not frozen: the Step rules rewrite it in place,
+  --- and the command's completion rules match its final kstate. A script runs
+  --- one deterministic execution like the reference interpreter, so this
+  --- driver is meant for rew, not for search or model checking.
+  --- rew is rule fair, so where several Step rules apply to one request it may
+  --- take any of them. The reference interpreter grows a memory or table
+  --- whenever memory.grow or table.grow can succeed. At such a choice point the
+  --- request is held in choice(_), whose rule takes the first successor in
+  --- Maude's search order: the rule declared first, the success rule.
+  op script.module : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
+  op script.return : Nat InstanceEnv ResultPatterns Commands KState
+    -> ScriptState [ctor] .
+  op script.trap : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
+  op script.exception : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
   op script.exhaustion : Nat Nat InstanceEnv Commands KState
-    -> ScriptState [ctor frozen (5)] .
-  op script.exhaustion-check : Nat Nat InstanceEnv Commands
-    SpectecTerminal KState
-    -> ScriptState [ctor frozen (5 6)] .
-  op script.action : Nat InstanceEnv Commands KState
-    -> ScriptState [ctor frozen (4)] .
+    -> ScriptState [ctor] .
+  op script.action : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
   op script.uninstantiable : Nat InstanceEnv Commands KState
-    -> ScriptState [ctor frozen (4)] .
+    -> ScriptState [ctor] .
+  op choice : Step-Request -> Step-Request [ctor frozen (1)] .
+  op choicePoint : Step-Request -> Bool .
   op script.wrong-result : Nat ValList ResultPatterns
     -> ScriptState [ctor] .
   op script.wrong-assertion : Nat -> ScriptState [ctor] .
@@ -140,11 +135,12 @@ mod WASM-WAST-DRIVER is
   op runtimeResults : ValList -> Bool .
 
   op activeFrameDepth : InstrList -> Nat .
+  op frameDepth : Holes -> Nat .
 
-  vars WSHC WSHC2 WSHM WSHS WSHS2 WSHF2 WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
+  vars WSHC WSHM WSHS WSHF WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
   vars WSHK WSHK2 : Holes .
   vars WSHR WSHR2 : Step-Request .
-  vars WSHKS WSHKS2 : KState .
+  var WSHH : Hole .
   vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .
   vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .
   vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .
@@ -190,12 +186,12 @@ mod WASM-WAST-DRIVER is
   ceq checkImport(WSHS, MEM(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.ok(MEM(WSHA))
     if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         ((WSHS . 'MEMS)[WSHA] . 'TYPE)
+         (map-read(WSHS . 'MEMS, WSHA) . 'TYPE)
        /\ WSHMIN >= WSHREQUIRED = true .
   ceq checkImport(WSHS, MEM(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.error
     if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         ((WSHS . 'MEMS)[WSHA] . 'TYPE)
+         (map-read(WSHS . 'MEMS, WSHA) . 'TYPE)
        /\ WSHMIN < WSHREQUIRED = true .
   eq checkImport(WSHS, TAG(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.error .
@@ -259,6 +255,15 @@ mod WASM-WAST-DRIVER is
     activeFrameDepth(WSHBODY)
     if runtimeResults(WSHPREFIX) .
   eq activeFrameDepth(WSHINSTRS) = 0 [owise] .
+  eq frameDepth(WSHK hole-Step-ctxt-frame(WSHN, WSHF) WSHK2) =
+    frameDepth(WSHK) + 1 + frameDepth(WSHK2) .
+  eq frameDepth(WSHK) = 0 [owise] .
+
+  eq choicePoint(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA)))) = true .
+  eq choicePoint(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA))))) = true .
+  eq choicePoint(WSHR ~> WSHH) = choicePoint(WSHR) .
+  eq choicePoint(WSHR) = false [owise] .
+  ceq kstate(WSHR, WSHK) = kstate(choice(WSHR), WSHK) if choicePoint(WSHR) .
   eq match.and(match.yes, match.yes) = match.yes .
   eq match.and(match.yes, match.no) = match.no .
   eq match.and(match.no, match.yes) = match.no .
@@ -379,7 +384,7 @@ mod WASM-WAST-DRIVER is
     if occurs(# WSHA, hostFunctionAddresses) = true
        /\ typecheck(WSHARGS, val) = true
        /\ typecheck(WSHARGS, instr) = true
-       /\ WSHXA := (WSHS . 'FUNCS)[WSHA]
+       /\ WSHXA := map-read(WSHS . 'FUNCS, WSHA)
        /\ (WSHXA . 'CODE) = ...
        /\ FUNC WSHTYPES -> nil := Expand((WSHXA . 'TYPE))
        /\ size(WSHARGS) = size(WSHTYPES)
@@ -394,6 +399,9 @@ mod WASM-WAST-DRIVER is
     Step-read((WSHS ; WSHCURRENT) ;
       (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => nil
     if hostCallable(WSHS, WSHA, WSHARGS) = true .
+
+  crl [choice] : kstate(choice(WSHR), WSHK) => kstate(WSHR2, WSHK)
+    if WSHR => WSHR2 /\ WSHR2 =/= WSHR .
 
   rl [start] : script.start => initialState .
   crl [module-start] :
@@ -411,11 +419,6 @@ mod WASM-WAST-DRIVER is
     script.module(WSHID, WSHENV, WSHCMDS,
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; nil), none))
     => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .
-
-
-  crl [module-step] : script.module(WSHID, WSHENV, WSHCMDS, WSHKS)
-    => script.module(WSHID, WSHENV, WSHCMDS, WSHKS2)
-    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   crl [assert-unlinkable] :
     script.ready(WSHS, WSHENV,
@@ -457,10 +460,6 @@ mod WASM-WAST-DRIVER is
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; nil), none))
     => script.wrong-assertion(WSHID) .
 
-  crl [assert-uninstantiable-step] : script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHKS)
-    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, WSHKS2)
-    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
-
   rl [call-return] :
     script.ready(WSHS, WSHENV, commands.cons(
       command.return(WSHID, action.invoke(WSHTARGET, WSHNAME, WSHARGS),
@@ -498,10 +497,6 @@ mod WASM-WAST-DRIVER is
     if runtimeResults(WSHACTUAL) = true
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
 
-  crl [return-step] : script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHKS)
-    => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS, WSHKS2)
-    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
-
   rl [call-trap] :
     script.ready(WSHS, WSHENV, commands.cons(command.trap(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
@@ -511,10 +506,6 @@ mod WASM-WAST-DRIVER is
     script.trap(WSHID, WSHENV, WSHCMDS,
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
-
-  crl [trap-step] : script.trap(WSHID, WSHENV, WSHCMDS, WSHKS)
-    => script.trap(WSHID, WSHENV, WSHCMDS, WSHKS2)
-    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   rl [call-exception] :
     script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,
@@ -536,10 +527,6 @@ mod WASM-WAST-DRIVER is
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
 
-  crl [exception-step] : script.exception(WSHID, WSHENV, WSHCMDS, WSHKS)
-    => script.exception(WSHID, WSHENV, WSHCMDS, WSHKS2)
-    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
-
   rl [call-action] :
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
@@ -550,9 +537,6 @@ mod WASM-WAST-DRIVER is
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if runtimeResults(WSHACTUAL) = true .
-  crl [action-step] : script.action(WSHID, WSHENV, WSHCMDS, WSHKS)
-    => script.action(WSHID, WSHENV, WSHCMDS, WSHKS2)
-    if WSHKS => WSHKS2 /\ WSHKS2 =/= WSHKS .
 
   crl [get-action] :
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
@@ -582,28 +566,15 @@ mod WASM-WAST-DRIVER is
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
-  crl [exhaustion-step] :
-    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
-    => script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      WSHS2, kstate(WSHR2, WSHK2))
-    if kstate(WSHR, WSHK) => kstate(WSHR2, WSHK2)
-       /\ kstate(WSHR2, WSHK2) =/= kstate(WSHR, WSHK)
-       /\ (WSHS2 ; WSHF2) ; WSHINSTRS := unheat(WSHR2) .
   --- SpecTec has no call-stack limit: assert_exhaustion passes once the frame
-  --- depth of the whole configuration exceeds the bound (--call-depth), so a
-  --- PASS is relative to that bound.
+  --- depth of the configuration exceeds the bound (--call-depth), so a PASS is
+  --- relative to that bound. The active frames of cool-all(unheat(R), K) are
+  --- the frame holes of K and the active frames of the request R.
   crl [exhaustion-done] :
-    script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,
-      kstate(WSHR, WSHK))
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
     => script.ready(WSHS, WSHENV, WSHCMDS)
-    if WSHC2 ; WSHINSTRS := cool-all(unheat(WSHR), WSHK)
-       /\ activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
-  crl [exhaustion-continue] :
-    script.exhaustion-check(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, WSHS,
-      kstate(WSHR, WSHK))
-    => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
-    if WSHC2 ; WSHINSTRS := cool-all(unheat(WSHR), WSHK)
-       /\ activeFrameDepth(WSHINSTRS) <= WSHREQUIRED = true .
+    if (WSHS ; WSHF) ; WSHINSTRS := unheat(WSHR)
+       /\ frameDepth(WSHK) + activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
 
   rl [done] :
     script.ready(WSHS, WSHENV, commands.nil) => script.done .

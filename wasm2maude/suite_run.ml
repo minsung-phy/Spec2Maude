@@ -5,7 +5,6 @@ type status =
   | Frontend_error
   | Maude_error
   | Timeout
-  | Step_limit
   | Stuck
 
 type case = {
@@ -31,7 +30,6 @@ let status_name = function
   | Frontend_error -> "FRONTEND_ERROR"
   | Maude_error -> "MAUDE_ERROR"
   | Timeout -> "TIMEOUT"
-  | Step_limit -> "STEP_LIMIT"
   | Stuck -> "STUCK"
 
 let contains text pattern =
@@ -52,31 +50,12 @@ let find_line pattern lines =
   |> Option.value ~default:""
   |> String.trim
 
-(* Wast_harness emits [rew [steps]] followed by [continue 1]. The penultimate
-   result belongs to the requested bound; the final result is only a probe. *)
-let bounded_result lines =
-  let previous, last =
-    List.fold_left
-      (fun ((_, last) as results) line ->
-        if contains line "result " then last, Some line else results)
-      (None, None) lines
-  in
-  match previous, last with
-  | Some result, _ | None, Some result -> String.trim result
-  | None, None -> "no Maude result"
-
-(* A positive rewrite count in the final probe distinguishes STEP_LIMIT from
-   STUCK. Do not use the probe's result to turn a bounded run into PASS. *)
-let last_rewrite_count lines =
-  let parse line =
-    String.split_on_char ' ' (String.trim line)
-    |> List.filter (fun field -> field <> "")
-    |> function
-    | "rewrites:" :: count :: _ -> int_of_string_opt count
-    | _ -> None
-  in
-  List.fold_left
-    (fun last line -> Option.value (parse line) ~default:last) 0 lines
+(* Wast_harness runs the script to a state where no rule applies; its result
+   line is the final script state. *)
+let final_result lines =
+  match List.find_opt (fun line -> contains line "result ") lines with
+  | Some result -> String.trim result
+  | None -> "no Maude result"
 
 let classify process output =
   let lines = String.split_on_char '\n' output in
@@ -86,12 +65,9 @@ let classify process output =
     match process with
     | Timed_out -> Timeout, "Maude exceeded the per-file timeout"
     | Exited (Unix.WEXITED 0) ->
-        let result = bounded_result lines in
+        let result = final_result lines in
         if contains result "script.wrong-" then Wrong_result, result
         else if contains result "script.done" then Pass, ""
-        else if last_rewrite_count lines > 0 then
-          Step_limit,
-          "bounded rewrite budget exhausted while execution could still step"
         else Stuck, result
     | Exited (Unix.WEXITED code) ->
         Maude_error, Printf.sprintf "Maude exited with status %d" code
@@ -175,14 +151,14 @@ let log_path dir index source =
   let name = Filename.basename source in
   Filename.concat dir (Printf.sprintf "%04d-%s.log" index name)
 
-let run_case ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir index source =
+let run_case ?runtime ~semantics ~maude ~timeout ~call_depth ~log_dir index source =
   let started = Unix.gettimeofday () in
   let commands = ref 0 in
   let checked_assertions = ref 0 in
   let runtime_assertions = ref 0 in
   let status, detail =
     try
-      let harness, emitted = Wast_run.emit ?runtime ~semantics ~steps ~call_depth source in
+      let harness, emitted = Wast_run.emit ?runtime ~semantics ~call_depth source in
       commands := Wast_run.commands emitted;
       checked_assertions := Wast_run.checked_assertions emitted;
       runtime_assertions := Wast_run.runtime_assertions emitted;
@@ -222,7 +198,7 @@ let run_case ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir ind
     runtime_assertions = !runtime_assertions;
     detail }
 
-let run ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ?progress ?log_dir path =
+let run ?runtime ~semantics ~maude ~timeout ~call_depth ?progress ?log_dir path =
   if timeout <= 0. then invalid_arg "Suite_run.run: non-positive timeout";
   Option.iter ensure_directory log_dir;
   let sources = Wast.sources path in
@@ -231,7 +207,7 @@ let run ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ?progress ?log_di
   |> List.mapi
        (fun index source ->
          let case =
-           run_case ?runtime ~semantics ~maude ~timeout ~steps ~call_depth ~log_dir
+           run_case ?runtime ~semantics ~maude ~timeout ~call_depth ~log_dir
              (index + 1) source
          in
          Option.iter
@@ -266,7 +242,6 @@ let summary report =
       Frontend_error;
       Maude_error;
       Timeout;
-      Step_limit;
       Stuck ]
   in
   List.filter_map

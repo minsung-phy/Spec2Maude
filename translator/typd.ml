@@ -112,7 +112,8 @@ let rec composable index seen typ =
      | AliasT _ | VariantT _ -> false
 
 (* No recordConcat for a record with a maude_array field: an array is not a
-   sequence to concatenate, and CompE on such a record is Unsupported. *)
+   sequence to concatenate, and CompE on such a record is Unsupported. A
+   maude_map field is concatenated by map-concat. *)
 let translate_struct_composition index id target fields =
   if Prescan.array_record index (VarT (id, []) $ id.at)
      || not (List.for_all (fun (_, (typ, _, _), _) -> composable index [] typ) fields)
@@ -123,9 +124,13 @@ let translate_struct_composition index id target fields =
     fields
     |> List.map (fun (atom, (typ, _, _), _) ->
          let field = Term.qid_of_atom atom in
+         let left_field = App ("_._", [left; field]) in
+         let right_field = App ("_._", [right; field]) in
          let value =
-           Term.translate_composition index typ
-             (App ("_._", [left; field])) (App ("_._", [right; field]))
+           match Prescan.stored_field index (VarT (id, []) $ id.at) atom with
+           | Some Hintd.Map -> App ("map-concat", [left_field; right_field])
+           | Some Hintd.Array | None ->
+               Term.translate_composition index typ left_field right_field
          in
          App ("field", [field; value]))
     |> join_struct_fields

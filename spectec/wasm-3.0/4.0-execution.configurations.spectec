@@ -67,7 +67,7 @@ syntax meminst hint(desc "memory instance") hint(macro "%" "MI%") =
   { TYPE memtype, BYTES byte* hint(maude_array) }
 
 syntax tableinst hint(desc "table instance") hint(macro "%" "TI%") =
-  { TYPE tabletype, REFS ref* }
+  { TYPE tabletype, REFS ref* hint(maude_map) }
 
 syntax funcinst hint(desc "function instance") hint(macro "%" "FI%") =
   { TYPE deftype, MODULE moduleinst, CODE funccode }
@@ -115,9 +115,9 @@ syntax moduleinst hint(desc "module instance") hint(macro "%" "MI%") =
 syntax store hint(desc "store") hint(macro "%" "S%") =
   { TAGS taginst*,
     GLOBALS globalinst*,
-    MEMS meminst*,
+    MEMS meminst* hint(maude_map),
     TABLES tableinst*,
-    FUNCS funcinst*,
+    FUNCS funcinst* hint(maude_map),
     DATAS datainst*,
     ELEMS eleminst*,
     STRUCTS structinst*,
@@ -228,9 +228,9 @@ def $tagaddr((s; f)) = f.MODULE.TAGS
 def $moduleinst(state) : moduleinst   hint(show %.MODULE)  hint(macro "Z%")
 def $taginst(state) : taginst*        hint(show %.TAGS)    hint(macro "Z%")
 def $globalinst(state) : globalinst*  hint(show %.GLOBALS) hint(macro "Z%")
-def $meminst(state) : meminst*        hint(show %.MEMS)    hint(macro "Z%")
+def $meminst(state) : meminst*        hint(show %.MEMS)    hint(macro "Z%") hint(maude_map)
 def $tableinst(state) : tableinst*    hint(show %.TABLES)  hint(macro "Z%")
-def $funcinst(state) : funcinst*      hint(show %.FUNCS)   hint(macro "Z%")
+def $funcinst(state) : funcinst*      hint(show %.FUNCS)   hint(macro "Z%") hint(maude_map)
 def $datainst(state) : datainst*      hint(show %.DATAS)   hint(macro "Z%")
 def $eleminst(state) : eleminst*      hint(show %.ELEMS)   hint(macro "Z%")
 def $structinst(state) : structinst*  hint(show %.STRUCTS) hint(macro "Z%")

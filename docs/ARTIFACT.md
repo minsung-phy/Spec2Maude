@@ -148,9 +148,10 @@ uses a temporary directory and does not modify the repository.
 1. `spectec-semantics.maude`, which loads `spectec-sorts.maude` (common sorts),
    the generated `types.maude`, and `spectec-builtin-types.maude` (SpecTec
    built-in type representation), then declares separate convert, list, option,
-   tuple, record, and array modules (the array module stores the fields marked
-   with `hint(maude_array)`, such as memory bytes, as a size and a prelude
-   `ARRAY`);
+   tuple, record, array, and map modules (they store the fields marked with
+   `hint(maude_array)`, such as memory bytes, as a size and a prelude `ARRAY`,
+   and the fields marked with `hint(maude_map)`, such as the store's functions
+   and memories and table references, as a size and a prelude `MAP`);
 2. generated semantics;
 3. primitive builtin semantics.
 
@@ -204,10 +205,15 @@ independent of `--semantics FILE`, which selects the translated Wasm semantics.
 
 The WAST runtime is a test runner, not part of the translated semantics:
 
-- It runs one deterministic execution per script, like the reference
-  interpreter. A script step is the first successor of the rewrite condition
-  `KS => KS2 /\ KS2 =/= KS`, found at one Step by `rew`; use it with `rew`, not
-  with `search` or model checking.
+- It runs one execution per script with `rew`, like the reference
+  interpreter. The Step rules rewrite the command's state in place, as in the
+  `run` runtime; there is no step bound, and `suite-run --timeout` bounds the
+  run. `rew` is rule fair, so where several Step rules apply it may take any of
+  them. The reference interpreter grows a memory or table whenever growth can
+  succeed: at `memory.grow` and `table.grow` the runtime takes the first
+  successor in Maude's search order, the success rule (`choice`). Other
+  choices are left to `rew`; use the runner with `rew`, not with `search` or
+  model checking.
 - `spectest` print functions are an environment model: a call is one step that
   consumes its arguments and leaves the store unchanged (`host-call`).
 - SpecTec has no call-stack limit. `assert_exhaustion` passes once the frame
@@ -293,9 +299,8 @@ test/wasm_core_suite.sh
 
 The script verifies that the suite contains exactly 258 distinct `.wast`
 files. It first runs all files with a 300-second wall-clock timeout and then
-reruns only `TIMEOUT` files with a 3600-second timeout. It uses a rewrite
-budget of `1000000000000` to make the runner's required bounded `rew` argument
-non-limiting in practice, and uses call depth 256.
+reruns only `TIMEOUT` files with a 3600-second timeout. It uses call depth
+256.
 
 The result directory contains the first-stage report and logs, every retry's
 command/report/log, and the merged `final.tsv` and `summary.tsv`. `final.tsv`
@@ -313,7 +318,6 @@ Each file is classified as one of:
 - `FRONTEND_ERROR`;
 - `MAUDE_ERROR`;
 - `TIMEOUT`;
-- `STEP_LIMIT`;
 - `STUCK`.
 
 The script exits with status 0 only when all 258 scripts are classified as

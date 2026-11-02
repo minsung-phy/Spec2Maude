@@ -1,7 +1,6 @@
-(* The final [continue 1] probes whether execution can still step after the
-   bounded rewrite. Suite_run judges the first result and uses the probe only
-   to distinguish a step limit from a stuck state. *)
-let render ~semantics ~runtime ~steps ~commands ~host_store ~host_instances
+(* rew runs the script until no rule applies. The runtime fixes the rule
+   choice at memory.grow and table.grow (wast-runtime.maude, choice). *)
+let render ~semantics ~runtime ~commands ~host_store ~host_instances
     ~host_functions =
   let buffer = Buffer.create 4096 in
   List.iter
@@ -22,7 +21,6 @@ mod WASM2MAUDE-WAST is
   eq initialState = script.ready(emptyStore, %s, inputCommands) .
 endm
 
-rew [%d] in WASM2MAUDE-WAST : script.start .
-continue 1 .
+rew in WASM2MAUDE-WAST : script.start .
 |}
-    semantics runtime commands host_store host_functions host_instances steps
+    semantics runtime commands host_store host_functions host_instances

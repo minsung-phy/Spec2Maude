@@ -2,7 +2,7 @@ open Wasm_to_maude
 
 let usage () =
   Printf.eprintf
-    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--steps N] [--call-depth N]\n  wasm2maude suite-run PATH [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--steps N] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
+    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--call-depth N]\n  wasm2maude suite-run PATH [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
   exit 2
 
 let write output text =
@@ -146,28 +146,26 @@ let execution_command mode args =
   write opts.output text
 
 let wast_run args =
-  let rec options input output semantics runtime steps call_depth = function
-    | [] -> input, output, semantics, runtime, steps, call_depth
+  let rec options input output semantics runtime call_depth = function
+    | [] -> input, output, semantics, runtime, call_depth
     | "-o" :: path :: rest ->
-        options input (Some path) semantics runtime steps call_depth rest
+        options input (Some path) semantics runtime call_depth rest
     | "--semantics" :: path :: rest ->
-        options input output path runtime steps call_depth rest
+        options input output path runtime call_depth rest
     | "--wast-runtime" :: path :: rest ->
-        options input output semantics (Some path) steps call_depth rest
-    | "--steps" :: value :: rest ->
-        options input output semantics runtime (nonnegative value) call_depth rest
+        options input output semantics (Some path) call_depth rest
     | "--call-depth" :: value :: rest ->
-        options input output semantics runtime steps (nonnegative value) rest
+        options input output semantics runtime (nonnegative value) rest
     | arg :: rest when input = None ->
-        options (Some arg) output semantics runtime steps call_depth rest
+        options (Some arg) output semantics runtime call_depth rest
     | _ -> usage ()
   in
-  let input, output, semantics, runtime, steps, call_depth =
-    options None None default_semantics None 1000000 256 args
+  let input, output, semantics, runtime, call_depth =
+    options None None default_semantics None 256 args
   in
   let semantics = resolve semantics in
   let input = match input with Some path -> path | None -> usage () in
-  let text, report = Wast_run.emit ?runtime ~semantics ~steps ~call_depth input in
+  let text, report = Wast_run.emit ?runtime ~semantics ~call_depth input in
   write output text;
   Printf.eprintf
     "[wasm2maude] commands=%d checked-assertions=%d runtime-assertions=%d\n"
@@ -180,38 +178,35 @@ let suite_run args =
     | Some value when value > 0. -> value
     | Some _ | None -> usage ()
   in
-  let rec options input output semantics runtime maude timeout steps call_depth log_dir =
+  let rec options input output semantics runtime maude timeout call_depth log_dir =
     function
     | [] ->
-        input, output, semantics, runtime, maude, timeout, steps, call_depth, log_dir
+        input, output, semantics, runtime, maude, timeout, call_depth, log_dir
     | "-o" :: path :: rest ->
-        options input (Some path) semantics runtime maude timeout steps call_depth log_dir
+        options input (Some path) semantics runtime maude timeout call_depth log_dir
           rest
     | "--semantics" :: path :: rest ->
-        options input output path runtime maude timeout steps call_depth log_dir rest
+        options input output path runtime maude timeout call_depth log_dir rest
     | "--wast-runtime" :: path :: rest ->
-        options input output semantics (Some path) maude timeout steps call_depth log_dir rest
+        options input output semantics (Some path) maude timeout call_depth log_dir rest
     | "--maude" :: path :: rest ->
-        options input output semantics runtime path timeout steps call_depth log_dir rest
+        options input output semantics runtime path timeout call_depth log_dir rest
     | "--timeout" :: value :: rest ->
-        options input output semantics runtime maude (positive_float value) steps call_depth
-          log_dir rest
-    | "--steps" :: value :: rest ->
-        options input output semantics runtime maude timeout (nonnegative value) call_depth
+        options input output semantics runtime maude (positive_float value) call_depth
           log_dir rest
     | "--call-depth" :: value :: rest ->
-        options input output semantics runtime maude timeout steps (nonnegative value)
+        options input output semantics runtime maude timeout (nonnegative value)
           log_dir rest
     | "--log-dir" :: path :: rest ->
-        options input output semantics runtime maude timeout steps call_depth (Some path)
+        options input output semantics runtime maude timeout call_depth (Some path)
           rest
     | arg :: rest when input = None ->
-        options (Some arg) output semantics runtime maude timeout steps call_depth log_dir
+        options (Some arg) output semantics runtime maude timeout call_depth log_dir
           rest
     | _ -> usage ()
   in
-  let input, output, semantics, runtime, maude, timeout, steps, call_depth, log_dir =
-    options None None default_semantics None "maude" 60. 1000000 256 None args
+  let input, output, semantics, runtime, maude, timeout, call_depth, log_dir =
+    options None None default_semantics None "maude" 60. 256 None args
   in
   let input = match input with Some path -> path | None -> usage () in
   let progress ~completed ~total ~source ~status ~seconds =
@@ -219,7 +214,7 @@ let suite_run args =
       status seconds source
   in
   let report =
-    Suite_run.run ?runtime ~semantics:(resolve semantics) ~maude ~timeout ~steps ~call_depth
+    Suite_run.run ?runtime ~semantics:(resolve semantics) ~maude ~timeout ~call_depth
       ~progress ?log_dir input
   in
   write output (Suite_run.to_tsv report);

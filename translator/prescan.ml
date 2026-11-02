@@ -154,13 +154,13 @@ let sort_of_typ index typ =
 let sequence_representation index typ =
   Hintd.sequence_representation index.sort_metadata typ
 
-(* hint(maude_array): field atom of the record type typ is an array, and
-   the record type typ has an array field. *)
-let array_field index typ atom =
-  Hintd.array_field index.sort_metadata.Hintd.arrays typ atom
+(* hint(maude_array), hint(maude_map): the representation of field atom of
+   the record type typ, and whether the record type typ has an array field. *)
+let stored_field index typ atom =
+  Hintd.stored_field index.sort_metadata.Hintd.stored typ atom
 
 let array_record index typ =
-  Hintd.array_record index.sort_metadata.Hintd.arrays typ
+  Hintd.array_record index.sort_metadata.Hintd.stored typ
 
 (* Record composition uses the equation emitted for its monomorphic TypD.
    A record with a maude_array field has no such equation. *)
@@ -197,8 +197,9 @@ let reserved_names =
     ; "iterOpt"; "iterList"
     ; "EMPTY"; "recordConcat"; "optionConcat"
     ; "sized-array"; "array-of"; "array-size"; "array-read"; "array-write"; "array-grow"
-    (* prelude ARRAY, imported by backend/spectec-semantics.maude *)
-    ; "empty"; "insert"; "$hasMapping"
+    ; "sized-map"; "map-of"; "map-size"; "map-read"; "map-write"; "map-append"; "map-concat"
+    (* prelude ARRAY and MAP, imported by backend/spectec-semantics.maude *)
+    ; "empty"; "insert"; "$hasMapping"; "undefined"
     (* prelude LIST, imported by backend/spectec-sorts.maude *)
     ; "nil"; "append"; "head"; "tail"; "last"; "front"
     ; "occurs"; "reverse"; "$reverse"; "size"; "$size"
@@ -452,8 +453,8 @@ let has_dec_hint_in hints target_name name =
           List.fold_left
                (fun found hint ->
                  begin match hint.hintid.it, hint.hintexp.it with
-                 | ("builtin" | "maude_kind" | "maude_rule"), El.Ast.SeqE [] -> ()
-                 | ("builtin" | "maude_kind" | "maude_rule" as flag), _ ->
+                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map"), El.Ast.SeqE [] -> ()
+                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map" as flag), _ ->
                      Util.Error.error hint.hintid.at "translation"
                        ("Unsupported DecD $" ^ target_name ^ ": "
                         ^ flag ^ " must be a flag hint")
@@ -1334,6 +1335,10 @@ let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
+
+(* hint(maude_map) on a DecD: its result is a maude_map field, read only
+   through $f(..)[i] and |$f(..)| (Term.stored_value). *)
+let map_definition index id = has_dec_hint index id "maude_map"
 
 let relation_policy index id =
   match List.assoc_opt id.it index.relation_policies with

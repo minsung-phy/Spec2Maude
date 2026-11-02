@@ -3,8 +3,9 @@
  *
  * Part 1: sorts. hint(maude_sort), hint(maude_subsort), and
  *   hint(maude_proper) decide the Maude sort of each type, its subsorts, and
- *   the representation of typed sequences. hint(maude_array) on a record
- *   field stores that sequence field as a size and a prelude ARRAY.
+ *   the representation of typed sequences. hint(maude_array) and
+ *   hint(maude_map) on a record field store that sequence field as a size and
+ *   a prelude ARRAY or MAP.
  * Part 2: hint(k_heatcool). The hinted rules are checked against the shapes
  *   that Heatcool supports, and context rules get their focus patterns
  *   (TRANSLATION_MAP.md, section 2). *)
@@ -46,15 +47,18 @@ type t =
   ; proper : (maude_sort * maude_sort * maude_sort) list
   ; owners : (constructor * maude_sort list) list
   ; lists : maude_sort list
-  ; arrays : arrays
+  ; stored : stored_fields
   }
 
-(* hint(maude_array) fields: (record type, field) pairs and the type
-   environment that resolves a record type to its name. *)
-and arrays =
-  { array_env : Il.Env.t
-  ; fields : (string * string) list
+(* hint(maude_array) and hint(maude_map) fields: (record type, field) pairs
+   with their representation, and the type environment that resolves a record
+   type to its name. *)
+and stored_fields =
+  { stored_env : Il.Env.t
+  ; fields : ((string * string) * stored) list
   }
+
+and stored = Array | Map
 
 let unsupported_sort at reason =
   Util.Error.error at "translation" ("Unsupported: maude sort hints " ^ reason)
@@ -154,12 +158,24 @@ let explicit_edges hints annotated =
 
 (* hint(maude_array) on a record field stores that sequence field as
    sized-array(size, array), where array entries equal to 0 are absent
-   (prelude ARRAY with default 0). The record type must be monomorphic. *)
-let array_field_of insts source (atom, (typ, _, _), hints) =
-  match hint_values "maude_array" hints with
+   (prelude ARRAY with default 0). hint(maude_map) stores it as
+   sized-map(size, map), with an entry for every index (prelude MAP). The
+   record type must be monomorphic. *)
+let stored_hints = ["maude_array", Array; "maude_map", Map]
+
+let stored_field_of insts source (atom, (typ, _, _), hints) =
+  match
+    List.concat_map
+      (fun (name, kind) ->
+        List.map (fun hint -> name, kind, hint) (hint_values name hints))
+      stored_hints
+  with
   | [] -> None
-  | hint :: _ ->
-      require_flags "maude_array" [hint];
+  | (name, kind, hint) :: others ->
+      if others <> [] then
+        unsupported_sort hint.hintid.at
+          "a field takes one of maude_array and maude_map";
+      require_flags name [hint];
       let sequence =
         match typ.it with IterT (_, (List | List1 | ListN _)) -> true | _ -> false
       in
@@ -168,18 +184,20 @@ let array_field_of insts source (atom, (typ, _, _), hints) =
       in
       if not (sequence && monomorphic) then
         unsupported_sort hint.hintid.at
-          "maude_array requires a sequence field of a monomorphic record type";
-      Some (source, Il.Print.string_of_atom atom)
+          (name ^ " requires a sequence field of a monomorphic record type");
+      Some ((source, Il.Print.string_of_atom atom), kind)
 
-let arrays_of type_env definitions type_hints =
+let stored_of type_env definitions type_hints =
   type_hints
   |> List.iter (fun (_, values) ->
-       match hint_values "maude_array" values with
-       | hint :: _ ->
-           unsupported_sort hint.hintid.at
-             "maude_array is a field hint: write it after the field type"
-       | [] -> ());
-  { array_env = type_env
+       stored_hints
+       |> List.iter (fun (name, _) ->
+            match hint_values name values with
+            | hint :: _ ->
+                unsupported_sort hint.hintid.at
+                  (name ^ " is a field hint: write it after the field type")
+            | [] -> ()));
+  { stored_env = type_env
   ; fields =
       definitions
       |> List.concat_map (fun (source, insts) ->
@@ -187,27 +205,31 @@ let arrays_of type_env definitions type_hints =
            |> List.concat_map (fun inst ->
                 match inst.it with
                 | InstD (_, _, {it = StructT fields; _}) ->
-                    List.filter_map (array_field_of insts source) fields
+                    List.filter_map (stored_field_of insts source) fields
                 | InstD _ -> []))
   }
 
-(* Only the maude_array hints, for the pass before Prescan (Def.array_script). *)
-let scan_arrays script =
+(* Only the stored-field hints, for the pass before Prescan (Def.stored_script). *)
+let scan_stored script =
   let source = scan_source script in
-  arrays_of (Il.Env.env_of_script script) source.definitions source.type_hints
+  stored_of (Il.Env.env_of_script script) source.definitions source.type_hints
 
-let array_record_name arrays typ =
-  match (Il.Eval.reduce_typ arrays.array_env typ).it with
-  | VarT (id, []) when List.mem_assoc id.it arrays.fields -> Some id.it
+let stored_record_name stored typ =
+  match (Il.Eval.reduce_typ stored.stored_env typ).it with
+  | VarT (id, []) -> Some id.it
   | _ -> None
 
-(* The record type typ has a maude_array field. *)
-let array_record arrays typ = Option.is_some (array_record_name arrays typ)
+(* The representation of field atom of the record type typ, if it is stored. *)
+let stored_field stored typ atom =
+  Option.bind (stored_record_name stored typ) (fun record ->
+    List.assoc_opt (record, Il.Print.string_of_atom atom) stored.fields)
 
-(* Field atom of the record type typ is a maude_array field. *)
-let array_field arrays typ atom =
-  match array_record_name arrays typ with
-  | Some record -> List.mem (record, Il.Print.string_of_atom atom) arrays.fields
+(* The record type typ has a maude_array field. *)
+let array_record stored typ =
+  match stored_record_name stored typ with
+  | Some record ->
+      List.exists (fun ((record', _), kind) -> record' = record && kind = Array)
+        stored.fields
   | None -> false
 
 let sort_origin origins sort =
@@ -500,7 +522,7 @@ let scan_sorts script =
   ; proper
   ; owners
   ; lists
-  ; arrays = arrays_of type_env definitions hints
+  ; stored = stored_of type_env definitions hints
   }
 
 let annotated_sorts metadata = metadata.annotated

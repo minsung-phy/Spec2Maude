@@ -6,7 +6,6 @@ val run :
   semantics:string ->
   maude:string ->
   timeout:float ->
-  steps:int ->
   call_depth:int ->
   ?progress:(
     completed:int ->

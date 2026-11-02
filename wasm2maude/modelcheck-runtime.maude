@@ -36,8 +36,8 @@ mod WASM-MODELCHECK-DRIVER is
   var P : Prop .
 
   eq emptyStore = {
-    field('TAGS, nil) ; field('GLOBALS, nil) ; field('MEMS, nil) ;
-    field('TABLES, nil) ; field('FUNCS, nil) ; field('DATAS, nil) ;
+    field('TAGS, nil) ; field('GLOBALS, nil) ; field('MEMS, sized-map(0, empty)) ;
+    field('TABLES, nil) ; field('FUNCS, sized-map(0, empty)) ; field('DATAS, nil) ;
     field('ELEMS, nil) ; field('STRUCTS, nil) ; field('ARRAYS, nil) ;
     field('EXNS, nil)
   } .

@@ -83,6 +83,7 @@ type prepared_clause =
   ; head : clause_head
   ; head_proven : Il.Free.Set.t
   ; result_sort : sort
+  ; map_result : bool
   ; index : Prescan.t
   }
 
@@ -126,7 +127,8 @@ let prepare_clauses index id params clauses =
           let head = translate_head index id args in
           let head_proven = guarded_quants index quants args in
           let _, result_sort = Term.definition_sorts index id in
-          {clause; head; head_proven; result_sort; index})
+          let map_result = Prescan.map_definition index id in
+          {clause; head; head_proven; result_sort; map_result; index})
     clauses
 
 let proven_variables prepared premises =
@@ -142,10 +144,17 @@ let clause_has_rewrite_call index args rhs prems =
   || List.exists (Prem.prem_has_rewrite_call index) prems
 
 
+(* A hint(maude_map) definition returns the map stored in a maude_map field. *)
 let translate_result prepared rhs =
   let index = prepared.index in
-  Term.to_sort index ~sort:prepared.result_sort rhs.note
-    (Term.translate_exp index rhs)
+  if prepared.map_result then
+    match Term.stored_value index rhs with
+    | Some (Hintd.Map, map) -> map
+    | Some (Hintd.Array, _) | None ->
+        invalid_arg "a hint(maude_map) definition must return a maude_map field"
+  else
+    Term.to_sort index ~sort:prepared.result_sort rhs.note
+      (Term.translate_exp index rhs)
 
 (* DefD clauses are a sequential pattern match (Bringing the WebAssembly
    Standard up to Speed with SpecTec, 3): a clause applies only if no earlier

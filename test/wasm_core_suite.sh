@@ -7,7 +7,6 @@ semantics="$root/translator/backend/main.maude"
 maude_bin=${MAUDE:-maude}
 short_timeout=${SHORT_TIMEOUT:-300}
 long_timeout=${LONG_TIMEOUT:-3600}
-steps=${STEPS:-1000000000000}
 call_depth=${CALL_DEPTH:-256}
 timestamp=$(date '+%Y%m%d-%H%M%S')
 results=${RESULT_DIR:-"${TMPDIR:-/tmp}/spec2maude-wasm-core-$timestamp"}
@@ -27,7 +26,6 @@ Environment variables:
   RESULT_DIR     new result directory
   SHORT_TIMEOUT  first-stage timeout in seconds (default: 300)
   LONG_TIMEOUT   retry timeout in seconds (default: 3600)
-  STEPS          rewrite budget (default: 1000000000000)
   CALL_DEPTH     WAST call-depth limit (default: 256)
 EOF
 }
@@ -77,7 +75,6 @@ printf '%s\n' \
   "maude=$maude_bin" \
   "short_timeout=$short_timeout" \
   "long_timeout=$long_timeout" \
-  "steps=$steps" \
   "call_depth=$call_depth" \
   "started=$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
   >"$results/settings.txt"
@@ -102,7 +99,6 @@ run_suite() {
     --semantics "$semantics"
     --maude "$maude_bin"
     --timeout "$timeout"
-    --steps "$steps"
     --call-depth "$call_depth"
     --log-dir "$logs"
     -o "$report"
@@ -184,8 +180,8 @@ printf 'status\tcount\n' >"$results/summary.tsv"
 awk -F '\t' '
   NR > 1 { count[$1]++ }
   END {
-    split("PASS WRONG_RESULT UNSUPPORTED FRONTEND_ERROR MAUDE_ERROR STUCK STEP_LIMIT TIMEOUT", order, " ")
-    for (i = 1; i <= 8; i++) print order[i] "\t" count[order[i]]
+    split("PASS WRONG_RESULT UNSUPPORTED FRONTEND_ERROR MAUDE_ERROR STUCK TIMEOUT", order, " ")
+    for (i = 1; i <= 7; i++) print order[i] "\t" count[order[i]]
   }
 ' "$results/final.tsv" >>"$results/summary.tsv"
 

@@ -220,8 +220,9 @@ let app name arguments =
       record ["TYPE", typ; "VALUE", value]
   | "rec.meminst", [typ; bytes] ->
       record ["TYPE", typ; "BYTES", bytes]
+  (* tableinst REFS and store MEMS and FUNCS are hint(maude_map) fields. *)
   | "rec.tableinst", [typ; refs] ->
-      record ["TYPE", typ; "REFS", refs]
+      record ["TYPE", typ; "REFS", raw_app "map-of" [refs]]
   | "rec.funcinst", [typ; module_; code] ->
       record ["TYPE", typ; "MODULE", module_; "CODE", code]
   | "rec.frame", [locals; module_] ->
@@ -236,8 +237,8 @@ let app name arguments =
   | ( "rec.store"
     , [tags; globals; mems; tables; funcs; datas; elems; structs; arrays; exns] ) ->
       record
-        [ "TAGS", tags; "GLOBALS", globals; "MEMS", mems; "TABLES", tables
-        ; "FUNCS", funcs; "DATAS", datas; "ELEMS", elems; "STRUCTS", structs
-        ; "ARRAYS", arrays; "EXNS", exns
+        [ "TAGS", tags; "GLOBALS", globals; "MEMS", raw_app "map-of" [mems]; "TABLES", tables
+        ; "FUNCS", raw_app "map-of" [funcs]; "DATAS", datas; "ELEMS", elems
+        ; "STRUCTS", structs; "ARRAYS", arrays; "EXNS", exns
         ]
   | _ -> raw_app (source_name name) arguments

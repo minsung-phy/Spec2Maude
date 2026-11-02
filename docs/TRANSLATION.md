@@ -169,9 +169,10 @@ def 호출 결과는 callee가 선언한 결과 sort에서 정한다.
 | `SPECTEC-TUPLE` | tuple 표현·projection |
 | `SPECTEC-RECORD` | record 표현·조회·갱신 |
 | `SPECTEC-ARRAY` | `hint(maude_array)` 필드의 크기 + prelude `ARRAY` 표현·연산 |
+| `SPECTEC-MAP` | `hint(maude_map)` 필드의 크기 + prelude `MAP` 표현·연산 |
 
-convert와 list는 builtin types를, option·tuple·record·array는 list를 import한다.
-마지막 `SPECTEC-SEMANTICS`가 여섯 모듈을 모은다. 공통 목록은
+convert와 list는 builtin types를, option·tuple·record·array·map은 list를 import한다.
+마지막 `SPECTEC-SEMANTICS`가 일곱 모듈을 모은다. 공통 목록은
 `spectec-sorts.maude`가 prelude `LIST{SpectecTerminal}`을 sort 이름만 바꿔
 가져온 것이다(`nil`, `__`, `size`, `occurs`, `append`는 prelude 이름 그대로).
 `types.maude`의 `SPEC2MAUDE-TYPES`는 hint별 목록 sort를 이 목록 위에 subsort로
@@ -240,13 +241,35 @@ record 타입의 sequence 필드 F에 `hint(maude_array)`를 붙이면
 `array-read`, `array-write`는 목록 slice/splice처럼 `i + n <= 크기`에서만 정의된다.
 `array-of`는 목록을 배열로 바꾼다. 다른 배열 필드의 값은 변환 없이 그대로 쓴다.
 필드 pattern(`-- if e = {.., F b*}`)은 배열 값을 그대로 묶고, 번역 전에
-(`def.ml:array_script`) 그 뒤의 전제와 결과에서 `b*`를 `e.F`로 바꿔 쓴다.
+(`def.ml:stored_script`) 그 뒤의 전제와 결과에서 `b*`를 `e.F`로 바꿔 쓴다.
 원문에서 `b* = e.F`이므로 의미가 같고, `|b*|`와 `b* 0^n`이 위 표의 배열 번역을
 받는다(Wasm `$growmem`).
 
 위 표 밖의 사용(필드 값 자체를 목록으로 읽기, 원소 하나 갱신, `++` 확장, 필드를
 가진 record의 `CompE`)은 `Unsupported`로 거부한다. 이 record 타입에는
 `recordConcat` equation을 생성하지 않는다.
+
+`hint(maude_map)`을 붙인 필드 F는 `sized-map(크기, M)`으로 저장한다. M은 prelude
+`MAP{Nat, Terminal}`이고(ARRAY와 겹치지 않게 항목 연산자를 `_|=>_`로 바꿈), 0부터
+크기-1까지 모든 index에 항목이 있다. 기본값이 없으므로 원소 타입에 0이 없어도 된다.
+없는 index의 조회는 prelude의 `undefined`(sort 없음)이므로 원문처럼 값이 없다.
+함수 `def $f(..) : t* hint(maude_map)`은 결과가 그런 필드임을 뜻하고, 호출 `$f(..)[i]`,
+`|$f(..)|`가 map 연산으로 번역된다. 함수의 각 절은 maude_map 필드를 돌려줘야 한다.
+
+| source | Maude |
+|---|---|
+| `\|e.F\|`, `\|$f(..)\|` | `map-size(e . 'F)`, `map-size(f(..))` |
+| `e.F[i]`, `$f(..)[i]` | `map-read(e . 'F, i)`, `map-read(f(..), i)` |
+| `e[.F[i] = x]` | `e[. 'F = map-write(e . 'F, i, x)]` |
+| `e[.F[i].G.. = x]` | `map-read(e . 'F, i)`를 고친 뒤 `map-write`로 다시 넣음 |
+| `e[.F = s]` | `e[. 'F = map-of(s)]` |
+| `{.., F e.F' s}` (e.F'는 map 필드) | `map-append(e . 'F', s)` |
+| `{.., F s}` | `map-of(s)` |
+| record `r ++ r'` | 이 필드는 `map-concat(r . 'F, r' . 'F)` |
+
+`map-write`는 목록 갱신처럼 `i < 크기`에서만 정의된다. `map-concat`은 오른쪽 항목을
+왼쪽 크기만큼 옮긴다. 옮기는 순서와 무관하게 결과가 같다. 위 표 밖의 사용(필드나 호출
+값 자체를 목록으로 읽기, 구간 읽기·쓰기, `++` 확장)은 `Unsupported`로 거부한다.
 
 비결정적 membership choice helper는 prefix/선택 원소/suffix 매칭 rule로
 가능한 원소를 선택한다. source의 선택 의미, boxing과 frozen 인자를 유지한다.
@@ -321,6 +344,7 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
 | `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
 | `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
 | `maude_array` (record 필드) | 단형 record 타입의 이 sequence 필드를 크기 + prelude `ARRAY`(기본값 0)로 저장한다. 필드 접근은 길이·원소·구간 읽기와 구간·전체 쓰기, 생성은 `0^n`·`s 0^n`·목록으로 제한한다. 다른 사용은 거부한다. 원소의 0은 저장하지 않으므로 원소 타입에 수 0이 있어야 한다. |
+| `maude_map` (record 필드, 함수) | 필드: 단형 record 타입의 이 sequence 필드를 크기 + prelude `MAP`(모든 index에 항목)으로 저장한다. 필드 접근은 길이·원소 읽기, 원소·전체 쓰기, 생성은 목록·`e.F s`, record `++`로 제한한다. 함수: 결과가 maude_map 필드이고, 호출은 길이·원소 읽기로만 쓴다. 다른 사용은 거부한다. |
 | `k_heatcool` | 실행 premise가 있는 rule을 heating/cooling으로 번역한다. premise가 같은 relation의 실행 premise 하나뿐인 context rule은 K embedding(K book §5.4.6)으로 `kstate(R, K)`에 context를 열어 두고, 그 밖의 rule은 split/plug(K book §5.4.5)로 연결한다. `~>` relation의 split과 focus 식별은 equation, `~>*` relation의 split은 rule이다. 적용 조건과 가정은 아래 [적용 범위](#k_heatcool-적용-범위)에 있다. |
 | `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
 | `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
@@ -370,6 +394,14 @@ hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 �
   원문의 사용은 길이, 원소·구간 읽기, 구간 쓰기(`$with_mem`), 전체 쓰기(`$with_data`),
   `0^n` 생성(`allocmem`), 목록 생성(`allocdata`), 필드 pattern 후 `b* 0^n`(`growmem`)이며
   모두 위 표의 형태다. byte의 0은 `%_byte(0)` 형태로 기본값과 대응한다.
+- `store`의 `FUNCS`, `MEMS`, `tableinst`의 `REFS` 필드와 `$funcinst`, `$meminst`: `maude_map`.
+  원문의 `$funcinst(z)[a]`, `$mem(z,x)`, `|$table(z,x).REFS|`는 목록에서 a칸·크기만큼 세며,
+  store에는 스크립트의 모든 모듈 함수·메모리가 쌓인다(Maude profile: return_call*,
+  call_indirect에서 rewrite의 약 40%, memory_copy(모듈 33개)에서 37%).
+  원문의 사용은 원소·길이 읽기, 원소 쓰기(`$with_table`, `$with_meminst`), 원소 안쪽 쓰기
+  (`$with_mem`), 전체 쓰기(`$with_tableinst`의 tableinst 값), 목록 생성(`alloctable`), 필드 pattern 후 `r'* r^n`(`growtable`),
+  store `++`(`alloc*`)이며 모두 위 표의 형태다. 원소 타입(`funcinst`, `ref`)에 기본값이 없어
+  ARRAY가 아니라 MAP을 쓴다.
 
 ### 숫자 builtin과 profile
 
@@ -709,10 +741,12 @@ ceq kstate(C-5, K-4) = kstate(Step(C-5), K-4)
 
 `kstate`의 첫 인자는 frozen이 아니다. 실행 driver(`wasm2maude/*-runtime.maude`, harness)는 상태를
 `exec(kstate(C, none))`로 시작하고, `Step` rule이 그 안에서 직접 적용된다(rewrite 조건 없음).
-완료는 `kstate(Step(z ; vals), none)`이다. wast 실행기는 참조 인터프리터처럼 결정적 실행 하나를
-따라가야 하므로, 각 step을 rewrite 조건 `KS => KS2 /\ KS2 =/= KS`의 가장 가까운 해로 진행한다
-(rule 선언 순서; 예: memory.grow-succeed가 memory.grow-fail보다 먼저). exhaustion 검사는 step마다
-`cool-all(unheat(R), K)`의 frame 깊이를 본다.
+완료는 `kstate(Step(z ; vals), none)`이다. wast 실행기도 같은 방식이다. 실행 중인 command의
+`kstate` 인자는 frozen이 아니어서 `Step` rule이 그 안에서 직접 적용되고 `rew`가 실행 하나를
+따라간다. `rew`는 rule-fair라 여러 rule이 적용되는 요청에서 아무 rule이나 고를 수 있다. 참조
+인터프리터는 늘릴 수 있으면 늘리므로, memory.grow·table.grow 요청은 `choice(R)`로 묶어 Maude 탐색
+순서의 첫 successor(먼저 선언된 성공 rule)를 택한다. exhaustion 검사는 K의 frame hole 수와 요청 R 안의
+활성 frame 수의 합을 bound와 비교한다.
 
 ### 7. Steps/trans (split, rule)
 
