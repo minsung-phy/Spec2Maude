@@ -90,7 +90,6 @@ mod WASM-WAST-DRIVER is
   op linkImports : SpectecTerminal InstanceEnv ImportRefs
     -> LinkResult .
 
-  op script.start : -> ScriptState [ctor] .
   op script.ready : SpectecTerminal InstanceEnv Commands
     -> ScriptState [ctor] .
   --- kstate(R, K): R is the Step request of the configuration around the next
@@ -123,7 +122,6 @@ mod WASM-WAST-DRIVER is
   op script.link-error : Nat -> ScriptState [ctor] .
   op script.done : -> ScriptState [ctor] .
 
-  op initialState : -> ScriptState .
   op emptyStore : -> SpectecTerminal .
   op hostFunctionAddresses : -> SpectecTerminals .
   op hostArguments : ValList SpectecTerminals -> Bool .
@@ -138,7 +136,7 @@ mod WASM-WAST-DRIVER is
   op frameDepth : Holes -> Nat .
 
   vars WSHC WSHM WSHS WSHF WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
-  vars WSHK WSHK2 : Holes .
+  var WSHK : Holes .
   vars WSHR WSHR2 : Step-Request .
   var WSHH : Hole .
   vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .
@@ -255,9 +253,12 @@ mod WASM-WAST-DRIVER is
     activeFrameDepth(WSHBODY)
     if runtimeResults(WSHPREFIX) .
   eq activeFrameDepth(WSHINSTRS) = 0 [owise] .
-  eq frameDepth(WSHK hole-Step-ctxt-frame(WSHN, WSHF) WSHK2) =
-    frameDepth(WSHK) + 1 + frameDepth(WSHK2) .
-  eq frameDepth(WSHK) = 0 [owise] .
+  --- Counted from the innermost hole, so each step matches only the head of K.
+  eq frameDepth(none) = 0 .
+  eq frameDepth(hole-Step-ctxt-frame(WSHN, WSHF) WSHK) = s frameDepth(WSHK) .
+  eq frameDepth(hole-Step-ctxt-label(WSHINSTRS, WSHN) WSHK) = frameDepth(WSHK) .
+  eq frameDepth(hole-Step-ctxt-handler(WSHCATCHES, WSHN) WSHK) = frameDepth(WSHK) .
+  eq frameDepth(WSHH WSHK) = frameDepth(WSHK) .
 
   eq choicePoint(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA)))) = true .
   eq choicePoint(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA))))) = true .
@@ -403,7 +404,6 @@ mod WASM-WAST-DRIVER is
   crl [choice] : kstate(choice(WSHR), WSHK) => kstate(WSHR2, WSHK)
     if WSHR => WSHR2 /\ WSHR2 =/= WSHR .
 
-  rl [start] : script.start => initialState .
   crl [module-start] :
     script.ready(WSHS, WSHENV,
       commands.cons(command.module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))

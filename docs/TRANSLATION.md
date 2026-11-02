@@ -316,12 +316,12 @@ WAST 출력기는 긴 `Seq`를 균형 괄호로 묶어 Maude의 평탄한 associ
 구문 분석 비용을 줄인다. 각 말단 그룹은 최대 8개 원소이며 `__`의 결합법칙만
 사용한다. 원소 순서, `App`의 인자 경계, 목록 원소를 구분하는 boxing은 유지한다.
 
-WAST command 목록은 AST에서 최대 64개씩 나누어 `inputCommands`와
-`script.commands-N`의 비순환 정의로 출력한다. 각 원래 command의 인코딩과
-순서는 유지하고 마지막 tail만 `commands.nil`이다. 빈 입력도
-`inputCommands = commands.nil`로 출력한다. 모든 정의를 펼친 정상형은
-기존의 단일 `commands.cons` 목록과 같다. 이 정의들은 WAST driver에만
-추가하며 SpecTec 실행 규칙이나 일반 Wasm run/modelcheck 출력은 바꾸지 않는다.
+WAST command 목록은 하나의 `commands.cons` 목록(빈 입력은 `commands.nil`)으로
+만들어 harness의 `rew` 시작 항 `script.ready(emptyStore, 환경, 명령들)`에 직접 넣는다.
+equation으로 정의하면 Maude가 rewriting 전에 module의 모든 equation을 compile하는데,
+큰 module을 담은 명령 목록에서는 이 compile이 느리다(skip-stack-guard-page: 8.8초 → 3.0초).
+각 command의 인코딩과 순서는 그대로이며 SpecTec 실행 규칙이나 일반 Wasm run/modelcheck
+출력은 바꾸지 않는다.
 
 WAST host memory(spectest `memory`)는 `meminst`의 `BYTES`가 `maude_array`
 필드이므로 `sized-array(크기, empty)`로 만든다(`wast_host_encode.ml`). 모듈의 메모리와
