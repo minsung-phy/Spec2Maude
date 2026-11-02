@@ -251,8 +251,10 @@ record 타입의 sequence 필드 F에 `hint(maude_array)`를 붙이면
 
 `hint(maude_map)`을 붙인 필드 F는 `sized-map(크기, M)`으로 저장한다. M은 prelude
 `MAP{Nat, Terminal}`이고(ARRAY와 겹치지 않게 항목 연산자를 `_|=>_`로 바꿈), 0부터
-크기-1까지 모든 index에 항목이 있다. 기본값이 없으므로 원소 타입에 0이 없어도 된다.
-없는 index의 조회는 prelude의 `undefined`(sort 없음)이므로 원문처럼 값이 없다.
+크기-1까지 모든 index에 항목이 정확히 하나 있다. 기본값이 없으므로 원소 타입에 0이 없어도 된다.
+그래서 `map-read`·`map-write`는 key가 같은 항목을 직접 매칭한다. prelude의 `M[I]`·`insert`는
+같은 key의 중복 항목을 매번 찾으므로 쓰지 않는다. 없는 index의 읽기·쓰기는 equation이 없어
+원문처럼 값이 없다.
 함수 `def $f(..) : t* hint(maude_map)`은 결과가 그런 필드임을 뜻하고, 호출 `$f(..)[i]`,
 `|$f(..)|`가 map 연산으로 번역된다. 함수의 각 절은 maude_map 필드를 돌려줘야 한다.
 
@@ -542,7 +544,7 @@ context rule의 적용 조건은 다음과 같다. 맞지 않으면 진단과 �
 
 ```maude
 kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K)
-  if _or_(PREFIX =/= nil, POSTFIX =/= nil) /\ closed-R-r(x) = false .     --- instrs heating
+  if _or-else_(PREFIX =/= nil, POSTFIX =/= nil) /\ closed-R-r(x) = false .  --- instrs heating
 kstate(C[x], K) = kstate(x, hole-R-r(..) K)  if closed-R-r(x) = false .   --- heating
 kstate(x', hole-R-r(..) K) = kstate(C'[x'], K)  if closed-R-r(x') = true .  --- cooling
 kstate(z ; s, hole(PREFIX, POSTFIX) K) = kstate(z ; PREFIX s POSTFIX, K) [owise] .  --- instrs cooling
@@ -663,7 +665,7 @@ rule Step/ctxt-label:
 
 ```maude
 ceq kstate(Z ; (PREFIX ((LABEL- N-3 { INSTR_0* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), hole(PREFIX, POSTFIX) K-4)
-    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+    if _or-else_(PREFIX =/= nil, POSTFIX =/= nil)
       /\ closed-Step-ctxt-label(INSTR*) = false .
 
 ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4)

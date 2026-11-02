@@ -1255,7 +1255,9 @@ let kembedding_statements cache index (context : Hintd.context) kept =
     ; sequence = Term.sequence_of_typ index context.focus_typ
     ; sequence_hole = App (name "hole", [prefix; postfix])
     ; nonempty =
-        BoolCond (App ("_or_",
+        (* Both operands are total, so the short-circuit or-else has the
+           value of _or_ without normalizing a Boolean polynomial. *)
+        BoolCond (App ("_or-else_",
           [ App ("_=/=_", [prefix; empty context.prefix_typ])
           ; App ("_=/=_", [postfix; empty context.postfix_typ]) ]))
     }

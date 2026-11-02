@@ -115,7 +115,6 @@ mod WASM-WAST-DRIVER is
   op script.uninstantiable : Nat InstanceEnv Commands KState
     -> ScriptState [ctor] .
   op choice : Step-Request -> Step-Request [ctor frozen (1)] .
-  op choicePoint : Step-Request -> Bool .
   op script.wrong-result : Nat ValList ResultPatterns
     -> ScriptState [ctor] .
   op script.wrong-assertion : Nat -> ScriptState [ctor] .
@@ -260,11 +259,16 @@ mod WASM-WAST-DRIVER is
   eq frameDepth(hole-Step-ctxt-handler(WSHCATCHES, WSHN) WSHK) = frameDepth(WSHK) .
   eq frameDepth(WSHH WSHK) = frameDepth(WSHK) .
 
-  eq choicePoint(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA)))) = true .
-  eq choicePoint(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA))))) = true .
-  eq choicePoint(WSHR ~> WSHH) = choicePoint(WSHR) .
-  eq choicePoint(WSHR) = false [owise] .
-  ceq kstate(WSHR, WSHK) = kstate(choice(WSHR), WSHK) if choicePoint(WSHR) .
+  --- A grow request is a focus of the instruction sequence, alone or under its
+  --- sequence hole; matching these shapes costs nothing for other requests.
+  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))), WSHK) =
+    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA)))), WSHK) .
+  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH, WSHK) =
+    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH), WSHK) .
+  eq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))), WSHK) =
+    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA))))), WSHK) .
+  eq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH, WSHK) =
+    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH), WSHK) .
   eq match.and(match.yes, match.yes) = match.yes .
   eq match.and(match.yes, match.no) = match.no .
   eq match.and(match.no, match.yes) = match.no .

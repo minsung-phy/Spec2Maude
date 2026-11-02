@@ -213,7 +213,9 @@ fmod SPECTEC-ARRAY is
 endfm
 
 --- hint(maude_map) (record 필드): 그 sequence 필드를 크기 + prelude MAP으로 저장
---- (모든 index 0 .. 크기-1에 항목이 있음; 없는 index의 조회는 prelude MAP의 undefined)
+--- (index 0 .. 크기-1마다 항목이 정확히 하나 있음. 그래서 읽기·쓰기는 그 항목을
+--- 직접 매칭하고, 같은 key의 중복을 찾는 prelude 조회 M[I]·insert는 쓰지 않음.
+--- 없는 index의 읽기·쓰기는 값이 없음)
 view Terminal from TRIV to SPECTEC-BUILTIN-TYPES is
   sort Elt to SpectecTerminal .
 endv
@@ -233,15 +235,15 @@ fmod SPECTEC-MAP is
 
   vars S S' I : Nat .
   vars M M' : TerminalMap .
-  var T : SpectecTerminal .
+  vars T T' : SpectecTerminal .
   var TS : SpectecTerminals .
   var TYPE : SpectecType .
 
   eq map-of(TS) = map-append(sized-map(0, empty), TS) .
 
   eq map-size(sized-map(S, M)) = S .
-  eq map-read(sized-map(S, M), I) = M[I] .
-  ceq map-write(sized-map(S, M), I, T) = sized-map(S, insert(I, T, M)) if I < S .
+  eq map-read(sized-map(S, (I |=> T, M)), I) = T .
+  eq map-write(sized-map(S, (I |=> T', M)), I, T) = sized-map(S, (I |=> T, M)) .
   eq map-append(sized-map(S, M), nil) = sized-map(S, M) .
   eq map-append(sized-map(S, M), T TS) = map-append(sized-map(s S, (M, S |=> T)), TS) .
   eq map-concat(sized-map(S, M), sized-map(S', empty)) = sized-map(S + S', M) .
@@ -254,6 +256,7 @@ fmod SPECTEC-MAP is
 endfm
 
 fmod SPECTEC-SEMANTICS is
+  protecting EXT-BOOL .
   protecting SPECTEC-CONVERT .
   protecting SPECTEC-LIST .
   protecting SPECTEC-OPTION .

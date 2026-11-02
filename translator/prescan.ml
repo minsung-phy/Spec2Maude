@@ -186,7 +186,7 @@ let reserved_names =
     ; "lift"; "repeatSeq"
     ; "_+_"; "_-_"; "_*_"; "_/_"; "_^_"; "_<_"; "_>_"
     ; "_<=_"; "_>=_"; "_==_"; "_=/=_"; "not_"; "_and_"
-    ; "_or_"; "_implies_"; "_rem_"
+    ; "_or_"; "_or-else_"; "_implies_"; "_rem_"
     (* Native numeric operators whose domains overlap unwrapped Nat/Int. *)
     ; "abs"; "ceiling"; "floor"; "gcd"; "lcm"; "modExp"
     (* Native string operators *)

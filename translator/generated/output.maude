@@ -7396,7 +7396,7 @@ mod SPEC2MAUDE-GENERATED is
   eq plug-first(K-4) = false [owise] .
 
   ceq kstate(Z ; (PREFIX ((LABEL- N-3 { INSTR_0* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), hole(PREFIX, POSTFIX) K-4)
-    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+    if _or-else_(PREFIX =/= nil, POSTFIX =/= nil)
       /\ closed-Step-ctxt-label(INSTR*) = false .
 
   ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4)
@@ -7424,7 +7424,7 @@ mod SPEC2MAUDE-GENERATED is
   eq closed-Step-ctxt-label(INSTR-3) = false [owise] .
 
   ceq kstate(Z ; (PREFIX ((HANDLER- N-3 { CATCH* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (HANDLER- N-3 { CATCH* } INSTR*), hole(PREFIX, POSTFIX) K-4)
-    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+    if _or-else_(PREFIX =/= nil, POSTFIX =/= nil)
       /\ closed-Step-ctxt-handler(INSTR*) = false .
 
   ceq kstate(Z ; (HANDLER- N-3 { CATCH* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-handler(CATCH*, N-3) K-4)
@@ -7450,7 +7450,7 @@ mod SPEC2MAUDE-GENERATED is
   eq closed-Step-ctxt-handler(INSTR-3) = false [owise] .
 
   ceq kstate((S-2 ; F) ; (PREFIX ((FRAME- N-3 { F' } INSTR*) POSTFIX)), K-4) = kstate((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*), hole(PREFIX, POSTFIX) K-4)
-    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+    if _or-else_(PREFIX =/= nil, POSTFIX =/= nil)
       /\ closed-Step-ctxt-frame(INSTR*) = false .
 
   ceq kstate((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*), K-4) = kstate((S-2 ; F') ; INSTR*, hole-Step-ctxt-frame(N-3, F) K-4)

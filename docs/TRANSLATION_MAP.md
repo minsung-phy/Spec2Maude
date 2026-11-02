@@ -201,7 +201,7 @@ gets no focus pattern.
 
 | Statement | Maude | Code |
 | --- | --- | --- |
-| Instrs heating | `ceq kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K) if _or_(PREFIX =/= eps, POSTFIX =/= eps) /\ closed-r(x) = false .` | `heatcool.ml:kembedding_rule` |
+| Instrs heating | `ceq kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K) if _or-else_(PREFIX =/= eps, POSTFIX =/= eps) /\ closed-r(x) = false .` (both operands are total; `or-else` of `EXT-BOOL` gives the value of `_or_` without normalizing it) | `heatcool.ml:kembedding_rule` |
 | Heating | `ceq kstate(⟦C[x]⟧, K) = kstate(⟦x⟧, hole-r(C) K) if closed-r(x) = false .` | `heatcool.ml:kembedding_rule` |
 | Cooling | `ceq kstate(⟦x'⟧, hole-r(C) K) = kstate(⟦C'[x']⟧, K) if closed-r(x') = true .` | `heatcool.ml:kembedding_rule` |
 | Closed bodies | `eq closed-r(b) = true .` for each focus pattern of the sequence context whose trigger is `E`'s constructor, `b` its body; `eq closed-r(x) = false [owise] .` Assumed: no step of `R` applies to such a body alone. | `heatcool.ml:closed_bodies` |
@@ -346,9 +346,11 @@ equal to `# 0` are absent (`backend/spectec-semantics.maude`, `SPECTEC-ARRAY`).
 `hint(maude_map)` on a sequence field `f` of a record type stores `f` as
 `sized-map(size, M)`, where `M` is a prelude `MAP{Nat, Terminal}` (entry
 operator renamed `_|=>_`) with an entry for every index `0 .. size-1`
-(`backend/spectec-semantics.maude`, `SPECTEC-MAP`). A missing index reads as
-the prelude `undefined`, which has no sort, so an out-of-range read gives no
-value, as in the source. `hint(maude_map)` on a `DecD` whose clauses return
+(`backend/spectec-semantics.maude`, `SPECTEC-MAP`). Since every index has
+exactly one entry, `map-read` and `map-write` match the entry with that key
+directly instead of the prelude `M[I]` and `insert`, which also search for a
+duplicate key. A missing index has no equation, so an out-of-range read or
+write gives no value, as in the source. `hint(maude_map)` on a `DecD` whose clauses return
 such a field (`def $funcinst(state) : funcinst*`) makes its calls map values.
 
 | IL | Maude | Code |
