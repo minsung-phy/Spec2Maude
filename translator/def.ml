@@ -414,24 +414,23 @@ let collect declarations script =
     exp
   in
   (* The same traversal as replace_calls, so every rewritten call is collected. *)
-  let visit = {Il.Walk.base_transformer with transform_exp = inspect} in
   List.iter
     (fun def ->
       owner := owner_of def;
       match def.it with
       | DecD (_, params, typ, clauses) ->
           bound := Param.def_ids params;
-          List.iter (fun param -> ignore (Il.Walk.transform_param visit param)) params;
-          ignore (Il.Walk.transform_typ visit typ);
+          List.iter (fun param -> ignore (Decd.map_param inspect param)) params;
+          ignore (Decd.map_typ inspect typ);
           List.iter
             (fun clause ->
               let DefD (quants, _, _, _) = clause.it in
               bound := Param.def_ids (params @ quants);
-              ignore (Il.Walk.transform_clause visit clause))
+              ignore (Decd.map_clause inspect clause))
             clauses;
           bound := []
       | TypD _ | RelD _ | GramD _ | HintD _ | RecD _ ->
-          ignore (Il.Walk.transform_def visit def))
+          ignore (Decd.map_def inspect def))
     (List.concat_map Prescan.flatten script);
   List.rev !instances
 
@@ -466,7 +465,7 @@ let replace_calls declarations instances def =
         end
     | _ -> exp
   in
-  Il.Walk.transform_def {Il.Walk.base_transformer with transform_exp = replace} def
+  Decd.map_def replace def
 
 
 (* Remaining def arguments have no specialization. *)
@@ -486,16 +485,37 @@ let check_remaining def =
       reject_def_params params
   | DecD _ | HintD _ | RecD _ -> ()
   end;
-  let reject arg =
-    match arg.it with
-    | DefA id ->
-        unsupported arg.at "DefA" owner
-          ("$" ^ id.it ^ " is passed outside a DecD call")
-    | ExpA _ | TypA _ | GramA _ -> arg
+  let reject args =
+    List.iter
+      (fun arg ->
+        match arg.it with
+        | DefA id ->
+            unsupported arg.at "DefA" owner
+              ("$" ^ id.it ^ " is passed outside a DecD call")
+        | ExpA _ | TypA _ | GramA _ -> ())
+      args
   in
-  ignore
-    (Il.Walk.transform_def
-       {Il.Walk.base_transformer with transform_arg = reject} def)
+  (* Every argument list of the IL: calls, type and grammar uses, premises,
+     and the heads of instances and clauses. *)
+  let module Remaining = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_exp exp =
+      match exp.it with CallE (_, args) -> reject args | _ -> ()
+    let visit_typ typ =
+      match typ.it with VarT (_, args) -> reject args | _ -> ()
+    let visit_sym sym =
+      match sym.it with VarG (_, args) -> reject args | _ -> ()
+    let visit_prem prem =
+      match prem.it with RulePr (_, args, _, _) -> reject args | _ -> ()
+    let visit_def def =
+      match def.it with
+      | TypD (_, _, insts) ->
+          List.iter (fun {it = InstD (_, args, _); _} -> reject args) insts
+      | DecD (_, _, _, clauses) ->
+          List.iter (fun {it = DefD (_, args, _, _); _} -> reject args) clauses
+      | RelD _ | GramD _ | RecD _ | HintD _ -> ()
+  end) in
+  Remaining.def def
 
 (* Translator hints that describe the higher-order definition itself would
  * not describe its copies. *)
@@ -507,7 +527,7 @@ let check_hints higher_order script =
           List.iter
             (fun hint ->
               match hint.hintid.it with
-              | "builtin" | "maude_kind" | "maude_rule" | "maude_map" | "inverse" ->
+              | "builtin" | "maude_kind" | "maude_rule" | "inverse" ->
                   unsupported hint.hintid.at "DecH" ("DecD $" ^ id.it)
                     (hint.hintid.it ^ " hint on a definition with def parameters")
               | _ -> ())
@@ -577,7 +597,7 @@ let rec premise_relation prem =
   match prem.it with
   | RulePr (id, _, _, _) -> Some id.it
   | IterPr (prem, _) -> premise_relation prem
-  | IfPr _ | LetPr _ | ElsePr | NegPr _ -> None
+  | IfPr _ | LetPr _ | ElsePr -> None
 
 let omit_assumed at owner names prems =
   let assumed prem =
@@ -668,7 +688,7 @@ let stored_script script =
   in
   let field_bindings record pattern =
     match pattern.it with
-    | StrE fields ->
+    | StrE (fields, _) ->
         fields
         |> List.filter_map (fun (atom, value) ->
              if Hintd.stored_field stored pattern.note atom = None then None

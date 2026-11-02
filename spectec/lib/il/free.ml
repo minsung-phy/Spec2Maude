@@ -65,12 +65,12 @@ and free_exp e =
   | UnE (_, _, e1) | LiftE e1 | LenE e1 | ProjE (e1, _) | TheE e1 -> free_exp e1
   | BinE (_, _, e1, e2) | CmpE (_, _, e1, e2)
   | IdxE (e1, e2) | CompE (e1, e2) | MemE (e1, e2) | CatE (e1, e2) -> free_exp e1 ++ free_exp e2
-  | SliceE (e1, e2, e3) | IfE (e1, e2, e3) -> free_list free_exp [e1; e2; e3]
+  | SliceE (e1, e2, e3) -> free_list free_exp [e1; e2; e3]
   | OptE eo -> free_opt free_exp eo
   | TupE es | ListE es -> free_list free_exp es
   | UpdE (e1, p, e2) | ExtE (e1, p, e2) -> free_exp e1 ++ free_path p ++ free_exp e2
-  | StrE efs -> free_list free_expfield efs
-  | DotE (e1, _) | CaseE (_, e1) | UncaseE (e1, _) -> free_exp e1
+  | StrE (efs, _) -> free_list free_expfield efs
+  | DotE (e1, _) | CaseE (_, e1, _) | UncaseE (e1, _) -> free_exp e1
   | CallE (x, as1) -> free_defid x ++ free_args as1
   | IterE (e1, ite) -> (free_exp e1 -- bound_iterexp ite) ++ free_iterexp ite
   | CvtE (e1, _nt1, _nt2) -> free_exp e1
@@ -113,7 +113,6 @@ and free_prem prem =
   | LetPr (qs, e1, e2) -> (free_exp e1 -- bound_quants qs) ++ free_exp e2
   | ElsePr -> empty
   | IterPr (prem1, ite) -> (free_prem prem1 -- bound_iterexp ite) ++ free_iterexp ite
-  | NegPr prem1 -> free_prem prem1
 
 and bound_prem prem =
   match prem.it with

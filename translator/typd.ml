@@ -102,7 +102,7 @@ let translate_struct_field index bound (atom, (typ, quants, prems), _hints) =
 
 let rec composable index seen typ =
   not (List.exists (Il.Eq.eq_typ typ) seen)
-  && match (Il.Eval.reduce_typdef index.Prescan.type_env typ).it with
+  && match (Prescan.reduce_typdef index.Prescan.type_env typ).it with
      | AliasT {it = IterT _; _} -> true
      | StructT fields ->
          List.for_all
@@ -272,18 +272,17 @@ let translate_inst index id params inst =
           quants
       in
       let as_quantified =
-        { Il.Walk.base_transformer with
-          transform_exp = (fun exp ->
-            match exp.it with
-            | SubE ({it = VarE id; _} as var, _, target)
-              when Il.Free.Set.mem id.it proven ->
-                begin match quant_typ id with
-                | Some typ -> {exp with it = SubE (var, typ, target)}
-                | None -> exp
-                end
-            | _ -> exp) }
+        fun exp ->
+          match exp.it with
+          | SubE ({it = VarE id; _} as var, _, target)
+            when Il.Free.Set.mem id.it proven ->
+              begin match quant_typ id with
+              | Some typ -> {exp with it = SubE (var, typ, target)}
+              | None -> exp
+              end
+          | _ -> exp
       in
-      let args = List.map (Il.Walk.transform_arg as_quantified) args in
+      let args = List.map (Decd.map_arg as_quantified) args in
       let target, guards, bound = translate_target index id params args in
       let quants =
         List.filter

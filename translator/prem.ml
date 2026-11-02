@@ -93,7 +93,7 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
       | None, _ | _, None -> None
       end
 
-  | CaseE (mixop, payload) ->
+  | CaseE (mixop, payload, _) ->
       translate_case_pattern ~computed index exp.note mixop payload
 
   | OptE (Some inner) ->
@@ -105,7 +105,7 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
                  ("_?", [Term.as_sequence_element index inner.note pattern.term])
            })
 
-  | StrE fields ->
+  | StrE (fields, _) ->
       translate_field_patterns ~computed index fields
       |> Option.map (fun (fields, guards) ->
            {term = App ("{_}", [Term.record_fields fields]); guards})
@@ -134,7 +134,7 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
 
   | UnE _ | BinE _ | CmpE _ | ProjE _ | UncaseE _ | TheE _ | DotE _
   | CompE _ | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _
-  | UpdE _ | ExtE _ | IfE _ | CvtE _ | SubE _ ->
+  | UpdE _ | ExtE _ | CvtE _ | SubE _ ->
       None
 
 and translate_patterns ?(computed = fun _ -> None) index = function
@@ -406,7 +406,7 @@ and bind_structural_pattern index bound exp subject error =
             (MatchCond
                (Term.sequence_of_typ index exp.note subjects, subject))
         ] error
-  | CaseE (mixop, payload) ->
+  | CaseE (mixop, payload, _) ->
       bind_case_pattern index bound mixop payload subject error
   | OptE (Some inner) ->
       let inner_subject = pattern_subject index "OPTION-PART" inner in
@@ -415,7 +415,7 @@ and bind_structural_pattern index bound exp subject error =
       in
       bind_pattern_parts index bound [inner] [inner_subject]
         [EqCondition (MatchCond (represented, subject))] error
-  | StrE fields ->
+  | StrE (fields, _) ->
       let exps = List.map snd fields in
       let subjects = pattern_subjects index "FIELD-PART" exps in
       let represented =
@@ -443,7 +443,7 @@ and bind_structural_pattern index bound exp subject error =
   | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
   | ProjE _ | UncaseE _ | OptE None | TheE _ | DotE _ | CompE _
   | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _ | UpdE _ | ExtE _
-  | IfE _ | CallE _ | IterE _ | CvtE _ ->
+  | CallE _ | IterE _ | CvtE _ ->
       invalid_arg (error ^ ": " ^ Il.Print.string_of_exp exp)
 
 and pattern_subject index prefix exp =
@@ -872,8 +872,6 @@ let translate_barrier index collect_outputs bound prem =
       | _ ->
           invalid_arg "IterPr has multiple unbound generator sources"
       end
-  | NegPr _ ->
-      invalid_arg "NegPr requires a total source-derived complement"
   | IfPr _ | LetPr _ ->
       invalid_arg "internal error: pure premise reached a barrier"
 
@@ -924,7 +922,7 @@ let rec translate_prems index bind_membership collect_outputs result skipped = f
               translate_prems index bind_membership collect_outputs result
                 (prem :: skipped) prems
           end
-      | RulePr _ | ElsePr | IterPr _ | NegPr _ ->
+      | RulePr _ | ElsePr | IterPr _ ->
           if prem_has_rewrite_call index prem then
             invalid_arg
               "rewrite-backed call must be an IfPr equality premise";

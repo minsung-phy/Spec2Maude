@@ -60,6 +60,15 @@ and stored_fields =
 
 and stored = Array | Map
 
+
+(* Il.Eval reports a reduction that cannot continue as Error with the last
+   term reached; that term is the reduced type, as before the result type. *)
+let reduce_typ env typ =
+  match Il.Eval.reduce_typ env typ with Ok typ | Error typ -> typ
+
+let reduce_typdef env typ =
+  match Il.Eval.reduce_typdef env typ with Ok deftyp | Error deftyp -> deftyp
+
 let unsupported_sort at reason =
   Util.Error.error at "translation" ("Unsupported: maude sort hints " ^ reason)
 
@@ -215,7 +224,7 @@ let scan_stored script =
   stored_of (Il.Env.env_of_script script) source.definitions source.type_hints
 
 let stored_record_name stored typ =
-  match (Il.Eval.reduce_typ stored.stored_env typ).it with
+  match (reduce_typ stored.stored_env typ).it with
   | VarT (id, []) -> Some id.it
   | _ -> None
 
@@ -573,7 +582,7 @@ let typed_list_roots metadata =
   |> List.filter (fun sort -> typed_list_root metadata sort = sort)
 
 let sort_of_typ metadata typ =
-  let reduced = Il.Eval.reduce_typ metadata.type_env typ in
+  let reduced = reduce_typ metadata.type_env typ in
   match typ.it with
   | VarT (id, _) when List.mem id.it metadata.annotated -> id.it
   | IterT ({it = VarT (id, _); _}, _) when List.mem id.it metadata.lists ->
@@ -586,7 +595,7 @@ let rec typed_list_owner metadata typ =
     when List.mem id.it metadata.lists ->
       Some id.it
   | _ ->
-      let reduced = Il.Eval.reduce_typ metadata.type_env typ in
+      let reduced = reduce_typ metadata.type_env typ in
       if Il.Eq.eq_typ typ reduced then None else typed_list_owner metadata reduced
 
 let typed_sequence_representation owner =
@@ -766,14 +775,14 @@ let nonempty_context prefix postfix exp =
 let children ~deep exp =
   match exp.it with
   | TupE exps | ListE exps -> exps
-  | CaseE (_, payload) | SubE (payload, _, _) -> [payload]
+  | CaseE (_, payload, _) | SubE (payload, _, _) -> [payload]
   | LiftE payload when deep -> [payload]
   | CatE (left, right) when deep -> [left; right]
   | IterE (body, (_, bindings)) when deep -> body :: List.map snd bindings
   | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
   | ProjE _ | UncaseE _ | OptE _ | TheE _ | StrE _ | DotE _ | CompE _
   | LiftE _ | MemE _ | LenE _ | CatE _ | IdxE _ | SliceE _ | UpdE _
-  | ExtE _ | IfE _ | CallE _ | IterE _ | CvtE _ -> []
+  | ExtE _ | CallE _ | IterE _ | CvtE _ -> []
 
 let rec sequence_subjects metadata owner exp =
   match typed_list_owner metadata exp.note with
@@ -809,7 +818,7 @@ let frame mixop exp state sequence_position =
 let sequence_frame_opt subject inputs at =
   let find exp =
     match exp.it with
-    | CaseE (mixop, {it = TupE components; _}) ->
+    | CaseE (mixop, {it = TupE components; _}, _) ->
         begin match
           components
           |> List.mapi (fun position component -> position, component)
@@ -836,7 +845,7 @@ let sequence_frame_opt subject inputs at =
 let framed_subject (expected : frame) inputs at =
   let find exp =
     match exp.it with
-    | CaseE (mixop, {it = TupE components; _})
+    | CaseE (mixop, {it = TupE components; _}, _)
       when mixop = expected.mixop ->
         if List.length components <> 2 then
           unsupported exp.at
@@ -875,7 +884,7 @@ let rec strip_subtype exp =
 
 let constructor exp =
   match (strip_subtype exp).it with
-  | CaseE (mixop, _) -> Some mixop
+  | CaseE (mixop, _, _) -> Some mixop
   | _ -> None
 
 let focus_proper_sort metadata owner at =
@@ -936,7 +945,7 @@ let execution_premises execution_input_count premises =
        | RulePr (id, _, mixop, head)
          when Option.is_some (execution_input_count id.it) ->
            Some (id, mixop, head, premise)
-       | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ | NegPr _ -> None)
+       | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ -> None)
 
 let focus_patterns (metadata : t) execution_input_count relations contexts
     excluded (context : context) owner =
@@ -1033,8 +1042,7 @@ let scan_heatcool (metadata : t) execution_input_count =
            List.iter (fun premise -> match premise.it with
              | RulePr _ | IfPr _ | LetPr _ -> ()
              | ElsePr -> fail "ElsePr is not supported in a heated rule"
-             | IterPr _ -> fail "IterPr is not supported in a heated rule"
-             | NegPr _ -> fail "NegPr is not supported in a heated rule") premises;
+             | IterPr _ -> fail "IterPr is not supported in a heated rule") premises;
            if execution_premises execution_input_count premises = [] then
              fail "hint requires a direct execution RulePr";
            Some ({source; ordinal; rule} : heatcool))

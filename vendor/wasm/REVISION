@@ -1,0 +1,4 @@
+Repository: https://github.com/WebAssembly/spec.git
+Commit: 0148af713f24eb68768a2f3fb86608555924d61c
+Subset: interpreter -> vendor/wasm (without .gitignore, dune-project, wasm.opam)
+Local changes: dune builds only the wasm library used by wasm2maude

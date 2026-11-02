@@ -183,7 +183,7 @@ let source_name = function
   | "ref.ref-exn-addr" -> "REF.EXN-ADDR"
   | "ref.ref-host-addr" -> "REF.HOST-ADDR"
   | "ref.ref-extern" -> "REF.EXTERN"
-  | "hostfunc.sym" -> "..."
+  | "hostfunc.hostfunc" -> "-HOSTFUNC"
   | "typecheck" | "isOpt" | "seq" | "_?" | "_._" as name -> name
   | name when String.starts_with ~prefix:"instances." name -> name
   | name when String.starts_with ~prefix:"syn." name -> remove_syn name

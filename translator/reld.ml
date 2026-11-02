@@ -289,9 +289,9 @@ let rec source_constructors ?(exact = false) index seen typ =
 let rec source_pattern exp =
   match exp.it with
   | SubE (inner, _, _) -> source_pattern inner
-  | CaseE (mixop, {it = TupE [inner]; _}) when Mixop.is_hole_only mixop ->
+  | CaseE (mixop, {it = TupE [inner]; _}, _) when Mixop.is_hole_only mixop ->
       source_pattern inner
-  | CaseE (mixop, inner) when Mixop.is_hole_only mixop -> source_pattern inner
+  | CaseE (mixop, inner, _) when Mixop.is_hole_only mixop -> source_pattern inner
   | _ -> exp
 
 let source_accepts index typ mixop =
@@ -302,7 +302,7 @@ let source_accepts index typ mixop =
 let rec source_overlap index left right =
   let left, right = source_pattern left, source_pattern right in
   match left.it, right.it with
-  | CaseE (op, payload), CaseE (op', payload') ->
+  | CaseE (op, payload, _), CaseE (op', payload', _) ->
       Il.Eq.eq_mixop op op' && source_overlap index payload payload'
   | TupE lefts, TupE rights when List.length lefts = List.length rights ->
       List.for_all2 (source_overlap index) lefts rights
@@ -314,8 +314,8 @@ let rec source_overlap index left right =
         | Some exp, _ -> List.exists (source_element_overlap index (Some exp, exp.note)) elements
       in
       List.for_all (covered rights) lefts && List.for_all (covered lefts) rights
-  | VarE _, CaseE (mixop, _) -> source_accepts index left.note mixop
-  | CaseE (mixop, _), VarE _ -> source_accepts index right.note mixop
+  | VarE _, CaseE (mixop, _, _) -> source_accepts index left.note mixop
+  | CaseE (mixop, _, _), VarE _ -> source_accepts index right.note mixop
   | VarE _, VarE _ ->
       (* Types with disjoint constructors (Inn, Fnn) have no common value. *)
       begin match source_constructors ~exact:true index [] left.note,
@@ -346,7 +346,7 @@ and source_element_overlap index (left, left_typ) (right, right_typ) =
   | Some exp, None | None, Some exp ->
       let exp = source_pattern exp in
       begin match exp.it with
-      | CaseE (mixop, _) ->
+      | CaseE (mixop, _, _) ->
           source_accepts index (if Option.is_none left then left_typ else right_typ) mixop
       | _ -> true
       end

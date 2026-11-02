@@ -12,7 +12,7 @@ All commands are run from the repository root.
 Spec2Maude requires:
 
 - a Unix-like environment;
-- OCaml 5.1.0;
+- OCaml 5.4 or newer (required by the pinned SpecTec);
 - Dune 3.0 or newer;
 - Menhir;
 - Zarith;
@@ -21,8 +21,8 @@ Spec2Maude requires:
 The artifact has been tested on macOS arm64 with:
 
 ```text
-OCaml   5.1.0
-Dune    3.23.1
+OCaml   5.4.1
+Dune    3.24.2
 Menhir  20260209
 Zarith  1.14
 Maude   3.5.1
@@ -34,9 +34,9 @@ Install [opam](https://opam.ocaml.org/), then create a switch and install the
 required packages:
 
 ```sh
-opam switch create 5.1.0 ocaml-base-compiler.5.1.0
-eval "$(opam env --switch=5.1.0)"
-opam install dune.3.23.1 menhir.20260209 zarith.1.14
+opam switch create spec2maude ocaml-base-compiler.5.4.1
+eval "$(opam env --switch=spec2maude)"
+opam install dune.3.24.2 menhir.20260209 zarith.1.14
 ```
 
 An existing compatible switch may be used instead. Confirm the active tools:
@@ -80,8 +80,8 @@ cat benchmarks/wasm-spec/REVISION
 The expected commits are:
 
 ```text
-SpecTec:             acc6e834ff403c82554d081237f327346190ad96
-WebAssembly suite:   fc209c5ed8afc4dfeb9252024d217da3376c7a6f
+SpecTec:             0148af713f24eb68768a2f3fb86608555924d61c
+WebAssembly suite:   0148af713f24eb68768a2f3fb86608555924d61c
 ```
 
 The SpecTec copy contains only the listed library subset, WebAssembly
@@ -214,8 +214,9 @@ The WAST runtime is a test runner, not part of the translated semantics:
   successor in Maude's search order, the success rule (`choice`). Other
   choices are left to `rew`; use the runner with `rew`, not with `search` or
   model checking.
-- `spectest` print functions are an environment model: a call is one step that
-  consumes its arguments and leaves the store unchanged (`host-call`).
+- `spectest` print functions are an environment model: the specification calls
+  a host function through `$hostcall`, and the runtime defines it for the print
+  functions, which return no values and leave the store unchanged.
 - SpecTec has no call-stack limit. `assert_exhaustion` passes once the frame
   depth exceeds `--call-depth` (default 256), so that PASS is relative to the
   bound.
@@ -261,7 +262,7 @@ finite protocol model.
 
 ## Official WebAssembly core suite
 
-The pinned suite contains 258 `.wast` files, including the `bulk-memory`,
+The pinned suite contains 259 `.wast` files, including the `bulk-memory`,
 `exceptions`, `gc`, `memory64`, `multi-memory`, `relaxed-simd`, and
 `simd` sub-suites.
 
@@ -278,9 +279,9 @@ inputs without executing Maude.
 Expected output:
 
 ```text
-files: 258
-modules: 2510
-encoded: 2510
+files: 259
+modules: 2523
+encoded: 2523
 ```
 
 ### Run the suite
@@ -297,7 +298,7 @@ RESULT_DIR=/tmp/spec2maude-wasm-core \
 test/wasm_core_suite.sh
 ```
 
-The script verifies that the suite contains exactly 258 distinct `.wast`
+The script verifies that the suite contains exactly 259 distinct `.wast`
 files. It first runs all files with a 300-second wall-clock timeout and then
 reruns only `TIMEOUT` files with a 3600-second timeout. It uses call depth
 256.
@@ -320,7 +321,7 @@ Each file is classified as one of:
 - `TIMEOUT`;
 - `STUCK`.
 
-The script exits with status 0 only when all 258 scripts are classified as
+The script exits with status 0 only when all 259 scripts are classified as
 `PASS`. Otherwise it exits nonzero after preserving the complete reports and
 logs; a nonzero exit therefore does not mean that the experiment artifacts
 were lost.

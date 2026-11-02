@@ -162,13 +162,13 @@ and exp e =
   | CmpE (op, ot, e1, e2) -> cmpop op; optyp ot; exp e1; exp e2
   | TupE es | ListE es -> list exp es
   | ProjE (e1, _) | TheE e1 | LiftE e1 | LenE e1 -> exp e1
-  | CaseE (op, e1) -> mixop op; exp e1
+  | CaseE (op, e1, _) -> mixop op; exp e1
   | UncaseE (e1, op) -> exp e1; mixop op
   | OptE eo -> opt exp eo
-  | StrE efs -> list expfield efs
+  | StrE (efs, _) -> list expfield efs
   | DotE (e1, at) -> exp e1; atom at
   | CompE (e1, e2) | MemE (e1, e2) | CatE (e1, e2) | IdxE (e1, e2) -> exp e1; exp e2
-  | SliceE (e1, e2, e3) | IfE (e1, e2, e3) -> exp e1; exp e2; exp e3
+  | SliceE (e1, e2, e3) -> exp e1; exp e2; exp e3
   | UpdE (e1, p, e2) | ExtE (e1, p, e2) -> exp e1; path p; exp e2
   | CallE (x, as_) -> defid x; args as_
   | IterE (e1, it) -> iterexp exp e1 it
@@ -211,7 +211,6 @@ and prem pr =
   | ElsePr -> ()
   | IterPr (pr1, it) -> iterexp prem pr1 it
   | LetPr (qs, e1, e2) -> params qs; exp e1; exp e2
-  | NegPr pr1 -> prem pr1
 
 and prems prs = list prem prs
 

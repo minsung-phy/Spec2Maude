@@ -135,6 +135,10 @@ type t =
 
 
 
+
+let reduce_typ = Hintd.reduce_typ
+let reduce_typdef = Hintd.reduce_typdef
+
 let sanitize name =
   name
   |> String.to_seq
@@ -165,7 +169,7 @@ let array_record index typ =
 (* Record composition uses the equation emitted for its monomorphic TypD.
    A record with a maude_array field has no such equation. *)
 let record_composition_available index typ =
-  match (Il.Eval.reduce_typ index.type_env typ).it with
+  match (reduce_typ index.type_env typ).it with
   | VarT (id, []) ->
       begin match Il.Env.find_typ index.type_env id with
       | [], [{it = InstD ([], [], {it = StructT _; _}); _}] ->
@@ -291,7 +295,7 @@ let compact name =
 let helper_subject place (body : exp) =
   match body.it with
   | CallE (id, _) when compact id.it <> "" -> compact id.it
-  | CaseE (mixop, _) when not (Mixop.is_hole_only mixop)
+  | CaseE (mixop, _, _) when not (Mixop.is_hole_only mixop)
                           && compact (Mixop.name mixop) <> "" ->
       compact (Mixop.name mixop)
   | _ -> place
@@ -453,11 +457,15 @@ let has_dec_hint_in hints target_name name =
           List.fold_left
                (fun found hint ->
                  begin match hint.hintid.it, hint.hintexp.it with
-                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map"), El.Ast.SeqE [] -> ()
-                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map" as flag), _ ->
+                 | ("builtin" | "maude_kind" | "maude_rule"), El.Ast.SeqE [] -> ()
+                 | ("builtin" | "maude_kind" | "maude_rule" as flag), _ ->
                      Util.Error.error hint.hintid.at "translation"
                        ("Unsupported DecD $" ^ target_name ^ ": "
                         ^ flag ^ " must be a flag hint")
+                 | "maude_map", _ ->
+                     Util.Error.error hint.hintid.at "translation"
+                       ("Unsupported DecD $" ^ target_name
+                        ^ ": maude_map marks a record field, not a definition")
                  | _ -> ()
                  end;
                  found || hint.hintid.it = name)
@@ -987,7 +995,7 @@ let collect_occurrences sort_metadata script =
       | LetPr (quants, _, _) -> add_params quants
       | IterPr (body, iterexp) ->
           add_premise_iteration !current_owner premise body iterexp
-      | RulePr _ | IfPr _ | ElsePr | NegPr _ -> ()
+      | RulePr _ | IfPr _ | ElsePr -> ()
 
     let scope_enter id typ =
       add_variable id typ
@@ -1163,7 +1171,7 @@ let unsupported_definitions unsupported_relations defs =
           when StringSet.mem target.it unsupported_relation_names ->
             unsupported := true
         | RulePr _ | IfPr _ | LetPr _ | ElsePr
-        | IterPr _ | NegPr _ -> ()
+        | IterPr _ -> ()
     end)
     in
     Visitor.clause clause;
@@ -1335,10 +1343,6 @@ let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
-
-(* hint(maude_map) on a DecD: its result is a maude_map field, read only
-   through $f(..)[i] and |$f(..)| (Term.stored_value). *)
-let map_definition index id = has_dec_hint index id "maude_map"
 
 let relation_policy index id =
   match List.assoc_opt id.it index.relation_policies with

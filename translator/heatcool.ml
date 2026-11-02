@@ -198,7 +198,7 @@ let rec focus_output index needed exp =
         | Some source -> source.it
         | None -> exp.it
         end
-    | CaseE (op, payload) -> CaseE (op, recurse payload)
+    | CaseE (op, payload, check) -> CaseE (op, recurse payload, check)
     | TupE fields -> TupE (List.map recurse fields)
     | ListE fields -> ListE (List.map recurse fields)
     | CatE (left, right) -> CatE (recurse left, recurse right)
@@ -313,7 +313,7 @@ let focus_premises index initial needed deferred prems =
           else if Prem.known bound right then binding bound left right
           else if Prem.known bound left then binding bound right left
           else none
-      | ElsePr | NegPr _ -> none
+      | ElsePr -> none
       | IfPr exp ->
           (* Sequence and cardinality guards constrain the boundary. *)
           S.inter needed (Prem.variables exp), Prem.variables exp, false
@@ -993,7 +993,7 @@ let heatcool_rule ~observed cache index (heated : Hintd.heatcool) =
           if Prem.prem_has_rewrite_call index prem then
             fail "rewrite-backed expression requires a separate hint contract";
           None
-      | ElsePr | IterPr _ | NegPr _ ->
+      | ElsePr | IterPr _ ->
           fail "unsupported premise under k_heatcool")
   in
   let body =

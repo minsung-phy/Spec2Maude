@@ -63,7 +63,11 @@ let empty_module =
 let host_resource_term {Wast_plan.export; _} =
   match Wast_host.kind export with
   | Wast_host.Function typ ->
-      T.app "rec.funcinst" [host_deftype typ; empty_module; T.atom "hostfunc.sym"]
+      (* hostfunc = _HOSTFUNC text, the export name; spectest names are ASCII. *)
+      let name = Wasm.Utf8.encode (Wast_host.name export) in
+      T.app "rec.funcinst"
+        [host_deftype typ; empty_module;
+         T.app "hostfunc.hostfunc" [T.app "#_" [T.atom ("\"" ^ name ^ "\"")]]]
   | Wast_host.Global (typ, value) ->
       T.app "rec.globalinst" [globaltype typ; Encode.num_value value]
   | Wast_host.Memory (Wasm.Types.MemoryT (_, lim) as typ) ->
@@ -110,9 +114,3 @@ let store (host : Wast_plan.host) =
      seq (List.map host_resource_term host.tables);
      seq (List.map host_resource_term host.funcs);
      seq []; seq []; seq []; seq []; seq []]
-
-let function_addresses funcs =
-  funcs
-  |> List.map (fun binding ->
-       T.app "#_" [T.atom (string_of_int binding.Wast_plan.address)])
-  |> T.seq

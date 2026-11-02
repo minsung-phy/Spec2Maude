@@ -83,23 +83,22 @@ type prepared_clause =
   ; head : clause_head
   ; head_proven : Il.Free.Set.t
   ; result_sort : sort
-  ; map_result : bool
   ; index : Prescan.t
   }
 
 (* A head SubE pattern already guards its variable, so the quantifier check
    of an equal membership repeats it. *)
 let guarded_quants index quants args =
-  let collector =
-    { (Il.Walk.base_collector [] ( @ )) with
-      collect_exp =
-        (fun exp ->
-          match exp.it with
-          | SubE ({it = VarE id; _}, typ, _) -> [id.it, typ], true
-          | _ -> [], true)
-    }
-  in
-  let guards = List.concat_map (Il.Walk.collect_arg collector) args in
+  let guards = ref [] in
+  let module Guards = Il.Iter.Make (struct
+    include Il.Iter.Skip
+    let visit_exp exp =
+      match exp.it with
+      | SubE ({it = VarE id; _}, typ, _) -> guards := (id.it, typ) :: !guards
+      | _ -> ()
+  end) in
+  Guards.args args;
+  let guards = !guards in
   List.fold_left
     (fun proven quant ->
       match quant.it with
@@ -127,8 +126,7 @@ let prepare_clauses index id params clauses =
           let head = translate_head index id args in
           let head_proven = guarded_quants index quants args in
           let _, result_sort = Term.definition_sorts index id in
-          let map_result = Prescan.map_definition index id in
-          {clause; head; head_proven; result_sort; map_result; index})
+          {clause; head; head_proven; result_sort; index})
     clauses
 
 let proven_variables prepared premises =
@@ -144,17 +142,10 @@ let clause_has_rewrite_call index args rhs prems =
   || List.exists (Prem.prem_has_rewrite_call index) prems
 
 
-(* A hint(maude_map) definition returns the map stored in a maude_map field. *)
 let translate_result prepared rhs =
   let index = prepared.index in
-  if prepared.map_result then
-    match Term.stored_value index rhs with
-    | Some (Hintd.Map, map) -> map
-    | Some (Hintd.Array, _) | None ->
-        invalid_arg "a hint(maude_map) definition must return a maude_map field"
-  else
-    Term.to_sort index ~sort:prepared.result_sort rhs.note
-      (Term.translate_exp index rhs)
+  Term.to_sort index ~sort:prepared.result_sort rhs.note
+    (Term.translate_exp index rhs)
 
 (* DefD clauses are a sequential pattern match (Bringing the WebAssembly
    Standard up to Speed with SpecTec, 3): a clause applies only if no earlier
@@ -477,15 +468,183 @@ type specialization =
   ; copy : id
   }
 
-(* Def ids have no binders inside clauses, so renaming a def parameter is
- * capture-free; Il.Subst would also refresh iteration binders. *)
-let renaming ids targets =
-  let rename id =
-    match List.assoc_opt id.it (List.combine ids targets) with
-    | Some target -> target
-    | None -> id
+(* Every expression of a definition, rewritten innermost first by f.
+ * Specialization rewrites calls wherever they occur: in clauses, rules,
+ * premises, and the arguments of types. Type notes and the two types of a
+ * SubE hold no call that specialization rewrites. *)
+let rec map_exp f exp =
+  let e = map_exp f in
+  let it =
+    match exp.it with
+    | VarE _ | BoolE _ | NumE _ | TextE _ -> exp.it
+    | UnE (op, ot, e1) -> UnE (op, ot, e e1)
+    | BinE (op, ot, e1, e2) -> BinE (op, ot, e e1, e e2)
+    | CmpE (op, ot, e1, e2) -> CmpE (op, ot, e e1, e e2)
+    | TupE es -> TupE (List.map e es)
+    | ProjE (e1, i) -> ProjE (e e1, i)
+    | CaseE (op, e1, check) -> CaseE (op, e e1, check)
+    | UncaseE (e1, op) -> UncaseE (e e1, op)
+    | OptE eo -> OptE (Option.map e eo)
+    | TheE e1 -> TheE (e e1)
+    | StrE (fields, check) ->
+        StrE (List.map (fun (atom, e1) -> atom, e e1) fields, check)
+    | DotE (e1, atom) -> DotE (e e1, atom)
+    | CompE (e1, e2) -> CompE (e e1, e e2)
+    | ListE es -> ListE (List.map e es)
+    | LiftE e1 -> LiftE (e e1)
+    | MemE (e1, e2) -> MemE (e e1, e e2)
+    | LenE e1 -> LenE (e e1)
+    | CatE (e1, e2) -> CatE (e e1, e e2)
+    | IdxE (e1, e2) -> IdxE (e e1, e e2)
+    | SliceE (e1, e2, e3) -> SliceE (e e1, e e2, e e3)
+    | UpdE (e1, path, e2) -> UpdE (e e1, map_path f path, e e2)
+    | ExtE (e1, path, e2) -> ExtE (e e1, map_path f path, e e2)
+    | CallE (id, args) -> CallE (id, List.map (map_arg f) args)
+    | IterE (e1, iterexp) -> IterE (e e1, map_iterexp f iterexp)
+    | CvtE (e1, nt1, nt2) -> CvtE (e e1, nt1, nt2)
+    | SubE (e1, t1, t2) -> SubE (e e1, t1, t2)
   in
-  {Il.Walk.base_transformer with transform_def_id = rename}
+  f {exp with it}
+
+and map_path f path =
+  let it =
+    match path.it with
+    | RootP -> RootP
+    | IdxP (p, e) -> IdxP (map_path f p, map_exp f e)
+    | SliceP (p, e1, e2) -> SliceP (map_path f p, map_exp f e1, map_exp f e2)
+    | DotP (p, atom) -> DotP (map_path f p, atom)
+  in
+  {path with it}
+
+and map_iter f iter =
+  match iter with
+  | ListN (e, x) -> ListN (map_exp f e, x)
+  | Opt | List | List1 -> iter
+
+and map_iterexp f (iter, sources) =
+  map_iter f iter, List.map (fun (x, e) -> x, map_exp f e) sources
+
+and map_arg f arg =
+  let it =
+    match arg.it with
+    | ExpA e -> ExpA (map_exp f e)
+    | TypA typ -> TypA (map_typ f typ)
+    | DefA _ -> arg.it
+    | GramA sym -> GramA (map_sym f sym)
+  in
+  {arg with it}
+
+and map_typ f typ =
+  let it =
+    match typ.it with
+    | VarT (id, args) -> VarT (id, List.map (map_arg f) args)
+    | BoolT | NumT _ | TextT -> typ.it
+    | TupT xts -> TupT (List.map (fun (x, t) -> x, map_typ f t) xts)
+    | IterT (t, iter) -> IterT (map_typ f t, map_iter f iter)
+  in
+  {typ with it}
+
+and map_sym f sym =
+  let it =
+    match sym.it with
+    | VarG (id, args) -> VarG (id, List.map (map_arg f) args)
+    | NumG _ | TextG _ | EpsG -> sym.it
+    | SeqG syms -> SeqG (List.map (map_sym f) syms)
+    | AltG syms -> AltG (List.map (map_sym f) syms)
+    | RangeG (s1, s2) -> RangeG (map_sym f s1, map_sym f s2)
+    | IterG (s, iterexp) -> IterG (map_sym f s, map_iterexp f iterexp)
+    | AttrG (e, s) -> AttrG (map_exp f e, map_sym f s)
+  in
+  {sym with it}
+
+and map_prem f prem =
+  let it =
+    match prem.it with
+    | RulePr (id, args, op, e) -> RulePr (id, List.map (map_arg f) args, op, map_exp f e)
+    | IfPr e -> IfPr (map_exp f e)
+    | LetPr (quants, e1, e2) ->
+        LetPr (List.map (map_param f) quants, map_exp f e1, map_exp f e2)
+    | ElsePr -> ElsePr
+    | IterPr (p, iterexp) -> IterPr (map_prem f p, map_iterexp f iterexp)
+  in
+  {prem with it}
+
+and map_param f param =
+  let it =
+    match param.it with
+    | ExpP (id, typ) -> ExpP (id, map_typ f typ)
+    | TypP _ -> param.it
+    | DefP (id, params, typ) -> DefP (id, List.map (map_param f) params, map_typ f typ)
+    | GramP (id, params, typ) -> GramP (id, List.map (map_param f) params, map_typ f typ)
+  in
+  {param with it}
+
+let map_case f (typ, quants, prems) =
+  map_typ f typ, List.map (map_param f) quants, List.map (map_prem f) prems
+
+let map_deftyp f deftyp =
+  let it =
+    match deftyp.it with
+    | AliasT typ -> AliasT (map_typ f typ)
+    | StructT fields ->
+        StructT (List.map (fun (atom, case, hints) -> atom, map_case f case, hints) fields)
+    | VariantT cases ->
+        VariantT (List.map (fun (op, case, hints) -> op, map_case f case, hints) cases)
+  in
+  {deftyp with it}
+
+let map_clause f clause =
+  let DefD (quants, args, exp, prems) = clause.it in
+  { clause with
+    it =
+      DefD
+        ( List.map (map_param f) quants
+        , List.map (map_arg f) args
+        , map_exp f exp
+        , List.map (map_prem f) prems ) }
+
+let rec map_def f def =
+  let params = List.map (map_param f) in
+  let it =
+    match def.it with
+    | TypD (id, ps, insts) ->
+        let inst {it = InstD (quants, args, deftyp); at; note} =
+          { it = InstD (params quants, List.map (map_arg f) args, map_deftyp f deftyp)
+          ; at; note }
+        in
+        TypD (id, params ps, List.map inst insts)
+    | RelD (id, ps, op, typ, rules) ->
+        let rule {it = RuleD (rid, quants, op, exp, prems); at; note} =
+          { it =
+              RuleD (rid, params quants, op, map_exp f exp, List.map (map_prem f) prems)
+          ; at; note }
+        in
+        RelD (id, params ps, op, map_typ f typ, List.map rule rules)
+    | DecD (id, ps, typ, clauses) ->
+        DecD (id, params ps, map_typ f typ, List.map (map_clause f) clauses)
+    | GramD (id, ps, typ, prods) ->
+        let prod {it = ProdD (quants, sym, exp, prems); at; note} =
+          { it =
+              ProdD (params quants, map_sym f sym, map_exp f exp, List.map (map_prem f) prems)
+          ; at; note }
+        in
+        GramD (id, params ps, map_typ f typ, List.map prod prods)
+    | RecD defs -> RecD (List.map (map_def f) defs)
+    | HintD _ -> def.it
+  in
+  {def with it}
+
+(* A def parameter occurs in a clause only as a callee: passing it on as a
+ * DefA is rejected when calls are collected. Def ids have no binders inside
+ * clauses, so the renaming is capture-free. *)
+let renaming ids targets exp =
+  match exp.it with
+  | CallE (callee, args) ->
+      begin match List.assoc_opt callee.it (List.combine ids targets) with
+      | Some target -> {exp with it = CallE (target, args)}
+      | None -> exp
+      end
+  | _ -> exp
 
 let specialize_clause id params targets clause =
   let DefD (quants, args, exp, prems) = clause.it in
@@ -509,14 +668,13 @@ let specialize_clause id params targets clause =
         | ExpP _ | TypP _ | GramP _ -> true)
       quants
   in
-  Il.Walk.transform_clause (renaming ids targets)
-    (DefD (quants, args, exp, prems) $ clause.at)
+  map_clause (renaming ids targets) (DefD (quants, args, exp, prems) $ clause.at)
 
 let specialize specialization id params result_typ clauses =
   let kept, def_params = Param.split_def_positions params params in
   let rename = renaming (Param.def_ids def_params) specialization.targets in
   DecD
     ( specialization.copy
-    , List.map (Il.Walk.transform_param rename) kept
-    , Il.Walk.transform_typ rename result_typ
+    , List.map (map_param rename) kept
+    , map_typ rename result_typ
     , List.map (specialize_clause id params specialization.targets) clauses )

@@ -122,9 +122,6 @@ mod WASM-WAST-DRIVER is
   op script.done : -> ScriptState [ctor] .
 
   op emptyStore : -> SpectecTerminal .
-  op hostFunctionAddresses : -> SpectecTerminals .
-  op hostArguments : ValList SpectecTerminals -> Bool .
-  op hostCallable : SpectecTerminal Nat ValList -> Bool .
   op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
 
   op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .
@@ -154,11 +151,6 @@ mod WASM-WAST-DRIVER is
   var WSHLPAT : LanePattern .
   var WSHLPATS : LanePatterns .
   vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM WSHBITS : Nat .
-
-  eq hostArguments(nil, nil) = true .
-  eq hostArguments(CONST(WSHNT, WSHVALUE) WSHVALUES,
-    WSHNT WSHTYPES) = hostArguments(WSHVALUES, WSHTYPES) .
-  eq hostArguments(WSHVALUES, WSHTYPES) = false [owise] .
 
   eq hasInstance(instances.concat(WSHENVPREFIX,
     instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = true .
@@ -385,25 +377,16 @@ mod WASM-WAST-DRIVER is
     alternatives.cons(WSHPATTERN, WSHALTSUFFIX))) = match.yes
     if match.value(WSHVALUE, WSHPATTERN) = match.yes .
   eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .
-  ceq hostCallable(WSHS, WSHA, WSHARGS) = true
-    if occurs(# WSHA, hostFunctionAddresses) = true
-       /\ typecheck(WSHARGS, val) = true
-       /\ typecheck(WSHARGS, instr) = true
-       /\ WSHXA := map-read(WSHS . 'FUNCS, WSHA)
-       /\ (WSHXA . 'CODE) = ...
-       /\ FUNC WSHTYPES -> nil := Expand((WSHXA . 'TYPE))
-       /\ size(WSHARGS) = size(WSHTYPES)
-       /\ hostArguments(WSHARGS, WSHTYPES) = true .
-  eq hostCallable(WSHS, WSHA, WSHARGS) = false [owise] .
-
-  --- Environment model, not SpecTec: a call of a spectest host function, the
-  --- print functions without results, is one Step_read step that consumes its
-  --- arguments and leaves the store unchanged. The split is the translated
-  --- identifyFocus of call_ref, whose arity is the function type's.
-  crl [host-call] :
-    Step-read((WSHS ; WSHCURRENT) ;
-      (WSHARGS (REF.FUNC-ADDR(WSHA) CALL-REF(WSHC)))) => nil
-    if hostCallable(WSHS, WSHA, WSHARGS) = true .
+  --- Environment model, not SpecTec: the source leaves $hostcall to the host.
+  --- The spectest functions are the print functions, which return no values
+  --- and leave the store unchanged.
+  eq hostcall(-HOSTFUNC(# "print"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_i32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_i64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_f32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_f64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_i32_f32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_f64_f64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
 
   crl [choice] : kstate(choice(WSHR), WSHK) => kstate(WSHR2, WSHK)
     if WSHR => WSHR2 /\ WSHR2 =/= WSHR .

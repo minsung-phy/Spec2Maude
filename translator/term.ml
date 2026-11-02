@@ -118,8 +118,8 @@ let rec is_zero exp =
   match exp.it with
   | NumE (`Nat n | `Int n) -> Z.equal n Z.zero
   | SubE (inner, _, _) | CvtE (inner, _, _) -> is_zero inner
-  | CaseE (Xl.Mixop.Arg (), {it = TupE [inner]; _}) -> is_zero inner
-  | CaseE (Xl.Mixop.Arg (), inner) -> is_zero inner
+  | CaseE (Xl.Mixop.Arg (), {it = TupE [inner]; _}, _) -> is_zero inner
+  | CaseE (Xl.Mixop.Arg (), inner, _) -> is_zero inner
   | _ -> false
 
 let rec record_fields = function
@@ -152,7 +152,7 @@ let payload_sorts index typ =
 let constructor_domain index typ mixop =
   let key = Mixop.key mixop in
   let owner =
-    match (Il.Eval.reduce_typ index.Prescan.type_env typ).it with
+    match (Prescan.reduce_typ index.Prescan.type_env typ).it with
     | VarT (id, _) -> id.it
     | BoolT | NumT _ | TextT | TupT _ | IterT _ ->
         invalid_arg ("constructor " ^ key ^ " has a non-variant type")
@@ -210,7 +210,7 @@ let to_native index typ term =
   in
   if Iter.native_sort (translate_sort index typ) then term
   else
-    match (Il.Eval.reduce_typ index.Prescan.type_env typ).it with
+    match (Prescan.reduce_typ index.Prescan.type_env typ).it with
     | BoolT -> unbox "#bool"
     | NumT _ -> unbox "#rat"
     | TextT -> unbox "#string"
@@ -365,7 +365,7 @@ and translate_value index exp =
         [translate_exp index tuple; Const (string_of_int field_index)]
       |> from_sequence_element index exp.note
 
-  | CaseE (mixop, payload) ->
+  | CaseE (mixop, payload, _) ->
       (* Type premises are invariants, not guards on value construction. *)
       if Mixop.is_hole_only mixop then
         begin match payload.it with
@@ -401,7 +401,7 @@ and translate_value index exp =
   | TheE _ ->
       invalid_arg "TheE option extraction is not supported"
 
-  | StrE fields ->
+  | StrE (fields, _) ->
       fields
       |> List.map (fun (atom, field) ->
            let value =
@@ -490,17 +490,6 @@ and translate_value index exp =
       translate_extension
         index (translate_exp index base) path (translate_exp index extension)
 
-  | IfE (condition, then_exp, else_exp) ->
-      app "if_then_else_fi"
-        [ translate_native index condition
-        ; translate_exp index then_exp
-        ; translate_exp index else_exp
-        ]
-
-  | CallE (id, _) when Prescan.map_definition index id ->
-      unsupported_stored Hintd.Map exp.at
-        ("read $" ^ id.it ^ "(..) through |$" ^ id.it ^ "(..)| or $" ^ id.it ^ "(..)[i]")
-
   | CallE (id, args) ->
       translate_call index id args
       |> Iter.coerce ~actual:(snd (definition_sorts index id))
@@ -525,8 +514,7 @@ and translate_call index id args =
   app (Prescan.def_name index id) (List.map2 (translate_call_arg index) sorts args)
 
 (* The stored value of a maude_array or maude_map field e.f, when exp is e.f
- * or the identity iteration x*{x <- e.f}, or a call of a hint(maude_map)
- * definition. *)
+ * or the identity iteration x*{x <- e.f}. *)
 and stored_value index exp =
   match exp.it with
   | DotE (record, atom) ->
@@ -535,8 +523,6 @@ and stored_value index exp =
            kind, app "_._" [translate_exp index record; qid_of_atom atom])
   | IterE (body, iterexp) ->
       Option.bind (Iter.identity_source index body iterexp) (stored_value index)
-  | CallE (id, args) when Prescan.map_definition index id ->
-      Some (Hintd.Map, translate_call index id args)
   | _ -> None
 
 (* A source sequence stored into a field of representation kind: a field of
@@ -698,7 +684,7 @@ and translate_extension index base path extension =
 
 and translate_composition index typ left right =
   (* Expand declarations and type arguments only; do not evaluate the operands. *)
-  match (Il.Eval.reduce_typdef index.Prescan.type_env typ).it with
+  match (Prescan.reduce_typdef index.Prescan.type_env typ).it with
   | AliasT {it = IterT (_, Opt); _} ->
       app "optionConcat" [left; right]
   | AliasT {it = IterT (_, (List | List1 | ListN _)); _} ->
@@ -732,7 +718,7 @@ let rec translate_typ_conditions index value typ =
      syntax exp = int) adds no condition. *)
   | ("Nat" | "Int" as sort), VarT _
     when (match value with Var v -> v.sort = sort | _ -> false)
-         && (Il.Eval.reduce_typ index.Prescan.type_env typ).it
+         && (Prescan.reduce_typ index.Prescan.type_env typ).it
             = NumT (if sort = "Nat" then `NatT else `IntT) ->
       []
   | _, TupT fields ->
@@ -831,7 +817,7 @@ let arg_payload payload =
 let rec source_value exp =
   match exp.it with
   | SubE (inner, _, _) -> source_value inner
-  | CaseE (Xl.Mixop.Arg (), payload) -> source_value (arg_payload payload)
+  | CaseE (Xl.Mixop.Arg (), payload, _) -> source_value (arg_payload payload)
   | _ -> exp
 
 let same_source_value a b = Il.Eq.eq_exp (source_value a) (source_value b)
@@ -897,9 +883,9 @@ let rec match_type_pattern quants subst constraints pattern actual =
       | Some previous when not (same_source_value previous actual) -> None
       | _ -> Some (Il.Subst.add_varid subst id actual, constraints)
       end
-  | CaseE (Xl.Mixop.Arg (), payload), _ ->
+  | CaseE (Xl.Mixop.Arg (), payload, _), _ ->
       match_type_pattern quants subst constraints (arg_payload payload) actual
-  | CaseE (op, payload), CaseE (op', payload') when Il.Eq.eq_mixop op op' ->
+  | CaseE (op, payload, _), CaseE (op', payload', _) when Il.Eq.eq_mixop op op' ->
       match_type_pattern quants subst constraints payload payload'
   | (TupE xs, TupE ys | ListE xs, ListE ys) when List.length xs = List.length ys ->
       List.fold_left2
@@ -1021,7 +1007,7 @@ and case_branches index seen value (op, (payload, _, _), _) =
   if op = Xl.Mixop.Arg () then branches value payload
   else
     match value.it with
-    | CaseE (actual, inner) when Il.Eq.eq_mixop op actual -> branches inner payload
+    | CaseE (actual, inner, _) when Il.Eq.eq_mixop op actual -> branches inner payload
     | VarE _ when translate_sort index value.note <> "Nat" -> [[]]
     | VarE _ | CaseE _ | NumE _ | BoolE _ | TextE _ | ListE _ | OptE _ | StrE _ | TupE _ -> []
     | _ -> [[]]

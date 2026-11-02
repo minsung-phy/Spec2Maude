@@ -15,7 +15,7 @@ usage() {
   cat <<EOF
 usage: test/wasm_core_suite.sh
 
-Runs all 258 official WebAssembly core .wast files with a ${short_timeout}s
+Runs all 259 official WebAssembly core .wast files with a ${short_timeout}s
 wall-clock timeout, then reruns only TIMEOUT files with a ${long_timeout}s
 timeout. Results are written to:
 
@@ -49,8 +49,8 @@ if ! command -v "$maude_bin" >/dev/null 2>&1; then
 fi
 
 file_count=$(find "$suite" -type f -name '*.wast' | wc -l | tr -d ' ')
-if [[ "$file_count" != 258 ]]; then
-  echo "wasm_core_suite: expected 258 .wast files, found $file_count" >&2
+if [[ "$file_count" != 259 ]]; then
+  echo "wasm_core_suite: expected 259 .wast files, found $file_count" >&2
   exit 1
 fi
 
@@ -121,7 +121,7 @@ run_suite "$suite" "$short_timeout" \
 
 rows=$(awk 'NR > 1 { count++ } END { print count + 0 }' "$stage300/report.tsv")
 unique=$(awk -F '\t' 'NR > 1 { seen[$6] = 1 } END { for (x in seen) count++; print count + 0 }' "$stage300/report.tsv")
-if [[ "$rows" != 258 || "$unique" != 258 ]]; then
+if [[ "$rows" != 259 || "$unique" != 259 ]]; then
   echo "wasm_core_suite: stage-300 report is incomplete ($rows rows, $unique unique sources)" >&2
   exit 1
 fi
@@ -171,7 +171,7 @@ awk -F '\t' '
 
 final_rows=$(awk 'NR > 1 { count++ } END { print count + 0 }' "$results/final.tsv")
 final_unique=$(awk -F '\t' 'NR > 1 { seen[$6] = 1 } END { for (x in seen) count++; print count + 0 }' "$results/final.tsv")
-if [[ "$final_rows" != 258 || "$final_unique" != 258 ]]; then
+if [[ "$final_rows" != 259 || "$final_unique" != 259 ]]; then
   echo "wasm_core_suite: final report is incomplete ($final_rows rows, $final_unique unique sources)" >&2
   exit 1
 fi

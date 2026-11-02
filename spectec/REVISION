@@ -1,5 +1,6 @@
-Repository: https://github.com/Wasm-DSL/spectec.git
-Commit: acc6e834ff403c82554d081237f327346190ad96
+Repository: https://github.com/WebAssembly/spec.git
+Commit: 0148af713f24eb68768a2f3fb86608555924d61c
 Library subset: spectec/src/{util,xl,el,il,frontend} -> lib
 Specification subset: specification/wasm-3.0/{0.*,1.*,2.*,3.*,4.*} -> wasm-3.0
+Requires: OCaml >= 5.4 (spectec/dune-project)
 Local changes: Spec2Maude-specific hint annotations in wasm-3.0 only

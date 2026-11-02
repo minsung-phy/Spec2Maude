@@ -49,6 +49,7 @@ and typcase = mixop * (typ * quant list * prem list) * hint list  (* variant cas
 and unop = [Bool.unop | Num.unop]
 and binop = [Bool.binop | Num.binop]
 and cmpop = [Bool.cmpop | Num.cmpop]
+and check = Unchecked | Checked
 
 and exp = (exp', typ) note_phrase
 and exp' =
@@ -61,11 +62,11 @@ and exp' =
   | CmpE of cmpop * optyp * exp * exp       (* exp cmpop exp *)
   | TupE of exp list                        (* ( exp* ) *)
   | ProjE of exp * int                      (* exp.i *)
-  | CaseE of mixop * exp                    (* atom exp? *)
+  | CaseE of mixop * exp * check            (* atom exp? *)
   | UncaseE of exp * mixop                  (* exp!mixop *)
   | OptE of exp option                      (* exp? *)
   | TheE of exp                             (* exp! *)
-  | StrE of expfield list                   (* { expfield* } *)
+  | StrE of expfield list * check           (* { expfield* } *)
   | DotE of exp * atom                      (* exp.atom *)
   | CompE of exp * exp                      (* exp @ exp *)
   | ListE of exp list                       (* [exp ... exp] *)
@@ -77,7 +78,6 @@ and exp' =
   | SliceE of exp * exp * exp               (* exp[exp : exp] *)
   | UpdE of exp * path * exp                (* exp[path = exp] *)
   | ExtE of exp * path * exp                (* exp[path =.. exp] *)
-  | IfE of exp * exp * exp                  (* `if` exp exp exp *)
   | CallE of id * arg list                  (* defid( arg* ) *)
   | IterE of exp * iterexp                  (* exp iter *)
   | CvtE of exp * numtyp * numtyp           (* exp : typ1 <:> typ2 *)
@@ -160,7 +160,6 @@ and prem' =
   | LetPr of quant list * exp * exp                   (* binding *)
   | ElsePr                                            (* otherwise *)
   | IterPr of prem * iterexp                          (* iteration *)
-  | NegPr of prem                                     (* negated premise *)
 
 and hintdef = hintdef' phrase
 and hintdef' =

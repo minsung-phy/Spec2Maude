@@ -52,9 +52,9 @@ syntax valtype/sem =
   | ... | BOT
 
 
-syntax Inn hint(show I#N) hint(macro "nt%") = addrtype
+syntax Inn hint(show I#N) hint(macro "nt%") = I32 | I64
 syntax Fnn hint(show F#N) hint(macro "nt%") = F32 | F64
-syntax Vnn hint(show V#N) hint(macro "nt%") = vectype
+syntax Vnn hint(show V#N) hint(macro "nt%") = V128
 syntax Cnn hint(show t) = Inn | Fnn | Vnn
 
 
@@ -94,7 +94,7 @@ syntax storagetype hint(desc "storage type") = valtype | packtype
 
 syntax Pnn hint(show I#N) hint(macro "nt%") = packtype
 syntax Jnn hint(show I#N) hint(macro "nt%") = Inn | Pnn
-syntax Lnn hint(show I#N) hint(macro "nt%") = lanetype
+syntax Lnn hint(show I#N) hint(macro "nt%") = Inn | Fnn | Pnn
 
 
 ;; Result types
@@ -223,9 +223,9 @@ def $isize(Inn) = $size(Inn)
 def $fsize(Fnn) = $size(Fnn)
 def $jsize(Jnn) = $lsize(Jnn)
 
-def $inv_isize(nat) : Inn hint(maude_kind)
-def $inv_jsize(nat) : Jnn hint(maude_kind)
-def $inv_fsize(nat) : Fnn hint(maude_kind)
+def $inv_isize(nat) : Inn hint(partial) hint(maude_kind)
+def $inv_jsize(nat) : Jnn hint(partial) hint(maude_kind)
+def $inv_fsize(nat) : Fnn hint(partial) hint(maude_kind)
 
 def $inv_isize(32) = I32
 def $inv_isize(64) = I64
@@ -233,7 +233,7 @@ def $inv_fsize(32) = F32
 def $inv_fsize(64) = F64
 def $inv_jsize(8)  = I8
 def $inv_jsize(16) = I16
-def $inv_jsize(n) = $inv_isize(n)
+def $inv_jsize(n)  = $inv_isize(n)
 
 ;; TODO(2, rossberg): get rid of these terrible hacks by defining $Inn(nat) hint(show I#%)
 def $sizenn(numtype) : nat     hint(show N)   hint(macro none)  ;; HACK!
@@ -259,8 +259,8 @@ def $lsizenn2(lt) = $lsize(lt)
 def $jsizenn(Jnn) : nat   hint(show N) hint(macro none) hint(inverse $inv_jsizenn) ;; HACK!
 def $jsizenn(Jnn) = $lsize(Jnn)
 
-def $inv_jsizenn(nat) : Jnn hint(maude_kind)
-def $inv_jsizenn(n) = $inv_jsize(n)
+def $inv_jsizenn(nat) : Jnn hint(partial) hint(maude_kind)
+def $inv_jsizenn(n)  = $inv_jsize(n)
 
 
 ;; Unpacking
@@ -273,14 +273,14 @@ def $unpack(storagetype) : valtype
 def $unpack(valtype) = valtype
 def $unpack(packtype) = I32
 
-def $nunpack(storagetype) : numtype  hint(show $unpack(%)) hint(maude_kind)
+def $nunpack(storagetype) : numtype  hint(show $unpack(%)) hint(partial) hint(maude_kind)
 def $nunpack(numtype) = numtype
 def $nunpack(packtype) = I32
 
-def $vunpack(storagetype) : vectype  hint(show $unpack(%)) hint(maude_kind)
+def $vunpack(storagetype) : vectype  hint(show $unpack(%)) hint(partial) hint(maude_kind)
 def $vunpack(vectype) = vectype
 
-def $cunpack(storagetype) : consttype hint(show $unpack(%)) hint(maude_kind)
+def $cunpack(storagetype) : consttype hint(show $unpack(%)) hint(partial) hint(maude_kind)
 def $cunpack(consttype) = consttype
 def $cunpack(packtype) = I32
 def $cunpack(lanetype) = $lunpack(lanetype)  ;; HACK
@@ -552,7 +552,7 @@ def $free_subtype(SUB final? typeuse* comptype) =
 
 def $free_rectype(REC subtype*) = $free_list($free_subtype(subtype)*)
 
-def $free_tagtype(deftype) = $free_deftype(deftype)
+def $free_tagtype(typeuse) = $free_typeuse(typeuse)
 
 def $free_globaltype(mut? valtype) = $free_valtype(valtype)
 

@@ -22,13 +22,8 @@ let emit ?(runtime = "wasm2maude/wast-runtime.maude")
     Wast_host_encode.instances host.providers
     |> Maude_term.to_string
   in
-  let host_functions =
-    Wast_host_encode.function_addresses host.funcs
-    |> Maude_term.to_string
-  in
   let text =
     Wast_harness.render ~semantics ~runtime ~commands ~host_store ~host_instances
-      ~host_functions
   in
   let commands = Wast_plan.source_commands plan in
   let checked_assertions = Wast_plan.checked_assertions plan in

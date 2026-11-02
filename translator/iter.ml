@@ -114,10 +114,16 @@ let source_iteration source =
   | IterT (_, iter) -> Some iter
   | _ -> None
 
+(* The source of x^n{x <- s} is typed as a plain list s : t*; the count n
+   fixes its length, checked with the iteration's cardinality. *)
+let ranges_over iter source_iter =
+  Il.Eq.eq_iter iter source_iter
+  || (match iter, source_iter with ListN _, List -> true | _ -> false)
+
 let rec identity_body_id index exp =
   match exp.it with
   | VarE id -> Some id
-  | CaseE (mixop, payload) when Mixop.is_hole_only mixop ->
+  | CaseE (mixop, payload, _) when Mixop.is_hole_only mixop ->
       begin match payload.it with
       | TupE [single] -> identity_body_id index single
       | _ -> identity_body_id index payload
@@ -134,7 +140,7 @@ let rec identity_body_id index exp =
       begin match identity_body_id index inner, source.it,
                   source_iteration source with
       | Some inner_id, VarE source_id, Some source_iter
-        when inner_id.it = binder.it && Il.Eq.eq_iter iter source_iter
+        when inner_id.it = binder.it && ranges_over iter source_iter
              && Prescan.same_representation index source.note exp.note ->
           Some source_id
       | _ -> None
@@ -146,7 +152,7 @@ let rec identity_requirements index exp =
   | SubE (inner, source, target)
     when Prescan.same_representation index source target ->
       source :: identity_requirements index inner
-  | CaseE (mixop, payload) when Mixop.is_hole_only mixop ->
+  | CaseE (mixop, payload, _) when Mixop.is_hole_only mixop ->
       begin match payload.it with
       | TupE [single] -> identity_requirements index single
       | _ -> identity_requirements index payload
@@ -162,7 +168,7 @@ let rec identity_requirements index exp =
   | VarE _ | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _
   | TupE _ | ProjE _ | CaseE _ | UncaseE _ | OptE _ | TheE _ | StrE _
   | DotE _ | CompE _ | ListE _ | LiftE _ | MemE _ | LenE _ | CatE _
-  | IdxE _ | SliceE _ | UpdE _ | ExtE _ | IfE _ | CallE _ | IterE _
+  | IdxE _ | SliceE _ | UpdE _ | ExtE _ | CallE _ | IterE _
   | CvtE _ | SubE _ ->
       []
 
@@ -172,7 +178,7 @@ let identity_source index body (iter, generators) =
       begin match source_iteration source with
       | Some source_iter
         when body_id.it = generator_id.it
-             && Il.Eq.eq_iter iter source_iter
+             && ranges_over iter source_iter
              && Prescan.same_representation index source.note
                   (iterated_typ body iter) ->
           Some source
