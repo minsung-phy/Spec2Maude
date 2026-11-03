@@ -1,5 +1,5 @@
 Repository: https://github.com/WebAssembly/spec.git
-Commit: 0148af713f24eb68768a2f3fb86608555924d61c
+Commit: e22ec2272bfbc06b995b00c1f1172a61d613fdd8
 Library subset: spectec/src/{util,xl,el,il,frontend} -> lib
 Specification subset: specification/wasm-3.0/{0.*,1.*,2.*,3.*,4.*} -> wasm-3.0
 Requires: OCaml >= 5.4 (spectec/dune-project)

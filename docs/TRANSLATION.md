@@ -367,9 +367,9 @@ WAST host memory (spectest `memory`) is built as `sized-array(size, empty)` beca
 field (`wast_host_encode.ml`). The memory and
 data instances of a module are built by the translated `allocmem`/`allocdata`.
 
-[language]: https://github.com/WebAssembly/spec/blob/0148af713f24eb68768a2f3fb86608555924d61c/spectec/doc/Language.md
-[type-premises]: https://github.com/WebAssembly/spec/blob/0148af713f24eb68768a2f3fb86608555924d61c/spectec/doc/Language.md#premises
-[formal]: https://github.com/WebAssembly/spec/blob/0148af713f24eb68768a2f3fb86608555924d61c/spectec/doc/semantics/il/
+[language]: https://github.com/WebAssembly/spec/blob/e22ec2272bfbc06b995b00c1f1172a61d613fdd8/spectec/doc/Language.md
+[type-premises]: https://github.com/WebAssembly/spec/blob/e22ec2272bfbc06b995b00c1f1172a61d613fdd8/spectec/doc/Language.md#premises
+[formal]: https://github.com/WebAssembly/spec/blob/e22ec2272bfbc06b995b00c1f1172a61d613fdd8/spectec/doc/semantics/il/
 
 ## Source hints and handwritten implementations
 

@@ -80,8 +80,8 @@ cat benchmarks/wasm-spec/REVISION
 The expected commits are:
 
 ```text
-SpecTec:             0148af713f24eb68768a2f3fb86608555924d61c
-WebAssembly suite:   0148af713f24eb68768a2f3fb86608555924d61c
+SpecTec:             e22ec2272bfbc06b995b00c1f1172a61d613fdd8
+WebAssembly suite:   e22ec2272bfbc06b995b00c1f1172a61d613fdd8
 ```
 
 The SpecTec copy contains only the listed library subset, WebAssembly

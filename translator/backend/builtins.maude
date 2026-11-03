@@ -1563,6 +1563,7 @@ mod WASM-BUILTINS is
   eq r-fmin = (0) .
   eq r-fmax = (0) .
   eq r-idot = (0) .
+  eq r-idot-add = (0) .
   eq r-iq15mulr = (0) .
   eq r-trunc-u = (0) .
   eq r-trunc-s = (0) .
