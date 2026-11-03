@@ -434,8 +434,8 @@ are separate checks. Source functions and rules are not deleted because they are
   The source uses are length, element and range reads, range write (`$with_mem`), whole write (`$with_data`),
   `0^n` construction (`allocmem`), list construction (`allocdata`), and `b* 0^n` after a field pattern (`growmem`),
   all of which are forms in the table above. A byte 0 corresponds to the default value in the form `%_byte(0)`.
-- `FUNCS`, `MEMS` fields of `store`, the `REFS` field of `tableinst`, and `$funcinst`, `$meminst`: `maude_map`.
-  The source `$funcinst(z)[a]`, `$mem(z,x)`, `|$table(z,x).REFS|` count up to a cells or the size in a list,
+- `FUNCS`, `MEMS` fields of `store` and the `REFS` field of `tableinst`: `maude_map`.
+  The source `$s(z).FUNCS[a]`, `$mem(z,x)`, `|$table(z,x).REFS|` count up to a cells or the size in a list,
   and the store accumulates the functions and memories of all modules of the script (Maude profile: about 40% of rewrites
   in return_call*, call_indirect; 37% in memory_copy (33 modules)).
   The source uses are element and length reads, element writes (`$with_table`, `$with_meminst`), writes inside an element

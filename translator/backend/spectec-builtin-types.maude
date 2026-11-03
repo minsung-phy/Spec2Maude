@@ -1,5 +1,5 @@
 fmod SPECTEC-BUILTIN-TYPES is
-  protecting SPEC2MAUDE-TYPES . --- in ../generated/typed.maude
+  protecting SPEC2MAUDE-TYPES . --- in ../generated/types.maude
   protecting CONVERSION . --- RAT, FLOAT, STRING, BOOL, NAT, INT
   protecting QID . --- for RECORD
 
