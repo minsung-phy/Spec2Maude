@@ -72,11 +72,14 @@ let length_conditions length = function
   | List | ListN _ -> []
   | List1 -> [BoolCond (app "_<_" [Const "0"; length])]
 
+(* An option is checked against its option type (an absent value or one
+   element of the type), a sequence element-wise with its length. *)
 let translate_conditions translate_count value element_type iter =
-  typecheck value element_type
-  :: match iter with
-     | ListN (count, _) -> [EqCond (length value, translate_count count)]
-     | Opt | List | List1 -> length_conditions (length value) iter
+  match iter with
+  | Opt -> [typecheck value (app "iterOpt" [element_type])]
+  | ListN (count, _) ->
+      [typecheck value element_type; EqCond (length value, translate_count count)]
+  | List | List1 -> typecheck value element_type :: length_conditions (length value) iter
 
 
 (* Bound and captured variables *)
@@ -92,7 +95,7 @@ let translate_captures index captures =
 let captures index body =
   match Prescan.iteration index body with
   | Some iteration -> iteration.Prescan.captures
-  | None -> invalid_arg "IterE is missing from the prescan index"
+  | None -> raise (Unsupported "IterE is missing from the prescan index")
 
 let capture_variables index body =
   captures index body |> translate_captures index
@@ -198,7 +201,7 @@ let request_helper index body kind =
   | Some iteration ->
       Prescan.request index iteration.Prescan.name kind;
       iteration
-  | None -> invalid_arg "IterE is missing from the prescan index"
+  | None -> raise (Unsupported "IterE is missing from the prescan index")
 
 let controls translate_exp = function
   | Opt | List | List1 ->
@@ -221,7 +224,7 @@ let translate_term index translate_exp body (iter, generators) =
             ; translate_exp body |> as_sequence_element index body.note
             ]
       | (Opt | List | List1), [] ->
-          invalid_arg "IterE with Opt, List, or List1 requires a generator"
+          raise (Unsupported "IterE with Opt, List, or List1 requires a generator")
       | ListN _, _ | (Opt | List | List1), _ :: _ ->
           let captures = capture_terms index body in
           let sources =
@@ -237,7 +240,7 @@ let translate_term index translate_exp body (iter, generators) =
 let generator_element (_, source) =
   match source.note.it with
   | IterT (element, _) -> element
-  | _ -> invalid_arg "iteration generator must have an iteration type"
+  | _ -> raise (Unsupported "iteration generator must have an iteration type")
 
 let source_head index generator head =
   term_of_variable head
@@ -384,7 +387,7 @@ let translate_pattern index translate_source_pattern translate_exp
           | None -> None
           | Some (_, count_conditions) ->
               if not (captures_ready ()) then
-                invalid_arg "IterE pattern has an unbound capture";
+                raise (Unsupported "IterE pattern has an unbound capture");
               let value =
                 match source_pattern with
                 | Var _ -> source_pattern
@@ -407,7 +410,7 @@ let translate_pattern index translate_source_pattern translate_exp
           | None -> None
           | Some (count, count_conditions) ->
               if not (captures_ready ()) then
-                invalid_arg "IterE pattern has an unbound capture";
+                raise (Unsupported "IterE pattern has an unbound capture");
               let captures = capture_terms index body in
               let controls =
                 match iter with
@@ -473,4 +476,4 @@ let translate_premise index translate_exp premise =
         premise_helper_call index translate_exp iteration
       in
       [EqCondition (BoolCond call)]
-  | None -> invalid_arg "IterPr is missing from the prescan index"
+  | None -> raise (Unsupported "IterPr is missing from the prescan index")

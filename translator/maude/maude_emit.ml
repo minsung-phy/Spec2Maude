@@ -49,7 +49,7 @@ let emit_mixfix emit_term name args =
   in
   let rec emit escaped index = function
     | args when index = String.length name ->
-        if args <> [] then invalid_arg "mixfix operator arity mismatch"
+        if args <> [] then raise (Unsupported "mixfix operator arity mismatch")
     | arg :: args when name.[index] = '_' && not escaped ->
         Buffer.add_char buffer ' ';
         Buffer.add_string buffer (emit_argument arg);

@@ -8,8 +8,7 @@ open Util.Source
 open Il.Ast
 open Maude_il
 
-let unsupported at reason =
-  Util.Error.error at "translation" ("Unsupported: k_heatcool " ^ reason)
+let unsupported = Hintd.unsupported
 
 let op ?(arrow = Total) ?(attrs = []) name domain codomain =
   OpDecl {name; domain; codomain; arrow; attrs}
@@ -642,7 +641,7 @@ let translate_pattern cache index (context : Hintd.context)
   let right = App (name "{_|_|_}", [prefix; rebuild focus; postfix]) in
   let conditions =
     try schedule_rule_conditions left conditions with
-    | Invalid_argument reason ->
+    | Unsupported reason ->
         unsupported pattern.rule.at
           ("focus of " ^ (Hintd.rule_id pattern.rule).it ^ ": " ^ reason)
   in
@@ -892,7 +891,7 @@ let unique_candidates candidates =
       | Rl (_, left, right) -> Rl (None, left, right)
       | Crl (_, left, right, conditions) -> Crl (None, left, right, conditions)
       | Eq _ | Ceq _ as statement -> statement
-      | _ -> invalid_arg "expected a focus candidate or an equation"
+      | _ -> raise (Unsupported "expected a focus candidate or an equation")
     in
     map_statement_variables rename statement
   in

@@ -1,7 +1,7 @@
 load spectec-sorts.maude
 
---- 공통 리스트(prelude LIST)는 spectec-sorts.maude에서 가져오고,
---- hint(maude_sort) 리스트는 types.maude에서 그 위에 subsort로 선언함
+--- The common list (prelude LIST) comes from spectec-sorts.maude; the lists of
+--- hint(maude_sort) are declared as its subsorts in types.maude
 load ../generated/types.maude
 
 load spectec-builtin-types.maude
@@ -9,24 +9,24 @@ load spectec-builtin-types.maude
 fmod SPECTEC-CONVERT is
   protecting SPECTEC-BUILTIN-TYPES .
 
-  --- 수치 타입 변환 CvtE
-  op _:_<:>_ : Rat SpectecType SpectecType ~> Rat . --- native 값끼리 변환해 바로 산술에 사용
+  --- Numeric conversion (CvtE)
+  op _:_<:>_ : Rat SpectecType SpectecType ~> Rat . --- converts native values, used directly in arithmetic
 
-  --- SpecTec의 수치 연산 모듈(lib/xl/num.ml)의 CvtE 규칙 그대로, 
-  --- 현재 wasm 3.0 SpecTec에서 사용하는 모든 수치 변환을 Maude로 구현                                            
+  --- The conversions of lib/xl/num.ml (Num.cvt); real is not supported
+  --- (rejected by the translator, term.ml)
   var CV_N : Nat .
   var CV_I : Int .
   var CV_R : Rat .
-  eq (CV_N : nat <:> nat) = CV_N . --- 같은 타입
-  eq (CV_N : nat <:> int) = CV_N . --- 자연수는 이미 정수에 포함되므로 그대로 반환
-  eq (CV_N : nat <:> rat) = CV_N . --- 자연수는 이미 유리수에 포함되므로 그대로 반환
-  ceq (CV_I : int <:> nat) = CV_I  
+  eq (CV_N : nat <:> nat) = CV_N .
+  eq (CV_N : nat <:> int) = CV_N . --- Nat is a subsort of Int
+  eq (CV_N : nat <:> rat) = CV_N . --- Nat is a subsort of Rat
+  ceq (CV_I : int <:> nat) = CV_I
     if CV_I >= 0 .
-  eq (CV_I : int <:> int) = CV_I . --- 같은 타입
-  eq (CV_I : int <:> rat) = CV_I . --- 정수는 이미 유리수에 포함되므로 그대로 반환
+  eq (CV_I : int <:> int) = CV_I .
+  eq (CV_I : int <:> rat) = CV_I . --- Int is a subsort of Rat
   ceq (CV_R : rat <:> nat) = floor(CV_R)
     if CV_R == floor(CV_R) /\ CV_R >= 0 .
-  ceq (CV_R : rat <:> int) = floor(CV_R) 
+  ceq (CV_R : rat <:> int) = floor(CV_R)
     if CV_R == floor(CV_R) .
   eq (CV_R : rat <:> rat) = CV_R .
 endfm
@@ -34,7 +34,7 @@ endfm
 fmod SPECTEC-LIST is
   protecting SPECTEC-BUILTIN-TYPES .
 
-  --- List (nil, __, size, occurs, append는 prelude LIST, spectec-sorts.maude)
+  --- Lists (nil, __, size, occurs, append: prelude LIST, spectec-sorts.maude)
   var N : Nat .
   op seq : SpectecTerminals -> SpectecTerminal [ctor] .
   op unseq : SpectecTerminal ~> SpectecTerminals .
@@ -48,51 +48,47 @@ fmod SPECTEC-LIST is
 
   eq unseq(seq(TS)) = TS .
 
-  --- 리스트 타입 검사
+  --- List type check
   eq typecheck(nil, TYPE) = true .
-  ceq typecheck(T NTS, TYPE) = typecheck(NTS, TYPE) --- NTS는 비어 있지 않으므로 단일 원소는 T nil로 매칭되지 않음
+  ceq typecheck(T NTS, TYPE) = typecheck(NTS, TYPE) --- NTS is nonempty, so one element does not match T nil
     if typecheck(T, TYPE) .
   eq typecheck(seq(TS), iterList(TYPE)) = typecheck(TS, TYPE) .
   eq typecheck(VALUE, TYPE) = false [owise] .
 
-  --- 리스트 반복
+  --- List repetition
   op repeatSeq : Nat SpectecTerminals -> SpectecTerminals .
 
   eq repeatSeq(0, WTS) = nil .
   eq repeatSeq(s N, WTS) = WTS repeatSeq(N, WTS) .
-    --- repeatSeq 이전 버전
-    --- eq repeatSeq(0, WTS) = nil .
-    --- eq repeatSeq(1, WTS) = WTS .
-    --- ceq repeatSeq(N, WTS) = repeatSeq(N quo 2, WTS WTS) repeatSeq(N rem 2, WTS) if N > 1 .
 
-  --- 리스트 인덱싱
+  --- List indexing
   op _[_] : SpectecTerminals Nat ~> SpectecTerminal [prec 10 gather (E e)] .
 
-  --- 앞 원소를 하나씩 넘기며 N번째 원소를 찾음
+  --- skips the leading elements one by one to the N-th
   eq (T TS)[0] = T .
   eq (T TS)[(s N)] = TS[N] .
 
-  --- 리스트 구간 추출
+  --- List slice
   op _[_:_] : SpectecTerminals Nat Nat ~> SpectecTerminals [prec 10 gather (E e e)] .
-  
-  --- 시작 위치까지 앞 원소를 넘긴 뒤, COUNT개를 하나씩 가져옴 (길이가 0인 빈 구간도 추출할 수 있음)
+
+  --- skips to the start, then takes COUNT elements one by one (an empty slice is allowed)
   eq (T TS)[(s N) : COUNT] = TS[N : COUNT] .
   eq TS[0 : 0] = nil .
   eq (T TS)[0 : (s COUNT)] = T TS[0 : COUNT] .
 
-  --- 리스트 원소 갱신
+  --- List element update
   op _[_=_] : SpectecTerminals Nat SpectecTerminal ~> SpectecTerminals [prec 10 gather (E e e)] .
   var NEW-K : SpectecTerminal .
 
-  --- 앞 원소를 남겨 두고 N번째 원소를 새 값으로 바꿈
+  --- keeps the leading elements and replaces the N-th
   eq (T TS)[0 = NEW-K] = NEW-K TS .
   eq (T TS)[(s N) = NEW-K] = T TS[N = NEW-K] .
-  
-  --- 리스트 구간 갱신
+
+  --- List slice update
   op _[_:_=_] : SpectecTerminals Nat Nat SpectecTerminals ~> SpectecTerminals [prec 10 gather (E e e e)] .
   var NEW-TS : SpectecTerminals .
-  
-  --- 시작 위치까지 앞 원소를 남기고, COUNT개를 하나씩 버린 뒤 새 구간을 넣음
+
+  --- keeps the elements before the start, drops COUNT elements, and inserts the new ones
   eq (T TS)[(s N) : COUNT = NEW-TS] = T TS[N : COUNT = NEW-TS] .
   eq (T TS)[0 : (s COUNT) = NEW-TS] = TS[0 : COUNT = NEW-TS] .
   eq TS[0 : 0 = NEW-TS] = NEW-TS TS .
@@ -107,24 +103,25 @@ fmod SPECTEC-OPTION is
   var TYPE : SpectecType .
   op _? : SpectecTerminal -> SpectecTerminal [ctor] .
   var K : SpectecTerminal .
-  
-  --- Option 결합: 두 option을 이어 붙이되, 결과가 원소 0개 또는 1개인 경우만 정의
-  --- 양쪽 모두 값이 있으면 결과가 2개가 되므로 정의하지 않음
+
+  --- Option composition: defined only when the result has at most one element;
+  --- two present values have no result
   op optionConcat : SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   eq optionConcat(nil, nil) = nil .
   eq optionConcat(K ?, nil) = K ? .
   eq optionConcat(nil, K ?) = K ? .
 
-  --- Option 타입 검사 (spectec/wasm-3.0/1.2-syntax.types.spectec:47 -> syntax reftype = REF null? heaptype를 maude로 변환시 typecheck(NULL-, null))
-  eq typecheck(T ?, TYPE) = typecheck(T, TYPE) .
-  eq typecheck(seq(TS), iterOpt(TYPE)) = typecheck(TS, TYPE) and size(TS) <= 1 .
-      --- SpecTec에 (val?)*처럼 option을 원소로 갖는 리스트가 있음
-      --- translator는 각 내부 option을 seq(nil) 또는 seq(K ?)로 포장함
-      --- 포장하지 않으면 nil이 리스트 결합 연산의 identity이므로 nil K ?가 K ?로 단순화되어 None 원소가 사라지기 때문
-      --- 그 원소의 타입 TYPE?를 Maude에서 iterOpt(TYPE)으로 나타냄
+  --- Option type T? (iterOpt(T)): a value is nil (absent; typecheck(nil, TYPE) above) or one V ?
+  --- e.g. syntax reftype = REF null? heaptype -> typecheck(NULL?, iterOpt(null))
+  eq typecheck(T ?, iterOpt(TYPE)) = typecheck(T, TYPE) .
+  eq typecheck(seq(TS), iterOpt(TYPE)) = typecheck(TS, iterOpt(TYPE)) .
+      --- A list may have options as elements, as in (val?)*:
+      --- the translator boxes each inner option as seq(nil) or seq(K ?),
+      --- since nil is the identity of concatenation and an absent element would vanish;
+      --- the element type TYPE? is iterOpt(TYPE)
 
-  --- Option을 리스트로 변환 (Option 값을 일반 리스트와 이어 붙여야 하는 경우에 사용)
+  --- Option as a list (to concatenate an option with a list)
   op lift : SpectecTerminals ~> SpectecTerminals .
   eq lift(nil) = nil .
   eq lift(K ?) = K .
@@ -158,24 +155,22 @@ fmod SPECTEC-RECORD is
   op _;_ : RecordFields RecordFields -> RecordFields [ctor assoc id: EMPTY] .
   op field : Qid SpectecTerminals -> RecordField [ctor] .
   op {_} : RecordFields -> Record [ctor] .
-  op _._ : Record Qid -> SpectecTerminals . --- 필드 조회 (DotE)
-  op recordConcat : Record Record SpectecType ~> Record . --- 레코드 결합 (CompE) / Record 타입마다 결합 방법이 달라서 eq는 자동 생성됨
-  op _[._=_] : Record Qid SpectecTerminals -> Record . --- 필드 갱신 (UpdE + DotP)
+  op _._ : Record Qid ~> SpectecTerminals . --- field access (DotE)
+  op recordConcat : Record Record SpectecType ~> Record . --- record composition (CompE); its equations are generated per record type
+  op _[._=_] : Record Qid SpectecTerminals ~> Record . --- field update (UpdE with DotP)
 
   var FIELD : Qid .
   vars FIELDS RECORD-PREFIX RECORD-SUFFIX : RecordFields .
   var NEW-VALUE : SpectecTerminals .
 
   eq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX} . FIELD = VALUE .
-  eq {FIELDS} . FIELD = nil [owise] .
 
   eq {RECORD-PREFIX ; field(FIELD, VALUE) ; RECORD-SUFFIX}[. FIELD = NEW-VALUE]
     = {RECORD-PREFIX ; field(FIELD, NEW-VALUE) ; RECORD-SUFFIX} .
-  eq {FIELDS}[. FIELD = NEW-VALUE] = {FIELDS ; field(FIELD, NEW-VALUE)} [owise] . --- 없으면 레코드 끝에 추가
 endfm
 
---- hint(maude_array) (record 필드): 그 sequence 필드를 크기 + prelude ARRAY로 저장
---- (기본값 # 0: 0인 칸은 저장하지 않음, prelude ARRAY의 insert와 _[_])
+--- hint(maude_array) (record field): the sequence field is stored as a size and a prelude ARRAY
+--- (default # 0: cells equal to 0 are not stored, by prelude ARRAY insert and _[_])
 view Zero from DEFAULT to SPECTEC-BUILTIN-TYPES is
   sort Elt to SpectecTerminal .
   op 0 to term # 0 .
@@ -185,8 +180,8 @@ fmod SPECTEC-ARRAY is
   protecting SPECTEC-LIST .
   protecting ARRAY{Nat, Zero} * (sort Array{Nat, Zero} to ZeroArray, sort Entry{Nat, Zero} to ZeroEntry) .
 
-  op sized-array : Nat ZeroArray -> SpectecTerminal [ctor] .                    --- 크기, 배열
-  op array-of : SpectecTerminals -> SpectecTerminal .                            --- sequence → 배열
+  op sized-array : Nat ZeroArray -> SpectecTerminal [ctor] .                    --- size, array
+  op array-of : SpectecTerminals -> SpectecTerminal .                            --- sequence to array
   op array-size : SpectecTerminal ~> Nat .                                       --- |e.f|
   op array-read : SpectecTerminal Nat Nat ~> SpectecTerminals .                  --- e.f[I : C]
   op array-write : SpectecTerminal Nat Nat SpectecTerminals ~> SpectecTerminal . --- e[.f[I : C] = TS], |TS| = C
@@ -207,15 +202,15 @@ fmod SPECTEC-ARRAY is
   ceq array-write(sized-array(S, A), I, s C, T TS) = array-write(sized-array(S, insert(I, T, A)), s I, C, TS) if I + s C <= S .
   eq array-grow(sized-array(S, A), K) = sized-array(S + K, A) .
 
-  --- 원소 타입 검사: 저장된 칸과 기본값 # 0만 확인
+  --- element type check: the stored cells and the default # 0
   eq typecheck(sized-array(S, empty), TYPE) = typecheck(# 0, TYPE) .
   eq typecheck(sized-array(S, (I |-> T ; A)), TYPE) = I < S and typecheck(T, TYPE) and typecheck(sized-array(S, A), TYPE) .
 endfm
 
---- hint(maude_map) (record 필드): 그 sequence 필드를 크기 + prelude MAP으로 저장
---- (index 0 .. 크기-1마다 항목이 정확히 하나 있음. 그래서 읽기·쓰기는 그 항목을
---- 직접 매칭하고, 같은 key의 중복을 찾는 prelude 조회 M[I]·insert는 쓰지 않음.
---- 없는 index의 읽기·쓰기는 값이 없음)
+--- hint(maude_map) (record field): the sequence field is stored as a size and a prelude MAP
+--- (every index 0 .. size-1 has exactly one entry, so reads and writes match that
+--- entry directly instead of the prelude M[I] and insert, which look for duplicate keys;
+--- a read or write at a missing index has no value)
 view Terminal from TRIV to SPECTEC-BUILTIN-TYPES is
   sort Elt to SpectecTerminal .
 endv
@@ -225,13 +220,13 @@ fmod SPECTEC-MAP is
   protecting MAP{Nat, Terminal} * (sort Map{Nat, Terminal} to TerminalMap,
     sort Entry{Nat, Terminal} to TerminalEntry, op _|->_ to _|=>_) .
 
-  op sized-map : Nat TerminalMap -> SpectecTerminal [ctor] .                   --- 크기, map
+  op sized-map : Nat TerminalMap -> SpectecTerminal [ctor] .                   --- size, map
   op map-of : SpectecTerminals -> SpectecTerminal .                            --- sequence → map
   op map-size : SpectecTerminal ~> Nat .                                       --- |e.f|
   op map-read : SpectecTerminal Nat ~> SpectecTerminal .                       --- e.f[I]
   op map-write : SpectecTerminal Nat SpectecTerminal ~> SpectecTerminal .      --- e[.f[I] = T]
   op map-append : SpectecTerminal SpectecTerminals ~> SpectecTerminal .        --- e.f TS
-  op map-concat : SpectecTerminal SpectecTerminal ~> SpectecTerminal .         --- record ++ 의 필드
+  op map-concat : SpectecTerminal SpectecTerminal ~> SpectecTerminal .         --- a field of record ++
 
   vars S S' I : Nat .
   vars M M' : TerminalMap .
@@ -250,7 +245,7 @@ fmod SPECTEC-MAP is
   eq map-concat(sized-map(S, M), sized-map(S', (I |=> T, M')))
     = map-concat(sized-map(S, (M, S + I |=> T)), sized-map(S', M')) .
 
-  --- 원소 타입 검사: 저장된 칸마다 확인
+  --- element type check: every stored cell
   eq typecheck(sized-map(S, empty), TYPE) = true .
   eq typecheck(sized-map(S, (I |=> T, M)), TYPE) = I < S and typecheck(T, TYPE) and typecheck(sized-map(S, M), TYPE) .
 endfm

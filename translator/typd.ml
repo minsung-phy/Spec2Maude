@@ -31,7 +31,7 @@ let translate_target index id params args =
             (function
               | EqCondition condition -> condition
               | RewriteCond _ ->
-                  invalid_arg "type instance pattern requires rewriting")
+                  raise (Unsupported "type instance pattern requires rewriting"))
             guards
         in
         term :: terms, conditions @ guards, bound
@@ -48,7 +48,7 @@ let translate_target index id params args =
     in
     let expected = Frontend.Det.(det_list det_arg args).varid in
     if not (Il.Free.Set.subset expected bound) then
-      invalid_arg "type instance pattern does not bind every deterministic variable";
+      raise (Unsupported "type instance pattern does not bind every deterministic variable");
     App (Prescan.typ_name index id, List.rev terms), guards,
     Il.Free.Set.elements bound
 
@@ -98,7 +98,7 @@ let translate_struct_field index bound (atom, (typ, quants, prems), _hints) =
         @ Param.translate_eq_conditions index quants
       in
       field, conditions
-  | _ -> invalid_arg "a StructT field must contain exactly one value"
+  | _ -> raise (Unsupported "a StructT field must contain exactly one value")
 
 let rec composable index seen typ =
   not (List.exists (Il.Eq.eq_typ typ) seen)
@@ -167,7 +167,7 @@ let transparent_payload index typ =
         |> Term.sequence
         |> fun values -> App ("tuple", [values])
     | _, [value] -> value
-    | _, _ -> invalid_arg "non-tuple type has multiple components"
+    | _, _ -> raise (Unsupported "non-tuple type has multiple components")
   in
   let conditions =
     components

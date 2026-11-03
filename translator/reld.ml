@@ -11,7 +11,7 @@ let component_types typ =
 let output_sort index = function
   | [typ] -> Term.translate_sort index typ
   | _ :: _ :: _ -> "SpectecTerminal"
-  | [] -> invalid_arg "relation policy has no output component"
+  | [] -> raise (Unsupported "relation policy has no output component")
 
 (* Keep constructors around computed fields. A function call is checked only
  * after its arguments and its result field are bound by the input pattern. *)
@@ -78,7 +78,7 @@ let translate_inputs ~defer index params inputs =
         with
         | binding ->
             subject :: terms, conditions @ binding.conditions, binding.bound, deferred
-        | exception Invalid_argument _ when defer ->
+        | exception Unsupported _ when defer ->
             subject :: terms, conditions, bound, (exp, subject) :: deferred
   in
   List.mapi (fun position exp -> position, exp) inputs
@@ -102,7 +102,7 @@ let eq_conditions conditions =
     (function
       | EqCondition condition -> condition
       | RewriteCond _ ->
-          invalid_arg "an equation relation cannot use a rewrite condition")
+          raise (Unsupported "an equation relation cannot use a rewrite condition"))
     conditions
 
 type rule_body =
@@ -136,7 +136,7 @@ let lower_rule_body ~head index id params policy rule =
         List.filter (fun exp -> not (List.exists (fun (e, _) -> e == exp) deferred)) inputs
       in
       if not (List.for_all (Prem.known bound) immediate) then
-        invalid_arg "relation rule has an unbound input";
+        raise (Unsupported "relation rule has an unbound input");
       let left =
         App
           ( head
@@ -151,7 +151,7 @@ let lower_rule_body ~head index id params policy rule =
           prems
       in
       if not (List.for_all (Prem.known premises.bound) outputs) then
-        invalid_arg "relation output contains an unbound variable";
+        raise (Unsupported "relation output contains an unbound variable");
       let deferred_conditions =
         List.concat_map
           (fun (exp, subject) ->
@@ -159,7 +159,7 @@ let lower_rule_body ~head index id params policy rule =
               Prem.bind_free_indices index premises.bound [] exp
             in
             if not (Prem.known bound exp) then
-              invalid_arg "relation input is not a structural pattern";
+              raise (Unsupported "relation input is not a structural pattern");
             choices
             @ [EqCondition (EqCond (Term.translate_exp index exp, subject))])
           deferred
@@ -192,11 +192,11 @@ let lower_rule_body ~head index id params policy rule =
 let translate_rule ~head index id params policy rule =
   let body = lower_rule_body ~head index id params policy rule in
   if body.otherwise then
-    invalid_arg "ElsePr in a relation rule requires source complement lowering";
+    raise (Unsupported "ElsePr in a relation rule requires source complement lowering");
   let right =
     match policy with
     | Prescan.Execution _ ->
-        invalid_arg "execution relations require source-order lowering"
+        raise (Unsupported "execution relations require source-order lowering")
     | Prescan.Compute _ -> body.right
     | Prescan.Check _ -> Const "true"
   in
@@ -230,6 +230,10 @@ type execution_rule =
   ; structural_right : bool
   ; conditions : rule_condition list
   ; guard_conditions : rule_condition list
+  ; selection_conditions : rule_condition list
+      (* conditions without the case premises for its output *)
+  ; selection_guard_conditions : rule_condition list
+  ; has_premise_case_check : bool  (* a case premise inside a premise *)
   ; predecessors : int list
   }
 
@@ -592,7 +596,8 @@ let direct_complement ~complements index params available inputs predecessor =
       in
       let rec negate bindings result = function
         | [] ->
-            if List.for_all (implied bindings) predecessor.guard_conditions then Some result
+            if List.for_all (implied bindings) predecessor.selection_guard_conditions
+            then Some result
             else None
         | EqCondition (MatchCond (pattern, subject)) :: conditions ->
             let subject =
@@ -632,7 +637,7 @@ let direct_complement ~complements index params available inputs predecessor =
             end
         | _ -> None
       in
-      negate bindings (Const "false") predecessor.conditions
+      negate bindings (Const "false") predecessor.selection_conditions
 
 let complement_conditions index id params inputs available predecessors =
   let step (conditions, helpers, complements) predecessor =
@@ -656,7 +661,7 @@ let lower_execution_rule index id params policy
   begin match prems with
   | {it = ElsePr; _} :: prems when not (has_else prems) -> ()
   | _ when has_else prems ->
-      invalid_arg "execution relation requires exactly one leading ElsePr"
+      raise (Unsupported "execution relation requires exactly one leading ElsePr")
   | _ -> ()
   end;
   let body =
@@ -664,6 +669,21 @@ let lower_execution_rule index id params policy
       index id params policy rule
   in
   let conditions = schedule_rule_conditions body.left body.conditions in
+  (* A rule applies, for a later otherwise rule, once its premises hold; a
+     failing case premise for its output (Def.case_premise_script) leaves it
+     stuck rather than enabling the otherwise rule. *)
+  let for_output = Prescan.is_result_case_premise index in
+  let selection_body, has_premise_case_check =
+    match rule.it with
+    | RuleD (rule_id, quants, mixop, exp, prems) ->
+        let checks = List.filter (Prescan.is_case_premise index) prems in
+        ( (if List.exists for_output checks then
+             let prems = List.filter (fun p -> not (for_output p)) prems in
+             lower_rule_body ~head:(Prescan.rel_name index id) index id params policy
+               {rule with it = RuleD (rule_id, quants, mixop, exp, prems)}
+           else body)
+        , not (List.for_all for_output checks) )
+  in
   let input_shapes = input_shapes body.head_conditions body.input_terms in
   let predecessors =
     if body.otherwise then
@@ -675,7 +695,11 @@ let lower_execution_rule index id params policy
     else []
   in
   if body.otherwise && previous = [] then
-    invalid_arg "otherwise execution rule has no predecessor";
+    raise (Unsupported "otherwise execution rule has no predecessor");
+  (* A failing case premise inside a premise leaves the predecessor stuck
+     too, but the complement of that premise would then hold. *)
+  if List.exists (fun predecessor -> predecessor.has_premise_case_check) predecessors then
+    raise (Unsupported "otherwise rule after a rule with a case premise inside a premise");
   let complements, helpers =
     complement_conditions index id params body.input_terms conditions predecessors
   in
@@ -688,6 +712,11 @@ let lower_execution_rule index id params policy
   ; structural_right = body.structural_right
   ; conditions = complements @ conditions
   ; guard_conditions = body.guard_conditions
+  ; selection_conditions =
+      if selection_body == body then conditions
+      else schedule_rule_conditions selection_body.left selection_body.conditions
+  ; selection_guard_conditions = selection_body.guard_conditions
+  ; has_premise_case_check
   ; predecessors = helpers
   }
 
@@ -711,15 +740,15 @@ let execution_statement result_sort rule =
   Maude_il.rule rule.left right conditions
 
 let helper_conditions id rule =
-  rule.conditions
+  rule.selection_conditions
   |> List.map
        (function
          | EqCondition condition -> condition
          | RewriteCond _ ->
-             invalid_arg
+             raise (Unsupported
                (Printf.sprintf
                   "otherwise predecessor in relation %s rule %d uses a rewrite condition"
-                  id.it (rule.ordinal + 1)))
+                  id.it (rule.ordinal + 1))))
 
 let helper_statements index id params input_sorts callers rule =
   let name = Prescan.relation_enabled_helper index id rule.ordinal in
@@ -752,7 +781,7 @@ let helper_statements index id params input_sorts callers rule =
   let redundant_guard condition =
     match condition with
     | EqCondition (BoolCond (App ("typecheck", _)))
-      when List.exists (same_condition condition) rule.guard_conditions ->
+      when List.exists (same_condition condition) rule.selection_guard_conditions ->
         callers <> []
         && List.for_all
              (fun caller ->
@@ -766,7 +795,9 @@ let helper_statements index id params input_sorts callers rule =
     | _ -> false
   in
   let rule =
-    {rule with conditions = List.filter (fun c -> not (redundant_guard c)) rule.conditions}
+    {rule with
+     selection_conditions =
+       List.filter (fun c -> not (redundant_guard c)) rule.selection_conditions}
   in
   let conditions =
     helper_conditions id rule
@@ -782,11 +813,10 @@ let helper_statements index id params input_sorts callers rule =
 
 (* A rule that cannot be lowered is Unsupported at that rule. *)
 let located id rule f =
-  try f () with Invalid_argument reason ->
-    Util.Error.error rule.at "translation"
-      ("Unsupported RelD " ^ id.it
-       ^ (match (Hintd.rule_id rule).it with "" -> "" | rule_id -> "/" ^ rule_id)
-       ^ ": " ^ reason)
+  Maude_il.located rule.at
+    ("RelD " ^ id.it
+     ^ (match (Hintd.rule_id rule).it with "" -> "" | rule_id -> "/" ^ rule_id))
+    f
 
 let lower_execution_rules ~include_rule
     index id params policy rules =
@@ -810,7 +840,7 @@ let translate_execution ~include_rule
     match policy with
     | Prescan.Execution {input_count; _} -> input_count
     | Prescan.Compute _ | Prescan.Check _ ->
-        invalid_arg "expected an execution relation policy"
+        raise (Unsupported "expected an execution relation policy")
   in
   let lowered =
     lower_execution_rules ~include_rule

@@ -131,6 +131,10 @@ type t =
   ; requests : (name * helper_request, unit) Hashtbl.t
   ; helper_names : (name * helper_name) list
   ; reserved : StringSet.t  (* every non-helper name in use *)
+  ; case_premises : prem list
+      (* premises instantiated from case definitions, not source premises *)
+  ; result_case_premises : prem list  (* those for rule outputs and results *)
+  ; partial_defs : string list  (* definitions given case premises *)
   }
 
 
@@ -739,7 +743,7 @@ let register registry kind source candidate =
 let registered registry kind source =
   match lookup !(registry.entries) kind source with
   | Some name -> name
-  | None -> invalid_arg ("unregistered source name " ^ source)
+  | None -> raise (Unsupported ("unregistered source name " ^ source))
 
 let register_names hints definitions script =
   let registry = {entries = ref []; used = ref reserved_names} in
@@ -822,7 +826,7 @@ let collect_occurrences sort_metadata script =
   let rec add_param param =
     match param.it with
     | ExpP (id, typ) -> add_variable id typ
-    | DefP _ -> invalid_arg "DefP must be removed by Def.specialize_script"
+    | DefP _ -> raise (Unsupported "DefP must be removed by Def.specialize_script")
     | TypP id ->
         type_parameters := id :: !type_parameters;
         add_variable_with_sort id "SpectecType"
@@ -1010,7 +1014,7 @@ let collect_occurrences sort_metadata script =
     List.iter (fun (id, source) ->
       match source.note.it with
       | IterT (element, _) -> add_variable id element
-      | _ -> invalid_arg "iteration generator does not have an iteration type")
+      | _ -> raise (Unsupported "iteration generator does not have an iteration type"))
       generators
   in
   List.iter (fun (iteration : iteration) -> add_generators iteration.iterexp)
@@ -1186,7 +1190,10 @@ let unsupported_definitions unsupported_relations defs =
   |> StringSet.of_list
 
 
-let scan script =
+(* The case premises added before translation (Def.case_premise_script) are
+   passed in: they are identified physically, so no pass may rebuild premises
+   after that one. *)
+let scan ?(case_premises = []) ?(result_case_premises = []) ?(partial_defs = []) script =
   let type_env = Il.Env.env_of_script script in
   let sort_metadata = Hintd.scan_sorts script in
   let defs = List.concat_map flatten script in
@@ -1321,6 +1328,9 @@ let scan script =
   ; requests = Hashtbl.create 64
   ; helper_names
   ; reserved
+  ; case_premises
+  ; result_case_premises
+  ; partial_defs
   }
 
 
@@ -1329,7 +1339,7 @@ let find_name index kind source = lookup index.names kind source
 let name index kind source =
   match find_name index kind source with
   | Some name -> name
-  | None -> invalid_arg ("unregistered source name " ^ source)
+  | None -> raise (Unsupported ("unregistered source name " ^ source))
 
 let local_name index kind id =
   match find_name index kind id.it with
@@ -1344,35 +1354,44 @@ let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
 
+let is_case_premise index prem = List.exists (( == ) prem) index.case_premises
+
+let is_result_case_premise index prem =
+  List.exists (( == ) prem) index.result_case_premises
+
+(* A definition may have no result: hint(maude_kind), or case premises. *)
+let is_partial_def index id =
+  has_dec_hint index id "maude_kind" || List.mem id.it index.partial_defs
+
 let relation_policy index id =
   match List.assoc_opt id.it index.relation_policies with
   | Some policy -> Ok policy
   | None ->
       begin match List.assoc_opt id.it index.unsupported_relations with
       | Some reason -> Error reason
-      | None -> invalid_arg ("unregistered relation " ^ id.it)
+      | None -> raise (Unsupported ("unregistered relation " ^ id.it))
       end
 
 let relation_enabled_helper index id ordinal =
   match List.assoc_opt (id.it, ordinal) index.relation_enabled_helpers with
   | Some name -> name
   | None ->
-      invalid_arg
+      raise (Unsupported
         (Printf.sprintf
            "unregistered enabledness helper for relation %s rule %d"
-           id.it (ordinal + 1))
+           id.it (ordinal + 1)))
 
 let definition_body_supported index id =
   match List.assoc_opt id.it index.definition_bodies with
   | Some supported -> supported
-  | None -> invalid_arg ("unregistered definition " ^ id.it)
+  | None -> raise (Unsupported ("unregistered definition " ^ id.it))
 
 let require_definition_body index use id =
   if not (definition_body_supported index id || has_dec_hint index id "builtin")
-  then invalid_arg
+  then raise (Unsupported
     (use ^ " $" ^ id.it ^ " at " ^ string_of_region id.at
      ^ " requires a body containing an unsupported RulePr;"
-     ^ " its relation needs an explicit supported lowering")
+     ^ " its relation needs an explicit supported lowering"))
 
 let premise_iteration_binds_membership index
     (iteration : premise_iteration) =
@@ -1399,13 +1418,13 @@ let definition_requires_rewrite index id =
 let rewrite_sort index id =
   match List.assoc_opt id.it index.rewrite_sorts with
   | Some sort -> sort
-  | None -> invalid_arg ("definition does not produce rewrite requests: " ^ id.it)
+  | None -> raise (Unsupported ("definition does not produce rewrite requests: " ^ id.it))
 
 let inverse index id =
   match List.assoc_opt id.it index.inverses with
   | None -> None
   | Some (ValidInverse contract) -> Some contract
-  | Some (InvalidInverse reason) -> invalid_arg reason
+  | Some (InvalidInverse reason) -> raise (Unsupported reason)
 
 let source_variable_with_sort index id sort =
   let target_name =
@@ -1418,7 +1437,7 @@ let source_variable_with_sort index id sort =
   match target_name with
   | Some name -> Maude_il.source_variable name sort
   | None ->
-      invalid_arg ("unregistered source variable " ^ id.it)
+      raise (Unsupported ("unregistered source variable " ^ id.it))
 
 let source_variable index id typ =
   source_variable_with_sort index id (sort_of_typ index typ)

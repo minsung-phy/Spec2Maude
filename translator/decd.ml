@@ -12,7 +12,7 @@ let translate_decl index id params result_typ =
     { name = Prescan.def_name index id
     ; domain = Param.translate_sorts index params
     ; codomain = Term.translate_sort index result_typ
-    ; arrow = if has_hint index id "maude_kind" then Partial else Total
+    ; arrow = if Prescan.is_partial_def index id then Partial else Total
     ; attrs = []
     }
 
@@ -25,7 +25,7 @@ let translate_request_header index id params result_typ =
       { name = Prescan.def_name index id
       ; domain = Param.translate_sorts index params
       ; codomain = request_sort
-      ; arrow = if has_hint index id "maude_kind" then Partial else Total
+      ; arrow = if Prescan.is_partial_def index id then Partial else Total
       ; attrs = frozen_all (List.length params)
       }
   ]
@@ -41,8 +41,8 @@ let eq_condition = function
       condition
 
   | RewriteCond _ ->
-      invalid_arg
-        "DecD with a rewrite premise requires source-directed rule lowering"
+      raise (Unsupported
+        "DecD with a rewrite premise requires source-directed rule lowering")
 
 type clause_head =
   { term : term
@@ -72,7 +72,7 @@ let translate_head index id args =
   in
   let expected = head_bound args in
   if not (Il.Free.Set.subset expected bound) then
-    invalid_arg "definition head does not bind every deterministic variable";
+    raise (Unsupported "definition head does not bind every deterministic variable");
   { term = App (Prescan.def_name index id, List.rev terms)
   ; conditions
   ; bound
@@ -112,9 +112,7 @@ let guarded_quants index quants args =
 
 (* A clause that cannot be translated is Unsupported at that clause. *)
 let located id clause f =
-  try f () with Invalid_argument reason ->
-    Util.Error.error clause.at "translation"
-      ("Unsupported DecD " ^ id.it ^ " clause: " ^ reason)
+  Maude_il.located clause.at ("DecD " ^ id.it ^ " clause") f
 
 let prepare_clauses index id params clauses =
   List.map
@@ -234,8 +232,8 @@ let equation_clause prepared =
   match prepared.clause.it with
   | DefD (quants, args, rhs, prems) ->
       if clause_has_rewrite_call index args rhs prems then
-        invalid_arg
-          "DecD calls a maude_rule definition without hint(maude_rule)";
+        raise (Unsupported
+          "DecD calls a maude_rule definition without hint(maude_rule)");
       let head = prepared.head in
 
       let right = translate_result prepared rhs in
@@ -298,7 +296,7 @@ let choice_helper index id
           )
       ]
   | _ ->
-      invalid_arg "membership choice element must be a variable"
+      raise (Unsupported "membership choice element must be a variable")
 
 let choice_public_quants element quants =
   match element.it with
@@ -314,12 +312,12 @@ let choice_public_quants element quants =
       begin match selected_quants with
       | [_] -> public_quants
       | [] ->
-          invalid_arg "membership choice variable has no ExpP quantifier"
+          raise (Unsupported "membership choice variable has no ExpP quantifier")
       | _ ->
-          invalid_arg "membership choice variable has multiple ExpP quantifiers"
+          raise (Unsupported "membership choice variable has multiple ExpP quantifiers")
       end
   | _ ->
-      invalid_arg "membership choice element must be a variable"
+      raise (Unsupported "membership choice element must be a variable")
 
 let translate_choice_clause id
     (choice : Prescan.membership_choice) prepared =
@@ -327,8 +325,8 @@ let translate_choice_clause id
   match prepared.clause.it with
   | DefD (quants, args, rhs, _) ->
       if clause_has_rewrite_call index args rhs choice.prefix then
-        invalid_arg
-          "membership choice prefix cannot call a rewrite definition";
+        raise (Unsupported
+          "membership choice prefix cannot call a rewrite definition");
       let head = prepared.head in
       let premises =
         Prem.translate_all index
@@ -337,11 +335,11 @@ let translate_choice_clause id
           choice.prefix
       in
       if premises.otherwise then
-        invalid_arg "membership choice cannot follow ElsePr";
+        raise (Unsupported "membership choice cannot follow ElsePr");
       if Prem.known premises.bound choice.element then
-        invalid_arg "membership choice element is already bound";
+        raise (Unsupported "membership choice element is already bound");
       if not (Prem.known premises.bound choice.collection) then
-        invalid_arg "membership choice collection is unbound";
+        raise (Unsupported "membership choice collection is unbound");
       let right =
         App
           ( choice.helper_name
@@ -373,8 +371,8 @@ let translate_rule_clause prepared =
       if List.exists (Prem.arg_has_rewrite_call index) args
          || Prem.has_rewrite_call index rhs
       then
-        invalid_arg
-          "maude_rule calls are only supported as premise equalities";
+        raise (Unsupported
+          "maude_rule calls are only supported as premise equalities");
       let head = prepared.head in
       let premises =
         Prem.translate_all index
@@ -382,7 +380,7 @@ let translate_rule_clause prepared =
           ~bind_membership:false ~collect_outputs:false prems
       in
       if premises.otherwise then
-        invalid_arg "ElsePr is not supported in a maude_rule DecD";
+        raise (Unsupported "ElsePr is not supported in a maude_rule DecD");
       let conditions =
         List.map (fun condition -> EqCondition condition) head.conditions
         @ premises.conditions
@@ -404,7 +402,7 @@ let ordered_clauses index id clauses =
   in
   (* As for ElsePr predecessors (Reld): the source patterns and the
      translated heads may both overlap. *)
-  let overlap (prepared, (head, _, _, _)) (earlier, (earlier_head, _, _, _)) =
+  let overlap (prepared, (head, _, _, _)) (earlier, (earlier_head, _, _, _), _) =
     List.for_all2
       (fun arg earlier_arg ->
         match arg.it, earlier_arg.it with
@@ -413,22 +411,68 @@ let ordered_clauses index id clauses =
       (source_arguments prepared) (source_arguments earlier)
     && Reld.inputs_may_overlap index (arguments head) (arguments earlier_head)
   in
+  let added_premises prepared =
+    match prepared.clause.it with
+    | DefD (_, _, _, prems) -> List.filter (Prescan.is_case_premise index) prems
+  in
+  let for_result = Prescan.is_result_case_premise index in
+  (* A clause is selected once its premises hold (Il MATCH); a failing case
+     premise for its result (Def.case_premise_script) then leaves the call
+     stuck. So a later clause complements the clause without them. *)
+  let selection_parts prepared current =
+    match prepared.clause.it with
+    | DefD (quants, args, rhs, prems) when List.exists for_result prems ->
+        let prems = List.filter (fun prem -> not (for_result prem)) prems in
+        (* Drop the quantifiers that occurred only in the dropped premises. *)
+        let free = Il.Free.(free_args args ++ free_exp rhs ++ free_prems prems) in
+        let quants =
+          List.filter
+            (fun quant ->
+              match quant.it with
+              | ExpP (x, _) -> Il.Free.Set.mem x.it free.Il.Free.varid
+              | TypP _ | DefP _ | GramP _ -> true)
+            quants
+        in
+        equation_clause
+          {prepared with clause = {prepared.clause with it = DefD (quants, args, rhs, prems)}}
+    | DefD _ -> current
+  in
+  (* A failing case premise inside a premise leaves the call stuck too, but
+     the complement of that premise would then hold. *)
+  let complement_of prepared current (earlier, _, selection) =
+    if not (List.for_all for_result (added_premises earlier)) then
+      raise (Unsupported "an earlier clause has a case premise inside a premise");
+    complement prepared.clause.at current selection
+  in
   let step (earlier, statements) prepared =
     let (head, right, conditions, attrs) as current =
       located id prepared.clause (fun () -> equation_clause prepared)
     in
+    let overlapping =
+      List.filter (fun earlier -> overlap (prepared, current) earlier) earlier
+    in
+    (* [owise] would also apply when an earlier clause's case premise fails,
+       so an otherwise clause after such a clause states its complements. *)
+    let attrs =
+      if List.exists (fun (earlier, _, _) -> added_premises earlier <> []) overlapping
+      then List.filter (fun attr -> attr <> Owise) attrs
+      else attrs
+    in
     let complements =
       if List.mem Owise attrs then []
       else
-        earlier
-        |> List.filter (fun earlier -> overlap (prepared, current) earlier)
-        |> List.map (fun (_, parts) -> complement prepared.clause.at current parts)
+        located id prepared.clause (fun () ->
+          List.map (complement_of prepared current) overlapping)
     in
     let conditions =
       if complements = [] then conditions
       else schedule_equation_conditions head (conditions @ complements)
     in
-    earlier @ [prepared, current], statements @ [equation ~attrs head right conditions]
+    let selection =
+      located id prepared.clause (fun () -> selection_parts prepared current)
+    in
+    ( earlier @ [prepared, current, selection]
+    , statements @ [equation ~attrs head right conditions] )
   in
   snd (List.fold_left step ([], []) clauses)
 
@@ -438,7 +482,7 @@ let translate index id params result_typ clauses =
   let choice = Prescan.has_membership_choice index id in
   let rule = has_hint index id "maude_rule" in
   if not builtin && choice && rule then
-    invalid_arg "membership choice conflicts with hint(maude_rule)";
+    raise (Unsupported "membership choice conflicts with hint(maude_rule)");
   let header =
     if builtin then [translate_decl index id params result_typ]
     else if choice || rule then translate_request_header index id params result_typ

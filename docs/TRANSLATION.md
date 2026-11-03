@@ -1,231 +1,270 @@
-# 번역 의미, source hints와 지원 범위
+# Translation meaning, source hints, and supported scope
 
-번역 대상은 [고정 revision](../spectec/REVISION)의 `wasm-3.0/*.spectec` 21개를
-elaboration해서 얻은 IL AST 전체다. 그 입력의 타입 선언·함수 본문·규칙·premise를
-이름 하드코딩 없이 재귀 번역한다. 특정 Wasm 프로그램이나 테스트에서 실행하지
-않는다는 이유로 입력 IL의 일부를 삭제하지 않는다.
+The translation target is the whole IL AST obtained by elaborating the 21
+`wasm-3.0/*.spectec` files of the [fixed revision](../spectec/REVISION). The
+translator recursively translates the type declarations, function bodies, rules, and premises of that input
+without hardcoding names. It does not delete part of the input IL because a particular Wasm program or test
+does not execute it.
 
-`ast.ml`에 정의할 수 있는 모든 형태의 임의 SpecTec 명세를 지원하는 것은
-현재 목표가 아니다. backend 정리는 입력 IL의 번역과 계산에 필요한 표현·연산을
-보존해야 한다. 테스트에서 호출되지 않았다는 사실만으로 미사용 구현으로 판단하지 않는다.
-원문의 선언·함수 본문·규칙은 수정하지 않고, 명시적인 번역 hint만 허용한다.
+Supporting every arbitrary SpecTec specification of any form definable in `ast.ml` is
+not a current goal. Backend cleanup must preserve the representations and operations needed to
+translate and compute the input IL. A fact that a test did not call something is not by itself a reason to judge it unused.
+The declarations, function bodies, and rules of the source are not modified; only explicit translation hints are allowed.
 
-## AST와 참조 문서
+## AST and reference documents
 
-- 실제 입력 구조: [lib/il/ast.ml](../spectec/lib/il/ast.ml).
-- 실행에 적용하는 언어 계약: 동일 revision의 [Language.md][language].
-- 이전에 참조한 formal: 동일 revision의 [doc/semantics/il/][formal].
-  이것은 SpecTec으로 작성한 **IL 자체의 명세**이며, Wasm의 실행 규칙 파일이 아니다.
-  README에는 substitution, let-premise, recursive subtyping의 TODO와
-  일반적으로 실행 불가능한 witness guessing, 미완성 executable fragment가 명시돼 있다.
+- Actual input structure: [lib/il/ast.ml](../spectec/lib/il/ast.ml).
+- Meaning of the IL (formal): [doc/semantics/il/][formal] of the same revision
+  (`Step_exp` in `5-reduction.spectec`, etc.). It is **the specification of the IL itself** written in SpecTec,
+  not a file of Wasm execution rules.
+- Language description: [Language.md][language] of the same revision. Where it differs from the formal, this is noted below.
 
-formal을 전부 무시하거나 AST constructor 이름만으로 의미를 추측하지 않는다.
-다만 formal의 별도 검사 체계를 executable Wasm에 자동으로 추가하지 않는다.
-원문·AST·언어 설명에 맞는 직접 번역을 우선하고, 불일치는 적용 범위를 확인한다.
+The semantic reference of the translation is the IL AST and the reduction rules of the formal. The translator does not guess
+meaning from AST constructor names alone, and it uses the behavior of the evaluator (`il/eval.ml`) or the interpreter only as supporting evidence.
 
-## 값 생성과 타입 제약
+## Value construction and type constraints
 
-Language의 [type premises][type-premises]는 값 생성 때 검사하지 않는
-불변식이다. 따라서 `CaseE`는 constructor/payload를, `StrE`는 record 필드를
-직접 생성한다. record 갱신·합성에도 타입 불변식 검사를 자동 주입하지 않는다.
-함수 clause와 relation rule의 실제 `IfPr`, `LetPr`, `RulePr`는 유지한다.
-필요한 타입 검사 연산과 validation relation 자체를 삭제한 것은 아니다.
+The IL marks for each constructor value whether it is checked (`CaseE (op, e, check)`, `StrE (fs, check)`,
+`Checked | Unchecked`). When the formal `Step_exp/INJ` computes an `Unchecked` construction `C e`, it
+checks the premise of case `C` on the payload, and if it is false the computation fails (there is no rule
+that moves on to the next clause or rule, so it is stuck). The translation follows this meaning
+(`def.ml:case_premise_script`, at the IL stage before translation).
 
-이전에는 formal STR/INJ의 검사를 실행 번역에 적용했다. 그 결과 원본 scalar
-shift 호출의 `CaseE : u32`가 큰 i64 count를 builtin에 넘기기 전에 차단했다.
-호출부에 modulo를 추가했던 로컬 원문 수정은 철회했다. builtin은 이미 count를
-폭으로 정규화하며, translator의 추가 생성 검사를 제거하는 것이 이 문제의 수정이다.
+- For each computed construction (a construction whose variables are all bound earlier), the case premise is
+  instantiated with the payload and inserted before the premise that computes that construction, or after the premises if it is a result or rule output.
+  A construction inside an iteration is inserted as an `IterPr` of the same iteration, and an element variable is treated as bound only when its source
+  is bound. Example: `L-1` of `br` gets
+  `_and_((L-1) >= 0, (L-1) <= 4294967295)`.
+- A construction that is a relation input, a function argument, or that has an unbound variable is a pattern. In the formal too
+  it only matches an existing value and is not checked (`Step_expmatch/INJ-good`). Of the values that come from outside the IL,
+  the initial state of `wasm2maude` is built from a module that passed the validator of the official interpreter (`Valid.check_module`),
+  and that encoding and the `hint(builtin)` implementations are checked with the official tests.
+- A function that contains a check may have no result, so it is declared with `~>`
+  (`Prescan.partial_defs`, the same effect as `hint(maude_kind)`).
+- If the check of a result or output fails, the failure happens after that clause or rule has already been selected, so it is stuck. Therefore
+  the complement of a later clause and the complement of an `ElsePr` rule leave that check out and negate only the original premises,
+  and if such an earlier clause overlaps, `[owise]` is not used either. When a construction check inside a premise
+  fails, it must also be stuck, but the negation of the premise is then true, so if such an earlier clause or rule needs a
+  complement, it is rejected (`Unsupported`) (none in current Wasm).
+- The premises of `SubE` that checks again (`SUB-INJ`, `SUB-STR`) and of field update (`UPD-DOT`),
+  `StrE` with field premises, and case quantifiers inside iterations are not instantiated and are
+  rejected (`Unsupported`) (none in current Wasm).
+- Number and logic operations without variables are replaced by values before translation (`def.ml:fold_ground`,
+  `Xl.Num`/`Xl.Bool`). They are replaced only when both operands are literals and the operation is defined;
+  `1 \ 0` or `0 * e` (computing e may fail) are left as they are. The same function is used for constant expressions produced by
+  instantiation, and a check that became `true` is omitted. Example: `2^32 - 1` →
+  `4294967295`, and the `0 <= 0 <= 255` check of a memory byte is omitted.
 
-## 현재 구현과 미지원 항목
+SpecTec [Language.md][type-premises] describes premises as "invariants not checked when a value is constructed",
+and the interpreter (AL) does not check them either. The formal IL and this description differ, and the translation follows
+the formal IL. As a result, `$binop_(Inn, SHL/SHR, ..)` in the current source makes the shift amount
+a `u32`, so it is stuck for amounts of 2^32 or more (`i64.shl` in `i64.wast`, etc.;
+`Il.Eval` fails the same way). Even under Language.md, the source constructs a value that violates its own type invariant,
+so this is recorded as a problem on the source side.
 
-- 일반 목록은 prelude `LIST{SpectecTerminal}`(sort `SpectecTerminals`, `nil`, `__`)이고,
-  목록 원소로 쓰이는 목록은 `seq(...)`로 구분한다. 별도 목록 sort는 `maude_sort` hint로만 선택한다.
-- Wasm IL에서 사용하는 Nat·Int·유한 Rat 계산과 변환은 유지한다.
-  Wasm f32/f64는 원문의 `POS/NEG`, `NORM/SUBNORM/INF/NAN` 자료와 builtin으로 처리한다.
-- 현재 입력에 없는 IL Real 값·변환·산술, 비유한 Rat 값과 일부 Rat 산술은
-  지원하지 않는다. 해당 입력을 추가하면 명시적으로 거부하며, 이를 처리하려면
-  해당 AST 번역과 backend의 의미를 함께 검토해야 한다.
-- 기준 커밋에 있던 `IfE`의 직접 Maude `if` 번역과 root `UpdE`의 replacement 반환은
-  유지한다. 추가 backend helper가 필요 없는 직접 번역이며, `RootP`는 중첩 갱신의
-  재귀 종료에도 필요하다.
-- 현재 입력에 없는 `TheE`와 현재 번역에서 사용하지 않는 `List1`·`ListN`의
-  타입 값 표현은 지원하지 않는다. 대응 backend 연산 `_!`, `iterList1`,
-  `iterListN`을 두지 않고, 해당 형태를 번역하려 하면 `Unsupported`로 거부한다.
-  실제 입력에서 사용하는 `ListN` 반복과 길이 검사는 유지한다. 입력 범위를
-  확장할 때는 필요한 AST 번역과 backend 연산을 함께 추가한다.
-- 다형 record 구체 인스턴스 생성과 표현을 바꾸는 중첩 SubE adapter 생성은
-  현재 제공하지 않는다. record 합성은 무인자 StructT 선언의 필드 타입을 따라
-  번역한다. 타입 검사는 선언 순서의 전체 record를 직접 매칭하며, 임의 record의
-  필드 순서 변경·추가를 허용하는 일반 검사는 생성하지 않는다.
-  Wasm의 실제 SubE는 기존 표현을 유지한다. 기준 커밋처럼 각 `SubE`에서
-  `same_representation`을 확인한다. 중첩 변환용 별도 전체 스캔은 유지하지 않는다.
-- relation 전제에서 어떤 입력에도 묶이지 않은 변수 i가 알려진 `xs[i]`의 인덱스로만
-  쓰이면, i는 xs의 유효한 위치를 고른다(`xs[i]`는 i < |xs|일 때만 정의된다):
-  `PREFIX E SUFFIX := xs /\ I := |PREFIX|`. 예: `Deftype_sub/super`의 `typeuse*[i]`.
-  `maude_check` rule의 결론 입력이 pattern이 아니면(예: `Heaptype_sub/rec-sub`의
-  `typeuse*[j]`), 전제가 변수를 묶은 뒤 그 값과 비교한다.
-  생성자가 없는 `e?{}` pattern은 eps 또는 e와 같다(예: `Reftype_sub/null`의 `NULL?`).
-- 함수 인자(`DefP`/`DefA`)는 번역 전에 함수별 정의로 specialization한다
-  (`Def.specialize_script`, `Decd.specialize`). `$g(..., def $t, ...)` 호출마다
-  `$g`의 복사본 `$gt`를 만들고 본문의 def 파라미터 이름을 `$t`로 바꾼다(source 의미
-  `$g_t(xs) = $g(xs)`, f := t). 호출되지 않는 고차 정의는 출력하지 않는다.
-  받은 함수를 다시 넘기는 경우(같은 함수를 넘기는 재귀 포함), def 파라미터를 받는
-  def 파라미터, DecD 호출 밖의 `DefA`, TypD/RelD/GramD의 `DefP`, 고차 정의의
-  `builtin`/`maude_kind`/`maude_rule`/`inverse` hint, 복사본 이름 충돌은
-  `Unsupported`로 거부한다.
-- 함수 절은 위에서부터 순서대로 매칭한다(SpecTec 논문, `eval.ml`의 `reduce_exp_call`).
-  Maude equation은 순서가 없으므로, 앞 절과 겹칠 수 있는 절에는 그 앞 절이 맞지 않는다는
-  조건을 붙인다(`decd.ml:complement`). 예: `ceq inv-jsize(N) = inv-isize(N) if N =/= 8
-  /\ N =/= 16`. 겹침은 source pattern과 번역된 head로 판단하고, 생성자가 겹치지 않는
-  타입(`Inn`, `Fnn`)은 겹치지 않는다. 두 head 중 하나가 다른 쪽의 instance가 아니거나,
-  앞 head의 추가 구조가 ground가 아니거나, 앞 절 조건이 변수를 묶으면 `Unsupported`.
-  자기 조건이 이미 함의하는 부정이 붙을 수 있다(`$signed_`): 중복이지만 틀리지 않는다.
-  `ElsePr` 절은 `[owise]`이고 마지막 절이어야 한다(검사하지 않음).
-- 목록 alias(`resulttype = valtype*`, `expr = instr*`)의 typecheck는 원소별이다. 포장된
-  `seq(v)`는 alias 값 하나이고, 직접 equation은 포장되지 않은 원소 하나에만 적용한다
-  (`V =/= seq(unseq(V))`). 여러 원소는 backend의 원소별 equation이 검사한다. 세 equation은
-  어떤 항에서도 결과가 갈리지 않는다.
-- `#` 표현의 미지원 형태: 한 family 안에서 instance마다 같은 생성자의 인자가 native
-  여부가 다르면 거부한다. 고차 정의를 대상으로 하는 다른 def의 `hint(inverse ...)`는
-  검사하지 않는다. text 값의 연결은 목록 연결로 번역되며 현재 입력에는 없다.
-  wasm2maude 인코더는 `#` 위치를 Wasm 구조에 맞춰 직접 정하므로 semantics의
-  sort가 바뀌면 함께 고친다.
-- 현재 입력을 넘어서는 AST 형태와 hint 조합에는 미지원 분기가 남아 있다.
-  Wasm 명세 번역과 실행 테스트의 통과를 임의 SpecTec 명세의 번역 지원으로 확대하지 않는다.
+## Current implementation and unsupported items
 
-## 검증과 모델체킹의 경계
+- A general list is the prelude `LIST{SpectecTerminal}` (sort `SpectecTerminals`, `nil`, `__`), and
+  a list used as a list element is distinguished by `seq(...)`. A separate list sort is selected only by the `maude_sort` hint.
+- The Nat, Int, and finite Rat computations and conversions used by the Wasm IL are kept.
+  Wasm f32/f64 are handled by the source's `POS/NEG`, `NORM/SUBNORM/INF/NAN` data and builtins.
+- IL Real values, conversions, and arithmetic, non-finite Rat values, and some Rat arithmetic, which are not in the current input,
+  are not supported. If such input is added, it is explicitly rejected; handling it requires
+  reviewing the corresponding AST translation together with the backend meaning.
+- The replacement return of a root `UpdE` is kept. `RootP` is also needed to end the recursion of nested updates.
+  The IL of the current revision has no `IfE` or `NegPr`.
+- An argument or result whose type is fixed by a type parameter (`def $relaxed2(.., syntax X, X, X) : X`)
+  is a single value even if X is a list type, so if it is a list it is passed wrapped in `seq(...)` and the result is
+  taken out with `unseq` (`term.ml:syntax_parameter_positions`).
+- IL nat subtraction and nat/int division are partial operations, and Maude `_-_`, `_/_` produce negative numbers and fractions,
+  so if they appear as is they are rejected (`Unsupported`). In the current source, elaboration converts them to int/rat
+  before computing.
+- A call of an undefined function (a stuck term) remains an uncomputed term in Maude. When this term
+  enters a `==`/`=/=` comparison, a complement of the form `b =/= true`, or `[owise]`, it may become a value or the next clause
+  instead of being stuck as in the IL (e.g. `-- if $f(n) =/= 2` when only `$f(0) = 1` exists).
+  The same holds for partial functions declared with `->`. Whether such calls arise in normal Wasm execution
+  was not confirmed, and this remains a known limitation (resolving it is separate work that needs partial function declarations and value-check
+  conditions).
+- `TheE`, which is not in the current input, and the type value representation of `List1` and `ListN`, which the current translation does not use,
+  are not supported. The corresponding backend operations `_!`, `iterList1`,
+  `iterListN` are not provided, and an attempt to translate such a form is rejected (`Unsupported`).
+  The `ListN` iteration and length check used by the actual input are kept. When extending the input scope,
+  add the needed AST translation and backend operations together.
+- Generating concrete instances of polymorphic records and generating nested SubE adapters that change the representation are
+  not currently provided. Record composition is translated following the field types of the parameterless StructT declaration.
+  The type check directly matches the whole record in declaration order, and no general check that allows reordering or adding
+  fields of an arbitrary record is generated.
+  Actual SubE in Wasm keeps the existing representation. As in the baseline commit, `same_representation` is checked at each `SubE`.
+  No separate whole scan for nested conversion is kept.
+- In a relation premise, if a variable i that is not bound by any input is used only as the index of a known `xs[i]`,
+  i chooses a valid position of xs (`xs[i]` is defined only when i < |xs|):
+  `PREFIX E SUFFIX := xs /\ I := |PREFIX|`. Example: `typeuse*[i]` of `Deftype_sub/super`.
+  If a conclusion input of a `maude_check` rule is not a pattern (e.g. `typeuse*[j]` of `Heaptype_sub/rec-sub`),
+  it is compared with that value after the premises bind the variables.
+  An `e?{}` pattern without a constructor is equal to eps or e (e.g. `NULL?` of `Reftype_sub/null`).
+- Function arguments (`DefP`/`DefA`) are specialized into per-function definitions before translation
+  (`Def.specialize_script`, `Decd.specialize`). For each call `$g(..., def $t, ...)`, a copy `$gt`
+  of `$g` is made and the def parameter name in the body is replaced by `$t` (source meaning
+  `$g_t(xs) = $g(xs)`, f := t). A higher-order definition that is not called is not output.
+  Passing a received function on again (including recursion that passes the same function), a def parameter that takes
+  a def parameter, `DefA` outside a DecD call, `DefP` of TypD/RelD/GramD, the
+  `builtin`/`maude_kind`/`maude_rule`/`inverse` hints of a higher-order definition, and copy name collisions are
+  rejected (`Unsupported`).
+- Function clauses are matched in order from the top (SpecTec paper, `reduce_exp_call` in `eval.ml`).
+  Maude equations have no order, so a clause that may overlap an earlier clause gets the condition that the earlier clause
+  does not match (`decd.ml:complement`). Example: `ceq inv-jsize(N) = inv-isize(N) if N =/= 8
+  /\ N =/= 16`. Overlap is decided from the source pattern and the translated head, and types whose constructors do not overlap
+  (`Inn`, `Fnn`) do not overlap. If neither of the two heads is an instance of the other,
+  or the extra structure of the earlier head is not ground, or the earlier clause's condition binds variables, it is `Unsupported`.
+  A negation already implied by the clause's own condition may be added (`$signed_`): it is redundant but not wrong.
+  An `ElsePr` clause is `[owise]` and must be the last clause (not checked).
+- The typecheck of a list alias (`resulttype = valtype*`, `expr = instr*`) is per element. A wrapped
+  `seq(v)` is one alias value, and the direct equation applies only to one unwrapped element
+  (`V =/= seq(unseq(V))`). Multiple elements are checked by the backend's per-element equation. The three equations
+  do not give different results on any term.
+- Unsupported forms of the `#` representation: within one family, if the arguments of the same constructor differ by instance in whether they are
+  native, it is rejected. A `hint(inverse ...)` of another def that targets a higher-order definition is
+  not checked. Concatenation of text values is translated as list concatenation and is not in the current input.
+  The wasm2maude encoder decides the `#` positions directly from the Wasm structure, so if the semantics'
+  sorts change, it must be fixed together.
+- Unsupported branches remain for AST forms and hint combinations beyond the current input.
+  Passing the Wasm specification translation and execution tests is not extended to translation support for arbitrary SpecTec specifications.
 
-설치와 실행 방법은 [ARTIFACT.md](ARTIFACT.md)에 둔다. hint 계약은 아래에
-기록한다. PASS, STUCK, TIMEOUT을 구분한다.
-official suite 통과만으로 모든 프로그램의 의미 동등성이 증명되는 것은 아니다.
+## Limits of verification and model checking
 
-모델체커의 초기화·실행 wrapper와 focus/split/plug 중간 상태를 source의 한 step과
-동일시하지 않는다. 특정 속성을 source로 옮겨 주장하려면 상태 대응, 관측 지점,
-내부 step의 발산·deadlock 영향과 탐색 완료 여부를 별도로 확인해야 한다.
-현재 checked formal 전체와의 동등성 또는 완성된 보존 증명을 주장하지 않는다.
+Installation and usage are in [ARTIFACT.md](ARTIFACT.md). Hint contracts are
+recorded below. PASS, STUCK, and TIMEOUT are distinguished.
+Passing the official suite alone does not prove semantic equivalence for all programs.
 
-### import 범위 (결정, 2026-10-03)
+The initialization and execution wrappers of the model checker and the focus/split/plug intermediate states are not
+identified with one source step. To claim a particular property transferred to the source, the state correspondence, observation points,
+the effect of divergence and deadlock in internal steps, and whether the search completed must be checked separately.
+No equivalence with the whole current checked formal or completed preservation proof is claimed.
 
-`run`, `modelcheck`, `instantiate`, `harness`는 import가 있는 모듈을 Unsupported로
-거부한다(`wasm2maude/emit.ml`). 결과 집계에서도 PASS가 아니라 Unsupported로 센다.
-`$instantiate`는 `maude_assume "Module_ok" "Externaddr_ok"`이다.
+### Import scope (decision, 2026-10-03)
 
-- 이유: import가 있는 프로그램을 실행·모델체킹하려면 import를 제공하는 쪽이
-  필요하다. 예를 들어 `(import "env" "print" (func (param i32)))`의 몸체는 host에
-  있고 SpecTec 명세에는 없다. 필요한 일은 ① 제공자(다른 Wasm 모듈 또는 host 함수
-  모델)와 ② 제공된 것의 타입 검사(`Externaddr_ok`) 두 가지다. ①이 없으면 ②만
-  번역해도 실행할 수 없으므로, import 지원은 ①과 함께 하는 별도 작업이다.
-- import가 없으면 `$instantiate`의 두 전제를 생략해도 의미가 그대로다.
-  `Module_ok`가 내는 `xt_I*`가 비고 `externaddr*`도 `eps`이므로
-  `(Externaddr_ok: s |- externaddr : xt_I)*`는 빈 반복이다. 이 등가는
-  import가 없을 때만 성립하므로 wasm2maude의 거부가 그 전제 조건을 보장한다.
-  `Module_ok`의 타입 검사는 frontend validator가 보장한다고 가정한다.
-- 나중에 import를 지원할 때: 링크 단계에서 frontend(reference interpreter의
-  linker)가 import 타입을 검사하면, `Module_ok`와 같은 논리로 `Externaddr_ok`도
-  가정으로 둘 수 있다. 그러면 `Externtype_sub` 아래의 validation relation을
-  번역하지 않아도 된다. 이 경우에는 frontend 검사와 명세 relation이 같다는 가정을 기록한다.
-- wast harness는 이미 이 방식이다. 계획 단계에서 reference interpreter의
-  `Wasm.Match.match_externtype`이 import 타입을 검사하고(`wasm2maude/wast_plan.ml`),
-  memory/table의 현재 최소 크기 조건만 Maude의 `linkImports`가 실행 중에 검사한다
-  (`wasm2maude/wast-runtime.maude`). 따라서 wast의 import 모듈은 frontend linker가
-  `Externaddr_ok`와 같은 판정을 한다는 가정 아래 지원된다.
+`run`, `modelcheck`, `instantiate`, and `harness` reject a module with imports as
+Unsupported (`wasm2maude/emit.ml`). In result accounting it is also counted as Unsupported, not PASS.
+`$instantiate` is `maude_assume "Module_ok" "Externaddr_ok"`.
 
-### 호출 인자 검사
+- Reason: executing or model checking a program with imports requires a side that provides the imports.
+  For example, the body of `(import "env" "print" (func (param i32)))` is in the host
+  and not in the SpecTec specification. Two things are needed: (1) a provider (another Wasm module or a host function
+  model) and (2) the type check of what is provided (`Externaddr_ok`). Without (1), translating only (2)
+  still does not allow execution, so import support is separate work done together with (1).
+- Without imports, omitting the two premises of `$instantiate` leaves the meaning unchanged.
+  The `xt_I*` produced by `Module_ok` is empty and `externaddr*` is also `eps`, so
+  `(Externaddr_ok: s |- externaddr : xt_I)*` is an empty iteration. This equivalence holds
+  only when there are no imports, so the rejection in wasm2maude guarantees that precondition.
+  The type check of `Module_ok` is assumed to be guaranteed by the frontend validator.
+- When imports are supported later: if the frontend (the linker of the reference interpreter) checks import types
+  at the link stage, `Externaddr_ok` can also be kept as an assumption by the same logic as `Module_ok`.
+  Then the validation relations under `Externtype_sub` need not be
+  translated. In that case, record the assumption that the frontend check and the specification relation are the same.
+- The wast harness already works this way. At the planning stage, `Wasm.Match.match_externtype` of the reference interpreter
+  checks import types (`wasm2maude/wast_plan.ml`),
+  and only the current minimum size condition of memory/table is checked at run time by Maude's `linkImports`
+  (`wasm2maude/wast-runtime.maude`). Therefore import modules in wast are supported under the assumption that the frontend linker
+  makes the same judgment as `Externaddr_ok`.
 
-`$invoke`의 `(Val_ok: s |- val : t_1)*`가 인자 개수와 타입을 검사한다. wasm2maude는
-export가 함수인지까지만 확인한다. `Val_ok`가 실패하면 `$invoke`는 정의되지 않으며,
-`run`/`modelcheck` runtime은 `invalid-invocation` 상태로 끝난다. 이 상태에서는
-아무 값도 반환되지 않으므로 `[]~ returned(rejected)` 같은 안전성 질의는 공허하게
-참이 된다. 먼저 `rewrite` 결과가 `invalid-invocation`이 아닌지 확인한다.
+### Invocation argument check
 
-## 공통 backend와 목록 계산
+`(Val_ok: s |- val : t_1)*` of `$invoke` checks the number and types of the arguments. wasm2maude
+only checks that the export is a function. If `Val_ok` fails, `$invoke` is undefined,
+and the `run`/`modelcheck` runtime ends in the `invalid-invocation` state. In this state
+no value is returned, so a safety query such as `[]~ returned(rejected)` is vacuously
+true. First check that the `rewrite` result is not `invalid-invocation`.
 
-공통 backend의 진입점은 `translator/backend/spectec-semantics.maude`다.
-먼저 `spectec-sorts.maude`의 `SPECTEC-SORTS`에서 공통 sort를 선언하고,
-`generated/types.maude`를 읽은 뒤 `spectec-builtin-types.maude`의
-`SPECTEC-BUILTIN-TYPES`에서 SpecTec 기본 타입(`bool nat int rat real text`)의
-Maude 표현, 즉 native import·타입 태그·기본 검사를 선언한다. 이 표현은 IL
-연산의 의미가 아니라 표현 선택이므로 의미 모듈과 다른 파일에 둔다.
+## Common backend and list computation
 
-기본 타입은 IMP처럼 생성자로 감싼다(`op #_ : Bool|Rat|Float|String ->
-SpectecTerminal [ctor]`). native sort를 `SpectecTerminal`의 subsort로 두지 않으므로
-prelude의 같은 이름 연산이 한 kind에서 충돌하지 않고 import renaming이 필요 없다.
-IL `nat`/`int` 값은 native `Nat`/`Int`, 그 밖의 값은 `SpectecTerminal`로 표현한다.
-번역기는 값의 sort와 자리가 기대하는 sort가 다를 때만 `#`를 넣거나 뺀다
-(`Iter.coerce`): native 값이 목록·option·tuple 원소, 생성자·def 인자, record 필드,
-`typecheck` 대상에 들어가면 `# V`, 꺼낼 때는 패턴이면 `# V` 매칭, 식 중간이면
-부분 함수 `#rat`/`#bool`/`#string`을 쓴다. 비교·논리 연산 결과는 native이므로
-값 자리에서 감싸고, 산술·비교 피연산자는 native로 꺼낸다. CvtE는 native `Rat`을
-받고 돌려준다. 생성자 인자 sort는 `CaseE`가 속한 variant 타입의 선언에서,
-def 호출 결과는 callee가 선언한 결과 sort에서 정한다.
+The entry point of the common backend is `translator/backend/spectec-semantics.maude`.
+First, `SPECTEC-SORTS` in `spectec-sorts.maude` declares the common sorts,
+then `generated/types.maude` is loaded, and `SPECTEC-BUILTIN-TYPES` in `spectec-builtin-types.maude`
+declares the Maude representation of the SpecTec base types (`bool nat int rat real text`),
+that is, native imports, type tags, and basic checks. This representation is a representation choice, not the meaning of IL
+operations, so it is kept in a file separate from the semantic modules.
 
-기능별 연산은 `spectec-semantics.maude` 파일 안의 다음 모듈에 둔다.
+Base types are wrapped in a constructor as in IMP (`op #_ : Bool|Rat|Float|String ->
+SpectecTerminal [ctor]`). Native sorts are not made subsorts of `SpectecTerminal`, so
+prelude operations with the same name do not clash in one kind and no import renaming is needed.
+IL `nat`/`int` values are represented as native `Nat`/`Int`, and other values as `SpectecTerminal`.
+The translator inserts or removes `#` only when the sort of a value differs from the sort its position expects
+(`Iter.coerce`): when a native value goes into a list, option, or tuple element, a constructor or def argument, a record field,
+or a `typecheck` target, it becomes `# V`; when it is taken out, a pattern matches `# V`, and in the middle of an expression the
+partial functions `#rat`/`#bool`/`#string` are used. Results of comparison and logic operations are native, so they are
+wrapped in value positions, and arithmetic and comparison operands are taken out as native. CvtE takes and returns native `Rat`.
+Constructor argument sorts come from the declaration of the variant type that the `CaseE` belongs to,
+and def call result sorts come from the result sort declared by the callee.
 
-| 모듈 | 내용 |
+Operations by feature are in the following modules in the file `spectec-semantics.maude`.
+
+| Module | Contents |
 |---|---|
-| `SPECTEC-CONVERT` | 수치 타입 변환 |
-| `SPECTEC-LIST` | 목록 표현·검사·연산 |
-| `SPECTEC-OPTION` | option 표현·검사·연산 |
-| `SPECTEC-TUPLE` | tuple 표현·projection |
-| `SPECTEC-RECORD` | record 표현·조회·갱신 |
-| `SPECTEC-ARRAY` | `hint(maude_array)` 필드의 크기 + prelude `ARRAY` 표현·연산 |
-| `SPECTEC-MAP` | `hint(maude_map)` 필드의 크기 + prelude `MAP` 표현·연산 |
+| `SPECTEC-CONVERT` | numeric type conversion |
+| `SPECTEC-LIST` | list representation, checks, operations |
+| `SPECTEC-OPTION` | option representation, checks, operations |
+| `SPECTEC-TUPLE` | tuple representation, projection |
+| `SPECTEC-RECORD` | record representation, lookup, update |
+| `SPECTEC-ARRAY` | size of `hint(maude_array)` fields + prelude `ARRAY` representation and operations |
+| `SPECTEC-MAP` | size of `hint(maude_map)` fields + prelude `MAP` representation and operations |
 
-convert와 list는 builtin types를, option·tuple·record·array·map은 list를 import한다.
-마지막 `SPECTEC-SEMANTICS`가 일곱 모듈을 모은다. 공통 목록은
-`spectec-sorts.maude`가 prelude `LIST{SpectecTerminal}`을 sort 이름만 바꿔
-가져온 것이다(`nil`, `__`, `size`, `occurs`, `append`는 prelude 이름 그대로).
-`types.maude`의 `SPEC2MAUDE-TYPES`는 hint별 목록 sort를 이 목록 위에 subsort로
-얹고 `nil`, `__`만 좁은 sort로 overload한다(LIST를 다시 instantiate하지 않는다).
-`generated/output.maude`는 `SPECTEC-SEMANTICS`를 import하고 번역된 정의를
-추가한다.
+convert and list import builtin types, and option, tuple, record, array, and map import list.
+The final `SPECTEC-SEMANTICS` collects the seven modules. The common list is
+the prelude `LIST{SpectecTerminal}` imported by `spectec-sorts.maude` with only the sort names changed
+(`nil`, `__`, `size`, `occurs`, `append` keep their prelude names).
+`SPEC2MAUDE-TYPES` in `types.maude` places the per-hint list sorts on this list as subsorts
+and overloads only `nil`, `__` at the narrower sorts (it does not instantiate LIST again).
+`generated/output.maude` imports `SPECTEC-SEMANTICS` and adds the translated
+definitions.
 
-LIST instance가 하나이므로 typed list의 `nil`, `__`, `size`, `occurs`는 모두 같은
-prelude 연산이고 warning·advisory 없이 load된다. prelude 연산 이름(`nil`,
-`size`, `occurs` 등)은 `Prescan.reserved_names`에 있어서, 같은 이름의 source
-정의는 `spectec-` 접두사를 받는다(예: Wasm `$size` → `spectec-size`).
+There is one LIST instance, so `nil`, `__`, `size`, `occurs` of typed lists are all the same
+prelude operations, and it loads without warnings or advisories. Prelude operation names (`nil`,
+`size`, `occurs`, etc.) are in `Prescan.reserved_names`, so a source
+definition with the same name gets the `spectec-` prefix (e.g. Wasm `$size` → `spectec-size`).
 
-비어 있지 않은 목록은 prelude `LIST`처럼 `SpectecNeTerminals` sort로 구분한다
-(`SpectecTerminal < SpectecNeTerminals < SpectecTerminals`). 공유 목록 검사는
-`typecheck(T NTS, TYPE)`로 원소가 두 개 이상일 때만 재귀하고, 빈 목록은 `t*`의
-올바른 값이므로 `typecheck(nil, TYPE) = true`를 유지한다. typed list root마다
-`NeXList < SpectecNeTerminals`를 함께 생성한다. 현재 Wasm의 `val < instr` 목록은 `nil`과 `__`를 공유한다.
-별도 연결 연산을 생성하는 경로는 제공하지 않으며, 목록 sort들이 하나의
-subsort chain을 이루지 않는 hint 조합은 `Unsupported`로 거부한다.
+Nonempty lists are distinguished by the sort `SpectecNeTerminals`, as in the prelude `LIST`
+(`SpectecTerminal < SpectecNeTerminals < SpectecTerminals`). The shared list check
+`typecheck(T NTS, TYPE)` recurses only when there are two or more elements, and since the empty list is a
+valid value of `t*`, `typecheck(nil, TYPE) = true` is kept. For each typed list root,
+`NeXList < SpectecNeTerminals` is generated as well. The current Wasm `val < instr` lists share `nil` and `__`.
+No path that generates a separate concatenation operation is provided, and a hint combination in which the list sorts do not form one
+subsort chain is rejected (`Unsupported`).
 
-`typecheck`는 `SpectecTerminals`에 속하는 값과 목록을 검사한다. 실패
-equation과 option 검사도 sort 변수로 정의한다. kind에만 속하는 미정의 항을
-일괄적으로 `false`로 바꾸지 않으며, 이런 항의 검사식은 미계산 상태로 남을 수
-있다. 생성된 긍정 검사 조건은 `true`일 때만 성립하므로 미계산 검사도 통과하지
-못한다. 검사 결과 자체를 부정하거나 `false`와 비교하는 용도로 확장할 때는
-미정의 항의 처리 계약을 별도로 정해야 한다.
+`typecheck` checks values and lists that belong to `SpectecTerminals`. The failure
+equations are also defined with sort variables. An option type `t?` is checked with `iterOpt(t)`,
+and its value is `nil` or `V ?` wrapping one value of `t`. Undefined terms that belong only to the kind are
+not uniformly turned into `false`, and the check expression of such a term may remain
+uncomputed. A generated positive check condition holds only when it is `true`, so an uncomputed check does not
+pass either. When extending this to negate the check result itself or compare it with `false`,
+a separate contract for handling undefined terms must be set.
 
-`LenE`, `SliceE`, `UpdE` 및 premise/iteration의 IL 번역은 유지한다.
-`ListE`는 목록 연결을, `LenE`는 prelude `size`를 직접 사용하므로
-별도의 `[TS]`, `|TS|` 표기 wrapper는 제공하지 않는다.
-membership(`MemE`)은 prelude `occurs`를 사용한다.
-index, slice, 원소 갱신, 구간 갱신은 prelude `occurs`처럼 앞 원소를 하나씩 떼는
-구조 재귀로 정의한다(`(T TS)[(s N)] = TS[N]`, `(T TS)[(s N) = K] = T TS[N = K]`).
-slice/splice는 시작 위치까지 넘긴 뒤 `COUNT`개를 가져오거나 버린다. 따라서
-정의역은 `N + COUNT <= size(S)`이고, 빈 slice도 끝 위치까지 허용한다. 범위 밖이면
-equation이 적용되지 않아 정의되지 않는다. `seq(...)`는 하나의 원소다.
-갱신과 slice의 가져오기 부분은 꼬리 재귀가 아니어서 위치(개수)에 비례하는 stack을
-쓴다(64MB stack에서 약 26만 칸까지 확인, 52만 칸에서 overflow).
+The IL translation of `LenE`, `SliceE`, `UpdE` and premises/iterations is kept.
+`ListE` uses list concatenation directly and `LenE` uses the prelude `size` directly, so
+no separate `[TS]`, `|TS|` notation wrappers are provided.
+Membership (`MemE`) uses the prelude `occurs`.
+Index, slice, element update, and range update are defined by structural recursion that removes leading elements one at a time, like the prelude `occurs`
+(`(T TS)[(s N)] = TS[N]`, `(T TS)[(s N) = K] = T TS[N = K]`).
+Slice/splice skip to the start position and then take or drop `COUNT` elements. Therefore
+the domain is `N + COUNT <= size(S)`, and an empty slice is allowed up to the end position. Out of range,
+no equation applies, so it is undefined. `seq(...)` is one element.
+Update and the take part of slice are not tail recursive, so they use stack proportional to the position (count)
+(confirmed up to about 260,000 cells with a 64MB stack; overflow at 520,000 cells).
 
-길이는 prelude `size`/`$size`(accumulator)로 계산한다.
-반복 목록은 `repeatSeq(0, S) = nil`,
-`repeatSeq(s N, S) = S repeatSeq(N, S)`의 직접 재귀 equation으로 구성한다.
-typed list는 별도 연산을 선언하지 않고 prelude 연산을 그대로 사용한다.
+Length is computed with the prelude `size`/`$size` (accumulator).
+Repeated lists are built by the direct recursive equations `repeatSeq(0, S) = nil`,
+`repeatSeq(s N, S) = S repeatSeq(N, S)`.
+Typed lists declare no separate operations and use the prelude operations as they are.
 
-record 조회/갱신은 field를 매칭하고 prefix에 동일 field가 없다는 조건으로
-첫 항목을 선택한다. 없는 field의 조회는 nil, 갱신은 끝에 추가한다.
+Record lookup/update (`_._`, `_[._=_]`, partial operations) match the field entry with the same name.
+A well-typed record has only one entry per name. Lookup or update of a missing field
+has no equation, so it is undefined as in the IL.
 
-record 타입의 sequence 필드 F에 `hint(maude_array)`를 붙이면
-(`{.., F t* hint(maude_array)}`) F는 목록이 아니라 `sized-array(크기, A)`로
-저장한다. A는 prelude `ARRAY{Nat, Zero}`이고, view `Zero`가 기본값을 `# 0`으로
-정하므로 0인 칸은 저장하지 않는다(prelude `insert`가 0을 지우고, `_[_]`가 없는
-칸에 0을 돌려준다). 크기를 따로 두므로 길이 검사가 칸 수에 비례하지 않는다.
-연산은 `SPECTEC-ARRAY`에 있다.
+If `hint(maude_array)` is attached to a sequence field F of a record type
+(`{.., F t* hint(maude_array)}`), F is stored not as a list but as `sized-array(size, A)`.
+A is the prelude `ARRAY{Nat, Zero}`, and the view `Zero` sets the default value to `# 0`,
+so cells that are 0 are not stored (the prelude `insert` removes 0, and `_[_]` returns 0 for a missing
+cell). Since the size is kept separately, the length check is not proportional to the number of cells.
+The operations are in `SPECTEC-ARRAY`.
 
 | source | Maude |
 |---|---|
@@ -238,280 +277,279 @@ record 타입의 sequence 필드 F에 `hint(maude_array)`를 붙이면
 | `{.., F s 0^n}` | `array-grow(⟦s⟧, n)` |
 | `{.., F s}` | `array-of(s)` |
 
-`array-read`, `array-write`는 목록 slice/splice처럼 `i + n <= 크기`에서만 정의된다.
-`array-of`는 목록을 배열로 바꾼다. 다른 배열 필드의 값은 변환 없이 그대로 쓴다.
-필드 pattern(`-- if e = {.., F b*}`)은 배열 값을 그대로 묶고, 번역 전에
-(`def.ml:stored_script`) 그 뒤의 전제와 결과에서 `b*`를 `e.F`로 바꿔 쓴다.
-원문에서 `b* = e.F`이므로 의미가 같고, `|b*|`와 `b* 0^n`이 위 표의 배열 번역을
-받는다(Wasm `$growmem`).
+`array-read`, `array-write` are defined only for `i + n <= size`, like list slice/splice.
+`array-of` turns a list into an array. The value of another array field is used as is, without conversion.
+A field pattern (`-- if e = {.., F b*}`) binds the array value as is, and before translation
+(`def.ml:stored_script`) `b*` is rewritten to `e.F` in the following premises and the result.
+In the source `b* = e.F`, so the meaning is the same, and `|b*|` and `b* 0^n` get the array translation of the table above
+(Wasm `$growmem`).
 
-위 표 밖의 사용(필드 값 자체를 목록으로 읽기, 원소 하나 갱신, `++` 확장, 필드를
-가진 record의 `CompE`)은 `Unsupported`로 거부한다. 이 record 타입에는
-`recordConcat` equation을 생성하지 않는다.
+Uses outside the table above (reading the field value itself as a list, updating one element, extending with `++`, `CompE` of a record
+that has the field) are rejected (`Unsupported`). No `recordConcat` equation is generated for this record type.
 
-`hint(maude_map)`을 붙인 필드 F는 `sized-map(크기, M)`으로 저장한다. M은 prelude
-`MAP{Nat, Terminal}`이고(ARRAY와 겹치지 않게 항목 연산자를 `_|=>_`로 바꿈), 0부터
-크기-1까지 모든 index에 항목이 정확히 하나 있다. 기본값이 없으므로 원소 타입에 0이 없어도 된다.
-그래서 `map-read`·`map-write`는 key가 같은 항목을 직접 매칭한다. prelude의 `M[I]`·`insert`는
-같은 key의 중복 항목을 매번 찾으므로 쓰지 않는다. 없는 index의 읽기·쓰기는 equation이 없어
-원문처럼 값이 없다.
-함수 `def $f(..) : t* hint(maude_map)`은 결과가 그런 필드임을 뜻하고, 호출 `$f(..)[i]`,
-`|$f(..)|`가 map 연산으로 번역된다. 함수의 각 절은 maude_map 필드를 돌려줘야 한다.
+A field F with `hint(maude_map)` is stored as `sized-map(size, M)`. M is the prelude
+`MAP{Nat, Terminal}` (with the entry operator renamed to `_|=>_` so as not to overlap with ARRAY), and every index from 0 to
+size-1 has exactly one entry. There is no default value, so the element type need not contain 0.
+So `map-read`·`map-write` directly match the entry with the same key. The prelude `M[I]`·`insert` are not used, because they
+search for duplicate entries of the same key every time. A read or write of a missing index has no equation, so,
+as in the source, there is no value.
+A function `def $f(..) : t* hint(maude_map)` means that its result is such a field, and the calls `$f(..)[i]`,
+`|$f(..)|` are translated to map operations. Each clause of the function must return a maude_map field.
 
 | source | Maude |
 |---|---|
 | `\|e.F\|`, `\|$f(..)\|` | `map-size(e . 'F)`, `map-size(f(..))` |
 | `e.F[i]`, `$f(..)[i]` | `map-read(e . 'F, i)`, `map-read(f(..), i)` |
 | `e[.F[i] = x]` | `e[. 'F = map-write(e . 'F, i, x)]` |
-| `e[.F[i].G.. = x]` | `map-read(e . 'F, i)`를 고친 뒤 `map-write`로 다시 넣음 |
+| `e[.F[i].G.. = x]` | modify `map-read(e . 'F, i)`, then put it back with `map-write` |
 | `e[.F = s]` | `e[. 'F = map-of(s)]` |
-| `{.., F e.F' s}` (e.F'는 map 필드) | `map-append(e . 'F', s)` |
+| `{.., F e.F' s}` (e.F' is a map field) | `map-append(e . 'F', s)` |
 | `{.., F s}` | `map-of(s)` |
-| record `r ++ r'` | 이 필드는 `map-concat(r . 'F, r' . 'F)` |
+| record `r ++ r'` | for this field, `map-concat(r . 'F, r' . 'F)` |
 
-`map-write`는 목록 갱신처럼 `i < 크기`에서만 정의된다. `map-concat`은 오른쪽 항목을
-왼쪽 크기만큼 옮긴다. 옮기는 순서와 무관하게 결과가 같다. 위 표 밖의 사용(필드나 호출
-값 자체를 목록으로 읽기, 구간 읽기·쓰기, `++` 확장)은 `Unsupported`로 거부한다.
+`map-write` is defined only for `i < size`, like list update. `map-concat` shifts the right entries
+by the left size. The result is the same regardless of the order of shifting. Uses outside the table above (reading the field or call
+value itself as a list, range read/write, extending with `++`) are rejected (`Unsupported`).
 
-비결정적 membership choice helper는 prefix/선택 원소/suffix 매칭 rule로
-가능한 원소를 선택한다. source의 선택 의미, boxing과 frozen 인자를 유지한다.
-비트별 논리 연산은 폭/operand 조건을 유지한 native Nat 연산을 사용한다.
-CLZ/CTZ와 고정 크기 chunk는 매칭으로 구현하며, 실제 인코딩/누산/반전 등
-결과를 구성하는 재귀 계산은 남긴다.
+The nondeterministic membership choice helper selects a possible element with a prefix/selected element/suffix matching rule.
+It keeps the source choice meaning, boxing, and frozen arguments.
+Bitwise logic operations use native Nat operations that keep the width/operand conditions.
+CLZ/CTZ and fixed-size chunks are implemented by matching, and the recursive computations that build the actual result,
+such as encoding, accumulation, and reversal, remain.
 
-popcount와 bit reverse도 accumulator equation으로 계산한다.
-각각 `count + 남은 비트의 1 개수`, `reverse(남은 비트) accumulator`를
-불변식으로 갖는다.
+Popcount and bit reverse are also computed with accumulator equations.
+Their invariants are `count + number of 1s in the remaining bits` and `reverse(remaining bits) accumulator`,
+respectively.
 
-이 대응은 유한 ground canonical source 값의 결과와 정의역에 관한 것이다.
-`[owise]` membership/record는 unknown symbolic tail에서 이전의 미평가 term과
-다른 결과를 낼 수 있으므로 자유 목록 변수의 narrowing 동등성을 주장하지 않는다.
-source rule, IL 반복 의미, 전체 model-checking graph 보존 증명으로 확대하지 않는다.
+This correspondence concerns the results and domains for finite ground canonical source values.
+`[owise]` membership/record may give results different from the earlier unevaluated term on an unknown symbolic tail,
+so narrowing equivalence for free list variables is not claimed.
+It is not extended to a preservation proof for source rules, the IL iteration meaning, or the whole model-checking graph.
 
-## Wasm driver의 조회와 결과 검사
+## Lookup and result checks in the Wasm driver
 
-run/modelcheck의 `findFunc`, WAST의 `findExport`는 export 앞/뒤를 매칭한다.
-prefix에 같은 이름이 없다는 조건은 첫 export를 선택하는 기존 의미를 유지한다.
-특히 먼저 나온 동일 이름의 global을 건너뛰어 뒤의 function을 선택하지 않는다.
-없는 export와 잘못된 address kind에는 정상 조회 결과를 추가하지 않는다.
+`findFunc` of run/modelcheck and `findExport` of WAST match before/after an export.
+The condition that the prefix has no entry with the same name keeps the existing meaning of selecting the first export.
+In particular, it does not skip an earlier global with the same name to select a later function.
+For a missing export or a wrong address kind, no normal lookup result is added.
 
-WAST instance 환경은 `instances.entry`와 associative `instances.concat`으로
-표현한다. identity는 `instances.nil`이며 `comm`은 붙이지 않는다.
-`cons(k,v,rest)`와 `entry(k,v) concat encode(rest)`를 대응시키면 기존 순서와
-삽입 위치를 보존한다. `findInstance`도 prefix 조건으로 첫 동일 ID를 선택한다.
-host-provider와 module-done의 환경 생성은 같은 표현을 사용한다.
+The WAST instance environment is represented with `instances.entry` and associative `instances.concat`.
+The identity is `instances.nil`, and `comm` is not attached.
+Mapping `cons(k,v,rest)` to `entry(k,v) concat encode(rest)` preserves the existing order and
+insertion position. `findInstance` also selects the first identical ID with a prefix condition.
+Environment construction in host-provider and module-done uses the same representation.
 
-`match.any`는 associative alternatives에서 성공하는 pattern 하나를 찾는다.
-지원하는 canonical result/pattern에서 기존의 Boolean OR와 같은 존재 조건이며,
-성공하는 pattern이 없을 때만 `match.no [owise]`가 적용된다.
-`activeFrameDepth`는 `runtimeResults`로 확인한 값 prefix를 건너뛴 뒤 활성
-FRAME/LABEL/HANDLER의 body로만 내려간다. 뒤쪽 sibling의 FRAME은 세지 않는다.
-`runtimeResults`, 인자/결과의 위치별 비교, import 목록 구성은 모든 원소를
-검사하거나 결과를 구성하는 연산이므로 필요한 구조적 재귀를 유지한다.
+`match.any` finds one pattern that succeeds among associative alternatives.
+For the supported canonical results/patterns, it is the same existence condition as the existing Boolean OR,
+and `match.no [owise]` applies only when no pattern succeeds.
+`activeFrameDepth` skips the value prefix confirmed by `runtimeResults` and then descends only into the body of the active
+FRAME/LABEL/HANDLER. A FRAME of a later sibling is not counted.
+`runtimeResults`, positionwise comparison of arguments/results, and construction of the import list are operations that
+check all elements or build a result, so the needed structural recursion is kept.
 
-근거는 [Maude 3.5.1 manual](../reference/manual/Maude3.5.1-manual.pdf)의
-§4.3(조건과 matching), §4.4(연산자 속성), §4.5.4(owise),
-§8.3(native NAT), §8.14.1(LIST), 그리고 설치된 3.5.1 prelude의 LIST/NAT
-정의다. native MAP으로 치환하지 않는 이유는 중복 key의 의미를 바꾸기 때문이다.
+The evidence is §4.3 (conditions and matching), §4.4 (operator attributes), §4.5.4 (owise),
+§8.3 (native NAT), §8.14.1 (LIST) of the [Maude 3.5.1 manual](../reference/manual/Maude3.5.1-manual.pdf),
+and the LIST/NAT definitions in the installed 3.5.1 prelude. The reason for not replacing it with native MAP is that it would change the
+meaning of duplicate keys.
 
-WAST 출력기는 긴 `Seq`를 균형 괄호로 묶어 Maude의 평탄한 associative
-구문 분석 비용을 줄인다. 각 말단 그룹은 최대 8개 원소이며 `__`의 결합법칙만
-사용한다. 원소 순서, `App`의 인자 경계, 목록 원소를 구분하는 boxing은 유지한다.
+The WAST printer groups a long `Seq` into balanced parentheses to reduce Maude's cost of parsing flat associative
+syntax. Each leaf group has at most 8 elements, and only the associativity of `__` is
+used. Element order, the argument boundaries of `App`, and the boxing that distinguishes list elements are kept.
 
-WAST command 목록은 하나의 `commands.cons` 목록(빈 입력은 `commands.nil`)으로
-만들어 harness의 `rew` 시작 항 `script.ready(emptyStore, 환경, 명령들)`에 직접 넣는다.
-equation으로 정의하면 Maude가 rewriting 전에 module의 모든 equation을 compile하는데,
-큰 module을 담은 명령 목록에서는 이 compile이 느리다(skip-stack-guard-page: 8.8초 → 3.0초).
-각 command의 인코딩과 순서는 그대로이며 SpecTec 실행 규칙이나 일반 Wasm run/modelcheck
-출력은 바꾸지 않는다.
+The WAST command list is built as one `commands.cons` list (empty input is `commands.nil`)
+and put directly into the harness's `rew` start term `script.ready(emptyStore, environment, commands)`.
+If it were defined by an equation, Maude would compile all equations of the module before rewriting,
+and for a command list containing large modules this compilation is slow (skip-stack-guard-page: 8.8 s → 3.0 s).
+The encoding and order of each command are unchanged, and the SpecTec execution rules and the general Wasm run/modelcheck
+output are not changed.
 
-WAST host memory(spectest `memory`)는 `meminst`의 `BYTES`가 `maude_array`
-필드이므로 `sized-array(크기, empty)`로 만든다(`wast_host_encode.ml`). 모듈의 메모리와
-data instance는 번역된 `allocmem`/`allocdata`가 만든다.
+WAST host memory (spectest `memory`) is built as `sized-array(size, empty)` because `BYTES` of `meminst` is a `maude_array`
+field (`wast_host_encode.ml`). The memory and
+data instances of a module are built by the translated `allocmem`/`allocdata`.
 
-[language]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md
-[type-premises]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/Language.md#premises
-[formal]: https://github.com/Wasm-DSL/spectec/blob/acc6e834ff403c82554d081237f327346190ad96/spectec/doc/semantics/il/README.md
+[language]: https://github.com/WebAssembly/spec/blob/0148af713f24eb68768a2f3fb86608555924d61c/spectec/doc/Language.md
+[type-premises]: https://github.com/WebAssembly/spec/blob/0148af713f24eb68768a2f3fb86608555924d61c/spectec/doc/Language.md#premises
+[formal]: https://github.com/WebAssembly/spec/blob/0148af713f24eb68768a2f3fb86608555924d61c/spectec/doc/semantics/il/
 
-## Source hints와 handwritten 구현
+## Source hints and handwritten implementations
 
-대상은 [고정 Wasm 원문](../spectec/REVISION)과 그 원문에 붙은 hint다.
-hint는 직접 번역하기 어려운 경계를 명시하며, 원문에 없는 계산을 추가하는 허가가 아니다.
+The target is the [fixed Wasm source](../spectec/REVISION) and the hints attached to that source.
+A hint makes explicit a boundary that is hard to translate directly; it is not permission to add a computation that is not in the source.
 
-### 번역 인터페이스
+### Translation interface
 
-| Hint | 역할과 적용 조건 |
+| Hint | Role and applicability conditions |
 | --- | --- |
-| `maude_sort` | source 타입에 별도 Maude sort와 목록 표현을 부여한다. 목록으로 사용하는 sort들은 하나의 subsort chain이어야 한다. 없는 경우 일반 `SpectecTerminals` 표현을 사용한다. |
-| `maude_subsort "T"` | 표시된 source 타입 사이의 subsort 관계. 잘못된 대상·cycle을 거부한다. |
-| `maude_proper "V P"` | 선언된 constructor 집합에서 값 V를 제외한 proper sort P를 만든다. instruction 이름을 하드코딩하지 않는다. |
-| `maude_array` (record 필드) | 단형 record 타입의 이 sequence 필드를 크기 + prelude `ARRAY`(기본값 0)로 저장한다. 필드 접근은 길이·원소·구간 읽기와 구간·전체 쓰기, 생성은 `0^n`·`s 0^n`·목록으로 제한한다. 다른 사용은 거부한다. 원소의 0은 저장하지 않으므로 원소 타입에 수 0이 있어야 한다. |
-| `maude_map` (record 필드, 함수) | 필드: 단형 record 타입의 이 sequence 필드를 크기 + prelude `MAP`(모든 index에 항목)으로 저장한다. 필드 접근은 길이·원소 읽기, 원소·전체 쓰기, 생성은 목록·`e.F s`, record `++`로 제한한다. 함수: 결과가 maude_map 필드이고, 호출은 길이·원소 읽기로만 쓴다. 다른 사용은 거부한다. |
-| `k_heatcool` | 실행 premise가 있는 rule을 heating/cooling으로 번역한다. premise가 같은 relation의 실행 premise 하나뿐인 context rule은 K embedding(K book §5.4.6)으로 `kstate(R, K)`에 context를 열어 두고, 그 밖의 rule은 split/plug(K book §5.4.5)로 연결한다. `~>` relation의 split과 focus 식별은 equation, `~>*` relation의 split은 rule이다. 적용 조건과 가정은 아래 [적용 범위](#k_heatcool-적용-범위)에 있다. |
-| `maude_kind` | 함수의 결과를 partial 화살표 `~>`로 선언한다. 이 hint가 없는 일반 함수는 `->`로 선언한다. |
-| `maude_rule` | rewrite premise가 필요한 함수를 request/rule로 번역한다. source 결과와 가능한 분기를 유지한다. |
-| `inverse $g` | 빠진 인자를 선언된 역함수 g로 구하고 pattern과 forward 결과를 재확인한다. 인자 순서·signature를 검사한다. |
-| `builtin` | 함수 선언을 생성하고 `translator/backend/builtins.maude`의 handwritten 구현에 연결한다. |
-| `maude_compute` | relation을 하나의 plain `~~` 또는 `:` 뒤의 출력을 계산하는 partial 연산으로 번역한다. |
-| `maude_check` | relation을 모든 component를 받는 partial Bool 검사로 번역한다. 성립하면 `true`, 아니면 결과가 없다. |
-| `maude_subsume` (rule) | `maude_compute` relation의 이 rule은 검사 형태다. rule 이름으로 된 별도 Bool 연산(`Ref_ok/sub` → `Ref-ok-sub`)이 되고, 출력까지 알려진 호출은 이 연산을 부른다. 출력을 모르는 호출만 계산 연산을 부른다. |
-| `maude_trans "C" ...` (rule) | `maude_check` relation의 추이 rule `R(.., h1, h2) :- R(.., h1, x), R(.., x, h2)`이다. 중간 x는 나열한 nullary constructor 중에서 고르고, 첫 전제는 이 rule을 뺀 `-step` 연산을 쓴다. |
-| `maude_assume "R" ...` (rule/def) | 나열한 relation의 전제를 번역하지 않는다. 입력이 그 전제를 이미 만족한다는 가정이며, 아래 적용 범위에 근거를 기록한다. 나열한 relation이 전제에 없으면 거부한다. |
+| `maude_sort` | Gives a source type a separate Maude sort and list representation. The sorts used as lists must form one subsort chain. Without it, the general `SpectecTerminals` representation is used. |
+| `maude_subsort "T"` | Subsort relation between the marked source types. A wrong target or a cycle is rejected. |
+| `maude_proper "V P"` | Builds a proper sort P that excludes the value V from the declared constructor set. Instruction names are not hardcoded. |
+| `maude_array` (record field) | Stores this sequence field of a monomorphic record type as a size + prelude `ARRAY` (default value 0). Field access is limited to length, element and range reads, and range and whole writes; construction is limited to `0^n`, `s 0^n`, and lists. Other uses are rejected. 0s in the elements are not stored, so the element type must contain the number 0. This condition is not checked (it holds for Wasm `byte`). |
+| `maude_map` (record field, function) | Field: stores this sequence field of a monomorphic record type as a size + prelude `MAP` (an entry at every index). Field access is limited to length and element reads and element and whole writes; construction is limited to lists, `e.F s`, and record `++`. Function: the result is a maude_map field, and calls are used only for length and element reads. Other uses are rejected. |
+| `k_heatcool` | Translates a rule with an execution premise by heating/cooling. A context rule whose only premise is one execution premise of the same relation keeps the context open in `kstate(R, K)` by K embedding (K book §5.4.6), and other rules are connected by split/plug (K book §5.4.5). For a `~>` relation, split and focus identification are equations; for a `~>*` relation, split is a rule. The applicability conditions and assumptions are in [scope](#k_heatcool-scope) below. |
+| `maude_kind` | Declares the result of a function with the partial arrow `~>`. A general function without this hint is declared with `->`. A function that contains a case premise check is also `~>` ([value construction and type constraints](#value-construction-and-type-constraints)). |
+| `maude_rule` | Translates a function that needs a rewrite premise to a request/rule. It keeps the source result and the possible branches. |
+| `inverse $g` | Obtains a missing argument with the declared inverse function g and rechecks the pattern and the forward result. The argument order and signature are checked. |
+| `builtin` | Generates the function declaration and connects it to the handwritten implementation in `translator/backend/builtins.maude`. |
+| `maude_compute` | Translates the relation to a partial operation that computes the output after one plain `~~` or `:`. |
+| `maude_check` | Translates the relation to a partial Bool check that takes all components. It is `true` if the relation holds, and has no result otherwise. |
+| `maude_subsume` (rule) | This rule of a `maude_compute` relation is in check form. It becomes a separate Bool operation named after the rule (`Ref_ok/sub` → `Ref-ok-sub`), and a call whose output is also known calls this operation. Only a call whose output is unknown calls the compute operation. |
+| `maude_trans "C" ...` (rule) | The transitivity rule `R(.., h1, h2) :- R(.., h1, x), R(.., x, h2)` of a `maude_check` relation. The intermediate x is chosen among the listed nullary constructors, and the first premise uses the `-step` operation that excludes this rule. |
+| `maude_assume "R" ...` (rule/def) | The premises of the listed relations are not translated. This is an assumption that the input already satisfies those premises, and the justification is recorded in the scope below. If a listed relation is not in the premises, it is rejected. |
 
-`show`, `macro`, `desc`, `name`, `prose`, `tabular`는 문서 표현용이며 실행 방식을
-선택하지 않는다. hint의 형식 검사가 통과했다는 것과 handwritten 구현이 정확하다는
-것은 별개의 검사다. source 함수·규칙을 미사용이라는 이유로 삭제하지 않는다.
+`show`, `macro`, `desc`, `name`, `prose`, `tabular` are for document presentation and do not
+select an execution method. That a hint passes the format check and that a handwritten implementation is correct
+are separate checks. Source functions and rules are not deleted because they are unused.
 
-### Wasm에서의 적용 범위
+### Application in Wasm
 
-- `inv_concat_`는 실제 vector 원문의 `(j_1 j_2)*`를 두 원소씩 복원한다.
-  `inv_concatn_`는 storage에서 정한 양수 byte 폭으로 복원한다.
-  임의 길이 목록의 모든 분할을 찾는 역관계로 확장하지 않는다.
-- `$fbits_`의 `inverse` 대상은 `$inv_fbits_`다. 기존의 `$inv_ibits_` 표기는
-  로컬 hint 수정으로 바로잡았다. 함수의 계산식은 변경하지 않는다.
-- 타입 검사 relation은 실행 rule과 함수의 전제에 나타날 때만 hint를 붙인다.
-  `Expand`, `Ref_ok`는 `maude_compute`, `Val_ok`, `Num_ok`, `Vec_ok`,
-  `Reftype_sub`, `Heaptype_sub`, `Deftype_sub`는 `maude_check`다.
-  hint가 없는 validation relation(`Module_ok`, `Externaddr_ok` 등)은 번역하지 않고,
-  그것을 전제로 쓰는 정의는 지원하지 않는다.
+- `inv_concat_` recovers `(j_1 j_2)*` of the actual vector source two elements at a time.
+  `inv_concatn_` recovers it with the positive byte width determined by the storage.
+  It is not extended to an inverse relation that finds all splits of a list of arbitrary length.
+- The `inverse` target of `$fbits_` is `$inv_fbits_`. The previous `$inv_ibits_` notation
+  was corrected by a local hint fix. The computation of the function is not changed.
+- Hints are attached to type-checking relations only when they appear in premises of execution rules and functions.
+  `Expand`, `Ref_ok` are `maude_compute`; `Val_ok`, `Num_ok`, `Vec_ok`,
+  `Reftype_sub`, `Heaptype_sub`, `Deftype_sub` are `maude_check`.
+  Validation relations without a hint (`Module_ok`, `Externaddr_ok`, etc.) are not translated, and
+  definitions that use them as premises are not supported.
 - `Ref_ok/sub`: `maude_subsume`, `maude_assume "Reftype_ok"`.
-  나머지 rule은 ref 생성자마다 하나씩 실제 타입을 계산한다(partial).
-  검사 `Ref-ok-sub(s, ref, rt)`는 그 타입이 `rt`의 subtype인지 본다.
-  `Reftype_sub`가 반사적이고 추이적이므로 `Ref_ok/sub`를 여러 번 중첩한 유도와 같다.
-  `Reftype_ok {} |- rt`는 `rt`가 검증된 모듈의 `$inst_reftype` 결과이거나
-  store instance의 타입이라 닫혀 있고 올바르다는 가정이다(증명하지 않음).
-  닫히지 않은 `_IDX` 타입이 들어오면 원문보다 더 받아들일 수 있다.
+  The other rules each compute the actual type for one ref constructor (partial).
+  The check `Ref-ok-sub(s, ref, rt)` tests whether that type is a subtype of `rt`.
+  Since `Reftype_sub` is reflexive and transitive, this is the same as a derivation that nests `Ref_ok/sub` several times.
+  `Reftype_ok {} |- rt` is the assumption that `rt` is a `$inst_reftype` result of a validated module or
+  the type of a store instance, and is therefore closed and well-formed (not proved).
+  If an unclosed `_IDX` type comes in, it may accept more than the source.
 - `Heaptype_sub/trans`: `maude_trans "ANY" "EQ" "I31" "STRUCT" "ARRAY" "FUNC" "EXN" "EXTERN"`,
-  `maude_assume "Heaptype_ok"`. 후보는 모두 `Heaptype_ok/abs`로 OK이므로
-  `Heaptype_ok` 생략은 근사가 아니다. bottom 타입(`NONE`, `NOFUNC`, `NOEXN`,
-  `NOEXTERN`, `BOT`)을 후보에 넣으면 `NOFUNC <: ANY` 같은 거짓 질의가
-  `NONE`/`NOFUNC` 사이를 순환한다. bottom을 거치는 사슬은 none/bot rule이 직접 다룬다.
-  deftype 중간값은 `Deftype_sub/super`의 재귀가 다룬다. 이 완전성은 C = {}와
-  닫힌 타입에 대한 귀납 논증(semantic review, 미증명)에 근거한다.
-  추상 heap type 169쌍 전부를 원문 정의로 계산한 값과 비교해 일치와 종료를 확인했다.
-- 실행 중 질의는 C = {}이므로 `_IDX`, `REC` rule은 번역되지만 적용되지 않는다.
-- `meminst`, `datainst`의 `BYTES` 필드: `maude_array`. 원문은 메모리(1 page = 65,536칸)와
-  data segment 바이트를 목록 `byte*`로 둔다. 목록에서는 범위 검사 `|$mem(z,x).BYTES|`가
-  매번 칸 수만큼 세고, 메모리 생성이 칸마다 원소를 만든다(Maude profile에서 확인).
-  원문의 사용은 길이, 원소·구간 읽기, 구간 쓰기(`$with_mem`), 전체 쓰기(`$with_data`),
-  `0^n` 생성(`allocmem`), 목록 생성(`allocdata`), 필드 pattern 후 `b* 0^n`(`growmem`)이며
-  모두 위 표의 형태다. byte의 0은 `%_byte(0)` 형태로 기본값과 대응한다.
-- `store`의 `FUNCS`, `MEMS`, `tableinst`의 `REFS` 필드와 `$funcinst`, `$meminst`: `maude_map`.
-  원문의 `$funcinst(z)[a]`, `$mem(z,x)`, `|$table(z,x).REFS|`는 목록에서 a칸·크기만큼 세며,
-  store에는 스크립트의 모든 모듈 함수·메모리가 쌓인다(Maude profile: return_call*,
-  call_indirect에서 rewrite의 약 40%, memory_copy(모듈 33개)에서 37%).
-  원문의 사용은 원소·길이 읽기, 원소 쓰기(`$with_table`, `$with_meminst`), 원소 안쪽 쓰기
-  (`$with_mem`), 전체 쓰기(`$with_tableinst`의 tableinst 값), 목록 생성(`alloctable`), 필드 pattern 후 `r'* r^n`(`growtable`),
-  store `++`(`alloc*`)이며 모두 위 표의 형태다. 원소 타입(`funcinst`, `ref`)에 기본값이 없어
-  ARRAY가 아니라 MAP을 쓴다.
+  `maude_assume "Heaptype_ok"`. All candidates are OK by `Heaptype_ok/abs`, so
+  omitting `Heaptype_ok` is not an approximation. If bottom types (`NONE`, `NOFUNC`, `NOEXN`,
+  `NOEXTERN`, `BOT`) are added to the candidates, a false query such as `NOFUNC <: ANY`
+  cycles between `NONE`/`NOFUNC`. Chains through bottom are handled directly by the none/bot rules.
+  Deftype intermediate values are handled by the recursion of `Deftype_sub/super`. This completeness rests on an inductive argument
+  for C = {} and closed types (semantic review, not proved).
+  For all 169 pairs of abstract heap types, the results were compared with values computed from the source definition, confirming agreement and termination.
+- Queries during execution have C = {}, so the `_IDX`, `REC` rules are translated but do not apply.
+- `BYTES` fields of `meminst`, `datainst`: `maude_array`. The source keeps memory (1 page = 65,536 cells) and
+  data segment bytes as the list `byte*`. With a list, the range check `|$mem(z,x).BYTES|` counts
+  the cells every time, and memory creation builds an element per cell (confirmed in the Maude profile).
+  The source uses are length, element and range reads, range write (`$with_mem`), whole write (`$with_data`),
+  `0^n` construction (`allocmem`), list construction (`allocdata`), and `b* 0^n` after a field pattern (`growmem`),
+  all of which are forms in the table above. A byte 0 corresponds to the default value in the form `%_byte(0)`.
+- `FUNCS`, `MEMS` fields of `store`, the `REFS` field of `tableinst`, and `$funcinst`, `$meminst`: `maude_map`.
+  The source `$funcinst(z)[a]`, `$mem(z,x)`, `|$table(z,x).REFS|` count up to a cells or the size in a list,
+  and the store accumulates the functions and memories of all modules of the script (Maude profile: about 40% of rewrites
+  in return_call*, call_indirect; 37% in memory_copy (33 modules)).
+  The source uses are element and length reads, element writes (`$with_table`, `$with_meminst`), writes inside an element
+  (`$with_mem`), whole write (the tableinst value of `$with_tableinst`), list construction (`alloctable`), `r'* r^n` after a field pattern (`growtable`),
+  and store `++` (`alloc*`), all of which are forms in the table above. The element types (`funcinst`, `ref`) have no default value, so
+  MAP is used instead of ARRAY.
 
-### 숫자 builtin과 profile
+### Numeric builtins and profile
 
-Wasm f32/f64·bits·bytes·rounding은 원문 `hint(builtin)` 구현의 책임이다.
-IL Real 연산의 번역 지원과 Wasm 부동소수점 builtin 지원은 구분한다.
-현재 Wasm 입력에 없는 IL Real 연산은 지원하지 않는다. 이것이 Wasm f32/f64
-builtin 지원을 제거한다는 뜻은 아니다.
-숫자 builtin은 해당 revision의 Wasm numeric 정의와 비교한다.
+Wasm f32/f64, bits, bytes, and rounding are the responsibility of the source `hint(builtin)` implementations.
+Translation support for IL Real operations and support for Wasm floating-point builtins are distinguished.
+IL Real operations that are not in the current Wasm input are not supported. This does not mean that Wasm f32/f64
+builtin support is removed.
+Numeric builtins are compared with the Wasm numeric definitions of the corresponding revision.
 
-현재 profile은 `ND=false`, relaxed 선택 0인 Wasm DET이다. 산술 NaN 생성과
-부호/payload를 보존하는 negate·abs·copysign·reinterpret를 구분한다.
-memory/table grow의 자원 실패 선택은 남는다. DET의 결과를 full profile의 모든
-NaN·relaxed 선택에 대한 결과로 일반화하지 않는다.
+The current profile is Wasm DET with `ND=false` and relaxed choice 0. Arithmetic NaN generation is distinguished from
+negate, abs, copysign, and reinterpret, which preserve sign/payload.
+The resource-failure choice of memory/table grow remains. DET results are not generalized to results for all
+NaN and relaxed choices of the full profile.
 
-`otherwise`는 source의 앞선 적용 가능한 규칙이 없다는 조건을 보존해야 한다.
-실행 `RelD`의 `ElsePr`은 먼저 선행 입력 패턴의 변수를 현재 입력에 정렬하고,
-이미 알려진 순수 조건의 complement를 직접 출력한다. relation parameter는
-고정하며, 반복 sequence 변수의 여러 matching 가능성을 임의로 선택하지 않는다.
-`Prem.translate_rulepr`가 Bool 조건으로 번역한 relation 호출은 `P =/= true`로,
-이미 알려진 결과와의 equation 조건은 `left =/= right`로 직접 부정한다.
-현재 caller에서 보장하지 못하는 선행 타입 가드나 새 변수 binding, 입력 패턴의
-다른 matching 가능성이 남으면 기존 enabled helper를 사용한다. rewrite 조건은
-equational enabled helper로 번역할 수 없으며 기존 진단을 유지한다.
+`otherwise` must preserve the condition that no earlier applicable rule of the source exists.
+`ElsePr` of an execution `RelD` first aligns the variables of the preceding input pattern with the current input, and
+directly outputs the complement of the already known pure conditions. Relation parameters are
+fixed, and the multiple matching possibilities of iterated sequence variables are not chosen arbitrarily.
+A relation call that `Prem.translate_rulepr` translated to a Bool condition is negated directly as `P =/= true`,
+and an equation condition with an already known result as `left =/= right`.
+If a preceding type guard or new variable binding that the current caller cannot guarantee, or another matching
+possibility of the input pattern, remains, the existing enabled helper is used. A rewrite condition cannot be translated
+to an equational enabled helper, and the existing diagnostic is kept.
 
-입력의 겹침은 source `CaseE`·`TupE`·`ListE`·`CatE`·`IterE`와 선언된 타입의
-constructor를 재귀적으로 비교한다. 원소 타입에 없는 constructor를 필수로
-포함하는 sequence는 해당 입력과 겹치지 않는다. 닫힌 constructor 집합을
-확인하지 못하는 type parameter·재귀 alias는 보수적으로 검사 대상에 남긴다.
-규칙·명령 이름으로 분기하지 않는다.
+Input overlap is decided by recursively comparing source `CaseE`·`TupE`·`ListE`·`CatE`·`IterE` and the
+constructors of the declared types. A sequence that necessarily contains a constructor not in the element type
+does not overlap that input. Type parameters and recursive aliases whose closed constructor set cannot be
+confirmed are conservatively left in the check.
+No branching is done on rule or instruction names.
 
-선행 `MatchCond`와 현재 fallback의 순수 binding이 같은 계산 결과를 같은
-구조로 분해하면 출력 변수도 정렬하여 재사용한다. associative spine에 sequence
-변수가 여러 개 있어 분해가 유일하지 않으면 이 재사용을 하지 않는다. 실행
-premise 뒤에서 얻는 값은 앞선 otherwise 검사로 가져오지 않는다. 앞선
-otherwise의 helper 실패 조건도 현재 binding으로 직접 검사할 수 있는 경우,
-그 caller 영역에서 이미 구한 동일한 direct 실패 조건으로 대체한다.
+If a preceding `MatchCond` and a pure binding of the current fallback decompose the same computed result with the same
+structure, the output variables are also aligned and reused. If the decomposition is not unique because an associative spine has several sequence
+variables, this reuse is not done. A value obtained after an execution
+premise is not brought into an earlier otherwise check. When the helper failure condition of an earlier
+otherwise can also be checked directly with the current binding, it is replaced by the identical direct failure condition
+already obtained in that caller's scope.
 
-현재 Wasm source의 실행 `ElsePr` 35개는 입력값으로 직접 검사하는 31개,
-fallback binding을 재사용하는 2개(`array.copy-gt`, `array.init_data-num`),
-helper를 사용하는 2개(`throw_ref-handler-next`, `array.init_data-zero`)로
-번역한다. 마지막 두 source 규칙이 참조하는 helper 함수는 catch 분기 4개와
-array 범위 검사 1개로 총 5개다. 이는 source rule 하나를 실행 rule 하나로
-유지하는 방법의 결과이며, 모든 규칙의 분할까지 고려한 helper 불가피성 주장은 아니다.
-helper의 `true` equation은 선행 규칙의 입력 패턴을 왼쪽에 직접 사용하고,
-그 규칙의 나머지 조건을 검사한다. 일반 입력을 받는 `false [owise]` equation은
-입력 패턴이나 조건이 맞지 않은 경우를 처리한다.
+The 35 execution `ElsePr`s of the current Wasm source are translated as 31 checked directly on input values,
+2 that reuse the fallback binding (`array.copy-gt`, `array.init_data-num`),
+and 2 that use a helper (`throw_ref-handler-next`, `array.init_data-zero`).
+The helper functions referenced by the last two source rules are 5 in total: 4 catch branches and
+1 array range check. This is the result of the method that keeps one source rule as one execution rule,
+and it is not a claim that the helpers are unavoidable even when splitting all rules is considered.
+The `true` equation of a helper uses the input pattern of the preceding rule directly on the left-hand side and
+checks the remaining conditions of that rule. A `false [owise]` equation that takes a general input handles
+the cases where the input pattern or conditions do not match.
 
-값 equality는 `==`와 `=/=`로 반전한다. numeric 비교의 반전과 Bool De Morgan은
-total한 비교에만 적용한다. 부분 계산이 남을 수 있는 비교·논리식은 전체
-`P =/= true`로 표현하여, 미평가 조건에도 `false [owise]`를 반환하던 helper의
-적용 실패를 보존한다. helper의 자동 타입 검사는 모든 caller의 정렬된 입력에서
-같은 검사가 보장될 때만 제거하고, caller의 실행 rule에서 먼저 검사한다.
-context의 내부 상태는 source 상태와 구분한다. 검색 결과 일치는 임의 LTL 속성의
-보존 증명이 아니며, 현재 경계는 [검증과 모델체킹의 경계](#검증과-모델체킹의-경계)에 기록한다.
+Value equality is inverted between `==` and `=/=`. Inversion of numeric comparisons and Bool De Morgan are applied only to
+total comparisons. Comparisons and logic expressions in which a partial computation may remain are expressed as a whole
+`P =/= true`, which preserves the application failure of the helper that returned `false [owise]` even for unevaluated conditions.
+The automatic type check of a helper is removed only when the same check is guaranteed on the aligned inputs of all callers,
+and it is checked first in the caller's execution rule.
+The internal state of a context is distinguished from the source state. Agreement of search results is not a
+preservation proof for arbitrary LTL properties; the current limits are recorded in [limits of verification and model checking](#limits-of-verification-and-model-checking).
 
-### k_heatcool 적용 범위
+### k_heatcool scope
 
-hint는 인자 없이 사용한다(이전 이름: `rl_embedding`, `k_embedding`, `maude_context`).
-번역기는 hint가 붙은 rule을 AST 구조로 두 가지로 나눈다. relation·constructor의 Wasm 이름으로 나누지 않는다.
+The hint is used without arguments (former names: `rl_embedding`, `k_embedding`, `maude_context`).
+The translator divides hinted rules into two kinds by AST structure. It does not divide them by the Wasm names of relations or constructors.
 
-- **context rule**: premise가 같은 relation의 실행 premise 하나뿐인 rule(`R: C[x] ~> C'[x']  -- R: x ~> x'`).
-  Wasm 3.0에서는 `Step/ctxt-label`, `Step/ctxt-handler`, `Step/ctxt-frame`이다.
-  K embedding(K book §5.4.6)이다. heating과 cooling이 모두 equation이고, context는 안쪽이
-  여러 step을 도는 동안 `kstate(R, K)`의 `K`에 열린 채로 남는다.
-- **split rule**: 그 밖의 hinted rule. Wasm 3.0에서는 `Step/pure`, `Step/read`, `Step/ctxt-instrs`,
-  `Steps/trans`, `Eval_expr`이다. 실행 premise에서 요청과 hole로 나누고(split), 결과를 결론으로
-  되돌린다(plug, equation).
+- **context rule**: a rule whose only premise is one execution premise of the same relation (`R: C[x] ~> C'[x']  -- R: x ~> x'`).
+  In Wasm 3.0 these are `Step/ctxt-label`, `Step/ctxt-handler`, `Step/ctxt-frame`.
+  It is K embedding (K book §5.4.6). Heating and cooling are both equations, and the context stays open in `K` of
+  `kstate(R, K)` while the inside takes several steps.
+- **split rule**: the other hinted rules. In Wasm 3.0 these are `Step/pure`, `Step/read`, `Step/ctxt-instrs`,
+  `Steps/trans`, `Eval_expr`. The execution premise is divided into a request and a hole (split), and the result is returned
+  to the conclusion (plug, equation).
 
-split을 equation으로 낼지 rule로 낼지는 relation의 화살표로 정한다.
+Whether split is emitted as an equation or a rule is decided by the arrow of the relation.
 
-- `~>` relation(`Step`): split과 focus 식별(`identifyFocus`)이 equation이다. configuration을 나누기만
-  하고 실행하지 않으므로 상태를 만들지 않는다. 한 step은 안쪽 relation의 rule 하나다.
-- `~>*` relation(`Steps`, `Eval_expr`): split이 rule이다. `Steps/refl`과 `Steps/trans`가 같은 요청에
-  모두 적용되는 실제 선택이기 때문이다. 이 relation들은 초기화의 rewrite 조건 안에서만 쓰인다.
+- `~>` relation (`Step`): split and focus identification (`identifyFocus`) are equations. They only divide the configuration
+  and do not execute, so they do not create states. One step is one rule of the inner relation.
+- `~>*` relation (`Steps`, `Eval_expr`): split is a rule, because `Steps/refl` and `Steps/trans` both apply to the same request,
+  which is an actual choice. These relations are used only inside the rewrite conditions of initialization.
 
-실제 source와 생성 결과는 아래 [8개 rule의 변환 예시](#k_heatcool-8개-rule의-변환-예시)에 있다.
+The actual source and generated output are in [translation examples for the 8 rules](#k_heatcool-translation-examples-for-the-8-rules) below.
 
-split rule은 실행 relation의 RuleD에 적용하며 직접적인 실행 RulePr가 하나 이상 필요하다.
-실행 premise마다 이전 binding 중 결과 패턴·남은 조건·결론에 필요한 변수만 hole에 저장한다.
-일반 조건과 출력 패턴 검사는 해당 실행의 앞뒤 순서를 유지한다.
-sequence-result relation으로 연결하는 단일 premise에서는 대상 입력 패턴으로 식별 helper를 생성한다.
-현재 source rule 이름으로 `identifyPure`와 `identifyRead`가 생성된다.
-hinted rule의 ElsePr·IterPr·NegPr와 rewrite-backed expression은 현재 Unsupported다.
-요청 sort와 반환 sort는 구분하고, hole 인자에는 `[frozen (2)]`를 부여해 rule rewriting을 막는다.
+A split rule applies to a RuleD of an execution relation and needs at least one direct execution RulePr.
+For each execution premise, only the variables among the earlier bindings that the result pattern, the remaining conditions, and the conclusion need are stored in the hole.
+General conditions and output pattern checks keep their order before and after that execution.
+For a single premise connected through a sequence-result relation, an identification helper is generated from the target input pattern.
+From the current source rule names, `identifyPure` and `identifyRead` are generated.
+ElsePr and IterPr of a hinted rule and rewrite-backed expressions are currently Unsupported.
+Request sorts and return sorts are distinguished, and hole arguments get `[frozen (2)]` to prevent rule rewriting.
 
-**equation split의 조건과 근거.** equation은 한 번 고르면 되돌아가지 않으므로 다음을 지킨다.
+**Conditions and justification of equation split.** An equation, once chosen, does not backtrack, so the following must hold.
 
-- 식별 helper는 대상 rule의 입력 패턴과, 입력 변수만 쓰는 equational premise(예: if-true의
-  `c =/= 0`)를 함께 검사한다. 어떤 rule도 실행할 수 없는 입력(끝에 남은 `TRAP` 하나 등)은
-  split하지 않고 `Step(c)`로 남는다. 길이가 정해지지 않은 pattern의 rule(trap-instrs 등, 아래)은
-  식별 helper에 넣지 않는다. 한 focus에 pure·read·Step rule이 함께 맞지
-  않아야 한다. Wasm 3.0에서 세 쪽 rule의 trigger 명령이 겹치지 않음을 생성 패턴으로 확인했다(증명 아님).
-- 식별 helper는 `identifyFocus`와 같은 범위 결정 premise도 검사한다(`val^m`의 m을 정하는 block
-  타입 등). 없으면 `c1 c2 BLOCK`(값을 받지 않는 block)을 전체로 자르는 read split과 `BLOCK`만 자르는
-  focus split이 둘 다 맞아, 같은 항이 진행 가능한 상태와 멈춘 상태 둘과 같아진다.
+- The identification helper checks the input pattern of the target rule together with the equational premises that use only input variables (e.g.
+  `c =/= 0` of if-true). An input on which no rule can execute (a single `TRAP` left at the end, etc.)
+  is not split and remains `Step(c)`. Rules with patterns whose length is not determined (trap-instrs etc., below)
+  are not put into the identification helper. pure, read, and Step rules must not match
+  the same focus together. In Wasm 3.0, it was confirmed from the generated patterns that the trigger instructions of the three kinds of rules do not overlap (not a proof).
+- The identification helper also checks the range-deciding premises, as `identifyFocus` does (the block
+  type that decides m of `val^m`, etc.). Without them, both the read split that cuts `c1 c2 BLOCK` (a block that takes no values) as a whole
+  and the focus split that cuts only `BLOCK` match, and the same term becomes equal to both a state that can progress and a stuck state.
 
   ```maude
   ceq identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) = true
     if M-3 := size(VAL*) /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
     /\ M-3 = size(T_1*) .
   ```
-- equation은 같음을 말하므로, 입력마다 자르는 방법이 하나여야 한다(confluence). focus pattern의
-  operand나 뒤쪽에 길이가 정해지지 않은 sequence(`val*`, 또는 rule의 다른 곳에 n이 없는 `val^n`)가
-  있으면 sequence context의 앞뒤와 겹쳐 자르는 방법이 여러 개이고, 각각 다른 source 다음 상태다.
-  예: trap-instrs(`val* TRAP instr* ~> TRAP`)로 `c1 c2 TRAP NOP`의 다음 상태는 5개
-  (`TRAP`, `TRAP NOP`, `c1 TRAP NOP`, `c1 TRAP`, `c1 c2 TRAP`)다. 이런 pattern은 focus·식별 equation을
-  만들지 않고, bridge를 거친 그 rule과 sequence context 안의 그 rule을 각각 rule 하나로 낸다
-  (`heatcool.ml:absorbed_rules`). rule은 매칭을 모두 쓰므로 다음 상태가 source와 같다.
+- An equation states equality, so there must be one way to cut each input (confluence). If the operands or the tail of a focus pattern
+  contain a sequence whose length is not determined (`val*`, or `val^n` where n does not occur elsewhere in the rule),
+  it overlaps the front and back of the sequence context, so there are several ways to cut, and each is a different source next state.
+  Example: with trap-instrs (`val* TRAP instr* ~> TRAP`), `c1 c2 TRAP NOP` has 5 next states
+  (`TRAP`, `TRAP NOP`, `c1 TRAP NOP`, `c1 TRAP`, `c1 c2 TRAP`). For such a pattern, no focus or identification equation is
+  generated; the rule through the bridge and the rule inside the sequence context are each emitted as one rule
+  (`heatcool.ml:absorbed_rules`). A rule uses all matches, so the next states are the same as in the source.
 
   ```maude
   crl [Step-pure-trap-instrs] : Step(Z ; (VAL* (TRAP INSTR*))) => Z ; TRAP
@@ -521,26 +559,26 @@ hinted rule의 ElsePr·IterPr·NegPr와 rewrite-backed expression은 현재 Unsu
     if _or_(PREFIX =/= nil, POSTFIX =/= nil) /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
   ```
 
-  판단은 rule 모양으로만 하며, Wasm 3.0에서 해당되는 것은 trap-instrs와 throw_ref-instrs다.
-  `val^n`은 n이 rule의 다른 곳에도 나오면 길이가 정해진다고 본다(block의 블록 타입, struct.new의
-  필드 수 등; 번역기는 n이 그 값으로 정해지는지까지는 검사하지 않는다).
-  근거: `WasmSuiteTest/spec2maude-results/20261029-trap-rule`.
-- 모델체킹 상태의 configuration은 split된 요청을 담을 수 있다. configuration을 보는 명제는
-  `cool-all(unheat(R), K)`로 읽어야 한다(현재 명제 `returned`는 `finished(...)`만 본다).
-- 실행 rule이 상태에 직접 적용되므로, 결과가 계산식인 실행 rule은 결과를 결과 sort 변수에 `:=`로
-  묶는다(`reld.ml:execution_statement`). 범위 밖 store처럼 부분 함수가 정의되지 않으면 그 rule은
-  적용되지 않는다. source에서도 결과가 정의되지 않는 rule은 step이 아니다.
+  The decision is made only from the rule shape; in Wasm 3.0 the rules concerned are trap-instrs and throw_ref-instrs.
+  `val^n` is regarded as having a determined length if n also occurs elsewhere in the rule (the block type of block, the number of
+  fields of struct.new, etc.; the translator does not check whether n is actually determined by that value).
+  Evidence: experiment record outside the repository (2026-10-29 trap-rule, not included in the artifact).
+- A configuration of a model-checking state may contain a split request. A proposition that inspects the configuration
+  must read it as `cool-all(unheat(R), K)` (the current proposition `returned` only inspects `finished(...)`).
+- Execution rules apply directly to the state, so an execution rule whose result is a computed expression binds the result to a result-sort variable with `:=`
+  (`reld.ml:execution_statement`). If a partial function is undefined, as for an out-of-range store, that rule
+  does not apply. In the source too, a rule whose result is undefined is not a step.
 
-context rule의 적용 조건은 다음과 같다. 맞지 않으면 진단과 함께 Unsupported다.
+The applicability conditions of a context rule are as follows. If they do not hold, it is Unsupported with a diagnostic.
 
-- context가 안쪽 step 동안 바뀌지 않는다: 결론 출력에 premise 입력을 다시 넣으면 결론 입력이 된다
-  (`C'[x]`가 `C[x]`). frame처럼 상태 일부를 안쪽과 바꾸는 것은 허용한다.
-- 결론 입력의 sequence가 context 원소 하나 `E`이고, premise는 `E`의 인자인 sequence 변수 `x`를 실행한다.
-- 같은 relation에 split rule의 sequence context(`val* instr* instr_1*`)가 정확히 하나 있고,
-  그 rule에 `val* =/= eps \/ instr_1* =/= eps` 조건이 있다.
-- `E`를 소비하는 rule이 하나 이상 있다(아래 closed body).
+- The context does not change during the inner steps: putting the premise input back into the conclusion output gives the conclusion input
+  (`C'[x]` is `C[x]`). Exchanging part of the state with the inside, as frame does, is allowed.
+- The sequence of the conclusion input is one context element `E`, and the premise executes the sequence variable `x` that is an argument of `E`.
+- The same relation has exactly one sequence context (`val* instr* instr_1*`) of a split rule, and
+  that rule has the condition `val* =/= eps \/ instr_1* =/= eps`.
+- There is at least one rule that consumes `E` (closed body below).
 
-생성 결과(`R`의 rule 이름을 `R-r`이라 하면):
+Generated output (where the rule name of `R` is `R-r`):
 
 ```maude
 kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K)
@@ -548,47 +586,47 @@ kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K)
 kstate(C[x], K) = kstate(x, hole-R-r(..) K)  if closed-R-r(x) = false .   --- heating
 kstate(x', hole-R-r(..) K) = kstate(C'[x'], K)  if closed-R-r(x') = true .  --- cooling
 kstate(z ; s, hole(PREFIX, POSTFIX) K) = kstate(z ; PREFIX s POSTFIX, K) [owise] .  --- instrs cooling
-kstate(c, K) = kstate(Step(c), K)  if plug-first(K) = false [owise] .       --- 요청으로 감싸기
-cool-all(c, K)                                                               --- 모든 hole을 다시 붙인 configuration
-unheat(r)                                                                    --- split된 요청이 나타내는 configuration
+kstate(c, K) = kstate(Step(c), K)  if plug-first(K) = false [owise] .       --- wrap as a request
+cool-all(c, K)                                                               --- the configuration with all holes plugged back
+unheat(r)                                                                    --- the configuration that a split request denotes
 ```
 
-closed body는 sequence context의 focus pattern 중 trigger가 `E`의 constructor인 것에서
-`x` 자리의 패턴이다. 즉 `E` 자체를 소비하는 rule(label-vals, br-label, return-frame 등)의
-body 모양이며, Wasm 이름이 아니라 source rule에서 뽑는다. instrs cooling은 heating 조건이
-맞지 않을 때만 적용되므로 `[owise]`다. context equation이 더 적용되지 않고 기다리는 sequence
-hole도 없으면, configuration을 relation의 요청으로 감싼다. 그러면 split equation이 focus를 찾고,
-relation의 rule 하나가 그 자리에서 한 step을 실행한다.
+A closed body is the pattern at the position of `x` in those focus patterns of the sequence context whose trigger is the constructor of `E`.
+That is, it is the body shape of the rules that consume `E` itself (label-vals, br-label, return-frame, etc.), and it is extracted
+from the source rules, not from Wasm names. Instrs cooling applies only when the heating condition
+does not hold, so it is `[owise]`. When no context equation applies any more and there is no sequence
+hole waiting either, the configuration is wrapped as a request of the relation. Then the split equations find the focus, and
+one rule of the relation executes one step there.
 
-**가정.** closed body에는 같은 relation의 Step이 단독으로 적용되지 않는다고 가정한다.
-이 가정이 깨지면 K embedding은 그 body를 열지 않으므로 안쪽 step 가지를 잃는다.
-번역기는 이 가정을 검사하지 않는다. Wasm 3.0에서는 rule.maude의 해당 rule들과 대조해 확인했다
-(br/return/return_call_ref에는 context 밖 rule이 없고, trap-instrs와 throw_ref-instrs는 앞뒤에 다른
-명령이 있을 때만 적용된다).
+**Applicability condition.** A Step of the same relation must not apply by itself to a closed body.
+Otherwise K embedding does not open that body, so it loses the inner step branches. The translator does not
+check this; it was confirmed to hold for the Step rules of Wasm 3.0 (`translator/generated/output.maude`):
+br/return/return_call_ref have no rules outside a context, and trap-instrs and throw_ref-instrs apply only when there are
+other instructions before or after.
 
-**상태 대응.** `cool-all(unheat(R), K)`가 source configuration이다. 실행 상태 안에서 rule이 한 번
-적용되는 것이 source Step 한 번이고, heating·cooling·split·focus는 equation이라 상태를 만들지 않는다
-(K book Theorem 13, step-for-step correspondence). fib(10)에서 계산 rule 적용 수(2,036)가 이전
-rewrite-condition driver와 같고, growbuf(n=128)의 도달 상태 수(3,008)·최종 상태·LTL 반례가 같음을
-확인했다(`WasmSuiteTest/spec2maude-results/20261029-step2-heateq`). 유한 입력에 대한 확인이며 증명이 아니다.
+**State correspondence.** `cool-all(unheat(R), K)` is the source configuration. One application of a rule inside the execution state
+is one source Step, and heating, cooling, split, and focus are equations, so they do not create states
+(K book Theorem 13, step-for-step correspondence). It was confirmed that for fib(10) the number of compute rule applications (2,036) is the same as
+with the earlier rewrite-condition driver, and that for growbuf(n=128) the number of reachable states (3,008), the final states, and the LTL counterexample are the same
+(experiment record outside the repository, 2026-10-29 step2-heateq). These are checks on finite inputs, not a proof.
 
-`Steps`와 `Eval_expr`는 driver 없이 `Step`을 직접 부른다. `Step`에는 context rule로
-들어가는 rule이 없으므로, 이 경로는 LABEL_/HANDLER_/FRAME_가 없는 식에만 맞다. 이들이 평가하는
-상수식에는 그런 명령이 없다.
+`Steps` and `Eval_expr` call `Step` directly without a driver. `Step` has no rule that goes into a context
+rule, so this path is valid only for expressions without LABEL_/HANDLER_/FRAME_. The
+constant expressions they evaluate contain no such instructions.
 
-## k_heatcool: 8개 rule의 변환 예시
+## k_heatcool: translation examples for the 8 rules
 
-아래는 현재 source와 생성된 Maude 문장이다. 보조 선언과 식별 규칙 전체는 생략했다.
+Below are the current source and the generated Maude statements. Auxiliary declarations and the full identification rules are omitted.
 
-### 번역 계약과 구조
+### Translation contract and structure
 
-`RuleD`의 실제 실행 `RulePr`를 식별하고, 기존 `Prem` 번역 결과를 사용한다. 실행 조건을 만나면 요청과 hole을 생성하고 남은 조건을 재귀적으로 번역한다. hole에는 이미 binding된 변수 중 내부 결과 패턴·나머지 조건·최종 결론에서 필요한 것만 저장한다. 모든 조건을 처리하면 원래 결론으로 plug한다. 일반 조건을 다음 실행 premise 앞뒤로 넘기지 않는다.
+The actual execution `RulePr` of a `RuleD` is identified, and the existing `Prem` translation result is used. When an execution condition is met, a request and a hole are generated and the remaining conditions are translated recursively. The hole stores only those already bound variables that the inner result pattern, the remaining conditions, and the final conclusion need. When all conditions are processed, the result is plugged into the original conclusion. General conditions are not moved across the next execution premise.
 
-LABEL, FRAME 등의 이름으로 분기하지 않으며, 식별 helper와 hole 이름은 source rule에서 생성한다. 별도 evaluator나 범용 premise 프레임워크를 추가하지 않는다.
+No branching is done on names such as LABEL or FRAME; identification helper and hole names are generated from the source rule. No separate evaluator or general premise framework is added.
 
-실행 요청과 반환 결과는 sort로 구분한다. plug는 반환 결과 패턴에만 적용된다. `Eval_expr`는 `VAL* : ValList`가 이 역할을 하므로 별도 typecheck를 삽입하지 않는다. `_~>_`의 hole 인자는 `[frozen (2)]`로 rule rewriting을 막는다. equation 정규화까지 금지한다는 뜻은 아니다.
+Execution requests and return results are distinguished by sort. Plug applies only to return result patterns. In `Eval_expr`, `VAL* : ValList` plays this role, so no separate typecheck is inserted. The hole argument of `_~>_` prevents rule rewriting with `[frozen (2)]`. This does not mean that equational normalization is also prohibited.
 
-실행할 rule이 없는 요청은 그 모양으로 멈춘다. driver는 `kstate(Step(z ; vals), none)`를 완료로 본다. raw 요청의 search/LTL을 source 상태의 search/LTL과 동일시하지 않는다. 유한 입력과 제한된 탐색 깊이의 결과 검사만으로 전체 의미 보존을 주장하지 않는다.
+A request with no rule to execute stops in that shape. The driver regards `kstate(Step(z ; vals), none)` as completion. Search/LTL on raw requests is not identified with search/LTL on source states. Preservation of the whole meaning is not claimed from result checks on finite inputs and bounded search depth alone.
 
 ### 1. Step/pure (split, equation)
 
@@ -609,7 +647,7 @@ eq unheat(Step-pure(INSTR*) ~> hole-Step-pure(Z)) = Z ; INSTR* .
 eq identifyPure(NOP) = true .
 ```
 
-`identifyPure(INSTR*)`로 입력 후보를 확인한다. 내부 instruction 결과에 원래 상태 Z를 붙인다.
+`identifyPure(INSTR*)` checks the input candidate. The original state Z is attached to the inner instruction result.
 
 ### 2. Step/read (split, equation)
 
@@ -628,7 +666,7 @@ eq INSTR'* ~> hole-Step-read(Z) = Z ; INSTR'* .
 eq unheat(Step-read(Z ; INSTR*) ~> hole-Step-read(Z)) = Z ; INSTR* .
 ```
 
-`identifyRead(Z ; INSTR*)`로 입력 후보를 확인한다. 읽기 실행은 instruction 목록을 반환하므로 원래 상태 Z를 붙인다.
+`identifyRead(Z ; INSTR*)` checks the input candidate. A read execution returns an instruction list, so the original state Z is attached.
 
 ### 3. Step/ctxt-instrs (split, equation)
 
@@ -650,9 +688,9 @@ eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 eq unheat(R-3 ~> hole(PREFIX, POSTFIX)) = unheat(R-3) ~> hole(PREFIX, POSTFIX) .
 ```
 
-`identifyFocus` 식도 equation이다(`eq`/`ceq identifyFocus(...) = { ... }`). source의 nonempty 조건은 guard로 남는다.
-매 step 자르는 자리가 바뀌므로(앞 명령의 결과가 다음 명령의 operand) 열어 두지 않는다.
-context rule(ctxt-label/handler/frame)에는 focus pattern을 만들지 않는다.
+The `identifyFocus` statements are also equations (`eq`/`ceq identifyFocus(...) = { ... }`). The nonempty condition of the source remains as a guard.
+The cut position changes at every step (the result of an earlier instruction is an operand of the next instruction), so it is not kept open.
+No focus pattern is generated for context rules (ctxt-label/handler/frame).
 
 ### 4. Step/ctxt-label (context rule)
 
@@ -686,8 +724,8 @@ eq closed-Step-ctxt-label(REF.EXN-ADDR(A) THROW-REF) = true .
 eq closed-Step-ctxt-label(INSTR-3) = false [owise] .
 ```
 
-closed body는 label-vals, br-label-zero, br-label-succ, return-label, trap-label,
-return_call_ref-label, throw_ref-label의 body다.
+The closed bodies are the bodies of label-vals, br-label-zero, br-label-succ, return-label, trap-label,
+return_call_ref-label, and throw_ref-label.
 
 ### 5. Step/ctxt-handler (context rule)
 
@@ -698,8 +736,8 @@ rule Step/ctxt-handler:
   hint(k_heatcool)
 ```
 
-ctxt-label과 같은 모양이다(hole `hole-Step-ctxt-handler(CATCH*, N-3)`). closed body는 br-handler,
-return-handler, handler-vals, trap-handler, return_call_ref-handler, throw_ref-handler-*의 body다.
+It has the same shape as ctxt-label (hole `hole-Step-ctxt-handler(CATCH*, N-3)`). The closed bodies are the bodies of br-handler,
+return-handler, handler-vals, trap-handler, return_call_ref-handler, and throw_ref-handler-*.
 
 ### 6. Step/ctxt-frame (context rule)
 
@@ -718,11 +756,11 @@ ceq kstate((S' ; F'') ; INSTR'*, hole-Step-ctxt-frame(N-3, F) K-4) = kstate((S' 
     if closed-Step-ctxt-frame(INSTR'*) = true .
 ```
 
-heating에서 안쪽 frame F'로 바꾸고 바깥 frame F를 hole에 둔다. cooling에서 store S'와 안쪽
-frame F''는 실행 결과를 쓴다. instrs heating과 closed body(frame-vals, return-frame, trap-frame,
-return_call_ref-frame-null/addr, throw_ref-frame)는 ctxt-label과 같은 방식으로 생성된다.
+Heating switches to the inner frame F' and keeps the outer frame F in the hole. In cooling, the store S' and the inner
+frame F'' take the execution result. Instrs heating and the closed bodies (frame-vals, return-frame, trap-frame,
+return_call_ref-frame-null/addr, throw_ref-frame) are generated in the same way as for ctxt-label.
 
-### 공통 선언, 요청으로 감싸기, instrs cooling
+### Common declarations, wrapping as a request, instrs cooling
 
 ```maude
 op none : -> Holes [ctor] .
@@ -741,14 +779,14 @@ ceq kstate(C-5, K-4) = kstate(Step(C-5), K-4)
     if plug-first(K-4) = false [owise] .
 ```
 
-`kstate`의 첫 인자는 frozen이 아니다. 실행 driver(`wasm2maude/*-runtime.maude`, harness)는 상태를
-`exec(kstate(C, none))`로 시작하고, `Step` rule이 그 안에서 직접 적용된다(rewrite 조건 없음).
-완료는 `kstate(Step(z ; vals), none)`이다. wast 실행기도 같은 방식이다. 실행 중인 command의
-`kstate` 인자는 frozen이 아니어서 `Step` rule이 그 안에서 직접 적용되고 `rew`가 실행 하나를
-따라간다. `rew`는 rule-fair라 여러 rule이 적용되는 요청에서 아무 rule이나 고를 수 있다. 참조
-인터프리터는 늘릴 수 있으면 늘리므로, memory.grow·table.grow 요청은 `choice(R)`로 묶어 Maude 탐색
-순서의 첫 successor(먼저 선언된 성공 rule)를 택한다. exhaustion 검사는 K의 frame hole 수와 요청 R 안의
-활성 frame 수의 합을 bound와 비교한다.
+The first argument of `kstate` is not frozen. The execution drivers (`wasm2maude/*-runtime.maude`, harness) start the state as
+`exec(kstate(C, none))`, and `Step` rules apply directly inside it (no rewrite conditions).
+Completion is `kstate(Step(z ; vals), none)`. The wast runner works the same way. The `kstate` argument of the running
+command is not frozen, so `Step` rules apply directly inside it and `rew` follows one
+execution. `rew` is rule-fair, so on a request to which several rules apply it may pick any rule. The reference
+interpreter grows whenever it can grow, so memory.grow and table.grow requests are wrapped in `choice(R)` to take the first successor in Maude's search
+order (the success rule declared first). The exhaustion check compares the sum of the number of frame holes in K and the number of
+active frames in the request R with the bound.
 
 ### 7. Steps/trans (split, rule)
 
@@ -770,7 +808,7 @@ eq (Z'' ; INSTR''*) ~> hole-Steps-trans-Steps = Z'' ; INSTR''* .
 rl Steps(Z ; INSTR*) => Z ; INSTR* .
 ```
 
-첫 Step의 결과를 다음 Steps에 전달한다. Steps/refl은 0회 실행을 보존하는 rule로 유지한다. 두 번째 hole은 원래 결론을 반환한다.
+The result of the first Step is passed to the next Steps. Steps/refl is kept as a rule that preserves zero executions. The second hole returns the original conclusion.
 
 ### 8. Eval_expr (split, rule)
 
@@ -787,15 +825,15 @@ rl [split-Eval-expr] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-ex
 eq (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
 ```
 
-VAL*의 sort는 ValList다. NOP/TRAP 등의 비-value 목록과 실행 중 요청은 이 plug 패턴에 매치하지 않는다. tuple 모양도 원래 출력과 같다.
+The sort of VAL* is ValList. Non-value lists such as NOP/TRAP and requests in execution do not match this plug pattern. The tuple shape is also the same as the original output.
 
-### 지원 범위와 검증
+### Supported scope and verification
 
-직접적인 실행 RulePr, 실행 전후의 일반 조건과 binding, 여러 실행 premise 연결을 지원한다. hinted rule 안의 ElsePr·IterPr·NegPr 및 rewrite-backed expression은 현재 명시적인 Unsupported다. 지원하지 않는 구조를 평범한 rule로 조용히 되돌리지 않는다. 기존 목록 context의 지원 범위는 유지한다.
+Direct execution RulePrs, general conditions and bindings before and after execution, and chaining of multiple execution premises are supported. ElsePr and IterPr inside a hinted rule and rewrite-backed expressions are currently explicitly Unsupported. An unsupported structure is not silently reverted to a plain rule. The supported scope of the existing list contexts is kept.
 
-`4.4-execution.modules.spectec`의 `$evalexprs`, `$evalglobals`는 함수 정의 절이므로 위 relation rule 8개에 포함하지 않았다. 이들은 기존 번역을 유지하며, 변경된 Eval_expr를 호출한다.
+`$evalexprs`, `$evalglobals` in `4.4-execution.modules.spectec` are function definition clauses, so they are not included in the 8 relation rules above. They keep the existing translation and call the changed Eval_expr.
 
-번역과 Maude load 확인:
+Translation and Maude load check:
 
 ```sh
 dune build
@@ -803,4 +841,4 @@ dune exec bin/spec2maude.exe --
 test/spectec_to_maude.sh
 ```
 
-위 명령은 source 번역, 생성 파일 비교와 Maude load를 확인한다. 실행 결과 검사나 전체 공식 suite, 성능 비교, 일반 search/LTL 의미 보존 증명을 대신하지 않는다. 실행 및 suite 검사 방법은 [ARTIFACT.md](ARTIFACT.md)에 둔다.
+The commands above check source translation, comparison of generated files, and Maude load. They do not replace execution result checks, the full official suite, performance comparison, or a preservation proof of general search/LTL meaning. Execution and suite checks are described in [ARTIFACT.md](ARTIFACT.md).

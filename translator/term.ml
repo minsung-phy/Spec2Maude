@@ -22,8 +22,8 @@ let translate_sort index typ =
 let translate_number = function
   | `Nat n | `Int n -> Const (Z.to_string n)
   | `Rat q when Q.is_real q -> Const (Q.to_string q)
-  | `Rat _ -> invalid_arg "nonfinite IL Rat literal is not implemented"
-  | `Real _ -> invalid_arg "IL Real literal is not implemented"
+  | `Rat _ -> raise (Unsupported "nonfinite IL Rat literal is not implemented")
+  | `Real _ -> raise (Unsupported "IL Real literal is not implemented")
 
 let translate_text text =
   let buffer = Buffer.create (String.length text + 2) in
@@ -50,30 +50,34 @@ let qid_of_atom atom =
 
 let translate_unop (op : unop) (optyp : optyp) =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real operation is not implemented"
+  | _, `RealT -> raise (Unsupported "IL Real operation is not implemented")
   | `NotOp, _ -> "not_"
   | `PlusOp, _ -> "+_"
   | `MinusOp, _ -> "-_"
 
 let translate_binop op optyp =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real operation is not implemented"
-  | `PowOp, `RatT -> invalid_arg "IL Rat power is not implemented"
+  | _, `RealT -> raise (Unsupported "IL Real operation is not implemented")
+  | `PowOp, `RatT -> raise (Unsupported "IL Rat power is not implemented")
   | `AndOp, `BoolT -> "_and_"
   | `OrOp, `BoolT -> "_or_"
   | `ImplOp, `BoolT -> "_implies_"
   | `EquivOp, `BoolT -> "_==_"
+  (* IL nat subtraction and nat/int division are partial (Xl.Num.bin); Maude
+     _-_ and _/_ would give a negative or rational result. *)
+  | `SubOp, `NatT -> raise (Unsupported "IL nat subtraction is partial")
+  | `DivOp, (`NatT | `IntT) -> raise (Unsupported "IL nat or int division is partial")
   | `AddOp, #Xl.Num.typ -> "_+_"
   | `SubOp, #Xl.Num.typ -> "_-_"
   | `MulOp, #Xl.Num.typ -> "_*_"
   | `DivOp, #Xl.Num.typ -> "_/_"
   | `ModOp, (`NatT | `IntT) -> "_rem_"
   | `PowOp, #Xl.Num.typ -> "_^_"
-  | _ -> invalid_arg "malformed BinE operator annotation"
+  | _ -> raise (Unsupported "malformed BinE operator annotation")
 
 let translate_comparison (op : cmpop) (optyp : optyp) left right =
   match op, optyp with
-  | _, `RealT -> invalid_arg "IL Real comparison is not implemented"
+  | _, `RealT -> raise (Unsupported "IL Real comparison is not implemented")
   | `EqOp, _ -> app "_==_" [left; right]
   | `NeOp, _ -> app "_=/=_" [left; right]
   | `LtOp, _ -> app "_<_" [left; right]
@@ -93,9 +97,9 @@ let sequence_operator index typ field =
 let unsupported_typed_sequence index operation typ =
   let representation = Prescan.sequence_representation index typ in
   if representation.typed then
-    invalid_arg
+    raise (Unsupported
       (operation ^ " is unsupported for typed list sort "
-       ^ representation.sort)
+       ^ representation.sort))
 
 (* hint(maude_array): a record field stored as sized-array(size, array). The
  * field is read only through |e.f|, e.f[i], and e.f[i : n], and written
@@ -108,9 +112,9 @@ let stored_hint = function
   | Hintd.Map -> "maude_map"
 
 let unsupported_stored kind at reason =
-  invalid_arg
+  raise (Unsupported
     ("Unsupported " ^ stored_hint kind ^ " use at " ^ string_of_region at
-     ^ ": " ^ reason)
+     ^ ": " ^ reason))
 
 (* The array default: entries equal to 0 are not stored. A numeric syntax
    type such as byte wraps its number in an argument case (%_byte(0)). *)
@@ -155,7 +159,7 @@ let constructor_domain index typ mixop =
     match (Prescan.reduce_typ index.Prescan.type_env typ).it with
     | VarT (id, _) -> id.it
     | BoolT | NumT _ | TextT | TupT _ | IterT _ ->
-        invalid_arg ("constructor " ^ key ^ " has a non-variant type")
+        raise (Unsupported ("constructor " ^ key ^ " has a non-variant type"))
   in
   let domains =
     List.assoc_opt owner index.Prescan.type_definitions
@@ -172,12 +176,12 @@ let constructor_domain index typ mixop =
          | InstD (_, _, {it = AliasT _ | StructT _; _}) -> [])
   in
   match domains with
-  | [] -> invalid_arg ("constructor " ^ key ^ " is not declared by " ^ owner)
+  | [] -> raise (Unsupported ("constructor " ^ key ^ " is not declared by " ^ owner))
   | domain :: others ->
       let natives domain = List.map Iter.native_sort domain in
       if List.exists (fun other -> natives other <> natives domain) others then
-        invalid_arg
-          ("constructor " ^ key ^ " has native and SpectecTerminal argument sorts");
+        raise (Unsupported
+          ("constructor " ^ key ^ " has native and SpectecTerminal argument sorts"));
       domain
 
 (* Parameter and result sorts of a DecD, as declared by Decd.translate_decl. *)
@@ -190,6 +194,31 @@ let definition_sorts index id =
         | TypP _ | DefP _ | GramP _ -> None)
       params
   , translate_sort index result )
+
+(* Positions of a definition typed by one of its syntax parameters, and
+   whether its result is: such a value is one value even when the parameter
+   is instantiated with a sequence type, so it passes as a sequence element
+   (boxed by seq when it is a sequence). *)
+let syntax_parameter_positions index id =
+  let params, result, _ = Il.Env.find_def index.Prescan.type_env id in
+  let is_parameter typ =
+    match typ.it with
+    | VarT (x, []) ->
+        List.exists
+          (fun param ->
+            match param.it with
+            | TypP y -> y.it = x.it
+            | ExpP _ | DefP _ | GramP _ -> false)
+          params
+    | _ -> false
+  in
+  ( List.map
+      (fun param ->
+        match param.it with
+        | ExpP (_, typ) -> is_parameter typ
+        | TypP _ | DefP _ | GramP _ -> false)
+      params
+  , is_parameter result )
 
 let to_parameter_sort index sort exp term =
   match sort with
@@ -215,7 +244,7 @@ let to_native index typ term =
     | NumT _ -> unbox "#rat"
     | TextT -> unbox "#string"
     | VarT _ | TupT _ | IterT _ ->
-        invalid_arg ("native operand of type " ^ Il.Print.string_of_typ typ)
+        raise (Unsupported ("native operand of type " ^ Il.Print.string_of_typ typ))
 
 (* Recursive translation *)
 
@@ -224,7 +253,7 @@ let rec translate_typ index typ =
   | VarT (id, args) ->
       begin match Prescan.type_parameter index id, args with
       | Some variable, [] -> Var variable
-      | Some _, _ -> invalid_arg "TypP type variable cannot have arguments"
+      | Some _, _ -> raise (Unsupported "TypP type variable cannot have arguments")
       | None, _ ->
           app (Prescan.typ_name index id) (List.map (translate_arg index) args)
       end
@@ -235,7 +264,7 @@ let rec translate_typ index typ =
   | TextT ->
       Const "text"
   | TupT _ ->
-      invalid_arg "TupT must be translated by translate_components"
+      raise (Unsupported "TupT must be translated by translate_components")
   | IterT (typ, List) ->
       (* typecheck distributes over the elements of a sequence, so t* is its
          element type here; as a type argument it is iterList(t)
@@ -243,7 +272,7 @@ let rec translate_typ index typ =
       translate_typ index typ
   | IterT (_, (Opt | List1 | ListN _)) ->
       (* The element type alone would drop the length condition. *)
-      invalid_arg "IterT ?, + or ^n as a type value is not supported"
+      raise (Unsupported "IterT ?, + or ^n as a type value is not supported")
 
 and translate_arg index arg =
   match arg.it with
@@ -252,9 +281,9 @@ and translate_arg index arg =
   | TypA typ ->
       translate_check_typ index typ
   | DefA _ ->
-      invalid_arg "DefA must be removed by Def.specialize_script"
+      raise (Unsupported "DefA must be removed by Def.specialize_script")
   | GramA _ ->
-      invalid_arg "GramA is not translated"
+      raise (Unsupported "GramA is not translated")
 
 and translate_call_arg index sort arg =
   match arg.it with
@@ -268,9 +297,9 @@ and translate_check_typ index typ =
   | IterT (element, List) ->
       app "iterList" [translate_check_typ index element]
   | IterT (_, List1) ->
-      invalid_arg "IterT List1 as a type value is not supported"
+      raise (Unsupported "IterT List1 as a type value is not supported")
   | IterT (_, ListN _) ->
-      invalid_arg "IterT ListN as a type value is not supported"
+      raise (Unsupported "IterT ListN as a type value is not supported")
   | VarT _ | BoolT | NumT _ | TextT | TupT _ ->
       translate_typ index typ
 
@@ -324,7 +353,7 @@ and native_exp index exp =
            ])
 
   | CvtE (_, `RealT, _) | CvtE (_, _, `RealT) ->
-      invalid_arg "IL Real conversion is not implemented"
+      raise (Unsupported "IL Real conversion is not implemented")
 
   | CvtE (inner, source, target) ->
       Some
@@ -347,7 +376,7 @@ and translate_value index exp =
       Var (Prescan.source_variable index id exp.note)
 
   | BoolE _ | NumE _ | TextE _ | UnE _ | BinE _ | CmpE _ | MemE _ | CvtE _ ->
-      invalid_arg "primitive operation is translated by native_exp"
+      raise (Unsupported "primitive operation is translated by native_exp")
 
   | TupE exps ->
       exps
@@ -366,7 +395,8 @@ and translate_value index exp =
       |> from_sequence_element index exp.note
 
   | CaseE (mixop, payload, _) ->
-      (* Type premises are invariants, not guards on value construction. *)
+      (* Its case premises are premises of the enclosing rule or clause
+         (Def.case_premise_script). *)
       if Mixop.is_hole_only mixop then
         begin match payload.it with
         | TupE [single] -> translate_exp index single
@@ -389,7 +419,7 @@ and translate_value index exp =
       if Mixop.is_hole_only mixop then
         translate_exp index case
       else
-        invalid_arg "named UncaseE is not supported"
+        raise (Unsupported "named UncaseE is not supported")
 
   | OptE None ->
       Const "nil"
@@ -399,7 +429,7 @@ and translate_value index exp =
         [translate_exp index inner |> as_sequence_element index inner.note]
 
   | TheE _ ->
-      invalid_arg "TheE option extraction is not supported"
+      raise (Unsupported "TheE option extraction is not supported")
 
   | StrE (fields, _) ->
       fields
@@ -491,9 +521,12 @@ and translate_value index exp =
         index (translate_exp index base) path (translate_exp index extension)
 
   | CallE (id, args) ->
-      translate_call index id args
-      |> Iter.coerce ~actual:(snd (definition_sorts index id))
-           ~expected:(translate_sort index exp.note)
+      let positions, by_result = syntax_parameter_positions index id in
+      let call = translate_call index ~positions id args in
+      if by_result then from_sequence_element index exp.note call
+      else
+        Iter.coerce ~actual:(snd (definition_sorts index id))
+          ~expected:(translate_sort index exp.note) call
 
   | IterE (body, (iter, generators)) ->
       Iter.translate_term
@@ -503,15 +536,22 @@ and translate_value index exp =
       if Prescan.same_representation index source target then
         translate_exp index inner
       else
-        invalid_arg
+        raise (Unsupported
           ("Unsupported SubE representation: " ^ Il.Print.string_of_typ source
            ^ " -> " ^ Il.Print.string_of_typ target
-           ^ " at " ^ string_of_region source.at)
+           ^ " at " ^ string_of_region source.at))
 
-and translate_call index id args =
+and translate_call index ~positions id args =
   Prescan.require_definition_body index "CallE" id;
   let sorts, _ = definition_sorts index id in
-  app (Prescan.def_name index id) (List.map2 (translate_call_arg index) sorts args)
+  let translate_arg (sort, by_parameter) arg =
+    match arg.it with
+    | ExpA exp when by_parameter ->
+        as_sequence_element index exp.note (translate_exp index exp)
+    | ExpA _ | TypA _ | DefA _ | GramA _ -> translate_call_arg index sort arg
+  in
+  app (Prescan.def_name index id)
+    (List.map2 translate_arg (List.combine sorts positions) args)
 
 (* The stored value of a maude_array or maude_map field e.f, when exp is e.f
  * or the identity iteration x*{x <- e.f}. *)
@@ -697,13 +737,13 @@ and translate_composition index typ left right =
         unsupported_stored Hintd.Array typ.at
           "a record with a maude_array field has no composition";
       if not (Prescan.record_composition_available index typ) then
-        invalid_arg
+        raise (Unsupported
           ("Unsupported CompE for " ^ Il.Print.string_of_typ typ
            ^ " at " ^ string_of_region typ.at
-           ^ ": record composition requires a monomorphic StructT declaration");
+           ^ ": record composition requires a monomorphic StructT declaration"));
       app "recordConcat" [left; right; translate_typ index typ]
   | AliasT _ | VariantT _ ->
-      invalid_arg ("non-composable CompE type: " ^ Il.Print.string_of_typ typ)
+      raise (Unsupported ("non-composable CompE type: " ^ Il.Print.string_of_typ typ))
 
 
 (* Constructor components *)
@@ -1070,10 +1110,9 @@ let with_relation_types index id params inputs =
   {index with Prescan.input_types = Some facts}
 
 (* An execution guard omits a membership that the input facts or the Maude
-   sort of the value already establish. Nat and Int range exactly over nat and
-   int. The sort of a hint(maude_sort) type is the sort of its constructors,
-   which is wider (CONST(I32, c) has sort val for any c): omitting that guard
-   relies on reachable values being well typed, like the input facts. *)
+   sort of the value already establish. Nat ranges exactly over nat. The sort
+   of a hint(maude_sort) type is wider (CONST(I32, c) has sort val for any c),
+   so its guard is kept. *)
 let translate_guard_conditions index value typ =
   let conditions = translate_typ_conditions index value typ in
   match index.Prescan.input_types with
@@ -1082,9 +1121,6 @@ let translate_guard_conditions index value typ =
       let native =
         match value, (type_alias index [] typ).it with
         | Var v, NumT `NatT -> v.sort = "Nat"
-        | Var v, VarT (id, []) ->
-            id.it = v.sort
-            && List.mem id.it (Hintd.annotated_sorts (Prescan.sort_metadata index))
         | _ -> false
       in
       let implied =

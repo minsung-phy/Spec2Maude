@@ -254,9 +254,9 @@ let inverse_plan index bound id args =
               }
           else None
       | [_] ->
-          invalid_arg "inverse missing argument is not an expression"
+          raise (Unsupported "inverse missing argument is not an expression")
       | _ ->
-          invalid_arg "inverse argument position does not match the call"
+          raise (Unsupported "inverse argument position does not match the call")
       end
 
 let inverse_call index plan subject =
@@ -303,8 +303,8 @@ let rec bind_pattern index bound exp subject error =
           in
           bind_pattern index bound inner converted error
       | _ ->
-          invalid_arg
-            "CvtE pattern requires an exact backend numeric conversion"
+          raise (Unsupported
+            "CvtE pattern requires an exact backend numeric conversion")
       end
   | ProjE ({it = UncaseE (inner, mixop); _}, 0)
     when Xl.Mixop.arity mixop = 1 ->
@@ -322,7 +322,7 @@ let rec bind_pattern index bound exp subject error =
         then
           right, left
         else
-          invalid_arg (error ^ ": " ^ Il.Print.string_of_exp exp)
+          raise (Unsupported (error ^ ": " ^ Il.Print.string_of_exp exp))
       in
       let factor_term = Term.translate_exp index factor in
       let result =
@@ -364,7 +364,7 @@ let rec bind_pattern index bound exp subject error =
       with
       | Some conditions ->
           make (bind bound exp) (List.map (fun c -> EqCondition c) conditions)
-      | None -> invalid_arg error
+      | None -> raise (Unsupported error)
       end
   | _ ->
       begin match translate_pattern index exp with
@@ -430,7 +430,7 @@ and bind_structural_pattern index bound exp subject error =
         [EqCondition (MatchCond (represented, subject))] error
   | SubE (inner, source, target) ->
       if not (Prescan.same_representation index source target) then
-        invalid_arg "SubE pattern representation conversion is not implemented";
+        raise (Unsupported "SubE pattern representation conversion is not implemented");
       let result = bind_pattern index bound inner subject error in
       { result with
         conditions =
@@ -444,7 +444,7 @@ and bind_structural_pattern index bound exp subject error =
   | ProjE _ | UncaseE _ | OptE None | TheE _ | DotE _ | CompE _
   | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _ | UpdE _ | ExtE _
   | CallE _ | IterE _ | CvtE _ ->
-      invalid_arg (error ^ ": " ^ Il.Print.string_of_exp exp)
+      raise (Unsupported (error ^ ": " ^ Il.Print.string_of_exp exp))
 
 and pattern_subject index prefix exp =
   Var (generated_variable prefix (Term.translate_sort index exp.note))
@@ -503,12 +503,12 @@ let bind_outputs index bound outputs subjects conditions error =
 let components mixop exp =
   match Mixop.components mixop exp with
   | Some exps -> exps
-  | None -> invalid_arg "RulePr expression does not match its mixop"
+  | None -> raise (Unsupported "RulePr expression does not match its mixop")
 
 let split count items =
   match Mixop.split count items with
   | Some parts -> parts
-  | None -> invalid_arg "malformed execution RulePr"
+  | None -> raise (Unsupported "malformed execution RulePr")
 
 let relation_call index id args exps =
   App
@@ -574,7 +574,7 @@ let bind_free_indices index bound args exp =
                   (MatchCond
                      ( Term.translate_exp index position
                      , App (representation.size, [prefix]) )) ] )
-      | _ -> invalid_arg "indexed collection is not iterated")
+      | _ -> raise (Unsupported "indexed collection is not iterated"))
     (bound, []) (List.rev !indices)
 
 let rec translate_rulepr index bound id args mixop exp =
@@ -590,15 +590,15 @@ and translate_known_rulepr index bound id args mixop exp =
     match Prescan.relation_policy index id with
     | Ok policy -> policy
     | Error reason ->
-        invalid_arg
-          ("RulePr target " ^ id.it ^ " is unsupported: " ^ reason)
+        raise (Unsupported
+          ("RulePr target " ^ id.it ^ " is unsupported: " ^ reason))
   in
   match policy with
   | Prescan.Check _ ->
       if not (known_args bound args && known bound exp) then
-        invalid_arg
+        raise (Unsupported
           ("checked RulePr contains an unbound variable: " ^ id.it ^ ": "
-           ^ Il.Print.string_of_exp exp);
+           ^ Il.Print.string_of_exp exp));
       make bound [EqCondition (BoolCond (relation_call index id args exps))]
   | Prescan.Compute {subsume = Some {check; _}; _}
     when known_args bound args && known bound exp ->
@@ -614,7 +614,7 @@ and translate_known_rulepr index bound id args mixop exp =
   | Prescan.Compute {input_count; _} ->
       let inputs, outputs = split input_count exps in
       if not (known_args bound args && List.for_all (known bound) inputs) then
-        invalid_arg "computed RulePr has an unbound input";
+        raise (Unsupported "computed RulePr has an unbound input");
       let call = relation_call index id args inputs in
       if List.for_all (known bound) outputs then
         make bound
@@ -642,7 +642,7 @@ and translate_known_rulepr index bound id args mixop exp =
   | Prescan.Execution {input_count; _} ->
       let inputs, outputs = split input_count exps in
       if not (known_args bound args && List.for_all (known bound) inputs) then
-        invalid_arg "execution RulePr has an unbound input";
+        raise (Unsupported "execution RulePr has an unbound input");
       begin match translate_patterns index outputs with
       | Some patterns ->
           make (List.fold_left bind bound outputs)
@@ -693,7 +693,7 @@ let translate_rewrite_call index bound call result =
             (make (bind bound result)
                (RewriteCond (call, pattern.term) :: rule_guards pattern))
       | None ->
-          invalid_arg "rewrite-backed call result is not a pattern"
+          raise (Unsupported "rewrite-backed call result is not a pattern")
 
 let translate_binding_membership index bound element collection =
   match collection.note.it, translate_pattern index element with
@@ -717,9 +717,9 @@ let translate_binding_membership index bound element collection =
               (MatchCond (sequence, Term.translate_exp index collection))
             :: rule_guards pattern))
   | IterT _, None ->
-      invalid_arg "binding membership element is not a pattern"
+      raise (Unsupported "binding membership element is not a pattern")
   | _ ->
-      invalid_arg "binding membership requires an iterated collection"
+      raise (Unsupported "binding membership requires an iterated collection")
 
 (* The shapes of an IfPr premise, in the order in which they are tried
  * (TRANSLATION_MAP.md, section 3). Only the classification depends on this
@@ -742,12 +742,12 @@ let classify_ifpr index bind_membership bound exp =
     when is_rewrite_call index call ->
       RewriteCall (call, result)
   | _ when has_rewrite_call index exp ->
-      invalid_arg "rewrite-backed call must be a top-level equality premise"
+      raise (Unsupported "rewrite-backed call must be a top-level equality premise")
   | MemE (_, collection) when not (known bound collection) ->
       Wait
   | MemE (element, collection) when not (known bound element) ->
       if bind_membership then Choice (element, collection)
-      else invalid_arg "binding membership must be a final definition choice"
+      else raise (Unsupported "binding membership must be a final definition choice")
   | BinE (`AndOp, `BoolT, left, right) when not (known bound exp) ->
       Conjunction (left, right)
   | CmpE (`EqOp, _, ({it = CallE (id, args); _} as call), result)
@@ -834,7 +834,7 @@ let translate_barrier index collect_outputs bound prem =
       let iteration =
         match Prescan.premise_iteration index prem with
         | Some iteration -> iteration
-        | None -> invalid_arg "IterPr is missing from the prescan index"
+        | None -> raise (Unsupported "IterPr is missing from the prescan index")
       in
       if not
            (List.for_all
@@ -843,10 +843,10 @@ let translate_barrier index collect_outputs bound prem =
                     Il.Free.Set.mem id.it bound
                 | Prescan.TypeCapture _ -> true)
               iteration.Prescan.captures)
-      then invalid_arg "IterPr has an unbound capture";
+      then raise (Unsupported "IterPr has an unbound capture");
       begin match iter with
       | ListN (count, _) when not (known bound count) ->
-          invalid_arg "IterPr has an unbound iteration count"
+          raise (Unsupported "IterPr has an unbound iteration count")
       | Opt | List | List1 | ListN _ -> ()
       end;
       let unknown =
@@ -861,19 +861,19 @@ let translate_barrier index collect_outputs bound prem =
       | [position, source]
         when Iter.premise_output_possible iteration position ->
           if not collect_outputs then
-            invalid_arg "IterPr output requires relation helper collection";
+            raise (Unsupported "IterPr output requires relation helper collection");
           Prescan.request index iteration.Prescan.name (OutputHelper position);
           bind_pattern index bound source
             (Iter.premise_output_call index (Term.translate_exp index)
                iteration position)
             "IterPr output source is not a structural pattern"
       | [_] ->
-          invalid_arg "IterPr body does not determine its unbound source"
+          raise (Unsupported "IterPr body does not determine its unbound source")
       | _ ->
-          invalid_arg "IterPr has multiple unbound generator sources"
+          raise (Unsupported "IterPr has multiple unbound generator sources")
       end
   | IfPr _ | LetPr _ ->
-      invalid_arg "internal error: pure premise reached a barrier"
+      raise (Unsupported "internal error: pure premise reached a barrier")
 
 let append result next =
   { conditions = result.conditions @ next.conditions
@@ -884,7 +884,7 @@ let append result next =
 let rec translate_prems index bind_membership collect_outputs result skipped = function
   | [] when skipped = [] -> result
   | [] ->
-      invalid_arg "pure premises have unresolved variable dependencies"
+      raise (Unsupported "pure premises have unresolved variable dependencies")
   | prem :: prems ->
       begin match prem.it with
       | IfPr exp ->
@@ -897,22 +897,22 @@ let rec translate_prems index bind_membership collect_outputs result skipped = f
                       (function RewriteCond _ -> true | EqCondition _ -> false)
                       next.conditions
               then
-                invalid_arg
-                  "a premise dependency crosses a rewrite premise";
+                raise (Unsupported
+                  "a premise dependency crosses a rewrite premise");
               translate_prems index bind_membership collect_outputs
                 (append result next) []
                 (List.rev_append skipped prems)
           | Waiting ->
               if has_rewrite_call index exp then
-                invalid_arg "rewrite premise has an unbound input"
+                raise (Unsupported "rewrite premise has an unbound input")
               else
                 translate_prems index bind_membership collect_outputs result
                   (prem :: skipped) prems
           end
       | LetPr (quants, left, right) ->
           if has_rewrite_call index left || has_rewrite_call index right then
-            invalid_arg
-              "rewrite-backed call must be an IfPr equality premise";
+            raise (Unsupported
+              "rewrite-backed call must be an IfPr equality premise");
           begin match translate_letpr index result.bound quants left right with
           | Ready next ->
               translate_prems index bind_membership collect_outputs
@@ -924,10 +924,10 @@ let rec translate_prems index bind_membership collect_outputs result skipped = f
           end
       | RulePr _ | ElsePr | IterPr _ ->
           if prem_has_rewrite_call index prem then
-            invalid_arg
-              "rewrite-backed call must be an IfPr equality premise";
+            raise (Unsupported
+              "rewrite-backed call must be an IfPr equality premise");
           if skipped <> [] then
-            invalid_arg "a premise dependency crosses an effectful premise";
+            raise (Unsupported "a premise dependency crosses an effectful premise");
           let next =
             translate_barrier index collect_outputs result.bound prem
           in
@@ -947,9 +947,9 @@ let translate_eq_conditions index ?bound prems =
   let result =
     translate_all index ?bound ~bind_membership:false ~collect_outputs:false prems
   in
-  if result.otherwise then invalid_arg "ElsePr belongs to DecD or RelD";
+  if result.otherwise then raise (Unsupported "ElsePr belongs to DecD or RelD");
   List.map
     (function
       | EqCondition condition -> condition
-      | RewriteCond _ -> invalid_arg "an equation cannot use a rewrite condition")
+      | RewriteCond _ -> raise (Unsupported "an equation cannot use a rewrite condition"))
     result.conditions

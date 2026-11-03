@@ -3,15 +3,15 @@ fmod SPECTEC-BUILTIN-TYPES is
   protecting CONVERSION . --- RAT, FLOAT, STRING, BOOL, NAT, INT
   protecting QID . --- for RECORD
 
-  --- 기본 타입 (ast.ml line 28 & num.ml line 14)
-  --- IMP처럼 native 값을 생성자로 감싼다. subsort로 두면 Bool, Rat, Float, String이
-  --- SpectecTerminal과 한 kind가 되어 prelude의 같은 이름 연산이 충돌한다.
+  --- Builtin types (ast.ml line 28, num.ml line 14)
+  --- Native values are wrapped in a constructor, as in IMP. As subsorts, Bool, Rat, Float,
+  --- and String would share a kind with SpectecTerminal and clash with prelude operators.
   op #_ : Bool -> SpectecTerminal [ctor] .
   op #_ : Rat -> SpectecTerminal [ctor] .
   op #_ : Float -> SpectecTerminal [ctor] .
   op #_ : String -> SpectecTerminal [ctor] .
 
-  --- 매칭으로 꺼낼 수 없는 식 중간에서만 쓰는 부분 함수
+  --- Partial unwrapping, used only inside expressions where matching cannot unwrap
   op #bool : SpectecTerminal ~> Bool .
   op #rat : SpectecTerminal ~> Rat .
   op #string : SpectecTerminal ~> String .

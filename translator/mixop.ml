@@ -29,7 +29,7 @@ let name mixop =
     when args <> [] && List.for_all is_arg args ->
       atom_name atom
   | _ when is_hole_only mixop ->
-      invalid_arg "a hole-only mixop has no constructor name"
+      raise (Maude_il.Unsupported "a hole-only mixop has no constructor name")
   | _ ->
       translate mixop
 

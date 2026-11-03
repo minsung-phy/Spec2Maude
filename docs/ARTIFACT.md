@@ -217,6 +217,10 @@ The WAST runtime is a test runner, not part of the translated semantics:
 - `spectest` print functions are an environment model: the specification calls
   a host function through `$hostcall`, and the runtime defines it for the print
   functions, which return no values and leave the store unchanged.
+- A table larger than 2^24 references is an environment model, like the
+  call-depth bound: the reference interpreter fails to allocate it, so a
+  `table.grow` past that size takes the specification's failure rule
+  (`Step/table.grow-fail`), which the specification allows at any size.
 - SpecTec has no call-stack limit. `assert_exhaustion` passes once the frame
   depth exceeds `--call-depth` (default 256), so that PASS is relative to the
   bound.

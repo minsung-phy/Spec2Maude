@@ -6,7 +6,7 @@ view SpectecTerminal from TRIV to SPECTEC-TERMINAL is
   sort Elt to SpectecTerminal .
 endv
 
---- 공통 리스트는 prelude LIST를 그대로 사용 (nil, __, size, occurs, append, ...)
+--- The common list is the prelude LIST (nil, __, size, occurs, append, ...)
 fmod SPECTEC-SORTS is
   protecting LIST{SpectecTerminal} * (
     sort List{SpectecTerminal} to SpectecTerminals,

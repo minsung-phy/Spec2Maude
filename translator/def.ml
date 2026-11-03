@@ -17,10 +17,10 @@ let normalize_constructor_declarations statements =
                && previous.arrow = declaration.arrow
                && previous.attrs = declaration.attrs then false
             else
-              invalid_arg
+              raise (Unsupported
                 (Printf.sprintf
                    "unsupported constructor signature for %s: %s and %s"
-                   declaration.name previous.codomain declaration.codomain)
+                   declaration.name previous.codomain declaration.codomain))
         | None | Some _ ->
             Hashtbl.replace declarations key declaration;
             true
@@ -60,7 +60,7 @@ let normalize_variables source_declarations statements =
         Hashtbl.add declared name sort;
         declaration_order := (name, sort) :: !declaration_order
     | Some sort' when sort = sort' -> ()
-    | Some _ -> invalid_arg ("variable " ^ name ^ " has conflicting sorts")
+    | Some _ -> raise (Unsupported ("variable " ^ name ^ " has conflicting sorts"))
   in
   List.iter
     (function
@@ -72,9 +72,9 @@ let normalize_variables source_declarations statements =
               | None -> Hashtbl.add source_sorts name sort
               | Some sort' when sort = sort' -> ()
               | Some _ ->
-                  invalid_arg ("source variable " ^ name ^ " has conflicting sorts"))
+                  raise (Unsupported ("source variable " ^ name ^ " has conflicting sorts")))
             names
-      | _ -> invalid_arg "expected a variable declaration")
+      | _ -> raise (Unsupported "expected a variable declaration"))
     source_declarations;
 
   let operator_names =
@@ -114,9 +114,9 @@ let normalize_variables source_declarations statements =
               local_used := StringSet.add variable.name !local_used;
               variable
           | Some _ ->
-              invalid_arg ("source variable " ^ variable.name ^ " changed sort")
+              raise (Unsupported ("source variable " ^ variable.name ^ " changed sort"))
           | None ->
-              invalid_arg ("undeclared source variable " ^ variable.name)
+              raise (Unsupported ("undeclared source variable " ^ variable.name))
           end
       | Generated id ->
           begin match Hashtbl.find_opt generated id with
@@ -130,7 +130,7 @@ let normalize_variables source_declarations statements =
           end
     in
     match statement with
-    | VarDecl _ -> invalid_arg "variable declarations are rebuilt after lowering"
+    | VarDecl _ -> raise (Unsupported "variable declarations are rebuilt after lowering")
     | statement -> map_statement_variables normalize_variable statement
   in
   let statements =
@@ -162,19 +162,16 @@ let owner_of def =
   | HintD _ -> "HintD"
 
 let rec translate index def =
-  try
-    match def.it with
-    | TypD (id, params, insts) -> Typd.translate index id params insts
-    | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
-    | RelD (id, params, mixop, typ, rules) ->
-        (* Rules with hint(k_heatcool) are left to Heatcool. *)
-        Reld.translate index id params mixop typ rules
-        @ Heatcool.translate_relation index id
-    | GramD _ | HintD _ -> []
-    | RecD defs -> List.concat_map (translate index) defs
-  with Invalid_argument reason ->
-    Util.Error.error def.at "translation"
-      ("Unsupported " ^ owner_of def ^ ": " ^ reason)
+  located def.at (owner_of def) @@ fun () ->
+  match def.it with
+  | TypD (id, params, insts) -> Typd.translate index id params insts
+  | DecD (id, params, typ, clauses) -> Decd.translate index id params typ clauses
+  | RelD (id, params, mixop, typ, rules) ->
+      (* Rules with hint(k_heatcool) are left to Heatcool. *)
+      Reld.translate index id params mixop typ rules
+      @ Heatcool.translate_relation index id
+  | GramD _ | HintD _ -> []
+  | RecD defs -> List.concat_map (translate index) defs
 
 let normalize_module ?(constructors = true) source_declarations statements =
   let variable_declarations, statements =
@@ -450,7 +447,7 @@ let replace_calls declarations instances def =
                   match arg.it with
                   | DefA id -> id.it
                   | ExpA _ | TypA _ | GramA _ ->
-                      invalid_arg "collected call lost its DefA argument")
+                      raise (Unsupported "collected call lost its DefA argument"))
                 def_args
             in
             let instance =
@@ -747,18 +744,357 @@ let stored_script script =
   in
   List.map transform script
 
+(* Operations on literals, such as 2^32 - 1, are replaced by their value
+ * (Xl.Num, Xl.Bool), innermost first by Decd.map_exp. An undefined operation,
+ * such as 1 \ 0, is kept, and so is any operation on a non-literal, even
+ * 0 * e: the IL evaluates e first (Step_exp/BIN), which may fail. *)
+let fold_ground e =
+  let it =
+    match e.it with
+    | UnE (#Xl.Num.unop as op, _, {it = NumE n; _}) ->
+        Option.map (fun n -> NumE n) (Xl.Num.un op n)
+    | BinE (#Xl.Num.binop as op, _, {it = NumE n1; _}, {it = NumE n2; _}) ->
+        Option.map (fun n -> NumE n) (Xl.Num.bin op n1 n2)
+    | CvtE ({it = NumE n; _}, _, nt) -> Option.map (fun n -> NumE n) (Xl.Num.cvt nt n)
+    | CmpE (#Xl.Num.cmpop as op, _, {it = NumE n1; _}, {it = NumE n2; _}) ->
+        Option.map (fun b -> BoolE b) (Xl.Num.cmp op n1 n2)
+    | CmpE (#Xl.Bool.cmpop as op, _, {it = NumE n1; _}, {it = NumE n2; _}) ->
+        Some (BoolE (Xl.Bool.cmp op n1 n2))
+    | UnE (#Xl.Bool.unop as op, _, {it = BoolE b; _}) -> Some (BoolE (Xl.Bool.un op b))
+    | BinE (#Xl.Bool.binop as op, _, {it = BoolE b1; _}, {it = BoolE b2; _}) ->
+        Some (BoolE (Xl.Bool.bin op b1 b2))
+    | _ -> None
+  in
+  match it with Some it -> {e with it} | None -> e
+
+let fold_script script = List.map (Decd.map_def fold_ground) script
+
+(* Case premises (IL reduction, Step_exp/INJ): a value built by an unchecked
+ * case constructor C e is a value only if the premises of C's case hold for
+ * the payload e; otherwise the construction fails. Each evaluated
+ * construction therefore adds its case premises, instantiated with the
+ * payload, in front of the premise that evaluates it, or after the premises
+ * for a rule output or definition result. Inside an iteration the premises
+ * are iterated likewise. A construction with an unbound variable is a pattern
+ * that only matches existing values, as are relation inputs and definition
+ * arguments. A definition with such premises may have no result, so it is
+ * partial (Prescan.partial_defs). *)
+
+type case_checks =
+  { checks : prem list  (* all added premises *)
+  ; result_checks : prem list  (* those for rule outputs and results *)
+  ; partial : string list  (* definitions with added premises *)
+  }
+
+let deftyp env owner typ =
+  match Il.Eval.reduce_typdef env typ with
+  | Ok dt -> dt
+  | Error _ -> unsupported typ.at "case type" owner "type does not reduce to a definition"
+
+let rec element_typ typ =
+  match typ.it with IterT (typ, _) -> element_typ typ | _ -> typ
+
+let has_field_premises fields =
+  List.exists (fun (_, (_, _, prems), _) -> prems <> []) fields
+
+(* Subsumption and field update recheck the premises of the result's case or
+   fields (Step_exp/SUB-INJ, SUB-STR, UPD-DOT); they are not instantiated, so
+   an evaluated one whose type has such premises is rejected. *)
+let recheck env owner exp =
+  let fail case = unsupported exp.at case owner "rechecked premises are not instantiated" in
+  match exp.it with
+  | SubE (_, t1, t2) ->
+      let source = deftyp env owner (element_typ t1) in
+      begin match source.it, (deftyp env owner (element_typ t2)).it with
+      | VariantT cases1, VariantT cases2
+        when List.exists
+               (fun (op, (_, _, prems), _) ->
+                 prems <> []
+                 && List.exists (fun (op', _, _) -> Xl.Mixop.eq op op') cases1)
+               cases2 ->
+          fail "SubE"
+      | _, StructT fields when has_field_premises fields -> fail "SubE"
+      | _ -> ()
+      end
+  | UpdE (_, path, _) | ExtE (_, path, _) ->
+      let rec dots path =
+        match path.it with
+        | RootP -> ()
+        | DotP (p, _) ->
+            begin match (deftyp env owner p.note).it with
+            | StructT fields when has_field_premises fields -> fail "UpdE"
+            | _ -> dots p
+            end
+        | IdxP (p, _) | SliceP (p, _, _) -> dots p
+      in
+      dots path
+  | _ -> ()
+
+let case_premises env owner bound exp =
+  match exp.it with
+  | CaseE (op, payload, Unchecked)
+    when Il.Free.Set.subset (Il.Free.free_exp exp).varid bound ->
+      begin match (deftyp env owner exp.note).it with
+      | VariantT cases ->
+          begin match List.find_opt (fun (op', _, _) -> Xl.Mixop.eq op op') cases with
+          | Some (_, (_, _, []), _) -> [], []
+          | Some (_, (typ, quants, prems), _) ->
+              (* Only named binders of a tuple case occur in its premises. *)
+              let subst =
+                match typ.it, payload.it with
+                | TupT binders, TupE values
+                  when List.length values = List.length binders ->
+                    List.fold_left2
+                      (fun subst (x, _) value -> Il.Subst.add_varid subst x value)
+                      Il.Subst.empty binders values
+                | TupT _, _ ->
+                    unsupported exp.at "CaseE" owner
+                      "case payload does not match its case binders"
+                | _ -> Il.Subst.empty
+              in
+              let subst, quants =
+                List.fold_left_map
+                  (fun subst quant ->
+                    match quant.it with
+                    | ExpP (x, typ) ->
+                        let x' = Il.Fresh.refresh_varid x in
+                        let typ = Il.Subst.subst_typ subst typ in
+                        ( Il.Subst.add_varid subst x (VarE x' $$ x.at % typ)
+                        , ExpP (x', typ) $ quant.at )
+                    | TypP _ | DefP _ | GramP _ ->
+                        unsupported quant.at "case quantifier" owner
+                          "only expression quantifiers are instantiated")
+                  subst quants
+              in
+              (* Instantiation makes operations on literals, folded as in the
+                 rest of the script; a premise folded to true holds for every
+                 construction and is omitted. *)
+              let instantiate prem =
+                match prem.it with
+                | IfPr e ->
+                    let e = Decd.map_exp fold_ground e in
+                    if e.it = BoolE true then None else Some (IfPr e $ prem.at)
+                | RulePr _ | LetPr _ | ElsePr | IterPr _ -> Some prem
+              in
+              ( quants
+              , List.filter_map instantiate (Il.Subst.subst_prems subst prems) )
+          | None -> unsupported exp.at "CaseE" owner "case is not in its variant type"
+          end
+      | AliasT _ | StructT _ ->
+          unsupported exp.at "CaseE" owner "constructed type is not a variant"
+      end
+  | StrE (_, Unchecked)
+    when Il.Free.Set.subset (Il.Free.free_exp exp).varid bound ->
+      begin match (deftyp env owner exp.note).it with
+      | StructT fields when not (has_field_premises fields) -> [], []
+      | StructT _ ->
+          unsupported exp.at "StrE" owner "record field premises are not instantiated"
+      | AliasT _ | VariantT _ ->
+          unsupported exp.at "StrE" owner "constructed type is not a record"
+      end
+  | _ -> [], []
+
+let concat_premises parts = List.concat_map fst parts, List.concat_map snd parts
+
+(* The case premises of the constructions evaluated in exp, inner first. An
+ * evaluated subsumption or update is also checked by recheck. *)
+let rec exp_case_premises env owner bound exp =
+  let sub = exp_case_premises env owner bound in
+  let concat = concat_premises in
+  let inner =
+    match exp.it with
+    | VarE _ | BoolE _ | NumE _ | TextE _ -> [], []
+    | UnE (_, _, e1) | ProjE (e1, _) | UncaseE (e1, _) | TheE e1 | DotE (e1, _)
+    | LiftE e1 | LenE e1 | CvtE (e1, _, _) | SubE (e1, _, _) | CaseE (_, e1, _) ->
+        sub e1
+    | StrE (fields, _) -> concat (List.map (fun (_, e) -> sub e) fields)
+    | OptE eo -> concat (List.map sub (Option.to_list eo))
+    | TupE es | ListE es -> concat (List.map sub es)
+    | BinE (_, _, e1, e2) | CmpE (_, _, e1, e2) | CompE (e1, e2) | MemE (e1, e2)
+    | CatE (e1, e2) | IdxE (e1, e2) ->
+        concat [sub e1; sub e2]
+    | SliceE (e1, e2, e3) -> concat [sub e1; sub e2; sub e3]
+    | UpdE (e1, path, e2) | ExtE (e1, path, e2) ->
+        concat [sub e1; path_case_premises env owner bound path; sub e2]
+    | CallE (_, args) ->
+        concat
+          (List.map
+             (fun arg ->
+               match arg.it with
+               | ExpA e -> sub e
+               | TypA _ | DefA _ | GramA _ -> [], [])
+             args)
+    | IterE (body, iterexp) ->
+        iterexp_case_premises env owner bound iterexp
+          (fun bound -> exp_case_premises env owner bound body)
+  in
+  if Il.Free.Set.subset (Il.Free.free_exp exp).varid bound then recheck env owner exp;
+  let quants, prems = case_premises env owner bound exp in
+  fst inner @ quants, snd inner @ prems
+
+and path_case_premises env owner bound path =
+  match path.it with
+  | RootP -> [], []
+  | DotP (p, _) -> path_case_premises env owner bound p
+  | IdxP (p, e) ->
+      concat_premises
+        [path_case_premises env owner bound p; exp_case_premises env owner bound e]
+  | SliceP (p, e1, e2) ->
+      concat_premises
+        [ path_case_premises env owner bound p
+        ; exp_case_premises env owner bound e1
+        ; exp_case_premises env owner bound e2 ]
+
+(* The body's premises hold for each element, so they iterate with it over
+ * the elements of the bound sources; an element variable whose source is
+ * unbound is a pattern. The sources and the count are evaluated outside the
+ * iteration. *)
+and iterexp_case_premises env owner bound (iter, generators) body =
+  let outside =
+    List.map (fun (_, source) -> exp_case_premises env owner bound source) generators
+    @ (match iter with
+       | ListN (count, _) -> [exp_case_premises env owner bound count]
+       | Opt | List | List1 -> [])
+  in
+  let is_bound e = Il.Free.Set.subset (Il.Free.free_exp e).varid bound in
+  let generators = List.filter (fun (_, source) -> is_bound source) generators in
+  let local =
+    Il.Free.Set.union bound
+      (Il.Free.Set.of_list
+         (List.map (fun (x, _) -> x.it) generators
+          @ (match iter with
+             | ListN (count, Some i) when is_bound count -> [i.it]
+             | _ -> [])))
+  in
+  let quants, prems = body local in
+  begin match quants with
+  | [] -> ()
+  | quant :: _ ->
+      unsupported quant.at "case quantifier" owner
+        "a case quantifier inside an iteration is not iterated"
+  end;
+  List.concat_map fst outside,
+  List.concat_map snd outside
+  @ List.map (fun prem -> IterPr (prem, (iter, generators)) $ prem.at) prems
+
+let rec prem_case_premises env owner bound prem =
+  match prem.it with
+  | RulePr (_, _, _, e) | IfPr e -> exp_case_premises env owner bound e
+  | LetPr (_, e1, e2) ->
+      concat_premises
+        [exp_case_premises env owner bound e1; exp_case_premises env owner bound e2]
+  | ElsePr -> [], []
+  | IterPr (p, iterexp) ->
+      iterexp_case_premises env owner bound iterexp
+        (fun bound -> prem_case_premises env owner bound p)
+
+(* Each premise is preceded by the case premises of its evaluated
+ * constructions; the variables of a premise are bound after it. Returns the
+ * added quantifiers, the premises, and the premises added for prems and for
+ * results. *)
+let with_case_premises env owner bound prems results =
+  let step (bound, quants, checks) prem =
+    let quants', checks' = prem_case_premises env owner bound prem in
+    ( (Il.Free.Set.union bound (Il.Free.free_prem prem).varid, quants @ quants', checks @ checks')
+    , checks' @ [prem] )
+  in
+  let (bound, quants, checks), prems = List.fold_left_map step (bound, [], []) prems in
+  let quants', after = concat_premises (List.map (exp_case_premises env owner bound) results) in
+  quants @ quants', List.concat prems @ after, checks, after
+
+let case_premise_script index script =
+  let env = Il.Env.env_of_script script in
+  let add acc checks after =
+    {acc with checks = checks @ after @ acc.checks; result_checks = after @ acc.result_checks}
+  in
+  let rule relation policy acc r =
+    let RuleD (id, quants, mixop, exp, prems) = r.it in
+    let owner = "RuleD " ^ relation ^ "/" ^ id.it in
+    let exps = Prem.components mixop exp in
+    let inputs, outputs =
+      match policy with
+      | Prescan.Execution {input_count; _} | Prescan.Compute {input_count; _} ->
+          Prem.split input_count exps
+      | Prescan.Check _ -> exps, []
+    in
+    let bound =
+      List.fold_left
+        (fun bound e -> Il.Free.Set.union bound (Il.Free.free_exp e).varid)
+        Il.Free.Set.empty inputs
+    in
+    let quants', prems, checks, after = with_case_premises env owner bound prems outputs in
+    add acc checks after, {r with it = RuleD (id, quants @ quants', mixop, exp, prems)}
+  in
+  let clause id acc c =
+    let DefD (quants, args, exp, prems) = c.it in
+    let owner = "DecD $" ^ id.it in
+    let bound = (Il.Free.free_args args).varid in
+    let quants', prems, checks, after = with_case_premises env owner bound prems [exp] in
+    let acc = add acc checks after in
+    let acc =
+      if checks @ after = [] || List.mem id.it acc.partial then acc
+      else {acc with partial = id.it :: acc.partial}
+    in
+    acc, {c with it = DefD (quants @ quants', args, exp, prems)}
+  in
+  let rec transform acc def =
+    match def.it with
+    | RelD (id, params, mixop, typ, rules) ->
+        begin match Prescan.relation_policy index id with
+        | Ok policy ->
+            let acc, rules = List.fold_left_map (rule id.it policy) acc rules in
+            acc, {def with it = RelD (id, params, mixop, typ, rules)}
+        | Error _ -> acc, def
+        end
+    | DecD (id, params, typ, clauses) ->
+        let acc, clauses = List.fold_left_map (clause id) acc clauses in
+        acc, {def with it = DecD (id, params, typ, clauses)}
+    | RecD defs ->
+        let acc, defs = List.fold_left_map transform acc defs in
+        acc, {def with it = RecD defs}
+    | TypD _ | GramD _ | HintD _ -> acc, def
+  in
+  let acc, script =
+    List.fold_left_map transform {checks = []; result_checks = []; partial = []} script
+  in
+  script, acc
+
 let translate_script script =
-  let script = stored_script (specialize_script (assume_script script)) in
-  let index = Prescan.scan script in
+  let script = fold_script (stored_script (specialize_script (assume_script script))) in
+  (* The pass needs the relation policies of the first scan; the index is
+     scanned again for the premises it adds. *)
+  let script, checks = case_premise_script (Prescan.scan script) script in
+  let index =
+    Prescan.scan ~case_premises:checks.checks ~result_case_premises:checks.result_checks
+      ~partial_defs:checks.partial script
+  in
   (* Relations without a supported policy are omitted; a call to one is
-     rejected later, but an unreferenced one would vanish silently. *)
-  (* One line per reason, listing its relations in source order. *)
+     rejected later, but an unreferenced one would vanish silently. One line
+     per reason lists its relations in source order, each with its file and
+     line. *)
+  let rec relation_regions defs =
+    List.concat_map
+      (fun def ->
+        match def.it with
+        | RelD (id, _, _, _, _) -> [id.it, def.at]
+        | RecD defs -> relation_regions defs
+        | TypD _ | DecD _ | GramD _ | HintD _ -> [])
+      defs
+  in
+  let regions = relation_regions script in
+  let with_region name =
+    match List.assoc_opt name regions with
+    | Some at ->
+        Printf.sprintf "%s (%s:%d)" name (Filename.basename at.left.file) at.left.line
+    | None -> name
+  in
   let relations = index.Prescan.unsupported_relations in
   List.sort_uniq compare (List.map snd relations)
   |> List.iter (fun reason ->
        let names =
          List.filter_map
-           (fun (name, reason') -> if reason' = reason then Some name else None)
+           (fun (name, reason') ->
+             if reason' = reason then Some (with_region name) else None)
            relations
        in
        Printf.eprintf "[spec2maude] warning: relations not translated (%s): %s\n"

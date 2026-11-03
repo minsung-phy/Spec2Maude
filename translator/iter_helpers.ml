@@ -46,7 +46,7 @@ let index_variable index = function
 let head_variable index (id, source) =
   match source.note.it with
   | IterT (typ, _) -> Prescan.source_variable index id typ
-  | _ -> invalid_arg "iteration generator must have an iteration type"
+  | _ -> raise (Unsupported "iteration generator must have an iteration type")
 
 (* The rest of the sequence after the head element [id]. *)
 let tail_variable index (id, source) =
@@ -173,14 +173,14 @@ let translate_projector_statements index (iteration : Prescan.iteration) =
                (List.for_all
                   (fun (id, _) -> Il.Free.Set.mem id.it bound)
                   generators)
-          then invalid_arg "computed IterE body does not bind every generator";
+          then raise (Unsupported "computed IterE body does not bind every generator");
           let guards =
             List.map
               (function
                 | EqCondition condition -> condition
                 | RewriteCond _ ->
-                    invalid_arg
-                      "an IterE projector cannot use a rewrite condition")
+                    raise (Unsupported
+                      "an IterE projector cannot use a rewrite condition"))
               conditions
           in
           Iter.term_of_variable value, guards
@@ -274,7 +274,7 @@ let translate_statements index (iteration : Prescan.iteration) =
         | (Opt | ListN (_, None)), [] ->
             []
         | (List | List1), [] ->
-            invalid_arg "IterE with List or List1 requires a generator"
+            raise (Unsupported "IterE with List or List1 requires a generator")
         | (Opt | List | List1 | ListN _), _ ->
             let captures =
               Iter.translate_captures index iteration.Prescan.captures
@@ -401,14 +401,12 @@ let helper_key = function
   | OpDecl declaration :: _ ->
       declaration.name, declaration.domain, declaration.codomain
   | [] ->
-      invalid_arg "an iteration helper cannot be empty"
+      raise (Unsupported "an iteration helper cannot be empty")
   | _ ->
-      invalid_arg "an iteration helper must start with an operator declaration"
+      raise (Unsupported "an iteration helper must start with an operator declaration")
 
 (* A helper that cannot be generated is Unsupported at its source iteration. *)
-let located at place f =
-  try f () with Invalid_argument reason ->
-    Util.Error.error at "translation" ("Unsupported iteration in " ^ place ^ ": " ^ reason)
+let located at place f = Maude_il.located at ("iteration in " ^ place) f
 
 let translate_all index =
   let add groups (iteration : Prescan.iteration) =
@@ -427,9 +425,9 @@ let translate_all index =
         | Some previous when previous = statements ->
             groups
         | Some _ ->
-            invalid_arg
+            raise (Unsupported
               ("conflicting iteration helpers named "
-               ^ iteration.Prescan.name)
+               ^ iteration.Prescan.name))
         end
   in
   let status (iteration : Prescan.iteration) =
@@ -464,12 +462,12 @@ let premise_conditions index without iteration =
     translate_body index (Option.is_none without) iteration
       (premise_local_names without iteration) iteration.Prescan.body
   in
-  if otherwise then invalid_arg "IterPr body cannot contain ElsePr";
+  if otherwise then raise (Unsupported "IterPr body cannot contain ElsePr");
   ( List.map
       (function
         | EqCondition condition -> condition
         | RewriteCond _ ->
-            invalid_arg "an IterPr helper cannot contain a rewrite condition")
+            raise (Unsupported "an IterPr helper cannot contain a rewrite condition"))
       conditions
   , bound
   )
@@ -510,7 +508,7 @@ let translate_premise_statements index
   in
   begin match output with
   | Some ((id, _), _) when not (Il.Free.Set.mem id.it bound) ->
-      invalid_arg "IterPr output helper body does not bind its output"
+      raise (Unsupported "IterPr output helper body does not bind its output")
   | None | Some _ -> ()
   end;
   let declaration = partial_op name domain codomain in
@@ -544,7 +542,7 @@ let translate_premise_statements index
   in
   match iter, generators with
   | (Opt | List | List1), [] ->
-      invalid_arg "IterPr with Opt, List, or List1 requires a generator"
+      raise (Unsupported "IterPr with Opt, List, or List1 requires a generator")
   | Opt, _ ->
       let result =
         match output with
@@ -608,7 +606,7 @@ let translate_premise_all index =
         | Some previous when previous = statements -> groups
         | Some _ ->
             let name, _, _ = key in
-            invalid_arg ("conflicting IterPr overload named " ^ name))
+            raise (Unsupported ("conflicting IterPr overload named " ^ name)))
       groups statements
   in
   let status (iteration : Prescan.premise_iteration) =

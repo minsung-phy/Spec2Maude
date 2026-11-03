@@ -70,7 +70,7 @@ The translation visits the definitions of the script in order
 | A clause ends with `x <- es` and returns `x` (membership choice) | `sort F-Request .` `subsort S(t) < F-Request .` `op f̂ : S(params) -> F-Request [frozen] .` | `ceq f̂(⟦args⟧) = choose-f(⟦es⟧) if ⟦other prs⟧ .` and `rl choose-f(PREFIX X SUFFIX) => X .` Any element of `es` can be returned. | `decd.ml:translate_choice_clause` |
 | `hint(builtin)` | `op f̂ : S(params) -> S(t) .` | no equations; the body is written by hand in `translator/backend/builtins.maude` | `decd.ml:translate` |
 
-`hint(maude_kind)` makes the declaration partial (`~>` instead of `->`).
+`hint(maude_kind)` makes the declaration partial (`~>` instead of `->`), and so do case premises added to a clause (section 7).
 
 Function clauses are a sequential pattern match: a clause applies only if no
 earlier clause does (the SpecTec paper; `spectec/lib/il/eval.ml`,
@@ -91,6 +91,13 @@ One head must be an instance of the other, and the earlier conditions must be
 negatable (no binding); otherwise the clause is rejected (section 8). A
 negation can repeat a condition that the clause's own conditions already imply
 (the two clauses of `$signed_`); it is redundant, not wrong.
+
+Case premises added for an earlier clause's result (section 7) are left out of
+its negation: a clause whose premises hold is selected, and a failing result
+check leaves the call stuck rather than enabling a later clause. For the same
+reason a clause after such an overlapping clause states its complements
+instead of using `[owise]`. An earlier clause with a case premise inside a
+premise is rejected when a complement is needed (section 8).
 
 `ElsePr` in a function clause means that no earlier clause applies. Maude's
 `[owise]` means that no other equation of the operator applies, earlier or
@@ -135,6 +142,10 @@ rule's conditions and an `[owise]` equation that returns `false`
 | 2. Negate the conditions of an earlier rule | The negation is exact. A comparison is negated by its dual only if it is total (numbers, `==`, `=/=`); any other condition `b` becomes `b =/= true`, which also holds when `b` is undefined. A matching condition is shared only if its pattern has a unique decomposition. | `reld.ml:direct_complement`, `reld.ml:negate_comparison`, `reld.ml:unique_match_pattern` |
 | 3. Fall back to `r̂-r-enabled` | `r̂-r-enabled(ins)` is `true` exactly when the earlier rule's conditions hold. An earlier rule with a rewrite condition cannot be used this way and is rejected. | `reld.ml:helper_statements` |
 
+The negated conditions of an earlier rule leave out the case premises added for
+its output (section 7), as for function clauses; an earlier rule with a case
+premise inside a premise is rejected.
+
 Rules with `hint(k_heatcool)` are not counted as
 earlier rules. In the WebAssembly specification, no relation has both
 (`ElsePr` occurs only in `Step_pure` and `Step_read`; the hint only in
@@ -145,7 +156,7 @@ earlier rules. In the WebAssembly specification, no relation has both
 | Hint | Meaning | Code |
 | --- | --- | --- |
 | `hint(maude_subsume)` on a rule of a computed relation | The rule defines a separate check operator. A premise whose outputs are already known calls this check (section 3). | `reld.ml:translate` |
-| `hint(maude_trans "C" …)` on a transitivity rule of a checked relation | The other rules are emitted under a separate operator `r̂-step`, and `ceq r̂(xs) = true if r̂-step(xs)` links the two. The transitivity rule becomes `ceq r̂(x, z) = true if y` ranges over the listed constructors `∧ y =/= z ∧ y =/= x ∧ r̂-step(x, y) ∧ r̂(y, z)`. | `reld.ml:translate_trans`, `reld.ml:step_bridge` |
+| `hint(maude_trans "C" …)` on a transitivity rule of a checked relation | The other rules are emitted under a separate operator `r̂-step`, and `ceq r̂(xs) = true if r̂-step(xs)` links the two. The transitivity rule becomes `ceq r̂(x, z) = true if y` ranges over the listed constructors `∧ typecheck(y, t) ∧ y =/= x ∧ y =/= z ∧ r̂-step(x, y) ∧ r̂(y, z)`, where `t` is the type of `y`. | `reld.ml:translate_trans`, `reld.ml:step_bridge` |
 | `hint(k_heatcool)` on a rule with an execution premise | A context rule (its only premise steps the same relation) is translated as in "Context rules with `hint(k_heatcool)`"; any other rule as in "Split rules with `hint(k_heatcool)`" below. | `heatcool.ml:translate_relation`, `hintd.ml:is_kept_rule` |
 
 ### Split rules with `hint(k_heatcool)`
@@ -213,7 +224,7 @@ gets no focus pattern.
 
 Premises are translated left to right (`prem.ml:translate_prems`). An `IfPr`
 or `LetPr` whose variables are not yet bound waits until a later `IfPr` or
-`LetPr` binds them. A `RulePr`, `ElsePr`, `IterPr`, or `NegPr` is never moved:
+`LetPr` binds them. A `RulePr`, `ElsePr`, or `IterPr` is never moved:
 it is rejected if an earlier premise is still waiting. A call of a
 `hint(maude_rule)` function is allowed only as a top-level equality in an
 `IfPr` (below).
@@ -230,7 +241,6 @@ it is rejected if an earlier premise is still waiting. A call of a
 | `ElsePr` | marks the rule; see section 2 (relations) and section 1 (`[owise]` for functions) | `prem.ml:translate_barrier` |
 | `IterPr pr (iter, gens)`, all sources known | `helper(⟦captures⟧, ⟦sources⟧)`: a generated helper that checks `pr` for every element (section 6) | `prem.ml:translate_barrier`, `iter.ml:translate_premise` |
 | `IterPr pr (iter, gens)`, one source unbound, `iter` is `^n` or there are two or more generators | `⟦source⟧` as a pattern for a generated helper that computes it from the other sources (section 6) | `prem.ml:translate_barrier` |
-| `NegPr pr` | rejected (section 8) | `prem.ml:translate_barrier` |
 
 ### `IfPr e`
 
@@ -283,11 +293,11 @@ other expressions are handled by `term.ml:translate_value`.
 | `VarE x` | variable `X̂ : S(t)` | `term.ml:translate_value` |
 | `BoolE b`, `NumE n`, `TextE s` | Maude literal | `term.ml:native_exp` |
 | `UnE op e` | `op(⟦e⟧)` (Maude built-in) | `term.ml:native_exp` |
-| `BinE op e1 e2` | `⟦e1⟧ op ⟦e2⟧` (Maude built-in) | `term.ml:native_exp` |
+| `BinE op e1 e2` | `⟦e1⟧ op ⟦e2⟧` (Maude built-in); nat `-` and nat/int `/` are rejected (section 8) | `term.ml:native_exp`, `term.ml:translate_binop` |
 | `CmpE op e1 e2` | `⟦e1⟧ op ⟦e2⟧`; `==`/`=/=` for equality | `term.ml:native_exp` |
 | `TupE es` | `tuple(⟦e1⟧ … ⟦en⟧)` | `term.ml:translate_value` |
 | `ProjE e i` | `⟦e⟧ . i` | `term.ml:translate_value` |
-| `CaseE C e`, named `C` | `Ĉ(⟦e1⟧, …, ⟦en⟧)` | `term.ml:translate_value` |
+| `CaseE C e`, named `C` | `Ĉ(⟦e1⟧, …, ⟦en⟧)`; an evaluated `Unchecked` one also adds the case premises (section 7) | `term.ml:translate_value` |
 | `CaseE C e`, hole-only `C` | `⟦e⟧` | `term.ml:translate_value` |
 | `UncaseE e C`, hole-only `C` | `⟦e⟧` | `term.ml:translate_value` |
 | `OptE None` / `OptE (Some e)` | `nil` / `⟦e⟧ ?` | `term.ml:translate_value` |
@@ -304,8 +314,7 @@ other expressions are handled by `term.ml:translate_value`.
 | `SliceE e i n` | `⟦e⟧[⟦i⟧ : ⟦n⟧]` | `term.ml:translate_value` |
 | `UpdE e path e'` | nested `_[_=_]`, `_[_:_=_]`, `_[._=_]` along `path` | `term.ml:translate_update` |
 | `ExtE e path e'` | update of `path` with (value at `path`) `⟦e'⟧` | `term.ml:translate_extension` |
-| `IfE c e1 e2` | `if ⟦c⟧ then ⟦e1⟧ else ⟦e2⟧ fi` | `term.ml:translate_value` |
-| `CallE f args` | `f̂(⟦args⟧)` | `term.ml:translate_value` |
+| `CallE f args` | `f̂(⟦args⟧)`; an argument or result typed by a syntax parameter `X` is one value, boxed by `seq(…)` / unboxed by `unseq(…)` when `X` is a sequence type | `term.ml:translate_value`, `term.ml:syntax_parameter_positions` |
 | `IterE e (iter, gens)` | see section 6 | `iter.ml:translate_term` |
 | `CvtE e t1 t2` | `⟦e⟧ : t1 <:> t2` | `term.ml:native_exp` |
 | `SubE e t1 t2` | `⟦e⟧`, when `t1` and `t2` have the same Maude representation | `term.ml:translate_value` |
@@ -378,6 +387,7 @@ Every other use of the field or of a call of the definition is rejected
 | `BoolT`, `NumT t`, `TextT` | `bool`, `nat`/`int`/`rat`/`real`, `text` | `term.ml:translate_typ` |
 | `TupT fields` | one component for each field | `term.ml:translate_components` |
 | `IterT t Opt` / `IterT t List`, as a type argument | `iterOpt(⟦t⟧)` / `iterList(⟦t⟧)` | `term.ml:translate_check_typ` |
+| A value `v` of type `t?` (guard) | `typecheck(v, iterOpt(⟦t⟧))`: `nil`, or `V ?` with `typecheck(V, ⟦t⟧)` | `iter.ml:translate_conditions` |
 | `IterT t iter`, as a sort | the sort of the sequence or option of `t` | `term.ml:translate_sort` |
 | `ExpA e` / `TypA t` | `⟦e⟧` / `⟦t⟧`, keeping the source type name (an alias such as `localidx` is not expanded; its `typecheck` equation resolves it) | `term.ml:translate_arg`, `term.ml:translate_check_typ` |
 | `ExpP x t` / `TypP x` | variable of sort `S(t)` / of sort `SpectecType` | `param.ml` |
@@ -454,12 +464,13 @@ its first occurrence.
 | Before translation | Remove the premises named by `hint(maude_assume)`, and the quantifiers whose variables occurred only in those premises | `def.ml:assume_script` |
 | Before translation | Remove `DefP`/`DefA` (section 5) | `def.ml:specialize_script` |
 | Before translation | After a premise `e = {.., f x*}` on a `hint(maude_array)` or `hint(maude_map)` field `f`, write `e.f` for `x*` in the later premises and the result, so that `x*` gets the stored translation (section 4). Only clauses and rules with such a premise are rewritten. | `def.ml:stored_script` |
+| Before translation | Replace an operation on literals (`BinE`, `UnE`, `CvtE`, `CmpE` on numbers or booleans) by its value when it is defined (`Xl.Num`, `Xl.Bool`), innermost first; an undefined operation such as `1 \ 0`, or one with a non-literal operand, is kept | `def.ml:fold_ground`, `def.ml:fold_script` |
+| Before translation | Case premises (`Step_exp/INJ`): for each evaluated `Unchecked` `CaseE C e` (all its variables bound by earlier premises or inputs), add the premises of case `C` instantiated with `e` before the premise that evaluates it, or after the premises for a rule output or clause result; inside an iteration, as an `IterPr` over the bound sources. Instantiated premises are folded as above and omitted when they fold to `true`. Relation inputs, clause arguments, and constructions with unbound variables are patterns and get none. The added premises (and those for results) are recorded in the index; clauses that got some are partial. | `def.ml:case_premise_script`, `prescan.ml:is_case_premise`, `prescan.ml:is_partial_def` |
 | Before translation | Choose Maude names; collect variables, iterations, relation kinds, and hints | `prescan.ml:scan` |
 | Type guards | A variable of a quantifier or parameter gets a condition `typecheck(X, ⟦t⟧)`, unless its type is already established: by a premise that binds it from a relation call, or by the declared types of the rule's inputs, or by an argument `SubE` pattern of a function head that already checks an equal membership. In a syntax instance such as `syntax num_(Inn)`, the `SubE` check of the alias-expanded type (`addrtype`) keeps its place but uses the quantifier's type (`Inn`), and the quantifier check is not repeated; the type is replaced in the source
-pattern before translation. A variable whose Maude sort is the sort of its
-type's `hint(maude_sort)` gets no guard either; the sort's constructors are
-wider than the type (`CONST(I32, c)` has sort `val` for any `c`), so this also
-relies on reachable values being well typed. In every context, including syntax membership equations, a variable of Maude sort `Nat` (`Int`) gets no guard for `nat` (`int`) or an alias of it (e.g. `syntax N = nat`, `syntax exp = int`): the sort already ranges exactly over those values. A guard of an earlier rule's `r̂-r-enabled` predicate is also dropped when every caller already checks it. This assumes that relation calls and inputs only produce values of their declared types. | `param.ml:translate_eq_conditions` (`proven`), `term.ml:translate_typ_conditions`, `term.ml:with_relation_types`, `term.ml:translate_guard_conditions`, `reld.ml:helper_statements` |
+pattern before translation. A variable of a `hint(maude_sort)` type keeps its
+guard: the sort's constructors are wider than the type (`CONST(I32, c)` has
+sort `val` for any `c`). In every context, including syntax membership equations, a variable of Maude sort `Nat` (`Int`) gets no guard for `nat` (`int`) or an alias of it (e.g. `syntax N = nat`, `syntax exp = int`): the sort already ranges exactly over those values. A guard of an earlier rule's `r̂-r-enabled` predicate is also dropped when every caller already checks it. This assumes that relation calls and inputs only produce values of their declared types. | `param.ml:translate_eq_conditions` (`proven`), `term.ml:translate_typ_conditions`, `term.ml:with_relation_types`, `term.ml:translate_guard_conditions`, `reld.ml:helper_statements` |
 | Condition order | Place each condition after the conditions that bind its variables. Among ready conditions, relation rules take equational conditions before rewrite conditions, and function clauses take conditions that bind nothing before conditions that bind variables. Otherwise the order of the premises is kept. | `maude_il.ml:schedule_conditions`, `maude_il.ml:schedule_rule_conditions`, `maude_il.ml:schedule_equation_conditions` |
 | Condition order, execution rules | The `typecheck` guards of the rule's inputs come first | `maude_il.ml:schedule_execution_conditions` |
 | After translation | Remove repeated conditions, including an equality that repeats an earlier match or equality in either order | `maude_il.ml:simplify_conditions` |
@@ -493,8 +504,10 @@ the rule, clause, or iteration, naming the definition and the reason. An omitted
 | --- | --- | --- |
 | A relation whose kind is none of section 2 (for example, a validation relation without `maude_compute` or `maude_check`) | omitted; listed in a warning with the reason; a premise that uses it is rejected | `def.ml:translate_script`, `reld.ml:translate` |
 | A function with a clause that uses an omitted relation | declaration only; a call to it is rejected | `prescan.ml:unsupported_definitions`, `term.ml:translate_value` |
-| `NegPr` | rejected | `prem.ml:translate_barrier` |
 | `TheE`, `UncaseE` with a named constructor | rejected | `term.ml:translate_value` |
+| `BinE` nat subtraction or nat/int division (partial in the IL, total in Maude) | rejected | `term.ml:translate_binop` |
+| An evaluated `SubE` into a variant whose shared cases have premises or into a record with field premises, an evaluated field update through such a record, an evaluated `StrE` of a record with field premises, a case quantifier inside an iteration, or a case type that does not reduce to a definition | rejected (the rechecked or field premises are not instantiated) | `def.ml:recheck`, `def.ml:case_premises`, `def.ml:iterexp_case_premises` |
+| A complement of an earlier function clause or rule that has a case premise inside a premise | rejected | `decd.ml:ordered_clauses`, `reld.ml:lower_execution_rule` |
 | `CvtE` to or from `real` | rejected | `term.ml:native_exp` |
 | `SubE` between types with different Maude representations | rejected | `term.ml:translate_value` |
 | `IdxE`, `SliceE`, and the paths `IdxP`, `SliceP` on a sequence with its own sort (`hint(maude_sort)`) | rejected | `term.ml:translate_value`, `term.ml:translate_select` |
@@ -505,7 +518,7 @@ the rule, clause, or iteration, naming the definition and the reason. An omitted
 | `ElsePr` in a `maude_rule` function, or not as the first premise of an execution rule | rejected | `decd.ml:translate_rule_clause`, `reld.ml:lower_execution_rule` |
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |
-| `ElsePr`, `IterPr`, or `NegPr` in a `k_heatcool` split rule, split rules whose shape does not fit section 2, and a rewrite condition in a split equation | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
+| `ElsePr` or `IterPr` in a `k_heatcool` split rule, split rules whose shape does not fit section 2, and a rewrite condition in a split equation | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
 | A `k_heatcool` context rule with a context that changes when its inside steps, a conclusion input that is not one sequence element, no sequence context or nonempty condition in its relation, or no rule consuming its element | rejected | `hintd.ml:scan_kembedding`, `heatcool.ml:kept_rule`, `heatcool.ml:kembedding_rule`, `heatcool.ml:kembedding_statements`, `heatcool.ml:translate_relation` |
 | An `ElsePr` execution rule whose earlier rule needs an `r̂-r-enabled` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
 | A call of a `maude_rule` function from a function without `maude_rule`, or in an argument or result of a `maude_rule` clause | rejected | `decd.ml:equation_clause`, `decd.ml:translate_rule_clause` |

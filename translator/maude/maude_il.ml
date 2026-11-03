@@ -4,6 +4,15 @@ type name = string
 type sort = string
 type label = string
 
+(* A source construct the translation does not support. [located] reports it
+   with the source location and enclosing definition; any other exception is
+   an internal error. *)
+exception Unsupported of string
+
+let located at owner f =
+  try f () with Unsupported reason ->
+    Util.Error.error at "translation" ("Unsupported " ^ owner ^ ": " ^ reason)
+
 
 (* Terms *)
 
@@ -246,7 +255,7 @@ let schedule_conditions prefer left conditions =
           | None -> take (fun _ -> true) bound pending
         in
         begin match selected with
-        | None -> invalid_arg "conditions have unresolved dependencies"
+        | None -> raise (Unsupported "conditions have unresolved dependencies")
         | Some (EqCondition (MatchCond (pattern, subject)), pending)
           when variables_bound bound pattern ->
             schedule bound (EqCondition (EqCond (pattern, subject)) :: ordered) pending
@@ -280,7 +289,7 @@ let schedule_equation_conditions left conditions =
   |> schedule_conditions (fun bound condition -> not (binds bound condition)) left
   |> List.map (function
        | EqCondition condition -> condition
-       | RewriteCond _ -> invalid_arg "an equation cannot use a rewrite condition")
+       | RewriteCond _ -> raise (Unsupported "an equation cannot use a rewrite condition"))
 
 (* Execution rules: the type guards of the inputs come first, because a
  * helper called by a later condition may rely on the input's type. *)

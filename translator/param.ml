@@ -7,8 +7,8 @@ let translate_sort index param =
   match param.it with
   | ExpP (_, typ) -> Term.translate_sort index typ
   | TypP _ -> "SpectecType"
-  | DefP _ -> invalid_arg "DefP must be removed by Def.specialize_script"
-  | GramP _ -> invalid_arg "GramP is not supported"
+  | DefP _ -> raise (Unsupported "DefP must be removed by Def.specialize_script")
+  | GramP _ -> raise (Unsupported "GramP is not supported")
 
 
 let translate_term index param =
@@ -20,10 +20,10 @@ let translate_term index param =
       Var (Prescan.source_variable_with_sort index id "SpectecType")
 
   | DefP _ ->
-      invalid_arg "DefP must be removed by Def.specialize_script"
+      raise (Unsupported "DefP must be removed by Def.specialize_script")
 
   | GramP _ ->
-      invalid_arg "GramP is not supported"
+      raise (Unsupported "GramP is not supported")
 
 
 let translate_sorts index params =
@@ -43,7 +43,7 @@ let translate_eq_conditions ?(proven = Il.Free.Set.empty) index params =
        | ExpP _ | TypP _ | DefP _ -> []
 
        | GramP _ ->
-           invalid_arg "GramP is not supported")
+           raise (Unsupported "GramP is not supported"))
 
 
 (* DefP positions, used to specialize def parameters away *)
