@@ -2,7 +2,7 @@ open Wasm_to_maude
 
 let usage () =
   Printf.eprintf
-    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [--wasm 1.0|2.0|3.0] [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--call-depth N]\n  wasm2maude suite-run PATH [--wasm 1.0|2.0|3.0] [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
+    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [--wasm 1.0|2.0|3.0] [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--call-depth N]\n  wasm2maude suite-run PATH [--wasm 1.0|2.0|3.0] [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--call-depth N] [--log-dir DIR]\n  wasm2maude suite-audit DIRECTORY\n";
   exit 2
 
 let write output text =
@@ -242,19 +242,6 @@ let suite_run args =
     (Suite_run.summary report);
   if not (Suite_run.successful report) then exit 1
 
-let wast_summary path =
-  let summary = Wast.load path in
-  Printf.printf "commands: %d\n" (Wast.total summary);
-  List.iter (fun (kind, count) -> Printf.printf "%-28s %d\n" kind count)
-    (Wast.to_lines summary)
-
-let suite_summary path =
-  let suite = Wast.load_suite path in
-  let summary = Wast.summary suite in
-  Printf.printf "files: %d\ncommands: %d\n" (Wast.files suite) (Wast.total summary);
-  List.iter (fun (kind, count) -> Printf.printf "%-28s %d\n" kind count)
-    (Wast.to_lines summary)
-
 let suite_audit path =
   let audit = Wast.audit_suite path in
   Printf.printf "files: %d\nmodules: %d\nencoded: %d\n"
@@ -264,20 +251,6 @@ let suite_audit path =
     (Wast.audit_failures audit);
   List.iter (Printf.printf "- %s\n") (Wast.audit_issues audit)
 
-let suite_typecheck ?(details = false) args =
-  let input, output, semantics, term_only = input_options args in
-  if term_only then usage ();
-  let text, audit = Wast.typecheck_suite ~details ~semantics input in
-  write output text;
-  Printf.eprintf "[wasm2maude] files=%d modules=%d encoded=%d\n"
-    (Wast.audit_files audit) (Wast.audit_modules audit)
-    (Wast.audit_encoded audit);
-  List.iter
-    (fun (reason, count) -> Printf.eprintf "[wasm2maude] skipped=%d %s\n" count reason)
-    (Wast.audit_failures audit);
-  List.iter
-    (Printf.eprintf "[wasm2maude] %s\n") (Wast.audit_issues audit)
-
 let main = function
   | "module" :: args -> module_command args
   | "instantiate" :: args -> instantiate_command args
@@ -286,11 +259,7 @@ let main = function
   | "harness" :: args -> execution_command Harness args
   | "wast-run" :: args -> wast_run args
   | "suite-run" :: args -> suite_run args
-  | ["wast-summary"; path] -> wast_summary path
-  | ["suite-summary"; path] -> suite_summary path
   | ["suite-audit"; path] -> suite_audit path
-  | "suite-typecheck" :: args -> suite_typecheck args
-  | "wast-typecheck" :: args -> suite_typecheck ~details:true args
   | _ -> usage ()
 
 let () =

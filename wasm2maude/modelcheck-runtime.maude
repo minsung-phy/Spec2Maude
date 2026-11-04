@@ -1,8 +1,10 @@
 --- Fixed modelcheck rules; the generated module supplies the input data.
+--- WASM-INVOCATION is in run-runtime.maude, beside this file.
+load run-runtime.maude
 load model-checker.maude
 
 mod WASM-MODELCHECK-DRIVER is
-  protecting WASM-BUILTINS .
+  including WASM-INVOCATION .
   including MODEL-CHECKER .
 
   sort ModelState .
@@ -15,49 +17,18 @@ mod WASM-MODELCHECK-DRIVER is
   --- $invoke is undefined unless the arguments satisfy Val_ok.
   op invalid-invocation : -> ModelState [ctor] .
 
-  op inputModule : -> SpectecTerminal .
-  op inputName : -> SpectecTerminals .
-  op inputArgs : -> ValList .
-  op emptyStore : -> SpectecTerminal .
   op expected : -> ValList .
   op rejected : -> ValList .
-  op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
-  op hasExport : SpectecTerminals SpectecTerminals -> Bool .
-  op invocation : SpectecTerminal -> SpectecTerminal .
-  op isConfig : SpectecTerminal -> Bool .
   op returned : ValList -> Prop [ctor] .
 
-  vars C C2 Z XA : SpectecTerminal .
-  var IS : InstrList .
-  vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
+  vars C C2 Z : SpectecTerminal .
   var RESULT : ValList .
-  var ADDR : Nat .
   var ST : ModelState .
   var P : Prop .
-
-  eq emptyStore = {
-    field('TAGS, nil) ; field('GLOBALS, nil) ; field('MEMS, sized-map(0, empty)) ;
-    field('TABLES, nil) ; field('FUNCS, sized-map(0, empty)) ; field('DATAS, nil) ;
-    field('ELEMS, nil) ; field('STRUCTS, nil) ; field('ARRAYS, nil) ;
-    field('EXNS, nil)
-  } .
-
-  ceq findFunc(
-    EXPORT-PREFIX {field('NAME, NAME) ; field('ADDR, FUNC(ADDR))} EXPORTS,
-    NAME) = ADDR
-    if not hasExport(EXPORT-PREFIX, NAME) .
-  eq hasExport(
-    EXPORT-PREFIX {field('NAME, NAME) ; field('ADDR, XA)} EXPORTS,
-    NAME) = true .
-  eq hasExport(EXPORTS, NAME) = false [owise] .
 
   crl [instantiate] : boot => init(kstate(C, none))
     if instantiate(emptyStore, inputModule, nil) => C .
   rl [initialize] : init(kstate(Step(Z ; nil), none)) => ready(Z) .
-  eq invocation(Z) = invoke(spectec-store(Z),
-      findFunc((spectec-moduleinst(Z) . 'EXPORTS), inputName), inputArgs) .
-  eq isConfig(Z ; IS) = true .
-  eq isConfig(C) = false [owise] .
 
   crl [invoke] : ready(Z) => exec(kstate(C2, none))
     if C2 := invocation(Z) /\ isConfig(C2) .

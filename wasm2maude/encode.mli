@@ -19,9 +19,3 @@ val vec_instr : Wasm.V128.t -> Maude_term.t
 val result_shape : Wasm.V128.shape -> Maude_term.t
 val result_heaptype : Wasm.Types.heaptype -> Maude_term.t
 val result_numtype : Wasm.Types.numtype -> Maude_term.t
-
-type check
-
-val module_checks : Frontend.module_ -> check list
-val check_label : check -> string
-val check_term : check -> Maude_term.t

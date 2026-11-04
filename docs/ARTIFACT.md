@@ -208,9 +208,10 @@ only. `wast-run` and `suite-run` select the version with `--wasm` (below). `.was
 `wast-run` for their modules, actions, and assertions.
 
 The fixed rules for `run` and `modelcheck` are in
-`wasm2maude/run-runtime.maude` and `wasm2maude/modelcheck-runtime.maude`.
-The generated modules import these rules and supply the module, invocation,
-and query data. Both commands emit an absolute runtime path resolved from
+`wasm2maude/run-runtime.maude` and `wasm2maude/modelcheck-runtime.maude`;
+the latter loads the shared invocation module (`WASM-INVOCATION`) from
+`run-runtime.maude` beside it. The generated modules import these rules and
+supply the module, invocation, and query data. Both commands emit an absolute runtime path resolved from
 the working directory; `--runtime FILE` selects a different location.
 
 The WAST execution rules are hand-written in `wasm2maude/`:
