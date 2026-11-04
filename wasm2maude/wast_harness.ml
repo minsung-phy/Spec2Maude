@@ -1,5 +1,5 @@
 (* rew runs the script until no rule applies. The runtime fixes the rule
-   choice at memory.grow and table.grow (wast-runtime.maude, choice). *)
+   choice at memory.grow and table.grow (wast-runtime-core.maude, choice). *)
 let render ~semantics ~runtime ~commands ~host_store ~host_instances =
   Printf.sprintf
     {|load %s

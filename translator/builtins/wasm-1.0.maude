@@ -1,0 +1,34 @@
+--- Builtins (contract in core.maude). Wasm 1.0: the shared implementations
+--- and $bytes_/$inv_bytes_ over valtype, where 2.0 and 3.0 have $nbytes_ over
+--- numtype; reinterpret__ uses them.
+
+load core.maude
+
+mod WASM-BUILTINS is
+  inc WASM-BUILTINS-CORE .
+
+  --- NaN propagation (Wasm 1.0 numerics, nans_N): the sign of a NaN result is
+  --- not determined, so both canonical NaNs are possible results.
+  var NAN_N : Nat .
+  eq float-default-nan(NAN_N) =
+      POS(NAN(_^_(2, _-_(signif(NAN_N), 1))))
+      NEG(NAN(_^_(2, _-_(signif(NAN_N), 1)))) .
+
+  var NB_PAYLOAD : SpectecTerminal .
+  var NB_BYTES : SpectecTerminals .
+
+  eq bytes-(I32, NB_PAYLOAD) = nbytes-int(32, NB_PAYLOAD) .
+  eq bytes-(I64, NB_PAYLOAD) = nbytes-int(64, NB_PAYLOAD) .
+  eq bytes-(F32, NB_PAYLOAD) = nbytes-float(32, NB_PAYLOAD) .
+  eq bytes-(F64, NB_PAYLOAD) = nbytes-float(64, NB_PAYLOAD) .
+
+  eq inv-bytes-(I32, NB_BYTES) = inv-nbytes-int(32, NB_BYTES) .
+  eq inv-bytes-(I64, NB_BYTES) = inv-nbytes-int(64, NB_BYTES) .
+  eq inv-bytes-(F32, NB_BYTES) = inv-nbytes-float(32, NB_BYTES) .
+  eq inv-bytes-(F64, NB_BYTES) = inv-nbytes-float(64, NB_BYTES) .
+
+  eq reinterpret--(I32, F32, NB_PAYLOAD) = inv-bytes-(F32, bytes-(I32, NB_PAYLOAD)) .
+  eq reinterpret--(F32, I32, NB_PAYLOAD) = inv-bytes-(I32, bytes-(F32, NB_PAYLOAD)) .
+  eq reinterpret--(I64, F64, NB_PAYLOAD) = inv-bytes-(F64, bytes-(I64, NB_PAYLOAD)) .
+  eq reinterpret--(F64, I64, NB_PAYLOAD) = inv-bytes-(I64, bytes-(F64, NB_PAYLOAD)) .
+endm

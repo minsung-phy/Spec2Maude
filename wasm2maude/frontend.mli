@@ -16,5 +16,6 @@ val text : name:string -> string -> module_
 val binary : name:string -> string -> module_
 val import_count : module_ -> int
 val export_type : module_ -> Wasm.Ast.name -> Wasm.Types.externtype option
-val function_parameters :
-  module_ -> Wasm.Ast.name -> (Wasm.Types.valtype list, invocation_error) result
+val function_type :
+  module_ -> Wasm.Ast.name ->
+  (Wasm.Types.valtype list * Wasm.Types.valtype list, invocation_error) result

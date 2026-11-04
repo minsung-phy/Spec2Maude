@@ -130,9 +130,9 @@ let rec translate_pattern ?(computed = fun _ -> None) index exp =
         body iterexp
       |> Option.map (fun (term, guards) -> {term; guards})
 
-  | CallE _ -> computed exp
+  | CallE _ | BinE _ | ProjE _ -> computed exp
 
-  | UnE _ | BinE _ | CmpE _ | ProjE _ | UncaseE _ | TheE _ | DotE _
+  | UnE _ | CmpE _ | UncaseE _ | TheE _ | DotE _
   | CompE _ | LiftE _ | MemE _ | LenE _ | IdxE _ | SliceE _
   | UpdE _ | ExtE _ | CvtE _ | SubE _ ->
       None
@@ -271,9 +271,17 @@ let can_bind_computed_pattern index bound exp =
   | CallE (id, args) -> Option.is_some (inverse_plan index bound id args)
   | _ -> false
 
-let direct_numeric_variable index bound exp =
+(* An unbound numeric operand of + or *: a variable, or another such
+   operation, bound recursively and rechecked against the subject. *)
+let rec numeric_pattern index bound exp =
   match exp.it, Prescan.sort_of_typ index exp.note with
   | VarE _, ("Nat" | "Int") -> not (known bound exp)
+  | BinE ((`AddOp | `MulOp), (`NatT | `IntT), left, right), _ ->
+      (numeric_pattern index bound left && known bound right)
+      || (known bound left && numeric_pattern index bound right)
+  | ProjE ({it = UncaseE (inner, mixop); _}, 0), ("Nat" | "Int")
+    when Xl.Mixop.arity mixop = 1 ->
+      not (known bound inner)
   | _ -> false
 
 let rec bind_pattern index bound exp subject error =
@@ -313,27 +321,33 @@ let rec bind_pattern index bound exp subject error =
         else App (Prescan.mixop_name index mixop, [subject])
       in
       bind_pattern index bound inner represented error
-  | BinE (`MulOp, (`NatT | `IntT), left, right) ->
-      let target, factor =
-        if direct_numeric_variable index bound left && known bound right then
+  | BinE (((`AddOp | `MulOp) as op), ((`NatT | `IntT) as typ), left, right) ->
+      (* e + k = v binds e to v - k (sd for nat; v < k leaves sd(v, k) + k
+         =/= v), and e * k = v binds e to v quo k with k =/= 0; the recheck
+         e + k = v or e * k = v rejects a value that has no such e. *)
+      let target, operand =
+        if numeric_pattern index bound left && known bound right then
           left, right
-        else if
-          known bound left && direct_numeric_variable index bound right
-        then
+        else if known bound left && numeric_pattern index bound right then
           right, left
         else
           raise (Unsupported (error ^ ": " ^ Il.Print.string_of_exp exp))
       in
-      let factor_term = Term.translate_exp index factor in
+      let operand = Term.translate_exp index operand in
+      let inverse, guards =
+        match op, typ with
+        | `AddOp, `NatT -> "sd", []
+        | `AddOp, `IntT -> "_-_", []
+        | `MulOp, _ ->
+            "_quo_", [EqCondition (BoolCond (App ("_=/=_", [operand; Const "0"])))]
+      in
       let result =
-        bind_pattern index bound target
-          (App ("_quo_", [subject; factor_term])) error
+        bind_pattern index bound target (App (inverse, [subject; operand])) error
       in
       { result with
         conditions =
-          EqCondition
-            (BoolCond (App ("_=/=_", [factor_term; Const "0"])))
-          :: result.conditions
+          guards
+          @ result.conditions
           @ [EqCondition (EqCond (Term.translate_exp index exp, subject))]
       }
   | CallE (id, args) ->
@@ -499,6 +513,16 @@ let output_subjects index outputs =
 
 let bind_outputs index bound outputs subjects conditions error =
   bind_pattern_parts index bound outputs subjects conditions error
+
+(* The quantifiers of a rule or clause whose variables still occur in [free]
+   after premises were removed. *)
+let used_quants free quants =
+  List.filter
+    (fun quant ->
+      match quant.it with
+      | ExpP (id, _) -> Il.Free.Set.mem id.it free.Il.Free.varid
+      | TypP _ | DefP _ | GramP _ -> true)
+    quants
 
 let components mixop exp =
   match Mixop.components mixop exp with
@@ -824,6 +848,19 @@ let translate_letpr index bound quants left right =
     in
     Ready (make (bind_names result.bound names) conditions)
 
+(* A premise on an execution relation, or calling a hint(maude_rule)
+   definition, is a rewrite condition. *)
+let rec premise_rewrites index prem =
+  match prem.it with
+  | RulePr (id, _, _, _) ->
+      begin match Prescan.relation_policy index id with
+      | Ok (Prescan.Execution _) -> true
+      | Ok (Prescan.Compute _ | Prescan.Check _) | Error _ -> false
+      end
+      || prem_has_rewrite_call index prem
+  | IterPr (prem, _) -> premise_rewrites index prem
+  | IfPr _ | LetPr _ | ElsePr -> prem_has_rewrite_call index prem
+
 let translate_barrier index collect_outputs bound prem =
   match prem.it with
   | RulePr (id, args, mixop, exp) ->
@@ -863,10 +900,25 @@ let translate_barrier index collect_outputs bound prem =
           if not collect_outputs then
             raise (Unsupported "IterPr output requires relation helper collection");
           Prescan.request index iteration.Prescan.name (OutputHelper position);
-          bind_pattern index bound source
-            (Iter.premise_output_call index (Term.translate_exp index)
-               iteration position)
-            "IterPr output source is not a structural pattern"
+          let call =
+            Iter.premise_output_call index (Term.translate_exp index)
+              iteration position
+          in
+          if premise_rewrites index iteration.Prescan.body then
+            (* The helper is rewritten by rules
+               (Iter_helpers.rewrite_premise_statements). *)
+            match translate_pattern index source with
+            | Some pattern ->
+                { conditions =
+                    RewriteCond (call, pattern.term)
+                    :: List.map (fun guard -> EqCondition guard) pattern.guards
+                ; bound = bind bound source
+                ; otherwise = false
+                }
+            | None -> raise (Unsupported "IterPr output source is not a structural pattern")
+          else
+            bind_pattern index bound source call
+              "IterPr output source is not a structural pattern"
       | [_] ->
           raise (Unsupported "IterPr body does not determine its unbound source")
       | _ ->
@@ -945,7 +997,7 @@ let translate_all index ?(bound = []) ~bind_membership ~collect_outputs prems =
 
 let translate_eq_conditions index ?bound prems =
   let result =
-    translate_all index ?bound ~bind_membership:false ~collect_outputs:false prems
+    translate_all index ?bound ~bind_membership:false ~collect_outputs:true prems
   in
   if result.otherwise then raise (Unsupported "ElsePr belongs to DecD or RelD");
   List.map

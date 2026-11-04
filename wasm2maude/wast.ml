@@ -55,8 +55,17 @@ let rec commands counts = function
       in
       commands counts rest
 
+(* Wasm 1.0 and 2.0 scripts may use forms the current parser no longer
+   reads (Legacy_wast). *)
 let parse path =
-  try Parse.Script.parse_file path with
+  try
+    if !Wasm_version.current = Wasm_version.V3 then Parse.Script.parse_file path
+    else
+      let text = In_channel.with_open_bin path In_channel.input_all in
+      let ids = !Wasm_version.current = Wasm_version.V1 in
+      let lexbuf = Lexing.from_string (Legacy_wast.normalize ~ids text) in
+      Parse.Script.parse path lexbuf
+  with
   | Parse.Syntax (at, message) | Wasm.Custom.Syntax (at, message) ->
       Ingress_error.raise ~region:at Ingress_error.Syntax path message
   | Sys_error message -> Ingress_error.raise Ingress_error.Io path message

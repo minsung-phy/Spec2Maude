@@ -427,10 +427,21 @@ let constructor_result_sort metadata constructor =
     |> List.filter (fun (_, parent, value) ->
          List.mem parent owners && not (List.mem value owners))
   in
-  match partitions with
-  | [(proper, _, _)] -> proper
-  | _ :: _ :: _ -> fail "constructor belongs to more than one proper partition"
-  | [] ->
+  (* Nested proper partitions (Wasm 1.0/2.0: instr proper sort inside the
+     admininstr one) give a constructor of both owners the partition of the
+     most specific owner. *)
+  let most_specific_partition =
+    List.filter
+      (fun (_, parent, _) ->
+        List.for_all
+          (fun (_, parent', _) -> is_subsort metadata.edges [] parent parent')
+          partitions)
+      partitions
+  in
+  match partitions, most_specific_partition with
+  | _ :: _, [(proper, _, _)] -> proper
+  | _ :: _, _ -> fail "constructor belongs to more than one proper partition"
+  | [], _ ->
       let most_specific =
         owners
         |> List.filter (fun candidate ->
@@ -539,6 +550,19 @@ let annotated_sorts metadata = metadata.annotated
 let subsort_edges metadata = metadata.edges
 let proper_sorts metadata =
   List.map (fun (proper, parent, _) -> proper, parent) metadata.proper
+
+(* A proper sort is below the proper sort of each strict supersort of its
+   parent: InstrProper < AdmininstrProper when instr < admininstr. *)
+let proper_edges metadata =
+  List.concat_map
+    (fun (proper, parent, _) ->
+      List.filter_map
+        (fun (proper', parent', _) ->
+          if parent <> parent' && is_subsort metadata.edges [] parent parent'
+          then Some (proper, proper')
+          else None)
+        metadata.proper)
+    metadata.proper
 let typed_list_sorts metadata = metadata.lists
 
 let typed_parents metadata sort =
@@ -896,7 +920,8 @@ let focus_proper_sort metadata owner at =
 
 let is_trigger metadata proper exp =
   match constructor exp with
-  | Some mixop -> constructor_result_sort metadata mixop = proper
+  | Some mixop ->
+      is_subsort (proper_edges metadata) [] (constructor_result_sort metadata mixop) proper
   | None -> false
 
 let rec value_part metadata owner exp =

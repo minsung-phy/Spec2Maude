@@ -1,8 +1,12 @@
 # Translation meaning, source hints, and supported scope
 
-The translation target is the whole IL AST obtained by elaborating the 21
-`wasm-3.0/*.spectec` files of the [fixed revision](../spectec/REVISION). The
-translator recursively translates the type declarations, function bodies, rules, and premises of that input
+The translation target is the whole IL AST obtained by elaborating the
+specification files of the [fixed revision](../spectec/REVISION): the 21
+`wasm-3.0/*.spectec` files, and the 9 files of each of `wasm-1.0/` and
+`wasm-2.0/` (chapters 0 to 9; the binary format, a grammar, is not translated).
+The same translator, with the same hint contracts, translates the three
+versions; their builtins are in `translator/builtins/` (core and vector parts
+shared, one `wasm-VERSION.maude` per version). The translator recursively translates the type declarations, function bodies, rules, and premises of that input
 without hardcoding names. It does not delete part of the input IL because a particular Wasm program or test
 does not execute it.
 
@@ -44,11 +48,14 @@ that moves on to the next clause or rule, so it is stuck). The translation follo
 - If the check of a result or output fails, the failure happens after that clause or rule has already been selected, so it is stuck. Therefore
   the complement of a later clause and the complement of an `ElsePr` rule leave that check out and negate only the original premises,
   and if such an earlier clause overlaps, `[owise]` is not used either. When a construction check inside a premise
-  fails, it must also be stuck, but the negation of the premise is then true, so if such an earlier clause or rule needs a
-  complement, it is rejected (`Unsupported`) (none in current Wasm).
-- The premises of `SubE` that checks again (`SUB-INJ`, `SUB-STR`) and of field update (`UPD-DOT`),
-  `StrE` with field premises, and case quantifiers inside iterations are not instantiated and are
-  rejected (`Unsupported`) (none in current Wasm).
+  fails, it must also be stuck, but the negation of the premise is then true. So an `ElsePr` rule after such a rule also
+  requires those checks, stated on its own inputs (`reld.ml:lower_execution_rule`, Wasm 2.0 `vtestop-false`): with them,
+  its complement holds exactly when the earlier rule's other premises fail. Checks that need variables the inputs do
+  not bind, and such an earlier DecD clause, are rejected (`Unsupported`).
+- `SubE` checks the premises of the target case again (`SUB-INJ`). When the source and target cases have the same
+  payload type, quantifiers, and premises (Wasm 1.0/2.0 `instr <: admininstr`, where `admininstr` includes `instr`),
+  a source value already satisfies them and nothing is added. Other rechecked `SubE` premises and those of field update
+  (`SUB-STR`, `UPD-DOT`), and `StrE` with field premises, are not instantiated and are rejected (`Unsupported`).
 - Number and logic operations without variables are replaced by values before translation (`def.ml:fold_ground`,
   `Xl.Num`/`Xl.Bool`). They are replaced only when both operands are literals and the operation is defined;
   `1 \ 0` or `0 * e` (computing e may fail) are left as they are. The same function is used for constant expressions produced by
@@ -115,7 +122,13 @@ so this is recorded as a problem on the source side.
   does not match (`decd.ml:complement`). Example: `ceq inv-jsize(N) = inv-isize(N) if N =/= 8
   /\ N =/= 16`. Overlap is decided from the source pattern and the translated head, and types whose constructors do not overlap
   (`Inn`, `Fnn`) do not overlap. If neither of the two heads is an instance of the other,
-  or the extra structure of the earlier head is not ground, or the earlier clause's condition binds variables, it is `Unsupported`.
+  or the earlier clause's condition binds variables, it is `Unsupported`, except for the last clause: when a complement
+  cannot be stated for it (for example an earlier head with non-ground extra structure, Wasm 2.0
+  `$dataidx_instr(MEMORY.INIT x)` before `$dataidx_instr(in)`), it is `[owise]`, which applies exactly when no earlier
+  clause does, provided no earlier overlapping clause has case premises; otherwise it is `Unsupported`. One difference
+  remains: if an earlier clause's condition is stuck (neither true nor false), the IL keeps the call stuck
+  (`Step_exp/MATCH-false` needs `false`), but `[owise]` applies. This is the same as the complement `_=/=_` of two stuck
+  terms; the Wasm 1.0–3.0 output has no such clause (its only new `[owise]` follows unconditional clauses).
   A negation already implied by the clause's own condition may be added (`$signed_`): it is redundant but not wrong.
   An `ElsePr` clause is `[owise]` and must be the last clause (not checked).
 - The typecheck of a list alias (`resulttype = valtype*`, `expr = instr*`) is per element. A wrapped
@@ -164,7 +177,7 @@ Unsupported (`wasm2maude/emit.ml`). In result accounting it is also counted as U
 - The wast harness already works this way. At the planning stage, `Wasm.Match.match_externtype` of the reference interpreter
   checks import types (`wasm2maude/wast_plan.ml`),
   and only the current minimum size condition of memory/table is checked at run time by Maude's `linkImports`
-  (`wasm2maude/wast-runtime.maude`). Therefore import modules in wast are supported under the assumption that the frontend linker
+  (`wasm2maude/wast-runtime-core.maude`). Therefore import modules in wast are supported under the assumption that the frontend linker
   makes the same judgment as `Externaddr_ok`.
 
 ### Invocation argument check
@@ -303,13 +316,16 @@ A function `def $f(..) : t* hint(maude_map)` means that its result is such a fie
 | `e[.F[i] = x]` | `e[. 'F = map-write(e . 'F, i, x)]` |
 | `e[.F[i].G.. = x]` | modify `map-read(e . 'F, i)`, then put it back with `map-write` |
 | `e[.F = s]` | `e[. 'F = map-of(s)]` |
+| `e[.F[i : n] = s]` | `e[. 'F = map-write-range(e . 'F, i, n, s)]` |
+| `e[.F =++ s]` | `e[. 'F = map-append(e . 'F, s)]` |
 | `{.., F e.F' s}` (e.F' is a map field) | `map-append(e . 'F', s)` |
 | `{.., F s}` | `map-of(s)` |
 | record `r ++ r'` | for this field, `map-concat(r . 'F, r' . 'F)` |
 
 `map-write` is defined only for `i < size`, like list update. `map-concat` shifts the right entries
 by the left size. The result is the same regardless of the order of shifting. Uses outside the table above (reading the field or call
-value itself as a list, range read/write, extending with `++`) are rejected (`Unsupported`).
+value itself as a list, range read) are rejected (`Unsupported`). `map-write-range` writes the n elements of s one by
+one with `map-write`, so it is defined only for `i + n <= size`, like the list range update.
 
 The nondeterministic membership choice helper selects a possible element with a prefix/selected element/suffix matching rule.
 It keeps the source choice meaning, boxing, and frozen arguments.
@@ -384,12 +400,12 @@ A hint makes explicit a boundary that is hard to translate directly; it is not p
 | `maude_subsort "T"` | Subsort relation between the marked source types. A wrong target or a cycle is rejected. |
 | `maude_proper "V P"` | Builds a proper sort P that excludes the value V from the declared constructor set. Instruction names are not hardcoded. |
 | `maude_array` (record field) | Stores this sequence field of a monomorphic record type as a size + prelude `ARRAY` (default value 0). Field access is limited to length, element and range reads, and range and whole writes; construction is limited to `0^n`, `s 0^n`, and lists. Other uses are rejected. 0s in the elements are not stored, so the element type must contain the number 0. This condition is not checked (it holds for Wasm `byte`). |
-| `maude_map` (record field, function) | Field: stores this sequence field of a monomorphic record type as a size + prelude `MAP` (an entry at every index). Field access is limited to length and element reads and element and whole writes; construction is limited to lists, `e.F s`, and record `++`. Function: the result is a maude_map field, and calls are used only for length and element reads. Other uses are rejected. |
+| `maude_map` (record field, function) | Field: stores this sequence field of a monomorphic record type as a size + prelude `MAP` (an entry at every index). Field access is limited to length and element reads and element, range (`map-write-range`), and whole writes and extension `=++` (`map-append`); construction is limited to lists, `e.F s`, and record `++`. Function: the result is a maude_map field, and calls are used only for length and element reads. Other uses are rejected. |
 | `k_heatcool` | Translates a rule with an execution premise by heating/cooling. A context rule whose only premise is one execution premise of the same relation keeps the context open in `kstate(R, K)` by K embedding (K book §5.4.6), and other rules are connected by split/plug (K book §5.4.5). For a `~>` relation, split and focus identification are equations; for a `~>*` relation, split is a rule. The applicability conditions and assumptions are in [scope](#k_heatcool-scope) below. |
 | `maude_kind` | Declares the result of a function with the partial arrow `~>`. A general function without this hint is declared with `->`. A function that contains a case premise check is also `~>` ([value construction and type constraints](#value-construction-and-type-constraints)). |
 | `maude_rule` | Translates a function that needs a rewrite premise to a request/rule. It keeps the source result and the possible branches. |
 | `inverse $g` | Obtains a missing argument with the declared inverse function g and rechecks the pattern and the forward result. The argument order and signature are checked. |
-| `builtin` | Generates the function declaration and connects it to the handwritten implementation in `translator/backend/builtins.maude`. |
+| `builtin` | Generates the function declaration and connects it to the handwritten implementation in `translator/builtins/` (`wasm-VERSION.maude` on the shared `core.maude` and, for 2.0 and 3.0, `vector.maude`). |
 | `maude_compute` | Translates the relation to a partial operation that computes the output after one plain `~~` or `:`. |
 | `maude_check` | Translates the relation to a partial Bool check that takes all components. It is `true` if the relation holds, and has no result otherwise. |
 | `maude_subsume` (rule) | This rule of a `maude_compute` relation is in check form. It becomes a separate Bool operation named after the rule (`Ref_ok/sub` → `Ref-ok-sub`), and a call whose output is also known calls this operation. Only a call whose output is unknown calls the compute operation. |
@@ -434,7 +450,9 @@ are separate checks. Source functions and rules are not deleted because they are
   The source uses are length, element and range reads, range write (`$with_mem`), whole write (`$with_data`),
   `0^n` construction (`allocmem`), list construction (`allocdata`), and `b* 0^n` after a field pattern (`growmem`),
   all of which are forms in the table above. A byte 0 corresponds to the default value in the form `%_byte(0)`.
-- `FUNCS`, `MEMS` fields of `store` and the `REFS` field of `tableinst`: `maude_map`.
+- `FUNCS`, `MEMS` fields of `store` and the `REFS` field of `tableinst`: `maude_map`. Wasm 1.0/2.0 also read
+  the whole fields through `$funcinst(z)`, `$meminst(z)` (marked `maude_map` as functions), append with
+  `s[.FUNCS =++ fi]`, and 1.0 writes a table range in `$initelem`.
   The source `$s(z).FUNCS[a]`, `$mem(z,x)`, `|$table(z,x).REFS|` count up to a cells or the size in a list,
   and the store accumulates the functions and memories of all modules of the script (Maude profile: about 40% of rewrites
   in return_call*, call_indirect; 37% in memory_copy (33 modules)).
@@ -455,6 +473,15 @@ The current profile is Wasm DET with `ND=false` and relaxed choice 0. Arithmetic
 negate, abs, copysign, and reinterpret, which preserve sign/payload.
 The resource-failure choice of memory/table grow remains. DET results are not generalized to results for all
 NaN and relaxed choices of the full profile.
+Wasm 1.0 and 2.0 have no profiles. Their NaN propagation (numerics, `nans_N`) leaves the sign of a NaN result
+open and gives a canonical payload when every NaN input is canonical, any arithmetic payload otherwise. The
+float builtins are shared; only `float-default-nan` differs per version: 3.0 returns the positive canonical NaN
+(deterministic profile), 1.0 and 2.0 return both canonical NaNs, so each sign is a separate rewrite. This is the
+source's result set exactly, except after a non-canonical NaN input: the source then allows every arithmetic
+NaN (2^23 for f32, 2^52 for f64, with both signs), and the backend gives the two canonical ones, which are among
+them. Every result is a source result; the other arithmetic payloads are not produced. This is an assumption of
+the backend, not of the translation. The official tests check such results as `nan:arithmetic`, which the
+canonical NaNs satisfy; the reference interpreter also returns a single NaN (`Fxx.determine_binary_nan`).
 
 `otherwise` must preserve the condition that no earlier applicable rule of the source exists.
 `ElsePr` of an execution `RelD` first aligns the variables of the preceding input pattern with the current input, and
@@ -831,6 +858,8 @@ The sort of VAL* is ValList. Non-value lists such as NOP/TRAP and requests in ex
 
 Direct execution RulePrs, general conditions and bindings before and after execution, and chaining of multiple execution premises are supported. ElsePr and IterPr inside a hinted rule and rewrite-backed expressions are currently explicitly Unsupported. An unsupported structure is not silently reverted to a plain rule. The supported scope of the existing list contexts is kept.
 
+Wasm 1.0 and 2.0 hint 7 of these rules (they have no `Step/ctxt-handler`).
+
 `$evalexprs`, `$evalglobals` in `4.4-execution.modules.spectec` are function definition clauses, so they are not included in the 8 relation rules above. They keep the existing translation and call the changed Eval_expr.
 
 Translation and Maude load check:
@@ -842,3 +871,59 @@ test/spectec_to_maude.sh
 ```
 
 The commands above check source translation, comparison of generated files, and Maude load. They do not replace execution result checks, the full official suite, performance comparison, or a preservation proof of general search/LTL meaning. Execution and suite checks are described in [ARTIFACT.md](ARTIFACT.md).
+
+## Forms needed by Wasm 1.0 and 2.0
+
+These cases follow the IL meaning directly; none names a Wasm construct.
+
+- Option alias `syntax mut = MUT?`: `typecheck(v, mut) = typecheck(v, iterOpt(MUT))` (`typd.ml:translate_alias`).
+- An `IterPr` that determines an unbound generator source (`STORE .. -- (if numtype = Inn /\ ..)?` determines `Inn?`)
+  uses the output helper in type and definition premises too; the body binds the output by equality, so it is a
+  function. An `IterPr` over an execution premise (`(Eval_expr: z; expr ~>* z; val)*` in `$instantiate`) is a request
+  rewritten by rules, one rule per element, so every result of each element is kept
+  (`iter_helpers.ml:rewrite_premise_statements`, request sort `S-Iteration` above the result sort S).
+- Arithmetic patterns: `e + k` and `e * k` with known k bind e to `sd(v, k)` (int: `v - k`) and `v quo k`, recursively,
+  and recheck `e + k = v`; a relation input keeps its constructors and solves only such a field (`BR $(l+1)`,
+  `$(n * 64 * $Ki) = |..|`).
+- A premise `e_1 \/ .. \/ e_n` of an execution rule that binds a variable is split into rules `id-1` .. `id-n`, one per
+  disjunct (`def.ml:disjunction_script`): a rewrite rule per disjunct has exactly the source rule's steps. Equations
+  and hinted rules are not split.
+- Typed lists share the prelude list operations, so index, slice, and update on them use the common equations.
+- An `ElsePr` selection drops the case quantifiers that occur only in the dropped result checks.
+- Nested proper sorts: Wasm 1.0/2.0 mark `instr` (`maude_proper "val InstrProper"`) and `admininstr`
+  (`maude_proper "val AdmininstrProper"`), where `admininstr` includes `instr`. A constructor of both owners gets
+  the partition of the most specific owner (`InstrProper`), `InstrProper < AdmininstrProper` is declared
+  (`Hintd.proper_edges`), and a focus trigger may be any proper subsort of the focused sort.
+- A definition whose result may be undefined needs `maude_kind` as in 3.0: in Wasm 1.0, `$initelem` and
+  `$initdata` (an out-of-range segment update) are marked, so `$instantiate` has no result there. In Wasm 2.0,
+  `$vextunop__` and `$vextbinop__` are marked, since their clauses do not cover every shape the syntax admits, and
+  `$default_`, which has no clause for `BOT`.
+- `maude_subsort "instr"` on `val` is exact in 1.0 (values are `CONST`) and 3.0 (`instr` includes the
+  administrative instructions), but in 2.0 `val` contains `REF.FUNC_ADDR` and `REF.HOST_ADDR`, which are
+  `admininstr` but not `instr`. So `val < instr` makes a Maude variable of sort `instr` also match these two
+  values. Explicit `typecheck(_, instr)` still rejects them. This is an assumption, not a proof: the two values arise only
+  during execution, in `admininstr*` positions, while the positions typed `instr*` (block bodies, `LABEL_`
+  continuations, the instructions after a `BR` or `RETURN`) hold instructions of the module.
+- Two pattern bindings do not recheck the type of the bound variable: `(e!C).0` as a pattern binds `e` to
+  `Ĉ(u)` without the case premise of `e`'s type (IL `MATCH-guess` needs `Ok_subst`), and an otherwise rule after a
+  rule with a case premise inside a premise requires those case premises on its own inputs, which can only stop it
+  when the predecessor's other premises already fail. In the Wasm 1.0–3.0 output the first binds only a `labelidx`
+  whose range the input bounds, and the second adds only the shape check of 2.0 `vtestop-false`, which holds for
+  every well-formed input.
+
+## Upstream reports
+
+Translating Wasm 1.0–3.0 and running each official suite on the result found these source problems, reported to
+WebAssembly/spec (status as of 2026-11-04):
+
+| Report | Problem | Upstream status | Here |
+| --- | --- | --- | --- |
+| [issue #2319](https://github.com/WebAssembly/spec/issues/2319) | `$binop_` passes a 64-bit shift amount to the `u32` parameter of `$ishl_`/`$ishr_`; under the IL, `i64.shl` with a count of 2^32 or more has no result (all versions). | Confirmed by the maintainers: the parameters should be `iN(N)`. Already fixed in Wasm-DSL/spectec ([c1ff19a](https://github.com/Wasm-DSL/spectec/commit/c1ff19a68ec6e5668004e0eca69ac19f8391fcda)), not yet in WebAssembly/spec. | not changed; `i64.wast` fails in every version |
+| [issue #2321](https://github.com/WebAssembly/spec/issues/2321) | wasm-2.0 `$vextunop__`/`$vextbinop__` are defined only for `Inn`, so I8/I16-lane `extadd_pairwise`, `extmul`, and `dot` have no result. | Confirmed; already fixed in Wasm-DSL/spectec ([5f77115](https://github.com/Wasm-DSL/spectec/commit/5f77115bfbc3306831ca71b6d0304b0c791f95fb)), not yet in WebAssembly/spec. | fixed locally (`Jnn`, as in wasm-3.0) |
+| [PR #2322](https://github.com/WebAssembly/spec/pull/2322) | wasm-2.0 lacks the context-rule fix #2218 made for wasm-1.0 (`Step/ctxt-instrs`, the frame update in `Step/ctxt-frame`, `admininstr*` in `Step/pure`, `Step/read`, `Step/ctxt-label`). | Merged ([c4a1a33](https://github.com/WebAssembly/spec/commit/c4a1a336ce725158dd52bb25e8e77b161232b37c)); the maintainers believe it was also fixed downstream. | applied locally (same change) |
+| [PR #2320](https://github.com/WebAssembly/spec/pull/2320) | The SpecTec interpreter's AL encoding of `return_call_ref`. | merged (6d03200) | interpreter only; no change here |
+
+#2319 and #2321 were found independently of the downstream fixes: they are in the pinned WebAssembly/spec
+revision (spectec/REVISION) and still on its main branch. The SpecTec interpreter passes the tests of #2321 and does
+not use the context rules of #2322: its AL translation does not check that `Inn_1` is `I32` or `I64`, and treats
+the `ctxt` rules as administrative.

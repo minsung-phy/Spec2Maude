@@ -88,10 +88,10 @@ let export_type m name =
       | Types.ExportT _ -> None)
     exports
 
-let function_parameters m name =
+let function_type m name =
   match export_type m name with
   | Some (Types.ExternFuncT (Types.Def deftype)) ->
-      Ok (Types.(functype_of_comptype (expand_deftype deftype)) |> fst)
+      Ok Types.(functype_of_comptype (expand_deftype deftype))
   | Some (Types.ExternFuncT (Types.Idx _)) -> Error Unresolved_function_type
   | Some _ -> Error Non_function_export
   | None -> Error Missing_export

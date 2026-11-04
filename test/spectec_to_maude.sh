@@ -1,37 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# For each Wasm version: translate spectec/wasm-VERSION, compare with the
+# checked-in generated output, and load it with its builtins
+# (translator/backend/main*.maude) without Maude diagnostics.
+
 root=$(cd "$(dirname "$0")/.." && pwd)
-source_dir="$root/spectec/wasm-3.0"
-expected_dir="$root/translator/generated"
 maude_bin=${MAUDE:-maude}
 work=$(mktemp -d "${TMPDIR:-/tmp}/spec2maude-translation.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-
-file_count=$(find "$source_dir" -maxdepth 1 -type f -name '*.spectec' | wc -l | tr -d ' ')
-if [[ "$file_count" != 21 ]]; then
-  echo "spectec_to_maude: expected 21 SpecTec files, found $file_count" >&2
-  exit 1
-fi
-
-mkdir -p "$work/translator/backend" "$work/translator/generated"
-output="$work/translator/generated/output.maude"
-
-(
-  cd "$root"
-  dune exec bin/spec2maude.exe -- -o "$output"
-)
-
-grep -Fq 'mod SPEC2MAUDE-GENERATED is' "$output"
-grep -Fq 'protecting SPECTEC-SEMANTICS .' "$output"
-
-for name in types.maude output.maude; do
-  if ! cmp -s "$expected_dir/$name" "$work/translator/generated/$name"; then
-    echo "spectec_to_maude: generated output differs from $expected_dir/$name" >&2
-    echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe --" >&2
-    exit 1
-  fi
-done
 
 if ! command -v "$maude_bin" >/dev/null 2>&1; then
   echo "spectec_to_maude: Maude executable not found: $maude_bin" >&2
@@ -39,22 +16,44 @@ if ! command -v "$maude_bin" >/dev/null 2>&1; then
   exit 1
 fi
 
-cp "$root/translator/backend/main.maude" "$work/translator/backend/"
-cp "$root/translator/backend/builtins.maude" "$work/translator/backend/"
-cp "$root/translator/backend/spectec-semantics.maude" "$work/translator/backend/"
-cp "$root/translator/backend/spectec-sorts.maude" "$work/translator/backend/"
-cp "$root/translator/backend/spectec-builtin-types.maude" "$work/translator/backend/"
+(cd "$root" && dune build bin/spec2maude.exe)
+spec2maude="$root/_build/default/bin/spec2maude.exe"
 
-log="$work/maude.log"
-(
-  cd "$work"
-  "$maude_bin" -no-banner translator/backend/main.maude
-) >"$log" 2>&1
-cat "$log"
+# version, expected file count, generated directory, main file
+check() {
+  local version=$1 expected_count=$2 generated=$3 main=$4
+  local source_dir="$root/spectec/wasm-$version"
+  local file_count
+  file_count=$(find "$source_dir" -maxdepth 1 -type f -name '*.spectec' | wc -l | tr -d ' ')
+  if [[ "$file_count" != "$expected_count" ]]; then
+    echo "spectec_to_maude: wasm-$version: expected $expected_count SpecTec files, found $file_count" >&2
+    exit 1
+  fi
 
-if grep -E '(^|[[:space:]])(Warning:|Advisory:|\*\*\*)' "$log" >/dev/null; then
-  echo "spectec_to_maude: Maude load produced diagnostics" >&2
-  exit 1
-fi
+  local out="$work/$version"
+  mkdir -p "$out/translator/$generated" "$out/translator/backend" "$out/translator/builtins"
+  "$spec2maude" -o "$out/translator/$generated/output.maude" "$source_dir"/*.spectec
 
-echo "spectec_to_maude: PASS ($file_count files)"
+  for name in types.maude output.maude; do
+    if ! cmp -s "$root/translator/$generated/$name" "$out/translator/$generated/$name"; then
+      echo "spectec_to_maude: wasm-$version: generated output differs from translator/$generated/$name" >&2
+      echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe -- -o translator/$generated/output.maude spectec/wasm-$version/*.spectec" >&2
+      exit 1
+    fi
+  done
+
+  cp "$root"/translator/backend/*.maude "$out/translator/backend/"
+  cp "$root"/translator/builtins/*.maude "$out/translator/builtins/"
+  local log="$out/maude.log"
+  (cd "$out" && "$maude_bin" -no-banner "translator/backend/$main" </dev/null) >"$log" 2>&1
+  if grep -E '(^|[[:space:]])(Warning:|Advisory:|\*\*\*)' "$log" >/dev/null; then
+    cat "$log"
+    echo "spectec_to_maude: wasm-$version: Maude load produced diagnostics" >&2
+    exit 1
+  fi
+  echo "spectec_to_maude: wasm-$version PASS ($file_count files)"
+}
+
+check 3.0 21 generated main.maude
+check 2.0 9 generated/wasm-2.0 main-wasm-2.0.maude
+check 1.0 9 generated/wasm-1.0 main-wasm-1.0.maude

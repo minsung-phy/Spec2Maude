@@ -1,0 +1,5 @@
+load spectec-sorts.maude
+load ../generated/wasm-2.0/types.maude
+load spectec-semantics.maude
+load ../generated/wasm-2.0/output.maude
+load ../builtins/wasm-2.0.maude

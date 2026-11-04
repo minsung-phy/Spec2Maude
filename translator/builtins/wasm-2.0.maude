@@ -1,0 +1,28 @@
+--- Builtins (contract in core.maude). Wasm 2.0: the shared implementations
+--- and the 2.0 v128 bytes, whose width is the source $size(V128) (3.0 has
+--- $vsize instead).
+
+load vector.maude
+
+mod WASM-BUILTINS is
+  inc WASM-BUILTINS-VECTOR .
+
+  --- NaN propagation (Wasm 2.0 numerics, nans_N): the sign of a NaN result is
+  --- not determined, so both canonical NaNs are possible results.
+  var NAN_N : Nat .
+  eq float-default-nan(NAN_N) =
+      POS(NAN(_^_(2, _-_(signif(NAN_N), 1))))
+      NEG(NAN(_^_(2, _-_(signif(NAN_N), 1)))) .
+
+  vars BY_I BY_RESULT : Nat .
+  var BY_BYTES : SpectecTerminals .
+
+  ceq vbytes-(V128, (BY_I)) =
+      ibytes-aux(_quo_(spectec-size(V128), 8), BY_I)
+    if _<_(BY_I, _^_(2, spectec-size(V128))) .
+
+  ceq inv-vbytes-(V128, BY_BYTES) = (BY_RESULT)
+    if size(BY_BYTES) = _quo_(spectec-size(V128), 8)
+       /\ typecheck(BY_BYTES, byte)
+       /\ BY_RESULT := inv-ibytes-aux(BY_BYTES, 1, 0) .
+endm

@@ -24,7 +24,7 @@ let translate_body index allow_membership iteration bound body =
     && Prescan.premise_iteration_binds_membership index iteration
   in
   let result =
-    Prem.translate_all index ~bound ~bind_membership ~collect_outputs:false [body]
+    Prem.translate_all index ~bound ~bind_membership ~collect_outputs:true [body]
   in
   result.conditions, result.otherwise, result.bound
 
@@ -463,16 +463,71 @@ let premise_conditions index without iteration =
       (premise_local_names without iteration) iteration.Prescan.body
   in
   if otherwise then raise (Unsupported "IterPr body cannot contain ElsePr");
-  ( List.map
-      (function
-        | EqCondition condition -> condition
-        | RewriteCond _ ->
-            raise (Unsupported "an IterPr helper cannot contain a rewrite condition"))
-      conditions
-  , bound
-  )
+  conditions, bound
+
+let eq_conditions conditions =
+  List.map
+    (function
+      | EqCondition condition -> condition
+      | RewriteCond _ ->
+          raise (Unsupported "an IterPr check helper cannot contain a rewrite condition"))
+    conditions
 
 type premise_mode = Check | Collect of int
+
+(* An IterPr over an execution premise (Wasm 1.0/2.0 $instantiate:
+ * (Eval_expr: z; expr_G ~>* z; val)* ) whose output source is unbound. Its
+ * elements are reached by rewriting, so the helper is a request rewritten
+ * by rules, like a hint(maude_rule) definition (Decd.translate_request_header),
+ * in the request sort codomain-Iteration above the result sort:
+ *   rl  h(captures, nil..) => nil .
+ *   crl h(captures, s_1 S_1..) => o O if body /\ h(captures, S_1..) => O .
+ * Every rewrite of the body gives one element, so all results are kept. *)
+let rewrite_premise_statements index (iteration : Prescan.premise_iteration)
+    name captures generators heads tails output codomain conditions =
+  let iter, _ = iteration.Prescan.iterexp in
+  let ((_, source) as generator), head =
+    match output with
+    | Some output -> output
+    | None -> raise (Unsupported "an IterPr check helper cannot contain a rewrite condition")
+  in
+  let request_sort = codomain ^ "-Iteration" in
+  let domain = helper_domain index captures None None generators in
+  let call args = Iter.app name (Iter.terms_of_variables captures @ args) in
+  let empty_sources =
+    List.map (fun (_, source) -> Iter.empty_of_typ index source.note) generators
+  in
+  let empty = Iter.empty_of_typ index source.note in
+  let element = Iter.source_head index generator head in
+  let declarations =
+    [ OpDecl
+        { name
+        ; domain
+        ; codomain = request_sort
+        ; arrow = Partial
+        ; attrs = frozen_all (List.length domain)
+        }
+    ; SortDecl request_sort
+    ; SubsortDecl (codomain, request_sort)
+    ]
+  in
+  let left = call (Iter.source_arguments index iter generators heads tails) in
+  match iter with
+  | List ->
+      let rest = Var (generated_variable "REST" codomain) in
+      let recursive = RewriteCond (call (Iter.terms_of_variables tails), rest) in
+      declarations
+      @ [ Maude_il.rule (call empty_sources) empty []
+        ; Maude_il.rule left
+            (Iter.sequence_of_typ index source.note [element; rest])
+            (schedule_rule_conditions left (conditions @ [recursive])) ]
+  | Opt ->
+      declarations
+      @ [ Maude_il.rule (call empty_sources) empty []
+        ; Maude_il.rule left (Iter.app "_?" [element])
+            (schedule_rule_conditions left conditions) ]
+  | List1 | ListN _ ->
+      raise (Unsupported "an IterPr over an execution premise must be ? or *")
 
 let translate_premise_statements index
     (iteration : Prescan.premise_iteration) mode =
@@ -511,6 +566,12 @@ let translate_premise_statements index
       raise (Unsupported "IterPr output helper body does not bind its output")
   | None | Some _ -> ()
   end;
+  if List.exists (function RewriteCond _ -> true | EqCondition _ -> false) conditions
+  then
+    rewrite_premise_statements index iteration name captures generators heads
+      tails output codomain conditions
+  else
+  let conditions = eq_conditions conditions in
   let declaration = partial_op name domain codomain in
   let empty_sources =
     List.map (fun (_, source) -> Iter.empty_of_typ index source.note) generators
@@ -609,7 +670,10 @@ let translate_premise_all index =
             raise (Unsupported ("conflicting IterPr overload named " ^ name)))
       groups statements
   in
+  (* A helper body may request a nested output helper, which is then
+     generated in the next round. *)
   let status (iteration : Prescan.premise_iteration) =
-    Prescan.requested index iteration.name CheckHelper
+    ( Prescan.requested index iteration.name CheckHelper
+    , Prescan.requested_outputs index iteration.name )
   in
   generate_requested status add (Prescan.premise_iterations index)

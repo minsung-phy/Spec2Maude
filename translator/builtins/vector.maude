@@ -1,0 +1,250 @@
+--- Builtins (contract in core.maude). Shared by Wasm 2.0 and 3.0: bits,
+--- lanes, number bytes, and the vector integer and saturating operations that
+--- Wasm 1.0 does not have.
+
+load core.maude
+
+mod WASM-BUILTINS-VECTOR is
+  inc WASM-BUILTINS-CORE .
+
+  vars BI_N BI_I BI_ACC BI_BIT BI_RESULT : Nat .
+  var BI_BITS : SpectecTerminals .
+  vars BT_N BT_I BT_J BT_K : Nat .
+  var NW_N : NzNat .
+  vars NW_M NW_I : Nat .
+  vars AV_N AV_I AV_J : Nat .
+  vars Q15_N Q15_I Q15_J : Nat .
+  vars FI_M FI_N FI_FRAC : Nat .
+  var FC_N : Nat .
+  var FI_R : Rat .
+  var FI_X : Int .
+  var FI_F : SpectecTerminal .
+  vars FC_F1 FC_F2 : SpectecTerminal .
+  vars FB_N FB_RAW : Nat .
+  var FB_MAG : SpectecTerminal .
+  var FB_BITS : SpectecTerminals .
+  var NB_PAYLOAD : SpectecTerminal .
+  var NB_BYTES : SpectecTerminals .
+  vars LN_W LN_COUNT LN_RAW LN_SCALE LN_ACC : Nat .
+  var LN_LT : SpectecTerminal .
+  var LN_HEAD : SpectecTerminal .
+  var LN_MAG : SpectecTerminal .
+  vars LN_LANES LN_TAIL : SpectecTerminals .
+  var BDI_T : SpectecType .
+  var BDI_X : SpectecTerminal .
+  vars BDI_XS BDI_REST : SpectecTerminals .
+  var BDI_Y : SpectecTerminal .
+  var BDI_N : NzNat .
+  op inv-ibits-aux : SpectecTerminals Nat -> Nat .
+  eq inv-ibits-aux(nil, BI_ACC) = BI_ACC .
+  ceq inv-ibits-aux((# BI_BIT) BI_BITS, BI_ACC) =
+      inv-ibits-aux(BI_BITS, _+_(_*_(BI_ACC, 2), BI_BIT))
+    if typecheck(# BI_BIT, bit) .
+  eq lane-width(I8) = 8 .
+  eq lane-width(I16) = 16 .
+  ceq lane-from-bits(I8, LN_RAW) = # LN_RAW
+    if _<_(LN_RAW, _^_(2, 8)) .
+  ceq lane-from-bits(I16, LN_RAW) = # LN_RAW
+    if _<_(LN_RAW, _^_(2, 16)) .
+  ceq lane-to-bits(I8, # LN_RAW) = LN_RAW
+    if _<_(LN_RAW, _^_(2, 8)) .
+  ceq lane-to-bits(I16, # LN_RAW) = LN_RAW
+    if _<_(LN_RAW, _^_(2, 16)) .
+
+  ceq ibits-(BI_N, (BI_I)) =
+      ibits-aux(BI_N, BI_I)
+    if _<_(BI_I, _^_(2, BI_N)) .
+
+  ceq inv-ibits-(BI_N, BI_BITS) = (BI_RESULT)
+    if size(BI_BITS) = BI_N
+       /\ typecheck(BI_BITS, bit)
+       /\ BI_RESULT := inv-ibits-aux(BI_BITS, 0) .
+
+  ceq fbits-(FB_N, POS(FB_MAG)) =
+      ibits-aux(FB_N, FB_RAW)
+    if (fnmag-valid(FB_N, FB_MAG)) = true
+       /\ FB_RAW := float-to-bits(FB_N, POS(FB_MAG)) .
+  ceq fbits-(FB_N, NEG(FB_MAG)) =
+      ibits-aux(FB_N, FB_RAW)
+    if (fnmag-valid(FB_N, FB_MAG)) = true
+       /\ FB_RAW := float-to-bits(FB_N, NEG(FB_MAG)) .
+
+  ceq inv-fbits-(FB_N, FB_BITS) = float-from-bits(FB_N, FB_RAW)
+    if size(FB_BITS) = FB_N
+       /\ typecheck(FB_BITS, bit)
+       /\ FB_RAW := inv-ibits-aux(FB_BITS, 0) .
+
+  eq nbytes-(I32, NB_PAYLOAD) = nbytes-int(32, NB_PAYLOAD) .
+  eq nbytes-(I64, NB_PAYLOAD) = nbytes-int(64, NB_PAYLOAD) .
+  eq nbytes-(F32, NB_PAYLOAD) = nbytes-float(32, NB_PAYLOAD) .
+  eq nbytes-(F64, NB_PAYLOAD) = nbytes-float(64, NB_PAYLOAD) .
+
+  eq inv-nbytes-(I32, NB_BYTES) = inv-nbytes-int(32, NB_BYTES) .
+  eq inv-nbytes-(I64, NB_BYTES) = inv-nbytes-int(64, NB_BYTES) .
+  eq inv-nbytes-(F32, NB_BYTES) = inv-nbytes-float(32, NB_BYTES) .
+  eq inv-nbytes-(F64, NB_BYTES) = inv-nbytes-float(64, NB_BYTES) .
+
+  eq reinterpret--(I32, F32, NB_PAYLOAD) =
+      inv-nbytes-(F32, nbytes-(I32, NB_PAYLOAD)) .
+  eq reinterpret--(F32, I32, NB_PAYLOAD) =
+      inv-nbytes-(I32, nbytes-(F32, NB_PAYLOAD)) .
+  eq reinterpret--(I64, F64, NB_PAYLOAD) =
+      inv-nbytes-(F64, nbytes-(I64, NB_PAYLOAD)) .
+  eq reinterpret--(F64, I64, NB_PAYLOAD) =
+      inv-nbytes-(I64, nbytes-(F64, NB_PAYLOAD)) .
+
+  ceq lanes-(LN_LT X LN_COUNT, LN_RAW) =
+      lanes-aux(LN_LT, LN_W, LN_COUNT, LN_RAW)
+    if LN_W := lane-width(LN_LT)
+       /\ _*_(LN_W, LN_COUNT) = 128
+       /\ _<_(LN_RAW, _^_(2, 128)) .
+
+  ceq inv-lanes-(LN_LT X LN_COUNT, LN_LANES) =
+      (inv-lanes-aux(LN_LT, LN_W, LN_LANES, 1, 0))
+    if LN_W := lane-width(LN_LT)
+       /\ _*_(LN_W, LN_COUNT) = 128
+       /\ size(LN_LANES) = LN_COUNT .
+
+  ceq irev-(BT_N, (BT_I)) = (inv-ibits-aux(irev-bits(ibits-aux(BT_N, BT_I)), 0))
+    if _>_(BT_N, 0)
+       /\ _<_(BT_I, _^_(2, BT_N)) .
+
+  ceq iandnot-(BT_N, (BT_I), (BT_J)) = (_&_(BT_I, _-_( _-_(2 ^ BT_N, 1), BT_J)))
+    if _>_(BT_N, 0)
+       /\ _<_(BT_I, _^_(2, BT_N))
+       /\ _<_(BT_J, _^_(2, BT_N)) .
+
+  ceq ibitselect-(BT_N, (BT_I), (BT_J), (BT_K)) =
+      _|_(_&_(BT_I, BT_K), _&_(BT_J, _-_( _-_(2 ^ BT_N, 1), BT_K)))
+    if _>_(BT_N, 0)
+       /\ _<_(BT_I, _^_(2, BT_N))
+       /\ _<_(BT_J, _^_(2, BT_N))
+       /\ _<_(BT_K, _^_(2, BT_N)) .
+
+  ceq narrow--(NW_M, NW_N, U, (NW_I)) = (NW_I)
+    if _>_(NW_M, NW_N)
+       /\ _<_(NW_I, _^_(2, NW_N)) .
+  ceq narrow--(NW_M, NW_N, U, (NW_I)) = (sd(1, _^_(2, NW_N)))
+    if _>_(NW_M, NW_N)
+       /\ _>=_(NW_I, _^_(2, NW_N))
+       /\ _<_(NW_I, _^_(2, sd(1, NW_M))) .
+  ceq narrow--(NW_M, NW_N, U, (NW_I)) = (0)
+    if _>_(NW_M, NW_N)
+       /\ _>=_(NW_I, _^_(2, sd(1, NW_M)))
+       /\ _<_(NW_I, _^_(2, NW_M)) .
+  ceq narrow--(NW_M, NW_N, S, (NW_I)) = (NW_I)
+    if _>_(NW_M, NW_N)
+       /\ _<_(NW_I, _^_(2, sd(1, NW_N))) .
+  ceq narrow--(NW_M, NW_N, S, (NW_I)) = (sd(1, _^_(2, sd(1, NW_N))))
+    if _>_(NW_M, NW_N)
+       /\ _>=_(NW_I, _^_(2, sd(1, NW_N)))
+       /\ _<_(NW_I, _^_(2, sd(1, NW_M))) .
+  ceq narrow--(NW_M, NW_N, S, (NW_I)) = (_^_(2, sd(1, NW_N)))
+    if _>_(NW_M, NW_N)
+       /\ _>=_(NW_I, _^_(2, sd(1, NW_M)))
+       /\ _<_(NW_I, sd(_^_(2, sd(1, NW_N)), _^_(2, NW_M))) .
+  ceq narrow--(NW_M, NW_N, S, (NW_I)) = (_+_(_-_(NW_I, _^_(2, NW_M)), _^_(2, NW_N)))
+    if _>_(NW_M, NW_N)
+       /\ _>=_(NW_I, sd(_^_(2, sd(1, NW_N)), _^_(2, NW_M)))
+       /\ _<_(NW_I, _^_(2, NW_M)) .
+
+  ceq iavgr-(AV_N, U, (AV_I), (AV_J)) =
+      (_quo_(_+_(_+_(AV_I, AV_J), 1), 2))
+    if _>_(AV_N, 0)
+       /\ _<_(AV_I, _^_(2, AV_N))
+       /\ _<_(AV_J, _^_(2, AV_N)) .
+
+  ceq iq15mulr-sat-(Q15_N, S, (Q15_I), (Q15_J)) =
+      (wrap-s-int(Q15_N,
+        sat-s-int(Q15_N,
+          floor-div-pow2-int(
+            _+_(_*_(signed-nat(Q15_N, Q15_I), signed-nat(Q15_N, Q15_J)), 16384),
+            32768))))
+    if Q15_N = 16
+       /\ _<_(Q15_I, _^_(2, Q15_N))
+       /\ _<_(Q15_J, _^_(2, Q15_N)) .
+  eq fpmin-(FC_N, FC_F1, FC_F2) =
+      float-pmin(FC_N, FC_F1, FC_F2) .
+  eq fpmax-(FC_N, FC_F1, FC_F2) =
+      float-pmax(FC_N, FC_F1, FC_F2) .
+
+  ceq trunc-sat--(FI_M, FI_N, U, FI_F) = (# saturate-u-int(FI_N, FI_X)) ?
+    if _>_(FI_N, 0)
+       /\ (float-finite(FI_M, FI_F)) = true
+       /\ FI_R := float-rat(FI_M, FI_F)
+       /\ FI_X := trunc-rat-int(FI_R) .
+  ceq trunc-sat--(FI_M, FI_N, S, FI_F) = (# saturate-s-int(FI_N, FI_X)) ?
+    if _>_(FI_N, 0)
+       /\ (float-finite(FI_M, FI_F)) = true
+       /\ FI_R := float-rat(FI_M, FI_F)
+       /\ FI_X := trunc-rat-int(FI_R) .
+  eq trunc-sat--(FI_M, FI_N, U, POS(INF)) = (# _-_(_^_(2, FI_N), 1)) ? .
+  eq trunc-sat--(FI_M, FI_N, U, NEG(INF)) = (# 0) ? .
+  ceq trunc-sat--(FI_M, FI_N, U, POS(NAN(FI_FRAC))) = (# 0) ?
+    if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
+  ceq trunc-sat--(FI_M, FI_N, U, NEG(NAN(FI_FRAC))) = (# 0) ?
+    if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
+  ceq trunc-sat--(FI_M, FI_N, S, POS(INF)) = (# _-_(_^_(2, _-_(FI_N, 1)), 1)) ?
+    if _>_(FI_N, 0) .
+  ceq trunc-sat--(FI_M, FI_N, S, NEG(INF)) = (# int-to-iN(FI_N, - _^_(2, _-_(FI_N, 1)))) ?
+    if _>_(FI_N, 0) .
+  ceq trunc-sat--(FI_M, FI_N, S, POS(NAN(FI_FRAC))) = (# 0) ?
+    if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
+  ceq trunc-sat--(FI_M, FI_N, S, NEG(NAN(FI_FRAC))) = (# 0) ?
+    if (fnmag-valid(FI_M, NAN(FI_FRAC))) = true .
+  ceq inv-concat-(BDI_T, BDI_XS) = pair-chunks(BDI_XS)
+    if _==_(_rem_(size(BDI_XS), 2), 0) .
+
+  --- Implemented builtin family: vector lane splitting/reassembly.
+  op lane-width : SpectecTerminal -> Nat .
+  op lane-from-bits : SpectecTerminal Nat -> SpectecTerminal .
+  op lane-to-bits : SpectecTerminal SpectecTerminal -> Nat .
+  op lanes-aux : SpectecTerminal Nat Nat Nat -> SpectecTerminals .
+  op inv-lanes-aux : SpectecTerminal Nat SpectecTerminals Nat Nat -> Nat .
+  eq lane-width(I32) = 32 .
+  eq lane-width(I64) = 64 .
+  eq lane-width(F32) = 32 .
+  eq lane-width(F64) = 64 .
+  ceq lane-from-bits(I32, LN_RAW) = # LN_RAW
+    if _<_(LN_RAW, _^_(2, 32)) .
+  ceq lane-from-bits(I64, LN_RAW) = # LN_RAW
+    if _<_(LN_RAW, _^_(2, 64)) .
+  ceq lane-from-bits(F32, LN_RAW) = float-from-bits(32, LN_RAW)
+    if _<_(LN_RAW, _^_(2, 32)) .
+  ceq lane-from-bits(F64, LN_RAW) = float-from-bits(64, LN_RAW)
+    if _<_(LN_RAW, _^_(2, 64)) .
+  ceq lane-to-bits(I32, # LN_RAW) = LN_RAW
+    if _<_(LN_RAW, _^_(2, 32)) .
+  ceq lane-to-bits(I64, # LN_RAW) = LN_RAW
+    if _<_(LN_RAW, _^_(2, 64)) .
+  ceq lane-to-bits(F32, POS(LN_MAG)) = float-to-bits(32, POS(LN_MAG))
+    if (fnmag-valid(32, LN_MAG)) = true .
+  ceq lane-to-bits(F32, NEG(LN_MAG)) = float-to-bits(32, NEG(LN_MAG))
+    if (fnmag-valid(32, LN_MAG)) = true .
+  ceq lane-to-bits(F64, POS(LN_MAG)) = float-to-bits(64, POS(LN_MAG))
+    if (fnmag-valid(64, LN_MAG)) = true .
+  ceq lane-to-bits(F64, NEG(LN_MAG)) = float-to-bits(64, NEG(LN_MAG))
+    if (fnmag-valid(64, LN_MAG)) = true .
+  eq lanes-aux(LN_LT, LN_W, 0, LN_RAW) = nil .
+  ceq lanes-aux(LN_LT, LN_W, LN_COUNT, LN_RAW) =
+      lane-from-bits(LN_LT, _rem_(LN_RAW, _^_(2, LN_W)))
+      lanes-aux(LN_LT, LN_W, _-_(LN_COUNT, 1), _quo_(LN_RAW, _^_(2, LN_W)))
+    if _>_(LN_COUNT, 0) .
+  eq inv-lanes-aux(LN_LT, LN_W, nil, LN_SCALE, LN_ACC) = LN_ACC .
+  ceq inv-lanes-aux(LN_LT, LN_W, LN_HEAD LN_TAIL, LN_SCALE, LN_ACC) =
+      inv-lanes-aux(LN_LT, LN_W, LN_TAIL, _*_(LN_SCALE, _^_(2, LN_W)), _+_(LN_ACC, _*_(LN_RAW, LN_SCALE)))
+    if LN_RAW := lane-to-bits(LN_LT, LN_HEAD)
+       /\ _<_(LN_RAW, _^_(2, LN_W)) .
+
+  --- Fixed-width inverse contracts: pair groups / positive-width groups.
+  --- These are not inverses over all possible list partitions. See docs/TRANSLATION.md.
+  op pair-chunks : SpectecTerminals ~> SpectecTerminals .
+  eq pair-chunks(nil) = nil .
+  eq pair-chunks(BDI_X BDI_Y BDI_REST) =
+      seq(BDI_X BDI_Y) pair-chunks(BDI_REST) .
+  op fixed-chunks : NzNat SpectecTerminals ~> SpectecTerminals .
+  eq fixed-chunks(BDI_N, nil) = nil .
+  ceq fixed-chunks(BDI_N, BDI_XS BDI_REST) =
+      seq(BDI_XS) fixed-chunks(BDI_N, BDI_REST)
+    if size(BDI_XS) == BDI_N .
+endm

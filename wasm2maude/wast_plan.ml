@@ -66,6 +66,8 @@ type exhaustion_plan = {
 type command =
   | Instantiate of int * T.t * import list
   | Unlinkable of int * import list
+  | Unlinkable_module of int * Maude_term.t * import list
+      (* Wasm 1.0: the imports do not link or the module has no instance *)
   | Uninstantiable of int * uninstantiable_plan
   | Return of int * action * result_pattern list
   | Trap of int * action
@@ -78,6 +80,7 @@ type t = {
   host : host;
   source_commands : int;
   checked_assertions : int;
+  unchecked_assertions : int;
 }
 
 type instance = {id : int; module_ : Frontend.module_}
@@ -159,13 +162,14 @@ let resolve source category names latest at = function
 let literal source literal =
   match literal.Source.it with
   | Script.ValLit (Wasm.Value.Num value) -> Encode.num_value value
-  | Script.ValLit (Wasm.Value.Ref Wasm.Value.NullRef)
-  | Script.NullLit _ -> Encode.reference_value Wasm.Value.NullRef
+  | Script.ValLit (Wasm.Value.Ref Wasm.Value.NullRef) ->
+      Encode_version.reference_value Wasm.Value.NullRef
+  | Script.NullLit heaptype -> Encode_version.null_literal heaptype
   | Script.ValLit (Wasm.Value.Ref reference) ->
       begin match reference with
       | Script.HostRef _
       | Wasm.Extern.ExternRef (Script.HostRef _) ->
-          Encode.reference_value reference
+          Encode_version.reference_value reference
       | _ ->
           unsupported source literal.at
             "this reference WAST argument is not supported"
@@ -269,7 +273,7 @@ let result_heaptype source at = function
 
 (* Argument count and types are checked by the translated $invoke (Val_ok). *)
 let check_invocation source at instance name =
-  match Frontend.function_parameters instance.module_ name with
+  match Result.map fst (Frontend.function_type instance.module_ name) with
   | Ok _ -> ()
   | Error Frontend.Missing_export ->
       unsupported source at "action names an undefined export"
@@ -353,19 +357,55 @@ let exhaustion_action source env source_action =
       unsupported source source_action.Source.at
         "a WAST global.get action cannot exhaust the call depth"
 
+(* assert_invalid and assert_malformed are checked by the reference
+   interpreter (vendor/wasm, Wasm 3.0), not by the generated semantics. For a
+   Wasm 1.0 or 2.0 script, a module that Wasm 3.0 accepts (a feature added
+   later, such as multiple results) cannot be checked: the assertion is
+   counted as unchecked. One that Wasm 3.0 rejects at the other stage
+   (malformed in 1.0, invalid in 3.0, such as a large memory offset) is still
+   rejected. Returns whether the assertion was checked. *)
 let expect_invalid source def =
   try
     ignore (Frontend.of_definition source def);
-    unsupported source def.Source.at "assert_invalid module passed validation"
+    if Wasm_version.legacy () then false
+    else unsupported source def.Source.at "assert_invalid module passed validation"
   with
-  | Ingress_error.Error {kind = Ingress_error.Invalid; _} -> ()
+  | Ingress_error.Error {kind = Ingress_error.Invalid; _} -> true
+  | Ingress_error.Error {kind = Ingress_error.Syntax; _} when Wasm_version.legacy () -> true
 
 let expect_malformed source def =
   try
     ignore (Frontend.of_definition source def);
-    unsupported source def.at "assert_malformed module was accepted"
+    if Wasm_version.legacy () then false
+    else unsupported source def.at "assert_malformed module was accepted"
   with
-  | Ingress_error.Error {kind = Ingress_error.Syntax; _} -> ()
+  | Ingress_error.Error {kind = Ingress_error.Syntax; _} -> true
+  | Ingress_error.Error {kind = Ingress_error.Invalid; _} when Wasm_version.legacy () -> true
+
+(* A Wasm 1.0 NaN assertion (Legacy_wast) gives its NaN pattern a placeholder
+   type; the pattern takes the type of the invoked function's result. *)
+let legacy_nan_results source env source_action results =
+  match source_action.Source.it with
+  | Script.Invoke (instance_var, name, _) when Wasm_version.legacy () ->
+      let instance =
+        resolve source "module instance" env.instances env.latest_instance
+          source_action.at instance_var
+      in
+      (match Result.map snd (Frontend.function_type instance.module_ name) with
+       | Ok types when List.length types = List.length results ->
+           List.map2
+             (fun typ (result : Script.result) ->
+               match result.it, typ with
+               | Script.NumResult (Script.NanPat nan), Wasm.Types.NumT Wasm.Types.F64T ->
+                   let nan' = match nan.it with
+                     | Wasm.Value.F32 n | Wasm.Value.F64 n -> Wasm.Value.F64 n
+                     | Wasm.Value.I32 _ | Wasm.Value.I64 _ -> .
+                   in
+                   {result with it = Script.NumResult (Script.NanPat {nan with it = nan'})}
+               | _ -> result)
+             types results
+       | _ -> results)
+  | _ -> results
 
 let bind_module source env var module_ =
   let modules =
@@ -520,7 +560,7 @@ let instantiate source env instance_var module_var at =
     | None -> env.instances
     | Some name -> bind source "module instance" env.instances name instance
   in
-  let command = Instantiate (instance.id, Encode.module_ module_, imports) in
+  let command = Instantiate (instance.id, Encode_version.module_ module_, imports) in
   command,
   {env with instances; latest_instance = Some instance;
     next_instance = instance.id + 1}
@@ -533,7 +573,7 @@ let plan_uninstantiable source env module_var expected at =
   let instantiation =
     match link with
     | Statically_unlinkable _ -> Static_link_failure
-    | Linkable imports -> Live_instantiation (Encode.module_ module_, imports)
+    | Linkable imports -> Live_instantiation (Encode_version.module_ module_, imports)
   in
   {expected; instantiation}, env
 
@@ -567,12 +607,17 @@ let load source =
      tables = List.rev host.tables;
      funcs = List.rev host.funcs}
   in
+  let unchecked = ref 0 in
+  let static_check checked expect def =
+    if expect source def then checked + 1 else (incr unchecked; checked)
+  in
   let rec collect env checked commands = function
     | [] ->
         { commands = List.rev commands;
           host = finish env.host;
           source_commands;
-          checked_assertions = checked }
+          checked_assertions = checked;
+          unchecked_assertions = !unchecked }
     | command :: rest ->
         (match command.Source.it with
          | Script.Module (var, def) ->
@@ -593,6 +638,7 @@ let load source =
          | Script.Assertion assertion ->
              (match assertion.Source.it with
               | Script.AssertReturn (source_action, results) ->
+                  let results = legacy_nan_results source env source_action results in
                   let action = action source env source_action in
                   let results = List.map (result source) results in
                   let command = Return (env.next_command, action, results) in
@@ -610,12 +656,10 @@ let load source =
                   collect env (checked + 1) commands rest
               | Script.AssertInvalid (def, _)
               | Script.AssertInvalidCustom (def, _) ->
-                  expect_invalid source def;
-                  collect env (checked + 1) commands rest
+                  collect env (static_check checked expect_invalid def) commands rest
               | Script.AssertMalformed (def, _)
               | Script.AssertMalformedCustom (def, _) ->
-                  expect_malformed source def;
-                  collect env (checked + 1) commands rest
+                  collect env (static_check checked expect_malformed def) commands rest
               | Script.AssertUnlinkable (module_var, _) ->
                   let module_ =
                     resolve source "module" env.modules env.latest_module
@@ -625,8 +669,13 @@ let load source =
                    | Statically_unlinkable _, env ->
                        collect env (checked + 1) commands rest
                    | Linkable imports, env ->
+                       (* Wasm 1.0 asserts unlinkable also for a segment that
+                          does not fit, where $instantiate has no result. *)
                        let command =
-                         Unlinkable (env.next_command, imports)
+                         if !Wasm_version.current = Wasm_version.V1 then
+                           Unlinkable_module
+                             (env.next_command, Encode_version.module_ module_, imports)
+                         else Unlinkable (env.next_command, imports)
                        in
                        let commands, env = push env command commands in
                        collect env (checked + 1) commands rest)
@@ -653,11 +702,12 @@ let commands plan = plan.commands
 let host (plan : t) = plan.host
 let source_commands plan = plan.source_commands
 let checked_assertions plan = plan.checked_assertions
+let unchecked_assertions plan = plan.unchecked_assertions
 
 let runtime_assertions plan =
   List.fold_left
     (fun count -> function
       | Instantiate _ | Do _ -> count
-      | Unlinkable _ | Uninstantiable _ | Return _ | Trap _
+      | Unlinkable _ | Unlinkable_module _ | Uninstantiable _ | Return _ | Trap _
       | Exception _ | Exhaustion _ -> count + 1)
     0 plan.commands

@@ -1,0 +1,4 @@
+Repository: https://github.com/WebAssembly/spec.git
+Tag: wg-1.0
+Commit: 977f97014c962f7bd1291fcc6d28b41a924882bf
+Subset: test/core

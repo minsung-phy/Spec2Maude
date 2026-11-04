@@ -59,7 +59,11 @@ let translate_alias index target quants typ =
     Var (generated_variable "VALUE" sort)
     |> Term.to_sort index ~sort:"SpectecTerminals" typ
   in
-  let source = Term.translate_typ index typ in
+  let source =
+    match typ.it with
+    | IterT (_, Opt) -> Term.translate_check_typ index typ  (* t? is iterOpt(t) *)
+    | _ -> Term.translate_typ index typ
+  in
   let left = App ("typecheck", [value; target]) in
   let right = App ("typecheck", [value; source]) in
   let conditions = Param.translate_eq_conditions index quants in

@@ -35,21 +35,41 @@ let translate_input_pattern index exp =
       | None -> None
       | Some pattern ->
           let bound = term_variables [] pattern.term in
-          let equalities =
-            List.rev !deferred
-            |> List.map (fun (exp, subject) -> Term.translate_exp index exp, subject)
+          (* A field whose variables the pattern binds is compared with its
+             value. Otherwise it is solved for them (Prem.bind_pattern, e.g.
+             BR (l + 1) binds l), given the source variables the pattern
+             binds. *)
+          let pattern_bound =
+            Il.Free.Set.filter
+              (fun name ->
+                List.exists
+                  (fun (variable : variable) ->
+                    variable.origin = Source
+                    && List.assoc_opt (name, variable.sort) index.Prescan.variables
+                       = Some variable.name)
+                  bound)
+              (Il.Free.free_exp exp).varid
           in
-          if List.for_all
-              (fun (value, subject) ->
-                variables_bound bound value && variables_bound bound subject)
-              equalities then
-            Some
-              { pattern with
-                guards = pattern.guards
-                  @ List.map (fun (value, subject) -> EqCond (value, subject))
-                      equalities
-              }
-          else None
+          let guard (il_bound, guards) (field, subject) =
+            let value = Term.translate_exp index field in
+            if variables_bound bound value then
+              il_bound, guards @ [EqCondition (EqCond (value, subject))]
+            else
+              let binding =
+                Prem.bind_pattern index il_bound field subject
+                  "relation input is not a structural pattern"
+              in
+              binding.bound, guards @ binding.conditions
+          in
+          let equational = function EqCondition c -> Some c | RewriteCond _ -> None in
+          (* A field that is no pattern, or that needs a rewrite condition,
+             leaves the whole input to Prem.bind_pattern (translate_inputs). *)
+          match List.fold_left guard (pattern_bound, []) (List.rev !deferred) with
+          | _, guards ->
+              let equations = List.filter_map equational guards in
+              if List.length equations < List.length guards then None
+              else Some {pattern with guards = pattern.guards @ equations}
+          | exception Unsupported _ -> None
 
 (* Relation inputs follow Prem.bind_head_argument, with two additions: an
  * input may contain computed fields (translate_input_pattern), and with
@@ -234,6 +254,8 @@ type execution_rule =
       (* conditions without the case premises for its output *)
   ; selection_guard_conditions : rule_condition list
   ; has_premise_case_check : bool  (* a case premise inside a premise *)
+  ; premise_checks : (rule_condition list, string) result
+      (* those case premises, if the inputs bind all their variables *)
   ; predecessors : int list
   }
 
@@ -679,10 +701,32 @@ let lower_execution_rule index id params policy
         let checks = List.filter (Prescan.is_case_premise index) prems in
         ( (if List.exists for_output checks then
              let prems = List.filter (fun p -> not (for_output p)) prems in
+             (* Case quantifiers that occurred only in those checks go too. *)
+             let free = Il.Free.(free_exp exp ++ free_prems prems) in
+             let quants = Prem.used_quants free quants in
              lower_rule_body ~head:(Prescan.rel_name index id) index id params policy
                {rule with it = RuleD (rule_id, quants, mixop, exp, prems)}
            else body)
         , not (List.for_all for_output checks) )
+  in
+  let premise_checks =
+    match rule.it with
+    | RuleD (_, _, _, _, prems) ->
+        let checks =
+          List.filter
+            (fun prem -> Prescan.is_case_premise index prem && not (for_output prem))
+            prems
+        in
+        let bound = (Il.Free.free_list Il.Free.free_exp body.input_exps).varid in
+        if not (Il.Free.Set.subset (Il.Free.free_prems checks).varid bound) then
+          Error "its checks use variables that the inputs do not bind"
+        else
+          match
+            Prem.translate_all index ~bound:(Il.Free.Set.elements bound)
+              ~bind_membership:false ~collect_outputs:false checks
+          with
+          | result -> Ok result.conditions
+          | exception Unsupported reason -> Error reason
   in
   let input_shapes = input_shapes body.head_conditions body.input_terms in
   let predecessors =
@@ -697,12 +741,31 @@ let lower_execution_rule index id params policy
   if body.otherwise && previous = [] then
     raise (Unsupported "otherwise execution rule has no predecessor");
   (* A failing case premise inside a premise leaves the predecessor stuck
-     too, but the complement of that premise would then hold. *)
-  if List.exists (fun predecessor -> predecessor.has_premise_case_check) predecessors then
-    raise (Unsupported "otherwise rule after a rule with a case premise inside a premise");
+     too, but the complement of that premise would then hold. So this rule
+     also requires those case premises (on its own inputs): with them, the
+     complement holds exactly when the predecessor's other premises fail. *)
+  let checks =
+    List.concat_map
+      (fun predecessor ->
+        if not predecessor.has_premise_case_check then []
+        else
+          match
+            predecessor.premise_checks,
+            align_inputs index params predecessor.inputs body.input_terms
+          with
+          | Ok checks, Some bindings -> List.map (aligned_condition bindings) checks
+          | Error reason, _ ->
+              raise (Unsupported
+                ("otherwise rule after a rule with a case premise inside a premise: " ^ reason))
+          | Ok _, None ->
+              raise (Unsupported
+                "otherwise rule after a rule with a case premise inside a premise: inputs do not align"))
+      predecessors
+  in
   let complements, helpers =
     complement_conditions index id params body.input_terms conditions predecessors
   in
+  let complements = complements @ checks in
   { ordinal
   ; input_exps = body.input_exps
   ; inputs = body.input_terms
@@ -717,6 +780,7 @@ let lower_execution_rule index id params policy
       else schedule_rule_conditions selection_body.left selection_body.conditions
   ; selection_guard_conditions = selection_body.guard_conditions
   ; has_premise_case_check
+  ; premise_checks
   ; predecessors = helpers
   }
 

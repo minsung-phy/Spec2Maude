@@ -52,7 +52,7 @@ The translation visits the definitions of the script in order
 | --- | --- | --- |
 | `TypD x params insts` | `op x̂ : S(params) -> SpectecType .` and the output for each `inst` | `typd.ml:translate` |
 | `InstD quants args deftyp` | output for `deftyp`, with type target `x̂(⟦args⟧)` and conditions from `quants` | `typd.ml:translate_inst` |
-| `AliasT t` | `eq typecheck(V, x̂(..)) = typecheck(V, ⟦t⟧) .` If `hint(maude_sort)` boxes the elements of `t`, a second equation for the boxed value. | `typd.ml:translate_alias` |
+| `AliasT t` | `eq typecheck(V, x̂(..)) = typecheck(V, ⟦t⟧) .` (for `t = t'?`, `⟦t⟧` is `iterOpt(⟦t'⟧)`). If `hint(maude_sort)` boxes the elements of `t`, a second equation for the boxed value. | `typd.ml:translate_alias` |
 | `StructT fields` | `ceq typecheck({ field('a1, V1) ; … }, x̂(..)) = true if typecheck(Vi, ⟦ti⟧) ∧ ⟦field premises⟧ .` If every field type can be composed and no field has `hint(maude_array)`, also an equation for `recordConcat`, used by `CompE`. | `typd.ml:translate_struct` |
 | `VariantT cases`, named case `C` | `op Ĉ : S(t1) … S(tn) -> Sort [ctor] .` and `ceq typecheck(Ĉ(V1, …, Vn), x̂(..)) = true if … .` | `typd.ml:translate_constructor` |
 | `VariantT cases`, hole-only case | `ceq typecheck(V, x̂(..)) = true if typecheck(V, ⟦t⟧) ∧ … .` | `typd.ml:translate_union` |
@@ -68,7 +68,7 @@ The translation visits the definitions of the script in order
 | Ordinary | `op f̂ : S(params) -> S(t) .` | `ceq f̂(⟦args⟧) = ⟦e⟧ if ⟦prs⟧ ∧ ¬earlier .` with the complement of each earlier clause that can match (below). If `prs` contains `ElsePr`, the equation gets `[owise]` instead. | `decd.ml:equation_clause`, `decd.ml:ordered_clauses`, `decd.ml:complement` |
 | `hint(maude_rule)` (the body needs rewriting) | `sort F-Config .` `subsort S(t) < F-Config .` `op f̂ : S(params) -> F-Config [frozen] .` | `crl f̂(⟦args⟧) => ⟦e⟧ if ⟦prs⟧ .` (`ElsePr` is rejected) | `decd.ml:translate_rule_clause` |
 | A clause ends with `x <- es` and returns `x` (membership choice) | `sort F-Request .` `subsort S(t) < F-Request .` `op f̂ : S(params) -> F-Request [frozen] .` | `ceq f̂(⟦args⟧) = choose-f(⟦es⟧) if ⟦other prs⟧ .` and `rl choose-f(PREFIX X SUFFIX) => X .` Any element of `es` can be returned. | `decd.ml:translate_choice_clause` |
-| `hint(builtin)` | `op f̂ : S(params) -> S(t) .` | no equations; the body is written by hand in `translator/backend/builtins.maude` | `decd.ml:translate` |
+| `hint(builtin)` | `op f̂ : S(params) -> S(t) .` | no equations; the body is written by hand in `translator/builtins/` | `decd.ml:translate` |
 
 `hint(maude_kind)` makes the declaration partial (`~>` instead of `->`), and so do case premises added to a clause (section 7).
 
@@ -241,6 +241,7 @@ it is rejected if an earlier premise is still waiting. A call of a
 | `ElsePr` | marks the rule; see section 2 (relations) and section 1 (`[owise]` for functions) | `prem.ml:translate_barrier` |
 | `IterPr pr (iter, gens)`, all sources known | `helper(⟦captures⟧, ⟦sources⟧)`: a generated helper that checks `pr` for every element (section 6) | `prem.ml:translate_barrier`, `iter.ml:translate_premise` |
 | `IterPr pr (iter, gens)`, one source unbound, `iter` is `^n` or there are two or more generators | `⟦source⟧` as a pattern for a generated helper that computes it from the other sources (section 6) | `prem.ml:translate_barrier` |
+| `IterPr pr (iter, gens)` whose `pr` rewrites (an execution premise, e.g. `(Eval_expr : z; expr ~>* z; val)*`), one source unbound | rewrite condition `helper(⟦captures⟧, ⟦sources⟧) => ⟦source⟧` for a rule helper (section 6) | `prem.ml:translate_barrier` |
 
 ### `IfPr e`
 
@@ -277,7 +278,9 @@ unbound part from `u` instead:
 | `e?` without a generator | `u == nil or u == ⟦e⟧ ?` |
 | `e : t1 <:> t2` (numeric conversion) | `e` as a pattern for `u : t2 <:> t1` |
 | `(e!C).0`, `C` with one argument | `e` as a pattern for `Ĉ(u)`, or for `u` if `C` is hole-only |
+| `x + k` or `k + x` (natural or integer), `k` known | `x` as a pattern for `sd(u, ⟦k⟧)` (nat) or `u - ⟦k⟧` (int), then `⟦p⟧ = u` |
 | `x * k` or `k * x` (natural or integer), `k` known | `k =/= 0`, `x` as a pattern for `u quo ⟦k⟧`, then `⟦p⟧ = u` |
+| `x` above may itself be such a `+` or `*`, or `(e!C).0` | each level as above; the final `⟦p⟧ = u` rejects a `u` that has no solution | 
 | `f(args)`, `f` has `hint(inverse g)` | the missing argument as a pattern for `ĝ(…, u)`, then `⟦p⟧ = u` |
 | `IterE` | the variables of the body are recovered by a generated helper (section 6) |
 | constructors, tuples, sequences, records | `⟦p⟧ := u`; parts that are computed are matched to fresh variables and then compared |
@@ -367,6 +370,8 @@ such a field (`def $funcinst(state) : funcinst*`) makes its calls map values.
 | `LenE (DotE e f)`, `LenE (CallE g ..)` | `map-size(⟦e⟧ . 'f)`, `map-size(ĝ(..))` | `term.ml:translate_value`, `term.ml:stored_value` |
 | `IdxE (DotE e f) i`, `IdxE (CallE g ..) i` | `map-read(⟦e⟧ . 'f, ⟦i⟧)`, `map-read(ĝ(..), ⟦i⟧)` | `term.ml:translate_value`, `term.ml:stored_value` |
 | `UpdE e (IdxP (DotP p f) i) e'` | `p` updated with `[. 'f = map-write(⟦p⟧ . 'f, ⟦i⟧, ⟦e'⟧)]` | `term.ml:translate_update` |
+| `UpdE e (SliceP (DotP p f) i n) e'` | `p` updated with `[. 'f = map-write-range(⟦p⟧ . 'f, ⟦i⟧, ⟦n⟧, ⟦e'⟧)]`; no value unless `e'` has length `n` and `i + n <= size` | `term.ml:translate_update` |
+| `ExtE e (DotP p f) e'` | `p` updated with `[. 'f = map-append(⟦p⟧ . 'f, ⟦e'⟧)]` | `term.ml:translate_extension` |
 | path `IdxP (DotP p f) i` below an update (`s[.f[i].g = e']`) | selected by `map-read(⟦p⟧ . 'f, ⟦i⟧)`, written back by `map-write` | `term.ml:translate_select`, `term.ml:translate_update` |
 | `UpdE e (DotP p f) e'` | `p` updated with `[. 'f = map-of(⟦e'⟧)]` | `term.ml:translate_update` |
 | field `f` of `StrE`, value `e.f'` of another map field | the stored map of `e.f'` | `term.ml:translate_stored_value` |
@@ -426,6 +431,7 @@ the iteration names an index variable.
 | `IterE` used as a pattern: recover the sequence of each variable | `unzip-C`, `unzip-` and the enclosing definition or rule otherwise | `iter_helpers.ml:translate_projector_statements` |
 | `IterPr`: check every element | `all-` and the enclosing definition or rule | `iter_helpers.ml:translate_premise_statements` |
 | `IterPr`: compute one unbound generator sequence | `bind-` and the enclosing rule | `iter_helpers.ml:translate_premise_statements` |
+| `IterPr` whose body rewrites: compute one unbound generator sequence | `bind-` and the enclosing definition or rule; `rl`/`crl` in the request sort `S-Iteration` above the result sort `S`, one result per rewrite of each element | `iter_helpers.ml:rewrite_premise_statements` |
 | Membership choice (section 2) | `choose-f` | `decd.ml:choice_helper` |
 
 A helper is generated only if a translated term or condition calls it. The
@@ -437,10 +443,10 @@ by its AST node, so the name lookup compares nodes physically. After all
 definitions are translated, the requested helpers are generated
 (`iter_helpers.ml:generate_requested`). Because a helper body can call another
 helper, generation repeats until no visited helper receives a new request.
-Requests for `IterPr` outputs come only from relation rules, which are all
-translated before generation starts. An `IterPr` that
-computes an unbound sequence is supported only in relation rules
-(`collect_outputs` in `prem.ml:translate_all`).
+An `IterPr` that computes an unbound sequence is supported in relation
+rules, function clauses, type premises, and helper bodies
+(`collect_outputs` in `prem.ml:translate_all`); a request made while a helper
+body is generated is generated in the next round.
 
 Each iteration first gets its own helper under a unique working name. After
 translation, helpers whose statements are equal up to variable names are
@@ -463,6 +469,7 @@ its first occurrence.
 | --- | --- | --- |
 | Before translation | Remove the premises named by `hint(maude_assume)`, and the quantifiers whose variables occurred only in those premises | `def.ml:assume_script` |
 | Before translation | Remove `DefP`/`DefA` (section 5) | `def.ml:specialize_script` |
+| Before translation | Split an execution rule whose premise `e1 ∨ e2` binds a variable into rules `r-1 .. r-n`, one per disjunct (∃x.(A ∨ B) = (∃x.A) ∨ (∃x.B)); a disjunction over bound variables, or a rule that a hint names, stays one rule | `def.ml:disjunction_script` |
 | Before translation | After a premise `e = {.., f x*}` on a `hint(maude_array)` or `hint(maude_map)` field `f`, write `e.f` for `x*` in the later premises and the result, so that `x*` gets the stored translation (section 4). Only clauses and rules with such a premise are rewritten. | `def.ml:stored_script` |
 | Before translation | Replace an operation on literals (`BinE`, `UnE`, `CvtE`, `CmpE` on numbers or booleans) by its value when it is defined (`Xl.Num`, `Xl.Bool`), innermost first; an undefined operation such as `1 \ 0`, or one with a non-literal operand, is kept | `def.ml:fold_ground`, `def.ml:fold_script` |
 | Before translation | Case premises (`Step_exp/INJ`): for each evaluated `Unchecked` `CaseE C e` (all its variables bound by earlier premises or inputs), add the premises of case `C` instantiated with `e` before the premise that evaluates it, or after the premises for a rule output or clause result; inside an iteration, as an `IterPr` over the bound sources. Instantiated premises are folded as above and omitted when they fold to `true`. Relation inputs, clause arguments, and constructions with unbound variables are patterns and get none. The added premises (and those for results) are recorded in the index; clauses that got some are partial. | `def.ml:case_premise_script`, `prescan.ml:is_case_premise`, `prescan.ml:is_partial_def` |
@@ -487,7 +494,7 @@ sort `val` for any `c`). In every context, including syntax membership equations
 | `maude_subsume`, `maude_trans`, `k_heatcool` | `RuleD` | 2 |
 | `maude_assume` | `RuleD` and `DecD` | 7 |
 | `maude_sort`, `maude_subsort`, `maude_proper` | `TypD` | 7 |
-| `maude_array`, `maude_map` | a field of `StructT` (the hint list of the field) | 4 |
+| `maude_array`, `maude_map` | a field of `StructT` (the hint list of the field); `maude_map` also a `DecD` | 4 |
 
 Hints arrive as `HintD` definitions (`TypH`, `RelH`, `DecH`, `RuleH`) and
 are collected by `prescan.ml:collect_hints`. A field hint (`maude_array`,
@@ -506,15 +513,14 @@ the rule, clause, or iteration, naming the definition and the reason. An omitted
 | A function with a clause that uses an omitted relation | declaration only; a call to it is rejected | `prescan.ml:unsupported_definitions`, `term.ml:translate_value` |
 | `TheE`, `UncaseE` with a named constructor | rejected | `term.ml:translate_value` |
 | `BinE` nat subtraction or nat/int division (partial in the IL, total in Maude) | rejected | `term.ml:translate_binop` |
-| An evaluated `SubE` into a variant whose shared cases have premises or into a record with field premises, an evaluated field update through such a record, an evaluated `StrE` of a record with field premises, a case quantifier inside an iteration, or a case type that does not reduce to a definition | rejected (the rechecked or field premises are not instantiated) | `def.ml:recheck`, `def.ml:case_premises`, `def.ml:iterexp_case_premises` |
-| A complement of an earlier function clause or rule that has a case premise inside a premise | rejected | `decd.ml:ordered_clauses`, `reld.ml:lower_execution_rule` |
+| An evaluated `SubE` into a variant whose shared cases have premises (unless the case is the same in both types: same payload, quantifiers, and premises) or into a record with field premises, an evaluated field update through such a record, an evaluated `StrE` of a record with field premises, a case quantifier inside an iteration, or a case type that does not reduce to a definition | rejected (the rechecked or field premises are not instantiated) | `def.ml:recheck`, `def.ml:case_premises`, `def.ml:iterexp_case_premises` |
+| A complement of an earlier function clause that has a case premise inside a premise; an otherwise rule after a rule with such a premise whose checks use variables that its inputs do not bind (otherwise the rule also requires those checks on its own inputs) | rejected | `decd.ml:ordered_clauses`, `reld.ml:lower_execution_rule` |
 | `CvtE` to or from `real` | rejected | `term.ml:native_exp` |
 | `SubE` between types with different Maude representations | rejected | `term.ml:translate_value` |
-| `IdxE`, `SliceE`, and the paths `IdxP`, `SliceP` on a sequence with its own sort (`hint(maude_sort)`) | rejected | `term.ml:translate_value`, `term.ml:translate_select` |
 | `IterT t +` and `IterT t ^n` as a type argument | rejected | `term.ml:translate_check_typ` |
 | `hint(maude_array)` or `hint(maude_map)` on a field that is not a sequence, or of a record type with parameters; both on one field; either on a `syntax` declaration instead of a field | rejected | `hintd.ml:stored_field_of`, `hintd.ml:stored_of` |
 | A `maude_array` field read other than by `LenE`, `IdxE`, `SliceE`; written by `IdxP` or `ExtE`; selected inside; or `CompE` of its record | rejected | `term.ml:translate_value`, `term.ml:translate_select`, `term.ml:translate_update`, `term.ml:translate_extension`, `term.ml:translate_composition` |
-| A `maude_map` field or `hint(maude_map)` call read other than by `LenE`, `IdxE`; written by `SliceP` or `ExtE`; selected inside by `SliceP`; a `hint(maude_map)` `DecD` clause that does not return a `maude_map` field | rejected | `term.ml:translate_value`, `term.ml:translate_select`, `term.ml:translate_update`, `term.ml:translate_extension`, `decd.ml:translate_result` |
+| A `maude_map` field or `hint(maude_map)` call read other than by `LenE`, `IdxE`; written by `SliceP` or `ExtE` below a path other than the field itself; selected inside by `SliceP`; a `hint(maude_map)` `DecD` clause that does not return a `maude_map` field | rejected | `term.ml:translate_value`, `term.ml:translate_select`, `term.ml:translate_update`, `term.ml:translate_extension`, `decd.ml:translate_result` |
 | `ElsePr` in a `maude_rule` function, or not as the first premise of an execution rule | rejected | `decd.ml:translate_rule_clause`, `reld.ml:lower_execution_rule` |
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |
@@ -523,7 +529,7 @@ the rule, clause, or iteration, naming the definition and the reason. An omitted
 | An `ElsePr` execution rule whose earlier rule needs an `r̂-r-enabled` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
 | A call of a `maude_rule` function from a function without `maude_rule`, or in an argument or result of a `maude_rule` clause | rejected | `decd.ml:equation_clause`, `decd.ml:translate_rule_clause` |
 | `ElsePr` or a `maude_rule` call in the premises before a membership choice | rejected | `decd.ml:translate_choice_clause` |
-| A function clause after an earlier clause that overlaps it without one head being an instance of the other, whose extra head structure is not ground, or whose conditions bind variables | rejected | `decd.ml:complement` |
+| A function clause after an earlier clause that overlaps it without one head being an instance of the other, whose extra head structure is not ground, or whose conditions bind variables, unless it is the last clause and no overlapping earlier clause adds case premises (then it is `[owise]`) | rejected | `decd.ml:complement`, `decd.ml:ordered_clauses` |
 | A record field whose type is a tuple (`syntax r = {A nat, B (nat, nat)}`) | rejected | `typd.ml:translate_struct_field` |
 | An alias of `t?`, `t+`, or `t^n` as a type value (`syntax foo = nat?`); as a type argument `t?` is supported, and `t*` is its element type here but `iterList` there | rejected | `term.ml:translate_typ` |
 | `IterE` with `?`, `*`, or `+` and no generator | rejected | `iter.ml:translate_term` |

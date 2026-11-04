@@ -205,13 +205,13 @@ let reserved_names =
     ; "iterOpt"; "iterList"
     ; "EMPTY"; "recordConcat"; "optionConcat"
     ; "sized-array"; "array-of"; "array-size"; "array-read"; "array-write"; "array-grow"
-    ; "sized-map"; "map-of"; "map-size"; "map-read"; "map-write"; "map-append"; "map-concat"
+    ; "sized-map"; "map-of"; "map-size"; "map-read"; "map-write"; "map-write-range"; "map-append"; "map-concat"
     (* prelude ARRAY and MAP, imported by backend/spectec-semantics.maude *)
     ; "empty"; "insert"; "$hasMapping"; "undefined"
     (* prelude LIST, imported by backend/spectec-sorts.maude *)
     ; "nil"; "append"; "head"; "tail"; "last"; "front"
     ; "occurs"; "reverse"; "$reverse"; "size"; "$size"
-    (* builtins.maude *)
+    (* builtins/*.maude *)
     ; "ibits-aux"; "inv-ibits-aux"; "ibytes-aux"
     ; "inv-ibytes-aux"; "sign-extend-nat"; "ipopcnt-bits"; "ipopcnt-bits-aux"
     ; "irev-bits"; "irev-bits-aux"; "shift-count"
@@ -461,15 +461,11 @@ let has_dec_hint_in hints target_name name =
           List.fold_left
                (fun found hint ->
                  begin match hint.hintid.it, hint.hintexp.it with
-                 | ("builtin" | "maude_kind" | "maude_rule"), El.Ast.SeqE [] -> ()
-                 | ("builtin" | "maude_kind" | "maude_rule" as flag), _ ->
+                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map"), El.Ast.SeqE [] -> ()
+                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map" as flag), _ ->
                      Util.Error.error hint.hintid.at "translation"
                        ("Unsupported DecD $" ^ target_name ^ ": "
                         ^ flag ^ " must be a flag hint")
-                 | "maude_map", _ ->
-                     Util.Error.error hint.hintid.at "translation"
-                       ("Unsupported DecD $" ^ target_name
-                        ^ ": maude_map marks a record field, not a definition")
                  | _ -> ()
                  end;
                  found || hint.hintid.it = name)
@@ -1353,6 +1349,10 @@ let mixop_name index mixop = name index MixopName (Mixop.key mixop)
 
 let has_dec_hint index id name =
   has_dec_hint_in index.hints id.it name
+
+(* hint(maude_map) on a DecD: its result is a maude_map field, read only
+   through $f(..)[i] and |$f(..)| (Term.stored_value). *)
+let map_definition index id = has_dec_hint index id "maude_map"
 
 let is_case_premise index prem = List.exists (( == ) prem) index.case_premises
 

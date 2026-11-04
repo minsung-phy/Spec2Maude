@@ -1,11 +1,11 @@
 type report = {
   commands : int;
   checked_assertions : int;
+  unchecked_assertions : int;
   runtime_assertions : int;
 }
 
-let emit ?(runtime = "wasm2maude/wast-runtime.maude")
-    ~semantics ~call_depth source =
+let emit ~runtime ~semantics ~call_depth source =
   if call_depth < 0 then invalid_arg "Wast_run.emit: negative call depth";
   let runtime =
     if Filename.is_relative runtime then Filename.concat (Sys.getcwd ()) runtime
@@ -28,8 +28,10 @@ let emit ?(runtime = "wasm2maude/wast-runtime.maude")
   let commands = Wast_plan.source_commands plan in
   let checked_assertions = Wast_plan.checked_assertions plan in
   let runtime_assertions = Wast_plan.runtime_assertions plan in
-  text, {commands; checked_assertions; runtime_assertions}
+  let unchecked_assertions = Wast_plan.unchecked_assertions plan in
+  text, {commands; checked_assertions; unchecked_assertions; runtime_assertions}
 
 let commands report = report.commands
 let checked_assertions report = report.checked_assertions
+let unchecked_assertions report = report.unchecked_assertions
 let runtime_assertions report = report.runtime_assertions

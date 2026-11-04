@@ -2,5 +2,7 @@ Repository: https://github.com/WebAssembly/spec.git
 Commit: e22ec2272bfbc06b995b00c1f1172a61d613fdd8
 Library subset: spectec/src/{util,xl,el,il,frontend} -> lib
 Specification subset: specification/wasm-3.0/{0.*,1.*,2.*,3.*,4.*} -> wasm-3.0
+Specification subset: specification/wasm-1.0/{0..9}-*.spectec (no A-binary) -> wasm-1.0
+Specification subset: specification/wasm-2.0/{0..9}-*.spectec (no A-binary) -> wasm-2.0
 Requires: OCaml >= 5.4 (spectec/dune-project)
-Local changes: Spec2Maude-specific hint annotations in wasm-3.0 only
+Local changes: Spec2Maude-specific hint annotations in wasm-1.0, wasm-2.0, wasm-3.0; wasm-2.0 Step context rules backported from the wasm-1.0 fix WebAssembly/spec#2218 (merged upstream as WebAssembly/spec#2322 after this revision), and wasm-2.0 $vextunop__/$vextbinop__ clauses over Jnn (I8 and I16 lanes) as in wasm-3.0 (upstream wasm-2.0 has Inn, leaving i16x8/i32x4 extadd, extmul, and dot without a result; reported as WebAssembly/spec#2321). Not changed: $binop_ shift amount (WebAssembly/spec#2319)

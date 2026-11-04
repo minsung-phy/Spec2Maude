@@ -98,15 +98,97 @@ let host_provider_term {Wast_plan.id; binding} =
   in
   id, instance
 
+(* Wasm 1.0 and 2.0 (spec/wasm-VERSION/4-runtime.spectec) have no host
+   functions: a spectest print function is a function instance whose code is
+   a function with no locals and an empty body. It returns no value and
+   changes no state, as the spectest functions observable to a test. This is
+   a model of the environment, not part of the specification. *)
+module Mvp = struct
+  module M = Maude_term
+
+  let record fields =
+    let field (name, value) = M.app "field" [M.atom ("'" ^ name); value] in
+    let rec join = function
+      | [] -> M.atom "EMPTY"
+      | [f] -> field f
+      | f :: rest -> M.app "_;_" [field f; join rest]
+    in
+    M.app "{_}" [join fields]
+
+  (* Wasm 2.0 module instances and stores also have element and data segments. *)
+  let segments () =
+    if !Wasm_version.current = Wasm_version.V2 then ["ELEMS", M.seq []; "DATAS", M.seq []]
+    else []
+
+  let instance_record exports =
+    let empty = List.map (fun f -> f, M.seq []) ["TYPES"; "FUNCS"; "GLOBALS"; "TABLES"; "MEMS"] in
+    record (empty @ segments () @ ["EXPORTS", M.seq exports])
+
+  let functype = function
+    | Wasm.Types.DefT
+        (Wasm.Types.RecT [Wasm.Types.SubT (Wasm.Types.Final, [], comp)], 0l) ->
+        Encode_version.functype comp
+    | _ -> invalid_arg "Wast_host_encode.Mvp.functype"
+
+  let resource {Wast_plan.export; _} =
+    match Wast_host.kind export with
+    | Wast_host.Function typ ->
+        let code = M.app "spectec-FUNC" [M.atom "0"; M.seq []; M.seq []] in
+        record ["TYPE", functype typ; "MODULE", instance_record []; "CODE", code]
+    | Wast_host.Global (typ, value) ->
+        record ["TYPE", Encode_version.globaltype typ; "VALUE", Encode.num_value value]
+    | Wast_host.Memory (Wasm.Types.MemoryT (_, lim) as typ) ->
+        let bytes = Int64.mul lim.min 65536L in
+        record
+          [ "TYPE", Encode_version.memtype typ
+          ; "BYTES", M.app "sized-array" [M.atom (Int64.to_string bytes); M.atom "empty"] ]
+    | Wast_host.Table (Wasm.Types.TableT (_, lim, _) as typ) ->
+        let null =
+          if !Wasm_version.current = Wasm_version.V2 then Encode_v2.null_reference Wasm.Types.FuncHT
+          else M.app "seq" [M.seq []]
+        in
+        record
+          [ "TYPE", Encode_version.tabletype typ
+          ; "REFS", M.app "map-of" [M.app "repeatSeq" [M.atom (Int64.to_string lim.min); null]] ]
+
+  let extern {Wast_plan.export; address} =
+    let address = M.atom (string_of_int address) in
+    match Wast_host.kind export with
+    | Wast_host.Function _ -> M.app "FUNC" [address]
+    | Wast_host.Global _ -> M.app "GLOBAL" [address]
+    | Wast_host.Memory _ -> M.app "MEM" [address]
+    | Wast_host.Table _ -> M.app "TABLE" [address]
+
+  let instance binding =
+    let export =
+      record ["NAME", Encode.name (Wast_host.name binding.Wast_plan.export); "ADDR", extern binding]
+    in
+    instance_record [export]
+
+  let store (host : Wast_plan.host) =
+    let resources bindings = M.seq (List.map resource bindings) in
+    let fields =
+      [ "FUNCS", M.app "map-of" [resources host.funcs]
+      ; "GLOBALS", resources host.globals
+      ; "TABLES", resources host.tables
+      ; "MEMS", M.app "map-of" [resources host.memories] ]
+    in
+    record (fields @ segments ())
+end
+
 let instances providers =
   List.fold_right
     (fun provider rest ->
-      let id, instance = host_provider_term provider in
+      let id, instance =
+        if Wasm_version.legacy () then provider.Wast_plan.id, Mvp.instance provider.binding
+        else host_provider_term provider
+      in
       T.app "instances.concat"
         [T.app "instances.entry" [T.atom (string_of_int id); instance]; rest])
     providers (T.atom "instances.nil")
 
 let store (host : Wast_plan.host) =
+  if Wasm_version.legacy () then Mvp.store host else
   T.app "rec.store"
     [seq [];
      seq (List.map host_resource_term host.globals);

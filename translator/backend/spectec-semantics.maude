@@ -1,9 +1,6 @@
-load spectec-sorts.maude
-
---- The common list (prelude LIST) comes from spectec-sorts.maude; the lists of
---- hint(maude_sort) are declared as its subsorts in types.maude
-load ../generated/types.maude
-
+--- Loaded after spectec-sorts.maude and the generated types.maude (main.maude):
+--- the common list (prelude LIST) comes from spectec-sorts.maude, and the lists
+--- of hint(maude_sort) are declared as its subsorts in types.maude.
 load spectec-builtin-types.maude
 
 fmod SPECTEC-CONVERT is
@@ -225,10 +222,11 @@ fmod SPECTEC-MAP is
   op map-size : SpectecTerminal ~> Nat .                                       --- |e.f|
   op map-read : SpectecTerminal Nat ~> SpectecTerminal .                       --- e.f[I]
   op map-write : SpectecTerminal Nat SpectecTerminal ~> SpectecTerminal .      --- e[.f[I] = T]
+  op map-write-range : SpectecTerminal Nat Nat SpectecTerminals ~> SpectecTerminal . --- e[.f[I : C] = TS], |TS| = C
   op map-append : SpectecTerminal SpectecTerminals ~> SpectecTerminal .        --- e.f TS
   op map-concat : SpectecTerminal SpectecTerminal ~> SpectecTerminal .         --- a field of record ++
 
-  vars S S' I : Nat .
+  vars S S' I C : Nat .
   vars M M' : TerminalMap .
   vars T T' : SpectecTerminal .
   var TS : SpectecTerminals .
@@ -239,6 +237,9 @@ fmod SPECTEC-MAP is
   eq map-size(sized-map(S, M)) = S .
   eq map-read(sized-map(S, (I |=> T, M)), I) = T .
   eq map-write(sized-map(S, (I |=> T', M)), I, T) = sized-map(S, (I |=> T, M)) .
+  ceq map-write-range(sized-map(S, M), I, 0, nil) = sized-map(S, M) if I <= S .
+  eq map-write-range(sized-map(S, M), I, s C, T TS)
+    = map-write-range(map-write(sized-map(S, M), I, T), s I, C, TS) .
   eq map-append(sized-map(S, M), nil) = sized-map(S, M) .
   eq map-append(sized-map(S, M), T TS) = map-append(sized-map(s S, (M, S |=> T)), TS) .
   eq map-concat(sized-map(S, M), sized-map(S', empty)) = sized-map(S + S', M) .

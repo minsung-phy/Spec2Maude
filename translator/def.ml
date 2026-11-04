@@ -38,7 +38,7 @@ let sort_metadata_declarations metadata =
     List.map (fun (sort, _) -> SortDecl sort) proper
   in
   let edges =
-    Hintd.subsort_edges metadata @ proper
+    Hintd.subsort_edges metadata @ proper @ Hintd.proper_edges metadata
     |> List.map (fun (subsort, supersort) -> SubsortDecl (subsort, supersort))
   in
   annotated @ proper_declarations @ edges
@@ -181,6 +181,10 @@ let normalize_module ?(constructors = true) source_declarations statements =
     List.partition
       (function SortDecl _ | SubsortDecl _ -> true | _ -> false)
       statements
+  in
+  (* Helpers may declare the same request sort (Iter_helpers). *)
+  let sort_declarations =
+    List.fold_left (fun kept d -> Hintd.add_unique ( = ) d kept) [] sort_declarations
   in
   let operator_declarations, definitions =
     List.partition (function OpDecl _ -> true | _ -> false) statements
@@ -612,14 +616,6 @@ let omit_assumed at owner names prems =
   List.filter (fun prem -> not (assumed prem)) prems
 
 (* Variables that occurred only in omitted premises are no longer quantified. *)
-let used_quants free quants =
-  List.filter
-    (fun quant ->
-      match quant.it with
-      | ExpP (id, _) -> Il.Free.Set.mem id.it free.Il.Free.varid
-      | TypP _ | DefP _ | GramP _ -> true)
-    quants
-
 let assume_script script =
   let hints = Prescan.collect_hints script in
   let rule_hints relation rule =
@@ -646,13 +642,13 @@ let assume_script script =
     | names ->
         let prems = omit_assumed r.at owner names prems in
         let free = Il.Free.(free_exp exp ++ free_prems prems) in
-        {r with it = RuleD (id, used_quants free quants, mixop, exp, prems)}
+        {r with it = RuleD (id, Prem.used_quants free quants, mixop, exp, prems)}
   in
   let clause owner names c =
     let DefD (quants, args, exp, prems) = c.it in
     let prems = omit_assumed c.at owner names prems in
     let free = Il.Free.(free_args args ++ free_exp exp ++ free_prems prems) in
-    {c with it = DefD (used_quants free quants, args, exp, prems)}
+    {c with it = DefD (Prem.used_quants free quants, args, exp, prems)}
   in
   let rec transform def =
     match def.it with
@@ -799,7 +795,16 @@ let has_field_premises fields =
 
 (* Subsumption and field update recheck the premises of the result's case or
    fields (Step_exp/SUB-INJ, SUB-STR, UPD-DOT); they are not instantiated, so
-   an evaluated one whose type has such premises is rejected. *)
+   an evaluated one whose type has such premises is rejected. A variant case
+   whose payload type, quantifiers, and premises equal those of the source
+   case (e.g. instr <: admininstr, where admininstr includes instr) needs no
+   recheck: a value of the source case already satisfies those premises
+   (evaluated constructions are checked, see case_premise_script). *)
+let same_case (typ1, quants1, prems1) (typ2, quants2, prems2) =
+  Il.Eq.eq_typ typ1 typ2
+  && Il.Eq.eq_list Il.Eq.eq_param quants1 quants2
+  && Il.Eq.eq_list Il.Eq.eq_prem prems1 prems2
+
 let recheck env owner exp =
   let fail case = unsupported exp.at case owner "rechecked premises are not instantiated" in
   match exp.it with
@@ -808,9 +813,12 @@ let recheck env owner exp =
       begin match source.it, (deftyp env owner (element_typ t2)).it with
       | VariantT cases1, VariantT cases2
         when List.exists
-               (fun (op, (_, _, prems), _) ->
+               (fun (op, ((_, _, prems) as case2), _) ->
                  prems <> []
-                 && List.exists (fun (op', _, _) -> Xl.Mixop.eq op op') cases1)
+                 && List.exists
+                      (fun (op', case1, _) ->
+                        Xl.Mixop.eq op op' && not (same_case case1 case2))
+                      cases1)
                cases2 ->
           fail "SubE"
       | _, StructT fields when has_field_premises fields -> fail "SubE"
@@ -1017,11 +1025,7 @@ let case_premise_script index script =
           Prem.split input_count exps
       | Prescan.Check _ -> exps, []
     in
-    let bound =
-      List.fold_left
-        (fun bound e -> Il.Free.Set.union bound (Il.Free.free_exp e).varid)
-        Il.Free.Set.empty inputs
-    in
+    let bound = (Il.Free.free_list Il.Free.free_exp inputs).varid in
     let quants', prems, checks, after = with_case_premises env owner bound prems outputs in
     add acc checks after, {r with it = RuleD (id, quants @ quants', mixop, exp, prems)}
   in
@@ -1059,8 +1063,70 @@ let case_premise_script index script =
   in
   script, acc
 
+(* A premise e_1 \/ .. \/ e_n with a variable that the inputs and earlier
+ * premises do not bind (Wasm 1.0 block: t? = eps /\ n = 0 \/ t? =/= eps /\
+ * n = 1) holds for some value of it iff one disjunct does. An execution rule
+ * is a rewrite rule, so it is split into one rule per disjunct, named
+ * id-1 .. id-n; together they have exactly the source rule's steps.
+ * Equations (definitions, other relations) are not split, and neither is a
+ * rule that a hint names. *)
+let rec disjuncts exp =
+  match exp.it with
+  | BinE (`OrOp, `BoolT, left, right) -> disjuncts left @ disjuncts right
+  | _ -> [exp]
+
+let disjunction_script index script =
+  let hinted =
+    List.filter_map
+      (fun hintdef ->
+        match hintdef.it with
+        | RuleH (r, id, _) -> Some (r.it, id.it)
+        | TypH _ | RelH _ | DecH _ | GramH _ -> None)
+      (Prescan.collect_hints script)
+  in
+  let rec rule relation input_count r =
+    let RuleD (id, quants, mixop, exp, prems) = r.it in
+    let inputs, _ = Prem.split input_count (Prem.components mixop exp) in
+    let bound = (Il.Free.free_list Il.Free.free_exp inputs).varid in
+    let rec find bound before = function
+      | [] -> None
+      | ({it = IfPr e; _} as prem) :: after
+        when List.length (disjuncts e) > 1
+             && not (Il.Free.Set.subset (Il.Free.free_exp e).varid bound) ->
+          Some (List.rev before, prem, e, after)
+      | prem :: after ->
+          find (Il.Free.Set.union bound (Il.Free.free_prem prem).varid)
+            (prem :: before) after
+    in
+    match find bound [] prems with
+    | None -> [r]
+    | Some _ when List.mem (relation, id.it) hinted -> [r]
+    | Some (before, prem, e, after) ->
+        disjuncts e
+        |> List.mapi (fun k disjunct ->
+             let prems = before @ [IfPr disjunct $ prem.at] @ after in
+             let free = Il.Free.(free_exp exp ++ free_prems prems) in
+             let id = {id with it = id.it ^ "-" ^ string_of_int (k + 1)} in
+             {r with it = RuleD (id, Prem.used_quants free quants, mixop, exp, prems)})
+        |> List.concat_map (rule relation input_count)
+  in
+  let rec transform def =
+    match def.it with
+    | RelD (id, params, mixop, typ, rules) ->
+        begin match Prescan.relation_policy index id with
+        | Ok (Prescan.Execution {input_count; _}) ->
+            let rules = List.concat_map (rule id.it input_count) rules in
+            {def with it = RelD (id, params, mixop, typ, rules)}
+        | Ok (Prescan.Compute _ | Prescan.Check _) | Error _ -> def
+        end
+    | RecD defs -> {def with it = RecD (List.map transform defs)}
+    | TypD _ | DecD _ | GramD _ | HintD _ -> def
+  in
+  List.map transform script
+
 let translate_script script =
   let script = fold_script (stored_script (specialize_script (assume_script script))) in
+  let script = disjunction_script (Prescan.scan script) script in
   (* The pass needs the relation policies of the first scan; the index is
      scanned again for the premises it adds. *)
   let script, checks = case_premise_script (Prescan.scan script) script in

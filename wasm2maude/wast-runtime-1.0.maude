@@ -1,0 +1,86 @@
+--- WAST runtime for the Wasm 1.0 semantics (on wast-runtime-core.maude): number
+--- results over valtype, the 1.0 memory, table, and memory.grow shapes,
+--- administrative instructions, and assert_unlinkable with a module.
+
+load wast-runtime-core.maude
+
+mod WASM-WAST-DRIVER is
+  including WASM-WAST-CORE .
+  protecting META-LEVEL .
+
+  op activeFrameDepth : AdmininstrList -> Nat .
+
+  vars WSHC WSHS WSHF WSHM WSHNT WSHVALUE WSHAT : SpectecTerminal .
+  var WSHK : Holes .
+  var WSHR : Step-Request .
+  var WSHH : Hole .
+  vars WSHMAX WSHEXPORTS : SpectecTerminals .
+  vars WSHACTUAL WSHPREFIX : ValList .
+  var WSHINSTRS : InstrList .
+  vars WSHBODY WSHREST : AdmininstrList .
+  var WSHCMDS : Commands .
+  var WSHIMPORTS : ImportRefs .
+  var WSHENV : InstanceEnv .
+  vars WSHID WSHN WSHMIN WSHREQUIRED : Nat .
+
+  eq memoryMin([WSHMIN .. WSHMAX]) = WSHMIN .
+  eq tableMin([WSHMIN .. WSHMAX]) = WSHMIN .
+
+  ceq runtimeResults(CONST(WSHNT, WSHVALUE) WSHACTUAL) =
+      runtimeResults(WSHACTUAL)
+    if typecheck(WSHNT, valtype)
+       /\ typecheck(WSHVALUE, val-(WSHNT)) .
+
+  ceq activeFrameDepth(WSHPREFIX ((FRAME- WSHN { WSHC } WSHBODY) WSHREST)) =
+    1 + activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  ceq activeFrameDepth(WSHPREFIX ((LABEL- WSHN { WSHINSTRS } WSHBODY) WSHREST)) =
+    activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  eq activeFrameDepth(WSHBODY) = 0 [owise] .
+
+  --- A grow request is a focus of the instruction sequence, alone or under its
+  --- sequence hole; matching these shapes costs nothing for other requests.
+  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW)), WSHK) =
+    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW))), WSHK) .
+  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW)) ~> WSHH, WSHK) =
+    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW)) ~> WSHH), WSHK) .
+
+  --- SpecTec has no call-stack limit: assert_exhaustion passes once the frame
+  --- depth of the configuration exceeds the bound (--call-depth), so a PASS is
+  --- relative to that bound. The active frames of cool-all(unheat(R), K) are
+  --- the frame holes of K and the active frames of the request R.
+  crl [exhaustion-done] :
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if (WSHS ; WSHF) ; WSHBODY := unheat(WSHR)
+       /\ frameDepth(WSHK) + activeFrameDepth(WSHBODY) > WSHREQUIRED = true .
+
+  --- Wasm 1.0 assert_unlinkable: the imports do not link, or the module has no
+  --- instance. $instantiate has no result when a segment does not fit (its
+  --- table or memory range update is undefined, spectec/wasm-1.0/9-module.spectec);
+  --- this is checked by searching the semantics for a configuration.
+  op command.unlinkable-module : Nat SpectecTerminal ImportRefs -> Command [ctor] .
+  op instantiable : SpectecTerminal SpectecTerminal SpectecTerminals -> Bool .
+  eq instantiable(WSHS, WSHM, WSHEXPORTS) =
+    metaSearch(upModule('WASM-WAST-DRIVER, false),
+      upTerm(instantiate(WSHS, WSHM, WSHEXPORTS)), 'C:SpectecTerminal, nil, '+, 1, 0)
+      =/= (failure).ResultTriple? .
+  crl [assert-unlinkable-module-link] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.unlinkable-module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
+  crl [assert-unlinkable-module-instance] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.unlinkable-module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)
+       /\ instantiable(WSHS, WSHM, WSHEXPORTS) = false .
+  crl [assert-unlinkable-module-wrong] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.unlinkable-module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
+    => script.wrong-assertion(WSHID)
+    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)
+       /\ instantiable(WSHS, WSHM, WSHEXPORTS) = true .
+endm

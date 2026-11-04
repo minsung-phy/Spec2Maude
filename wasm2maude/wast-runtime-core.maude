@@ -1,12 +1,16 @@
---- WAST command execution and assertion checking over the loaded Wasm semantics.
---- The generated WASM2MAUDE-WAST module supplies the initial state and host data.
-mod WASM-WAST-DRIVER is
+--- WAST command execution and assertion checking over the loaded Wasm semantics,
+--- shared by Wasm 1.0, 2.0, and 3.0: every statement here uses only names that
+--- the three generated semantics declare alike. wast-runtime-vector.maude adds
+--- what 2.0 and 3.0 share; wast-runtime-VERSION.maude complete the driver
+--- module WASM-WAST-DRIVER of each version. The generated WASM2MAUDE-WAST
+--- module of wast_harness.ml supplies the initial state and host data.
+mod WASM-WAST-CORE is
   including WASM-BUILTINS .
 
   sorts ScriptAction ImportRequirement ImportRef ImportRefs LinkResult
     Command Commands
     InstanceEnv ScriptState ResultPattern ResultPatterns
-    ResultAlternatives LanePattern LanePatterns MatchVerdict .
+    ResultAlternatives MatchVerdict .
   subsort Command < Commands .
   op action.invoke : Nat SpectecTerminals ValList
     -> ScriptAction [ctor] .
@@ -25,7 +29,6 @@ mod WASM-WAST-DRIVER is
   op link.append : LinkResult LinkResult -> LinkResult .
   op command.module : Nat SpectecTerminal ImportRefs
     -> Command [ctor] .
-  op command.unlinkable : Nat ImportRefs -> Command [ctor] .
   op command.uninstantiable-static : Nat -> Command [ctor] .
   op command.uninstantiable : Nat SpectecTerminal ImportRefs
     -> Command [ctor] .
@@ -37,22 +40,11 @@ mod WASM-WAST-DRIVER is
   op alternatives.cons : ResultAlternatives ResultAlternatives
     -> ResultAlternatives [ctor assoc id: alternatives.nil] .
   op result.exact-num : SpectecTerminal -> ResultPattern [ctor] .
-  op result.exact-vec : SpectecTerminal -> ResultPattern [ctor] .
-  op result.vec-lanes : SpectecTerminal LanePatterns
-    -> ResultPattern [ctor] .
-  op result.exact-ref : SpectecTerminal -> ResultPattern [ctor] .
-  op result.ref-type : SpectecTerminal -> ResultPattern [ctor] .
-  op result.null-ref : SpectecTerminal -> ResultPattern [ctor] .
   op result.either : ResultAlternatives -> ResultPattern [ctor] .
   op result.nan-canonical : SpectecTerminal
     -> ResultPattern [ctor] .
   op result.nan-arithmetic : SpectecTerminal
     -> ResultPattern [ctor] .
-  op lane.exact : SpectecTerminal -> LanePattern [ctor] .
-  op lane.nan-canonical : -> LanePattern [ctor] .
-  op lane.nan-arithmetic : -> LanePattern [ctor] .
-  op lanes.nil : -> LanePatterns [ctor] .
-  op lanes.cons : LanePattern LanePatterns -> LanePatterns [ctor] .
   op match.yes : -> MatchVerdict [ctor] .
   op match.no : -> MatchVerdict [ctor] .
   op match.and : MatchVerdict MatchVerdict -> MatchVerdict .
@@ -63,15 +55,9 @@ mod WASM-WAST-DRIVER is
   op match.any : SpectecTerminal ResultAlternatives
     -> MatchVerdict .
 
-  op match.lane : SpectecTerminal SpectecTerminal LanePattern
-    -> MatchVerdict .
-  op match.vec-lanes : SpectecTerminal SpectecTerminals LanePatterns
-    -> MatchVerdict .
-
   op command.return : Nat ScriptAction ResultPatterns
     -> Command [ctor] .
   op command.trap : Nat ScriptAction -> Command [ctor] .
-  op command.exception : Nat ScriptAction -> Command [ctor] .
   op command.exhaustion : Nat Nat ScriptAction -> Command [ctor] .
   op command.do : Nat ScriptAction -> Command [ctor] .
 
@@ -89,6 +75,8 @@ mod WASM-WAST-DRIVER is
     -> LinkResult .
   op linkImports : SpectecTerminal InstanceEnv ImportRefs
     -> LinkResult .
+  --- The minimum of a memory or table type; each version gives its shape.
+  ops memoryMin tableMin : SpectecTerminal ~> Nat .
 
   op script.ready : SpectecTerminal InstanceEnv Commands
     -> ScriptState [ctor] .
@@ -108,15 +96,12 @@ mod WASM-WAST-DRIVER is
   op script.return : Nat InstanceEnv ResultPatterns Commands KState
     -> ScriptState [ctor] .
   op script.trap : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
-  op script.exception : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
   op script.exhaustion : Nat Nat InstanceEnv Commands KState
     -> ScriptState [ctor] .
   op script.action : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
   op script.uninstantiable : Nat InstanceEnv Commands KState
     -> ScriptState [ctor] .
   op choice : Step-Request -> Step-Request [ctor frozen (1)] .
-  op tableLimit : -> Nat .
-  op tableFits : SpectecTerminal Nat Nat -> Bool .
   op script.wrong-result : Nat ValList ResultPatterns
     -> ScriptState [ctor] .
   op script.wrong-assertion : Nat -> ScriptState [ctor] .
@@ -125,23 +110,19 @@ mod WASM-WAST-DRIVER is
 
   op emptyStore : -> SpectecTerminal .
   op findFunc : SpectecTerminals SpectecTerminals ~> Nat .
-
   op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .
 
   op runtimeResults : ValList -> Bool .
-
-  op activeFrameDepth : InstrList -> Nat .
   op frameDepth : Holes -> Nat .
 
   vars WSHC WSHM WSHS WSHF WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
   var WSHK : Holes .
   vars WSHR WSHR2 : Step-Request .
   var WSHH : Hole .
-  vars WSHNT WSHVALUE WSHLT WSHAT WSHRT : SpectecTerminal .
+  var WSHVALUE : SpectecTerminal .
   vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .
-  vars WSHLANES WSHTYPES WSHMAX WSHCATCHES : SpectecTerminals .
-  vars WSHARGS WSHACTUAL WSHVALUES WSHPREFIX : ValList .
-  vars WSHBODY WSHINSTRS WSHREST : InstrList .
+  vars WSHARGS WSHACTUAL : ValList .
+  var WSHINSTRS : InstrList .
   var WSHCMDS : Commands .
   vars WSHIMPORTS WSHIMPORTS2 : ImportRefs .
   var WSHREQUIREMENT : ImportRequirement .
@@ -150,9 +131,7 @@ mod WASM-WAST-DRIVER is
   var WSHPATTERN : ResultPattern .
   vars WSHEXPECTED WSHPATTERNS : ResultPatterns .
   vars WSHALTERNATIVES WSHALTPREFIX WSHALTSUFFIX : ResultAlternatives .
-  var WSHLPAT : LanePattern .
-  var WSHLPATS : LanePatterns .
-  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHDIM WSHBITS : Nat .
+  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHREQUIRED : Nat .
 
   eq hasInstance(instances.concat(WSHENVPREFIX,
     instances.concat(instances.entry(WSHID, WSHMI), WSHENVSUFFIX)), WSHID) = true .
@@ -173,44 +152,16 @@ mod WASM-WAST-DRIVER is
   eq link.append(link.ok(WSHXA), link.ok(WSHEXPORTS)) =
     link.ok(WSHXA WSHEXPORTS) .
 
+  --- A memory (table) import needs a memory (table) of at least the required
+  --- minimum; any other external value does not link.
   eq checkImport(WSHS, WSHXA, import.ready) = link.ok(WSHXA) .
   ceq checkImport(WSHS, MEM(WSHA),
     import.current-memory-min(WSHREQUIRED)) = link.ok(MEM(WSHA))
-    if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         (map-read(WSHS . 'MEMS, WSHA) . 'TYPE)
-       /\ WSHMIN >= WSHREQUIRED = true .
-  ceq checkImport(WSHS, MEM(WSHA),
-    import.current-memory-min(WSHREQUIRED)) = link.error
-    if __PAGE(WSHAT, [WSHMIN .. WSHMAX]) :=
-         (map-read(WSHS . 'MEMS, WSHA) . 'TYPE)
-       /\ WSHMIN < WSHREQUIRED = true .
-  eq checkImport(WSHS, TAG(WSHA),
-    import.current-memory-min(WSHREQUIRED)) = link.error .
-  eq checkImport(WSHS, GLOBAL(WSHA),
-    import.current-memory-min(WSHREQUIRED)) = link.error .
-  eq checkImport(WSHS, TABLE(WSHA),
-    import.current-memory-min(WSHREQUIRED)) = link.error .
-  eq checkImport(WSHS, FUNC(WSHA),
-    import.current-memory-min(WSHREQUIRED)) = link.error .
-
+    if memoryMin(map-read(WSHS . 'MEMS, WSHA) . 'TYPE) >= WSHREQUIRED = true .
   ceq checkImport(WSHS, TABLE(WSHA),
     import.current-table-min(WSHREQUIRED)) = link.ok(TABLE(WSHA))
-    if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
-         ((WSHS . 'TABLES)[WSHA] . 'TYPE)
-       /\ WSHMIN >= WSHREQUIRED = true .
-  ceq checkImport(WSHS, TABLE(WSHA),
-    import.current-table-min(WSHREQUIRED)) = link.error
-    if tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT) :=
-         ((WSHS . 'TABLES)[WSHA] . 'TYPE)
-       /\ WSHMIN < WSHREQUIRED = true .
-  eq checkImport(WSHS, TAG(WSHA),
-    import.current-table-min(WSHREQUIRED)) = link.error .
-  eq checkImport(WSHS, GLOBAL(WSHA),
-    import.current-table-min(WSHREQUIRED)) = link.error .
-  eq checkImport(WSHS, MEM(WSHA),
-    import.current-table-min(WSHREQUIRED)) = link.error .
-  eq checkImport(WSHS, FUNC(WSHA),
-    import.current-table-min(WSHREQUIRED)) = link.error .
+    if tableMin((WSHS . 'TABLES)[WSHA] . 'TYPE) >= WSHREQUIRED = true .
+  eq checkImport(WSHS, WSHXA, WSHREQUIREMENT) = link.error [owise] .
 
   eq linkImports(WSHS, WSHENV, imports.nil) = link.ok(nil) .
   eq linkImports(WSHS, WSHENV, imports.cons(
@@ -225,111 +176,20 @@ mod WASM-WAST-DRIVER is
     if GLOBAL(WSHA) := findExport(WSHEXPORTS, WSHNAME) .
 
   eq runtimeResults(nil) = true .
-  ceq runtimeResults(CONST(WSHNT, WSHVALUE) WSHACTUAL) =
-      runtimeResults(WSHACTUAL)
-    if typecheck(WSHNT, numtype)
-       /\ typecheck(WSHVALUE, num-(WSHNT)) .
 
-  eq runtimeResults(VCONST(V128, WSHBITS) WSHACTUAL) =
-    runtimeResults(WSHACTUAL) .
-
-  ceq runtimeResults(WSHC WSHACTUAL) = runtimeResults(WSHACTUAL)
-    if typecheck(WSHC, ref) .
-
-  ceq activeFrameDepth(WSHPREFIX ((FRAME- WSHN { WSHC } WSHBODY) WSHREST)) =
-    1 + activeFrameDepth(WSHBODY)
-    if runtimeResults(WSHPREFIX) .
-  ceq activeFrameDepth(WSHPREFIX ((LABEL- WSHN { WSHINSTRS } WSHBODY) WSHREST)) =
-    activeFrameDepth(WSHBODY)
-    if runtimeResults(WSHPREFIX) .
-  ceq activeFrameDepth(WSHPREFIX ((HANDLER- WSHN { WSHCATCHES } WSHBODY) WSHREST)) =
-    activeFrameDepth(WSHBODY)
-    if runtimeResults(WSHPREFIX) .
-  eq activeFrameDepth(WSHINSTRS) = 0 [owise] .
   --- Counted from the innermost hole, so each step matches only the head of K.
   eq frameDepth(none) = 0 .
   eq frameDepth(hole-Step-ctxt-frame(WSHN, WSHF) WSHK) = s frameDepth(WSHK) .
   eq frameDepth(hole-Step-ctxt-label(WSHINSTRS, WSHN) WSHK) = frameDepth(WSHK) .
-  eq frameDepth(hole-Step-ctxt-handler(WSHCATCHES, WSHN) WSHK) = frameDepth(WSHK) .
   eq frameDepth(WSHH WSHK) = frameDepth(WSHK) .
 
-  --- A grow request is a focus of the instruction sequence, alone or under its
-  --- sequence hole; matching these shapes costs nothing for other requests.
-  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))), WSHK) =
-    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA)))), WSHK) .
-  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH, WSHK) =
-    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH), WSHK) .
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))), WSHK) =
-    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA))))), WSHK)
-    if tableFits(WSHS, WSHA, WSHN) .
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH, WSHK) =
-    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH), WSHK)
-    if tableFits(WSHS, WSHA, WSHN) .
-
-  --- Environment model, not SpecTec: a table of more than tableLimit references
-  --- is not allocated, as the reference interpreter fails to allocate it, so
-  --- table.grow takes the result of its failure rule (Step/table.grow-fail),
-  --- which the specification allows at any size. Its result below copies that
-  --- rule's right-hand side; update it with the rule.
-  eq tableLimit = 16777216 .
-  eq tableFits(WSHS, WSHA, WSHN) =
-    map-size(spectec-table(WSHS, WSHA) . 'REFS) + WSHN <= tableLimit .
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))), WSHK) =
-    kstate(WSHS ; CONST(WSHAT, # inv-signed-(spectec-size(WSHAT), -_(1 : nat <:> int))), WSHK)
-    if tableFits(WSHS, WSHA, WSHN) = false .
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH, WSHK) =
-    kstate((WSHS ; CONST(WSHAT, # inv-signed-(spectec-size(WSHAT), -_(1 : nat <:> int)))) ~> WSHH, WSHK)
-    if tableFits(WSHS, WSHA, WSHN) = false .
   eq match.and(match.yes, match.yes) = match.yes .
   eq match.and(match.yes, match.no) = match.no .
   eq match.and(match.no, match.yes) = match.no .
   eq match.and(match.no, match.no) = match.no .
   eq match.value(WSHVALUE, result.exact-num(WSHVALUE)) = match.yes .
-  eq match.value(WSHVALUE, result.exact-vec(WSHVALUE)) = match.yes .
-  eq match.value(WSHVALUE, result.exact-ref(WSHVALUE)) = match.yes .
-  eq match.value(REF.NULL-ADDR, result.null-ref(WSHNT)) =
-    match.yes .
   eq match.value(WSHVALUE, result.either(WSHALTERNATIVES)) =
     match.any(WSHVALUE, WSHALTERNATIVES) .
-
-  ceq match.value(
-    VCONST(V128, WSHBITS),
-    result.vec-lanes(WSHLT X WSHDIM, WSHLPATS)) =
-      match.vec-lanes(WSHLT, WSHLANES, WSHLPATS)
-    if WSHLANES := lanes-(WSHLT X WSHDIM, WSHBITS) .
-
-  eq match.lane(WSHNT, WSHVALUE, lane.exact(WSHVALUE)) = match.yes .
-  eq match.lane(F32,
-    POS(NAN(4194304)), lane.nan-canonical) = match.yes .
-  eq match.lane(F32,
-    NEG(NAN(4194304)), lane.nan-canonical) = match.yes .
-  eq match.lane(F64,
-    POS(NAN(2251799813685248)), lane.nan-canonical) =
-      match.yes .
-  eq match.lane(F64,
-    NEG(NAN(2251799813685248)), lane.nan-canonical) =
-      match.yes .
-  ceq match.lane(F32,
-    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
-    if _>=_(WSHADDR, 4194304) = true .
-  ceq match.lane(F32,
-    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
-    if _>=_(WSHADDR, 4194304) = true .
-  ceq match.lane(F64,
-    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
-    if _>=_(WSHADDR, 2251799813685248) = true .
-  ceq match.lane(F64,
-    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
-    if _>=_(WSHADDR, 2251799813685248) = true .
-  eq match.lane(WSHNT, WSHVALUE, WSHLPAT) = match.no [owise] .
-
-  eq match.vec-lanes(WSHNT, nil, lanes.nil) = match.yes .
-  eq match.vec-lanes(WSHNT, WSHVALUE WSHLANES,
-    lanes.cons(WSHLPAT, WSHLPATS)) =
-    match.and(match.lane(WSHNT, WSHVALUE, WSHLPAT),
-      match.vec-lanes(WSHNT, WSHLANES, WSHLPATS)) .
-  eq match.vec-lanes(WSHNT, WSHLANES, WSHLPATS) =
-    match.no [owise] .
 
   eq match.value(
     CONST(F32, POS(NAN(4194304))),
@@ -359,30 +219,6 @@ mod WASM-WAST-DRIVER is
     CONST(F64, NEG(NAN(WSHADDR))),
     result.nan-arithmetic(F64)) = match.yes
     if _>=_(WSHADDR, 2251799813685248) = true .
-
-  eq match.value(REF.NULL-ADDR, result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(ANY)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(EQ)) = match.yes .
-  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
-  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(I31)) = match.yes .
-  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(STRUCT)) = match.yes .
-  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ARRAY)) = match.yes .
-  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(spectec-FUNC)) = match.yes .
-  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXN)) = match.yes .
-  eq match.value(REF.NULL-ADDR, result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
-  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(EXTERN)) = match.yes .
   eq match.value(WSHVALUE, WSHPATTERN) = match.no [owise] .
 
   eq match.values(nil, patterns.nil) = match.yes .
@@ -396,16 +232,6 @@ mod WASM-WAST-DRIVER is
     alternatives.cons(WSHPATTERN, WSHALTSUFFIX))) = match.yes
     if match.value(WSHVALUE, WSHPATTERN) = match.yes .
   eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .
-  --- Environment model, not SpecTec: the source leaves $hostcall to the host.
-  --- The spectest functions are the print functions, which return no values
-  --- and leave the store unchanged.
-  eq hostcall(-HOSTFUNC(# "print"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
-  eq hostcall(-HOSTFUNC(# "print_i32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
-  eq hostcall(-HOSTFUNC(# "print_i64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
-  eq hostcall(-HOSTFUNC(# "print_f32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
-  eq hostcall(-HOSTFUNC(# "print_f64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
-  eq hostcall(-HOSTFUNC(# "print_i32_f32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
-  eq hostcall(-HOSTFUNC(# "print_f64_f64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
 
   crl [choice] : kstate(choice(WSHR), WSHK) => kstate(WSHR2, WSHK)
     if WSHR => WSHR2 /\ WSHR2 =/= WSHR .
@@ -426,17 +252,6 @@ mod WASM-WAST-DRIVER is
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; nil), none))
     => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .
 
-  crl [assert-unlinkable] :
-    script.ready(WSHS, WSHENV,
-      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))
-    => script.ready(WSHS, WSHENV, WSHCMDS)
-    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
-  crl [assert-unlinkable-wrong] :
-    script.ready(WSHS, WSHENV,
-      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))
-    => script.wrong-assertion(WSHID)
-    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS) .
-
   rl [assert-uninstantiable-static-link-error] :
     script.ready(WSHS, WSHENV,
       commands.cons(command.uninstantiable-static(WSHID), WSHCMDS))
@@ -455,11 +270,6 @@ mod WASM-WAST-DRIVER is
   rl [assert-uninstantiable-trap] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
-    => script.ready(WSHS, WSHENV, WSHCMDS) .
-  rl [assert-uninstantiable-exception] :
-    script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [assert-uninstantiable-normal] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
@@ -513,26 +323,6 @@ mod WASM-WAST-DRIVER is
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
 
-  rl [call-exception] :
-    script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,
-      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
-    => script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
-  rl [exception-done] :
-    script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
-    => script.ready(WSHS, WSHENV, WSHCMDS) .
-  rl [exception-trap] :
-    script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
-    => script.wrong-assertion(WSHID) .
-  crl [exception-normal] :
-    script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
-    => script.wrong-assertion(WSHID)
-    if runtimeResults(WSHACTUAL) = true .
-
   rl [call-action] :
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
@@ -562,25 +352,11 @@ mod WASM-WAST-DRIVER is
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
     => script.wrong-assertion(WSHID) .
-  rl [exhaustion-exception] :
-    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
-    => script.wrong-assertion(WSHID) .
   crl [exhaustion-normal] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
       kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
-  --- SpecTec has no call-stack limit: assert_exhaustion passes once the frame
-  --- depth of the configuration exceeds the bound (--call-depth), so a PASS is
-  --- relative to that bound. The active frames of cool-all(unheat(R), K) are
-  --- the frame holes of K and the active frames of the request R.
-  crl [exhaustion-done] :
-    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
-    => script.ready(WSHS, WSHENV, WSHCMDS)
-    if (WSHS ; WSHF) ; WSHINSTRS := unheat(WSHR)
-       /\ frameDepth(WSHK) + activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
 
   rl [done] :
     script.ready(WSHS, WSHENV, commands.nil) => script.done .

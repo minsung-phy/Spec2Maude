@@ -59,8 +59,9 @@ properties in a composed model.
 | [`spectec/`](spectec/) | SpecTec frontend, IL definitions, and WebAssembly specification |
 | [`translator/`](translator/) | Recursive SpecTec IL-to-Maude translator |
 | [`translator/maude/`](translator/maude/) | Maude intermediate representation and renderer |
-| [`translator/backend/`](translator/backend/) | Common representations and builtins |
-| [`translator/generated/`](translator/generated/) | Generated Maude declarations and semantics |
+| [`translator/backend/`](translator/backend/) | Common representations and the per-version load files (`main*.maude`) |
+| [`translator/generated/`](translator/generated/) | Generated Maude declarations and semantics (3.0; `wasm-1.0/`, `wasm-2.0/`) |
+| [`translator/builtins/`](translator/builtins/) | Hand-written `hint(builtin)` implementations, shared and per version |
 | [`wasm2maude/`](wasm2maude/) | WebAssembly program encoding and execution drivers |
 | [`bin/`](bin/) | Command-line entry points |
 | [`test/`](test/) | Translation and execution test entry points |

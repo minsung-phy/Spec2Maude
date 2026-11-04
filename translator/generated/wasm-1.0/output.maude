@@ -1,0 +1,2695 @@
+mod SPEC2MAUDE-GENERATED is
+  protecting SPECTEC-SEMANTICS .
+
+  sort Step-pure-Request .
+
+  subsort AdmininstrList < Step-pure-Request .
+
+  sort Step-read-Request .
+
+  subsort AdmininstrList < Step-read-Request .
+
+  sort Step-Request .
+
+  subsort SpectecTerminal < Step-Request .
+
+  sort FocusSearch .
+
+  sort FocusTarget .
+
+  sort Hole .
+
+  subsort FocusTarget < FocusSearch .
+
+  sort Holes .
+
+  sort KState .
+
+  subsort Hole < Holes .
+
+  sort Hole-Step-ctxt-label .
+
+  subsort Hole-Step-ctxt-label < Holes .
+
+  sort Hole-Step-ctxt-frame .
+
+  subsort Hole-Step-ctxt-frame < Holes .
+
+  sort Hole-Step-pure .
+
+  sort Hole-Step-read .
+
+  sort Steps-Request .
+
+  subsort SpectecTerminal < Steps-Request .
+
+  sort Hole-Steps-trans-Step .
+
+  sort Hole-Steps-trans-Steps .
+
+  sort Eval-expr-Request .
+
+  subsort SpectecTerminal < Eval-expr-Request .
+
+  sort Hole-Eval-expr .
+
+  sort instantiate-Config .
+
+  subsort SpectecTerminal < instantiate-Config .
+
+  sort ValList-Iteration .
+
+  subsort ValList < ValList-Iteration .
+
+  sort SpectecTerminals-Iteration .
+
+  subsort SpectecTerminals < SpectecTerminals-Iteration .
+
+  op valLift : SpectecTerminals ~> ValList .
+
+  op instrLift : SpectecTerminals ~> InstrList .
+
+  op admininstrLift : SpectecTerminals ~> AdmininstrList .
+
+  op MUT : -> SpectecType .
+
+  op spectec-MUT : -> SpectecTerminal [ctor] .
+
+  op N : -> SpectecType .
+
+  op M : -> SpectecType .
+
+  op n : -> SpectecType .
+
+  op m : -> SpectecType .
+
+  op Ki : -> Nat .
+
+  op spectec-min : Nat Nat -> Nat .
+
+  op sum : SpectecTerminals -> Nat .
+
+  op opt- : SpectecType SpectecTerminals ~> SpectecTerminals .
+
+  op list- : SpectecType SpectecTerminals -> SpectecTerminals .
+
+  op concat- : SpectecType SpectecTerminals -> SpectecTerminals .
+
+  op disjoint- : SpectecType SpectecTerminals -> SpectecTerminal .
+
+  op list : SpectecType -> SpectecType .
+
+  op byte : -> SpectecType .
+
+  op uN : Nat -> SpectecType .
+
+  op sN : Nat -> SpectecType .
+
+  op iN : Nat -> SpectecType .
+
+  op u31 : -> SpectecType .
+
+  op u32 : -> SpectecType .
+
+  op u64 : -> SpectecType .
+
+  op i32 : -> SpectecType .
+
+  op i64 : -> SpectecType .
+
+  op signif : Nat ~> Nat .
+
+  op expon : Nat ~> Nat .
+
+  op spectec-M : Nat -> Nat .
+
+  op E : Nat -> Nat .
+
+  op spectec-exp : -> SpectecType .
+
+  op fNmag : Nat -> SpectecType .
+
+  op NORM : Nat Int -> SpectecTerminal [ctor] .
+
+  op SUBNORM : Nat -> SpectecTerminal [ctor] .
+
+  op INF : -> SpectecTerminal [ctor] .
+
+  op NAN : Nat -> SpectecTerminal [ctor] .
+
+  op fN : Nat -> SpectecType .
+
+  op POS : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op NEG : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op f32 : -> SpectecType .
+
+  op f64 : -> SpectecType .
+
+  op fzero : Nat ~> SpectecTerminal .
+
+  op fone : Nat ~> SpectecTerminal .
+
+  op canon- : Nat -> Nat .
+
+  op spectec-char : -> SpectecType .
+
+  op utf8 : SpectecTerminals -> SpectecTerminals .
+
+  op name : -> SpectecType .
+
+  op idx : -> SpectecType .
+
+  op typeidx : -> SpectecType .
+
+  op funcidx : -> SpectecType .
+
+  op globalidx : -> SpectecType .
+
+  op tableidx : -> SpectecType .
+
+  op memidx : -> SpectecType .
+
+  op labelidx : -> SpectecType .
+
+  op localidx : -> SpectecType .
+
+  op valtype : -> SpectecType .
+
+  op I32 : -> SpectecTerminal [ctor] .
+
+  op I64 : -> SpectecTerminal [ctor] .
+
+  op F32 : -> SpectecTerminal [ctor] .
+
+  op F64 : -> SpectecTerminal [ctor] .
+
+  op Inn : -> SpectecType .
+
+  op Fnn : -> SpectecType .
+
+  op resulttype : -> SpectecType .
+
+  op mut : -> SpectecType .
+
+  op limits : -> SpectecType .
+
+  op [_.._] : Nat SpectecTerminals -> SpectecTerminal [ctor] .
+
+  op globaltype : -> SpectecType .
+
+  op functype : -> SpectecType .
+
+  op _->_ : SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
+
+  op tabletype : -> SpectecType .
+
+  op memtype : -> SpectecType .
+
+  op externtype : -> SpectecType .
+
+  op FUNC : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op GLOBAL : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op TABLE : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op MEM : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op moduletype : -> SpectecType .
+
+  op spectec-size : SpectecTerminal -> Nat .
+
+  op val- : SpectecTerminal -> SpectecType .
+
+  op sx : -> SpectecType .
+
+  op U : -> SpectecTerminal [ctor] .
+
+  op S : -> SpectecTerminal [ctor] .
+
+  op sz : -> SpectecType .
+
+  op unop- : SpectecTerminal -> SpectecType .
+
+  op CLZ : -> SpectecTerminal [ctor] .
+
+  op CTZ : -> SpectecTerminal [ctor] .
+
+  op POPCNT : -> SpectecTerminal [ctor] .
+
+  op ABS : -> SpectecTerminal [ctor] .
+
+  op spectec-NEG : -> SpectecTerminal [ctor] .
+
+  op SQRT : -> SpectecTerminal [ctor] .
+
+  op CEIL : -> SpectecTerminal [ctor] .
+
+  op FLOOR : -> SpectecTerminal [ctor] .
+
+  op TRUNC : -> SpectecTerminal [ctor] .
+
+  op NEAREST : -> SpectecTerminal [ctor] .
+
+  op binop- : SpectecTerminal -> SpectecType .
+
+  op ADD : -> SpectecTerminal [ctor] .
+
+  op SUB : -> SpectecTerminal [ctor] .
+
+  op MUL : -> SpectecTerminal [ctor] .
+
+  op DIV : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op REM : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op AND : -> SpectecTerminal [ctor] .
+
+  op OR : -> SpectecTerminal [ctor] .
+
+  op XOR : -> SpectecTerminal [ctor] .
+
+  op SHL : -> SpectecTerminal [ctor] .
+
+  op SHR : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op ROTL : -> SpectecTerminal [ctor] .
+
+  op ROTR : -> SpectecTerminal [ctor] .
+
+  op spectec-DIV : -> SpectecTerminal [ctor] .
+
+  op MIN : -> SpectecTerminal [ctor] .
+
+  op MAX : -> SpectecTerminal [ctor] .
+
+  op COPYSIGN : -> SpectecTerminal [ctor] .
+
+  op testop- : SpectecTerminal -> SpectecType .
+
+  op EQZ : -> SpectecTerminal [ctor] .
+
+  op relop- : SpectecTerminal -> SpectecType .
+
+  op EQ : -> SpectecTerminal [ctor] .
+
+  op NE : -> SpectecTerminal [ctor] .
+
+  op LT : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op GT : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op LE : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op GE : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op spectec-LT : -> SpectecTerminal [ctor] .
+
+  op spectec-GT : -> SpectecTerminal [ctor] .
+
+  op spectec-LE : -> SpectecTerminal [ctor] .
+
+  op spectec-GE : -> SpectecTerminal [ctor] .
+
+  op cvtop : -> SpectecType .
+
+  op EXTEND : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op WRAP : -> SpectecTerminal [ctor] .
+
+  op CONVERT : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op spectec-TRUNC : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op PROMOTE : -> SpectecTerminal [ctor] .
+
+  op DEMOTE : -> SpectecTerminal [ctor] .
+
+  op REINTERPRET : -> SpectecTerminal [ctor] .
+
+  op memarg : -> SpectecType .
+
+  op loadop- : SpectecTerminal -> SpectecType .
+
+  op spectec-_-_ : Nat SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op blocktype : -> SpectecType .
+
+  op instr : -> SpectecType .
+
+  op NOP : -> InstrProper [ctor] .
+
+  op UNREACHABLE : -> InstrProper [ctor] .
+
+  op DROP : -> InstrProper [ctor] .
+
+  op SELECT : -> InstrProper [ctor] .
+
+  op BLOCK : SpectecTerminals InstrList -> InstrProper [ctor] .
+
+  op LOOP : SpectecTerminals InstrList -> InstrProper [ctor] .
+
+  op IF__ELSE_ : SpectecTerminals InstrList InstrList -> InstrProper [ctor] .
+
+  op BR : Nat -> InstrProper [ctor] .
+
+  op BR-IF : Nat -> InstrProper [ctor] .
+
+  op BR-TABLE : SpectecTerminals Nat -> InstrProper [ctor] .
+
+  op CALL : Nat -> InstrProper [ctor] .
+
+  op CALL-INDIRECT : Nat -> InstrProper [ctor] .
+
+  op RETURN : -> InstrProper [ctor] .
+
+  op CONST : SpectecTerminal SpectecTerminal -> val [ctor] .
+
+  op UNOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+
+  op BINOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+
+  op TESTOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+
+  op RELOP : SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+
+  op CVTOP : SpectecTerminal SpectecTerminal SpectecTerminal -> InstrProper [ctor] .
+
+  op LOCAL.GET : Nat -> InstrProper [ctor] .
+
+  op LOCAL.SET : Nat -> InstrProper [ctor] .
+
+  op LOCAL.TEE : Nat -> InstrProper [ctor] .
+
+  op GLOBAL.GET : Nat -> InstrProper [ctor] .
+
+  op GLOBAL.SET : Nat -> InstrProper [ctor] .
+
+  op LOAD : SpectecTerminal SpectecTerminals SpectecTerminal -> InstrProper [ctor] .
+
+  op STORE : SpectecTerminal SpectecTerminals SpectecTerminal -> InstrProper [ctor] .
+
+  op MEMORY.SIZE : -> InstrProper [ctor] .
+
+  op MEMORY.GROW : -> InstrProper [ctor] .
+
+  op expr : -> SpectecType .
+
+  op type : -> SpectecType .
+
+  op TYPE : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op local : -> SpectecType .
+
+  op LOCAL : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op func : -> SpectecType .
+
+  op spectec-FUNC : Nat SpectecTerminals InstrList -> SpectecTerminal [ctor] .
+
+  op global : -> SpectecType .
+
+  op spectec-GLOBAL : SpectecTerminal InstrList -> SpectecTerminal [ctor] .
+
+  op table : -> SpectecType .
+
+  op mem : -> SpectecType .
+
+  op MEMORY : SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op elem : -> SpectecType .
+
+  op ELEM : InstrList SpectecTerminals -> SpectecTerminal [ctor] .
+
+  op data : -> SpectecType .
+
+  op DATA : InstrList SpectecTerminals -> SpectecTerminal [ctor] .
+
+  op start : -> SpectecType .
+
+  op START : Nat -> SpectecTerminal [ctor] .
+
+  op externidx : -> SpectecType .
+
+  op FUNC : Nat -> SpectecTerminal [ctor] .
+
+  op GLOBAL : Nat -> SpectecTerminal [ctor] .
+
+  op TABLE : Nat -> SpectecTerminal [ctor] .
+
+  op MEM : Nat -> SpectecTerminal [ctor] .
+
+  op export : -> SpectecType .
+
+  op EXPORT : SpectecTerminals SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op import : -> SpectecType .
+
+  op IMPORT : SpectecTerminals SpectecTerminals SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op module : -> SpectecType .
+
+  op MODULE : SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals -> SpectecTerminal [ctor] .
+
+  op funcsxt : SpectecTerminals -> SpectecTerminals .
+
+  op globalsxt : SpectecTerminals -> SpectecTerminals .
+
+  op tablesxt : SpectecTerminals -> SpectecTerminals .
+
+  op memsxt : SpectecTerminals -> SpectecTerminals .
+
+  op memarg0 : -> SpectecTerminal .
+
+  op spectec-bool : SpectecTerminal -> Nat .
+
+  op truncz : SpectecTerminal -> Int .
+
+  op signed- : Nat Nat -> Int .
+
+  op inv-signed- : Nat Int -> Nat .
+
+  op fabs- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op fceil- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op ffloor- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op fnearest- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op fneg- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op fsqrt- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op ftrunc- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op iclz- : Nat Nat -> Nat .
+
+  op ictz- : Nat Nat -> Nat .
+
+  op ipopcnt- : Nat Nat -> Nat .
+
+  op spectec-unop- : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op fadd- : Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op fcopysign- : Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op fdiv- : Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op fmax- : Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op fmin- : Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op fmul- : Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op fsub- : Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op iadd- : Nat Nat Nat ~> Nat .
+
+  op iand- : Nat Nat Nat -> Nat .
+
+  op idiv- : Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
+
+  op imul- : Nat Nat Nat ~> Nat .
+
+  op ior- : Nat Nat Nat -> Nat .
+
+  op irem- : Nat SpectecTerminal Nat Nat ~> SpectecTerminals .
+
+  op irotl- : Nat Nat Nat -> Nat .
+
+  op irotr- : Nat Nat Nat -> Nat .
+
+  op ishl- : Nat Nat Nat -> Nat .
+
+  op ishr- : Nat SpectecTerminal Nat Nat -> Nat .
+
+  op isub- : Nat Nat Nat ~> Nat .
+
+  op ixor- : Nat Nat Nat -> Nat .
+
+  op spectec-binop- : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal ~> SpectecTerminals .
+
+  op ieqz- : Nat Nat ~> Nat .
+
+  op spectec-testop- : SpectecTerminal SpectecTerminal SpectecTerminal -> Nat .
+
+  op feq- : Nat SpectecTerminal SpectecTerminal -> Nat .
+
+  op fge- : Nat SpectecTerminal SpectecTerminal -> Nat .
+
+  op fgt- : Nat SpectecTerminal SpectecTerminal -> Nat .
+
+  op fle- : Nat SpectecTerminal SpectecTerminal -> Nat .
+
+  op flt- : Nat SpectecTerminal SpectecTerminal -> Nat .
+
+  op fne- : Nat SpectecTerminal SpectecTerminal -> Nat .
+
+  op ieq- : Nat Nat Nat ~> Nat .
+
+  op ige- : Nat SpectecTerminal Nat Nat ~> Nat .
+
+  op igt- : Nat SpectecTerminal Nat Nat ~> Nat .
+
+  op ile- : Nat SpectecTerminal Nat Nat ~> Nat .
+
+  op ilt- : Nat SpectecTerminal Nat Nat ~> Nat .
+
+  op ine- : Nat Nat Nat ~> Nat .
+
+  op spectec-relop- : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> Nat .
+
+  op convert-- : Nat Nat SpectecTerminal Nat -> SpectecTerminal .
+
+  op demote-- : Nat Nat SpectecTerminal -> SpectecTerminals .
+
+  op extend-- : Nat Nat SpectecTerminal Nat -> Nat .
+
+  op promote-- : Nat Nat SpectecTerminal -> SpectecTerminals .
+
+  op reinterpret-- : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
+
+  op trunc-- : Nat Nat SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op wrap-- : Nat Nat Nat -> Nat .
+
+  op cvtop-- : SpectecTerminal SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op ibytes- : Nat Nat -> SpectecTerminals .
+
+  op fbytes- : Nat SpectecTerminal -> SpectecTerminals .
+
+  op bytes- : SpectecTerminal SpectecTerminal -> SpectecTerminals .
+
+  op inv-ibytes- : Nat SpectecTerminals -> Nat .
+
+  op inv-fbytes- : Nat SpectecTerminals -> SpectecTerminal .
+
+  op inv-bytes- : SpectecTerminal SpectecTerminals -> SpectecTerminal .
+
+  op inot- : Nat Nat -> Nat .
+
+  op inez- : Nat Nat ~> Nat .
+
+  op addr : -> SpectecType .
+
+  op funcaddr : -> SpectecType .
+
+  op globaladdr : -> SpectecType .
+
+  op tableaddr : -> SpectecType .
+
+  op memaddr : -> SpectecType .
+
+  op externaddr : -> SpectecType .
+
+  op val : -> SpectecType .
+
+  op result : -> SpectecType .
+
+  op -VALS : ValList -> SpectecTerminal [ctor] .
+
+  op TRAP : -> AdmininstrProper [ctor] .
+
+  op exportinst : -> SpectecType .
+
+  op moduleinst : -> SpectecType .
+
+  op funcinst : -> SpectecType .
+
+  op globalinst : -> SpectecType .
+
+  op tableinst : -> SpectecType .
+
+  op meminst : -> SpectecType .
+
+  op store : -> SpectecType .
+
+  op frame : -> SpectecType .
+
+  op state : -> SpectecType .
+
+  op _;_ : SpectecTerminal SpectecTerminal -> SpectecTerminal [ctor] .
+
+  op admininstr : -> SpectecType .
+
+  op CALL-ADDR : Nat -> AdmininstrProper [ctor] .
+
+  op LABEL-_{_}_ : Nat InstrList AdmininstrList -> AdmininstrProper [ctor] .
+
+  op FRAME-_{_}_ : Nat SpectecTerminal AdmininstrList -> AdmininstrProper [ctor] .
+
+  op config : -> SpectecType .
+
+  op _;_ : SpectecTerminal AdmininstrList -> SpectecTerminal [ctor] .
+
+  op default- : SpectecTerminal -> val .
+
+  op funcsxa : SpectecTerminals -> SpectecTerminals .
+
+  op globalsxa : SpectecTerminals -> SpectecTerminals .
+
+  op tablesxa : SpectecTerminals -> SpectecTerminals .
+
+  op memsxa : SpectecTerminals -> SpectecTerminals .
+
+  op spectec-store : SpectecTerminal -> SpectecTerminal .
+
+  op spectec-frame : SpectecTerminal -> SpectecTerminal .
+
+  op spectec-funcaddr : SpectecTerminal -> SpectecTerminals .
+
+  op spectec-funcinst : SpectecTerminal -> SpectecTerminals .
+
+  op spectec-globalinst : SpectecTerminal -> SpectecTerminals .
+
+  op spectec-tableinst : SpectecTerminal -> SpectecTerminals .
+
+  op spectec-meminst : SpectecTerminal -> SpectecTerminals .
+
+  op spectec-moduleinst : SpectecTerminal -> SpectecTerminal .
+
+  op spectec-type : SpectecTerminal Nat -> SpectecTerminal .
+
+  op spectec-func : SpectecTerminal Nat -> SpectecTerminal .
+
+  op spectec-global : SpectecTerminal Nat -> SpectecTerminal .
+
+  op spectec-table : SpectecTerminal Nat -> SpectecTerminal .
+
+  op spectec-mem : SpectecTerminal Nat -> SpectecTerminal .
+
+  op spectec-local : SpectecTerminal Nat -> val .
+
+  op with-local : SpectecTerminal Nat val -> SpectecTerminal .
+
+  op with-global : SpectecTerminal Nat val -> SpectecTerminal .
+
+  op with-table : SpectecTerminal Nat Nat Nat -> SpectecTerminal .
+
+  op with-tableinst : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .
+
+  op with-mem : SpectecTerminal Nat Nat Nat SpectecTerminals -> SpectecTerminal .
+
+  op with-meminst : SpectecTerminal Nat SpectecTerminal -> SpectecTerminal .
+
+  op growtable : SpectecTerminal Nat ~> SpectecTerminal .
+
+  op growmemory : SpectecTerminal Nat ~> SpectecTerminal .
+
+  op context : -> SpectecType .
+
+  op Step-pure : AdmininstrList -> Step-pure-Request [frozen (1)] .
+
+  op Step-read : SpectecTerminal -> Step-read-Request [frozen (1)] .
+
+  op Step-read-call-indirect-call-enabled : SpectecTerminal -> Bool [frozen (1)] .
+
+  op Step : SpectecTerminal -> Step-Request [frozen (1)] .
+
+  op unheat : Step-Request ~> Step-Request .
+
+  op identifyFocus : SpectecTerminal ValList AdmininstrProper AdmininstrList ~> FocusSearch [frozen (1 2 3 4)] .
+
+  op {_|_|_} : ValList SpectecTerminal AdmininstrList -> FocusTarget [ctor] .
+
+  op hole : ValList AdmininstrList -> Hole [ctor] .
+
+  op _~>_ : Step-Request Hole -> Step-Request [frozen (2)] .
+
+  op none : -> Holes [ctor] .
+
+  op __ : Holes Holes -> Holes [ctor assoc id: none] .
+
+  op kstate : Step-Request Holes -> KState [ctor frozen (2)] .
+
+  op cool-all : SpectecTerminal Holes -> SpectecTerminal .
+
+  op plug-first : Holes -> Bool .
+
+  op hole-Step-ctxt-label : InstrList Nat -> Hole-Step-ctxt-label [ctor] .
+
+  op closed-Step-ctxt-label : AdmininstrList -> Bool .
+
+  op hole-Step-ctxt-frame : Nat SpectecTerminal -> Hole-Step-ctxt-frame [ctor] .
+
+  op closed-Step-ctxt-frame : AdmininstrList -> Bool .
+
+  op hole-Step-pure : SpectecTerminal -> Hole-Step-pure [ctor] .
+
+  op _~>_ : Step-pure-Request Hole-Step-pure -> Step-Request [frozen (2)] .
+
+  op identifyPure : AdmininstrList -> Bool .
+
+  op hole-Step-read : SpectecTerminal -> Hole-Step-read [ctor] .
+
+  op _~>_ : Step-read-Request Hole-Step-read -> Step-Request [frozen (2)] .
+
+  op identifyRead : SpectecTerminal -> Bool .
+
+  op Steps : SpectecTerminal -> Steps-Request [frozen (1)] .
+
+  op hole-Steps-trans-Step : -> Hole-Steps-trans-Step [ctor] .
+
+  op _~>_ : Step-Request Hole-Steps-trans-Step -> Steps-Request [frozen (2)] .
+
+  op hole-Steps-trans-Steps : -> Hole-Steps-trans-Steps [ctor] .
+
+  op _~>_ : Steps-Request Hole-Steps-trans-Steps -> Steps-Request [frozen (2)] .
+
+  op Eval-expr : SpectecTerminal InstrList -> Eval-expr-Request [frozen (1 2)] .
+
+  op hole-Eval-expr : -> Hole-Eval-expr [ctor] .
+
+  op _~>_ : Steps-Request Hole-Eval-expr -> Eval-expr-Request [frozen (2)] .
+
+  op funcs : SpectecTerminals -> SpectecTerminals .
+
+  op globals : SpectecTerminals -> SpectecTerminals .
+
+  op tables : SpectecTerminals -> SpectecTerminals .
+
+  op mems : SpectecTerminals -> SpectecTerminals .
+
+  op allocfunc : SpectecTerminal SpectecTerminal SpectecTerminal -> SpectecTerminal .
+
+  op allocfuncs : SpectecTerminal SpectecTerminal SpectecTerminals -> SpectecTerminal .
+
+  op allocglobal : SpectecTerminal SpectecTerminal val -> SpectecTerminal .
+
+  op allocglobals : SpectecTerminal SpectecTerminals ValList -> SpectecTerminal .
+
+  op alloctable : SpectecTerminal SpectecTerminal -> SpectecTerminal .
+
+  op alloctables : SpectecTerminal SpectecTerminals -> SpectecTerminal .
+
+  op allocmem : SpectecTerminal SpectecTerminal -> SpectecTerminal .
+
+  op allocmems : SpectecTerminal SpectecTerminals -> SpectecTerminal .
+
+  op instexport : SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminal -> SpectecTerminal .
+
+  op allocmodule : SpectecTerminal SpectecTerminal SpectecTerminals ValList -> SpectecTerminal .
+
+  op initelem : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminal .
+
+  op initdata : SpectecTerminal SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminal .
+
+  op instantiate : SpectecTerminal SpectecTerminal SpectecTerminals -> instantiate-Config [frozen (1 2 3)] .
+
+  op invoke : SpectecTerminal Nat ValList -> SpectecTerminal .
+
+  op unzip-growtable : SpectecTerminals ~> SpectecTerminals .
+
+  op map-growtable : SpectecTerminals ~> SpectecTerminals .
+
+  op unzip-LOCAL : SpectecTerminals ~> SpectecTerminals .
+
+  op map-default : SpectecTerminals ~> ValList .
+
+  op unzip-TYPE : SpectecTerminals ~> SpectecTerminals .
+
+  op unzip-allocmodule : Nat SpectecTerminals ~> SpectecTerminal .
+
+  op unzip-TABLE : Nat SpectecTerminals ~> SpectecTerminals .
+
+  op unzip-MEMORY : Nat SpectecTerminals ~> SpectecTerminals .
+
+  op map-allocmodule : SpectecTerminal Nat Nat ~> SpectecTerminals .
+
+  op map-allocmodule-2 : SpectecTerminal Nat Nat ~> SpectecTerminals .
+
+  op map-allocmodule-3 : SpectecTerminal Nat Nat ~> SpectecTerminals .
+
+  op map-allocmodule-4 : SpectecTerminal Nat Nat ~> SpectecTerminals .
+
+  op map-instexport : SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+
+  op map-CALL : SpectecTerminals ~> SpectecTerminals .
+
+  op unzip-instantiate : SpectecTerminals ~> SpectecTerminal .
+
+  op unzip-ELEM : SpectecTerminals ~> SpectecTerminal .
+
+  op unzip-DATA : SpectecTerminals ~> SpectecTerminal .
+
+  op unzip-START : SpectecTerminals ~> SpectecTerminals .
+
+  op map-instantiate : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+
+  op map-instantiate-2 : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+
+  op bind-exp : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
+
+  op all-growtable : Nat SpectecTerminals ~> Bool .
+
+  op all-growmemory : SpectecTerminal SpectecTerminals ~> Bool .
+
+  op bind-instantiate : SpectecTerminal SpectecTerminals ~> ValList-Iteration [frozen (1 2)] .
+
+  op bind-instantiate-2 : SpectecTerminal SpectecTerminals ~> SpectecTerminals-Iteration [frozen (1 2)] .
+
+  vars LIFT-ELEMENT VALUE-15 V VAL VAL_1 VAL_2 : val .
+
+  var LIFT-ELEMENT-2 : instr .
+
+  var LIFT-ELEMENT-3 : admininstr .
+
+  vars VALUE I J N-3 N-2 M-3 U32 VALUE-5 SZ LABELIDX TYPEIDX IN I_1 I_2 IN_1 IN_2 FA GA TA MA X-4 A I' C-3 INPUT-FIELD L L' K CASE-PART1 N_FUNC N_GLOBAL N_TABLE N_MEM N_F ITER-COUNT I_FUNC I_GLOBAL I_TABLE I_MEM X'-2 J-2-3 I_E-2 : Nat .
+
+  vars N'* W* W'** W'* X* CHAR* VALUE-4 U32? MUT-2 VALTYPE* VALTYPE*-2 EXTERNTYPE* EXTERNTYPE*-2 BLOCKTYPE LABELIDX* VALUE2-2 SZ? INN? LOCAL* FUNCIDX* BYTE* NAME NAME-2 TYPE* IMPORT* FUNC* GLOBAL* TABLE* MEM* ELEM* DATA* START? EXPORT* XT* VALUE-8 VALUE-9 VALUE-10 VALUE-11 VALUE-12 XV* B* FIELD-PART2 J? A* VALUE-16 VALUE-17 T? L* MEMBER-PREFIX MEMBER-SUFFIX T_1* T_2* CASE-PART2 T* EXTERNADDR'* FUNC'* FA'* GLOBALTYPE'* GA'* TABLETYPE'* TA'* MEMTYPE'* MA'* FA* GA* TA* MA* CASE-PART1-2 CASE-PART3-2 CASE-PART4 CASE-PART5 CASE-PART6 CASE-PART7 CASE-PART8 CASE-PART9 CASE-PART10 FT* EXPR_1* GLOBALTYPE* TABLETYPE* MEMTYPE* EXTERNADDR* FA_EX* GA_EX* TA_EX* MA_EX* XI* A'** I'* B'** FUNCTYPE* EXPR_G* EXPR_E* X** B** EXPR_D* X'? I_E* I_D* PROJECT-REST PROJECT-COLUMN-1 A*-REST T*-REST PROJECT-COLUMN-2 EXPORT*-REST X*-2 X**-REST X*-REST EXPR_G*-REST REST-3 EXPR_E*-REST : SpectecTerminals .
+
+  var X : SpectecType .
+
+  vars W VALUE-3 VALTYPE INN FNN SX VALUE2 VALTYPE_1 VALTYPE_2 CVTOP-2 MEMARG GLOBALTYPE EXTERNIDX EXTERNTYPE FT GT-2 TT MT FN FN_1 FN_2 VALUE-13 VALUE-14 STORE-2 FRAME STATE EXTERNADDR S-2 F TI MI FIELD-PART1 TI' I'-2 MI' T UNOP-2 C_1 C-2 BINOP-2 C_2 TESTOP-2 RELOP-2 T_1-2 T_2-2 Z ENABLED-INPUT1 MM FUNC-3 AO RESULT-2 C-4 BRIDGE-Z Z' Z-2 F' S' F'' Z'' MODULEINST FI S_1 S_2 GI TABLETYPE MEMTYPE MODULE-2 S_3 S_4 MODULEINST_INIT F_INIT EXPORT-3 : SpectecTerminal .
+
+  vars I-2 VALUE-2 EXP EXP-1 J_1 J_2 : Int .
+
+  vars INSTR* INSTR*-2 VALUE-6 EXPR INSTR_1* INSTR_2* INSTR'* CASE-PART3 INSTR_0* EXPR_1-2 EXPR_G-2 EXPR_E-2 EXPR_D-2 : InstrList .
+
+  vars VALUE-7 VAL* VAL'* PREFIX STACK REST-2 : ValList .
+
+  vars LEFT RIGHT : Record .
+
+  vars ADMININSTR* RESULT POSTFIX REST FOCUS ADMININSTR'* INSTR-3 ADMININSTR''* : AdmininstrList .
+
+  var OP : AdmininstrProper .
+
+  var R : Step-Request .
+
+  var K-2 : Holes .
+
+  eq valLift(nil) = nil .
+
+  eq valLift(LIFT-ELEMENT ?) = LIFT-ELEMENT .
+
+  eq instrLift(nil) = nil .
+
+  eq instrLift(LIFT-ELEMENT-2 ?) = LIFT-ELEMENT-2 .
+
+  eq admininstrLift(nil) = nil .
+
+  eq admininstrLift(LIFT-ELEMENT-3 ?) = LIFT-ELEMENT-3 .
+
+  eq typecheck(spectec-MUT, MUT) = true .
+
+  eq typecheck(# VALUE, N) = typecheck(# VALUE, nat) .
+
+  eq typecheck(# VALUE, M) = typecheck(# VALUE, nat) .
+
+  eq typecheck(# VALUE, n) = typecheck(# VALUE, nat) .
+
+  eq typecheck(# VALUE, m) = typecheck(# VALUE, nat) .
+
+  eq Ki = 1024 .
+
+  ceq spectec-min(I, J) = I
+    if I <= J .
+
+  eq spectec-min(I, J) = J [owise] .
+
+  eq sum(nil) = 0 .
+
+  eq sum((# N-3) N'*) = N-3 + sum(N'*) .
+
+  eq opt-(X, nil) = nil .
+
+  eq opt-(X, W) = W ? .
+
+  eq list-(X, nil) = nil .
+
+  eq list-(X, W ?) = W .
+
+  eq concat-(X, nil) = nil .
+
+  eq concat-(X, seq(W*) W'**) = W* concat-(X, W'**) .
+
+  eq disjoint-(X, nil) = # true .
+
+  eq disjoint-(X, W W'*) = # _and_(not_(occurs(W, W'*)), #bool(disjoint-(X, W'*))) .
+
+  ceq typecheck(X*, list(X)) = true
+    if size(X*) < 4294967296
+      /\ typecheck(X*, X) .
+
+  ceq typecheck(# I, byte) = true
+    if _and_(I >= 0, I <= 255) .
+
+  ceq typecheck(# I, uN(N-2)) = true
+    if _and_(I >= 0, I <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat)) .
+
+  ceq typecheck(# I-2, sN(N-2)) = true
+    if _or_(_or_(_and_(I-2 >= -_((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) : nat <:> int), I-2 <= -1), I-2 == 0), _and_(I-2 >= 1, I-2 <= _-_((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) : nat <:> int, 1))) .
+
+  eq typecheck(# VALUE, iN(N-2)) = typecheck(# VALUE, uN(N-2)) .
+
+  eq typecheck(# VALUE, u31) = typecheck(# VALUE, uN(31)) .
+
+  eq typecheck(# VALUE, u32) = typecheck(# VALUE, uN(32)) .
+
+  eq typecheck(# VALUE, u64) = typecheck(# VALUE, uN(64)) .
+
+  eq typecheck(# VALUE, i32) = typecheck(# VALUE, iN(32)) .
+
+  eq typecheck(# VALUE, i64) = typecheck(# VALUE, iN(64)) .
+
+  eq signif(32) = 23 .
+
+  eq signif(64) = 52 .
+
+  eq expon(32) = 8 .
+
+  eq expon(64) = 11 .
+
+  eq spectec-M(N-2) = signif(N-2) .
+
+  eq E(N-2) = expon(N-2) .
+
+  eq typecheck(# VALUE-2, spectec-exp) = typecheck(# VALUE-2, int) .
+
+  ceq typecheck(NORM(M-3, EXP), fNmag(N-2)) = true
+    if _and_(M-3 < (2 ^ spectec-M(N-2)), _and_(_-_(2, (2 ^ (_-_(E(N-2) : nat <:> int, 1) : int <:> nat)) : nat <:> int) <= EXP, EXP <= _-_((2 ^ (_-_(E(N-2) : nat <:> int, 1) : int <:> nat)) : nat <:> int, 1))) .
+
+  ceq typecheck(SUBNORM(M-3), fNmag(N-2)) = true
+    if M-3 < (2 ^ spectec-M(N-2))
+      /\ EXP := _-_(2, (2 ^ (_-_(E(N-2) : nat <:> int, 1) : int <:> nat)) : nat <:> int) .
+
+  eq typecheck(INF, fNmag(N-2)) = true .
+
+  ceq typecheck(NAN(M-3), fNmag(N-2)) = true
+    if _and_(1 <= M-3, M-3 < (2 ^ spectec-M(N-2))) .
+
+  ceq typecheck(POS(VALUE-3), fN(N-2)) = true
+    if typecheck(VALUE-3, fNmag(N-2)) .
+
+  ceq typecheck(NEG(VALUE-3), fN(N-2)) = true
+    if typecheck(VALUE-3, fNmag(N-2)) .
+
+  eq typecheck(VALUE-3, f32) = typecheck(VALUE-3, fN(32)) .
+
+  eq typecheck(VALUE-3, f64) = typecheck(VALUE-3, fN(64)) .
+
+  ceq fzero(N-2) = POS(SUBNORM(0))
+    if 0 < (2 ^ spectec-M(N-2))
+      /\ EXP-1 := _-_(2, (2 ^ (_-_(E(N-2) : nat <:> int, 1) : int <:> nat)) : nat <:> int) .
+
+  ceq fone(N-2) = POS(NORM(1, 0))
+    if _and_(1 < (2 ^ spectec-M(N-2)), _and_(_-_(2, (2 ^ (_-_(E(N-2) : nat <:> int, 1) : int <:> nat)) : nat <:> int) <= 0, 0 <= _-_((2 ^ (_-_(E(N-2) : nat <:> int, 1) : int <:> nat)) : nat <:> int, 1))) .
+
+  eq canon-(N-2) = 2 ^ (_-_(signif(N-2) : nat <:> int, 1) : int <:> nat) .
+
+  ceq typecheck(# I, spectec-char) = true
+    if _or_(_and_(I >= 0, I <= 55295), _and_(I >= 57344, I <= 1114111)) .
+
+  ceq typecheck(CHAR*, name) = true
+    if size(utf8(CHAR*)) < 4294967296
+      /\ typecheck(CHAR*, spectec-char) .
+
+  eq typecheck(# VALUE, idx) = typecheck(# VALUE, u32) .
+
+  eq typecheck(# VALUE, typeidx) = typecheck(# VALUE, idx) .
+
+  eq typecheck(# VALUE, funcidx) = typecheck(# VALUE, idx) .
+
+  eq typecheck(# VALUE, globalidx) = typecheck(# VALUE, idx) .
+
+  eq typecheck(# VALUE, tableidx) = typecheck(# VALUE, idx) .
+
+  eq typecheck(# VALUE, memidx) = typecheck(# VALUE, idx) .
+
+  eq typecheck(# VALUE, labelidx) = typecheck(# VALUE, idx) .
+
+  eq typecheck(# VALUE, localidx) = typecheck(# VALUE, idx) .
+
+  eq typecheck(I32, valtype) = true .
+
+  eq typecheck(I64, valtype) = true .
+
+  eq typecheck(F32, valtype) = true .
+
+  eq typecheck(F64, valtype) = true .
+
+  eq typecheck(I32, Inn) = true .
+
+  eq typecheck(I64, Inn) = true .
+
+  eq typecheck(F32, Fnn) = true .
+
+  eq typecheck(F64, Fnn) = true .
+
+  eq typecheck(seq(VALUE-4), resulttype) = typecheck(VALUE-4, iterOpt(valtype)) .
+
+  ceq typecheck(VALUE-3, resulttype) = typecheck(VALUE-3, iterOpt(valtype))
+    if VALUE-3 =/= seq(unseq(VALUE-3)) .
+
+  eq typecheck(seq(VALUE-4), mut) = typecheck(VALUE-4, iterOpt(MUT)) .
+
+  ceq typecheck(VALUE-3, mut) = typecheck(VALUE-3, iterOpt(MUT))
+    if VALUE-3 =/= seq(unseq(VALUE-3)) .
+
+  ceq typecheck([ U32 .. U32? ], limits) = true
+    if typecheck(# U32, u32)
+      /\ typecheck(U32?, iterOpt(u32)) .
+
+  ceq typecheck(tuple(seq(MUT-2) VALTYPE), globaltype) = true
+    if typecheck(MUT-2, mut)
+      /\ typecheck(VALTYPE, valtype) .
+
+  ceq typecheck(VALTYPE* -> VALTYPE*-2, functype) = true
+    if typecheck(VALTYPE*, valtype)
+      /\ typecheck(VALTYPE*-2, valtype) .
+
+  eq typecheck(VALUE-3, tabletype) = typecheck(VALUE-3, limits) .
+
+  eq typecheck(VALUE-3, memtype) = typecheck(VALUE-3, limits) .
+
+  ceq typecheck(FUNC(VALUE-3), externtype) = true
+    if typecheck(VALUE-3, functype) .
+
+  ceq typecheck(GLOBAL(VALUE-3), externtype) = true
+    if typecheck(VALUE-3, globaltype) .
+
+  ceq typecheck(TABLE(VALUE-3), externtype) = true
+    if typecheck(VALUE-3, tabletype) .
+
+  ceq typecheck(MEM(VALUE-3), externtype) = true
+    if typecheck(VALUE-3, memtype) .
+
+  ceq typecheck(EXTERNTYPE* -> EXTERNTYPE*-2, moduletype) = true
+    if typecheck(EXTERNTYPE*, externtype)
+      /\ typecheck(EXTERNTYPE*-2, externtype) .
+
+  eq spectec-size(I32) = 32 .
+
+  eq spectec-size(I64) = 64 .
+
+  eq spectec-size(F32) = 32 .
+
+  eq spectec-size(F64) = 64 .
+
+  ceq typecheck(# VALUE, val-(INN)) = typecheck(# VALUE, iN(spectec-size(INN)))
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(VALUE-3, val-(FNN)) = typecheck(VALUE-3, fN(spectec-size(FNN)))
+    if typecheck(FNN, Fnn) .
+
+  eq typecheck(U, sx) = true .
+
+  eq typecheck(S, sx) = true .
+
+  ceq typecheck(# I, sz) = true
+    if _or_(_or_(_or_(I == 8, I == 16), I == 32), I == 64) .
+
+  ceq typecheck(CLZ, unop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(CTZ, unop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(POPCNT, unop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(ABS, unop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(spectec-NEG, unop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(SQRT, unop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(CEIL, unop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(FLOOR, unop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(TRUNC, unop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(NEAREST, unop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(ADD, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(SUB, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(MUL, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(DIV(VALUE-3), binop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ typecheck(VALUE-3, sx) .
+
+  ceq typecheck(REM(VALUE-3), binop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ typecheck(VALUE-3, sx) .
+
+  ceq typecheck(AND, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(OR, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(XOR, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(SHL, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(SHR(VALUE-3), binop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ typecheck(VALUE-3, sx) .
+
+  ceq typecheck(ROTL, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(ROTR, binop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(ADD, binop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(SUB, binop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(MUL, binop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(spectec-DIV, binop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(MIN, binop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(MAX, binop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(COPYSIGN, binop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(EQZ, testop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(EQ, relop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(NE, relop-(INN)) = true
+    if typecheck(INN, Inn) .
+
+  ceq typecheck(LT(VALUE-3), relop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ typecheck(VALUE-3, sx) .
+
+  ceq typecheck(GT(VALUE-3), relop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ typecheck(VALUE-3, sx) .
+
+  ceq typecheck(LE(VALUE-3), relop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ typecheck(VALUE-3, sx) .
+
+  ceq typecheck(GE(VALUE-3), relop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ typecheck(VALUE-3, sx) .
+
+  ceq typecheck(EQ, relop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(NE, relop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(spectec-LT, relop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(spectec-GT, relop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(spectec-LE, relop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(spectec-GE, relop-(FNN)) = true
+    if typecheck(FNN, Fnn) .
+
+  ceq typecheck(EXTEND(VALUE-3), cvtop) = true
+    if typecheck(VALUE-3, sx) .
+
+  eq typecheck(WRAP, cvtop) = true .
+
+  ceq typecheck(CONVERT(VALUE-3), cvtop) = true
+    if typecheck(VALUE-3, sx) .
+
+  ceq typecheck(spectec-TRUNC(VALUE-3), cvtop) = true
+    if typecheck(VALUE-3, sx) .
+
+  eq typecheck(PROMOTE, cvtop) = true .
+
+  eq typecheck(DEMOTE, cvtop) = true .
+
+  eq typecheck(REINTERPRET, cvtop) = true .
+
+  ceq typecheck({ (field('ALIGN, # VALUE) ; field('OFFSET, # VALUE-5)) }, memarg) = true
+    if typecheck(# VALUE, u32)
+      /\ typecheck(# VALUE-5, u32) .
+
+  ceq typecheck(spectec-_-_(SZ, SX), loadop-(INN)) = true
+    if typecheck(INN, Inn)
+      /\ SZ < spectec-size(INN)
+      /\ typecheck(# SZ, sz)
+      /\ typecheck(SX, sx) .
+
+  eq typecheck(seq(VALUE-4), blocktype) = typecheck(VALUE-4, iterOpt(valtype)) .
+
+  ceq typecheck(VALUE-3, blocktype) = typecheck(VALUE-3, iterOpt(valtype))
+    if VALUE-3 =/= seq(unseq(VALUE-3)) .
+
+  eq typecheck(NOP, instr) = true .
+
+  eq typecheck(UNREACHABLE, instr) = true .
+
+  eq typecheck(DROP, instr) = true .
+
+  eq typecheck(SELECT, instr) = true .
+
+  ceq typecheck(BLOCK(BLOCKTYPE, INSTR*), instr) = true
+    if typecheck(BLOCKTYPE, blocktype) .
+
+  ceq typecheck(LOOP(BLOCKTYPE, INSTR*), instr) = true
+    if typecheck(BLOCKTYPE, blocktype) .
+
+  ceq typecheck(IF__ELSE_(BLOCKTYPE, INSTR*, INSTR*-2), instr) = true
+    if typecheck(BLOCKTYPE, blocktype) .
+
+  ceq typecheck(BR(VALUE), instr) = true
+    if typecheck(# VALUE, labelidx) .
+
+  ceq typecheck(BR-IF(VALUE), instr) = true
+    if typecheck(# VALUE, labelidx) .
+
+  ceq typecheck(BR-TABLE(LABELIDX*, LABELIDX), instr) = true
+    if typecheck(LABELIDX*, labelidx)
+      /\ typecheck(# LABELIDX, labelidx) .
+
+  ceq typecheck(CALL(VALUE), instr) = true
+    if typecheck(# VALUE, funcidx) .
+
+  ceq typecheck(CALL-INDIRECT(VALUE), instr) = true
+    if typecheck(# VALUE, typeidx) .
+
+  eq typecheck(RETURN, instr) = true .
+
+  ceq typecheck(CONST(VALTYPE, VALUE2), instr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, val-(VALTYPE)) .
+
+  ceq typecheck(UNOP(VALTYPE, VALUE2), instr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, unop-(VALTYPE)) .
+
+  ceq typecheck(BINOP(VALTYPE, VALUE2), instr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, binop-(VALTYPE)) .
+
+  ceq typecheck(TESTOP(VALTYPE, VALUE2), instr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, testop-(VALTYPE)) .
+
+  ceq typecheck(RELOP(VALTYPE, VALUE2), instr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, relop-(VALTYPE)) .
+
+  ceq typecheck(CVTOP(VALTYPE_1, VALTYPE_2, CVTOP-2), instr) = true
+    if VALTYPE_1 =/= VALTYPE_2
+      /\ typecheck(VALTYPE_1, valtype)
+      /\ typecheck(VALTYPE_2, valtype)
+      /\ typecheck(CVTOP-2, cvtop) .
+
+  ceq typecheck(LOCAL.GET(VALUE), instr) = true
+    if typecheck(# VALUE, localidx) .
+
+  ceq typecheck(LOCAL.SET(VALUE), instr) = true
+    if typecheck(# VALUE, localidx) .
+
+  ceq typecheck(LOCAL.TEE(VALUE), instr) = true
+    if typecheck(# VALUE, localidx) .
+
+  ceq typecheck(GLOBAL.GET(VALUE), instr) = true
+    if typecheck(# VALUE, globalidx) .
+
+  ceq typecheck(GLOBAL.SET(VALUE), instr) = true
+    if typecheck(# VALUE, globalidx) .
+
+  ceq typecheck(LOAD(VALTYPE, VALUE2-2, MEMARG), instr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2-2, iterOpt(loadop-(VALTYPE)))
+      /\ typecheck(MEMARG, memarg) .
+
+  ceq typecheck(STORE(VALTYPE, SZ?, MEMARG), instr) = true
+    if INN? := bind-exp(VALTYPE, SZ?)
+      /\ typecheck(INN?, iterOpt(Inn))
+      /\ typecheck(VALTYPE, valtype)
+      /\ typecheck(SZ?, iterOpt(sz))
+      /\ typecheck(MEMARG, memarg) .
+
+  eq typecheck(MEMORY.SIZE, instr) = true .
+
+  eq typecheck(MEMORY.GROW, instr) = true .
+
+  eq typecheck(seq(VALUE-6), expr) = typecheck(VALUE-6, instr) .
+
+  ceq typecheck(VALUE-3, expr) = typecheck(VALUE-3, instr)
+    if VALUE-3 =/= seq(unseq(VALUE-3)) .
+
+  ceq typecheck(TYPE(VALUE-3), type) = true
+    if typecheck(VALUE-3, functype) .
+
+  ceq typecheck(LOCAL(VALUE-3), local) = true
+    if typecheck(VALUE-3, valtype) .
+
+  ceq typecheck(spectec-FUNC(TYPEIDX, LOCAL*, EXPR), func) = true
+    if typecheck(# TYPEIDX, typeidx)
+      /\ typecheck(LOCAL*, local)
+      /\ typecheck(EXPR, expr) .
+
+  ceq typecheck(spectec-GLOBAL(GLOBALTYPE, EXPR), global) = true
+    if typecheck(GLOBALTYPE, globaltype)
+      /\ typecheck(EXPR, expr) .
+
+  ceq typecheck(TABLE(VALUE-3), table) = true
+    if typecheck(VALUE-3, tabletype) .
+
+  ceq typecheck(MEMORY(VALUE-3), mem) = true
+    if typecheck(VALUE-3, memtype) .
+
+  ceq typecheck(ELEM(EXPR, FUNCIDX*), elem) = true
+    if typecheck(EXPR, expr)
+      /\ typecheck(FUNCIDX*, funcidx) .
+
+  ceq typecheck(DATA(EXPR, BYTE*), data) = true
+    if typecheck(EXPR, expr)
+      /\ typecheck(BYTE*, byte) .
+
+  ceq typecheck(START(VALUE), start) = true
+    if typecheck(# VALUE, funcidx) .
+
+  ceq typecheck(FUNC(VALUE), externidx) = true
+    if typecheck(# VALUE, funcidx) .
+
+  ceq typecheck(GLOBAL(VALUE), externidx) = true
+    if typecheck(# VALUE, globalidx) .
+
+  ceq typecheck(TABLE(VALUE), externidx) = true
+    if typecheck(# VALUE, tableidx) .
+
+  ceq typecheck(MEM(VALUE), externidx) = true
+    if typecheck(# VALUE, memidx) .
+
+  ceq typecheck(EXPORT(NAME, EXTERNIDX), export) = true
+    if typecheck(NAME, name)
+      /\ typecheck(EXTERNIDX, externidx) .
+
+  ceq typecheck(IMPORT(NAME, NAME-2, EXTERNTYPE), import) = true
+    if typecheck(NAME, name)
+      /\ typecheck(NAME-2, name)
+      /\ typecheck(EXTERNTYPE, externtype) .
+
+  ceq typecheck(MODULE(TYPE*, IMPORT*, FUNC*, GLOBAL*, TABLE*, MEM*, ELEM*, DATA*, START?, EXPORT*), module) = true
+    if typecheck(TYPE*, type)
+      /\ typecheck(IMPORT*, import)
+      /\ typecheck(FUNC*, func)
+      /\ typecheck(GLOBAL*, global)
+      /\ typecheck(TABLE*, table)
+      /\ typecheck(MEM*, mem)
+      /\ typecheck(ELEM*, elem)
+      /\ typecheck(DATA*, data)
+      /\ typecheck(START?, iterOpt(start))
+      /\ typecheck(EXPORT*, export) .
+
+  eq funcsxt(nil) = nil .
+
+  eq funcsxt(FUNC(FT) XT*) = FT funcsxt(XT*) .
+
+  eq funcsxt(EXTERNTYPE XT*) = funcsxt(XT*) [owise] .
+
+  eq globalsxt(nil) = nil .
+
+  eq globalsxt(GLOBAL(GT-2) XT*) = GT-2 globalsxt(XT*) .
+
+  eq globalsxt(EXTERNTYPE XT*) = globalsxt(XT*) [owise] .
+
+  eq tablesxt(nil) = nil .
+
+  eq tablesxt(TABLE(TT) XT*) = TT tablesxt(XT*) .
+
+  eq tablesxt(EXTERNTYPE XT*) = tablesxt(XT*) [owise] .
+
+  eq memsxt(nil) = nil .
+
+  eq memsxt(MEM(MT) XT*) = MT memsxt(XT*) .
+
+  eq memsxt(EXTERNTYPE XT*) = memsxt(XT*) [owise] .
+
+  eq memarg0 = { (field('ALIGN, # 0) ; field('OFFSET, # 0)) } .
+
+  eq spectec-bool(# false) = 0 .
+
+  eq spectec-bool(# true) = 1 .
+
+  ceq signed-(N-2, I) = I : nat <:> int
+    if I < (2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) .
+
+  ceq signed-(N-2, I) = _-_(I : nat <:> int, (2 ^ N-2) : nat <:> int)
+    if _and_((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) <= I, I < (2 ^ N-2))
+      /\ (I < (2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat))) =/= true .
+
+  ceq inv-signed-(N-2, I-2) = I-2 : int <:> nat
+    if _and_(0 <= I-2, I-2 < ((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) : nat <:> int)) .
+
+  ceq inv-signed-(N-2, I-2) = (I-2 + ((2 ^ N-2) : nat <:> int)) : int <:> nat
+    if _and_(-_((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) : nat <:> int) <= I-2, I-2 < 0)
+      /\ _and_(0 <= I-2, I-2 < ((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) : nat <:> int)) =/= true .
+
+  eq spectec-unop-(INN, CLZ, # IN) = # iclz-(spectec-size(INN), IN) .
+
+  eq spectec-unop-(INN, CTZ, # IN) = # ictz-(spectec-size(INN), IN) .
+
+  eq spectec-unop-(INN, POPCNT, # IN) = # ipopcnt-(spectec-size(INN), IN) .
+
+  eq spectec-unop-(FNN, ABS, FN) = fabs-(spectec-size(FNN), FN) .
+
+  eq spectec-unop-(FNN, spectec-NEG, FN) = fneg-(spectec-size(FNN), FN) .
+
+  eq spectec-unop-(FNN, SQRT, FN) = fsqrt-(spectec-size(FNN), FN) .
+
+  eq spectec-unop-(FNN, CEIL, FN) = fceil-(spectec-size(FNN), FN) .
+
+  eq spectec-unop-(FNN, FLOOR, FN) = ffloor-(spectec-size(FNN), FN) .
+
+  eq spectec-unop-(FNN, TRUNC, FN) = ftrunc-(spectec-size(FNN), FN) .
+
+  eq spectec-unop-(FNN, NEAREST, FN) = fnearest-(spectec-size(FNN), FN) .
+
+  ceq iadd-(N-2, I_1, I_2) = _rem_(I_1 + I_2, 2 ^ N-2)
+    if _and_(_rem_(I_1 + I_2, 2 ^ N-2) >= 0, _rem_(I_1 + I_2, 2 ^ N-2) <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat)) .
+
+  eq idiv-(N-2, U, I_1, 0) = nil .
+
+  ceq idiv-(N-2, U, I_1, I_2) = (# (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) ?
+    if _and_((truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat) >= 0, (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat) <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat))
+      /\ I_2 =/= 0 .
+
+  eq idiv-(N-2, S, I_1, 0) = nil .
+
+  ceq idiv-(N-2, S, I_1, I_2) = nil
+    if (# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))) == (# ((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) : nat <:> rat))
+      /\ I_2 =/= 0 .
+
+  ceq idiv-(N-2, S, I_1, I_2) = (# inv-signed-(N-2, truncz(# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))))) ?
+    if _and_(inv-signed-(N-2, truncz(# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat)))) >= 0, inv-signed-(N-2, truncz(# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat)))) <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat))
+      /\ I_2 =/= 0
+      /\ (# ((signed-(N-2, I_1) : int <:> rat) / (signed-(N-2, I_2) : int <:> rat))) =/= (# ((2 ^ (_-_(N-2 : nat <:> int, 1) : int <:> nat)) : nat <:> rat)) .
+
+  ceq imul-(N-2, I_1, I_2) = _rem_(I_1 * I_2, 2 ^ N-2)
+    if _and_(_rem_(I_1 * I_2, 2 ^ N-2) >= 0, _rem_(I_1 * I_2, 2 ^ N-2) <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat)) .
+
+  eq irem-(N-2, U, I_1, 0) = nil .
+
+  ceq irem-(N-2, U, I_1, I_2) = (# (_-_(I_1 : nat <:> int, (I_2 * (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) : nat <:> int) : int <:> nat)) ?
+    if _and_((_-_(I_1 : nat <:> int, (I_2 * (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) : nat <:> int) : int <:> nat) >= 0, (_-_(I_1 : nat <:> int, (I_2 * (truncz(# ((I_1 : nat <:> rat) / (I_2 : nat <:> rat))) : int <:> nat)) : nat <:> int) : int <:> nat) <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat))
+      /\ I_2 =/= 0 .
+
+  eq irem-(N-2, S, I_1, 0) = nil .
+
+  ceq irem-(N-2, S, I_1, I_2) = (# inv-signed-(N-2, _-_(J_1, J_2 * truncz(# ((J_1 : int <:> rat) / (J_2 : int <:> rat)))))) ?
+    if I_2 =/= 0
+      /\ J_1 := signed-(N-2, I_1)
+      /\ J_2 := signed-(N-2, I_2)
+      /\ _and_(inv-signed-(N-2, _-_(J_1, J_2 * truncz(# ((J_1 : int <:> rat) / (J_2 : int <:> rat))))) >= 0, inv-signed-(N-2, _-_(J_1, J_2 * truncz(# ((J_1 : int <:> rat) / (J_2 : int <:> rat))))) <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat)) .
+
+  ceq isub-(N-2, I_1, I_2) = _rem_(_-_(((2 ^ N-2) + I_1) : nat <:> int, I_2 : nat <:> int), (2 ^ N-2) : nat <:> int) : int <:> nat
+    if _and_((_rem_(_-_(((2 ^ N-2) + I_1) : nat <:> int, I_2 : nat <:> int), (2 ^ N-2) : nat <:> int) : int <:> nat) >= 0, (_rem_(_-_(((2 ^ N-2) + I_1) : nat <:> int, I_2 : nat <:> int), (2 ^ N-2) : nat <:> int) : int <:> nat) <= (_-_((2 ^ N-2) : nat <:> int, 1) : int <:> nat)) .
+
+  eq spectec-binop-(INN, ADD, # IN_1, # IN_2) = # iadd-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-binop-(INN, SUB, # IN_1, # IN_2) = # isub-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-binop-(INN, MUL, # IN_1, # IN_2) = # imul-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-binop-(INN, DIV(SX), # IN_1, # IN_2) = list-(val-(INN), idiv-(spectec-size(INN), SX, IN_1, IN_2)) .
+
+  eq spectec-binop-(INN, REM(SX), # IN_1, # IN_2) = list-(val-(INN), irem-(spectec-size(INN), SX, IN_1, IN_2)) .
+
+  eq spectec-binop-(INN, AND, # IN_1, # IN_2) = # iand-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-binop-(INN, OR, # IN_1, # IN_2) = # ior-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-binop-(INN, XOR, # IN_1, # IN_2) = # ixor-(spectec-size(INN), IN_1, IN_2) .
+
+  ceq spectec-binop-(INN, SHL, # IN_1, # IN_2) = # ishl-(spectec-size(INN), IN_1, IN_2)
+    if _and_(IN_2 >= 0, IN_2 <= 4294967295) .
+
+  ceq spectec-binop-(INN, SHR(SX), # IN_1, # IN_2) = # ishr-(spectec-size(INN), SX, IN_1, IN_2)
+    if _and_(IN_2 >= 0, IN_2 <= 4294967295) .
+
+  eq spectec-binop-(INN, ROTL, # IN_1, # IN_2) = # irotl-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-binop-(INN, ROTR, # IN_1, # IN_2) = # irotr-(spectec-size(INN), IN_1, IN_2) .
+
+  ceq spectec-binop-(FNN, ADD, FN_1, FN_2) = fadd-(spectec-size(FNN), FN_1, FN_2)
+    if typecheck(FNN, Fnn) .
+
+  ceq spectec-binop-(FNN, SUB, FN_1, FN_2) = fsub-(spectec-size(FNN), FN_1, FN_2)
+    if typecheck(FNN, Fnn) .
+
+  ceq spectec-binop-(FNN, MUL, FN_1, FN_2) = fmul-(spectec-size(FNN), FN_1, FN_2)
+    if typecheck(FNN, Fnn) .
+
+  eq spectec-binop-(FNN, spectec-DIV, FN_1, FN_2) = fdiv-(spectec-size(FNN), FN_1, FN_2) .
+
+  eq spectec-binop-(FNN, MIN, FN_1, FN_2) = fmin-(spectec-size(FNN), FN_1, FN_2) .
+
+  eq spectec-binop-(FNN, MAX, FN_1, FN_2) = fmax-(spectec-size(FNN), FN_1, FN_2) .
+
+  eq spectec-binop-(FNN, COPYSIGN, FN_1, FN_2) = fcopysign-(spectec-size(FNN), FN_1, FN_2) .
+
+  ceq ieqz-(N-2, I_1) = spectec-bool(# (I_1 == 0))
+    if _and_(spectec-bool(# (I_1 == 0)) >= 0, spectec-bool(# (I_1 == 0)) <= 4294967295) .
+
+  eq spectec-testop-(INN, EQZ, # IN) = ieqz-(spectec-size(INN), IN) .
+
+  ceq ieq-(N-2, I_1, I_2) = spectec-bool(# (I_1 == I_2))
+    if _and_(spectec-bool(# (I_1 == I_2)) >= 0, spectec-bool(# (I_1 == I_2)) <= 4294967295) .
+
+  ceq ige-(N-2, U, I_1, I_2) = spectec-bool(# (I_1 >= I_2))
+    if _and_(spectec-bool(# (I_1 >= I_2)) >= 0, spectec-bool(# (I_1 >= I_2)) <= 4294967295) .
+
+  ceq ige-(N-2, S, I_1, I_2) = spectec-bool(# (signed-(N-2, I_1) >= signed-(N-2, I_2)))
+    if _and_(spectec-bool(# (signed-(N-2, I_1) >= signed-(N-2, I_2))) >= 0, spectec-bool(# (signed-(N-2, I_1) >= signed-(N-2, I_2))) <= 4294967295) .
+
+  ceq igt-(N-2, U, I_1, I_2) = spectec-bool(# (I_1 > I_2))
+    if _and_(spectec-bool(# (I_1 > I_2)) >= 0, spectec-bool(# (I_1 > I_2)) <= 4294967295) .
+
+  ceq igt-(N-2, S, I_1, I_2) = spectec-bool(# (signed-(N-2, I_1) > signed-(N-2, I_2)))
+    if _and_(spectec-bool(# (signed-(N-2, I_1) > signed-(N-2, I_2))) >= 0, spectec-bool(# (signed-(N-2, I_1) > signed-(N-2, I_2))) <= 4294967295) .
+
+  ceq ile-(N-2, U, I_1, I_2) = spectec-bool(# (I_1 <= I_2))
+    if _and_(spectec-bool(# (I_1 <= I_2)) >= 0, spectec-bool(# (I_1 <= I_2)) <= 4294967295) .
+
+  ceq ile-(N-2, S, I_1, I_2) = spectec-bool(# (signed-(N-2, I_1) <= signed-(N-2, I_2)))
+    if _and_(spectec-bool(# (signed-(N-2, I_1) <= signed-(N-2, I_2))) >= 0, spectec-bool(# (signed-(N-2, I_1) <= signed-(N-2, I_2))) <= 4294967295) .
+
+  ceq ilt-(N-2, U, I_1, I_2) = spectec-bool(# (I_1 < I_2))
+    if _and_(spectec-bool(# (I_1 < I_2)) >= 0, spectec-bool(# (I_1 < I_2)) <= 4294967295) .
+
+  ceq ilt-(N-2, S, I_1, I_2) = spectec-bool(# (signed-(N-2, I_1) < signed-(N-2, I_2)))
+    if _and_(spectec-bool(# (signed-(N-2, I_1) < signed-(N-2, I_2))) >= 0, spectec-bool(# (signed-(N-2, I_1) < signed-(N-2, I_2))) <= 4294967295) .
+
+  ceq ine-(N-2, I_1, I_2) = spectec-bool(# (I_1 =/= I_2))
+    if _and_(spectec-bool(# (I_1 =/= I_2)) >= 0, spectec-bool(# (I_1 =/= I_2)) <= 4294967295) .
+
+  eq spectec-relop-(INN, EQ, # IN_1, # IN_2) = ieq-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-relop-(INN, NE, # IN_1, # IN_2) = ine-(spectec-size(INN), IN_1, IN_2) .
+
+  eq spectec-relop-(INN, LT(SX), # IN_1, # IN_2) = ilt-(spectec-size(INN), SX, IN_1, IN_2) .
+
+  eq spectec-relop-(INN, GT(SX), # IN_1, # IN_2) = igt-(spectec-size(INN), SX, IN_1, IN_2) .
+
+  eq spectec-relop-(INN, LE(SX), # IN_1, # IN_2) = ile-(spectec-size(INN), SX, IN_1, IN_2) .
+
+  eq spectec-relop-(INN, GE(SX), # IN_1, # IN_2) = ige-(spectec-size(INN), SX, IN_1, IN_2) .
+
+  ceq spectec-relop-(FNN, EQ, FN_1, FN_2) = feq-(spectec-size(FNN), FN_1, FN_2)
+    if typecheck(FNN, Fnn) .
+
+  ceq spectec-relop-(FNN, NE, FN_1, FN_2) = fne-(spectec-size(FNN), FN_1, FN_2)
+    if typecheck(FNN, Fnn) .
+
+  eq spectec-relop-(FNN, spectec-LT, FN_1, FN_2) = flt-(spectec-size(FNN), FN_1, FN_2) .
+
+  eq spectec-relop-(FNN, spectec-GT, FN_1, FN_2) = fgt-(spectec-size(FNN), FN_1, FN_2) .
+
+  eq spectec-relop-(FNN, spectec-LE, FN_1, FN_2) = fle-(spectec-size(FNN), FN_1, FN_2) .
+
+  eq spectec-relop-(FNN, spectec-GE, FN_1, FN_2) = fge-(spectec-size(FNN), FN_1, FN_2) .
+
+  eq cvtop--(I32, I64, EXTEND(SX), # IN) = # extend--(32, 64, SX, IN) .
+
+  eq cvtop--(I64, I32, WRAP, # IN) = # wrap--(64, 32, IN) .
+
+  ceq cvtop--(FNN, INN, spectec-TRUNC(SX), FN) = list-(val-(INN), trunc--(spectec-size(FNN), spectec-size(INN), SX, FN))
+    if typecheck(FNN, Fnn)
+      /\ typecheck(INN, Inn) .
+
+  eq cvtop--(F32, F64, PROMOTE, FN) = promote--(32, 64, FN) .
+
+  eq cvtop--(F64, F32, DEMOTE, FN) = demote--(64, 32, FN) .
+
+  ceq cvtop--(INN, FNN, CONVERT(SX), # IN) = convert--(spectec-size(INN), spectec-size(FNN), SX, IN)
+    if typecheck(FNN, Fnn) .
+
+  ceq cvtop--(INN, FNN, REINTERPRET, # IN) = reinterpret--(INN, FNN, # IN)
+    if typecheck(FNN, Fnn)
+      /\ spectec-size(INN) == spectec-size(FNN) .
+
+  ceq cvtop--(FNN, INN, REINTERPRET, FN) = # #rat(reinterpret--(FNN, INN, FN))
+    if typecheck(FNN, Fnn)
+      /\ typecheck(INN, Inn)
+      /\ spectec-size(INN) == spectec-size(FNN) .
+
+  ceq inez-(N-2, I_1) = spectec-bool(# (I_1 =/= 0))
+    if _and_(spectec-bool(# (I_1 =/= 0)) >= 0, spectec-bool(# (I_1 =/= 0)) <= 4294967295) .
+
+  eq typecheck(# VALUE, addr) = typecheck(# VALUE, nat) .
+
+  eq typecheck(# VALUE, funcaddr) = typecheck(# VALUE, addr) .
+
+  eq typecheck(# VALUE, globaladdr) = typecheck(# VALUE, addr) .
+
+  eq typecheck(# VALUE, tableaddr) = typecheck(# VALUE, addr) .
+
+  eq typecheck(# VALUE, memaddr) = typecheck(# VALUE, addr) .
+
+  eq typecheck(FUNC(VALUE), externaddr) = true .
+
+  eq typecheck(GLOBAL(VALUE), externaddr) = true .
+
+  eq typecheck(TABLE(VALUE), externaddr) = true .
+
+  eq typecheck(MEM(VALUE), externaddr) = true .
+
+  ceq typecheck(CONST(VALTYPE, VALUE2), val) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, val-(VALTYPE)) .
+
+  eq typecheck(-VALS(VALUE-7), result) = true .
+
+  eq typecheck(TRAP, result) = true .
+
+  ceq typecheck({ (field('NAME, VALUE-4) ; field('ADDR, VALUE-3)) }, exportinst) = true
+    if typecheck(VALUE-4, name)
+      /\ typecheck(VALUE-3, externaddr) .
+
+  ceq typecheck({ (((((field('TYPES, VALUE-4) ; field('FUNCS, VALUE-8)) ; field('GLOBALS, VALUE-9)) ; field('TABLES, VALUE-10)) ; field('MEMS, VALUE-11)) ; field('EXPORTS, VALUE-12)) }, moduleinst) = true
+    if typecheck(VALUE-4, functype)
+      /\ typecheck(VALUE-8, funcaddr)
+      /\ typecheck(VALUE-9, globaladdr)
+      /\ typecheck(VALUE-10, tableaddr)
+      /\ typecheck(VALUE-11, memaddr)
+      /\ typecheck(VALUE-12, exportinst) .
+
+  eq recordConcat(LEFT, RIGHT, moduleinst) = { (((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('EXPORTS, (LEFT . 'EXPORTS) (RIGHT . 'EXPORTS))) } .
+
+  ceq typecheck({ ((field('TYPE, VALUE-3) ; field('MODULE, VALUE-13)) ; field('CODE, VALUE-14)) }, funcinst) = true
+    if typecheck(VALUE-3, functype)
+      /\ typecheck(VALUE-13, moduleinst)
+      /\ typecheck(VALUE-14, func) .
+
+  ceq typecheck({ (field('TYPE, VALUE-3) ; field('VALUE, VALUE-15)) }, globalinst) = true
+    if typecheck(VALUE-3, globaltype)
+      /\ typecheck(VALUE-15, val) .
+
+  ceq typecheck({ (field('TYPE, VALUE-3) ; field('REFS, VALUE-4)) }, tableinst) = true
+    if typecheck(VALUE-3, tabletype)
+      /\ typecheck(VALUE-4, iterOpt(funcaddr)) .
+
+  ceq typecheck({ (field('TYPE, VALUE-3) ; field('BYTES, VALUE-4)) }, meminst) = true
+    if typecheck(VALUE-3, memtype)
+      /\ typecheck(VALUE-4, byte) .
+
+  ceq typecheck({ (((field('FUNCS, VALUE-4) ; field('GLOBALS, VALUE-8)) ; field('TABLES, VALUE-9)) ; field('MEMS, VALUE-10)) }, store) = true
+    if typecheck(VALUE-4, funcinst)
+      /\ typecheck(VALUE-8, globalinst)
+      /\ typecheck(VALUE-9, tableinst)
+      /\ typecheck(VALUE-10, meminst) .
+
+  eq recordConcat(LEFT, RIGHT, store) = { (((field('FUNCS, map-concat(LEFT . 'FUNCS, RIGHT . 'FUNCS)) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('MEMS, map-concat(LEFT . 'MEMS, RIGHT . 'MEMS))) } .
+
+  ceq typecheck({ (field('LOCALS, VALUE-7) ; field('MODULE, VALUE-3)) }, frame) = true
+    if typecheck(VALUE-3, moduleinst) .
+
+  eq recordConcat(LEFT, RIGHT, frame) = { (field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS)) ; field('MODULE, recordConcat(LEFT . 'MODULE, RIGHT . 'MODULE, moduleinst))) } .
+
+  ceq typecheck(STORE-2 ; FRAME, state) = true
+    if typecheck(STORE-2, store)
+      /\ typecheck(FRAME, frame) .
+
+  eq typecheck(NOP, admininstr) = true .
+
+  eq typecheck(UNREACHABLE, admininstr) = true .
+
+  eq typecheck(DROP, admininstr) = true .
+
+  eq typecheck(SELECT, admininstr) = true .
+
+  ceq typecheck(BLOCK(BLOCKTYPE, INSTR*), admininstr) = true
+    if typecheck(BLOCKTYPE, blocktype) .
+
+  ceq typecheck(LOOP(BLOCKTYPE, INSTR*), admininstr) = true
+    if typecheck(BLOCKTYPE, blocktype) .
+
+  ceq typecheck(IF__ELSE_(BLOCKTYPE, INSTR*, INSTR*-2), admininstr) = true
+    if typecheck(BLOCKTYPE, blocktype) .
+
+  ceq typecheck(BR(VALUE), admininstr) = true
+    if typecheck(# VALUE, labelidx) .
+
+  ceq typecheck(BR-IF(VALUE), admininstr) = true
+    if typecheck(# VALUE, labelidx) .
+
+  ceq typecheck(BR-TABLE(LABELIDX*, LABELIDX), admininstr) = true
+    if typecheck(LABELIDX*, labelidx)
+      /\ typecheck(# LABELIDX, labelidx) .
+
+  ceq typecheck(CALL(VALUE), admininstr) = true
+    if typecheck(# VALUE, funcidx) .
+
+  ceq typecheck(CALL-INDIRECT(VALUE), admininstr) = true
+    if typecheck(# VALUE, typeidx) .
+
+  eq typecheck(RETURN, admininstr) = true .
+
+  ceq typecheck(CONST(VALTYPE, VALUE2), admininstr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, val-(VALTYPE)) .
+
+  ceq typecheck(UNOP(VALTYPE, VALUE2), admininstr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, unop-(VALTYPE)) .
+
+  ceq typecheck(BINOP(VALTYPE, VALUE2), admininstr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, binop-(VALTYPE)) .
+
+  ceq typecheck(TESTOP(VALTYPE, VALUE2), admininstr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, testop-(VALTYPE)) .
+
+  ceq typecheck(RELOP(VALTYPE, VALUE2), admininstr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2, relop-(VALTYPE)) .
+
+  ceq typecheck(CVTOP(VALTYPE_1, VALTYPE_2, CVTOP-2), admininstr) = true
+    if VALTYPE_1 =/= VALTYPE_2
+      /\ typecheck(VALTYPE_1, valtype)
+      /\ typecheck(VALTYPE_2, valtype)
+      /\ typecheck(CVTOP-2, cvtop) .
+
+  ceq typecheck(LOCAL.GET(VALUE), admininstr) = true
+    if typecheck(# VALUE, localidx) .
+
+  ceq typecheck(LOCAL.SET(VALUE), admininstr) = true
+    if typecheck(# VALUE, localidx) .
+
+  ceq typecheck(LOCAL.TEE(VALUE), admininstr) = true
+    if typecheck(# VALUE, localidx) .
+
+  ceq typecheck(GLOBAL.GET(VALUE), admininstr) = true
+    if typecheck(# VALUE, globalidx) .
+
+  ceq typecheck(GLOBAL.SET(VALUE), admininstr) = true
+    if typecheck(# VALUE, globalidx) .
+
+  ceq typecheck(LOAD(VALTYPE, VALUE2-2, MEMARG), admininstr) = true
+    if typecheck(VALTYPE, valtype)
+      /\ typecheck(VALUE2-2, iterOpt(loadop-(VALTYPE)))
+      /\ typecheck(MEMARG, memarg) .
+
+  ceq typecheck(STORE(VALTYPE, SZ?, MEMARG), admininstr) = true
+    if INN? := bind-exp(VALTYPE, SZ?)
+      /\ typecheck(INN?, iterOpt(Inn))
+      /\ typecheck(VALTYPE, valtype)
+      /\ typecheck(SZ?, iterOpt(sz))
+      /\ typecheck(MEMARG, memarg) .
+
+  eq typecheck(MEMORY.SIZE, admininstr) = true .
+
+  eq typecheck(MEMORY.GROW, admininstr) = true .
+
+  eq typecheck(CALL-ADDR(VALUE), admininstr) = true .
+
+  eq typecheck(LABEL- N-3 { INSTR* } ADMININSTR*, admininstr) = true .
+
+  ceq typecheck(FRAME- N-3 { FRAME } ADMININSTR*, admininstr) = true
+    if typecheck(FRAME, frame) .
+
+  eq typecheck(TRAP, admininstr) = true .
+
+  ceq typecheck(STATE ; ADMININSTR*, config) = true
+    if typecheck(STATE, state) .
+
+  eq default-(I32) = CONST(I32, # 0) .
+
+  eq default-(I64) = CONST(I64, # 0) .
+
+  eq default-(F32) = CONST(F32, fzero(32)) .
+
+  eq default-(F64) = CONST(F64, fzero(64)) .
+
+  eq funcsxa(nil) = nil .
+
+  eq funcsxa(FUNC(FA) XV*) = (# FA) funcsxa(XV*) .
+
+  eq funcsxa(EXTERNADDR XV*) = funcsxa(XV*) [owise] .
+
+  eq globalsxa(nil) = nil .
+
+  eq globalsxa(GLOBAL(GA) XV*) = (# GA) globalsxa(XV*) .
+
+  eq globalsxa(EXTERNADDR XV*) = globalsxa(XV*) [owise] .
+
+  eq tablesxa(nil) = nil .
+
+  eq tablesxa(TABLE(TA) XV*) = (# TA) tablesxa(XV*) .
+
+  eq tablesxa(EXTERNADDR XV*) = tablesxa(XV*) [owise] .
+
+  eq memsxa(nil) = nil .
+
+  eq memsxa(MEM(MA) XV*) = (# MA) memsxa(XV*) .
+
+  eq memsxa(EXTERNADDR XV*) = memsxa(XV*) [owise] .
+
+  eq spectec-store(S-2 ; F) = S-2 .
+
+  eq spectec-frame(S-2 ; F) = F .
+
+  eq spectec-funcaddr(S-2 ; F) = (F . 'MODULE) . 'FUNCS .
+
+  eq spectec-funcinst(S-2 ; F) = S-2 . 'FUNCS .
+
+  eq spectec-globalinst(S-2 ; F) = S-2 . 'GLOBALS .
+
+  eq spectec-tableinst(S-2 ; F) = S-2 . 'TABLES .
+
+  eq spectec-meminst(S-2 ; F) = S-2 . 'MEMS .
+
+  eq spectec-moduleinst(S-2 ; F) = F . 'MODULE .
+
+  eq spectec-type(S-2 ; F, X-4) = ((F . 'MODULE) . 'TYPES) [ X-4 ] .
+
+  eq spectec-func(S-2 ; F, X-4) = map-read(S-2 . 'FUNCS, #rat(((F . 'MODULE) . 'FUNCS) [ X-4 ])) .
+
+  eq spectec-global(S-2 ; F, X-4) = (S-2 . 'GLOBALS) [ #rat(((F . 'MODULE) . 'GLOBALS) [ X-4 ]) ] .
+
+  eq spectec-table(S-2 ; F, X-4) = (S-2 . 'TABLES) [ #rat(((F . 'MODULE) . 'TABLES) [ X-4 ]) ] .
+
+  eq spectec-mem(S-2 ; F, X-4) = map-read(S-2 . 'MEMS, #rat(((F . 'MODULE) . 'MEMS) [ X-4 ])) .
+
+  eq spectec-local(S-2 ; F, X-4) = (F . 'LOCALS) [ X-4 ] .
+
+  eq with-local(S-2 ; F, X-4, V) = S-2 ; (F [. 'LOCALS = ((F . 'LOCALS) [ X-4 = V ]) ]) .
+
+  eq with-global(S-2 ; F, X-4, V) = (S-2 [. 'GLOBALS = ((S-2 . 'GLOBALS) [ #rat(((F . 'MODULE) . 'GLOBALS) [ X-4 ]) = (((S-2 . 'GLOBALS) [ #rat(((F . 'MODULE) . 'GLOBALS) [ X-4 ]) ]) [. 'VALUE = V ]) ]) ]) ; F .
+
+  eq with-table(S-2 ; F, X-4, I, A) = (S-2 [. 'TABLES = ((S-2 . 'TABLES) [ #rat(((F . 'MODULE) . 'TABLES) [ X-4 ]) = (((S-2 . 'TABLES) [ #rat(((F . 'MODULE) . 'TABLES) [ X-4 ]) ]) [. 'REFS = map-write(((S-2 . 'TABLES) [ #rat(((F . 'MODULE) . 'TABLES) [ X-4 ]) ]) . 'REFS, I, seq((# A) ?)) ]) ]) ]) ; F .
+
+  eq with-tableinst(S-2 ; F, X-4, TI) = (S-2 [. 'TABLES = ((S-2 . 'TABLES) [ #rat(((F . 'MODULE) . 'TABLES) [ X-4 ]) = TI ]) ]) ; F .
+
+  eq with-mem(S-2 ; F, X-4, I, J, B*) = (S-2 [. 'MEMS = map-write(S-2 . 'MEMS, #rat(((F . 'MODULE) . 'MEMS) [ X-4 ]), map-read(S-2 . 'MEMS, #rat(((F . 'MODULE) . 'MEMS) [ X-4 ])) [. 'BYTES = array-write(map-read(S-2 . 'MEMS, #rat(((F . 'MODULE) . 'MEMS) [ X-4 ])) . 'BYTES, I, J, B*) ]) ]) ; F .
+
+  eq with-meminst(S-2 ; F, X-4, MI) = (S-2 [. 'MEMS = map-write(S-2 . 'MEMS, #rat(((F . 'MODULE) . 'MEMS) [ X-4 ]), MI) ]) ; F .
+
+  ceq growtable(TI, N-3) = TI'
+    if { (field('TYPE, FIELD-PART1) ; field('REFS, FIELD-PART2)) } := TI
+      /\ [ I .. J? ] := FIELD-PART1
+      /\ size(J?) <= 1
+      /\ A* := unzip-growtable(FIELD-PART2)
+      /\ I' := size(A*) + N-3
+      /\ _and_(I' >= 0, I' <= 4294967295)
+      /\ all-growtable(I', J?)
+      /\ I' < 4294967296
+      /\ TI' := { (field('TYPE, [ I' .. J? ]) ; field('REFS, map-of(map-growtable(A*) repeatSeq(N-3, seq(nil))))) } .
+
+  ceq growmemory(MI, N-3) = MI'
+    if { (field('TYPE, [ I .. J? ]) ; field('BYTES, B*)) } := MI
+      /\ size(J?) <= 1
+      /\ I'-2 := # (((array-size(MI . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) + (N-3 : nat <:> rat))
+      /\ _and_((#rat(I'-2) : rat <:> nat) >= 0, (#rat(I'-2) : rat <:> nat) <= 4294967295)
+      /\ all-growmemory(I'-2, J?)
+      /\ #rat(I'-2) <= 65536
+      /\ MI' := { (field('TYPE, [ (#rat(I'-2) : rat <:> nat) .. J? ]) ; field('BYTES, array-grow(MI . 'BYTES, N-3 * (64 * Ki)))) } .
+
+  ceq typecheck({ (((((((field('TYPES, VALUE-4) ; field('FUNCS, VALUE-8)) ; field('GLOBALS, VALUE-9)) ; field('TABLES, VALUE-10)) ; field('MEMS, VALUE-11)) ; field('LOCALS, VALUE-12)) ; field('LABELS, VALUE-16)) ; field('RETURN, VALUE-17)) }, context) = true
+    if typecheck(VALUE-4, functype)
+      /\ typecheck(VALUE-8, functype)
+      /\ typecheck(VALUE-9, globaltype)
+      /\ typecheck(VALUE-10, tabletype)
+      /\ typecheck(VALUE-11, memtype)
+      /\ typecheck(VALUE-12, valtype)
+      /\ typecheck(VALUE-16, resulttype)
+      /\ typecheck(VALUE-17, iterOpt(resulttype)) .
+
+  eq recordConcat(LEFT, RIGHT, context) = { (((((((field('TYPES, (LEFT . 'TYPES) (RIGHT . 'TYPES)) ; field('FUNCS, (LEFT . 'FUNCS) (RIGHT . 'FUNCS))) ; field('GLOBALS, (LEFT . 'GLOBALS) (RIGHT . 'GLOBALS))) ; field('TABLES, (LEFT . 'TABLES) (RIGHT . 'TABLES))) ; field('MEMS, (LEFT . 'MEMS) (RIGHT . 'MEMS))) ; field('LOCALS, (LEFT . 'LOCALS) (RIGHT . 'LOCALS))) ; field('LABELS, (LEFT . 'LABELS) (RIGHT . 'LABELS))) ; field('RETURN, optionConcat(LEFT . 'RETURN, RIGHT . 'RETURN))) } .
+
+  rl Step-pure(UNREACHABLE) => TRAP .
+
+  rl Step-pure(NOP) => nil .
+
+  crl Step-pure(VAL DROP) => nil
+    if typecheck(VAL, val) .
+
+  crl Step-pure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT))) => VAL_1
+    if typecheck(VAL_1, val)
+      /\ typecheck(VAL_2, val)
+      /\ C-3 =/= 0 .
+
+  crl Step-pure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT))) => VAL_2
+    if typecheck(VAL_1, val)
+      /\ typecheck(VAL_2, val)
+      /\ C-3 == 0 .
+
+  crl Step-pure(CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*)) => BLOCK(T?, INSTR_1*)
+    if size(T?) <= 1
+      /\ C-3 =/= 0 .
+
+  crl Step-pure(CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*)) => BLOCK(T?, INSTR_2*)
+    if size(T?) <= 1
+      /\ C-3 == 0 .
+
+  rl Step-pure(LABEL- N-3 { INSTR* } VAL*) => VAL* .
+
+  crl Step-pure(LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*)) => VAL* INSTR'*
+    if size(VAL*) = N-3 .
+
+  crl Step-pure(LABEL- N-3 { INSTR'* } ((VAL* BR(INPUT-FIELD)) INSTR*)) => VAL* BR(L)
+    if L := sd(INPUT-FIELD, 1)
+      /\ L + 1 = INPUT-FIELD .
+
+  crl Step-pure(CONST(I32, # C-3) BR-IF(L)) => BR(L)
+    if C-3 =/= 0 .
+
+  crl Step-pure(CONST(I32, # C-3) BR-IF(L)) => nil
+    if C-3 == 0 .
+
+  crl Step-pure(CONST(I32, # I) BR-TABLE(L*, L')) => RESULT
+    if I < size(L*)
+      /\ RESULT := BR(#rat(L* [ I ])) .
+
+  crl Step-pure(CONST(I32, # I) BR-TABLE(L*, L')) => BR(L')
+    if I >= size(L*) .
+
+  crl Step-pure(FRAME- N-3 { F } VAL*) => VAL*
+    if size(VAL*) = N-3 .
+
+  crl Step-pure(FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) => VAL*
+    if size(VAL*) = N-3 .
+
+  rl Step-pure(LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*)) => VAL* RETURN .
+
+  crl Step-pure(VAL* (TRAP INSTR*)) => TRAP
+    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+
+  rl Step-pure(LABEL- N-3 { INSTR'* } TRAP) => TRAP .
+
+  rl Step-pure(FRAME- N-3 { F } TRAP) => TRAP .
+
+  crl Step-pure(CONST(T, C_1) UNOP(T, UNOP-2)) => CONST(T, C-2)
+    if MEMBER-PREFIX (C-2 MEMBER-SUFFIX) := spectec-unop-(T, UNOP-2, C_1) .
+
+  crl Step-pure(CONST(T, C_1) UNOP(T, UNOP-2)) => TRAP
+    if spectec-unop-(T, UNOP-2, C_1) == nil .
+
+  crl Step-pure(CONST(T, C_1) (CONST(T, C_2) BINOP(T, BINOP-2))) => CONST(T, C-2)
+    if MEMBER-PREFIX (C-2 MEMBER-SUFFIX) := spectec-binop-(T, BINOP-2, C_1, C_2) .
+
+  crl Step-pure(CONST(T, C_1) (CONST(T, C_2) BINOP(T, BINOP-2))) => TRAP
+    if spectec-binop-(T, BINOP-2, C_1, C_2) == nil .
+
+  crl Step-pure(CONST(T, C_1) TESTOP(T, TESTOP-2)) => CONST(I32, # C-3)
+    if C-3 := spectec-testop-(T, TESTOP-2, C_1) .
+
+  crl Step-pure(CONST(T, C_1) (CONST(T, C_2) RELOP(T, RELOP-2))) => CONST(I32, # C-3)
+    if C-3 := spectec-relop-(T, RELOP-2, C_1, C_2) .
+
+  crl Step-pure(CONST(T_1-2, C_1) CVTOP(T_2-2, T_1-2, CVTOP-2)) => CONST(T_2-2, C-2)
+    if MEMBER-PREFIX (C-2 MEMBER-SUFFIX) := cvtop--(T_1-2, T_2-2, CVTOP-2, C_1) .
+
+  crl Step-pure(CONST(T_1-2, C_1) CVTOP(T_2-2, T_1-2, CVTOP-2)) => TRAP
+    if cvtop--(T_1-2, T_2-2, CVTOP-2, C_1) == nil .
+
+  crl Step-pure(VAL LOCAL.TEE(X-4)) => VAL (VAL LOCAL.SET(X-4))
+    if typecheck(VAL, val) .
+
+  ceq Step-read-call-indirect-call-enabled(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = true
+    if (# A) ? := unseq(map-read(spectec-table(Z, 0) . 'REFS, I))
+      /\ spectec-type(Z, X-4) == (map-read(spectec-funcinst(Z), A) . 'TYPE) .
+
+  eq Step-read-call-indirect-call-enabled(ENABLED-INPUT1) = false [owise] .
+
+  crl Step-read(Z ; BLOCK(T?, INSTR*)) => LABEL- N-3 { nil } INSTR*
+    if size(T?) <= 1
+      /\ T? == nil
+      /\ N-3 := 0 .
+
+  crl Step-read(Z ; BLOCK(T?, INSTR*)) => LABEL- N-3 { nil } INSTR*
+    if size(T?) <= 1
+      /\ T? =/= nil
+      /\ N-3 := 1 .
+
+  crl Step-read(Z ; LOOP(T?, INSTR*)) => LABEL- 0 { LOOP(T?, INSTR*) } INSTR*
+    if size(T?) <= 1 .
+
+  crl Step-read(Z ; CALL(X-4)) => RESULT
+    if RESULT := CALL-ADDR(#rat(spectec-funcaddr(Z) [ X-4 ])) .
+
+  crl Step-read(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) => CALL-ADDR(A)
+    if (# A) ? := unseq(map-read(spectec-table(Z, 0) . 'REFS, I))
+      /\ spectec-type(Z, X-4) == (map-read(spectec-funcinst(Z), A) . 'TYPE) .
+
+  crl Step-read(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) => TRAP
+    if Step-read-call-indirect-call-enabled(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = false .
+
+  crl Step-read(Z ; (VAL* CALL-ADDR(A))) => FRAME- N-3 { F } (LABEL- N-3 { nil } INSTR*)
+    if K := size(VAL*)
+      /\ { (field('TYPE, T_1* -> T_2*) ; (field('MODULE, MM) ; field('CODE, FUNC-3))) } := map-read(spectec-funcinst(Z), A)
+      /\ K = size(T_1*)
+      /\ N-3 := size(T_2*)
+      /\ spectec-FUNC(CASE-PART1, CASE-PART2, CASE-PART3) := FUNC-3
+      /\ X-4 := CASE-PART1
+      /\ INSTR* := CASE-PART3
+      /\ T* := unzip-LOCAL(CASE-PART2)
+      /\ F := { (field('LOCALS, VAL* map-default(T*)) ; field('MODULE, MM)) } .
+
+  crl Step-read(Z ; LOCAL.GET(X-4)) => RESULT
+    if RESULT := spectec-local(Z, X-4) .
+
+  crl Step-read(Z ; GLOBAL.GET(X-4)) => RESULT
+    if RESULT := spectec-global(Z, X-4) . 'VALUE .
+
+  crl Step-read(Z ; (CONST(I32, # I) LOAD(T, nil, AO))) => TRAP
+    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(T) : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
+
+  crl Step-read(Z ; (CONST(I32, # I) LOAD(T, nil, AO))) => CONST(T, C-2)
+    if C-2 := inv-bytes-(T, array-read(spectec-mem(Z, 0) . 'BYTES, I + #rat(AO . 'OFFSET), ((spectec-size(T) : nat <:> rat) / 8) : rat <:> nat))
+      /\ bytes-(T, C-2) == array-read(spectec-mem(Z, 0) . 'BYTES, I + #rat(AO . 'OFFSET), ((spectec-size(T) : nat <:> rat) / 8) : rat <:> nat) .
+
+  crl Step-read(Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) => TRAP
+    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
+
+  crl Step-read(Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) => RESULT
+    if C-3 := inv-ibytes-(N-3, array-read(spectec-mem(Z, 0) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / 8) : rat <:> nat))
+      /\ ibytes-(N-3, C-3) == array-read(spectec-mem(Z, 0) . 'BYTES, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / 8) : rat <:> nat)
+      /\ RESULT := CONST(INN, # extend--(N-3, spectec-size(INN), SX, C-3)) .
+
+  crl Step-read(Z ; (MEMORY.SIZE)) => CONST(I32, # N-3)
+    if Ki =/= 0
+      /\ 64 =/= 0
+      /\ N-3 := _quo_(_quo_(array-size(spectec-mem(Z, 0) . 'BYTES), Ki), 64)
+      /\ N-3 * 64 = _quo_(array-size(spectec-mem(Z, 0) . 'BYTES), Ki)
+      /\ (N-3 * 64) * Ki = array-size(spectec-mem(Z, 0) . 'BYTES)
+      /\ _and_(N-3 >= 0, N-3 <= 4294967295) .
+
+  crl Step(Z ; (VAL LOCAL.SET(X-4))) => RESULT-2
+    if typecheck(VAL, val)
+      /\ RESULT-2 := with-local(Z, X-4, VAL) ; nil .
+
+  crl Step(Z ; (VAL GLOBAL.SET(X-4))) => RESULT-2
+    if typecheck(VAL, val)
+      /\ RESULT-2 := with-global(Z, X-4, VAL) ; nil .
+
+  crl Step(Z ; (CONST(I32, # I) (CONST(T, C-2) STORE(T, nil, AO)))) => Z ; TRAP
+    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(T) : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
+
+  crl Step(Z ; (CONST(I32, # I) (CONST(T, C-2) STORE(T, nil, AO)))) => RESULT-2
+    if B* := bytes-(T, C-2)
+      /\ RESULT-2 := with-mem(Z, 0, I + #rat(AO . 'OFFSET), ((spectec-size(T) : nat <:> rat) / 8) : rat <:> nat, B*) ; nil .
+
+  crl Step(Z ; (CONST(I32, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, AO)))) => Z ; TRAP
+    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
+
+  crl Step(Z ; (CONST(I32, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, AO)))) => RESULT-2
+    if B* := ibytes-(N-3, wrap--(spectec-size(INN), N-3, C-3))
+      /\ RESULT-2 := with-mem(Z, 0, I + #rat(AO . 'OFFSET), ((N-3 : nat <:> rat) / 8) : rat <:> nat, B*) ; nil .
+
+  crl Step(Z ; (CONST(I32, # N-3) (MEMORY.GROW))) => RESULT-2
+    if MI := growmemory(spectec-mem(Z, 0), N-3)
+      /\ _and_((((array-size(spectec-mem(Z, 0) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat) >= 0, (((array-size(spectec-mem(Z, 0) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat) <= 4294967295)
+      /\ RESULT-2 := with-meminst(Z, 0, MI) ; CONST(I32, # (((array-size(spectec-mem(Z, 0) . 'BYTES) : nat <:> rat) / ((64 * Ki) : nat <:> rat)) : rat <:> nat)) .
+
+  crl Step(Z ; (CONST(I32, # N-3) (MEMORY.GROW))) => RESULT-2
+    if _and_(inv-signed-(32, -1) >= 0, inv-signed-(32, -1) <= 4294967295)
+      /\ RESULT-2 := Z ; CONST(I32, # inv-signed-(32, -1)) .
+
+  eq unheat(Step(C-4)) = C-4 .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, UNREACHABLE, POSTFIX) = { PREFIX | (BRIDGE-Z ; UNREACHABLE) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, NOP, POSTFIX) = { PREFIX | (BRIDGE-Z ; NOP) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX VAL, DROP, POSTFIX) = { PREFIX | (BRIDGE-Z ; (VAL DROP)) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX (VAL_1 (VAL_2 CONST(I32, # C-3))), SELECT, POSTFIX) = { PREFIX | (BRIDGE-Z ; (VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT)))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX CONST(I32, # C-3), IF__ELSE_(T?, INSTR_1*, INSTR_2*), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, LABEL- N-3 { INSTR* } VAL*, POSTFIX) = { PREFIX | (BRIDGE-Z ; (LABEL- N-3 { INSTR* } VAL*)) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*), POSTFIX) = { PREFIX | (BRIDGE-Z ; (LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, LABEL- N-3 { INSTR'* } ((VAL* BR(INPUT-FIELD)) INSTR*), POSTFIX) = { PREFIX | (BRIDGE-Z ; (LABEL- N-3 { INSTR'* } ((VAL* BR(INPUT-FIELD)) INSTR*))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX CONST(I32, # C-3), BR-IF(L), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(I32, # C-3) BR-IF(L))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX CONST(I32, # I), BR-TABLE(L*, L'), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(I32, # I) BR-TABLE(L*, L'))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, FRAME- N-3 { F } VAL*, POSTFIX) = { PREFIX | (BRIDGE-Z ; (FRAME- N-3 { F } VAL*)) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*), POSTFIX) = { PREFIX | (BRIDGE-Z ; (FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*), POSTFIX) = { PREFIX | (BRIDGE-Z ; (LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, LABEL- N-3 { INSTR'* } TRAP, POSTFIX) = { PREFIX | (BRIDGE-Z ; (LABEL- N-3 { INSTR'* } TRAP)) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX, FRAME- N-3 { F } TRAP, POSTFIX) = { PREFIX | (BRIDGE-Z ; (FRAME- N-3 { F } TRAP)) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX CONST(T, C_1), UNOP(T, UNOP-2), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(T, C_1) UNOP(T, UNOP-2))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX (CONST(T, C_1) CONST(T, C_2)), BINOP(T, BINOP-2), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(T, C_1) (CONST(T, C_2) BINOP(T, BINOP-2)))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX CONST(T, C_1), TESTOP(T, TESTOP-2), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(T, C_1) TESTOP(T, TESTOP-2))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX (CONST(T, C_1) CONST(T, C_2)), RELOP(T, RELOP-2), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(T, C_1) (CONST(T, C_2) RELOP(T, RELOP-2)))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX CONST(T_1-2, C_1), CVTOP(T_2-2, T_1-2, CVTOP-2), POSTFIX) = { PREFIX | (BRIDGE-Z ; (CONST(T_1-2, C_1) CVTOP(T_2-2, T_1-2, CVTOP-2))) | POSTFIX } .
+
+  eq identifyFocus(BRIDGE-Z, PREFIX VAL, LOCAL.TEE(X-4), POSTFIX) = { PREFIX | (BRIDGE-Z ; (VAL LOCAL.TEE(X-4))) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX, BLOCK(T?, INSTR*), POSTFIX) = { PREFIX | (Z ; BLOCK(T?, INSTR*)) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX, LOOP(T?, INSTR*), POSTFIX) = { PREFIX | (Z ; LOOP(T?, INSTR*)) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX, CALL(X-4), POSTFIX) = { PREFIX | (Z ; CALL(X-4)) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX CONST(I32, # I), CALL-INDIRECT(X-4), POSTFIX) = { PREFIX | (Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) | POSTFIX } .
+
+  ceq identifyFocus(Z, STACK, CALL-ADDR(A), POSTFIX) = { PREFIX | (Z ; (VAL* CALL-ADDR(A))) | POSTFIX }
+    if { (field('TYPE, T_1* -> T_2*) ; (field('MODULE, MM) ; field('CODE, FUNC-3))) } := map-read(spectec-funcinst(Z), A)
+      /\ K := size(T_1*)
+      /\ PREFIX VAL* := STACK
+      /\ size(VAL*) = K .
+
+  eq identifyFocus(Z, PREFIX, LOCAL.GET(X-4), POSTFIX) = { PREFIX | (Z ; LOCAL.GET(X-4)) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX, GLOBAL.GET(X-4), POSTFIX) = { PREFIX | (Z ; GLOBAL.GET(X-4)) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX CONST(I32, # I), LOAD(T, nil, AO), POSTFIX) = { PREFIX | (Z ; (CONST(I32, # I) LOAD(T, nil, AO))) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX CONST(I32, # I), LOAD(INN, spectec-_-_(N-3, SX) ?, AO), POSTFIX) = { PREFIX | (Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX, MEMORY.SIZE, POSTFIX) = { PREFIX | (Z ; (MEMORY.SIZE)) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX VAL, LOCAL.SET(X-4), POSTFIX) = { PREFIX | (Z ; (VAL LOCAL.SET(X-4))) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX VAL, GLOBAL.SET(X-4), POSTFIX) = { PREFIX | (Z ; (VAL GLOBAL.SET(X-4))) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX (CONST(I32, # I) CONST(T, C-2)), STORE(T, nil, AO), POSTFIX) = { PREFIX | (Z ; (CONST(I32, # I) (CONST(T, C-2) STORE(T, nil, AO)))) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX (CONST(I32, # I) CONST(INN, # C-3)), STORE(INN, (# N-3) ?, AO), POSTFIX) = { PREFIX | (Z ; (CONST(I32, # I) (CONST(INN, # C-3) STORE(INN, (# N-3) ?, AO)))) | POSTFIX } .
+
+  eq identifyFocus(Z, PREFIX CONST(I32, # N-3), MEMORY.GROW, POSTFIX) = { PREFIX | (Z ; (CONST(I32, # N-3) (MEMORY.GROW))) | POSTFIX } .
+
+  ceq Step(Z ; (STACK (OP REST))) = Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
+    if (STACK (OP REST)) =/= OP
+      /\ { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
+      /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
+
+  eq (Z' ; ADMININSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (ADMININSTR'* POSTFIX)) .
+
+  eq unheat(R ~> hole(PREFIX, POSTFIX)) = unheat(R) ~> hole(PREFIX, POSTFIX) .
+
+  crl [Step-pure-trap-vals] : Step(Z ; (VAL* (TRAP INSTR*))) => Z ; TRAP
+    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+
+  crl [Step-ctxt-instrs-trap-vals] : Step(Z ; (PREFIX ((VAL* (TRAP INSTR*)) POSTFIX))) => Z ; (PREFIX (TRAP POSTFIX))
+    if _or_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
+
+  eq cool-all(C-4, none) = C-4 .
+
+  eq cool-all(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-2) = cool-all(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-2) .
+
+  eq plug-first(hole(PREFIX, POSTFIX) K-2) = true .
+
+  eq plug-first(K-2) = false [owise] .
+
+  ceq kstate(Z ; (PREFIX ((LABEL- N-3 { INSTR_0* } ADMININSTR*) POSTFIX)), K-2) = kstate(Z ; (LABEL- N-3 { INSTR_0* } ADMININSTR*), hole(PREFIX, POSTFIX) K-2)
+    if _or-else_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ closed-Step-ctxt-label(ADMININSTR*) = false .
+
+  ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } ADMININSTR*), K-2) = kstate(Z ; ADMININSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-2)
+    if closed-Step-ctxt-label(ADMININSTR*) = false .
+
+  ceq kstate(Z' ; ADMININSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-2) = kstate(Z' ; (LABEL- N-3 { INSTR_0* } ADMININSTR'*), K-2)
+    if closed-Step-ctxt-label(ADMININSTR'*) = true .
+
+  eq cool-all(Z' ; ADMININSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-2) = cool-all(Z' ; (LABEL- N-3 { INSTR_0* } ADMININSTR'*), K-2) .
+
+  eq closed-Step-ctxt-label(VAL*) = true .
+
+  eq closed-Step-ctxt-label(((VAL'* VAL*) BR(0)) INSTR*) = true .
+
+  eq closed-Step-ctxt-label((VAL* BR(INPUT-FIELD)) INSTR*) = true .
+
+  eq closed-Step-ctxt-label((VAL* RETURN) INSTR*) = true .
+
+  eq closed-Step-ctxt-label(TRAP) = true .
+
+  eq closed-Step-ctxt-label(INSTR-3) = false [owise] .
+
+  ceq kstate((S-2 ; F) ; (PREFIX ((FRAME- N-3 { F' } ADMININSTR*) POSTFIX)), K-2) = kstate((S-2 ; F) ; (FRAME- N-3 { F' } ADMININSTR*), hole(PREFIX, POSTFIX) K-2)
+    if _or-else_(PREFIX =/= nil, POSTFIX =/= nil)
+      /\ closed-Step-ctxt-frame(ADMININSTR*) = false .
+
+  ceq kstate((S-2 ; F) ; (FRAME- N-3 { F' } ADMININSTR*), K-2) = kstate((S-2 ; F') ; ADMININSTR*, hole-Step-ctxt-frame(N-3, F) K-2)
+    if closed-Step-ctxt-frame(ADMININSTR*) = false .
+
+  ceq kstate((S' ; F'') ; ADMININSTR'*, hole-Step-ctxt-frame(N-3, F) K-2) = kstate((S' ; F) ; (FRAME- N-3 { F'' } ADMININSTR'*), K-2)
+    if closed-Step-ctxt-frame(ADMININSTR'*) = true .
+
+  eq cool-all((S' ; F'') ; ADMININSTR'*, hole-Step-ctxt-frame(N-3, F) K-2) = cool-all((S' ; F) ; (FRAME- N-3 { F'' } ADMININSTR'*), K-2) .
+
+  eq closed-Step-ctxt-frame(VAL*) = true .
+
+  eq closed-Step-ctxt-frame(((VAL'* VAL*) RETURN) INSTR*) = true .
+
+  eq closed-Step-ctxt-frame(TRAP) = true .
+
+  eq closed-Step-ctxt-frame(INSTR-3) = false [owise] .
+
+  eq kstate(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-2) = kstate(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-2) [owise] .
+
+  ceq kstate(C-4, K-2) = kstate(Step(C-4), K-2)
+    if plug-first(K-2) = false [owise] .
+
+  eq identifyPure(UNREACHABLE) = true .
+
+  eq identifyPure(NOP) = true .
+
+  ceq identifyPure(VAL DROP) = true
+    if typecheck(VAL, val) .
+
+  ceq identifyPure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT))) = true
+    if typecheck(VAL_1, val)
+      /\ typecheck(VAL_2, val)
+      /\ C-3 =/= 0 .
+
+  ceq identifyPure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT))) = true
+    if typecheck(VAL_1, val)
+      /\ typecheck(VAL_2, val)
+      /\ C-3 == 0 .
+
+  ceq identifyPure(CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*)) = true
+    if size(T?) <= 1
+      /\ C-3 =/= 0 .
+
+  ceq identifyPure(CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*)) = true
+    if size(T?) <= 1
+      /\ C-3 == 0 .
+
+  eq identifyPure(LABEL- N-3 { INSTR* } VAL*) = true .
+
+  ceq identifyPure(LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*)) = true
+    if size(VAL*) = N-3 .
+
+  eq identifyPure(LABEL- N-3 { INSTR'* } ((VAL* BR(INPUT-FIELD)) INSTR*)) = true .
+
+  ceq identifyPure(CONST(I32, # C-3) BR-IF(L)) = true
+    if C-3 =/= 0 .
+
+  ceq identifyPure(CONST(I32, # C-3) BR-IF(L)) = true
+    if C-3 == 0 .
+
+  ceq identifyPure(CONST(I32, # I) BR-TABLE(L*, L')) = true
+    if I < size(L*) .
+
+  ceq identifyPure(CONST(I32, # I) BR-TABLE(L*, L')) = true
+    if I >= size(L*) .
+
+  ceq identifyPure(FRAME- N-3 { F } VAL*) = true
+    if size(VAL*) = N-3 .
+
+  ceq identifyPure(FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) = true
+    if size(VAL*) = N-3 .
+
+  eq identifyPure(LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*)) = true .
+
+  eq identifyPure(LABEL- N-3 { INSTR'* } TRAP) = true .
+
+  eq identifyPure(FRAME- N-3 { F } TRAP) = true .
+
+  eq identifyPure(CONST(T, C_1) UNOP(T, UNOP-2)) = true .
+
+  ceq identifyPure(CONST(T, C_1) UNOP(T, UNOP-2)) = true
+    if spectec-unop-(T, UNOP-2, C_1) == nil .
+
+  eq identifyPure(CONST(T, C_1) (CONST(T, C_2) BINOP(T, BINOP-2))) = true .
+
+  ceq identifyPure(CONST(T, C_1) (CONST(T, C_2) BINOP(T, BINOP-2))) = true
+    if spectec-binop-(T, BINOP-2, C_1, C_2) == nil .
+
+  eq identifyPure(CONST(T, C_1) TESTOP(T, TESTOP-2)) = true .
+
+  eq identifyPure(CONST(T, C_1) (CONST(T, C_2) RELOP(T, RELOP-2))) = true .
+
+  eq identifyPure(CONST(T_1-2, C_1) CVTOP(T_2-2, T_1-2, CVTOP-2)) = true .
+
+  ceq identifyPure(CONST(T_1-2, C_1) CVTOP(T_2-2, T_1-2, CVTOP-2)) = true
+    if cvtop--(T_1-2, T_2-2, CVTOP-2, C_1) == nil .
+
+  ceq identifyPure(VAL LOCAL.TEE(X-4)) = true
+    if typecheck(VAL, val) .
+
+  ceq Step(Z ; ADMININSTR*) = Step-pure(ADMININSTR*) ~> hole-Step-pure(Z)
+    if identifyPure(ADMININSTR*) .
+
+  eq unheat(Step-pure(ADMININSTR*) ~> hole-Step-pure(Z)) = Z ; ADMININSTR* .
+
+  eq ADMININSTR'* ~> hole-Step-pure(Z) = Z ; ADMININSTR'* .
+
+  ceq identifyRead(Z ; BLOCK(T?, INSTR*)) = true
+    if size(T?) <= 1
+      /\ T? == nil .
+
+  ceq identifyRead(Z ; BLOCK(T?, INSTR*)) = true
+    if size(T?) <= 1
+      /\ T? =/= nil .
+
+  ceq identifyRead(Z ; LOOP(T?, INSTR*)) = true
+    if size(T?) <= 1 .
+
+  eq identifyRead(Z ; CALL(X-4)) = true .
+
+  eq identifyRead(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = true .
+
+  ceq identifyRead(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = true
+    if Step-read-call-indirect-call-enabled(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = false .
+
+  ceq identifyRead(Z ; (VAL* CALL-ADDR(A))) = true
+    if K := size(VAL*)
+      /\ { (field('TYPE, T_1* -> T_2*) ; (field('MODULE, MM) ; field('CODE, FUNC-3))) } := map-read(spectec-funcinst(Z), A)
+      /\ K = size(T_1*) .
+
+  eq identifyRead(Z ; LOCAL.GET(X-4)) = true .
+
+  eq identifyRead(Z ; GLOBAL.GET(X-4)) = true .
+
+  ceq identifyRead(Z ; (CONST(I32, # I) LOAD(T, nil, AO))) = true
+    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(T) : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
+
+  eq identifyRead(Z ; (CONST(I32, # I) LOAD(T, nil, AO))) = true .
+
+  ceq identifyRead(Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) = true
+    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
+
+  eq identifyRead(Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) = true .
+
+  ceq identifyRead(Z ; (MEMORY.SIZE)) = true
+    if Ki =/= 0
+      /\ 64 =/= 0 .
+
+  ceq Step(Z ; ADMININSTR*) = Step-read(Z ; ADMININSTR*) ~> hole-Step-read(Z)
+    if identifyRead(Z ; ADMININSTR*) .
+
+  eq unheat(Step-read(Z ; ADMININSTR*) ~> hole-Step-read(Z)) = Z ; ADMININSTR* .
+
+  eq ADMININSTR'* ~> hole-Step-read(Z) = Z ; ADMININSTR'* .
+
+  rl Steps(Z ; ADMININSTR*) => Z ; ADMININSTR* .
+
+  rl [split-Steps-trans] : Steps(Z ; ADMININSTR*) => Step(Z ; ADMININSTR*) ~> hole-Steps-trans-Step .
+
+  eq (Z' ; ADMININSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; ADMININSTR'*) ~> hole-Steps-trans-Steps .
+
+  eq (Z'' ; ADMININSTR''*) ~> hole-Steps-trans-Steps = Z'' ; ADMININSTR''* .
+
+  rl [split-Eval-expr] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr .
+
+  eq (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
+
+  eq funcs(nil) = nil .
+
+  eq funcs(FUNC(FA) EXTERNADDR'*) = (# FA) funcs(EXTERNADDR'*) .
+
+  eq funcs(EXTERNADDR EXTERNADDR'*) = funcs(EXTERNADDR'*) [owise] .
+
+  eq globals(nil) = nil .
+
+  eq globals(GLOBAL(GA) EXTERNADDR'*) = (# GA) globals(EXTERNADDR'*) .
+
+  eq globals(EXTERNADDR EXTERNADDR'*) = globals(EXTERNADDR'*) [owise] .
+
+  eq tables(nil) = nil .
+
+  eq tables(TABLE(TA) EXTERNADDR'*) = (# TA) tables(EXTERNADDR'*) .
+
+  eq tables(EXTERNADDR EXTERNADDR'*) = tables(EXTERNADDR'*) [owise] .
+
+  eq mems(nil) = nil .
+
+  eq mems(MEM(MA) EXTERNADDR'*) = (# MA) mems(EXTERNADDR'*) .
+
+  eq mems(EXTERNADDR EXTERNADDR'*) = mems(EXTERNADDR'*) [owise] .
+
+  ceq allocfunc(S-2, MODULEINST, FUNC-3) = tuple((S-2 [. 'FUNCS = map-append(S-2 . 'FUNCS, FI) ]) (# map-size(S-2 . 'FUNCS)))
+    if spectec-FUNC(X-4, LOCAL*, EXPR) := FUNC-3
+      /\ FI := { (field('TYPE, (MODULEINST . 'TYPES) [ X-4 ]) ; (field('MODULE, MODULEINST) ; field('CODE, FUNC-3))) } .
+
+  eq allocfuncs(S-2, MODULEINST, nil) = tuple(S-2 seq(nil)) .
+
+  ceq allocfuncs(S-2, MODULEINST, FUNC-3 FUNC'*) = tuple(S_2 seq((# FA) FA'*))
+    if tuple(S_1 (# FA)) := allocfunc(S-2, MODULEINST, FUNC-3)
+      /\ tuple(S_2 seq(FA'*)) := allocfuncs(S_1, MODULEINST, FUNC'*) .
+
+  ceq allocglobal(S-2, GLOBALTYPE, VAL) = tuple((S-2 [. 'GLOBALS = ((S-2 . 'GLOBALS) GI) ]) (# size(S-2 . 'GLOBALS)))
+    if GI := { (field('TYPE, GLOBALTYPE) ; field('VALUE, VAL)) } .
+
+  eq allocglobals(S-2, nil, nil) = tuple(S-2 seq(nil)) .
+
+  ceq allocglobals(S-2, GLOBALTYPE GLOBALTYPE'*, VAL VAL'*) = tuple(S_2 seq((# GA) GA'*))
+    if tuple(S_1 (# GA)) := allocglobal(S-2, GLOBALTYPE, VAL)
+      /\ tuple(S_2 seq(GA'*)) := allocglobals(S_1, GLOBALTYPE'*, VAL'*) .
+
+  ceq alloctable(S-2, [ I .. J? ]) = tuple((S-2 [. 'TABLES = ((S-2 . 'TABLES) TI) ]) (# size(S-2 . 'TABLES)))
+    if size(J?) <= 1
+      /\ TI := { (field('TYPE, [ I .. J? ]) ; field('REFS, map-of(repeatSeq(I, seq(nil))))) } .
+
+  eq alloctables(S-2, nil) = tuple(S-2 seq(nil)) .
+
+  ceq alloctables(S-2, TABLETYPE TABLETYPE'*) = tuple(S_2 seq((# TA) TA'*))
+    if tuple(S_1 (# TA)) := alloctable(S-2, TABLETYPE)
+      /\ tuple(S_2 seq(TA'*)) := alloctables(S_1, TABLETYPE'*) .
+
+  ceq allocmem(S-2, [ I .. J? ]) = tuple((S-2 [. 'MEMS = map-append(S-2 . 'MEMS, MI) ]) (# map-size(S-2 . 'MEMS)))
+    if size(J?) <= 1
+      /\ MI := { (field('TYPE, [ I .. J? ]) ; field('BYTES, sized-array(I * (64 * Ki), empty))) } .
+
+  eq allocmems(S-2, nil) = tuple(S-2 seq(nil)) .
+
+  ceq allocmems(S-2, MEMTYPE MEMTYPE'*) = tuple(S_2 seq((# MA) MA'*))
+    if tuple(S_1 (# MA)) := allocmem(S-2, MEMTYPE)
+      /\ tuple(S_2 seq(MA'*)) := allocmems(S_1, MEMTYPE'*) .
+
+  eq instexport(FA*, GA*, TA*, MA*, EXPORT(NAME, FUNC(X-4))) = { (field('NAME, NAME) ; field('ADDR, FUNC(#rat(FA* [ X-4 ])))) } .
+
+  eq instexport(FA*, GA*, TA*, MA*, EXPORT(NAME, GLOBAL(X-4))) = { (field('NAME, NAME) ; field('ADDR, GLOBAL(#rat(GA* [ X-4 ])))) } .
+
+  eq instexport(FA*, GA*, TA*, MA*, EXPORT(NAME, TABLE(X-4))) = { (field('NAME, NAME) ; field('ADDR, TABLE(#rat(TA* [ X-4 ])))) } .
+
+  eq instexport(FA*, GA*, TA*, MA*, EXPORT(NAME, MEM(X-4))) = { (field('NAME, NAME) ; field('ADDR, MEM(#rat(MA* [ X-4 ])))) } .
+
+  ceq allocmodule(S-2, MODULE-2, EXTERNADDR*, VAL*) = tuple(S_4 MODULEINST)
+    if MODULE(CASE-PART1-2, CASE-PART2, CASE-PART3-2, CASE-PART4, CASE-PART5, CASE-PART6, CASE-PART7, CASE-PART8, CASE-PART9, CASE-PART10) := MODULE-2
+      /\ IMPORT* := CASE-PART2
+      /\ N_FUNC := size(CASE-PART3-2)
+      /\ FUNC* := CASE-PART3-2
+      /\ ELEM* := CASE-PART7
+      /\ DATA* := CASE-PART8
+      /\ START? := CASE-PART9
+      /\ size(START?) <= 1
+      /\ EXPORT* := CASE-PART10
+      /\ FT* := unzip-TYPE(CASE-PART1-2)
+      /\ N_GLOBAL := size(CASE-PART4)
+      /\ tuple(seq(EXPR_1*) seq(GLOBALTYPE*)) := unzip-allocmodule(N_GLOBAL, CASE-PART4)
+      /\ N_TABLE := size(CASE-PART5)
+      /\ TABLETYPE* := unzip-TABLE(N_TABLE, CASE-PART5)
+      /\ N_MEM := size(CASE-PART6)
+      /\ MEMTYPE* := unzip-MEMORY(N_MEM, CASE-PART6)
+      /\ FA_EX* := funcs(EXTERNADDR*)
+      /\ GA_EX* := globals(EXTERNADDR*)
+      /\ TA_EX* := tables(EXTERNADDR*)
+      /\ MA_EX* := mems(EXTERNADDR*)
+      /\ FA* := map-allocmodule(S-2, N_FUNC, 0)
+      /\ GA* := map-allocmodule-2(S-2, N_GLOBAL, 0)
+      /\ TA* := map-allocmodule-3(S-2, N_TABLE, 0)
+      /\ MA* := map-allocmodule-4(S-2, N_MEM, 0)
+      /\ XI* := map-instexport(FA_EX*, FA*, GA_EX*, GA*, TA_EX*, TA*, MA_EX*, MA*, EXPORT*)
+      /\ MODULEINST := { (field('TYPES, FT*) ; (field('FUNCS, FA_EX* FA*) ; (field('GLOBALS, GA_EX* GA*) ; (field('TABLES, TA_EX* TA*) ; (field('MEMS, MA_EX* MA*) ; field('EXPORTS, XI*)))))) }
+      /\ tuple(S_1 seq(FA*)) := allocfuncs(S-2, MODULEINST, FUNC*)
+      /\ tuple(S_2 seq(GA*)) := allocglobals(S_1, GLOBALTYPE*, VAL*)
+      /\ tuple(S_3 seq(TA*)) := alloctables(S_2, TABLETYPE*)
+      /\ tuple(S_4 seq(MA*)) := allocmems(S_3, MEMTYPE*) .
+
+  eq initelem(S-2, MODULEINST, nil, nil) = S-2 .
+
+  ceq initelem(S-2, MODULEINST, (# I) I'*, seq(A*) A'**) = S_2
+    if typecheck(A'**, iterList(addr))
+      /\ S_1 := S-2 [. 'TABLES = ((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) = (((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) ]) [. 'REFS = map-write-range(((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) ]) . 'REFS, I, size(A*), map-growtable(A*)) ]) ]) ]
+      /\ S_2 := initelem(S_1, MODULEINST, I'*, A'**) .
+
+  eq initdata(S-2, MODULEINST, nil, nil) = S-2 .
+
+  ceq initdata(S-2, MODULEINST, (# I) I'*, seq(B*) B'**) = S_2
+    if S_1 := S-2 [. 'MEMS = map-write(S-2 . 'MEMS, #rat((MODULEINST . 'MEMS) [ 0 ]), map-read(S-2 . 'MEMS, #rat((MODULEINST . 'MEMS) [ 0 ])) [. 'BYTES = array-write(map-read(S-2 . 'MEMS, #rat((MODULEINST . 'MEMS) [ 0 ])) . 'BYTES, I, size(B*), B*) ]) ]
+      /\ S_2 := initdata(S_1, MODULEINST, I'*, B'**) .
+
+  crl instantiate(S-2, MODULE-2, EXTERNADDR*) => (S_3 ; F) ; admininstrLift(map-CALL(X'?))
+    if MODULE(TYPE*, IMPORT*, FUNC*, GLOBAL*, TABLE*, MEM*, ELEM*, DATA*, START?, EXPORT*) := MODULE-2
+      /\ size(START?) <= 1
+      /\ FUNCTYPE* := unzip-TYPE(TYPE*)
+      /\ tuple(seq(EXPR_G*) seq(GLOBALTYPE*)) := unzip-instantiate(GLOBAL*)
+      /\ tuple(seq(EXPR_E*) seq(X**)) := unzip-ELEM(ELEM*)
+      /\ tuple(seq(B**) seq(EXPR_D*)) := unzip-DATA(DATA*)
+      /\ X'? := unzip-START(START?)
+      /\ N_F := size(FUNC*)
+      /\ MODULEINST_INIT := { (field('TYPES, FUNCTYPE*) ; (field('FUNCS, funcs(EXTERNADDR*) map-allocmodule(S-2, N_F, 0)) ; (field('GLOBALS, globals(EXTERNADDR*)) ; (field('TABLES, nil) ; (field('MEMS, nil) ; field('EXPORTS, nil)))))) }
+      /\ F_INIT := { (field('LOCALS, nil) ; field('MODULE, MODULEINST_INIT)) }
+      /\ Z := S-2 ; F_INIT
+      /\ bind-instantiate(Z, EXPR_G*) => VAL*
+      /\ bind-instantiate-2(Z, EXPR_E*) => I_E*
+      /\ bind-instantiate-2(Z, EXPR_D*) => I_D*
+      /\ tuple(S_1 MODULEINST) := allocmodule(S-2, MODULE-2, EXTERNADDR*, VAL*)
+      /\ S_2 := initelem(S_1, MODULEINST, I_E*, map-instantiate(MODULEINST, X**))
+      /\ S_3 := initdata(S_2, MODULEINST, I_D*, B**)
+      /\ F := { (field('LOCALS, nil) ; field('MODULE, MODULEINST)) } .
+
+  ceq invoke(S-2, FA, VAL*) = (S-2 ; F) ; (VAL* CALL-ADDR(FA))
+    if N-3 := size(VAL*)
+      /\ F := { (field('LOCALS, nil) ; field('MODULE, { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; field('EXPORTS, nil)))))) })) }
+      /\ T_1* -> T_2* := map-read(spectec-funcinst(S-2 ; F), FA) . 'TYPE
+      /\ N-3 = size(T_1*) .
+
+  eq unzip-growtable(nil) = nil .
+
+  ceq unzip-growtable(seq((# A) ?) PROJECT-REST) = (# A) PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-growtable(PROJECT-REST) .
+
+  eq map-growtable(nil) = nil .
+
+  eq map-growtable((# A) A*-REST) = seq((# A) ?) map-growtable(A*-REST) .
+
+  eq unzip-LOCAL(nil) = nil .
+
+  ceq unzip-LOCAL(LOCAL(T) PROJECT-REST) = T PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-LOCAL(PROJECT-REST) .
+
+  eq map-default(nil) = nil .
+
+  eq map-default(T T*-REST) = default-(T) map-default(T*-REST) .
+
+  eq unzip-TYPE(nil) = nil .
+
+  ceq unzip-TYPE(TYPE(FT) PROJECT-REST) = FT PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-TYPE(PROJECT-REST) .
+
+  eq unzip-allocmodule(0, nil) = tuple(seq(nil) seq(nil)) .
+
+  ceq unzip-allocmodule(s(ITER-COUNT), spectec-GLOBAL(GLOBALTYPE, EXPR_1-2) PROJECT-REST) = tuple(seq(seq(EXPR_1-2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-allocmodule(ITER-COUNT, PROJECT-REST) .
+
+  eq unzip-TABLE(0, nil) = nil .
+
+  ceq unzip-TABLE(s(ITER-COUNT), TABLE(TABLETYPE) PROJECT-REST) = TABLETYPE PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-TABLE(ITER-COUNT, PROJECT-REST) .
+
+  eq unzip-MEMORY(0, nil) = nil .
+
+  ceq unzip-MEMORY(s(ITER-COUNT), MEMORY(MEMTYPE) PROJECT-REST) = MEMTYPE PROJECT-COLUMN-1
+    if PROJECT-COLUMN-1 := unzip-MEMORY(ITER-COUNT, PROJECT-REST) .
+
+  eq map-allocmodule(S-2, 0, I_FUNC) = nil .
+
+  eq map-allocmodule(S-2, s(ITER-COUNT), I_FUNC) = (# (map-size(S-2 . 'FUNCS) + I_FUNC)) map-allocmodule(S-2, ITER-COUNT, s(I_FUNC)) .
+
+  eq map-allocmodule-2(S-2, 0, I_GLOBAL) = nil .
+
+  eq map-allocmodule-2(S-2, s(ITER-COUNT), I_GLOBAL) = (# (size(S-2 . 'GLOBALS) + I_GLOBAL)) map-allocmodule-2(S-2, ITER-COUNT, s(I_GLOBAL)) .
+
+  eq map-allocmodule-3(S-2, 0, I_TABLE) = nil .
+
+  eq map-allocmodule-3(S-2, s(ITER-COUNT), I_TABLE) = (# (size(S-2 . 'TABLES) + I_TABLE)) map-allocmodule-3(S-2, ITER-COUNT, s(I_TABLE)) .
+
+  eq map-allocmodule-4(S-2, 0, I_MEM) = nil .
+
+  eq map-allocmodule-4(S-2, s(ITER-COUNT), I_MEM) = (# (map-size(S-2 . 'MEMS) + I_MEM)) map-allocmodule-4(S-2, ITER-COUNT, s(I_MEM)) .
+
+  eq map-instexport(FA_EX*, FA*, GA_EX*, GA*, TA_EX*, TA*, MA_EX*, MA*, nil) = nil .
+
+  eq map-instexport(FA_EX*, FA*, GA_EX*, GA*, TA_EX*, TA*, MA_EX*, MA*, EXPORT-3 EXPORT*-REST) = instexport(FA_EX* FA*, GA_EX* GA*, TA_EX* TA*, MA_EX* MA*, EXPORT-3) map-instexport(FA_EX*, FA*, GA_EX*, GA*, TA_EX*, TA*, MA_EX*, MA*, EXPORT*-REST) .
+
+  eq map-CALL(nil) = nil .
+
+  eq map-CALL((# X'-2) ?) = CALL(X'-2) ? .
+
+  eq unzip-instantiate(nil) = tuple(seq(nil) seq(nil)) .
+
+  ceq unzip-instantiate(spectec-GLOBAL(GLOBALTYPE, EXPR_G-2) PROJECT-REST) = tuple(seq(seq(EXPR_G-2) PROJECT-COLUMN-1) seq(GLOBALTYPE PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-instantiate(PROJECT-REST) .
+
+  eq unzip-ELEM(nil) = tuple(seq(nil) seq(nil)) .
+
+  ceq unzip-ELEM(ELEM(EXPR_E-2, X*-2) PROJECT-REST) = tuple(seq(seq(EXPR_E-2) PROJECT-COLUMN-1) seq(seq(X*-2) PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-ELEM(PROJECT-REST) .
+
+  eq unzip-DATA(nil) = tuple(seq(nil) seq(nil)) .
+
+  ceq unzip-DATA(DATA(EXPR_D-2, B*) PROJECT-REST) = tuple(seq(seq(B*) PROJECT-COLUMN-1) seq(seq(EXPR_D-2) PROJECT-COLUMN-2))
+    if tuple(seq(PROJECT-COLUMN-1) seq(PROJECT-COLUMN-2)) := unzip-DATA(PROJECT-REST) .
+
+  eq unzip-START(nil) = nil .
+
+  eq unzip-START(START(X'-2) ?) = (# X'-2) ? .
+
+  eq map-instantiate(MODULEINST, nil) = nil .
+
+  eq map-instantiate(MODULEINST, seq(X*-2) X**-REST) = seq(map-instantiate-2(MODULEINST, X*-2)) map-instantiate(MODULEINST, X**-REST) .
+
+  eq map-instantiate-2(MODULEINST, nil) = nil .
+
+  eq map-instantiate-2(MODULEINST, (# X-4) X*-REST) = (# #rat((MODULEINST . 'FUNCS) [ X-4 ])) map-instantiate-2(MODULEINST, X*-REST) .
+
+  eq bind-exp(VALTYPE, nil) = nil .
+
+  ceq bind-exp(VALTYPE, (# SZ) ?) = INN ?
+    if INN := VALTYPE
+      /\ typecheck(INN, Inn)
+      /\ SZ < spectec-size(INN) .
+
+  eq all-growtable(I', nil) = true .
+
+  ceq all-growtable(I', (# J) ?) = true
+    if I' <= J .
+
+  eq all-growmemory(I'-2, nil) = true .
+
+  ceq all-growmemory(I'-2, (# J-2-3) ?) = true
+    if #rat(I'-2) <= (J-2-3 : nat <:> rat) .
+
+  rl bind-instantiate(Z, nil) => nil .
+
+  crl bind-instantiate(Z, seq(EXPR_G-2) EXPR_G*-REST) => VAL REST-2
+    if Eval-expr(Z, EXPR_G-2) => tuple(Z seq(VAL))
+      /\ bind-instantiate(Z, EXPR_G*-REST) => REST-2 .
+
+  rl bind-instantiate-2(Z, nil) => nil .
+
+  crl bind-instantiate-2(Z, seq(EXPR_E-2) EXPR_E*-REST) => (# I_E-2) REST-3
+    if Eval-expr(Z, EXPR_E-2) => tuple(Z seq(CONST(I32, # I_E-2)))
+      /\ bind-instantiate-2(Z, EXPR_E*-REST) => REST-3 .
+endm

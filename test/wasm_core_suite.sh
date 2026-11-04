@@ -2,8 +2,16 @@
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
-suite="$root/benchmarks/wasm-spec/test/core"
-semantics="$root/translator/backend/main.maude"
+version=${WASM_VERSION:-3.0}
+case "$version" in
+  3.0) suite="$root/benchmarks/wasm-spec/test/core"
+       semantics="$root/translator/backend/main.maude"; generated=generated; expected_files=259 ;;
+  2.0) suite="$root/benchmarks/wasm-spec-2.0/test/core"
+       semantics="$root/translator/backend/main-wasm-2.0.maude"; generated=generated/wasm-2.0; expected_files=148 ;;
+  1.0) suite="$root/benchmarks/wasm-spec-1.0/test/core"
+       semantics="$root/translator/backend/main-wasm-1.0.maude"; generated=generated/wasm-1.0; expected_files=73 ;;
+  *) echo "wasm_core_suite: WASM_VERSION must be 1.0, 2.0, or 3.0" >&2; exit 2 ;;
+esac
 maude_bin=${MAUDE:-maude}
 short_timeout=${SHORT_TIMEOUT:-300}
 long_timeout=${LONG_TIMEOUT:-3600}
@@ -15,13 +23,15 @@ usage() {
   cat <<EOF
 usage: test/wasm_core_suite.sh
 
-Runs all 259 official WebAssembly core .wast files with a ${short_timeout}s
+Runs the official WebAssembly core .wast files of WASM_VERSION (3.0: 259,
+2.0: 148, 1.0: 73 files) with a ${short_timeout}s
 wall-clock timeout, then reruns only TIMEOUT files with a ${long_timeout}s
 timeout. Results are written to:
 
   $results
 
 Environment variables:
+  WASM_VERSION   1.0, 2.0, or 3.0 (default: 3.0)
   MAUDE          Maude executable (default: maude)
   RESULT_DIR     new result directory
   SHORT_TIMEOUT  first-stage timeout in seconds (default: 300)
@@ -49,8 +59,8 @@ if ! command -v "$maude_bin" >/dev/null 2>&1; then
 fi
 
 file_count=$(find "$suite" -type f -name '*.wast' | wc -l | tr -d ' ')
-if [[ "$file_count" != 259 ]]; then
-  echo "wasm_core_suite: expected 259 .wast files, found $file_count" >&2
+if [[ "$file_count" != "$expected_files" ]]; then
+  echo "wasm_core_suite: expected $expected_files .wast files, found $file_count" >&2
   exit 1
 fi
 
@@ -61,15 +71,17 @@ else
   echo 'unavailable (source archive)' >"$results/revision.txt"
 fi
 cp "$root/spectec/REVISION" "$results/spectec-revision.txt"
-cp "$root/benchmarks/wasm-spec/REVISION" "$results/suite-revision.txt"
+cp "$suite/../../REVISION" "$results/suite-revision.txt"
+# The files a run loads: generated output, backend, builtins, WAST runtimes.
+semantics_files=("$root/translator/$generated"/*.maude "$root"/translator/backend/*.maude
+  "$root"/translator/builtins/*.maude "$root"/wasm2maude/wast-runtime*.maude)
 if command -v sha256sum >/dev/null 2>&1; then
-  sha256sum "$root/translator/generated/types.maude" \
-    "$root/translator/generated/output.maude" >"$results/semantics.sha256"
+  sha256sum "${semantics_files[@]}" >"$results/semantics.sha256"
 else
-  shasum -a 256 "$root/translator/generated/types.maude" \
-    "$root/translator/generated/output.maude" >"$results/semantics.sha256"
+  shasum -a 256 "${semantics_files[@]}" >"$results/semantics.sha256"
 fi
 printf '%s\n' \
+  "wasm_version=$version" \
   "suite=$suite" \
   "semantics=$semantics" \
   "maude=$maude_bin" \
@@ -95,8 +107,7 @@ run_suite() {
   local stderr=$6
   local command_file=$7
   local command=(
-    dune exec bin/wasm2maude.exe -- suite-run "$input"
-    --semantics "$semantics"
+    dune exec bin/wasm2maude.exe -- suite-run "$input" --wasm "$version"
     --maude "$maude_bin"
     --timeout "$timeout"
     --call-depth "$call_depth"
@@ -121,7 +132,7 @@ run_suite "$suite" "$short_timeout" \
 
 rows=$(awk 'NR > 1 { count++ } END { print count + 0 }' "$stage300/report.tsv")
 unique=$(awk -F '\t' 'NR > 1 { seen[$6] = 1 } END { for (x in seen) count++; print count + 0 }' "$stage300/report.tsv")
-if [[ "$rows" != 259 || "$unique" != 259 ]]; then
+if [[ "$rows" != "$expected_files" || "$unique" != "$expected_files" ]]; then
   echo "wasm_core_suite: stage-300 report is incomplete ($rows rows, $unique unique sources)" >&2
   exit 1
 fi
@@ -171,7 +182,7 @@ awk -F '\t' '
 
 final_rows=$(awk 'NR > 1 { count++ } END { print count + 0 }' "$results/final.tsv")
 final_unique=$(awk -F '\t' 'NR > 1 { seen[$6] = 1 } END { for (x in seen) count++; print count + 0 }' "$results/final.tsv")
-if [[ "$final_rows" != 259 || "$final_unique" != 259 ]]; then
+if [[ "$final_rows" != "$expected_files" || "$final_unique" != "$expected_files" ]]; then
   echo "wasm_core_suite: final report is incomplete ($final_rows rows, $final_unique unique sources)" >&2
   exit 1
 fi

@@ -151,17 +151,19 @@ let log_path dir index source =
   let name = Filename.basename source in
   Filename.concat dir (Printf.sprintf "%04d-%s.log" index name)
 
-let run_case ?runtime ~semantics ~maude ~timeout ~call_depth ~log_dir index source =
+let run_case ~runtime ~semantics ~maude ~timeout ~call_depth ~log_dir index source =
   let started = Unix.gettimeofday () in
   let commands = ref 0 in
   let checked_assertions = ref 0 in
   let runtime_assertions = ref 0 in
+  let unchecked = ref 0 in
   let status, detail =
     try
-      let harness, emitted = Wast_run.emit ?runtime ~semantics ~call_depth source in
+      let harness, emitted = Wast_run.emit ~runtime ~semantics ~call_depth source in
       commands := Wast_run.commands emitted;
       checked_assertions := Wast_run.checked_assertions emitted;
       runtime_assertions := Wast_run.runtime_assertions emitted;
+      unchecked := Wast_run.unchecked_assertions emitted;
       let harness_file = Filename.temp_file "spec2maude-wast-" ".maude" in
       let output_file = Filename.temp_file "spec2maude-wast-" ".log" in
       Fun.protect
@@ -190,6 +192,14 @@ let run_case ?runtime ~semantics ~maude ~timeout ~call_depth ~log_dir index sour
           (Unix.error_message error)
     | Sys_error message -> Frontend_error, message
   in
+  (* Static assertions the Wasm 3.0 reference front end cannot decide for a
+     Wasm 1.0/2.0 script (Wast_plan.expect_invalid) are not counted as checked. *)
+  let detail =
+    if !unchecked = 0 then detail
+    else
+      Printf.sprintf "%sunchecked static assertions: %d"
+        (if detail = "" then "" else detail ^ "; ") !unchecked
+  in
   { source;
     status;
     seconds = Unix.gettimeofday () -. started;
@@ -198,7 +208,7 @@ let run_case ?runtime ~semantics ~maude ~timeout ~call_depth ~log_dir index sour
     runtime_assertions = !runtime_assertions;
     detail }
 
-let run ?runtime ~semantics ~maude ~timeout ~call_depth ?progress ?log_dir path =
+let run ~runtime ~semantics ~maude ~timeout ~call_depth ?progress ?log_dir path =
   if timeout <= 0. then invalid_arg "Suite_run.run: non-positive timeout";
   Option.iter ensure_directory log_dir;
   let sources = Wast.sources path in
@@ -207,7 +217,7 @@ let run ?runtime ~semantics ~maude ~timeout ~call_depth ?progress ?log_dir path 
   |> List.mapi
        (fun index source ->
          let case =
-           run_case ?runtime ~semantics ~maude ~timeout ~call_depth ~log_dir
+           run_case ~runtime ~semantics ~maude ~timeout ~call_depth ~log_dir
              (index + 1) source
          in
          Option.iter

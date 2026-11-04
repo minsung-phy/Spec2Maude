@@ -1,0 +1,127 @@
+--- WAST runtime shared by Wasm 2.0 and 3.0 (on wast-runtime-core.maude): number
+--- and v128 results with lane patterns, references, assert_unlinkable, and
+--- table.grow.
+
+load wast-runtime-core.maude
+
+mod WASM-WAST-VECTOR is
+  including WASM-WAST-CORE .
+
+  sorts LanePattern LanePatterns .
+  op command.unlinkable : Nat ImportRefs -> Command [ctor] .
+  op result.exact-vec : SpectecTerminal -> ResultPattern [ctor] .
+  op result.vec-lanes : SpectecTerminal LanePatterns
+    -> ResultPattern [ctor] .
+  op result.exact-ref : SpectecTerminal -> ResultPattern [ctor] .
+  op result.ref-type : SpectecTerminal -> ResultPattern [ctor] .
+  op result.null-ref : SpectecTerminal -> ResultPattern [ctor] .
+  op lane.exact : SpectecTerminal -> LanePattern [ctor] .
+  op lane.nan-canonical : -> LanePattern [ctor] .
+  op lane.nan-arithmetic : -> LanePattern [ctor] .
+  op lanes.nil : -> LanePatterns [ctor] .
+  op lanes.cons : LanePattern LanePatterns -> LanePatterns [ctor] .
+  op match.lane : SpectecTerminal SpectecTerminal LanePattern
+    -> MatchVerdict .
+  op match.vec-lanes : SpectecTerminal SpectecTerminals LanePatterns
+    -> MatchVerdict .
+  op tableLimit : -> Nat .
+  op tableFits : SpectecTerminal Nat Nat -> Bool .
+
+  vars WSHC WSHS WSHNT WSHVALUE WSHLT WSHAT : SpectecTerminal .
+  var WSHK : Holes .
+  var WSHH : Hole .
+  var WSHLANES : SpectecTerminals .
+  var WSHACTUAL : ValList .
+  var WSHCMDS : Commands .
+  var WSHIMPORTS : ImportRefs .
+  var WSHENV : InstanceEnv .
+  var WSHEXPORTS : SpectecTerminals .
+  var WSHLPAT : LanePattern .
+  var WSHLPATS : LanePatterns .
+  vars WSHID WSHA WSHADDR WSHN WSHDIM WSHBITS : Nat .
+
+  ceq runtimeResults(CONST(WSHNT, WSHVALUE) WSHACTUAL) =
+      runtimeResults(WSHACTUAL)
+    if typecheck(WSHNT, numtype)
+       /\ typecheck(WSHVALUE, num-(WSHNT)) .
+  eq runtimeResults(VCONST(V128, WSHBITS) WSHACTUAL) =
+    runtimeResults(WSHACTUAL) .
+  ceq runtimeResults(WSHC WSHACTUAL) = runtimeResults(WSHACTUAL)
+    if typecheck(WSHC, ref) .
+
+  crl [assert-unlinkable] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
+  crl [assert-unlinkable-wrong] :
+    script.ready(WSHS, WSHENV,
+      commands.cons(command.unlinkable(WSHID, WSHIMPORTS), WSHCMDS))
+    => script.wrong-assertion(WSHID)
+    if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS) .
+
+  --- A grow request is a focus of the instruction sequence, alone or under its
+  --- sequence hole; matching these shapes costs nothing for other requests.
+  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))), WSHK) =
+    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA))))), WSHK)
+    if tableFits(WSHS, WSHA, WSHN) .
+  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH, WSHK) =
+    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH), WSHK)
+    if tableFits(WSHS, WSHA, WSHN) .
+
+  --- Environment model, not SpecTec: a table of more than tableLimit references
+  --- is not allocated, as the reference interpreter fails to allocate it, so
+  --- table.grow takes the result of its failure rule (Step/table.grow-fail),
+  --- which the specification allows at any size. Its result below copies that
+  --- rule's right-hand side; update it with the rule.
+  eq tableLimit = 16777216 .
+  eq tableFits(WSHS, WSHA, WSHN) =
+    map-size(spectec-table(WSHS, WSHA) . 'REFS) + WSHN <= tableLimit .
+  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))), WSHK) =
+    kstate(WSHS ; CONST(WSHAT, # inv-signed-(spectec-size(WSHAT), -_(1 : nat <:> int))), WSHK)
+    if tableFits(WSHS, WSHA, WSHN) = false .
+  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH, WSHK) =
+    kstate((WSHS ; CONST(WSHAT, # inv-signed-(spectec-size(WSHAT), -_(1 : nat <:> int)))) ~> WSHH, WSHK)
+    if tableFits(WSHS, WSHA, WSHN) = false .
+
+  eq match.value(WSHVALUE, result.exact-vec(WSHVALUE)) = match.yes .
+  eq match.value(WSHVALUE, result.exact-ref(WSHVALUE)) = match.yes .
+  ceq match.value(
+    VCONST(V128, WSHBITS),
+    result.vec-lanes(WSHLT X WSHDIM, WSHLPATS)) =
+      match.vec-lanes(WSHLT, WSHLANES, WSHLPATS)
+    if WSHLANES := lanes-(WSHLT X WSHDIM, WSHBITS) .
+
+  eq match.lane(WSHNT, WSHVALUE, lane.exact(WSHVALUE)) = match.yes .
+  eq match.lane(F32,
+    POS(NAN(4194304)), lane.nan-canonical) = match.yes .
+  eq match.lane(F32,
+    NEG(NAN(4194304)), lane.nan-canonical) = match.yes .
+  eq match.lane(F64,
+    POS(NAN(2251799813685248)), lane.nan-canonical) =
+      match.yes .
+  eq match.lane(F64,
+    NEG(NAN(2251799813685248)), lane.nan-canonical) =
+      match.yes .
+  ceq match.lane(F32,
+    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 4194304) = true .
+  ceq match.lane(F32,
+    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 4194304) = true .
+  ceq match.lane(F64,
+    POS(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 2251799813685248) = true .
+  ceq match.lane(F64,
+    NEG(NAN(WSHADDR)), lane.nan-arithmetic) = match.yes
+    if _>=_(WSHADDR, 2251799813685248) = true .
+  eq match.lane(WSHNT, WSHVALUE, WSHLPAT) = match.no [owise] .
+
+  eq match.vec-lanes(WSHNT, nil, lanes.nil) = match.yes .
+  eq match.vec-lanes(WSHNT, WSHVALUE WSHLANES,
+    lanes.cons(WSHLPAT, WSHLPATS)) =
+    match.and(match.lane(WSHNT, WSHVALUE, WSHLPAT),
+      match.vec-lanes(WSHNT, WSHLANES, WSHLPATS)) .
+  eq match.vec-lanes(WSHNT, WSHLANES, WSHLPATS) =
+    match.no [owise] .
+endm

@@ -75,19 +75,26 @@ The artifact pins both external inputs:
 ```sh
 cat spectec/REVISION
 cat benchmarks/wasm-spec/REVISION
+cat benchmarks/wasm-spec-2.0/REVISION
+cat benchmarks/wasm-spec-1.0/REVISION
 ```
 
 The expected commits are:
 
 ```text
-SpecTec:             e22ec2272bfbc06b995b00c1f1172a61d613fdd8
-WebAssembly suite:   e22ec2272bfbc06b995b00c1f1172a61d613fdd8
+SpecTec:                 e22ec2272bfbc06b995b00c1f1172a61d613fdd8
+WebAssembly suite:       e22ec2272bfbc06b995b00c1f1172a61d613fdd8
+WebAssembly 2.0 suite:   fffc6e12fa454e475455a7b58d3b5dc343980c10 (wg-2.0)
+WebAssembly 1.0 suite:   977f97014c962f7bd1291fcc6d28b41a924882bf (wg-1.0)
 ```
 
-The SpecTec copy contains only the listed library subset, WebAssembly
-specification chapters 0--4, and Spec2Maude-specific hint annotations.
-Function bodies and rules remain those of the pinned upstream source.
-The benchmark copy contains only the official `test/core` suite.
+The SpecTec copy contains only the listed library subset, the WebAssembly 3.0
+specification chapters 0--4, the 1.0 and 2.0 specifications without the
+binary format, and Spec2Maude-specific hint annotations. Function bodies and
+rules remain those of the pinned upstream source, except two 2.0 fixes
+reported upstream (spectec/REVISION, docs/TRANSLATION.md "Upstream reports"). The benchmark copies contain
+only the official `test/core` suites: `wasm-spec` at the pinned commit (3.0),
+and `wasm-spec-2.0`, `wasm-spec-1.0` at the upstream tags `wg-2.0` and `wg-1.0`.
 
 ## Reviewer smoke test
 
@@ -113,20 +120,23 @@ If Maude is not on `PATH`, provide its absolute path:
 MAUDE=/absolute/path/to/maude test/spectec_to_maude.sh
 ```
 
-The test performs one complete pipeline:
+The test performs one complete pipeline for each of Wasm 3.0, 2.0, and 1.0:
 
-- confirms that the pinned source contains exactly 21 `.spectec` files;
-- parses and elaborates all 21 files through `bin/spec2maude.exe`;
+- confirms the number of pinned `.spectec` files (21 for 3.0, 9 for 2.0 and 1.0);
+- parses and elaborates them through `bin/spec2maude.exe`;
 - generates fresh temporary `types.maude` and `output.maude` files;
 - checks that both are byte-for-byte identical to their counterparts in
-  `translator/generated/`;
-- loads those files together with all hand-written backends in Maude;
+  `translator/generated/` (3.0) or `translator/generated/wasm-VERSION/`;
+- loads them with the hand-written backend and that version's builtins
+  (`translator/backend/main.maude`, `main-wasm-2.0.maude`, `main-wasm-1.0.maude`);
 - rejects every Maude warning, advisory, or error.
 
 Expected final output:
 
 ```text
-spectec_to_maude: PASS (21 files)
+spectec_to_maude: wasm-3.0 PASS (21 files)
+spectec_to_maude: wasm-2.0 PASS (9 files)
+spectec_to_maude: wasm-1.0 PASS (9 files)
 ```
 
 ### 3. Regenerate the versioned semantics manually
@@ -137,23 +147,30 @@ dune exec bin/spec2maude.exe --
 
 This reads `spectec/wasm-3.0/*.spectec` in lexical order and writes
 `translator/generated/types.maude` and `translator/generated/output.maude`.
+For Wasm 1.0 or 2.0, pass the files and an output path:
+
+```sh
+dune exec bin/spec2maude.exe -- -o translator/generated/wasm-2.0/output.maude spectec/wasm-2.0/*.spectec
+```
 With `-o FILE`, the type declarations are written to `types.maude` beside
 `FILE`; that name is reserved for the type declarations. The preceding test
 uses a temporary directory and does not modify the repository.
 
 ### 4. Load the complete Maude semantics manually
 
-`translator/backend/main.maude` owns the complete loading order:
+`translator/backend/main.maude` (Wasm 3.0; `main-wasm-2.0.maude` and
+`main-wasm-1.0.maude` load the other versions) owns the complete loading order:
 
-1. `spectec-semantics.maude`, which loads `spectec-sorts.maude` (common sorts),
-   the generated `types.maude`, and `spectec-builtin-types.maude` (SpecTec
+1. `spectec-sorts.maude` (common sorts) and the generated `types.maude`;
+2. `spectec-semantics.maude`, which loads `spectec-builtin-types.maude` (SpecTec
    built-in type representation), then declares separate convert, list, option,
    tuple, record, array, and map modules (they store the fields marked with
    `hint(maude_array)`, such as memory bytes, as a size and a prelude `ARRAY`,
    and the fields marked with `hint(maude_map)`, such as the store's functions
    and memories and table references, as a size and a prelude `MAP`);
-2. generated semantics;
-3. primitive builtin semantics.
+3. generated semantics;
+4. primitive builtin semantics, `translator/builtins/wasm-VERSION.maude`
+   (module `WASM-BUILTINS`), on the shared `core.maude` and `vector.maude`.
 
 Load it from the repository root:
 
@@ -186,7 +203,8 @@ subcommand was selected.
 `instantiate` emits an instantiation request. `run` adds initialization and a
 fixed invocation; `modelcheck` also adds returned-value propositions and queries.
 These load `translator/backend/main.maude`, which loads the generated
-`translator/generated/output.maude` and backend support. `.wast` scripts use
+`translator/generated/output.maude` and backend support; they use Wasm 3.0
+only. `wast-run` and `suite-run` select the version with `--wasm` (below). `.wast` scripts use
 `wast-run` for their modules, actions, and assertions.
 
 The fixed rules for `run` and `modelcheck` are in
@@ -195,9 +213,14 @@ The generated modules import these rules and supply the module, invocation,
 and query data. Both commands emit an absolute runtime path resolved from
 the working directory; `--runtime FILE` selects a different location.
 
-The shared WAST execution rules are hand-written in
-`wasm2maude/wast-runtime.maude`. The generated `WASM2MAUDE-WAST` module imports
-this runtime and supplies the input commands, host data, and initial state.
+The WAST execution rules are hand-written in `wasm2maude/`:
+`wast-runtime-core.maude` (all versions), `wast-runtime-vector.maude` (2.0
+and 3.0: v128 and reference results, `assert_unlinkable`, `table.grow`), and
+the driver module of each version, `wast-runtime-3.0.maude`,
+`wast-runtime-2.0.maude`, and `wast-runtime-1.0.maude`, which give the memory,
+table, and grow shapes of that version. The generated `WASM2MAUDE-WAST` module
+imports the driver and supplies the input commands, host data, and initial
+state.
 Both `wast-run` and `suite-run` resolve that default path against the working
 directory and emit an absolute `load` path. Use `--wast-runtime FILE` when
 running from another directory or relocating the runtime. This path is
@@ -266,7 +289,7 @@ finite protocol model.
 
 ## Official WebAssembly core suite
 
-The pinned suite contains 259 `.wast` files, including the `bulk-memory`,
+The pinned 3.0 suite contains 259 `.wast` files (2.0: 148, 1.0: 73), including the `bulk-memory`,
 `exceptions`, `gc`, `memory64`, `multi-memory`, `relaxed-simd`, and
 `simd` sub-suites.
 
@@ -303,7 +326,7 @@ test/wasm_core_suite.sh
 ```
 
 The script verifies that the suite contains exactly 259 distinct `.wast`
-files. It first runs all files with a 300-second wall-clock timeout and then
+files (148 for 2.0, 73 for 1.0). It first runs all files with a 300-second wall-clock timeout and then
 reruns only `TIMEOUT` files with a 3600-second timeout. It uses call depth
 256.
 
@@ -325,10 +348,48 @@ Each file is classified as one of:
 - `TIMEOUT`;
 - `STUCK`.
 
-The script exits with status 0 only when all 259 scripts are classified as
+The script exits with status 0 only when all scripts are classified as
 `PASS`. Otherwise it exits nonzero after preserving the complete reports and
 logs; a nonzero exit therefore does not mean that the experiment artifacts
 were lost.
+
+### Wasm 1.0 and 2.0
+
+```sh
+WASM_VERSION=1.0 test/wasm_core_suite.sh
+WASM_VERSION=2.0 test/wasm_core_suite.sh
+```
+
+`wasm2maude wast-run` and `suite-run` take `--wasm 1.0|2.0|3.0` (default
+3.0). It selects the module encoding of that version
+(`wasm2maude/encode_v1.ml`, `encode_v2.ml`), the semantics
+(`translator/backend/main-wasm-VERSION.maude`), and the WAST runtime
+(`wasm2maude/wast-runtime-VERSION.maude`, above). The scripts are parsed, validated,
+and decoded by the pinned reference interpreter (Wasm 3.0). For a 1.0 or 2.0
+script:
+
+- the script forms the current parser no longer reads are rewritten to their
+  current equivalents (`wasm2maude/legacy_wast.ml`): `assert_return_canonical_nan`,
+  `assert_return_arithmetic_nan`, and segments with a bare memory or table index;
+- an `assert_invalid` or `assert_malformed` module that Wasm 3.0 accepts (a
+  feature added after that version) cannot be checked by this front end; it is
+  not counted as checked and is listed in the `detail` column as
+  `unchecked static assertions: N`. A module that Wasm 3.0 rejects at the
+  other stage (malformed in 1.0, invalid in 3.0) is still rejected;
+- Wasm 1.0 has no instruction-level segment initialization: a segment that
+  does not fit leaves `$instantiate` without a result. `assert_unlinkable`
+  then passes when the imports do not link or a search of the semantics finds
+  no configuration for the instantiation (`metaSearch` in
+  `wast-runtime-1.0.maude`);
+- 1.0 and 2.0 have no host functions. A `spectest` print function is a
+  function instance with an empty body: it returns no value and changes no
+  state, as the spectest functions do for a test.
+
+Expected result (Maude 3.5.1, default timeouts): 1.0 has 72 of 73 files
+`PASS` (18413 checked assertions, 25 unchecked static assertions), and 2.0 has
+147 of 148 (52209 checked, 21 unchecked). In both, `i64.wast` is `STUCK`: the
+shift-amount problem of WebAssembly/spec#2319 (docs/TRANSLATION.md, "Upstream
+reports"), so the script exits nonzero.
 
 ## Model-checking claims
 

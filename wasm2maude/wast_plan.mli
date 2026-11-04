@@ -62,6 +62,8 @@ type exhaustion_plan = {
 type command =
   | Instantiate of int * Maude_term.t * import list
   | Unlinkable of int * import list
+  | Unlinkable_module of int * Maude_term.t * import list
+      (* Wasm 1.0: the imports do not link or the module has no instance *)
   | Uninstantiable of int * uninstantiable_plan
   | Return of int * action * result_pattern list
   | Trap of int * action
@@ -76,4 +78,5 @@ val commands : t -> command list
 val host : t -> host
 val source_commands : t -> int
 val checked_assertions : t -> int
+val unchecked_assertions : t -> int
 val runtime_assertions : t -> int

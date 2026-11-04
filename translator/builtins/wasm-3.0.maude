@@ -1,0 +1,100 @@
+--- Builtins (contract in core.maude). Wasm 3.0: the shared implementations
+--- and the 3.0 builtins (storage and const bytes, relaxed choices, ND, ceilz,
+--- inv_concatn_, v128 bytes). Backend profile: WebAssembly DET (ND = false,
+--- relaxed choice 0).
+
+load vector.maude
+
+mod WASM-BUILTINS is
+  inc WASM-BUILTINS-VECTOR .
+
+  --- Deterministic profile: a NaN result is the positive canonical NaN.
+  var NAN_N : Nat .
+  eq float-default-nan(NAN_N) = POS(NAN(_^_(2, _-_(signif(NAN_N), 1)))) .
+
+  --- Implemented builtin family: composite storage/const bytes.
+  vars ZB_N ZB_RAW : Nat .
+  var ZB_PAYLOAD : SpectecTerminal .
+  var ZB_BYTES : SpectecTerminals .
+  op zbytes-pack : Nat SpectecTerminal -> SpectecTerminals .
+  op inv-zbytes-pack : Nat SpectecTerminals -> SpectecTerminal .
+  ceq zbytes-pack(ZB_N, # ZB_RAW) = ibytes-(ZB_N, ZB_RAW)
+    if _<_(ZB_RAW, _^_(2, ZB_N)) .
+  ceq inv-zbytes-pack(ZB_N, ZB_BYTES) = # ZB_RAW
+    if _rem_(ZB_N, 8) = 0
+       /\ size(ZB_BYTES) = _quo_(ZB_N, 8)
+       /\ typecheck(ZB_BYTES, byte)
+       /\ ZB_RAW := inv-ibytes-aux(ZB_BYTES, 1, 0) .
+
+  --- WebAssembly DET: fixed relaxed choices.
+  --- Relaxed madd is separately rounded fmul- then fadd-, not fused.
+  --- This intentionally differs from the direct Wasm interpreter's fused choice.
+  vars BDR_M BDR_N BDR_I BDR_J BDR_K : Nat .
+  var BDR_SX : SpectecTerminal .
+  vars BDR_F1 BDR_F2 BDR_F3 : SpectecTerminal .
+  vars BY_I BY_RESULT : Nat .
+  var BY_BYTES : SpectecTerminals .
+  var TZ_R : Rat .
+  var BDI_T : SpectecType .
+  var BDI_XS : SpectecTerminals .
+  var BDI_N : NzNat .
+
+  ceq vbytes-(V128, (BY_I)) =
+      ibytes-aux(_quo_(vsize(V128), 8), BY_I)
+    if _<_(BY_I, _^_(2, vsize(V128))) .
+
+  ceq inv-vbytes-(V128, BY_BYTES) = (BY_RESULT)
+    if size(BY_BYTES) = _quo_(vsize(V128), 8)
+       /\ typecheck(BY_BYTES, byte)
+       /\ BY_RESULT := inv-ibytes-aux(BY_BYTES, 1, 0) .
+
+  eq zbytes-(I32, ZB_PAYLOAD) = nbytes-(I32, ZB_PAYLOAD) .
+  eq zbytes-(I64, ZB_PAYLOAD) = nbytes-(I64, ZB_PAYLOAD) .
+  eq zbytes-(F32, ZB_PAYLOAD) = nbytes-(F32, ZB_PAYLOAD) .
+  eq zbytes-(F64, ZB_PAYLOAD) = nbytes-(F64, ZB_PAYLOAD) .
+  eq zbytes-(V128, # ZB_RAW) = vbytes-(V128, ZB_RAW) .
+  eq zbytes-(I8, ZB_PAYLOAD) = zbytes-pack(8, ZB_PAYLOAD) .
+  eq zbytes-(I16, ZB_PAYLOAD) = zbytes-pack(16, ZB_PAYLOAD) .
+
+  eq cbytes-(I32, ZB_PAYLOAD) = nbytes-(I32, ZB_PAYLOAD) .
+  eq cbytes-(I64, ZB_PAYLOAD) = nbytes-(I64, ZB_PAYLOAD) .
+  eq cbytes-(F32, ZB_PAYLOAD) = nbytes-(F32, ZB_PAYLOAD) .
+  eq cbytes-(F64, ZB_PAYLOAD) = nbytes-(F64, ZB_PAYLOAD) .
+  eq cbytes-(V128, # ZB_RAW) = vbytes-(V128, ZB_RAW) .
+
+  eq inv-zbytes-(I32, ZB_BYTES) = inv-nbytes-(I32, ZB_BYTES) .
+  eq inv-zbytes-(I64, ZB_BYTES) = inv-nbytes-(I64, ZB_BYTES) .
+  eq inv-zbytes-(F32, ZB_BYTES) = inv-nbytes-(F32, ZB_BYTES) .
+  eq inv-zbytes-(F64, ZB_BYTES) = inv-nbytes-(F64, ZB_BYTES) .
+  eq inv-zbytes-(V128, ZB_BYTES) = # inv-vbytes-(V128, ZB_BYTES) .
+  eq inv-zbytes-(I8, ZB_BYTES) = inv-zbytes-pack(8, ZB_BYTES) .
+  eq inv-zbytes-(I16, ZB_BYTES) = inv-zbytes-pack(16, ZB_BYTES) .
+
+  eq inv-cbytes-(I32, ZB_BYTES) = inv-nbytes-(I32, ZB_BYTES) .
+  eq inv-cbytes-(I64, ZB_BYTES) = inv-nbytes-(I64, ZB_BYTES) .
+  eq inv-cbytes-(F32, ZB_BYTES) = inv-nbytes-(F32, ZB_BYTES) .
+  eq inv-cbytes-(F64, ZB_BYTES) = inv-nbytes-(F64, ZB_BYTES) .
+  eq inv-cbytes-(V128, ZB_BYTES) = # inv-vbytes-(V128, ZB_BYTES) .
+
+  eq ceilz(# TZ_R) = ceiling(TZ_R) .
+  ceq inv-concatn-(BDI_T, BDI_N, BDI_XS) = fixed-chunks(BDI_N, BDI_XS)
+    if _==_(_rem_(size(BDI_XS), BDI_N), 0) .
+  eq nd = # false .
+  eq r-fmadd = (0) .
+  eq r-fmin = (0) .
+  eq r-fmax = (0) .
+  eq r-idot = (0) .
+  eq r-idot-add = (0) .
+  eq r-iq15mulr = (0) .
+  eq r-trunc-u = (0) .
+  eq r-trunc-s = (0) .
+  eq r-swizzle = (0) .
+  eq r-laneselect = (0) .
+  eq irelaxed-q15mulr-(BDR_N, BDR_SX, (BDR_I), (BDR_J)) = # iq15mulr-sat-(BDR_N, BDR_SX, BDR_I, BDR_J) .
+  eq irelaxed-laneselect-(BDR_N, (BDR_I), (BDR_J), (BDR_K)) = # ibitselect-(BDR_N, BDR_I, BDR_J, BDR_K) .
+  eq frelaxed-min-(BDR_N, BDR_F1, BDR_F2) = fmin-(BDR_N, BDR_F1, BDR_F2) .
+  eq frelaxed-max-(BDR_N, BDR_F1, BDR_F2) = fmax-(BDR_N, BDR_F1, BDR_F2) .
+  eq frelaxed-madd-(BDR_N, BDR_F1, BDR_F2, BDR_F3) = fadd-(BDR_N, fmul-(BDR_N, BDR_F1, BDR_F2), BDR_F3) .
+  eq frelaxed-nmadd-(BDR_N, BDR_F1, BDR_F2, BDR_F3) = fadd-(BDR_N, fmul-(BDR_N, fneg-(BDR_N, BDR_F1), BDR_F2), BDR_F3) .
+  eq relaxed-trunc--(BDR_M, BDR_N, BDR_SX, BDR_F1) = trunc-sat--(BDR_M, BDR_N, BDR_SX, BDR_F1) .
+endm

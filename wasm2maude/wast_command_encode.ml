@@ -48,11 +48,11 @@ let rec result_pattern_term = function
       T.app "result.exact-vec" [Encode.vec_instr value]
   | Wast_plan.VecLanes pattern -> vector_pattern_term pattern
   | Wast_plan.ExactRef reference ->
-      T.app "result.exact-ref" [Encode.reference_value reference]
+      T.app "result.exact-ref" [Encode_version.reference_value reference]
   | Wast_plan.RefType heaptype ->
-      T.app "result.ref-type" [Encode.result_heaptype heaptype]
+      T.app "result.ref-type" [Encode_version.result_heaptype heaptype]
   | Wast_plan.NullRef heaptype ->
-      T.app "result.null-ref" [Encode.result_heaptype heaptype]
+      T.app "result.null-ref" [Encode_version.result_heaptype heaptype]
   | Wast_plan.Either alternatives ->
       T.app "result.either" [result_alternatives_term alternatives]
   | Wast_plan.Nan (numtype, Wast_plan.Canonical) ->
@@ -88,6 +88,9 @@ let command_term ~call_depth = function
   | Wast_plan.Instantiate (instance, module_, imports) ->
       T.app "command.module"
         [T.atom (string_of_int instance); module_; imports_term imports]
+  | Wast_plan.Unlinkable_module (index, module_, imports) ->
+      T.app "command.unlinkable-module"
+        [T.atom (string_of_int index); module_; imports_term imports]
   | Wast_plan.Unlinkable (index, imports) ->
       T.app "command.unlinkable"
         [T.atom (string_of_int index); imports_term imports]

@@ -1,0 +1,115 @@
+fmod SPEC2MAUDE-SORTS is
+  protecting SPECTEC-SORTS .
+
+  sort val .
+
+  sort instr .
+
+  sort admininstr .
+
+  sort InstrProper .
+
+  sort AdmininstrProper .
+
+  subsort instr < admininstr .
+
+  subsort val < instr .
+
+  subsort admininstr < SpectecTerminal .
+
+  subsort InstrProper < instr .
+
+  subsort AdmininstrProper < admininstr .
+
+  subsort InstrProper < AdmininstrProper .
+endfm
+
+fmod SPEC2MAUDE-TYPES is
+  protecting SPEC2MAUDE-SORTS .
+
+  subsort AdmininstrList < SpectecTerminals .
+
+  subsort NeAdmininstrList < SpectecNeTerminals .
+
+  subsort NeInstrList < NeAdmininstrList .
+
+  subsort InstrList < AdmininstrList .
+
+  subsort NeValList < NeInstrList .
+
+  subsort ValList < InstrList .
+
+  sort NeValList .
+
+  sort ValList .
+
+  subsort val < NeValList .
+
+  subsort NeValList < ValList .
+
+  sort NeInstrList .
+
+  sort InstrList .
+
+  subsort instr < NeInstrList .
+
+  subsort NeInstrList < InstrList .
+
+  sort NeAdmininstrList .
+
+  sort AdmininstrList .
+
+  subsort admininstr < NeAdmininstrList .
+
+  subsort NeAdmininstrList < AdmininstrList .
+
+  op nil : -> ValList [ctor] .
+
+  op __ : ValList ValList -> ValList [ctor ditto] .
+
+  op __ : NeValList ValList -> NeValList [ctor ditto] .
+
+  op __ : ValList NeValList -> NeValList [ctor ditto] .
+
+  op nil : -> InstrList [ctor] .
+
+  op __ : InstrList InstrList -> InstrList [ctor ditto] .
+
+  op __ : NeInstrList InstrList -> NeInstrList [ctor ditto] .
+
+  op __ : InstrList NeInstrList -> NeInstrList [ctor ditto] .
+
+  op nil : -> AdmininstrList [ctor] .
+
+  op __ : AdmininstrList AdmininstrList -> AdmininstrList [ctor ditto] .
+
+  op __ : NeAdmininstrList AdmininstrList -> NeAdmininstrList [ctor ditto] .
+
+  op __ : AdmininstrList NeAdmininstrList -> NeAdmininstrList [ctor ditto] .
+
+  op valRepeat : Nat val -> ValList .
+
+  op instrRepeat : Nat instr -> InstrList .
+
+  op admininstrRepeat : Nat admininstr -> AdmininstrList .
+
+  var REPEAT-ELEMENT : val .
+
+  var REPEAT-COUNT : Nat .
+
+  var REPEAT-ELEMENT-2 : instr .
+
+  var REPEAT-ELEMENT-3 : admininstr .
+
+  eq valRepeat(0, REPEAT-ELEMENT) = nil .
+
+  eq valRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT) = REPEAT-ELEMENT valRepeat(REPEAT-COUNT, REPEAT-ELEMENT) .
+
+  eq instrRepeat(0, REPEAT-ELEMENT-2) = nil .
+
+  eq instrRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT-2) = REPEAT-ELEMENT-2 instrRepeat(REPEAT-COUNT, REPEAT-ELEMENT-2) .
+
+  eq admininstrRepeat(0, REPEAT-ELEMENT-3) = nil .
+
+  eq admininstrRepeat(s(REPEAT-COUNT), REPEAT-ELEMENT-3) = REPEAT-ELEMENT-3 admininstrRepeat(REPEAT-COUNT, REPEAT-ELEMENT-3) .
+endfm

@@ -1,3 +1,5 @@
+load spectec-sorts.maude
+load ../generated/types.maude
 load spectec-semantics.maude
 load ../generated/output.maude
-load builtins.maude
+load ../builtins/wasm-3.0.maude

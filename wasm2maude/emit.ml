@@ -35,7 +35,7 @@ type runtime_terms = {
 (* Argument count and types are checked by the translated $invoke (Val_ok);
  * the runtime reports an invocation it leaves undefined. *)
 let check_export m export =
-  match Frontend.function_parameters m export with
+  match Result.map fst (Frontend.function_type m export) with
   | Ok _ -> ()
   | Error error ->
       let message =
@@ -153,7 +153,7 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   if Frontend.import_count m <> 0 then
     Ingress_error.raise Ingress_error.Unsupported m.source
       "a harness with imports needs an explicit host-address mapping";
-  (match Frontend.function_parameters m export with
+  (match Result.map fst (Frontend.function_type m export) with
    | Ok _ -> ()
    | Error _ ->
        Ingress_error.raise Ingress_error.Unsupported m.source

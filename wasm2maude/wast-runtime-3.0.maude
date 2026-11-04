@@ -1,0 +1,124 @@
+--- WAST runtime for the Wasm 3.0 semantics (on wast-runtime-vector.maude):
+--- memory and table shapes with an address type, exception handlers and
+--- assert_exception, the 3.0 reference results, and the spectest host
+--- functions.
+
+load wast-runtime-vector.maude
+
+mod WASM-WAST-DRIVER is
+  including WASM-WAST-VECTOR .
+
+  op command.exception : Nat ScriptAction -> Command [ctor] .
+  op script.exception : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
+  op activeFrameDepth : InstrList -> Nat .
+
+  vars WSHC WSHS WSHF WSHCURRENT WSHVALUE WSHAT WSHRT WSHNT : SpectecTerminal .
+  var WSHK : Holes .
+  var WSHR : Step-Request .
+  var WSHH : Hole .
+  vars WSHLOCALS WSHNAME WSHMAX WSHCATCHES : SpectecTerminals .
+  vars WSHARGS WSHACTUAL WSHPREFIX : ValList .
+  vars WSHBODY WSHINSTRS WSHREST : InstrList .
+  var WSHCMDS : Commands .
+  var WSHENV : InstanceEnv .
+  vars WSHID WSHTARGET WSHA WSHADDR WSHN WSHMIN WSHREQUIRED WSHBITS : Nat .
+
+  eq memoryMin(__PAGE(WSHAT, [WSHMIN .. WSHMAX])) = WSHMIN .
+  eq tableMin(tuple(WSHAT [WSHMIN .. WSHMAX] WSHRT)) = WSHMIN .
+
+  ceq activeFrameDepth(WSHPREFIX ((FRAME- WSHN { WSHC } WSHBODY) WSHREST)) =
+    1 + activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  ceq activeFrameDepth(WSHPREFIX ((LABEL- WSHN { WSHINSTRS } WSHBODY) WSHREST)) =
+    activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  ceq activeFrameDepth(WSHPREFIX ((HANDLER- WSHN { WSHCATCHES } WSHBODY) WSHREST)) =
+    activeFrameDepth(WSHBODY)
+    if runtimeResults(WSHPREFIX) .
+  eq activeFrameDepth(WSHINSTRS) = 0 [owise] .
+  eq frameDepth(hole-Step-ctxt-handler(WSHCATCHES, WSHN) WSHK) = frameDepth(WSHK) .
+
+  --- A grow request is a focus of the instruction sequence, alone or under its
+  --- sequence hole; matching these shapes costs nothing for other requests.
+  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))), WSHK) =
+    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA)))), WSHK) .
+  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH, WSHK) =
+    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH), WSHK) .
+
+  eq match.value(REF.NULL-ADDR, result.null-ref(WSHNT)) = match.yes .
+  eq match.value(REF.NULL-ADDR, result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(ANY)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(EQ)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EQ)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(I31)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(STRUCT)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(ARRAY)) = match.yes .
+  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(spectec-FUNC)) = match.yes .
+  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXN)) = match.yes .
+  eq match.value(REF.NULL-ADDR, result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.I31-NUM(WSHBITS), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.STRUCT-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.ARRAY-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.FUNC-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.EXN-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.HOST-ADDR(WSHADDR), result.ref-type(EXTERN)) = match.yes .
+  eq match.value(REF.EXTERN(WSHVALUE), result.ref-type(EXTERN)) = match.yes .
+
+  --- Environment model, not SpecTec: the source leaves $hostcall to the host.
+  --- The spectest functions are the print functions, which return no values
+  --- and leave the store unchanged.
+  eq hostcall(-HOSTFUNC(# "print"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_i32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_i64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_f32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_f64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_i32_f32"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+  eq hostcall(-HOSTFUNC(# "print_f64_f64"), WSHS, WSHARGS) = RES(WSHS, -VALS(nil)) .
+
+  rl [assert-uninstantiable-exception] :
+    script.uninstantiable(WSHID, WSHENV, WSHCMDS,
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
+    => script.ready(WSHS, WSHENV, WSHCMDS) .
+
+  rl [call-exception] :
+    script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,
+      action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
+    => script.exception(WSHID, WSHENV, WSHCMDS,
+      kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
+  rl [exception-done] :
+    script.exception(WSHID, WSHENV, WSHCMDS,
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
+    => script.ready(WSHS, WSHENV, WSHCMDS) .
+  rl [exception-trap] :
+    script.exception(WSHID, WSHENV, WSHCMDS,
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
+    => script.wrong-assertion(WSHID) .
+  crl [exception-normal] :
+    script.exception(WSHID, WSHENV, WSHCMDS,
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
+    => script.wrong-assertion(WSHID)
+    if runtimeResults(WSHACTUAL) = true .
+
+  rl [exhaustion-exception] :
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
+      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
+    => script.wrong-assertion(WSHID) .
+  --- SpecTec has no call-stack limit: assert_exhaustion passes once the frame
+  --- depth of the configuration exceeds the bound (--call-depth), so a PASS is
+  --- relative to that bound. The active frames of cool-all(unheat(R), K) are
+  --- the frame holes of K and the active frames of the request R.
+  crl [exhaustion-done] :
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
+    => script.ready(WSHS, WSHENV, WSHCMDS)
+    if (WSHS ; WSHF) ; WSHINSTRS := unheat(WSHR)
+       /\ frameDepth(WSHK) + activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
+endm

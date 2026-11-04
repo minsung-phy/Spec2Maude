@@ -94,18 +94,12 @@ let sequence_operator index typ field =
   let representation = Prescan.sequence_representation index typ in
   field representation
 
-let unsupported_typed_sequence index operation typ =
-  let representation = Prescan.sequence_representation index typ in
-  if representation.typed then
-    raise (Unsupported
-      (operation ^ " is unsupported for typed list sort "
-       ^ representation.sort))
-
 (* hint(maude_array): a record field stored as sized-array(size, array). The
  * field is read only through |e.f|, e.f[i], and e.f[i : n], and written
  * through e[.f[i : n] = s] and e[.f = s]. hint(maude_map): a record field
  * stored as sized-map(size, map), read through |e.f| and e.f[i], and written
- * through e[.f[i] = x], e[.f = s], and record composition
+ * through e[.f[i] = x], e[.f[i : n] = s], e[.f = s], e[.f =++ s], and record
+ * composition; a hint(maude_map) function returns such a field
  * (TRANSLATION_MAP.md). *)
 let stored_hint = function
   | Hintd.Array -> "maude_array"
@@ -490,7 +484,6 @@ and translate_value index exp =
       | Some (Hintd.Map, map) ->
           app "map-read" [map; translate_exp index element_index]
       | None ->
-          unsupported_typed_sequence index "IdxE" sequence.note;
           app "_`[_`]"
             [translate_exp index sequence; translate_exp index element_index]
       end
@@ -504,7 +497,6 @@ and translate_value index exp =
       | Some (Hintd.Map, _) ->
           unsupported_stored Hintd.Map exp.at "read it through |e.f| or e.f[i]"
       | None ->
-          unsupported_typed_sequence index "SliceE" sequence.note;
           app "_`[_:_`]"
             [ translate_exp index sequence
             ; translate_exp index start
@@ -519,6 +511,10 @@ and translate_value index exp =
   | ExtE (base, path, extension) ->
       translate_extension
         index (translate_exp index base) path (translate_exp index extension)
+
+  | CallE (id, _) when Prescan.map_definition index id ->
+      unsupported_stored Hintd.Map exp.at
+        ("read $" ^ id.it ^ "(..) through |$" ^ id.it ^ "(..)| or $" ^ id.it ^ "(..)[i]")
 
   | CallE (id, args) ->
       let positions, by_result = syntax_parameter_positions index id in
@@ -563,6 +559,9 @@ and stored_value index exp =
            kind, app "_._" [translate_exp index record; qid_of_atom atom])
   | IterE (body, iterexp) ->
       Option.bind (Iter.identity_source index body iterexp) (stored_value index)
+  | CallE (id, args) when Prescan.map_definition index id ->
+      let positions, _ = syntax_parameter_positions index id in
+      Some (Hintd.Map, translate_call index ~positions id args)
   | _ -> None
 
 (* A source sequence stored into a field of representation kind: a field of
@@ -608,7 +607,6 @@ and translate_select index base path =
         | Some Hintd.Array ->
             unsupported_stored Hintd.Array path.at "select inside the field"
         | None ->
-            unsupported_typed_sequence index "IdxP" parent.note;
             "_`[_`]"
       in
       app operator
@@ -621,7 +619,6 @@ and translate_select index base path =
       Option.iter
         (fun kind -> unsupported_stored kind path.at "select inside the field")
         (stored_path index parent);
-      unsupported_typed_sequence index "SliceP" parent.note;
       app "_`[_:_`]"
         [ translate_select index base parent
         ; translate_exp index start
@@ -656,7 +653,6 @@ and translate_update index base path replacement =
       unsupported_stored Hintd.Array path.at "write it through e[.f[i : n] = s]"
 
   | IdxP (parent, element_index) ->
-      unsupported_typed_sequence index "UpdE/IdxP" parent.note;
       let parent_value = translate_select index base parent in
       let replacement =
         as_sequence_element index path.note replacement
@@ -679,11 +675,19 @@ and translate_update index base path replacement =
       in
       translate_field_update index base record atom written
 
-  | SliceP (parent, _, _) when stored_path index parent = Some Hintd.Map ->
-      unsupported_stored Hintd.Map path.at "write it through e[.f[i] = x]"
+  | SliceP ({it = DotP (record, atom); _} as parent, start, length)
+    when stored_path index parent = Some Hintd.Map ->
+      let written =
+        app "map-write-range"
+          [ translate_select index base parent
+          ; translate_exp index start
+          ; translate_exp index length
+          ; replacement
+          ]
+      in
+      translate_field_update index base record atom written
 
   | SliceP (parent, start, length) ->
-      unsupported_typed_sequence index "UpdE/SliceP" parent.note;
       let parent_value = translate_select index base parent in
       let updated_parent =
         app "_`[_:_=_`]"
@@ -711,16 +715,20 @@ and translate_field_update index base record atom value =
 
 
 and translate_extension index base path extension =
-  Option.iter
-    (fun kind -> unsupported_stored kind path.at "extend it through e[.f = s]")
-    (stored_path index path);
-  (* EXT e p e' = UPD e p (CAT (ACC e p) e').  The existing path
-   * translation unboxes the selected value and reboxes it on update. *)
-  let operator =
-    sequence_operator index path.note (fun sequence -> sequence.concat)
-  in
-  let extended = app operator [translate_select index base path; extension] in
-  translate_update index base path extended
+  match path.it, stored_path index path with
+  | DotP (record, atom), Some Hintd.Map ->
+      (* e[.f =++ s] on a maude_map field appends s at its end. *)
+      let written = app "map-append" [translate_select index base path; extension] in
+      translate_field_update index base record atom written
+  | _, Some kind -> unsupported_stored kind path.at "extend it through e[.f = s]"
+  | _, None ->
+      (* EXT e p e' = UPD e p (CAT (ACC e p) e').  The existing path
+       * translation unboxes the selected value and reboxes it on update. *)
+      let operator =
+        sequence_operator index path.note (fun sequence -> sequence.concat)
+      in
+      let extended = app operator [translate_select index base path; extension] in
+      translate_update index base path extended
 
 and translate_composition index typ left right =
   (* Expand declarations and type arguments only; do not evaluate the operands. *)

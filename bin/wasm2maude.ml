@@ -2,7 +2,7 @@ open Wasm_to_maude
 
 let usage () =
   Printf.eprintf
-    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--call-depth N]\n  wasm2maude suite-run PATH [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
+    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [--wasm 1.0|2.0|3.0] [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--call-depth N]\n  wasm2maude suite-run PATH [--wasm 1.0|2.0|3.0] [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--call-depth N] [--log-dir DIR]\n  wasm2maude wast-summary FILE\n  wasm2maude suite-summary DIRECTORY\n  wasm2maude suite-audit DIRECTORY\n  wasm2maude suite-typecheck DIRECTORY [-o FILE] [--semantics FILE]\n  wasm2maude wast-typecheck FILE [-o FILE] [--semantics FILE]\n";
   exit 2
 
 let write output text =
@@ -18,7 +18,7 @@ let resolve path =
   if Filename.is_relative path then Filename.concat (Sys.getcwd ()) path
   else path
 
-let default_semantics = "translator/backend/main.maude"
+let default_semantics = Wasm_version.semantics Wasm_version.V3
 
 let nonnegative value =
   match int_of_string_opt value with
@@ -145,7 +145,24 @@ let execution_command mode args =
   in
   write opts.output text
 
+(* --wasm VERSION selects the Wasm version (Wasm_version): its module
+   encoding, and the default semantics and WAST runtime. *)
+let wasm_version args =
+  let rec go = function
+    | "--wasm" :: version :: rest ->
+        (match Wasm_version.of_string version with
+         | Some v -> Wasm_version.current := v
+         | None -> usage ());
+        go rest
+    | arg :: rest -> arg :: go rest
+    | [] -> []
+  in
+  let args = go args in
+  args, Wasm_version.semantics !Wasm_version.current,
+  Wasm_version.wast_runtime !Wasm_version.current
+
 let wast_run args =
+  let args, default_semantics, default_runtime = wasm_version args in
   let rec options input output semantics runtime call_depth = function
     | [] -> input, output, semantics, runtime, call_depth
     | "-o" :: path :: rest ->
@@ -153,7 +170,7 @@ let wast_run args =
     | "--semantics" :: path :: rest ->
         options input output path runtime call_depth rest
     | "--wast-runtime" :: path :: rest ->
-        options input output semantics (Some path) call_depth rest
+        options input output semantics path call_depth rest
     | "--call-depth" :: value :: rest ->
         options input output semantics runtime (nonnegative value) rest
     | arg :: rest when input = None ->
@@ -161,11 +178,11 @@ let wast_run args =
     | _ -> usage ()
   in
   let input, output, semantics, runtime, call_depth =
-    options None None default_semantics None 256 args
+    options None None default_semantics default_runtime 256 args
   in
   let semantics = resolve semantics in
   let input = match input with Some path -> path | None -> usage () in
-  let text, report = Wast_run.emit ?runtime ~semantics ~call_depth input in
+  let text, report = Wast_run.emit ~runtime ~semantics ~call_depth input in
   write output text;
   Printf.eprintf
     "[wasm2maude] commands=%d checked-assertions=%d runtime-assertions=%d\n"
@@ -173,6 +190,7 @@ let wast_run args =
     (Wast_run.runtime_assertions report)
 
 let suite_run args =
+  let args, default_semantics, default_runtime = wasm_version args in
   let positive_float value =
     match float_of_string_opt value with
     | Some value when value > 0. -> value
@@ -188,7 +206,7 @@ let suite_run args =
     | "--semantics" :: path :: rest ->
         options input output path runtime maude timeout call_depth log_dir rest
     | "--wast-runtime" :: path :: rest ->
-        options input output semantics (Some path) maude timeout call_depth log_dir rest
+        options input output semantics path maude timeout call_depth log_dir rest
     | "--maude" :: path :: rest ->
         options input output semantics runtime path timeout call_depth log_dir rest
     | "--timeout" :: value :: rest ->
@@ -206,7 +224,7 @@ let suite_run args =
     | _ -> usage ()
   in
   let input, output, semantics, runtime, maude, timeout, call_depth, log_dir =
-    options None None default_semantics None "maude" 60. 256 None args
+    options None None default_semantics default_runtime "maude" 60. 256 None args
   in
   let input = match input with Some path -> path | None -> usage () in
   let progress ~completed ~total ~source ~status ~seconds =
@@ -214,7 +232,7 @@ let suite_run args =
       status seconds source
   in
   let report =
-    Suite_run.run ?runtime ~semantics:(resolve semantics) ~maude ~timeout ~call_depth
+    Suite_run.run ~runtime ~semantics:(resolve semantics) ~maude ~timeout ~call_depth
       ~progress ?log_dir input
   in
   write output (Suite_run.to_tsv report);

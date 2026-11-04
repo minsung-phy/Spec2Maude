@@ -83,6 +83,7 @@ type prepared_clause =
   ; head : clause_head
   ; head_proven : Il.Free.Set.t
   ; result_sort : sort
+  ; map_result : bool  (* hint(maude_map) *)
   ; index : Prescan.t
   }
 
@@ -124,7 +125,8 @@ let prepare_clauses index id params clauses =
           let head = translate_head index id args in
           let head_proven = guarded_quants index quants args in
           let _, result_sort = Term.definition_sorts index id in
-          {clause; head; head_proven; result_sort; index})
+          let map_result = Prescan.map_definition index id in
+          {clause; head; head_proven; result_sort; map_result; index})
     clauses
 
 let proven_variables prepared premises =
@@ -142,8 +144,16 @@ let clause_has_rewrite_call index args rhs prems =
 
 let translate_result prepared rhs =
   let index = prepared.index in
-  Term.to_sort index ~sort:prepared.result_sort rhs.note
-    (Term.translate_exp index rhs)
+  if prepared.map_result then
+    (* A hint(maude_map) definition returns the map stored in a maude_map
+       field. *)
+    match Term.stored_value index rhs with
+    | Some (Hintd.Map, map) -> map
+    | Some (Hintd.Array, _) | None ->
+        raise (Unsupported "a hint(maude_map) definition must return a maude_map field")
+  else
+    Term.to_sort index ~sort:prepared.result_sort rhs.note
+      (Term.translate_exp index rhs)
 
 (* DefD clauses are a sequential pattern match (Bringing the WebAssembly
    Standard up to Speed with SpecTec, 3): a clause applies only if no earlier
@@ -242,7 +252,7 @@ let equation_clause prepared =
         Prem.translate_all
           index
           ~bound:(Il.Free.Set.elements head.bound)
-          ~bind_membership:false ~collect_outputs:false
+          ~bind_membership:false ~collect_outputs:true
           prems
       in
 
@@ -331,7 +341,7 @@ let translate_choice_clause id
       let premises =
         Prem.translate_all index
           ~bound:(Il.Free.Set.elements head.bound)
-          ~bind_membership:false ~collect_outputs:false
+          ~bind_membership:false ~collect_outputs:true
           choice.prefix
       in
       if premises.otherwise then
@@ -377,7 +387,7 @@ let translate_rule_clause prepared =
       let premises =
         Prem.translate_all index
           ~bound:(Il.Free.Set.elements head.bound)
-          ~bind_membership:false ~collect_outputs:false prems
+          ~bind_membership:false ~collect_outputs:true prems
       in
       if premises.otherwise then
         raise (Unsupported "ElsePr is not supported in a maude_rule DecD");
@@ -425,14 +435,7 @@ let ordered_clauses index id clauses =
         let prems = List.filter (fun prem -> not (for_result prem)) prems in
         (* Drop the quantifiers that occurred only in the dropped premises. *)
         let free = Il.Free.(free_args args ++ free_exp rhs ++ free_prems prems) in
-        let quants =
-          List.filter
-            (fun quant ->
-              match quant.it with
-              | ExpP (x, _) -> Il.Free.Set.mem x.it free.Il.Free.varid
-              | TypP _ | DefP _ | GramP _ -> true)
-            quants
-        in
+        let quants = Prem.used_quants free quants in
         equation_clause
           {prepared with clause = {prepared.clause with it = DefD (quants, args, rhs, prems)}}
     | DefD _ -> current
@@ -453,16 +456,28 @@ let ordered_clauses index id clauses =
     in
     (* [owise] would also apply when an earlier clause's case premise fails,
        so an otherwise clause after such a clause states its complements. *)
-    let attrs =
-      if List.exists (fun (earlier, _, _) -> added_premises earlier <> []) overlapping
-      then List.filter (fun attr -> attr <> Owise) attrs
-      else attrs
+    let no_case_premises =
+      List.for_all (fun (earlier, _, _) -> added_premises earlier = []) overlapping
     in
-    let complements =
-      if List.mem Owise attrs then []
+    let attrs =
+      if no_case_premises then attrs else List.filter (fun attr -> attr <> Owise) attrs
+    in
+    (* The last clause applies exactly when no earlier clause does, which is
+       [owise] when the earlier clauses add no case premises; it is used
+       when a complement cannot be stated (for example an earlier head with
+       non-ground extra structure: $f(C x) = .. before $f(y) = ..). *)
+    let can_owise =
+      List.length earlier = List.length clauses - 1 && no_case_premises
+    in
+    let attrs, complements =
+      if List.mem Owise attrs then attrs, []
       else
-        located id prepared.clause (fun () ->
-          List.map (complement_of prepared current) overlapping)
+        match
+          located id prepared.clause (fun () ->
+            List.map (complement_of prepared current) overlapping)
+        with
+        | complements -> attrs, complements
+        | exception (Util.Error.Error _) when can_owise -> attrs @ [Owise], []
     in
     let conditions =
       if complements = [] then conditions
