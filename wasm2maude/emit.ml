@@ -1,11 +1,15 @@
 module T = Spectec_term
 
 let render = Maude_term.to_string
-let term m = render (Encode.module_ m)
+let term m = render (Encode_version.module_ m)
 let empty = T.seq []
 
-let empty_store =
-  T.app "rec.store" (List.init 10 (fun _ -> empty))
+(* The store of the selected Wasm version (Wasm_version.current), with no
+   host resources. *)
+let empty_store () =
+  Wast_host_encode.store
+    {Wast_plan.providers = []; globals = []; memories = []; tables = [];
+     funcs = []}
 
 let variable = T.atom
 let pair left right = T.app "_;_" [left; right]
@@ -32,8 +36,8 @@ type runtime_terms = {
   invocation : string;
 }
 
-(* Argument count and types are checked by the translated $invoke (Val_ok);
- * the runtime reports an invocation it leaves undefined. *)
+(* The translated $invoke checks the argument count, and in Wasm 3.0 their
+ * types (Val_ok); the runtime reports an invocation it leaves undefined. *)
 let check_export m export =
   match Result.map fst (Frontend.function_type m export) with
   | Ok _ -> ()
@@ -56,7 +60,7 @@ let invocation m export args =
 
 let typecheck ~semantics m =
   let check =
-    T.app "typecheck" [Encode.module_ m; T.atom "syn.module"] |> render
+    T.app "typecheck" [Encode_version.module_ m; T.atom "syn.module"] |> render
   in
   Printf.sprintf
     {|load %s
@@ -76,7 +80,8 @@ let instantiate ~semantics m =
       "module instantiation needs an explicit host-import address mapping"
   else
     let request =
-      instantiate_term empty_store (Encode.module_ m) empty |> render
+      instantiate_term (empty_store ()) (Encode_version.module_ m) empty
+      |> render
     in
     Printf.sprintf
       {|load %s
@@ -183,7 +188,7 @@ let harness ~module_name ~prefix ~export (m : Frontend.module_) =
   emit "  vars ARGS RESULT : ValList .\n  var ADDR : Nat .\n\n";
   emit "  eq %s = %s .\n" (name "inputModule") (term m);
   emit "  eq %s = %s .\n" (name "inputName") (render (Encode.name export));
-  emit "  eq %s = %s .\n\n" (name "emptyStore") (render empty_store);
+  emit "  eq %s = %s .\n\n" (name "emptyStore") (render (empty_store ()));
   emit "%s\n" (export_lookup name runtime);
   (* kstate(C, K): C is the configuration around the next redex, K the holes
      of hint(k_heatcool) contexts taken off it. The generated equations make C a
@@ -214,6 +219,7 @@ load %s
 mod WASM2MAUDE-RUN is
   including WASM-RUN-DRIVER .
 
+  eq emptyStore = %s .
   eq inputModule = %s .
   eq inputName = %s .
   eq inputArgs = %s .
@@ -221,7 +227,8 @@ endm
 
 rew [%d] in WASM2MAUDE-RUN : boot .
 |}
-      semantics (runtime_path runtime) input export args limit
+      semantics (runtime_path runtime) (render (empty_store ())) input export args
+      limit
 
 let modelcheck ?(runtime = "wasm2maude/modelcheck-runtime.maude")
     ~semantics ~export ~args ~expected ~rejected ~steps:limit m =
@@ -245,6 +252,7 @@ mod WASM2MAUDE-MODELCHECK is
   including WASM-MODELCHECK-DRIVER .
   var RESULT : ValList .
 
+  eq emptyStore = %s .
   eq inputModule = %s .
   eq inputName = %s .
   eq inputArgs = %s .
@@ -269,5 +277,6 @@ red in WASM2MAUDE-MODELCHECK :
 red in WASM2MAUDE-MODELCHECK :
   modelCheck(boot, <> returned(rejected)) .
 |}
-      semantics (runtime_path runtime) input export args expected rejected
+      semantics (runtime_path runtime) (render (empty_store ())) input export args
+      expected rejected
       limit limit limit

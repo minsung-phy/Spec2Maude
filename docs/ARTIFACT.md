@@ -202,10 +202,11 @@ subcommand was selected.
 `module` encodes a `.wat`/`.wasm` module (`--term-only` emits just the term).
 `instantiate` emits an instantiation request. `run` adds initialization and a
 fixed invocation; `modelcheck` also adds returned-value propositions and queries.
-These load `translator/backend/main.maude`, which loads the generated
-`translator/generated/output.maude` and backend support; they use Wasm 3.0
-only. `wast-run` and `suite-run` select the version with `--wasm` (below). `.wast` scripts use
-`wast-run` for their modules, actions, and assertions.
+These commands, `harness`, `wast-run`, and `suite-run` take
+`--wasm 1.0|2.0|3.0` (default 3.0), which selects the module encoding and the
+semantics they load (`translator/backend/main.maude` for 3.0,
+`main-wasm-VERSION.maude` otherwise; below). `.wast` scripts use `wast-run`
+for their modules, actions, and assertions.
 
 The fixed rules for `run` and `modelcheck` are in
 `wasm2maude/run-runtime.maude` and `wasm2maude/modelcheck-runtime.maude`;
@@ -361,11 +362,12 @@ WASM_VERSION=1.0 test/wasm_core_suite.sh
 WASM_VERSION=2.0 test/wasm_core_suite.sh
 ```
 
-`wasm2maude wast-run` and `suite-run` take `--wasm 1.0|2.0|3.0` (default
-3.0). It selects the module encoding of that version
-(`wasm2maude/encode_v1.ml`, `encode_v2.ml`), the semantics
-(`translator/backend/main-wasm-VERSION.maude`), and the WAST runtime
-(`wasm2maude/wast-runtime-VERSION.maude`, above). The scripts are parsed, validated,
+`wasm2maude` takes `--wasm 1.0|2.0|3.0` (default 3.0). It selects the module encoding of that version
+(`wasm2maude/encode_v1.ml`, `encode_v2.ml`) and store, the semantics
+(`translator/backend/main-wasm-VERSION.maude`), and, for `wast-run` and
+`suite-run`, the WAST runtime (`wasm2maude/wast-runtime-VERSION.maude`, above).
+A `harness` file of version VERSION is loaded after that version's
+`main-wasm-VERSION.maude` instead of `main.maude`. The scripts are parsed, validated,
 and decoded by the pinned reference interpreter (Wasm 3.0). For a 1.0 or 2.0
 script:
 

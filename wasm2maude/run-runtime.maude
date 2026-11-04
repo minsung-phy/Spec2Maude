@@ -1,7 +1,8 @@
 --- Fixed run rules; the generated module supplies the input data.
 
 --- Invocation of an export of a fresh instance, shared with the modelcheck
---- runtime (modelcheck-runtime.maude).
+--- runtime (modelcheck-runtime.maude). The generated module supplies the
+--- empty store of its Wasm version and the input.
 mod WASM-INVOCATION is
   protecting WASM-BUILTINS .
 
@@ -15,16 +16,11 @@ mod WASM-INVOCATION is
   op isConfig : SpectecTerminal -> Bool .
 
   vars C Z XA : SpectecTerminal .
-  var IS : InstrList .
+  --- The instructions of a configuration (InstrList in Wasm 3.0,
+  --- AdmininstrList in 1.0 and 2.0).
+  var IS : SpectecTerminals .
   vars NAME EXPORT-PREFIX EXPORTS : SpectecTerminals .
   var ADDR : Nat .
-
-  eq emptyStore = {
-    field('TAGS, nil) ; field('GLOBALS, nil) ; field('MEMS, sized-map(0, empty)) ;
-    field('TABLES, nil) ; field('FUNCS, sized-map(0, empty)) ; field('DATAS, nil) ;
-    field('ELEMS, nil) ; field('STRUCTS, nil) ; field('ARRAYS, nil) ;
-    field('EXNS, nil)
-  } .
 
   ceq findFunc(
     EXPORT-PREFIX {field('NAME, NAME) ; field('ADDR, FUNC(ADDR))} EXPORTS,

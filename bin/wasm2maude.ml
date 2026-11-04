@@ -2,7 +2,7 @@ open Wasm_to_maude
 
 let usage () =
   Printf.eprintf
-    "usage:\n  wasm2maude module INPUT [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [--wasm 1.0|2.0|3.0] [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--call-depth N]\n  wasm2maude suite-run PATH [--wasm 1.0|2.0|3.0] [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--call-depth N] [--log-dir DIR]\n  wasm2maude suite-audit DIRECTORY\n";
+    "usage:\n  wasm2maude module INPUT [--wasm 1.0|2.0|3.0] [-o FILE] [--semantics FILE] [--term-only]\n  wasm2maude instantiate INPUT [--wasm 1.0|2.0|3.0] [-o FILE] [--semantics FILE]\n  wasm2maude run INPUT [--wasm 1.0|2.0|3.0] --invoke NAME [--arg TYPE:VALUE]... [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude modelcheck INPUT [--wasm 1.0|2.0|3.0] --invoke NAME [--arg TYPE:VALUE]... --expect TYPE:VALUE --reject TYPE:VALUE [-o FILE] [--semantics FILE] [--runtime FILE] [--steps N]\n  wasm2maude harness INPUT [--wasm 1.0|2.0|3.0] --invoke NAME --module-name NAME --prefix NAME [-o FILE]\n  wasm2maude wast-run FILE [--wasm 1.0|2.0|3.0] [-o FILE] [--semantics FILE] [--wast-runtime FILE] [--call-depth N]\n  wasm2maude suite-run PATH [--wasm 1.0|2.0|3.0] [-o REPORT] [--semantics FILE] [--wast-runtime FILE] [--maude FILE] [--timeout SEC] [--call-depth N] [--log-dir DIR]\n  wasm2maude suite-audit DIRECTORY\n";
   exit 2
 
 let write output text =
@@ -18,14 +18,29 @@ let resolve path =
   if Filename.is_relative path then Filename.concat (Sys.getcwd ()) path
   else path
 
-let default_semantics = Wasm_version.semantics Wasm_version.V3
-
 let nonnegative value =
   match int_of_string_opt value with
   | Some value when value >= 0 -> value
   | Some _ | None -> usage ()
 
+(* --wasm VERSION selects the Wasm version (Wasm_version): its module
+   encoding, and the default semantics and WAST runtime. *)
+let wasm_version args =
+  let rec go = function
+    | "--wasm" :: version :: rest ->
+        (match Wasm_version.of_string version with
+         | Some v -> Wasm_version.current := v
+         | None -> usage ());
+        go rest
+    | arg :: rest -> arg :: go rest
+    | [] -> []
+  in
+  let args = go args in
+  args, Wasm_version.semantics !Wasm_version.current,
+  Wasm_version.wast_runtime !Wasm_version.current
+
 let input_options args =
+  let args, default_semantics, _ = wasm_version args in
   let rec options input output semantics term_only = function
     | [] -> (input, output, semantics, term_only)
     | "-o" :: path :: rest -> options input (Some path) semantics term_only rest
@@ -91,6 +106,7 @@ type execution_options = {
 }
 
 let execution_command mode args =
+  let args, default_semantics, _ = wasm_version args in
   let rec options opts = function
     | [] -> opts
     | "-o" :: path :: rest -> options {opts with output = Some path} rest
@@ -144,22 +160,6 @@ let execution_command mode args =
         Emit.harness ~module_name ~prefix ~export m
   in
   write opts.output text
-
-(* --wasm VERSION selects the Wasm version (Wasm_version): its module
-   encoding, and the default semantics and WAST runtime. *)
-let wasm_version args =
-  let rec go = function
-    | "--wasm" :: version :: rest ->
-        (match Wasm_version.of_string version with
-         | Some v -> Wasm_version.current := v
-         | None -> usage ());
-        go rest
-    | arg :: rest -> arg :: go rest
-    | [] -> []
-  in
-  let args = go args in
-  args, Wasm_version.semantics !Wasm_version.current,
-  Wasm_version.wast_runtime !Wasm_version.current
 
 let wast_run args =
   let args, default_semantics, default_runtime = wasm_version args in

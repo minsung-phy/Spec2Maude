@@ -182,8 +182,10 @@ Unsupported (`wasm2maude/emit.ml`). In result accounting it is also counted as U
 
 ### Invocation argument check
 
-`(Val_ok: s |- val : t_1)*` of `$invoke` checks the number and types of the arguments. wasm2maude
-only checks that the export is a function. If `Val_ok` fails, `$invoke` is undefined,
+`(Val_ok: s |- val : t_1)*` of `$invoke` checks the number and types of the arguments. The
+Wasm 1.0 and 2.0 `$invoke` checks only their number (`t_1^n` with `val^n`): an argument of
+the wrong type starts the call, and execution gets stuck at the first instruction with no
+rule for it. wasm2maude only checks that the export is a function. If `Val_ok` fails, `$invoke` is undefined,
 and the `run`/`modelcheck` runtime ends in the `invalid-invocation` state. In this state
 no value is returned, so a safety query such as `[]~ returned(rejected)` is vacuously
 true. First check that the `rewrite` result is not `invalid-invocation`.
