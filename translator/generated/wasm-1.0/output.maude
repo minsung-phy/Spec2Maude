@@ -2216,9 +2216,8 @@ mod SPEC2MAUDE-GENERATED is
   eq identifyFocus(Z, PREFIX CONST(I32, # N-3), MEMORY.GROW, POSTFIX) = { PREFIX | (Z ; (CONST(I32, # N-3) (MEMORY.GROW))) | POSTFIX } .
 
   ceq Step(Z ; (STACK (OP REST))) = Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
-    if (STACK (OP REST)) =/= OP
-      /\ { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
-      /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
+    if { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
+      /\ _or_(PREFIX =/= nil, POSTFIX =/= nil) .
 
   eq (Z' ; ADMININSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (ADMININSTR'* POSTFIX)) .
 

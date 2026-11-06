@@ -672,15 +672,11 @@ let is_nonempty (context : Hintd.context) premise =
 let context_transitions index (context : Hintd.context) =
   let name = helper index context in
   let policy = execution_policy index context.source.id in
-  let RuleD (id, quants, mixop, head, prems) = context.rule.it in
-  let nonempty = List.exists (is_nonempty context) prems in
-  let rule =
-    let prems = List.filter (fun premise -> not (is_nonempty context premise)) prems in
-    {context.rule with it = RuleD (id, quants, mixop, head, prems)}
-  in
+  (* The nonempty premise val* =/= eps \/ instr_1* =/= eps is translated like
+     any other premise, on PREFIX and POSTFIX after identifyFocus binds them. *)
   let lowered =
     Reld.lower_execution_rule index context.source.id
-      context.source.params policy [] context.ordinal rule
+      context.source.params policy [] context.ordinal context.rule
   in
   let inner_name = Prescan.rel_name index context.inner_relation in
   let (inner_call, inner_result), remaining =
@@ -708,19 +704,8 @@ let context_transitions index (context : Hintd.context) =
     if heats_by_equation context.source then EqCondition (MatchCond (target, search))
     else RewriteCond (search, target)
   in
-  let different left right =
-    EqCondition (BoolCond (App ("_=/=_", [left; right])))
-  in
-  let guards =
-    if nonempty then
-      let whole =
-        Term.sequence_of_typ index context.focus_typ [prefix; focus; postfix]
-      in
-      [different sequence trigger; identify; different focus whole]
-    else [identify]
-  in
   let conditions =
-    guards @ List.map (substitute_condition bindings) remaining
+    identify :: List.map (substitute_condition bindings) remaining
     |> schedule_rule_conditions split_left
   in
   let hole = App (name "hole", [prefix; postfix]) in

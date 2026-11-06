@@ -7954,9 +7954,8 @@ mod SPEC2MAUDE-GENERATED is
   eq identifyFocus(Z, PREFIX (REF.ARRAY-ADDR(A) (CONST(I32, # I) VAL)), ARRAY.SET(X-4), POSTFIX) = { PREFIX | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | POSTFIX } .
 
   ceq Step(Z ; (STACK (OP REST))) = Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
-    if (STACK (OP REST)) =/= OP
-      /\ { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
-      /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
+    if { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
+      /\ _or_(PREFIX =/= nil, POSTFIX =/= nil) .
 
   eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 

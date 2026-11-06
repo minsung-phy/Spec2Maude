@@ -709,15 +709,14 @@ rule Step/ctxt-instrs:
 
 ```maude
 ceq Step(Z ; (STACK (OP REST))) = Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
-    if (STACK (OP REST)) =/= OP
-      /\ { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
-      /\ FOCUS =/= (PREFIX (FOCUS POSTFIX)) .
+    if { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
+      /\ _or_(PREFIX =/= nil, POSTFIX =/= nil) .
 
 eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
 eq unheat(R-3 ~> hole(PREFIX, POSTFIX)) = unheat(R-3) ~> hole(PREFIX, POSTFIX) .
 ```
 
-The `identifyFocus` statements are also equations (`eq`/`ceq identifyFocus(...) = { ... }`). The nonempty condition of the source remains as a guard.
+The `identifyFocus` statements are also equations (`eq`/`ceq identifyFocus(...) = { ... }`). The nonempty premise of the source (`val* =/= eps \/ instr_1* =/= eps`) is translated like any other premise, on `PREFIX` and `POSTFIX` after `identifyFocus` binds them.
 The cut position changes at every step (the result of an earlier instruction is an operand of the next instruction), so it is not kept open.
 No focus pattern is generated for context rules (ctxt-label/handler/frame).
 
