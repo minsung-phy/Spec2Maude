@@ -231,14 +231,14 @@ independent of `--semantics FILE`, which selects the translated Wasm semantics.
 The WAST runtime is a test runner, not part of the translated semantics:
 
 - It runs one execution per script with `rew`, like the reference
-  interpreter. The Step rules rewrite the command's state in place, as in the
+  interpreter. A running command holds its configuration in `run(C)`, and one
+  rewrite `run(C) => run(C2) if Step(C) => C2` is one source step, as in the
   `run` runtime; there is no step bound, and `suite-run --timeout` bounds the
-  run. `rew` is rule fair, so where several Step rules apply it may take any of
-  them. The reference interpreter grows a memory or table whenever growth can
-  succeed: at `memory.grow` and `table.grow` the runtime takes the first
-  successor in Maude's search order, the success rule (`choice`). Other
-  choices are left to `rew`; use the runner with `rew`, not with `search` or
-  model checking.
+  run. The rewrite condition takes the first successor in Maude's search order,
+  the rule declared first. The reference interpreter grows a memory or table
+  whenever growth can succeed, and the success rules of `memory.grow` and
+  `table.grow` are declared before the failure rules. Use the runner with
+  `rew`, not with `search` or model checking.
 - `spectest` print functions are an environment model: the specification calls
   a host function through `$hostcall`, and the runtime defines it for the print
   functions, which return no values and leave the store unchanged.
@@ -397,7 +397,11 @@ reports"), so the script exits nonzero.
 ## Model-checking claims
 
 The `modelcheck` command generates an initialization/invocation wrapper around
-the translated `Step` relation. It currently observes returned numeric values.
+the translated `Step` relation. One transition is one rule
+`exec(C) => exec(C2) if Step(C) => C2`: the heating and cooling of
+`hint(k_heatcool)` rules happen inside its rewrite condition, so every state is a
+source configuration ([state correspondence](TRANSLATION.md#k_heatcool-scope)).
+It currently observes returned numeric values.
 `<> returned(expected)` is universal eventual return, while
 `[] ~ returned(rejected)` excludes only that particular returned value; it is
 not a trap-freedom or termination claim. `search` checks existence separately.

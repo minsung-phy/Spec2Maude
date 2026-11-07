@@ -527,7 +527,7 @@ syntax instr/data hint(desc "data instruction") = ...
 syntax expr hint(desc "expression") =
   instr*
 
-syntax instr hint(desc "instruction") hint(maude_sort) hint(maude_subsort "admininstr") hint(maude_proper "val InstrProper")
+syntax instr hint(desc "instruction") hint(maude_sort) hint(maude_subsort "admininstr")
 var in : instr
 var e : expr
 

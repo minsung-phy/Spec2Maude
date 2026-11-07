@@ -1,13 +1,14 @@
 (* Source hints that need whole-script analysis. Nothing here emits Maude
  * code; the results are read through Prescan.
  *
- * Part 1: sorts. hint(maude_sort), hint(maude_subsort), and
- *   hint(maude_proper) decide the Maude sort of each type, its subsorts, and
- *   the representation of typed sequences. hint(maude_array) and
+ * Part 1: sorts. hint(maude_sort) and hint(maude_subsort) decide the Maude
+ *   sort of each type, its subsorts, and the representation of typed
+ *   sequences. hint(maude_array) and
  *   hint(maude_map) on a record field store that sequence field as a size and
  *   a prelude ARRAY or MAP.
  * Part 2: hint(k_heatcool). The hinted rules are checked against the shapes
- *   that Heatcool supports, and context rules get their focus patterns
+ *   that Heatcool supports. A rule whose hint names a hole,
+ *   hint(k_heatcool "x*"), is a sequence context and gets its focus patterns
  *   (TRANSLATION_MAP.md, section 2). *)
 
 open Util.Source
@@ -44,7 +45,6 @@ type t =
   ; origins : (maude_sort * region) list
   ; annotated : maude_sort list
   ; edges : (maude_sort * maude_sort) list
-  ; proper : (maude_sort * maude_sort * maude_sort) list
   ; owners : (constructor * maude_sort list) list
   ; lists : maude_sort list
   ; stored : stored_fields
@@ -299,29 +299,6 @@ let order_sorts origins edges sorts =
   order [] sorts
 
 
-let proper_sorts_of hints annotated =
-  hints
-  |> List.concat_map (fun (source, values) ->
-       hint_values "maude_proper" values
-       |> List.map (fun hint ->
-            let value, proper =
-              match hint.hintexp.it with
-              | El.Ast.TextE text ->
-                  begin match
-                    String.split_on_char ' ' text |> List.filter ((<>) "")
-                  with
-                  | [value; proper] -> value, proper
-                  | _ -> unsupported_sort hint.hintid.at
-                      "maude_proper expects a value type and proper sort"
-                  end
-              | _ -> unsupported_sort hint.hintid.at
-                  "maude_proper expects a string"
-            in
-            if not (List.mem source annotated && List.mem value annotated) then
-              unsupported_sort hint.hintid.at
-                "maude_proper types require maude_sort";
-            proper, source, value))
-
 let rec constructors_of_name definitions seen name =
   if List.mem name seen then []
   else
@@ -422,39 +399,18 @@ let constructor_result_sort metadata constructor =
     in
     unsupported_sort at reason
   in
-  let partitions =
-    metadata.proper
-    |> List.filter (fun (_, parent, value) ->
-         List.mem parent owners && not (List.mem value owners))
+  let most_specific =
+    owners
+    |> List.filter (fun candidate ->
+         List.for_all
+           (fun owner -> is_subsort metadata.edges [] candidate owner)
+           owners)
   in
-  (* Nested proper partitions (Wasm 1.0/2.0: instr proper sort inside the
-     admininstr one) give a constructor of both owners the partition of the
-     most specific owner. *)
-  let most_specific_partition =
-    List.filter
-      (fun (_, parent, _) ->
-        List.for_all
-          (fun (_, parent', _) -> is_subsort metadata.edges [] parent parent')
-          partitions)
-      partitions
-  in
-  match partitions, most_specific_partition with
-  | _ :: _, [(proper, _, _)] -> proper
-  | _ :: _, _ -> fail "constructor belongs to more than one proper partition"
-  | [], _ ->
-      let most_specific =
-        owners
-        |> List.filter (fun candidate ->
-             List.for_all
-               (fun owner -> is_subsort metadata.edges [] candidate owner)
-               owners)
-      in
-      begin match most_specific with
-      | [owner] -> owner
-      | [] when owners = [] -> "SpectecTerminal"
-      | [] -> fail "constructor has incomparable annotated owners"
-      | _ -> fail "constructor has ambiguous annotated owners"
-      end
+  match most_specific with
+  | [owner] -> owner
+  | [] when owners = [] -> "SpectecTerminal"
+  | [] -> fail "constructor has incomparable annotated owners"
+  | _ -> fail "constructor has ambiguous annotated owners"
 
 let rec sort_of_typ_seen metadata seen typ =
   match typ.it with
@@ -527,7 +483,6 @@ let scan_sorts script =
   let edges = subsort_edges_of hints annotated in
   validate_edges origins edges;
   let annotated = order_sorts origins edges annotated in
-  let proper = proper_sorts_of hints annotated in
   let lists = typed_list_sorts_of source.list_uses annotated edges in
   validate_list_families hints lists edges;
   let owners = constructor_owners_of definitions annotated in
@@ -539,7 +494,6 @@ let scan_sorts script =
   ; origins
   ; annotated
   ; edges
-  ; proper
   ; owners
   ; lists
   ; stored = stored_of type_env definitions hints
@@ -548,21 +502,6 @@ let scan_sorts script =
 let annotated_sorts metadata = metadata.annotated
 
 let subsort_edges metadata = metadata.edges
-let proper_sorts metadata =
-  List.map (fun (proper, parent, _) -> proper, parent) metadata.proper
-
-(* A proper sort is below the proper sort of each strict supersort of its
-   parent: InstrProper < AdmininstrProper when instr < admininstr. *)
-let proper_edges metadata =
-  List.concat_map
-    (fun (proper, parent, _) ->
-      List.filter_map
-        (fun (proper', parent', _) ->
-          if parent <> parent' && is_subsort metadata.edges [] parent parent'
-          then Some (proper, proper')
-          else None)
-        metadata.proper)
-    metadata.proper
 let typed_list_sorts metadata = metadata.lists
 
 let typed_parents metadata sort =
@@ -667,10 +606,12 @@ let sequence_element_wrappers metadata typ =
  *
  * Rule-level hints are analyzed here as certificates for later RuleD
  * translation. *)
+
+(* The configuration constructor whose argument at sequence_position is the
+   sequence that a sequence context splits. *)
 type frame =
   { mixop : mixop
   ; config_typ : typ
-  ; state_typ : typ
   ; sequence_position : int
   }
 
@@ -681,28 +622,29 @@ type bridge =
   ; premise : prem
   }
 
+(* A rule that identifyFocus finds inside a sequence: a rule of the inner
+   relation of a sequence context, or of a relation reached through bridges.
+   parts are the top-level parts of its conclusion input sequence. *)
 type focus_pattern =
   { source : relation
   ; ordinal : int
   ; rule : rule
-  ; operands : exp list
-  ; trailing : exp list
-  ; deferred_execution : id option
+  ; parts : exp list
   ; bridges : bridge list
   }
 
+(* A sequence context, hint(k_heatcool "x*") on
+     C[l_1 ... l_m x* r_1 ... r_n] ~> C'[l_1 ... l_m x'* r_1 ... r_n]
+     -- R: ...x*... ~> ...x'*...
+   with the hole x* and the context variables l_i and r_j. *)
 type context =
   { source : relation
   ; ordinal : int
   ; rule : rule
   ; inner_relation : id
-  ; prefix : id
-  ; prefix_typ : typ
-  ; focus : id
-  ; focus_typ : typ
-  ; postfix : id
-  ; postfix_typ : typ
-  ; proper_sort : maude_sort
+  ; left : (id * typ) list
+  ; hole : id * typ
+  ; right : (id * typ) list
   ; frame : frame
   ; patterns : focus_pattern list
   }
@@ -711,6 +653,7 @@ type heatcool =
   { source : relation
   ; ordinal : int
   ; rule : rule
+  ; hole : id option  (* x* of hint(k_heatcool "x*") *)
   }
 
 let unsupported at reason =
@@ -724,13 +667,13 @@ let unique at absent ambiguous = function
 let context_hint values =
   values |> List.filter (fun hint -> hint.hintid.it = "k_heatcool")
 
-(* A hint(k_heatcool) rule whose only premise steps the same relation, the
-   inside of its context (K embedding, TRANSLATION.md). *)
-let is_kept_rule relation_id rule =
-  let RuleD (_, _, _, _, premises) = rule.it in
-  match premises with
-  | [{it = RulePr (target, _, _, _); _}] -> target.it = relation_id.it
-  | _ -> false
+(* hint(k_heatcool) or hint(k_heatcool "x*"), where x* names the hole: the
+   conclusion's sequence variable that the execution premise steps. *)
+let heatcool_hole hint =
+  match hint.hintexp.it with
+  | El.Ast.SeqE [] -> None
+  | El.Ast.TextE name -> Some (name $ hint.hintexp.at)
+  | _ -> unsupported hint.hintexp.at "expects no argument or a variable name"
 
 let find_relation relations id at =
   relations
@@ -776,26 +719,6 @@ let rec source_name exp =
   | SubE (source, _, _) -> source_name source
   | _ -> None
 
-let empty exp =
-  match exp.it with ListE [] -> true | _ -> false
-
-let nonempty_name exp =
-  match exp.it with
-  | CmpE (`NeOp, _, left, right) when empty right -> source_name left
-  | CmpE (`NeOp, _, left, right) when empty left -> source_name right
-  | _ -> None
-
-let nonempty_context prefix postfix exp =
-  match exp.it with
-  | BinE (`OrOp, `BoolT, left, right) ->
-      begin match nonempty_name left, nonempty_name right with
-      | Some left, Some right ->
-          List.sort String.compare [left; right]
-          = List.sort String.compare [prefix; postfix]
-      | _ -> false
-      end
-  | _ -> false
-
 let children ~deep exp =
   match exp.it with
   | TupE exps | ListE exps -> exps
@@ -836,10 +759,8 @@ let rec locate_unique ~deep at ambiguous locate exp =
 let locate_inputs ~deep at ambiguous locate inputs =
   List.filter_map (locate_unique ~deep at ambiguous locate) inputs
 
-let frame mixop exp state sequence_position =
-  {mixop; config_typ = exp.note; state_typ = state.note; sequence_position}
-
-let sequence_frame_opt subject inputs at =
+(* The configuration in the rule inputs that has subject as an argument. *)
+let sequence_frame subject inputs at =
   let find exp =
     match exp.it with
     | CaseE (mixop, {it = TupE components; _}, _) ->
@@ -848,12 +769,9 @@ let sequence_frame_opt subject inputs at =
           |> List.mapi (fun position component -> position, component)
           |> List.filter (fun (_, component) -> component == subject)
         with
-        | [sequence_position, _] when List.length components = 2 ->
-            let state = List.nth components (1 - sequence_position) in
-            Some (frame mixop exp state sequence_position)
+        | [sequence_position, _] ->
+            Some {mixop; config_typ = exp.note; sequence_position}
         | [] -> None
-        | [_] -> unsupported exp.at
-            "focused configuration must contain one state and one sequence"
         | _ -> unsupported exp.at
             "focused sequence occurs more than once in its configuration"
         end
@@ -861,20 +779,23 @@ let sequence_frame_opt subject inputs at =
   in
   match locate_inputs ~deep:false at
     "focused sequence has more than one enclosing configuration" find inputs with
-  | [] -> None
-  | [frame] -> Some frame
+  | [frame] -> frame
+  | [] -> unsupported at "focused sequence is not an argument of a configuration"
   | _ -> unsupported at
       "focused sequence has more than one enclosing input configuration"
 
+(* The sequence at the position of the frame in the configuration of the
+   rule inputs that has the frame's constructor. *)
 let framed_subject (expected : frame) inputs at =
   let find exp =
     match exp.it with
     | CaseE (mixop, {it = TupE components; _}, _)
       when mixop = expected.mixop ->
-        if List.length components <> 2 then
-          unsupported exp.at
-            "focused configuration must contain one state and one sequence";
-        Some (List.nth components expected.sequence_position)
+        begin match List.nth_opt components expected.sequence_position with
+        | Some subject -> Some subject
+        | None -> unsupported exp.at
+            "focused configuration has no argument at the sequence position"
+        end
     | _ -> None
   in
   match locate_inputs ~deep:true at
@@ -883,12 +804,6 @@ let framed_subject (expected : frame) inputs at =
   | [] -> unsupported at "cannot locate the focused configuration"
   | _ -> unsupported at
       "focused configuration occurs in more than one relation input"
-
-let sequence_frame subject inputs at =
-  match sequence_frame_opt subject inputs at with
-  | Some frame -> frame
-  | None -> unsupported at
-      "focused repeated field is not inside a state/sequence configuration"
 
 let sequence_parts exp =
   let rec collect exp parts =
@@ -901,68 +816,6 @@ let sequence_parts exp =
   in
   collect exp []
 
-let rec strip_subtype exp =
-  match exp.it with
-  | SubE (source, _, _) -> strip_subtype source
-  | _ -> exp
-
-let constructor exp =
-  match (strip_subtype exp).it with
-  | CaseE (mixop, _, _) -> Some mixop
-  | _ -> None
-
-let focus_proper_sort metadata owner at =
-  proper_sorts metadata
-  |> List.filter_map (fun (proper, parent) ->
-       if parent = owner then Some proper else None)
-  |> unique at "focused sort has no proper-instruction subsort"
-       "focused sort has ambiguous proper-instruction subsorts"
-
-let is_trigger metadata proper exp =
-  match constructor exp with
-  | Some mixop ->
-      is_subsort (proper_edges metadata) [] (constructor_result_sort metadata mixop) proper
-  | None -> false
-
-let rec value_part metadata owner exp =
-  let exp = strip_subtype exp in
-  match exp.it with
-  | IterE (element, _) | LiftE element -> value_part metadata owner element
-  | ListE elements -> List.for_all (value_part metadata owner) elements
-  | _ ->
-      let candidate =
-        match constructor exp with
-        | Some mixop -> constructor_result_sort metadata mixop
-        | None ->
-            begin match typed_list_owner metadata exp.note with
-            | Some candidate -> candidate
-            | None -> sort_of_typ metadata exp.note
-            end
-      in
-      candidate <> owner
-      && is_subsort
-           (subsort_edges metadata) [] candidate owner
-
-let split_trigger metadata owner subject at =
-  let parts = sequence_parts subject in
-  let proper = focus_proper_sort metadata owner at in
-  let rec split operands = function
-    | [] -> None
-    | exp :: trailing when is_trigger metadata proper exp ->
-        Some (List.rev operands, exp, trailing)
-    | exp :: rest -> split (exp :: operands) rest
-  in
-  match split [] parts with
-  | None -> None
-  | Some (operands, trigger, trailing) ->
-      if List.exists (is_trigger metadata proper) trailing then
-        unsupported at "has more than one top-level proper-instruction trigger";
-      if not (List.for_all (value_part metadata owner) operands) then
-        unsupported at
-          ("has a non-value before its proper-instruction trigger in `"
-           ^ Il.Print.string_of_exp subject ^ "`");
-      Some (operands, trigger, trailing)
-
 let execution_premises execution_input_count premises =
   premises
   |> List.filter_map (fun premise ->
@@ -972,76 +825,45 @@ let execution_premises execution_input_count premises =
            Some (id, mixop, head, premise)
        | RulePr _ | IfPr _ | LetPr _ | ElsePr | IterPr _ -> None)
 
-let focus_patterns (metadata : t) execution_input_count relations contexts
-    excluded (context : context) owner =
+(* The focus patterns of a sequence context: one per rule of its inner
+   relation, except sequence contexts. A rule whose only premise steps another
+   execution relation is a bridge, e.g.
+     rule Step/pure: z; instr* ~> z; instr'*  -- Step_pure: instr* ~> instr'*
+   and the rules of that relation give the patterns instead. *)
+let focus_patterns (metadata : t) execution_input_count contexts
+    (context : context) owner =
+  let is_context rule =
+    List.exists (fun (candidate : context) -> candidate.rule == rule) contexts
+  in
   let rec visit seen bridges relation_id =
     if List.mem relation_id.it seen then
       unsupported relation_id.at "execution-relation bridge contains a cycle";
-    let relation = find_relation relations relation_id relation_id.at in
+    let relation = find_relation metadata.relations relation_id relation_id.at in
     relation.rules
     |> List.mapi (fun ordinal rule -> ordinal, rule)
     |> List.concat_map (fun (ordinal, rule) ->
          let RuleD (_, _, mixop, head, premises) = rule.it in
-         let is_context_rule =
-           List.exists
-             (fun (candidate : context) -> candidate.rule == rule)
-             contexts
-           || List.exists (fun (kept : heatcool) -> kept.rule == rule) excluded
-         in
          let execution = execution_premises execution_input_count premises in
-         if is_context_rule then []
-         else
-           let inputs =
-             relation_inputs execution_input_count relation mixop head rule.at
-           in
-           let subject =
-             if relation.id.it = context.source.id.it then
-               framed_subject context.frame inputs rule.at
-             else
-               sequence_subject metadata owner inputs rule.at
-           in
-           match split_trigger metadata owner subject rule.at with
-           | Some (operands, _, trailing) ->
-               let deferred_execution =
-                 match
-                   execution
-                   |> List.filter_map (fun (target, _, _, _) ->
-                        if target.it = relation.id.it then Some target else None)
-                 with
-                 | [] -> None
-                 | [target] -> Some target
-                 | _ -> unsupported rule.at
-                     "has more than one recursive execution premise"
-               in
-               [{ source = relation
-                ; ordinal
-                ; rule
-                ; operands
-                ; trailing
-                ; deferred_execution
-                ; bridges = List.rev bridges
-                }]
-           | None ->
-               begin match execution with
-               | [(target_id, _, _, premise)]
-                 when target_id.it <> relation.id.it ->
-                   if List.length premises <> 1 then
-                     unsupported rule.at
-                       "execution-relation bridge has additional premises";
-                   let bridge =
-                     { source = relation
-                     ; ordinal
-                     ; rule
-                     ; premise
-                     }
-                   in
-                   visit (relation.id.it :: seen) (bridge :: bridges) target_id
-               | [] -> unsupported rule.at
-                   ("direct execution rule has no proper-instruction trigger in `"
-                    ^ Il.Print.string_of_exp subject ^ "`")
-               | _ -> unsupported rule.at
-                   "has an ambiguous execution-relation bridge"
-               end)
+         match execution, premises with
+         | _ when is_context rule -> []
+         | [(target, _, _, premise)], [_] when target.it <> relation.id.it ->
+             let bridge = {source = relation; ordinal; rule; premise} in
+             visit (relation.id.it :: seen) (bridge :: bridges) target
+         | _ ->
+             let inputs =
+               relation_inputs execution_input_count relation mixop head rule.at
+             in
+             let subject =
+               if relation.id.it = context.source.id.it then
+                 framed_subject context.frame inputs rule.at
+               else sequence_subject metadata owner inputs rule.at
+             in
+             [{ source = relation
+              ; ordinal
+              ; rule
+              ; parts = sequence_parts subject
+              ; bridges = List.rev bridges
+              }])
   in
   visit [] [] context.inner_relation
 
@@ -1053,10 +875,9 @@ let scan_heatcool (metadata : t) execution_input_count =
        | _ :: _ :: _ -> unsupported hintdef.at
            "rule has more than one k_heatcool hint"
        | [hint] ->
-           require_flags "k_heatcool" [hint];
+           let hole = heatcool_hole hint in
            let source = find_relation metadata.relations relation_id hintdef.at in
            let ordinal, rule = find_rule source rule_id hintdef.at in
-           if is_kept_rule relation_id rule then None else
            let fail reason =
              unsupported rule.at
                ("RuleD " ^ relation_id.it ^ "/" ^ rule_id.it ^ ": " ^ reason)
@@ -1070,80 +891,77 @@ let scan_heatcool (metadata : t) execution_input_count =
              | IterPr _ -> fail "IterPr is not supported in a heated rule") premises;
            if execution_premises execution_input_count premises = [] then
              fail "hint requires a direct execution RulePr";
-           Some ({source; ordinal; rule} : heatcool))
+           Some ({source; ordinal; rule; hole} : heatcool))
 
+(* The sequence context of a rule with hint(k_heatcool "x*"): the conclusion
+   input sequence that contains the hole x*, split around it. The hole must be
+   the input sequence of the rule's one execution premise. *)
 let extract_context (metadata : t) execution_input_count (heated : heatcool) =
-  let {source = relation; ordinal; rule} = heated in
-  let RuleD (_, quants, _, head, premises) = rule.it in
-  let inputs =
-    relation_inputs execution_input_count relation relation.mixop head rule.at
-  in
-  match execution_premises execution_input_count premises with
-  | [(inner_relation, inner_mixop, inner_head, _)] ->
-      let inner = find_relation metadata.relations inner_relation rule.at in
-      let inner_inputs =
-        relation_inputs execution_input_count inner inner_mixop inner_head rule.at
+  match heated.hole with
+  | None -> None
+  | Some hole ->
+      let {source = relation; ordinal; rule; _} = heated in
+      let RuleD (_, quants, _, head, premises) = rule.it in
+      let fail reason = unsupported hole.at ("hole `" ^ hole.it ^ "` " ^ reason) in
+      let inputs =
+        relation_inputs execution_input_count relation relation.mixop head rule.at
       in
-      let inner_focus owner focus =
-        List.exists
-          (fun input ->
-            sequence_subjects metadata owner input
-            |> List.exists (fun exp -> source_name exp = Some focus))
-          inner_inputs
+      let inner_relation, inner_inputs =
+        match execution_premises execution_input_count premises with
+        | [(inner_relation, inner_mixop, inner_head, _)] ->
+            let inner = find_relation metadata.relations inner_relation rule.at in
+            inner_relation,
+            relation_inputs execution_input_count inner inner_mixop inner_head rule.at
+        | _ -> fail "requires exactly one execution premise"
       in
-      let candidates owner =
-        inputs
-        |> List.concat_map (sequence_subjects metadata owner)
-        |> List.filter_map (fun subject ->
-             match List.map source_name (sequence_parts subject) with
-             | [Some prefix; Some focus; Some postfix]
-               when inner_focus owner focus ->
-                 Some (subject, owner, prefix, focus, postfix)
-             | _ -> None)
+      let is_hole exp = source_name exp = Some hole.it in
+      let subjects owner exps =
+        List.concat_map (sequence_subjects metadata owner) exps
       in
-      begin match metadata.annotated |> List.concat_map candidates with
-      | [] -> None
-      | [(subject, focus_owner, prefix_name, focus_name, postfix_name)] ->
-          let prefix, prefix_typ = quant_type quants prefix_name rule.at in
-          let focus, focus_typ = quant_type quants focus_name rule.at in
-          let postfix, postfix_typ = quant_type quants postfix_name rule.at in
-          let frame = sequence_frame subject inputs rule.at in
-          Some
-            ({ source = relation; ordinal; rule; inner_relation
-             ; prefix; prefix_typ; focus; focus_typ; postfix; postfix_typ
-             ; proper_sort = focus_proper_sort metadata focus_owner rule.at
-             ; frame; patterns = []
-             }, focus_owner)
-      | _ -> unsupported rule.at "has ambiguous prefix/hole/postfix contexts"
-      end
-  | _ -> None
+      let enclosing owner =
+        subjects owner inputs
+        |> List.filter (fun subject -> List.exists is_hole (sequence_parts subject))
+        |> List.map (fun subject -> subject, owner)
+      in
+      let subject, owner =
+        match List.concat_map enclosing metadata.annotated with
+        | [found] -> found
+        | [] -> fail "is not a variable of a sequence in the conclusion input"
+        | _ -> fail "occurs in more than one sequence of the conclusion input"
+      in
+      if not (List.exists is_hole (subjects owner inner_inputs)) then
+        fail "is not the input sequence of the execution premise";
+      let variable exp =
+        match source_name exp with
+        | Some name -> quant_type quants name rule.at
+        | None -> fail "has a context part that is not a variable"
+      in
+      let rec around left = function
+        | part :: right when is_hole part ->
+            if List.exists is_hole right then
+              fail "occurs more than once in its sequence";
+            List.rev left, part, right
+        | part :: right -> around (part :: left) right
+        | [] -> fail "is not a part of its sequence"
+      in
+      let left, hole, right = around [] (sequence_parts subject) in
+      Some
+        ({ source = relation; ordinal; rule; inner_relation
+         ; left = List.map variable left
+         ; hole = variable hole
+         ; right = List.map variable right
+         ; frame = sequence_frame subject inputs rule.at
+         ; patterns = []
+         }, owner)
 
-(* The hint(k_heatcool) context rules whose only premise steps the inside of
- * their context in the same relation. The context stays open between steps
- * (K embedding, TRANSLATION.md); such a rule gets no focus pattern. *)
-let scan_kembedding (metadata : t) execution_input_count =
-  metadata.context_hints
-  |> List.filter_map (fun (relation_id, rule_id, values, hintdef) ->
-       match context_hint values with
-       | [] -> None
-       | _ ->
-           let source = find_relation metadata.relations relation_id hintdef.at in
-           let ordinal, rule = find_rule source rule_id hintdef.at in
-           if not (is_kept_rule relation_id rule) then None
-           else if Option.is_none (execution_input_count source.id.it) then
-             unsupported rule.at
-               ("RuleD " ^ relation_id.it ^ "/" ^ rule_id.it
-                ^ ": hint requires an execution relation")
-           else Some ({source; ordinal; rule} : heatcool))
-
-let scan_contexts metadata execution_input_count heated kept =
+let scan_contexts metadata execution_input_count heated =
   let contexts =
     List.filter_map (extract_context metadata execution_input_count) heated
   in
+  let all = List.map fst contexts in
   contexts
   |> List.map (fun (context, owner) ->
        let patterns =
-         focus_patterns metadata execution_input_count metadata.relations
-           (List.map fst contexts) kept context owner
+         focus_patterns metadata execution_input_count all context owner
        in
        {context with patterns})

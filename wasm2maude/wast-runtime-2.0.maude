@@ -10,9 +10,6 @@ mod WASM-WAST-DRIVER is
   op activeFrameDepth : AdmininstrList -> Nat .
 
   vars WSHC WSHS WSHF WSHAT WSHRT : SpectecTerminal .
-  var WSHK : Holes .
-  var WSHR : Step-Request .
-  var WSHH : Hole .
   var WSHMAX : SpectecTerminals .
   var WSHPREFIX : ValList .
   var WSHINSTRS : InstrList .
@@ -32,13 +29,6 @@ mod WASM-WAST-DRIVER is
     if runtimeResults(WSHPREFIX) .
   eq activeFrameDepth(WSHBODY) = 0 [owise] .
 
-  --- A grow request is a focus of the instruction sequence, alone or under its
-  --- sequence hole; matching these shapes costs nothing for other requests.
-  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW)), WSHK) =
-    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW))), WSHK) .
-  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW)) ~> WSHH, WSHK) =
-    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW)) ~> WSHH), WSHK) .
-
   --- Wasm 2.0 references: REF.NULL reftype, REF.FUNC_ADDR, and REF.HOST_ADDR,
   --- which is ref.extern in WAST.
   eq match.value(REF.NULL(WSHRT), result.null-ref(WSHRT)) = match.yes .
@@ -47,11 +37,9 @@ mod WASM-WAST-DRIVER is
 
   --- SpecTec has no call-stack limit: assert_exhaustion passes once the frame
   --- depth of the configuration exceeds the bound (--call-depth), so a PASS is
-  --- relative to that bound. The active frames of cool-all(unheat(R), K) are
-  --- the frame holes of K and the active frames of the request R.
+  --- relative to that bound.
   crl [exhaustion-done] :
-    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, run((WSHS ; WSHF) ; WSHBODY))
     => script.ready(WSHS, WSHENV, WSHCMDS)
-    if (WSHS ; WSHF) ; WSHBODY := unheat(WSHR)
-       /\ frameDepth(WSHK) + activeFrameDepth(WSHBODY) > WSHREQUIRED = true .
+    if activeFrameDepth(WSHBODY) > WSHREQUIRED = true .
 endm

@@ -125,7 +125,7 @@ var z : state
 ;; Administrative Instructions
 ;;
 
-syntax admininstr hint(show instr) hint(desc "administrative instruction") hint(maude_sort) hint(maude_proper "val AdmininstrProper") =
+syntax admininstr hint(show instr) hint(desc "administrative instruction") hint(maude_sort) =
   | instr
   | REF.FUNC_ADDR funcaddr         hint(show REF.FUNC %)
   | REF.HOST_ADDR hostaddr         hint(show REF.EXTERN %)

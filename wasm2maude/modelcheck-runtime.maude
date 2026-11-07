@@ -10,9 +10,9 @@ mod WASM-MODELCHECK-DRIVER is
   sort ModelState .
   subsort ModelState < State .
   op boot : -> ModelState [ctor] .
-  op init : KState -> ModelState [ctor] .
+  op init : SpectecTerminal -> ModelState [ctor frozen (1)] .
   op ready : SpectecTerminal -> ModelState [ctor] .
-  op exec : KState -> ModelState [ctor] .
+  op exec : SpectecTerminal -> ModelState [ctor frozen (1)] .
   op finished : ValList -> ModelState [ctor] .
   --- $invoke is undefined unless the arguments satisfy Val_ok.
   op invalid-invocation : -> ModelState [ctor] .
@@ -26,15 +26,20 @@ mod WASM-MODELCHECK-DRIVER is
   var ST : ModelState .
   var P : Prop .
 
-  crl [instantiate] : boot => init(kstate(C, none))
+  --- One rewrite of init or exec is one source step (run-runtime.maude).
+  crl [instantiate] : boot => init(C)
     if instantiate(emptyStore, inputModule, nil) => C .
-  rl [initialize] : init(kstate(Step(Z ; nil), none)) => ready(Z) .
+  crl [init-step] : init(C) => init(C2)
+    if Step(C) => C2 .
+  rl [initialize] : init(Z ; nil) => ready(Z) .
 
-  crl [invoke] : ready(Z) => exec(kstate(C2, none))
+  crl [invoke] : ready(Z) => exec(C2)
     if C2 := invocation(Z) /\ isConfig(C2) .
   crl [invalid-invocation] : ready(Z) => invalid-invocation
     if not isConfig(invocation(Z)) .
-  rl [finished] : exec(kstate(Step(Z ; RESULT), none)) => finished(RESULT) .
+  crl [step] : exec(C) => exec(C2)
+    if Step(C) => C2 .
+  rl [finished] : exec(Z ; RESULT) => finished(RESULT) .
 
   eq finished(RESULT) |= returned(RESULT) = true .
   eq ST |= P = false [owise] .

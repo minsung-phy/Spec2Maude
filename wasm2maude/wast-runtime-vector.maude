@@ -28,8 +28,6 @@ mod WASM-WAST-VECTOR is
   op tableFits : SpectecTerminal Nat Nat -> Bool .
 
   vars WSHC WSHS WSHNT WSHVALUE WSHLT WSHAT : SpectecTerminal .
-  var WSHK : Holes .
-  var WSHH : Hole .
   var WSHLANES : SpectecTerminals .
   var WSHACTUAL : ValList .
   var WSHCMDS : Commands .
@@ -60,15 +58,6 @@ mod WASM-WAST-VECTOR is
     => script.wrong-assertion(WSHID)
     if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS) .
 
-  --- A grow request is a focus of the instruction sequence, alone or under its
-  --- sequence hole; matching these shapes costs nothing for other requests.
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))), WSHK) =
-    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA))))), WSHK)
-    if tableFits(WSHS, WSHA, WSHN) .
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH, WSHK) =
-    kstate(choice(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH), WSHK)
-    if tableFits(WSHS, WSHA, WSHN) .
-
   --- Environment model, not SpecTec: a table of more than tableLimit references
   --- is not allocated, as the reference interpreter fails to allocate it, so
   --- table.grow takes the result of its failure rule (Step/table.grow-fail),
@@ -77,11 +66,8 @@ mod WASM-WAST-VECTOR is
   eq tableLimit = 16777216 .
   eq tableFits(WSHS, WSHA, WSHN) =
     map-size(spectec-table(WSHS, WSHA) . 'REFS) + WSHN <= tableLimit .
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))), WSHK) =
-    kstate(WSHS ; CONST(WSHAT, # inv-signed-(spectec-size(WSHAT), -_(1 : nat <:> int))), WSHK)
-    if tableFits(WSHS, WSHA, WSHN) = false .
-  ceq kstate(Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) ~> WSHH, WSHK) =
-    kstate((WSHS ; CONST(WSHAT, # inv-signed-(spectec-size(WSHAT), -_(1 : nat <:> int)))) ~> WSHH, WSHK)
+  ceq Step(WSHS ; (WSHC (CONST(WSHAT, # WSHN) TABLE.GROW(WSHA)))) =
+    WSHS ; CONST(WSHAT, # inv-signed-(spectec-size(WSHAT), -_(1 : nat <:> int)))
     if tableFits(WSHS, WSHA, WSHN) = false .
 
   eq match.value(WSHVALUE, result.exact-vec(WSHVALUE)) = match.yes .

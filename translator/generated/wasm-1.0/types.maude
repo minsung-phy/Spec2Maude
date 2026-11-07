@@ -7,21 +7,11 @@ fmod SPEC2MAUDE-SORTS is
 
   sort admininstr .
 
-  sort InstrProper .
-
-  sort AdmininstrProper .
-
   subsort instr < admininstr .
 
   subsort val < instr .
 
   subsort admininstr < SpectecTerminal .
-
-  subsort InstrProper < instr .
-
-  subsort AdmininstrProper < admininstr .
-
-  subsort InstrProper < AdmininstrProper .
 endfm
 
 fmod SPEC2MAUDE-TYPES is

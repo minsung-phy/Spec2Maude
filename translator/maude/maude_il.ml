@@ -93,6 +93,7 @@ type rule_condition =
 
 type eq_attr =
   | Owise
+  | Label of label  (* emitted as eq [label] : ... *)
 
 
 (* Maude statements *)

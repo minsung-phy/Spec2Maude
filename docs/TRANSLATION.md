@@ -149,8 +149,9 @@ Installation and usage are in [ARTIFACT.md](ARTIFACT.md). Hint contracts are
 recorded below. PASS, STUCK, and TIMEOUT are distinguished.
 Passing the official suite alone does not prove semantic equivalence for all programs.
 
-The initialization and execution wrappers of the model checker and the focus/split/plug intermediate states are not
-identified with one source step. To claim a particular property transferred to the source, the state correspondence, observation points,
+The initialization and execution wrappers of the model checker are not identified with source steps; heating and
+cooling happen inside the rewrite condition of one step and are not states ([state correspondence](#k_heatcool-scope)).
+To claim a particular property transferred to the source, the state correspondence, observation points,
 the effect of divergence and deadlock in internal steps, and whether the search completed must be checked separately.
 No equivalence with the whole current checked formal or completed preservation proof is claimed.
 
@@ -400,10 +401,9 @@ A hint makes explicit a boundary that is hard to translate directly; it is not p
 | --- | --- |
 | `maude_sort` | Gives a source type a separate Maude sort and list representation. The sorts used as lists must form one subsort chain. Without it, the general `SpectecTerminals` representation is used. |
 | `maude_subsort "T"` | Subsort relation between the marked source types. A wrong target or a cycle is rejected. |
-| `maude_proper "V P"` | Builds a proper sort P that excludes the value V from the declared constructor set. Instruction names are not hardcoded. |
 | `maude_array` (record field) | Stores this sequence field of a monomorphic record type as a size + prelude `ARRAY` (default value 0). Field access is limited to length, element and range reads, and range and whole writes; construction is limited to `0^n`, `s 0^n`, and lists. Other uses are rejected. 0s in the elements are not stored, so the element type must contain the number 0. This condition is not checked (it holds for Wasm `byte`). |
 | `maude_map` (record field, function) | Field: stores this sequence field of a monomorphic record type as a size + prelude `MAP` (an entry at every index). Field access is limited to length and element reads and element, range (`map-write-range`), and whole writes and extension `=++` (`map-append`); construction is limited to lists, `e.F s`, and record `++`. Function: the result is a maude_map field, and calls are used only for length and element reads. Other uses are rejected. |
-| `k_heatcool` | Translates a rule with an execution premise by heating/cooling. A context rule whose only premise is one execution premise of the same relation keeps the context open in `kstate(R, K)` by K embedding (K book §5.4.6), and other rules are connected by split/plug (K book §5.4.5). For a `~>` relation, split and focus identification are equations; for a `~>*` relation, split is a rule. The applicability conditions and assumptions are in [scope](#k_heatcool-scope) below. |
+| `k_heatcool`, `k_heatcool "x*"` (rule) | Translates a rule with execution premises by heating (a rule) and cooling (equations), split/plug of K book §5.4.5. With `"x*"`, the rule is a sequence context whose hole is the conclusion's sequence variable `x*`, and its relation gets `identifyFocus` rules. The applicability conditions are in [scope](#k_heatcool-scope) below. |
 | `maude_kind` | Declares the result of a function with the partial arrow `~>`. A general function without this hint is declared with `->`. A function that contains a case premise check is also `~>` ([value construction and type constraints](#value-construction-and-type-constraints)). |
 | `maude_rule` | Translates a function that needs a rewrite premise to a request/rule. It keeps the source result and the possible branches. |
 | `inverse $g` | Obtains a missing argument with the declared inverse function g and rechecks the pattern and the forward result. The argument order and signature are checked. |
@@ -528,136 +528,92 @@ preservation proof for arbitrary LTL properties; the current limits are recorded
 
 ### k_heatcool scope
 
-The hint is used without arguments (former names: `rl_embedding`, `k_embedding`, `maude_context`).
-The translator divides hinted rules into two kinds by AST structure. It does not divide them by the Wasm names of relations or constructors.
+`hint(k_heatcool)` translates a rule with execution premises by heating and cooling, following split/plug
+(K book §5.4.5): splitting is a rule, since a term may split in several ways, and plugging is an equation.
+Every hinted rule is translated the same way. The translator reads the rule; it does not divide rules by the Wasm
+names of relations or constructors.
 
-- **context rule**: a rule whose only premise is one execution premise of the same relation (`R: C[x] ~> C'[x']  -- R: x ~> x'`).
-  In Wasm 3.0 these are `Step/ctxt-label`, `Step/ctxt-handler`, `Step/ctxt-frame`.
-  It is K embedding (K book §5.4.6). Heating and cooling are both equations, and the context stays open in `K` of
-  `kstate(R, K)` while the inside takes several steps.
-- **split rule**: the other hinted rules. In Wasm 3.0 these are `Step/pure`, `Step/read`, `Step/ctxt-instrs`,
-  `Steps/trans`, `Eval_expr`. The execution premise is divided into a request and a hole (split), and the result is returned
-  to the conclusion (plug, equation).
-
-Whether split is emitted as an equation or a rule is decided by the arrow of the relation.
-
-- `~>` relation (`Step`): split and focus identification (`identifyFocus`) are equations. They only divide the configuration
-  and do not execute, so they do not create states. One step is one rule of the inner relation.
-- `~>*` relation (`Steps`, `Eval_expr`): split is a rule, because `Steps/refl` and `Steps/trans` both apply to the same request,
-  which is an actual choice. These relations are used only inside the rewrite conditions of initialization.
-
-The actual source and generated output are in [translation examples for the 8 rules](#k_heatcool-translation-examples-for-the-8-rules) below.
-
-A split rule applies to a RuleD of an execution relation and needs at least one direct execution RulePr.
-For each execution premise, only the variables among the earlier bindings that the result pattern, the remaining conditions, and the conclusion need are stored in the hole.
-General conditions and output pattern checks keep their order before and after that execution.
-For a single premise connected through a sequence-result relation, an identification helper is generated from the target input pattern.
-From the current source rule names, `identifyPure` and `identifyRead` are generated.
-ElsePr and IterPr of a hinted rule and rewrite-backed expressions are currently Unsupported.
-Request sorts and return sorts are distinguished, and hole arguments get `[frozen (2)]` to prevent rule rewriting.
-
-**Conditions and justification of equation split.** An equation, once chosen, does not backtrack, so the following must hold.
-
-- The identification helper checks the input pattern of the target rule together with the equational premises that use only input variables (e.g.
-  `c =/= 0` of if-true). An input on which no rule can execute (a single `TRAP` left at the end, etc.)
-  is not split and remains `Step(c)`. Rules with patterns whose length is not determined (trap-instrs etc., below)
-  are not put into the identification helper. pure, read, and Step rules must not match
-  the same focus together. In Wasm 3.0, it was confirmed from the generated patterns that the trigger instructions of the three kinds of rules do not overlap (not a proof).
-- The identification helper also checks the range-deciding premises, as `identifyFocus` does (the block
-  type that decides m of `val^m`, etc.). Without them, both the read split that cuts `c1 c2 BLOCK` (a block that takes no values) as a whole
-  and the focus split that cuts only `BLOCK` match, and the same term becomes equal to both a state that can progress and a stuck state.
-
-  ```maude
-  ceq identifyRead(Z ; (VAL* BLOCK(BT, INSTR*))) = true
-    if M-3 := size(VAL*) /\ T_1* ->- nil  T_2* := blocktype-(Z, BT)
-    /\ M-3 = size(T_1*) .
-  ```
-- An equation states equality, so there must be one way to cut each input (confluence). If the operands or the tail of a focus pattern
-  contain a sequence whose length is not determined (`val*`, or `val^n` where n does not occur elsewhere in the rule),
-  it overlaps the front and back of the sequence context, so there are several ways to cut, and each is a different source next state.
-  Example: with trap-instrs (`val* TRAP instr* ~> TRAP`), `c1 c2 TRAP NOP` has 5 next states
-  (`TRAP`, `TRAP NOP`, `c1 TRAP NOP`, `c1 TRAP`, `c1 c2 TRAP`). For such a pattern, no focus or identification equation is
-  generated; the rule through the bridge and the rule inside the sequence context are each emitted as one rule
-  (`heatcool.ml:absorbed_rules`). A rule uses all matches, so the next states are the same as in the source.
-
-  ```maude
-  crl [Step-pure-trap-instrs] : Step(Z ; (VAL* (TRAP INSTR*))) => Z ; TRAP
-    if _or_(VAL* =/= nil, INSTR* =/= nil) .
-  crl [Step-ctxt-instrs-trap-instrs] : Step(Z ; (PREFIX ((VAL* (TRAP INSTR*)) POSTFIX)))
-      => Z ; (PREFIX (TRAP POSTFIX))
-    if _or_(PREFIX =/= nil, POSTFIX =/= nil) /\ _or_(VAL* =/= nil, INSTR* =/= nil) .
-  ```
-
-  The decision is made only from the rule shape; in Wasm 3.0 the rules concerned are trap-instrs and throw_ref-instrs.
-  `val^n` is regarded as having a determined length if n also occurs elsewhere in the rule (the block type of block, the number of
-  fields of struct.new, etc.; the translator does not check whether n is actually determined by that value).
-  Evidence: experiment record outside the repository (2026-10-29 trap-rule, not included in the artifact).
-- A configuration of a model-checking state may contain a split request. A proposition that inspects the configuration
-  must read it as `cool-all(unheat(R), K)` (the current proposition `returned` only inspects `finished(...)`).
-- Execution rules apply directly to the state, so an execution rule whose result is a computed expression binds the result to a result-sort variable with `:=`
-  (`reld.ml:execution_statement`). If a partial function is undefined, as for an out-of-range store, that rule
-  does not apply. In the source too, a rule whose result is undefined is not a step.
-
-The applicability conditions of a context rule are as follows. If they do not hold, it is Unsupported with a diagnostic.
-
-- The context does not change during the inner steps: putting the premise input back into the conclusion output gives the conclusion input
-  (`C'[x]` is `C[x]`). Exchanging part of the state with the inside, as frame does, is allowed.
-- The sequence of the conclusion input is one context element `E`, and the premise executes the sequence variable `x` that is an argument of `E`.
-- The same relation has exactly one sequence context (`val* instr* instr_1*`) of a split rule, and
-  that rule has the condition `val* =/= eps \/ instr_1* =/= eps`.
-- There is at least one rule that consumes `E` (closed body below).
-
-Generated output (where the rule name of `R` is `R-r`):
+For a hinted rule `C ~> C'  -- R_1: c_1 ~> c_1' ... -- R_k: c_k ~> c_k'` (other premises in between):
 
 ```maude
-kstate(z ; PREFIX E POSTFIX, K) = kstate(z ; E, hole(PREFIX, POSTFIX) K)
-  if _or-else_(PREFIX =/= nil, POSTFIX =/= nil) /\ closed-R-r(x) = false .  --- instrs heating
-kstate(C[x], K) = kstate(x, hole-R-r(..) K)  if closed-R-r(x) = false .   --- heating
-kstate(x', hole-R-r(..) K) = kstate(C'[x'], K)  if closed-R-r(x') = true .  --- cooling
-kstate(z ; s, hole(PREFIX, POSTFIX) K) = kstate(z ; PREFIX s POSTFIX, K) [owise] .  --- instrs cooling
-kstate(c, K) = kstate(Step(c), K)  if plug-first(K) = false [owise] .       --- wrap as a request
-cool-all(c, K)                                                               --- the configuration with all holes plugged back
-unheat(r)                                                                    --- the configuration that a split request denotes
+crl [r-heat] : C => R_1(c_1) ~> hole_1 if <R_1 can start on c_1> .   --- heating, a rule
+eq  [r-next] : c_1' ~> hole_1 = R_2(c_2) ~> hole_2 .                  --- next execution premise
+eq  [r-cool] : c_k' ~> hole_k = C' .                                  --- cooling, an equation
 ```
 
-A closed body is the pattern at the position of `x` in those focus patterns of the sequence context whose trigger is the constructor of `E`.
-That is, it is the body shape of the rules that consume `E` itself (label-vals, br-label, return-frame, etc.), and it is extracted
-from the source rules, not from Wasm names. Instrs cooling applies only when the heating condition
-does not hold, so it is `[owise]`. When no context equation applies any more and there is no sequence
-hole waiting either, the configuration is wrapped as a request of the relation. Then the split equations find the focus, and
-one rule of the relation executes one step there.
+- The heating left side is the conclusion input, the request is the premise input, and the cooling right side is
+  the conclusion output. Each hole keeps only the already bound variables that the result pattern, the remaining
+  premises, and the conclusion need. General premises keep their order before and after each execution.
+- Labels are the lowercase rule name with `-heat`, `-next`, `-cool` (`step-ctxt-frame-heat`).
+- *R can start on c* is the start condition of the first execution premise (below). It prunes heating: the inner
+  rules check all their premises when the request executes, so a heating whose request cannot step only fails the
+  enclosing condition and adds no state or successor.
+- Request sorts and return sorts are distinguished, and the hole argument of `_~>_` is `[frozen (2)]`.
+- ElsePr and IterPr in a hinted rule and rewrite-backed expressions are Unsupported with a diagnostic.
 
-**Applicability condition.** A Step of the same relation must not apply by itself to a closed body.
-Otherwise K embedding does not open that body, so it loses the inner step branches. The translator does not
-check this; it was confirmed to hold for the Step rules of Wasm 3.0 (`translator/generated/output.maude`):
-br/return/return_call_ref have no rules outside a context, and trap-instrs and throw_ref-instrs apply only when there are
-other instructions before or after.
+**Sequence context.** `hint(k_heatcool "x*")` names the hole `x*`: the variable of the conclusion input sequence that
+the execution premise steps. The rule
+`C[l_1 ... l_m x* r_1 ... r_n] ~> C'[l_1 ... l_m x'* r_1 ... r_n]  -- R: ...x*... ~> ...x'*...`
+is a sequence context with context variables `l_i`, `r_j`. The translator checks that `x*` occurs once in one
+sequence of the conclusion input and is the input sequence of the rule's one execution premise; otherwise it reports
+the hint as Unsupported. In Wasm, `Step/ctxt-instrs` (`z; val* instr* instr_1*`, hole `instr*`, 1.0 and 2.0:
+`admininstr*`) is the only sequence context. A relation has at most one.
 
-**State correspondence.** `cool-all(unheat(R), K)` is the source configuration. One application of a rule inside the execution state
-is one source Step, and heating, cooling, split, and focus are equations, so they do not create states
-(K book Theorem 13, step-for-step correspondence). It was confirmed that for fib(10) the number of compute rule applications (2,036) is the same as
-with the earlier rewrite-condition driver, and that for growbuf(n=128) the number of reachable states (3,008), the final states, and the LTL counterexample are the same
-(experiment record outside the repository, 2026-10-29 step2-heateq). These are checks on finite inputs, not a proof.
+The relation of a sequence context gets `identifyFocus`, which finds a part of the sequence that the relation can
+step:
 
-`Steps` and `Eval_expr` call `Step` directly without a driver. `Step` has no rule that goes into a context
-rule, so this path is valid only for expressions without LABEL_/HANDLER_/FRAME_. The
-constant expressions they evaluate contain no such instructions.
+```maude
+op identifyFocus : Config -> FocusSearch [frozen (1)] .
+op {_|...|_} : L_1 .. L_m Config R_1 .. R_n -> FocusTarget [ctor] .   --- one slot per context variable
+```
+
+- One rule per rule of the relation, except the sequence context itself: the rule's input sequence `p` anywhere in
+  the context sequence, `identifyFocus(C[l p r]) => {l | C[p] | r}`. The slots have the sorts of the context
+  variables, so in Wasm the prefix is a `ValList` because the source variable is `val*`; no value/instruction
+  partition is assumed.
+- A rule whose only premise steps another execution relation is a bridge (`Step/pure`, `Step/read`): the rules of that
+  relation give the patterns, unified into the bridge's input.
+- A pattern keeps only the premises that decide where the focus ends (the `n` of `val^n`, unbounded sequence parts);
+  the others choose between rules with the same focus and are checked when the focus executes. Execution premises
+  are never kept: `Step/ctxt-label`, `-handler`, `-frame` give the patterns `LABEL_ n {..} instr*`, ... without a
+  condition on the body, which the request checks after heating. A condition that runs `identifyFocus` on the body
+  would repeat the search of every nested context at every level (fib(5): 165,181 instead of 36,985 rewrites).
+- `identifyFocus` is defined by rules: one sequence may have several foci with different successors
+  (trap-instrs: `c1 TRAP NOP` has the successors `TRAP`, `TRAP NOP`, `c1 TRAP`). An equation would keep one of them.
+
+The start condition of a premise on relation R is `identifyFocus(c) => {..}` when R has a sequence context, and
+otherwise `identifyFocus<Rule>(c)`, a Bool equation per rule of R that holds when that rule's input pattern and its
+equational premises over input variables hold. The answer is `true` or no result, so these are equations.
+
+Variables keep their source names. A generated variable whose name a statement already uses gets a suffix (`VAL*-1`):
+Maude identifies variables by name.
+
+**State correspondence.** Every driver takes one step as one rule application whose condition runs the heating:
+
+```maude
+crl [step] : exec(C) => exec(C2) if Step(C) => C2 .
+```
+
+In the Kripke structure of a module, a state is an equivalence class of terms of the state kind modulo the equations,
+and a transition is one application of a rule at some position of a state term (Maude manual §12.2). The argument of
+`exec` is frozen (§5.3), so the only transition from `exec(C)` is `[step]` at the top. The heating, the
+`identifyFocus` search, the inner rule, and the cooling happen inside the proof of its rewrite condition (§5.3), so
+they are not transitions. One transition is one source `Step`. For fib(10), the model checker reaches 2,037 states,
+one per Wasm step, the same as the earlier equational K embedding (opt/kstate-embedding). This is a check on a
+deterministic finite input, not a proof.
+
+`Steps` and `Eval_expr` call `Step` through their own heating rules inside rewrite conditions of initialization; the
+context rules are rules of `Step`, so expressions with `LABEL_`, `HANDLER_`, `FRAME_` are stepped as well.
+
+The equational K embedding of the context rules (context kept open in `kstate(R, K)`, closed bodies, heating and
+cooling as equations) is an optimization of this baseline and is kept on the branch `opt/kstate-embedding`.
 
 ## k_heatcool: translation examples for the 8 rules
 
-Below are the current source and the generated Maude statements. Auxiliary declarations and the full identification rules are omitted.
+Below are the current source and the generated Maude statements (`translator/generated/output.maude`).
+Declarations and most `identifyFocus` rules are omitted.
 
-### Translation contract and structure
-
-The actual execution `RulePr` of a `RuleD` is identified, and the existing `Prem` translation result is used. When an execution condition is met, a request and a hole are generated and the remaining conditions are translated recursively. The hole stores only those already bound variables that the inner result pattern, the remaining conditions, and the final conclusion need. When all conditions are processed, the result is plugged into the original conclusion. General conditions are not moved across the next execution premise.
-
-No branching is done on names such as LABEL or FRAME; identification helper and hole names are generated from the source rule. No separate evaluator or general premise framework is added.
-
-Execution requests and return results are distinguished by sort. Plug applies only to return result patterns. In `Eval_expr`, `VAL* : ValList` plays this role, so no separate typecheck is inserted. The hole argument of `_~>_` prevents rule rewriting with `[frozen (2)]`. This does not mean that equational normalization is also prohibited.
-
-A request with no rule to execute stops in that shape. The driver regards `kstate(Step(z ; vals), none)` as completion. Search/LTL on raw requests is not identified with search/LTL on source states. Preservation of the whole meaning is not claimed from result checks on finite inputs and bounded search depth alone.
-
-### 1. Step/pure (split, equation)
+### 1. Step/pure
 
 ```spectec
 rule Step/pure:
@@ -667,18 +623,16 @@ rule Step/pure:
 ```
 
 ```maude
-ceq Step(Z ; INSTR*) = Step-pure(INSTR*) ~> hole-Step-pure(Z)
-    if identifyPure(INSTR*) .
+crl [step-pure-heat] : Step(Z ; INSTR*) => Step-pure(INSTR*) ~> hole-Step-pure(Z)
+  if identifyFocusPure(INSTR*) .
+eq [step-pure-cool] : INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
 
-eq INSTR'* ~> hole-Step-pure(Z) = Z ; INSTR'* .
-eq unheat(Step-pure(INSTR*) ~> hole-Step-pure(Z)) = Z ; INSTR* .
-
-eq identifyPure(NOP) = true .
+eq [focus-pure-nop] : identifyFocusPure(NOP) = true .
 ```
 
-`identifyPure(INSTR*)` checks the input candidate. The original state Z is attached to the inner instruction result.
+`Step_pure` has no sequence context, so the start condition is `identifyFocusPure`, one equation per `Step_pure` rule.
 
-### 2. Step/read (split, equation)
+### 2. Step/read
 
 ```spectec
 rule Step/read:
@@ -688,39 +642,48 @@ rule Step/read:
 ```
 
 ```maude
-ceq Step(Z ; INSTR*) = Step-read(Z ; INSTR*) ~> hole-Step-read(Z)
-    if identifyRead(Z ; INSTR*) .
+crl [step-read-heat] : Step(Z ; INSTR*) => Step-read(Z ; INSTR*) ~> hole-Step-read(Z)
+  if identifyFocusRead(Z ; INSTR*) .
+eq [step-read-cool] : INSTR'* ~> hole-Step-read(Z) = Z ; INSTR'* .
 
-eq INSTR'* ~> hole-Step-read(Z) = Z ; INSTR'* .
-eq unheat(Step-read(Z ; INSTR*) ~> hole-Step-read(Z)) = Z ; INSTR* .
+eq [focus-read-local-get] : identifyFocusRead(Z ; LOCAL.GET(X-4)) = true .
 ```
 
-`identifyRead(Z ; INSTR*)` checks the input candidate. A read execution returns an instruction list, so the original state Z is attached.
-
-### 3. Step/ctxt-instrs (split, equation)
+### 3. Step/ctxt-instrs (sequence context)
 
 ```spectec
 rule Step/ctxt-instrs:
   z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
   -- Step: z; instr* ~> z'; instr'*
-  -- if val* =/= eps \/ instr_1* =/= eps
-  hint(k_heatcool)
+  -- if (val* =/= eps \/ instr_1* =/= eps)
+  hint(k_heatcool "instr*")
 ```
 
 ```maude
-ceq Step(Z ; (STACK (OP REST))) = Step(Z ; FOCUS) ~> hole(PREFIX, POSTFIX)
-    if { PREFIX | (Z ; FOCUS) | POSTFIX } := identifyFocus(Z, STACK, OP, REST)
-      /\ _or_(PREFIX =/= nil, POSTFIX =/= nil) .
-
-eq (Z' ; INSTR'*) ~> hole(PREFIX, POSTFIX) = Z' ; (PREFIX (INSTR'* POSTFIX)) .
-eq unheat(R-3 ~> hole(PREFIX, POSTFIX)) = unheat(R-3) ~> hole(PREFIX, POSTFIX) .
+crl [step-ctxt-instrs-heat] : Step(Z ; INSTRS) => Step(Z ; INSTR*) ~> hole-Step-ctxt-instrs(VAL*, INSTR_1*)
+  if identifyFocus(Z ; INSTRS) => { VAL* | (Z ; INSTR*) | INSTR_1* }
+    /\ _or_(VAL* =/= nil, INSTR_1* =/= nil) .
+eq [step-ctxt-instrs-cool] : (Z' ; INSTR'*) ~> hole-Step-ctxt-instrs(VAL*, INSTR_1*) = Z' ; (VAL* (INSTR'* INSTR_1*)) .
 ```
 
-The `identifyFocus` statements are also equations (`eq`/`ceq identifyFocus(...) = { ... }`). The nonempty premise of the source (`val* =/= eps \/ instr_1* =/= eps`) is translated like any other premise, on `PREFIX` and `POSTFIX` after `identifyFocus` binds them.
-The cut position changes at every step (the result of an earlier instruction is an operand of the next instruction), so it is not kept open.
-No focus pattern is generated for context rules (ctxt-label/handler/frame).
+The whole sequence `INSTRS` is named after its element type. Some `identifyFocus` rules:
 
-### 4. Step/ctxt-label (context rule)
+```maude
+rl [focus-nop] : identifyFocus(Z ; (VAL* (NOP INSTR_1*))) => { VAL* | (Z ; NOP) | INSTR_1* } .
+crl [focus-trap-instrs] : identifyFocus(Z ; (VAL*-1 (VAL* (TRAP (INSTR* INSTR_1*)))))
+    => { VAL*-1 | (Z ; (VAL* (TRAP INSTR*))) | INSTR_1* }
+  if _or_(VAL* =/= nil, INSTR* =/= nil) .
+crl [focus-block] : identifyFocus(Z ; (VAL*-1 (VAL* (BLOCK(BT, INSTR*) INSTR_1*))))
+    => { VAL*-1 | (Z ; (VAL* BLOCK(BT, INSTR*))) | INSTR_1* }
+  if M-3 := size(VAL*) /\ T_1* ->- nil  T_2* := blocktype-(Z, BT) /\ M-3 = size(T_1*) .
+rl [focus-ctxt-label] : identifyFocus(Z ; (VAL* ((LABEL- N-3 { INSTR_0* } INSTR*) INSTR_1*)))
+    => { VAL* | (Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) | INSTR_1* } .
+```
+
+`focus-nop` and `focus-trap-instrs` come from `Step_pure` rules through the bridge `Step/pure`, `focus-block` from a
+`Step_read` rule through `Step/read`, and `focus-ctxt-label` from `Step/ctxt-label`.
+
+### 4. Step/ctxt-label
 
 ```spectec
 rule Step/ctxt-label:
@@ -730,44 +693,19 @@ rule Step/ctxt-label:
 ```
 
 ```maude
-ceq kstate(Z ; (PREFIX ((LABEL- N-3 { INSTR_0* } INSTR*) POSTFIX)), K-4) = kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), hole(PREFIX, POSTFIX) K-4)
-    if _or-else_(PREFIX =/= nil, POSTFIX =/= nil)
-      /\ closed-Step-ctxt-label(INSTR*) = false .
-
-ceq kstate(Z ; (LABEL- N-3 { INSTR_0* } INSTR*), K-4) = kstate(Z ; INSTR*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4)
-    if closed-Step-ctxt-label(INSTR*) = false .
-
-ceq kstate(Z' ; INSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4) = kstate(Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*), K-4)
-    if closed-Step-ctxt-label(INSTR'*) = true .
-
-eq cool-all(Z' ; INSTR'*, hole-Step-ctxt-label(INSTR_0*, N-3) K-4) = cool-all(Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*), K-4) .
-
-eq closed-Step-ctxt-label(VAL*) = true .
-eq closed-Step-ctxt-label(((VAL'* VAL*) BR(L)) INSTR*) = true .
-eq closed-Step-ctxt-label((VAL* BR(L)) INSTR*) = true .
-eq closed-Step-ctxt-label((VAL* RETURN) INSTR*) = true .
-eq closed-Step-ctxt-label(TRAP) = true .
-eq closed-Step-ctxt-label((VAL* RETURN-CALL-REF(YY-2)) INSTR*) = true .
-eq closed-Step-ctxt-label(REF.EXN-ADDR(A) THROW-REF) = true .
-eq closed-Step-ctxt-label(INSTR-3) = false [owise] .
+crl [step-ctxt-label-heat] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3)
+  if identifyFocus(Z ; INSTR*) => { VAL* | (Z ; INSTR*-1) | INSTR_1* } .
+eq [step-ctxt-label-cool] : (Z' ; INSTR'*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
 ```
 
-The closed bodies are the bodies of label-vals, br-label-zero, br-label-succ, return-label, trap-label,
-return_call_ref-label, and throw_ref-label.
+The label opens only where its body can step. A body that the rules on the label itself consume (label-vals,
+br-label-zero, ...) has no focus, so no list of such bodies is needed.
 
-### 5. Step/ctxt-handler (context rule)
+### 5. Step/ctxt-handler
 
-```spectec
-rule Step/ctxt-handler:
-  z; (HANDLER_ n `{catch*} instr*) ~> z'; (HANDLER_ n `{catch*} instr'*)
-  -- Step: z; instr* ~> z'; instr'*
-  hint(k_heatcool)
-```
+The same shape as ctxt-label, with the hole `hole-Step-ctxt-handler(CATCH*, N-3)`.
 
-It has the same shape as ctxt-label (hole `hole-Step-ctxt-handler(CATCH*, N-3)`). The closed bodies are the bodies of br-handler,
-return-handler, handler-vals, trap-handler, return_call_ref-handler, and throw_ref-handler-*.
-
-### 6. Step/ctxt-frame (context rule)
+### 6. Step/ctxt-frame
 
 ```spectec
 rule Step/ctxt-frame:
@@ -777,46 +715,15 @@ rule Step/ctxt-frame:
 ```
 
 ```maude
-ceq kstate((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*), K-4) = kstate((S-2 ; F') ; INSTR*, hole-Step-ctxt-frame(N-3, F) K-4)
-    if closed-Step-ctxt-frame(INSTR*) = false .
-
-ceq kstate((S' ; F'') ; INSTR'*, hole-Step-ctxt-frame(N-3, F) K-4) = kstate((S' ; F) ; (FRAME- N-3 { F'' } INSTR'*), K-4)
-    if closed-Step-ctxt-frame(INSTR'*) = true .
+crl [step-ctxt-frame-heat] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame(N-3, F)
+  if identifyFocus((S-2 ; F') ; INSTR*) => { VAL* | ((S-2 ; F') ; INSTR*-1) | INSTR_1* } .
+eq [step-ctxt-frame-cool] : ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
 ```
 
-Heating switches to the inner frame F' and keeps the outer frame F in the hole. In cooling, the store S' and the inner
-frame F'' take the execution result. Instrs heating and the closed bodies (frame-vals, return-frame, trap-frame,
-return_call_ref-frame-null/addr, throw_ref-frame) are generated in the same way as for ctxt-label.
+Heating switches to the inner frame `F'` and keeps the outer frame `F` in the hole; the start condition looks for a
+focus under `F'`.
 
-### Common declarations, wrapping as a request, instrs cooling
-
-```maude
-op none : -> Holes [ctor] .
-op __ : Holes Holes -> Holes [ctor assoc id: none] .
-op kstate : Step-Request Holes -> KState [ctor frozen (2)] .
-op cool-all : SpectecTerminal Holes -> SpectecTerminal .
-op unheat : Step-Request ~> Step-Request .
-
-eq cool-all(C-5, none) = C-5 .
-eq cool-all(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-4) = cool-all(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-4) .
-eq unheat(Step(C-5)) = C-5 .
-eq plug-first(hole(PREFIX, POSTFIX) K-4) = true .
-eq plug-first(K-4) = false [owise] .
-eq kstate(Z-2 ; INSTR-3, hole(PREFIX, POSTFIX) K-4) = kstate(Z-2 ; (PREFIX (INSTR-3 POSTFIX)), K-4) [owise] .
-ceq kstate(C-5, K-4) = kstate(Step(C-5), K-4)
-    if plug-first(K-4) = false [owise] .
-```
-
-The first argument of `kstate` is not frozen. The execution drivers (`wasm2maude/*-runtime.maude`, harness) start the state as
-`exec(kstate(C, none))`, and `Step` rules apply directly inside it (no rewrite conditions).
-Completion is `kstate(Step(z ; vals), none)`. The wast runner works the same way. The `kstate` argument of the running
-command is not frozen, so `Step` rules apply directly inside it and `rew` follows one
-execution. `rew` is rule-fair, so on a request to which several rules apply it may pick any rule. The reference
-interpreter grows whenever it can grow, so memory.grow and table.grow requests are wrapped in `choice(R)` to take the first successor in Maude's search
-order (the success rule declared first). The exhaustion check compares the sum of the number of frame holes in K and the number of
-active frames in the request R with the bound.
-
-### 7. Steps/trans (split, rule)
+### 7. Steps/trans
 
 ```spectec
 rule Steps/trans:
@@ -827,18 +734,17 @@ rule Steps/trans:
 ```
 
 ```maude
-rl [split-Steps-trans] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step .
-
-eq (Z' ; INSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-Steps .
-
-eq (Z'' ; INSTR''*) ~> hole-Steps-trans-Steps = Z'' ; INSTR''* .
+crl [steps-trans-heat] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step
+  if identifyFocus(Z ; INSTR*) => { VAL* | (Z ; INSTR*-1) | INSTR_1* } .
+eq [steps-trans-next] : (Z' ; INSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-Steps .
+eq [steps-trans-cool] : (Z'' ; INSTR''*) ~> hole-Steps-trans-Steps = Z'' ; INSTR''* .
 
 rl Steps(Z ; INSTR*) => Z ; INSTR* .
 ```
 
-The result of the first Step is passed to the next Steps. Steps/refl is kept as a rule that preserves zero executions. The second hole returns the original conclusion.
+Two execution premises give two holes. `Steps/refl` is a plain rule.
 
-### 8. Eval_expr (split, rule)
+### 8. Eval_expr
 
 ```spectec
 rule Eval_expr:
@@ -848,12 +754,15 @@ rule Eval_expr:
 ```
 
 ```maude
-rl [split-Eval-expr] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr .
+crl [eval-expr-heat] : Eval-expr(Z, INSTR*) => Steps(Z ; INSTR*) ~> hole-Eval-expr
+  if identifyFocusEval-expr(Z ; INSTR*) .
+eq [eval-expr-cool] : (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
 
-eq (Z' ; VAL*) ~> hole-Eval-expr = tuple(Z' seq(VAL*)) .
+eq [focus-eval-expr-refl] : identifyFocusEval-expr(Z ; INSTR*) = true .
 ```
 
-The sort of VAL* is ValList. Non-value lists such as NOP/TRAP and requests in execution do not match this plug pattern. The tuple shape is also the same as the original output.
+The rule has no name, so its helper is named after the relation. The sort of `VAL*` is `ValList`, so only a value
+result plugs.
 
 ### Supported scope and verification
 
@@ -891,10 +800,6 @@ These cases follow the IL meaning directly; none names a Wasm construct.
   and hinted rules are not split.
 - Typed lists share the prelude list operations, so index, slice, and update on them use the common equations.
 - An `ElsePr` selection drops the case quantifiers that occur only in the dropped result checks.
-- Nested proper sorts: Wasm 1.0/2.0 mark `instr` (`maude_proper "val InstrProper"`) and `admininstr`
-  (`maude_proper "val AdmininstrProper"`), where `admininstr` includes `instr`. A constructor of both owners gets
-  the partition of the most specific owner (`InstrProper`), `InstrProper < AdmininstrProper` is declared
-  (`Hintd.proper_edges`), and a focus trigger may be any proper subsort of the focused sort.
 - A definition whose result may be undefined needs `maude_kind` as in 3.0: in Wasm 1.0, `$initelem` and
   `$initdata` (an out-of-range segment update) are marked, so `$instantiate` has no result there. In Wasm 2.0,
   `$vextunop__` and `$vextbinop__` are marked, since their clauses do not cover every shape the syntax admits, and

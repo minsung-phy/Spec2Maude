@@ -178,7 +178,7 @@ rule Step/ctxt-instrs:
   z; val* admininstr* admininstr_1*  ~>  z'; val* admininstr'* admininstr_1*
   -- Step: z; admininstr* ~> z'; admininstr'*
   -- if val* =/= eps \/ admininstr_1* =/= eps
-  hint(k_heatcool)
+  hint(k_heatcool "admininstr*")
 
 
 ;; Numeric instructions

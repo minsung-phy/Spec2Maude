@@ -5,13 +5,9 @@ fmod SPEC2MAUDE-SORTS is
 
   sort instr .
 
-  sort InstrProper .
-
   subsort val < instr .
 
   subsort instr < SpectecTerminal .
-
-  subsort InstrProper < instr .
 endfm
 
 fmod SPEC2MAUDE-TYPES is

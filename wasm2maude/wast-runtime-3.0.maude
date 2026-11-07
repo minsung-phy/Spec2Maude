@@ -9,13 +9,10 @@ mod WASM-WAST-DRIVER is
   including WASM-WAST-VECTOR .
 
   op command.exception : Nat ScriptAction -> Command [ctor] .
-  op script.exception : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
+  op script.exception : Nat InstanceEnv Commands Run -> ScriptState [ctor] .
   op activeFrameDepth : InstrList -> Nat .
 
   vars WSHC WSHS WSHF WSHCURRENT WSHVALUE WSHAT WSHRT WSHNT : SpectecTerminal .
-  var WSHK : Holes .
-  var WSHR : Step-Request .
-  var WSHH : Hole .
   vars WSHLOCALS WSHNAME WSHMAX WSHCATCHES : SpectecTerminals .
   vars WSHARGS WSHACTUAL WSHPREFIX : ValList .
   vars WSHBODY WSHINSTRS WSHREST : InstrList .
@@ -36,14 +33,6 @@ mod WASM-WAST-DRIVER is
     activeFrameDepth(WSHBODY)
     if runtimeResults(WSHPREFIX) .
   eq activeFrameDepth(WSHINSTRS) = 0 [owise] .
-  eq frameDepth(hole-Step-ctxt-handler(WSHCATCHES, WSHN) WSHK) = frameDepth(WSHK) .
-
-  --- A grow request is a focus of the instruction sequence, alone or under its
-  --- sequence hole; matching these shapes costs nothing for other requests.
-  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))), WSHK) =
-    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA)))), WSHK) .
-  eq kstate(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH, WSHK) =
-    kstate(choice(Step(WSHS ; (CONST(WSHAT, # WSHN) MEMORY.GROW(WSHA))) ~> WSHH), WSHK) .
 
   eq match.value(REF.NULL-ADDR, result.null-ref(WSHNT)) = match.yes .
   eq match.value(REF.NULL-ADDR, result.ref-type(ANY)) = match.yes .
@@ -83,42 +72,40 @@ mod WASM-WAST-DRIVER is
 
   rl [assert-uninstantiable-exception] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
 
   rl [call-exception] :
     script.ready(WSHS, WSHENV, commands.cons(command.exception(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
+      run(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS))) .
   rl [exception-done] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [exception-trap] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP))
     => script.wrong-assertion(WSHID) .
   crl [exception-normal] :
     script.exception(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL))
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
 
   rl [exhaustion-exception] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
-        (REF.EXN-ADDR(WSHA) THROW-REF)), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ;
+        (REF.EXN-ADDR(WSHA) THROW-REF)))
     => script.wrong-assertion(WSHID) .
   --- SpecTec has no call-stack limit: assert_exhaustion passes once the frame
   --- depth of the configuration exceeds the bound (--call-depth), so a PASS is
-  --- relative to that bound. The active frames of cool-all(unheat(R), K) are
-  --- the frame holes of K and the active frames of the request R.
+  --- relative to that bound.
   crl [exhaustion-done] :
-    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, kstate(WSHR, WSHK))
+    script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS, run((WSHS ; WSHF) ; WSHINSTRS))
     => script.ready(WSHS, WSHENV, WSHCMDS)
-    if (WSHS ; WSHF) ; WSHINSTRS := unheat(WSHR)
-       /\ frameDepth(WSHK) + activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
+    if activeFrameDepth(WSHINSTRS) > WSHREQUIRED = true .
 endm

@@ -80,28 +80,26 @@ mod WASM-WAST-CORE is
 
   op script.ready : SpectecTerminal InstanceEnv Commands
     -> ScriptState [ctor] .
-  --- kstate(R, K): R is the Step request of the configuration around the next
-  --- redex, K the holes of hint(k_heatcool) contexts taken off it, and
-  --- cool-all(unheat(R), K) is the whole configuration. The KState argument
-  --- of a running command is not frozen: the Step rules rewrite it in place,
-  --- and the command's completion rules match its final kstate. A script runs
-  --- one deterministic execution like the reference interpreter, so this
-  --- driver is meant for rew, not for search or model checking.
-  --- rew is rule fair, so where several Step rules apply to one request it may
-  --- take any of them. The reference interpreter grows a memory or table
-  --- whenever memory.grow or table.grow can succeed. At such a choice point the
-  --- request is held in choice(_), whose rule takes the first successor in
-  --- Maude's search order: the rule declared first, the success rule.
-  op script.module : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
-  op script.return : Nat InstanceEnv ResultPatterns Commands KState
+  --- run(C) holds the configuration C of a running command. One rewrite of
+  --- run is one source step: the condition Step(C) => C2 runs the heating,
+  --- the inner rule, and the cooling of hint(k_heatcool) rules, and takes the
+  --- first successor in Maude's search order, the rule declared first. Where
+  --- memory.grow or table.grow can both succeed and fail, that is the success
+  --- rule, as in the reference interpreter. The command's completion rules
+  --- match its final configuration. A script runs one deterministic
+  --- execution like the reference interpreter, so this driver is meant for
+  --- rew, not for search or model checking.
+  sort Run .
+  op run : SpectecTerminal -> Run [ctor frozen (1)] .
+  op script.module : Nat InstanceEnv Commands Run -> ScriptState [ctor] .
+  op script.return : Nat InstanceEnv ResultPatterns Commands Run
     -> ScriptState [ctor] .
-  op script.trap : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
-  op script.exhaustion : Nat Nat InstanceEnv Commands KState
+  op script.trap : Nat InstanceEnv Commands Run -> ScriptState [ctor] .
+  op script.exhaustion : Nat Nat InstanceEnv Commands Run
     -> ScriptState [ctor] .
-  op script.action : Nat InstanceEnv Commands KState -> ScriptState [ctor] .
-  op script.uninstantiable : Nat InstanceEnv Commands KState
+  op script.action : Nat InstanceEnv Commands Run -> ScriptState [ctor] .
+  op script.uninstantiable : Nat InstanceEnv Commands Run
     -> ScriptState [ctor] .
-  op choice : Step-Request -> Step-Request [ctor frozen (1)] .
   op script.wrong-result : Nat ValList ResultPatterns
     -> ScriptState [ctor] .
   op script.wrong-assertion : Nat -> ScriptState [ctor] .
@@ -113,12 +111,8 @@ mod WASM-WAST-CORE is
   op findGlobal : SpectecTerminals SpectecTerminals ~> Nat .
 
   op runtimeResults : ValList -> Bool .
-  op frameDepth : Holes -> Nat .
 
-  vars WSHC WSHM WSHS WSHF WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
-  var WSHK : Holes .
-  vars WSHR WSHR2 : Step-Request .
-  var WSHH : Hole .
+  vars WSHC WSHC2 WSHM WSHS WSHF WSHMI WSHCURRENT WSHXA WSHHEAD : SpectecTerminal .
   var WSHVALUE : SpectecTerminal .
   vars WSHNAME WSHEXPORTPREFIX WSHLOCALS WSHEXPORTS : SpectecTerminals .
   vars WSHARGS WSHACTUAL : ValList .
@@ -177,12 +171,6 @@ mod WASM-WAST-CORE is
 
   eq runtimeResults(nil) = true .
 
-  --- Counted from the innermost hole, so each step matches only the head of K.
-  eq frameDepth(none) = 0 .
-  eq frameDepth(hole-Step-ctxt-frame(WSHN, WSHF) WSHK) = s frameDepth(WSHK) .
-  eq frameDepth(hole-Step-ctxt-label(WSHINSTRS, WSHN) WSHK) = frameDepth(WSHK) .
-  eq frameDepth(WSHH WSHK) = frameDepth(WSHK) .
-
   eq match.and(match.yes, match.yes) = match.yes .
   eq match.and(match.yes, match.no) = match.no .
   eq match.and(match.no, match.yes) = match.no .
@@ -233,13 +221,13 @@ mod WASM-WAST-CORE is
     if match.value(WSHVALUE, WSHPATTERN) = match.yes .
   eq match.any(WSHVALUE, WSHALTERNATIVES) = match.no [owise] .
 
-  crl [choice] : kstate(choice(WSHR), WSHK) => kstate(WSHR2, WSHK)
-    if WSHR => WSHR2 /\ WSHR2 =/= WSHR .
+  crl [step] : run(WSHC) => run(WSHC2)
+    if Step(WSHC) => WSHC2 .
 
   crl [module-start] :
     script.ready(WSHS, WSHENV,
       commands.cons(command.module(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
-    => script.module(WSHID, WSHENV, WSHCMDS, kstate(WSHC, none))
+    => script.module(WSHID, WSHENV, WSHCMDS, run(WSHC))
     if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)
        /\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .
   crl [module-link-error] :
@@ -249,7 +237,7 @@ mod WASM-WAST-CORE is
     if linkImports(WSHS, WSHENV, WSHIMPORTS) = link.error .
   rl [module-done] :
     script.module(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; nil), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHMI)) }) ; nil))
     => script.ready(WSHS, instances.concat(instances.entry(WSHID, WSHMI), WSHENV), WSHCMDS) .
 
   rl [assert-uninstantiable-static-link-error] :
@@ -264,16 +252,16 @@ mod WASM-WAST-CORE is
   crl [assert-uninstantiable-start] :
     script.ready(WSHS, WSHENV,
       commands.cons(command.uninstantiable(WSHID, WSHM, WSHIMPORTS), WSHCMDS))
-    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, kstate(WSHC, none))
+    => script.uninstantiable(WSHID, WSHENV, WSHCMDS, run(WSHC))
     if link.ok(WSHEXPORTS) := linkImports(WSHS, WSHENV, WSHIMPORTS)
        /\ instantiate(WSHS, WSHM, WSHEXPORTS) => WSHC .
   rl [assert-uninstantiable-trap] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
   rl [assert-uninstantiable-normal] :
     script.uninstantiable(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; nil), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; nil))
     => script.wrong-assertion(WSHID) .
 
   rl [call-return] :
@@ -281,7 +269,7 @@ mod WASM-WAST-CORE is
       command.return(WSHID, action.invoke(WSHTARGET, WSHNAME, WSHARGS),
         WSHEXPECTED), WSHCMDS))
     => script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
+      run(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS))) .
   crl [get-return] :
     script.ready(WSHS, WSHENV, commands.cons(command.return(WSHID,
       action.get(WSHTARGET, WSHNAME), WSHEXPECTED), WSHCMDS))
@@ -302,13 +290,13 @@ mod WASM-WAST-CORE is
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
   crl [return-done] :
     script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL))
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if runtimeResults(WSHACTUAL) = true
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.yes .
   crl [return-wrong-result] :
     script.return(WSHID, WSHENV, WSHEXPECTED, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL))
     => script.wrong-result(WSHID, WSHACTUAL, WSHEXPECTED)
     if runtimeResults(WSHACTUAL) = true
        /\ match.values(WSHACTUAL, WSHEXPECTED) = match.no .
@@ -317,20 +305,20 @@ mod WASM-WAST-CORE is
     script.ready(WSHS, WSHENV, commands.cons(command.trap(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.trap(WSHID, WSHENV, WSHCMDS,
-      kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
+      run(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS))) .
   rl [trap-done] :
     script.trap(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP))
     => script.ready(WSHS, WSHENV, WSHCMDS) .
 
   rl [call-action] :
     script.ready(WSHS, WSHENV, commands.cons(command.do(WSHID,
       action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.action(WSHID, WSHENV, WSHCMDS,
-      kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
+      run(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS))) .
   crl [action-done] :
     script.action(WSHID, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL))
     => script.ready(WSHS, WSHENV, WSHCMDS)
     if runtimeResults(WSHACTUAL) = true .
 
@@ -347,14 +335,14 @@ mod WASM-WAST-CORE is
     script.ready(WSHS, WSHENV, commands.cons(command.exhaustion(WSHID,
       WSHREQUIRED, action.invoke(WSHTARGET, WSHNAME, WSHARGS)), WSHCMDS))
     => script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS), none)) .
+      run(invoke(WSHS, findFunc((findInstance(WSHENV, WSHTARGET) . 'EXPORTS), WSHNAME), WSHARGS))) .
   rl [exhaustion-trap] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; TRAP))
     => script.wrong-assertion(WSHID) .
   crl [exhaustion-normal] :
     script.exhaustion(WSHID, WSHREQUIRED, WSHENV, WSHCMDS,
-      kstate(Step((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL), none))
+      run((WSHS ; { (field('LOCALS, WSHLOCALS) ; field('MODULE, WSHCURRENT)) }) ; WSHACTUAL))
     => script.wrong-assertion(WSHID)
     if runtimeResults(WSHACTUAL) = true .
 

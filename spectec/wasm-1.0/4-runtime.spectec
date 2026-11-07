@@ -102,7 +102,7 @@ var z : state
 ;; Administrative Instructions
 ;;
 
-syntax admininstr hint(show instr) hint(desc "administrative instruction") hint(maude_sort) hint(maude_proper "val AdmininstrProper") =
+syntax admininstr hint(show instr) hint(desc "administrative instruction") hint(maude_sort) =
   | instr
   | CALL_ADDR funcaddr             hint(show CALL %)
   | LABEL_ n `{instr*} admininstr* hint(show LABEL_%#% %%)

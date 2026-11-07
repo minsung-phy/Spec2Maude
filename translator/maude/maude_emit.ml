@@ -180,27 +180,21 @@ let emit_conditions emit_condition conditions =
 
 (* Equation attributes *)
 
-let emit_eq_attr = function
-  | Owise ->
-      "owise"
-
 let emit_eq_attrs attrs =
-  match attrs with
+  match List.filter (fun attr -> attr = Owise) attrs with
   | [] ->
       ""
 
   | _ ->
-      let attrs =
-        attrs
-        |> List.map emit_eq_attr
-        |> join " "
-      in
-      " [" ^ attrs ^ "]"
+      " [owise]"
+
+let eq_label attrs =
+  List.find_map (function Label label -> Some label | Owise -> None) attrs
 
 
-(* Rule labels *)
+(* Statement labels *)
 
-let emit_rule_head keyword = function
+let emit_statement_head keyword = function
   | None ->
       keyword
 
@@ -229,7 +223,7 @@ let rec emit_statement = function
       emit_op_decl decl
 
   | Eq (left, right, attrs) ->
-      "eq " ^ emit_term left
+      emit_statement_head "eq" (eq_label attrs) ^ " " ^ emit_term left
       ^ " = " ^ emit_term right
       ^ emit_eq_attrs attrs
       ^ " ."
@@ -238,7 +232,7 @@ let rec emit_statement = function
       emit_statement (Eq (left, right, attrs))
 
   | Ceq (left, right, conditions, attrs) ->
-      "ceq " ^ emit_term left
+      emit_statement_head "ceq" (eq_label attrs) ^ " " ^ emit_term left
       ^ " = " ^ emit_term right
       ^ "\n  if "
       ^ emit_conditions emit_eq_condition conditions
@@ -246,7 +240,7 @@ let rec emit_statement = function
       ^ " ."
 
   | Rl (label, left, right) ->
-      emit_rule_head "rl" label
+      emit_statement_head "rl" label
       ^ " "
       ^ emit_term left
       ^ " => "
@@ -257,7 +251,7 @@ let rec emit_statement = function
       emit_statement (Rl (label, left, right))
 
   | Crl (label, left, right, conditions) ->
-      emit_rule_head "crl" label
+      emit_statement_head "crl" label
       ^ " "
       ^ emit_term left
       ^ " => "
