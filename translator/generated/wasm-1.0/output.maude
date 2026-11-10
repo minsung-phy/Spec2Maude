@@ -783,10 +783,6 @@ mod SPEC2MAUDE-GENERATED is
 
   op invoke : SpectecTerminal Nat ValList -> SpectecTerminal .
 
-  op unzip-growtable : SpectecTerminals ~> SpectecTerminals .
-
-  op map-growtable : SpectecTerminals ~> SpectecTerminals .
-
   op unzip-LOCAL : SpectecTerminals ~> SpectecTerminals .
 
   op map-default : SpectecTerminals ~> ValList .
@@ -809,6 +805,8 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-instexport : SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
+  op map-initelem : SpectecTerminals ~> SpectecTerminals .
+
   op map-CALL : SpectecTerminals ~> SpectecTerminals .
 
   op unzip-instantiate : SpectecTerminals ~> SpectecTerminal .
@@ -825,8 +823,6 @@ mod SPEC2MAUDE-GENERATED is
 
   op bind-exp : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op all-growtable : Nat SpectecTerminals ~> Bool .
-
   op all-growmemory : SpectecTerminal SpectecTerminals ~> Bool .
 
   op bind-instantiate : SpectecTerminal SpectecTerminals ~> ValList-Iteration [frozen (1 2)] .
@@ -839,13 +835,13 @@ mod SPEC2MAUDE-GENERATED is
 
   var LIFT-ELEMENT-3 : admininstr .
 
-  vars VALUE I J N-3 N-2 M-3 U32 VALUE-5 SZ LABELIDX TYPEIDX IN I_1 I_2 IN_1 IN_2 FA GA TA MA X-4 A I' C-3 INPUT-FIELD L L' K CASE-PART1 N_FUNC N_GLOBAL N_TABLE N_MEM N_F ITER-COUNT I_FUNC I_GLOBAL I_TABLE I_MEM X'-2 J-2-3 I_E-2 : Nat .
+  vars VALUE I J N-3 N-2 M-3 U32 VALUE-5 SZ LABELIDX TYPEIDX IN I_1 I_2 IN_1 IN_2 FA GA TA MA X-4 A C-3 INPUT-FIELD L L' K CASE-PART1 N_FUNC N_GLOBAL N_TABLE N_MEM N_F ITER-COUNT I_FUNC I_GLOBAL I_TABLE I_MEM X'-2 J-2-3 I_E-2 : Nat .
 
-  vars N'* W* W'** W'* X* CHAR* VALUE-4 U32? MUT-2 VALTYPE* VALTYPE*-2 EXTERNTYPE* EXTERNTYPE*-2 BLOCKTYPE LABELIDX* VALUE2-2 SZ? INN? LOCAL* FUNCIDX* BYTE* NAME NAME-2 TYPE* IMPORT* FUNC* GLOBAL* TABLE* MEM* ELEM* DATA* START? EXPORT* XT* VALUE-8 VALUE-9 VALUE-10 VALUE-11 VALUE-12 XV* B* FIELD-PART2 J? A* VALUE-16 VALUE-17 T? L* MEMBER-PREFIX MEMBER-SUFFIX T_1* T_2* CASE-PART2 T* EXTERNADDR'* FUNC'* FA'* GLOBALTYPE'* GA'* TABLETYPE'* TA'* MEMTYPE'* MA'* FA* GA* TA* MA* CASE-PART1-2 CASE-PART3-2 CASE-PART4 CASE-PART5 CASE-PART6 CASE-PART7 CASE-PART8 CASE-PART9 CASE-PART10 FT* EXPR_1* GLOBALTYPE* TABLETYPE* MEMTYPE* EXTERNADDR* FA_EX* GA_EX* TA_EX* MA_EX* XI* A'** I'* B'** FUNCTYPE* EXPR_G* EXPR_E* X** B** EXPR_D* X'? I_E* I_D* PROJECT-REST PROJECT-COLUMN-1 A*-REST T*-REST PROJECT-COLUMN-2 EXPORT*-REST X*-2 X**-REST X*-REST EXPR_G*-REST REST-2 EXPR_E*-REST : SpectecTerminals .
+  vars N'* W* W'** W'* X* CHAR* VALUE-4 U32? MUT-2 VALTYPE* VALTYPE*-2 EXTERNTYPE* EXTERNTYPE*-2 BLOCKTYPE LABELIDX* VALUE2-2 SZ? INN? LOCAL* FUNCIDX* BYTE* NAME NAME-2 TYPE* IMPORT* FUNC* GLOBAL* TABLE* MEM* ELEM* DATA* START? EXPORT* XT* VALUE-8 VALUE-9 VALUE-10 VALUE-11 VALUE-12 XV* B* J? VALUE-16 VALUE-17 T? L* MEMBER-PREFIX MEMBER-SUFFIX T_1* T_2* CASE-PART2 T* EXTERNADDR'* FUNC'* FA'* GLOBALTYPE'* GA'* TABLETYPE'* TA'* MEMTYPE'* MA'* FA* GA* TA* MA* CASE-PART1-2 CASE-PART3-2 CASE-PART4 CASE-PART5 CASE-PART6 CASE-PART7 CASE-PART8 CASE-PART9 CASE-PART10 FT* EXPR_1* GLOBALTYPE* TABLETYPE* MEMTYPE* EXTERNADDR* FA_EX* GA_EX* TA_EX* MA_EX* XI* A'** A* I'* B'** FUNCTYPE* EXPR_G* EXPR_E* X** B** EXPR_D* X'? I_E* I_D* PROJECT-REST PROJECT-COLUMN-1 T*-REST PROJECT-COLUMN-2 EXPORT*-REST A*-REST X*-2 X**-REST X*-REST EXPR_G*-REST REST-2 EXPR_E*-REST : SpectecTerminals .
 
   var X : SpectecType .
 
-  vars W VALUE-3 VALTYPE INN FNN SX VALUE2 VALTYPE_1 VALTYPE_2 CVTOP-2 MEMARG GLOBALTYPE EXTERNIDX EXTERNTYPE FT GT-2 TT MT FN FN_1 FN_2 VALUE-13 VALUE-14 STORE-2 FRAME STATE EXTERNADDR S-2 F TI MI FIELD-PART1 TI' I'-2 MI' T UNOP-2 C_1 C-2 BINOP-2 C_2 TESTOP-2 RELOP-2 T_1-2 T_2-2 Z ENABLED-INPUT1 MM FUNC-3 AO RESULT-2 F' Z' S' F'' Z'' MODULEINST FI S_1 S_2 GI TABLETYPE MEMTYPE MODULE-2 S_3 S_4 MODULEINST_INIT F_INIT EXPORT-3 : SpectecTerminal .
+  vars W VALUE-3 VALTYPE INN FNN SX VALUE2 VALTYPE_1 VALTYPE_2 CVTOP-2 MEMARG GLOBALTYPE EXTERNIDX EXTERNTYPE FT GT-2 TT MT FN FN_1 FN_2 VALUE-13 VALUE-14 STORE-2 FRAME STATE EXTERNADDR S-2 F TI MI I'-2 MI' T UNOP-2 C_1 C-2 BINOP-2 C_2 TESTOP-2 RELOP-2 T_1-2 T_2-2 Z ENABLED-INPUT1 MM FUNC-3 AO RESULT-2 F' Z' S' F'' Z'' MODULEINST FI S_1 S_2 GI TABLETYPE MEMTYPE MODULE-2 S_3 S_4 MODULEINST_INIT F_INIT EXPORT-3 : SpectecTerminal .
 
   vars I-2 VALUE-2 EXP EXP-1 J_1 J_2 : Int .
 
@@ -1890,17 +1886,6 @@ mod SPEC2MAUDE-GENERATED is
 
   eq with-meminst(S-2 ; F, X-4, MI) = (S-2 [. 'MEMS = map-write(S-2 . 'MEMS, #rat(((F . 'MODULE) . 'MEMS) [ X-4 ]), MI) ]) ; F .
 
-  ceq growtable(TI, N-3) = TI'
-    if { (field('TYPE, FIELD-PART1) ; field('REFS, FIELD-PART2)) } := TI
-      /\ [ I .. J? ] := FIELD-PART1
-      /\ size(J?) <= 1
-      /\ A* := unzip-growtable(FIELD-PART2)
-      /\ I' := size(A*) + N-3
-      /\ _and_(I' >= 0, I' <= 4294967295)
-      /\ all-growtable(I', J?)
-      /\ I' < 4294967296
-      /\ TI' := { (field('TYPE, [ I' .. J? ]) ; field('REFS, map-of(map-growtable(A*) repeatSeq(N-3, seq(nil))))) } .
-
   ceq growmemory(MI, N-3) = MI'
     if { (field('TYPE, [ I .. J? ]) ; field('BYTES, B*)) } := MI
       /\ size(J?) <= 1
@@ -2123,8 +2108,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-label-vals] : identifyFocus(Z ; (VAL*-1 ((LABEL- N-3 { INSTR* } VAL*) ADMININSTR_1*))) => { VAL*-1 | (Z ; (LABEL- N-3 { INSTR* } VAL*)) | ADMININSTR_1* } .
 
-  crl [focus-br-zero] : identifyFocus(Z ; (VAL*-1 ((LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*)) ADMININSTR_1*))) => { VAL*-1 | (Z ; (LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*))) | ADMININSTR_1* }
-    if size(VAL*) = N-3 .
+  rl [focus-br-zero] : identifyFocus(Z ; (VAL*-1 ((LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*)) ADMININSTR_1*))) => { VAL*-1 | (Z ; (LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*))) | ADMININSTR_1* } .
 
   rl [focus-br-succ] : identifyFocus(Z ; (VAL*-1 ((LABEL- N-3 { INSTR'* } ((VAL* BR(INPUT-FIELD)) INSTR*)) ADMININSTR_1*))) => { VAL*-1 | (Z ; (LABEL- N-3 { INSTR'* } ((VAL* BR(INPUT-FIELD)) INSTR*))) | ADMININSTR_1* } .
 
@@ -2132,16 +2116,13 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-br-table-lt] : identifyFocus(Z ; (VAL* (CONST(I32, # I) (BR-TABLE(L*, L') ADMININSTR_1*)))) => { VAL* | (Z ; (CONST(I32, # I) BR-TABLE(L*, L'))) | ADMININSTR_1* } .
 
-  crl [focus-frame-vals] : identifyFocus(Z ; (VAL*-1 ((FRAME- N-3 { F } VAL*) ADMININSTR_1*))) => { VAL*-1 | (Z ; (FRAME- N-3 { F } VAL*)) | ADMININSTR_1* }
-    if size(VAL*) = N-3 .
+  rl [focus-frame-vals] : identifyFocus(Z ; (VAL*-1 ((FRAME- N-3 { F } VAL*) ADMININSTR_1*))) => { VAL*-1 | (Z ; (FRAME- N-3 { F } VAL*)) | ADMININSTR_1* } .
 
-  crl [focus-return-frame] : identifyFocus(Z ; (VAL*-1 ((FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) ADMININSTR_1*))) => { VAL*-1 | (Z ; (FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*))) | ADMININSTR_1* }
-    if size(VAL*) = N-3 .
+  rl [focus-return-frame] : identifyFocus(Z ; (VAL*-1 ((FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) ADMININSTR_1*))) => { VAL*-1 | (Z ; (FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*))) | ADMININSTR_1* } .
 
   rl [focus-return-label] : identifyFocus(Z ; (VAL*-1 ((LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*)) ADMININSTR_1*))) => { VAL*-1 | (Z ; (LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*))) | ADMININSTR_1* } .
 
-  crl [focus-trap-vals] : identifyFocus(Z ; (VAL*-1 (VAL* (TRAP (INSTR* ADMININSTR_1*))))) => { VAL*-1 | (Z ; (VAL* (TRAP INSTR*))) | ADMININSTR_1* }
-    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+  rl [focus-trap-vals] : identifyFocus(Z ; (VAL*-1 (VAL* (TRAP (INSTR* ADMININSTR_1*))))) => { VAL*-1 | (Z ; (VAL* (TRAP INSTR*))) | ADMININSTR_1* } .
 
   rl [focus-trap-label] : identifyFocus(Z ; (VAL* ((LABEL- N-3 { INSTR'* } TRAP) ADMININSTR_1*))) => { VAL* | (Z ; (LABEL- N-3 { INSTR'* } TRAP)) | ADMININSTR_1* } .
 
@@ -2167,10 +2148,7 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-call-indirect-call] : identifyFocus(Z ; (VAL* (CONST(I32, # I) (CALL-INDIRECT(X-4) ADMININSTR_1*)))) => { VAL* | (Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) | ADMININSTR_1* } .
 
-  crl [focus-call-addr] : identifyFocus(Z ; (VAL*-1 (VAL* (CALL-ADDR(A) ADMININSTR_1*)))) => { VAL*-1 | (Z ; (VAL* CALL-ADDR(A))) | ADMININSTR_1* }
-    if K := size(VAL*)
-      /\ { (field('TYPE, T_1* -> T_2*) ; (field('MODULE, MM) ; field('CODE, FUNC-3))) } := map-read(spectec-funcinst(Z), A)
-      /\ K = size(T_1*) .
+  rl [focus-call-addr] : identifyFocus(Z ; (VAL*-1 (VAL* (CALL-ADDR(A) ADMININSTR_1*)))) => { VAL*-1 | (Z ; (VAL* CALL-ADDR(A))) | ADMININSTR_1* } .
 
   rl [focus-local-get] : identifyFocus(Z ; (VAL* (LOCAL.GET(X-4) ADMININSTR_1*))) => { VAL* | (Z ; LOCAL.GET(X-4)) | ADMININSTR_1* } .
 
@@ -2206,56 +2184,29 @@ mod SPEC2MAUDE-GENERATED is
 
   eq [focus-pure-nop] : identifyFocusPure(NOP) = true .
 
-  ceq [focus-pure-drop] : identifyFocusPure(VAL DROP) = true
-    if typecheck(VAL, val) .
+  eq [focus-pure-drop] : identifyFocusPure(VAL DROP) = true .
 
-  ceq [focus-pure-select-true] : identifyFocusPure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT))) = true
-    if typecheck(VAL_1, val)
-      /\ typecheck(VAL_2, val)
-      /\ C-3 =/= 0 .
+  eq [focus-pure-select-true] : identifyFocusPure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT))) = true .
 
-  ceq [focus-pure-select-false] : identifyFocusPure(VAL_1 (VAL_2 (CONST(I32, # C-3) SELECT))) = true
-    if typecheck(VAL_1, val)
-      /\ typecheck(VAL_2, val)
-      /\ C-3 == 0 .
-
-  ceq [focus-pure-if-true] : identifyFocusPure(CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*)) = true
-    if size(T?) <= 1
-      /\ C-3 =/= 0 .
-
-  ceq [focus-pure-if-false] : identifyFocusPure(CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*)) = true
-    if size(T?) <= 1
-      /\ C-3 == 0 .
+  eq [focus-pure-if-true] : identifyFocusPure(CONST(I32, # C-3) IF__ELSE_(T?, INSTR_1*, INSTR_2*)) = true .
 
   eq [focus-pure-label-vals] : identifyFocusPure(LABEL- N-3 { INSTR* } VAL*) = true .
 
-  ceq [focus-pure-br-zero] : identifyFocusPure(LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*)) = true
-    if size(VAL*) = N-3 .
+  eq [focus-pure-br-zero] : identifyFocusPure(LABEL- N-3 { INSTR'* } (((VAL'* VAL*) BR(0)) INSTR*)) = true .
 
   eq [focus-pure-br-succ] : identifyFocusPure(LABEL- N-3 { INSTR'* } ((VAL* BR(INPUT-FIELD)) INSTR*)) = true .
 
-  ceq [focus-pure-br-if-true] : identifyFocusPure(CONST(I32, # C-3) BR-IF(L)) = true
-    if C-3 =/= 0 .
+  eq [focus-pure-br-if-true] : identifyFocusPure(CONST(I32, # C-3) BR-IF(L)) = true .
 
-  ceq [focus-pure-br-if-false] : identifyFocusPure(CONST(I32, # C-3) BR-IF(L)) = true
-    if C-3 == 0 .
+  eq [focus-pure-br-table-lt] : identifyFocusPure(CONST(I32, # I) BR-TABLE(L*, L')) = true .
 
-  ceq [focus-pure-br-table-lt] : identifyFocusPure(CONST(I32, # I) BR-TABLE(L*, L')) = true
-    if I < size(L*) .
+  eq [focus-pure-frame-vals] : identifyFocusPure(FRAME- N-3 { F } VAL*) = true .
 
-  ceq [focus-pure-br-table-ge] : identifyFocusPure(CONST(I32, # I) BR-TABLE(L*, L')) = true
-    if I >= size(L*) .
-
-  ceq [focus-pure-frame-vals] : identifyFocusPure(FRAME- N-3 { F } VAL*) = true
-    if size(VAL*) = N-3 .
-
-  ceq [focus-pure-return-frame] : identifyFocusPure(FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) = true
-    if size(VAL*) = N-3 .
+  eq [focus-pure-return-frame] : identifyFocusPure(FRAME- N-3 { F } (((VAL'* VAL*) RETURN) INSTR*)) = true .
 
   eq [focus-pure-return-label] : identifyFocusPure(LABEL- N-3 { INSTR'* } ((VAL* RETURN) INSTR*)) = true .
 
-  ceq [focus-pure-trap-vals] : identifyFocusPure(VAL* (TRAP INSTR*)) = true
-    if _or_(VAL* =/= nil, INSTR* =/= nil) .
+  eq [focus-pure-trap-vals] : identifyFocusPure(VAL* (TRAP INSTR*)) = true .
 
   eq [focus-pure-trap-label] : identifyFocusPure(LABEL- N-3 { INSTR'* } TRAP) = true .
 
@@ -2263,13 +2214,7 @@ mod SPEC2MAUDE-GENERATED is
 
   eq [focus-pure-unop-val] : identifyFocusPure(CONST(T, C_1) UNOP(T, UNOP-2)) = true .
 
-  ceq [focus-pure-unop-trap] : identifyFocusPure(CONST(T, C_1) UNOP(T, UNOP-2)) = true
-    if spectec-unop-(T, UNOP-2, C_1) == nil .
-
   eq [focus-pure-binop-val] : identifyFocusPure(CONST(T, C_1) (CONST(T, C_2) BINOP(T, BINOP-2))) = true .
-
-  ceq [focus-pure-binop-trap] : identifyFocusPure(CONST(T, C_1) (CONST(T, C_2) BINOP(T, BINOP-2))) = true
-    if spectec-binop-(T, BINOP-2, C_1, C_2) == nil .
 
   eq [focus-pure-testop] : identifyFocusPure(CONST(T, C_1) TESTOP(T, TESTOP-2)) = true .
 
@@ -2277,34 +2222,20 @@ mod SPEC2MAUDE-GENERATED is
 
   eq [focus-pure-cvtop-val] : identifyFocusPure(CONST(T_1-2, C_1) CVTOP(T_2-2, T_1-2, CVTOP-2)) = true .
 
-  ceq [focus-pure-cvtop-trap] : identifyFocusPure(CONST(T_1-2, C_1) CVTOP(T_2-2, T_1-2, CVTOP-2)) = true
-    if cvtop--(T_1-2, T_2-2, CVTOP-2, C_1) == nil .
-
-  ceq [focus-pure-local-tee] : identifyFocusPure(VAL LOCAL.TEE(X-4)) = true
-    if typecheck(VAL, val) .
+  eq [focus-pure-local-tee] : identifyFocusPure(VAL LOCAL.TEE(X-4)) = true .
 
   crl [step-pure-heat] : Step(Z ; ADMININSTR*) => Step-pure(ADMININSTR*) ~> hole-Step-pure(Z)
     if identifyFocusPure(ADMININSTR*) .
 
   eq [step-pure-cool] : ADMININSTR'* ~> hole-Step-pure(Z) = Z ; ADMININSTR'* .
 
-  ceq [focus-read-block-1] : identifyFocusRead(Z ; BLOCK(T?, INSTR*)) = true
-    if size(T?) <= 1
-      /\ T? == nil .
+  eq [focus-read-block-1] : identifyFocusRead(Z ; BLOCK(T?, INSTR*)) = true .
 
-  ceq [focus-read-block-2] : identifyFocusRead(Z ; BLOCK(T?, INSTR*)) = true
-    if size(T?) <= 1
-      /\ T? =/= nil .
-
-  ceq [focus-read-loop] : identifyFocusRead(Z ; LOOP(T?, INSTR*)) = true
-    if size(T?) <= 1 .
+  eq [focus-read-loop] : identifyFocusRead(Z ; LOOP(T?, INSTR*)) = true .
 
   eq [focus-read-call] : identifyFocusRead(Z ; CALL(X-4)) = true .
 
   eq [focus-read-call-indirect-call] : identifyFocusRead(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = true .
-
-  ceq [focus-read-call-indirect-trap] : identifyFocusRead(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = true
-    if Step-read-call-indirect-call-enabled(Z ; (CONST(I32, # I) CALL-INDIRECT(X-4))) = false .
 
   eq [focus-read-call-addr] : identifyFocusRead(Z ; (VAL* CALL-ADDR(A))) = true .
 
@@ -2312,19 +2243,11 @@ mod SPEC2MAUDE-GENERATED is
 
   eq [focus-read-global-get] : identifyFocusRead(Z ; GLOBAL.GET(X-4)) = true .
 
-  ceq [focus-read-load-num-trap] : identifyFocusRead(Z ; (CONST(I32, # I) LOAD(T, nil, AO))) = true
-    if ((I + #rat(AO . 'OFFSET)) + (((spectec-size(T) : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
+  eq [focus-read-load-num-trap] : identifyFocusRead(Z ; (CONST(I32, # I) LOAD(T, nil, AO))) = true .
 
-  eq [focus-read-load-num-val] : identifyFocusRead(Z ; (CONST(I32, # I) LOAD(T, nil, AO))) = true .
+  eq [focus-read-load-pack-trap] : identifyFocusRead(Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) = true .
 
-  ceq [focus-read-load-pack-trap] : identifyFocusRead(Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) = true
-    if ((I + #rat(AO . 'OFFSET)) + (((N-3 : nat <:> rat) / 8) : rat <:> nat)) > array-size(spectec-mem(Z, 0) . 'BYTES) .
-
-  eq [focus-read-load-pack-val] : identifyFocusRead(Z ; (CONST(I32, # I) LOAD(INN, spectec-_-_(N-3, SX) ?, AO))) = true .
-
-  ceq [focus-read-memory-size] : identifyFocusRead(Z ; (MEMORY.SIZE)) = true
-    if Ki =/= 0
-      /\ 64 =/= 0 .
+  eq [focus-read-memory-size] : identifyFocusRead(Z ; (MEMORY.SIZE)) = true .
 
   crl [step-read-heat] : Step(Z ; ADMININSTR*) => Step-read(Z ; ADMININSTR*) ~> hole-Step-read(Z)
     if identifyFocusRead(Z ; ADMININSTR*) .
@@ -2464,7 +2387,7 @@ mod SPEC2MAUDE-GENERATED is
 
   ceq initelem(S-2, MODULEINST, (# I) I'*, seq(A*) A'**) = S_2
     if typecheck(A'**, iterList(addr))
-      /\ S_1 := S-2 [. 'TABLES = ((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) = (((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) ]) [. 'REFS = map-write-range(((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) ]) . 'REFS, I, size(A*), map-growtable(A*)) ]) ]) ]
+      /\ S_1 := S-2 [. 'TABLES = ((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) = (((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) ]) [. 'REFS = map-write-range(((S-2 . 'TABLES) [ #rat((MODULEINST . 'TABLES) [ 0 ]) ]) . 'REFS, I, size(A*), map-initelem(A*)) ]) ]) ]
       /\ S_2 := initelem(S_1, MODULEINST, I'*, A'**) .
 
   eq initdata(S-2, MODULEINST, nil, nil) = S-2 .
@@ -2498,15 +2421,6 @@ mod SPEC2MAUDE-GENERATED is
       /\ F := { (field('LOCALS, nil) ; field('MODULE, { (field('TYPES, nil) ; (field('FUNCS, nil) ; (field('GLOBALS, nil) ; (field('TABLES, nil) ; (field('MEMS, nil) ; field('EXPORTS, nil)))))) })) }
       /\ T_1* -> T_2* := map-read(spectec-funcinst(S-2 ; F), FA) . 'TYPE
       /\ N-3 = size(T_1*) .
-
-  eq unzip-growtable(nil) = nil .
-
-  ceq unzip-growtable(seq((# A) ?) PROJECT-REST) = (# A) PROJECT-COLUMN-1
-    if PROJECT-COLUMN-1 := unzip-growtable(PROJECT-REST) .
-
-  eq map-growtable(nil) = nil .
-
-  eq map-growtable((# A) A*-REST) = seq((# A) ?) map-growtable(A*-REST) .
 
   eq unzip-LOCAL(nil) = nil .
 
@@ -2557,6 +2471,10 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-instexport(FA_EX*, FA*, GA_EX*, GA*, TA_EX*, TA*, MA_EX*, MA*, EXPORT-3 EXPORT*-REST) = instexport(FA_EX* FA*, GA_EX* GA*, TA_EX* TA*, MA_EX* MA*, EXPORT-3) map-instexport(FA_EX*, FA*, GA_EX*, GA*, TA_EX*, TA*, MA_EX*, MA*, EXPORT*-REST) .
 
+  eq map-initelem(nil) = nil .
+
+  eq map-initelem((# A) A*-REST) = seq((# A) ?) map-initelem(A*-REST) .
+
   eq map-CALL(nil) = nil .
 
   eq map-CALL((# X'-2) ?) = CALL(X'-2) ? .
@@ -2594,11 +2512,6 @@ mod SPEC2MAUDE-GENERATED is
     if INN := VALTYPE
       /\ typecheck(INN, Inn)
       /\ SZ < spectec-size(INN) .
-
-  eq all-growtable(I', nil) = true .
-
-  ceq all-growtable(I', (# J) ?) = true
-    if I' <= J .
 
   eq all-growmemory(I'-2, nil) = true .
 

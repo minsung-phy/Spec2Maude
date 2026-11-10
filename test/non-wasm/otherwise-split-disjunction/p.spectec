@@ -1,0 +1,11 @@
+syntax s = A | B nat
+
+relation R: s ~> s
+
+rule R/a:
+  A ~> B 0
+
+rule R/e:
+  s ~> B x
+  -- otherwise
+  -- if x = 1 \/ x = 2

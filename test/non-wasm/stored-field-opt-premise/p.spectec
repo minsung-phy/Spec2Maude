@@ -1,0 +1,12 @@
+syntax addr = nat
+syntax ti = { LIMIT nat, REFS (addr?)* hint(maude_map) }
+
+def $mk : ti
+def $mk = { LIMIT 0, REFS eps }
+
+def $grow(ti, nat) : ti
+def $grow(t, n) = { LIMIT $(|a*| + n), REFS a* eps^n }
+  -- if t = { LIMIT i, REFS a* }
+
+def $use : ti
+def $use = $grow($mk, 1)

@@ -1,0 +1,11 @@
+syntax byte = 0 | ... | 255
+syntax mi = { BYTES byte* hint(maude_array) }
+
+def $mk : mi
+def $mk = {BYTES 7 8 9}
+
+def $headarg(mi) : byte
+def $headarg({BYTES b*}) = b*[1]
+
+def $use : byte
+def $use = $headarg($mk)

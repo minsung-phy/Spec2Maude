@@ -1,0 +1,1 @@
+eq pick(N*) = choose-pick(N*) .

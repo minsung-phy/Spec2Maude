@@ -164,7 +164,7 @@ let translate_result prepared rhs =
    One head must be an instance of the other, the extra structure of an earlier
    head ground; the earlier conditions must be negatable. Otherwise
    Unsupported. *)
-let complement at (head, _, _, _) (earlier_head, _, earlier_conditions, _) =
+let complement at head (earlier_head, _, earlier_conditions, _) =
   let unsupported reason =
     Util.Error.error at "translation"
       ("Unsupported: DefD clause order: " ^ reason)
@@ -271,9 +271,14 @@ let equation_clause prepared =
 
       head.term, right, conditions, attrs
 
-let translate_equation_clause prepared =
-  let head, right, conditions, attrs = equation_clause prepared in
-  equation ~attrs head right conditions
+(* The clause's conditions with the complements of the earlier clauses. *)
+let with_complements head conditions complements =
+  if complements = [] then conditions
+  else schedule_equation_conditions head (conditions @ complements)
+
+let translate_equation_clause ?(attrs = []) prepared complements =
+  let head, right, conditions, _ = equation_clause prepared in
+  [equation ~attrs head right (with_complements head conditions complements)]
 
 let choice_helper index id
     (choice : Prescan.membership_choice) rhs =
@@ -330,7 +335,7 @@ let choice_public_quants element quants =
       raise (Unsupported "membership choice element must be a variable")
 
 let translate_choice_clause id
-    (choice : Prescan.membership_choice) prepared =
+    (choice : Prescan.membership_choice) prepared complements =
   let index = prepared.index in
   match prepared.clause.it with
   | DefD (quants, args, rhs, _) ->
@@ -362,19 +367,20 @@ let translate_choice_clause id
         @ Param.translate_eq_conditions index
             ~proven:(proven_variables prepared premises)
             (choice_public_quants choice.element quants)
+        @ complements
         |> schedule_equation_conditions head.term
       in
       equation head.term right conditions
       :: choice_helper index id choice rhs
 
-let translate_clause index id prepared =
+let translate_clause index id prepared complements =
   match Prescan.membership_choice index prepared.clause with
   | Some choice ->
-      translate_choice_clause id choice prepared
+      translate_choice_clause id choice prepared complements
   | None ->
-      [translate_equation_clause prepared]
+      translate_equation_clause prepared complements
 
-let translate_rule_clause prepared =
+let translate_rule_clause prepared complements =
   let index = prepared.index in
   match prepared.clause.it with
   | DefD (quants, args, rhs, prems) ->
@@ -398,28 +404,34 @@ let translate_rule_clause prepared =
             (fun condition -> EqCondition condition)
             (Param.translate_eq_conditions
                ~proven:(proven_variables prepared premises) index quants)
+        @ List.map (fun condition -> EqCondition condition) complements
       in
       let right = translate_result prepared rhs in
-      rule head.term right conditions
+      [rule head.term right conditions]
 
 
-(* Equation clauses in source order, each with the complements of the earlier
-   clauses that can match its input. An otherwise clause is [owise]. *)
-let ordered_clauses index id clauses =
+(* Clauses in source order, each translated by [translate] with the
+   complements of the earlier clauses that can match its input. An otherwise
+   clause is translated by [owise] if given: [owise] is correct only if each
+   translated clause applies exactly when its source clause does. A membership
+   choice equation applies even when the choice has no element, so a choice
+   definition takes complements only. *)
+let ordered_clauses index id ?owise clauses translate =
   let arguments = function App (_, args) -> args | _ -> [] in
   let source_arguments prepared =
     match prepared.clause.it with DefD (_, args, _, _) -> args
   in
   (* As for ElsePr predecessors (Reld): the source patterns and the
      translated heads may both overlap. *)
-  let overlap (prepared, (head, _, _, _)) (earlier, (earlier_head, _, _, _), _) =
+  let overlap prepared earlier =
     List.for_all2
       (fun arg earlier_arg ->
         match arg.it, earlier_arg.it with
         | ExpA exp, ExpA earlier_exp -> Reld.source_overlap index exp earlier_exp
         | _ -> true)
       (source_arguments prepared) (source_arguments earlier)
-    && Reld.inputs_may_overlap index (arguments head) (arguments earlier_head)
+    && Reld.inputs_may_overlap index
+         (arguments prepared.head.term) (arguments earlier.head.term)
   in
   let added_premises prepared =
     match prepared.clause.it with
@@ -428,9 +440,16 @@ let ordered_clauses index id clauses =
   let for_result = Prescan.is_result_case_premise index in
   (* A clause is selected once its premises hold (Il MATCH); a failing case
      premise for its result (Def.case_premise_script) then leaves the call
-     stuck. So a later clause complements the clause without them. *)
-  let selection_parts prepared current =
+     stuck. So a later clause complements the clause without them. A
+     membership choice or a maude_rule call has no equational complement. *)
+  let selection prepared =
+    if Option.is_some (Prescan.membership_choice index prepared.clause) then
+      raise (Unsupported "a later clause needs the complement of this membership choice");
     match prepared.clause.it with
+    | DefD (_, args, rhs, prems)
+      when clause_has_rewrite_call prepared.index args rhs prems ->
+        raise (Unsupported
+          "a later clause needs the complement of this clause, which calls a maude_rule definition")
     | DefD (quants, args, rhs, prems) when List.exists for_result prems ->
         let prems = List.filter (fun prem -> not (for_result prem)) prems in
         (* Drop the quantifiers that occurred only in the dropped premises. *)
@@ -438,58 +457,62 @@ let ordered_clauses index id clauses =
         let quants = Prem.used_quants free quants in
         equation_clause
           {prepared with clause = {prepared.clause with it = DefD (quants, args, rhs, prems)}}
-    | DefD _ -> current
+    | DefD _ -> equation_clause prepared
   in
   (* A failing case premise inside a premise leaves the call stuck too, but
      the complement of that premise would then hold. *)
-  let complement_of prepared current (earlier, _, selection) =
+  let complement_of prepared earlier =
     if not (List.for_all for_result (added_premises earlier)) then
       raise (Unsupported "an earlier clause has a case premise inside a premise");
-    complement prepared.clause.at current selection
+    complement prepared.clause.at prepared.head.term
+      (located id earlier.clause (fun () -> selection earlier))
   in
   let step (earlier, statements) prepared =
-    let (head, right, conditions, attrs) as current =
-      located id prepared.clause (fun () -> equation_clause prepared)
-    in
-    let overlapping =
-      List.filter (fun earlier -> overlap (prepared, current) earlier) earlier
-    in
+    let overlapping = List.filter (overlap prepared) earlier in
     (* [owise] would also apply when an earlier clause's case premise fails,
        so an otherwise clause after such a clause states its complements. *)
     let no_case_premises =
-      List.for_all (fun (earlier, _, _) -> added_premises earlier = []) overlapping
+      List.for_all (fun earlier -> added_premises earlier = []) overlapping
     in
-    let attrs =
-      if no_case_premises then attrs else List.filter (fun attr -> attr <> Owise) attrs
+    let otherwise =
+      match prepared.clause.it with DefD (_, _, _, prems) -> Reld.has_else prems
     in
     (* The last clause applies exactly when no earlier clause does, which is
        [owise] when the earlier clauses add no case premises; it is used
        when a complement cannot be stated (for example an earlier head with
        non-ground extra structure: $f(C x) = .. before $f(y) = ..). *)
-    let can_owise =
-      List.length earlier = List.length clauses - 1 && no_case_premises
+    let last = List.length earlier = List.length clauses - 1 in
+    let translate () =
+      match owise with
+      | Some owise when otherwise && no_case_premises -> owise prepared
+      | _ ->
+          match
+            located id prepared.clause (fun () ->
+              List.map (complement_of prepared) overlapping)
+          with
+          | complements -> translate prepared complements
+          | exception (Util.Error.Error _ as error) ->
+              match owise with
+              | Some owise when last && no_case_premises -> owise prepared
+              | _ -> raise error
     in
-    let attrs, complements =
-      if List.mem Owise attrs then attrs, []
-      else
-        match
-          located id prepared.clause (fun () ->
-            List.map (complement_of prepared current) overlapping)
-        with
-        | complements -> attrs, complements
-        | exception (Util.Error.Error _) when can_owise -> attrs @ [Owise], []
-    in
-    let conditions =
-      if complements = [] then conditions
-      else schedule_equation_conditions head (conditions @ complements)
-    in
-    let selection =
-      located id prepared.clause (fun () -> selection_parts prepared current)
-    in
-    ( earlier @ [prepared, current, selection]
-    , statements @ [equation ~attrs head right conditions] )
+    ( earlier @ [prepared]
+    , statements @ located id prepared.clause translate )
   in
   snd (List.fold_left step ([], []) clauses)
+
+(* hint(maude_disjoint): the user guarantees that at most one clause applies
+   to any input (not checked), so each clause is translated without the
+   complements of the others. An otherwise clause depends on the others. *)
+let disjoint_clauses id clauses translate =
+  List.concat_map
+    (fun prepared ->
+      located id prepared.clause (fun () ->
+        match prepared.clause.it with
+        | DefD (_, _, _, prems) when Reld.has_else prems ->
+            raise (Unsupported "ElsePr in a hint(maude_disjoint) definition")
+        | DefD _ -> translate prepared []))
+    clauses
 
 (* Complete DecD *)
 let translate index id params result_typ clauses =
@@ -507,14 +530,16 @@ let translate index id params result_typ clauses =
     header
   else
     let clauses = prepare_clauses index id params clauses in
-    if choice then
-      header @ List.concat_map (fun prepared ->
-        located id prepared.clause (fun () -> translate_clause index id prepared)) clauses
-    else if rule then
-      header @ List.map (fun prepared ->
-        located id prepared.clause (fun () -> translate_rule_clause prepared)) clauses
-    else
-      header @ ordered_clauses index id clauses
+    let ordered ?owise translate =
+      if has_hint index id "maude_disjoint" then disjoint_clauses id clauses translate
+      else ordered_clauses index id ?owise clauses translate
+    in
+    let owise prepared = translate_equation_clause ~attrs:[Owise] prepared [] in
+    header
+    @
+    if choice then ordered (translate_clause index id)
+    else if rule then ordered translate_rule_clause
+    else ordered ~owise (translate_equation_clause ?attrs:None)
 
 
 (* Def-parameter specialization: a copy of a DecD whose DefP parameters are

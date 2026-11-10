@@ -130,6 +130,7 @@ type t =
   ; requests : (name * helper_request, unit) Hashtbl.t
   ; helper_names : (name * helper_name) list
   ; reserved : StringSet.t  (* every non-helper name in use *)
+  ; backend_names : StringSet.t  (* reserved_names and builtin helper names *)
   ; case_premises : prem list
       (* premises instantiated from case definitions, not source premises *)
   ; result_case_premises : prem list  (* those for rule outputs and results *)
@@ -181,6 +182,8 @@ let record_composition_available index typ =
       end
   | _ -> false
 
+(* Maude, prelude and backend names. The helper names of a spec's builtin
+ * files are added by scan ~builtin_names (spec2maude --builtins). *)
 let reserved_names =
   StringSet.of_list
     [ "true"; "false"; "none"; "min"; "max"; "s"; "sd"
@@ -210,40 +213,6 @@ let reserved_names =
     (* prelude LIST, imported by backend/spectec-sorts.maude *)
     ; "nil"; "append"; "head"; "tail"; "last"; "front"
     ; "occurs"; "reverse"; "$reverse"; "size"; "$size"
-    (* builtins/*.maude *)
-    ; "ibits-aux"; "inv-ibits-aux"; "ibytes-aux"
-    ; "inv-ibytes-aux"; "sign-extend-nat"; "ipopcnt-bits"; "ipopcnt-bits-aux"
-    ; "irev-bits"; "irev-bits-aux"; "shift-count"
-    ; "signed-nat"; "floor-div-pow2-int"; "sat-s-int"
-    ; "wrap-s-int"; "fnmag-valid"
-    ; "scale-rat"; "fmag-rat"; "float-rat"
-    ; "float-finite"; "trunc-rat-int"; "nearest-rat-int"
-    ; "floor-log2"
-    ; "floor-log2-rat"; "nat-fmag-exact"; "nat-to-fmag"
-    ; "round-nat-significand"; "rounded-nat-to-fmag"; "round-rat-subnormal"
-    ; "round-rat-normal"; "round-rat-to-fmag"; "floor-half-int"
-    ; "floor-sqrt-rat-range"; "nearest-sqrt-rat-int"; "sqrt-rat-subnormal"
-    ; "sqrt-rat-normal"; "sqrt-rat-to-fmag"; "sqrt-fmag"
-    ; "int-to-float-like"; "int-to-iN"; "saturate-u-int"
-    ; "saturate-s-int"; "bit-not"; "bit-and"
-    ; "bit-or"; "bit-xor"; "float-nan-bit"
-    ; "float-sign-bit"; "float-eq-bit"; "float-lt-bit"
-    ; "float-default-nan"; "float-canonical-nan"; "float-binary-nan"
-    ; "float-neg"; "rat-to-float-nearest"; "rat-to-float-nearest-signed-zero"
-    ; "float-signed-zero"; "float-signed-inf"; "float-add-result"
-    ; "float-min-equal"; "float-max-equal"; "float-min"
-    ; "float-max"; "float-pmin"; "float-pmax"
-    ; "promote-f32-normal-frac"; "promote-f32-subnorm-frac"; "promote-f32-subnorm-exp"
-    ; "promote-f32"
-    ; "demote-f64"
-    ; "float-bias"; "float-max-exp-field"; "float-exp-field"
-    ; "float-frac-field"; "float-sign-field"; "float-mag-from-bits"
-    ; "float-from-bits"; "float-mag-to-bits"; "float-to-bits"
-    ; "nbytes-int"; "nbytes-float"; "inv-nbytes-int"
-    ; "inv-nbytes-float"; "zbytes-pack"; "inv-zbytes-pack"
-    ; "lane-width"; "lane-from-bits"
-    ; "lane-to-bits"; "lanes-aux"; "inv-lanes-aux"
-    ; "pair-chunks"; "fixed-chunks"
     ]
 
 (* SpecTec subscripts use '_', so a "-N" suffix stays visibly distinct from
@@ -261,9 +230,9 @@ let fresh used candidate =
   used := StringSet.add name !used;
   name
 
-let fresh_name used candidate =
+let fresh_name reserved used candidate =
   let candidate =
-    if StringSet.mem candidate reserved_names
+    if StringSet.mem candidate reserved
        || StringSet.mem candidate !used
     then "spectec-" ^ candidate
     else candidate
@@ -460,8 +429,10 @@ let has_dec_hint_in hints target_name name =
           List.fold_left
                (fun found hint ->
                  begin match hint.hintid.it, hint.hintexp.it with
-                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map"), El.Ast.SeqE [] -> ()
-                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map" as flag), _ ->
+                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map"
+                   | "maude_disjoint"), El.Ast.SeqE [] -> ()
+                 | ("builtin" | "maude_kind" | "maude_rule" | "maude_map"
+                   | "maude_disjoint" as flag), _ ->
                      Util.Error.error hint.hintid.at "translation"
                        ("Unsupported DecD $" ^ target_name ^ ": "
                         ^ flag ^ " must be a flag hint")
@@ -719,6 +690,7 @@ let collect_membership_choices defs =
 type registry =
   { entries : (name_kind * string * name) list ref
   ; used : StringSet.t ref
+  ; reserved : StringSet.t  (* backend and builtin helper names *)
   }
 
 let lookup entries kind source =
@@ -731,7 +703,7 @@ let register registry kind source candidate =
   match lookup !(registry.entries) kind source with
   | Some name -> name
   | None ->
-      let name = fresh_name registry.used candidate in
+      let name = fresh_name registry.reserved registry.used candidate in
       registry.entries := (kind, source, name) :: !(registry.entries);
       name
 
@@ -740,9 +712,21 @@ let registered registry kind source =
   | Some name -> name
   | None -> raise (Unsupported ("unregistered source name " ^ source))
 
-let register_names hints definitions script =
-  let registry = {entries = ref []; used = ref reserved_names} in
+let register_names hints definitions builtin_names script =
   let builtin source = has_dec_hint_in hints source "builtin" in
+  (* A builtin file declares the hint(builtin) definitions it implements;
+     those names are used, not reserved. *)
+  let implemented =
+    definitions
+    |> List.filter_map (fun (source, _, _) ->
+         if builtin source then Some (builtin_name source) else None)
+    |> StringSet.of_list
+  in
+  let reserved =
+    StringSet.union reserved_names
+      (StringSet.diff (StringSet.of_list builtin_names) implemented)
+  in
+  let registry = {entries = ref []; used = ref reserved; reserved} in
   let add kind source candidate = ignore (register registry kind source candidate) in
   List.iter
     (fun (source, _, _) ->
@@ -753,7 +737,7 @@ let register_names hints definitions script =
   let current_typ = ref None in
   let constructor_candidate name =
     let taken name =
-      StringSet.mem name !(registry.used) || StringSet.mem name reserved_names
+      StringSet.mem name !(registry.used) || StringSet.mem name registry.reserved
     in
     match taken name, taken ("spectec-" ^ name), !current_typ with
     | true, true, Some typ -> name ^ "-" ^ sanitize typ
@@ -1049,7 +1033,7 @@ let name_variables used observed =
   in
   variables, anonymous_variables
 
-let name_iterations used iterations =
+let name_iterations reserved used iterations =
   iterations
   |> List.map (fun (iteration : iteration) ->
        let name =
@@ -1057,26 +1041,26 @@ let name_iterations used iterations =
        in
        { iteration with
          name
-       ; tail_name = fresh_name used (name ^ "-tail")
-       ; projector_name = fresh_name used ("project-" ^ name)
-       ; projector_tail_name = fresh_name used ("project-" ^ name ^ "-tail")
+       ; tail_name = fresh_name reserved used (name ^ "-tail")
+       ; projector_name = fresh_name reserved used ("project-" ^ name)
+       ; projector_tail_name = fresh_name reserved used ("project-" ^ name ^ "-tail")
        })
 
-let name_premise_iterations used premise_iterations =
+let name_premise_iterations reserved used premise_iterations =
   premise_iterations
   |> List.map (fun (iteration : premise_iteration) ->
-       let name = fresh_name used iteration.name in
+       let name = fresh_name reserved used iteration.name in
        let _, generators = iteration.iterexp in
        let output_names =
          List.mapi
            (fun position _ ->
              let output =
-               fresh_name used (name ^ "-output-" ^ string_of_int (position + 1))
+               fresh_name reserved used (name ^ "-output-" ^ string_of_int (position + 1))
              in
-             output, fresh_name used (output ^ "-tail"))
+             output, fresh_name reserved used (output ^ "-tail"))
            generators
        in
-       {iteration with name; tail_name = fresh_name used (name ^ "-tail"); output_names})
+       {iteration with name; tail_name = fresh_name reserved used (name ^ "-tail"); output_names})
 
 let name_membership_choices registry choices =
   choices
@@ -1087,7 +1071,7 @@ let name_membership_choices registry choices =
          Printf.sprintf "%s-choice-%d-%d"
            definition_name position.line position.column
        in
-       {choice with helper_name = fresh_name registry.used candidate})
+       {choice with helper_name = fresh_name registry.reserved registry.used candidate})
 
 
 (* Generated Maude sorts for definitions evaluated by rewriting. *)
@@ -1103,7 +1087,7 @@ let name_rewrite_sorts registry hints definitions membership_choices =
        if has_dec_hint_in hints source "maude_rule" || is_choice then
          let name = registered registry DefName source in
          let suffix = if is_choice then "-Request" else "-Config" in
-         Some (source, fresh_name registry.used (name ^ suffix))
+         Some (source, fresh_name registry.reserved registry.used (name ^ suffix))
        else
          None)
 
@@ -1116,10 +1100,10 @@ let classify_relations registry hints relations =
     (fun (source, mixop) (policies, unsupported) ->
       let request_sort () =
         let name = registered registry RelName source in
-        fresh_name registry.used (name ^ "-Request")
+        fresh_name registry.reserved registry.used (name ^ "-Request")
       in
       let derived suffix =
-        fresh_name registry.used (registered registry RelName source ^ "-" ^ suffix)
+        fresh_name registry.reserved registry.used (registered registry RelName source ^ "-" ^ suffix)
       in
       match classify_relation hints source mixop request_sort derived with
       | Ok policy -> (source, policy) :: policies, unsupported
@@ -1146,7 +1130,7 @@ let name_enabled_helpers registry relation_policies defs =
                      else
                        Printf.sprintf "%s-%s-enabled" relation (compact rule_id.it)
                    in
-                   (id.it, ordinal), fresh_name registry.used candidate)
+                   (id.it, ordinal), fresh_name registry.reserved registry.used candidate)
                  rules
            | Some (Compute _ | Check _)
            | None -> []
@@ -1188,7 +1172,10 @@ let unsupported_definitions unsupported_relations defs =
 (* The case premises added before translation (Def.case_premise_script) are
    passed in: they are identified physically, so no pass may rebuild premises
    after that one. *)
-let scan ?(case_premises = []) ?(result_case_premises = []) ?(partial_defs = []) script =
+(* bodiless_defs are definitions that Def.check_stored_patterns leaves
+   without a body, like those that use an untranslated relation. *)
+let scan ?(case_premises = []) ?(result_case_premises = []) ?(partial_defs = [])
+    ?(bodiless_defs = []) ?(builtin_names = []) script =
   let type_env = Il.Env.env_of_script script in
   let sort_metadata = Hintd.scan_sorts script in
   let defs = List.concat_map flatten script in
@@ -1226,14 +1213,17 @@ let scan ?(case_premises = []) ?(result_case_premises = []) ?(partial_defs = [])
               source,
               validate_inverse definitions source inverse))
   in
-  let registry = register_names hints definitions script in
+  let registry = register_names hints definitions builtin_names script in
   let occurrences = collect_occurrences sort_metadata script in
   let variables, anonymous_variables =
     name_variables !(registry.used) occurrences.observed
   in
-  let iterations = name_iterations registry.used occurrences.found_iterations in
+  let iterations =
+    name_iterations registry.reserved registry.used occurrences.found_iterations
+  in
   let premise_iterations =
-    name_premise_iterations registry.used occurrences.found_premise_iterations
+    name_premise_iterations registry.reserved registry.used
+      occurrences.found_premise_iterations
   in
   let membership_choices =
     name_membership_choices registry membership_choices
@@ -1261,7 +1251,8 @@ let scan ?(case_premises = []) ?(result_case_premises = []) ?(partial_defs = [])
     name_enabled_helpers registry relation_policies defs
   in
   let unsupported_definition_names =
-    unsupported_definitions unsupported_relations defs
+    StringSet.union (unsupported_definitions unsupported_relations defs)
+      (StringSet.of_list bodiless_defs)
   in
   let definition_bodies =
     definitions
@@ -1321,6 +1312,7 @@ let scan ?(case_premises = []) ?(result_case_premises = []) ?(partial_defs = [])
   ; requests = Hashtbl.create 64
   ; helper_names
   ; reserved
+  ; backend_names = registry.reserved
   ; case_premises
   ; result_case_premises
   ; partial_defs
@@ -1387,8 +1379,8 @@ let require_definition_body index use id =
   if not (definition_body_supported index id || has_dec_hint index id "builtin")
   then raise (Unsupported
     (use ^ " $" ^ id.it ^ " at " ^ string_of_region id.at
-     ^ " requires a body containing an unsupported RulePr;"
-     ^ " its relation needs an explicit supported lowering"))
+     ^ " requires a body that is not translated (an unsupported RulePr,"
+     ^ " or a record pattern on a maude_array or maude_map field)"))
 
 let premise_iteration_binds_membership index
     (iteration : premise_iteration) =
@@ -1474,7 +1466,7 @@ let helper_names index = index.helper_names
  * already in use. A base that is a backend name gets the spectec- prefix. *)
 let fresh_helper_name index used candidate =
   let candidate =
-    if StringSet.mem candidate reserved_names then "spectec-" ^ candidate
+    if StringSet.mem candidate index.backend_names then "spectec-" ^ candidate
     else candidate
   in
   used := StringSet.union index.reserved !used;

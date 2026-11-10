@@ -515,11 +515,39 @@ let check_remaining def =
   Remaining.def def
 
 (* Translator hints that describe the higher-order definition itself would
- * not describe its copies. *)
+ * not describe its copies. hint(maude_disjoint) is for definitions only. *)
 let check_hints higher_order script =
+  let only_definitions kind owner hints =
+    List.iter
+      (fun hint ->
+        if hint.hintid.it = "maude_disjoint" then
+          unsupported hint.hintid.at kind owner
+            "maude_disjoint is a hint on a definition (DecD)")
+      hints
+  in
   List.iter
     (fun def ->
       match def.it with
+      | TypD (id, _, insts) ->
+          List.iter
+            (fun inst ->
+              let InstD (_, _, deftyp) = inst.it in
+              match deftyp.it with
+              | VariantT cases ->
+                  List.iter
+                    (fun (_, _, hints) -> only_definitions "case hint" ("TypD " ^ id.it) hints)
+                    cases
+              | StructT fields ->
+                  List.iter
+                    (fun (_, _, hints) -> only_definitions "field hint" ("TypD " ^ id.it) hints)
+                    fields
+              | AliasT _ -> ())
+            insts
+      | HintD {it = TypH (id, hints); _} -> only_definitions "TypH" ("TypD " ^ id.it) hints
+      | HintD {it = RelH (id, hints); _} -> only_definitions "RelH" ("RelD " ^ id.it) hints
+      | HintD {it = GramH (id, hints); _} -> only_definitions "GramH" ("GramD " ^ id.it) hints
+      | HintD {it = RuleH (id, rule_id, hints); _} ->
+          only_definitions "RuleH" ("RelD " ^ id.it ^ "/" ^ rule_id.it) hints
       | HintD {it = DecH (id, hints); _} when List.mem id.it higher_order ->
           List.iter
             (fun hint ->
@@ -1097,6 +1125,10 @@ let disjunction_script index script =
     match find bound [] prems with
     | None -> [r]
     | Some _ when List.mem (relation, id.it) hinted -> [r]
+    | Some _ when List.exists (fun prem -> match prem.it with ElsePr -> true | _ -> false) prems ->
+        (* Each piece would count the earlier pieces as preceding rules. *)
+        Maude_il.located r.at ("RelD " ^ relation ^ "/" ^ id.it) (fun () ->
+          raise (Unsupported "otherwise rule with a disjunction premise that splits it"))
     | Some (before, prem, e, after) ->
         disjuncts e
         |> List.mapi (fun k disjunct ->
@@ -1120,15 +1152,137 @@ let disjunction_script index script =
   in
   List.map transform script
 
-let translate_script script =
+(* A maude_array or maude_map field is not a Maude list, so a record pattern
+ * binds its value only in the premises that stored_script replaces by the
+ * field: m = {F x*} and {F x*} = m. Elsewhere (a DefD argument, a rule input,
+ * another premise) such a binding is Unsupported. A definition with such a
+ * clause gets no body, as one that uses an untranslated relation (Prescan);
+ * the result lists them with the position of the first binding. *)
+let check_stored_patterns index script =
+  let stored_variables bound exp =
+    let found = ref [] in
+    let module Visitor = Il.Iter.Make (struct
+      include Il.Iter.Skip
+      let visit_exp exp =
+        match exp.it with
+        | StrE (fields, _) ->
+            List.iter
+              (fun (atom, value) ->
+                if Prescan.stored_field index exp.note atom <> None then
+                  let free = Il.Free.(free_exp value).varid in
+                  found := Il.Free.Set.elements (Il.Free.Set.diff free bound) @ !found)
+              fields
+        | _ -> ()
+    end)
+    in
+    Visitor.exp exp;
+    !found
+  in
+  let reason x =
+    "record pattern binds " ^ x ^ " to a maude_array or maude_map field outside m = {F x*}"
+  in
+  let check owner bound exp =
+    match stored_variables bound exp with
+    | [] -> ()
+    | x :: _ -> unsupported exp.at "StrE" owner (reason x)
+  in
+  (* For a definition, the first such binding instead of an error. *)
+  let first bound exp =
+    match stored_variables bound exp with
+    | [] -> None
+    | _ :: _ -> Some exp.at
+  in
+  let replaced = function
+    | {it = StrE (fields, _); note; _} ->
+        List.for_all
+          (fun (atom, (value : exp)) ->
+            Prescan.stored_field index note atom = None
+            ||
+            match value.it with
+            | VarE _ -> true
+            | IterE ({it = VarE y; _}, (_, [(y', {it = VarE _; _})])) -> y.it = y'.it
+            | _ -> false)
+          fields
+    | _ -> false
+  in
+  let premise_patterns bound prems =
+    List.fold_left
+      (fun (bound, patterns) prem ->
+        let patterns =
+          match prem.it with
+          | IfPr {it = CmpE (`EqOp, _, left, right); _}
+            when replaced left || replaced right -> patterns
+          | LetPr (_, pattern, _) when replaced pattern -> patterns
+          | IfPr exp | LetPr (_, exp, _) | RulePr (_, _, _, exp) ->
+              (bound, exp) :: patterns
+          | IterPr _ | ElsePr -> patterns
+        in
+        Il.Free.Set.union bound (Il.Free.free_prem prem).varid, patterns)
+      (bound, []) prems
+    |> snd |> List.rev
+  in
+  let rec visit def =
+    match def.it with
+    | DecD (id, _, _, clauses) ->
+        clauses
+        |> List.find_map (fun clause ->
+             let DefD (_, args, _, prems) = clause.it in
+             let exps =
+               List.filter_map (fun arg -> match arg.it with ExpA e -> Some e | _ -> None) args
+             in
+             List.map (fun exp -> Il.Free.Set.empty, exp) exps
+             @ premise_patterns Il.Free.(free_list free_exp exps).varid prems
+             |> List.find_map (fun (bound, exp) -> first bound exp))
+        |> Option.map (fun at -> id.it, at)
+        |> Option.to_list
+    | RelD (id, _, _, _, rules) ->
+        let input_count =
+          match Prescan.relation_policy index id with
+          | Ok (Prescan.Execution {input_count; _} | Prescan.Compute {input_count; _}) ->
+              Some input_count
+          | Ok (Prescan.Check _) -> None
+          | Error _ -> Some 0
+        in
+        List.iter
+          (fun rule ->
+            let RuleD (rule_id, _, mixop, exp, prems) = rule.it in
+            let owner = "RelD " ^ id.it ^ "/" ^ rule_id.it in
+            let components = Prem.components mixop exp in
+            let inputs =
+              match input_count with
+              | Some count -> fst (Prem.split count components)
+              | None -> components
+            in
+            List.iter (check owner Il.Free.Set.empty) inputs;
+            premise_patterns Il.Free.(free_list free_exp inputs).varid prems
+            |> List.iter (fun (bound, exp) -> check owner bound exp))
+          rules;
+        []
+    | RecD defs -> List.concat_map visit defs
+    | TypD _ | GramD _ | HintD _ -> []
+  in
+  List.concat_map visit script
+
+(* builtin_names are the operators of the spec's builtin Maude files
+   (spec2maude --builtins); generated names avoid them. *)
+let translate_script ?(builtin_names = []) script =
   let script = fold_script (stored_script (specialize_script (assume_script script))) in
-  let script = disjunction_script (Prescan.scan script) script in
+  let index = Prescan.scan ~builtin_names script in
+  let bodiless = check_stored_patterns index script in
+  List.iter
+    (fun (name, (at : region)) ->
+      Printf.eprintf
+        "[spec2maude] warning: definition not translated (record pattern on a maude_array or maude_map field outside m = {F x*}): %s (%s:%d)\n"
+        name (Filename.basename at.left.file) at.left.line)
+    bodiless;
+  let script = disjunction_script index script in
   (* The pass needs the relation policies of the first scan; the index is
      scanned again for the premises it adds. *)
-  let script, checks = case_premise_script (Prescan.scan script) script in
+  let script, checks = case_premise_script (Prescan.scan ~builtin_names script) script in
   let index =
     Prescan.scan ~case_premises:checks.checks ~result_case_premises:checks.result_checks
-      ~partial_defs:checks.partial script
+      ~partial_defs:checks.partial ~bodiless_defs:(List.map fst bodiless) ~builtin_names
+      script
   in
   (* Relations without a supported policy are omitted; a call to one is
      rejected later, but an unreferenced one would vanish silently. One line

@@ -886,16 +886,24 @@ let lower_execution_rules ~include_rule
     index id params policy rules =
   rules
   |> List.mapi (fun ordinal rule -> ordinal, rule)
-  |> List.filter (fun (_, rule) -> include_rule rule)
   |> List.fold_left
-       (fun previous (ordinal, rule) ->
-         let lowered =
-           located id rule (fun () ->
-             lower_execution_rule index id params policy
-               (List.rev previous) ordinal rule)
-         in
-         lowered :: previous)
-       []
+       (fun (previous, excluded) (ordinal, rule) ->
+         if not (include_rule rule) then previous, true
+         else
+           let lowered =
+             located id rule (fun () ->
+               (* An excluded earlier rule would be missing from the
+                  complement. *)
+               let RuleD (_, _, _, _, prems) = rule.it in
+               if excluded && has_else prems then
+                 raise (Unsupported
+                   "otherwise rule after a rule lowered separately (hint(k_heatcool))");
+               lower_execution_rule index id params policy
+                 (List.rev previous) ordinal rule)
+           in
+           lowered :: previous, excluded)
+       ([], false)
+  |> fst
   |> List.rev
 
 let translate_execution ~include_rule

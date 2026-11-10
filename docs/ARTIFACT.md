@@ -142,7 +142,7 @@ spectec_to_maude: wasm-1.0 PASS (9 files)
 ### 3. Regenerate the versioned semantics manually
 
 ```sh
-dune exec bin/spec2maude.exe --
+dune exec bin/spec2maude.exe -- --builtins translator/builtins/core.maude translator/builtins/vector.maude translator/builtins/wasm-3.0.maude
 ```
 
 This reads `spectec/wasm-3.0/*.spectec` in lexical order and writes
@@ -150,8 +150,10 @@ This reads `spectec/wasm-3.0/*.spectec` in lexical order and writes
 For Wasm 1.0 or 2.0, pass the files and an output path:
 
 ```sh
-dune exec bin/spec2maude.exe -- -o translator/generated/wasm-2.0/output.maude spectec/wasm-2.0/*.spectec
+dune exec bin/spec2maude.exe -- -o translator/generated/wasm-2.0/output.maude --builtins translator/builtins/core.maude translator/builtins/vector.maude translator/builtins/wasm-2.0.maude spectec/wasm-2.0/*.spectec
 ```
+`--builtins` names the builtin Maude files that the version loads (Wasm 1.0:
+`core.maude wasm-1.0.maude`); generated names avoid their `op`/`ops` names.
 With `-o FILE`, the type declarations are written to `types.maude` beside
 `FILE`; that name is reserved for the type declarations. The preceding test
 uses a temporary directory and does not modify the repository.

@@ -1,0 +1,7 @@
+search in SPEC2MAUDE-GENERATED : pick(nil) =>! X:pick-Request .
+X:pick-Request --> 0
+search in SPEC2MAUDE-GENERATED : pick(# 3 # 5) =>! X:pick-Request .
+X:pick-Request --> 3
+X:pick-Request --> 5
+search in SPEC2MAUDE-GENERATED : pick(# 7) =>! X:pick-Request .
+X:pick-Request --> pick(# 7)

@@ -1,0 +1,4 @@
+search in SPEC2MAUDE-GENERATED : f(2, seq(# 1 # 2) seq(# 1 # 2 # 3)) =>!
+X:SpectecTerminals --> f(2, seq(# 1 # 2) seq(# 1 # 2 # 3))
+search in SPEC2MAUDE-GENERATED : f(2, seq(# 1 # 2) seq(# 3 # 4)) =>!
+X:SpectecTerminals --> seq(# 1 # 2) seq(# 3 # 4)

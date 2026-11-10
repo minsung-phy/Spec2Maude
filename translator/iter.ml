@@ -123,7 +123,11 @@ let ranges_over iter source_iter =
   Il.Eq.eq_iter iter source_iter
   || (match iter, source_iter with ListN _, List -> true | _ -> false)
 
-let rec identity_body_id index exp =
+(* In a pattern, a nested iteration is the identity only without a length
+   condition: the outer cardinality does not check the length of x^n or x+
+   inside it. An expression only reads a sequence whose pattern checked it. *)
+let rec identity_body_id ~pattern index exp =
+  let identity_body_id = identity_body_id ~pattern in
   match exp.it with
   | VarE id -> Some id
   | CaseE (mixop, payload, _) when Mixop.is_hole_only mixop ->
@@ -140,10 +144,12 @@ let rec identity_body_id index exp =
     when Prescan.same_representation index source target ->
       identity_body_id index inner
   | IterE (inner, (iter, [(binder, source)])) ->
+      let counted = match iter with ListN _ | List1 -> true | Opt | List -> false in
       begin match identity_body_id index inner, source.it,
                   source_iteration source with
       | Some inner_id, VarE source_id, Some source_iter
         when inner_id.it = binder.it && ranges_over iter source_iter
+             && not (pattern && counted)
              && Prescan.same_representation index source.note exp.note ->
           Some source_id
       | _ -> None
@@ -175,8 +181,8 @@ let rec identity_requirements index exp =
   | CvtE _ | SubE _ ->
       []
 
-let identity_source index body (iter, generators) =
-  match identity_body_id index body, generators with
+let identity_source ~pattern index body (iter, generators) =
+  match identity_body_id ~pattern index body, generators with
   | Some body_id, [(generator_id, source)] ->
       begin match source_iteration source with
       | Some source_iter
@@ -212,7 +218,7 @@ let controls translate_exp = function
       [translate_exp count; Const "0"]
 
 let translate_term index translate_exp body (iter, generators) =
-  match identity_source index body (iter, generators) with
+  match identity_source ~pattern:false index body (iter, generators) with
   | Some source -> translate_exp source
   | None ->
       match iter, generators with
@@ -262,7 +268,7 @@ let source_arguments index iter generators heads tails =
 
 let translate_identity_pattern index translate_pattern translate_conditions
     body (iter, generators) =
-  match identity_source index body (iter, generators) with
+  match identity_source ~pattern:true index body (iter, generators) with
   | None -> None
   | Some source ->
       begin match translate_pattern source with
@@ -309,7 +315,7 @@ let projector_local_bound captures iter =
 let projector_supported index translate_pattern can_bind_body bound body iterexp =
   let _, generators = iterexp in
   generators <> []
-  && identity_source index body iterexp = None
+  && identity_source ~pattern:true index body iterexp = None
   && (Option.is_some (translate_pattern body) || can_bind_body bound body)
   && List.for_all
        (fun (id, _) -> Il.Free.Set.mem id.it Il.Free.(free_exp body).varid)
@@ -379,7 +385,7 @@ let translate_pattern index translate_source_pattern translate_exp
   | None -> None
   | Some (source_patterns, source_guards) ->
       begin match
-        identity_source index body (iter, generators), source_patterns
+        identity_source ~pattern:true index body (iter, generators), source_patterns
       with
       | Some source, [source_pattern] ->
           begin match pattern_count index source.note translate_source_pattern

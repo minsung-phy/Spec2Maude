@@ -1,0 +1,4 @@
+search in SPEC2MAUDE-GENERATED : pick(0) =>+ X:pick-Config .
+X:pick-Config --> 0
+search in SPEC2MAUDE-GENERATED : pick(4) =>+ X:pick-Config .
+X:pick-Config --> 1

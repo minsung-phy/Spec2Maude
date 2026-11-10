@@ -1,0 +1,2 @@
+def $f(nat, (nat*)*) : (nat*)*
+def $f(n, (m^n)*) = (m^n)*

@@ -288,6 +288,10 @@ def $lcvtop__(Fnn_1 X M_1, Fnn_2 X M_2, DEMOTE ZERO, c_1) = c*
 def $lcvtop__(Fnn_1 X M_1, Fnn_2 X M_2, PROMOTE LOW, c_1) = c*
     -- if c* = $promote__($lsizenn1(Fnn_1), $lsizenn2(Fnn_2), c_1)
 
+;; The clauses below are disjoint: the first requires $halfop = eps and
+;; $zeroop = eps, the second $halfop =/= eps, the third $zeroop =/= eps, and by
+;; $zeroop and $halfop above no vcvtop has both $halfop and $zeroop non-eps.
+def $vcvtop__ hint(maude_disjoint)
 def $vcvtop__(Lnn_1 X M, Lnn_2 X M, vcvtop, v_1) = v
   -- if $halfop(Lnn_1 X M, Lnn_2 X M, vcvtop) = eps /\ $zeroop(Lnn_1 X M, Lnn_2 X M, vcvtop) = eps
   -- if c_1* = $lanes_(Lnn_1 X M, v_1)

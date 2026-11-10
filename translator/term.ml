@@ -558,7 +558,7 @@ and stored_value index exp =
       |> Option.map (fun kind ->
            kind, app "_._" [translate_exp index record; qid_of_atom atom])
   | IterE (body, iterexp) ->
-      Option.bind (Iter.identity_source index body iterexp) (stored_value index)
+      Option.bind (Iter.identity_source ~pattern:false index body iterexp) (stored_value index)
   | CallE (id, args) when Prescan.map_definition index id ->
       let positions, _ = syntax_parameter_positions index id in
       Some (Hintd.Map, translate_call index ~positions id args)

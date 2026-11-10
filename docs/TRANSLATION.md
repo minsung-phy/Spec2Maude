@@ -776,7 +776,7 @@ Translation and Maude load check:
 
 ```sh
 dune build
-dune exec bin/spec2maude.exe --
+dune exec bin/spec2maude.exe -- --builtins translator/builtins/core.maude translator/builtins/vector.maude translator/builtins/wasm-3.0.maude
 test/spectec_to_maude.sh
 ```
 

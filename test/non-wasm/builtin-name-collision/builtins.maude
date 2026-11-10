@@ -1,0 +1,8 @@
+--- op ignored : Nat -> Nat .   (a comment, not a declaration)
+fmod EXAMPLE-BUILTINS is
+  protecting NAT .
+  op pick
+    : Nat -> Nat .
+  ops twice
+      other : Nat -> Nat .
+endfm

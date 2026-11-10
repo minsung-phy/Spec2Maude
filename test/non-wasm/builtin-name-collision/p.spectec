@@ -1,0 +1,8 @@
+def $pick(nat) : nat
+def $pick(n) = n
+
+def $twice(nat) : nat
+def $twice(n) = $(2 * n)
+
+def $ignored(nat) : nat
+def $ignored(n) = n

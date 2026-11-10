@@ -1,0 +1,4 @@
+def $pick(nat*) : nat
+def $pick(eps) = 0
+def $pick(n*) = m
+  -- if m <- n*

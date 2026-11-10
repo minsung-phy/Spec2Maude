@@ -1,0 +1,6 @@
+def $pick(nat*) : nat hint(maude_disjoint)
+def $pick(n*) = m
+  -- if |n*| = 2
+  -- if m <- n*
+def $pick(n*) = 0
+  -- if |n*| = 0

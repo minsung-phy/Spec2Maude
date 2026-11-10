@@ -1,0 +1,3 @@
+def $pick(nat) : nat hint(maude_rule)
+def $pick(0) = 0
+def $pick(n) = 1

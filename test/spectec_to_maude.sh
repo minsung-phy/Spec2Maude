@@ -19,9 +19,12 @@ fi
 (cd "$root" && dune build bin/spec2maude.exe)
 spec2maude="$root/_build/default/bin/spec2maude.exe"
 
-# version, expected file count, generated directory, main file
+# version, expected file count, generated directory, main file, builtin files
+# (the translator avoids their op names)
 check() {
   local version=$1 expected_count=$2 generated=$3 main=$4
+  shift 4
+  local builtins=("$@")
   local source_dir="$root/spectec/wasm-$version"
   local file_count
   file_count=$(find "$source_dir" -maxdepth 1 -type f -name '*.spectec' | wc -l | tr -d ' ')
@@ -32,12 +35,13 @@ check() {
 
   local out="$work/$version"
   mkdir -p "$out/translator/$generated" "$out/translator/backend" "$out/translator/builtins"
-  "$spec2maude" -o "$out/translator/$generated/output.maude" "$source_dir"/*.spectec
+  "$spec2maude" -o "$out/translator/$generated/output.maude" \
+    --builtins "${builtins[@]/#/$root/translator/builtins/}" "$source_dir"/*.spectec
 
   for name in types.maude output.maude; do
     if ! cmp -s "$root/translator/$generated/$name" "$out/translator/$generated/$name"; then
       echo "spectec_to_maude: wasm-$version: generated output differs from translator/$generated/$name" >&2
-      echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe -- -o translator/$generated/output.maude spectec/wasm-$version/*.spectec" >&2
+      echo "spectec_to_maude: regenerate it with: dune exec bin/spec2maude.exe -- -o translator/$generated/output.maude --builtins ${builtins[*]/#/translator/builtins/} spectec/wasm-$version/*.spectec" >&2
       exit 1
     fi
   done
@@ -54,6 +58,6 @@ check() {
   echo "spectec_to_maude: wasm-$version PASS ($file_count files)"
 }
 
-check 3.0 21 generated main.maude
-check 2.0 9 generated/wasm-2.0 main-wasm-2.0.maude
-check 1.0 9 generated/wasm-1.0 main-wasm-1.0.maude
+check 3.0 21 generated main.maude core.maude vector.maude wasm-3.0.maude
+check 2.0 9 generated/wasm-2.0 main-wasm-2.0.maude core.maude vector.maude wasm-2.0.maude
+check 1.0 9 generated/wasm-1.0 main-wasm-1.0.maude core.maude wasm-1.0.maude

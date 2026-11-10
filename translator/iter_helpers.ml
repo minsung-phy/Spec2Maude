@@ -185,6 +185,17 @@ let translate_projector_statements index (iteration : Prescan.iteration) =
           in
           Iter.term_of_variable value, guards
     in
+    (* A capture is a helper argument, so it is bound: matching it (the count
+       n of a nested x^n) is an equality. *)
+    let body_guards =
+      List.map
+        (function
+          | MatchCond (Var variable, subject)
+            when List.exists (same_variable variable) captures ->
+              EqCond (Var variable, subject)
+          | guard -> guard)
+        body_guards
+    in
     let element = Iter.as_sequence_element index body.note body_pattern in
     let subject =
       Iter.app result_representation.concat
@@ -265,7 +276,7 @@ let translate_statements index (iteration : Prescan.iteration) =
   let name = iteration.Prescan.name in
   let body = iteration.Prescan.body in
   let iter, generators = iteration.Prescan.iterexp in
-  match Iter.identity_source index body (iter, generators) with
+  match Iter.identity_source ~pattern:true index body (iter, generators) with
   | Some _ -> []
   | None ->
       let forward =

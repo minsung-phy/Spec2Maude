@@ -1,0 +1,2 @@
+search in SPEC2MAUDE-GENERATED : pick(nil) =>! X:pick-Request .
+search in SPEC2MAUDE-GENERATED : pick((# 3) (# 5)) =>! X:pick-Request .

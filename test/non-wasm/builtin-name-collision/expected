@@ -1,0 +1,6 @@
+search in SPEC2MAUDE-GENERATED : spectec-pick(3) =>! X:Nat .
+X:Nat --> 3
+search in SPEC2MAUDE-GENERATED : spectec-twice(3) =>! X:Nat .
+X:Nat --> 6
+search in SPEC2MAUDE-GENERATED : ignored(3) =>! X:Nat .
+X:Nat --> 3

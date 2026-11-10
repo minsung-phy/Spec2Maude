@@ -1,0 +1,18 @@
+syntax e = T | F | NOT e | IF e e e | ERROR
+
+relation Step: e ~> e
+
+rule Step/not-t:
+  NOT T ~> F
+
+rule Step/not-f:
+  NOT F ~> T
+
+rule Step/if-cond:
+  IF e e_1 e_2 ~> IF e' e_1 e_2
+  -- Step: e ~> e'
+  hint(k_heatcool)
+
+rule Step/if-stuck:
+  IF e e_1 e_2 ~> ERROR
+  -- otherwise
