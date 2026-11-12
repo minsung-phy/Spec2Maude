@@ -170,8 +170,8 @@ lowercase rule name with `-heat`, `-next`, `-cool`.
 
 | Statement | Maude | Code |
 | --- | --- | --- |
-| Heating (first execution premise) | `crl [r-heat] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ ∧ start .` `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
-| Start condition, `inner` with a sequence context | `identifyFocus(⟦ins'⟧) => {l_1 … c … r_n}` with fresh slot variables | `heatcool.ml:start_condition`, `heatcool.ml:focus_condition` |
+| Heating (first execution premise) | `crl [r-heat] : r̂(⟦ins⟧) => inner(⟦ins'⟧) ~> hole-r(C) if ⟦earlier premises⟧ ∧ start .` (`rl` when both are empty) `C` holds the bound variables that later premises use. `_~>_` is frozen in the hole. | `heatcool.ml:heatcool_rule` |
+| Start condition, `inner` with a sequence context | none: the request finds its focus when it executes | `heatcool.ml:start_condition` |
 | Start condition, other `inner` | `identifyFocusRule(⟦ins'⟧)` (named after the hinted rule), a `Bool` operator with one equation `eq [focus-rule-r'] : identifyFocusRule(⟦ins of r'⟧) = true .` per rule `r'` of `inner`, conditional on the equational premises of `r'` over its input variables only. On an input that no rule matches it stays unreduced. | `heatcool.ml:identify_statements` |
 | Next execution premise | `eq [r-next] : ⟦outs'⟧ ~> hole-r-inner(C) = inner2(⟦ins''⟧) ~> hole-r-inner2(C') .` With several execution premises, each hole is named after the relation it waits for. | `heatcool.ml:heatcool_rule` |
 | Cooling (after the last execution premise) | `eq [r-cool] : ⟦outs'⟧ ~> hole-r-inner2(C) = ⟦outs⟧ .`, with the remaining premises as conditions | `heatcool.ml:heatcool_rule` |

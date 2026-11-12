@@ -2407,7 +2407,7 @@ mod SPEC2MAUDE-GENERATED is
 
   vars LEFT RIGHT : Record .
 
-  vars INSTR* INSTR*-2 VALUE-16 INSTR_1* INSTR_2* EXPR INSTR'* RESULT-2 CASE-PART3 INSTR_1*-1 INSTR_0* INSTRS INSTR*-1 INSTR''* INSTR_D* INSTR_E* INSTR*-REST EXPR_G-2 EXPR_T-2 EXPR_F-2 : InstrList .
+  vars INSTR* INSTR*-2 VALUE-16 INSTR_1* INSTR_2* EXPR INSTR'* RESULT-2 CASE-PART3 INSTR_1*-1 INSTR_0* INSTRS INSTR''* INSTR_D* INSTR_E* INSTR*-REST EXPR_G-2 EXPR_T-2 EXPR_F-2 : InstrList .
 
   vars VALUE-20 VAL* VAL'* VAL*-1 VAL_G* VAL*-REST : ValList .
 
@@ -8158,25 +8158,21 @@ mod SPEC2MAUDE-GENERATED is
 
   eq [step-read-cool] : INSTR'* ~> hole-Step-read(Z) = Z ; INSTR'* .
 
-  crl [step-ctxt-label-heat] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3)
-    if identifyFocus(Z ; INSTR*) => { VAL* | (Z ; INSTR*-1) | INSTR_1* } .
+  rl [step-ctxt-label-heat] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) .
 
   eq [step-ctxt-label-cool] : (Z' ; INSTR'*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
 
-  crl [step-ctxt-handler-heat] : Step(Z ; (HANDLER- N-3 { CATCH* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-handler(CATCH*, N-3)
-    if identifyFocus(Z ; INSTR*) => { VAL* | (Z ; INSTR*-1) | INSTR_1* } .
+  rl [step-ctxt-handler-heat] : Step(Z ; (HANDLER- N-3 { CATCH* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-handler(CATCH*, N-3) .
 
   eq [step-ctxt-handler-cool] : (Z' ; INSTR'*) ~> hole-Step-ctxt-handler(CATCH*, N-3) = Z' ; (HANDLER- N-3 { CATCH* } INSTR'*) .
 
-  crl [step-ctxt-frame-heat] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame(N-3, F)
-    if identifyFocus((S-2 ; F') ; INSTR*) => { VAL* | ((S-2 ; F') ; INSTR*-1) | INSTR_1* } .
+  rl [step-ctxt-frame-heat] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame(N-3, F) .
 
   eq [step-ctxt-frame-cool] : ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
 
   rl Steps(Z ; INSTR*) => Z ; INSTR* .
 
-  crl [steps-trans-heat] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step
-    if identifyFocus(Z ; INSTR*) => { VAL* | (Z ; INSTR*-1) | INSTR_1* } .
+  rl [steps-trans-heat] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step .
 
   eq [steps-trans-next] : (Z' ; INSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-Steps .
 

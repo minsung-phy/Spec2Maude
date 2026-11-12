@@ -5,7 +5,8 @@
  * Every hinted rule  C ~> C'  -- R_1: c_1 ~> c_1' ... -- R_k: c_k ~> c_k'
  * heats by a rule into a request of its first execution premise and resumes
  * the next premise, then the conclusion, by equations:
- *   crl C => R_1(c_1) ~> hole_1 if <R_1 can start on c_1> .
+ *   rl  C => R_1(c_1) ~> hole_1 .               (R_1 has a sequence context)
+ *   crl C => R_1(c_1) ~> hole_1 if identifyFocus<Rule>(c_1) .   (otherwise)
  *   eq  c_1' ~> hole_1 = R_2(c_2) ~> hole_2 .   ...
  *   eq  c_k' ~> hole_k = C' .
  * A sequence context, hint(k_heatcool "x*"), heats through identifyFocus,
@@ -254,10 +255,9 @@ let focus_target index (context : Hintd.context) slots config =
   App (helper index context (target_operator context),
        variable_terms slots.left @ [config] @ variable_terms slots.right)
 
-(* The relation of [context] can start on [input]: identifyFocus finds a focus
-   in it. Its slots keep apart from the variables in [taken]. *)
-let focus_condition index (context : Hintd.context) taken input =
-  let slots = slots_apart taken (slots index context) in
+(* identifyFocus finds a focus in [input], the sequence of the context rule. *)
+let focus_condition index (context : Hintd.context) input =
+  let slots = slots index context in
   let _, rebuild = split_config index context.frame input context.rule.at in
   RewriteCond
     ( App (helper index context "identifyFocus", [input])
@@ -465,7 +465,7 @@ let context_transitions index (context : Hintd.context) =
   in
   let left = relation_call index context.source [rebuild sequence] in
   (* The context rule's own variables are the slots: nothing to rename. *)
-  let identify = focus_condition index context [] (rebuild sequence) in
+  let identify = focus_condition index context (rebuild sequence) in
   let conditions = schedule_rule_conditions left (identify :: remaining) in
   let hole =
     App (context_hole index context,
@@ -558,14 +558,13 @@ let identify_statements index (heated : Hintd.heatcool) target args =
         |> List.map (fun (ordinal, rule) -> equation ordinal rule)),
   [EqCondition (BoolCond (App (name, args)))]
 
-(* The first execution premise heats only where its relation can start:
- * identifyFocus of the relation's sequence context finds a focus, or else an
- * identifyFocus<Rule> equation matches. *)
-let start_condition index (heated : Hintd.heatcool) taken target call =
+(* The start condition of the first execution premise. A relation with a
+ * sequence context has none: the heating is a rule without a condition, and
+ * the request finds its focus when it executes. Otherwise an
+ * identifyFocus<Rule> equation must match. *)
+let start_condition index (heated : Hintd.heatcool) target call =
   match sequence_context index target, call with
-  | Some context, _ ->
-      [], [focus_condition index context taken
-             (call_input index target call heated.rule.at)]
+  | Some _, _ -> [], []
   | None, App (_, args) -> identify_statements index heated target args
   | None, (Var _ | Const _) ->
       unsupported heated.rule.at "execution premise is not a relation call"
@@ -644,10 +643,7 @@ let heatcool_rule index (heated : Hintd.heatcool) =
         let returned = App ("_~>_", [result; hole]) in
         let transition =
           if initial then
-            let statements, start =
-              start_condition index heated
-                (term_variables (term_variables [] left) call) target call
-            in
+            let statements, start = start_condition index heated target call in
             statements
             @ [rule ~label:(label "heat") left suspended
                  (List.map (fun guard -> EqCondition guard) guards @ start)]

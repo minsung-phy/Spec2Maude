@@ -536,7 +536,8 @@ names of relations or constructors.
 For a hinted rule `C ~> C'  -- R_1: c_1 ~> c_1' ... -- R_k: c_k ~> c_k'` (other premises in between):
 
 ```maude
-crl [r-heat] : C => R_1(c_1) ~> hole_1 if <R_1 can start on c_1> .   --- heating, a rule
+rl  [r-heat] : C => R_1(c_1) ~> hole_1 .                             --- heating, a rule
+                                                                      --- (crl ... if identifyFocus<Rule>(c_1) without a sequence context)
 eq  [r-next] : c_1' ~> hole_1 = R_2(c_2) ~> hole_2 .                  --- next execution premise
 eq  [r-cool] : c_k' ~> hole_k = C' .                                  --- cooling, an equation
 ```
@@ -545,9 +546,10 @@ eq  [r-cool] : c_k' ~> hole_k = C' .                                  --- coolin
   the conclusion output. Each hole keeps only the already bound variables that the result pattern, the remaining
   premises, and the conclusion need. General premises keep their order before and after each execution.
 - Labels are the lowercase rule name with `-heat`, `-next`, `-cool` (`step-ctxt-frame-heat`).
-- *R can start on c* is the start condition of the first execution premise (below). It prunes heating: the inner
-  rules check all their premises when the request executes, so a heating whose request cannot step only fails the
-  enclosing condition and adds no state or successor.
+- The heating has a start condition only when the relation of the first execution premise has no sequence context
+  (below). It prunes heating: the inner rules check all their premises when the request executes, so a heating whose
+  request cannot step only fails the enclosing condition and adds no state or successor. A heating into a relation with
+  a sequence context is a rule without a condition; its request finds its focus when it executes.
 - Request sorts and return sorts are distinguished, and the hole argument of `_~>_` is `[frozen (2)]`.
 - ElsePr and IterPr in a hinted rule and rewrite-backed expressions are Unsupported with a diagnostic.
 
@@ -581,8 +583,8 @@ op {_|...|_} : L_1 .. L_m Config R_1 .. R_n -> FocusTarget [ctor] .   --- one sl
 - `identifyFocus` is defined by rules: one sequence may have several foci with different successors
   (trap-instrs: `c1 TRAP NOP` has the successors `TRAP`, `TRAP NOP`, `c1 TRAP`). An equation would keep one of them.
 
-The start condition of a premise on relation R is `identifyFocus(c) => {..}` when R has a sequence context, and
-otherwise `identifyFocus<Rule>(c)`, a Bool equation per rule of R that holds when that rule's input pattern and its
+The first execution premise on relation R has no start condition when R has a sequence context. Otherwise its start
+condition is `identifyFocus<Rule>(c)`, a Bool equation per rule of R that holds when that rule's input pattern and its
 equational premises over input variables hold. The answer is `true` or no result, so these are equations.
 
 Variables keep their source names. A generated variable whose name a statement already uses gets a suffix (`VAL*-1`):
@@ -693,13 +695,12 @@ rule Step/ctxt-label:
 ```
 
 ```maude
-crl [step-ctxt-label-heat] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3)
-  if identifyFocus(Z ; INSTR*) => { VAL* | (Z ; INSTR*-1) | INSTR_1* } .
+rl [step-ctxt-label-heat] : Step(Z ; (LABEL- N-3 { INSTR_0* } INSTR*)) => Step(Z ; INSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) .
 eq [step-ctxt-label-cool] : (Z' ; INSTR'*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } INSTR'*) .
 ```
 
-The label opens only where its body can step. A body that the rules on the label itself consume (label-vals,
-br-label-zero, ...) has no focus, so no list of such bodies is needed.
+The label opens on any body. A body that cannot step (label-vals, br-label-zero, ... consume the label itself) leaves
+the request `Step(Z ; INSTR*)` without a result, so that heating only fails the enclosing condition.
 
 ### 5. Step/ctxt-handler
 
@@ -715,13 +716,11 @@ rule Step/ctxt-frame:
 ```
 
 ```maude
-crl [step-ctxt-frame-heat] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame(N-3, F)
-  if identifyFocus((S-2 ; F') ; INSTR*) => { VAL* | ((S-2 ; F') ; INSTR*-1) | INSTR_1* } .
+rl [step-ctxt-frame-heat] : Step((S-2 ; F) ; (FRAME- N-3 { F' } INSTR*)) => Step((S-2 ; F') ; INSTR*) ~> hole-Step-ctxt-frame(N-3, F) .
 eq [step-ctxt-frame-cool] : ((S' ; F'') ; INSTR'*) ~> hole-Step-ctxt-frame(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } INSTR'*) .
 ```
 
-Heating switches to the inner frame `F'` and keeps the outer frame `F` in the hole; the start condition looks for a
-focus under `F'`.
+Heating switches to the inner frame `F'` and keeps the outer frame `F` in the hole.
 
 ### 7. Steps/trans
 
@@ -734,8 +733,7 @@ rule Steps/trans:
 ```
 
 ```maude
-crl [steps-trans-heat] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step
-  if identifyFocus(Z ; INSTR*) => { VAL* | (Z ; INSTR*-1) | INSTR_1* } .
+rl [steps-trans-heat] : Steps(Z ; INSTR*) => Step(Z ; INSTR*) ~> hole-Steps-trans-Step .
 eq [steps-trans-next] : (Z' ; INSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; INSTR'*) ~> hole-Steps-trans-Steps .
 eq [steps-trans-cool] : (Z'' ; INSTR''*) ~> hole-Steps-trans-Steps = Z'' ; INSTR''* .
 

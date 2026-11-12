@@ -851,7 +851,7 @@ mod SPEC2MAUDE-GENERATED is
 
   vars LEFT RIGHT : Record .
 
-  vars ADMININSTR* RESULT ADMININSTR_1* ADMININSTRS ADMININSTR'* ADMININSTR*-1 ADMININSTR''* : AdmininstrList .
+  vars ADMININSTR* RESULT ADMININSTR_1* ADMININSTRS ADMININSTR'* ADMININSTR''* : AdmininstrList .
 
   eq valLift(nil) = nil .
 
@@ -2254,20 +2254,17 @@ mod SPEC2MAUDE-GENERATED is
 
   eq [step-read-cool] : ADMININSTR'* ~> hole-Step-read(Z) = Z ; ADMININSTR'* .
 
-  crl [step-ctxt-label-heat] : Step(Z ; (LABEL- N-3 { INSTR_0* } ADMININSTR*)) => Step(Z ; ADMININSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3)
-    if identifyFocus(Z ; ADMININSTR*) => { VAL* | (Z ; ADMININSTR*-1) | ADMININSTR_1* } .
+  rl [step-ctxt-label-heat] : Step(Z ; (LABEL- N-3 { INSTR_0* } ADMININSTR*)) => Step(Z ; ADMININSTR*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) .
 
   eq [step-ctxt-label-cool] : (Z' ; ADMININSTR'*) ~> hole-Step-ctxt-label(INSTR_0*, N-3) = Z' ; (LABEL- N-3 { INSTR_0* } ADMININSTR'*) .
 
-  crl [step-ctxt-frame-heat] : Step((S-2 ; F) ; (FRAME- N-3 { F' } ADMININSTR*)) => Step((S-2 ; F') ; ADMININSTR*) ~> hole-Step-ctxt-frame(N-3, F)
-    if identifyFocus((S-2 ; F') ; ADMININSTR*) => { VAL* | ((S-2 ; F') ; ADMININSTR*-1) | ADMININSTR_1* } .
+  rl [step-ctxt-frame-heat] : Step((S-2 ; F) ; (FRAME- N-3 { F' } ADMININSTR*)) => Step((S-2 ; F') ; ADMININSTR*) ~> hole-Step-ctxt-frame(N-3, F) .
 
   eq [step-ctxt-frame-cool] : ((S' ; F'') ; ADMININSTR'*) ~> hole-Step-ctxt-frame(N-3, F) = (S' ; F) ; (FRAME- N-3 { F'' } ADMININSTR'*) .
 
   rl Steps(Z ; ADMININSTR*) => Z ; ADMININSTR* .
 
-  crl [steps-trans-heat] : Steps(Z ; ADMININSTR*) => Step(Z ; ADMININSTR*) ~> hole-Steps-trans-Step
-    if identifyFocus(Z ; ADMININSTR*) => { VAL* | (Z ; ADMININSTR*-1) | ADMININSTR_1* } .
+  rl [steps-trans-heat] : Steps(Z ; ADMININSTR*) => Step(Z ; ADMININSTR*) ~> hole-Steps-trans-Step .
 
   eq [steps-trans-next] : (Z' ; ADMININSTR'*) ~> hole-Steps-trans-Step = Steps(Z' ; ADMININSTR'*) ~> hole-Steps-trans-Steps .
 
