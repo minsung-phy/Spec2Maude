@@ -789,6 +789,49 @@ let fold_ground e =
 
 let fold_script script = List.map (Decd.map_def fold_ground) script
 
+(* A use of a variable has the type of its binder. The elaborator may note a
+ * use with an equivalent type instead (val* as instr* when val and instr have
+ * the same cases), and the translator names a variable after its type, so
+ * such a use would become another variable. Give each such use its binder's
+ * type. *)
+let binder_type_script script =
+  let env = Il.Env.env_of_script script in
+  let binder_types quants =
+    let binders =
+      List.filter_map
+        (fun param -> match param.it with ExpP (id, typ) -> Some (id.it, typ) | _ -> None)
+        quants
+    in
+    fun exp ->
+      match exp.it with
+      | VarE id ->
+          begin match List.assoc_opt id.it binders with
+          | Some typ
+            when not (Il.Eq.eq_typ typ exp.note) && Il.Eval.equiv_typ env typ exp.note ->
+              {exp with note = typ}
+          | Some _ | None -> exp
+          end
+      | _ -> exp
+  in
+  let rule ({it = RuleD (id, quants, mixop, exp, prems); _} as rule) =
+    let f = binder_types quants in
+    {rule with
+     it = RuleD (id, quants, mixop, Decd.map_exp f exp, List.map (Decd.map_prem f) prems)}
+  in
+  let clause ({it = DefD (quants, _, _, _); _} as clause) =
+    Decd.map_clause (binder_types quants) clause
+  in
+  let rec def d =
+    match d.it with
+    | RelD (id, params, mixop, typ, rules) ->
+        {d with it = RelD (id, params, mixop, typ, List.map rule rules)}
+    | DecD (id, params, typ, clauses) ->
+        {d with it = DecD (id, params, typ, List.map clause clauses)}
+    | RecD defs -> {d with it = RecD (List.map def defs)}
+    | TypD _ | GramD _ | HintD _ -> d
+  in
+  List.map def script
+
 (* Case premises (IL reduction, Step_exp/INJ): a value built by an unchecked
  * case constructor C e is a value only if the premises of C's case hold for
  * the payload e; otherwise the construction fails. Each evaluated
@@ -1266,7 +1309,10 @@ let check_stored_patterns index script =
 (* builtin_names are the operators of the spec's builtin Maude files
    (spec2maude --builtins); generated names avoid them. *)
 let translate_script ?(builtin_names = []) script =
-  let script = fold_script (stored_script (specialize_script (assume_script script))) in
+  let script =
+    binder_type_script
+      (fold_script (stored_script (specialize_script (assume_script script))))
+  in
   let index = Prescan.scan ~builtin_names script in
   let bodiless = check_stored_patterns index script in
   List.iter

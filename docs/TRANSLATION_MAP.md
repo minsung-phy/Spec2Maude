@@ -42,6 +42,11 @@ variables would get the same name, because they differ only in case (`C`/`c`)
 or one source variable occurs with two Maude sorts, the later one gets a
 `-N` suffix: `C-2`, `C_1-2`. Generated variables follow the same suffix rule;
 the rest of a sequence after its head `x` is `X*-REST`.
+Each use of a rule or clause variable has its binder's type: the elaborator
+may note a use with an equivalent type (`val*` as `instr*` when `val` and
+`instr` have the same cases), and such a note is replaced by the binder's type
+first, so one source variable stays one Maude variable
+(`def.ml:binder_type_script`).
 
 ## 1. Definitions
 

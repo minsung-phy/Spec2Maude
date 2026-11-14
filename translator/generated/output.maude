@@ -2235,9 +2235,9 @@ mod SPEC2MAUDE-GENERATED is
 
   op map-ivbitmaskop : SpectecTerminal SpectecTerminals ~> SpectecTerminals .
 
-  op map-iswizzle-lane : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-iswizzle-lane : SpectecTerminal Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
-  op map-irelaxed-swizzle-lane : SpectecTerminal SpectecTerminals SpectecTerminals ~> SpectecTerminals .
+  op map-irelaxed-swizzle-lane : SpectecTerminal Nat SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
   op map-ivshufflop : SpectecTerminal Nat SpectecTerminals SpectecTerminals SpectecTerminals ~> SpectecTerminals .
 
@@ -5914,14 +5914,14 @@ mod SPEC2MAUDE-GENERATED is
       /\ (lsize(JNN) * M-2) == 128
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-iswizzle-lane(JNN, C_1*, C_2*) .
+      /\ C* := map-iswizzle-lane(JNN, M-2, C_1*, C_2*) .
 
   ceq ivswizzlop-irelaxed-swizzle-lane-(_X_(JNN, M-2), V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
       /\ (lsize(JNN) * M-2) == 128
       /\ C_1* := lanes-(_X_(JNN, M-2), V_1)
       /\ C_2* := lanes-(_X_(JNN, M-2), V_2)
-      /\ C* := map-irelaxed-swizzle-lane(JNN, C_1*, C_2*) .
+      /\ C* := map-irelaxed-swizzle-lane(JNN, M-2, C_1*, C_2*) .
 
   ceq ivshufflop-(_X_(JNN, M-2), I*, V_1, V_2) = inv-lanes-(_X_(JNN, M-2), C*)
     if typecheck(JNN, Jnn)
@@ -8718,13 +8718,13 @@ mod SPEC2MAUDE-GENERATED is
 
   eq map-ivbitmaskop(JNN, (# C_1-2) C_1*-REST) = (# ilt-(lsizenn(JNN), S, C_1-2, 0)) map-ivbitmaskop(JNN, C_1*-REST) .
 
-  eq map-iswizzle-lane(JNN, C_1*, nil) = nil .
+  eq map-iswizzle-lane(JNN, M-2, C_1*, nil) = nil .
 
-  eq map-iswizzle-lane(JNN, C_1*, (# C_2-2) C_2*-REST) = (# iswizzle-lane-(lsizenn(JNN), C_1*, C_2-2)) map-iswizzle-lane(JNN, C_1*, C_2*-REST) .
+  eq map-iswizzle-lane(JNN, M-2, C_1*, (# C_2-2) C_2*-REST) = (# iswizzle-lane-(lsizenn(JNN), C_1*, C_2-2)) map-iswizzle-lane(JNN, M-2, C_1*, C_2*-REST) .
 
-  eq map-irelaxed-swizzle-lane(JNN, C_1*, nil) = nil .
+  eq map-irelaxed-swizzle-lane(JNN, M-2, C_1*, nil) = nil .
 
-  eq map-irelaxed-swizzle-lane(JNN, C_1*, (# C_2-2) C_2*-REST) = (# irelaxed-swizzle-lane-(lsizenn(JNN), C_1*, C_2-2)) map-irelaxed-swizzle-lane(JNN, C_1*, C_2*-REST) .
+  eq map-irelaxed-swizzle-lane(JNN, M-2, C_1*, (# C_2-2) C_2*-REST) = (# irelaxed-swizzle-lane-(lsizenn(JNN), C_1*, C_2-2)) map-irelaxed-swizzle-lane(JNN, M-2, C_1*, C_2*-REST) .
 
   eq map-ivshufflop(JNN, M-2, C_1*, C_2*, nil) = nil .
 
