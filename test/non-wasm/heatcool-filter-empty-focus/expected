@@ -1,0 +1,3 @@
+search in SPEC2MAUDE-GENERATED : Step(0 ; ONE) =>! X:Step-Request .
+X:Step-Request --> 0 ; ONE TWO
+X:Step-Request --> 0 ; TWO ONE

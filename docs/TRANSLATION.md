@@ -403,7 +403,7 @@ A hint makes explicit a boundary that is hard to translate directly; it is not p
 | `maude_subsort "T"` | Subsort relation between the marked source types. A wrong target or a cycle is rejected. |
 | `maude_array` (record field) | Stores this sequence field of a monomorphic record type as a size + prelude `ARRAY` (default value 0). Field access is limited to length, element and range reads, and range and whole writes; construction is limited to `0^n`, `s 0^n`, and lists. Other uses are rejected. 0s in the elements are not stored, so the element type must contain the number 0. This condition is not checked (it holds for Wasm `byte`). |
 | `maude_map` (record field, function) | Field: stores this sequence field of a monomorphic record type as a size + prelude `MAP` (an entry at every index). Field access is limited to length and element reads and element, range (`map-write-range`), and whole writes and extension `=++` (`map-append`); construction is limited to lists, `e.F s`, and record `++`. Function: the result is a maude_map field, and calls are used only for length and element reads. Other uses are rejected. |
-| `k_heatcool`, `k_heatcool "x*"` (rule) | Translates a rule with execution premises by heating (a rule) and cooling (equations), split/plug of K book §5.4.5. With `"x*"`, the rule is a sequence context whose hole is the conclusion's sequence variable `x*`, and its relation gets `identifyFocus` rules. The applicability conditions are in [scope](#k_heatcool-scope) below. |
+| `k_heatcool`, `k_heatcool "v_1 ... v_k"` (rule) | Translates a rule with execution premises by heating (a rule) and cooling (equations), split/plug of K book §5.4.5. With `"v_1 ... v_k"`, the rule is a sequence context: the named consecutive variables of the conclusion input sequence (the group) are matched as one variable, the hole is the group variable that the execution premise steps, and its relation gets `identifyFocus` rules. The applicability conditions are in [scope](#k_heatcool-scope) below. |
 | `maude_kind` | Declares the result of a function with the partial arrow `~>`. A general function without this hint is declared with `->`. A function that contains a case premise check is also `~>` ([value construction and type constraints](#value-construction-and-type-constraints)). |
 | `maude_rule` | Translates a function that needs a rewrite premise to a request/rule. It keeps the source result and the possible branches. |
 | `inverse $g` | Obtains a missing argument with the declared inverse function g and rechecks the pattern and the forward result. The argument order and signature are checked. |
@@ -553,13 +553,27 @@ eq  [r-cool] : c_k' ~> hole_k = C' .                                  --- coolin
 - Request sorts and return sorts are distinguished, and the hole argument of `_~>_` is `[frozen (2)]`.
 - ElsePr and IterPr in a hinted rule and rewrite-backed expressions are Unsupported with a diagnostic.
 
-**Sequence context.** `hint(k_heatcool "x*")` names the hole `x*`: the variable of the conclusion input sequence that
-the execution premise steps. The rule
-`C[l_1 ... l_m x* r_1 ... r_n] ~> C'[l_1 ... l_m x'* r_1 ... r_n]  -- R: ...x*... ~> ...x'*...`
-is a sequence context with context variables `l_i`, `r_j`. The translator checks that `x*` occurs once in one
-sequence of the conclusion input and is the input sequence of the rule's one execution premise; otherwise it reports
-the hint as Unsupported. In Wasm, `Step/ctxt-instrs` (`z; val* instr* instr_1*`, hole `instr*`, 1.0 and 2.0:
-`admininstr*`) is the only sequence context. A relation has at most one.
+**Sequence context.** `hint(k_heatcool "v_1 ... v_k")` names the group: consecutive variables of the conclusion
+input sequence. For the rule
+`C[a l_1 ... l_m x* r_1 ... r_n b] ~> C'[a l_1 ... l_m x'* r_1 ... r_n b]  -- R: ...x*... ~> ...x'*...`
+with group `l_1 ... l_m x* r_1 ... r_n`, the hole `x*` is the group variable that is the input sequence of the rule's
+one execution premise; `l_i`, `r_j` are the slots that `identifyFocus` returns. The parts `a`, `b` outside the group
+need not be variables and stay in the heating pattern, matched by Maude as written. The translator checks that the
+group is one run of variables in one sequence of the conclusion input and contains exactly one input sequence of the
+execution premise; otherwise it reports the hint as Unsupported. The hint chooses only where the sequence is split
+(by the heating match or by `identifyFocus`); every source decomposition is still one match. In Wasm,
+`Step/ctxt-instrs` groups the whole sequence, `"val* instr* instr_1*"` (1.0 and 2.0:
+`"val* admininstr* admininstr_1*"`), and is the only sequence context. A relation has at most one.
+
+**Filter.** A premise `-- if x =/= eps` over context variables `x` (sequence parts that are typed-list variables),
+combined by `/\` and `\/`, stays a condition of the heating rule. It also gives a filter on the group, tested before
+`identifyFocus`: one equation per disjunct of its disjunctive normal form, in which the disjunct's group variables
+have the nonempty list sort (`VAL+ : NeValList` for `val*`) and the others stay possibly empty. The hole is nonempty
+in the filter when every focus pattern has a part that is not of an iteration type, so that `identifyFocus` never
+returns an empty focus (`hintd.ml:has_element`); otherwise it stays possibly empty. A filter equation only says that
+some split of the group may satisfy the premise, so the filter is a necessary condition: it removes the
+`identifyFocus` search on a group that no split can satisfy (in Wasm, a one-element sequence), and the premise itself
+still decides the split that `identifyFocus` returns.
 
 The relation of a sequence context gets `identifyFocus`, which finds a part of the sequence that the relation can
 step:
@@ -658,17 +672,21 @@ rule Step/ctxt-instrs:
   z; val* instr* instr_1*  ~>  z'; val* instr'* instr_1*
   -- Step: z; instr* ~> z'; instr'*
   -- if (val* =/= eps \/ instr_1* =/= eps)
-  hint(k_heatcool "instr*")
+  hint(k_heatcool "val* instr* instr_1*")
 ```
 
 ```maude
+op step-ctxt-instrs-filter : InstrList -> Bool .
+eq step-ctxt-instrs-filter(VAL+ (INSTR+ INSTR_1*)) = true .
+eq step-ctxt-instrs-filter(VAL* (INSTR+ INSTR_1+)) = true .
 crl [step-ctxt-instrs-heat] : Step(Z ; INSTRS) => Step(Z ; INSTR*) ~> hole-Step-ctxt-instrs(VAL*, INSTR_1*)
-  if identifyFocus(Z ; INSTRS) => { VAL* | (Z ; INSTR*) | INSTR_1* }
+  if step-ctxt-instrs-filter(INSTRS) = true
+    /\ identifyFocus(Z ; INSTRS) => { VAL* | (Z ; INSTR*) | INSTR_1* }
     /\ _or_(VAL* =/= nil, INSTR_1* =/= nil) .
 eq [step-ctxt-instrs-cool] : (Z' ; INSTR'*) ~> hole-Step-ctxt-instrs(VAL*, INSTR_1*) = Z' ; (VAL* (INSTR'* INSTR_1*)) .
 ```
 
-The whole sequence `INSTRS` is named after its element type. Some `identifyFocus` rules:
+The group `INSTRS` is a generated variable named after the hole's element type (`instr*` → `INSTRS`). Some `identifyFocus` rules:
 
 ```maude
 rl [focus-nop] : identifyFocus(Z ; (VAL* (NOP INSTR_1*))) => { VAL* | (Z ; NOP) | INSTR_1* } .

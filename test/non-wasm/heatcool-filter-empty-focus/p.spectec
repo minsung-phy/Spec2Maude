@@ -1,0 +1,23 @@
+;; Step_pure/grow steps the empty sequence, so identifyFocus can focus on eps:
+;; the filter keeps the hole instr* possibly empty, and ONE alone still heats.
+
+syntax instr hint(maude_sort) = ONE | TWO | FLIP
+syntax val hint(maude_sort) hint(maude_subsort "instr") = ONE | TWO
+syntax config = nat; instr*
+
+relation Step: config ~> config
+relation Step_pure: instr* ~> instr*
+
+rule Step_pure/grow:
+  eps ~> TWO
+
+rule Step/pure:
+  z; instr* ~> z; instr'*
+  -- Step_pure: instr* ~> instr'*
+  hint(k_heatcool)
+
+rule Step/ctxt:
+  z; val* instr* instr_1* ~> z'; val* instr'* instr_1*
+  -- Step: z; instr* ~> z'; instr'*
+  -- if val* =/= eps \/ instr_1* =/= eps
+  hint(k_heatcool "val* instr* instr_1*")

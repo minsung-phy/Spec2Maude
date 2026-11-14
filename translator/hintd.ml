@@ -7,8 +7,9 @@
  *   hint(maude_map) on a record field store that sequence field as a size and
  *   a prelude ARRAY or MAP.
  * Part 2: hint(k_heatcool). The hinted rules are checked against the shapes
- *   that Heatcool supports. A rule whose hint names a hole,
- *   hint(k_heatcool "x*"), is a sequence context and gets its focus patterns
+ *   that Heatcool supports. A rule whose hint names a group of sequence
+ *   variables, hint(k_heatcool "l* x* r*"), is a sequence context and gets
+ *   its focus patterns
  *   (TRANSLATION_MAP.md, section 2). *)
 
 open Util.Source
@@ -633,10 +634,16 @@ type focus_pattern =
   ; bridges : bridge list
   }
 
-(* A sequence context, hint(k_heatcool "x*") on
-     C[l_1 ... l_m x* r_1 ... r_n] ~> C'[l_1 ... l_m x'* r_1 ... r_n]
+(* A sequence context, hint(k_heatcool "l_1 ... l_m x* r_1 ... r_n") on
+     C[a l_1 ... l_m x* r_1 ... r_n b] ~> C'[a l_1 ... l_m x'* r_1 ... r_n b]
      -- R: ...x*... ~> ...x'*...
-   with the hole x* and the context variables l_i and r_j. *)
+   The hint names the group, a run of variables of the conclusion input
+   sequence that the heating matches as one variable; identifyFocus splits it.
+   The hole x* is the group variable that is the premise's input sequence;
+   l_i and r_j are the other group variables. The parts a and b outside the
+   group stay in the heating pattern. filters are the alternatives of the
+   premises -- if x =/= eps (combined by /\ and \/) as sets of nonempty
+   group variables; the premises themselves stay in the heating rule. *)
 type context =
   { source : relation
   ; ordinal : int
@@ -645,7 +652,9 @@ type context =
   ; left : (id * typ) list
   ; hole : id * typ
   ; right : (id * typ) list
+  ; sequence : typ
   ; frame : frame
+  ; filters : (id * typ) list list
   ; patterns : focus_pattern list
   }
 
@@ -653,7 +662,7 @@ type heatcool =
   { source : relation
   ; ordinal : int
   ; rule : rule
-  ; hole : id option  (* x* of hint(k_heatcool "x*") *)
+  ; group : id list option  (* the variables of hint(k_heatcool "...") *)
   }
 
 let unsupported at reason =
@@ -667,13 +676,18 @@ let unique at absent ambiguous = function
 let context_hint values =
   values |> List.filter (fun hint -> hint.hintid.it = "k_heatcool")
 
-(* hint(k_heatcool) or hint(k_heatcool "x*"), where x* names the hole: the
-   conclusion's sequence variable that the execution premise steps. *)
-let heatcool_hole hint =
+(* hint(k_heatcool) or hint(k_heatcool "v_1 ... v_k"), where v_1 ... v_k name
+   the group: consecutive variables of the conclusion's input sequence. *)
+let heatcool_group hint =
+  let at = hint.hintexp.at in
   match hint.hintexp.it with
   | El.Ast.SeqE [] -> None
-  | El.Ast.TextE name -> Some (name $ hint.hintexp.at)
-  | _ -> unsupported hint.hintexp.at "expects no argument or a variable name"
+  | El.Ast.TextE text ->
+      begin match String.split_on_char ' ' text |> List.filter ((<>) "") with
+      | [] -> unsupported at "expects variable names"
+      | names -> Some (List.map (fun name -> name $ at) names)
+      end
+  | _ -> unsupported at "expects no argument or variable names"
 
 let find_relation relations id at =
   relations
@@ -867,6 +881,15 @@ let focus_patterns (metadata : t) execution_input_count contexts
   in
   visit [] [] context.inner_relation
 
+(* Whether every sequence that a focus pattern matches has an element: one of
+   its parts is not of an iteration type. *)
+let has_element (metadata : t) (pattern : focus_pattern) =
+  pattern.parts
+  |> List.exists (fun part ->
+       match (reduce_typ metadata.type_env part.note).it with
+       | IterT _ -> false
+       | _ -> true)
+
 let scan_heatcool (metadata : t) execution_input_count =
   metadata.context_hints
   |> List.filter_map (fun (relation_id, rule_id, values, hintdef) ->
@@ -875,7 +898,7 @@ let scan_heatcool (metadata : t) execution_input_count =
        | _ :: _ :: _ -> unsupported hintdef.at
            "rule has more than one k_heatcool hint"
        | [hint] ->
-           let hole = heatcool_hole hint in
+           let group = heatcool_group hint in
            let source = find_relation metadata.relations relation_id hintdef.at in
            let ordinal, rule = find_rule source rule_id hintdef.at in
            let fail reason =
@@ -891,18 +914,42 @@ let scan_heatcool (metadata : t) execution_input_count =
              | IterPr _ -> fail "IterPr is not supported in a heated rule") premises;
            if execution_premises execution_input_count premises = [] then
              fail "hint requires a direct execution RulePr";
-           Some ({source; ordinal; rule; hole} : heatcool))
+           Some ({source; ordinal; rule; group} : heatcool))
 
-(* The sequence context of a rule with hint(k_heatcool "x*"): the conclusion
-   input sequence that contains the hole x*, split around it. The hole must be
-   the input sequence of the rule's one execution premise. *)
+(* The nonempty alternatives of a premise
+     -- if x_1 =/= eps \/ (x_2 =/= eps /\ x_3 =/= eps) ...
+   over context variables: [[x_1]; [x_2; x_3]]. None for any other premise. *)
+let rec nonempty_alternatives context_variable exp =
+  let both combine left right =
+    match nonempty_alternatives context_variable left,
+          nonempty_alternatives context_variable right with
+    | Some left, Some right -> Some (combine left right)
+    | _ -> None
+  in
+  match exp.it with
+  | CmpE (`NeOp, _, variable, {it = ListE []; _})
+  | CmpE (`NeOp, _, {it = ListE []; _}, variable) ->
+      Option.map (fun variable -> [[variable]]) (context_variable variable)
+  | BinE (`OrOp, _, left, right) -> both (@) left right
+  | BinE (`AndOp, _, left, right) ->
+      both (fun left right ->
+          List.concat_map (fun l -> List.map (fun r -> l @ r) right) left)
+        left right
+  | _ -> None
+
+(* The sequence context of a rule with hint(k_heatcool "v_1 ... v_k"): the
+   conclusion input sequence that contains the group v_1 ... v_k as
+   consecutive parts. The hole is the group variable that is the input
+   sequence of the rule's one execution premise. *)
 let extract_context (metadata : t) execution_input_count (heated : heatcool) =
-  match heated.hole with
+  match heated.group with
   | None -> None
-  | Some hole ->
+  | Some group ->
       let {source = relation; ordinal; rule; _} = heated in
       let RuleD (_, quants, _, head, premises) = rule.it in
-      let fail reason = unsupported hole.at ("hole `" ^ hole.it ^ "` " ^ reason) in
+      let names = String.concat " " (List.map (fun name -> name.it) group) in
+      let at = (List.hd group).at in
+      let fail reason = unsupported at ("group `" ^ names ^ "` " ^ reason) in
       let inputs =
         relation_inputs execution_input_count relation relation.mixop head rule.at
       in
@@ -914,43 +961,96 @@ let extract_context (metadata : t) execution_input_count (heated : heatcool) =
             relation_inputs execution_input_count inner inner_mixop inner_head rule.at
         | _ -> fail "requires exactly one execution premise"
       in
-      let is_hole exp = source_name exp = Some hole.it in
+      let in_group exp =
+        match source_name exp with
+        | Some name -> List.exists (fun member -> member.it = name) group
+        | None -> false
+      in
       let subjects owner exps =
         List.concat_map (sequence_subjects metadata owner) exps
       in
       let enclosing owner =
         subjects owner inputs
-        |> List.filter (fun subject -> List.exists is_hole (sequence_parts subject))
+        |> List.filter (fun subject -> List.exists in_group (sequence_parts subject))
         |> List.map (fun subject -> subject, owner)
       in
       let subject, owner =
         match List.concat_map enclosing metadata.annotated with
         | [found] -> found
-        | [] -> fail "is not a variable of a sequence in the conclusion input"
+        | [] -> fail "is not in a sequence of the conclusion input"
         | _ -> fail "occurs in more than one sequence of the conclusion input"
       in
-      if not (List.exists is_hole (subjects owner inner_inputs)) then
-        fail "is not the input sequence of the execution premise";
-      let variable exp =
-        match source_name exp with
-        | Some name -> quant_type quants name rule.at
-        | None -> fail "has a context part that is not a variable"
+      let rec run members parts =
+        match members, parts with
+        | [], rest -> Some rest
+        | member :: members, part :: parts
+          when source_name part = Some member.it -> run members parts
+        | _ -> None
+      in
+      let rec split before parts =
+        match run group parts, parts with
+        | Some after, _ -> List.rev before, after
+        | None, part :: parts -> split (part :: before) parts
+        | None, [] -> fail "is not a run of consecutive parts of its sequence"
+      in
+      let parts = sequence_parts subject in
+      let before, after = split [] parts in
+      if List.length (List.filter in_group parts) <> List.length group then
+        fail "names a part more than once";
+      let premise_sequences =
+        subjects owner inner_inputs |> List.filter_map source_name
       in
       let rec around left = function
-        | part :: right when is_hole part ->
-            if List.exists is_hole right then
-              fail "occurs more than once in its sequence";
-            List.rev left, part, right
-        | part :: right -> around (part :: left) right
-        | [] -> fail "is not a part of its sequence"
+        | member :: right when List.mem member.it premise_sequences ->
+            if List.exists (fun other -> List.mem other.it premise_sequences) right
+            then fail "has more than one input sequence of the execution premise";
+            List.rev left, member, right
+        | member :: right -> around (member :: left) right
+        | [] -> fail "has no input sequence of the execution premise"
       in
-      let left, hole, right = around [] (sequence_parts subject) in
+      let left, hole, right = around [] group in
+      let variable name = quant_type quants name.it rule.at in
+      (* Context variables: the sequence parts that are typed-list variables. *)
+      let context_variables =
+        before @ after
+        |> List.filter_map source_name
+        |> List.map (fun name -> name $ at)
+        |> (@) group
+        |> List.map variable
+        |> List.filter (fun (_, typ) ->
+             match typ.it with
+             | IterT (_, List) -> (sequence_representation metadata typ).typed
+             | _ -> false)
+      in
+      let context_variable exp =
+        match exp.it, source_name exp with
+        | (VarE _ | IterE _), Some name ->
+            List.find_opt (fun (id, _) -> id.it = name) context_variables
+        | _ -> None
+      in
+      (* Each premise's alternatives combined with those of the earlier ones. *)
+      let filters =
+        List.fold_left
+          (fun filters premise ->
+            match premise.it with
+            | IfPr exp ->
+                begin match nonempty_alternatives context_variable exp with
+                | Some these ->
+                    List.concat_map (fun filter -> List.map (( @ ) filter) these)
+                      filters
+                | None -> filters
+                end
+            | RulePr _ | LetPr _ | ElsePr | IterPr _ -> filters)
+          [[]] premises
+      in
       Some
         ({ source = relation; ordinal; rule; inner_relation
          ; left = List.map variable left
          ; hole = variable hole
          ; right = List.map variable right
+         ; sequence = subject.note
          ; frame = sequence_frame subject inputs rule.at
+         ; filters
          ; patterns = []
          }, owner)
 

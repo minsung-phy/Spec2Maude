@@ -157,7 +157,7 @@ earlier rules. In the WebAssembly specification, no relation has both
 | --- | --- | --- |
 | `hint(maude_subsume)` on a rule of a computed relation | The rule defines a separate check operator. A premise whose outputs are already known calls this check (section 3). | `reld.ml:translate` |
 | `hint(maude_trans "C" …)` on a transitivity rule of a checked relation | The other rules are emitted under a separate operator `r̂-step`, and `ceq r̂(xs) = true if r̂-step(xs)` links the two. The transitivity rule becomes `ceq r̂(x, z) = true if y` ranges over the listed constructors `∧ typecheck(y, t) ∧ y =/= x ∧ y =/= z ∧ r̂-step(x, y) ∧ r̂(y, z)`, where `t` is the type of `y`. | `reld.ml:translate_trans`, `reld.ml:step_bridge` |
-| `hint(k_heatcool)` or `hint(k_heatcool "x*")` on a rule with an execution premise | Heating and cooling, as in "Rules with `hint(k_heatcool)`" below; with `"x*"` the rule is also a sequence context. | `heatcool.ml:translate_relation`, `hintd.ml:scan_heatcool` |
+| `hint(k_heatcool)` or `hint(k_heatcool "v_1 ... v_k")` on a rule with an execution premise | Heating and cooling, as in "Rules with `hint(k_heatcool)`" below; with `"v_1 ... v_k"` the rule is also a sequence context. | `heatcool.ml:translate_relation`, `hintd.ml:scan_heatcool` |
 
 ### Rules with `hint(k_heatcool)`
 
@@ -179,17 +179,23 @@ lowercase rule name with `-heat`, `-next`, `-cool`.
 The start condition only prunes heating: the inner rules check all their
 premises when the request executes.
 
-A rule with `hint(k_heatcool "x*")` is a sequence context
-`C[l_1 … l_m x* r_1 … r_n] ~> C'[l_1 … l_m x'* r_1 … r_n]`: `x*` must occur
-once in one sequence of the conclusion input and be the input sequence of the
-rule's one execution premise (`hintd.ml:extract_context`). A relation has at
+A rule with `hint(k_heatcool "l_1 … l_m x* r_1 … r_n")` is a sequence context
+`C[a l_1 … l_m x* r_1 … r_n b] ~> C'[a l_1 … l_m x'* r_1 … r_n b]`: the named
+group must be one run of variables in one sequence of the conclusion input and
+contain exactly one input sequence of the rule's one execution premise, the
+hole `x*` (`hintd.ml:extract_context`). The parts `a`, `b` stay in the heating
+pattern. Premises `-- if x =/= eps` over context variables (with `/\`, `\/`)
+stay conditions and give a filter on the group, one equation per disjunct with
+its group variables of the nonempty list sort, the hole nonempty when every
+focus pattern has an element (`hintd.ml:nonempty_alternatives`,
+`hintd.ml:has_element`). A relation has at
 most one. Its relation gets `identifyFocus`:
 
 | Statement | Maude | Code |
 | --- | --- | --- |
 | Declarations | `op identifyFocus : Config -> FocusSearch [frozen (1)] .` `op {_\|…\|_} : L_1 … L_m Config R_1 … R_n -> FocusTarget [ctor] .` (one slot per context variable, of its sort) | `heatcool.ml:declarations` |
 | One rule per rule `r'` of the relation, except the sequence context | `rl [focus-r'] : identifyFocus(⟦C[l p r]⟧) => {l \| ⟦C[p]⟧ \| r} .` with `p` the input sequence of `r'`. A rule whose only premise steps another execution relation is a bridge: the rules of that relation give the patterns, unified into its input (`heatcool.ml:lift_bridge`). Only the premises that fix where `p` ends are kept, and no execution premise (`heatcool.ml:focus_premises`). | `heatcool.ml:translate_pattern`, `hintd.ml:focus_patterns` |
-| Heating | `crl [r-heat] : r̂(⟦C[XS]⟧) => inner(⟦C[x]⟧) ~> hole-r(l, r) if identifyFocus(⟦C[XS]⟧) => {l \| ⟦C[x]⟧ \| r} ∧ ⟦other premises⟧ .` with the rule's own variables as slots; `XS` is named after the element type of `x*` (`INSTRS`). | `heatcool.ml:context_transitions` |
+| Heating | `crl [r-heat] : r̂(⟦C[a XS b]⟧) => inner(⟦C[x]⟧) ~> hole-r(a, l, r, b) if filter(XS) = true ∧ identifyFocus(⟦C[XS]⟧) => {l \| ⟦C[x]⟧ \| r} ∧ ⟦other premises⟧ .` with `eq filter(l x r) = true .` per disjunct of the nonempty premises with the rule's own variables as slots; `XS` replaces the group and is named after the element type of `x*` (`INSTRS`); the hole keeps the variables that the cooling needs. | `heatcool.ml:context_transitions` |
 | Cooling | `eq [r-cool] : ⟦outs'⟧ ~> hole-r(l, r) = ⟦C'[l x' r]⟧ .` | `heatcool.ml:context_transitions` |
 
 `identifyFocus` is defined by rules because one sequence may have several foci
@@ -501,7 +507,7 @@ the rule, clause, or iteration, naming the definition and the reason. An omitted
 | An `ElsePr` execution rule with no earlier rule | rejected | `reld.ml:lower_execution_rule` |
 | `ElsePr` in a rule of a computed or checked relation, in the premises of a type, or in an `IterPr` body | rejected | `reld.ml:translate_rule`, `prem.ml:translate_eq_conditions`, `iter_helpers.ml:premise_conditions` |
 | `ElsePr` or `IterPr` in a `k_heatcool` rule, a rule whose shape does not fit section 2, and a rewrite condition in an `identifyFocusRule` equation | rejected | `hintd.ml:scan_heatcool`, `hintd.ml:scan_contexts`, `heatcool.ml` |
-| A `k_heatcool "x*"` hole that is not a variable of one conclusion input sequence, occurs more than once, or is not the input sequence of the rule's one execution premise; a context part that is not a variable; a relation with more than one sequence context | rejected | `hintd.ml:heatcool_hole`, `hintd.ml:extract_context`, `heatcool.ml:sequence_context` |
+| A `k_heatcool "v_1 ... v_k"` group that is not one run of variables of one conclusion input sequence, names a part more than once, or does not contain exactly one input sequence of the rule's one execution premise; a relation with more than one sequence context | rejected | `hintd.ml:heatcool_group`, `hintd.ml:extract_context`, `heatcool.ml:sequence_context` |
 | An `ElsePr` execution rule whose earlier rule needs an `r̂-r-enabled` predicate but has a rewrite condition | rejected | `reld.ml:helper_conditions` |
 | A call of a `maude_rule` function from a function without `maude_rule`, or in an argument or result of a `maude_rule` clause | rejected | `decd.ml:equation_clause`, `decd.ml:translate_rule_clause` |
 | `ElsePr` or a `maude_rule` call in the premises before a membership choice | rejected | `decd.ml:translate_choice_clause` |

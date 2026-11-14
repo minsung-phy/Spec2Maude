@@ -1,0 +1,26 @@
+;; val* =/= eps \/ instr_1* =/= eps stays a condition of the one heating rule
+;; and gives one filter equation per disjunct: val+ or instr_1+ nonempty.
+
+syntax instr hint(maude_sort) = ONE | TWO | FLIP | MARK
+syntax val hint(maude_sort) hint(maude_subsort "instr") = ONE | TWO
+syntax config = nat; instr*
+
+relation Step: config ~> config
+relation Step_pure: instr* ~> instr*
+
+rule Step_pure/flip-one:
+  ONE FLIP ~> TWO
+
+rule Step_pure/flip-two:
+  TWO FLIP ~> ONE
+
+rule Step/pure:
+  z; instr* ~> z; instr'*
+  -- Step_pure: instr* ~> instr'*
+  hint(k_heatcool)
+
+rule Step/ctxt:
+  z; val* instr* instr_1* ~> z'; val* instr'* instr_1*
+  -- Step: z; instr* ~> z'; instr'*
+  -- if val* =/= eps \/ instr_1* =/= eps
+  hint(k_heatcool "val* instr* instr_1*")

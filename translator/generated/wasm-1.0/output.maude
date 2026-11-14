@@ -17,9 +17,9 @@ mod SPEC2MAUDE-GENERATED is
 
   sort FocusTarget .
 
-  sort Hole-Step-ctxt-instrs .
-
   subsort FocusTarget < FocusSearch .
+
+  sort Hole-Step-ctxt-instrs .
 
   sort Hole-Step-pure .
 
@@ -709,6 +709,8 @@ mod SPEC2MAUDE-GENERATED is
 
   op _~>_ : Step-Request Hole-Step-ctxt-instrs -> Step-Request [frozen (2)] .
 
+  op step-ctxt-instrs-filter : AdmininstrList -> Bool .
+
   op hole-Step-pure : SpectecTerminal -> Hole-Step-pure [ctor] .
 
   op _~>_ : Step-pure-Request Hole-Step-pure -> Step-Request [frozen (2)] .
@@ -852,6 +854,10 @@ mod SPEC2MAUDE-GENERATED is
   vars LEFT RIGHT : Record .
 
   vars ADMININSTR* RESULT ADMININSTR_1* ADMININSTRS ADMININSTR'* ADMININSTR''* : AdmininstrList .
+
+  var VAL+ : NeValList .
+
+  vars ADMININSTR+ ADMININSTR_1+ : NeAdmininstrList .
 
   eq valLift(nil) = nil .
 
@@ -2174,8 +2180,13 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-memory-grow-succeed] : identifyFocus(Z ; (VAL* (CONST(I32, # N-3) ((MEMORY.GROW) ADMININSTR_1*)))) => { VAL* | (Z ; (CONST(I32, # N-3) (MEMORY.GROW))) | ADMININSTR_1* } .
 
+  eq step-ctxt-instrs-filter(VAL+ (ADMININSTR+ ADMININSTR_1*)) = true .
+
+  eq step-ctxt-instrs-filter(VAL* (ADMININSTR+ ADMININSTR_1+)) = true .
+
   crl [step-ctxt-instrs-heat] : Step(Z ; ADMININSTRS) => Step(Z ; ADMININSTR*) ~> hole-Step-ctxt-instrs(VAL*, ADMININSTR_1*)
-    if identifyFocus(Z ; ADMININSTRS) => { VAL* | (Z ; ADMININSTR*) | ADMININSTR_1* }
+    if step-ctxt-instrs-filter(ADMININSTRS) = true
+      /\ identifyFocus(Z ; ADMININSTRS) => { VAL* | (Z ; ADMININSTR*) | ADMININSTR_1* }
       /\ _or_(VAL* =/= nil, ADMININSTR_1* =/= nil) .
 
   eq [step-ctxt-instrs-cool] : (Z' ; ADMININSTR'*) ~> hole-Step-ctxt-instrs(VAL*, ADMININSTR_1*) = Z' ; (VAL* (ADMININSTR'* ADMININSTR_1*)) .

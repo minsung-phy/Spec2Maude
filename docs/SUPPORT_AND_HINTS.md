@@ -75,7 +75,7 @@ dune exec bin/spec2maude.exe -- -o OUT/output.maude --builtins BUILTIN.maude... 
 | `maude_subsume` | `maude_compute` relation의 규칙 | 그 규칙의 결론을 계산과 별도의 검사 연산자로 번역한다. | [코드] |
 | `maude_trans "C" ...` | `maude_check` relation의 이행 규칙 | 가운데 항을 나열한 생성자들에서만 찾는다. | [코드] |
 | `k_heatcool` | 실행 premise(`~>`, `~>*`)가 있는 규칙 | heating(rule)과 cooling(등식)으로 번역한다. 실행 premise가 있는 규칙에는 반드시 붙인다. | [실행] |
-| `k_heatcool "x*"` | 위와 같음 | 추가로 이 규칙을 sequence context로 본다. `x*`는 결론 입력 sequence 안의 변수이고 실행 premise의 입력이어야 한다. relation에 `identifyFocus` 규칙이 생긴다 (6절). | [실행] |
+| `k_heatcool "v_1 ... v_k"` | 위와 같음 | 추가로 이 규칙을 sequence context로 본다. `v_1 ... v_k`는 결론 입력 sequence에서 하나의 변수로 묶어 매칭할 연속된 변수들(그룹)이고, 그중 정확히 하나(hole)가 실행 premise의 입력 sequence여야 한다. 그룹 밖 부분은 heating 패턴에 그대로 남는다. `-- if x =/= eps` (`/\`, `\/`) premise는 heating rule의 조건으로 남고, hint 없이 `identifyFocus` 앞의 filter equation들도 만든다 (`val* =/= eps \/ instr_1* =/= eps`: `filter(VAL+ INSTR+ INSTR_1*)`, `filter(VAL* INSTR+ INSTR_1+)`). relation에 `identifyFocus` 규칙이 생긴다 (6절). | [실행] |
 
 ## 5. 지원 범위: 거부되는 모양
 
@@ -100,7 +100,7 @@ dune exec bin/spec2maude.exe -- -o OUT/output.maude --builtins BUILTIN.maude... 
 
 ## 6. sequence context와 identifyFocus
 
-`hint(k_heatcool "x*")`가 붙은 규칙
+`hint(k_heatcool "l* x* r*")`가 붙은 규칙 (그룹 `l* x* r*`, hole `x*`)
 
 ```
 rule R/ctxt:

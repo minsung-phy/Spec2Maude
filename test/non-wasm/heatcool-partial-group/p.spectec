@@ -1,0 +1,27 @@
+;; hint(k_heatcool "instr* instr_1*") groups only part of the sequence: MARK
+;; and val* stay in the heating pattern. The premise val* =/= eps /\ instr_1* =/= eps
+;; stays a condition; the filter uses only the group part, instr_1+.
+
+syntax instr hint(maude_sort) = ONE | TWO | FLIP | MARK
+syntax val hint(maude_sort) hint(maude_subsort "instr") = ONE | TWO
+syntax config = nat; instr*
+
+relation Step: config ~> config
+relation Step_pure: instr* ~> instr*
+
+rule Step_pure/flip-one:
+  ONE FLIP ~> TWO
+
+rule Step_pure/flip-two:
+  TWO FLIP ~> ONE
+
+rule Step/pure:
+  z; instr* ~> z; instr'*
+  -- Step_pure: instr* ~> instr'*
+  hint(k_heatcool)
+
+rule Step/ctxt:
+  z; MARK val* instr* instr_1* ~> z'; MARK val* instr'* instr_1*
+  -- Step: z; instr* ~> z'; instr'*
+  -- if val* =/= eps /\ instr_1* =/= eps
+  hint(k_heatcool "instr* instr_1*")

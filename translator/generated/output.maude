@@ -25,9 +25,9 @@ mod SPEC2MAUDE-GENERATED is
 
   sort FocusTarget .
 
-  sort Hole-Step-ctxt-instrs .
-
   subsort FocusTarget < FocusSearch .
+
+  sort Hole-Step-ctxt-instrs .
 
   sort Hole-Step-pure .
 
@@ -1969,6 +1969,8 @@ mod SPEC2MAUDE-GENERATED is
 
   op _~>_ : Step-Request Hole-Step-ctxt-instrs -> Step-Request [frozen (2)] .
 
+  op step-ctxt-instrs-filter : InstrList -> Bool .
+
   op hole-Step-pure : SpectecTerminal -> Hole-Step-pure [ctor] .
 
   op _~>_ : Step-pure-Request Hole-Step-pure -> Step-Request [frozen (2)] .
@@ -2410,6 +2412,10 @@ mod SPEC2MAUDE-GENERATED is
   vars INSTR* INSTR*-2 VALUE-16 INSTR_1* INSTR_2* EXPR INSTR'* RESULT-2 CASE-PART3 INSTR_1*-1 INSTR_0* INSTRS INSTR''* INSTR_D* INSTR_E* INSTR*-REST EXPR_G-2 EXPR_T-2 EXPR_F-2 : InstrList .
 
   vars VALUE-20 VAL* VAL'* VAL*-1 VAL_G* VAL*-REST : ValList .
+
+  var VAL+ : NeValList .
+
+  vars INSTR+ INSTR_1+ : NeInstrList .
 
   eq valLift(nil) = nil .
 
@@ -7894,8 +7900,13 @@ mod SPEC2MAUDE-GENERATED is
 
   rl [focus-array-set-oob] : identifyFocus(Z ; (VAL* (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL (ARRAY.SET(X-4) INSTR_1*)))))) => { VAL* | (Z ; (REF.ARRAY-ADDR(A) (CONST(I32, # I) (VAL ARRAY.SET(X-4))))) | INSTR_1* } .
 
+  eq step-ctxt-instrs-filter(VAL+ (INSTR+ INSTR_1*)) = true .
+
+  eq step-ctxt-instrs-filter(VAL* (INSTR+ INSTR_1+)) = true .
+
   crl [step-ctxt-instrs-heat] : Step(Z ; INSTRS) => Step(Z ; INSTR*) ~> hole-Step-ctxt-instrs(VAL*, INSTR_1*)
-    if identifyFocus(Z ; INSTRS) => { VAL* | (Z ; INSTR*) | INSTR_1* }
+    if step-ctxt-instrs-filter(INSTRS) = true
+      /\ identifyFocus(Z ; INSTRS) => { VAL* | (Z ; INSTR*) | INSTR_1* }
       /\ _or_(VAL* =/= nil, INSTR_1* =/= nil) .
 
   eq [step-ctxt-instrs-cool] : (Z' ; INSTR'*) ~> hole-Step-ctxt-instrs(VAL*, INSTR_1*) = Z' ; (VAL* (INSTR'* INSTR_1*)) .

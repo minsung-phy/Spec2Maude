@@ -9,8 +9,9 @@
  *   crl C => R_1(c_1) ~> hole_1 if identifyFocus<Rule>(c_1) .   (otherwise)
  *   eq  c_1' ~> hole_1 = R_2(c_2) ~> hole_2 .   ...
  *   eq  c_k' ~> hole_k = C' .
- * A sequence context, hint(k_heatcool "x*"), heats through identifyFocus,
- * which finds an x* that the inner relation can step inside the sequence.
+ * A sequence context, hint(k_heatcool "l* x* r*"), matches the named group
+ * of its sequence as one variable and heats through identifyFocus, which finds
+ * an x* that the inner relation can step inside the group.
  * identifyFocus is defined by rules, one per rule of the inner relation, since
  * one sequence can be split in several ways (TRANSLATION.md). *)
 
@@ -379,19 +380,13 @@ let declarations index (context : Hintd.context) =
   let name = helper index context in
   let sorts = List.map (fun (_, typ) -> Term.translate_sort index typ) in
   let config_sort = Term.translate_sort index context.frame.config_typ in
-  let request_sort = request_sort index context in
-  let hole = context_hole index context in
-  let hole_sort = String.capitalize_ascii hole in
   [ SortDecl (name "FocusSearch")
   ; SortDecl (name "FocusTarget")
-  ; SortDecl hole_sort
   ; SubsortDecl (name "FocusTarget", name "FocusSearch")
   ; op ~attrs:[Frozen [1]] (name "identifyFocus") [config_sort] (name "FocusSearch")
   ; op ~attrs:[Ctor] (name (target_operator context))
       (sorts context.left @ [config_sort] @ sorts context.right)
       (name "FocusTarget")
-  ; op ~attrs:[Ctor] hole (sorts context.left @ sorts context.right) hole_sort
-  ; op ~attrs:[Frozen [2]] "_~>_" [request_sort; hole_sort] request_sort
   ]
 
 (* One identifyFocus rule per focus pattern: the pattern's input sequence
@@ -426,11 +421,17 @@ let translate_pattern cache index (context : Hintd.context)
   in
   rule ~label:(focus_label index pattern) left right conditions
 
-(* The sequence context rule itself: heat at the focus that identifyFocus
-   finds, and plug the inner result back between the context variables.
-     crl R(C[XS]) => R'(C[x]) ~> hole-R-r(l, r)
-       if identifyFocus(C[XS]) => {l | C[x] | r} /\ ... .
-     eq c' ~> hole-R-r(l, r) = C'[l x' r] .                                 *)
+(* The sequence context rule itself: match the group as one sequence GROUP,
+   heat at the focus that identifyFocus finds in it, and plug the inner result
+   back between the context variables.
+     crl R(C[a GROUP b]) => R'(C[x]) ~> hole-R-r(a, l, r, b)
+       if filter(GROUP) = true /\ identifyFocus(C[GROUP]) => {l | C[x] | r}
+          /\ ... .
+     eq c' ~> hole-R-r(a, l, r, b) = C'[a l x' r b] .
+   The filter has one equation per alternative of the premises -- if x =/= eps,
+   with those group variables nonempty; the premises stay in the rule. Since a
+   filter equation only says that some split of GROUP may satisfy them, the
+   hole is nonempty in it only when every focus pattern has an element. *)
 let context_transitions index (context : Hintd.context) =
   let lowered =
     Reld.lower_execution_rule index context.source.id context.source.params
@@ -440,41 +441,118 @@ let context_transitions index (context : Hintd.context) =
     delegated_condition context.rule.at
       (Prescan.rel_name index context.inner_relation) lowered.conditions
   in
-  let _, rebuild =
+  let sequence, rebuild =
     split_config index context.frame (relation_input index context lowered.left)
       context.rule.at
   in
   let slots = slots index context in
-  (* The whole sequence, named after its element type: INSTRS for instr*. *)
-  let sequence =
-    let typ = snd context.hole in
+  let concat = (Prescan.sequence_representation index context.sequence).concat in
+  (* The parts before and after the group, which is a run of slot variables. *)
+  let group_slots = slots.left @ [slots.focus] @ slots.right in
+  let rec run slots parts =
+    match slots, parts with
+    | [], rest -> Some rest
+    | slot :: slots, Var variable :: parts when same_variable slot variable ->
+        run slots parts
+    | _ -> None
+  in
+  let rec split before parts =
+    match run group_slots parts, parts with
+    | Some after, _ -> List.rev before, after
+    | None, part :: parts -> split (part :: before) parts
+    | None, [] -> unsupported context.rule.at
+        "the group is not a run of its translated sequence"
+  in
+  let before, after = split [] (flatten concat sequence) in
+  let taken =
+    variable_names
+      (List.fold_left condition_variables
+         (term_variables (term_variables [] lowered.left) lowered.right)
+         lowered.conditions)
+  in
+  (* The group, named after the hole's element type: INSTRS for instr*. *)
+  let group =
     let name =
-      match typ.it with
+      match (snd context.hole).it with
       | IterT ({it = VarT (id, _); _}, _) ->
           String.uppercase_ascii (Prescan.sanitize id.it) ^ "S"
       | _ -> "SEQUENCE"
     in
-    let taken =
-      variable_names
-        (List.fold_left condition_variables
-           (term_variables (term_variables [] lowered.left) lowered.right)
-           lowered.conditions)
-    in
     Var (rename_apart taken taken
-           (generated_variable name (Term.translate_sort index typ)))
+           (generated_variable name (Term.translate_sort index context.sequence)))
   in
-  let left = relation_call index context.source [rebuild sequence] in
-  (* The context rule's own variables are the slots: nothing to rename. *)
-  let identify = focus_condition index context (rebuild sequence) in
-  let conditions = schedule_rule_conditions left (identify :: remaining) in
-  let hole =
-    App (context_hole index context,
-         variable_terms slots.left @ variable_terms slots.right)
+  let left =
+    relation_call index context.source
+      [rebuild (Term.sequence_of_typ index context.sequence
+                  (before @ [group] @ after))]
   in
   let label = stage_label index context.source context.ordinal context.rule in
-  [ rule ~label:(label "heat") left (App ("_~>_", [inner_call; hole])) conditions
-  ; Eq (App ("_~>_", [inner_result; hole]), lowered.right, [Label (label "cool")])
+  let filter_name = label "filter" in
+  (* x* as VAL* and, when nonempty, as VAL+ of the nonempty list sort. *)
+  let filter_variable nonempty (id, typ) =
+    let variable = Prescan.source_variable index id typ in
+    if not nonempty then Var variable
+    else
+      let base =
+        if String.ends_with ~suffix:"*" variable.name
+        then String.sub variable.name 0 (String.length variable.name - 1)
+        else variable.name
+      in
+      Var (generated_variable (base ^ "+") ("Ne" ^ variable.sort))
+  in
+  let filter_equation alternative =
+    let focus_nonempty =
+      (Prescan.sequence_representation index (snd context.hole)).typed
+      && List.for_all (Hintd.has_element index.Prescan.sort_metadata)
+           context.patterns
+    in
+    let member variables (id, _) =
+      List.exists (fun ((other : id), _) -> other.it = id.it) variables
+    in
+    let part variable =
+      filter_variable
+        (member alternative variable
+         || (focus_nonempty && member [context.hole] variable))
+        variable
+    in
+    Eq (App (filter_name,
+             [Term.sequence_of_typ index context.sequence
+                (List.map part (context.left @ [context.hole] @ context.right))]),
+        Const "true", [])
+  in
+  let filter_statements, filter_conditions =
+    match context.filters with
+    | [[]] -> [], []
+    | filters ->
+        op filter_name [Term.translate_sort index context.sequence] "Bool"
+        :: List.map filter_equation filters,
+        [EqCondition (EqCond (App (filter_name, [group]), Const "true"))]
+  in
+  (* The context rule's own variables are the slots: nothing to rename. *)
+  let identify = focus_condition index context (rebuild group) in
+  let conditions =
+    filter_conditions @ schedule_rule_conditions left (identify :: remaining)
+  in
+  let needed = term_variables [] lowered.right in
+  let captures =
+    List.fold_left term_variables [] before
+    |> List.rev
+    |> (fun outer -> outer @ slots.left @ slots.right
+                     @ List.rev (List.fold_left term_variables [] after))
+    |> List.filter (fun variable -> List.exists (same_variable variable) needed)
+  in
+  let name = context_hole index context in
+  let hole_sort = String.capitalize_ascii name in
+  let hole = App (name, variable_terms captures) in
+  let request_sort = request_sort index context in
+  [ SortDecl hole_sort
+  ; op ~attrs:[Ctor] name (List.map (fun variable -> variable.sort) captures) hole_sort
+  ; op ~attrs:[Frozen [2]] "_~>_" [request_sort; hole_sort] request_sort
   ]
+  @ filter_statements
+  @ [ rule ~label:(label "heat") left (App ("_~>_", [inner_call; hole])) conditions
+    ; Eq (App ("_~>_", [inner_result; hole]), lowered.right, [Label (label "cool")])
+    ]
 
 let unlabeled attrs =
   List.filter (function Label _ -> false | Owise -> true) attrs

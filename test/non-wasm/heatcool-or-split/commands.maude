@@ -1,0 +1,4 @@
+search in SPEC2MAUDE-GENERATED : Step(0 ; ONE ONE FLIP TWO) =>! X:Step-Request .
+search in SPEC2MAUDE-GENERATED : Step(0 ; ONE FLIP TWO) =>! X:Step-Request .
+search in SPEC2MAUDE-GENERATED : Step(0 ; ONE ONE FLIP) =>! X:Step-Request .
+search in SPEC2MAUDE-GENERATED : Step(0 ; FLIP ONE FLIP) =>! X:Step-Request .
